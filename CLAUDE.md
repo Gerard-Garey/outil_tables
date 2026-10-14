@@ -6,7 +6,7 @@ Ce fichier guide Claude Code (claude.ai/code) dans ce dépôt. Les passages marq
 
 **À ADAPTER** : objet du projet en trois ou quatre phrases ; à qui sont destinés les livrables et ce qui prime (traçabilité, performance, délai…) ; textes ou sources de référence versionnés et celui qui fait foi ; contraintes fortes (taille d'échantillon, volumétrie, plateforme…).
 
-Le dépôt de référence est `https://github.com/<propriétaire>/<dépôt>` (**À ADAPTER**), utilisé depuis le poste local et depuis des sessions cloud. `docs/exigences.md` contient le cahier des charges : le lire avant toute évolution de fond ou de l'interface.
+Le dépôt de référence est `https://github.com/Gerard-Garey/outil_tables`, utilisé depuis le poste local et depuis des sessions cloud. `docs/exigences.md` contient le cahier des charges : le lire avant toute évolution de fond ou de l'interface.
 
 ## Commandes
 
