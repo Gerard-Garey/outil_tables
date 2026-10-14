@@ -28,7 +28,7 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 
 ## Prérequis et commandes
 
-- **R 4.3.1** (CI et références ; poste aligné), R base et packages livrés avec R pour le moteur ; `shiny` pour l'application ; `openxlsx` facultatif pour les fichiers xlsx ; packages de contre-vérification (`survival`, `mgcv`, `WH`, `ELT`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen`) seulement pour régénérer les valeurs externes des tests, hors CI.
+- **R 4.3.1** (CI et références ; poste aligné), packages de priorité `base` seulement pour le moteur (ADR 0002 ; relevé du poste de travail : issue #2) ; `shiny` pour l'application ; `openxlsx` facultatif pour les fichiers xlsx ; packages de contre-vérification (`survival`, `mgcv`, `WH`, `ELT`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen`) seulement pour régénérer les valeurs externes des tests, hors CI.
 - Commandes (lancer l'application, moteur seul, batteries) : à définir par la première branche de travail ; elles seront listées ici et dans `CLAUDE.md`, « Commandes ».
 
 ## Façon de travailler
@@ -69,4 +69,6 @@ gh api -X PUT repos/$R/actions/permissions/workflow -f default_workflow_permissi
 gh api -X POST repos/$R/rulesets --input .github/ruleset-main.json
 ```
 
-Le ruleset est dans `.github/ruleset-main.json`. L'appliquer **après** le premier push sur `main`, qu'il bloque ensuite.
+Le ruleset est dans `.github/ruleset-main.json`. L'appliquer **après** le premier push sur `main`, qu'il bloque ensuite. **Appliqué le 14/10/2026** (id 25116580), avec les autres réglages ci-dessus et les libellés de `.github/creer_labels.sh`.
+
+**Mise à jour du ruleset** (par exemple pour ajouter aux contrôles requis les jobs de tests que la première branche de travail créera dans `ci.yml`) : modifier `.github/ruleset-main.json` (liste `required_status_checks`, un `context` par nom de job), puis `gh api -X PUT repos/$R/rulesets/25116580 --input .github/ruleset-main.json` ; vérifier avec `gh api repos/$R/rulesets/25116580 --jq '.rules[] | select(.type=="required_status_checks")'`. Un job absent de cette liste n'est pas bloquant, même s'il échoue.
