@@ -25,8 +25,8 @@ export const meta = {
 //    CONTROLEE apres chaque tour (tete, amont et ZONES_PROTEGEES inchanges) ;
 //    une violation detectee arrete le workflow. La session principale
 //    verifie en outre git status et git log apres chaque workflow.
-//  - Principe 3 : arret des qu'un constat releve d'expert ou du mainteneur,
-//    ou que deux verifications se contredisent. Questions pour expert : pas
+//  - Principe 3 : arret des qu'un constat releve d'actuary ou du mainteneur,
+//    ou que deux verifications se contredisent. Questions pour actuary : pas
 //    de reprise ; statut 'termine avec questions' seulement si les seules
 //    remontees sont des questions, sinon 'arrete'.
 //  - Principe 4 : au plus une reprise (deux tours coder -> audit).
@@ -45,11 +45,14 @@ const BATTERIES = [
   // 'pytest -q',
 ]
 
-// A ADAPTER : repertoires que ni coder ni audit ne doivent toucher dans un
-// workflow (references de non-regression, documentation de fond : regle 9)
+// Repertoires que ni coder ni audit ne doivent toucher dans un workflow
+// (references de non-regression, documentation de fond : regle 9, tables de
+// reference et jeux simules verses par la session principale)
 const ZONES_PROTEGEES = [
-  // 'tests/reference/',
-  // 'docs/doc/',
+  'tests/reference/',
+  'docs/latex/',
+  'docs/adr/',
+  'inst/extdata/',
 ]
 
 // Consigne commune a tous les agents du workflow (principe 2)
@@ -89,9 +92,9 @@ const entree = lireArgs(typeof args === 'undefined' ? undefined : args)
 const issue = entree.issue
 const consigne = entree.consigne
 
-// Rapport final, complete au fil des phases ; questions pour expert en tete
+// Rapport final, complete au fil des phases ; questions pour actuary en tete
 const rapport = {
-  questions_expert: [],
+  questions_actuary: [],
   issue: issue,
   statut: 'en cours',
   motif_arret: null,
@@ -112,14 +115,14 @@ function arreter(motif) {
 }
 
 function arreterReprise(motif) {
-  const n = rapport.questions_expert.length
-  return arreter(n > 0 ? motif + ' ; ' + n + ' question(s) pour expert en tete du rapport' : motif)
+  const n = rapport.questions_actuary.length
+  return arreter(n > 0 ? motif + ' ; ' + n + ' question(s) pour actuary en tete du rapport' : motif)
 }
 
 function terminerAvecQuestions() {
   rapport.statut = 'termine avec questions'
-  rapport.motif_arret = rapport.questions_expert.length + ' question(s) pour expert, sans reprise'
-  log('Fin avec questions pour expert : ' + rapport.motif_arret)
+  rapport.motif_arret = rapport.questions_actuary.length + ' question(s) pour actuary, sans reprise'
+  log('Fin avec questions pour actuary : ' + rapport.motif_arret)
   return rapport
 }
 
@@ -166,14 +169,14 @@ const SCHEMA_IMPLEMENTATION = {
       items: { type: 'string' }
     },
     commit_propose: { type: 'string', description: 'Message de commit propose, NON execute' },
-    doutes_expert: { type: 'array', items: { type: 'string' } },
+    doutes_actuary: { type: 'array', items: { type: 'string' } },
     decision_requise: {
       type: 'boolean',
-      description: "Vrai si la suite exige expert ou le mainteneur (choix de fond, resultat modifie a viser, acte interdit)"
+      description: "Vrai si la suite exige actuary ou le mainteneur (choix de fond, resultat modifie a viser, acte interdit)"
     },
     motif_decision: { type: 'string' }
   },
-  required: ['fichiers_modifies', 'mesures', 'resultats_modifies', 'surface_documentaire', 'commit_propose', 'doutes_expert', 'decision_requise', 'motif_decision']
+  required: ['fichiers_modifies', 'mesures', 'resultats_modifies', 'surface_documentaire', 'commit_propose', 'doutes_actuary', 'decision_requise', 'motif_decision']
 }
 
 const SCHEMA_VERIFICATION = {
@@ -231,7 +234,7 @@ const SCHEMA_AUDIT = {
           correction_suggeree: { type: 'string' },
           releve_de: {
             type: 'string',
-            enum: ['coder', 'expert', 'mainteneur'],
+            enum: ['coder', 'actuary', 'regulatory', 'mainteneur'],
             description: "coder si corrigeable sans decision ; sinon qui doit trancher"
           }
         },
@@ -246,13 +249,13 @@ const SCHEMA_AUDIT = {
         required: ['commande', 'resultat']
       }
     },
-    questions_expert: { type: 'array', items: { type: 'string' } },
+    questions_actuary: { type: 'array', items: { type: 'string' } },
     contradiction_avec_batteries: {
       type: 'boolean',
       description: 'Vrai si ta conclusion contredit le resultat des batteries fourni'
     }
   },
-  required: ['conclusion', 'constats', 'verifications_executees', 'questions_expert', 'contradiction_avec_batteries']
+  required: ['conclusion', 'constats', 'verifications_executees', 'questions_actuary', 'contradiction_avec_batteries']
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +324,7 @@ function consigneAudit(depot, verif, reference, tour, aVerifier) {
     INTERDITS,
     "Resultats des batteries executees juste avant (ne les relance pas sauf besoin d'une mesure precise) :",
     JSON.stringify(verif.batteries, null, 2),
-    "Chaque constat porte sa gravite, fichier:ligne, la mesure executee (commande et sortie) et releve_de : 'coder' s'il se corrige sans decision, sinon 'expert' (question de fond) ou 'mainteneur' (resultat final, verdict, reference a regenerer). Un constat sans mesure ni emplacement n'est pas recevable.",
+    "Chaque constat porte sa gravite, fichier:ligne, la mesure executee (commande et sortie) et releve_de : 'coder' s'il se corrige sans decision, sinon 'actuary' (question de fond), 'regulatory' (question de texte) ou 'mainteneur' (resultat final, verdict, reference a regenerer). Un constat sans mesure ni emplacement n'est pas recevable.",
     "contradiction_avec_batteries : vrai si tu conclus conforme alors qu'une batterie echoue, ou l'inverse sans explication."
   ]
   if (tour === 2) {
@@ -376,7 +379,7 @@ function noterImplementation(impl) {
   rapport.fichiers_modifies = unir(impl.fichiers_modifies, rapport.fichiers_modifies, 'fichier')
   rapport.surface_documentaire = unir(rapport.surface_documentaire, impl.surface_documentaire, null)
   rapport.commit_propose_non_execute = impl.commit_propose
-  rapport.questions_expert = rapport.questions_expert.concat(impl.doutes_expert)
+  rapport.questions_actuary = rapport.questions_actuary.concat(impl.doutes_actuary)
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +438,7 @@ async function derouler() {
     { label: 'audit leger tour 1', agentType: 'audit', schema: SCHEMA_AUDIT })
   if (!audit1) return arreter("audit n'a rien rendu")
   tour1.audit = audit1
-  rapport.questions_expert = rapport.questions_expert.concat(audit1.questions_expert)
+  rapport.questions_actuary = rapport.questions_actuary.concat(audit1.questions_actuary)
   if (audit1.contradiction_avec_batteries) return arreter('contradiction entre audit et batteries (principe 3)')
   const decisions1 = constatsDecision(audit1)
   if (decisions1.length > 0) {
@@ -443,12 +446,12 @@ async function derouler() {
       decisions1.map(function (c) { return c.releve_de + ' : ' + c.fichier_ligne }).join(' ; ') + ')')
   }
   const aCorriger = constatsCorrigeables(audit1)
-  if (rapport.questions_expert.length > 0) {
+  if (rapport.questions_actuary.length > 0) {
     const attente1 = []
     if (rouges1.length > 0) attente1.push('batterie(s) en echec : ' + listerRouges(rouges1))
     if (aCorriger.length > 0) attente1.push(aCorriger.length + ' constat(s) bloquant(s) ou majeur(s) corrigeable(s) non repris')
     if (audit1.conclusion === 'non conforme') attente1.push('audit non conforme')
-    if (attente1.length > 0) return arreter('question(s) pour expert et ' + attente1.join(' ; ') + ', sans reprise')
+    if (attente1.length > 0) return arreter('question(s) pour actuary et ' + attente1.join(' ; ') + ', sans reprise')
     return terminerAvecQuestions()
   }
   if (aCorriger.length === 0) {
@@ -490,14 +493,14 @@ async function derouler() {
     { label: 'audit leger tour 2', agentType: 'audit', schema: SCHEMA_AUDIT })
   if (!audit2) return arreter("audit n'a rien rendu a la reprise")
   tour2.audit = audit2
-  rapport.questions_expert = rapport.questions_expert.concat(audit2.questions_expert)
+  rapport.questions_actuary = rapport.questions_actuary.concat(audit2.questions_actuary)
   if (audit2.contradiction_avec_batteries) return arreterReprise('contradiction entre audit et batteries apres la reprise (principe 3)')
   if (constatsDecision(audit2).length > 0) return arreterReprise('constat(s) a trancher hors workflow apres la reprise')
   if (constatsCorrigeables(audit2).length > 0) return arreterReprise('constat bloquant ou majeur apres la reprise unique (principe 4)')
   const rouges2 = batteriesRouges(verif2)
   if (rouges2.length > 0) return arreterReprise('batterie(s) en echec apres la reprise unique : ' + listerRouges(rouges2))
   if (audit2.conclusion === 'non conforme') return arreterReprise('audit de la reprise non conforme (principe 4)')
-  if (rapport.questions_expert.length > 0) return terminerAvecQuestions()
+  if (rapport.questions_actuary.length > 0) return terminerAvecQuestions()
   rapport.statut = 'termine'
   log('Audit de la reprise : ' + audit2.conclusion)
   return rapport
