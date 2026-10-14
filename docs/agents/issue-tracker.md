@@ -8,7 +8,7 @@ Les issues et les specs de ce dépôt sont des issues GitHub de `Gerard-Garey/ou
 | outils `mcp__github__*` | disponibles | disponibles |
 | `GH_TOKEN` / `GITHUB_TOKEN` | — | présents dans l'environnement |
 
-Les six agents de `.claude/agents/` déclarent leurs outils GitHub dans leur frontmatter, selon deux profils : `coder`, `audit`, `docwriter` et `app-review` en lecture seule (`mcp__github__issue_read`, `mcp__github__list_issues`), `architect` et `expert` y ajoutant l'écriture d'issues (`mcp__github__issue_write`, `mcp__github__add_issue_comment`). Aucun ne reçoit d'outil GitHub touchant aux fichiers du dépôt, ce qui préserve la règle « ceux qui vérifient n'écrivent pas ».
+Les sept agents de `.claude/agents/` déclarent leurs outils GitHub dans leur frontmatter, selon deux profils : `coder`, `audit`, `docwriter` et `app-review` en lecture seule (`mcp__github__issue_read`, `mcp__github__list_issues`), `architect`, `actuary` et `regulatory` y ajoutant l'écriture d'issues (`mcp__github__issue_write`, `mcp__github__add_issue_comment`). Aucun ne reçoit d'outil GitHub touchant aux fichiers du dépôt, ce qui préserve la règle « ceux qui vérifient n'écrivent pas ».
 
 ## Conventions
 
