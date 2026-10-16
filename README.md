@@ -28,7 +28,7 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 
 ## Prérequis et commandes
 
-- **R 4.3.1** (CI et références ; poste aligné), packages de priorité `base` seulement pour le moteur, sauf package admis par ADR de méthode (ADR 0002 et son annotation du 16/10/2026) ; `shiny` pour l'application ; `openxlsx` facultatif pour les fichiers xlsx ; packages de contre-vérification (`survival`, `mgcv`, `WH`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen`) seulement pour régénérer les valeurs externes des tests, hors CI. **Aucune dépendance à Java**, directe ou indirecte (d'où l'exclusion d'`ELT`).
+- **R 4.3.1** (CI et références ; poste aligné), packages de priorité `base` seulement pour le moteur, sauf package admis par ADR de méthode (ADR 0002 et son annotation du 16/10/2026) ; `shiny` pour l'application ; `openxlsx` facultatif pour les fichiers xlsx ; packages de contre-vérification (`survival`, `mgcv`, `WH`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen`, `MortCast`, `locfit`, `flexsurv` facultatif) seulement pour régénérer les valeurs externes des tests, hors CI, éventuellement sur un autre poste muni d'un R récent (versions de R et des packages consignées ; ADR 0002, troisième annotation du 16/10/2026). **Aucune dépendance à Java**, directe ou indirecte (d'où l'exclusion du package `ELT` ; sa source s'exécute seulement hors du dépôt, sans Java, en appoint).
 - Commandes (lancer l'application, moteur seul, batteries) : à définir par la première branche de travail ; elles seront listées ici et dans `CLAUDE.md`, « Commandes ».
 
 ## Façon de travailler
