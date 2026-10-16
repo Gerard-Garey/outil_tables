@@ -38,3 +38,17 @@ Arrêtée par le mainteneur le 14/10/2026 (Q8 points 3 à 5, Q11, Q22, Q27, Q32,
 - Vocabulaire : `CONTEXT.md`, « Plan de construction », « Fiche de construction », « Rapport figé », « Table unique », « Tableau avant / après », « Visa ».
 
 Issues : aucune à ce jour.
+
+## Annotation du 16 octobre 2026 — format de sérialisation du plan et de la fiche reporté à la branche `claude/fiche-rapport` ; structure en mémoire fixée par l'ADR 0007
+
+Décision d'`architect` du 16/10/2026 dans le cadre du plan de la première branche accepté par le mainteneur (décision M45, `docs/feuille-de-route.md` § 1 et § 2 : la branche `claude/fiche-rapport` porte « sérialisation du plan et de la fiche (export, import, rejeu) ») ; consignée par l'ADR 0007, point 12. Le texte du 14/10/2026 n'est pas réécrit.
+
+**Écart déclaré.** « Conséquences » ci-dessus veut le format du plan et de la fiche « fixé au plan de la première branche ». La première branche (`claude/socle-donnees-exposition`, PR #12) ne fixe **que la structure en mémoire** : le plan est une liste R nommée validée sans défaut implicite (ADR 0007, point 5 : `transition`, `periode`, `delai_declaration`, `graine`, `etapes`), la fiche une liste nommée dans l'objet résultat de classe `construction` (ADR 0007, point 6), et le rejeu se teste sur l'objet (`construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)` redonne un résultat `identical` hors `execution`). Le **format de sérialisation** (export et import du plan, E5.4 ; écriture de la fiche, livrable (c) du point 7) est **reporté** à la branche `claude/fiche-rapport`, première branche qui aura un consommateur du format (export, import, rapport figé) et pourra donc le tester : le fixer sans consommateur serait le fixer sans test.
+
+**Contraintes posées dès maintenant** (ADR 0007, point 12.2), que le format devra satisfaire : (a) texte lisible par un relecteur ; (b) aller-retour identique — relire ce qui a été écrit redonne un objet `identical`, nombres compris (doubles en `%.17g`, dates en ISO 8601, chaînes en UTF-8, `NA` distingué de la chaîne « NA ») ; (c) **aucune évaluation de code à l'import** : ni `dget()`, ni `source()`, ni `eval(parse())` ; un plan importé est une donnée, validée comme un plan construit en mémoire ; (d) écrit et lu en R de base (l'ADR 0002 exclut `jsonlite` du moteur) ; (e) versionné (`version_fiche`).
+
+**Points 6 et 8 précisés par l'ADR 0007** : l'empreinte des données reçues est un MD5 de `tools::md5sum` sur une représentation textuelle canonique définie au point 9.3 de l'ADR 0007, l'algorithme étant nommé dans la fiche (P8, M45) ; les empreintes du résultat et du code sont des champs présents à `NA` jusqu'à la branche `fiche-rapport` ; la graine et le générateur (`Mersenne-Twister`, `Inversion`, `Rejection`) figurent dans la fiche (ADR 0007, point 8).
+
+**Effet sur les résultats** : aucun (aucun code).
+
+Issues : #11 (objet résultat et fiche en mémoire) ; branche `claude/fiche-rapport` (à rédiger).
