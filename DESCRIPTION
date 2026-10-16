@@ -1,0 +1,15 @@
+Package: tablexp
+Type: Package
+Title: Construction de tables d'expérience à partir d'une base d'observation
+Version: 0.0.0.9000
+Authors@R: person("Gerard", "Garey", role = c("aut", "cre"),
+    email = "332156383+Gerard-Garey@users.noreply.github.com")
+Description: Moteur de construction de tables d'expérience (mortalité, puis
+    rachat, incapacité-invalidité, dépendance, chômage des emprunteurs) à
+    partir d'une base d'observation d'un portefeuille d'assurés : une table
+    est l'estimation d'une transition d'un modèle multi-états. Point d'entrée
+    unique construire_table(donnees, roles, plan). Packages de priorité base
+    seulement (ADR 0002).
+License: file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.3.3)

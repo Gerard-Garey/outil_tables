@@ -1,8 +1,9 @@
 name: CI
 
-# Contrôles requis par le ruleset de main (README, « Sécurité du dépôt »).
-# À ADAPTER : ajouter les jobs de tests du projet, et leur nom aux contrôles
-# requis du ruleset.
+# Contrôles requis par le ruleset de main (README, « Sécurité du dépôt » ;
+# liste dans .github/ruleset-main.json, un context par nom de job).
+# Jobs R : conteneur épinglé par empreinte, BLAS et LAPACK contrôlées par
+# tests/controles/plateforme.R (ADR 0008).
 
 on:
   pull_request:
@@ -52,3 +53,82 @@ jobs:
             echo "::error::fichier sensible versionné (voir la liste ci-dessus)"; exit 1
           fi
           echo "Aucun fichier sensible versionné."
+
+  # ADR 0008, points 1 à 6 ; issue #8. Aucun package du CRAN n'est installé
+  # ni aucun dépôt CRAN configuré : tablexp est installé depuis l'arbre de
+  # travail par chaque batterie, dans une bibliothèque temporaire.
+  tests:
+    name: Tests (R 4.3.3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      # EMPREINTE-A-RELEVER : remplacer par rocker/r-ver:4.3.3@sha256:<empreinte
+      # de l'index> relevée par le job « Relevé de l'empreinte de l'image »
+      # (ADR 0008, point 2), ici et dans TABLEXP_IMAGE ci-dessous (même chaîne,
+      # contrôlée par tests/controles/identite_batteries.R). Tant que l'image
+      # n'est pas épinglée, le script de plateforme échoue en mode strict.
+      image: rocker/r-ver:4.3.3
+    env:
+      TABLEXP_IMAGE: rocker/r-ver:4.3.3
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Première étape, avant tout calcul (ADR 0008, point 3). Les étapes
+      # suivantes s'exécutent même si elle échoue (!cancelled()) pour que tous
+      # les écarts soient visibles ; le job reste en échec. Aucune référence
+      # n'est produite par ce job.
+      - name: Plateforme (mode strict)
+        run: Rscript tests/controles/plateforme.R --exiger
+      # Batteries de CLAUDE.md, « Commandes » : une étape « Batterie : » par
+      # commande, dans le même ordre (tests/controles/identite_batteries.R).
+      - name: "Batterie : tests unitaires"
+        if: ${{ !cancelled() }}
+        run: Rscript tests/test_unitaires.R
+      - name: "Batterie : reproductibilité"
+        if: ${{ !cancelled() }}
+        run: Rscript tests/test_reproductibilite.R
+      - name: "Batterie : concordance documentation et moteur"
+        if: ${{ !cancelled() }}
+        run: Rscript tests/concordance_doc_moteur.R --strict
+      - name: Liste blanche de DESCRIPTION
+        if: ${{ !cancelled() }}
+        run: Rscript tests/controles/liste_blanche_description.R
+      - name: Ordre des modules
+        if: ${{ !cancelled() }}
+        run: Rscript tests/controles/graphe_modules.R
+      - name: Identité des batteries et de l'image
+        if: ${{ !cancelled() }}
+        run: Rscript tests/controles/identite_batteries.R
+
+  # Temporaire (issue #8) : la session de rédaction n'atteint pas Docker Hub.
+  # Ce job, sur l'hôte, affiche l'empreinte de l'index que désigne l'étiquette
+  # rocker/r-ver:4.3.3, à reporter dans le job « Tests (R 4.3.3) » (commit
+  # repo:, ADR 0008, point 2) ; il est retiré par ce même commit. Non requis.
+  empreinte:
+    name: Relevé de l'empreinte de l'image (temporaire)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Empreinte de rocker/r-ver:4.3.3
+        run: |
+          set -euo pipefail
+          date -u '+%Y-%m-%dT%H:%M:%SZ'
+          docker buildx imagetools inspect rocker/r-ver:4.3.3 | tee imagetools.txt
+          docker pull rocker/r-ver:4.3.3
+          repo_digest=$(docker inspect --format '{{index .RepoDigests 0}}' rocker/r-ver:4.3.3)
+          echo "RepoDigests[0] : $repo_digest"
+          {
+            echo "### Empreinte de rocker/r-ver:4.3.3"
+            echo
+            echo '```'
+            date -u '+%Y-%m-%dT%H:%M:%SZ'
+            head -n 5 imagetools.txt
+            echo "RepoDigests[0] : $repo_digest"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
