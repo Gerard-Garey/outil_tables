@@ -4,7 +4,9 @@
 #  - GENERATEUR et sous_graine() : exécution sous graine locale, générateur
 #    fixé, état de l'appelant restauré (ADR 0007, point 8) ;
 #  - refus_tablexp() et refuser() : un refus est une condition R typée, jamais
-#    un objet retourné (ADR 0007, point 6.4).
+#    un objet retourné (ADR 0007, point 6.4) ;
+#  - avertissements_vides() et avertir() : les avertissements métier sont
+#    inscrits dans l'objet, jamais émis par warning() (ADR 0007, point 6.5).
 #
 #  Ce fichier n'appelle aucun module (graphe d'appels, ADR 0007, point 2.1 ;
 #  contrôlé par tests/controles/graphe_modules.R).
@@ -45,6 +47,22 @@ refus_tablexp <- function(module, motif, message, details = list()) {
 # Lève le refus (ne retourne jamais).
 refuser <- function(module, motif, message, details = list()) {
   stop(refus_tablexp(module, motif, message, details))
+}
+
+# Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
+# data.frame (etape, code, message, nombre), restitué dans l'objet. avertir()
+# rend l'accumulateur augmenté d'une ligne ; aucun warning() n'est émis.
+avertissements_vides <- function() {
+  data.frame(etape = character(0), code = character(0), message = character(0),
+             nombre = numeric(0), stringsAsFactors = FALSE)
+}
+
+avertir <- function(acc, etape, code, message, nombre) {
+  if (!is.character(code) || length(code) != 1L || !grepl(MOTIF_CODE_REFUS, code))
+    stop("avertir() : 'code' doit être un code court (minuscules, chiffres, '_').",
+         call. = FALSE)
+  rbind(acc, data.frame(etape = etape, code = code, message = message,
+                        nombre = as.numeric(nombre), stringsAsFactors = FALSE))
 }
 
 # Évalue expr sous la graine `graine` et le générateur GENERATEUR, puis
