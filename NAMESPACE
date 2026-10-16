@@ -1,0 +1,5 @@
+# Écrit à la main (ADR 0007, point 3.4) : un export() par fonction, sans
+# exportPattern. Tout export ajouté est motivé dans le commit par son appelant
+# hors package et cité dans docs/latex/ (concordance, E3.3), ou inscrit dans
+# tests/concordance_attente.csv avec renvoi à l'issue.
+export(construire_table)
