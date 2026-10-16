@@ -29,7 +29,17 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 ## Prérequis et commandes
 
 - **R 4.3.3** (CI et références ; poste aligné ; ADR 0002, quatrième annotation du 16/10/2026), packages de priorité `base` seulement pour le moteur, sauf package admis par ADR de méthode (ADR 0002 et son annotation du 16/10/2026) ; `shiny` pour l'application ; `openxlsx` facultatif pour les fichiers xlsx ; packages de contre-vérification (`survival`, `mgcv`, `WH`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen`, `MortCast`, `locfit`, `flexsurv` facultatif) seulement pour régénérer les valeurs externes des tests, hors CI, éventuellement sur un autre poste muni d'un R récent (versions de R et des packages consignées ; ADR 0002, troisième annotation du 16/10/2026). **Aucune dépendance à Java**, directe ou indirecte (d'où l'exclusion du package `ELT` ; sa source s'exécute seulement hors du dépôt, sans Java, en appoint).
-- Commandes (lancer l'application, moteur seul, batteries) : à définir par la première branche de travail ; elles seront listées ici et dans `CLAUDE.md`, « Commandes ».
+- **Batteries** (depuis la racine du dépôt ; chacune installe l'arbre de travail dans une bibliothèque temporaire par `R CMD INSTALL`, n'installe aucun package, affiche une ligne de bilan et sort avec un code non nul en cas d'échec ; ADR 0007, point 11) :
+
+  ```
+  Rscript tests/test_unitaires.R
+  Rscript tests/test_reproductibilite.R
+  Rscript tests/concordance_doc_moteur.R --strict
+  ```
+
+  Détail de toutes les assertions : `Rscript -e "options(harnais.verbeux = TRUE); source('tests/test_unitaires.R')"`.
+- **Contrôles** (scripts en R de base, aussi exécutés par le job « Tests (R 4.3.3) » de la CI) : `Rscript tests/controles/plateforme.R` (relevé de la plateforme ; `--exiger` en CI : R 4.3.3, BLAS et LAPACK de référence, monothread, image épinglée ; ADR 0008), `Rscript tests/controles/liste_blanche_description.R` (dépendances de `DESCRIPTION`, ADR 0002), `Rscript tests/controles/graphe_modules.R` (ordre des modules, ADR 0007), `Rscript tests/controles/identite_batteries.R` (batteries identiques entre `CLAUDE.md`, `BATTERIES` et `ci.yml` ; chaîne d'image unique).
+- Lancement de l'application et appel du moteur seul : à venir avec les branches qui les créent.
 
 ## Façon de travailler
 
@@ -55,7 +65,7 @@ Réglages à reproduire sur le dépôt (`Gerard-Garey/outil_tables`) ; indispens
 - fusion par **commit de fusion seulement** (squash et rebase désactivés), wiki désactivé ;
 - **secret scanning** et **push protection** activés ; **alertes et correctifs de sécurité Dependabot** activés ;
 - Actions limitées à celles de GitHub (`github_owned_allowed`), jeton des workflows en lecture seule, actions épinglées par SHA ;
-- ruleset **« Protection main »** : suppression et force-push interdits, PR obligatoire (fusion par commit de fusion, fils de discussion résolus), contrôle requis « Contrôles du dépôt » à jour avec `main`, sans contournement.
+- ruleset **« Protection main »** : suppression et force-push interdits, PR obligatoire (fusion par commit de fusion, fils de discussion résolus), contrôles requis « Contrôles du dépôt » et « Tests (R 4.3.3) » à jour avec `main`, sans contournement.
 
 ```bash
 R=Gerard-Garey/outil_tables
