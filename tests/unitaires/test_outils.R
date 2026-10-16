@@ -37,6 +37,22 @@ verifier("refus_tablexp : motif mal formé -> erreur de programmation, pas un re
 verifier("refus_tablexp : details non liste -> erreur",
          inherits(tryCatch(refus_tablexp("m", "motif", "msg", "x"), error = function(e) e), "error"))
 
+# --- avertissements métier (ADR 0007, point 6.5) ------------------------------
+
+avertir <- tablexp:::avertir
+avertissements_vides <- tablexp:::avertissements_vides
+a0 <- avertissements_vides()
+verifier("avertissements_vides() : data.frame (etape, code, message, nombre) sans ligne",
+         identical(names(a0), c("etape", "code", "message", "nombre")) && nrow(a0) == 0L)
+a <- avertir(avertir(a0, "donnees", "unite_contrat", "msg 1", 3L), "donnees", "exclusion", "msg 2", 2)
+verifier("avertir() : lignes ajoutées dans l'ordre, nombre en double",
+         identical(a, data.frame(etape = c("donnees", "donnees"), code = c("unite_contrat", "exclusion"),
+                                 message = c("msg 1", "msg 2"), nombre = c(3, 2), stringsAsFactors = FALSE)))
+verifier("avertir() : aucun warning() émis",
+         is.null(tryCatch({ avertir(a0, "donnees", "code", "msg", 1); NULL }, warning = function(w) w)))
+verifier("avertir() : code mal formé -> erreur de programmation",
+         inherits(tryCatch(avertir(a0, "donnees", "Code Libre", "msg", 1), error = function(e) e), "error"))
+
 # --- générateur et graine locale ---------------------------------------------
 
 verifier("GENERATEUR : Mersenne-Twister / Inversion / Rejection (valeurs de R 4.3.3)",

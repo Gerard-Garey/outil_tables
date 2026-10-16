@@ -1,2 +1,4 @@
 nom,issue,motif
 construire_table,#11,"point d'entrée documenté par docwriter avec #11 (squelette dans #8)"
+catalogue_roles,#9,"catalogue fermé des rôles, lu par l'application ; documenté par docwriter en fin de branche"
+table_reference,#9,"constructeur de table de référence, appelé par l'application ; documenté par docwriter en fin de branche"
