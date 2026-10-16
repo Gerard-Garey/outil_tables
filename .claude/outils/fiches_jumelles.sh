@@ -18,9 +18,9 @@
 ###############################################################################
 set -euo pipefail
 
-# A ADAPTER : roles dedoubles (un expert duplique s'ajoute ici), effort et
+# Roles dedoubles (decision Q9 du cadrage du 14/10/2026), effort et
 # plafond de tours des fiches de jugement.
-ROLES="architect expert"
+ROLES="architect actuary regulatory"
 EFFORT_APPROFONDI="high"
 TOURS_APPROFONDI="80"
 

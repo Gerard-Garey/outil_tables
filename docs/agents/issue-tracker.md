@@ -1,6 +1,6 @@
 # Suivi des issues : GitHub
 
-Les issues et les specs de ce dépôt sont des issues GitHub de `<propriétaire>/<dépôt>` (**À ADAPTER**). **La voie d'accès dépend de l'environnement**, et les deux coexistent : la CLI `gh` sur le poste local, les outils `mcp__github__*` en session cloud.
+Les issues et les specs de ce dépôt sont des issues GitHub de `Gerard-Garey/outil_tables`. **La voie d'accès dépend de l'environnement**, et les deux coexistent : la CLI `gh` sur le poste local, les outils `mcp__github__*` en session cloud.
 
 | | Poste local | Session cloud |
 |---|---|---|
@@ -8,7 +8,7 @@ Les issues et les specs de ce dépôt sont des issues GitHub de `<propriétaire>
 | outils `mcp__github__*` | disponibles | disponibles |
 | `GH_TOKEN` / `GITHUB_TOKEN` | — | présents dans l'environnement |
 
-Les six agents de `.claude/agents/` déclarent leurs outils GitHub dans leur frontmatter, selon deux profils : `coder`, `audit`, `docwriter` et `app-review` en lecture seule (`mcp__github__issue_read`, `mcp__github__list_issues`), `architect` et `expert` y ajoutant l'écriture d'issues (`mcp__github__issue_write`, `mcp__github__add_issue_comment`). Aucun ne reçoit d'outil GitHub touchant aux fichiers du dépôt, ce qui préserve la règle « ceux qui vérifient n'écrivent pas ».
+Les sept agents de `.claude/agents/` déclarent leurs outils GitHub dans leur frontmatter, selon deux profils : `coder`, `audit`, `docwriter` et `app-review` en lecture seule (`mcp__github__issue_read`, `mcp__github__list_issues`), `architect`, `actuary` et `regulatory` y ajoutant l'écriture d'issues (`mcp__github__issue_write`, `mcp__github__add_issue_comment`). Aucun ne reçoit d'outil GitHub touchant aux fichiers du dépôt, ce qui préserve la règle « ceux qui vérifient n'écrivent pas ».
 
 ## Conventions
 
@@ -23,7 +23,7 @@ Chaque opération, dans les deux voies :
 | Libellés | `mcp__github__issue_write`, `method: "update"`, champ `labels` | `gh issue edit <n> --add-label` / `--remove-label` |
 | Fermer | `mcp__github__issue_write`, `method: "update"`, `state: "closed"` et `state_reason` | `gh issue close <n> --comment "..."` |
 
-`owner` et `repo` sont ceux du dépôt (**À ADAPTER**). Avec `gh`, le dépôt se déduit de `git remote -v`, automatiquement dans un clone.
+`owner` vaut `Gerard-Garey` et `repo` vaut `outil_tables`. Avec `gh`, le dépôt se déduit de `git remote -v`, automatiquement dans un clone.
 
 Les outils `mcp__github__*` peuvent être différés : s'ils ne figurent pas dans la liste d'outils, les charger avec `ToolSearch` (`select:mcp__github__issue_read`, par exemple). Les sous-agents, eux, n'ont ni `ToolSearch` ni d'autre moyen d'en charger : ils ne disposent que des outils de leur frontmatter.
 
@@ -35,7 +35,7 @@ Si aucun outil MCP n'est disponible et que `gh` est absent, `Bash` suffit, `GH_T
 curl -sS -H "Authorization: Bearer $GH_TOKEN" \
      -H "Accept: application/vnd.github+json" \
      -H "X-GitHub-Api-Version: 2022-11-28" \
-     https://api.github.com/repos/<propriétaire>/<dépôt>/issues/1
+     https://api.github.com/repos/Gerard-Garey/outil_tables/issues/1
 ```
 
 C'est un repli, pas la voie normale : il contourne la granularité des profils ci-dessus, et tout agent disposant de `Bash` peut ainsi écrire sur GitHub quels que soient les outils de son frontmatter. Ne l'employer que si les deux autres voies manquent, et le signaler dans le compte rendu.
