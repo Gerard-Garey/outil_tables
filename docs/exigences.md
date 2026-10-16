@@ -69,7 +69,7 @@ Ce document fixe ce que `outil_tables` doit faire ; `CLAUDE.md` renvoie ici pour
 - **E4.5** Le moteur exécute un **plan de construction** d'un bloc et retourne un objet complet ; la fiche de construction = plan + rôles + convention + empreintes + graine + versions (Q22).
 - **E4.6** **Reproductibilité** : à données, rôles, plan et graine identiques, résultats identiques au bit près sur une même machine ; toute simulation passe par une graine locale explicite sous un générateur fixé, consignée dans le résultat (Q8-4).
 - **E4.7** **Références de non-régression** produites par la CI seule (R 4.3.1, BLAS et LAPACK de référence), comparaison valeur par valeur à tolérance, tableau avant / après et visa pour tout changement de résultat ; les jeux simulés en sont la base (Q8-3).
-- **E4.8** R pur, mesuré sur le simulateur à la volumétrie cible (millions de lignes, dizaines d'années) ; du C par l'interface native de R, sans `Rcpp`, seulement sur mesure de lenteur documentée et par ADR (Q38).
+- **E4.8** R pur, mesuré sur le simulateur à la volumétrie cible (millions de lignes, dizaines d'années) ; du code compilé écrit par le projet, par l'interface native de R (`.Call`) ou en C++ par `Rcpp`, seulement sur mesure de lenteur documentée et par ADR ; l'ADR qui introduit `Rcpp` l'inscrit sur la liste blanche du script de CI (`LinkingTo`, `Imports`) (Q38 ; ADR 0002, point 6, révisé par la seconde annotation du 16/10/2026, A8 ; M41).
 - **E4.9** Le code est lisible en entier par un relecteur : un module par famille, un index des fonctions dans la documentation, aucun calcul dispersé dans l'interface (Q8-2, A1).
 
 ## 5. Interface
