@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Ce fichier guide Claude Code (claude.ai/code) dans ce dépôt. Les passages marqués **À ADAPTER** restent à remplir : les batteries de vérification, que la première branche de travail définit (`grep -rn "À ADAPTER"`).
+Ce fichier guide Claude Code (claude.ai/code) dans ce dépôt.
 
 ## Contexte
 
@@ -14,7 +14,7 @@ Le dépôt de référence est `https://github.com/Gerard-Garey/outil_tables` (pu
 
 Les commandes courantes (lancer, tester, compiler) sont dans `README.md` : s'y reporter plutôt que de les recopier ici.
 
-**À ADAPTER** — batteries de vérification, lancées par `coder`, `audit` et le workflow `circuit-technique` (liste `BATTERIES` de `.claude/workflows/circuit-technique.js`, à tenir identique ; jobs de `.github/workflows/ci.yml` à ajouter aux contrôles requis du ruleset). La première branche de travail les définit ; forme attendue :
+Batteries de vérification, lancées depuis la racine du dépôt par `coder`, `audit`, le workflow `circuit-technique` et le job « Tests (R 4.3.3) » de la CI (contrôle requis du ruleset de `main`) ; la liste `BATTERIES` de `.claude/workflows/circuit-technique.js` et les étapes « Batterie : » de `.github/workflows/ci.yml` sont identiques à ce bloc, dans le même ordre (contrôle : `Rscript tests/controles/identite_batteries.R`). Chaque batterie installe l'arbre de travail dans une bibliothèque temporaire et sort avec un code non nul en cas d'échec (ADR 0007, point 11) :
 
 ```
 Rscript tests/test_unitaires.R
