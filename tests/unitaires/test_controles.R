@@ -108,6 +108,18 @@ for (cas in list(
   list(nom = "fichier hors des modules",
        fichiers = list(affichage = "f <- function() 1"),
        motif = "affichage.R : fichier hors des modules"),
+  list(nom = "get passée comme objet (R3)",
+       fichiers = list(outils = "f <- function(x) lapply(x, get)"), motif = "get()"),
+  list(nom = "base::get passée comme objet (R3)",
+       fichiers = list(outils = "f <- function(x) vapply(x, base::get, numeric(1))"), motif = "get()"),
+  list(nom = "match.fun passée comme objet (R3)",
+       fichiers = list(outils = "f <- function(x) Map(match.fun, x)"), motif = "match.fun()"),
+  list(nom = "asNamespace() (R3)",
+       fichiers = list(outils = "f <- function() asNamespace(\"tablexp\")$g"), motif = "asNamespace()"),
+  list(nom = "getNamespace() (R3)",
+       fichiers = list(outils = "f <- function() getNamespace(\"tablexp\")"), motif = "getNamespace()"),
+  list(nom = "methods::getFunction() (R3)",
+       fichiers = list(outils = "f <- function() methods::getFunction(\"g\")"), motif = "getFunction()"),
   list(nom = "symbole défini dans deux modules",
        fichiers = list(outils = "f <- function() 1", donnees = "f <- function() 2"),
        motif = "symbole f défini plusieurs fois")
@@ -142,10 +154,13 @@ copie_racine <- function() {
   file.copy(file.path(RACINE, ".github", "workflows", "ci.yml"), file.path(d, ".github", "workflows"))
   d
 }
+# Remplace la première occurrence de `motif` (éventuellement sur plusieurs
+# lignes, séparées par \n) dans le texte entier ; rend le nombre
+# d'occurrences.
 modifier <- function(chemin, motif, remplacement) {
-  l <- readLines(chemin)
-  n <- sum(grepl(motif, l, fixed = TRUE))
-  writeLines(sub(motif, remplacement, l, fixed = TRUE), chemin)
+  texte <- paste(readLines(chemin), collapse = "\n")
+  n <- sum(gregexpr(motif, texte, fixed = TRUE)[[1L]] > 0L)
+  writeLines(sub(motif, remplacement, texte, fixed = TRUE), chemin)
   n
 }
 for (cas in list(
@@ -164,6 +179,24 @@ for (cas in list(
        motif = "        run: Rscript tests/test_unitaires.R",
        remplacement = "        continue-on-error: true\n        run: Rscript tests/test_unitaires.R",
        ecart = "continue-on-error interdit"),
+  list(nom = "continue-on-error sur une étape hors batterie (R2)", fichier = c(".github", "workflows", "ci.yml"),
+       motif = "        run: Rscript tests/controles/plateforme.R --exiger",
+       remplacement = "        continue-on-error: true\n        run: Rscript tests/controles/plateforme.R --exiger",
+       ecart = "continue-on-error interdit"),
+  list(nom = "continue-on-error au niveau du job (R2)", fichier = c(".github", "workflows", "ci.yml"),
+       motif = "    timeout-minutes: 30", remplacement = "    timeout-minutes: 30\n    continue-on-error: true",
+       ecart = "continue-on-error interdit"),
+  list(nom = "if: au niveau du job de tests (m4)", fichier = c(".github", "workflows", "ci.yml"),
+       motif = "    timeout-minutes: 30", remplacement = "    timeout-minutes: 30\n    if: false",
+       ecart = "condition interdite au niveau du job"),
+  list(nom = "if: false sur une étape de batterie (R2)", fichier = c(".github", "workflows", "ci.yml"),
+       motif = "      - name: \"Batterie : concordance documentation et moteur\"\n        if: ${{ !cancelled() }}",
+       remplacement = "      - name: \"Batterie : concordance documentation et moteur\"\n        if: false",
+       ecart = "condition `if: false` interdite"),
+  list(nom = "if: always() sur une étape de batterie (R2)", fichier = c(".github", "workflows", "ci.yml"),
+       motif = "      - name: \"Batterie : tests unitaires\"\n        if: ${{ !cancelled() }}",
+       remplacement = "      - name: \"Batterie : tests unitaires\"\n        if: ${{ always() && false }}",
+       ecart = "interdite sur l'étape"),
   list(nom = "job de tests sans container:", fichier = c(".github", "workflows", "ci.yml"),
        motif = "    container:", remplacement = "    conteneur_retire:",
        ecart = "sans `container:`"),
@@ -251,14 +284,19 @@ attente_temoin <- function(lignes) {
   writeLines(c("nom,issue,motif", lignes), f)
   f
 }
+# Témoins construits sur la liste des exports (tous en attente, ou tous
+# cités), pour rester valables quand un export s'ajoute.
+EXPORTS <- sort(getNamespaceExports("tablexp"))
+code_latex <- function(n) sprintf("\\code{%s()}", gsub("_", "\\_", n, fixed = TRUE))
 vide <- latex_temoin("% aucun \\code{construire\\_table()} cité : ligne commentée")
-cite <- latex_temoin("Point d'entrée : \\code{construire\\_table()}, \\code{tools::md5sum()}, \\code{set.seed()}.")
+cite <- latex_temoin(paste0("Exports : ", paste(code_latex(EXPORTS), collapse = ", "),
+                            ", \\code{tools::md5sum()}, \\code{set.seed()}."))
 inconnu <- latex_temoin("\\code{construire\\_table()} et \\code{fonction\\_inconnue()}.")
 inconnu_args <- latex_temoin("\\code{construire\\_table(donnees, roles, plan)} et \\code{autre\\_inconnue(x, y = 2)}.")
 cite_args <- latex_temoin("\\code{construire\\_table(donnees, roles, plan)}.")
-attente_ok <- attente_temoin("construire_table,#11,en attente")
+attente_ok <- attente_temoin(sprintf("%s,#11,en attente", EXPORTS))
 attente_vide <- attente_temoin(character(0))
-attente_perimee <- attente_temoin(c("construire_table,#11,en attente", "nom_disparu,#9,retiré"))
+attente_perimee <- attente_temoin(c(sprintf("%s,#11,en attente", EXPORTS), "nom_disparu,#9,retiré"))
 attente_sans_issue <- attente_temoin("construire_table,11,en attente")
 
 verifier("concordance : passe sur le dépôt (--strict)", passe(concordance("--strict")))

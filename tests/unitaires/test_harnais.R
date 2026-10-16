@@ -183,3 +183,68 @@ verifier("proche() : NaN égal à NaN, NA égal à NA",
          isTRUE(proche(c(NaN, NA), c(NaN, NA), rel = 0, abs = 0)))
 r <- temoin(c('verifier(c("a", "b"), TRUE)', "bilan()"))
 verifier("témoin : nom d'assertion de longueur 2 -> code non nul", r$statut != 0L)
+
+# --- constats résiduels d'audit de #8 (R1, R4, R5, R6, valeurs d'echec_attendu)
+
+# R1 : bilan() neutralisé dans un fichier de test.
+d <- dossier_temoin(list(test_temoin.R = c('verifier("vrai", TRUE)', "bilan()")))
+r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
+verifier("lanceur : bilan() dans un fichier de test -> code non nul, motif signalé",
+         if (r$statut == 0L) "code de sortie 0"
+         else if (!any(grepl("bilan() interdit", r$sortie, fixed = TRUE)))
+           paste("motif non signalé :", paste(r$sortie, collapse = " | ")) else TRUE)
+unlink(d, recursive = TRUE)
+
+# R4 : proche() refuse les comparaisons sans objet ou mal déclarées.
+verifier("proche() : chaîne contre nombre -> écart décrit (pas d'égalité par as.numeric)",
+         is.character(proche("1", 1, rel = 0, abs = 0)))
+verifier("proche() : NULL contre NULL -> écart décrit", is.character(proche(NULL, NULL, rel = 0, abs = 0)))
+verifier("proche() : longueur 0 des deux côtés -> écart décrit",
+         is.character(proche(numeric(0), numeric(0), rel = 0, abs = 0)))
+verifier("proche() : logique admis (TRUE contre 1)", isTRUE(proche(TRUE, 1, rel = 0, abs = 0)))
+for (tol in list(list(rel = NA_real_, abs = 0), list(rel = 0, abs = -1), list(rel = c(0, 1), abs = 0),
+                 list(rel = "0", abs = 0)))
+  verifier(sprintf("proche() : tolérances rel = %s, abs = %s -> erreur", deparse(tol$rel), deparse(tol$abs)),
+           inherits(tryCatch(proche(1, 1, rel = tol$rel, abs = tol$abs), error = function(e) e), "error"))
+
+# Valeurs d'echec_attendu() : ni FALSE ni chaîne -> ECHEC, comme verifier().
+for (v in c("NA", "1", "list(FALSE)", "character(0)")) {
+  r <- temoin(c(sprintf('echec_attendu("défaut", "#8", %s)', v), "bilan()"))
+  verifier(sprintf("échec attendu qui rend %s -> code non nul (ECHEC)", v),
+           r$statut != 0L && grepl("; 1 échec(s) ;", ligne_bilan(r), fixed = TRUE))
+}
+
+# R5 : empreinte de l'arbre installable (inst/, data/, src/, sous-dossiers).
+d <- copie_source()
+e0 <- empreinte_source(d)
+dir.create(file.path(d, "inst", "extdata"), recursive = TRUE)
+writeLines("a", file.path(d, "inst", "extdata", "table.csv"))
+e1 <- empreinte_source(d)
+writeLines("b", file.path(d, "inst", "extdata", "table.csv"))
+e2 <- empreinte_source(d)
+dir.create(file.path(d, "data")); writeLines("x", file.path(d, "data", "jeu.R"))
+dir.create(file.path(d, "src")); writeLines("/* */", file.path(d, "src", "f.c"))
+e3 <- empreinte_source(d)
+verifier("empreinte_source() : change quand inst/ apparaît, quand un fichier d'inst/ change, quand data/ et src/ apparaissent",
+         length(unique(c(e0, e1, e2, e3))) == 4L)
+unlink(file.path(d, c("data", "src")), recursive = TRUE)
+r <- installe(d)
+verifier("bibliothèque fournie, fichier d'inst/ ajouté -> réinstallée, code 0",
+         r$statut == 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE)))
+unlink(d, recursive = TRUE)
+
+# R6 : sorties délibérées sans le message de la garde .Last.
+GARDE <- "sortie du processus avant la ligne de bilan"
+d <- copie_source(function(d) cat("f_cassee <- function( {\n", file = file.path(d, "R", "outils.R"), append = TRUE))
+r <- installe(d)
+verifier("installation en échec : code non nul, sans le message de la garde de sortie",
+         r$statut != 0L && any(grepl("ECHEC : installation", r$sortie, fixed = TRUE)) &&
+           !any(grepl(GARDE, r$sortie, fixed = TRUE)))
+unlink(d, recursive = TRUE)
+r <- executer_rscript(file.path(RACINE, "tests", "concordance_doc_moteur.R"), c("--strict", "--latex"))
+verifier("concordance, option sans valeur : code non nul, sans le message de la garde de sortie",
+         r$statut != 0L && any(grepl("option --latex sans valeur", r$sortie, fixed = TRUE)) &&
+           !any(grepl(GARDE, r$sortie, fixed = TRUE)))
+r <- temoin(c('verifier("faux", FALSE)', "bilan()"))
+verifier("bilan() en échec : code non nul, sans le message de la garde de sortie",
+         r$statut != 0L && !any(grepl(GARDE, r$sortie, fixed = TRUE)))

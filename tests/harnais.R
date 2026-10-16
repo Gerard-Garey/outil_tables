@@ -44,7 +44,10 @@
 #  installation par batterie au lieu d'une par sous-processus.
 #
 #  Garde de sortie (.Last) : un processus qui a chargé le harnais sort avec
-#  le code 1 s'il se termine avant bilan(), même par quit(status = 0).
+#  le code 1 s'il se termine avant bilan(), même par quit(status = 0). Les
+#  sorties délibérées du harnais et des batteries (installation en échec,
+#  option invalide, bilan en échec) passent runLast = FALSE : leur propre
+#  message d'échec n'est pas suivi de celui de la garde.
 #
 #  echec_attendu(nom, issue, expr, motif = NULL, erreur_quelconque = FALSE) :
 #  une erreur qui n'est pas un refus_tablexp (du motif donné) est un ECHEC,
@@ -92,16 +95,20 @@ fichier_courant <- function(nom) {
 }
 
 # Évalue expr dans l'environnement de l'appelant ; rend list(ok, message,
-# erreur) ; `erreur` est la condition levée, NULL sinon.
+# erreur, ecart_decrit) ; `erreur` est la condition levée, NULL sinon ;
+# `ecart_decrit` vaut TRUE si expr rend FALSE ou une chaîne (non vide), la
+# seule forme d'échec par valeur qu'echec_attendu() admet.
 .evaluer <- function(expr, env) {
   r <- tryCatch(eval(expr, env), error = function(e) e)
   if (inherits(r, "error"))
-    return(list(ok = FALSE, message = paste("erreur :", conditionMessage(r)), erreur = r))
-  if (isTRUE(r)) return(list(ok = TRUE, message = ""))
+    return(list(ok = FALSE, message = paste("erreur :", conditionMessage(r)), erreur = r,
+                ecart_decrit = FALSE))
+  if (isTRUE(r)) return(list(ok = TRUE, message = "", ecart_decrit = FALSE))
   list(ok = FALSE,
        message = if (is.character(r)) paste(r, collapse = " ; ")
                  else paste("valeur obtenue :",
-                            paste(utils::capture.output(utils::str(r)), collapse = " ")))
+                            paste(utils::capture.output(utils::str(r)), collapse = " ")),
+       ecart_decrit = isFALSE(r) || (is.character(r) && length(r) >= 1L))
 }
 
 verifier <- function(nom, expr) {
@@ -111,7 +118,10 @@ verifier <- function(nom, expr) {
 }
 
 # Natures d'un échec attendu (colonne `nature`, décomptées par bilan()) :
-#   valeur            expr rend FALSE ou une chaîne ;
+#   valeur            expr rend FALSE ou une chaîne ; toute autre valeur
+#                     (NA, 1, liste...) est un ECHEC, comme pour verifier() :
+#                     une expression qui ne rend ni TRUE, ni FALSE, ni un
+#                     écart décrit ne dit rien du défaut connu ;
 #   refus             expr lève un refus_tablexp (du motif `motif` s'il est
 #                     donné) ;
 #   erreur_quelconque expr lève une autre erreur, admise seulement si
@@ -133,6 +143,11 @@ echec_attendu <- function(nom, issue, expr, motif = NULL, erreur_quelconque = FA
     return(invisible(FALSE))
   }
   e <- r$erreur
+  if (is.null(e) && !isTRUE(r$ecart_decrit)) {
+    .enregistrer(sprintf("%s {%s}", nom, issue), "ECHEC",
+                 paste("valeur qui n'est ni TRUE, ni FALSE, ni une chaîne ;", r$message))
+    return(invisible(FALSE))
+  }
   nature <- if (is.null(e)) "valeur"
     else if (inherits(e, "refus_tablexp") && (is.null(motif) || identical(e$motif, motif))) "refus"
     else if (isTRUE(erreur_quelconque)) "erreur_quelconque"
@@ -152,6 +167,16 @@ echec_attendu <- function(nom, issue, expr, motif = NULL, erreur_quelconque = FA
 proche <- function(a, b, rel, abs) {
   if (missing(rel) || missing(abs))
     stop("proche() : tolérances 'rel' et 'abs' à déclarer explicitement.")
+  tolerance <- function(t) is.numeric(t) && length(t) == 1L && !is.na(t) && t >= 0
+  if (!tolerance(rel) || !tolerance(abs))
+    stop("proche() : tolérances 'rel' et 'abs' numériques, uniques, non manquantes et >= 0.")
+  # Valeurs numériques (ou logiques) seulement : une chaîne "1" ou un NULL
+  # convertis par as.numeric() donneraient une égalité trompeuse.
+  numerique <- function(x) (is.numeric(x) || is.logical(x)) && !is.object(x)
+  if (!numerique(a) || !numerique(b))
+    return(sprintf("valeurs non numériques : %s et %s", paste(class(a), collapse = "/"),
+                   paste(class(b), collapse = "/")))
+  if (!length(a) && !length(b)) return("deux vecteurs de longueur 0 : rien n'est comparé")
   a <- unname(as.numeric(a)); b <- unname(as.numeric(b))
   if (length(a) != length(b))
     return(sprintf("longueurs différentes : %d et %d", length(a), length(b)))
@@ -227,12 +252,18 @@ executer_rscript <- function(script, args = character(0), env = character(0)) {
        sortie = as.character(sortie))
 }
 
-# Empreinte de l'arbre source installé : MD5 (tools::md5sum) de DESCRIPTION,
-# NAMESPACE et R/*, chemins relatifs compris, résumés en une seule MD5.
+# Empreinte de l'arbre source installé : MD5 (tools::md5sum) de tout ce que
+# R CMD INSTALL installe depuis l'arbre — DESCRIPTION, NAMESPACE et,
+# récursivement, R/, inst/, data/, src/ s'ils existent —, chemins relatifs
+# compris, triés par octets (radix, indépendant de la locale), résumés en une
+# seule MD5.
 FICHIER_EMPREINTE_SOURCE <- "tablexp_empreinte_source.txt"
+DOSSIERS_INSTALLES <- c("R", "inst", "data", "src")
 empreinte_source <- function(racine) {
-  fichiers <- c("DESCRIPTION", "NAMESPACE",
-                file.path("R", sort(list.files(file.path(racine, "R"), all.files = TRUE, no.. = TRUE))))
+  dossiers <- DOSSIERS_INSTALLES[dir.exists(file.path(racine, DOSSIERS_INSTALLES))]
+  contenus <- unlist(lapply(dossiers, function(d)
+    file.path(d, list.files(file.path(racine, d), all.files = TRUE, no.. = TRUE, recursive = TRUE))))
+  fichiers <- c("DESCRIPTION", "NAMESPACE", sort(contenus, method = "radix"))
   fichiers <- fichiers[file.exists(file.path(racine, fichiers))]
   md5 <- unname(tools::md5sum(file.path(racine, fichiers)))
   f <- tempfile(); on.exit(unlink(f))
@@ -260,7 +291,7 @@ installer_tablexp <- function(racine = racine_depot()) {
     if (!is.null(attr(r, "status")) && attr(r, "status") != 0L) {
       cat(r, sep = "\n")
       cat("\nECHEC : installation de tablexp depuis l'arbre de travail\n")
-      quit(save = "no", status = 1L)
+      quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
     }
     writeLines(empreinte, file.path(lib, FICHIER_EMPREINTE_SOURCE))
     cat(sprintf("tablexp : arbre de travail installé dans %s\n", lib))
@@ -269,7 +300,7 @@ installer_tablexp <- function(racine = racine_depot()) {
   chemin <- normalizePath(getNamespaceInfo("tablexp", "path"))
   if (!identical(dirname(chemin), normalizePath(lib))) {
     cat(sprintf("ECHEC : tablexp chargé depuis %s, pas depuis %s\n", chemin, lib))
-    quit(save = "no", status = 1L)
+    quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
   }
   .harnais$bibliotheque <- lib  # transmise aux sous-processus par executer_rscript()
   invisible(lib)
@@ -300,6 +331,6 @@ bilan <- function(code_sortie = TRUE) {
   ko <- n_echec + n_inattendu > 0L
   .harnais$bilan_fait <- TRUE
   cat(if (ko) "ECHEC\n" else "OK\n")
-  if (ko && code_sortie) quit(save = "no", status = 1L)
+  if (ko && code_sortie) quit(save = "no", status = 1L, runLast = FALSE)
   invisible(!ko)
 }

@@ -49,7 +49,7 @@ option <- function(nom, defaut) {
   if (is.na(i)) return(defaut)
   if (i == length(ARGS) || startsWith(ARGS[i + 1L], "--")) {
     cat(sprintf("ECHEC : option %s sans valeur\n", nom))
-    quit(save = "no", status = 1L)
+    quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
   }
   ARGS[i + 1L]
 }

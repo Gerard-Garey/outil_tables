@@ -11,7 +11,13 @@
 #         de `const BATTERIES = [ ... ]`, lignes de commentaire exclues ;
 #       - .github/workflows/ci.yml : `run:` des étapes du seul job `tests:`
 #         dont le nom commence par « Batterie : » ; ce job déclare
-#         `container:` et aucune étape de batterie n'a continue-on-error ;
+#         `container:` ; aucune ligne `continue-on-error:` n'y figure
+#         (niveau du job ou d'une étape, quelle qu'elle soit) ; aucun
+#         `if:` au niveau du job ; chaque
+#         étape de batterie a un `if:` absent ou égal à
+#         `${{ !cancelled() }}` (écrit tel quel, sans guillemets : toute
+#         autre condition, dont `false`, pourrait sauter la batterie sans
+#         faire échouer le job) ;
 #       aucune des trois listes n'est vide ;
 #    2. la marque « À ADAPTER » est absente de ces trois fichiers ;
 #    3. dans .github/workflows/*.yml, toutes les valeurs `image:` et
@@ -89,17 +95,32 @@ batteries_ci <- function(chemin) {
   }, character(1L))
 }
 
-# Écarts propres au job de tests : job absent, sans `container:`, étape de
-# batterie avec continue-on-error.
+# Condition admise sur une étape « Batterie : » (absente, ou celle-ci).
+CONDITION_BATTERIE <- "${{ !cancelled() }}"
+
+# Écarts propres au job de tests : job absent, sans `container:`,
+# `if:` au niveau du job, continue-on-error n'importe où dans le job, étape
+# de batterie dont le
+# `if:` n'est ni absent ni CONDITION_BATTERIE.
 defauts_job_tests <- function(chemin) {
   lj <- lignes_job(lire_lignes(chemin))
   if (!length(lj)) return(sprintf("ci.yml : job `%s:` absent", JOB_TESTS))
   d <- character(0)
   if (!any(grepl("^    container:", lj)))
     d <- c(d, sprintf("ci.yml : job `%s:` sans `container:` (ADR 0008, point 1)", JOB_TESTS))
-  for (e in etapes_job(lj))
-    if (grepl("Batterie :", e[1L], fixed = TRUE) && any(grepl("continue-on-error", e, fixed = TRUE)))
-      d <- c(d, sprintf("ci.yml : continue-on-error interdit sur l'étape %s", trimws(e[1L])))
+  # Une condition au niveau du job peut le sauter entièrement (constat m4).
+  for (l in grep("^    if[[:space:]]*:", lj, value = TRUE))
+    d <- c(d, sprintf("ci.yml : condition interdite au niveau du job `%s:` (%s)", JOB_TESTS, trimws(l)))
+  for (l in grep("^[[:space:]]*(- )?continue-on-error[[:space:]]*:", lj, value = TRUE))
+    d <- c(d, sprintf("ci.yml : continue-on-error interdit dans le job `%s:` (%s)", JOB_TESTS, trimws(l)))
+  for (e in etapes_job(lj)) {
+    if (!grepl("Batterie :", e[1L], fixed = TRUE)) next
+    conditions <- trimws(sub("^[[:space:]]*(- )?if[[:space:]]*:", "",
+                             grep("^[[:space:]]*(- )?if[[:space:]]*:", e, value = TRUE)))
+    if (length(conditions) > 1L || (length(conditions) == 1L && !identical(conditions, CONDITION_BATTERIE)))
+      d <- c(d, sprintf("ci.yml : condition `if: %s` interdite sur l'étape %s (admis : absente ou `if: %s`)",
+                        paste(conditions, collapse = " / "), trimws(e[1L]), CONDITION_BATTERIE))
+  }
   d
 }
 

@@ -41,8 +41,10 @@ for (f in sort(list.files(DOSSIER,
   avant <- nrow(.harnais$lignes)
   env <- new.env(parent = globalenv())
   # quit() et q() neutralisés dans le fichier de test (base::quit() est
-  # rattrapé par la garde de sortie du harnais).
+  # rattrapé par la garde de sortie du harnais) ; bilan() aussi : un bilan
+  # intermédiaire marquerait la batterie comme close avant la fin.
   env$quit <- env$q <- function(...) stop("quit() interdit dans un fichier de test")
+  env$bilan <- function(...) stop("bilan() interdit dans un fichier de test")
   r <- tryCatch({ source(f, local = env); NULL }, error = function(e) e)
   if (inherits(r, "error"))
     verifier("chargement complet du fichier", paste("erreur :", conditionMessage(r)))

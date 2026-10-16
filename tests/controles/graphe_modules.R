@@ -18,12 +18,18 @@
 #       syntaxique, aussi sous forme qualifiée (base::, utils::, methods::) :
 #       do.call() dont l'argument `what` (apparié par match.call(), position
 #       ou nom) n'est ni un symbole ni une fonction anonyme (chaîne,
-#       paste0(...), etc.), match.fun(), get(), get0(), mget(),
-#       getFromNamespace(), getExportedValue(), eval()/evalq() d'un
+#       paste0(...), etc.) ; toute occurrence (appel, ou fonction passée
+#       comme objet : lapply(x, get)) de match.fun, get, get0, mget,
+#       getFromNamespace, getExportedValue, getFunction, asNamespace,
+#       getNamespace (all.names()) ; eval()/evalq() d'un
 #       parse()/str2lang()/str2expression()/call()/as.call(), `:::`
 #       (interdit dans R/, point 11.3) et `tablexp::`. Par rapport à l'ADR
 #       0007 (point 2.3), la liste est élargie (audit de #8) : formes
-#       qualifiées, `what` non symbolique, call() et as.call() sous eval().
+#       qualifiées, `what` non symbolique, call() et as.call() sous eval(),
+#       toute occurrence des symboles d'appel dynamique et trois symboles
+#       de plus (getFunction, asNamespace, getNamespace). Un nom local
+#       homonyme (variable `get`, x$get) est aussi relevé : faux positif
+#       possible, assumé.
 #
 #  Limites : (i) un nom local (variable, argument) homonyme d'un symbole
 #  d'un autre module compte comme une arête (prudent : faux positif possible,
@@ -51,8 +57,11 @@ APPELS_AUTORISES <- c(
        construire_table = ORDRE_MODULES)
 )
 
+# Toute occurrence de ces symboles est interdite, appel ou fonction passée
+# comme objet (lapply(x, get)) : élargissement issu de l'audit de #8 (R3),
+# avec getFunction, asNamespace et getNamespace.
 APPELS_DYNAMIQUES <- c("match.fun", "get", "get0", "mget", "getFromNamespace",
-                       "getExportedValue")
+                       "getExportedValue", "getFunction", "asNamespace", "getNamespace")
 # Constructeurs d'appel interdits sous eval()/evalq() (élargissement de
 # l'ADR 0007, point 2.3, issu de l'audit de #8 : call() et as.call()).
 CONSTRUCTEURS_EVAL <- c("parse", "str2lang", "str2expression", "call", "as.call")
@@ -105,8 +114,6 @@ appels_interdits <- function(e) {
           trouves <<- c(trouves, sprintf("do.call(what = %s, ...)",
                                          paste(deparse(quoi), collapse = " ")))
       }
-      if (nom %in% APPELS_DYNAMIQUES)
-        trouves <<- c(trouves, sprintf("%s()", nom))
       if (is.symbol(tete) && nom == ":::")
         trouves <<- c(trouves, paste(deparse(x), collapse = " "))
       if (is.symbol(tete) && nom == "::" && identical(as.character(premier), "tablexp"))
@@ -122,7 +129,10 @@ appels_interdits <- function(e) {
     }
   }
   visiter(e)
-  unique(trouves)
+  # Symboles d'appel dynamique, en tête d'appel ou comme objet (all.names()
+  # voit aussi la forme qualifiée base::get).
+  dyn <- intersect(all.names(e), APPELS_DYNAMIQUES)
+  unique(c(trouves, sprintf("%s() (appel, ou fonction passée comme objet)", dyn)))
 }
 
 # Analyse le dossier R/ ; rend list(defauts, aretes, symboles).
