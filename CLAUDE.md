@@ -22,7 +22,7 @@ Rscript tests/test_reproductibilite.R
 Rscript tests/concordance_doc_moteur.R --strict
 ```
 
-Règles des tests : un défaut connu est codé en échec attendu, avec renvoi à l'issue ; un succès inattendu fait échouer la batterie, et la marque est alors retirée pour en faire un test ordinaire. Pour vérifier un point isolé, appeler directement la fonction concernée du package plutôt que tout le programme. Les contre-vérifications par les packages avancés (`survival`, `mgcv`, `WH`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen` ; aucun package qui dépende de Java) sont des valeurs écrites en dur dans les tests, produites par un script **hors CI** qui consigne les versions ; régénération sur ordre du mainteneur, avec tableau avant / après.
+Règles des tests : un défaut connu est codé en échec attendu, avec renvoi à l'issue ; un succès inattendu fait échouer la batterie, et la marque est alors retirée pour en faire un test ordinaire. Pour vérifier un point isolé, appeler directement la fonction concernée du package plutôt que tout le programme. Les contre-vérifications par les packages avancés (`survival`, `mgcv`, `WH`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen`, `MortCast`, `locfit`, `flexsurv` facultatif ; aucun package qui dépende de Java ; la source d'`ELT` s'exécute seulement hors du dépôt, sans Java, en appoint, sans qu'aucun code en soit copié) sont des valeurs écrites en dur dans les tests, produites par un script **hors CI**, éventuellement sur un autre poste muni d'un R récent, qui consigne la version de R et celle des packages (ADR 0002, troisième annotation du 16/10/2026) ; régénération sur ordre du mainteneur, avec tableau avant / après.
 
 ## Git et GitHub
 
