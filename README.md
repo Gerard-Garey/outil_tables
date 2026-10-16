@@ -2,7 +2,7 @@
 
 Outil R (package `tablexp` + application Shiny locale) qui construit des **tables d'expérience** à partir d'une base d'observation d'un portefeuille d'assurés : estimation des taux d'une transition (noyau multi-états), lissage ou positionnement sur une table de référence, fermeture aux âges extrêmes, validation, suivi d'expérience. Cas principal : la mortalité (tables du moment, puis prospectives) ; ensuite le rachat, l'incapacité-invalidité, la dépendance, le chômage des emprunteurs. Les résultats servent d'hypothèses biométriques de best estimate (Solvabilité II) et de support à la certification d'une table d'expérience (Code des assurances, A132-18).
 
-**État : cadrage terminé le 14 octobre 2026, aucun code encore.** Décisions : `docs/cadrage/2026-10-14-entretien-cadrage.md` ; faits sourcés : `docs/recherche/2026-10-14-cadre-tables-experience.md` ; cahier des charges : `docs/exigences.md` ; ADR : `docs/adr/`. Prochaine étape : plan de la première branche de travail par `architect`.
+**État : cadrage terminé le 14 octobre 2026 ; première branche de travail de code en cours (`claude/socle-donnees-exposition`, PR #12).** Décisions : `docs/cadrage/2026-10-14-entretien-cadrage.md` ; faits sourcés : `docs/recherche/2026-10-14-cadre-tables-experience.md` ; cahier des charges : `docs/exigences.md` ; ADR : `docs/adr/`. Plan de la branche : `docs/feuille-de-route.md`, § 1.
 
 Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés sous une loi vraie connue et une graine. Licence : PolyForm Noncommercial 1.0.0 (`LICENSE`).
 
@@ -24,7 +24,7 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 | `.github/` | Modèles d'issue et de PR, CI, Dependabot, ruleset de `main` |
 | `LICENSE` | PolyForm Noncommercial 1.0.0 |
 
-À venir, fixés par le cadrage : `R/` (package `tablexp`, un module par famille, point d'entrée `construire_table(donnees, roles, plan)`), `app.R` et `R/affichage.R` (Shiny, sans calcul), `tests/` (batteries, références de non-régression produites par la CI, contre-vérifications hors CI), `inst/extdata/` (jeux simulés, tables de référence et provenances), `docs/latex/` (documentation méthodologique, charte d'`outil_USP`).
+En place depuis la branche `claude/socle-donnees-exposition` : `DESCRIPTION`, `NAMESPACE`, `R/` (package `tablexp`, un module par famille, `R/outils.R`, point d'entrée `construire_table(donnees, roles, plan)` ; ADR 0007), `tests/` (harnais, trois batteries, scripts de contrôle sous `tests/controles/`). À venir : `app/app.R` et `app/affichage.R` (Shiny, sans calcul ; ADR 0007, M46), références de non-régression produites par la CI et contre-vérifications hors CI sous `tests/`, `inst/extdata/` (jeux simulés, tables de référence et provenances), `docs/latex/` (documentation méthodologique, charte d'`outil_USP`).
 
 ## Prérequis et commandes
 
