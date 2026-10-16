@@ -209,3 +209,60 @@ Les tests appellent n'importe quel module (`tablexp:::` admis dans `tests/`, poi
 8. Champs de premier niveau du plan (`transition`, `periode`, `delai_declaration`, `graine`, `etapes`) et `etapes` en liste nommée ordonnée (5.1).
 
 Issues : #8, #3, #9, #10, #11 ; branche `claude/socle-donnees-exposition` (PR #12).
+
+## Annotation du 16 octobre 2026 — points nouveaux acceptés (décision M46) ; mise en œuvre de #8 : appels dynamiques interdits élargis, scripts de contrôle sous `tests/controles/`, harnais
+
+Rédigée par `architect` ; le texte ci-dessus n'est pas réécrit.
+
+**(a) Points nouveaux acceptés.** Le 16/10/2026, le mainteneur a accepté les points marqués **[nouveau]** (décision M46, `docs/feuille-de-route.md` § 4). Ce sont les huit points de la liste « Points nouveaux soumis à confirmation du mainteneur » :
+
+- `R/outils.R` ;
+- l'application sous `app/` ;
+- l'argument `provenance` ;
+- le refus par condition typée `refus_tablexp` ;
+- les avertissements inscrits dans l'objet, avec la lecture de « émis » dans #9 ;
+- `positionnement` autorisé à appeler `lissage` ;
+- le périmètre et le codage de l'empreinte des données ;
+- les champs de premier niveau du plan.
+
+L'énumération de M46 ne nomme pas le point 8 (champs du plan) ; il est lu comme compris dans l'acceptation des « points nouveaux de l'ADR 0007 ». Le mainteneur le dira si cette lecture est contestée. Les mentions **[nouveau]** et la phrase « soumis à confirmation » du corps valent désormais historique. La relecture générale de l'ADR par le mainteneur, annoncée dans le statut, reste attendue comme pour les ADR 0002 à 0006 (Q40).
+
+Alignements faits à cette date, en conséquence (« Conséquences » ci-dessus) :
+
+- ADR 0003, point 5 : mention datée ;
+- ADR 0004, point 5 et « Ce que l'ADR ne règle pas » : mentions datées ;
+- ADR 0005, point 4 : mention datée ;
+- `CLAUDE.md` (« Architecture », domaine de commit `app:`, « Déclencheurs ») : alignement en commit `claude:`.
+
+Reste à aligner `README.md` l. 27, qui cite encore `app.R` et `R/affichage.R` (commit `docs:`, hors du périmètre d'écriture d'`architect`).
+
+**(b) Appels dynamiques interdits : liste élargie (point 2.3).** L'implémentation de #8 et son audit ont élargi la liste du point 2.3 (`tests/controles/graphe_modules.R`, en-tête et constantes `APPELS_DYNAMIQUES`, `CONSTRUCTEURS_EVAL`, `PACKAGES_QUALIFIES`, commit `0139a16`). Sont désormais interdits dans `R/` :
+
+- les formes **qualifiées** `base::`, `utils::` et `methods::` des appels interdits, lues comme la forme nue ;
+- `do.call()` dont l'argument `what`, apparié par `match.call()` (position ou nom), n'est **ni un symbole ni une fonction anonyme** (chaîne, `paste0(...)`, etc.). Cela remplace « premier argument chaîne » ;
+- `get0()` et `getExportedValue()`, en plus de `match.fun()`, `get()`, `mget()` et `getFromNamespace()` ;
+- `eval()` **et `evalq()`** d'un `parse()`, `str2lang()`, `str2expression()`, **`call()` ou `as.call()`**.
+
+Un nouvel élargissement est **en cours** dans la branche, non commité à la date de l'annotation : toute occurrence des symboles d'appel dynamique, et non leur seul appel, ainsi que `getFunction`, `asNamespace` et `getNamespace`. Il se constatera sur le commit `tests:` qui l'introduira. La règle d'interprétation est inchangée : `do.call(f, args)`, avec `f` un objet fonction désigné par un symbole, reste permis. La limite connue « fonction passée en argument » vaut toujours. L'élargissement **ne change aucun résultat** (contrôle statique).
+
+**(c) Scripts de contrôle sous `tests/controles/`.** Les contrôles mécaniques du point 2.2 et de l'ADR 0008 sont rangés sous `tests/controles/` (commit `0139a16`) :
+
+- `graphe_modules.R` ;
+- `liste_blanche_description.R` ;
+- `identite_batteries.R` (batteries de `CLAUDE.md` et de `circuit-technique.js`, chaîne `image@empreinte`) ;
+- `plateforme.R` (ADR 0008, point 3).
+
+Le **script de frontière** (point 1.3 ; ADR 0004, point 6 b) n'existe pas encore : `app/` est vide dans cette branche. Il est dû par la branche d'application.
+
+**(d) Harnais (point 11.2), forme effective** (`tests/harnais.R`, commit `0139a16`).
+
+- **Signature** : `echec_attendu(nom, issue, expr, motif = NULL, erreur_quelconque = FALSE)`. Une erreur qui n'est pas un `refus_tablexp` du motif donné est un `ECHEC`, sauf `erreur_quelconque = TRUE` : un défaut connu ne masque pas une panne différente. La nature de l'échec attendu (`valeur`, `refus`, `erreur_quelconque`) est décomptée par `bilan()`. Le renvoi d'issue de la forme `"#N"` reste obligatoire.
+- **Garde de sortie avant bilan** : une fonction `.Last` fait sortir avec le code 1 tout processus qui a chargé le harnais et se termine avant la ligne de `bilan()`, même par `quit(status = 0)`.
+- **Bibliothèque réutilisée** : `installer_tablexp()` ne réutilise la bibliothèque désignée par `TABLEXP_BIBLIOTHEQUE` que si l'**empreinte de l'arbre source** inscrite à l'installation égale celle de l'arbre courant. Cette empreinte est un MD5 par `tools::md5sum` de `DESCRIPTION`, `NAMESPACE` et `R/*`, chemins compris. Sinon le harnais réinstalle et le dit. C'est un complément au point 11.1 (une installation par batterie), qui empêche de tester un package installé périmé.
+- **Contrôle de fin de batterie** : `bilan()` compte un échec si un espace de noms hors priorité `base`, autre que `tablexp`, est chargé. C'est la proposition de l'ADR 0008 (« Conséquences »), retenue par la session pour #8.
+
+Remarque pour `audit`, sans effet sur les résultats : `empreinte_source()` trie les noms de fichiers par `sort()`, donc selon la locale, et non par `method = "radix"` comme le point 9.3. L'empreinte ne sert qu'à décider d'une réinstallation sur une même machine, mais une différence de locale entre la batterie et le sous-processus provoquerait une réinstallation superflue. Cette conséquence est une *hypothèse*, non mesurée.
+
+**Effet sur les résultats** : aucun.
+
+Issues : #8 ; #9 (avertissements, refus). Décisions M45, M46.

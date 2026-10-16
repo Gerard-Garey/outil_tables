@@ -18,7 +18,7 @@ Mise à jour du 16/10/2026 (`architect-approfondi`, plan de la première branche
 
 **Accepté par le mainteneur le 16/10/2026 (M45)** : branche ouverte, issues créées (N1 = #8, N3 = #9, N2 = #10, N4 = #11), précisions ajoutées à #3.
 
-- **Branche** : `claude/socle-donnees-exposition`, partie de `main` (`8ec1077`, PR #1 fusionnée) — PR brouillon à ouvrir dès la création de la branche (P1).
+- **Branche** : `claude/socle-donnees-exposition`, partie de `main` (`8ec1077`, PR #1 fusionnée) — PR brouillon à ouvrir dès la création de la branche (P1) *(ouverte : PR #12)*.
 - **Périmètre** (fermé, cinq issues) :
   - [ ] #8 (N1) — Socle du package `tablexp`, batteries et CI sous R 4.3.3 (liste blanche de `DESCRIPTION`, ordre des modules, concordance documentation ↔ code) — agents : `coder` ; `docwriter` pour le squelette LaTeX (commit `docs:` préparatoire, exception de la règle 9) — circuit : 3 — résultats : aucun
   - [ ] #3 — Script de contrôle de l'absence de Java dans les dépendances récursives — agent : `coder` — circuit : 3 — résultats : aucun
@@ -58,6 +58,7 @@ Issues ouvertes non rattachées à une branche, avec la raison.
 | #5 — Contre-vérification des méthodes IA 1 à 4 et de Denuit-Goderniaux sans ELT | issue parapluie : chaque ligne suit la branche de sa méthode (SMR : troisième branche ; méthodes 2 à 4 et fermeture : branches ultérieures) ; à découper en une issue par méthode au plan de la branche concernée | plusieurs branches |
 | #6 — Sources primaires de la v1 (`needs-info`) | travail de recherche (`actuary`, `regulatory`) sur documents que le mainteneur doit rendre accessibles (notes II1291, Lignes directrices, articles) ; préalable à toute citation, pas au code de la première branche | sous-ensemble par branche : Garwood (1936) pour la deuxième, II1291-14 et Forfar et al. (1988) pour la troisième |
 | #7 — Versions de contre-vérification et du poste | première contre-vérification hors CI à la deuxième branche ; la version de R du poste peut être consignée dès que les batteries de la première branche y tournent (sortie collée dans la PR) | deuxième branche |
+| #13 — Établir sur la source les textes réglementaires cités par `docs/exigences.md` (§ 2.4) (`needs-info`) | recherche `regulatory` sur des textes français inaccessibles depuis la session ; neuf questions au mainteneur (M46) ; préalable à toute citation dans `docs/latex/` | avant le passage de `docwriter` qui cite un texte ; à rattacher au point d'étape |
 
 ## 4. Décisions du mainteneur
 

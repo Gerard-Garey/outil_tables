@@ -199,3 +199,55 @@ Arrêtée par le mainteneur le 16/10/2026 (M45, point P3) : R 4.3.3 en CI par le
 - **Accès réseau tenté depuis la session**, refusé par le proxy (`CONNECT tunnel failed, response 403`) : `auth.docker.io`, `registry-1.docker.io`, `hub.docker.com`, `ghcr.io`, `raw.githubusercontent.com`, `packagemanager.posit.co` ; `docker manifest inspect rocker/r-ver:4.3.3` donne `Forbidden`.
 
 Issues : #8 (socle, batteries et CI sous R 4.3.3), #3 (absence de Java). Décisions M43 (R 4.3.3), M44 (`Depends: R (>= 4.3.3)`), M45 (P3, P6, P7, P8 ; `docs/feuille-de-route.md`, § 1 et § 4). Voir ADR 0002 (quatrième annotation, A13 ; seconde annotation, A8, points ouverts) et ADR 0005 (point 8).
+
+## Annotation du 16 octobre 2026 — empreinte relevée, OpenBLAS constaté, bascule vers la BLAS et la LAPACK Netlib (décision M47) ; identifiant de plateforme de référence fixé
+
+Annotation prévue par les points 2, 3 et 9 et par « Conséquences » (hypothèses sur l'image) ; rédigée par `architect` à partir des commits et des exécutions cités. Le texte ci-dessus n'est pas réécrit.
+
+**Relevé de l'empreinte (point 2).** Exécution GitHub Actions 38903692466 (commit `df21528`), job temporaire « Relevé de l'empreinte de l'image », `docker buildx imagetools inspect rocker/r-ver:4.3.3` sur l'exécuteur, le 16/10/2026 : empreinte de l'**index multi-architecture**
+
+```
+rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
+```
+
+reportée dans `container.image` et `TABLEXP_IMAGE` du job « Tests (R 4.3.3) » (`.github/workflows/ci.yml`) par le commit `1d49e17`, qui retire aussi le job temporaire.
+
+**Constat (point 3, cas « BLAS optimisée »).** La même exécution montre que l'image charge **OpenBLAS 0.3.20** (chemins `/usr/lib/x86_64-linux-gnu/openblas-pthread/...`), sur **Ubuntu 22.04.5**, `La_version()` = `3.10.0`. L'hypothèse de départ (Netlib chargée par défaut) est donc fausse ; la distribution de base (Ubuntu 22.04, LAPACK 3.10.0) est confirmée. Le script de plateforme a échoué en mode strict en disant ce qu'il voyait : aucune constante n'a été ajustée en silence.
+
+**Décision du mainteneur M47 (16/10/2026)** : des deux voies du point 3, la **bascule dans le job** est retenue, comme dans `outil_USP`, et non le repli (point 10). Une étape « BLAS et LAPACK de référence », placée avant le script de plateforme, pointe par `update-alternatives` les alternatives `libblas.so.3-x86_64-linux-gnu` et `liblapack.so.3-x86_64-linux-gnu` vers les paquets Netlib d'Ubuntu, `libblas3` et `liblapack3` en version **3.10.0-2ubuntu1**. Ces paquets sont déjà présents dans l'image ; l'étape les passe à `apt-get install`, qui ne fait que confirmer leur présence, puis affiche les cibles résolues et les versions (`dpkg-query`). Le coût d'un `apt-get update` à chaque exécution, prévu au point 3, est accepté. La chaîne `image@empreinte` ne change pas : la plateforme de référence est **l'image épinglée suivie de cette bascule**. Une modification de l'étape est un changement de plateforme (point 9).
+
+**Première exécution conforme.** Exécution 38904463401 (commit `23ac813`), job « Tests (R 4.3.3) » vert, script de plateforme en mode strict :
+
+- R `R version 4.3.3 (2024-02-29)` ;
+- BLAS `/usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0` ;
+- LAPACK `/usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0`, `La_version()` `3.10.0` ;
+- `OPENBLAS_NUM_THREADS` et `OMP_NUM_THREADS` à `1`.
+
+Les constantes de `tests/controles/plateforme.R` (`R_ATTENDU`, `LA_VERSION_ATTENDUE`, `MOTIF_BLAS`, `MOTIF_LAPACK`) sont ainsi confirmées sans modification.
+
+**Grandeurs consignées sans faire échouer (point 5).**
+
+- **Processeur** : AMD EPYC 9V45 dans l'exécution 38904463401, AMD EPYC 7763 dans l'exécution 38903692466. Le modèle varie donc d'une exécution à l'autre sur le même libellé d'exécuteur. La BLAS Netlib n'a pas de noyau choisi selon le processeur, contrairement à OpenBLAS ; la réserve de « Conséquences » sur la `libm` de la glibc, qui pourrait différer au dernier bit d'un processeur à l'autre, reste en revanche **ouverte, non mesurée**.
+- **`ImageOS` et `ImageVersion`** de l'hôte ne sont **pas transmises au conteneur** : le bloc les écrit vides. Pour les consigner, le job devrait les transmettre explicitement au conteneur (moyen à établir et à mesurer). C'est un point mineur, sans effet sur les résultats, laissé à la deuxième branche (workflow de régénération).
+- **Java** : aucun exécutable `java` dans l'image (`Sys.which("java")` vide), ce qui confirme l'hypothèse correspondante de « Conséquences ».
+
+Hypothèses de « Conséquences » non consignées par la présente annotation, faute de relevé rapporté : options exactes de `configure` de rocker, présence de `g++`, `gfortran` et `make`, `LANG` et `TZ`. Elles restent ouvertes. Le bloc du point 5 consigne déjà `LC_COLLATE` et le fuseau horaire ; les autres seront relevées quand elles serviront (code compilé, tri de chaînes).
+
+**Identifiant de plateforme de référence** (point 5), fixé à cette date :
+
+- image `rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309`, suivie de la bascule `update-alternatives` vers `libblas3` et `liblapack3` 3.10.0-2ubuntu1 ;
+- `R version 4.3.3 (2024-02-29)` ;
+- BLAS `/usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0` ;
+- LAPACK `/usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0`, version 3.10.0 ;
+- monothread.
+
+Les premières références de non-régression naîtront sur cette plateforme (deuxième branche) ; tout changement d'un de ces éléments relève du point 9.
+
+**Effet sur les résultats** : aucun (aucune référence n'existe).
+
+**Preuves.**
+
+- *Vérifié par `architect`* : le SHA de tête de chaque exécution (`gh api repos/Gerard-Garey/outil_tables/actions/runs/<id>` : 38903692466 → `df21528`, conclusion `failure` ; 38904463401 → `23ac813`, conclusion `success`) ; le contenu du commit `1d49e17` (`git show`) ; les constantes de `tests/controles/plateforme.R`.
+- *Rapporté par la session principale, non revérifié* : les valeurs lues dans les journaux des jobs (OpenBLAS 0.3.20, Ubuntu 22.04.5, chemins, processeurs, version des paquets, absence de `java`, `ImageOS` vide). Le téléchargement des journaux depuis la session de rédaction est refusé (`results-receiver.actions.githubusercontent.com`, `Forbidden`).
+
+Issues : #8. Décision M47 (`docs/feuille-de-route.md` § 4).
