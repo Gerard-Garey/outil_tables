@@ -6,6 +6,7 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
 
 - **Fichier unique** : `docs/latex/doc_outil_tables.tex`, sans `\input` ni `\include` (E3.1).
 - **PDF versionné** : `docs/latex/doc_outil_tables.pdf` est recompilé et commité **avec** toute modification du `.tex`, dans le même commit `docs:` (E3.1). Les fichiers auxiliaires (`.aux`, `.log`, `.toc`, `.out`, `.fls`, `.fdb_latexmk`, `.synctex.gz`) sont ignorés par `.gitignore`.
+- **Date fixe** : la page de garde porte la date de la dernière modification du `.tex`, écrite à la main dans la macro `\datedoc` du préambule (`17/10/2026`), mise à jour par chaque commit `docs:` qui modifie le document. `\today` est proscrit : un document de certification ne change pas selon le jour où on le compile.
 - **Lecteur visé** : un relecteur externe (actuaire certificateur, ACPR) qui n'a pas accès au code (E3.7). Toute affirmation sur le code est vraie de l'état du code au commit qui la porte ; elle s'adosse à une lecture du code ou à une mesure citée dans le compte rendu de `docwriter`.
 
 ## 2. Structure : invariants
@@ -34,23 +35,23 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
   - une fonction d'un package hors priorité `base` (`survival`, `mgcv`, `shiny`…) **ne s'écrit jamais avec des parenthèses** dans `\code{}` : on cite le package (`\code{survival}`) ou la fonction sans parenthèses et en toutes lettres (« la fonction `survfit` du package `survival` ») ;
   - une fonction d'un script de `tests/controles/` n'est pas reconnue : on cite le script par son chemin (`\code{tests/controles/plateforme.R}`), jamais sa fonction ;
   - une commande système (`update-alternatives`, `R CMD INSTALL`) s'écrit sans parenthèses.
-- **Contrôle 2** : toute fonction exportée de `tablexp` est citée au moins une fois sous cette forme (ou par son entrée du catalogue `exports`, section 3.2). Un export pas encore documenté figure dans `tests/concordance_attente.csv` (colonnes `nom`, `issue`, `motif`), compté en échec attendu ; **le citer rend son échec attendu inattendu, ce qui fait échouer la batterie** : la ligne est retirée de la liste par un commit `tests:` qui suit le commit `docs:` et part avec lui au même push (un domaine par commit), pour que la CI ne voie jamais l'état intermédiaire.
+- **Contrôle 2** : toute fonction exportée de `tablexp` est citée au moins une fois sous cette forme (ou par son entrée du catalogue `exports`, section 3.2). Un export pas encore documenté figure dans `tests/concordance_attente.csv` (colonnes `type`, `nom`, `issue`, `motif` ; `type` = `export`), compté en échec attendu ; **le citer rend son échec attendu inattendu, ce qui fait échouer la batterie** : la ligne est retirée de la liste par un commit `tests:` qui suit le commit `docs:` et part avec lui au même push (un domaine par commit), pour que la CI ne voie jamais l'état intermédiaire.
 
-### 3.2 Entrée de catalogue (format proposé pour les contrôles à écrire par `coder`)
+### 3.2 Entrée de catalogue (contrôle 4)
 
-- **Forme** : `\catalogue{<catalogue>}{<nom>}`, sur une ligne du tableau qui recense le catalogue, en première cellule. La macro compose `\code{<nom>}` ; le premier argument, en ASCII minuscule avec tirets, n'est pas imprimé. `<nom>` s'écrit comme dans le code, souligné échappé `\_` ; une fonction porte `()`, sans argument. Motif proposé : `\\catalogue\{([a-z0-9-]+)\}\{([^{}]+)\}`, puis `\_` → `_` et suppression d'un `()` final.
-- **Règle de concordance** : pour chaque catalogue, l'ensemble des noms lus dans le document est **égal** à l'ensemble de sa source dans le code ; un nom y figure une seule fois ; un catalogue inconnu est un écart. L'ordre des lignes est libre (ordre du code recommandé). Une entrée de catalogue dont le nom porte `()` compte comme citation de fonction pour les contrôles 1 et 2 (même vérification d'existence).
+- **Forme** : `\catalogue{<catalogue>}{<nom>}`, sur une ligne du tableau qui recense le catalogue, en première cellule. La macro compose `\code{<nom>}` ; le premier argument, en ASCII minuscule avec tirets, n'est pas imprimé. `<nom>` s'écrit comme dans le code, souligné échappé `\_` ; une fonction porte `()`, sans argument. Motif lu : `\\catalogue\{([a-z0-9-]+)\}\{([^{}]+)\}`, puis `\_` → `_` et suppression d'un `()` final. Toute occurrence de `\catalogue` que ce motif ne lit pas est un écart (« entrée de catalogue illisible ») : nom de catalogue en majuscules ou avec souligné, espace avant une accolade, accolade dans le nom, entrée coupée sur deux lignes.
+- **Règle de concordance** : pour chaque catalogue, l'ensemble des noms lus dans le document est **égal** à l'ensemble de sa source dans le code ; un nom y figure une seule fois ; un catalogue inconnu est un écart. Dans `exports` et `fonctions-<fichier>`, un nom porte `()` si et seulement s'il désigne une fonction ; dans `roles` et `recettes`, aucun nom ne porte `()`. L'ordre des lignes est libre (ordre du code recommandé). Une entrée de catalogue dont le nom porte `()` compte comme citation de fonction pour les contrôles 1 et 2 (même vérification d'existence).
 - **Catalogues requis** (E2.2, E3.3, E4.9 ; issue #8, point 3) :
 
   | Catalogue | Source dans le code | Où il est recensé |
   |---|---|---|
   | `exports` | `getNamespaceExports("tablexp")` | tableau `tab:index-exports` (dernière partie) |
   | `fonctions-<fichier>` | définitions de premier niveau de `R/<fichier>.R` (`nom <- …` ou `nom = …`, lues par `parse()` comme dans `tests/controles/graphe_modules.R`) | tableau `tab:fonctions-<fichier>` de la partie du module |
-  | `roles` | `catalogue_roles()$role` | tableau du catalogue des rôles (partie `donnees`, #9) |
-  | `recettes` | liste des recettes d'exposition du moteur (à cette date une seule, constante `RECETTE_BRANCHE` de `R/donnees.R`, clé de `CONVENTION_NATIVE` de `R/exposition.R`) ; `coder` fixe la source unique | tableau des recettes (partie `exposition`, #11) |
+  | `roles` | `catalogue_roles()$role` | tableau `tab:catalogue-roles` (partie `donnees`) |
+  | `recettes` | constante `RECETTE_BRANCHE` de `R/donnees.R`, source unique ; les clés de `CONVENTION_NATIVE` de `R/exposition.R` lui sont égales (contrôlé) | tableau `tab:recettes` (partie `exposition`) |
 
-- **Catalogues proposés**, instrumentés quand la section qui les recense est écrite : `conventions` (`ORDRE_CONVENTIONS`), `champs-plan` (`CHAMPS_PLAN`), `parametres-<etape>` (colonne `parametre` de `PARAMETRES_ETAPES[[etape]]`), `motifs` (`MOTIFS_LIGNES` et `MOTIFS_TETE`), `refus` (codes de refus passés à `refuser()`), `avertissements` (codes passés à `avertir()`).
-- **Catalogue en attente** : tant qu'un catalogue requis n'a aucune entrée dans le document, la batterie le compte en échec attendu avec renvoi à l'issue qui le documente (mécanisme de la liste d'attente, à étendre par `coder`).
+- **Catalogues proposés**, non instrumentés (les codes correspondants sont cités par `\code{}` dans le texte ; un catalogue non requis employé par `\catalogue` serait un écart) : `conventions` (`ORDRE_CONVENTIONS`), `champs-plan` (`CHAMPS_PLAN`), `parametres-<etape>` (colonne `parametre` de `PARAMETRES_ETAPES[[etape]]`), `motifs` (`MOTIFS_LIGNES` et `MOTIFS_TETE`), `refus` (codes de refus passés à `refuser()`), `avertissements` (codes passés à `avertir()`).
+- **Catalogue en attente** : un catalogue requis sans aucune entrée dans le document est un échec, sauf s'il figure dans `tests/concordance_attente.csv` (colonne `type` = `catalogue`, avec renvoi à l'issue qui le documente), où il compte en échec attendu ; présent et encore en attente, c'est un succès inattendu, qui fait échouer la batterie.
 
 ## 4. Contenu : invariants
 
@@ -88,7 +89,7 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
    ```
 
    Relancer tant que le log contient « Rerun to get cross-references right » ou « Label(s) may have changed » ; trois passes en pratique, cinq au plus (au-delà, un renvoi oscille). `latexmk -pdf -interaction=nonstopmode -halt-on-error doc_outil_tables.tex` fait de même.
-4. **Contrôler le log final** et comparer avant / après : nombre de passes et code de sortie de chacune ; lignes commençant par `!` (aucune) ; occurrences de `undefined` (aucune) ; occurrences d'`Overfull` et d'`Underfull` (un `Overfull` nouveau de plus de 10pt sur une ligne modifiée est à corriger) ; nombre de pages (`pdfinfo`) ; table des matières (le plan ne change que par ajout voulu).
+4. **Contrôler le log final** et comparer avant / après : nombre de passes et code de sortie de chacune ; erreurs, c'est-à-dire lignes commençant par `! ` (un `!` suivi d'une espace : aucune ; c'est le critère du job « Documentation »). Une ligne qui commence par `!` sans espace n'est pas une erreur : c'est, par exemple, la reproduction d'une boîte mal remplie, où une flèche mathématique en début de ligne s'imprime `!` ; elle ne fait pas échouer le job ; occurrences de `undefined` (aucune) ; occurrences d'`Overfull` et d'`Underfull` (un `Overfull` nouveau de plus de 10pt sur une ligne modifiée est à corriger) ; nombre de pages (`pdfinfo`) ; table des matières (le plan ne change que par ajout voulu).
 5. **Concordance** : `Rscript tests/concordance_doc_moteur.R --strict` passe sur l'état modifié, ou son écart attendu (liste d'attente) est dit dans le compte rendu.
 6. **Ce qui est commité** : `git status docs/latex` montre le `.tex` et le `.pdf` ensemble ; nommer la chaîne de composition (ligne `Producer` de `pdfinfo`).
 7. **Rendre compte** : modifications par section, avec avant / après pour toute modification de fond ; références ajoutées ou retirées et pourquoi ; suppressions et leur motif ; balayage de la surface d'impact.
