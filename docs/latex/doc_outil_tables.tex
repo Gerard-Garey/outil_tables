@@ -602,14 +602,27 @@ dans la partie du module.
 \subsection{Avertissements métier}
 \label{sec:avertissements}
 
-\emph{À rédiger (issue~\#9).}
+Un avertissement métier signale ce qui n'empêche pas la construction mais doit
+être lu~: unité d'observation par défaut, exclusion appliquée, relevé
+d'incohérence non bloquant. Il est \textbf{inscrit dans l'objet résultat,
+jamais émis par \code{warning()}} (ADR 0007, point 6.5)~: l'objet est la seule
+source du rapport figé et de l'application~; un \code{warning()} serait perdu
+par l'application, absent de la fiche et parasite dans les batteries.
+\code{avertissements\_vides()} crée l'accumulateur, un \code{data.frame} de
+colonnes \code{etape}, \code{code}, \code{message} et \code{nombre}~;
+\code{avertir()} lui ajoute une ligne, et refuse, par une erreur de
+programmation, un code qui n'est pas conforme à \code{MOTIF\_CODE\_REFUS}.
+Chaque fonction d'étape rend ses avertissements~; le point d'entrée les
+rassemble dans le champ \code{avertissements} de l'objet et de la fiche. Les
+codes de chaque étape sont recensés dans la partie de son module
+(sections~\ref{sec:unite-observation} et~\ref{sec:exposition}).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-outils}
 
-{\small
+{\footnotesize
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
 \caption{Définitions de premier niveau de \code{R/outils.R}.}
 \label{tab:fonctions-outils}\\
 \rowcolor{tableheader}
@@ -892,7 +905,8 @@ Chaque test nomme la nature de son attendu (ADR 0007, point 11.4~; E2.20)~:
 valeur calculée à la main (identité exacte, ou tolérance déclarée)~;
 \emph{recoupement}, comparaison à la valeur que rend, dans la batterie, un appel
 direct d'une fonction d'un package de priorité \code{base}, dont la portée est
-limitée quand le moteur repose sur la même fonction~;
+limitée quand le moteur repose sur la même fonction~: le test dit alors ce
+qu'il vérifie (la formule et son branchement, non la fonction de base)~;
 \emph{contre-vérification}, valeur de référence produite hors CI par un package
 avancé et écrite en dur avec sa version et sa date~; \emph{constat de
 simulation}, qui écrit le nombre de têtes, le niveau, la région d'acceptation
@@ -1206,30 +1220,486 @@ relève du mainteneur.
 \section{Données, rôles et contrôles~: \code{R/donnees.R}}
 \label{sec:donnees}
 
+Le module \code{donnees} reçoit la base d'observation, un \code{data.frame}, et
+la déclaration des rôles de ses colonnes. Il contrôle les rôles, évalue les
+motifs d'invalidité de chaque ligne, applique les règles d'exclusion
+déclarées par le plan, déduit l'unité d'observation et fusionne les
+intervalles d'observation d'une même tête (E2.2, E2.4, E2.7). Il ne modifie
+jamais les données~: une ligne invalide arrête la construction, sauf règle
+d'exclusion déclarée, et rien n'est corrigé (E2.7). Sa fonction d'étape est
+\code{preparer\_donnees()}~; il porte aussi le catalogue des rôles
+(\code{catalogue\_roles()}) et la représentation commune d'une table de
+référence (\code{table\_reference()}), toutes deux exportées. Le contenu de fond
+(catalogue, motifs, règles de fusion) vient de la spécification d'\code{actuary}
+du 16/10/2026, versée dans l'issue~\#11 (parties A.0 et A.1).
+
+\subsection{Conventions de temps}
+\label{sec:conventions-temps}
+
+Trois conventions de temps sont communes à toutes les recettes (E2.3)~; elles
+sont appliquées par \code{donnees} et par \code{exposition}
+(section~\ref{sec:exposition}), qui ajoute l'unité de l'exposition et la
+fenêtre d'observation.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Une date est un jour} (classe \code{Date}, sans heure ni fuseau).
+    Un intervalle d'observation est l'intervalle d'instants semi-ouvert
+    $[\text{entrée}, \text{sortie})$~: \code{date\_entree} est l'instant où
+    l'observation commence, \code{date\_sortie} celui où elle cesse (jour du
+    décès ou du rachat, ou lendemain du dernier jour couvert pour une fin de
+    garantie). Un événement daté du jour $s$ survient à l'instant $s$~: la tête
+    est exposée jusqu'à $s$, jour $s$ exclu. Une ligne \code{en\_cours} est
+    ouverte à droite. \emph{Choix de conception}~: il donne des décomptes
+    entiers et additifs, au prix d'une sous-estimation de l'exposition d'un
+    demi-jour par événement en moyenne.
+  \item \textbf{Âge au dernier anniversaire.} L'âge au jour $t$ d'une tête née
+    le jour $n$ est le nombre d'années révolues
+    \[
+      \operatorname{age}(n,t) = \operatorname{an}(t) - \operatorname{an}(n)
+      - \mathds{1}\{(\operatorname{mois}(t), \operatorname{jour}(t)) <
+      (\operatorname{mois}(n), \operatorname{jour}(n))\},
+    \]
+    comparaison lexicographique, appliquée sans cas particulier
+    (\code{age\_revolu()}). Pour une naissance le 29~février, l'anniversaire
+    tombe donc le 1\textsuperscript{er}~mars des années non bissextiles~: le
+    28~février d'une telle année, $(2, 28) < (2, 29)$ et l'année n'est pas
+    révolue. Une année d'âge dure ainsi 365 ou 366 jours. Convention de
+    calcul, conséquence de la formule (spécification, A.0, T2), validée par
+    \code{actuary} le 17/10/2026, d'impact négligeable (un jour d'exposition
+    déplacé entre deux âges, pour les seules naissances du 29~février)~;
+    aucune source juridique n'est établie à son sujet.
+  \item \textbf{Période d'observation et délai de déclaration.} La période
+    $[\text{début}, \text{fin}]$ est déclarée par le plan, fin incluse, jamais
+    déduite des données (E2.5). Le délai de déclaration est un nombre entier
+    de jours $\ge 0$, sans arithmétique de mois. La fin effective est
+    $\text{fin} - \text{délai}$ et la borne d'instant
+    $B = \text{fin effective} + 1$~: l'observation s'arrête à l'instant $B$. Une
+    période dont le début est postérieur à la fin effective est refusée
+    (\code{periode\_vide}).
+\end{itemize}
+
 \subsection{Catalogue des rôles}
 \label{sec:catalogue-roles}
 
-\emph{À rédiger (issue~\#9).}
+Le moteur ne lit une colonne que par son \emph{rôle}, déclaré par
+l'utilisateur dans un catalogue fermé (E2.2~; ADR 0003, point 2). Les rôles
+sont transmis à \code{construire\_table()} sous la forme d'un vecteur de
+chaînes nommé~: noms = rôles du catalogue, valeurs = noms de colonnes de la
+base (ADR 0007, point 4.1). Les colonnes sans rôle sont ignorées.
+\code{catalogue\_roles()}, exportée pour que l'application propose la
+déclaration des rôles, rend le catalogue sous la forme d'un \code{data.frame}
+de colonnes \code{role}, \code{famille}, \code{type\_admis}, \code{usage} et
+\code{recettes} (tableau~\ref{tab:catalogue-roles}).
+
+\medskip
+{\sloppy La colonne \emph{usage} décrit l'emploi du rôle par la seule recette
+d'exposition disponible, \code{lignes\_dates\_completes}
+(section~\ref{sec:recettes})~:\par}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{requis}~: rôle sans lequel aucune recette ne s'applique (refus
+    \code{aucune\_recette})~;
+  \item \code{facultatif}~: rôle lu pour des contrôles (unicité du contrat,
+    cohérence de l'année de naissance) ou, pour \code{id\_tete}, pour l'unité
+    d'observation~;
+  \item \code{segmentation}~: rôle requis si la segmentation du plan l'emploie
+    (refus \code{role\_requis\_manquant}), contrôlé s'il est seulement
+    déclaré, avec l'avertissement \code{role\_non\_employe}~;
+  \item \code{non\_pris\_en\_charge}~: rôle qu'aucune recette disponible
+    n'emploie et dont l'omission changerait le sens du résultat (pondération,
+    agrégats, états, date de survenance distincte de la sortie, date
+    d'inventaire, âge fourni)~; sa déclaration est \textbf{refusée}
+    (\code{role\_non\_pris\_en\_charge}) plutôt qu'ignorée en silence. Le rôle
+    \code{montant} est de ceux-là~: la pondération par les montants attend la
+    spécification de ses intervalles (E2.8).
+\end{itemize}
+
+\noindent
+Les types sont contrôlés sans conversion (E4.4)~: une colonne de dates doit
+être de classe \code{Date}, exactement, à valeurs entières et finies~; une
+colonne \code{POSIXct}, une chaîne ou un nombre sont refusés
+(\code{type\_incompatible}), la conversion revenant à la couche de lecture.
+Les modalités des rôles catégoriels sont comparées après conversion en
+chaîne, en respectant la casse~: \code{H} et \code{F} pour \code{sexe}~;
+\code{deces}, \code{rachat}, \code{terme}, \code{autre} et \code{en\_cours}
+pour \code{cause\_sortie} (constantes \code{MODALITES\_SEXE} et
+\code{MODALITES\_CAUSE}). Un recodage (par exemple \code{1}/\code{2} vers
+\code{H}/\code{F}) relève de la couche de lecture.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{3.3cm}p{2.5cm}p{5.4cm}p{3.4cm}@{}}
+\caption{Catalogue fermé des rôles (\code{catalogue\_roles()}~; constantes
+\code{CATALOGUE\_ROLES} et \code{TYPES\_ADMIS}). La colonne \code{recettes}
+du catalogue vaut \code{lignes\_dates\_completes} pour tout rôle pris en
+charge, vide sinon.}
+\label{tab:catalogue-roles}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Famille}} &
+\textcolor{financeblue}{\textbf{Types R admis}} &
+\textcolor{financeblue}{\textbf{Usage}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Famille}} &
+\textcolor{financeblue}{\textbf{Types R admis}} &
+\textcolor{financeblue}{\textbf{Usage}} \\
+\endhead
+\catalogue{roles}{id\_contrat} & identification & \code{character}, \code{integer}, \code{double} entier fini & facultatif \\
+\catalogue{roles}{id\_tete} & identification & \code{character}, \code{integer}, \code{double} entier fini & facultatif \\
+\catalogue{roles}{sexe} & état civil & \code{character}, \code{factor} & segmentation \\
+\catalogue{roles}{date\_naissance} & état civil & \code{Date} (valeurs entières finies) & requis \\
+\catalogue{roles}{annee\_naissance} & état civil & \code{integer}, \code{double} entier fini & facultatif \\
+\catalogue{roles}{age\_fourni} & état civil & \code{integer}, \code{double} entier fini $\ge 0$ & non pris en charge \\
+\catalogue{roles}{date\_age\_fourni} & état civil & \code{Date} (valeurs entières finies) & non pris en charge \\
+\catalogue{roles}{date\_entree} & observation & \code{Date} (valeurs entières finies) & requis \\
+\catalogue{roles}{date\_sortie} & observation & \code{Date} (valeurs entières finies~; manquante admise pour une ligne \code{en\_cours}) & requis \\
+\catalogue{roles}{cause\_sortie} & observation & \code{character}, \code{factor} & requis \\
+\catalogue{roles}{date\_evenement} & observation & \code{Date} (valeurs entières finies) & non pris en charge \\
+\catalogue{roles}{date\_inventaire} & observation & \code{Date} (valeurs entières finies) & non pris en charge \\
+\catalogue{roles}{age} & agrégats & \code{integer}, \code{double} entier fini & non pris en charge \\
+\catalogue{roles}{annee} & agrégats & \code{integer}, \code{double} entier fini & non pris en charge \\
+\catalogue{roles}{exposition} & agrégats & \code{double} fini $\ge 0$ & non pris en charge \\
+\catalogue{roles}{evenements} & agrégats & \code{double} fini $\ge 0$ & non pris en charge \\
+\catalogue{roles}{montant} & pondération & \code{double} fini $> 0$ & non pris en charge \\
+\catalogue{roles}{segment} & segmentation & \code{character}, \code{factor}, \code{integer} & segmentation \\
+\catalogue{roles}{etat\_depart} & multi-états & \code{character}, \code{factor} & non pris en charge \\
+\catalogue{roles}{etat\_arrivee} & multi-états & \code{character}, \code{factor} & non pris en charge \\
+\catalogue{roles}{date\_changement} & multi-états & \code{Date} (valeurs entières finies) & non pris en charge \\
+\end{longtable}
+}
 
 \subsection{Contrôles, refus et exclusions}
 \label{sec:controles-donnees}
 
-\emph{À rédiger (issue~\#9).}
+\subsubsection*{Refus au niveau des rôles et des paramètres}
+
+\code{controler\_roles()} contrôle la déclaration des rôles dans cet ordre, et
+chaque refus nomme tous les rôles et colonnes en cause~:
+\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame})~;
+\code{roles\_mal\_formes} (les rôles ne sont pas un vecteur de chaînes nommé,
+sans valeur ni nom manquant)~; \code{role\_inconnu}~;
+\code{role\_declare\_deux\_fois}~; \code{role\_non\_pris\_en\_charge}~;
+\code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
+plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
+\code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
+\code{type\_incompatible}~; \code{aucune\_recette} (un rôle requis manque~; le
+message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
+(un rôle employé par la segmentation n'est pas déclaré).
+
+\medskip
+{\sloppy \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
+reçoit~: \code{transition\_inconnue} (liste de champs autres qu'exactement
+\code{depart} et \code{arrivee}, ou transition non prise en charge~: seules
+vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
+\code{TRANSITIONS})~; \code{periode\_invalide} (liste de champs autres
+qu'exactement \code{debut} et \code{fin}, ou dates manquantes ou non
+\code{Date})~; \code{delai\_invalide} (délai qui n'est pas un entier $\ge 0$)~;
+\code{periode\_vide}~; \code{segmentation\_invalide} (vecteur de chaînes sans
+doublon pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
+\code{exclusions\_invalides}~; \code{exclusion\_inconnue} (code absent de la
+liste fermée des motifs). Les noms de champs sont lus exactement, jamais par
+appariement partiel. Le même contrôle est appelé par \code{valider\_plan()},
+avant toute étape~: un code désigne une condition, quelle que soit la fonction
+qui la détecte, et le refus porte le module \code{donnees} (ADR 0007,
+annotation du 17/10/2026, point~d).\par}
+
+\subsubsection*{Motifs d'invalidité des lignes}
+
+Les motifs forment une liste fermée (E2.7), évaluée par
+\code{evaluer\_motifs()} (tableau~\ref{tab:motifs}).
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Exhaustivité}~: tous les motifs de ligne sont évalués sur toutes
+    les lignes, sans court-circuit~; un motif de comparaison n'est pas levé si
+    l'une de ses dates est manquante (le motif de la valeur manquante l'est)~;
+  \item \textbf{motifs de tête}~: évalués, quand \code{id\_tete} est déclaré,
+    sur les lignes exemptes de motif de ligne, ils s'appliquent à toutes les
+    lignes de la tête~; le rapport est ainsi complet en un seul passage~;
+  \item \textbf{décompte}~: une ligne peut porter plusieurs motifs~; le décompte
+    par motif compte les lignes porteuses, et le nombre de lignes distinctes
+    est donné à part.
+\end{itemize}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.9cm}p{9.7cm}@{}}
+\caption{Motifs d'invalidité, dans l'ordre de restitution (constantes
+\code{MOTIFS\_LIGNES} et \code{MOTIFS\_TETE}). Ce sont aussi les codes
+admis comme règles d'exclusion.}
+\label{tab:motifs}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Code}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Code}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endhead
+\multicolumn{2}{@{}l@{}}{\textit{\textcolor{financeblue}{Motifs de ligne}}} \\
+\code{id\_contrat\_manquant} & \code{id\_contrat} déclaré et manquant \\
+\code{id\_tete\_manquant} & \code{id\_tete} déclaré et manquant \\
+\code{naissance\_manquante} & date de naissance manquante \\
+\code{entree\_manquante} & date d'entrée manquante \\
+\code{sortie\_manquante} & date de sortie manquante et cause autre que \code{en\_cours} \\
+\code{cause\_manquante} & cause de sortie manquante \\
+\code{cause\_hors\_modalites} & cause hors des cinq modalités \\
+\code{sexe\_manquant} & \code{sexe} déclaré et manquant \\
+\code{sexe\_hors\_modalites} & \code{sexe} déclaré, hors de \code{H} et \code{F} \\
+\code{segment\_manquant} & \code{segment} déclaré et manquant \\
+\code{naissance\_apres\_entree} & naissance postérieure à l'entrée (l'égalité est admise) \\
+\code{sortie\_avant\_entree} & sortie antérieure à l'entrée (l'égalité est admise~: durée nulle) \\
+\code{en\_cours\_avant\_fin} & cause \code{en\_cours} et date de sortie renseignée antérieure à la fin déclarée~: la base ne couvre pas la période déclarée \\
+\code{annee\_naissance\_}\allowbreak\code{incoherente} & \code{annee\_naissance} déclarée et différente de l'année de la date de naissance \\
+\code{age\_aberrant} & âge au dernier anniversaire au moins égal à \code{AGE\_ABERRANT} (130) à la plus petite des dates de sortie et de fin de période (à la fin si la sortie manque)~; constante de catalogue, \emph{choix de conception}~: la borne laisse passer toute durée de vie humaine connue, elle n'est pas un paramètre du plan \\
+\code{contrat\_duplique} & \code{id\_contrat} déclaré et présent sur plusieurs lignes (toutes les lignes du groupe sont listées) \\
+\multicolumn{2}{@{}l@{}}{\textit{\textcolor{financeblue}{Motifs de tête (si \code{id\_tete} est déclaré)}}} \\
+\code{tete\_naissance\_incoherente} & dates de naissance différentes entre lignes d'une même tête \\
+\code{tete\_sexe\_incoherent} & sexes différents au sein d'une tête (\code{sexe} déclaré) \\
+\code{tete\_segment\_incoherent} & segments différents au sein d'une tête, si la segmentation emploie \code{segment} \\
+\code{tete\_observee\_apres\_deces} & le premier décès $s_d$ de la tête est antérieur à $B$ et une ligne de la tête a une fin d'observation postérieure à $s_d$ (lecture~B de E2.4, ci-dessous) \\
+\end{longtable}
+}
+
+\subsubsection*{Refus par défaut et exclusions déclarées}
+
+Une ligne qui porte un motif \textbf{non déclaré} dans les règles d'exclusion
+du plan arrête la construction (refus \code{ligne\_invalide}), même si elle
+porte aussi un motif déclaré. Le message nomme, pour chaque motif en cause, le
+nombre de lignes et leurs dix premiers numéros (\code{NB\_LIGNES\_CITEES},
+numéros 1 à $n$ des lignes du \code{data.frame} reçu), puis le total des lignes
+distinctes~; la condition porte la liste complète (E2.7, E5.5).
+
+\medskip
+Le plan peut déclarer des \emph{règles d'exclusion}, paramètre
+\code{exclusions} de l'étape \code{donnees}~: un vecteur de codes de motif sans
+doublon, vide explicite admis. Une ligne est exclue si l'un de ses motifs est
+déclaré. Les exclusions sont comptées et listées par motif dans le résultat de
+l'étape (\code{resultat\$exclusions}, \code{resultat\$lignes\_exclues}) et
+chacune donne un avertissement \code{exclusion}. Si toutes les lignes sont
+exclues, la construction est refusée (\code{aucune\_ligne\_conservee})~; une
+base sans ligne l'est aussi (\code{base\_vide}). Le diagnostic
+\code{diagnostics\$motifs} restitue, pour chaque motif, sa nature (ligne ou
+tête), son décompte et s'il est exclu.
+
+\medskip
+\textbf{Les lignes conservées sont celles de l'entrée}~: \code{donnees}
+lui-même s'il n'y a aucune exclusion, sinon le sous-ensemble de ses lignes,
+sans aucune modification de valeur~; les quantités dérivées (observations
+fusionnées) sont rangées à part. Une réserve technique~: l'extraction des
+lignes conservées par l'opérateur d'indexation de R retire des colonnes les
+attributs autres que la classe et les niveaux d'un facteur (par exemple
+\code{tzone}, \code{label}~; constat sur R 4.3.3)~; les valeurs et les
+classes ne changent pas, et le moteur ne lit pas ces attributs.
 
 \subsection{Unité d'observation et fusion par tête}
 \label{sec:unite-observation}
 
-\emph{À rédiger (issue~\#9).}
+\subsubsection*{Unité d'observation, déduite des rôles}
+
+L'unité d'observation n'est pas un paramètre du plan~: le moteur la déduit des
+rôles et de la transition, comme il déduit la recette (décision M48~; ADR 0007,
+annotation du 17/10/2026, point~a), et l'inscrit dans les paramètres effectifs
+de l'étape et dans la fiche~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{tête}, si l'état de départ de la transition est un état de la
+    personne (vivant $\to$ décédé) et que \code{id\_tete} est déclaré~;
+  \item \textbf{contrat} sinon~: transition dont l'état de départ est un état du
+    contrat (en cours $\to$ racheté, décision M46), ou transition de tête sans
+    \code{id\_tete}. Dans ce second cas, l'avertissement \code{unite\_contrat}
+    est inscrit dans l'objet et repris dans la fiche~: «~une tête titulaire de
+    plusieurs contrats est comptée plusieurs fois, ce qui surestime
+    l'exposition et peut compter plusieurs fois un même décès~» (cas F4 des
+    tests~: deux décès comptés au lieu d'un).
+\end{itemize}
+
+\noindent
+Un paramètre d'unité serait soit redondant avec les rôles, soit en
+contradiction avec eux~: une tête déclarée «~contrat~» alors que
+\code{id\_tete} est présent compterait plusieurs fois un même décès. Pour le
+rachat, l'unité est le contrat~; l'identifiant de tête sert alors aux contrôles
+de cohérence et au futur rééchantillonnage par têtes (E2.4, E2.14)~: il est
+gardé dans la table des observations.
+
+\subsubsection*{Fusion des intervalles d'une tête}
+
+En unité tête, les intervalles $[\text{entrée}, \text{fin})$ des lignes d'une
+même tête (fin $= +\infty$ pour une ligne \code{en\_cours}) sont triés par
+entrée et fusionnés quand $\text{entrée suivante} \le \text{fin courante}$, ce
+qui couvre le chevauchement et la contiguïté exacte
+(\code{fusionner\_intervalles()}). \textbf{Aucune tolérance «~à un jour
+près~»}~: un écart d'un jour reste un trou non exposé, et la tête est de
+nouveau tronquée à gauche à sa réentrée~; combler l'écart inventerait une
+exposition. Un tel écart trahit souvent une date de fin inclusive dans la
+base~: il est relevé et décompté à part, non corrigé (\emph{choix de
+conception}). La cause de fin d'une composante fusionnée est \code{deces} si
+une ligne de décès se termine à cette fin, \code{en\_cours} si la fin est
+$+\infty$, \code{censure} sinon~; le décès n'est compté qu'une fois.
+
+\medskip
+Le calcul de la fusion est vectorisé par un maximum cumulé décalé par tête,
+exact en \code{double} tant que (nombre de têtes) $\times$ (étendue des dates,
+en jours, $+ 1$) reste inférieur à $2^{52}$. Au-delà, le moteur refuse
+(\code{dates\_hors\_plage}) au lieu de fusionner inexactement~; pour $10^6$
+têtes, il faudrait une étendue d'environ $4{,}5\cdot 10^{9}$ jours, ce que
+seules des dates aberrantes atteignent. C'est une limite d'implémentation, non
+un motif de ligne~: elle n'est pas excluable.
+
+\subsubsection*{Observation après le décès~: lecture~B de E2.4}
+
+Une tête dont un contrat est observé après son décès a une trajectoire
+indéterminée, et ses lignes sont refusées (E2.4). Le décès doit cependant être
+connu~: le mainteneur a retenu une \emph{lecture~B} (décision M48)~: le motif
+\code{tete\_observee\_apres\_deces} n'est levé que si le premier décès $s_d$ de
+la tête est \textbf{antérieur à la borne $B$} de la période effective et qu'une
+fin d'observation d'une ligne de la tête le dépasse. Une ligne \code{en\_cours}
+compte pour $+\infty$, quelle que soit sa date de sortie, et une sortie
+manquante aussi (\code{deces\_par\_tete()}). Deux lignes closes par le décès le
+même jour sont cohérentes.
+
+\medskip
+Si $s_d \ge B$, le décès est hors de la période effective~: aucune ligne n'est
+refusée, mais le relevé \code{observations\_apres\_deces\_hors\_periode}
+compte ces têtes et donne un avertissement du même code. Ce relevé est calculé
+\textbf{sur les seules lignes conservées}~: une tête écartée par une exclusion
+déclarée n'y est pas comptée, une tête dont une ligne seulement est exclue
+l'est sur ses lignes conservées. Il est calculé dès que \code{id\_tete} est
+déclaré, \textbf{quelle que soit l'unité}, donc aussi en unité contrat pour le
+rachat (contrôle par identifiant de tête, E2.4, M46, M48)~; sans
+\code{id\_tete}, il n'est pas calculable et vaut \code{NA}.
+
+\subsubsection*{Relevés et avertissements}
+
+L'étape restitue dans \code{diagnostics\$releves}, sans bloquer, le nombre de
+têtes et de têtes multi-contrats, de chevauchements, de contiguïtés,
+d'intervalles disjoints, d'écarts d'un jour, de fenêtres vides (observations
+sans intersection avec la période), d'observations, et le relevé après décès
+hors période. Les relevés de fusion valent \code{NA} sans \code{id\_tete}. Ses
+avertissements sont~: \code{unite\_contrat}~; \code{role\_non\_employe}~;
+\code{exclusion}~; \code{chevauchements}, \code{disjoints} et
+\code{ecarts\_un\_jour}, en unité tête seulement~; \code{fenetres\_vides} et
+\code{observations\_apres\_deces\_hors\_periode}, dans toutes les unités. Les
+contiguïtés sont décomptées sans avertissement~: une contiguïté exacte est
+fusionnée sans perte.
+
+\medskip
+Le résultat de l'étape (\code{resultat}) contient les lignes conservées et
+leurs numéros, les exclusions, l'unité retenue, la table des observations
+(une ligne par composante fusionnée ou par contrat~: identifiant, numéro de la
+première ligne, nombre de lignes, date de naissance, sexe s'il est déclaré,
+segment s'il est employé, début, fin, cause) et, pour chaque ligne conservée,
+le numéro de son observation. Les paramètres effectifs
+(\code{parametres}) sont le code interne de la transition
+(\code{vivant\_decede} ou \code{en\_cours\_rachete}), l'unité d'observation, la
+segmentation, les exclusions et la fin effective.
 
 \subsection{Table de référence}
 \label{sec:table-reference}
 
-\emph{À rédiger (issue~\#9).}
+Toute table de référence --- loi vraie synthétique du simulateur, table
+embarquée, table importée --- est lue par le moteur sous une seule forme~: la
+classe S3 \code{table\_reference}, sur un \code{data.frame} en format long
+(ADR 0007, point 7.1, et annotation du 17/10/2026, point~b), que construit et
+contrôle \code{table\_reference(x, nom, statut, source, parametres,
+forme\_origine)}, exportée pour l'import de tables par l'application~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item colonnes \code{age} (entier $\ge 0$), \code{sexe} (\code{H}, \code{F},
+    ou \code{ensemble} pour une table sans distinction de sexe, modalité qui ne
+    coexiste jamais avec \code{H} ou \code{F}, dans la table ou au sein d'une
+    même année), \code{qx} (double fini dans $[0, 1]$) et, facultative,
+    \code{annee} (entier), pour les tables prospectives de la v2~;
+  \item âges sans doublon, croissants dans l'ordre reçu et contigus, au sein de
+    chaque sexe (et de chaque année)~;
+  \item attributs \code{nom}, \code{statut} (\code{synthetique},
+    \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
+    de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
+    \code{qx}) et \code{parametres}~: une liste non vide est \textbf{requise}
+    pour une table synthétique, qui n'a d'autre provenance que sa loi, et
+    \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
+    passer pour dérivée d'une loi.
+\end{itemize}
+
+\noindent
+{\sloppy Le constructeur refuse au lieu de corriger, avec un code par contrôle~:
+\code{table\_nom\_manquant}, \code{table\_statut\_inconnu},
+\code{table\_source\_manquante}, \code{table\_parametres\_manquants},
+\code{table\_parametres\_inattendus}, \code{table\_forme\_inconnue},
+\code{table\_mal\_formee}, \code{table\_colonne\_manquante},
+\code{table\_colonne\_inconnue}, \code{table\_vide},
+\code{table\_colonne\_mal\_typee}, \code{table\_sexe\_hors\_modalites},
+\code{table\_sexes\_melanges}, \code{table\_qx\_non\_fini},
+\code{table\_qx\_hors\_bornes}, \code{table\_age\_double},
+\code{table\_ages\_non\_croissants} et \code{table\_ages\_non\_contigus}.\par}
+
+\subsection{Vérifications}
+\label{sec:verifications-donnees}
+
+\code{tests/unitaires/test\_donnees.R} vérifie le catalogue, chaque refus de
+rôle et de paramètre, chaque motif et les règles d'évaluation, les exclusions
+(lignes conservées identiques à l'entrée), la lecture~B de E2.4 au jour près
+de la borne $B$ (délais 0 et 30~jours) et le relevé après décès hors période
+(lignes conservées, deux unités), la table de référence et ses refus. Les cas
+de fusion F1 à F7 de la spécification (chevauchement, contiguïté, écart d'un
+jour, décès sur deux contrats, observation après décès, deux décès,
+naissances discordantes) ont des attendus calculés à la main~; la fusion est
+vérifiée en outre contre un second algorithme, une boucle naïve écrite dans
+le test.
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-donnees}
 
-\emph{À rédiger (issue~\#9).}
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
+\caption{Définitions de premier niveau de \code{R/donnees.R}.}
+\label{tab:fonctions-donnees}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-donnees}{CATALOGUE\_ROLES} & constante & --- & catalogue fermé des rôles (rôle, famille, code de type, usage) \\
+\catalogue{fonctions-donnees}{TYPES\_ADMIS} & constante & --- & libellé des types R admis par code de type \\
+\catalogue{fonctions-donnees}{RECETTE\_BRANCHE} & constante & --- & seule recette d'exposition disponible~: \code{lignes\_dates\_completes} \\
+\catalogue{fonctions-donnees}{MODALITES\_SEXE} & constante & --- & \code{H}, \code{F} \\
+\catalogue{fonctions-donnees}{MODALITES\_CAUSE} & constante & --- & \code{deces}, \code{rachat}, \code{terme}, \code{autre}, \code{en\_cours} \\
+\catalogue{fonctions-donnees}{ROLES\_SEGMENTATION} & constante & --- & \code{sexe}, \code{segment} \\
+\catalogue{fonctions-donnees}{AGE\_ABERRANT} & constante & --- & 130 (motif \code{age\_aberrant}) \\
+\catalogue{fonctions-donnees}{TRANSITIONS} & constante & --- & transitions prises en charge~: départ, arrivée, code interne, porteur de l'état de départ (tête ou contrat) \\
+\catalogue{fonctions-donnees}{MOTIFS\_LIGNES} & constante & --- & motifs de ligne (tableau~\ref{tab:motifs}) \\
+\catalogue{fonctions-donnees}{MOTIFS\_TETE} & constante & --- & motifs de tête (tableau~\ref{tab:motifs}) \\
+\catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus \\
+\catalogue{fonctions-donnees}{catalogue\_roles()} & exportée & --- & catalogue des rôles (tableau~\ref{tab:catalogue-roles}) \\
+\catalogue{fonctions-donnees}{composantes\_date()} & interne & jours depuis 1970-01-01 & année, mois, jour \\
+\catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
+\catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
+\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
+\catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages \\
+\catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres~; transition retenue, début, fin, borne $B$ \\
+\catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
+\catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
+\catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
+\catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation & numéros des lignes porteuses de chaque motif \\
+\catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, transition, période, délai, segmentation, exclusions & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements \\
+\catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
+\catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
+\catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé (section~\ref{sec:table-reference}) \\
+\end{longtable}
+}
 
 
 % =============================================================================
@@ -1274,9 +1744,9 @@ bruts (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
 \subsection{Fonctions du module}
 \label{sec:fonctions-brut}
 
-{\small
+{\footnotesize
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
 \caption{Définitions de premier niveau de \code{R/brut.R}.}
 \label{tab:fonctions-brut}\\
 \rowcolor{tableheader}
@@ -1302,9 +1772,9 @@ ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
 \subsection{Fonctions du module}
 \label{sec:fonctions-lissage}
 
-{\small
+{\footnotesize
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
 \caption{Définitions de premier niveau de \code{R/lissage.R}.}
 \label{tab:fonctions-lissage}\\
 \rowcolor{tableheader}
@@ -1331,9 +1801,9 @@ table de référence. Il sera créé par une branche ultérieure
 \subsection{Fonctions du module}
 \label{sec:fonctions-positionnement}
 
-{\small
+{\footnotesize
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
 \caption{Définitions de premier niveau de \code{R/positionnement.R}.}
 \label{tab:fonctions-positionnement}\\
 \rowcolor{tableheader}
@@ -1359,9 +1829,9 @@ une surface de mortalité.
 \subsection{Fonctions du module}
 \label{sec:fonctions-prospective}
 
-{\small
+{\footnotesize
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
 \caption{Définitions de premier niveau de \code{R/prospective.R}.}
 \label{tab:fonctions-prospective}\\
 \rowcolor{tableheader}
@@ -1387,9 +1857,9 @@ par une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, 
 \subsection{Fonctions du module}
 \label{sec:fonctions-fermeture}
 
-{\small
+{\footnotesize
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
 \caption{Définitions de premier niveau de \code{R/fermeture.R}.}
 \label{tab:fonctions-fermeture}\\
 \rowcolor{tableheader}
@@ -1416,9 +1886,9 @@ d'expérience. Il sera créé par une branche ultérieure
 \subsection{Fonctions du module}
 \label{sec:fonctions-validation}
 
-{\small
+{\footnotesize
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
 \caption{Définitions de premier niveau de \code{R/validation.R}.}
 \label{tab:fonctions-validation}\\
 \rowcolor{tableheader}
@@ -1492,7 +1962,34 @@ d'expérience. Il sera créé par une branche ultérieure
 \subsection{Index des fonctions exportées}
 \label{sec:index-exports}
 
-\emph{À rédiger (issues~\#9, \#10 et \#11).}
+Le tableau~\ref{tab:index-exports} recense les fonctions exportées de
+\code{tablexp} (directives \code{export} de \code{NAMESPACE}~; ADR 0007,
+point 3.4)~: les points d'entrée et les fonctions que l'application appelle.
+Les autres fonctions sont internes~; elles figurent dans le tableau des
+fonctions de leur module.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{2.6cm}p{5.6cm}p{2.2cm}@{}}
+\caption{Fonctions exportées de \code{tablexp}.}
+\label{tab:index-exports}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fonction}} &
+\textcolor{financeblue}{\textbf{Module}} &
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fonction}} &
+\textcolor{financeblue}{\textbf{Module}} &
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endhead
+\catalogue{exports}{catalogue\_roles()} & \code{donnees} & catalogue fermé des rôles, lu par l'application pour la déclaration des rôles & \ref{sec:catalogue-roles} \\
+\catalogue{exports}{table\_reference()} & \code{donnees} & constructeur contrôlé d'une table de référence, appelé par l'application pour l'import de tables & \ref{sec:table-reference} \\
+%% INDEX-SUITE
+\end{longtable}
+}
 
 \subsection{Traçabilité des exigences}
 \label{sec:tracabilite}
@@ -1518,6 +2015,10 @@ chaque section rédigée.
 \endhead
 E1.3 & rigueur, traçabilité, reproductibilité &
 \ref{sec:reproductibilite}, \ref{sec:batteries} \\
+E2.2 & catalogue fermé des rôles, lecture d'une colonne par son rôle & \ref{sec:catalogue-roles} \\
+E2.4 & unité d'observation, fusion par tête, incohérences entre contrats & \ref{sec:unite-observation} \\
+E2.5 & période déclarée, délai de déclaration & \ref{sec:conventions-temps} \\
+E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, données inchangées & \ref{sec:controles-donnees} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP},
 tableaux de fonctions & ensemble du document~; \ref{sec:fonctions-outils} \\
 E3.3 & test de concordance entre la documentation et le code &
@@ -1534,6 +2035,7 @@ E4.7 & références de non-régression sur la plateforme de référence &
 \ref{sec:plateforme} \\
 E4.9 & un module par famille, index des fonctions contrôlé par la
 concordance & \ref{sec:architecture}, \ref{sec:trois-batteries} \\
+E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, \ref{sec:controles-donnees} \\
 \end{longtable}
 }
 
