@@ -90,11 +90,7 @@ TOLERANCES <- c(
   "diagnostics/kaplan_meier/instants" = 0, "diagnostics/kaplan_meier/evenements" = 0,
   "diagnostics/kaplan_meier/evenements_a_l_instant_d_entree" = 0,
   "diagnostics/kaplan_meier/cellules_survie_nulle" = 0,
-  "diagnostics/kaplan_meier/ensemble_a_risque_maximal" = 0,
-  # Dénombrement stocké en double par le moteur (#24) ; ADR 0009, troisième
-  # annotation du 17/10/2026 (avis d'actuary) : classe exacte. Couvre aussi
-  # fiche/avertissements/nombre.
-  "avertissements/nombre" = 0)
+  "diagnostics/kaplan_meier/ensemble_a_risque_maximal" = 0)
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 
