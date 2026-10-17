@@ -38,7 +38,7 @@ En place depuis la branche `claude/socle-donnees-exposition` : `DESCRIPTION`, `N
   ```
 
   Détail de toutes les assertions : `Rscript -e "options(harnais.verbeux = TRUE); source('tests/test_unitaires.R')"`.
-- **Contrôles** (scripts en R de base, aussi exécutés par le job « Tests (R 4.3.3) » de la CI) : `Rscript tests/controles/plateforme.R` (relevé de la plateforme ; `--exiger` en CI : R 4.3.3, BLAS et LAPACK de référence, monothread, image épinglée ; ADR 0008), `Rscript tests/controles/liste_blanche_description.R` (dépendances de `DESCRIPTION`, ADR 0002), `Rscript tests/controles/graphe_modules.R` (ordre des modules, ADR 0007), `Rscript tests/controles/identite_batteries.R` (batteries identiques entre `CLAUDE.md`, `BATTERIES` et `ci.yml` ; chaîne d'image unique).
+- **Contrôles** (scripts en R de base, exécutés aussi par la CI : job « Absence de Java » pour `absence_java.R`, job « Tests (R 4.3.3) » pour les autres) : `Rscript tests/controles/plateforme.R` (relevé de la plateforme ; `--exiger` en CI : R 4.3.3, BLAS et LAPACK de référence, monothread, image épinglée ; ADR 0008), `Rscript tests/controles/liste_blanche_description.R` (dépendances de `DESCRIPTION`, ADR 0002), `Rscript tests/controles/graphe_modules.R` (ordre des modules, ADR 0007), `Rscript tests/controles/identite_batteries.R` (batteries identiques entre `CLAUDE.md`, `BATTERIES` et `ci.yml` ; chaîne d'image unique), `Rscript tests/controles/absence_java.R` (aucun package Java, `rJava`, `xlsx` ou `xlsxjars`, dans les dépendances récursives de l'application, de la contre-vérification et du moteur, listées dans `tests/controles/packages_hors_moteur.csv` ; instantané daté du CRAN chez Posit Package Manager, réseau requis ; `--ajouter ELT` pour le cas témoin, qui doit échouer ; ADR 0002, A1 ; ADR 0008, point 7).
 - Lancement de l'application et appel du moteur seul : à venir avec les branches qui les créent.
 
 ## Façon de travailler
@@ -65,7 +65,7 @@ Réglages à reproduire sur le dépôt (`Gerard-Garey/outil_tables`) ; indispens
 - fusion par **commit de fusion seulement** (squash et rebase désactivés), wiki désactivé ;
 - **secret scanning** et **push protection** activés ; **alertes et correctifs de sécurité Dependabot** activés ;
 - Actions limitées à celles de GitHub (`github_owned_allowed`), jeton des workflows en lecture seule, actions épinglées par SHA ;
-- ruleset **« Protection main »** : suppression et force-push interdits, PR obligatoire (fusion par commit de fusion, fils de discussion résolus), contrôles requis « Contrôles du dépôt » et « Tests (R 4.3.3) » à jour avec `main`, sans contournement.
+- ruleset **« Protection main »** : suppression et force-push interdits, PR obligatoire (fusion par commit de fusion, fils de discussion résolus), contrôles requis « Contrôles du dépôt », « Tests (R 4.3.3) » et « Absence de Java » à jour avec `main`, sans contournement.
 
 ```bash
 R=Gerard-Garey/outil_tables
