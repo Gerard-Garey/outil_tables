@@ -1,0 +1,95 @@
+# Conventions de la documentation LaTeX
+
+Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par un humain ou un agent (`docwriter` ; `coder` ne modifie pas `docs/latex/`, `CLAUDE.md`, règle 9). Elles reprennent la charte d'`outil_USP` (structure, typographie, préambule, compilation ; E3.1) et l'adaptent à `outil_tables` : une partie par module du package `tablexp`, des tableaux de fonctions par module, des catalogues lus par la batterie de concordance (E3.3, E4.9). Une modification qui les enfreint est refusée en relecture.
+
+## 1. Objet et fichiers
+
+- **Fichier unique** : `docs/latex/doc_outil_tables.tex`, sans `\input` ni `\include` (E3.1).
+- **PDF versionné** : `docs/latex/doc_outil_tables.pdf` est recompilé et commité **avec** toute modification du `.tex`, dans le même commit `docs:` (E3.1). Les fichiers auxiliaires (`.aux`, `.log`, `.toc`, `.out`, `.fls`, `.fdb_latexmk`, `.synctex.gz`) sont ignorés par `.gitignore`.
+- **Date fixe** : la page de garde porte la date de la dernière modification du `.tex`, écrite à la main dans la macro `\datedoc` du préambule (`17/10/2026`), mise à jour par chaque commit `docs:` qui modifie le document. `\today` est proscrit : un document de certification ne change pas selon le jour où on le compile.
+- **Lecteur visé** : un relecteur externe (actuaire certificateur, ACPR) qui n'a pas accès au code (E3.7). Toute affirmation sur le code est vraie de l'état du code au commit qui la porte ; elle s'adosse à une lecture du code ou à une mesure citée dans le compte rendu de `docwriter`.
+
+## 2. Structure : invariants
+
+- **Plan fixe**, dans cet ordre : page de garde, Objet du document, Sommaire, puis les parties, chacune déclarée par `\partie{Partie N}{Titre}` (numéro en chiffres romains écrit à la main, comme dans la charte) :
+  1. **Partie I — Présentation de l'outil** : architecture du package et graphe des modules, services transverses (`R/outils.R`), reproductibilité et aléa, batteries de vérification et plateforme de CI, contrôles du dépôt ;
+  2. **Partie II — Point d'entrée et plan de construction** (`R/construire_table.R`) ;
+  3. **une partie par module**, dans l'ordre des modules de l'ADR 0007 (point 2.1) : `donnees`, `exposition`, `brut`, `lissage`, `positionnement`, `prospective`, `fermeture`, `validation`, `rapport`, puis `simulation`, hors de la chaîne du moteur ;
+  4. **dernière partie — Index et traçabilité** : index des fonctions exportées, traçabilité des exigences, références.
+
+  On n'ajoute une partie que pour un module ou un fichier transversal nouveau, décidé par ADR ; on n'en supprime, ne renomme ni ne réordonne aucune. Un module qui n'existe pas encore a déjà sa partie, avec son tableau de fonctions vide (issue #8, point 7).
+- **Sections** : l'ordre et les titres des `\section` et `\subsection` existantes sont conservés. Une section nouvelle se place dans la partie dont elle relève, sans déplacer les autres. Un titre ne change que s'il est faux. Une section en attente porte son titre et la seule phrase `\emph{À rédiger (issue~\#N).}` ; elle est rédigée par le commit `docs:` de l'issue `#N`.
+- **Renvois** : toujours par `\label` / `\ref`, jamais par un numéro écrit en dur (« section 3.2 »). Schéma des labels, en ASCII minuscule, mots séparés par des tirets : `sec:<nom>` (section et sous-section), `tab:<nom>` (tableau), `fig:<nom>` (figure). `\partie` n'incrémente aucun compteur : un `\label` posé après lui prendrait le numéro de la dernière sous-section. On ne renvoie donc jamais à une partie, mais à la section qui l'ouvre (`sec:donnees` pour la partie du module `donnees`). Un `\label` existant n'est jamais renommé ni supprimé tant qu'un `\ref` y renvoie.
+- **Tableau des fonctions d'un module** : chaque partie de module, et la partie I pour `R/outils.R`, contient une sous-section « Fonctions du module » dont le tableau `tab:fonctions-<fichier>` (`<fichier>` = nom de `R/<fichier>.R`, souligné remplacé par un tiret : `tab:fonctions-construire-table`) recense **toutes les définitions de premier niveau** du fichier, fonctions et constantes, à raison d'une ligne chacune. Format : environnement `longtable`, quatre colonnes `Nom`, `Statut`, `Entrées`, `Sortie et rôle` ; la cellule `Nom` est `\catalogue{fonctions-<fichier>}{nom()}` pour une fonction et `\catalogue{fonctions-<fichier>}{NOM}` pour une constante (section 3) ; `Statut` vaut `exportée`, `interne` ou `constante`. Une fonction ajoutée, renommée ou retirée l'est dans le tableau, dans l'index des fonctions exportées si elle est exportée, et dans le diagramme du code, dans le même commit `docs:`. Tant que le fichier n'existe pas, le tableau a une seule ligne : « aucune fonction : fichier `R/<fichier>.R` absent ».
+- **Diagramme du code** : la figure `fig:graphe-modules` (partie I) représente le graphe d'appels autorisés des modules (ADR 0007, point 2.1). Un fichier de `R/` créé ou retiré y change de forme (bloc plein : fichier présent ; bloc pointillé : module prévu, fichier absent) dans le même commit.
+- **Préambule et charte** : ceux d'`outil_USP` (couleurs `maincolor`, `greenline`, `tableheader`, `tablerow`, `financeblue` ; titres en bandeau ; pied de page ; `\partie`). Ni paquet ajouté, ni macro redéfinie, ni couleur modifiée. On utilise les macros existantes : `\code{}` pour tout identifiant R, nom de fichier ou commande ; `\refl{}` pour la référence d'une section de méthode ; `\reglement{titre}{texte}` pour une citation d'un texte qui fait foi (section 4, « Textes ») ; l'environnement `encadre` pour un point de revue ou un exemple d'appel ; `\catalogue{}{}` pour une entrée de catalogue (section 3). Une nouvelle macro ne s'introduit qu'en cas de besoin répété, définie dans le préambule avec un commentaire. Les macros de fiche de test d'`outil_USP` (`fiche`, `\Cadre`… `\Pertinence`) ne sont pas reprises : le gabarit des fiches de méthode et de vérification (E3.2) sera fixé ici par le premier commit `docs:` qui en rédige une.
+
+## 3. Catalogues lus par la batterie de concordance
+
+`tests/concordance_doc_moteur.R --strict` (E3.3, E4.9) lit tous les `.tex` de `docs/latex/`, commentaires LaTeX retirés par `retirer_commentaires()` : sur chaque ligne, un `%` ouvre un commentaire, retiré jusqu'à la fin de la ligne, s'il est précédé d'un nombre pair (zéro compris) de barres obliques inverses (`\%` est un pour-cent littéral, `\\%` une fin de ligne suivie d'un commentaire) ; les `%` placés dans le contenu de `\verb<d>…<d>` ou de `\verb*<d>…<d>`, et dans le premier argument de `\url{…}` ou de `\href{…}`, ne comptent pas. Limites : un `\verb` ou un `\url` coupé sur deux lignes, ou un `\url` (ou `\href`) dont l'argument contient une accolade, n'est pas reconnu, et un `%` qu'il contient ouvre alors un commentaire ; on n'écrit donc ni l'un ni l'autre. Deux formes y sont lues.
+
+### 3.1 Citation d'une fonction (contrôles 1 et 2, en place)
+
+- **Forme lue** : `\code{nom()}` ou `\code{nom(arguments)}`, arguments sans accolade, souligné échappé `\_` admis ; `\code{pkg::nom()}` pour un package de priorité `base`. Motif du script : `\\code\{[A-Za-z0-9._\\:]+\([^{}]*\)\}`.
+- **Contrôle 1** : tout nom cité sous cette forme est une fonction de l'espace de noms de `tablexp` (exportée ou interne), une fonction exportée d'un package de priorité `base` (hors `tcltk`), ou une fonction de premier niveau de `tests/harnais.R`. Conséquences pour la rédaction :
+  - une fonction d'un package hors priorité `base` (`survival`, `mgcv`, `shiny`…) **ne s'écrit jamais avec des parenthèses** dans `\code{}` : on cite le package (`\code{survival}`) ou la fonction sans parenthèses et en toutes lettres (« la fonction `survfit` du package `survival` ») ;
+  - une fonction d'un script de `tests/controles/` n'est pas reconnue : on cite le script par son chemin (`\code{tests/controles/plateforme.R}`), jamais sa fonction ;
+  - une commande système (`update-alternatives`, `R CMD INSTALL`) s'écrit sans parenthèses.
+- **Contrôle 2** : toute fonction exportée de `tablexp` est citée au moins une fois sous cette forme (ou par son entrée du catalogue `exports`, section 3.2). Un export pas encore documenté figure dans `tests/concordance_attente.csv` (colonnes `type`, `nom`, `issue`, `motif` ; `type` = `export`), compté en échec attendu ; **le citer rend son échec attendu inattendu, ce qui fait échouer la batterie** : la ligne est retirée de la liste par un commit `tests:` qui suit le commit `docs:` et part avec lui au même push (un domaine par commit), pour que la CI ne voie jamais l'état intermédiaire.
+
+### 3.2 Entrée de catalogue (contrôle 4)
+
+- **Forme** : `\catalogue{<catalogue>}{<nom>}`, sur une ligne du tableau qui recense le catalogue, en première cellule. La macro compose `\code{<nom>}` ; le premier argument, en ASCII minuscule avec tirets, n'est pas imprimé. `<nom>` s'écrit comme dans le code, souligné échappé `\_` ; une fonction porte `()`, sans argument. Motif lu : `\\catalogue\{([a-z0-9-]+)\}\{([^{}]+)\}`, puis `\_` → `_` et suppression d'un `()` final. Toute occurrence de `\catalogue` que ce motif ne lit pas est un écart (« entrée de catalogue illisible ») : nom de catalogue en majuscules ou avec souligné, espace avant une accolade, accolade dans le nom, entrée coupée sur deux lignes.
+- **Règle de concordance** : pour chaque catalogue, l'ensemble des noms lus dans le document est **égal** à l'ensemble de sa source dans le code ; un nom y figure une seule fois ; un catalogue inconnu est un écart. Dans `exports` et `fonctions-<fichier>`, un nom porte `()` si et seulement s'il désigne une fonction ; dans `roles` et `recettes`, aucun nom ne porte `()`. L'ordre des lignes est libre (ordre du code recommandé). Une entrée de catalogue dont le nom porte `()` compte comme citation de fonction pour les contrôles 1 et 2 (même vérification d'existence).
+- **Catalogues requis** (E2.2, E3.3, E4.9 ; issue #8, point 3) :
+
+  | Catalogue | Source dans le code | Où il est recensé |
+  |---|---|---|
+  | `exports` | `getNamespaceExports("tablexp")` | tableau `tab:index-exports` (dernière partie) |
+  | `fonctions-<fichier>` | définitions de premier niveau de `R/<fichier>.R` (`nom <- …` ou `nom = …`, lues par `parse()` comme dans `tests/controles/graphe_modules.R`) | tableau `tab:fonctions-<fichier>` de la partie du module |
+  | `roles` | `catalogue_roles()$role` | tableau `tab:catalogue-roles` (partie `donnees`) |
+  | `recettes` | constante `RECETTE_BRANCHE` de `R/donnees.R`, source unique ; les clés de `CONVENTION_NATIVE` de `R/exposition.R` lui sont égales (contrôlé) | tableau `tab:recettes` (partie `exposition`) |
+
+- **Catalogues proposés**, non instrumentés (les codes correspondants sont cités par `\code{}` dans le texte ; un catalogue non requis employé par `\catalogue` serait un écart) : `conventions` (`ORDRE_CONVENTIONS`), `champs-plan` (`CHAMPS_PLAN`), `parametres-<etape>` (colonne `parametre` de `PARAMETRES_ETAPES[[etape]]`), `motifs` (`MOTIFS_LIGNES` et `MOTIFS_TETE`), `refus` (codes de refus passés à `refuser()`), `avertissements` (codes passés à `avertir()`).
+- **Catalogue en attente** : un catalogue requis sans aucune entrée dans le document est un échec, sauf s'il figure dans `tests/concordance_attente.csv` (colonne `type` = `catalogue`, avec renvoi à l'issue qui le documente), où il compte en échec attendu ; présent et encore en attente, c'est un succès inattendu, qui fait échouer la batterie.
+
+## 4. Contenu : invariants
+
+- **Conservation** : aucun développement, aucune justification, aucune limite, aucune référence n'est supprimé au seul motif d'alléger. Une suppression n'est admise que si le passage est faux ou décrit un code qui n'existe plus ; elle est signalée dans le compte rendu avec le texte retiré.
+- **Concordance avec le code** : la doc décrit ce que fait le code de `R/` et des scripts de `tests/`. En cas d'écart dont le code semble fautif, on ne réécrit pas la doc pour la conformer à ce que le code devrait faire : l'écart est signalé, et une issue est proposée.
+- **Aucun chiffre issu d'une exécution** (E3.4) : ni nombre de tests, ni durée, ni valeur calculée sur un jeu simulé ; les résultats sont dans le rapport figé et la fiche de construction, et les bilans dans la sortie des batteries. Les constantes du code (générateur, chemins attendus de la BLAS, date d'instantané) ne sont pas des chiffres d'exécution : elles se citent avec leur emplacement.
+- **Décomptes** : un décompte écrit (en chiffres ou en toutes lettres) se remesure à chaque modification de ce qu'il compte ; on préfère renvoyer au tableau qui énumère.
+- **Statuts épistémiques** : résultat exact, résultat asymptotique, approximation numérique et constat de simulation sont toujours nommés et jamais confondus (E2.20). Une identité « au bit près » est un constat de batterie sur une machine donnée, pas une propriété démontrée ; ce qui n'est pas mesuré est écrit comme tel (hypothèse).
+- **Deux sources d'erreur** : l'erreur Monte-Carlo (fonction du nombre de réplications) et l'erreur d'estimation (fonction de l'exposition) sont toujours distinguées (E2.20).
+- **Vocabulaire** : les termes de `CONTEXT.md` sont employés dans leur sens et remplacent leurs synonymes écartés (« recette d'exposition », jamais « mode de calcul » ; « plan de construction », jamais « pipeline » ; « plateforme de référence », jamais « machine de CI »…).
+- **Références** :
+  - chacune a été retrouvée et soutient l'affirmation qui la cite ; aucune référence, aucun numéro d'article ou de page n'est inventé (E2.21) ;
+  - format : initiales et nom (`M.~Matsumoto`), titre en `\emph{}`, revue en `\emph{}`, volume, année, `p.~x--y` ; une référence lue dans une source secondaire le dit (« cité par … ») ;
+  - **textes qui font foi** (`docs/exigences.md`, § 2.4) : cités seulement une fois établis sur la source (issue #13) et, pour A132-18, d'après la lecture consignée par `regulatory` (E2.25) ; **A335-1 est abrogé** et ne se cite jamais comme texte en vigueur ;
+  - un ADR, une décision (M*n*, Q*n*) ou une issue se cite comme source d'une décision, jamais comme seule justification d'une affirmation de fond : le raisonnement qui fonde une décision figure dans le document (autonomie du document).
+- **Quand la source ne permet pas de conclure**, le document l'écrit.
+
+## 5. Typographie et notations
+
+- Français, avec accents ; espace insécable avant les signes doubles (`~:`, `~;`, `~?`, `~!`) ; guillemets « » ; `p.~` devant un numéro de page ; `\,` entre les initiales.
+- Nombres : virgule décimale, écrite `{,}` en mode mathématique (`0{,}10`) ; `\%` précédé d'une espace insécable (`10~\%`).
+- Identifiants R : dans `\code{}`, souligné échappé (`\_`), dollar échappé (`\$`), dièse échappé (`\#`) ; un double tiret d'option s'écrit `-{}-` (`\code{-{}-strict}`), la police à chasse fixe du préambule faisant de `--` un tiret demi-cadratin. Une fonction s'écrit avec ses parenthèses (`\code{sous\_graine()}`), une constante sans (`\code{GENERATEUR}`), un champ d'objet avec `\$` (`\code{fiche\$generateur}`).
+- Notations fixes (à compléter au premier usage, sans redéfinir une notation existante) : $x$ (âge), $t$ (année calendaire), $q_x$ (probabilité de l'événement entre $x$ et $x+1$), $\mu_x$ (intensité), $E^c_x$ (exposition centrale), $D_x$ (nombre d'événements) ; estimateurs chapeautés ($\hat q_x$) ; $H_0$ et $H_1$ ; $\alpha$ (niveau) ; $B$ (nombre de réplications).
+- Indicatrice : `\mathds{1}` (paquet `dsfont`, chargé par le préambule), jamais `\mathbb{1}`.
+- Mise en valeur sobre : `\textbf` pour ce qui change une lecture (mise en garde, refus), `\emph` pour un terme défini ou un titre.
+
+## 6. Manière de modifier et compilation
+
+1. Modifications **ciblées** : on corrige le passage fautif, on ne réécrit pas une section correcte. Le diff reste lisible par un relecteur.
+2. Avant de modifier, relever ce que le passage affirme et ce qui y renvoie (`\ref`, tableaux de fonctions, index, traçabilité des exigences, décomptes, encadrés de portée) ; après, vérifier que tout ce qui y renvoie reste juste.
+3. **Compiler** (TeX Live ; paquets Debian ou Ubuntu requis : `texlive-latex-base`, `texlive-latex-recommended`, `texlive-latex-extra`, `texlive-fonts-recommended`, `texlive-fonts-extra` — pour `newtxtext` et `dsfont` —, `texlive-lang-french`, `texlive-pictures`, `texlive-plain-generic` — pour `binhex.tex` —) l'état **avant** la modification, pour la comparaison, puis l'état après, depuis `docs/latex/` :
+
+   ```bash
+   pdflatex -interaction=nonstopmode -halt-on-error doc_outil_tables.tex
+   ```
+
+   Relancer tant que le log contient « Rerun to get cross-references right » ou « Label(s) may have changed » ; trois passes en pratique, cinq au plus (au-delà, un renvoi oscille). `latexmk -pdf -interaction=nonstopmode -halt-on-error doc_outil_tables.tex` fait de même.
+4. **Contrôler le log final** et comparer avant / après : nombre de passes et code de sortie de chacune ; erreurs, c'est-à-dire lignes commençant par `! ` (un `!` suivi d'une espace : aucune ; c'est le critère du job « Documentation »). Une ligne qui commence par `!` sans espace n'est pas une erreur : c'est, par exemple, la reproduction d'une boîte mal remplie, où une flèche mathématique en début de ligne s'imprime `!` ; elle ne fait pas échouer le job ; occurrences de `undefined` (aucune) ; occurrences d'`Overfull` et d'`Underfull` (un `Overfull` nouveau de plus de 10pt sur une ligne modifiée est à corriger) ; nombre de pages (`pdfinfo`) ; table des matières (le plan ne change que par ajout voulu).
+5. **Concordance** : `Rscript tests/concordance_doc_moteur.R --strict` passe sur l'état modifié, ou son écart attendu (liste d'attente) est dit dans le compte rendu.
+6. **Ce qui est commité** : `git status docs/latex` montre le `.tex` et le `.pdf` ensemble ; nommer la chaîne de composition (ligne `Producer` de `pdfinfo`).
+7. **Rendre compte** : modifications par section, avec avant / après pour toute modification de fond ; références ajoutées ou retirées et pourquoi ; suppressions et leur motif ; balayage de la surface d'impact.

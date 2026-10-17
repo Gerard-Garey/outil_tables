@@ -38,11 +38,14 @@ export const meta = {
 //  supprimee par le workflow : son chemin est rendu dans copie_temporaire.
 // ---------------------------------------------------------------------------
 
-// A ADAPTER : batteries de verification, identiques a CLAUDE.md, « Commandes »
-// (commande complete, lancee depuis la racine du depot)
+// Batteries de verification, identiques a CLAUDE.md, « Commandes », et aux
+// etapes « Batterie : » de .github/workflows/ci.yml, dans le meme ordre
+// (commande complete, lancee depuis la racine du depot ; controle :
+// Rscript tests/controles/identite_batteries.R)
 const BATTERIES = [
-  // 'Rscript tests/test_unitaires.R',
-  // 'pytest -q',
+  'Rscript tests/test_unitaires.R',
+  'Rscript tests/test_reproductibilite.R',
+  'Rscript tests/concordance_doc_moteur.R --strict',
 ]
 
 // Repertoires que ni coder ni audit ne doivent toucher dans un workflow

@@ -29,7 +29,10 @@
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "Contrôles du dépôt", "integration_id": 15368 }
+          { "context": "Contrôles du dépôt", "integration_id": 15368 },
+          { "context": "Tests (R 4.3.3)", "integration_id": 15368 },
+          { "context": "Absence de Java", "integration_id": 15368 },
+          { "context": "Documentation", "integration_id": 15368 }
         ]
       }
     }

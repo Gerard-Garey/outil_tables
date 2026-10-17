@@ -1,0 +1,11 @@
+^app$
+^docs$
+^tests$
+^\.claude$
+^\.github$
+^CLAUDE\.md$
+^CONTEXT\.md$
+^README\.md$
+^AGENTS\.md$
+^\.gitattributes$
+^\.gitignore$

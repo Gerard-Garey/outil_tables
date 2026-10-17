@@ -1,0 +1,3160 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage[left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\usepackage[french]{babel}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{etoolbox}
+\usepackage{csquotes}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathrsfs}
+\usepackage{float}
+\usepackage{dsfont}
+\usepackage{tikz}
+\usepackage{url}
+\usepackage{color, xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{longtable}
+\usepackage{pdflscape}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{hyperref}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric, fit, backgrounds}
+
+% ---------------------------------------------------------------- charte ----
+% Charte reprise d'outil_USP (docs/latex/CONVENTIONS.md, section 2) : bleu
+% financier pour la structure, vert pour l'accent et les sorties, deux gris de
+% tableau.
+\definecolor{maincolor}{RGB}{0,70,140}
+\definecolor{greenline}{RGB}{0,180,80}
+\definecolor{tableheader}{RGB}{200,220,250}
+\definecolor{tablerow}{RGB}{245,245,245}
+\definecolor{financeblue}{RGB}{0,70,140}
+
+\newcommand{\annee}{2026}
+% Date fixe, mise a jour a la main a chaque modification du document
+% (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
+% dependre le PDF du jour de compilation.
+\newcommand{\datedoc}{17/10/2026}
+\newcommand{\versiondoc}{0.1}
+\newcommand{\statutdoc}{Projet}
+% Titre court utilise dans le pied de page (fancyhdr).
+\newcommand{\titredoc}{Documentation de l'outil de construction de tables d'expérience}
+
+\captionsetup[figure]{labelfont={bf, color=maincolor}, textfont={normalfont}, labelsep=colon}
+\captionsetup[table]{labelfont={bf, color=maincolor}, textfont={normalfont}, labelsep=colon}
+
+\hypersetup{colorlinks=true, linkcolor=financeblue, urlcolor=financeblue,
+            pdftitle={Documentation de l'outil de construction de tables d'experience}}
+
+\renewcommand{\baselinestretch}{1.08}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\color{maincolor}\nouppercase{\leftmark}}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancyfoot[R]{\color{greenline}\textbf{page \thepage}}
+\fancyfoot[L]{\color{maincolor}\titredoc}
+\fancypagestyle{plain}{\fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}\renewcommand{\footrulewidth}{0.4pt}%
+  \fancyfoot[R]{\color{greenline}\textbf{page \thepage}}%
+  \fancyfoot[L]{\color{maincolor}\titredoc}}
+
+% ------------------------------------------------------ titres de section ---
+% Le bandeau bleu pleine largeur avec le titre en vert marque le niveau
+% section, qui joue ici le role du chapitre.
+\newcommand{\titrebandeau}[1]{%
+  \noindent{\color{financeblue}\rule{\linewidth}{2.5pt}}
+  \par\vspace{5mm}
+  {\color{greenline}\raggedright\fontsize{19}{23}\bfseries\selectfont #1\par}
+  \vspace{6mm}}
+
+\titleformat{\section}[display]
+  {\normalfont}{}{0pt}
+  {\titrebandeau}
+\titlespacing*{\section}{0pt}{0pt}{0pt}
+\titleformat{\subsection}
+  {\color{financeblue}\normalfont\large\bfseries}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}
+  {\color{financeblue}\normalfont\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+
+\renewcommand{\cftsecfont}{\bfseries\color{financeblue}}
+\renewcommand{\cftsecaftersnum}{\color{financeblue}}
+\renewcommand{\cftsecpagefont}{\color{financeblue}}
+\renewcommand{\cftsubsecfont}{\color{black}}
+\renewcommand{\cftsubsecpagefont}{\color{black}}
+\setlength{\cftsecnumwidth}{2.2em}
+\setcounter{tocdepth}{2}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\refl}[1]{{\small\textcolor{maincolor!70!black}{\textit{Référence.} #1}}\par\smallskip}
+
+% Entree d'un catalogue lu par la batterie de concordance
+% (tests/concordance_doc_moteur.R ; docs/latex/CONVENTIONS.md, section 3.2) :
+% #1 = nom du catalogue (exports, fonctions-<fichier>, roles, recettes...),
+% non imprime ; #2 = nom tel qu'il s'ecrit dans le code, compose comme \code.
+\newcommand{\catalogue}[2]{\code{#2}}
+
+% Encadre de citation d'un texte qui fait foi : filet vertical bleu en marge.
+\newcommand{\reglement}[2]{%
+  \par\vspace{2mm}\noindent\begin{minipage}{\linewidth}
+  \small\setlength{\parindent}{0pt}
+  \textcolor{financeblue}{\vrule width 2pt}\hspace{4mm}%
+  \begin{minipage}{\dimexpr\linewidth-7mm\relax}
+  \textcolor{financeblue}{\textbf{#1}}
+  \par\vspace{2pt}
+  {\itshape #2}
+  \end{minipage}
+  \end{minipage}\par\vspace{3mm}}
+
+% L'encadre generique reprend le filet bleu de la charte.
+\newmdenv[linecolor=financeblue, linewidth=0pt, leftline=true,
+          innerleftmargin=6mm, innertopmargin=4pt, innerbottommargin=4pt,
+          backgroundcolor=tablerow, skipabove=3mm, skipbelow=3mm]{encadre}
+
+% Titre de partie : un seul filet bleu, titre en vert dessous, corps plus
+% petit que le bandeau des sections qui suivent (charte d'outil_USP).
+\newcommand{\partie}[2]{%
+  \clearpage
+  \vspace*{1cm}
+  \noindent{\color{financeblue}\rule{\linewidth}{2pt}}\par\vspace{3mm}
+  {\color{financeblue}\raggedright\normalsize\bfseries\scshape #1\par}
+  \vspace{1.5mm}
+  {\color{greenline}\raggedright\fontsize{20}{24}\bfseries\selectfont #2\par}
+  \vspace{5mm}
+  \addcontentsline{toc}{section}{\protect\numberline{}\textsc{#1} --- #2}}
+
+\emergencystretch=1.5em
+
+\begin{document}
+
+% ============================================================ page de garde ==
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[financeblue]
+    ([xshift=2.5cm,yshift=-3.2cm]current page.north west) rectangle
+    ([xshift=-2.5cm,yshift=-3.28cm]current page.north east);
+  \fill[greenline]
+    ([xshift=2.5cm,yshift=-3.2cm]current page.north west) rectangle
+    ([xshift=7.5cm,yshift=-3.28cm]current page.north west);
+  \fill[financeblue]
+    ([xshift=2.5cm,yshift=3.6cm]current page.south west) rectangle
+    ([xshift=-2.5cm,yshift=3.53cm]current page.south east);
+\end{tikzpicture}%
+\vspace*{2.1cm}
+\noindent
+{\color{financeblue}\normalsize\bfseries\scshape Exercice \annee}
+
+\vspace{1.7cm}
+\noindent
+{\color{financeblue}\fontsize{28}{34}\bfseries\selectfont
+ Documentation\\ de l'outil\par}
+
+\vspace{1.1cm}
+\noindent
+{\color{black}\Large
+ Construction de tables d'expérience\\
+ Package \code{tablexp}, méthodes, vérifications et application\par}
+
+\vspace{0.7cm}
+\noindent
+{\color{black}\normalsize\itshape
+ Une table d'expérience est l'estimation d'une transition d'un modèle multi-états\par}
+
+\vfill
+\noindent
+{\footnotesize\color{black}
+ Établie le \datedoc\quad\textbar\quad Version \versiondoc\quad\textbar\quad
+ Statut : \statutdoc\quad\textbar\quad Package \code{tablexp} 0.0.0.9000\par}
+\vspace{2.6cm}
+\clearpage
+
+% ================================================================= resume ==
+\titrebandeau{Objet du document}
+\markboth{Objet du document}{}
+
+\noindent
+Ce document est la documentation de l'\textbf{outil de construction de tables
+d'expérience} \code{outil\_tables}. Il couvre le package R \code{tablexp}, qui
+porte toute la logique quantitative, les vérifications qui l'accompagnent
+(batteries de tests, contrôles du dépôt, plateforme de calcul) et, quand elle
+existera, l'application interactive qui l'exploite. Une \emph{table
+d'expérience} est construite à partir des observations d'un portefeuille
+d'assurés~: pour un risque donné, l'outil estime le taux d'une
+\emph{transition} (vivant $\to$ décédé, en cours $\to$ racheté\ldots) selon un
+ou plusieurs axes, le lisse ou le positionne sur une table de référence, le
+ferme aux âges extrêmes, le valide, et restitue la table avec tout ce qui
+permet de la rejouer et de la relire.
+
+\medskip\noindent
+Les destinataires des tables et des rapports sont, par priorité, les
+hypothèses biométriques de la meilleure estimation (\emph{best estimate})
+Solvabilité~II, que l'ACPR revoit en contrôle, puis la certification d'une
+table d'expérience par un actuaire indépendant agréé (\code{docs/exigences.md},
+E1.2). Le document doit permettre à un relecteur externe, sans lire le code,
+de savoir ce qui a été calculé, avec quelles hypothèses, et de rejouer le
+calcul (E3.7). Les textes qui font foi sont recensés par le cahier des charges
+(\code{docs/exigences.md}, §~2.4)~; ils ne sont cités dans le présent document
+qu'une fois établis sur la source (issue~\#13).
+
+\medskip\noindent
+Il est organisé en une partie par module du package (E3.1). La
+\textbf{partie~I} présente l'outil~: forme du package et graphe des modules,
+services transverses, reproductibilité, batteries de vérification et
+plateforme de calcul, contrôles du dépôt. La \textbf{partie~II} décrit le point
+d'entrée unique et le plan de construction. Les parties suivantes suivent
+l'ordre des modules du moteur~: données, exposition, taux bruts, lissage,
+positionnement, table prospective, fermeture, validation, rapport, puis le
+simulateur, qui produit les jeux de données sous une loi vraie connue. La
+dernière partie rassemble l'index des fonctions exportées, la traçabilité des
+exigences et les références. Chaque partie de module se termine par le
+tableau des fonctions du module, qui relie la description de la méthode à
+son implémentation~; un module qui n'existe pas encore a déjà sa partie, avec
+un tableau vide.
+
+\medskip\noindent
+Le document ne porte aucun chiffre issu d'une exécution (E3.4)~: les
+résultats d'une construction sont dans son rapport figé et sa fiche de
+construction, et les bilans des vérifications dans la sortie des batteries.
+Ses conventions de rédaction sont fixées par \code{docs/latex/CONVENTIONS.md}~;
+le vocabulaire est celui du glossaire du projet (\code{CONTEXT.md}).
+
+\vspace{6mm}
+\noindent
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{tabular}{@{}p{4.6cm}p{10.2cm}@{}}
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Élément}} & \textcolor{financeblue}{\textbf{Référence}} \\
+Cahier des charges & \code{docs/exigences.md} (exigences E1.1 à E5.5) \\
+Décisions d'architecture & \code{docs/adr/} (ADR 0002 à 0008) \\
+Moteur de calcul & package \code{tablexp} (\code{R/}), packages de priorité
+\code{base} seulement (ADR 0002) \\
+Interface & \code{app/app.R}, \code{app/affichage.R} (à venir~; aucun calcul) \\
+Version de R & 4.3.3~; \code{DESCRIPTION} déclare \code{Depends: R (>= 4.3.3)} \\
+Plateforme de référence & conteneur \code{rocker/r-ver:4.3.3} épinglé par
+empreinte, BLAS et LAPACK de référence (ADR 0008~; section~\ref{sec:plateforme}) \\
+Données & aucune donnée réelle~: jeux simulés sous une loi vraie et une graine \\
+\end{tabular}
+\end{center}
+
+\clearpage
+\titrebandeau{Sommaire}
+\markboth{Sommaire}{}
+% \tableofcontents composerait son propre titre, qui ferait doublon avec le
+% bandeau ci-dessus : on n'appelle que \@starttoc.
+\makeatletter
+\@starttoc{toc}
+\makeatother
+\newpage
+
+
+% =============================================================================
+\partie{Partie I}{Présentation de l'outil}
+% =============================================================================
+
+% =============================================================================
+\section{Architecture du package et graphe des modules}
+\label{sec:architecture}
+% =============================================================================
+
+\subsection{Principe de séparation}
+\label{sec:separation}
+
+L'outil sépare strictement le \emph{calcul} de l'\emph{affichage}. La règle
+est la suivante~: si un résultat peut être calculé indépendamment de
+l'interface, son calcul figure dans le package \code{tablexp} (E4.3). Le moteur
+reçoit un \code{data.frame} et la déclaration des \emph{rôles} de ses colonnes,
+jamais un fichier~; la lecture des fichiers, et les conversions de type qui
+l'accompagnent, relèvent d'une couche mince hors du moteur, qui n'existe pas
+encore (E4.4). Le moteur refuse un type incompatible, il ne le convertit pas.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{tabular}{@{}p{3.6cm}p{5.6cm}p{5.6cm}@{}}
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Emplacement}} &
+\textcolor{financeblue}{\textbf{Contenu}} &
+\textcolor{financeblue}{\textbf{Interdit}} \\
+\code{R/} (package \code{tablexp}) & toute la logique quantitative~: rôles et
+validation des données, recettes d'exposition, estimation, lissage,
+positionnement, prospective, fermeture, validation, simulation, quantités des
+rapports et empreintes & toute primitive Shiny (\code{input\$},
+\code{reactive}, \code{render*})~; tout package hors priorité \code{base}
+sans ADR de méthode~; toute dépendance à Java \\
+\code{app/app.R} (à venir) & déclaration des rôles, édition du plan, appel du
+point d'entrée sur clic du bouton «~Relancer les calculs~», affichage &
+tout calcul~; tout appel d'une fonction non exportée (\code{tablexp:::}) \\
+\code{app/affichage.R} (à venir) & formatage, tableaux HTML, tracés à partir
+des quantités du résultat & tout calcul \\
+\code{tests/} & batteries, harnais, scripts de contrôle & --- \\
+\end{tabular}
+\end{center}
+
+\medskip
+L'application vit hors du package, sous \code{app/}, et non dans un fichier
+\code{R/affichage.R}~: tout fichier de \code{R/} est installé dans l'espace de
+noms du package (section~\ref{sec:fichiers-package}), si bien qu'un fichier
+d'affichage placé là entrerait dans le moteur et rendrait circulaire le
+contrôle de frontière (ADR 0007, point 1.3). Le dossier \code{app/} et son
+script de frontière n'existent pas encore~: ils viennent avec la branche de
+l'application.
+
+\subsection{Fichiers du package}
+\label{sec:fichiers-package}
+
+Le package \code{tablexp} est à la racine du dépôt (ADR 0007, point 1.1)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{DESCRIPTION}~: \code{Package: tablexp}, \code{Depends: R (>= 4.3.3)}
+    (décision M44), aucun champ \code{Imports}, \code{Suggests} ni
+    \code{LinkingTo}, \code{Encoding: UTF-8}, \code{License: file LICENSE}~; le
+    contrôle de la liste blanche (section~\ref{sec:controles-depot}) en fait une
+    règle vérifiée~;
+  \item \code{NAMESPACE}, écrit à la main~: une directive \code{export} par
+    fonction, sans \code{exportPattern}~; les fonctions exportées sont les
+    points d'entrée et les fonctions que l'application appelle (contrôles de
+    saisie à sens métier, constructeurs d'objets partagés), recensées dans
+    l'index (section~\ref{sec:index-exports})~; aucune méthode S3 n'est
+    exportée~;
+  \item \code{R/}~: un fichier par module et deux fichiers transversaux
+    (tableau~\ref{tab:fichiers-r})~;
+  \item \code{.Rbuildignore}~: exclut de l'archive du package \code{app/},
+    \code{docs/}, \code{tests/}, \code{.claude/}, \code{.github/} et les
+    fichiers de pilotage du dépôt.
+\end{itemize}
+
+\noindent
+Aucun fichier \code{Rd} ni \code{roxygen2}~: la documentation de référence est
+le présent document, tenu concordant avec le code par la batterie de
+concordance (section~\ref{sec:batteries}~; E3.3).
+
+\medskip
+\textbf{\code{R/} ne contient que du code du package.} Une installation depuis
+l'arbre de travail (\code{R CMD INSTALL <dossier>}), qui est celle des
+batteries, n'applique pas \code{.Rbuildignore}~: tout fichier de \code{R/} est
+installé, même s'il y est exclu (constat~: un fichier \code{R/b.R} exclu par
+\code{.Rbuildignore} est présent dans le package installé~; ADR 0007, mesures).
+Un fichier étranger au moteur ne peut donc pas être rangé dans \code{R/}.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{7.6cm}p{2.9cm}@{}}
+\caption{Fichiers de \code{R/}, dans l'ordre des modules (ADR 0007, points 1.2 et 2.1).}
+\label{tab:fichiers-r}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fichier}} &
+\textcolor{financeblue}{\textbf{Contenu}} &
+\textcolor{financeblue}{\textbf{État}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fichier}} &
+\textcolor{financeblue}{\textbf{Contenu}} &
+\textcolor{financeblue}{\textbf{État}} \\
+\endhead
+\code{R/outils.R} & services transverses sans contenu métier~: graine locale,
+refus et avertissements (section~\ref{sec:outils})~; n'appelle aucun module &
+présent \\
+\code{R/donnees.R} & rôles, contrôles, refus et exclusions, unité
+d'observation, table de référence (section~\ref{sec:donnees}) & présent \\
+\code{R/exposition.R} & recettes d'exposition, conventions d'âge, troncature
+et censure (section~\ref{sec:exposition}) & présent \\
+\code{R/brut.R} & taux bruts et intervalles (section~\ref{sec:brut}) & à créer \\
+\code{R/lissage.R} & lissages (section~\ref{sec:lissage}) & à créer \\
+\code{R/positionnement.R} & positionnement sur une table de référence
+(section~\ref{sec:positionnement}) & à créer \\
+\code{R/prospective.R} & tables prospectives (section~\ref{sec:prospective}) & à créer \\
+\code{R/fermeture.R} & fermeture aux âges extrêmes (section~\ref{sec:fermeture}) & à créer \\
+\code{R/validation.R} & validation et suivi d'expérience (section~\ref{sec:validation}) & à créer \\
+\code{R/rapport.R} & quantités des rapports, fiche de construction, empreintes
+(section~\ref{sec:rapport}) & présent \\
+\code{R/simulation.R} & simulateur (section~\ref{sec:simulation})~; hors de la
+chaîne du moteur & présent \\
+\code{R/construire\_table.R} & point d'entrée unique, validation du plan,
+orchestration seule, aucun calcul (section~\ref{sec:construction}) & présent \\
+\end{longtable}
+\end{center}
+
+\subsection{Graphe d'appels autorisés}
+\label{sec:graphe}
+
+Les modules sont ordonnés~: \code{outils}, \code{donnees}, \code{exposition},
+\code{brut}, \code{lissage}, \code{positionnement}, \code{prospective},
+\code{fermeture}, \code{validation}, \code{rapport}. Un module ne peut appeler
+que des fonctions définies dans les modules situés \textbf{strictement avant
+lui} dans cet ordre (ADR 0007, point 2.1). Deux fichiers sont hors de la
+chaîne~: \code{simulation}, qui ne peut appeler que \code{donnees} et
+\code{outils} et qu'\textbf{aucun module du moteur n'appelle}, et
+\code{construire\_table}, qui peut appeler tous les modules \textbf{sauf}
+\code{simulation}. La figure~\ref{fig:graphe-modules} et le
+tableau~\ref{tab:appels-autorises} donnent ce graphe.
+
+\medskip
+Deux raisons fondent cette règle. Un ordre sans cycle rend chaque module
+lisible et vérifiable avec ses seuls modules amont~: une anomalie d'un module
+ne peut atteindre que les modules situés après lui. Et le simulateur, qui
+produit les jeux sur lesquels le moteur est testé, ne partage pas le code
+qu'il sert à tester~: s'il pouvait appeler \code{exposition}, une erreur de la
+recette d'exposition se retrouverait à l'identique dans les données simulées
+et dans leur estimation, et la vérification ne la verrait pas (ADR 0007,
+«~Options écartées~»). Le simulateur reproduit le même modèle, pas le même
+code. Une seule exception à la lecture «~en aval seulement~» est assumée~:
+\code{positionnement} peut appeler \code{lissage}, parce que la méthode~4 de
+positionnement est un lissage de la table du moment avec dérive de la
+référence (E2.12)~; le sens inverse est interdit, \code{lissage} n'appelant
+jamais \code{positionnement}.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  ent/.style   = {rectangle, rounded corners=2pt, draw=financeblue, line width=0.7pt,
+                  fill=tableheader, text=financeblue, align=center, inner sep=3pt,
+                  minimum height=6mm, text width=36mm, font=\small\bfseries},
+  fonc/.style  = {rectangle, rounded corners=2pt, draw=financeblue, line width=0.7pt,
+                  fill=white, text=black, align=center, inner sep=3pt,
+                  minimum height=6mm, text width=36mm},
+  prevu/.style = {rectangle, rounded corners=2pt, draw=financeblue!60, dashed,
+                  line width=0.6pt, fill=white, text=black!60, align=center,
+                  inner sep=3pt, minimum height=6mm, text width=36mm},
+  fl/.style    = {-{Latex[length=2mm]}, draw=financeblue, line width=0.6pt},
+  flx/.style   = {font=\scriptsize\itshape, text=greenline, inner sep=1.5pt}
+]
+\node[fonc] (rap) {\code{rapport}};
+\node[prevu, below=3.5mm of rap] (val) {\code{validation}};
+\node[prevu, below=3.5mm of val] (fer) {\code{fermeture}};
+\node[prevu, below=3.5mm of fer] (pro) {\code{prospective}};
+\node[prevu, below=3.5mm of pro] (pos) {\code{positionnement}};
+\node[prevu, below=3.5mm of pos] (lis) {\code{lissage}};
+\node[prevu, below=3.5mm of lis] (bru) {\code{brut}};
+\node[fonc, below=3.5mm of bru] (exp) {\code{exposition}};
+\node[fonc, below=3.5mm of exp] (don) {\code{donnees}};
+\node[fonc, below=3.5mm of don] (out) {\code{outils}};
+
+\node[ent, above=8mm of rap] (ct) {\code{construire\_table}\\[1pt]
+  \scriptsize\mdseries point d'entrée, orchestration};
+\node[fonc, right=22mm of don] (sim) {\code{simulation}\\[1pt]
+  \scriptsize simulateur};
+
+\foreach \a/\b in {rap/val, val/fer, fer/pro, pro/pos, pos/lis, lis/bru,
+                   bru/exp, exp/don, don/out}
+  \draw[fl] (\a) -- (\b);
+\draw[fl] (ct) -- node[flx, right] {tous les modules du moteur} (rap);
+\draw[fl] (sim) -- (don);
+\end{tikzpicture}
+\caption{Graphe d'appels autorisés des modules (ADR 0007, point 2.1). Une
+flèche de $A$ vers $B$ signifie que $A$ peut appeler $B$ et, la règle étant
+«~strictement avant~», tout module situé après $B$ dans le sens des flèches.
+Blocs pleins~: fichiers présents dans \code{R/}~; blocs en pointillé~: modules
+prévus, fichiers absents. \code{simulation} n'est appelé par aucun module du
+moteur, ni par \code{construire\_table}~; \code{lissage} n'appelle jamais
+\code{positionnement}.}
+\label{fig:graphe-modules}
+\end{figure}
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{3.6cm}p{11.2cm}@{}}
+\caption{Appels autorisés, par module appelant (ADR 0007, point 2.1~;
+constante \code{APPELS\_AUTORISES} de \code{tests/controles/graphe\_modules.R}).}
+\label{tab:appels-autorises}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Module appelant}} &
+\textcolor{financeblue}{\textbf{Peut appeler}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Module appelant}} &
+\textcolor{financeblue}{\textbf{Peut appeler}} \\
+\endhead
+\code{outils} & aucun module (fonctions des packages de priorité \code{base} seulement) \\
+\code{donnees} & \code{outils} \\
+\code{exposition} & \code{donnees}, \code{outils} \\
+\code{brut} & \code{exposition} et les modules amont \\
+\code{lissage} & \code{brut} et les modules amont \\
+\code{positionnement} & \code{lissage} et les modules amont \\
+\code{prospective} & \code{positionnement} et les modules amont \\
+\code{fermeture} & \code{prospective} et les modules amont \\
+\code{validation} & \code{fermeture} et les modules amont \\
+\code{rapport} & tous les modules ci-dessus \\
+\code{simulation} & \code{donnees} et \code{outils} seulement \\
+\code{construire\_table} & tous les modules sauf \code{simulation} \\
+\end{longtable}
+\end{center}
+
+\subsubsection*{Contrôle par script}
+
+Le graphe est vérifié par \code{tests/controles/graphe\_modules.R}, en R de
+base (\code{codetools}, de priorité \code{recommended}, est exclu par
+l'ADR 0002), dans le job «~Tests (R 4.3.3)~» de la CI (ADR 0007, point 2.2)~:
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item chaque fichier \code{R/<module>.R} est lu par \code{parse()}~; un fichier
+    dont le nom n'est pas un module connu est un écart~;
+  \item les affectations de premier niveau (\code{nom <- \ldots} ou
+    \code{nom = \ldots}, fonctions comme constantes) donnent la table
+    «~symbole $\to$ module~»~; un symbole défini dans deux modules est un
+    écart~;
+  \item pour chaque définition, les noms qu'elle emploie (\code{all.names()}),
+    croisés avec cette table, donnent les arêtes entre modules~; toute arête
+    absente du tableau~\ref{tab:appels-autorises} est un écart, imprimé avec le
+    module appelant, le module appelé et les deux symboles~;
+  \item les appels dynamiques interdits (ci-dessous) sont cherchés dans tout
+    l'arbre syntaxique.
+\end{enumerate}
+
+\noindent
+Le script imprime toutes les arêtes trouvées et tous les écarts, puis sort
+avec le code~1 s'il en a trouvé au moins un. Ses limites sont écrites dans son en-tête~: un nom local homonyme d'un
+symbole d'un autre module compte comme une arête (faux positif possible,
+jamais d'arête manquée par homonymie)~; un code de premier niveau qui n'est
+pas une affectation est un écart~; les appels vers les packages de base ne
+sont pas contrôlés ici, mais par la liste blanche de \code{DESCRIPTION}. Le
+script est lui-même testé sur des témoins (\code{tests/unitaires/test\_controles.R})~:
+il échoue, entre autres, quand \code{exposition} appelle \code{brut}, quand
+\code{donnees} appelle \code{simulation}, quand \code{lissage} appelle
+\code{positionnement} et quand \code{construire\_table} appelle
+\code{simulation}, et il passe sur un graphe conforme où \code{positionnement}
+appelle \code{lissage}.
+
+\subsubsection*{Appels dynamiques interdits}
+
+Un appel dont la cible est calculée à l'exécution (\code{do.call("f", \ldots)},
+\code{get("f")}) n'apparaît pas dans \code{all.names()}~: il créerait une
+arête invisible pour le contrôle. Le script interdit donc dans \code{R/}
+(ADR 0007, point 2.3, liste élargie à la mise en œuvre et consignée dans
+l'annotation du 16/10/2026)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{do.call()} dont l'argument \code{what}, apparié par
+    \code{match.call()} (position ou nom), n'est ni un symbole ni une fonction
+    anonyme (chaîne, \code{paste0(\ldots)}\ldots)~; \code{do.call(f, args)} avec
+    \code{f} un symbole désignant une fonction reste permis~;
+  \item toute occurrence, appel ou fonction passée comme objet
+    (\code{lapply(x, get)}), de \code{match.fun}, \code{get}, \code{get0},
+    \code{mget}, \code{getFromNamespace}, \code{getExportedValue},
+    \code{getFunction}, \code{asNamespace} et \code{getNamespace}~;
+  \item \code{eval()} ou \code{evalq()} d'un \code{parse()}, \code{str2lang()},
+    \code{str2expression()}, \code{call()} ou \code{as.call()}~;
+  \item l'opérateur \code{:::} et toute référence qualifiée \code{tablexp::}~;
+  \item les formes qualifiées \code{base::}, \code{utils::} et \code{methods::}
+    de ce qui précède, lues comme la forme nue.
+\end{itemize}
+
+\noindent
+Une fonction passée en argument puis appelée dans le corps de la fonction qui la reçoit crée une arête
+que le script attribue à l'appelant qui l'a passée~: c'est voulu, la
+dépendance existe bien là. Les tests, seuls, appellent les fonctions non
+exportées par \code{tablexp:::} (ADR 0007, point 11.3).
+
+% =============================================================================
+\section{Services transverses~: \code{R/outils.R}}
+\label{sec:outils}
+% =============================================================================
+
+\code{R/outils.R} porte les services sans contenu métier partagés par tous les
+modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
+la forme des refus et celle des avertissements (ADR 0007, point 1.2). Il
+n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+dans le simulateur et dans le futur bootstrap par têtes, et chaque module
+inventerait sa forme de refus.
+
+\subsection{Refus~: une condition R typée}
+\label{sec:refus}
+
+Le moteur ne devine pas~: quand une entrée ne permet pas de construire, il
+\emph{refuse} (E2.3, E2.7). Un refus est une \textbf{condition R typée, jamais
+un objet retourné} (ADR 0007, point 6.4). \code{refus\_tablexp()} construit la
+condition, de classe \code{c("refus\_tablexp", "error", "condition")}, avec
+quatre champs~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{module}~: le module qui refuse~;
+  \item \code{motif}~: un code court stable, en minuscules ASCII, chiffres et
+    soulignés, conforme au motif \code{MOTIF\_CODE\_REFUS}
+    (\verb|^[a-z][a-z0-9_]*$|)~;
+  \item \code{message}~: la phrase qui dit ce qui manque (E5.5)~;
+  \item \code{details}~: une liste (rôle, colonne, étape, paramètre, décompte,
+    premiers numéros de ligne).
+\end{itemize}
+
+\noindent
+\code{refuser()} la lève par \code{stop()} et ne rend jamais la main. Un
+argument mal formé de \code{refus\_tablexp()} (module ou message vide, motif
+non conforme, détails qui ne sont pas une liste) n'est pas un refus mais une
+erreur de programmation du package, signalée par \code{stop()}. Les tests
+vérifient le motif, le décompte et les numéros par \code{tryCatch()}~;
+l'application attrapera la condition et affichera son message. Une condition
+est préférée à un objet portant \code{ok = FALSE}, forme d'\code{outil\_USP}~:
+un tel objet peut être lu par mégarde comme une construction partielle, une
+condition ne le peut pas. Les codes de refus de chaque module sont recensés
+dans la partie du module.
+
+\subsection{Avertissements métier}
+\label{sec:avertissements}
+
+Un avertissement métier signale ce qui n'empêche pas la construction mais doit
+être lu~: unité d'observation par défaut, exclusion appliquée, relevé
+d'incohérence non bloquant. Il est \textbf{inscrit dans l'objet résultat,
+jamais émis par \code{warning()}} (ADR 0007, point 6.5)~: l'objet est la seule
+source du rapport figé et de l'application~; un \code{warning()} serait perdu
+par l'application, absent de la fiche et parasite dans les batteries.
+\code{avertissements\_vides()} crée l'accumulateur, un \code{data.frame} de
+colonnes \code{etape}, \code{code}, \code{message} et \code{nombre}~;
+\code{avertir()} lui ajoute une ligne, et refuse, par une erreur de
+programmation, un code qui n'est pas conforme à \code{MOTIF\_CODE\_REFUS}.
+Chaque fonction d'étape rend ses avertissements~; le point d'entrée les
+rassemble dans le champ \code{avertissements} de l'objet et de la fiche. Les
+codes de chaque étape sont recensés dans la partie de son module
+(sections~\ref{sec:unite-observation} et~\ref{sec:exposition}).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-outils}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/outils.R}.}
+\label{tab:fonctions-outils}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-outils}{GENERATEUR} & constante & --- & générateur fixé
+(section~\ref{sec:generateur})~: Mersenne-Twister, inversion pour la loi
+normale, rejet pour \code{sample()} \\
+\catalogue{fonctions-outils}{MOTIF\_CODE\_REFUS} & constante & --- & motif
+d'un code de refus ou d'avertissement~: \verb|^[a-z][a-z0-9_]*$| \\
+\catalogue{fonctions-outils}{refus\_tablexp()} & interne & \code{module},
+\code{motif}, \code{message}, \code{details} (liste, vide par défaut) &
+condition de classe \code{refus\_tablexp}, sans la lever~; \code{stop()} si un
+argument est mal formé (section~\ref{sec:refus}) \\
+\catalogue{fonctions-outils}{refuser()} & interne & mêmes arguments & lève le
+refus~; ne rend jamais la main \\
+\catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
+accumulateur vide des avertissements métier
+(section~\ref{sec:avertissements}~; issue~\#9) \\
+\catalogue{fonctions-outils}{avertir()} & interne & accumulateur, \code{etape},
+\code{code}, \code{message}, \code{nombre} & accumulateur augmenté d'une ligne,
+sans \code{warning()} (section~\ref{sec:avertissements}~; issue~\#9) \\
+\catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
+explicite, sans défaut), \code{expr} & valeur de \code{expr} évaluée sous la
+graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
+\code{graine\_invalide} (section~\ref{sec:sous-graine}) \\
+\end{longtable}
+}
+
+% =============================================================================
+\section{Reproductibilité et aléa}
+\label{sec:reproductibilite}
+% =============================================================================
+
+\subsection{Exigence et portée}
+\label{sec:reproductibilite-exigence}
+
+À données, rôles, plan et graine identiques, le programme produit des
+résultats identiques \textbf{au bit près sur une même machine}~; toute
+simulation passe par une graine locale explicite sous un générateur fixé,
+consignée dans le résultat, l'état global du générateur étant restauré à la
+sortie~; aucun horodatage n'entre dans la partie du résultat comparée lors
+d'un rejeu (E4.6). La présente section décrit les deux mécanismes du socle~:
+le générateur fixé et l'exécution sous graine locale. La consignation de la
+graine et du générateur dans la fiche de construction et le rejeu de la fiche
+sont décrits avec la fiche (section~\ref{sec:fiche}).
+
+\begin{encadre}
+\small
+\textbf{Statut.} L'identité au bit près est un \emph{constat} des batteries
+(section~\ref{sec:verifications-alea}), établi sur la machine qui les exécute~;
+ce n'est pas une propriété démontrée. L'identité entre deux machines n'est
+\textbf{pas garantie}~: deux processeurs différents pourraient différer au
+dernier bit, même dans le même conteneur, si la bibliothèque mathématique
+du système choisit ses variantes de calcul selon le processeur (hypothèse de
+l'ADR 0008, non mesurée). C'est pourquoi les références de non-régression
+seront comparées à tolérance et produites sur une plateforme unique
+(section~\ref{sec:plateforme}).
+\end{encadre}
+
+\subsection{Générateur fixé}
+\label{sec:generateur}
+
+Le générateur est la constante \code{GENERATEUR} de \code{R/outils.R}~:
+\code{kind = "Mersenne-Twister"}, \code{normal.kind = "Inversion"},
+\code{sample.kind = "Rejection"}. Ce sont les valeurs par défaut de R 4.3.3
+(\code{RNGkind()} dans une session neuve), fixées en constante pour qu'un
+changement de défaut d'une version de R ne change pas les tirages en silence.
+Le générateur uniforme est le Mersenne-Twister de Matsumoto et Nishimura~; les
+lois normales s'obtiennent par inversion de la fonction de répartition~; la
+génération uniforme discrète (\code{sample()}) emploie la méthode par rejet,
+défaut de R depuis la version 3.6.0, la méthode antérieure par arrondi rendant
+\code{sample()} sensiblement non uniforme sur de grandes populations
+(documentation de R, \code{?Random}).
+
+\refl{M.~Matsumoto, T.~Nishimura, \emph{Mersenne Twister: a 623-dimensionally
+equidistributed uniform pseudo-random number generator}, \emph{ACM
+Transactions on Modeling and Computer Simulation}, 8, 1998, p.~3--30 (cité par
+la documentation de R, \code{?Random}).}
+
+\noindent
+Un changement de \code{GENERATEUR} change tout résultat simulé~: c'est un
+changement de résultat, soumis au visa (ADR 0007, «~Conséquences~»).
+
+\subsection{Exécution sous graine locale}
+\label{sec:sous-graine}
+
+\code{sous\_graine(graine, expr)} est la seule voie par laquelle le package
+tire un aléa (ADR 0007, point 8.1). Elle procède ainsi~:
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item \textbf{contrôle de la graine}~: un nombre unique, non manquant, fini,
+    entier et de valeur absolue au plus \code{.Machine\$integer.max}~; sinon,
+    et aussi quand la graine est omise, refus \code{graine\_invalide} du module
+    \code{outils}. Il n'y a jamais de graine par défaut~: une graine par défaut
+    serait une graine non déclarée~;
+  \item \textbf{sauvegarde de l'état de l'appelant}~: \code{.Random.seed} de
+    l'environnement global, ou son absence, et le réglage \code{RNGkind()}~;
+  \item \textbf{tirage}~: \code{set.seed(graine, kind, normal.kind, sample.kind)}
+    sous \code{GENERATEUR}, puis évaluation de \code{expr}~;
+  \item \textbf{restauration}, par \code{on.exit()}, donc aussi après une erreur
+    dans \code{expr}~: le réglage d'abord, parce que \code{RNGkind()} réécrit
+    \code{.Random.seed}, puis \code{.Random.seed} de l'appelant, ou sa
+    suppression s'il n'existait pas.
+\end{enumerate}
+
+\noindent
+Les tirages ne dépendent donc que de la graine~: ni de l'état du générateur
+de l'appelant, ni de son réglage, que \code{sous\_graine()} laisse inchangés.
+Le simulateur (section~\ref{sec:simulation}) est, à cette date, la seule
+fonction du package qui tire un aléa~; il reçoit sa graine en argument et la
+consigne, avec \code{GENERATEUR}, dans le jeu simulé.
+
+\medskip
+\textbf{Limite.} La réserve de la méthode normale de Box-Muller d'un appelant,
+gardée par R hors de \code{.Random.seed}, n'est pas restaurable~; c'est sans
+effet sur le moteur, qui tire toujours sous \code{Inversion} (limite reprise
+d'\code{outil\_USP}, ADR 0007, point 8.1).
+
+\medskip
+\textbf{Aucun aléa hors calcul.} Les fichiers temporaires, employés par
+exemple pour calculer une empreinte par \code{tools::md5sum()}, sont créés par
+\code{tempfile()}, qui ne touche pas \code{.Random.seed} (constat~: dans une
+session neuve, \code{.Random.seed} n'existe ni avant ni après \code{tempfile()}
+et \code{tools::md5sum()}~; ADR 0007, point 8.2).
+
+\subsection{Vérifications}
+\label{sec:verifications-alea}
+
+Deux fichiers de tests portent ces propriétés (section~\ref{sec:batteries})~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{tests/unitaires/test\_outils.R}~: valeur de \code{GENERATEUR}~;
+    mêmes tirages que \code{set.seed()} nu sous le générateur par défaut~;
+    graine entière écrite en double admise~; appelant sous
+    \code{L'Ecuyer-CMRG}~: tirages de \code{GENERATEUR}, \code{.Random.seed}
+    et \code{RNGkind()} de l'appelant restaurés~; absence de \code{.Random.seed}
+    restaurée~; état restauré après une erreur dans \code{expr}~; refus
+    \code{graine\_invalide} des graines mal formées~;
+  \item \code{tests/test\_reproductibilite.R}~: à graine égale, tirages
+    identiques (\code{identical()}) dans un même processus, quel que soit l'état
+    du générateur de l'appelant, et dans un autre processus R de la même
+    machine~; à graines différentes, tirages différents. Les tirages comparés
+    couvrent les trois réglages du générateur (\code{runif()}, \code{rnorm()},
+    \code{sample.int()})~; le processus fils les écrit en \code{\%.17g}, format
+    qui restitue un double au bit près. La même batterie vérifie le simulateur
+    et la construction (sections~\ref{sec:simulation} et~\ref{sec:rapport}).
+\end{itemize}
+
+\noindent
+Ces vérifications sont des constats sur la machine qui exécute la batterie~;
+sur la CI, c'est la plateforme de référence (section~\ref{sec:plateforme}).
+
+% =============================================================================
+\section{Batteries de vérification et plateforme de CI}
+\label{sec:batteries}
+% =============================================================================
+
+\subsection{Trois batteries}
+\label{sec:trois-batteries}
+
+Les vérifications du code passent par trois batteries en R de base, sans
+\code{testthat} (package du CRAN, hors priorité \code{base}), lancées depuis
+la racine du dépôt (ADR 0007, point 11.1)~:
+
+\begin{encadre}
+\small
+\code{Rscript tests/test\_unitaires.R}\\
+\code{Rscript tests/test\_reproductibilite.R}\\
+\code{Rscript tests/concordance\_doc\_moteur.R -{}-strict}
+\end{encadre}
+
+\noindent
+La même liste, dans le même ordre, figure dans \code{CLAUDE.md}
+(«~Commandes~»), dans le workflow \code{.claude/workflows/circuit-technique.js}
+et dans le job «~Tests (R 4.3.3)~» de la CI~; un script le contrôle
+(section~\ref{sec:controles-depot}). Chaque batterie~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{installe l'arbre de travail} dans une bibliothèque temporaire
+    (\code{R CMD INSTALL -{}-no-docs -l <bibliothèque> <racine>}, par
+    \code{installer\_tablexp()}), sans installer aucun autre package, puis
+    charge \code{tablexp} depuis elle et échoue s'il est chargé d'ailleurs~:
+    c'est le code de l'arbre qui est testé, jamais un package installé
+    auparavant~;
+  \item affiche \code{R.version.string} puis, à la fin, une \textbf{ligne de
+    bilan}~: version de R, nombre de tests, d'échecs, d'échecs attendus et de
+    succès inattendus~;
+  \item \textbf{sort avec un code non nul} en cas d'échec ou de succès
+    inattendu (section~\ref{sec:harnais}).
+\end{itemize}
+
+\noindent
+Une bibliothèque déjà installée, désignée par la variable d'environnement
+\code{TABLEXP\_BIBLIOTHEQUE}, n'est réutilisée que si l'\emph{empreinte de
+l'arbre source} inscrite à son installation est égale à celle de l'arbre
+courant~; sinon la batterie réinstalle et le dit. Cette empreinte est un MD5
+(\code{tools::md5sum()}) de \code{DESCRIPTION}, de \code{NAMESPACE} et, s'ils
+existent, de tous les fichiers de \code{R/}, \code{inst/}, \code{data/} et
+\code{src/}, chemins relatifs compris, triés par octets
+(\code{empreinte\_source()}). Elle empêche de tester un package périmé~; elle
+n'a aucun rôle dans les résultats.
+
+\medskip
+\textbf{\code{tests/test\_unitaires.R}} exécute chaque fichier
+\code{tests/unitaires/test\_*.R}, triés par nom, chacun dans son
+propre environnement~; \code{quit()}, \code{q()} et \code{bilan()} y sont
+neutralisés, une erreur au chargement d'un fichier est un échec, et un fichier
+sans aucune assertion aussi. \textbf{\code{tests/test\_reproductibilite.R}}
+vérifie les identités de la section~\ref{sec:verifications-alea}, puis celles du
+simulateur et de la construction~; la comparaison aux références de
+non-régression s'y ajoutera avec la branche qui les crée.
+\textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
+au code installé~: toute fonction citée existe~; toute fonction exportée est
+citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
+avec renvoi à l'issue qui la documentera, où elle compte en échec attendu~;
+chaque catalogue recensé par le document (fonctions exportées, définitions
+de premier niveau de chaque fichier de \code{R/}, rôles, recettes
+d'exposition) est égal, nom pour nom, à sa source dans le code~; toute ligne de
+la liste d'attente désigne un export ou un catalogue requis et renvoie à une
+issue. Le format des citations et des catalogues qu'elle lit est fixé par
+\code{docs/latex/CONVENTIONS.md} (section~3)~; les tableaux de fonctions de
+chaque module en sont la principale application (E4.9). Sans \code{-{}-strict}, elle
+rend compte des écarts sans échouer.
+
+\subsection{Harnais}
+\label{sec:harnais}
+
+Les trois batteries partagent \code{tests/harnais.R}, repris de la forme
+d'\code{outil\_USP} (ADR 0007, point 11.2, et annotation du 16/10/2026,
+point~d)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{verifier(nom, expr)}~: succès si \code{expr} vaut \code{TRUE}~;
+    une chaîne décrit l'écart~; toute autre valeur, ou une erreur, est un
+    échec~;
+  \item \code{echec\_attendu(nom, issue, expr, motif, erreur\_quelconque)}~:
+    \textbf{défaut connu}, codé en échec attendu avec renvoi obligatoire à
+    l'issue, de la forme \code{\#N}~; \code{expr} décrit le comportement
+    \emph{correct}. Tant qu'elle échoue, le test est «~attendu~»~; \textbf{si
+    elle passe, c'est un succès inattendu et la batterie échoue}~: le défaut
+    semble corrigé, la marque est retirée et le test devient ordinaire. Trois
+    natures d'échec attendu sont admises et décomptées~: par valeur
+    (\code{expr} rend \code{FALSE} ou une chaîne), par refus (un
+    \code{refus\_tablexp}, du motif donné s'il l'est) et, seulement si
+    \code{erreur\_quelconque = TRUE}, par une autre erreur~; toute autre issue
+    est un échec, pour qu'un défaut connu ne masque pas une panne différente~;
+  \item \code{proche(a, b, rel, abs)}~: égalité numérique à tolérance déclarée,
+    $|a-b| \le \mathit{abs} + \mathit{rel}\,|b|$ élément par élément, sans
+    tolérance par défaut~; rend un écart pour des valeurs non numériques, des
+    longueurs différentes ou des valeurs manquantes à des positions
+    différentes~; exige l'égalité exacte des valeurs infinies~;
+  \item \code{leve\_refus(expr, motif)}~: vrai si \code{expr} lève un
+    \code{refus\_tablexp} du motif donné~;
+  \item \code{sans\_execution(x)}~: retire de l'objet résultat le champ des
+    informations d'exécution, seul champ qui change entre deux exécutions
+    identiques, avant \code{identical()}~;
+  \item \code{bilan()}~: ligne de bilan et code de sortie. Il compte en outre
+    un échec si un espace de noms hors priorité \code{base}, autre que
+    \code{tablexp}, est chargé en fin de batterie (\code{espaces\_hors\_base()})~:
+    l'image de la CI contient des packages \code{recommended}, et cette règle
+    empêche un test de s'appuyer sur l'un d'eux à l'insu de la liste blanche
+    (ADR 0008, «~Conséquences~»).
+\end{itemize}
+
+\noindent
+Une \textbf{garde de sortie} (\code{.Last()}) fait sortir avec le code~1 tout
+processus qui a chargé le harnais et se termine avant la ligne de bilan, même
+par \code{quit(status = 0)}. Le harnais est lui-même testé
+(\code{tests/unitaires/test\_harnais.R})~: une assertion fausse donne un code
+de sortie non nul, et un échec attendu qui réussit fait échouer la batterie.
+
+\medskip
+Chaque test nomme la nature de son attendu (ADR 0007, point 11.4~; E2.20)~:
+valeur calculée à la main (identité exacte, ou tolérance déclarée)~;
+\emph{recoupement}, comparaison à la valeur que rend, dans la batterie, un appel
+direct d'une fonction d'un package de priorité \code{base}, dont la portée est
+limitée quand le moteur repose sur la même fonction~: le test dit alors ce
+qu'il vérifie (la formule et son branchement, non la fonction de base)~;
+\emph{contre-vérification}, valeur de référence produite hors CI par un package
+avancé et écrite en dur avec sa version et sa date~; \emph{constat de
+simulation}, qui écrit le nombre de têtes, le niveau, la région d'acceptation
+et la probabilité de fausse alarme (\code{CONTEXT.md}~; E2.19).
+
+\subsection{Plateforme de référence}
+\label{sec:plateforme}
+
+Les références de non-régression, qui viendront avec la deuxième branche, sont
+produites et comparées sur une \emph{plateforme de référence} unique (E4.7~;
+ADR 0008)~: le job de la CI s'exécute dans un \textbf{conteneur
+\code{rocker/r-ver:4.3.3} épinglé par empreinte}, dont R charge la \textbf{BLAS
+et la LAPACK de référence} (Netlib), en monothread. Identifiant fixé par
+l'annotation du 16/10/2026 de l'ADR 0008 (décision M47)~:
+
+\begin{encadre}
+\small
+image \code{rocker/r-ver:4.3.3@sha256:}\\
+\code{\phantom{image }732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309}\\
+suivie de la bascule \code{update-alternatives} vers les paquets \code{libblas3}
+et \code{liblapack3} 3.10.0-2ubuntu1 d'Ubuntu~22.04~;\\
+\code{R version 4.3.3 (2024-02-29)}~;\\
+BLAS \code{/usr/lib/x86\_64-linux-gnu/blas/libblas.so.3.10.0}~;\\
+LAPACK \code{/usr/lib/x86\_64-linux-gnu/lapack/liblapack.so.3.10.0}, version 3.10.0~;\\
+monothread (\code{OPENBLAS\_NUM\_THREADS} et \code{OMP\_NUM\_THREADS} valent 1).
+\end{encadre}
+
+\noindent
+\textbf{Pourquoi un conteneur épinglé.} Un libellé d'exécuteur
+(\code{ubuntu-24.04}) n'est pas une image figée~: elle est mise à jour par
+GitHub, bibliothèques comprises, sans commit dans le dépôt. \code{outil\_USP},
+qui installait R sur l'image de l'exécuteur, a constaté une dérive entre deux
+exécutions de même R et de même image, due à une BLAS optimisée (OpenBLAS) qui
+choisit ses noyaux selon le processeur (constat d'\code{outil\_USP} rapporté
+par l'ADR 0008, «~Contexte~»). Une étiquette
+de conteneur peut elle aussi désigner une autre image après une
+reconstruction (hypothèse de l'ADR 0008, non vérifiée)~; l'empreinte
+(\code{@sha256:\ldots}) désigne un contenu immuable. Le conteneur est une fonctionnalité native de GitHub Actions, et
+non une action tierce, ce que la politique des Actions du dépôt exige.
+
+\medskip
+\textbf{Pourquoi la bascule.} L'image charge par défaut OpenBLAS (relevé de la
+première exécution, rapporté par l'annotation du 16/10/2026 de l'ADR 0008). Le mainteneur a retenu
+de basculer dans le job vers la Netlib déjà présente dans l'image, plutôt que
+de compiler R depuis la source (décision M47~; le repli par compilation reste
+prévu par l'ADR 0008, point 10). L'étape «~BLAS et LAPACK de référence~» de
+\code{.github/workflows/ci.yml} pointe par \code{update-alternatives} les
+alternatives \code{libblas.so.3-x86\_64-linux-gnu} et
+\code{liblapack.so.3-x86\_64-linux-gnu} vers \code{libblas3} et
+\code{liblapack3}, puis affiche les cibles résolues et les versions des
+paquets. La plateforme de référence est l'image épinglée \emph{suivie de cette
+bascule}~: modifier l'étape, l'image ou les bibliothèques est un changement de
+plateforme, décidé par le mainteneur et, une fois des références existantes,
+accompagné d'un tableau avant / après de toutes les références (ADR 0008,
+point 9).
+
+\medskip
+\textbf{Script de plateforme.} \code{tests/controles/plateforme.R} s'exécute en
+première étape de chaque job R qui calcule, avant tout calcul (ADR 0008,
+points 3 à 5)~; le job «~Absence de Java~», qui n'effectue aucun calcul
+numérique et ne produit aucun résultat, en est exempté, ainsi que des
+variables monothread (ADR 0008, annotation du 17/10/2026).
+En mode strict (\code{-{}-exiger}, sur la CI), il \textbf{échoue} si~:
+\code{R.version.string} n'est pas exactement \code{R\_ATTENDU}
+(\code{R version 4.3.3 (2024-02-29)})~; l'une des quatre lectures de la BLAS et
+de la LAPACK (\code{extSoftVersion()["BLAS"]}, \code{sessionInfo()\$BLAS},
+\code{sessionInfo()\$LAPACK}, \code{La\_library()}) est vide, désigne une BLAS
+optimisée (motif \code{MOTIF\_OPTIMISE}~: \code{openblas}, \code{mkl},
+\code{atlas}, \code{blis}, \code{flexiblas}) ou sort des chemins de référence
+(\code{MOTIF\_BLAS}, \code{MOTIF\_LAPACK})~; \code{La\_version()} n'est pas
+\code{LA\_VERSION\_ATTENDUE} (3.10.0)~; \code{OPENBLAS\_NUM\_THREADS} ou
+\code{OMP\_NUM\_THREADS} ne vaut pas 1~; \code{TABLEXP\_IMAGE}, que le job
+renseigne avec la même chaîne que l'image du conteneur, n'est pas épinglée par
+empreinte (\code{MOTIF\_IMAGE}). Sans \code{-{}-exiger} (poste, session), il
+affiche les mêmes grandeurs et les écarts sans échouer~: les batteries restent
+exécutables sur le poste Windows du mainteneur, dont la BLAS est celle de R.
+Dans les deux modes, il écrit l'\emph{identifiant de plateforme} (image,
+\code{R.version.string}, BLAS, LAPACK et sa version, \code{sessionInfo()}) et
+consigne sans faire échouer le processeur et ses drapeaux (\code{fma},
+\code{avx2}, \code{avx512f}), \code{ImageOS} et \code{ImageVersion} de l'hôte,
+\code{LC\_COLLATE}, le fuseau horaire, la présence d'un exécutable
+\code{java} et \code{GITHUB\_SHA}. Ce bloc sera reporté dans le message de
+chaque commit de référence.
+
+\begin{encadre}
+\small
+\textbf{Ce que la plateforme ne garantit pas.} Le modèle de processeur varie
+d'une exécution à l'autre sous le même libellé d'exécuteur (relevé de l'ADR
+0008, annotation du 16/10/2026). La BLAS Netlib n'a pas de noyau choisi selon
+le processeur~; la réserve sur la bibliothèque mathématique du système
+(section~\ref{sec:reproductibilite-exigence}) reste en revanche ouverte, non
+mesurée. Les références seront donc comparées à tolérance, structure contrôlée
+à part (E4.7).
+\end{encadre}
+
+\subsection{Jobs de la CI}
+\label{sec:jobs-ci}
+
+\code{.github/workflows/ci.yml} définit les jobs suivants, exécutés sur chaque
+pull request, sur chaque push vers \code{main} et sur demande. Aucun job n'installe de
+package du CRAN ni ne configure de dépôt CRAN pour une installation~:
+\code{tablexp} est installé depuis l'arbre de travail par chaque batterie.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{3.3cm}p{3.2cm}p{8.3cm}@{}}
+\caption{Jobs de la CI (\code{.github/workflows/ci.yml}).}
+\label{tab:jobs-ci}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Job}} &
+\textcolor{financeblue}{\textbf{Exécution}} &
+\textcolor{financeblue}{\textbf{Contenu}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Job}} &
+\textcolor{financeblue}{\textbf{Exécution}} &
+\textcolor{financeblue}{\textbf{Contenu}} \\
+\endhead
+«~Contrôles du dépôt~» & hôte \code{ubuntu-24.04}, sans R & réglages de Claude
+Code valides (JSON)~; fiches d'agents complètes~; fiches \code{-approfondi} à
+jour~; aucun fichier sensible versionné \\
+«~Tests (R 4.3.3)~» & conteneur de la plateforme de référence & bascule vers
+la BLAS et la LAPACK de référence~; script de plateforme en mode strict~; les
+trois batteries~; liste blanche de \code{DESCRIPTION}~; ordre des modules~;
+identité des batteries et de l'image. Les étapes des batteries et des
+contrôles, sous la condition \code{\$\{\{ !cancelled() \}\}}, s'exécutent
+même si une étape antérieure échoue, pour que tous les écarts soient
+visibles~; le job reste en échec. L'étape du script de plateforme, sans
+condition, est sautée si la bascule vers la BLAS de référence échoue \\
+«~Absence de Java~» & même conteneur, réseau requis & contrôle de l'absence de
+Java (section~\ref{sec:absence-java}) et son cas témoin \\
+«~Documentation~» & hôte \code{ubuntu-24.04}, sans R & installation des paquets TeX
+par \code{apt-get} (versions affichées), compilation du présent document selon
+\code{docs/latex/CONVENTIONS.md} (section~6~: passes jusqu'à stabilisation,
+cinq au plus~; échec sur une erreur ou un renvoi indéfini), PDF et journal
+publiés en artefact \\
+\end{longtable}
+\end{center}
+
+\noindent
+Ces quatre jobs sont les contrôles requis que liste le ruleset de \code{main}
+(\code{.github/ruleset-main.json}, appliqué au dépôt par le mainteneur~;
+ADR 0008, point 6)~: une pull request ne peut alors être fusionnée que s'ils
+sont verts. Le job «~Documentation~» ne produit aucun résultat~; le PDF
+versionné reste celui que commite la session principale, et la version des
+paquets TeX suit l'image de l'exécuteur. Les batteries et les
+scripts des jobs conteneurisés ne dépendent pas de git, absent de l'image~;
+un contrôle qui lit l'historique reste dans «~Contrôles du dépôt~», sur l'hôte
+(ADR 0008, point 11).
+
+% =============================================================================
+\section{Contrôles du dépôt}
+\label{sec:controles-depot}
+% =============================================================================
+
+\subsection{Scripts de contrôle}
+\label{sec:scripts-controle}
+
+Tout contrôle mécanique est un script, jamais une relecture (\code{CLAUDE.md},
+«~Workflows~», principe~7). Les scripts sont en R de base, sous
+\code{tests/controles/}, et sortent avec un code non nul en cas d'écart. Chacun
+est testé sur des témoins dans \code{tests/unitaires/test\_controles.R}~: il
+doit échouer sur un cas fautif et passer sur le dépôt.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.6cm}p{7.4cm}p{2.8cm}@{}}
+\caption{Scripts de contrôle (\code{tests/controles/}).}
+\label{tab:scripts-controle}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Script}} &
+\textcolor{financeblue}{\textbf{Règle contrôlée}} &
+\textcolor{financeblue}{\textbf{Source}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Script}} &
+\textcolor{financeblue}{\textbf{Règle contrôlée}} &
+\textcolor{financeblue}{\textbf{Source}} \\
+\endhead
+\code{liste\_blanche\_}\newline\code{description.R} & \code{Depends}~: exactement
+\code{R (>= 4.3.3)}, plus d'éventuels packages de priorité \code{base} ou
+admis~; \code{Imports}~: packages de priorité \code{base} de R 4.3.3, ou
+admis~; \code{LinkingTo}, \code{Suggests}, \code{Enhances}~: packages admis
+seulement. Un package est admis s'il figure, avec son champ et l'ADR de
+méthode qui l'introduit, dans la constante \code{ADMIS}, vide à cette date &
+ADR 0002, point 3 et A8~; M44 \\
+\code{graphe\_modules.R} & graphe d'appels autorisés et appels dynamiques
+interdits (section~\ref{sec:graphe}) & ADR 0007, points 2.1 à 2.3 \\
+\code{identite\_batteries.R} & mêmes batteries, dans le même ordre, dans
+\code{CLAUDE.md}, dans \code{circuit-technique.js} et dans les étapes
+«~Batterie~:~» du job «~Tests (R 4.3.3)~»~; ce job ne porte ni
+\code{continue-on-error}, ni condition \code{if:} de job, et une étape de
+batterie n'a pas d'autre condition que \code{\$\{\{ !cancelled() \}\}}~; une
+seule chaîne d'image dans tous les workflows & \code{CLAUDE.md}~; ADR 0008,
+point 1 \\
+\code{plateforme.R} & plateforme de référence (section~\ref{sec:plateforme}) &
+ADR 0008, points 3 à 5 \\
+\code{absence\_java.R} & aucune dépendance à Java
+(section~\ref{sec:absence-java}) & ADR 0002, A1~; ADR 0008, point 7~; issue~\#3 \\
+\end{longtable}
+\end{center}
+
+\noindent
+La liste des packages de priorité \code{base} est écrite en dur dans
+\code{liste\_blanche\_description.R} pour R 4.3.3 (\code{PACKAGES\_BASE\_R433})~:
+le verdict ne dépend pas de la machine~; le script signale, sans échouer, un
+écart avec les packages de priorité \code{base} effectivement installés.
+
+\subsection{Absence de Java}
+\label{sec:absence-java}
+
+\textbf{Règle.} Aucun code du projet ne dépend de Java, ni directement ni
+indirectement~: ni le moteur, ni l'application, ni la contre-vérification
+(ADR 0002, annotation du 16/10/2026, A1, décision M40). Java n'est pas
+utilisable sur le poste de travail du mainteneur~; c'est pour cette raison
+que le package \code{ELT}, qui dépend de \code{xlsx} et donc de Java, est exclu
+de la contre-vérification. Sa source ne peut être exécutée qu'hors du dépôt,
+sans Java, en appoint, sans qu'aucun code en soit copié (ADR 0002, A5 et
+troisième annotation).
+
+\medskip
+\textbf{Contrôle.} \code{tests/controles/absence\_java.R} (issue~\#3) contrôle
+trois ensembles de packages~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item le \emph{moteur}~: les packages déclarés dans les champs \code{Depends},
+    \code{Imports} et \code{LinkingTo} de \code{DESCRIPTION}, hors R~; aucun à
+    cette date~;
+  \item l'\emph{application}~: \code{shiny}, \code{htmltools}, et
+    \code{openxlsx} à titre facultatif~;
+  \item la \emph{contre-vérification}~: les packages \code{survival},
+    \code{mgcv}, \code{WH}, \code{StMoMo}, \code{demography}, \code{MortalityLaws},
+    \code{lifecontingencies}, \code{survPen}, \code{MortCast}, \code{locfit}, et
+    \code{flexsurv} à titre facultatif.
+\end{itemize}
+
+\noindent
+Les deux derniers ensembles sont lus dans une liste unique, le fichier
+\code{packages\_hors\_moteur.csv} du dossier \code{tests/controles/} (colonnes \code{ensemble},
+\code{package}, \code{statut}, \code{source}), qui est la référence~; la liste
+ci-dessus en est la transcription à la date du document. Le script lit les
+métadonnées d'un \textbf{instantané daté} du CRAN chez Posit Package Manager,
+par \code{available.packages()}, sans rien installer~; la date est la constante
+\code{INSTANTANE} du script (2026-10-15, un jour ouvré~: selon la documentation de Posit citée par
+l'ADR 0008, aucun instantané n'est publié les week-ends et jours fériés), qui ne change que par un commit
+\code{repo:}. Il calcule, pour chaque package, la fermeture récursive de ses
+dépendances \code{Depends}, \code{Imports} et \code{LinkingTo}, par la
+fonction \code{tools::package\_dependencies()} appelée avec
+\code{recursive = TRUE}, et \textbf{échoue} (code~1)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item si un package de \code{PACKAGES\_JAVA} (\code{rJava}, \code{xlsx},
+    \code{xlsxjars}) figure dans un ensemble ou dans la fermeture de l'un de ses
+    packages~; la chaîne de dépendances la plus courte qui y mène est
+    affichée~;
+  \item si un package listé, ou une dépendance récursive hors priorité
+    \code{base}, manque aux métadonnées~: un package introuvable n'a pas de
+    dépendances connues, il ne passe pas en silence~;
+  \item si la liste est mal formée (en-tête, ensembles et statuts connus, noms
+    valides, sans doublon, ensembles non vides).
+\end{itemize}
+
+\noindent
+Des métadonnées illisibles (panne réseau, adresse fausse) donnent le code~2~:
+aucun verdict n'est rendu, l'échec du job n'est jamais masqué et une relance
+le lève. Seul le filtre \code{duplicates} d'\code{available.packages()} est
+appliqué~: le filtre par version de R écarterait les packages qui exigent un R
+plus récent que celui qui exécute le contrôle, alors que la
+contre-vérification peut tourner sur un autre poste muni d'un R récent, et ces
+packages seraient alors signalés absents (faux échec)~; le filtre par système
+d'exploitation est écarté aussi, le poste étant sous Windows et la CI sous
+Linux.
+
+\medskip
+\textbf{Cas témoin.} Le job «~Absence de Java~» exécute aussi le script avec
+\code{-{}-ajouter ELT}~: il doit rendre le code~1 (un verdict, et non le code~2
+d'une panne) et afficher la chaîne de \code{ELT} à \code{xlsx}. Les tests du
+script s'exécutent sans réseau, sur des dépôts locaux témoins
+(\code{tests/unitaires/test\_controles.R}).
+
+\begin{encadre}
+\small
+\textbf{Limite.} La détection porte sur les seuls noms de
+\code{PACKAGES\_JAVA}. Le champ \code{SystemRequirements}, qui pourrait déclarer
+Java, n'est pas renseigné dans les métadonnées \code{PACKAGES} du CRAN (relevé
+consigné dans l'en-tête du script)~: un package qui exigerait Java sans
+dépendre de l'un de ces noms échapperait au contrôle. Étendre la détection
+relève du mainteneur.
+\end{encadre}
+
+
+% =============================================================================
+\partie{Partie II}{Point d'entrée et plan de construction}
+% =============================================================================
+
+\section{Point d'entrée unique~: \code{R/construire\_table.R}}
+\label{sec:construction}
+
+Le package a un point d'entrée unique,
+\code{construire\_table(donnees, roles, plan, provenance = NULL)}, qui exécute
+un \emph{plan de construction} d'un bloc et retourne un objet complet
+(ADR 0004~; ADR 0005~; ADR 0007, point 3.1). \code{R/construire\_table.R} se
+limite à l'orchestration~: il valide le plan, appelle une fonction d'étape par
+module dans l'ordre du plan et assemble l'objet, sans aucun calcul. Le
+quatrième argument, \code{provenance}, facultatif, est la voie par laquelle la
+couche de lecture transmet le nom du fichier lu, son empreinte et l'algorithme
+de celle-ci~; \code{NULL} signifie «~données construites en mémoire, aucun
+fichier~», ce que la fiche écrit (section~\ref{sec:fiche}).
+
+\subsection{Plan de construction et validation}
+\label{sec:plan}
+
+Le plan est une liste R nommée, construite en mémoire par l'appelant, et
+\textbf{validée entièrement avant toute exécution, sans aucun défaut
+implicite} (ADR 0005, point 3~; ADR 0007, point 5)~: un paramètre absent est
+un refus, jamais une valeur supposée. Il porte six champs de premier niveau
+(constante \code{CHAMPS\_PLAN}~; décisions M48 et M49)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{transition}~: \code{list(depart = , arrivee = )}, deux noms
+    d'états~; dans cette branche, \code{vivant} $\to$ \code{deces} ou
+    \code{en\_cours} $\to$ \code{rachat}~; les autres causes de sortie sont des
+    sorties concurrentes~;
+  \item \code{periode}~: \code{list(debut = , fin = )}, deux dates, fin
+    incluse~;
+  \item \code{delai\_declaration}~: entier de jours $\ge 0$, requis (zéro
+    explicite admis)~;
+  \item \code{segmentation}~: vecteur de rôles pris dans \code{sexe} et
+    \code{segment}, sans doublon, requis, vide explicite admis (E2.9). Elle est
+    au premier niveau, et non parmi les paramètres de l'étape
+    \code{exposition}, parce que l'étape \code{donnees}, qui précède, en a
+    besoin pour ses contrôles (rôle requis, \code{segment\_manquant},
+    \code{tete\_segment\_incoherent})~: une étape antérieure ne doit pas
+    dépendre d'un paramètre d'une étape postérieure, et un plan réduit à
+    l'étape \code{donnees} doit rester défini sans défaut (décision M49)~;
+  \item \code{graine}~: entier, requis dès qu'une étape du plan tire un aléa,
+    interdit sinon. Aucune étape de cette branche ne tire d'aléa~: la graine y
+    est donc refusée, et la fiche écrit «~aucune étape aléatoire~»~;
+  \item \code{etapes}~: liste nommée ordonnée~; chaque nom est une étape, au
+    plus une fois, dans l'ordre des modules, et chaque valeur la liste nommée
+    des paramètres de l'étape, tous requis.
+\end{itemize}
+
+\noindent
+\code{transition}, \code{periode}, \code{delai\_declaration} et
+\code{segmentation} sont déclarés une seule fois et transmis par le point
+d'entrée, en arguments nommés, à chaque fonction d'étape qui les emploie~;
+\textbf{une fonction d'étape ne reçoit jamais le plan entier} (ADR 0007,
+annotation du 17/10/2026, point~c). Deux étapes ne peuvent donc pas lire deux
+périodes ou deux segmentations différentes, et le chemin d'un champ dans le
+plan n'est connu que du point d'entrée et du validateur.
+
+\medskip
+{\sloppy\hbadness=10000 Les étapes de la branche et leurs paramètres sont des constantes du package
+(\code{ETAPES}, \code{PARAMETRES\_ETAPES}), que le validateur applique~:\par}
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{tabular}{@{}p{2.1cm}p{4.3cm}p{1.9cm}p{6.1cm}@{}}
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Étape}} &
+\textcolor{financeblue}{\textbf{Fonction d'étape}} &
+\textcolor{financeblue}{\textbf{Préalable}} &
+\textcolor{financeblue}{\textbf{Paramètres (tous requis)}} \\
+\code{donnees} & \code{preparer\_donnees()} & --- & \code{exclusions}~:
+vecteur de codes de motif sans doublon, vide explicite admis
+(section~\ref{sec:controles-donnees}) \\
+\code{exposition} & \code{calculer\_exposition()} & \code{donnees} &
+\code{convention}~: \code{plus\_fine}, \code{dernier\_anniversaire} ou
+\code{age\_atteint\_annee}~; \code{par\_annee}~: \code{TRUE} ou \code{FALSE}
+(section~\ref{sec:recettes}) \\
+\end{tabular}
+\end{center}
+
+\noindent
+Ni l'une ni l'autre ne tire d'aléa. La recette d'exposition et l'unité
+d'observation ne sont pas des paramètres~: le moteur les déduit des rôles
+(sections~\ref{sec:recettes} et~\ref{sec:unite-observation})~; seule une
+convention d'âge plus grossière peut être forcée.
+
+\medskip
+{\sloppy\hbadness=10000 \textbf{\code{valider\_plan(plan)}}, exportée parce que l'application l'appellera
+comme contrôle de saisie (E4.3), rend le plan inchangé, ou refuse. Elle porte
+les codes \emph{structurels} du plan, module \code{construire\_table}~:
+\code{plan\_mal\_forme}, \code{champ\_inconnu}, \code{champ\_manquant},
+\code{etapes\_mal\_formees}, \code{aucune\_etape}, \code{etape\_en\_double},
+\code{etape\_inconnue}, \code{etapes\_hors\_ordre},
+\code{etape\_prealable\_manquante}, \code{graine\_inattendue},
+\code{graine\_manquante}, \code{parametres\_mal\_formes},
+\code{parametre\_inconnu} et \code{parametre\_manquant}. Elle ne
+réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
+(\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()}),
+dont les codes et le module sont ainsi identiques, quelle que soit la
+fonction qui détecte la condition (ADR 0007, annotation du 17/10/2026,
+point~d).\par}
+
+\begin{encadre}
+\small
+Exemple de plan (vivant $\to$ décédé, par sexe, sans exclusion)~:\\[2pt]
+\code{plan <- list(transition = list(depart = "vivant", arrivee = "deces"),}\\
+\code{\phantom{plan <- list(}periode = list(debut = as.Date("2015-01-01"),}\\
+\code{\phantom{plan <- list(periode = list(}fin = as.Date("2024-12-31")),}\\
+\code{\phantom{plan <- list(}delai\_declaration = 0L, segmentation = "sexe",}\\
+\code{\phantom{plan <- list(}etapes = list(donnees = list(exclusions = character(0)),}\\
+\code{\phantom{plan <- list(etapes = list(}exposition = list(convention = "plus\_fine",}\\
+\code{\phantom{plan <- list(etapes = list(exposition = list(}par\_annee = FALSE)))}\\
+\code{res <- construire\_table(donnees, roles, plan)}
+\end{encadre}
+
+\subsection{Exécution}
+\label{sec:execution}
+
+{\sloppy\hbadness=10000 \code{construire\_table()} procède dans cet ordre~: validation du plan~;
+contrôle des rôles (\code{controler\_roles()})~; déduction de la recette et,
+si le plan comprend l'étape \code{exposition}, de la convention retenue~;
+contrôle de la provenance~; calcul de l'empreinte des données reçues
+(section~\ref{sec:empreinte}). Tout refus possible avant le calcul a donc lieu
+avant la première étape. Les étapes s'exécutent ensuite dans l'ordre du plan,
+chacune par sa fonction d'étape, qui rend ses paramètres effectifs, son
+résultat, ses diagnostics et ses avertissements~; l'étape \code{exposition}
+lit la table des observations de l'étape \code{donnees}.\par}
+
+\subsection{Objet résultat}
+\label{sec:objet-resultat}
+
+L'objet retourné est une liste nommée de classe S3 \code{construction}
+(ADR 0007, point 6.1), lue par \code{\$} et jamais recalculée par ses
+lecteurs~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{table}~: la table finale~; \code{NULL} dans cette branche, dont
+    les plans s'arrêtent à l'exposition~;
+  \item \code{etapes}~: une entrée par étape exécutée, dans l'ordre, avec
+    \code{parametres} (paramètres effectifs, après résolution par le moteur),
+    \code{resultat} et \code{diagnostics}~;
+  \item \code{avertissements}~: le \code{data.frame} (\code{etape}, \code{code},
+    \code{message}, \code{nombre}) des avertissements de toutes les étapes
+    (section~\ref{sec:avertissements})~;
+  \item \code{fiche}~: la fiche de construction (section~\ref{sec:fiche})~;
+  \item \code{execution}~: horodatage de début, durée, version de R,
+    plateforme, système, paramètres régionaux et packages attachés~;
+    \textbf{hors de toute comparaison} (rejeu, reproductibilité,
+    non-régression)~: c'est le seul champ qui change entre deux exécutions
+    identiques.
+\end{itemize}
+
+\noindent
+Ajouter un champ est compatible~; renommer ou retirer un champ change le
+contrat partagé «~objet résultat~» (ADR 0007, point 6.3).
+
+\subsection{Vérifications}
+\label{sec:verifications-construction}
+
+{\sloppy\hbadness=10000 \code{tests/unitaires/test\_construire\_table.R} vérifie la liste des exports,
+chaque refus de \code{valider\_plan()} (noms exacts des champs de transition et
+de période compris), la cohérence entre \code{ETAPES} et les fonctions
+d'étape appelées, la structure de l'objet et de la fiche, et des identités
+exactes sur un portefeuille simulé (section~\ref{sec:verifications-exposition}).
+\code{tests/test\_reproductibilite.R} vérifie que deux constructions
+identiques sont \code{identical()} hors \code{execution}, dans le même
+processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\par}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-construire-table}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/construire\_table.R}.}
+\label{tab:fonctions-construire-table}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-construire-table}{CHAMPS\_PLAN} & constante & --- & les six champs de premier niveau du plan \\
+\catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{graine}) \\
+\catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalable, tirage d'un aléa \\
+\catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type, domaine \\
+\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & liste nommée aux noms uniques et non vides \\
+\catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
+\catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat}) \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie III}{Module \code{donnees}}
+% =============================================================================
+
+\section{Données, rôles et contrôles~: \code{R/donnees.R}}
+\label{sec:donnees}
+
+Le module \code{donnees} reçoit la base d'observation, un \code{data.frame}, et
+la déclaration des rôles de ses colonnes. Il contrôle les rôles, évalue les
+motifs d'invalidité de chaque ligne, applique les règles d'exclusion
+déclarées par le plan, déduit l'unité d'observation et fusionne les
+intervalles d'observation d'une même tête (E2.2, E2.4, E2.7). Il ne modifie
+jamais les données~: une ligne invalide arrête la construction, sauf règle
+d'exclusion déclarée, et rien n'est corrigé (E2.7). Sa fonction d'étape est
+\code{preparer\_donnees()}~; il porte aussi le catalogue des rôles
+(\code{catalogue\_roles()}) et la représentation commune d'une table de
+référence (\code{table\_reference()}), toutes deux exportées. Le contenu de fond
+(catalogue, motifs, règles de fusion) vient de la spécification d'\code{actuary}
+du 16/10/2026, versée dans l'issue~\#11 (parties A.0 et A.1).
+
+\subsection{Conventions de temps}
+\label{sec:conventions-temps}
+
+Trois conventions de temps sont communes à toutes les recettes (E2.3)~; elles
+sont appliquées par \code{donnees} et par \code{exposition}
+(section~\ref{sec:exposition}), qui ajoute l'unité de l'exposition et la
+fenêtre d'observation.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Une date est un jour} (classe \code{Date}, sans heure ni fuseau).
+    Un intervalle d'observation est l'intervalle d'instants semi-ouvert
+    $[\text{entrée}, \text{sortie})$~: \code{date\_entree} est l'instant où
+    l'observation commence, \code{date\_sortie} celui où elle cesse (jour du
+    décès ou du rachat, ou lendemain du dernier jour couvert pour une fin de
+    garantie). Un événement daté du jour $s$ survient à l'instant $s$~: la tête
+    est exposée jusqu'à $s$, jour $s$ exclu. Une ligne \code{en\_cours} est
+    ouverte à droite. \emph{Choix de conception}~: il donne des décomptes
+    entiers et additifs, au prix d'une sous-estimation de l'exposition d'un
+    demi-jour par événement en moyenne.
+  \item \textbf{Âge au dernier anniversaire.} L'âge au jour $t$ d'une tête née
+    le jour $n$ est le nombre d'années révolues
+    \[
+      \operatorname{age}(n,t) = \operatorname{an}(t) - \operatorname{an}(n)
+      - \mathds{1}\{(\operatorname{mois}(t), \operatorname{jour}(t)) <
+      (\operatorname{mois}(n), \operatorname{jour}(n))\},
+    \]
+    comparaison lexicographique, appliquée sans cas particulier
+    (\code{age\_revolu()}). Pour une naissance le 29~février, l'anniversaire
+    tombe donc le 1\textsuperscript{er}~mars des années non bissextiles~: le
+    28~février d'une telle année, $(2, 28) < (2, 29)$ et l'année n'est pas
+    révolue. Une année d'âge dure ainsi 365 ou 366 jours. Convention de
+    calcul, conséquence de la formule (spécification, A.0, T2), validée par
+    \code{actuary} le 17/10/2026, d'impact négligeable (un jour d'exposition
+    déplacé entre deux âges, pour les seules naissances du 29~février)~;
+    aucune source juridique n'est établie à son sujet.
+  \item \textbf{Période d'observation et délai de déclaration.} La période
+    $[\text{début}, \text{fin}]$ est déclarée par le plan, fin incluse, jamais
+    déduite des données (E2.5). Le délai de déclaration est un nombre entier
+    de jours $\ge 0$, sans arithmétique de mois. La fin effective est
+    $\text{fin} - \text{délai}$ et la borne d'instant
+    $B = \text{fin effective} + 1$~: l'observation s'arrête à l'instant $B$. Une
+    période dont le début est postérieur à la fin effective est refusée
+    (\code{periode\_vide}).
+\end{itemize}
+
+\subsection{Catalogue des rôles}
+\label{sec:catalogue-roles}
+
+Le moteur ne lit une colonne que par son \emph{rôle}, déclaré par
+l'utilisateur dans un catalogue fermé (E2.2~; ADR 0003, point 2). Les rôles
+sont transmis à \code{construire\_table()} sous la forme d'un vecteur de
+chaînes nommé~: noms = rôles du catalogue, valeurs = noms de colonnes de la
+base (ADR 0007, point 4.1). Les colonnes sans rôle sont ignorées.
+\code{catalogue\_roles()}, exportée pour que l'application propose la
+déclaration des rôles, rend le catalogue sous la forme d'un \code{data.frame}
+de colonnes \code{role}, \code{famille}, \code{type\_admis}, \code{usage} et
+\code{recettes} (tableau~\ref{tab:catalogue-roles}).
+
+\medskip
+{\sloppy\hbadness=10000 La colonne \emph{usage} décrit l'emploi du rôle par la seule recette
+d'exposition disponible, \code{lignes\_dates\_completes}
+(section~\ref{sec:recettes})~:\par}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{requis}~: rôle sans lequel aucune recette ne s'applique (refus
+    \code{aucune\_recette})~;
+  \item \code{facultatif}~: rôle lu pour des contrôles (unicité du contrat,
+    cohérence de l'année de naissance) ou, pour \code{id\_tete}, pour l'unité
+    d'observation~;
+  \item \code{segmentation}~: rôle requis si la segmentation du plan l'emploie
+    (refus \code{role\_requis\_manquant}), contrôlé s'il est seulement
+    déclaré, avec l'avertissement \code{role\_non\_employe}~;
+  \item \code{non\_pris\_en\_charge}~: rôle qu'aucune recette disponible
+    n'emploie et dont l'omission changerait le sens du résultat (pondération,
+    agrégats, états, date de survenance distincte de la sortie, date
+    d'inventaire, âge fourni)~; sa déclaration est \textbf{refusée}
+    (\code{role\_non\_pris\_en\_charge}) plutôt qu'ignorée en silence. Le rôle
+    \code{montant} est de ceux-là~: la pondération par les montants attend la
+    spécification de ses intervalles (E2.8).
+\end{itemize}
+
+\noindent
+Les types sont contrôlés sans conversion (E4.4)~: une colonne de dates doit
+être de classe \code{Date}, exactement, à valeurs entières et finies~; une
+colonne \code{POSIXct}, une chaîne ou un nombre sont refusés
+(\code{type\_incompatible}), la conversion revenant à la couche de lecture.
+Les modalités des rôles catégoriels sont comparées après conversion en
+chaîne, en respectant la casse~: \code{H} et \code{F} pour \code{sexe}~;
+\code{deces}, \code{rachat}, \code{terme}, \code{autre} et \code{en\_cours}
+pour \code{cause\_sortie} (constantes \code{MODALITES\_SEXE} et
+\code{MODALITES\_CAUSE}). Un recodage (par exemple \code{1}/\code{2} vers
+\code{H}/\code{F}) relève de la couche de lecture.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{3.3cm}p{2.5cm}p{5.4cm}p{3.4cm}@{}}
+\caption{Catalogue fermé des rôles (\code{catalogue\_roles()}~; constantes
+\code{CATALOGUE\_ROLES} et \code{TYPES\_ADMIS}). La colonne \code{recettes}
+du catalogue vaut \code{lignes\_dates\_completes} pour tout rôle pris en
+charge, vide sinon.}
+\label{tab:catalogue-roles}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Famille}} &
+\textcolor{financeblue}{\textbf{Types R admis}} &
+\textcolor{financeblue}{\textbf{Usage}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Famille}} &
+\textcolor{financeblue}{\textbf{Types R admis}} &
+\textcolor{financeblue}{\textbf{Usage}} \\
+\endhead
+\catalogue{roles}{id\_contrat} & identification & \code{character}, \code{integer}, \code{double} entier fini & facultatif \\
+\catalogue{roles}{id\_tete} & identification & \code{character}, \code{integer}, \code{double} entier fini & facultatif \\
+\catalogue{roles}{sexe} & état civil & \code{character}, \code{factor} & segmentation \\
+\catalogue{roles}{date\_naissance} & état civil & \code{Date} (valeurs entières finies) & requis \\
+\catalogue{roles}{annee\_naissance} & état civil & \code{integer}, \code{double} entier fini & facultatif \\
+\catalogue{roles}{age\_fourni} & état civil & \code{integer}, \code{double} entier fini $\ge 0$ & non pris en charge \\
+\catalogue{roles}{date\_age\_fourni} & état civil & \code{Date} (valeurs entières finies) & non pris en charge \\
+\catalogue{roles}{date\_entree} & observation & \code{Date} (valeurs entières finies) & requis \\
+\catalogue{roles}{date\_sortie} & observation & \code{Date} (valeurs entières finies~; manquante admise pour une ligne \code{en\_cours}) & requis \\
+\catalogue{roles}{cause\_sortie} & observation & \code{character}, \code{factor} & requis \\
+\catalogue{roles}{date\_evenement} & observation & \code{Date} (valeurs entières finies) & non pris en charge \\
+\catalogue{roles}{date\_inventaire} & observation & \code{Date} (valeurs entières finies) & non pris en charge \\
+\catalogue{roles}{age} & agrégats & \code{integer}, \code{double} entier fini & non pris en charge \\
+\catalogue{roles}{annee} & agrégats & \code{integer}, \code{double} entier fini & non pris en charge \\
+\catalogue{roles}{exposition} & agrégats & \code{double} fini $\ge 0$ & non pris en charge \\
+\catalogue{roles}{evenements} & agrégats & \code{double} fini $\ge 0$ & non pris en charge \\
+\catalogue{roles}{montant} & pondération & \code{double} fini $> 0$ & non pris en charge \\
+\catalogue{roles}{segment} & segmentation & \code{character}, \code{factor}, \code{integer} & segmentation \\
+\catalogue{roles}{etat\_depart} & multi-états & \code{character}, \code{factor} & non pris en charge \\
+\catalogue{roles}{etat\_arrivee} & multi-états & \code{character}, \code{factor} & non pris en charge \\
+\catalogue{roles}{date\_changement} & multi-états & \code{Date} (valeurs entières finies) & non pris en charge \\
+\end{longtable}
+}
+
+\subsection{Contrôles, refus et exclusions}
+\label{sec:controles-donnees}
+
+\subsubsection*{Refus au niveau des rôles et des paramètres}
+
+\code{controler\_roles()} contrôle la déclaration des rôles dans cet ordre, et
+chaque refus nomme tous les rôles et colonnes en cause~:
+\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame})~;
+\code{roles\_mal\_formes} (les rôles ne sont pas un vecteur de chaînes nommé,
+sans valeur ni nom manquant)~; \code{role\_inconnu}~;
+\code{role\_declare\_deux\_fois}~; \code{role\_non\_pris\_en\_charge}~;
+\code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
+plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
+\code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
+\code{type\_incompatible}~; \code{aucune\_recette} (un rôle requis manque~; le
+message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
+(un rôle employé par la segmentation n'est pas déclaré).
+
+\medskip
+{\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
+reçoit~: \code{transition\_inconnue} (liste de champs autres qu'exactement
+\code{depart} et \code{arrivee}, ou transition non prise en charge~: seules
+vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
+\code{TRANSITIONS})~; \code{periode\_invalide} (liste de champs autres
+qu'exactement \code{debut} et \code{fin}, ou dates manquantes ou non
+\code{Date})~; \code{delai\_invalide} (délai qui n'est pas un entier $\ge 0$)~;
+\code{periode\_vide}~; \code{segmentation\_invalide} (vecteur de chaînes sans
+doublon pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
+\code{exclusions\_invalides}~; \code{exclusion\_inconnue} (code absent de la
+liste fermée des motifs). Les noms de champs sont lus exactement, jamais par
+appariement partiel. Le même contrôle est appelé par \code{valider\_plan()},
+avant toute étape~: un code désigne une condition, quelle que soit la fonction
+qui la détecte, et le refus porte le module \code{donnees} (ADR 0007,
+annotation du 17/10/2026, point~d).\par}
+
+\subsubsection*{Motifs d'invalidité des lignes}
+
+Les motifs forment une liste fermée (E2.7), évaluée par
+\code{evaluer\_motifs()} (tableau~\ref{tab:motifs}).
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Exhaustivité}~: tous les motifs de ligne sont évalués sur toutes
+    les lignes, sans court-circuit~; un motif de comparaison n'est pas levé si
+    l'une de ses dates est manquante (le motif de la valeur manquante l'est)~;
+  \item \textbf{motifs de tête}~: évalués, quand \code{id\_tete} est déclaré,
+    sur les lignes exemptes de motif de ligne (lignes \emph{propres}), ils
+    marquent les lignes propres de la tête, et elles seules~: une ligne déjà
+    porteuse d'un motif de ligne n'est pas comptée de nouveau sous le motif
+    de tête. Les lignes conservées n'en dépendent pas, puisqu'une telle ligne
+    est de toute façon refusée ou exclue au titre de son motif de ligne~;
+    seul le décompte du motif de tête, dans le refus et dans les
+    diagnostics, l'omet (constat~: une tête de trois lignes dont la première
+    porte \code{annee\_naissance\_incoherente} et dont les naissances
+    diffèrent donne \code{tete\_naissance\_incoherente} sur les lignes 2 et 3
+    seulement, et le refus annonce deux lignes pour ce motif)~; le rapport
+    est ainsi complet en un seul passage~;
+  \item \textbf{décompte}~: une ligne peut porter plusieurs motifs~; le décompte
+    par motif compte les lignes porteuses, et le nombre de lignes distinctes
+    est donné à part.
+\end{itemize}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.9cm}p{9.7cm}@{}}
+\caption{Motifs d'invalidité, dans l'ordre de restitution (constantes
+\code{MOTIFS\_LIGNES} et \code{MOTIFS\_TETE}). Ce sont aussi les codes
+admis comme règles d'exclusion.}
+\label{tab:motifs}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Code}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Code}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endhead
+\multicolumn{2}{@{}l@{}}{\textit{\textcolor{financeblue}{Motifs de ligne}}} \\
+\code{id\_contrat\_manquant} & \code{id\_contrat} déclaré et manquant \\
+\code{id\_tete\_manquant} & \code{id\_tete} déclaré et manquant \\
+\code{naissance\_manquante} & date de naissance manquante \\
+\code{entree\_manquante} & date d'entrée manquante \\
+\code{sortie\_manquante} & date de sortie manquante et cause autre que \code{en\_cours} \\
+\code{cause\_manquante} & cause de sortie manquante \\
+\code{cause\_hors\_modalites} & cause hors des cinq modalités \\
+\code{sexe\_manquant} & \code{sexe} déclaré et manquant \\
+\code{sexe\_hors\_modalites} & \code{sexe} déclaré, hors de \code{H} et \code{F} \\
+\code{segment\_manquant} & \code{segment} déclaré et manquant \\
+\code{naissance\_apres\_entree} & naissance postérieure à l'entrée (l'égalité est admise) \\
+\code{sortie\_avant\_entree} & sortie antérieure à l'entrée (l'égalité est admise~: durée nulle) \\
+\code{en\_cours\_avant\_fin} & cause \code{en\_cours} et date de sortie renseignée antérieure à la fin déclarée~: la base ne couvre pas la période déclarée \\
+\code{annee\_naissance\_}\allowbreak\code{incoherente} & \code{annee\_naissance} déclarée et différente de l'année de la date de naissance \\
+\code{age\_aberrant} & âge au dernier anniversaire au moins égal à \code{AGE\_ABERRANT} (130) à la plus petite des dates de sortie et de fin de période (à la fin si la sortie manque)~; constante de catalogue, \emph{choix de conception}~: la borne laisse passer toute durée de vie humaine connue, elle n'est pas un paramètre du plan \\
+\code{contrat\_duplique} & \code{id\_contrat} déclaré et présent sur plusieurs lignes (toutes les lignes du groupe sont listées) \\
+\multicolumn{2}{@{}l@{}}{\textit{\textcolor{financeblue}{Motifs de tête (si \code{id\_tete} est déclaré)}}} \\
+\code{tete\_naissance\_incoherente} & dates de naissance différentes entre lignes d'une même tête \\
+\code{tete\_sexe\_incoherent} & sexes différents au sein d'une tête (\code{sexe} déclaré) \\
+\code{tete\_segment\_incoherent} & segments différents au sein d'une tête, si la segmentation emploie \code{segment} \\
+\code{tete\_observee\_apres\_deces} & le premier décès $s_d$ de la tête est antérieur à $B$ et une ligne de la tête a une fin d'observation postérieure à $s_d$ (lecture~B de E2.4, ci-dessous) \\
+\end{longtable}
+}
+
+\subsubsection*{Refus par défaut et exclusions déclarées}
+
+Une ligne qui porte un motif \textbf{non déclaré} dans les règles d'exclusion
+du plan arrête la construction (refus \code{ligne\_invalide}), même si elle
+porte aussi un motif déclaré. Le message nomme, pour chaque motif en cause, le
+nombre de lignes et leurs dix premiers numéros (\code{NB\_LIGNES\_CITEES},
+numéros 1 à $n$ des lignes du \code{data.frame} reçu), puis le total des lignes
+distinctes~; la condition porte la liste complète (E2.7, E5.5).
+
+\medskip
+Le plan peut déclarer des \emph{règles d'exclusion}, paramètre
+\code{exclusions} de l'étape \code{donnees}~: un vecteur de codes de motif sans
+doublon, vide explicite admis. Une ligne est exclue si l'un de ses motifs est
+déclaré. Les exclusions sont comptées et listées par motif dans le résultat de
+l'étape (\code{resultat\$exclusions}, \code{resultat\$lignes\_exclues}) et
+chacune donne un avertissement \code{exclusion}. Si toutes les lignes sont
+exclues, la construction est refusée (\code{aucune\_ligne\_conservee})~; une
+base sans ligne l'est aussi (\code{base\_vide}). Le diagnostic
+\code{diagnostics\$motifs} restitue, pour chaque motif, sa nature (ligne ou
+tête), son décompte et s'il est exclu.
+
+\medskip
+\textbf{Les lignes conservées sont celles de l'entrée}~: \code{donnees}
+lui-même s'il n'y a aucune exclusion, sinon le sous-ensemble de ses lignes,
+sans aucune modification de valeur~; les quantités dérivées (observations
+fusionnées) sont rangées à part. Une réserve technique~: l'extraction des
+lignes conservées par l'opérateur d'indexation de R retire des colonnes les
+attributs autres que la classe et les niveaux d'un facteur (par exemple
+\code{tzone}, \code{label}~; constat sur R 4.3.3)~; les valeurs et les
+classes ne changent pas, et le moteur ne lit pas ces attributs.
+
+\subsection{Unité d'observation et fusion par tête}
+\label{sec:unite-observation}
+
+\subsubsection*{Unité d'observation, déduite des rôles}
+
+L'unité d'observation n'est pas un paramètre du plan~: le moteur la déduit des
+rôles et de la transition, comme il déduit la recette (décision M48~; ADR 0007,
+annotation du 17/10/2026, point~a), et l'inscrit dans les paramètres effectifs
+de l'étape et dans la fiche~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{tête}, si l'état de départ de la transition est un état de la
+    personne (vivant $\to$ décédé) et que \code{id\_tete} est déclaré~;
+  \item \textbf{contrat} sinon~: transition dont l'état de départ est un état du
+    contrat (en cours $\to$ racheté, décision M46), ou transition de tête sans
+    \code{id\_tete}. Dans ce second cas, l'avertissement \code{unite\_contrat}
+    est inscrit dans l'objet et repris dans la fiche~: «~une tête titulaire de
+    plusieurs contrats est comptée plusieurs fois, ce qui surestime
+    l'exposition et peut compter plusieurs fois un même décès~» (cas F4 des
+    tests~: deux décès comptés au lieu d'un).
+\end{itemize}
+
+\noindent
+Un paramètre d'unité serait soit redondant avec les rôles, soit en
+contradiction avec eux~: une tête déclarée «~contrat~» alors que
+\code{id\_tete} est présent compterait plusieurs fois un même décès. Pour le
+rachat, l'unité est le contrat~; l'identifiant de tête sert alors aux contrôles
+de cohérence et au futur rééchantillonnage par têtes (E2.4, E2.14)~: il est
+gardé dans la table des observations.
+
+\subsubsection*{Fusion des intervalles d'une tête}
+
+En unité tête, les intervalles $[\text{entrée}, \text{fin})$ des lignes d'une
+même tête (fin $= +\infty$ pour une ligne \code{en\_cours}) sont triés par
+entrée et fusionnés quand $\text{entrée suivante} \le \text{fin courante}$, ce
+qui couvre le chevauchement et la contiguïté exacte
+(\code{fusionner\_intervalles()}). \textbf{Aucune tolérance «~à un jour
+près~»}~: un écart d'un jour reste un trou non exposé, et la tête est de
+nouveau tronquée à gauche à sa réentrée~; combler l'écart inventerait une
+exposition. Un tel écart trahit souvent une date de fin inclusive dans la
+base~: il est relevé et décompté à part, non corrigé (\emph{choix de
+conception}). La cause de fin d'une composante fusionnée est \code{deces} si
+une ligne de décès se termine à cette fin, \code{en\_cours} si la fin est
+$+\infty$, \code{censure} sinon~; le décès n'est compté qu'une fois.
+
+\medskip
+Le calcul de la fusion est vectorisé par un maximum cumulé décalé par tête,
+exact en \code{double} tant que (nombre de têtes) $\times$ (étendue des dates,
+en jours, $+ 1$) reste inférieur à $2^{52}$. Au-delà, le moteur refuse
+(\code{dates\_hors\_plage}) au lieu de fusionner inexactement~; pour $10^6$
+têtes, il faudrait une étendue d'environ $4{,}5\cdot 10^{9}$ jours, ce que
+seules des dates aberrantes atteignent. C'est une limite d'implémentation, non
+un motif de ligne~: elle n'est pas excluable.
+
+\subsubsection*{Observation après le décès~: lecture~B de E2.4}
+
+Une tête dont un contrat est observé après son décès a une trajectoire
+indéterminée, et ses lignes sont refusées (E2.4). Le décès doit cependant être
+connu~: le mainteneur a retenu une \emph{lecture~B} (décision M48)~: le motif
+\code{tete\_observee\_apres\_deces} n'est levé que si le premier décès $s_d$ de
+la tête est \textbf{antérieur à la borne $B$} de la période effective et qu'une
+fin d'observation d'une ligne de la tête le dépasse. Une ligne \code{en\_cours}
+compte pour $+\infty$, quelle que soit sa date de sortie, et une sortie
+manquante aussi (\code{deces\_par\_tete()}). Deux lignes closes par le décès le
+même jour sont cohérentes.
+
+\medskip
+Si $s_d \ge B$, le décès est hors de la période effective~: aucune ligne n'est
+refusée, mais le relevé \code{observations\_apres\_deces\_hors\_periode}
+compte ces têtes et donne un avertissement du même code. Ce relevé est calculé
+\textbf{sur les seules lignes conservées}~: une tête écartée par une exclusion
+déclarée n'y est pas comptée, une tête dont une ligne seulement est exclue
+l'est sur ses lignes conservées. Il est calculé dès que \code{id\_tete} est
+déclaré, \textbf{quelle que soit l'unité}, donc aussi en unité contrat pour le
+rachat (contrôle par identifiant de tête, E2.4, M46, M48)~; sans
+\code{id\_tete}, il n'est pas calculable et vaut \code{NA}.
+
+\subsubsection*{Relevés et avertissements}
+
+L'étape restitue dans \code{diagnostics\$releves}, sans bloquer, le nombre de
+têtes et de têtes multi-contrats, de chevauchements, de contiguïtés,
+d'intervalles disjoints, d'écarts d'un jour, de fenêtres vides (observations
+sans intersection avec la période), d'observations, et le relevé après décès
+hors période. Les relevés de fusion valent \code{NA} sans \code{id\_tete}. Ses
+avertissements sont~: \code{unite\_contrat}~; \code{role\_non\_employe}~;
+\code{exclusion}~; \code{chevauchements}, \code{disjoints} et
+\code{ecarts\_un\_jour}, en unité tête seulement~; \code{fenetres\_vides} et
+\code{observations\_apres\_deces\_hors\_periode}, dans toutes les unités. Les
+contiguïtés sont décomptées sans avertissement~: une contiguïté exacte est
+fusionnée sans perte.
+
+\medskip
+Le résultat de l'étape (\code{resultat}) contient les lignes conservées et
+leurs numéros, les exclusions, l'unité retenue, la table des observations
+(une ligne par composante fusionnée ou par contrat~: identifiant, numéro de la
+première ligne, nombre de lignes, date de naissance, sexe s'il est déclaré,
+segment s'il est employé, début, fin, cause) et, pour chaque ligne conservée,
+le numéro de son observation. Les paramètres effectifs
+(\code{parametres}) sont le code interne de la transition
+(\code{vivant\_decede} ou \code{en\_cours\_rachete}), l'unité d'observation, la
+segmentation, les exclusions et la fin effective.
+
+\subsection{Table de référence}
+\label{sec:table-reference}
+
+Toute table de référence --- loi vraie synthétique du simulateur, table
+embarquée, table importée --- est lue par le moteur sous une seule forme~: la
+classe S3 \code{table\_reference}, sur un \code{data.frame} en format long
+(ADR 0007, point 7.1, et annotation du 17/10/2026, point~b), que construit et
+contrôle \code{table\_reference(x, nom, statut, source, parametres,
+forme\_origine)}, exportée pour l'import de tables par l'application~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item colonnes \code{age} (entier $\ge 0$), \code{sexe} (\code{H}, \code{F},
+    ou \code{ensemble} pour une table sans distinction de sexe, modalité qui ne
+    coexiste jamais avec \code{H} ou \code{F}, dans la table ou au sein d'une
+    même année), \code{qx} (double fini dans $[0, 1]$) et, facultative,
+    \code{annee} (entier), pour les tables prospectives de la v2~;
+  \item âges sans doublon, croissants dans l'ordre reçu et contigus, au sein de
+    chaque sexe (et de chaque année)~;
+  \item attributs \code{nom}, \code{statut} (\code{synthetique},
+    \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
+    de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
+    \code{qx}) et \code{parametres}~: une liste non vide est \textbf{requise}
+    pour une table synthétique, qui n'a d'autre provenance que sa loi, et
+    \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
+    passer pour dérivée d'une loi.
+\end{itemize}
+
+\noindent
+{\sloppy\hbadness=10000 Le constructeur refuse au lieu de corriger, avec un code par contrôle~:
+\code{table\_nom\_manquant}, \code{table\_statut\_inconnu},
+\code{table\_source\_manquante}, \code{table\_parametres\_manquants},
+\code{table\_parametres\_inattendus}, \code{table\_forme\_inconnue},
+\code{table\_mal\_formee}, \code{table\_colonne\_manquante},
+\code{table\_colonne\_inconnue}, \code{table\_vide},
+\code{table\_colonne\_mal\_typee}, \code{table\_sexe\_hors\_modalites},
+\code{table\_sexes\_melanges}, \code{table\_qx\_non\_fini},
+\code{table\_qx\_hors\_bornes}, \code{table\_age\_double},
+\code{table\_ages\_non\_croissants} et \code{table\_ages\_non\_contigus}.\par}
+
+\subsection{Vérifications}
+\label{sec:verifications-donnees}
+
+\code{tests/unitaires/test\_donnees.R} vérifie le catalogue, chaque refus de
+rôle et de paramètre, chaque motif et les règles d'évaluation, les exclusions
+(lignes conservées identiques à l'entrée), la lecture~B de E2.4 au jour près
+de la borne $B$ (délais 0 et 30~jours) et le relevé après décès hors période
+(lignes conservées, deux unités), la table de référence et ses refus. Les cas
+de fusion F1 à F7 de la spécification (chevauchement, contiguïté, écart d'un
+jour, décès sur deux contrats, observation après décès, deux décès,
+naissances discordantes) ont des attendus calculés à la main~; la fusion est
+vérifiée en outre contre un second algorithme, une boucle naïve écrite dans
+le test.
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-donnees}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/donnees.R}.}
+\label{tab:fonctions-donnees}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-donnees}{CATALOGUE\_ROLES} & constante & --- & catalogue fermé des rôles (rôle, famille, code de type, usage) \\
+\catalogue{fonctions-donnees}{TYPES\_ADMIS} & constante & --- & libellé des types R admis par code de type \\
+\catalogue{fonctions-donnees}{RECETTE\_BRANCHE} & constante & --- & seule recette d'exposition disponible~: \code{lignes\_dates\_completes} \\
+\catalogue{fonctions-donnees}{MODALITES\_SEXE} & constante & --- & \code{H}, \code{F} \\
+\catalogue{fonctions-donnees}{MODALITES\_CAUSE} & constante & --- & \code{deces}, \code{rachat}, \code{terme}, \code{autre}, \code{en\_cours} \\
+\catalogue{fonctions-donnees}{ROLES\_SEGMENTATION} & constante & --- & \code{sexe}, \code{segment} \\
+\catalogue{fonctions-donnees}{AGE\_ABERRANT} & constante & --- & 130 (motif \code{age\_aberrant}) \\
+\catalogue{fonctions-donnees}{TRANSITIONS} & constante & --- & transitions prises en charge~: départ, arrivée, code interne, porteur de l'état de départ (tête ou contrat) \\
+\catalogue{fonctions-donnees}{MOTIFS\_LIGNES} & constante & --- & motifs de ligne (tableau~\ref{tab:motifs}) \\
+\catalogue{fonctions-donnees}{MOTIFS\_TETE} & constante & --- & motifs de tête (tableau~\ref{tab:motifs}) \\
+\catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus \\
+\catalogue{fonctions-donnees}{catalogue\_roles()} & exportée & --- & catalogue des rôles (tableau~\ref{tab:catalogue-roles}) \\
+\catalogue{fonctions-donnees}{composantes\_date()} & interne & jours depuis 1970-01-01 & année, mois, jour \\
+\catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
+\catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
+\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
+\catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages \\
+\catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres~; transition retenue, début, fin, borne $B$ \\
+\catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
+\catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
+\catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
+\catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation & numéros des lignes porteuses de chaque motif \\
+\catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, transition, période, délai, segmentation, exclusions & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements \\
+\catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
+\catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
+\catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé (section~\ref{sec:table-reference}) \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie IV}{Module \code{exposition}}
+% =============================================================================
+
+\section{Exposition et événements~: \code{R/exposition.R}}
+\label{sec:exposition}
+
+Le module \code{exposition} calcule, pour la transition étudiée,
+l'exposition au risque et le nombre d'événements par cellule (segment, âge
+et, sur demande, année civile), en traitant explicitement la troncature à
+gauche et la censure à droite (E2.3, E2.5, E2.6~; ADR 0003, points 3, 6 et 8).
+Sa fonction d'étape est \code{calculer\_exposition()}~; elle reçoit la table
+des observations de l'étape \code{donnees} (composantes fusionnées ou
+contrats, section~\ref{sec:unite-observation}), les rôles, les champs du plan
+et ses deux paramètres. Le contenu de fond vient de la spécification
+d'\code{actuary} (issue~\#11, parties A.0 et A.3) et de son erratum du
+17/10/2026.
+
+\subsection{Recette d'exposition et conventions d'âge}
+\label{sec:recettes}
+
+\subsubsection*{Recette déduite des rôles}
+
+La \emph{recette d'exposition} n'est pas un paramètre du plan~: le moteur
+retient la plus fine que les rôles permettent, la nomme dans les paramètres
+effectifs et dans la fiche, et \textbf{refuse si aucune ne s'applique}, sans
+jamais deviner (E2.3~; ADR 0003, point 3~; ADR 0007, point 5.3). Une seule
+recette existe dans cette branche (tableau~\ref{tab:recettes})~; les recettes
+«~agrégats~» et «~stocks successifs~» (E2.1) viendront avec les branches qui
+les créent. \code{deduire\_recette()} retient la recette dont tous les rôles
+requis sont déclarés, ou refuse (\code{aucune\_recette}, le message nommant la
+recette et les rôles absents)~; dans \code{construire\_table()}, le même
+manque est détecté plus tôt par le contrôle des rôles, avec le même code et le
+module \code{donnees}.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.4cm}p{5.6cm}p{4.6cm}@{}}
+\caption{Recettes d'exposition (constantes \code{RECETTE\_BRANCHE} et
+\code{CONVENTION\_NATIVE}).}
+\label{tab:recettes}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Recette}} &
+\textcolor{financeblue}{\textbf{Rôles requis}} &
+\textcolor{financeblue}{\textbf{Convention native}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Recette}} &
+\textcolor{financeblue}{\textbf{Rôles requis}} &
+\textcolor{financeblue}{\textbf{Convention native}} \\
+\endhead
+\catalogue{recettes}{lignes\_dates\_completes} & \code{date\_naissance},
+\code{date\_entree}, \code{date\_sortie}, \code{cause\_sortie} (lignes
+individuelles, dates complètes) & âge au dernier anniversaire
+(\code{dernier\_anniversaire}) \\
+\end{longtable}
+}
+
+\subsubsection*{Conventions d'âge}
+
+Les conventions d'âge sont ordonnées de la plus fine à la plus grossière
+(\code{ORDRE\_CONVENTIONS})~: âge au dernier anniversaire
+(\code{dernier\_anniversaire}), âge atteint dans l'année
+(\code{age\_atteint\_annee}), âge fourni (\code{age\_fourni}). Le paramètre
+\code{convention} de l'étape vaut \code{plus\_fine}, qui retient la convention
+native de la recette, ou désigne une convention~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item une convention \textbf{plus grossière} que la native est un
+    \emph{forçage}, admis~: il est inscrit dans les paramètres effectifs et
+    dans la fiche (convention demandée, native, retenue, forcée ou non) et
+    donne l'avertissement \code{convention\_forcee} (E2.3)~;
+  \item une convention \textbf{plus fine} que la native est refusée
+    (\code{convention\_plus\_fine})~: les rôles ne la permettent pas~;
+  \item \sloppy\hbadness=10000 \code{age\_fourni}, non mise en œuvre (ses rôles ne sont pas pris en
+    charge), est refusée (\code{convention\_non\_mise\_en\_oeuvre})~; toute
+    autre valeur aussi (\code{convention\_invalide})~; \code{par\_annee} doit
+    valoir \code{TRUE} ou \code{FALSE} (\code{par\_annee\_invalide}).
+\end{itemize}
+
+\noindent
+Chaque convention définit ses cellules d'âge et l'unité de l'exposition
+(\code{UNITES\_EXPOSITION}, inscrite dans la fiche)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{dernier\_anniversaire}~: la cellule d'âge $x$ d'une tête est
+    $[\operatorname{anniv}(x), \operatorname{anniv}(x+1))$, l'âge étant celui
+    de la section~\ref{sec:conventions-temps} (29~février compris)~; l'unité
+    est l'\textbf{année d'âge}~: un morceau de $j$ jours dans la cellule $x$
+    vaut $j/L_x$, avec $L_x = \operatorname{anniv}(x+1) -
+    \operatorname{anniv}(x)$, soit 365 ou 366 jours~;
+  \item \sloppy\hbadness=10000 \code{age\_atteint\_annee}~: l'âge au jour $t$ est
+    $\operatorname{an}(t) - \operatorname{an}(n)$, la cellule est l'année
+    civile $[1^{\text{er}}\text{ janvier}, 1^{\text{er}}\text{ janvier
+    suivant})$, et l'unité la fraction d'année civile ($j/365$ ou $j/366$).
+\end{itemize}
+
+\noindent
+\textbf{Pourquoi l'année d'âge.} Avec cette unité, une année d'âge entière
+vaut exactement 1~; c'est la seule pour laquelle l'hypothèse «~force constante
+par âge entier~» donne exactement $q_x = 1 - e^{-\mu_x}$ pour toute année
+d'âge (résultat exact). Avec une division par 365,25, une année d'âge pèserait
+$365/365{,}25$ ou $366/365{,}25$ selon les années, et la correspondance ne
+serait plus exacte. L'unité est un \emph{choix de conception} de la
+spécification (A.0, T3), validé par \code{actuary} le 17/10/2026 (validation
+de fin de branche).
+
+\medskip
+\textbf{Statut des valeurs.} L'exposition est produite en jours, entiers
+exacts stockés en \code{double}~: l'exposition totale en jours d'un
+portefeuille de $10^{6}$ lignes sur 30 ans (environ $1{,}1\cdot 10^{10}$)
+dépasse \code{.Machine\$integer.max}~; résultat exact.
+L'exposition en unité d'exposition est une somme de quotients en virgule
+flottante~: approximation numérique, vérifiée à $10^{-12}$ près en relatif.
+L'arithmétique des dates du module (années bissextiles, anniversaires,
+1\textsuperscript{er}~janvier) est entière et vectorisée, écrite
+indépendamment de celle du simulateur~; elle est recoupée par \code{as.Date()}
+et comparée à \code{age\_revolu()} du module \code{donnees}, écrite
+indépendamment, dans les tests.
+
+\subsection{Troncature à gauche et censure à droite}
+\label{sec:troncature-censure}
+
+\subsubsection*{Fenêtre d'observation et décompte}
+
+Pour une observation d'entrée $e$ et de fin $s$ ($s = +\infty$ si elle est en
+cours), la période effective étant $[D, B)$, avec $D$ le début de la période
+et $B$ la borne de la section~\ref{sec:conventions-temps}~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item la \textbf{fenêtre} est $[a, b)$, avec $a = \max(e, D)$ et
+    $b = \min(s, B)$, vide si $a \ge b$~: une entrée antérieure à $D$ est
+    tronquée à gauche à $D$, et l'observation est censurée à droite à $B$
+    (fin de période et délai de déclaration)~;
+  \item l'\textbf{exposition centrale} de la cellule $(g, x)$ est
+    \[
+      E^{c}_{g,x} = \sum_{i \in g} \bigl|[a_i, b_i) \cap
+      [\operatorname{anniv}_i(x), \operatorname{anniv}_i(x+1))\bigr|,
+    \]
+    en jours, et en unité d'exposition par division de chaque morceau par la
+    longueur de sa cellule~;
+  \item l'\textbf{événement} de la transition étudiée est compté si et
+    seulement si la cause est la cible et $D \le s < B$~; il est attribué à
+    la cellule du jour $s$. Un décès le jour d'un anniversaire est donc
+    attribué à l'âge $x+1$, où l'exposition de la tête est nulle (cas H8 des
+    tests), et un événement le jour de l'entrée est compté avec une exposition
+    nulle (cas H11)~; le relevé \code{evenement\_sans\_exposition} compte les
+    cellules à exposition nulle qui comptent un événement.
+\end{itemize}
+
+\subsubsection*{Sorties concurrentes}
+
+Une sortie dans la fenêtre dont la cause n'est ni la cible ni \code{en\_cours}
+est une \emph{sortie concurrente}~: rachat ou décès pour l'autre transition,
+terme, autre cause, composante de tête close sans décès. Elle est traitée
+comme une \textbf{censure à droite à son instant}, et comptée dans la colonne
+\code{sorties\_concurrentes} de sa cellule, censures programmées comprises.
+Ce traitement suppose une \textbf{censure non informative} (risques
+concurrents indépendants)~: l'hypothèse est nommée dans les paramètres
+effectifs et dans la fiche (\code{HYPOTHESE\_CENSURE}~; E2.6).
+
+\subsubsection*{Compléments de l'exposition initiale}
+
+L'exposition initiale n'est pas choisie dans cette branche~: pour chaque
+événement compté au jour $s$ dans une cellule qui se termine en
+$\operatorname{fin}(x)$, deux compléments, en unité d'exposition, sont
+restitués~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{complement\_initial\_cellule}~: $c_1 = \operatorname{fin}(x) - s$,
+    jusqu'à la fin de la cellule (anniversaire suivant sous
+    \code{dernier\_anniversaire}, 1\textsuperscript{er}~janvier suivant sous
+    \code{age\_atteint\_annee}), convention actuarielle classique~;
+  \item \code{complement\_initial\_fenetre}~: $c_2 = \min(\operatorname{fin}(x),
+    B) - s$, jusqu'à la fin de la fenêtre, la censure par la période étant
+    connue d'avance.
+\end{itemize}
+
+\noindent
+D'où deux expositions initiales, $E^{i,\text{cellule}} = E^{c} + \sum c_1$ et
+$E^{i,\text{fenêtre}} = E^{c} + \sum c_2$. Aucune n'est sans biais
+indépendamment de l'hypothèse de répartition dans l'année. \emph{Résultat
+exact}~: pour une cohorte entrée à l'âge exact $x$, sans sortie concurrente,
+censurée par la période à un instant $c \sim \mathcal{U}(0, 1)$ indépendant de
+la durée de vie, la limite presque sûre de $D/E^{i,\text{fenêtre}}$ quand le
+nombre de têtes croît (rapport des espérances) vaut
+$2\bigl(1 - (1 - e^{-\mu})/\mu\bigr)$ sous force constante, soit environ
+$0{,}05043$ pour $q = 0{,}05$, et exactement $q$ sous l'hypothèse de
+répartition uniforme~; dans le même schéma, la limite de
+$D/E^{i,\text{cellule}}$ vaut exactement $q$ sous l'hypothèse de Balducci
+(calcul direct). À effectif fini, le rapport a un biais que ce résultat ne
+couvre pas. Le choix de l'exposition initiale revient
+donc à la spécification de l'estimateur binomial (branche des taux bruts), qui
+devra nommer son hypothèse de répartition. Dans les deux définitions, une
+sortie concurrente reste à son instant réel~: c'est une limite connue de
+l'estimateur binomial, à documenter avec lui.
+
+\subsubsection*{Table d'exposition}
+
+{\sloppy\hbadness=10000 \code{resultat\$exposition} a une ligne par cellule~: clés de segmentation,
+\code{age} et, avec \code{par\_annee}, \code{annee}~; colonnes
+\code{exposition\_jours}, \code{exposition\_centrale} (unité nommée dans
+\code{parametres\$unite\_exposition}), \code{complement\_initial\_cellule} et
+\code{complement\_initial\_fenetre} (sans \code{par\_annee} seulement),
+\code{evenements} et \code{sorties\_concurrentes}. Par segment, la table couvre
+la plage \textbf{contiguë} des âges dont les cellules ont une exposition
+non nulle, un événement ou une sortie concurrente~; les zéros sont explicites.
+Inclure les sorties concurrentes dans la plage garde exacte l'identité
+« somme de \code{sorties\_concurrentes} = nombre de sorties concurrentes dans
+la fenêtre »~; la plage de validité de la table finale se fixera à la
+fermeture (erratum A.3, point~1).\par}
+
+\medskip
+\textbf{Clés de segmentation.} Leur ordre et leur type ne dépendent ni des
+niveaux d'un facteur ni de la classe reçue~: \code{sexe}, et \code{segment}
+reçu en chaîne ou en facteur, sont rendus en chaînes et triés en ordre
+d'octets~; un \code{segment} entier est rendu en entier et trié par valeur.
+L'empreinte des données ignore les niveaux d'un facteur
+(section~\ref{sec:empreinte})~: sans cette règle, deux entrées de même
+empreinte pourraient donner des tables ordonnées différemment (erratum A.3,
+point~4).
+
+\medskip
+\textbf{Paramètres effectifs, diagnostics, avertissements.} Les paramètres
+effectifs sont la recette, la convention (demandée, native, retenue,
+forcée), l'unité d'exposition, \code{par\_annee}, le code de la transition, la
+segmentation, la période, le délai, la fin effective et l'hypothèse de
+censure. Les diagnostics donnent le nombre d'observations et d'observations
+exposées, l'exposition totale en jours, le nombre d'événements et de sorties
+concurrentes, le nombre de cellules et de cellules à exposition nulle qui
+comptent un événement. Avertissements~: \code{convention\_forcee},
+\code{evenement\_sans\_exposition} et \code{aucune\_exposition} (aucune
+exposition ni aucun événement dans la période).
+
+\subsection{Découpage par année}
+\label{sec:decoupage-annee}
+
+Avec \code{par\_annee = TRUE}, chaque morceau d'exposition est en outre découpé
+au 1\textsuperscript{er}~janvier, et un événement est attribué à l'année civile
+de son jour. La grille est \textbf{rectangulaire}~: elle croise la plage
+d'âges du segment et toutes les années civiles de l'année du début de la
+période à celle de la fin effective, avec des zéros explicites~; la première
+et la dernière année peuvent être partielles (erratum A.3, point~2). La somme
+sur les années redonne la table par âge seul, exactement en jours. Les
+compléments de l'exposition initiale ne sont pas produits dans ce découpage.
+
+\subsection{Vérifications}
+\label{sec:verifications-exposition}
+
+Les cas construits à la main de la spécification (H1 à H13 pour une ligne,
+F1 à F4 pour la fusion) sont vérifiés par
+\code{tests/unitaires/test\_exposition.R}, en jours exactement et en unité
+d'exposition à $10^{-12}$ près. Quelques-uns illustrent les règles
+ci-dessus (période du 2015-01-01 au 2024-12-31, délai nul, vivant $\to$
+décédé)~:
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{1.1cm}p{5.0cm}p{5.0cm}p{3.5cm}@{}}
+\caption{Exemples de cas calculés à la main (spécification, A.4~; valeurs
+reproduites par le moteur sur R 4.3.3).}
+\label{tab:cas-exposition}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cas}} &
+\textcolor{financeblue}{\textbf{Ligne}} &
+\textcolor{financeblue}{\textbf{Exposition par âge (jours / $L_x$)}} &
+\textcolor{financeblue}{\textbf{Événement}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cas}} &
+\textcolor{financeblue}{\textbf{Ligne}} &
+\textcolor{financeblue}{\textbf{Exposition par âge (jours / $L_x$)}} &
+\textcolor{financeblue}{\textbf{Événement}} \\
+\endhead
+H2 & née 1945-10-15~; 2016-05-20 $\to$ 2019-02-10, décès & 70~: 148/366~; 71~: 365/365~; 72~: 365/365~; 73~: 118/365~; total 996~jours & à 73~ans~; $c_1 = c_2 = 247/365$ \\
+H6 & née 1964-02-29~; 2021-01-01 $\to$ en cours & 56~: 59/366~; 57 à 59~: 1 chacun~; 60~: 307/366~; total 1\,461~jours, 4 années d'âge & aucun \\
+H8 & née 1955-04-12~; 2019-09-01 $\to$ 2020-04-12, décès & 64~: 224/366~; 65~: 0 & à 65~ans, exposition nulle à 65~; $c_1 = 365/365$ \\
+H11 & née 1980-01-01~; 2018-06-15 $\to$ 2018-06-15, décès & aucune & à 38~ans~; $c_1 = 200/365$ \\
+H12 & H2 avec \code{age\_atteint\_annee} & 71~: 226/366~; 72~: 1~; 73~: 1~; 74~: 40/365 & à 74~ans~; $c_1 = 325/365$ \\
+\end{longtable}
+}
+
+\noindent
+{\sloppy\hbadness=10000 Le cas F4 (décès porté par deux contrats d'une même tête) donne un décès en
+unité tête et deux en unité contrat, avec l'avertissement \code{unite\_contrat}.
+Sur un portefeuille simulé, \code{tests/unitaires/test\_construire\_table.R}
+vérifie des \emph{identités exactes}~: exposition totale en jours égale à la
+somme des $\max(0, b - a)$, égalité entière~; décès comptés égaux aux décès
+simulés tels que $D \le s \le \text{fin effective}$~; même identité pour les
+rachats, décès censurés~; décès par sexe et par âge égaux aux décès simulés
+par âge au dernier anniversaire~; avec \code{par\_annee}, somme sur les années
+égale à l'exposition par âge seul, en jours. La segmentation est vérifiée
+avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-exposition}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/exposition.R}.}
+\label{tab:fonctions-exposition}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-exposition}{ORDRE\_CONVENTIONS} & constante & --- & conventions d'âge, de la plus fine à la plus grossière \\
+\catalogue{fonctions-exposition}{CONVENTIONS\_MISES\_EN\_OEUVRE} & constante & --- & \code{dernier\_anniversaire}, \code{age\_atteint\_annee} \\
+\catalogue{fonctions-exposition}{VALEURS\_CONVENTION} & constante & --- & valeurs admises du paramètre \code{convention} \\
+\catalogue{fonctions-exposition}{CONVENTION\_NATIVE} & constante & --- & convention native de chaque recette \\
+\catalogue{fonctions-exposition}{UNITES\_EXPOSITION} & constante & --- & unité de l'exposition par convention \\
+\catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE} & constante & --- & hypothèse de censure non informative, inscrite dans la fiche \\
+\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis~; refus \code{aucune\_recette} \\
+\catalogue{fonctions-exposition}{controler\_parametres\_exposition()} & interne & convention, \code{par\_annee} & refus des valeurs \\
+\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & convention retenue et forçage~; refus \code{convention\_plus\_fine} \\
+\catalogue{fonctions-exposition}{an\_bissextile()} & interne & années & bissextilité grégorienne \\
+\catalogue{fonctions-exposition}{bissextiles\_anterieures()} & interne & années & nombre d'années bissextiles antérieures \\
+\catalogue{fonctions-exposition}{premier\_janvier()} & interne & années & jour du 1\textsuperscript{er}~janvier \\
+\catalogue{fonctions-exposition}{JOURS\_AVANT\_MOIS} & constante & --- & jours écoulés avant chaque mois, année commune \\
+\catalogue{fonctions-exposition}{annee\_du\_jour()} & interne & jours & année civile \\
+\catalogue{fonctions-exposition}{composantes\_jour()} & interne & jours & année, mois, jour, quantième commun \\
+\catalogue{fonctions-exposition}{calendrier()} & interne & années extrêmes & table calendaire \\
+\catalogue{fonctions-exposition}{indice\_annee()} & interne & table, années & indice dans la table calendaire \\
+\catalogue{fonctions-exposition}{annee\_calendrier()} & interne & table, jours & année civile, par la table \\
+\catalogue{fonctions-exposition}{anniversaire\_age()} & interne & table, naissances, âges & jour de l'anniversaire \\
+\catalogue{fonctions-exposition}{age\_dernier\_anniversaire()} & interne & table, naissances, jours & âge au dernier anniversaire \\
+\catalogue{fonctions-exposition}{debut\_cellule()} & interne & table, naissances, âges, convention & début de la cellule d'âge \\
+\catalogue{fonctions-exposition}{cellule\_du\_jour()} & interne & table, naissances, jours, convention & cellule d'âge du jour \\
+\catalogue{fonctions-exposition}{extraire\_composantes()} & interne & composantes, indices & sous-ensemble \\
+\catalogue{fonctions-exposition}{decouper\_cellules()} & interne & fenêtres, convention & morceaux contenus chacun dans une cellule \\
+\catalogue{fonctions-exposition}{decouper\_annees()} & interne & morceaux & morceaux découpés au 1\textsuperscript{er}~janvier \\
+\catalogue{fonctions-exposition}{somme\_par\_cellule()} & interne & cellules, valeurs & sommes par cellule, zéros explicites \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee} & fonction d'étape \code{exposition} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie V}{Module \code{brut}}
+% =============================================================================
+
+\section{Taux bruts~: \code{R/brut.R}}
+\label{sec:brut}
+
+Module prévu (E2.12, E2.14)~: estimateurs des taux bruts et leurs intervalles
+de confiance exacts et asymptotiques. Il sera créé par la branche des taux
+bruts (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-brut}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/brut.R}.}
+\label{tab:fonctions-brut}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/brut.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie VI}{Module \code{lissage}}
+% =============================================================================
+
+\section{Lissage~: \code{R/lissage.R}}
+\label{sec:lissage}
+
+Module prévu (E2.12)~: lissages des taux bruts. Il sera créé par une branche
+ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-lissage}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/lissage.R}.}
+\label{tab:fonctions-lissage}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/lissage.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie VII}{Module \code{positionnement}}
+% =============================================================================
+
+\section{Positionnement sur une table de référence~: \code{R/positionnement.R}}
+\label{sec:positionnement}
+
+Module prévu (E2.12, E2.15)~: positionnement d'une table d'expérience sur une
+table de référence. Il sera créé par une branche ultérieure
+(\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-positionnement}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/positionnement.R}.}
+\label{tab:fonctions-positionnement}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/positionnement.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie VIII}{Module \code{prospective}}
+% =============================================================================
+
+\section{Tables prospectives~: \code{R/prospective.R}}
+\label{sec:prospective}
+
+Module prévu (E2.13, v2)~: tables prospectives, toute table prospective étant
+une surface de mortalité.
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-prospective}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/prospective.R}.}
+\label{tab:fonctions-prospective}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/prospective.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie IX}{Module \code{fermeture}}
+% =============================================================================
+
+\section{Fermeture aux âges extrêmes~: \code{R/fermeture.R}}
+\label{sec:fermeture}
+
+Module prévu (E2.12)~: fermeture de la table aux âges extrêmes. Il sera créé
+par une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-fermeture}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/fermeture.R}.}
+\label{tab:fonctions-fermeture}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/fermeture.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie X}{Module \code{validation}}
+% =============================================================================
+
+\section{Validation et suivi d'expérience~: \code{R/validation.R}}
+\label{sec:validation}
+
+Module prévu (E2.12, E2.18)~: validation de la table construite et suivi
+d'expérience. Il sera créé par une branche ultérieure
+(\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-validation}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/validation.R}.}
+\label{tab:fonctions-validation}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/validation.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie XI}{Module \code{rapport}}
+% =============================================================================
+
+\section{Fiche de construction et empreintes~: \code{R/rapport.R}}
+\label{sec:rapport}
+
+Le module \code{rapport} porte les quantités des rapports, pas leur rendu
+(E4.1)~: dans cette branche, la fiche de construction en mémoire et
+l'empreinte des données reçues. Le rapport figé HTML, l'écriture des tables et
+la sérialisation de la fiche viendront avec la branche
+\code{claude/fiche-rapport} (ADR 0007, point 12).
+
+\subsection{Fiche de construction}
+\label{sec:fiche}
+
+La \emph{fiche de construction} est la description lisible par machine d'une
+construction, qui suffit à la rejouer à l'identique (E4.5~; ADR 0005,
+point 6~; ADR 0007, point 6.2). Elle est assemblée par \code{assembler\_fiche()}
+et rangée dans le champ \code{fiche} de l'objet. Elle ne contient
+\textbf{aucun horodatage}~: deux constructions identiques ont des fiches
+identiques. Ses champs~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{version\_fiche} (\code{VERSION\_FICHE}, 1)~; \code{versions}
+    (\code{tablexp}, lue dans la description du package installé, et
+    \code{R.version.string})~; \code{plateforme} (système, version, machine,
+    BLAS par \code{extSoftVersion()}, LAPACK par \code{La\_library()})~;
+  \item \code{roles}~; \code{plan}, le plan \textbf{reçu, inchangé}~;
+  \item \code{transition} et son code interne \code{transition\_code}~;
+    \code{periode}, \code{delai\_declaration} et \code{fin\_effective}~;
+    \code{segmentation}~;
+  \item \sloppy\hbadness=10000 \code{unite\_observation} et, s'il y a lieu, \code{avertissement\_unite}
+    (message de l'avertissement \code{unite\_contrat})~;
+  \item \code{recette}~; \code{convention} (demandée, native, retenue,
+    forcée)~; \code{unite\_exposition}~; \code{par\_annee}~;
+    \code{exclusions} (par motif, avec leur nombre)~; \code{hypothese\_censure}~;
+  \item \code{graine} et \code{graine\_mention} (\code{NA} et «~aucune étape
+    aléatoire~» dans cette branche)~; \code{generateur} (\code{GENERATEUR})~;
+  \item \code{provenance} et \code{provenance\_mention} («~aucun fichier
+    (données construites en mémoire)~» si \code{provenance} est \code{NULL})~;
+  \item \code{empreintes} (section~\ref{sec:empreinte})~; \code{avertissements}.
+\end{itemize}
+
+\noindent
+Les champs qui n'ont pas d'objet (convention et unité d'exposition d'un plan
+sans étape \code{exposition}) valent \code{NULL} ou \code{NA}. \textbf{Rejeu}~:
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
+redonne un objet \code{identical()} hors \code{execution}~; c'est un test de
+la batterie de reproductibilité. La fiche vit en mémoire~: son format
+d'écriture et de relecture est reporté, sous des contraintes déjà posées
+(texte lisible par un relecteur, aller-retour identique, nombres compris,
+aucune évaluation de code à l'import, R de base, version de fiche~; ADR 0007,
+point 12.2).
+
+\subsection{Empreinte des données}
+\label{sec:empreinte}
+
+\subsubsection*{Algorithme et portée}
+
+L'empreinte identifie l'entrée reçue par le moteur~; elle n'a pas de rôle de
+sécurité. Elle est un MD5, calculé par \code{tools::md5sum()} sur un fichier
+temporaire écrit en binaire (\code{empreinte\_donnees()}), l'algorithme étant
+nommé dans la fiche (\code{empreintes\$algorithme}, \code{"md5"}) pour qu'un
+changement ultérieur soit visible et daté (décision M45, P8~; ADR 0007,
+point 9). R 4.3.3 n'offre ni SHA-256 ni empreinte directe d'un vecteur
+d'octets dans \code{tools} (ADR 0007, mesures), et le moteur n'admet aucun
+package hors priorité \code{base}. L'empreinte n'est pas calculée sur
+\code{serialize()}~: l'en-tête de la sérialisation porte la version de R qui
+écrit, si bien qu'à données identiques l'empreinte changerait avec la version
+de R. Elle est calculée sur une \emph{représentation textuelle canonique},
+définie indépendamment de la manière de l'écrire, qu'un tiers peut recalculer
+avec n'importe quel outil MD5.
+
+\medskip
+La fiche porte~: \code{algorithme}~; \code{representation}
+(\code{ENTETE\_CANONIQUE}, \code{"tablexp canonique 1"})~; \code{donnees}~;
+\code{fichier} et \code{algorithme\_fichier}, reçus par \code{provenance}
+(\code{NA} sans fichier)~; \code{resultat} et \code{code}, à \code{NA} avec le
+statut «~non calculée (branche fiche-rapport)~»
+(\code{statut\_resultat\_code})~: l'empreinte du résultat dépend de la
+plateforme (E3.6) et attend la sérialisation, et celle du code suppose de
+fixer ce qu'est «~le code~». L'argument \code{provenance} est \code{NULL} ou
+une liste de trois chaînes non vides, \code{fichier}, \code{empreinte} et
+\code{algorithme}~; sinon, refus \code{provenance\_invalide}
+(\code{controler\_provenance()}).
+
+\subsubsection*{Représentation canonique}
+
+\code{texte\_canonique()} écrit les octets suivants (ADR 0007, point 9.3, et
+annotation du 17/10/2026, point~f)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{périmètre}~: les seules colonnes auxquelles un rôle est déclaré,
+    \textbf{toutes les lignes reçues}, avant exclusions, dans l'ordre reçu~;
+    une base dont les lignes sont permutées a une autre empreinte, à résultats
+    égaux. Les exclusions sont des paramètres du plan, non une propriété de
+    l'entrée~;
+  \item \textbf{ordre des colonnes}~: par nom de rôle, en ordre d'octets~; le
+    nom de colonne n'entre pas dans le texte (il est dans \code{fiche\$roles})~:
+    renommer une colonne ne change pas l'empreinte~;
+  \item \textbf{structure}~: une première ligne
+    \code{tablexp canonique 1<TAB><nombre de lignes><TAB><nombre de colonnes>},
+    puis, pour chaque colonne, une ligne d'en-tête \code{\#<rôle><TAB><type>}
+    suivie d'une valeur par ligne~; lignes terminées par LF, aucun CR, fichier
+    écrit octet par octet~;
+  \item \textbf{valeurs}~: \code{double} écrit en \code{\%.17g} après ajout de
+    0 (le zéro négatif est normalisé~; \code{\%.17g} restitue un double au bit
+    près, \code{\%.15g} ne le fait pas), \code{NA}, \code{NaN}, \code{Inf},
+    \code{-Inf}~; \code{integer} en \code{\%d}~; \code{logical} en
+    \code{TRUE}, \code{FALSE}, \code{NA}~; \code{Date} en \code{\%Y-\%m-\%d}~;
+    chaînes et facteurs (convertis en chaînes, les niveaux n'entrent pas)~:
+    octets UTF-8 entre guillemets droits, avec cinq échappements
+    (\verb|\\|, \verb|\n|, \verb|\r|, \verb|\t|, \verb|\"|), \code{NA} sans
+    guillemets pour une valeur manquante~;
+  \item \textbf{codage}~: les chaînes sont converties en UTF-8 puis traitées en
+    octets~; le moteur refuse une chaîne au codage \code{bytes}
+    (\code{chaine\_codage\_bytes}), une chaîne qui n'est pas de l'UTF-8 valide
+    (\code{chaine\_non\_utf8}) et, dans une session dont la locale n'est ni
+    UTF-8 ni latin-1, une chaîne non ASCII non marquée, dont le codage est
+    indéterminé (\code{chaine\_codage\_indetermine}). Sous ces règles,
+    l'empreinte ne dépend pas des paramètres régionaux.
+\end{itemize}
+
+\noindent
+Le libellé de type de l'en-tête est pris dans une \textbf{liste fermée de six
+chaînes}, par des tests faits dans l'ordre du tableau~\ref{tab:types-canoniques}
+(\code{colonne\_canonique()})~; le premier qui réussit fixe le libellé. Un
+type hors de la liste est refusé (\code{type\_non\_canonique}), sans
+conversion. C'est une seconde barrière~: le contrôle des types des rôles
+(\code{type\_incompatible}, section~\ref{sec:catalogue-roles}) refuse déjà,
+avant le calcul de l'empreinte, toute classe hors du catalogue~; aucun rôle
+n'admet aujourd'hui une colonne logique, si bien que le libellé
+\code{logical} n'est pas produit par \code{construire\_table()}.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{1.2cm}p{2.4cm}p{11.0cm}@{}}
+\caption{Libellés de type de la représentation canonique, dans l'ordre des
+tests.}
+\label{tab:types-canoniques}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Ordre}} &
+\textcolor{financeblue}{\textbf{Libellé}} &
+\textcolor{financeblue}{\textbf{Test}} \\
+1 & \code{factor} & facteur, ordonné ou non \\
+2 & \code{Date} & classe exactement \code{Date} (une classe \code{Date}
+augmentée échoue et tombe au test~3) \\
+3 & refus & toute autre classe (\code{POSIXct}, \code{difftime}, \code{AsIs}\ldots) \\
+4 & \code{character} & chaîne \\
+5 & \code{integer} & entier \\
+6 & \code{double} & double \\
+7 & \code{logical} & logique \\
+8 & refus & tout autre type de base (liste, complexe, octets bruts\ldots) \\
+\end{longtable}
+\end{center}
+
+\noindent
+\textbf{Pourquoi \code{factor} reste distinct de \code{character}.} Les valeurs
+s'écrivent de la même façon~; seul le libellé distingue une colonne facteur
+d'une colonne de chaînes aux mêmes valeurs. L'empreinte identifiant l'entrée,
+deux \code{data.frame} dont une colonne n'a pas la même classe sont deux
+entrées différentes, que la fiche doit permettre de distinguer. L'empreinte ne
+dépend pas, en revanche, des niveaux d'un facteur~; c'est pourquoi aucun
+résultat ne doit en dépendre (clés de segmentation,
+section~\ref{sec:troncature-censure}).
+
+\medskip
+\textbf{Règle durable.} Changer la représentation canonique (libellé, ordre
+des tests, format d'une valeur) change l'empreinte des données de toutes les
+fiches~: c'est un changement de résultat, qui appelle l'incrément de
+\code{version\_fiche} et le visa.
+
+\subsection{Vérifications}
+\label{sec:verifications-rapport}
+
+\code{tests/unitaires/test\_construire\_table.R} compare l'empreinte d'un petit
+\code{data.frame}, colonnes facteur et chaîne comprises, à une valeur calculée
+hors de R (texte écrit par \code{printf}, empreinte par \code{md5sum} de GNU
+coreutils). \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
+la même dans des processus R lancés sous \code{LANG=C} et sous
+\code{LANG=C.UTF-8}, égale à cette valeur, et que le rejeu de la fiche redonne
+l'objet.
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-rapport}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/rapport.R}.}
+\label{tab:fonctions-rapport}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (1) \\
+\catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 1"} \\
+\catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
+\catalogue{fonctions-rapport}{STATUT\_EMPREINTES\_NON\_CALCULEES} & constante & --- & statut des empreintes du résultat et du code \\
+\catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle & octets canoniques des chaînes~; refus de codage \\
+\catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
+\catalogue{fonctions-rapport}{colonne\_canonique()} & interne & colonne, rôle & libellé de type et octets~; refus \code{type\_non\_canonique} \\
+\catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire \\
+\catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
+\catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
+\catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche \\
+\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction \\
+\catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie XII}{Module \code{simulation}}
+% =============================================================================
+
+\section{Simulateur~: \code{R/simulation.R}}
+\label{sec:simulation}
+
+Le dépôt ne contient aucune donnée réelle~: tous les jeux sont simulés sous
+une \emph{loi vraie} connue et une graine (E1.5). Le simulateur est le modèle
+multi-états exécuté en avant (E2.19~; ADR 0003, point 9)~: il produit des
+lignes individuelles portant les rôles du catalogue, sur lesquelles le moteur
+est vérifié. Il reproduit le même modèle que le moteur, pas le même code~: il
+n'appelle que \code{donnees} et \code{outils}, et aucun module du moteur ne
+l'appelle (section~\ref{sec:graphe}). La version de cette branche est
+\emph{minimale}~: deux transitions concurrentes, vivant $\to$ décédé et en
+cours $\to$ racheté, une tête par contrat, troncature à gauche et censure par
+la période. Les autres formes de données (agrégats, stocks successifs), les
+têtes multi-contrats et l'injection de défauts paramétrés viendront avec une
+branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2). Son point
+d'entrée est \code{simuler\_portefeuille(loi, portefeuille, periode,
+graine)}, exporté (ADR 0007, point 3.2). Le contenu de fond vient de la
+spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
+17/10/2026.
+
+\subsection{Loi vraie et tables synthétiques}
+\label{sec:loi-vraie}
+
+La loi vraie est une liste de deux lois, \code{deces} et \code{rachat}~;
+chacune associe une table de référence (classe \code{table\_reference},
+section~\ref{sec:table-reference}) et un facteur par sexe, \code{c(H = , F = )},
+réel fini $\ge 0$. Pour un sexe $s$, la loi effective est
+\[
+  q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
+\]
+où $q_x$ est lu dans la table du sexe si elle y figure, sinon dans la table
+\code{ensemble} (\code{loi\_effective()}). Une table prospective (colonne
+\code{annee}) est refusée par le simulateur minimal. Seuls les sexes
+effectivement tirés (proportion d'hommes non nulle pour \code{H}, différente
+de 1 pour \code{F}) sont construits et contrôlés~; ils sont consignés dans
+\code{sexes\_controles}.
+
+\medskip
+Deux tables synthétiques, de statut \code{synthetique} et porteuses de leurs
+paramètres (attribut \code{parametres}), sont construites par le module~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Gompertz-Makeham} (\code{table\_gompertz\_makeham()})~: intensité
+    $\mu(x) = A + B\,c^{x}$, avec $A \ge 0$, $B \ge 0$, $c > 1$ déclarés, sans
+    valeur par défaut, sur des âges entiers déclarés~; la probabilité annuelle
+    est l'intégrale exacte de $\mu$ sur $[x, x+1)$~:
+    \[
+      q_x = 1 - \exp\Bigl(-A - B\,c^{x}\,\frac{c-1}{\ln c}\Bigr)~;
+    \]
+    la table est sans distinction de sexe (\code{ensemble}). Les tests
+    emploient $A = 2\cdot 10^{-4}$, $B = 2{,}5\cdot 10^{-5}$, $c = 1{,}1$, âges
+    0 à 120 (\emph{choix de conception} de la spécification, sans prétention
+    de réalisme), qui donnent $q_{60} = 0{,}008153179142$ et
+    $q_{100} = 0{,}303486068312$, et des facteurs $f_H = 1$, $f_F = 0{,}6$~;
+  \item \textbf{table constante} (\code{table\_constante()})~: $q_x = q$ à tous
+    les âges déclarés~; elle porte la loi de rachat ($q = 0{,}05$ dans les
+    tests de portefeuille), ou une transition absente ($q = 0$). Une loi de
+    rachat par ancienneté (axe secondaire) est hors du périmètre de la
+    branche.
+\end{itemize}
+
+\subsubsection*{Hypothèse de répartition dans l'année}
+
+Le simulateur suppose une \textbf{force constante par âge entier},
+$\mu_x = -\ln(1 - q_x)$, dans l'échelle des années d'âge (une année d'âge vaut
+1, quelle que soit sa durée de 365 ou 366 jours~;
+section~\ref{sec:recettes}), et des \textbf{risques concurrents
+indépendants}. L'hypothèse est consignée dans le résultat
+(\code{HYPOTHESE\_REPARTITION}). Elle est retenue pour deux raisons~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item sous cette hypothèse, $q_x = 1 - e^{-\mu_x}$ \emph{exactement}~; le
+    décompte des événements rapporté à l'exposition centrale est alors
+    l'estimateur du maximum de vraisemblance de $\mu_x$ du modèle à force
+    constante par âge entier, avec troncature à gauche et censure
+    indépendante, pour une observation en temps continu (résultat exact), et
+    la cible des estimateurs à venir est connue exactement. Sur des dates au
+    jour (section~\ref{sec:conventions-temps}), l'exposition est arrêtée au
+    début du jour de l'événement, d'où un écart relatif d'ordre
+    $\mu_x/(2L_x)$, négligeable mais non nul~;
+  \item la force constante est stable par addition des forces~: une force
+    constante dans chaque décrément équivaut à une force constante dans la
+    table à décréments multiples, alors que la répartition uniforme n'a pas
+    cette propriété. Deux forces indépendantes s'additionnent, et la
+    probabilité de décès en présence du rachat a une forme close~:
+    \[
+      q^{(d)}_x = \frac{\mu^{d}_x}{\mu^{d}_x + \mu^{r}_x}
+      \Bigl(1 - e^{-(\mu^{d}_x + \mu^{r}_x)}\Bigr)~;
+    \]
+    sous l'hypothèse de répartition uniforme dans chaque table à décrément
+    simple, de taux $q'^{d}$ et $q'^{r}$, la survie à double décrément
+    $(1 - t\,q'^{d})(1 - t\,q'^{r})$ est quadratique en $t$ dès que les deux
+    taux sont strictement positifs, et la table à décréments multiples n'est
+    plus uniforme~: l'hypothèse ne serait plus la même pour les deux
+    transitions (résultat exact, calcul direct).
+\end{itemize}
+
+\noindent
+Une probabilité $q_x = 1$ à un âge atteignable rend la force infinie~: le
+simulateur la refuse (\code{qx\_egal\_a\_un}).
+
+\subsection{Portefeuille simulé}
+\label{sec:portefeuille-simule}
+
+\subsubsection*{Entrées}
+
+{\sloppy\hbadness=10000 Le portefeuille est une liste dont tous les champs sont requis, sans valeur
+par défaut (\code{CHAMPS\_PORTEFEUILLE}), selon deux modes~:\par}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{uniforme}~: \code{n} contrats, \code{proportion\_hommes},
+    \code{age\_min}, \code{age\_max}, \code{origine} (date au plus égale au
+    début de la période)~; le jour d'entrée est uniforme discret sur les jours
+    de $[\text{origine}, \text{fin}]$, l'âge à l'entrée uniforme continu sur
+    $[\text{age\_min}, \text{age\_max})$, et la naissance est l'entrée moins
+    $\operatorname{round}(\text{âge} \times 365{,}25)$ jours~; l'âge exact est
+    ensuite recalculé depuis les dates, selon la convention d'âge du moteur
+    (section~\ref{sec:conventions-temps})~;
+  \item \code{age\_exact}~: \code{n}, \code{proportion\_hommes}, \code{age}
+    (entier), \code{date\_entree}~; toutes les têtes entrent à l'âge exact
+    \code{age}, née le même jour et le même mois, \code{age} années avant
+    l'entrée. Ce mode sert au constat de simulation
+    (section~\ref{sec:constats-simulation}). Une entrée le 29~février est
+    refusée (\code{entree\_29\_fevrier})~: la naissance «~\code{age} années
+    avant~» serait ambiguë.
+\end{itemize}
+
+\noindent
+Pour garantir une naissance strictement antérieure à l'entrée, il faut
+$\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondit
+au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
+au moins égal à 1 en mode âge exact~; ces conditions sont contrôlées
+(\code{portefeuille\_invalide}). La période d'observation est une liste
+\code{debut}, \code{fin} de dates~; la censure a lieu à l'instant
+$B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
+
+\subsubsection*{Algorithme}
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item Pour chaque transition et chaque tête, un \textbf{temps latent} est
+    tiré par inversion du risque cumulé $H$, linéaire par morceaux sur l'âge
+    (force constante par âge entier)~: l'âge de l'événement est celui où $H$
+    atteint $H(a_0) + E$, avec $a_0$ l'âge exact à l'entrée et
+    $E \sim \mathrm{Exp}(1)$, cherché par \code{findInterval()}
+    (\code{temps\_latent()}).
+  \item La sortie est le \textbf{minimum} des deux temps latents et de la
+    censure à $B$, comparés en temps continu~; une égalité, de probabilité
+    nulle, est attribuée au décès.
+  \item L'instant de l'événement, dans l'année d'âge $k$ à la fraction
+    $\varphi$, est converti en jour~: $\operatorname{anniv}(k) +
+    \lfloor \varphi\, L_k \rfloor$, avec $L_k$ la durée de l'année d'âge,
+    borné à $[\text{entrée}, \operatorname{anniv}(k+1) - 1]$. Le jour reste
+    dans l'année d'âge~: \textbf{la probabilité d'un événement dans l'année $k$
+    est conservée exactement}~; la discrétisation n'affecte que la
+    répartition à l'intérieur de l'année, et la borne ne corrige que
+    l'arrondi de la virgule flottante.
+\end{enumerate}
+
+\subsubsection*{Ordre des tirages et graine}
+
+Les tirages ont lieu sous \code{sous\_graine()}, avec la graine reçue en
+argument, sans défaut, sous \code{GENERATEUR} (section~\ref{sec:sous-graine}),
+dans un ordre fixé, qui fait partie du contrat de reproductibilité et est
+consigné (\code{ORDRE\_TIRAGES})~: (1) sexe, \code{runif(n)} comparé à la
+proportion d'hommes~; (2) jour d'entrée, \code{sample.int()} avec remise~;
+(3) âge à l'entrée, \code{runif(n)}~; (4) décès, \code{rexp(n)}~; (5) rachat,
+\code{rexp(n)}. En mode âge exact, (2) et (3) ne sont pas tirés. Changer cet
+ordre change tout jeu simulé~: c'est un changement de résultat.
+
+\subsubsection*{Couverture de la table~: aucune extrapolation}
+
+Le simulateur refuse (\code{table\_trop\_courte}) une loi qui ne couvre pas
+tous les âges atteignables, \emph{avant tout tirage}, si bien que le refus ne
+dépend pas de la graine (\code{controler\_portefeuille()},
+\code{controler\_couverture()}). Les âges atteignables sont bornés a priori
+par les seuls paramètres~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{borne basse}~: l'âge révolu à l'entrée est au moins
+    \[
+      y_{\min} = \max\bigl\{y : 365\,y + \lceil y/4 \rceil \le
+      \operatorname{round}(\text{age\_min} \times 365{,}25)\bigr\}
+    \]
+    (\code{age\_revolu\_minimal()}), parce que $y$ années comptent au plus
+    $\lceil y/4 \rceil$ jours de 29~février~; la borne est prudente, les années
+    séculaires non bissextiles ne faisant que retirer des jours. Elle donne
+    $y_{\min} = 20$ pour $\text{age\_min} = 20$ comme pour $21$~: la borne
+    $\lfloor \text{age\_min} \rfloor$ serait fausse, une naissance arrondie au
+    jour pouvant donner l'âge révolu 20 à une tête entrée à 21 ans (erratum
+    A.2, point~4). En mode âge exact, la borne basse est l'âge déclaré~;
+  \item \sloppy \textbf{borne haute}~: $\text{age\_max} + (B - \text{origine})/365{,}25 + 1$
+    en mode uniforme, et $\text{age} + (B - \text{date\_entree})/365{,}25 + 1$
+    en mode âge exact. \emph{Preuve.} Soit $\operatorname{span}(y)$ le nombre de
+    jours de la naissance à l'anniversaire $y$. Pour $y \le 130$ (âges des
+    tables des tests), $\operatorname{span}(y) \ge 365{,}25\,y - 2{,}75$ et
+    $\operatorname{span}(y) \le 365{,}25\,y + 0{,}75$~; une tête d'âge révolu
+    $y$ à $B$ vérifie $\operatorname{span}(y) \le B - n$, et, en mode uniforme,
+    $B - n \le (B - \text{origine}) + \text{age\_max} \times 365{,}25 + 0{,}5$~;
+    donc $y \le \text{age\_max} + (B - \text{origine})/365{,}25 + 3{,}25/365{,}25$,
+    strictement inférieur à la borne. En mode âge exact,
+    $B - n = (B - \text{date\_entree}) + \operatorname{span}(\text{age})$ et le
+    même raisonnement donne une marge de $3{,}5/365{,}25$.
+    \emph{Statut des deux encadrements de $\operatorname{span}$}~: ils sont
+    établis par calcul exhaustif, toutes naissances du 1\textsuperscript{er}
+    janvier 1700 au 31~décembre 2150 et $1 \le y \le 130$ (minimum $-2{,}75$,
+    maximum $+0{,}75$, remesurés sur R 4.3.3 avec les fonctions de dates du
+    module)~; le calendrier grégorien étant périodique de 400 ans, cette plage
+    contient un cycle complet de dates de naissance, et les encadrements valent
+    pour toute naissance (résultat exact). Au-delà de 130 ans, l'encadrement
+    bas mesuré jusqu'à 260 ans est $-3{,}75$ (atteint pour $y = 207$,
+    naissance au 2096-03-01), l'encadrement haut restant $+0{,}75$~; la même
+    preuve donne alors une marge de $4{,}25/365{,}25$ en mode uniforme
+    ($4{,}5/365{,}25$ en mode âge exact), inférieure à un an pour $y \le 260$.
+\end{itemize}
+
+\noindent
+Après les tirages, une assertion interne vérifie que les âges parcourus
+restent dans ces bornes~: un écart serait une erreur de programmation, jamais
+un refus dépendant de la graine. Avec le portefeuille des tests
+($\text{age\_max} = 75$, origine 2005-01-01, fin 2024-12-31), la borne haute
+vaut 96 (erratum A.2, point~1), couverte par la table de 0 à 120 ans.
+
+\subsubsection*{Sortie}
+
+{\sloppy\hbadness=10000 \code{simuler\_portefeuille()} rend un \code{data.frame} de colonnes
+\code{id\_contrat}, \code{id\_tete} (égal à \code{id\_contrat}), \code{sexe},
+\code{date\_naissance}, \code{date\_entree}, \code{date\_sortie} (manquante si
+la tête est en cours à la fin) et \code{cause\_sortie} (\code{deces},
+\code{rachat} ou \code{en\_cours}), qui portent les noms des rôles du
+catalogue. Toutes les lignes sont conservées, y compris celles sorties avant
+le début de la période, qui exercent la troncature à gauche. Les lignes sont
+cohérentes au sens exact, $\text{naissance} < \text{entrée} \le \text{sortie}
+\le \text{fin}$, et passent les contrôles du module \code{donnees} sans
+exclusion, pour les deux transitions (constat des tests).\par}
+
+\medskip
+L'attribut \code{simulation} consigne~: la loi vraie (tables, facteurs, loi
+effective par transition et par sexe avec $q_x$ et $\mu_x$, transitions,
+hypothèse de répartition, \code{sexes\_controles})~; le portefeuille et la
+période reçus~; la graine, \code{GENERATEUR} et l'ordre des tirages~; la
+version de R~; des décomptes (lignes, décès, rachats, en cours, sorties et
+entrées antérieures au début de la période).
+
+\medskip
+{\sloppy\hbadness=10000 Refus du simulateur~: \code{loi\_invalide}, \code{portefeuille\_invalide},
+\code{periode\_invalide}, \code{entree\_29\_fevrier}, \code{table\_trop\_courte}
+et \code{qx\_egal\_a\_un}~; et, par \code{sous\_graine()}, \code{graine\_invalide}.\par}
+
+\subsection{Constats de simulation}
+\label{sec:constats-simulation}
+
+Retrouver la loi vraie est une batterie de tests, chacun un \emph{constat de
+simulation} qui écrit le nombre de têtes, le niveau, la région d'acceptation et
+la probabilité de fausse alarme (E2.19, E2.20). Le constat du simulateur
+minimal porte sur cinq cohortes de $n = 10^{6}$ têtes, entrées le
+2016-03-15 à l'âge exact $x$ (mode \code{age\_exact}), période du 2016-03-15
+au 2017-12-31~: l'année d'âge $x$ est observée entière, sans censure par la
+période. On compte les événements $D$ datés avant l'anniversaire $x+1$. Sous
+le modèle simulé, $D$ suit exactement la loi binomiale
+$\mathcal{B}(n, p)$, $p$ étant la probabilité de l'événement dans l'année.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Région d'acceptation}~: bilatérale exacte,
+    $[\text{qbinom}(\alpha_k/2, n, p), \text{qbinom}(1 - \alpha_k/2, n, p)]$.
+  \item \textbf{Correction multiple}~: Bonferroni, $\alpha = 10^{-3}$ global,
+    $K = 5$, $\alpha_k = 2\cdot 10^{-4}$.
+  \item \textbf{Fausse alarme exacte} de chaque test~:
+    $FA_k = P(D < \text{lo}) + P(D > \text{hi})$, calculée et écrite par le
+    test.
+  \item \textbf{Fausse alarme familiale}~: elle est bornée par
+    $\sum_k FA_k = 9{,}857\cdot 10^{-4} \le 10^{-3}$ (inégalité de Bonferroni,
+    valable \emph{sans hypothèse d'indépendance}~; c'est le critère vérifié).
+    Sous indépendance des cinq cohortes, tirées sous des graines distinctes
+    (20261016 à 20261020), elle vaut $1 - \prod_k (1 - FA_k) = 9{,}853\cdot
+    10^{-4}$~; cette indépendance est l'hypothèse usuelle sur le générateur,
+    non démontrée, et la valeur n'est donnée qu'à titre d'information.
+\end{itemize}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{2.6cm}p{3.4cm}p{2.2cm}@{}}
+\caption{Constat de simulation du simulateur minimal~: probabilité exacte $p$
+sous le modèle, région d'acceptation et fausse alarme exacte
+(\code{tests/unitaires/test\_simulation.R}).}
+\label{tab:constat-simulation}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$p$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$p$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endhead
+1. décès, $x = 60$, H, sans rachat & $0{,}008153179142$ & $[7\,821\,;\ 8\,490]$ & $1{,}951\cdot 10^{-4}$ \\
+2. décès, $x = 80$, F (facteur 0,6), sans rachat & $0{,}03150085056$ & $[30\,853\,;\ 32\,152]$ & $1{,}981\cdot 10^{-4}$ \\
+3. décès, $x = 100$, F, sans rachat & $0{,}182091641$ & $[180\,658\,;\ 183\,528]$ & $1{,}995\cdot 10^{-4}$ \\
+4. rachat, $x = 40$, $q^{r} = 0{,}05$, sans décès & $0{,}05$ & $[49\,191\,;\ 50\,812]$ & $1{,}983\cdot 10^{-4}$ \\
+5. décès, $x = 60$, H, rachat concurrent $q^{r} = 0{,}30$ & $0{,}006859320306$ & $[6\,554\,;\ 7\,168]$ & $1{,}947\cdot 10^{-4}$ \\
+\end{longtable}
+}
+
+\noindent
+La probabilité du test~5 est la forme close $q^{(d)}$ ci-dessus~; le rachat
+concurrent y est porté à $0{,}30$ pour que le test soit sensible à son oubli
+(choix de la spécification). La graine étant fixe, chaque test est
+déterministe~: sa fausse alarme est la probabilité, sur les graines, qu'une
+implémentation juste échoue. Les valeurs observées de $D$ sont écrites par la
+batterie à chaque exécution~; elles ne sont pas reproduites ici (E3.4).
+
+\begin{encadre}
+\small
+\textbf{Statuts et sources d'erreur} (E2.20).
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
+  \item \emph{Résultats exacts}~: la formule de $q_x$ de Gompertz-Makeham
+    (intégrale de $\mu$), la forme close $q^{(d)}$, la loi binomiale de $D$
+    sous le modèle, les régions d'acceptation et les $FA_k$ (quantiles et
+    probabilités de la loi binomiale), l'inégalité de Bonferroni, la
+    fausse alarme familiale $1 - \prod_k (1 - FA_k)$, sous l'hypothèse
+    d'indépendance des cohortes (hypothèse sur le générateur, non
+    démontrée), la conservation de la probabilité annuelle par la conversion
+    en jours, les bornes de couverture.
+  \item \emph{Résultat asymptotique}~: aucun dans ce constat.
+  \item \emph{Approximations numériques}~: l'évaluation en virgule flottante
+    de $q_x$, de $\mu_x$ et des temps latents, des quantiles binomiaux et des
+    $FA_k$~; le critère $\sum_k FA_k \le 10^{-3}$ est vérifié sur les valeurs
+    évaluées.
+  \item \emph{Constat de simulation}~: le passage des cinq tests.
+  \item \emph{Erreur Monte-Carlo}~: la dispersion binomiale de $D$ autour de
+    $np$, due au nombre fini de têtes simulées~; c'est elle que mesure la
+    largeur de la région. \emph{Erreur d'estimation}~: elle n'intervient pas
+    ici, $D$ étant comparé à la probabilité exacte du modèle, sans taux estimé
+    sur une exposition~; elle viendra avec les taux bruts.
+\end{itemize}
+\end{encadre}
+
+\subsection{Vérifications}
+\label{sec:verifications-simulation}
+
+\code{tests/unitaires/test\_simulation.R} vérifie~: les valeurs des tables
+synthétiques (valeurs de la spécification, et recoupement par
+\code{stats::integrate()}, que le simulateur n'emploie pas)~; les dates
+d'anniversaire, 29~février compris (recoupement par \code{as.Date()}~;
+comparaison à \code{age\_revolu()} du module \code{donnees}, écrite
+indépendamment)~; la cohérence exacte des lignes et l'âge révolu à
+l'entrée~; le passage du module \code{donnees} sans exclusion, pour les deux
+transitions~; l'identité des jeux à graine égale et la restauration de l'état
+du générateur de l'appelant~; chaque refus, dont \code{table\_trop\_courte}
+indépendant de la graine~; le constat ci-dessus.
+\code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
+identique, attribut compris, dans un autre processus R.
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-simulation}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{1.4cm}p{2.6cm}p{4.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/simulation.R}.}
+\label{tab:fonctions-simulation}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-simulation}{CAUSES\_SIMULEES} & constante & --- & causes produites et transitions associées \\
+\catalogue{fonctions-simulation}{HYPOTHESE\_REPARTITION} & constante & --- & hypothèse consignée~: force constante par âge entier, risques indépendants \\
+\catalogue{fonctions-simulation}{ORDRE\_TIRAGES} & constante & --- & ordre des tirages, consigné \\
+\catalogue{fonctions-simulation}{CHAMPS\_PORTEFEUILLE} & constante & --- & champs requis du portefeuille, par mode \\
+\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
+\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe \\
+\catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
+\catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
+\catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
+\catalogue{fonctions-simulation}{age\_anniversaire()} & interne & composantes, année, jour & âge au dernier anniversaire \\
+\catalogue{fonctions-simulation}{date\_unique()} & interne & valeur & date unique entière et finie \\
+\catalogue{fonctions-simulation}{controler\_portefeuille()} & interne & portefeuille, période & refus des entrées~; bornes d'âge a priori \\
+\catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
+\catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
+\catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
+\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine & jeu simulé et attribut \code{simulation} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie XIII}{Index et traçabilité}
+% =============================================================================
+
+\section{Index et traçabilité}
+\label{sec:index}
+
+\subsection{Index des fonctions exportées}
+\label{sec:index-exports}
+
+Le tableau~\ref{tab:index-exports} recense les fonctions exportées de
+\code{tablexp} (directives \code{export} de \code{NAMESPACE}~; ADR 0007,
+point 3.4)~: les points d'entrée et les fonctions que l'application appelle.
+Les autres fonctions sont internes~; elles figurent dans le tableau des
+fonctions de leur module.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{3.2cm}p{5.2cm}p{2.0cm}@{}}
+\caption{Fonctions exportées de \code{tablexp}.}
+\label{tab:index-exports}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fonction}} &
+\textcolor{financeblue}{\textbf{Module}} &
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fonction}} &
+\textcolor{financeblue}{\textbf{Module}} &
+\textcolor{financeblue}{\textbf{Rôle}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endhead
+\catalogue{exports}{catalogue\_roles()} & \code{donnees} & catalogue fermé des rôles, lu par l'application pour la déclaration des rôles & \ref{sec:catalogue-roles} \\
+\catalogue{exports}{table\_reference()} & \code{donnees} & constructeur contrôlé d'une table de référence, appelé par l'application pour l'import de tables & \ref{sec:table-reference} \\
+\catalogue{exports}{simuler\_portefeuille()} & \code{simulation} & point d'entrée du simulateur~: jeu simulé sous une loi vraie et une graine & \ref{sec:simulation} \\
+\catalogue{exports}{valider\_plan()} & \code{construire\_table} & validateur du plan, contrôle de saisie que l'application appellera (E4.3) & \ref{sec:plan} \\
+\catalogue{exports}{construire\_table()} & \code{construire\_table} & point d'entrée unique~: exécute un plan de construction et retourne l'objet \code{construction} & \ref{sec:construction} \\
+\end{longtable}
+}
+
+\subsection{Traçabilité des exigences}
+\label{sec:tracabilite}
+
+Le tableau~\ref{tab:tracabilite} relie les exigences du cahier des charges
+(\code{docs/exigences.md}) aux sections qui les décrivent. Une exigence qui n'y
+figure pas n'est pas encore mise en œuvre (méthodes d'estimation, de lissage,
+de positionnement, de fermeture et de validation, rapport figé, interface,
+tables de référence embarquées)~; le tableau est complété avec chaque partie
+rédigée.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{1.6cm}p{8.6cm}p{4.6cm}@{}}
+\caption{Exigences et sections qui les décrivent.}
+\label{tab:tracabilite}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Exigence}} &
+\textcolor{financeblue}{\textbf{Objet}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Exigence}} &
+\textcolor{financeblue}{\textbf{Objet}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endhead
+E1.1 & construction d'une table d'expérience, estimation d'une transition & Objet du document~; \ref{sec:construction} \\
+E1.3 & rigueur, traçabilité, reproductibilité & \ref{sec:reproductibilite}, \ref{sec:batteries}, \ref{sec:fiche} \\
+E1.5 & aucune donnée réelle~: jeux simulés sous une loi vraie et une graine & \ref{sec:simulation} \\
+E2.2 & catalogue fermé des rôles, lecture d'une colonne par son rôle & \ref{sec:catalogue-roles} \\
+E2.3 & recette la plus fine, nommée, refus si aucune~; convention d'âge, forçage plus grossier~; conventions de temps communes & \ref{sec:conventions-temps}, \ref{sec:recettes} \\
+E2.4 & unité d'observation, fusion par tête, incohérences entre contrats & \ref{sec:unite-observation} \\
+E2.5 & période déclarée, délai de déclaration & \ref{sec:conventions-temps}, \ref{sec:troncature-censure} \\
+E2.6 & troncature à gauche, censure à droite, censure non informative nommée & \ref{sec:troncature-censure} \\
+E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, données inchangées & \ref{sec:controles-donnees} \\
+E2.8 & pondération par les montants~: rôle refusé tant que ses intervalles ne sont pas spécifiés & \ref{sec:catalogue-roles} \\
+E2.9 & segmentation déclarée, vide explicite admis (le test d'homogénéité viendra avec la validation) & \ref{sec:plan}, \ref{sec:troncature-censure} \\
+E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
+E2.19 & simulateur~: loi vraie, entrées, sorties concurrentes, censure, constat de simulation & \ref{sec:simulation} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation} \\
+E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
+E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
+E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
+E3.7 & relecture sans le code, rejeu à partir de la fiche & \ref{sec:fiche} \\
+E4.1 & R 4.3.3, package \code{tablexp}, point d'entrée unique, modules & \ref{sec:fichiers-package}, \ref{sec:construction} \\
+E4.2 & packages de priorité \code{base}~; aucune dépendance à Java & \ref{sec:scripts-controle}, \ref{sec:absence-java} \\
+E4.3 & frontière calcul / affichage~; contrôles de saisie dans le package & \ref{sec:separation}, \ref{sec:plan} \\
+E4.4 & le moteur reçoit un \code{data.frame} et des rôles, refuse un type incompatible & \ref{sec:separation}, \ref{sec:catalogue-roles} \\
+E4.5 & plan exécuté d'un bloc, objet complet, contenu de la fiche & \ref{sec:construction}, \ref{sec:fiche} \\
+E4.6 & reproductibilité, graine locale, générateur fixé, aucun horodatage comparé & \ref{sec:reproductibilite}, \ref{sec:objet-resultat} \\
+E4.7 & références de non-régression sur la plateforme de référence & \ref{sec:plateforme} \\
+E4.9 & un module par famille, index des fonctions contrôlé par la concordance & \ref{sec:architecture}, \ref{sec:index-exports} \\
+E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, \ref{sec:controles-donnees} \\
+\end{longtable}
+}
+
+\subsection{Références}
+\label{sec:references}
+
+\begin{itemize}[leftmargin=*, itemsep=3pt]
+  \item M.~Matsumoto, T.~Nishimura, \emph{Mersenne Twister: a
+    623-dimensionally equidistributed uniform pseudo-random number generator},
+    \emph{ACM Transactions on Modeling and Computer Simulation}, 8, 1998,
+    p.~3--30 (cité par la documentation de R, \code{?Random})~;
+    section~\ref{sec:generateur}.
+  \item R Core Team, \emph{R: A Language and Environment for Statistical
+    Computing}, R Foundation for Statistical Computing, Vienne, 2024
+    (\url{https://www.R-project.org/}~; référence rendue par
+    \code{citation()} sous R 4.3.3).
+\end{itemize}
+
+\end{document}

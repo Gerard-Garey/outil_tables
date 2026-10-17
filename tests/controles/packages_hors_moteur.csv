@@ -1,0 +1,15 @@
+ensemble,package,statut,source
+application,shiny,obligatoire,ADR 0002 point 1 ; issue #2 groupe A
+application,htmltools,obligatoire,issue #2 groupe A
+application,openxlsx,facultatif,ADR 0002 point 7 ; issue #2 groupe A
+contre_verification,survival,obligatoire,ADR 0002 point 4 et A10
+contre_verification,mgcv,obligatoire,ADR 0002 point 4 et A10
+contre_verification,WH,obligatoire,ADR 0002 point 4 et A10
+contre_verification,StMoMo,obligatoire,ADR 0002 point 4 et A10
+contre_verification,demography,obligatoire,ADR 0002 point 4 et A10
+contre_verification,MortalityLaws,obligatoire,ADR 0002 point 4 et A10
+contre_verification,lifecontingencies,obligatoire,ADR 0002 point 4 et A10
+contre_verification,survPen,obligatoire,ADR 0002 point 4 et A10
+contre_verification,MortCast,obligatoire,ADR 0002 A10 (M42)
+contre_verification,locfit,obligatoire,ADR 0002 A10 (M42)
+contre_verification,flexsurv,facultatif,ADR 0002 A10 (M42)
