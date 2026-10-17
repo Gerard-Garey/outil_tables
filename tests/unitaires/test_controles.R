@@ -45,6 +45,99 @@ verifier("liste blanche : passe avec des Imports de priorité base",
          passe(controle("liste_blanche_description.R", shQuote(f))))
 unlink(f)
 
+# --- absence de Java (ADR 0002, A1 ; ADR 0008, point 7 ; issue #3) ----------
+# Hors réseau : dépôts locaux file:// dont PACKAGES est écrit ici ; la liste
+# du dépôt est lue telle quelle, sauf témoin de liste. Le contrôle sur
+# l'instantané daté est le job CI « Absence de Java ».
+
+depot_temoin <- function(entrees) {
+  d <- tempfile("depot_temoin_")
+  dir.create(file.path(d, "src", "contrib"), recursive = TRUE)
+  lignes <- unlist(lapply(names(entrees), function(p)
+    c(sprintf("Package: %s", p), "Version: 1.0", entrees[[p]], "")))
+  writeLines(lignes, file.path(d, "src", "contrib", "PACKAGES"))
+  d
+}
+url_depot <- function(d) paste0("file://", normalizePath(d, winslash = "/"))
+liste_temoin <- function(lignes) {
+  f <- tempfile("liste_", fileext = ".csv")
+  writeLines(c("ensemble,package,statut,source", lignes), f)
+  f
+}
+# Dépôt où figurent tous les packages de la liste du dépôt, sans dépendance,
+# plus ELT -> xlsx -> xlsxjars -> rJava (dépendances d'ELT 1.7 et de xlsx
+# relevées sur le CRAN le 17/10/2026, réduites à la chaîne Java) et deux
+# packages propres à des témoins.
+noms_liste <- utils::read.csv(file.path(CONTROLES, "packages_hors_moteur.csv"),
+                              colClasses = "character")$package
+entrees <- stats::setNames(rep(list(character(0)), length(noms_liste)), noms_liste)
+entrees <- c(entrees, list(
+  ELT = "Depends: R (>= 2.10.0), locfit, lattice, xlsx",
+  lattice = "Imports: grid, grDevices, graphics, stats, utils",
+  xlsx = "Imports: rJava, xlsxjars, grDevices, utils",
+  xlsxjars = "Depends: rJava",
+  rJava = "Depends: R (>= 3.6.0), methods",
+  appui = "Imports: intermediaire",
+  intermediaire = "LinkingTo: xlsxjars",
+  orphelin = "Imports: introuvable, stats"))
+depot <- depot_temoin(entrees)
+aj <- function(...) controle("absence_java.R", "--depot", shQuote(url_depot(depot)), ...)
+
+verifier("absence de Java : passe sur la liste du dépôt (dépôt local)", passe(aj()))
+verifier("absence de Java : échoue sur le témoin ELT, chaîne affichée",
+         echoue(aj("--ajouter", "ELT"), "ELT dépend de Java (ELT -> xlsx -> rJava)"))
+r <- aj("--ajouter", "ELT")
+verifier("absence de Java : témoin ELT -> code de sortie 1 (verdict, pas panne)", r$statut == 1L)
+verifier("absence de Java : échoue sur un package Java listé directement",
+         echoue(aj("--ajouter", "rJava"), "rJava est un package Java"))
+verifier("absence de Java : échoue par LinkingTo, au second niveau",
+         echoue(aj("--ajouter", "appui"), "appui -> intermediaire -> xlsxjars -> rJava"))
+verifier("absence de Java : échoue sur un package absent des métadonnées",
+         echoue(aj("--ajouter", "inexistant"), "inexistant absent des métadonnées"))
+verifier("absence de Java : échoue sur une dépendance absente des métadonnées",
+         echoue(aj("--ajouter", "orphelin"), "dépendance introuvable absente"))
+verifier("absence de Java : package de priorité base ajouté -> passe",
+         passe(aj("--ajouter", "stats")))
+f <- tempfile("DESCRIPTION_")
+writeLines(c("Package: x", "Depends: R (>= 4.3.3)", "LinkingTo: xlsxjars"), f)
+verifier("absence de Java : échoue sur une dépendance Java du moteur (DESCRIPTION)",
+         echoue(aj("--description", shQuote(f)), "moteur : xlsxjars est un package Java"))
+writeLines(c("Package: x", "Depends: R (>= 4.3.3)", "Imports: xlsx [bad]"), f)
+verifier("absence de Java : échoue sur une entrée illisible de DESCRIPTION",
+         echoue(aj("--description", shQuote(f)), "Imports : entrée illisible « xlsx [bad] »"))
+writeLines(c("Package: x", "ligne sans deux-points"), f)
+r <- aj("--description", shQuote(f))
+verifier("absence de Java : DESCRIPTION mal formée -> défaut explicite, code 1",
+         r$statut == 1L && any(grepl("ECHEC : DESCRIPTION illisible", r$sortie, fixed = TRUE)))
+unlink(f)
+for (cas in list(
+  list(nom = "ensemble inconnu", lignes = c("application,shiny,obligatoire,x", "contre_verification,WH,obligatoire,x",
+                                           "moteur,stats,obligatoire,x"), motif = "ensemble « moteur » inconnu"),
+  list(nom = "statut inconnu", lignes = c("application,shiny,requis,x", "contre_verification,WH,obligatoire,x"),
+       motif = "statut « requis » inconnu"),
+  list(nom = "doublon", lignes = c("application,shiny,obligatoire,x", "application,shiny,facultatif,y",
+                                   "contre_verification,WH,obligatoire,x"), motif = "shiny en double"),
+  list(nom = "ensemble vide", lignes = "application,shiny,obligatoire,x", motif = "ensemble contre_verification vide"),
+  list(nom = "nom invalide", lignes = c("application,shiny pro,obligatoire,x", "contre_verification,WH,obligatoire,x"),
+       motif = "« shiny pro » invalide")
+)) {
+  f <- liste_temoin(cas$lignes)
+  verifier(sprintf("absence de Java : échoue sur la liste témoin « %s »", cas$nom),
+           echoue(aj("--liste", shQuote(f)), cas$motif))
+  unlink(f)
+}
+f <- tempfile("liste_", fileext = ".csv")
+writeLines("ensemble,package", f)
+verifier("absence de Java : échoue sur une liste aux colonnes inattendues",
+         echoue(aj("--liste", shQuote(f)), "colonnes"))
+unlink(f)
+verifier("absence de Java : échoue sur une option inconnue", echoue(aj("--inconnue"), "option inconnue"))
+verifier("absence de Java : échoue sur --ajouter sans valeur", echoue(aj("--ajouter"), "option sans valeur"))
+r <- controle("absence_java.R", "--depot", shQuote(url_depot(tempfile("depot_absent_"))))
+verifier("absence de Java : métadonnées illisibles -> code de sortie 2, sans verdict",
+         r$statut == 2L && any(grepl("métadonnées illisibles", r$sortie, fixed = TRUE)))
+unlink(depot, recursive = TRUE)
+
 # --- ordre des modules (ADR 0007, points 2.1 à 2.3) --------------------------
 
 verifier("ordre des modules : passe sur R/ du dépôt", passe(controle("graphe_modules.R")))
@@ -198,13 +291,16 @@ for (cas in list(
        remplacement = "      - name: \"Batterie : tests unitaires\"\n        if: ${{ always() && false }}",
        ecart = "interdite sur l'étape"),
   list(nom = "job de tests sans container:", fichier = c(".github", "workflows", "ci.yml"),
-       motif = "    container:", remplacement = "    conteneur_retire:",
+       motif = "    timeout-minutes: 30\n    container:", remplacement = "    timeout-minutes: 30\n    conteneur_retire:",
        ecart = "sans `container:`"),
   list(nom = "job de tests renommé (batteries hors du job tests:)", fichier = c(".github", "workflows", "ci.yml"),
        motif = "  tests:", remplacement = "  autres:",
        ecart = "job `tests:` absent"),
   list(nom = "TABLEXP_IMAGE différente de container.image", fichier = c(".github", "workflows", "ci.yml"),
        motif = "TABLEXP_IMAGE: rocker/r-ver:4.3.3", remplacement = "TABLEXP_IMAGE: rocker/r-ver:4.3.2",
+       # Une TABLEXP_IMAGE par job conteneurisé (tests, absence_java) : en
+       # modifier une seule (la première) suffit à l'écart.
+       plusieurs = TRUE,
        ecart = "chaînes d'image différentes")
 )) {
   d <- copie_racine()
@@ -214,7 +310,8 @@ for (cas in list(
     con <- file(chemin, "a"); writeLines("**\u00c0 ADAPTER** : marque témoin", con, useBytes = TRUE)
     close(con); 1L
   } else modifier(chemin, cas$motif, cas$remplacement)
-  verifier(sprintf("identité des batteries : témoin « %s » préparé (%d remplacement)", cas$nom, n), n == 1L)
+  verifier(sprintf("identité des batteries : témoin « %s » préparé (%d occurrence(s), 1 remplacée)", cas$nom, n),
+           if (isTRUE(cas$plusieurs)) n >= 1L else n == 1L)
   verifier(sprintf("identité des batteries : échoue sur le témoin « %s »", cas$nom),
            echoue(controle("identite_batteries.R", shQuote(d)), cas$ecart))
   unlink(d, recursive = TRUE)

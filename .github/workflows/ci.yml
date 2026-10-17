@@ -121,3 +121,42 @@ jobs:
       - name: Identité des batteries et de l'image
         if: ${{ !cancelled() }}
         run: Rscript tests/controles/identite_batteries.R
+
+  # ADR 0008, point 7 ; issue #3. Métadonnées de l'instantané daté du CRAN
+  # (date dans tests/controles/absence_java.R), lues sans rien installer ;
+  # aucun résultat produit, hors plateforme de référence. Une panne réseau
+  # fait échouer le job (code 2), une relance la lève.
+  absence_java:
+    name: Absence de Java
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      # Même chaîne que le job de tests (ADR 0008, point 1 ;
+      # tests/controles/identite_batteries.R).
+      image: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
+    env:
+      TABLEXP_IMAGE: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Packages de l'application, de la contre-vérification et du moteur
+        run: Rscript tests/controles/absence_java.R
+      # Cas témoin : ELT dépend de Java par xlsx ; le contrôle doit rendre le
+      # code 1 (verdict) et la chaîne, pas 0 ni 2 (panne). Le shell de l'étape
+      # est `bash -eo pipefail` : le code non nul est capté par `|| statut=$?`,
+      # sans quoi -e arrêterait l'étape dans le cas attendu.
+      - name: Cas témoin (ELT doit échouer)
+        if: ${{ !cancelled() }}
+        run: |
+          set -uo pipefail
+          statut=0
+          sortie=$(Rscript tests/controles/absence_java.R --ajouter ELT 2>&1) || statut=$?
+          echo "$sortie"
+          if [ "$statut" -ne 1 ] || ! grep -q "ELT dépend de Java (ELT -> xlsx" <<< "$sortie"; then
+            echo "::error title=Absence de Java::cas témoin ELT non détecté (code $statut)"; exit 1
+          fi
+          echo "Cas témoin : ELT détecté, code 1."
