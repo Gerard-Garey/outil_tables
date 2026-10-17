@@ -381,7 +381,7 @@ cas_refus <- list(
   list("estimateurs en double", "estimateurs_invalides", plan_brut(estimateurs = c("poisson", "poisson"))),
   list("estimateurs NA", "estimateurs_invalides", plan_brut(estimateurs = NA)),
   list("estimateurs NA_character_", "estimateurs_invalides", plan_brut(estimateurs = c("poisson", NA))),
-  list("estimateur kaplan_meier (#15)", "estimateur_inconnu", plan_brut(estimateurs = "kaplan_meier")),
+  list("estimateur inconnu", "estimateur_inconnu", plan_brut(estimateurs = "estimateur_fictif")),
   list("brut sans exposition", "etape_prealable_manquante",
        { p <- plan_brut(); p$etapes$exposition <- NULL; p }),
   list("brut avant exposition", "etapes_hors_ordre",
@@ -396,10 +396,10 @@ verifier("refus de valeur portés par le module brut (codes identiques depuis va
   r1 <- tryCatch(valider_plan(plan_brut(niveau = 2)), refus_tablexp = function(r) r)
   r2 <- tryCatch(calculer_taux_bruts(EC, character(0), FALSE, "dernier_anniversaire", "u", "poisson", 2),
                  refus_tablexp = function(r) r)
-  r3 <- tryCatch(controler_parametres_brut("kaplan_meier", 0.95, FALSE), refus_tablexp = function(r) r)
+  r3 <- tryCatch(controler_parametres_brut("estimateur_fictif", 0.95, FALSE), refus_tablexp = function(r) r)
   identical(c(r1$module, r2$module, r3$module), rep("brut", 3L)) &&
     identical(c(r1$motif, r2$motif, r3$motif), c("niveau_invalide", "niveau_invalide", "estimateur_inconnu")) &&
-    identical(r3$details$estimateur, "kaplan_meier")
+    identical(r3$details$estimateur, "estimateur_fictif")
 })
 verifier("niveau 1 - 2^-53 admis : bornes exactes et asymptotiques finies dans les cellules définies (cas C)", {
   x <- construire_table(DC, ROLES_C, plan_brut(niveau = 1 - 2^-53))

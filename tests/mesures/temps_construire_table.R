@@ -6,7 +6,10 @@
 #  Hors des batteries (aucun seuil ; durée de plusieurs dizaines de
 #  secondes). Mesure séparément la simulation (#10), l'empreinte des données
 #  (ADR 0007, point 9.3) et la construction (étapes donnees et exposition),
-#  pour les deux transitions, avec et sans découpage par année.
+#  pour les deux transitions, avec et sans découpage par année ; puis le
+#  temps de l'étape `brut` (#14, #15) : construction avec brut (poisson,
+#  binomial), avec Kaplan-Meier en plus, et appel direct de l'estimateur de
+#  Kaplan-Meier (taux_kaplan_meier()) sur les résultats de la construction.
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/mesures/temps_construire_table.R [n ...]
@@ -64,6 +67,21 @@ for (n in TAILLES) {
     cat(sprintf("  construire_table, %s : %.1f s (%d cellules, %.0f jours d'exposition, %d événements)\n",
                 cas[[1]], x$secondes, nrow(t), sum(t$exposition_jours), sum(t$evenements)))
   }
+  vd <- list(depart = "vivant", arrivee = "deces")
+  pb <- plan(vd, FALSE)
+  pb$etapes$brut <- list(estimateurs = c("poisson", "binomial"), niveau = 0.95)
+  xb <- chrono(construire_table(s$valeur, ROLES, pb))
+  cat(sprintf("  construire_table, vivant -> décédé, brut (poisson, binomial) : %.1f s\n", xb$secondes))
+  pb$etapes$brut$estimateurs <- c("poisson", "binomial", "kaplan_meier")
+  xk <- chrono(construire_table(s$valeur, ROLES, pb))
+  sk <- xk$valeur$etapes$brut$resultat$kaplan_meier_sauts
+  cat(sprintf("  construire_table, vivant -> décédé, brut (poisson, binomial, kaplan_meier) : %.1f s (%d sauts)\n",
+              xk$secondes, nrow(sk)))
+  et <- xk$valeur$etapes
+  k <- chrono(tablexp:::taux_kaplan_meier(et$donnees$resultat$observations, et$exposition$resultat$exposition,
+                                          "sexe", vd, PER, 90, et$exposition$parametres$convention$retenue, 0.95,
+                                          et$exposition$parametres))
+  cat(sprintf("  taux_kaplan_meier(), appel direct : %.2f s\n", k$secondes))
   verifier(sprintf("mesure n = %.0f exécutée", n), TRUE)
 }
 bilan()

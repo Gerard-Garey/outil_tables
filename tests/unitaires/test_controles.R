@@ -492,6 +492,32 @@ verifier("concordance : catalogue inconnu -> échec",
 verifier("concordance : fonction de catalogue sans () -> échec",
          echoue(concordance("--strict", "--latex", shQuote(forme), "--attente", shQuote(attente_vide)),
                 "forme fausse : sous_graine (fonction sans ())"))
+# Entrées de catalogue en attente (type `entree`, #15).
+entree_attendue <- SOURCES[["fonctions-exposition"]][1L]
+sans_entree <- latex_temoin(retirer(CATALOGUES_COMPLETS, entree("fonctions-exposition", entree_attendue)))
+attente_entree <- attente_temoin(sprintf("entree,fonctions-exposition:%s,#15,en attente", entree_attendue))
+verifier("concordance : entrée de catalogue absente, en attente (type entree) -> code 0",
+         passe(concordance("--strict", "--latex", shQuote(sans_entree), "--attente", shQuote(attente_entree))))
+verifier("concordance : entrée de catalogue absente, hors attente -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(sans_entree), "--attente", shQuote(attente_vide)),
+                paste("absents du document :", entree_attendue)))
+verifier("concordance : entrée de catalogue présente et encore en attente -> succès inattendu, échec",
+         echoue(concordance("--strict", "--latex", shQuote(complet), "--attente", shQuote(attente_entree)),
+                "succès inattendu"))
+verifier("concordance : entrée en attente absente de la source -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(complet), "--attente",
+                            shQuote(attente_temoin("entree,fonctions-exposition:nom_disparu,#15,en attente"))),
+                "absent de la source de fonctions-exposition"))
+verifier("concordance : entrée en attente hors de la forme <catalogue>:<nom> -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(complet), "--attente",
+                            shQuote(attente_temoin(sprintf("entree,%s,#15,en attente", entree_attendue)))),
+                "hors de la forme"))
+verifier("concordance : entrée en attente d'un catalogue lui-même en attente -> échec (ligne redondante)",
+         echoue(concordance("--strict", "--latex", shQuote(vide), "--attente",
+                            shQuote(attente_temoin(c(sprintf("export,%s,#11,en attente", EXPORTS), lignes_catalogues,
+                                                     sprintf("entree,fonctions-exposition:%s,#15,en attente",
+                                                             entree_attendue))))),
+                "ligne redondante"))
 # Entrées que le motif ne lit pas : signalées, jamais ignorées (constat M1).
 for (cas in list(
   list(nom = "catalogue en majuscules", lignes = "\\catalogue{Roles}{x}"),

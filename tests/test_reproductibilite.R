@@ -12,8 +12,11 @@
 #  données identique sous LANG=C et LANG=C.UTF-8 et égale à la valeur
 #  calculée hors R ; taux bruts (#14) : construction avec l'étape `brut`
 #  identical() hors `execution`, rejeu de la fiche, même objet dans un autre
-#  processus R, invariance du plan sans `brut` (R1 et R4). À venir :
-#  comparaison aux références de non-régression (#17).
+#  processus R, invariance du plan sans `brut` (R1 et R4) ; Kaplan-Meier
+#  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
+#  rejeu de la fiche, même objet dans un autre processus R, invariance du
+#  plan sans kaplan_meier. À venir : comparaison aux références de
+#  non-régression (#17).
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -222,6 +225,60 @@ verifier("construction avec brut, sous-processus R : exécution sans erreur",
          if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
 verifier("construction avec brut, autre processus : objet identical() hors execution (taux, bornes, fiche)",
          if (!file.exists(sortie)) "fichier de sortie du sous-processus absent" else identical(xb, readRDS(sortie)))
+unlink(c(script, sortie))
+
+# Kaplan-Meier (#15) : plan R6 de l'ADR 0009 (annotation du 17/10/2026, (b)),
+# R1 avec les trois estimateurs ; invariance : le plan R1 donne l'objet de R6
+# privé des seuls ajouts de Kaplan-Meier (tables, hypothèse, statuts, états,
+# diagnostics, paramètres, avertissement, fiche).
+fichier_courant("construction avec Kaplan-Meier (plan R6) : identical(), rejeu, autre processus, invariance")
+
+km_code <- c(
+  "plan_6 <- plan_b",
+  "plan_6$etapes$brut$estimateurs <- c('poisson', 'binomial', 'kaplan_meier')",
+  "x6 <- tablexp::construire_table(s, roles, plan_6)",
+  "x6$execution <- NULL")
+eval(parse(text = km_code))
+verifier("R6, même processus : deux exécutions identical() hors execution",
+         identical(x6, sans_execution(construire_table(s, roles, plan_6))))
+verifier("R6 : rejeu construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) identical() hors execution",
+         identical(x6, sans_execution(construire_table(s, x6$fiche$roles, x6$fiche$plan, x6$fiche$provenance))))
+verifier("R6 : tables kaplan_meier et kaplan_meier_sauts présentes, somme de d par cellule = événements de l'exposition ; avertissement kaplan_meier_ensemble_a_risque_vide réservé aux cellules de cet état qui portent un événement (absent s'il n'y en a aucune)", {
+  km <- x6$etapes$brut$resultat$kaplan_meier
+  a <- x6$avertissements[x6$avertissements$code == "kaplan_meier_ensemble_a_risque_vide", , drop = FALSE]
+  n_perdus <- sum(km$etat == "ensemble_a_risque_vide" & km$evenements > 0L)
+  nrow(x6$etapes$brut$resultat$kaplan_meier_sauts) > 0L &&
+    identical(km$evenements, x6$etapes$exposition$resultat$exposition$evenements) &&
+    (if (n_perdus) identical(a$nombre, as.numeric(n_perdus)) else !nrow(a))
+})
+verifier("invariance du plan sans kaplan_meier (R1 contre R6) : objet identical() à celui de R6 privé des ajouts de Kaplan-Meier", {
+  z <- x6
+  b <- z$etapes$brut
+  b$resultat <- b$resultat[c("poisson", "binomial")]
+  b$parametres$estimateurs <- c("poisson", "binomial")
+  b$parametres$hypotheses$kaplan_meier <- NULL
+  b$parametres$ensemble_a_risque <- NULL; b$parametres$denominateur_instants <- NULL
+  b$parametres$statuts <- b$parametres$statuts[b$parametres$statuts$estimateur != "kaplan_meier", , drop = FALSE]
+  b$diagnostics$kaplan_meier <- NULL
+  b$diagnostics$etats <- b$diagnostics$etats[b$diagnostics$etats$estimateur != "kaplan_meier", , drop = FALSE]
+  z$etapes$brut <- b
+  garde <- z$avertissements$code != "kaplan_meier_ensemble_a_risque_vide"
+  z$avertissements <- z$avertissements[garde, , drop = FALSE]; rownames(z$avertissements) <- NULL
+  z$fiche$avertissements <- z$avertissements
+  z$fiche$plan <- plan_b
+  z$fiche$hypotheses_brut <- b$parametres[names(xb$fiche$hypotheses_brut)]
+  identical(xb, z)
+})
+script <- tempfile(fileext = ".R")
+sortie <- tempfile(fileext = ".rds")
+writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(BIBLIOTHEQUE)),
+             "set.seed(11L); invisible(runif(2))  # état de l'appelant différent",
+             sim_code, constr_code, brut_code, km_code, sprintf("saveRDS(x6, %s)", deparse(sortie))), script)
+r <- executer_rscript(script)
+verifier("R6, sous-processus R : exécution sans erreur",
+         if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
+verifier("R6, autre processus : objet identical() hors execution (Kaplan-Meier compris)",
+         if (!file.exists(sortie)) "fichier de sortie du sous-processus absent" else identical(x6, readRDS(sortie)))
 unlink(c(script, sortie))
 
 bilan()

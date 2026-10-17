@@ -1,0 +1,33 @@
+# Jeu fixé de la contre-vérification de Kaplan-Meier par survival::survfit() (#15, spécification
+# d'actuary, A.12 ; #7). Segments C (cas composite C de tests/unitaires/test_brut.R), K (cas K,
+# A.11) et Z (décès, rachat et unité en cours au même instant 70 : censure à l'instant x de la
+# cellule, constat C1 de l'audit). Plan : rôle segment, segmentation "segment", transition vivant -> deces, période
+# 2015-01-01 -> 2024-12-31, délai 0, convention plus_fine (dernier_anniversaire).
+# Chaque ligne en dates ET en âges rationnels de la fenêtre [a, b] (T5) : x + j / L, L = longueur de
+# la cellule x (365 ou 366) ; retenue : a < b ou événement ; NA pour une ligne non retenue (C9).
+# La correspondance dates <-> rationnels est vérifiée à l'égalité exacte par
+# tests/unitaires/test_brut_kaplan_meier.R ; le script de contre-vérification ne lit que les rationnels.
+"segment","tete","naissance","entree","sortie","cause","retenue","evenement","debut_x","debut_j","debut_L","fin_x","fin_j","fin_L"
+"C","C1","1960-07-01","2020-03-01",NA,"en_cours",TRUE,FALSE,59,244,366,64,184,365
+"C","C2","1945-10-15","2016-05-20","2019-02-10","deces",TRUE,TRUE,70,218,366,73,118,365
+"C","C3","1950-01-10","2010-06-01",NA,"en_cours",TRUE,FALSE,64,356,365,74,357,366
+"C","C4","1940-12-05","2022-01-01","2024-11-15","deces",TRUE,TRUE,81,27,365,83,346,366
+"C","C5","1955-06-30","2023-01-01","2025-02-01","deces",TRUE,FALSE,67,185,365,69,185,365
+"C","C6","1964-02-29","2021-01-01",NA,"en_cours",TRUE,FALSE,56,307,366,60,307,366
+"C","C7","1955-04-12","2019-09-01","2020-04-12","deces",TRUE,TRUE,64,142,366,65,0,365
+"C","C8","1970-03-03","2017-05-05","2021-08-08","rachat",TRUE,FALSE,47,63,365,51,158,365
+"C","C9","1950-05-05","2005-01-01","2014-12-31","deces",FALSE,FALSE,NA,NA,NA,NA,NA,NA
+"C","C10","1950-05-05","2005-01-01","2015-01-01","deces",TRUE,TRUE,64,241,365,64,241,365
+"C","C11","1980-01-01","2018-06-15","2018-06-15","deces",TRUE,TRUE,38,165,365,38,165,365
+"K","K1","1950-01-01","2019-06-01",NA,"en_cours",TRUE,FALSE,69,151,365,75,0,365
+"K","K2","1950-01-01","2020-01-01","2020-03-01","deces",TRUE,TRUE,70,0,366,70,60,366
+"K","K3","1950-01-01","2019-01-01","2020-01-01","deces",TRUE,TRUE,69,0,365,70,0,366
+"K","K4","1950-01-01","2018-01-01","2020-03-01","rachat",TRUE,FALSE,68,0,365,70,60,366
+"K","K5","1950-07-01","2020-03-01","2020-03-01","deces",TRUE,TRUE,69,244,366,69,244,366
+"K","K6","1950-07-01","2010-01-01","2020-08-15","deces",TRUE,TRUE,64,184,365,70,45,365
+"K","K7","1950-07-01","2016-01-01","2021-01-01","terme",TRUE,FALSE,65,184,366,70,184,365
+"K","K8","1950-01-01","2020-06-01","2020-09-01","deces",TRUE,TRUE,70,152,366,70,244,366
+"K","K9","1950-01-01","2020-03-01",NA,"en_cours",TRUE,FALSE,70,60,366,75,0,365
+"Z","Z1","1950-01-01","2016-01-01","2020-01-01","deces",TRUE,TRUE,66,0,366,70,0,366
+"Z","Z2","1950-01-01","2016-01-01","2020-01-01","rachat",TRUE,FALSE,66,0,366,70,0,366
+"Z","Z3","1950-01-01","2016-01-01",NA,"en_cours",TRUE,FALSE,66,0,366,75,0,365
