@@ -343,6 +343,29 @@ Les motifs cités en exemple au point 6.4 (`role_absent`, `recette_impossible`) 
 
 Deux autres codes, `donnees_mal_formees` (`:181`, entrée qui n'est pas un `data.frame`) et `roles_mal_formes` (`:186`, rôles qui ne respectent pas la forme du point 4.1), sont des refus de forme. Ils sont également hors de la liste fermée A.1. Les codes `table_*` (`:654-746`) répondent à A.1, « chaque contrôle a un message de refus nommé ». **Tous ces codes sont des refus de la branche** : la documentation les recense (règle 9, surface d'impact de `dc9e32a`).
 
+**(f) Point 9.3 : liste fermée des libellés de type de l'en-tête `#<rôle><TAB><type>` (#11).** Le point 9.3 donne le format des valeurs par type, mais ne dit pas quel libellé l'en-tête de colonne porte, ni dans quel ordre les tests sont faits. Or un tiers qui recalcule l'empreinte doit écrire le même libellé, octet pour octet. Relevé `actuary` sur #11. Lu dans `R/rapport.R` (non commité, état de la branche au 17/10/2026), fonction `colonne_canonique()` (`:89-113`) ; l'en-tête de colonne est écrit en `:128`, dans `texte_canonique()` (`:121-132`).
+
+Les libellés forment une **liste fermée de six chaînes ASCII**, en minuscules sauf `Date`. Les tests sont faits **dans l'ordre ci-dessous** ; le premier qui réussit fixe le libellé :
+
+| Ordre | Libellé | Test R | Ligne |
+|---|---|---|---|
+| 1 | `factor` | `is.factor(x)` (un facteur ordonné, de classe `ordered`/`factor`, reçoit aussi `factor`, mesuré) | `:90` |
+| 2 | `Date` | `identical(class(x), "Date")` (une classe `Date` augmentée, par exemple `c("Date", "x")`, ne passe pas ce test et elle est refusée en 3, mesuré) | `:91-97` |
+| 3 | refus | `is.object(x)` : toute autre classe (`POSIXct`, `difftime`, `AsIs`…) | `:98-102` |
+| 4 | `character` | `is.character(x)` | `:103` |
+| 5 | `integer` | `is.integer(x)` | `:104` |
+| 6 | `double` | `is.double(x)` | `:105` |
+| 7 | `logical` | `is.logical(x)` | `:106-109` |
+| 8 | refus | tout autre type de base (`list`, `complex`, `raw`…) | `:110-112` |
+
+**Refus.** Un type hors de la liste est refusé avec le code **`type_non_canonique`**, module `rapport`, sans valeur par défaut ni conversion. Le message nomme le rôle et la classe (`:99-102`, condition `is.object`) ou le type de base (`:110-112`, `typeof`). Le point 9.3 attribue ce refus à `donnees`. En fait, il y a **deux barrières**. La première est `controler_roles()` (`R/donnees.R`, code `type_incompatible`), appelée par `construire_table()` (`R/construire_table.R:164`) avant le calcul des empreintes (`:170`) : par `type_conforme()` (`R/donnees.R:147-165`), elle n'admet par rôle que `character`, `factor`, `integer`, `double` à valeurs entières ou réelles selon le catalogue, et `Date`. Le refus `type_non_canonique` est la seconde barrière : il protège la définition de l'empreinte si le catalogue s'élargit. Par ailleurs, aucun type de rôle du catalogue n'admet aujourd'hui `logical` (`R/donnees.R:43-47`). Le libellé `logical` existe dans la définition (point 9.3), mais `construire_table()` ne le produit pas tant que le catalogue n'admet pas de rôle logique (*hypothèse* tirée de la lecture du catalogue, non mesurée par un appel de `construire_table()`).
+
+Mesure, *vérifiée* : sous R 4.3.3, après `sys.source()` de `R/outils.R` et `R/rapport.R`, `colonne_canonique()` rend `double`, `integer`, `logical`, `Date`, `character`, `factor` sur les six types admis. Elle rend `factor` sur un facteur ordonné. Elle refuse `POSIXct`, `difftime`, `AsIs`, `Date`/`x`, `list`, `complex` et `raw` avec la condition de classe `refus_tablexp`.
+
+**Pourquoi `factor` reste distinct de `character`** (avis d'`actuary`, #11). Les valeurs s'écrivent de la même façon (point 9.3 : le facteur est converti en chaînes, ses niveaux n'entrent pas). Seul le libellé distingue donc une colonne `factor` d'une colonne `character` aux mêmes valeurs. On le garde, parce que l'empreinte **identifie l'entrée, pas le résultat** (point 9.3, périmètre) : deux `data.frame` dont une colonne n'a pas la même classe sont deux entrées différentes, et la fiche doit permettre à un tiers de dire laquelle a été reçue. Un seul libellé ferait confondre les deux entrées. Ce choix ne fait pas dépendre l'empreinte des niveaux. Mesuré, *vérifié* : `factor(c("x","y"))` et le même facteur aux niveaux `c("y","x","w")` ont la même empreinte (`b5f64b38…`), distincte de celle de `c("x","y")` en `character` (`5ca89468…`). Cette indépendance aux niveaux n'est sûre que si **aucun résultat ne dépend des niveaux**. C'est l'objet de la correction en cours, demandée par `actuary` : l'ordre et la classe des clés de segmentation de la table d'exposition ne doivent plus dépendre des niveaux d'un facteur. Tant qu'elle n'est pas faite, deux entrées de même empreinte peuvent donner des tables d'exposition ordonnées différemment (*hypothèse*, non mesurée ici).
+
+**Règle durable.** Ajouter, retirer ou renommer un libellé, ou changer l'ordre des tests, change la représentation canonique. C'est donc un changement de résultat qui appelle l'incrément de `version_fiche` (Conséquences, « Effet sur les résultats »). Le test « empreinte calculée à la main » du point 9.3 doit couvrir au moins une colonne `factor` et une colonne `character`.
+
 **Effet sur les résultats** : aucun. L'annotation consigne l'état du code de `dc9e32a` et des règles de forme pour #11. Elle ne modifie aucune valeur calculée.
 
 Issues : #9, #11 ; décisions M48, M49. Aucun point ouvert.
