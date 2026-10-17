@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-17
 ---
 
@@ -196,3 +196,36 @@ Ainsi, une création ne peut pas modifier une référence existante en silence, 
 8. **Toute grandeur ajoutée à l'objet résultat passe par une régénération visée** (point 9.1), ce qui rend chaque extension de l'objet visible (recommandé ; alternative : ignorer les chemins « en trop », écartée parce qu'une grandeur non comparée n'est pas une grandeur de référence).
 
 Issues : #17 (périmètre) ; #14 (critère d'invariance, point 8) ; #15 (R6) ; #16 (constats de simulation, hors références). Décisions M50 (Q6) ; ADR 0005 (point 8), ADR 0007 (points 6.1, 9.3, 11.1, 12), ADR 0008 (points 5, 8, 9 ; annotation M47).
+
+## Annotation du 17 octobre 2026 — ADR accepté par le mainteneur (décision M52) ; plan R6 et tolérances de Kaplan-Meier fixés par la spécification de #15
+
+Rédigée par `architect` d'après la décision du mainteneur du 17/10/2026 (M52, `docs/feuille-de-route.md`, § 4) et la spécification d'`actuary` sur #15 (https://github.com/Gerard-Garey/outil_tables/issues/15#issuecomment-6236222949, fin de A.14). Le texte ci-dessus n'est pas réécrit ; seul l'en-tête `status` passe de `proposed` à `accepted`. La mention « Statut : `proposed` » du premier paragraphe se lit désormais à la lumière de la présente annotation.
+
+**(a) Statut : `accepted`.** Le mainteneur a accepté le 17/10/2026 (M52) les huit points de la liste « Points soumis au mainteneur », chacun selon la recommandation de l'ADR :
+
+1. format et emplacement : un fichier texte aplati par plan sous `tests/reference/<id>.tsv`, une ligne par vecteur, structure en lignes `@` (points 2.1 à 2.3) ;
+2. tables de lignes de l'étape `donnees` résumées par nombre de lignes et empreinte MD5 (point 1.2) ;
+3. tolérances d'`actuary` et règle « double sans classe déclarée = échec » (point 3.4) ;
+4. entrée : n = 10^5, graine 20261016 (point 4.1), d'où le simulateur figé pour cette graine (point 4.2) ;
+5. un workflow à trois modes à règles mécaniques, artefact de 90 jours, production systématique de tous les plans (point 5.2) ;
+6. ancrage à `f9ab269` par transitivité (diff vide des modules producteurs, invariance en batterie, références), sans exécution du workflow sur `f9ab269` (point 8) ;
+7. plan sans fichier = échec attendu `#17` jusqu'à la création (point 3.7) ;
+8. toute grandeur ajoutée à l'objet résultat passe par une régénération visée (point 9.1).
+
+**(b) Plan R6, fixé par la spécification de #15.** La ligne R6 du tableau du point 4.3, laissée « à fixer par la spécification de #15 », se lit : **R6 = R1 avec `etapes$brut$estimateurs` = `c("poisson", "binomial", "kaplan_meier")`**, c'est-à-dire décès, segmentation `sexe`, délai 0, convention `plus_fine` (→ `dernier_anniversaire`), `par_annee = FALSE`, niveau 0,95. R6 couvre ainsi l'estimateur de Kaplan-Meier sans `par_annee`, que la spécification refuse (`kaplan_meier_par_annee`, A.8). Les décisions du mainteneur sur les questions A.14 de #15 (M52, (b)) fixent la forme de ce que R6 compare : ensemble à risque fermé, tables `kaplan_meier` et `kaplan_meier_sauts` sans survie cumulée par segment.
+
+**(c) Tolérances de Kaplan-Meier, avis d'`actuary` (#15, fin de A.14).** Au titre de la règle de complétude du point 3.4 :
+
+- **1e-12** pour q̂ (`taux` de la table `kaplan_meier`), sa `variance` et ses bornes asymptotiques (`borne_inf_asymptotique`, `borne_sup_asymptotique`) : calcul par `log1p`, `expm1` et `plogis`, donc fonctions de la `libm`, comme la classe 1e-12 existante ;
+- **exacte** pour r (`ensemble_a_risque`), d (`evenements`) et `numerateur`, entiers.
+
+Ces deux lignes complètent la table `TOLERANCES` ; la présente annotation est l'annotation datée que le point 3.4 exige pour toute modification de cette table.
+
+**(d) Points de forme laissés ouverts, à régler avant la création de R6** (constat de l'architecte sur la lecture conjointe du point 3.4 et de A.9 de la spécification ; *non vérifié* contre le code, que `coder` écrit en parallèle) :
+
+1. **Clé de tolérance en collision.** La table `TOLERANCES` est indexée par le dernier segment du chemin (point 3.4). Or la colonne q̂ de Kaplan-Meier s'appelle `taux` (A.9), nom déjà classé en 1e-14 pour Poisson et binomial. La clé du dernier segment ne peut donc porter 1e-12 pour `etapes/brut/resultat/kaplan_meier/taux` sans changer la classe des taux de Poisson et binomial. Deux formes possibles : une clé plus spécifique (`<table>/<colonne>`) prioritaire sur le dernier segment, ou un nom de colonne distinct. Le choix revient à `coder` sous l'avis d'`actuary` ; il est consigné par une annotation datée de cet ADR.
+2. **Doubles de `kaplan_meier_sauts` sans classe.** L'avis de (c) ne classe ni `age_exact`, ni `survie_cellule`, ni `variance_log_survie_cellule` (qui vaut `Inf` après d = r, position relevant de la structure, point 3.1). La table `kaplan_meier_sauts` est comparée valeur par valeur (point 1.3). Par la règle de complétude, ces grandeurs feraient échouer R6 tant qu'`actuary` ne les a pas classées.
+
+**Effet sur les résultats** : aucun. L'annotation consigne une décision et une spécification ; aucune référence n'existe encore (création après #14 à #16, point 3.7).
+
+Issues : #17, #15. Décisions M52 ; M50 (Q6).
