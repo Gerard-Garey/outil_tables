@@ -194,7 +194,7 @@ jobs:
       - name: Paquets TeX
         run: |
           set -euo pipefail
-          paquets="texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-lang-french texlive-pictures"
+          paquets="texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-lang-french texlive-pictures texlive-plain-generic"
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends $paquets
           dpkg-query -W -f='${Package} ${Version}\n' $paquets
