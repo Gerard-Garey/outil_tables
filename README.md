@@ -15,8 +15,9 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 | `docs/exigences.md` | Cahier des charges, exigences numérotées E1.1 à E5.5 |
 | `docs/cadrage/` | Comptes rendus des entretiens de cadrage (décisions du mainteneur) |
 | `docs/recherche/` | Rapports de recherche d'agents, avec leurs statuts vérifié / incertain / non trouvé |
-| `docs/adr/` | Décisions consignées (0001 : routage ; 0002 à 0006 : décisions du cadrage) |
+| `docs/adr/` | Décisions consignées (0001 : routage ; 0002 à 0006 : décisions du cadrage ; 0007 : forme du package et contrats initiaux ; 0008 : plateforme de CI et de référence) |
 | `docs/feuille-de-route.md` | Périmètre des branches de travail, décisions du mainteneur numérotées (M1, M2…) |
+| `docs/latex/` | Documentation méthodologique (`doc_outil_tables.tex` et son PDF versionné, charte d'`outil_USP`) et ses règles de rédaction (`CONVENTIONS.md`) ; compilée par le job requis « Documentation » |
 | `docs/agents/` | Suivi des issues (GitHub, `gh` ou MCP), libellés de tri, documentation du domaine, routage du modèle et de l'effort |
 | `.claude/agents/` | Sept sous-agents : `architect` (pilotage), `actuary` et `regulatory` (fond), `coder`, `docwriter` (réalisation), `audit`, `app-review` (vérification) ; variantes `-approfondi` générées par `.claude/outils/fiches_jumelles.sh` |
 | `.claude/workflows/circuit-technique.js` | Circuit `coder` → batteries → `audit` léger, une reprise au plus, sans commit ni push |
@@ -24,7 +25,7 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 | `.github/` | Modèles d'issue et de PR, CI, Dependabot, ruleset de `main` |
 | `LICENSE` | PolyForm Noncommercial 1.0.0 |
 
-En place depuis la branche `claude/socle-donnees-exposition` : `DESCRIPTION`, `NAMESPACE`, `R/` (package `tablexp`, un module par famille, `R/outils.R`, point d'entrée `construire_table(donnees, roles, plan)` ; ADR 0007), `tests/` (harnais, trois batteries, scripts de contrôle sous `tests/controles/`). À venir : `app/app.R` et `app/affichage.R` (Shiny, sans calcul ; ADR 0007, M46), références de non-régression produites par la CI et contre-vérifications hors CI sous `tests/`, `inst/extdata/` (jeux simulés, tables de référence et provenances), `docs/latex/` (documentation méthodologique, charte d'`outil_USP`).
+En place depuis la branche `claude/socle-donnees-exposition` : `DESCRIPTION`, `NAMESPACE`, `R/` (package `tablexp`, un module par famille, `R/outils.R`, point d'entrée `construire_table(donnees, roles, plan)` ; ADR 0007), `tests/` (harnais, trois batteries, scripts de contrôle sous `tests/controles/`), `docs/latex/` (documentation méthodologique, job requis « Documentation »). À venir : `app/app.R` et `app/affichage.R` (Shiny, sans calcul ; ADR 0007, M46), références de non-régression produites par la CI et contre-vérifications hors CI sous `tests/`, `inst/extdata/` (jeux simulés, tables de référence et provenances).
 
 ## Prérequis et commandes
 
@@ -39,7 +40,9 @@ En place depuis la branche `claude/socle-donnees-exposition` : `DESCRIPTION`, `N
 
   Détail de toutes les assertions : `Rscript -e "options(harnais.verbeux = TRUE); source('tests/test_unitaires.R')"`.
 - **Contrôles** (scripts en R de base, exécutés aussi par la CI : job « Absence de Java » pour `absence_java.R`, job « Tests (R 4.3.3) » pour les autres) : `Rscript tests/controles/plateforme.R` (relevé de la plateforme ; `--exiger` en CI : R 4.3.3, BLAS et LAPACK de référence, monothread, image épinglée ; ADR 0008), `Rscript tests/controles/liste_blanche_description.R` (dépendances de `DESCRIPTION`, ADR 0002), `Rscript tests/controles/graphe_modules.R` (ordre des modules, ADR 0007), `Rscript tests/controles/identite_batteries.R` (batteries identiques entre `CLAUDE.md`, `BATTERIES` et `ci.yml` ; chaîne d'image unique), `Rscript tests/controles/absence_java.R` (aucun package Java, `rJava`, `xlsx` ou `xlsxjars`, dans les dépendances récursives de l'application, de la contre-vérification et du moteur, listées dans `tests/controles/packages_hors_moteur.csv` ; instantané daté du CRAN chez Posit Package Manager, réseau requis ; `--ajouter ELT` pour le cas témoin, qui doit échouer ; ADR 0002, A1 ; ADR 0008, point 7).
-- Lancement de l'application et appel du moteur seul : à venir avec les branches qui les créent.
+- **Documentation** : depuis `docs/latex/`, `pdflatex -interaction=nonstopmode -halt-on-error doc_outil_tables.tex`, relancé tant que le journal demande une nouvelle passe (paquets TeX et contrôles du journal : `docs/latex/CONVENTIONS.md`, section 6) ; même commande dans le job « Documentation » de la CI, qui publie le PDF compilé et son journal en artefact.
+- **Appel du moteur seul** : installer le package depuis la racine du dépôt (`R CMD INSTALL .`), puis, dans R, `library(tablexp)` et `construire_table(donnees, roles, plan)` (un data.frame, des rôles et un plan de construction, jamais un fichier ; contrôle du plan seul : `valider_plan(plan)` ; rôles admis : `catalogue_roles()`).
+- Lancement de l'application : à venir avec la branche qui la crée.
 
 ## Façon de travailler
 
@@ -81,4 +84,4 @@ gh api -X POST repos/$R/rulesets --input .github/ruleset-main.json
 
 Le ruleset est dans `.github/ruleset-main.json`. L'appliquer **après** le premier push sur `main`, qu'il bloque ensuite. **Appliqué le 14/10/2026** (id 25116580), avec les autres réglages ci-dessus et les libellés de `.github/creer_labels.sh`.
 
-**Mise à jour du ruleset** (par exemple pour ajouter aux contrôles requis les jobs de tests que la première branche de travail créera dans `ci.yml`) : modifier `.github/ruleset-main.json` (liste `required_status_checks`, un `context` par nom de job), puis `gh api -X PUT repos/$R/rulesets/25116580 --input .github/ruleset-main.json` ; vérifier avec `gh api repos/$R/rulesets/25116580 --jq '.rules[] | select(.type=="required_status_checks")'`. Un job absent de cette liste n'est pas bloquant, même s'il échoue.
+**Mise à jour du ruleset** (par exemple pour ajouter un job de `ci.yml` aux contrôles requis) : modifier `.github/ruleset-main.json` (liste `required_status_checks`, un `context` par nom de job), puis `gh api -X PUT repos/$R/rulesets/25116580 --input .github/ruleset-main.json` ; vérifier avec `gh api repos/$R/rulesets/25116580 --jq '.rules[] | select(.type=="required_status_checks")'`. Un job absent de cette liste n'est pas bloquant, même s'il échoue.
