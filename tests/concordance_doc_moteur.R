@@ -19,15 +19,21 @@
 #       l'issue ; s'il est cité, c'est un succès inattendu : la ligne est à
 #       retirer de la liste ;
 #    3. toute ligne de la liste d'attente désigne un export existant (type
-#       `export`) ou un catalogue requis (type `catalogue`) et porte un
-#       renvoi d'issue « #N » ; aucune ligne en double ;
+#       `export`), un catalogue requis (type `catalogue`) ou une entrée de
+#       catalogue (type `entree`, nom de la forme `<catalogue>:<nom>`, nom
+#       de la source d'un catalogue requis qui n'est pas lui-même en
+#       attente) et porte un renvoi d'issue « #N » ; aucune ligne en double ;
 #    4. entrées \catalogue{<catalogue>}{<nom>} (CONVENTIONS.md, section 3.2 ;
 #       `\_` lu `_`, un `()` final retiré) :
 #       - une occurrence de \catalogue que le motif ne lit pas (ligne où
 #         les deux décomptes diffèrent) est un écart : entrée illisible ;
 #       - un catalogue lu hors des catalogues requis est un écart ;
 #       - pour chaque catalogue présent, l'ensemble des noms lus est égal à
-#         l'ensemble de sa source, sans doublon ; dans `exports` et
+#         l'ensemble de sa source, sans doublon, aux entrées en attente près
+#         (type `entree`, #15 : définition ajoutée à un module dont le
+#         catalogue est déjà écrit ; règle 9, docwriter en fin de branche) :
+#         une entrée en attente absente du document est un échec attendu,
+#         présente c'est un succès inattendu ; dans `exports` et
 #         `fonctions-<fichier>`, un nom de la source porte `()` si et
 #         seulement s'il désigne une fonction ; dans `roles` et `recettes`,
 #         aucun nom ne porte `()` ;
@@ -82,7 +88,7 @@ FICHIER_ATTENTE <- option("--attente", file.path(RACINE, "tests", "concordance_a
 # la batterie.
 LATEX_EXIGE <- TRUE
 COLONNES_ATTENTE <- c("type", "nom", "issue", "motif")
-TYPES_ATTENTE <- c("export", "catalogue")
+TYPES_ATTENTE <- c("export", "catalogue", "entree")
 
 cat(R.version.string, "\n")
 installer_tablexp(RACINE)
@@ -215,6 +221,9 @@ if (!colonnes_ok)  # contrôle 2 en échec ; colonnes complétées pour la suite
   for (k in setdiff(COLONNES_ATTENTE, names(attente))) attente[[k]] <- rep(NA_character_, nrow(attente))
 attente_exports <- attente[attente$type %in% "export", , drop = FALSE]
 attente_catalogues <- attente[attente$type %in% "catalogue", , drop = FALSE]
+attente_entrees <- attente[attente$type %in% "entree", , drop = FALSE]
+attente_entrees$catalogue <- sub(":.*$", "", attente_entrees$nom)
+attente_entrees$entree <- sub("^[^:]*:", "", attente_entrees$nom)
 
 cat(sprintf("Documentation : %s (%d fonction(s) citée(s), %d entrée(s) de catalogue)\n",
             DOSSIER_LATEX, length(cites), nrow(entrees)))
@@ -265,6 +274,15 @@ for (i in seq_len(nrow(attente))) {
     verifier(sprintf("%s : catalogue requis", etiquette),
              if (attente$nom[i] %in% names(SOURCES_CATALOGUES)) TRUE
              else "pas un catalogue requis : ligne à retirer")
+  if (identical(attente$type[i], "entree")) {
+    k <- sub(":.*$", "", attente$nom[i]); n <- sub("^[^:]*:", "", attente$nom[i])
+    verifier(sprintf("%s : entrée d'un catalogue requis, nom de sa source", etiquette),
+             if (!grepl("^[a-z0-9-]+:[^:]+$", attente$nom[i])) "nom hors de la forme <catalogue>:<nom>"
+             else if (!(k %in% names(SOURCES_CATALOGUES))) sprintf("catalogue « %s » non requis", k)
+             else if (k %in% attente_catalogues$nom) sprintf("catalogue « %s » déjà en attente : ligne redondante", k)
+             else if (!(n %in% SOURCES_CATALOGUES[[k]])) sprintf("« %s » absent de la source de %s : ligne à retirer", n, k)
+             else TRUE)
+  }
   verifier(sprintf("%s : renvoi d'issue \"#N\"", etiquette),
            if (grepl(MOTIF_ISSUE, attente$issue[i])) TRUE else sprintf("issue « %s »", attente$issue[i]))
 }
@@ -301,8 +319,15 @@ for (k in names(SOURCES_CATALOGUES)) {
              else "catalogue requis sans entrée et absent de la liste d'attente (tests/concordance_attente.csv)")
   }
   if (!nrow(lus)) next
-  verifier(sprintf("catalogue %s : noms égaux à la source (%d)", k, length(unique(source_k))), {
-    manquants <- setdiff(source_k, lus$nom); en_trop <- setdiff(lus$nom, source_k)
+  en_attente <- attente_entrees[attente_entrees$catalogue == k & grepl(MOTIF_ISSUE, attente_entrees$issue), ,
+                                drop = FALSE]
+  for (j in seq_len(nrow(en_attente)))
+    echec_attendu(sprintf("catalogue %s : entrée %s présente dans docs/latex/", k, en_attente$entree[j]),
+                  en_attente$issue[j],
+                  if (en_attente$entree[j] %in% lus$nom) TRUE else sprintf("absente (%s)", en_attente$motif[j]))
+  verifier(sprintf("catalogue %s : noms égaux à la source (%d), entrées en attente exceptées (%d)", k,
+                   length(unique(source_k)), nrow(en_attente)), {
+    manquants <- setdiff(setdiff(source_k, en_attente$entree), lus$nom); en_trop <- setdiff(lus$nom, source_k)
     if (!length(manquants) && !length(en_trop)) TRUE
     else paste(c(if (length(manquants)) paste("absents du document :", paste(sort(manquants), collapse = ", ")),
                  if (length(en_trop)) paste("absents de la source :", paste(sort(en_trop), collapse = ", "))),

@@ -1,1 +1,5 @@
 type,nom,issue,motif
+catalogue,fonctions-brut,#14,"R/brut.R créé par #14 ; tableau tab:fonctions-brut écrit par docwriter en fin de branche (règle 9)"
+entree,fonctions-exposition:fenetres_observations,#15,"factorisation de calculer_exposition() par #15 ; entrée du tableau tab:fonctions-exposition écrite par docwriter en fin de branche (règle 9)"
+entree,fonctions-exposition:segments_observations,#15,"factorisation de calculer_exposition() par #15 ; entrée du tableau tab:fonctions-exposition écrite par docwriter en fin de branche (règle 9)"
+entree,fonctions-exposition:position_dans_cellule,#15,"factorisation de calculer_exposition() par #15 ; entrée du tableau tab:fonctions-exposition écrite par docwriter en fin de branche (règle 9)"
