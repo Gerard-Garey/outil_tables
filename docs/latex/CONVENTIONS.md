@@ -82,7 +82,7 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
 
 1. Modifications **ciblées** : on corrige le passage fautif, on ne réécrit pas une section correcte. Le diff reste lisible par un relecteur.
 2. Avant de modifier, relever ce que le passage affirme et ce qui y renvoie (`\ref`, tableaux de fonctions, index, traçabilité des exigences, décomptes, encadrés de portée) ; après, vérifier que tout ce qui y renvoie reste juste.
-3. **Compiler** (TeX Live ; paquets Debian ou Ubuntu requis : `texlive-latex-base`, `texlive-latex-recommended`, `texlive-latex-extra`, `texlive-fonts-recommended`, `texlive-fonts-extra` — pour `newtxtext` et `dsfont` —, `texlive-lang-french`, `texlive-pictures`) l'état **avant** la modification, pour la comparaison, puis l'état après, depuis `docs/latex/` :
+3. **Compiler** (TeX Live ; paquets Debian ou Ubuntu requis : `texlive-latex-base`, `texlive-latex-recommended`, `texlive-latex-extra`, `texlive-fonts-recommended`, `texlive-fonts-extra` — pour `newtxtext` et `dsfont` —, `texlive-lang-french`, `texlive-pictures`, `texlive-plain-generic` — pour `binhex.tex` —) l'état **avant** la modification, pour la comparaison, puis l'état après, depuis `docs/latex/` :
 
    ```bash
    pdflatex -interaction=nonstopmode -halt-on-error doc_outil_tables.tex
