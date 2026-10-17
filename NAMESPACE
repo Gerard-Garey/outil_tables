@@ -5,3 +5,4 @@
 export(construire_table)
 export(catalogue_roles)
 export(table_reference)
+export(simuler_portefeuille)
