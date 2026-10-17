@@ -229,3 +229,37 @@ Ces deux lignes complètent la table `TOLERANCES` ; la présente annotation est 
 **Effet sur les résultats** : aucun. L'annotation consigne une décision et une spécification ; aucune référence n'existe encore (création après #14 à #16, point 3.7).
 
 Issues : #17, #15. Décisions M52 ; M50 (Q6).
+
+## Annotation du 17 octobre 2026 (seconde) — points ouverts de la section (d) réglés : clé qualifiée `<table>/<colonne>`, classes de Kaplan-Meier, comparaison élément par élément
+
+Rédigée par `architect` d'après l'avis d'`actuary` du 17/10/2026, retenu par le mainteneur le même jour. Le texte ci-dessus, première annotation comprise, n'est pas réécrit ; la présente annotation règle les deux points de sa section (d) et clarifie le point 3.3. C'est aussi l'annotation datée que le point 3.4 exige pour toute modification de `TOLERANCES`.
+
+**(a) Collision du nom `taux` (point (d) 1) : clé qualifiée prioritaire, remède (a).** La table `TOLERANCES` admet, outre la clé du dernier segment du chemin (point 3.4), une clé qualifiée `<table>/<colonne>`, **prioritaire** sur le nom nu. La recherche se fait par le **suffixe le plus long** du chemin : pour `etapes/brut/resultat/kaplan_meier/taux`, la clé `kaplan_meier/taux` d'abord, `taux` ensuite. Le nom de colonne `taux` reste commun aux trois estimateurs (Poisson, binomial, Kaplan-Meier). Raisons d'`actuary` :
+
+- la tolérance dépend du calcul qui produit la grandeur, pas du sens de la grandeur ;
+- le nom commun fait partie du contrat « objet résultat » (`CONTEXT.md`) ;
+- d'autres collisions viendront avec le lissage et le positionnement ; la clé qualifiée les absorbe sans renommage.
+
+Les grandeurs propres à Kaplan-Meier se déclarent sous clé qualifiée. Le script de comparaison (point 2.6) imprime, pour chaque chemin que deux clés pourraient classer, la clé retenue et la classe. Option écartée : un nom de colonne distinct pour q̂ de Kaplan-Meier, qui romprait le nom commun du contrat et ne règlerait pas les collisions à venir.
+
+**(b) Classes de tolérance de Kaplan-Meier (point (d) 2), avis d'`actuary`.** Ces lignes complètent la table `TOLERANCES` du point 3.4 et précisent la section (c) de la première annotation :
+
+| Classe | Clés qualifiées | Justification (`actuary`) |
+|---|---|---|
+| **1e-12** | `kaplan_meier/taux`, `kaplan_meier/variance`, `kaplan_meier_sauts/survie_cellule` | `taux` et `variance` : `log1p`, `expm1`, `plogis`, fonctions de la `libm` (première annotation, (c)) ; `survie_cellule` passe par la `libm` (`log1p`, `expm1`) et vaut 1 − `taux` au dernier saut ; plus petit changement significatif ≥ 1e-5 |
+| **1e-14** | `kaplan_meier_sauts/age_exact`, `kaplan_meier_sauts/variance_log_survie_cellule` | `age_exact` : une division et une addition IEEE, plus petit changement significatif ≥ 5,8e-8 en relatif ; `variance_log_survie_cellule` : somme cumulée en arithmétique de base, plus petit changement significatif ≥ 2e-5. *Hypothèse non mesurée* : l'accumulation de `cumsum` en `long double` dépend de l'architecture, mais à quelques 1e-16 près seulement |
+| **exacte** | `numerateur`, `ensemble_a_risque`, `instants_evenement`, `denominateur_instants` (sous clés qualifiées de leur table) et les cinq diagnostics `diagnostics/kaplan_meier/instants`, `diagnostics/kaplan_meier/evenements`, `diagnostics/kaplan_meier/evenements_a_l_instant_d_entree`, `diagnostics/kaplan_meier/cellules_survie_nulle`, `diagnostics/kaplan_meier/ensemble_a_risque_maximal` | dénombrements ; le moteur les stocke en `integer`, ce qui les place aussi dans la classe exacte par leur type (point 3.4) |
+
+Les bornes asymptotiques de la table `kaplan_meier` (première annotation, (c)) restent en 1e-12 par leur nom nu, déjà classé (point 3.4). La valeur `Inf` de `variance_log_survie_cellule` après d = r relève de la structure (point 3.1) et de la règle (c) ci-dessous.
+
+**(c) Clarification du point 3.3 : la règle « égalité exacte si `identical` » s'applique élément par élément.** Qualifiée de clarification par le mainteneur, sans autre visa. Pour deux vecteurs de même chemin, chaque paire d'éléments (a, b) se juge ainsi :
+
+1. si `identical(a, b)`, les éléments sont égaux, y compris `Inf`, `-Inf`, 0, `NA` et `NaN` — sans confondre `NA` avec `NaN`, ni `Inf` avec `-Inf` ;
+2. sinon, la règle de tolérance du point 3.3 s'applique (deux valeurs finies, non nulles, de même signe, |a − b| ≤ tol · max(|a|, |b|)) ;
+3. tout autre cas est un écart.
+
+C'était le sens de l'avis d'`actuary` sur #14 (partie B) ; aucun écart réel n'est absorbé. Mesure d'`actuary` sous R 4.3.3, avec `a = c(Inf, 0, 0.1 + 0.2)`, `b = c(Inf, 0, 0.3)`, `tol = 1e-14` : la lecture au niveau du vecteur (`identical` sur le vecteur entier, puis tolérance) donne `FALSE FALSE TRUE` ; la lecture élément par élément donne `TRUE TRUE TRUE`.
+
+**Effet sur les résultats** : aucun. Aucune référence n'existe encore (création après #14 à #16, point 3.7) ; l'annotation fixe la règle avant la création de R6.
+
+Issues : #17, #15, #14. Décision du mainteneur du 17/10/2026 (avis d'`actuary` retenu) ; M52.
