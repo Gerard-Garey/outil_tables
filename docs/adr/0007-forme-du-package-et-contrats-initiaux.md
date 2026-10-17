@@ -266,3 +266,83 @@ Remarque pour `audit`, sans effet sur les résultats : `empreinte_source()` trie
 **Effet sur les résultats** : aucun.
 
 Issues : #8 ; #9 (avertissements, refus). Décisions M45, M46.
+
+## Annotation du 17 octobre 2026 — unité d'observation déduite des rôles, attribut `parametres` des tables synthétiques, transmission des champs du plan aux étapes, segmentation en champ de premier niveau, codes de refus de l'étape `donnees` (décisions M48, M49)
+
+Rédigée par `architect` ; le texte ci-dessus n'est pas réécrit. Elle consigne la mise en œuvre de #9 (`R/donnees.R`, commit `dc9e32a`, état mesuré à `ab437b4`), la décision M48 (b) du 16/10/2026 et la décision M49 du 17/10/2026 (`docs/feuille-de-route.md` § 4), d'après la spécification d'`actuary` versée dans #11 (commentaire 6216628746, A.1 et A.3). Les mesures citées ont été exécutées sur le package installé depuis `ab437b4` (R 4.3.3).
+
+**(a) Point 5.2 : l'unité d'observation n'est pas un paramètre du plan (M48).** Le catalogue `donnees` du point 5.2 prévoyait un paramètre « unité d'observation (`tete` ou `contrat`) ». Ce paramètre est **retiré**. Le moteur déduit l'unité des rôles et de la transition, comme il déduit la recette (point 5.3) :
+
+- **tête** si l'état de départ de la transition est un état de la personne (vivant → décédé) et qu'un rôle `id_tete` est déclaré ;
+- **contrat** sinon : transition dont l'état de départ est un état du contrat (en cours → racheté, M46), ou transition de tête sans `id_tete`. Dans ce second cas, l'avertissement `unite_contrat` est inscrit dans l'objet (point 6.5).
+
+Emplacements : `R/donnees.R:87-93` (constante `TRANSITIONS`, colonne `etat_de`), `:525` (déduction), `:581-586` (avertissement). Mesure sur deux lignes d'une même tête (cas F1 de la spécification) : unité `tete` pour vivant → décédé, `contrat` pour en cours → racheté, `contrat` sans `id_tete` (*vérifié*).
+
+L'unité retenue est un **paramètre effectif** : elle figure dans `etapes$donnees$parametres$unite_observation` (point 6.1, `R/donnees.R:613`) et dans le champ `unite_observation` de la fiche (point 6.2, inchangé). Un plan qui déclare `unite_observation` est refusé comme « paramètre inconnu » (point 5.4). Aucun forçage de l'unité n'existe dans cette branche.
+
+Raison : un paramètre d'unité serait soit redondant avec les rôles, soit en contradiction avec eux. Une tête déclarée « contrat » alors que `id_tete` est présent compterait plusieurs fois un même décès (spécification, A.1 : cas F4, 2 décès au lieu de 1). Le moteur ne devine pas, mais il n'a pas non plus à recevoir ce que les rôles établissent.
+
+Autres précisions du contenu de la branche, apportées par la spécification (le point 5.2 lui en laissait le soin) ; les deux dernières sont confirmées par le mainteneur le 17/10/2026 (M49) :
+
+- **étape `donnees`** : le seul paramètre propre à l'étape est `exclusions`. C'est un **vecteur de chaînes** (codes de motif sans doublon, vide explicite admis), et non une liste (`R/donnees.R:303-310`) ;
+- **étape `exposition`** (#11) : la segmentation n'y figure plus (voir (c)) ; le paramètre de convention prend ses valeurs dans `plus_fine`, `dernier_anniversaire` et `age_atteint_annee` (A.3). La valeur `plus_fine` remplace le `deduite` du point 5.2 ;
+- **pondération** : elle n'entre pas au catalogue de la branche, car le rôle `montant` y est refusé (`role_non_pris_en_charge`, `R/donnees.R:205` ; A.1). Elle y entrera avec E2.8.
+
+**(b) Point 7.1 : attribut `parametres` d'une table de référence.** Aux attributs `nom`, `statut`, `source` et `forme_origine` s'ajoute **`parametres`** (`R/donnees.R:651`, `:754`) :
+
+- une **liste non vide est requise** pour une table de statut `synthetique` (refus `table_parametres_manquants`, `:662-664`) ;
+- l'attribut est **interdit** pour une table `embarquee` ou `importee` (refus `table_parametres_inattendus`, `:665-667`).
+
+Mesures *vérifiées* : une table synthétique sans paramètres lève `table_parametres_manquants` ; une table embarquée qui en porte lève `table_parametres_inattendus` ; une table synthétique valide porte les attributs `nom statut source forme_origine parametres`.
+
+Raison : une table synthétique n'a d'autre provenance que sa loi. Sans ses paramètres, elle ne se reconstruit pas, et la loi vraie d'un jeu simulé n'est plus consignée (`CLAUDE.md`, « Données » ; A.1, « pour une table synthétique, ses paramètres »). À l'inverse, des paramètres de loi joints à une table transcrite ou importée laisseraient croire qu'elle en dérive. Le simulateur (#10) construit sa loi Gompertz-Makeham sous cette forme et la consigne à partir de l'attribut. La modalité `ensemble` de `sexe` (constante `SEXES_TABLE`, `:638`) ne coexiste jamais avec `H` ou `F` : voir le code `table_sexes_melanges` en (e).
+
+**(c) Transmission des champs du plan aux étapes (M48, M49).** Les champs de premier niveau `transition`, `periode` et `delai_declaration` (point 5.1, acceptés par M48) sont déclarés **une seule fois**. `construire_table()` les transmet **en arguments nommés** à chaque fonction d'étape qui en a besoin. La segmentation, sixième champ de premier niveau depuis M49 (ci-dessous), est déclarée et transmise de la même manière.
+
+Une fonction d'étape ne reçoit **jamais le plan entier**. Son interface se réduit aux arguments qu'elle emploie. Exemple : `preparer_donnees(donnees, roles, transition, periode, delai_declaration, segmentation, exclusions)`, `R/donnees.R:478-479`.
+
+Ce choix a deux effets :
+
+- **Localité** : le chemin d'un champ dans le plan n'est connu que de `construire_table()` et de `valider_plan()`. Déplacer un champ ne touche ni les modules ni leurs tests, qui appellent la fonction d'étape directement (point 11.3).
+- **Pas de seconde source** : une étape ne peut pas lire une période ou une segmentation différente de celle d'une autre étape.
+
+La fonction d'étape inscrit dans `parametres` (point 6.1) les valeurs qu'elle a effectivement employées (`R/donnees.R:613-614`). Pour la transition, elle inscrit le code interne `vivant_decede` ou `en_cours_rachete` (constante `TRANSITIONS`). La représentation du plan reste `list(depart, arrivee)`, et la fiche garde le plan reçu (point 6.2).
+
+**Emplacement de la segmentation dans le plan : sixième champ de premier niveau `segmentation` (décision M49 du mainteneur, 17/10/2026).** M48 (b) disait « segmentation déclarée une fois et transmise aux étapes », sans la placer parmi les champs de premier niveau acceptés. Le point 5.2 la plaçait parmi les paramètres de l'étape `exposition`, et la spécification aussi (A.3). Pourtant l'étape `donnees`, qui précède, en a besoin pour trois contrôles : rôle requis par la segmentation (`R/donnees.R:249-253`), motif `segment_manquant`, motif `tete_segment_incoherent`.
+
+Le plan porte donc **six champs de premier niveau** : `transition`, `periode`, `delai_declaration`, `segmentation`, `graine`, `etapes`. `segmentation` est **requis** : c'est un vecteur de chaînes sans doublon, pris dans `sexe` et `segment`, vide explicite admis (E2.9, M16). `construire_table()` le transmet à toutes les étapes qui l'emploient. Il **sort du catalogue de l'étape `exposition`** du point 5.2, et un plan qui le déclare dans `etapes$exposition` est refusé comme « paramètre inconnu » (point 5.4).
+
+Raisons :
+
+- la segmentation est consommée par toutes les étapes, de `donnees` à `validation` (test d'homogénéité, E2.9). Elle est de même nature que `transition` et `periode` ;
+- un plan réduit à l'étape `donnees` (contrôle de la base seule) reste défini sans défaut implicite (point 5.1).
+
+Option écartée : **paramètre de l'étape `exposition`**, lu par `construire_table()` et transmis aussi à `donnees`. Une étape antérieure dépendrait alors d'un paramètre d'une étape postérieure. Un plan sans `exposition` n'aurait plus de segmentation, et il faudrait soit exiger la présence de l'étape `exposition`, soit admettre un défaut, ce que le point 5.1 interdit.
+
+La décision laisse inchangées les fonctions d'étape, où la segmentation entre en argument (`preparer_donnees`, `R/donnees.R:478-479`). Elle touche seulement `valider_plan()`, `PARAMETRES_ETAPES` et l'orchestration, que #11 écrit. Le champ `segmentation` s'ajoute au plan reçu que garde la fiche (point 6.2). La décision modifie le contrat partagé du plan, sans aucun code existant à reprendre.
+
+**(d) Codes de refus : un code par condition, quelle que soit la fonction qui la détecte (#11).** `valider_plan()` (point 5.4) **ne réimplémente pas** les contrôles des champs que `donnees` contrôle déjà. Il appelle `controler_parametres_donnees()` (`R/donnees.R:263-312`), ce que le graphe du point 2.1 permet (`construire_table` peut appeler `donnees`). De même, la validation des rôles passe par `controler_roles()` (`:179-256`, point 3.1).
+
+Les codes sont donc **identiques par construction**, et le champ `module` du refus reste `donnees`, le module qui détecte. Ces codes sont : `transition_inconnue` (`:267`, `:272`), `periode_invalide` (`:280`), `delai_invalide` (`:286`), `periode_vide` (`:292`), `segmentation_invalide` (`:299`), `exclusions_invalides` (`:304`) et `exclusion_inconnue` (`:309`). Le refus de « rôle requis absent » de la spécification (A.3) est `role_requis_manquant` (`:251`).
+
+Ces contrôles s'exécutent dans `valider_plan()`, **avant toute étape** (point 5.1 : plan validé entièrement avant exécution). Leur second appel, dans `preparer_donnees()` (`:480`), est conservé : il protège la fonction d'étape appelée directement, et son coût est négligeable.
+
+`valider_plan()` n'ajoute que les codes **structurels** du plan : champ de premier niveau inconnu ou manquant, étape inconnue, en double ou hors ordre, paramètre inconnu, manquant ou hors domaine. Leurs noms sont fixés par #11 et recensés avec les autres dans la documentation, sous le contrôle de la concordance.
+
+Les motifs cités en exemple au point 6.4 (`role_absent`, `recette_impossible`) étaient illustratifs. Les codes effectifs sont `role_requis_manquant`, `aucune_recette` (`:244`) et `ligne_invalide` (`:496`). Le refus provisoire `construction_indisponible` (`R/construire_table.R:22`) disparaît avec #11.
+
+**(e) Codes de refus de `donnees` absents des listes fermées de la spécification (A.1).** Relevé par `grep -on 'refuser("[a-z_]*", "[a-z_]*"' R/*.R` à `ab437b4` (*vérifié*). Ces codes viennent de l'avis d'`actuary` du 16/10, mentionné en tête de la spécification versée dans #11 :
+
+| Code | Emplacement | Condition | Raison |
+|---|---|---|---|
+| `colonne_ambigue` | `R/donnees.R:218` | la colonne déclarée pour un rôle porte un nom présent plusieurs fois dans `names(donnees)` | `donnees[[colonne]]` lirait la première sans le dire ; le moteur refuse au lieu de choisir |
+| `base_vide` | `:484` | la base reçue n'a aucune ligne | aucune exposition n'est calculable ; mesuré sur `d[0, ]` : refus `base_vide` (*vérifié*) |
+| `aucune_ligne_conservee` | `:514` | toutes les lignes sont écartées par les exclusions déclarées | une construction sur zéro ligne n'est pas un résultat ; le message nomme les règles en cause |
+| `dates_hors_plage` | `:440` | (nombre de têtes) × (étendue des dates d'entrée et de sortie, en jours, + 1) ≥ 2^52, dans la fusion par tête | limite d'exactitude du calcul en `double` par `cummax` décalé. Le moteur refuse plutôt que de fusionner de façon inexacte. Pour 10^6 têtes, il faut une étendue d'environ 4,5·10^9 jours, soit 1,2·10^7 ans (calcul *vérifié*) : le seuil n'est atteint que par des dates aberrantes. C'est une **limite d'implémentation**, non un motif de ligne : elle n'est pas excluable |
+| `table_sexes_melanges` | `:708` | la modalité `ensemble` coexiste avec `H` ou `F` dans la table, ou au sein d'une même année pour une table qui en a | A.1 : `ensemble` n'est « jamais mêlé à `H`/`F` » ; mesuré sur une table `H` + `ensemble` (*vérifié*) |
+
+Deux autres codes, `donnees_mal_formees` (`:181`, entrée qui n'est pas un `data.frame`) et `roles_mal_formes` (`:186`, rôles qui ne respectent pas la forme du point 4.1), sont des refus de forme. Ils sont également hors de la liste fermée A.1. Les codes `table_*` (`:654-746`) répondent à A.1, « chaque contrôle a un message de refus nommé ». **Tous ces codes sont des refus de la branche** : la documentation les recense (règle 9, surface d'impact de `dc9e32a`).
+
+**Effet sur les résultats** : aucun. L'annotation consigne l'état du code de `dc9e32a` et des règles de forme pour #11. Elle ne modifie aucune valeur calculée.
+
+Issues : #9, #11 ; décisions M48, M49. Aucun point ouvert.
