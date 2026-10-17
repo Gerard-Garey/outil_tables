@@ -972,7 +972,10 @@ point 9).
 
 \medskip
 \textbf{Script de plateforme.} \code{tests/controles/plateforme.R} s'exécute en
-première étape de chaque job R, avant tout calcul (ADR 0008, points 3 à 5).
+première étape de chaque job R qui calcule, avant tout calcul (ADR 0008,
+points 3 à 5)~; le job «~Absence de Java~», qui n'effectue aucun calcul
+numérique et ne produit aucun résultat, en est exempté, ainsi que des
+variables monothread (ADR 0008, annotation du 17/10/2026).
 En mode strict (\code{-{}-exiger}, sur la CI), il \textbf{échoue} si~:
 \code{R.version.string} n'est pas exactement \code{R\_ATTENDU}
 (\code{R version 4.3.3 (2024-02-29)})~; l'une des quatre lectures de la BLAS et
@@ -1036,10 +1039,11 @@ jour~; aucun fichier sensible versionné \\
 «~Tests (R 4.3.3)~» & conteneur de la plateforme de référence & bascule vers
 la BLAS et la LAPACK de référence~; script de plateforme en mode strict~; les
 trois batteries~; liste blanche de \code{DESCRIPTION}~; ordre des modules~;
-identité des batteries et de l'image. Les batteries et les contrôles
-s'exécutent même si une étape antérieure échoue (condition
-\code{\$\{\{ !cancelled() \}\}}), pour que tous les écarts soient visibles~;
-le job reste en échec \\
+identité des batteries et de l'image. Les étapes des batteries et des
+contrôles, sous la condition \code{\$\{\{ !cancelled() \}\}}, s'exécutent
+même si une étape antérieure échoue, pour que tous les écarts soient
+visibles~; le job reste en échec. L'étape du script de plateforme, sans
+condition, est sautée si la bascule vers la BLAS de référence échoue \\
 «~Absence de Java~» & même conteneur, réseau requis & contrôle de l'absence de
 Java (section~\ref{sec:absence-java}) et son cas témoin \\
 «~Documentation~» & hôte \code{ubuntu-24.04}, sans R & installation des paquets TeX
@@ -1608,8 +1612,17 @@ Les motifs forment une liste fermée (E2.7), évaluée par
     les lignes, sans court-circuit~; un motif de comparaison n'est pas levé si
     l'une de ses dates est manquante (le motif de la valeur manquante l'est)~;
   \item \textbf{motifs de tête}~: évalués, quand \code{id\_tete} est déclaré,
-    sur les lignes exemptes de motif de ligne, ils s'appliquent à toutes les
-    lignes de la tête~; le rapport est ainsi complet en un seul passage~;
+    sur les lignes exemptes de motif de ligne (lignes \emph{propres}), ils
+    marquent les lignes propres de la tête, et elles seules~: une ligne déjà
+    porteuse d'un motif de ligne n'est pas comptée de nouveau sous le motif
+    de tête. Les lignes conservées n'en dépendent pas, puisqu'une telle ligne
+    est de toute façon refusée ou exclue au titre de son motif de ligne~;
+    seul le décompte du motif de tête, dans le refus et dans les
+    diagnostics, l'omet (constat~: une tête de trois lignes dont la première
+    porte \code{annee\_naissance\_incoherente} et dont les naissances
+    diffèrent donne \code{tete\_naissance\_incoherente} sur les lignes 2 et 3
+    seulement, et le refus annonce deux lignes pour ce motif)~; le rapport
+    est ainsi complet en un seul passage~;
   \item \textbf{décompte}~: une ligne peut porter plusieurs motifs~; le décompte
     par motif compte les lignes porteuses, et le nombre de lignes distinctes
     est donné à part.
