@@ -169,6 +169,13 @@ type_conforme <- function(x, type) {
 
 liste_guillemets <- function(x) paste0("« ", x, " »", collapse = ", ")
 
+# Message du refus `aucune_recette` (texte unique, repris par le module
+# `exposition`, deduire_recette()).
+message_aucune_recette <- function(requis, manquants)
+  sprintf(paste("Aucune recette d'exposition ne s'applique : la recette « %s »",
+                "(seule disponible) exige les rôles %s ; absents : %s."),
+          RECETTE_BRANCHE, liste_guillemets(requis), liste_guillemets(manquants))
+
 # Contrôle `roles` (vecteur de chaînes nommé rôle -> colonne, ADR 0007,
 # point 4.1) contre le catalogue et `donnees`. Ordre des contrôles :
 # forme, rôle inconnu, rôle déclaré deux fois, rôle non pris en charge,
@@ -241,10 +248,7 @@ controler_roles <- function(donnees, roles, segmentation) {
   requis <- CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"]
   manquants <- setdiff(requis, r)
   if (length(manquants))
-    refuser("donnees", "aucune_recette",
-            sprintf(paste("Aucune recette d'exposition ne s'applique : la recette « %s »",
-                          "(seule disponible) exige les rôles %s ; absents : %s."),
-                    RECETTE_BRANCHE, liste_guillemets(requis), liste_guillemets(manquants)),
+    refuser("donnees", "aucune_recette", message_aucune_recette(requis, manquants),
             list(recette = RECETTE_BRANCHE, role = manquants))
   seg_manquants <- setdiff(segmentation, r)
   if (length(seg_manquants))
@@ -263,22 +267,30 @@ controler_roles <- function(donnees, roles, segmentation) {
 controler_parametres_donnees <- function(transition, periode, delai_declaration,
                                          segmentation, exclusions) {
   chaine <- function(x) is.character(x) && length(x) == 1L && !is.na(x)
-  if (!is.list(transition) || !chaine(transition$depart) || !chaine(transition$arrivee))
+  # Liste aux noms exactement `noms` (ni champ en trop, ni nom partiel :
+  # lecture par [[ ]], jamais par $, qui apparie les noms partiels).
+  noms_exacts <- function(x, noms) is.list(x) && !is.null(names(x)) &&
+    identical(sort(names(x), method = "radix"), sort(noms, method = "radix"))
+  if (!noms_exacts(transition, c("depart", "arrivee")) || !chaine(transition[["depart"]]) ||
+      !chaine(transition[["arrivee"]]))
     refuser("donnees", "transition_inconnue",
-            "La transition doit être une liste (depart, arrivee) de deux noms d'états (ADR 0007, point 5.1).",
+            paste("La transition doit être une liste de deux noms d'états, de champs exactement",
+                  "depart et arrivee (ADR 0007, point 5.1)."),
             list(transition = transition))
-  k <- which(TRANSITIONS$depart == transition$depart & TRANSITIONS$arrivee == transition$arrivee)
+  depart <- transition[["depart"]]; arrivee <- transition[["arrivee"]]
+  k <- which(TRANSITIONS$depart == depart & TRANSITIONS$arrivee == arrivee)
   if (!length(k))
     refuser("donnees", "transition_inconnue",
             sprintf("Transition non prise en charge : %s -> %s (prises en charge : %s).",
-                    transition$depart, transition$arrivee,
+                    depart, arrivee,
                     paste(TRANSITIONS$depart, "->", TRANSITIONS$arrivee, collapse = ", ")),
             list(transition = transition))
   date1 <- function(x) identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
     is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
-  if (!is.list(periode) || !date1(periode$debut) || !date1(periode$fin))
+  if (!noms_exacts(periode, c("debut", "fin")) || !date1(periode[["debut"]]) || !date1(periode[["fin"]]))
     refuser("donnees", "periode_invalide",
-            "La période d'observation doit être une liste (debut, fin) de deux dates (classe Date) non manquantes.",
+            paste("La période d'observation doit être une liste de champs exactement debut et fin,",
+                  "deux dates (classe Date) non manquantes."),
             list(periode = periode))
   if (!is.numeric(delai_declaration) || length(delai_declaration) != 1L ||
       is.na(delai_declaration) || !is.finite(delai_declaration) ||
@@ -286,14 +298,14 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
     refuser("donnees", "delai_invalide",
             "Le délai de déclaration doit être un nombre entier de jours >= 0 (A.0, T4).",
             list(delai_declaration = delai_declaration))
-  debut <- as.numeric(periode$debut); fin <- as.numeric(periode$fin)
+  debut <- as.numeric(periode[["debut"]]); fin <- as.numeric(periode[["fin"]])
   fin_effective <- fin - delai_declaration
   if (debut > fin_effective)
     refuser("donnees", "periode_vide",
             sprintf("Période d'observation vide : début %s postérieur à la fin effective %s (fin %s, délai %s jour(s)).",
-                    format(periode$debut), format(structure(fin_effective, class = "Date")),
-                    format(periode$fin), format(delai_declaration)),
-            list(debut = periode$debut, fin_effective = structure(fin_effective, class = "Date")))
+                    format(periode[["debut"]]), format(structure(fin_effective, class = "Date")),
+                    format(periode[["fin"]]), format(delai_declaration)),
+            list(debut = periode[["debut"]], fin_effective = structure(fin_effective, class = "Date")))
   if (!is.character(segmentation) || anyNA(segmentation) || anyDuplicated(segmentation) ||
       !all(segmentation %in% ROLES_SEGMENTATION))
     refuser("donnees", "segmentation_invalide",
@@ -622,7 +634,8 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
 
   list(
     parametres = list(transition = p$transition$code, unite_observation = unite,
-                      segmentation = segmentation, exclusions = exclusions),
+                      segmentation = segmentation, exclusions = exclusions,
+                      fin_effective = structure(p$borne - 1, class = "Date")),
     resultat = list(lignes_conservees = conservees, numeros_conserves = numeros,
                     exclusions = data.frame(motif = exclusions,
                                             nombre = unname(lengths(motifs[exclusions])),

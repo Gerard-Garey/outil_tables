@@ -3,6 +3,7 @@
 # hors package et cité dans docs/latex/ (concordance, E3.3), ou inscrit dans
 # tests/concordance_attente.csv avec renvoi à l'issue.
 export(construire_table)
+export(valider_plan)
 export(catalogue_roles)
 export(table_reference)
 export(simuler_portefeuille)
