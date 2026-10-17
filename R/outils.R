@@ -84,9 +84,11 @@ sous_graine <- function(graine, expr) {
   graine_appelant <- if (avait_graine) env[[".Random.seed"]] else NULL
   reglage_appelant <- RNGkind()
   on.exit({
-    # Le réglage d'abord : RNGkind() réécrit .Random.seed.
-    RNGkind(kind = reglage_appelant[1L], normal.kind = reglage_appelant[2L],
-            sample.kind = reglage_appelant[3L])
+    # Le réglage d'abord : RNGkind() réécrit .Random.seed. suppressWarnings :
+    # rétablir sample.kind = "Rounding" d'un appelant émet l'avertissement R
+    # « non-uniform 'Rounding' sampler used », qui ne concerne que lui.
+    suppressWarnings(RNGkind(kind = reglage_appelant[1L], normal.kind = reglage_appelant[2L],
+                             sample.kind = reglage_appelant[3L]))
     if (avait_graine) {
       assign(".Random.seed", graine_appelant, envir = env)
     } else if (exists(".Random.seed", envir = env, inherits = FALSE)) {
