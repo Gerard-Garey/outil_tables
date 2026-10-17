@@ -4,7 +4,7 @@
 #  docs/latex/CONVENTIONS.md, section 3)
 #
 #  Lit les fichiers .tex de docs/latex/ (récursivement), commentaires LaTeX
-#  retirés, et confronte aux exports et au code de tablexp, installé depuis
+#  retirés (retirer_commentaires()), et confronte aux exports et au code de tablexp, installé depuis
 #  l'arbre de travail :
 #    1. toute fonction citée existe : forme \code{nom()} ou
 #       \code{nom(arguments)} (souligné échappé \_ admis), ou entrée de
@@ -87,13 +87,33 @@ TYPES_ATTENTE <- c("export", "catalogue")
 cat(R.version.string, "\n")
 installer_tablexp(RACINE)
 
+# Retire les commentaires LaTeX : sur chaque ligne, tout ce qui suit le
+# premier `%` précédé d'un nombre pair (zéro compris) de barres obliques
+# inverses (`\%` est un pour-cent, `\\%` une fin de ligne suivie d'un
+# commentaire), hors du contenu de \verb<d>...<d> (et \verb*) et du premier
+# argument de \url{...} et \href{...}{...}, où `%` est un caractère. Les
+# positions sont cherchées sur une copie où ces contenus sont remplacés par
+# des espaces de même longueur ; le texte gardé est celui de la ligne.
+# Limites : un \verb ou un \url coupé sur deux lignes, ou un \url dont
+# l'argument contient une accolade, n'est pas reconnu.
+retirer_commentaires <- function(lignes) {
+  masque <- lignes
+  for (re in c("\\\\verb\\*?([^A-Za-z*[:space:]]).*?\\1", "\\\\(url|href)\\{[^{}]*\\}")) {
+    m <- gregexpr(re, masque, perl = TRUE)
+    regmatches(masque, m) <- lapply(regmatches(masque, m), function(x) strrep(" ", nchar(x)))
+  }
+  p <- regexpr("(?<!\\\\)(?:\\\\\\\\)*%", masque, perl = TRUE)
+  fin <- p + attr(p, "match.length") - 1L  # position du `%`
+  ifelse(p > 0L, substr(lignes, 1L, fin - 1L), lignes)
+}
+
 # Lignes des .tex du dossier, commentaires LaTeX retirés.
 texte_latex <- function(dossier) {
   tex <- if (dir.exists(dossier))
     list.files(dossier, pattern = "\\.tex$", recursive = TRUE, full.names = TRUE) else character(0)
   if (!length(tex)) return(character(0))
   texte <- unlist(lapply(tex, readLines, warn = FALSE, encoding = "UTF-8"))
-  sub("(^|[^\\\\])%.*$", "\\1", texte)  # commentaires LaTeX
+  retirer_commentaires(texte)
 }
 
 # Citations \code{nom()} ou \code{pkg::nom()}.

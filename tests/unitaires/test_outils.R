@@ -105,6 +105,22 @@ verifier("erreur dans expr : l'erreur est propagée", inherits(e, "error"))
 verifier("erreur dans expr : .Random.seed restauré",
          identical(globalenv()$.Random.seed, avant))
 
+# Appelant sous sample.kind = "Rounding" : la restauration ne doit émettre
+# aucun avertissement (R en émet un à chaque RNGkind(sample.kind =
+# "Rounding"), mesuré avant la correction).
+suppressWarnings(RNGkind(sample.kind = "Rounding"))
+set.seed(3L); avant <- globalenv()$.Random.seed; reglage_avant <- RNGkind()
+avertissements <- character(0)
+x <- withCallingHandlers(sous_graine(1L, runif(1)), warning = function(w) {
+  avertissements <<- c(avertissements, conditionMessage(w)); invokeRestart("muffleWarning")
+})
+verifier("appelant sous sample.kind = \"Rounding\" : aucun avertissement émis",
+         if (length(avertissements)) paste("avertissements :", paste(avertissements, collapse = " ; ")) else TRUE)
+verifier("appelant sous sample.kind = \"Rounding\" : RNGkind() et .Random.seed restaurés",
+         identical(RNGkind(), reglage_avant) && identical(RNGkind()[3L], "Rounding") &&
+           identical(globalenv()$.Random.seed, avant))
+RNGkind("Mersenne-Twister", "Inversion", "Rejection")
+
 for (g in list(NA_integer_, 1.5, "1", c(1L, 2L), Inf, 2^31))
   verifier(sprintf("sous_graine(%s) : refus graine_invalide", deparse(g)),
            leve_refus(sous_graine(g, runif(1)), "graine_invalide"))

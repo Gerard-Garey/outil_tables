@@ -507,6 +507,33 @@ for (cas in list(
                   "entrée de catalogue illisible"))
   unlink(d, recursive = TRUE)
 }
+# Retrait des commentaires LaTeX : `%` précédé d'un nombre pair de barres
+# obliques inverses, hors \verb et premier argument de \url et \href. Une
+# citation placée après un `%` qui n'ouvre pas de commentaire est lue (et
+# échoue ici, la fonction n'existant pas) ; après un vrai commentaire, elle
+# ne l'est pas.
+for (cas in list(
+  list(nom = "après \\url{...%...}", ligne = "\\url{https://exemple.org/a%20b} \\code{inconnue\\_url()}",
+       motif = "inconnue_url() existe"),
+  list(nom = "après \\href{...%...}{...}", ligne = "\\href{https://exemple.org/%41}{lien} \\code{inconnue\\_href()}",
+       motif = "inconnue_href() existe"),
+  list(nom = "après \\verb|...%...|", ligne = "\\verb|50%| \\code{inconnue\\_verb()}",
+       motif = "inconnue_verb() existe"),
+  list(nom = "après \\%", ligne = "50\\% \\code{inconnue\\_pct()}", motif = "inconnue_pct() existe"),
+  list(nom = "après \\\\\\% (trois barres)", ligne = "a\\\\\\% \\code{inconnue\\_trois()}",
+       motif = "inconnue_trois() existe")
+)) {
+  d <- latex_temoin(c(CATALOGUES_COMPLETS, cas$ligne))
+  verifier(sprintf("concordance : %% qui n'ouvre pas de commentaire (%s) -> citation lue, échec", cas$nom),
+           echoue(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)), cas$motif))
+  unlink(d, recursive = TRUE)
+}
+d <- latex_temoin(c(CATALOGUES_COMPLETS, "fin de ligne\\\\% \\code{inconnue\\_commentee()}",
+                    "\\url{https://exemple.org/a%20b} texte % \\catalogue{bidule}{commentee}",
+                    "\\verb|%| texte % \\code{inconnue\\_apres\\_verb()}"))
+verifier("concordance : citations après un vrai commentaire (\\\\%, % après \\url et \\verb) non lues -> code 0",
+         passe(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide))))
+unlink(d, recursive = TRUE)
 verifier("concordance : catalogue requis absent, hors attente -> échec",
          echoue(concordance("--strict", "--latex", shQuote(sans_roles), "--attente", shQuote(attente_vide)),
                 "catalogue requis sans entrée"))
