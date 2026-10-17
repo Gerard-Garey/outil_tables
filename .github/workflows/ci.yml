@@ -3,7 +3,8 @@ name: CI
 # Contrôles requis par le ruleset de main (README, « Sécurité du dépôt » ;
 # liste dans .github/ruleset-main.json, un context par nom de job).
 # Jobs R : conteneur épinglé par empreinte, BLAS et LAPACK contrôlées par
-# tests/controles/plateforme.R (ADR 0008).
+# tests/controles/plateforme.R (ADR 0008). Job « Documentation » : paquets
+# TeX de l'hôte par apt-get (ADR 0008, point 6).
 
 on:
   pull_request:
@@ -78,10 +79,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      # Première étape, avant tout calcul (ADR 0008, point 3). Les étapes
-      # suivantes s'exécutent même si elle échoue (!cancelled()) pour que tous
-      # les écarts soient visibles ; le job reste en échec. Aucune référence
-      # n'est produite par ce job.
+      # Première étape, avant tout calcul (ADR 0008, point 3). Si elle échoue,
+      # l'étape « Plateforme (mode strict) », sans `if:`, est sautée ; les
+      # étapes suivantes, sous `if: ${{ !cancelled() }}`, s'exécutent quand
+      # même, pour que tous les écarts soient visibles (de même si l'étape de
+      # plateforme échoue) ; le job reste en échec. Aucune référence n'est
+      # produite par ce job.
       # L'image charge OpenBLAS 0.3.20 (relevé du 16/10/2026) : bascule vers le
       # BLAS et le LAPACK de référence (Netlib, paquets libblas3 et liblapack3
       # d'Ubuntu 22.04) par update-alternatives, comme outil_USP (décision du
@@ -160,3 +163,81 @@ jobs:
             echo "::error title=Absence de Java::cas témoin ELT non détecté (code $statut)"; exit 1
           fi
           echo "Cas témoin : ELT détecté, code 1."
+
+  # ADR 0008, point 6 ; issue #8, point 7. Compilation du PDF de docs/latex/
+  # sans action tierce : paquets TeX de l'exécuteur par apt-get, sur
+  # ubuntu-24.04 (exécuteur épinglé par version ; la version des paquets suit
+  # l'image de l'exécuteur et est affichée par dpkg-query). Commande et
+  # critères de docs/latex/CONVENTIONS.md, section 6 : pdflatex relancé tant
+  # que le journal demande une nouvelle passe, cinq passes au plus ; échec
+  # sur un journal absent ou vide après une passe, sur une ligne commençant
+  # par « ! » suivi d'une espace (erreur TeX ; un « ! » seul peut venir d'une
+  # boîte mal remplie qui reproduit $\to$) ou sur « undefined » dans le
+  # journal final, et si une nouvelle passe est encore demandée après la
+  # cinquième. Le PDF versionné est retiré avant la compilation.
+  # Les commandes dont l'échec est attendu sont gardées (|| statut=$?,
+  # || true, if) : -e n'arrête l'étape sur aucune d'elles. Aucun résultat
+  # produit ; le PDF compilé et son journal sont publiés en artefact par
+  # actions/upload-artifact (action de GitHub, épinglée par SHA) ; le PDF
+  # versionné reste celui que commite la session principale.
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Paquets TeX
+        run: |
+          set -euo pipefail
+          paquets="texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-lang-french texlive-pictures"
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends $paquets
+          dpkg-query -W -f='${Package} ${Version}\n' $paquets
+          pdflatex --version | sed -n 1p
+      - name: Compilation de docs/latex/doc_outil_tables.tex
+        working-directory: docs/latex
+        run: |
+          set -euo pipefail
+          # PDF versionné retiré : l'artefact est le PDF compilé ici.
+          rm -f doc_outil_tables.pdf
+          for passe in 1 2 3 4 5; do
+            statut=0
+            pdflatex -interaction=nonstopmode -halt-on-error doc_outil_tables.tex > /dev/null || statut=$?
+            echo "Passe $passe : code $statut"
+            [ -s doc_outil_tables.log ] || { echo "::error title=Documentation::journal doc_outil_tables.log absent ou vide (passe $passe)"; exit 1; }
+            if [ "$statut" -ne 0 ]; then
+              grep -n -A3 '^! ' doc_outil_tables.log || true
+              echo "::error title=Documentation::pdflatex en échec (code $statut, passe $passe)"; exit 1
+            fi
+            grep -q -E 'Rerun to get|Rerun LaTeX|Label\(s\) may have changed' doc_outil_tables.log || break
+            if [ "$passe" -eq 5 ]; then
+              echo "::error title=Documentation::nouvelle passe encore demandée après 5 passes (renvoi qui oscille)"; exit 1
+            fi
+          done
+          ecart=0
+          if grep -n '^! ' doc_outil_tables.log; then
+            echo "::error title=Documentation::ligne commençant par « ! » suivi d’une espace (erreur TeX) dans le journal"; ecart=1
+          fi
+          if grep -n 'undefined' doc_outil_tables.log; then
+            echo "::error title=Documentation::« undefined » dans le journal"; ecart=1
+          fi
+          echo "Overfull : $(grep -c '^Overfull' doc_outil_tables.log || true) ; Underfull : $(grep -c '^Underfull' doc_outil_tables.log || true)"
+          exit $ecart
+      # Aussi après un échec de la compilation, pour publier le journal (le
+      # PDF peut alors manquer) ; échec seulement si aucun des deux fichiers
+      # n'existe.
+      - name: PDF compilé en artefact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: doc_outil_tables
+          path: |
+            docs/latex/doc_outil_tables.pdf
+            docs/latex/doc_outil_tables.log
+          if-no-files-found: error
+          retention-days: 30
