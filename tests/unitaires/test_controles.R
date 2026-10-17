@@ -10,7 +10,7 @@ CONTROLES <- file.path(RACINE, "tests", "controles")
 controle <- function(script, ...) executer_rscript(file.path(CONTROLES, script), c(...))
 echoue <- function(r, motif = NULL) {
   if (r$statut == 0L) return("code de sortie 0")
-  if (!is.null(motif) && !any(grepl(motif, r$sortie, fixed = TRUE)))
+  if (!is.null(motif) && !any(grepl(motif, r$sortie, fixed = TRUE, useBytes = TRUE)))
     return(paste("écart attendu non signalé :", motif, "| sortie :", paste(r$sortie, collapse = " | ")))
   TRUE
 }
@@ -108,7 +108,7 @@ verifier("absence de Java : échoue sur une entrée illisible de DESCRIPTION",
 writeLines(c("Package: x", "ligne sans deux-points"), f)
 r <- aj("--description", shQuote(f))
 verifier("absence de Java : DESCRIPTION mal formée -> défaut explicite, code 1",
-         r$statut == 1L && any(grepl("ECHEC : DESCRIPTION illisible", r$sortie, fixed = TRUE)))
+         r$statut == 1L && any(grepl("ECHEC : DESCRIPTION illisible", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(f)
 for (cas in list(
   list(nom = "ensemble inconnu", lignes = c("application,shiny,obligatoire,x", "contre_verification,WH,obligatoire,x",
@@ -135,7 +135,7 @@ verifier("absence de Java : échoue sur une option inconnue", echoue(aj("--incon
 verifier("absence de Java : échoue sur --ajouter sans valeur", echoue(aj("--ajouter"), "option sans valeur"))
 r <- controle("absence_java.R", "--depot", shQuote(url_depot(tempfile("depot_absent_"))))
 verifier("absence de Java : métadonnées illisibles -> code de sortie 2, sans verdict",
-         r$statut == 2L && any(grepl("métadonnées illisibles", r$sortie, fixed = TRUE)))
+         r$statut == 2L && any(grepl("métadonnées illisibles", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(depot, recursive = TRUE)
 
 # --- ordre des modules (ADR 0007, points 2.1 à 2.3) --------------------------
@@ -244,7 +244,8 @@ copie_racine <- function() {
   file.copy(file.path(RACINE, "CLAUDE.md"), d)
   file.copy(file.path(RACINE, ".claude", "workflows", "circuit-technique.js"),
             file.path(d, ".claude", "workflows"))
-  file.copy(file.path(RACINE, ".github", "workflows", "ci.yml"), file.path(d, ".github", "workflows"))
+  file.copy(file.path(RACINE, ".github", "workflows", c("ci.yml", "references.yml")),
+            file.path(d, ".github", "workflows"))
   d
 }
 # Remplace la première occurrence de `motif` (éventuellement sur plusieurs
@@ -252,8 +253,8 @@ copie_racine <- function() {
 # d'occurrences.
 modifier <- function(chemin, motif, remplacement) {
   texte <- paste(readLines(chemin), collapse = "\n")
-  n <- sum(gregexpr(motif, texte, fixed = TRUE)[[1L]] > 0L)
-  writeLines(sub(motif, remplacement, texte, fixed = TRUE), chemin)
+  n <- sum(gregexpr(motif, texte, fixed = TRUE, useBytes = TRUE)[[1L]] > 0L)
+  writeLines(sub(motif, remplacement, texte, fixed = TRUE, useBytes = TRUE), chemin)
   n
 }
 for (cas in list(
@@ -301,7 +302,61 @@ for (cas in list(
        # Une TABLEXP_IMAGE par job conteneurisé (tests, absence_java) : en
        # modifier une seule (la première) suffit à l'écart.
        plusieurs = TRUE,
-       ecart = "chaînes d'image différentes")
+       ecart = "chaînes d'image différentes"),
+  # Contrôle 4 : workflow de régénération (ADR 0009, point 6.1). Motifs
+  # d'écart en ASCII : la sortie du sous-processus est lue sans conversion
+  # (locale C en CI comme sur le poste).
+  list(nom = "bascule BLAS et LAPACK modifiée dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "          apt-get update -q\n", remplacement = "          apt-get update -qq\n",
+       ecart = "de celui de ci.yml (ligne 4 du bloc"),
+  list(nom = "bascule BLAS et LAPACK modifiée dans ci.yml seul", fichier = c(".github", "workflows", "ci.yml"),
+       motif = "          dpkg-query -W -f='${Package} ${Version}\\n' libblas3",
+       remplacement = "          dpkg-query -l\n          dpkg-query -W -f='${Package} ${Version}\\n' libblas3",
+       ecart = "de celui de ci.yml (ligne 10 du bloc"),
+  list(nom = "on: push ajouté à references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "on:\n  workflow_dispatch:", remplacement = "on:\n  push:\n  workflow_dispatch:",
+       ecart = "(s) push, workflow_dispatch au lieu de workflow_dispatch seul"),
+  list(nom = "étape de plateforme retirée de references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "          Rscript tests/controles/plateforme.R --exiger | tee", remplacement = "          echo plateforme | tee",
+       ecart = "plateforme (`Rscript tests/controles/plateforme.R --exiger`) absente"),
+  list(nom = "commande de production à la place de la plateforme dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "          Rscript tests/controles/plateforme.R --exiger | tee \"$SORTIE/plateforme.txt\"\n",
+       remplacement = "          Rscript tests/reference/produire_references.R --mode x\n",
+       ecart = "absente ou en double"),
+  list(nom = "if: always() sur la production de references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "      - name: Production et comparaison des références\n",
+       remplacement = "      - name: Production et comparaison des références\n        if: always()\n",
+       ecart = "condition `if:` interdite"),
+  list(nom = "permissions: contents: write dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "  contents: read", remplacement = "  contents: write", ecart = "`contents: read` attendu"),
+  list(nom = "permissions au niveau du job de references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "    timeout-minutes: 30\n", remplacement = "    timeout-minutes: 30\n    permissions: write-all\n",
+       ecart = "`contents: read` attendu"),
+  list(nom = "secret employé dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "      SORTIE: sortie_references", remplacement = "      SORTIE: sortie_references\n      JETON: ${{ secrets.JETON }}",
+       ecart = "references.yml : secret employ"),
+  list(nom = "continue-on-error dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "    timeout-minutes: 30\n", remplacement = "    timeout-minutes: 30\n    continue-on-error: true\n",
+       ecart = "references.yml : continue-on-error interdit"),
+  list(nom = "OMP_NUM_THREADS à 2 dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "      OMP_NUM_THREADS: \"1\"", remplacement = "      OMP_NUM_THREADS: \"2\"", ecart = "OMP_NUM_THREADS : 2"),
+  list(nom = "SHA d'actions/checkout différent dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+       remplacement = "actions/checkout@0000000000000000000000000000000000000000", ecart = "SHA de actions/checkout"),
+  list(nom = "action non épinglée par SHA dans references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", remplacement = "actions/upload-artifact@v4",
+       ecart = "par SHA : actions/upload-artifact@v4"),
+  list(nom = "references.yml sans container:", fichier = c(".github", "workflows", "references.yml"),
+       motif = "    container:\n", remplacement = "    conteneur_retire:\n", ecart = "sans `container:`"),
+  list(nom = "inputs interpolé dans un run: de references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "--motif \"$MOTIF\"", remplacement = "--motif \"${{ inputs.motif }}\"",
+       ecart = "interpolation d'entr"),
+  list(nom = "github.event interpolé dans un run: de references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "            echo \"mode : $MODE\"", remplacement = "            echo \"mode : ${{ github.event.inputs.mode }}\"",
+       ecart = "interpolation d'entr"),
+  list(nom = "persist-credentials retiré de references.yml", fichier = c(".github", "workflows", "references.yml"),
+       motif = "          persist-credentials: false", remplacement = "          persist-credentials: true",
+       ecart = "persist-credentials: false absent")
 )) {
   d <- copie_racine()
   chemin <- do.call(file.path, as.list(c(d, cas$fichier)))
@@ -316,6 +371,16 @@ for (cas in list(
            echoue(controle("identite_batteries.R", shQuote(d)), cas$ecart))
   unlink(d, recursive = TRUE)
 }
+
+d <- copie_racine()
+unlink(file.path(d, ".github", "workflows", "references.yml"))
+verifier("identité des batteries : échoue sur le témoin « references.yml absent »",
+         echoue(controle("identite_batteries.R", shQuote(d)), "references.yml absent"))
+unlink(d, recursive = TRUE)
+d <- copie_racine()
+verifier("identité des batteries : passe sur la copie non altérée (references.yml compris)",
+         passe(controle("identite_batteries.R", shQuote(d))))
+unlink(d, recursive = TRUE)
 
 # --- plateforme (ADR 0008, points 3 à 5) --------------------------------------
 
@@ -353,7 +418,7 @@ for (cas in list(
 )) {
   d <- env_plateforme$defauts_plateforme(cas$x)
   verifier(sprintf("plateforme : écart relevé sur le témoin « %s »", cas$nom),
-           if (length(d) == 1L && grepl(cas$motif, d, fixed = TRUE)) TRUE
+           if (length(d) == 1L && grepl(cas$motif, d, fixed = TRUE, useBytes = TRUE)) TRUE
            else paste("écarts :", paste(d, collapse = " ; ")))
 }
 # GITHUB_STEP_SUMMARY vidée : le résumé du job CI ne reçoit que le relevé de
@@ -361,7 +426,7 @@ for (cas in list(
 r <- executer_rscript(file.path(CONTROLES, "plateforme.R"), env = "GITHUB_STEP_SUMMARY=")
 verifier("plateforme : mode relevé -> code 0 et sessionInfo() au journal",
          r$statut == 0L && any(r$sortie == "sessionInfo()") &&
-           any(grepl(R.version.string, r$sortie, fixed = TRUE)))
+           any(grepl(R.version.string, r$sortie, fixed = TRUE, useBytes = TRUE)))
 r <- executer_rscript(file.path(CONTROLES, "plateforme.R"), "--exiger",
                       env = c("OPENBLAS_NUM_THREADS=2", "GITHUB_STEP_SUMMARY="))
 verifier("plateforme : mode strict hors plateforme de référence -> code non nul et ::error",
@@ -392,11 +457,11 @@ SOURCES <- local({
   defs <- g$analyser_modules(file.path(RACINE, "R"))$symboles
   fichiers <- sort(sub("\\.[Rr]$", "", list.files(file.path(RACINE, "R"), pattern = "\\.[Rr]$")))
   f <- lapply(fichiers, function(m) defs$symbole[defs$module == m])
-  names(f) <- paste0("fonctions-", gsub("_", "-", fichiers, fixed = TRUE))
+  names(f) <- paste0("fonctions-", gsub("_", "-", fichiers, fixed = TRUE, useBytes = TRUE))
   c(list(exports = EXPORTS), f,
     list(roles = catalogue_roles()$role, recettes = tablexp:::RECETTE_BRANCHE))
 })
-echapper <- function(n) gsub("_", "\\_", n, fixed = TRUE)
+echapper <- function(n) gsub("_", "\\_", n, fixed = TRUE, useBytes = TRUE)
 code_latex <- function(n) sprintf("\\code{%s()}", echapper(n))
 # Entrée \catalogue{k}{nom} ; `()` pour une fonction de tablexp dans exports
 # et fonctions-<fichier>.

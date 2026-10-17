@@ -45,7 +45,10 @@ for (f in sort(list.files(DOSSIER,
   # intermédiaire marquerait la batterie comme close avant la fin.
   env$quit <- env$q <- function(...) stop("quit() interdit dans un fichier de test")
   env$bilan <- function(...) stop("bilan() interdit dans un fichier de test")
-  r <- tryCatch({ source(f, local = env); NULL }, error = function(e) e)
+  # parse(encoding = "UTF-8") : littéraux non ASCII des tests marqués UTF-8
+  # en toute locale, comme ceux du moteur installé sous une locale UTF-8
+  # (M54) ; source(encoding = "UTF-8") n'exécute rien en locale C (mesuré).
+  r <- tryCatch({ for (e in parse(f, encoding = "UTF-8")) eval(e, env); NULL }, error = function(e) e)
   if (inherits(r, "error"))
     verifier("chargement complet du fichier", paste("erreur :", conditionMessage(r)))
   else if (nrow(.harnais$lignes) == avant)
