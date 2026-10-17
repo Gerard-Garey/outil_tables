@@ -614,6 +614,73 @@ verifier("Q7 : sans observation après décès, relevé = 0 ; sans id_tete, rele
          identical(pt(F4)$diagnostics$releves$observations_apres_deces_hors_periode, 0L) &&
            identical(pt(F4, roles = R_C)$diagnostics$releves$observations_apres_deces_hors_periode, NA_integer_))
 
+# Relevé en unité contrat (E2.4, M46, M48 : contrôle par identifiant de tête
+# quelle que soit l'unité). Période 2016-01-01 -> 2023-12-31, délai 30 :
+# fin effective 2023-12-01, B = 2023-12-02. Tête T1 : contrat décédé à sA,
+# second contrat en cours.
+PER_RA <- list(debut = D("2016-01-01"), fin = D("2023-12-31"))
+t1 <- function(sA, id = "T1", naissance = c("1950-01-01", "1950-01-01"))
+  tete(naissance, c("2016-01-01", "2018-01-01"), c(sA, NA), c("deces", "en_cours"), id)
+pra <- function(d, transition = RA, exclusions = character(0))
+  prep(d = d, roles = R_T, transition = transition, segmentation = character(0), periode = PER_RA,
+       delai = 30, exclusions = exclusions)
+r <- pra(t1("2023-12-20"))
+verifier("relevé, unité contrat (en_cours -> rachat), décès 2023-12-20 >= B = 2023-12-02 : relevé = 1, averti",
+         identical(r$resultat$unite_observation, "contrat") &&
+           identical(r$diagnostics$releves$observations_apres_deces_hors_periode, 1L) &&
+           "observations_apres_deces_hors_periode" %in% r$avertissements$code)
+x <- refus(pra(t1("2023-11-20")))
+verifier("unité contrat, décès 2023-11-20 < B : refus tete_observee_apres_deces, lignes 1 et 2",
+         identical(x$motif, "ligne_invalide") &&
+           identical(x$details$lignes$tete_observee_apres_deces, 1:2))
+
+# Exclusion de tête déclarée : T3 (naissances discordantes, même profil de
+# décès après B) est écartée et n'entre pas dans le relevé (règle d'actuary :
+# relevé calculé sur les seules lignes conservées).
+d <- rbind(t1("2023-12-20"), t1("2023-12-20", "T3", c("1950-01-01", "1951-01-01")))
+for (tr_ in list(RA, VD)) {
+  r <- pra(d, transition = tr_, exclusions = "tete_naissance_incoherente")
+  verifier(sprintf("relevé, %s -> %s, T3 exclue (tete_naissance_incoherente) : relevé = 1 (et non 2), lignes 1 et 2 conservées",
+                   tr_$depart, tr_$arrivee),
+           identical(r$diagnostics$releves$observations_apres_deces_hors_periode, 1L) &&
+             identical(r$resultat$numeros_conserves, 1:2) &&
+             any(grepl("Relevé : 1 ", r$avertissements$message[
+               r$avertissements$code == "observations_apres_deces_hors_periode"], fixed = TRUE)))
+}
+# Deux exclusions de tête déclarées : T1 (décès >= B, relevé), T2 (décès
+# 2023-11-20 < B, écartée par tete_observee_apres_deces), T3 (écartée par
+# tete_naissance_incoherente) : seules les lignes de T1 sont conservées.
+d <- rbind(t1("2023-12-20"), t1("2023-11-20", "T2"), t1("2023-12-20", "T3", c("1950-01-01", "1951-01-01")))
+for (tr_ in list(RA, VD)) {
+  r <- pra(d, transition = tr_, exclusions = c("tete_naissance_incoherente", "tete_observee_apres_deces"))
+  verifier(sprintf("relevé, %s -> %s, T2 et T3 exclues (deux motifs de tête) : relevé = 1, lignes 1 et 2 conservées",
+                   tr_$depart, tr_$arrivee),
+           identical(r$diagnostics$releves$observations_apres_deces_hors_periode, 1L) &&
+             identical(r$resultat$numeros_conserves, 1:2) &&
+             identical(r$resultat$exclusions$nombre, c(2L, 2L)))
+}
+# Non-régression (non une preuve de la règle) : résultat identique à
+# l'ancien calcul, les lignes à motif de ligne étant déjà hors de `propres`.
+d <- rbind(t1("2023-12-20"), tete("1950-01-01", "2017-01-01", "2016-06-01", "rachat", "T1"))
+r <- pra(d, exclusions = "sortie_avant_entree")
+verifier("relevé : tête dont une seule ligne est exclue (motif de ligne) comptée sur ses lignes conservées (relevé = 1)",
+         identical(r$resultat$numeros_conserves, 1:2) &&
+           identical(r$diagnostics$releves$observations_apres_deces_hors_periode, 1L))
+
+# Borne B au jour près (B = fin - délai + 1) : période PER (fin 2024-12-31).
+for (cas in list(list(delai = 0, sA = "2024-12-31", refuse = TRUE),
+                 list(delai = 0, sA = "2025-01-01", refuse = FALSE),
+                 list(delai = 30, sA = "2024-12-01", refuse = TRUE),
+                 list(delai = 30, sA = "2024-12-02", refuse = FALSE))) {
+  r <- tryCatch(pt(t1(cas$sA), delai = cas$delai), refus_tablexp = function(e) e)
+  verifier(sprintf("borne B, délai %d, décès %s : %s", cas$delai, cas$sA,
+                   if (cas$refuse) "refus tete_observee_apres_deces" else "accepté, relevé = 1"),
+           if (cas$refuse) inherits(r, "refus_tablexp") &&
+             identical(r$details$lignes$tete_observee_apres_deces, 1:2)
+           else !inherits(r, "refus_tablexp") &&
+             identical(r$diagnostics$releves$observations_apres_deces_hors_periode, 1L))
+}
+
 # --- Q9 : colonnes des observations, lignes exclues, correspondance -----------
 
 d <- data.frame(id = c("A", "B"), t = c(1, 1), n = D(c("1950-01-01", "1950-01-01")),

@@ -331,15 +331,26 @@ extremes_par_groupe <- function(g, x) {
   list(groupe = gs[prem], min = xs[prem], max = xs[dern])
 }
 
+# Premier décès s_d de chaque tête (g : entier de tête) et observation après
+# ce décès : une fin d'observation (+Inf pour une ligne en cours, quelle que
+# soit sa date de sortie, comme dans la fusion ; NA compté +Inf) dépasse s_d.
+# Rend list(groupe, premier_deces, apres) ; premier_deces = +Inf sans décès.
+deces_par_tete <- function(g, sor, cause) {
+  fin_obs <- sor; fin_obs[is.na(fin_obs) | cause == "en_cours"] <- Inf
+  dec <- rep(Inf, length(g))
+  est_dec <- cause == "deces"
+  dec[est_dec] <- sor[est_dec]
+  e_dec <- extremes_par_groupe(g, dec)
+  e_fin <- extremes_par_groupe(g, fin_obs)
+  list(groupe = e_dec$groupe, premier_deces = e_dec$min, apres = e_fin$max > e_dec$min)
+}
+
 # Évalue tous les motifs sur toutes les lignes (aucun court-circuit ; un
 # motif de comparaison n'est pas levé si l'une de ses valeurs est NA). Les
 # motifs de tête sont évalués sur les lignes exemptes de motif de ligne et
-# s'appliquent à toutes les lignes de la tête. Rend list(motifs,
-# apres_deces_hors_periode) : `motifs`, liste nommée code -> numéros de
-# ligne (1-based, croissants), dans l'ordre MOTIFS_LIGNES puis MOTIFS_TETE
-# (integer(0) pour un motif sans objet) ; `apres_deces_hors_periode`, nombre
-# de têtes observées après un premier décès survenu à partir de la borne
-# `borne` = fin - délai + 1 (NA sans id_tete).
+# s'appliquent à toutes les lignes de la tête. Rend list(motifs) : liste
+# nommée code -> numéros de ligne (1-based, croissants), dans l'ordre
+# MOTIFS_LIGNES puis MOTIFS_TETE (integer(0) pour un motif sans objet).
 evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation) {
   n <- nrow(donnees)
   col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
@@ -380,7 +391,6 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation) {
   m$age_aberrant <- vrai(age_revolu(nai, t_age) >= AGE_ABERRANT)
 
   t <- stats::setNames(rep(list(logical(n)), length(MOTIFS_TETE)), MOTIFS_TETE)
-  hors_periode <- NA_integer_
   if (!is.null(id_t)) {
     propres <- which(!Reduce(`|`, m))
     g <- match(id_t[propres], unique(id_t[propres]))
@@ -394,23 +404,15 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation) {
       t$tete_sexe_incoherent <- marquer(groupes_heterogenes(g, sexe[propres]))
     if (!is.null(segment) && "segment" %in% segmentation)
       t$tete_segment_incoherent <- marquer(groupes_heterogenes(g, as.character(segment[propres])))
-    # Fin d'observation de chaque ligne (+Inf pour une ligne en cours, quelle
-    # que soit sa date de sortie, comme dans la fusion ; NA compté +Inf) et
-    # premier décès s_d de la tête. Lecture B d'E2.4 (décision du mainteneur
-    # du 16/10/2026) : motif si s_d < borne et qu'une fin dépasse s_d ; si
-    # s_d >= borne, le décès est hors de la période effective : relevé non
-    # bloquant (nombre de têtes), aucune ligne refusée.
-    fin_obs <- sor[propres]; fin_obs[is.na(fin_obs) | cause[propres] == "en_cours"] <- Inf
-    dec <- rep(Inf, length(propres))
-    est_dec <- cause[propres] == "deces"
-    dec[est_dec] <- sor[propres][est_dec]
-    e_dec <- extremes_par_groupe(g, dec)
-    e_fin <- extremes_par_groupe(g, fin_obs)
-    apres <- e_fin$max > e_dec$min
-    t$tete_observee_apres_deces <- marquer(e_dec$groupe[apres & e_dec$min < borne])
-    hors_periode <- sum(apres & e_dec$min >= borne)
+    # Lecture B d'E2.4 (décision du mainteneur du 16/10/2026) : motif si le
+    # premier décès s_d de la tête précède `borne` (= fin - délai + 1) et
+    # qu'une fin d'observation le dépasse ; si s_d >= borne, le décès est
+    # hors de la période effective : aucune ligne refusée, relevé non
+    # bloquant compté par preparer_donnees() sur les lignes conservées.
+    dt <- deces_par_tete(g, sor[propres], cause[propres])
+    t$tete_observee_apres_deces <- marquer(dt$groupe[dt$apres & dt$premier_deces < borne])
   }
-  list(motifs = lapply(c(m, t), which), apres_deces_hors_periode = hors_periode)
+  list(motifs = lapply(c(m, t), which))
 }
 
 # --- fusion par tête (A.1, « Unité d'observation et fusion par tête ») --------
@@ -528,12 +530,19 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
                   chevauchements = NA_integer_, contiguites = NA_integer_,
                   disjoints = NA_integer_, ecarts_un_jour = NA_integer_)
   fusion <- NULL
+  hors_periode <- NA_integer_
   if (!is.null(id_t)) {
     g <- match(id_t, unique(id_t))
     fusion <- fusionner_intervalles(g, ent, fin)
     tab <- tabulate(g, nbins = max(0L, g))  # nbins explicite : 0 tête si 0 ligne
     releves <- c(list(tetes = length(tab), tetes_multi_contrats = sum(tab > 1L)),
                  lapply(fusion$releves, as.integer))
+    # Têtes observées après un premier décès s_d >= borne (lecture B d'E2.4),
+    # quelle que soit l'unité (M48), sur les seules lignes conservées : une
+    # tête écartée par une exclusion déclarée n'est pas comptée ; une tête
+    # dont une ligne seulement est exclue l'est sur ses lignes conservées.
+    dt <- deces_par_tete(g, sor, cause)
+    hors_periode <- sum(dt$apres & dt$premier_deces >= p$borne)
   }
   as_date <- function(j) { j[!is.finite(j)] <- NA; structure(j, class = "Date") }
   if (unite == "tete") {
@@ -575,7 +584,7 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
   ofin <- as.numeric(observations$fin); ofin[is.na(ofin)] <- Inf
   releves$fenetres_vides <- sum(pmax(as.numeric(observations$debut), p$debut) >= pmin(ofin, p$borne))
   releves$observations <- nrow(observations)
-  releves$observations_apres_deces_hors_periode <- ev$apres_deces_hors_periode
+  releves$observations_apres_deces_hors_periode <- hors_periode
 
   # Avertissements (ADR 0007, point 6.5).
   if (p$transition$etat_de == "tete" && is.null(id_t))
@@ -598,11 +607,13 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
                                        "inclusive probable ; non comblé)"),
                 fenetres_vides = "observation(s) sans intersection avec la période d'observation",
                 observations_apres_deces_hors_periode = paste(
-                  "tête(s) observée(s) après un premier décès survenu à partir de la fin effective",
-                  "de la période (hors période : non refusé, E2.4, lecture B)"))
+                  "tête(s) dont un contrat est observé après le premier décès de la tête, survenu",
+                  "à partir de la fin effective de la période (contrôle par identifiant de tête ;",
+                  "non refusé, E2.4, lecture B)"))
   # Relevés de fusion : avertis quand l'unité est la tête (ils décrivent la
   # fusion) ; pour l'unité contrat, restitués dans les diagnostics seulement.
-  # Fenêtres vides : toujours.
+  # Fenêtres vides et observations après décès hors période : avertis dans
+  # toutes les unités.
   for (r in names(libelles))
     if (!is.na(releves[[r]]) && releves[[r]] > 0L &&
         (unite == "tete" || r %in% c("fenetres_vides", "observations_apres_deces_hors_periode")))
