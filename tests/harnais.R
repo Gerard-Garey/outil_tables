@@ -38,7 +38,8 @@
 #  Variable d'environnement TABLEXP_BIBLIOTHEQUE : installer_tablexp() ne
 #  réutilise la bibliothèque qu'elle désigne que si l'empreinte de l'arbre
 #  source inscrite à l'installation (empreinte_source() : MD5 de
-#  DESCRIPTION, NAMESPACE et R/*) égale celle de l'arbre courant ; sinon il
+#  DESCRIPTION, NAMESPACE et, récursivement, R/, inst/, data/ et src/ s'ils
+#  existent) égale celle de l'arbre courant ; sinon il
 #  réinstalle (et le dit). executer_rscript() la pose pour le seul
 #  sous-processus, avec la bibliothèque installée par la batterie : une
 #  installation par batterie au lieu d'une par sous-processus.

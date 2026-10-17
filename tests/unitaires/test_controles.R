@@ -378,37 +378,81 @@ latex_temoin <- function(lignes) {
 }
 attente_temoin <- function(lignes) {
   f <- tempfile("attente_", fileext = ".csv")
-  writeLines(c("nom,issue,motif", lignes), f)
+  writeLines(c("type,nom,issue,motif", lignes), f)
   f
 }
-# Témoins construits sur la liste des exports (tous en attente, ou tous
-# cités), pour rester valables quand un export s'ajoute.
+# Témoins construits sur les sources des catalogues requis (exports,
+# fonctions-<fichier>, roles, recettes ; docs/latex/CONVENTIONS.md, section
+# 3.2), relues ici indépendamment du script, pour rester valables quand un
+# export, une définition ou un rôle s'ajoute.
 EXPORTS <- sort(getNamespaceExports("tablexp"))
-code_latex <- function(n) sprintf("\\code{%s()}", gsub("_", "\\_", n, fixed = TRUE))
+SOURCES <- local({
+  g <- new.env()
+  sys.source(file.path(CONTROLES, "graphe_modules.R"), envir = g)
+  defs <- g$analyser_modules(file.path(RACINE, "R"))$symboles
+  fichiers <- sort(sub("\\.[Rr]$", "", list.files(file.path(RACINE, "R"), pattern = "\\.[Rr]$")))
+  f <- lapply(fichiers, function(m) defs$symbole[defs$module == m])
+  names(f) <- paste0("fonctions-", gsub("_", "-", fichiers, fixed = TRUE))
+  c(list(exports = EXPORTS), f,
+    list(roles = catalogue_roles()$role, recettes = tablexp:::RECETTE_BRANCHE))
+})
+echapper <- function(n) gsub("_", "\\_", n, fixed = TRUE)
+code_latex <- function(n) sprintf("\\code{%s()}", echapper(n))
+# Entrée \catalogue{k}{nom} ; `()` pour une fonction de tablexp dans exports
+# et fonctions-<fichier>.
+entree <- function(k, n) {
+  fonction <- (k == "exports" || startsWith(k, "fonctions-")) &&
+    is.function(get(n, envir = asNamespace("tablexp")))
+  sprintf("\\catalogue{%s}{%s%s}", k, echapper(n), if (fonction) "()" else "")
+}
+CATALOGUES_COMPLETS <- unlist(lapply(names(SOURCES), function(k)
+  vapply(SOURCES[[k]], function(n) entree(k, n), character(1L))), use.names = FALSE)
+retirer <- function(lignes, x) lignes[lignes != x]
 vide <- latex_temoin("% aucun \\code{construire\\_table()} cité : ligne commentée")
 cite <- latex_temoin(paste0("Exports : ", paste(code_latex(EXPORTS), collapse = ", "),
                             ", \\code{tools::md5sum()}, \\code{set.seed()}."))
 inconnu <- latex_temoin("\\code{construire\\_table()} et \\code{fonction\\_inconnue()}.")
 inconnu_args <- latex_temoin("\\code{construire\\_table(donnees, roles, plan)} et \\code{autre\\_inconnue(x, y = 2)}.")
 cite_args <- latex_temoin("\\code{construire\\_table(donnees, roles, plan)}.")
-attente_ok <- attente_temoin(sprintf("%s,#11,en attente", EXPORTS))
+# Catalogues complets, exports cités par le seul catalogue `exports` ; une
+# entrée commentée n'est pas lue ; la ligne de définition de la macro n'est
+# pas une entrée.
+complet <- latex_temoin(c("\\newcommand{\\catalogue}[2]{\\code{#2}}", CATALOGUES_COMPLETS,
+                          "% \\catalogue{bidule}{commentee}"))
+role_retire <- SOURCES$roles[1L]
+incomplet <- latex_temoin(retirer(CATALOGUES_COMPLETS, entree("roles", role_retire)))
+en_trop <- latex_temoin(c(CATALOGUES_COMPLETS, "\\catalogue{recettes}{recette\\_inventee}"))
+doublon <- latex_temoin(c(CATALOGUES_COMPLETS, entree("fonctions-outils", "sous_graine")))
+cat_inconnu <- latex_temoin(c(CATALOGUES_COMPLETS, "\\catalogue{bidule}{x}"))
+sans_roles <- latex_temoin(CATALOGUES_COMPLETS[!startsWith(CATALOGUES_COMPLETS, "\\catalogue{roles}")])
+forme <- latex_temoin(c(retirer(CATALOGUES_COMPLETS, entree("fonctions-outils", "sous_graine")),
+                        "\\catalogue{fonctions-outils}{sous\\_graine}"))
+lignes_catalogues <- sprintf("catalogue,%s,#11,en attente", names(SOURCES))
+attente_ok <- attente_temoin(c(sprintf("export,%s,#11,en attente", EXPORTS), lignes_catalogues))
+attente_cat <- attente_temoin(lignes_catalogues)
 attente_vide <- attente_temoin(character(0))
-attente_perimee <- attente_temoin(c(sprintf("%s,#11,en attente", EXPORTS), "nom_disparu,#9,retiré"))
-attente_sans_issue <- attente_temoin("construire_table,11,en attente")
+attente_perimee <- attente_temoin(c(sprintf("export,%s,#11,en attente", EXPORTS), lignes_catalogues,
+                                    "export,nom_disparu,#9,retiré"))
+attente_sans_issue <- attente_temoin(c("export,construire_table,11,en attente", lignes_catalogues))
+attente_cat_inconnu <- attente_temoin(c(lignes_catalogues, "catalogue,bidule,#11,en attente"))
+attente_type <- attente_temoin(c(lignes_catalogues, "fonction,construire_table,#11,en attente"))
+attente_doublon <- attente_temoin(c(lignes_catalogues, lignes_catalogues[1L]))
+attente_ancienne <- tempfile("attente_", fileext = ".csv")
+writeLines(c("nom,issue,motif", "construire_table,#11,en attente"), attente_ancienne)
 
 verifier("concordance : passe sur le dépôt (--strict)", passe(concordance("--strict")))
 verifier("concordance : export non cité, en attente -> code 0",
          passe(concordance("--strict", "--latex", shQuote(vide), "--attente", shQuote(attente_ok))))
 verifier("concordance : export non cité, hors attente -> échec",
-         echoue(concordance("--strict", "--latex", shQuote(vide), "--attente", shQuote(attente_vide)),
+         echoue(concordance("--strict", "--latex", shQuote(vide), "--attente", shQuote(attente_cat)),
                 "absent de la liste d'attente"))
 verifier("concordance : export cité et encore en attente -> succès inattendu, échec",
          echoue(concordance("--strict", "--latex", shQuote(cite), "--attente", shQuote(attente_ok)),
                 "succès inattendu"))
-verifier("concordance : export cité, attente vide, fonctions de base citées -> code 0",
-         passe(concordance("--strict", "--latex", shQuote(cite), "--attente", shQuote(attente_vide))))
+verifier("concordance : export cité, catalogues en attente, fonctions de base citées -> code 0",
+         passe(concordance("--strict", "--latex", shQuote(cite), "--attente", shQuote(attente_cat))))
 verifier("concordance : fonction citée introuvable -> échec",
-         echoue(concordance("--strict", "--latex", shQuote(inconnu), "--attente", shQuote(attente_vide)),
+         echoue(concordance("--strict", "--latex", shQuote(inconnu), "--attente", shQuote(attente_cat)),
                 "fonction_inconnue() existe"))
 verifier("concordance : ligne d'attente qui n'est pas un export -> échec",
          echoue(concordance("--strict", "--latex", shQuote(vide), "--attente", shQuote(attente_perimee)),
@@ -416,7 +460,7 @@ verifier("concordance : ligne d'attente qui n'est pas un export -> échec",
 verifier("concordance : ligne d'attente sans renvoi « #N » -> échec",
          echoue(concordance("--strict", "--latex", shQuote(vide), "--attente", shQuote(attente_sans_issue))))
 verifier("concordance : fonction citée avec arguments introuvable -> échec",
-         echoue(concordance("--strict", "--latex", shQuote(inconnu_args), "--attente", shQuote(attente_vide)),
+         echoue(concordance("--strict", "--latex", shQuote(inconnu_args), "--attente", shQuote(attente_cat)),
                 "autre_inconnue() existe"))
 verifier("concordance : export cité avec arguments -> lu comme cité (succès inattendu en attente)",
          echoue(concordance("--strict", "--latex", shQuote(cite_args), "--attente", shQuote(attente_ok)),
@@ -427,5 +471,61 @@ verifier("concordance : --latex vers un dossier inexistant -> échec",
          echoue(concordance("--strict", "--latex", shQuote(tempfile("absent_"))), "dossier introuvable"))
 verifier("concordance : sans --strict, écart -> code 0 (mode rapport)",
          passe(concordance("--latex", shQuote(inconnu), "--attente", shQuote(attente_vide))))
-unlink(c(vide, cite, inconnu, inconnu_args, cite_args), recursive = TRUE)
-unlink(c(attente_ok, attente_vide, attente_perimee, attente_sans_issue))
+# Catalogues (CONVENTIONS.md, section 3.2).
+verifier(sprintf("concordance : témoin des catalogues complet (%d entrées, %d catalogues)",
+                 length(CATALOGUES_COMPLETS), length(SOURCES)),
+         length(CATALOGUES_COMPLETS) > length(SOURCES) && all(lengths(SOURCES) > 0L))
+verifier("concordance : catalogues complets, attente vide -> code 0 (exports cités par le catalogue)",
+         passe(concordance("--strict", "--latex", shQuote(complet), "--attente", shQuote(attente_vide))))
+verifier("concordance : catalogue incomplet -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(incomplet), "--attente", shQuote(attente_vide)),
+                paste("absents du document :", role_retire)))
+verifier("concordance : nom de catalogue en trop -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(en_trop), "--attente", shQuote(attente_vide)),
+                "absents de la source : recette_inventee"))
+verifier("concordance : nom de catalogue en double -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(doublon), "--attente", shQuote(attente_vide)),
+                "en double : sous_graine"))
+verifier("concordance : catalogue inconnu -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(cat_inconnu), "--attente", shQuote(attente_vide)),
+                "catalogue inconnu"))
+verifier("concordance : fonction de catalogue sans () -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(forme), "--attente", shQuote(attente_vide)),
+                "forme fausse : sous_graine (fonction sans ())"))
+# Entrées que le motif ne lit pas : signalées, jamais ignorées (constat M1).
+for (cas in list(
+  list(nom = "catalogue en majuscules", lignes = "\\catalogue{Roles}{x}"),
+  list(nom = "espace avant l'accolade", lignes = "\\catalogue {roles}{x}"),
+  list(nom = "accolade dans le nom", lignes = "\\catalogue{roles}{\\textit{x}}"),
+  list(nom = "entrée coupée sur deux lignes", lignes = c("\\catalogue{roles}", "{x}")),
+  list(nom = "deuxième entrée illisible sur une ligne lue",
+       lignes = "\\catalogue{roles}{x} & \\catalogue{Roles}{y}")
+)) {
+  d <- latex_temoin(c(CATALOGUES_COMPLETS, cas$lignes))
+  verifier(sprintf("concordance : entrée de catalogue illisible (%s) -> échec", cas$nom),
+           echoue(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                  "entrée de catalogue illisible"))
+  unlink(d, recursive = TRUE)
+}
+verifier("concordance : catalogue requis absent, hors attente -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(sans_roles), "--attente", shQuote(attente_vide)),
+                "catalogue requis sans entrée"))
+verifier("concordance : catalogues présents et encore en attente -> succès inattendu, échec",
+         echoue(concordance("--strict", "--latex", shQuote(complet), "--attente", shQuote(attente_cat)),
+                "succès inattendu"))
+verifier("concordance : ligne d'attente d'un catalogue inconnu -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(vide), "--attente", shQuote(attente_cat_inconnu)),
+                "pas un catalogue requis"))
+verifier("concordance : ligne d'attente de type inconnu -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(cite), "--attente", shQuote(attente_type)),
+                "type « fonction »"))
+verifier("concordance : ligne d'attente en double -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(cite), "--attente", shQuote(attente_doublon)),
+                "ligne en double"))
+verifier("concordance : liste d'attente à l'ancien format (nom, issue, motif) -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(complet), "--attente", shQuote(attente_ancienne)),
+                "colonnes lues : nom, issue, motif"))
+unlink(c(vide, cite, inconnu, inconnu_args, cite_args, complet, incomplet, en_trop, doublon,
+         cat_inconnu, sans_roles, forme), recursive = TRUE)
+unlink(c(attente_ok, attente_cat, attente_vide, attente_perimee, attente_sans_issue,
+         attente_cat_inconnu, attente_type, attente_doublon, attente_ancienne))

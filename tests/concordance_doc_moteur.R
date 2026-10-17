@@ -1,32 +1,53 @@
 # -----------------------------------------------------------------------------
 #  tests/concordance_doc_moteur.R : concordance documentation <-> moteur
-#  (E3.3 ; ADR 0007, points 3.4 et 11 ; issue #8)
+#  (E3.3, E4.9 ; ADR 0007, points 3.4 et 11 ; issue #8 ;
+#  docs/latex/CONVENTIONS.md, section 3)
 #
-#  Lit les fichiers .tex de docs/latex/ (récursivement) et confronte aux
-#  exports et au code de tablexp, installé depuis l'arbre de travail :
+#  Lit les fichiers .tex de docs/latex/ (récursivement), commentaires LaTeX
+#  retirés, et confronte aux exports et au code de tablexp, installé depuis
+#  l'arbre de travail :
 #    1. toute fonction citée existe : forme \code{nom()} ou
-#       \code{nom(arguments)} (souligné échappé \_ admis) ; `nom` est une fonction de l'espace de noms de tablexp
-#       (exportée ou interne), une fonction d'un package de priorité base
-#       (base, stats, utils, tools...), ou, pour la forme \code{pkg::nom()},
-#       une fonction exportée de `pkg` ; un outil des batteries (fonction de
-#       premier niveau de tests/harnais.R) est admis ;
-#    2. toute fonction exportée est citée ; un export pas encore documenté
-#       figure dans la liste d'attente tests/concordance_attente.csv (nom,
-#       issue, motif), où il est compté en échec attendu avec renvoi à
+#       \code{nom(arguments)} (souligné échappé \_ admis), ou entrée de
+#       catalogue dont le nom porte `()` ; `nom` est une fonction de l'espace
+#       de noms de tablexp (exportée ou interne), une fonction d'un package
+#       de priorité base (base, stats, utils, tools...), ou, pour la forme
+#       \code{pkg::nom()}, une fonction exportée de `pkg` ; un outil des
+#       batteries (fonction de premier niveau de tests/harnais.R) est admis ;
+#    2. toute fonction exportée est citée (même formes) ; un export pas encore
+#       documenté figure dans la liste d'attente tests/concordance_attente.csv
+#       (type `export`), où il est compté en échec attendu avec renvoi à
 #       l'issue ; s'il est cité, c'est un succès inattendu : la ligne est à
 #       retirer de la liste ;
-#    3. toute ligne de la liste d'attente désigne un export existant et
-#       porte un renvoi d'issue « #N ».
-#  Les noms de rôles et de recettes s'ajouteront à ces contrôles avec #9 et
-#  #11 (catalogue des rôles, recettes d'exposition).
+#    3. toute ligne de la liste d'attente désigne un export existant (type
+#       `export`) ou un catalogue requis (type `catalogue`) et porte un
+#       renvoi d'issue « #N » ; aucune ligne en double ;
+#    4. entrées \catalogue{<catalogue>}{<nom>} (CONVENTIONS.md, section 3.2 ;
+#       `\_` lu `_`, un `()` final retiré) :
+#       - une occurrence de \catalogue que le motif ne lit pas (ligne où
+#         les deux décomptes diffèrent) est un écart : entrée illisible ;
+#       - un catalogue lu hors des catalogues requis est un écart ;
+#       - pour chaque catalogue présent, l'ensemble des noms lus est égal à
+#         l'ensemble de sa source, sans doublon ; dans `exports` et
+#         `fonctions-<fichier>`, un nom de la source porte `()` si et
+#         seulement s'il désigne une fonction ; dans `roles` et `recettes`,
+#         aucun nom ne porte `()` ;
+#       - un catalogue requis sans aucune entrée est un échec attendu s'il
+#         figure dans la liste d'attente (type `catalogue`), un échec sinon ;
+#         présent et encore en attente, c'est un succès inattendu.
+#       Catalogues requis et sources :
+#         exports              getNamespaceExports("tablexp") ;
+#         fonctions-<fichier>  définitions de premier niveau de R/<fichier>.R
+#                              (souligné du nom de fichier lu comme un tiret :
+#                              fonctions-construire-table), lues par parse()
+#                              par analyser_modules() de
+#                              tests/controles/graphe_modules.R ;
+#         roles                catalogue_roles()$role ;
+#         recettes             RECETTE_BRANCHE (R/donnees.R), source unique ;
+#                              les clés de CONVENTION_NATIVE (R/exposition.R)
+#                              lui sont égales (contrôle 4).
 #
-#  docs/latex/ absent ou sans .tex : aucune citation lue (le squelette LaTeX
-#  vient avec docwriter, #8) ; les contrôles 2 et 3 s'appliquent. Constante
-#  LATEX_EXIGE à passer à TRUE quand le squelette existe. Un dossier donné
-#  par --latex doit exister ; une option sans valeur est un échec.
-#
-#  Convention de citation lue : \code{nom()} (charte d'outil_USP), à tenir
-#  identique à docs/latex/CONVENTIONS.md quand il existera.
+#  docs/latex/ doit exister (LATEX_EXIGE) ; un dossier donné par --latex doit
+#  exister ; une option sans valeur est un échec.
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/concordance_doc_moteur.R --strict   # code 1 si écart
@@ -57,26 +78,55 @@ STRICT <- "--strict" %in% ARGS
 RACINE <- racine_depot()
 DOSSIER_LATEX <- option("--latex", file.path(RACINE, "docs", "latex"))
 FICHIER_ATTENTE <- option("--attente", file.path(RACINE, "tests", "concordance_attente.csv"))
-# docs/latex/ absent : admis tant que docwriter n'a pas créé le squelette
-# LaTeX (#8, point 7). Passer à TRUE dans le commit qui le crée : l'absence
-# du dossier fera alors échouer la batterie.
-LATEX_EXIGE <- FALSE
+# Le squelette LaTeX existe (#8, point 7) : l'absence du dossier fait échouer
+# la batterie.
+LATEX_EXIGE <- TRUE
+COLONNES_ATTENTE <- c("type", "nom", "issue", "motif")
+TYPES_ATTENTE <- c("export", "catalogue")
 
 cat(R.version.string, "\n")
 installer_tablexp(RACINE)
 
-# Citations \code{nom()} ou \code{pkg::nom()} des .tex du dossier.
-citations_latex <- function(dossier) {
+# Lignes des .tex du dossier, commentaires LaTeX retirés.
+texte_latex <- function(dossier) {
   tex <- if (dir.exists(dossier))
     list.files(dossier, pattern = "\\.tex$", recursive = TRUE, full.names = TRUE) else character(0)
   if (!length(tex)) return(character(0))
   texte <- unlist(lapply(tex, readLines, warn = FALSE, encoding = "UTF-8"))
-  texte <- sub("(^|[^\\\\])%.*$", "\\1", texte)  # commentaires LaTeX
+  sub("(^|[^\\\\])%.*$", "\\1", texte)  # commentaires LaTeX
+}
+
+# Citations \code{nom()} ou \code{pkg::nom()}.
+citations_latex <- function(texte) {
   # \code{nom()} ou \code{nom(arguments)}, souligné échappé \_ admis ; les
   # arguments ne contiennent pas d'accolade.
   m <- unlist(regmatches(texte, gregexpr("\\\\code\\{[A-Za-z0-9._\\\\:]+\\([^{}]*\\)\\}", texte)))
   m <- gsub("\\\\_", "_", sub("\\(.*$", "", sub("^\\\\code\\{", "", m)))
   sort(unique(m))
+}
+
+# Entrées \catalogue{<catalogue>}{<nom>}, dans l'ordre du texte :
+# data.frame(catalogue, nom, fonction), `fonction` vaut TRUE si le nom
+# portait un `()` final (retiré de `nom`). Attribut `illisibles` : lignes où
+# le nombre d'occurrences de la macro (\catalogue non suivi d'une lettre)
+# diffère du nombre d'entrées lues par le motif (catalogue en majuscules,
+# espace avant l'accolade, accolade dans le nom, entrée coupée sur deux
+# lignes...) ; la ligne de définition \newcommand{\catalogue} est exclue.
+MOTIF_CATALOGUE <- "\\\\catalogue\\{([a-z0-9-]+)\\}\\{([^{}]+)\\}"
+entrees_catalogue <- function(texte) {
+  motif <- MOTIF_CATALOGUE
+  m <- unlist(regmatches(texte, gregexpr(motif, texte)))
+  catalogue <- sub(motif, "\\1", m)
+  nom <- gsub("\\\\_", "_", sub(motif, "\\2", m))
+  fonction <- grepl("\\(\\)$", nom)
+  d <- data.frame(catalogue = catalogue, nom = sub("\\(\\)$", "", nom), fonction = fonction,
+                  stringsAsFactors = FALSE)
+  compte <- function(re, perl = FALSE)
+    vapply(gregexpr(re, texte, perl = perl), function(g) sum(g > 0L), integer(1L))
+  definition <- grepl("\\\\(re|provide)?newcommand\\*?\\{?\\\\catalogue[}\\[]", texte)
+  ecart <- !definition & compte("\\\\catalogue(?![A-Za-z])", perl = TRUE) != compte(motif)
+  attr(d, "illisibles") <- trimws(texte[ecart])
+  d
 }
 
 # Packages de priorité base où chercher une fonction citée ; tcltk exclu :
@@ -110,15 +160,46 @@ fonction_existe <- function(nom) {
   FALSE
 }
 
-cites <- citations_latex(DOSSIER_LATEX)
+# Sources des catalogues requis (CONVENTIONS.md, section 3.2) : liste nommée
+# catalogue -> noms. Les définitions de premier niveau sont lues par le même
+# code que le contrôle de l'ordre des modules.
+NS <- asNamespace("tablexp")
+SOURCES_CATALOGUES <- local({
+  g <- new.env()
+  sys.source(file.path(RACINE, "tests", "controles", "graphe_modules.R"), envir = g)
+  dossier_r <- file.path(RACINE, "R")
+  defs <- g$analyser_modules(dossier_r)$symboles
+  fichiers <- sort(sub("\\.[Rr]$", "", list.files(dossier_r, pattern = "\\.[Rr]$")))
+  fonctions <- lapply(fichiers, function(m) if (is.null(defs)) character(0)
+                                            else defs$symbole[defs$module == m])
+  names(fonctions) <- paste0("fonctions-", gsub("_", "-", fichiers, fixed = TRUE))
+  c(list(exports = getNamespaceExports("tablexp")),
+    fonctions,
+    list(roles = tablexp::catalogue_roles()$role,
+         recettes = NS[["RECETTE_BRANCHE"]]))
+})
+# Catalogues où `()` marque une fonction ; ailleurs, aucun nom n'en porte.
+avec_fonctions <- function(catalogue) catalogue == "exports" || startsWith(catalogue, "fonctions-")
+
+texte <- texte_latex(DOSSIER_LATEX)
+entrees <- entrees_catalogue(texte)
+cites <- sort(unique(c(citations_latex(texte), entrees$nom[entrees$fonction])))
 exports <- sort(getNamespaceExports("tablexp"))
 attente <- if (file.exists(FICHIER_ATTENTE))
   utils::read.csv(FICHIER_ATTENTE, colClasses = "character",
                   strip.white = TRUE) else
-  data.frame(nom = character(0), issue = character(0), motif = character(0))
+  as.data.frame(stats::setNames(rep(list(character(0)), length(COLONNES_ATTENTE)), COLONNES_ATTENTE))
+colonnes_lues <- names(attente)
+colonnes_ok <- identical(colonnes_lues, COLONNES_ATTENTE)
+if (!colonnes_ok)  # contrôle 2 en échec ; colonnes complétées pour la suite
+  for (k in setdiff(COLONNES_ATTENTE, names(attente))) attente[[k]] <- rep(NA_character_, nrow(attente))
+attente_exports <- attente[attente$type %in% "export", , drop = FALSE]
+attente_catalogues <- attente[attente$type %in% "catalogue", , drop = FALSE]
 
-cat(sprintf("Documentation : %s (%d fonction(s) citée(s))\n", DOSSIER_LATEX, length(cites)))
+cat(sprintf("Documentation : %s (%d fonction(s) citée(s), %d entrée(s) de catalogue)\n",
+            DOSSIER_LATEX, length(cites), nrow(entrees)))
 cat(sprintf("Exports de tablexp : %s\n", paste(exports, collapse = ", ")))
+cat(sprintf("Catalogues requis : %s\n", paste(names(SOURCES_CATALOGUES), collapse = ", ")))
 cat(sprintf("Liste d'attente : %s (%d ligne(s))\n", FICHIER_ATTENTE, nrow(attente)))
 
 fichier_courant("0. documentation lue")
@@ -137,11 +218,11 @@ for (n in cites)
   })
 
 fichier_courant("2. fonctions exportées citées dans docs/latex/")
-verifier("liste d'attente : colonnes nom, issue, motif",
-         if (identical(names(attente), c("nom", "issue", "motif"))) TRUE
-         else paste("colonnes lues :", paste(names(attente), collapse = ", ")))
+verifier("liste d'attente : colonnes type, nom, issue, motif",
+         if (colonnes_ok) TRUE
+         else paste("colonnes lues :", paste(colonnes_lues, collapse = ", ")))
 for (n in exports) {
-  ligne <- attente[attente$nom == n, , drop = FALSE]
+  ligne <- attente_exports[attente_exports$nom == n, , drop = FALSE]
   if (nrow(ligne) == 1L && grepl(MOTIF_ISSUE, ligne$issue)) {
     echec_attendu(sprintf("%s() citée dans docs/latex/", n), ligne$issue,
                   if (n %in% cites) TRUE else sprintf("non citée (%s)", ligne$motif))
@@ -154,13 +235,78 @@ for (n in exports) {
 
 fichier_courant("3. liste d'attente")
 for (i in seq_len(nrow(attente))) {
-  verifier(sprintf("attente %s : export existant", attente$nom[i]),
-           if (attente$nom[i] %in% exports) TRUE else "pas un export de tablexp : ligne à retirer")
-  verifier(sprintf("attente %s : renvoi d'issue \"#N\"", attente$nom[i]),
+  etiquette <- sprintf("attente %s %s", attente$type[i], attente$nom[i])
+  verifier(sprintf("%s : type export ou catalogue", etiquette),
+           if (attente$type[i] %in% TYPES_ATTENTE) TRUE else sprintf("type « %s »", attente$type[i]))
+  if (identical(attente$type[i], "export"))
+    verifier(sprintf("%s : export existant", etiquette),
+             if (attente$nom[i] %in% exports) TRUE else "pas un export de tablexp : ligne à retirer")
+  if (identical(attente$type[i], "catalogue"))
+    verifier(sprintf("%s : catalogue requis", etiquette),
+             if (attente$nom[i] %in% names(SOURCES_CATALOGUES)) TRUE
+             else "pas un catalogue requis : ligne à retirer")
+  verifier(sprintf("%s : renvoi d'issue \"#N\"", etiquette),
            if (grepl(MOTIF_ISSUE, attente$issue[i])) TRUE else sprintf("issue « %s »", attente$issue[i]))
 }
-verifier("attente : aucun nom en double",
-         if (anyDuplicated(attente$nom)) "nom en double" else TRUE)
+verifier("attente : aucune ligne en double (type, nom)",
+         if (anyDuplicated(attente[, c("type", "nom")])) "ligne en double" else TRUE)
+
+fichier_courant("4. catalogues de docs/latex/")
+verifier("entrées de catalogue toutes lisibles (forme \\catalogue{<catalogue>}{<nom>} sur une ligne)", {
+  il <- attr(entrees, "illisibles")
+  if (length(il)) paste("entrée de catalogue illisible :", paste(sprintf("« %s »", il), collapse = " ; "))
+  else TRUE
+})
+inconnus <- setdiff(unique(entrees$catalogue), names(SOURCES_CATALOGUES))
+for (k in inconnus)
+  verifier(sprintf("catalogue %s : catalogue requis", k),
+           sprintf("catalogue inconnu (%d entrée(s)) ; requis : %s", sum(entrees$catalogue == k),
+                   paste(names(SOURCES_CATALOGUES), collapse = ", ")))
+verifier("recettes : clés de CONVENTION_NATIVE égales à RECETTE_BRANCHE (source unique)", {
+  cles <- names(NS[["CONVENTION_NATIVE"]])
+  if (setequal(cles, SOURCES_CATALOGUES$recettes)) TRUE
+  else sprintf("CONVENTION_NATIVE : %s ; RECETTE_BRANCHE : %s", paste(cles, collapse = ", "),
+               paste(SOURCES_CATALOGUES$recettes, collapse = ", "))
+})
+for (k in names(SOURCES_CATALOGUES)) {
+  lus <- entrees[entrees$catalogue == k, , drop = FALSE]
+  source_k <- SOURCES_CATALOGUES[[k]]
+  ligne <- attente_catalogues[attente_catalogues$nom == k, , drop = FALSE]
+  if (nrow(ligne) == 1L && grepl(MOTIF_ISSUE, ligne$issue)) {
+    echec_attendu(sprintf("catalogue %s présent dans docs/latex/", k), ligne$issue,
+                  if (nrow(lus)) TRUE else sprintf("aucune entrée (%s)", ligne$motif))
+  } else {
+    verifier(sprintf("catalogue %s présent dans docs/latex/", k),
+             if (nrow(lus)) TRUE
+             else "catalogue requis sans entrée et absent de la liste d'attente (tests/concordance_attente.csv)")
+  }
+  if (!nrow(lus)) next
+  verifier(sprintf("catalogue %s : noms égaux à la source (%d)", k, length(unique(source_k))), {
+    manquants <- setdiff(source_k, lus$nom); en_trop <- setdiff(lus$nom, source_k)
+    if (!length(manquants) && !length(en_trop)) TRUE
+    else paste(c(if (length(manquants)) paste("absents du document :", paste(sort(manquants), collapse = ", ")),
+                 if (length(en_trop)) paste("absents de la source :", paste(sort(en_trop), collapse = ", "))),
+               collapse = " ; ")
+  })
+  verifier(sprintf("catalogue %s : aucun nom en double", k), {
+    doubles <- unique(lus$nom[duplicated(lus$nom)])
+    if (length(doubles)) paste("en double :", paste(doubles, collapse = ", ")) else TRUE
+  })
+  verifier(sprintf("catalogue %s : `()` si et seulement si fonction", k), {
+    dans_source <- lus[lus$nom %in% source_k, , drop = FALSE]
+    attendu <- if (avec_fonctions(k))
+      vapply(dans_source$nom, function(n) exists(n, envir = NS, inherits = FALSE) && is.function(NS[[n]]),
+             logical(1L))
+      else rep(FALSE, nrow(dans_source))
+    ko <- dans_source$fonction != attendu
+    if (any(ko))
+      paste("forme fausse :", paste(ifelse(dans_source$fonction[ko],
+                                           sprintf("%s() (pas une fonction)", dans_source$nom[ko]),
+                                           sprintf("%s (fonction sans ())", dans_source$nom[ko])),
+                                    collapse = ", "))
+    else TRUE
+  })
+}
 
 if (!STRICT) cat("\nMode rapport : code de sortie 0 même en cas d'écart (--strict pour échouer).\n")
 bilan(code_sortie = STRICT)
