@@ -299,3 +299,21 @@ La locale d'installation du package relève de l'ADR 0007 (annotation M54).
 **Effet sur les résultats** : aucun. Aucune référence n'existe encore (point 3.7) ; l'annotation fixe le format et la classe avant la création.
 
 Issues : #17, #24, #25. Décision M54 (ADR 0007) ; M52.
+
+## Annotation du 17 octobre 2026 (quatrième) — retrait de la clé `avertissements/nombre` de `TOLERANCES` après #24
+
+Rédigée par `architect` d'après l'avis d'`actuary` et la mesure de `coder`, tous deux du 17/10/2026. Le texte ci-dessus, annotations comprises, n'est pas réécrit. C'est l'annotation datée que le point 3.4 exige pour cette modification de `TOLERANCES`, comme l'annonçait la troisième annotation, (a).
+
+**(a) Type `integer` du `nombre` des avertissements (#24).** `avertissements_vides()` déclare la colonne `nombre` en `integer(0)`. `avertir()` stocke `as.integer(nombre)` après un contrôle qui refuse par `stop()` toute valeur non numérique, de longueur autre que 1, `NA`, infinie, non entière, négative ou supérieure à `.Machine$integer.max`. Le refus porte sur une erreur de programmation du package : il n'y a aucune conversion silencieuse.
+
+**(b) Retrait de la clé.** La clé qualifiée `"avertissements/nombre" = 0`, introduite par la troisième annotation, (a), est retirée de `TOLERANCES` (`tests/reference/outils_reference.R`). Motif, avis d'`actuary` : la tolérance n'est cherchée que pour un `double`. Une fois le type en `integer`, la clé ne sert plus. Si on la laissait en place, elle neutraliserait la règle de complétude du point 3.4 au cas où une régression remettrait le type en `double`, car un tel `double` trouverait encore sa classe. Sans la clé, cette régression est relevée deux fois :
+- par le contrôle de type, comme écart structurel ;
+- par `doubles_sans_tolerance()`.
+
+**(c) Témoin**, mesuré par `coder` le 17/10/2026 : sur R1 produit par `1906ae9`, où le type est encore `double`, `doubles_sans_tolerance()` relève `avertissements/nombre` et `fiche/avertissements/nombre`.
+
+**(d) Texte périmé de la troisième annotation.** Le motif de la troisième annotation, (a), cite la conversion par `as.numeric(nombre)` dans `avertir()` (`R/outils.R:65`). Cette mention est désormais **périmée** : la conversion est `as.integer(nombre)`, précédée du contrôle décrit en (a), et la ligne citée a changé. Elle reste vraie pour l'état antérieur à #24 (`1906ae9`). La remarque de la même annotation sur le nom nu `nombre` garde sa portée : un autre `double` nommé `nombre` resterait sans classe et ferait échouer la comparaison.
+
+**Effet sur les résultats** : le type de `avertissements$nombre` et de `fiche$avertissements$nombre` passe de `double` à `integer` (deux chemins par plan). **Aucune valeur ne change.** Le visa d'`actuary` est accordé le 17/10/2026. Il n'y a aucun tableau avant / après de références, car aucune référence n'existe encore (point 3.7) : le type `integer` entre dans la version 1 dès la création.
+
+Issues : #24, #17.
