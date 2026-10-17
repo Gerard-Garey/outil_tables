@@ -251,3 +251,33 @@ Les premières références de non-régression naîtront sur cette plateforme (d
 - *Rapporté par la session principale, non revérifié* : les valeurs lues dans les journaux des jobs (OpenBLAS 0.3.20, Ubuntu 22.04.5, chemins, processeurs, version des paquets, absence de `java`, `ImageOS` vide). Le téléchargement des journaux depuis la session de rédaction est refusé (`results-receiver.actions.githubusercontent.com`, `Forbidden`).
 
 Issues : #8. Décision M47 (`docs/feuille-de-route.md` § 4).
+
+## Annotation du 17 octobre 2026 — job R sans calcul numérique exempté des points 3 et 4 ; paquets TeX de l'hôte retenus pour le job « Documentation »
+
+Rédigée par `architect` à la suite de la revue finale de la PR #12 (constat C2), d'après `.github/workflows/ci.yml` à `bc8ee13`. Le texte ci-dessus n'est pas réécrit.
+
+**(a) Exemption des points 3 et 4 pour un job R sans calcul numérique.** Le point 3 dit le script de plateforme « exécuté en première étape de chaque job R », et le point 4 pose `OPENBLAS_NUM_THREADS=1` et `OMP_NUM_THREADS=1` « dans l'`env` de chaque job R ». Le point 7 dit pourtant que le job « Absence de Java » « n'entre pas dans la plateforme de référence ». Les deux formulations ne sont pas compatibles telles quelles. L'état réel de la CI est le suivant (*vérifié* par lecture de `ci.yml`) :
+
+- « Tests (R 4.3.3) » applique les points 3 et 4 : les variables sont posées l. 73-74, la bascule BLAS et LAPACK (M47) est faite l. 93-104 et le script `tests/controles/plateforme.R --exiger` tourne l. 105-106, avant les batteries ;
+- « Absence de Java » (l. 128-165) tourne dans la même image épinglée (l. 136-139, chaîne unique contrôlée par `tests/controles/identite_batteries.R`, sortie « OK : … chaîne d'image unique », *vérifié*). En revanche, son `env` ne porte que `TABLEXP_IMAGE` (l. 140-141), sans `OPENBLAS_NUM_THREADS` ni `OMP_NUM_THREADS`, et il n'a ni bascule BLAS ni étape de plateforme. Ses deux étapes (l. 149-150 et 155-165) exécutent `tests/controles/absence_java.R`, qui lit les métadonnées d'un instantané du CRAN (point 7). Son commentaire, l. 128-131, le dit « hors plateforme de référence ». R y charge donc l'OpenBLAS de l'image (constat de l'annotation du 16/10/2026).
+
+**Règle consignée.** Les points 3 et 4 s'entendent de **tout job R qui exécute un calcul numérique dont le résultat est produit, comparé ou contrôlé** : batteries, régénération des références (point 8), et tout futur job qui appelle `tablexp`. Un job R qui **ne fait aucun calcul numérique** (lecture de métadonnées, contrôle de texte ou de structure) en est exempté, à trois conditions :
+
+1. il ne produit aucun résultat ni aucune référence, et n'en compare aucun ;
+2. il n'installe ni n'appelle `tablexp` ;
+3. son commentaire dans `ci.yml` le dit « hors plateforme de référence ».
+
+Raison : la BLAS et le nombre de fils n'influent que sur un calcul en virgule flottante. Pour un job qui n'en fait aucun, l'étape de plateforme coûterait un `apt-get` par exécution sans rien protéger. L'image épinglée y reste une commodité (point 7) et non une garantie. Le job « Absence de Java » remplit les trois conditions (*vérifié* par lecture de `ci.yml`, l. 149-165). Si un job exempté se met à calculer, l'exemption tombe : il reçoit les points 3 et 4 dans le même commit.
+
+**(b) Job « Documentation » : paquets TeX de l'hôte par `apt-get`.** Le tableau du point 6 laissait ouvert le choix entre un conteneur TeX épinglé par empreinte et les paquets TeX de l'hôte par `apt-get`, renvoyé à #8, point 7. Le même renvoi figure sous « Conséquences », « Ce que l'ADR ne règle pas ». La branche a retenu **les paquets de l'hôte** (commits `052d8fc` et `b40ba3a`). Le job tourne sur `runs-on: ubuntu-24.04` sans `container:` (l. 183-189). Il installe huit paquets `texlive-*` par `sudo apt-get install --no-install-recommends` (l. 194-199), puis affiche leurs versions par `dpkg-query` et celle de `pdflatex` (l. 200-201). L'en-tête de `ci.yml` (l. 5-7) le résume.
+
+Raisons et limite :
+- le PDF n'est pas un résultat au sens de `CLAUDE.md`. Il est versionné par la session principale, et le job ne fait que contrôler qu'il se compile (P7) ;
+- la version des paquets suit l'image de l'exécuteur, que GitHub met à jour sans commit (contexte, précédent d'`outil_USP`). Elle n'est pas figée, seulement **consignée** dans le journal de chaque exécution ;
+- une mise à jour de TeX Live peut faire échouer la compilation sans aucun commit du dépôt. C'est un échec visible, à traiter comme une panne de l'outil et non comme un changement de résultat.
+
+Si la stabilité du PDF devient une exigence (par exemple une empreinte du PDF), le choix se rouvre en faveur d'un conteneur TeX épinglé, par une nouvelle annotation.
+
+**Effet sur les résultats** : aucun. L'annotation consigne l'état de la CI ; aucun job ne change.
+
+Issues : #8, #3 ; PR #12 (revue finale, C2).
