@@ -240,6 +240,15 @@ verifier("unité contrat sans id_tete : avertissement inscrit dans l'objet et da
   identical(y$fiche$unite_observation, "contrat") && !is.na(y$fiche$avertissement_unite) &&
     "unite_contrat" %in% y$fiche$avertissements$code
 })
+verifier("avertissements$nombre en integer dans l'objet et dans la fiche, avec avertissements (unité contrat) et sans aucun (BASE[1:3, ]) (#24)", {
+  y <- construire_table(BASE, ROLES[names(ROLES) != "id_tete"], plan_type())
+  z <- construire_table(BASE[1:3, ], ROLES, plan_type())
+  nrow(y$avertissements) > 0L && identical(typeof(y$avertissements$nombre), "integer") &&
+    identical(typeof(y$fiche$avertissements$nombre), "integer") &&
+    nrow(z$avertissements) == 0L && nrow(z$fiche$avertissements) == 0L &&
+    identical(typeof(z$avertissements$nombre), "integer") &&
+    identical(typeof(z$fiche$avertissements$nombre), "integer")
+})
 verifier("fiche : fin effective lue dans les paramètres effectifs de l'étape donnees",
          identical(x$etapes$donnees$parametres$fin_effective, D("2024-12-31")) &&
            identical(x$fiche$fin_effective, x$etapes$donnees$parametres$fin_effective))

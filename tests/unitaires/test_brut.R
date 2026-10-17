@@ -216,7 +216,7 @@ verifier("H8, âge 65 (valeur calculée à la main) : Poisson evenement_sans_exp
 verifier("H8 : avertissement poisson_evenement_sans_exposition (1 cellule, 1 événement), aucun avertissement binomial", {
   a <- H8$objet$avertissements
   k <- a$etape == "brut"
-  identical(a$code[k], "poisson_evenement_sans_exposition") && identical(a$nombre[k], 1) &&
+  identical(a$code[k], "poisson_evenement_sans_exposition") && identical(a$nombre[k], 1L) &&
     grepl("1 événement", a$message[k], fixed = TRUE)
 })
 for (k in list(list("H10b", "1950-05-05", "2005-01-01", "2015-01-01", 64L, 124 / 365),

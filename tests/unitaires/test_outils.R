@@ -44,10 +44,27 @@ avertissements_vides <- tablexp:::avertissements_vides
 a0 <- avertissements_vides()
 verifier("avertissements_vides() : data.frame (etape, code, message, nombre) sans ligne",
          identical(names(a0), c("etape", "code", "message", "nombre")) && nrow(a0) == 0L)
+verifier("avertissements_vides() : nombre en integer (#24)", identical(typeof(a0$nombre), "integer"))
 a <- avertir(avertir(a0, "donnees", "unite_contrat", "msg 1", 3L), "donnees", "exclusion", "msg 2", 2)
-verifier("avertir() : lignes ajoutées dans l'ordre, nombre en double",
+verifier("avertir() : lignes ajoutées dans l'ordre, nombre en integer (double entier converti, #24)",
          identical(a, data.frame(etape = c("donnees", "donnees"), code = c("unite_contrat", "exclusion"),
-                                 message = c("msg 1", "msg 2"), nombre = c(3, 2), stringsAsFactors = FALSE)))
+                                 message = c("msg 1", "msg 2"), nombre = c(3L, 2L), stringsAsFactors = FALSE)))
+# Nombre mal formé : erreur de programmation (stop()), pas un refus typé (#24).
+erreur_programmation <- function(expr) {
+  e <- tryCatch({ expr; NULL }, error = function(e) e)
+  inherits(e, "error") && !inherits(e, "refus_tablexp") &&
+    grepl("'nombre'", conditionMessage(e), fixed = TRUE)
+}
+for (cas in list(list("non entier", 2.5), list("NA entier", NA_integer_), list("NA double", NA_real_),
+                 list("Inf", Inf), list("-Inf", -Inf), list("NaN", NaN), list("longueur 0", integer(0)),
+                 list("longueur 2", c(1L, 2L)), list("caractère", "3"), list("logique", TRUE),
+                 list("hors étendue des entiers", 2^31), list("négatif (double)", -1),
+                 list("négatif (integer)", -1L)))
+  verifier(sprintf("avertir() : nombre %s -> erreur de programmation (#24)", cas[[1L]]),
+           erreur_programmation(avertir(a0, "donnees", "code", "msg", cas[[2L]])))
+verifier("avertir() : nombre 0 et .Machine$integer.max admis",
+         identical(avertir(a0, "e", "c", "m", 0)$nombre, 0L) &&
+           identical(avertir(a0, "e", "c", "m", .Machine$integer.max)$nombre, .Machine$integer.max))
 verifier("avertir() : aucun warning() émis",
          is.null(tryCatch({ avertir(a0, "donnees", "code", "msg", 1); NULL }, warning = function(w) w)))
 verifier("avertir() : code mal formé -> erreur de programmation",

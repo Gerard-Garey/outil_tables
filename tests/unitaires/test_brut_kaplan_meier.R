@@ -148,7 +148,7 @@ for (k in list(list("H10b", "1950-05-05", "2005-01-01", "2015-01-01", 64L, 241L,
     a <- cas$objet$avertissements
     if (!isTRUE(r)) r
     else if (!identical(a$code[a$etape == "brut"], "kaplan_meier_ensemble_a_risque_vide") ||
-             !identical(a$nombre[a$etape == "brut"], 1)) "avertissement"
+             !identical(a$nombre[a$etape == "brut"], 1L)) "avertissement"
     else identical(s$age, k[[5]]) && identical(s$numerateur, k[[6]] * (M %/% k[[7]])) &&
       identical(s$survie_cellule, NA_real_) && identical(s$variance_log_survie_cellule, NA_real_) &&
       identical(cas$objet$etapes$brut$diagnostics$kaplan_meier$cellules_survie_nulle, 0L) &&
@@ -322,7 +322,7 @@ verifier("C, K (identité) : exposition_nulle exactement dans les cellules sans 
 })
 verifier("C (valeur calculée à la main) : avertissement kaplan_meier_ensemble_a_risque_vide réservé aux cellules ensemble_a_risque_vide qui portent un événement : nombre 1 (âge 38, C11), 1 événement ; renvoi à diagnostics$etats (6 cellules de cet état)", {
   a <- XC$avertissements[XC$avertissements$code == "kaplan_meier_ensemble_a_risque_vide", ]
-  nrow(a) == 1L && identical(a$etape, "brut") && identical(a$nombre, 1) &&
+  nrow(a) == 1L && identical(a$etape, "brut") && identical(a$nombre, 1L) &&
     grepl("1 cellule(s) à couverture incomplète de l'ensemble à risque qui comptent 1 événement(s)",
           a$message, fixed = TRUE) && grepl("diagnostics$etats", a$message, fixed = TRUE)
 })

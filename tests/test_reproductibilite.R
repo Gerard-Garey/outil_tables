@@ -255,7 +255,7 @@ verifier("R6 : tables kaplan_meier et kaplan_meier_sauts présentes, somme de d 
   n_perdus <- sum(km$etat == "ensemble_a_risque_vide" & km$evenements > 0L)
   nrow(x6$etapes$brut$resultat$kaplan_meier_sauts) > 0L &&
     identical(km$evenements, x6$etapes$exposition$resultat$exposition$evenements) &&
-    (if (n_perdus) identical(a$nombre, as.numeric(n_perdus)) else !nrow(a))
+    (if (n_perdus) identical(a$nombre, n_perdus) else !nrow(a))
 })
 verifier("invariance du plan sans kaplan_meier (R1 contre R6) : objet identical() à celui de R6 privé des ajouts de Kaplan-Meier", {
   z <- x6
