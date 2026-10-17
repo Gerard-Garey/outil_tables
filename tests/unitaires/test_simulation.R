@@ -98,7 +98,7 @@ cn29 <- composantes_date(as.numeric(D("1964-02-29")))
 verifier("anniversaires de 1964-02-29 (valeur calculée à la main, T2) : 2020-02-29, 2021-03-01, 2022-03-01, 2023-03-01, 2024-02-29",
          identical(jour_anniversaire(cn29, 56:60),
                    as.numeric(D(c("2020-02-29", "2021-03-01", "2022-03-01", "2023-03-01", "2024-02-29")))))
-verifier("age_anniversaire = age_revolu (recoupement interne, 10^5 couples dont 1 000 naissances au 29/02)", {
+verifier("age_anniversaire (comparée à age_revolu() du module donnees) : 10^5 couples dont 1 000 naissances au 29/02", {
   set.seed(1L)
   n <- c(sample(as.numeric(D("1900-01-01")):as.numeric(D("2000-12-31")), 99000, replace = TRUE),
          rep(as.numeric(D(c("1964-02-29", "1996-02-29"))), 500))

@@ -11,8 +11,10 @@
 #  - identité exacte : sur un portefeuille simulé (#10), exposition totale =
 #    somme des durées dans la période, décès et rachats comptés = événements
 #    simulés dans la période réduite du délai ;
-#  - recoupement : somme des années d'âge recalculée ligne par ligne avec
-#    as.Date() et age_revolu(), dont l'exposition ne se sert pas.
+#  - recoupement : somme des années d'âge recalculée ligne par ligne, les
+#    anniversaires par as.Date() et les âges extrêmes de chaque ligne par
+#    age_revolu() du module donnees (comparaison, pas recoupement), dont
+#    l'exposition ne se sert pas.
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -363,7 +365,7 @@ verifier("portefeuille simulé (identité exacte) : décès par sexe et par âge
   identical(as.integer(att[cbind(obs$sexe, as.character(obs$age))]), obs$evenements) &&
     sum(att) == sum(obs$evenements)
 })
-verifier("portefeuille simulé (recoupement : as.Date et age_revolu, ligne par ligne) : somme des années d'âge à 1e-12 relatif", {
+verifier("portefeuille simulé (recoupement : anniversaires par as.Date, âges extrêmes comparés à age_revolu() du module donnees, ligne par ligne) : somme des années d'âge à 1e-12 relatif", {
   i <- which(a < b)
   nai <- as.numeric(SIM$date_naissance)[i]
   xa <- tablexp:::age_revolu(nai, a[i]); xb <- tablexp:::age_revolu(nai, b[i] - 1)

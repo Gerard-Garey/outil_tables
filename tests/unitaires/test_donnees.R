@@ -714,7 +714,8 @@ r <- prep(d = d, exclusions = c("cause_hors_modalites", "sortie_avant_entree"))
 verifier("ligne 1 exclue pour deux motifs : décomptes par motif 1 et 1, lignes exclues distinctes 1",
          identical(r$resultat$exclusions$nombre, c(1L, 1L)) && identical(r$resultat$nombre_lignes_exclues, 1L))
 
-# --- fusion : recoupement avec une fusion naïve, tête par tête -----------------
+# --- fusion : vérifiée contre un second algorithme (boucle naïve écrite dans
+# le test), tête par tête -------------------------------------------------------
 
 # Nature : valeur attendue calculée par un second algorithme (boucle), sur un
 # jeu déterministe sans tirage : 600 têtes de 2 ou 3 lignes (300 de chaque,

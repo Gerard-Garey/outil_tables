@@ -11,8 +11,9 @@
 #    et contrôlées par le total en jours de la spécification ; un cas
 #    complémentaire H4c (complément c2 différent de c1) est calculé à la main
 #    par coder ;
-#  - recoupement : arithmétique de dates du module contre as.Date() et
-#    age_revolu() (module donnees), dont l'exposition ne se sert pas.
+#  - recoupement : arithmétique de dates du module contre as.Date() ;
+#  - âge au dernier anniversaire comparé à age_revolu() du module donnees,
+#    dont l'exposition ne se sert pas.
 #  Les cas passent par construire_table() (étapes donnees puis exposition).
 # -----------------------------------------------------------------------------
 
@@ -244,7 +245,7 @@ verifier("controler_parametres_exposition : par_annee NA ou non logique -> par_a
          isTRUE(leve_refus(controler_parametres_exposition("plus_fine", NA), "par_annee_invalide")) &&
            isTRUE(leve_refus(controler_parametres_exposition("plus_fine", "oui"), "par_annee_invalide")))
 
-# --- arithmétique de dates (recoupement : as.Date, age_revolu) ---------------
+# --- arithmétique de dates (recoupement : as.Date ; comparaison à age_revolu()) --
 
 annee_du_jour <- tablexp:::annee_du_jour
 composantes_jour <- tablexp:::composantes_jour
@@ -277,7 +278,7 @@ verifier("anniversaire_age (recoupement : as.Date) : anniversaires 0 à 120 de n
 verifier("anniversaire_age (valeur calculée à la main, T2) : 1964-02-29 -> 2020-02-29, 2021-03-01, 2022-03-01, 2023-03-01, 2024-02-29",
          identical(anniversaire_age(CAL, composantes_jour(rep(as.numeric(D("1964-02-29")), 5)), 56:60),
                    as.numeric(D(c("2020-02-29", "2021-03-01", "2022-03-01", "2023-03-01", "2024-02-29")))))
-verifier("age_dernier_anniversaire (recoupement : age_revolu du module donnees) : 2·10^4 couples (naissance, jour) tirés, plus trois naissances au 29/02 sur tous les jours de 1900 à 2030", {
+verifier("age_dernier_anniversaire (comparée à age_revolu() du module donnees) : 2·10^4 couples (naissance, jour) tirés, plus trois naissances au 29/02 sur tous les jours de 1900 à 2030", {
   tir <- tablexp:::sous_graine(11L, list(
     n = sample(as.numeric(D("1890-01-01")):as.numeric(D("2010-12-31")), 2e4, replace = TRUE),
     d = sample(0:(110 * 366), 2e4, replace = TRUE)))
