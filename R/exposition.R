@@ -215,13 +215,16 @@ decouper_annees <- function(cal, debut, fin) {
        fin = pmin(fin[rang], cal$premier_janvier[i + 1]))
 }
 
-# Somme de v par cellule (indices entiers 1..n_cellules), dans l'ordre des
-# valeurs (rowsum) ; 0 pour une cellule sans valeur.
+# Somme de v par cellule (indices entiers 1..n_cellules, sans NA), dans
+# l'ordre des valeurs (rowsum) ; 0 pour une cellule sans valeur. Avec
+# reorder = TRUE, les lignes de rowsum() suivent sort(unique(cellule)) :
+# l'affectation se fait par ces indices, sans relire les noms de ligne
+# (écriture des nombres dépendante de l'option scipen).
 somme_par_cellule <- function(cellule, v, n_cellules) {
   r <- numeric(n_cellules)
   if (length(cellule)) {
     s <- rowsum(as.numeric(v), cellule, reorder = TRUE)
-    r[as.integer(rownames(s))] <- s[, 1L]
+    r[sort(unique(cellule))] <- s[, 1L]
   }
   r
 }
