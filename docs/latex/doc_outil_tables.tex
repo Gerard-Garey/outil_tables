@@ -1,0 +1,1555 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage[left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\usepackage[french]{babel}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{etoolbox}
+\usepackage{csquotes}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathrsfs}
+\usepackage{float}
+\usepackage{dsfont}
+\usepackage{tikz}
+\usepackage{url}
+\usepackage{color, xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{longtable}
+\usepackage{pdflscape}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{hyperref}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric, fit, backgrounds}
+
+% ---------------------------------------------------------------- charte ----
+% Charte reprise d'outil_USP (docs/latex/CONVENTIONS.md, section 2) : bleu
+% financier pour la structure, vert pour l'accent et les sorties, deux gris de
+% tableau.
+\definecolor{maincolor}{RGB}{0,70,140}
+\definecolor{greenline}{RGB}{0,180,80}
+\definecolor{tableheader}{RGB}{200,220,250}
+\definecolor{tablerow}{RGB}{245,245,245}
+\definecolor{financeblue}{RGB}{0,70,140}
+
+\newcommand{\annee}{2026}
+\newcommand{\datedoc}{\today}
+\newcommand{\versiondoc}{0.1}
+\newcommand{\statutdoc}{Projet}
+% Titre court utilise dans le pied de page (fancyhdr).
+\newcommand{\titredoc}{Documentation de l'outil de construction de tables d'expérience}
+
+\captionsetup[figure]{labelfont={bf, color=maincolor}, textfont={normalfont}, labelsep=colon}
+\captionsetup[table]{labelfont={bf, color=maincolor}, textfont={normalfont}, labelsep=colon}
+
+\hypersetup{colorlinks=true, linkcolor=financeblue, urlcolor=financeblue,
+            pdftitle={Documentation de l'outil de construction de tables d'experience}}
+
+\renewcommand{\baselinestretch}{1.08}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\color{maincolor}\nouppercase{\leftmark}}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancyfoot[R]{\color{greenline}\textbf{page \thepage}}
+\fancyfoot[L]{\color{maincolor}\titredoc}
+\fancypagestyle{plain}{\fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}\renewcommand{\footrulewidth}{0.4pt}%
+  \fancyfoot[R]{\color{greenline}\textbf{page \thepage}}%
+  \fancyfoot[L]{\color{maincolor}\titredoc}}
+
+% ------------------------------------------------------ titres de section ---
+% Le bandeau bleu pleine largeur avec le titre en vert marque le niveau
+% section, qui joue ici le role du chapitre.
+\newcommand{\titrebandeau}[1]{%
+  \noindent{\color{financeblue}\rule{\linewidth}{2.5pt}}
+  \par\vspace{5mm}
+  {\color{greenline}\raggedright\fontsize{19}{23}\bfseries\selectfont #1\par}
+  \vspace{6mm}}
+
+\titleformat{\section}[display]
+  {\normalfont}{}{0pt}
+  {\titrebandeau}
+\titlespacing*{\section}{0pt}{0pt}{0pt}
+\titleformat{\subsection}
+  {\color{financeblue}\normalfont\large\bfseries}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}
+  {\color{financeblue}\normalfont\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+
+\renewcommand{\cftsecfont}{\bfseries\color{financeblue}}
+\renewcommand{\cftsecaftersnum}{\color{financeblue}}
+\renewcommand{\cftsecpagefont}{\color{financeblue}}
+\renewcommand{\cftsubsecfont}{\color{black}}
+\renewcommand{\cftsubsecpagefont}{\color{black}}
+\setlength{\cftsecnumwidth}{2.2em}
+\setcounter{tocdepth}{2}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\refl}[1]{{\small\textcolor{maincolor!70!black}{\textit{Référence.} #1}}\par\smallskip}
+
+% Entree d'un catalogue lu par la batterie de concordance
+% (tests/concordance_doc_moteur.R ; docs/latex/CONVENTIONS.md, section 3.2) :
+% #1 = nom du catalogue (exports, fonctions-<fichier>, roles, recettes...),
+% non imprime ; #2 = nom tel qu'il s'ecrit dans le code, compose comme \code.
+\newcommand{\catalogue}[2]{\code{#2}}
+
+% Encadre de citation d'un texte qui fait foi : filet vertical bleu en marge.
+\newcommand{\reglement}[2]{%
+  \par\vspace{2mm}\noindent\begin{minipage}{\linewidth}
+  \small\setlength{\parindent}{0pt}
+  \textcolor{financeblue}{\vrule width 2pt}\hspace{4mm}%
+  \begin{minipage}{\dimexpr\linewidth-7mm\relax}
+  \textcolor{financeblue}{\textbf{#1}}
+  \par\vspace{2pt}
+  {\itshape #2}
+  \end{minipage}
+  \end{minipage}\par\vspace{3mm}}
+
+% L'encadre generique reprend le filet bleu de la charte.
+\newmdenv[linecolor=financeblue, linewidth=0pt, leftline=true,
+          innerleftmargin=6mm, innertopmargin=4pt, innerbottommargin=4pt,
+          backgroundcolor=tablerow, skipabove=3mm, skipbelow=3mm]{encadre}
+
+% Titre de partie : un seul filet bleu, titre en vert dessous, corps plus
+% petit que le bandeau des sections qui suivent (charte d'outil_USP).
+\newcommand{\partie}[2]{%
+  \clearpage
+  \vspace*{1cm}
+  \noindent{\color{financeblue}\rule{\linewidth}{2pt}}\par\vspace{3mm}
+  {\color{financeblue}\raggedright\normalsize\bfseries\scshape #1\par}
+  \vspace{1.5mm}
+  {\color{greenline}\raggedright\fontsize{20}{24}\bfseries\selectfont #2\par}
+  \vspace{5mm}
+  \addcontentsline{toc}{section}{\protect\numberline{}\textsc{#1} --- #2}}
+
+\emergencystretch=1.5em
+
+\begin{document}
+
+% ============================================================ page de garde ==
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[financeblue]
+    ([xshift=2.5cm,yshift=-3.2cm]current page.north west) rectangle
+    ([xshift=-2.5cm,yshift=-3.28cm]current page.north east);
+  \fill[greenline]
+    ([xshift=2.5cm,yshift=-3.2cm]current page.north west) rectangle
+    ([xshift=7.5cm,yshift=-3.28cm]current page.north west);
+  \fill[financeblue]
+    ([xshift=2.5cm,yshift=3.6cm]current page.south west) rectangle
+    ([xshift=-2.5cm,yshift=3.53cm]current page.south east);
+\end{tikzpicture}%
+\vspace*{2.1cm}
+\noindent
+{\color{financeblue}\normalsize\bfseries\scshape Exercice \annee}
+
+\vspace{1.7cm}
+\noindent
+{\color{financeblue}\fontsize{28}{34}\bfseries\selectfont
+ Documentation\\ de l'outil\par}
+
+\vspace{1.1cm}
+\noindent
+{\color{black}\Large
+ Construction de tables d'expérience\\
+ Package \code{tablexp}, méthodes, vérifications et application\par}
+
+\vspace{0.7cm}
+\noindent
+{\color{black}\normalsize\itshape
+ Une table d'expérience est l'estimation d'une transition d'un modèle multi-états\par}
+
+\vfill
+\noindent
+{\footnotesize\color{black}
+ Établie le \datedoc\quad\textbar\quad Version \versiondoc\quad\textbar\quad
+ Statut : \statutdoc\quad\textbar\quad Package \code{tablexp} 0.0.0.9000\par}
+\vspace{2.6cm}
+\clearpage
+
+% ================================================================= resume ==
+\titrebandeau{Objet du document}
+\markboth{Objet du document}{}
+
+\noindent
+Ce document est la documentation de l'\textbf{outil de construction de tables
+d'expérience} \code{outil\_tables}. Il couvre le package R \code{tablexp}, qui
+porte toute la logique quantitative, les vérifications qui l'accompagnent
+(batteries de tests, contrôles du dépôt, plateforme de calcul) et, quand elle
+existera, l'application interactive qui l'exploite. Une \emph{table
+d'expérience} est construite à partir des observations d'un portefeuille
+d'assurés~: pour un risque donné, l'outil estime le taux d'une
+\emph{transition} (vivant $\to$ décédé, en cours $\to$ racheté\ldots) selon un
+ou plusieurs axes, le lisse ou le positionne sur une table de référence, le
+ferme aux âges extrêmes, le valide, et restitue la table avec tout ce qui
+permet de la rejouer et de la relire.
+
+\medskip\noindent
+Les destinataires des tables et des rapports sont, par priorité, les
+hypothèses biométriques de la meilleure estimation (\emph{best estimate})
+Solvabilité~II, que l'ACPR revoit en contrôle, puis la certification d'une
+table d'expérience par un actuaire indépendant agréé (\code{docs/exigences.md},
+E1.2). Le document doit permettre à un relecteur externe, sans lire le code,
+de savoir ce qui a été calculé, avec quelles hypothèses, et de rejouer le
+calcul (E3.7). Les textes qui font foi sont recensés par le cahier des charges
+(\code{docs/exigences.md}, §~2.4)~; ils ne sont cités dans le présent document
+qu'une fois établis sur la source (issue~\#13).
+
+\medskip\noindent
+Il est organisé en une partie par module du package (E3.1). La
+\textbf{partie~I} présente l'outil~: forme du package et graphe des modules,
+services transverses, reproductibilité, batteries de vérification et
+plateforme de calcul, contrôles du dépôt. La \textbf{partie~II} décrit le point
+d'entrée unique et le plan de construction. Les parties suivantes suivent
+l'ordre des modules du moteur~: données, exposition, taux bruts, lissage,
+positionnement, table prospective, fermeture, validation, rapport, puis le
+simulateur, qui produit les jeux de données sous une loi vraie connue. La
+dernière partie rassemble l'index des fonctions exportées, la traçabilité des
+exigences et les références. Chaque partie de module se termine par le
+tableau des fonctions du module, qui relie la description de la méthode à
+son implémentation~; un module qui n'existe pas encore a déjà sa partie, avec
+un tableau vide.
+
+\medskip\noindent
+Le document ne porte aucun chiffre issu d'une exécution (E3.4)~: les
+résultats d'une construction sont dans son rapport figé et sa fiche de
+construction, et les bilans des vérifications dans la sortie des batteries.
+Ses conventions de rédaction sont fixées par \code{docs/latex/CONVENTIONS.md}~;
+le vocabulaire est celui du glossaire du projet (\code{CONTEXT.md}).
+
+\vspace{6mm}
+\noindent
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{tabular}{@{}p{4.6cm}p{10.2cm}@{}}
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Élément}} & \textcolor{financeblue}{\textbf{Référence}} \\
+Cahier des charges & \code{docs/exigences.md} (exigences E1.1 à E5.5) \\
+Décisions d'architecture & \code{docs/adr/} (ADR 0002 à 0008) \\
+Moteur de calcul & package \code{tablexp} (\code{R/}), packages de priorité
+\code{base} seulement (ADR 0002) \\
+Interface & \code{app/app.R}, \code{app/affichage.R} (à venir~; aucun calcul) \\
+Version de R & 4.3.3~; \code{DESCRIPTION} déclare \code{Depends: R (>= 4.3.3)} \\
+Plateforme de référence & conteneur \code{rocker/r-ver:4.3.3} épinglé par
+empreinte, BLAS et LAPACK de référence (ADR 0008~; section~\ref{sec:plateforme}) \\
+Données & aucune donnée réelle~: jeux simulés sous une loi vraie et une graine \\
+\end{tabular}
+\end{center}
+
+\clearpage
+\titrebandeau{Sommaire}
+\markboth{Sommaire}{}
+% \tableofcontents composerait son propre titre, qui ferait doublon avec le
+% bandeau ci-dessus : on n'appelle que \@starttoc.
+\makeatletter
+\@starttoc{toc}
+\makeatother
+\newpage
+
+
+% =============================================================================
+\partie{Partie I}{Présentation de l'outil}
+% =============================================================================
+
+% =============================================================================
+\section{Architecture du package et graphe des modules}
+\label{sec:architecture}
+% =============================================================================
+
+\subsection{Principe de séparation}
+\label{sec:separation}
+
+L'outil sépare strictement le \emph{calcul} de l'\emph{affichage}. La règle
+est la suivante~: si un résultat peut être calculé indépendamment de
+l'interface, son calcul figure dans le package \code{tablexp} (E4.3). Le moteur
+reçoit un \code{data.frame} et la déclaration des \emph{rôles} de ses colonnes,
+jamais un fichier~; la lecture des fichiers, et les conversions de type qui
+l'accompagnent, relèvent d'une couche mince hors du moteur, qui n'existe pas
+encore (E4.4). Le moteur refuse un type incompatible, il ne le convertit pas.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{tabular}{@{}p{3.6cm}p{5.6cm}p{5.6cm}@{}}
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Emplacement}} &
+\textcolor{financeblue}{\textbf{Contenu}} &
+\textcolor{financeblue}{\textbf{Interdit}} \\
+\code{R/} (package \code{tablexp}) & toute la logique quantitative~: rôles et
+validation des données, recettes d'exposition, estimation, lissage,
+positionnement, prospective, fermeture, validation, simulation, quantités des
+rapports et empreintes & toute primitive Shiny (\code{input\$},
+\code{reactive}, \code{render*})~; tout package hors priorité \code{base}
+sans ADR de méthode~; toute dépendance à Java \\
+\code{app/app.R} (à venir) & déclaration des rôles, édition du plan, appel du
+point d'entrée sur clic du bouton «~Relancer les calculs~», affichage &
+tout calcul~; tout appel d'une fonction non exportée (\code{tablexp:::}) \\
+\code{app/affichage.R} (à venir) & formatage, tableaux HTML, tracés à partir
+des quantités du résultat & tout calcul \\
+\code{tests/} & batteries, harnais, scripts de contrôle & --- \\
+\end{tabular}
+\end{center}
+
+\medskip
+L'application vit hors du package, sous \code{app/}, et non dans un fichier
+\code{R/affichage.R}~: tout fichier de \code{R/} est installé dans l'espace de
+noms du package (section~\ref{sec:fichiers-package}), si bien qu'un fichier
+d'affichage placé là entrerait dans le moteur et rendrait circulaire le
+contrôle de frontière (ADR 0007, point 1.3). Le dossier \code{app/} et son
+script de frontière n'existent pas encore~: ils viennent avec la branche de
+l'application.
+
+\subsection{Fichiers du package}
+\label{sec:fichiers-package}
+
+Le package \code{tablexp} est à la racine du dépôt (ADR 0007, point 1.1)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{DESCRIPTION}~: \code{Package: tablexp}, \code{Depends: R (>= 4.3.3)}
+    (décision M44), aucun champ \code{Imports}, \code{Suggests} ni
+    \code{LinkingTo}, \code{Encoding: UTF-8}, \code{License: file LICENSE}~; le
+    contrôle de la liste blanche (section~\ref{sec:controles-depot}) en fait une
+    règle vérifiée~;
+  \item \code{NAMESPACE}, écrit à la main~: une directive \code{export} par
+    fonction, sans \code{exportPattern}~; les fonctions exportées sont les
+    points d'entrée et les fonctions que l'application appelle (contrôles de
+    saisie à sens métier, constructeurs d'objets partagés), recensées dans
+    l'index (section~\ref{sec:index-exports})~; aucune méthode S3 n'est
+    exportée~;
+  \item \code{R/}~: un fichier par module et deux fichiers transversaux
+    (tableau~\ref{tab:fichiers-r})~;
+  \item \code{.Rbuildignore}~: exclut de l'archive du package \code{app/},
+    \code{docs/}, \code{tests/}, \code{.claude/}, \code{.github/} et les
+    fichiers de pilotage du dépôt.
+\end{itemize}
+
+\noindent
+Aucun fichier \code{Rd} ni \code{roxygen2}~: la documentation de référence est
+le présent document, tenu concordant avec le code par la batterie de
+concordance (section~\ref{sec:batteries}~; E3.3).
+
+\medskip
+\textbf{\code{R/} ne contient que du code du package.} Une installation depuis
+l'arbre de travail (\code{R CMD INSTALL <dossier>}), qui est celle des
+batteries, n'applique pas \code{.Rbuildignore}~: tout fichier de \code{R/} est
+installé, même s'il y est exclu (constat~: un fichier \code{R/b.R} exclu par
+\code{.Rbuildignore} est présent dans le package installé~; ADR 0007, mesures).
+Un fichier étranger au moteur ne peut donc pas être rangé dans \code{R/}.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{7.6cm}p{2.9cm}@{}}
+\caption{Fichiers de \code{R/}, dans l'ordre des modules (ADR 0007, points 1.2 et 2.1).}
+\label{tab:fichiers-r}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fichier}} &
+\textcolor{financeblue}{\textbf{Contenu}} &
+\textcolor{financeblue}{\textbf{État}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Fichier}} &
+\textcolor{financeblue}{\textbf{Contenu}} &
+\textcolor{financeblue}{\textbf{État}} \\
+\endhead
+\code{R/outils.R} & services transverses sans contenu métier~: graine locale,
+refus et avertissements (section~\ref{sec:outils})~; n'appelle aucun module &
+présent \\
+\code{R/donnees.R} & rôles, contrôles, refus et exclusions, unité
+d'observation, table de référence (section~\ref{sec:donnees}) & présent \\
+\code{R/exposition.R} & recettes d'exposition, conventions d'âge, troncature
+et censure (section~\ref{sec:exposition}) & présent \\
+\code{R/brut.R} & taux bruts et intervalles (section~\ref{sec:brut}) & à créer \\
+\code{R/lissage.R} & lissages (section~\ref{sec:lissage}) & à créer \\
+\code{R/positionnement.R} & positionnement sur une table de référence
+(section~\ref{sec:positionnement}) & à créer \\
+\code{R/prospective.R} & tables prospectives (section~\ref{sec:prospective}) & à créer \\
+\code{R/fermeture.R} & fermeture aux âges extrêmes (section~\ref{sec:fermeture}) & à créer \\
+\code{R/validation.R} & validation et suivi d'expérience (section~\ref{sec:validation}) & à créer \\
+\code{R/rapport.R} & quantités des rapports, fiche de construction, empreintes
+(section~\ref{sec:rapport}) & présent \\
+\code{R/simulation.R} & simulateur (section~\ref{sec:simulation})~; hors de la
+chaîne du moteur & présent \\
+\code{R/construire\_table.R} & point d'entrée unique, validation du plan,
+orchestration seule, aucun calcul (section~\ref{sec:construction}) & présent \\
+\end{longtable}
+\end{center}
+
+\subsection{Graphe d'appels autorisés}
+\label{sec:graphe}
+
+Les modules sont ordonnés~: \code{outils}, \code{donnees}, \code{exposition},
+\code{brut}, \code{lissage}, \code{positionnement}, \code{prospective},
+\code{fermeture}, \code{validation}, \code{rapport}. Un module ne peut appeler
+que des fonctions définies dans les modules situés \textbf{strictement avant
+lui} dans cet ordre (ADR 0007, point 2.1). Deux fichiers sont hors de la
+chaîne~: \code{simulation}, qui ne peut appeler que \code{donnees} et
+\code{outils} et qu'\textbf{aucun module du moteur n'appelle}, et
+\code{construire\_table}, qui peut appeler tous les modules \textbf{sauf}
+\code{simulation}. La figure~\ref{fig:graphe-modules} et le
+tableau~\ref{tab:appels-autorises} donnent ce graphe.
+
+\medskip
+Deux raisons fondent cette règle. Un ordre sans cycle rend chaque module
+lisible et vérifiable avec ses seuls modules amont~: une anomalie d'un module
+ne peut atteindre que les modules situés après lui. Et le simulateur, qui
+produit les jeux sur lesquels le moteur est testé, ne partage pas le code
+qu'il sert à tester~: s'il pouvait appeler \code{exposition}, une erreur de la
+recette d'exposition se retrouverait à l'identique dans les données simulées
+et dans leur estimation, et la vérification ne la verrait pas (ADR 0007,
+«~Options écartées~»). Le simulateur reproduit le même modèle, pas le même
+code. Une seule exception à la lecture «~en aval seulement~» est assumée~:
+\code{positionnement} peut appeler \code{lissage}, parce que la méthode~4 de
+positionnement est un lissage de la table du moment avec dérive de la
+référence (E2.12)~; le sens inverse est interdit, \code{lissage} n'appelant
+jamais \code{positionnement}.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  ent/.style   = {rectangle, rounded corners=2pt, draw=financeblue, line width=0.7pt,
+                  fill=tableheader, text=financeblue, align=center, inner sep=3pt,
+                  minimum height=6mm, text width=36mm, font=\small\bfseries},
+  fonc/.style  = {rectangle, rounded corners=2pt, draw=financeblue, line width=0.7pt,
+                  fill=white, text=black, align=center, inner sep=3pt,
+                  minimum height=6mm, text width=36mm},
+  prevu/.style = {rectangle, rounded corners=2pt, draw=financeblue!60, dashed,
+                  line width=0.6pt, fill=white, text=black!60, align=center,
+                  inner sep=3pt, minimum height=6mm, text width=36mm},
+  fl/.style    = {-{Latex[length=2mm]}, draw=financeblue, line width=0.6pt},
+  flx/.style   = {font=\scriptsize\itshape, text=greenline, inner sep=1.5pt}
+]
+\node[fonc] (rap) {\code{rapport}};
+\node[prevu, below=3.5mm of rap] (val) {\code{validation}};
+\node[prevu, below=3.5mm of val] (fer) {\code{fermeture}};
+\node[prevu, below=3.5mm of fer] (pro) {\code{prospective}};
+\node[prevu, below=3.5mm of pro] (pos) {\code{positionnement}};
+\node[prevu, below=3.5mm of pos] (lis) {\code{lissage}};
+\node[prevu, below=3.5mm of lis] (bru) {\code{brut}};
+\node[fonc, below=3.5mm of bru] (exp) {\code{exposition}};
+\node[fonc, below=3.5mm of exp] (don) {\code{donnees}};
+\node[fonc, below=3.5mm of don] (out) {\code{outils}};
+
+\node[ent, above=8mm of rap] (ct) {\code{construire\_table}\\[1pt]
+  \scriptsize\mdseries point d'entrée, orchestration};
+\node[fonc, right=22mm of don] (sim) {\code{simulation}\\[1pt]
+  \scriptsize simulateur};
+
+\foreach \a/\b in {rap/val, val/fer, fer/pro, pro/pos, pos/lis, lis/bru,
+                   bru/exp, exp/don, don/out}
+  \draw[fl] (\a) -- (\b);
+\draw[fl] (ct) -- node[flx, right] {tous les modules du moteur} (rap);
+\draw[fl] (sim) -- (don);
+\end{tikzpicture}
+\caption{Graphe d'appels autorisés des modules (ADR 0007, point 2.1). Une
+flèche de $A$ vers $B$ signifie que $A$ peut appeler $B$ et, la règle étant
+«~strictement avant~», tout module situé après $B$ dans le sens des flèches.
+Blocs pleins~: fichiers présents dans \code{R/}~; blocs en pointillé~: modules
+prévus, fichiers absents. \code{simulation} n'est appelé par aucun module du
+moteur, ni par \code{construire\_table}~; \code{lissage} n'appelle jamais
+\code{positionnement}.}
+\label{fig:graphe-modules}
+\end{figure}
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{3.6cm}p{11.2cm}@{}}
+\caption{Appels autorisés, par module appelant (ADR 0007, point 2.1~;
+constante \code{APPELS\_AUTORISES} de \code{tests/controles/graphe\_modules.R}).}
+\label{tab:appels-autorises}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Module appelant}} &
+\textcolor{financeblue}{\textbf{Peut appeler}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Module appelant}} &
+\textcolor{financeblue}{\textbf{Peut appeler}} \\
+\endhead
+\code{outils} & aucun module (fonctions des packages de priorité \code{base} seulement) \\
+\code{donnees} & \code{outils} \\
+\code{exposition} & \code{donnees}, \code{outils} \\
+\code{brut} & \code{exposition} et les modules amont \\
+\code{lissage} & \code{brut} et les modules amont \\
+\code{positionnement} & \code{lissage} et les modules amont \\
+\code{prospective} & \code{positionnement} et les modules amont \\
+\code{fermeture} & \code{prospective} et les modules amont \\
+\code{validation} & \code{fermeture} et les modules amont \\
+\code{rapport} & tous les modules ci-dessus \\
+\code{simulation} & \code{donnees} et \code{outils} seulement \\
+\code{construire\_table} & tous les modules sauf \code{simulation} \\
+\end{longtable}
+\end{center}
+
+\subsubsection*{Contrôle par script}
+
+Le graphe est vérifié par \code{tests/controles/graphe\_modules.R}, en R de
+base (\code{codetools}, de priorité \code{recommended}, est exclu par
+l'ADR 0002), dans le job «~Tests (R 4.3.3)~» de la CI (ADR 0007, point 2.2)~:
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item chaque fichier \code{R/<module>.R} est lu par \code{parse()}~; un fichier
+    dont le nom n'est pas un module connu est un écart~;
+  \item les affectations de premier niveau (\code{nom <- \ldots} ou
+    \code{nom = \ldots}, fonctions comme constantes) donnent la table
+    «~symbole $\to$ module~»~; un symbole défini dans deux modules est un
+    écart~;
+  \item pour chaque définition, les noms qu'elle emploie (\code{all.names()}),
+    croisés avec cette table, donnent les arêtes entre modules~; toute arête
+    absente du tableau~\ref{tab:appels-autorises} est un écart, imprimé avec le
+    module appelant, le module appelé et les deux symboles~;
+  \item les appels dynamiques interdits (ci-dessous) sont cherchés dans tout
+    l'arbre syntaxique.
+\end{enumerate}
+
+\noindent
+Le script imprime toutes les arêtes trouvées et tous les écarts, puis sort
+avec le code~1 s'il en a trouvé au moins un. Ses limites sont écrites dans son en-tête~: un nom local homonyme d'un
+symbole d'un autre module compte comme une arête (faux positif possible,
+jamais d'arête manquée par homonymie)~; un code de premier niveau qui n'est
+pas une affectation est un écart~; les appels vers les packages de base ne
+sont pas contrôlés ici, mais par la liste blanche de \code{DESCRIPTION}. Le
+script est lui-même testé sur des témoins (\code{tests/unitaires/test\_controles.R})~:
+il échoue, entre autres, quand \code{exposition} appelle \code{brut}, quand
+\code{donnees} appelle \code{simulation}, quand \code{lissage} appelle
+\code{positionnement} et quand \code{construire\_table} appelle
+\code{simulation}, et il passe sur un graphe conforme où \code{positionnement}
+appelle \code{lissage}.
+
+\subsubsection*{Appels dynamiques interdits}
+
+Un appel dont la cible est calculée à l'exécution (\code{do.call("f", \ldots)},
+\code{get("f")}) n'apparaît pas dans \code{all.names()}~: il créerait une
+arête invisible pour le contrôle. Le script interdit donc dans \code{R/}
+(ADR 0007, point 2.3, liste élargie à la mise en œuvre et consignée dans
+l'annotation du 16/10/2026)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{do.call()} dont l'argument \code{what}, apparié par
+    \code{match.call()} (position ou nom), n'est ni un symbole ni une fonction
+    anonyme (chaîne, \code{paste0(\ldots)}\ldots)~; \code{do.call(f, args)} avec
+    \code{f} un symbole désignant une fonction reste permis~;
+  \item toute occurrence, appel ou fonction passée comme objet
+    (\code{lapply(x, get)}), de \code{match.fun}, \code{get}, \code{get0},
+    \code{mget}, \code{getFromNamespace}, \code{getExportedValue},
+    \code{getFunction}, \code{asNamespace} et \code{getNamespace}~;
+  \item \code{eval()} ou \code{evalq()} d'un \code{parse()}, \code{str2lang()},
+    \code{str2expression()}, \code{call()} ou \code{as.call()}~;
+  \item l'opérateur \code{:::} et toute référence qualifiée \code{tablexp::}~;
+  \item les formes qualifiées \code{base::}, \code{utils::} et \code{methods::}
+    de ce qui précède, lues comme la forme nue.
+\end{itemize}
+
+\noindent
+Une fonction passée en argument puis appelée dans le corps de la fonction qui la reçoit crée une arête
+que le script attribue à l'appelant qui l'a passée~: c'est voulu, la
+dépendance existe bien là. Les tests, seuls, appellent les fonctions non
+exportées par \code{tablexp:::} (ADR 0007, point 11.3).
+
+% =============================================================================
+\section{Services transverses~: \code{R/outils.R}}
+\label{sec:outils}
+% =============================================================================
+
+\code{R/outils.R} porte les services sans contenu métier partagés par tous les
+modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
+la forme des refus et celle des avertissements (ADR 0007, point 1.2). Il
+n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+dans le simulateur et dans le futur bootstrap par têtes, et chaque module
+inventerait sa forme de refus.
+
+\subsection{Refus~: une condition R typée}
+\label{sec:refus}
+
+Le moteur ne devine pas~: quand une entrée ne permet pas de construire, il
+\emph{refuse} (E2.3, E2.7). Un refus est une \textbf{condition R typée, jamais
+un objet retourné} (ADR 0007, point 6.4). \code{refus\_tablexp()} construit la
+condition, de classe \code{c("refus\_tablexp", "error", "condition")}, avec
+quatre champs~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{module}~: le module qui refuse~;
+  \item \code{motif}~: un code court stable, en minuscules ASCII, chiffres et
+    soulignés, conforme au motif \code{MOTIF\_CODE\_REFUS}
+    (\verb|^[a-z][a-z0-9_]*$|)~;
+  \item \code{message}~: la phrase qui dit ce qui manque (E5.5)~;
+  \item \code{details}~: une liste (rôle, colonne, étape, paramètre, décompte,
+    premiers numéros de ligne).
+\end{itemize}
+
+\noindent
+\code{refuser()} la lève par \code{stop()} et ne rend jamais la main. Un
+argument mal formé de \code{refus\_tablexp()} (module ou message vide, motif
+non conforme, détails qui ne sont pas une liste) n'est pas un refus mais une
+erreur de programmation du package, signalée par \code{stop()}. Les tests
+vérifient le motif, le décompte et les numéros par \code{tryCatch()}~;
+l'application attrapera la condition et affichera son message. Une condition
+est préférée à un objet portant \code{ok = FALSE}, forme d'\code{outil\_USP}~:
+un tel objet peut être lu par mégarde comme une construction partielle, une
+condition ne le peut pas. Les codes de refus de chaque module sont recensés
+dans la partie du module.
+
+\subsection{Avertissements métier}
+\label{sec:avertissements}
+
+\emph{À rédiger (issue~\#9).}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-outils}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/outils.R}.}
+\label{tab:fonctions-outils}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-outils}{GENERATEUR} & constante & --- & générateur fixé
+(section~\ref{sec:generateur})~: Mersenne-Twister, inversion pour la loi
+normale, rejet pour \code{sample()} \\
+\catalogue{fonctions-outils}{MOTIF\_CODE\_REFUS} & constante & --- & motif
+d'un code de refus ou d'avertissement~: \verb|^[a-z][a-z0-9_]*$| \\
+\catalogue{fonctions-outils}{refus\_tablexp()} & interne & \code{module},
+\code{motif}, \code{message}, \code{details} (liste, vide par défaut) &
+condition de classe \code{refus\_tablexp}, sans la lever~; \code{stop()} si un
+argument est mal formé (section~\ref{sec:refus}) \\
+\catalogue{fonctions-outils}{refuser()} & interne & mêmes arguments & lève le
+refus~; ne rend jamais la main \\
+\catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
+accumulateur vide des avertissements métier
+(section~\ref{sec:avertissements}~; issue~\#9) \\
+\catalogue{fonctions-outils}{avertir()} & interne & accumulateur, \code{etape},
+\code{code}, \code{message}, \code{nombre} & accumulateur augmenté d'une ligne,
+sans \code{warning()} (section~\ref{sec:avertissements}~; issue~\#9) \\
+\catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
+explicite, sans défaut), \code{expr} & valeur de \code{expr} évaluée sous la
+graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
+\code{graine\_invalide} (section~\ref{sec:sous-graine}) \\
+\end{longtable}
+}
+
+% =============================================================================
+\section{Reproductibilité et aléa}
+\label{sec:reproductibilite}
+% =============================================================================
+
+\subsection{Exigence et portée}
+\label{sec:reproductibilite-exigence}
+
+À données, rôles, plan et graine identiques, le programme produit des
+résultats identiques \textbf{au bit près sur une même machine}~; toute
+simulation passe par une graine locale explicite sous un générateur fixé,
+consignée dans le résultat, l'état global du générateur étant restauré à la
+sortie~; aucun horodatage n'entre dans la partie du résultat comparée lors
+d'un rejeu (E4.6). La présente section décrit les deux mécanismes du socle~:
+le générateur fixé et l'exécution sous graine locale. La consignation de la
+graine et du générateur dans la fiche de construction et le rejeu de la fiche
+sont décrits avec la fiche (section~\ref{sec:fiche}).
+
+\begin{encadre}
+\small
+\textbf{Statut.} L'identité au bit près est un \emph{constat} des batteries
+(section~\ref{sec:verifications-alea}), établi sur la machine qui les exécute~;
+ce n'est pas une propriété démontrée. L'identité entre deux machines n'est
+\textbf{pas garantie}~: deux processeurs différents pourraient différer au
+dernier bit, même dans le même conteneur, si la bibliothèque mathématique
+du système choisit ses variantes de calcul selon le processeur (hypothèse de
+l'ADR 0008, non mesurée). C'est pourquoi les références de non-régression
+seront comparées à tolérance et produites sur une plateforme unique
+(section~\ref{sec:plateforme}).
+\end{encadre}
+
+\subsection{Générateur fixé}
+\label{sec:generateur}
+
+Le générateur est la constante \code{GENERATEUR} de \code{R/outils.R}~:
+\code{kind = "Mersenne-Twister"}, \code{normal.kind = "Inversion"},
+\code{sample.kind = "Rejection"}. Ce sont les valeurs par défaut de R 4.3.3
+(\code{RNGkind()} dans une session neuve), fixées en constante pour qu'un
+changement de défaut d'une version de R ne change pas les tirages en silence.
+Le générateur uniforme est le Mersenne-Twister de Matsumoto et Nishimura~; les
+lois normales s'obtiennent par inversion de la fonction de répartition~; la
+génération uniforme discrète (\code{sample()}) emploie la méthode par rejet,
+défaut de R depuis la version 3.6.0, la méthode antérieure par arrondi rendant
+\code{sample()} sensiblement non uniforme sur de grandes populations
+(documentation de R, \code{?Random}).
+
+\refl{M.~Matsumoto, T.~Nishimura, \emph{Mersenne Twister: a 623-dimensionally
+equidistributed uniform pseudo-random number generator}, \emph{ACM
+Transactions on Modeling and Computer Simulation}, 8, 1998, p.~3--30 (cité par
+la documentation de R, \code{?Random}).}
+
+\noindent
+Un changement de \code{GENERATEUR} change tout résultat simulé~: c'est un
+changement de résultat, soumis au visa (ADR 0007, «~Conséquences~»).
+
+\subsection{Exécution sous graine locale}
+\label{sec:sous-graine}
+
+\code{sous\_graine(graine, expr)} est la seule voie par laquelle le package
+tire un aléa (ADR 0007, point 8.1). Elle procède ainsi~:
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item \textbf{contrôle de la graine}~: un nombre unique, non manquant, fini,
+    entier et de valeur absolue au plus \code{.Machine\$integer.max}~; sinon,
+    et aussi quand la graine est omise, refus \code{graine\_invalide} du module
+    \code{outils}. Il n'y a jamais de graine par défaut~: une graine par défaut
+    serait une graine non déclarée~;
+  \item \textbf{sauvegarde de l'état de l'appelant}~: \code{.Random.seed} de
+    l'environnement global, ou son absence, et le réglage \code{RNGkind()}~;
+  \item \textbf{tirage}~: \code{set.seed(graine, kind, normal.kind, sample.kind)}
+    sous \code{GENERATEUR}, puis évaluation de \code{expr}~;
+  \item \textbf{restauration}, par \code{on.exit()}, donc aussi après une erreur
+    dans \code{expr}~: le réglage d'abord, parce que \code{RNGkind()} réécrit
+    \code{.Random.seed}, puis \code{.Random.seed} de l'appelant, ou sa
+    suppression s'il n'existait pas.
+\end{enumerate}
+
+\noindent
+Les tirages ne dépendent donc que de la graine~: ni de l'état du générateur
+de l'appelant, ni de son réglage, que \code{sous\_graine()} laisse inchangés.
+Le simulateur (section~\ref{sec:simulation}) est, à cette date, la seule
+fonction du package qui tire un aléa~; il reçoit sa graine en argument et la
+consigne, avec \code{GENERATEUR}, dans le jeu simulé.
+
+\medskip
+\textbf{Limite.} La réserve de la méthode normale de Box-Muller d'un appelant,
+gardée par R hors de \code{.Random.seed}, n'est pas restaurable~; c'est sans
+effet sur le moteur, qui tire toujours sous \code{Inversion} (limite reprise
+d'\code{outil\_USP}, ADR 0007, point 8.1).
+
+\medskip
+\textbf{Aucun aléa hors calcul.} Les fichiers temporaires, employés par
+exemple pour calculer une empreinte par \code{tools::md5sum()}, sont créés par
+\code{tempfile()}, qui ne touche pas \code{.Random.seed} (constat~: dans une
+session neuve, \code{.Random.seed} n'existe ni avant ni après \code{tempfile()}
+et \code{tools::md5sum()}~; ADR 0007, point 8.2).
+
+\subsection{Vérifications}
+\label{sec:verifications-alea}
+
+Deux fichiers de tests portent ces propriétés (section~\ref{sec:batteries})~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{tests/unitaires/test\_outils.R}~: valeur de \code{GENERATEUR}~;
+    mêmes tirages que \code{set.seed()} nu sous le générateur par défaut~;
+    graine entière écrite en double admise~; appelant sous
+    \code{L'Ecuyer-CMRG}~: tirages de \code{GENERATEUR}, \code{.Random.seed}
+    et \code{RNGkind()} de l'appelant restaurés~; absence de \code{.Random.seed}
+    restaurée~; état restauré après une erreur dans \code{expr}~; refus
+    \code{graine\_invalide} des graines mal formées~;
+  \item \code{tests/test\_reproductibilite.R}~: à graine égale, tirages
+    identiques (\code{identical()}) dans un même processus, quel que soit l'état
+    du générateur de l'appelant, et dans un autre processus R de la même
+    machine~; à graines différentes, tirages différents. Les tirages comparés
+    couvrent les trois réglages du générateur (\code{runif()}, \code{rnorm()},
+    \code{sample.int()})~; le processus fils les écrit en \code{\%.17g}, format
+    qui restitue un double au bit près. La même batterie vérifie le simulateur
+    et la construction (sections~\ref{sec:simulation} et~\ref{sec:rapport}).
+\end{itemize}
+
+\noindent
+Ces vérifications sont des constats sur la machine qui exécute la batterie~;
+sur la CI, c'est la plateforme de référence (section~\ref{sec:plateforme}).
+
+% =============================================================================
+\section{Batteries de vérification et plateforme de CI}
+\label{sec:batteries}
+% =============================================================================
+
+\subsection{Trois batteries}
+\label{sec:trois-batteries}
+
+Les vérifications du code passent par trois batteries en R de base, sans
+\code{testthat} (package du CRAN, hors priorité \code{base}), lancées depuis
+la racine du dépôt (ADR 0007, point 11.1)~:
+
+\begin{encadre}
+\small
+\code{Rscript tests/test\_unitaires.R}\\
+\code{Rscript tests/test\_reproductibilite.R}\\
+\code{Rscript tests/concordance\_doc\_moteur.R -{}-strict}
+\end{encadre}
+
+\noindent
+La même liste, dans le même ordre, figure dans \code{CLAUDE.md}
+(«~Commandes~»), dans le workflow \code{.claude/workflows/circuit-technique.js}
+et dans le job «~Tests (R 4.3.3)~» de la CI~; un script le contrôle
+(section~\ref{sec:controles-depot}). Chaque batterie~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{installe l'arbre de travail} dans une bibliothèque temporaire
+    (\code{R CMD INSTALL -{}-no-docs -l <bibliothèque> <racine>}, par
+    \code{installer\_tablexp()}), sans installer aucun autre package, puis
+    charge \code{tablexp} depuis elle et échoue s'il est chargé d'ailleurs~:
+    c'est le code de l'arbre qui est testé, jamais un package installé
+    auparavant~;
+  \item affiche \code{R.version.string} puis, à la fin, une \textbf{ligne de
+    bilan}~: version de R, nombre de tests, d'échecs, d'échecs attendus et de
+    succès inattendus~;
+  \item \textbf{sort avec un code non nul} en cas d'échec ou de succès
+    inattendu (section~\ref{sec:harnais}).
+\end{itemize}
+
+\noindent
+Une bibliothèque déjà installée, désignée par la variable d'environnement
+\code{TABLEXP\_BIBLIOTHEQUE}, n'est réutilisée que si l'\emph{empreinte de
+l'arbre source} inscrite à son installation est égale à celle de l'arbre
+courant~; sinon la batterie réinstalle et le dit. Cette empreinte est un MD5
+(\code{tools::md5sum()}) de \code{DESCRIPTION}, de \code{NAMESPACE} et, s'ils
+existent, de tous les fichiers de \code{R/}, \code{inst/}, \code{data/} et
+\code{src/}, chemins relatifs compris, triés par octets
+(\code{empreinte\_source()}). Elle empêche de tester un package périmé~; elle
+n'a aucun rôle dans les résultats.
+
+\medskip
+\textbf{\code{tests/test\_unitaires.R}} exécute chaque fichier
+\code{tests/unitaires/test\_*.R}, triés par nom, chacun dans son
+propre environnement~; \code{quit()}, \code{q()} et \code{bilan()} y sont
+neutralisés, une erreur au chargement d'un fichier est un échec, et un fichier
+sans aucune assertion aussi. \textbf{\code{tests/test\_reproductibilite.R}}
+vérifie les identités de la section~\ref{sec:verifications-alea}, puis celles du
+simulateur et de la construction~; la comparaison aux références de
+non-régression s'y ajoutera avec la branche qui les crée.
+\textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
+au code installé~: toute fonction citée existe~; toute fonction exportée est
+citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
+avec renvoi à l'issue qui la documentera, où elle compte en échec attendu~;
+toute ligne de cette liste désigne un export existant et renvoie à une issue.
+Le format des citations et des catalogues qu'elle lit est fixé par
+\code{docs/latex/CONVENTIONS.md} (section~3). Sans \code{-{}-strict}, elle
+rend compte des écarts sans échouer.
+
+\subsection{Harnais}
+\label{sec:harnais}
+
+Les trois batteries partagent \code{tests/harnais.R}, repris de la forme
+d'\code{outil\_USP} (ADR 0007, point 11.2, et annotation du 16/10/2026,
+point~d)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{verifier(nom, expr)}~: succès si \code{expr} vaut \code{TRUE}~;
+    une chaîne décrit l'écart~; toute autre valeur, ou une erreur, est un
+    échec~;
+  \item \code{echec\_attendu(nom, issue, expr, motif, erreur\_quelconque)}~:
+    \textbf{défaut connu}, codé en échec attendu avec renvoi obligatoire à
+    l'issue, de la forme \code{\#N}~; \code{expr} décrit le comportement
+    \emph{correct}. Tant qu'elle échoue, le test est «~attendu~»~; \textbf{si
+    elle passe, c'est un succès inattendu et la batterie échoue}~: le défaut
+    semble corrigé, la marque est retirée et le test devient ordinaire. Trois
+    natures d'échec attendu sont admises et décomptées~: par valeur
+    (\code{expr} rend \code{FALSE} ou une chaîne), par refus (un
+    \code{refus\_tablexp}, du motif donné s'il l'est) et, seulement si
+    \code{erreur\_quelconque = TRUE}, par une autre erreur~; toute autre issue
+    est un échec, pour qu'un défaut connu ne masque pas une panne différente~;
+  \item \code{proche(a, b, rel, abs)}~: égalité numérique à tolérance déclarée,
+    $|a-b| \le \mathit{abs} + \mathit{rel}\,|b|$ élément par élément, sans
+    tolérance par défaut~; rend un écart pour des valeurs non numériques, des
+    longueurs différentes ou des valeurs manquantes à des positions
+    différentes~; exige l'égalité exacte des valeurs infinies~;
+  \item \code{leve\_refus(expr, motif)}~: vrai si \code{expr} lève un
+    \code{refus\_tablexp} du motif donné~;
+  \item \code{sans\_execution(x)}~: retire de l'objet résultat le champ des
+    informations d'exécution, seul champ qui change entre deux exécutions
+    identiques, avant \code{identical()}~;
+  \item \code{bilan()}~: ligne de bilan et code de sortie. Il compte en outre
+    un échec si un espace de noms hors priorité \code{base}, autre que
+    \code{tablexp}, est chargé en fin de batterie (\code{espaces\_hors\_base()})~:
+    l'image de la CI contient des packages \code{recommended}, et cette règle
+    empêche un test de s'appuyer sur l'un d'eux à l'insu de la liste blanche
+    (ADR 0008, «~Conséquences~»).
+\end{itemize}
+
+\noindent
+Une \textbf{garde de sortie} (\code{.Last()}) fait sortir avec le code~1 tout
+processus qui a chargé le harnais et se termine avant la ligne de bilan, même
+par \code{quit(status = 0)}. Le harnais est lui-même testé
+(\code{tests/unitaires/test\_harnais.R})~: une assertion fausse donne un code
+de sortie non nul, et un échec attendu qui réussit fait échouer la batterie.
+
+\medskip
+Chaque test nomme la nature de son attendu (ADR 0007, point 11.4~; E2.20)~:
+valeur calculée à la main (identité exacte, ou tolérance déclarée)~;
+\emph{recoupement}, comparaison à la valeur que rend, dans la batterie, un appel
+direct d'une fonction d'un package de priorité \code{base}, dont la portée est
+limitée quand le moteur repose sur la même fonction~;
+\emph{contre-vérification}, valeur de référence produite hors CI par un package
+avancé et écrite en dur avec sa version et sa date~; \emph{constat de
+simulation}, qui écrit le nombre de têtes, le niveau, la région d'acceptation
+et la probabilité de fausse alarme (\code{CONTEXT.md}~; E2.19).
+
+\subsection{Plateforme de référence}
+\label{sec:plateforme}
+
+Les références de non-régression, qui viendront avec la deuxième branche, sont
+produites et comparées sur une \emph{plateforme de référence} unique (E4.7~;
+ADR 0008)~: le job de la CI s'exécute dans un \textbf{conteneur
+\code{rocker/r-ver:4.3.3} épinglé par empreinte}, dont R charge la \textbf{BLAS
+et la LAPACK de référence} (Netlib), en monothread. Identifiant fixé par
+l'annotation du 16/10/2026 de l'ADR 0008 (décision M47)~:
+
+\begin{encadre}
+\small
+image \code{rocker/r-ver:4.3.3@sha256:}\\
+\code{\phantom{image }732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309}\\
+suivie de la bascule \code{update-alternatives} vers les paquets \code{libblas3}
+et \code{liblapack3} 3.10.0-2ubuntu1 d'Ubuntu~22.04~;\\
+\code{R version 4.3.3 (2024-02-29)}~;\\
+BLAS \code{/usr/lib/x86\_64-linux-gnu/blas/libblas.so.3.10.0}~;\\
+LAPACK \code{/usr/lib/x86\_64-linux-gnu/lapack/liblapack.so.3.10.0}, version 3.10.0~;\\
+monothread (\code{OPENBLAS\_NUM\_THREADS} et \code{OMP\_NUM\_THREADS} valent 1).
+\end{encadre}
+
+\noindent
+\textbf{Pourquoi un conteneur épinglé.} Un libellé d'exécuteur
+(\code{ubuntu-24.04}) n'est pas une image figée~: elle est mise à jour par
+GitHub, bibliothèques comprises, sans commit dans le dépôt. \code{outil\_USP},
+qui installait R sur l'image de l'exécuteur, a constaté une dérive entre deux
+exécutions de même R et de même image, due à une BLAS optimisée (OpenBLAS) qui
+choisit ses noyaux selon le processeur (constat d'\code{outil\_USP} rapporté
+par l'ADR 0008, «~Contexte~»). Une étiquette
+de conteneur peut elle aussi désigner une autre image après une
+reconstruction (hypothèse de l'ADR 0008, non vérifiée)~; l'empreinte
+(\code{@sha256:\ldots}) désigne un contenu immuable. Le conteneur est une fonctionnalité native de GitHub Actions, et
+non une action tierce, ce que la politique des Actions du dépôt exige.
+
+\medskip
+\textbf{Pourquoi la bascule.} L'image charge par défaut OpenBLAS (relevé de la
+première exécution, rapporté par l'annotation du 16/10/2026 de l'ADR 0008). Le mainteneur a retenu
+de basculer dans le job vers la Netlib déjà présente dans l'image, plutôt que
+de compiler R depuis la source (décision M47~; le repli par compilation reste
+prévu par l'ADR 0008, point 10). L'étape «~BLAS et LAPACK de référence~» de
+\code{.github/workflows/ci.yml} pointe par \code{update-alternatives} les
+alternatives \code{libblas.so.3-x86\_64-linux-gnu} et
+\code{liblapack.so.3-x86\_64-linux-gnu} vers \code{libblas3} et
+\code{liblapack3}, puis affiche les cibles résolues et les versions des
+paquets. La plateforme de référence est l'image épinglée \emph{suivie de cette
+bascule}~: modifier l'étape, l'image ou les bibliothèques est un changement de
+plateforme, décidé par le mainteneur et, une fois des références existantes,
+accompagné d'un tableau avant / après de toutes les références (ADR 0008,
+point 9).
+
+\medskip
+\textbf{Script de plateforme.} \code{tests/controles/plateforme.R} s'exécute en
+première étape de chaque job R, avant tout calcul (ADR 0008, points 3 à 5).
+En mode strict (\code{-{}-exiger}, sur la CI), il \textbf{échoue} si~:
+\code{R.version.string} n'est pas exactement \code{R\_ATTENDU}
+(\code{R version 4.3.3 (2024-02-29)})~; l'une des quatre lectures de la BLAS et
+de la LAPACK (\code{extSoftVersion()["BLAS"]}, \code{sessionInfo()\$BLAS},
+\code{sessionInfo()\$LAPACK}, \code{La\_library()}) est vide, désigne une BLAS
+optimisée (motif \code{MOTIF\_OPTIMISE}~: \code{openblas}, \code{mkl},
+\code{atlas}, \code{blis}, \code{flexiblas}) ou sort des chemins de référence
+(\code{MOTIF\_BLAS}, \code{MOTIF\_LAPACK})~; \code{La\_version()} n'est pas
+\code{LA\_VERSION\_ATTENDUE} (3.10.0)~; \code{OPENBLAS\_NUM\_THREADS} ou
+\code{OMP\_NUM\_THREADS} ne vaut pas 1~; \code{TABLEXP\_IMAGE}, que le job
+renseigne avec la même chaîne que l'image du conteneur, n'est pas épinglée par
+empreinte (\code{MOTIF\_IMAGE}). Sans \code{-{}-exiger} (poste, session), il
+affiche les mêmes grandeurs et les écarts sans échouer~: les batteries restent
+exécutables sur le poste Windows du mainteneur, dont la BLAS est celle de R.
+Dans les deux modes, il écrit l'\emph{identifiant de plateforme} (image,
+\code{R.version.string}, BLAS, LAPACK et sa version, \code{sessionInfo()}) et
+consigne sans faire échouer le processeur et ses drapeaux (\code{fma},
+\code{avx2}, \code{avx512f}), \code{ImageOS} et \code{ImageVersion} de l'hôte,
+\code{LC\_COLLATE}, le fuseau horaire, la présence d'un exécutable
+\code{java} et \code{GITHUB\_SHA}. Ce bloc sera reporté dans le message de
+chaque commit de référence.
+
+\begin{encadre}
+\small
+\textbf{Ce que la plateforme ne garantit pas.} Le modèle de processeur varie
+d'une exécution à l'autre sous le même libellé d'exécuteur (relevé de l'ADR
+0008, annotation du 16/10/2026). La BLAS Netlib n'a pas de noyau choisi selon
+le processeur~; la réserve sur la bibliothèque mathématique du système
+(section~\ref{sec:reproductibilite-exigence}) reste en revanche ouverte, non
+mesurée. Les références seront donc comparées à tolérance, structure contrôlée
+à part (E4.7).
+\end{encadre}
+
+\subsection{Jobs de la CI}
+\label{sec:jobs-ci}
+
+\code{.github/workflows/ci.yml} définit les jobs suivants, exécutés sur chaque
+pull request, sur chaque push vers \code{main} et sur demande. Aucun job n'installe de
+package du CRAN ni ne configure de dépôt CRAN pour une installation~:
+\code{tablexp} est installé depuis l'arbre de travail par chaque batterie.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{3.3cm}p{3.2cm}p{8.3cm}@{}}
+\caption{Jobs de la CI (\code{.github/workflows/ci.yml}).}
+\label{tab:jobs-ci}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Job}} &
+\textcolor{financeblue}{\textbf{Exécution}} &
+\textcolor{financeblue}{\textbf{Contenu}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Job}} &
+\textcolor{financeblue}{\textbf{Exécution}} &
+\textcolor{financeblue}{\textbf{Contenu}} \\
+\endhead
+«~Contrôles du dépôt~» & hôte \code{ubuntu-24.04}, sans R & réglages de Claude
+Code valides (JSON)~; fiches d'agents complètes~; fiches \code{-approfondi} à
+jour~; aucun fichier sensible versionné \\
+«~Tests (R 4.3.3)~» & conteneur de la plateforme de référence & bascule vers
+la BLAS et la LAPACK de référence~; script de plateforme en mode strict~; les
+trois batteries~; liste blanche de \code{DESCRIPTION}~; ordre des modules~;
+identité des batteries et de l'image. Les batteries et les contrôles
+s'exécutent même si une étape antérieure échoue (condition
+\code{\$\{\{ !cancelled() \}\}}), pour que tous les écarts soient visibles~;
+le job reste en échec \\
+«~Absence de Java~» & même conteneur, réseau requis & contrôle de l'absence de
+Java (section~\ref{sec:absence-java}) et son cas témoin \\
+\end{longtable}
+\end{center}
+
+\noindent
+Ces trois jobs sont les contrôles requis que liste le ruleset de \code{main}
+(\code{.github/ruleset-main.json}, appliqué au dépôt par le mainteneur)~: une
+pull request ne peut alors être fusionnée que s'ils sont verts. L'ADR 0008 (point 6) prévoit un quatrième job,
+«~Documentation~», qui compilera le PDF du présent document sans action tierce
+et le publiera en artefact~; il n'existe pas encore. Les batteries et les
+scripts des jobs conteneurisés ne dépendent pas de git, absent de l'image~;
+un contrôle qui lit l'historique reste dans «~Contrôles du dépôt~», sur l'hôte
+(ADR 0008, point 11).
+
+% =============================================================================
+\section{Contrôles du dépôt}
+\label{sec:controles-depot}
+% =============================================================================
+
+\subsection{Scripts de contrôle}
+\label{sec:scripts-controle}
+
+Tout contrôle mécanique est un script, jamais une relecture (\code{CLAUDE.md},
+«~Workflows~», principe~7). Les scripts sont en R de base, sous
+\code{tests/controles/}, et sortent avec un code non nul en cas d'écart. Chacun
+est testé sur des témoins dans \code{tests/unitaires/test\_controles.R}~: il
+doit échouer sur un cas fautif et passer sur le dépôt.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.6cm}p{7.4cm}p{2.8cm}@{}}
+\caption{Scripts de contrôle (\code{tests/controles/}).}
+\label{tab:scripts-controle}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Script}} &
+\textcolor{financeblue}{\textbf{Règle contrôlée}} &
+\textcolor{financeblue}{\textbf{Source}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Script}} &
+\textcolor{financeblue}{\textbf{Règle contrôlée}} &
+\textcolor{financeblue}{\textbf{Source}} \\
+\endhead
+\code{liste\_blanche\_}\newline\code{description.R} & \code{Depends}~: exactement
+\code{R (>= 4.3.3)}, plus d'éventuels packages de priorité \code{base} ou
+admis~; \code{Imports}~: packages de priorité \code{base} de R 4.3.3, ou
+admis~; \code{LinkingTo}, \code{Suggests}, \code{Enhances}~: packages admis
+seulement. Un package est admis s'il figure, avec son champ et l'ADR de
+méthode qui l'introduit, dans la constante \code{ADMIS}, vide à cette date &
+ADR 0002, point 3 et A8~; M44 \\
+\code{graphe\_modules.R} & graphe d'appels autorisés et appels dynamiques
+interdits (section~\ref{sec:graphe}) & ADR 0007, points 2.1 à 2.3 \\
+\code{identite\_batteries.R} & mêmes batteries, dans le même ordre, dans
+\code{CLAUDE.md}, dans \code{circuit-technique.js} et dans les étapes
+«~Batterie~:~» du job «~Tests (R 4.3.3)~»~; ce job ne porte ni
+\code{continue-on-error}, ni condition \code{if:} de job, et une étape de
+batterie n'a pas d'autre condition que \code{\$\{\{ !cancelled() \}\}}~; une
+seule chaîne d'image dans tous les workflows & \code{CLAUDE.md}~; ADR 0008,
+point 1 \\
+\code{plateforme.R} & plateforme de référence (section~\ref{sec:plateforme}) &
+ADR 0008, points 3 à 5 \\
+\code{absence\_java.R} & aucune dépendance à Java
+(section~\ref{sec:absence-java}) & ADR 0002, A1~; ADR 0008, point 7~; issue~\#3 \\
+\end{longtable}
+\end{center}
+
+\noindent
+La liste des packages de priorité \code{base} est écrite en dur dans
+\code{liste\_blanche\_description.R} pour R 4.3.3 (\code{PACKAGES\_BASE\_R433})~:
+le verdict ne dépend pas de la machine~; le script signale, sans échouer, un
+écart avec les packages de priorité \code{base} effectivement installés.
+
+\subsection{Absence de Java}
+\label{sec:absence-java}
+
+\textbf{Règle.} Aucun code du projet ne dépend de Java, ni directement ni
+indirectement~: ni le moteur, ni l'application, ni la contre-vérification
+(ADR 0002, annotation du 16/10/2026, A1, décision M40). Java n'est pas
+utilisable sur le poste de travail du mainteneur~; c'est pour cette raison
+que le package \code{ELT}, qui dépend de \code{xlsx} et donc de Java, est exclu
+de la contre-vérification. Sa source ne peut être exécutée qu'hors du dépôt,
+sans Java, en appoint, sans qu'aucun code en soit copié (ADR 0002, A5 et
+troisième annotation).
+
+\medskip
+\textbf{Contrôle.} \code{tests/controles/absence\_java.R} (issue~\#3) contrôle
+trois ensembles de packages~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item le \emph{moteur}~: les packages déclarés dans les champs \code{Depends},
+    \code{Imports} et \code{LinkingTo} de \code{DESCRIPTION}, hors R~; aucun à
+    cette date~;
+  \item l'\emph{application}~: \code{shiny}, \code{htmltools}, et
+    \code{openxlsx} à titre facultatif~;
+  \item la \emph{contre-vérification}~: les packages \code{survival},
+    \code{mgcv}, \code{WH}, \code{StMoMo}, \code{demography}, \code{MortalityLaws},
+    \code{lifecontingencies}, \code{survPen}, \code{MortCast}, \code{locfit}, et
+    \code{flexsurv} à titre facultatif.
+\end{itemize}
+
+\noindent
+Les deux derniers ensembles sont lus dans une liste unique, le fichier
+\code{packages\_hors\_moteur.csv} du dossier \code{tests/controles/} (colonnes \code{ensemble},
+\code{package}, \code{statut}, \code{source}), qui est la référence~; la liste
+ci-dessus en est la transcription à la date du document. Le script lit les
+métadonnées d'un \textbf{instantané daté} du CRAN chez Posit Package Manager,
+par \code{available.packages()}, sans rien installer~; la date est la constante
+\code{INSTANTANE} du script (2026-10-15, un jour ouvré~: selon la documentation de Posit citée par
+l'ADR 0008, aucun instantané n'est publié les week-ends et jours fériés), qui ne change que par un commit
+\code{repo:}. Il calcule, pour chaque package, la fermeture récursive de ses
+dépendances \code{Depends}, \code{Imports} et \code{LinkingTo}, par la
+fonction \code{tools::package\_dependencies()} appelée avec
+\code{recursive = TRUE}, et \textbf{échoue} (code~1)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item si un package de \code{PACKAGES\_JAVA} (\code{rJava}, \code{xlsx},
+    \code{xlsxjars}) figure dans un ensemble ou dans la fermeture de l'un de ses
+    packages~; la chaîne de dépendances la plus courte qui y mène est
+    affichée~;
+  \item si un package listé, ou une dépendance récursive hors priorité
+    \code{base}, manque aux métadonnées~: un package introuvable n'a pas de
+    dépendances connues, il ne passe pas en silence~;
+  \item si la liste est mal formée (en-tête, ensembles et statuts connus, noms
+    valides, sans doublon, ensembles non vides).
+\end{itemize}
+
+\noindent
+Des métadonnées illisibles (panne réseau, adresse fausse) donnent le code~2~:
+aucun verdict n'est rendu, l'échec du job n'est jamais masqué et une relance
+le lève. Seul le filtre \code{duplicates} d'\code{available.packages()} est
+appliqué~: le filtre par version de R écarterait les packages qui exigent un R
+plus récent que celui qui exécute le contrôle, alors que la
+contre-vérification peut tourner sur un autre poste muni d'un R récent, et ces
+packages seraient alors signalés absents (faux échec)~; le filtre par système
+d'exploitation est écarté aussi, le poste étant sous Windows et la CI sous
+Linux.
+
+\medskip
+\textbf{Cas témoin.} Le job «~Absence de Java~» exécute aussi le script avec
+\code{-{}-ajouter ELT}~: il doit rendre le code~1 (un verdict, et non le code~2
+d'une panne) et afficher la chaîne de \code{ELT} à \code{xlsx}. Les tests du
+script s'exécutent sans réseau, sur des dépôts locaux témoins
+(\code{tests/unitaires/test\_controles.R}).
+
+\begin{encadre}
+\small
+\textbf{Limite.} La détection porte sur les seuls noms de
+\code{PACKAGES\_JAVA}. Le champ \code{SystemRequirements}, qui pourrait déclarer
+Java, n'est pas renseigné dans les métadonnées \code{PACKAGES} du CRAN (relevé
+consigné dans l'en-tête du script)~: un package qui exigerait Java sans
+dépendre de l'un de ces noms échapperait au contrôle. Étendre la détection
+relève du mainteneur.
+\end{encadre}
+
+
+% =============================================================================
+\partie{Partie II}{Point d'entrée et plan de construction}
+% =============================================================================
+
+\section{Point d'entrée unique~: \code{R/construire\_table.R}}
+\label{sec:construction}
+
+\subsection{Plan de construction et validation}
+\label{sec:plan}
+
+\emph{À rédiger (issue~\#11).}
+
+\subsection{Objet résultat}
+\label{sec:objet-resultat}
+
+\emph{À rédiger (issue~\#11).}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-construire-table}
+
+\emph{À rédiger (issue~\#11).}
+
+
+% =============================================================================
+\partie{Partie III}{Module \code{donnees}}
+% =============================================================================
+
+\section{Données, rôles et contrôles~: \code{R/donnees.R}}
+\label{sec:donnees}
+
+\subsection{Catalogue des rôles}
+\label{sec:catalogue-roles}
+
+\emph{À rédiger (issue~\#9).}
+
+\subsection{Contrôles, refus et exclusions}
+\label{sec:controles-donnees}
+
+\emph{À rédiger (issue~\#9).}
+
+\subsection{Unité d'observation et fusion par tête}
+\label{sec:unite-observation}
+
+\emph{À rédiger (issue~\#9).}
+
+\subsection{Table de référence}
+\label{sec:table-reference}
+
+\emph{À rédiger (issue~\#9).}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-donnees}
+
+\emph{À rédiger (issue~\#9).}
+
+
+% =============================================================================
+\partie{Partie IV}{Module \code{exposition}}
+% =============================================================================
+
+\section{Exposition et événements~: \code{R/exposition.R}}
+\label{sec:exposition}
+
+\subsection{Recette d'exposition et conventions d'âge}
+\label{sec:recettes}
+
+\emph{À rédiger (issue~\#11).}
+
+\subsection{Troncature à gauche et censure à droite}
+\label{sec:troncature-censure}
+
+\emph{À rédiger (issue~\#11).}
+
+\subsection{Découpage par année}
+\label{sec:decoupage-annee}
+
+\emph{À rédiger (issue~\#11).}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-exposition}
+
+\emph{À rédiger (issue~\#11).}
+
+
+% =============================================================================
+\partie{Partie V}{Module \code{brut}}
+% =============================================================================
+
+\section{Taux bruts~: \code{R/brut.R}}
+\label{sec:brut}
+
+Module prévu (E2.12, E2.14)~: estimateurs des taux bruts et leurs intervalles
+de confiance exacts et asymptotiques. Il sera créé par la branche des taux
+bruts (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-brut}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/brut.R}.}
+\label{tab:fonctions-brut}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/brut.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie VI}{Module \code{lissage}}
+% =============================================================================
+
+\section{Lissage~: \code{R/lissage.R}}
+\label{sec:lissage}
+
+Module prévu (E2.12)~: lissages des taux bruts. Il sera créé par une branche
+ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-lissage}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/lissage.R}.}
+\label{tab:fonctions-lissage}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/lissage.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie VII}{Module \code{positionnement}}
+% =============================================================================
+
+\section{Positionnement sur une table de référence~: \code{R/positionnement.R}}
+\label{sec:positionnement}
+
+Module prévu (E2.12, E2.15)~: positionnement d'une table d'expérience sur une
+table de référence. Il sera créé par une branche ultérieure
+(\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-positionnement}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/positionnement.R}.}
+\label{tab:fonctions-positionnement}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/positionnement.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie VIII}{Module \code{prospective}}
+% =============================================================================
+
+\section{Tables prospectives~: \code{R/prospective.R}}
+\label{sec:prospective}
+
+Module prévu (E2.13, v2)~: tables prospectives, toute table prospective étant
+une surface de mortalité.
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-prospective}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/prospective.R}.}
+\label{tab:fonctions-prospective}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/prospective.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie IX}{Module \code{fermeture}}
+% =============================================================================
+
+\section{Fermeture aux âges extrêmes~: \code{R/fermeture.R}}
+\label{sec:fermeture}
+
+Module prévu (E2.12)~: fermeture de la table aux âges extrêmes. Il sera créé
+par une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-fermeture}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/fermeture.R}.}
+\label{tab:fonctions-fermeture}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/fermeture.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie X}{Module \code{validation}}
+% =============================================================================
+
+\section{Validation et suivi d'expérience~: \code{R/validation.R}}
+\label{sec:validation}
+
+Module prévu (E2.12, E2.18)~: validation de la table construite et suivi
+d'expérience. Il sera créé par une branche ultérieure
+(\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-validation}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.2cm}p{1.6cm}p{3.4cm}p{5.4cm}@{}}
+\caption{Définitions de premier niveau de \code{R/validation.R}.}
+\label{tab:fonctions-validation}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/validation.R} absent} \\
+\end{longtable}
+}
+
+
+% =============================================================================
+\partie{Partie XI}{Module \code{rapport}}
+% =============================================================================
+
+\section{Fiche de construction et empreintes~: \code{R/rapport.R}}
+\label{sec:rapport}
+
+\subsection{Fiche de construction}
+\label{sec:fiche}
+
+\emph{À rédiger (issue~\#11).}
+
+\subsection{Empreinte des données}
+\label{sec:empreinte}
+
+\emph{À rédiger (issue~\#11).}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-rapport}
+
+\emph{À rédiger (issue~\#11).}
+
+
+% =============================================================================
+\partie{Partie XII}{Module \code{simulation}}
+% =============================================================================
+
+\section{Simulateur~: \code{R/simulation.R}}
+\label{sec:simulation}
+
+\subsection{Loi vraie et tables synthétiques}
+\label{sec:loi-vraie}
+
+\emph{À rédiger (issue~\#10).}
+
+\subsection{Portefeuille simulé}
+\label{sec:portefeuille-simule}
+
+\emph{À rédiger (issue~\#10).}
+
+\subsection{Constats de simulation}
+\label{sec:constats-simulation}
+
+\emph{À rédiger (issue~\#10).}
+
+\subsection{Fonctions du module}
+\label{sec:fonctions-simulation}
+
+\emph{À rédiger (issue~\#10).}
+
+
+% =============================================================================
+\partie{Partie XIII}{Index et traçabilité}
+% =============================================================================
+
+\section{Index et traçabilité}
+\label{sec:index}
+
+\subsection{Index des fonctions exportées}
+\label{sec:index-exports}
+
+\emph{À rédiger (issues~\#9, \#10 et \#11).}
+
+\subsection{Traçabilité des exigences}
+\label{sec:tracabilite}
+
+Le tableau~\ref{tab:tracabilite} relie les exigences du cahier des charges
+(\code{docs/exigences.md}) aux sections qui les décrivent. Il est complété à
+chaque section rédigée.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{1.6cm}p{8.6cm}p{4.6cm}@{}}
+\caption{Exigences et sections qui les décrivent.}
+\label{tab:tracabilite}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Exigence}} &
+\textcolor{financeblue}{\textbf{Objet}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Exigence}} &
+\textcolor{financeblue}{\textbf{Objet}} &
+\textcolor{financeblue}{\textbf{Section}} \\
+\endhead
+E1.3 & rigueur, traçabilité, reproductibilité &
+\ref{sec:reproductibilite}, \ref{sec:batteries} \\
+E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP},
+tableaux de fonctions & ensemble du document~; \ref{sec:fonctions-outils} \\
+E3.3 & test de concordance entre la documentation et le code &
+\ref{sec:trois-batteries} \\
+E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
+E4.1 & R 4.3.3, package \code{tablexp}, modules & \ref{sec:fichiers-package} \\
+E4.2 & packages de priorité \code{base}~; aucune dépendance à Java &
+\ref{sec:scripts-controle}, \ref{sec:absence-java} \\
+E4.3 & frontière calcul / affichage & \ref{sec:separation} \\
+E4.4 & le moteur reçoit un \code{data.frame} et des rôles & \ref{sec:separation} \\
+E4.6 & reproductibilité, graine locale, générateur fixé &
+\ref{sec:reproductibilite} \\
+E4.7 & références de non-régression sur la plateforme de référence &
+\ref{sec:plateforme} \\
+E4.9 & un module par famille, index des fonctions contrôlé par la
+concordance & \ref{sec:architecture}, \ref{sec:trois-batteries} \\
+\end{longtable}
+}
+
+\subsection{Références}
+\label{sec:references}
+
+\begin{itemize}[leftmargin=*, itemsep=3pt]
+  \item M.~Matsumoto, T.~Nishimura, \emph{Mersenne Twister: a
+    623-dimensionally equidistributed uniform pseudo-random number generator},
+    \emph{ACM Transactions on Modeling and Computer Simulation}, 8, 1998,
+    p.~3--30 (cité par la documentation de R, \code{?Random})~;
+    section~\ref{sec:generateur}.
+  \item R Core Team, \emph{R: A Language and Environment for Statistical
+    Computing}, R Foundation for Statistical Computing, Vienne, 2024
+    (\url{https://www.R-project.org/}~; référence rendue par
+    \code{citation()} sous R 4.3.3).
+\end{itemize}
+
+\end{document}
