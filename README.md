@@ -65,7 +65,7 @@ Réglages à reproduire sur le dépôt (`Gerard-Garey/outil_tables`) ; indispens
 - fusion par **commit de fusion seulement** (squash et rebase désactivés), wiki désactivé ;
 - **secret scanning** et **push protection** activés ; **alertes et correctifs de sécurité Dependabot** activés ;
 - Actions limitées à celles de GitHub (`github_owned_allowed`), jeton des workflows en lecture seule, actions épinglées par SHA ;
-- ruleset **« Protection main »** : suppression et force-push interdits, PR obligatoire (fusion par commit de fusion, fils de discussion résolus), contrôles requis « Contrôles du dépôt », « Tests (R 4.3.3) » et « Absence de Java » à jour avec `main`, sans contournement.
+- ruleset **« Protection main »** : suppression et force-push interdits, PR obligatoire (fusion par commit de fusion, fils de discussion résolus), contrôles requis « Contrôles du dépôt », « Tests (R 4.3.3) », « Absence de Java » et « Documentation » à jour avec `main`, sans contournement.
 
 ```bash
 R=Gerard-Garey/outil_tables
