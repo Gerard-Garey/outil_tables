@@ -26,7 +26,7 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
 
 ## 3. Catalogues lus par la batterie de concordance
 
-`tests/concordance_doc_moteur.R --strict` (E3.3, E4.9) lit tous les `.tex` de `docs/latex/`, commentaires LaTeX retirés (`%` non précédé de `\`). Deux formes y sont lues.
+`tests/concordance_doc_moteur.R --strict` (E3.3, E4.9) lit tous les `.tex` de `docs/latex/`, commentaires LaTeX retirés par `retirer_commentaires()` : sur chaque ligne, un `%` ouvre un commentaire, retiré jusqu'à la fin de la ligne, s'il est précédé d'un nombre pair (zéro compris) de barres obliques inverses (`\%` est un pour-cent littéral, `\\%` une fin de ligne suivie d'un commentaire) ; les `%` placés dans le contenu de `\verb<d>…<d>` ou de `\verb*<d>…<d>`, et dans le premier argument de `\url{…}` ou de `\href{…}`, ne comptent pas. Limites : un `\verb` ou un `\url` coupé sur deux lignes, ou un `\url` (ou `\href`) dont l'argument contient une accolade, n'est pas reconnu, et un `%` qu'il contient ouvre alors un commentaire ; on n'écrit donc ni l'un ni l'autre. Deux formes y sont lues.
 
 ### 3.1 Citation d'une fonction (contrôles 1 et 2, en place)
 
