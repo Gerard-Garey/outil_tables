@@ -221,12 +221,18 @@ controler_portefeuille <- function(portefeuille, periode) {
     age_bas <- age_revolu_minimal(round(p$age_min * 365.25))
     # Borne haute (erratum d'actuary du 17/10/2026, point 4). Soit span(y)
     # le nombre de jours de la naissance à l'anniversaire y (T2) : pour
-    # y <= 130, span(y) >= 365,25 y - 2,75 (minimum exact -2,75 mesuré sur
-    # les naissances de 1700 à 2150, atteint pour y = 107, naissance au
-    # 1796-03-01). Une tête d'âge révolu y à B vérifie span(y) <= B - n, et
+    # y <= 130 (âges des tables des tests), span(y) >= 365,25 y - 2,75
+    # (minimum exact -2,75 mesuré sur les naissances de 1700 à 2150, atteint
+    # pour y = 107, naissance au 1796-03-01). Une tête d'âge révolu y à B
+    # vérifie span(y) <= B - n, et
     # B - n <= (B - origine) + round(age_max * 365,25)
     # <= (B - origine) + age_max * 365,25 + 0,5 ; donc
     # y <= age_max + (B - origine) / 365,25 + 3,25 / 365,25 < age_haut.
+    # Domaine : aucune règle du code ne limite les âges de la table à 130.
+    # Au-delà, le minimum mesuré sur les mêmes naissances jusqu'à y = 260 est
+    # -3,75 (atteint pour y = 207, naissance au 2096-03-01 ; premier
+    # y < -2,75 à y = 204) : la même preuve donne une marge de 4,25 / 365,25,
+    # encore inférieure au « + 1 » d'age_haut.
     age_haut <- p$age_max + (fin + 1 - as.numeric(p$origine)) / 365.25 + 1
   } else {
     if (!entier(p$age) || p$age < 1) invalide("âge exact entier >= 1.")
@@ -241,8 +247,10 @@ controler_portefeuille <- function(portefeuille, periode) {
     # Borne haute : même preuve qu'en mode uniforme, avec B - n =
     # (B - date_entree) + span(age) et, pour age <= 130, span(age) <=
     # 365,25 age + 0,75 (maximum exact +0,75 mesuré sur les mêmes
-    # naissances) : y <= age + (B - date_entree) / 365,25 + 3,5 / 365,25
-    # < age_haut.
+    # naissances) : pour y <= 130, y <= age + (B - date_entree) / 365,25
+    # + 3,5 / 365,25 < age_haut. Domaine : au-delà de 130, le maximum mesuré
+    # jusqu'à 260 reste +0,75 et le minimum devient -3,75 (mode uniforme) :
+    # marge de 4,5 / 365,25, encore inférieure au « + 1 ».
     age_haut <- p$age + (fin + 1 - as.numeric(p$date_entree)) / 365.25 + 1
   }
   list(mode = mode, age_bas = age_bas, age_haut = age_haut)
