@@ -369,3 +369,29 @@ Mesure, *vérifiée* : sous R 4.3.3, après `sys.source()` de `R/outils.R` et `R
 **Effet sur les résultats** : aucun. L'annotation consigne l'état du code de `dc9e32a` et des règles de forme pour #11. Elle ne modifie aucune valeur calculée.
 
 Issues : #9, #11 ; décisions M48, M49. Aucun point ouvert.
+
+## Annotation du 17 octobre 2026 (seconde) — locale d'installation UTF-8 et sonde du harnais, chargement des tests en UTF-8 (décision M54)
+
+Rédigée par `architect` d'après la décision du mainteneur du 17/10/2026 (M54, `docs/feuille-de-route.md`, § 4), qui retient la recommandation d'`architect`, et d'après l'audit de l'outillage de #17 du même jour. Le texte ci-dessus, annotations comprises, n'est pas réécrit ; la présente annotation complète les points 11.1 et 9.3.
+
+**(a) Point 11.1 : installation sous une locale UTF-8, contrôlée par une sonde.**
+
+- Le harnais (`installer_tablexp()`, `tests/harnais.R`) installe `tablexp` sous une locale UTF-8, prise dans l'ordre `C.UTF-8`, `C.utf8`, `en_US.UTF-8` (`LOCALES_UTF8`). Chaque locale est testée, puis la première disponible est passée à `R CMD INSTALL` par `system2(env = "LC_ALL=…")`.
+- Une **sonde** lit le littéral non ASCII `STATUT_EMPREINTES_NON_CALCULEES` (`R/rapport.R:34`) dans l'espace de noms installé. Si l'installation a été faite hors UTF-8, la batterie échoue.
+- La **locale d'exécution reste libre** : les batteries tournent sous la locale de la session.
+
+**(b) Extension rendue nécessaire par la mesure.**
+
+- Les fichiers de test sont chargés par `parse(encoding = "UTF-8")` puis `eval`, et non plus par `source()`. Sans cela, 16 échecs apparaissent en session C : les messages du moteur sont marqués UTF-8, les littéraux des tests ne le sont pas, et les comparaisons de chaînes échouent.
+- Les recherches dans les sorties de sous-processus se font en octets (`useBytes = TRUE`, 26 appels selon le décompte de l'audit).
+- Mesures de l'audit : les décomptes d'assertions sont identiques, fichier par fichier, entre l'ancien et le nouveau chargeur (900 au total) ; avec `fixed = TRUE`, `useBytes` ne peut que rendre une recherche plus stricte, jamais en faire réussir une qui échouait.
+
+**(c) Point 9.3 : la règle de refus des chaînes indéterminées vaut aussi pour l'outillage des tests.** Une chaîne non ASCII non marquée, dans une session dont la locale n'est ni UTF-8 ni latin-1, est refusée par l'outillage de `tests/` comme par le moteur, et jamais convertie par `enc2utf8()`. L'outillage des références de non-régression suit la règle d'`octets_chaines()` (`R/rapport.R:41`) ; voir ADR 0009, troisième annotation, (e).
+
+**(d) Limite admise, mesurée.** La sonde laisse passer une installation faite en C si la session est en UTF-8 : le littéral se lit alors correctement. C'est sans effet : R1 produit sous C et sous `C.UTF-8` a le même MD5 (`7b0f55f1fe2b7265d21548f493973c7b`, mesure de l'audit).
+
+**Hors périmètre** : une garde au chargement du package (`.onLoad`) qui refuserait un `tablexp` installé hors UTF-8 quel que soit le harnais ; issue #25.
+
+**Effet sur les résultats** : aucun. L'annotation porte sur l'installation et le chargement des tests ; l'objet du moteur a les mêmes octets dans les quatre combinaisons installation × exécution (ADR 0009, troisième annotation, (e)).
+
+Issues : #17, #25. Décision M54.

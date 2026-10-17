@@ -263,3 +263,39 @@ C'était le sens de l'avis d'`actuary` sur #14 (partie B) ; aucun écart réel n
 **Effet sur les résultats** : aucun. Aucune référence n'existe encore (création après #14 à #16, point 3.7) ; l'annotation fixe la règle avant la création de R6.
 
 Issues : #17, #15, #14. Décision du mainteneur du 17/10/2026 (avis d'`actuary` retenu) ; M52.
+
+## Annotation du 17 octobre 2026 (troisième) — clé `avertissements/nombre`, ligne `@noms` des vecteurs nommés, représentation de l'empreinte des tables résumées, limites admises, hypothèse de locale corrigée
+
+Rédigée par `architect` d'après les avis d'`actuary` et d'`architect` et l'audit de l'outillage de #17, tous du 17/10/2026. Le texte ci-dessus, annotations comprises, n'est pas réécrit. C'est aussi l'annotation datée que le point 3.4 exige pour toute modification de `TOLERANCES`.
+
+**(a) `TOLERANCES` : clé qualifiée `avertissements/nombre`, classe exacte.** Par la recherche au suffixe le plus long (seconde annotation, (a)), elle couvre aussi `fiche/avertissements/nombre`. Motif, avis d'`actuary` : ces valeurs sont des dénombrements, convertis en `double` par `as.numeric(nombre)` dans `avertir()` (`R/outils.R:65`), sans arithmétique flottante. La clé est qualifiée, et non le nom nu `nombre`, pour respecter la règle de complétude du point 3.4 : un autre double nommé `nombre` resterait sans classe et ferait échouer la comparaison. Cette clé deviendra redondante quand l'issue #24 (stockage en `integer`) passera, le type `integer` étant exact par lui-même ; son retrait s'annotera ici.
+
+**(b) Format, point 2.3, version 1 : ligne `chemin/@noms` des vecteurs atomiques nommés.** Tout vecteur atomique dont `names` n'est pas `NULL` porte une ligne `chemin/@noms` (type `character`, les noms dans l'ordre) juste avant sa ligne de valeurs. Motif : sans cette ligne, renommer un élément de `fiche/roles` ou de `fiche/generateur` passerait inaperçu, les valeurs restant égales. La règle entre dans la **version 1** du format (`tablexp reference 1`), sans incrément, parce qu'aucune référence n'existe encore (point 3.7).
+
+**(c) Représentation de l'empreinte des tables résumées (point 1.2), octet pour octet.** Le point 1.2 la décrivait en une phrase ; elle se lit ainsi :
+
+- **data.frame** : pour chaque colonne, dans l'ordre de la table, la ligne `#<nom>\t<type>\n`, puis les octets produits par `tablexp:::colonne_canonique()` ;
+- **vecteur** : même règle, sous son nom ;
+- **liste** : pour chaque élément, dans l'ordre, la ligne `@<nom>\n` (ou `[i]` si l'élément n'a pas de nom), puis sa représentation, récursivement ;
+- texte en UTF-8 ; les attributs autres que `names`, `class` et `row.names` sont ignorés (point 1.2) ;
+- une liste vide donne un texte vide, de MD5 `d41d8cd98f00b204e9800998ecf8427e`.
+
+**(d) Limites admises.**
+
+1. **Niveaux des facteurs non écrits.** Sans portée aujourd'hui : l'objet ne contient aucun facteur. Si un facteur y apparaît, il faudra une ligne `@niveaux`, donc un changement de format (version 2, point 2.3).
+2. **Noms de lignes.** Un data.frame comparé dont les noms de lignes ne sont pas automatiques entraîne un refus d'écriture, avec le chemin fautif (point 2.3 : rien n'est ignoré en silence).
+3. **Position des `NA`.** Une différence de position d'un `NA` est un écart structurel, quel que soit le type (point 3.1, étendu à tous les types).
+4. **Plateforme en mode bascule.** L'identifiant de plateforme comparé ne retient que les lignes contrôlées par `tests/controles/plateforme.R`. Les lignes seulement consignées (processeur, drapeaux) sont écrites dans l'en-tête mais pas comparées.
+
+**(e) Correction de l'hypothèse du point 1.2 « aucune dépendance à la locale ».**
+
+- **Vérifiée pour l'objet du moteur**, mesure d'`architect` du 17/10/2026 : 400 977 chaînes, mêmes octets dans les quatre combinaisons installation × exécution (C ou UTF-8), MD5 `942c0745b937aa2327442f4980e974c4`.
+- **Fausse pour l'outillage**, qui appelait `enc2utf8()` sur des chaînes non marquées : en session C, une chaîne non ASCII non marquée est de codage indéterminé et la conversion la dénature (ADR 0007, point 9.3).
+- **Corrections** : les chaînes de l'outillage suivent la règle d'`octets_chaines()` (`R/rapport.R:41` ; ADR 0007, point 9.3), par **refus** et non par conversion ; le lecteur traite les octets ; les tests T1 à T4 sont ajoutés.
+- **Mesure de l'audit** : R1 produit sous `C` et sous `C.UTF-8` donne le même MD5, `7b0f55f1fe2b7265d21548f493973c7b`.
+
+La locale d'installation du package relève de l'ADR 0007 (annotation M54).
+
+**Effet sur les résultats** : aucun. Aucune référence n'existe encore (point 3.7) ; l'annotation fixe le format et la classe avant la création.
+
+Issues : #17, #24, #25. Décision M54 (ADR 0007) ; M52.
