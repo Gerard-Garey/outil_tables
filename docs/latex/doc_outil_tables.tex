@@ -1931,25 +1931,397 @@ d'expérience. Il sera créé par une branche ultérieure
 \section{Simulateur~: \code{R/simulation.R}}
 \label{sec:simulation}
 
+Le dépôt ne contient aucune donnée réelle~: tous les jeux sont simulés sous
+une \emph{loi vraie} connue et une graine (E1.5). Le simulateur est le modèle
+multi-états exécuté en avant (E2.19~; ADR 0003, point 9)~: il produit des
+lignes individuelles portant les rôles du catalogue, sur lesquelles le moteur
+est vérifié. Il reproduit le même modèle que le moteur, pas le même code~: il
+n'appelle que \code{donnees} et \code{outils}, et aucun module du moteur ne
+l'appelle (section~\ref{sec:graphe}). La version de cette branche est
+\emph{minimale}~: deux transitions concurrentes, vivant $\to$ décédé et en
+cours $\to$ racheté, une tête par contrat, troncature à gauche et censure par
+la période. Les autres formes de données (agrégats, stocks successifs), les
+têtes multi-contrats et l'injection de défauts paramétrés viendront avec une
+branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2). Son point
+d'entrée est \code{simuler\_portefeuille(loi, portefeuille, periode,
+graine)}, exporté (ADR 0007, point 3.2). Le contenu de fond vient de la
+spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
+17/10/2026.
+
 \subsection{Loi vraie et tables synthétiques}
 \label{sec:loi-vraie}
 
-\emph{À rédiger (issue~\#10).}
+La loi vraie est une liste de deux lois, \code{deces} et \code{rachat}~;
+chacune associe une table de référence (classe \code{table\_reference},
+section~\ref{sec:table-reference}) et un facteur par sexe, \code{c(H = , F = )},
+réel fini $\ge 0$. Pour un sexe $s$, la loi effective est
+\[
+  q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
+\]
+où $q_x$ est lu dans la table du sexe si elle y figure, sinon dans la table
+\code{ensemble} (\code{loi\_effective()}). Une table prospective (colonne
+\code{annee}) est refusée par le simulateur minimal. Seuls les sexes
+effectivement tirés (proportion d'hommes non nulle pour \code{H}, différente
+de 1 pour \code{F}) sont construits et contrôlés~; ils sont consignés dans
+\code{sexes\_controles}.
+
+\medskip
+Deux tables synthétiques, de statut \code{synthetique} et porteuses de leurs
+paramètres (attribut \code{parametres}), sont construites par le module~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Gompertz-Makeham} (\code{table\_gompertz\_makeham()})~: intensité
+    $\mu(x) = A + B\,c^{x}$, avec $A \ge 0$, $B \ge 0$, $c > 1$ déclarés, sans
+    valeur par défaut, sur des âges entiers déclarés~; la probabilité annuelle
+    est l'intégrale exacte de $\mu$ sur $[x, x+1)$~:
+    \[
+      q_x = 1 - \exp\Bigl(-A - B\,c^{x}\,\frac{c-1}{\ln c}\Bigr)~;
+    \]
+    la table est sans distinction de sexe (\code{ensemble}). Les tests
+    emploient $A = 2\cdot 10^{-4}$, $B = 2{,}5\cdot 10^{-5}$, $c = 1{,}1$, âges
+    0 à 120 (\emph{choix de conception} de la spécification, sans prétention
+    de réalisme), qui donnent $q_{60} = 0{,}008153179142$ et
+    $q_{100} = 0{,}303486068312$, et des facteurs $f_H = 1$, $f_F = 0{,}6$~;
+  \item \textbf{table constante} (\code{table\_constante()})~: $q_x = q$ à tous
+    les âges déclarés~; elle porte la loi de rachat ($q = 0{,}05$ dans les
+    tests de portefeuille), ou une transition absente ($q = 0$). Une loi de
+    rachat par ancienneté (axe secondaire) est hors du périmètre de la
+    branche.
+\end{itemize}
+
+\subsubsection*{Hypothèse de répartition dans l'année}
+
+Le simulateur suppose une \textbf{force constante par âge entier},
+$\mu_x = -\ln(1 - q_x)$, dans l'échelle des années d'âge (une année d'âge vaut
+1, quelle que soit sa durée de 365 ou 366 jours~;
+section~\ref{sec:recettes}), et des \textbf{risques concurrents
+indépendants}. L'hypothèse est consignée dans le résultat
+(\code{HYPOTHESE\_REPARTITION}). Elle est retenue pour deux raisons~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item sous cette hypothèse, $q_x = 1 - e^{-\mu_x}$ \emph{exactement}~; le
+    décompte des événements rapporté à l'exposition centrale est alors
+    l'estimateur du maximum de vraisemblance de $\mu_x$ du modèle à force
+    constante par âge entier, avec troncature à gauche et censure
+    indépendante, pour une observation en temps continu (résultat exact), et
+    la cible des estimateurs à venir est connue exactement. Sur des dates au
+    jour (section~\ref{sec:conventions-temps}), l'exposition est arrêtée au
+    début du jour de l'événement, d'où un écart relatif d'ordre
+    $\mu_x/(2L_x)$, négligeable mais non nul~;
+  \item la force constante est stable par addition des forces~: une force
+    constante dans chaque décrément équivaut à une force constante dans la
+    table à décréments multiples, alors que la répartition uniforme n'a pas
+    cette propriété. Deux forces indépendantes s'additionnent, et la
+    probabilité de décès en présence du rachat a une forme close~:
+    \[
+      q^{(d)}_x = \frac{\mu^{d}_x}{\mu^{d}_x + \mu^{r}_x}
+      \Bigl(1 - e^{-(\mu^{d}_x + \mu^{r}_x)}\Bigr)~;
+    \]
+    sous l'hypothèse de répartition uniforme dans chaque table à décrément
+    simple, de taux $q'^{d}$ et $q'^{r}$, la survie à double décrément
+    $(1 - t\,q'^{d})(1 - t\,q'^{r})$ est quadratique en $t$ dès que les deux
+    taux sont strictement positifs, et la table à décréments multiples n'est
+    plus uniforme~: l'hypothèse ne serait plus la même pour les deux
+    transitions (résultat exact, calcul direct).
+\end{itemize}
+
+\noindent
+Une probabilité $q_x = 1$ à un âge atteignable rend la force infinie~: le
+simulateur la refuse (\code{qx\_egal\_a\_un}).
 
 \subsection{Portefeuille simulé}
 \label{sec:portefeuille-simule}
 
-\emph{À rédiger (issue~\#10).}
+\subsubsection*{Entrées}
+
+{\sloppy Le portefeuille est une liste dont tous les champs sont requis, sans valeur
+par défaut (\code{CHAMPS\_PORTEFEUILLE}), selon deux modes~:\par}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{uniforme}~: \code{n} contrats, \code{proportion\_hommes},
+    \code{age\_min}, \code{age\_max}, \code{origine} (date au plus égale au
+    début de la période)~; le jour d'entrée est uniforme discret sur les jours
+    de $[\text{origine}, \text{fin}]$, l'âge à l'entrée uniforme continu sur
+    $[\text{age\_min}, \text{age\_max})$, et la naissance est l'entrée moins
+    $\operatorname{round}(\text{âge} \times 365{,}25)$ jours~; l'âge exact est
+    ensuite recalculé depuis les dates, selon la convention d'âge du moteur
+    (section~\ref{sec:conventions-temps})~;
+  \item \code{age\_exact}~: \code{n}, \code{proportion\_hommes}, \code{age}
+    (entier), \code{date\_entree}~; toutes les têtes entrent à l'âge exact
+    \code{age}, née le même jour et le même mois, \code{age} années avant
+    l'entrée. Ce mode sert au constat de simulation
+    (section~\ref{sec:constats-simulation}). Une entrée le 29~février est
+    refusée (\code{entree\_29\_fevrier})~: la naissance «~\code{age} années
+    avant~» serait ambiguë.
+\end{itemize}
+
+\noindent
+Pour garantir une naissance strictement antérieure à l'entrée, il faut
+$\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondit
+au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
+au moins égal à 1 en mode âge exact~; ces conditions sont contrôlées
+(\code{portefeuille\_invalide}). La période d'observation est une liste
+\code{debut}, \code{fin} de dates~; la censure a lieu à l'instant
+$B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
+
+\subsubsection*{Algorithme}
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item Pour chaque transition et chaque tête, un \textbf{temps latent} est
+    tiré par inversion du risque cumulé $H$, linéaire par morceaux sur l'âge
+    (force constante par âge entier)~: l'âge de l'événement est celui où $H$
+    atteint $H(a_0) + E$, avec $a_0$ l'âge exact à l'entrée et
+    $E \sim \mathrm{Exp}(1)$, cherché par \code{findInterval()}
+    (\code{temps\_latent()}).
+  \item La sortie est le \textbf{minimum} des deux temps latents et de la
+    censure à $B$, comparés en temps continu~; une égalité, de probabilité
+    nulle, est attribuée au décès.
+  \item L'instant de l'événement, dans l'année d'âge $k$ à la fraction
+    $\varphi$, est converti en jour~: $\operatorname{anniv}(k) +
+    \lfloor \varphi\, L_k \rfloor$, avec $L_k$ la durée de l'année d'âge,
+    borné à $[\text{entrée}, \operatorname{anniv}(k+1) - 1]$. Le jour reste
+    dans l'année d'âge~: \textbf{la probabilité d'un événement dans l'année $k$
+    est conservée exactement}~; la discrétisation n'affecte que la
+    répartition à l'intérieur de l'année, et la borne ne corrige que
+    l'arrondi de la virgule flottante.
+\end{enumerate}
+
+\subsubsection*{Ordre des tirages et graine}
+
+Les tirages ont lieu sous \code{sous\_graine()}, avec la graine reçue en
+argument, sans défaut, sous \code{GENERATEUR} (section~\ref{sec:sous-graine}),
+dans un ordre fixé, qui fait partie du contrat de reproductibilité et est
+consigné (\code{ORDRE\_TIRAGES})~: (1) sexe, \code{runif(n)} comparé à la
+proportion d'hommes~; (2) jour d'entrée, \code{sample.int()} avec remise~;
+(3) âge à l'entrée, \code{runif(n)}~; (4) décès, \code{rexp(n)}~; (5) rachat,
+\code{rexp(n)}. En mode âge exact, (2) et (3) ne sont pas tirés. Changer cet
+ordre change tout jeu simulé~: c'est un changement de résultat.
+
+\subsubsection*{Couverture de la table~: aucune extrapolation}
+
+Le simulateur refuse (\code{table\_trop\_courte}) une loi qui ne couvre pas
+tous les âges atteignables, \emph{avant tout tirage}, si bien que le refus ne
+dépend pas de la graine (\code{controler\_portefeuille()},
+\code{controler\_couverture()}). Les âges atteignables sont bornés a priori
+par les seuls paramètres~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{borne basse}~: l'âge révolu à l'entrée est au moins
+    \[
+      y_{\min} = \max\bigl\{y : 365\,y + \lceil y/4 \rceil \le
+      \operatorname{round}(\text{age\_min} \times 365{,}25)\bigr\}
+    \]
+    (\code{age\_revolu\_minimal()}), parce que $y$ années comptent au plus
+    $\lceil y/4 \rceil$ jours de 29~février~; la borne est prudente, les années
+    séculaires non bissextiles ne faisant que retirer des jours. Elle donne
+    $y_{\min} = 20$ pour $\text{age\_min} = 20$ comme pour $21$~: la borne
+    $\lfloor \text{age\_min} \rfloor$ serait fausse, une naissance arrondie au
+    jour pouvant donner l'âge révolu 20 à une tête entrée à 21 ans (erratum
+    A.2, point~4). En mode âge exact, la borne basse est l'âge déclaré~;
+  \item \sloppy \textbf{borne haute}~: $\text{age\_max} + (B - \text{origine})/365{,}25 + 1$
+    en mode uniforme, et $\text{age} + (B - \text{date\_entree})/365{,}25 + 1$
+    en mode âge exact. \emph{Preuve.} Soit $\operatorname{span}(y)$ le nombre de
+    jours de la naissance à l'anniversaire $y$. Pour $y \le 130$ (âges des
+    tables des tests), $\operatorname{span}(y) \ge 365{,}25\,y - 2{,}75$ et
+    $\operatorname{span}(y) \le 365{,}25\,y + 0{,}75$~; une tête d'âge révolu
+    $y$ à $B$ vérifie $\operatorname{span}(y) \le B - n$, et, en mode uniforme,
+    $B - n \le (B - \text{origine}) + \text{age\_max} \times 365{,}25 + 0{,}5$~;
+    donc $y \le \text{age\_max} + (B - \text{origine})/365{,}25 + 3{,}25/365{,}25$,
+    strictement inférieur à la borne. En mode âge exact,
+    $B - n = (B - \text{date\_entree}) + \operatorname{span}(\text{age})$ et le
+    même raisonnement donne une marge de $3{,}5/365{,}25$.
+    \emph{Statut des deux encadrements de $\operatorname{span}$}~: ils sont
+    établis par calcul exhaustif, toutes naissances du 1\textsuperscript{er}
+    janvier 1700 au 31~décembre 2150 et $1 \le y \le 130$ (minimum $-2{,}75$,
+    maximum $+0{,}75$, remesurés sur R 4.3.3 avec les fonctions de dates du
+    module)~; le calendrier grégorien étant périodique de 400 ans, cette plage
+    contient un cycle complet de dates de naissance, et les encadrements valent
+    pour toute naissance (résultat exact). Au-delà de 130 ans, l'encadrement
+    bas mesuré jusqu'à 260 ans est $-3{,}75$ (atteint pour $y = 207$,
+    naissance au 2096-03-01), l'encadrement haut restant $+0{,}75$~; la même
+    preuve donne alors une marge de $4{,}25/365{,}25$ en mode uniforme
+    ($4{,}5/365{,}25$ en mode âge exact), inférieure à un an pour $y \le 260$.
+\end{itemize}
+
+\noindent
+Après les tirages, une assertion interne vérifie que les âges parcourus
+restent dans ces bornes~: un écart serait une erreur de programmation, jamais
+un refus dépendant de la graine. Avec le portefeuille des tests
+($\text{age\_max} = 75$, origine 2005-01-01, fin 2024-12-31), la borne haute
+vaut 96 (erratum A.2, point~1), couverte par la table de 0 à 120 ans.
+
+\subsubsection*{Sortie}
+
+{\sloppy \code{simuler\_portefeuille()} rend un \code{data.frame} de colonnes
+\code{id\_contrat}, \code{id\_tete} (égal à \code{id\_contrat}), \code{sexe},
+\code{date\_naissance}, \code{date\_entree}, \code{date\_sortie} (manquante si
+la tête est en cours à la fin) et \code{cause\_sortie} (\code{deces},
+\code{rachat} ou \code{en\_cours}), qui portent les noms des rôles du
+catalogue. Toutes les lignes sont conservées, y compris celles sorties avant
+le début de la période, qui exercent la troncature à gauche. Les lignes sont
+cohérentes au sens exact, $\text{naissance} < \text{entrée} \le \text{sortie}
+\le \text{fin}$, et passent les contrôles du module \code{donnees} sans
+exclusion, pour les deux transitions (constat des tests).\par}
+
+\medskip
+L'attribut \code{simulation} consigne~: la loi vraie (tables, facteurs, loi
+effective par transition et par sexe avec $q_x$ et $\mu_x$, transitions,
+hypothèse de répartition, \code{sexes\_controles})~; le portefeuille et la
+période reçus~; la graine, \code{GENERATEUR} et l'ordre des tirages~; la
+version de R~; des décomptes (lignes, décès, rachats, en cours, sorties et
+entrées antérieures au début de la période).
+
+\medskip
+{\sloppy Refus du simulateur~: \code{loi\_invalide}, \code{portefeuille\_invalide},
+\code{periode\_invalide}, \code{entree\_29\_fevrier}, \code{table\_trop\_courte}
+et \code{qx\_egal\_a\_un}~; et, par \code{sous\_graine()}, \code{graine\_invalide}.\par}
 
 \subsection{Constats de simulation}
 \label{sec:constats-simulation}
 
-\emph{À rédiger (issue~\#10).}
+Retrouver la loi vraie est une batterie de tests, chacun un \emph{constat de
+simulation} qui écrit le nombre de têtes, le niveau, la région d'acceptation et
+la probabilité de fausse alarme (E2.19, E2.20). Le constat du simulateur
+minimal porte sur cinq cohortes de $n = 10^{6}$ têtes, entrées le
+2016-03-15 à l'âge exact $x$ (mode \code{age\_exact}), période du 2016-03-15
+au 2017-12-31~: l'année d'âge $x$ est observée entière, sans censure par la
+période. On compte les événements $D$ datés avant l'anniversaire $x+1$. Sous
+le modèle simulé, $D$ suit exactement la loi binomiale
+$\mathcal{B}(n, p)$, $p$ étant la probabilité de l'événement dans l'année.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Région d'acceptation}~: bilatérale exacte,
+    $[\text{qbinom}(\alpha_k/2, n, p), \text{qbinom}(1 - \alpha_k/2, n, p)]$.
+  \item \textbf{Correction multiple}~: Bonferroni, $\alpha = 10^{-3}$ global,
+    $K = 5$, $\alpha_k = 2\cdot 10^{-4}$.
+  \item \textbf{Fausse alarme exacte} de chaque test~:
+    $FA_k = P(D < \text{lo}) + P(D > \text{hi})$, calculée et écrite par le
+    test.
+  \item \textbf{Fausse alarme familiale}~: elle est bornée par
+    $\sum_k FA_k = 9{,}857\cdot 10^{-4} \le 10^{-3}$ (inégalité de Bonferroni,
+    valable \emph{sans hypothèse d'indépendance}~; c'est le critère vérifié).
+    Sous indépendance des cinq cohortes, tirées sous des graines distinctes
+    (20261016 à 20261020), elle vaut $1 - \prod_k (1 - FA_k) = 9{,}853\cdot
+    10^{-4}$~; cette indépendance est l'hypothèse usuelle sur le générateur,
+    non démontrée, et la valeur n'est donnée qu'à titre d'information.
+\end{itemize}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{2.6cm}p{3.4cm}p{2.2cm}@{}}
+\caption{Constat de simulation du simulateur minimal~: probabilité exacte $p$
+sous le modèle, région d'acceptation et fausse alarme exacte
+(\code{tests/unitaires/test\_simulation.R}).}
+\label{tab:constat-simulation}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$p$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$p$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endhead
+1. décès, $x = 60$, H, sans rachat & $0{,}008153179142$ & $[7\,821\,;\ 8\,490]$ & $1{,}951\cdot 10^{-4}$ \\
+2. décès, $x = 80$, F (facteur 0,6), sans rachat & $0{,}03150085056$ & $[30\,853\,;\ 32\,152]$ & $1{,}981\cdot 10^{-4}$ \\
+3. décès, $x = 100$, F, sans rachat & $0{,}182091641$ & $[180\,658\,;\ 183\,528]$ & $1{,}995\cdot 10^{-4}$ \\
+4. rachat, $x = 40$, $q^{r} = 0{,}05$, sans décès & $0{,}05$ & $[49\,191\,;\ 50\,812]$ & $1{,}983\cdot 10^{-4}$ \\
+5. décès, $x = 60$, H, rachat concurrent $q^{r} = 0{,}30$ & $0{,}006859320306$ & $[6\,554\,;\ 7\,168]$ & $1{,}947\cdot 10^{-4}$ \\
+\end{longtable}
+}
+
+\noindent
+La probabilité du test~5 est la forme close $q^{(d)}$ ci-dessus~; le rachat
+concurrent y est porté à $0{,}30$ pour que le test soit sensible à son oubli
+(choix de la spécification). La graine étant fixe, chaque test est
+déterministe~: sa fausse alarme est la probabilité, sur les graines, qu'une
+implémentation juste échoue. Les valeurs observées de $D$ sont écrites par la
+batterie à chaque exécution~; elles ne sont pas reproduites ici (E3.4).
+
+\begin{encadre}
+\small
+\textbf{Statuts et sources d'erreur} (E2.20).
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
+  \item \emph{Résultats exacts}~: la formule de $q_x$ de Gompertz-Makeham
+    (intégrale de $\mu$), la forme close $q^{(d)}$, la loi binomiale de $D$
+    sous le modèle, les régions d'acceptation et les $FA_k$ (quantiles et
+    probabilités de la loi binomiale), l'inégalité de Bonferroni, la
+    fausse alarme familiale $1 - \prod_k (1 - FA_k)$, sous l'hypothèse
+    d'indépendance des cohortes (hypothèse sur le générateur, non
+    démontrée), la conservation de la probabilité annuelle par la conversion
+    en jours, les bornes de couverture.
+  \item \emph{Résultat asymptotique}~: aucun dans ce constat.
+  \item \emph{Approximations numériques}~: l'évaluation en virgule flottante
+    de $q_x$, de $\mu_x$ et des temps latents, des quantiles binomiaux et des
+    $FA_k$~; le critère $\sum_k FA_k \le 10^{-3}$ est vérifié sur les valeurs
+    évaluées.
+  \item \emph{Constat de simulation}~: le passage des cinq tests.
+  \item \emph{Erreur Monte-Carlo}~: la dispersion binomiale de $D$ autour de
+    $np$, due au nombre fini de têtes simulées~; c'est elle que mesure la
+    largeur de la région. \emph{Erreur d'estimation}~: elle n'intervient pas
+    ici, $D$ étant comparé à la probabilité exacte du modèle, sans taux estimé
+    sur une exposition~; elle viendra avec les taux bruts.
+\end{itemize}
+\end{encadre}
+
+\subsection{Vérifications}
+\label{sec:verifications-simulation}
+
+\code{tests/unitaires/test\_simulation.R} vérifie~: les valeurs des tables
+synthétiques (valeurs de la spécification, et recoupement par
+\code{stats::integrate()}, que le simulateur n'emploie pas)~; les dates
+d'anniversaire, 29~février compris (recoupement par \code{as.Date()}~;
+comparaison à \code{age\_revolu()} du module \code{donnees}, écrite
+indépendamment)~; la cohérence exacte des lignes et l'âge révolu à
+l'entrée~; le passage du module \code{donnees} sans exclusion, pour les deux
+transitions~; l'identité des jeux à graine égale et la restauration de l'état
+du générateur de l'appelant~; chaque refus, dont \code{table\_trop\_courte}
+indépendant de la graine~; le constat ci-dessus.
+\code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
+identique, attribut compris, dans un autre processus R.
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-simulation}
 
-\emph{À rédiger (issue~\#10).}
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{5.6cm}p{1.4cm}p{2.9cm}p{4.7cm}@{}}
+\caption{Définitions de premier niveau de \code{R/simulation.R}.}
+\label{tab:fonctions-simulation}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-simulation}{CAUSES\_SIMULEES} & constante & --- & causes produites et transitions associées \\
+\catalogue{fonctions-simulation}{HYPOTHESE\_REPARTITION} & constante & --- & hypothèse consignée~: force constante par âge entier, risques indépendants \\
+\catalogue{fonctions-simulation}{ORDRE\_TIRAGES} & constante & --- & ordre des tirages, consigné \\
+\catalogue{fonctions-simulation}{CHAMPS\_PORTEFEUILLE} & constante & --- & champs requis du portefeuille, par mode \\
+\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
+\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe \\
+\catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
+\catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
+\catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
+\catalogue{fonctions-simulation}{age\_anniversaire()} & interne & composantes, année, jour & âge au dernier anniversaire \\
+\catalogue{fonctions-simulation}{date\_unique()} & interne & valeur & date unique entière et finie \\
+\catalogue{fonctions-simulation}{controler\_portefeuille()} & interne & portefeuille, période & refus des entrées~; bornes d'âge a priori \\
+\catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
+\catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
+\catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
+\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine & jeu simulé et attribut \code{simulation} \\
+\end{longtable}
+}
 
 
 % =============================================================================
@@ -1987,6 +2359,7 @@ fonctions de leur module.
 \endhead
 \catalogue{exports}{catalogue\_roles()} & \code{donnees} & catalogue fermé des rôles, lu par l'application pour la déclaration des rôles & \ref{sec:catalogue-roles} \\
 \catalogue{exports}{table\_reference()} & \code{donnees} & constructeur contrôlé d'une table de référence, appelé par l'application pour l'import de tables & \ref{sec:table-reference} \\
+\catalogue{exports}{simuler\_portefeuille()} & \code{simulation} & point d'entrée du simulateur~: jeu simulé sous une loi vraie et une graine & \ref{sec:simulation} \\
 %% INDEX-SUITE
 \end{longtable}
 }
@@ -2013,12 +2386,15 @@ chaque section rédigée.
 \textcolor{financeblue}{\textbf{Objet}} &
 \textcolor{financeblue}{\textbf{Section}} \\
 \endhead
+E1.5 & aucune donnée réelle~: jeux simulés sous une loi vraie et une graine & \ref{sec:simulation} \\
 E1.3 & rigueur, traçabilité, reproductibilité &
 \ref{sec:reproductibilite}, \ref{sec:batteries} \\
 E2.2 & catalogue fermé des rôles, lecture d'une colonne par son rôle & \ref{sec:catalogue-roles} \\
 E2.4 & unité d'observation, fusion par tête, incohérences entre contrats & \ref{sec:unite-observation} \\
 E2.5 & période déclarée, délai de déclaration & \ref{sec:conventions-temps} \\
 E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, données inchangées & \ref{sec:controles-donnees} \\
+E2.19 & simulateur~: loi vraie, entrées, sorties concurrentes, censure, constat de simulation & \ref{sec:simulation} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:constats-simulation} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP},
 tableaux de fonctions & ensemble du document~; \ref{sec:fonctions-outils} \\
 E3.3 & test de concordance entre la documentation et le code &
