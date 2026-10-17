@@ -2,3 +2,4 @@ nom,issue,motif
 construire_table,#11,"point d'entrée documenté par docwriter avec #11 (squelette dans #8)"
 catalogue_roles,#9,"catalogue fermé des rôles, lu par l'application ; documenté par docwriter en fin de branche"
 table_reference,#9,"constructeur de table de référence, appelé par l'application ; documenté par docwriter en fin de branche"
+simuler_portefeuille,#10,"point d'entrée du simulateur (ADR 0007, point 3.2) ; documenté par docwriter en fin de branche"

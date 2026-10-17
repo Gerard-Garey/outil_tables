@@ -4,9 +4,9 @@
 #  Nature des attendus : valeurs exactes.
 # -----------------------------------------------------------------------------
 
-verifier("NAMESPACE : exports = catalogue_roles, construire_table, table_reference (ADR 0007, point 3.4 ; #9)",
+verifier("NAMESPACE : exports = catalogue_roles, construire_table, simuler_portefeuille, table_reference (ADR 0007, point 3.4 ; #9, #10)",
          identical(sort(getNamespaceExports("tablexp")),
-                   c("catalogue_roles", "construire_table", "table_reference")))
+                   c("catalogue_roles", "construire_table", "simuler_portefeuille", "table_reference")))
 verifier("construire_table : signature (donnees, roles, plan, provenance = NULL)",
          identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance")) &&
            is.null(formals(construire_table)$provenance))
