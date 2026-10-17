@@ -360,7 +360,7 @@ deces_par_tete <- function(g, sor, cause) {
 # Évalue tous les motifs sur toutes les lignes (aucun court-circuit ; un
 # motif de comparaison n'est pas levé si l'une de ses valeurs est NA). Les
 # motifs de tête sont évalués sur les lignes exemptes de motif de ligne et
-# s'appliquent à toutes les lignes de la tête. Rend list(motifs) : liste
+# s'appliquent aux lignes propres de la tête. Rend list(motifs) : liste
 # nommée code -> numéros de ligne (1-based, croissants), dans l'ordre
 # MOTIFS_LIGNES puis MOTIFS_TETE (integer(0) pour un motif sans objet).
 evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation) {
