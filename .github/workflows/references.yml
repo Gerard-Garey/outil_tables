@@ -1,0 +1,127 @@
+name: Références de non-régression
+
+# Production des références de non-régression sur la plateforme de référence
+# (ADR 0009, point 5 ; ADR 0008, points 8 et 9 ; issue #17). Déclenchement
+# manuel seul, sur ordre du mainteneur, par la session principale, sur la
+# branche de travail (workflow_dispatch prend la référence choisie). Le job
+# ne commite rien, ne pousse rien, ne crée aucune issue : il publie un
+# artefact (références, MD5SUMS, plateforme.txt, execution.txt, ecarts.txt) ;
+# la session principale commite les références après visa (ADR 0009, point
+# 5.5). Déclenché sur main avant la création des références, il échoue
+# faute des scripts de tests/reference/ : c'est attendu (point 5.4).
+# Invariants contrôlés par tests/controles/identite_batteries.R (contrôle 4) :
+# même chaîne image@empreinte, même étape « BLAS et LAPACK de référence »
+# (ligne pour ligne) et mêmes SHA d'actions que le job « Tests (R 4.3.3) »
+# de ci.yml ; plateforme en mode strict avant la production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode (ADR 0009, point 5.2)"
+        required: true
+        type: choice
+        options:
+          - creation
+          - regeneration
+          - bascule
+      plans:
+        description: "Plans visés : tous, ou identifiants séparés par des virgules (R1,R4)"
+        required: true
+        type: string
+        default: tous
+      motif:
+        description: "Motif : issue et raison (#N, ...)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  references:
+    name: Références (R 4.3.3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      # Même chaîne que les jobs R de ci.yml (ADR 0008, point 1 ;
+      # tests/controles/identite_batteries.R, contrôle 3).
+      image: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
+    env:
+      TABLEXP_IMAGE: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      # Entrées passées par l'environnement, jamais interpolées dans un run.
+      MODE: ${{ inputs.mode }}
+      PLANS: ${{ inputs.plans }}
+      MOTIF: ${{ inputs.motif }}
+      SORTIE: sortie_references
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Identique, ligne pour ligne, à l'étape de même nom du job de tests de
+      # ci.yml (décision M47 ; ADR 0008, point 3) : la plateforme de
+      # référence est l'image épinglée suivie de cette bascule.
+      - name: BLAS et LAPACK de référence
+        run: |
+          set -euo pipefail
+          [ "$(uname -m)" = x86_64 ] || { echo "::error::architecture $(uname -m) inattendue"; exit 1; }
+          lib=/usr/lib/x86_64-linux-gnu
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends libblas3 liblapack3
+          update-alternatives --set libblas.so.3-x86_64-linux-gnu "$lib/blas/libblas.so.3"
+          update-alternatives --set liblapack.so.3-x86_64-linux-gnu "$lib/lapack/liblapack.so.3"
+          echo "libblas.so.3   -> $(readlink -f "$lib/libblas.so.3")"
+          echo "liblapack.so.3 -> $(readlink -f "$lib/liblapack.so.3")"
+          dpkg-query -W -f='${Package} ${Version}\n' libblas3 liblapack3
+      # Sans `if:` : si une étape précédente échoue, celle-ci et la
+      # production sont sautées ; aucune référence n'est produite hors
+      # plateforme de référence.
+      - name: Plateforme (mode strict)
+        run: |
+          set -euo pipefail
+          mkdir -p "$SORTIE"
+          Rscript tests/controles/plateforme.R --exiger | tee "$SORTIE/plateforme.txt"
+      - name: Production et comparaison des références
+        run: |
+          set -euo pipefail
+          Rscript tests/reference/produire_references.R --mode "$MODE" --plans "$PLANS" --sortie "$SORTIE" --motif "$MOTIF"
+      # Aussi après un échec, pour que l'écart soit lisible (point 5.2).
+      - name: MD5SUMS et execution.txt
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$SORTIE"
+          cd "$SORTIE"
+          if compgen -G "references/*.tsv" > /dev/null; then
+            md5sum references/*.tsv > MD5SUMS
+            cat MD5SUMS
+          fi
+          {
+            echo "GITHUB_SHA : $GITHUB_SHA"
+            echo "GITHUB_RUN_ID : $GITHUB_RUN_ID"
+            echo "adresse : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "référence : $GITHUB_REF"
+            echo "mode : $MODE"
+            echo "plans : $PLANS"
+            echo "motif : $MOTIF"
+            echo "date : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          } > execution.txt
+          cat execution.txt
+      - name: Artefact des références
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: references-${{ github.run_id }}
+          path: |
+            sortie_references/references/
+            sortie_references/MD5SUMS
+            sortie_references/plateforme.txt
+            sortie_references/execution.txt
+            sortie_references/ecarts.txt
+          if-no-files-found: error
+          retention-days: 90
