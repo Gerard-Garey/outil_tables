@@ -10,8 +10,10 @@
 #  construction (#11) : deux constructions identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, empreinte des
 #  données identique sous LANG=C et LANG=C.UTF-8 et égale à la valeur
-#  calculée hors R. À venir : comparaison aux références de non-régression
-#  (deuxième branche).
+#  calculée hors R ; taux bruts (#14) : construction avec l'étape `brut`
+#  identical() hors `execution`, rejeu de la fiche, même objet dans un autre
+#  processus R, invariance du plan sans `brut` (R1 et R4). À venir :
+#  comparaison aux références de non-régression (#17).
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -169,5 +171,57 @@ for (lang in c("C", "C.UTF-8")) {
            })
   unlink(c(script, sortie))
 }
+
+# Taux bruts (#14) : plan R1 de la spécification d'actuary (B, plans de
+# référence) sur le portefeuille simulé ; identical() hors `execution`,
+# rejeu de la fiche, autre processus ; invariance : le plan sans `brut` donne
+# l'objet du plan avec `brut` privé des seuls ajouts de l'étape.
+fichier_courant("construction avec l'étape brut (construire_table) : identical(), rejeu, autre processus")
+
+brut_code <- c(
+  "plan_b <- plan",
+  "plan_b$delai_declaration <- 0",
+  "plan_b$etapes$exposition$par_annee <- FALSE",
+  "plan_b$etapes$brut <- list(estimateurs = c('poisson', 'binomial'), niveau = 0.95)",
+  "xb <- tablexp::construire_table(s, roles, plan_b)",
+  "xb$execution <- NULL")
+eval(parse(text = brut_code))
+verifier("construction avec brut, même processus : deux exécutions identical() hors execution",
+         identical(xb, sans_execution(construire_table(s, roles, plan_b))))
+verifier("construction avec brut : rejeu construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) identical() hors execution",
+         identical(xb, sans_execution(construire_table(s, xb$fiche$roles, xb$fiche$plan, xb$fiche$provenance))))
+verifier("construction avec brut : fiche$plan porte l'étape brut, fiche$hypotheses_brut en fin de liste",
+         identical(xb$fiche$plan, plan_b) && identical(tail(names(xb$fiche), 1L), "hypotheses_brut"))
+# Invariance du plan sans `brut` (la comparaison à l'état de f9ab269 relève
+# des références de non-régression, #17).
+invariance_sans_brut <- function(xb, plan_b) {
+  p0 <- plan_b; p0$etapes$brut <- NULL
+  y0 <- sans_execution(construire_table(s, roles, p0))
+  z <- xb
+  z$etapes$brut <- NULL; z$fiche$hypotheses_brut <- NULL; z$fiche$plan <- p0
+  garde <- z$avertissements$etape != "brut"
+  z$avertissements <- z$avertissements[garde, , drop = FALSE]; rownames(z$avertissements) <- NULL
+  z$fiche$avertissements <- z$avertissements
+  identical(y0, z)
+}
+verifier("invariance du plan sans brut (R1) : objet identical() à celui du plan avec brut, hors etapes$brut, fiche$plan, fiche$hypotheses_brut et avertissements de l'étape brut",
+         invariance_sans_brut(xb, plan_b))
+verifier("invariance du plan sans brut (R4 : sexe, par_annee = TRUE, poisson seul, 0,95) : même contrôle", {
+  plan_4 <- plan_b
+  plan_4$etapes$exposition$par_annee <- TRUE
+  plan_4$etapes$brut$estimateurs <- "poisson"
+  invariance_sans_brut(sans_execution(construire_table(s, roles, plan_4)), plan_4)
+})
+script <- tempfile(fileext = ".R")
+sortie <- tempfile(fileext = ".rds")
+writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(BIBLIOTHEQUE)),
+             "set.seed(7L); invisible(runif(3))  # état de l'appelant différent",
+             sim_code, constr_code, brut_code, sprintf("saveRDS(xb, %s)", deparse(sortie))), script)
+r <- executer_rscript(script)
+verifier("construction avec brut, sous-processus R : exécution sans erreur",
+         if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
+verifier("construction avec brut, autre processus : objet identical() hors execution (taux, bornes, fiche)",
+         if (!file.exists(sortie)) "fichier de sortie du sous-processus absent" else identical(xb, readRDS(sortie)))
+unlink(c(script, sortie))
 
 bilan()
