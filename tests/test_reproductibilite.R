@@ -6,10 +6,12 @@
 #  générateur GENERATEUR) — tirages identiques au bit près à graine égale,
 #  dans un même processus, quel que soit l'état du générateur de l'appelant,
 #  et entre deux processus R de la même machine ; simulateur (#10) : jeu
-#  simulé identical() à graine égale, dans le processus et dans un autre.
-#  À venir : deux constructions identical() hors `execution` et rejeu de la
-#  fiche (#11) ; comparaison aux références de non-régression (deuxième
-#  branche).
+#  simulé identical() à graine égale, dans le processus et dans un autre ;
+#  construction (#11) : deux constructions identical() hors `execution`,
+#  rejeu de la fiche, même objet dans un autre processus R, empreinte des
+#  données identique sous LANG=C et LANG=C.UTF-8 et égale à la valeur
+#  calculée hors R. À venir : comparaison aux références de non-régression
+#  (deuxième branche).
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -97,5 +99,75 @@ verifier("simulateur, autre processus, même graine : jeu simulé identical() (a
          if (!file.exists(sortie)) "fichier de sortie du sous-processus absent" else
            identical(s, readRDS(sortie)))
 unlink(c(script, sortie))
+
+# Construction (#11) : identical() hors `execution` (ADR 0007, point 6.1),
+# rejeu de la fiche (point 6.2), autre processus, empreinte indépendante de
+# la locale (point 9.3) ; l'empreinte ne passe pas par serialize() (point
+# 9.4), dont l'en-tête porte la version de R.
+fichier_courant("construction (construire_table) : identical(), rejeu, autre processus, empreinte")
+
+constr_code <- c(
+  "roles <- c(id_contrat = 'id_contrat', id_tete = 'id_tete', sexe = 'sexe',",
+  "           date_naissance = 'date_naissance', date_entree = 'date_entree',",
+  "           date_sortie = 'date_sortie', cause_sortie = 'cause_sortie')",
+  "plan <- list(transition = list(depart = 'vivant', arrivee = 'deces'), periode = per,",
+  "             delai_declaration = 90, segmentation = 'sexe',",
+  "             etapes = list(donnees = list(exclusions = character(0)),",
+  "                           exposition = list(convention = 'plus_fine', par_annee = TRUE)))",
+  "x <- tablexp::construire_table(s, roles, plan)",
+  "x$execution <- NULL")
+eval(parse(text = constr_code))
+y <- sans_execution(construire_table(s, roles, plan))
+verifier("construction, même processus : deux exécutions identical() hors execution", identical(x, y))
+verifier("construction : rejeu construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) identical() hors execution",
+         identical(x, sans_execution(construire_table(s, x$fiche$roles, x$fiche$plan, x$fiche$provenance))))
+verifier("construction : seul le champ execution diffère entre deux exécutions (horodatage)", {
+  a1 <- construire_table(s, roles, plan); Sys.sleep(0.01); a2 <- construire_table(s, roles, plan)
+  !identical(a1$execution$debut, a2$execution$debut) && identical(sans_execution(a1), sans_execution(a2))
+})
+script <- tempfile(fileext = ".R")
+sortie <- tempfile(fileext = ".rds")
+writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(BIBLIOTHEQUE)),
+             sim_code, constr_code, sprintf("saveRDS(x, %s)", deparse(sortie))), script)
+r <- executer_rscript(script)
+verifier("construction, sous-processus R : exécution sans erreur",
+         if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
+verifier("construction, autre processus : objet identical() hors execution (fiche et empreinte comprises)",
+         if (!file.exists(sortie)) "fichier de sortie du sous-processus absent" else identical(x, readRDS(sortie)))
+unlink(c(script, sortie))
+
+# Empreinte d'un petit data.frame (chaînes marquées UTF-8, non ASCII
+# compris) : valeur calculée hors R (printf, md5sum de GNU coreutils ; voir
+# tests/unitaires/test_construire_table.R), recalculée dans deux processus
+# de locales différentes.
+EMPREINTE_ATTENDUE <- "80e1ed7c22b2c1b6086260ce4490d64c"
+emp_code <- c(
+  "D <- as.Date",
+  "d <- data.frame(c = c('deces', 'en_cours', NA), e = D(c('2020-03-01', '2016-05-20', '2024-02-29')),",
+  "  n = D(c('1960-07-01', '1945-10-15', '1964-02-29')), s = D(c(NA, '2019-02-10', '2024-12-31')),",
+  "  ic = c(1, 2, 3e10), it = c(1L, NA, 3L), sg = c('a\"b', 'c\\\\d\\te', '\\u00e9t\\u00e9'),",
+  "  sx = factor(c('H', 'F', 'H')), stringsAsFactors = FALSE)",
+  "Encoding(d$sg) <- 'UTF-8'",
+  "roles <- c(sexe = 'sx', segment = 'sg', id_tete = 'it', id_contrat = 'ic', date_sortie = 's',",
+  "           date_naissance = 'n', date_entree = 'e', cause_sortie = 'c')")
+for (lang in c("C", "C.UTF-8")) {
+  script <- tempfile(fileext = ".R")
+  sortie <- tempfile(fileext = ".txt")
+  writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(BIBLIOTHEQUE)), emp_code,
+               sprintf("writeLines(c(Sys.getlocale('LC_CTYPE'), tablexp:::empreinte_donnees(d, roles)), %s)",
+                       deparse(sortie))), script)
+  r <- executer_rscript(script, env = c(paste0("LANG=", lang), paste0("LC_ALL=", lang)))
+  verifier(sprintf("empreinte, sous-processus LANG=%s : égale à la valeur calculée hors R (%s)", lang,
+                   EMPREINTE_ATTENDUE),
+           if (r$statut != 0L) paste(r$sortie, collapse = " | ")
+           else if (!file.exists(sortie)) "fichier de sortie du sous-processus absent"
+           else {
+             lu <- readLines(sortie)
+             if (!identical(lu[1L], lang)) sprintf("locale effective %s au lieu de %s", lu[1L], lang)
+             else if (identical(lu[2L], EMPREINTE_ATTENDUE)) TRUE
+             else sprintf("locale %s : empreinte %s", lu[1L], lu[2L])
+           })
+  unlink(c(script, sortie))
+}
 
 bilan()
