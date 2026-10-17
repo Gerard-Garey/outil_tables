@@ -1,14 +1,17 @@
 # -----------------------------------------------------------------------------
-#  R/brut.R : module `brut`, taux bruts par cellule (issue #14 ; E2.12,
-#  E2.14, E2.20 ; ADR 0007, points 2.1, 5.2, 6.1 et 6.5 ; spécification
-#  d'actuary du 17/10/2026, A.1 à A.5 ; décisions du mainteneur du
-#  17/10/2026 sur ses questions A.8)
+#  R/brut.R : module `brut`, taux bruts par cellule (issues #14 et #15 ;
+#  E2.12, E2.14, E2.20 ; ADR 0007, points 2.1, 5.2, 6.1 et 6.5 ;
+#  spécifications d'actuary du 17/10/2026, A.1 à A.5 de #14 et A.1 à A.12
+#  de #15 ; décisions du mainteneur du 17/10/2026 sur les questions A.8 de
+#  #14 et A.14 de #15)
 #
 #  - controler_parametres_brut() : paramètres de l'étape (estimateurs,
-#    niveau) et refus du binomial sous découpage par année ; appelée par
-#    valider_plan() et par la fonction d'étape ;
+#    niveau) et refus du binomial et de Kaplan-Meier sous découpage par
+#    année ; appelée par valider_plan() et par la fonction d'étape ;
 #  - taux_poisson(), taux_binomial() : estimateur, intervalles exacts et
 #    asymptotiques et état de chaque cellule ;
+#  - taux_kaplan_meier() : estimateur de Kaplan-Meier sur l'âge (#15),
+#    tables par cellule et par instant d'événement ;
 #  - calculer_taux_bruts() : fonction d'étape `brut`.
 #
 #  Notations (A.1) : D = evenements ; E^c = exposition_centrale ; E^i = E^c +
@@ -22,12 +25,23 @@
 #  Une cellule où l'estimateur n'est pas défini reçoit NA, un état et, si
 #  elle compte un événement, un avertissement ; jamais de refus (A.8,
 #  question 3).
-#  Ce module n'appelle que `donnees` (liste_guillemets()) et `outils`
-#  (ADR 0007, point 2.1).
+#  Kaplan-Meier (#15) : âge en années d'âge de la convention retenue (A.1),
+#  tau = x + j / L, comparé exactement par la clé entière K = x 133 590 +
+#  j (133 590 / L) ; ensemble à risque fermé r(t) = #{i : tau(a_i) <= t <=
+#  tau(b_i)} : à un même instant, entrées, puis événements, puis censures
+#  (A.2, décision du mainteneur, A.14 question 1) ; q_x = 1 - prod (1 -
+#  d / r) sur les instants de [x, x+1) (A.3) ; cellule définie si [x, t0)
+#  est couvert, t0 premier instant où d = r (A.6) ; aucun intervalle exact,
+#  variance et bornes NA à q = 0 et q = 1 (A.7) ; pas de survie cumulée par
+#  segment (A.14 question 2).
+#  Ce module n'appelle que `donnees` (liste_guillemets(),
+#  controler_parametres_donnees()), `exposition` (fenetres_observations(),
+#  segments_observations(), extraire_composantes(), position_dans_cellule(),
+#  somme_par_cellule()) et `outils` (ADR 0007, point 2.1).
 # -----------------------------------------------------------------------------
 
 # Estimateurs disponibles, dans l'ordre canonique des résultats (A.4).
-ESTIMATEURS_BRUT <- c("poisson", "binomial")
+ESTIMATEURS_BRUT <- c("poisson", "binomial", "kaplan_meier")
 # Définition de l'exposition initiale du binomial, fixée sans paramètre (A.2).
 EXPOSITION_INITIALE_BRUT <- "cellule"
 # Tolérance absolue sur |E^i - D| (A.3), approximation numérique : en deçà,
@@ -38,7 +52,13 @@ TOLERANCE_EFFECTIF <- 1e-9
 # États d'une cellule par estimateur (A.5) ; taux et bornes NA hors `defini`.
 ETATS_BRUT <- list(
   poisson = c("defini", "exposition_nulle", "evenement_sans_exposition"),
-  binomial = c("defini", "exposition_nulle", "effectif_inferieur_aux_evenements"))
+  binomial = c("defini", "exposition_nulle", "effectif_inferieur_aux_evenements"),
+  kaplan_meier = c("defini", "exposition_nulle", "ensemble_a_risque_vide"))
+# Kaplan-Meier (#15, A.1 et A.9) : dénominateur commun des instants, 365 x
+# 366 (deux instants distincts diffèrent d'au moins 1 / 133 590 an ; clés
+# entières exactes en double) ; convention d'ensemble à risque.
+DENOMINATEUR_INSTANTS <- 133590L
+ENSEMBLE_A_RISQUE_KM <- "ferme"
 
 # Hypothèses inscrites dans les paramètres de l'étape et dans la fiche (A.1),
 # nommées par leur formule (aucune appellation d'auteur avant #6).
@@ -54,6 +74,18 @@ HYPOTHESES_BRUT <- list(
                    "cellule). Estimateur des moments q = D / E^i : E[D] = q E[E^i] exactement sous",
                    "cette hypothèse, pour toute troncature à gauche et toute censure indépendante",
                    "dans la cellule ; convergent ; non sans biais à effectif fini."),
+  kaplan_meier = paste("ensemble à risque fermé {tau(a) <= t <= tau(b)} : à un même instant, entrées,",
+                       "puis événements, puis censures. Risques discrets h_j aux instants d'événement ;",
+                       "vraisemblance prod_j h_j^d_j (1 - h_j)^(r_j - d_j), maximum h_j = d_j / r_j :",
+                       "q_x = 1 - prod_j (1 - d_j / r_j) sur les instants de [x, x+1), estimateur du",
+                       "maximum de vraisemblance, résultat exact (valeur en arithmétique flottante) ;",
+                       "aucune hypothèse de répartition dans la cellule ; non sans biais à effectif fini.",
+                       "Hypothèses : troncature à gauche non informative (aucun effet de sélection à l'entrée) ;",
+                       "censure non informative (hypothese_censure : sorties concurrentes, délai de",
+                       "déclaration et fin de période censurés à leur instant) ; unités d'observation",
+                       "indépendantes. Âge en années d'âge de la convention retenue, x + j / L. q_x n'est",
+                       "pas identifié là où personne n'est à risque : cellule à couverture incomplète",
+                       "non définie (NA, état ensemble_a_risque_vide)."),
   probabilite = paste("probabilite = 1 - exp(-taux), bornes transformées par la même fonction",
                       "croissante (couverture conservée exactement) : force constante sur la",
                       "cellule entière, égale au taux de la cellule."))
@@ -67,9 +99,11 @@ PORTEE_PROBABILITE <- c(
 # (estimateur, grandeur, intervalle) ; « E^c fixe » et « E^i fixe » réservés
 # aux intervalles exacts (avis d'actuary sur la reprise de #14).
 STATUTS_BRUT <- data.frame(
-  estimateur = c(rep("poisson", 6L), rep("binomial", 3L)),
-  grandeur = c(rep("taux", 3L), rep("probabilite", 3L), rep("taux", 3L)),
-  intervalle = rep(c("sans objet (estimation ponctuelle)", "exact", "asymptotique"), 3L),
+  estimateur = c(rep("poisson", 6L), rep("binomial", 3L), rep("kaplan_meier", 4L)),
+  grandeur = c(rep("taux", 3L), rep("probabilite", 3L), rep("taux", 3L), "taux", "variance", "taux", "taux"),
+  intervalle = c(rep(c("sans objet (estimation ponctuelle)", "exact", "asymptotique"), 3L),
+                 "sans objet (estimation ponctuelle)", "sans objet (estimation ponctuelle)", "asymptotique",
+                 "exact"),
   statut = c(
     "résultat exact : maximum de vraisemblance du modèle à force constante dans la cellule",
     paste("exact sous la loi supposée : couverture >= niveau pour tout mu, E^c tenue pour fixe ;",
@@ -85,12 +119,24 @@ STATUTS_BRUT <- data.frame(
           "convergent ; non sans biais à effectif fini"),
     paste("exact sous la loi supposée si E^i est entier ; si E^i n'est pas entier, prolongement",
           "continu de la formule exacte : couverture non établie"),
-    "asymptotique (E^i q(1-q) -> infini) ; non défini à D = 0 et à D = E^i"),
+    "asymptotique (E^i q(1-q) -> infini) ; non défini à D = 0 et à D = E^i",
+    paste("résultat exact : maximum de vraisemblance non paramétrique (risques discrets aux instants",
+          "d'événement) ; non sans biais à effectif fini"),
+    paste("asymptotique (méthode delta sur log P, ensemble à risque -> infini sur toute la cellule) ;",
+          "non définie à q = 0 et q = 1"),
+    paste("asymptotique (ensemble à risque -> infini sur toute la cellule), sous indépendance des",
+          "unités d'observation ; non défini à q = 0 et q = 1 ; sous l'unité contrat, les contrats",
+          "d'une même tête sont supposés indépendants (une dépendance positive rend l'intervalle trop",
+          "étroit ; relevé tetes_multi_contrats de l'étape donnees)"),
+    paste("aucun : non restitué (sous troncature et censure, D ne suit aucune loi binomiale)")),
   loi_supposee = c(
     rep(c("force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)",
           "D ~ Poisson(mu E^c), E^c fixe", "D ~ Poisson(mu E^c)"), 2L),
     "répartition _(1-t)q_(x+t) = (1 - t) q_x dans la cellule, censure indépendante",
-    "D ~ Bin(E^i, q), E^i fixe", "D ~ Bin(E^i, q)"),
+    "D ~ Bin(E^i, q), E^i fixe", "D ~ Bin(E^i, q)",
+    rep(paste("troncature à gauche et censure non informatives, unités indépendantes ; aucune",
+              "hypothèse de répartition dans la cellule"), 3L),
+    "sans objet"),
   calcul = c(
     "D / E^c",
     paste("[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et",
@@ -103,7 +149,12 @@ STATUTS_BRUT <- data.frame(
     paste("[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ;",
           "0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"),
     paste("plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : Wald sur logit q ;",
-          "z = qnorm(alpha/2, lower.tail = FALSE)")),
+          "z = qnorm(alpha/2, lower.tail = FALSE)"),
+    "-expm1(sum(log1p(-d/r))) sur les instants d'événement de la cellule",
+    "P^2 Sigma, P = exp(sum(log1p(-d/r))) = 1 - q, Sigma = sum d / (r (r - d)) en double",
+    paste("plogis(qlogis(q) -+ z sqrt(Sigma) / q) : Wald sur logit q, Var(logit q) ~ Sigma / q^2 ;",
+          "z = qnorm(alpha/2, lower.tail = FALSE)"),
+    "sans objet"),
   stringsAsFactors = FALSE)
 
 # Contrôle les paramètres propres à l'étape `brut` (valeurs ; les noms sont
@@ -136,6 +187,11 @@ controler_parametres_brut <- function(estimateurs, niveau, par_annee) {
                   "initiale n'est pas produite sous par_annee, et une cellule âge x année ne couvre pas",
                   "une année d'âge entière, si bien que q_x n'y est pas défini."),
             list(estimateur = "binomial", par_annee = par_annee))
+  if ("kaplan_meier" %in% estimateurs && isTRUE(par_annee))
+    refuser("brut", "kaplan_meier_par_annee",
+            paste("Estimateur de Kaplan-Meier refusé sous découpage par année (par_annee = TRUE) : une",
+                  "cellule âge x année ne couvre pas une année d'âge entière ; q_x n'y est pas défini."),
+            list(estimateur = "kaplan_meier", par_annee = par_annee))
   invisible(TRUE)
 }
 
@@ -203,6 +259,168 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
        effectif_egal = k & !m)
 }
 
+# Estimateur de Kaplan-Meier sur l'âge (#15, A.1 à A.7), par cellule de la
+# table d'exposition.
+#   observations : observations de l'étape `donnees` ;
+#   exposition   : table de l'étape `exposition` (lignes et ordre repris) ;
+#   segmentation, transition, periode, delai_declaration : champs du plan ;
+#   convention   : convention d'âge retenue par l'étape `exposition` ;
+#   niveau       : niveau de confiance de l'intervalle asymptotique ;
+#   parametres_exposition : paramètres de l'étape `exposition`
+#                  (fin_effective, transition), contrôlés à l'égalité exacte
+#                  contre la période et la transition recalculées ici.
+# Rend list(table, sauts, diagnostics) : table aux lignes de la table
+# d'exposition (clés, age, evenements, instants_evenement, taux, variance,
+# borne_inf_asymptotique, borne_sup_asymptotique, etat) ; sauts, une ligne
+# par (segment, instant d'événement), triée par segment puis par instant.
+# Fenêtres et événements à l'identique de calculer_exposition()
+# (fenetres_observations(), T5) ; observation retenue : a < b, ou un
+# événement (a <= s = b). Calcul en O(n log n) : r(t) = #{K_a <= t} -
+# #{K_b < t} par findInterval() ; couverture, union des [K_a, K_b) non
+# vides, par cummax().
+taux_kaplan_meier <- function(observations, exposition, segmentation, transition, periode,
+                              delai_declaration, convention, niveau, parametres_exposition) {
+  p <- controler_parametres_donnees(transition, periode, delai_declaration, segmentation, character(0))
+  if (!identical(p$borne - 1, as.numeric(parametres_exposition$fin_effective)) ||
+      !identical(p$transition$code, parametres_exposition$transition))
+    stop(paste("taux_kaplan_meier() : période ou transition différente de celle de l'étape exposition",
+               "(erreur de programmation)."), call. = FALSE)
+  manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
+  if (length(manquantes))
+    stop(sprintf("taux_kaplan_meier() : colonne(s) %s absente(s) des observations (erreur de programmation).",
+                 paste(manquantes, collapse = ", ")), call. = FALSE)
+  M <- as.numeric(DENOMINATEUR_INSTANTS)
+  z <- stats::qnorm((1 - niveau) / 2, lower.tail = FALSE)
+  f <- fenetres_observations(observations, p$debut, p$borne, p$transition$arrivee)
+  sg <- segments_observations(observations, segmentation)
+  retenue <- which(f$a < f$b | f$evenement)
+  cn <- extraire_composantes(f$composantes, retenue)
+  pa <- position_dans_cellule(f$calendrier, cn, f$a[retenue], convention)
+  pb <- position_dans_cellule(f$calendrier, cn, f$b[retenue], convention)
+  # Clé entière de l'instant (A.1) : K = x M + j (M / L), M / L = 366 ou
+  # 365 ; segments séparés par le décalage g * etendue, etendue > toute clé
+  # (valeurs entières exactes en double).
+  n <- nrow(exposition)
+  etendue <- (max(c(0, pb$x, exposition$age)) + 2) * M
+  g <- sg$g[retenue]
+  ka <- g * etendue + pa$x * M + pa$j * (M / pa$longueur)
+  kb <- g * etendue + pb$x * M + pb$j * (M / pb$longueur)
+  if (length(kb) && max(kb) >= 2^53)
+    stop("taux_kaplan_meier() : clé d'instant hors des entiers exacts (erreur de programmation).", call. = FALSE)
+  e <- f$evenement[retenue]
+
+  # Instants d'événement, d et r (ensemble à risque fermé, A.2).
+  te <- sort(kb[e])
+  tj <- unique(te)
+  d <- tabulate(match(te, tj), nbins = length(tj))
+  r <- findInterval(tj, sort(ka)) - findInterval(tj, sort(kb), left.open = TRUE)
+  gj <- tj %/% etendue
+  kj <- tj - gj * etendue
+  xj <- kj %/% M
+  numerateur <- kj - xj * M
+
+  # Lignes de la table : segment de chaque ligne (clés), début de cellule
+  # lo et fin hi sur l'échelle des clés.
+  gt <- if (length(segmentation))
+    match(do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r"))),
+          do.call(paste, c(unname(as.list(sg$segments)), list(sep = "\r"))))
+  else rep(1, n)
+  lo <- gt * etendue + exposition$age * M
+  hi <- lo + M
+  kr <- match(gj * etendue + xj * M, lo)
+  if (anyNA(kr) || anyNA(gt) || is.unsorted(kr))
+    stop("taux_kaplan_meier() : instant d'événement hors des cellules de la table d'exposition (erreur de programmation).",
+         call. = FALSE)
+
+  # Sommes cumulées dans la cellule (les instants sont triés, les lignes
+  # aussi : kr est croissant au sens large). Sigma en double (A.7 :
+  # r (r - d) déborde en entiers).
+  rd <- as.numeric(r); dd <- as.numeric(d)
+  cumul <- function(v) if (!length(v)) numeric(0) else unlist(lapply(split(v, kr), cumsum), use.names = FALSE)
+  log_survie <- cumul(log1p(-dd / rd))
+  sigma <- cumul(dd / (rd * (rd - dd)))
+  dernier <- !duplicated(kr, fromLast = TRUE)
+  L <- S2 <- numeric(n)
+  L[kr[dernier]] <- log_survie[dernier]
+  S2[kr[dernier]] <- sigma[dernier]
+  evenements <- as.integer(somme_par_cellule(kr, d, n))
+  instants <- tabulate(kr, nbins = n)
+
+  # Couverture (A.6) : blocs disjoints de l'union des [K_a, K_b) non vides ;
+  # t0 premier instant de la cellule où d = r, hi sinon ; cellule définie
+  # si t0 = lo ou si un bloc couvre [lo, t0).
+  nv <- ka < kb
+  o <- order(ka[nv])
+  A <- ka[nv][o]; B <- cummax(kb[nv][o])
+  nouveau <- c(TRUE, A[-1L] > B[-length(B)])
+  debuts <- A[nouveau]
+  fins <- B[!duplicated(cumsum(nouveau), fromLast = TRUE)]
+  nul <- which(d == r)
+  t0 <- hi
+  premier_nul <- nul[!duplicated(kr[nul])]
+  t0[kr[premier_nul]] <- tj[premier_nul]
+  k1 <- findInterval(lo, debuts)
+  couvert <- t0 == lo | (k1 > 0L & fins[pmax(k1, 1L)] >= t0)
+  k2 <- findInterval(hi, debuts, left.open = TRUE)
+  touche <- k2 > 0L & fins[pmax(k2, 1L)] > lo
+  etat <- ifelse(couvert, "defini", ifelse(!touche & evenements == 0L, "exposition_nulle",
+                                           "ensemble_a_risque_vide"))
+  if (!n) etat <- character(0)
+
+  # Taux, variance (méthode delta) et Wald sur logit q (A.3, A.7) ; 0 - x
+  # rend +0 pour une cellule sans événement.
+  def <- etat == "defini"
+  taux <- variance <- inf_a <- sup_a <- rep(NA_real_, n)
+  taux[def] <- 0 - expm1(L[def])
+  k <- def & taux > 0 & taux < 1
+  variance[k] <- exp(L[k])^2 * S2[k]
+  l <- stats::qlogis(taux[k])
+  w <- z * sqrt(S2[k]) / taux[k]
+  inf_a[k] <- stats::plogis(l - w)
+  sup_a[k] <- stats::plogis(l + w)
+
+  table <- exposition[c(segmentation, "age")]
+  table$evenements <- evenements
+  table$instants_evenement <- instants
+  table$taux <- taux
+  table$variance <- variance
+  table$borne_inf_asymptotique <- inf_a
+  table$borne_sup_asymptotique <- sup_a
+  table$etat <- etat
+
+  sauts <- sg$segments[gj, , drop = FALSE]
+  rownames(sauts) <- NULL
+  sauts$age <- as.integer(xj)
+  sauts$numerateur <- as.integer(numerateur)
+  # Quotient correctement arrondi du rationnel K / M = x + j / L.
+  sauts$age_exact <- kj / M
+  sauts$ensemble_a_risque <- r
+  sauts$evenements <- d
+  # Survie et Sigma cumulées restituées dans les cellules définies seulement
+  # (avis d'actuary sur la reprise de #15, point 2) ; NA ailleurs.
+  saut_defini <- def[kr]
+  survie <- variance_log <- rep(NA_real_, length(kr))
+  survie[saut_defini] <- exp(log_survie[saut_defini])
+  variance_log[saut_defini] <- sigma[saut_defini]
+  sauts$survie_cellule <- survie
+  sauts$variance_log_survie_cellule <- variance_log
+
+  list(table = table, sauts = sauts,
+       diagnostics = list(instants = length(tj), evenements = as.integer(sum(d)),
+                          # Événements dont l'instant coïncide avec le début
+                          # d'observation retenu de l'unité, max(entrée,
+                          # début de la période d'observation) ; ceux
+                          # qu'exclurait l'ensemble à risque prévisible
+                          # {a < t <= b}.
+                          evenements_a_l_instant_d_entree = sum(e & ka == kb),
+                          # Cellules définies où q = 1 est publié (au moins
+                          # un saut d = r).
+                          cellules_survie_nulle = length(unique(kr[nul][def[kr[nul]]])),
+                          # Maximum de r aux instants d'événement (0 sans
+                          # événement).
+                          ensemble_a_risque_maximal = if (length(r)) max(r) else 0L))
+}
+
 # Étape `brut` du plan.
 #   exposition       : table de l'étape `exposition`
 #                      (etapes$exposition$resultat$exposition) ;
@@ -211,13 +429,20 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
 #   convention       : convention d'âge retenue par l'étape `exposition` ;
 #   unite_exposition : unité de l'exposition centrale (étape `exposition`) ;
 #   estimateurs      : sous-ensemble de ESTIMATEURS_BRUT ;
-#   niveau           : niveau de confiance des intervalles.
+#   niveau           : niveau de confiance des intervalles ;
+#   observations     : observations de l'étape `donnees`, et transition,
+#                      periode, delai_declaration : champs du plan, et
+#                      parametres_exposition : paramètres de l'étape
+#                      `exposition` ; requis par Kaplan-Meier seulement
+#                      (NULL sinon admis).
 # Rend list(parametres, resultat, diagnostics, avertissements) ;
 # resultat : une table par estimateur retenu, dans l'ordre canonique, aux
 # mêmes lignes et dans le même ordre que la table d'exposition (zéro ligne
-# si elle n'en a aucune).
+# si elle n'en a aucune) ; Kaplan-Meier ajoute la table kaplan_meier_sauts
+# (une ligne par instant d'événement).
 calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention, unite_exposition,
-                                estimateurs, niveau) {
+                                estimateurs, niveau, observations = NULL, transition = NULL,
+                                periode = NULL, delai_declaration = NULL, parametres_exposition = NULL) {
   controler_parametres_brut(estimateurs, niveau, par_annee)
   retenus <- ESTIMATEURS_BRUT[ESTIMATEURS_BRUT %in% estimateurs]
   cles <- c(segmentation, "age", if (isTRUE(par_annee)) "annee")
@@ -278,6 +503,33 @@ calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention,
                                sum(inferieur)),
                        sum(inferieur))
   }
+  diag_km <- NULL
+  if ("kaplan_meier" %in% retenus) {
+    if (is.null(observations))
+      stop("calculer_taux_bruts() : observations requises par Kaplan-Meier (erreur de programmation).",
+           call. = FALSE)
+    km <- taux_kaplan_meier(observations, exposition, segmentation, transition, periode,
+                            delai_declaration, convention, niveau, parametres_exposition)
+    if (!identical(km$table$evenements, exposition$evenements))
+      stop("calculer_taux_bruts() : somme de d par cellule différente des événements de l'exposition (erreur de programmation).",
+           call. = FALSE)
+    resultat$kaplan_meier <- km$table
+    resultat$kaplan_meier_sauts <- km$sauts
+    diag_km <- km$diagnostics
+    hypotheses$kaplan_meier <- HYPOTHESES_BRUT$kaplan_meier
+    # Avertissement réservé aux cellules à couverture incomplète qui portent
+    # au moins un événement (décision du mainteneur du 17/10/2026) ; toutes
+    # les cellules de cet état sont relevées par diagnostics$etats.
+    perdus <- km$table$etat == "ensemble_a_risque_vide" & km$table$evenements > 0L
+    if (any(perdus))
+      avert <- avertir(avert, "brut", "kaplan_meier_ensemble_a_risque_vide",
+                       sprintf(paste("Kaplan-Meier : %d cellule(s) à couverture incomplète de l'ensemble à",
+                                     "risque qui comptent %d événement(s) : taux, variance et bornes non",
+                                     "définis (NA, état ensemble_a_risque_vide) ; relevé de toutes les",
+                                     "cellules de cet état : diagnostics$etats."),
+                               sum(perdus), sum(km$table$evenements[perdus])),
+                       sum(perdus))
+  }
   if ("poisson" %in% retenus)
     hypotheses$probabilite <- paste(HYPOTHESES_BRUT$probabilite,
                                     PORTEE_PROBABILITE[[if (isTRUE(par_annee)) "par_annee" else convention]])
@@ -291,18 +543,22 @@ calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention,
                stringsAsFactors = FALSE)))
   rownames(etats) <- NULL
 
-  list(
-    parametres = list(estimateurs = retenus, niveau = niveau,
-                      exposition_initiale = EXPOSITION_INITIALE_BRUT,
-                      tolerance_effectif = TOLERANCE_EFFECTIF, convention = convention,
-                      unite_exposition = unite_exposition, hypotheses = hypotheses, statuts = statuts),
-    resultat = resultat,
-    diagnostics = list(cellules = nrow(exposition), evenements = sum(D),
-                       cellules_sans_evenement = sum(D == 0L),
-                       # D = E^i > 0 à la tolérance près (q = 1) : masque de
-                       # taux_binomial() ; NA si le binomial n'est pas retenu.
-                       cellules_effectif_egal_aux_evenements = effectif_egal,
-                       etats = etats),
-    avertissements = avert
-  )
+  parametres <- list(estimateurs = retenus, niveau = niveau,
+                     exposition_initiale = EXPOSITION_INITIALE_BRUT,
+                     tolerance_effectif = TOLERANCE_EFFECTIF, convention = convention,
+                     unite_exposition = unite_exposition, hypotheses = hypotheses, statuts = statuts)
+  diagnostics <- list(cellules = nrow(exposition), evenements = sum(D),
+                      cellules_sans_evenement = sum(D == 0L),
+                      # D = E^i > 0 à la tolérance près (q = 1) : masque de
+                      # taux_binomial() ; NA si le binomial n'est pas retenu.
+                      cellules_effectif_egal_aux_evenements = effectif_egal,
+                      etats = etats)
+  # Champs de Kaplan-Meier ajoutés seulement si l'estimateur est retenu : un
+  # plan sans kaplan_meier garde l'objet antérieur à #15.
+  if (!is.null(diag_km)) {
+    parametres$ensemble_a_risque <- ENSEMBLE_A_RISQUE_KM
+    parametres$denominateur_instants <- DENOMINATEUR_INSTANTS
+    diagnostics$kaplan_meier <- diag_km
+  }
+  list(parametres = parametres, resultat = resultat, diagnostics = diagnostics, avertissements = avert)
 }

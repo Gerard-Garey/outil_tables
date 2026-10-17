@@ -1,10 +1,10 @@
 # -----------------------------------------------------------------------------
 #  R/construire_table.R : point d'entrée unique, orchestration seule
 #  (ADR 0004 ; ADR 0005, points 3 et 6 ; ADR 0007, points 3.1, 5 et 6 et
-#  annotation du 17/10/2026 ; issues #11 et #14)
+#  annotation du 17/10/2026 ; issues #11, #14 et #15)
 #
 #  - ETAPES, PARAMETRES_ETAPES : catalogue des étapes (ordre, fonction
-#    d'étape, étape préalable, aléa) et de leurs paramètres (nom, type,
+#    d'étape, étapes préalables, aléa) et de leurs paramètres (nom, type,
 #    domaine), recensé par la documentation ;
 #  - valider_plan() : plan validé entièrement avant toute exécution (codes
 #    structurels du plan ; valeurs contrôlées par les modules qui les
@@ -27,12 +27,15 @@ CHAMPS_PLAN <- c("transition", "periode", "delai_declaration", "segmentation", "
 CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentation", "etapes")
 
 # Étapes de la branche, dans l'ordre des modules : fonction d'étape (module),
-# étape préalable dont le résultat est employé, tirage d'un aléa.
+# étapes préalables dont les résultats sont employés (colonne liste, vecteur
+# vide sans préalable ; #15, spécification d'actuary, A.9 : `brut` emploie
+# les observations de `donnees` pour l'estimateur de Kaplan-Meier), tirage
+# d'un aléa.
 ETAPES <- data.frame(
   etape = c("donnees", "exposition", "brut"),
   module = c("donnees", "exposition", "brut"),
   fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts"),
-  prealable = c(NA, "donnees", "exposition"),
+  prealable = I(list(character(0), "donnees", c("donnees", "exposition"))),
   aleatoire = c(FALSE, FALSE, FALSE),
   stringsAsFactors = FALSE
 )
@@ -54,8 +57,9 @@ PARAMETRES_ETAPES <- list(
   brut = data.frame(
     parametre = c("estimateurs", "niveau"),
     type = c("character", "double"),
-    domaine = c(paste("sous-ensemble non vide, sans doublon ni NA, de poisson et binomial ; binomial",
-                      "refusé sous par_annee = TRUE ; résultats dans l'ordre canonique"),
+    domaine = c(paste("sous-ensemble non vide, sans doublon ni NA, de poisson, binomial et kaplan_meier ;",
+                      "binomial et kaplan_meier refusés sous par_annee = TRUE ; résultats dans l'ordre",
+                      "canonique"),
                 "nombre unique, fini, 0 < niveau < 1"),
     stringsAsFactors = FALSE)
 )
@@ -111,13 +115,18 @@ valider_plan <- function(plan) {
                sprintf("Étapes hors de l'ordre des modules : %s reçu, ordre attendu %s.",
                        liste_guillemets(noms), liste_guillemets(ETAPES$etape[sort(rang)])),
                list(etape = noms))
-  prealables <- ETAPES$prealable[rang]
-  sans_prealable <- !is.na(prealables) & !(prealables %in% noms)
-  if (any(sans_prealable))
+  # Chaque préalable de chaque étape est contrôlé ; seuls les préalables
+  # absents sont cités.
+  absents <- lapply(ETAPES$prealable[rang], function(p) setdiff(p, noms))
+  sans_prealable <- lengths(absents) > 0L
+  if (any(sans_prealable)) {
+    manquants <- unique(unlist(absents))
     refus_plan("etape_prealable_manquante",
-               sprintf("Étape(s) %s sans son étape préalable %s.",
-                       liste_guillemets(noms[sans_prealable]), liste_guillemets(prealables[sans_prealable])),
-               list(etape = noms[sans_prealable], prealable = prealables[sans_prealable]))
+               sprintf("Étape(s) %s sans %s %s.", liste_guillemets(noms[sans_prealable]),
+                       if (length(manquants) == 1L) "son étape préalable" else "ses étapes préalables",
+                       liste_guillemets(manquants)),
+               list(etape = noms[sans_prealable], prealable = manquants))
+  }
   aleatoire <- any(ETAPES$aleatoire[rang])
   if (!aleatoire && "graine" %in% names(plan))
     refus_plan("graine_inattendue",
@@ -152,8 +161,8 @@ valider_plan <- function(plan) {
   if ("exposition" %in% noms)
     controler_parametres_exposition(etapes[["exposition"]][["convention"]],
                                     etapes[["exposition"]][["par_annee"]])
-  # `brut` a pour préalable `exposition` (contrôlé ci-dessus) : par_annee est
-  # déjà validé.
+  # `brut` a pour préalables `donnees` et `exposition` (contrôlés ci-dessus) :
+  # par_annee est déjà validé.
   if ("brut" %in% noms)
     controler_parametres_brut(etapes[["brut"]][["estimateurs"]], etapes[["brut"]][["niveau"]],
                               etapes[["exposition"]][["par_annee"]])
@@ -201,7 +210,11 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
                                  par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
                                  convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
                                  unite_exposition = etapes[["exposition"]][["parametres"]][["unite_exposition"]],
-                                 estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]]),
+                                 estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]],
+                                 observations = etapes[["donnees"]][["resultat"]][["observations"]],
+                                 transition = plan[["transition"]], periode = plan[["periode"]],
+                                 delai_declaration = plan[["delai_declaration"]],
+                                 parametres_exposition = etapes[["exposition"]][["parametres"]]),
       stop(sprintf("construire_table() : étape « %s » sans fonction d'étape (erreur de programmation).", nom),
            call. = FALSE))
     etapes[[nom]] <- r[c("parametres", "resultat", "diagnostics")]

@@ -9,6 +9,12 @@
 #    de l'étape (convention d'âge, découpage par année) ; forçage vers une
 #    convention plus grossière admis et inscrit, vers une convention plus
 #    fine ou non mise en oeuvre refusé ;
+#  - fenetres_observations(), segments_observations(),
+#    position_dans_cellule() : fenêtres et événements (T5), segments des
+#    observations, position d'un instant dans sa cellule ; employées par
+#    calculer_exposition() et par l'estimateur de Kaplan-Meier du module
+#    `brut` (#15, spécification d'actuary, A.9 : factorisation à résultats
+#    identiques) ;
 #  - calculer_exposition() : fonction d'étape `exposition` — fenêtre de
 #    chaque observation (troncature au début de la période, censure à
 #    B = fin - délai + 1), exposition centrale par cellule (segment, âge
@@ -229,6 +235,68 @@ somme_par_cellule <- function(cellule, v, n_cellules) {
   r
 }
 
+# Fenêtres et événements des observations (T5), sur la période [debut_p, B)
+# (jours ; borne = B = fin - délai + 1) et la cause cible. Rend
+# list(composantes, calendrier, sortie, a, b, evenement, sortie_concurrente) :
+# composantes de la naissance de chaque observation (calculées sur les
+# naissances distinctes) ; table calendaire de l'année de naissance la plus
+# ancienne à l'année qui suit la cellule de B (âges atteints au plus à B,
+# plus une cellule) ; sortie (Inf pour une observation en cours) ; fenêtre
+# [a, b), a = max(entrée, D), b = min(sortie, B) ; evenement : cause cible et
+# D <= s < B ; sortie_concurrente : autre cause, hors observation en cours,
+# observation close dans la fenêtre.
+fenetres_observations <- function(observations, debut_p, borne, cible) {
+  nai <- as.numeric(observations$date_naissance)
+  entree <- as.numeric(observations$debut)
+  sortie <- as.numeric(observations$fin); sortie[is.na(sortie)] <- Inf
+  cause <- as.character(observations$cause)
+  nai_u <- unique(nai)
+  cn <- extraire_composantes(composantes_jour(nai_u), match(nai, nai_u))
+  cal <- calendrier(min(cn$an, annee_du_jour(debut_p)), annee_du_jour(borne) + 2)
+  dans_fenetre <- is.finite(sortie) & sortie >= debut_p & sortie < borne
+  list(composantes = cn, calendrier = cal, sortie = sortie,
+       a = pmax(entree, debut_p), b = pmin(sortie, borne),
+       evenement = dans_fenetre & cause == cible,
+       sortie_concurrente = dans_fenetre & cause != cible & cause != "en_cours")
+}
+
+# Segments : combinaisons des clés de segmentation. Les clés ne dépendent
+# pas des niveaux d'un facteur : `sexe` et un `segment` reçu en facteur ou
+# en chaîne sont rendus en chaînes (character) et triés sur ces chaînes en
+# ordre d'octets (radix) ; un `segment` entier est rendu en integer et trié
+# sur sa valeur. Un segment unique sans segmentation. Rend list(g, segments) :
+# g, indice du segment de chaque observation ; segments, data.frame des clés,
+# une ligne par segment, dans l'ordre des indices.
+segments_observations <- function(observations, segmentation) {
+  n_obs <- nrow(observations)
+  if (length(segmentation)) {
+    cles <- lapply(observations[segmentation], function(v) if (is.integer(v)) v else as.character(v))
+    codes <- lapply(cles, function(v) match(v, sort(unique(v), method = "radix")))
+    o <- do.call(order, c(unname(codes), list(method = "radix")))
+    cle_triee <- do.call(paste, c(unname(codes), list(sep = "\r")))[o]
+    nouvelle <- c(TRUE, cle_triee[-1L] != cle_triee[-length(cle_triee)])
+    g <- integer(n_obs); g[o] <- cumsum(nouvelle)
+    segments <- as.data.frame(lapply(cles, function(v) v[o[nouvelle]]), stringsAsFactors = FALSE)
+    names(segments) <- segmentation
+  } else {
+    g <- rep(1L, n_obs)
+    segments <- data.frame(row.names = 1L)
+  }
+  list(g = g, segments = segments)
+}
+
+# Position de l'instant t (jour) dans sa cellule, pour les naissances de
+# composantes cn, selon la convention : list(x, j, longueur, haut) ; x,
+# cellule du jour (T2) ; haut, début de la cellule x + 1 ; longueur =
+# haut - début de la cellule x (365 ou 366) ; j = t - début de la cellule x
+# (0 <= j < longueur). Âge en années d'âge (T3) : x + j / longueur.
+position_dans_cellule <- function(cal, cn, t, convention) {
+  x <- cellule_du_jour(cal, cn, t, convention)
+  bas <- debut_cellule(cal, cn, x, convention)
+  haut <- debut_cellule(cal, cn, x + 1, convention)
+  list(x = x, j = t - bas, longueur = haut - bas, haut = haut)
+}
+
 # --- fonction d'étape `exposition` ---------------------------------------------
 
 # Étape `exposition` du plan.
@@ -266,19 +334,11 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
   debut_p <- p$debut; borne <- p$borne
   n_obs <- nrow(observations)
 
-  nai <- as.numeric(observations$date_naissance)
-  entree <- as.numeric(observations$debut)
-  sortie <- as.numeric(observations$fin); sortie[is.na(sortie)] <- Inf
-  cause <- as.character(observations$cause)
-  # Composantes calculées sur les naissances distinctes seulement.
-  nai_u <- unique(nai)
-  cn <- extraire_composantes(composantes_jour(nai_u), match(nai, nai_u))
-  # Table calendaire : de l'année de naissance la plus ancienne à l'année
-  # qui suit la cellule de B (âges atteints au plus à B, plus une cellule).
-  cal <- calendrier(min(cn$an, annee_du_jour(debut_p)), annee_du_jour(borne) + 2)
-
-  # Fenêtre (T5) : troncature au début de la période, censure à B.
-  a <- pmax(entree, debut_p); b <- pmin(sortie, borne)
+  # Fenêtre (T5) : troncature au début de la période, censure à B ;
+  # composantes des naissances et table calendaire.
+  f <- fenetres_observations(observations, debut_p, borne, cible)
+  cn <- f$composantes; cal <- f$calendrier; sortie <- f$sortie
+  a <- f$a; b <- f$b
   exposees <- which(a < b)
   m <- decouper_cellules(cal, cn, exposees, a[exposees], b[exposees], cv)
   if (par_annee) {
@@ -294,36 +354,18 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
 
   # Événements de la transition (D <= s < B) et sorties concurrentes (autre
   # cause, observation close dans la fenêtre), attribués à la cellule du jour s.
-  dans_fenetre <- is.finite(sortie) & sortie >= debut_p & sortie < borne
-  ev <- which(dans_fenetre & cause == cible)
-  sc <- which(dans_fenetre & cause != cible & cause != "en_cours")
+  ev <- which(f$evenement)
+  sc <- which(f$sortie_concurrente)
   attribuer <- function(i) {
-    cn_i <- extraire_composantes(cn, i)
-    x <- cellule_du_jour(cal, cn_i, sortie[i], cv)
-    haut <- debut_cellule(cal, cn_i, x + 1, cv)
-    list(obs = i, x = x, annee = annee_calendrier(cal, sortie[i]), haut = haut,
-         longueur = haut - debut_cellule(cal, cn_i, x, cv))
+    pos <- position_dans_cellule(cal, extraire_composantes(cn, i), sortie[i], cv)
+    list(obs = i, x = pos$x, annee = annee_calendrier(cal, sortie[i]), haut = pos$haut,
+         longueur = pos$longueur)
   }
   e <- attribuer(ev); s <- attribuer(sc)
 
-  # Segments : combinaisons des clés de segmentation. Les clés ne dépendent
-  # pas des niveaux d'un facteur : `sexe` et un `segment` reçu en facteur ou
-  # en chaîne sont rendus en chaînes (character) et triés sur ces chaînes en
-  # ordre d'octets (radix) ; un `segment` entier est rendu en integer et trié
-  # sur sa valeur. Un segment unique sans segmentation.
-  if (length(segmentation)) {
-    cles <- lapply(observations[segmentation], function(v) if (is.integer(v)) v else as.character(v))
-    codes <- lapply(cles, function(v) match(v, sort(unique(v), method = "radix")))
-    o <- do.call(order, c(unname(codes), list(method = "radix")))
-    cle_triee <- do.call(paste, c(unname(codes), list(sep = "\r")))[o]
-    nouvelle <- c(TRUE, cle_triee[-1L] != cle_triee[-length(cle_triee)])
-    g <- integer(n_obs); g[o] <- cumsum(nouvelle)
-    segments <- as.data.frame(lapply(cles, function(v) v[o[nouvelle]]), stringsAsFactors = FALSE)
-    names(segments) <- segmentation
-  } else {
-    g <- rep(1L, n_obs)
-    segments <- data.frame(row.names = 1L)
-  }
+  # Segments (segments_observations()).
+  sg <- segments_observations(observations, segmentation)
+  g <- sg$g; segments <- sg$segments
   n_seg <- nrow(segments)
 
   # Plage contiguë des âges par segment, et des années si par_annee.
