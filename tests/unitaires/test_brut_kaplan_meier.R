@@ -16,8 +16,8 @@
 #    stats::plogis (le moteur repose sur les mêmes fonctions : le test
 #    vérifie la formule Sigma / q^2, pas la fonction) ;
 #  - contre-vérification : valeurs de survival::survfit() produites hors CI
-#    par tests/contre_verification/survfit_kaplan_meier.R (#7) ; échec
-#    attendu tant que le fichier de valeurs n'est pas versionné.
+#    par tests/contre_verification/survfit_kaplan_meier.R (#7), versionnées
+#    dans tests/contre_verification/valeurs_survfit_kaplan_meier.csv.
 #  Tolérances déclarées dans chaque test (A.11) : 1e-14 relative sur q et la
 #  variance, 1e-13 relative sur les bornes, 1e-13 relative pour l'identité
 #  avec le binomial ; égalité exacte pour r, d, numerateur, les états et les
@@ -530,11 +530,9 @@ verifier("jeu fixé (identité exacte) : segments C, K et Z de la base commune i
 })
 source(file.path(DOSSIER_CV, "comparer_survfit_kaplan_meier.R"), local = TRUE)
 FICHIER_SURVFIT <- file.path(DOSSIER_CV, "valeurs_survfit_kaplan_meier.csv")
-# Fichier absent : échec attendu (#7). Fichier présent : un écart lève une
-# erreur, qui est un ECHEC (et non un échec attendu) ; l'accord est un succès
-# inattendu, qui oblige à retirer la marque.
-echec_attendu("contre-vérification par survival::survfit() (valeurs hors CI, poste du mainteneur) : cellules définies des segments C, K et Z, age_exact 1e-13 absolue, r et d exacts, survie, q et std.err 1e-13 relative, bornes 1e-12 relative",
-              "#7", {
+# Fichier versionné depuis #7 (valeurs produites hors CI sur le poste du
+# mainteneur) : son absence, un en-tête incomplet ou un écart est un ECHEC.
+verifier("contre-vérification par survival::survfit() (valeurs hors CI, poste du mainteneur) : cellules définies des segments C, K et Z, age_exact 1e-13 absolue, r et d exacts, survie, q et std.err 1e-13 relative, bornes 1e-12 relative", {
   if (!file.exists(FICHIER_SURVFIT)) "fichier de valeurs absent (tests/contre_verification/valeurs_survfit_kaplan_meier.csv, à produire par survfit_kaplan_meier.R)"
   else {
     v <- lire_valeurs_survfit(FICHIER_SURVFIT)
