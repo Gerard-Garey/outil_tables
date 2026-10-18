@@ -90,9 +90,14 @@ const LISTE_NON_SUIVIS = 'git status --porcelain -z --untracked-files=all | tr "
 // '=high', l'effort est celui de la fiche (medium). Une option mal formee
 // (par ex. '--approfondis', '-approfondi', '--approfondi=High', option
 // placee apres la consigne ou en double, approfondi non booleen, effort sans
-// approfondi) arrete le workflow au lieu d'etre ignoree ; un mot compose
-// comme 'non-approfondi' dans la consigne l'arrete aussi. Une consigne qui
-// doit citer l'option ou un tel mot passe par la forme objet.
+// approfondi, 'approfondi' sans tiret juste apres le numero) arrete le
+// workflow au lieu d'etre ignoree. Ecart au depot modele : est lu comme une
+// option tout mot de la consigne colle a un tiret ou a un signe moins
+// que ne precede ni lettre ni chiffre ('-approfondi', ',--approfondi',
+// '"\u2014approfondi"', '\u2212approfondi'), mais plus un mot
+// precede d'un tiret et d'une espace ('\u2014 approfondir le cas') ni un mot
+// compose ('non-approfondi'). Une consigne qui doit citer l'option passe par
+// la forme objet.
 function lireArgs(a) {
   let v = (typeof a === 'undefined') ? null : a
   if (typeof v === 'string') {
@@ -116,7 +121,7 @@ function lireArgs(a) {
   let reste = m ? brut.slice(m[0].length).trim() : ''
   const o = reste.match(/^--approfondi(=high)?(?=\s|$)/)
   if (o) reste = reste.slice(o[0].length).trim()
-  const invalide = /(-|\u2014|\u2013)\s*approfondi/i.test(reste)
+  const invalide = (/(^|[^\p{L}\p{N}])[-\u2010-\u2015\u2212]+approfondi/iu.test(reste) || /^approfondi(?=[\s=]|$)/i.test(reste))
     ? "option '--approfondi' mal formee ou mal placee (attendu, juste apres le numero : '--approfondi' ou '--approfondi=high')"
     : null
   return { issue: m ? m[1] : null, consigne: reste, approfondi: !!o, effortHaut: !!(o && o[1]), invalide: invalide }
