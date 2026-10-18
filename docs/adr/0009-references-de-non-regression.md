@@ -317,3 +317,70 @@ Rédigée par `architect` d'après l'avis d'`actuary` et la mesure de `coder`, t
 **Effet sur les résultats** : le type de `avertissements$nombre` et de `fiche$avertissements$nombre` passe de `double` à `integer` (deux chemins par plan). **Aucune valeur ne change.** Le visa d'`actuary` est accordé le 17/10/2026. Il n'y a aucun tableau avant / après de références, car aucune référence n'existe encore (point 3.7) : le type `integer` entre dans la version 1 dès la création.
 
 Issues : #24, #17.
+
+## Annotation du 18 octobre 2026 — premières références créées ; lecture des doubles selon la plateforme (point 2.4) ; garde du dossier de sortie portable (point 9.4) ; ancrage par transitivité (point 8.1 (i)) ; bruit nul constaté sur la plateforme de référence
+
+Rédigée par `architect` d'après les messages des commits `ddf77bd` et `1019d8e` (branche `claude/taux-bruts-non-regression`) et le journal du job « Tests (R 4.3.3) » de l'exécution 39148101369 de la CI (commit `1019d8e`, job 117735985035), relu le 18/10/2026. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Chaque chiffre est cité avec sa source ; aucun n'a été remesuré par `architect`, sauf le décompte du journal de la CI en (d) et les maillons de l'ancrage en (c).
+
+**(a) Point 2.4, aller-retour : la lecture des doubles dépend de la plateforme.** Le point 2.4 affirmait l'aller-retour au bit près, mesuré sur 19 370 doubles dans un conteneur Linux. Le passage en condition réelle sur le poste Windows du mainteneur (R 4.3.3 ucrt) l'a contredit : `lire_reference()` refusait `R6.tsv` produit par la CI (exécution 39140635363 ; message de `ddf77bd`). Depuis `ddf77bd`, `double_lu()` (`tests/reference/outils_reference.R`) applique deux règles.
+
+- **Hors Windows, plateforme de référence comprise** : le texte lu doit être égal à `sprintf("%.17g")` de la valeur lue. Statut : **preuve d'aller-retour**. La glibc arrondit correctement, donc un texte reproduit est le seul texte de la valeur lue. Un texte lu en un double voisin n'est pas reproduit : il est refusé.
+- **Sous Windows** : le texte doit seulement avoir la forme de `%.17g` (`forme_double_17g()`). Statut : **constat de mesure**, pas preuve. Deux défauts mesurés (message de `ddf77bd`) :
+  - le `sprintf` de Windows n'arrondit pas toujours correctement le 17ᵉ chiffre (exemple : 0x1.422927add0ecbp-18 s'écrit 4.8005694404694591e-06 sous glibc et 4.800569440469459e-06 sous Windows) ;
+  - `R_strtod` ne lit pas toujours le double désigné par le texte.
+
+  Ce qui est constaté : les textes correctement arrondis se relisent exactement. Les six fichiers de la CI, lus sous Windows, donnent 42 952 textes de doubles, et aucun n'est lu en un autre double que celui de Python (arrondi correct). Les autres mesures sont dans le commentaire de `double_lu()`.
+
+La branche stricte de `ddf77bd` a été comparée au code de `8ca8ce4` : 0 désaccord sur 46 089 textes, en acceptation et en valeur (46 060 des six fichiers de la CI et 29 textes piégés ; message de `ddf77bd`). Les deux branches sont testées sur toute plateforme : plateforme et formateur sont injectables.
+
+Conséquences :
+
+1. Une référence ne se produit jamais hors de la CI. C'était déjà la règle (`CLAUDE.md` ; points 2.6 et 5.5) ; elle a désormais aussi une raison technique. Un texte écrit sous Windows peut différer au 17ᵉ chiffre de celui de la plateforme de référence.
+2. Une comparaison aux références exécutée sous Windows a le statut de constat de mesure. Seule celle de la plateforme de référence (et de tout hôte glibc) repose sur une preuve d'aller-retour.
+
+Remarque de vocabulaire : « constat de mesure » s'entend ici au sens des statuts de `CLAUDE.md`, « Rigueur ». Ce n'est pas un « Constat » au sens de `CONTEXT.md` (défaut relevé par un vérificateur).
+
+**(b) Point 9.4, garde du dossier de sortie : portable depuis `ddf77bd`.** Le point 9.4 interdit à tout agent et à tout workflow d'écrire sous `tests/reference/`. `produire_references.R`, exécutable sur le poste en mode relevé (point 2.6), le garantit par `sortie_interdite()`. Avant `ddf77bd`, cette garde ne tenait pas sous Windows : `--sortie tests/reference/essai` était accepté et le producteur écrivait sous `tests/reference/` (constat sur le poste du mainteneur ; message de `ddf77bd`).
+
+Depuis `ddf77bd`, `forme_chemin()` normalise les points suivants : séparateurs, lecteur et casse, chemins UNC, préfixe `\\?\` et chemins relatifs. La garde résout ensuite par le système l'ancêtre existant du texte brut, avant toute réduction des « .. ». Les liens POSIX, les noms courts 8.3 et les jonctions sont donc suivis avant la comparaison.
+
+Mesure (message de `ddf77bd`) : 35 scénarios adverses sur 35 (jonctions, 8.3, casse, UNC, « .. »). Une réserve mineure restait ouverte : sur un hôte POSIX où `file.symlink()` échoue, le test des liens est sauté avec trace. Elle est levée pour la plateforme de référence. Le journal de l'exécution 39148101369 ne contient pas la trace de saut de ce test (`tests/test_reproductibilite.R:682`) ; la seule trace de saut de la garde est celle du test réservé à un hôte Windows (`tests/test_reproductibilite.R:658`).
+
+Dans la même revue, le témoin T3 passait à tort sous Windows (`system2(env =)` n'y est pas appliqué). Il est corrigé par `Sys.setenv` (message de `ddf77bd`). Cela relève de la troisième annotation, (e).
+
+**(c) Point 8.1 (i), ancrage à `f9ab269` : la forme transitive est admise et doit être citée comme telle.** Le point 8.1 (i) prévoyait de citer un diff **vide** des modules producteurs entre `f9ab269` et le commit calculé. À la création, ce diff n'était plus vide : `git diff --stat f9ab269 8ca8ce4 -- R/donnees.R R/exposition.R R/simulation.R R/outils.R` touche `R/exposition.R` (factorisation de #15) et `R/outils.R` (#24). Le commit `1019d8e` établit donc l'ancrage par une **chaîne de maillons**, chacun mesuré :
+
+1. `f9ab269 → 103d396` : diff des quatre modules vide ;
+2. `103d396 → aa76b1d` : objets `identical()` hors `execution` pour les plans sans `kaplan_meier` (56 constructions pour `coder`, 530 pour `audit` ; message de `aa76b1d`) ;
+3. `aa76b1d → 8ca8ce4` : seul `R/outils.R` change (#24, `f50f63d` : type `integer` de `avertissements$nombre`, valeurs identiques, reste de l'objet `identical`).
+
+Règle durable :
+
+- L'ancrage par transitivité est une forme de preuve **admise** pour le point 8.1 (i).
+- Le commit de référence le cite **sous cette forme** : un maillon par ligne, sa mesure (diff vide, ou `identical()` avec le nombre de constructions et le commit qui porte la mesure), et le changement de type ou de valeur qu'il admet.
+- Un maillon sans mesure citée rompt l'ancrage.
+- Un changement de valeur rompt la chaîne : il ne s'admet pas dans un maillon, il relève du tableau avant / après et du visa. Un changement de type sans changement de valeur (maillon 3) s'admet s'il a été visé (quatrième annotation).
+
+Maillons recontrôlés par `architect` le 18/10/2026 : `git diff --stat f9ab269 103d396 -- R/donnees.R R/exposition.R R/simulation.R R/outils.R` est vide ; `git diff --stat aa76b1d 8ca8ce4 -- R/` ne touche que `R/outils.R` ; le message de `aa76b1d` porte bien les 56 et 530 constructions.
+
+**(d) Hypothèse de bruit nul sur la plateforme de référence (« Conséquences », (b) ; ADR 0008) : confirmée par mesure, au statut de constat.** La CI de `1019d8e` a recalculé R1 à R6 dans une seconde exécution de la plateforme de référence (39148101369, « Plateforme conforme à la plateforme de référence »). Elle les a comparés aux fichiers produits par l'exécution 39140635363.
+
+Les lignes « Bilan : … grandeur(s) comparée(s) » du journal (relues par `architect`) donnent 234 (R1), 231 (R2), 234 (R3), 220 (R4), 234 (R5) et 267 (R6) grandeurs comparées. Toutes sont identiques au bit près, soit **1 420 grandeurs**. Une grandeur est ici un chemin, c'est-à-dire un vecteur, et non une valeur. On compte 0 écart sous tolérance, 0 écart, 0 grandeur sans tolérance déclarée et 0 écart structurel. L'écart relatif maximal vaut 0 dans les trois classes, pour chaque plan. La batterie compte 111 tests, 0 échec, 0 échec attendu.
+
+Hors plateforme de référence, sur le poste Windows du mainteneur (message de `1019d8e`) :
+
+- R1 à R6 : verdict OK ;
+- classes exacte et 1e-14 : écart nul ;
+- classe 1e-12 : écart relatif de 1,84e-15 au plus (R6), soit plus de deux ordres de grandeur sous la tolérance.
+
+Ce que la mesure établit, et ce qu'elle n'établit pas :
+
+1. **Constat sur deux exécutions, pas preuve.** Les deux exécutions de la plateforme de référence ont tourné sur le même modèle de processeur : AMD EPYC 7763 (consigné dans `1019d8e` pour 39140635363 ; journal de 39148101369). La réserve de l'ADR 0008 sur les variantes de la `libm` d'un processeur à l'autre (AMD EPYC 9V45 déjà observé, ADR 0008) n'est donc **pas exercée**. Elle reste **ouverte**.
+2. **Tolérances bien dimensionnées.** Le seul écart non nul mesuré est celui du poste Windows, qui diffère de la plateforme de référence par la `libm` comme par le système. Il entre dans la classe 1e-12 avec une marge supérieure à 500. Aucune tolérance ne change.
+3. **Hypothèses (a) et (f) de « Conséquences » : réglées par constat.**
+   - (a) L'empreinte des données mesurée sur la plateforme de référence est `f3519cc1b73ab0d1fcc6ad89dc6d595c` : c'est la valeur mesurée hors plateforme au point 4.1 (`fiche/empreintes/donnees` des six fichiers ; en-têtes).
+   - (f) Les tables de lignes résumées (point 1.2) ont donné les mêmes empreintes sous Windows, d'après le verdict OK du poste. Leur indépendance à la plateforme est constatée entre deux systèmes.
+
+**Effet sur les résultats** : aucun. `ddf77bd` ne touche ni `R/` ni les références. `1019d8e` crée les références sans changer aucune valeur existante (mode `creation`, visa d'`actuary` du 18/10/2026, message de `1019d8e`).
+
+Issues : #17 ; #15, #24 (maillons de l'ancrage). ADR 0008 (réserve sur la `libm`, maintenue). PR #30 : les mesures sous Windows ont été faites avec le correctif du harnais de cette PR (messages de `ddf77bd` et `1019d8e`).
