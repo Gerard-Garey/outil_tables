@@ -2423,6 +2423,30 @@ l'arrondi (approximation numérique).
     $E^c$ est aléatoire, sa couverture n'est qu'asymptotique~; bornes par
     approximation numérique (\code{qgamma})~; intervalle asymptotique,
     asymptotique ($\mu E^c \to \infty$).
+  \item \textbf{Biais dû à la datation au jour} (spécification de \#16, A.1~;
+    résultat exact, preuve écrite). L'exposition court jusqu'au jour de la
+    sortie exclu (section~\ref{sec:conventions-temps})~: il manque en moyenne
+    un demi-jour d'exposition par sortie, quelle qu'en soit la cause. Dans une
+    cellule de $L$ jours où la transition a la force constante $\mu_d$ et les
+    sorties concurrentes la force $\mu_r$, avec $m = \mu_d + \mu_r$, une tête
+    à risque au début d'un jour subit la transition ce jour-là avec la
+    probabilité $h_d = (\mu_d/m)(1 - e^{-m/L})$, constante dans la cellule~;
+    il en résulte $E[D - \mu^{*} E^c] = 0$ exactement, avec
+    \[
+      \mu^{*} = \frac{\mu_d}{m}\, L\, \bigl(e^{m/L} - 1\bigr), \qquad
+      \frac{\mu^{*}}{\mu_d} - 1 \approx \frac{m}{2L} .
+    \]
+    $\hat\mu$ estime donc $\mu^{*}$, et non $\mu_d$~: l'écart relatif, de
+    l'ordre de $10^{-5}$ à $5 \cdot 10^{-4}$ pour les forces des constats de
+    simulation (section~\ref{sec:constats-brut}), est négligeable devant
+    l'erreur d'estimation, mais non nul. Il vaut pour des données réelles
+    datées au jour comme pour le simulateur. Le binomial sur une cellule
+    observée entière ($E^i = n$) et l'estimateur produit-limite sans sortie
+    concurrente n'en sont pas affectés~: leur cible exacte est $q_x$. Avec
+    une sortie concurrente, la cible de l'estimateur produit-limite sur la
+    grille des jours, $q^{*} = 1 - (1 - h_d)^L$, s'écarte de
+    $1 - e^{-\mu_d}$ d'un écart relatif du même ordre (constats,
+    section~\ref{sec:constats-brut}).
   \item \textbf{Références}~: à établir (issue~\#6).
 \end{itemize}
 
@@ -2462,7 +2486,15 @@ l'arrondi (approximation numérique).
     tout $c$. Sous une autre loi, en particulier la force constante du
     simulateur, l'identité ne tient plus dès qu'une entrée ou une censure
     tombe dans la cellule~; elle tient pour une cellule observée entière,
-    sans entrée ni censure, où $E^i$ est le nombre de têtes.
+    sans entrée ni censure, où $E^i$ est le nombre de têtes. Exemple exact
+    (spécification de \#16, A.1, point~3~; section~\ref{sec:constats-brut})~:
+    pour $n$ têtes entrées à l'âge exact $x$, sans sortie concurrente,
+    censurées par la période à la fraction $c$ de la cellule, sous la force
+    constante $\mu$, $D \sim \mathcal{B}(n, \pi_c)$ avec $\pi_c = 1 -
+    e^{-\mu c}$, et $D/E^i$ tend vers $\pi_c/\bigl(c(1 - \pi_c) +
+    \pi_c\bigr)$ pour la définition «~cellule~» et vers $\pi_c/c$ pour la
+    définition «~fenêtre~»~; avec $q = 0{,}182091641$ et $c = 183/365$, ces
+    limites s'écartent de $q$ de $-4{,}13~\%$ et de $+5{,}01~\%$.
   \item \textbf{Intervalle exact}~:
     $\bigl[B^{-1}_{D,\,E^i - D + 1}(\alpha/2),\ B^{-1}_{D + 1,\,E^i - D}(1 - \alpha/2)\bigr]$,
     où $B_{a,b}$ est la loi bêta~; borne inférieure 0 si $D = 0$, borne
@@ -2907,6 +2939,269 @@ processus et dans un autre, que le rejeu de la fiche redonne l'objet, et
 l'invariance du plan sans \code{brut} sur deux plans de référence (R1 et
 R4)~; et de même pour le plan R6, qui retient \code{kaplan\_meier}, avec
 l'invariance du plan sans \code{kaplan\_meier}.
+
+\subsection{Constats de simulation~: retrouver la loi vraie}
+\label{sec:constats-brut}
+
+Retrouver la loi vraie par les taux bruts est une batterie de constats de
+simulation (E2.19, E2.20), \code{tests/unitaires/test\_constats\_brut.R},
+spécifiée par \code{actuary} le 17/10/2026 (issue~\#16, parties A.1 à A.8,
+et errata du même jour). Chaque test écrit, à chaque exécution, le nombre de
+têtes, le niveau $\alpha_k$, la région d'acceptation, la fausse alarme et sa
+nature, la graine~; les valeurs observées ne sont pas reproduites ici (E3.4).
+Un constat de simulation n'est jamais un résultat exact sur le moteur~: sous
+une graine fixée, la sortie du moteur tombe dans une région dont la
+probabilité de fausse alarme est écrite~; la graine étant fixe, le test est
+déterministe, et sa fausse alarme est la probabilité, sur les graines, qu'une
+implémentation juste échoue (comme pour le simulateur,
+section~\ref{sec:constats-simulation}).
+
+\subsubsection*{Cibles exactes sous le modèle simulé}
+
+Le simulateur tire des instants continus sous force constante par âge entier
+(section~\ref{sec:loi-vraie})~; le moteur ne voit que des jours. Dans une
+cellule de $L$ jours, avec les forces $\mu_d$ (transition) et $\mu_r$ (sortie
+concurrente), $m = \mu_d + \mu_r$, une tête à risque au début d'un jour subit
+la transition avec la probabilité $h_d = (\mu_d/m)(1 - e^{-m/L})$, sort par
+la cause concurrente avec $h_r = (\mu_r/m)(1 - e^{-m/L})$ et survit au jour
+avec $e^{-m/L}$, probabilités constantes dans la cellule. D'où, en
+\emph{résultats exacts} (preuve écrite de la spécification, A.1)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item binomial et produit-limite sur une cellule observée entière, sans
+    entrée ni censure~: $D \sim \mathcal{B}(n, \pi)$ exactement, avec
+    $\pi = q_x$ sans cause concurrente et $\pi = (\mu_d/m)(1 - e^{-m})$ sinon~;
+    $E^i = n$ et le produit-limite égale le binomial
+    (section~\ref{sec:brut-kaplan-meier})~;
+  \item produit-limite sur la grille des jours~: limite $q^{*} = 1 - (1 -
+    h_d)^L$, égale à $1 - e^{-\mu_d}$ sans cause concurrente~;
+  \item Poisson~: $E[D - \mu^{*} E^c] = 0$, avec $\mu^{*}$ de la
+    section~\ref{sec:brut-poisson}~;
+  \item binomial, cohorte censurée par la période à la fraction $c$ de la
+    cellule~: $D \sim \mathcal{B}(n, \pi_c)$, $\pi_c = 1 - e^{-\mu c}$, et les
+    limites de la section~\ref{sec:brut-binomial}, qui ne valent pas $q$.
+\end{itemize}
+
+\noindent
+Chaque test compare l'estimateur à sa cible exacte sous le modèle simulé~;
+l'écart de cette cible à la loi vraie est écrit à côté. Loi vraie des tests~:
+celle du simulateur (Gompertz-Makeham $A = 2 \cdot 10^{-4}$, $B = 2{,}5
+\cdot 10^{-5}$, $c = 1{,}1$, facteurs H 1 et F 0,6, plafond 1~; rachat
+constant 0,05), convention \code{plus\_fine}, délai nul, niveau 0,95.
+
+\subsubsection*{Familles de tests}
+
+\textbf{Hypothèse nulle}, pour tous les tests sauf C3b~: le moteur calcule
+correctement l'estimateur, si bien que sa sortie suit la loi déduite du
+modèle simulé (cibles ci-dessus)~; C3b a une hypothèse nulle composite,
+donnée avec lui. Pour chaque famille sont indiqués le jeu, la statistique et
+la région~; la fausse alarme et sa nature sont au
+tableau~\ref{tab:constats-familles}, les conditions de validité dans
+l'encadré qui suit.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{C1, cohortes d'âge exact}~: $n = 10^{5}$ têtes par cohorte,
+    entrées le 2016-03-15 à l'âge exact $x$, période du 2016-03-15 au
+    2017-03-14, si bien que $B$ est l'anniversaire $x + 1$, que $L = 365$ et
+    que la cellule $x$ est observée entière (sauf C1.6, censurée au
+    2016-09-13, $c = 183/365$). \emph{Statistiques}~: binomial,
+    $D \in [\text{qbinom}(\alpha_k/2, n, \pi), \text{qbinom}(1 - \alpha_k/2,
+    n, \pi)]$~; Poisson, $U = D - \mu^{*} E^c \in [-t_{\text{lo}},
+    t_{\text{hi}}]$~; produit-limite (C1.5), $z = (\operatorname{logit}\hat q
+    - \operatorname{logit} q^{*})\, \hat q(1 - \hat q)/\sqrt{\text{variance}}$,
+    $|z| \le \Phi^{-1}(1 - \alpha_k/2)$. \emph{Région de Poisson}~: $U$ est
+    la somme de $n$ variables indépendantes de même loi, de support fini (une
+    valeur par jour de transition, de sortie concurrente, et la survie à la
+    fin de la fenêtre)~; pour tout $\theta > 0$, $P(U \ge t) \le
+    \exp\bigl(-\theta t + n \Lambda(\theta)\bigr)$, $\Lambda$ étant le
+    logarithme de la fonction génératrice des moments d'un terme (inégalité
+    $P(Y \ge a) \le E[Y]/a$ pour $Y \ge 0$, appliquée à $Y = e^{\theta U}$)~; $t_{\text{hi}}$ rend
+    l'infimum en $\theta$ de cette borne égal à $\alpha_k/2$, et
+    $t_{\text{lo}}$ de même pour $-U$. La borne est exacte~; le calcul de
+    $t$ (\code{optimize()}, \code{uniroot()}) est une approximation
+    numérique sans effet sur la validité~: $t$ est arrondi vers l'extérieur
+    à $10^{-6}$ et la borne, recalculée en $t$, est vérifiée inférieure ou
+    égale à $\alpha_k/2$. Le binomial n'est pas testé en C1.5, où le rachat
+    concurrent censure dans la cellule~: sa cible n'y est pas $q$.
+  \item \textbf{C2, portefeuille tronqué et censuré, avec rachat}~: mode
+    uniforme, $n = 3 \cdot 10^{5}$, proportion d'hommes 0,5, âges 20 à 75,
+    origine 2005-01-01, période 2015-01-01 au 2024-12-31, segmentation
+    \code{sexe}, estimateurs \code{poisson} et \code{kaplan\_meier}.
+    Sélection \emph{a priori}, sur l'exposition seule~: cellules définies
+    pour les deux estimateurs et $\lambda_x = \mu^{*}_x E^c_x \ge 30$~; leur
+    nombre $K = 83$ sous la graine déclarée est une constante du test,
+    vérifiée à l'exécution~; une cellule sélectionnée où $\hat q$ vaut 0 ou 1
+    compte comme un rejet. Tests par cellule, à $a = 1{,}5 \cdot 10^{-4}/K$
+    chacun~: Poisson, $D_x \in [\text{qpois}(a/2, \lambda_x),
+    \text{qpois}(1 - a/2, \lambda_x)]$~; produit-limite, $|z_x| \le
+    \Phi^{-1}(1 - a/2)$, de cible $1 - e^{-\mu_{d,x}}$. Tests globaux, à
+    $10^{-4}$ chacun, $|z| \le \Phi^{-1}(1 - 5 \cdot 10^{-5})$~: Poisson
+    signé, $\sum (D - \lambda)/\sqrt{\sum (1 + \mu^{*}/365)\lambda}$, dont la
+    variance est exacte (scores de cellules disjointes non corrélés, preuve
+    écrite de la spécification)~; produit-limite, $\sum_x z_x/\sqrt{K}$. Pas
+    de test binomial~: sa cible n'est pas $q$, et l'écart entre les deux
+    définitions de l'exposition initiale y est indétectable à cet effectif.
+  \item \textbf{C3, couverture des intervalles}~: une simulation de
+    $R \cdot m$ têtes indépendantes est découpée en $R$ blocs de $m$ têtes
+    par un \code{segment} entier, $(\text{id\_tete} - 1)\ \text{div}\ m + 1$,
+    ce qui donne $R$ réplications indépendantes sous l'hypothèse usuelle sur
+    le générateur~; un intervalle \code{NA} compte comme non couvrant.
+    \emph{C3a}~: cohortes de femmes de 100 ans, $m = 50$, $R = 2\,000$~;
+    intervalles binomial exact, binomial logit, Poisson exact, Poisson log~;
+    $N_{\text{couverts}} \sim \mathcal{B}(R, C)$ exactement, $C$ étant la
+    couverture exacte, calculée par le test par sommation sur la loi de $D$
+    (et, pour Poisson, par convolution de la loi de l'exposition, $E^c = m -
+    D + S/L$, calculée par transformée de Fourier rapide complétée de zéros
+    jusqu'à une longueur donnée par \code{nextn()}~: approximation
+    numérique)~; région bilatérale exacte. \emph{C3b}~: portefeuille
+    d'hommes tronqué (âges 79 à 81 à l'entrée, origine et début de période
+    le 2015-01-01, période jusqu'au 2016-12-31, rachat 0,05), $m = 600$,
+    $R = 2\,000$, cellules 80 et 81~; intervalles Poisson exact, Poisson log
+    et produit-limite logit~; hypothèse nulle composite «~couverture
+    $\ge 0{,}95 - \eta$~», $\eta = 0{,}02$ déclaré (\emph{choix de jugement},
+    sans source, appuyé sur les couvertures exactes calculées pour la
+    spécification de \#14)~; région $N \ge \text{qbinom}(\alpha_k, R,
+    0{,}93) = 1\,811$, de fausse alarme au plus $1{,}711 \cdot 10^{-5}$ pour
+    toute couverture vraie $\ge 0{,}93$ (borne exacte, par monotonie).
+    Chaque ligne écrit à part l'\textbf{erreur Monte-Carlo} de la couverture,
+    $\sqrt{C(1 - C)/R}$, fonction du seul nombre de réplications, et
+    l'\textbf{erreur d'estimation}, demi-largeur moyenne des intervalles,
+    fonction de l'exposition de chaque bloc. En C1 et C2, chaque test est une
+    réplication unique~: la largeur de la région y est l'erreur
+    d'estimation, et il n'y a pas d'erreur Monte-Carlo de couverture.
+\end{itemize}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{2.3cm}p{2.5cm}p{2.4cm}p{1.7cm}p{2.6cm}p{1.7cm}@{}}
+\caption{Famille C1~: cibles, régions et fausses alarmes, valeurs calculées
+par le test (\code{tests/unitaires/test\_constats\_brut.R}~; $\alpha_k = 2
+\cdot 10^{-5}$ par test~; graines 20261611 à 20261616).}
+\label{tab:constats-c1}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$\pi$ (binomial)}} &
+\textcolor{financeblue}{\textbf{Région de $D$}} &
+\textcolor{financeblue}{\textbf{FA exacte}} &
+\textcolor{financeblue}{\textbf{Région de $U$}} &
+\textcolor{financeblue}{\textbf{$\mu^{*}/\mu - 1$}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$\pi$ (binomial)}} &
+\textcolor{financeblue}{\textbf{Région de $D$}} &
+\textcolor{financeblue}{\textbf{FA exacte}} &
+\textcolor{financeblue}{\textbf{Région de $U$}} &
+\textcolor{financeblue}{\textbf{$\mu^{*}/\mu - 1$}} \\
+\endhead
+C1.1 décès, 60 ans, H & $0{,}008153179142$ & $[697\,;\ 939]$ & $1{,}917 \cdot 10^{-5}$ & $[-133{,}169304\,;$\newline $140{,}755387]$ & $1{,}121 \cdot 10^{-5}$ \\
+C1.2 décès, 80 ans, F & $0{,}03150085056$ & $[2\,917\,;\ 3\,388]$ & $1{,}927 \cdot 10^{-5}$ & $[-265{,}646914\,;$\newline $272{,}957234]$ & $4{,}385 \cdot 10^{-5}$ \\
+C1.3 décès, 100 ans, F & $0{,}182091641$ & $[17\,691\,;\ 18\,731]$ & $1{,}998 \cdot 10^{-5}$ & $[-644{,}959663\,;$\newline $650{,}399965]$ & $2{,}754 \cdot 10^{-4}$ \\
+C1.4 rachat, 40 ans, $q^r = 0{,}05$, sans décès, unité contrat & $0{,}05$ & $[4\,709\,;\ 5\,296]$ & $1{,}989 \cdot 10^{-5}$ & $[-335{,}760302\,;$\newline $342{,}851378]$ & $7{,}027 \cdot 10^{-5}$ \\
+C1.5 décès, 60 ans, H, rachat concurrent $q^r = 0{,}30$ & non testé & --- & --- & $[-121{,}820313\,;$\newline $129{,}412807]$ & $5{,}000 \cdot 10^{-4}$ \\
+C1.6 décès, 100 ans, F, censure à $c = 183/365$ & $\pi_c =$\newline $0{,}09586612604$ & $[9\,192\,;\ 9\,986]$ & $1{,}957 \cdot 10^{-5}$ & $[-466{,}670347\,;$\newline $473{,}207095]$ & $2{,}754 \cdot 10^{-4}$ \\
+\end{longtable}
+}
+
+\noindent
+En C1.5, le produit-limite est comparé à $q^{*}$, dont l'écart relatif à
+$1 - e^{-\mu_d}$ vaut $-4{,}864 \cdot 10^{-4}$~; région
+$|z| \le 4{,}2649$, fausse alarme nominale (asymptotique). En C1.6, la cible
+du binomial «~cellule~» est $0{,}1745649731$, à $-4{,}13~\%$ de la loi vraie
+(section~\ref{sec:brut-binomial})~; le produit-limite y est à l'état
+\code{ensemble\_a\_risque\_vide}~: il refuse d'extrapoler là où le binomial
+s'appuie sur son hypothèse de répartition. \emph{Identités} vérifiées à côté
+des constats, par des tests ordinaires~: $E^i = n$ et $\hat q$ produit-limite
+$= \hat q$ binomial en C1.1 à C1.4~; en C1.6, taux binomial $= D/((n -
+D)c + D)$ et $E^c$ + \code{complement\_initial\_fenetre} $= nc$~; en C3a,
+bornes du produit-limite égales aux bornes logit binomiales sur les
+$2\,000$ blocs. Couvertures exactes de C3a, écrites en dur et recalculées
+par le test~: binomial exact $0{,}974129060872$, binomial logit
+$0{,}958230588612$, Poisson exact $0{,}968699258108$, Poisson log
+$0{,}955857903542$~; régions $[1\,916\,;\ 1\,975]$, $[1\,877\,;\ 1\,951]$,
+$[1\,902\,;\ 1\,967]$ et $[1\,871\,;\ 1\,947]$, à $\alpha_k = 3 \cdot
+10^{-5}$.
+
+\subsubsection*{Fausse alarme familiale}
+
+Elle est bornée par l'inégalité de l'union pondérée, valable \emph{sans
+hypothèse d'indépendance}~; les tests d'une même cohorte (binomial et
+Poisson) étant fortement dépendants, aucune valeur «~sous indépendance~»
+n'est donnée.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.6cm}p{2.4cm}p{2.8cm}p{4.6cm}@{}}
+\caption{Allocation du niveau entre les familles (graines 20261611 à
+20261616, 20261621, 20261631, 20261641, distinctes de celles du
+simulateur).}
+\label{tab:constats-familles}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Famille}} &
+\textcolor{financeblue}{\textbf{Tests}} &
+\textcolor{financeblue}{\textbf{$\sum \alpha_k$}} &
+\textcolor{financeblue}{\textbf{Nature de la fausse alarme}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Famille}} &
+\textcolor{financeblue}{\textbf{Tests}} &
+\textcolor{financeblue}{\textbf{$\sum \alpha_k$}} &
+\textcolor{financeblue}{\textbf{Nature de la fausse alarme}} \\
+\endhead
+C1 & 12, à $2 \cdot 10^{-5}$ & $2{,}4 \cdot 10^{-4}$ & binomial exacte~; Poisson bornée exactement~; produit-limite (C1.5) nominale asymptotique \\
+C2 par cellule & $2 \times K$, à $1{,}5 \cdot 10^{-4}/K$ & $3{,}0 \cdot 10^{-4}$ & nominale asymptotique (Poisson~: exacte si $E^c$ était fixe, valeur calculée et écrite par le test) \\
+C2 globaux & 2, à $10^{-4}$ & $2{,}0 \cdot 10^{-4}$ & nominale asymptotique \\
+C3a & 4, à $3 \cdot 10^{-5}$ & $1{,}2 \cdot 10^{-4}$ & exacte \\
+C3b & 6, à $2 \cdot 10^{-5}$ & $1{,}2 \cdot 10^{-4}$ & bornée exactement \\
+Total & 190 & $9{,}8 \cdot 10^{-4} \le 10^{-3}$ & dont exacte ou bornée exactement au plus $4{,}15 \cdot 10^{-4}$, nominale asymptotique $5{,}2 \cdot 10^{-4}$ \\
+\end{longtable}
+}
+
+\noindent
+La batterie unitaire porte ainsi deux familles de constats, celle du
+simulateur (au plus $10^{-3}$, section~\ref{sec:constats-simulation}) et
+celle-ci~: sa fausse alarme est au plus $1{,}98 \cdot 10^{-3}$, nominale pour
+les parties asymptotiques.
+
+\subsubsection*{Puissance et témoins}
+
+Deux témoins exécutés par le fichier montrent que les tests détectent une
+erreur plausible~: en C1.6, l'exposition initiale «~fenêtre~» à la place de
+«~cellule~» donne un taux hors de la région binomiale (puissance exacte,
+calculée par sommation sur $\mathcal{B}(n, \pi_c)$, égale à 1 à $10^{-6}$
+près)~; en C2, une cible décalée d'un an d'âge fait rejeter les deux tests
+globaux (constat sous la graine déclarée). Les tests par cellule de C2 n'ont
+pratiquement pas de puissance contre un tel décalage~: ce sont les globaux
+qui la portent (puissances calculées par la spécification, A.4). La
+convention «~prévisible~» de l'ensemble à risque du produit-limite n'est pas
+détectable par ces constats (écart de l'ordre de $10^{-3}$ en relatif sur
+$q$, spécification, A.4)~: sa garantie est le cas K
+(section~\ref{sec:brut-kaplan-meier}).
+
+\begin{encadre}
+\small
+\textbf{Statuts et sources d'erreur} (E2.20).
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
+  \item \emph{Résultats exacts}~: les cibles sous le modèle simulé, la loi
+    binomiale de $D$ en C1 et de $N_{\text{couverts}}$ en C3a, les
+    couvertures exactes de C3a, la borne exponentielle de Poisson, la borne
+    de C3b, l'inégalité de l'union, la puissance exacte du témoin C1.6.
+  \item \emph{Résultats asymptotiques}~: les régions du produit-limite (C1.5,
+    C2) et des tests de Poisson de C2 sous le modèle de survie.
+  \item \emph{Approximations numériques}~: quantiles binomiaux et de Poisson,
+    seuils $t$ de la borne exponentielle (arrondis vers l'extérieur et
+    vérifiés), convolution par transformée de Fourier.
+  \item \emph{Constat de simulation}~: le passage des tests sous les graines
+    déclarées.
+  \item \emph{Erreur Monte-Carlo}~: en C3, la dispersion du nombre
+    d'intervalles couvrants, fonction de $R$. \emph{Erreur d'estimation}~: la
+    largeur des régions de C1 et C2 et la demi-largeur des intervalles de
+    C3, fonction de l'exposition.
+  \item \emph{Hypothèses}~: indépendance des blocs et des cohortes sous le
+    générateur (hypothèse usuelle, non démontrée)~; validité asymptotique des
+    régions de C1.5 et de C2~; $\eta = 0{,}02$, choix de jugement.
+\end{itemize}
+\end{encadre}
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-brut}
@@ -3400,8 +3695,10 @@ indépendants}. L'hypothèse est consignée dans le résultat
     indépendante, pour une observation en temps continu (résultat exact), et
     la cible des estimateurs à venir est connue exactement. Sur des dates au
     jour (section~\ref{sec:conventions-temps}), l'exposition est arrêtée au
-    début du jour de l'événement, d'où un écart relatif d'ordre
-    $\mu_x/(2L_x)$, négligeable mais non nul~;
+    début du jour de toute sortie, d'où un écart relatif d'ordre
+    $m_x/(2L_x)$, où $m_x$ est la somme des forces de la transition et des
+    sorties concurrentes, négligeable mais non nul (forme exacte~:
+    section~\ref{sec:brut-poisson})~;
   \item la force constante est stable par addition des forces~: une force
     constante dans chaque décrément équivaut à une force constante dans la
     table à décréments multiples, alors que la répartition uniforme n'a pas
@@ -3657,7 +3954,8 @@ batterie à chaque exécution~; elles ne sont pas reproduites ici (E3.4).
     $np$, due au nombre fini de têtes simulées~; c'est elle que mesure la
     largeur de la région. \emph{Erreur d'estimation}~: elle n'intervient pas
     ici, $D$ étant comparé à la probabilité exacte du modèle, sans taux estimé
-    sur une exposition~; elle viendra avec les taux bruts.
+    sur une exposition~; pour les taux bruts, elle est écrite par les
+    constats de la section~\ref{sec:constats-brut}.
 \end{itemize}
 \end{encadre}
 
@@ -3799,10 +4097,10 @@ E2.9 & segmentation déclarée, vide explicite admis (le test d'homogénéité v
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
 E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
-E2.19 & simulateur~: loi vraie, entrées, sorties concurrentes, censure, constat de simulation & \ref{sec:simulation} \\
-E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts} \\
+E2.19 & simulateur~: loi vraie, entrées, sorties concurrentes, censure, constat de simulation~; retrouver la loi vraie par les taux bruts & \ref{sec:simulation}, \ref{sec:constats-brut} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
-E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier} \\
+E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
 E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
 E3.7 & relecture sans le code, rejeu à partir de la fiche & \ref{sec:fiche} \\
