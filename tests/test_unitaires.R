@@ -34,22 +34,30 @@ if (is.na(DOSSIER) || !dir.exists(DOSSIER)) {
   bilan()
 }
 
-t0 <- Sys.time()
-for (f in sort(list.files(DOSSIER,
-                          pattern = "^test_.*\\.R$", full.names = TRUE))) {
-  fichier_courant(basename(f))
-  avant <- nrow(.harnais$lignes)
-  env <- new.env(parent = globalenv())
-  # quit() et q() neutralisés dans le fichier de test (base::quit() est
-  # rattrapé par la garde de sortie du harnais) ; bilan() aussi : un bilan
-  # intermédiaire marquerait la batterie comme close avant la fin.
-  env$quit <- env$q <- function(...) stop("quit() interdit dans un fichier de test")
-  env$bilan <- function(...) stop("bilan() interdit dans un fichier de test")
-  r <- tryCatch({ source(f, local = env); NULL }, error = function(e) e)
-  if (inherits(r, "error"))
-    verifier("chargement complet du fichier", paste("erreur :", conditionMessage(r)))
-  else if (nrow(.harnais$lignes) == avant)
-    verifier("au moins une assertion", "fichier de test sans aucune assertion")
-}
-cat(sprintf("\nDurée : %.1f s\n", as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+# Boucle dans local() : f, env, avant, r, e et t0 ne restent pas dans
+# globalenv(), parent des environnements de test, où un test qui lirait l'une
+# d'elles comme variable libre la trouverait silencieusement (mesuré, #17).
+local({
+  t0 <- Sys.time()
+  for (f in sort(list.files(DOSSIER,
+                            pattern = "^test_.*\\.R$", full.names = TRUE))) {
+    fichier_courant(basename(f))
+    avant <- nrow(.harnais$lignes)
+    env <- new.env(parent = globalenv())
+    # quit() et q() neutralisés dans le fichier de test (base::quit() est
+    # rattrapé par la garde de sortie du harnais) ; bilan() aussi : un bilan
+    # intermédiaire marquerait la batterie comme close avant la fin.
+    env$quit <- env$q <- function(...) stop("quit() interdit dans un fichier de test")
+    env$bilan <- function(...) stop("bilan() interdit dans un fichier de test")
+    # parse(encoding = "UTF-8") : littéraux non ASCII des tests marqués UTF-8
+    # en toute locale, comme ceux du moteur installé sous une locale UTF-8
+    # (M54) ; source(encoding = "UTF-8") n'exécute rien en locale C (mesuré).
+    r <- tryCatch({ for (e in parse(f, encoding = "UTF-8")) eval(e, env); NULL }, error = function(e) e)
+    if (inherits(r, "error"))
+      verifier("chargement complet du fichier", paste("erreur :", conditionMessage(r)))
+    else if (nrow(.harnais$lignes) == avant)
+      verifier("au moins une assertion", "fichier de test sans aucune assertion")
+  }
+  cat(sprintf("\nDurée : %.1f s\n", as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+})
 bilan()

@@ -44,6 +44,16 @@
 #  sous-processus, avec la bibliothèque installée par la batterie : une
 #  installation par batterie au lieu d'une par sous-processus.
 #
+#  Locale de l'installation (décision M54 du 17/10/2026) : si la session
+#  n'est pas en UTF-8, installer_tablexp() lance R CMD INSTALL sous la
+#  première locale UTF-8 disponible parmi LOCALES_UTF8 (testée par
+#  Sys.setlocale puis restaurée), passée par system2(env = "LC_ALL=...") ;
+#  aucune disponible : ECHEC. La locale d'exécution ne change pas. Après
+#  library(), sonde_utf8() vérifie un littéral non ASCII du moteur ; en
+#  échec : ECHEC « tablexp installé hors locale UTF-8 » (un paquet installé
+#  en locale C garde ses littéraux non marqués, qu'enc2utf8() change en
+#  « <c3><a9> » dans une session C : mesuré).
+#
 #  Garde de sortie (.Last) : un processus qui a chargé le harnais sort avec
 #  le code 1 s'il se termine avant bilan(), même par quit(status = 0). Les
 #  sorties délibérées du harnais et des batteries (installation en échec,
@@ -272,6 +282,27 @@ empreinte_source <- function(racine) {
   unname(tools::md5sum(f))
 }
 
+LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")
+
+# NA si la session est déjà en UTF-8 (rien à poser) ; sinon la première
+# locale UTF-8 de LOCALES_UTF8 que Sys.setlocale accepte, "" si aucune.
+locale_installation <- function() {
+  if (isTRUE(l10n_info()[["UTF-8"]])) return(NA_character_)
+  ancienne <- Sys.getlocale("LC_CTYPE")
+  on.exit(Sys.setlocale("LC_CTYPE", ancienne))
+  for (l in LOCALES_UTF8) if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) return(l)
+  ""
+}
+
+# Sonde : STATUT_EMPREINTES_NON_CALCULEES (R/rapport.R, « non calculée »),
+# littéral non ASCII du moteur écrit dans la fiche, donc dans les
+# références ; il doit être de l'UTF-8 valide, inchangé par enc2utf8().
+sonde_utf8 <- function() {
+  x <- get("STATUT_EMPREINTES_NON_CALCULEES", envir = asNamespace("tablexp"))
+  grepl("[^\001-\177]", x, useBytes = TRUE) && validUTF8(x) &&
+    identical(charToRaw(enc2utf8(x)), charToRaw(x))
+}
+
 installer_tablexp <- function(racine = racine_depot()) {
   empreinte <- empreinte_source(racine)
   lib <- Sys.getenv("TABLEXP_BIBLIOTHEQUE", "")
@@ -285,17 +316,25 @@ installer_tablexp <- function(racine = racine_depot()) {
                   lib, if (is.na(inscrite)) "absente" else inscrite, empreinte))
     lib <- tempfile("tablexp_lib_")
     dir.create(lib)
+    locale <- locale_installation()
+    if (identical(locale, "")) {
+      cat(sprintf("\nECHEC : session hors UTF-8 et aucune locale UTF-8 disponible parmi %s pour R CMD INSTALL\n",
+                  paste(LOCALES_UTF8, collapse = ", ")))
+      quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
+    }
     r <- suppressWarnings(system2(file.path(R.home("bin"), "R"),
                                   c("CMD", "INSTALL", "--no-docs", "-l",
                                     shQuote(lib), shQuote(racine)),
-                                  stdout = TRUE, stderr = TRUE))
+                                  stdout = TRUE, stderr = TRUE,
+                                  env = if (is.na(locale)) character(0) else paste0("LC_ALL=", locale)))
     if (!is.null(attr(r, "status")) && attr(r, "status") != 0L) {
       cat(r, sep = "\n")
       cat("\nECHEC : installation de tablexp depuis l'arbre de travail\n")
       quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
     }
     writeLines(empreinte, file.path(lib, FICHIER_EMPREINTE_SOURCE))
-    cat(sprintf("tablexp : arbre de travail installé dans %s\n", lib))
+    cat(sprintf("tablexp : arbre de travail installé dans %s%s\n", lib,
+                if (is.na(locale)) "" else sprintf(" (R CMD INSTALL sous LC_ALL=%s)", locale)))
   }
   library(tablexp, lib.loc = lib)
   chemin <- normalizePath(getNamespaceInfo("tablexp", "path"))
@@ -303,6 +342,10 @@ installer_tablexp <- function(racine = racine_depot()) {
   # côtés passent par normalizePath().
   if (!identical(normalizePath(dirname(chemin)), normalizePath(lib))) {
     cat(sprintf("ECHEC : tablexp chargé depuis %s, pas depuis %s\n", chemin, lib))
+    quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
+  }
+  if (!isTRUE(sonde_utf8())) {
+    cat(sprintf("ECHEC : tablexp installé hors locale UTF-8 (sonde sur STATUT_EMPREINTES_NON_CALCULEES, %s)\n", lib))
     quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
   }
   .harnais$bibliotheque <- lib  # transmise aux sous-processus par executer_rscript()

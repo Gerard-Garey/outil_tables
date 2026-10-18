@@ -21,14 +21,16 @@ ligne_bilan <- function(r) grep("^Bilan : ", r$sortie, value = TRUE)
 r <- temoin(c('verifier("vrai", TRUE)', "bilan()"))
 verifier("témoin : assertion vraie -> code 0", r$statut == 0L)
 verifier("témoin : la ligne de bilan cite R.version.string et les décomptes",
-         identical(ligne_bilan(r), sprintf(
+         # Octets comparés : sortie du sous-processus non marquée, littéral
+         # marqué UTF-8 (chargement des tests par parse(encoding = "UTF-8")).
+         identical(lapply(ligne_bilan(r), charToRaw), list(charToRaw(sprintf(
            "Bilan : %s ; 2 tests ; 0 échec(s) ; 0 échec(s) attendu(s) ; 0 succès inattendu(s)",
-           R.version.string)))
+           R.version.string)))))
 
 r <- temoin(c('verifier("faux", FALSE)', "bilan()"))
 verifier("témoin : assertion fausse -> code non nul", r$statut != 0L)
 verifier("témoin : assertion fausse -> 1 échec au bilan",
-         grepl("; 1 échec(s) ;", ligne_bilan(r), fixed = TRUE))
+         grepl("; 1 échec(s) ;", ligne_bilan(r), fixed = TRUE, useBytes = TRUE))
 
 r <- temoin(c('verifier("erreur", stop("boum"))', "bilan()"))
 verifier("témoin : erreur dans une assertion -> code non nul", r$statut != 0L)
@@ -38,11 +40,11 @@ verifier("témoin : assertion qui rend une chaîne -> échec", r$statut != 0L)
 
 r <- temoin(c('echec_attendu("défaut connu", "#8", FALSE)', "bilan()"))
 verifier("témoin : échec attendu qui échoue -> code 0, compté attendu",
-         r$statut == 0L && grepl("; 1 échec(s) attendu(s) ;", ligne_bilan(r), fixed = TRUE))
+         r$statut == 0L && grepl("; 1 échec(s) attendu(s) ;", ligne_bilan(r), fixed = TRUE, useBytes = TRUE))
 
 r <- temoin(c('echec_attendu("défaut corrigé", "#8", TRUE)', "bilan()"))
 verifier("témoin : échec attendu qui réussit (succès inattendu) -> code non nul",
-         r$statut != 0L && grepl("; 1 succès inattendu(s)", ligne_bilan(r), fixed = TRUE))
+         r$statut != 0L && grepl("; 1 succès inattendu(s)", ligne_bilan(r), fixed = TRUE, useBytes = TRUE))
 
 r <- temoin(c('echec_attendu("sans issue", "issue 8", FALSE)', "bilan()"))
 verifier("témoin : échec attendu sans renvoi « #N » -> code non nul", r$statut != 0L)
@@ -71,7 +73,7 @@ verifier("package témoin hors base installé",
 r <- temoin(c(sprintf('loadNamespace("temoinhorsbase", lib.loc = %s)', deparse(lib_temoin)),
               'verifier("vrai", TRUE)', "bilan()"))
 verifier("témoin : espace de noms hors base chargé en fin de batterie -> code non nul",
-         r$statut != 0L && any(grepl("temoinhorsbase", r$sortie, fixed = TRUE)))
+         r$statut != 0L && any(grepl("temoinhorsbase", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(c(lib_temoin, dirname(src_temoin)), recursive = TRUE)
 
 verifier("espaces_hors_base() : base et tablexp exclus, le reste relevé",
@@ -111,13 +113,25 @@ for (cas in list(
   r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
   verifier(sprintf("lanceur : %s -> code non nul", cas$nom),
            if (r$statut == 0L) "code de sortie 0"
-           else if (!any(grepl(cas$motif, r$sortie, fixed = TRUE)))
+           else if (!any(grepl(cas$motif, r$sortie, fixed = TRUE, useBytes = TRUE)))
              paste("motif non signalé :", paste(r$sortie, collapse = " | ")) else TRUE)
   unlink(d, recursive = TRUE)
 }
 d <- dossier_temoin(list(test_temoin.R = 'verifier("vrai", TRUE)'))
 r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
 verifier("lanceur : fichier témoin conforme -> code 0",
+         if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
+unlink(d, recursive = TRUE)
+# Le lanceur ne laisse aucune de ses variables dans globalenv(), parent des
+# environnements de test : un test qui lirait `e`, `f`, `env`, `r`, `avant` ou
+# `t0` comme variable libre lirait celle du lanceur (ou d'un fichier précédent).
+# Le second fichier les cherche (le premier laisse `env` et `r` en cas de fuite).
+d <- dossier_temoin(list(
+  test_a.R = 'verifier("premier fichier", TRUE)',
+  test_b.R = c('presentes <- intersect(c("e", "f", "env", "r", "avant", "t0"), ls(globalenv(), all.names = TRUE))',
+               'verifier("globalenv sans variable du lanceur", if (length(presentes)) paste("présentes :", paste(presentes, collapse = ", ")) else TRUE)')))
+r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
+verifier("lanceur : aucune variable du lanceur dans globalenv() pour les fichiers de test",
          if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
 unlink(d, recursive = TRUE)
 
@@ -139,7 +153,7 @@ for (cas in list(
   r <- temoin(c(sprintf('echec_attendu("défaut", "#8", %s%s)', cas$expr, cas$opt), "bilan()"))
   verifier(sprintf("échec attendu, %s -> code %s", cas$nom, if (cas$code0) "0" else "non nul"),
            if ((r$statut == 0L) != cas$code0) paste("code", r$statut, ":", paste(r$sortie, collapse = " | "))
-           else if (!is.null(cas$nature) && !any(grepl(cas$nature, r$sortie, fixed = TRUE)))
+           else if (!is.null(cas$nature) && !any(grepl(cas$nature, r$sortie, fixed = TRUE, useBytes = TRUE)))
              "nature non décomptée au bilan" else TRUE)
 }
 
@@ -160,17 +174,17 @@ installe <- function(d) temoin(c(sprintf("installer_tablexp(%s)", deparse(d)), '
 d <- copie_source()
 r <- installe(d)
 verifier("bibliothèque fournie, arbre identique -> réutilisée, code 0",
-         r$statut == 0L && any(grepl("empreinte de l'arbre identique", r$sortie, fixed = TRUE)))
+         r$statut == 0L && any(grepl("empreinte de l'arbre identique", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(d, recursive = TRUE)
 d <- copie_source(function(d) cat("f_ajoutee <- function() 1\n", file = file.path(d, "R", "outils.R"), append = TRUE))
 r <- installe(d)
 verifier("bibliothèque fournie, arbre modifié -> réinstallée, code 0",
-         r$statut == 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE)))
+         r$statut == 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(d, recursive = TRUE)
 d <- copie_source(function(d) cat("f_cassee <- function( {\n", file = file.path(d, "R", "outils.R"), append = TRUE))
 r <- installe(d)
 verifier("bibliothèque fournie, arbre cassé -> réinstallation en échec, code non nul",
-         r$statut != 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE)))
+         r$statut != 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(d, recursive = TRUE)
 
 # --- proche() et noms d'assertion (audit de #8, m6) --------------------------
@@ -191,7 +205,7 @@ d <- dossier_temoin(list(test_temoin.R = c('verifier("vrai", TRUE)', "bilan()"))
 r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
 verifier("lanceur : bilan() dans un fichier de test -> code non nul, motif signalé",
          if (r$statut == 0L) "code de sortie 0"
-         else if (!any(grepl("bilan() interdit", r$sortie, fixed = TRUE)))
+         else if (!any(grepl("bilan() interdit", r$sortie, fixed = TRUE, useBytes = TRUE)))
            paste("motif non signalé :", paste(r$sortie, collapse = " | ")) else TRUE)
 unlink(d, recursive = TRUE)
 
@@ -211,7 +225,7 @@ for (tol in list(list(rel = NA_real_, abs = 0), list(rel = 0, abs = -1), list(re
 for (v in c("NA", "1", "list(FALSE)", "character(0)")) {
   r <- temoin(c(sprintf('echec_attendu("défaut", "#8", %s)', v), "bilan()"))
   verifier(sprintf("échec attendu qui rend %s -> code non nul (ECHEC)", v),
-           r$statut != 0L && grepl("; 1 échec(s) ;", ligne_bilan(r), fixed = TRUE))
+           r$statut != 0L && grepl("; 1 échec(s) ;", ligne_bilan(r), fixed = TRUE, useBytes = TRUE))
 }
 
 # R5 : empreinte de l'arbre installable (inst/, data/, src/, sous-dossiers).
@@ -230,7 +244,7 @@ verifier("empreinte_source() : change quand inst/ apparaît, quand un fichier d'
 unlink(file.path(d, c("data", "src")), recursive = TRUE)
 r <- installe(d)
 verifier("bibliothèque fournie, fichier d'inst/ ajouté -> réinstallée, code 0",
-         r$statut == 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE)))
+         r$statut == 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(d, recursive = TRUE)
 
 # R6 : sorties délibérées sans le message de la garde .Last.
@@ -238,13 +252,13 @@ GARDE <- "sortie du processus avant la ligne de bilan"
 d <- copie_source(function(d) cat("f_cassee <- function( {\n", file = file.path(d, "R", "outils.R"), append = TRUE))
 r <- installe(d)
 verifier("installation en échec : code non nul, sans le message de la garde de sortie",
-         r$statut != 0L && any(grepl("ECHEC : installation", r$sortie, fixed = TRUE)) &&
-           !any(grepl(GARDE, r$sortie, fixed = TRUE)))
+         r$statut != 0L && any(grepl("ECHEC : installation", r$sortie, fixed = TRUE, useBytes = TRUE)) &&
+           !any(grepl(GARDE, r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(d, recursive = TRUE)
 r <- executer_rscript(file.path(RACINE, "tests", "concordance_doc_moteur.R"), c("--strict", "--latex"))
 verifier("concordance, option sans valeur : code non nul, sans le message de la garde de sortie",
-         r$statut != 0L && any(grepl("option --latex sans valeur", r$sortie, fixed = TRUE)) &&
-           !any(grepl(GARDE, r$sortie, fixed = TRUE)))
+         r$statut != 0L && any(grepl("option --latex sans valeur", r$sortie, fixed = TRUE, useBytes = TRUE)) &&
+           !any(grepl(GARDE, r$sortie, fixed = TRUE, useBytes = TRUE)))
 r <- temoin(c('verifier("faux", FALSE)', "bilan()"))
 verifier("bilan() en échec : code non nul, sans le message de la garde de sortie",
-         r$statut != 0L && !any(grepl(GARDE, r$sortie, fixed = TRUE)))
+         r$statut != 0L && !any(grepl(GARDE, r$sortie, fixed = TRUE, useBytes = TRUE)))

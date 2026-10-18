@@ -12,6 +12,10 @@
 #  - controler_provenance() : argument `provenance` de construire_table()
 #    (point 3.1) ;
 #  - assembler_fiche() : fiche en mémoire (point 6.2), sans horodatage ;
+#    champ hypotheses_brut ajouté en fin de liste si l'étape `brut` est
+#    exécutée (#14, spécification d'actuary, A.5), avec la convention
+#    d'ensemble à risque et le dénominateur des instants si Kaplan-Meier est
+#    retenu (#15, A.9) ;
 #  - informations_execution() : horodatage, durée, session abrégée, hors de
 #    toute comparaison (point 6.1).
 #
@@ -168,13 +172,15 @@ empreintes_construction <- function(donnees, roles, provenance) {
 # Fiche de construction en mémoire (ADR 0007, point 6.2 ; A.3) : aucun
 # horodatage. `plan` est le plan reçu, inchangé (rejeu :
 # construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)).
+# Le champ hypotheses_brut n'existe que si l'étape `brut` est exécutée : un
+# plan sans cette étape garde les champs de la fiche antérieure à #14.
 assembler_fiche <- function(roles, plan, recette, etapes, avertissements, empreintes, provenance) {
   pd <- etapes[["donnees"]][["parametres"]]
   pe <- etapes[["exposition"]][["parametres"]]
   periode <- plan[["periode"]]
   delai <- plan[["delai_declaration"]]
   unite <- pd$unite_observation
-  list(
+  fiche <- list(
     version_fiche = VERSION_FICHE,
     versions = list(tablexp = as.character(utils::packageVersion("tablexp")), R = R.version.string),
     plateforme = list(sysname = Sys.info()[["sysname"]], release = Sys.info()[["release"]],
@@ -206,6 +212,13 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     empreintes = empreintes,
     avertissements = avertissements
   )
+  pb <- etapes[["brut"]][["parametres"]]
+  if (!is.null(pb))
+    fiche$hypotheses_brut <- pb[c("estimateurs", "niveau", "exposition_initiale", "tolerance_effectif",
+                                  "hypotheses", "statuts",
+                                  # Kaplan-Meier retenu seulement (#15, A.9).
+                                  intersect(c("ensemble_a_risque", "denominateur_instants"), names(pb)))]
+  fiche
 }
 
 # Informations d'exécution, hors de toute comparaison (ADR 0007, point 6.1).

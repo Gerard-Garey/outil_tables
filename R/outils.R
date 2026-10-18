@@ -52,17 +52,25 @@ refuser <- function(module, motif, message, details = list()) {
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
 # data.frame (etape, code, message, nombre), restitué dans l'objet. avertir()
 # rend l'accumulateur augmenté d'une ligne ; aucun warning() n'est émis.
+# nombre : dénombrement, stocké en integer (#24) ; une valeur non entière, NA,
+# infinie, négative, supérieure à .Machine$integer.max ou de longueur
+# différente de 1 est une erreur de programmation du package : stop(), sans
+# conversion.
 avertissements_vides <- function() {
   data.frame(etape = character(0), code = character(0), message = character(0),
-             nombre = numeric(0), stringsAsFactors = FALSE)
+             nombre = integer(0), stringsAsFactors = FALSE)
 }
 
 avertir <- function(acc, etape, code, message, nombre) {
   if (!is.character(code) || length(code) != 1L || !grepl(MOTIF_CODE_REFUS, code))
     stop("avertir() : 'code' doit être un code court (minuscules, chiffres, '_').",
          call. = FALSE)
+  if (!is.numeric(nombre) || length(nombre) != 1L || is.na(nombre) ||
+      !is.finite(nombre) || nombre != trunc(nombre) ||
+      nombre < 0 || nombre > .Machine$integer.max)
+    stop("avertir() : 'nombre' doit être un entier unique, fini, positif ou nul.", call. = FALSE)
   rbind(acc, data.frame(etape = etape, code = code, message = message,
-                        nombre = as.numeric(nombre), stringsAsFactors = FALSE))
+                        nombre = as.integer(nombre), stringsAsFactors = FALSE))
 }
 
 # Évalue expr sous la graine `graine` et le générateur GENERATEUR, puis

@@ -96,17 +96,36 @@ consignes_plateforme <- function() {
     if (length(l)) gsub("\"", "", sub("^PRETTY_NAME=", "", l[1L])) else ""
   } else paste(Sys.info()[["sysname"]], Sys.info()[["release"]])
   java <- Sys.which("java")
-  c("Système" = os,
-    "Processeur" = if (length(cpu)) modele else "(non relevé : /proc/cpuinfo absent)",
-    "Drapeaux fma / avx2 / avx512f" = if (length(cpu))
-      paste(c("fma", "avx2", "avx512f"), ifelse(c("fma", "avx2", "avx512f") %in% drapeaux, "oui", "non"),
-            sep = " : ", collapse = " ; ") else "(non relevé)",
-    "ImageOS / ImageVersion (hôte)" = paste(Sys.getenv("ImageOS", "(non définie)"),
-                                            Sys.getenv("ImageVersion", "(non définie)"), sep = " / "),
-    "LC_COLLATE" = Sys.getlocale("LC_COLLATE"),
-    "Fuseau horaire" = as.character(Sys.timezone()),
-    "java" = if (nzchar(java)) unname(java) else "absent",
-    "GITHUB_SHA" = Sys.getenv("GITHUB_SHA", "(non défini)"))
+  # Noms en chaînes, non en étiquettes de c() : une étiquette non ASCII est un
+  # symbole, traduit en natif à l'analyse (« Syst<U+00E8>me » en locale C
+  # sous parse(encoding = "UTF-8"), mesuré).
+  stats::setNames(
+    c(os,
+      if (length(cpu)) modele else "(non relevé : /proc/cpuinfo absent)",
+      if (length(cpu))
+        paste(c("fma", "avx2", "avx512f"), ifelse(c("fma", "avx2", "avx512f") %in% drapeaux, "oui", "non"),
+              sep = " : ", collapse = " ; ") else "(non relevé)",
+      paste(Sys.getenv("ImageOS", "(non définie)"), Sys.getenv("ImageVersion", "(non définie)"), sep = " / "),
+      Sys.getlocale("LC_COLLATE"),
+      as.character(Sys.timezone()),
+      if (nzchar(java)) unname(java) else "absent",
+      Sys.getenv("GITHUB_SHA", "(non défini)")),
+    c("Système", "Processeur", "Drapeaux fma / avx2 / avx512f", "ImageOS / ImageVersion (hôte)",
+      "LC_COLLATE", "Fuseau horaire", "java", "GITHUB_SHA"))
+}
+
+# Lignes du bloc d'identifiant (grandeurs contrôlées du relevé r) et des
+# grandeurs consignées ; reprises dans l'en-tête des références de
+# non-régression (ADR 0009, point 2.2 ; tests/reference/outils_reference.R).
+lignes_identifiant <- function(r) {
+  c(sprintf("  Image                     : %s", r$image),
+    sprintf("  R                         : %s", r$r),
+    sprintf("  %-26s: %s", names(r$bibliotheques), r$bibliotheques),
+    sprintf("  La_version()              : %s", r$la_version),
+    sprintf("  %-26s: %s", names(r$fils), r$fils))
+}
+lignes_consignees <- function() {
+  sprintf("  %-30s: %s", names(consignes_plateforme()), consignes_plateforme())
 }
 
 principal <- function(args = commandArgs(trailingOnly = TRUE)) {
@@ -114,13 +133,9 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   r <- relever_plateforme()
   lignes <- c(
     "Identifiant de plateforme (ADR 0008, point 5)",
-    sprintf("  Image                     : %s", r$image),
-    sprintf("  R                         : %s", r$r),
-    sprintf("  %-26s: %s", names(r$bibliotheques), r$bibliotheques),
-    sprintf("  La_version()              : %s", r$la_version),
-    sprintf("  %-26s: %s", names(r$fils), r$fils),
+    lignes_identifiant(r),
     "Consigné sans contrôle",
-    sprintf("  %-30s: %s", names(consignes_plateforme()), consignes_plateforme())
+    lignes_consignees()
   )
   cat(lignes, sep = "\n")
   cat("\nsessionInfo()\n")
