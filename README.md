@@ -15,13 +15,13 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 | `docs/exigences.md` | Cahier des charges, exigences numérotées E1.1 à E5.5 |
 | `docs/cadrage/` | Comptes rendus des entretiens de cadrage (décisions du mainteneur) |
 | `docs/recherche/` | Rapports de recherche d'agents, avec leurs statuts vérifié / incertain / non trouvé |
-| `docs/adr/` | Décisions consignées (0001 : routage ; 0002 à 0006 : décisions du cadrage ; 0007 : forme du package et contrats initiaux ; 0008 : plateforme de CI et de référence) |
+| `docs/adr/` | Décisions consignées (0001 : routage ; 0002 à 0006 : décisions du cadrage ; 0007 : forme du package et contrats initiaux ; 0008 : plateforme de CI et de référence ; 0010 : modèle et effort des agents de réalisation et de vérification) |
 | `docs/feuille-de-route.md` | Périmètre des branches de travail, décisions du mainteneur numérotées (M1, M2…) |
 | `docs/latex/` | Documentation méthodologique (`doc_outil_tables.tex` et son PDF versionné, charte d'`outil_USP`) et ses règles de rédaction (`CONVENTIONS.md`) ; compilée par le job requis « Documentation » |
 | `docs/agents/` | Suivi des issues (GitHub, `gh` ou MCP), libellés de tri, documentation du domaine, routage du modèle et de l'effort |
-| `.claude/agents/` | Sept sous-agents : `architect` (pilotage), `actuary` et `regulatory` (fond), `coder`, `docwriter` (réalisation), `audit`, `app-review` (vérification) ; variantes `-approfondi` générées par `.claude/outils/fiches_jumelles.sh` |
+| `.claude/agents/` | Sept sous-agents : `architect` (pilotage), `actuary` et `regulatory` (fond), `coder`, `docwriter` (réalisation), `audit`, `app-review` (vérification) ; variantes `-approfondi` d'`architect`, d'`actuary` et de `regulatory` (effort `high`) et variante Opus de `coder`, générées par `.claude/outils/fiches_jumelles.sh` |
 | `.claude/workflows/circuit-technique.js` | Circuit `coder` → batteries → `audit` léger, une reprise au plus, sans commit ni push |
-| `.claude/settings.json`, `.claude/hooks/` | Permissions, hooks (installation des plugins, journal des sous-agents) |
+| `.claude/settings.json`, `.claude/hooks/` | Permissions, hooks (installation des plugins, installation de R 4.3.3 et des packages de l'application en session cloud, journal des sous-agents) |
 | `.github/` | Modèles d'issue et de PR, CI, Dependabot, ruleset de `main` |
 | `LICENSE` | PolyForm Noncommercial 1.0.0 |
 
@@ -30,6 +30,7 @@ En place depuis la branche `claude/socle-donnees-exposition` : `DESCRIPTION`, `N
 ## Prérequis et commandes
 
 - **R 4.3.3** (CI et références ; poste aligné ; ADR 0002, quatrième annotation du 16/10/2026), packages de priorité `base` seulement pour le moteur, sauf package admis par ADR de méthode (ADR 0002 et son annotation du 16/10/2026) ; `shiny` pour l'application ; `openxlsx` facultatif pour les fichiers xlsx ; packages de contre-vérification (`survival`, `mgcv`, `WH`, `StMoMo`, `demography`, `MortalityLaws`, `lifecontingencies`, `survPen`, `MortCast`, `locfit`, `flexsurv` facultatif) seulement pour régénérer les valeurs externes des tests, hors CI, éventuellement sur un autre poste muni d'un R récent (versions de R et des packages consignées ; ADR 0002, troisième annotation du 16/10/2026). **Aucune dépendance à Java**, directe ou indirecte (d'où l'exclusion du package `ELT` ; sa source s'exécute seulement hors du dépôt, sans Java, en appoint).
+- **Session cloud** : le hook `SessionStart` `.claude/hooks/installer_r.sh` installe R 4.3.3 (`r-base-core` du dépôt apt d'Ubuntu, sans dépôt CRAN) et les packages de l'application (`shiny`, `htmltools`, `openxlsx`), fixe `OPENBLAS_NUM_THREADS` et `OMP_NUM_THREADS` à 1, n'installe que ce qui manque et n'échoue jamais ; il n'agit pas sur un poste local. La plateforme obtenue n'est pas la plateforme de référence (LAPACK, image) : les références ne se régénèrent que sur la CI.
 - **Batteries** (depuis la racine du dépôt ; chacune installe l'arbre de travail dans une bibliothèque temporaire par `R CMD INSTALL`, n'installe aucun package, affiche une ligne de bilan et sort avec un code non nul en cas d'échec ; ADR 0007, point 11) :
 
   ```
@@ -58,7 +59,9 @@ Détail : `CLAUDE.md`.
 
 `architect`, `actuary` et `regulatory` tournent sur Opus par défaut : effort `medium` pour la routine et `high` pour le jugement, Fable réservé à une liste fermée de cas ou à l'accord du mainteneur, avec des plafonds d'escalade (`docs/agents/routage.md`, ADR 0001 annoté le 14/10/2026). Les contrats partagés du projet (signature de `construire_table()`, catalogue des rôles et recettes, format du plan et de la fiche, objet résultat, surface de mortalité, tables de référence et provenances, jeux simulés, critère de non-régression) et le seuil « macro » (un module touché suffit) sont fixés au § 4 du routage.
 
-- **Vérification** : `bash .claude/outils/fiches_jumelles.sh --verifier` (aussi en CI) ; puis, dans une **session neuve** (les fiches ne sont pas rechargées en cours de session), une consultation de chaque fiche et `bash .claude/outils/bilan_journal.sh`, qui affiche le modèle réellement servi ; les escalades, relances ciblées et arrêts sont notés dans la PR.
+Les agents de réalisation et de vérification ont leur modèle et leur effort fixés par leur fiche (`docs/agents/routage.md`, § 10, ADR 0010) : `coder` sur Sonnet en effort `high`, et `coder-approfondi` sur Opus en effort `medium`, d'office pour les évolutions de fond et les corrections de conformité (circuits 1 et 2), ailleurs sur accord du mainteneur ; `audit` et `docwriter` sur Opus en effort `medium`, la revue finale complète d'`audit` en effort `high` ; `app-review` sur Sonnet en effort `high`. Ces réglages se lisent dans le frontmatter de `coder.md`, `audit.md`, `docwriter.md` et `app-review.md`, et, pour `coder-approfondi`, dans la fonction `parametres` de `.claude/outils/fiches_jumelles.sh`.
+
+- **Vérification** : `bash .claude/outils/fiches_jumelles.sh --verifier` (aussi en CI) ; puis, dans une **session neuve** (les fiches modifiées ou créées ne sont pas rechargées en cours de session, constaté de nouveau le 18/10/2026 : ADR 0010), une consultation de chaque fiche et `bash .claude/outils/bilan_journal.sh`, qui affiche le modèle réellement servi ; les escalades, relances ciblées et arrêts sont notés dans la PR.
 - **Limites** : un plafond de tours n'est pas un plafond de tokens, une réponse courte ne borne pas le raisonnement, l'effort effectif n'est pas observable dans le journal, et la politique ne supprime pas les angles morts des modèles.
 
 ## Sécurité du dépôt

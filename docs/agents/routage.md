@@ -1,6 +1,6 @@
-# Routage du modèle et de l'effort des agents de pilotage et de fond
+# Routage du modèle et de l'effort des agents
 
-Politique appliquée par la session principale quand elle consulte `architect`, `actuary` ou `regulatory`. Décision : ADR 0001. Les agents de réalisation et de vérification (`coder`, `docwriter`, `audit`, `app-review`) ne sont pas concernés : leur fiche fixe leur modèle.
+Politique appliquée par la session principale quand elle consulte `architect`, `actuary` ou `regulatory`. Décision : ADR 0001. Les agents de réalisation et de vérification (`coder`, `docwriter`, `audit`, `app-review`) suivent une règle plus simple, au § 10 (ADR 0010).
 
 **Point de départ, pas politique figée.** Les valeurs ci-dessous sont celles du modèle de dépôt. Ce projet les a adaptées au cadrage du 14/10/2026 (§ 4.2, 4.3 et 9 : contrats partagés, seuil « macro », rôles dédoublés) et les réévalue à mesure qu'il évolue (§ 8).
 
@@ -14,7 +14,7 @@ Politique appliquée par la session principale quand elle consulte `architect`, 
 
 ## 2. Mécanisme
 
-Le paramètre `model` d'un appel `Agent` l'emporte sur le `model` de la fiche ; l'effort, lui, ne peut pas être passé à l'appel et vient de la fiche (champ `effort`), qui prime sur l'effort de la session (documentation Claude Code des sous-agents, champ `effort` : « Overrides the session effort level ») mais n'est pas observable dans le journal (§ 7). D'où deux fiches par rôle, au même corps :
+Le paramètre `model` d'un appel `Agent` l'emporte sur le `model` de la fiche. L'effort vient de la fiche (champ `effort`), qui prime sur l'effort de la session (documentation Claude Code des sous-agents, champ `effort` : « Overrides the session effort level ») mais n'est pas observable dans le journal (§ 7). Quand l'ADR 0001 a été écrit, l'effort ne pouvait pas être passé à l'appel ; il le peut depuis Claude Code 2.1.292 (paramètre `effort` d'un sous-agent non-fork, qui l'emporte sur la fiche), possibilité employée au § 10 mais pas encore ici. D'où deux fiches par rôle, au même corps :
 
 | Fiche | Modèle servi | Effort | `maxTurns` | Usage |
 |---|---|---|---|---|
@@ -22,10 +22,10 @@ Le paramètre `model` d'un appel `Agent` l'emporte sur le `model` de la fiche ; 
 | `architect-approfondi`, `actuary-approfondi`, `regulatory-approfondi` | `opus` | `high` | 80 | jugement (§ 3) |
 | `architect-approfondi`, `actuary-approfondi`, `regulatory-approfondi` appelées avec `model: "fable"` | Fable (fiche : `opus`, l'appel l'emporte) | `high` | 80 | cas du § 4.1, ou accord du mainteneur |
 
-- Les fiches `-approfondi` sont **générées** par `bash .claude/outils/fiches_jumelles.sh` à partir de la fiche de base : seul le frontmatter diffère (nom, description, effort, `maxTurns`). Ne jamais les modifier à la main ; la CI vérifie la concordance (`--verifier`). La liste des rôles dédoublés est la variable `ROLES` du script : `architect`, `actuary` et `regulatory` (décision Q9 du cadrage, A4).
+- Les fiches `-approfondi` sont **générées** par `bash .claude/outils/fiches_jumelles.sh` à partir de la fiche de base : seul le frontmatter diffère (nom, description, effort, `maxTurns` et, pour `coder`, le modèle). Ne jamais les modifier à la main ; la CI vérifie la concordance (`--verifier`). La liste des rôles dédoublés est la variable `ROLES` du script : `architect`, `actuary` et `regulatory` (décision Q9 du cadrage, A4), et `coder`, dont la fiche `-approfondi` a ses propres paramètres (fonction `parametres` du script, § 10).
 - Fable en `xhigh` ou `max` : jamais sans accord explicite du mainteneur (il faudrait alors une troisième fiche, à créer sur décision). Fable en `medium` (fiche de base appelée avec `model: "fable"`) : sur indication explicite du mainteneur seulement.
 - Les modèles sont désignés par **alias** (`opus`, `fable`), qui suivent les nouvelles versions ; le journal (§ 7) note la version effectivement servie.
-- Une fiche modifiée n'est prise en compte que par une **session neuve** (`docs/agents/issue-tracker.md`, constat 3).
+- Une fiche modifiée ou créée ne se vérifie que dans une **session neuve** (`docs/agents/issue-tracker.md`, constat 3). Le dépôt modèle a constaté le rechargement d'une fiche modifiée avec Claude Code 2.1.302 (son ADR 0002) ; ce projet ne le retrouve pas : le 18/10/2026, dans la session qui venait de passer `coder.md` à `model: sonnet`, `coder` a été servi en `claude-opus-5-5`, et `coder-approfondi`, créée dans la même session, était inconnue de l'outil `Agent` (ADR 0010).
 
 ## 3. Matrice
 
@@ -143,7 +143,7 @@ Chaque consultation se termine par un bloc « Retour » (fiches `architect` et `
 ## 8. Calibration et retour arrière
 
 - **Calibration** : après les dix premières consultations `architect` et `actuary` d'un projet, puis à chaque point d'étape d'`architect`, relire le bilan du journal et les lignes d'escalade des PR : part des relances ciblées (fiches trop légères ?), escalades vers Fable et leur apport réel, contexte au dernier appel (lectures trop larges ?). Ajuster les seuils et efforts par un commit `claude:` motivé ; une réorientation durable s'annote dans l'ADR 0001.
-- **Retour au comportement antérieur** (Fable pour tout), sur décision du mainteneur : de préférence, annuler le commit de fusion de la PR qui a introduit la politique (`git revert -m 1 <sha>`), puis rétablir l'ADR 0001 (que l'annulation supprime) avec une annotation datée « Politique abandonnée le … » (ou `superseded by NNNN` si un nouvel ADR consigne le retour) ; dans un projet créé depuis le modèle, qui n'a pas ce commit, ou à défaut, à la main : remettre `model: fable` dans `architect.md`, `actuary.md` et `regulatory.md`, retirer `effort` et `maxTurns`, vider `ROLES` dans `.claude/outils/fiches_jumelles.sh`, supprimer les fiches `-approfondi`, retirer de `CLAUDE.md` le paragraphe « Routage du modèle et de l'effort », et annoter l'ADR 0001.
+- **Retour au comportement antérieur** (Fable pour tout), sur décision du mainteneur : de préférence, annuler le commit de fusion de la PR qui a introduit la politique (`git revert -m 1 <sha>`), puis rétablir l'ADR 0001 (que l'annulation supprime) avec une annotation datée « Politique abandonnée le … » (ou `superseded by NNNN` si un nouvel ADR consigne le retour) ; dans un projet créé depuis le modèle, qui n'a pas ce commit, ou à défaut, à la main : remettre `model: fable` dans `architect.md`, `actuary.md` et `regulatory.md`, retirer `effort` et `maxTurns`, retirer `architect`, `actuary` et `regulatory` de `ROLES` dans `.claude/outils/fiches_jumelles.sh`, supprimer leurs fiches `-approfondi`, retirer de `CLAUDE.md` le paragraphe « Routage du modèle et de l'effort », et annoter l'ADR 0001.
 
 ## 9. Adapter la politique à un projet
 
@@ -153,9 +153,31 @@ Emplacements réellement lus :
 |---|---|
 | `docs/agents/routage.md` (ce fichier) | matrice (§ 3), seuils et contrats partagés (§ 4.2, § 4.3), plafonds (§ 5.2) |
 | frontmatter de `architect.md`, `actuary.md` et `regulatory.md` | effort et `maxTurns` de routine ; le script reprend leur modèle, leurs outils et leur corps dans les fiches `-approfondi` |
-| `.claude/outils/fiches_jumelles.sh`, variables `ROLES`, `EFFORT_APPROFONDI`, `TOURS_APPROFONDI` | rôles dédoublés (experts supplémentaires), effort et plafond de jugement |
-| `CLAUDE.md`, « Sous-agents » | renvoi à ce fichier ; règles qui priment (§ 5.5, rang 1) ; liste du § 4.1 et plafonds du § 5.2, recopiés : à tenir identiques |
+| `.claude/outils/fiches_jumelles.sh`, variables `ROLES`, `EFFORT_APPROFONDI`, `TOURS_APPROFONDI`, fonction `parametres` | rôles dédoublés (experts supplémentaires), effort et plafond de jugement ; paramètres propres à un rôle (`coder-approfondi`, § 10) |
+| frontmatter de `coder.md`, `audit.md`, `docwriter.md`, `app-review.md` | modèle et effort des agents de réalisation et de vérification (§ 10) |
+| `CLAUDE.md`, « Sous-agents » | renvoi à ce fichier ; règles qui priment (§ 5.5, rang 1) ; liste du § 4.1, plafonds du § 5.2 et règles du § 10, recopiés : à tenir identiques |
 
-Ces critères s'articulent avec `CLAUDE.md` sans le remplacer : les décisions qu'il réserve au mainteneur restent les siennes quel que soit le modèle. Vérification : `bash .claude/outils/fiches_jumelles.sh --verifier` (CI), puis, dans une session neuve, une consultation de chaque fiche suivie de `bash .claude/outils/bilan_journal.sh` pour lire le modèle servi.
+Ces critères s'articulent avec `CLAUDE.md` sans le remplacer : les décisions qu'il réserve au mainteneur restent les siennes quel que soit le modèle. Vérification : `bash .claude/outils/fiches_jumelles.sh --verifier` (CI), puis, dans une session neuve (§ 2), une consultation de chaque fiche suivie de `bash .claude/outils/bilan_journal.sh` pour lire le modèle servi.
 
 Exemple d'adaptation (projet de calcul réglementaire) : contrats partagés = table des paramètres réglementaires et format d'entrée ; seuil « macro » = une couche de calcul touchée suffit ; un deuxième expert `regulatory` ajouté à `ROLES` ; validation après audit en jugement, parce qu'un écart de conformité y coûte plus qu'une consultation Opus `high`.
+
+## 10. Agents de réalisation et de vérification
+
+Décision : ADR 0010 (reprise de l'ADR 0002 du dépôt modèle). Le modèle et l'effort sont fixés par la fiche ; la session choisit seulement entre `coder` et `coder-approfondi`, et passe l'effort `high` dans deux cas.
+
+| Fiche | Modèle | Effort | Emploi |
+|---|---|---|---|
+| `coder` | `sonnet` | `high` | par défaut |
+| `coder-approfondi` | `opus` | `medium` (`high` à l'appel, sur accord du mainteneur) | d'office en circuits 1 et 2 ; ailleurs sur accord du mainteneur |
+| `audit` | `opus` | `medium` (`high` à l'appel pour la revue finale complète, règle 10) | — |
+| `docwriter` | `opus` | `medium` | — |
+| `app-review` | `sonnet` | `high` | — |
+
+- **`coder-approfondi`** : même corps et mêmes outils que `coder`, générée par `bash .claude/outils/fiches_jumelles.sh` (fonction `parametres` : modèle Opus, effort `medium`, sans plafond de tours propre : celui de `coder.md`, aucun aujourd'hui) ; ne jamais la modifier à la main.
+- **D'office** : en circuits 1 et 2 de `CLAUDE.md` (évolution de fond, correction de conformité), chaque appel de `coder`, reprises comprises, va à `coder-approfondi`.
+- **Sur accord du mainteneur** (un message, réponse oui / non ; pas de plafond chiffré, chaque emploi est validé) : la session propose `coder-approfondi` pour une tâche de codage longue ou complexe — par exemple plusieurs modules du package ou un contrat partagé (§ 4.2) touchés, un refactoring étendu, un algorithme à concevoir — ou pour reprendre une issue de circuit 3 finie en `arrete` parce que `coder` n'a pas corrigé les constats après la reprise. Un arrêt pour une autre raison (question pour `actuary` ou `regulatory`, visa, contradiction entre vérificateurs) suit `CLAUDE.md`, sans changement de fiche. L'effort `high` (paramètre `effort` de l'appel) se propose de même, en le motivant.
+- **Workflow `circuit-technique`** (circuit 3) : `coder` par défaut ; le mainteneur, qui seul lance le workflow, y confie l'issue à `coder-approfondi` par l'option `--approfondi` (`--approfondi=high` pour l'effort `high`) : la donner vaut accord. Le rapport du workflow indique la fiche employée ; une option mal formée arrête le workflow. Les étapes mécaniques (état du dépôt, batteries) restent sur `audit` en effort `low`. Pour relancer avec `--approfondi` une issue finie en `arrete`, l'arbre de travail doit être propre (le workflow le vérifie au lancement) : la session sauvegarde d'abord hors du dépôt le travail du premier passage (`git diff` et les fichiers non suivis listés au rapport), puis, avec l'accord du mainteneur, remet l'arbre à la tête de lancement ; à défaut, elle reprend l'issue hors workflow (`coder-approfondi` sur l'arbre en l'état, puis `audit` léger).
+- **Trace** : chaque emploi de `coder-approfondi` hors circuits 1 et 2, et chaque passage de `coder-approfondi` à l'effort `high`, est noté d'une ligne dans la PR : `fiche / modèle / critère déclenché / statut obtenu / suite` (§ 7).
+- **Motifs** : `coder` exécute des tâches délimitées par un plan ou une issue, et ses erreurs sont rattrapées par les batteries et par `audit` ; le fond et les tâches longues ou complexes gardent Opus ; `audit`, dernier filet, et `docwriter`, dont le livrable est relu par des tiers (actuaire certificateur, ACPR), restent sur Opus. Fixer l'effort dans chaque fiche évite qu'une session lancée en effort élevé y entraîne tous les agents.
+- **Calibration** : comme au § 8, à chaque point d'étape d'`architect` : modèles servis (journal, § 7), reprises et arrêts du workflow, constats trouvés en revue finale complète, emplois de `coder-approfondi` notés dans les PR.
+- **Retour arrière** : de préférence, annuler le commit de fusion de la PR qui a introduit l'ADR 0010 (`git revert -m 1 <sha>`). À la main : dans `coder.md`, remettre `model: opus` et retirer `effort`, la mention « Fiche de routine » et la consigne de périmètre ; retirer `effort` d'`audit.md`, `docwriter.md` et `app-review.md` (l'effort redevient celui de la session) ; retirer `coder` de `ROLES` et son cas de `parametres`, supprimer `coder-approfondi.md` et l'option `--approfondi` du workflow ; dans `CLAUDE.md`, retirer le paragraphe « Modèle et effort des agents de réalisation et de vérification », rétablir le principe 8 et le décompte des fiches (dix) ; dans ce document, retirer ce § 10 et ses renvois (titre, introduction, § 2, § 9) ; retirer les entrées de `CONTEXT.md` et du README, et la mention de `coder-approfondi` du modèle de PR ; annoter les ADR 0001 et 0010. Un retour partiel (par exemple `coder` seul sur Opus) garde les efforts fixés des autres fiches.
