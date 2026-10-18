@@ -54,6 +54,7 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
 
 - **Catalogues proposés**, non instrumentés (les codes correspondants sont cités par `\code{}` dans le texte ; un catalogue non requis employé par `\catalogue` serait un écart) : `conventions` (`ORDRE_CONVENTIONS`), `champs-plan` (`CHAMPS_PLAN`), `parametres-<etape>` (colonne `parametre` de `PARAMETRES_ETAPES[[etape]]`), `motifs` (`MOTIFS_LIGNES` et `MOTIFS_TETE`), `refus` (codes de refus passés à `refuser()`), `avertissements` (codes passés à `avertir()`).
 - **Catalogue en attente** : un catalogue requis sans aucune entrée dans le document est un échec, sauf s'il figure dans `tests/concordance_attente.csv` (colonne `type` = `catalogue`, avec renvoi à l'issue qui le documente), où il compte en échec attendu ; présent et encore en attente, c'est un succès inattendu, qui fait échouer la batterie.
+- **Entrée en attente** : une définition ajoutée à un fichier dont le tableau est déjà écrit peut figurer dans la liste d'attente (colonne `type` = `entree`, `nom` de la forme `<catalogue>:<nom>`, renvoi à l'issue) ; absente du document, elle compte en échec attendu et le catalogue est jugé égal à sa source à cette entrée près ; présente et encore en attente, c'est un succès inattendu. La ligne est retirée par un commit `tests:` qui suit le commit `docs:`, comme pour un export (section 3.1).
 
 ## 4. Contenu : invariants
 
