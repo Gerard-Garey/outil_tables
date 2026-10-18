@@ -2739,24 +2739,6 @@ l'arrondi (approximation numérique).
     entier (section~\ref{sec:recettes})~; sous \code{age\_atteint\_annee},
     c'est la probabilité sur l'année civile de la cellule~; sous
     \code{par\_annee}, c'est le $q_x$ de l'année $t$ à force $\mu_{x,t}$.
-  \item \textbf{Intervalle exact}~:
-    $\bigl[G_D^{-1}(\alpha/2),\ G_{D+1}^{-1}(1 - \alpha/2)\bigr] / E^c$, où
-    $G_k$ est la loi gamma de forme $k$ et d'échelle 1~; borne inférieure 0
-    si $D = 0$, borne supérieure alors $-\ln(\alpha/2)/E^c$.
-  \item \textbf{Intervalle asymptotique}~: normal sur l'échelle de
-    $\log\mu$, $\operatorname{Var}(\log\hat\mu) \approx 1/D$, soit
-    $\hat\mu\, e^{\mp z/\sqrt{D}}$~; non défini à $D = 0$.
-  \item \textbf{Calcul}~: \code{taux\_poisson()}, bornes exactes par
-    \code{qgamma()}.
-  \item \textbf{Statut}~: $\hat\mu$, résultat exact (maximum de
-    vraisemblance du modèle), valeur en arithmétique flottante~; $\hat q^{P}$,
-    résultat exact (image du maximum de vraisemblance par
-    $q = 1 - e^{-\mu}$)~; intervalle exact, exact sous la loi supposée
-    $D \sim \mathcal{P}(\mu E^c)$, $E^c$ tenue pour fixe (E2.14)~: couverture
-    au moins égale au niveau pour tout $\mu$~; sous le modèle de survie, où
-    $E^c$ est aléatoire, sa couverture n'est qu'asymptotique~; bornes par
-    approximation numérique (\code{qgamma})~; intervalle asymptotique,
-    asymptotique ($\mu E^c \to \infty$).
   \item \textbf{Biais dû à la datation au jour} (spécification de \#16, A.1~;
     résultat exact, preuve écrite). L'exposition court jusqu'au jour de la
     sortie exclu (section~\ref{sec:conventions-temps})~: il manque en moyenne
@@ -2781,6 +2763,24 @@ l'arrondi (approximation numérique).
     grille des jours, $q^{*} = 1 - (1 - h_d)^L$, s'écarte de
     $1 - e^{-\mu_d}$ d'un écart relatif du même ordre (constats,
     section~\ref{sec:constats-brut}).
+  \item \textbf{Intervalle exact}~:
+    $\bigl[G_D^{-1}(\alpha/2),\ G_{D+1}^{-1}(1 - \alpha/2)\bigr] / E^c$, où
+    $G_k$ est la loi gamma de forme $k$ et d'échelle 1~; borne inférieure 0
+    si $D = 0$, borne supérieure alors $-\ln(\alpha/2)/E^c$.
+  \item \textbf{Intervalle asymptotique}~: normal sur l'échelle de
+    $\log\mu$, $\operatorname{Var}(\log\hat\mu) \approx 1/D$, soit
+    $\hat\mu\, e^{\mp z/\sqrt{D}}$~; non défini à $D = 0$.
+  \item \textbf{Calcul}~: \code{taux\_poisson()}, bornes exactes par
+    \code{qgamma()}.
+  \item \textbf{Statut}~: $\hat\mu$, résultat exact (maximum de
+    vraisemblance du modèle), valeur en arithmétique flottante~; $\hat q^{P}$,
+    résultat exact (image du maximum de vraisemblance par
+    $q = 1 - e^{-\mu}$)~; intervalle exact, exact sous la loi supposée
+    $D \sim \mathcal{P}(\mu E^c)$, $E^c$ tenue pour fixe (E2.14)~: couverture
+    au moins égale au niveau pour tout $\mu$~; sous le modèle de survie, où
+    $E^c$ est aléatoire, sa couverture n'est qu'asymptotique~; bornes par
+    approximation numérique (\code{qgamma})~; intervalle asymptotique,
+    asymptotique ($\mu E^c \to \infty$).
   \item \textbf{Références}~: à établir (issue~\#6).
 \end{itemize}
 
@@ -2905,6 +2905,9 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     dans l'année civile $\operatorname{an}(n) + x$ pour une tête présente au
     1\textsuperscript{er}~janvier, même portée que le binomial sous cette
     convention.
+  \item \textbf{Hypothèses}~: troncature à gauche non informative (aucun
+    effet de sélection à l'entrée)~; censure non informative
+    (\code{HYPOTHESE\_CENSURE})~; unités d'observation indépendantes.
   \item \textbf{Échelle de temps}~: celle des cellules de la convention
     retenue, en années d'âge (section~\ref{sec:recettes})~: à l'instant $t$
     (un jour), $\tau(t) = x + j/L$, avec $x$ la cellule du jour, $j$ le
@@ -2963,9 +2966,6 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     la vraisemblance $\prod_j h_j^{d_j}(1 - h_j)^{r_j - d_j}$ est maximale en
     $h_j = d_j/r_j$. Aux instants où personne n'est à risque, elle ne dépend
     pas du risque~: $q_x$ n'y est \textbf{pas identifié}.
-  \item \textbf{Hypothèses}~: troncature à gauche non informative (aucun
-    effet de sélection à l'entrée)~; censure non informative
-    (\code{HYPOTHESE\_CENSURE})~; unités d'observation indépendantes.
   \item \textbf{Cellule définie}~: la couverture d'une cellule est l'union des
     intervalles $[\tau(a_i), \tau(b_i))$ non vides~; soit $t_0$ le premier
     instant de la cellule où $d = r$, ou $x + 1$ s'il n'y en a pas. La
@@ -3333,10 +3333,14 @@ avec $e^{-m/L}$, probabilités constantes dans la cellule. D'où, en
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item binomial et produit-limite sur une cellule observée entière, sans
-    entrée ni censure~: $D \sim \mathcal{B}(n, \pi)$ exactement, avec
-    $\pi = q_x$ sans cause concurrente et $\pi = (\mu_d/m)(1 - e^{-m})$ sinon~;
-    $E^i = n$ et le produit-limite égale le binomial
-    (section~\ref{sec:brut-kaplan-meier})~;
+    entrée ni censure et sans cause concurrente~: $D \sim \mathcal{B}(n,
+    q_x)$ exactement~; $E^i = n$ et le produit-limite égale le binomial
+    (identité de la section~\ref{sec:brut-kaplan-meier}, qui exige l'absence
+    de censure dans la cellule). Avec une cause concurrente, $D \sim
+    \mathcal{B}\bigl(n, (\mu_d/m)(1 - e^{-m})\bigr)$ reste exact, mais les
+    sorties concurrentes censurent dans la cellule~: $E^i < n$ dès qu'une
+    sortie concurrente survient, le binomial ne
+    vise plus $q_x$ et le produit-limite vise $q^{*}$ (point suivant)~;
   \item produit-limite sur la grille des jours~: limite $q^{*} = 1 - (1 -
     h_d)^L$, égale à $1 - e^{-\mu_d}$ sans cause concurrente~;
   \item Poisson~: $E[D - \mu^{*} E^c] = 0$, avec $\mu^{*}$ de la
@@ -3347,8 +3351,9 @@ avec $e^{-m/L}$, probabilités constantes dans la cellule. D'où, en
 \end{itemize}
 
 \noindent
-Chaque test compare l'estimateur à sa cible exacte sous le modèle simulé~;
-l'écart de cette cible à la loi vraie est écrit à côté. Loi vraie des tests~:
+Chaque test compare l'estimateur à sa cible exacte sous le modèle simulé,
+sauf en C2, où deux approximations de la cible sont faites et bornées
+(ci-dessous)~; l'écart de cette cible à la loi vraie est écrit à côté. Loi vraie des tests~:
 celle du simulateur (Gompertz-Makeham $A = 2 \cdot 10^{-4}$, $B = 2{,}5
 \cdot 10^{-5}$, $c = 1{,}1$, facteurs H 1 et F 0,6, plafond 1~; rachat
 constant 0,05), convention \code{plus\_fine}, délai nul, niveau 0,95.
@@ -3398,11 +3403,19 @@ l'encadré qui suit.
     compte comme un rejet. Tests par cellule, à $a = 1{,}5 \cdot 10^{-4}/K$
     chacun~: Poisson, $D_x \in [\text{qpois}(a/2, \lambda_x),
     \text{qpois}(1 - a/2, \lambda_x)]$~; produit-limite, $|z_x| \le
-    \Phi^{-1}(1 - a/2)$, de cible $1 - e^{-\mu_{d,x}}$. Tests globaux, à
+    \Phi^{-1}(1 - a/2)$, de cible $1 - e^{-\mu_{d,x}}$, et non la cible
+    exacte $q^{*}_x$ sur la grille des jours~: l'écart relatif, de l'ordre
+    de $-\mu_r/(2L)$, vaut environ $-7 \cdot 10^{-5}$ (rachat 0,05), négligeable
+    devant l'erreur d'estimation par cellule. Tests globaux, à
     $10^{-4}$ chacun, $|z| \le \Phi^{-1}(1 - 5 \cdot 10^{-5})$~: Poisson
     signé, $\sum (D - \lambda)/\sqrt{\sum (1 + \mu^{*}/365)\lambda}$, dont la
-    variance est exacte (scores de cellules disjointes non corrélés, preuve
-    écrite de la spécification)~; produit-limite, $\sum_x z_x/\sqrt{K}$. Pas
+    variance est exacte à $L$ fixé (scores de cellules disjointes non
+    corrélés, preuve écrite de la spécification)~; produit-limite,
+    $\sum_x z_x/\sqrt{K}$. \emph{Approximation}~: $\mu^{*}$, donc $\lambda_x$,
+    et la variance du test signé sont calculés à $L = 365$ pour toutes les
+    cellules, y compris celles de 366~jours~; l'écart relatif de $\mu^{*}$
+    est alors au plus $9{,}6 \cdot 10^{-7}$, sans effet pratique sur les
+    régions. Pas
     de test binomial~: sa cible n'est pas $q$, et l'écart entre les deux
     définitions de l'exposition initiale y est indétectable à cet effectif.
   \item \textbf{C3, couverture des intervalles}~: une simulation de
@@ -3517,7 +3530,7 @@ C2 par cellule & $2 \times K$, à $1{,}5 \cdot 10^{-4}/K$ & $3{,}0 \cdot 10^{-4}
 C2 globaux & 2, à $10^{-4}$ & $2{,}0 \cdot 10^{-4}$ & nominale asymptotique \\
 C3a & 4, à $3 \cdot 10^{-5}$ & $1{,}2 \cdot 10^{-4}$ & exacte \\
 C3b & 6, à $2 \cdot 10^{-5}$ & $1{,}2 \cdot 10^{-4}$ & bornée exactement \\
-Total & 190 & $9{,}8 \cdot 10^{-4} \le 10^{-3}$ & dont exacte ou bornée exactement au plus $4{,}15 \cdot 10^{-4}$, nominale asymptotique $5{,}2 \cdot 10^{-4}$ \\
+Total & 190 & $9{,}8 \cdot 10^{-4} \le 10^{-3}$ & dont exacte ou bornée exactement au plus $4{,}16 \cdot 10^{-4}$ (somme calculée par le test~: $4{,}153 \cdot 10^{-4}$), nominale asymptotique $5{,}2 \cdot 10^{-4}$ \\
 \end{longtable}
 }
 
@@ -3555,6 +3568,10 @@ $q$, spécification, A.4)~: sa garantie est le cas K
   \item \emph{Approximations numériques}~: quantiles binomiaux et de Poisson,
     seuils $t$ de la borne exponentielle (arrondis vers l'extérieur et
     vérifiés), convolution par transformée de Fourier.
+  \item \emph{Approximations de la cible} (C2), d'écart relatif écrit~: le
+    produit-limite comparé à $1 - e^{-\mu_d}$ plutôt qu'à $q^{*}$ (environ
+    $-7 \cdot 10^{-5}$), $\mu^{*}$ et la variance du test signé calculés à
+    $L = 365$ pour toutes les cellules (au plus $9{,}6 \cdot 10^{-7}$).
   \item \emph{Constat de simulation}~: le passage des tests sous les graines
     déclarées.
   \item \emph{Erreur Monte-Carlo}~: en C3, la dispersion du nombre
@@ -4247,13 +4264,14 @@ $\mathcal{B}(n, p)$, $p$ étant la probabilité de l'événement dans l'année.
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{Région d'acceptation}~: bilatérale exacte,
     $[\text{qbinom}(\alpha_k/2, n, p), \text{qbinom}(1 - \alpha_k/2, n, p)]$.
-  \item \textbf{Correction multiple}~: Bonferroni, $\alpha = 10^{-3}$ global,
-    $K = 5$, $\alpha_k = 2\cdot 10^{-4}$.
+  \item \textbf{Correction multiple}~: partage égal du niveau, justifié par
+    l'inégalité de l'union, $\alpha = 10^{-3}$ global, $K = 5$, $\alpha_k =
+    2\cdot 10^{-4}$.
   \item \textbf{Fausse alarme exacte} de chaque test~:
     $FA_k = P(D < \text{lo}) + P(D > \text{hi})$, calculée et écrite par le
     test.
   \item \textbf{Fausse alarme familiale}~: elle est bornée par
-    $\sum_k FA_k = 9{,}857\cdot 10^{-4} \le 10^{-3}$ (inégalité de Bonferroni,
+    $\sum_k FA_k = 9{,}857\cdot 10^{-4} \le 10^{-3}$ (inégalité de l'union,
     valable \emph{sans hypothèse d'indépendance}~; c'est le critère vérifié).
     Sous indépendance des cinq cohortes, tirées sous des graines distinctes
     (20261016 à 20261020), elle vaut $1 - \prod_k (1 - FA_k) = 9{,}853\cdot
@@ -4303,7 +4321,7 @@ batterie à chaque exécution~; elles ne sont pas reproduites ici (E3.4).
   \item \emph{Résultats exacts}~: la formule de $q_x$ de Gompertz-Makeham
     (intégrale de $\mu$), la forme close $q^{(d)}$, la loi binomiale de $D$
     sous le modèle, les régions d'acceptation et les $FA_k$ (quantiles et
-    probabilités de la loi binomiale), l'inégalité de Bonferroni, la
+    probabilités de la loi binomiale), l'inégalité de l'union, la
     fausse alarme familiale $1 - \prod_k (1 - FA_k)$, sous l'hypothèse
     d'indépendance des cohortes (hypothèse sur le générateur, non
     démontrée), la conservation de la probabilité annuelle par la conversion
