@@ -1250,7 +1250,12 @@ produite hors de la CI.
     en trop, type, longueur) est structurel et fait échouer le plan.
   \item \textbf{Valeurs, élément par élément}~: deux éléments sont égaux
     s'ils sont identiques (\code{Inf}, 0, \code{NA} et \code{NaN} compris,
-    sans confondre \code{NA} et \code{NaN})~; sinon, deux valeurs finies, non
+    sans confondre \code{NA} et \code{NaN}~; $\pm 0$ confondus par la
+    représentation canonique, qui écrit $x + 0$, soit \code{0} pour
+    \code{-0}, et par l'égalité \code{==} de la comparaison, ce qui est
+    voulu~: aucune grandeur du moteur ne porte de sens par le signe d'un
+    zéro~; ADR 0009, complément du 18/10/2026, point~(e))~; sinon, deux
+    valeurs finies, non
     nulles, de même signe, sont égales à la tolérance $\tau$ de la grandeur
     si $|a - b| \le \tau \max(|a|, |b|)$~; tout autre cas est un écart.
     Cette règle, symétrique et relative, est propre aux références~;
@@ -1259,11 +1264,21 @@ produite hors de la CI.
 
 \noindent
 Les grandeurs de type entier, logique, chaîne, date et les lignes de
-structure sont exactes par leur type~: c'est le cas du nombre des
-avertissements, stocké en \code{integer}, si bien qu'aucune clé de tolérance
-ne le couvre et qu'un retour au type \code{double} serait relevé deux fois,
-comme écart structurel de type et comme double sans classe (ADR 0009,
-quatrième annotation du 17/10/2026). Un double reçoit sa tolérance de la
+structure sont exactes par leur type, sans clé de tolérance~: c'est le cas
+du nombre des avertissements, stocké en \code{integer}, si bien qu'un retour
+au type \code{double} serait relevé deux fois, comme écart structurel de
+type et comme double sans classe (ADR 0009, quatrième annotation du
+17/10/2026)~; c'est aussi le cas de la version de la fiche, de la graine, des
+colonnes entières de \code{kaplan\_meier\_sauts} (\code{numerateur},
+\code{ensemble\_a\_risque}), de \code{kaplan\_meier/instants\_evenement}, de
+\code{denominateur\_instants} (paramètres et fiche) et des cinq diagnostics
+de \code{kaplan\_meier}, toutes stockées en \code{integer}. Les douze clés
+exactes qui les nommaient dans \code{TOLERANCES} sont retirées~: inertes, la
+tolérance n'étant cherchée que pour un double, elles auraient en outre
+masqué un retour au type \code{double} au contrôle de complétude des classes
+(ADR 0009, complément du 18/10/2026, point~(f), sur avis
+d'\code{actuary}). La clé nue \code{cellules} reste~: elle classe
+\code{etapes/exposition/diagnostics/cellules}, de type \code{double}. Un double reçoit sa tolérance de la
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), cherchée par le
 \textbf{suffixe le plus long} du chemin~: une clé qualifiée
 \code{<table>/<colonne>} l'emporte sur le nom nu, ce qui donne au \code{taux}
@@ -1279,7 +1294,8 @@ d'\code{actuary}.
 \begin{longtable}{@{}p{1.4cm}p{7.6cm}p{5.6cm}@{}}
 \caption{Classes de tolérance des doubles (\code{TOLERANCES},
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
-ADR 0009, point 3.4 et seconde annotation).}
+ADR 0009, point 3.4, seconde annotation et complément du 18/10/2026,
+point~(f)).}
 \label{tab:tolerances}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Classe}} &
@@ -1291,7 +1307,7 @@ ADR 0009, point 3.4 et seconde annotation).}
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{exposition\_jours}, \code{cellules}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif}, \code{version\_fiche}, \code{graine}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{numerateur}, \code{kaplan\_meier\_sauts/}\allowbreak\code{ensemble\_a\_risque}, \code{kaplan\_meier/}\allowbreak\code{instants\_evenement}, \code{denominateur\_instants} (paramètres et fiche) et les cinq diagnostics de \code{kaplan\_meier} & valeurs entières ou déclarées~: aucun bruit possible \\
+exacte & \code{exposition\_jours}, \code{cellules}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
 $10^{-14}$ & \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}, \code{exposition\_initiale}, \code{taux}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
 $10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (hypothèse non mesurée) \\
 \end{longtable}
@@ -1387,6 +1403,10 @@ changement de valeur, visé, étant admis~; ADR 0009, annotation du
     identiques au bit près~; la réserve de
     l'ADR 0008 sur les variantes de la bibliothèque mathématique du système
     d'un processeur à l'autre reste ouverte, non mesurée.
+  \item Le signe d'un zéro~: la représentation canonique et la comparaison
+    confondent 0 et \code{-0}, si bien qu'un passage de l'un à l'autre n'est
+    pas détecté (limite admise~; aucune grandeur actuelle n'en dépend~;
+    ADR 0009, complément du 18/10/2026, point~(e)).
 \end{itemize}
 \end{encadre}
 
