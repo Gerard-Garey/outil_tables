@@ -60,7 +60,7 @@ PARAMETRES_ETAPES <- list(
     domaine = c(paste("sous-ensemble non vide, sans doublon ni NA, de poisson, binomial et kaplan_meier ;",
                       "binomial et kaplan_meier refusés sous par_annee = TRUE ; résultats dans l'ordre",
                       "canonique"),
-                "nombre unique, fini, 0 < niveau < 1"),
+                "nombre double unique, sans attribut, fini, 0 < niveau < 1"),
     stringsAsFactors = FALSE)
 )
 
