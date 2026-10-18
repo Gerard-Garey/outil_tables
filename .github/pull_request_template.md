@@ -10,7 +10,7 @@ Closes #
 
 ## Escalades, relances et arrêts
 
-<!-- « Aucune », ou une ligne par escalade, relance ciblée ou arrêt (docs/agents/routage.md, § 7) : fiche / modèle / critère déclenché / statut obtenu / suite. -->
+<!-- « Aucune », ou une ligne par escalade, relance ciblée ou arrêt (docs/agents/routage.md, § 7), et par emploi de coder-approfondi hors circuits 1 et 2 ou passage de coder-approfondi à l'effort high (§ 10) : fiche / modèle / critère déclenché / statut obtenu / suite. -->
 
 ## Contrôles
 
