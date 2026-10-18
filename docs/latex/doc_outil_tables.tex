@@ -237,7 +237,7 @@ le vocabulaire est celui du glossaire du projet (\code{CONTEXT.md}).
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Élément}} & \textcolor{financeblue}{\textbf{Référence}} \\
 Cahier des charges & \code{docs/exigences.md} (exigences E1.1 à E5.5) \\
-Décisions d'architecture & \code{docs/adr/} (ADR 0002 à 0008) \\
+Décisions d'architecture & \code{docs/adr/} (ADR 0002 à 0009) \\
 Moteur de calcul & package \code{tablexp} (\code{R/}), packages de priorité
 \code{base} seulement (ADR 0002) \\
 Interface & \code{app/app.R}, \code{app/affichage.R} (à venir~; aucun calcul) \\
@@ -692,8 +692,8 @@ ce n'est pas une propriété démontrée. L'identité entre deux machines n'est
 dernier bit, même dans le même conteneur, si la bibliothèque mathématique
 du système choisit ses variantes de calcul selon le processeur (hypothèse de
 l'ADR 0008, non mesurée). C'est pourquoi les références de non-régression
-seront comparées à tolérance et produites sur une plateforme unique
-(section~\ref{sec:plateforme}).
+sont produites sur une plateforme unique et comparées à tolérance
+(sections~\ref{sec:plateforme} et~\ref{sec:non-regression}).
 \end{encadre}
 
 \subsection{Générateur fixé}
@@ -782,7 +782,9 @@ Deux fichiers de tests portent ces propriétés (section~\ref{sec:batteries})~:
     couvrent les trois réglages du générateur (\code{runif()}, \code{rnorm()},
     \code{sample.int()})~; le processus fils les écrit en \code{\%.17g}, format
     qui restitue un double au bit près. La même batterie vérifie le simulateur
-    et la construction (sections~\ref{sec:simulation} et~\ref{sec:rapport}).
+    et la construction (sections~\ref{sec:simulation} et~\ref{sec:rapport})
+    et compare les plans de référence à leurs références de non-régression
+    (section~\ref{sec:non-regression}).
 \end{itemize}
 
 \noindent
@@ -817,7 +819,8 @@ et dans le job «~Tests (R 4.3.3)~» de la CI~; un script le contrôle
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{installe l'arbre de travail} dans une bibliothèque temporaire
     (\code{R CMD INSTALL -{}-no-docs -l <bibliothèque> <racine>}, par
-    \code{installer\_tablexp()}), sans installer aucun autre package, puis
+    \code{installer\_tablexp()}, sous une locale UTF-8~: section~\ref{sec:harnais}),
+    sans installer aucun autre package, puis
     charge \code{tablexp} depuis elle et échoue s'il est chargé d'ailleurs~:
     c'est le code de l'arbre qui est testé, jamais un package installé
     auparavant~;
@@ -842,12 +845,15 @@ n'a aucun rôle dans les résultats.
 \medskip
 \textbf{\code{tests/test\_unitaires.R}} exécute chaque fichier
 \code{tests/unitaires/test\_*.R}, triés par nom, chacun dans son
-propre environnement~; \code{quit()}, \code{q()} et \code{bilan()} y sont
+propre environnement, où il est lu par \code{parse(encoding = "UTF-8")} puis
+évalué, si bien que ses littéraux non ASCII sont marqués UTF-8 quelle que soit
+la locale de la session (décision M54)~; \code{quit()}, \code{q()} et
+\code{bilan()} y sont
 neutralisés, une erreur au chargement d'un fichier est un échec, et un fichier
 sans aucune assertion aussi. \textbf{\code{tests/test\_reproductibilite.R}}
 vérifie les identités de la section~\ref{sec:verifications-alea}, puis celles du
-simulateur et de la construction~; la comparaison aux références de
-non-régression s'y ajoutera avec la branche qui les crée.
+simulateur et de la construction, et compare les plans de référence à leurs
+références de non-régression (section~\ref{sec:non-regression}).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -905,6 +911,27 @@ point~d)~:
 \end{itemize}
 
 \noindent
+\textbf{Locale de l'installation} (décision M54~; ADR 0007, annotation du
+17/10/2026). Un package installé sous une locale qui n'est pas UTF-8 garde ses
+littéraux non ASCII non marqués, qu'une conversion vers UTF-8 dénature dans
+une session de même locale (constat consigné par l'ADR 0007)~; les chaînes du
+moteur entrent dans la fiche et dans les références de non-régression. Si la
+session n'est pas en UTF-8, \code{installer\_tablexp()} lance donc
+\code{R CMD INSTALL} sous la première locale UTF-8 disponible parmi
+\code{C.UTF-8}, \code{C.utf8} et \code{en\_US.UTF-8}
+(\code{locale\_installation()}), et échoue s'il n'y en a aucune~; la locale
+d'exécution des batteries reste libre. Après le chargement, une sonde
+(\code{sonde\_utf8()}) vérifie qu'un littéral non ASCII du moteur, la
+constante \code{STATUT\_EMPREINTES\_NON\_CALCULEES}, est de l'UTF-8 valide et
+inchangé par la conversion~; sinon la batterie échoue. Limite admise~: une
+installation hors UTF-8 sous une session UTF-8 passe la sonde, sans effet sur
+les résultats (constat de l'audit consigné par l'ADR 0007~: le plan de
+référence R1 aplati sous les deux locales donne le même fichier). La sonde ne
+protège que les batteries~: une garde au chargement du package, pour tout
+usage, est l'objet de l'issue~\#25.
+
+\medskip
+\noindent
 Une \textbf{garde de sortie} (\code{.Last()}) fait sortir avec le code~1 tout
 processus qui a chargé le harnais et se termine avant la ligne de bilan, même
 par \code{quit(status = 0)}. Le harnais est lui-même testé
@@ -926,7 +953,7 @@ et la probabilité de fausse alarme (\code{CONTEXT.md}~; E2.19).
 \subsection{Plateforme de référence}
 \label{sec:plateforme}
 
-Les références de non-régression, qui viendront avec la deuxième branche, sont
+Les références de non-régression (section~\ref{sec:non-regression}) sont
 produites et comparées sur une \emph{plateforme de référence} unique (E4.7~;
 ADR 0008)~: le job de la CI s'exécute dans un \textbf{conteneur
 \code{rocker/r-ver:4.3.3} épinglé par empreinte}, dont R charge la \textbf{BLAS
@@ -999,8 +1026,9 @@ Dans les deux modes, il écrit l'\emph{identifiant de plateforme} (image,
 consigne sans faire échouer le processeur et ses drapeaux (\code{fma},
 \code{avx2}, \code{avx512f}), \code{ImageOS} et \code{ImageVersion} de l'hôte,
 \code{LC\_COLLATE}, le fuseau horaire, la présence d'un exécutable
-\code{java} et \code{GITHUB\_SHA}. Ce bloc sera reporté dans le message de
-chaque commit de référence.
+\code{java} et \code{GITHUB\_SHA}. Ce bloc est reporté dans le message de
+chaque commit de référence et dans l'en-tête de chaque fichier de référence
+(section~\ref{sec:non-regression}).
 
 \begin{encadre}
 \small
@@ -1009,8 +1037,8 @@ d'une exécution à l'autre sous le même libellé d'exécuteur (relevé de l'AD
 0008, annotation du 16/10/2026). La BLAS Netlib n'a pas de noyau choisi selon
 le processeur~; la réserve sur la bibliothèque mathématique du système
 (section~\ref{sec:reproductibilite-exigence}) reste en revanche ouverte, non
-mesurée. Les références seront donc comparées à tolérance, structure contrôlée
-à part (E4.7).
+mesurée. Les références sont donc comparées à tolérance, structure contrôlée
+à part (E4.7~; section~\ref{sec:non-regression}).
 \end{encadre}
 
 \subsection{Jobs de la CI}
@@ -1069,6 +1097,300 @@ scripts des jobs conteneurisés ne dépendent pas de git, absent de l'image~;
 un contrôle qui lit l'historique reste dans «~Contrôles du dépôt~», sur l'hôte
 (ADR 0008, point 11).
 
+\subsection{Références de non-régression}
+\label{sec:non-regression}
+
+Une \emph{référence de non-régression} fige, sur la plateforme de référence,
+ce que le moteur rend pour un \emph{plan de référence} appliqué à l'\emph{entrée
+de référence}~; toute modification ultérieure qui change une grandeur est
+détectée par la batterie de reproductibilité et appelle un tableau avant /
+après et un visa (E4.7~; ADR 0009, accepté le 17/10/2026, décision M52, et
+ses annotations). L'outillage, en R de base, est sous \code{tests/reference/}~:
+\code{outils\_reference.R} (aplatissement, écriture, lecture, comparaison,
+tolérances, plans et entrée), \code{produire\_references.R} (script du
+workflow de production) et \code{comparer\_references.R} (comparaison de deux
+fichiers en ligne de commande).
+
+\subsubsection*{Ce qui est figé}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \sloppy \textbf{L'objet \code{construction} entier}, aplati, \textbf{moins}
+    \code{execution} (jamais écrit), \code{fiche\$versions} et
+    \code{fiche\$plateforme}, écrits dans l'en-tête du fichier et jamais
+    comparés~: une montée de version de \code{tablexp} n'est pas un
+    changement de résultat. \code{fiche\$version\_fiche}, le plan et les
+    rôles sont comparés~: le plan de référence est lui-même une grandeur.
+  \item \sloppy \textbf{Les tables de lignes de l'étape \code{donnees}}
+    (\code{lignes\_conservees}, \code{numeros\_conserves},
+    \code{lignes\_exclues}, \code{observations},
+    \code{observation\_des\_lignes}~; constante
+    \code{RESUMES\_PAR\_EMPREINTE}) sont \textbf{résumées} par leur nombre de
+    lignes et l'empreinte MD5 de leur représentation canonique (colonnes
+    écrites par \code{colonne\_canonique()}, section~\ref{sec:empreinte}),
+    non recopiées~: elles ne contiennent que des entiers, des dates et des
+    chaînes, sans arithmétique flottante, si bien que le résumé exact ne perd
+    aucune détection, et la table «~avant~» se reconstitue en rejouant le plan
+    sur le commit de référence. Les attributs autres que les noms, la classe
+    et les noms de lignes n'y entrent pas.
+  \item \textbf{Première grandeur}~: l'empreinte des données
+    (\code{fiche/empreintes/donnees}), qui identifie l'entrée.
+\end{itemize}
+
+\noindent
+\textbf{Entrée de référence} (décision M50, Q6~; ADR 0009, point 4.1)~: un
+jeu tiré par \code{simuler\_portefeuille()} sous la loi vraie des tests
+(Gompertz-Makeham $A = 2 \cdot 10^{-4}$, $B = 2{,}5 \cdot 10^{-5}$,
+$c = 1{,}1$, facteurs H 1 et F 0,6~; rachat constant 0,05), portefeuille
+uniforme de $10^{5}$ contrats, proportion d'hommes 0,5, âges 20 à 75,
+origine 2005-01-01, période 2015-01-01 au 2024-12-31, graine 20261016
+(constante \code{GRAINE\_REFERENCE}), rôles \code{id\_contrat},
+\code{id\_tete}, \code{sexe}, \code{date\_naissance}, \code{date\_entree},
+\code{date\_sortie}, \code{cause\_sortie}. Le simulateur est ainsi figé pour
+cette graine~: une modification qui change le jeu tiré change l'empreinte et
+met toutes les références en «~entrée différente~».
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{0.6cm}p{2.8cm}p{1.4cm}p{0.9cm}p{3.2cm}p{1.2cm}p{2.6cm}@{}}
+\caption{Plans de référence (\code{plans\_reference} de
+\code{tests/reference/outils\_reference.R}~; tous sur la période de l'entrée,
+sans exclusion~; un identifiant n'est jamais réemployé).}
+\label{tab:plans-reference}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Id}} &
+\textcolor{financeblue}{\textbf{Description}} &
+\textcolor{financeblue}{\textbf{Segm.}} &
+\textcolor{financeblue}{\textbf{Délai}} &
+\textcolor{financeblue}{\textbf{Convention}} &
+\textcolor{financeblue}{\textbf{Par année}} &
+\textcolor{financeblue}{\textbf{Estimateurs, niveau}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Id}} &
+\textcolor{financeblue}{\textbf{Description}} &
+\textcolor{financeblue}{\textbf{Segm.}} &
+\textcolor{financeblue}{\textbf{Délai}} &
+\textcolor{financeblue}{\textbf{Convention}} &
+\textcolor{financeblue}{\textbf{Par année}} &
+\textcolor{financeblue}{\textbf{Estimateurs, niveau}} \\
+\endhead
+R1 & vivant $\to$ décédé, référence principale & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
+R2 & sans segmentation, délai, niveau 0,99 & aucune & 90 & \code{plus\_fine} & non & Poisson, binomial~; 0,99 \\
+R3 & convention forcée & \code{sexe} & 0 & \code{age\_atteint\_annee} & non & Poisson, binomial~; 0,95 \\
+R4 & par année (surface) & \code{sexe} & 0 & \code{plus\_fine} & oui & Poisson~; 0,95 \\
+R5 & en cours $\to$ racheté, unité contrat & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
+R6 & R1 avec l'estimateur produit-limite & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial, \code{kaplan\_meier}~; 0,95 \\
+\end{longtable}
+}
+
+\subsubsection*{Format des fichiers}
+
+Un fichier texte par plan, \code{tests/reference/<id>.tsv}, en UTF-8, lignes
+terminées par LF, écrit octet par octet~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \sloppy un \textbf{en-tête} de lignes \code{\# <clé> : <valeur>}, hors
+    comparaison~: version du format (\code{tablexp reference 1}),
+    identifiant et description du plan, identifiant de plateforme écrit par
+    \code{tests/controles/}\allowbreak\code{plateforme.R} (grandeurs contrôlées et grandeurs
+    consignées), \code{fiche\$versions} et \code{fiche\$plateforme}, commit
+    calculé, exécution et adresse, mode, date UTC, empreinte des données en
+    rappel~;
+  \item un \textbf{corps} d'une ligne par vecteur atomique,
+    \code{chemin<TAB>type<TAB>}\allowbreak\code{longueur<TAB>valeurs}, dans l'ordre de
+    parcours de l'objet~; le chemin joint les noms par \code{/}
+    (\code{etapes/brut/resultat/poisson/taux})~;
+  \item des \textbf{lignes de structure}~: \code{@noms} de chaque liste et
+    de chaque vecteur atomique nommé, \code{@colonnes} et \code{@lignes} de
+    chaque \code{data.frame}, \code{@classe} de l'objet, \code{@lignes} et
+    \code{@empreinte} d'une table résumée~;
+  \item des \textbf{types} \code{double}, \code{integer}, \code{logical},
+    \code{character}, \code{Date}, \code{factor}, \code{NULL}, aux valeurs
+    écrites selon la représentation canonique de l'empreinte
+    (section~\ref{sec:empreinte})~: doubles en \code{\%.17g}, chaînes
+    échappées entre guillemets, sous la même règle de codage, par
+    \textbf{refus} et jamais par conversion~;
+  \item des \textbf{refus d'écriture}, avec le chemin fautif, pour toute
+    autre classe (\code{POSIXct}, \code{difftime}\ldots), tout attribut
+    autre que les noms, la classe et les noms de lignes, et des noms de
+    lignes non automatiques~: rien n'est converti ni ignoré en silence. Les
+    niveaux d'un facteur ne sont pas écrits (limite sans portée~: l'objet
+    n'en contient aucun~; en ajouter demanderait une version 2 du format).
+\end{itemize}
+
+\noindent
+\textbf{Lecture}~: en R de base, sans évaluation de code. La lecture des
+doubles dépend de la plateforme. \emph{Hors Windows}, plateforme de référence
+comprise, le texte lu doit être égal à l'écriture \code{\%.17g} de la valeur
+lue~: la bibliothèque C du système arrondissant correctement, c'est une
+\textbf{preuve d'aller-retour}. \emph{Sous Windows}, le texte doit seulement
+avoir la forme de \code{\%.17g}~: l'écriture du système n'y arrondit pas
+toujours correctement le dix-septième chiffre, et la lecture n'y rend pas
+toujours le double désigné (constats sur le poste du mainteneur, ADR 0009,
+annotation du 18/10/2026)~; une comparaison exécutée sous Windows est donc un
+\textbf{constat de mesure}, non une preuve, et une référence n'est jamais
+produite hors de la CI.
+
+\subsubsection*{Comparaison et tolérances}
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Entrée, d'abord}~: l'empreinte des données, exigée des deux
+    côtés, est comparée en premier~; si elle diffère, le plan est en échec
+    «~entrée différente~», et la comparaison se poursuit et s'imprime sous
+    cette mention, ses écarts n'étant pas interprétables comme un tableau
+    avant / après.
+  \item \textbf{Structure, exacte}~: même ensemble de chemins, mêmes types et
+    longueurs, mêmes positions des \code{NA}~; tout écart (chemin manquant,
+    en trop, type, longueur) est structurel et fait échouer le plan.
+  \item \textbf{Valeurs, élément par élément}~: deux éléments sont égaux
+    s'ils sont identiques (\code{Inf}, 0, \code{NA} et \code{NaN} compris,
+    sans confondre \code{NA} et \code{NaN})~; sinon, deux valeurs finies, non
+    nulles, de même signe, sont égales à la tolérance $\tau$ de la grandeur
+    si $|a - b| \le \tau \max(|a|, |b|)$~; tout autre cas est un écart.
+    Cette règle, symétrique et relative, est propre aux références~;
+    \code{proche()} reste celle des tests unitaires.
+\end{enumerate}
+
+\noindent
+Les grandeurs de type entier, logique, chaîne, date et les lignes de
+structure sont exactes par leur type~; un double reçoit sa tolérance de la
+table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), cherchée par le
+\textbf{suffixe le plus long} du chemin~: une clé qualifiée
+\code{<table>/<colonne>} l'emporte sur le nom nu, ce qui donne au \code{taux}
+de \code{kaplan\_meier} une autre classe qu'au \code{taux} de Poisson ou du
+binomial sans changer le nom commun de la colonne. \textbf{Un double sans
+classe déclarée fait échouer la comparaison}~: une grandeur nouvelle reçoit
+sa classe d'\code{actuary} avant d'entrer dans une référence, et toute
+modification de la table est annotée dans l'ADR 0009, datée, avec l'avis
+d'\code{actuary}.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{1.4cm}p{7.6cm}p{5.6cm}@{}}
+\caption{Classes de tolérance des doubles (\code{TOLERANCES},
+\code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
+ADR 0009, point 3.4 et seconde annotation).}
+\label{tab:tolerances}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Classe}} &
+\textcolor{financeblue}{\textbf{Grandeurs}} &
+\textcolor{financeblue}{\textbf{Justification}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Classe}} &
+\textcolor{financeblue}{\textbf{Grandeurs}} &
+\textcolor{financeblue}{\textbf{Justification}} \\
+\endhead
+exacte & \code{exposition\_jours}, \code{cellules}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif}, \code{version\_fiche}, \code{graine}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{numerateur}, \code{kaplan\_meier\_sauts/}\allowbreak\code{ensemble\_a\_risque}, \code{kaplan\_meier/}\allowbreak\code{instants\_evenement}, \code{denominateur\_instants} (paramètres et fiche) et les cinq diagnostics de \code{kaplan\_meier} & valeurs entières ou déclarées~: aucun bruit possible \\
+$10^{-14}$ & \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}, \code{exposition\_initiale}, \code{taux}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
+$10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (hypothèse non mesurée) \\
+\end{longtable}
+}
+
+\noindent
+Les tolérances restent plusieurs ordres de grandeur sous le plus petit
+changement significatif estimé par \code{actuary} (un jour d'exposition dans
+la cellule la plus exposée, un événement de plus~; ADR 0009, point 3.4).
+\textbf{Impression}, pour chaque plan, dans la batterie comme dans le
+workflow~: une ligne de bilan (grandeurs comparées, identiques, à écart sous
+tolérance, en écart, écarts structurels)~; l'écart relatif maximal observé
+par classe, toujours imprimé, même nul~; une ligne par grandeur dont l'écart
+n'est pas nul, avec sa position et les valeurs avant et après en
+\code{\%.17g}. Ces lignes sont la matière du tableau avant / après~;
+\code{comparer\_references.R} produit la même impression à partir de deux
+fichiers.
+
+\subsubsection*{Batterie, production et commit}
+
+\textbf{Dans la batterie} (\code{tests/test\_reproductibilite.R}, job «~Tests
+(R 4.3.3)~», donc sur la plateforme de référence)~: le jeu est tiré une fois,
+chaque plan de référence est exécuté, aplati, écrit puis relu
+(aller-retour \code{identical()}), et comparé à son fichier~; un plan sans
+fichier est un échec attendu renvoyant à l'issue de création tant qu'il
+figure dans la liste \code{SANS\_REFERENCE\_17}, vide depuis la création
+des six fichiers~; hors de cette liste, un fichier manquant est un échec, de
+même qu'un fichier sans plan (référence orpheline). Des témoins, sur des
+copies temporaires et jamais sur \code{tests/reference/}, vérifient que la
+comparaison échoue quand elle le doit (valeur altérée au-delà de sa
+tolérance, grandeur retirée ou ajoutée, type ou longueur changés, empreinte
+altérée ou absente, double sans classe, classe ou attribut interdits), qu'une
+valeur altérée juste en deçà de sa tolérance passe, et que les chaînes non
+ASCII font
+l'aller-retour au bit près sous les locales C et UTF-8, l'aplatissement de R1
+donnant les mêmes octets sous les deux.
+
+\medskip
+\textbf{Production}, par le workflow \code{.github/workflows/references.yml},
+distinct de \code{ci.yml}~: déclenché à la main seulement
+(\code{workflow\_dispatch}), sur ordre du mainteneur, droits en lecture
+seule, sans secret, dans le même conteneur épinglé que le job «~Tests
+(R 4.3.3)~», avec la même étape de bascule vers la BLAS et la LAPACK de
+référence et le script de plateforme en mode strict avant toute production
+(invariants contrôlés par \code{tests/controles/identite\_batteries.R},
+contrôle~4). Le script \code{produire\_references.R} produit et compare
+toujours tous les plans~; le \textbf{mode} fixe ce qui est admis~:
+\code{creation} (aucun fichier existant pour les plans visés, comparaison
+réussie pour les autres), \code{regeneration} (écarts admis sur les seuls
+plans visés), \code{bascule} (écarts admis sur tous, l'identifiant de
+plateforme de l'exécution devant différer de celui des en-têtes commités)~;
+un mode \code{releve}, refusé sur la CI, sert aux essais sur un poste, dont
+les fichiers ne sont jamais commités. Le dossier de sortie ne peut être
+\code{tests/reference/} ni s'y trouver, quelle que soit l'écriture du chemin
+(séparateurs, casse, lecteur, chemins réseau, liens, noms courts).
+Le job ne commite rien~: il publie un artefact (références, leurs MD5,
+identifiant de plateforme, exécution, écarts), conservé 90~jours. La session
+principale seule, après visa (\code{actuary} pour les taux bruts~;
+mainteneur dès qu'une table finale ou un verdict change), vérifie les MD5,
+copie les fichiers sans modification et les commite avec l'identifiant de
+plateforme, le tableau avant / après et le visa.
+
+\medskip
+\textbf{Références existantes}~: R1 à R6, créées le 18/10/2026 en mode
+\code{creation} (exécution 39140635363 du workflow, commit \code{1019d8e},
+visa d'\code{actuary}). Les grandeurs des étapes \code{donnees} et
+\code{exposition} sont rattachées à l'état de la première branche
+(\code{f9ab269}) par une chaîne de mesures (différences de code vides, ou
+objets \code{identical()} hors \code{execution}, un changement de type sans
+changement de valeur, visé, étant admis~; ADR 0009, annotation du
+18/10/2026).
+
+\begin{encadre}
+\small
+\textbf{Ce que les références ne couvrent pas.}
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
+  \item La couverture est celle des plans~: une recette ou une convention
+    absente des plans n'est protégée qu'à partir du plan qui l'introduira.
+    En particulier, l'estimateur \code{kaplan\_meier} n'est figé que sous
+    \code{dernier\_anniversaire} (R6)~; sa branche \code{age\_atteint\_annee}
+    n'a pas de référence (avis d'\code{actuary} au visa).
+  \item L'entrée n'exerce pas la fusion des contrats par tête~: le
+    simulateur minimal tire une tête par contrat
+    (section~\ref{sec:simulation}). La fusion n'est couverte que par les
+    tests unitaires (section~\ref{sec:verifications-donnees}).
+  \item R6 comprend une cellule définie à $\hat q_x = 1$ avec un seul exposé
+    à risque~: la référence fige ce cas d'instabilité de l'estimateur
+    produit-limite sous troncature (section~\ref{sec:brut-kaplan-meier}),
+    qui n'est pas une anomalie.
+  \item Absence de bruit numérique sur la plateforme de référence~:
+    \emph{constat} sur deux exécutions de la plateforme de référence, sur le
+    même modèle de processeur, où toutes les grandeurs des six plans sont
+    identiques au bit près~; la réserve de
+    l'ADR 0008 sur les variantes de la bibliothèque mathématique du système
+    d'un processeur à l'autre reste ouverte, non mesurée.
+\end{itemize}
+\end{encadre}
+
+\noindent
+\textbf{Règles durables} (ADR 0009, point 9). Ajouter une grandeur à l'objet
+résultat est visible par la non-régression (écart structurel «~en trop~»)~:
+les plans concernés sont régénérés, avec un tableau avant / après où les
+lignes nouvelles sont marquées «~création~», et la classe de tolérance d'un
+double nouveau est déclarée dans le même commit. Changer le format incrémente
+sa version et régénère tous les plans. Élargir une tolérance pour faire
+passer un écart est interdit sans tableau avant / après et visa. Un fichier de
+\code{tests/reference/} ne change que par un commit de la session principale
+qui cite une exécution du workflow et un visa.
+
 % =============================================================================
 \section{Contrôles du dépôt}
 \label{sec:controles-depot}
@@ -1113,8 +1435,9 @@ interdits (section~\ref{sec:graphe}) & ADR 0007, points 2.1 à 2.3 \\
 «~Batterie~:~» du job «~Tests (R 4.3.3)~»~; ce job ne porte ni
 \code{continue-on-error}, ni condition \code{if:} de job, et une étape de
 batterie n'a pas d'autre condition que \code{\$\{\{ !cancelled() \}\}}~; une
-seule chaîne d'image dans tous les workflows & \code{CLAUDE.md}~; ADR 0008,
-point 1 \\
+seule chaîne d'image dans tous les workflows~; invariants du workflow
+\code{references.yml} (contrôle~4, section~\ref{sec:non-regression}) &
+\code{CLAUDE.md}~; ADR 0008, points 1 et 8~; ADR 0009, point 6 \\
 \code{plateforme.R} & plateforme de référence (section~\ref{sec:plateforme}) &
 ADR 0008, points 3 à 5 \\
 \code{absence\_java.R} & aucune dépendance à Java
@@ -2937,7 +3260,7 @@ n'est chargé par aucune batterie.
 l'étape \code{brut} est \code{identical()} hors \code{execution} dans le même
 processus et dans un autre, que le rejeu de la fiche redonne l'objet, et
 l'invariance du plan sans \code{brut} sur deux plans de référence (R1 et
-R4)~; et de même pour le plan R6, qui retient \code{kaplan\_meier}, avec
+R4, section~\ref{sec:non-regression})~; et de même pour le plan R6, qui retient \code{kaplan\_meier}, avec
 l'invariance du plan sans \code{kaplan\_meier}.
 
 \subsection{Constats de simulation~: retrouver la loi vraie}
@@ -4110,7 +4433,7 @@ E4.3 & frontière calcul / affichage~; contrôles de saisie dans le package & \r
 E4.4 & le moteur reçoit un \code{data.frame} et des rôles, refuse un type incompatible & \ref{sec:separation}, \ref{sec:catalogue-roles} \\
 E4.5 & plan exécuté d'un bloc, objet complet, contenu de la fiche & \ref{sec:construction}, \ref{sec:fiche} \\
 E4.6 & reproductibilité, graine locale, générateur fixé, aucun horodatage comparé & \ref{sec:reproductibilite}, \ref{sec:objet-resultat} \\
-E4.7 & références de non-régression sur la plateforme de référence & \ref{sec:plateforme} \\
+E4.7 & références de non-régression sur la plateforme de référence & \ref{sec:plateforme}, \ref{sec:non-regression} \\
 E4.9 & un module par famille, index des fonctions contrôlé par la concordance & \ref{sec:architecture}, \ref{sec:index-exports} \\
 E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, \ref{sec:controles-donnees} \\
 \end{longtable}
