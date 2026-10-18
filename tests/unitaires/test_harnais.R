@@ -122,6 +122,18 @@ r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
 verifier("lanceur : fichier témoin conforme -> code 0",
          if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
 unlink(d, recursive = TRUE)
+# Le lanceur ne laisse aucune de ses variables dans globalenv(), parent des
+# environnements de test : un test qui lirait `e`, `f`, `env`, `r`, `avant` ou
+# `t0` comme variable libre lirait celle du lanceur (ou d'un fichier précédent).
+# Le second fichier les cherche (le premier laisse `env` et `r` en cas de fuite).
+d <- dossier_temoin(list(
+  test_a.R = 'verifier("premier fichier", TRUE)',
+  test_b.R = c('presentes <- intersect(c("e", "f", "env", "r", "avant", "t0"), ls(globalenv(), all.names = TRUE))',
+               'verifier("globalenv sans variable du lanceur", if (length(presentes)) paste("présentes :", paste(presentes, collapse = ", ")) else TRUE)')))
+r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
+verifier("lanceur : aucune variable du lanceur dans globalenv() pour les fichiers de test",
+         if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
+unlink(d, recursive = TRUE)
 
 # --- natures d'un échec attendu (audit de #8, m3) ----------------------------
 

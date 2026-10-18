@@ -99,13 +99,17 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   jeu <- jeu_reference()
   for (p in plans) {
     id <- p$identifiant
-    x <- construire_table(jeu$donnees, jeu$roles, p$plan)
-    g <- tryCatch(aplatir_construction(x), refus_reference = function(e) e)
-    non_produit <- function(e) {
-      defauts <<- c(defauts, sprintf("%s : %s", id, conditionMessage(e)))
+    non_produit <- function(e, etape = NULL) {
+      defauts <<- c(defauts, sprintf("%s : %s%s", id, if (is.null(etape)) "" else paste0(etape, " : "), conditionMessage(e)))
       resume[nrow(resume) + 1L, ] <<- list(id, if (file.exists(file.path(commis, paste0(id, ".tsv")))) "oui" else "non",
                                            "non produit", "NON")
     }
+    # Un refus ou une erreur de construction consigne le plan comme non
+    # produit (comme les échecs d'aplatissement, d'écriture et de lecture) :
+    # les autres plans sont produits et comparés, le bilan est écrit.
+    x <- tryCatch(construire_table(jeu$donnees, jeu$roles, p$plan), error = function(e) e)
+    if (inherits(x, "error")) { non_produit(x, "construction en échec"); next }
+    g <- tryCatch(aplatir_construction(x), refus_reference = function(e) e)
     if (inherits(g, "refus_reference")) { non_produit(g); next }
     sans <- doubles_sans_tolerance(g)
     for (c_ in sans) defauts <- c(defauts, sprintf("%s : grandeur sans tolérance déclarée : %s", id, c_))

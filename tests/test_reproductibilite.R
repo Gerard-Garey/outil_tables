@@ -294,8 +294,8 @@ fichier_courant("références de non-régression (ADR 0009) : plans R1 à R6, al
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
-for (e in parse(file.path(RACINE, "tests", "reference", "outils_reference.R"), encoding = "UTF-8",
-                keep.source = FALSE)) eval(e, globalenv())
+local(for (e in parse(file.path(RACINE, "tests", "reference", "outils_reference.R"), encoding = "UTF-8",
+                      keep.source = FALSE)) eval(e, globalenv()))
 DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # Plans sans fichier de référence (point 3.7) : échec attendu #17. Le commit
 # de référence de la session principale retire de cette liste les plans
@@ -750,6 +750,49 @@ for (cas in list(
     else if (!identical(avant, contenu())) "tests/reference/ modifié" else TRUE
   })
 }
+# Un plan dont la construction échoue est consigné comme non produit : les
+# autres plans sont produits et comparés, ecarts.txt est écrit, code 1.
+# Copie de l'outillage (même arbre installable : bibliothèque de la batterie
+# réutilisée) dont plans_reference() ne garde que R1 et un R2 invalide
+# (niveau 2), sans toucher tests/reference/. GITHUB_STEP_SUMMARY est vidée pour
+# le sous-processus (le producteur n'écrit le résumé que si elle est non vide) :
+# le résumé du job CI ne doit pas recevoir l'échec du témoin ; posée ici sur un
+# fichier, elle prouve que le sous-processus ne l'écrit pas.
+verifier("producteur : plan dont la construction échoue -> non produit, autres plans produits, ecarts.txt écrit, code 1", local({
+  d <- tempfile("producteur_temoin_"); dir.create(file.path(d, "tests", "reference"), recursive = TRUE)
+  dir.create(file.path(d, "tests", "controles"))
+  on.exit(unlink(d, recursive = TRUE))
+  file.copy(file.path(RACINE, c("DESCRIPTION", "NAMESPACE", "LICENSE")), d)
+  for (s in DOSSIERS_INSTALLES[dir.exists(file.path(RACINE, DOSSIERS_INSTALLES))])
+    file.copy(file.path(RACINE, s), d, recursive = TRUE)
+  file.copy(file.path(RACINE, "tests", "harnais.R"), file.path(d, "tests"))
+  file.copy(file.path(RACINE, "tests", "controles", "plateforme.R"), file.path(d, "tests", "controles"))
+  file.copy(file.path(DOSSIER_REFERENCES, c("produire_references.R", "outils_reference.R")),
+            file.path(d, "tests", "reference"))
+  cat("plans_reference <- function() list(",
+      "R1 = list(identifiant = 'R1', description = 'temoin valide', plan = plan_reference()),",
+      "R2 = list(identifiant = 'R2', description = 'temoin invalide', plan = plan_reference(niveau = 2)))",
+      sep = "\n", file = file.path(d, "tests", "reference", "outils_reference.R"), append = TRUE)
+  sortie_t <- file.path(d, "sortie")
+  resume_t <- file.path(d, "resume_job.md")
+  ancien_resume <- Sys.getenv("GITHUB_STEP_SUMMARY", unset = NA)
+  Sys.setenv(GITHUB_STEP_SUMMARY = resume_t)
+  on.exit(if (is.na(ancien_resume)) Sys.unsetenv("GITHUB_STEP_SUMMARY") else Sys.setenv(GITHUB_STEP_SUMMARY = ancien_resume), add = TRUE)
+  r <- executer_rscript(file.path(d, "tests", "reference", "produire_references.R"),
+                        c("--mode", "releve", "--plans", "tous", "--sortie", shQuote(sortie_t)),
+                        env = c("GITHUB_ACTIONS=false", "GITHUB_STEP_SUMMARY="))
+  ecarts <- file.path(sortie_t, "ecarts.txt")
+  texte <- if (file.exists(ecarts)) rawToChar(readBin(ecarts, "raw", file.size(ecarts))) else ""
+  if (r$statut != 1L) sprintf("code %d : %s", r$statut, paste(utils::tail(r$sortie, 3L), collapse = " | "))
+  else if (!file.exists(ecarts)) "ecarts.txt absent"
+  else if (file.exists(resume_t) && file.size(resume_t) > 0) "le sous-processus a écrit dans GITHUB_STEP_SUMMARY"
+  else if (!grepl("R2 : construction en .+chec : ", texte, useBytes = TRUE)) "R2 non consigné comme non produit dans ecarts.txt"
+  else if (!grepl("R2 : fichier commit.+ non ; comparaison non produit ; admis NON", texte, useBytes = TRUE)) "ligne de bilan de R2 absente"
+  else if (!file.exists(file.path(sortie_t, "references", "R1.tsv"))) "R1 non produit"
+  else if (file.exists(file.path(sortie_t, "references", "R2.tsv"))) "R2.tsv produit malgré l'échec"
+  else if (!grepl("R1 : fichier commit.+ non ; comparaison sans fichier commit.+ ; admis oui", texte, useBytes = TRUE)) "R1 non comparé"
+  else TRUE
+}))
 verifier("comparer_references.R : deux fichiers identiques -> code 0, verdict OK", {
   r <- executer_rscript(COMPARATEUR, c(shQuote(F_BASE), shQuote(F_BASE)))
   r$statut == 0L && any(grepl("Verdict : OK", r$sortie, fixed = TRUE, useBytes = TRUE)) &&
