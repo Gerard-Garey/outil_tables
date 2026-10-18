@@ -300,7 +300,7 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # Plans sans fichier de référence (point 3.7) : échec attendu #17. Le commit
 # de référence de la session principale retire de cette liste les plans
 # qu'il crée (succès inattendu sinon).
-SANS_REFERENCE_17 <- c("R1", "R2", "R3", "R4", "R5", "R6")
+SANS_REFERENCE_17 <- character(0)
 
 jeu_ref <- jeu_reference()
 aplatis <- list()
