@@ -338,7 +338,9 @@ installer_tablexp <- function(racine = racine_depot()) {
   }
   library(tablexp, lib.loc = lib)
   chemin <- normalizePath(getNamespaceInfo("tablexp", "path"))
-  if (!identical(dirname(chemin), normalizePath(lib))) {
+  # dirname() rend des « / » sous Windows, normalizePath() des « \ » : les deux
+  # côtés passent par normalizePath().
+  if (!identical(normalizePath(dirname(chemin)), normalizePath(lib))) {
     cat(sprintf("ECHEC : tablexp chargé depuis %s, pas depuis %s\n", chemin, lib))
     quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
   }
