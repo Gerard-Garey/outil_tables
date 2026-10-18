@@ -2855,10 +2855,26 @@ l'arrondi (approximation numérique).
     $E[D] = q\,E[E^i]$ exactement sous l'hypothèse de répartition, convergent,
     non sans biais à effectif fini (c'est un rapport)~; intervalle exact,
     exact sous la loi supposée $D \sim \mathcal{B}(E^i, q)$, $E^i$ tenue pour
-    fixe, \textbf{si $E^i$ est entier}~; sinon, prolongement continu de la
-    formule exacte, \textbf{couverture non établie}~; bornes par
-    approximation numérique (\code{qbeta})~; intervalle asymptotique,
-    asymptotique ($E^i q(1 - q) \to \infty$).
+    fixe, \textbf{pour une cellule observée entière}, sans entrée ni censure
+    dans la cellule (alors $E^i$ est le nombre de têtes, entier)~;
+    intervalle asymptotique, asymptotique ($E^i q(1 - q) \to \infty$) sous
+    la même condition~; bornes par approximation numérique (\code{qbeta}).
+    \textbf{Avec une entrée ou une censure dans la cellule}, $D$ ne suit pas
+    $\mathcal{B}(E^i, q)$, même si $E^i$ est entier~: seule l'égalité
+    $E[D] = q\,E[E^i]$ subsiste, et la \textbf{couverture des deux
+    intervalles n'est pas établie}~; si $E^i$ n'est pas entier, l'intervalle
+    exact est en outre un prolongement continu de la formule exacte. Exemple
+    (calcul exact de la loi de $D$, sans simulation~: résultat exact, calculé
+    numériquement, sur un cas)~: $n$ têtes entrées à la fraction $u = 0{,}5$
+    de la cellule et observées jusqu'à sa fin, sous l'hypothèse de
+    répartition avec $q = 0{,}2$, si bien que $E^i = n/2$ est entier et
+    $D \sim \mathcal{B}(n, 0{,}1)$~; pour un niveau de 0,95, la couverture
+    vraie de l'intervalle exact vaut 0,9561, 0,9423 et 0,9381 pour $n = 200$,
+    $1\,000$ et $10^{4}$, celle de l'intervalle logit 0,9245, 0,9352 et
+    0,9357~: l'intervalle «~exact~» peut couvrir moins que le niveau, et
+    l'écart ne disparaît pas quand l'effectif croît ($\operatorname{Var}(D)$
+    vaut $n \cdot 0{,}1 \cdot 0{,}9$, au lieu de $E^i q (1 - q) = n \cdot
+    0{,}08$ supposé par les deux intervalles).
   \item \textbf{Références}~: à établir (issue~\#6), y compris pour
     l'appellation usuelle de l'hypothèse de répartition, nommée ici par sa
     formule.
@@ -3039,7 +3055,8 @@ Le statut de chaque grandeur est restitué par le moteur, dans les paramètres
 de l'étape et dans la fiche (\code{statuts}, constante \code{STATUTS\_BRUT}~:
 colonnes \code{estimateur}, \code{grandeur}, \code{intervalle},
 \code{statut}, \code{loi\_supposee}, \code{calcul}), pour les seuls
-estimateurs retenus. Le tableau~\ref{tab:statuts-brut} en donne le contenu~;
+estimateurs retenus. Le tableau~\ref{tab:statuts-brut} en donne le contenu,
+complété pour les intervalles du binomial (note~a)~;
 la mention «~$E^c$ fixe~» ou «~$E^i$ fixe~» est réservée aux intervalles
 exacts.
 
@@ -3068,14 +3085,27 @@ exacts.
 \code{poisson}, probabilité & exact & exact sous la loi supposée (transformation croissante des bornes exactes du taux~: couverture identique) & $D \sim \mathcal{P}(\mu E^c)$, $E^c$ fixe \\
 \code{poisson}, probabilité & asymptotique & asymptotique (transformation croissante des bornes asymptotiques du taux~: même régime)~; non défini à $D = 0$ & $D \sim \mathcal{P}(\mu E^c)$ \\
 \code{binomial}, taux & sans objet & estimateur des moments~: $E[D] = q\,E[E^i]$ exactement sous l'hypothèse de répartition~; convergent~; non sans biais à effectif fini & ${}_{1-t}q_{x+t} = (1 - t)q_x$, censure indépendante \\
-\code{binomial}, taux & exact & exact sous la loi supposée si $E^i$ est entier~; sinon prolongement continu de la formule exacte~: couverture non établie & $D \sim \mathcal{B}(E^i, q)$, $E^i$ fixe \\
-\code{binomial}, taux & asymptotique & asymptotique ($E^i q(1-q) \to \infty$)~; non défini à $D = 0$ et à $D = E^i$ & $D \sim \mathcal{B}(E^i, q)$ \\
+\code{binomial}, taux & exact & exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, $E^i$ entier)~; avec une entrée ou une censure dans la cellule, couverture non établie, même si $E^i$ est entier (prolongement continu de la formule exacte si $E^i$ n'est pas entier)~\textsuperscript{a} & $D \sim \mathcal{B}(E^i, q)$, $E^i$ fixe \\
+\code{binomial}, taux & asymptotique & asymptotique ($E^i q(1-q) \to \infty$) pour une cellule observée entière~; avec une entrée ou une censure dans la cellule, couverture non établie~\textsuperscript{a}~; non défini à $D = 0$ et à $D = E^i$ & $D \sim \mathcal{B}(E^i, q)$ \\
 \code{kaplan\_meier}, taux & sans objet & résultat exact~: maximum de vraisemblance non paramétrique (risques discrets aux instants d'événement)~; non sans biais à effectif fini & troncature à gauche et censure non informatives, unités indépendantes~; aucune hypothèse de répartition dans la cellule \\
 \code{kaplan\_meier}, variance & sans objet & asymptotique (méthode delta sur $\log \hat P$, ensemble à risque $\to \infty$ sur toute la cellule)~; non définie à $q = 0$ et $q = 1$ & idem \\
 \code{kaplan\_meier}, taux & asymptotique & asymptotique (ensemble à risque $\to \infty$ sur toute la cellule), sous indépendance des unités d'observation~; non défini à $q = 0$ et $q = 1$~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & idem \\
 \code{kaplan\_meier}, taux & exact & aucun~: non restitué (sous troncature et censure, $D$ ne suit aucune loi binomiale) & sans objet \\
 \end{longtable}
 }
+
+\noindent
+\textsuperscript{a}~Statut documenté plus complet que le libellé inscrit
+dans la fiche~: pour les deux intervalles du binomial, la colonne
+\code{statut} de \code{STATUTS\_BRUT} (\code{R/brut.R}) ne pose pas encore
+la condition de cellule observée entière (intervalle exact~: «~exact sous la
+loi supposée si E\textasciicircum i est entier~», suivi du seul cas non
+entier~; intervalle asymptotique~: «~asymptotique~», avec son régime). Le
+statut qui fait foi est celui de ce tableau et de la
+section~\ref{sec:brut-binomial} (entrée «~Statut~»)~; la mise à jour du
+texte du code, donc de la fiche et des références de non-régression, est
+renvoyée à l'issue~\#31 (décision M55 du mainteneur, 18/10/2026). Aucune
+valeur calculée n'en dépend.
 
 \noindent
 Les bornes exactes sont calculées numériquement par \code{qgamma()} ou
