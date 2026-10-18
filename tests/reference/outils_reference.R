@@ -24,8 +24,10 @@
 #    sur toute classe ou tout attribut hors format ;
 #  - ecrire_reference(grandeurs, fichier, entete) : TSV UTF-8, LF, octet par
 #    octet, valeurs par tablexp:::colonne_canonique() (ADR 0007, point 9.3) ;
-#  - lire_reference(fichier) : lecture stricte (toute valeur non canonique
-#    est refusée) ; aller-retour exact (point 2.4) ;
+#  - lire_reference(fichier) : lecture stricte (tout double hors de la forme
+#    de `%.17g` est refusé ; hors Windows, tout texte différent de
+#    sprintf("%.17g") de la valeur lue l'est aussi : double_lu()) ; aller-retour
+#    exact (point 2.4) ;
 #  - TOLERANCES, tolerance_de(chemin) : classes de tolérance, clé qualifiée
 #    `<table>/<colonne>` prioritaire, recherche par le suffixe le plus long
 #    (seconde annotation, (a)) ;
@@ -36,8 +38,8 @@
 #  - imprimer_comparaison(r) : impression du point 3.5 ;
 #  - references_orphelines(dossier) : fichiers sans plan (point 3.7) ;
 #  - regle_mode(), controle_bascule(), sortie_interdite() : règles des modes
-#    du workflow (point 5.2) et garde du dossier de sortie (point 9.4),
-#    appliquées par produire_references.R ;
+#    du workflow (point 5.2) et garde du dossier de sortie (point 9.4,
+#    portable : forme_chemin()), appliquées par produire_references.R ;
 #  - identifiant_plateforme(racine) : bloc de tests/controles/plateforme.R
 #    (ADR 0008, point 5), pour l'en-tête (point 2.2).
 #
@@ -354,13 +356,73 @@ desechapper <- function(s, fichier, chemin) {
   x
 }
 
+TEXTES_SPECIAUX_DOUBLE <- c("NA", "NaN", "Inf", "-Inf")
+
+# Forme des textes de double que produit `%.17g` (conversion g de la norme C,
+# précision 17, sans indicateur « # ») : NA, NaN, Inf, -Inf ; sinon au plus 17
+# chiffres significatifs, zéros terminaux de la partie fractionnaire
+# supprimés, notation fixe si l'exposant décimal X vérifie -4 <= X < 17 et
+# notation à exposant (signé, deux chiffres au moins) sinon ; ni espace, ni
+# « + » ou zéro de tête, ni hexadécimal. Cette forme est la même sur toutes
+# les plateformes ; seuls les chiffres peuvent différer (voir double_lu()).
+forme_double_17g <- function(s) {
+  fixe <- grepl("^-?(0|[1-9][0-9]{0,16}(\\.[0-9]*[1-9])?|0\\.0{0,3}[1-9]([0-9]*[1-9])?)$", s)
+  expo <- grepl("^-?[1-9](\\.[0-9]{0,15}[1-9])?e[-+]([0-9]{2}|[1-9][0-9]{2})$", s)
+  x <- suppressWarnings(as.integer(sub("^.*e", "", s)))
+  chiffres <- nchar(sub("^0+", "", gsub("[^0-9]", "", sub("e.*$", "", s))))
+  s %in% TEXTES_SPECIAUX_DOUBLE | ((fixe | (expo & ((x <= -5L | x >= 17L) %in% TRUE))) & chiffres <= 17L)
+}
+
+# Lecture d'un double (ADR 0009, point 2.4 : mêmes valeurs au bit près). Un
+# texte de 17 chiffres significatifs au plus désigne un seul double, mais
+# as.numeric() (R_strtod) ne lit pas toujours ce double : certains décimaux
+# acceptés par la forme de `%.17g` sont lus en un double voisin (ex.
+# 0.001673229520730213 : 9ac77e84086a5b3f au lieu de 9bc77e84086a5b3f ;
+# mesuré). Deux branches, selon la plateforme (`windows`) :
+#  - hors Windows : preuve d'aller-retour. Le texte doit être égal à
+#    sprintf("%.17g") de la valeur lue ; la bibliothèque C (glibc) arrondit
+#    correctement (mesuré sous R 4.3.3 : 0 écart à l'arrondi correct de Python
+#    sur 551 008 doubles tirés, et 0 texte relu en un autre double), donc un
+#    texte ainsi reproduit est le seul texte de la valeur lue et as.numeric()
+#    la lit sans erreur ; un texte lu de travers n'est pas reproduit : il est
+#    refusé ;
+#  - sous Windows (R 4.3.3 ucrt) : forme de `%.17g` seulement
+#    (forme_double_17g()). Ce n'est pas une preuve d'aller-retour mais un
+#    constat de mesure : as.numeric() relit au bit près les textes
+#    correctement arrondis (0 erreur sur 300 000 tirés et sur les 42 952
+#    textes des fichiers de la CI). La forme n'est pas comparée à sprintf :
+#    sous Windows, sprintf n'arrondit pas toujours correctement le 17e chiffre
+#    (36 694 écarts à l'arrondi correct de Python sur 551 008 doubles tirés,
+#    dont 13 aux exposants décimaux de -5 à 5) et son texte ne se relit pas
+#    toujours en le même double (5 sur 551 008, exposants au-delà de 266). Un
+#    décimal hors de ces textes (ex. 0.001673229520730213) est accepté par la
+#    forme et peut être lu de travers : les références sont produites par la
+#    CI (Linux), jamais éditées à la main.
+# Un dépassement (Inf) ou un sous-dépassement (0) du texte est refusé dans la
+# branche Windows ; la branche stricte le refuse par la comparaison. `windows`
+# et `formater` (sprintf("%.17g") d'une bibliothèque C simulée) ne servent
+# qu'à tester chaque branche sur toute plateforme.
+double_lu <- function(s, fichier, chemin, windows = .Platform$OS.type == "windows",
+                      formater = function(v) sprintf("%.17g", v)) {
+  v <- suppressWarnings(as.numeric(s))
+  if (windows) {
+    if (!all(forme_double_17g(s)))
+      erreur_lecture(fichier, sprintf("%s : valeur hors de la forme de %%.17g (lecture sous Windows : forme seule, voir double_lu())", chemin))
+    if (any(!s %in% TEXTES_SPECIAUX_DOUBLE & (!is.finite(v) | (v == 0 & !s %in% c("0", "-0")))))
+      erreur_lecture(fichier, sprintf("%s : valeur hors de l'intervalle des doubles", chemin))
+  } else if (!identical(formater(v), s)) {
+    erreur_lecture(fichier, sprintf("%s : valeur non canonique pour le type double (différente de sprintf(\"%%.17g\") de la valeur lue)", chemin))
+  }
+  v
+}
+
 valeurs_lues <- function(type, s, fichier, chemin) {
   canonique <- function(v, texte) {
     if (!identical(texte, s)) erreur_lecture(fichier, sprintf("%s : valeur non canonique pour le type %s", chemin, type))
     v
   }
   switch(type,
-    double = { v <- suppressWarnings(as.numeric(s)); canonique(v, sprintf("%.17g", v)) },
+    double = double_lu(s, fichier, chemin),
     integer = { v <- suppressWarnings(as.integer(s)); canonique(v, ifelse(is.na(v), "NA", sprintf("%d", v))) },
     logical = { v <- c("TRUE" = TRUE, "FALSE" = FALSE, "NA" = NA)[s]
                 if (anyNA(names(v))) erreur_lecture(fichier, sprintf("%s : logique invalide", chemin)); unname(v) },
@@ -601,11 +663,62 @@ controle_bascule <- function(plateformes_commises, courante) {
   NA_character_
 }
 
+# Forme comparable d'un chemin, par le texte seul (aucun accès au système de
+# fichiers) : absolu (relatif à `courant`), séparateur « / », sans « . », « .. »
+# ni « / » final (`reduire = FALSE` conserve les « .. » : le texte est alors
+# résolu par le système avant toute réduction, voir sortie_interdite()).
+# `windows` : « \ » est un séparateur, un chemin absolu est `X:/...`,
+# `//serveur/partage/...` (UNC, préfixes `\\?\` et `\\?\UNC\` compris) ou
+# `/...` (lecteur du répertoire courant), `X:rel` est relatif au répertoire
+# courant du lecteur X (ramené à `courant` si c'est le lecteur courant), et la
+# casse est ignorée (lettre de lecteur comprise).
+forme_chemin <- function(p, courant, windows = .Platform$OS.type == "windows", reduire = TRUE) {
+  prefixe <- ""
+  if (windows) {
+    p <- gsub("\\", "/", p, fixed = TRUE); courant <- gsub("\\", "/", courant, fixed = TRUE)
+    p <- sub("^//[?.]/", "", sub("^//[?.]/UNC/", "//", p))
+    lecteur <- function(x) if (grepl("^[A-Za-z]:", x)) toupper(substr(x, 1L, 2L)) else ""
+    if (grepl("^[A-Za-z]:([^/]|$)", p)) {
+      base <- if (identical(lecteur(p), lecteur(courant))) courant else substr(p, 1L, 2L)
+      p <- paste0(base, "/", substring(p, 3L))
+    } else if (grepl("^/([^/]|$)", p)) {
+      p <- paste0(lecteur(courant), p)
+    } else if (!grepl("^(//|[A-Za-z]:/)", p)) {
+      p <- paste0(courant, "/", p)
+    }
+    if (startsWith(p, "//")) { prefixe <- "/"; p <- substring(p, 2L) }
+    else if (grepl("^[A-Za-z]:", p)) { prefixe <- substr(p, 1L, 2L); p <- substring(p, 3L) }
+    p <- tolower(p); prefixe <- tolower(prefixe)
+  } else if (!startsWith(p, "/")) p <- paste0(courant, "/", p)
+  pile <- character(0)
+  for (seg in strsplit(p, "/", fixed = TRUE)[[1L]]) {
+    if (!nzchar(seg) || identical(seg, ".")) next
+    if (reduire && identical(seg, "..")) pile <- pile[-length(pile)] else pile <- c(pile, seg)
+  }
+  paste0(prefixe, "/", paste(pile, collapse = "/"))
+}
+
 # Le dossier de sortie est-il tests/reference/ ou l'un de ses sous-dossiers ?
-sortie_interdite <- function(sortie, commis) {
-  absolu <- function(p) normalizePath(if (startsWith(p, "/")) p else file.path(getwd(), p), mustWork = FALSE)
-  s <- sub("/+$", "", absolu(sortie)); c_ <- sub("/+$", "", absolu(commis))
-  identical(s, c_) || startsWith(s, paste0(c_, "/"))
+# Refusé si l'une des deux formes l'indique : la forme du texte (portable :
+# séparateurs, lecteur, casse, UNC) et celle que résout le système de fichiers
+# pour la partie existante (liens, noms courts), seulement si `windows` est
+# la plateforme de l'hôte et `resoudre` vrai. `courant`, `windows` et
+# `resoudre = FALSE` ne servent qu'à tester, par le texte seul et sur
+# n'importe quelle plateforme, les formes de chemin d'une autre.
+sortie_interdite <- function(sortie, commis, courant = getwd(), windows = .Platform$OS.type == "windows",
+                             resoudre = TRUE) {
+  dedans <- function(s, c_) identical(s, c_) || startsWith(s, paste0(c_, "/"))
+  texte <- function(p) forme_chemin(p, courant, windows)
+  # Ancêtre existant du texte BRUT (« .. » non réduits : sous POSIX, `<lien>/..`
+  # est le parent de la cible du lien, pas celui du lien), résolu par le système ;
+  # le reste du chemin lui est rattaché puis réduit.
+  resolu <- function(p) {
+    t <- forme_chemin(p, courant, windows, reduire = FALSE); reste <- character(0)
+    while (!file.exists(t) && !identical(dirname(t), t)) { reste <- c(basename(t), reste); t <- dirname(t) }
+    forme_chemin(file.path(normalizePath(t, winslash = "/", mustWork = FALSE), paste(reste, collapse = "/")), courant, windows)
+  }
+  dedans(texte(sortie), texte(commis)) ||
+    (resoudre && identical(windows, .Platform$OS.type == "windows") && dedans(resolu(sortie), resolu(commis)))
 }
 
 # En-tête d'une référence (point 2.2), construit ici pour que ses clés non

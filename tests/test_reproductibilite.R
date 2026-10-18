@@ -535,13 +535,87 @@ lecture_refusee <- function(remplacer) {
   e <- tryCatch({ lire_reference(f); NULL }, error = function(e) e)
   if (is.null(e)) "aucune erreur de lecture" else TRUE
 }
-verifier("témoin : lecture refusée sur un double non canonique (1.0), un CR, une longueur fausse", {
+verifier("témoin : lecture refusée sur un double hors de la forme %.17g (zéro terminal), un CR, une longueur fausse", {
   sub_txt <- function(motif, remplacement) function(o)
     charToRaw(sub(motif, remplacement, rawToChar(o), fixed = TRUE, useBytes = TRUE))
   isTRUE(lecture_refusee(sub_txt("fiche/plan/etapes/brut/niveau\tdouble\t1\t0.94999999999999996",
-                                 "fiche/plan/etapes/brut/niveau\tdouble\t1\t0.95"))) &&
+                                 "fiche/plan/etapes/brut/niveau\tdouble\t1\t0.949999999999999960"))) &&
     isTRUE(lecture_refusee(sub_txt("\n@classe", "\r\n@classe"))) &&
     isTRUE(lecture_refusee(sub_txt("table\tNULL\t0", "table\tNULL\t1")))
+})
+# Lecture des doubles (point 2.4 : mêmes valeurs au bit près), deux branches de
+# double_lu() choisies par `windows` et testées ici sur toute plateforme.
+# Branche Windows : forme de %.17g seulement, car la bibliothèque C de Windows
+# n'arrondit pas toujours correctement le 17e chiffre ; les textes glibc et
+# Windows d'un même double se relisent en le même double. Branche stricte
+# (hors Windows) : preuve d'aller-retour, texte == sprintf("%.17g") de la
+# valeur lue ; elle s'appuie sur le sprintf de l'hôte, donc, pour passer à
+# l'identique sous Linux et sous Windows, les cas à sprintf réel sont des
+# textes que le sprintf de Windows écrit correctement (mesuré), et le texte
+# glibc de 0x1.422927add0ecbp-18 (que Windows écrit à 16 chiffres) est testé
+# par un formateur simulé qui renvoie le texte de glibc (Python, hors R).
+# Doubles construits depuis leurs octets (petit-boutiste), aucun littéral.
+double_bits <- function(...) readBin(as.raw(c(...)), "double", 1L, size = 8L, endian = "little")
+meme_double <- function(a, b) identical(a, b, num.eq = FALSE)
+X_ECB <- double_bits(0xcb, 0x0e, 0xdd, 0x7a, 0x92, 0x22, 0xd4, 0x3e)  # 0x1.422927add0ecbp-18
+T_GLIBC <- "4.8005694404694591e-06"; T_WINDOWS <- "4.800569440469459e-06"
+formateur_glibc <- function(v) { w <- sprintf("%.17g", v); w[which(v == X_ECB)] <- T_GLIBC; w }
+lu_windows <- function(s) double_lu(s, "(témoin)", "x", windows = TRUE)
+lu_stricte <- function(s) double_lu(s, "(témoin)", "x", windows = FALSE, formater = formateur_glibc)
+lu_stricte_reelle <- function(s) double_lu(s, "(témoin)", "x", windows = FALSE)  # sprintf de l'hôte
+refuse_lecture <- function(lire, s) vapply(s, function(t) inherits(tryCatch(lire(t), error = function(e) e), "error"), NA)
+TEXTES_HORS_FORME <- c("1.0", "+0.5", " 0.5", "0.5 ", "00.5", ".5", "5.", "0x1p-3", "1e5", "1E+05", "1e+05", "1e-4", "0.00001", "0.10",
+                       "1.50", "1e-006", "1e+017", "0e+00", "inf", "nan", "na", "NA ", "+Inf", "TRUE", "1,5", "", "-", "1e+17.5",
+                       "1.2345678901234567890", "123456789012345678", "1e+400", "1e-400")
+verifier("lecture des doubles, branche Windows : textes glibc et Windows de 0x1.422927add0ecbp-18 acceptés, même double", {
+  meme_double(lu_windows(T_GLIBC), X_ECB) && meme_double(lu_windows(T_WINDOWS), X_ECB) &&
+    meme_double(lu_windows(c(T_GLIBC, "NA", "-Inf")), c(X_ECB, NA_real_, -Inf))
+})
+verifier("lecture des doubles, branche Windows : le texte du double voisin est un autre double (aucune confusion)", {
+  voisin <- double_bits(0xcc, 0x0e, 0xdd, 0x7a, 0x92, 0x22, 0xd4, 0x3e)
+  t_voisin <- "4.8005694404694599e-06"  # %.17g du voisin 0x1.422927add0eccp-18 (Python, hors R)
+  meme_double(lu_windows(t_voisin), voisin) && !meme_double(lu_windows(t_voisin), X_ECB)
+})
+verifier("lecture des doubles, branche Windows : formes de %.17g acceptées (NA, NaN, Inf, notations fixe et à exposant, bornes)", {
+  ok <- c("NA", "NaN", "Inf", "-Inf", "0", "-0", "0.5", "-1.5", "100000", "0.0001", "1e-05", "9.9999999999999995e-07",
+          "1e+17", "1.2345678901234568e+17", "5e-324", "1.7976931348623157e+308", "0.94999999999999996")
+  mal <- ok[refuse_lecture(lu_windows, ok)]
+  if (length(mal)) paste("refusés à tort :", paste(mal, collapse = " ")) else TRUE
+})
+verifier("lecture des doubles, branche Windows : textes hors de la forme %.17g refusés (zéro terminal, espace, +, zéro de tête, 0x, exposant, 18 chiffres, dépassement)", {
+  mal <- TEXTES_HORS_FORME[!refuse_lecture(lu_windows, TEXTES_HORS_FORME)]
+  if (length(mal)) paste("acceptés à tort :", paste(mal, collapse = " ")) else TRUE
+})
+verifier("lecture des doubles, branche stricte : textes que sprintf(\"%.17g\") reproduit acceptés (texte glibc simulé, NA, NaN, Inf, bornes)", {
+  ok <- c("0.94999999999999996", "NA", "NaN", "Inf", "-Inf", "0", "-0", "0.5", "-1.5", "100000", "0.10000000000000001",
+          "1.7976931348623157e+308")
+  mal <- ok[refuse_lecture(lu_stricte_reelle, ok)]
+  if (length(mal)) paste("refusés à tort :", paste(mal, collapse = " ")) else
+    meme_double(lu_stricte(T_GLIBC), X_ECB) && meme_double(lu_stricte(c(T_GLIBC, "NA", "-Inf")), c(X_ECB, NA_real_, -Inf))
+})
+verifier("lecture des doubles, branche stricte : 0.95, le texte à 16 chiffres de Windows et tout texte hors de la forme refusés", {
+  # 0.95 est un texte plus court que sprintf("%.17g", 0.95) = 0.94999999999999996
+  r <- c(refuse_lecture(lu_stricte_reelle, "0.95"), refuse_lecture(lu_stricte, T_WINDOWS))
+  mal <- TEXTES_HORS_FORME[!refuse_lecture(lu_stricte_reelle, TEXTES_HORS_FORME)]
+  if (!all(r)) "0.95 ou le texte Windows accepté" else if (length(mal)) paste("acceptés à tort :", paste(mal, collapse = " ")) else TRUE
+})
+verifier("lecture des doubles, branche stricte : 0.001673229520730213, que as.numeric() lit de travers, refusé", {
+  # as.numeric() lit 9ac77e84086a5b3f (0.0016732295207302129) au lieu du double le plus proche, 9bc77e84086a5b3f ;
+  # le %.17g correct de ce dernier est 0.0016732295207302131 (Python, hors R) : aucun sprintf correct ne produit le texte.
+  refuse_lecture(lu_stricte_reelle, "0.001673229520730213")
+})
+verifier("lecture des doubles : les messages de refus distinguent les deux branches", {
+  msg <- function(...) tryCatch(double_lu("0.95", "(f)", "x", ...), error = function(e) conditionMessage(e))
+  m_s <- msg(windows = FALSE); m_w <- tryCatch(double_lu("1.0", "(f)", "x", windows = TRUE), error = function(e) conditionMessage(e))
+  grepl("sprintf", m_s, fixed = TRUE) && grepl("Windows", m_w, fixed = TRUE) && !grepl("Windows", m_s, fixed = TRUE)
+})
+verifier("lecture des doubles : aller-retour exact d'un fichier, branche de l'hôte (valeurs usuelles, bornes, NA, NaN, Inf)", {
+  v <- c(0.1, 1 / 3, 0.94999999999999996, 1e-300, 5e-324, .Machine$double.xmax, .Machine$double.xmin, 123456789.123456789, -2^52,
+         2^-18 * 1.2587401, 1e15, 1e16, 1e17, 1e-4, 1e-5, 0, NA, NaN, Inf, -Inf)
+  g <- list(types = c(x = "double"), valeurs = list(x = v))
+  f <- tempfile(fileext = ".tsv"); on.exit(unlink(f))
+  ecrire_reference(g, f, c(identifiant = "doubles"))
+  meme_double(lire_reference(f)$valeurs$x, v)
 })
 verifier("témoin : référence orpheline détectée (R7.tsv dans un dossier temporaire)", {
   d <- tempfile("references_"); dir.create(d)
@@ -570,7 +644,70 @@ verifier("garde du dossier de sortie : tests/reference/ et ses sous-dossiers int
     sortie_interdite(file.path(DOSSIER_REFERENCES, "x", "y"), DOSSIER_REFERENCES) &&
     sortie_interdite(paste0(DOSSIER_REFERENCES, "/"), DOSSIER_REFERENCES) &&
     !sortie_interdite(file.path(tempdir(), "sortie"), DOSSIER_REFERENCES) &&
-    !sortie_interdite(paste0(DOSSIER_REFERENCES, "_bis"), DOSSIER_REFERENCES)
+    !sortie_interdite(paste0(DOSSIER_REFERENCES, "_bis"), DOSSIER_REFERENCES) &&
+    sortie_interdite(file.path("tests", "reference", "essai"), DOSSIER_REFERENCES, courant = RACINE)
+})
+# Hôte Windows (formes réelles du système de fichiers) : antislash, casse et
+# nom court 8.3 désignent le même dossier.
+if (.Platform$OS.type == "windows") {
+  verifier("garde du dossier de sortie, hôte Windows : antislash, casse et nom court (8.3) de tests/reference/ interdits", {
+    sortie_interdite(gsub("/", "\\\\", file.path(DOSSIER_REFERENCES, "x")), DOSSIER_REFERENCES) &&
+      sortie_interdite(toupper(file.path(DOSSIER_REFERENCES, "x")), DOSSIER_REFERENCES) &&
+      sortie_interdite(file.path(utils::shortPathName(DOSSIER_REFERENCES), "x"), DOSSIER_REFERENCES)
+  })
+} else cat("  [sauté] garde du dossier de sortie, hôte Windows : plateforme POSIX (formes Windows couvertes par le texte seul ci-dessous)\n")
+# Hôte POSIX : « .. » après un lien. `<lien vers tests/reference/sous>/../x`
+# désigne physiquement tests/reference/x (le système résout le lien avant
+# « .. ») : le texte seul le classe hors du dossier, la résolution du texte
+# brut l'interdit. Arbre factice dans un dossier temporaire.
+lien_ok <- FALSE
+if (.Platform$OS.type != "windows") {
+  d_lien <- tempfile("garde_lien_"); dir.create(d_lien)
+  commis_f <- file.path(normalizePath(d_lien), "depot", "tests", "reference"); dir.create(file.path(commis_f, "sous"), recursive = TRUE)
+  dir.create(file.path(d_lien, "ext", "autre", "sous"), recursive = TRUE)
+  lien_ok <- file.symlink(file.path(commis_f, "sous"), file.path(d_lien, "ext", "lien")) &&
+    file.symlink(file.path(d_lien, "ext", "autre", "sous"), file.path(d_lien, "ext", "lien_autre"))
+}
+if (lien_ok) {
+  verifier("garde du dossier de sortie, hôte POSIX : « .. » après un lien vers un sous-dossier de tests/reference/", {
+    ext <- file.path(normalizePath(d_lien), "ext")
+    interdits <- c(file.path(ext, "lien", "..", "x"), file.path(ext, "lien", "..", "neuf", "y"), file.path(ext, "lien", ".."),
+                   file.path(ext, "lien", "..", "sous", "z"), file.path(ext, "lien", "z"))
+    autorises <- c(file.path(ext, "x"), file.path(ext, "lien_autre", "..", "x"), file.path(ext, "lien", "..", "..", "x"),
+                   file.path(ext, "lien", "..", "..", "ext", "y"), file.path(ext, "lien_autre", "..", ".."))
+    est <- function(s) vapply(s, sortie_interdite, NA, commis = commis_f)
+    mal <- c(interdits[!est(interdits)], autorises[est(autorises)])
+    if (length(mal)) paste("mal classés :", paste(mal, collapse = " | ")) else TRUE
+  })
+} else cat("  [sauté] garde du dossier de sortie, hôte POSIX : liens symboliques indisponibles (hôte Windows ou système de fichiers sans liens)\n")
+if (exists("d_lien", inherits = FALSE)) unlink(d_lien, recursive = TRUE)
+# Formes de chemin (texte seul, `resoudre = FALSE` : exécutée sur toute
+# plateforme, `courant` et `windows` posés) ; sous Windows, `/` et `\`
+# séparent, un chemin absolu est `X:/`, `X:\`, UNC ou `/` (lecteur courant),
+# la casse est ignorée, `X:rel` est relatif au lecteur X.
+verifier("garde du dossier de sortie : formes de chemin Windows (séparateurs, lecteur, casse, UNC, relatifs)", {
+  cw <- "C:/Depot/outil_tables"; rw <- "C:/Depot/outil_tables/tests/reference"
+  interdits <- c("tests/reference/essai", "tests\\reference\\essai", "tests/reference", "tests/reference/", "./tests/../tests/reference/x",
+                 "C:/Depot/outil_tables/tests/reference/x", "C:\\Depot\\outil_tables\\tests\\reference\\x",
+                 "c:/depot/OUTIL_TABLES/Tests/Reference/x", "c:\\Depot\\outil_tables\\tests\\reference",
+                 "/Depot/outil_tables/tests/reference/x", "C:tests/reference/x", "\\\\?\\C:\\Depot\\outil_tables\\tests\\reference\\x",
+                 "C:/Depot/outil_tables/tests/reference/../reference/x", "C:\\Depot\\outil_tables\\tests\\reference\\\\x\\")
+  autorises <- c("C:/Temp/sortie", "D:/Depot/outil_tables/tests/reference/x", "tests/reference_bis",
+                 "C:/Depot/outil_tables/tests/referenceX", "C:/Depot/outil_tables/tests", "..", "tests/reference/../autre",
+                 "C:autre", "\\Temp\\x", "E:\\", "C:\\")
+  est <- function(s) vapply(s, sortie_interdite, NA, commis = rw, courant = cw, windows = TRUE, resoudre = FALSE)
+  mal <- c(interdits[!est(interdits)], autorises[est(autorises)])
+  if (length(mal)) paste("mal classés :", paste(mal, collapse = " | ")) else TRUE
+})
+verifier("garde du dossier de sortie : formes UNC (\\\\serveur\\partage, préfixe \\\\?\\UNC\\) et formes POSIX (casse, antislash)", {
+  u <- function(s) sortie_interdite(s, "//serveur/partage/depot/tests/reference", "//serveur/partage/depot",
+                                    windows = TRUE, resoudre = FALSE)
+  p <- function(s) sortie_interdite(s, "/home/u/depot/tests/reference", "/home/u/depot", windows = FALSE, resoudre = FALSE)
+  isTRUE(u("\\\\SERVEUR\\Partage\\depot\\tests\\reference\\x")) && isTRUE(u("\\\\?\\UNC\\serveur\\partage\\depot\\tests\\reference\\x")) &&
+    isTRUE(u("tests/reference/x")) && !u("\\\\serveur\\autre\\depot\\tests\\reference\\x") && !u("\\\\serveur\\partage\\depot\\tests") &&
+    all(vapply(c("tests/reference/x", "/home/u/depot/tests/reference", "/home/u/depot/tests/reference/",
+                 "tests/./reference/../reference/x"), p, NA)) &&
+    !any(vapply(c("/home/u/depot/tests/reference_bis", "/tmp/x", "/home/u/depot/Tests/reference", "tests\\reference", "/"), p, NA))
 })
 # Scripts en sous-processus : refus d'appel du producteur (avant toute
 # installation ni écriture) ; ligne de commande de comparaison.
@@ -672,9 +809,16 @@ verifier("T2, témoin : la même chaîne marquée UTF-8 passe", identical(trimws
 verifier("T3 : sonde UTF-8 de l'installation de la batterie (STATUT_EMPREINTES_NON_CALCULEES)", isTRUE(sonde_utf8()))
 t3 <- system.time({
   lib_c <- tempfile("tablexp_lib_C_"); dir.create(lib_c)
+  # LC_ALL posée dans ce processus le temps de l'installation : sous Windows,
+  # system2(env =) n'est pas pris en charge (la variable n'atteint pas
+  # R CMD INSTALL, qui installe alors en UTF-8 et la sonde passe : mesuré),
+  # comme dans executer_rscript().
+  ancien_lc_all <- Sys.getenv("LC_ALL", unset = NA)
+  Sys.setenv(LC_ALL = "C")
   inst <- suppressWarnings(system2(file.path(R.home("bin"), "R"),
                                    c("CMD", "INSTALL", "--no-docs", "-l", shQuote(lib_c), shQuote(RACINE)),
-                                   stdout = TRUE, stderr = TRUE, env = "LC_ALL=C"))
+                                   stdout = TRUE, stderr = TRUE))
+  if (is.na(ancien_lc_all)) Sys.unsetenv("LC_ALL") else Sys.setenv(LC_ALL = ancien_lc_all)
   script <- tempfile(fileext = ".R")
   writeLines(c("h <- new.env()", sprintf("sys.source(%s, envir = h)", deparse(file.path(RACINE, "tests", "harnais.R"))),
                sprintf("library(tablexp, lib.loc = %s)", deparse(lib_c)),
