@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{17/10/2026}
+\newcommand{\datedoc}{18/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -371,7 +371,7 @@ présent \\
 d'observation, table de référence (section~\ref{sec:donnees}) & présent \\
 \code{R/exposition.R} & recettes d'exposition, conventions d'âge, troncature
 et censure (section~\ref{sec:exposition}) & présent \\
-\code{R/brut.R} & taux bruts et intervalles (section~\ref{sec:brut}) & à créer \\
+\code{R/brut.R} & taux bruts, intervalles et statuts (section~\ref{sec:brut}) & présent \\
 \code{R/lissage.R} & lissages (section~\ref{sec:lissage}) & à créer \\
 \code{R/positionnement.R} & positionnement sur une table de référence
 (section~\ref{sec:positionnement}) & à créer \\
@@ -438,7 +438,7 @@ jamais \code{positionnement}.
 \node[prevu, below=3.5mm of fer] (pro) {\code{prospective}};
 \node[prevu, below=3.5mm of pro] (pos) {\code{positionnement}};
 \node[prevu, below=3.5mm of pos] (lis) {\code{lissage}};
-\node[prevu, below=3.5mm of lis] (bru) {\code{brut}};
+\node[fonc, below=3.5mm of lis] (bru) {\code{brut}};
 \node[fonc, below=3.5mm of bru] (exp) {\code{exposition}};
 \node[fonc, below=3.5mm of exp] (don) {\code{donnees}};
 \node[fonc, below=3.5mm of don] (out) {\code{outils}};
@@ -618,7 +618,8 @@ programmation, un code qui n'est pas conforme à \code{MOTIF\_CODE\_REFUS}.
 Chaque fonction d'étape rend ses avertissements~; le point d'entrée les
 rassemble dans le champ \code{avertissements} de l'objet et de la fiche. Les
 codes de chaque étape sont recensés dans la partie de son module
-(sections~\ref{sec:unite-observation} et~\ref{sec:exposition}).
+(sections~\ref{sec:unite-observation}, \ref{sec:exposition}
+et~\ref{sec:brut-etats}).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-outils}
@@ -1288,11 +1289,16 @@ vecteur de codes de motif sans doublon, vide explicite admis
 \code{convention}~: \code{plus\_fine}, \code{dernier\_anniversaire} ou
 \code{age\_atteint\_annee}~; \code{par\_annee}~: \code{TRUE} ou \code{FALSE}
 (section~\ref{sec:recettes}) \\
+\code{brut} & \code{calculer\_taux\_bruts()} & \code{exposition} &
+\code{estimateurs}~: sous-ensemble non vide, sans doublon ni \code{NA}, de
+\code{poisson} et \code{binomial}, restitué dans cet ordre~; \code{niveau}~:
+niveau de confiance, nombre \code{double} unique sans attribut, fini,
+$0 < \text{niveau} < 1$ (section~\ref{sec:brut-etape}) \\
 \end{tabular}
 \end{center}
 
 \noindent
-Ni l'une ni l'autre ne tire d'aléa. La recette d'exposition et l'unité
+Aucune des trois ne tire d'aléa. La recette d'exposition et l'unité
 d'observation ne sont pas des paramètres~: le moteur les déduit des rôles
 (sections~\ref{sec:recettes} et~\ref{sec:unite-observation})~; seule une
 convention d'âge plus grossière peut être forcée.
@@ -1308,8 +1314,8 @@ les codes \emph{structurels} du plan, module \code{construire\_table}~:
 \code{graine\_manquante}, \code{parametres\_mal\_formes},
 \code{parametre\_inconnu} et \code{parametre\_manquant}. Elle ne
 réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
-(\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()}),
-dont les codes et le module sont ainsi identiques, quelle que soit la
+(\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
+\code{controler\_parametres\_brut()}), dont les codes et le module sont ainsi identiques, quelle que soit la
 fonction qui détecte la condition (ADR 0007, annotation du 17/10/2026,
 point~d).\par}
 
@@ -1322,7 +1328,9 @@ Exemple de plan (vivant $\to$ décédé, par sexe, sans exclusion)~:\\[2pt]
 \code{\phantom{plan <- list(}delai\_declaration = 0L, segmentation = "sexe",}\\
 \code{\phantom{plan <- list(}etapes = list(donnees = list(exclusions = character(0)),}\\
 \code{\phantom{plan <- list(etapes = list(}exposition = list(convention = "plus\_fine",}\\
-\code{\phantom{plan <- list(etapes = list(exposition = list(}par\_annee = FALSE)))}\\
+\code{\phantom{plan <- list(etapes = list(exposition = list(}par\_annee = FALSE),}\\
+\code{\phantom{plan <- list(etapes = list(}brut = list(estimateurs = c("poisson", "binomial"),}\\
+\code{\phantom{plan <- list(etapes = list(brut = list(}niveau = 0.95)))}\\
 \code{res <- construire\_table(donnees, roles, plan)}
 \end{encadre}
 
@@ -1337,7 +1345,10 @@ contrôle de la provenance~; calcul de l'empreinte des données reçues
 avant la première étape. Les étapes s'exécutent ensuite dans l'ordre du plan,
 chacune par sa fonction d'étape, qui rend ses paramètres effectifs, son
 résultat, ses diagnostics et ses avertissements~; l'étape \code{exposition}
-lit la table des observations de l'étape \code{donnees}.\par}
+lit la table des observations de l'étape \code{donnees}~; l'étape \code{brut}
+lit la table d'exposition et les paramètres effectifs de l'étape
+\code{exposition} (découpage par année, convention retenue, unité de
+l'exposition).\par}
 
 \subsection{Objet résultat}
 \label{sec:objet-resultat}
@@ -1348,7 +1359,7 @@ lecteurs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{table}~: la table finale~; \code{NULL} dans cette branche, dont
-    les plans s'arrêtent à l'exposition~;
+    les plans s'arrêtent aux taux bruts~;
   \item \code{etapes}~: une entrée par étape exécutée, dans l'ordre, avec
     \code{parametres} (paramètres effectifs, après résolution par le moteur),
     \code{resultat} et \code{diagnostics}~;
@@ -2097,13 +2108,17 @@ nombre de têtes croît (rapport des espérances) vaut
 $2\bigl(1 - (1 - e^{-\mu})/\mu\bigr)$ sous force constante, soit environ
 $0{,}05043$ pour $q = 0{,}05$, et exactement $q$ sous l'hypothèse de
 répartition uniforme~; dans le même schéma, la limite de
-$D/E^{i,\text{cellule}}$ vaut exactement $q$ sous l'hypothèse de Balducci
-(calcul direct). À effectif fini, le rapport a un biais que ce résultat ne
-couvre pas. Le choix de l'exposition initiale revient
-donc à la spécification de l'estimateur binomial (branche des taux bruts), qui
-devra nommer son hypothèse de répartition. Dans les deux définitions, une
-sortie concurrente reste à son instant réel~: c'est une limite connue de
-l'estimateur binomial, à documenter avec lui.
+$D/E^{i,\text{cellule}}$ vaut exactement $q$ sous l'hypothèse
+${}_{1-t}q_{x+t} = (1 - t)\,q_x$ (calcul direct). À effectif fini, le rapport a
+un biais que ce résultat ne couvre pas. Le choix de l'exposition initiale
+revient donc à l'estimateur binomial, qui doit nommer son hypothèse de
+répartition~: le module \code{brut} retient $E^{i,\text{cellule}}$, sans
+paramètre, et la colonne \code{complement\_initial\_fenetre} reste un relevé
+de l'étape \code{exposition}, que le binomial n'emploie pas (preuve et
+hypothèse~: section~\ref{sec:brut-binomial}). Dans les deux définitions, une
+sortie concurrente reste à son instant réel~: elle est traitée comme une
+censure, et la portée de l'estimateur binomial sous censure est décrite avec
+lui.
 
 \subsubsection*{Table d'exposition}
 
@@ -2260,9 +2275,364 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 \section{Taux bruts~: \code{R/brut.R}}
 \label{sec:brut}
 
-Module prévu (E2.12, E2.14)~: estimateurs des taux bruts et leurs intervalles
-de confiance exacts et asymptotiques. Il sera créé par la branche des taux
-bruts (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+Le module \code{brut} estime, par cellule de la table d'exposition (segment,
+âge et, sur demande, année civile), le taux de la transition étudiée et ses
+intervalles de confiance exacts et asymptotiques, chacun restitué avec son
+statut (E2.12, E2.14, E2.20). Sa fonction d'étape est
+\code{calculer\_taux\_bruts()}~; elle reçoit la table d'exposition et les
+paramètres effectifs de l'étape \code{exposition}, jamais le plan. Le module
+n'appelle que des modules situés avant lui (\code{donnees}, \code{exposition},
+\code{outils}~; section~\ref{sec:graphe}) et ne tire aucun aléa. Le contenu de
+fond vient de la spécification d'\code{actuary} du 17/10/2026 (issue~\#14,
+parties A.1 à A.7) et des décisions du mainteneur sur ses questions A.8
+(décision M51).
+
+\begin{encadre}
+\small
+\textbf{Appellations et références.} Les sources primaires des estimateurs et
+des intervalles de la présente partie ne sont pas encore établies
+(issue~\#6~; décision M50, Q4). Chaque méthode est donc décrite par sa
+formule, sa dérivation et son statut, \textbf{sans attribution d'auteur}~:
+référence à établir, issue~\#6. Les textes inscrits par le code dans la fiche
+emploient, pour les intervalles asymptotiques, l'appellation d'usage
+«~Wald~», dont la référence est elle aussi à établir.
+\end{encadre}
+
+\subsection{Étape \code{brut} du plan}
+\label{sec:brut-etape}
+
+\textbf{Notations}, par cellule de la table \code{etapes\$exposition\$resultat\$exposition}
+(section~\ref{sec:troncature-censure})~: $D$ le nombre d'événements
+(\code{evenements})~; $E^c$ l'exposition centrale
+(\code{exposition\_centrale}, dans l'unité de la fiche~: année d'âge, ou
+fraction d'année civile sous \code{age\_atteint\_annee})~; $E^i = E^c +
+\sum c_1$ l'exposition initiale «~cellule~», où $c_1$ est le complément
+\code{complement\_initial\_cellule} de chaque événement
+(section~\ref{sec:troncature-censure})~; $\alpha = 1 - \text{niveau}$ et
+$z = \Phi^{-1}(1 - \alpha/2)$. Les intervalles sont à queues égales,
+$\alpha/2$ de chaque côté, quel que soit $D$.
+
+\medskip
+\textbf{Paramètres}, tous requis, sans défaut (ADR 0007, point~5~;
+constante \code{PARAMETRES\_ETAPES})~: \code{estimateurs}, sous-ensemble non
+vide, sans doublon ni \code{NA}, de \code{ESTIMATEURS\_BRUT}~; les résultats
+sont toujours rendus dans l'ordre de cette constante, quel que soit l'ordre
+déclaré~; \code{niveau}, nombre \code{double} unique, sans attribut, fini,
+strictement compris entre 0 et 1. L'étape a pour préalable l'étape
+\code{exposition} (constante \code{ETAPES}~; refus
+\code{etape\_prealable\_manquante} de \code{valider\_plan()} sinon).
+
+\medskip
+\textbf{Refus du module \code{brut}}, levés par
+\code{controler\_parametres\_brut()}, que \code{valider\_plan()} appelle avant
+toute étape et que la fonction d'étape rappelle~: \code{estimateurs\_invalides}
+(pas un vecteur de chaînes, vide, \code{NA} ou doublon)~;
+\code{estimateur\_inconnu}~; \code{niveau\_invalide} (autre type que
+\code{double}, attribut, longueur différente de 1, valeur non finie, $\le 0$
+ou $\ge 1$)~; \code{binomial\_par\_annee}~: sous \code{par\_annee = TRUE},
+l'exposition initiale n'est pas produite (section~\ref{sec:decoupage-annee}),
+et une cellule âge $\times$ année ne couvre pas une année d'âge entière, si
+bien que $q_x$ n'y est pas défini.
+
+\medskip
+\textbf{Quantiles supérieurs.} Ils sont calculés par la queue supérieure
+(\code{qgamma(alpha / 2, D + 1, lower.tail = FALSE)}, de même pour
+\code{qbeta()} et \code{qnorm()}) plutôt que par le quantile $1 - \alpha/2$~:
+pour un niveau très proche de 1 (par exemple $1 - 2^{-53}$), $1 - \alpha/2$
+vaut exactement 1 en \code{double} et le quantile serait infini, alors que la
+queue supérieure garde une borne finie (spécification, A.3~; cas couvert par
+les tests). Aux niveaux usuels, les deux écritures ne diffèrent que par
+l'arrondi (approximation numérique).
+
+\subsection{Estimateur de Poisson}
+\label{sec:brut-poisson}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Objet}~: l'intensité $\mu$ de la transition dans la cellule,
+    sur l'axe de l'âge (et de l'année sous \code{par\_annee})~; estimateur
+    \code{poisson}.
+  \item \textbf{Hypothèses}~: force de la transition constante dans la
+    cellule~; sorties concurrentes non informatives
+    (\code{HYPOTHESE\_CENSURE}, section~\ref{sec:troncature-censure})~;
+    troncature à gauche traitée par la fenêtre d'observation.
+  \item \textbf{Estimateur}~: sous ces hypothèses, la log-vraisemblance de
+    $\mu$ vaut exactement $D \log \mu - \mu E^c$~; son maximum est
+    \[
+      \hat\mu = D / E^c .
+    \]
+  \item \textbf{Probabilité associée}~: $\hat q^{P} = 1 - e^{-\hat\mu}$,
+    calculée par \code{-expm1(-taux)}, sous l'hypothèse «~force constante sur
+    la cellule entière, égale au taux de la cellule~»~; les bornes sont
+    transformées par la même fonction croissante, si bien que la couverture
+    est conservée exactement. Sa portée dépend de la cellule
+    (\code{PORTEE\_PROBABILITE})~: sous \code{dernier\_anniversaire}, l'unité
+    étant l'année d'âge, c'est le $q_x$ exact sous force constante par âge
+    entier (section~\ref{sec:recettes})~; sous \code{age\_atteint\_annee},
+    c'est la probabilité sur l'année civile de la cellule~; sous
+    \code{par\_annee}, c'est le $q_x$ de l'année $t$ à force $\mu_{x,t}$.
+  \item \textbf{Intervalle exact}~:
+    $\bigl[G_D^{-1}(\alpha/2),\ G_{D+1}^{-1}(1 - \alpha/2)\bigr] / E^c$, où
+    $G_k$ est la loi gamma de forme $k$ et d'échelle 1~; borne inférieure 0
+    si $D = 0$, borne supérieure alors $-\ln(\alpha/2)/E^c$.
+  \item \textbf{Intervalle asymptotique}~: normal sur l'échelle de
+    $\log\mu$, $\operatorname{Var}(\log\hat\mu) \approx 1/D$, soit
+    $\hat\mu\, e^{\mp z/\sqrt{D}}$~; non défini à $D = 0$.
+  \item \textbf{Calcul}~: \code{taux\_poisson()}, bornes exactes par
+    \code{qgamma()}.
+  \item \textbf{Statut}~: $\hat\mu$, résultat exact (maximum de
+    vraisemblance du modèle), valeur en arithmétique flottante~; $\hat q^{P}$,
+    résultat exact (image du maximum de vraisemblance par
+    $q = 1 - e^{-\mu}$)~; intervalle exact, exact sous la loi supposée
+    $D \sim \mathcal{P}(\mu E^c)$, $E^c$ tenue pour fixe (E2.14)~: couverture
+    au moins égale au niveau pour tout $\mu$~; sous le modèle de survie, où
+    $E^c$ est aléatoire, sa couverture n'est qu'asymptotique~; bornes par
+    approximation numérique (\code{qgamma})~; intervalle asymptotique,
+    asymptotique ($\mu E^c \to \infty$).
+  \item \textbf{Références}~: à établir (issue~\#6).
+\end{itemize}
+
+\subsection{Estimateur binomial}
+\label{sec:brut-binomial}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Objet}~: la probabilité $q$ de la transition dans la cellule,
+    sur l'axe de l'âge~; estimateur \code{binomial}, refusé sous
+    \code{par\_annee}.
+  \item \textbf{Hypothèse de répartition dans la cellule}~:
+    ${}_{1-t}q_{x+t} = (1 - t)\, q_x$ pour $0 \le t \le 1$, ce qui revient à
+    interpoler linéairement $1/S$ dans la cellule~; censures (sorties
+    concurrentes, fin de période, délai de déclaration) indépendantes de
+    l'instant de l'événement.
+  \item \textbf{Estimateur}~: $\hat q^{B} = D / E^i$, avec l'exposition
+    initiale «~cellule~» (\code{EXPOSITION\_INITIALE\_BRUT}), fixée sans
+    paramètre (décision M51, question~1).
+  \item \textbf{Pourquoi la définition «~cellule~»} (spécification, A.2~;
+    preuve écrite). Soit une tête présente dans la cellule à la fraction
+    $u$ et censurée en $c$ ($u < c \le 1$, $c$ fixe ou indépendant de
+    l'instant $T$ de l'événement), et $\pi = P(T \in (u, c) \mid T > u)$.
+    \emph{Définition «~fenêtre~»}~: le complément court jusqu'à $c$, donc
+    $E^{i,\text{fenêtre}} = c - u$ quelle que soit la loi~; l'égalité
+    $E[D] = q\,E[E^i]$ exige $\pi = q(c - u)$ pour tout $(u, c)$~; avec
+    $u = 0$, cela impose la répartition uniforme $P(T \le c) = qc$, sous
+    laquelle $\pi = q(c - u)/(1 - qu) \ne q(c - u)$ dès que $u > 0$~:
+    \textbf{aucune hypothèse de répartition ne rend cette définition exacte
+    dès qu'une tête entre en cours de cellule}. \emph{Définition
+    «~cellule~»}~: le complément court jusqu'à la fin de la cellule, donc
+    $E[E^{i,\text{cellule}}] = (c - u)(1 - \pi) + (1 - u)\pi$, et l'égalité
+    $\pi = q\,E[E^i]$ équivaut à $\pi = q(c - u)/(1 - q(1 - c))$, qui est
+    exactement la valeur de $\pi$ sous l'hypothèse ci-dessus. En sommant sur
+    les têtes, $E[D] = q\,E[E^i]$ \textbf{pour toute troncature à gauche et
+    toute censure indépendante dans la cellule}~; avec $u = 0$, cette
+    hypothèse est la seule loi dans la cellule qui rende l'égalité vraie pour
+    tout $c$. Sous une autre loi, en particulier la force constante du
+    simulateur, l'identité ne tient plus dès qu'une entrée ou une censure
+    tombe dans la cellule~; elle tient pour une cellule observée entière,
+    sans entrée ni censure, où $E^i$ est le nombre de têtes.
+  \item \textbf{Intervalle exact}~:
+    $\bigl[B^{-1}_{D,\,E^i - D + 1}(\alpha/2),\ B^{-1}_{D + 1,\,E^i - D}(1 - \alpha/2)\bigr]$,
+    où $B_{a,b}$ est la loi bêta~; borne inférieure 0 si $D = 0$, borne
+    supérieure 1 si $D = E^i$. Si $E^i$ n'est pas entier, aucune loi
+    binomiale ne lui correspond~: la formule est prolongée continûment
+    (décision M51, question~4).
+  \item \textbf{Intervalle asymptotique}~: normal sur l'échelle de
+    $\operatorname{logit} q$,
+    $\operatorname{logit}^{-1}\bigl(\operatorname{logit}\hat q \mp
+    z\sqrt{1/D + 1/(E^i - D)}\bigr)$~; non défini à $D = 0$ et à $D = E^i$.
+  \item \textbf{Tolérance sur l'effectif} (\code{TOLERANCE\_EFFECTIF},
+    $10^{-9}$, absolue)~: si $|E^i - D| \le 10^{-9}$, le calcul prend
+    $E^i := D$, la colonne \code{exposition\_initiale} gardant la somme
+    calculée. Raison~: $E^i$ est une somme de fractions $j/L$, $L \in \{365,
+    366\}$, dont l'arrondi flottant peut placer une valeur rationnellement
+    égale à $D$ juste en dessous, ce qui la ferait déclarer à tort
+    «~effectif inférieur~»~; le plus petit écart rationnel non nul entre $E^i$
+    et un entier vaut $1/(365 \times 366) = 1/133\,590 \approx 7{,}5\cdot
+    10^{-6}$, si bien que la tolérance ne peut absorber un écart réel
+    (approximation numérique).
+  \item \textbf{Calcul}~: \code{taux\_binomial()}, bornes exactes par
+    \code{qbeta()}.
+  \item \textbf{Statut}~: $\hat q^{B}$, estimateur des moments~:
+    $E[D] = q\,E[E^i]$ exactement sous l'hypothèse de répartition, convergent,
+    non sans biais à effectif fini (c'est un rapport)~; intervalle exact,
+    exact sous la loi supposée $D \sim \mathcal{B}(E^i, q)$, $E^i$ tenue pour
+    fixe, \textbf{si $E^i$ est entier}~; sinon, prolongement continu de la
+    formule exacte, \textbf{couverture non établie}~; bornes par
+    approximation numérique (\code{qbeta})~; intervalle asymptotique,
+    asymptotique ($E^i q(1 - q) \to \infty$).
+  \item \textbf{Références}~: à établir (issue~\#6), y compris pour
+    l'appellation usuelle de l'hypothèse de répartition, nommée ici par sa
+    formule.
+\end{itemize}
+
+\noindent
+\textbf{Choix des échelles asymptotiques} (décision M51, question~2). La
+couverture exacte des intervalles, calculée par sommation sur la loi du
+décompte (spécification, A.3~; résultat exact calculé numériquement, sans
+simulation), est meilleure sur l'échelle du lien canonique, $\log\mu$ pour
+Poisson et $\operatorname{logit} q$ pour le binomial, que sur l'échelle
+naturelle dès environ cinq événements attendus~; en deçà, les deux formes
+asymptotiques sont mauvaises, à cause du poids de $D = 0$, et c'est
+l'intervalle exact qui fait foi. Ces échelles gardent en outre les bornes
+dans l'espace des paramètres, sans troncature à 0 ou à 1.
+
+\subsection{Statuts des grandeurs restituées}
+\label{sec:brut-statuts}
+
+Le statut de chaque grandeur est restitué par le moteur, dans les paramètres
+de l'étape et dans la fiche (\code{statuts}, constante \code{STATUTS\_BRUT}~:
+colonnes \code{estimateur}, \code{grandeur}, \code{intervalle},
+\code{statut}, \code{loi\_supposee}, \code{calcul}), pour les seuls
+estimateurs retenus. Le tableau~\ref{tab:statuts-brut} en donne le contenu~;
+la mention «~$E^c$ fixe~» ou «~$E^i$ fixe~» est réservée aux intervalles
+exacts.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{2.6cm}p{2.3cm}p{6.0cm}p{3.7cm}@{}}
+\caption{Statuts restitués par l'étape \code{brut} (constante
+\code{STATUTS\_BRUT}).}
+\label{tab:statuts-brut}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Estimateur, grandeur}} &
+\textcolor{financeblue}{\textbf{Intervalle}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Loi supposée}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Estimateur, grandeur}} &
+\textcolor{financeblue}{\textbf{Intervalle}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Loi supposée}} \\
+\endhead
+\code{poisson}, taux & sans objet (estimation ponctuelle) & résultat exact~: maximum de vraisemblance du modèle à force constante dans la cellule & force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson) \\
+\code{poisson}, taux & exact & exact sous la loi supposée~: couverture $\ge$ niveau pour tout $\mu$, $E^c$ tenue pour fixe~; sous le modèle de survie ($E^c$ aléatoire), couverture seulement asymptotique & $D \sim \mathcal{P}(\mu E^c)$, $E^c$ fixe \\
+\code{poisson}, taux & asymptotique & asymptotique ($\mu E^c \to \infty$)~; non défini à $D = 0$ & $D \sim \mathcal{P}(\mu E^c)$ \\
+\code{poisson}, probabilité & sans objet & résultat exact~: image du maximum de vraisemblance par $q = 1 - e^{-\mu}$, force constante sur la cellule entière & force constante dans la cellule \\
+\code{poisson}, probabilité & exact & exact sous la loi supposée (transformation croissante des bornes exactes du taux~: couverture identique) & $D \sim \mathcal{P}(\mu E^c)$, $E^c$ fixe \\
+\code{poisson}, probabilité & asymptotique & asymptotique (transformation croissante des bornes asymptotiques du taux~: même régime)~; non défini à $D = 0$ & $D \sim \mathcal{P}(\mu E^c)$ \\
+\code{binomial}, taux & sans objet & estimateur des moments~: $E[D] = q\,E[E^i]$ exactement sous l'hypothèse de répartition~; convergent~; non sans biais à effectif fini & ${}_{1-t}q_{x+t} = (1 - t)q_x$, censure indépendante \\
+\code{binomial}, taux & exact & exact sous la loi supposée si $E^i$ est entier~; sinon prolongement continu de la formule exacte~: couverture non établie & $D \sim \mathcal{B}(E^i, q)$, $E^i$ fixe \\
+\code{binomial}, taux & asymptotique & asymptotique ($E^i q(1-q) \to \infty$)~; non défini à $D = 0$ et à $D = E^i$ & $D \sim \mathcal{B}(E^i, q)$ \\
+\end{longtable}
+}
+
+\noindent
+Les bornes exactes sont calculées numériquement par \code{qgamma()} ou
+\code{qbeta()}~: leur valeur est une approximation numérique de la borne
+exacte, ce que la colonne \code{calcul} de la fiche écrit.
+
+\subsection{États des cellules et avertissements}
+\label{sec:brut-etats}
+
+Une cellule où l'estimateur n'est pas défini reçoit \code{NA} pour le taux et
+ses bornes, un \emph{état} et, si elle compte un événement, un
+avertissement~; \textbf{jamais un refus} (décision M51, question~3)~: un
+décès survenu le jour d'un anniversaire, au bord de la plage d'âges, ne doit
+pas bloquer la construction. Les états possibles sont ceux de
+\code{ETATS\_BRUT}~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{defini}, pour tous les estimateurs~;
+  \item \code{exposition\_nulle}~: exposition nulle et aucun événement~;
+    zéro explicite de la table d'exposition, compté dans les diagnostics,
+    sans avertissement~;
+  \item \code{evenement\_sans\_exposition} (Poisson)~: $E^c = 0$ et $D > 0$~;
+    la vraisemblance croît sans borne et le maximum est infini (cas H8, H10b
+    et H11 de l'étape \code{exposition}). Avertissement
+    \code{poisson\_evenement\_sans\_exposition}, de nombre le nombre de ces
+    cellules, le message donnant aussi le nombre d'événements~;
+  \item \code{effectif\_inferieur\_aux\_evenements} (binomial)~:
+    $0 < E^i < D$, la tolérance appliquée~; le modèle binomial ne s'applique
+    pas. C'est le cas d'une tête entrée dans la cellule puis touchée par
+    l'événement, qui apporte moins d'une unité d'exposition initiale.
+    Avertissement \code{binomial\_effectif\_inferieur\_aux\_evenements}, de
+    nombre le nombre de ces cellules. Côté binomial, $E^i = 0$ avec $D > 0$
+    est impossible~: chaque événement apporte un complément d'au moins un
+    jour.
+\end{itemize}
+
+\noindent
+Dans une cellule définie, les bornes asymptotiques valent en outre
+\code{NA} à $D = 0$ et, pour le binomial, à $D = E^i$ ($\hat q = 1$~; borne
+exacte inférieure $(\alpha/2)^{1/D}$, borne supérieure 1).
+
+\subsection{Résultat, paramètres et diagnostics}
+\label{sec:brut-resultat}
+
+\code{etapes\$brut\$resultat} contient une table par estimateur retenu,
+dans l'ordre de \code{ESTIMATEURS\_BRUT}, aux \textbf{mêmes lignes et dans le
+même ordre} que la table d'exposition (zéro ligne si elle n'en a aucune)~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \sloppy \code{poisson}~: clés de segmentation, \code{age} et, sous
+    \code{par\_annee}, \code{annee}~; \code{evenements} et
+    \code{exposition\_centrale}, identiques aux colonnes de l'exposition~;
+    \code{taux}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte},
+    \code{borne\_inf\_asymptotique}, \code{borne\_sup\_asymptotique}~;
+    \code{probabilite} et ses quatre bornes, de même nom préfixé
+    (\code{probabilite\_}\allowbreak\code{borne\_inf\_exacte}\ldots)~;
+    \code{etat}~;
+  \item \code{binomial}~: clés, \code{age}, \code{evenements},
+    \code{exposition\_initiale} ($E^c + \sum c_1$, avant tolérance),
+    \code{taux}, les quatre bornes, \code{etat}.
+\end{itemize}
+
+\noindent
+\textbf{Paramètres effectifs}~: \code{estimateurs} (ordre canonique),
+\code{niveau}, \code{exposition\_initiale} (\code{"cellule"}),
+\code{tolerance\_effectif}, \code{convention} (retenue), \code{unite\_exposition},
+\code{hypotheses} (texte par estimateur retenu et, si Poisson est retenu,
+pour la probabilité, complété de sa portée~; constantes
+\code{HYPOTHESES\_BRUT} et \code{PORTEE\_PROBABILITE}) et \code{statuts}
+(tableau~\ref{tab:statuts-brut}). \textbf{Diagnostics}~: nombre de cellules,
+somme des événements, nombre de cellules sans événement, nombre de cellules
+où $D = E^i > 0$ à la tolérance près (\code{NA} si le binomial n'est pas
+retenu), et le tableau \code{etats} (estimateur, état, nombre de cellules).
+La fiche reçoit le champ \code{hypotheses\_brut} (section~\ref{sec:fiche}).
+
+\subsection{Vérifications}
+\label{sec:verifications-brut}
+
+\code{tests/unitaires/test\_brut.R} vérifie, au niveau 0,95, avec $z$ écrit
+en dur~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item des \emph{formes closes}, indépendantes de \code{qgamma()},
+    \code{qbeta()} et \code{pgamma()}~: Poisson à $D = 0$ (borne
+    $-\ln(\alpha/2)/E$) et à $D = 1$ (borne supérieure $u/E$, $u$ racine de
+    $(1 + u)e^{-u} = \alpha/2$ obtenue par la méthode de Newton)~; binomial à
+    $E^i$ réel, $D = 0$ ($1 - (\alpha/2)^{1/n}$), $D = 1$ et $D = n$~; séries
+    explicites (Poisson $D \le 5$, binomial $n \in \{2, 5, 12\}$)~;
+  \item les cas d'une ligne et de fusion de l'étape \code{exposition} (H, F)
+    et un cas composite à onze têtes (C), aux attendus calculés à la main~:
+    taux, bornes, états, avertissements, diagnostics~;
+  \item chaque refus, depuis \code{valider\_plan()} et depuis la fonction
+    d'étape, avec le même code~; le niveau $1 - 2^{-53}$, admis, à bornes
+    finies~;
+  \item des identités exactes~: \code{evenements} et
+    \code{exposition\_centrale} \code{identical()} aux colonnes de
+    l'exposition, clés et ordre compris~; $\hat\mu E^c = D$ à $10^{-14}$ près~;
+    \code{exposition\_initiale} $= E^c +$ \code{complement\_initial\_cellule}~;
+  \item l'\emph{invariance}~: un plan sans étape \code{brut} donne un objet
+    \code{identical()} à celui du plan avec \code{brut}, privé de ses seuls
+    ajouts (\code{etapes\$brut}, \code{fiche\$hypotheses\_brut},
+    avertissements de l'étape et plan).
+\end{itemize}
+
+\noindent
+\textbf{Portée du recoupement} (\code{CONTEXT.md}). Les bornes exactes sont
+recoupées par \code{stats::poisson.test()} et, pour un $E^i$ entier
+seulement, par \code{stats::binom.test()}, qui reposent sur les mêmes
+fonctions \code{qgamma()} et \code{qbeta()} que le moteur~: le recoupement
+vérifie la formule, les branchements à $D = 0$ et $D = E^i$, la division par
+l'exposition et le partage $\alpha/2$, \textbf{pas} les fonctions
+spéciales~; ce sont les formes closes qui en font une vérification
+indépendante. Les bornes asymptotiques et la probabilité ne sont recoupées
+par aucune fonction de \code{stats}~: leurs attendus sont calculés à la main.
+\code{tests/test\_reproductibilite.R} vérifie qu'une construction avec
+l'étape \code{brut} est \code{identical()} hors \code{execution} dans le même
+processus et dans un autre, que le rejeu de la fiche redonne l'objet, et
+l'invariance du plan sans \code{brut} sur deux plans de référence (R1 et
+R4).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-brut}
@@ -2277,7 +2647,24 @@ bruts (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
 \textcolor{financeblue}{\textbf{Statut}} &
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
-\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/brut.R} absent} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-brut}{ESTIMATEURS\_BRUT} & constante & --- & estimateurs disponibles, dans l'ordre canonique des résultats \\
+\catalogue{fonctions-brut}{EXPOSITION\_INITIALE\_BRUT} & constante & --- & \code{"cellule"}~: définition de l'exposition initiale du binomial, sans paramètre (section~\ref{sec:brut-binomial}) \\
+\catalogue{fonctions-brut}{TOLERANCE\_EFFECTIF} & constante & --- & $10^{-9}$~: tolérance absolue sur $|E^i - D|$ \\
+\catalogue{fonctions-brut}{ETATS\_BRUT} & constante & --- & états possibles d'une cellule, par estimateur (section~\ref{sec:brut-etats}) \\
+\catalogue{fonctions-brut}{HYPOTHESES\_BRUT} & constante & --- & textes des hypothèses, par estimateur et pour la probabilité, inscrits dans les paramètres et dans la fiche \\
+\catalogue{fonctions-brut}{PORTEE\_PROBABILITE} & constante & --- & portée de la probabilité de Poisson selon la cellule (année d'âge, année civile, âge $\times$ année) \\
+\catalogue{fonctions-brut}{STATUTS\_BRUT} & constante & --- & statut, loi supposée et calcul de chaque grandeur (tableau~\ref{tab:statuts-brut}) \\
+\catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} et par la fonction d'étape \\
+\catalogue{fonctions-brut}{taux\_poisson()} & interne & $D$, $E^c$, niveau & taux, bornes exactes et asymptotiques, état (section~\ref{sec:brut-poisson}) \\
+\catalogue{fonctions-brut}{taux\_binomial()} & interne & $D$, $E^i$, niveau, tolérance & taux, bornes, état, cellules où $D = E^i > 0$ (section~\ref{sec:brut-binomial}) \\
+\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat}) \\
 \end{longtable}
 }
 
@@ -2465,7 +2852,13 @@ identiques. Ses champs~:
     aléatoire~» dans cette branche)~; \code{generateur} (\code{GENERATEUR})~;
   \item \code{provenance} et \code{provenance\_mention} («~aucun fichier
     (données construites en mémoire)~» si \code{provenance} est \code{NULL})~;
-  \item \code{empreintes} (section~\ref{sec:empreinte})~; \code{avertissements}.
+  \item \code{empreintes} (section~\ref{sec:empreinte})~; \code{avertissements}~;
+  \item \code{hypotheses\_brut}, \textbf{seulement si l'étape \code{brut} est
+    exécutée}, en fin de liste~: copie des paramètres effectifs de l'étape
+    \code{estimateurs}, \code{niveau}, \code{exposition\_initiale},
+    \code{tolerance\_effectif}, \code{hypotheses} et \code{statuts}
+    (section~\ref{sec:brut-resultat}). Un plan sans étape \code{brut} a donc
+    exactement les champs de la fiche antérieure au module.
 \end{itemize}
 
 \noindent
@@ -2640,7 +3033,7 @@ l'objet.
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche \\
-\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction \\
+\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
 \end{longtable}
 }
@@ -3092,10 +3485,11 @@ fonctions de leur module.
 
 Le tableau~\ref{tab:tracabilite} relie les exigences du cahier des charges
 (\code{docs/exigences.md}) aux sections qui les décrivent. Une exigence qui n'y
-figure pas n'est pas encore mise en œuvre (méthodes d'estimation, de lissage,
-de positionnement, de fermeture et de validation, rapport figé, interface,
-tables de référence embarquées)~; le tableau est complété avec chaque partie
-rédigée.
+figure pas n'est pas encore mise en œuvre (méthodes de lissage, de
+positionnement, de fermeture et de validation, rapport figé, interface,
+tables de référence embarquées)~; une exigence mise en œuvre en partie
+renvoie aux sections de la partie réalisée~; le tableau est complété avec
+chaque partie rédigée.
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -3124,9 +3518,12 @@ E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, donn�
 E2.8 & pondération par les montants~: rôle refusé tant que ses intervalles ne sont pas spécifiés & \ref{sec:catalogue-roles} \\
 E2.9 & segmentation déclarée, vide explicite admis (le test d'homogénéité viendra avec la validation) & \ref{sec:plan}, \ref{sec:troncature-censure} \\
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
+E2.12 & taux bruts~: estimateurs de Poisson et binomial, hypothèses de répartition dans la cellule (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut} \\
+E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, sorties concurrentes, censure, constat de simulation & \ref{sec:simulation} \\
-E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
+E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références & \ref{sec:brut-poisson}, \ref{sec:brut-binomial} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
 E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
 E3.7 & relecture sans le code, rejeu à partir de la fiche & \ref{sec:fiche} \\
