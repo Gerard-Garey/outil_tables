@@ -2884,17 +2884,21 @@ l'arrondi (approximation numérique).
     $E[D] = q\,E[E^i]$ subsiste, et la \textbf{couverture des deux
     intervalles n'est pas établie}~; si $E^i$ n'est pas entier, l'intervalle
     exact est en outre un prolongement continu de la formule exacte. Exemple
-    (calcul exact de la loi de $D$, sans simulation~: résultat exact, calculé
-    numériquement, sur un cas)~: $n$ têtes entrées à la fraction $u = 0{,}5$
-    de la cellule et observées jusqu'à sa fin, sous l'hypothèse de
-    répartition avec $q = 0{,}2$, si bien que $E^i = n/2$ est entier et
-    $D \sim \mathcal{B}(n, 0{,}1)$~; pour un niveau de 0,95, la couverture
-    vraie de l'intervalle exact vaut 0,9561, 0,9423 et 0,9381 pour $n = 200$,
-    $1\,000$ et $10^{4}$, celle de l'intervalle logit 0,9245, 0,9352 et
-    0,9357~: l'intervalle «~exact~» peut couvrir moins que le niveau, et
-    l'écart ne disparaît pas quand l'effectif croît ($\operatorname{Var}(D)$
-    vaut $n \cdot 0{,}1 \cdot 0{,}9$, au lieu de $E^i q (1 - q) = n \cdot
-    0{,}08$ supposé par les deux intervalles).
+    (calcul exact de la loi de $D$, sans simulation~: résultat exact sur un
+    cas, bornes par \code{qbeta}, approximation numérique)~: $n$ têtes
+    entrées à la fraction $u = 0{,}5$ de la cellule et observées jusqu'à sa
+    fin, sous l'hypothèse de répartition avec $q = 0{,}2$, si bien que
+    $E^i = n/2$ est entier et $D \sim \mathcal{B}(n, 0{,}1)$~; pour un niveau
+    de 0,95, la couverture vraie de l'intervalle exact vaut 0,9561, 0,9423,
+    0,9381 et 0,9364 pour $n = 200$, $1\,000$, $10^{4}$ et $10^{5}$, celle de
+    l'intervalle logit 0,9245, 0,9352, 0,9357 et 0,9357~: l'intervalle
+    «~exact~» peut couvrir moins que le niveau. L'écart ne disparaît pas
+    quand l'effectif croît~: $\operatorname{Var}(D)$ vaut $n \cdot 0{,}1
+    \cdot 0{,}9$, au lieu de $E^i q (1 - q) = n \cdot 0{,}08$ supposé par les
+    deux intervalles, et les deux couvertures tendent, quand $n \to \infty$,
+    vers $2\,\Phi\bigl(\Phi^{-1}(0{,}975)/\sqrt{1{,}125}\bigr) - 1 =
+    0{,}9354$, où $1{,}125 = 0{,}09/0{,}08$ est le rapport de ces deux
+    variances (résultat asymptotique).
   \item \textbf{Références}~: à établir (issue~\#6), y compris pour
     l'appellation usuelle de l'hypothèse de répartition, nommée ici par sa
     formule.
