@@ -3430,7 +3430,16 @@ l'encadré qui suit.
     \Phi^{-1}(1 - a/2)$, de cible $1 - e^{-\mu_{d,x}}$, et non la cible
     exacte $q^{*}_x$ sur la grille des jours~: l'écart relatif, de l'ordre
     de $-\mu_r/(2L)$, vaut environ $-7 \cdot 10^{-5}$ (rachat 0,05), négligeable
-    devant l'erreur d'estimation par cellule. Tests globaux, à
+    devant l'erreur d'estimation par cellule. Cet écart de cible déplace les
+    statistiques d'au plus des valeurs mesurées sous la graine déclarée, sur
+    les $K = 83$ cellules~: $z_x$ d'au plus $1{,}4 \cdot 10^{-3}$ en valeur
+    absolue par cellule, et la statistique globale $\sum_x z_x/\sqrt{K}$ de
+    $-7{,}4 \cdot 10^{-3}$~; la fausse alarme des tests produit-limite, par
+    cellule et global, reste nominale asymptotique à ce déplacement près. Ce
+    déplacement ne s'annule pas quand l'exposition croît~: l'écart de cible
+    est fixe et l'écart type de $\hat q$ décroît comme l'inverse de la racine
+    de l'exposition, si bien que le déplacement de $z_x$ croît comme
+    $\sqrt{D_x}$. Tests globaux, à
     $10^{-4}$ chacun, $|z| \le \Phi^{-1}(1 - 5 \cdot 10^{-5})$~: Poisson
     signé, $\sum (D - \lambda)/\sqrt{\sum (1 + \mu^{*}/365)\lambda}$, dont la
     variance est exacte à $L$ fixé (scores de cellules disjointes non
@@ -3438,8 +3447,8 @@ l'encadré qui suit.
     $\sum_x z_x/\sqrt{K}$. \emph{Approximation}~: $\mu^{*}$, donc $\lambda_x$,
     et la variance du test signé sont calculés à $L = 365$ pour toutes les
     cellules, y compris celles de 366~jours~; l'écart relatif de $\mu^{*}$
-    est alors au plus $9{,}6 \cdot 10^{-7}$, sans effet pratique sur les
-    régions. Pas
+    est alors au plus $6{,}7 \cdot 10^{-7}$ sur les 83 cellules retenues
+    (mesuré), sans effet pratique sur les régions. Pas
     de test binomial~: sa cible n'est pas $q$, et l'écart entre les deux
     définitions de l'exposition initiale y est indétectable à cet effectif.
   \item \textbf{C3, couverture des intervalles}~: une simulation de
@@ -3550,8 +3559,8 @@ simulateur).}
 \textcolor{financeblue}{\textbf{Nature de la fausse alarme}} \\
 \endhead
 C1 & 12, à $2 \cdot 10^{-5}$ & $2{,}4 \cdot 10^{-4}$ & binomial exacte~; Poisson bornée exactement~; produit-limite (C1.5) nominale asymptotique \\
-C2 par cellule & $2 \times K$, à $1{,}5 \cdot 10^{-4}/K$ & $3{,}0 \cdot 10^{-4}$ & nominale asymptotique (Poisson~: exacte si $E^c$ était fixe, valeur calculée et écrite par le test) \\
-C2 globaux & 2, à $10^{-4}$ & $2{,}0 \cdot 10^{-4}$ & nominale asymptotique \\
+C2 par cellule & $2 \times K$, à $1{,}5 \cdot 10^{-4}/K$ & $3{,}0 \cdot 10^{-4}$ & nominale asymptotique (produit-limite~: à un déplacement mesuré près~; Poisson~: exacte si $E^c$ était fixe, valeur calculée et écrite par le test) \\
+C2 globaux & 2, à $10^{-4}$ & $2{,}0 \cdot 10^{-4}$ & nominale asymptotique (produit-limite~: à un déplacement mesuré près) \\
 C3a & 4, à $3 \cdot 10^{-5}$ & $1{,}2 \cdot 10^{-4}$ & exacte \\
 C3b & 6, à $2 \cdot 10^{-5}$ & $1{,}2 \cdot 10^{-4}$ & bornée exactement \\
 Total & 190 & $9{,}8 \cdot 10^{-4} \le 10^{-3}$ & dont exacte ou bornée exactement au plus $4{,}16 \cdot 10^{-4}$ (somme calculée par le test~: $4{,}153 \cdot 10^{-4}$), nominale asymptotique $5{,}2 \cdot 10^{-4}$ \\
@@ -3595,7 +3604,13 @@ $q$, spécification, A.4)~: sa garantie est le cas K
   \item \emph{Approximations de la cible} (C2), d'écart relatif écrit~: le
     produit-limite comparé à $1 - e^{-\mu_d}$ plutôt qu'à $q^{*}$ (environ
     $-7 \cdot 10^{-5}$), $\mu^{*}$ et la variance du test signé calculés à
-    $L = 365$ pour toutes les cellules (au plus $9{,}6 \cdot 10^{-7}$).
+    $L = 365$ pour toutes les cellules (au plus $6{,}7 \cdot 10^{-7}$ sur les
+    83 cellules retenues, mesuré). La première déplace $z_x$ d'au plus
+    $1{,}4 \cdot 10^{-3}$ par cellule et la statistique globale de
+    $-7{,}4 \cdot 10^{-3}$ (mesurés sous la graine déclarée)~; la fausse
+    alarme du produit-limite, test global compris, est nominale
+    asymptotique à ce déplacement près, qui croît comme $\sqrt{D}$ et ne
+    s'annule pas quand l'exposition croît.
   \item \emph{Constat de simulation}~: le passage des tests sous les graines
     déclarées.
   \item \emph{Erreur Monte-Carlo}~: en C3, la dispersion du nombre
