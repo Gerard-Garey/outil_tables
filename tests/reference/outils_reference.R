@@ -68,10 +68,13 @@ TYPES_REFERENCE <- c("double", "integer", "logical", "character", "Date", "facto
 # les lignes @ sont exacts par leur type. Toute modification est annotée
 # dans l'ADR 0009, datée, avec l'avis d'actuary (point 9.3).
 CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12)
+# Aucune clé pour une grandeur de type integer (quatrième annotation, (b)) :
+# une clé la classerait aussi si elle redevenait double, et masquerait ce
+# retour à doubles_sans_tolerance().
 TOLERANCES <- c(
   # exacte : doubles à valeur entière ou déclarée (point 3.4)
   exposition_jours = 0, cellules = 0, niveau = 0, delai_declaration = 0,
-  tolerance_effectif = 0, version_fiche = 0, graine = 0,
+  tolerance_effectif = 0,
   # 1e-14 : arithmétique IEEE de base (point 3.4)
   exposition_centrale = 1e-14, complement_initial_cellule = 1e-14,
   complement_initial_fenetre = 1e-14, exposition_initiale = 1e-14, taux = 1e-14,
@@ -85,14 +88,7 @@ TOLERANCES <- c(
   "kaplan_meier/taux" = 1e-12, "kaplan_meier/variance" = 1e-12,
   "kaplan_meier_sauts/survie_cellule" = 1e-12,
   "kaplan_meier_sauts/age_exact" = 1e-14,
-  "kaplan_meier_sauts/variance_log_survie_cellule" = 1e-14,
-  "kaplan_meier_sauts/numerateur" = 0, "kaplan_meier_sauts/ensemble_a_risque" = 0,
-  "kaplan_meier/instants_evenement" = 0, "parametres/denominateur_instants" = 0,
-  "hypotheses_brut/denominateur_instants" = 0,
-  "diagnostics/kaplan_meier/instants" = 0, "diagnostics/kaplan_meier/evenements" = 0,
-  "diagnostics/kaplan_meier/evenements_a_l_instant_d_entree" = 0,
-  "diagnostics/kaplan_meier/cellules_survie_nulle" = 0,
-  "diagnostics/kaplan_meier/ensemble_a_risque_maximal" = 0)
+  "kaplan_meier_sauts/variance_log_survie_cellule" = 1e-14)
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 

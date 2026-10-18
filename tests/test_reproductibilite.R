@@ -460,6 +460,24 @@ verifier("témoin : double de nom inconnu, identique des deux côtés -> « sans
     any(grepl(paste("grandeur sans tolérance déclarée :", c_), imprimer_comparaison(r), fixed = TRUE, useBytes = TRUE)) &&
     identical(doubles_sans_tolerance(g), c_)
 })
+# Aucune clé pour une grandeur integer (ADR 0009, quatrième annotation, (b)) :
+# copie en mémoire de R6, rien n'est écrit sous tests/reference/.
+verifier("témoin : kaplan_meier_sauts/numerateur remis en double -> relevé par doubles_sans_tolerance(), que la clé retirée aurait masqué", {
+  g <- aplatis[["R6"]]
+  c_ <- grep("kaplan_meier_sauts/numerateur$", names(g$types), value = TRUE)
+  if (length(c_) != 1L || !identical(unname(g$types[[c_]]), "integer")) return("numerateur de R6 : un chemin integer attendu")
+  masque <- c(TOLERANCES, "kaplan_meier_sauts/numerateur" = 0)
+  g$types[[c_]] <- "double"; g$valeurs[[c_]] <- as.double(g$valeurs[[c_]])
+  identical(doubles_sans_tolerance(g), c_) && !length(doubles_sans_tolerance(g, masque))
+})
+verifier("tolérances : aucun double sans tolérance déclarée dans les six références commitées (table sans clé integer)", {
+  restes <- lapply(plans_reference(), function(p) {
+    f <- file.path(DOSSIER_REFERENCES, paste0(p$identifiant, ".tsv"))
+    if (!file.exists(f)) return(paste("absent :", f))
+    doubles_sans_tolerance(lire_reference(f))
+  })
+  if (all(lengths(restes) == 0L)) TRUE else paste(names(restes)[lengths(restes) > 0L], collapse = ", ")
+})
 # Règle élément par élément (seconde annotation, (c)) : mesure d'actuary,
 # a = c(Inf, 0, 0.1 + 0.2), b = c(Inf, 0, 0.3), tol = 1e-14 -> égaux ;
 # Inf contre -Inf et NA contre NaN restent des écarts (structure).
