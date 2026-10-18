@@ -384,3 +384,25 @@ Ce que la mesure établit, et ce qu'elle n'établit pas :
 **Effet sur les résultats** : aucun. `ddf77bd` ne touche ni `R/` ni les références. `1019d8e` crée les références sans changer aucune valeur existante (mode `creation`, visa d'`actuary` du 18/10/2026, message de `1019d8e`).
 
 Issues : #17 ; #15, #24 (maillons de l'ancrage). ADR 0008 (réserve sur la `libm`, maintenue). PR #30 : les mesures sous Windows ont été faites avec le correctif du harnais de cette PR (messages de `ddf77bd` et `1019d8e`).
+
+**Complément du 18/10/2026 (revue finale complète de la PR #18, règle 10).** Les points (e) et (f) s'ajoutent à la présente annotation après sa rédaction ; les points (a) à (d) ne sont pas réécrits.
+
+**(e) Point 3.3 : 0 et −0 sont confondus, ce qui est voulu.** L'écriture canonique des doubles, `sprintf("%.17g", x + 0)` (`R/rapport.R:109`, `colonne_canonique()`, employée par `octets_valeurs()` de l'outillage), écrit −0 comme 0 : en arrondi au plus proche, −0 + 0 vaut +0. La comparaison les confond aussi : `identical(0, -0)` vaut `TRUE`, et `identiques_elements()` compare par `==`.
+
+- Mesure d'`audit` (revue finale) : `taux[1]` passé de 0 à −0 donne « identique(s) au bit près », verdict OK.
+- Mesure d'`architect` (18/10/2026, R 4.3.3 ucrt, poste Windows, hors plateforme de référence) : `sprintf("%.17g", -0)` donne `-0` et `sprintf("%.17g", -0 + 0)` donne `0` ; `identical(0, -0)` vaut `TRUE` et `identical(0, -0, num.eq = FALSE)` vaut `FALSE`. `comparer_references()`, appliquée à deux jeux de grandeurs qui ne diffèrent que par le signe d'un zéro de `etapes/brut/resultat/poisson/taux`, rend `ok = TRUE` et le verdict « identique », alors que `1 / x` vaut `-Inf` du côté obtenu.
+
+±0 confondus par la représentation canonique, voulu. Motif : aucune grandeur actuelle du moteur (taux, borne, exposition, probabilité) ne porte de sens par le signe d'un zéro, et la même écriture fait l'empreinte (ADR 0007, point 9.3). Limite admise : la non-régression ne détecte pas un passage de 0 à −0. Une grandeur future dont le signe du zéro aurait un sens appellerait un changement de format (point 9.2).
+
+**(f) Point 3.4 : clés inertes de la classe exacte retirées de `TOLERANCES`.** La seconde annotation, (b), et la quatrième, (b), se contredisaient pour les grandeurs `integer`. La contradiction est résolue en faveur de la quatrième, sur avis d'`actuary` (réponse à la question Q1 de la revue finale, 18/10/2026).
+
+- **La contradiction.** La seconde annotation, (b), range les dénombrements de Kaplan-Meier dans la classe exacte par des clés qualifiées de `TOLERANCES`, tout en notant qu'ils sont `integer`, donc exacts par leur type. La quatrième, (b), pose la règle inverse pour `avertissements/nombre` : la tolérance n'est cherchée que pour un `double`, une clé sur un `integer` ne sert donc à rien, et elle masquerait à `doubles_sans_tolerance()` (règle de complétude du point 3.4) un retour au `double`.
+- **La résolution.** La règle de la quatrième annotation, (b), vaut pour toute clé dont la grandeur est `integer`. Douze clés de la classe exacte sont retirées : `kaplan_meier_sauts/numerateur`, `kaplan_meier_sauts/ensemble_a_risque`, `kaplan_meier/instants_evenement`, `parametres/denominateur_instants`, `hypotheses_brut/denominateur_instants`, les cinq `diagnostics/kaplan_meier/*` (`instants`, `evenements`, `evenements_a_l_instant_d_entree`, `cellules_survie_nulle`, `ensemble_a_risque_maximal`), `version_fiche` et `graine`. Le point 3.4 range ces deux dernières parmi les doubles ; elles sont `integer` dans les six références.
+- **Types vérifiés par `architect`** (18/10/2026, deuxième colonne des fichiers commités) : les douze chemins sont `integer` dans `tests/reference/R6.tsv` ; `fiche/version_fiche` et `fiche/graine` le sont dans `R1.tsv` à `R5.tsv`.
+- **Témoin d'`actuary`** sur R6 : `kaplan_meier_sauts/numerateur` remis en `double` n'est relevé par `doubles_sans_tolerance()` que sans la clé.
+- **Ce qui reste.** La clé nue `cellules` est conservée : elle classe `etapes/exposition/diagnostics/cellules`, de type `double` dans `R1.tsv` à `R6.tsv` (vérifié). Son passage en `integer`, sur le modèle de #24, est proposé en issue ; la clé se retirera alors, avec une annotation.
+- **Mise en œuvre.** Retrait par `coder`, commit `tests:` `ff6279d` (#17). Le présent point décrit l'état cible.
+
+**Effet sur les résultats de (e) et (f)** : aucun. (e) constate une propriété de l'écriture et de la comparaison, sans changement de code. (f) ne touche que `TOLERANCES`, dans le code de test : les références ne portent aucune tolérance, aucun fichier de `tests/reference/` ne change, et une grandeur `integer` reste comparée exactement par son type.
+
+Issues : #17 ; #24 (règle de la quatrième annotation, (b)).
