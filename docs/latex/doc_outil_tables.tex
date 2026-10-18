@@ -613,8 +613,13 @@ source du rapport figé et de l'application~; un \code{warning()} serait perdu
 par l'application, absent de la fiche et parasite dans les batteries.
 \code{avertissements\_vides()} crée l'accumulateur, un \code{data.frame} de
 colonnes \code{etape}, \code{code}, \code{message} et \code{nombre}~;
-\code{avertir()} lui ajoute une ligne, et refuse, par une erreur de
-programmation, un code qui n'est pas conforme à \code{MOTIF\_CODE\_REFUS}.
+\code{nombre}, un dénombrement (lignes, cellules, têtes), est stocké en
+\code{integer}, positif ou nul (issue~\#24). \code{avertir()} lui ajoute une
+ligne, et refuse, par une erreur de programmation (\code{stop()}, sans
+conversion), un code qui n'est pas conforme à \code{MOTIF\_CODE\_REFUS} et un
+nombre qui n'est pas un nombre unique, fini, entier, positif ou nul et au plus
+égal à \code{.Machine\$integer.max}~; sinon il le stocke par
+\code{as.integer()}.
 Chaque fonction d'étape rend ses avertissements~; le point d'entrée les
 rassemble dans le champ \code{avertissements} de l'objet et de la fiche. Les
 codes de chaque étape sont recensés dans la partie de son module
@@ -653,11 +658,12 @@ argument est mal formé (section~\ref{sec:refus}) \\
 \catalogue{fonctions-outils}{refuser()} & interne & mêmes arguments & lève le
 refus~; ne rend jamais la main \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
-accumulateur vide des avertissements métier
-(section~\ref{sec:avertissements}~; issue~\#9) \\
+accumulateur vide des avertissements métier, colonne \code{nombre} en
+\code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
 \catalogue{fonctions-outils}{avertir()} & interne & accumulateur, \code{etape},
 \code{code}, \code{message}, \code{nombre} & accumulateur augmenté d'une ligne,
-sans \code{warning()} (section~\ref{sec:avertissements}~; issue~\#9) \\
+sans \code{warning()}~; \code{stop()} si le code ou le nombre est mal formé
+(section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
 explicite, sans défaut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
@@ -1253,7 +1259,11 @@ produite hors de la CI.
 
 \noindent
 Les grandeurs de type entier, logique, chaîne, date et les lignes de
-structure sont exactes par leur type~; un double reçoit sa tolérance de la
+structure sont exactes par leur type~: c'est le cas du nombre des
+avertissements, stocké en \code{integer}, si bien qu'aucune clé de tolérance
+ne le couvre et qu'un retour au type \code{double} serait relevé deux fois,
+comme écart structurel de type et comme double sans classe (ADR 0009,
+quatrième annotation du 17/10/2026). Un double reçoit sa tolérance de la
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), cherchée par le
 \textbf{suffixe le plus long} du chemin~: une clé qualifiée
 \code{<table>/<colonne>} l'emporte sur le nom nu, ce qui donne au \code{taux}
@@ -1698,7 +1708,8 @@ lecteurs~:
     \code{parametres} (paramètres effectifs, après résolution par le moteur),
     \code{resultat} et \code{diagnostics}~;
   \item \code{avertissements}~: le \code{data.frame} (\code{etape}, \code{code},
-    \code{message}, \code{nombre}) des avertissements de toutes les étapes
+    \code{message}, \code{nombre}, ce dernier en \code{integer}) des
+    avertissements de toutes les étapes, repris tel quel dans la fiche
     (section~\ref{sec:avertissements})~;
   \item \code{fiche}~: la fiche de construction (section~\ref{sec:fiche})~;
   \item \code{execution}~: horodatage de début, durée, version de R,
