@@ -3302,8 +3302,10 @@ aussi de test de débordement des entiers~; les refus, le message de
 ajouts).
 
 \medskip
-\textbf{Contre-vérification par le package \code{survival}}, hors CI et hors
-batterie (ADR 0002~; issue~\#7). Le script
+\textbf{Contre-vérification par le package \code{survival}} (ADR 0002~;
+issue~\#7)~: la production des valeurs par \code{survfit} se fait hors CI et
+hors batterie~; leur comparaison au moteur est un test ordinaire de la
+batterie unitaire, exécuté en CI. Le script
 \code{tests/contre\_verification/}\allowbreak\code{survfit\_kaplan\_meier.R}, exécuté à la main
 sur un poste muni de \code{survival} et qui n'emploie pas \code{tablexp}, lit
 un jeu fixé (\code{tests/contre\_verification/}\allowbreak\code{jeu\_kaplan\_meier.csv}~:
@@ -3324,9 +3326,13 @@ doivent être exactement celles que rend \code{survfit}~: sept cellules (C~64,
 65, 73 et 83, K~69 et 70, Z~70) et dix sauts~; la cellule C~38, rendue par
 \code{survfit} mais déclarée \code{ensemble\_a\_risque\_vide} par le moteur,
 n'est pas comparée. Tolérances~: âge exact à $10^{-13}$ près en
-absolu~; $r$ et $d$ exactement~; survie, $\hat q$ et écart-type de
-$\log \hat P$ à $10^{-13}$ près en relatif~; bornes à $10^{-12}$ près en
-relatif. C'est un test ordinaire~: un fichier absent, un en-tête incomplet
+absolu~; $r$ et $d$ exactement~; survie à chaque saut, $\hat q$ de la cellule
+(comparé à $1 - \text{surv}$ au dernier saut) et écart-type de $\log \hat P$ à
+chaque saut à $10^{-13}$ près en relatif~; bornes de la cellule (comparées à
+\code{q\_inf} et \code{q\_sup} au dernier saut) à $10^{-12}$ près en
+relatif~; valeurs manquantes ou infinies (survie nulle, C~83~: écart-type
+infini, bornes manquantes)~: identité exacte des positions et des valeurs.
+C'est un test ordinaire~: un fichier absent, un en-tête incomplet
 (version de R, de \code{survival}, date ou \code{sessionInfo()}) ou un écart
 le fait échouer. Ses attendus sont des valeurs de
 \emph{contre-vérification} (section~\ref{sec:harnais})~: produites par un
