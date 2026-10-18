@@ -69,7 +69,7 @@ Le vocabulaire du projet est défini dans `CONTEXT.md` : l'employer tel quel dan
 
 ## Sous-agents
 
-Sept sous-agents de projet (`.claude/agents/` ; dix fiches : `architect`, `actuary` et `regulatory` ont une variante `-approfondi`), orchestrés par la session principale. Règle de séparation : **ceux qui écrivent ne vérifient pas, ceux qui vérifient n'écrivent pas**.
+Sept sous-agents de projet (`.claude/agents/` ; onze fiches : `architect`, `actuary` et `regulatory` ont une variante `-approfondi`, `coder` sa variante Opus `coder-approfondi`), orchestrés par la session principale. Règle de séparation : **ceux qui écrivent ne vérifient pas, ceux qui vérifient n'écrivent pas**.
 
 | Famille | Agent | Écrit | Question |
 |---|---|---|---|
@@ -82,6 +82,8 @@ Sept sous-agents de projet (`.claude/agents/` ; dix fiches : `architect`, `actua
 | Vérification | `app-review` | rien (rapport) | Interface conforme à `docs/exigences.md` § 5 ? |
 
 **Routage du modèle et de l'effort** (`docs/agents/routage.md`, ADR 0001 annoté) — `architect`, `actuary` et `regulatory` existent en deux fiches au même corps : la fiche de base (Opus, effort `medium`, routine) et la fiche `-approfondi` (Opus, effort `high`, jugement), générée par `bash .claude/outils/fiches_jumelles.sh` et contrôlée par la CI ; ne jamais modifier une fiche `-approfondi` à la main. La session principale choisit la fiche selon la matrice de `docs/agents/routage.md` (§ 3) et ne passe `model: "fable"` à l'appel que dans les cas du § 4.1 (échec documenté d'Opus `high`, désaccord entre agents, rédaction d'un ADR d'architecture) ou sur accord du mainteneur ; au plus une relance ciblée, une hausse d'effort et une consultation Fable par question, trois consultations Fable par branche sans nouvel accord ; un modèle indisponible arrête le circuit (aucun remplacement silencieux). Les agents signalent les critères rencontrés dans leur bloc « Retour », ils ne décident pas de leur escalade ; la session note chaque escalade, relance ciblée ou arrêt d'une ligne dans la PR de la branche de travail.
+
+**Modèle et effort des agents de réalisation et de vérification** (`docs/agents/routage.md`, § 10, ADR 0010) — fixés par leur fiche : `coder` Sonnet, effort `high` ; `coder-approfondi` (même corps, générée par `fiches_jumelles.sh`) Opus, effort `medium` ; `audit` et `docwriter` Opus, effort `medium` ; `app-review` Sonnet, effort `high`. En circuits 1 et 2 (évolution de fond, correction de conformité), la session appelle `coder-approfondi` d'office, reprises comprises. Ailleurs — tâche de codage longue ou complexe, issue de circuit 3 finie en `arrete` parce que `coder` n'a pas corrigé les constats après la reprise —, elle le **propose** au mainteneur et ne l'emploie qu'avec son accord, au cas par cas, sans plafond chiffré (dans le workflow `circuit-technique`, option `--approfondi`). L'effort `high` pour `coder-approfondi` (paramètre `effort` de l'appel ; `--approfondi=high`) demande aussi son accord. La revue finale complète d'`audit` (règle 10) est appelée avec `effort: "high"`. Chaque emploi de `coder-approfondi` hors circuits 1 et 2, et chaque passage de `coder-approfondi` à l'effort `high`, est noté d'une ligne dans la PR.
 
 **Déclencheurs** — un agent n'entre dans le circuit que si la modification touche son domaine : plusieurs issues ou forme du package → `architect` en amont ; méthode, estimateur, test ou critère de validation → `actuary` (spécification en amont, validation en aval) ; texte, règle de certification, table homologuée ou sa provenance → `regulatory` (lecture du texte en amont, contrôle de conformité en aval) ; `R/` du package ou `tests/` → `audit` ; `app/` (`app/app.R`, `app/affichage.R`) → `app-review` ; fond de `docs/latex/` → `docwriter`, en dernier, une seule fois par branche (règle 9).
 
@@ -103,7 +105,7 @@ Un constat bloquant ou majeur d'un vérificateur renvoie à l'étape de réalisa
 5. **vérificateurs ciblés sur le diff** (audit léger) ;
 6. **constats structurés** : gravité (bloquant / majeur / mineur), `fichier:ligne`, mesure exécutée ; un constat sans emplacement ni mesure n'est pas recevable ;
 7. **tout contrôle mécanique est un script**, jamais un agent : un agent lit la sortie d'un script, il ne refait pas le décompte ; un contrôle récurrent sans script en appelle un (issue) ;
-8. **effort réduit** pour les étapes mécaniques ; aucun `model` fixé dans un workflow (hérité de la session).
+8. **effort réduit** pour les étapes mécaniques ; aucun `model` fixé dans un workflow : un agent lancé avec `agentType` prend le modèle de sa fiche, les autres celui de la session (ordre documenté par Claude Code, pas encore mesuré dans un workflow : le confirmer par le modèle servi, `bash .claude/outils/bilan_journal.sh`, au premier passage).
 
 Un **constat** (défaut du code) conduit à la reprise ou à l'arrêt ; une **question pour `actuary`** ou pour `regulatory` (doute de `coder`, question de l'audit) ne relance pas `coder`. Trois statuts de fin : `termine`, `termine avec questions` (les seules remontées sont des questions : la session principale les porte à l'expert concerné avant tout commit), `arrete` ; une batterie en échec à la dernière vérification finit toujours par `arrete`.
 
