@@ -52,3 +52,19 @@ Décision d'`architect` du 16/10/2026 dans le cadre du plan de la première bran
 **Effet sur les résultats** : aucun (aucun code).
 
 Issues : #11 (objet résultat et fiche en mémoire) ; branche `claude/fiche-rapport` (à rédiger).
+
+## Annotation du 19 octobre 2026 — point 6 : le plan de la fiche est le plan reçu canonique ; « plan effectif » = plan canonique + paramètres retenus (ADR 0011)
+
+Rédigée par `architect-approfondi` (Fable, consultation 3/3 de la branche B4, M62, Q3). Statut : **proposé, sous réserve de l'acceptation de l'ADR 0011** par le mainteneur. Le texte du 14/10/2026 et l'annotation du 16/10/2026 ne sont pas réécrits.
+
+Le point 6 veut que la fiche contienne « le plan tel qu'exécuté (paramètres effectifs, recette et convention retenues ou forcées) » ; E4.5 dit « le plan effectif » ; l'ADR 0007, point 6.2, dit « le plan reçu, inchangé » (écart (iii) relevé le 19/10/2026, `docs/feuille-de-route.md`). L'ADR 0011 (point 5) fixe la lecture :
+
+- `fiche$plan` est le **plan reçu mis sous forme canonique** — ordre du schéma, types canoniques, sans conversion de sens —, canonisé une seule fois à l'entrée de `construire_table()` après `valider_plan()` ; deux plans de même sens donnent le même `fiche$plan`, les mêmes `etapes` et le même objet hors `execution` ; c'est lui qu'on rejoue ;
+- la fiche **n'écrit jamais un plan résolu** : une déclaration `plus_fine` reste `plus_fine` ; la convention retenue, la recette, l'unité d'observation, la fin effective et les hypothèses de chaque étape sont les **paramètres retenus** (`etapes[[étape]]$parametres` et les champs correspondants de la fiche) ;
+- le **plan effectif** du point 6 et d'E4.5 est la **paire** (plan canonique, paramètres retenus) ; la certification lit la paire, le rejeu n'emploie que le premier terme.
+
+Le format de sérialisation reporté par l'annotation du 16/10/2026 est fixé par l'ADR 0011 (points 6 à 10), qui remplace le point 12 de l'ADR 0007 ; les livrables (c) du point 7 et l'export-import d'E5.4 en relèvent. Une note de lecture d'E4.5 est soumise au mainteneur (ADR 0011, question 6).
+
+**Effet sur les résultats** : aucun par cette annotation (voir ADR 0011, « Conséquences »).
+
+Issues : #42, #22 (point 6), #50 ; ADR 0011.
