@@ -396,19 +396,20 @@ verifier("par_annee : c(\"binomial\", \"kaplan_meier\") -> binomial_par_annee, l
 verifier("kaplan_meier n'est plus un estimateur inconnu : plan validé ; estimateurs disponibles dans l'ordre canonique",
          identical(valider_plan(plan_km()), plan_km()) &&
            identical(tablexp:::ESTIMATEURS_BRUT, c("poisson", "binomial", "kaplan_meier")))
-verifier("etape_prealable_manquante : brut sans exposition, message et détails inchangés", {
+verifier("etape_prealable_manquante : brut sans exposition, message inchangé, détails avec prealables_par_etape (#27)", {
   p <- plan_km(); p$etapes$exposition <- NULL
   r <- tryCatch(valider_plan(p), refus_tablexp = function(r) r)
   identical(r$motif, "etape_prealable_manquante") &&
     identical(conditionMessage(r), "Étape(s) « brut » sans son étape préalable « exposition ».") &&
-    identical(r$details, list(etape = "brut", prealable = "exposition"))
+    identical(r$details, list(etape = "brut", prealable = "exposition", prealables_par_etape = list(brut = "exposition")))
 })
 verifier("etape_prealable_manquante : brut seul, préalables donnees et exposition cités, au pluriel (chaque élément contrôlé)", {
   p <- plan_km(); p$etapes <- p$etapes["brut"]
   r <- tryCatch(valider_plan(p), refus_tablexp = function(r) r)
   identical(r$motif, "etape_prealable_manquante") &&
     identical(conditionMessage(r), "Étape(s) « brut » sans ses étapes préalables « donnees », « exposition ».") &&
-    identical(r$details, list(etape = "brut", prealable = c("donnees", "exposition")))
+    identical(r$details, list(etape = "brut", prealable = c("donnees", "exposition"),
+                                 prealables_par_etape = list(brut = c("donnees", "exposition"))))
 })
 verifier("ETAPES : colonne prealable en liste (donnees : aucun ; exposition : donnees ; brut : donnees, exposition)",
          identical(unclass(tablexp:::ETAPES$prealable), list(character(0), "donnees", c("donnees", "exposition"))))
@@ -543,4 +544,63 @@ verifier("contre-vérification par survival::survfit() (valeurs hors CI, poste d
     if (!isTRUE(r)) stop(paste(r, collapse = " ; "))
     TRUE
   }
+})
+
+# --- 8. fenêtres transmises par l'étape exposition, ordre des lignes (#38) ----
+
+# Base commune du jeu fixé (trois segments) ; fenêtres rendues par
+# calculer_exposition() et transmises à l'étape brut par construire_table().
+OJ <- XJ$etapes$donnees$resultat$observations
+RJ <- tablexp:::calculer_exposition(OJ, c(ROLES, segment = "g"), VD, PER, 0, "segment", "plus_fine", FALSE)
+EJ <- XJ$etapes$exposition$resultat$exposition
+brut_j <- function(e, o, convention = "dernier_anniversaire")
+  calculer_taux_bruts(e, "segment", FALSE, convention, XJ$etapes$exposition$parametres$unite_exposition,
+                      "kaplan_meier", 0.95, o, VD, PER, 0, XJ$etapes$exposition$parametres)
+verifier("fenêtres transmises (identité exacte) : calculer_exposition() rend un objet fenetres_exposition à côté de ses quatre éléments ; étape brut identical() avec les fenêtres transmises et avec les observations (appel direct, fenêtres recalculées) ; objet résultat sans fenêtres", {
+  cherche <- function(x) inherits(x, "fenetres_exposition") || (is.list(x) && any(vapply(x, cherche, logical(1L))))
+  identical(names(RJ), c("parametres", "resultat", "diagnostics", "avertissements", "fenetres")) &&
+    inherits(RJ$fenetres, "fenetres_exposition") &&
+    identical(RJ[c("parametres", "resultat", "diagnostics")], XJ$etapes$exposition) &&
+    identical(brut_j(EJ, RJ$fenetres), brut_j(EJ, OJ)) &&
+    identical(brut_j(EJ, RJ$fenetres)$resultat, XJ$etapes$brut$resultat) &&
+    identical(names(XJ$etapes$exposition), c("parametres", "resultat", "diagnostics")) &&
+    identical(names(XJ$etapes$brut), c("parametres", "resultat", "diagnostics")) &&
+    !cherche(unclass(XJ)) && !("fenetres" %in% names(XJ$fiche))
+})
+verifier("ordre des lignes de la table d'exposition (identité exacte) : trois permutations (dont l'inverse), fenêtres transmises et observations : table kaplan_meier identical() à l'originale permutée, sauts et diagnostics identical()", {
+  ordres <- c(list(rev(seq_len(nrow(EJ)))),
+              tablexp:::sous_graine(38L, list(sample(nrow(EJ)), sample(nrow(EJ)))))
+  ok <- vapply(ordres, function(o) {
+    all(vapply(list(RJ$fenetres, OJ), function(src) {
+      b <- brut_j(EJ[o, ], src)
+      identical(b$resultat$kaplan_meier, KJ[o, ]) && identical(b$resultat$kaplan_meier_sauts, SJ) &&
+        identical(b$diagnostics$kaplan_meier, XJ$etapes$brut$diagnostics$kaplan_meier)
+    }, logical(1L)))
+  }, logical(1L))
+  all(ok)
+})
+verifier("fenêtres transmises calculées sous un autre début ou une autre borne de période, une autre transition, une autre convention ou une autre segmentation : arrêt « erreur de programmation », un cas par contrôle", {
+  # Motif ASCII (message lu en octets sous une locale C).
+  msg <- function(expr) tryCatch({ force(expr); "" }, error = function(e) conditionMessage(e))
+  altere <- function(champ, valeur) { a <- RJ$fenetres; a[[champ]] <- valeur; a }
+  cas <- list(debut = altere("debut", RJ$fenetres$debut + 1),
+              borne = altere("borne", RJ$fenetres$borne - 1),
+              transition = altere("transition", "en_cours_rachete"),
+              segmentation = altere("segmentation", character(0)))
+  arrets <- vapply(cas, function(a) grepl("transmises calcul", msg(brut_j(EJ, a)), fixed = TRUE), logical(1L))
+  # Convention : fenêtres sous dernier_anniversaire, étape brut sous age_atteint_annee.
+  arrets <- c(arrets, convention = grepl("transmises calcul", msg(brut_j(EJ, RJ$fenetres, "age_atteint_annee")),
+                                         fixed = TRUE))
+  # Témoin : fenêtres inchangées, aucun arrêt.
+  if (all(arrets) && identical(msg(brut_j(EJ, RJ$fenetres)), "")) TRUE
+  else paste("contrôle(s) non tenu(s) :", paste(names(arrets)[!arrets], collapse = ", "))
+})
+verifier("clé (segment, âge) en double dans la table d'exposition (appel direct) : arrêt « erreur de programmation » distinct de celui de l'instant hors des cellules ; témoin sans doublon, aucun arrêt", {
+  # Motif ASCII (message lu en octets sous une locale C).
+  msg <- function(expr) tryCatch({ force(expr); "" }, error = function(e) conditionMessage(e))
+  double <- EJ[c(1L, seq_len(nrow(EJ))), , drop = FALSE]
+  m <- msg(brut_j(double, OJ))
+  if (grepl("taux_kaplan_meier() : cl", m, fixed = TRUE) && grepl("en double dans la table d'exposition", m, fixed = TRUE) &&
+      !grepl("hors des cellules", m, fixed = TRUE) && identical(msg(brut_j(EJ, OJ)), "")) TRUE
+  else paste("message obtenu :", m)
 })

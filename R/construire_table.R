@@ -121,8 +121,10 @@ valider_plan <- function(plan) {
                        liste_guillemets(noms), liste_guillemets(ETAPES$etape[sort(rang)])),
                list(etape = noms))
   # Chaque préalable de chaque étape est contrôlé ; seuls les préalables
-  # absents sont cités.
+  # absents sont cités. `etape` et `prealable` sont les vecteurs aplatis ;
+  # `prealables_par_etape` dit quel préalable manque à quelle étape (#27).
   absents <- lapply(ETAPES$prealable[rang], function(p) setdiff(p, noms))
+  names(absents) <- noms
   sans_prealable <- lengths(absents) > 0L
   if (any(sans_prealable)) {
     manquants <- unique(unlist(absents))
@@ -130,7 +132,8 @@ valider_plan <- function(plan) {
                sprintf("Étape(s) %s sans %s %s.", liste_guillemets(noms[sans_prealable]),
                        if (length(manquants) == 1L) "son étape préalable" else "ses étapes préalables",
                        liste_guillemets(manquants)),
-               list(etape = noms[sans_prealable], prealable = manquants))
+               list(etape = noms[sans_prealable], prealable = manquants,
+                    prealables_par_etape = absents[sans_prealable]))
   }
   aleatoire <- any(ETAPES$aleatoire[rang])
   if (!aleatoire && "graine" %in% names(plan))
@@ -217,14 +220,25 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
                                  convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
                                  unite_exposition = etapes[["exposition"]][["parametres"]][["unite_exposition"]],
                                  estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]],
-                                 observations = etapes[["donnees"]][["resultat"]][["observations"]],
+                                 observations = fenetres,
                                  transition = plan[["transition"]], periode = plan[["periode"]],
                                  delai_declaration = plan[["delai_declaration"]],
                                  parametres_exposition = etapes[["exposition"]][["parametres"]]),
       stop(sprintf("construire_table() : étape « %s » sans fonction d'étape (erreur de programmation).", nom),
            call. = FALSE))
     etapes[[nom]] <- r[c("parametres", "resultat", "diagnostics")]
+    # Transmission entre étapes hors de l'objet (#38) : fenêtres des
+    # observations rendues par `exposition` (préalable de `brut`, contrôlé
+    # par valider_plan()), passées à `brut` (argument observations, évalué
+    # pour Kaplan-Meier seulement) puis libérées ; ni dans etapes, ni dans
+    # la fiche. Conservées seulement si le plan retient Kaplan-Meier ; r est
+    # vidé en fin de tour, sinon il garde les fenêtres vivantes pendant l'étape
+    # suivante.
+    if (nom == "exposition")
+      fenetres <- if ("kaplan_meier" %in% etapes_plan[["brut"]][["estimateurs"]]) r[["fenetres"]]
+    if (nom == "brut") fenetres <- NULL
     avertissements <- rbind(avertissements, r$avertissements)
+    r <- NULL
   }
   rownames(avertissements) <- NULL
 

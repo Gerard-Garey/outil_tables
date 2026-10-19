@@ -482,6 +482,50 @@ Avant la PR #41, `tests/harnais.R` passait la locale par `env =` (`git show 99c7
 
 Issues : #21, #23 ; #33, #34 (PR #41) ; points ouverts #42, #43. Décision du mainteneur du 19/10/2026 (constat B de l'audit de la PR #41).
 
+## Annotation du 19 octobre 2026 (seconde) — transmission entre étapes : fenêtres de l'étape `exposition` passées à l'étape `brut` hors de l'objet résultat (#38, M63)
+
+Rédigée par `architect` ; le texte ci-dessus, annotations comprises, n'est pas réécrit. C'est la seule annotation d'ADR admise sur la branche `claude/exposition-brut-fenetres` (P2, PR #53 ; décision M63, `docs/feuille-de-route.md`, § 1.4.3). Elle consigne l'état du code au commit `858b359` (#38). La tête de branche `a733dae`, fusion de `main` (PR #55), ne modifie pas `R/` (`git diff --stat 858b359 a733dae` : `tests/test_reproductibilite.R` seul). Elle complète les points 2.1, 6.1 et 6.3, et l'annotation du 17/10/2026, (c). Les numéros de ligne valent pour `858b359`.
+
+**(a) Ce qui est transmis.** `calculer_exposition()` rend, à côté de `parametres`, `resultat`, `diagnostics` et `avertissements`, un cinquième élément `fenetres` (`R/exposition.R:486-489`). C'est un objet de classe S3 `fenetres_exposition`, liste qui contient :
+
+- les fenêtres des observations (`composantes`, `calendrier`, `a`, `b`, `evenement`, de `fenetres_observations()`) et leurs segments (`g`, `segments`, de `segments_observations()`), sans copie des vecteurs ;
+- le début D (`debut`) et la borne B (`borne`) de la période ;
+- les paramètres sous lesquels l'objet est calculé : le code de la transition (`transition`), la convention retenue (`convention`) et la segmentation (`segmentation`).
+
+**(b) Comment.** `construire_table()` place l'objet dans une variable locale de la boucle des étapes (`fenetres`, `R/construire_table.R:232`). Elle le passe à `calculer_taux_bruts()` par l'argument existant `observations` (`:220`) ; aucune signature ne change. Elle le libère après l'étape `brut` (`:233`). L'étape `exposition` précède toujours l'étape `brut` : `valider_plan()` contrôle cette dépendance (point 5.4).
+
+Seuls `parametres`, `resultat` et `diagnostics` entrent dans `etapes` (`:226`, inchangé). Le point 6.1 et le contrat de lecture 6.3 sont donc **inchangés** : l'élément `fenetres` ne figure ni dans l'objet résultat ni dans la fiche (point 6.2). Le test « fenêtres transmises » le vérifie en cherchant la classe `fenetres_exposition` dans tout l'objet (`tests/unitaires/test_brut_kaplan_meier.R`, section 8).
+
+**(c) Côté destinataire.** `taux_kaplan_meier()` (`R/brut.R:299-312`) accepte deux entrées :
+
+- un objet `fenetres_exposition` : elle le reprend tel quel après avoir contrôlé à l'**égalité exacte** (`identical()`) les cinq paramètres de (a) (début, borne, transition, convention, segmentation). Un écart arrête l'étape comme « erreur de programmation ». Elle **ne contrôle pas les observations elles-mêmes**, puisque seul `construire_table()` produit l'objet, à partir des observations de l'étape `donnees` de la même exécution ;
+- un `data.frame` d'observations (appel direct de la fonction d'étape, point 11.3) : elle recalcule les fenêtres et les segments par les mêmes fonctions du module `exposition`.
+
+Les deux voies donnent des résultats `identical()` (test « fenêtres transmises », section 8). Un test couvre chacun des cinq contrôles, plus un témoin sans arrêt.
+
+**(d) Ce qui n'est pas transmis : les positions dans la cellule.** L'avis de forme d'`architect` (`docs/feuille-de-route.md`, § 3, ligne #38) prévoyait de transmettre aussi les positions dans la cellule. Le code ne le fait pas : `taux_kaplan_meier()` les calcule une fois (`position_dans_cellule()`, `R/brut.R`), à partir des fenêtres transmises. `architect` a accepté cet écart le 19/10/2026, pour deux raisons :
+
+- seul Kaplan-Meier emploie ces positions. Les calculer dans `exposition` coûterait à chaque construction, y compris pour les plans R1 à R5, qui n'ont pas cet estimateur ;
+- le module `exposition` n'a pas à connaître les besoins d'un estimateur du module `brut`. Transmettre les positions l'y obligerait (couplage `exposition` → estimateurs).
+
+**(e) Appariement par clé.** La table d'exposition est appariée par clé (segment, âge), sans hypothèse sur l'ordre de ses lignes (`R/brut.R`, `match()` sur le début de cellule ; sommes cumulées par plage contiguë d'instants). Une clé en double ou un instant hors des cellules arrête l'étape. Le test « ordre des lignes » applique trois permutations de la table d'exposition (l'inverse et deux tirages sous graine locale), par les deux voies de (c).
+
+**(f) Graphe d'appels inchangé (point 2.1).** `brut` appelait déjà `fenetres_observations()`, `segments_observations()`, `extraire_composantes()` et `position_dans_cellule()` du module `exposition` avant `858b359` (lignes retirées du diff de `R/brut.R`). Aucun arc n'est ajouté. `Rscript tests/controles/graphe_modules.R` à `a733dae` : « OK : graphe d'appels conforme à l'ADR 0007, aucun appel dynamique interdit » (*vérifié* le 19/10/2026).
+
+**(g) Parallèle avec M49.** Le cas est le même que celui de la segmentation (annotation du 17/10/2026, (c)). Une donnée produite ou déclarée une fois est transmise en argument nommé par `construire_table()`, seule à connaître l'enchaînement des étapes. Aucune étape ne la recalcule ni n'en lit une seconde source. La différence est que la donnée vient ici d'une étape, et non du plan ; elle n'entre donc pas dans la fiche, qui garde le plan reçu.
+
+**(h) Remarque, sans condition : le nom de l'argument `observations`.** L'argument `observations` de `calculer_taux_bruts()` et de `taux_kaplan_meier()` reçoit désormais deux types : un `fenetres_exposition` ou un `data.frame`. Son nom ne décrit plus exactement le premier. Le garder évite de changer les signatures ; un renommage éventuel se traitera avec la table étape → fonction (#22, point 7).
+
+**(i) Mesures**, toutes tirées du message du commit `858b359` (*non remesurées ici*) :
+
+- **Résultats** : R1 à R6 et empreintes identiques (`tests/test_reproductibilite.R`, 140 tests, 0 échec, sans régénération). L'objet résultat est `identical()` avant / après sur `jeu_reference()` (R1 à R6, 10⁵ lignes), sur le simulateur à 10⁶ lignes (R6) et sur 216 scénarios adverses de l'audit.
+- **Durée** (n = 10⁶, plan R6, médianes de 5, machine à 1 cœur, R 4.3.3 ; scripts de mesure de `coder-approfondi`, confirmés par `audit`) : étape `brut` 0,86 s → 0,50 s (audit : 0,862 → 0,474) ; `construire_table()` 10,05 s → 9,11 s ; `calculer_exposition()` inchangée (2,62-2,71 s → 2,61-2,72 s).
+- **Ordre des lignes** : avant, une permutation des lignes de la table d'exposition arrêtait l'étape `brut` (« instant d'événement hors des cellules… (erreur de programmation) ») ; après, la table `kaplan_meier` est `identical()` à l'originale permutée.
+
+**Effet sur les résultats** : aucun. Le changement porte sur le chemin des données entre deux étapes ; aucune valeur calculée ne change, et `tests/reference/` est inchangé.
+
+Issues : #38 ; #22 (point 7). Décision M63.
+
 ## Annotation du 19 octobre 2026 (troisième) — point 12 remplacé par l'ADR 0011 ; mention « mêmes `etapes` » de l'annotation du 19/10/2026, (d), inexacte pour `periode` ; point 6.2 précisé (plan canonique)
 
 Rédigée par `architect-approfondi` (Fable, consultation 3/3 de la branche B4, M62, Q3) ; intitulée « seconde » à sa rédaction (`1f785b0`), renumérotée « troisième » le 19/10/2026 (décision du mainteneur M65), la seconde annotation du même jour étant celle de la branche P2 (PR #53, `ad6bc43`). Statut : **proposé, sous réserve de l'acceptation de l'ADR 0011** par le mainteneur. Le texte ci-dessus, annotations comprises, n'est pas réécrit.

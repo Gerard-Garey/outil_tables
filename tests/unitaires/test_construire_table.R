@@ -201,7 +201,7 @@ LISTES_PLAN <- list(
 for (k in LISTES_PLAN)
   verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[3]]), leve_refus(valider_plan(k[[2]](plan_complet())), k[[3]]))
 # Élément en plus nommé NA (#23) : sort() retire un nom NA, la longueur de la
-# liste est donc contrôlée à part (noms_exacts()).
+# liste est donc contrôlée à part (liste_aux_noms()).
 LISTES_PLAN_NOM_NA <- list(
   list("transition avec un élément de plus nommé NA", function(p) { p$transition <- c(p$transition, list("x"))
                                                                     names(p$transition)[3L] <- NA; p },
@@ -584,6 +584,43 @@ verifier("portefeuille simulé (identité exacte) : par_annee, somme sur les ann
 verifier("portefeuille simulé : unité tête, aucune exclusion, aucune cellule d'âge hors de la plage contiguë",
          identical(XD$fiche$unite_observation, "tete") && XD$etapes$donnees$resultat$nombre_lignes_exclues == 0L &&
            all(tapply(TD$age, TD$sexe, function(v) identical(v, seq(min(v), max(v))))))
+
+# --- refus etape_prealable_manquante : préalable absent par étape (#27) ---------
+# Attendus écrits à la main (ETAPES$prealable : exposition <- donnees ;
+# brut <- donnees, exposition), vecteurs aplatis `etape` et `prealable`
+# inchangés.
+plan_prealable <- function(...) {
+  e <- list(donnees = list(exclusions = character(0)),
+            exposition = list(convention = "plus_fine", par_annee = FALSE),
+            brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95))
+  modifier(plan_type(), etapes = e[c(...)])
+}
+verifier("etape_prealable_manquante : exposition et brut sans donnees, préalable absent de chaque étape fautive, message inchangé", {
+  r <- refus(valider_plan(plan_prealable("exposition", "brut")))
+  identical(r$motif, "etape_prealable_manquante") &&
+    identical(conditionMessage(r), "Étape(s) « exposition », « brut » sans son étape préalable « donnees ».") &&
+    identical(r$details, list(etape = c("exposition", "brut"), prealable = "donnees",
+                              prealables_par_etape = list(exposition = "donnees", brut = "donnees")))
+})
+verifier("etape_prealable_manquante : brut sans exposition (donnees présente), puis brut seul : préalables absents selon le plan", {
+  r <- refus(valider_plan(plan_prealable("donnees", "brut")))
+  r2 <- refus(valider_plan(plan_prealable("brut")))
+  identical(r$motif, "etape_prealable_manquante") &&
+    identical(r$details, list(etape = "brut", prealable = "exposition",
+                              prealables_par_etape = list(brut = "exposition"))) &&
+    identical(conditionMessage(r2), "Étape(s) « brut » sans ses étapes préalables « donnees », « exposition ».") &&
+    identical(r2$details, list(etape = "brut", prealable = c("donnees", "exposition"),
+                               prealables_par_etape = list(brut = c("donnees", "exposition"))))
+})
+verifier("etape_prealable_manquante : seule l'étape fautive figure dans prealables_par_etape (exposition seule fautive, brut non)", {
+  r <- refus(valider_plan(plan_prealable("exposition")))
+  identical(r$details, list(etape = "exposition", prealable = "donnees",
+                            prealables_par_etape = list(exposition = "donnees")))
+})
+verifier("etape_prealable_manquante : plans à préalables présents toujours admis", {
+  p1 <- plan_prealable("donnees", "exposition"); p2 <- plan_prealable("donnees", "exposition", "brut")
+  identical(valider_plan(p1), p1) && identical(valider_plan(p2), p2)
+})
 
 # --- écriture canonique des valeurs en deux formes (#35 ; ADR 0011, points 2 et 3) ---
 #

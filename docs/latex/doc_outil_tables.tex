@@ -568,8 +568,11 @@ exportées par \code{tablexp:::} (ADR 0007, point 11.3).
 modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
 la forme des refus et celle des avertissements (ADR 0007, point 1.2), ainsi
 que le contrôle de la forme exacte d'une valeur reçue, \code{forme\_exacte()}
-(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23). Il
-n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23), et
+les deux contrôles de forme qui s'y appuient, partagés par les modules~:
+\code{liste\_aux\_noms()} (liste nue aux noms exacts) et
+\code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
+issue~\#48). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -594,8 +597,10 @@ quatre champs~:
 
 \noindent
 \code{refuser()} la lève par \code{stop()} et ne rend jamais la main. Un
-argument mal formé de \code{refus\_tablexp()} (module ou message vide, motif
-non conforme, détails qui ne sont pas une liste) n'est pas un refus mais une
+argument mal formé de \code{refus\_tablexp()} (module, motif ou message
+qui n'est pas une chaîne unique sans attribut, ni \code{NA} ni vide, au sens
+de \code{chaine\_unique()}, chaîne nommée comprise~; motif non conforme~;
+détails qui ne sont pas une liste) n'est pas un refus mais une
 erreur de programmation du package, signalée par \code{stop()}. Les tests
 vérifient le motif, le décompte et les numéros par \code{tryCatch()}~;
 l'application attrapera la condition et affichera son message. Une condition
@@ -666,6 +671,19 @@ admis, aucun par défaut) & \code{TRUE} si \code{typeof(x)} est pris dans
 \code{attributs}, \code{FALSE} sinon, jamais \code{NA}~; un attribut admis
 n'est pas requis et sa valeur n'est pas contrôlée~; ne refuse pas, l'appelant
 refuse sous son propre motif (section~\ref{sec:plan}~; issue~\#23) \\
+\catalogue{fonctions-outils}{liste\_aux\_noms()} & interne & \code{x},
+\code{noms} (noms attendus) & \code{TRUE} si \code{x} est une liste nue
+(\code{forme\_exacte()} de type \code{list}, seul attribut admis~: les noms~;
+ni \code{data.frame}, ni classe) d'autant d'éléments que \code{noms}, aux
+mêmes noms une fois triés par \code{sort(method = "radix")}, indépendamment
+de la locale, \code{FALSE} sinon (liste sans noms comprise)~; la longueur est
+comparée à part, \code{sort()} retirant un nom \code{NA}~; le contenu des
+éléments, lus par \code{[[ ]]}, est contrôlé par l'appelant, qui refuse sous
+son propre motif (issue~\#48) \\
+\catalogue{fonctions-outils}{chaine\_unique()} & interne & \code{v} &
+\code{TRUE} si \code{v} est de forme exacte \code{character}, sans aucun
+attribut (noms compris), de longueur~1, ni \code{NA} ni vide, \code{FALSE}
+sinon, jamais \code{NA}~; ne refuse pas (issue~\#48) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -674,7 +692,7 @@ accumulateur vide des avertissements métier, colonne \code{nombre} en
 sans \code{warning()}~; \code{stop()} si le code ou le nombre est mal formé
 (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
-explicite, sans défaut), \code{expr} & valeur de \code{expr} évaluée sous la
+explicite, sans défaut ni attribut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
 \code{graine\_invalide} (section~\ref{sec:sous-graine}) \\
 \end{longtable}
@@ -743,7 +761,11 @@ changement de résultat, soumis au visa (ADR 0007, «~Conséquences~»).
 tire un aléa (ADR 0007, point 8.1). Elle procède ainsi~:
 
 \begin{enumerate}[leftmargin=*, itemsep=2pt]
-  \item \textbf{contrôle de la graine}~: un nombre unique, non manquant, fini,
+  \item \textbf{contrôle de la graine}~: un nombre unique, de type de base
+    \code{integer} ou \code{double} et \textbf{sans aucun attribut}~--- ni
+    noms, ni dimension, ni classe (\code{forme\_exacte()},
+    section~\ref{sec:fonctions-outils}~; issue~\#43)~: une graine non
+    canonique ne doit pas être consignée~---, non manquant, fini,
     entier et de valeur absolue au plus \code{.Machine\$integer.max}~; sinon,
     et aussi quand la graine est omise, refus \code{graine\_invalide} du module
     \code{outils}. Il n'y a jamais de graine par défaut~: une graine par défaut
@@ -1735,8 +1757,14 @@ d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{integer}~; \code{delai\_declaration} est un \code{integer} ou un
 \code{double} sans attribut~; \code{segmentation} un vecteur
 \code{character} sans attribut, vide compris. La forme est contrôlée par
-\code{forme\_exacte()} (section~\ref{sec:fonctions-outils}), sous le motif
-existant de chaque paramètre~: aucun motif n'est propre à la forme. Pour
+\code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()} et
+\code{chaine\_unique()} (section~\ref{sec:fonctions-outils}), sous le motif
+existant de chaque paramètre~: aucun motif n'est propre à la forme. Hors du
+plan, la même règle s'applique à la graine reçue par \code{sous\_graine()}
+(refus \code{graine\_invalide}, section~\ref{sec:sous-graine}) et, à
+l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()}, à la
+forme seule de la segmentation (refus \code{segmentation\_invalide} du module
+\code{brut}, section~\ref{sec:brut-etape}~; issue~\#43). Pour
 chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
@@ -1754,6 +1782,12 @@ les codes \emph{structurels} du plan, module \code{construire\_table}~:
 d'une étape forment une liste (colonne \code{prealable} de \code{ETAPES})~;
 chacun est contrôlé, et le refus \code{etape\_prealable\_manquante} ne cite
 que les préalables absents, au singulier ou au pluriel selon leur nombre.
+Son message et ses champs \code{etape} et \code{prealable} de
+\code{details} rassemblent les étapes fautives d'une part, les préalables
+absents d'autre part~; le champ \code{prealables\_par\_etape}, liste nommée
+par étape fautive dans l'ordre du plan, donne pour chacune ses propres
+préalables absents, dans l'ordre de \code{ETAPES}, si bien que le refus dit
+quel préalable manque à quelle étape (issue~\#27).
 Le plan, son champ \code{etapes} et la liste des paramètres de chaque étape
 sont des listes nommées \textbf{nues}, dont le seul attribut admis est
 celui des noms~: un \code{data.frame}, un objet de classe ou une liste
@@ -1794,9 +1828,25 @@ résultat, ses diagnostics et ses avertissements~; l'étape \code{exposition}
 lit la table des observations de l'étape \code{donnees}~; l'étape \code{brut}
 lit la table d'exposition et les paramètres effectifs de l'étape
 \code{exposition} (découpage par année, convention retenue, unité de
-l'exposition) et, pour l'estimateur \code{kaplan\_meier}, la table des
-observations de l'étape \code{donnees}, avec la transition, la période et le
-délai du plan.\par}
+l'exposition) et, pour l'estimateur \code{kaplan\_meier}, les fenêtres des
+observations calculées par l'étape \code{exposition}, avec la transition, la
+période et le délai du plan. Ces fenêtres sont la seule donnée qu'une étape
+transmet à une autre hors de l'objet résultat (issue~\#38~; ADR 0007, seconde
+annotation du 19/10/2026)~: \code{calculer\_exposition()} les rend dans un
+élément \code{fenetres} à côté de son résultat
+(section~\ref{sec:troncature-censure})~; \code{construire\_table()} ne les
+conserve que si le plan retient l'estimateur \code{kaplan\_meier}, et les
+abandonne sinon dès la fin de l'étape \code{exposition}~; conservées, elle les
+garde dans une variable locale, les passe à \code{calculer\_taux\_bruts()}
+par son argument \code{observations}, puis les libère après l'étape
+\code{brut}. Seuls
+les paramètres effectifs, le résultat et les diagnostics de chaque étape
+entrent dans \code{etapes}~; les fenêtres n'entrent ni dans l'objet résultat
+ni dans la fiche, qui sont ceux de la section~\ref{sec:objet-resultat}.
+L'étape \code{exposition} précède toujours l'étape \code{brut}, préalable que
+\code{valider\_plan()} contrôle~; dans une construction, l'étape \code{brut}
+ne lit donc pas la table des observations de l'étape \code{donnees}
+elle-même, mais ses fenêtres.\par}
 
 \subsection{Objet résultat}
 \label{sec:objet-resultat}
@@ -2054,7 +2104,7 @@ reçoit~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
 \code{data.frame} ou une liste munie d'un autre attribut que ses noms~---, de
 champs autres qu'exactement \code{depart} et \code{arrivee}, ou d'un élément
 de plus, même nommé \code{NA}~; état qui n'est pas une chaîne unique sans
-attribut ni \code{NA}~; ou transition non prise en charge~: seules
+attribut, ni \code{NA} ni vide, refusé dès ce contrôle de forme~; ou transition non prise en charge~: seules
 vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
 \code{TRANSITIONS})~; \code{periode\_invalide} (liste qui n'est pas nue, de
 champs autres qu'exactement \code{debut} et \code{fin}, ou d'un élément de
@@ -2129,7 +2179,7 @@ admis comme règles d'exclusion.}
 \code{segment\_manquant} & \code{segment} déclaré et manquant \\
 \code{naissance\_apres\_entree} & naissance postérieure à l'entrée (l'égalité est admise) \\
 \code{sortie\_avant\_entree} & sortie antérieure à l'entrée (l'égalité est admise~: durée nulle) \\
-\code{en\_cours\_avant\_fin} & cause \code{en\_cours} et date de sortie renseignée antérieure à la fin déclarée~: la base ne couvre pas la période déclarée \\
+\code{en\_cours\_avant\_fin} & cause \code{en\_cours} et date de sortie renseignée antérieure à la fin déclarée~: la base ne couvre pas la période déclarée. Une ligne \code{en\_cours} dont la date de sortie renseignée précède l'entrée relève de \code{sortie\_avant\_entree} et, si sa sortie précède la fin déclarée (toujours le cas quand son entrée ne la dépasse pas), de ce motif-ci~: elle se contredit, le moteur ne choisit pas entre la cause et les dates et refuse (E2.7)~; elle s'écarte par une exclusion déclarée de chacun des motifs qu'elle porte (exclure le seul \code{sortie\_avant\_entree} laisse le refus sous \code{en\_cours\_avant\_fin} si elle le porte~; issue~\#20) \\
 \code{annee\_naissance\_}\allowbreak\code{incoherente} & \code{annee\_naissance} déclarée et différente de l'année de la date de naissance \\
 \code{age\_aberrant} & âge au dernier anniversaire au moins égal à \code{AGE\_ABERRANT} (130) à la plus petite des dates de sortie et de fin de période (à la fin si la sortie manque)~; constante de catalogue, \emph{choix de conception}~: la borne laisse passer toute durée de vie humaine connue, elle n'est pas un paramètre du plan \\
 \code{contrat\_duplique} & \code{id\_contrat} déclaré et présent sur plusieurs lignes (toutes les lignes du groupe sont listées) \\
@@ -2156,7 +2206,9 @@ Le plan peut déclarer des \emph{règles d'exclusion}, paramètre
 doublon, vide explicite admis. Une ligne est exclue si l'un de ses motifs est
 déclaré. Les exclusions sont comptées et listées par motif dans le résultat de
 l'étape (\code{resultat\$exclusions}, \code{resultat\$lignes\_exclues}) et
-chacune donne un avertissement \code{exclusion}. Si toutes les lignes sont
+chacune donne un avertissement \code{exclusion}~; une ligne exclue sous
+plusieurs motifs est comptée sous chacun, et le nombre de lignes distinctes
+exclues est donné à part (\code{resultat\$nombre\_lignes\_exclues}). Si toutes les lignes sont
 exclues, la construction est refusée (\code{aucune\_ligne\_conservee})~; une
 base sans ligne l'est aussi (\code{base\_vide}). Le diagnostic
 \code{diagnostics\$motifs} restitue, pour chaque motif, sa nature (ligne ou
@@ -2295,7 +2347,10 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
   \item attributs \code{nom}, \code{statut} (\code{synthetique},
     \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
     de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
-    \code{qx}) et \code{parametres}~: une liste non vide est \textbf{requise}
+    \code{qx}), chacun une chaîne unique de forme exacte~--- sans attribut,
+    noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
+    section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
+    motif du champ~; issue~\#48)~---, et \code{parametres}~: une liste non vide est \textbf{requise}
     pour une table synthétique, qui n'a d'autre provenance que sa loi, et
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
@@ -2404,7 +2459,11 @@ la position d'un jour dans sa cellule sont calculés par trois fonctions
 \code{position\_dans\_cellule()}) que l'estimateur \code{kaplan\_meier} du
 module \code{brut} emploie aussi (section~\ref{sec:brut-kaplan-meier})~:
 les deux modules lisent ainsi les mêmes fenêtres, sans seconde
-implémentation. Leur extraction de \code{calculer\_exposition()} n'a changé
+implémentation. Dans une construction, les fenêtres et les segments ne sont
+calculés qu'une fois~: l'étape \code{exposition} les rend à côté de son
+résultat, et \code{construire\_table()} les transmet à l'étape \code{brut},
+si le plan retient l'estimateur \code{kaplan\_meier}, sans les inscrire dans l'objet résultat (section~\ref{sec:troncature-censure},
+«~Fenêtres transmises à l'étape \code{brut}~»~; issue~\#38). Leur extraction de \code{calculer\_exposition()} n'a changé
 aucun résultat (constat~: objets \code{identical()} hors \code{execution}
 avant et après l'extraction, sur les cas de test et sur des plans sans
 \code{kaplan\_meier}).
@@ -2478,9 +2537,11 @@ native de la recette, ou désigne une convention~:
 \noindent
 Aux refus des paramètres s'ajoute un refus de capacité,
 \code{trop\_de\_cellules}, levé à la construction de la table quand elle
-compterait plus de \code{.Machine\$integer.max} cellules
+compterait plus de \code{.Machine\$integer.max} cellules (issue~\#37), ou,
+plus tôt, quand le décompte de présence des âges compterait plus de
+\code{.Machine\$integer.max} couples (segment, âge) (issue~\#45)
 (section~\ref{sec:troncature-censure}, «~Paramètres effectifs, diagnostics,
-avertissements~»~; issue~\#37).
+avertissements~»).
 
 \noindent
 Chaque convention définit ses cellules d'âge et l'unité de l'exposition
@@ -2644,14 +2705,62 @@ plage par le nombre d'années (une seule sans \code{par\_annee}), formée en
 ($2^{31} - 1$), l'étape \textbf{refuse} sous le motif
 \code{trop\_de\_cellules} (refus de capacité~: segmentation trop fine ou
 plage d'âges et d'années trop étendue), avant toute allocation par cellule,
-au lieu de laisser \code{tabulate()} échouer sur une erreur R. Ce refus
-n'est atteignable qu'avec \code{par\_annee = TRUE}~: sans découpage par
-année, le nombre de cellules est au plus le produit du nombre de segments par
-l'étendue des âges présents, sur lequel le décompte de présence des âges,
-fait plus tôt par \code{tabulate()}, échoue déjà par une erreur R au-delà de
-$2^{31} - 1$ (\textbf{limite connue}, issue~\#45). Avertissements~: \code{convention\_forcee},
+au lieu de laisser \code{tabulate()} échouer sur une erreur R. Le même motif
+est levé plus tôt, par la même fonction, avant le décompte de présence des
+âges (issue~\#45)~: ce décompte, fait par \code{tabulate()}, porte sur une
+matrice qui croise les segments et la plage globale des âges présents (du
+plus petit au plus grand âge présent, tous segments confondus), soit le
+produit du nombre de segments par cette étendue, en couples (segment, âge)~;
+au-delà de \code{.Machine\$integer.max}, l'étape \textbf{refuse}, avec un
+message qui compte des couples (segment, âge) et non des cellules, et un
+décompte inscrit dans \code{details} sous le nom \code{couples\_presence} au
+lieu de \code{cellules}. Ce produit n'est pas un nombre de cellules mais en
+est un majorant quand il n'y a pas de découpage par année~: sans
+\code{par\_annee}, c'est donc la garde de présence qui refuse, et le refus sur
+le nombre de cellules n'est atteignable qu'avec \code{par\_annee = TRUE}.
+Ce majorant peut être lâche~: la garde de présence peut refuser alors que la
+table elle-même tiendrait sous la limite, par exemple quand les plages d'âges
+des segments sont disjointes, la plage globale couvrant alors, pour chaque
+segment, les âges de tous les autres. Une
+base de cette taille étant hors de portée d'un test, la garde est vérifiée
+par appel direct de \code{nombre\_cellules()} sous ses deux libellés, et son
+placement avant le \code{tabulate()} de présence par une copie instrumentée
+de \code{calculer\_exposition()} (\code{tests/unitaires/test\_exposition.R}).
+Avertissements~: \code{convention\_forcee},
 \code{evenement\_sans\_exposition} et \code{aucune\_exposition} (aucune
 exposition ni aucun événement dans la période).
+
+\medskip
+\textbf{Fenêtres transmises à l'étape \code{brut}} (issue~\#38~; ADR 0007,
+seconde annotation du 19/10/2026). Outre ses paramètres effectifs, son
+résultat, ses diagnostics et ses avertissements, \code{calculer\_exposition()}
+rend un cinquième élément, \code{fenetres}, objet de classe
+\code{fenetres\_exposition}. Il contient les fenêtres des observations et
+leurs événements (\code{composantes}, \code{calendrier}, \code{a}, \code{b},
+\code{evenement}, issus de \code{fenetres\_observations()}), le segment de
+chaque observation et la table des clés de segmentation (\code{g},
+\code{segments}, issus de \code{segments\_observations()}), les paramètres
+dont ils dépendent~: début $D$ (\code{debut}) et borne $B$ (\code{borne}) de
+la période, code de la transition (\code{transition}) et segmentation
+(\code{segmentation}), et la convention retenue par l'étape
+(\code{convention}). La convention n'entre pas dans le calcul des fenêtres ni
+des segments (\code{fenetres\_observations()} et
+\code{segments\_observations()} ne la prennent pas)~: elle est jointe pour
+que l'étape \code{brut} vérifie qu'elle emploie la même convention que
+l'étape \code{exposition} qui a produit la table d'exposition. Ce sont les valeurs mêmes qui ont servi à construire
+la table d'exposition, non recalculées. Cet élément est \textbf{interne à
+l'exécution}~: \code{construire\_table()} ne le conserve que si le plan
+retient l'estimateur \code{kaplan\_meier}~; elle le passe alors à l'étape
+\code{brut}, puis le libère~; il n'entre ni dans \code{etapes} de l'objet résultat ni dans la
+fiche (section~\ref{sec:execution}). L'estimateur \code{kaplan\_meier} le
+reprend après un contrôle d'égalité exacte de ces cinq paramètres
+(section~\ref{sec:brut-kaplan-meier}, «~Données~»). Ainsi, les deux étapes
+lisent les fenêtres d'une seule source, calculées une seule fois. Les
+positions des jours dans leur cellule ne sont pas transmises~: seul
+\code{kaplan\_meier} les emploie et il les calcule lui-même. Les calculer ici
+coûterait à toute construction, y compris sans cet estimateur, et ferait
+dépendre le module \code{exposition} des besoins d'un estimateur du module
+\code{brut}.
 
 \subsection{Découpage par année}
 \label{sec:decoupage-annee}
@@ -2759,11 +2868,11 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 \catalogue{fonctions-exposition}{decouper\_cellules()} & interne & fenêtres, convention & morceaux contenus chacun dans une cellule \\
 \catalogue{fonctions-exposition}{decouper\_annees()} & interne & morceaux & morceaux découpés au 1\textsuperscript{er}~janvier \\
 \catalogue{fonctions-exposition}{somme\_par\_cellule()} & interne & cellules, valeurs & sommes par cellule, zéros explicites \\
-\catalogue{fonctions-exposition}{nombre\_cellules()} & interne & nombres d'âges par segment, nombre d'années & nombre de cellules de la table, en \code{integer}~; refus \code{trop\_de\_cellules} au-delà de \code{.Machine\$integer.max} (issue~\#37) \\
+\catalogue{fonctions-exposition}{nombre\_cellules()} & interne & nombres d'âges par segment, nombre d'années~; libellé et nom du décompte, facultatifs & nombre de cellules de la table, en \code{integer}~; refus \code{trop\_de\_cellules} au-delà de \code{.Machine\$integer.max} (issue~\#37)~; appelée aussi, avant le décompte de présence des âges, sur le produit du nombre de segments par l'étendue des âges, avec son propre libellé et le décompte \code{couples\_presence} (issue~\#45) \\
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
-\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee} & fonction d'étape \code{exposition} \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee} & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38) \\
 \end{longtable}
 }
 
@@ -2831,7 +2940,9 @@ tous les estimateurs.
 L'étape a pour préalables les étapes \code{donnees} et \code{exposition}
 (constante \code{ETAPES}~; refus \code{etape\_prealable\_manquante} de
 \code{valider\_plan()} sinon)~: l'estimateur \code{kaplan\_meier} lit les
-observations de la première, tous les estimateurs la table de la seconde.
+fenêtres des observations de la première, calculées par la seconde et
+transmises par \code{construire\_table()} (section~\ref{sec:execution}),
+tous les estimateurs la table de la seconde.
 
 \medskip
 \textbf{Refus du module \code{brut}}, levés par
@@ -2850,6 +2961,18 @@ même raison de couverture (un estimateur de période sur une cellule âge
 $\times$ année relèverait d'une autre spécification). Si le binomial et
 \code{kaplan\_meier} sont tous deux déclarés sous \code{par\_annee},
 \code{binomial\_par\_annee} est levé en premier.
+La fonction d'étape contrôle en outre, en tête et avant
+\code{controler\_parametres\_brut()}, la \emph{forme seule} de la
+segmentation qu'elle reçoit~: \code{segmentation\_invalide}, module
+\code{brut} (autre chose qu'un vecteur \code{character} sans attribut, sans
+\code{NA} ni doublon~; vide explicite admis~; issue~\#43). Le même code est
+porté par le module qui détecte la condition (ADR 0007, annotation du
+17/10/2026, point~d)~: dans le plan, la segmentation est déjà refusée sous ce
+code par \code{controler\_parametres\_donnees()}, module \code{donnees},
+que \code{valider\_plan()} appelle, et qui contrôle aussi son appartenance
+aux rôles admis (section~\ref{sec:controles-donnees})~; ce contrôle-ci ne
+sert qu'à l'appel direct de la fonction d'étape, et une forme invalide y est
+signalée avant un estimateur inconnu.
 
 \medskip
 \textbf{Quantiles supérieurs.} Ils sont calculés par la queue supérieure
@@ -3078,7 +3201,27 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     n'intervient.
   \item \sloppy \textbf{Données}~: fenêtres et événements identiques à ceux de
     l'étape \code{exposition} (\code{fenetres\_observations()},
-    section~\ref{sec:troncature-censure}). Une observation est retenue si sa
+    section~\ref{sec:troncature-censure}). Dans une construction, ce sont
+    ceux-là mêmes~: l'étape \code{exposition} les transmet, avec les segments
+    des observations, dans un objet \code{fenetres\_exposition} («~Fenêtres
+    transmises à l'étape \code{brut}~», section~\ref{sec:troncature-censure}),
+    que \code{taux\_kaplan\_meier()} reprend tel quel après avoir contrôlé à
+    l'égalité exacte (\code{identical()}) les cinq paramètres qu'il porte,
+    comparés à ceux de l'étape \code{brut}~: début et borne de la période,
+    transition et segmentation, dont dépendent les fenêtres et les segments~;
+    convention retenue, qui n'entre pas dans leur calcul et dont le contrôle
+    vérifie la cohérence avec la convention de l'étape \code{exposition}~; un
+    écart est une erreur de programmation. Les observations elles-mêmes ne
+    sont pas contrôlées~: seul \code{construire\_table()} transmet cet objet,
+    produit par \code{calculer\_exposition()} à partir des observations de
+    l'étape \code{donnees} de la même exécution. En appel
+    direct de la fonction d'étape sur la table des observations, les fenêtres
+    et les segments sont recalculés par les mêmes fonctions
+    (\code{fenetres\_observations()}, \code{segments\_observations()})~; les
+    deux voies donnent des résultats \code{identical()} (constat de test,
+    section~\ref{sec:verifications-brut}). Les positions des jours dans leur
+    cellule (\code{position\_dans\_cellule()}) sont calculées ici, dans les
+    deux cas. Une observation est retenue si sa
     fenêtre $[a, b)$ est non vide, ou si elle porte un événement
     ($a \le s = b$). Sorties concurrentes, fin de période et délai de
     déclaration sont des censures à leur instant. Une tête dont deux
@@ -3171,10 +3314,28 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     table.
   \item \textbf{Calcul}~: \code{taux\_kaplan\_meier()}~; $r(t) = \#\{K_a \le
     t\} - \#\{K_b < t\}$ par \code{findInterval()}, couverture par
-    \code{cummax()}, en $O(n \log n)$. Deux gardes-fous, erreurs de
-    programmation et non refus~: la période et la transition doivent être
-    celles de l'étape \code{exposition}, et la somme des $d_j$ par cellule
-    doit être \code{identical()} aux événements de la table d'exposition.
+    \code{cummax()}, en $O(n \log n)$. La table d'exposition est appariée
+    \textbf{par clé} (segment, âge)~: chaque instant d'événement est rattaché,
+    par \code{match()}, à la ligne dont la cellule commence au même point de
+    l'échelle des clés, sans hypothèse sur l'ordre des lignes~; les instants
+    étant triés et les cellules étant des intervalles disjoints de cette
+    échelle, les instants d'une même cellule forment une plage contiguë, sur
+    laquelle se font les sommes cumulées de $\log(1 - d_j/r_j)$ et de
+    $\Sigma$. Gardes-fous, erreurs de programmation et non refus~: la période
+    et la transition doivent être celles de l'étape \code{exposition}~; les
+    fenêtres transmises doivent porter les mêmes début et borne de période,
+    transition, segmentation et convention (ci-dessus, «~Données~»)~; la clé
+    d'un instant doit rester un entier exact en \code{double}
+    ($< 2^{53}$)~; chaque clé (segment, âge) ne doit figurer qu'une fois dans
+    la table d'exposition, sous son propre message («~clé (segment, âge) en
+    double dans la table d'exposition~»), contrôlé avant le suivant~; chaque
+    instant d'événement doit tomber dans une cellule de la table d'exposition,
+    et chaque segment de la table d'exposition figurer parmi les segments des
+    observations (transmis ou recalculés), ces deux contrôles partageant le
+    message «~instant d'événement hors des cellules de la table
+    d'exposition~»~; les instants d'une cellule doivent être contigus~;
+    enfin, la somme des $d_j$ par cellule doit être \code{identical()} aux
+    événements de la table d'exposition.
   \item \textbf{Statut}~: $\hat q_x$, maximum de vraisemblance non
     paramétrique (risques discrets aux instants d'événement), résultat
     exact, valeur en arithmétique flottante~; non sans biais à effectif
@@ -3425,7 +3586,21 @@ aussi de test de débordement des entiers~; les refus, le message de
 \code{etape\_prealable\_manquante}, les types entiers, l'admission de
 \code{age\_atteint\_annee}~; l'invariance d'un plan sans \code{kaplan\_meier}
 (objet \code{identical()} à celui du plan qui le retient, privé de ses seuls
-ajouts).
+ajouts). Quatre tests portent sur les fenêtres transmises et l'appariement
+par clé (issue~\#38)~:
+\code{calculer\_exposition()} rend l'objet \code{fenetres\_exposition} à
+côté de ses quatre éléments, l'étape \code{brut} donne des résultats
+\code{identical()} avec les fenêtres transmises et en appel direct sur les
+observations, et aucun objet de cette classe ne figure dans l'objet résultat
+ni dans la fiche~; trois permutations des lignes de la table d'exposition
+(l'inverse et deux tirages sous graine locale), par les deux voies, rendent
+la table \code{kaplan\_meier} \code{identical()} à l'originale permutée, et
+la table des sauts et les diagnostics \code{identical()}~; chacun des cinq
+contrôles des fenêtres transmises arrête l'étape, un cas par contrôle, et
+des fenêtres inchangées ne l'arrêtent pas~; une table d'exposition dont une
+ligne est dupliquée arrête l'étape, en appel direct, par le message de la clé
+en double et non par celui de l'instant hors des cellules, et la table sans
+doublon ne l'arrête pas.
 
 \medskip
 \textbf{Contre-vérification par le package \code{survival}} (ADR 0002~;
@@ -3802,8 +3977,8 @@ $q$, spécification, A.4)~: sa garantie est le cas K
 \catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} et par la fonction d'étape \\
 \catalogue{fonctions-brut}{taux\_poisson()} & interne & $D$, $E^c$, niveau & taux, bornes exactes et asymptotiques, état (section~\ref{sec:brut-poisson}) \\
 \catalogue{fonctions-brut}{taux\_binomial()} & interne & $D$, $E^i$, niveau, tolérance & taux, bornes, état, cellules où $D = E^i > 0$ (section~\ref{sec:brut-binomial}) \\
-\catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & observations, table d'exposition, segmentation, transition, période, délai, convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
-\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: observations, transition, période, délai, paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat}) \\
+\catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & fenêtres transmises par l'étape \code{exposition} ou observations (appel direct), table d'exposition, segmentation, transition, période, délai, convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
+\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), transition, période, délai, paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat}) \\
 \end{longtable}
 }
 
@@ -4048,8 +4223,9 @@ et \code{algorithme} dans un ordre quelconque, chacun une chaîne
 \code{data.frame}, un objet de classe, une liste munie d'un autre attribut,
 un élément de plus (même nommé \code{NA}) ou une chaîne munie de noms, d'une
 dimension ou d'une classe sont refusés~: refus \code{provenance\_invalide}
-(\code{controler\_provenance()}, par \code{forme\_exacte()}~;
-issue~\#21).
+(\code{controler\_provenance()}, par \code{liste\_aux\_noms()} et
+\code{chaine\_unique()}, qui s'appuient sur \code{forme\_exacte()}~;
+issues~\#21 et~\#48).
 
 \subsubsection*{Représentation canonique}
 
@@ -4251,7 +4427,14 @@ spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
 La loi vraie est une liste de deux lois, \code{deces} et \code{rachat}~;
 chacune associe une table de référence (classe \code{table\_reference},
 section~\ref{sec:table-reference}) et un facteur par sexe, \code{c(H = , F = )},
-réel fini $\ge 0$. Pour un sexe $s$, la loi effective est
+réel fini $\ge 0$. La loi vraie et chacune de ses deux lois sont des
+\textbf{listes nues}, dont le seul attribut admis est celui des noms,
+d'exactement autant d'éléments que de noms attendus (\code{deces} et
+\code{rachat}~; \code{table} et \code{facteurs}), dans un ordre
+quelconque~: un \code{data.frame}, un objet de classe, une liste munie d'un
+autre attribut ou un élément de plus, même nommé \code{NA}, sont refusés
+(\code{loi\_invalide}~; \code{liste\_aux\_noms()},
+section~\ref{sec:fonctions-outils}~; issue~\#44). Pour un sexe $s$, la loi effective est
 \[
   q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
 \]
@@ -4360,7 +4543,9 @@ $\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondi
 au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
 au moins égal à 1 en mode âge exact~; ces conditions sont contrôlées
 (\code{portefeuille\_invalide}). La période d'observation est une liste
-\code{debut}, \code{fin} de dates~; la censure a lieu à l'instant
+nue, de champs exactement \code{debut} et \code{fin} (même contrôle
+\code{liste\_aux\_noms()} que la loi vraie~; refus \code{periode\_invalide}),
+de deux dates (classe \code{Date}) uniques, non manquantes, finies et entières~; la censure a lieu à l'instant
 $B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
 
 \subsubsection*{Algorithme}

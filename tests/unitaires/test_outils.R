@@ -175,3 +175,75 @@ cas_forme <- list(
 for (k in cas_forme)
   verifier(sprintf("forme_exacte : %s -> %s (valeur calculée à la main)", k[[1]], k[[5]]),
            identical(forme_exacte(k[[2]], k[[3]], k[[4]]), k[[5]]))
+
+# --- liste aux noms exacts et chaîne unique (#48) -------------------------------
+
+liste_aux_noms <- tablexp:::liste_aux_noms
+chaine_unique <- tablexp:::chaine_unique
+AB <- c("a", "b")
+cas_liste <- list(
+  list("liste nommée exactement", list(a = 1, b = 2), AB, TRUE),
+  list("mêmes noms dans l'autre ordre", list(b = 2, a = 1), AB, TRUE),
+  list("éléments de types quelconques (contenu non contrôlé)", list(a = NULL, b = 1:3), AB, TRUE),
+  list("liste vide, aucun nom attendu", list(), character(0), TRUE),
+  list("élément manquant (un élément)", list(a = 1), AB, FALSE),
+  list("élément en trop (trois éléments)", list(a = 1, b = 2, c = 3), AB, FALSE),
+  list("nom inconnu à la place d'un nom attendu", list(a = 1, c = 2), AB, FALSE),
+  list("nom partiel (ab pour a)", list(ab = 1, b = 2), AB, FALSE),
+  list("noms en double (a, a)", list(a = 1, a = 2), AB, FALSE),
+  list("noms en double avec b présent (a, a, b)", list(a = 1, a = 2, b = 3), AB, FALSE),
+  list("nom vide", setNames(list(1, 2), c("a", "")), AB, FALSE),
+  list("nom NA", setNames(list(1, 2), c("a", NA)), AB, FALSE),
+  list("nom NA en plus des noms attendus (sort() le retire : la longueur le refuse)",
+       setNames(list(1, 2, 3), c("a", "b", NA)), AB, FALSE),
+  list("liste sans noms (sort(NULL) lèverait une erreur)", list(1, 2), AB, FALSE),
+  list("liste vide, noms attendus", list(), AB, FALSE),
+  list("data.frame", data.frame(a = 1, b = 2), AB, FALSE),
+  list("liste de classe", structure(list(a = 1, b = 2), class = "x"), AB, FALSE),
+  list("liste à attribut quelconque", structure(list(a = 1, b = 2), foo = "x"), AB, FALSE),
+  list("vecteur atomique nommé", c(a = 1, b = 2), AB, FALSE),
+  list("NULL", NULL, AB, FALSE))
+for (k in cas_liste)
+  verifier(sprintf("liste_aux_noms : %s -> %s (valeur calculée à la main)", k[[1]], k[[4]]),
+           identical(liste_aux_noms(k[[2]], k[[3]]), k[[4]]))
+
+cas_chaine <- list(
+  list("chaîne nue", "a", TRUE),
+  list("chaîne d'un blanc (non vide)", " ", TRUE),
+  list("chaîne vide", "", FALSE),
+  list("NA_character_", NA_character_, FALSE),
+  list("NA logique", NA, FALSE),
+  list("longueur 2", c("a", "b"), FALSE),
+  list("longueur 0", character(0), FALSE),
+  list("NULL", NULL, FALSE),
+  list("chaîne nommée", c(x = "a"), FALSE),
+  list("chaîne de classe", structure("a", class = "x"), FALSE),
+  list("chaîne à attribut quelconque", structure("a", foo = "x"), FALSE),
+  list("chaîne en matrix", matrix("a"), FALSE),
+  list("facteur", factor("a"), FALSE),
+  list("nombre", 1, FALSE),
+  list("liste d'une chaîne", list("a"), FALSE))
+for (k in cas_chaine)
+  verifier(sprintf("chaine_unique : %s -> %s (valeur calculée à la main)", k[[1]], k[[3]]),
+           identical(chaine_unique(k[[2]]), k[[3]]))
+
+# Témoin du refus nouveau (#48) : refus_tablexp() testait is.character()
+# (attributs admis) ; la forme exacte refuse une chaîne nommée, par stop()
+# (erreur de programmation du package). Les témoins de table_reference() sont
+# dans test_donnees.R.
+verifier("refus_tablexp : module, motif ou message nommé -> erreur de programmation (stop())",
+         inherits(tryCatch(refus_tablexp(c(m = "donnees"), "a", "x"), error = function(e) e), "simpleError") &&
+           inherits(tryCatch(refus_tablexp("donnees", c(m = "a"), "x"), error = function(e) e), "simpleError") &&
+           inherits(tryCatch(refus_tablexp("donnees", "a", c(m = "x")), error = function(e) e), "simpleError"))
+verifier("refus_tablexp : chaînes nues admises (inchangé)",
+         inherits(refus_tablexp("donnees", "a", "x"), "refus_tablexp"))
+
+# Forme exacte de la graine (#43) : integer ou double, aucun attribut. Une
+# graine nommée, en matrix ou à attribut rendait le tirage de la graine nue.
+for (g in list(c(a = 1), matrix(1L), structure(1, x = 1), structure(1L, class = "x"), array(1, 1L)))
+  verifier(sprintf("sous_graine(%s) : refus graine_invalide (forme exacte)", paste(deparse(g), collapse = "")),
+           leve_refus(sous_graine(g, runif(1)), "graine_invalide"))
+verifier("sous_graine : graines nues 1 et 1L admises, même tirage (0,2655087 sous Mersenne-Twister, Inversion, Rejection)", {
+  u1 <- sous_graine(1, runif(1)); u2 <- sous_graine(1L, runif(1))
+  identical(u1, u2) && abs(u1 - 0.2655087) < 1e-7
+})

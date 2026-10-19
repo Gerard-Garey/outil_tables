@@ -100,7 +100,7 @@ table_constante <- function(q, ages, nom) {
 # Rend un data.frame (cause, sexe, age, qx, mu) trié par sexe puis âge ;
 # mu = -ln(1 - q_x), Inf si q_x = 1.
 loi_effective <- function(loi_t, cause, sexes) {
-  if (!is.list(loi_t) || !identical(sort(names(loi_t)), c("facteurs", "table")))
+  if (!liste_aux_noms(loi_t, c("facteurs", "table")))
     refuser("simulation", "loi_invalide",
             sprintf("Loi « %s » : liste (table, facteurs) attendue.", cause), list(cause = cause))
   tab <- loi_t$table; f <- loi_t$facteurs
@@ -181,7 +181,7 @@ date_unique <- function(x) identical(class(x), "Date") && length(x) == 1L && !is
   is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
 
 controler_portefeuille <- function(portefeuille, periode) {
-  if (!is.list(periode) || !identical(sort(names(periode)), c("debut", "fin")) ||
+  if (!liste_aux_noms(periode, c("debut", "fin")) ||
       !date_unique(periode$debut) || !date_unique(periode$fin))
     refuser("simulation", "periode_invalide",
             "La période d'observation doit être une liste (debut, fin) de deux dates (classe Date).",
@@ -344,7 +344,7 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 # date_sortie, cause_sortie) avec l'attribut `simulation`. Toutes les lignes
 # sont gardées, y compris celles sorties avant le début de la période.
 simuler_portefeuille <- function(loi, portefeuille, periode, graine) {
-  if (!is.list(loi) || !identical(sort(names(loi)), sort(names(CAUSES_SIMULEES))))
+  if (!liste_aux_noms(loi, names(CAUSES_SIMULEES)))
     refuser("simulation", "loi_invalide",
             sprintf("La loi vraie doit être une liste nommée %s.", liste_guillemets(names(CAUSES_SIMULEES))),
             list(noms = names(loi)))

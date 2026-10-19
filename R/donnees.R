@@ -294,18 +294,10 @@ controler_roles <- function(donnees, roles, segmentation) {
 # période ; sinon refus sous le motif du paramètre.
 controler_parametres_donnees <- function(transition, periode, delai_declaration,
                                          segmentation, exclusions) {
-  chaine <- function(x) forme_exacte(x, "character") && length(x) == 1L && !is.na(x)
-  # Liste nue aux noms exactement `noms` (ni champ en trop, ni nom partiel :
-  # lecture par [[ ]], jamais par $, qui apparie les noms partiels ; ni
-  # data.frame ni autre attribut que names ; la longueur est contrôlée à part :
-  # sort() retire un nom NA, qui passerait sinon avec un élément de plus).
-  noms_exacts <- function(x, noms) forme_exacte(x, "list", "names") && length(x) == length(noms) &&
-    !is.null(names(x)) &&
-    identical(sort(names(x), method = "radix"), sort(noms, method = "radix"))
-  if (!noms_exacts(transition, c("depart", "arrivee")) || !chaine(transition[["depart"]]) ||
-      !chaine(transition[["arrivee"]]))
+  if (!liste_aux_noms(transition, c("depart", "arrivee")) || !chaine_unique(transition[["depart"]]) ||
+      !chaine_unique(transition[["arrivee"]]))
     refuser("donnees", "transition_inconnue",
-            paste("La transition doit être une liste de deux noms d'états (chaînes sans attribut),",
+            paste("La transition doit être une liste de deux noms d'états (chaînes non vides, sans attribut),",
                   "de champs exactement depart et arrivee, sans autre attribut (ADR 0007, point 5.1)."),
             list(transition = transition))
   depart <- transition[["depart"]]; arrivee <- transition[["arrivee"]]
@@ -320,7 +312,7 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
   date1 <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
     identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
     is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
-  if (!noms_exacts(periode, c("debut", "fin")) || !date1(periode[["debut"]]) || !date1(periode[["fin"]]))
+  if (!liste_aux_noms(periode, c("debut", "fin")) || !date1(periode[["debut"]]) || !date1(periode[["fin"]]))
     refuser("donnees", "periode_invalide",
             paste("La période d'observation doit être une liste de champs exactement debut et fin,",
                   "sans autre attribut, deux dates (classe Date, sans autre attribut) non manquantes."),
@@ -723,25 +715,24 @@ FORMES_ORIGINE <- c("qx", "lx")
 #                  NULL sinon ;
 #   forme_origine: qx ou lx (forme de la transcription).
 table_reference <- function(x, nom, statut, source, parametres = NULL, forme_origine = "qx") {
-  chaine <- function(v) is.character(v) && length(v) == 1L && !is.na(v) && nzchar(v)
-  if (!chaine(nom))
-    refuser("donnees", "table_nom_manquant", "La table de référence doit avoir un nom (chaîne non vide).")
-  if (!chaine(statut) || !(statut %in% STATUTS_TABLE))
+  if (!chaine_unique(nom))
+    refuser("donnees", "table_nom_manquant", "La table de référence doit avoir un nom (chaîne non vide, sans attribut).")
+  if (!chaine_unique(statut) || !(statut %in% STATUTS_TABLE))
     refuser("donnees", "table_statut_inconnu",
-            sprintf("Table « %s » : statut à prendre dans %s.", nom, liste_guillemets(STATUTS_TABLE)),
+            sprintf("Table « %s » : statut (chaîne sans attribut) à prendre dans %s.", nom, liste_guillemets(STATUTS_TABLE)),
             list(statut = statut))
-  if (!chaine(source))
+  if (!chaine_unique(source))
     refuser("donnees", "table_source_manquante",
-            sprintf("Table « %s » : la source (arrêté, URL, fichier de provenance) est requise.", nom))
+            sprintf("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom))
   if (statut == "synthetique" && (!is.list(parametres) || !length(parametres)))
     refuser("donnees", "table_parametres_manquants",
             sprintf("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom))
   if (statut != "synthetique" && !is.null(parametres))
     refuser("donnees", "table_parametres_inattendus",
             sprintf("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom, statut))
-  if (!chaine(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
+  if (!chaine_unique(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
     refuser("donnees", "table_forme_inconnue",
-            sprintf("Table « %s » : forme d'origine à prendre dans %s.", nom, liste_guillemets(FORMES_ORIGINE)))
+            sprintf("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom, liste_guillemets(FORMES_ORIGINE)))
   if (!is.data.frame(x))
     refuser("donnees", "table_mal_formee", sprintf("Table « %s » : un data.frame est attendu.", nom))
   colonnes <- c("age", "sexe", "qx", if ("annee" %in% names(x)) "annee")

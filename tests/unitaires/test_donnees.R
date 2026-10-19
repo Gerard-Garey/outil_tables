@@ -745,6 +745,89 @@ verifier("fusion vectorisée = fusion naïve (600 têtes, 1500 lignes, ordre mé
          identical(r$debut, unname(naif[, 1L])) && identical(r$fin, unname(naif[, 2L])) &&
            length(unique(g)) == 600L && nrow(naif) == 1123L && any(is.infinite(r$fin)))
 
+# --- chaîne unique et liste aux noms exacts (#48) -------------------------------
+
+# table_reference() testait is.character() (attributs admis) : la forme exacte
+# refuse désormais une chaîne nommée ou à attribut, sous le motif existant.
+CHAINES_ATTR <- list("nommée" = c(n = "qx"), "à attribut foo" = structure("qx", foo = "x"))
+for (k in names(CHAINES_ATTR)) {
+  v <- CHAINES_ATTR[[k]]
+  verifier(sprintf("table_reference : nom %s -> refus table_nom_manquant", k),
+           leve_refus(tr(nom = v), "table_nom_manquant"))
+  verifier(sprintf("table_reference : statut %s -> refus table_statut_inconnu", k),
+           leve_refus(tr(statut = v), "table_statut_inconnu"))
+  verifier(sprintf("table_reference : source %s -> refus table_source_manquante", k),
+           leve_refus(tr(source = v), "table_source_manquante"))
+  verifier(sprintf("table_reference : forme_origine %s -> refus table_forme_inconnue", k),
+           leve_refus(tr(forme_origine = v), "table_forme_inconnue"))
+}
+verifier("table_reference : nom, statut, source et forme_origine nus admis (inchangé)",
+         inherits(tr(forme_origine = "qx"), "table_reference"))
+# Un nom d'état vide était refusé au second contrôle de la transition (non prise
+# en charge) ; il l'est au premier (forme), sous le même motif.
+verifier("transition : nom d'état vide (depart, puis arrivee) -> refus transition_inconnue",
+         isTRUE(leve_refus(prep(transition = list(depart = "", arrivee = "deces")), "transition_inconnue")) &&
+           isTRUE(leve_refus(prep(transition = list(depart = "vivant", arrivee = "")), "transition_inconnue")))
+
+# --- ligne en_cours dont la date de sortie précède l'entrée : refus voulu (#20) --
+
+# Avis d'actuary du 19/10/2026 (issue #20) : le refus est voulu. La date de
+# sortie d'une ligne `en_cours` atteste que le contrat est en cours jusqu'à
+# cette date ; antérieure à l'entrée, la ligne se contredit (cause fausse, ou
+# dates fausses). Le moteur ne choisit pas entre la cause et les dates (E2.7 :
+# aucune correction automatique) ; le recours est une exclusion déclarée des
+# motifs. Cas (i) à (v) de l'avis ; attendus calculés à la main (ligne 2 de
+# BASE modifiée, période 2015-01-01 à 2024-12-31).
+EC_AVANT <- avec(entree = D(c("2016-01-01", "2005-01-01", "2016-01-01", "2019-01-01")),
+                 sortie = D(c("2019-12-31", "2004-01-01", "2022-03-01", "2022-03-01")))
+x <- refus(prep(d = EC_AVANT))
+verifier("(i) en_cours, entrée 2005-01-01, sortie 2004-01-01 : refus ligne_invalide, motifs sortie_avant_entree et en_cours_avant_fin, ligne 2",
+         if (is.null(x)) "aucun refus" else if (!identical(x$motif, "ligne_invalide")) x$motif
+         else if (!identical(names(x$details$decompte), c("sortie_avant_entree", "en_cours_avant_fin")) ||
+                    !identical(unname(x$details$decompte), c(1L, 1L))) "décompte"
+         else if (!identical(x$details$lignes, list(sortie_avant_entree = 2L, en_cours_avant_fin = 2L))) "numéros de ligne"
+         else if (!identical(x$details$total_lignes, 1L)) "total de lignes"
+         else contient(x, "sortie_avant_entree", "en_cours_avant_fin"))
+# Entrée après la fin de la période (2026-01-01 > 2024-12-31) : la sortie
+# antérieure à l'entrée reste postérieure à la fin, en_cours_avant_fin n'est pas levé.
+x <- refus(prep(d = avec(entree = D(c("2016-01-01", "2026-01-01", "2016-01-01", "2019-01-01")),
+                         sortie = D(c("2019-12-31", "2025-06-01", "2022-03-01", "2022-03-01")))))
+verifier("(ii) en_cours, entrée après la fin de la période, sortie antérieure à l'entrée : refus par sortie_avant_entree seul, ligne 2",
+         if (is.null(x)) "aucun refus" else if (!identical(x$motif, "ligne_invalide")) x$motif
+         else if (!identical(names(x$details$decompte), "sortie_avant_entree") ||
+                    !identical(unname(x$details$decompte), 1L)) "décompte"
+         else if (!identical(x$details$lignes, list(sortie_avant_entree = 2L))) "numéros de ligne"
+         else contient(x, "sortie_avant_entree"))
+r <- tryCatch(prep(d = avec(entree = D(c("2016-01-01", "2005-01-01", "2016-01-01", "2019-01-01")),
+                            sortie = D(c("2019-12-31", "2024-12-31", "2022-03-01", "2022-03-01")))),
+              refus_tablexp = function(e) e)
+verifier("(iii) en_cours, entrée 2005-01-01, sortie = fin de la période : ligne acceptée, aucune exclusion",
+         if (inherits(r, "refus_tablexp")) paste("refus", r$motif, conditionMessage(r))
+         else if (!identical(r$resultat$numeros_conserves, 1:4)) "numéros conservés"
+         else if (!identical(r$resultat$nombre_lignes_exclues, 0L)) "nombre de lignes exclues"
+         else TRUE)
+r <- tryCatch(prep(d = EC_AVANT, exclusions = c("sortie_avant_entree", "en_cours_avant_fin")),
+              refus_tablexp = function(e) e)
+verifier("(iv) exclusion déclarée des deux motifs : ligne 2 acceptée à l'exclusion, une ligne exclue (comptée sous chaque motif)",
+         if (inherits(r, "refus_tablexp")) paste("refus", r$motif, conditionMessage(r))
+         else if (!identical(r$resultat$nombre_lignes_exclues, 1L)) "nombre de lignes exclues"
+         else if (!identical(r$resultat$numeros_conserves, c(1L, 3L, 4L))) "numéros conservés"
+         else if (!identical(r$resultat$lignes_conservees, EC_AVANT[-2L, , drop = FALSE])) "lignes conservées"
+         else if (!identical(r$resultat$exclusions,
+                             data.frame(motif = c("sortie_avant_entree", "en_cours_avant_fin"), nombre = c(1L, 1L),
+                                        stringsAsFactors = FALSE))) "décompte des exclusions"
+         else if (!identical(r$resultat$lignes_exclues,
+                             list(sortie_avant_entree = 2L, en_cours_avant_fin = 2L))) "liste des exclusions"
+         else if (!identical(sum(r$avertissements$code == "exclusion"), 2L)) "avertissements d'exclusion (un par motif)"
+         else TRUE)
+x <- refus(prep(d = EC_AVANT, exclusions = "sortie_avant_entree"))
+verifier("(v) exclusion de sortie_avant_entree seule : refus par en_cours_avant_fin (lever un seul motif ne change rien au cas), ligne 2",
+         if (is.null(x)) "aucun refus" else if (!identical(x$motif, "ligne_invalide")) x$motif
+         else if (!identical(names(x$details$decompte), "en_cours_avant_fin") ||
+                    !identical(unname(x$details$decompte), 1L)) "décompte"
+         else if (!identical(x$details$lignes, list(en_cours_avant_fin = 2L))) "numéros de ligne"
+         else contient(x, "en_cours_avant_fin"))
+
 # --- dates hors du domaine [0001-01-01, 9999-12-31] (#19 ; ADR 0011, point 4) ---
 
 # Nature : bornes en jours depuis 1970-01-01 calculées hors R (Python 3.13 :

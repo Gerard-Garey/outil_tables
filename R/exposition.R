@@ -242,14 +242,17 @@ somme_par_cellule <- function(cellule, v, n_cellules) {
 # où il ne déborde pas ; au-delà de .Machine$integer.max la recette refuse
 # (motif trop_de_cellules) avant les allocations par cellule : tabulate()
 # refuse un nbins d'au moins 2^31 (« attempt to make a table with >= 2^31
-# elements », mesuré).
-nombre_cellules <- function(n_age, n_an) {
+# elements », mesuré). Le libellé (deux conversions : le nombre, la limite) et le
+# nom du diagnostic se précisent pour la garde de la matrice de présence (#45),
+# qui compte des couples (segment, âge) et non des cellules.
+nombre_cellules <- function(n_age, n_an,
+                            libelle = "La table compterait %s cellules, au-delà de %d : segmentation trop fine ou plage d'âges et d'années trop étendue.",
+                            diagnostic = "cellules") {
   n <- sum(as.double(n_age) * n_an)
   if (n > .Machine$integer.max)
     refuser("exposition", "trop_de_cellules",
-            sprintf("La table compterait %s cellules, au-delà de %d : segmentation trop fine ou plage d'âges et d'années trop étendue.",
-                    format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
-            list(cellules = n))
+            sprintf(libelle, format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
+            stats::setNames(list(n), diagnostic))
   as.integer(n)
 }
 
@@ -328,7 +331,21 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #   segmentation      : sous-ensemble de c("sexe", "segment"), vide admis ;
 #   convention        : plus_fine, dernier_anniversaire ou age_atteint_annee ;
 #   par_annee         : TRUE pour découper aussi par année civile.
-# Rend list(parametres, resultat, diagnostics, avertissements) ;
+# Rend list(parametres, resultat, diagnostics, avertissements, fenetres) ;
+# fenetres (#38) : objet de classe `fenetres_exposition`, fenêtres des
+# observations (composantes, calendrier, a, b, evenement :
+# fenetres_observations()) et segments (g, segments :
+# segments_observations()), avec les paramètres sous lesquels ils sont
+# calculés (début D et borne B de la période, code de la transition dont
+# l'état d'arrivée fixe l'événement, segmentation) et la convention retenue
+# (que fenetres_observations() ne prend pas : elle sert à `brut` de contrôle
+# de cohérence avec cette étape), que l'étape `brut` contrôle à l'égalité
+# exacte (les observations elles-mêmes
+# ne sont pas contrôlées : construire_table() passe celles de l'étape) ; construire_table() le passe à `brut`
+# (argument observations) et ne l'inscrit ni dans l'objet résultat ni dans
+# la fiche. Aucune copie : les vecteurs sont ceux de f et sg. Les positions
+# dans la cellule n'y figurent pas : seul Kaplan-Meier les emploie, et il
+# les calcule une fois.
 # resultat$exposition : une ligne par cellule (clés de segmentation, age
 # [, annee]) sur la plage contiguë des âges, par segment, des cellules qui
 # ont une exposition > 0, un événement ou une sortie concurrente ; zéros
@@ -394,6 +411,15 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
     # Présence par (segment, âge) sur la plage globale des âges, puis
     # premier et dernier âge présents de chaque segment.
     x0 <- min(xs); etendue <- max(xs) - x0 + 1
+    # Garde de la matrice de présence (#45) : n_seg · etendue est la taille de
+    # cette matrice (couples (segment, âge) de la plage globale). Sans
+    # par_annee, c'est un majorant du nombre de cellules, qui peut être
+    # lâche ; avec par_annee, ce n'en est pas nécessairement un (la table
+    # compte aussi les années). Même motif que plus bas, avant le tabulate()
+    # qui refuserait un nbins d'au moins 2^31.
+    nombre_cellules(etendue, n_seg,
+                    "Le décompte de présence des âges compterait %s couples (segment, âge), au-delà de %d : segmentation trop fine ou plage d'âges trop étendue.",
+                    "couples_presence")
     presence <- matrix(tabulate((gx - 1) * etendue + (xs - x0) + 1, nbins = n_seg * etendue) > 0L,
                        nrow = etendue)
     occupe <- colSums(presence) > 0
@@ -460,6 +486,10 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
                        exposition_jours = sum(m$jours), evenements = length(ev),
                        sorties_concurrentes = length(sc), cellules = n_cel,
                        cellules_evenement_sans_exposition = sans_exposition),
-    avertissements = avert
+    avertissements = avert,
+    fenetres = structure(c(f[c("composantes", "calendrier", "a", "b", "evenement")], sg,
+                           list(debut = debut_p, borne = borne, transition = p$transition$code, convention = cv,
+                                segmentation = segmentation)),
+                         class = "fenetres_exposition")
   )
 }
