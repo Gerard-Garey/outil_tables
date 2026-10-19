@@ -1385,8 +1385,9 @@ le contrôle des autres options et avant toute écriture, si bien qu'aucun
 dossier de sortie n'est créé (ADR 0009, seconde annotation du 19/10/2026,
 point~(d)). Cette garde protège contre l'erreur, \textbf{pas contre la
 malveillance}~: la variable se pose à la main~; la garantie de fond reste
-la vérification, par la session principale, des MD5 des fichiers commités
-contre l'artefact de l'exécution citée. Le dossier de sortie ne peut être
+l'appariement des MD5 des fichiers commités à ceux de l'artefact de
+l'exécution citée, vérifié par la session principale au commit puis en revue
+finale (ADR 0009, point 5.5). Le dossier de sortie ne peut être
 \code{tests/reference/} ni s'y trouver, quelle que soit l'écriture du chemin
 (séparateurs, casse, lecteur, chemins réseau, liens, noms courts).
 Le job ne commite rien~: il publie un artefact (références, leurs MD5,
@@ -1404,7 +1405,7 @@ visa d'\code{actuary}). Les grandeurs des étapes \code{donnees} et
 (\code{f9ab269}) par une chaîne de mesures (différences de code vides, ou
 objets \code{identical()} hors \code{execution}, un changement de type sans
 changement de valeur, visé, étant admis~; ADR 0009, annotation du
-18/10/2026). Elles ont été \textbf{régénérées une fois}, le 19/10/2026, en
+18/10/2026). Les références R1 à R6 ont été \textbf{régénérées une fois}, le 19/10/2026, en
 mode \code{regeneration} sur tous les plans (exécution 39248539956 du
 workflow, calcul sur \code{99272a4}, commit \code{763da20}, visa
 d'\code{actuary}), pour le seul changement de type du nombre de cellules de
@@ -1731,8 +1732,8 @@ d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{double} sans attribut~; \code{segmentation} un vecteur
 \code{character} sans attribut, vide compris. La forme est contrôlée par
 \code{forme\_exacte()} (section~\ref{sec:fonctions-outils}), sous le motif
-existant de chaque paramètre~: aucun motif n'est propre à la forme. Elle
-l'est avant la valeur, si bien qu'un vecteur nommé de codes inconnus est
+existant de chaque paramètre~: aucun motif n'est propre à la forme. Pour
+chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
 
@@ -4053,7 +4054,8 @@ annotation du 17/10/2026, point~f)~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{périmètre}~: les seules colonnes auxquelles un rôle est déclaré,
     \textbf{toutes les lignes reçues}, avant exclusions, dans l'ordre reçu~;
-    une base dont les lignes sont permutées a une autre empreinte, et ses
+    les exclusions sont des paramètres du plan, non une propriété de
+    l'entrée~; une base dont les lignes sont permutées a une autre empreinte, et ses
     résultats ne sont pas garantis identiques au bit près (E4.6 ne porte que
     sur des données identiques)~: les lignes conservées et les observations
     suivent l'ordre reçu~; les grandeurs entières ou à valeur entière
@@ -4065,11 +4067,12 @@ annotation du 17/10/2026, point~f)~:
     dans les derniers bits. Écart relatif maximal mesuré~: $1{,}6 \cdot
     10^{-14}$ sur l'entrée de référence ($10^5$~lignes, plans R1 à R6, six
     permutations, R~4.3.3, 19/10/2026), atteint par la borne supérieure
-    exacte (\code{borne\_sup\_exacte}, plan R2)~; les taux et l'exposition
+    exacte (\code{borne\_sup\_exacte} de l'estimateur binomial, plan R2)~; les taux et l'exposition
     centrale restent au plus à $5{,}73 \cdot 10^{-15}$. L'écart croît avec
-    le nombre de termes sommés par cellule~: sur l'exposition centrale,
-    $1{,}37 \cdot 10^{-14}$ à $10^6$~lignes et $1{,}73 \cdot 10^{-14}$ à
-    $3 \cdot 10^6$ (plan R1, une permutation). C'est un \textbf{constat de
+    le nombre de termes sommés par cellule~: sur l'exposition centrale (plan
+    R1, une permutation tirée sous la graine 20261019),
+    $3{,}97 \cdot 10^{-15}$ à $10^5$~lignes, $1{,}37 \cdot 10^{-14}$ à
+    $10^6$ et $1{,}73 \cdot 10^{-14}$ à $3 \cdot 10^6$. C'est un \textbf{constat de
     mesure, non une borne démontrée}~; le test de permutation de la batterie
     de reproductibilité (plans R6, R4, R5 et R2, trois permutations) le
     contrôle à la tolérance relative $10^{-12}$ (constante
@@ -4078,9 +4081,9 @@ annotation du 17/10/2026, point~f)~:
     doubles, les doubles de classe exacte, les tables de Kaplan-Meier et les
     diagnostics de l'étape \code{brut} y sont comparés par
     \code{identical()}, les trois empreintes (données, lignes conservées,
-    observations) devant au contraire différer~; tout autre double fait
-    échouer le test. Les exclusions sont des paramètres du plan, non une propriété de
-    l'entrée~;
+    observations) devant au contraire différer~; tout double qui n'est dans
+    aucune de ces deux classes («~double non classé~») fait échouer le
+    test~;
   \item \textbf{ordre des colonnes}~: par nom de rôle, en ordre d'octets~; le
     nom de colonne n'entre pas dans le texte (il est dans \code{fiche\$roles})~:
     renommer une colonne ne change pas l'empreinte~;
