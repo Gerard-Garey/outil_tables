@@ -1146,7 +1146,7 @@ fichiers en ligne de commande).
     \code{observation\_des\_lignes}~; constante
     \code{RESUMES\_PAR\_EMPREINTE}) sont \textbf{résumées} par leur nombre de
     lignes et l'empreinte MD5 de leur représentation canonique (colonnes
-    écrites par \code{colonne\_canonique()}, section~\ref{sec:empreinte}),
+    écrites par \code{ecrire\_valeurs()}, section~\ref{sec:empreinte}),
     non recopiées~: elles ne contiennent que des entiers, des dates et des
     chaînes, sans arithmétique flottante, si bien que le résumé exact ne perd
     aucune détection, et la table «~avant~» se reconstitue en rejouant le plan
@@ -4122,7 +4122,7 @@ annotation du 17/10/2026, point~f)~:
 \noindent
 Le libellé de type de l'en-tête est pris dans une \textbf{liste fermée de six
 chaînes}, par des tests faits dans l'ordre du tableau~\ref{tab:types-canoniques}
-(\code{colonne\_canonique()})~; le premier qui réussit fixe le libellé. Un
+(\code{ecrire\_valeurs()})~; le premier qui réussit fixe le libellé. Un
 type hors de la liste est refusé (\code{type\_non\_canonique}), sans
 conversion. C'est une seconde barrière~: le contrôle des types des rôles
 (\code{type\_incompatible}, section~\ref{sec:catalogue-roles}) refuse déjà,
@@ -4208,7 +4208,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{STATUT\_EMPREINTES\_NON\_CALCULEES} & constante & --- & statut des empreintes du résultat et du code \\
 \catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle & octets canoniques des chaînes~; refus de codage \\
 \catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
-\catalogue{fonctions-rapport}{colonne\_canonique()} & interne & colonne, rôle & libellé de type et octets~; refus \code{type\_non\_canonique} \\
+\catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g})~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique} \\
 \catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire \\
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
