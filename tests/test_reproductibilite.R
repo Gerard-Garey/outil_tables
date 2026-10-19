@@ -1875,4 +1875,42 @@ local({
                      fixed = TRUE)))
 })
 
+
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R6 ---
+
+# Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
+# construire_table() sur le plan relu de la fiche écrite, identical() hors
+# execution à l'objet comparé aux références ci-dessus (même entrée, même
+# plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R6, aller-retour identical(), rejeu depuis le texte")
+local({
+  for (p in plans_reference()) {
+    id <- p$identifiant
+    x <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan)
+    verifier(sprintf("%s : lire_plan(ecrire_plan(plan)) identical() au plan", id),
+             identical(lire_plan(ecrire_plan(p$plan)), p$plan))
+    f <- lire_fiche(ecrire_fiche(x$fiche))
+    verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
+    y <- construire_table(jeu_ref$donnees, f$roles, valider_plan(f$plan), f$provenance)
+    verifier(sprintf("%s : rejeu sur le plan relu de la fiche écrite identical() hors execution", id),
+             identical(sans_execution(y), sans_execution(x)))
+    if (id != "R1") next
+    # Fiche de R1 (ADR 0011, troisième annotation, (d) et (h)) : tout préfixe
+    # strict du corps, coupé à une frontière de ligne, est refusé ; les blocs de
+    # lecture partitionnent les champs de la fiche.
+    l <- strsplit(rawToChar(ecrire_fiche(x$fiche)), "\n", fixed = TRUE)[[1L]]
+    entete <- l[seq_len(match(FALSE, startsWith(l[-1L], "#")))]
+    corps <- l[-seq_along(entete)]
+    acceptes <- Filter(function(m) !inherits(tryCatch(lire_fiche(charToRaw(enc2utf8(paste0(paste(c(entete, corps[seq_len(m)]),
+                                                                                                collapse = "\n"), "\n")))),
+                                                      refus_tablexp = function(e) e), "refus_tablexp"),
+                       0:(length(corps) - 1L))
+    verifier(sprintf("R1 : chacun des %d préfixes stricts du corps de la fiche écrite refusé par lire_fiche()", length(corps)),
+             !length(acceptes) || sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
+    b <- unlist(tablexp:::BLOCS_LECTURE_FICHE)
+    verifier("R1 : BLOCS_LECTURE_FICHE partitionne names(fiche) (aucun champ manquant, en double ni étranger)",
+             setequal(b, names(x$fiche)) && length(b) == length(x$fiche) && !anyDuplicated(b))
+  }
+})
+
 bilan()
