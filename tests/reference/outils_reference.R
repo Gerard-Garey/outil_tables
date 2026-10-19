@@ -73,7 +73,7 @@ CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12)
 # retour à doubles_sans_tolerance().
 TOLERANCES <- c(
   # exacte : doubles à valeur entière ou déclarée (point 3.4)
-  exposition_jours = 0, cellules = 0, niveau = 0, delai_declaration = 0,
+  exposition_jours = 0, niveau = 0, delai_declaration = 0,
   tolerance_effectif = 0,
   # 1e-14 : arithmétique IEEE de base (point 3.4)
   exposition_centrale = 1e-14, complement_initial_cellule = 1e-14,

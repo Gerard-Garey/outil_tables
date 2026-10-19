@@ -652,16 +652,42 @@ verifier("témoin : kaplan_meier_sauts/numerateur remis en double -> relevé par
   if (length(c_) != 1L || !identical(unname(g$types[[c_]]), "integer")) return("numerateur de R6 : un chemin integer attendu")
   masque <- c(TOLERANCES, "kaplan_meier_sauts/numerateur" = 0)
   g$types[[c_]] <- "double"; g$valeurs[[c_]] <- as.double(g$valeurs[[c_]])
-  identical(doubles_sans_tolerance(g), c_) && !length(doubles_sans_tolerance(g, masque))
+  c_ %in% doubles_sans_tolerance(g) && !c_ %in% doubles_sans_tolerance(g, masque)
 })
-verifier("tolérances : aucun double sans tolérance déclarée dans les six références commitées (table sans clé integer)", {
-  restes <- lapply(plans_reference(), function(p) {
-    f <- file.path(DOSSIER_REFERENCES, paste0(p$identifiant, ".tsv"))
-    if (!file.exists(f)) return(paste("absent :", f))
-    doubles_sans_tolerance(lire_reference(f))
+# Les trois chemins que la clé nue `cellules` classait (#37) : le dénombrement
+# de l'étape exposition (integer depuis #37) et les deux de l'étape brut. Pour
+# chacun : integer dans R6 (sinon le moteur est revenu au double, et seul le
+# témoin de ce chemin échoue), puis remis en double en mémoire, il est relevé
+# par doubles_sans_tolerance() alors que la clé nue le classerait.
+for (chemin_37 in c("etapes/exposition/diagnostics/cellules", "etapes/brut/diagnostics/cellules",
+             "etapes/brut/diagnostics/etats/cellules")) {
+  verifier(sprintf("témoin : %s remis en double -> relevé par doubles_sans_tolerance(), que la clé nue cellules aurait masqué", chemin_37), {
+    g <- aplatis[["R6"]]
+    if (!identical(unname(g$types[chemin_37]), "integer"))
+      return(sprintf("%s de R6 : un chemin integer attendu, type %s", chemin_37, unname(g$types[chemin_37])))
+    masque <- c(TOLERANCES, cellules = 0)
+    g$types[[chemin_37]] <- "double"; g$valeurs[[chemin_37]] <- as.double(g$valeurs[[chemin_37]])
+    chemin_37 %in% doubles_sans_tolerance(g) && !chemin_37 %in% doubles_sans_tolerance(g, masque)
   })
-  if (all(lengths(restes) == 0L)) TRUE else paste(names(restes)[lengths(restes) > 0L], collapse = ", ")
+}
+restes_commites <- function() lapply(plans_reference(), function(p) {
+  f <- file.path(DOSSIER_REFERENCES, paste0(p$identifiant, ".tsv"))
+  if (!file.exists(f)) return(paste("absent :", f))
+  doubles_sans_tolerance(lire_reference(f))
 })
+restes_vides <- function(restes)
+  if (all(lengths(restes) == 0L)) TRUE else paste(names(restes)[lengths(restes) > 0L], collapse = ", ")
+nom_restes <- "tolérances : aucun double sans tolérance déclarée dans les six références commitées (table sans clé integer)"
+if (length(A_REGENERER_37)) {
+  # Tant que la référence porte le double de #37 : ce chemin est le seul
+  # reste admis (test ordinaire), le test strict est un échec attendu.
+  verifier("tolérances : dans les références à régénérer, le seul double sans tolérance déclarée est le type de #37", {
+    restes <- restes_commites()
+    for (plan_id in A_REGENERER_37) restes[[plan_id]] <- setdiff(restes[[plan_id]], CHEMIN_TYPE_37)
+    restes_vides(restes)
+  })
+  echec_attendu(nom_restes, "#37", restes_vides(restes_commites()))
+} else verifier(nom_restes, restes_vides(restes_commites()))
 # Règle élément par élément (seconde annotation, (c)) : mesure d'actuary,
 # a = c(Inf, 0, 0.1 + 0.2), b = c(Inf, 0, 0.3), tol = 1e-14 -> égaux ;
 # Inf contre -Inf et NA contre NaN restent des écarts (structure).
