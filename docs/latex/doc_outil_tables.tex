@@ -566,7 +566,9 @@ exportées par \code{tablexp:::} (ADR 0007, point 11.3).
 
 \code{R/outils.R} porte les services sans contenu métier partagés par tous les
 modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
-la forme des refus et celle des avertissements (ADR 0007, point 1.2). Il
+la forme des refus et celle des avertissements (ADR 0007, point 1.2), ainsi
+que le contrôle de la forme exacte d'une valeur reçue, \code{forme\_exacte()}
+(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23). Il
 n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
@@ -657,6 +659,13 @@ condition de classe \code{refus\_tablexp}, sans la lever~; \code{stop()} si un
 argument est mal formé (section~\ref{sec:refus}) \\
 \catalogue{fonctions-outils}{refuser()} & interne & mêmes arguments & lève le
 refus~; ne rend jamais la main \\
+\catalogue{fonctions-outils}{forme\_exacte()} & interne & \code{x},
+\code{types} (types de base admis), \code{attributs} (noms d'attributs
+admis, aucun par défaut) & \code{TRUE} si \code{typeof(x)} est pris dans
+\code{types} et si \code{x} ne porte aucun attribut hors de
+\code{attributs}, \code{FALSE} sinon, jamais \code{NA}~; un attribut admis
+n'est pas requis et sa valeur n'est pas contrôlée~; ne refuse pas, l'appelant
+refuse sous son propre motif (section~\ref{sec:plan}~; issue~\#23) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -1662,7 +1671,7 @@ vecteur de codes de motif sans doublon, vide explicite admis
 \code{poisson}, \code{binomial} et \code{kaplan\_meier}, restitué dans cet
 ordre~; \code{binomial} et \code{kaplan\_meier} refusés sous
 \code{par\_annee = TRUE}~; \code{niveau}~:
-niveau de confiance, nombre \code{double} unique sans attribut, fini,
+niveau de confiance, nombre \code{double} unique, fini,
 $0 < \text{niveau} < 1$ (section~\ref{sec:brut-etape}) \\
 \end{tabular}
 \end{center}
@@ -1672,6 +1681,28 @@ Aucune des trois ne tire d'aléa. La recette d'exposition et l'unité
 d'observation ne sont pas des paramètres~: le moteur les déduit des rôles
 (sections~\ref{sec:recettes} et~\ref{sec:unite-observation})~; seule une
 convention d'âge plus grossière peut être forcée.
+
+\noindent
+\textbf{Règle commune de forme} (issue~\#23)~: chaque paramètre d'étape a
+exactement le type de base que déclare la colonne \code{type} de
+\code{PARAMETRES\_ETAPES} (\code{character} pour \code{exclusions},
+\code{convention} et \code{estimateurs}, \code{logical} pour
+\code{par\_annee}, \code{double} pour \code{niveau}) et \textbf{ne porte
+aucun attribut}~: ni noms, ni dimension, ni classe (un facteur, une matrice
+ou un vecteur nommé sont refusés), sinon refus sous le motif propre au
+paramètre. Il en va de même des champs du plan~: \code{transition} et
+\code{periode} sont des listes nues, dont le seul attribut admis est celui
+des noms, exactement autant d'éléments que de noms attendus (un
+\code{data.frame} est refusé)~; les deux bornes de la période n'ont
+d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
+\code{integer}~; \code{delai\_declaration} est un \code{integer} ou un
+\code{double} sans attribut~; \code{segmentation} un vecteur
+\code{character} sans attribut, vide compris. La forme est contrôlée par
+\code{forme\_exacte()} (section~\ref{sec:fonctions-outils}), sous le motif
+existant de chaque paramètre~: aucun motif n'est propre à la forme. Elle
+l'est avant la valeur, si bien qu'un vecteur nommé de codes inconnus est
+refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
+et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
 
 \medskip
 {\sloppy\hbadness=10000 \textbf{\code{valider\_plan(plan)}}, exportée parce que l'application l'appellera
@@ -1686,6 +1717,11 @@ les codes \emph{structurels} du plan, module \code{construire\_table}~:
 d'une étape forment une liste (colonne \code{prealable} de \code{ETAPES})~;
 chacun est contrôlé, et le refus \code{etape\_prealable\_manquante} ne cite
 que les préalables absents, au singulier ou au pluriel selon leur nombre.
+Le plan, son champ \code{etapes} et la liste des paramètres de chaque étape
+sont des listes nommées \textbf{nues}, dont le seul attribut admis est
+celui des noms~: un \code{data.frame}, un objet de classe ou une liste
+munie d'un autre attribut est refusé sous \code{plan\_mal\_forme},
+\code{etapes\_mal\_formees} ou \code{parametres\_mal\_formes} (issue~\#23).
 Elle ne réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
 (\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
 \code{controler\_parametres\_brut()}), dont les codes et le module sont ainsi identiques, quelle que soit la
@@ -1759,7 +1795,10 @@ contrat partagé «~objet résultat~» (ADR 0007, point 6.3).
 
 {\sloppy\hbadness=10000 \code{tests/unitaires/test\_construire\_table.R} vérifie la liste des exports,
 chaque refus de \code{valider\_plan()} (noms exacts des champs de transition et
-de période compris), la cohérence entre \code{ETAPES} et les fonctions
+de période compris), la règle commune de forme (pour chaque paramètre d'étape
+et chaque champ du plan, une valeur valide munie de noms, d'une dimension ou
+d'un autre attribut est refusée sous le motif du paramètre, porté par le
+module qui le contrôle~; issue~\#23), la cohérence entre \code{ETAPES} et les fonctions
 d'étape appelées, la structure de l'objet et de la fiche, et des identités
 exactes sur un portefeuille simulé (section~\ref{sec:verifications-exposition}).
 \code{tests/test\_reproductibilite.R} vérifie que deux constructions
@@ -1789,8 +1828,8 @@ processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN} & constante & --- & les six champs de premier niveau du plan \\
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{graine}) \\
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa \\
-\catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type, domaine \\
-\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & liste nommée aux noms uniques et non vides \\
+\catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine \\
+\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; par \code{forme\_exacte()} (issue~\#23) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat}) \\
 \end{longtable}
@@ -1974,16 +2013,26 @@ message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
 
 \medskip
 {\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
-reçoit~: \code{transition\_inconnue} (liste de champs autres qu'exactement
-\code{depart} et \code{arrivee}, ou transition non prise en charge~: seules
+reçoit~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
+\code{data.frame} ou une liste munie d'un autre attribut que ses noms~---, de
+champs autres qu'exactement \code{depart} et \code{arrivee}, ou d'un élément
+de plus, même nommé \code{NA}~; état qui n'est pas une chaîne unique sans
+attribut ni \code{NA}~; ou transition non prise en charge~: seules
 vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
-\code{TRANSITIONS})~; \code{periode\_invalide} (liste de champs autres
-qu'exactement \code{debut} et \code{fin}, ou dates manquantes ou non
-\code{Date})~; \code{delai\_invalide} (délai qui n'est pas un entier $\ge 0$)~;
-\code{periode\_vide}~; \code{segmentation\_invalide} (vecteur de chaînes sans
-doublon pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
-\code{exclusions\_invalides}~; \code{exclusion\_inconnue} (code absent de la
-liste fermée des motifs). Les noms de champs sont lus exactement, jamais par
+\code{TRANSITIONS})~; \code{periode\_invalide} (liste qui n'est pas nue, de
+champs autres qu'exactement \code{debut} et \code{fin}, ou d'un élément de
+plus~; bornes manquantes, non \code{Date}, non entières ou munies d'un autre
+attribut que la classe \code{Date})~; \code{delai\_invalide} (délai qui
+n'est pas un nombre unique, \code{integer} ou \code{double}, sans attribut,
+entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
+(autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
+doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
+\code{exclusions\_invalides} (autre chose qu'un vecteur \code{character} sans
+attribut, sans \code{NA} ni doublon, vide explicite admis)~;
+\code{exclusion\_inconnue} (code absent de la liste fermée des motifs). Les
+deux derniers sont contrôlés dans cet ordre~: \code{exclusions\_invalides}
+l'emporte, si bien qu'un vecteur nommé ou en double de codes inconnus est
+refusé sous ce motif et non sous \code{exclusion\_inconnue}. Les noms de champs sont lus exactement, jamais par
 appariement partiel. Le même contrôle est appelé par \code{valider\_plan()},
 avant toute étape~: un code désigne une condition, quelle que soit la fonction
 qui la détecte, et le refus porte le module \code{donnees} (ADR 0007,
@@ -2380,8 +2429,12 @@ native de la recette, ou désigne une convention~:
     (\code{convention\_plus\_fine})~: les rôles ne la permettent pas~;
   \item \sloppy\hbadness=10000 \code{age\_fourni}, non mise en œuvre (ses rôles ne sont pas pris en
     charge), est refusée (\code{convention\_non\_mise\_en\_oeuvre})~; toute
-    autre valeur aussi (\code{convention\_invalide})~; \code{par\_annee} doit
-    valoir \code{TRUE} ou \code{FALSE} (\code{par\_annee\_invalide}).
+    autre valeur aussi, de même qu'une convention qui n'est pas une chaîne
+    unique sans attribut ni \code{NA} (\code{convention\_invalide})~;
+    \code{par\_annee} doit valoir \code{TRUE} ou \code{FALSE}, valeur
+    \code{logical} unique sans attribut (\code{par\_annee\_invalide}).
+    Ces deux contrôles appliquent la règle commune de forme du plan
+    (section~\ref{sec:plan}~; issue~\#23).
 \end{itemize}
 
 \noindent
@@ -2708,11 +2761,14 @@ $\alpha/2$ de chaque côté, quel que soit $D$.
 
 \medskip
 \textbf{Paramètres}, tous requis, sans défaut (ADR 0007, point~5~;
-constante \code{PARAMETRES\_ETAPES})~: \code{estimateurs}, sous-ensemble non
-vide, sans doublon ni \code{NA}, de \code{ESTIMATEURS\_BRUT}~; les résultats
-sont toujours rendus dans l'ordre de cette constante, quel que soit l'ordre
-déclaré~; \code{niveau}, nombre \code{double} unique, sans attribut, fini,
-strictement compris entre 0 et 1, partagé par tous les estimateurs.
+constante \code{PARAMETRES\_ETAPES}), soumis à la règle commune de forme
+(type de base exact, aucun attribut~; section~\ref{sec:plan},
+issue~\#23)~: \code{estimateurs}, vecteur \code{character},
+sous-ensemble non vide, sans doublon ni \code{NA}, de
+\code{ESTIMATEURS\_BRUT}~; les résultats sont toujours rendus dans l'ordre
+de cette constante, quel que soit l'ordre déclaré~; \code{niveau}, nombre
+\code{double} unique, fini, strictement compris entre 0 et 1, partagé par
+tous les estimateurs.
 L'étape a pour préalables les étapes \code{donnees} et \code{exposition}
 (constante \code{ETAPES}~; refus \code{etape\_prealable\_manquante} de
 \code{valider\_plan()} sinon)~: l'estimateur \code{kaplan\_meier} lit les
@@ -2722,8 +2778,10 @@ observations de la première, tous les estimateurs la table de la seconde.
 \textbf{Refus du module \code{brut}}, levés par
 \code{controler\_parametres\_brut()}, que \code{valider\_plan()} appelle avant
 toute étape et que la fonction d'étape rappelle~: \code{estimateurs\_invalides}
-(pas un vecteur de chaînes, vide, \code{NA} ou doublon)~;
-\code{estimateur\_inconnu}~; \code{niveau\_invalide} (autre type que
+(pas un vecteur \code{character}, attribut~--- noms, dimension ou classe~---,
+vide, \code{NA} ou doublon)~; \code{estimateur\_inconnu}, contrôlé
+après la forme~: un vecteur nommé de noms inconnus relève du motif
+précédent~; \code{niveau\_invalide} (autre type que
 \code{double}, attribut, longueur différente de 1, valeur non finie, $\le 0$
 ou $\ge 1$)~; \code{binomial\_par\_annee}~: sous \code{par\_annee = TRUE},
 l'exposition initiale n'est pas produite (section~\ref{sec:decoupage-annee}),
