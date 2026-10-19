@@ -486,3 +486,71 @@ Il comble l'intervalle entre le commit qui change un résultat (un commit par is
 **Effet sur les résultats de (d)** : aucun. R1 à R6 donnent le verdict OK (message de `4f182e3`).
 
 Issues : #37, #39, #36 ; #24 (règle de la quatrième annotation, (b)). Branche `claude/consolidation-controles-references`, PR #40.
+
+## Annotation du 19 octobre 2026 (troisième) — #47 : règle 9.5 étendue (liste unique `TRANSITIONS_EN_COURS`, cinq natures, exactitude dans les deux sens, union, rattachement de l'échec attendu, restes) ; garde « entrée différente » (point 3.2) sous transition
+
+Rédigée par `architect-approfondi` sur la branche `claude/fiche-serialisation` (B4, PR #51), d'après le diff de `coder` sur #47 (`tests/test_reproductibilite.R`, non commité à cette date), le rapport d'`audit` (conforme avec réserves, trois constats mineurs, rapporté par la session principale) et des mesures d'`architect` citées en (f). Elle décrit l'état du code **après la reprise unique de `coder`** que demande le même avis ; le commit `tests:` de #47 doit y être conforme. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Le point 9.5 (M60) reste la règle ; la présente annotation fixe sa mise en œuvre générique et précise deux de ses phrases.
+
+**(a) Liste unique.** Le mécanisme propre à #37 (`A_REGENERER_37`, `CHEMIN_TYPE_37`, deux branches dédiées) est retiré. Les transitions en cours sont déclarées dans une **liste unique** `TRANSITIONS_EN_COURS` de `tests/test_reproductibilite.R`, vide hors transition. Chaque élément porte trois champs, et eux seuls : `issue` (`"#N"`, une transition par issue), `plans` (identifiants de `plans_reference()`) et `changements` (au moins un). Un test ordinaire, `valider_transitions()`, refuse une liste mal formée. Dans le point 9.5, « la liste `A_REGENERER_<n>` des plans concernés » se lit désormais : « la transition de l'issue `<n>` dans `TRANSITIONS_EN_COURS` ».
+
+**(b) Cinq natures, liste fermée.** Un changement nomme un chemin et une nature. Chaque nature se déclare exactement et doit être **observée** sur la référence commitée, telle qu'elle est lue, avant tout alignement :
+
+| Nature | Champs déclarés | Admis | Condition d'observation |
+|---|---|---|---|
+| `type` | `de`, `vers` | `double` → `integer` ou `integer` → `double`, conversion sans perte | type de la référence égal à `de` |
+| `valeur` | `valeurs` (numériques), `positions` facultatif | sans `positions` : le vecteur déclaré remplace tout le vecteur de la référence, de longueur nouvelle quelconque mais au moins 1 ; avec `positions` : même longueur, positions dans le vecteur | référence `double` ou `integer` ; vecteur différent (sans `positions`) ou chaque position déclarée différente |
+| `valeur de chaîne` | `valeurs` (`character`), `positions` facultatif | comme `valeur` | référence `character` ; comme `valeur` |
+| `ajout` | `type`, `longueur` | chemin présent dans l'objet seul, de ce type et de cette longueur | chemin absent de la référence |
+| `retrait` | `type`, `longueur` | chemin présent dans la référence seule, de ce type et de cette longueur | chemin présent dans la référence |
+
+1. **Pas de nature « longueur ».** Un changement de longueur se déclare par `valeur` ou `valeur de chaîne` **sans `positions`**, avec le vecteur nouveau entier. C'est le cas de `fiche/@noms` si la question Q2 de l'ADR 0011 est retenue (25 → 21 noms). Une longueur déclarée sans ses valeurs admettrait des valeurs « quelles qu'elles soient » : c'est ce que le point 9.5 exclut. **La longueur nouvelle est au moins 1** : `valider_transitions()` exige des valeurs non vides (`tests/test_reproductibilite.R:411`) et l'union refuse un `ajout` et un `retrait` sur un même chemin. Le passage d'un vecteur à la longueur 0 n'est donc pas déclarable, et il est exclu jusqu'à décision contraire. Aucun cas n'est prévu dans B4 : les huit retraits de #42 sont des retraits de chemins, non des vecteurs vidés (*vérifié* : les huit chemins figurent dans `R1.tsv` à `R6.tsv`).
+2. **Précision du point 9.5, « valeurs nouvelles nommées chemin par chemin ».** Pour `valeur` et `valeur de chaîne`, les valeurs sont déclarées. Pour `ajout` et `retrait`, la structure est déclarée (type et longueur). Les valeurs d'un chemin ajouté n'ont pas d'« avant » à comparer : elles entrent dans le tableau avant / après de la régénération, sous visa. Les valeurs d'un chemin retiré y figurent aussi, lues dans la référence.
+
+**(c) Exactitude dans les deux sens.** Le test « seul écart » (point 9.5 (i)) vérifie que tout écart observé est déclaré. La condition d'observation de (b) vérifie la réciproque : **tout changement déclaré est observé**. Un changement déclaré mais non observé fait échouer le test « seul écart » (« changement déclaré non observé »). Trois cas en relèvent : un chemin absent de la référence et de l'objet (constat 1 d'`audit`, `tests/test_reproductibilite.R:417` du diff), une valeur déclarée égale à celle de la référence, et un type déjà converti. Conséquence pour un plan resté listé après la régénération : le test « seul écart » échoue et la comparaison stricte est un succès inattendu. La batterie échoue donc, comme l'exige le point 9.5. Le code soumis ne relevait pas ces cas : il traitait un changement déjà appliqué comme un succès. La reprise corrige ce point.
+
+**(d) Union et rattachement de l'échec attendu.**
+
+1. Les changements de toutes les transitions qui portent sur un plan **s'unissent**. Ils s'appliquent dans l'ordre `type`, `valeur`, `valeur de chaîne`, `ajout`, `retrait`, et l'observation se juge sur la référence commitée, après la seule conversion de type sans perte, non sur l'état intermédiaire des autres changements (commentaire de `aligner_reference()`, `tests/test_reproductibilite.R`, `7ada1f1`). Une conversion sans perte ne change aucune valeur, si bien que juger avant ou après elle donne le même résultat (mesures X5 et X6 d'`audit`, rapportées par la session principale). Deux déclarations identiques s'appliquent une fois. Des déclarations contradictoires sont une erreur : deux valeurs différentes à une même position ; un remplacement entier et une autre déclaration de valeurs sur le même chemin ; deux conversions de type différentes ; un `ajout` ou un `retrait` combiné à une autre nature sur le même chemin.
+2. **Un test « seul écart » par plan**, qui cite toutes les issues du plan.
+3. **Un échec attendu par plan** pour la comparaison stricte, rattaché à **la première transition de la liste qui porte le plan**, et non un échec attendu par issue. Trois raisons :
+   - une comparaison est un seul test, et la compter une fois par issue fausserait le bilan ;
+   - la régénération porte sur un plan entier, donc sur toutes ses transitions à la fois, et ne lève jamais une issue seule ;
+   - le harnais attend une seule issue par échec attendu (`MOTIF_ISSUE`, `tests/harnais.R:87`), contrat partagé avec la batterie de concordance.
+
+**(e) Restes de doubles sans tolérance (point 9.5 (ii)).** Pour un plan listé, un double de la référence commitée qu'aucune clé ne classe n'est admis que dans deux cas : son type est converti depuis `double`, ou il est retiré avec le type déclaré `double`. Le test strict des restes n'est un échec attendu **que si des restes existent** dans les références commitées ; sinon il reste ordinaire. Cet écart au code de #37 est voulu. Une transition sans reste en ferait sinon un succès inattendu, et c'est le cas de B4 : `delai_declaration` est classé exact (`tests/reference/outils_reference.R:76`). Une liste oubliée après la régénération reste relevée par (c).
+
+**(f) Garde « entrée différente » (point 3.2) sous transition.**
+
+1. **Constat** (mesure d'`architect`, *vérifiée*, script hors dépôt sur le diff de `coder`, environnement cloud). On permute les lignes de l'entrée de référence (`set.seed(1)`, `sample.int`) et on construit R1. L'objet diffère de `tests/reference/R1.tsv` sur 23 chemins. Trois sont des chaînes : `fiche/empreintes/donnees` et les deux `@empreinte` des tables résumées. Les vingt autres sont des doubles sous tolérance. On déclare ces trois chemins en `valeur de chaîne`, avec les valeurs de l'objet : `seul_ecart()` rend `TRUE`. Une entrée **réellement différente** passe donc le test « seul écart » : sans garde, la transition absorbe le point 3.2.
+2. **Règle.** Une transition sur `fiche/empreintes/donnees` est admise à trois conditions :
+   - (i) sa nature est `valeur de chaîne`, sans `positions` ;
+   - (ii) l'union du plan déclare aussi un changement de `fiche/empreintes/representation`, car seule une nouvelle définition de la représentation canonique change l'empreinte d'une entrée inchangée (ADR 0011, point 10) ;
+   - (iii) un **test ordinaire de garde**, distinct du test « seul écart », prouve que l'entrée est inchangée. Il calcule le texte canonique de l'entrée de référence par le package, remplace l'en-tête de la première ligne (texte avant la première tabulation, égal à l'en-tête courant) par la valeur `fiche/empreintes/representation` de la référence, et exige que le MD5 obtenu soit égal à `fiche/empreintes/donnees` de la référence. Il exige aussi que les deux représentations diffèrent.
+3. **Faisabilité** (mesure d'`architect`, *vérifiée*). La première ligne du texte actuel est `tablexp canonique 1<TAB>100000<TAB>7`. Son MD5 redonne `f3519cc1b73ab0d1fcc6ad89dc6d595c`. Le même texte avec l'en-tête `tablexp canonique 0` donne `fe300026706602afcd22e97ecb08c5fd` : l'en-tête entre bien dans l'empreinte.
+4. **Si la preuve échoue**, aucune transition n'est possible. Le changement est un **changement de l'entrée de référence** au sens du point 4.2 : régénération de tous les plans, tableau des grandeurs agrégées, visa. C'est notamment le cas d'une définition nouvelle qui changerait d'autres octets du texte de l'entrée que la première ligne.
+   **Réserve** (M2 d'`audit`) : `entree_inchangee()` ne vérifie pas que l'objet a été construit sur l'entrée qu'on lui passe. C'est sans effet dans la batterie, qui construit chaque plan sur `jeu_reference()` et passe ce même jeu à la garde. Le contrôle est à compléter avec #35, premier usage réel : le MD5 du texte de l'entrée, sous la représentation courante, doit être égal à l'empreinte des données de l'objet.
+5. **Trois causes au lieu de deux.** Le point 3.2 nomme deux causes d'une entrée différente. Il en compte désormais une troisième : la définition de la représentation canonique a changé. `imprimer_comparaison()` la nomme quand `fiche/empreintes/representation` diffère entre la référence et l'objet, avec les deux valeurs, et précise qu'une entrée inchangée se prouve par la garde.
+6. **Accord avec l'ADR 0011** (point 2.5, statut proposé). La règle réalise ce que cet ADR demande : la garde de la batterie « honore » la transition de #35, déclarée en `valeur de chaîne` sur les deux chemins pour les six plans, sans s'y dissoudre. La preuve « hors R » qu'il exige dans le commit de #35 reste due : elle ne dépend pas de `tools::md5sum`. La garde de la batterie en est la forme mécanique et permanente pendant la transition (`CLAUDE.md`, « Workflows », principe 7).
+7. **Lignes `@empreinte` des tables résumées** (`RESUMES_PAR_EMPREINTE`). Ce sont des résultats de l'étape `donnees`, non l'entrée : elles relèvent de la `valeur de chaîne` ordinaire. Le constat de (f) 1 montre que c'est la garde, et non elles, qui distingue une entrée permutée.
+
+**(g) Transitions attendues de B4**, à titre d'illustration et sous réserve de la décision du mainteneur sur l'ADR 0011 (Q2 (a)). Elles sont déclarées dans les commits de #35 et #42 :
+
+- **#35, plans R1 à R6** : `fiche/empreintes/representation` en `valeur de chaîne` (`tablexp canonique 2`) et `fiche/empreintes/donnees` en `valeur de chaîne`, sous la garde de (f) ;
+- **#42, plans R1 à R6** :
+  - `fiche/version_fiche` en `valeur` (2) ;
+  - `fiche/@noms` en `valeur de chaîne`, sans `positions` (21 noms) ;
+  - huit `retrait`, chacun avec son type et sa longueur : `fiche/transition/@noms`, `…/depart`, `…/arrivee`, `fiche/periode/@noms`, `…/debut`, `…/fin`, `fiche/delai_declaration` et `fiche/segmentation`.
+
+Toute autre ligne du tableau avant / après de la régénération unique est une régression, conformément à l'ADR 0011 (« Effet sur les résultats »).
+
+> **Lecture du point 9.5 après la présente annotation.** Quand un commit change un résultat avant la régénération des références, il déclare sa transition dans `TRANSITIONS_EN_COURS` (`tests/test_reproductibilite.R`). Une transition porte l'issue, les plans et les changements admis. Chaque changement nomme un chemin et l'une des cinq natures `type`, `valeur`, `valeur de chaîne`, `ajout`, `retrait`, déclarée exactement. Pour chaque plan listé, les changements de toutes ses transitions s'unissent, puis :
+> (i) un test ordinaire exige que tout écart soit déclaré et que tout changement déclaré soit observé sur la référence commitée ;
+> (ii) la comparaison stricte est un échec attendu, rattaché à la première transition de la liste qui porte le plan ; le test des doubles sans tolérance l'est aussi, si la référence commitée en porte ;
+> (iii) un changement de `fiche/empreintes/donnees` n'est admis qu'avec un changement de `fiche/empreintes/representation` et la preuve, par un test ordinaire, que l'entrée est inchangée ; sinon, c'est un changement de l'entrée de référence (point 4.2).
+> Le commit des références de la session principale retire la transition. Un plan resté listé fait échouer la batterie.
+
+**Effet sur les résultats** : aucun. La règle n'organise que les tests. Le point (f) 5 change une ligne de l'impression de la comparaison, non une grandeur.
+
+**Soumis au mainteneur** : (f) étend le point 3.2, qui est un contrat partagé (critère de non-régression). Cette extension lui est soumise avec l'ADR 0011, dont elle réalise le point 2.5.
+
+Issues : #47 ; #35 et #42 (premiers emplois) ; #37 (mécanisme d'origine). ADR 0011 (proposé). Branche `claude/fiche-serialisation`, PR #51.
