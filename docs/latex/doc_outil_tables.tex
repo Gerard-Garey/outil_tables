@@ -692,7 +692,7 @@ accumulateur vide des avertissements métier, colonne \code{nombre} en
 sans \code{warning()}~; \code{stop()} si le code ou le nombre est mal formé
 (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
-explicite, sans défaut), \code{expr} & valeur de \code{expr} évaluée sous la
+explicite, sans défaut ni attribut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
 \code{graine\_invalide} (section~\ref{sec:sous-graine}) \\
 \end{longtable}
@@ -761,7 +761,11 @@ changement de résultat, soumis au visa (ADR 0007, «~Conséquences~»).
 tire un aléa (ADR 0007, point 8.1). Elle procède ainsi~:
 
 \begin{enumerate}[leftmargin=*, itemsep=2pt]
-  \item \textbf{contrôle de la graine}~: un nombre unique, non manquant, fini,
+  \item \textbf{contrôle de la graine}~: un nombre unique, de type de base
+    \code{integer} ou \code{double} et \textbf{sans aucun attribut}~--- ni
+    noms, ni dimension, ni classe (\code{forme\_exacte()},
+    section~\ref{sec:fonctions-outils}~; issue~\#43)~: une graine non
+    canonique ne doit pas être consignée~---, non manquant, fini,
     entier et de valeur absolue au plus \code{.Machine\$integer.max}~; sinon,
     et aussi quand la graine est omise, refus \code{graine\_invalide} du module
     \code{outils}. Il n'y a jamais de graine par défaut~: une graine par défaut
@@ -1755,7 +1759,12 @@ d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{character} sans attribut, vide compris. La forme est contrôlée par
 \code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()} et
 \code{chaine\_unique()} (section~\ref{sec:fonctions-outils}), sous le motif
-existant de chaque paramètre~: aucun motif n'est propre à la forme. Pour
+existant de chaque paramètre~: aucun motif n'est propre à la forme. Hors du
+plan, la même règle s'applique à la graine reçue par \code{sous\_graine()}
+(refus \code{graine\_invalide}, section~\ref{sec:sous-graine}) et, à
+l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()}, à la
+forme seule de la segmentation (refus \code{segmentation\_invalide} du module
+\code{brut}, section~\ref{sec:brut-etape}~; issue~\#43). Pour
 chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
@@ -2871,6 +2880,18 @@ même raison de couverture (un estimateur de période sur une cellule âge
 $\times$ année relèverait d'une autre spécification). Si le binomial et
 \code{kaplan\_meier} sont tous deux déclarés sous \code{par\_annee},
 \code{binomial\_par\_annee} est levé en premier.
+La fonction d'étape contrôle en outre, en tête et avant
+\code{controler\_parametres\_brut()}, la \emph{forme seule} de la
+segmentation qu'elle reçoit~: \code{segmentation\_invalide}, module
+\code{brut} (autre chose qu'un vecteur \code{character} sans attribut, sans
+\code{NA} ni doublon~; vide explicite admis~; issue~\#43). Le même code est
+porté par le module qui détecte la condition (ADR 0007, annotation du
+17/10/2026, point~d)~: dans le plan, la segmentation est déjà refusée sous ce
+code par \code{controler\_parametres\_donnees()}, module \code{donnees},
+que \code{valider\_plan()} appelle, et qui contrôle aussi son appartenance
+aux rôles admis (section~\ref{sec:controles-donnees})~; ce contrôle-ci ne
+sert qu'à l'appel direct de la fonction d'étape, et une forme invalide y est
+signalée avant un estimateur inconnu.
 
 \medskip
 \textbf{Quantiles supérieurs.} Ils sont calculés par la queue supérieure
