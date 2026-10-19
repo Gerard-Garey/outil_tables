@@ -322,7 +322,7 @@ SANS_REFERENCE_17 <- character(0)
 # commit de référence de la session principale vide cette liste
 # (character(0)), ce qui supprime les tests « seul écart » et rend ordinaires
 # la comparaison stricte et le test des doubles sans tolérance des références.
-A_REGENERER_37 <- c("R1", "R2", "R3", "R4", "R5", "R6")
+A_REGENERER_37 <- character(0)
 CHEMIN_TYPE_37 <- "etapes/exposition/diagnostics/cellules"
 
 jeu_ref <- jeu_reference()
