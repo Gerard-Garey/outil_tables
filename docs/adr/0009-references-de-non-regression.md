@@ -406,3 +406,19 @@ Issues : #17 ; #15, #24 (maillons de l'ancrage). ADR 0008 (réserve sur la `libm
 **Effet sur les résultats de (e) et (f)** : aucun. (e) constate une propriété de l'écriture et de la comparaison, sans changement de code. (f) ne touche que `TOLERANCES`, dans le code de test : les références ne portent aucune tolérance, aucun fichier de `tests/reference/` ne change, et une grandeur `integer` reste comparée exactement par son type.
 
 Issues : #17 ; #24 (règle de la quatrième annotation, (b)).
+
+## Annotation du 19 octobre 2026 — constat 1 de l'annotation du 18/10/2026, (d), dépassé : réserve sur la `libm` exercée sur trois modèles de processeur
+
+Rédigée par `architect` au point d'étape qui suit la fusion de la PR #18 (`2c8cce4`), d'après les journaux des jobs « Tests (R 4.3.3) » relus le 19/10/2026. Décision du mainteneur du 19/10/2026 (M58, Q7). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+Le constat 1 de l'annotation du 18/10/2026, (d), écrit que les deux exécutions de la plateforme de référence alors disponibles (39140635363 et 39148101369) ont tourné sur un AMD EPYC 7763, et que la réserve de l'ADR 0008 sur la `libm` n'est **pas exercée**. C'était exact à sa date. Les exécutions postérieures de la CI ont comparé R1 à R6 sur d'autres processeurs : AMD EPYC 9V74 (39156288666, 39162270569) et AMD EPYC 9V45 (39161760255), tous deux avec `avx512f`, puis de nouveau un EPYC 7763 (39164433640, `main` à `2c8cce4`). Chaque fois, les **1 420 grandeurs** sont identiques au bit près (tableau de l'annotation du 19/10/2026 de l'ADR 0008).
+
+Conséquences :
+
+1. L'hypothèse de bruit nul sur la plateforme de référence (« Conséquences », (b)) tient désormais sur trois modèles de processeur, au statut de **constat**. La réserve sur la `libm` reste **ouverte pour un exécuteur sans FMA** (ADR 0008, annotation du 19/10/2026).
+2. Les tolérances ne changent pas. La classe 1e-12 (fonctions de la `libm`) garde sa justification, puisque le cas sans FMA et les postes hors plateforme de référence (Windows : 1,84e-15 au plus, annotation du 18/10/2026, (d)) restent possibles.
+3. La mention « variante selon le processeur : hypothèse non mesurée » du tableau des classes (point 3) se lit désormais : mesurée sans écart sur trois modèles munis de FMA, non mesurée sans FMA.
+
+**Effet sur les résultats** : aucun.
+
+Issues : #17 ; ADR 0008 (réserve sur la `libm`).

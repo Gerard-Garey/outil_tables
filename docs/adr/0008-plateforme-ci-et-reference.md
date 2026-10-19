@@ -281,3 +281,27 @@ Si la stabilité du PDF devient une exigence (par exemple une empreinte du PDF),
 **Effet sur les résultats** : aucun. L'annotation consigne l'état de la CI ; aucun job ne change.
 
 Issues : #8, #3 ; PR #12 (revue finale, C2).
+
+## Annotation du 19 octobre 2026 — réserve sur la `libm` (« Conséquences ») exercée sur trois modèles de processeur ; ouverte pour un exécuteur sans FMA
+
+Rédigée par `architect` au point d'étape qui suit la fusion de la PR #18 (`2c8cce4`), d'après les journaux des jobs « Tests (R 4.3.3) » relus le 19/10/2026 (`gh api repos/Gerard-Garey/outil_tables/actions/jobs/<job>/logs`, lignes « Processeur », « Drapeaux fma / avx2 / avx512f » et « Bilan : … grandeur(s) comparée(s) »). Décision du mainteneur du 19/10/2026 (M58, Q7). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**Mesure.** Les références R1 à R6 ont été créées par l'exécution 39140635363 de `references.yml` sur un **AMD EPYC 7763** (drapeaux `fma` et `avx2`, sans `avx512f`). Les exécutions suivantes de la CI les ont recalculées et comparées, dans la même image (`rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309`), avec la même BLAS et la même LAPACK Netlib 3.10.0 :
+
+| Exécution (job) | Commit | Processeur | `avx512f` | R1 à R6 |
+|---|---|---|---|---|
+| 39148101369 (117735985035) | `1019d8e` | AMD EPYC 7763 | non | 1 420 grandeurs identiques au bit près (ADR 0009, annotation du 18/10/2026, (d)) |
+| 39156288666 (117760080447) | `27625d2` | AMD EPYC 9V74 | oui | 1 420 grandeurs identiques au bit près |
+| 39161760255 (117776341803) | `3dd6064` | AMD EPYC 9V45 | oui | 1 420 grandeurs identiques au bit près |
+| 39162270569 (117777868313) | `e03801c` | AMD EPYC 9V74 | oui | 1 420 grandeurs identiques au bit près |
+| 39164433640 (117784302687) | `2c8cce4` (`main`) | AMD EPYC 7763 | non | 1 420 grandeurs identiques au bit près |
+
+Les 1 420 grandeurs se répartissent en 234 (R1), 231 (R2), 234 (R3), 220 (R4), 234 (R5) et 267 (R6) ; aucun écart sous tolérance, aucun écart, aucune grandeur sans tolérance, aucun écart structurel. Les trois modèles portent `fma` et `avx2`.
+
+**Ce que la mesure établit.** La réserve de « Conséquences » (« Identité au bit près entre exécuteurs non garantie ») et la mention « ouverte, non mesurée » de l'annotation du 16/10/2026 (« Grandeurs consignées sans faire échouer ») sont **exercées** : sur trois modèles de processeur, dont deux avec AVX-512, les références se retrouvent au bit près. Statut : **constat de mesure** sur cinq exécutions, pas preuve.
+
+**Ce qu'elle n'établit pas.** La réserve porte sur le choix, par la glibc, de variantes de `exp`, `log` et `pow` selon les capacités du processeur (FMA, AVX2). Les trois modèles observés ont tous FMA et AVX2 : il est vraisemblable qu'ils emploient la même variante (*hypothèse*, source de la glibc non relue, version de la glibc de l'image non consignée). La réserve reste donc **ouverte pour un exécuteur sans FMA**, qui n'a pas été observé. Le processeur et ses drapeaux restent consignés (point 5) ; aucune règle de comparaison ni aucune tolérance ne change.
+
+**Effet sur les résultats** : aucun. L'annotation consigne des exécutions passées.
+
+Issues : #17 ; ADR 0009 (annotation du 19/10/2026).
