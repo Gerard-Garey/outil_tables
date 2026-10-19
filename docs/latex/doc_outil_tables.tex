@@ -568,8 +568,11 @@ exportées par \code{tablexp:::} (ADR 0007, point 11.3).
 modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
 la forme des refus et celle des avertissements (ADR 0007, point 1.2), ainsi
 que le contrôle de la forme exacte d'une valeur reçue, \code{forme\_exacte()}
-(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23). Il
-n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23), et
+les deux contrôles de forme qui s'y appuient, partagés par les modules~:
+\code{liste\_aux\_noms()} (liste nue aux noms exacts) et
+\code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
+issue~\#48). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -594,8 +597,10 @@ quatre champs~:
 
 \noindent
 \code{refuser()} la lève par \code{stop()} et ne rend jamais la main. Un
-argument mal formé de \code{refus\_tablexp()} (module ou message vide, motif
-non conforme, détails qui ne sont pas une liste) n'est pas un refus mais une
+argument mal formé de \code{refus\_tablexp()} (module, motif ou message
+qui n'est pas une chaîne unique sans attribut, ni \code{NA} ni vide, au sens
+de \code{chaine\_unique()}, chaîne nommée comprise~; motif non conforme~;
+détails qui ne sont pas une liste) n'est pas un refus mais une
 erreur de programmation du package, signalée par \code{stop()}. Les tests
 vérifient le motif, le décompte et les numéros par \code{tryCatch()}~;
 l'application attrapera la condition et affichera son message. Une condition
@@ -666,6 +671,19 @@ admis, aucun par défaut) & \code{TRUE} si \code{typeof(x)} est pris dans
 \code{attributs}, \code{FALSE} sinon, jamais \code{NA}~; un attribut admis
 n'est pas requis et sa valeur n'est pas contrôlée~; ne refuse pas, l'appelant
 refuse sous son propre motif (section~\ref{sec:plan}~; issue~\#23) \\
+\catalogue{fonctions-outils}{liste\_aux\_noms()} & interne & \code{x},
+\code{noms} (noms attendus) & \code{TRUE} si \code{x} est une liste nue
+(\code{forme\_exacte()} de type \code{list}, seul attribut admis~: les noms~;
+ni \code{data.frame}, ni classe) d'autant d'éléments que \code{noms}, aux
+mêmes noms une fois triés par \code{sort(method = "radix")}, indépendamment
+de la locale, \code{FALSE} sinon (liste sans noms comprise)~; la longueur est
+comparée à part, \code{sort()} retirant un nom \code{NA}~; le contenu des
+éléments, lus par \code{[[ ]]}, est contrôlé par l'appelant, qui refuse sous
+son propre motif (issue~\#48) \\
+\catalogue{fonctions-outils}{chaine\_unique()} & interne & \code{v} &
+\code{TRUE} si \code{v} est de forme exacte \code{character}, sans aucun
+attribut (noms compris), de longueur~1, ni \code{NA} ni vide, \code{FALSE}
+sinon, jamais \code{NA}~; ne refuse pas (issue~\#48) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -1735,7 +1753,8 @@ d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{integer}~; \code{delai\_declaration} est un \code{integer} ou un
 \code{double} sans attribut~; \code{segmentation} un vecteur
 \code{character} sans attribut, vide compris. La forme est contrôlée par
-\code{forme\_exacte()} (section~\ref{sec:fonctions-outils}), sous le motif
+\code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()} et
+\code{chaine\_unique()} (section~\ref{sec:fonctions-outils}), sous le motif
 existant de chaque paramètre~: aucun motif n'est propre à la forme. Pour
 chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
@@ -2054,7 +2073,7 @@ reçoit~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
 \code{data.frame} ou une liste munie d'un autre attribut que ses noms~---, de
 champs autres qu'exactement \code{depart} et \code{arrivee}, ou d'un élément
 de plus, même nommé \code{NA}~; état qui n'est pas une chaîne unique sans
-attribut ni \code{NA}~; ou transition non prise en charge~: seules
+attribut, ni \code{NA} ni vide, refusé dès ce contrôle de forme~; ou transition non prise en charge~: seules
 vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
 \code{TRANSITIONS})~; \code{periode\_invalide} (liste qui n'est pas nue, de
 champs autres qu'exactement \code{debut} et \code{fin}, ou d'un élément de
@@ -2295,7 +2314,10 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
   \item attributs \code{nom}, \code{statut} (\code{synthetique},
     \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
     de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
-    \code{qx}) et \code{parametres}~: une liste non vide est \textbf{requise}
+    \code{qx}), chacun une chaîne unique de forme exacte~--- sans attribut,
+    noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
+    section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
+    motif du champ~; issue~\#48)~---, et \code{parametres}~: une liste non vide est \textbf{requise}
     pour une table synthétique, qui n'a d'autre provenance que sa loi, et
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
@@ -4047,8 +4069,9 @@ et \code{algorithme} dans un ordre quelconque, chacun une chaîne
 \code{data.frame}, un objet de classe, une liste munie d'un autre attribut,
 un élément de plus (même nommé \code{NA}) ou une chaîne munie de noms, d'une
 dimension ou d'une classe sont refusés~: refus \code{provenance\_invalide}
-(\code{controler\_provenance()}, par \code{forme\_exacte()}~;
-issue~\#21).
+(\code{controler\_provenance()}, par \code{liste\_aux\_noms()} et
+\code{chaine\_unique()}, qui s'appuient sur \code{forme\_exacte()}~;
+issues~\#21 et~\#48).
 
 \subsubsection*{Représentation canonique}
 
