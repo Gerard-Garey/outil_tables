@@ -150,11 +150,8 @@ empreinte_donnees <- function(donnees, roles) {
 # trois noms, chaque valeur une chaîne de longueur 1 sans attribut.
 controler_provenance <- function(provenance) {
   if (is.null(provenance)) return(invisible(TRUE))
-  chaine <- function(v) forme_exacte(v, "character") && length(v) == 1L && !is.na(v) && nzchar(v)
-  if (!forme_exacte(provenance, "list", "names") || length(provenance) != 3L ||
-      is.null(names(provenance)) ||
-      !identical(sort(names(provenance), method = "radix"), c("algorithme", "empreinte", "fichier")) ||
-      !all(vapply(provenance, chaine, logical(1L))))
+  if (!liste_aux_noms(provenance, c("fichier", "empreinte", "algorithme")) ||
+      !all(vapply(provenance, chaine_unique, logical(1L))))
     refuser("rapport", "provenance_invalide",
             paste("La provenance doit être NULL (données construites en mémoire) ou une liste nue",
                   "(fichier, empreinte, algorithme) de trois chaînes non vides, sans attribut",

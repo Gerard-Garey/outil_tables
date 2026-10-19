@@ -480,6 +480,14 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
 calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention, unite_exposition,
                                 estimateurs, niveau, observations = NULL, transition = NULL,
                                 periode = NULL, delai_declaration = NULL, parametres_exposition = NULL) {
+  # Forme seule de la segmentation (#43, forme_exacte()) : type, attributs, NA,
+  # doublons ; appel direct de la fonction d'étape. Le catalogue
+  # ROLES_SEGMENTATION est contrôlé en amont par valider_plan() et, sur le
+  # chemin Kaplan-Meier, par controler_parametres_donnees().
+  if (!forme_exacte(segmentation, "character") || anyNA(segmentation) || anyDuplicated(segmentation))
+    refuser("brut", "segmentation_invalide",
+            "La segmentation doit être un vecteur de chaînes sans attribut, sans doublon ni NA (vide explicite admis).",
+            list(segmentation = segmentation))
   controler_parametres_brut(estimateurs, niveau, par_annee)
   retenus <- ESTIMATEURS_BRUT[ESTIMATEURS_BRUT %in% estimateurs]
   cles <- c(segmentation, "age", if (isTRUE(par_annee)) "annee")
