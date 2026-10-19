@@ -422,3 +422,67 @@ Conséquences :
 **Effet sur les résultats** : aucun.
 
 Issues : #17 ; ADR 0008 (réserve sur la `libm`).
+
+## Annotation du 19 octobre 2026 (seconde) — #37 : `cellules` en integer, clé nue retirée, première régénération ; mécanisme transitoire `A_REGENERER_<n>` érigé en règle (point 9.5) ; `TOLERANCE_PERMUTATION` (#39) ; garde « CI seule » du producteur (#36)
+
+Rédigée par `architect` sur la branche `claude/consolidation-controles-references` (tête `763da20`), d'après les messages des commits cités, relus par `git show`, les en-têtes des six `.tsv` commités et le code de `tests/`. C'est l'annotation datée que le point 9.3 exige pour le retrait de la clé `cellules`, comme l'annonçait le complément du 18/10/2026, (f). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) #37 : `etapes/exposition/diagnostics/cellules` en integer, retrait de la clé nue `cellules`, régénération de R1 à R6.**
+
+1. **Type.** Depuis `5bf62e6`, `nombre_cellules()` (`R/exposition.R`) rend le nombre de cellules en `integer`. Elle refuse, sous le motif `trop_de_cellules`, un nombre supérieur à `.Machine$integer.max`. Les valeurs ne changent pas : 149, 75, 149, 1490, 149 et 149 pour R1 à R6 (tableau avant / après du message de `5bf62e6`). Le visa d'`actuary` est du 19/10/2026, avec une réserve : la régénération ne doit porter que le type.
+2. **Clé.** `99272a4` retire la clé nue `cellules` de `TOLERANCES` (`tests/reference/outils_reference.R`), avec l'avis favorable d'`actuary` au titre du point 9.3. La règle appliquée est celle de la quatrième annotation du 17/10/2026, (b). La clé classait aussi `etapes/brut/diagnostics/cellules` et `etapes/brut/diagnostics/etats/cellules`, déjà `integer`, et aurait masqué leur retour au double. Trois témoins, un par chemin, font échouer `doubles_sans_tolerance()` sur un retour au double (message de `99272a4`). *Vérifié le 19/10/2026* : `TOLERANCES` ne contient plus aucune clé `cellules`.
+3. **Régénération sur la CI.** Mode `regeneration`, plans `tous`, exécution 39248539956 de `references.yml`. La CI a calculé sur `99272a4` ; la session principale a commité les références en `763da20`. Les en-têtes portent `commit : 99272a4…`, `mode : regeneration` et `execution : 39248539956` (*vérifié*). La plateforme est celle de l'ADR 0008, sur un AMD EPYC 9V45 (`fma`, `avx2`, `avx512f`), consigné dans l'en-tête des six fichiers. La réserve du visa est vérifiée (message de `763da20`) :
+   - par plan, `ecarts.txt` relève **un seul écart structurel**, le type de `etapes/exposition/diagnostics/cellules` ;
+   - toutes les autres grandeurs sont identiques au bit près (233, 230, 233, 219, 233 et 266, soit 1 414 ; avec les six chemins changés de type, on retrouve les 1 420 grandeurs) ;
+   - aucune grandeur n'est sous tolérance.
+4. **Diff des `.tsv`** (*vérifié* : `git diff 99272a4 763da20 -- tests/reference/`). Par fichier, le corps ne change que d'une ligne, celle du type (`double` → `integer`, valeur inchangée). L'en-tête change sur neuf lignes : processeur et drapeaux, `GITHUB_SHA`, commit, exécution, adresse, mode et date. L'identifiant de plateforme, image, R, BLAS et LAPACK, ne change pas.
+5. **Première régénération du projet.** Avant `763da20`, les fichiers de `tests/reference/` n'avaient été écrits qu'une fois, en mode `creation` (`1019d8e` ; *vérifié* par `git log -- tests/reference/R1.tsv`). La chaîne de régénération a donc été exercée pour la première fois sur un changement minimal, un type et aucune valeur, comme le prévoyait l'arbitrage (C) de la feuille de route (§ 1.3) : mode `regeneration`, tableau avant / après, visa, commit par la session principale.
+6. **Texte périmé.** Le complément du 18/10/2026, (f), « Ce qui reste », écrit : « La clé nue `cellules` est conservée : elle classe `etapes/exposition/diagnostics/cellules`, de type `double` dans `R1.tsv` à `R6.tsv` ». Ce passage est **périmé**, comme la quatrième annotation, (d), l'avait été pour #24. Il reste vrai pour l'état antérieur à #37, jusqu'à `9f957ba`.
+
+**Effet sur les résultats de (a)** : le type d'une grandeur par plan passe de `double` à `integer`, soit six lignes. **Aucune valeur ne change.** Visa d'`actuary` du 19/10/2026. Le tableau avant / après figure dans `5bf62e6` et dans `763da20`.
+
+**(b) Mécanisme transitoire `A_REGENERER_37`, et règle durable pour les régénérations suivantes (point 9.5, nouveau).**
+
+Entre `5bf62e6` et `763da20`, le code rendait le type `integer`, alors que les références commitées portaient encore `double`. `tests/test_reproductibilite.R` a tenu cette transition par une liste `A_REGENERER_37` des plans à régénérer et par le chemin `CHEMIN_TYPE_37`. Pour chaque plan listé :
+
+- un **test ordinaire « seul écart »** aligne le type de la référence sur celui de l'objet. Il vérifie d'abord que la conversion est exacte (`as.double(as.integer(v))` identique à `v`), puis exige une comparaison sans aucun écart. Tout autre écart de grandeur ou de structure, et toute entrée différente, le font échouer ;
+- la **comparaison stricte** au fichier commité est un **échec attendu `#37`**. Il en va de même du test des doubles sans tolérance, qui admet pour seul reste le chemin de #37.
+
+Après la régénération, l'échec attendu devient un succès inattendu, ce qui fait échouer la batterie. Le commit des références vide donc la liste (`A_REGENERER_37 <- character(0)`, `763da20`). Les tests « seul écart » disparaissent alors, et les comparaisons strictes redeviennent des tests ordinaires. La batterie de reproductibilité compte ensuite 143 tests en C.UTF-8, avec 0 échec, 0 échec attendu et 0 succès inattendu (message de `763da20`).
+
+**Avis d'`architect` : oui, c'est une règle.** Le mécanisme est sûr dans les deux sens :
+
+- une dérive autre que celle qui est annoncée fait échouer le test ordinaire ;
+- une liste oubliée après la régénération fait échouer la batterie par succès inattendu.
+
+Il comble l'intervalle entre le commit qui change un résultat (un commit par issue, `CLAUDE.md`) et le commit des références, intervalle où la batterie était sinon soit rouge, soit aveugle. L'avis d'`audit` sur sa sûreté (scénarios M7 et M8) est rapporté par la session principale ; il n'est retrouvé ni dans le dépôt ni sur la PR #40 (*non vérifié par `architect`*). Le constat de six scénarios dans le message de `5bf62e6` et le comportement du code décrit ci-dessus, relu, vont dans le même sens.
+
+> **9.5. Transition d'un changement de résultat annoncé.** Quand un commit change un résultat avant la régénération des références, il déclare, dans `tests/test_reproductibilite.R`, la liste `A_REGENERER_<n>` des plans concernés, où `<n>` est l'issue, ainsi que le ou les chemins admis à changer et la nature du changement admis. Pour chaque plan listé :
+> (i) un test ordinaire compare la référence à l'objet, après n'avoir corrigé que le changement annoncé, et exige l'absence de tout autre écart ;
+> (ii) la comparaison stricte, et tout contrôle des références que le changement fait échouer, sont des échecs attendus `#<n>`.
+> Le commit des références de la session principale vide la liste. Un plan resté listé après la régénération fait échouer la batterie par succès inattendu.
+> Le changement admis par (i) doit être décrit **exactement** : type converti sans perte, ou valeurs nouvelles nommées chemin par chemin. Une tolérance élargie, ou un chemin admis « quel que soit l'écart », n'est pas une transition : c'est un changement de résultat déguisé (point 9.3).
+> La règle ne remplace ni le tableau avant / après, ni le visa, ni le point 9.4.
+>
+> *Règle retenue par le mainteneur le 19/10/2026 (M60, `docs/feuille-de-route.md` § 4).*
+
+**Effet sur les résultats de (b)** : aucun. La règle n'organise que les tests.
+
+**(c) `TOLERANCE_PERMUTATION` (#39, `9f957ba`).** Le test de permutation des lignes de l'entrée de référence (`tests/test_reproductibilite.R`) compare à tolérance les doubles issus de sommes par cellule. La constante qu'il emploie vaut `CLASSES_TOLERANCE[["1e-12"]]` (*vérifié*, l. 402). Ce n'est **pas une modification de `TOLERANCES`**, au sens du point 9.3 : aucune clé n'est ajoutée ni retirée, et aucune référence ne porte de tolérance. C'est l'emploi d'une **classe existante hors des références**, consigné ici à la recommandation d'`audit`, par traçabilité.
+
+- **Statut** : tolérance déclarée, appuyée sur un constat de mesure, et non sur une borne démontrée. Les mesures sont les suivantes :
+  - à 10⁵ lignes (entrée de référence), l'écart relatif maximal vaut 1,6e-14 (R2, `borne_sup_exacte`), et taux et exposition centrale restent à 5,73e-15 au plus (message de `9f957ba`) ;
+  - à 10⁶ et 3·10⁶ lignes, il vaut 1,37e-14 et 1,73e-14 (plan R1, une permutation ; avis d'`actuary` sur #39, commentaire de l'issue).
+- **Pourquoi pas la classe 1e-14.** L'écart croît avec le nombre de termes sommés par cellule (`somme_par_cellule()`, `R/exposition.R`). La classe 1e-14 de `TOLERANCES` (exposition, taux) vise l'arithmétique IEEE de base pour un **même** ordre des opérations, sur la plateforme de référence. Elle ne s'applique pas sous permutation : l'exposition et les taux la dépassent dès 10⁶ lignes.
+- **Ce que le test fixe par ailleurs.** Tout double non classé fait échouer le test. Les doubles de classe exacte, les tables de Kaplan-Meier et les diagnostics du brut sont comparés par `identical()`.
+- **Règle.** Un emploi d'une classe de `CLASSES_TOLERANCE` hors des références n'appelle pas d'annotation au titre du point 9.3. Il se cite, avec son statut et sa mesure, dans le test qui l'emploie. Une valeur hors des trois classes demanderait l'avis d'`actuary` et une annotation.
+
+**Effet sur les résultats de (c)** : aucun. Aucune référence ni aucun résultat ne change (message de `9f957ba`).
+
+**(d) Garde du producteur : la règle « CI seule » passe des consignes au script (#36, `4f182e3`).** Les points 2.6, 5.2, 5.5 et 9.4 réservent l'écriture des références à la CI, de même que `CLAUDE.md` (« Changements de résultats et reproductibilité ») et l'annotation du 18/10/2026, (a), conséquence 1. Jusqu'à `4f182e3`, la règle n'était portée que par les consignes. Depuis ce commit, `principal()` (`tests/reference/produire_references.R`) refuse par `echouer()` les modes `creation`, `regeneration` et `bascule` quand `GITHUB_ACTIONS` ne vaut pas `"true"` (*vérifié* : `git show 4f182e3`). Le refus intervient avant le contrôle de `--motif`, `--plans` et `--sortie`, et avant toute écriture. Le message renvoie au présent ADR et à `CLAUDE.md`. Cette garde est symétrique de celle du mode `releve`, refusé sur la CI. Sept témoins l'exercent en sous-processus : six refus hors CI, avec code 1, message, dossier de sortie non créé et `tests/reference/` intact, et un passage en CI pour `regeneration`. `references.yml` est inchangé.
+
+**Limite** : la garde protège contre l'**erreur**, non contre la malveillance. La variable se pose à la main. Le point 5.5 reste donc la garantie de fond : appariement MD5 ↔ artefact cité, vérifié en revue finale.
+
+**Effet sur les résultats de (d)** : aucun. R1 à R6 donnent le verdict OK (message de `4f182e3`).
+
+Issues : #37, #39, #36 ; #24 (règle de la quatrième annotation, (b)). Branche `claude/consolidation-controles-references`, PR #40.
