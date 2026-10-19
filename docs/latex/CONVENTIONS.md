@@ -6,7 +6,7 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
 
 - **Fichier unique** : `docs/latex/doc_outil_tables.tex`, sans `\input` ni `\include` (E3.1).
 - **PDF versionné** : `docs/latex/doc_outil_tables.pdf` est recompilé et commité **avec** toute modification du `.tex`, dans le même commit `docs:` (E3.1). Les fichiers auxiliaires (`.aux`, `.log`, `.toc`, `.out`, `.fls`, `.fdb_latexmk`, `.synctex.gz`) sont ignorés par `.gitignore`.
-- **Date fixe** : la page de garde porte la date de la dernière modification du `.tex`, écrite à la main dans la macro `\datedoc` du préambule (`18/10/2026`), mise à jour par chaque commit `docs:` qui modifie le document. `\today` est proscrit : un document de certification ne change pas selon le jour où on le compile.
+- **Date fixe** : la page de garde porte la date de la dernière modification du `.tex`, écrite à la main dans la macro `\datedoc` du préambule, au format `JJ/MM/AAAA`, mise à jour par chaque commit `docs:` qui modifie le document. `\today` est proscrit : un document de certification ne change pas selon le jour où on le compile.
 - **Lecteur visé** : un relecteur externe (actuaire certificateur, ACPR) qui n'a pas accès au code (E3.7). Toute affirmation sur le code est vraie de l'état du code au commit qui la porte ; elle s'adosse à une lecture du code ou à une mesure citée dans le compte rendu de `docwriter`.
 
 ## 2. Structure : invariants
