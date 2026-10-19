@@ -413,10 +413,10 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
     x0 <- min(xs); etendue <- max(xs) - x0 + 1
     # Garde de la matrice de présence (#45) : n_seg · etendue est la taille de
     # cette matrice (couples (segment, âge) de la plage globale). Sans
-    # par_annee, c'est un majorant du nombre de cellules, souvent lâche ; avec
-    # par_annee, ce n'en est pas nécessairement un (la table compte aussi les
-    # années). Même motif que plus bas, avant le tabulate() qui refuserait un
-    # nbins d'au moins 2^31.
+    # par_annee, c'est un majorant du nombre de cellules, qui peut être
+    # lâche ; avec par_annee, ce n'en est pas nécessairement un (la table
+    # compte aussi les années). Même motif que plus bas, avant le tabulate()
+    # qui refuserait un nbins d'au moins 2^31.
     nombre_cellules(etendue, n_seg,
                     "Le décompte de présence des âges compterait %s couples (segment, âge), au-delà de %d : segmentation trop fine ou plage d'âges trop étendue.",
                     "couples_presence")
