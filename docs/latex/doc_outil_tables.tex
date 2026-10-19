@@ -1282,14 +1282,20 @@ type et comme double sans classe (ADR 0009, quatrième annotation du
 17/10/2026)~; c'est aussi le cas de la version de la fiche, de la graine, des
 colonnes entières de \code{kaplan\_meier\_sauts} (\code{numerateur},
 \code{ensemble\_a\_risque}), de \code{kaplan\_meier/instants\_evenement}, de
-\code{denominateur\_instants} (paramètres et fiche) et des cinq diagnostics
-de \code{kaplan\_meier}, toutes stockées en \code{integer}. Les douze clés
-exactes qui les nommaient dans \code{TOLERANCES} sont retirées~: inertes, la
-tolérance n'étant cherchée que pour un double, elles auraient en outre
-masqué un retour au type \code{double} au contrôle de complétude des classes
-(ADR 0009, complément du 18/10/2026, point~(f), sur avis
-d'\code{actuary}). La clé nue \code{cellules} reste~: elle classe
-\code{etapes/exposition/diagnostics/cellules}, de type \code{double}. Un double reçoit sa tolérance de la
+\code{denominateur\_instants} (paramètres et fiche), des cinq diagnostics
+de \code{kaplan\_meier} et, depuis l'issue~\#37, du nombre de cellules de
+l'étape \code{exposition} (\code{etapes/exposition/diagnostics/cellules}),
+toutes stockées en \code{integer}. Les treize clés exactes qui les
+nommaient dans \code{TOLERANCES} sont retirées~: inertes, la tolérance
+n'étant cherchée que pour un double, elles auraient en outre masqué un
+retour au type \code{double} au contrôle de complétude des classes. Douze
+l'ont été sur avis d'\code{actuary} (ADR 0009, complément du 18/10/2026,
+point~(f))~; la treizième, la clé nue \code{cellules}, l'a été à son tour,
+sur avis d'\code{actuary}, parce qu'elle classait aussi
+\code{etapes/brut/diagnostics/cellules} et
+\code{etapes/brut/diagnostics/etats/cellules}, déjà \code{integer}, et
+aurait masqué leur retour au double (ADR 0009, seconde annotation du
+19/10/2026, point~(a)). Un double reçoit sa tolérance de la
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), cherchée par le
 \textbf{suffixe le plus long} du chemin~: une clé qualifiée
 \code{<table>/<colonne>} l'emporte sur le nom nu, ce qui donne au \code{taux}
@@ -1305,8 +1311,8 @@ d'\code{actuary}.
 \begin{longtable}{@{}p{1.4cm}p{7.6cm}p{5.6cm}@{}}
 \caption{Classes de tolérance des doubles (\code{TOLERANCES},
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
-ADR 0009, point 3.4, seconde annotation et complément du 18/10/2026,
-point~(f)).}
+ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
+point~(f), et seconde annotation du 19/10/2026, point~(a)).}
 \label{tab:tolerances}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Classe}} &
@@ -1318,7 +1324,7 @@ point~(f)).}
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{exposition\_jours}, \code{cellules}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
+exacte & \code{exposition\_jours}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
 $10^{-14}$ & \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}, \code{exposition\_initiale}, \code{taux}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
 $10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (hypothèse non mesurée) \\
 \end{longtable}
@@ -1398,7 +1404,14 @@ visa d'\code{actuary}). Les grandeurs des étapes \code{donnees} et
 (\code{f9ab269}) par une chaîne de mesures (différences de code vides, ou
 objets \code{identical()} hors \code{execution}, un changement de type sans
 changement de valeur, visé, étant admis~; ADR 0009, annotation du
-18/10/2026).
+18/10/2026). Elles ont été \textbf{régénérées une fois}, le 19/10/2026, en
+mode \code{regeneration} sur tous les plans (exécution 39248539956 du
+workflow, calcul sur \code{99272a4}, commit \code{763da20}, visa
+d'\code{actuary}), pour le seul changement de type du nombre de cellules de
+l'étape \code{exposition}, passé de \code{double} à \code{integer} à valeur
+inchangée (issue~\#37)~: le corps de chaque fichier ne change que de cette
+ligne, et toutes les autres grandeurs sont restées identiques au bit près
+(ADR 0009, seconde annotation du 19/10/2026, point~(a)).
 
 \begin{encadre}
 \small
@@ -1439,7 +1452,24 @@ double nouveau est déclarée dans le même commit. Changer le format incrément
 sa version et régénère tous les plans. Élargir une tolérance pour faire
 passer un écart est interdit sans tableau avant / après et visa. Un fichier de
 \code{tests/reference/} ne change que par un commit de la session principale
-qui cite une exécution du workflow et un visa.
+qui cite une exécution du workflow et un visa. \textbf{Transition d'un
+changement de résultat annoncé} (ADR 0009, point 9.5, règle retenue par le
+mainteneur le 19/10/2026)~: quand un commit change un résultat avant la
+régénération des références, il déclare dans
+\code{tests/test\_reproductibilite.R} la liste \code{A\_REGENERER\_<n>}
+des plans concernés (\code{<n>}~: numéro de l'issue), avec le ou les chemins
+admis à changer et la nature exacte du changement (type converti sans perte,
+ou valeurs nouvelles nommées chemin par chemin). Pour chaque plan listé, un
+test ordinaire compare la référence à l'objet après n'avoir corrigé que le
+changement annoncé et exige l'absence de tout autre écart~; la comparaison
+stricte, et tout contrôle des références que le changement fait échouer,
+sont des échecs attendus renvoyant à l'issue. Le commit des références vide
+la liste~: un plan resté listé après la régénération ferait échouer la
+batterie par succès inattendu. Une tolérance élargie ou un chemin admis
+«~quel que soit l'écart~» n'est pas une transition mais un changement de
+résultat déguisé~; la règle ne dispense ni du tableau avant / après, ni du
+visa. Elle a servi une première fois pour l'issue~\#37
+(\code{A\_REGENERER\_37}, vidée par le commit des références).
 
 % =============================================================================
 \section{Contrôles du dépôt}
@@ -2440,6 +2470,13 @@ native de la recette, ou désigne une convention~:
 \end{itemize}
 
 \noindent
+Aux refus des paramètres s'ajoute un refus de capacité,
+\code{trop\_de\_cellules}, levé à la construction de la table quand elle
+compterait plus de \code{.Machine\$integer.max} cellules
+(section~\ref{sec:troncature-censure}, «~Paramètres effectifs, diagnostics,
+avertissements~»~; issue~\#37).
+
+\noindent
 Chaque convention définit ses cellules d'âge et l'unité de l'exposition
 (\code{UNITES\_EXPOSITION}, inscrite dans la fiche)~:
 
@@ -2592,8 +2629,21 @@ forcée), l'unité d'exposition, \code{par\_annee}, le code de la transition, la
 segmentation, la période, le délai, la fin effective et l'hypothèse de
 censure. Les diagnostics donnent le nombre d'observations et d'observations
 exposées, l'exposition totale en jours, le nombre d'événements et de sorties
-concurrentes, le nombre de cellules et de cellules à exposition nulle qui
-comptent un événement. Avertissements~: \code{convention\_forcee},
+concurrentes, le nombre de cellules, stocké en \code{integer}
+(issue~\#37), et le nombre de cellules à exposition nulle qui
+comptent un événement. Le nombre de cellules est calculé par
+\code{nombre\_cellules()}~: somme, sur les segments, du nombre d'âges de la
+plage par le nombre d'années (une seule sans \code{par\_annee}), formée en
+\code{double}~; s'il dépasse \code{.Machine\$integer.max}
+($2^{31} - 1$), l'étape \textbf{refuse} sous le motif
+\code{trop\_de\_cellules} (refus de capacité~: segmentation trop fine ou
+plage d'âges et d'années trop étendue), avant toute allocation par cellule,
+au lieu de laisser \code{tabulate()} échouer sur une erreur R. Ce refus
+n'est atteignable qu'avec \code{par\_annee = TRUE}~: sans découpage par
+année, le nombre de cellules est au plus le produit du nombre de segments par
+l'étendue des âges présents, sur lequel le décompte de présence des âges,
+fait plus tôt par \code{tabulate()}, échoue déjà par une erreur R au-delà de
+$2^{31} - 1$ (\textbf{limite connue}, issue~\#45). Avertissements~: \code{convention\_forcee},
 \code{evenement\_sans\_exposition} et \code{aucune\_exposition} (aucune
 exposition ni aucun événement dans la période).
 
@@ -2703,6 +2753,7 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 \catalogue{fonctions-exposition}{decouper\_cellules()} & interne & fenêtres, convention & morceaux contenus chacun dans une cellule \\
 \catalogue{fonctions-exposition}{decouper\_annees()} & interne & morceaux & morceaux découpés au 1\textsuperscript{er}~janvier \\
 \catalogue{fonctions-exposition}{somme\_par\_cellule()} & interne & cellules, valeurs & sommes par cellule, zéros explicites \\
+\catalogue{fonctions-exposition}{nombre\_cellules()} & interne & nombres d'âges par segment, nombre d'années & nombre de cellules de la table, en \code{integer}~; refus \code{trop\_de\_cellules} au-delà de \code{.Machine\$integer.max} (issue~\#37) \\
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
