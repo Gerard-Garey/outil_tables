@@ -414,6 +414,18 @@ double_lu <- function(s, fichier, chemin, windows = .Platform$OS.type == "window
   v
 }
 
+# Écriture canonique d'un vecteur de Date (ADR 0011, point 4 ; #19) pour le
+# contrôle de lecture et les messages : %04d-%02d-%02d sur as.POSIXlt(), jetons
+# NA et NaN. Ne passe pas par tablexp:::ecrire_valeurs() : la lecture et la
+# comparaison s'exécutent sans installation de tablexp (comparer_references.R) ;
+# c'est aussi une seconde écriture, indépendante de celle du moteur.
+texte_dates <- function(v) {
+  lt <- as.POSIXlt(structure(as.double(unclass(v)), class = "Date"))
+  t <- sprintf("%04d-%02d-%02d", lt$year + 1900L, lt$mon + 1L, lt$mday)
+  t[is.na(v)] <- "NA"; t[is.nan(unclass(v))] <- "NaN"
+  t
+}
+
 valeurs_lues <- function(type, s, fichier, chemin) {
   canonique <- function(v, texte) {
     if (!identical(texte, s)) erreur_lecture(fichier, sprintf("%s : valeur non canonique pour le type %s", chemin, type))
@@ -424,8 +436,13 @@ valeurs_lues <- function(type, s, fichier, chemin) {
     integer = { v <- suppressWarnings(as.integer(s)); canonique(v, ifelse(is.na(v), "NA", sprintf("%d", v))) },
     logical = { v <- c("TRUE" = TRUE, "FALSE" = FALSE, "NA" = NA)[s]
                 if (anyNA(names(v))) erreur_lecture(fichier, sprintf("%s : logique invalide", chemin)); unname(v) },
-    Date = { v <- as.Date(ifelse(s == "NA", NA_character_, s), format = "%Y-%m-%d")
-             t <- format(v, "%Y-%m-%d"); t[is.na(v)] <- "NA"; canonique(structure(as.double(unclass(v)), class = "Date"), t) },
+    # Date : jetons NA et NaN lus tels quels (NaN en Date stockée NaN) ; forme
+    # canonique (année sur quatre chiffres, ADR 0011, point 4 ; #19) contrôlée
+    # par la réécriture de la valeur lue, texte_dates().
+    Date = { u <- as.double(unclass(as.Date(ifelse(s %in% c("NA", "NaN"), NA_character_, s), format = "%Y-%m-%d")))
+             u[s == "NaN"] <- NaN
+             v <- structure(u, class = "Date")
+             canonique(v, texte_dates(v)) },
     character = , factor = desechapper(s, fichier, chemin),
     erreur_lecture(fichier, sprintf("%s : type %s inconnu", chemin, type)))
 }
@@ -487,7 +504,7 @@ tolerance_de <- function(chemin, tolerances = TOLERANCES) {
 
 texte_valeur <- function(v, type) {
   if (type == "double") return(sprintf("%.17g", v))
-  if (type == "Date") return(ifelse(is.na(v), "NA", format(v, "%Y-%m-%d")))
+  if (type == "Date") return(texte_dates(v))
   if (type %in% c("character", "factor")) return(ifelse(is.na(v), "NA", sprintf("\"%s\"", encodeString(v))))
   ifelse(is.na(v), "NA", as.character(v))
 }

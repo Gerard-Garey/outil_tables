@@ -1831,4 +1831,31 @@ local({
   })
 })
 
+# --- dates : aller-retour des références, années sur quatre chiffres, jeton NaN (#19) ---
+
+local({
+  J <- function(j) structure(j, class = "Date")
+  v <- J(c(-354650, -719162, 2932896, NA, NaN, 19782, 0))   # 0999-01-01, 0001-01-01, 9999-12-31, NA, NaN
+  g <- list(types = c(x = "Date"), valeurs = list(x = v))
+  f <- tempfile(fileext = ".tsv"); on.exit(unlink(f))
+  ecrire_reference(g, f)
+  texte <- rawToChar(readBin(f, "raw", file.info(f)$size))
+  verifier("références, Date : 0999-01-01, 0001-01-01, 9999-12-31, NA, NaN écrits en ISO sur quatre chiffres, jetons NA et NaN distincts",
+           grepl("\tDate\t7\t0999-01-01\t0001-01-01\t9999-12-31\tNA\tNaN\t2024-02-29\t1970-01-01\n", texte, fixed = TRUE))
+  verifier("références, Date : aller-retour lire(ecrire()) identical() sur l'objet relu, NA et NaN distingués",
+           identical(lire_reference(f)$valeurs$x, v) && !identical(lire_reference(f)$valeurs$x, J(c(-354650, -719162, 2932896, NA, NA, 19782, 0))))
+  refus_lecture <- function(motif_ecrit) {
+    f2 <- tempfile(fileext = ".tsv"); on.exit(unlink(f2))
+    writeBin(charToRaw(motif_ecrit(texte)), f2)
+    tryCatch({ lire_reference(f2); "aucune erreur" }, error = function(e) conditionMessage(e))
+  }
+  verifier("références, Date : lecture d'une année sans zéros (999-01-01) ou de NaN écrit nan -> erreur « non canonique »",
+           grepl("non canonique", refus_lecture(function(t) sub("\t0999-01-01\t", "\t999-01-01\t", t, fixed = TRUE)), fixed = TRUE) &&
+             grepl("non canonique", refus_lecture(function(t) sub("\tNaN\t", "\tnan\t", t, fixed = TRUE)), fixed = TRUE))
+  verifier("références, Date : une date hors domaine ou non entière est refusée à l'écriture (refus_reference)",
+           all(vapply(list(J(-719163), J(2932897), J(100.5)), function(w)
+             inherits(tryCatch(ecrire_reference(list(types = c(x = "Date"), valeurs = list(x = w)), tempfile()),
+                               refus_reference = function(e) e), "refus_reference"), NA)))
+})
+
 bilan()

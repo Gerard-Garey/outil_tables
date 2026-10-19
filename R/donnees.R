@@ -81,6 +81,18 @@ ROLES_SEGMENTATION <- c("sexe", "segment")
 # paramètre du plan.
 AGE_ABERRANT <- 130L
 
+# Dates hors du domaine [0001-01-01, 9999-12-31] (ADR 0011, point 4) : TRUE pour
+# chaque jour (depuis 1970-01-01) hors de [-719162, 2932896], infinis compris ;
+# un manquant (NA, NaN) n'est pas hors domaine. Les deux bornes sont les jours
+# où composantes_date() rend l'année 1 puis 9999 (0 et 10000 aux jours voisins :
+# test_donnees.R). Hors de ce domaine, aucune écriture ISO 8601 à quatre chiffres
+# n'existe : refus date_hors_domaine, avant toute empreinte (données et bornes
+# du plan) ; l'écrivain du module `rapport` s'en sert aussi, en garde-fou.
+dates_hors_domaine <- function(j) {
+  j <- as.numeric(j)
+  !is.na(j) & (j < -719162 | j > 2932896)
+}
+
 # Transitions prises en charge (ADR 0007, point 5.1 : deux noms d'états) et
 # porteur de l'état de départ : la tête (vivant -> décédé) ou le contrat (en
 # cours -> racheté, unité contrat, M46).
@@ -180,8 +192,8 @@ message_aucune_recette <- function(requis, manquants)
 # point 4.1) contre le catalogue et `donnees`. Ordre des contrôles :
 # forme, rôle inconnu, rôle déclaré deux fois, rôle non pris en charge,
 # colonne absente, colonne ambiguë (nom présent plusieurs fois dans
-# `donnees`), colonne déclarée deux fois, type incompatible, recette
-# impossible (aucune_recette), rôle requis par la segmentation manquant.
+# `donnees`), colonne déclarée deux fois, type incompatible, date hors du
+# domaine (date_hors_domaine), recette impossible (aucune_recette), rôle requis par la segmentation manquant.
 # Chaque refus nomme tous les rôles en cause. Rend `roles`, inchangé.
 controler_roles <- function(donnees, roles, segmentation) {
   if (!is.data.frame(donnees))
@@ -245,6 +257,18 @@ controler_roles <- function(donnees, roles, segmentation) {
                                     character(1L))),
                           collapse = " ; ")),
             list(role = r[ko], colonne = unname(roles[ko]), type_attendu = unname(TYPES_ADMIS[types[ko]])))
+  # Dates hors du domaine [0001-01-01, 9999-12-31] : type conforme, mais aucune
+  # écriture canonique ; refus nommé, les lignes sont citées (ADR 0011, point 4).
+  for (i in which(types == "date")) {
+    hors <- which(dates_hors_domaine(unclass(donnees[[roles[[i]]]])))
+    if (length(hors))
+      refuser("donnees", "date_hors_domaine",
+              sprintf(paste("Rôle « %s », colonne « %s » : %d date(s) hors du domaine [0001-01-01, 9999-12-31]",
+                            "(premières lignes %s) ; aucune écriture canonique à quatre chiffres n'existe."),
+                      r[i], roles[[i]], length(hors),
+                      paste(utils::head(hors, NB_LIGNES_CITEES), collapse = ", ")),
+              list(role = r[i], colonne = unname(roles[[i]]), lignes = hors))
+  }
   requis <- CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"]
   manquants <- setdiff(requis, r)
   if (length(manquants))
@@ -301,6 +325,13 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
             paste("La période d'observation doit être une liste de champs exactement debut et fin,",
                   "sans autre attribut, deux dates (classe Date, sans autre attribut) non manquantes."),
             list(periode = periode))
+  # Bornes hors du domaine des dates (ADR 0011, point 4), même domaine que les données.
+  hors_p <- c(debut = dates_hors_domaine(periode[["debut"]]), fin = dates_hors_domaine(periode[["fin"]]))
+  if (any(hors_p))
+    refuser("donnees", "date_hors_domaine",
+            sprintf("Période d'observation : borne(s) %s hors du domaine des dates [0001-01-01, 9999-12-31].",
+                    paste(names(hors_p)[hors_p], collapse = " et ")),
+            list(bornes = names(hors_p)[hors_p]))
   if (!forme_exacte(delai_declaration, c("integer", "double")) || length(delai_declaration) != 1L ||
       is.na(delai_declaration) || !is.finite(delai_declaration) ||
       delai_declaration != trunc(delai_declaration) || delai_declaration < 0)
@@ -461,10 +492,18 @@ fusionner_intervalles <- function(g, entree, fin) {
   finies <- c(es, fs[is.finite(fs)])
   bas <- min(finies); haut <- max(finies) + 1
   largeur <- haut - bas + 1
+  # Garde : le produit (numéro de tête maximal) x (étendue des dates) doit rester
+  # sous 2^52 pour que le décalage par tête soit exact. Depuis #19, les dates
+  # sont dans [0001-01-01, 9999-12-31] (étendue au plus 3 652 060 jours) : la
+  # garde n'est atteignable par construire_table() qu'au-delà d'environ
+  # 1,23e9 têtes (2^52 / 3 652 060), sous .Machine$integer.max ; elle reste
+  # atteignable par une étendue de dates plus grande si cette fonction est appelée
+  # directement.
   if (max(gs) * largeur >= 2^52)
     refuser("donnees", "dates_hors_plage",
-            sprintf(paste("Dates d'entrée et de sortie étendues sur %.0f jours : hors de la plage que la",
-                          "fusion par tête calcule exactement (%d têtes) ; vérifier les dates."),
+            sprintf(paste("Étendue des dates d'entrée et de sortie de %.0f jours pour %d têtes : leur produit",
+                          "dépasse 2^52, hors de la plage que la fusion par tête calcule exactement ;",
+                          "vérifier les dates et le nombre de têtes."),
                     largeur, max(gs)),
             list(etendue_jours = largeur, tetes = max(gs)))
   fc <- fs; fc[!is.finite(fc)] <- haut

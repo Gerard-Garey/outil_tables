@@ -703,3 +703,134 @@ local({
       identical(emp(c(1, NaN)), emp(c(1, 0 / 0))) && !identical(emp(c(1, 2)), emp(c(1, 2 + 2^-51)))
   })
 })
+
+# --- dates : année sur quatre chiffres, refus hors du domaine (#19 ; ADR 0011, point 4) ---
+
+# Nature des attendus : textes écrits à la main ; jours depuis 1970-01-01 des
+# quatre dates calculés hors R (Python 3.13, date(a, m, j).toordinal() -
+# date(1970,1,1).toordinal()) : 0001-01-01 -> -719162, 0019-05-12 -> -712457,
+# 0999-01-01 -> -354650, 9999-12-31 -> 2932896 ; isoformat() de Python écrit
+# ces quatre dates comme attendu ci-dessous. Témoin d'empreinte : texte écrit
+# par printf et haché par md5sum (GNU coreutils 9.4), hors de R :
+#   tablexp canonique 2<TAB>3<TAB>3
+#   #date_entree<TAB>Date / 0999-01-01 / 1000-01-01 / 2020-03-01
+#   #date_naissance<TAB>Date / 0019-05-12 / 0950-03-01 / 1960-07-01
+#   #date_sortie<TAB>Date / NA / 9999-12-31 / 0001-01-01
+# (172 octets, md5 a96cb8dddf746b5aef7d4014096e6fad) ; avec NaN à la place du
+# premier NA de date_sortie : 173 octets, md5 9253374d78befa9073e8f1b2e0f69181.
+# Avant #19, l'écriture par format.Date donnait 999-01-01, 19-05-12 et 950-03-01
+# (années sans zéros), et NA et NaN s'écrivaient NA.
+local({
+  ev <- tablexp:::ecrire_valeurs
+  J <- function(j) structure(j, class = "Date")
+  lignes <- function(x, forme = "empreinte") strsplit(rawToChar(ev(x, forme, "d")$octets), "\n", fixed = TRUE)[[1L]]
+
+  verifier("écriture des dates, deux formes : 0999-01-01, 0019-05-12, 0001-01-01, 9999-12-31 sur quatre chiffres, type Date",
+           all(vapply(c("empreinte", "texte"), function(f)
+             identical(lignes(J(c(-354650, -712457, -719162, 2932896)), f),
+                       c("0999-01-01", "0019-05-12", "0001-01-01", "9999-12-31")), NA)) &&
+             identical(ev(J(0), "texte", "d")$type, "Date"))
+  verifier("écriture des dates : 1970-01-01, 1000-01-01 (-354285) et un 29 février bissextile (2024-02-29, 19782) inchangés",
+           identical(lignes(J(c(0, -354285, 19782))), c("1970-01-01", "1000-01-01", "2024-02-29")))
+  verifier("écriture des dates : tous les jours de 1930-01-01 à 2024-12-31 identiques à format.Date (R1 à R6 inchangés)", {
+    j <- as.numeric(as.Date("1930-01-01")):as.numeric(as.Date("2024-12-31"))
+    identical(lignes(J(j)), format(J(j), "%Y-%m-%d"))
+  })
+  verifier("écriture des dates : stockage integer, valeurs répétées, ordre conservé, attribut names sans effet",
+           identical(lignes(J(c(1L, 0L, 1L))), c("1970-01-02", "1970-01-01", "1970-01-02")) &&
+             identical(lignes(J(c(a = 0, b = 31))), c("1970-01-01", "1970-02-01")))
+  verifier("écriture des dates : vecteur vide -> aucun octet",
+           identical(ev(J(numeric(0)), "empreinte", "d")$octets, raw(0)))
+  verifier("écriture des dates : NA s'écrit NA, NaN s'écrit NaN, quel que soit le calcul qui les a produits, dans les deux formes",
+           all(vapply(c("empreinte", "texte"), function(f)
+             identical(lignes(J(c(NA, NaN, 0, NA_real_ + 1, 0 / 0, NA_integer_)), f),
+                       c("NA", "NaN", "1970-01-01", "NA", "NaN", "NA")), NA)))
+  verifier("écriture des dates : hors de [0001-01-01, 9999-12-31] (-719163, 2932897, infinis) -> refus date_hors_domaine, dans les deux formes",
+           all(vapply(c("empreinte", "texte"), function(f)
+             leve_refus(ev(J(c(0, -719163)), f, "d"), "date_hors_domaine") &&
+               leve_refus(ev(J(c(0, 2932897)), f, "d"), "date_hors_domaine") &&
+               leve_refus(ev(J(Inf), f, "d"), "date_hors_domaine") &&
+               leve_refus(ev(J(-Inf), f, "d"), "date_hors_domaine"), NA)))
+
+  # Témoin d'empreinte calculée hors R (années < 1000).
+  TEM <- data.frame(n = J(c(-712457, -372488, as.numeric(as.Date("1960-07-01")))),
+                    e = J(c(-354650, -354285, as.numeric(as.Date("2020-03-01")))),
+                    s = J(c(NA, 2932896, -719162)))
+  ROLES_TEM <- c(date_naissance = "n", date_entree = "e", date_sortie = "s")
+  emp <- tablexp:::empreinte_donnees
+  verifier("empreinte (valeur calculée à la main par printf et md5sum, hors R), années 19, 950, 999, 1 : a96cb8dddf746b5aef7d4014096e6fad",
+           identical(emp(TEM, ROLES_TEM), "a96cb8dddf746b5aef7d4014096e6fad"))
+  verifier("empreinte : texte canonique des dates à année < 1000 de 172 octets, sans CR", {
+    fch <- tempfile(); tablexp:::texte_canonique(TEM, ROLES_TEM, fch)
+    o <- readBin(fch, "raw", 1000L); unlink(fch)
+    length(o) == 172L && !any(o == as.raw(0x0d))
+  })
+  TEM_NAN <- TEM; TEM_NAN$s[1L] <- J(NaN)
+  verifier("empreinte (valeur calculée à la main, hors R), même jeu avec une date NaN à la place du NA : 9253374d78befa9073e8f1b2e0f69181, distincte de celle du NA",
+           identical(emp(TEM_NAN, ROLES_TEM), "9253374d78befa9073e8f1b2e0f69181") &&
+             !identical(emp(TEM_NAN, ROLES_TEM), emp(TEM, ROLES_TEM)))
+
+  # Refus avant l'empreinte : la colonne cause_sortie porte une chaîne au codage
+  # bytes, que le calcul de l'empreinte refuserait (chaine_codage_bytes) ; le
+  # refus de la date hors domaine est levé le premier.
+  z <- "é"; Encoding(z) <- "bytes"
+  octets_ko <- BASE; octets_ko$cause <- c(z, BASE$cause[-1L])
+  date_ko <- BASE; date_ko$sortie[1L] <- J(2932897)
+  verifier("construire_table : sans date hors domaine, la chaîne bytes est refusée par l'empreinte (chaine_codage_bytes)",
+           leve_refus(construire_table(octets_ko, ROLES, plan_type()), "chaine_codage_bytes"))
+  verifier("construire_table : date hors domaine dans les données -> refus date_hors_domaine, avant le calcul de l'empreinte",
+           { d <- date_ko; d$cause <- octets_ko$cause
+             leve_refus(construire_table(d, ROLES, plan_type()), "date_hors_domaine") })
+  verifier("construire_table : date hors domaine (10000-01-01) seule -> refus date_hors_domaine",
+           leve_refus(construire_table(date_ko, ROLES, plan_type()), "date_hors_domaine"))
+  verifier("construire_table : naissance à 0000-12-31 -> refus date_hors_domaine",
+           { d <- BASE; d$naissance[2L] <- J(-719163)
+             leve_refus(construire_table(d, ROLES, plan_type()), "date_hors_domaine") })
+  verifier("construire_table : borne du plan hors domaine (début 0000-12-31, fin 10000-01-01) -> refus date_hors_domaine, avant le calcul de l'empreinte",
+           leve_refus(construire_table(octets_ko, ROLES, modifier(plan_type(), periode = list(debut = J(-719163), fin = PER$fin))),
+                      "date_hors_domaine") &&
+             leve_refus(construire_table(octets_ko, ROLES, modifier(plan_type(), periode = list(debut = PER$debut, fin = J(2932897)))),
+                        "date_hors_domaine"))
+
+  # Une date stockée NaN atteint l'écrivain par construire_table() (mesuré :
+  # type_conforme() la laisse passer comme un manquant) ; elle est traitée comme
+  # une date manquante par les étapes, et se distingue de NA dans l'empreinte.
+  nan_ <- BASE; nan_$sortie[2L] <- J(NaN)
+  na_ <- BASE; na_$sortie[2L] <- J(NA)
+  x_nan <- construire_table(nan_, ROLES, plan_type()); x_na <- construire_table(na_, ROLES, plan_type())
+  # Les lignes conservées gardent la valeur reçue (NaN, non corrigée en NA) :
+  # c'est le seul élément des étapes qui diffère, par identical() (mesuré).
+  verifier("construire_table : une date NaN est acceptée et traitée comme un manquant (exposition, observations et avertissements identiques à ceux d'un NA ; lignes conservées : la valeur reçue), mais l'empreinte des données la distingue",
+           identical(x_nan$etapes$exposition, x_na$etapes$exposition) &&
+             identical(x_nan$etapes$donnees$resultat$observations, x_na$etapes$donnees$resultat$observations) &&
+             isTRUE(all.equal(x_nan$etapes, x_na$etapes)) &&
+             is.nan(unclass(x_nan$etapes$donnees$resultat$lignes_conservees$sortie[2L])) &&
+             identical(x_nan$avertissements, x_na$avertissements) &&
+             !identical(x_nan$fiche$empreintes$donnees, x_na$fiche$empreintes$donnees) &&
+             identical(x_na$fiche$empreintes$donnees, emp(na_, ROLES)) && identical(x_nan$fiche$empreintes$donnees, emp(nan_, ROLES)))
+})
+
+# Date non entière (#19, reprise) : 100 et 100,5 s'écriraient de même ; refus nommé.
+local({
+  ev <- tablexp:::ecrire_valeurs
+  J <- function(j) structure(j, class = "Date")
+  for (f in c("empreinte", "texte")) {
+    verifier(sprintf("écriture des dates, forme %s : 100.5 et -0.5 refusés (date_non_entiere), 100 accepté", f),
+             leve_refus(ev(J(100.5), f, "d"), "date_non_entiere") && leve_refus(ev(J(c(0, -0.5)), f, "d"), "date_non_entiere") &&
+               leve_refus(ev(J(c(NA, 3, 1e-9)), f, "d"), "date_non_entiere") &&
+               identical(rawToChar(ev(J(100), f, "d")$octets), "1970-04-11\n"))
+  }
+  verifier("écriture des dates : un NaN ou un NA n'est pas une date non entière ; un infini reste date_hors_domaine ; ligne citée",
+           identical(rawToChar(ev(J(c(NaN, NA)), "texte", "d")$octets), "NaN\nNA\n") &&
+             leve_refus(ev(J(Inf), "texte", "d"), "date_hors_domaine") &&
+             identical(tryCatch(ev(J(c(1, 2.5, 3, 2.5)), "texte", "d"), refus_tablexp = function(r) r$details$lignes), c(2L, 4L)))
+  # Garde dates_hors_plage de fusionner_intervalles : étendue maximale du domaine
+  # (3 652 060 jours) ; seuil 2^52 / 3 652 060 = 1,2332e9 têtes (mesuré).
+  fu <- tablexp:::fusionner_intervalles
+  verifier("fusionner_intervalles : étendue maximale du domaine, numéro de tête 1 232 000 000 admis, 1 234 000 000 refusé (dates_hors_plage), message citant étendue et têtes",
+           is.list(fu(c(1L, 1232000000L), c(-719162, 0), c(2932896, 1))) &&
+             leve_refus(fu(c(1L, 1234000000L), c(-719162, 0), c(2932896, 1)), "dates_hors_plage") &&
+             grepl("3652060 jours pour 1234000000 têtes",
+                   conditionMessage(tryCatch(fu(c(1L, 1234000000L), c(-719162, 0), c(2932896, 1)), refus_tablexp = function(r) r)),
+                   fixed = TRUE))
+})

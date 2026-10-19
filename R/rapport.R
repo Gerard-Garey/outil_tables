@@ -98,7 +98,7 @@ octets_lignes <- function(textes) {
 # en octets IEEE 754) ou « texte » (fiche, références de non-régression :
 # doubles en %.17g). Les doubles seuls diffèrent d'une forme à l'autre ;
 # integer, logical, character, factor et Date s'écrivent de même (ADR 0007,
-# point 9.3 ; les dates relèvent de #19).
+# point 9.3 ; dates : ADR 0011, point 4, #19).
 #
 # Double : ramené d'abord à un vecteur nu (as.vector() ; writeBin refuse un
 # attribut dim, dim et names n'entrent pas dans l'écriture) ; un fini est écrit
@@ -161,10 +161,34 @@ ecrire_valeurs <- function(x, forme, role) {
   }
   if (is.factor(x)) return(list(type = "factor", octets = octets_chaines(as.character(x), role)))
   if (identical(class(x), "Date")) {
-    j <- unclass(x)
+    # Date : sprintf("%04d-%02d-%02d") sur composantes_date() (année sur quatre
+    # chiffres, ADR 0011, point 4), sur les valeurs distinctes seulement ; jeton
+    # lu sur la valeur reçue : NA, ou NaN (une Date stockée NaN est admise par
+    # les données et ne se confond pas avec NA, comme pour un double, point 2.2).
+    # Garde-fou : une date hors du domaine n'a aucune écriture à quatre chiffres
+    # (refusée en amont par `donnees`, motif commun).
+    j <- as.vector(unclass(x))
     u <- unique(j)
-    txt <- format(structure(u, class = "Date"), "%Y-%m-%d")
-    txt[is.na(u)] <- "NA"
+    # Une valeur finie non entière n'a pas d'écriture : 100 et 100,5 s'écriraient
+    # de même et l'aller-retour perdrait la fraction (aucune correction silencieuse).
+    # Les infinis relèvent du refus de domaine ci-dessous.
+    ni <- is.finite(u) & u != trunc(u)
+    if (any(ni))
+      refuser("rapport", "date_non_entiere",
+              sprintf("Rôle « %s » : date non entière (%s), sans écriture canonique.", role,
+                      paste(format(utils::head(u[ni], 3L), digits = 15L), collapse = ", ")),
+              list(role = role, lignes = which(is.finite(j) & j != trunc(j))))
+    hors <- dates_hors_domaine(u)
+    if (any(hors))
+      refuser("rapport", "date_hors_domaine",
+              sprintf("Rôle « %s » : date hors du domaine [0001-01-01, 9999-12-31], sans écriture canonique.", role),
+              list(role = role, lignes = which(dates_hors_domaine(j))))
+    txt <- ifelse(is.nan(u), "NaN", "NA")
+    k <- !is.na(u)
+    if (any(k)) {
+      cd <- composantes_date(u[k])
+      txt[k] <- sprintf("%04d-%02d-%02d", cd$an, cd$mois + 1L, cd$jour)
+    }
     return(list(type = "Date", octets = octets_lignes(txt[match(j, u)])))
   }
   if (is.object(x))
