@@ -739,3 +739,27 @@ naif <- do.call(rbind, lapply(split(i, g), function(k) {
 verifier("fusion vectorisée = fusion naïve (600 têtes, 1500 lignes, ordre mélangé, 1123 composantes)",
          identical(r$debut, unname(naif[, 1L])) && identical(r$fin, unname(naif[, 2L])) &&
            length(unique(g)) == 600L && nrow(naif) == 1123L && any(is.infinite(r$fin)))
+
+# --- chaîne unique et liste aux noms exacts (#48) -------------------------------
+
+# table_reference() testait is.character() (attributs admis) : la forme exacte
+# refuse désormais une chaîne nommée ou à attribut, sous le motif existant.
+CHAINES_ATTR <- list("nommée" = c(n = "qx"), "à attribut foo" = structure("qx", foo = "x"))
+for (k in names(CHAINES_ATTR)) {
+  v <- CHAINES_ATTR[[k]]
+  verifier(sprintf("table_reference : nom %s -> refus table_nom_manquant", k),
+           leve_refus(tr(nom = v), "table_nom_manquant"))
+  verifier(sprintf("table_reference : statut %s -> refus table_statut_inconnu", k),
+           leve_refus(tr(statut = v), "table_statut_inconnu"))
+  verifier(sprintf("table_reference : source %s -> refus table_source_manquante", k),
+           leve_refus(tr(source = v), "table_source_manquante"))
+  verifier(sprintf("table_reference : forme_origine %s -> refus table_forme_inconnue", k),
+           leve_refus(tr(forme_origine = v), "table_forme_inconnue"))
+}
+verifier("table_reference : nom, statut, source et forme_origine nus admis (inchangé)",
+         inherits(tr(forme_origine = "qx"), "table_reference"))
+# Un nom d'état vide était refusé au second contrôle de la transition (non prise
+# en charge) ; il l'est au premier (forme), sous le même motif.
+verifier("transition : nom d'état vide (depart, puis arrivee) -> refus transition_inconnue",
+         isTRUE(leve_refus(prep(transition = list(depart = "", arrivee = "deces")), "transition_inconnue")) &&
+           isTRUE(leve_refus(prep(transition = list(depart = "vivant", arrivee = "")), "transition_inconnue")))

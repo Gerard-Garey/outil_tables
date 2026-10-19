@@ -201,7 +201,7 @@ LISTES_PLAN <- list(
 for (k in LISTES_PLAN)
   verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[3]]), leve_refus(valider_plan(k[[2]](plan_complet())), k[[3]]))
 # Élément en plus nommé NA (#23) : sort() retire un nom NA, la longueur de la
-# liste est donc contrôlée à part (noms_exacts()).
+# liste est donc contrôlée à part (liste_aux_noms()).
 LISTES_PLAN_NOM_NA <- list(
   list("transition avec un élément de plus nommé NA", function(p) { p$transition <- c(p$transition, list("x"))
                                                                     names(p$transition)[3L] <- NA; p },

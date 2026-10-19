@@ -8,7 +8,9 @@
 #  - avertissements_vides() et avertir() : les avertissements métier sont
 #    inscrits dans l'objet, jamais émis par warning() (ADR 0007, point 6.5) ;
 #  - forme_exacte() : type de base exact, aucun attribut hors de ceux admis
-#    (forme canonique des valeurs du plan, #23).
+#    (forme canonique des valeurs du plan, #23) ;
+#  - liste_aux_noms() et chaine_unique() : les deux contrôles de forme qui s'y
+#    appuient, partagés par les modules (#48).
 #
 #  Ce fichier n'appelle aucun module (graphe d'appels, ADR 0007, point 2.1 ;
 #  contrôlé par tests/controles/graphe_modules.R).
@@ -28,8 +30,6 @@ MOTIF_CODE_REFUS <- "^[a-z][a-z0-9_]*$"
 # (rôle, colonne, étape, paramètre, décompte, premiers numéros de ligne).
 # Un argument mal formé est une erreur de programmation du package : stop().
 refus_tablexp <- function(module, motif, message, details = list()) {
-  chaine_unique <- function(x) is.character(x) && length(x) == 1L &&
-    !is.na(x) && nzchar(x)
   if (!chaine_unique(module))
     stop("refus_tablexp() : 'module' doit être une chaîne non vide.", call. = FALSE)
   if (!chaine_unique(motif) || !grepl(MOTIF_CODE_REFUS, motif))
@@ -59,6 +59,25 @@ refuser <- function(module, motif, message, details = list()) {
 # propre motif. Rend TRUE ou FALSE, jamais NA.
 forme_exacte <- function(x, types, attributs = character(0)) {
   typeof(x) %in% types && all(names(attributes(x)) %in% attributs)
+}
+
+# Liste nue aux noms exactement `noms` (#48) : forme_exacte() de type list, seul
+# attribut names (ni data.frame, ni classe), autant d'éléments que de noms, et
+# mêmes noms une fois triés par sort(method = "radix"), indépendant de la
+# locale. La longueur est contrôlée à part : sort() retire un nom NA, qui
+# passerait sinon avec un élément de plus. as.character() : sort(NULL) est une
+# erreur, une liste sans noms doit être refusée (FALSE), pas lever. Les
+# éléments se lisent par [[ ]] (jamais $, qui apparie les noms partiels). Rend
+# TRUE ou FALSE ; le contenu des éléments est l'affaire de l'appelant.
+liste_aux_noms <- function(x, noms) {
+  forme_exacte(x, "list", "names") && length(x) == length(noms) &&
+    identical(sort(as.character(names(x)), method = "radix"), sort(noms, method = "radix"))
+}
+
+# Chaîne unique (#48) : forme exacte character (aucun attribut, names compris),
+# longueur 1, ni NA ni vide. Rend TRUE ou FALSE, jamais NA.
+chaine_unique <- function(v) {
+  forme_exacte(v, "character") && length(v) == 1L && !is.na(v) && nzchar(v)
 }
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
