@@ -23,7 +23,7 @@
 #  copies temporaires (jamais sur tests/reference/) ; règles des modes du
 #  workflow et lignes de commande produire_references.R (refus d'appel) et
 #  comparer_references.R ; permutation des lignes de l'entrée de référence
-#  (#39) : plans R6, R4, R5 et R2, trois permutations, identical() hors
+#  (#39) : plans R6, R4, R5, R3 et R2, deux permutations, identical() hors
 #  sommes par cellule, celles-ci à la tolérance TOLERANCE_PERMUTATION, bilan
 #  des écarts et témoins ; chaînes non ASCII et locale (T1 à T4, M54).
 #
@@ -399,6 +399,12 @@ GRAINE_PERMUTATION <- 20261019L
 # 1e-12) le dépasse déjà (1,6e-14), tandis que taux et exposition_centrale
 # restent à 5,73e-15 au plus. La borne de la sommation récursive n'est pas
 # citée, faute d'avoir été vérifiée à la source.
+# Ce test contrôle l'invariance à l'ordre des lignes ; la précision des sommes
+# dans l'ordre reçu est gardée par la comparaison aux références (classe 1e-14).
+# Un écart dépendant de l'ordre inférieur à 1e-12 n'y est pas détecté (témoin
+# « taux altéré de 1e-13 »). R1 est couvert par R6, qui en contient tous les
+# chemins aux mêmes valeurs, hors paramètres et diagnostics du brut liés à
+# kaplan_meier ; R3 est le seul plan sous age_atteint_annee.
 TOLERANCE_PERMUTATION <- CLASSES_TOLERANCE[["1e-12"]]
 EMPREINTES_PERMUTATION <- c(CHEMIN_EMPREINTE_DONNEES, "etapes/donnees/resultat/lignes_conservees/@empreinte",
                             "etapes/donnees/resultat/observations/@empreinte")
@@ -455,17 +461,17 @@ controle_permutation <- function(g0, g, tolerance = TOLERANCE_PERMUTATION) {
   list(defauts = defauts, ecarts = setNames(e, tol))
 }
 
-# Trois permutations, les mêmes pour chaque plan : deux tirées sous graine
-# locale, l'ordre inverse. rownames(d) <- NULL : le nom des lignes n'est pas
-# celui de l'entrée d'origine.
+# Deux permutations, les mêmes pour chaque plan : une tirée sous graine locale,
+# l'ordre inverse (l'entrée de référence est triée par id_tete : l'ordre inverse
+# la trie en sens contraire, le tirage la désordonne). rownames(d) <- NULL : le
+# nom des lignes n'est pas celui de l'entrée d'origine.
 n_perm <- nrow(jeu_ref$donnees)
-ordres_permutation <- c(sous_graine(GRAINE_PERMUTATION, list(sample.int(n_perm), sample.int(n_perm))),
-                        list(n_perm:1))
-names(ordres_permutation) <- c("tirage 1", "tirage 2", "ordre inverse")
+ordres_permutation <- c(sous_graine(GRAINE_PERMUTATION, list(sample.int(n_perm))), list(n_perm:1))
+names(ordres_permutation) <- c("tirage 1", "ordre inverse")
 permuter <- function(o) { d <- jeu_ref$donnees[o, ]; rownames(d) <- NULL; d }
 
 bilan_permutation <- data.frame(plan = character(0), permutation = character(0), grandeur = character(0), ecart = numeric(0))
-t_perm <- system.time(for (id in c("R6", "R4", "R5", "R2")) {
+t_perm <- system.time(for (id in c("R6", "R4", "R5", "R3", "R2")) {
   p <- plans_reference()[[id]]
   for (nom_o in names(ordres_permutation)) {
     g_p <- aplatir_construction(construire_table(permuter(ordres_permutation[[nom_o]]), jeu_ref$roles, p$plan))
@@ -478,9 +484,9 @@ t_perm <- system.time(for (id in c("R6", "R4", "R5", "R2")) {
                                                               ecart = unname(r$ecarts)))
   }
 })[["elapsed"]]
-# Bilan : écart relatif maximal par plan et par grandeur, sur les trois permutations.
-cat(sprintf("  permutation : écart relatif maximal par plan et par grandeur (3 permutations ; tolérance %g ; %.1f s)\n",
-            TOLERANCE_PERMUTATION, t_perm))
+# Bilan : écart relatif maximal par plan et par grandeur, sur les permutations.
+cat(sprintf("  permutation : écart relatif maximal par plan et par grandeur (%d permutations ; tolérance %g ; %.1f s)\n",
+            length(ordres_permutation), TOLERANCE_PERMUTATION, t_perm))
 for (id in unique(bilan_permutation$plan)) {
   b <- bilan_permutation[bilan_permutation$plan == id, ]
   m <- tapply(b$ecart, b$grandeur, max)
