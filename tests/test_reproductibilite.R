@@ -359,47 +359,9 @@ SANS_REFERENCE_17 <- character(0)
 # (succès inattendu), le test « seul écart » échouant aussi (changement
 # déclaré non observé). Un plan non listé passe par le test ordinaire de la
 # comparaison au fichier.
-# #35 (ADR 0011, points 2.5 et 10) : « tablexp canonique 2 », doubles de
-# l'empreinte des données écrits en octets IEEE 754 ; l'entrée de référence n'a
-# aucune colonne double, donc son texte ne change que par sa première ligne
-# (garde 3.2 : MD5 du texte de l'entrée sous « tablexp canonique 1 » =
-# f3519cc1b73ab0d1fcc6ad89dc6d595c, vérifié aussi hors R par printf, tail et
-# md5sum). Valeur de l'empreinte : mesurée, identique pour R1 à R6 (même entrée).
-changements_42 <- function(longueur_segmentation) list(
-  list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 2L),
-  list(chemin = "fiche/@noms", nature = "valeur de chaîne",
-       valeurs = c("version_fiche", "roles", "plan", "transition_code", "fin_effective", "unite_observation",
-                   "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                   "hypothese_censure", "graine", "graine_mention", "generateur", "provenance", "provenance_mention",
-                   "empreintes", "avertissements", "hypotheses_brut")),
-  list(chemin = "fiche/transition/@noms", nature = "retrait", type = "character", longueur = 2L),
-  list(chemin = "fiche/transition/depart", nature = "retrait", type = "character", longueur = 1L),
-  list(chemin = "fiche/transition/arrivee", nature = "retrait", type = "character", longueur = 1L),
-  list(chemin = "fiche/periode/@noms", nature = "retrait", type = "character", longueur = 2L),
-  list(chemin = "fiche/periode/debut", nature = "retrait", type = "Date", longueur = 1L),
-  list(chemin = "fiche/periode/fin", nature = "retrait", type = "Date", longueur = 1L),
-  list(chemin = "fiche/delai_declaration", nature = "retrait", type = "double", longueur = 1L),
-  list(chemin = "fiche/segmentation", nature = "retrait", type = "character", longueur = longueur_segmentation))
-TRANSITIONS_EN_COURS <- list(
-  list(issue = "#35", plans = c("R1", "R2", "R3", "R4", "R5", "R6"),
-       changements = list(
-         list(chemin = "fiche/empreintes/representation", nature = "valeur de chaîne",
-              valeurs = "tablexp canonique 2"),
-         list(chemin = "fiche/empreintes/donnees", nature = "valeur de chaîne",
-              valeurs = "35ca55371e72f0f0103993d70e3a64d3"))),
-  # #42 et #22, point 6 (ADR 0011, points 5.4 et 5.5 ; M64, Q2) : fiche 2,
-  # copies de premier niveau du plan retirées (fiche$plan fait foi) ; types et
-  # longueurs des retraits lus dans tests/reference/R1.tsv à R6.tsv ;
-  # fiche/segmentation est de longueur 0 dans R2 et 1 ailleurs, d'où deux
-  # transitions de #42 à plans disjoints (ADR 0009, quatrième annotation du
-  # 19/10/2026, (b)). Valeurs mesurées sur l'objet construit (21 noms,
-  # identiques pour R1 à R6). fiche/plan et fiche/roles sont inchangés : les
-  # plans de référence sont déjà canoniques et leurs rôles dans l'ordre du
-  # catalogue.
-  list(issue = "#42", plans = c("R1", "R3", "R4", "R5", "R6"),
-       changements = changements_42(longueur_segmentation = 1L)),
-  list(issue = "#42", plans = "R2",
-       changements = changements_42(longueur_segmentation = 0L)))
+# Transitions #35 et #42 closes par la régénération unique de B4 (run CI
+# 39315172327, d18c269 ; ADR 0009, point 9.5) : liste vide.
+TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
