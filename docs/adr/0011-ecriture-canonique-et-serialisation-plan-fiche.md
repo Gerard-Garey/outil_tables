@@ -214,3 +214,17 @@ Rédigée par `architect` d'après les réponses du mainteneur du 19/10/2026, ra
 **Effet sur les résultats** : aucun par cette annotation. L'effet attendu de la régénération unique est celui des « Conséquences », lu sans conditionnel : par plan R1 à R6, `fiche/version_fiche` 1 → 2, `fiche/empreintes/representation` `tablexp canonique 1` → `tablexp canonique 2`, `fiche/empreintes/donnees` (sous la garde du point 3.2 étendu), `fiche/@noms` 25 → 21 et huit retraits. Toute autre ligne est une régression. Aucune table finale, aucun verdict : visa d'`actuary`.
 
 Issues : #35, #19, #42, #22 (point 6), #50 ; #47. Décision M64. Branche `claude/fiche-serialisation`, PR #51.
+
+## Annotation du 19 octobre 2026 — précision des points 2.1 et 3.1 : le jeton se lit sur la valeur reçue
+
+Rédigée par `architect` sur avis d'`actuary` du 19/10/2026, à la suite d'un constat d'`audit` sur #35 (branche `claude/fiche-serialisation`, PR #51). Précision de rédaction, **sans nouvelle décision** : elle rend la règle du point 2.1 conforme à ce que dit déjà le point 2.2. Le mainteneur en est informé par la PR #51. Le texte ci-dessus n'est pas réécrit.
+
+**(a) Règle précisée.** Pour une valeur double `x` reçue : le jeton (`NA` si `is.na(x) & !is.nan(x)`, `NaN`, `Inf`, `-Inf`) se lit **sur `x`** ; `y <- x + 0` ne sert **qu'aux valeurs finies**, pour ramener `-0` à `0` avant `writeBin` (point 2.1). La même règle vaut pour la forme « texte » du point 3.1 : jeton lu sur `x`, `sprintf("%.17g", x + 0)` pour les seules valeurs finies.
+
+**(b) Motif.** Le point 2.2 pose qu'« aucune opération n'est faite » sur les données reçues ; or la règle littérale du point 2.1 classe sur `x + 0`, qui est une opération. Mesuré sous x86-64 : `NA_real_` s'écrit `a20700000000f07f` et `NA_real_ + 0` `a20700000000f87f` ; le `NA` ne reste reconnu après l'addition que parce que le matériel propage la charge utile du NaN, ce que R ne garantit pas (`?NA`, R 4.3.3 : « this is not guaranteed and future CPUs and/or compilers may behave differently »). Classer sur `x + 0` exposerait donc la propriété (P1) (point 1.1) et le statut « toute plateforme » de `fiche$empreintes$donnees` à un comportement du matériel.
+
+**(c) Effet sur les résultats : aucun** sur la plateforme de référence. Mesure d'`actuary` : pour `c(NA, NaN, NA + 1, 0/0, -0, 0, Inf, -Inf, 1.5)`, les classements sur `x` et sur `x + 0` sont `identical`. Aucun incrément de version (point 10) ; le point 2.5 est inchangé. Le comportement d'un matériel qui ne propage pas la charge utile (par exemple RISC-V) reste une **hypothèse non mesurée**. Le point 11.2 (empreinte du résultat, même machine seulement) est inchangé.
+
+**(d) Signalé pour #19** (relevé d'`actuary`) : la branche `Date` de l'écrivain écrit `NA` pour tout `is.na(u)`, si bien qu'une date portée par un double `NaN` s'écrit `NA` ; le traitement relève de #19 (point 4), non de la présente précision.
+
+Issues : #35 ; #19 (point (d)). Branche `claude/fiche-serialisation`, PR #51.
