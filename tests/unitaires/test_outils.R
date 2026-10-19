@@ -237,3 +237,13 @@ verifier("refus_tablexp : module, motif ou message nommé -> erreur de programma
            inherits(tryCatch(refus_tablexp("donnees", "a", c(m = "x")), error = function(e) e), "simpleError"))
 verifier("refus_tablexp : chaînes nues admises (inchangé)",
          inherits(refus_tablexp("donnees", "a", "x"), "refus_tablexp"))
+
+# Forme exacte de la graine (#43) : integer ou double, aucun attribut. Une
+# graine nommée, en matrix ou à attribut rendait le tirage de la graine nue.
+for (g in list(c(a = 1), matrix(1L), structure(1, x = 1), structure(1L, class = "x"), array(1, 1L)))
+  verifier(sprintf("sous_graine(%s) : refus graine_invalide (forme exacte)", paste(deparse(g), collapse = "")),
+           leve_refus(sous_graine(g, runif(1)), "graine_invalide"))
+verifier("sous_graine : graines nues 1 et 1L admises, même tirage (0,2655087 sous Mersenne-Twister, Inversion, Rejection)", {
+  u1 <- sous_graine(1, runif(1)); u2 <- sous_graine(1L, runif(1))
+  identical(u1, u2) && abs(u1 - 0.2655087) < 1e-7
+})

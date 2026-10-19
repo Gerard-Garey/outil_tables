@@ -112,11 +112,14 @@ avertir <- function(acc, etape, code, message, nombre) {
 # appelant n'est pas dans .Random.seed et n'est pas restaurable ; sans effet
 # sur le moteur, qui tire sous Inversion.
 sous_graine <- function(graine, expr) {
-  if (missing(graine) || !is.numeric(graine) || length(graine) != 1L ||
+  # Forme exacte (#43, forme_exacte()) : integer ou double, aucun attribut (ni
+  # names, ni dim, ni classe) ; une graine non canonique ne doit pas être
+  # consignée.
+  if (missing(graine) || !forme_exacte(graine, c("double", "integer")) || length(graine) != 1L ||
       is.na(graine) || !is.finite(graine) || graine != trunc(graine) ||
       abs(graine) > .Machine$integer.max)
     refuser("outils", "graine_invalide",
-            "La graine doit être un nombre entier unique, explicite et fini.",
+            "La graine doit être un nombre entier unique, explicite et fini, sans attribut.",
             list(graine = if (missing(graine)) NULL else graine))
   env <- globalenv()
   avait_graine <- exists(".Random.seed", envir = env, inherits = FALSE)
