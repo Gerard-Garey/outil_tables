@@ -737,25 +737,52 @@ verifier("garde du dossier de sortie : formes UNC (\\\\serveur\\partage, préfix
     !any(vapply(c("/home/u/depot/tests/reference_bis", "/tmp/x", "/home/u/depot/Tests/reference", "tests\\reference", "/"), p, NA))
 })
 # Scripts en sous-processus : refus d'appel du producteur (avant toute
-# installation ni écriture) ; ligne de commande de comparaison.
+# installation ni écriture) ; ligne de commande de comparaison. Les modes
+# creation, regeneration et bascule ne s'exécutent que sur la CI (issue #36) :
+# les témoins qui les exercent posent GITHUB_ACTIONS=true dans leur
+# sous-processus (env), faute de quoi la garde les refuserait avant le contrôle
+# visé ; le cas sans CI de chaque mode est testé plus bas.
 PRODUCTEUR <- file.path(RACINE, "tests", "reference", "produire_references.R")
 COMPARATEUR <- file.path(RACINE, "tests", "reference", "comparer_references.R")
+EN_CI <- "GITHUB_ACTIONS=true"
 for (cas in list(
   list(args = c("--mode", "inconnu", "--plans", "tous", "--sortie", tempfile()), motif = "--mode parmi"),
-  list(args = c("--mode", "creation", "--plans", "tous", "--sortie", tempfile()), motif = "--motif exigé"),
-  list(args = c("--mode", "bascule", "--plans", "R1", "--sortie", tempfile(), "--motif", "x"), motif = "--plans tous obligatoire"),
-  list(args = c("--mode", "creation", "--plans", "R9", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : "),
+  list(args = c("--mode", "creation", "--plans", "tous", "--sortie", tempfile()), motif = "--motif exigé", env = EN_CI),
+  list(args = c("--mode", "bascule", "--plans", "R1", "--sortie", tempfile(), "--motif", "x"), motif = "--plans tous obligatoire",
+       env = EN_CI),
+  list(args = c("--mode", "creation", "--plans", "R9", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
+  list(args = c("--mode", "regeneration", "--plans", "R9", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
   list(args = c("--mode", "creation", "--plans", "tous", "--sortie", shQuote(file.path(DOSSIER_REFERENCES, "essai")), "--motif", "x"),
-       motif = "ne peut être tests/reference/"),
+       motif = "ne peut être tests/reference/", env = EN_CI),
   list(args = c("--mode", "releve", "--plans", "tous", "--sortie", tempfile()), motif = "mode releve refusé sur la CI",
-       env = "GITHUB_ACTIONS=true"))) {
-  verifier(sprintf("producteur : appel refusé (%s), code 1, sans rien écrire sous tests/reference/", cas$motif), {
+       env = EN_CI))) {
+  verifier(sprintf("producteur : appel refusé (%s%s), code 1, sans rien écrire sous tests/reference/", cas$motif,
+                   if (is.null(cas$env)) "" else sprintf(" ; mode %s en CI", cas$args[2L])), {
     contenu <- function() if (dir.exists(DOSSIER_REFERENCES))
       list.files(DOSSIER_REFERENCES, recursive = TRUE, all.files = TRUE, include.dirs = TRUE) else NA
     avant <- contenu()
     r <- executer_rscript(PRODUCTEUR, cas$args, env = if (is.null(cas$env)) "GITHUB_ACTIONS=false" else cas$env)
     if (r$statut != 1L) sprintf("code %d", r$statut)
     else if (!any(grepl(cas$motif, r$sortie, fixed = TRUE, useBytes = TRUE))) paste("sortie :", paste(r$sortie, collapse = " | "))
+    else if (!identical(avant, contenu())) "tests/reference/ modifié" else TRUE
+  })
+}
+# Garde de #36 : hors CI (variable fausse ou vide), chacun des trois modes qui
+# produisent des références sort avec le code 1 et le message renvoyant à
+# l'ADR 0009, avant toute écriture (le dossier de sortie n'est pas créé,
+# tests/reference/ est intact), même avec des arguments par ailleurs valides.
+for (mode_ci in c("creation", "regeneration", "bascule")) for (ga in c("GITHUB_ACTIONS=false", "GITHUB_ACTIONS=")) {
+  verifier(sprintf("producteur : mode %s refusé hors CI (%s), code 1, message ADR 0009, rien écrit", mode_ci, ga), {
+    sortie_t <- tempfile("sortie_hors_ci_")
+    contenu <- function() if (dir.exists(DOSSIER_REFERENCES))
+      list.files(DOSSIER_REFERENCES, recursive = TRUE, all.files = TRUE, include.dirs = TRUE) else NA
+    avant <- contenu()
+    r <- executer_rscript(PRODUCTEUR, c("--mode", mode_ci, "--plans", "tous", "--sortie", shQuote(sortie_t), "--motif", "x"), env = ga)
+    if (r$statut != 1L) sprintf("code %d", r$statut)
+    else if (!any(grepl(sprintf("mode %s refus", mode_ci), r$sortie, fixed = TRUE, useBytes = TRUE)) ||
+             !any(grepl("hors CI", r$sortie, fixed = TRUE, useBytes = TRUE)) ||
+             !any(grepl("ADR 0009", r$sortie, fixed = TRUE, useBytes = TRUE))) paste("sortie :", paste(r$sortie, collapse = " | "))
+    else if (file.exists(sortie_t)) { unlink(sortie_t, recursive = TRUE); "le dossier de sortie a été créé" }
     else if (!identical(avant, contenu())) "tests/reference/ modifié" else TRUE
   })
 }
