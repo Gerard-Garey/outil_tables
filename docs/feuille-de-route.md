@@ -95,6 +95,13 @@ Les deux premières branches sont closes (§ 1.1, § 1.2) ; la troisième est ou
 
 **État au 19/10/2026** (branche à `763da20`) : les cinq issues sont implémentées ; restent (6) `docwriter` et (7) la revue finale.
 
+**État au 19/10/2026, seconde mise à jour** (branche à `bec1fa4`) : les étapes (0) à (6) sont faites, (7) est en cours.
+
+- *(6) Passage de `docwriter`* : un commit `docs:` par issue, `0f797fd` (#36), `2c956f6` (#23), `6b16fec` (#21), `258d288` (#39) et `20b7ed2` (#37), avec les deux commits `tests:` qui vident la liste d'attente de la concordance, `ba5c516` (#23) et `0ecc7d9` (#37) ; puis les corrections de la validation d'`actuary`, `7446d2e` (#23, #36, #37, #39) et `bec1fa4` (réserve `libm` actualisée, sans issue, rattachée à M58, Q7). Issues et domaines relevés par `git log -1 --format=%B` sur chaque SHA (*vérifié* le 19/10/2026).
+- *Validation de la documentation par `actuary`* : « validé avec réserves », puis « validé » après `7446d2e` et `bec1fa4` (rapporté par la session principale ; *non vérifié par `architect`*).
+- *(7) Revue finale complète, en cours* : `audit` en effort `high`, **conforme avec réserves**, constats tous mineurs (m1, m2, m6 et m7 corrigés dans l'ADR 0009, l'ADR 0007, la présente feuille et `CONTEXT.md`) ; `/code-review`, 10 points ; `actuary` (rapporté par la session principale).
+- **Écart à la règle 9** (`CLAUDE.md`, « un commit `docs:` par issue ») : `7446d2e` couvre quatre issues (#23, #36, #37, #39) dans un seul commit `docs:`, pour des corrections postérieures à la validation d'`actuary`. L'écart est consigné ici ; l'historique n'est pas réécrit (commits de fusion, SHA cités).
+
 - **Correctif rapide R2** : PR #41 (`99c7e3f`), **fusionnée le 19/10/2026 en `badaf91`**, puis `main` fusionnée dans la branche en `8a5f602`. Elle ferme #28 (`Closes #28`) ; #33 et #34 restent ouvertes jusqu'à la mesure sous Windows sur le poste du mainteneur (`Refs #33, #34`, M59). Correction de la reprise (constat A) : retrait de la quatrième locale candidate, liste `LOCALES_UTF8` inchangée par rapport à `main` (M59).
 - **Routage** (Q6) : `e5123fb`, puis motif corrigé en `1687110` (`docs/agents/routage.md`, § 3 ; domaine `docs:`, comme les commits antérieurs de ce fichier, et non `claude:`).
 
