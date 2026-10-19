@@ -11,13 +11,13 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
+# plateforme consignée : Processeur                    : AMD EPYC 9V45 96-Core Processor
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 8ca8ce41a81e9a2a1b6ec2ac0a47bd09a48403bc
+# plateforme consignée : GITHUB_SHA                    : 99272a48ee8a42496e158e855524e15479e4d5c7
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -25,11 +25,11 @@
 # fiche$plateforme/machine : x86_64
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
-# commit : 8ca8ce41a81e9a2a1b6ec2ac0a47bd09a48403bc
-# execution : 39140635363
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/39140635363
-# mode : creation
-# date : 2026-10-18 15:28:52 UTC
+# commit : 99272a48ee8a42496e158e855524e15479e4d5c7
+# execution : 39248539956
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/39248539956
+# mode : regeneration
+# date : 2026-10-19 11:59:16 UTC
 # empreinte des données : f3519cc1b73ab0d1fcc6ad89dc6d595c
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -112,7 +112,7 @@ etapes/exposition/diagnostics/observations_exposees	integer	1	87921
 etapes/exposition/diagnostics/exposition_jours	double	1	179881658
 etapes/exposition/diagnostics/evenements	integer	1	4228
 etapes/exposition/diagnostics/sorties_concurrentes	integer	1	25312
-etapes/exposition/diagnostics/cellules	double	1	149
+etapes/exposition/diagnostics/cellules	integer	1	149
 etapes/exposition/diagnostics/cellules_evenement_sans_exposition	integer	1	0
 etapes/brut/@noms	character	3	"parametres"	"resultat"	"diagnostics"
 etapes/brut/parametres/@noms	character	8	"estimateurs"	"niveau"	"exposition_initiale"	"tolerance_effectif"	"convention"	"unite_exposition"	"hypotheses"	"statuts"

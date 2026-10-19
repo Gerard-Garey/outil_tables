@@ -74,11 +74,13 @@ deduire_recette <- function(roles) {
 }
 
 # Contrôle les paramètres propres à l'étape `exposition` (valeurs ; les noms
-# sont contrôlés par valider_plan()). Rend TRUE, invisible.
+# sont contrôlés par valider_plan()). Forme exacte (#23, forme_exacte()) :
+# type de base exact, aucun attribut (ni names, ni dim, ni classe), sinon
+# refus sous le motif du paramètre. Rend TRUE, invisible.
 controler_parametres_exposition <- function(convention, par_annee) {
-  if (!is.character(convention) || length(convention) != 1L || is.na(convention))
+  if (!forme_exacte(convention, "character") || length(convention) != 1L || is.na(convention))
     refuser("exposition", "convention_invalide",
-            sprintf("La convention d'âge doit être une chaîne prise dans %s.",
+            sprintf("La convention d'âge doit être une chaîne unique, sans attribut, prise dans %s.",
                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (convention %in% setdiff(ORDRE_CONVENTIONS, CONVENTIONS_MISES_EN_OEUVRE))
@@ -92,9 +94,9 @@ controler_parametres_exposition <- function(convention, par_annee) {
             sprintf("Convention d'âge inconnue « %s » (valeurs admises : %s).", convention,
                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
-  if (!is.logical(par_annee) || length(par_annee) != 1L || is.na(par_annee))
+  if (!forme_exacte(par_annee, "logical") || length(par_annee) != 1L || is.na(par_annee))
     refuser("exposition", "par_annee_invalide",
-            "Le découpage par année (par_annee) doit valoir TRUE ou FALSE.",
+            "Le découpage par année (par_annee) doit valoir TRUE ou FALSE, sans attribut.",
             list(par_annee = par_annee))
   invisible(TRUE)
 }
@@ -233,6 +235,22 @@ somme_par_cellule <- function(cellule, v, n_cellules) {
     r[sort(unique(cellule))] <- s[, 1L]
   }
   r
+}
+
+# Nombre de cellules de la table, en integer (#37) : somme, sur les segments,
+# des âges de la plage par le nombre d'années. Le produit est formé en double,
+# où il ne déborde pas ; au-delà de .Machine$integer.max la recette refuse
+# (motif trop_de_cellules) avant les allocations par cellule : tabulate()
+# refuse un nbins d'au moins 2^31 (« attempt to make a table with >= 2^31
+# elements », mesuré).
+nombre_cellules <- function(n_age, n_an) {
+  n <- sum(as.double(n_age) * n_an)
+  if (n > .Machine$integer.max)
+    refuser("exposition", "trop_de_cellules",
+            sprintf("La table compterait %s cellules, au-delà de %d : segmentation trop fine ou plage d'âges et d'années trop étendue.",
+                    format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
+            list(cellules = n))
+  as.integer(n)
 }
 
 # Fenêtres et événements des observations (T5), sur la période [debut_p, B)
@@ -386,7 +404,7 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
   annees <- if (par_annee) annee_du_jour(debut_p):annee_du_jour(borne - 1) else 0
   n_an <- length(annees)
   decalage <- c(0, cumsum(n_age * n_an))[seq_len(n_seg)]
-  n_cel <- sum(n_age * n_an)
+  n_cel <- nombre_cellules(n_age, n_an)
   indice <- function(gg, x, y) {
     i <- decalage[gg] + (x - age_min[gg]) * n_an + 1
     if (par_annee) i + (y - annees[1L]) else i

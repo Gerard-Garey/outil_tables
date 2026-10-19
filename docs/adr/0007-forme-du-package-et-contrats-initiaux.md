@@ -395,3 +395,89 @@ Rédigée par `architect` d'après la décision du mainteneur du 17/10/2026 (M54
 **Effet sur les résultats** : aucun. L'annotation porte sur l'installation et le chargement des tests ; l'objet du moteur a les mêmes octets dans les quatre combinaisons installation × exécution (ADR 0009, troisième annotation, (e)).
 
 Issues : #17, #25. Décision M54.
+
+## Annotation du 19 octobre 2026 — forme exacte des valeurs du plan (#23) et de la provenance (#21) ; locale d'installation posée par `Sys.setenv` (PR #41)
+
+Rédigée par `architect` ; le texte ci-dessus, annotations comprises, n'est pas réécrit. Elle consigne l'état du code à `a311c85` (branche `claude/consolidation-controles-references`) : commits `1537475` et `406cd74` (#23), tests `f04355d` (#23), commit `a311c85` (#21) ; et, pour le harnais, la PR #41 (`99c7e3f`, fusion `badaf91`). Elle complète les points 3.1, 5.1, 5.4 et 11.1, ainsi que la seconde annotation du 17/10/2026. Les mesures citées ont été exécutées sous R 4.3.3, sur `tablexp` installé depuis `a311c85` et depuis `4f182e3` (état avant #23).
+
+**(a) Points 5.1 et 5.4 : contrat « format du plan » précisé, pas changé (#23).** Le point 5.1 fixait les champs et leur nature, sans dire si une valeur pouvait porter des attributs. La règle est désormais la suivante.
+
+- Toute valeur du plan a exactement le **type de base** (`typeof`) que son contrôle attend. Elle ne porte **aucun attribut** : ni `names`, ni `dim`, ni classe, ni attribut quelconque (`comment` compris).
+- **Exceptions.**
+  - Les listes du plan portent leur seul attribut `names` : le plan, `transition`, `periode`, `etapes`, et la liste des paramètres de chaque étape. Leurs noms sont uniques, non vides et non `NA`. Il y a donc autant d'éléments que de noms.
+  - Les noms de `transition`, de `periode` et de chaque liste de paramètres d'étape sont exactement les noms attendus. Les noms du plan sont les champs du point 5.1, `graine` selon l'aléa (annotation du 17/10/2026, (c)). Les noms d'`etapes` sont des étapes connues, chacune au plus une fois, dans l'ordre des modules (point 5.1).
+  - Les bornes de `periode` portent leur seul attribut `class = "Date"`, exactement cette classe, stockage double ou integer.
+- **Types.**
+  - `delai_declaration` : integer ou double.
+  - character : `segmentation`, `exclusions`, `convention`, `estimateurs` et les deux états de `transition`.
+  - `par_annee` : logical.
+  - `niveau` : double (un integer est refusé, comme avant #23).
+  - La colonne `type` de `PARAMETRES_ETAPES` porte ces types.
+- **Refus.** Une valeur hors de cette forme est refusée sous le **motif propre au paramètre**, et **aucun motif n'est créé**. Pour les valeurs, ce sont `transition_inconnue`, `periode_invalide`, `delai_invalide`, `segmentation_invalide`, `exclusions_invalides`, `convention_invalide`, `par_annee_invalide`, `estimateurs_invalides` et `niveau_invalide`. Pour les listes, ce sont `plan_mal_forme`, `etapes_mal_formees` et `parametres_mal_formes`. La forme est contrôlée avant la valeur. Exemple : `exclusions = c(a = "zzz")` passe de `exclusion_inconnue` à `exclusions_invalides`.
+- **Utilitaire.** La règle s'écrit par un utilitaire sans contenu métier, `forme_exacte(x, types, attributs = character(0))` (`R/outils.R:60-62`). Il rend `TRUE` si `typeof(x)` est dans `types` et si `x` ne porte aucun attribut hors de `attributs`. Il ne contrôle ni la présence ni la valeur des attributs admis : les noms et la classe sont contrôlés par l'appelant, sous son propre motif. Emplois :
+  - `R/donnees.R:273-326` : `chaine`, `noms_exacts`, `date1`, délai, segmentation, exclusions ;
+  - `R/exposition.R:81`, `:97` ;
+  - `R/brut.R:167`, `:181` ;
+  - `R/construire_table.R:71` (`liste_nommee`) et `:98` (`etapes`).
+  - `R/outils.R` n'appelle toujours aucun module (point 2.1).
+- **Garde de longueur** (`406cd74`). `noms_exacts()` exige `length(x) == length(noms)`. En effet, `sort()` retire un nom `NA`, si bien qu'une `transition` ou une `periode` portant un élément de plus nommé `NA` passait le contrôle, et la fiche la consignait.
+
+Raison : la fiche garde le **plan reçu** (point 6.2). Un attribut y entrerait sans être une donnée de la construction. De plus, une dimension pouvait produire des erreurs R hors de `refuser()` (point 6.4).
+
+Mesures, *vérifiées* (`4f182e3` → `a311c85`, appel de `valider_plan()`) :
+
+| Valeur | Avant | Après |
+|---|---|---|
+| `transition$depart` en `matrix` | erreur R « dims [product 1] do not match the length of object [2] » | `transition_inconnue` |
+| `transition` en `data.frame` | admis | `transition_inconnue` |
+| `transition` avec un élément de plus nommé `NA` | admis | `transition_inconnue` |
+| borne de `periode` nommée | admis | `periode_invalide` |
+| `segmentation = c(a = "sexe")` | admis | `segmentation_invalide` |
+| `par_annee` à attribut `comment` | admis | `par_annee_invalide` |
+| plan à classe | admis | `plan_mal_forme` |
+| `etapes` à attribut | admis | `etapes_mal_formees` |
+| liste de paramètres d'étape à classe | admis | `parametres_mal_formes` |
+| borne de `periode` en Date à stockage integer ; `delai_declaration` integer | admis | admis |
+
+L'ensemble des codes de refus de `R/` est identique avant et après : 74 motifs distincts, soit 76 paires (module, motif), `aucune_recette` (`donnees`, `exposition`) et `periode_invalide` (`donnees`, `simulation`) étant émis par deux modules chacun. Relevé des arguments littéraux des appels `refuser()`, `refus_tablexp()` et `refus_plan()` dans les jetons de `getParseData(parse(text = git show <sha>:R/<fichier>))`, pour chaque fichier de `R/`, à `4f182e3` et à `a311c85` (*vérifié* le 19/10/2026 ; ensembles identiques). Le même relevé donne 75 motifs et 77 paires depuis `5bf62e6` (#37), qui ajoute `trop_de_cellules` (`exposition`).
+
+**Effet sur les résultats** : aucun pour un plan valide. `tests/test_reproductibilite.R` à `a311c85` donne 122 tests, 0 échec, comparaison à R1 à R6 OK. Les objets R1 à R6 sont `identical` hors `execution` (mesure de l'audit, messages de `1537475` et `406cd74`). `tests/reference/` est inchangé (`git diff --stat 4f182e3 a311c85 -- tests/reference`, vide). Les refus nouveaux sont des **changements de comportement**, non de résultat.
+
+**(b) Point 3.1 : forme exacte de l'argument `provenance` (#21, `a311c85`).** Le point 3.1 disait « le nom du fichier lu, son empreinte et l'algorithme », sans en fixer la forme. `provenance` est soit `NULL`, soit une **liste nue** qui obéit aux règles suivantes (`controler_provenance()`, `R/rapport.R:151-164`) :
+
+- elle ne porte que l'attribut `names` ;
+- elle a exactement trois éléments, nommés exactement `fichier`, `empreinte` et `algorithme`, dans un ordre quelconque ;
+- chaque élément est une chaîne de longueur 1, sans attribut, non `NA` et non vide.
+
+Sont donc refusés : un `data.frame`, un objet de classe, une liste à attribut autre que `names`, une chaîne nommée ou à attribut, et trois noms attendus plus un nom `NA` (garde `length(provenance) == 3`, même défaut de `sort()` qu'en (a)). Le motif reste `provenance_invalide`, et aucun motif n'est créé.
+
+Mesures, *vérifiées* (`4f182e3` → `a311c85`, appel de `construire_table()`) :
+
+| Valeur | Avant | Après |
+|---|---|---|
+| `data.frame` | admis | refusé |
+| objet de classe | admis | refusé |
+| trois noms attendus plus un nom `NA` | admis | refusé |
+| chaîne nommée | admis | refusé |
+| chaîne vide, `NA`, longueur 2 | refusé | refusé |
+| provenance valide | admis | admis |
+
+**Effet sur les résultats** : aucun pour une provenance valide ou `NULL` (`identical` hors `execution`, mesure de `coder` et d'`audit`, message de `a311c85`).
+
+**(c) Point 11.1 et seconde annotation du 17/10/2026, (a) : la locale d'installation est posée par `Sys.setenv`, non par `system2(env =)` (constat B de l'audit de la PR #41, décision du mainteneur du 19/10/2026).** La seconde annotation du 17/10/2026, (a), écrit que la locale retenue « est passée à `R CMD INSTALL` par `system2(env = "LC_ALL=…")` ». M54 (`docs/feuille-de-route.md`, § 4) dit de même. Ce n'est plus exact depuis la PR #41 (`99c7e3f`, fusion `badaf91`), parce que `system2(env =)` est sans effet sous Windows.
+
+- `installer_tablexp()` (`tests/harnais.R:322`) pose `LC_ALL` dans le processus par `Sys.setenv`, le temps de l'installation. Elle le restaure ensuite, y compris en cas d'erreur : `poser_environnement()` (`:247-258`) rend la fonction de restauration, appelée en `finally` (`:344-349`). Le sous-processus `R CMD INSTALL` hérite de la variable. C'est la mécanique d'`executer_rscript()`.
+- La liste des locales candidates, `LOCALES_UTF8` (`:294`), est inchangée : `C.UTF-8`, `C.utf8`, `en_US.UTF-8`.
+- La locale retenue est la première que `locale_utf8_disponible()` (`:299-304`) fait accepter par `Sys.setlocale("LC_CTYPE", …)`, avant de restaurer la locale. Aucune n'est posée si la session est déjà en UTF-8 (`locale_installation()`). Si aucune n'est disponible, la batterie échoue (`:336-339`).
+- La sonde de l'installation (`sonde_utf8()`, M54) est inchangée.
+
+Avant la PR #41, `tests/harnais.R` passait la locale par `env =` (`git show 99c7e3f^:tests/harnais.R`, l. 329). **Effet sur les résultats** : aucun. `R/` et `tests/reference/` sont inchangés par la PR #41 (message de `99c7e3f`). Le comportement sous Windows n'est pas mesuré : #33 et #34 restent ouvertes.
+
+**(d) Points ouverts** (renvois, sans décision) :
+
+- **#42**. Le **type de stockage** d'une borne de `periode` (double ou integer) et celui de `delai_declaration` sont admis tous deux à l'entrée. Ils sont consignés tels quels dans la fiche, si bien que deux plans de même sens donnent deux fiches. De même, mesuré à `a311c85` et *vérifié* : l'**ordre des noms** du plan, de `transition`, de `periode` et de la provenance est consigné tel qu'il est reçu. Un plan et une provenance aux noms permutés donnent les mêmes `etapes` mais des fiches non `identical`. Ce second fait n'est pas dans le corps de #42 ; il est à y verser. Dans les deux cas, la question est de savoir si la fiche canonise. Elle relève du contrat de sérialisation (point 12.2 ; branche `claude/fiche-rapport`, avec #19 et #35).
+- **#43**. La forme exacte reste à étendre hors du plan : une graine nommée ou en `matrix` est admise par `sous_graine()`, et `calculer_taux_bruts()` appelée directement ne contrôle pas la forme de `segmentation`. La graine du plan est aujourd'hui toujours refusée (`graine_inattendue`, aucune étape aléatoire), et sa forme n'est pas couverte par (a).
+
+**Note sur les emplacements cités.** L'annotation du 17/10/2026 cite des numéros de ligne de `R/donnees.R` mesurés à `ab437b4`. Exemples : en (d), `controler_parametres_donnees()` en `:263-312`, `controler_roles()` en `:179-256`, et les lignes des codes de refus ; en (a) et (c), `preparer_donnees()` en `:478-479`. Ces numéros ne correspondent plus au code : à `4f182e3`, avant #23, les fonctions commencent déjà en `:267`, `:186` et `:492`, et à `a311c85` en `:271`, `:186` et `:503`. Ils ne sont pas corrigés ici, car un ADR accepté ne se réécrit pas. Les noms de fonctions et de codes font foi, et les lignes valent pour le commit cité.
+
+Issues : #21, #23 ; #33, #34 (PR #41) ; points ouverts #42, #43. Décision du mainteneur du 19/10/2026 (constat B de l'audit de la PR #41).

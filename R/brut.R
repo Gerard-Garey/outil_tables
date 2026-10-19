@@ -159,13 +159,16 @@ STATUTS_BRUT <- data.frame(
 
 # Contrôle les paramètres propres à l'étape `brut` (valeurs ; les noms sont
 # contrôlés par valider_plan()). par_annee : paramètre de l'étape
-# `exposition`, déjà contrôlé par controler_parametres_exposition(). Rend
+# `exposition`, déjà contrôlé par controler_parametres_exposition(). Forme
+# exacte (#23, forme_exacte()) : type de base exact, aucun attribut (ni
+# names, ni dim, ni classe), sinon refus sous le motif du paramètre. Rend
 # TRUE, invisible.
 controler_parametres_brut <- function(estimateurs, niveau, par_annee) {
-  if (!is.character(estimateurs) || !length(estimateurs) || anyNA(estimateurs) ||
+  if (!forme_exacte(estimateurs, "character") || !length(estimateurs) || anyNA(estimateurs) ||
       anyDuplicated(estimateurs))
     refuser("brut", "estimateurs_invalides",
-            sprintf("Les estimateurs doivent être un vecteur de chaînes non vide, sans doublon ni NA, pris dans %s.",
+            sprintf(paste("Les estimateurs doivent être un vecteur de chaînes non vide, sans attribut,",
+                          "sans doublon ni NA, pris dans %s."),
                     liste_guillemets(ESTIMATEURS_BRUT)),
             list(estimateurs = estimateurs))
   inconnus <- setdiff(estimateurs, ESTIMATEURS_BRUT)
@@ -175,7 +178,7 @@ controler_parametres_brut <- function(estimateurs, niveau, par_annee) {
                     liste_guillemets(inconnus), liste_guillemets(ESTIMATEURS_BRUT)),
             list(estimateur = inconnus))
   # Double nu, sans attribut (ni dim, ni names, ni classe).
-  if (!is.double(niveau) || !is.null(attributes(niveau)) || length(niveau) != 1L || !is.finite(niveau) ||
+  if (!forme_exacte(niveau, "double") || length(niveau) != 1L || !is.finite(niveau) ||
       niveau <= 0 || niveau >= 1)
     refuser("brut", "niveau_invalide",
             paste("Le niveau de confiance doit être un nombre (double) unique, sans attribut, fini,",

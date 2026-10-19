@@ -264,18 +264,25 @@ controler_roles <- function(donnees, roles, segmentation) {
 
 # Contrôle les paramètres que l'étape `donnees` reçoit ; rend la ligne de
 # TRANSITIONS et les bornes de la période (jours depuis 1970-01-01).
+# Forme exacte (#23, forme_exacte()) : chaque valeur a son type de base exact
+# et ne porte aucun attribut (ni names, ni dim, ni classe), hormis les noms
+# des listes `transition` et `periode` et la classe Date des bornes de la
+# période ; sinon refus sous le motif du paramètre.
 controler_parametres_donnees <- function(transition, periode, delai_declaration,
                                          segmentation, exclusions) {
-  chaine <- function(x) is.character(x) && length(x) == 1L && !is.na(x)
-  # Liste aux noms exactement `noms` (ni champ en trop, ni nom partiel :
-  # lecture par [[ ]], jamais par $, qui apparie les noms partiels).
-  noms_exacts <- function(x, noms) is.list(x) && !is.null(names(x)) &&
+  chaine <- function(x) forme_exacte(x, "character") && length(x) == 1L && !is.na(x)
+  # Liste nue aux noms exactement `noms` (ni champ en trop, ni nom partiel :
+  # lecture par [[ ]], jamais par $, qui apparie les noms partiels ; ni
+  # data.frame ni autre attribut que names ; la longueur est contrôlée à part :
+  # sort() retire un nom NA, qui passerait sinon avec un élément de plus).
+  noms_exacts <- function(x, noms) forme_exacte(x, "list", "names") && length(x) == length(noms) &&
+    !is.null(names(x)) &&
     identical(sort(names(x), method = "radix"), sort(noms, method = "radix"))
   if (!noms_exacts(transition, c("depart", "arrivee")) || !chaine(transition[["depart"]]) ||
       !chaine(transition[["arrivee"]]))
     refuser("donnees", "transition_inconnue",
-            paste("La transition doit être une liste de deux noms d'états, de champs exactement",
-                  "depart et arrivee (ADR 0007, point 5.1)."),
+            paste("La transition doit être une liste de deux noms d'états (chaînes sans attribut),",
+                  "de champs exactement depart et arrivee, sans autre attribut (ADR 0007, point 5.1)."),
             list(transition = transition))
   depart <- transition[["depart"]]; arrivee <- transition[["arrivee"]]
   k <- which(TRANSITIONS$depart == depart & TRANSITIONS$arrivee == arrivee)
@@ -285,18 +292,20 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
                     depart, arrivee,
                     paste(TRANSITIONS$depart, "->", TRANSITIONS$arrivee, collapse = ", ")),
             list(transition = transition))
-  date1 <- function(x) identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
+  # Stockage double ou integer admis (inchangé), seul attribut : la classe.
+  date1 <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
+    identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
     is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
   if (!noms_exacts(periode, c("debut", "fin")) || !date1(periode[["debut"]]) || !date1(periode[["fin"]]))
     refuser("donnees", "periode_invalide",
             paste("La période d'observation doit être une liste de champs exactement debut et fin,",
-                  "deux dates (classe Date) non manquantes."),
+                  "sans autre attribut, deux dates (classe Date, sans autre attribut) non manquantes."),
             list(periode = periode))
-  if (!is.numeric(delai_declaration) || length(delai_declaration) != 1L ||
+  if (!forme_exacte(delai_declaration, c("integer", "double")) || length(delai_declaration) != 1L ||
       is.na(delai_declaration) || !is.finite(delai_declaration) ||
       delai_declaration != trunc(delai_declaration) || delai_declaration < 0)
     refuser("donnees", "delai_invalide",
-            "Le délai de déclaration doit être un nombre entier de jours >= 0 (A.0, T4).",
+            "Le délai de déclaration doit être un nombre entier unique de jours >= 0, sans attribut (A.0, T4).",
             list(delai_declaration = delai_declaration))
   debut <- as.numeric(periode[["debut"]]); fin <- as.numeric(periode[["fin"]])
   fin_effective <- fin - delai_declaration
@@ -306,15 +315,17 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
                     format(periode[["debut"]]), format(structure(fin_effective, class = "Date")),
                     format(periode[["fin"]]), format(delai_declaration)),
             list(debut = periode[["debut"]], fin_effective = structure(fin_effective, class = "Date")))
-  if (!is.character(segmentation) || anyNA(segmentation) || anyDuplicated(segmentation) ||
+  if (!forme_exacte(segmentation, "character") || anyNA(segmentation) || anyDuplicated(segmentation) ||
       !all(segmentation %in% ROLES_SEGMENTATION))
     refuser("donnees", "segmentation_invalide",
-            sprintf("La segmentation doit être un vecteur de chaînes sans doublon pris dans %s (vide explicite admis).",
+            sprintf(paste("La segmentation doit être un vecteur de chaînes sans attribut, sans doublon,",
+                          "pris dans %s (vide explicite admis)."),
                     liste_guillemets(ROLES_SEGMENTATION)),
             list(segmentation = segmentation))
-  if (!is.character(exclusions) || anyNA(exclusions) || anyDuplicated(exclusions))
+  if (!forme_exacte(exclusions, "character") || anyNA(exclusions) || anyDuplicated(exclusions))
     refuser("donnees", "exclusions_invalides",
-            "Les règles d'exclusion doivent être un vecteur de codes de motif sans doublon (vide explicite admis).",
+            paste("Les règles d'exclusion doivent être un vecteur de codes de motif sans attribut, sans doublon",
+                  "(vide explicite admis)."),
             list(exclusions = exclusions))
   inconnus <- setdiff(exclusions, c(MOTIFS_LIGNES, MOTIFS_TETE))
   if (length(inconnus))

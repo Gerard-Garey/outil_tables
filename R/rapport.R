@@ -145,16 +145,20 @@ empreinte_donnees <- function(donnees, roles) {
 }
 
 # Contrôle l'argument `provenance` : NULL, ou list(fichier, empreinte,
-# algorithme) de trois chaînes non vides.
+# algorithme) de trois chaînes non vides. Forme exacte (#21, forme_exacte()) :
+# liste nue (seul l'attribut names ; ni data.frame, ni classe), exactement ces
+# trois noms, chaque valeur une chaîne de longueur 1 sans attribut.
 controler_provenance <- function(provenance) {
   if (is.null(provenance)) return(invisible(TRUE))
-  chaine <- function(v) is.character(v) && length(v) == 1L && !is.na(v) && nzchar(v)
-  if (!is.list(provenance) || is.null(names(provenance)) ||
+  chaine <- function(v) forme_exacte(v, "character") && length(v) == 1L && !is.na(v) && nzchar(v)
+  if (!forme_exacte(provenance, "list", "names") || length(provenance) != 3L ||
+      is.null(names(provenance)) ||
       !identical(sort(names(provenance), method = "radix"), c("algorithme", "empreinte", "fichier")) ||
       !all(vapply(provenance, chaine, logical(1L))))
     refuser("rapport", "provenance_invalide",
-            paste("La provenance doit être NULL (données construites en mémoire) ou une liste",
-                  "(fichier, empreinte, algorithme) de trois chaînes non vides (ADR 0007, point 3.1)."),
+            paste("La provenance doit être NULL (données construites en mémoire) ou une liste nue",
+                  "(fichier, empreinte, algorithme) de trois chaînes non vides, sans attribut",
+                  "(ni data.frame, ni classe ; ADR 0007, point 3.1)."),
             list(provenance = provenance))
   invisible(TRUE)
 }

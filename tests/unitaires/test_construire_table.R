@@ -133,6 +133,154 @@ verifier("valider_plan : plan réduit à l'étape donnees admis",
          identical(valider_plan(modifier(plan_type(), etapes = plan_type()$etapes["donnees"])),
                    modifier(plan_type(), etapes = plan_type()$etapes["donnees"])))
 
+# --- forme exacte des valeurs du plan (#23 ; valeur calculée à la main : codes)
+#
+# Chaque paramètre d'étape (donnees, exposition, brut) et chaque champ de
+# premier niveau, valeur valide munie de noms, d'une dimension ou d'un
+# attribut quelconque, est refusé par valider_plan() sous le motif du
+# paramètre, porté par le module qui le contrôle ; les fonctions de contrôle
+# appelées par les fonctions d'étape refusent de même.
+
+plan_complet <- function() modifier(plan_type(), etapes = c(plan_type()$etapes,
+  list(brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95))))
+temoins_forme <- function(v) list(
+  "nommé" = { x <- v; names(x) <- rep("a", length(x)); x },
+  "matrix" = matrix(v),
+  "structure(foo)" = structure(v, foo = "x"))
+# chemin dans le plan, valeur valide, motif, module.
+VALEURS_PLAN <- list(
+  list(c("delai_declaration"), 0, "delai_invalide", "donnees"),
+  list(c("delai_declaration"), 90L, "delai_invalide", "donnees"),
+  list(c("segmentation"), "sexe", "segmentation_invalide", "donnees"),
+  list(c("segmentation"), character(0), "segmentation_invalide", "donnees"),
+  list(c("transition", "depart"), "vivant", "transition_inconnue", "donnees"),
+  list(c("transition", "arrivee"), "deces", "transition_inconnue", "donnees"),
+  list(c("periode", "debut"), PER$debut, "periode_invalide", "donnees"),
+  list(c("periode", "fin"), PER$fin, "periode_invalide", "donnees"),
+  list(c("etapes", "donnees", "exclusions"), character(0), "exclusions_invalides", "donnees"),
+  list(c("etapes", "donnees", "exclusions"), "id_tete_manquant", "exclusions_invalides", "donnees"),
+  list(c("etapes", "exposition", "convention"), "plus_fine", "convention_invalide", "exposition"),
+  list(c("etapes", "exposition", "par_annee"), FALSE, "par_annee_invalide", "exposition"),
+  list(c("etapes", "brut", "estimateurs"), c("poisson", "binomial"), "estimateurs_invalides", "brut"),
+  list(c("etapes", "brut", "estimateurs"), "poisson", "estimateurs_invalides", "brut"),
+  list(c("etapes", "brut", "niveau"), 0.95, "niveau_invalide", "brut"))
+poser <- function(plan, chemin, v) { plan[[chemin]] <- v; plan }
+verifier("forme exacte : plan complet de référence admis, et chaque valeur valide nue admise", {
+  ok <- vapply(VALEURS_PLAN, function(k) isTRUE(tryCatch({ valider_plan(poser(plan_complet(), k[[1]], k[[2]])); TRUE },
+                                                         refus_tablexp = function(r) FALSE)), logical(1L))
+  if (all(ok)) TRUE else paste("refusé :", vapply(VALEURS_PLAN[!ok], function(k) paste(k[[1]], collapse = "$"), ""))
+})
+for (k in VALEURS_PLAN) for (t in names(temoins_forme(k[[2]]))) {
+  verifier(sprintf("forme exacte : %s = %s %s -> refus %s (module %s)", paste(k[[1]], collapse = "$"),
+                   paste(deparse(k[[2]]), collapse = ""), t, k[[3]], k[[4]]), {
+    r <- tryCatch({ valider_plan(poser(plan_complet(), k[[1]], temoins_forme(k[[2]])[[t]])); NULL },
+                  refus_tablexp = function(r) r, error = function(e) e)
+    if (is.null(r)) "aucun refus levé"
+    else if (!inherits(r, "refus_tablexp")) paste("erreur qui n'est pas un refus_tablexp :", conditionMessage(r))
+    else if (!identical(r$motif, k[[3]]) || !identical(r$module, k[[4]]))
+      sprintf("refus %s du module %s", r$motif, r$module)
+    else TRUE
+  })
+}
+# Listes du plan : seul l'attribut names est admis.
+LISTES_PLAN <- list(
+  list("transition à attribut quelconque", function(p) { attr(p$transition, "foo") <- "x"; p }, "transition_inconnue"),
+  list("transition en data.frame", function(p) { p$transition <- data.frame(depart = "vivant", arrivee = "deces"); p },
+       "transition_inconnue"),
+  list("transition à classe", function(p) { class(p$transition) <- "x"; p }, "transition_inconnue"),
+  list("periode à attribut quelconque", function(p) { attr(p$periode, "foo") <- "x"; p }, "periode_invalide"),
+  list("periode en data.frame", function(p) { p$periode <- data.frame(debut = PER$debut, fin = PER$fin); p },
+       "periode_invalide"),
+  list("etapes à attribut quelconque", function(p) { attr(p$etapes, "foo") <- "x"; p }, "etapes_mal_formees"),
+  list("etapes à classe", function(p) { class(p$etapes) <- "x"; p }, "etapes_mal_formees"),
+  list("paramètres de brut à attribut quelconque", function(p) { attr(p$etapes$brut, "foo") <- "x"; p },
+       "parametres_mal_formes"),
+  list("paramètres de donnees à classe", function(p) { class(p$etapes$donnees) <- "x"; p }, "parametres_mal_formes"),
+  list("plan à attribut quelconque", function(p) { attr(p, "foo") <- "x"; p }, "plan_mal_forme"),
+  list("plan à classe", function(p) { class(p) <- "x"; p }, "plan_mal_forme"))
+for (k in LISTES_PLAN)
+  verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[3]]), leve_refus(valider_plan(k[[2]](plan_complet())), k[[3]]))
+# Élément en plus nommé NA (#23) : sort() retire un nom NA, la longueur de la
+# liste est donc contrôlée à part (noms_exacts()).
+LISTES_PLAN_NOM_NA <- list(
+  list("transition avec un élément de plus nommé NA", function(p) { p$transition <- c(p$transition, list("x"))
+                                                                    names(p$transition)[3L] <- NA; p },
+       "transition_inconnue"),
+  list("periode avec un élément de plus nommé NA", function(p) { p$periode <- c(p$periode, list("x"))
+                                                                 names(p$periode)[3L] <- NA; p },
+       "periode_invalide"))
+for (k in LISTES_PLAN_NOM_NA)
+  verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[3]]), leve_refus(valider_plan(k[[2]](plan_complet())), k[[3]]))
+verifier("forme exacte : date de stockage integer admise (inchangé ; classe Date seule)",
+         isTRUE(tryCatch({ valider_plan(poser(plan_complet(), c("periode", "debut"), structure(16436L, class = "Date")))
+                           TRUE }, refus_tablexp = function(r) FALSE)))
+verifier("forme exacte : transition$depart en matrix -> refus, et non plus erreur R « dims do not match »",
+         leve_refus(valider_plan(poser(plan_complet(), c("transition", "depart"), matrix("vivant"))),
+                    "transition_inconnue"))
+# Les contrôles appelés par les fonctions d'étape (preparer_donnees,
+# calculer_exposition, calculer_taux_bruts) refusent sous les mêmes motifs.
+verifier("forme exacte : contrôles des fonctions d'étape, mêmes motifs (nommé)", {
+  cpd <- tablexp:::controler_parametres_donnees
+  cpe <- tablexp:::controler_parametres_exposition
+  cpb <- tablexp:::controler_parametres_brut
+  n <- function(v) { names(v) <- rep("a", length(v)); v }
+  r <- list(leve_refus(cpd(VD, PER, n(0), "sexe", character(0)), "delai_invalide"),
+            leve_refus(cpd(VD, PER, 0, n("sexe"), character(0)), "segmentation_invalide"),
+            leve_refus(cpd(VD, PER, 0, "sexe", n("id_tete_manquant")), "exclusions_invalides"),
+            leve_refus(cpd(list(depart = n("vivant"), arrivee = "deces"), PER, 0, "sexe", character(0)),
+                       "transition_inconnue"),
+            leve_refus(cpd(VD, list(debut = n(PER$debut), fin = PER$fin), 0, "sexe", character(0)),
+                       "periode_invalide"),
+            leve_refus(cpe(n("plus_fine"), FALSE), "convention_invalide"),
+            leve_refus(cpe("plus_fine", n(FALSE)), "par_annee_invalide"),
+            leve_refus(cpb(n("poisson"), 0.95, FALSE), "estimateurs_invalides"),
+            leve_refus(cpb("poisson", n(0.95), FALSE), "niveau_invalide"))
+  ok <- vapply(r, isTRUE, logical(1L))
+  if (all(ok)) TRUE else paste(unlist(r[!ok]), collapse = " | ")
+})
+# Priorité de la forme sur la valeur (paramètres à liste fermée) : une valeur
+# inconnue et nommée est refusée sous le motif de forme, avant le contrôle de
+# la liste fermée.
+PRIORITE_FORME <- list(
+  list(c("etapes", "donnees", "exclusions"), c(a = "zzz"), "exclusions_invalides", "exclusion_inconnue"),
+  list(c("etapes", "brut", "estimateurs"), c(a = "zzz"), "estimateurs_invalides", "estimateur_inconnu"),
+  list(c("etapes", "exposition", "convention"), c(a = "age_fourni"), "convention_invalide",
+       "convention_non_mise_en_oeuvre"))
+for (k in PRIORITE_FORME)
+  verifier(sprintf("forme exacte avant la valeur : %s = %s -> refus %s, et non %s", paste(k[[1]], collapse = "$"),
+                   paste(deparse(k[[2]]), collapse = ""), k[[3]], k[[4]]),
+           leve_refus(valider_plan(poser(plan_complet(), k[[1]], k[[2]])), k[[3]]))
+# Colonne `type` de PARAMETRES_ETAPES confrontée aux contrôles : pour chaque
+# paramètre, une valeur valide du type déclaré, sans attribut, est admise ;
+# une valeur de tout autre type de base est refusée sous le motif du
+# paramètre.
+VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalides"),
+                    exposition.convention = list("plus_fine", "convention_invalide"),
+                    exposition.par_annee = list(FALSE, "par_annee_invalide"),
+                    brut.estimateurs = list("poisson", "estimateurs_invalides"),
+                    brut.niveau = list(0.95, "niveau_invalide"))
+AUTRES_TYPES <- list(logical = TRUE, integer = 1L, double = 0.5, complex = 0.5 + 0i, character = "poisson",
+                     list = list("poisson"), raw = as.raw(1L))
+pe_cat <- tablexp:::PARAMETRES_ETAPES
+cles_cat <- unlist(lapply(names(pe_cat), function(e) paste(e, pe_cat[[e]]$parametre, sep = ".")))
+types_cat <- unlist(lapply(pe_cat, function(t) t$type), use.names = FALSE)
+verifier("PARAMETRES_ETAPES : chaque paramètre a un témoin de type (liste VALEUR_TYPE à compléter sinon)",
+         if (setequal(cles_cat, names(VALEUR_TYPE))) TRUE
+         else sprintf("catalogue %s ; témoins %s", paste(cles_cat, collapse = ", "),
+                      paste(names(VALEUR_TYPE), collapse = ", ")))
+for (i in seq_along(cles_cat)) {
+  cle <- cles_cat[i]; ty <- types_cat[i]; k <- VALEUR_TYPE[[cle]]
+  if (is.null(k)) next
+  chemin <- c("etapes", strsplit(cle, ".", fixed = TRUE)[[1L]])
+  verifier(sprintf("PARAMETRES_ETAPES : %s de type %s, valeur nue du type déclaré admise", cle, ty),
+           identical(typeof(k[[1]]), ty) &&
+             isTRUE(tryCatch({ valider_plan(poser(plan_complet(), chemin, k[[1]])); TRUE },
+                             refus_tablexp = function(r) FALSE)))
+  for (t in setdiff(names(AUTRES_TYPES), ty))
+    verifier(sprintf("PARAMETRES_ETAPES : %s de type %s, valeur de type %s -> refus %s", cle, ty, t, k[[2]]),
+             leve_refus(valider_plan(poser(plan_complet(), chemin, AUTRES_TYPES[[t]])), k[[2]]))
+}
+
 # --- construire_table : refus et validation avant exécution ------------------
 
 verifier("construire_table : plan validé avant toute exécution (données invalides et plan invalide : refus du plan)", {
@@ -149,6 +297,37 @@ verifier("construire_table : rôle employé par la segmentation absent -> refus 
          leve_refus(construire_table(BASE, ROLES[names(ROLES) != "sexe"], plan_type()), "role_requis_manquant"))
 verifier("construire_table : provenance mal formée -> refus provenance_invalide",
          leve_refus(construire_table(BASE, ROLES, plan_type(), provenance = list(fichier = "a.csv")),
+                    "provenance_invalide"))
+# Forme exacte de la provenance (#21, forme_exacte()) : liste nue à trois chaînes
+# nommées de longueur 1, sans attribut (seul names sur la liste). Chaque cas de
+# refus a son témoin, sous le motif existant provenance_invalide (clés de la liste
+# en ASCII : une clé accentuée émet un avertissement de parse() sous LC_ALL=C).
+PROV <- list(fichier = "base.csv", empreinte = "0123456789abcdef0123456789abcdef", algorithme = "md5")
+cp <- tablexp:::controler_provenance
+verifier("provenance : liste nue valide admise, quel que soit l'ordre des noms, et NULL admis",
+         isTRUE(cp(PROV)) && isTRUE(cp(PROV[c("algorithme", "fichier", "empreinte")])) && isTRUE(cp(NULL)))
+PROV_REFUSEES <- list(
+  "data.frame (trois colonnes, une ligne)" = as.data.frame(PROV, stringsAsFactors = FALSE),
+  "objet de classe (liste de classe prov)" = structure(PROV, class = "prov"),
+  "liste a attribut autre que names" = structure(PROV, source = "a"),
+  "nom en trop (quatre elements)" = c(PROV, extra = "x"),
+  "nom manquant (deux elements)" = PROV[c("fichier", "empreinte")],
+  "nom manquant remplace par un doublon (trois elements)" = list(fichier = "a", fichier = "b", empreinte = "c"),
+  "nom inconnu a la place d'un nom attendu" = setNames(PROV, c("fichier", "empreinte", "hash")),
+  "nom NA en plus des trois noms" = setNames(c(PROV, "x"), c(names(PROV), NA)),
+  "liste sans noms" = unname(PROV),
+  "chaine de longueur 2" = modifyList(PROV, list(fichier = c("a.csv", "b.csv"))),
+  "chaine de longueur 0" = modifyList(PROV, list(fichier = character(0))),
+  "chaine a attribut names" = modifyList(PROV, list(fichier = c(a = "base.csv"))),
+  "chaine a attribut class" = modifyList(PROV, list(algorithme = structure("md5", class = "algo"))),
+  "chaine a attribut dim" = modifyList(PROV, list(empreinte = matrix("0123"))),
+  "chaine NA" = modifyList(PROV, list(fichier = NA_character_)),
+  "chaine vide" = modifyList(PROV, list(fichier = "")))
+for (k in names(PROV_REFUSEES))
+  verifier(sprintf("provenance : %s -> refus provenance_invalide", k),
+           leve_refus(cp(PROV_REFUSEES[[k]]), "provenance_invalide"))
+verifier("provenance : data.frame refusé aussi par construire_table, avant tout calcul",
+         leve_refus(construire_table(BASE, ROLES, plan_type(), provenance = PROV_REFUSEES[[1L]]),
                     "provenance_invalide"))
 verifier("construire_table : ligne invalide sans exclusion déclarée -> refus ligne_invalide (étape donnees)", {
   d <- BASE; d$naissance[2] <- NA

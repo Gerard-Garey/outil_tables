@@ -390,6 +390,13 @@ for (niv in list(0, 1, -0.1, 1.5, NA, "0.95", c(0.9, 0.95), Inf, NA_real_, NaN, 
                  matrix(0.95), c(a = 0.95), structure(0.95, foo = "x")))
   cas_refus[[length(cas_refus) + 1L]] <-
     list(sprintf("niveau %s", paste(deparse(niv), collapse = "")), "niveau_invalide", plan_brut(niveau = niv))
+# estimateurs nommé, en matrix ou à attribut : refusé comme niveau (#23,
+# commentaire du 19/10/2026 ; avant #23, estimateurs nommé était admis).
+for (est in list(c(a = "poisson"), c(a = "poisson", b = "binomial"), matrix(c("poisson", "binomial")),
+                 structure("poisson", foo = "x")))
+  cas_refus[[length(cas_refus) + 1L]] <-
+    list(sprintf("estimateurs %s", paste(deparse(est), collapse = "")), "estimateurs_invalides",
+         plan_brut(estimateurs = est))
 for (k in cas_refus)
   verifier(sprintf("valider_plan : %s -> refus %s", k[[1]], k[[2]]), leve_refus(valider_plan(k[[3]]), k[[2]]))
 verifier("refus de valeur portés par le module brut (codes identiques depuis valider_plan() et la fonction d'étape)", {

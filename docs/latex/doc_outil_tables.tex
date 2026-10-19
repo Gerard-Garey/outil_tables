@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{18/10/2026}
+\newcommand{\datedoc}{19/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -566,7 +566,9 @@ exportées par \code{tablexp:::} (ADR 0007, point 11.3).
 
 \code{R/outils.R} porte les services sans contenu métier partagés par tous les
 modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
-la forme des refus et celle des avertissements (ADR 0007, point 1.2). Il
+la forme des refus et celle des avertissements (ADR 0007, point 1.2), ainsi
+que le contrôle de la forme exacte d'une valeur reçue, \code{forme\_exacte()}
+(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23). Il
 n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
@@ -657,6 +659,13 @@ condition de classe \code{refus\_tablexp}, sans la lever~; \code{stop()} si un
 argument est mal formé (section~\ref{sec:refus}) \\
 \catalogue{fonctions-outils}{refuser()} & interne & mêmes arguments & lève le
 refus~; ne rend jamais la main \\
+\catalogue{fonctions-outils}{forme\_exacte()} & interne & \code{x},
+\code{types} (types de base admis), \code{attributs} (noms d'attributs
+admis, aucun par défaut) & \code{TRUE} si \code{typeof(x)} est pris dans
+\code{types} et si \code{x} ne porte aucun attribut hors de
+\code{attributs}, \code{FALSE} sinon, jamais \code{NA}~; un attribut admis
+n'est pas requis et sa valeur n'est pas contrôlée~; ne refuse pas, l'appelant
+refuse sous son propre motif (section~\ref{sec:plan}~; issue~\#23) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -696,8 +705,9 @@ sont décrits avec la fiche (section~\ref{sec:fiche}).
 ce n'est pas une propriété démontrée. L'identité entre deux machines n'est
 \textbf{pas garantie}~: deux processeurs différents pourraient différer au
 dernier bit, même dans le même conteneur, si la bibliothèque mathématique
-du système choisit ses variantes de calcul selon le processeur (hypothèse de
-l'ADR 0008, non mesurée). C'est pourquoi les références de non-régression
+du système choisit ses variantes de calcul selon le processeur (réserve de
+l'ADR 0008~: non observée sur trois modèles de processeur munis de FMA et
+d'AVX2, ouverte pour un exécuteur sans FMA~; annotation du 19/10/2026). C'est pourquoi les références de non-régression
 sont produites sur une plateforme unique et comparées à tolérance
 (sections~\ref{sec:plateforme} et~\ref{sec:non-regression}).
 \end{encadre}
@@ -858,8 +868,10 @@ la locale de la session (décision M54)~; \code{quit()}, \code{q()} et
 neutralisés, une erreur au chargement d'un fichier est un échec, et un fichier
 sans aucune assertion aussi. \textbf{\code{tests/test\_reproductibilite.R}}
 vérifie les identités de la section~\ref{sec:verifications-alea}, puis celles du
-simulateur et de la construction, et compare les plans de référence à leurs
-références de non-régression (section~\ref{sec:non-regression}).
+simulateur et de la construction, compare les plans de référence à leurs
+références de non-régression (section~\ref{sec:non-regression}) et contrôle
+l'effet d'une permutation des lignes de l'entrée de référence
+(section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -1042,8 +1054,10 @@ chaque commit de référence et dans l'en-tête de chaque fichier de référence
 d'une exécution à l'autre sous le même libellé d'exécuteur (relevé de l'ADR
 0008, annotation du 16/10/2026). La BLAS Netlib n'a pas de noyau choisi selon
 le processeur~; la réserve sur la bibliothèque mathématique du système
-(section~\ref{sec:reproductibilite-exigence}) reste en revanche ouverte, non
-mesurée. Les références sont donc comparées à tolérance, structure contrôlée
+(section~\ref{sec:reproductibilite-exigence}) reste en revanche ouverte pour
+un exécuteur sans FMA~: elle n'a pas été observée sur les trois modèles
+rencontrés, tous munis de FMA et d'AVX2 (ADR 0008, annotation du
+19/10/2026). Les références sont donc comparées à tolérance, structure contrôlée
 à part (E4.7~; section~\ref{sec:non-regression}).
 \end{encadre}
 
@@ -1271,14 +1285,20 @@ type et comme double sans classe (ADR 0009, quatrième annotation du
 17/10/2026)~; c'est aussi le cas de la version de la fiche, de la graine, des
 colonnes entières de \code{kaplan\_meier\_sauts} (\code{numerateur},
 \code{ensemble\_a\_risque}), de \code{kaplan\_meier/instants\_evenement}, de
-\code{denominateur\_instants} (paramètres et fiche) et des cinq diagnostics
-de \code{kaplan\_meier}, toutes stockées en \code{integer}. Les douze clés
-exactes qui les nommaient dans \code{TOLERANCES} sont retirées~: inertes, la
-tolérance n'étant cherchée que pour un double, elles auraient en outre
-masqué un retour au type \code{double} au contrôle de complétude des classes
-(ADR 0009, complément du 18/10/2026, point~(f), sur avis
-d'\code{actuary}). La clé nue \code{cellules} reste~: elle classe
-\code{etapes/exposition/diagnostics/cellules}, de type \code{double}. Un double reçoit sa tolérance de la
+\code{denominateur\_instants} (paramètres et fiche), des cinq diagnostics
+de \code{kaplan\_meier} et, depuis l'issue~\#37, du nombre de cellules de
+l'étape \code{exposition} (\code{etapes/exposition/diagnostics/cellules}),
+toutes stockées en \code{integer}. Les treize clés exactes qui les
+nommaient dans \code{TOLERANCES} sont retirées~: inertes, la tolérance
+n'étant cherchée que pour un double, elles auraient en outre masqué un
+retour au type \code{double} au contrôle de complétude des classes. Douze
+l'ont été sur avis d'\code{actuary} (ADR 0009, complément du 18/10/2026,
+point~(f))~; la treizième, la clé nue \code{cellules}, l'a été à son tour,
+sur avis d'\code{actuary}, parce qu'elle classait aussi
+\code{etapes/brut/diagnostics/cellules} et
+\code{etapes/brut/diagnostics/etats/cellules}, déjà \code{integer}, et
+aurait masqué leur retour au double (ADR 0009, seconde annotation du
+19/10/2026, point~(a)). Un double reçoit sa tolérance de la
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), cherchée par le
 \textbf{suffixe le plus long} du chemin~: une clé qualifiée
 \code{<table>/<colonne>} l'emporte sur le nom nu, ce qui donne au \code{taux}
@@ -1294,8 +1314,8 @@ d'\code{actuary}.
 \begin{longtable}{@{}p{1.4cm}p{7.6cm}p{5.6cm}@{}}
 \caption{Classes de tolérance des doubles (\code{TOLERANCES},
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
-ADR 0009, point 3.4, seconde annotation et complément du 18/10/2026,
-point~(f)).}
+ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
+point~(f), et seconde annotation du 19/10/2026, point~(a)).}
 \label{tab:tolerances}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Classe}} &
@@ -1307,9 +1327,9 @@ point~(f)).}
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{exposition\_jours}, \code{cellules}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
+exacte & \code{exposition\_jours}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
 $10^{-14}$ & \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}, \code{exposition\_initiale}, \code{taux}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (hypothèse non mesurée) \\
+$10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3) \\
 \end{longtable}
 }
 
@@ -1360,7 +1380,17 @@ réussie pour les autres), \code{regeneration} (écarts admis sur les seuls
 plans visés), \code{bascule} (écarts admis sur tous, l'identifiant de
 plateforme de l'exécution devant différer de celui des en-têtes commités)~;
 un mode \code{releve}, refusé sur la CI, sert aux essais sur un poste, dont
-les fichiers ne sont jamais commités. Le dossier de sortie ne peut être
+les fichiers ne sont jamais commités. Symétriquement, les modes
+\code{creation}, \code{regeneration} et \code{bascule} sont \textbf{refusés
+hors de la CI}, c'est-à-dire quand la variable d'environnement
+\code{GITHUB\_ACTIONS} ne vaut pas \code{true}~: le refus intervient avant
+le contrôle des autres options et avant toute écriture, si bien qu'aucun
+dossier de sortie n'est créé (ADR 0009, seconde annotation du 19/10/2026,
+point~(d)). Cette garde protège contre l'erreur, \textbf{pas contre la
+malveillance}~: la variable se pose à la main~; la garantie de fond reste
+l'appariement des MD5 des fichiers commités à ceux de l'artefact de
+l'exécution citée, vérifié par la session principale au commit puis en revue
+finale (ADR 0009, point 5.5). Le dossier de sortie ne peut être
 \code{tests/reference/} ni s'y trouver, quelle que soit l'écriture du chemin
 (séparateurs, casse, lecteur, chemins réseau, liens, noms courts).
 Le job ne commite rien~: il publie un artefact (références, leurs MD5,
@@ -1378,7 +1408,14 @@ visa d'\code{actuary}). Les grandeurs des étapes \code{donnees} et
 (\code{f9ab269}) par une chaîne de mesures (différences de code vides, ou
 objets \code{identical()} hors \code{execution}, un changement de type sans
 changement de valeur, visé, étant admis~; ADR 0009, annotation du
-18/10/2026).
+18/10/2026). Les références R1 à R6 ont été \textbf{régénérées une fois}, le 19/10/2026, en
+mode \code{regeneration} sur tous les plans (exécution 39248539956 du
+workflow, calcul sur \code{99272a4}, commit \code{763da20}, visa
+d'\code{actuary}), pour le seul changement de type du nombre de cellules de
+l'étape \code{exposition}, passé de \code{double} à \code{integer} à valeur
+inchangée (issue~\#37)~: le corps de chaque fichier ne change que de cette
+ligne, et toutes les autres grandeurs sont restées identiques au bit près
+(ADR 0009, seconde annotation du 19/10/2026, point~(a)).
 
 \begin{encadre}
 \small
@@ -1398,11 +1435,12 @@ changement de valeur, visé, étant admis~; ADR 0009, annotation du
     produit-limite sous troncature (section~\ref{sec:brut-kaplan-meier}),
     qui n'est pas une anomalie.
   \item Absence de bruit numérique sur la plateforme de référence~:
-    \emph{constat} sur deux exécutions de la plateforme de référence, sur le
-    même modèle de processeur, où toutes les grandeurs des six plans sont
-    identiques au bit près~; la réserve de
-    l'ADR 0008 sur les variantes de la bibliothèque mathématique du système
-    d'un processeur à l'autre reste ouverte, non mesurée.
+    \emph{constat} sur cinq exécutions de la CI sur la plateforme de
+    référence, sur trois modèles de processeur (AMD EPYC 7763, 9V74 et 9V45,
+    tous avec FMA et AVX2), où toutes les grandeurs des six plans sont
+    identiques au bit près (ADR 0008, annotation du 19/10/2026)~; la réserve
+    de l'ADR 0008 sur les variantes de la bibliothèque mathématique du
+    système reste ouverte pour un exécuteur sans FMA, non observé.
   \item Le signe d'un zéro~: la représentation canonique et la comparaison
     confondent 0 et \code{-0}, si bien qu'un passage de l'un à l'autre n'est
     pas détecté (limite admise~; aucune grandeur actuelle n'en dépend~;
@@ -1419,7 +1457,24 @@ double nouveau est déclarée dans le même commit. Changer le format incrément
 sa version et régénère tous les plans. Élargir une tolérance pour faire
 passer un écart est interdit sans tableau avant / après et visa. Un fichier de
 \code{tests/reference/} ne change que par un commit de la session principale
-qui cite une exécution du workflow et un visa.
+qui cite une exécution du workflow et un visa. \textbf{Transition d'un
+changement de résultat annoncé} (ADR 0009, point 9.5, règle retenue par le
+mainteneur le 19/10/2026)~: quand un commit change un résultat avant la
+régénération des références, il déclare dans
+\code{tests/test\_reproductibilite.R} la liste \code{A\_REGENERER\_<n>}
+des plans concernés (\code{<n>}~: numéro de l'issue), avec le ou les chemins
+admis à changer et la nature exacte du changement (type converti sans perte,
+ou valeurs nouvelles nommées chemin par chemin). Pour chaque plan listé, un
+test ordinaire compare la référence à l'objet après n'avoir corrigé que le
+changement annoncé et exige l'absence de tout autre écart~; la comparaison
+stricte, et tout contrôle des références que le changement fait échouer,
+sont des échecs attendus renvoyant à l'issue. Le commit des références vide
+la liste~: un plan resté listé après la régénération ferait échouer la
+batterie par succès inattendu. Une tolérance élargie ou un chemin admis
+«~quel que soit l'écart~» n'est pas une transition mais un changement de
+résultat déguisé~; la règle ne dispense ni du tableau avant / après, ni du
+visa. Elle a servi une première fois pour l'issue~\#37
+(\code{A\_REGENERER\_37}, vidée par le commit des références).
 
 % =============================================================================
 \section{Contrôles du dépôt}
@@ -1653,7 +1708,7 @@ vecteur de codes de motif sans doublon, vide explicite admis
 \code{poisson}, \code{binomial} et \code{kaplan\_meier}, restitué dans cet
 ordre~; \code{binomial} et \code{kaplan\_meier} refusés sous
 \code{par\_annee = TRUE}~; \code{niveau}~:
-niveau de confiance, nombre \code{double} unique sans attribut, fini,
+niveau de confiance, nombre \code{double} unique, fini,
 $0 < \text{niveau} < 1$ (section~\ref{sec:brut-etape}) \\
 \end{tabular}
 \end{center}
@@ -1663,6 +1718,28 @@ Aucune des trois ne tire d'aléa. La recette d'exposition et l'unité
 d'observation ne sont pas des paramètres~: le moteur les déduit des rôles
 (sections~\ref{sec:recettes} et~\ref{sec:unite-observation})~; seule une
 convention d'âge plus grossière peut être forcée.
+
+\noindent
+\textbf{Règle commune de forme} (issue~\#23)~: chaque paramètre d'étape a
+exactement le type de base que déclare la colonne \code{type} de
+\code{PARAMETRES\_ETAPES} (\code{character} pour \code{exclusions},
+\code{convention} et \code{estimateurs}, \code{logical} pour
+\code{par\_annee}, \code{double} pour \code{niveau}) et \textbf{ne porte
+aucun attribut}~: ni noms, ni dimension, ni classe (un facteur, une matrice
+ou un vecteur nommé sont refusés), sinon refus sous le motif propre au
+paramètre. Il en va de même des champs du plan~: \code{transition} et
+\code{periode} sont des listes nues, dont le seul attribut admis est celui
+des noms, exactement autant d'éléments que de noms attendus (un
+\code{data.frame} est refusé)~; les deux bornes de la période n'ont
+d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
+\code{integer}~; \code{delai\_declaration} est un \code{integer} ou un
+\code{double} sans attribut~; \code{segmentation} un vecteur
+\code{character} sans attribut, vide compris. La forme est contrôlée par
+\code{forme\_exacte()} (section~\ref{sec:fonctions-outils}), sous le motif
+existant de chaque paramètre~: aucun motif n'est propre à la forme. Pour
+chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
+refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
+et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
 
 \medskip
 {\sloppy\hbadness=10000 \textbf{\code{valider\_plan(plan)}}, exportée parce que l'application l'appellera
@@ -1677,6 +1754,11 @@ les codes \emph{structurels} du plan, module \code{construire\_table}~:
 d'une étape forment une liste (colonne \code{prealable} de \code{ETAPES})~;
 chacun est contrôlé, et le refus \code{etape\_prealable\_manquante} ne cite
 que les préalables absents, au singulier ou au pluriel selon leur nombre.
+Le plan, son champ \code{etapes} et la liste des paramètres de chaque étape
+sont des listes nommées \textbf{nues}, dont le seul attribut admis est
+celui des noms~: un \code{data.frame}, un objet de classe ou une liste
+munie d'un autre attribut est refusé sous \code{plan\_mal\_forme},
+\code{etapes\_mal\_formees} ou \code{parametres\_mal\_formes} (issue~\#23).
 Elle ne réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
 (\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
 \code{controler\_parametres\_brut()}), dont les codes et le module sont ainsi identiques, quelle que soit la
@@ -1750,7 +1832,10 @@ contrat partagé «~objet résultat~» (ADR 0007, point 6.3).
 
 {\sloppy\hbadness=10000 \code{tests/unitaires/test\_construire\_table.R} vérifie la liste des exports,
 chaque refus de \code{valider\_plan()} (noms exacts des champs de transition et
-de période compris), la cohérence entre \code{ETAPES} et les fonctions
+de période compris), la règle commune de forme (pour chaque paramètre d'étape
+et chaque champ du plan, une valeur valide munie de noms, d'une dimension ou
+d'un autre attribut est refusée sous le motif du paramètre, porté par le
+module qui le contrôle~; issue~\#23), la cohérence entre \code{ETAPES} et les fonctions
 d'étape appelées, la structure de l'objet et de la fiche, et des identités
 exactes sur un portefeuille simulé (section~\ref{sec:verifications-exposition}).
 \code{tests/test\_reproductibilite.R} vérifie que deux constructions
@@ -1780,8 +1865,8 @@ processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN} & constante & --- & les six champs de premier niveau du plan \\
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{graine}) \\
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa \\
-\catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type, domaine \\
-\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & liste nommée aux noms uniques et non vides \\
+\catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine \\
+\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; par \code{forme\_exacte()} (issue~\#23) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat}) \\
 \end{longtable}
@@ -1965,16 +2050,26 @@ message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
 
 \medskip
 {\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
-reçoit~: \code{transition\_inconnue} (liste de champs autres qu'exactement
-\code{depart} et \code{arrivee}, ou transition non prise en charge~: seules
+reçoit~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
+\code{data.frame} ou une liste munie d'un autre attribut que ses noms~---, de
+champs autres qu'exactement \code{depart} et \code{arrivee}, ou d'un élément
+de plus, même nommé \code{NA}~; état qui n'est pas une chaîne unique sans
+attribut ni \code{NA}~; ou transition non prise en charge~: seules
 vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
-\code{TRANSITIONS})~; \code{periode\_invalide} (liste de champs autres
-qu'exactement \code{debut} et \code{fin}, ou dates manquantes ou non
-\code{Date})~; \code{delai\_invalide} (délai qui n'est pas un entier $\ge 0$)~;
-\code{periode\_vide}~; \code{segmentation\_invalide} (vecteur de chaînes sans
-doublon pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
-\code{exclusions\_invalides}~; \code{exclusion\_inconnue} (code absent de la
-liste fermée des motifs). Les noms de champs sont lus exactement, jamais par
+\code{TRANSITIONS})~; \code{periode\_invalide} (liste qui n'est pas nue, de
+champs autres qu'exactement \code{debut} et \code{fin}, ou d'un élément de
+plus~; bornes manquantes, non \code{Date}, non entières ou munies d'un autre
+attribut que la classe \code{Date})~; \code{delai\_invalide} (délai qui
+n'est pas un nombre unique, \code{integer} ou \code{double}, sans attribut,
+entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
+(autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
+doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
+\code{exclusions\_invalides} (autre chose qu'un vecteur \code{character} sans
+attribut, sans \code{NA} ni doublon, vide explicite admis)~;
+\code{exclusion\_inconnue} (code absent de la liste fermée des motifs). Les
+deux derniers sont contrôlés dans cet ordre~: \code{exclusions\_invalides}
+l'emporte, si bien qu'un vecteur nommé ou en double de codes inconnus est
+refusé sous ce motif et non sous \code{exclusion\_inconnue}. Les noms de champs sont lus exactement, jamais par
 appariement partiel. Le même contrôle est appelé par \code{valider\_plan()},
 avant toute étape~: un code désigne une condition, quelle que soit la fonction
 qui la détecte, et le refus porte le module \code{donnees} (ADR 0007,
@@ -2371,9 +2466,20 @@ native de la recette, ou désigne une convention~:
     (\code{convention\_plus\_fine})~: les rôles ne la permettent pas~;
   \item \sloppy\hbadness=10000 \code{age\_fourni}, non mise en œuvre (ses rôles ne sont pas pris en
     charge), est refusée (\code{convention\_non\_mise\_en\_oeuvre})~; toute
-    autre valeur aussi (\code{convention\_invalide})~; \code{par\_annee} doit
-    valoir \code{TRUE} ou \code{FALSE} (\code{par\_annee\_invalide}).
+    autre valeur aussi, de même qu'une convention qui n'est pas une chaîne
+    unique sans attribut ni \code{NA} (\code{convention\_invalide})~;
+    \code{par\_annee} doit valoir \code{TRUE} ou \code{FALSE}, valeur
+    \code{logical} unique sans attribut (\code{par\_annee\_invalide}).
+    Ces deux contrôles appliquent la règle commune de forme du plan
+    (section~\ref{sec:plan}~; issue~\#23).
 \end{itemize}
+
+\noindent
+Aux refus des paramètres s'ajoute un refus de capacité,
+\code{trop\_de\_cellules}, levé à la construction de la table quand elle
+compterait plus de \code{.Machine\$integer.max} cellules
+(section~\ref{sec:troncature-censure}, «~Paramètres effectifs, diagnostics,
+avertissements~»~; issue~\#37).
 
 \noindent
 Chaque convention définit ses cellules d'âge et l'unité de l'exposition
@@ -2528,8 +2634,21 @@ forcée), l'unité d'exposition, \code{par\_annee}, le code de la transition, la
 segmentation, la période, le délai, la fin effective et l'hypothèse de
 censure. Les diagnostics donnent le nombre d'observations et d'observations
 exposées, l'exposition totale en jours, le nombre d'événements et de sorties
-concurrentes, le nombre de cellules et de cellules à exposition nulle qui
-comptent un événement. Avertissements~: \code{convention\_forcee},
+concurrentes, le nombre de cellules, stocké en \code{integer}
+(issue~\#37), et le nombre de cellules à exposition nulle qui
+comptent un événement. Le nombre de cellules est calculé par
+\code{nombre\_cellules()}~: somme, sur les segments, du nombre d'âges de la
+plage par le nombre d'années (une seule sans \code{par\_annee}), formée en
+\code{double}~; s'il dépasse \code{.Machine\$integer.max}
+($2^{31} - 1$), l'étape \textbf{refuse} sous le motif
+\code{trop\_de\_cellules} (refus de capacité~: segmentation trop fine ou
+plage d'âges et d'années trop étendue), avant toute allocation par cellule,
+au lieu de laisser \code{tabulate()} échouer sur une erreur R. Ce refus
+n'est atteignable qu'avec \code{par\_annee = TRUE}~: sans découpage par
+année, le nombre de cellules est au plus le produit du nombre de segments par
+l'étendue des âges présents, sur lequel le décompte de présence des âges,
+fait plus tôt par \code{tabulate()}, échoue déjà par une erreur R au-delà de
+$2^{31} - 1$ (\textbf{limite connue}, issue~\#45). Avertissements~: \code{convention\_forcee},
 \code{evenement\_sans\_exposition} et \code{aucune\_exposition} (aucune
 exposition ni aucun événement dans la période).
 
@@ -2639,6 +2758,7 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 \catalogue{fonctions-exposition}{decouper\_cellules()} & interne & fenêtres, convention & morceaux contenus chacun dans une cellule \\
 \catalogue{fonctions-exposition}{decouper\_annees()} & interne & morceaux & morceaux découpés au 1\textsuperscript{er}~janvier \\
 \catalogue{fonctions-exposition}{somme\_par\_cellule()} & interne & cellules, valeurs & sommes par cellule, zéros explicites \\
+\catalogue{fonctions-exposition}{nombre\_cellules()} & interne & nombres d'âges par segment, nombre d'années & nombre de cellules de la table, en \code{integer}~; refus \code{trop\_de\_cellules} au-delà de \code{.Machine\$integer.max} (issue~\#37) \\
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
@@ -2699,11 +2819,14 @@ $\alpha/2$ de chaque côté, quel que soit $D$.
 
 \medskip
 \textbf{Paramètres}, tous requis, sans défaut (ADR 0007, point~5~;
-constante \code{PARAMETRES\_ETAPES})~: \code{estimateurs}, sous-ensemble non
-vide, sans doublon ni \code{NA}, de \code{ESTIMATEURS\_BRUT}~; les résultats
-sont toujours rendus dans l'ordre de cette constante, quel que soit l'ordre
-déclaré~; \code{niveau}, nombre \code{double} unique, sans attribut, fini,
-strictement compris entre 0 et 1, partagé par tous les estimateurs.
+constante \code{PARAMETRES\_ETAPES}), soumis à la règle commune de forme
+(type de base exact, aucun attribut~; section~\ref{sec:plan},
+issue~\#23)~: \code{estimateurs}, vecteur \code{character},
+sous-ensemble non vide, sans doublon ni \code{NA}, de
+\code{ESTIMATEURS\_BRUT}~; les résultats sont toujours rendus dans l'ordre
+de cette constante, quel que soit l'ordre déclaré~; \code{niveau}, nombre
+\code{double} unique, fini, strictement compris entre 0 et 1, partagé par
+tous les estimateurs.
 L'étape a pour préalables les étapes \code{donnees} et \code{exposition}
 (constante \code{ETAPES}~; refus \code{etape\_prealable\_manquante} de
 \code{valider\_plan()} sinon)~: l'estimateur \code{kaplan\_meier} lit les
@@ -2713,8 +2836,10 @@ observations de la première, tous les estimateurs la table de la seconde.
 \textbf{Refus du module \code{brut}}, levés par
 \code{controler\_parametres\_brut()}, que \code{valider\_plan()} appelle avant
 toute étape et que la fonction d'étape rappelle~: \code{estimateurs\_invalides}
-(pas un vecteur de chaînes, vide, \code{NA} ou doublon)~;
-\code{estimateur\_inconnu}~; \code{niveau\_invalide} (autre type que
+(pas un vecteur \code{character}, attribut~--- noms, dimension ou classe~---,
+vide, \code{NA} ou doublon)~; \code{estimateur\_inconnu}, contrôlé
+après la forme~: un vecteur nommé de noms inconnus relève du motif
+précédent~; \code{niveau\_invalide} (autre type que
 \code{double}, attribut, longueur différente de 1, valeur non finie, $\le 0$
 ou $\ge 1$)~; \code{binomial\_par\_annee}~: sous \code{par\_annee = TRUE},
 l'exposition initiale n'est pas produite (section~\ref{sec:decoupage-annee}),
@@ -3915,9 +4040,15 @@ statut «~non calculée (branche fiche-rapport)~»
 (\code{statut\_resultat\_code})~: l'empreinte du résultat dépend de la
 plateforme (E3.6) et attend la sérialisation, et celle du code suppose de
 fixer ce qu'est «~le code~». L'argument \code{provenance} est \code{NULL} ou
-une liste de trois chaînes non vides, \code{fichier}, \code{empreinte} et
-\code{algorithme}~; sinon, refus \code{provenance\_invalide}
-(\code{controler\_provenance()}).
+une \textbf{liste nue}, dont le seul attribut admis est celui des noms, de
+\textbf{exactement trois éléments}, nommés \code{fichier}, \code{empreinte}
+et \code{algorithme} dans un ordre quelconque, chacun une chaîne
+(\code{character}) de longueur~1, sans attribut, ni \code{NA} ni vide~; un
+\code{data.frame}, un objet de classe, une liste munie d'un autre attribut,
+un élément de plus (même nommé \code{NA}) ou une chaîne munie de noms, d'une
+dimension ou d'une classe sont refusés~: refus \code{provenance\_invalide}
+(\code{controler\_provenance()}, par \code{forme\_exacte()}~;
+issue~\#21).
 
 \subsubsection*{Représentation canonique}
 
@@ -3927,9 +4058,41 @@ annotation du 17/10/2026, point~f)~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{périmètre}~: les seules colonnes auxquelles un rôle est déclaré,
     \textbf{toutes les lignes reçues}, avant exclusions, dans l'ordre reçu~;
-    une base dont les lignes sont permutées a une autre empreinte, à résultats
-    égaux. Les exclusions sont des paramètres du plan, non une propriété de
-    l'entrée~;
+    les exclusions sont des paramètres du plan, non une propriété de
+    l'entrée~; une base dont les lignes sont permutées a une autre empreinte, et ses
+    résultats ne sont pas garantis identiques au bit près (E4.6 ne porte que
+    sur des données identiques)~: les lignes conservées et les observations
+    suivent l'ordre reçu~; les grandeurs entières ou à valeur entière
+    (exposition en jours, événements, sorties concurrentes), les tables de
+    Kaplan-Meier et les diagnostics sont restés identiques~; l'exposition
+    centrale, les compléments initiaux, l'exposition initiale, les taux, les
+    probabilités et leurs bornes (Poisson et binomial), sommés par cellule
+    dans l'ordre des lignes (\code{somme\_par\_cellule()}), peuvent différer
+    dans les derniers bits. Écart relatif maximal mesuré~: $1{,}6 \cdot
+    10^{-14}$ sur l'entrée de référence ($10^5$~lignes, plans R1 à R6, six
+    permutations, R~4.3.3, 19/10/2026), atteint par la borne supérieure
+    exacte (\code{borne\_sup\_exacte} de l'estimateur binomial, plan R2)~; les taux et l'exposition
+    centrale restent au plus à $5{,}73 \cdot 10^{-15}$. L'écart croît avec
+    le nombre de termes sommés par cellule~: sur l'exposition centrale (plan
+    R1, une permutation tirée sous la graine 20261019),
+    $3{,}97 \cdot 10^{-15}$ à $10^5$~lignes, $1{,}37 \cdot 10^{-14}$ à
+    $10^6$ et $1{,}73 \cdot 10^{-14}$ à $3 \cdot 10^6$. C'est un \textbf{constat de
+    mesure, non une borne démontrée}~; le test de permutation de la batterie
+    de reproductibilité (plans R6, R4, R5, R3 et R2, R1 étant couvert par
+    R6~; deux permutations, un tirage sous la graine 20261019 et l'ordre
+    inverse) le contrôle à la tolérance relative $10^{-12}$ (constante
+    \code{TOLERANCE\_PERMUTATION}, classe existante de
+    \code{CLASSES\_TOLERANCE}~; issue~\#39)~; il vérifie l'invariance à
+    l'ordre des lignes, non la précision des sommes, que garde la
+    comparaison aux références de non-régression dans l'ordre reçu (classe
+    $10^{-14}$)~: un écart dépendant de l'ordre inférieur à $10^{-12}$ n'y
+    est pas détecté~; les grandeurs qui ne sont pas des
+    doubles, les doubles de classe exacte, les tables de Kaplan-Meier et les
+    diagnostics de l'étape \code{brut} y sont comparés par
+    \code{identical()}, les trois empreintes (données, lignes conservées,
+    observations) devant au contraire différer~; tout double qui n'est dans
+    aucune de ces deux classes («~double non classé~») fait échouer le
+    test~;
   \item \textbf{ordre des colonnes}~: par nom de rôle, en ordre d'octets~; le
     nom de colonne n'entre pas dans le texte (il est dans \code{fiche\$roles})~:
     renommer une colonne ne change pas l'empreinte~;
@@ -4015,7 +4178,9 @@ hors de R (texte écrit par \code{printf}, empreinte par \code{md5sum} de GNU
 coreutils). \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
 la même dans des processus R lancés sous \code{LANG=C} et sous
 \code{LANG=C.UTF-8}, égale à cette valeur, et que le rejeu de la fiche redonne
-l'objet.
+l'objet. \code{tests/unitaires/test\_construire\_table.R} vérifie aussi
+chaque cas de refus de la provenance décrit à la
+section~\ref{sec:empreinte} (issue~\#21).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-rapport}

@@ -21,6 +21,11 @@
 #                  en-têtes commités ;
 #    releve        hors CI seulement (refusé si GITHUB_ACTIONS = true) :
 #                  produit, compare, imprime, n'applique aucune règle de mode.
+#  Garde symétrique (issue #36) : les trois autres modes, qui produisent des
+#  fichiers destinés à être commités, sont refusés hors CI (GITHUB_ACTIONS !=
+#  true), avant toute écriture : les références se régénèrent sur la CI seule
+#  (ADR 0009 ; CLAUDE.md, « Changements de résultats »). La garde protège
+#  contre l'erreur, non contre la malveillance : la variable se pose à la main.
 #  Dans tous les modes : un double sans classe de tolérance (point 3.4), une
 #  référence commitée orpheline (point 3.7) ou un refus d'écriture font
 #  échouer. --motif est exigé hors du mode releve.
@@ -85,6 +90,9 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   if (is.na(mode) || !mode %in% MODES) echouer(sprintf("--mode parmi %s", paste(MODES, collapse = ", ")))
   if (mode == "releve" && identical(Sys.getenv("GITHUB_ACTIONS"), "true"))
     echouer("mode releve refusé sur la CI (essai sur un poste seulement)")
+  if (mode != "releve" && !identical(Sys.getenv("GITHUB_ACTIONS"), "true"))
+    echouer(sprintf(paste0("mode %s refusé hors CI : les références se régénèrent sur la CI seule ",
+                           "(ADR 0009 ; CLAUDE.md, « Changements de résultats et reproductibilité »)"), mode))
   if (mode != "releve" && (is.na(motif) || !nzchar(trimws(motif))))
     echouer("--motif exigé (issue et raison)")
   if (is.na(sortie)) echouer("--sortie exigé")

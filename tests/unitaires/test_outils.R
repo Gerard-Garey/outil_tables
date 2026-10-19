@@ -149,3 +149,29 @@ RNGkind(reglage_initial[1L], reglage_initial[2L], reglage_initial[3L])
 if (is.null(etat_initial)) {
   if (exists(".Random.seed", globalenv())) rm(".Random.seed", envir = globalenv())
 } else assign(".Random.seed", etat_initial, envir = globalenv())
+
+# --- forme exacte (#23) -------------------------------------------------------
+
+forme_exacte <- tablexp:::forme_exacte
+cas_forme <- list(
+  list("double nu", 0.95, "double", character(0), TRUE),
+  list("double nommé", c(a = 0.95), "double", character(0), FALSE),
+  list("double en matrix", matrix(0.95), "double", character(0), FALSE),
+  list("double à attribut quelconque", structure(0.95, foo = "x"), "double", character(0), FALSE),
+  list("integer sous types double seul", 1L, "double", character(0), FALSE),
+  list("integer sous types integer ou double", 1L, c("integer", "double"), character(0), TRUE),
+  list("facteur sous type integer (levels, class)", factor("a"), "integer", character(0), FALSE),
+  list("chaîne vide character(0)", character(0), "character", character(0), TRUE),
+  list("character(0) aux noms character(0)", { x <- character(0); names(x) <- character(0); x },
+       "character", character(0), FALSE),
+  list("NULL sous type character", NULL, "character", character(0), FALSE),
+  list("liste nommée, names admis", list(a = 1), "list", "names", TRUE),
+  list("liste nommée, aucun attribut admis", list(a = 1), "list", character(0), FALSE),
+  list("liste sans noms, names admis (admis non requis)", list(1), "list", "names", TRUE),
+  list("data.frame, names admis", data.frame(a = 1), "list", "names", FALSE),
+  list("liste à classe, names admis", structure(list(a = 1), class = "x"), "list", "names", FALSE),
+  list("Date, class admis", as.Date("2015-01-01"), "double", "class", TRUE),
+  list("Date nommée, class admis", structure(16436, class = "Date", names = "a"), "double", "class", FALSE))
+for (k in cas_forme)
+  verifier(sprintf("forme_exacte : %s -> %s (valeur calculée à la main)", k[[1]], k[[5]]),
+           identical(forme_exacte(k[[2]], k[[3]], k[[4]]), k[[5]]))

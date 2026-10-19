@@ -42,7 +42,9 @@ ETAPES <- data.frame(
 
 # Catalogue des paramètres par étape (ADR 0007, point 5.2 et annotation du
 # 17/10/2026) : tous requis, aucun défaut. Les valeurs sont contrôlées par le
-# module de l'étape.
+# module de l'étape. Règle commune (#23) : chaque paramètre a exactement le
+# type de base de la colonne `type` et ne porte aucun attribut (ni names, ni
+# dim, ni classe), sinon refus sous le motif propre au paramètre.
 PARAMETRES_ETAPES <- list(
   donnees = data.frame(
     parametre = "exclusions",
@@ -60,12 +62,13 @@ PARAMETRES_ETAPES <- list(
     domaine = c(paste("sous-ensemble non vide, sans doublon ni NA, de poisson, binomial et kaplan_meier ;",
                       "binomial et kaplan_meier refusés sous par_annee = TRUE ; résultats dans l'ordre",
                       "canonique"),
-                "nombre double unique, sans attribut, fini, 0 < niveau < 1"),
+                "nombre double unique, fini, 0 < niveau < 1"),
     stringsAsFactors = FALSE)
 )
 
-# Liste nommée aux noms uniques, non vides, non manquants (ni data.frame).
-liste_nommee <- function(x) is.list(x) && !is.data.frame(x) && is.null(dim(x)) &&
+# Liste nommée aux noms uniques, non vides, non manquants, sans autre
+# attribut que names (ni data.frame, ni dim, ni classe ; #23).
+liste_nommee <- function(x) forme_exacte(x, "list", "names") &&
   (!length(x) || (!is.null(names(x)) && !anyNA(names(x)) && all(nzchar(names(x))) &&
                     !anyDuplicated(names(x))))
 
@@ -77,7 +80,8 @@ valider_plan <- function(plan) {
     refuser("construire_table", motif, message, details)
   if (!liste_nommee(plan) || !length(plan))
     refus_plan("plan_mal_forme",
-               "Le plan doit être une liste nommée non vide, aux noms uniques (ADR 0007, point 5.1).")
+               paste("Le plan doit être une liste nommée non vide, aux noms uniques, sans autre attribut",
+                     "que ses noms (ADR 0007, point 5.1)."))
   inconnus <- setdiff(names(plan), CHAMPS_PLAN)
   if (length(inconnus))
     refus_plan("champ_inconnu",
@@ -91,10 +95,11 @@ valider_plan <- function(plan) {
                        liste_guillemets(manquants)),
                list(champ = manquants))
   etapes <- plan[["etapes"]]
-  if (!is.list(etapes) || is.data.frame(etapes) ||
+  if (!forme_exacte(etapes, "list", "names") ||
       (length(etapes) && (is.null(names(etapes)) || anyNA(names(etapes)) || !all(nzchar(names(etapes))))))
     refus_plan("etapes_mal_formees",
-               "Le champ « etapes » doit être une liste nommée (nom d'étape -> liste de ses paramètres).")
+               paste("Le champ « etapes » doit être une liste nommée (nom d'étape -> liste de ses paramètres),",
+                     "sans autre attribut que ses noms."))
   if (!length(etapes))
     refus_plan("aucune_etape", "Le plan ne déclare aucune étape.")
   noms <- names(etapes)
@@ -139,7 +144,8 @@ valider_plan <- function(plan) {
     attendus <- PARAMETRES_ETAPES[[nom]]$parametre
     if (!liste_nommee(pe))
       refus_plan("parametres_mal_formes",
-                 sprintf("Étape « %s » : ses paramètres doivent être une liste nommée.", nom),
+                 sprintf("Étape « %s » : ses paramètres doivent être une liste nommée, sans autre attribut que ses noms.",
+                         nom),
                  list(etape = nom))
     inconnus <- setdiff(names(pe), attendus)
     if (length(inconnus))
