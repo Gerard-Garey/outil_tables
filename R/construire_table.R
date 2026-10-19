@@ -187,7 +187,7 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
   debut <- Sys.time()
   # Validation entière avant toute exécution : plan, rôles, recette et
   # convention, provenance.
-  valider_plan(plan)
+  plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES)
   controler_roles(donnees, roles, plan[["segmentation"]])
   recette <- deduire_recette(roles)
   etapes_plan <- plan[["etapes"]]

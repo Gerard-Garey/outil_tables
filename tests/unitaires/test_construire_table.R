@@ -373,23 +373,23 @@ verifier("objet : exposition par (sexe, âge), colonnes de la spécification (A.
          identical(names(x$etapes$exposition$resultat$exposition),
                    c("sexe", "age", "exposition_jours", "exposition_centrale", "complement_initial_cellule",
                      "complement_initial_fenetre", "evenements", "sorties_concurrentes")))
-CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition", "transition_code",
-                  "periode", "delai_declaration", "fin_effective", "segmentation", "unite_observation",
+CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
+                  "fin_effective", "unite_observation",
                   "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
                   "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
                   "provenance_mention", "empreintes", "avertissements")
 f <- x$fiche
 verifier("fiche : champs de l'ADR 0007 (point 6.2) et de la spécification (A.3)", identical(names(f), CHAMPS_FICHE))
-verifier("fiche : plan reçu inchangé, rôles, recette, convention retenue non forcée, unité tête",
+verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôles, recette, convention retenue non forcée, unité tête",
          identical(f$plan, plan_type()) && identical(f$roles, ROLES) &&
            identical(f$recette, "lignes_dates_completes") &&
            identical(f$convention, list(demandee = "plus_fine", native = "dernier_anniversaire",
                                         retenue = "dernier_anniversaire", forcee = FALSE)) &&
            identical(f$unite_observation, "tete") && is.na(f$avertissement_unite) &&
            identical(f$transition_code, "vivant_decede") && identical(f$fin_effective, D("2024-12-31")))
-verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 1",
+verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 2",
          identical(f$graine, NA_integer_) && identical(f$graine_mention, "aucune étape aléatoire") &&
-           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 1L))
+           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 2L))
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
@@ -833,4 +833,73 @@ local({
              grepl("3652060 jours pour 1234000000 têtes",
                    conditionMessage(tryCatch(fu(c(1L, 1234000000L), c(-719162, 0), c(2932896, 1)), refus_tablexp = function(r) r)),
                    fixed = TRUE))
+})
+
+# Plan canonique et fiche canonique (#42 ; ADR 0011, points 5.1 à 5.5 ; #22,
+# point 6). Valeur calculée à la main : formes et ordres attendus ; identité
+# exacte : deux plans de même sens donnent des objets identical() hors
+# execution (le stockage d'une Date est invisible aux références).
+local({
+  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES)
+  erreur <- function(expr) inherits(tryCatch({ force(expr); NULL }, error = function(e) e), "error")
+  J <- function(j) structure(j, class = "Date")
+  pb <- modifier(plan_type(), etapes = c(plan_type()$etapes,
+                                         list(brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95))))
+  # Liste fermée des stockages admis, un témoin chacun.
+  verifier("canoniser_plan : borne Date à stockage double inchangée, à stockage integer convertie en Date double",
+           identical(cn(pb)$periode, PER) && typeof(PER$debut) == "double" &&
+             identical(cn(modifier(pb, periode = list(debut = J(16436L), fin = J(20088L))))$periode, PER))
+  verifier("canoniser_plan : délai double inchangé, délai integer converti en double",
+           identical(cn(pb)$delai_declaration, 0) && identical(cn(modifier(pb, delai_declaration = 90L))$delai_declaration, 90))
+  verifier("canoniser_plan : graine integer inchangée, graine double entière convertie en integer",
+           identical(cn(modifier(pb, graine = 7L))$graine, 7L) && identical(cn(modifier(pb, graine = 7))$graine, 7L) &&
+             identical(names(cn(modifier(pb, graine = 7L))), tablexp:::CHAMPS_PLAN))
+  verifier("canoniser_plan : stockage hors de la liste fermée -> erreur (délai character, borne non Date, graine 1,5 ou hors étendue des integer)",
+           erreur(cn(modifier(pb, delai_declaration = "0"))) &&
+             erreur(cn(modifier(pb, periode = list(debut = 16436, fin = PER$fin)))) &&
+             erreur(cn(modifier(pb, graine = 1.5))) && erreur(cn(modifier(pb, graine = 3e9))))
+  verifier("canoniser_plan : garde-fous de la liste fermée -> erreur (graine NA integer ou double, étape absente du catalogue, paramètre en trop ou manquant)",
+           erreur(cn(modifier(pb, graine = NA_integer_))) && erreur(cn(modifier(pb, graine = NA_real_))) &&
+             erreur(cn(modifier(pb, etapes = c(pb$etapes, list(lissage = list()))))) &&
+             erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- list(estimateurs = "poisson", niveau = 0.95, x = 1); et }))) &&
+             erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- list(niveau = 0.95); et }))))
+  # Plans de même sens que pb.
+  variantes <- list(
+    "début de période en integer" = modifier(pb, periode = list(debut = J(16436L), fin = PER$fin)),
+    "délai de déclaration 0L" = modifier(pb, delai_declaration = 0L),
+    "noms du plan, de transition et de periode permutés" =
+      list(etapes = pb$etapes, segmentation = "sexe", periode = list(fin = PER$fin, debut = PER$debut),
+           delai_declaration = 0, transition = list(arrivee = "deces", depart = "vivant")),
+    "paramètres de brut et d'exposition permutés" =
+      modifier(pb, etapes = list(donnees = pb$etapes$donnees, exposition = list(par_annee = FALSE, convention = "plus_fine"),
+                                 brut = list(niveau = 0.95, estimateurs = c("poisson", "binomial")))))
+  verifier("canoniser_plan : plan déjà canonique rendu identical() ; champs dans l'ordre de CHAMPS_PLAN",
+           identical(cn(pb), pb) && identical(cn(plan_type()), plan_type()))
+  for (n in names(variantes)) {
+    q <- variantes[[n]]
+    verifier(sprintf("canoniser_plan (%s) : canon = plan canonique, idempotente, valider_plan(canon) le rend inchangé", n),
+             !identical(q, pb) && identical(cn(q), pb) && identical(cn(cn(q)), cn(q)) && identical(valider_plan(cn(q)), cn(q)))
+  }
+  prov <- list(fichier = "base.csv", empreinte = "d41d8cd98f00b204e9800998ecf8427e", algorithme = "md5")
+  x0 <- sans_execution(construire_table(BASE, ROLES, pb, prov))
+  for (n in names(variantes))
+    verifier(sprintf("construire_table (%s) : objet identical() hors execution à celui du plan canonique", n),
+             identical(sans_execution(construire_table(BASE, ROLES, variantes[[n]], prov)), x0))
+  verifier("construire_table (rôles dans l'ordre inverse) : objet identical() hors execution ; fiche$roles dans l'ordre du catalogue",
+           identical(sans_execution(construire_table(BASE, rev(ROLES), pb, prov)), x0) &&
+             identical(x0$fiche$roles, ROLES) &&
+             !is.unsorted(match(names(x0$fiche$roles), catalogue_roles()$role)))
+  verifier("construire_table (provenance permutée) : objet identical() hors execution ; fiche$provenance dans l'ordre (fichier, empreinte, algorithme)",
+           identical(sans_execution(construire_table(BASE, ROLES, pb, prov[c("algorithme", "fichier", "empreinte")])), x0) &&
+             identical(x0$fiche$provenance, prov))
+  verifier("construire_table : etapes$exposition$parametres$periode dans l'ordre (debut, fin), plan aux noms permutés",
+           identical(names(sans_execution(construire_table(BASE, ROLES, variantes[[3L]], prov))$etapes$exposition$parametres$periode),
+                     c("debut", "fin")))
+  y <- construire_table(BASE, rev(ROLES), variantes[[3L]], prov[3:1])
+  verifier("construire_table : rejeu de la fiche (rôles, plan canonique, provenance) identical() hors execution",
+           identical(sans_execution(construire_table(BASE, y$fiche$roles, y$fiche$plan, y$fiche$provenance)), x0) &&
+             identical(y$fiche$plan, pb))
+  verifier("fiche : version 2, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
+           identical(x0$fiche$version_fiche, 2L) &&
+             !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
 })

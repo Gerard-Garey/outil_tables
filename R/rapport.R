@@ -14,7 +14,11 @@
 #    (point 9.4) ;
 #  - controler_provenance() : argument `provenance` de construire_table()
 #    (point 3.1) ;
+#  - canoniser_plan() : plan canonique (ADR 0011, point 5.1 ; #42), appelé
+#    une fois par construire_table(), après valider_plan() ;
 #  - assembler_fiche() : fiche en mémoire (point 6.2), sans horodatage ;
+#    plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre
+#    (fichier, empreinte, algorithme) (ADR 0011, points 5.2 à 5.4) ;
 #    champ hypotheses_brut ajouté en fin de liste si l'étape `brut` est
 #    exécutée (#14, spécification d'actuary, A.5), avec la convention
 #    d'ensemble à risque et le dénominateur des instants si Kaplan-Meier est
@@ -32,7 +36,9 @@
 # canonique (point 9.3) : tout changement de l'une ou de l'autre est un
 # changement de résultat (visa, incrément). « tablexp canonique 2 » : doubles
 # de l'empreinte écrits en octets IEEE 754 (ADR 0011, points 2 et 10 ; #35).
-VERSION_FICHE <- 1L
+# Fiche 2 : plan canonique, rôles et provenance dans l'ordre canonique, copies
+# de premier niveau du plan retirées (ADR 0011, points 5.1 à 5.5 ; #42, #22).
+VERSION_FICHE <- 2L
 ENTETE_CANONIQUE <- "tablexp canonique 2"
 ALGORITHME_EMPREINTE <- "md5"
 STATUT_EMPREINTES_NON_CALCULEES <- "non calculée (branche fiche-rapport)"
@@ -270,16 +276,63 @@ empreintes_construction <- function(donnees, roles, provenance) {
        statut_resultat_code = STATUT_EMPREINTES_NON_CALCULEES)
 }
 
+# Plan canonique (ADR 0011, point 5.1 ; #42), à partir d'un plan validé par
+# valider_plan() ; `champs` et `parametres` sont CHAMPS_PLAN et
+# PARAMETRES_ETAPES, passés par construire_table() (point 9.3 : le module ne
+# lit pas les constantes de l'orchestration). Champs dans l'ordre de
+# `champs` ; transition (depart, arrivee) ; periode (debut, fin) ; étapes
+# dans l'ordre reçu (imposé par valider_plan()), paramètres de chaque étape
+# dans l'ordre de parametres[[étape]]$parametre ; toute autre valeur
+# inchangée. Stockages admis, liste fermée, conversions sans perte : borne de
+# période Date à stockage double ou integer -> Date double ; délai integer ou
+# double -> double ; graine integer, ou double entier dans l'étendue des
+# integer -> integer (graine NA refusée). Un autre stockage, une étape absente
+# de `parametres` ou aux noms de paramètres autres que ceux du catalogue sont
+# une erreur de programmation (le plan n'a pas été validé). Idempotente : un plan canonique est rendu
+# identical(). Ce n'est pas un plan résolu (point 5.2 : convention demandée
+# inchangée).
+canoniser_plan <- function(plan, champs, parametres) {
+  non_canonique <- function(champ)
+    stop(sprintf("canoniser_plan() : stockage non canonisable pour « %s » (erreur de programmation : plan non validé).",
+                 champ), call. = FALSE)
+  borne <- function(x, champ) {
+    if (!identical(class(x), "Date") || !typeof(x) %in% c("double", "integer")) non_canonique(champ)
+    structure(as.double(unclass(x)), class = "Date")
+  }
+  p <- plan[intersect(champs, names(plan))]
+  p[["transition"]] <- p[["transition"]][c("depart", "arrivee")]
+  per <- p[["periode"]]
+  p[["periode"]] <- list(debut = borne(per[["debut"]], "periode$debut"), fin = borne(per[["fin"]], "periode$fin"))
+  delai <- p[["delai_declaration"]]
+  if (!typeof(delai) %in% c("double", "integer")) non_canonique("delai_declaration")
+  p[["delai_declaration"]] <- as.double(delai)
+  if ("graine" %in% names(p)) {
+    g <- p[["graine"]]
+    if (is.double(g) && length(g) == 1L && is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max)
+      g <- as.integer(g)
+    if (!is.integer(g) || anyNA(g)) non_canonique("graine")
+    p[["graine"]] <- g
+  }
+  e <- p[["etapes"]]
+  for (n in names(e))
+    if (is.null(parametres[[n]]) || !setequal(names(e[[n]]), parametres[[n]]$parametre))
+      non_canonique(sprintf("etapes$%s", n))
+  p[["etapes"]] <- stats::setNames(lapply(names(e), function(n) e[[n]][parametres[[n]]$parametre]), names(e))
+  p
+}
+
 # Fiche de construction en mémoire (ADR 0007, point 6.2 ; A.3) : aucun
-# horodatage. `plan` est le plan reçu, inchangé (rejeu :
-# construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)).
-# Le champ hypotheses_brut n'existe que si l'étape `brut` est exécutée : un
-# plan sans cette étape garde les champs de la fiche antérieure à #14.
+# horodatage. `plan` est le plan canonique (canoniser_plan(), ADR 0011,
+# point 5.2), qui fait foi : la fiche n'en porte pas de copie au premier
+# niveau (point 5.4 ; #22, point 6). Rôles dans l'ordre du catalogue
+# (CATALOGUE_ROLES$role), provenance dans l'ordre (fichier, empreinte,
+# algorithme) (point 5.3). Rejeu : construire_table(donnees, fiche$roles,
+# fiche$plan, fiche$provenance). Le champ hypotheses_brut n'existe que si
+# l'étape `brut` est exécutée : un plan sans cette étape garde les autres
+# champs.
 assembler_fiche <- function(roles, plan, recette, etapes, avertissements, empreintes, provenance) {
   pd <- etapes[["donnees"]][["parametres"]]
   pe <- etapes[["exposition"]][["parametres"]]
-  periode <- plan[["periode"]]
-  delai <- plan[["delai_declaration"]]
   unite <- pd$unite_observation
   fiche <- list(
     version_fiche = VERSION_FICHE,
@@ -287,14 +340,10 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     plateforme = list(sysname = Sys.info()[["sysname"]], release = Sys.info()[["release"]],
                       machine = Sys.info()[["machine"]], blas = extSoftVersion()[["BLAS"]],
                       lapack = La_library()),
-    roles = roles,
+    roles = roles[order(match(names(roles), CATALOGUE_ROLES$role))],
     plan = plan,
-    transition = plan[["transition"]],
     transition_code = pd$transition,
-    periode = periode,
-    delai_declaration = delai,
     fin_effective = pd$fin_effective,
-    segmentation = plan[["segmentation"]],
     unite_observation = unite,
     avertissement_unite = if (any(avertissements$code == "unite_contrat"))
       avertissements$message[avertissements$code == "unite_contrat"][1L] else NA_character_,
@@ -307,7 +356,7 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     graine = if ("graine" %in% names(plan)) plan[["graine"]] else NA_integer_,
     graine_mention = if ("graine" %in% names(plan)) "graine du plan" else "aucune étape aléatoire",
     generateur = GENERATEUR,
-    provenance = provenance,
+    provenance = if (is.null(provenance)) NULL else provenance[c("fichier", "empreinte", "algorithme")],
     provenance_mention = if (is.null(provenance)) "aucun fichier (données construites en mémoire)"
                          else "fichier lu par la couche de lecture",
     empreintes = empreintes,

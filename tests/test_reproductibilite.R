@@ -320,7 +320,8 @@ SANS_REFERENCE_17 <- character(0)
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
 # commit de référence de la session principale la vide. Une transition (une
-# par issue) :
+# issue peut en porter plusieurs, à plans deux à deux disjoints, ADR 0009,
+# quatrième annotation du 19/10/2026, (b)) :
 #   list(issue = "#N", plans = c("R1", ...), changements = list(<changement>, ...))
 # Un changement nomme un chemin et la nature exacte du changement admis ; il
 # doit être OBSERVÉ sur la référence commitée telle qu'elle est lue, avant
@@ -364,13 +365,41 @@ SANS_REFERENCE_17 <- character(0)
 # (garde 3.2 : MD5 du texte de l'entrée sous « tablexp canonique 1 » =
 # f3519cc1b73ab0d1fcc6ad89dc6d595c, vérifié aussi hors R par printf, tail et
 # md5sum). Valeur de l'empreinte : mesurée, identique pour R1 à R6 (même entrée).
+changements_42 <- function(longueur_segmentation) list(
+  list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 2L),
+  list(chemin = "fiche/@noms", nature = "valeur de chaîne",
+       valeurs = c("version_fiche", "roles", "plan", "transition_code", "fin_effective", "unite_observation",
+                   "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
+                   "hypothese_censure", "graine", "graine_mention", "generateur", "provenance", "provenance_mention",
+                   "empreintes", "avertissements", "hypotheses_brut")),
+  list(chemin = "fiche/transition/@noms", nature = "retrait", type = "character", longueur = 2L),
+  list(chemin = "fiche/transition/depart", nature = "retrait", type = "character", longueur = 1L),
+  list(chemin = "fiche/transition/arrivee", nature = "retrait", type = "character", longueur = 1L),
+  list(chemin = "fiche/periode/@noms", nature = "retrait", type = "character", longueur = 2L),
+  list(chemin = "fiche/periode/debut", nature = "retrait", type = "Date", longueur = 1L),
+  list(chemin = "fiche/periode/fin", nature = "retrait", type = "Date", longueur = 1L),
+  list(chemin = "fiche/delai_declaration", nature = "retrait", type = "double", longueur = 1L),
+  list(chemin = "fiche/segmentation", nature = "retrait", type = "character", longueur = longueur_segmentation))
 TRANSITIONS_EN_COURS <- list(
   list(issue = "#35", plans = c("R1", "R2", "R3", "R4", "R5", "R6"),
        changements = list(
          list(chemin = "fiche/empreintes/representation", nature = "valeur de chaîne",
               valeurs = "tablexp canonique 2"),
          list(chemin = "fiche/empreintes/donnees", nature = "valeur de chaîne",
-              valeurs = "35ca55371e72f0f0103993d70e3a64d3"))))
+              valeurs = "35ca55371e72f0f0103993d70e3a64d3"))),
+  # #42 et #22, point 6 (ADR 0011, points 5.4 et 5.5 ; M64, Q2) : fiche 2,
+  # copies de premier niveau du plan retirées (fiche$plan fait foi) ; types et
+  # longueurs des retraits lus dans tests/reference/R1.tsv à R6.tsv ;
+  # fiche/segmentation est de longueur 0 dans R2 et 1 ailleurs, d'où deux
+  # transitions de #42 à plans disjoints (ADR 0009, quatrième annotation du
+  # 19/10/2026, (b)). Valeurs mesurées sur l'objet construit (21 noms,
+  # identiques pour R1 à R6). fiche/plan et fiche/roles sont inchangés : les
+  # plans de référence sont déjà canoniques et leurs rôles dans l'ordre du
+  # catalogue.
+  list(issue = "#42", plans = c("R1", "R3", "R4", "R5", "R6"),
+       changements = changements_42(longueur_segmentation = 1L)),
+  list(issue = "#42", plans = "R2",
+       changements = changements_42(longueur_segmentation = 0L)))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -391,7 +420,16 @@ valider_transitions <- function(transitions, plans = names(plans_reference())) {
       p <- c(p, paste0(e, "champs issue, plans et changements exigés, et eux seuls")); next
     }
     if (is.na(issues[k]) || !grepl(MOTIF_ISSUE, issues[k])) p <- c(p, paste0(e, "issue de la forme \"#N\" exigée"))
-    else if (sum(issues == issues[k], na.rm = TRUE) > 1L) p <- c(p, paste0(e, "issue ", issues[k], " en double"))
+    else {
+      # Une issue peut porter plusieurs transitions, à plans deux à deux
+      # disjoints (ADR 0009, quatrième annotation du 19/10/2026, (b)) ; un plan
+      # commun à deux transitions d'une même issue est refusé.
+      autres <- setdiff(which(issues == issues[k]), k)
+      communs <- unique(unlist(lapply(transitions[autres], function(u) if (is.list(u)) intersect(u$plans, t$plans))))
+      if (length(communs))
+        p <- c(p, paste0(e, "issue ", issues[k], " : deux transitions de cette issue sur le(s) même(s) plan(s) ",
+                         paste(communs, collapse = ", ")))
+    }
     if (!is.character(t$plans) || !length(t$plans) || anyNA(t$plans) || !all(t$plans %in% plans))
       p <- c(p, paste0(e, "plans : identifiants de plans de référence exigés"))
     if (!is.list(t$changements) || !length(t$changements)) {
@@ -1632,7 +1670,7 @@ local({
   for (cas in list(
     list("nature inconnue", list(tr("#901", "R1", list(chemin = "s/n", nature = "quelconque")))),
     list("issue sans #", list(tr("37", "R1", ch$ajout))),
-    list("issue en double", list(tr("#901", "R1", ch$ajout), tr("#901", "R2", ch$retrait))),
+    list("issue en double sur un plan commun", list(tr("#901", c("R1", "R2"), ch$ajout), tr("#901", "R2", ch$retrait))),
     list("plan de référence inconnu", list(tr("#901", "R9", ch$ajout))),
     list("aucun changement", list(tr("#901", "R1"))),
     list("champ hors de la nature (valeurs sur un type)", list(tr("#901", "R1", modifyList(ch$type, list(valeurs = 1))))),
@@ -1856,6 +1894,23 @@ local({
            all(vapply(list(J(-719163), J(2932897), J(100.5)), function(w)
              inherits(tryCatch(ecrire_reference(list(types = c(x = "Date"), valeurs = list(x = w)), tempfile()),
                                refus_reference = function(e) e), "refus_reference"), NA)))
+})
+
+# --- plan canonique : plans de référence déjà canoniques ; transitions d'une même issue (#42) ---
+
+local({
+  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES)
+  for (id in names(plans_reference())) {
+    p <- plans_reference()[[id]]$plan
+    verifier(sprintf("%s : plan de référence déjà canonique (canoniser_plan() le rend identical())", id), identical(cn(p), p))
+  }
+  ch <- list(chemin = "s/n", nature = "ajout", type = "integer", longueur = 1L)
+  t <- function(issue, plans) list(issue = issue, plans = plans, changements = list(ch))
+  verifier("témoin 9.5, forme : deux transitions d'une même issue à plans disjoints -> liste bien formée",
+           !length(valider_transitions(list(t("#901", c("R1", "R3")), t("#901", "R2")))))
+  verifier("témoin 9.5, forme : deux transitions d'une même issue partageant un plan -> refus nommé citant le plan commun",
+           any(grepl("même(s) plan(s) R3", valider_transitions(list(t("#901", c("R1", "R3")), t("#901", c("R2", "R3")))),
+                     fixed = TRUE)))
 })
 
 bilan()
