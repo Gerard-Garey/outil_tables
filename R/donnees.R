@@ -273,8 +273,10 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
   chaine <- function(x) forme_exacte(x, "character") && length(x) == 1L && !is.na(x)
   # Liste nue aux noms exactement `noms` (ni champ en trop, ni nom partiel :
   # lecture par [[ ]], jamais par $, qui apparie les noms partiels ; ni
-  # data.frame ni autre attribut que names).
-  noms_exacts <- function(x, noms) forme_exacte(x, "list", "names") && !is.null(names(x)) &&
+  # data.frame ni autre attribut que names ; la longueur est contrôlée à part :
+  # sort() retire un nom NA, qui passerait sinon avec un élément de plus).
+  noms_exacts <- function(x, noms) forme_exacte(x, "list", "names") && length(x) == length(noms) &&
+    !is.null(names(x)) &&
     identical(sort(names(x), method = "radix"), sort(noms, method = "radix"))
   if (!noms_exacts(transition, c("depart", "arrivee")) || !chaine(transition[["depart"]]) ||
       !chaine(transition[["arrivee"]]))

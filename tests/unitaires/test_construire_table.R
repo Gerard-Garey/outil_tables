@@ -200,6 +200,17 @@ LISTES_PLAN <- list(
   list("plan à classe", function(p) { class(p) <- "x"; p }, "plan_mal_forme"))
 for (k in LISTES_PLAN)
   verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[3]]), leve_refus(valider_plan(k[[2]](plan_complet())), k[[3]]))
+# Élément en plus nommé NA (#23) : sort() retire un nom NA, la longueur de la
+# liste est donc contrôlée à part (noms_exacts()).
+LISTES_PLAN_NOM_NA <- list(
+  list("transition avec un élément de plus nommé NA", function(p) { p$transition <- c(p$transition, list("x"))
+                                                                    names(p$transition)[3L] <- NA; p },
+       "transition_inconnue"),
+  list("periode avec un élément de plus nommé NA", function(p) { p$periode <- c(p$periode, list("x"))
+                                                                 names(p$periode)[3L] <- NA; p },
+       "periode_invalide"))
+for (k in LISTES_PLAN_NOM_NA)
+  verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[3]]), leve_refus(valider_plan(k[[2]](plan_complet())), k[[3]]))
 verifier("forme exacte : date de stockage integer admise (inchangé ; classe Date seule)",
          isTRUE(tryCatch({ valider_plan(poser(plan_complet(), c("periode", "debut"), structure(16436L, class = "Date")))
                            TRUE }, refus_tablexp = function(r) FALSE)))
