@@ -4272,7 +4272,14 @@ spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
 La loi vraie est une liste de deux lois, \code{deces} et \code{rachat}~;
 chacune associe une table de référence (classe \code{table\_reference},
 section~\ref{sec:table-reference}) et un facteur par sexe, \code{c(H = , F = )},
-réel fini $\ge 0$. Pour un sexe $s$, la loi effective est
+réel fini $\ge 0$. La loi vraie et chacune de ses deux lois sont des
+\textbf{listes nues}, dont le seul attribut admis est celui des noms,
+d'exactement autant d'éléments que de noms attendus (\code{deces} et
+\code{rachat}~; \code{table} et \code{facteurs}), dans un ordre
+quelconque~: un \code{data.frame}, un objet de classe, une liste munie d'un
+autre attribut ou un élément de plus, même nommé \code{NA}, sont refusés
+(\code{loi\_invalide}~; \code{liste\_aux\_noms()},
+section~\ref{sec:fonctions-outils}~; issue~\#44). Pour un sexe $s$, la loi effective est
 \[
   q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
 \]
@@ -4381,7 +4388,9 @@ $\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondi
 au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
 au moins égal à 1 en mode âge exact~; ces conditions sont contrôlées
 (\code{portefeuille\_invalide}). La période d'observation est une liste
-\code{debut}, \code{fin} de dates~; la censure a lieu à l'instant
+nue, de champs exactement \code{debut} et \code{fin} (même contrôle
+\code{liste\_aux\_noms()} que la loi vraie~; refus \code{periode\_invalide}),
+de deux dates (classe \code{Date}) uniques, non manquantes et entières~; la censure a lieu à l'instant
 $B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
 
 \subsubsection*{Algorithme}
