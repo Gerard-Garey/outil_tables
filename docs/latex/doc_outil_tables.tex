@@ -568,8 +568,11 @@ exportées par \code{tablexp:::} (ADR 0007, point 11.3).
 modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
 la forme des refus et celle des avertissements (ADR 0007, point 1.2), ainsi
 que le contrôle de la forme exacte d'une valeur reçue, \code{forme\_exacte()}
-(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23). Il
-n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+(type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23), et
+les deux contrôles de forme qui s'y appuient, partagés par les modules~:
+\code{liste\_aux\_noms()} (liste nue aux noms exacts) et
+\code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
+issue~\#48). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -594,8 +597,10 @@ quatre champs~:
 
 \noindent
 \code{refuser()} la lève par \code{stop()} et ne rend jamais la main. Un
-argument mal formé de \code{refus\_tablexp()} (module ou message vide, motif
-non conforme, détails qui ne sont pas une liste) n'est pas un refus mais une
+argument mal formé de \code{refus\_tablexp()} (module, motif ou message
+qui n'est pas une chaîne unique sans attribut, ni \code{NA} ni vide, au sens
+de \code{chaine\_unique()}, chaîne nommée comprise~; motif non conforme~;
+détails qui ne sont pas une liste) n'est pas un refus mais une
 erreur de programmation du package, signalée par \code{stop()}. Les tests
 vérifient le motif, le décompte et les numéros par \code{tryCatch()}~;
 l'application attrapera la condition et affichera son message. Une condition
@@ -666,6 +671,19 @@ admis, aucun par défaut) & \code{TRUE} si \code{typeof(x)} est pris dans
 \code{attributs}, \code{FALSE} sinon, jamais \code{NA}~; un attribut admis
 n'est pas requis et sa valeur n'est pas contrôlée~; ne refuse pas, l'appelant
 refuse sous son propre motif (section~\ref{sec:plan}~; issue~\#23) \\
+\catalogue{fonctions-outils}{liste\_aux\_noms()} & interne & \code{x},
+\code{noms} (noms attendus) & \code{TRUE} si \code{x} est une liste nue
+(\code{forme\_exacte()} de type \code{list}, seul attribut admis~: les noms~;
+ni \code{data.frame}, ni classe) d'autant d'éléments que \code{noms}, aux
+mêmes noms une fois triés par \code{sort(method = "radix")}, indépendamment
+de la locale, \code{FALSE} sinon (liste sans noms comprise)~; la longueur est
+comparée à part, \code{sort()} retirant un nom \code{NA}~; le contenu des
+éléments, lus par \code{[[ ]]}, est contrôlé par l'appelant, qui refuse sous
+son propre motif (issue~\#48) \\
+\catalogue{fonctions-outils}{chaine\_unique()} & interne & \code{v} &
+\code{TRUE} si \code{v} est de forme exacte \code{character}, sans aucun
+attribut (noms compris), de longueur~1, ni \code{NA} ni vide, \code{FALSE}
+sinon, jamais \code{NA}~; ne refuse pas (issue~\#48) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -674,7 +692,7 @@ accumulateur vide des avertissements métier, colonne \code{nombre} en
 sans \code{warning()}~; \code{stop()} si le code ou le nombre est mal formé
 (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
-explicite, sans défaut), \code{expr} & valeur de \code{expr} évaluée sous la
+explicite, sans défaut ni attribut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
 \code{graine\_invalide} (section~\ref{sec:sous-graine}) \\
 \end{longtable}
@@ -743,7 +761,11 @@ changement de résultat, soumis au visa (ADR 0007, «~Conséquences~»).
 tire un aléa (ADR 0007, point 8.1). Elle procède ainsi~:
 
 \begin{enumerate}[leftmargin=*, itemsep=2pt]
-  \item \textbf{contrôle de la graine}~: un nombre unique, non manquant, fini,
+  \item \textbf{contrôle de la graine}~: un nombre unique, de type de base
+    \code{integer} ou \code{double} et \textbf{sans aucun attribut}~--- ni
+    noms, ni dimension, ni classe (\code{forme\_exacte()},
+    section~\ref{sec:fonctions-outils}~; issue~\#43)~: une graine non
+    canonique ne doit pas être consignée~---, non manquant, fini,
     entier et de valeur absolue au plus \code{.Machine\$integer.max}~; sinon,
     et aussi quand la graine est omise, refus \code{graine\_invalide} du module
     \code{outils}. Il n'y a jamais de graine par défaut~: une graine par défaut
@@ -1735,8 +1757,14 @@ d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{integer}~; \code{delai\_declaration} est un \code{integer} ou un
 \code{double} sans attribut~; \code{segmentation} un vecteur
 \code{character} sans attribut, vide compris. La forme est contrôlée par
-\code{forme\_exacte()} (section~\ref{sec:fonctions-outils}), sous le motif
-existant de chaque paramètre~: aucun motif n'est propre à la forme. Pour
+\code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()} et
+\code{chaine\_unique()} (section~\ref{sec:fonctions-outils}), sous le motif
+existant de chaque paramètre~: aucun motif n'est propre à la forme. Hors du
+plan, la même règle s'applique à la graine reçue par \code{sous\_graine()}
+(refus \code{graine\_invalide}, section~\ref{sec:sous-graine}) et, à
+l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()}, à la
+forme seule de la segmentation (refus \code{segmentation\_invalide} du module
+\code{brut}, section~\ref{sec:brut-etape}~; issue~\#43). Pour
 chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
@@ -1754,6 +1782,12 @@ les codes \emph{structurels} du plan, module \code{construire\_table}~:
 d'une étape forment une liste (colonne \code{prealable} de \code{ETAPES})~;
 chacun est contrôlé, et le refus \code{etape\_prealable\_manquante} ne cite
 que les préalables absents, au singulier ou au pluriel selon leur nombre.
+Son message et ses champs \code{etape} et \code{prealable} de
+\code{details} rassemblent les étapes fautives d'une part, les préalables
+absents d'autre part~; le champ \code{prealables\_par\_etape}, liste nommée
+par étape fautive dans l'ordre du plan, donne pour chacune ses propres
+préalables absents, dans l'ordre de \code{ETAPES}, si bien que le refus dit
+quel préalable manque à quelle étape (issue~\#27).
 Le plan, son champ \code{etapes} et la liste des paramètres de chaque étape
 sont des listes nommées \textbf{nues}, dont le seul attribut admis est
 celui des noms~: un \code{data.frame}, un objet de classe ou une liste
@@ -2054,7 +2088,7 @@ reçoit~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
 \code{data.frame} ou une liste munie d'un autre attribut que ses noms~---, de
 champs autres qu'exactement \code{depart} et \code{arrivee}, ou d'un élément
 de plus, même nommé \code{NA}~; état qui n'est pas une chaîne unique sans
-attribut ni \code{NA}~; ou transition non prise en charge~: seules
+attribut, ni \code{NA} ni vide, refusé dès ce contrôle de forme~; ou transition non prise en charge~: seules
 vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
 \code{TRANSITIONS})~; \code{periode\_invalide} (liste qui n'est pas nue, de
 champs autres qu'exactement \code{debut} et \code{fin}, ou d'un élément de
@@ -2129,7 +2163,7 @@ admis comme règles d'exclusion.}
 \code{segment\_manquant} & \code{segment} déclaré et manquant \\
 \code{naissance\_apres\_entree} & naissance postérieure à l'entrée (l'égalité est admise) \\
 \code{sortie\_avant\_entree} & sortie antérieure à l'entrée (l'égalité est admise~: durée nulle) \\
-\code{en\_cours\_avant\_fin} & cause \code{en\_cours} et date de sortie renseignée antérieure à la fin déclarée~: la base ne couvre pas la période déclarée \\
+\code{en\_cours\_avant\_fin} & cause \code{en\_cours} et date de sortie renseignée antérieure à la fin déclarée~: la base ne couvre pas la période déclarée. Une ligne \code{en\_cours} dont la date de sortie renseignée précède l'entrée relève de \code{sortie\_avant\_entree} et, si sa sortie précède la fin déclarée (toujours le cas quand son entrée ne la dépasse pas), de ce motif-ci~: elle se contredit, le moteur ne choisit pas entre la cause et les dates et refuse (E2.7)~; elle s'écarte par une exclusion déclarée de chacun des motifs qu'elle porte (exclure le seul \code{sortie\_avant\_entree} laisse le refus sous \code{en\_cours\_avant\_fin} si elle le porte~; issue~\#20) \\
 \code{annee\_naissance\_}\allowbreak\code{incoherente} & \code{annee\_naissance} déclarée et différente de l'année de la date de naissance \\
 \code{age\_aberrant} & âge au dernier anniversaire au moins égal à \code{AGE\_ABERRANT} (130) à la plus petite des dates de sortie et de fin de période (à la fin si la sortie manque)~; constante de catalogue, \emph{choix de conception}~: la borne laisse passer toute durée de vie humaine connue, elle n'est pas un paramètre du plan \\
 \code{contrat\_duplique} & \code{id\_contrat} déclaré et présent sur plusieurs lignes (toutes les lignes du groupe sont listées) \\
@@ -2156,7 +2190,9 @@ Le plan peut déclarer des \emph{règles d'exclusion}, paramètre
 doublon, vide explicite admis. Une ligne est exclue si l'un de ses motifs est
 déclaré. Les exclusions sont comptées et listées par motif dans le résultat de
 l'étape (\code{resultat\$exclusions}, \code{resultat\$lignes\_exclues}) et
-chacune donne un avertissement \code{exclusion}. Si toutes les lignes sont
+chacune donne un avertissement \code{exclusion}~; une ligne exclue sous
+plusieurs motifs est comptée sous chacun, et le nombre de lignes distinctes
+exclues est donné à part (\code{resultat\$nombre\_lignes\_exclues}). Si toutes les lignes sont
 exclues, la construction est refusée (\code{aucune\_ligne\_conservee})~; une
 base sans ligne l'est aussi (\code{base\_vide}). Le diagnostic
 \code{diagnostics\$motifs} restitue, pour chaque motif, sa nature (ligne ou
@@ -2295,7 +2331,10 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
   \item attributs \code{nom}, \code{statut} (\code{synthetique},
     \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
     de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
-    \code{qx}) et \code{parametres}~: une liste non vide est \textbf{requise}
+    \code{qx}), chacun une chaîne unique de forme exacte~--- sans attribut,
+    noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
+    section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
+    motif du champ~; issue~\#48)~---, et \code{parametres}~: une liste non vide est \textbf{requise}
     pour une table synthétique, qui n'a d'autre provenance que sa loi, et
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
@@ -2849,6 +2888,18 @@ même raison de couverture (un estimateur de période sur une cellule âge
 $\times$ année relèverait d'une autre spécification). Si le binomial et
 \code{kaplan\_meier} sont tous deux déclarés sous \code{par\_annee},
 \code{binomial\_par\_annee} est levé en premier.
+La fonction d'étape contrôle en outre, en tête et avant
+\code{controler\_parametres\_brut()}, la \emph{forme seule} de la
+segmentation qu'elle reçoit~: \code{segmentation\_invalide}, module
+\code{brut} (autre chose qu'un vecteur \code{character} sans attribut, sans
+\code{NA} ni doublon~; vide explicite admis~; issue~\#43). Le même code est
+porté par le module qui détecte la condition (ADR 0007, annotation du
+17/10/2026, point~d)~: dans le plan, la segmentation est déjà refusée sous ce
+code par \code{controler\_parametres\_donnees()}, module \code{donnees},
+que \code{valider\_plan()} appelle, et qui contrôle aussi son appartenance
+aux rôles admis (section~\ref{sec:controles-donnees})~; ce contrôle-ci ne
+sert qu'à l'appel direct de la fonction d'étape, et une forme invalide y est
+signalée avant un estimateur inconnu.
 
 \medskip
 \textbf{Quantiles supérieurs.} Ils sont calculés par la queue supérieure
@@ -4047,8 +4098,9 @@ et \code{algorithme} dans un ordre quelconque, chacun une chaîne
 \code{data.frame}, un objet de classe, une liste munie d'un autre attribut,
 un élément de plus (même nommé \code{NA}) ou une chaîne munie de noms, d'une
 dimension ou d'une classe sont refusés~: refus \code{provenance\_invalide}
-(\code{controler\_provenance()}, par \code{forme\_exacte()}~;
-issue~\#21).
+(\code{controler\_provenance()}, par \code{liste\_aux\_noms()} et
+\code{chaine\_unique()}, qui s'appuient sur \code{forme\_exacte()}~;
+issues~\#21 et~\#48).
 
 \subsubsection*{Représentation canonique}
 
@@ -4249,7 +4301,14 @@ spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
 La loi vraie est une liste de deux lois, \code{deces} et \code{rachat}~;
 chacune associe une table de référence (classe \code{table\_reference},
 section~\ref{sec:table-reference}) et un facteur par sexe, \code{c(H = , F = )},
-réel fini $\ge 0$. Pour un sexe $s$, la loi effective est
+réel fini $\ge 0$. La loi vraie et chacune de ses deux lois sont des
+\textbf{listes nues}, dont le seul attribut admis est celui des noms,
+d'exactement autant d'éléments que de noms attendus (\code{deces} et
+\code{rachat}~; \code{table} et \code{facteurs}), dans un ordre
+quelconque~: un \code{data.frame}, un objet de classe, une liste munie d'un
+autre attribut ou un élément de plus, même nommé \code{NA}, sont refusés
+(\code{loi\_invalide}~; \code{liste\_aux\_noms()},
+section~\ref{sec:fonctions-outils}~; issue~\#44). Pour un sexe $s$, la loi effective est
 \[
   q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
 \]
@@ -4358,7 +4417,9 @@ $\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondi
 au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
 au moins égal à 1 en mode âge exact~; ces conditions sont contrôlées
 (\code{portefeuille\_invalide}). La période d'observation est une liste
-\code{debut}, \code{fin} de dates~; la censure a lieu à l'instant
+nue, de champs exactement \code{debut} et \code{fin} (même contrôle
+\code{liste\_aux\_noms()} que la loi vraie~; refus \code{periode\_invalide}),
+de deux dates (classe \code{Date}) uniques, non manquantes, finies et entières~; la censure a lieu à l'instant
 $B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
 
 \subsubsection*{Algorithme}

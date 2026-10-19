@@ -341,3 +341,36 @@ ligne <- sprintf(paste("constat : fausse alarme familiale <= sum(FA_k) = %.4g <=
                        "sur le générateur)"), sum(fa), ALPHA, K, 1 - prod(1 - fa))
 cat("  ", ligne, "\n", sep = "")
 verifier(ligne, sum(fa) <= ALPHA)
+
+# --- forme exacte des listes contrôlées (#44) -------------------------------------
+# sort() retire un nom NA : un élément de plus nommé NA passait les contrôles de
+# loi, loi_t et periode, qui ne vérifiaient pas la longueur ; liste_aux_noms()
+# la contrôle, et refuse aussi une liste à classe ou à attribut. Avec "x", le
+# refus nommé remplace l'erreur R brute « subscript out of bounds » (loi).
+PF_FORME <- modifyList(PF, list(n = 1000))
+plus_nom_na <- function(l, v) { l <- c(l, list(v)); names(l)[length(l)] <- NA; l }
+LISTES_FORME <- list(
+  list("loi : élément de plus nommé NA, loi valide", "loi_invalide",
+       function() simuler(plus_nom_na(loi(), loi()$deces), PF_FORME, PER, GRAINE)),
+  list("loi : élément de plus nommé NA valant \"x\" (plus d'erreur R brute)", "loi_invalide",
+       function() simuler(plus_nom_na(loi(), "x"), PF_FORME, PER, GRAINE)),
+  list("loi : liste à classe", "loi_invalide",
+       function() { l <- loi(); class(l) <- "x"; simuler(l, PF_FORME, PER, GRAINE) }),
+  list("loi_t : élément de plus nommé NA, valide", "loi_invalide",
+       function() simuler(list(deces = plus_nom_na(loi()$deces, 1), rachat = loi()$rachat), PF_FORME, PER, GRAINE)),
+  list("loi_t : élément de plus nommé NA valant \"x\"", "loi_invalide",
+       function() simuler(list(deces = plus_nom_na(loi()$deces, "x"), rachat = loi()$rachat), PF_FORME, PER, GRAINE)),
+  list("loi_t : liste à attribut quelconque", "loi_invalide",
+       function() { l <- loi(); attr(l$deces, "foo") <- "x"; simuler(l, PF_FORME, PER, GRAINE) }),
+  list("facteurs : élément de plus nommé NA (déjà refusé par la garde de longueur)", "loi_invalide",
+       function() { f <- c(H = 1, F = 0.6, 1); names(f)[3L] <- NA; simuler(loi(f_deces = f), PF_FORME, PER, GRAINE) }),
+  list("periode : élément de plus nommé NA, date valide", "periode_invalide",
+       function() simuler(loi(), PF_FORME, plus_nom_na(PER, D("2020-01-01")), GRAINE)),
+  list("periode : élément de plus nommé NA valant \"x\"", "periode_invalide",
+       function() simuler(loi(), PF_FORME, plus_nom_na(PER, "x"), GRAINE)),
+  list("periode : data.frame (debut, fin)", "periode_invalide",
+       function() simuler(loi(), PF_FORME, data.frame(debut = PER$debut, fin = PER$fin), GRAINE)),
+  list("periode : liste à classe", "periode_invalide",
+       function() { p <- PER; class(p) <- "x"; simuler(loi(), PF_FORME, p, GRAINE) }))
+for (k in LISTES_FORME)
+  verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[2]]), leve_refus(k[[3]](), k[[2]]))

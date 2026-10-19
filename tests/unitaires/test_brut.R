@@ -524,3 +524,28 @@ verifier("invariance du plan sans brut (cas C, poisson et binomial) : fiche sans
 verifier("invariance du plan sans brut (cas C, par_annee = TRUE, poisson seul) : même contrôle",
          invariance_sans_brut(construire_table(DC, ROLES_C, plan_brut(estimateurs = "poisson", par_annee = TRUE)),
                               DC, ROLES_C))
+
+# Forme exacte de la segmentation à l'appel direct de calculer_taux_bruts()
+# (#43) : hors du chemin Kaplan-Meier, elle n'était pas contrôlée. Table
+# d'exposition munie d'une colonne `sexe`, pour que seule la forme échoue.
+EC_SEXE <- cbind(EC, sexe = "H")
+cas_segmentation <- list(
+  list("nommée", c(a = "sexe")),
+  list("matrix", matrix("sexe")),
+  list("à attribut quelconque", structure("sexe", foo = "x")),
+  list("facteur", factor("sexe")),
+  list("NA", NA_character_),
+  list("doublon", c("sexe", "sexe")),
+  list("logique", NA),
+  list("NULL", NULL))
+for (k in cas_segmentation)
+  verifier(sprintf("calculer_taux_bruts(segmentation %s) : refus segmentation_invalide, module brut", k[[1]]), {
+    r <- tryCatch(calculer_taux_bruts(EC_SEXE, k[[2]], FALSE, "dernier_anniversaire", "u", "poisson", 0.95),
+                  error = function(e) e)
+    inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "brut")
+  })
+verifier("calculer_taux_bruts : segmentation valide (character(0) et \"sexe\") admise, colonnes de segmentation en tête", {
+  r0 <- calculer_taux_bruts(EC_SEXE, character(0), FALSE, "dernier_anniversaire", "u", "poisson", 0.95)
+  r1 <- calculer_taux_bruts(EC_SEXE, "sexe", FALSE, "dernier_anniversaire", "u", "poisson", 0.95)
+  identical(names(r0$resultat$poisson)[1L], "age") && identical(names(r1$resultat$poisson)[1:2], c("sexe", "age"))
+})
