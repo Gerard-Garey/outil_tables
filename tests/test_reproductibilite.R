@@ -25,7 +25,10 @@
 #  comparer_references.R ; permutation des lignes de l'entrée de référence
 #  (#39) : plans R6, R4, R5, R3 et R2, deux permutations, identical() hors
 #  sommes par cellule, celles-ci à la tolérance TOLERANCE_PERMUTATION, bilan
-#  des écarts et témoins ; chaînes non ASCII et locale (T1 à T4, M54).
+#  des écarts et témoins ; chaînes non ASCII et locale (T1 à T4, M54) ;
+#  transitions de changement de résultat annoncé (ADR 0009, point 9.5, #47) :
+#  liste unique TRANSITIONS_EN_COURS (vide hors transition), utilitaire
+#  générique et témoins de chaque nature, de l'union et du succès inattendu.
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -313,17 +316,296 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # de référence de la session principale retire de cette liste les plans
 # qu'il crée (succès inattendu sinon).
 SANS_REFERENCE_17 <- character(0)
-# Plans dont la référence commitée porte encore etapes/exposition/diagnostics/
-# cellules en double (#37 : le moteur le rend en integer, valeur inchangée).
-# Tant qu'un plan est listé, sa comparaison stricte est un échec attendu #37
-# et un test ordinaire exige que ce type soit le seul écart ; la
-# régénération sur la CI (references.yml, mode regeneration) fait de
-# l'échec attendu un succès inattendu, qui fait échouer la batterie : le
-# commit de référence de la session principale vide cette liste
-# (character(0)), ce qui supprime les tests « seul écart » et rend ordinaires
-# la comparaison stricte et le test des doubles sans tolérance des références.
-A_REGENERER_37 <- character(0)
-CHEMIN_TYPE_37 <- "etapes/exposition/diagnostics/cellules"
+# Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
+# 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
+# les références ne sont pas encore régénérées. Vide hors transition ; le
+# commit de référence de la session principale la vide. Une transition (une
+# par issue) :
+#   list(issue = "#N", plans = c("R1", ...), changements = list(<changement>, ...))
+# Un changement nomme un chemin et la nature exacte du changement admis ; il
+# doit être OBSERVÉ sur la référence commitée telle qu'elle est lue, avant
+# tout alignement (sinon : « changement déclaré non observé ») :
+#   list(chemin = , nature = "type", de = "double", vers = "integer")
+#       conversion de type sans perte (double <-> integer) ; la référence est
+#       du type `de` ;
+#   list(chemin = , nature = "valeur", valeurs = , positions = )
+#       valeurs numériques nouvelles. Sans `positions`, `valeurs` remplace
+#       tout le vecteur, de n'importe quelle longueur (changement de
+#       longueur compris : il n'y a pas de nature « longueur ») et diffère de
+#       la référence ; avec `positions` (rangs à partir de 1), la longueur
+#       reste celle de la référence et chaque position déclarée diffère ;
+#   list(chemin = , nature = "valeur de chaîne", valeurs = , positions = )
+#       idem pour des chaînes (version, empreinte) ;
+#   list(chemin = , nature = "ajout", type = , longueur = )
+#       chemin absent de la référence, présent dans l'objet seul, de ce type
+#       et de cette longueur (les valeurs relèvent du tableau avant / après) ;
+#   list(chemin = , nature = "retrait", type = , longueur = )
+#       chemin présent dans la référence seule, de ce type et de cette longueur.
+# Plusieurs transitions peuvent porter sur un même plan : leurs changements
+# s'unissent. Deux déclarations identiques s'appliquent une fois ; sont des
+# erreurs : deux valeurs différentes à une même position, un vecteur entier et
+# une autre déclaration de valeurs sur un même chemin, deux conversions de
+# type, un ajout ou un retrait combiné à une autre nature sur un même chemin.
+# Un changement de fiche/empreintes/donnees n'est admis qu'en « valeur de
+# chaîne » sans `positions`, avec un changement de
+# fiche/empreintes/representation et la garde 3.2 (entree_inchangee()), qui
+# prouve que l'entrée est inchangée sous la représentation de la référence.
+# Pour chaque plan listé : un test ordinaire « seul écart » aligne la
+# référence sur les changements déclarés (aligner_reference()) puis exige une
+# comparaison sans aucun autre écart ; la comparaison stricte est un échec
+# attendu renvoyant à l'issue de la première transition de la liste qui porte
+# le plan : après la régénération, elle réussit et fait échouer la batterie
+# (succès inattendu), le test « seul écart » échouant aussi (changement
+# déclaré non observé). Un plan non listé passe par le test ordinaire de la
+# comparaison au fichier.
+TRANSITIONS_EN_COURS <- list()
+
+NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
+CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
+                          "valeur de chaîne" = c("valeurs", "positions"),
+                          ajout = c("type", "longueur"), retrait = c("type", "longueur"))
+CHAMPS_EXIGES <- list(type = c("de", "vers"), valeur = "valeurs", "valeur de chaîne" = "valeurs",
+                      ajout = c("type", "longueur"), retrait = c("type", "longueur"))
+
+# Problèmes de forme d'une liste de transitions (character(0) si elle est
+# bien formée).
+valider_transitions <- function(transitions, plans = names(plans_reference())) {
+  if (!is.list(transitions)) return("la liste des transitions n'est pas une liste")
+  p <- character(0)
+  issues <- vapply(transitions, function(t) if (is.character(t$issue) && length(t$issue) == 1L) t$issue else NA_character_, "")
+  for (k in seq_along(transitions)) {
+    t <- transitions[[k]]; e <- sprintf("transition %d : ", k)
+    if (!is.list(t) || !identical(sort(names(t)), c("changements", "issue", "plans"))) {
+      p <- c(p, paste0(e, "champs issue, plans et changements exigés, et eux seuls")); next
+    }
+    if (is.na(issues[k]) || !grepl(MOTIF_ISSUE, issues[k])) p <- c(p, paste0(e, "issue de la forme \"#N\" exigée"))
+    else if (sum(issues == issues[k], na.rm = TRUE) > 1L) p <- c(p, paste0(e, "issue ", issues[k], " en double"))
+    if (!is.character(t$plans) || !length(t$plans) || anyNA(t$plans) || !all(t$plans %in% plans))
+      p <- c(p, paste0(e, "plans : identifiants de plans de référence exigés"))
+    if (!is.list(t$changements) || !length(t$changements)) {
+      p <- c(p, paste0(e, "au moins un changement exigé")); next
+    }
+    for (j in seq_along(t$changements)) {
+      ch <- t$changements[[j]]; e2 <- sprintf("%schangement %d : ", e, j)
+      if (!is.list(ch) || !is.character(ch$chemin) || length(ch$chemin) != 1L || is.na(ch$chemin) || !nzchar(ch$chemin) ||
+          !is.character(ch$nature) || length(ch$nature) != 1L || !ch$nature %in% NATURES_TRANSITION) {
+        p <- c(p, paste0(e2, "chemin et nature (parmi ", paste(NATURES_TRANSITION, collapse = ", "), ") exigés")); next
+      }
+      inconnus <- setdiff(names(ch), c("chemin", "nature", CHAMPS_CHANGEMENT[[ch$nature]]))
+      if (length(inconnus)) p <- c(p, paste0(e2, "champ(s) hors de la nature « ", ch$nature, " » : ", paste(inconnus, collapse = ", ")))
+      absents <- setdiff(CHAMPS_EXIGES[[ch$nature]], names(ch))
+      if (length(absents)) { p <- c(p, paste0(e2, "champ(s) exigé(s) par la nature « ", ch$nature, " » : ", paste(absents, collapse = ", "))); next }
+      if (identical(ch$chemin, CHEMIN_EMPREINTE_DONNEES) && !(ch$nature == "valeur de chaîne" && is.null(ch$positions)))
+        p <- c(p, paste0(e2, CHEMIN_EMPREINTE_DONNEES, " : seule la nature « valeur de chaîne » sans positions est admise (garde 3.2)"))
+      if (ch$nature == "type" && !(is.character(ch$de) && is.character(ch$vers) && length(ch$de) == 1L && length(ch$vers) == 1L &&
+                                   paste(ch$de, ch$vers) %in% c("double integer", "integer double")))
+        p <- c(p, paste0(e2, "type : de et vers parmi double -> integer ou integer -> double"))
+      if (ch$nature %in% c("ajout", "retrait")) {
+        if (!(is.character(ch$type) && length(ch$type) == 1L && ch$type %in% TYPES_REFERENCE))
+          p <- c(p, paste0(e2, "type : un type du format des références exigé"))
+        if (!(is.numeric(ch$longueur) && length(ch$longueur) == 1L && !is.na(ch$longueur) && ch$longueur >= 0 && ch$longueur == floor(ch$longueur)))
+          p <- c(p, paste0(e2, "longueur : entier >= 0 exigé"))
+      }
+      if (ch$nature %in% c("valeur", "valeur de chaîne")) {
+        ok_v <- if (ch$nature == "valeur") is.numeric(ch$valeurs) && !is.object(ch$valeurs) else is.character(ch$valeurs)
+        if (!ok_v || !length(ch$valeurs)) p <- c(p, paste0(e2, "valeurs ", if (ch$nature == "valeur") "numériques" else "de type character", " non vides exigées"))
+        else if (!is.null(ch$positions) && !(is.numeric(ch$positions) && length(ch$positions) == length(ch$valeurs) &&
+                                              !anyNA(ch$positions) && all(ch$positions >= 1 & ch$positions == floor(ch$positions)) &&
+                                              !anyDuplicated(ch$positions)))
+          p <- c(p, paste0(e2, "positions : entiers distincts >= 1, en nombre égal à celui des valeurs"))
+      }
+    }
+  }
+  p
+}
+
+# Changements (union) et issues des transitions qui portent sur le plan `id`.
+changements_du_plan <- function(id, transitions) {
+  t <- Filter(function(t) id %in% t$plans, transitions)
+  list(issues = vapply(t, function(x) x$issue, ""), changements = unlist(lapply(t, `[[`, "changements"), recursive = FALSE))
+}
+plans_en_transition <- function(transitions) unique(unlist(lapply(transitions, `[[`, "plans")))
+
+decrire_changement <- function(ch) switch(ch$nature,
+  type = sprintf("type de %s (%s -> %s)", ch$chemin, ch$de, ch$vers),
+  sprintf("%s de %s", ch$nature, ch$chemin))
+
+NON_OBSERVE <- "changement déclaré non observé (référence déjà régénérée ? retirer la transition)"
+
+# Aligne `ref` (référence lue) sur les changements déclarés et rend la
+# référence alignée. Les déclarations identiques s'appliquent une fois ; les
+# déclarations contradictoires sont une erreur (voir TRANSITIONS_EN_COURS). Un
+# changement déclaré doit être observé sur `ref` avant alignement (type de la
+# référence égal à `de` ; valeurs différentes de celles de la référence, à
+# chaque position déclarée ou sur le vecteur entier ; ajout absent de la
+# référence ; retrait présent dans la référence), sinon erreur NON_OBSERVE.
+# Ordre d'application : type, valeurs, valeurs de chaîne, ajouts, retraits ;
+# l'observation des valeurs se juge sur la référence après conversion de type.
+# Les autres erreurs (stop) disent pourquoi le changement n'est pas celui qu'on
+# observe : chemin absent, type ou longueur inattendus, conversion avec perte,
+# positions hors du vecteur, ajout absent de l'objet, retrait encore présent.
+aligner_reference <- function(ref, g, changements) {
+  changements <- lapply(changements, function(ch) {
+    ch <- ch[sort(names(ch), method = "radix")]
+    if (!is.null(ch$positions)) ch$positions <- as.integer(ch$positions)
+    ch
+  })
+  changements <- changements[!duplicated(changements)]
+  for (c_ in unique(vapply(changements, `[[`, "", "chemin"))) {
+    cs <- Filter(function(x) x$chemin == c_, changements)
+    if (length(cs) < 2L) next
+    natures <- vapply(cs, `[[`, "", "nature")
+    valeurs_ <- natures %in% c("valeur", "valeur de chaîne")
+    if (sum(natures == "type") > 1L) stop(sprintf("%s : deux conversions de type différentes", c_))
+    if (any(natures %in% c("ajout", "retrait"))) stop(sprintf("%s : ajout ou retrait combiné à une autre déclaration sur le même chemin", c_))
+    if (sum(valeurs_) > 1L && any(vapply(cs[valeurs_], function(x) is.null(x$positions), NA)))
+      stop(sprintf("%s : vecteur entier et autre déclaration de valeurs sur le même chemin", c_))
+  }
+  rang <- match(vapply(changements, `[[`, "", "nature"), NATURES_TRANSITION)
+  ordonnes <- changements[order(rang)]
+  ref_t <- NULL  # référence après conversion de type : base d'observation des valeurs
+  fixees <- list()  # par chemin : positions et valeurs déjà imposées (conflit)
+  for (ch in ordonnes) {
+    if (is.null(ref_t) && !ch$nature %in% "type") ref_t <- ref
+    c_ <- ch$chemin
+    if (ch$nature %in% c("type", "valeur", "valeur de chaîne", "retrait") && !c_ %in% names(ref$types))
+      stop(sprintf("%s : absent de la référence%s", c_, if (ch$nature == "retrait") paste0(" ; ", NON_OBSERVE) else ""))
+    if (ch$nature == "type") {
+      t <- ref$types[[c_]]
+      if (identical(t, ch$vers)) stop(sprintf("%s : type déjà %s ; %s", c_, t, NON_OBSERVE))
+      if (!identical(t, ch$de)) stop(sprintf("%s : type %s de la référence, %s déclaré", c_, t, ch$de))
+      v <- ref$valeurs[[c_]]
+      w <- if (ch$vers == "integer") suppressWarnings(as.integer(v)) else as.double(v)
+      if (!identical(if (ch$de == "double") as.double(w) else as.integer(w), v))
+        stop(sprintf("%s : conversion %s -> %s avec perte", c_, ch$de, ch$vers))
+      ref$types[[c_]] <- ch$vers; ref$valeurs[[c_]] <- w
+    } else if (ch$nature %in% c("valeur", "valeur de chaîne")) {
+      t <- ref$types[[c_]]; v0 <- ref_t$valeurs[[c_]]
+      if (!t %in% (if (ch$nature == "valeur") c("double", "integer") else "character"))
+        stop(sprintf("%s : type %s de la référence incompatible avec la nature « %s »", c_, t, ch$nature))
+      nouveau <- switch(t, double = as.double(ch$valeurs), integer = as.integer(ch$valeurs), ch$valeurs)
+      if (t == "integer" && !identical(as.double(nouveau), as.double(ch$valeurs))) stop(sprintf("%s : valeurs non entières pour un chemin integer", c_))
+      if (is.null(ch$positions)) {
+        if (length(nouveau) == length(v0) && all(identiques_elements(v0, nouveau))) stop(sprintf("%s : %s", c_, NON_OBSERVE))
+        ref$valeurs[[c_]] <- nouveau
+      } else {
+        pos <- ch$positions
+        if (length(pos) != length(nouveau) || any(pos > length(v0)))
+          stop(sprintf("%s : %d valeur(s) déclarée(s) à des positions d'un vecteur de %d élément(s) de la référence", c_, length(nouveau), length(v0)))
+        if (any(identiques_elements(v0[pos], nouveau))) stop(sprintf("%s : %s", c_, NON_OBSERVE))
+        prec <- fixees[[c_]]
+        if (!is.null(prec)) {
+          commun <- intersect(pos, prec$pos)
+          if (length(commun) && !identical(nouveau[match(commun, pos)], prec$val[match(commun, prec$pos)]))
+            stop(sprintf("%s : deux transitions déclarent des valeurs différentes à la position %d", c_, commun[1L]))
+        }
+        fixees[[c_]] <- list(pos = c(prec$pos, pos), val = c(prec$val, nouveau))
+        v <- ref$valeurs[[c_]]; v[pos] <- nouveau; ref$valeurs[[c_]] <- v
+      }
+    } else if (ch$nature == "ajout") {
+      if (c_ %in% names(ref$types)) stop(sprintf("%s : %s", c_, NON_OBSERVE))
+      if (!c_ %in% names(g$types)) stop(sprintf("%s : ajout déclaré d'un chemin absent de l'objet", c_))
+      if (!identical(g$types[[c_]], ch$type)) stop(sprintf("%s : type %s de l'objet, %s déclaré", c_, g$types[[c_]], ch$type))
+      if (length(g$valeurs[[c_]]) != ch$longueur)
+        stop(sprintf("%s : longueur %d de l'objet, %d déclarée", c_, length(g$valeurs[[c_]]), as.integer(ch$longueur)))
+      ref$types[[c_]] <- g$types[[c_]]; ref$valeurs[c_] <- list(g$valeurs[[c_]])
+    } else {
+      if (c_ %in% names(g$types)) stop(sprintf("%s : retrait déclaré d'un chemin encore présent dans l'objet", c_))
+      if (!identical(ref$types[[c_]], ch$type)) stop(sprintf("%s : type %s de la référence, %s déclaré", c_, ref$types[[c_]], ch$type))
+      if (length(ref$valeurs[[c_]]) != ch$longueur)
+        stop(sprintf("%s : longueur %d de la référence, %d déclarée", c_, length(ref$valeurs[[c_]]), as.integer(ch$longueur)))
+      garde <- names(ref$types) != c_
+      ref$types <- ref$types[garde]; ref$valeurs <- ref$valeurs[garde]
+    }
+  }
+  ref
+}
+
+# TRUE si `g` ne diffère de `ref` que par les changements déclarés, tous
+# observés, sinon la raison (chaîne) : la référence alignée est comparée à `g`
+# comme dans le test ordinaire, aux tolérances près.
+seul_ecart <- function(ref, g, changements) {
+  r <- tryCatch(aligner_reference(ref, g, changements), error = function(e) e)
+  if (inherits(r, "error")) return(conditionMessage(r))
+  if (comparer_references(r, g)$ok) TRUE
+  else "écart autre que les changements déclarés (référence alignée, comparaison en échec)"
+}
+
+# Garde 3.2 (ADR 0009, troisième annotation du 19/10/2026, (f)) : prouve que
+# l'entrée est inchangée quand l'empreinte des données change avec la
+# représentation canonique. Le texte canonique de `donnees` (le package, une
+# seule fois par couple donnees / roles) voit l'en-tête de sa première ligne
+# (avant la première tabulation, égal à fiche/empreintes/representation de
+# `g`) remplacé par celui de la référence ; son MD5 doit égaler
+# fiche/empreintes/donnees de la référence. Rend TRUE ou la raison.
+CACHE_ENTREE <- new.env(parent = emptyenv())
+entree_inchangee <- function(ref, g, donnees, roles) {
+  chaine <- function(x) is.character(x) && length(x) == 1L && !is.na(x) && nzchar(x)
+  rep_r <- ref$valeurs[[CHEMIN_REPRESENTATION]]; rep_g <- g$valeurs[[CHEMIN_REPRESENTATION]]
+  emp_r <- ref$valeurs[[CHEMIN_EMPREINTE_DONNEES]]
+  if (!chaine(rep_r) || !chaine(rep_g) || !chaine(emp_r))
+    return(sprintf("%s et %s exigés, chaînes non vides, dans la référence et l'objet", CHEMIN_REPRESENTATION, CHEMIN_EMPREINTE_DONNEES))
+  if (identical(rep_r, rep_g))
+    return(sprintf("représentation canonique identique des deux côtés (%s) : la différence d'empreinte ne vient pas d'une nouvelle définition, l'entrée est différente", rep_g))
+  if (is.null(CACHE_ENTREE$octets) || !identical(CACHE_ENTREE$donnees, donnees) || !identical(CACHE_ENTREE$roles, roles)) {
+    f <- tempfile("texte_canonique_")
+    tablexp:::texte_canonique(donnees, roles, f)
+    CACHE_ENTREE$octets <- readBin(f, "raw", file.info(f)$size)
+    CACHE_ENTREE$donnees <- donnees; CACHE_ENTREE$roles <- roles
+    unlink(f)
+  }
+  o <- CACHE_ENTREE$octets
+  tab <- which(o == as.raw(9L))[1L]
+  if (is.na(tab) || !identical(o[seq_len(tab - 1L)], charToRaw(rep_g)))
+    return(sprintf("en-tête du texte canonique différent de %s de l'objet (%s)", CHEMIN_REPRESENTATION, rep_g))
+  f2 <- tempfile("texte_canonique_ref_"); on.exit(unlink(f2))
+  writeBin(c(charToRaw(rep_r), o[-seq_len(tab - 1L)]), f2)
+  m <- unname(tools::md5sum(f2))
+  if (identical(m, emp_r)) TRUE
+  else sprintf("empreinte %s sous l'en-tête « %s » au lieu de %s : l'entrée a changé", m, rep_r, emp_r)
+}
+
+# Contrôles d'un plan : listé dans `transitions` -> test « seul écart », garde
+# 3.2 si les changements du plan touchent l'empreinte des données, et échec
+# attendu de la comparaison stricte ; sinon test ordinaire. `ref` et `strict`
+# (TRUE ou la raison de l'échec de la comparaison au fichier) ne sont évalués
+# que si le plan les exige. `donnees` et `roles` : l'entrée de référence, pour
+# la garde.
+controler_plan <- function(id, nom, ref, g, strict, transitions, donnees = NULL, roles = NULL) {
+  t <- changements_du_plan(id, transitions)
+  if (!length(t$changements)) return(verifier(nom, strict))
+  chemins <- vapply(t$changements, `[[`, "", "chemin")
+  verifier(sprintf("%s : seul écart à tests/reference/%s.tsv : %s (%s)", id, id,
+                   paste(vapply(t$changements, decrire_changement, ""), collapse = " ; "),
+                   paste(unique(t$issues), collapse = ", ")),
+           seul_ecart(ref, g, t$changements))
+  if (CHEMIN_EMPREINTE_DONNEES %in% chemins)
+    verifier(sprintf("%s : garde 3.2 : entrée inchangée sous la représentation de la référence (%s)", id,
+                     paste(unique(t$issues), collapse = ", ")),
+             if (!CHEMIN_REPRESENTATION %in% chemins)
+               sprintf("%s non déclaré dans les changements du plan : l'empreinte des données ne change pas sans nouvelle représentation", CHEMIN_REPRESENTATION)
+             else entree_inchangee(ref, g, donnees, roles))
+  echec_attendu(nom, t$issues[1L], strict)
+}
+
+# Doubles de la référence commitée qu'aucune clé ne classe, hors ceux que les
+# transitions du plan admettent : chemin dont le type est converti depuis
+# double, ou retiré avec le type déclaré double (ADR 0009, troisième
+# annotation du 19/10/2026, (e)). Un chemin à valeurs nouvelles, ajouté, ou
+# retiré avec un autre type n'en fait pas partie.
+admet_reste <- function(ch) (ch$nature == "type" && ch$de == "double") || (ch$nature == "retrait" && ch$type == "double")
+restes_hors_transitions <- function(restes, transitions) {
+  for (plan_id in intersect(names(restes), plans_en_transition(transitions))) {
+    ch <- changements_du_plan(plan_id, transitions)$changements
+    restes[[plan_id]] <- setdiff(restes[[plan_id]], vapply(Filter(admet_reste, ch), `[[`, "", "chemin"))
+  }
+  restes
+}
+# Première issue dont une transition admet un reste (à défaut, la première).
+issue_des_restes <- function(transitions) {
+  t <- Filter(function(t) any(vapply(t$changements, admet_reste, NA)), transitions)
+  (if (length(t)) t else transitions)[[1L]]$issue
+}
 
 jeu_ref <- jeu_reference()
 aplatis <- list()
@@ -359,23 +641,8 @@ for (p in plans_reference()) {
   if (id %in% SANS_REFERENCE_17 && !present) echec_attendu(nom, "#17", comparer_au_fichier(id, g))
   else if (id %in% SANS_REFERENCE_17)
     verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE_17", id, id))
-  else if (id %in% A_REGENERER_37) {
-    # Le type de #37 est le seul écart toléré : la référence, son type aligné
-    # sur celui de l'objet (valeurs entières, conversion exacte), doit se
-    # comparer sans aucun écart. Toute autre grandeur en écart, tout autre
-    # écart de structure ou une entrée différente reste un échec.
-    verifier(sprintf("%s : seul écart à tests/reference/%s.tsv : le type de %s (#37)", id, id, CHEMIN_TYPE_37), {
-      ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))
-      if (identical(unname(ref$types[CHEMIN_TYPE_37]), "double")) {
-        v <- ref$valeurs[[CHEMIN_TYPE_37]]
-        if (!identical(as.double(as.integer(v)), v)) return("valeurs de la référence non entières")
-        ref$types[[CHEMIN_TYPE_37]] <- "integer"; ref$valeurs[[CHEMIN_TYPE_37]] <- as.integer(v)
-      }
-      if (comparer_references(ref, g)$ok) TRUE else "écart autre que le type de #37 (référence au type aligné, comparaison en échec)"
-    })
-    echec_attendu(nom, "#37", comparer_au_fichier(id, g))
-  }
-  else verifier(nom, comparer_au_fichier(id, g))
+  else controler_plan(id, nom, lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv"))), g,
+                      comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, jeu_ref$donnees, jeu_ref$roles)
 }
 verifier("aucune référence orpheline sous tests/reference/ (point 3.7)", {
   o <- if (dir.exists(DOSSIER_REFERENCES)) references_orphelines(DOSSIER_REFERENCES) else character(0)
@@ -475,6 +742,7 @@ t_perm <- system.time(for (id in c("R6", "R4", "R5", "R3", "R2")) {
   p <- plans_reference()[[id]]
   for (nom_o in names(ordres_permutation)) {
     g_p <- aplatir_construction(construire_table(permuter(ordres_permutation[[nom_o]]), jeu_ref$roles, p$plan))
+    if (id == "R6" && nom_o == names(ordres_permutation)[1L]) g_permute_r6 <- g_p  # témoin de la garde 3.2 (#47)
     if (id == "R6" && nom_o == "tirage 1") G_PERMUTE_R6 <- g_p
     r <- controle_permutation(aplatis[[id]], g_p)
     verifier(sprintf("permutation (%s) : %s : structure identique, identical() hors sommes par cellule, sommes à la tolérance %g",
@@ -665,15 +933,15 @@ verifier("témoin : kaplan_meier_sauts/numerateur remis en double -> relevé par
 # chacun : integer dans R6 (sinon le moteur est revenu au double, et seul le
 # témoin de ce chemin échoue), puis remis en double en mémoire, il est relevé
 # par doubles_sans_tolerance() alors que la clé nue le classerait.
-for (chemin_37 in c("etapes/exposition/diagnostics/cellules", "etapes/brut/diagnostics/cellules",
+for (chemin_cellules in c("etapes/exposition/diagnostics/cellules", "etapes/brut/diagnostics/cellules",
              "etapes/brut/diagnostics/etats/cellules")) {
-  verifier(sprintf("témoin : %s remis en double -> relevé par doubles_sans_tolerance(), que la clé nue cellules aurait masqué", chemin_37), {
+  verifier(sprintf("témoin : %s remis en double -> relevé par doubles_sans_tolerance(), que la clé nue cellules aurait masqué", chemin_cellules), {
     g <- aplatis[["R6"]]
-    if (!identical(unname(g$types[chemin_37]), "integer"))
-      return(sprintf("%s de R6 : un chemin integer attendu, type %s", chemin_37, unname(g$types[chemin_37])))
+    if (!identical(unname(g$types[chemin_cellules]), "integer"))
+      return(sprintf("%s de R6 : un chemin integer attendu, type %s", chemin_cellules, unname(g$types[chemin_cellules])))
     masque <- c(TOLERANCES, cellules = 0)
-    g$types[[chemin_37]] <- "double"; g$valeurs[[chemin_37]] <- as.double(g$valeurs[[chemin_37]])
-    chemin_37 %in% doubles_sans_tolerance(g) && !chemin_37 %in% doubles_sans_tolerance(g, masque)
+    g$types[[chemin_cellules]] <- "double"; g$valeurs[[chemin_cellules]] <- as.double(g$valeurs[[chemin_cellules]])
+    chemin_cellules %in% doubles_sans_tolerance(g) && !chemin_cellules %in% doubles_sans_tolerance(g, masque)
   })
 }
 restes_commites <- function() lapply(plans_reference(), function(p) {
@@ -684,16 +952,17 @@ restes_commites <- function() lapply(plans_reference(), function(p) {
 restes_vides <- function(restes)
   if (all(lengths(restes) == 0L)) TRUE else paste(names(restes)[lengths(restes) > 0L], collapse = ", ")
 nom_restes <- "tolérances : aucun double sans tolérance déclarée dans les six références commitées (table sans clé integer)"
-if (length(A_REGENERER_37)) {
-  # Tant que la référence porte le double de #37 : ce chemin est le seul
-  # reste admis (test ordinaire), le test strict est un échec attendu.
-  verifier("tolérances : dans les références à régénérer, le seul double sans tolérance déclarée est le type de #37", {
-    restes <- restes_commites()
-    for (plan_id in A_REGENERER_37) restes[[plan_id]] <- setdiff(restes[[plan_id]], CHEMIN_TYPE_37)
-    restes_vides(restes)
-  })
-  echec_attendu(nom_restes, "#37", restes_vides(restes_commites()))
-} else verifier(nom_restes, restes_vides(restes_commites()))
+# Plans en transition (#47) : tant que la référence commitée porte un double
+# que les transitions admettent (type converti depuis double, ou retrait), ce
+# reste est admis par un test ordinaire et le test strict est un échec
+# attendu. Une fois les références régénérées, il n'y a plus de reste : le test
+# strict est ordinaire (un plan resté listé est relevé par controler_plan()).
+restes <- restes_commites()
+if (length(plans_en_transition(TRANSITIONS_EN_COURS)) && any(lengths(restes) > 0L)) {
+  verifier("tolérances : dans les références à régénérer, seuls les doubles des chemins admis par les transitions (type converti depuis double, retrait) restent sans tolérance déclarée",
+           restes_vides(restes_hors_transitions(restes, TRANSITIONS_EN_COURS)))
+  echec_attendu(nom_restes, issue_des_restes(TRANSITIONS_EN_COURS), restes_vides(restes))
+} else verifier(nom_restes, restes_vides(restes))
 # Règle élément par élément (seconde annotation, (c)) : mesure d'actuary,
 # a = c(Inf, 0, 0.1 + 0.2), b = c(Inf, 0, 0.3), tol = 1e-14 -> égaux ;
 # Inf contre -Inf et NA contre NaN restent des écarts (structure).
@@ -1199,5 +1468,334 @@ if (nzchar(LOCALE_UTF8)) {
   })
   unlink(c(script, sorties))
 } else cat("  [sauté] T4 : aucune locale UTF-8 disponible parmi", paste(LOCALES_UTF8, collapse = ", "), "\n")
+
+# Mécanisme générique des transitions (ADR 0009, point 9.5 ; #47) : témoins
+# sur des objets de référence en mémoire (rien n'est écrit sous
+# tests/reference/). `nouveau` est ce que produit le moteur ; chaque témoin en
+# tire la référence « commitée » (état d'avant) en défaisant le seul
+# changement qu'il teste. Deux témoins rejouent des cas réels : celui de #37
+# sur R1 recalculé (aplatis), remis en double en mémoire, et le constat de la
+# permutation (g_permute_r6, construit plus haut) pour la garde 3.2.
+fichier_courant("références de non-régression (ADR 0009, point 9.5) : mécanisme générique des transitions, témoins (#47)")
+
+verifier("transitions en cours : liste bien formée (champs, issues, plans de référence, natures)", {
+  p <- valider_transitions(TRANSITIONS_EN_COURS)
+  if (length(p)) p else TRUE
+})
+
+local({
+  nouveau <- list(
+    types = c("fiche/empreintes/donnees" = "character", "fiche/version" = "character", "s/taux" = "double",
+              "s/cellules" = "integer", "s/n" = "integer", "s/nouveau" = "integer"),
+    valeurs = list("fiche/empreintes/donnees" = strrep("a", 32L), "fiche/version" = "v2", "s/taux" = c(0.1, 0.2, 0.3),
+                   "s/cellules" = c(149L, 75L), "s/n" = c(1L, 2L, 3L), "s/nouveau" = 7L))
+  # États d'avant, un par nature.
+  def_type <- function(r) { r$types[["s/cellules"]] <- "double"; r$valeurs[["s/cellules"]] <- c(149, 75); r }
+  def_valeur <- function(r) { r$valeurs[["s/taux"]][3L] <- 0.35; r }
+  def_chaine <- function(r) { r$valeurs[["fiche/version"]] <- "v1"; r }
+  def_ajout <- function(r) { r$types <- r$types[names(r$types) != "s/nouveau"]; r$valeurs <- r$valeurs[names(r$valeurs) != "s/nouveau"]; r }
+  def_retrait <- function(r) { r$types[["s/ancien"]] <- "integer"; r$valeurs[["s/ancien"]] <- 5L; r }
+  derive <- function(r) { r$valeurs[["s/n"]][2L] <- 9L; r }  # dérive non déclarée
+  ch <- list(
+    type = list(chemin = "s/cellules", nature = "type", de = "double", vers = "integer"),
+    valeur = list(chemin = "s/taux", nature = "valeur", valeurs = 0.3, positions = 3L),
+    "valeur de chaîne" = list(chemin = "fiche/version", nature = "valeur de chaîne", valeurs = "v2"),
+    ajout = list(chemin = "s/nouveau", nature = "ajout", type = "integer", longueur = 1L),
+    retrait = list(chemin = "s/ancien", nature = "retrait", type = "integer", longueur = 1L))
+  avant <- list(type = def_type, valeur = def_valeur, "valeur de chaîne" = def_chaine, ajout = def_ajout, retrait = def_retrait)
+  strict <- function(ref, g) { r <- comparer_references(ref, g); if (r$ok) TRUE else "comparaison en échec" }
+  fixe <- function(...) list(...)
+  # Statuts enregistrés par un appel du harnais, sans les conserver au bilan.
+  lignes_de <- function(expr) {
+    anciennes <- .harnais$lignes; fichier <- .harnais$fichier
+    on.exit({ .harnais$lignes <- anciennes; .harnais$fichier <- fichier })
+    utils::capture.output(expr)
+    .harnais$lignes[seq_len(nrow(.harnais$lignes)) > nrow(anciennes), , drop = FALSE]
+  }
+  tr <- function(issue, plans, ...) list(issue = issue, plans = plans, changements = list(...))
+
+  for (n in NATURES_TRANSITION) {
+    old <- avant[[n]](nouveau)
+    verifier(sprintf("témoin 9.5, nature « %s » : la comparaison stricte échoue, le seul écart déclaré passe", n),
+             !comparer_references(old, nouveau)$ok && isTRUE(seul_ecart(old, nouveau, fixe(ch[[n]]))))
+    verifier(sprintf("témoin 9.5, nature « %s » : un écart non déclaré en plus échoue", n),
+             is.character(seul_ecart(derive(old), nouveau, fixe(ch[[n]]))))
+    verifier(sprintf("témoin 9.5, nature « %s » : le changement non déclaré échoue", n),
+             is.character(seul_ecart(old, nouveau, list())))
+  }
+  mauvais <- function(old, changement, motif) {
+    r <- seul_ecart(old, nouveau, fixe(changement))
+    if (is.character(r) && grepl(motif, r, fixed = TRUE, useBytes = TRUE)) TRUE else sprintf("résultat : %s", paste(r, collapse = " "))
+  }
+  verifier("témoin 9.5, valeur : valeur déclarée différente de celle de l'objet -> échec",
+           is.character(seul_ecart(def_valeur(nouveau), nouveau, fixe(modifyList(ch$valeur, list(valeurs = 0.31))))))
+  verifier("témoin 9.5, valeur de chaîne : chaîne déclarée différente de celle de l'objet -> échec",
+           is.character(seul_ecart(def_chaine(nouveau), nouveau, fixe(modifyList(ch[["valeur de chaîne"]], list(valeurs = "v3"))))))
+  verifier("témoin 9.5, type : conversion avec perte (valeurs non entières) refusée",
+           mauvais({ o <- def_type(nouveau); o$valeurs[["s/cellules"]][1L] <- 149.5; o }, ch$type, "avec perte"))
+  verifier("témoin 9.5, type : type de la référence autre que le type déclaré refusé",
+           mauvais(def_type(nouveau), modifyList(ch$type, list(chemin = "fiche/version")), "type character de la référence"))
+  verifier("témoin 9.5, type : chemin absent de la référence refusé",
+           mauvais(def_type(nouveau), modifyList(ch$type, list(chemin = "s/inconnu")), "absent de la référence"))
+  verifier("témoin 9.5, valeur : positions hors du vecteur refusées",
+           mauvais(def_valeur(nouveau), modifyList(ch$valeur, list(positions = 4L)), "valeur(s) déclarée(s)"))
+  verifier("témoin 9.5, valeur : nature « valeur » sur un chemin character refusée",
+           mauvais(def_chaine(nouveau), modifyList(ch$valeur, list(chemin = "fiche/version")), "incompatible"))
+  verifier("témoin 9.5, ajout : chemin absent de l'objet refusé",
+           mauvais(def_ajout(nouveau), modifyList(ch$ajout, list(chemin = "s/inconnu")), "absent de l'objet"))
+  verifier("témoin 9.5, retrait : chemin encore présent dans l'objet refusé",
+           mauvais(def_ajout(nouveau), modifyList(ch$retrait, list(chemin = "s/n")), "encore présent"))
+
+  # Plusieurs transitions simultanées sur un même plan : union.
+  ref_tout <- def_retrait(def_ajout(def_chaine(def_valeur(def_type(nouveau)))))
+  t_a <- tr("#901", c("R1", "R2"), ch$type, ch$valeur)
+  t_b <- tr("#902", "R1", ch[["valeur de chaîne"]], ch$ajout, ch$retrait)
+  verifier("témoin 9.5, union : deux transitions (cinq natures, issues différentes) sur un même plan -> seul écart", {
+    u <- changements_du_plan("R1", list(t_a, t_b))
+    length(u$changements) == 5L && identical(u$issues, c("#901", "#902")) &&
+      isTRUE(seul_ecart(ref_tout, nouveau, u$changements)) && !comparer_references(ref_tout, nouveau)$ok
+  })
+  verifier("témoin 9.5, union : la transition sur un autre plan ne s'ajoute pas ; chaque transition est nécessaire", {
+    u2 <- changements_du_plan("R2", list(t_a, t_b))$changements
+    length(u2) == 2L && is.character(seul_ecart(ref_tout, nouveau, u2)) &&
+      is.character(seul_ecart(ref_tout, nouveau, changements_du_plan("R1", list(t_a))$changements))
+  })
+  # Même chemin : positions disjointes (deux issues), natures différentes
+  # (type puis valeur) dans l'un ou l'autre ordre, conflit, idempotence.
+  n2 <- nouveau; n2$valeurs[["s/cellules"]] <- c(149L, 80L); n2$valeurs[["s/taux"]] <- c(0.15, 0.2, 0.3)
+  old2 <- def_type(n2); old2$valeurs[["s/taux"]][1L] <- 0.1; old2$valeurs[["s/taux"]][3L] <- 0.35
+  v1 <- list(chemin = "s/taux", nature = "valeur", valeurs = 0.15, positions = 1L)
+  v3 <- list(chemin = "s/taux", nature = "valeur", valeurs = 0.3, positions = 3L)
+  vc <- list(chemin = "s/cellules", nature = "valeur", valeurs = 80L, positions = 2L)
+  old2$valeurs[["s/cellules"]] <- c(149, 75)
+  verifier("témoin 9.5, union sur un même chemin : positions disjointes de deux issues -> seul écart", {
+    u <- changements_du_plan("R1", list(tr("#903", "R1", v1, ch$type), tr("#904", "R1", v3, vc)))$changements
+    isTRUE(seul_ecart(old2, n2, u)) && is.character(seul_ecart(old2, n2, fixe(v1, ch$type, vc)))
+  })
+  verifier("témoin 9.5, union sur un même chemin : type et valeur du même chemin, dans l'un ou l'autre ordre", {
+    isTRUE(seul_ecart(old2, n2, fixe(v1, v3, ch$type, vc))) && isTRUE(seul_ecart(old2, n2, fixe(vc, v3, v1, ch$type)))
+  })
+  verifier("témoin 9.5, union sur un même chemin : deux valeurs différentes à une même position -> conflit", {
+    r <- seul_ecart(old2, n2, fixe(ch$type, vc, v1, v3, modifyList(v3, list(valeurs = 0.31))))
+    is.character(r) && grepl("deux transitions", r, fixed = TRUE, useBytes = TRUE)
+  })
+  verifier("témoin 9.5, union sur un même chemin : même valeur déclarée deux fois (deux issues) -> sans conflit",
+           isTRUE(seul_ecart(old2, n2, fixe(ch$type, ch$type, vc, vc, v1, v3, v3))))
+
+  # Branchement par plan : plan listé, plan resté listé après la
+  # régénération (succès inattendu), plan non listé.
+  statuts <- function(id, ref, transitions, g = nouveau, donnees = NULL, roles = NULL) {
+    l <- lignes_de(controler_plan(id, sprintf("%s : comparaison stricte", id), ref, g, strict(ref, g), transitions, donnees, roles))
+    stats::setNames(l$statut, NULL)
+  }
+  verifier("témoin 9.5, plan listé : test « seul écart » réussi et comparaison stricte en échec attendu renvoyant à l'issue", {
+    l <- lignes_de(controler_plan("R1", "R1 : stricte", def_type(nouveau), nouveau, strict(def_type(nouveau), nouveau), list(tr("#901", "R1", ch$type))))
+    identical(l$statut, c("OK", "ATTENDU")) && grepl("{#901}", l$nom[2L], fixed = TRUE, useBytes = TRUE) &&
+      grepl("#901", l$nom[1L], fixed = TRUE, useBytes = TRUE)
+  })
+  verifier("témoin 9.5, plans de deux issues : l'échec attendu renvoie à la première issue de la liste",
+           grepl("{#901}", lignes_de(controler_plan("R1", "R1 : stricte", ref_tout, nouveau, strict(ref_tout, nouveau), list(t_a, t_b)))$nom[2L],
+                 fixed = TRUE, useBytes = TRUE))
+  verifier("témoin 9.5, plan resté listé après la régénération : « seul écart » en échec (changement non observé) et succès inattendu (la batterie échouerait)",
+           identical(statuts("R1", nouveau, list(t_a)), c("ECHEC", "INATTENDU")))
+  verifier("témoin 9.5, plan listé et écart non déclaré : « seul écart » en échec, comparaison stricte en échec attendu",
+           identical(statuts("R1", derive(def_type(nouveau)), list(tr("#901", "R1", ch$type))), c("ECHEC", "ATTENDU")))
+  verifier("témoin 9.5, plan non listé : test ordinaire, en échec sur un écart (R2 absent de la transition de R1)",
+           identical(statuts("R2", def_type(nouveau), list(tr("#901", "R1", ch$type))), "ECHEC"))
+  verifier("témoin 9.5, plan non listé : test ordinaire, réussi sans écart",
+           identical(statuts("R2", nouveau, list(tr("#901", "R1", ch$type))), "OK") && identical(statuts("R1", nouveau, list()), "OK"))
+
+  # Mal formé : chaque défaut de forme est relevé.
+  bien <- list(tr("#901", "R1", ch$type, ch$valeur, ch[["valeur de chaîne"]], ch$ajout, ch$retrait))
+  verifier("témoin 9.5, forme : une transition bien formée et la liste vide sont acceptées",
+           !length(valider_transitions(bien)) && !length(valider_transitions(list())))
+  for (cas in list(
+    list("nature inconnue", list(tr("#901", "R1", list(chemin = "s/n", nature = "quelconque")))),
+    list("issue sans #", list(tr("37", "R1", ch$ajout))),
+    list("issue en double", list(tr("#901", "R1", ch$ajout), tr("#901", "R2", ch$retrait))),
+    list("plan de référence inconnu", list(tr("#901", "R9", ch$ajout))),
+    list("aucun changement", list(tr("#901", "R1"))),
+    list("champ hors de la nature (valeurs sur un type)", list(tr("#901", "R1", modifyList(ch$type, list(valeurs = 1))))),
+    list("conversion de type hors double / integer", list(tr("#901", "R1", modifyList(ch$type, list(vers = "character"))))),
+    list("valeurs sans positions de même longueur", list(tr("#901", "R1", modifyList(ch$valeur, list(positions = 1:2))))),
+    list("positions dupliquées", list(tr("#901", "R1", modifyList(ch$valeur, list(valeurs = c(1, 2), positions = c(1L, 1L)))))),
+    list("valeur de chaîne numérique", list(tr("#901", "R1", modifyList(ch[["valeur de chaîne"]], list(valeurs = 1)))))))
+    verifier(sprintf("témoin 9.5, forme : %s -> relevé par valider_transitions()", cas[[1L]]), length(valider_transitions(cas[[2L]])) > 0L)
+
+  # Doubles sans tolérance déclarée des références à régénérer.
+  verifier("témoin 9.5, restes : type converti depuis double et retrait de type double admis ; retrait d'un autre type, valeur, ajout et autre plan non admis", {
+    restes <- list(R1 = c("s/cellules", "s/vieux", "s/ancien", "s/taux"), R2 = "s/cellules")
+    vieux <- list(chemin = "s/vieux", nature = "retrait", type = "double", longueur = 1L)
+    r <- restes_hors_transitions(restes, list(tr("#901", "R1", ch$type, vieux, ch$retrait, ch$valeur, ch$ajout)))
+    identical(r$R1, c("s/ancien", "s/taux")) && identical(r$R2, "s/cellules") &&
+      identical(issue_des_restes(list(tr("#902", "R1", ch$valeur), tr("#901", "R1", ch$type))), "#901")
+  })
+
+  # Changement de longueur : « valeur » sans positions remplace tout le vecteur.
+  n3 <- nouveau; n3$valeurs[["s/n"]] <- c(1L, 2L)
+  v_entier <- list(chemin = "s/n", nature = "valeur", valeurs = c(1L, 2L))
+  verifier("témoin 9.5, longueur : vecteur entier de longueur 3 -> 2 déclaré sans positions -> seul écart ; sans déclaration -> échec", {
+    isTRUE(seul_ecart(nouveau, n3, fixe(v_entier))) && is.character(seul_ecart(nouveau, n3, list())) &&
+      is.character(seul_ecart(nouveau, n3, fixe(modifyList(v_entier, list(valeurs = c(1L, 3L))))))
+  })
+  verifier("témoin 9.5, longueur : longueur changée avec positions -> refusée", {
+    r <- seul_ecart(nouveau, n3, fixe(modifyList(v_entier, list(positions = 1:3))))
+    r2 <- seul_ecart(nouveau, n3, fixe(modifyList(v_entier, list(positions = 1:2))))
+    is.character(r) && is.character(r2)
+  })
+  verifier("témoin 9.5, longueur : chaîne, 3 -> 1 élément sans positions -> seul écart", {
+    a <- nouveau; a$valeurs[["fiche/version"]] <- c("v2", "v3", "v4")
+    isTRUE(seul_ecart(a, nouveau, fixe(list(chemin = "fiche/version", nature = "valeur de chaîne", valeurs = "v2"))))
+  })
+
+  # Ajout et retrait : type et longueur déclarés, vérifiés.
+  for (cas in list(
+    list("ajout, type faux", def_ajout(nouveau), modifyList(ch$ajout, list(type = "double"))),
+    list("ajout, longueur fausse", def_ajout(nouveau), modifyList(ch$ajout, list(longueur = 2L))),
+    list("retrait, type faux", def_retrait(nouveau), modifyList(ch$retrait, list(type = "double"))),
+    list("retrait, longueur fausse", def_retrait(nouveau), modifyList(ch$retrait, list(longueur = 3L)))))
+    verifier(sprintf("témoin 9.5, %s -> refusé", cas[[1L]]), is.character(seul_ecart(cas[[2L]], nouveau, fixe(cas[[3L]]))))
+
+  # Règle « observé » : jugée sur la référence lue, avant alignement.
+  non_observe <- function(old, changements) {
+    r <- seul_ecart(old, nouveau, changements)
+    if (is.character(r) && grepl("changement déclaré non observé", r, fixed = TRUE, useBytes = TRUE)) TRUE else sprintf("résultat : %s", paste(r, collapse = " "))
+  }
+  verifier("témoin 9.5, observé : retrait d'un chemin absent des deux côtés -> refusé", non_observe(nouveau, fixe(ch$retrait)))
+  verifier("témoin 9.5, observé : ajout d'un chemin déjà présent dans la référence -> refusé", non_observe(nouveau, fixe(ch$ajout)))
+  verifier("témoin 9.5, observé : type déjà converti dans la référence -> refusé", non_observe(nouveau, fixe(ch$type)))
+  verifier("témoin 9.5, observé : valeur déclarée égale à celle de la référence (une position, vecteur entier) -> refusé",
+           isTRUE(non_observe(nouveau, fixe(ch$valeur))) && isTRUE(non_observe(nouveau, fixe(ch[["valeur de chaîne"]]))) &&
+             isTRUE(non_observe(nouveau, fixe(modifyList(ch$valeur, list(positions = NULL, valeurs = c(0.1, 0.2, 0.3)))))))
+  verifier("témoin 9.5, observé : une position déclarée sur deux égale à la référence -> refusé",
+           isTRUE(non_observe(def_valeur(nouveau), fixe(modifyList(ch$valeur, list(positions = c(1L, 3L), valeurs = c(0.1, 0.3)))))))
+  verifier("témoin 9.5, observé : un seul des changements d'une union non observé -> refusé",
+           isTRUE(non_observe(def_valeur(nouveau), fixe(ch$valeur, ch$type))))
+
+  # Union : déclarations contradictoires.
+  verifier("témoin 9.5, union : vecteur entier et autre déclaration de valeurs sur le même chemin -> erreur", {
+    r <- seul_ecart(def_valeur(nouveau), nouveau, fixe(modifyList(ch$valeur, list(positions = NULL, valeurs = c(0.1, 0.2, 0.3))), ch$valeur))
+    is.character(r) && grepl("vecteur entier", r, fixed = TRUE, useBytes = TRUE)
+  })
+  verifier("témoin 9.5, union : deux conversions de type différentes sur le même chemin -> erreur", {
+    r <- seul_ecart(def_type(nouveau), nouveau, fixe(ch$type, modifyList(ch$type, list(de = "integer", vers = "double"))))
+    is.character(r) && grepl("deux conversions", r, fixed = TRUE, useBytes = TRUE)
+  })
+  verifier("témoin 9.5, union : ajout ou retrait combiné à une autre nature sur le même chemin -> erreur", {
+    a <- seul_ecart(def_ajout(nouveau), nouveau, fixe(ch$ajout, modifyList(ch$valeur, list(chemin = "s/nouveau"))))
+    b <- seul_ecart(def_retrait(nouveau), nouveau, fixe(ch$retrait, ch$retrait, modifyList(ch$type, list(chemin = "s/ancien"))))
+    is.character(a) && grepl("ajout ou retrait combiné", a, fixed = TRUE, useBytes = TRUE) &&
+      is.character(b) && grepl("ajout ou retrait combiné", b, fixed = TRUE, useBytes = TRUE)
+  })
+  verifier("témoin 9.5, union : deux déclarations identiques (ajout, retrait, type) s'appliquent une fois", {
+    isTRUE(seul_ecart(def_retrait(def_ajout(def_type(nouveau))), nouveau, fixe(ch$ajout, ch$retrait, ch$type, ch$ajout, ch$retrait, ch$type)))
+  })
+
+  # Forme : champs de l'ajout et du retrait ; empreinte des données.
+  for (cas in list(
+    list("ajout sans type ni longueur", list(chemin = "s/nouveau", nature = "ajout")),
+    list("retrait de type hors du format", modifyList(ch$retrait, list(type = "complexe"))),
+    list("retrait de longueur négative", modifyList(ch$retrait, list(longueur = -1))),
+    list("empreinte des données en nature « valeur »", list(chemin = CHEMIN_EMPREINTE_DONNEES, nature = "valeur", valeurs = 1)),
+    list("empreinte des données avec positions", list(chemin = CHEMIN_EMPREINTE_DONNEES, nature = "valeur de chaîne", valeurs = "a", positions = 1L)),
+    list("empreinte des données retirée", list(chemin = CHEMIN_EMPREINTE_DONNEES, nature = "retrait", type = "character", longueur = 1L))))
+    verifier(sprintf("témoin 9.5, forme : %s -> relevé par valider_transitions()", cas[[1L]]),
+             length(valider_transitions(list(tr("#901", "R1", cas[[2L]])))) > 0L)
+  verifier("témoin 9.5, forme : l'empreinte des données en « valeur de chaîne » sans positions est acceptée",
+           !length(valider_transitions(list(tr("#901", "R1", list(chemin = CHEMIN_EMPREINTE_DONNEES, nature = "valeur de chaîne", valeurs = "a"))))))
+
+  # Garde 3.2 : l'entrée est inchangée sous la représentation de la référence.
+  d <- data.frame(c = c("deces", "en_cours", NA), e = as.Date(c("2020-03-01", "2016-05-20", "2024-02-29")),
+                  it = c(1L, 2L, 3L), stringsAsFactors = FALSE)
+  rl <- c(cause_sortie = "c", date_entree = "e", id_tete = "it")
+  rep_g <- tablexp:::ENTETE_CANONIQUE; emp_g <- tablexp:::empreinte_donnees(d, rl)
+  # Empreinte de la référence, calculée ici : texte canonique complet, en-tête
+  # remplacé par une chaîne, MD5 du fichier.
+  f_t <- tempfile(); tablexp:::texte_canonique(d, rl, f_t)
+  texte <- rawToChar(readBin(f_t, "raw", file.info(f_t)$size)); unlink(f_t)
+  rep_r <- "tablexp canonique 0"
+  stopifnot(startsWith(texte, rep_g))
+  writeBin(charToRaw(paste0(rep_r, substring(texte, nchar(rep_g) + 1L))), f_t)
+  emp_r <- unname(tools::md5sum(f_t)); unlink(f_t)
+  objet_emp <- function(rep, emp) list(types = stats::setNames(c("character", "character"), c(CHEMIN_EMPREINTE_DONNEES, CHEMIN_REPRESENTATION)),
+                                       valeurs = stats::setNames(list(emp, rep), c(CHEMIN_EMPREINTE_DONNEES, CHEMIN_REPRESENTATION)))
+  g_s <- objet_emp(rep_g, emp_g); ref_s <- objet_emp(rep_r, emp_r)
+  ch_emp <- list(chemin = CHEMIN_EMPREINTE_DONNEES, nature = "valeur de chaîne", valeurs = emp_g)
+  ch_rep <- list(chemin = CHEMIN_REPRESENTATION, nature = "valeur de chaîne", valeurs = rep_g)
+  t_e <- tr("#905", "R1", ch_emp, ch_rep)
+  verifier("témoin 9.5, garde 3.2 (a) : entrée inchangée sous la représentation de la référence -> TRUE ; plan complet : seul écart, garde, échec attendu",
+           isTRUE(entree_inchangee(ref_s, g_s, d, rl)) && identical(statuts("R1", ref_s, list(t_e), g_s, d, rl), c("OK", "OK", "ATTENDU")))
+  verifier("témoin 9.5, garde 3.2 (b) : une valeur de l'entrée altérée -> échec (raison citant l'empreinte) ; plan complet : garde en échec", {
+    d2 <- d; d2$it[2L] <- 9L
+    r <- entree_inchangee(ref_s, g_s, d2, rl)
+    is.character(r) && grepl("l'entrée a changé", r, fixed = TRUE, useBytes = TRUE) &&
+      identical(statuts("R1", ref_s, list(t_e), g_s, d2, rl), c("OK", "ECHEC", "ATTENDU"))
+  })
+  verifier("témoin 9.5, garde 3.2 (c) : même représentation des deux côtés -> échec ; plan complet : garde en échec", {
+    ref_c <- objet_emp(rep_g, emp_r)
+    r <- entree_inchangee(ref_c, g_s, d, rl)
+    is.character(r) && grepl("identique des deux côtés", r, fixed = TRUE, useBytes = TRUE) &&
+      identical(statuts("R1", ref_c, list(tr("#905", "R1", ch_emp)), g_s, d, rl), c("OK", "ECHEC", "ATTENDU"))
+  })
+  verifier("témoin 9.5, garde 3.2 (d) : empreinte déclarée sans changement de représentation déclaré -> garde en échec, citant la représentation", {
+    # Représentation identique des deux côtés : « seul écart » réussit (seule l'empreinte diffère), la garde échoue.
+    ref_d <- objet_emp(rep_g, strrep("0", 32L))
+    l <- lignes_de(controler_plan("R1", "R1 : stricte", ref_d, g_s, strict(ref_d, g_s), list(tr("#905", "R1", ch_emp)), d, rl))
+    identical(l$statut, c("OK", "ECHEC", "ATTENDU")) && grepl(CHEMIN_REPRESENTATION, l$message[2L], fixed = TRUE, useBytes = TRUE) &&
+      grepl("non déclaré", l$message[2L], fixed = TRUE, useBytes = TRUE)
+  })
+  verifier("témoin 9.5, garde 3.2 (e) : constat de la permutation rejoué sur R6 permuté (déjà construit) : les trois chaînes déclarées -> seul écart réussi, garde en échec", {
+    g0 <- aplatis[["R6"]]
+    chaines <- c(CHEMIN_EMPREINTE_DONNEES, "etapes/donnees/resultat/lignes_conservees/@empreinte",
+                 "etapes/donnees/resultat/observations/@empreinte")
+    ch3 <- lapply(chaines, function(c_) list(chemin = c_, nature = "valeur de chaîne", valeurs = g_permute_r6$valeurs[[c_]]))
+    l <- lignes_de(controler_plan("R6", "R6 : stricte", g0, g_permute_r6, strict(g0, g_permute_r6), list(tr("#905", "R6", ch3[[1L]], ch3[[2L]], ch3[[3L]])),
+                                  jeu_ref$donnees, jeu_ref$roles))
+    identical(l$statut[1:2], c("OK", "ECHEC")) &&
+      is.character(entree_inchangee(g0, g_permute_r6, jeu_ref$donnees, jeu_ref$roles))
+  })
+  verifier("témoin 9.5, garde 3.2 : le texte canonique de l'entrée est calculé une seule fois pour une même entrée (cache)", {
+    entree_inchangee(ref_s, g_s, d, rl)
+    o <- CACHE_ENTREE$octets
+    entree_inchangee(ref_s, g_s, d, rl)
+    identical(o, CACHE_ENTREE$octets) && identical(CACHE_ENTREE$donnees, d)
+  })
+
+  # Impression de la troisième cause d'une entrée différente.
+  verifier("témoin 9.5, impression : représentation différente -> troisième cause nommée avec les deux valeurs ; représentation identique ou empreinte égale -> absente", {
+    cause <- function(r) any(grepl("la représentation canonique a changé", imprimer_comparaison(r), fixed = TRUE, useBytes = TRUE))
+    r1 <- comparer_references(ref_s, g_s)
+    l1 <- imprimer_comparaison(r1)
+    r2 <- comparer_references(objet_emp(rep_g, emp_r), g_s)
+    r3 <- comparer_references(objet_emp(rep_r, emp_g), objet_emp(rep_g, emp_g))
+    identical(r1$entree$representation_reference, rep_r) && identical(r1$entree$representation_obtenue, rep_g) && cause(r1) &&
+      any(grepl(sprintf("« %s » (référence) contre « %s » (obtenu)", rep_r, rep_g), l1, fixed = TRUE, useBytes = TRUE)) &&
+      !cause(r2) && !cause(r3)
+  })
+
+  # Harnais : lignes_de() sans aucune ligne déjà enregistrée.
+  verifier("témoin 9.5, lignes_de() : harnais sans ligne enregistrée -> toutes les nouvelles lignes rendues", {
+    essai <- function() {
+      sauve <- .harnais$lignes; on.exit(.harnais$lignes <- sauve)
+      .harnais$lignes <- sauve[0L, ]
+      lignes_de(verifier("x", TRUE))
+    }
+    identical(essai()$statut, "OK") && identical(nrow(lignes_de(NULL)), 0L)
+  })
+
+  # Cas de #37 rejoué sur R1 : l'objet recalculé, remis au type double en
+  # mémoire comme référence d'avant, ne diffère de l'objet que par le type de
+  # ce chemin.
+  verifier("témoin 9.5, cas de #37 rejoué sur R1 : objet recalculé remis en double en mémoire, seul écart déclaré, reste admis", {
+    c_ <- "etapes/exposition/diagnostics/cellules"
+    g <- aplatis[["R1"]]
+    if (!identical(unname(g$types[c_]), "integer")) return("cellules de R1 : un chemin integer attendu")
+    ref <- g
+    ref$types[[c_]] <- "double"; ref$valeurs[[c_]] <- as.double(ref$valeurs[[c_]])
+    t <- tr("#901", "R1", list(chemin = c_, nature = "type", de = "double", vers = "integer"))
+    !comparer_references(ref, g)$ok && isTRUE(seul_ecart(ref, g, t$changements)) && identical(doubles_sans_tolerance(ref), c_) &&
+      !length(restes_hors_transitions(list(R1 = doubles_sans_tolerance(ref)), list(t))$R1)
+  })
+})
 
 bilan()

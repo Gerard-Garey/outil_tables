@@ -57,6 +57,7 @@ charger_utf8 <- function(fichier, envir) {
 
 FORMAT_REFERENCE <- "tablexp reference 1"
 CHEMIN_EMPREINTE_DONNEES <- "fiche/empreintes/donnees"
+CHEMIN_REPRESENTATION <- "fiche/empreintes/representation"
 CHEMIN_RESUMES <- "etapes/donnees/resultat"
 RESUMES_PAR_EMPREINTE <- c("lignes_conservees", "numeros_conserves", "lignes_exclues",
                            "observations", "observation_des_lignes")
@@ -503,7 +504,12 @@ comparer_references <- function(reference, obtenu, tolerances = TOLERANCES) {
   # Entrée, en premier (point 3.2).
   e_r <- if (CHEMIN_EMPREINTE_DONNEES %in% ch_r) reference$valeurs[[CHEMIN_EMPREINTE_DONNEES]] else NA_character_
   e_o <- if (CHEMIN_EMPREINTE_DONNEES %in% ch_o) obtenu$valeurs[[CHEMIN_EMPREINTE_DONNEES]] else NA_character_
-  entree <- list(reference = e_r, obtenu = e_o, differente = !identical(e_r, e_o))
+  # Représentation canonique des deux côtés (NA si absente) : troisième cause
+  # d'une entrée différente (annotation du 19/10/2026 (troisième), (f)).
+  rep_de <- function(g) if (CHEMIN_REPRESENTATION %in% names(g$types) && length(g$valeurs[[CHEMIN_REPRESENTATION]]) == 1L)
+    as.character(g$valeurs[[CHEMIN_REPRESENTATION]]) else NA_character_
+  entree <- list(reference = e_r, obtenu = e_o, differente = !identical(e_r, e_o),
+                 representation_reference = rep_de(reference), representation_obtenue = rep_de(obtenu))
   # Exigée des deux côtés (point 3.2) : son absence n'est jamais une égalité.
   for (cote in c("référence", "obtenu"))
     if (anyNA(if (cote == "obtenu") e_o else e_r))
@@ -590,7 +596,11 @@ imprimer_comparaison <- function(r, titre = "") {
     c(sprintf("  ENTRÉE DIFFÉRENTE : empreinte des données %s (référence) contre %s (obtenu)",
               r$entree$reference, r$entree$obtenu),
       "  entrée différente : écarts non interprétables comme un tableau avant / après ;",
-      "  causes possibles : le simulateur a changé pour cette graine (ADR 0009, point 4.2), ou la plateforme a produit un tirage différent (ADR 0008, hypothèse sur la libm)")
+      "  causes possibles : le simulateur a changé pour cette graine (ADR 0009, point 4.2), ou la plateforme a produit un tirage différent (ADR 0008, hypothèse sur la libm)",
+      if (!is.na(r$entree$representation_reference) && !is.na(r$entree$representation_obtenue) &&
+          !identical(r$entree$representation_reference, r$entree$representation_obtenue))
+        sprintf("  ou la représentation canonique a changé (%s : « %s » (référence) contre « %s » (obtenu)) ; une entrée inchangée se prouve par la garde 3.2 de tests/test_reproductibilite.R",
+                CHEMIN_REPRESENTATION, r$entree$representation_reference, r$entree$representation_obtenue))
     else sprintf("  Entrée : empreinte des données identique (%s)", r$entree$reference))
   out <- c(out, sprintf("  Bilan : %d grandeur(s) comparée(s) ; %d identique(s) au bit près ; %d à écart non nul sous tolérance ; %d en écart ; %d sans tolérance déclarée ; %d écart(s) structurel(s)",
                         nrow(g), sum(g$verdict == "identique"), sum(g$verdict == "sous tolérance"),
