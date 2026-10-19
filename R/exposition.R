@@ -242,14 +242,17 @@ somme_par_cellule <- function(cellule, v, n_cellules) {
 # où il ne déborde pas ; au-delà de .Machine$integer.max la recette refuse
 # (motif trop_de_cellules) avant les allocations par cellule : tabulate()
 # refuse un nbins d'au moins 2^31 (« attempt to make a table with >= 2^31
-# elements », mesuré).
-nombre_cellules <- function(n_age, n_an) {
+# elements », mesuré). Le libellé (deux conversions : le nombre, la limite) et le
+# nom du diagnostic se précisent pour la garde de la matrice de présence (#45),
+# qui compte des couples (segment, âge) et non des cellules.
+nombre_cellules <- function(n_age, n_an,
+                            libelle = "La table compterait %s cellules, au-delà de %d : segmentation trop fine ou plage d'âges et d'années trop étendue.",
+                            diagnostic = "cellules") {
   n <- sum(as.double(n_age) * n_an)
   if (n > .Machine$integer.max)
     refuser("exposition", "trop_de_cellules",
-            sprintf("La table compterait %s cellules, au-delà de %d : segmentation trop fine ou plage d'âges et d'années trop étendue.",
-                    format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
-            list(cellules = n))
+            sprintf(libelle, format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
+            stats::setNames(list(n), diagnostic))
   as.integer(n)
 }
 
@@ -394,6 +397,13 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
     # Présence par (segment, âge) sur la plage globale des âges, puis
     # premier et dernier âge présents de chaque segment.
     x0 <- min(xs); etendue <- max(xs) - x0 + 1
+    # Garde de la matrice de présence (#45) : n_seg · etendue est la taille de
+    # cette matrice (couples (segment, âge) de la plage globale), non une borne
+    # du nombre de cellules ; même motif que plus bas, avant le tabulate() qui
+    # refuserait un nbins d'au moins 2^31.
+    nombre_cellules(etendue, n_seg,
+                    "Le décompte de présence des âges compterait %s couples (segment, âge), au-delà de %d : segmentation trop fine ou plage d'âges trop étendue.",
+                    "couples_presence")
     presence <- matrix(tabulate((gx - 1) * etendue + (xs - x0) + 1, nbins = n_seg * etendue) > 0L,
                        nrow = etendue)
     occupe <- colSums(presence) > 0
