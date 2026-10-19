@@ -220,14 +220,25 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
                                  convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
                                  unite_exposition = etapes[["exposition"]][["parametres"]][["unite_exposition"]],
                                  estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]],
-                                 observations = etapes[["donnees"]][["resultat"]][["observations"]],
+                                 observations = fenetres,
                                  transition = plan[["transition"]], periode = plan[["periode"]],
                                  delai_declaration = plan[["delai_declaration"]],
                                  parametres_exposition = etapes[["exposition"]][["parametres"]]),
       stop(sprintf("construire_table() : étape « %s » sans fonction d'étape (erreur de programmation).", nom),
            call. = FALSE))
     etapes[[nom]] <- r[c("parametres", "resultat", "diagnostics")]
+    # Transmission entre étapes hors de l'objet (#38) : fenêtres des
+    # observations rendues par `exposition` (préalable de `brut`, contrôlé
+    # par valider_plan()), passées à `brut` (argument observations, évalué
+    # pour Kaplan-Meier seulement) puis libérées ; ni dans etapes, ni dans
+    # la fiche. Conservées seulement si le plan retient Kaplan-Meier ; r est
+    # vidé en fin de tour, sinon il garde les fenêtres vivantes pendant l'étape
+    # suivante.
+    if (nom == "exposition")
+      fenetres <- if ("kaplan_meier" %in% etapes_plan[["brut"]][["estimateurs"]]) r[["fenetres"]]
+    if (nom == "brut") fenetres <- NULL
     avertissements <- rbind(avertissements, r$avertissements)
+    r <- NULL
   }
   rownames(avertissements) <- NULL
 

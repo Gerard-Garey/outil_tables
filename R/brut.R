@@ -288,29 +288,50 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
       !identical(p$transition$code, parametres_exposition$transition))
     stop(paste("taux_kaplan_meier() : période ou transition différente de celle de l'étape exposition",
                "(erreur de programmation)."), call. = FALSE)
-  manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
-  if (length(manquantes))
-    stop(sprintf("taux_kaplan_meier() : colonne(s) %s absente(s) des observations (erreur de programmation).",
-                 paste(manquantes, collapse = ", ")), call. = FALSE)
+  # observations (#38) : soit les fenêtres transmises par l'étape
+  # `exposition` (objet fenetres_exposition de calculer_exposition(), passé
+  # par construire_table()), reprises telles quelles après contrôle à
+  # l'égalité exacte de leurs paramètres : début et borne de la période,
+  # transition, segmentation (dont dépendent fenetres_observations() et
+  # segments_observations()), et convention (qu'elles ne prennent pas : ce
+  # contrôle vérifie la cohérence avec la convention de l'étape `exposition`
+  # qui a produit la table) ; soit, en appel direct, les observations de
+  # l'étape `donnees`, dont les fenêtres et segments sont recalculés à
+  # l'identique.
+  # La table d'exposition est appariée par clé (segment, âge), dans tout
+  # ordre de ses lignes.
+  if (inherits(observations, "fenetres_exposition")) {
+    fe <- observations
+    if (!identical(fe$debut, p$debut) || !identical(fe$borne, p$borne) ||
+        !identical(fe$transition, p$transition$code) || !identical(fe$convention, convention) ||
+        !identical(fe$segmentation, segmentation))
+      stop(paste("taux_kaplan_meier() : fenêtres transmises calculées sous une autre période, transition,",
+                 "convention ou segmentation (erreur de programmation)."), call. = FALSE)
+  } else {
+    manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
+    if (length(manquantes))
+      stop(sprintf("taux_kaplan_meier() : colonne(s) %s absente(s) des observations (erreur de programmation).",
+                   paste(manquantes, collapse = ", ")), call. = FALSE)
+    fe <- c(fenetres_observations(observations, p$debut, p$borne, p$transition$arrivee),
+            segments_observations(observations, segmentation))
+  }
   M <- as.numeric(DENOMINATEUR_INSTANTS)
   z <- stats::qnorm((1 - niveau) / 2, lower.tail = FALSE)
-  f <- fenetres_observations(observations, p$debut, p$borne, p$transition$arrivee)
-  sg <- segments_observations(observations, segmentation)
-  retenue <- which(f$a < f$b | f$evenement)
-  cn <- extraire_composantes(f$composantes, retenue)
-  pa <- position_dans_cellule(f$calendrier, cn, f$a[retenue], convention)
-  pb <- position_dans_cellule(f$calendrier, cn, f$b[retenue], convention)
+  retenue <- which(fe$a < fe$b | fe$evenement)
+  cn <- extraire_composantes(fe$composantes, retenue)
+  pa <- position_dans_cellule(fe$calendrier, cn, fe$a[retenue], convention)
+  pb <- position_dans_cellule(fe$calendrier, cn, fe$b[retenue], convention)
   # Clé entière de l'instant (A.1) : K = x M + j (M / L), M / L = 366 ou
   # 365 ; segments séparés par le décalage g * etendue, etendue > toute clé
   # (valeurs entières exactes en double).
   n <- nrow(exposition)
   etendue <- (max(c(0, pb$x, exposition$age)) + 2) * M
-  g <- sg$g[retenue]
+  g <- fe$g[retenue]
   ka <- g * etendue + pa$x * M + pa$j * (M / pa$longueur)
   kb <- g * etendue + pb$x * M + pb$j * (M / pb$longueur)
   if (length(kb) && max(kb) >= 2^53)
     stop("taux_kaplan_meier() : clé d'instant hors des entiers exacts (erreur de programmation).", call. = FALSE)
-  e <- f$evenement[retenue]
+  e <- fe$evenement[retenue]
 
   # Instants d'événement, d et r (ensemble à risque fermé, A.2).
   te <- sort(kb[e])
@@ -326,20 +347,31 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
   # lo et fin hi sur l'échelle des clés.
   gt <- if (length(segmentation))
     match(do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r"))),
-          do.call(paste, c(unname(as.list(sg$segments)), list(sep = "\r"))))
+          do.call(paste, c(unname(as.list(fe$segments)), list(sep = "\r"))))
   else rep(1, n)
   lo <- gt * etendue + exposition$age * M
   hi <- lo + M
+  # Appariement par clé (#38) : ligne de la table d'exposition de chaque
+  # instant, par le début de sa cellule ; aucune hypothèse sur l'ordre des
+  # lignes. Une clé (segment, âge) par ligne (par_annee est refusé).
   kr <- match(gj * etendue + xj * M, lo)
-  if (anyNA(kr) || anyNA(gt) || is.unsorted(kr))
+  if (anyDuplicated(lo))
+    stop("taux_kaplan_meier() : clé (segment, âge) en double dans la table d'exposition (erreur de programmation).",
+         call. = FALSE)
+  if (anyNA(kr) || anyNA(gt))
     stop("taux_kaplan_meier() : instant d'événement hors des cellules de la table d'exposition (erreur de programmation).",
          call. = FALSE)
 
-  # Sommes cumulées dans la cellule (les instants sont triés, les lignes
-  # aussi : kr est croissant au sens large). Sigma en double (A.7 :
-  # r (r - d) déborde en entiers).
+  # Sommes cumulées dans la cellule. Les instants tj sont triés et les
+  # cellules sont des intervalles disjoints [lo, hi) de l'échelle des clés :
+  # les instants d'une cellule forment une plage contiguë de tj, numérotée
+  # par plage, quel que soit l'ordre des lignes (kr n'est pas supposé
+  # croissant). Sigma en double (A.7 : r (r - d) déborde en entiers).
   rd <- as.numeric(r); dd <- as.numeric(d)
-  cumul <- function(v) if (!length(v)) numeric(0) else unlist(lapply(split(v, kr), cumsum), use.names = FALSE)
+  plage <- cumsum(c(TRUE, kr[-1L] != kr[-length(kr)]))
+  if (anyDuplicated(kr[!duplicated(plage)]))
+    stop("taux_kaplan_meier() : instants d'une cellule non contigus (erreur de programmation).", call. = FALSE)
+  cumul <- function(v) if (!length(v)) numeric(0) else unlist(lapply(split(v, plage), cumsum), use.names = FALSE)
   log_survie <- cumul(log1p(-dd / rd))
   sigma <- cumul(dd / (rd * (rd - dd)))
   dernier <- !duplicated(kr, fromLast = TRUE)
@@ -391,7 +423,7 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
   table$borne_sup_asymptotique <- sup_a
   table$etat <- etat
 
-  sauts <- sg$segments[gj, , drop = FALSE]
+  sauts <- fe$segments[gj, , drop = FALSE]
   rownames(sauts) <- NULL
   sauts$age <- as.integer(xj)
   sauts$numerateur <- as.integer(numerateur)
@@ -433,7 +465,9 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
 #   unite_exposition : unité de l'exposition centrale (étape `exposition`) ;
 #   estimateurs      : sous-ensemble de ESTIMATEURS_BRUT ;
 #   niveau           : niveau de confiance des intervalles ;
-#   observations     : observations de l'étape `donnees`, et transition,
+#   observations     : fenêtres transmises par l'étape `exposition`
+#                      (construire_table(), #38) ou observations de l'étape
+#                      `donnees` (appel direct), et transition,
 #                      periode, delai_declaration : champs du plan, et
 #                      parametres_exposition : paramètres de l'étape
 #                      `exposition` ; requis par Kaplan-Meier seulement

@@ -385,3 +385,58 @@ verifier("nombre_cellules : .Machine$integer.max admis ; un de plus -> refus tro
     warning = function(w) { avert <<- c(avert, conditionMessage(w)); invokeRestart("muffleWarning") })
   identical(r[[1L]], lim) && isTRUE(r[[2L]]) && isTRUE(r[[3L]]) && !length(avert)
 })
+# Garde de la matrice de présence (#45) : la taille n_seg · etendue de cette matrice passe par
+# nombre_cellules(etendue, n_seg), avant le tabulate() de présence. Une base de
+# cette taille est hors de portée d'un test : témoin par appel direct de la
+# garde, puis témoin de comportement sur une copie de calculer_exposition()
+# dont nombre_cellules() et tabulate() sont instrumentées.
+verifier("garde de présence : n_seg · etendue > .Machine$integer.max -> refus trop_de_cellules (appel direct) ; = integer.max admis ; libellé et diagnostic des deux variantes", {
+  lim <- .Machine$integer.max
+  lib <- "Le décompte de présence des âges compterait %s couples (segment, âge), au-delà de %d : segmentation trop fine ou plage d'âges trop étendue."
+  refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(c) c)
+  # Variante par défaut (#37) : message et diagnostic « cellules ».
+  rd <- refus(nombre_cellules(120, 2e7))
+  # Variante de présence (#45) : libellé et diagnostic « couples_presence ».
+  rp <- refus(nombre_cellules(120, 2e7, lib, "couples_presence"))
+  isTRUE(leve_refus(nombre_cellules(2, lim), "trop_de_cellules")) &&
+    identical(nombre_cellules(1, lim), lim) && identical(nombre_cellules(1, lim, lib, "couples_presence"), lim) &&
+    identical(rd$motif, "trop_de_cellules") && identical(names(rd$details), "cellules") && identical(rd$details$cellules, 2.4e9) &&
+    identical(conditionMessage(rd), sprintf("La table compterait %s cellules, au-delà de %d : segmentation trop fine ou plage d'âges et d'années trop étendue.", "2400000000", lim)) &&
+    identical(rp$motif, "trop_de_cellules") && identical(names(rp$details), "couples_presence") && identical(rp$details$couples_presence, 2.4e9) &&
+    identical(conditionMessage(rp), sprintf(lib, "2400000000", lim))
+})
+verifier("calculer_exposition : garde de présence avant le tabulate() de présence (garde au refus : trop_de_cellules, aucun tabulate ; garde passante : garde puis tabulate, résultat identique)", {
+  ns <- asNamespace("tablexp")
+  jours <- as.Date(c("1950-03-01", "1980-06-01", "2015-01-01", "2016-01-01", "2020-01-01", "2026-12-31"))
+  d <- data.frame(n = jours[1:2], e = jours[3:4], s = jours[5:6], c = c("deces", "deces"), stringsAsFactors = FALSE)
+  roles <- c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c")
+  per <- list(debut = as.Date("2015-01-01"), fin = as.Date("2024-12-31"))
+  vd <- list(depart = "vivant", arrivee = "deces")
+  plan <- list(transition = vd, periode = per, delai_declaration = 0, segmentation = character(0),
+               etapes = list(donnees = list(exclusions = character(0)),
+                             exposition = list(convention = "plus_fine", par_annee = FALSE)))
+  obs <- construire_table(d, roles, plan)$etapes$donnees$resultat$observations
+  appeler <- function(f) f(obs, roles, transition = vd, periode = per, delai_declaration = 0,
+                           segmentation = character(0), convention = "plus_fine", par_annee = FALSE)
+  original <- get("calculer_exposition", ns)
+  journal <- character(0)
+  instrumentee <- function(garde) {
+    env <- new.env(parent = ns)
+    env$nombre_cellules <- function(...) { journal <<- c(journal, "garde"); garde(...) }
+    env$tabulate <- function(bin, nbins) { journal <<- c(journal, "tabulate"); base::tabulate(bin, nbins) }
+    f <- original; environment(f) <- env
+    f
+  }
+  # Garde au refus (vraie fonction, argument au-delà de la limite, libellé et
+  # diagnostic transmis tels que l'appelant les donne) : aucun tabulate().
+  refus <- tryCatch(appeler(instrumentee(function(n_age, n_an, ...)
+                      nombre_cellules(.Machine$integer.max, 2, ...))),
+                    refus_tablexp = function(c) c)
+  j_refus <- journal
+  # Garde passante : la garde précède le premier tabulate(), résultat identique à l'original.
+  journal <- character(0)
+  r <- appeler(instrumentee(nombre_cellules))
+  identical(refus$motif, "trop_de_cellules") && identical(names(refus$details), "couples_presence") &&
+    grepl("^Le décompte de présence des âges compterait ", conditionMessage(refus)) && identical(j_refus, "garde") &&
+    identical(journal[1:2], c("garde", "tabulate")) && identical(r, appeler(original))
+})
