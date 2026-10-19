@@ -205,7 +205,7 @@ Rédigée par `architect` d'après les réponses du mainteneur du 19/10/2026, ra
 6. **Q6 — notes de lecture datées** portées dans `docs/exigences.md` : E4.5 (« plan effectif » = paire plan canonique, paramètres retenus ; point 5.2) et E3.7 (critère de rejeu par un tiers ; point 12). Elles sont écrites par le même commit `docs:` que la présente annotation ; les exigences elles-mêmes ne changent pas.
 7. **Q7 — refus nommé des dates hors de [0001-01-01, 9999-12-31]** dans le module `donnees` (point 4) : changement de comportement, non de résultat (R1 à R6 : dates de 1930 à 2024).
 
-**(b) Annotations conditionnelles levées.** Les annotations du 19/10/2026 de l'ADR 0005 (point 6) et de l'ADR 0007 (seconde, point 12 remplacé) étaient au statut « proposé, sous réserve de l'acceptation de l'ADR 0011 » : la condition est remplie ce jour ; elles valent à compter de la présente annotation, sans être réécrites. L'extension du point 3.2 de l'ADR 0009 (troisième annotation du 19/10/2026, (f)), qui réalise le point 2.5, est actée par la même décision (annotation du même jour de l'ADR 0009).
+**(b) Annotations conditionnelles levées.** Les annotations du 19/10/2026 de l'ADR 0005 (point 6) et de l'ADR 0007 (troisième, point 12 remplacé ; numérotée « seconde » à sa rédaction, M65) étaient au statut « proposé, sous réserve de l'acceptation de l'ADR 0011 » : la condition est remplie ce jour ; elles valent à compter de la présente annotation, sans être réécrites. L'extension du point 3.2 de l'ADR 0009 (troisième annotation du 19/10/2026, (f)), qui réalise le point 2.5, est actée par la même décision (annotation du même jour de l'ADR 0009).
 
 **(c) Précision de mise en œuvre pour #42** (décision du mainteneur du même jour, M64). Le retrait de `fiche/segmentation` n'a pas la même structure sur tous les plans : `character` de longueur 0 dans R2, de longueur 1 (`"sexe"`) dans R1, R3, R4, R5 et R6 (*vérifié* : `grep -n 'fiche/segmentation' tests/reference/R*.tsv`). La nature `retrait` déclarant un type et une longueur (ADR 0009, troisième annotation, (b)), une seule transition de #42 sur R1 à R6 ne peut pas le déclarer exactement. Il se déclare par **plusieurs transitions d'une même issue, à plans disjoints** (par exemple R2 seul, et R1, R3 à R6) ; `valider_transitions()` sera modifiée en ce sens dans le commit de #42 (ADR 0009, annotation du même jour).
 
@@ -215,7 +215,7 @@ Rédigée par `architect` d'après les réponses du mainteneur du 19/10/2026, ra
 
 Issues : #35, #19, #42, #22 (point 6), #50 ; #47. Décision M64. Branche `claude/fiche-serialisation`, PR #51.
 
-## Annotation du 19 octobre 2026 — précision des points 2.1 et 3.1 : le jeton se lit sur la valeur reçue
+## Annotation du 19 octobre 2026 (seconde) — précision des points 2.1 et 3.1 : le jeton se lit sur la valeur reçue
 
 Rédigée par `architect` sur avis d'`actuary` du 19/10/2026, à la suite d'un constat d'`audit` sur #35 (branche `claude/fiche-serialisation`, PR #51). Précision de rédaction, **sans nouvelle décision** : elle rend la règle du point 2.1 conforme à ce que dit déjà le point 2.2. Le mainteneur en est informé par la PR #51. Le texte ci-dessus n'est pas réécrit.
 

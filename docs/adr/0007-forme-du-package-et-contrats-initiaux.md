@@ -482,9 +482,9 @@ Avant la PR #41, `tests/harnais.R` passait la locale par `env =` (`git show 99c7
 
 Issues : #21, #23 ; #33, #34 (PR #41) ; points ouverts #42, #43. Décision du mainteneur du 19/10/2026 (constat B de l'audit de la PR #41).
 
-## Annotation du 19 octobre 2026 (seconde) — point 12 remplacé par l'ADR 0011 ; mention « mêmes `etapes` » de l'annotation précédente, (d), inexacte pour `periode` ; point 6.2 précisé (plan canonique)
+## Annotation du 19 octobre 2026 (troisième) — point 12 remplacé par l'ADR 0011 ; mention « mêmes `etapes` » de l'annotation du 19/10/2026, (d), inexacte pour `periode` ; point 6.2 précisé (plan canonique)
 
-Rédigée par `architect-approfondi` (Fable, consultation 3/3 de la branche B4, M62, Q3). Statut : **proposé, sous réserve de l'acceptation de l'ADR 0011** par le mainteneur. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+Rédigée par `architect-approfondi` (Fable, consultation 3/3 de la branche B4, M62, Q3) ; intitulée « seconde » à sa rédaction (`1f785b0`), renumérotée « troisième » le 19/10/2026 (décision du mainteneur M65), la seconde annotation du même jour étant celle de la branche P2 (PR #53, `ad6bc43`). Statut : **proposé, sous réserve de l'acceptation de l'ADR 0011** par le mainteneur. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
 
 1. **Point 12 remplacé.** Le format de sérialisation du plan et de la fiche, reporté par le point 12.1, est fixé par l'**ADR 0011** (points 6, 8 et 9 : grammaire de ligne aplatie, octets UTF-8 et LF chez l'appelant, module `rapport`, lecteur sans évaluation, `lire_plan()` sans `valider_plan()`). Les cinq contraintes du point 12.2 sont **maintenues** telles quelles par l'ADR 0011 (point 6.4 pour (b), 6.2 pour (c), 10 pour (e)) ; le point 12 ne fait plus foi que par leur intermédiaire.
 
