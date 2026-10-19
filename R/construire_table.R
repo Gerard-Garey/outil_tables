@@ -228,10 +228,14 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
     # observations rendues par `exposition` (préalable de `brut`, contrôlé
     # par valider_plan()), passées à `brut` (argument observations, évalué
     # pour Kaplan-Meier seulement) puis libérées ; ni dans etapes, ni dans
-    # la fiche.
-    if (nom == "exposition") fenetres <- r[["fenetres"]]
+    # la fiche. Conservées seulement si le plan retient Kaplan-Meier ; r est
+    # vidé en fin de tour, sinon il garde les fenêtres vivantes pendant l'étape
+    # suivante.
+    if (nom == "exposition")
+      fenetres <- if ("kaplan_meier" %in% etapes_plan[["brut"]][["estimateurs"]]) r[["fenetres"]]
     if (nom == "brut") fenetres <- NULL
     avertissements <- rbind(avertissements, r$avertissements)
+    r <- NULL
   }
   rownames(avertissements) <- NULL
 

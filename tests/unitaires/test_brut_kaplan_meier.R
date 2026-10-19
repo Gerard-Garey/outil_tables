@@ -594,3 +594,12 @@ verifier("fenêtres transmises calculées sous un autre début ou une autre born
   if (all(arrets) && identical(msg(brut_j(EJ, RJ$fenetres)), "")) TRUE
   else paste("contrôle(s) non tenu(s) :", paste(names(arrets)[!arrets], collapse = ", "))
 })
+verifier("clé (segment, âge) en double dans la table d'exposition (appel direct) : arrêt « erreur de programmation » distinct de celui de l'instant hors des cellules ; témoin sans doublon, aucun arrêt", {
+  # Motif ASCII (message lu en octets sous une locale C).
+  msg <- function(expr) tryCatch({ force(expr); "" }, error = function(e) conditionMessage(e))
+  double <- EJ[c(1L, seq_len(nrow(EJ))), , drop = FALSE]
+  m <- msg(brut_j(double, OJ))
+  if (grepl("taux_kaplan_meier() : cl", m, fixed = TRUE) && grepl("en double dans la table d'exposition", m, fixed = TRUE) &&
+      !grepl("hors des cellules", m, fixed = TRUE) && identical(msg(brut_j(EJ, OJ)), "")) TRUE
+  else paste("message obtenu :", m)
+})

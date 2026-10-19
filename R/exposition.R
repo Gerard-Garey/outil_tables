@@ -337,8 +337,10 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 # fenetres_observations()) et segments (g, segments :
 # segments_observations()), avec les paramètres sous lesquels ils sont
 # calculés (début D et borne B de la période, code de la transition dont
-# l'état d'arrivée fixe l'événement, convention retenue, segmentation), que
-# l'étape `brut` contrôle à l'égalité exacte (les observations elles-mêmes
+# l'état d'arrivée fixe l'événement, segmentation) et la convention retenue
+# (que fenetres_observations() ne prend pas : elle sert à `brut` de contrôle
+# de cohérence avec cette étape), que l'étape `brut` contrôle à l'égalité
+# exacte (les observations elles-mêmes
 # ne sont pas contrôlées : construire_table() passe celles de l'étape) ; construire_table() le passe à `brut`
 # (argument observations) et ne l'inscrit ni dans l'objet résultat ni dans
 # la fiche. Aucune copie : les vecteurs sont ceux de f et sg. Les positions

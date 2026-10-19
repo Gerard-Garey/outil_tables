@@ -291,9 +291,13 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
   # observations (#38) : soit les fenêtres transmises par l'étape
   # `exposition` (objet fenetres_exposition de calculer_exposition(), passé
   # par construire_table()), reprises telles quelles après contrôle à
-  # l'égalité exacte des paramètres sous lesquels elles sont calculées
-  # (début et borne de la période, transition, convention, segmentation) ; soit, en appel direct, les observations de l'étape
-  # `donnees`, dont les fenêtres et segments sont recalculés à l'identique.
+  # l'égalité exacte de leurs paramètres : début et borne de la période,
+  # transition, segmentation (dont dépendent fenetres_observations() et
+  # segments_observations()), et convention (qu'elles ne prennent pas : ce
+  # contrôle vérifie la cohérence avec la convention de l'étape `exposition`
+  # qui a produit la table) ; soit, en appel direct, les observations de
+  # l'étape `donnees`, dont les fenêtres et segments sont recalculés à
+  # l'identique.
   # La table d'exposition est appariée par clé (segment, âge), dans tout
   # ordre de ses lignes.
   if (inherits(observations, "fenetres_exposition")) {
@@ -351,7 +355,10 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
   # instant, par le début de sa cellule ; aucune hypothèse sur l'ordre des
   # lignes. Une clé (segment, âge) par ligne (par_annee est refusé).
   kr <- match(gj * etendue + xj * M, lo)
-  if (anyNA(kr) || anyNA(gt) || anyDuplicated(lo))
+  if (anyDuplicated(lo))
+    stop("taux_kaplan_meier() : clé (segment, âge) en double dans la table d'exposition (erreur de programmation).",
+         call. = FALSE)
+  if (anyNA(kr) || anyNA(gt))
     stop("taux_kaplan_meier() : instant d'événement hors des cellules de la table d'exposition (erreur de programmation).",
          call. = FALSE)
 
