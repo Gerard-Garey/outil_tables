@@ -1800,9 +1800,12 @@ période et le délai du plan. Ces fenêtres sont la seule donnée qu'une étape
 transmet à une autre hors de l'objet résultat (issue~\#38~; ADR 0007, seconde
 annotation du 19/10/2026)~: \code{calculer\_exposition()} les rend dans un
 élément \code{fenetres} à côté de son résultat
-(section~\ref{sec:troncature-censure}), \code{construire\_table()} les garde
-dans une variable locale, les passe à \code{calculer\_taux\_bruts()} par son
-argument \code{observations}, puis les libère après l'étape \code{brut}. Seuls
+(section~\ref{sec:troncature-censure})~; \code{construire\_table()} ne les
+conserve que si le plan retient l'estimateur \code{kaplan\_meier}, et les
+abandonne sinon dès la fin de l'étape \code{exposition}~; conservées, elle les
+garde dans une variable locale, les passe à \code{calculer\_taux\_bruts()}
+par son argument \code{observations}, puis les libère après l'étape
+\code{brut}. Seuls
 les paramètres effectifs, le résultat et les diagnostics de chaque étape
 entrent dans \code{etapes}~; les fenêtres n'entrent ni dans l'objet résultat
 ni dans la fiche, qui sont ceux de la section~\ref{sec:objet-resultat}.
@@ -2418,8 +2421,8 @@ module \code{brut} emploie aussi (section~\ref{sec:brut-kaplan-meier})~:
 les deux modules lisent ainsi les mêmes fenêtres, sans seconde
 implémentation. Dans une construction, les fenêtres et les segments ne sont
 calculés qu'une fois~: l'étape \code{exposition} les rend à côté de son
-résultat, et \code{construire\_table()} les transmet à l'étape \code{brut}
-sans les inscrire dans l'objet résultat (section~\ref{sec:troncature-censure},
+résultat, et \code{construire\_table()} les transmet à l'étape \code{brut},
+si le plan retient l'estimateur \code{kaplan\_meier}, sans les inscrire dans l'objet résultat (section~\ref{sec:troncature-censure},
 «~Fenêtres transmises à l'étape \code{brut}~»~; issue~\#38). Leur extraction de \code{calculer\_exposition()} n'a changé
 aucun résultat (constat~: objets \code{identical()} hors \code{execution}
 avant et après l'extraction, sur les cas de test et sur des plans sans
@@ -2696,14 +2699,19 @@ rend un cinquième élément, \code{fenetres}, objet de classe
 leurs événements (\code{composantes}, \code{calendrier}, \code{a}, \code{b},
 \code{evenement}, issus de \code{fenetres\_observations()}), le segment de
 chaque observation et la table des clés de segmentation (\code{g},
-\code{segments}, issus de \code{segments\_observations()}), et les paramètres
-sous lesquels ils sont calculés~: début $D$ (\code{debut}) et borne $B$
-(\code{borne}) de la période, code de la transition (\code{transition}),
-convention retenue (\code{convention}) et segmentation
-(\code{segmentation}). Ce sont les valeurs mêmes qui ont servi à construire
+\code{segments}, issus de \code{segments\_observations()}), les paramètres
+dont ils dépendent~: début $D$ (\code{debut}) et borne $B$ (\code{borne}) de
+la période, code de la transition (\code{transition}) et segmentation
+(\code{segmentation}), et la convention retenue par l'étape
+(\code{convention}). La convention n'entre pas dans le calcul des fenêtres ni
+des segments (\code{fenetres\_observations()} et
+\code{segments\_observations()} ne la prennent pas)~: elle est jointe pour
+que l'étape \code{brut} vérifie qu'elle emploie la même convention que
+l'étape \code{exposition} qui a produit la table d'exposition. Ce sont les valeurs mêmes qui ont servi à construire
 la table d'exposition, non recalculées. Cet élément est \textbf{interne à
-l'exécution}~: \code{construire\_table()} le passe à l'étape \code{brut}, puis
-le libère~; il n'entre ni dans \code{etapes} de l'objet résultat ni dans la
+l'exécution}~: \code{construire\_table()} ne le conserve que si le plan
+retient l'estimateur \code{kaplan\_meier}~; elle le passe alors à l'étape
+\code{brut}, puis le libère~; il n'entre ni dans \code{etapes} de l'objet résultat ni dans la
 fiche (section~\ref{sec:execution}). L'estimateur \code{kaplan\_meier} le
 reprend après un contrôle d'égalité exacte de ces cinq paramètres
 (section~\ref{sec:brut-kaplan-meier}, «~Données~»). Ainsi, les deux étapes
@@ -3146,13 +3154,15 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     des observations, dans un objet \code{fenetres\_exposition} («~Fenêtres
     transmises à l'étape \code{brut}~», section~\ref{sec:troncature-censure}),
     que \code{taux\_kaplan\_meier()} reprend tel quel après avoir contrôlé à
-    l'égalité exacte (\code{identical()}) les cinq paramètres sous lesquels il
-    est calculé~: début et borne de la période, transition, convention
-    retenue et segmentation, comparés à ceux de l'étape \code{brut}~; un
-    écart est une erreur
-    de programmation. Les observations elles-mêmes ne sont pas contrôlées~:
-    seul \code{construire\_table()} produit cet objet, à partir des
-    observations de l'étape \code{donnees} de la même exécution. En appel
+    l'égalité exacte (\code{identical()}) les cinq paramètres qu'il porte,
+    comparés à ceux de l'étape \code{brut}~: début et borne de la période,
+    transition et segmentation, dont dépendent les fenêtres et les segments~;
+    convention retenue, qui n'entre pas dans leur calcul et dont le contrôle
+    vérifie la cohérence avec la convention de l'étape \code{exposition}~; un
+    écart est une erreur de programmation. Les observations elles-mêmes ne
+    sont pas contrôlées~: seul \code{construire\_table()} transmet cet objet,
+    produit par \code{calculer\_exposition()} à partir des observations de
+    l'étape \code{donnees} de la même exécution. En appel
     direct de la fonction d'étape sur la table des observations, les fenêtres
     et les segments sont recalculés par les mêmes fonctions
     (\code{fenetres\_observations()}, \code{segments\_observations()})~; les
@@ -3261,13 +3271,18 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     laquelle se font les sommes cumulées de $\log(1 - d_j/r_j)$ et de
     $\Sigma$. Gardes-fous, erreurs de programmation et non refus~: la période
     et la transition doivent être celles de l'étape \code{exposition}~; les
-    fenêtres transmises doivent avoir été calculées sous les mêmes début et
-    borne de période, transition, convention et segmentation (ci-dessus,
-    «~Données~»)~; la clé d'un instant doit rester un entier exact en
-    \code{double} ($< 2^{53}$)~; chaque instant d'événement doit tomber dans
-    une cellule de la table d'exposition, chaque clé (segment, âge) n'y
-    figurer qu'une fois, et les instants d'une cellule être contigus~; enfin,
-    la somme des $d_j$ par cellule doit être \code{identical()} aux
+    fenêtres transmises doivent porter les mêmes début et borne de période,
+    transition, segmentation et convention (ci-dessus, «~Données~»)~; la clé
+    d'un instant doit rester un entier exact en \code{double}
+    ($< 2^{53}$)~; chaque clé (segment, âge) ne doit figurer qu'une fois dans
+    la table d'exposition, sous son propre message («~clé (segment, âge) en
+    double dans la table d'exposition~»), contrôlé avant le suivant~; chaque
+    instant d'événement doit tomber dans une cellule de la table d'exposition,
+    et chaque segment de la table d'exposition figurer parmi les segments des
+    observations (transmis ou recalculés), ces deux contrôles partageant le
+    message «~instant d'événement hors des cellules de la table
+    d'exposition~»~; les instants d'une cellule doivent être contigus~;
+    enfin, la somme des $d_j$ par cellule doit être \code{identical()} aux
     événements de la table d'exposition.
   \item \textbf{Statut}~: $\hat q_x$, maximum de vraisemblance non
     paramétrique (risques discrets aux instants d'événement), résultat
@@ -3519,7 +3534,8 @@ aussi de test de débordement des entiers~; les refus, le message de
 \code{etape\_prealable\_manquante}, les types entiers, l'admission de
 \code{age\_atteint\_annee}~; l'invariance d'un plan sans \code{kaplan\_meier}
 (objet \code{identical()} à celui du plan qui le retient, privé de ses seuls
-ajouts). Trois tests portent sur les fenêtres transmises (issue~\#38)~:
+ajouts). Quatre tests portent sur les fenêtres transmises et l'appariement
+par clé (issue~\#38)~:
 \code{calculer\_exposition()} rend l'objet \code{fenetres\_exposition} à
 côté de ses quatre éléments, l'étape \code{brut} donne des résultats
 \code{identical()} avec les fenêtres transmises et en appel direct sur les
@@ -3529,7 +3545,10 @@ ni dans la fiche~; trois permutations des lignes de la table d'exposition
 la table \code{kaplan\_meier} \code{identical()} à l'originale permutée, et
 la table des sauts et les diagnostics \code{identical()}~; chacun des cinq
 contrôles des fenêtres transmises arrête l'étape, un cas par contrôle, et
-des fenêtres inchangées ne l'arrêtent pas.
+des fenêtres inchangées ne l'arrêtent pas~; une table d'exposition dont une
+ligne est dupliquée arrête l'étape, en appel direct, par le message de la clé
+en double et non par celui de l'instant hors des cellules, et la table sans
+doublon ne l'arrête pas.
 
 \medskip
 \textbf{Contre-vérification par le package \code{survival}} (ADR 0002~;
