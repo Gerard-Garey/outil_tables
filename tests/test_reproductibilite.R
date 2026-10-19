@@ -161,11 +161,17 @@ emp_code <- c(
   "Encoding(d$sg) <- 'UTF-8'",
   "roles <- c(sexe = 'sx', segment = 'sg', id_tete = 'it', id_contrat = 'ic', date_sortie = 's',",
   "           date_naissance = 'n', date_entree = 'e', cause_sortie = 'c')")
-for (lang in c("C", "C.UTF-8")) {
+# Locale UTF-8 réellement disponible sur la plateforme (sondée par le harnais,
+# issue #34) : C.UTF-8 n'existe pas partout (Windows). Aucune : échec explicite.
+LOCALE_UTF8 <- locale_utf8_disponible()
+verifier("empreinte, sous-processus : une locale UTF-8 est disponible",
+         if (nzchar(LOCALE_UTF8)) TRUE
+         else sprintf("aucune locale UTF-8 disponible parmi %s : cas UTF-8 non exécuté", paste(LOCALES_UTF8, collapse = ", ")))
+for (lang in c("C", if (nzchar(LOCALE_UTF8)) LOCALE_UTF8)) {
   script <- tempfile(fileext = ".R")
   sortie <- tempfile(fileext = ".txt")
   writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(BIBLIOTHEQUE)), emp_code,
-               sprintf("writeLines(c(Sys.getlocale('LC_CTYPE'), tablexp:::empreinte_donnees(d, roles)), %s)",
+               sprintf("writeLines(c(Sys.getlocale('LC_CTYPE'), l10n_info()[['UTF-8']], tablexp:::empreinte_donnees(d, roles)), %s)",
                        deparse(sortie))), script)
   r <- executer_rscript(script, env = c(paste0("LANG=", lang), paste0("LC_ALL=", lang)))
   verifier(sprintf("empreinte, sous-processus LANG=%s : égale à la valeur calculée hors R (%s)", lang,
@@ -173,10 +179,13 @@ for (lang in c("C", "C.UTF-8")) {
            if (r$statut != 0L) paste(r$sortie, collapse = " | ")
            else if (!file.exists(sortie)) "fichier de sortie du sous-processus absent"
            else {
-             lu <- readLines(sortie)
-             if (!identical(lu[1L], lang)) sprintf("locale effective %s au lieu de %s", lu[1L], lang)
-             else if (identical(lu[2L], EMPREINTE_ATTENDUE)) TRUE
-             else sprintf("locale %s : empreinte %s", lu[1L], lu[2L])
+             lu <- readLines(sortie)  # locale, session UTF-8 (TRUE / FALSE), empreinte
+             # « C » : nom exact ; locale UTF-8 : session effectivement en UTF-8
+             # (le nom rendu par Sys.getlocale() varie selon la plateforme).
+             effective <- if (identical(lang, "C")) identical(lu[1L], "C") else identical(lu[2L], "TRUE")
+             if (!effective) sprintf("locale effective %s (UTF-8 : %s) au lieu de %s", lu[1L], lu[2L], lang)
+             else if (identical(lu[3L], EMPREINTE_ATTENDUE)) TRUE
+             else sprintf("locale %s : empreinte %s", lu[1L], lu[3L])
            })
   unlink(c(script, sortie))
 }
@@ -793,6 +802,44 @@ verifier("producteur : plan dont la construction échoue -> non produit, autres 
   else if (!grepl("R1 : fichier commit.+ non ; comparaison sans fichier commit.+ ; admis oui", texte, useBytes = TRUE)) "R1 non comparé"
   else TRUE
 }))
+# Témoin de #28 : en LC_ALL=C, les libellés non ASCII du producteur ne sont pas
+# abîmés dans ecarts.txt (« commit<c3><a9> »). Le plan témoin porte une
+# description marquée UTF-8 (échappement \u), faute de quoi aucune chaîne
+# marquée ne se mêle aux libellés et l'altération n'apparaîtrait pas.
+verifier("producteur, sous-processus LC_ALL=C : libellés non ASCII d'ecarts.txt intacts (UTF-8, pas de <c3>)", local({
+  d <- tempfile("producteur_c_"); dir.create(file.path(d, "tests", "reference"), recursive = TRUE)
+  dir.create(file.path(d, "tests", "controles"))
+  on.exit(unlink(d, recursive = TRUE))
+  file.copy(file.path(RACINE, c("DESCRIPTION", "NAMESPACE", "LICENSE")), d)
+  for (s in DOSSIERS_INSTALLES[dir.exists(file.path(RACINE, DOSSIERS_INSTALLES))])
+    file.copy(file.path(RACINE, s), d, recursive = TRUE)
+  file.copy(file.path(RACINE, "tests", "harnais.R"), file.path(d, "tests"))
+  file.copy(file.path(RACINE, "tests", "controles", "plateforme.R"), file.path(d, "tests", "controles"))
+  file.copy(file.path(DOSSIER_REFERENCES, c("produire_references.R", "outils_reference.R")),
+            file.path(d, "tests", "reference"))
+  cat("plans_reference <- function() list(",
+      "R1 = list(identifiant = 'R1', description = 'd\\u00e9c\\u00e8s', plan = plan_reference()))",
+      sep = "\n", file = file.path(d, "tests", "reference", "outils_reference.R"), append = TRUE)
+  sortie_t <- file.path(d, "sortie")
+  r <- executer_rscript(file.path(d, "tests", "reference", "produire_references.R"),
+                        c("--mode", "releve", "--plans", "tous", "--sortie", shQuote(sortie_t)),
+                        env = c("LC_ALL=C", "GITHUB_ACTIONS=false", "GITHUB_STEP_SUMMARY="))
+  ecarts <- file.path(sortie_t, "ecarts.txt")
+  octets <- if (file.exists(ecarts)) readBin(ecarts, "raw", file.size(ecarts)) else raw(0)
+  texte <- rawToChar(octets)
+  attendu <- c(charToRaw("d"), as.raw(c(0xc3, 0xa9)), charToRaw("c"), as.raw(c(0xc3, 0xa8)), charToRaw("s : aucun fichier commit"),
+               as.raw(c(0xc3, 0xa9)), charToRaw(" (cr"), as.raw(c(0xc3, 0xa9)), charToRaw("ation)"))
+  contient <- function(x, motif) {
+    i <- seq_len(length(x) - length(motif) + 1L)
+    any(vapply(i, function(k) identical(x[k:(k + length(motif) - 1L)], motif), NA))
+  }
+  if (r$statut != 0L) sprintf("code %d : %s", r$statut, paste(utils::tail(r$sortie, 3L), collapse = " | "))
+  else if (!file.exists(ecarts)) "ecarts.txt absent"
+  else if (grepl("<c3>", texte, fixed = TRUE, useBytes = TRUE)) "ecarts.txt contient <c3> (littéraux non marqués UTF-8)"
+  else if (!validUTF8(texte)) "ecarts.txt n'est pas de l'UTF-8 valide"
+  else if (!contient(octets, attendu)) "libellé « décès : aucun fichier commité (création) » absent ou altéré"
+  else TRUE
+}))
 verifier("comparer_references.R : deux fichiers identiques -> code 0, verdict OK", {
   r <- executer_rscript(COMPARATEUR, c(shQuote(F_BASE), shQuote(F_BASE)))
   r$statut == 0L && any(grepl("Verdict : OK", r$sortie, fixed = TRUE, useBytes = TRUE)) &&
@@ -813,12 +860,7 @@ unlink(F_BASE)
 # pour octet en LC_ALL=C et sous une locale UTF-8.
 fichier_courant("références de non-régression (ADR 0009) : chaînes non ASCII et locale (T1 à T4)")
 
-# Locale UTF-8 disponible (même liste que le harnais) ; "" si aucune.
-LOCALE_UTF8 <- local({
-  ancienne <- Sys.getlocale("LC_CTYPE"); on.exit(Sys.setlocale("LC_CTYPE", ancienne))
-  ok <- vapply(LOCALES_UTF8, function(l) nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l))), NA)
-  if (any(ok)) LOCALES_UTF8[ok][1L] else ""
-})
+# LOCALE_UTF8 : locale UTF-8 disponible, sondée plus haut (empreinte, sous-processus).
 # Code commun aux sous-processus : tablexp de la batterie, outillage chargé
 # en UTF-8, chaînes construites depuis leurs octets (aucun littéral non
 # ASCII dans le script, dont le marquage dépendrait de la locale).
