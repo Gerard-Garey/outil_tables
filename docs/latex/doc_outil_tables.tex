@@ -867,8 +867,10 @@ la locale de la session (décision M54)~; \code{quit()}, \code{q()} et
 neutralisés, une erreur au chargement d'un fichier est un échec, et un fichier
 sans aucune assertion aussi. \textbf{\code{tests/test\_reproductibilite.R}}
 vérifie les identités de la section~\ref{sec:verifications-alea}, puis celles du
-simulateur et de la construction, et compare les plans de référence à leurs
-références de non-régression (section~\ref{sec:non-regression}).
+simulateur et de la construction, compare les plans de référence à leurs
+références de non-régression (section~\ref{sec:non-regression}) et contrôle
+l'effet d'une permutation des lignes de l'entrée de référence
+(section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -4000,8 +4002,33 @@ annotation du 17/10/2026, point~f)~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{périmètre}~: les seules colonnes auxquelles un rôle est déclaré,
     \textbf{toutes les lignes reçues}, avant exclusions, dans l'ordre reçu~;
-    une base dont les lignes sont permutées a une autre empreinte, à résultats
-    égaux. Les exclusions sont des paramètres du plan, non une propriété de
+    une base dont les lignes sont permutées a une autre empreinte, et ses
+    résultats ne sont pas garantis identiques au bit près (E4.6 ne porte que
+    sur des données identiques)~: les lignes conservées et les observations
+    suivent l'ordre reçu~; les grandeurs entières ou à valeur entière
+    (exposition en jours, événements, sorties concurrentes), les tables de
+    Kaplan-Meier et les diagnostics sont restés identiques~; l'exposition
+    centrale, les compléments initiaux, l'exposition initiale, les taux, les
+    probabilités et leurs bornes (Poisson et binomial), sommés par cellule
+    dans l'ordre des lignes (\code{somme\_par\_cellule()}), peuvent différer
+    dans les derniers bits. Écart relatif maximal mesuré~: $1{,}6 \cdot
+    10^{-14}$ sur l'entrée de référence ($10^5$~lignes, plans R1 à R6, six
+    permutations, R~4.3.3, 19/10/2026), atteint par la borne supérieure
+    exacte (\code{borne\_sup\_exacte}, plan R2)~; les taux et l'exposition
+    centrale restent au plus à $5{,}73 \cdot 10^{-15}$. L'écart croît avec
+    le nombre de termes sommés par cellule~: sur l'exposition centrale,
+    $1{,}37 \cdot 10^{-14}$ à $10^6$~lignes et $1{,}73 \cdot 10^{-14}$ à
+    $3 \cdot 10^6$ (plan R1, une permutation). C'est un \textbf{constat de
+    mesure, non une borne démontrée}~; le test de permutation de la batterie
+    de reproductibilité (plans R6, R4, R5 et R2, trois permutations) le
+    contrôle à la tolérance relative $10^{-12}$ (constante
+    \code{TOLERANCE\_PERMUTATION}, classe existante de
+    \code{CLASSES\_TOLERANCE}~; issue~\#39)~; les grandeurs qui ne sont pas des
+    doubles, les doubles de classe exacte, les tables de Kaplan-Meier et les
+    diagnostics de l'étape \code{brut} y sont comparés par
+    \code{identical()}, les trois empreintes (données, lignes conservées,
+    observations) devant au contraire différer~; tout autre double fait
+    échouer le test. Les exclusions sont des paramètres du plan, non une propriété de
     l'entrée~;
   \item \textbf{ordre des colonnes}~: par nom de rôle, en ordre d'octets~; le
     nom de colonne n'entre pas dans le texte (il est dans \code{fiche\$roles})~:
