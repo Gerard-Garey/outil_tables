@@ -3982,9 +3982,15 @@ statut «~non calculée (branche fiche-rapport)~»
 (\code{statut\_resultat\_code})~: l'empreinte du résultat dépend de la
 plateforme (E3.6) et attend la sérialisation, et celle du code suppose de
 fixer ce qu'est «~le code~». L'argument \code{provenance} est \code{NULL} ou
-une liste de trois chaînes non vides, \code{fichier}, \code{empreinte} et
-\code{algorithme}~; sinon, refus \code{provenance\_invalide}
-(\code{controler\_provenance()}).
+une \textbf{liste nue}, dont le seul attribut admis est celui des noms, de
+\textbf{exactement trois éléments}, nommés \code{fichier}, \code{empreinte}
+et \code{algorithme} dans un ordre quelconque, chacun une chaîne
+(\code{character}) de longueur~1, sans attribut, ni \code{NA} ni vide~; un
+\code{data.frame}, un objet de classe, une liste munie d'un autre attribut,
+un élément de plus (même nommé \code{NA}) ou une chaîne munie de noms, d'une
+dimension ou d'une classe sont refusés~: refus \code{provenance\_invalide}
+(\code{controler\_provenance()}, par \code{forme\_exacte()}~;
+issue~\#21).
 
 \subsubsection*{Représentation canonique}
 
@@ -4082,7 +4088,9 @@ hors de R (texte écrit par \code{printf}, empreinte par \code{md5sum} de GNU
 coreutils). \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
 la même dans des processus R lancés sous \code{LANG=C} et sous
 \code{LANG=C.UTF-8}, égale à cette valeur, et que le rejeu de la fiche redonne
-l'objet.
+l'objet. \code{tests/unitaires/test\_construire\_table.R} vérifie aussi
+chaque cas de refus de la provenance décrit à la
+section~\ref{sec:empreinte} (issue~\#21).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-rapport}
