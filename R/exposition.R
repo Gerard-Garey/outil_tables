@@ -74,11 +74,13 @@ deduire_recette <- function(roles) {
 }
 
 # Contrôle les paramètres propres à l'étape `exposition` (valeurs ; les noms
-# sont contrôlés par valider_plan()). Rend TRUE, invisible.
+# sont contrôlés par valider_plan()). Forme exacte (#23, forme_exacte()) :
+# type de base exact, aucun attribut (ni names, ni dim, ni classe), sinon
+# refus sous le motif du paramètre. Rend TRUE, invisible.
 controler_parametres_exposition <- function(convention, par_annee) {
-  if (!is.character(convention) || length(convention) != 1L || is.na(convention))
+  if (!forme_exacte(convention, "character") || length(convention) != 1L || is.na(convention))
     refuser("exposition", "convention_invalide",
-            sprintf("La convention d'âge doit être une chaîne prise dans %s.",
+            sprintf("La convention d'âge doit être une chaîne unique, sans attribut, prise dans %s.",
                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (convention %in% setdiff(ORDRE_CONVENTIONS, CONVENTIONS_MISES_EN_OEUVRE))
@@ -92,9 +94,9 @@ controler_parametres_exposition <- function(convention, par_annee) {
             sprintf("Convention d'âge inconnue « %s » (valeurs admises : %s).", convention,
                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
-  if (!is.logical(par_annee) || length(par_annee) != 1L || is.na(par_annee))
+  if (!forme_exacte(par_annee, "logical") || length(par_annee) != 1L || is.na(par_annee))
     refuser("exposition", "par_annee_invalide",
-            "Le découpage par année (par_annee) doit valoir TRUE ou FALSE.",
+            "Le découpage par année (par_annee) doit valoir TRUE ou FALSE, sans attribut.",
             list(par_annee = par_annee))
   invisible(TRUE)
 }

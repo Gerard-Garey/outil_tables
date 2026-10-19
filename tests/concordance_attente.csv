@@ -1,1 +1,2 @@
 type,nom,issue,motif
+entree,fonctions-outils:forme_exacte,#23,"utilitaire de forme exacte (type de base, attributs admis) ; documenté par docwriter en fin de branche (règle 9)"

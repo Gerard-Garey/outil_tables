@@ -6,7 +6,9 @@
 #  - refus_tablexp() et refuser() : un refus est une condition R typée, jamais
 #    un objet retourné (ADR 0007, point 6.4) ;
 #  - avertissements_vides() et avertir() : les avertissements métier sont
-#    inscrits dans l'objet, jamais émis par warning() (ADR 0007, point 6.5).
+#    inscrits dans l'objet, jamais émis par warning() (ADR 0007, point 6.5) ;
+#  - forme_exacte() : type de base exact, aucun attribut hors de ceux admis
+#    (forme canonique des valeurs du plan, #23).
 #
 #  Ce fichier n'appelle aucun module (graphe d'appels, ADR 0007, point 2.1 ;
 #  contrôlé par tests/controles/graphe_modules.R).
@@ -47,6 +49,16 @@ refus_tablexp <- function(module, motif, message, details = list()) {
 # Lève le refus (ne retourne jamais).
 refuser <- function(module, motif, message, details = list()) {
   stop(refus_tablexp(module, motif, message, details))
+}
+
+# Forme exacte d'une valeur reçue (#23) : TRUE si son type de base (typeof)
+# est pris dans `types` et si elle ne porte aucun attribut hors des noms
+# d'attributs `attributs` (aucun par défaut : ni names, ni dim, ni classe, ni
+# attribut quelconque). Un attribut admis n'est pas requis, et sa valeur n'est
+# pas contrôlée : c'est l'affaire de l'appelant, qui refuse aussi sous son
+# propre motif. Rend TRUE ou FALSE, jamais NA.
+forme_exacte <- function(x, types, attributs = character(0)) {
+  typeof(x) %in% types && all(names(attributes(x)) %in% attributs)
 }
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
