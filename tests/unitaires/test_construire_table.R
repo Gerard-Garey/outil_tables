@@ -298,6 +298,37 @@ verifier("construire_table : rôle employé par la segmentation absent -> refus 
 verifier("construire_table : provenance mal formée -> refus provenance_invalide",
          leve_refus(construire_table(BASE, ROLES, plan_type(), provenance = list(fichier = "a.csv")),
                     "provenance_invalide"))
+# Forme exacte de la provenance (#21, forme_exacte()) : liste nue à trois chaînes
+# nommées de longueur 1, sans attribut (seul names sur la liste). Chaque cas de
+# refus a son témoin, sous le motif existant provenance_invalide (clés de la liste
+# en ASCII : une clé accentuée émet un avertissement de parse() sous LC_ALL=C).
+PROV <- list(fichier = "base.csv", empreinte = "0123456789abcdef0123456789abcdef", algorithme = "md5")
+cp <- tablexp:::controler_provenance
+verifier("provenance : liste nue valide admise, quel que soit l'ordre des noms, et NULL admis",
+         isTRUE(cp(PROV)) && isTRUE(cp(PROV[c("algorithme", "fichier", "empreinte")])) && isTRUE(cp(NULL)))
+PROV_REFUSEES <- list(
+  "data.frame (trois colonnes, une ligne)" = as.data.frame(PROV, stringsAsFactors = FALSE),
+  "objet de classe (liste de classe prov)" = structure(PROV, class = "prov"),
+  "liste a attribut autre que names" = structure(PROV, source = "a"),
+  "nom en trop (quatre elements)" = c(PROV, extra = "x"),
+  "nom manquant (deux elements)" = PROV[c("fichier", "empreinte")],
+  "nom manquant remplace par un doublon (trois elements)" = list(fichier = "a", fichier = "b", empreinte = "c"),
+  "nom inconnu a la place d'un nom attendu" = setNames(PROV, c("fichier", "empreinte", "hash")),
+  "nom NA en plus des trois noms" = setNames(c(PROV, "x"), c(names(PROV), NA)),
+  "liste sans noms" = unname(PROV),
+  "chaine de longueur 2" = modifyList(PROV, list(fichier = c("a.csv", "b.csv"))),
+  "chaine de longueur 0" = modifyList(PROV, list(fichier = character(0))),
+  "chaine a attribut names" = modifyList(PROV, list(fichier = c(a = "base.csv"))),
+  "chaine a attribut class" = modifyList(PROV, list(algorithme = structure("md5", class = "algo"))),
+  "chaine a attribut dim" = modifyList(PROV, list(empreinte = matrix("0123"))),
+  "chaine NA" = modifyList(PROV, list(fichier = NA_character_)),
+  "chaine vide" = modifyList(PROV, list(fichier = "")))
+for (k in names(PROV_REFUSEES))
+  verifier(sprintf("provenance : %s -> refus provenance_invalide", k),
+           leve_refus(cp(PROV_REFUSEES[[k]]), "provenance_invalide"))
+verifier("provenance : data.frame refusé aussi par construire_table, avant tout calcul",
+         leve_refus(construire_table(BASE, ROLES, plan_type(), provenance = PROV_REFUSEES[[1L]]),
+                    "provenance_invalide"))
 verifier("construire_table : ligne invalide sans exclusion déclarée -> refus ligne_invalide (étape donnees)", {
   d <- BASE; d$naissance[2] <- NA
   leve_refus(construire_table(d, ROLES, plan_type()), "ligne_invalide")
