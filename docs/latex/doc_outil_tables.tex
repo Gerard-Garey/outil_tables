@@ -705,8 +705,9 @@ sont décrits avec la fiche (section~\ref{sec:fiche}).
 ce n'est pas une propriété démontrée. L'identité entre deux machines n'est
 \textbf{pas garantie}~: deux processeurs différents pourraient différer au
 dernier bit, même dans le même conteneur, si la bibliothèque mathématique
-du système choisit ses variantes de calcul selon le processeur (hypothèse de
-l'ADR 0008, non mesurée). C'est pourquoi les références de non-régression
+du système choisit ses variantes de calcul selon le processeur (réserve de
+l'ADR 0008~: non observée sur trois modèles de processeur munis de FMA et
+d'AVX2, ouverte pour un exécuteur sans FMA~; annotation du 19/10/2026). C'est pourquoi les références de non-régression
 sont produites sur une plateforme unique et comparées à tolérance
 (sections~\ref{sec:plateforme} et~\ref{sec:non-regression}).
 \end{encadre}
@@ -1053,8 +1054,10 @@ chaque commit de référence et dans l'en-tête de chaque fichier de référence
 d'une exécution à l'autre sous le même libellé d'exécuteur (relevé de l'ADR
 0008, annotation du 16/10/2026). La BLAS Netlib n'a pas de noyau choisi selon
 le processeur~; la réserve sur la bibliothèque mathématique du système
-(section~\ref{sec:reproductibilite-exigence}) reste en revanche ouverte, non
-mesurée. Les références sont donc comparées à tolérance, structure contrôlée
+(section~\ref{sec:reproductibilite-exigence}) reste en revanche ouverte pour
+un exécuteur sans FMA~: elle n'a pas été observée sur les trois modèles
+rencontrés, tous munis de FMA et d'AVX2 (ADR 0008, annotation du
+19/10/2026). Les références sont donc comparées à tolérance, structure contrôlée
 à part (E4.7~; section~\ref{sec:non-regression}).
 \end{encadre}
 
@@ -1326,7 +1329,7 @@ point~(f), et seconde annotation du 19/10/2026, point~(a)).}
 \endhead
 exacte & \code{exposition\_jours}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
 $10^{-14}$ & \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}, \code{exposition\_initiale}, \code{taux}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (hypothèse non mesurée) \\
+$10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3) \\
 \end{longtable}
 }
 
@@ -1432,11 +1435,12 @@ ligne, et toutes les autres grandeurs sont restées identiques au bit près
     produit-limite sous troncature (section~\ref{sec:brut-kaplan-meier}),
     qui n'est pas une anomalie.
   \item Absence de bruit numérique sur la plateforme de référence~:
-    \emph{constat} sur deux exécutions de la plateforme de référence, sur le
-    même modèle de processeur, où toutes les grandeurs des six plans sont
-    identiques au bit près~; la réserve de
-    l'ADR 0008 sur les variantes de la bibliothèque mathématique du système
-    d'un processeur à l'autre reste ouverte, non mesurée.
+    \emph{constat} sur cinq exécutions de la CI sur la plateforme de
+    référence, sur trois modèles de processeur (AMD EPYC 7763, 9V74 et 9V45,
+    tous avec FMA et AVX2), où toutes les grandeurs des six plans sont
+    identiques au bit près (ADR 0008, annotation du 19/10/2026)~; la réserve
+    de l'ADR 0008 sur les variantes de la bibliothèque mathématique du
+    système reste ouverte pour un exécuteur sans FMA, non observé.
   \item Le signe d'un zéro~: la représentation canonique et la comparaison
     confondent 0 et \code{-0}, si bien qu'un passage de l'un à l'autre n'est
     pas détecté (limite admise~; aucune grandeur actuelle n'en dépend~;
