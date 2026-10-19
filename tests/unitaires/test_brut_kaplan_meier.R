@@ -396,19 +396,20 @@ verifier("par_annee : c(\"binomial\", \"kaplan_meier\") -> binomial_par_annee, l
 verifier("kaplan_meier n'est plus un estimateur inconnu : plan validé ; estimateurs disponibles dans l'ordre canonique",
          identical(valider_plan(plan_km()), plan_km()) &&
            identical(tablexp:::ESTIMATEURS_BRUT, c("poisson", "binomial", "kaplan_meier")))
-verifier("etape_prealable_manquante : brut sans exposition, message et détails inchangés", {
+verifier("etape_prealable_manquante : brut sans exposition, message inchangé, détails avec prealables_par_etape (#27)", {
   p <- plan_km(); p$etapes$exposition <- NULL
   r <- tryCatch(valider_plan(p), refus_tablexp = function(r) r)
   identical(r$motif, "etape_prealable_manquante") &&
     identical(conditionMessage(r), "Étape(s) « brut » sans son étape préalable « exposition ».") &&
-    identical(r$details, list(etape = "brut", prealable = "exposition"))
+    identical(r$details, list(etape = "brut", prealable = "exposition", prealables_par_etape = list(brut = "exposition")))
 })
 verifier("etape_prealable_manquante : brut seul, préalables donnees et exposition cités, au pluriel (chaque élément contrôlé)", {
   p <- plan_km(); p$etapes <- p$etapes["brut"]
   r <- tryCatch(valider_plan(p), refus_tablexp = function(r) r)
   identical(r$motif, "etape_prealable_manquante") &&
     identical(conditionMessage(r), "Étape(s) « brut » sans ses étapes préalables « donnees », « exposition ».") &&
-    identical(r$details, list(etape = "brut", prealable = c("donnees", "exposition")))
+    identical(r$details, list(etape = "brut", prealable = c("donnees", "exposition"),
+                                 prealables_par_etape = list(brut = c("donnees", "exposition"))))
 })
 verifier("ETAPES : colonne prealable en liste (donnees : aucun ; exposition : donnees ; brut : donnees, exposition)",
          identical(unclass(tablexp:::ETAPES$prealable), list(character(0), "donnees", c("donnees", "exposition"))))

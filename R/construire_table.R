@@ -121,8 +121,10 @@ valider_plan <- function(plan) {
                        liste_guillemets(noms), liste_guillemets(ETAPES$etape[sort(rang)])),
                list(etape = noms))
   # Chaque préalable de chaque étape est contrôlé ; seuls les préalables
-  # absents sont cités.
+  # absents sont cités. `etape` et `prealable` sont les vecteurs aplatis ;
+  # `prealables_par_etape` dit quel préalable manque à quelle étape (#27).
   absents <- lapply(ETAPES$prealable[rang], function(p) setdiff(p, noms))
+  names(absents) <- noms
   sans_prealable <- lengths(absents) > 0L
   if (any(sans_prealable)) {
     manquants <- unique(unlist(absents))
@@ -130,7 +132,8 @@ valider_plan <- function(plan) {
                sprintf("Étape(s) %s sans %s %s.", liste_guillemets(noms[sans_prealable]),
                        if (length(manquants) == 1L) "son étape préalable" else "ses étapes préalables",
                        liste_guillemets(manquants)),
-               list(etape = noms[sans_prealable], prealable = manquants))
+               list(etape = noms[sans_prealable], prealable = manquants,
+                    prealables_par_etape = absents[sans_prealable]))
   }
   aleatoire <- any(ETAPES$aleatoire[rang])
   if (!aleatoire && "graine" %in% names(plan))
