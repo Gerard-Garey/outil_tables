@@ -22,7 +22,10 @@
 #  liste SANS_REFERENCE_17), aucune référence orpheline ; témoins sur des
 #  copies temporaires (jamais sur tests/reference/) ; règles des modes du
 #  workflow et lignes de commande produire_references.R (refus d'appel) et
-#  comparer_references.R ; chaînes non ASCII et locale (T1 à T4, M54).
+#  comparer_references.R ; permutation des lignes de l'entrée de référence
+#  (#39) : plans R6, R4, R5 et R2, trois permutations, identical() hors
+#  sommes par cellule, celles-ci à la tolérance TOLERANCE_PERMUTATION, bilan
+#  des écarts et témoins ; chaînes non ASCII et locale (T1 à T4, M54).
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -350,6 +353,151 @@ for (p in plans_reference()) {
 verifier("aucune référence orpheline sous tests/reference/ (point 3.7)", {
   o <- if (dir.exists(DOSSIER_REFERENCES)) references_orphelines(DOSSIER_REFERENCES) else character(0)
   if (length(o)) paste("orphelines :", paste(o, collapse = ", ")) else TRUE
+})
+
+# Permutation des lignes de l'entrée de référence (#39) : une base dont les
+# lignes sont permutées a une autre empreinte (E4.6 ne porte que sur des
+# données identiques). Les sommes par cellule (somme_par_cellule(),
+# R/exposition.R) suivent l'ordre des lignes : les doubles qui en sortent
+# peuvent différer dans les derniers bits. Tout le reste est identical().
+fichier_courant("permutation des lignes de l'entrée de référence (#39) : identité hors sommes par cellule, tolérance sur celles-ci")
+
+GRAINE_PERMUTATION <- 20261019L
+# STATUT : tolérance déclarée, appuyée sur un constat de mesure (écart relatif
+# maximal 1,6e-14 par actuary le 19/10/2026, remesuré par le bilan imprimé
+# ci-dessous), pas une borne démontrée. Elle est de la classe 1e-12 existante ;
+# l'écart croît avec le nombre de termes sommés par cellule (1,73e-14 à 3e6
+# lignes, plan R1) ; les grandeurs de la classe 1e-14 de TOLERANCES (exposition,
+# taux) dépassent 1e-14 dès 1e6 lignes. À 1e5 lignes, borne_sup_exacte (classe
+# 1e-12) le dépasse déjà (1,6e-14), tandis que taux et exposition_centrale
+# restent à 5,73e-15 au plus. La borne de la sommation récursive n'est pas
+# citée, faute d'avoir été vérifiée à la source.
+TOLERANCE_PERMUTATION <- CLASSES_TOLERANCE[["1e-12"]]
+EMPREINTES_PERMUTATION <- c(CHEMIN_EMPREINTE_DONNEES, "etapes/donnees/resultat/lignes_conservees/@empreinte",
+                            "etapes/donnees/resultat/observations/@empreinte")
+# Doubles sommés par cellule, comparés à tolérance (nom de la grandeur).
+SOMMES_PERMUTATION <- paste0("^(exposition_centrale|complement_initial_cellule|complement_initial_fenetre|",
+                             "exposition_initiale|taux|probabilite|borne_(inf|sup)_(exacte|asymptotique)|",
+                             "probabilite_borne_(inf|sup)_(exacte|asymptotique))$")
+# Kaplan-Meier (tables et sauts) et diagnostics du brut : identical().
+IDENTIQUES_PERMUTATION <- "^etapes/brut/(resultat/(kaplan_meier|kaplan_meier_sauts)|diagnostics)/"
+
+# « identique » : identical() ; « tolérance » : somme par cellule ; « non
+# classé » : fait échouer le contrôle (aucun double n'est admis sans classe).
+classe_permutation <- function(chemin) {
+  if (grepl(IDENTIQUES_PERMUTATION, chemin)) return("identique")
+  if (identical(tolerance_de(chemin)$tol, 0)) return("identique")
+  if (grepl(SOMMES_PERMUTATION, basename(chemin))) return("tolérance")
+  "non classé"
+}
+
+# Compare l'aplati `g` de la construction sur lignes permutées à `g0` (ordre
+# d'origine). Rend les défauts (character) et, pour chaque double comparé à
+# tolérance, son écart relatif maximal.
+controle_permutation <- function(g0, g, tolerance = TOLERANCE_PERMUTATION) {
+  if (!identical(g$types, g0$types)) return(list(defauts = "structure : chemins ou types différents", ecarts = numeric(0)))
+  ch <- names(g0$types)
+  classe <- vapply(ch, function(c_) if (g0$types[[c_]] == "double") classe_permutation(c_) else "identique", "")
+  defauts <- character(0)
+  for (c_ in ch[classe == "non classé"]) defauts <- c(defauts, paste("double non classé :", c_))
+  for (c_ in ch[classe == "identique"]) {
+    egal <- identical(g$valeurs[[c_]], g0$valeurs[[c_]])
+    if (c_ %in% EMPREINTES_PERMUTATION) { if (egal) defauts <- c(defauts, paste("empreinte identique, devrait différer :", c_)) }
+    else if (!egal) defauts <- c(defauts, paste("diffère :", c_))
+  }
+  tol <- ch[classe == "tolérance"]
+  # Règle de comparer_references() (ADR 0009, point 3.3) ; l'empreinte des
+  # données, exigée des deux côtés, est posée identique.
+  emp <- list(types = setNames("character", CHEMIN_EMPREINTE_DONNEES),
+              valeurs = setNames(list(strrep("a", 32L)), CHEMIN_EMPREINTE_DONNEES))
+  sous <- function(h) list(types = c(emp$types, h$types[tol]), valeurs = c(emp$valeurs, h$valeurs[tol]))
+  feuilles <- unique(basename(tol))
+  r <- comparer_references(sous(g0), sous(g), setNames(rep(tolerance, length(feuilles)), feuilles))
+  for (s in r$structure) defauts <- c(defauts, paste("structure :", s))
+  # Verdict comparé sur son motif ASCII : un littéral non ASCII de ce fichier
+  # n'est pas marqué en locale C, le verdict l'est (charger_utf8()).
+  admis <- r$grandeurs$verdict == "identique" | grepl("^sous tol", r$grandeurs$verdict, useBytes = TRUE)
+  # Une grandeur déjà signalée par un défaut de structure (position des NA,
+  # NaN ou Inf) ne l'est pas une seconde fois : son écart relatif porte sur
+  # les seules paires finies et ne dit rien du défaut.
+  couvert <- vapply(r$grandeurs$chemin, function(c_) any(startsWith(r$structure, paste0(c_, " : "))), NA)
+  for (k in which(!admis & !couvert))
+    defauts <- c(defauts, sprintf("hors tolérance %.3g (écart %.3g) : %s", tolerance, r$grandeurs$ecart_relatif_max[k],
+                                  r$grandeurs$chemin[k]))
+  e <- r$grandeurs$ecart_relatif_max[match(tol, r$grandeurs$chemin)]
+  list(defauts = defauts, ecarts = setNames(e, tol))
+}
+
+# Trois permutations, les mêmes pour chaque plan : deux tirées sous graine
+# locale, l'ordre inverse. rownames(d) <- NULL : le nom des lignes n'est pas
+# celui de l'entrée d'origine.
+n_perm <- nrow(jeu_ref$donnees)
+ordres_permutation <- c(sous_graine(GRAINE_PERMUTATION, list(sample.int(n_perm), sample.int(n_perm))),
+                        list(n_perm:1))
+names(ordres_permutation) <- c("tirage 1", "tirage 2", "ordre inverse")
+permuter <- function(o) { d <- jeu_ref$donnees[o, ]; rownames(d) <- NULL; d }
+
+bilan_permutation <- data.frame(plan = character(0), permutation = character(0), grandeur = character(0), ecart = numeric(0))
+t_perm <- system.time(for (id in c("R6", "R4", "R5", "R2")) {
+  p <- plans_reference()[[id]]
+  for (nom_o in names(ordres_permutation)) {
+    g_p <- aplatir_construction(construire_table(permuter(ordres_permutation[[nom_o]]), jeu_ref$roles, p$plan))
+    if (id == "R6" && nom_o == "tirage 1") G_PERMUTE_R6 <- g_p
+    r <- controle_permutation(aplatis[[id]], g_p)
+    verifier(sprintf("permutation (%s) : %s : structure identique, identical() hors sommes par cellule, sommes à la tolérance %g",
+                     nom_o, id, TOLERANCE_PERMUTATION),
+             if (length(r$defauts)) utils::head(r$defauts, 5L) else TRUE)
+    bilan_permutation <- rbind(bilan_permutation, data.frame(plan = id, permutation = nom_o, grandeur = basename(names(r$ecarts)),
+                                                              ecart = unname(r$ecarts)))
+  }
+})[["elapsed"]]
+# Bilan : écart relatif maximal par plan et par grandeur, sur les trois permutations.
+cat(sprintf("  permutation : écart relatif maximal par plan et par grandeur (3 permutations ; tolérance %g ; %.1f s)\n",
+            TOLERANCE_PERMUTATION, t_perm))
+for (id in unique(bilan_permutation$plan)) {
+  b <- bilan_permutation[bilan_permutation$plan == id, ]
+  m <- tapply(b$ecart, b$grandeur, max)
+  cat(sprintf("    %s : %s\n", id, paste(sprintf("%s %.3g", names(m), m), collapse = " ; ")))
+}
+cat(sprintf("    maximum, tous plans : %.3g\n", max(bilan_permutation$ecart)))
+
+# Témoins : le contrôle détecte un défaut (sur l'aplati de R6, tirage 1).
+chemin_p <- "etapes/brut/resultat/poisson/taux"
+chemin_j <- "etapes/exposition/resultat/exposition/exposition_jours"
+chemin_c <- "etapes/exposition/resultat/exposition/exposition_centrale"
+verifier("permutation, témoin : appariement des cellules cassé (colonne exposition_jours permutée) -> défaut", {
+  g <- G_PERMUTE_R6; v <- g$valeurs[[chemin_j]]; g$valeurs[[chemin_j]] <- c(v[-1L], v[1L])
+  any(grepl(chemin_j, controle_permutation(aplatis[["R6"]], g)$defauts, fixed = TRUE))
+})
+verifier("permutation, témoin : appariement des cellules cassé (colonne exposition_centrale permutée, grandeur à tolérance) -> défaut", {
+  g <- G_PERMUTE_R6; v <- g$valeurs[[chemin_c]]; g$valeurs[[chemin_c]] <- rev(v)
+  any(grepl(chemin_c, controle_permutation(aplatis[["R6"]], g)$defauts, fixed = TRUE))
+})
+# Écart de 1e-13 (sous 1e-12) puis de 1e-11 (au-delà) sur un taux ; tolérance 0.
+# Le volet « tolérance 0 » compare R6 altéré à R6 lui-même (G_PERMUTE_R6 diffère
+# déjà de R6 sous la permutation, ce qui signalerait le taux sans altération).
+altere_taux <- function(facteur, g = G_PERMUTE_R6) {
+  i <- which(is.finite(g$valeurs[[chemin_p]]) & g$valeurs[[chemin_p]] != 0)[1L]
+  g$valeurs[[chemin_p]][i] <- g$valeurs[[chemin_p]][i] * facteur; g
+}
+verifier("permutation, témoin : taux altéré de 1e-13 -> accepté à 1e-12 ; altéré de 1e-11 -> défaut ; altéré de 1e-13 à la tolérance 0 -> défaut", {
+  a13 <- altere_taux(1 + 1e-13)
+  !length(controle_permutation(aplatis[["R6"]], a13)$defauts) &&
+    any(grepl(chemin_p, controle_permutation(aplatis[["R6"]], altere_taux(1 + 1e-11))$defauts, fixed = TRUE)) &&
+    !any(grepl(chemin_p, controle_permutation(aplatis[["R6"]], aplatis[["R6"]], tolerance = 0)$defauts, fixed = TRUE)) &&
+    any(grepl(chemin_p, controle_permutation(aplatis[["R6"]], altere_taux(1 + 1e-13, aplatis[["R6"]]), tolerance = 0)$defauts, fixed = TRUE))
+})
+verifier("permutation, témoin : double non classé ajouté des deux côtés -> défaut « double non classé »", {
+  c_ <- "etapes/brut/resultat/poisson/grandeur_inconnue"
+  g0 <- aplatis[["R6"]]; g <- G_PERMUTE_R6
+  for (nom in c("g0", "g")) { h <- get(nom); h$types[[c_]] <- "double"; h$valeurs[[c_]] <- c(0.5, 1); assign(nom, h) }
+  identical(controle_permutation(g0, g)$defauts, paste("double non classé :", c_))
+})
+verifier("permutation, témoin : entier altéré (evenements) -> défaut ; empreintes identiques (aucune permutation) -> trois défauts", {
+  g <- G_PERMUTE_R6; c_ <- "etapes/brut/resultat/poisson/evenements"; g$valeurs[[c_]][1L] <- g$valeurs[[c_]][1L] + 1L
+  d1 <- controle_permutation(aplatis[["R6"]], g)$defauts
+  d2 <- controle_permutation(aplatis[["R6"]], aplatis[["R6"]])$defauts
+  any(grepl(c_, d1, fixed = TRUE)) && setequal(d2, paste("empreinte identique, devrait différer :", EMPREINTES_PERMUTATION)) && length(d2) == 3L
 })
 
 # Témoins (point 3.6) : base = R6 aplati (Kaplan-Meier, Inf compris), écrit
