@@ -23,7 +23,8 @@
 #    refus d'écriture (condition de classe `refus_reference`, chemin fautif)
 #    sur toute classe ou tout attribut hors format ;
 #  - ecrire_reference(grandeurs, fichier, entete) : TSV UTF-8, LF, octet par
-#    octet, valeurs par tablexp:::colonne_canonique() (ADR 0007, point 9.3) ;
+#    octet, valeurs par tablexp:::ecrire_valeurs() en forme « texte »
+#    (doubles en %.17g ; ADR 0007, point 9.3 ; ADR 0011, point 7) ;
 #  - lire_reference(fichier) : lecture stricte (tout double hors de la forme
 #    de `%.17g` est refusé ; hors Windows, tout texte différent de
 #    sprintf("%.17g") de la valeur lue l'est aussi : double_lu()) ; aller-retour
@@ -210,7 +211,7 @@ atome <- function(x, chemin) {
 # row.names ignorés (l'entrée est identifiée par fiche/empreintes/donnees).
 octets_resume <- function(x, nom, chemin) {
   colonne <- function(v, n) {
-    cc <- tryCatch(tablexp:::colonne_canonique(v, n), error = function(e)
+    cc <- tryCatch(tablexp:::ecrire_valeurs(v, "texte", n), error = function(e)
       refus_reference(joindre(chemin, n), conditionMessage(e)))
     c(charToRaw(utf8_ou_refus(sprintf("#%s\t%s\n", n, cc$type), joindre(chemin, n))), cc$octets)
   }
@@ -298,7 +299,7 @@ dirname_chemin <- function(chemin) sub("/[^/]*$", "", chemin)
 octets_valeurs <- function(type, v, chemin) {
   if (type == "NULL" || !length(v)) return(raw(0))
   w <- if (type == "factor") factor(v, levels = unique(v)) else v
-  tryCatch(tablexp:::colonne_canonique(w, chemin)$octets, error = function(e)
+  tryCatch(tablexp:::ecrire_valeurs(w, "texte", chemin)$octets, error = function(e)
     refus_reference(chemin, conditionMessage(e)))
 }
 

@@ -451,18 +451,21 @@ verifier("construire_table ne touche pas .Random.seed de l'appelant (absent : re
 
 # --- empreinte (valeur calculée à la main, autre outil) ----------------------
 
-# Texte canonique attendu (ADR 0007, point 9.3), écrit par printf et haché par
-# md5sum (GNU coreutils), hors de R :
-#   tablexp canonique 1<TAB>3<TAB>8
+# Texte canonique attendu (ADR 0007, point 9.3 ; ADR 0011, point 2), écrit par
+# printf et haché par md5sum (GNU coreutils), hors de R ; octets des doubles de
+# struct.pack('<d', v).hex() (Python 3.13) :
+#   tablexp canonique 2<TAB>3<TAB>8
 #   #cause_sortie<TAB>character / "deces" / "en_cours" / NA
 #   #date_entree<TAB>Date / 2020-03-01 / 2016-05-20 / 2024-02-29
 #   #date_naissance<TAB>Date / 1960-07-01 / 1945-10-15 / 1964-02-29
 #   #date_sortie<TAB>Date / NA / 2019-02-10 / 2024-12-31
-#   #id_contrat<TAB>double / 1 / 2 / 30000000000
+#   #id_contrat<TAB>double / 000000000000f03f / 0000000000000040 / 000000b08ef01b42
 #   #id_tete<TAB>integer / 1 / NA / 3
 #   #segment<TAB>character / "a\"b" / "c\\d\te" / "été" (UTF-8)
 #   #sexe<TAB>factor / "H" / "F" / "H"
-# (346 octets, LF, md5 80e1ed7c22b2c1b6086260ce4490d64c).
+# (381 octets, LF, md5 2264ac10aa5504caec70eb1f97b2fb76 ; avant #35, doubles
+# en %.17g « 1 / 2 / 30000000000 » : 346 octets, md5
+# 80e1ed7c22b2c1b6086260ce4490d64c).
 EMP <- data.frame(c = c("deces", "en_cours", NA), e = D(c("2020-03-01", "2016-05-20", "2024-02-29")),
                   n = D(c("1960-07-01", "1945-10-15", "1964-02-29")), s = D(c(NA, "2019-02-10", "2024-12-31")),
                   ic = c(1, 2, 3e10), it = c(1L, NA, 3L), sg = c("a\"b", "c\\d\te", "été"),
@@ -471,22 +474,22 @@ Encoding(EMP$sg) <- "UTF-8"
 ROLES_EMP <- c(sexe = "sx", segment = "sg", id_tete = "it", id_contrat = "ic", date_sortie = "s",
                date_naissance = "n", date_entree = "e", cause_sortie = "c")
 empreinte_donnees <- tablexp:::empreinte_donnees
-verifier("empreinte (valeur calculée à la main par printf et md5sum, hors R) : 80e1ed7c22b2c1b6086260ce4490d64c",
-         identical(empreinte_donnees(EMP, ROLES_EMP), "80e1ed7c22b2c1b6086260ce4490d64c"))
-verifier("empreinte : texte canonique de 346 octets, sans CR", {
+verifier("empreinte (valeur calculée à la main par printf et md5sum, hors R) : 2264ac10aa5504caec70eb1f97b2fb76",
+         identical(empreinte_donnees(EMP, ROLES_EMP), "2264ac10aa5504caec70eb1f97b2fb76"))
+verifier("empreinte : texte canonique de 381 octets, sans CR", {
   fch <- tempfile()
   tablexp:::texte_canonique(EMP, ROLES_EMP, fch)
   o <- readBin(fch, "raw", 1000L)
   unlink(fch)
-  length(o) == 346L && !any(o == as.raw(0x0d))
+  length(o) == 381L && !any(o == as.raw(0x0d))
 })
 verifier("empreinte : indépendante du nom des colonnes et des colonnes non déclarées, sensible à l'ordre des lignes et aux valeurs", {
   e2 <- EMP; names(e2)[names(e2) == "ic"] <- "contrat"; r2 <- ROLES_EMP; r2[["id_contrat"]] <- "contrat"
   e2$autre <- 7:9
   e3 <- EMP[3:1, ]; e4 <- EMP; e4$ic[1] <- 1 + 2^-40
-  identical(empreinte_donnees(e2, r2), "80e1ed7c22b2c1b6086260ce4490d64c") &&
-    !identical(empreinte_donnees(e3, ROLES_EMP), "80e1ed7c22b2c1b6086260ce4490d64c") &&
-    !identical(empreinte_donnees(e4, ROLES_EMP), "80e1ed7c22b2c1b6086260ce4490d64c")
+  identical(empreinte_donnees(e2, r2), "2264ac10aa5504caec70eb1f97b2fb76") &&
+    !identical(empreinte_donnees(e3, ROLES_EMP), "2264ac10aa5504caec70eb1f97b2fb76") &&
+    !identical(empreinte_donnees(e4, ROLES_EMP), "2264ac10aa5504caec70eb1f97b2fb76")
 })
 verifier("empreinte : zéro négatif normalisé (-0 et 0 donnent la même empreinte)", {
   a <- data.frame(x = c(0, 1)); b <- data.frame(x = c(-0, 1))
@@ -581,3 +584,122 @@ verifier("portefeuille simulé (identité exacte) : par_annee, somme sur les ann
 verifier("portefeuille simulé : unité tête, aucune exclusion, aucune cellule d'âge hors de la plage contiguë",
          identical(XD$fiche$unite_observation, "tete") && XD$etapes$donnees$resultat$nombre_lignes_exclues == 0L &&
            all(tapply(TD$age, TD$sexe, function(v) identical(v, seq(min(v), max(v))))))
+
+# --- écriture canonique des valeurs en deux formes (#35 ; ADR 0011, points 2 et 3) ---
+#
+# Natures des attendus : valeur calculée hors R (octets de struct.pack('<d')
+# de Python 3.13 sur les vecteurs de la table de l'ADR 0011), identité exacte
+# (aller-retour readBin des seize hexadécimaux), recoupement (MD5 du texte
+# attendu d'un échantillon de 10^5 doubles, produit hors R par le juge Python
+# de tests/controles/ecriture_doubles.R, qui recoupe 10^6 doubles ligne à
+# ligne ; ce contrôle n'est pas une assertion de la batterie).
+local({
+  ev <- tablexp:::ecrire_valeurs
+  texte <- function(x, forme = "empreinte") rawToChar(ev(x, forme, "x")$octets)
+  lignes <- function(x, forme = "empreinte") { t <- texte(x, forme); if (nzchar(t)) strsplit(t, "\n", fixed = TRUE)[[1L]] else character(0) }
+  octets8 <- function(...) readBin(as.raw(c(...)), "double", n = 1L, size = 8L, endian = "little")
+
+  verifier("écriture des valeurs, forme empreinte : vecteurs de test de l'ADR 0011 (0.95, 1, 0, -0, 1e-9, 5e-324, Inf, -Inf), type double",
+           identical(lignes(c(0.95, 1, 0, -0, 1e-9, 5e-324, Inf, -Inf)),
+                     c("666666666666ee3f", "000000000000f03f", "0000000000000000", "0000000000000000",
+                       "95d626e80b2e113e", "0100000000000000", "Inf", "-Inf")) &&
+             identical(ev(1, "empreinte", "x")$type, "double"))
+  verifier("écriture des valeurs, forme empreinte : un double s'écrit en seize hexadécimaux minuscules, petit-boutiste, LF final, sans CR",
+           identical(texte(0.95), "666666666666ee3f\n") && !grepl("\r", texte(c(1, 2, 3))))
+  verifier("écriture des valeurs, forme texte : %.17g, jetons NA, NaN, Inf, -Inf (ADR 0011, point 3.1)",
+           identical(lignes(c(0.95, 1, 0, -0, 1e-9, NA, NaN, Inf, -Inf), "texte"),
+                     c("0.94999999999999996", "1", "0", "0", "1.0000000000000001e-09", "NA", "NaN", "Inf", "-Inf")))
+  verifier("écriture des valeurs, forme empreinte : -0 et 0 donnent les mêmes octets (x + 0)",
+           identical(lignes(-0), "0000000000000000") && identical(texte(-0), texte(0)))
+  verifier("écriture des valeurs, forme empreinte : signe négatif, sous-normaux, plus petit normal, maximum (octets construits, valeurs calculées hors R)",
+           identical(lignes(c(-1, -5e-324, octets8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x00), octets8(0, 0, 0, 0, 0, 0, 0x10, 0),
+                              .Machine$double.xmax, -.Machine$double.xmax, .Machine$double.xmin)),
+                     c("000000000000f0bf", "0100000000000080", "ffffffffffff0f00", "0000000000001000",
+                       "ffffffffffffef7f", "ffffffffffffefff", "0000000000001000")))
+  verifier("écriture des valeurs, forme empreinte : NA, NA + 1, NaN et 0/0 s'écrivent par jeton, quels que soient leurs octets",
+           identical(lignes(c(NA_real_, NA_real_ + 1, NaN, 0 / 0)), c("NA", "NA", "NaN", "NaN")))
+  verifier("écriture des valeurs : les octets de NA_real_ et de NA_real_ + 1 diffèrent sous x86-64 (constat de plateforme qui motive les jetons, ADR 0011, point 2.2) ; le jeton est le même",
+           {
+             o <- function(v) writeBin(v, raw(), size = 8L, endian = "little")
+             (Sys.info()[["machine"]] != "x86_64" || (!identical(o(NA_real_), o(NA_real_ + 1)) && !identical(o(NaN), o(0 / 0)))) &&
+               identical(texte(NA_real_), texte(NA_real_ + 1)) && identical(texte(NaN), texte(0 / 0))
+           })
+  verifier("écriture des valeurs : le classement des jetons se lit sur la valeur reçue, non sur x + 0 (décision d'actuary, #35) ; mêmes lignes pour x et x + 0, dans les deux formes", {
+    x <- c(NA, NaN, NA + 1, 0 / 0, -0, 0, Inf, -Inf, 1.5)
+    cl <- function(v) c(is.na(v) & !is.nan(v), is.nan(v), is.finite(v), v == Inf, v == -Inf)
+    identical(cl(x), cl(x + 0)) &&
+      identical(lignes(x), c("NA", "NaN", "NA", "NaN", "0000000000000000", "0000000000000000", "Inf", "-Inf", "000000000000f83f")) &&
+      identical(lignes(x), lignes(x + 0)) &&
+      identical(lignes(x, "texte"), c("NA", "NaN", "NA", "NaN", "0", "0", "Inf", "-Inf", "1.5")) &&
+      identical(lignes(x, "texte"), lignes(x + 0, "texte"))
+  })
+  verifier("écriture des valeurs : un double portant un attribut dim ou names s'écrit comme le vecteur nu, dans les deux formes, avec ou sans non fini (writeBin refuse dim)", {
+    v <- c(1, 2.5, 0.95); w <- c(1, NA, 0.95, Inf)
+    mat <- function(u) matrix(u, ncol = 1L)
+    identical(texte(mat(v)), texte(v)) && identical(texte(mat(w)), texte(w)) && identical(texte(c(a = 1, b = NA)), texte(c(1, NA))) &&
+      identical(texte(mat(v), "texte"), texte(v, "texte")) && identical(texte(mat(w), "texte"), texte(w, "texte")) &&
+      identical(ev(mat(v), "empreinte", "x")$type, "double")
+  })
+  verifier("empreinte des données : une colonne double portant un attribut dim a l'empreinte de la colonne nue (finie ou avec NA)", {
+    emp <- function(v) { d <- data.frame(i = seq_along(v)); d$x <- v; tablexp:::empreinte_donnees(d, c(id_contrat = "x")) }
+    identical(emp(matrix(c(1, 2), 2L)), emp(c(1, 2))) && identical(emp(matrix(c(1, NA), 2L)), emp(c(1, NA)))
+  })
+  verifier("écriture des valeurs, forme empreinte : mélange de finis et de jetons, positions et ordre conservés (début, milieu, fin, consécutifs)", {
+    x <- c(NA, 1, NaN, Inf, 0.95, -Inf, NA, NA, 5e-324, NaN)
+    attendu <- c("NA", "000000000000f03f", "NaN", "Inf", "666666666666ee3f", "-Inf", "NA", "NA", "0100000000000000", "NaN")
+    identical(lignes(x), attendu) &&
+      identical(lignes(c(1, NA)), c("000000000000f03f", "NA")) && identical(lignes(c(NA, 1)), c("NA", "000000000000f03f"))
+  })
+  verifier("écriture des valeurs, forme empreinte : longueurs limites (vecteur vide, une valeur, uniquement des jetons)",
+           identical(ev(numeric(0), "empreinte", "x")$octets, raw(0)) && identical(lignes(NA_real_), "NA") &&
+             identical(lignes(c(NA_real_, -Inf)), c("NA", "-Inf")) && identical(lignes(2^-1074), "0100000000000000"))
+  verifier("écriture des valeurs : les types autres que double s'écrivent de même dans les deux formes (integer, logical, character, factor, Date)", {
+    d <- as.Date(c("2020-03-01", NA))
+    cas <- list(c(1L, NA), c(TRUE, NA, FALSE), c("a\"b", NA, "été"), factor(c("H", "F", NA)), d)
+    types <- c("integer", "logical", "character", "factor", "Date")
+    all(vapply(cas, function(v) identical(ev(v, "empreinte", "x"), ev(v, "texte", "x")), NA)) &&
+      identical(vapply(cas, function(v) ev(v, "texte", "x")$type, ""), types)
+  })
+  verifier("écriture des valeurs : forme inconnue ou mal formée -> refus forme_ecriture_inconnue",
+           leve_refus(ev(1, "hexa", "x"), "forme_ecriture_inconnue") && leve_refus(ev(1, NA_character_, "x"), "forme_ecriture_inconnue") &&
+             leve_refus(ev(1, c("texte", "empreinte"), "x"), "forme_ecriture_inconnue"))
+  verifier("écriture des valeurs : type sans représentation -> refus type_non_canonique dans les deux formes",
+           leve_refus(ev(list(1), "empreinte", "x"), "type_non_canonique") && leve_refus(ev(Sys.time(), "texte", "x"), "type_non_canonique"))
+
+  # Échantillon de 10^5 doubles sous graine locale (recette de
+  # tests/controles/ecriture_doubles.R) : motifs de 64 bits tirés au hasard et
+  # valeurs de runif() transformées par des opérations IEEE exactes.
+  echantillon <- function(n, graine) tablexp:::sous_graine(graine, {
+    m <- n %/% 2L
+    octets <- as.raw(sample.int(256L, 8L * m, replace = TRUE) - 1L)
+    brut <- readBin(octets, "double", n = m, size = 8L, endian = "little")
+    brut[!is.finite(brut)] <- 0.5
+    u <- runif(n - m)
+    c(brut, u[seq_len((n - m) %/% 2L)] * 1e6 - 5e5, 1 / u[-seq_len((n - m) %/% 2L)])
+  })
+  ech <- echantillon(1e5L, 20261019L)
+  o <- ev(ech, "empreinte", "x")$octets
+  verifier("écriture des valeurs, forme empreinte : échantillon de 10^5 doubles (graine 20261019), MD5 du texte égal à celui du juge Python (struct.pack('<d'), hors R)", {
+    f <- tempfile(); writeBin(o, f); m <- unname(tools::md5sum(f)); unlink(f)
+    if (length(ech) == 1e5L && identical(m, "b0a409caef68f9219d6b70501c190a4e")) TRUE
+    else sprintf("%d doubles, MD5 %s au lieu de b0a409caef68f9219d6b70501c190a4e", length(ech), m)
+  })
+  verifier("écriture des valeurs, forme empreinte : l'échantillon de 10^5 doubles avec des jetons insérés (début, milieu, fin) s'écrit comme l'échantillon seul, aux jetons près", {
+    x <- c(NA, ech[1:50000], NaN, Inf, ech[50001:1e5], -Inf, NA_real_ + 1)
+    l <- lignes(x); k <- c(1L, 50002L, 50003L, 100004L, 100005L)
+    identical(l[k], c("NA", "NaN", "Inf", "-Inf", "NA")) && identical(l[-k], lignes(ech))
+  })
+  verifier("écriture des valeurs, forme empreinte : échantillon de 10^5 doubles, aller-retour readBin des hexadécimaux identical() (x + 0)", {
+    d <- match(as.integer(o[o != as.raw(0x0a)]), c(48:57, 97:102)) - 1L
+    b <- as.raw(d[c(TRUE, FALSE)] * 16L + d[c(FALSE, TRUE)])
+    length(o) == 17L * length(ech) && identical(readBin(b, "double", n = length(ech), size = 8L, endian = "little"), ech + 0)
+  })
+
+  # Empreinte des données : NA et NaN se distinguent ; les variantes d'octets
+  # de NA et de NaN ne changent pas l'empreinte.
+  verifier("empreinte des données, colonne double : NA et NaN donnent des empreintes différentes ; NA, NA + 1 et NaN, 0/0 donnent la même", {
+    emp <- function(v) tablexp:::empreinte_donnees(data.frame(x = v), c(id_contrat = "x"))
+    !identical(emp(c(1, NA)), emp(c(1, NaN))) && identical(emp(c(1, NA)), emp(c(1, NA_real_ + 1))) &&
+      identical(emp(c(1, NaN)), emp(c(1, 0 / 0))) && !identical(emp(c(1, 2)), emp(c(1, 2 + 2^-51)))
+  })
+})

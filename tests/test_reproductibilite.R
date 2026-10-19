@@ -155,9 +155,9 @@ unlink(c(script, sortie))
 
 # Empreinte d'un petit data.frame (chaînes marquées UTF-8, non ASCII
 # compris) : valeur calculée hors R (printf, md5sum de GNU coreutils ; voir
-# tests/unitaires/test_construire_table.R), recalculée dans deux processus
-# de locales différentes.
-EMPREINTE_ATTENDUE <- "80e1ed7c22b2c1b6086260ce4490d64c"
+# tests/unitaires/test_construire_table.R ; doubles en octets IEEE 754 depuis
+# #35, ADR 0011), recalculée dans deux processus de locales différentes.
+EMPREINTE_ATTENDUE <- "2264ac10aa5504caec70eb1f97b2fb76"
 emp_code <- c(
   "D <- as.Date",
   "d <- data.frame(c = c('deces', 'en_cours', NA), e = D(c('2020-03-01', '2016-05-20', '2024-02-29')),",
@@ -358,7 +358,19 @@ SANS_REFERENCE_17 <- character(0)
 # (succès inattendu), le test « seul écart » échouant aussi (changement
 # déclaré non observé). Un plan non listé passe par le test ordinaire de la
 # comparaison au fichier.
-TRANSITIONS_EN_COURS <- list()
+# #35 (ADR 0011, points 2.5 et 10) : « tablexp canonique 2 », doubles de
+# l'empreinte des données écrits en octets IEEE 754 ; l'entrée de référence n'a
+# aucune colonne double, donc son texte ne change que par sa première ligne
+# (garde 3.2 : MD5 du texte de l'entrée sous « tablexp canonique 1 » =
+# f3519cc1b73ab0d1fcc6ad89dc6d595c, vérifié aussi hors R par printf, tail et
+# md5sum). Valeur de l'empreinte : mesurée, identique pour R1 à R6 (même entrée).
+TRANSITIONS_EN_COURS <- list(
+  list(issue = "#35", plans = c("R1", "R2", "R3", "R4", "R5", "R6"),
+       changements = list(
+         list(chemin = "fiche/empreintes/representation", nature = "valeur de chaîne",
+              valeurs = "tablexp canonique 2"),
+         list(chemin = "fiche/empreintes/donnees", nature = "valeur de chaîne",
+              valeurs = "35ca55371e72f0f0103993d70e3a64d3"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -537,13 +549,17 @@ seul_ecart <- function(ref, g, changements) {
 # seule fois par couple donnees / roles) voit l'en-tête de sa première ligne
 # (avant la première tabulation, égal à fiche/empreintes/representation de
 # `g`) remplacé par celui de la référence ; son MD5 doit égaler
-# fiche/empreintes/donnees de la référence. Rend TRUE ou la raison.
+# fiche/empreintes/donnees de la référence. Réserve M2 de la même annotation :
+# l'objet doit avoir été construit sur l'entrée passée, c'est-à-dire que le MD5
+# du texte de `donnees` sous la représentation courante égale
+# fiche/empreintes/donnees de `g` (le texte et ce MD5 sont dans le cache).
+# Rend TRUE ou la raison.
 CACHE_ENTREE <- new.env(parent = emptyenv())
 entree_inchangee <- function(ref, g, donnees, roles) {
   chaine <- function(x) is.character(x) && length(x) == 1L && !is.na(x) && nzchar(x)
   rep_r <- ref$valeurs[[CHEMIN_REPRESENTATION]]; rep_g <- g$valeurs[[CHEMIN_REPRESENTATION]]
-  emp_r <- ref$valeurs[[CHEMIN_EMPREINTE_DONNEES]]
-  if (!chaine(rep_r) || !chaine(rep_g) || !chaine(emp_r))
+  emp_r <- ref$valeurs[[CHEMIN_EMPREINTE_DONNEES]]; emp_g <- g$valeurs[[CHEMIN_EMPREINTE_DONNEES]]
+  if (!chaine(rep_r) || !chaine(rep_g) || !chaine(emp_r) || !chaine(emp_g))
     return(sprintf("%s et %s exigés, chaînes non vides, dans la référence et l'objet", CHEMIN_REPRESENTATION, CHEMIN_EMPREINTE_DONNEES))
   if (identical(rep_r, rep_g))
     return(sprintf("représentation canonique identique des deux côtés (%s) : la différence d'empreinte ne vient pas d'une nouvelle définition, l'entrée est différente", rep_g))
@@ -551,6 +567,7 @@ entree_inchangee <- function(ref, g, donnees, roles) {
     f <- tempfile("texte_canonique_")
     tablexp:::texte_canonique(donnees, roles, f)
     CACHE_ENTREE$octets <- readBin(f, "raw", file.info(f)$size)
+    CACHE_ENTREE$md5 <- unname(tools::md5sum(f))
     CACHE_ENTREE$donnees <- donnees; CACHE_ENTREE$roles <- roles
     unlink(f)
   }
@@ -558,6 +575,9 @@ entree_inchangee <- function(ref, g, donnees, roles) {
   tab <- which(o == as.raw(9L))[1L]
   if (is.na(tab) || !identical(o[seq_len(tab - 1L)], charToRaw(rep_g)))
     return(sprintf("en-tête du texte canonique différent de %s de l'objet (%s)", CHEMIN_REPRESENTATION, rep_g))
+  if (!identical(CACHE_ENTREE$md5, emp_g))
+    return(sprintf("objet non construit sur l'entrée passée : MD5 %s du texte canonique de l'entrée, %s dans l'objet (%s)",
+                   CACHE_ENTREE$md5, emp_g, CHEMIN_EMPREINTE_DONNEES))
   f2 <- tempfile("texte_canonique_ref_"); on.exit(unlink(f2))
   writeBin(c(charToRaw(rep_r), o[-seq_len(tab - 1L)]), f2)
   m <- unname(tools::md5sum(f2))
@@ -1725,11 +1745,13 @@ local({
   t_e <- tr("#905", "R1", ch_emp, ch_rep)
   verifier("témoin 9.5, garde 3.2 (a) : entrée inchangée sous la représentation de la référence -> TRUE ; plan complet : seul écart, garde, échec attendu",
            isTRUE(entree_inchangee(ref_s, g_s, d, rl)) && identical(statuts("R1", ref_s, list(t_e), g_s, d, rl), c("OK", "OK", "ATTENDU")))
-  verifier("témoin 9.5, garde 3.2 (b) : une valeur de l'entrée altérée -> échec (raison citant l'empreinte) ; plan complet : garde en échec", {
+  verifier("témoin 9.5, garde 3.2 (b) : une valeur de l'entrée altérée (objet construit sur elle) -> échec (raison citant l'empreinte) ; plan complet : garde en échec", {
     d2 <- d; d2$it[2L] <- 9L
-    r <- entree_inchangee(ref_s, g_s, d2, rl)
+    g_s2 <- objet_emp(rep_g, tablexp:::empreinte_donnees(d2, rl))
+    t_e2 <- tr("#905", "R1", modifyList(ch_emp, list(valeurs = g_s2$valeurs[[CHEMIN_EMPREINTE_DONNEES]])), ch_rep)
+    r <- entree_inchangee(ref_s, g_s2, d2, rl)
     is.character(r) && grepl("l'entrée a changé", r, fixed = TRUE, useBytes = TRUE) &&
-      identical(statuts("R1", ref_s, list(t_e), g_s, d2, rl), c("OK", "ECHEC", "ATTENDU"))
+      identical(statuts("R1", ref_s, list(t_e2), g_s2, d2, rl), c("OK", "ECHEC", "ATTENDU"))
   })
   verifier("témoin 9.5, garde 3.2 (c) : même représentation des deux côtés -> échec ; plan complet : garde en échec", {
     ref_c <- objet_emp(rep_g, emp_r)
@@ -1754,11 +1776,22 @@ local({
     identical(l$statut[1:2], c("OK", "ECHEC")) &&
       is.character(entree_inchangee(g0, g_permute_r6, jeu_ref$donnees, jeu_ref$roles))
   })
+  verifier("témoin 9.5, garde 3.2 (f) : objet construit sur une autre entrée que celle passée (réserve M2) -> échec nommant les deux MD5, dans les deux sens ; plan complet : garde en échec", {
+    d2 <- d; d2$it[2L] <- 9L
+    g_s2 <- objet_emp(rep_g, tablexp:::empreinte_donnees(d2, rl))
+    r1 <- entree_inchangee(ref_s, g_s, d2, rl)   # objet construit sur d, entrée passée d2
+    r2 <- entree_inchangee(ref_s, g_s2, d, rl)   # objet construit sur d2, entrée passée d
+    motif <- "objet non construit sur l'entrée passée"
+    is.character(r1) && is.character(r2) && grepl(motif, r1, fixed = TRUE, useBytes = TRUE) && grepl(motif, r2, fixed = TRUE, useBytes = TRUE) &&
+      grepl(emp_g, r1, fixed = TRUE, useBytes = TRUE) && grepl(g_s2$valeurs[[CHEMIN_EMPREINTE_DONNEES]], r1, fixed = TRUE, useBytes = TRUE) &&
+      identical(statuts("R1", ref_s, list(t_e), g_s, d2, rl), c("OK", "ECHEC", "ATTENDU"))
+  })
   verifier("témoin 9.5, garde 3.2 : le texte canonique de l'entrée est calculé une seule fois pour une même entrée (cache)", {
     entree_inchangee(ref_s, g_s, d, rl)
-    o <- CACHE_ENTREE$octets
+    o <- CACHE_ENTREE$octets; m <- CACHE_ENTREE$md5
     entree_inchangee(ref_s, g_s, d, rl)
-    identical(o, CACHE_ENTREE$octets) && identical(CACHE_ENTREE$donnees, d)
+    f <- tempfile(); writeBin(o, f); m_o <- unname(tools::md5sum(f)); unlink(f)
+    identical(o, CACHE_ENTREE$octets) && identical(m, CACHE_ENTREE$md5) && identical(CACHE_ENTREE$donnees, d) && identical(m, m_o)
   })
 
   # Impression de la troisième cause d'une entrée différente.

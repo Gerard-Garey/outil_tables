@@ -3,8 +3,11 @@
 #  empreintes (issue #11 ; ADR 0005, point 6 ; ADR 0007, points 6.2, 9 et
 #  12 ; spécification d'actuary, A.3, « Fiche »)
 #
+#  - ecrire_valeurs() : écrivain unique des valeurs d'une colonne, en octets,
+#    en deux formes, « empreinte » (doubles en octets IEEE 754) et « texte »
+#    (doubles en %.17g) (ADR 0011, points 2 et 3 ; #35) ;
 #  - texte_canonique() : représentation textuelle canonique des données
-#    reçues (ADR 0007, point 9.3), en octets ;
+#    reçues (ADR 0007, point 9.3 ; ADR 0011, point 2), en octets ;
 #  - empreinte_donnees(), empreintes_construction() : MD5 par
 #    tools::md5sum() sur un fichier temporaire écrit en binaire ; algorithme
 #    nommé ; jamais serialize(), dont l'en-tête porte la version de R
@@ -27,9 +30,10 @@
 
 # Version de la fiche (ADR 0007, point 6.2) et de la représentation
 # canonique (point 9.3) : tout changement de l'une ou de l'autre est un
-# changement de résultat (visa, incrément).
+# changement de résultat (visa, incrément). « tablexp canonique 2 » : doubles
+# de l'empreinte écrits en octets IEEE 754 (ADR 0011, points 2 et 10 ; #35).
 VERSION_FICHE <- 1L
-ENTETE_CANONIQUE <- "tablexp canonique 1"
+ENTETE_CANONIQUE <- "tablexp canonique 2"
 ALGORITHME_EMPREINTE <- "md5"
 STATUT_EMPREINTES_NON_CALCULEES <- "non calculée (branche fiche-rapport)"
 
@@ -89,8 +93,72 @@ octets_lignes <- function(textes) {
   charToRaw(paste0(textes, "\n", collapse = ""))
 }
 
-# Type canonique et octets des valeurs d'une colonne (ADR 0007, point 9.3).
-colonne_canonique <- function(x, role) {
+# Écrivain unique des valeurs d'une colonne (ADR 0011, point 3.1) : type
+# canonique et octets, selon la forme, « empreinte » (texte empreinté : doubles
+# en octets IEEE 754) ou « texte » (fiche, références de non-régression :
+# doubles en %.17g). Les doubles seuls diffèrent d'une forme à l'autre ;
+# integer, logical, character, factor et Date s'écrivent de même (ADR 0007,
+# point 9.3 ; les dates relèvent de #19).
+#
+# Double : ramené d'abord à un vecteur nu (as.vector() ; writeBin refuse un
+# attribut dim, dim et names n'entrent pas dans l'écriture) ; un fini est écrit
+# depuis x + 0 (-0 devient 0) ; un non fini n'est jamais passé par une
+# opération, qui n'en garantit pas les octets (?NA ; NA_real_ + 0 change les
+# octets de NA_real_) : son jeton NA (is.na & !is.nan), NaN, Inf ou -Inf se lit
+# sur la valeur reçue (ADR 0011, point 2.2 ; décision d'actuary, #35).
+# Forme « empreinte » (point 2.1), une valeur par ligne, LF final : un fini
+# s'écrit en 16 hexadécimaux minuscules des 8 octets de
+# writeBin(x + 0, raw(), size = 8, endian = "little"), un non fini par son
+# jeton. Vectorisé sur raw : aucune boucle R par élément (la seule boucle
+# porte sur les quatre jetons). Forme « texte » : %.17g, un non fini s'écrit
+# comme R l'écrit (NA, NaN, Inf, -Inf).
+ecrire_valeurs <- function(x, forme, role) {
+  formes <- c("empreinte", "texte")
+  if (!is.character(forme) || length(forme) != 1L || !forme %in% formes)
+    refuser("rapport", "forme_ecriture_inconnue",
+            sprintf("Forme d'écriture « %s » inconnue (attendu : %s).",
+                    paste(forme, collapse = "/"), paste(formes, collapse = ", ")),
+            list(forme = forme))
+  # Seize hexadécimaux minuscules et LF par double fini : un octet = deux
+  # caractères, quartet fort puis quartet faible.
+  hexadecimaux <- function(y) {
+    o <- as.integer(writeBin(y, raw(), size = 8L, endian = "little"))
+    h <- charToRaw("0123456789abcdef")[as.vector(rbind(o %/% 16L, o %% 16L)) + 1L]
+    as.vector(rbind(matrix(h, nrow = 16L), as.raw(0x0a)))
+  }
+  doubles_empreinte <- function(x) {
+    fini <- is.finite(x)
+    if (all(fini)) return(hexadecimaux(x + 0))
+    # Jeton des non finis, lu sur x : 1 NA, 2 NaN, 3 Inf, 4 -Inf. Les jetons
+    # sont posés par leur position, les lignes finies, dans l'ordre, ensuite.
+    jetons <- c("NA", "NaN", "Inf", "-Inf")
+    z <- x[!fini]
+    jeton <- ifelse(is.nan(z), 2L, ifelse(is.na(z), 1L, ifelse(z > 0, 3L, 4L)))
+    longueur <- rep.int(17, length(x))
+    longueur[!fini] <- c(3, 4, 4, 5)[jeton]
+    debut <- cumsum(longueur) - longueur
+    sortie <- raw(sum(longueur))
+    pos <- debut[!fini]
+    pris <- vector("list", length(jetons))
+    for (k in seq_along(jetons)) {
+      i <- which(jeton == k)
+      if (length(i)) {
+        t <- charToRaw(paste0(jetons[k], "\n"))
+        pris[[k]] <- rep(pos[i], each = length(t)) + seq_along(t)
+        sortie[pris[[k]]] <- t
+      }
+    }
+    if (any(fini)) sortie[-unlist(pris, use.names = FALSE)] <- hexadecimaux(x[fini] + 0)
+    sortie
+  }
+  doubles_texte <- function(x) {
+    fini <- is.finite(x)
+    if (all(fini)) return(octets_lignes(sprintf("%.17g", x + 0)))
+    t <- character(length(x))
+    t[fini] <- sprintf("%.17g", x[fini] + 0)
+    t[!fini] <- sprintf("%.17g", x[!fini])
+    octets_lignes(t)
+  }
   if (is.factor(x)) return(list(type = "factor", octets = octets_chaines(as.character(x), role)))
   if (identical(class(x), "Date")) {
     j <- unclass(x)
@@ -106,7 +174,11 @@ colonne_canonique <- function(x, role) {
             list(role = role))
   if (is.character(x)) return(list(type = "character", octets = octets_chaines(x, role)))
   if (is.integer(x)) return(list(type = "integer", octets = octets_lignes(sprintf("%d", x))))
-  if (is.double(x)) return(list(type = "double", octets = octets_lignes(sprintf("%.17g", x + 0))))
+  if (is.double(x)) {
+    x <- as.vector(x)
+    return(list(type = "double", octets = if (!length(x)) raw(0) else if (forme == "empreinte") doubles_empreinte(x)
+                                          else doubles_texte(x)))
+  }
   if (is.logical(x)) {
     txt <- ifelse(is.na(x), "NA", ifelse(x, "TRUE", "FALSE"))
     return(list(type = "logical", octets = octets_lignes(txt)))
@@ -116,19 +188,20 @@ colonne_canonique <- function(x, role) {
           list(role = role))
 }
 
-# Représentation canonique des données reçues (ADR 0007, point 9.3) :
-# colonnes à rôle déclaré, toutes les lignes reçues dans l'ordre reçu,
-# colonnes par nom de rôle en ordre d'octets ; première ligne
-# « tablexp canonique 1<TAB><lignes><TAB><colonnes> », puis par colonne
-# « #<rôle><TAB><type> » et une valeur par ligne ; LF, aucun CR. Écrit les
-# octets dans `fichier` (binaire, writeBin) ; rend `fichier`, invisible.
+# Représentation canonique des données reçues (ADR 0007, point 9.3 ; ADR
+# 0011, point 2) : colonnes à rôle déclaré, toutes les lignes reçues dans
+# l'ordre reçu, colonnes par nom de rôle en ordre d'octets ; première ligne
+# « tablexp canonique 2<TAB><lignes><TAB><colonnes> », puis par colonne
+# « #<rôle><TAB><type> » et une valeur par ligne, écrite en forme
+# « empreinte » ; LF, aucun CR. Écrit les octets dans `fichier` (binaire,
+# writeBin) ; rend `fichier`, invisible.
 texte_canonique <- function(donnees, roles, fichier) {
   r <- sort(names(roles), method = "radix")
   con <- file(fichier, open = "wb")
   on.exit(close(con))
   writeBin(charToRaw(sprintf("%s\t%d\t%d\n", ENTETE_CANONIQUE, nrow(donnees), length(r))), con)
   for (role in r) {
-    cc <- colonne_canonique(donnees[[roles[[role]]]], role)
+    cc <- ecrire_valeurs(donnees[[roles[[role]]]], "empreinte", role)
     writeBin(charToRaw(sprintf("#%s\t%s\n", role, cc$type)), con)
     writeBin(cc$octets, con)
   }
