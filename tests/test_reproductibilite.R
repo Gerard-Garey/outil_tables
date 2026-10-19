@@ -948,7 +948,12 @@ verifier("garde du dossier de sortie : formes UNC (\\\\serveur\\partage, préfix
 # creation, regeneration et bascule ne s'exécutent que sur la CI (issue #36) :
 # les témoins qui les exercent posent GITHUB_ACTIONS=true dans leur
 # sous-processus (env), faute de quoi la garde les refuserait avant le contrôle
-# visé ; le cas sans CI de chaque mode est testé plus bas.
+# visé ; le cas sans CI de chaque mode est testé plus bas. Sur un poste, ces
+# témoins contournent donc la garde « CI seule » (issue #46) : chacun doit
+# s'arrêter sur le contrôle visé avant toute écriture, et le test échoue si le
+# dossier de sortie demandé existe après l'appel (le producteur le crée avant
+# toute production : une production non refusée d'emblée est détectée même
+# après un réordonnancement des contrôles).
 PRODUCTEUR <- file.path(RACINE, "tests", "reference", "produire_references.R")
 COMPARATEUR <- file.path(RACINE, "tests", "reference", "comparer_references.R")
 EN_CI <- "GITHUB_ACTIONS=true"
@@ -968,8 +973,14 @@ for (cas in list(
     contenu <- function() if (dir.exists(DOSSIER_REFERENCES))
       list.files(DOSSIER_REFERENCES, recursive = TRUE, all.files = TRUE, include.dirs = TRUE) else NA
     avant <- contenu()
+    sortie_t <- gsub("^'|'$", "", cas$args[match("--sortie", cas$args) + 1L])
     r <- executer_rscript(PRODUCTEUR, cas$args, env = if (is.null(cas$env)) "GITHUB_ACTIONS=false" else cas$env)
-    if (r$statut != 1L) sprintf("code %d", r$statut)
+    if (file.exists(sortie_t) && !startsWith(normalizePath(sortie_t), normalizePath(DOSSIER_REFERENCES))) {
+      fichiers <- list.files(sortie_t, recursive = TRUE, all.files = TRUE, include.dirs = TRUE)
+      unlink(sortie_t, recursive = TRUE)
+      sprintf("le dossier de sortie a été créé (%s)", if (length(fichiers)) paste(fichiers, collapse = ", ") else "vide")
+    }
+    else if (r$statut != 1L) sprintf("code %d", r$statut)
     else if (!any(grepl(cas$motif, r$sortie, fixed = TRUE, useBytes = TRUE))) paste("sortie :", paste(r$sortie, collapse = " | "))
     else if (!identical(avant, contenu())) "tests/reference/ modifié" else TRUE
   })
