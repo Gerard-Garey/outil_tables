@@ -313,6 +313,17 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # de référence de la session principale retire de cette liste les plans
 # qu'il crée (succès inattendu sinon).
 SANS_REFERENCE_17 <- character(0)
+# Plans dont la référence commitée porte encore etapes/exposition/diagnostics/
+# cellules en double (#37 : le moteur le rend en integer, valeur inchangée).
+# Tant qu'un plan est listé, sa comparaison stricte est un échec attendu #37
+# et un test ordinaire exige que ce type soit le seul écart ; la
+# régénération sur la CI (references.yml, mode regeneration) fait de
+# l'échec attendu un succès inattendu, qui fait échouer la batterie : le
+# commit de référence de la session principale vide cette liste
+# (character(0)), ce qui supprime les tests « seul écart » et rend ordinaires
+# la comparaison stricte et le test des doubles sans tolérance des références.
+A_REGENERER_37 <- c("R1", "R2", "R3", "R4", "R5", "R6")
+CHEMIN_TYPE_37 <- "etapes/exposition/diagnostics/cellules"
 
 jeu_ref <- jeu_reference()
 aplatis <- list()
@@ -348,6 +359,22 @@ for (p in plans_reference()) {
   if (id %in% SANS_REFERENCE_17 && !present) echec_attendu(nom, "#17", comparer_au_fichier(id, g))
   else if (id %in% SANS_REFERENCE_17)
     verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE_17", id, id))
+  else if (id %in% A_REGENERER_37) {
+    # Le type de #37 est le seul écart toléré : la référence, son type aligné
+    # sur celui de l'objet (valeurs entières, conversion exacte), doit se
+    # comparer sans aucun écart. Toute autre grandeur en écart, tout autre
+    # écart de structure ou une entrée différente reste un échec.
+    verifier(sprintf("%s : seul écart à tests/reference/%s.tsv : le type de %s (#37)", id, id, CHEMIN_TYPE_37), {
+      ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))
+      if (identical(unname(ref$types[CHEMIN_TYPE_37]), "double")) {
+        v <- ref$valeurs[[CHEMIN_TYPE_37]]
+        if (!identical(as.double(as.integer(v)), v)) return("valeurs de la référence non entières")
+        ref$types[[CHEMIN_TYPE_37]] <- "integer"; ref$valeurs[[CHEMIN_TYPE_37]] <- as.integer(v)
+      }
+      if (comparer_references(ref, g)$ok) TRUE else "écart autre que le type de #37 (référence au type aligné, comparaison en échec)"
+    })
+    echec_attendu(nom, "#37", comparer_au_fichier(id, g))
+  }
   else verifier(nom, comparer_au_fichier(id, g))
 }
 verifier("aucune référence orpheline sous tests/reference/ (point 3.7)", {

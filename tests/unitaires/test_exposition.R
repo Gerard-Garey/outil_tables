@@ -348,3 +348,40 @@ verifier("segmentation : segment entier rendu en integer et trié sur sa valeur 
   t <- construire_table(d, roles, plan)$etapes$exposition$resultat$exposition
   is.integer(t$segment) && identical(unique(t$segment), c(2L, 10L))
 })
+
+# Nombre de cellules en integer (#37) : diagnostics$cellules de l'étape est un
+# integer égal au nombre de lignes de la table (sans et avec par_annee, table
+# vide, plusieurs segments) ; nombre_cellules() refuse au-delà de
+# .Machine$integer.max sans avertissement de débordement entier.
+verifier("diagnostics$cellules de l'étape exposition : integer égal à nrow(table) (H1 sans par_annee, H13 par_annee, H10a table vide 0L)", {
+  v <- function(x) x$objet$etapes$exposition$diagnostics$cellules
+  is.integer(v(H1)) && identical(v(H1), nrow(H1$table)) &&
+    is.integer(v(H13)) && identical(v(H13), nrow(H13$table)) && v(H13) > v(H1) &&
+    identical(v(H10a), 0L)
+})
+verifier("diagnostics$cellules de l'étape exposition : integer avec deux segments (segment 2 et 10)", {
+  d <- data.frame(n = D(c("1960-07-01", "1945-10-15")), e = D(c("2020-03-01", "2016-05-20")),
+                  s = D(c(NA, "2019-02-10")), c = c("en_cours", "deces"), sg = c(10L, 2L),
+                  stringsAsFactors = FALSE)
+  roles <- c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c", segment = "sg")
+  plan <- list(transition = VD, periode = PER, delai_declaration = 0, segmentation = "segment",
+               etapes = list(donnees = list(exclusions = character(0)),
+                             exposition = list(convention = "plus_fine", par_annee = FALSE)))
+  x <- construire_table(d, roles, plan)$etapes$exposition
+  is.integer(x$diagnostics$cellules) && identical(x$diagnostics$cellules, nrow(x$resultat$exposition)) &&
+    x$diagnostics$cellules > 1L
+})
+nombre_cellules <- tablexp:::nombre_cellules
+verifier("nombre_cellules : somme des plages d'âges par le nombre d'années, en integer ; 0L pour aucune plage", {
+  identical(nombre_cellules(c(5, 0, 3), 2L), 16L) && identical(nombre_cellules(c(5L, 0L, 3L), 1L), 8L) &&
+    identical(nombre_cellules(numeric(0), 1L), 0L)
+})
+verifier("nombre_cellules : .Machine$integer.max admis ; un de plus -> refus trop_de_cellules, sans avertissement de débordement entier", {
+  lim <- .Machine$integer.max
+  avert <- character(0)
+  r <- withCallingHandlers(
+    list(nombre_cellules(lim, 1L), leve_refus(nombre_cellules(c(lim, 1), 1L), "trop_de_cellules"),
+         leve_refus(nombre_cellules(c(lim, lim), 3L), "trop_de_cellules")),
+    warning = function(w) { avert <<- c(avert, conditionMessage(w)); invokeRestart("muffleWarning") })
+  identical(r[[1L]], lim) && isTRUE(r[[2L]]) && isTRUE(r[[3L]]) && !length(avert)
+})
