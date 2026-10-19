@@ -4078,10 +4078,15 @@ annotation du 17/10/2026, point~f)~:
     $3{,}97 \cdot 10^{-15}$ à $10^5$~lignes, $1{,}37 \cdot 10^{-14}$ à
     $10^6$ et $1{,}73 \cdot 10^{-14}$ à $3 \cdot 10^6$. C'est un \textbf{constat de
     mesure, non une borne démontrée}~; le test de permutation de la batterie
-    de reproductibilité (plans R6, R4, R5 et R2, trois permutations) le
-    contrôle à la tolérance relative $10^{-12}$ (constante
+    de reproductibilité (plans R6, R4, R5, R3 et R2, R1 étant couvert par
+    R6~; deux permutations, un tirage sous la graine 20261019 et l'ordre
+    inverse) le contrôle à la tolérance relative $10^{-12}$ (constante
     \code{TOLERANCE\_PERMUTATION}, classe existante de
-    \code{CLASSES\_TOLERANCE}~; issue~\#39)~; les grandeurs qui ne sont pas des
+    \code{CLASSES\_TOLERANCE}~; issue~\#39)~; il vérifie l'invariance à
+    l'ordre des lignes, non la précision des sommes, que garde la
+    comparaison aux références de non-régression dans l'ordre reçu (classe
+    $10^{-14}$)~: un écart dépendant de l'ordre inférieur à $10^{-12}$ n'y
+    est pas détecté~; les grandeurs qui ne sont pas des
     doubles, les doubles de classe exacte, les tables de Kaplan-Meier et les
     diagnostics de l'étape \code{brut} y sont comparés par
     \code{identical()}, les trois empreintes (données, lignes conservées,
