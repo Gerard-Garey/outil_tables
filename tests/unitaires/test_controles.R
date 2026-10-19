@@ -58,7 +58,14 @@ depot_temoin <- function(entrees) {
   writeLines(lignes, file.path(d, "src", "contrib", "PACKAGES"))
   d
 }
-url_depot <- function(d) paste0("file://", normalizePath(d, winslash = "/"))
+# URL de fichier absolue : « file:// » + chemin commençant par « / »
+# (POSIX : file:///tmp/…) ; sous Windows, le chemin « C:/… » prend un « / »
+# de tête (file:///C:/…, forme portable), faute de quoi « C: » serait lu
+# comme un hôte (issue #33).
+url_depot <- function(d) {
+  chemin <- normalizePath(d, winslash = "/", mustWork = FALSE)
+  paste0("file://", if (startsWith(chemin, "/")) "" else "/", chemin)
+}
 liste_temoin <- function(lignes) {
   f <- tempfile("liste_", fileext = ".csv")
   writeLines(c("ensemble,package,statut,source", lignes), f)
@@ -83,6 +90,9 @@ entrees <- c(entrees, list(
 depot <- depot_temoin(entrees)
 aj <- function(...) controle("absence_java.R", "--depot", shQuote(url_depot(depot)), ...)
 
+verifier("absence de Java : URL du dépôt local file:///… (trois barres, pas quatre), lisible par available.packages",
+         grepl("^file:///[^/]", url_depot(depot)) &&
+           nrow(utils::available.packages(repos = url_depot(depot), type = "source")) > 0L)
 verifier("absence de Java : passe sur la liste du dépôt (dépôt local)", passe(aj()))
 verifier("absence de Java : échoue sur le témoin ELT, chaîne affichée",
          echoue(aj("--ajouter", "ELT"), "ELT dépend de Java (ELT -> xlsx -> rJava)"))

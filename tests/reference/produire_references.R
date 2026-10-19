@@ -31,6 +31,22 @@
 #  ni s'y trouver. Code de sortie 1 en cas d'échec.
 # -----------------------------------------------------------------------------
 
+# Relecture en UTF-8 (issue #28). Rscript analyse ce fichier sans encodage : en
+# locale C, ses littéraux non ASCII ne seraient pas marqués UTF-8 et, mêlés à
+# des chaînes marquées (sprintf), seraient abîmés dans ecarts.txt (« commit<c3><a9> »).
+# Lancé par Rscript, le script se relit donc avec parse(encoding = "UTF-8"),
+# exécute cette relecture, puis s'arrête ; source() et les appels imbriqués
+# (sys.nframe() > 0) ne relisent rien.
+if (sys.nframe() == 0L && !isTRUE(getOption("tablexp.relecture_utf8"))) {
+  f <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
+  if (length(f)) {
+    options(tablexp.relecture_utf8 = TRUE)
+    for (e in parse(normalizePath(f[1L]), encoding = "UTF-8", keep.source = FALSE)) eval(e, globalenv())
+    principal()
+    quit(save = "no", status = 0L)
+  }
+}
+
 local({
   f <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
   ici <- if (length(f)) dirname(normalizePath(f[1L])) else file.path("tests", "reference")
@@ -45,10 +61,15 @@ local({
 
 MODES <- c("creation", "regeneration", "bascule", "releve")
 
+# Octets UTF-8 tels quels (marque retirée) pour la console et le résumé :
+# cat() d'une chaîne marquée UTF-8 écrit « <U+00E9> » en locale C, alors que ces
+# sorties portaient jusqu'ici les octets (les tests les lisent par octets).
+octets_bruts <- function(x) { Encoding(x) <- "unknown"; x }
+
 echouer <- function(message) {
-  cat("ECHEC :", message, "\n")
+  cat("ECHEC :", octets_bruts(message), "\n")
   if (identical(Sys.getenv("GITHUB_ACTIONS"), "true"))
-    cat("::error title=Références::", gsub("\n", " ", message), "\n", sep = "")
+    cat("::error title=Références::", octets_bruts(gsub("\n", " ", message)), "\n", sep = "")
   quit(save = "no", status = 1L)
 }
 
@@ -155,14 +176,14 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
                          resume$comparaison, resume$admis),
                  if (length(defauts)) paste0("  ECHEC : ", defauts) else "  OK", "")
   writeBin(octets_texte(c(bilan_txt, impression)), file.path(sortie, "ecarts.txt"))
-  cat(bilan_txt, impression, sep = "\n")
+  cat(octets_bruts(c(bilan_txt, impression)), sep = "\n")
   s <- Sys.getenv("GITHUB_STEP_SUMMARY")
   if (nzchar(s))
-    cat(c(sprintf("### Références de non-régression (mode %s)", mode), "",
+    cat(octets_bruts(c(sprintf("### Références de non-régression (mode %s)", mode), "",
           "| Plan | Fichier commité | Comparaison | Admis |", "|---|---|---|---|",
           sprintf("| %s | %s | %s | %s |", resume$plan, resume$commis, resume$comparaison, resume$admis), "",
           if (length(defauts)) paste0("- ECHEC : ", defauts) else "- OK", "",
-          "```", impression, "```", ""), file = s, sep = "\n", append = TRUE)
+          "```", impression, "```", "")), file = s, sep = "\n", append = TRUE)
   if (length(defauts)) echouer(paste(defauts, collapse = " ; "))
   invisible(TRUE)
 }
