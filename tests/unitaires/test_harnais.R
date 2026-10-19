@@ -10,11 +10,11 @@
 HARNAIS <- file.path(RACINE, "tests", "harnais.R")
 
 # Exécute un témoin dont `corps` est le code R après le chargement du harnais.
-temoin <- function(corps) {
+temoin <- function(corps, env = character(0)) {
   f <- tempfile("temoin_harnais_", fileext = ".R")
   on.exit(unlink(f))
   writeLines(c(sprintf("source(%s)", deparse(HARNAIS)), corps), f)
-  executer_rscript(f)
+  executer_rscript(f, env = env)
 }
 ligne_bilan <- function(r) grep("^Bilan : ", r$sortie, value = TRUE)
 
@@ -262,3 +262,53 @@ verifier("concordance, option sans valeur : code non nul, sans le message de la 
 r <- temoin(c('verifier("faux", FALSE)', "bilan()"))
 verifier("bilan() en échec : code non nul, sans le message de la garde de sortie",
          r$statut != 0L && !any(grepl(GARDE, r$sortie, fixed = TRUE, useBytes = TRUE)))
+
+# --- locale UTF-8 sondée et variables d'environnement (#34) -------------------
+
+# poser_environnement() : pose puis restaure (variable absente, variable
+# existante, valeur contenant « = »).
+local({
+  Sys.setenv(TABLEXP_TEMOIN_B = "avant")
+  Sys.unsetenv("TABLEXP_TEMOIN_A")
+  restaurer <- poser_environnement(c("TABLEXP_TEMOIN_A=1=2", "TABLEXP_TEMOIN_B=apres"))
+  pose <- Sys.getenv(c("TABLEXP_TEMOIN_A", "TABLEXP_TEMOIN_B"), unset = NA)
+  restaurer()
+  restaure <- Sys.getenv(c("TABLEXP_TEMOIN_A", "TABLEXP_TEMOIN_B"), unset = NA)
+  Sys.unsetenv("TABLEXP_TEMOIN_B")
+  verifier("poser_environnement() : variables posées, valeur avec « = » conservée",
+           identical(unname(pose), c("1=2", "apres")))
+  verifier("poser_environnement() : variable absente retirée, variable existante restaurée",
+           identical(unname(restaure), c(NA, "avant")))
+  verifier("poser_environnement() : liste vide -> restauration sans effet",
+           is.null(poser_environnement(character(0))()))
+})
+
+# locale_utf8_disponible() : aucune candidate disponible -> "" (le test de la
+# batterie de reproductibilité échoue alors explicitement), LC_CTYPE restaurée.
+r <- temoin(c('LOCALES_UTF8 <- c("xx_XX.UTF-8", "yy_YY.utf8")',
+              'avant <- Sys.getlocale("LC_CTYPE")',
+              'cat("DISPO[", locale_utf8_disponible(), "] RESTAUREE ", identical(Sys.getlocale("LC_CTYPE"), avant), "\\n", sep = "")',
+              'verifier("vrai", TRUE)', "bilan()"))
+verifier("locale_utf8_disponible() : aucune candidate disponible -> chaîne vide, LC_CTYPE restaurée",
+         any(grepl("DISPO[] RESTAUREE TRUE", r$sortie, fixed = TRUE, useBytes = TRUE)))
+# Une candidate disponible est rendue, sans changer LC_CTYPE.
+r <- temoin(c('avant <- Sys.getlocale("LC_CTYPE")',
+              'l <- locale_utf8_disponible()',
+              'cat("DANS_LISTE ", l %in% c(LOCALES_UTF8, ""), " RESTAUREE ", identical(Sys.getlocale("LC_CTYPE"), avant), "\\n", sep = "")',
+              'verifier("vrai", TRUE)', "bilan()"))
+verifier("locale_utf8_disponible() : rend une candidate de LOCALES_UTF8 (ou une chaîne vide), LC_CTYPE restaurée",
+         any(grepl("DANS_LISTE TRUE RESTAUREE TRUE", r$sortie, fixed = TRUE, useBytes = TRUE)))
+
+# installer_tablexp() : LC_ALL posée le temps de R CMD INSTALL puis restaurée
+# (arbre modifié, donc réinstallation).
+d <- copie_source(function(d) cat("f_ajoutee <- function() 1\n", file = file.path(d, "R", "outils.R"), append = TRUE))
+# Le témoin est lancé en session LC_ALL=C (hors UTF-8, quelle que soit la
+# session de la batterie) : la pose a donc lieu aussi sur la CI.
+r <- temoin(c(sprintf("installer_tablexp(%s)", deparse(d)),
+              'cat("LC_ALL_APRES[", Sys.getenv("LC_ALL", unset = "<non posee>"), "]\\n", sep = "")',
+              'verifier("vrai", TRUE)', "bilan()"), env = "LC_ALL=C")
+verifier("installer_tablexp() : session LC_ALL=C, réinstallation sous une locale UTF-8, LC_ALL=C restaurée après R CMD INSTALL",
+         r$statut == 0L && any(grepl("réinstallation", r$sortie, fixed = TRUE, useBytes = TRUE)) &&
+           any(grepl("(R CMD INSTALL sous LC_ALL=", r$sortie, fixed = TRUE, useBytes = TRUE)) &&
+           any(grepl("LC_ALL_APRES[C]", r$sortie, fixed = TRUE, useBytes = TRUE)))
+unlink(d, recursive = TRUE)

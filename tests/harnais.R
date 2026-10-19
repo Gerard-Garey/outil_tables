@@ -47,8 +47,9 @@
 #  Locale de l'installation (décision M54 du 17/10/2026) : si la session
 #  n'est pas en UTF-8, installer_tablexp() lance R CMD INSTALL sous la
 #  première locale UTF-8 disponible parmi LOCALES_UTF8 (testée par
-#  Sys.setlocale puis restaurée), passée par system2(env = "LC_ALL=...") ;
-#  aucune disponible : ECHEC. La locale d'exécution ne change pas. Après
+#  Sys.setlocale puis restaurée), posée par Sys.setenv le temps de
+#  l'installation (system2(env =) est sans effet sous Windows) ; aucune
+#  disponible : ECHEC. La locale d'exécution ne change pas. Après
 #  library(), sonde_utf8() vérifie un littéral non ASCII du moteur ; en
 #  échec : ECHEC « tablexp installé hors locale UTF-8 » (un paquet installé
 #  en locale C garde ses littéraux non marqués, qu'enc2utf8() change en
@@ -240,22 +241,28 @@ racine_depot <- function() {
   }
 }
 
+# Pose des variables « NOM=valeur » dans ce processus et rend la fonction qui
+# les restaure : le sous-processus en hérite (system2(env =) n'est pas pris en
+# charge sous Windows).
+poser_environnement <- function(env) {
+  if (!length(env)) return(function() invisible(NULL))  # Sys.getenv(character(0)) rendrait tout l'environnement
+  noms <- sub("=.*$", "", env)
+  anciens <- Sys.getenv(noms, unset = NA, names = TRUE)
+  valeurs <- sub("^[^=]*=", "", env)
+  do.call(Sys.setenv, stats::setNames(as.list(valeurs), noms))
+  function() {
+    for (n in noms) if (is.na(anciens[[n]])) Sys.unsetenv(n)
+                    else do.call(Sys.setenv, stats::setNames(list(anciens[[n]]), n))
+    invisible(NULL)
+  }
+}
+
 executer_rscript <- function(script, args = character(0), env = character(0)) {
   rscript <- file.path(R.home("bin"), "Rscript")
   if (!is.null(.harnais$bibliotheque) && !any(startsWith(env, "TABLEXP_BIBLIOTHEQUE=")))
     env <- c(env, paste0("TABLEXP_BIBLIOTHEQUE=", .harnais$bibliotheque))
-  if (length(env)) {
-    # Posées dans ce processus puis restaurées : le sous-processus en hérite
-    # (system2(env =) n'est pas pris en charge sous Windows).
-    noms <- sub("=.*$", "", env)
-    anciens <- Sys.getenv(noms, unset = NA, names = TRUE)
-    valeurs <- sub("^[^=]*=", "", env)
-    do.call(Sys.setenv, stats::setNames(as.list(valeurs), noms))
-    on.exit({
-      for (n in noms) if (is.na(anciens[[n]])) Sys.unsetenv(n)
-                      else do.call(Sys.setenv, stats::setNames(list(anciens[[n]]), n))
-    }, add = TRUE)
-  }
+  restaurer <- poser_environnement(env)
+  on.exit(restaurer(), add = TRUE)
   sortie <- suppressWarnings(system2(rscript, c(shQuote(script), args),
                                      stdout = TRUE, stderr = TRUE))
   statut <- attr(sortie, "status")
@@ -282,16 +289,25 @@ empreinte_source <- function(racine) {
   unname(tools::md5sum(f))
 }
 
+# Candidates, dans l'ordre ; seule la sonde ci-dessous décide de la
+# disponibilité sur la plateforme (issue #34).
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")
 
-# NA si la session est déjà en UTF-8 (rien à poser) ; sinon la première
-# locale UTF-8 de LOCALES_UTF8 que Sys.setlocale accepte, "" si aucune.
-locale_installation <- function() {
-  if (isTRUE(l10n_info()[["UTF-8"]])) return(NA_character_)
+# Première locale UTF-8 de LOCALES_UTF8 que Sys.setlocale accepte (LC_CTYPE,
+# restaurée ensuite), "" si aucune : la disponibilité se sonde, ne se suppose
+# pas (C.UTF-8 n'existe pas sous Windows).
+locale_utf8_disponible <- function() {
   ancienne <- Sys.getlocale("LC_CTYPE")
   on.exit(Sys.setlocale("LC_CTYPE", ancienne))
   for (l in LOCALES_UTF8) if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) return(l)
   ""
+}
+
+# NA si la session est déjà en UTF-8 (rien à poser) ; sinon la locale de
+# locale_utf8_disponible(), "" si aucune.
+locale_installation <- function() {
+  if (isTRUE(l10n_info()[["UTF-8"]])) return(NA_character_)
+  locale_utf8_disponible()
 }
 
 # Sonde : STATUT_EMPREINTES_NON_CALCULEES (R/rapport.R, « non calculée »),
@@ -322,11 +338,15 @@ installer_tablexp <- function(racine = racine_depot()) {
                   paste(LOCALES_UTF8, collapse = ", ")))
       quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
     }
-    r <- suppressWarnings(system2(file.path(R.home("bin"), "R"),
-                                  c("CMD", "INSTALL", "--no-docs", "-l",
-                                    shQuote(lib), shQuote(racine)),
-                                  stdout = TRUE, stderr = TRUE,
-                                  env = if (is.na(locale)) character(0) else paste0("LC_ALL=", locale)))
+    # LC_ALL posée dans ce processus le temps de l'installation, comme dans
+    # executer_rscript() : le message « sous LC_ALL=… » dit vrai aussi sous
+    # Windows, où system2(env =) est sans effet (issue #34, point connexe).
+    restaurer <- poser_environnement(if (is.na(locale)) character(0) else paste0("LC_ALL=", locale))
+    r <- tryCatch(suppressWarnings(system2(file.path(R.home("bin"), "R"),
+                                           c("CMD", "INSTALL", "--no-docs", "-l",
+                                             shQuote(lib), shQuote(racine)),
+                                           stdout = TRUE, stderr = TRUE)),
+                  finally = restaurer())
     if (!is.null(attr(r, "status")) && attr(r, "status") != 0L) {
       cat(r, sep = "\n")
       cat("\nECHEC : installation de tablexp depuis l'arbre de travail\n")
