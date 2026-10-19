@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{18/10/2026}
+\newcommand{\datedoc}{19/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1360,7 +1360,16 @@ réussie pour les autres), \code{regeneration} (écarts admis sur les seuls
 plans visés), \code{bascule} (écarts admis sur tous, l'identifiant de
 plateforme de l'exécution devant différer de celui des en-têtes commités)~;
 un mode \code{releve}, refusé sur la CI, sert aux essais sur un poste, dont
-les fichiers ne sont jamais commités. Le dossier de sortie ne peut être
+les fichiers ne sont jamais commités. Symétriquement, les modes
+\code{creation}, \code{regeneration} et \code{bascule} sont \textbf{refusés
+hors de la CI}, c'est-à-dire quand la variable d'environnement
+\code{GITHUB\_ACTIONS} ne vaut pas \code{true}~: le refus intervient avant
+le contrôle des autres options et avant toute écriture, si bien qu'aucun
+dossier de sortie n'est créé (ADR 0009, seconde annotation du 19/10/2026,
+point~(d)). Cette garde protège contre l'erreur, \textbf{pas contre la
+malveillance}~: la variable se pose à la main~; la garantie de fond reste
+la vérification, par la session principale, des MD5 des fichiers commités
+contre l'artefact de l'exécution citée. Le dossier de sortie ne peut être
 \code{tests/reference/} ni s'y trouver, quelle que soit l'écriture du chemin
 (séparateurs, casse, lecteur, chemins réseau, liens, noms courts).
 Le job ne commite rien~: il publie un artefact (références, leurs MD5,
