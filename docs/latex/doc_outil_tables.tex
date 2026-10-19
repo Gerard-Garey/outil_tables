@@ -4203,7 +4203,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (1) \\
+\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (2) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 1"} \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
 \catalogue{fonctions-rapport}{STATUT\_EMPREINTES\_NON\_CALCULEES} & constante & --- & statut des empreintes du résultat et du code \\
@@ -4214,6 +4214,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche \\
+\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}~; idempotente~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
 \catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
 \end{longtable}
