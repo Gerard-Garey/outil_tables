@@ -1794,9 +1794,22 @@ résultat, ses diagnostics et ses avertissements~; l'étape \code{exposition}
 lit la table des observations de l'étape \code{donnees}~; l'étape \code{brut}
 lit la table d'exposition et les paramètres effectifs de l'étape
 \code{exposition} (découpage par année, convention retenue, unité de
-l'exposition) et, pour l'estimateur \code{kaplan\_meier}, la table des
-observations de l'étape \code{donnees}, avec la transition, la période et le
-délai du plan.\par}
+l'exposition) et, pour l'estimateur \code{kaplan\_meier}, les fenêtres des
+observations calculées par l'étape \code{exposition}, avec la transition, la
+période et le délai du plan. Ces fenêtres sont la seule donnée qu'une étape
+transmet à une autre hors de l'objet résultat (issue~\#38~; ADR 0007, seconde
+annotation du 19/10/2026)~: \code{calculer\_exposition()} les rend dans un
+élément \code{fenetres} à côté de son résultat
+(section~\ref{sec:troncature-censure}), \code{construire\_table()} les garde
+dans une variable locale, les passe à \code{calculer\_taux\_bruts()} par son
+argument \code{observations}, puis les libère après l'étape \code{brut}. Seuls
+les paramètres effectifs, le résultat et les diagnostics de chaque étape
+entrent dans \code{etapes}~; les fenêtres n'entrent ni dans l'objet résultat
+ni dans la fiche, qui sont ceux de la section~\ref{sec:objet-resultat}.
+L'étape \code{exposition} précède toujours l'étape \code{brut}, préalable que
+\code{valider\_plan()} contrôle~; dans une construction, l'étape \code{brut}
+ne lit donc pas la table des observations de l'étape \code{donnees}
+elle-même, mais ses fenêtres.\par}
 
 \subsection{Objet résultat}
 \label{sec:objet-resultat}
@@ -2403,7 +2416,11 @@ la position d'un jour dans sa cellule sont calculés par trois fonctions
 \code{position\_dans\_cellule()}) que l'estimateur \code{kaplan\_meier} du
 module \code{brut} emploie aussi (section~\ref{sec:brut-kaplan-meier})~:
 les deux modules lisent ainsi les mêmes fenêtres, sans seconde
-implémentation. Leur extraction de \code{calculer\_exposition()} n'a changé
+implémentation. Dans une construction, les fenêtres et les segments ne sont
+calculés qu'une fois~: l'étape \code{exposition} les rend à côté de son
+résultat, et \code{construire\_table()} les transmet à l'étape \code{brut}
+sans les inscrire dans l'objet résultat (section~\ref{sec:troncature-censure},
+«~Fenêtres transmises à l'étape \code{brut}~»~; issue~\#38). Leur extraction de \code{calculer\_exposition()} n'a changé
 aucun résultat (constat~: objets \code{identical()} hors \code{execution}
 avant et après l'extraction, sur les cas de test et sur des plans sans
 \code{kaplan\_meier}).
@@ -2666,6 +2683,33 @@ Avertissements~: \code{convention\_forcee},
 \code{evenement\_sans\_exposition} et \code{aucune\_exposition} (aucune
 exposition ni aucun événement dans la période).
 
+\medskip
+\textbf{Fenêtres transmises à l'étape \code{brut}} (issue~\#38~; ADR 0007,
+seconde annotation du 19/10/2026). Outre ses paramètres effectifs, son
+résultat, ses diagnostics et ses avertissements, \code{calculer\_exposition()}
+rend un cinquième élément, \code{fenetres}, objet de classe
+\code{fenetres\_exposition}. Il contient les fenêtres des observations et
+leurs événements (\code{composantes}, \code{calendrier}, \code{a}, \code{b},
+\code{evenement}, issus de \code{fenetres\_observations()}), le segment de
+chaque observation et la table des clés de segmentation (\code{g},
+\code{segments}, issus de \code{segments\_observations()}), et les paramètres
+sous lesquels ils sont calculés~: début $D$ (\code{debut}) et borne $B$
+(\code{borne}) de la période, code de la transition (\code{transition}),
+convention retenue (\code{convention}) et segmentation
+(\code{segmentation}). Ce sont les valeurs mêmes qui ont servi à construire
+la table d'exposition, non recalculées. Cet élément est \textbf{interne à
+l'exécution}~: \code{construire\_table()} le passe à l'étape \code{brut}, puis
+le libère~; il n'entre ni dans \code{etapes} de l'objet résultat ni dans la
+fiche (section~\ref{sec:execution}). L'estimateur \code{kaplan\_meier} le
+reprend après un contrôle d'égalité exacte de ces cinq paramètres
+(section~\ref{sec:brut-kaplan-meier}, «~Données~»). Ainsi, les deux étapes
+lisent les fenêtres d'une seule source, calculées une seule fois. Les
+positions des jours dans leur cellule ne sont pas transmises~: seul
+\code{kaplan\_meier} les emploie et il les calcule lui-même. Les calculer ici
+coûterait à toute construction, y compris sans cet estimateur, et ferait
+dépendre le module \code{exposition} des besoins d'un estimateur du module
+\code{brut}.
+
 \subsection{Découpage par année}
 \label{sec:decoupage-annee}
 
@@ -2776,7 +2820,7 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
-\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee} & fonction d'étape \code{exposition} \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee} & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38) \\
 \end{longtable}
 }
 
@@ -2844,7 +2888,9 @@ tous les estimateurs.
 L'étape a pour préalables les étapes \code{donnees} et \code{exposition}
 (constante \code{ETAPES}~; refus \code{etape\_prealable\_manquante} de
 \code{valider\_plan()} sinon)~: l'estimateur \code{kaplan\_meier} lit les
-observations de la première, tous les estimateurs la table de la seconde.
+fenêtres des observations de la première, calculées par la seconde et
+transmises par \code{construire\_table()} (section~\ref{sec:execution}),
+tous les estimateurs la table de la seconde.
 
 \medskip
 \textbf{Refus du module \code{brut}}, levés par
@@ -3091,7 +3137,25 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     n'intervient.
   \item \sloppy \textbf{Données}~: fenêtres et événements identiques à ceux de
     l'étape \code{exposition} (\code{fenetres\_observations()},
-    section~\ref{sec:troncature-censure}). Une observation est retenue si sa
+    section~\ref{sec:troncature-censure}). Dans une construction, ce sont
+    ceux-là mêmes~: l'étape \code{exposition} les transmet, avec les segments
+    des observations, dans un objet \code{fenetres\_exposition} («~Fenêtres
+    transmises à l'étape \code{brut}~», section~\ref{sec:troncature-censure}),
+    que \code{taux\_kaplan\_meier()} reprend tel quel après avoir contrôlé à
+    l'égalité exacte (\code{identical()}) les cinq paramètres sous lesquels il
+    est calculé~: début et borne de la période, transition, convention
+    retenue et segmentation, comparés à ceux de l'étape \code{brut}~; un
+    écart est une erreur
+    de programmation. Les observations elles-mêmes ne sont pas contrôlées~:
+    seul \code{construire\_table()} produit cet objet, à partir des
+    observations de l'étape \code{donnees} de la même exécution. En appel
+    direct de la fonction d'étape sur la table des observations, les fenêtres
+    et les segments sont recalculés par les mêmes fonctions
+    (\code{fenetres\_observations()}, \code{segments\_observations()})~; les
+    deux voies donnent des résultats \code{identical()} (constat de test,
+    section~\ref{sec:verifications-brut}). Les positions des jours dans leur
+    cellule (\code{position\_dans\_cellule()}) sont calculées ici, dans les
+    deux cas. Une observation est retenue si sa
     fenêtre $[a, b)$ est non vide, ou si elle porte un événement
     ($a \le s = b$). Sorties concurrentes, fin de période et délai de
     déclaration sont des censures à leur instant. Une tête dont deux
@@ -3184,10 +3248,23 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     table.
   \item \textbf{Calcul}~: \code{taux\_kaplan\_meier()}~; $r(t) = \#\{K_a \le
     t\} - \#\{K_b < t\}$ par \code{findInterval()}, couverture par
-    \code{cummax()}, en $O(n \log n)$. Deux gardes-fous, erreurs de
-    programmation et non refus~: la période et la transition doivent être
-    celles de l'étape \code{exposition}, et la somme des $d_j$ par cellule
-    doit être \code{identical()} aux événements de la table d'exposition.
+    \code{cummax()}, en $O(n \log n)$. La table d'exposition est appariée
+    \textbf{par clé} (segment, âge)~: chaque instant d'événement est rattaché,
+    par \code{match()}, à la ligne dont la cellule commence au même point de
+    l'échelle des clés, sans hypothèse sur l'ordre des lignes~; les instants
+    étant triés et les cellules étant des intervalles disjoints de cette
+    échelle, les instants d'une même cellule forment une plage contiguë, sur
+    laquelle se font les sommes cumulées de $\log(1 - d_j/r_j)$ et de
+    $\Sigma$. Gardes-fous, erreurs de programmation et non refus~: la période
+    et la transition doivent être celles de l'étape \code{exposition}~; les
+    fenêtres transmises doivent avoir été calculées sous les mêmes début et
+    borne de période, transition, convention et segmentation (ci-dessus,
+    «~Données~»)~; la clé d'un instant doit rester un entier exact en
+    \code{double} ($< 2^{53}$)~; chaque instant d'événement doit tomber dans
+    une cellule de la table d'exposition, chaque clé (segment, âge) n'y
+    figurer qu'une fois, et les instants d'une cellule être contigus~; enfin,
+    la somme des $d_j$ par cellule doit être \code{identical()} aux
+    événements de la table d'exposition.
   \item \textbf{Statut}~: $\hat q_x$, maximum de vraisemblance non
     paramétrique (risques discrets aux instants d'événement), résultat
     exact, valeur en arithmétique flottante~; non sans biais à effectif
@@ -3438,7 +3515,17 @@ aussi de test de débordement des entiers~; les refus, le message de
 \code{etape\_prealable\_manquante}, les types entiers, l'admission de
 \code{age\_atteint\_annee}~; l'invariance d'un plan sans \code{kaplan\_meier}
 (objet \code{identical()} à celui du plan qui le retient, privé de ses seuls
-ajouts).
+ajouts). Trois tests portent sur les fenêtres transmises (issue~\#38)~:
+\code{calculer\_exposition()} rend l'objet \code{fenetres\_exposition} à
+côté de ses quatre éléments, l'étape \code{brut} donne des résultats
+\code{identical()} avec les fenêtres transmises et en appel direct sur les
+observations, et aucun objet de cette classe ne figure dans l'objet résultat
+ni dans la fiche~; trois permutations des lignes de la table d'exposition
+(l'inverse et deux tirages sous graine locale), par les deux voies, rendent
+la table \code{kaplan\_meier} \code{identical()} à l'originale permutée, et
+la table des sauts et les diagnostics \code{identical()}~; chacun des cinq
+contrôles des fenêtres transmises arrête l'étape, un cas par contrôle, et
+des fenêtres inchangées ne l'arrêtent pas.
 
 \medskip
 \textbf{Contre-vérification par le package \code{survival}} (ADR 0002~;
@@ -3815,8 +3902,8 @@ $q$, spécification, A.4)~: sa garantie est le cas K
 \catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} et par la fonction d'étape \\
 \catalogue{fonctions-brut}{taux\_poisson()} & interne & $D$, $E^c$, niveau & taux, bornes exactes et asymptotiques, état (section~\ref{sec:brut-poisson}) \\
 \catalogue{fonctions-brut}{taux\_binomial()} & interne & $D$, $E^i$, niveau, tolérance & taux, bornes, état, cellules où $D = E^i > 0$ (section~\ref{sec:brut-binomial}) \\
-\catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & observations, table d'exposition, segmentation, transition, période, délai, convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
-\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: observations, transition, période, délai, paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat}) \\
+\catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & fenêtres transmises par l'étape \code{exposition} ou observations (appel direct), table d'exposition, segmentation, transition, période, délai, convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
+\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), transition, période, délai, paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat}) \\
 \end{longtable}
 }
 
