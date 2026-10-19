@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-19
 ---
 
@@ -190,3 +190,27 @@ Un tiers (certificateur, relecteur) qui rejoue une construction à partir de la 
 7. **Refus des dates hors de [0001-01-01, 9999-12-31]** (point 4), nouveau motif de refus dans `donnees` (changement de comportement, non de résultat) : (a) **oui** ; (b) écrire avec signe et plus de quatre chiffres (hors ISO 8601 à quatre chiffres, non recalculable par un outil courant). **Recommandation : (a)** (`actuary`).
 
 Issues : #35, #19, #42, #22 (point 6), #50 ; #47 (transition) ; #49 (portabilité Windows, ajournée) ; cinquième branche `claude/fiche-rapport` (empreintes du résultat et du code).
+
+## Annotation du 19 octobre 2026 — ADR accepté par le mainteneur (décision M64) ; questions 1 à 7 tranchées selon la recommandation (a)
+
+Rédigée par `architect` d'après les réponses du mainteneur du 19/10/2026, rapportées par la session principale de la branche `claude/fiche-serialisation` (B4, PR #51) ; décision M64, `docs/feuille-de-route.md`, § 4. Le texte ci-dessus n'est pas réécrit ; seul l'en-tête `status` passe de `proposed` à `accepted`. La mention « Statut : `proposed` » du premier paragraphe et le conditionnel des points soumis (« si Q2 », « si Q4 est acceptée », « note de lecture soumise ») se lisent désormais à la lumière de la présente annotation.
+
+**(a) Statut : `accepted`.** Le mainteneur a répondu aux sept questions de la section « Questions au mainteneur », chacune selon la recommandation (a) :
+
+1. **Q1 — deux formes d'écriture des doubles** : octets IEEE 754 pour l'empreinte (point 2), `%.17g` pour le texte (point 3). #35 suit l'option (iv) ; `fiche/empreintes/representation` et `fiche/empreintes/donnees` changent pour R1 à R6 (point 2.5).
+2. **Q2 — retrait des copies de premier niveau de la fiche** (`transition`, `periode`, `delai_declaration`, `segmentation` ; #22, point 6), **dans B4**, au même incrément de `version_fiche` et dans la même régénération (points 5.4 et 5.5). Le contrat « objet résultat » (ADR 0007, point 6.3) perd ces quatre champs ; `fiche/@noms` passe de 25 à 21 noms et huit chemins sont retirés par plan.
+3. **Q3 — lecteur de forme** pour l'import : tout texte décimal lisible par `as.numeric` est accepté, la valeur retenue est le double lu (point 6.3).
+4. **Q4 — ordre canonique des rôles (ordre du catalogue) et des noms de la provenance** (`fichier`, `empreinte`, `algorithme`) dans la fiche, **dans #42** (point 5.3). Le mainteneur accorde l'**extension du périmètre fermé de #42** que cela demande (`CLAUDE.md`, « Git et GitHub » : ajout noté dans la PR #51). Les lignes `fiche/roles` de R1 à R6 ne changent pas (point 5.3).
+5. **Q5 — petit-boutiste** pour la forme d'empreinte (`endian = "little"`) ; les vecteurs de test du contexte en sont les valeurs.
+6. **Q6 — notes de lecture datées** portées dans `docs/exigences.md` : E4.5 (« plan effectif » = paire plan canonique, paramètres retenus ; point 5.2) et E3.7 (critère de rejeu par un tiers ; point 12). Elles sont écrites par le même commit `docs:` que la présente annotation ; les exigences elles-mêmes ne changent pas.
+7. **Q7 — refus nommé des dates hors de [0001-01-01, 9999-12-31]** dans le module `donnees` (point 4) : changement de comportement, non de résultat (R1 à R6 : dates de 1930 à 2024).
+
+**(b) Annotations conditionnelles levées.** Les annotations du 19/10/2026 de l'ADR 0005 (point 6) et de l'ADR 0007 (seconde, point 12 remplacé) étaient au statut « proposé, sous réserve de l'acceptation de l'ADR 0011 » : la condition est remplie ce jour ; elles valent à compter de la présente annotation, sans être réécrites. L'extension du point 3.2 de l'ADR 0009 (troisième annotation du 19/10/2026, (f)), qui réalise le point 2.5, est actée par la même décision (annotation du même jour de l'ADR 0009).
+
+**(c) Précision de mise en œuvre pour #42** (décision du mainteneur du même jour, M64). Le retrait de `fiche/segmentation` n'a pas la même structure sur tous les plans : `character` de longueur 0 dans R2, de longueur 1 (`"sexe"`) dans R1, R3, R4, R5 et R6 (*vérifié* : `grep -n 'fiche/segmentation' tests/reference/R*.tsv`). La nature `retrait` déclarant un type et une longueur (ADR 0009, troisième annotation, (b)), une seule transition de #42 sur R1 à R6 ne peut pas le déclarer exactement. Il se déclare par **plusieurs transitions d'une même issue, à plans disjoints** (par exemple R2 seul, et R1, R3 à R6) ; `valider_transitions()` sera modifiée en ce sens dans le commit de #42 (ADR 0009, annotation du même jour).
+
+**(d) Ce qui reste dû, inchangé** : #35 (option (iv), preuve hors R de l'entrée inchangée, point 2.5, et complément de la garde au titre de la réserve M2 d'`audit`, ADR 0009, troisième annotation, (f) 4) ; #19 (option (a) avec refus hors domaine) ; #42 (points 5.1 à 5.5 avec Q2 et Q4) ; régénération unique ; #50 (points 6, 8, 9). La portabilité de l'écriture par octets sous Windows et macOS reste une **hypothèse non mesurée** (point 1 ; #49, M61).
+
+**Effet sur les résultats** : aucun par cette annotation. L'effet attendu de la régénération unique est celui des « Conséquences », lu sans conditionnel : par plan R1 à R6, `fiche/version_fiche` 1 → 2, `fiche/empreintes/representation` `tablexp canonique 1` → `tablexp canonique 2`, `fiche/empreintes/donnees` (sous la garde du point 3.2 étendu), `fiche/@noms` 25 → 21 et huit retraits. Toute autre ligne est une régression. Aucune table finale, aucun verdict : visa d'`actuary`.
+
+Issues : #35, #19, #42, #22 (point 6), #50 ; #47. Décision M64. Branche `claude/fiche-serialisation`, PR #51.

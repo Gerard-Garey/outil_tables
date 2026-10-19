@@ -554,3 +554,21 @@ Toute autre ligne du tableau avant / après de la régénération unique est une
 **Soumis au mainteneur** : (f) étend le point 3.2, qui est un contrat partagé (critère de non-régression). Cette extension lui est soumise avec l'ADR 0011, dont elle réalise le point 2.5.
 
 Issues : #47 ; #35 et #42 (premiers emplois) ; #37 (mécanisme d'origine). ADR 0011 (proposé). Branche `claude/fiche-serialisation`, PR #51.
+
+## Annotation du 19 octobre 2026 (quatrième) — extension du point 3.2 actée par le mainteneur (décision M64) ; plusieurs transitions d'une même issue à plans disjoints
+
+Rédigée par `architect` d'après la décision du mainteneur du 19/10/2026 (M64, `docs/feuille-de-route.md`, § 4), rapportée par la session principale de la branche `claude/fiche-serialisation` (B4, PR #51). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Point 3.2 étendu : acté.** L'extension de la garde « entrée différente » sous transition, soumise par la troisième annotation du 19/10/2026 (point (f) ; mise en œuvre dans `tests/test_reproductibilite.R` au commit `7ada1f1`, annotation au commit `4f59467`), est **actée par le mainteneur** avec l'acceptation de l'ADR 0011 (M64). La mention « Soumis au mainteneur » de la troisième annotation se lit désormais « acté (M64) ». La **réserve M2** d'`audit` reste ouverte : la garde est à compléter **avec #35**, premier usage réel (le MD5 du texte de l'entrée, sous la représentation courante, doit être égal à `fiche/empreintes/donnees` de l'objet), dans le commit de #35.
+
+**(b) Plusieurs transitions d'une même issue, à plans disjoints.** La troisième annotation, (a), admet « une transition par issue » ; `valider_transitions()` refuse aujourd'hui une issue en double, même sur des plans disjoints (`tests/test_reproductibilite.R:382`, témoin « issue en double » `:1615`, *vérifié* par lecture à `4f59467`). Or le retrait de `fiche/segmentation` par #42 n'a pas la même structure sur tous les plans : `character` de longueur 0 dans R2, de longueur 1 dans R1, R3, R4, R5 et R6 (*vérifié* : `grep -n 'fiche/segmentation' tests/reference/R*.tsv`) ; une nature `retrait` déclare un type et une longueur exacts ((b) de la troisième annotation), si bien qu'une seule transition sur R1 à R6 ne peut pas le déclarer. Décision : une issue **peut porter plusieurs transitions, à condition que leurs plans soient deux à deux disjoints**. Conséquences :
+
+1. `valider_transitions()` refuse deux transitions d'une même issue qui partagent un plan (motif nommé), et non plus toute issue en double ; témoins : deux transitions d'une même issue à plans disjoints → liste bien formée ; deux transitions d'une même issue à plans communs → refus. Le témoin actuel « issue en double » (`#901` sur R1 puis sur R2, plans disjoints) deviendrait une liste bien formée : il est à réécrire sur des plans communs.
+2. L'union par plan ((d) 1 de la troisième annotation) et le rattachement de l'échec attendu à la première transition qui porte le plan ((d) 3) sont inchangés : un plan n'est porté que par une transition de chaque issue, et l'issue citée est la même.
+3. Dans (a) de la troisième annotation, « une transition par issue » se lit « une transition par issue et par plan ».
+
+La modification et ses témoins entrent dans le commit de #42 (`coder-approfondi` → `audit`), qui en est le premier usage. Le point 9.5 reste la règle.
+
+**Effet sur les résultats** : aucun. La décision n'organise que les tests.
+
+Issues : #42, #35, #47. ADR 0011 (accepté, M64). Décision M64.
