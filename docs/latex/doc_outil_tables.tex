@@ -1782,6 +1782,12 @@ les codes \emph{structurels} du plan, module \code{construire\_table}~:
 d'une étape forment une liste (colonne \code{prealable} de \code{ETAPES})~;
 chacun est contrôlé, et le refus \code{etape\_prealable\_manquante} ne cite
 que les préalables absents, au singulier ou au pluriel selon leur nombre.
+Son message et ses champs \code{etape} et \code{prealable} de
+\code{details} rassemblent les étapes fautives d'une part, les préalables
+absents d'autre part~; le champ \code{prealables\_par\_etape}, liste nommée
+par étape fautive dans l'ordre du plan, donne pour chacune ses propres
+préalables absents, dans l'ordre de \code{ETAPES}, si bien que le refus dit
+quel préalable manque à quelle étape (issue~\#27).
 Le plan, son champ \code{etapes} et la liste des paramètres de chaque étape
 sont des listes nommées \textbf{nues}, dont le seul attribut admis est
 celui des noms~: un \code{data.frame}, un objet de classe ou une liste
