@@ -439,7 +439,7 @@ Mesures, *vérifiées* (`4f182e3` → `a311c85`, appel de `valider_plan()`) :
 | liste de paramètres d'étape à classe | admis | `parametres_mal_formes` |
 | borne de `periode` en Date à stockage integer ; `delai_declaration` integer | admis | admis |
 
-L'ensemble des codes de refus de `R/` est identique avant et après : 75 codes, relevés dans les appels `refuser()` et `refus_plan()`.
+L'ensemble des codes de refus de `R/` est identique avant et après : 74 motifs distincts, soit 76 paires (module, motif), `aucune_recette` (`donnees`, `exposition`) et `periode_invalide` (`donnees`, `simulation`) étant émis par deux modules chacun. Relevé des arguments littéraux des appels `refuser()`, `refus_tablexp()` et `refus_plan()` dans les jetons de `getParseData(parse(text = git show <sha>:R/<fichier>))`, pour chaque fichier de `R/`, à `4f182e3` et à `a311c85` (*vérifié* le 19/10/2026 ; ensembles identiques). Le même relevé donne 75 motifs et 77 paires depuis `5bf62e6` (#37), qui ajoute `trop_de_cellules` (`exposition`).
 
 **Effet sur les résultats** : aucun pour un plan valide. `tests/test_reproductibilite.R` à `a311c85` donne 122 tests, 0 échec, comparaison à R1 à R6 OK. Les objets R1 à R6 sont `identical` hors `execution` (mesure de l'audit, messages de `1537475` et `406cd74`). `tests/reference/` est inchangé (`git diff --stat 4f182e3 a311c85 -- tests/reference`, vide). Les refus nouveaux sont des **changements de comportement**, non de résultat.
 
