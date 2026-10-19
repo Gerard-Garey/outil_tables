@@ -1,2 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-exposition:nombre_cellules,#37,"nombre de cellules en integer, refus au-delà de .Machine$integer.max ; documenté par docwriter en fin de branche (règle 9)"
