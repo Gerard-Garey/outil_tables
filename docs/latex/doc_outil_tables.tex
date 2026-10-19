@@ -4393,6 +4393,21 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}~; idempotente~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
 \catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
+\catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_PLAN} & constante & --- & \code{"tablexp plan 1"}, première ligne du texte du plan (nature et version de la grammaire) \\
+\catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_FICHE} & constante & --- & \code{"tablexp fiche 1"}, première ligne du texte de la fiche \\
+\catalogue{fonctions-rapport}{TYPES\_TEXTE} & constante & --- & types admis d'une ligne du texte~: \code{double}, \code{integer}, \code{logical}, \code{character}, \code{Date}, \code{NULL} \\
+\catalogue{fonctions-rapport}{PROFONDEUR\_MAX\_TEXTE} & constante & --- & profondeur maximale d'une ligne du texte (32), contrôlée à l'écriture et à la lecture \\
+\catalogue{fonctions-rapport}{CONVENTIONS\_TEXTE} & constante & --- & conventions d'écriture rappelées en lignes d'en-tête \code{\# <clé> : <valeur>} du texte, ignorées à la lecture \\
+\catalogue{fonctions-rapport}{BLOCS\_LECTURE\_FICHE} & constante & --- & partition des champs de la fiche en trois blocs (E3.7)~: \code{calculé}, \code{hypothèses}, \code{rejeu}~; rappelée par la ligne d'en-tête \code{\# lecture} \\
+\catalogue{fonctions-rapport}{joindre\_chemin()} & interne & chemin, segment & chemin d'un élément, segments séparés par \code{/} \\
+\catalogue{fonctions-rapport}{segments\_texte()} & interne & noms, longueur & segment de chemin de chaque élément~: son nom, ou \code{[i]} (rang) si le nom est absent, vide, \code{NA}, en double, contient \code{/}, une tabulation ou une fin de ligne, ou commence par \code{@}, \code{\#} ou \code{[} \\
+\catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"}~; refus \code{serialisation\_impossible} (facteur, classe ou attribut non écrits, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}) \\
+\catalogue{fonctions-rapport}{valeurs\_texte()} & interne & type, textes d'une ligne, refus & valeurs relues sans évaluation~; refus \code{texte\_valeur\_invalide}, \code{texte\_double\_}\allowbreak\code{sous\_depassement} (décimal non nul relu 0) \\
+\catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne} \\
+\catalogue{fonctions-rapport}{ecrire\_plan()} & exportée & plan & octets du texte du plan, écrit tel qu'il est reçu, sans validation ni canonisation \\
+\catalogue{fonctions-rapport}{lire\_plan()} & exportée & octets & plan relu, \textbf{non validé}~: à passer à \code{valider\_plan()} ou à \code{construire\_table()} \\
+\catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier)~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}) \\
+\catalogue{fonctions-rapport}{lire\_fiche()} & exportée & octets & fiche relue, dont le rejeu est \code{construire\_table(donnees, f\$roles, f\$plan, f\$provenance)} \\
 \end{longtable}
 }
 
@@ -4848,6 +4863,10 @@ fonctions de leur module.
 \catalogue{exports}{simuler\_portefeuille()} & \code{simulation} & point d'entrée du simulateur~: jeu simulé sous une loi vraie et une graine & \ref{sec:simulation} \\
 \catalogue{exports}{valider\_plan()} & \code{construire\_table} & validateur du plan, contrôle de saisie que l'application appellera (E4.3) & \ref{sec:plan} \\
 \catalogue{exports}{construire\_table()} & \code{construire\_table} & point d'entrée unique~: exécute un plan de construction et retourne l'objet \code{construction} & \ref{sec:construction} \\
+\catalogue{exports}{ecrire\_plan()} & \code{rapport} & texte du plan en octets UTF-8, pour l'export du plan (E5.4)~; l'appelant écrit le fichier & \ref{sec:fonctions-rapport} \\
+\catalogue{exports}{lire\_plan()} & \code{rapport} & plan relu d'octets, sans évaluation, pour l'import du plan (E5.4)~; non validé & \ref{sec:fonctions-rapport} \\
+\catalogue{exports}{ecrire\_fiche()} & \code{rapport} & texte de la fiche de construction en octets UTF-8~; l'appelant écrit le fichier & \ref{sec:fonctions-rapport} \\
+\catalogue{exports}{lire\_fiche()} & \code{rapport} & fiche relue d'octets, sans évaluation, pour le rejeu (E3.7) & \ref{sec:fonctions-rapport} \\
 \end{longtable}
 }
 
