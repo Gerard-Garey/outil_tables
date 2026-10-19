@@ -331,7 +331,19 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #   segmentation      : sous-ensemble de c("sexe", "segment"), vide admis ;
 #   convention        : plus_fine, dernier_anniversaire ou age_atteint_annee ;
 #   par_annee         : TRUE pour découper aussi par année civile.
-# Rend list(parametres, resultat, diagnostics, avertissements) ;
+# Rend list(parametres, resultat, diagnostics, avertissements, fenetres) ;
+# fenetres (#38) : objet de classe `fenetres_exposition`, fenêtres des
+# observations (composantes, calendrier, a, b, evenement :
+# fenetres_observations()) et segments (g, segments :
+# segments_observations()), avec les paramètres sous lesquels ils sont
+# calculés (début D et borne B de la période, code de la transition dont
+# l'état d'arrivée fixe l'événement, convention retenue, segmentation), que
+# l'étape `brut` contrôle à l'égalité exacte (les observations elles-mêmes
+# ne sont pas contrôlées : construire_table() passe celles de l'étape) ; construire_table() le passe à `brut`
+# (argument observations) et ne l'inscrit ni dans l'objet résultat ni dans
+# la fiche. Aucune copie : les vecteurs sont ceux de f et sg. Les positions
+# dans la cellule n'y figurent pas : seul Kaplan-Meier les emploie, et il
+# les calcule une fois.
 # resultat$exposition : une ligne par cellule (clés de segmentation, age
 # [, annee]) sur la plage contiguë des âges, par segment, des cellules qui
 # ont une exposition > 0, un événement ou une sortie concurrente ; zéros
@@ -470,6 +482,10 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
                        exposition_jours = sum(m$jours), evenements = length(ev),
                        sorties_concurrentes = length(sc), cellules = n_cel,
                        cellules_evenement_sans_exposition = sans_exposition),
-    avertissements = avert
+    avertissements = avert,
+    fenetres = structure(c(f[c("composantes", "calendrier", "a", "b", "evenement")], sg,
+                           list(debut = debut_p, borne = borne, transition = p$transition$code, convention = cv,
+                                segmentation = segmentation)),
+                         class = "fenetres_exposition")
   )
 }
