@@ -422,15 +422,15 @@ verifier("calculer_exposition : garde de présence avant le tabulate() de prése
   journal <- character(0)
   instrumentee <- function(garde) {
     env <- new.env(parent = ns)
-    env$nombre_cellules <- function(n_age, n_an, libelle, diagnostic) { journal <<- c(journal, "garde"); garde(n_age, n_an, libelle, diagnostic) }
+    env$nombre_cellules <- function(...) { journal <<- c(journal, "garde"); garde(...) }
     env$tabulate <- function(bin, nbins) { journal <<- c(journal, "tabulate"); base::tabulate(bin, nbins) }
     f <- original; environment(f) <- env
     f
   }
   # Garde au refus (vraie fonction, argument au-delà de la limite, libellé et
   # diagnostic transmis tels que l'appelant les donne) : aucun tabulate().
-  refus <- tryCatch(appeler(instrumentee(function(n_age, n_an, libelle, diagnostic)
-                      nombre_cellules(.Machine$integer.max, 2, libelle, diagnostic))),
+  refus <- tryCatch(appeler(instrumentee(function(n_age, n_an, ...)
+                      nombre_cellules(.Machine$integer.max, 2, ...))),
                     refus_tablexp = function(c) c)
   j_refus <- journal
   # Garde passante : la garde précède le premier tabulate(), résultat identique à l'original.
