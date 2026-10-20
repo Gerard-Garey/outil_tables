@@ -39,10 +39,11 @@ refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function
 
 # --- exports et signature -------------------------------------------------------
 
-verifier("NAMESPACE : exports = catalogue_roles, construire_table, simuler_portefeuille, table_reference, valider_plan (ADR 0007, point 3.4 ; #9, #10, #11)",
+verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, lire_fiche,",
+               "lire_plan, simuler_portefeuille, table_reference, valider_plan (ADR 0007, point 3.4 ; #9, #10, #11, #50)"),
          identical(sort(getNamespaceExports("tablexp")),
-                   c("catalogue_roles", "construire_table", "simuler_portefeuille", "table_reference",
-                     "valider_plan")))
+                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "lire_fiche",
+                     "lire_plan", "simuler_portefeuille", "table_reference", "valider_plan")))
 verifier("construire_table : signature (donnees, roles, plan, provenance = NULL)",
          identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance")) &&
            is.null(formals(construire_table)$provenance))
@@ -373,23 +374,23 @@ verifier("objet : exposition par (sexe, âge), colonnes de la spécification (A.
          identical(names(x$etapes$exposition$resultat$exposition),
                    c("sexe", "age", "exposition_jours", "exposition_centrale", "complement_initial_cellule",
                      "complement_initial_fenetre", "evenements", "sorties_concurrentes")))
-CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition", "transition_code",
-                  "periode", "delai_declaration", "fin_effective", "segmentation", "unite_observation",
+CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
+                  "fin_effective", "unite_observation",
                   "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
                   "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
                   "provenance_mention", "empreintes", "avertissements")
 f <- x$fiche
 verifier("fiche : champs de l'ADR 0007 (point 6.2) et de la spécification (A.3)", identical(names(f), CHAMPS_FICHE))
-verifier("fiche : plan reçu inchangé, rôles, recette, convention retenue non forcée, unité tête",
+verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôles, recette, convention retenue non forcée, unité tête",
          identical(f$plan, plan_type()) && identical(f$roles, ROLES) &&
            identical(f$recette, "lignes_dates_completes") &&
            identical(f$convention, list(demandee = "plus_fine", native = "dernier_anniversaire",
                                         retenue = "dernier_anniversaire", forcee = FALSE)) &&
            identical(f$unite_observation, "tete") && is.na(f$avertissement_unite) &&
            identical(f$transition_code, "vivant_decede") && identical(f$fin_effective, D("2024-12-31")))
-verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 1",
+verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 2",
          identical(f$graine, NA_integer_) && identical(f$graine_mention, "aucune étape aléatoire") &&
-           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 1L))
+           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 2L))
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
@@ -451,18 +452,21 @@ verifier("construire_table ne touche pas .Random.seed de l'appelant (absent : re
 
 # --- empreinte (valeur calculée à la main, autre outil) ----------------------
 
-# Texte canonique attendu (ADR 0007, point 9.3), écrit par printf et haché par
-# md5sum (GNU coreutils), hors de R :
-#   tablexp canonique 1<TAB>3<TAB>8
+# Texte canonique attendu (ADR 0007, point 9.3 ; ADR 0011, point 2), écrit par
+# printf et haché par md5sum (GNU coreutils), hors de R ; octets des doubles de
+# struct.pack('<d', v).hex() (Python 3.13) :
+#   tablexp canonique 2<TAB>3<TAB>8
 #   #cause_sortie<TAB>character / "deces" / "en_cours" / NA
 #   #date_entree<TAB>Date / 2020-03-01 / 2016-05-20 / 2024-02-29
 #   #date_naissance<TAB>Date / 1960-07-01 / 1945-10-15 / 1964-02-29
 #   #date_sortie<TAB>Date / NA / 2019-02-10 / 2024-12-31
-#   #id_contrat<TAB>double / 1 / 2 / 30000000000
+#   #id_contrat<TAB>double / 000000000000f03f / 0000000000000040 / 000000b08ef01b42
 #   #id_tete<TAB>integer / 1 / NA / 3
 #   #segment<TAB>character / "a\"b" / "c\\d\te" / "été" (UTF-8)
 #   #sexe<TAB>factor / "H" / "F" / "H"
-# (346 octets, LF, md5 80e1ed7c22b2c1b6086260ce4490d64c).
+# (381 octets, LF, md5 2264ac10aa5504caec70eb1f97b2fb76 ; avant #35, doubles
+# en %.17g « 1 / 2 / 30000000000 » : 346 octets, md5
+# 80e1ed7c22b2c1b6086260ce4490d64c).
 EMP <- data.frame(c = c("deces", "en_cours", NA), e = D(c("2020-03-01", "2016-05-20", "2024-02-29")),
                   n = D(c("1960-07-01", "1945-10-15", "1964-02-29")), s = D(c(NA, "2019-02-10", "2024-12-31")),
                   ic = c(1, 2, 3e10), it = c(1L, NA, 3L), sg = c("a\"b", "c\\d\te", "été"),
@@ -471,22 +475,22 @@ Encoding(EMP$sg) <- "UTF-8"
 ROLES_EMP <- c(sexe = "sx", segment = "sg", id_tete = "it", id_contrat = "ic", date_sortie = "s",
                date_naissance = "n", date_entree = "e", cause_sortie = "c")
 empreinte_donnees <- tablexp:::empreinte_donnees
-verifier("empreinte (valeur calculée à la main par printf et md5sum, hors R) : 80e1ed7c22b2c1b6086260ce4490d64c",
-         identical(empreinte_donnees(EMP, ROLES_EMP), "80e1ed7c22b2c1b6086260ce4490d64c"))
-verifier("empreinte : texte canonique de 346 octets, sans CR", {
+verifier("empreinte (valeur calculée à la main par printf et md5sum, hors R) : 2264ac10aa5504caec70eb1f97b2fb76",
+         identical(empreinte_donnees(EMP, ROLES_EMP), "2264ac10aa5504caec70eb1f97b2fb76"))
+verifier("empreinte : texte canonique de 381 octets, sans CR", {
   fch <- tempfile()
   tablexp:::texte_canonique(EMP, ROLES_EMP, fch)
   o <- readBin(fch, "raw", 1000L)
   unlink(fch)
-  length(o) == 346L && !any(o == as.raw(0x0d))
+  length(o) == 381L && !any(o == as.raw(0x0d))
 })
 verifier("empreinte : indépendante du nom des colonnes et des colonnes non déclarées, sensible à l'ordre des lignes et aux valeurs", {
   e2 <- EMP; names(e2)[names(e2) == "ic"] <- "contrat"; r2 <- ROLES_EMP; r2[["id_contrat"]] <- "contrat"
   e2$autre <- 7:9
   e3 <- EMP[3:1, ]; e4 <- EMP; e4$ic[1] <- 1 + 2^-40
-  identical(empreinte_donnees(e2, r2), "80e1ed7c22b2c1b6086260ce4490d64c") &&
-    !identical(empreinte_donnees(e3, ROLES_EMP), "80e1ed7c22b2c1b6086260ce4490d64c") &&
-    !identical(empreinte_donnees(e4, ROLES_EMP), "80e1ed7c22b2c1b6086260ce4490d64c")
+  identical(empreinte_donnees(e2, r2), "2264ac10aa5504caec70eb1f97b2fb76") &&
+    !identical(empreinte_donnees(e3, ROLES_EMP), "2264ac10aa5504caec70eb1f97b2fb76") &&
+    !identical(empreinte_donnees(e4, ROLES_EMP), "2264ac10aa5504caec70eb1f97b2fb76")
 })
 verifier("empreinte : zéro négatif normalisé (-0 et 0 donnent la même empreinte)", {
   a <- data.frame(x = c(0, 1)); b <- data.frame(x = c(-0, 1))
@@ -617,4 +621,327 @@ verifier("etape_prealable_manquante : seule l'étape fautive figure dans prealab
 verifier("etape_prealable_manquante : plans à préalables présents toujours admis", {
   p1 <- plan_prealable("donnees", "exposition"); p2 <- plan_prealable("donnees", "exposition", "brut")
   identical(valider_plan(p1), p1) && identical(valider_plan(p2), p2)
+})
+
+# --- écriture canonique des valeurs en deux formes (#35 ; ADR 0011, points 2 et 3) ---
+#
+# Natures des attendus : valeur calculée hors R (octets de struct.pack('<d')
+# de Python 3.13 sur les vecteurs de la table de l'ADR 0011), identité exacte
+# (aller-retour readBin des seize hexadécimaux), recoupement (MD5 du texte
+# attendu d'un échantillon de 10^5 doubles, produit hors R par le juge Python
+# de tests/controles/ecriture_doubles.R, qui recoupe 10^6 doubles ligne à
+# ligne ; ce contrôle n'est pas une assertion de la batterie).
+local({
+  ev <- tablexp:::ecrire_valeurs
+  texte <- function(x, forme = "empreinte") rawToChar(ev(x, forme, "x")$octets)
+  lignes <- function(x, forme = "empreinte") { t <- texte(x, forme); if (nzchar(t)) strsplit(t, "\n", fixed = TRUE)[[1L]] else character(0) }
+  octets8 <- function(...) readBin(as.raw(c(...)), "double", n = 1L, size = 8L, endian = "little")
+
+  verifier("écriture des valeurs, forme empreinte : vecteurs de test de l'ADR 0011 (0.95, 1, 0, -0, 1e-9, 5e-324, Inf, -Inf), type double",
+           identical(lignes(c(0.95, 1, 0, -0, 1e-9, 5e-324, Inf, -Inf)),
+                     c("666666666666ee3f", "000000000000f03f", "0000000000000000", "0000000000000000",
+                       "95d626e80b2e113e", "0100000000000000", "Inf", "-Inf")) &&
+             identical(ev(1, "empreinte", "x")$type, "double"))
+  verifier("écriture des valeurs, forme empreinte : un double s'écrit en seize hexadécimaux minuscules, petit-boutiste, LF final, sans CR",
+           identical(texte(0.95), "666666666666ee3f\n") && !grepl("\r", texte(c(1, 2, 3))))
+  verifier("écriture des valeurs, forme texte : %.17g, jetons NA, NaN, Inf, -Inf (ADR 0011, point 3.1)",
+           identical(lignes(c(0.95, 1, 0, -0, 1e-9, NA, NaN, Inf, -Inf), "texte"),
+                     c("0.94999999999999996", "1", "0", "0", "1.0000000000000001e-09", "NA", "NaN", "Inf", "-Inf")))
+  verifier("écriture des valeurs, forme empreinte : -0 et 0 donnent les mêmes octets (x + 0)",
+           identical(lignes(-0), "0000000000000000") && identical(texte(-0), texte(0)))
+  verifier("écriture des valeurs, forme empreinte : signe négatif, sous-normaux, plus petit normal, maximum (octets construits, valeurs calculées hors R)",
+           identical(lignes(c(-1, -5e-324, octets8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x00), octets8(0, 0, 0, 0, 0, 0, 0x10, 0),
+                              .Machine$double.xmax, -.Machine$double.xmax, .Machine$double.xmin)),
+                     c("000000000000f0bf", "0100000000000080", "ffffffffffff0f00", "0000000000001000",
+                       "ffffffffffffef7f", "ffffffffffffefff", "0000000000001000")))
+  verifier("écriture des valeurs, forme empreinte : NA, NA + 1, NaN et 0/0 s'écrivent par jeton, quels que soient leurs octets",
+           identical(lignes(c(NA_real_, NA_real_ + 1, NaN, 0 / 0)), c("NA", "NA", "NaN", "NaN")))
+  verifier("écriture des valeurs : les octets de NA_real_ et de NA_real_ + 1 diffèrent sous x86-64 (constat de plateforme qui motive les jetons, ADR 0011, point 2.2) ; le jeton est le même",
+           {
+             o <- function(v) writeBin(v, raw(), size = 8L, endian = "little")
+             (Sys.info()[["machine"]] != "x86_64" || (!identical(o(NA_real_), o(NA_real_ + 1)) && !identical(o(NaN), o(0 / 0)))) &&
+               identical(texte(NA_real_), texte(NA_real_ + 1)) && identical(texte(NaN), texte(0 / 0))
+           })
+  verifier("écriture des valeurs : le classement des jetons se lit sur la valeur reçue, non sur x + 0 (décision d'actuary, #35) ; mêmes lignes pour x et x + 0, dans les deux formes", {
+    x <- c(NA, NaN, NA + 1, 0 / 0, -0, 0, Inf, -Inf, 1.5)
+    cl <- function(v) c(is.na(v) & !is.nan(v), is.nan(v), is.finite(v), v == Inf, v == -Inf)
+    identical(cl(x), cl(x + 0)) &&
+      identical(lignes(x), c("NA", "NaN", "NA", "NaN", "0000000000000000", "0000000000000000", "Inf", "-Inf", "000000000000f83f")) &&
+      identical(lignes(x), lignes(x + 0)) &&
+      identical(lignes(x, "texte"), c("NA", "NaN", "NA", "NaN", "0", "0", "Inf", "-Inf", "1.5")) &&
+      identical(lignes(x, "texte"), lignes(x + 0, "texte"))
+  })
+  verifier("écriture des valeurs : un double portant un attribut dim ou names s'écrit comme le vecteur nu, dans les deux formes, avec ou sans non fini (writeBin refuse dim)", {
+    v <- c(1, 2.5, 0.95); w <- c(1, NA, 0.95, Inf)
+    mat <- function(u) matrix(u, ncol = 1L)
+    identical(texte(mat(v)), texte(v)) && identical(texte(mat(w)), texte(w)) && identical(texte(c(a = 1, b = NA)), texte(c(1, NA))) &&
+      identical(texte(mat(v), "texte"), texte(v, "texte")) && identical(texte(mat(w), "texte"), texte(w, "texte")) &&
+      identical(ev(mat(v), "empreinte", "x")$type, "double")
+  })
+  verifier("empreinte des données : une colonne double portant un attribut dim a l'empreinte de la colonne nue (finie ou avec NA)", {
+    emp <- function(v) { d <- data.frame(i = seq_along(v)); d$x <- v; tablexp:::empreinte_donnees(d, c(id_contrat = "x")) }
+    identical(emp(matrix(c(1, 2), 2L)), emp(c(1, 2))) && identical(emp(matrix(c(1, NA), 2L)), emp(c(1, NA)))
+  })
+  verifier("écriture des valeurs, forme empreinte : mélange de finis et de jetons, positions et ordre conservés (début, milieu, fin, consécutifs)", {
+    x <- c(NA, 1, NaN, Inf, 0.95, -Inf, NA, NA, 5e-324, NaN)
+    attendu <- c("NA", "000000000000f03f", "NaN", "Inf", "666666666666ee3f", "-Inf", "NA", "NA", "0100000000000000", "NaN")
+    identical(lignes(x), attendu) &&
+      identical(lignes(c(1, NA)), c("000000000000f03f", "NA")) && identical(lignes(c(NA, 1)), c("NA", "000000000000f03f"))
+  })
+  verifier("écriture des valeurs, forme empreinte : longueurs limites (vecteur vide, une valeur, uniquement des jetons)",
+           identical(ev(numeric(0), "empreinte", "x")$octets, raw(0)) && identical(lignes(NA_real_), "NA") &&
+             identical(lignes(c(NA_real_, -Inf)), c("NA", "-Inf")) && identical(lignes(2^-1074), "0100000000000000"))
+  verifier("écriture des valeurs : les types autres que double s'écrivent de même dans les deux formes (integer, logical, character, factor, Date)", {
+    d <- as.Date(c("2020-03-01", NA))
+    cas <- list(c(1L, NA), c(TRUE, NA, FALSE), c("a\"b", NA, "été"), factor(c("H", "F", NA)), d)
+    types <- c("integer", "logical", "character", "factor", "Date")
+    all(vapply(cas, function(v) identical(ev(v, "empreinte", "x"), ev(v, "texte", "x")), NA)) &&
+      identical(vapply(cas, function(v) ev(v, "texte", "x")$type, ""), types)
+  })
+  verifier("écriture des valeurs : forme inconnue ou mal formée -> refus forme_ecriture_inconnue",
+           leve_refus(ev(1, "hexa", "x"), "forme_ecriture_inconnue") && leve_refus(ev(1, NA_character_, "x"), "forme_ecriture_inconnue") &&
+             leve_refus(ev(1, c("texte", "empreinte"), "x"), "forme_ecriture_inconnue"))
+  verifier("écriture des valeurs : type sans représentation -> refus type_non_canonique dans les deux formes",
+           leve_refus(ev(list(1), "empreinte", "x"), "type_non_canonique") && leve_refus(ev(Sys.time(), "texte", "x"), "type_non_canonique"))
+
+  # Échantillon de 10^5 doubles sous graine locale (recette de
+  # tests/controles/ecriture_doubles.R) : motifs de 64 bits tirés au hasard et
+  # valeurs de runif() transformées par des opérations IEEE exactes.
+  echantillon <- function(n, graine) tablexp:::sous_graine(graine, {
+    m <- n %/% 2L
+    octets <- as.raw(sample.int(256L, 8L * m, replace = TRUE) - 1L)
+    brut <- readBin(octets, "double", n = m, size = 8L, endian = "little")
+    brut[!is.finite(brut)] <- 0.5
+    u <- runif(n - m)
+    c(brut, u[seq_len((n - m) %/% 2L)] * 1e6 - 5e5, 1 / u[-seq_len((n - m) %/% 2L)])
+  })
+  ech <- echantillon(1e5L, 20261019L)
+  o <- ev(ech, "empreinte", "x")$octets
+  verifier("écriture des valeurs, forme empreinte : échantillon de 10^5 doubles (graine 20261019), MD5 du texte égal à celui du juge Python (struct.pack('<d'), hors R)", {
+    f <- tempfile(); writeBin(o, f); m <- unname(tools::md5sum(f)); unlink(f)
+    if (length(ech) == 1e5L && identical(m, "b0a409caef68f9219d6b70501c190a4e")) TRUE
+    else sprintf("%d doubles, MD5 %s au lieu de b0a409caef68f9219d6b70501c190a4e", length(ech), m)
+  })
+  verifier("écriture des valeurs, forme empreinte : l'échantillon de 10^5 doubles avec des jetons insérés (début, milieu, fin) s'écrit comme l'échantillon seul, aux jetons près", {
+    x <- c(NA, ech[1:50000], NaN, Inf, ech[50001:1e5], -Inf, NA_real_ + 1)
+    l <- lignes(x); k <- c(1L, 50002L, 50003L, 100004L, 100005L)
+    identical(l[k], c("NA", "NaN", "Inf", "-Inf", "NA")) && identical(l[-k], lignes(ech))
+  })
+  verifier("écriture des valeurs, forme empreinte : échantillon de 10^5 doubles, aller-retour readBin des hexadécimaux identical() (x + 0)", {
+    d <- match(as.integer(o[o != as.raw(0x0a)]), c(48:57, 97:102)) - 1L
+    b <- as.raw(d[c(TRUE, FALSE)] * 16L + d[c(FALSE, TRUE)])
+    length(o) == 17L * length(ech) && identical(readBin(b, "double", n = length(ech), size = 8L, endian = "little"), ech + 0)
+  })
+
+  # Empreinte des données : NA et NaN se distinguent ; les variantes d'octets
+  # de NA et de NaN ne changent pas l'empreinte.
+  verifier("empreinte des données, colonne double : NA et NaN donnent des empreintes différentes ; NA, NA + 1 et NaN, 0/0 donnent la même", {
+    emp <- function(v) tablexp:::empreinte_donnees(data.frame(x = v), c(id_contrat = "x"))
+    !identical(emp(c(1, NA)), emp(c(1, NaN))) && identical(emp(c(1, NA)), emp(c(1, NA_real_ + 1))) &&
+      identical(emp(c(1, NaN)), emp(c(1, 0 / 0))) && !identical(emp(c(1, 2)), emp(c(1, 2 + 2^-51)))
+  })
+})
+
+# --- dates : année sur quatre chiffres, refus hors du domaine (#19 ; ADR 0011, point 4) ---
+
+# Nature des attendus : textes écrits à la main ; jours depuis 1970-01-01 des
+# quatre dates calculés hors R (Python 3.13, date(a, m, j).toordinal() -
+# date(1970,1,1).toordinal()) : 0001-01-01 -> -719162, 0019-05-12 -> -712457,
+# 0999-01-01 -> -354650, 9999-12-31 -> 2932896 ; isoformat() de Python écrit
+# ces quatre dates comme attendu ci-dessous. Témoin d'empreinte : texte écrit
+# par printf et haché par md5sum (GNU coreutils 9.4), hors de R :
+#   tablexp canonique 2<TAB>3<TAB>3
+#   #date_entree<TAB>Date / 0999-01-01 / 1000-01-01 / 2020-03-01
+#   #date_naissance<TAB>Date / 0019-05-12 / 0950-03-01 / 1960-07-01
+#   #date_sortie<TAB>Date / NA / 9999-12-31 / 0001-01-01
+# (172 octets, md5 a96cb8dddf746b5aef7d4014096e6fad) ; avec NaN à la place du
+# premier NA de date_sortie : 173 octets, md5 9253374d78befa9073e8f1b2e0f69181.
+# Avant #19, l'écriture par format.Date donnait 999-01-01, 19-05-12 et 950-03-01
+# (années sans zéros), et NA et NaN s'écrivaient NA.
+local({
+  ev <- tablexp:::ecrire_valeurs
+  J <- function(j) structure(j, class = "Date")
+  lignes <- function(x, forme = "empreinte") strsplit(rawToChar(ev(x, forme, "d")$octets), "\n", fixed = TRUE)[[1L]]
+
+  verifier("écriture des dates, deux formes : 0999-01-01, 0019-05-12, 0001-01-01, 9999-12-31 sur quatre chiffres, type Date",
+           all(vapply(c("empreinte", "texte"), function(f)
+             identical(lignes(J(c(-354650, -712457, -719162, 2932896)), f),
+                       c("0999-01-01", "0019-05-12", "0001-01-01", "9999-12-31")), NA)) &&
+             identical(ev(J(0), "texte", "d")$type, "Date"))
+  verifier("écriture des dates : 1970-01-01, 1000-01-01 (-354285) et un 29 février bissextile (2024-02-29, 19782) inchangés",
+           identical(lignes(J(c(0, -354285, 19782))), c("1970-01-01", "1000-01-01", "2024-02-29")))
+  verifier("écriture des dates : tous les jours de 1930-01-01 à 2024-12-31 identiques à format.Date (R1 à R6 inchangés)", {
+    j <- as.numeric(as.Date("1930-01-01")):as.numeric(as.Date("2024-12-31"))
+    identical(lignes(J(j)), format(J(j), "%Y-%m-%d"))
+  })
+  verifier("écriture des dates : stockage integer, valeurs répétées, ordre conservé, attribut names sans effet",
+           identical(lignes(J(c(1L, 0L, 1L))), c("1970-01-02", "1970-01-01", "1970-01-02")) &&
+             identical(lignes(J(c(a = 0, b = 31))), c("1970-01-01", "1970-02-01")))
+  verifier("écriture des dates : vecteur vide -> aucun octet",
+           identical(ev(J(numeric(0)), "empreinte", "d")$octets, raw(0)))
+  verifier("écriture des dates : NA s'écrit NA, NaN s'écrit NaN, quel que soit le calcul qui les a produits, dans les deux formes",
+           all(vapply(c("empreinte", "texte"), function(f)
+             identical(lignes(J(c(NA, NaN, 0, NA_real_ + 1, 0 / 0, NA_integer_)), f),
+                       c("NA", "NaN", "1970-01-01", "NA", "NaN", "NA")), NA)))
+  verifier("écriture des dates : hors de [0001-01-01, 9999-12-31] (-719163, 2932897, infinis) -> refus date_hors_domaine, dans les deux formes",
+           all(vapply(c("empreinte", "texte"), function(f)
+             leve_refus(ev(J(c(0, -719163)), f, "d"), "date_hors_domaine") &&
+               leve_refus(ev(J(c(0, 2932897)), f, "d"), "date_hors_domaine") &&
+               leve_refus(ev(J(Inf), f, "d"), "date_hors_domaine") &&
+               leve_refus(ev(J(-Inf), f, "d"), "date_hors_domaine"), NA)))
+
+  # Témoin d'empreinte calculée hors R (années < 1000).
+  TEM <- data.frame(n = J(c(-712457, -372488, as.numeric(as.Date("1960-07-01")))),
+                    e = J(c(-354650, -354285, as.numeric(as.Date("2020-03-01")))),
+                    s = J(c(NA, 2932896, -719162)))
+  ROLES_TEM <- c(date_naissance = "n", date_entree = "e", date_sortie = "s")
+  emp <- tablexp:::empreinte_donnees
+  verifier("empreinte (valeur calculée à la main par printf et md5sum, hors R), années 19, 950, 999, 1 : a96cb8dddf746b5aef7d4014096e6fad",
+           identical(emp(TEM, ROLES_TEM), "a96cb8dddf746b5aef7d4014096e6fad"))
+  verifier("empreinte : texte canonique des dates à année < 1000 de 172 octets, sans CR", {
+    fch <- tempfile(); tablexp:::texte_canonique(TEM, ROLES_TEM, fch)
+    o <- readBin(fch, "raw", 1000L); unlink(fch)
+    length(o) == 172L && !any(o == as.raw(0x0d))
+  })
+  TEM_NAN <- TEM; TEM_NAN$s[1L] <- J(NaN)
+  verifier("empreinte (valeur calculée à la main, hors R), même jeu avec une date NaN à la place du NA : 9253374d78befa9073e8f1b2e0f69181, distincte de celle du NA",
+           identical(emp(TEM_NAN, ROLES_TEM), "9253374d78befa9073e8f1b2e0f69181") &&
+             !identical(emp(TEM_NAN, ROLES_TEM), emp(TEM, ROLES_TEM)))
+
+  # Refus avant l'empreinte : la colonne cause_sortie porte une chaîne au codage
+  # bytes, que le calcul de l'empreinte refuserait (chaine_codage_bytes) ; le
+  # refus de la date hors domaine est levé le premier.
+  z <- "é"; Encoding(z) <- "bytes"
+  octets_ko <- BASE; octets_ko$cause <- c(z, BASE$cause[-1L])
+  date_ko <- BASE; date_ko$sortie[1L] <- J(2932897)
+  verifier("construire_table : sans date hors domaine, la chaîne bytes est refusée par l'empreinte (chaine_codage_bytes)",
+           leve_refus(construire_table(octets_ko, ROLES, plan_type()), "chaine_codage_bytes"))
+  verifier("construire_table : date hors domaine dans les données -> refus date_hors_domaine, avant le calcul de l'empreinte",
+           { d <- date_ko; d$cause <- octets_ko$cause
+             leve_refus(construire_table(d, ROLES, plan_type()), "date_hors_domaine") })
+  verifier("construire_table : date hors domaine (10000-01-01) seule -> refus date_hors_domaine",
+           leve_refus(construire_table(date_ko, ROLES, plan_type()), "date_hors_domaine"))
+  verifier("construire_table : naissance à 0000-12-31 -> refus date_hors_domaine",
+           { d <- BASE; d$naissance[2L] <- J(-719163)
+             leve_refus(construire_table(d, ROLES, plan_type()), "date_hors_domaine") })
+  verifier("construire_table : borne du plan hors domaine (début 0000-12-31, fin 10000-01-01) -> refus date_hors_domaine, avant le calcul de l'empreinte",
+           leve_refus(construire_table(octets_ko, ROLES, modifier(plan_type(), periode = list(debut = J(-719163), fin = PER$fin))),
+                      "date_hors_domaine") &&
+             leve_refus(construire_table(octets_ko, ROLES, modifier(plan_type(), periode = list(debut = PER$debut, fin = J(2932897)))),
+                        "date_hors_domaine"))
+
+  # Une date stockée NaN atteint l'écrivain par construire_table() (mesuré :
+  # type_conforme() la laisse passer comme un manquant) ; elle est traitée comme
+  # une date manquante par les étapes, et se distingue de NA dans l'empreinte.
+  nan_ <- BASE; nan_$sortie[2L] <- J(NaN)
+  na_ <- BASE; na_$sortie[2L] <- J(NA)
+  x_nan <- construire_table(nan_, ROLES, plan_type()); x_na <- construire_table(na_, ROLES, plan_type())
+  # Les lignes conservées gardent la valeur reçue (NaN, non corrigée en NA) :
+  # c'est le seul élément des étapes qui diffère, par identical() (mesuré).
+  verifier("construire_table : une date NaN est acceptée et traitée comme un manquant (exposition, observations et avertissements identiques à ceux d'un NA ; lignes conservées : la valeur reçue), mais l'empreinte des données la distingue",
+           identical(x_nan$etapes$exposition, x_na$etapes$exposition) &&
+             identical(x_nan$etapes$donnees$resultat$observations, x_na$etapes$donnees$resultat$observations) &&
+             isTRUE(all.equal(x_nan$etapes, x_na$etapes)) &&
+             is.nan(unclass(x_nan$etapes$donnees$resultat$lignes_conservees$sortie[2L])) &&
+             identical(x_nan$avertissements, x_na$avertissements) &&
+             !identical(x_nan$fiche$empreintes$donnees, x_na$fiche$empreintes$donnees) &&
+             identical(x_na$fiche$empreintes$donnees, emp(na_, ROLES)) && identical(x_nan$fiche$empreintes$donnees, emp(nan_, ROLES)))
+})
+
+# Date non entière (#19, reprise) : 100 et 100,5 s'écriraient de même ; refus nommé.
+local({
+  ev <- tablexp:::ecrire_valeurs
+  J <- function(j) structure(j, class = "Date")
+  for (f in c("empreinte", "texte")) {
+    verifier(sprintf("écriture des dates, forme %s : 100.5 et -0.5 refusés (date_non_entiere), 100 accepté", f),
+             leve_refus(ev(J(100.5), f, "d"), "date_non_entiere") && leve_refus(ev(J(c(0, -0.5)), f, "d"), "date_non_entiere") &&
+               leve_refus(ev(J(c(NA, 3, 1e-9)), f, "d"), "date_non_entiere") &&
+               identical(rawToChar(ev(J(100), f, "d")$octets), "1970-04-11\n"))
+  }
+  verifier("écriture des dates : un NaN ou un NA n'est pas une date non entière ; un infini reste date_hors_domaine ; ligne citée",
+           identical(rawToChar(ev(J(c(NaN, NA)), "texte", "d")$octets), "NaN\nNA\n") &&
+             leve_refus(ev(J(Inf), "texte", "d"), "date_hors_domaine") &&
+             identical(tryCatch(ev(J(c(1, 2.5, 3, 2.5)), "texte", "d"), refus_tablexp = function(r) r$details$lignes), c(2L, 4L)))
+  # Garde dates_hors_plage de fusionner_intervalles : étendue maximale du domaine
+  # (3 652 060 jours) ; seuil 2^52 / 3 652 060 = 1,2332e9 têtes (mesuré).
+  fu <- tablexp:::fusionner_intervalles
+  verifier("fusionner_intervalles : étendue maximale du domaine, numéro de tête 1 232 000 000 admis, 1 234 000 000 refusé (dates_hors_plage), message citant étendue et têtes",
+           is.list(fu(c(1L, 1232000000L), c(-719162, 0), c(2932896, 1))) &&
+             leve_refus(fu(c(1L, 1234000000L), c(-719162, 0), c(2932896, 1)), "dates_hors_plage") &&
+             grepl("3652060 jours pour 1234000000 têtes",
+                   conditionMessage(tryCatch(fu(c(1L, 1234000000L), c(-719162, 0), c(2932896, 1)), refus_tablexp = function(r) r)),
+                   fixed = TRUE))
+})
+
+# Plan canonique et fiche canonique (#42 ; ADR 0011, points 5.1 à 5.5 ; #22,
+# point 6). Valeur calculée à la main : formes et ordres attendus ; identité
+# exacte : deux plans de même sens donnent des objets identical() hors
+# execution (le stockage d'une Date est invisible aux références).
+local({
+  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES)
+  erreur <- function(expr) inherits(tryCatch({ force(expr); NULL }, error = function(e) e), "error")
+  J <- function(j) structure(j, class = "Date")
+  pb <- modifier(plan_type(), etapes = c(plan_type()$etapes,
+                                         list(brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95))))
+  # Liste fermée des stockages admis, un témoin chacun.
+  verifier("canoniser_plan : borne Date à stockage double inchangée, à stockage integer convertie en Date double",
+           identical(cn(pb)$periode, PER) && typeof(PER$debut) == "double" &&
+             identical(cn(modifier(pb, periode = list(debut = J(16436L), fin = J(20088L))))$periode, PER))
+  verifier("canoniser_plan : délai double inchangé, délai integer converti en double",
+           identical(cn(pb)$delai_declaration, 0) && identical(cn(modifier(pb, delai_declaration = 90L))$delai_declaration, 90))
+  verifier("canoniser_plan : graine integer inchangée, graine double entière convertie en integer",
+           identical(cn(modifier(pb, graine = 7L))$graine, 7L) && identical(cn(modifier(pb, graine = 7))$graine, 7L) &&
+             identical(names(cn(modifier(pb, graine = 7L))), tablexp:::CHAMPS_PLAN))
+  verifier("canoniser_plan : stockage hors de la liste fermée -> erreur (délai character, borne non Date, graine 1,5 ou hors étendue des integer)",
+           erreur(cn(modifier(pb, delai_declaration = "0"))) &&
+             erreur(cn(modifier(pb, periode = list(debut = 16436, fin = PER$fin)))) &&
+             erreur(cn(modifier(pb, graine = 1.5))) && erreur(cn(modifier(pb, graine = 3e9))))
+  verifier("canoniser_plan : garde-fous de la liste fermée -> erreur (graine NA integer ou double, étape absente du catalogue, paramètre en trop ou manquant)",
+           erreur(cn(modifier(pb, graine = NA_integer_))) && erreur(cn(modifier(pb, graine = NA_real_))) &&
+             erreur(cn(modifier(pb, etapes = c(pb$etapes, list(lissage = list()))))) &&
+             erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- list(estimateurs = "poisson", niveau = 0.95, x = 1); et }))) &&
+             erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- list(niveau = 0.95); et }))))
+  verifier("canoniser_plan : nom en double -> erreur, jamais réduit en silence à sa première occurrence (paramètre d'étape, étape)",
+           erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- c(et$brut, list(niveau = 0.5)); et }))) &&
+             erreur(cn(modifier(pb, etapes = c(pb$etapes, pb$etapes["brut"])))) &&
+             erreur(cn(modifier(pb, etapes = c(pb$etapes["donnees"], pb$etapes)))))
+  # Plans de même sens que pb.
+  variantes <- list(
+    "début de période en integer" = modifier(pb, periode = list(debut = J(16436L), fin = PER$fin)),
+    "délai de déclaration 0L" = modifier(pb, delai_declaration = 0L),
+    "noms du plan, de transition et de periode permutés" =
+      list(etapes = pb$etapes, segmentation = "sexe", periode = list(fin = PER$fin, debut = PER$debut),
+           delai_declaration = 0, transition = list(arrivee = "deces", depart = "vivant")),
+    "paramètres de brut et d'exposition permutés" =
+      modifier(pb, etapes = list(donnees = pb$etapes$donnees, exposition = list(par_annee = FALSE, convention = "plus_fine"),
+                                 brut = list(niveau = 0.95, estimateurs = c("poisson", "binomial")))))
+  verifier("canoniser_plan : plan déjà canonique rendu identical() ; champs dans l'ordre de CHAMPS_PLAN",
+           identical(cn(pb), pb) && identical(cn(plan_type()), plan_type()))
+  for (n in names(variantes)) {
+    q <- variantes[[n]]
+    verifier(sprintf("canoniser_plan (%s) : canon = plan canonique, idempotente, valider_plan(canon) le rend inchangé", n),
+             !identical(q, pb) && identical(cn(q), pb) && identical(cn(cn(q)), cn(q)) && identical(valider_plan(cn(q)), cn(q)))
+  }
+  prov <- list(fichier = "base.csv", empreinte = "d41d8cd98f00b204e9800998ecf8427e", algorithme = "md5")
+  x0 <- sans_execution(construire_table(BASE, ROLES, pb, prov))
+  for (n in names(variantes))
+    verifier(sprintf("construire_table (%s) : objet identical() hors execution à celui du plan canonique", n),
+             identical(sans_execution(construire_table(BASE, ROLES, variantes[[n]], prov)), x0))
+  verifier("construire_table (rôles dans l'ordre inverse) : objet identical() hors execution ; fiche$roles dans l'ordre du catalogue",
+           identical(sans_execution(construire_table(BASE, rev(ROLES), pb, prov)), x0) &&
+             identical(x0$fiche$roles, ROLES) &&
+             !is.unsorted(match(names(x0$fiche$roles), catalogue_roles()$role)))
+  verifier("construire_table (provenance permutée) : objet identical() hors execution ; fiche$provenance dans l'ordre (fichier, empreinte, algorithme)",
+           identical(sans_execution(construire_table(BASE, ROLES, pb, prov[c("algorithme", "fichier", "empreinte")])), x0) &&
+             identical(x0$fiche$provenance, prov))
+  verifier("construire_table : etapes$exposition$parametres$periode dans l'ordre (debut, fin), plan aux noms permutés",
+           identical(names(sans_execution(construire_table(BASE, ROLES, variantes[[3L]], prov))$etapes$exposition$parametres$periode),
+                     c("debut", "fin")))
+  y <- construire_table(BASE, rev(ROLES), variantes[[3L]], prov[3:1])
+  verifier("construire_table : rejeu de la fiche (rôles, plan canonique, provenance) identical() hors execution",
+           identical(sans_execution(construire_table(BASE, y$fiche$roles, y$fiche$plan, y$fiche$provenance)), x0) &&
+             identical(y$fiche$plan, pb))
+  verifier("fiche : version 2, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
+           identical(x0$fiche$version_fiche, 2L) &&
+             !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
 })

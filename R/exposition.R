@@ -476,11 +476,12 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
 
   list(
     parametres = list(recette = rec$recette, convention = conv,
-                      unite_exposition = UNITES_EXPOSITION[[cv]], par_annee = par_annee,
+                      # Texte du moteur marqué UTF-8 en toute locale (#50).
+                      unite_exposition = texte_moteur(UNITES_EXPOSITION[[cv]]), par_annee = par_annee,
                       transition = p$transition$code, segmentation = segmentation,
                       periode = periode, delai_declaration = delai_declaration,
                       fin_effective = structure(borne - 1, class = "Date"),
-                      hypothese_censure = HYPOTHESE_CENSURE),
+                      hypothese_censure = texte_moteur(HYPOTHESE_CENSURE)),
     resultat = list(exposition = table_exp),
     diagnostics = list(observations = n_obs, observations_exposees = length(exposees),
                        exposition_jours = sum(m$jours), evenements = length(ev),

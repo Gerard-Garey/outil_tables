@@ -23,7 +23,8 @@
 #    refus d'écriture (condition de classe `refus_reference`, chemin fautif)
 #    sur toute classe ou tout attribut hors format ;
 #  - ecrire_reference(grandeurs, fichier, entete) : TSV UTF-8, LF, octet par
-#    octet, valeurs par tablexp:::colonne_canonique() (ADR 0007, point 9.3) ;
+#    octet, valeurs par tablexp:::ecrire_valeurs() en forme « texte »
+#    (doubles en %.17g ; ADR 0007, point 9.3 ; ADR 0011, point 7) ;
 #  - lire_reference(fichier) : lecture stricte (tout double hors de la forme
 #    de `%.17g` est refusé ; hors Windows, tout texte différent de
 #    sprintf("%.17g") de la valeur lue l'est aussi : double_lu()) ; aller-retour
@@ -57,6 +58,7 @@ charger_utf8 <- function(fichier, envir) {
 
 FORMAT_REFERENCE <- "tablexp reference 1"
 CHEMIN_EMPREINTE_DONNEES <- "fiche/empreintes/donnees"
+CHEMIN_REPRESENTATION <- "fiche/empreintes/representation"
 CHEMIN_RESUMES <- "etapes/donnees/resultat"
 RESUMES_PAR_EMPREINTE <- c("lignes_conservees", "numeros_conserves", "lignes_exclues",
                            "observations", "observation_des_lignes")
@@ -209,7 +211,7 @@ atome <- function(x, chemin) {
 # row.names ignorés (l'entrée est identifiée par fiche/empreintes/donnees).
 octets_resume <- function(x, nom, chemin) {
   colonne <- function(v, n) {
-    cc <- tryCatch(tablexp:::colonne_canonique(v, n), error = function(e)
+    cc <- tryCatch(tablexp:::ecrire_valeurs(v, "texte", n), error = function(e)
       refus_reference(joindre(chemin, n), conditionMessage(e)))
     c(charToRaw(utf8_ou_refus(sprintf("#%s\t%s\n", n, cc$type), joindre(chemin, n))), cc$octets)
   }
@@ -297,7 +299,7 @@ dirname_chemin <- function(chemin) sub("/[^/]*$", "", chemin)
 octets_valeurs <- function(type, v, chemin) {
   if (type == "NULL" || !length(v)) return(raw(0))
   w <- if (type == "factor") factor(v, levels = unique(v)) else v
-  tryCatch(tablexp:::colonne_canonique(w, chemin)$octets, error = function(e)
+  tryCatch(tablexp:::ecrire_valeurs(w, "texte", chemin)$octets, error = function(e)
     refus_reference(chemin, conditionMessage(e)))
 }
 
@@ -412,6 +414,18 @@ double_lu <- function(s, fichier, chemin, windows = .Platform$OS.type == "window
   v
 }
 
+# Écriture canonique d'un vecteur de Date (ADR 0011, point 4 ; #19) pour le
+# contrôle de lecture et les messages : %04d-%02d-%02d sur as.POSIXlt(), jetons
+# NA et NaN. Ne passe pas par tablexp:::ecrire_valeurs() : la lecture et la
+# comparaison s'exécutent sans installation de tablexp (comparer_references.R) ;
+# c'est aussi une seconde écriture, indépendante de celle du moteur.
+texte_dates <- function(v) {
+  lt <- as.POSIXlt(structure(as.double(unclass(v)), class = "Date"))
+  t <- sprintf("%04d-%02d-%02d", lt$year + 1900L, lt$mon + 1L, lt$mday)
+  t[is.na(v)] <- "NA"; t[is.nan(unclass(v))] <- "NaN"
+  t
+}
+
 valeurs_lues <- function(type, s, fichier, chemin) {
   canonique <- function(v, texte) {
     if (!identical(texte, s)) erreur_lecture(fichier, sprintf("%s : valeur non canonique pour le type %s", chemin, type))
@@ -422,8 +436,13 @@ valeurs_lues <- function(type, s, fichier, chemin) {
     integer = { v <- suppressWarnings(as.integer(s)); canonique(v, ifelse(is.na(v), "NA", sprintf("%d", v))) },
     logical = { v <- c("TRUE" = TRUE, "FALSE" = FALSE, "NA" = NA)[s]
                 if (anyNA(names(v))) erreur_lecture(fichier, sprintf("%s : logique invalide", chemin)); unname(v) },
-    Date = { v <- as.Date(ifelse(s == "NA", NA_character_, s), format = "%Y-%m-%d")
-             t <- format(v, "%Y-%m-%d"); t[is.na(v)] <- "NA"; canonique(structure(as.double(unclass(v)), class = "Date"), t) },
+    # Date : jetons NA et NaN lus tels quels (NaN en Date stockée NaN) ; forme
+    # canonique (année sur quatre chiffres, ADR 0011, point 4 ; #19) contrôlée
+    # par la réécriture de la valeur lue, texte_dates().
+    Date = { u <- as.double(unclass(as.Date(ifelse(s %in% c("NA", "NaN"), NA_character_, s), format = "%Y-%m-%d")))
+             u[s == "NaN"] <- NaN
+             v <- structure(u, class = "Date")
+             canonique(v, texte_dates(v)) },
     character = , factor = desechapper(s, fichier, chemin),
     erreur_lecture(fichier, sprintf("%s : type %s inconnu", chemin, type)))
 }
@@ -485,7 +504,7 @@ tolerance_de <- function(chemin, tolerances = TOLERANCES) {
 
 texte_valeur <- function(v, type) {
   if (type == "double") return(sprintf("%.17g", v))
-  if (type == "Date") return(ifelse(is.na(v), "NA", format(v, "%Y-%m-%d")))
+  if (type == "Date") return(texte_dates(v))
   if (type %in% c("character", "factor")) return(ifelse(is.na(v), "NA", sprintf("\"%s\"", encodeString(v))))
   ifelse(is.na(v), "NA", as.character(v))
 }
@@ -503,7 +522,12 @@ comparer_references <- function(reference, obtenu, tolerances = TOLERANCES) {
   # Entrée, en premier (point 3.2).
   e_r <- if (CHEMIN_EMPREINTE_DONNEES %in% ch_r) reference$valeurs[[CHEMIN_EMPREINTE_DONNEES]] else NA_character_
   e_o <- if (CHEMIN_EMPREINTE_DONNEES %in% ch_o) obtenu$valeurs[[CHEMIN_EMPREINTE_DONNEES]] else NA_character_
-  entree <- list(reference = e_r, obtenu = e_o, differente = !identical(e_r, e_o))
+  # Représentation canonique des deux côtés (NA si absente) : troisième cause
+  # d'une entrée différente (annotation du 19/10/2026 (troisième), (f)).
+  rep_de <- function(g) if (CHEMIN_REPRESENTATION %in% names(g$types) && length(g$valeurs[[CHEMIN_REPRESENTATION]]) == 1L)
+    as.character(g$valeurs[[CHEMIN_REPRESENTATION]]) else NA_character_
+  entree <- list(reference = e_r, obtenu = e_o, differente = !identical(e_r, e_o),
+                 representation_reference = rep_de(reference), representation_obtenue = rep_de(obtenu))
   # Exigée des deux côtés (point 3.2) : son absence n'est jamais une égalité.
   for (cote in c("référence", "obtenu"))
     if (anyNA(if (cote == "obtenu") e_o else e_r))
@@ -590,7 +614,11 @@ imprimer_comparaison <- function(r, titre = "") {
     c(sprintf("  ENTRÉE DIFFÉRENTE : empreinte des données %s (référence) contre %s (obtenu)",
               r$entree$reference, r$entree$obtenu),
       "  entrée différente : écarts non interprétables comme un tableau avant / après ;",
-      "  causes possibles : le simulateur a changé pour cette graine (ADR 0009, point 4.2), ou la plateforme a produit un tirage différent (ADR 0008, hypothèse sur la libm)")
+      "  causes possibles : le simulateur a changé pour cette graine (ADR 0009, point 4.2), ou la plateforme a produit un tirage différent (ADR 0008, hypothèse sur la libm)",
+      if (!is.na(r$entree$representation_reference) && !is.na(r$entree$representation_obtenue) &&
+          !identical(r$entree$representation_reference, r$entree$representation_obtenue))
+        sprintf("  ou la représentation canonique a changé (%s : « %s » (référence) contre « %s » (obtenu)) ; une entrée inchangée se prouve par la garde 3.2 de tests/test_reproductibilite.R",
+                CHEMIN_REPRESENTATION, r$entree$representation_reference, r$entree$representation_obtenue))
     else sprintf("  Entrée : empreinte des données identique (%s)", r$entree$reference))
   out <- c(out, sprintf("  Bilan : %d grandeur(s) comparée(s) ; %d identique(s) au bit près ; %d à écart non nul sous tolérance ; %d en écart ; %d sans tolérance déclarée ; %d écart(s) structurel(s)",
                         nrow(g), sum(g$verdict == "identique"), sum(g$verdict == "sous tolérance"),

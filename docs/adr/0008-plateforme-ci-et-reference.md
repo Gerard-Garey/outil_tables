@@ -305,3 +305,25 @@ Les 1 420 grandeurs se répartissent en 234 (R1), 231 (R2), 234 (R3), 220 (R4), 
 **Effet sur les résultats** : aucun. L'annotation consigne des exécutions passées.
 
 Issues : #17 ; ADR 0009 (annotation du 19/10/2026).
+
+## Annotation du 19 octobre 2026 (seconde) — réserve sur la `libm` exercée hors plateforme de référence : un ulp sur R4 et R5 sous Intel Xeon et glibc 2.39, cause non séparée, sans effet sur la CI ni sur les références
+
+Rédigée par `architect-approfondi` (Fable, consultation 3/3 de la branche B4, M62, Q3) lors de la rédaction de l'ADR 0011. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**Mesure** (script `m11.R` d'`actuary-approfondi`, remesuré par `architect` le 19/10/2026 ; *vérifié*). Environnement cloud, **hors plateforme de référence** : R 4.3.3, `tablexp` installé depuis l'arbre de `31a490d` (`R/` identique à `main` à `4f2cefe`), Intel Xeon à 2,10 GHz (drapeaux `fma`, `avx2`, `avx512f`, relevés dans `/proc/cpuinfo`), Ubuntu 24.04.5 LTS, glibc 2.39 (`ldd --version`), BLAS `/usr/lib/x86_64-linux-gnu/blas/libblas.so.3.12.0`, LAPACK `liblapack.so.3.12.0` (`La_version()` 3.12.0). Les références R1, R4 et R5 (créées sur AMD EPYC 7763, Ubuntu 22.04.5, Netlib 3.10.0, annotation précédente) ont été recalculées et comparées par `comparer_references()` :
+
+| Plan | Grandeurs | Identiques au bit près | Écart non nul sous tolérance |
+|---|---|---|---|
+| R1 | 234 | 234 | aucun |
+| R4 | 220 | 219 | `etapes/brut/resultat/poisson/probabilite_borne_sup_asymptotique`, 1 élément sur 1 490 (position 1409) : `0.21344982613139146` → `0.21344982613139143`, écart relatif 1,3e-16, classe 1e-12, verdict OK |
+| R5 | 234 | 233 | même grandeur, 1 élément sur 149 (position 116) : `0.054734356422945107` → `0.054734356422945114`, écart relatif 1,27e-16, classe 1e-12, verdict OK |
+
+L'empreinte des données vaut `f3519cc1b73ab0d1fcc6ad89dc6d595c` dans les trois cas ; aucun écart structurel ; verdict OK pour les trois plans. La grandeur touchée est calculée par `-expm1(-borne)` (`R/brut.R:146`, `:474`), fonction de la `libm`.
+
+**Ce que la mesure établit.** La réserve de « Conséquences » (« Identité au bit près entre exécuteurs non garantie ») est **exercée** hors plateforme de référence : à entrée, plan et code identiques, un résultat diffère au dernier bit quand changent à la fois le fondeur du processeur (Intel au lieu d'AMD, FMA et AVX2 présents des deux côtés, AVX-512 présent ici comme sur les EPYC 9V74 et 9V45), la version de la glibc (2.39 au lieu de celle de l'image `rocker/r-ver:4.3.3`, non consignée) et la BLAS et la LAPACK (3.12.0 au lieu de 3.10.0 ; sans rôle vraisemblable pour une fonction scalaire). La **cause n'est pas séparée** : une seule de ces trois variables n'a pas été changée à la fois. Statut : constat de mesure. L'annotation précédente (même jour) reste exacte sur son périmètre : sur la plateforme de référence, cinq exécutions et trois modèles AMD donnent 1 420 grandeurs identiques au bit près.
+
+**Conséquences.** Aucune sur la CI ni sur les références : la comparaison à tolérance (ADR 0009, classe 1e-12 pour les fonctions spéciales et la `libm`) absorbe l'écart, et le verdict est OK ; aucune règle de comparaison ni aucune tolérance ne change. Pour l'ADR 0011 (point 11) : l'**empreinte du résultat** de R4 et de R5 différerait entre la plateforme de référence et cet hôte, ce qui confirme E3.6 (« l'empreinte du résultat dépend de la plateforme ») et fixe son statut — témoin d'identité sur une même machine, jamais critère de rejeu chez un tiers (E4.6). Le constat vaut aussi pour la conséquence 2 de l'annotation du 18/10/2026 de l'ADR 0009 : une comparaison aux références exécutée hors de la plateforme de référence a le statut de constat de mesure, même sous glibc.
+
+**Effet sur les résultats** : aucun. L'annotation consigne une mesure.
+
+Issues : #17 ; ADR 0011 (point 11) ; ADR 0009 (annotation du 19/10/2026).

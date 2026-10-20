@@ -574,8 +574,13 @@ verifier("colonne présente deux fois dans les données : refus colonne_ambigue,
 # Constat m2 : étendue des dates hors de la précision de la fusion.
 d <- tete("1950-01-01", c("2016-01-01", "2017-01-01"), c("2018-01-01", "2018-01-01"), c("rachat", "terme"))
 d$sortie[1] <- structure(5e15, class = "Date")
-verifier("date de sortie 5e15 jours : refus dates_hors_plage (et non erreur ordinaire)",
-         leve_refus(pt(d), "dates_hors_plage"))
+# Depuis #19, le domaine des dates [0001-01-01, 9999-12-31] est contrôlé en amont
+# (refus date_hors_domaine) : 5e15 jours n'atteint plus la fusion par tête, dont
+# le refus dates_hors_plage reste atteint par appel direct (étendue de 5e15 jours).
+verifier("date de sortie 5e15 jours : refus date_hors_domaine (#19), avant la fusion par tête",
+         leve_refus(pt(d), "date_hors_domaine"))
+verifier("fusion par tête, étendue de 5e15 jours (appel direct) : refus dates_hors_plage (et non erreur ordinaire)",
+         leve_refus(tablexp:::fusionner_intervalles(c(1L, 2L), c(0, 0), c(5e15, 1)), "dates_hors_plage"))
 
 # Constat m1 : cause des observations toujours en chaîne.
 verifier("cause des observations : character (unité tête et unité contrat)",
@@ -822,3 +827,72 @@ verifier("(v) exclusion de sortie_avant_entree seule : refus par en_cours_avant_
                     !identical(unname(x$details$decompte), 1L)) "décompte"
          else if (!identical(x$details$lignes, list(en_cours_avant_fin = 2L))) "numéros de ligne"
          else contient(x, "en_cours_avant_fin"))
+
+# --- dates hors du domaine [0001-01-01, 9999-12-31] (#19 ; ADR 0011, point 4) ---
+
+# Nature : bornes en jours depuis 1970-01-01 calculées hors R (Python 3.13 :
+# date(1,1,1).toordinal() - date(1970,1,1).toordinal() = 1 - 719163 = -719162 ;
+# date(9999,12,31).toordinal() - 719163 = 3652059 - 719163 = 2932896) ; les
+# jours voisins (-719163, 2932897) portent les années 0 et 10000.
+J <- function(j) structure(j, class = "Date")
+verifier("domaine des dates : composantes_date() rend 0001-01-01 en -719162, l'année 0 la veille, 9999-12-31 en 2932896, l'année 10000 le lendemain", {
+  cd <- tablexp:::composantes_date(c(-719163, -719162, 2932896, 2932897))
+  identical(cd$an, c(0L, 1L, 9999L, 10000L)) && identical(cd$mois, c(11L, 0L, 11L, 0L)) &&
+    identical(cd$jour, c(31L, 1L, 31L, 1L))
+})
+verifier("dates_hors_domaine : bornes incluses, manquants (NA, NaN) jamais hors domaine, infinis hors domaine",
+         identical(tablexp:::dates_hors_domaine(c(-719163, -719162, 0, 2932896, 2932897, NA, NaN, Inf, -Inf)),
+                   c(TRUE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE)))
+for (cas in list(list("naissance", "date_naissance", 2L), list("entree", "date_entree", 3L),
+                 list("sortie", "date_sortie", 1L)))
+  for (v in c(-719163, 2932897)) {
+    col <- BASE[[cas[[1L]]]]; col[cas[[3L]]] <- J(v)
+    dd <- BASE; dd[[cas[[1L]]]] <- col
+    x <- refus(prep(d = dd))
+    verifier(sprintf("date hors domaine (rôle %s, jour %d) : refus date_hors_domaine, ligne %d citée", cas[[2L]], v, cas[[3L]]),
+             if (is.null(x)) "aucun refus" else if (!identical(x$motif, "date_hors_domaine")) x$motif
+             else if (!identical(x$details$lignes, stats::setNames(list(cas[[3L]]), cas[[2L]]))) "numéros de ligne"
+             else contient(x, cas[[2L]], cas[[1L]], sprintf("lignes %d", cas[[3L]])))
+  }
+verifier("date hors domaine dans deux rôles (naissance ligne 2, sortie lignes 1 et 3) : un seul refus qui nomme les deux rôles, colonnes et lignes", {
+  dd <- BASE
+  dd$naissance[2L] <- J(-719163); dd$sortie[c(1L, 3L)] <- J(2932897)
+  x <- refus(prep(d = dd))
+  if (is.null(x)) "aucun refus" else if (!identical(x$motif, "date_hors_domaine")) x$motif
+  else if (!identical(x$details$role, c("date_naissance", "date_sortie")) ||
+           !identical(x$details$colonne, c("naissance", "sortie")) ||
+           !identical(x$details$lignes, list(date_naissance = 2L, date_sortie = c(1L, 3L)))) "détails du refus"
+  else contient(x, "« date_naissance », colonne « naissance » : 1 date(s) (premières lignes 2)",
+                "« date_sortie », colonne « sortie » : 2 date(s) (premières lignes 1, 3)")
+})
+verifier("date hors domaine dans une colonne non déclarée : sans effet",
+         is.list(prep(d = avec(autre_date = J(c(-719163, 2932897, NA, NaN))))))
+verifier("dates aux bornes du domaine (0001-01-01, 9999-12-31) : acceptées par le contrôle des rôles",
+         identical(tablexp:::controler_roles(
+           avec(naissance = J(c(-719162, 2932896, -719162, 2932896)), entree = J(rep(-719162, 4L))),
+           ROLES, "sexe"), ROLES))
+verifier("période : borne début à 0000-12-31 (-719163) ou borne fin à 10000-01-01 (2932897) : refus date_hors_domaine",
+         leve_refus(prep(periode = list(debut = J(-719163), fin = PER$fin)), "date_hors_domaine") &&
+           leve_refus(prep(periode = list(debut = PER$debut, fin = J(2932897))), "date_hors_domaine") &&
+           leve_refus(prep(periode = list(debut = J(-719163), fin = J(2932897))), "date_hors_domaine"))
+verifier("période : bornes 0001-01-01 et 9999-12-31 acceptées par le contrôle des paramètres",
+         is.list(tablexp:::controler_parametres_donnees(VD, list(debut = J(-719162), fin = J(2932896)), 0, "sexe",
+                                                          character(0))))
+verifier("période : borne non finie ou manquante reste periode_invalide (non date_hors_domaine)",
+         leve_refus(prep(periode = list(debut = J(NA_real_), fin = PER$fin)), "periode_invalide") &&
+           leve_refus(prep(periode = list(debut = PER$debut, fin = J(Inf))), "periode_invalide"))
+# Années 1 à 999 : admises, relevées par age_aberrant, exclues par une règle déclarée.
+d <- avec(naissance = J(c(-719162, as.numeric(D("1960-07-01")), as.numeric(D("1945-06-06")),
+                          as.numeric(D("1945-06-06")))))  # ligne 1 : 0001-01-01
+x <- refus(prep(d = d))
+verifier("naissance en l'an 1 (0001-01-01) : non refusée comme date, relevée par age_aberrant (ligne 1)",
+         identical(x$motif, "ligne_invalide") && identical(names(x$details$decompte), "age_aberrant") &&
+           identical(x$details$lignes$age_aberrant, 1L))
+r <- prep(d = d, exclusions = "age_aberrant")
+verifier("naissance en l'an 1 avec la règle age_aberrant déclarée : ligne 1 exclue, comptée",
+         identical(r$resultat$lignes_exclues, list(age_aberrant = 1L)) && r$resultat$nombre_lignes_exclues == 1L)
+# 0019-05-12 = jour -712457 (Python : date(19,5,12).toordinal() - date(1970,1,1).toordinal())
+d <- avec(naissance = J(c(-712457, as.numeric(D("1960-07-01")), as.numeric(D("1945-06-06")),
+                          as.numeric(D("1945-06-06")))))
+verifier("naissance en l'an 19 (0019-05-12) : relevée par age_aberrant (ligne 1), non refusée comme date",
+         identical(refus(prep(d = d))$details$lignes$age_aberrant, 1L))

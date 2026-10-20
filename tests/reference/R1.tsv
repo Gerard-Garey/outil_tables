@@ -17,7 +17,7 @@
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 99272a48ee8a42496e158e855524e15479e4d5c7
+# plateforme consignée : GITHUB_SHA                    : d18c269921646d6cb6c57940ae45bf1823e6c565
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -25,12 +25,12 @@
 # fiche$plateforme/machine : x86_64
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
-# commit : 99272a48ee8a42496e158e855524e15479e4d5c7
-# execution : 39248539956
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/39248539956
+# commit : d18c269921646d6cb6c57940ae45bf1823e6c565
+# execution : 39315172327
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/39315172327
 # mode : regeneration
-# date : 2026-10-19 11:59:16 UTC
-# empreinte des données : f3519cc1b73ab0d1fcc6ad89dc6d595c
+# date : 2026-10-19 19:57:12 UTC
+# empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
 table	NULL	0
@@ -180,8 +180,8 @@ avertissements/etape	character	1	"donnees"
 avertissements/code	character	1	"fenetres_vides"
 avertissements/message	character	1	"Relevé : 12079 observation(s) sans intersection avec la période d'observation."
 avertissements/nombre	integer	1	12079
-fiche/@noms	character	25	"version_fiche"	"roles"	"plan"	"transition"	"transition_code"	"periode"	"delai_declaration"	"fin_effective"	"segmentation"	"unite_observation"	"avertissement_unite"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"hypothese_censure"	"graine"	"graine_mention"	"generateur"	"provenance"	"provenance_mention"	"empreintes"	"avertissements"	"hypotheses_brut"
-fiche/version_fiche	integer	1	1
+fiche/@noms	character	21	"version_fiche"	"roles"	"plan"	"transition_code"	"fin_effective"	"unite_observation"	"avertissement_unite"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"hypothese_censure"	"graine"	"graine_mention"	"generateur"	"provenance"	"provenance_mention"	"empreintes"	"avertissements"	"hypotheses_brut"
+fiche/version_fiche	integer	1	2
 fiche/roles/@noms	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/roles	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/plan/@noms	character	5	"transition"	"periode"	"delai_declaration"	"segmentation"	"etapes"
@@ -202,16 +202,8 @@ fiche/plan/etapes/exposition/par_annee	logical	1	FALSE
 fiche/plan/etapes/brut/@noms	character	2	"estimateurs"	"niveau"
 fiche/plan/etapes/brut/estimateurs	character	2	"poisson"	"binomial"
 fiche/plan/etapes/brut/niveau	double	1	0.94999999999999996
-fiche/transition/@noms	character	2	"depart"	"arrivee"
-fiche/transition/depart	character	1	"vivant"
-fiche/transition/arrivee	character	1	"deces"
 fiche/transition_code	character	1	"vivant_decede"
-fiche/periode/@noms	character	2	"debut"	"fin"
-fiche/periode/debut	Date	1	2015-01-01
-fiche/periode/fin	Date	1	2024-12-31
-fiche/delai_declaration	double	1	0
 fiche/fin_effective	Date	1	2024-12-31
-fiche/segmentation	character	1	"sexe"
 fiche/unite_observation	character	1	"tete"
 fiche/avertissement_unite	character	1	NA
 fiche/recette	character	1	"lignes_dates_completes"
@@ -235,8 +227,8 @@ fiche/provenance	NULL	0
 fiche/provenance_mention	character	1	"aucun fichier (données construites en mémoire)"
 fiche/empreintes/@noms	character	8	"algorithme"	"representation"	"donnees"	"fichier"	"algorithme_fichier"	"resultat"	"code"	"statut_resultat_code"
 fiche/empreintes/algorithme	character	1	"md5"
-fiche/empreintes/representation	character	1	"tablexp canonique 1"
-fiche/empreintes/donnees	character	1	"f3519cc1b73ab0d1fcc6ad89dc6d595c"
+fiche/empreintes/representation	character	1	"tablexp canonique 2"
+fiche/empreintes/donnees	character	1	"35ca55371e72f0f0103993d70e3a64d3"
 fiche/empreintes/fichier	character	1	NA
 fiche/empreintes/algorithme_fichier	character	1	NA
 fiche/empreintes/resultat	character	1	NA

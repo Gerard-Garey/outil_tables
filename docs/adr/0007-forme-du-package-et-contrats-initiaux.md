@@ -525,3 +525,19 @@ Les deux voies donnent des résultats `identical()` (test « fenêtres transmise
 **Effet sur les résultats** : aucun. Le changement porte sur le chemin des données entre deux étapes ; aucune valeur calculée ne change, et `tests/reference/` est inchangé.
 
 Issues : #38 ; #22 (point 7). Décision M63.
+
+## Annotation du 19 octobre 2026 (troisième) — point 12 remplacé par l'ADR 0011 ; mention « mêmes `etapes` » de l'annotation du 19/10/2026, (d), inexacte pour `periode` ; point 6.2 précisé (plan canonique)
+
+Rédigée par `architect-approfondi` (Fable, consultation 3/3 de la branche B4, M62, Q3) ; intitulée « seconde » à sa rédaction (`1f785b0`), renumérotée « troisième » le 19/10/2026 (décision du mainteneur M65), la seconde annotation du même jour étant celle de la branche P2 (PR #53, `ad6bc43`). Statut : **proposé, sous réserve de l'acceptation de l'ADR 0011** par le mainteneur. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+1. **Point 12 remplacé.** Le format de sérialisation du plan et de la fiche, reporté par le point 12.1, est fixé par l'**ADR 0011** (points 6, 8 et 9 : grammaire de ligne aplatie, octets UTF-8 et LF chez l'appelant, module `rapport`, lecteur sans évaluation, `lire_plan()` sans `valider_plan()`). Les cinq contraintes du point 12.2 sont **maintenues** telles quelles par l'ADR 0011 (point 6.4 pour (b), 6.2 pour (c), 10 pour (e)) ; le point 12 ne fait plus foi que par leur intermédiaire.
+
+2. **Points 9.2 et 9.3 complétés, non réécrits.** L'écriture des doubles de la représentation canonique (`sprintf("%.17g", x + 0)`, point 9.3) est remplacée, pour l'**empreinte**, par les octets IEEE 754 petit-boutistes en hexadécimal avec jetons pour les non-finis (ADR 0011, point 2), et l'année d'une `Date` s'écrit sur quatre chiffres dans [0001, 9999], hors domaine refusée (point 4) ; la première ligne devient `tablexp canonique 2`. Le `%.17g` subsiste comme **forme texte** (point 3). L'empreinte du résultat (point 9.2, « non calculée ») reçoit son principe et son périmètre (ADR 0011, point 11), à calculer en cinquième branche.
+
+3. **Annotation du 19/10/2026, (d), #42 : « les mêmes `etapes` » est inexact pour `periode`.** Elle écrit qu'« un plan et une provenance aux noms permutés donnent les mêmes `etapes` mais des fiches non `identical` ». *Vérifié* le 19/10/2026 (script `m7.R` d'`actuary`, remesuré par `architect`, 10⁴ lignes, plan R1, `periode` reçue dans l'ordre `fin`, `debut`) : `etapes$exposition$parametres$periode` porte les noms dans l'ordre reçu, et `etapes` n'est **pas** `identical`. La phrase reste vraie pour `transition` et pour la provenance. C'est une raison de plus de canoniser le plan **à l'entrée** de `construire_table()` et non dans la seule fiche (ADR 0011, point 5.1).
+
+4. **Point 6.2 précisé** : `fiche$plan` est le plan reçu **mis sous forme canonique** (ordre du schéma, bornes de `periode` en `Date` à stockage double, `delai_declaration` en double, paramètres d'étape dans l'ordre du catalogue), sans autre changement ; c'est lui qu'on rejoue. Le « plan effectif » d'E4.5 est la paire (plan canonique, paramètres retenus) : ADR 0011, point 5.2 ; ADR 0005, annotation du même jour. `version_fiche` passe de 1 à 2.
+
+**Effet sur les résultats** : aucun par cette annotation ; ceux de l'ADR 0011 sont consignés dans ses « Conséquences » (tableau attendu : `fiche/version_fiche`, `fiche/empreintes/representation`, `fiche/empreintes/donnees` ; retraits si la question 2 de l'ADR 0011 est acceptée).
+
+Issues : #35, #19, #42, #22 (point 6), #50 ; ADR 0011.

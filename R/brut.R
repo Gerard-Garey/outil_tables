@@ -591,7 +591,9 @@ calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention,
   parametres <- list(estimateurs = retenus, niveau = niveau,
                      exposition_initiale = EXPOSITION_INITIALE_BRUT,
                      tolerance_effectif = TOLERANCE_EFFECTIF, convention = convention,
-                     unite_exposition = unite_exposition, hypotheses = hypotheses, statuts = statuts)
+                     unite_exposition = unite_exposition,
+                     # Texte du moteur marqué UTF-8 en toute locale (#50).
+                     hypotheses = texte_moteur(hypotheses), statuts = texte_moteur(statuts))
   diagnostics <- list(cellules = nrow(exposition), evenements = sum(D),
                       cellules_sans_evenement = sum(D == 0L),
                       # D = E^i > 0 à la tolérance près (q = 1) : masque de

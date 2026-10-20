@@ -10,7 +10,9 @@
 #  - forme_exacte() : type de base exact, aucun attribut hors de ceux admis
 #    (forme canonique des valeurs du plan, #23) ;
 #  - liste_aux_noms() et chaine_unique() : les deux contrôles de forme qui s'y
-#    appuient, partagés par les modules (#48).
+#    appuient, partagés par les modules (#48) ;
+#  - texte_moteur() : texte produit par le moteur marqué UTF-8, quelle que
+#    soit la locale d'installation ou d'exécution (#50).
 #
 #  Ce fichier n'appelle aucun module (graphe d'appels, ADR 0007, point 2.1 ;
 #  contrôlé par tests/controles/graphe_modules.R).
@@ -100,8 +102,38 @@ avertir <- function(acc, etape, code, message, nombre) {
       !is.finite(nombre) || nombre != trunc(nombre) ||
       nombre < 0 || nombre > .Machine$integer.max)
     stop("avertir() : 'nombre' doit être un entier unique, fini, positif ou nul.", call. = FALSE)
-  rbind(acc, data.frame(etape = etape, code = code, message = message,
+  rbind(acc, data.frame(etape = etape, code = code, message = texte_moteur(message),
                         nombre = as.integer(nombre), stringsAsFactors = FALSE))
+}
+
+# Texte produit par le moteur (littéraux du package, et ce que paste() ou
+# sprintf() en tirent), marqué UTF-8 quelle que soit la locale d'installation
+# ou d'exécution (#50). Les sources sont en UTF-8 (DESCRIPTION, Encoding) ;
+# installé sous une locale UTF-8, le package a ses littéraux non ASCII marqués
+# UTF-8, mais paste() et sprintf() en rendent du natif non marqué sous une
+# locale UTF-8 ; installé sous la locale C, il garde leurs octets UTF-8 sans
+# marque (mesuré, #50). Une chaîne non ASCII non marquée dont les octets sont de
+# l'UTF-8 valide est donc marquée UTF-8 ; une chaîne marquée latin-1 est
+# convertie par enc2utf8() ; une autre est laissée telle quelle (l'écriture la
+# refuse ensuite). x : character, ou liste (data.frame compris) dont les
+# feuilles character sont traitées ; noms traités aussi ; attributs conservés.
+# Réservé au texte du moteur : jamais aux données, aux rôles ni au plan de
+# l'utilisateur, dont un codage indéterminé reste refusé (module rapport).
+texte_moteur <- function(x) {
+  if (is.list(x)) {
+    x[] <- lapply(x, texte_moteur)
+  } else if (is.character(x)) {
+    latin1 <- Encoding(x) == "latin1"
+    if (any(latin1)) x[latin1] <- enc2utf8(x[latin1])
+    inconnu <- !is.na(x) & Encoding(x) == "unknown" & grepl("[^\001-\177]", x, useBytes = TRUE) & validUTF8(x)
+    if (any(inconnu)) {
+      y <- x[inconnu]
+      Encoding(y) <- "UTF-8"
+      x[inconnu] <- y
+    }
+  }
+  if (!is.null(names(x))) names(x) <- texte_moteur(names(x))
+  x
 }
 
 # Évalue expr sous la graine `graine` et le générateur GENERATEUR, puis
