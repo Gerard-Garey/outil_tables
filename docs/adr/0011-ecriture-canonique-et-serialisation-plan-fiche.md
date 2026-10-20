@@ -529,3 +529,24 @@ Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M71
 **Effet sur les résultats : aucun** par la présente annotation. L'effet attendu du commit de #67 reste celui de la cinquième annotation (« Effet sur les résultats ») : `fiche/empreintes/resultat` et `/code` comparées par jeton, `statut_resultat_code` (valeur de chaîne, libellés du (d)), `representation_resultat` créé, `fiche/empreintes/@noms`. Le correctif (e) ne change aucune grandeur des références : R1 à R6 n'ont aucun attribut `label` (hypothèse à confirmer par le tableau avant / après du commit de #67). Aucune table finale, aucun verdict : visa d'`actuary`.
 
 Issues : #67 ; #71 (optimisation) ; #49 (Windows et macOS non mesurés). Décision M71, qui révise M70, point 2. Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (huitième) — Extension de M71 Q4 aux facteurs de rôle (M72)
+
+Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M72 ; `docs/feuille-de-route.md`, § 4), prise sur un constat majeur de l'audit léger de #67 et l'avis d'`actuary-approfondi`, rapportée par la session principale de la branche `claude/fiche-rapport` (PR #68), branche à `8a03ccc`. Le texte ci-dessus, annotations comprises, n'est pas réécrit : la présente annotation **étend** la septième annotation du 20/10/2026, (e) (M71, Q4).
+
+**(a) Constat.** Un facteur de rôle catégorie (`sexe`, ou `segment` quand le plan est segmenté) qui porte l'attribut `contrasts`, ou qui est de sous-classe (`c("mafac", "factor")`), est admis par `type_conforme()` (`R/donnees.R`) ; à l'implémentation de #67, il était recopié tel quel dans `observations` et refusé par l'écrivain en forme « empreinte ». `construire_table()` échouait donc sur une entrée valide : régression de #67, du même type que celle de l'unité contrat (septième annotation, (e)). Constat de l'audit et mesure d'`actuary-approfondi`, rapportés par la session ; *non remesurés par `architect`*.
+
+**(b) Décision (M72) : M71 Q4 s'étend aux facteurs `sexe` et `segment`, dans les deux unités.**
+- La copie dans `observations` est normalisée par la fonction locale `categorie()` de `preparer_donnees()` (`R/donnees.R:642-647`, lu à `8a03ccc`) : `structure(unclass(x)[i], levels = levels(x), class = if (is.ordered(x)) c("ordered", "factor") else "factor")`.
+- Effet : `contrasts` et tout autre attribut sont retirés (sauf `names`) ; une sous-classe est ramenée à `factor` (ou `ordered`) ; `ordered` reste distinct de `factor` ; les niveaux sont gardés tels quels, ordre et niveaux inutilisés compris. Une chaîne ou un entier est sous-indicé `[i]`, comme le veut M71, Q4.
+- C'est une normalisation de la **quantité dérivée** `observations` : l'entrée et sa copie `lignes_conservees` restent intactes ; ce n'est pas une correction des données (`docs/exigences.md` § 2).
+- **Option écartée** : refuser ces facteurs à la validation. Elle resserrerait le contrat d'entrée pour une métadonnée sans effet sur le résultat.
+- **Témoins** dans les deux unités (tête et contrat), pour `sexe` et pour `segment`.
+
+**(c) Complément de la sixième annotation (empreinte du code, option (iv)) : fichier illisible.** À la reprise d'audit de #67, `empreinte_sources()` (`R/rapport.R:428-440`, lu à `8a03ccc`) rend `NA` quand un fichier de `R/` est illisible (`tools::md5sum` rend `NA`), avec le statut « sources introuvables », au lieu de hacher un relevé qui contiendrait « NA ». C'est l'application de la garde de la cinquième annotation, (c) 3 (« rien n'est deviné ») ; l'installation n'échoue pas.
+
+**Mise en œuvre** : commit `5422404` (#67), avec le reste de #67 ; `8a03ccc`, commit `docs:` minimal de concordance (règle 9, exception « écart de concordance »).
+
+**Effet sur les résultats : aucun** pour les entrées déjà acceptées (mesuré par `actuary-approfondi` et par `audit`, rapporté). L'effet du commit de #67 reste celui des cinquième et septième annotations. Aucune table finale, aucun verdict : visa d'`actuary`.
+
+Issues : #67. Décision M72, qui étend M71, Q4. Branche `claude/fiche-rapport`, PR #68.
