@@ -541,3 +541,19 @@ Rédigée par `architect-approfondi` (Fable, consultation 3/3 de la branche B4, 
 **Effet sur les résultats** : aucun par cette annotation ; ceux de l'ADR 0011 sont consignés dans ses « Conséquences » (tableau attendu : `fiche/version_fiche`, `fiche/empreintes/representation`, `fiche/empreintes/donnees` ; retraits si la question 2 de l'ADR 0011 est acceptée).
 
 Issues : #35, #19, #42, #22 (point 6), #50 ; ADR 0011.
+
+## Annotation du 20 octobre 2026 — seconde annotation du 19/10/2026, (h) : renvoi du renommage de l'argument `observations` à #56
+
+Rédigée par `architect` au point d'étape qui suit la fusion de la PR #51 (décision M68 ; `docs/feuille-de-route.md`, § 1.5), commit (0) de la branche `claude/fiche-rapport`, partie de `main` à `2146717`. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Constat.** La seconde annotation du 19/10/2026, (h), renvoie le renommage éventuel de l'argument `observations` à « la table étape → fonction (#22, point 7) ». Or ce point a été clos par constat, sans code, sur décision du mainteneur (branche P2, 19/10/2026 ; `docs/feuille-de-route.md`, § 3, ligne #22). Le renvoi ne mène donc plus à rien, comme le relève #56. *Vérifié* sur `2146717` : l'argument s'appelle toujours `observations` dans `taux_kaplan_meier()` (`R/brut.R:284`) et dans `calculer_taux_bruts()` (`R/brut.R:481`, défaut `NULL`) ; `construire_table()` lui passe l'objet `fenetres` (`R/construire_table.R:223`) ; aucune des deux fonctions n'est exportée (`NAMESPACE`, 0 occurrence).
+
+**(b) Renvoi.** Le renommage éventuel est renvoyé à #56, rattachée à la branche `claude/forme-exacte-suite` (M68, C.2). Cette issue porte déjà les commentaires devenus inexacts sur le même argument (`R/brut.R:267`, `:279` ; `R/construire_table.R:30-32`). Deux issues sont admises :
+1. ou bien l'argument garde son nom, et les commentaires corrigés par #56 disent qu'il reçoit soit un objet `fenetres_exposition`, soit un `data.frame` ;
+2. ou bien il est renommé dans le même commit que ces commentaires.
+
+Les deux fonctions étant internes, un renommage ne touche aucun contrat partagé (`docs/agents/routage.md`, § 4.2) : la signature de `construire_table()` est inchangée. Il touche seulement ses appelants internes et les tests. Le choix revient à `coder`, avec l'audit léger de #56.
+
+**Effet sur les résultats : aucun.** Rien n'est modifié dans le code par cette annotation.
+
+Issues : #56 ; #38 ; #22 (point 7, clos). Décision M68.

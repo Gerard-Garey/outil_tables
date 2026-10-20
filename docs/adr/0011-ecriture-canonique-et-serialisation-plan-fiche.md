@@ -333,3 +333,20 @@ Rédigée par `architect` d'après un constat de la revue finale complète d'`au
 **Effet sur les résultats : aucun.** Les fiches de R1 à R6 ne contiennent aucun vecteur atomique nommé de longueur 0 (mesure d'`audit`). Il s'agit d'un changement de comportement d'une fonction nouvelle de B4, jamais publiée : pas d'incrément de version (point 10 (a)), pas de visa.
 
 Issues : #50. Prolonge la troisième annotation du 19/10/2026 (décision M66). Branche `claude/fiche-serialisation`, PR #51.
+
+## Annotation du 20 octobre 2026 (troisième) — troisième annotation du 19/10/2026, (i) : le contrôle de `version_fiche` au rejeu passe à la branche `claude/rapport-fige`
+
+Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M68, question C.3 du point d'étape qui suit la fusion de la PR #51 ; `docs/feuille-de-route.md`, § 1.5 et § 2), commit (0) de la branche `claude/fiche-rapport`, partie de `main` à `2146717`. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Ce qui change.** La troisième annotation du 19/10/2026, (i), attribue le contrôle de `version_fiche` au « futur rejeu de la cinquième branche (`claude/fiche-rapport`) », avec un motif nommé fixé par une annotation du présent ADR. La cinquième branche est désormais consacrée à **fermer la structure de la fiche** : empreintes du résultat et du code (#67, point 11), champ `nombre_lignes_exclues` (#57), ordre des champs (#64), ordre des valeurs du plan canonique (#63), contrôle sous la locale C (#66), sous un seul incrément de `version_fiche` (2 → 3, point 10 (a)). Le **rejeu**, qui consomme cette fiche comme le rapport figé et le CSV à en-tête, passe à la branche suivante qui les porte, **`claude/rapport-fige`**.
+
+**(b) Ce qui ne change pas.**
+- `lire_fiche()` ne contrôle toujours pas `version_fiche` ((i) ; point 10 (d) : la première ligne du texte versionne la grammaire, non la structure).
+- Le critère de rejeu par un tiers reste celui du point 12 et de la note de lecture d'E3.7. Le tiers vérifie `version_fiche`, la représentation et l'empreinte des données, puis exécute `construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)`, et compare à tolérance par classes sur une autre machine.
+- Le contrat du rejeu outillé sera fixé par une annotation du présent ADR (ou par l'ADR du rapport figé) dans `claude/rapport-fige`. Il couvre le motif de refus d'une `version_fiche` inconnue, le contrôle de `representation` et de l'empreinte des données, et la place de la fonction dans le graphe d'appels.
+
+**(c) Conséquence pour la cinquième branche.** Une fiche de `version_fiche` 3, produite par cette branche, sera relue par `lire_fiche()` sans contrôle de version jusqu'à `claude/rapport-fige`. C'est déjà le cas des fiches de version 2 depuis B4. Aucun rejeu outillé n'existe encore, si bien qu'aucune fiche n'est rejouée sous une version inconnue sans le dire. *Vérifié* sur `2146717` par `grep -n 'construire_table(' R/*.R` : hors de `R/construire_table.R`, seules des lignes de commentaire le mentionnent. Aucune fonction du package ne rejoue donc le `plan` d'une fiche relue ; seuls les tests le font, explicitement.
+
+**Effet sur les résultats : aucun.** Il s'agit d'un renvoi de calendrier, sans modification du code.
+
+Issues : #67, #57, #63, #64, #66 (cinquième branche) ; contrôles de rejeu à rédiger pour `claude/rapport-fige`. Décision M68.
