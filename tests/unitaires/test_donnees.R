@@ -851,9 +851,20 @@ for (cas in list(list("naissance", "date_naissance", 2L), list("entree", "date_e
     x <- refus(prep(d = dd))
     verifier(sprintf("date hors domaine (rôle %s, jour %d) : refus date_hors_domaine, ligne %d citée", cas[[2L]], v, cas[[3L]]),
              if (is.null(x)) "aucun refus" else if (!identical(x$motif, "date_hors_domaine")) x$motif
-             else if (!identical(x$details$lignes, cas[[3L]])) "numéros de ligne"
+             else if (!identical(x$details$lignes, stats::setNames(list(cas[[3L]]), cas[[2L]]))) "numéros de ligne"
              else contient(x, cas[[2L]], cas[[1L]], sprintf("lignes %d", cas[[3L]])))
   }
+verifier("date hors domaine dans deux rôles (naissance ligne 2, sortie lignes 1 et 3) : un seul refus qui nomme les deux rôles, colonnes et lignes", {
+  dd <- BASE
+  dd$naissance[2L] <- J(-719163); dd$sortie[c(1L, 3L)] <- J(2932897)
+  x <- refus(prep(d = dd))
+  if (is.null(x)) "aucun refus" else if (!identical(x$motif, "date_hors_domaine")) x$motif
+  else if (!identical(x$details$role, c("date_naissance", "date_sortie")) ||
+           !identical(x$details$colonne, c("naissance", "sortie")) ||
+           !identical(x$details$lignes, list(date_naissance = 2L, date_sortie = c(1L, 3L)))) "détails du refus"
+  else contient(x, "« date_naissance », colonne « naissance » : 1 date(s) (premières lignes 2)",
+                "« date_sortie », colonne « sortie » : 2 date(s) (premières lignes 1, 3)")
+})
 verifier("date hors domaine dans une colonne non déclarée : sans effet",
          is.list(prep(d = avec(autre_date = J(c(-719163, 2932897, NA, NaN))))))
 verifier("dates aux bornes du domaine (0001-01-01, 9999-12-31) : acceptées par le contrôle des rôles",
