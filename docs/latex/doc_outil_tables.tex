@@ -623,7 +623,10 @@ colonnes \code{etape}, \code{code}, \code{message} et \code{nombre}~;
 \code{nombre}, un dénombrement (lignes, cellules, têtes), est stocké en
 \code{integer}, positif ou nul (issue~\#24). \code{avertir()} lui ajoute une
 ligne, et refuse, par une erreur de programmation (\code{stop()}, sans
-conversion), un code qui n'est pas conforme à \code{MOTIF\_CODE\_REFUS} et un
+conversion), un code qui n'est pas une chaîne unique sans attribut, ni
+\code{NA} ni vide, au sens de \code{chaine\_unique()} (chaîne nommée ou
+munie d'une classe comprise~; issue~\#60), ou qui n'est pas conforme à
+\code{MOTIF\_CODE\_REFUS}, et un
 nombre qui n'est pas un nombre unique, fini, entier, positif ou nul et au plus
 égal à \code{.Machine\$integer.max}~; sinon il le stocke par
 \code{as.integer()}.
@@ -690,8 +693,9 @@ accumulateur vide des avertissements métier, colonne \code{nombre} en
 \catalogue{fonctions-outils}{avertir()} & interne & accumulateur, \code{etape},
 \code{code}, \code{message}, \code{nombre} & accumulateur augmenté d'une ligne,
 message marqué UTF-8 par \code{texte\_moteur()}, sans \code{warning()}~;
-\code{stop()} si le code ou le nombre est mal formé
-(section~\ref{sec:avertissements}~; issues~\#9, \#24 et~\#50) \\
+\code{stop()} si le code (chaîne unique au sens de \code{chaine\_unique()},
+conforme à \code{MOTIF\_CODE\_REFUS}) ou le nombre est mal formé
+(section~\ref{sec:avertissements}~; issues~\#9, \#24, \#50 et~\#60) \\
 \catalogue{fonctions-outils}{texte\_moteur()} & interne & \code{x}, chaîne ou
 liste (\code{data.frame} compris) & le même objet, chaînes et noms non ASCII
 du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
@@ -2063,6 +2067,11 @@ sont des listes nommées \textbf{nues}, dont le seul attribut admis est
 celui des noms~: un \code{data.frame}, un objet de classe ou une liste
 munie d'un autre attribut est refusé sous \code{plan\_mal\_forme},
 \code{etapes\_mal\_formees} ou \code{parametres\_mal\_formes} (issue~\#23).
+Leurs noms sont présents, non vides et non manquants (\code{noms\_complets()})~;
+un nom en double est refusé sous \code{plan\_mal\_forme} ou
+\code{parametres\_mal\_formes} (\code{liste\_nommee()}), mais, dans
+\code{etapes}, sous \code{etape\_en\_double}, qui nomme les étapes répétées, et
+non sous \code{etapes\_mal\_formees} (issue~\#60).
 Elle ne réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
 (\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
 \code{controler\_parametres\_brut()}), dont les codes et le module sont ainsi identiques, quelle que soit la
@@ -2195,7 +2204,8 @@ processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{graine}) \\
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa \\
 \catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine \\
-\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; par \code{forme\_exacte()} (issue~\#23) \\
+\catalogue{fonctions-construire-table}{noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms présents, non vides et non manquants, ou vide (sans noms admis)~; doublons non contrôlés~; par \code{forme\_exacte()}~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#23 et~\#60) \\
+\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
@@ -5786,6 +5796,13 @@ par défaut (\code{CHAMPS\_PORTEFEUILLE}), selon deux modes~:\par}
 \end{itemize}
 
 \noindent
+Le champ \code{mode} est une chaîne unique sans attribut, ni \code{NA} ni
+vide, au sens de \code{chaine\_unique()} (une chaîne nommée ou munie d'une
+classe est refusée), prise parmi \code{uniforme} et \code{age\_exact}~; le
+portefeuille porte exactement les champs de son mode, sans champ manquant,
+inconnu ni en double, et ses champs sont lus par leur nom exact, sans
+appariement partiel (un champ \code{mode\_x} ne tient pas lieu de
+\code{mode})~; sinon refus \code{portefeuille\_invalide} (issue~\#60).
 Pour garantir une naissance strictement antérieure à l'entrée, il faut
 $\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondit
 au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
