@@ -374,11 +374,11 @@ verifier("objet : exposition par (sexe, âge), colonnes de la spécification (A.
          identical(names(x$etapes$exposition$resultat$exposition),
                    c("sexe", "age", "exposition_jours", "exposition_centrale", "complement_initial_cellule",
                      "complement_initial_fenetre", "evenements", "sorties_concurrentes")))
-CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
-                  "fin_effective", "unite_observation",
-                  "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                  "nombre_lignes_exclues", "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
-                  "provenance_mention", "empreintes", "avertissements")
+CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention",
+                  "empreintes", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
+                  "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
+                  "avertissement_unite", "hypothese_censure", "graine", "graine_mention", "generateur",
+                  "avertissements")  # ordre de lecture (#64)
 f <- x$fiche
 verifier("fiche : champs de l'ADR 0007 (point 6.2) et de la spécification (A.3)", identical(names(f), CHAMPS_FICHE))
 verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôles, recette, convention retenue non forcée, unité tête",

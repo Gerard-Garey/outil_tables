@@ -22,10 +22,12 @@
 #  - assembler_fiche() : fiche en mémoire (point 6.2), sans horodatage ;
 #    plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre
 #    (fichier, empreinte, algorithme) (ADR 0011, points 5.2 à 5.4) ;
-#    champ hypotheses_brut ajouté en fin de liste si l'étape `brut` est
-#    exécutée (#14, spécification d'actuary, A.5), avec la convention
-#    d'ensemble à risque et le dénominateur des instants si Kaplan-Meier est
-#    retenu (#15, A.9) ;
+#    champ hypotheses_brut, présent seulement si l'étape `brut` est exécutée,
+#    à sa place dans ORDRE_CHAMPS_FICHE (#64 ; #14, spécification d'actuary,
+#    A.5), avec la convention d'ensemble à risque et le dénominateur des
+#    instants si Kaplan-Meier est retenu (#15, A.9) ;
+#  - ordonner_fiche() : réordonnancement pur de la fiche selon un ordre de
+#    champs, erreur de programmation si un champ présent n'y figure pas (#64) ;
 #  - informations_execution() : horodatage, durée, session abrégée, hors de
 #    toute comparaison (point 6.1) ;
 #  - ecrire_plan(), lire_plan(), ecrire_fiche(), lire_fiche() : sérialisation
@@ -452,8 +454,37 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
                                   "hypotheses", "statuts",
                                   # Kaplan-Meier retenu seulement (#15, A.9).
                                   intersect(c("ensemble_a_risque", "denominateur_instants"), names(pb)))]
-  fiche
+  # Ordre de lecture (#64) : la fiche est construite, puis réordonnée selon la
+  # constante unique ORDRE_CHAMPS_FICHE.
+  ordonner_fiche(fiche, ORDRE_CHAMPS_FICHE)
 }
+
+# Réordonne `fiche` selon `ordre`, intersecté avec les champs présents
+# (hypotheses_brut reste absent sans l'étape `brut`). Un champ présent hors de
+# `ordre` est une erreur de programmation, jamais retiré en silence (#64).
+ordonner_fiche <- function(fiche, ordre) {
+  hors_ordre <- setdiff(names(fiche), ordre)
+  if (length(hors_ordre))
+    stop(sprintf("ordonner_fiche() : champ(s) de la fiche absent(s) de l'ordre des champs : %s",
+                 paste(hors_ordre, collapse = ", ")), call. = FALSE)
+  fiche[intersect(ordre, names(fiche))]
+}
+
+# Ordre des champs de la fiche (#64 ; avis d'actuary du 20/10/2026, étape
+# (1)), en huit blocs :
+# identification ; données (rôles, provenance, empreintes) ; plan ; paramètres
+# retenus, dans l'ordre du calcul ; exclusions ; hypothèses ; aléa ;
+# avertissements en dernier. Source unique de l'ordre du corps de la fiche
+# écrite (ecrire_fiche()) ; BLOCS_LECTURE_FICHE en est une partition.
+ORDRE_CHAMPS_FICHE <- c(
+  "version_fiche", "versions", "plateforme",
+  "roles", "provenance", "provenance_mention", "empreintes",
+  "plan",
+  "transition_code", "fin_effective", "unite_observation", "recette", "convention", "unite_exposition", "par_annee",
+  "exclusions", "nombre_lignes_exclues",
+  "avertissement_unite", "hypothese_censure", "hypotheses_brut",
+  "graine", "graine_mention", "generateur",
+  "avertissements")
 
 # Informations d'exécution, hors de toute comparaison (ADR 0007, point 6.1).
 informations_execution <- function(debut) {
@@ -542,16 +573,16 @@ CONVENTIONS_TEXTE <- texte_moteur(c(
 # Blocs de lecture de la fiche (E3.7 ; troisième annotation, (h)) : ce qui a
 # été calculé, avec quelles hypothèses, de quoi rejouer ; chaque champ de la
 # fiche dans un seul bloc (partition contrôlée par les tests), dans l'ordre
-# des champs de chaque bloc. Affectation validée par actuary le 20/10/2026
+# des champs de chaque bloc, qui suit ORDRE_CHAMPS_FICHE (#64). Affectation validée par actuary le 20/10/2026
 # (ADR 0011, point 6.5) ; nombre_lignes_exclues à côté d'exclusions, dans les
 # hypothèses (avis d'actuary, M69 ; #57). Noms des blocs marqués UTF-8 (#50).
 BLOCS_LECTURE_FICHE <- texte_moteur(list(
-  "calculé" = c("plan", "transition_code", "fin_effective", "unite_observation", "unite_exposition", "par_annee",
-               "recette", "convention"),
-  "hypothèses" = c("exclusions", "nombre_lignes_exclues", "hypothese_censure", "hypotheses_brut",
-                  "avertissement_unite", "avertissements"),
-  rejeu = c("version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "graine", "graine_mention",
-            "generateur", "versions", "plateforme")))
+  "calculé" = c("plan", "transition_code", "fin_effective", "unite_observation", "recette", "convention",
+               "unite_exposition", "par_annee"),
+  "hypothèses" = c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure",
+                  "hypotheses_brut", "avertissements"),
+  rejeu = c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention", "empreintes",
+            "graine", "graine_mention", "generateur")))
 
 joindre_chemin <- function(chemin, segment) if (nzchar(chemin)) paste0(chemin, "/", segment) else segment
 

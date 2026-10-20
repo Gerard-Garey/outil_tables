@@ -494,14 +494,15 @@ verifier("objet : etapes$brut (parametres, resultat, diagnostics), table NULL", 
   identical(names(XC$etapes), c("donnees", "exposition", "brut")) &&
     identical(names(XC$etapes$brut), c("parametres", "resultat", "diagnostics")) && is.null(XC$table)
 })
-CHAMPS_FICHE_SANS_BRUT <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
-                     "fin_effective", "unite_observation",
-                     "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                     "nombre_lignes_exclues", "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
-                     "provenance_mention", "empreintes", "avertissements")
-verifier("fiche : hypotheses_brut en fin de liste si l'étape brut est exécutée, copie des paramètres de l'étape", {
+# Ordre des champs de la fiche (#64 ; avis d'actuary du 20/10/2026, étape (1)), sans l'étape brut.
+CHAMPS_FICHE_SANS_BRUT <- c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention",
+                     "empreintes", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
+                     "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
+                     "avertissement_unite", "hypothese_censure", "graine", "graine_mention", "generateur",
+                     "avertissements")
+verifier("fiche : hypotheses_brut après hypothese_censure (bloc hypothèses) si l'étape brut est exécutée, copie des paramètres de l'étape", {
   f <- XC$fiche
-  identical(names(f), c(CHAMPS_FICHE_SANS_BRUT, "hypotheses_brut")) &&
+  identical(names(f), append(CHAMPS_FICHE_SANS_BRUT, "hypotheses_brut", after = match("hypothese_censure", CHAMPS_FICHE_SANS_BRUT))) &&
     identical(f$hypotheses_brut, XC$etapes$brut$parametres[c("estimateurs", "niveau", "exposition_initiale",
                                                              "tolerance_effectif", "hypotheses", "statuts")])
 })

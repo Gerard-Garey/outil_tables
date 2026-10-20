@@ -214,8 +214,9 @@ verifier("construction avec brut, même processus : deux exécutions identical()
          identical(xb, sans_execution(construire_table(s, roles, plan_b))))
 verifier("construction avec brut : rejeu construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) identical() hors execution",
          identical(xb, sans_execution(construire_table(s, xb$fiche$roles, xb$fiche$plan, xb$fiche$provenance))))
-verifier("construction avec brut : fiche$plan porte l'étape brut, fiche$hypotheses_brut en fin de liste",
-         identical(xb$fiche$plan, plan_b) && identical(tail(names(xb$fiche), 1L), "hypotheses_brut"))
+verifier("construction avec brut : fiche$plan porte l'étape brut, fiche$hypotheses_brut juste après fiche$hypothese_censure (#64)",
+         identical(xb$fiche$plan, plan_b) &&
+           identical(names(xb$fiche)[match("hypothese_censure", names(xb$fiche)) + 1L], "hypotheses_brut"))
 # Invariance du plan sans `brut` (la comparaison à l'état de f9ab269 relève
 # des références de non-régression, #17).
 invariance_sans_brut <- function(xb, plan_b) {
@@ -365,18 +366,35 @@ SANS_REFERENCE_17 <- character(0)
 # version_fiche 2 -> 3) : champ nombre_lignes_exclues de la fiche. R1 à R6
 # ne déclarent aucune exclusion (plan_reference(), exclusions vides) : valeur
 # attendue 0L, relevant du tableau avant / après (nature « ajout »). Les noms
-# de la fiche gagnent nombre_lignes_exclues après exclusions (21 -> 22 noms
-# dans la référence, qui ne porte ni versions ni plateforme). Transition à
-# retirer à la régénération unique de fin de branche (CI, session principale).
+# de la fiche gagnent nombre_lignes_exclues (21 -> 22 noms dans la référence,
+# qui ne porte ni versions ni plateforme).
+# Transition de #64 (ordre des champs de la fiche, ORDRE_CHAMPS_FICHE ; avis
+# d'actuary du 20/10/2026, étape (1)) : seul l'ordre de fiche/@noms change, la valeur est un
+# vecteur de 22 noms. Les deux transitions portent sur le même chemin
+# fiche/@noms, que l'union des changements (règle ci-dessus) n'admet qu'en
+# déclarations identiques (un vecteur entier et une autre déclaration de
+# valeurs sur un même chemin sont une erreur) : #57 et #64 déclarent donc le
+# même vecteur, celui de l'état final de la branche (noms de #57 dans l'ordre
+# de #64), qui s'applique une fois ; retirer l'une des deux déclarations sans
+# l'autre ne change donc rien. Chaque déclaration reste observée sur la
+# référence commitée (21 noms, ordre antérieur). L'ordre des lignes aplaties
+# ne compte pas : la comparaison se fait chemin par chemin. Transitions à
+# retirer toutes deux à la régénération unique de fin de branche (CI, session
+# principale) : en retirer une seule laisse l'autre déclarer un changement que
+# la référence régénérée ne porte plus, et la batterie échoue par « changement
+# déclaré non observé ».
+NOMS_FICHE_REFERENCE_FINAL <- c(
+  "version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "plan", "transition_code",
+  "fin_effective", "unite_observation", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
+  "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure", "hypotheses_brut", "graine",
+  "graine_mention", "generateur", "avertissements")
 TRANSITIONS_EN_COURS <- list(
   list(issue = "#57", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
     list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 3L),
     list(chemin = "fiche/nombre_lignes_exclues", nature = "ajout", type = "integer", longueur = 1L),
-    list(chemin = "fiche/@noms", nature = "valeur de chaîne",
-         valeurs = c("version_fiche", "roles", "plan", "transition_code", "fin_effective", "unite_observation",
-                     "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                     "nombre_lignes_exclues", "hypothese_censure", "graine", "graine_mention", "generateur",
-                     "provenance", "provenance_mention", "empreintes", "avertissements", "hypotheses_brut")))))
+    list(chemin = "fiche/@noms", nature = "valeur de chaîne", valeurs = NOMS_FICHE_REFERENCE_FINAL))),
+  list(issue = "#64", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
+    list(chemin = "fiche/@noms", nature = "valeur de chaîne", valeurs = NOMS_FICHE_REFERENCE_FINAL))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
