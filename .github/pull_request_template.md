@@ -21,3 +21,4 @@ Closes #
 - [ ] Documentation mise à jour (passage unique de `docwriter`, un commit `docs:` par issue) et validée par `actuary` (et `regulatory` si un texte ou une table homologuée est touché)
 - [ ] Changement d'un résultat final ou d'un verdict : visé par le mainteneur
 - [ ] Aucun secret ni donnée confidentielle (le dépôt peut être public)
+- [ ] Bilan du journal des agents (`bash .claude/outils/bilan_journal.sh`) collé dans la PR avant la fin de chaque session cloud (`docs/agents/routage.md`, M68)
