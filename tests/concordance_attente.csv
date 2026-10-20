@@ -1,1 +1,2 @@
 type,nom,issue,motif
+entree,fonctions-rapport:bornes_blocs,#22,fonction interne ajoutée par #22 point 1 (bornes des blocs de octets_chaines()) ; catalogue écrit par docwriter en fin de branche (règle 9)

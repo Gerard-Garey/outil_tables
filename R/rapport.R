@@ -49,12 +49,39 @@ ALGORITHME_EMPREINTE <- "md5"
 # (tests/harnais.R, sonde_utf8(), M54) ; marqué UTF-8 à l'emploi (#50).
 STATUT_EMPREINTES_NON_CALCULEES <- "non calculée (branche fiche-rapport)"
 
+# Bornes des blocs de collage d'octets_chaines() (#22, point 1) : une ligne
+# occupe, dans le texte passé à paste(), guillemet, corps, guillemet et LF,
+# soit nchar(corps, "bytes") + 3 octets (une ligne NA, de corps guillemet,
+# y compte 4 octets pour les 3 écrits après le gsub() : la borne porte sur
+# le texte avant ce gsub(), la plus grande chaîne construite). Découpage
+# glouton dans l'ordre : chaque bloc de plusieurs lignes fait au plus
+# `limite` octets (une chaîne R plafonne à 2^31 - 1 octets) et la ligne
+# suivante ne tiendrait pas ; une ligne plus longue que `limite` forme seule
+# son bloc (seule = TRUE). Rend debut, fin (indices de lignes) et seule.
+bornes_blocs <- function(corps, limite) {
+  fin_ligne <- cumsum(as.numeric(nchar(corps, type = "bytes")) + 3)
+  debut <- fin <- integer(0)
+  seule <- logical(0)
+  s <- 1L
+  base <- 0
+  while (s <= length(corps)) {
+    e <- findInterval(base + limite, fin_ligne)
+    debut <- c(debut, s)
+    seule <- c(seule, e < s)
+    if (e < s) e <- s
+    fin <- c(fin, e)
+    base <- fin_ligne[e]
+    s <- e + 1L
+  }
+  list(debut = debut, fin = fin, seule = seule)
+}
+
 # Octets UTF-8 des chaînes x (character), entre guillemets droits, avec les
 # cinq échappements \\, \n, \r, \t, \" ; NA sans guillemets ; une valeur
 # par ligne, LF final. Refuse (module rapport) une chaîne au codage
 # `bytes`, non UTF-8 valide, ou non ASCII non marquée dans une session dont
 # la locale n'est ni UTF-8 ni latin-1 (ADR 0007, point 9.3).
-octets_chaines <- function(x, role) {
+octets_chaines <- function(x, role, limite = 2^30) {
   enc <- Encoding(x)
   if (any(enc == "bytes"))
     refuser("rapport", "chaine_codage_bytes",
@@ -75,28 +102,44 @@ octets_chaines <- function(x, role) {
     refuser("rapport", "chaine_non_utf8",
             sprintf("Rôle « %s » : chaîne qui n'est pas de l'UTF-8 valide.", role),
             list(role = role, lignes = which(invalide)))
-  # Échappements sur les valeurs distinctes, vectorisés (cinq gsub), puis
-  # octets par charToRaw() (indépendant du marquage) ; chaque ligne est
-  # assemblée en trois morceaux : guillemet ouvrant, octets, guillemet
-  # fermant et LF ; NA s'écrit NA, LF, sans guillemets.
+  # Échappements sur les valeurs distinctes, vectorisés (cinq gsub). Les
+  # corps, marqués `bytes` pour que paste() les copie sans traduction en toute
+  # locale, sont collés avec le séparateur guillemet, LF, guillemet, entre un
+  # guillemet ouvrant et un guillemet fermant et LF, puis un seul charToRaw()
+  # par bloc, sans liste d'un vecteur raw par ligne (#22, point 1). NA prend
+  # le corps guillemet : sa ligne s'écrit trois guillemets et LF, puis devient
+  # NA et LF par un gsub(). Trois guillemets de suite n'apparaissent dans
+  # aucune autre ligne : un corps échappé ne contient de guillemet que précédé
+  # d'une barre oblique inverse, donc jamais en tête, et deux au plus de suite
+  # avec le guillemet fermant. Collage par blocs (bornes_blocs()) ; une
+  # ligne plus longue que `limite` forme son bloc à elle seule et s'écrit en
+  # raw, sans paste(). `limite` n'est un argument que pour les tests du
+  # découpage.
   if (!length(y)) return(raw(0))
   valeurs <- unique(y)
   na <- is.na(valeurs)
-  esc <- valeurs[!na]
+  esc <- valeurs
   for (r in list(c("\\", "\\\\"), c("\n", "\\n"), c("\r", "\\r"), c("\t", "\\t"), c("\"", "\\\"")))
     esc <- gsub(r[1L], r[2L], esc, fixed = TRUE, useBytes = TRUE)
-  corps <- vector("list", length(valeurs))
-  corps[!na] <- lapply(esc, charToRaw)
-  corps[na] <- list(charToRaw("NA"))
+  esc[na] <- "\""
+  Encoding(esc) <- "bytes"
   i <- match(y, valeurs)
-  na_i <- na[i]
-  morceaux <- vector("list", 3L * length(y))
-  morceaux[seq.int(1L, by = 3L, length.out = length(y))] <-
-    ifelse(na_i, list(raw(0)), list(as.raw(0x22)))
-  morceaux[seq.int(2L, by = 3L, length.out = length(y))] <- corps[i]
-  morceaux[seq.int(3L, by = 3L, length.out = length(y))] <-
-    ifelse(na_i, list(as.raw(0x0a)), list(as.raw(c(0x22, 0x0a))))
-  unlist(morceaux, use.names = FALSE)
+  corps <- esc[i]
+  b <- bornes_blocs(corps, limite)
+  blocs <- vector("list", length(b$debut))
+  for (k in seq_along(blocs)) {
+    s <- b$debut[k]
+    e <- b$fin[k]
+    blocs[[k]] <- if (b$seule[k]) {
+      if (na[i[s]]) charToRaw("NA\n") else c(as.raw(0x22), charToRaw(corps[s]), as.raw(c(0x22, 0x0a)))
+    } else {
+      texte <- paste0("\"", paste(if (s == 1L && e == length(corps)) corps else corps[s:e],
+                                  collapse = "\"\n\""), "\"\n")
+      if (any(na)) texte <- gsub("\"\"\"\n", "NA\n", texte, fixed = TRUE, useBytes = TRUE)
+      charToRaw(texte)
+    }
+  }
+  if (length(blocs) == 1L) blocs[[1L]] else unlist(blocs, use.names = FALSE)
 }
 
 # Octets ASCII d'un vecteur de textes (une valeur par ligne, LF final).

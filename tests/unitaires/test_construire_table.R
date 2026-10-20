@@ -742,6 +742,113 @@ local({
   })
 })
 
+# --- écriture des chaînes sans liste d'un vecteur raw par ligne (#22, point 1 ; #67) ---
+
+# Oracle : assemblage d'octets_chaines() avant #22, point 1 (R/rapport.R à
+# df74de8, une liste de 3n vecteurs raw puis unlist()), recopié ici et non dans
+# le package ; partie de refus omise (inchangée), appliquée à des entrées
+# admises. Les cas sont du code texte, évalué ici et dans un sous-processus
+# LC_ALL=C : chaînes non ASCII construites depuis leurs octets.
+local({
+  oracle <- function(x) {
+    y <- enc2utf8(x)
+    if (!length(y)) return(raw(0))
+    valeurs <- unique(y)
+    na <- is.na(valeurs)
+    esc <- valeurs[!na]
+    for (r in list(c("\\", "\\\\"), c("\n", "\\n"), c("\r", "\\r"), c("\t", "\\t"), c("\"", "\\\"")))
+      esc <- gsub(r[1L], r[2L], esc, fixed = TRUE, useBytes = TRUE)
+    corps <- vector("list", length(valeurs))
+    corps[!na] <- lapply(esc, charToRaw)
+    corps[na] <- list(charToRaw("NA"))
+    i <- match(y, valeurs)
+    na_i <- na[i]
+    morceaux <- vector("list", 3L * length(y))
+    morceaux[seq.int(1L, by = 3L, length.out = length(y))] <-
+      ifelse(na_i, list(raw(0)), list(as.raw(0x22)))
+    morceaux[seq.int(2L, by = 3L, length.out = length(y))] <- corps[i]
+    morceaux[seq.int(3L, by = 3L, length.out = length(y))] <-
+      ifelse(na_i, list(as.raw(0x0a)), list(as.raw(c(0x22, 0x0a))))
+    unlist(morceaux, use.names = FALSE)
+  }
+  code_cas <- c(
+    "u8 <- function(o) { x <- rawToChar(as.raw(o)); Encoding(x) <- 'UTF-8'; x }",
+    "l1 <- rawToChar(as.raw(c(0x63, 0xe9))); Encoding(l1) <- 'latin1'",
+    "e <- u8(c(0xc3, 0xa9)); euro <- u8(c(0xe2, 0x82, 0xac))",
+    "CAS <- list(character(0), 'a', NA_character_, '', c(NA_character_, NA), c('', '', NA, ''), 'NA',",
+    "  c('NA', NA, '\"NA\"', '\"\"', '\"', '\"\"\"'), c('\\\\', '\\n', '\\r', '\\t', '\"', '\\\\\\\\n\"\\r\\t', 'a\"\"\"b', '\\\\\"'),",
+    "  c(e, 'x', euro, NA, e, paste0(euro, '\\t', e, '\"')), l1, c(l1, 'a', e, NA), rep(c('ab', NA, 'ab', ''), 50),",
+    "  sprintf('C%09d', c(1:500, 500:1)), c(NA, sprintf('T%05d', 1:300), NA), paste0(strrep('z', 5000), '\\t'),",
+    "  c(rawToChar(as.raw(c(0x01, 0x7f))), 'fin'))",
+    "LIMITES <- c(2^30, 1, 3, 4, 5, 7, 10, 64)",
+    "ecarts <- function(nouvelle, oracle) {",
+    "  r <- character(0)",
+    "  for (k in seq_along(CAS)) for (lim in LIMITES)",
+    "    if (!identical(nouvelle(CAS[[k]], 'r', limite = lim), oracle(CAS[[k]]))) r <- c(r, sprintf('cas %d, limite %g', k, lim))",
+    "  r",
+    "}")
+  eval(parse(text = code_cas))
+  oc <- tablexp:::octets_chaines
+  verifier(sprintf("octets_chaines() : octets identiques à l'oracle avant #22 (liste de 3n raw), %d cas adverses (NA, chaîne vide, non ASCII UTF-8 et latin-1, cinq échappements, triples guillemets, répétitions, longueurs 0 et 1) x %d limites de bloc, session %s",
+                   length(CAS), length(LIMITES), Sys.getlocale("LC_CTYPE")), {
+    r <- ecarts(oc, oracle)
+    if (!length(r)) TRUE else paste("écarts :", paste(r, collapse = " ; "))
+  })
+  verifier("octets_chaines() : sortie à la main (NA sans guillemets, \"NA\" entre guillemets, chaîne vide, échappements, non ASCII)",
+           identical(oc(c(NA, "NA", "", "a\"\\\n", u8(c(0xc3, 0xa9))), "r"),
+                     c(charToRaw("NA\n\"NA\"\n\"\"\n\"a\\\"\\\\\\n\"\n\""), as.raw(c(0xc3, 0xa9)), charToRaw("\"\n"))))
+  verifier("octets_chaines() : découpage en blocs (limite de 64 octets) sur 2 000 lignes avec NA, octets identiques à l'unique bloc", {
+    x <- sprintf("V%06d", 1:2000); x[c(1L, 17L, 1000L, 2000L)] <- NA
+    identical(oc(x, "r", limite = 64), oc(x, "r")) && identical(oc(x, "r"), oracle(x))
+  })
+  # Bornes des blocs (bornes_blocs()), tailles mesurées ici, indépendamment de
+  # la fonction : taille d'une ligne = octets de guillemet, corps, guillemet,
+  # LF ; taille d'un bloc = nchar() du texte collé comme dans octets_chaines()
+  # (avant le gsub() des NA, dont le corps guillemet compte 4 octets).
+  verifier("bornes_blocs() : partition de 1..n dans l'ordre ; bloc de plusieurs lignes <= limite et maximal (la ligne suivante ne tiendrait pas) ; ligne plus longue que limite seule dans son bloc, et elle seule marquée ; 45 limites x 3 jeux de corps", {
+    e <- u8(c(0xc3, 0xa9))
+    jeux <- list(strrep("x", (seq_len(300L) * 7L) %% 13L),
+                 c("\"", "", "ab", paste0(e, e), "\"", strrep("y", 9L), "\\\"", "\"", strrep(e, 4L), "z"),
+                 "seule")
+    jeux <- lapply(jeux, function(v) { Encoding(v) <- "bytes"; v })
+    taille_bloc <- function(v) nchar(paste0("\"", paste(v, collapse = "\"\n\""), "\"\n"), type = "bytes")
+    ecarts <- character(0)
+    for (j in seq_along(jeux)) for (lim in c(1:40, 64, 100, 1000, 2^20, 2^30)) {
+      corps <- jeux[[j]]
+      n <- length(corps)
+      ligne <- nchar(corps, type = "bytes") + 3
+      b <- tablexp:::bornes_blocs(corps, lim)
+      k <- length(b$debut)
+      partition <- k >= 1L && b$debut[1L] == 1L && b$fin[k] == n && all(b$debut <= b$fin) &&
+        all(b$debut[-1L] == b$fin[-k] + 1L)
+      ok <- partition && length(b$fin) == k && length(b$seule) == k
+      if (ok) for (q in seq_len(k)) {
+        s <- b$debut[q]; f <- b$fin[q]
+        t <- taille_bloc(corps[s:f])
+        ok <- ok && identical(b$seule[q], s == f && ligne[s] > lim) &&
+          (if (s < f) t <= lim else TRUE) && (if (s == f && ligne[s] > lim) TRUE else t <= lim) &&
+          (if (q < k && !b$seule[q] && !b$seule[q + 1L]) t + ligne[f + 1L] > lim else TRUE)
+      }
+      if (!ok) ecarts <- c(ecarts, sprintf("jeu %d, limite %g", j, lim))
+    }
+    if (!length(ecarts)) TRUE else paste("écarts :", paste(ecarts, collapse = " ; "))
+  })
+  script <- tempfile(fileext = ".R")
+  writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(.harnais$bibliotheque)),
+               paste("oracle <-", paste(deparse(oracle), collapse = "\n")), code_cas,
+               "r <- ecarts(tablexp:::octets_chaines, oracle)",
+               "cat('LOCALE', Sys.getlocale('LC_CTYPE'), '\\n')",
+               "cat('ECARTS', length(r), paste(r, collapse = ' ; '), '\\n')"), script)
+  r <- executer_rscript(script, env = "LC_ALL=C")
+  unlink(script)
+  verifier("octets_chaines() : sous-processus LC_ALL=C, octets identiques à l'oracle sur les mêmes cas et limites", {
+    loc <- trimws(sub("^LOCALE ", "", grep("^LOCALE ", r$sortie, value = TRUE)))
+    ec <- trimws(sub("^ECARTS ", "", grep("^ECARTS ", r$sortie, value = TRUE)))
+    if (r$statut == 0L && identical(loc, "C") && identical(ec, "0")) TRUE
+    else paste("statut", r$statut, ":", paste(r$sortie, collapse = " | "))
+  })
+})
+
 # --- dates : année sur quatre chiffres, refus hors du domaine (#19 ; ADR 0011, point 4) ---
 
 # Nature des attendus : textes écrits à la main ; jours depuis 1970-01-01 des
