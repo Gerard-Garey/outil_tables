@@ -1,11 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-rapport:REPRESENTATION_RESULTAT,#67,constante interne ajoutée par #67 (première ligne tablexp resultat 1 du texte empreinté du résultat) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:STATUT_EMPREINTE_RESULTAT,#67,constante interne ajoutée par #67 (statut de l empreinte du résultat ; sonde UTF-8 des batteries) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:STATUT_EMPREINTE_CODE,#67,constante interne ajoutée par #67 (statut de l empreinte du code calculée) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:STATUT_CODE_INTROUVABLE,#67,constante interne ajoutée par #67 (statut de l empreinte du code si les sources sont introuvables à l installation) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:statut_empreintes,#67,fonction interne ajoutée par #67 (statut_resultat_code selon l empreinte du code) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:md5_octets,#67,fonction interne ajoutée par #67 (MD5 d un vecteur d octets par fichier temporaire) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:CHEMINS_HORS_RESULTAT,#67,constante interne ajoutée par #67 (chemins hors du périmètre de l empreinte du résultat) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:empreinte_resultat,#67,fonction interne ajoutée par #67 (empreinte du résultat) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:empreinte_sources,#67,fonction interne ajoutée par #67 (MD5 des sources R/*.R d une racine) ; catalogue écrit par docwriter en fin de branche (règle 9)
-entree,fonctions-rapport:EMPREINTE_CODE,#67,constante interne ajoutée par #67 (empreinte du code calculée à l installation) ; catalogue écrit par docwriter en fin de branche (règle 9)
