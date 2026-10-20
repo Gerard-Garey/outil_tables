@@ -71,7 +71,13 @@ cat(sprintf("%d doubles (dont %d cas limites)\n", length(x), length(CAS_LIMITES)
 
 entree <- tempfile("doubles_", fileext = ".txt"); sortie <- tempfile("hex_", fileext = ".txt")
 script <- tempfile("juge_", fileext = ".py")
-on.exit(unlink(c(entree, sortie, script)))
+# Nettoyage explicite : on.exit() est sans effet au niveau supérieur d'un
+# Rscript, et quit() ne l'exécuterait pas ; toute sortie après la création des
+# fichiers temporaires passe par sortir().
+sortir <- function(statut) {
+  unlink(c(entree, sortie, script))
+  quit(status = statut)
+}
 writeLines(sprintf("%.17g", x), entree)
 writeLines(c("import struct, sys",
              "jetons = ('NA', 'NaN', 'Inf', '-Inf')",
@@ -81,7 +87,7 @@ writeLines(c("import struct, sys",
              "        s.write((l if l in jetons else struct.pack('<d', float(l) + 0.0).hex()) + '\\n')"),
            script)
 t_juge <- system.time(statut <- system2(python, c("-I", script, entree, sortie)))[["elapsed"]]
-if (statut != 0L) { cat("ECHEC : le juge Python a échoué.\n"); quit(status = 1L) }
+if (statut != 0L) { cat("ECHEC : le juge Python a échoué.\n"); sortir(1L) }
 attendu <- readLines(sortie)
 
 t_r <- system.time(obtenu <- strsplit(rawToChar(moteur$ecrire_valeurs(x, "empreinte", "x")$octets), "\n", fixed = TRUE)[[1L]])[["elapsed"]]
@@ -95,6 +101,7 @@ cat(sprintf("MD5 du texte attendu de l'échantillon (juge Python) : %s\n", unnam
 cat(sprintf("Lignes : %d (R) contre %d (Python) ; écarts : %d\n", length(obtenu), length(attendu), length(ecarts)))
 if (length(obtenu) != length(attendu) || length(ecarts)) {
   for (i in head(ecarts, 10L)) cat(sprintf("  ligne %d : %.17g -> R %s, Python %s\n", i, x[i], obtenu[i], attendu[i]))
-  quit(status = 1L)
+  sortir(1L)
 }
 cat("OK\n")
+sortir(0L)
