@@ -13,7 +13,14 @@
 # -----------------------------------------------------------------------------
 
 D <- as.Date
-octets <- function(...) charToRaw(enc2utf8(paste0(paste(c(...), collapse = "\n"), "\n")))
+# Octets des lignes reçues, sans conversion : littéraux des tests marqués UTF-8
+# (parse(encoding = "UTF-8") du lanceur), lignes relues marquées par lignes_de() ;
+# jamais enc2utf8(), qui change en « <c3><a9> » une chaîne non marquée sous la
+# locale C (M54 : la locale d'exécution reste libre).
+octets <- function(...) charToRaw(paste0(paste(c(...), collapse = "\n"), "\n"))
+# Lignes d'un texte en octets, marquées UTF-8 (comparables aux littéraux en
+# toute locale).
+lignes_de <- function(o) { l <- strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]]; Encoding(l) <- "UTF-8"; l }
 refus_de <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r)
 aller_retour_plan <- function(x) lire_plan(ecrire_plan(x))
 aller_retour_fiche <- function(x) lire_fiche(ecrire_fiche(x))
@@ -45,7 +52,7 @@ local({
   verifier("ecrire_plan : octets (raw), UTF-8 valide, LF final, aucun CR, aucune marque d'ordre des octets",
            is.raw(o) && validUTF8(rawToChar(o)) && o[length(o)] == as.raw(0x0a) && !any(o == as.raw(0x0d)) &&
              !identical(o[1:3], as.raw(c(0xef, 0xbb, 0xbf))))
-  l <- strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]]
+  l <- lignes_de(o)
   verifier("ecrire_plan : première ligne « tablexp plan 1 », puis en-tête « # clé : valeur », puis corps",
            identical(l[1L], "tablexp plan 1") && startsWith(l[2L], "# ") &&
              identical(l[match(FALSE, startsWith(l[-1L], "#")) + 1L], "@noms\tcharacter\t5\t\"transition\"\t\"periode\"\t\"delai_declaration\"\t\"segmentation\"\t\"etapes\""))
@@ -76,7 +83,9 @@ adverse <- list(
   logiques = c(TRUE, FALSE, NA),
   dates = structure(c(-719162, 2932896, NA, NaN, 0, 19782), class = "Date"),
   vides = list(character(0), integer(0), double(0), logical(0), structure(double(0), class = "Date")),
-  nommes_vides = list(setNames(character(0), character(0)), setNames(list(), character(0)), list()),
+  # Vecteur atomique nommé de longueur 0 : refusé à l'écriture (revue finale
+  # de #50), voir les refus de l'écriture.
+  nommes_vides = list(setNames(list(), character(0)), list()),
   null = list(a = NULL, b = list(NULL), c = list()),
   nommes = list(v = c(a = 1, b = 2), w = c(x = "é", "sans nom"), z = c("NA" = NA, "a/b" = TRUE)),
   noms_inadmissibles = list(1, "a/b" = 2, "@noms" = 3, "#x" = 4, "[1]" = 5, d = 6, d = 7, "tab\tnom" = 8,
@@ -239,7 +248,17 @@ local({
     list("racine data.frame", "serialisation_impossible", data.frame(a = 1)),
     list("date hors domaine", "date_hors_domaine", list(a = structure(-719163, class = "Date"))),
     list("date non entière", "date_non_entiere", list(a = structure(0.5, class = "Date"))),
-    list("chaîne au codage bytes", "chaine_codage_bytes", list(a = `Encoding<-`("\xe9", "bytes"))))
+    list("chaîne au codage bytes", "chaine_codage_bytes", list(a = `Encoding<-`("\xe9", "bytes"))),
+    list("Date à stockage character", "serialisation_impossible", list(d = structure("2020-01-01", class = "Date"))),
+    list("Date à stockage logical", "serialisation_impossible", list(d = structure(TRUE, class = "Date"))),
+    list("Date à stockage character, colonne de data.frame", "serialisation_impossible",
+         list(t = structure(list(d = structure("2020-01-01", class = "Date")), class = "data.frame", row.names = 1L))),
+    list("vecteur atomique nommé de longueur 0 (character)", "serialisation_impossible",
+         list(a = 1, v = setNames(character(0), character(0)))),
+    list("vecteur atomique nommé de longueur 0 (double, cas de l'audit)", "serialisation_impossible",
+         list(a = 1, v = setNames(numeric(0), character(0)))),
+    list("Date nommée de longueur 0", "serialisation_impossible",
+         list(v = setNames(structure(double(0), class = "Date"), character(0)))))
   for (c_ in cas) {
     r <- refus_de(ecrire_plan(c_[[3L]]))
     verifier(sprintf("ecrire_plan, refus : %s -> %s", c_[[1L]], c_[[2L]]),
@@ -250,6 +269,9 @@ local({
                      "serialisation_impossible"))
   verifier("ecrire_plan, refus : le chemin fautif est dans details$chemin",
            identical(refus_de(ecrire_plan(list(b = list(c = factor("x")))))$details$chemin, "b/c"))
+  verifier("ecrire_plan, refus : vecteur atomique nommé de longueur 0, chemin cité ; le même vecteur sans noms est écrit",
+           identical(refus_de(ecrire_plan(list(a = 1, v = setNames(numeric(0), character(0)))))$details$chemin, "v") &&
+             identical(aller_retour_plan(list(a = 1, v = numeric(0))), list(a = 1, v = numeric(0))))
 })
 
 # --- doubles relus par as.numeric (Q3, « lecteur de forme ») ---------------------
@@ -331,7 +353,7 @@ local({
 # (valeur calculée à la main : codes ; identité exacte : aller-retour).
 local({
   x <- list(a = 1, b = list(10, 20, 30))
-  t <- strsplit(rawToChar(ecrire_plan(x)), "\n", fixed = TRUE)[[1L]]
+  t <- lignes_de(ecrire_plan(x))
   verifier("C1 : liste sans noms écrite par b/@longueur integer 1 3 puis b/[1] à b/[3], sans ligne @noms",
            "b/@longueur\tinteger\t1\t3" %in% t && all(sprintf("b/[%d]\tdouble\t1\t%d0", 1:3, 1:3) %in% t) &&
              !any(startsWith(t, "b/@noms")))
@@ -345,7 +367,7 @@ local({
                                                  "a/@longueur\tinteger\t1\t2", "a/[1]\tdouble\t1\t1",
                                                  "b\tdouble\t1\t2"))))$motif, "texte_chemin_inattendu"))
   tronque <- function(o, nom) {
-    l <- strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]]
+    l <- lignes_de(o)
     entete <- l[seq_len(match(FALSE, startsWith(l[-1L], "#")))]
     corps <- l[-seq_along(entete)]
     acceptes <- Filter(function(m) is.null(refus_de(lire_plan(octets(c(entete, corps[seq_len(m)]))))),
@@ -453,8 +475,7 @@ verifier("factor : refusé à l'écriture (serialisation_impossible) et type inc
 
 # (h) : en-tête, ordre des lignes et blocs de lecture (valeur calculée à la main).
 local({
-  cles <- function(o) { l <- strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]]
-                        sub(" : .*$", "", sub("^# ", "", l[startsWith(l, "# ")])) }
+  cles <- function(o) { l <- lignes_de(o); sub(" : .*$", "", sub("^# ", "", l[startsWith(l, "# ")])) }
   conv <- c("grammaire", "doubles", "dates", "chaînes", "délais", "codage")
   verifier("en-tête du plan : grammaire, doubles, dates, chaînes, délais, codage, dans cet ordre (ni lecture ni rejeu)",
            identical(cles(ecrire_plan(plan_complet())), conv))
@@ -462,14 +483,25 @@ local({
   o <- ecrire_fiche(x$fiche)
   verifier("en-tête de la fiche : les six lignes du plan, puis version_fiche, representation, lecture, rejeu",
            identical(cles(o), c(conv, "version_fiche", "representation", "lecture", "rejeu")))
-  l <- strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]]
+  l <- lignes_de(o)
   verifier("en-tête : grammaire (@longueur, profondeur 32), doubles (sous-dépassement), rejeu (construire_table)",
            any(grepl("@longueur", l, fixed = TRUE) & startsWith(l, "# grammaire") & grepl("profondeur au plus 32", l, fixed = TRUE)) &&
              any(startsWith(l, "# doubles") & grepl("décimal non nul relu 0", l, fixed = TRUE)) &&
+             any(startsWith(l, "# doubles") &
+                   grepl("17 chiffres significatifs (%.17g) ; relecture au bit près constatée sous glibc, non garantie ailleurs",
+                         l, fixed = TRUE)) &&
+             !any(grepl("aller-retour exact", l, fixed = TRUE)) &&
              any(startsWith(l, "# rejeu") & grepl("construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)", l, fixed = TRUE)))
   b <- tablexp:::BLOCS_LECTURE_FICHE
   verifier("BLOCS_LECTURE_FICHE : trois blocs (calculé, hypothèses, rejeu), aucun champ en double",
            identical(names(b), c("calculé", "hypothèses", "rejeu")) && !anyDuplicated(unlist(b)))
+  verifier("BLOCS_LECTURE_FICHE : affectation validée par actuary le 20/10/2026 (ADR 0011, point 6.5), ordre des champs compris",
+           identical(unname(b), list(
+             c("plan", "transition_code", "fin_effective", "unite_observation", "unite_exposition", "par_annee", "recette",
+               "convention"),
+             c("exclusions", "hypothese_censure", "hypotheses_brut", "avertissement_unite", "avertissements"),
+             c("version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "graine", "graine_mention",
+               "generateur", "versions", "plateforme"))))
   presents <- intersect(unlist(b), names(x$fiche))
   verifier("BLOCS_LECTURE_FICHE : partition de names(fiche) sans étape brut (aucun manquant ; seul hypotheses_brut hors fiche)",
            setequal(presents, names(x$fiche)) && length(presents) == length(x$fiche) &&
@@ -479,11 +511,72 @@ local({
            setequal(unlist(b), names(xb$fiche)) && length(unlist(b)) == length(xb$fiche))
   verifier("en-tête : ligne lecture sans hypotheses_brut pour la fiche sans brut, avec pour la fiche avec brut",
            !grepl("hypotheses_brut", l[startsWith(l, "# lecture")], fixed = TRUE) &&
-             grepl("hypotheses_brut", grep("^# lecture", strsplit(rawToChar(ecrire_fiche(xb$fiche)), "\n")[[1L]], value = TRUE),
-                   fixed = TRUE))
+             grepl("hypotheses_brut", grep("^# lecture", lignes_de(ecrire_fiche(xb$fiche)), value = TRUE), fixed = TRUE))
   m <- l; m[startsWith(m, "# lecture")] <- "# lecture : modifiée à la main"; m <- m[!startsWith(m, "# rejeu")]
   verifier("en-tête de la fiche hors aller-retour : ligne lecture modifiée, ligne rejeu retirée -> même fiche relue",
            identical(lire_fiche(octets(m)), x$fiche))
+})
+
+# Revue finale de #50 : texte du moteur marqué UTF-8 en toute locale (identité
+# exacte : marques de codage ; valeur calculée à la main : codes de refus). Le
+# lanceur installe tablexp sous une locale UTF-8 (M54) ; la locale d'exécution
+# est celle de la batterie (C ou C.UTF-8), puis la locale C posée ici.
+local({
+  # Chaînes de l'objet, valeurs et noms à tous les niveaux.
+  chaines <- function(x) c(names(x), if (is.list(x)) unlist(lapply(x, chaines), use.names = FALSE) else if (is.character(x)) x)
+  non_ascii_non_utf8 <- function(x) {
+    s <- chaines(x)
+    s[!is.na(s) & grepl("[^\001-\177]", s, useBytes = TRUE) & Encoding(s) != "UTF-8"]
+  }
+  sous_locale_c <- function(expr) {
+    ancienne <- Sys.getlocale("LC_CTYPE")
+    on.exit(Sys.setlocale("LC_CTYPE", ancienne))
+    Sys.setlocale("LC_CTYPE", "C")
+    force(expr)
+  }
+  x <- construire_table(BASE, ROLES, plan_complet())
+  verifier(sprintf("#50 : toutes les chaînes non ASCII de la fiche marquées UTF-8 (locale %s)", Sys.getlocale("LC_CTYPE")),
+           !length(non_ascii_non_utf8(x$fiche)) || sprintf("non marquées : %s", paste(utils::head(non_ascii_non_utf8(x$fiche), 3L),
+                                                                                       collapse = " | ")))
+  verifier("#50 : la fiche compte des chaînes non ASCII (témoin : le contrôle ci-dessus porte)",
+           any(grepl("[^\001-\177]", chaines(x$fiche), useBytes = TRUE)))
+  verifier("#50 : CONVENTIONS_TEXTE et BLOCS_LECTURE_FICHE (valeurs et noms) marqués UTF-8",
+           !length(non_ascii_non_utf8(list(tablexp:::CONVENTIONS_TEXTE, tablexp:::BLOCS_LECTURE_FICHE))))
+  xc <- sous_locale_c(construire_table(BASE, ROLES, plan_complet()))
+  verifier("#50 : sous la locale C, fiche aux chaînes non ASCII marquées UTF-8, ecrire_fiche() réussit sans avertissement, aller-retour identical()",
+           sous_locale_c({
+             a <- NULL
+             o <- withCallingHandlers(ecrire_fiche(xc$fiche), warning = function(w) { a <<- c(a, conditionMessage(w))
+                                                                                      invokeRestart("muffleWarning") })
+             !length(non_ascii_non_utf8(xc$fiche)) && is.null(a) && identical(lire_fiche(o), xc$fiche) &&
+               identical(o, ecrire_fiche(x$fiche)) || if (length(a)) a[1L] else "fiche non marquée ou texte différent"
+           }))
+  verifier("#50 : sous la locale C, ecrire_plan() sans avertissement (en-tête marqué UTF-8), mêmes octets",
+           sous_locale_c({
+             a <- NULL
+             o <- withCallingHandlers(ecrire_plan(plan_complet()), warning = function(w) { a <<- c(a, conditionMessage(w))
+                                                                                          invokeRestart("muffleWarning") })
+             is.null(a) && identical(o, ecrire_plan(plan_complet())) || if (length(a)) a[1L] else "octets différents"
+           }))
+  # Données de l'utilisateur : refus inchangé (texte_moteur() ne les touche pas).
+  inconnue <- rawToChar(as.raw(c(0x61, 0xc3, 0xa9)))
+  verifier("#50 : témoin, chaîne non ASCII non marquée (octets UTF-8, codage unknown)",
+           identical(Encoding(inconnue), "unknown") && grepl("[^\001-\177]", inconnue, useBytes = TRUE))
+  verifier("#50 : sous la locale C, chaîne non ASCII non marquée de l'utilisateur toujours refusée (chaine_codage_indetermine : plan, données)",
+           sous_locale_c(identical(refus_de(ecrire_plan(list(a = inconnue)))$motif, "chaine_codage_indetermine") &&
+                           identical(refus_de(tablexp:::empreinte_donnees(data.frame(x = c("a", inconnue), stringsAsFactors = FALSE),
+                                                                           c(segment = "x")))$motif,
+                                     "chaine_codage_indetermine")))
+})
+verifier("#50 : texte_moteur() : non ASCII non marqué valide -> UTF-8 ; latin-1 -> UTF-8 ; ASCII, NA et UTF-8 invalide inchangés ; noms et attributs conservés", {
+  tm <- tablexp:::texte_moteur
+  u <- rawToChar(as.raw(c(0xc3, 0xa9))); l1 <- iconv("\u00e9", "UTF-8", "latin1"); inv <- rawToChar(as.raw(0xe9))
+  y <- tm(c(a = u, b = l1, c = "x", d = NA, e = inv))
+  z <- tm(data.frame(v = c(u, "x"), n = 1:2, stringsAsFactors = FALSE))
+  identical(Encoding(l1), "latin1") && identical(Encoding(y), c("UTF-8", "UTF-8", "unknown", "unknown", "unknown")) &&
+    identical(unname(y[1:2]), c("\u00e9", "\u00e9")) && identical(names(y), letters[1:5]) && is.na(y[["d"]]) &&
+    identical(charToRaw(y[["e"]]), as.raw(0xe9)) && is.data.frame(z) && identical(Encoding(z$v), c("UTF-8", "unknown")) &&
+    identical(z$n, 1:2) && identical(attr(z, "row.names"), 1:2)
 })
 
 # (i) : lire_fiche() ne contrôle pas version_fiche (identité exacte).
