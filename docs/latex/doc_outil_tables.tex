@@ -4360,42 +4360,68 @@ construction, qui suffit à la rejouer à l'identique (E4.5~; ADR 0005,
 point 6~; ADR 0007, point 6.2, précisé par l'ADR 0011, point~5). Elle est assemblée par \code{assembler\_fiche()}
 et rangée dans le champ \code{fiche} de l'objet. Elle ne contient
 \textbf{aucun horodatage}~: deux constructions identiques ont des fiches
-identiques. Ses champs~:
+identiques. Ses champs, dans cet ordre, en huit blocs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \code{version\_fiche} (\code{VERSION\_FICHE}, 3)~; \code{versions}
+  \item \textbf{identification}~: \code{version\_fiche}
+    (\code{VERSION\_FICHE}, 3)~; \code{versions}
     (\code{tablexp}, lue dans la description du package installé, et
     \code{R.version.string})~; \code{plateforme} (système, version, machine,
     BLAS par \code{extSoftVersion()}, LAPACK par \code{La\_library()})~;
-  \item \code{roles}, dans l'ordre du catalogue des rôles
-    (\code{CATALOGUE\_ROLES})~; \code{plan}, le \textbf{plan canonique}
+  \item \textbf{données}~: \code{roles}, dans l'ordre du catalogue des rôles
+    (\code{CATALOGUE\_ROLES})~; \code{provenance}, dans l'ordre
+    \code{fichier}, \code{empreinte}, \code{algorithme}, et
+    \code{provenance\_mention} («~aucun fichier (données construites en
+    mémoire)~» si \code{provenance} est \code{NULL})~; \code{empreintes}
+    (section~\ref{sec:empreinte})~;
+  \item \textbf{plan}~: \code{plan}, le \textbf{plan canonique}
     (ci-dessous)~;
-  \item \code{transition\_code}, code interne de la transition retenue~;
-    \code{fin\_effective}~;
-  \item \sloppy\hbadness=10000 \code{unite\_observation} et, s'il y a lieu, \code{avertissement\_unite}
-    (message de l'avertissement \code{unite\_contrat})~;
-  \item \code{recette}~; \code{convention} (demandée, native, retenue,
+  \item \sloppy\hbadness=10000 \textbf{paramètres retenus}, dans l'ordre du
+    calcul~: \code{transition\_code}, code interne de la transition
+    retenue~; \code{fin\_effective}~; \code{unite\_observation}~;
+    \code{recette}~; \code{convention} (demandée, native, retenue,
     forcée)~; \code{unite\_exposition}~; \code{par\_annee}~;
-    \code{exclusions} (par motif, avec leur nombre~; une ligne exclue sous
-    plusieurs motifs déclarés compte sous chacun)~;
-    \code{nombre\_lignes\_exclues} (\code{integer}, nombre de lignes
-    distinctes exclues, \code{0L} sans exclusion~; ci-dessous)~;
-    \code{hypothese\_censure}~;
-  \item \code{graine} et \code{graine\_mention} (\code{NA} et «~aucune étape
-    aléatoire~» dans cette branche)~; \code{generateur} (\code{GENERATEUR})~;
-  \item \code{provenance}, dans l'ordre \code{fichier}, \code{empreinte},
-    \code{algorithme}, et \code{provenance\_mention} («~aucun fichier
-    (données construites en mémoire)~» si \code{provenance} est \code{NULL})~;
-  \item \code{empreintes} (section~\ref{sec:empreinte})~; \code{avertissements}~;
-  \item \code{hypotheses\_brut}, \textbf{seulement si l'étape \code{brut} est
-    exécutée}, en fin de liste~: copie des paramètres effectifs de l'étape
-    \code{estimateurs}, \code{niveau}, \code{exposition\_initiale},
+  \item \textbf{exclusions}~: \code{exclusions} (par motif, avec leur
+    nombre~; une ligne exclue sous plusieurs motifs déclarés compte sous
+    chacun)~; \code{nombre\_lignes\_exclues} (\code{integer}, nombre de
+    lignes distinctes exclues, \code{0L} sans exclusion~; ci-dessous)~;
+  \item \textbf{hypothèses}~: \code{avertissement\_unite}, s'il y a lieu
+    (message de l'avertissement \code{unite\_contrat})~;
+    \code{hypothese\_censure}~; \code{hypotheses\_brut}, \textbf{seulement
+    si l'étape \code{brut} est exécutée}~: copie des paramètres effectifs de
+    l'étape \code{estimateurs}, \code{niveau}, \code{exposition\_initiale},
     \code{tolerance\_effectif}, \code{hypotheses} et \code{statuts}, plus
     \code{ensemble\_a\_risque} et \code{denominateur\_instants} si
     l'estimateur \code{kaplan\_meier} est retenu
-    (section~\ref{sec:brut-resultat}). Un plan sans étape \code{brut} n'a
-    pas ce champ.
+    (section~\ref{sec:brut-resultat})~;
+  \item \textbf{aléa}~: \code{graine} et \code{graine\_mention} (\code{NA}
+    et «~aucune étape aléatoire~» dans cette branche)~; \code{generateur}
+    (\code{GENERATEUR})~;
+  \item \textbf{avertissements}~: \code{avertissements}, en dernier.
 \end{itemize}
+
+\noindent
+\textbf{Ordre des champs} (issue~\#64~; avis d'\code{actuary} du
+20/10/2026, consigné sous la décision M69, point~5). L'ordre suit la lecture d'un
+certificateur (E3.7)~: ce qui identifie la construction, puis les données
+reçues, avec les rôles, la provenance et l'empreinte des données, que la
+procédure de rejeu fait vérifier avant toute exécution~; le plan déclaré~; les
+paramètres retenus, dans l'ordre où le calcul les fixe~; les exclusions~;
+les hypothèses, regroupées~; l'aléa~; les avertissements, en dernier.
+Auparavant, l'ordre de construction dispersait ces éléments~: l'empreinte
+des données venait après l'aléa, la provenance était séparée des rôles, et
+\code{hypothese\_censure} et \code{hypotheses\_brut} étaient séparés par
+l'aléa, la provenance, les empreintes et les avertissements. L'ordre est fixé par une seule constante,
+\code{ORDRE\_CHAMPS\_FICHE}~: \code{assembler\_fiche()} construit la fiche
+puis la réordonne par \code{ordonner\_fiche()}, qui garde les seuls champs
+présents~; un plan sans étape \code{brut} a donc le même ordre, sans
+\code{hypotheses\_brut}. Un champ présent hors de cet ordre est une erreur
+de programmation, jamais un champ retiré en silence. Le corps de la fiche
+écrite (section~\ref{sec:serialisation}) suit cet ordre, et les blocs de
+lecture en sont une partition (ci-dessous, «~Blocs de lecture~»). Seul
+l'ordre des noms de la fiche change~: aucune valeur, aucune table ni aucun
+verdict.
+
 
 \noindent
 \textbf{Plan canonique} (ADR 0011, points 5.1 et 5.2~; issue~\#42). Deux plans
@@ -4999,18 +5025,17 @@ les trois questions d'E3.7~: ce qui a été \emph{calculé}, avec quelles
 partitionnent les champs de la fiche (aucun champ manquant, en double ni
 étranger), si bien qu'un champ ajouté sans bloc fait échouer la batterie.
 L'affectation, validée par \code{actuary} le 20/10/2026 (ADR 0011,
-point~6.5), est la suivante, dans l'ordre des champs de chaque bloc~:
+point~6.5), est la suivante, les champs de chaque bloc étant dans l'ordre
+de la fiche (\code{ORDRE\_CHAMPS\_FICHE}, issue~\#64)~:
 \emph{calculé}~: \code{plan}, \code{transition\_code},
-\code{fin\_effective}, \code{unite\_observation},
-\code{unite\_exposition}, \code{par\_annee}, \code{recette},
-\code{convention}~; \emph{hypothèses}~: \code{exclusions},
-\code{nombre\_lignes\_exclues},
-\code{hypothese\_censure}, \code{hypotheses\_brut},
-\code{avertissement\_unite}, \code{avertissements}~; \emph{rejeu}~:
-\code{version\_fiche}, \code{roles}, \code{provenance},
-\code{provenance\_mention}, \code{empreintes}, \code{graine},
-\code{graine\_mention}, \code{generateur}, \code{versions},
-\code{plateforme}. Un champ absent de la fiche (\code{hypotheses\_brut}
+\code{fin\_effective}, \code{unite\_observation}, \code{recette},
+\code{convention}, \code{unite\_exposition}, \code{par\_annee}~;
+\emph{hypothèses}~: \code{exclusions}, \code{nombre\_lignes\_exclues},
+\code{avertissement\_unite}, \code{hypothese\_censure},
+\code{hypotheses\_brut}, \code{avertissements}~; \emph{rejeu}~:
+\code{version\_fiche}, \code{versions}, \code{plateforme}, \code{roles},
+\code{provenance}, \code{provenance\_mention}, \code{empreintes},
+\code{graine}, \code{graine\_mention}, \code{generateur}. Un champ absent de la fiche (\code{hypotheses\_brut}
 sans étape \code{brut}) est omis de la ligne.\par}
 
 \subsection{Vérifications}
@@ -5127,14 +5152,16 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche \\
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
-\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme})~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
+\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme})~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée~; champs réordonnés par \code{ordonner\_fiche()} selon \code{ORDRE\_CHAMPS\_FICHE} \\
+\catalogue{fonctions-rapport}{ordonner\_fiche()} & interne & fiche, ordre & fiche réordonnée selon l'ordre, réduit aux champs présents (\code{hypotheses\_brut} absent sans étape \code{brut})~; erreur de programmation sur un champ présent hors de l'ordre, jamais retiré en silence \\
+\catalogue{fonctions-rapport}{ORDRE\_CHAMPS\_FICHE} & constante & --- & ordre des champs de la fiche en huit blocs (identification, données, plan, paramètres retenus, exclusions, hypothèses, aléa, avertissements)~; source unique de l'ordre du corps de la fiche écrite \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
 \catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_PLAN} & constante & --- & \code{"tablexp plan 1"}, première ligne du texte du plan (nature et version de la grammaire) \\
 \catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_FICHE} & constante & --- & \code{"tablexp fiche 1"}, première ligne du texte de la fiche \\
 \catalogue{fonctions-rapport}{TYPES\_TEXTE} & constante & --- & types admis d'une ligne du texte~: \code{double}, \code{integer}, \code{logical}, \code{character}, \code{Date}, \code{NULL} \\
 \catalogue{fonctions-rapport}{PROFONDEUR\_MAX\_TEXTE} & constante & --- & profondeur maximale d'une ligne du texte (32), contrôlée à l'écriture et à la lecture \\
 \catalogue{fonctions-rapport}{CONVENTIONS\_TEXTE} & constante & --- & conventions d'écriture rappelées en lignes d'en-tête \code{\# <clé> : <valeur>} du texte, ignorées à la lecture \\
-\catalogue{fonctions-rapport}{BLOCS\_LECTURE\_FICHE} & constante & --- & partition des champs de la fiche en trois blocs (E3.7)~: \code{calculé}, \code{hypothèses}, \code{rejeu}~; rappelée par la ligne d'en-tête \code{\# lecture} \\
+\catalogue{fonctions-rapport}{BLOCS\_LECTURE\_FICHE} & constante & --- & partition des champs de la fiche en trois blocs (E3.7)~: \code{calculé}, \code{hypothèses}, \code{rejeu}, champs de chaque bloc dans l'ordre de \code{ORDRE\_CHAMPS\_FICHE}~; rappelée par la ligne d'en-tête \code{\# lecture} \\
 \catalogue{fonctions-rapport}{joindre\_chemin()} & interne & chemin, segment & chemin d'un élément, segments séparés par \code{/} \\
 \catalogue{fonctions-rapport}{segments\_texte()} & interne & noms, longueur & segment de chemin de chaque élément~: son nom, ou \code{[i]} (rang) si le nom est absent, vide, \code{NA}, en double, contient \code{/}, une tabulation ou une fin de ligne, ou commence par \code{@}, \code{\#} ou \code{[} \\
 \catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"}~; refus \code{serialisation\_impossible} (facteur, classe ou attribut non écrits, \code{Date} de stockage autre que \code{double} ou \code{integer}, vecteur atomique nommé de longueur~0, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}) \\
