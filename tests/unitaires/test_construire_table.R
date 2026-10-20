@@ -901,6 +901,10 @@ local({
              erreur(cn(modifier(pb, etapes = c(pb$etapes, list(lissage = list()))))) &&
              erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- list(estimateurs = "poisson", niveau = 0.95, x = 1); et }))) &&
              erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- list(niveau = 0.95); et }))))
+  verifier("canoniser_plan : nom en double -> erreur, jamais réduit en silence à sa première occurrence (paramètre d'étape, étape)",
+           erreur(cn(modifier(pb, etapes = { et <- pb$etapes; et$brut <- c(et$brut, list(niveau = 0.5)); et }))) &&
+             erreur(cn(modifier(pb, etapes = c(pb$etapes, pb$etapes["brut"])))) &&
+             erreur(cn(modifier(pb, etapes = c(pb$etapes["donnees"], pb$etapes)))))
   # Plans de même sens que pb.
   variantes <- list(
     "début de période en integer" = modifier(pb, periode = list(debut = J(16436L), fin = PER$fin)),
