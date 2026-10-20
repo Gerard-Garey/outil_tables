@@ -2213,10 +2213,14 @@ distinctes dans l'empreinte (section~\ref{sec:empreinte}). Une
 date de type conforme doit en outre appartenir au \textbf{domaine}
 [0001-01-01, 9999-12-31]~: hors de lui, aucune écriture ISO~8601 à quatre
 chiffres d'année n'existe, et la date est refusée
-(\code{date\_hors\_domaine}, lignes citées) avant tout calcul, empreinte
-comprise (\code{dates\_hors\_domaine()}~; ADR 0011, point~4~; décision
-M64, Q7~; issue~\#19). Les années 1 à 999 sont admises~; une naissance
-aussi ancienne est relevée par le motif \code{age\_aberrant}.
+(\code{date\_hors\_domaine}, tous les rôles en cause cités avec leurs
+lignes) avant tout calcul, empreinte comprise (\code{dates\_hors\_domaine()}~;
+ADR 0011, point~4~; décision M64, Q7~; issue~\#19). Les années 1 à 999 sont
+admises. Le motif \code{age\_aberrant} mesure l'âge à la plus petite des
+dates de sortie et de fin de période~: une ligne née avant l'an 1000 et
+observée dans une période postérieure à l'an 1129 a au moins 130~ans à cette
+date et est relevée~; une ligne entièrement antérieure à la période ne l'est
+pas, mais elle n'a aucune intersection avec la période.
 Les modalités des rôles catégoriels sont comparées après conversion en
 chaîne, en respectant la casse~: \code{H} et \code{F} pour \code{sexe}~;
 \code{deces}, \code{rachat}, \code{terme}, \code{autre} et \code{en\_cours}
@@ -2282,8 +2286,10 @@ sans valeur ni nom manquant)~; \code{role\_inconnu}~;
 \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
 \code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
-\code{type\_incompatible}~; \code{date\_hors\_domaine} (une colonne de
-date porte une date hors de [0001-01-01, 9999-12-31])~;
+\code{type\_incompatible}~; \code{date\_hors\_domaine} (une ou plusieurs
+colonnes de date portent une date hors de [0001-01-01, 9999-12-31]~; le refus
+nomme tous les rôles et colonnes en cause et, dans \code{details\$lignes},
+les lignes de chacun, comme \code{ligne\_invalide})~;
 \code{aucune\_recette} (un rôle requis manque~; le
 message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
 (un rôle employé par la segmentation n'est pas déclaré).
@@ -2301,7 +2307,7 @@ champs autres qu'exactement \code{debut} et \code{fin}, ou d'un élément de
 plus~; bornes manquantes, non \code{Date}, non entières ou munies d'un autre
 attribut que la classe \code{Date})~; \code{date\_hors\_domaine} (borne
 de la période hors de [0001-01-01, 9999-12-31], même domaine que les
-données)~; \code{delai\_invalide} (délai qui
+données~; \code{details\$bornes} nomme les bornes en cause)~; \code{delai\_invalide} (délai qui
 n'est pas un nombre unique, \code{integer} ou \code{double}, sans attribut,
 entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
 (autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
@@ -2463,11 +2469,14 @@ $+\infty$, \code{censure} sinon~; le décès n'est compté qu'une fois.
 
 \medskip
 Le calcul de la fusion est vectorisé par un maximum cumulé décalé par tête,
-exact en \code{double} tant que (nombre de têtes) $\times$ (étendue des dates,
-en jours, $+ 1$) reste inférieur à $2^{52}$. Au-delà, le moteur refuse
+exact en \code{double} tant que (nombre de têtes) $\times$ (largeur du
+décalage) reste inférieur à $2^{52}$, la largeur valant
+$\max - \min + 2$ jours sur les dates d'entrée et de sortie
+(\code{fusionner\_intervalles()}). Au-delà, le moteur refuse
 (\code{dates\_hors\_plage}, dont le message cite l'étendue et le nombre de
 têtes) au lieu de fusionner inexactement. Depuis le refus des dates hors du
-domaine (issue~\#19), l'étendue est au plus de 3\,652\,060~jours~: par
+domaine (issue~\#19), qui compte 3\,652\,059~jours, la largeur est au plus
+de 3\,652\,060~: par
 \code{construire\_table()}, le refus n'est atteint qu'au-delà d'environ
 $1{,}23\cdot 10^{9}$ têtes ($2^{52}/3\,652\,060$), sous le plus grand
 entier de R~; la garde est conservée (avis d'\code{actuary}), une étendue
@@ -4564,7 +4573,8 @@ annotation du 17/10/2026, point~f)~:
     comme pour un double (ADR 0011, point~4, et seconde annotation du
     19/10/2026, point~(d)~; issue~\#19)~; l'écrivain refuse, en garde-fou des
     contrôles de l'étape \code{donnees}, une date hors du domaine
-    (\code{date\_hors\_domaine}) et une date non entière
+    (\code{date\_hors\_domaine}, ici pour la seule colonne écrite, son
+    rôle et ses lignes dans \code{details}) et une date non entière
     (\code{date\_non\_entiere}~: 100 et 100,5 jours s'écriraient de même)~;
     chaînes et facteurs (convertis en chaînes, les niveaux n'entrent pas)~:
     octets UTF-8 entre guillemets droits, avec cinq échappements
