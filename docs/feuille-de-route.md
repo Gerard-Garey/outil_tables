@@ -209,21 +209,29 @@ Issues ouvertes, avec la raison et le rattachement. Les issues du périmètre de
 
 *N14* — titre : « Fiche de construction : consigner la bibliothèque C (glibc, d'où vient la libm) dans fiche$plateforme » ; libellés : `enhancement`, `needs-triage`. Corps (texte d'`actuary`, repris tel quel) :
 
-> > *Rédigé par l'agent actuary (IA).*
+> *Rédigé par l'agent actuary (IA).*
 >
-> **Constat** — `fiche$plateforme` (`R/rapport.R`, `assembler_fiche()`) consigne `sysname`, `release`, `machine`, BLAS et LAPACK, mais pas la bibliothèque C ; le seul écart entre plateformes mesuré (un ulp, R4 et R5) naît dans `expm1()` de la libm ; le script de plateforme la consigne depuis #72 mais seulement sur la machine où il tourne.
+> **Constat.** `fiche$plateforme` (R/rapport.R, `assembler_fiche()`) consigne sysname, release (noyau), machine, BLAS et LAPACK, mais pas la bibliothèque C. Or le seul écart entre plateformes mesuré (un ulp de `probabilite_borne_sup_asymptotique` sur R4 et R5, ADR 0008, seconde annotation du 19/10/2026) naît dans `expm1()`, fonction de la libm de la glibc. Le script de plateforme consigne la glibc depuis #72, mais seulement sur la machine où il tourne. Une construction rejouée chez un tiers n'en garde aucune trace.
 >
-> **Objectif** — champ lu par R lui-même, en R base, sans processus : `extSoftVersion()[["iconv"]]` ou « non relevée » ; hors glibc, il désigne l'implémentation d'iconv.
+> **Objectif.** Ajouter à `fiche$plateforme` un champ qui consigne la bibliothèque C lue par R lui-même, en R base, sans lancer de processus.
 >
-> **Critères** — (1) sémantique établie sur le source R 4.3.3 (`src/main/platform.c` : exécution ou compilation) ; (2) valeur mesurée sur la plateforme de référence et sous Windows ; (3) empreinte du résultat inchangée (`CHEMINS_HORS_RESULTAT`), testée ; (4) décision `VERSION_FICHE` par `architect` (ADR 0011), régénération après visa si elle change ; (5) tests des champs de la fiche ; (6) surface d'impact documentaire.
+> **Comportement attendu.** Le champ prend la valeur de `extSoftVersion()[["iconv"]]` (par exemple `"glibc 2.35"`) ou, si elle est vide ou absente, une mention explicite « non relevée ». Rien n'est deviné. La documentation dit que, hors glibc, ce champ désigne l'implémentation d'iconv et pas la libm.
 >
-> **Hors périmètre** : bascule fondée sur ce champ.
+> **Critères d'acceptation.**
+> 1. La sémantique de `extSoftVersion()["iconv"]` sous R 4.3.3 est établie sur le source (`src/main/platform.c`) : version de la glibc à l'exécution (`gnu_get_libc_version()`) ou à la compilation. Source citée dans le commit. Si c'est la version de compilation, le champ est écarté ou renommé, et l'issue revient à `actuary`.
+> 2. La valeur est mesurée sur la plateforme de référence et sur le poste Windows du mainteneur.
+> 3. L'empreinte du résultat est inchangée (le champ reste sous `fiche/plateforme`, dans `CHEMINS_HORS_RESULTAT`), vérifié par test.
+> 4. La décision sur `VERSION_FICHE` est prise par `architect` (ADR 0011). Si elle change, tableau avant / après et régénération des références après visa.
+> 5. Les tests listant les champs de la fiche sont mis à jour ; les batteries passent.
+> 6. La surface d'impact documentaire est listée (section de la fiche, empreinte du code, doc:5174-5177).
 >
-> **Impact** : aucun sur tables, verdicts, empreinte du résultat.
+> **Hors périmètre.** Toute bascule ou contrôle fondé sur ce champ. La variante de libm choisie selon le processeur (non observable depuis R).
+>
+> **Impact attendu sur les résultats.** Aucun sur les tables, les verdicts, ni l'empreinte du résultat. Le texte de la fiche change, ainsi que `version_fiche` si elle est incrémentée.
 
 *N15* — titre : « Portefeuille simulé : forme exacte du portefeuille (liste nue) et des champs numériques » ; libellés : `bug`, `needs-triage`. Corps :
 
-> > *Rédigé par l'agent architect (IA).*
+> *Rédigé par l'agent architect (IA).*
 >
 > **Constat** (revue finale de la branche `claude/forme-exacte-suite`, PR #75 : `/code-review` et `audit` ; remesuré par `architect` sur les sources de `1acc6e8`). `controler_portefeuille()` (`R/simulation.R`), appelée par `simuler_portefeuille()` (exportée), contrôle la forme du portefeuille par `is.list()` seul, et ses champs numériques par `reel()` et `entier()` (`is.numeric`, longueur 1, fini), sans `forme_exacte()`. Sont admis sans refus :
 > - `controler_portefeuille(as.data.frame(PF), PER)` ;
