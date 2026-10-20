@@ -296,8 +296,10 @@ empreintes_construction <- function(donnees, roles, provenance) {
 # période Date à stockage double ou integer -> Date double ; délai integer ou
 # double -> double ; graine integer, ou double entier dans l'étendue des
 # integer -> integer (graine NA refusée). Un autre stockage, une étape absente
-# de `parametres` ou aux noms de paramètres autres que ceux du catalogue sont
-# une erreur de programmation (le plan n'a pas été validé). Idempotente : un plan canonique est rendu
+# de `parametres` ou en double, ou aux noms de paramètres en double ou autres
+# que ceux du catalogue, sont une erreur de programmation (le plan n'a pas été
+# validé ; un nom en double serait sinon réduit en silence à sa première
+# occurrence, #42). Idempotente : un plan canonique est rendu
 # identical(). Ce n'est pas un plan résolu (point 5.2 : convention demandée
 # inchangée).
 canoniser_plan <- function(plan, champs, parametres) {
@@ -323,8 +325,9 @@ canoniser_plan <- function(plan, champs, parametres) {
     p[["graine"]] <- g
   }
   e <- p[["etapes"]]
+  if (anyDuplicated(names(e))) non_canonique("etapes")
   for (n in names(e))
-    if (is.null(parametres[[n]]) || !setequal(names(e[[n]]), parametres[[n]]$parametre))
+    if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) || !setequal(names(e[[n]]), parametres[[n]]$parametre))
       non_canonique(sprintf("etapes$%s", n))
   p[["etapes"]] <- stats::setNames(lapply(names(e), function(n) e[[n]][parametres[[n]]$parametre]), names(e))
   p
