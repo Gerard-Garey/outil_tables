@@ -27,8 +27,12 @@
 #
 #  Identifiant de plateforme (point 5) écrit dans le journal et, s'il existe,
 #  dans $GITHUB_STEP_SUMMARY ; consignés sans faire échouer : processeur et
-#  drapeaux (fma, avx2, avx512f), ImageOS et ImageVersion de l'hôte,
-#  LC_COLLATE, fuseau horaire, présence d'un exécutable java, GITHUB_SHA.
+#  drapeaux (fma, avx2, avx512f), version de la glibc (libm, d'où vient l'écart
+#  d'un ulp de expm1 mesuré hors plateforme de référence ; « inconnue » hors
+#  glibc), ImageOS et ImageVersion de l'hôte, LC_COLLATE, fuseau horaire,
+#  présence d'un exécutable java, GITHUB_SHA. La glibc n'entre pas dans
+#  l'identifiant contrôlé (lignes_identifiant()) : elle ne déclenche aucune
+#  bascule (issue #72).
 #
 #  Usage : Rscript tests/controles/plateforme.R [--exiger]
 #  Sourcé (tests), le fichier ne fait que définir les fonctions.
@@ -86,6 +90,26 @@ defauts_plateforme <- function(r) {
   defauts
 }
 
+# Version de la glibc d'après les lignes de sortie de `getconf
+# GNU_LIBC_VERSION` (« glibc 2.39 ») ou, à défaut, de `ldd --version` (première
+# ligne, « ldd (Ubuntu GLIBC 2.39-0ubuntu8.9) 2.39 ») ; « inconnue » si aucune
+# ligne ne désigne la glibc (musl, macOS, Windows, outil absent).
+analyser_glibc <- function(getconf = character(0), ldd = character(0)) {
+  if (length(getconf) && grepl("^glibc [0-9]", getconf[1L])) return(getconf[1L])
+  if (length(ldd) && grepl("GLIBC|GNU libc", ldd[1L])) return(ldd[1L])
+  "inconnue"
+}
+# Relève la version de la glibc de la machine ; ne signale jamais d'erreur ni
+# d'avertissement (outil absent, statut non nul, sortie vide).
+version_glibc <- function() {
+  lire <- function(outil, args) {
+    if (!nzchar(Sys.which(outil))) return(character(0))
+    tryCatch(suppressWarnings(system2(outil, args, stdout = TRUE, stderr = TRUE)),
+             error = function(e) character(0))
+  }
+  analyser_glibc(getconf = lire("getconf", "GNU_LIBC_VERSION"), ldd = lire("ldd", "--version"))
+}
+
 # Grandeurs consignées sans faire échouer (ADR 0008, point 5).
 consignes_plateforme <- function() {
   cpu <- if (file.exists("/proc/cpuinfo")) readLines("/proc/cpuinfo", warn = FALSE) else character(0)
@@ -105,12 +129,13 @@ consignes_plateforme <- function() {
       if (length(cpu))
         paste(c("fma", "avx2", "avx512f"), ifelse(c("fma", "avx2", "avx512f") %in% drapeaux, "oui", "non"),
               sep = " : ", collapse = " ; ") else "(non relevé)",
+      version_glibc(),
       paste(Sys.getenv("ImageOS", "(non définie)"), Sys.getenv("ImageVersion", "(non définie)"), sep = " / "),
       Sys.getlocale("LC_COLLATE"),
       as.character(Sys.timezone()),
       if (nzchar(java)) unname(java) else "absent",
       Sys.getenv("GITHUB_SHA", "(non défini)")),
-    c("Système", "Processeur", "Drapeaux fma / avx2 / avx512f", "ImageOS / ImageVersion (hôte)",
+    c("Système", "Processeur", "Drapeaux fma / avx2 / avx512f", "glibc (libm)", "ImageOS / ImageVersion (hôte)",
       "LC_COLLATE", "Fuseau horaire", "java", "GITHUB_SHA"))
 }
 
