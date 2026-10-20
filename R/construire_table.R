@@ -70,9 +70,10 @@ PARAMETRES_ETAPES <- list(
 )
 
 # Liste aux noms complets (non NULL, sans NA, non vides ; liste vide admise
-# sans noms), sans autre attribut que names (ni data.frame, ni dim, ni classe ; #23). Les doublons ne sont pas
-# contrôlés : le contrôle de `etapes` les admet, pour que le refus nommé
-# etape_en_double les signale ensuite (#60).
+# sans noms), sans autre attribut que names (ni data.frame, ni dim, ni
+# classe ; #23). Les doublons ne sont pas contrôlés : le contrôle de `etapes`
+# les admet, pour que le refus nommé etape_en_double les signale ensuite
+# (#60).
 noms_complets <- function(x) forme_exacte(x, "list", "names") &&
   (!length(x) || (!is.null(names(x)) && !anyNA(names(x)) && all(nzchar(names(x)))))
 
