@@ -893,7 +893,9 @@ vérifie les identités de la section~\ref{sec:verifications-alea}, puis celles 
 simulateur et de la construction, compare les plans de référence à leurs
 références de non-régression (section~\ref{sec:non-regression}) et contrôle
 l'effet d'une permutation des lignes de l'entrée de référence
-(section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39).
+(section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39), puis
+l'aller-retour du texte du plan et de la fiche et le rejeu à partir de ce
+texte pour les six plans de référence (section~\ref{sec:serialisation}).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -4294,10 +4296,12 @@ d'expérience. Il sera créé par une branche ultérieure
 \label{sec:rapport}
 
 Le module \code{rapport} porte les quantités des rapports, pas leur rendu
-(E4.1)~: dans cette branche, la fiche de construction en mémoire et
-l'empreinte des données reçues. Le rapport figé HTML, l'écriture des tables et
-la sérialisation de la fiche viendront avec la branche
-\code{claude/fiche-rapport} (ADR 0007, point 12).
+(E4.1)~: la fiche de construction, l'empreinte des données reçues et le texte
+du plan et de la fiche (section~\ref{sec:serialisation}~; ADR 0011, qui
+remplace le point~12 de l'ADR 0007). Le rapport figé HTML, l'écriture des
+tables, les empreintes du résultat et du code et le contrôle de
+\code{version\_fiche} au rejeu viendront avec la branche
+\code{claude/fiche-rapport}.
 
 \subsection{Fiche de construction}
 \label{sec:fiche}
@@ -4399,11 +4403,12 @@ Les champs qui n'ont pas d'objet (convention et unité d'exposition d'un plan
 sans étape \code{exposition}) valent \code{NULL} ou \code{NA}. \textbf{Rejeu}~:
 \code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
 redonne un objet \code{identical()} hors \code{execution}~; c'est un test de
-la batterie de reproductibilité. La fiche vit en mémoire~: son format
-d'écriture et de relecture est reporté, sous des contraintes déjà posées
-(texte lisible par un relecteur, aller-retour identique, nombres compris,
-aucune évaluation de code à l'import, R de base, version de fiche~; ADR 0007,
-point 12.2).
+la batterie de reproductibilité, aussi à partir du texte de la fiche. La
+fiche s'écrit et se relit en texte (section~\ref{sec:serialisation}), sous
+les contraintes posées par l'ADR 0007, point 12.2 (texte lisible par un
+relecteur, aller-retour identique, nombres compris, aucune évaluation de
+code à l'import, R de base, version), maintenues par l'ADR 0011, qui remplace
+ce point.
 
 \subsection{Empreinte des données}
 \label{sec:empreinte}
@@ -4636,6 +4641,194 @@ l'empreinte des données des six plans de référence a changé, l'entrée
 restant la même, ce qu'a prouvé la garde «~entrée différente~»
 (section~\ref{sec:non-regression}, «~Règles durables~»).
 
+\subsection{Texte du plan et de la fiche}
+\label{sec:serialisation}
+
+\textbf{Objet} (ADR 0011, points 6, 8, 9 et 12, et troisième annotation du
+19/10/2026~; décision M66~; issue~\#50). Le plan s'exporte et s'importe
+(E5.4)~; la fiche s'écrit, se relit et se rejoue (E3.7). Quatre fonctions
+exportées du module \code{rapport} convertissent un objet en texte et
+inversement~: \code{ecrire\_plan()}, \code{lire\_plan()},
+\code{ecrire\_fiche()} et \code{lire\_fiche()}. Elles rendent et reçoivent
+des \textbf{octets} (\code{raw}), jamais un fichier~: l'appelant écrit par
+\code{writeBin(octets, fichier)} et lit par
+\code{readBin(fichier, "raw", file.size(fichier))} (E4.4~; ADR 0011,
+point~8). Des octets, et non une chaîne, parce que l'écriture en mode texte
+produirait des fins de ligne CRLF sous Windows (hypothèse non mesurée) et que
+la lecture ligne à ligne de R réencode selon la locale~: les octets sont le
+contrat, et un fichier altéré, par exemple par un éditeur qui ajoute des CR,
+est refusé avec un message qui nomme l'altération plutôt que corrigé en
+silence. Ce format remplace le report du point~12 de l'ADR 0007, dont il
+garde les cinq contraintes~: texte lisible par un relecteur, aller-retour
+identique, nombres compris, aucune évaluation de code à l'import, R de base,
+version portée par le texte.
+
+\subsubsection*{Grammaire du texte (grammaire~1)}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{forme}~: UTF-8, lignes terminées par LF, LF final, ni CR ni
+    marque d'ordre des octets~;
+  \item \sloppy \textbf{première ligne}~: \code{tablexp plan 1}
+    (\code{PREMIERE\_LIGNE\_PLAN}) ou \code{tablexp fiche 1}
+    (\code{PREMIERE\_LIGNE\_FICHE}), qui nomme la nature et la version de la
+    grammaire. La version est portée par le texte seul, jamais par un champ de
+    l'objet, et le lecteur refuse toute autre première ligne, sans migration
+    (ADR 0011, point~10)~;
+  \item \textbf{en-tête}~: des lignes \code{\# <clé> : <valeur>},
+    \textbf{hors aller-retour}, que le lecteur ignore. Elles rappellent au
+    relecteur les conventions (\code{CONVENTIONS\_TEXTE}~: grammaire,
+    doubles, dates, chaînes, délais, codage). La fiche y ajoute
+    \code{version\_fiche}, la représentation canonique de l'empreinte des
+    données, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu
+    (\code{\# rejeu}), décrits plus bas~;
+  \item \textbf{corps}~: une ligne par feuille,
+    \code{chemin<TAB>type<TAB>longueur<TAB>valeurs}, dans l'ordre de l'objet
+    (parcours en profondeur), jamais trié~; le chemin joint les segments par
+    \code{/}~; un élément sans nom, ou dont le nom ne peut pas être un segment
+    (vide, \code{NA}, en double, contenant \code{/}, une tabulation ou une fin
+    de ligne, ou commençant par \code{@}, \code{\#} ou \code{[}), a pour
+    segment \code{[i]}, son rang, le nom restant porté par la ligne
+    \code{@noms}, si bien que tout nom fait l'aller-retour~;
+  \item \textbf{structure}~: chaque conteneur déclare son effectif. Une liste
+    nommée a une ligne \code{chemin/@noms}, puis ses éléments~; une liste sans
+    noms a une ligne \code{chemin/@longueur} (\code{integer}, une valeur
+    $n$), puis exactement ses éléments \code{chemin/[1]} à
+    \code{chemin/[$n$]}~; un \code{data.frame} a ses lignes
+    \code{chemin/@colonnes} et \code{chemin/@lignes}, puis ses colonnes
+    (noms de lignes automatiques seulement)~; un vecteur atomique nommé a sa
+    ligne \code{chemin/@noms}, puis sa ligne de valeurs~; \code{NULL}
+    s'écrit \code{chemin<TAB>NULL<TAB>0}. Conséquence~: \textbf{un texte
+    coupé à une frontière de ligne est toujours refusé}, faute de quoi un
+    fichier tronqué serait relu comme un objet plus court~;
+  \item \textbf{types}~: \code{double}, \code{integer}, \code{logical},
+    \code{character}, \code{Date}, \code{NULL} (\code{TYPES\_TEXTE})~;
+    valeurs écrites par \code{ecrire\_valeurs()} en forme «~texte~»
+    (section~\ref{sec:empreinte}~: doubles en \code{\%.17g}, dates ISO à
+    quatre chiffres, chaînes entre guillemets avec cinq échappements,
+    \code{NA} sans guillemets, distinct de \code{"NA"}). Un facteur est hors
+    de la grammaire~1~: sans ses niveaux, il n'a pas d'aller-retour
+    identique, et aucun plan valide n'en porte. Une \code{Date} à stockage
+    entier s'écrit comme la même date à stockage double et se relit en
+    double~;
+  \item \textbf{profondeur}~: nombre de segments du chemin, sans le dernier
+    s'il commence par \code{@}~; au plus \code{PROFONDEUR\_MAX\_TEXTE}~(32),
+    contrôlée à l'écriture et, à la lecture, avant toute reconstruction, si
+    bien qu'aucun texte ne fait déborder la pile de R (débordement constaté
+    entre 800 et 1\,000 niveaux sur une pile de 8~Mo, profondeur des fiches
+    de R1 à R6 égale à~4~: ADR 0011, troisième annotation, point~(g)).
+\end{itemize}
+
+\noindent
+La forme de ligne et l'écrivain des valeurs sont ceux des références de
+non-régression (section~\ref{sec:non-regression})~; les \textbf{formats
+restent distincts}, et la grammaire~1 s'en écarte sur sept points (ADR 0011,
+troisième annotation, point~(f))~: liste sans noms (\code{@longueur} ici,
+\code{@noms} vide là)~; noms qui ne peuvent pas être des segments (écrits
+\code{[i]} ici, refusés là)~; facteur (exclu ici, admis là)~; lecture des
+doubles (lecteur de forme ici, stricte là)~; lignes propres aux références
+(\code{@classe}, \code{@empreinte})~; en-tête \code{\#}~; profondeur bornée.
+
+\subsubsection*{Lecture sans évaluation}
+
+Le lecteur découpe les octets sur LF, puis chaque ligne sur la tabulation, et
+convertit par \code{as.numeric()}, \code{as.integer()} et \code{as.Date()}
+sur une forme contrôlée, plus le désechappement des chaînes~; il n'emploie
+\textbf{jamais} \code{parse()}, \code{eval()}, \code{source()} ni
+\code{dget()} (ADR 0007, point 2.3). Un texte qui contient du code R est
+relu comme une chaîne ou refusé, jamais évalué. Les types autres que
+\code{double} exigent leur écriture canonique~; une date relue doit, réécrite,
+redonner son texte. Pour les \textbf{doubles}, le lecteur est un
+\emph{lecteur de forme} (décision M64, Q3)~: tout décimal que
+\code{as.numeric()} lit en un double fini est admis, ainsi que les jetons
+\code{NA}, \code{NaN}, \code{Inf} et \code{-Inf}, et la valeur retenue est
+le double lu~: un plan édité à la main peut écrire \code{0.95} au lieu de
+\code{0.94999999999999996}. La valeur de référence pour un tiers est
+l'écriture \code{\%.17g} que l'export réécrit. Un décimal non nul relu~0
+(sous-dépassement, par exemple \code{1e-400}) est \textbf{refusé} (décision
+M66)~: l'erreur relative serait de 100~\%, et un délai de déclaration écrit
+\code{1e-400} passerait la validation comme~0. \textbf{Statut} de
+l'aller-retour~: exact pour tous les types sauf \code{double}~; pour un
+double, celui de la forme «~texte~» (section~\ref{sec:empreinte}~: écriture
+correctement arrondie et relecture exacte constatée sous glibc, non
+démontrée). Un texte écrit sous Windows, dont le dix-septième chiffre peut
+différer, se relit en le même double dans le cas testé~: c'est un
+\emph{constat de mesure}.
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{5.4cm}p{9.4cm}@{}}
+\caption{Refus de la lecture et de l'écriture du texte (module
+\code{rapport}~; numéro de la ligne fautive dans \code{details\$ligne}, chemin
+fautif dans \code{details\$chemin}).}
+\label{tab:refus-texte}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Motif}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Motif}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endhead
+\code{texte\_non\_octets} & texte reçu autrement qu'en octets (\code{raw}) \\
+\code{texte\_version\_inconnue} & texte vide, ou première ligne autre que celle attendue (nature ou version de grammaire) \\
+\code{texte\_marque\_ordre\_octets} & marque d'ordre des octets en tête \\
+\code{texte\_retour\_chariot} & octet CR (fins de ligne CRLF ou CR) \\
+\code{texte\_octet\_nul} & octet nul \\
+\code{texte\_sans\_lf\_final} & dernière ligne sans LF \\
+\code{texte\_utf8\_invalide} & ligne qui n'est pas de l'UTF-8 valide \\
+\code{texte\_ligne\_mal\_formee} & texte sans corps~; ligne hors de la forme (champ vide, longueur illisible, ligne d'en-tête dans le corps)~; ligne \code{@longueur}, \code{@noms}, \code{@colonnes} ou \code{@lignes} de type ou de valeur invalide~; \code{NULL} nommé~; colonne non atomique \\
+\code{texte\_type\_inconnu} & type hors de \code{TYPES\_TEXTE} (\code{factor} compris) \\
+\code{texte\_longueur\_incoherente} & nombre de valeurs différent de la longueur déclarée~; \code{NULL} de longueur non nulle~; \code{@longueur} supérieur au nombre de lignes restantes (contrôlé avant toute allocation)~; noms et valeurs en nombres différents~; colonne d'une autre longueur que \code{@lignes} \\
+\code{texte\_chemin\_en\_double} & chemin présent deux fois \\
+\code{texte\_profondeur\_excessive} & profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE} \\
+\code{texte\_chemin\_inattendu} & chemin autre que celui qu'attend la structure~: élément manquant ou en trop, ligne après la fin de l'objet, corps qui ne commence ni par \code{@noms} ni par \code{@longueur} \\
+\code{texte\_valeur\_invalide} & valeur hors de l'écriture de son type~: chaîne sans guillemets droits ou à échappement inconnu~; double qui n'est ni un décimal lu en un double fini ni un jeton~; entier non canonique ou hors de l'étendue des entiers~; logique autre que \code{TRUE}, \code{FALSE}, \code{NA}~; date hors de la forme AAAA-MM-JJ, inexistante, hors du domaine ou non canonique \\
+\code{texte\_double\_sous\_depassement} & décimal non nul relu~0 \\
+\code{serialisation\_impossible} & à l'écriture~: racine qui n'est pas une liste~; facteur~; classe ou attribut hors de la grammaire~; \code{data.frame} classé ou aux noms de lignes non automatiques~; colonne non atomique~; profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}~; objet \code{construction} entier passé à \code{ecrire\_fiche()} au lieu de sa fiche \\
+\end{longtable}
+\end{center}
+
+\noindent
+L'écriture peut aussi lever les refus de l'écrivain des valeurs (codage d'une
+chaîne, date hors du domaine~; section~\ref{sec:empreinte}).
+
+\subsubsection*{Plan importé, fiche relue, rejeu}
+
+\code{ecrire\_plan()} écrit le plan tel qu'il est reçu, sans validation ni
+canonisation, et \code{lire\_plan()} rend un plan \textbf{non validé}~: le
+module \code{rapport} ne peut pas appeler \code{R/construire\_table.R}, où vit
+\code{valider\_plan()} (graphe des modules, section~\ref{sec:graphe}). La
+validation se fait chez l'appelant, par \code{valider\_plan()}, ou à l'entrée
+de \code{construire\_table()}, qui l'appelle toujours~: un plan importé
+reçoit exactement les refus d'un plan construit en mémoire (ADR 0011,
+point~9.2). Pour un plan canonique, \code{lire\_plan(ecrire\_plan(p))} est
+\code{identical()} à \code{p}~; pour un autre plan, au stockage des dates
+près. \code{lire\_fiche()} ne contrôle pas \code{version\_fiche}~: ce
+contrôle appartient au rejeu, que la branche \code{claude/fiche-rapport}
+outillera avec un refus nommé (ADR 0011, troisième annotation, point~(i)).
+
+\medskip
+\textbf{Rejeu par un tiers} (E3.7 et sa note de lecture du 19/10/2026~; ADR
+0011, point~12), rappelé par la ligne \code{\# rejeu} de la fiche écrite~: le
+relecteur vérifie \code{version\_fiche}, la représentation canonique et
+l'empreinte des données de la fiche~; il exécute
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
+sur le plan relu du texte~; il compare les grandeurs à tolérance par classes
+(section~\ref{sec:non-regression}) sur une autre machine, au bit près sur la
+même (E4.6). L'empreinte du résultat, quand elle sera calculée, ne servira
+de témoin que sur la même machine.
+
+\medskip
+\textbf{Blocs de lecture.} La ligne \code{\# lecture} de la fiche écrite
+range ses champs en trois blocs (\code{BLOCS\_LECTURE\_FICHE}), qui suivent
+les trois questions d'E3.7~: ce qui a été \emph{calculé}, avec quelles
+\emph{hypothèses}, de quoi \emph{rejouer}. Un test vérifie que les blocs
+partitionnent les champs de la fiche (aucun champ manquant, en double ni
+étranger), si bien qu'un champ ajouté sans bloc fait échouer la batterie.
+L'affectation des champs aux blocs est une proposition, soumise au jugement
+d'\code{actuary} sur la lisibilité de la fiche (ADR 0011, point~6.5).
+
 \subsection{Vérifications}
 \label{sec:verifications-rapport}
 
@@ -4661,7 +4854,25 @@ d'année (0001, 0019, 0999, 9999), sur tous les jours de 1930 à 2024
 dont les dates sont dans cet intervalle, n'ont pas changé), avec les jetons
 \code{NA} et \code{NaN} distincts (deux empreintes calculées hors de R) et
 les refus \code{date\_hors\_domaine} et \code{date\_non\_entiere}~;
-\code{construire\_table()} traite une date \code{NaN} comme un manquant. \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
+\code{construire\_table()} traite une date \code{NaN} comme un manquant.
+
+\medskip
+\code{tests/unitaires/test\_serialisation.R} vérifie le texte du plan et de
+la fiche (section~\ref{sec:serialisation})~: forme des octets, première
+ligne et en-tête hors aller-retour~; aller-retour \code{identical()} sur des
+cas adverses (\code{NA} et \code{"NA"}, \code{NA} et \code{NaN}, chaînes non
+ASCII, doubles extrêmes et sous-normaux, dates aux bornes du domaine, listes
+et vecteurs vides, \code{NULL}, noms qui ne peuvent pas être des segments)~;
+code R en valeur, en nom ou en chemin, jamais évalué (témoin non créé), et
+absence d'appel à une fonction d'évaluation dans les lecteurs~; chaque refus
+de la lecture et de l'écriture, avec son numéro de ligne ou son chemin~;
+lecteur de forme des doubles et refus du sous-dépassement~; plan importé
+soumis aux mêmes refus qu'un plan en mémoire~; liste sans noms, troncature
+à chaque frontière de ligne, profondeur 32 admise et 33 refusée~; partition
+des champs de la fiche par les blocs de lecture~; rejeu
+\code{identical()} hors \code{execution}. La batterie de reproductibilité
+refait l'aller-retour et le rejeu pour les six plans de référence et refuse
+chacun des préfixes stricts du corps de la fiche écrite de R1. \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
 la même dans des processus R lancés sous \code{LANG=C} et sous
 \code{LANG=C.UTF-8}, égale à cette valeur, et que le rejeu de la fiche redonne
 l'objet. \code{tests/unitaires/test\_construire\_table.R} vérifie aussi
@@ -5172,10 +5383,10 @@ fonctions de leur module.
 \catalogue{exports}{simuler\_portefeuille()} & \code{simulation} & point d'entrée du simulateur~: jeu simulé sous une loi vraie et une graine & \ref{sec:simulation} \\
 \catalogue{exports}{valider\_plan()} & \code{construire\_table} & validateur du plan, contrôle de saisie que l'application appellera (E4.3) & \ref{sec:plan} \\
 \catalogue{exports}{construire\_table()} & \code{construire\_table} & point d'entrée unique~: exécute un plan de construction et retourne l'objet \code{construction} & \ref{sec:construction} \\
-\catalogue{exports}{ecrire\_plan()} & \code{rapport} & texte du plan en octets UTF-8, pour l'export du plan (E5.4)~; l'appelant écrit le fichier & \ref{sec:fonctions-rapport} \\
-\catalogue{exports}{lire\_plan()} & \code{rapport} & plan relu d'octets, sans évaluation, pour l'import du plan (E5.4)~; non validé & \ref{sec:fonctions-rapport} \\
-\catalogue{exports}{ecrire\_fiche()} & \code{rapport} & texte de la fiche de construction en octets UTF-8~; l'appelant écrit le fichier & \ref{sec:fonctions-rapport} \\
-\catalogue{exports}{lire\_fiche()} & \code{rapport} & fiche relue d'octets, sans évaluation, pour le rejeu (E3.7) & \ref{sec:fonctions-rapport} \\
+\catalogue{exports}{ecrire\_plan()} & \code{rapport} & texte du plan en octets UTF-8, pour l'export du plan (E5.4)~; l'appelant écrit le fichier & \ref{sec:serialisation} \\
+\catalogue{exports}{lire\_plan()} & \code{rapport} & plan relu d'octets, sans évaluation, pour l'import du plan (E5.4)~; non validé & \ref{sec:serialisation} \\
+\catalogue{exports}{ecrire\_fiche()} & \code{rapport} & texte de la fiche de construction en octets UTF-8~; l'appelant écrit le fichier & \ref{sec:serialisation} \\
+\catalogue{exports}{lire\_fiche()} & \code{rapport} & fiche relue d'octets, sans évaluation, pour le rejeu (E3.7) & \ref{sec:serialisation} \\
 \end{longtable}
 }
 
@@ -5225,7 +5436,7 @@ E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP},
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
 E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
-E3.7 & relecture sans le code, rejeu à partir de la fiche & \ref{sec:fiche} \\
+E3.7 & relecture sans le code, rejeu à partir de la fiche & \ref{sec:fiche}, \ref{sec:serialisation} \\
 E4.1 & R 4.3.3, package \code{tablexp}, point d'entrée unique, modules & \ref{sec:fichiers-package}, \ref{sec:construction} \\
 E4.2 & packages de priorité \code{base}~; aucune dépendance à Java & \ref{sec:scripts-controle}, \ref{sec:absence-java} \\
 E4.3 & frontière calcul / affichage~; contrôles de saisie dans le package & \ref{sec:separation}, \ref{sec:plan} \\
@@ -5234,6 +5445,7 @@ E4.5 & plan exécuté d'un bloc, objet complet, contenu de la fiche & \ref{sec:c
 E4.6 & reproductibilité, graine locale, générateur fixé, aucun horodatage comparé & \ref{sec:reproductibilite}, \ref{sec:objet-resultat} \\
 E4.7 & références de non-régression sur la plateforme de référence & \ref{sec:plateforme}, \ref{sec:non-regression} \\
 E4.9 & un module par famille, index des fonctions contrôlé par la concordance & \ref{sec:architecture}, \ref{sec:index-exports} \\
+E5.4 & export et import du plan, écriture de la fiche (fonctions du moteur~; l'interface viendra avec l'application) & \ref{sec:serialisation} \\
 E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, \ref{sec:controles-donnees} \\
 \end{longtable}
 }
