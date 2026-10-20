@@ -258,17 +258,22 @@ controler_roles <- function(donnees, roles, segmentation) {
                           collapse = " ; ")),
             list(role = r[ko], colonne = unname(roles[ko]), type_attendu = unname(TYPES_ADMIS[types[ko]])))
   # Dates hors du domaine [0001-01-01, 9999-12-31] : type conforme, mais aucune
-  # écriture canonique ; refus nommé, les lignes sont citées (ADR 0011, point 4).
-  for (i in which(types == "date")) {
-    hors <- which(dates_hors_domaine(unclass(donnees[[roles[[i]]]])))
-    if (length(hors))
-      refuser("donnees", "date_hors_domaine",
-              sprintf(paste("Rôle « %s », colonne « %s » : %d date(s) hors du domaine [0001-01-01, 9999-12-31]",
-                            "(premières lignes %s) ; aucune écriture canonique à quatre chiffres n'existe."),
-                      r[i], roles[[i]], length(hors),
-                      paste(utils::head(hors, NB_LIGNES_CITEES), collapse = ", ")),
-              list(role = r[i], colonne = unname(roles[[i]]), lignes = hors))
-  }
+  # écriture canonique ; refus nommé, tous les rôles en cause et leurs lignes
+  # sont cités (ADR 0011, point 4) ; details$lignes : liste nommée rôle ->
+  # lignes, comme ligne_invalide.
+  hors <- lapply(stats::setNames(which(types == "date"), r[types == "date"]),
+                 function(i) which(dates_hors_domaine(unclass(donnees[[roles[[i]]]]))))
+  hors <- hors[lengths(hors) > 0L]
+  if (length(hors))
+    refuser("donnees", "date_hors_domaine",
+            sprintf(paste("Dates hors du domaine [0001-01-01, 9999-12-31] : %s ; aucune écriture canonique à",
+                          "quatre chiffres n'existe."),
+                    paste(sprintf("rôle « %s », colonne « %s » : %d date(s) (premières lignes %s)",
+                                  names(hors), roles[names(hors)], lengths(hors),
+                                  vapply(hors, function(h) paste(utils::head(h, NB_LIGNES_CITEES), collapse = ", "),
+                                         character(1L))),
+                          collapse = " ; ")),
+            list(role = names(hors), colonne = unname(roles[names(hors)]), lignes = hors))
   requis <- CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"]
   manquants <- setdiff(requis, r)
   if (length(manquants))
