@@ -244,6 +244,42 @@ verifier("ordre des modules : passe sur un graphe conforme (simulation -> donnee
          passe(controle("graphe_modules.R", shQuote(d))))
 unlink(d, recursive = TRUE)
 
+# --- tablexp sous la locale C (issue #66) -------------------------------------
+# Le contrôle complet (deux installations, R1 à R6 sous C et sous UTF-8) dure
+# une trentaine de secondes : il est une étape de la CI, non rejouée ici. Seul
+# le chemin d'échec bon marché l'est : une racine sans package sort en code 1
+# et nomme l'installation en échec.
+
+racine_sans_package <- tempfile("racine_sans_package_")
+dir.create(racine_sans_package)
+verifier("locale C : racine sans package -> échec, installation sous LC_ALL=C nommée",
+         echoue(controle("locale_c.R", shQuote(racine_sans_package)), "installation sous LC_ALL=C en échec"))
+unlink(racine_sans_package, recursive = TRUE)
+
+# locale_c.R sourcé ne fait que définir (sa dernière ligne ne lance principal()
+# que hors de toute fonction, sys.nframe() == 0L). LOCALES_UTF8 y est dupliquée
+# du harnais : l'égalité est contrôlée ici. ecart_octets() (message d'écart de
+# la comparaison octet à octet) n'est pas atteinte par le chemin d'échec bon
+# marché ci-dessus : attendus écrits à la main.
+env_locale_c <- new.env()
+sys.source(file.path(CONTROLES, "locale_c.R"), envir = env_locale_c)
+verifier("locale C : sourcé, locale_c.R ne définit que des fonctions et constantes ; LOCALES_UTF8 identique à celle du harnais",
+         identical(env_locale_c$LOCALES_UTF8, LOCALES_UTF8) && is.function(env_locale_c$ecart_octets) &&
+           is.function(env_locale_c$locale_utf8_disponible) &&
+           identical(env_locale_c$locale_utf8_disponible(), locale_utf8_disponible()))
+octets_ <- function(t) charToRaw(t)
+verifier("locale C : ecart_octets() — textes identiques (le premier octet « différent » est celui qui suit la fin)",
+         identical(env_locale_c$ecart_octets(octets_("ab\ncd\n"), octets_("ab\ncd\n")),
+                   "longueurs 6 et 6 octets ; premier octet différent : 7 (ligne 3)"))
+verifier("locale C : ecart_octets() — premier octet différent à la ligne 2",
+         identical(env_locale_c$ecart_octets(octets_("ab\ncd\n"), octets_("ab\nXd\n")),
+                   "longueurs 6 et 6 octets ; premier octet différent : 4 (ligne 2)"))
+verifier("locale C : ecart_octets() — longueurs inégales à préfixe commun (premier octet différent = premier octet manquant)",
+         identical(env_locale_c$ecart_octets(octets_("ab\ncd"), octets_("ab\ncd\nef")),
+                   "longueurs 5 et 8 octets ; premier octet différent : 6 (ligne 2)") &&
+           identical(env_locale_c$ecart_octets(octets_("ab\ncd\nef"), octets_("ab\ncd")),
+                     "longueurs 8 et 5 octets ; premier octet différent : 6 (ligne 2)"))
+
 # --- identité des batteries et de l'image (CLAUDE.md, BATTERIES, ci.yml) -----
 
 verifier("identité des batteries : passe sur le dépôt", passe(controle("identite_batteries.R")))

@@ -494,14 +494,15 @@ verifier("objet : etapes$brut (parametres, resultat, diagnostics), table NULL", 
   identical(names(XC$etapes), c("donnees", "exposition", "brut")) &&
     identical(names(XC$etapes$brut), c("parametres", "resultat", "diagnostics")) && is.null(XC$table)
 })
-CHAMPS_FICHE_SANS_BRUT <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
-                     "fin_effective", "unite_observation",
-                     "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                     "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
-                     "provenance_mention", "empreintes", "avertissements")
-verifier("fiche : hypotheses_brut en fin de liste si l'étape brut est exécutée, copie des paramètres de l'étape", {
+# Ordre des champs de la fiche (#64 ; avis d'actuary du 20/10/2026, étape (1)), sans l'étape brut.
+CHAMPS_FICHE_SANS_BRUT <- c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention",
+                     "empreintes", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
+                     "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
+                     "avertissement_unite", "hypothese_censure", "graine", "graine_mention", "generateur",
+                     "avertissements")
+verifier("fiche : hypotheses_brut après hypothese_censure (bloc hypothèses) si l'étape brut est exécutée, copie des paramètres de l'étape", {
   f <- XC$fiche
-  identical(names(f), c(CHAMPS_FICHE_SANS_BRUT, "hypotheses_brut")) &&
+  identical(names(f), append(CHAMPS_FICHE_SANS_BRUT, "hypotheses_brut", after = match("hypothese_censure", CHAMPS_FICHE_SANS_BRUT))) &&
     identical(f$hypotheses_brut, XC$etapes$brut$parametres[c("estimateurs", "niveau", "exposition_initiale",
                                                              "tolerance_effectif", "hypotheses", "statuts")])
 })
@@ -516,10 +517,13 @@ invariance_sans_brut <- function(x, donnees, roles) {
   garde <- z$avertissements$etape != "brut"
   z$avertissements <- z$avertissements[garde, , drop = FALSE]; rownames(z$avertissements) <- NULL
   z$fiche$avertissements <- z$avertissements
+  # Empreinte du résultat (#67) : celle de l'objet privé des ajouts de l'étape,
+  # recalculée sur lui (elle couvre tout l'objet hors execution).
+  z$fiche$empreintes$resultat <- tablexp:::empreinte_resultat(z)
   if (!identical(names(y$fiche), CHAMPS_FICHE_SANS_BRUT)) "champs de la fiche du plan sans brut"
   else identical(y, z)
 }
-verifier("invariance du plan sans brut (cas C, poisson et binomial) : fiche sans hypotheses_brut ; objet identical() à celui du plan avec brut hors etapes$brut, fiche$plan, fiche$hypotheses_brut et avertissements de l'étape brut",
+verifier("invariance du plan sans brut (cas C, poisson et binomial) : fiche sans hypotheses_brut ; objet identical() à celui du plan avec brut hors etapes$brut, fiche$plan, fiche$hypotheses_brut et avertissements de l'étape brut, empreinte du résultat recalculée sur l'objet ainsi privé (#67)",
          invariance_sans_brut(XC, DC, ROLES_C))
 verifier("invariance du plan sans brut (cas C, par_annee = TRUE, poisson seul) : même contrôle",
          invariance_sans_brut(construire_table(DC, ROLES_C, plan_brut(estimateurs = "poisson", par_annee = TRUE)),

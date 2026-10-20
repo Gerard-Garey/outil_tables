@@ -18,7 +18,9 @@
 #    référence (points 4.1 et 4.3 ; R6 : première annotation, (b)) ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
 #    type, valeurs), moins `execution`, `fiche$versions`, `fiche$plateforme`
-#    (point 1.1) ; tables de lignes de RESUMES_PAR_EMPREINTE résumées par
+#    (point 1.1) ; valeurs de fiche/empreintes/resultat et /code remplacées
+#    par le jeton "<md5>" si et seulement si elles ont la forme ^[0-9a-f]{32}$
+#    (CHEMINS_JETON_MD5 ; annotation du 20/10/2026, seconde, #67) ; tables de lignes de RESUMES_PAR_EMPREINTE résumées par
 #    @lignes et @empreinte (point 1.2) ; lignes @ de structure (point 2.3) ;
 #    refus d'écriture (condition de classe `refus_reference`, chemin fautif)
 #    sur toute classe ou tout attribut hors format ;
@@ -58,6 +60,13 @@ charger_utf8 <- function(fichier, envir) {
 
 FORMAT_REFERENCE <- "tablexp reference 1"
 CHEMIN_EMPREINTE_DONNEES <- "fiche/empreintes/donnees"
+# Comparaison de forme (ADR 0009, annotation du 20/10/2026, seconde ; #67) :
+# les deux seuls chemins dont la valeur est remplacée par JETON_MD5, liste
+# fermée, jamais une règle générique sur la forme hexadécimale (condition 1 :
+# fiche/empreintes/donnees et les lignes @empreinte restent comparées en
+# valeur). Valeurs réelles dans l'en-tête, hors comparaison (condition 2).
+CHEMINS_JETON_MD5 <- c("fiche/empreintes/resultat", "fiche/empreintes/code")
+JETON_MD5 <- "<md5>"
 CHEMIN_REPRESENTATION <- "fiche/empreintes/representation"
 CHEMIN_RESUMES <- "etapes/donnees/resultat"
 RESUMES_PAR_EMPREINTE <- c("lignes_conservees", "numeros_conserves", "lignes_exclues",
@@ -289,6 +298,15 @@ aplatir_construction <- function(x) {
   }
   ajouter("@classe", "character", "construction")
   parcourir(unclass(x), "", "")
+  # Jeton (annotation du 20/10/2026, seconde, (b)) : seulement un character de
+  # longueur 1 de la forme ^[0-9a-f]{32}$ ; toute autre valeur (NA, majuscules,
+  # autre longueur ou type) est gardée telle quelle, donc comparée au jeton de
+  # la référence et relevée en écart. Chemin, type et longueur inchangés.
+  for (chemin in intersect(CHEMINS_JETON_MD5, names(acc$valeurs))) {
+    v <- acc$valeurs[[chemin]]
+    if (identical(acc$types[[chemin]], "character") && length(v) == 1L && !is.na(v) &&
+        grepl("^[0-9a-f]{32}$", v)) acc$valeurs[[chemin]] <- JETON_MD5
+  }
   list(types = acc$types, valeurs = acc$valeurs)
 }
 
@@ -753,6 +771,12 @@ entete_reference <- function(p, plateforme, x, ci, mode, date_utc) {
     stats::setNames(plateforme$consigne, rep("plateforme consignée", length(plateforme$consigne))),
     stats::setNames(unlist(x$fiche$versions), paste0("fiche$versions/", names(x$fiche$versions))),
     stats::setNames(unlist(x$fiche$plateforme), paste0("fiche$plateforme/", names(x$fiche$plateforme))),
+    # Valeurs réelles des deux empreintes comparées par jeton, hors
+    # comparaison (ADR 0009, annotation du 20/10/2026, seconde, (d) ; #67).
+    stats::setNames(vapply(c("resultat", "code"), function(n) {
+      v <- x$fiche$empreintes[[n]]
+      if (is.character(v) && length(v) == 1L && !is.na(v)) v else "NA"
+    }, ""), paste0("fiche$empreintes/", c("resultat", "code"))),
     commit = ci$commit, execution = ci$execution, adresse = ci$adresse, mode = mode,
     date = date_utc,
     # Clé en chaîne, jamais en étiquette de c() : une étiquette est un symbole,

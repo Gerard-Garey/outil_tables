@@ -178,6 +178,19 @@ valider_plan <- function(plan) {
   invisible(plan)
 }
 
+# Vecteurs d'ordre des trois champs du plan dont les valeurs forment un
+# ensemble (ADR 0011, point 5.1 (h), quatrième annotation du 20/10/2026 ; #63),
+# liste nommée par le chemin du champ dans le plan. Une fonction, non une
+# constante de premier niveau : les fichiers de R/ sont évalués par ordre
+# alphabétique à l'installation, `construire_table.R` avant `donnees.R`,
+# dont les constantes (ROLES_SEGMENTATION, MOTIFS_*) ne sont pas encore
+# définies ; `brut.R` (ESTIMATEURS_BRUT) l'est déjà, mais la fonction les
+# lit toutes trois au même endroit.
+ordres_canoniques <- function()
+  list(segmentation = ROLES_SEGMENTATION,
+       "etapes/donnees/exclusions" = c(MOTIFS_LIGNES, MOTIFS_TETE),
+       "etapes/brut/estimateurs" = ESTIMATEURS_BRUT)
+
 # Point d'entrée unique (ADR 0007, point 3.1).
 #   donnees    : data.frame (le moteur ne lit pas de fichier) ;
 #   roles      : vecteur de chaînes nommé rôle -> colonne ;
@@ -190,7 +203,7 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
   debut <- Sys.time()
   # Validation entière avant toute exécution : plan, rôles, recette et
   # convention, provenance.
-  plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES)
+  plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
   controler_roles(donnees, roles, plan[["segmentation"]])
   recette <- deduire_recette(roles)
   etapes_plan <- plan[["etapes"]]
@@ -242,9 +255,13 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
   }
   rownames(avertissements) <- NULL
 
-  structure(
+  x <- structure(
     list(table = NULL, etapes = etapes, avertissements = avertissements,
-         fiche = assembler_fiche(roles, plan, recette, etapes, avertissements, empreintes, provenance),
-         execution = informations_execution(debut)),
+         fiche = assembler_fiche(roles, plan, recette, etapes, avertissements, empreintes, provenance)),
     class = "construction")
+  # Empreinte du résultat sur l'objet assemblé, avant execution, hors de son
+  # périmètre (ADR 0011, point 11.1 ; #67).
+  x$fiche$empreintes$resultat <- empreinte_resultat(x)
+  x$execution <- informations_execution(debut)
+  x
 }

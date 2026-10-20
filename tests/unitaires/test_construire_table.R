@@ -374,11 +374,11 @@ verifier("objet : exposition par (sexe, âge), colonnes de la spécification (A.
          identical(names(x$etapes$exposition$resultat$exposition),
                    c("sexe", "age", "exposition_jours", "exposition_centrale", "complement_initial_cellule",
                      "complement_initial_fenetre", "evenements", "sorties_concurrentes")))
-CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
-                  "fin_effective", "unite_observation",
-                  "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                  "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
-                  "provenance_mention", "empreintes", "avertissements")
+CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention",
+                  "empreintes", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
+                  "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
+                  "avertissement_unite", "hypothese_censure", "graine", "graine_mention", "generateur",
+                  "avertissements")  # ordre de lecture (#64)
 f <- x$fiche
 verifier("fiche : champs de l'ADR 0007 (point 6.2) et de la spécification (A.3)", identical(names(f), CHAMPS_FICHE))
 verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôles, recette, convention retenue non forcée, unité tête",
@@ -388,16 +388,25 @@ verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôl
                                         retenue = "dernier_anniversaire", forcee = FALSE)) &&
            identical(f$unite_observation, "tete") && is.na(f$avertissement_unite) &&
            identical(f$transition_code, "vivant_decede") && identical(f$fin_effective, D("2024-12-31")))
-verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 2",
+verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 3 (#57)",
          identical(f$graine, NA_integer_) && identical(f$graine_mention, "aucune étape aléatoire") &&
-           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 2L))
+           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 3L))
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
-verifier("fiche : empreintes (algorithme md5 nommé, données en 32 chiffres hexadécimaux ; résultat et code non calculés)",
-         identical(f$empreintes$algorithme, "md5") && grepl("^[0-9a-f]{32}$", f$empreintes$donnees) &&
-           is.na(f$empreintes$resultat) && is.na(f$empreintes$code) &&
-           identical(f$empreintes$statut_resultat_code, "non calculée (branche fiche-rapport)"))
+verifier(paste("fiche : empreintes (algorithme md5 nommé ; données, résultat et code en 32 chiffres hexadécimaux ;",
+               "representation_resultat avant resultat ; statut des deux empreintes, code calculé) (#67)"),
+         identical(names(f$empreintes), c("algorithme", "representation", "donnees", "fichier", "algorithme_fichier",
+                                          "representation_resultat", "resultat", "code", "statut_resultat_code")) &&
+           identical(f$empreintes$algorithme, "md5") && grepl("^[0-9a-f]{32}$", f$empreintes$donnees) &&
+           identical(f$empreintes$representation_resultat, "tablexp resultat 1") &&
+           grepl("^[0-9a-f]{32}$", f$empreintes$resultat) && grepl("^[0-9a-f]{32}$", f$empreintes$code) &&
+           identical(f$empreintes$statut_resultat_code, paste(
+             "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un",
+             "tiers ; code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine",
+             "des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement numérique,",
+             "qui dépend aussi de R, du BLAS et de la libm")) &&
+           identical(Encoding(f$empreintes$statut_resultat_code), "UTF-8"))
 verifier("fiche : versions (tablexp, R) et plateforme (sysname, release, machine, blas, lapack)",
          identical(names(f$versions), c("tablexp", "R")) && identical(f$versions$R, R.version.string) &&
            identical(names(f$plateforme), c("sysname", "release", "machine", "blas", "lapack")))
@@ -415,6 +424,40 @@ verifier("fiche : provenance reçue consignée (fichier, empreinte, algorithme)"
          identical(xp$fiche$provenance$fichier, "base.csv") &&
            identical(xp$fiche$empreintes$fichier, "0123456789abcdef0123456789abcdef") &&
            identical(xp$fiche$empreintes$algorithme_fichier, "md5"))
+# nombre_lignes_exclues (#57) : lignes distinctes exclues, à côté du décompte
+# par motif. Valeurs calculées à la main : C5 porte deux motifs déclarés
+# (cause « Rachat » hors modalités, sortie avant l'entrée), C6 un seul (sortie
+# avant l'entrée) ; décompte par motif 1 et 2 (somme 3), lignes distinctes 2.
+local({
+  BASE_X <- rbind(BASE, data.frame(
+    contrat = c("C5", "C6"), tete = c("T5", "T6"), sexe = c("H", "F"),
+    naissance = D(c("1950-01-01", "1950-01-01")), entree = D(c("2018-01-01", "2018-01-01")),
+    sortie = D(c("2017-01-01", "2017-06-01")), cause = c("Rachat", "deces"), stringsAsFactors = FALSE))
+  motifs <- c("cause_hors_modalites", "sortie_avant_entree")
+  plan_x <- modifier(plan_type(), etapes = list(donnees = list(exclusions = motifs),
+                                                 exposition = list(convention = "plus_fine", par_annee = FALSE)))
+  y <- construire_table(BASE_X, ROLES, plan_x)
+  fx <- y$fiche
+  verifier("#57 : deux motifs sur une ligne, un sur l'autre -> exclusions$nombre c(1, 2) (somme 3), nombre_lignes_exclues 2L",
+           identical(fx$exclusions$motif, motifs) && identical(fx$exclusions$nombre, c(1L, 2L)) &&
+             identical(fx$nombre_lignes_exclues, 2L) && sum(fx$exclusions$nombre) != fx$nombre_lignes_exclues)
+  verifier("#57 : identité exacte lignes reçues = lignes conservées + nombre_lignes_exclues (6 = 4 + 2)",
+           nrow(BASE_X) == 6L &&
+             nrow(y$etapes$donnees$resultat$lignes_conservees) + fx$nombre_lignes_exclues == nrow(BASE_X) &&
+             identical(fx$nombre_lignes_exclues, y$etapes$donnees$resultat$nombre_lignes_exclues))
+  verifier("#57 : nombre_lignes_exclues = lignes distinctes de lignes_exclues (union des numéros), integer de longueur 1",
+           identical(fx$nombre_lignes_exclues,
+                     length(unique(unlist(y$etapes$donnees$resultat$lignes_exclues, use.names = FALSE)))) &&
+             is.integer(fx$nombre_lignes_exclues) && length(fx$nombre_lignes_exclues) == 1L)
+  verifier("#57 : aller-retour lire_fiche(ecrire_fiche(fiche)) identical(), champ écrit en integer de longueur 1",
+           identical(lire_fiche(ecrire_fiche(fx)), fx) &&
+             any(grepl("^nombre_lignes_exclues\tinteger\t1\t2$",
+                       strsplit(rawToChar(ecrire_fiche(fx)), "\n", fixed = TRUE)[[1L]])))
+  z <- construire_table(BASE, ROLES, plan_x)$fiche
+  verifier("#57 : exclusions déclarées sans ligne porteuse -> 0L et décomptes nuls c(0, 0) ; plan sans exclusion -> 0L, aucun décompte",
+           identical(z$nombre_lignes_exclues, 0L) && identical(z$exclusions$nombre, c(0L, 0L)) &&
+             identical(f$nombre_lignes_exclues, 0L) && identical(f$exclusions$nombre, integer(0)))
+})
 verifier("unité contrat sans id_tete : avertissement inscrit dans l'objet et dans la fiche", {
   y <- construire_table(BASE, ROLES[names(ROLES) != "id_tete"], plan_type())
   identical(y$fiche$unite_observation, "contrat") && !is.na(y$fiche$avertissement_unite) &&
@@ -508,6 +551,248 @@ verifier("empreinte : chaîne marquée UTF-8 invalide -> refus chaine_non_utf8",
 })
 verifier("empreinte de la fiche = empreinte_donnees des données reçues (avant exclusions)",
          identical(x$fiche$empreintes$donnees, empreinte_donnees(BASE, ROLES)))
+
+# --- empreinte du résultat (ADR 0011, point 11 ; cinquième annotation du 20/10/2026 ; #67) ---
+#
+# Natures : identité exacte (deux constructions, rejeu) ; valeur calculée à la
+# main par un autre outil (texte du petit objet XT écrit et haché en Python,
+# hashlib.md5, struct.pack('<d', x).hex() pour les doubles, hors R : 1057
+# octets, md5 62ba547dde2bde7096af769a0af2a372) ; témoins de sensibilité et
+# d'insensibilité sur des copies.
+empreinte_resultat <- tablexp:::empreinte_resultat
+# Double suivant d'un ulp (mot de poids faible des octets IEEE 754 + 1 ; v
+# fini, non nul, de mot faible inférieur à .Machine$integer.max).
+ulp_suivant <- function(v) {
+  i <- readBin(writeBin(v, raw(), size = 8L, endian = "little"), "integer", n = 2L, size = 4L, endian = "little")
+  i[1L] <- i[1L] + 1L
+  readBin(writeBin(i, raw(), size = 4L, endian = "little"), "double", size = 8L, endian = "little")
+}
+verifier("empreinte du résultat (identité exacte) : égale sur deux constructions et au rejeu de la fiche, recalculée égale sur l'objet",
+         identical(construire_table(BASE, ROLES, plan_type())$fiche$empreintes$resultat, x$fiche$empreintes$resultat) &&
+           identical(construire_table(BASE, f$roles, f$plan, f$provenance)$fiche$empreintes$resultat,
+                     x$fiche$empreintes$resultat) &&
+           identical(empreinte_resultat(x), x$fiche$empreintes$resultat))
+verifier("empreinte du résultat : inchangée quand execution, fiche$versions, fiche$plateforme, resultat, code ou statut_resultat_code changent", {
+  y <- x
+  y$execution <- list(debut = Sys.time() + 3600, duree_secondes = 1e9)
+  y$fiche$versions <- list(tablexp = "9.9.9", R = "R version 0")
+  y$fiche$plateforme$machine <- "autre"; y$fiche$plateforme$blas <- "autre BLAS"
+  y$fiche$empreintes$resultat <- "0"; y$fiche$empreintes$code <- NA_character_
+  y$fiche$empreintes$statut_resultat_code <- "autre"
+  identical(empreinte_resultat(y), x$fiche$empreintes$resultat)
+})
+verifier("empreinte du résultat (témoin) : changée par un ulp d'un double du périmètre (exposition_jours[1]), et par la représentation", {
+  y <- x
+  v <- y$etapes$exposition$resultat$exposition$exposition_jours[1L]
+  w <- ulp_suivant(v)
+  y$etapes$exposition$resultat$exposition$exposition_jours[1L] <- w
+  z <- x; z$fiche$empreintes$representation_resultat <- "tablexp resultat 0"
+  w != v && abs(w - v) <= abs(v) * 2^-52 && !identical(empreinte_resultat(y), x$fiche$empreintes$resultat) &&
+    !identical(empreinte_resultat(z), x$fiche$empreintes$resultat)
+})
+verifier("empreinte du résultat (témoin) : changée par l'empreinte des données, le plan et les rôles (dans le périmètre)", {
+  a <- x; a$fiche$empreintes$donnees <- "0"
+  b <- x; b$fiche$plan$delai_declaration <- 1
+  r <- x; names(r$fiche$roles)[1L] <- "autre"
+  length(unique(c(x$fiche$empreintes$resultat, empreinte_resultat(a), empreinte_resultat(b), empreinte_resultat(r)))) == 4L
+})
+XT <- structure(list(
+  table = NULL,
+  etapes = list(donnees = list(resultat = list(
+                  lignes_conservees = structure(data.frame(t = as.POSIXct(0, origin = "1970-01-01", tz = "UTC"),
+                                                           f = factor("a")), simulation = list(graine = 1L)),
+                  numeros_conserves = 1L)),
+                e = list(v = c(0.95, -0, NA, NaN, Inf, -Inf), n = c(a = 1L, b = NA), d = D(c("2024-02-29", NA)),
+                         f = factor(c("y", "x")))),
+  avertissements = data.frame(code = tablexp:::texte_moteur(c("é", NA)), nombre = c(2L, 0L), stringsAsFactors = FALSE),
+  fiche = list(versions = list(R = "x"), plateforme = list(s = "y"),
+               empreintes = list(algorithme = "md5", representation_resultat = "tablexp resultat 1",
+                                 resultat = "z", code = NA_character_, statut_resultat_code = "s"),
+               ok = TRUE, l = list(1.5, "a\tb\"c")),
+  execution = list(debut = 1)), class = "construction")
+verifier(paste("empreinte du résultat (valeur calculée à la main, hors R, Python) : 62ba547dde2bde7096af769a0af2a372",
+               "(doubles en octets, jetons, -0, Date, facteur, chaînes échappées, data.frame, liste sans noms ;",
+               "lignes_conservees, versions, plateforme, trois champs d'empreinte et execution hors du texte)"),
+         identical(empreinte_resultat(XT), "62ba547dde2bde7096af769a0af2a372"))
+verifier("empreinte du résultat : lignes_conservees hors du périmètre (colonne, classe, attribut ou noms de lignes de l'entrée sans effet ; M71, Q1, #67)", {
+  y <- x
+  lc <- y$etapes$donnees$resultat$lignes_conservees
+  lc$autre <- as.POSIXct(0, origin = "1970-01-01", tz = "UTC"); attr(lc, "simulation") <- list(a = 1); attr(lc, "foo") <- 1
+  y$etapes$donnees$resultat$lignes_conservees <- lc
+  identical(empreinte_resultat(y), x$fiche$empreintes$resultat)
+})
+# retirer() de empreinte_resultat() ignore un chemin absent : un champ renommé
+# rentrerait en silence dans le périmètre (son contenu, la version de R par
+# exemple, ferait varier l'empreinte). Chaque chemin de CHEMINS_HORS_RESULTAT
+# existe donc dans une construction sans brut et dans une avec brut (poisson,
+# binomial ; kaplan_meier) ; execution, ajouté après le calcul de l'empreinte,
+# est le seul absent de l'objet que reçoit empreinte_resultat().
+verifier("empreinte du résultat : chaque chemin de CHEMINS_HORS_RESULTAT, sauf execution, existe dans une construction sans brut, avec brut, avec kaplan_meier", {
+  existe <- function(v, segments) {
+    for (sg in segments) { if (!is.list(v) || !sg %in% names(v)) return(FALSE); v <- v[[sg]] }
+    TRUE
+  }
+  chemins <- setdiff(tablexp:::CHEMINS_HORS_RESULTAT, "execution")
+  etapes_brut <- function(est) {
+    e <- plan_type()$etapes; e$brut <- list(estimateurs = est, niveau = 0.95); modifier(plan_type(), etapes = e)
+  }
+  plans <- list(plan_type(), etapes_brut(c("poisson", "binomial")), etapes_brut("kaplan_meier"))
+  length(chemins) == length(tablexp:::CHEMINS_HORS_RESULTAT) - 1L && "execution" %in% tablexp:::CHEMINS_HORS_RESULTAT &&
+    all(vapply(plans, function(pl) {
+      z <- construire_table(BASE, ROLES, pl)
+      all(vapply(strsplit(chemins, "/", fixed = TRUE), function(sg) existe(z, sg), logical(1L))) && "execution" %in% names(z)
+    }, logical(1L)))
+})
+verifier("empreinte du résultat : attribut inattendu (dont simulation hors de lignes_conservees), classe autre que construction ou valeur sans écriture -> erreur de programmation", {
+  msg <- function(expr) tryCatch({ force(expr); "" }, refus_tablexp = function(e) "refus", error = function(e) conditionMessage(e))
+  prog <- function(m) grepl("erreur de programmation", m, fixed = TRUE)
+  a <- x; attr(a$etapes$exposition$resultat$exposition, "foo") <- 1
+  b <- x; attr(b$etapes$donnees$resultat$observations, "simulation") <- list(a = 1)
+  c_ <- x; class(c_) <- c("construction", "autre")
+  d <- x; d$etapes$exposition$resultat$exposition$age <- as.POSIXct(0, origin = "1970-01-01", tz = "UTC")
+  e <- x; attr(e$fiche$roles, "foo") <- "x"
+  all(vapply(list(msg(empreinte_resultat(a)), msg(empreinte_resultat(b)), msg(empreinte_resultat(c_)),
+                  msg(empreinte_resultat(unclass(x))), msg(empreinte_resultat(d)), msg(empreinte_resultat(e))), prog, NA))
+})
+verifier("empreinte du résultat : colonne de rôle catégorie en facteur admise (type factor, libellés), niveaux permutés sans effet", {
+  b1 <- BASE; b1$sexe <- factor(b1$sexe, levels = c("H", "F"))
+  b2 <- BASE; b2$sexe <- factor(b2$sexe, levels = c("F", "H"))
+  e1 <- construire_table(b1, ROLES, plan_type())$fiche$empreintes$resultat
+  grepl("^[0-9a-f]{32}$", e1) && identical(e1, construire_table(b2, ROLES, plan_type())$fiche$empreintes$resultat)
+})
+# Attributs de colonne de l'entrée (label) sur chaque colonne de rôle, dans
+# les deux unités (#67, M71, Q4) : la construction est acceptée et son
+# empreinte égale celle de la même entrée sans attribut (observations recopie
+# les colonnes par sous-indiçage, qui retire ces attributs).
+for (u in c("tete", "contrat")) {
+  r_u <- if (u == "tete") ROLES else ROLES[names(ROLES) != "id_tete"]
+  verifier(sprintf("empreinte du résultat, unité %s : attribut label sur chaque colonne de rôle -> construction acceptée, empreinte égale à celle sans attribut", u), {
+    ref_u <- construire_table(BASE, r_u, plan_type())
+    ok <- identical(ref_u$fiche$unite_observation, u)
+    for (col in unname(r_u)) {
+      b <- BASE; attr(b[[col]], "label") <- "Libellé"
+      e <- tryCatch(construire_table(b, r_u, plan_type())$fiche$empreintes$resultat, error = function(err) conditionMessage(err))
+      ok <- ok && identical(e, ref_u$fiche$empreintes$resultat)
+    }
+    ok
+  })
+}
+# Unité contrat avec id_tete déclaré (transition en_cours -> rachat, rôles
+# complets) : la copie id_t[i] d'observations est exercée (audit de #67).
+PLAN_RACHAT <- modifier(plan_type(), transition = RA)
+verifier("empreinte du résultat, unité contrat avec id_tete déclaré : attribut label sur la colonne de tête -> construction acceptée, empreinte égale à celle sans attribut", {
+  x0 <- construire_table(BASE, ROLES, PLAN_RACHAT)
+  b <- BASE; attr(b$tete, "label") <- "Libellé"
+  e <- tryCatch(construire_table(b, ROLES, PLAN_RACHAT)$fiche$empreintes$resultat, error = function(err) conditionMessage(err))
+  identical(x0$fiche$unite_observation, "contrat") && "id_tete" %in% names(x0$etapes$donnees$resultat$observations) &&
+    identical(e, x0$fiche$empreintes$resultat)
+})
+# Colonne d'identifiant portant l'attribut names (data.frame construit par
+# list2DF) : data.frame() en tirait les noms de lignes d'observations, que
+# l'empreinte du résultat refuse (régression de #67, revue finale). La
+# construction aboutit, observations porte des noms de lignes automatiques,
+# l'entrée est intacte et l'empreinte égale celle de l'entrée sans noms.
+# Les deux premiers cas échouaient avant la correction ; le troisième
+# (id_tete recopiée par `$<-` en unité contrat) aboutissait déjà et protège
+# ce chemin.
+for (cas_ in list(list("tete", "tete", plan_type(), ROLES),
+                  list("contrat", "contrat", PLAN_RACHAT, ROLES),
+                  list("contrat", "tete", PLAN_RACHAT, ROLES))) {
+  verifier(sprintf("empreinte du résultat, unité %s, colonne %s portant names (list2DF) -> construction acceptée, noms de lignes d'observations automatiques, entrée intacte, empreinte égale à celle sans names",
+                   cas_[[1L]], cas_[[2L]]), {
+    l <- as.list(BASE); l[[cas_[[2L]]]] <- setNames(l[[cas_[[2L]]]], paste0("n", seq_len(nrow(BASE))))
+    b <- list2DF(l); b0 <- b
+    x0 <- construire_table(BASE, cas_[[4L]], cas_[[3L]])
+    x <- tryCatch(construire_table(b, cas_[[4L]], cas_[[3L]]), error = function(err) conditionMessage(err))
+    !is.null(names(b[[cas_[[2L]]]])) && is.list(x) && identical(x$fiche$unite_observation, cas_[[1L]]) &&
+      identical(attr(x$etapes$donnees$resultat$observations, "row.names"), seq_len(nrow(x$etapes$donnees$resultat$observations))) &&
+      identical(b, b0) && identical(x$fiche$empreintes$resultat, x0$fiche$empreintes$resultat)
+  })
+}
+# Facteurs de rôle catégorie (sexe ; segment segmenté) recopiés normalisés
+# dans observations (#67, M72), dans les deux unités : contrasts, sous-classe
+# ou sous-classe d'ordered -> construction acceptée, empreinte égale à celle du
+# facteur simple (de l'ordered) aux mêmes libellés.
+BASE_SEG <- BASE; BASE_SEG$seg <- c("A", "B", "A", "A")
+ROLES_SEG <- c(ROLES, segment = "seg")
+for (u_ in list(list("tête", plan_type()), list("contrat", PLAN_RACHAT))) {
+  for (r_ in list(list("sexe", "sexe"), list("segment", "seg"))) {
+    verifier(sprintf("empreinte du résultat, unité %s, %s en facteur avec contrasts, de sous-classe mafac/factor ou x/ordered/factor -> construction acceptée, empreinte égale à celle du facteur simple (de l'ordered)",
+                     u_[[1L]], r_[[1L]]), {
+      pl <- u_[[2L]]
+      if (r_[[1L]] == "segment") pl$segmentation <- "segment"
+      col <- r_[[2L]]
+      emp <- function(v) {
+        b <- BASE_SEG; b[[col]] <- v
+        tryCatch(construire_table(b, ROLES_SEG, pl)$fiche$empreintes$resultat, error = function(err) conditionMessage(err))
+      }
+      fs <- factor(BASE_SEG[[col]]); fo <- factor(BASE_SEG[[col]], ordered = TRUE)
+      ct <- fs; contrasts(ct) <- contr.sum(2)
+      sc <- fs; class(sc) <- c("mafac", "factor")
+      so <- fo; class(so) <- c("x", "ordered", "factor")
+      ef <- emp(fs); eo <- emp(fo)
+      grepl("^[0-9a-f]{32}$", ef) && grepl("^[0-9a-f]{32}$", eo) &&
+        identical(emp(ct), ef) && identical(emp(sc), ef) && identical(emp(so), eo)
+    })
+  }
+}
+verifier("texte de la fiche : facteur toujours refusé en forme texte (grammaire 1), admis en forme empreinte", {
+  o <- list(f = factor("a"))
+  leve_refus(tablexp:::texte_objet(o, "t", character(0)), "serialisation_impossible") &&
+    is.raw(tablexp:::texte_objet(o, "t", character(0), "empreinte"))
+})
+verifier("texte empreinté : facteur admis seulement de classe exactement factor ou c(ordered, factor) ; c(factor, x) et c(ordered, factor, x) refusés", {
+  sous <- function(cl) { f <- factor(c("a", "b")); class(f) <- cl; list(f = f) }
+  leve_refus(tablexp:::texte_objet(sous(c("factor", "x")), "t", character(0), "empreinte"), "serialisation_impossible") &&
+    leve_refus(tablexp:::texte_objet(sous(c("ordered", "factor", "x")), "t", character(0), "empreinte"), "serialisation_impossible") &&
+    is.raw(tablexp:::texte_objet(sous("factor"), "t", character(0), "empreinte")) &&
+    is.raw(tablexp:::texte_objet(sous(c("ordered", "factor")), "t", character(0), "empreinte"))
+})
+
+# --- empreinte du code (option (iv), M70 ; cinquième annotation du 20/10/2026, (c) ; #67) ---
+#
+# Nature : valeur recalculée par un autre outil (md5sum de GNU coreutils, sur
+# R/*.R de la racine installée par la batterie), ou à défaut recalculée en R
+# sans empreinte_sources().
+recalcul_code <- function(racine) {
+  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
+  t <- tempfile(); on.exit(unlink(t))
+  writeBin(charToRaw(paste0(md5, "  R/", fichiers, "\n", collapse = "")), t)
+  unname(tools::md5sum(t))
+}
+CODE <- tablexp:::EMPREINTE_CODE
+verifier("empreinte du code : non NA, égale au recalcul en R sur R/*.R de la racine installée, et à fiche$empreintes$code",
+         is.character(CODE) && length(CODE) == 1L && !is.na(CODE) && identical(CODE, recalcul_code(RACINE)) &&
+           identical(f$empreintes$code, CODE))
+if (nzchar(Sys.which("md5sum")) && nzchar(Sys.which("sh"))) {
+  verifier("empreinte du code (autre outil) : égale à `LC_ALL=C md5sum R/*.R | md5sum` à la racine installée", {
+    s <- system2("sh", c("-c", shQuote(sprintf("cd %s && LC_ALL=C md5sum R/*.R | md5sum", shQuote(RACINE)))), stdout = TRUE)
+    identical(sub(" .*$", "", s), CODE)
+  })
+} else cat("  (md5sum ou sh absent : comparaison à l'autre outil non faite ; recalcul en R seulement)\n")
+verifier("empreinte du code : R/ ne contient que des fichiers *.R (R CMD INSTALL évalue aussi .r, .S, .s, .q)",
+         all(grepl("[.]R$", list.files(file.path(RACINE, "R"), all.files = TRUE, no.. = TRUE))))
+verifier("empreinte du code : sources introuvables -> NA (sans DESCRIPTION, autre paquet, sans R/rapport.R, fichier illisible), statut nommé ; racine conforme -> recalcul", {
+  es <- tablexp:::empreinte_sources
+  r <- tempfile("racine_"); dir.create(file.path(r, "R"), recursive = TRUE)
+  sans_description <- es(r)
+  writeLines(c("Package: autre", "Version: 1"), file.path(r, "DESCRIPTION"))
+  autre <- es(r)
+  writeLines(c("Package: tablexp", "Version: 1"), file.path(r, "DESCRIPTION"))
+  sans_rapport <- es(r)
+  writeLines("x <- 1", file.path(r, "R", "rapport.R")); writeLines("y <- 2", file.path(r, "R", "a.R"))
+  writeLines("z <- 3", file.path(r, "R", "b.r"))
+  st <- tablexp:::statut_empreintes(NA_character_)
+  conforme <- es(r); attendu <- recalcul_code(r)
+  # Fichier illisible (lien cassé) : md5sum rend NA -> NA (audit de #67).
+  casse <- if (isTRUE(file.symlink(file.path(r, "absent.R"), file.path(r, "R", "z.R")))) es(r) else NA_character_
+  unlink(r, recursive = TRUE)
+  is.na(sans_description) && is.na(autre) && is.na(sans_rapport) && identical(conforme, attendu) && is.na(casse) &&
+    grepl("code : non calculée, sources introuvables à l'installation", st, fixed = TRUE) &&
+    startsWith(st, "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6)") &&
+    identical(Encoding(st), "UTF-8") && !grepl("introuvables", tablexp:::statut_empreintes("0"), fixed = TRUE)
+})
 
 # --- portefeuille simulé (#10) : identités exactes et recoupement -----------
 
@@ -742,6 +1027,113 @@ local({
   })
 })
 
+# --- écriture des chaînes sans liste d'un vecteur raw par ligne (#22, point 1 ; #67) ---
+
+# Oracle : assemblage d'octets_chaines() avant #22, point 1 (R/rapport.R à
+# df74de8, une liste de 3n vecteurs raw puis unlist()), recopié ici et non dans
+# le package ; partie de refus omise (inchangée), appliquée à des entrées
+# admises. Les cas sont du code texte, évalué ici et dans un sous-processus
+# LC_ALL=C : chaînes non ASCII construites depuis leurs octets.
+local({
+  oracle <- function(x) {
+    y <- enc2utf8(x)
+    if (!length(y)) return(raw(0))
+    valeurs <- unique(y)
+    na <- is.na(valeurs)
+    esc <- valeurs[!na]
+    for (r in list(c("\\", "\\\\"), c("\n", "\\n"), c("\r", "\\r"), c("\t", "\\t"), c("\"", "\\\"")))
+      esc <- gsub(r[1L], r[2L], esc, fixed = TRUE, useBytes = TRUE)
+    corps <- vector("list", length(valeurs))
+    corps[!na] <- lapply(esc, charToRaw)
+    corps[na] <- list(charToRaw("NA"))
+    i <- match(y, valeurs)
+    na_i <- na[i]
+    morceaux <- vector("list", 3L * length(y))
+    morceaux[seq.int(1L, by = 3L, length.out = length(y))] <-
+      ifelse(na_i, list(raw(0)), list(as.raw(0x22)))
+    morceaux[seq.int(2L, by = 3L, length.out = length(y))] <- corps[i]
+    morceaux[seq.int(3L, by = 3L, length.out = length(y))] <-
+      ifelse(na_i, list(as.raw(0x0a)), list(as.raw(c(0x22, 0x0a))))
+    unlist(morceaux, use.names = FALSE)
+  }
+  code_cas <- c(
+    "u8 <- function(o) { x <- rawToChar(as.raw(o)); Encoding(x) <- 'UTF-8'; x }",
+    "l1 <- rawToChar(as.raw(c(0x63, 0xe9))); Encoding(l1) <- 'latin1'",
+    "e <- u8(c(0xc3, 0xa9)); euro <- u8(c(0xe2, 0x82, 0xac))",
+    "CAS <- list(character(0), 'a', NA_character_, '', c(NA_character_, NA), c('', '', NA, ''), 'NA',",
+    "  c('NA', NA, '\"NA\"', '\"\"', '\"', '\"\"\"'), c('\\\\', '\\n', '\\r', '\\t', '\"', '\\\\\\\\n\"\\r\\t', 'a\"\"\"b', '\\\\\"'),",
+    "  c(e, 'x', euro, NA, e, paste0(euro, '\\t', e, '\"')), l1, c(l1, 'a', e, NA), rep(c('ab', NA, 'ab', ''), 50),",
+    "  sprintf('C%09d', c(1:500, 500:1)), c(NA, sprintf('T%05d', 1:300), NA), paste0(strrep('z', 5000), '\\t'),",
+    "  c(rawToChar(as.raw(c(0x01, 0x7f))), 'fin'))",
+    "LIMITES <- c(2^30, 1, 3, 4, 5, 7, 10, 64)",
+    "ecarts <- function(nouvelle, oracle) {",
+    "  r <- character(0)",
+    "  for (k in seq_along(CAS)) for (lim in LIMITES)",
+    "    if (!identical(nouvelle(CAS[[k]], 'r', limite = lim), oracle(CAS[[k]]))) r <- c(r, sprintf('cas %d, limite %g', k, lim))",
+    "  r",
+    "}")
+  eval(parse(text = code_cas))
+  oc <- tablexp:::octets_chaines
+  verifier(sprintf("octets_chaines() : octets identiques à l'oracle avant #22 (liste de 3n raw), %d cas adverses (NA, chaîne vide, non ASCII UTF-8 et latin-1, cinq échappements, triples guillemets, répétitions, longueurs 0 et 1) x %d limites de bloc, session %s",
+                   length(CAS), length(LIMITES), Sys.getlocale("LC_CTYPE")), {
+    r <- ecarts(oc, oracle)
+    if (!length(r)) TRUE else paste("écarts :", paste(r, collapse = " ; "))
+  })
+  verifier("octets_chaines() : sortie à la main (NA sans guillemets, \"NA\" entre guillemets, chaîne vide, échappements, non ASCII)",
+           identical(oc(c(NA, "NA", "", "a\"\\\n", u8(c(0xc3, 0xa9))), "r"),
+                     c(charToRaw("NA\n\"NA\"\n\"\"\n\"a\\\"\\\\\\n\"\n\""), as.raw(c(0xc3, 0xa9)), charToRaw("\"\n"))))
+  verifier("octets_chaines() : découpage en blocs (limite de 64 octets) sur 2 000 lignes avec NA, octets identiques à l'unique bloc", {
+    x <- sprintf("V%06d", 1:2000); x[c(1L, 17L, 1000L, 2000L)] <- NA
+    identical(oc(x, "r", limite = 64), oc(x, "r")) && identical(oc(x, "r"), oracle(x))
+  })
+  # Bornes des blocs (bornes_blocs()), tailles mesurées ici, indépendamment de
+  # la fonction : taille d'une ligne = octets de guillemet, corps, guillemet,
+  # LF ; taille d'un bloc = nchar() du texte collé comme dans octets_chaines()
+  # (avant le gsub() des NA, dont le corps guillemet compte 4 octets).
+  verifier("bornes_blocs() : partition de 1..n dans l'ordre ; bloc de plusieurs lignes <= limite et maximal (la ligne suivante ne tiendrait pas) ; ligne plus longue que limite seule dans son bloc, et elle seule marquée ; 45 limites x 3 jeux de corps", {
+    e <- u8(c(0xc3, 0xa9))
+    jeux <- list(strrep("x", (seq_len(300L) * 7L) %% 13L),
+                 c("\"", "", "ab", paste0(e, e), "\"", strrep("y", 9L), "\\\"", "\"", strrep(e, 4L), "z"),
+                 "seule")
+    jeux <- lapply(jeux, function(v) { Encoding(v) <- "bytes"; v })
+    taille_bloc <- function(v) nchar(paste0("\"", paste(v, collapse = "\"\n\""), "\"\n"), type = "bytes")
+    ecarts <- character(0)
+    for (j in seq_along(jeux)) for (lim in c(1:40, 64, 100, 1000, 2^20, 2^30)) {
+      corps <- jeux[[j]]
+      n <- length(corps)
+      ligne <- nchar(corps, type = "bytes") + 3
+      b <- tablexp:::bornes_blocs(corps, lim)
+      k <- length(b$debut)
+      partition <- k >= 1L && b$debut[1L] == 1L && b$fin[k] == n && all(b$debut <= b$fin) &&
+        all(b$debut[-1L] == b$fin[-k] + 1L)
+      ok <- partition && length(b$fin) == k && length(b$seule) == k
+      if (ok) for (q in seq_len(k)) {
+        s <- b$debut[q]; f <- b$fin[q]
+        t <- taille_bloc(corps[s:f])
+        ok <- ok && identical(b$seule[q], s == f && ligne[s] > lim) &&
+          (if (s < f) t <= lim else TRUE) && (if (s == f && ligne[s] > lim) TRUE else t <= lim) &&
+          (if (q < k && !b$seule[q] && !b$seule[q + 1L]) t + ligne[f + 1L] > lim else TRUE)
+      }
+      if (!ok) ecarts <- c(ecarts, sprintf("jeu %d, limite %g", j, lim))
+    }
+    if (!length(ecarts)) TRUE else paste("écarts :", paste(ecarts, collapse = " ; "))
+  })
+  script <- tempfile(fileext = ".R")
+  writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(.harnais$bibliotheque)),
+               paste("oracle <-", paste(deparse(oracle), collapse = "\n")), code_cas,
+               "r <- ecarts(tablexp:::octets_chaines, oracle)",
+               "cat('LOCALE', Sys.getlocale('LC_CTYPE'), '\\n')",
+               "cat('ECARTS', length(r), paste(r, collapse = ' ; '), '\\n')"), script)
+  r <- executer_rscript(script, env = "LC_ALL=C")
+  unlink(script)
+  verifier("octets_chaines() : sous-processus LC_ALL=C, octets identiques à l'oracle sur les mêmes cas et limites", {
+    loc <- trimws(sub("^LOCALE ", "", grep("^LOCALE ", r$sortie, value = TRUE)))
+    ec <- trimws(sub("^ECARTS ", "", grep("^ECARTS ", r$sortie, value = TRUE)))
+    if (r$statut == 0L && identical(loc, "C") && identical(ec, "0")) TRUE
+    else paste("statut", r$statut, ":", paste(r$sortie, collapse = " | "))
+  })
+})
+
 # --- dates : année sur quatre chiffres, refus hors du domaine (#19 ; ADR 0011, point 4) ---
 
 # Nature des attendus : textes écrits à la main ; jours depuis 1970-01-01 des
@@ -878,7 +1270,7 @@ local({
 # exacte : deux plans de même sens donnent des objets identical() hors
 # execution (le stockage d'une Date est invisible aux références).
 local({
-  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES)
+  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES, tablexp:::ordres_canoniques())
   erreur <- function(expr) inherits(tryCatch({ force(expr); NULL }, error = function(e) e), "error")
   J <- function(j) structure(j, class = "Date")
   pb <- modifier(plan_type(), etapes = c(plan_type()$etapes,
@@ -941,7 +1333,78 @@ local({
   verifier("construire_table : rejeu de la fiche (rôles, plan canonique, provenance) identical() hors execution",
            identical(sans_execution(construire_table(BASE, y$fiche$roles, y$fiche$plan, y$fiche$provenance)), x0) &&
              identical(y$fiche$plan, pb))
-  verifier("fiche : version 2, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
-           identical(x0$fiche$version_fiche, 2L) &&
+  verifier("fiche : version 3, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
+           identical(x0$fiche$version_fiche, 3L) &&
              !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
+
+  # Ordre canonique des valeurs de segmentation, exclusions et estimateurs (#63 ;
+  # ADR 0011, quatrième annotation du 20/10/2026). Valeur calculée à la main :
+  # ordres des catalogues ; identité exacte : objets identical() hors execution,
+  # fiche comprise, sur un portefeuille simulé (n = 5 000, graine 7) auquel est
+  # ajouté un rôle segment constant par tête (trois segments).
+  ord <- tablexp:::ordres_canoniques()
+  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête ; estimateurs = poisson, binomial, kaplan_meier",
+           identical(names(ord), c("segmentation", "etapes/donnees/exclusions", "etapes/brut/estimateurs")) &&
+             identical(ord$segmentation, c("sexe", "segment")) &&
+             identical(ord[["etapes/brut/estimateurs"]], c("poisson", "binomial", "kaplan_meier")) &&
+             identical(ord[["etapes/donnees/exclusions"]], c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE)))
+  SIM63 <- simuler_portefeuille(LOI, modifier(PF, n = 5000), PER, 7L)
+  SIM63$segment <- paste0("s", SIM63$id_tete %% 3L)
+  ROLES63 <- c(ROLES_SIM, segment = "segment")
+  EXC <- c("sortie_avant_entree", "age_aberrant", "tete_sexe_incoherent")
+  EST <- c("poisson", "binomial", "kaplan_meier")
+  SEG <- c("sexe", "segment")
+  plan63 <- function(seg, exc, est)
+    list(transition = VD, periode = PER, delai_declaration = 0, segmentation = seg,
+         etapes = list(donnees = list(exclusions = exc),
+                       exposition = list(convention = "plus_fine", par_annee = FALSE),
+                       brut = list(estimateurs = est, niveau = 0.95)))
+  canon63 <- plan63(SEG, EXC, EST)
+  verifier("canoniser_plan (ordre des valeurs) : plan déjà canonique rendu identical(), idempotente, valide ; exclusions vides et segmentation vide inchangées",
+           identical(cn(canon63), canon63) && identical(valider_plan(canon63), canon63) &&
+             identical(cn(plan63(character(0), character(0), "poisson")), plan63(character(0), character(0), "poisson")))
+  permutations <- list(
+    "segmentation seule" = plan63(rev(SEG), EXC, EST),
+    "exclusions seules" = plan63(SEG, EXC[c(3, 1, 2)], EST),
+    "estimateurs seuls" = plan63(SEG, EXC, EST[c(3, 1, 2)]),
+    "les trois champs" = plan63(rev(SEG), rev(EXC), rev(EST)),
+    "les trois champs et les permutations du point 5.1" = {
+      q <- plan63(rev(SEG), EXC[c(2, 3, 1)], EST[c(2, 3, 1)])
+      list(etapes = list(donnees = q$etapes$donnees,
+                         exposition = list(par_annee = FALSE, convention = "plus_fine"),
+                         brut = list(niveau = 0.95, estimateurs = q$etapes$brut$estimateurs)),
+           segmentation = q$segmentation, periode = list(fin = PER$fin, debut = PER$debut),
+           delai_declaration = 0L, transition = list(arrivee = "deces", depart = "vivant"))
+    })
+  x63 <- sans_execution(construire_table(SIM63, ROLES63, canon63))
+  for (n in names(permutations)) {
+    q <- permutations[[n]]
+    verifier(sprintf("canoniser_plan (ordre des valeurs, %s) : canon = plan canonique, idempotente, valider_plan(canon) le rend inchangé", n),
+             !identical(q, canon63) && identical(cn(q), canon63) && identical(cn(cn(q)), cn(q)) &&
+               identical(valider_plan(cn(q)), cn(q)))
+    verifier(sprintf("construire_table (ordre des valeurs, %s) : objet identical() hors execution à celui du plan canonique, fiche comprise", n),
+             identical(sans_execution(construire_table(SIM63, ROLES63, q)), x63))
+  }
+  verifier("construire_table (ordre des valeurs) : fiche$plan et fiche$hypotheses_brut$estimateurs dans l'ordre des catalogues",
+           identical(x63$fiche$plan$segmentation, SEG) && identical(x63$fiche$plan$etapes$donnees$exclusions, EXC) &&
+             identical(x63$fiche$plan$etapes$brut$estimateurs, EST) &&
+             identical(x63$fiche$hypotheses_brut$estimateurs, EST))
+  verifier("construire_table (ordre des valeurs) : rejeu de la fiche d'un plan permuté identical() hors execution",
+           identical(sans_execution(construire_table(SIM63, ROLES63, construire_table(SIM63, ROLES63, permutations[[4L]])$fiche$plan)), x63))
+  # Erreur de programmation sur une valeur hors du vecteur d'ordre, un doublon ou
+  # un attribut, passés directement à canoniser_plan() (jamais retirés en silence).
+  verifier("canoniser_plan (ordre des valeurs) : valeur inconnue, doublon ou attribut -> erreur de programmation pour chacun des trois champs",
+           erreur(cn(plan63(c("sexe", "inconnu"), EXC, EST))) && erreur(cn(plan63(c("sexe", "sexe"), EXC, EST))) &&
+             erreur(cn(plan63(SEG, c(EXC, "inconnu"), EST))) && erreur(cn(plan63(SEG, c(EXC, EXC[1L]), EST))) &&
+             erreur(cn(plan63(SEG, EXC, c("poisson", "inconnu")))) && erreur(cn(plan63(SEG, EXC, c("poisson", "poisson")))) &&
+             erreur(cn(plan63(SEG, EXC, c(a = "poisson")))) && erreur(cn(plan63(SEG, EXC, NA_character_))) &&
+             erreur(cn(plan63(1L, EXC, EST))) &&
+             grepl("erreur de programmation", conditionMessage(tryCatch(cn(plan63(SEG, EXC, c("poisson", "inconnu"))),
+                                                                       error = function(e) e)), fixed = TRUE))
+  verifier("canoniser_plan (ordre des valeurs) : catalogues fabriqués ; étape absente du plan -> rien à canoniser ; liste ordres vide -> valeurs inchangées",
+           identical(tablexp:::canoniser_plan(plan63(c("a", "b"), EXC, EST), tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES,
+                                              list(segmentation = c("b", "a")))$segmentation, c("b", "a")) &&
+             identical(cn(plan_type()), plan_type()) &&
+             identical(tablexp:::canoniser_plan(plan63(rev(SEG), rev(EXC), rev(EST)), tablexp:::CHAMPS_PLAN,
+                                                tablexp:::PARAMETRES_ETAPES, list())$etapes$brut$estimateurs, rev(EST)))
 })

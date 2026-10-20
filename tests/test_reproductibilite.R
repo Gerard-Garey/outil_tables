@@ -214,8 +214,9 @@ verifier("construction avec brut, même processus : deux exécutions identical()
          identical(xb, sans_execution(construire_table(s, roles, plan_b))))
 verifier("construction avec brut : rejeu construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) identical() hors execution",
          identical(xb, sans_execution(construire_table(s, xb$fiche$roles, xb$fiche$plan, xb$fiche$provenance))))
-verifier("construction avec brut : fiche$plan porte l'étape brut, fiche$hypotheses_brut en fin de liste",
-         identical(xb$fiche$plan, plan_b) && identical(tail(names(xb$fiche), 1L), "hypotheses_brut"))
+verifier("construction avec brut : fiche$plan porte l'étape brut, fiche$hypotheses_brut juste après fiche$hypothese_censure (#64)",
+         identical(xb$fiche$plan, plan_b) &&
+           identical(names(xb$fiche)[match("hypothese_censure", names(xb$fiche)) + 1L], "hypotheses_brut"))
 # Invariance du plan sans `brut` (la comparaison à l'état de f9ab269 relève
 # des références de non-régression, #17).
 invariance_sans_brut <- function(xb, plan_b) {
@@ -226,9 +227,11 @@ invariance_sans_brut <- function(xb, plan_b) {
   garde <- z$avertissements$etape != "brut"
   z$avertissements <- z$avertissements[garde, , drop = FALSE]; rownames(z$avertissements) <- NULL
   z$fiche$avertissements <- z$avertissements
+  # Empreinte du résultat (#67) : recalculée sur l'objet privé des ajouts.
+  z$fiche$empreintes$resultat <- tablexp:::empreinte_resultat(z)
   identical(y0, z)
 }
-verifier("invariance du plan sans brut (R1) : objet identical() à celui du plan avec brut, hors etapes$brut, fiche$plan, fiche$hypotheses_brut et avertissements de l'étape brut",
+verifier("invariance du plan sans brut (R1) : objet identical() à celui du plan avec brut, hors etapes$brut, fiche$plan, fiche$hypotheses_brut et avertissements de l'étape brut (empreinte du résultat recalculée, #67)",
          invariance_sans_brut(xb, plan_b))
 verifier("invariance du plan sans brut (R4 : sexe, par_annee = TRUE, poisson seul, 0,95) : même contrôle", {
   plan_4 <- plan_b
@@ -272,7 +275,7 @@ verifier("R6 : tables kaplan_meier et kaplan_meier_sauts présentes, somme de d 
     identical(km$evenements, x6$etapes$exposition$resultat$exposition$evenements) &&
     (if (n_perdus) identical(a$nombre, n_perdus) else !nrow(a))
 })
-verifier("invariance du plan sans kaplan_meier (R1 contre R6) : objet identical() à celui de R6 privé des ajouts de Kaplan-Meier", {
+verifier("invariance du plan sans kaplan_meier (R1 contre R6) : objet identical() à celui de R6 privé des ajouts de Kaplan-Meier (empreinte du résultat recalculée, #67)", {
   z <- x6
   b <- z$etapes$brut
   b$resultat <- b$resultat[c("poisson", "binomial")]
@@ -288,6 +291,8 @@ verifier("invariance du plan sans kaplan_meier (R1 contre R6) : objet identical(
   z$fiche$avertissements <- z$avertissements
   z$fiche$plan <- plan_b
   z$fiche$hypotheses_brut <- b$parametres[names(xb$fiche$hypotheses_brut)]
+  # Empreinte du résultat (#67) : recalculée sur l'objet privé des ajouts.
+  z$fiche$empreintes$resultat <- tablexp:::empreinte_resultat(z)
   identical(xb, z)
 })
 script <- tempfile(fileext = ".R")
@@ -360,7 +365,9 @@ SANS_REFERENCE_17 <- character(0)
 # déclaré non observé). Un plan non listé passe par le test ordinaire de la
 # comparaison au fichier.
 # Transitions #35 et #42 closes par la régénération unique de B4 (run CI
-# 39315172327, d18c269 ; ADR 0009, point 9.5) : liste vide.
+# 39315172327, d18c269) ; transitions #57, #64 et #67 closes ensemble par la
+# régénération unique de B5 (run CI 39435673257, 5757c30 ; ADR 0009, point
+# 9.5). Liste vide.
 TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
@@ -1053,6 +1060,61 @@ verifier("témoin : execution, fiche$versions et fiche$plateforme hors référen
   !any(grepl("^execution|^fiche/versions|^fiche/plateforme", ch)) && "fiche/version_fiche" %in% ch &&
     !"execution" %in% aplatis[["R6"]]$valeurs[["@noms"]]
 })
+# Comparaison de forme par jeton (ADR 0009, annotation du 20/10/2026, seconde,
+# (i) ; #67) : témoins 1 à 5, sur des copies en mémoire de R6.
+CH_RESULTAT <- "fiche/empreintes/resultat"
+CH_CODE <- "fiche/empreintes/code"
+verifier("jeton (i) 5 : R6 aplati porte le jeton <md5> aux deux seuls chemins, l'objet les valeurs réelles ; aller-retour lire(ecrire(aplatir(x))) identical()", {
+  g <- aplatis[["R6"]]
+  lu <- par_fichier(g)
+  meme(g$valeurs[[CH_RESULTAT]], JETON_MD5) && meme(g$valeurs[[CH_CODE]], JETON_MD5) &&
+    identical(unname(g$types[c(CH_RESULTAT, CH_CODE)]), c("character", "character")) &&
+    grepl("^[0-9a-f]{32}$", x6_ref$fiche$empreintes$resultat) && grepl("^[0-9a-f]{32}$", x6_ref$fiche$empreintes$code) &&
+    identical(lu$types, g$types) && identical(lu$valeurs, g$valeurs)
+})
+verifier("jeton (i) 1 : empreinte de résultat ou de code NA, en majuscules ou de longueur 2 -> gardée telle quelle, écart sur son chemin", {
+  essai <- function(chemin, valeur) {
+    y <- x6_ref
+    y$fiche$empreintes[[sub("^fiche/empreintes/", "", chemin)]] <- valeur
+    v <- aplatir_construction(y)$valeurs[[chemin]]
+    g <- base; g$valeurs[[chemin]] <- v
+    r <- comparer_references(ref0, par_fichier(g))
+    identical(v, valeur) && !r$ok &&
+      (length(valeur) != 1L || meme(verdict(r, chemin), "écart")) &&
+      (length(valeur) == 1L || identical(r$structure, paste(chemin, ": longueur 2 au lieu de 1")))
+  }
+  essai(CH_RESULTAT, NA_character_) && essai(CH_CODE, NA_character_) &&
+    essai(CH_RESULTAT, toupper(x6_ref$fiche$empreintes$resultat)) &&
+    essai(CH_CODE, rep(x6_ref$fiche$empreintes$code, 2L))
+})
+verifier("jeton (i) 2 : empreinte des données altérée (32 hexadécimaux) -> non remplacée par le jeton, « entrée différente »", {
+  y <- x6_ref; y$fiche$empreintes$donnees <- strrep("a", 32L)
+  v <- aplatir_construction(y)$valeurs[[CHEMIN_EMPREINTE_DONNEES]]
+  g <- base; g$valeurs[[CHEMIN_EMPREINTE_DONNEES]] <- v
+  r <- comparer_references(ref0, par_fichier(g))
+  meme(v, strrep("a", 32L)) && !r$ok && isTRUE(r$entree$differente)
+})
+verifier("jeton (i) 3 : lignes @empreinte des tables résumées en valeur (32 hexadécimaux), une ligne altérée reste un écart", {
+  ch <- grep("/@empreinte$", names(base$types), value = TRUE)
+  g <- base; g$valeurs[[ch[1L]]] <- strrep("0", 32L)
+  r <- comparer_references(ref0, par_fichier(g))
+  length(ch) >= 1L && all(vapply(base$valeurs[ch], function(v) grepl("^[0-9a-f]{32}$", v), NA)) &&
+    !r$ok && meme(verdict(r, ch[1L]), "écart")
+})
+verifier("jeton (i) 4 : l'en-tête porte les deux valeurs réelles ; une autre valeur dans l'en-tête ne change pas la comparaison", {
+  e <- entete_reference(list(identifiant = "R6", description = "temoin"), list(controle = c(a = "x"), consigne = character(0)),
+                        x6_ref, list(commit = "c", execution = "e", adresse = "a"), "releve", "2026-10-20 00:00:00 UTC")
+  e2 <- e
+  e2[names(e2) %in% c("fiche$empreintes/resultat", "fiche$empreintes/code")] <- strrep("f", 32L)
+  f1 <- tempfile(fileext = ".tsv"); f2 <- tempfile(fileext = ".tsv")
+  ecrire_reference(base, f1, e); ecrire_reference(base, f2, e2)
+  r1 <- lire_reference(f1); r2 <- lire_reference(f2); unlink(c(f1, f2))
+  c1 <- comparer_references(r1, base); c2 <- comparer_references(r2, base)
+  meme(unname(r1$entete[["fiche$empreintes/resultat"]]), x6_ref$fiche$empreintes$resultat) &&
+    meme(unname(r1$entete[["fiche$empreintes/code"]]), x6_ref$fiche$empreintes$code) &&
+    meme(unname(r2$entete[["fiche$empreintes/code"]]), strrep("f", 32L)) &&
+    c1$ok && c2$ok && identical(c1$grandeurs, c2$grandeurs)
+})
 # Lecture stricte (point 2.4) : valeur non canonique, CR, longueur fausse.
 lecture_refusee <- function(remplacer) {
   l <- readLines(F_BASE, encoding = "UTF-8")
@@ -1446,7 +1508,7 @@ verifier("T2, témoin : la même chaîne marquée UTF-8 passe", identical(trimws
 # T3 : sonde de l'installation de la batterie ; témoin : installation forcée
 # en LC_ALL=C, sonde lue dans une session LC_ALL=C (une session UTF-8 ne
 # convertit rien et la sonde y passerait, mesuré).
-verifier("T3 : sonde UTF-8 de l'installation de la batterie (STATUT_EMPREINTES_NON_CALCULEES)", isTRUE(sonde_utf8()))
+verifier("T3 : sonde UTF-8 de l'installation de la batterie (STATUT_EMPREINTE_RESULTAT)", isTRUE(sonde_utf8()))
 t3 <- system.time({
   lib_c <- tempfile("tablexp_lib_C_"); dir.create(lib_c)
   # LC_ALL posée dans ce processus le temps de l'installation : sous Windows,
@@ -1865,7 +1927,7 @@ local({
 # --- plan canonique : plans de référence déjà canoniques ; transitions d'une même issue (#42) ---
 
 local({
-  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES)
+  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES, tablexp:::ordres_canoniques())
   for (id in names(plans_reference())) {
     p <- plans_reference()[[id]]$plan
     verifier(sprintf("%s : plan de référence déjà canonique (canoniser_plan() le rend identical())", id), identical(cn(p), p))
@@ -1895,6 +1957,11 @@ local({
              identical(lire_plan(ecrire_plan(p$plan)), p$plan))
     f <- lire_fiche(ecrire_fiche(x$fiche))
     verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
+    # #57 : lignes reçues = lignes conservées + lignes distinctes exclues ;
+    # aucune exclusion déclarée dans R1 à R6, donc 0L et aucune ligne écartée.
+    verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (0L, integer) (#57)", id),
+             identical(x$fiche$nombre_lignes_exclues, 0L) &&
+               nrow(jeu_ref$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
     y <- construire_table(jeu_ref$donnees, f$roles, valider_plan(f$plan), f$provenance)
     verifier(sprintf("%s : rejeu sur le plan relu de la fiche écrite identical() hors execution", id),
              identical(sans_execution(y), sans_execution(x)))

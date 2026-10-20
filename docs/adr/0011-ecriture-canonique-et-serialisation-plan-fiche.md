@@ -333,3 +333,220 @@ Rédigée par `architect` d'après un constat de la revue finale complète d'`au
 **Effet sur les résultats : aucun.** Les fiches de R1 à R6 ne contiennent aucun vecteur atomique nommé de longueur 0 (mesure d'`audit`). Il s'agit d'un changement de comportement d'une fonction nouvelle de B4, jamais publiée : pas d'incrément de version (point 10 (a)), pas de visa.
 
 Issues : #50. Prolonge la troisième annotation du 19/10/2026 (décision M66). Branche `claude/fiche-serialisation`, PR #51.
+
+## Annotation du 20 octobre 2026 (troisième) — troisième annotation du 19/10/2026, (i) : le contrôle de `version_fiche` au rejeu passe à la branche `claude/rapport-fige`
+
+Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M68, question C.3 du point d'étape qui suit la fusion de la PR #51 ; `docs/feuille-de-route.md`, § 1.5 et § 2), commit (0) de la branche `claude/fiche-rapport`, partie de `main` à `2146717`. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Ce qui change.** La troisième annotation du 19/10/2026, (i), attribue le contrôle de `version_fiche` au « futur rejeu de la cinquième branche (`claude/fiche-rapport`) », avec un motif nommé fixé par une annotation du présent ADR. La cinquième branche est désormais consacrée à **fermer la structure de la fiche** : empreintes du résultat et du code (#67, point 11), champ `nombre_lignes_exclues` (#57), ordre des champs (#64), ordre des valeurs du plan canonique (#63), contrôle sous la locale C (#66), sous un seul incrément de `version_fiche` (2 → 3, point 10 (a)). Le **rejeu**, qui consomme cette fiche comme le rapport figé et le CSV à en-tête, passe à la branche suivante qui les porte, **`claude/rapport-fige`**.
+
+**(b) Ce qui ne change pas.**
+- `lire_fiche()` ne contrôle toujours pas `version_fiche` ((i) ; point 10 (d) : la première ligne du texte versionne la grammaire, non la structure).
+- Le critère de rejeu par un tiers reste celui du point 12 et de la note de lecture d'E3.7. Le tiers vérifie `version_fiche`, la représentation et l'empreinte des données, puis exécute `construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)`, et compare à tolérance par classes sur une autre machine.
+- Le contrat du rejeu outillé sera fixé par une annotation du présent ADR (ou par l'ADR du rapport figé) dans `claude/rapport-fige`. Il couvre le motif de refus d'une `version_fiche` inconnue, le contrôle de `representation` et de l'empreinte des données, et la place de la fonction dans le graphe d'appels.
+
+**(c) Conséquence pour la cinquième branche.** Une fiche de `version_fiche` 3, produite par cette branche, sera relue par `lire_fiche()` sans contrôle de version jusqu'à `claude/rapport-fige`. C'est déjà le cas des fiches de version 2 depuis B4. Aucun rejeu outillé n'existe encore, si bien qu'aucune fiche n'est rejouée sous une version inconnue sans le dire. *Vérifié* sur `2146717` par `grep -n 'construire_table(' R/*.R` : hors de `R/construire_table.R`, seules des lignes de commentaire le mentionnent. Aucune fonction du package ne rejoue donc le `plan` d'une fiche relue ; seuls les tests le font, explicitement.
+
+**Effet sur les résultats : aucun.** Il s'agit d'un renvoi de calendrier, sans modification du code.
+
+Issues : #67, #57, #63, #64, #66 (cinquième branche) ; contrôles de rejeu à rédiger pour `claude/rapport-fige`. Décision M68.
+
+## Annotation du 20 octobre 2026 (quatrième) — point 5.1 (h) révisé : ordre canonique des valeurs de `estimateurs`, `exclusions` et `segmentation` (#63)
+
+Rédigée par `architect-approfondi` d'après la décision du mainteneur du 20/10/2026 (M69, point 2 ; `docs/feuille-de-route.md`, § 4), prise sur avis d'`actuary-approfondi` (étape (1) de la branche `claude/fiche-rapport`, PR #68). Branche à `af54361`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. La présente annotation **revient sur le point 5.1 (h)** (« toute autre valeur inchangée ») pour trois champs.
+
+**(a) Décision.** `canoniser_plan()` met dans un ordre canonique les valeurs de trois champs du plan :
+- `etapes$brut$estimateurs`, dans l'ordre de `ESTIMATEURS_BRUT` (`R/brut.R:44`) ;
+- `etapes$donnees$exclusions`, dans l'ordre du catalogue `c(MOTIFS_LIGNES, MOTIFS_TETE)` (`R/donnees.R:109-116`), qui est déjà l'ordre de restitution documenté (`tab:motifs`) ;
+- `segmentation`, dans l'ordre de `ROLES_SEGMENTATION` (`R/donnees.R:76`).
+
+Toute autre valeur reste inchangée : le point 5.1 (h) vaut pour le reste du plan.
+
+**(b) Motif.** Ces trois champs sont des **ensembles**. `valider_plan()` y refuse les doublons (*vérifié* par lecture : `R/brut.R:167-168`, `R/donnees.R:346` et `:353`). Deux plans qui ne diffèrent que par l'ordre de ces valeurs ont donc le même sens, et le point 5.1 veut que deux plans de même sens donnent la même fiche. Mesures d'`actuary` (étape (1)) :
+- pour `estimateurs`, les `etapes` sont identiques mais `fiche$plan` diffère. Or `fiche$hypotheses_brut$estimateurs` est déjà dans l'ordre canonique (`retenus <- ESTIMATEURS_BRUT[ESTIMATEURS_BRUT %in% estimateurs]`, `R/brut.R:492`, *vérifié* par lecture) : la fiche se contredit aujourd'hui ;
+- pour `exclusions` et `segmentation`, seul l'ordre de présentation change (lignes, colonnes, avertissements), aucune valeur.
+
+**(c) Forme.**
+1. **Les vecteurs d'ordre sont passés en argument** à `canoniser_plan()` par `construire_table()`, comme `CHAMPS_PLAN` et `PARAMETRES_ETAPES` (point 9.3). Proposition de signature : `canoniser_plan(plan, champs, parametres, ordres)`, où `ordres` est une liste nommée par le chemin du champ dans le plan (`segmentation`, `etapes/donnees/exclusions`, `etapes/brut/estimateurs`), chaque élément étant le vecteur d'ordre. Les noms exacts sont fixés par `coder`.
+2. **Ce choix n'est pas imposé par le graphe d'appels.** Les arêtes `rapport` → `donnees` et `rapport` → `brut` sont autorisées (ADR 0007, point 2.1), et `assembler_fiche()` lit déjà `CATALOGUE_ROLES`. Il est retenu pour la **localité**. `canoniser_plan()` ne lit aucune constante. Le seul endroit qui sait quel champ suit quel catalogue est l'appel, dans `construire_table()`. La fonction se teste avec des catalogues fabriqués.
+3. **La liste `ordres` se construit au moment de l'appel**, dans `construire_table()` ou dans une fonction de `R/construire_table.R`, et **pas comme constante de premier niveau** de ce fichier. Les fichiers de `R/` sont évalués par ordre alphabétique à l'installation (`DESCRIPTION` n'a pas de champ `Collate`, *vérifié*), et `construire_table.R` passe avant `donnees.R`. Une constante de premier niveau qui lit `ROLES_SEGMENTATION` ferait donc échouer l'installation. *Vérifié* sur un paquet jouet sous R 4.3.3 : une constante de `a0.R` qui lit un objet de `b.R` donne « object 'b' not found » puis « lazy loading failed ».
+4. **Aucune valeur n'est retirée en silence.** Une valeur absente du vecteur d'ordre, ou un doublon, est une erreur de programmation (`non_canonique()`, comme les autres stockages non canonisables). La forme `o[o %in% x]` seule perdrait une valeur inconnue sans le dire. Le contrôle est donc `all(x %in% o) && !anyDuplicated(x)` avant de réordonner. Une étape absente du plan (plan sans `brut`) n'a rien à canoniser.
+
+**(d) Réserve v2 (E2.9).** Si un emboîtement de segments devient un jour nécessaire (plusieurs variables de segmentation en v2), il sera porté par un **paramètre déclaré à part**, jamais par l'ordre de `segmentation`. Cet ordre n'a plus de sens après la présente annotation.
+
+**(e) Critère d'acceptation de #63** (remplace celui de `docs/feuille-de-route.md`, § 1.5, dont la clause « `etapes` `identical` dans les deux cas » a été **mesurée fausse** par `actuary` pour `exclusions` et `segmentation`) :
+- deux plans qui ne diffèrent que par l'ordre des valeurs de l'un des trois champs, ou des trois, combiné ou non avec les permutations du point 5.1, donnent des objets `identical` hors `execution`, fiche comprise ;
+- `valider_plan(canoniser_plan(p))` reste valide ;
+- `canoniser_plan()` reste idempotente ;
+- les plans R1 à R6 sont invariants. Ils sont déjà dans l'ordre canonique (*vérifié* sur les `.tsv` : `estimateurs` vaut `poisson, binomial` dans R1, R2, R3 et R5, `poisson` dans R4, `poisson, binomial, kaplan_meier` dans R6 ; `exclusions` est de longueur 0 ; `segmentation` vaut `sexe`, ou est de longueur 0 dans R2) ;
+- un témoin montre l'erreur de programmation sur une valeur inconnue passée directement à `canoniser_plan()`.
+
+**(f) Version.** Pour l'application du point 10 (c), la forme canonique des valeurs du plan fait partie de ce que numérote `version_fiche` : une fiche de version 3 garantit cet ordre, une fiche de version 2 ne le garantit pas. #63 tombe donc sous l'incrément 2 → 3 de la branche. Selon le point 10 (a), l'incrément est porté par le premier commit qui change la définition. L'ordre des commits du § 1.5 est ajusté en conséquence : #57, qui porte l'incrément, passe avant #63 (`docs/feuille-de-route.md`, § 1.5).
+
+**Effet sur les résultats.**
+- R1 à R6 : aucun.
+- Plan non canonique sur l'un des trois champs : `fiche$plan` change et, pour `exclusions` et `segmentation`, l'ordre de présentation dans `etapes` et dans les avertissements aussi. Aucune valeur numérique ne change.
+
+Aucune table finale ni aucun verdict n'est touché : visa d'`actuary`.
+
+Issues : #63 ; #42 (point 5.1). Décision M69. Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (cinquième) — point 11 : première ligne `tablexp resultat 1`, périmètre précisé ; point 11.4 : empreinte du code, option (iv) recommandée, à défaut (i)
+
+Rédigée par `architect-approfondi` d'après l'avis d'`actuary-approfondi` (étape (1) de `claude/fiche-rapport`, PR #68) et la décision du mainteneur du 20/10/2026 (M69, point 3). Cette décision demande de mettre en regard les options (iv) et (i) pour l'empreinte du code, avec une recommandation. **La décision définitive du mainteneur porte sur la présente annotation** (questions en fin). Branche à `af54361`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Mesures refaites par `architect` sous R 4.3.3, Linux (environnement cloud, hors plateforme de référence).
+
+**(a) Première ligne de l'aplatissement empreinté : `tablexp resultat 1`** (point 11.1). Décision de forme d'`architect`.
+- **Nom.** En ASCII, sans accent, sur le modèle de `tablexp plan 1`, `tablexp fiche 1`, `tablexp canonique 2` et `tablexp reference 1`. Cela fait une **cinquième version** au tableau du point 10. Elle numérote la définition du texte empreinté : grammaire de ligne, forme « empreinte », périmètre. Elle s'incrémente selon le point 10 (a) et (d).
+- **Contenu du texte.** La première ligne, puis le corps, **sans ligne d'en-tête `#`**. Le corps suit les règles de ligne du point 6.1 et de la troisième annotation du 19/10/2026 : `@noms`, `@longueur`, `@colonnes`, `@lignes`, `[i]`, profondeur au plus 32. Les valeurs sont en forme « empreinte » (point 2 et seconde annotation du 19/10/2026).
+- **Champ de la fiche.** Le nom de la première ligne est consigné dans un champ `fiche$empreintes$representation_resultat`, placé avant `resultat`. Il est distinct de `representation`, qui nomme la représentation des données. Ce champ entre dans l'incrément 2 → 3 de la branche et ajoute une ligne `fiche/empreintes/@noms` au tableau avant / après.
+
+**(b) Périmètre : l'objet porte un attribut que l'écrivain refuse** (constat, *vérifié* à `af54361`, plan R1 sur `jeu_reference()`).
+- **Constat.** `etapes/donnees/resultat/lignes_conservees` porte un attribut `simulation` hérité du jeu reçu. Il a huit éléments : `loi_vraie`, `portefeuille`, `periode`, `graine`, `generateur`, `ordre_tirages`, `version_r`, `decomptes`. C'est le seul attribut hors `names`, `class` et `row.names` dans tout l'objet, hors `execution`. L'écrivain de la grammaire 1, appliqué à l'objet privé de sa classe et d'`execution`, le refuse : `serialisation_impossible`, « data.frame de classe data.frame ou d'attribut(s) names, class, row.names, simulation ». La racine porte en outre la classe `construction`. Le point 11.1 ne règle aucun de ces deux cas.
+- **Recommandation (question 2).**
+  - L'attribut `simulation` est **exclu par son nom**, sur une liste fermée déclarée ici, comme les attributs des tables résumées des références (ADR 0009, point 1.2). C'est une copie de métadonnées de l'entrée : il n'est pas calculé, le moteur ne le lit pas, et il contient `version_r`, une donnée de plateforme. L'entrée est identifiée par `fiche$empreintes$donnees`.
+  - Tout autre attribut est une **erreur de programmation**, avec un témoin : rien n'est ignoré en silence.
+  - La classe de la racine est **vérifiée** (`construction`) mais **non écrite** : la première ligne en tient lieu.
+- **Options écartées.**
+  - Écrire les attributs : il faudrait une ligne nouvelle (`@attributs`), donc une extension de grammaire pour une métadonnée.
+  - Que le moteur cesse de recopier l'attribut : c'est un changement du contrat « objet résultat » (ADR 0007, point 6.3), hors du périmètre de la branche (issue à proposer si le mainteneur le souhaite).
+
+**(c) Empreinte du code (point 11.4) : (iv) et (i) en regard.** Deux options sont écartées par la décision M69 :
+- (ii), la version seule : `Version: 0.0.0.9000` n'a pas changé depuis `1d49e17`, alors que 27 commits ont touché `R/` depuis (*vérifié* : `git log --oneline 1d49e17..HEAD -- R/ | wc -l` rend 27) ;
+- (iii), le SHA du commit : il est absent à l'exécution dans les jobs R sans git (M46) et ignore les modifications non commitées.
+
+| | **(iv) MD5 des sources relevé à l'installation** | **(i) manifeste sous `inst/`** |
+|---|---|---|
+| Définition | `fiche$empreintes$code` = MD5 du texte « `<md5>␣␣R/<fichier>` », une ligne par fichier de `R/*.R`, fichiers triés par octets, LF. Calculé par du code de premier niveau du package pendant `R CMD INSTALL` | même valeur, écrite dans un fichier de `inst/` par un script ; le script a un mode `--verifier`, appelé par la CI (modèle : `fiches_jumelles.sh`) |
+| Recalcul hors R | `LC_ALL=C md5sum R/*.R \| md5sum` (*vérifié* à `af54361` : `fd27ed57eccd8fb75238501b0ab52e4b`, en R et dans le shell) | idem |
+| Ce que la valeur identifie | le texte source **effectivement installé**, modifications non commitées comprises | le texte source **déclaré** au dernier passage du script |
+| Défaut non détecté | aucun dans le périmètre (voir la garde, ci-dessous) | une installation locale d'un arbre modifié sans relancer le script : l'empreinte est périmée et rien ne le dit ; la CI ne le voit qu'au push |
+| Accès fichier à l'exécution | aucun : `construire_table()` lit une chaîne déjà stockée dans la base de chargement différé | il faut lire `system.file(...)` à l'exécution, ou relire le manifeste à l'installation, ce qui revient au mécanisme de (iv) |
+| Contrôle de CI | aucun spécifique : test de batterie (ci-dessous) | contrôle `--verifier` en plus du test de batterie |
+| Fondement | constat de plateforme, non documenté par R (ci-dessous) | outillage du dépôt |
+
+**Mesures de (iv).**
+- *Mesure d'`actuary`* : paquet jouet, installé depuis le dossier et depuis l'archive de `R CMD build`. Le répertoire courant est la racine des sources dans les deux cas, et le MD5 est égal.
+- *Remesuré par `architect`* sur un paquet jouet (R 4.3.3, Linux) :
+  - installé depuis le dossier : répertoire courant = dossier des sources ;
+  - installé depuis l'archive : répertoire courant = `/tmp/Rtmp…/R.INSTALL…/jouet` ;
+  - dans les deux cas, MD5 `fad3e2bc1d43a85b6ab26afc68f1d6f2`, égal à `LC_ALL=C md5sum R/*.R | md5sum` ;
+  - le paquet installé ne garde dans `R/` que `jouet`, `jouet.rdb` et `jouet.rdx`.
+
+**Compatibilité de (iv) avec l'architecture** (vérifiée par lecture et par mesure).
+1. **Emplacement.** Une constante de premier niveau de `R/rapport.R`, module qui porte les empreintes (ADR 0007, point 2.1), sous la forme d'une affectation (`EMPREINTE_CODE <- local({...})`, nom indicatif).
+   - Le contrôle du graphe attribue les affectations de premier niveau. Un appel nu serait un écart (`tests/controles/graphe_modules.R`, méthode, point 2, et limite (ii)).
+   - Elle n'emploie que des fonctions de base (`list.files`, `read.dcf`, `tools::md5sum` ; `tools` est déjà employé, `R/rapport.R:259`) et ne lit aucune constante d'un autre module. Ce point compte à cause de l'ordre alphabétique d'évaluation (quatrième annotation du 20/10/2026, (c) 3).
+   - `R/outils.R` n'est pas touché : il reste sans contenu métier et n'appelle aucun module.
+2. **E4.4 et point 8.1.** Le calcul a lieu **pendant l'installation**, quand `R CMD INSTALL` évalue le code de premier niveau pour construire la base de chargement différé.
+   - Ce n'est pas une lecture de fichier **par le moteur à l'exécution**. `construire_table()` n'ouvre aucun fichier et lit une chaîne déjà stockée.
+   - Ce n'est pas non plus une lecture de **données** : E4.4 vise les données d'entrée, qui restent un `data.frame`.
+   - Le point 8.1 (« le package n'ouvre aucun fichier pour le plan ni pour la fiche ») reste vrai à l'exécution.
+3. **Garde.**
+   - Le code vérifie que le répertoire courant est la racine des sources de `tablexp` : `DESCRIPTION` lisible avec `Package: tablexp`, et `R/rapport.R` présent.
+   - Si ce n'est pas le cas, l'empreinte vaut `NA` et `statut_resultat_code` le dit en toutes lettres (« sources introuvables à l'installation »). Rien n'est deviné.
+   - Recommandation : `NA` avec ce statut plutôt qu'un refus d'installation. Une installation sur une plateforme non mesurée reste alors utilisable, et elle le dit.
+   - La garde porte sur `R/*.R`. Or `R CMD INSTALL` évalue aussi les fichiers `.r`, `.S`, `.s` et `.q` de `R/`. Un test vérifie donc que `R/` ne contient que des fichiers `*.R` : sinon, l'empreinte ne couvrirait pas tout le code.
+4. **`installer_tablexp()` des batteries.**
+   - Elle installe par `R CMD INSTALL --no-docs -l <lib> <racine>` (`tests/harnais.R:345-347`, lu), donc depuis la racine.
+   - La réutilisation d'une bibliothèque par `TABLEXP_BIBLIOTHEQUE` exige une empreinte de l'arbre source égale, et cette empreinte couvre `R/` récursivement (`tests/harnais.R:280-290`) : une bibliothèque réutilisée a donc la même empreinte du code.
+   - **Test exigé** : l'empreinte installée n'est pas `NA` et elle est égale au recalcul fait par la batterie sur `R/*.R` de la racine qu'elle a installée. Ce test vérifie en même temps l'hypothèse du répertoire courant.
+   - **Point à reprendre par `coder`.** La sonde UTF-8 du harnais lit le littéral `STATUT_EMPREINTES_NON_CALCULEES` (`tests/harnais.R:313-320`, M54), que #67 retire ou remplace. Elle doit viser un littéral non ASCII qui reste dans le moteur, par exemple le nouveau statut.
+5. **Statut.**
+   - Objet portable : c'est le texte source, en LF imposé par `.gitattributes` (`* text=auto eol=lf`).
+   - Écriture exacte : MD5 d'octets.
+   - Le mécanisme d'installation (répertoire courant égal à la racine des sources) est un **constat de plateforme** sous Linux et R 4.3.3, non documenté par R. Il n'est pas mesuré sous Windows ni sous macOS (#49, M61) ; la garde et le test de batterie le surveillent.
+   - L'empreinte identifie le **texte source**, pas le comportement numérique : celui-ci dépend aussi de R, du BLAS et de la `libm` (`fiche$versions`, `fiche$plateforme`).
+   - Elle est hors de l'empreinte du résultat (point 11.1).
+   - La ligne `code` du tableau du point 1.1 se lit désormais « toute plateforme pour l'objet et l'écriture ; mécanisme d'installation constaté sous Linux seulement ».
+
+**Recommandation : (iv), à défaut (i).** (iv) identifie ce qui est installé, sans valeur déclarée à tenir à jour, sans contrôle de CI supplémentaire et sans lecture de fichier à l'exécution. Sa faiblesse est de reposer sur un comportement non documenté de `R CMD INSTALL`. La garde (`NA` et statut nommé) et le test d'égalité au recalcul la rendent visible sans la corriger en silence. (i) reste le repli si le mainteneur refuse de dépendre d'un comportement non documenté.
+
+**(d) `statut_resultat_code`.** Le libellé est fixé par `coder` et validé par `actuary`. Il dit :
+- pour le résultat : témoin d'identité sur la même machine seulement (point 11.2 ; E3.6) ;
+- pour le code : MD5 du texte source des fichiers `R/*.R` relevé à l'installation, recalculable par `LC_ALL=C md5sum R/*.R | md5sum`, qui n'identifie pas le comportement numérique ;
+- le cas échéant : « sources introuvables à l'installation ».
+
+**Effet sur les résultats** (régénération unique de la branche, par plan R1 à R6) :
+- `fiche/empreintes/resultat` et `fiche/empreintes/code` passent de `NA` à une valeur, comparées par jeton selon l'annotation du 20/10/2026 (seconde) de l'ADR 0009 ;
+- `fiche/empreintes/statut_resultat_code` : valeur de chaîne ;
+- `fiche/empreintes/representation_resultat` : création ;
+- `fiche/empreintes/@noms` change.
+
+Tout est compris dans l'incrément `version_fiche` 2 → 3. Aucune table finale ni aucun verdict : visa d'`actuary`.
+
+**Questions au mainteneur.**
+1. **Empreinte du code** : (iv), MD5 des sources relevé à l'installation, avec `NA` et statut nommé si les sources sont introuvables ; ou (i), manifeste sous `inst/` vérifié par la CI. **Recommandation : (iv).**
+2. **Attribut `simulation` de `lignes_conservees`** : (a) exclu de l'empreinte du résultat par son nom, sur une liste fermée, tout autre attribut étant une erreur de programmation ; (b) écrit dans le texte empreinté (extension de grammaire) ; (c) retiré de l'objet par le moteur (issue séparée, contrat « objet résultat »). **Recommandation : (a).**
+
+Issues : #67 ; #22 (point 1) ; #49 (Windows et macOS non mesurés). Décision M69 (mise en regard demandée) ; décision définitive attendue. Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (sixième) — Décision du mainteneur sur la cinquième annotation (M70)
+
+Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M70 ; `docs/feuille-de-route.md`, § 4), rapportée par la session principale de la branche `claude/fiche-rapport` (PR #68), branche à `df74de8`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Les questions 1 et 2 de la cinquième annotation du 20/10/2026 sont tranchées selon leur recommandation.
+
+1. **Question 1 — empreinte du code (point 11.4) : option (iv) retenue.** `fiche$empreintes$code` est le MD5 des sources `R/*.R`, calculé par le code de premier niveau du package pendant `R CMD INSTALL`, selon la définition, la garde et le test d'égalité au recalcul de la cinquième annotation, (c). Si les sources sont introuvables à l'installation, l'empreinte vaut `NA` et `statut_resultat_code` le dit en toutes lettres ; l'installation n'échoue pas. L'option (i), manifeste sous `inst/` vérifié par la CI, n'est plus qu'un **repli documenté**, à rouvrir par une nouvelle annotation si le mécanisme de (iv) se révèle défaillant (garde ou test en échec, plateforme non conforme, #49). Le point 11.4 se lit désormais avec cette décision.
+2. **Question 2 — attribut `simulation` de `etapes/donnees/resultat/lignes_conservees` : option (a) retenue.** L'attribut est exclu de l'empreinte du résultat **par son nom**, sur une liste fermée déclarée dans le code (un seul nom aujourd'hui). Tout autre attribut inattendu est une **erreur de programmation**, avec un témoin ; rien n'est ignoré en silence. La classe `construction` de la racine est vérifiée et non écrite (cinquième annotation, (b)). Les options (b), extension de grammaire, et (c), retrait par le moteur, sont écartées pour les raisons données en (b) de la cinquième annotation.
+3. **Ordre des commits** : #57, porteur de l'incrément `version_fiche` 2 → 3, précède #63 (quatrième annotation du 20/10/2026, (f) ; `docs/feuille-de-route.md`, § 1.5). Déjà écrit, acté sans changement.
+
+**Effet sur les résultats : aucun** par la présente annotation. L'effet attendu du commit de #67 est celui de la cinquième annotation (« Effet sur les résultats »), lu sans alternative ; aucune table finale, aucun verdict : visa d'`actuary`.
+
+Issues : #67 ; #57, #63 (ordre des commits) ; #49 (Windows et macOS non mesurés). Décision M70. Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (septième) — Décision du mainteneur sur le périmètre de l'empreinte du résultat (M71)
+
+Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M71 ; `docs/feuille-de-route.md`, § 4), prise sur l'avis d'`actuary-approfondi` et rapportée par la session principale de la branche `claude/fiche-rapport` (PR #68), branche à `57ee1f3`. Le texte ci-dessus, annotations comprises, n'est pas réécrit : la présente annotation **rectifie** un constat de la cinquième annotation du 20/10/2026, (b), et **révise** la décision M70, point 2 (sixième annotation du 20/10/2026, point 2).
+
+**Origine.** À l'implémentation de #67, `coder-approfondi` a constaté que le périmètre littéral du point 11.1 (objet entier moins `execution`, `fiche$versions`, `fiche$plateforme` et les champs d'empreinte), avec la seule exclusion de l'attribut `simulation` (M70, point 2), fait échouer `construire_table()` par une erreur de programmation de l'écrivain sur des entrées **valides, acceptées à `57ee1f3`** : toute exclusion effective (noms de lignes non automatiques de `lignes_conservees`), un sous-ensemble fait par l'utilisateur, une colonne hors rôle POSIXct, une classe `tbl_df`, un attribut quelconque. Cause : `etapes/donnees/resultat/lignes_conservees` est une copie de l'entrée (`donnees[-exclues, , drop = FALSE]`, `R/donnees.R:572`, lu à `57ee1f3`), que l'écrivain de la grammaire 1 refuse en partie (troisième annotation du 19/10/2026). Constats de `coder-approfondi` et remesure d'`actuary-approfondi`, rapportés par la session ; *non remesurés par `architect`* (la tâche parallèle modifie `R/` dans l'arbre de travail ; aucune installation du package dans cette consultation).
+
+**(a) Rectification de la cinquième annotation du 20/10/2026, (b), « Constat ».** La phrase « C'est le seul attribut hors `names`, `class` et `row.names` dans tout l'objet, hors `execution` » n'est vraie que pour le cas mesuré : plan R1 sur `jeu_reference()`, **sans exclusion**. Elle est fausse en général : `lignes_conservees` hérite de l'entrée tous ses attributs, sa classe et, dès qu'une exclusion retire une ligne, des noms de lignes non automatiques (remesure d'`actuary-approfondi`). La recommandation (a) de la cinquième annotation, et la décision M70, point 2, qui la retient, reposaient sur ce constat trop étroit.
+
+**(b) Point 1 de M71 (Q1, option (a)) — `lignes_conservees` hors du périmètre de l'empreinte du résultat.**
+- Le chemin `etapes/donnees/resultat/lignes_conservees` sort du périmètre du point 11.1. Les chemins exclus forment une **liste fermée déclarée dans le code** (`CHEMINS_HORS_RESULTAT`, nom retenu par la décision) ; le point 11.1 se lit désormais : l'objet `construction` moins `execution`, `fiche$versions`, `fiche$plateforme`, `fiche$empreintes$resultat`, `fiche$empreintes$code`, `fiche$empreintes$statut_resultat_code` **et `etapes/donnees/resultat/lignes_conservees`**.
+- **Motif.** Cette copie est entièrement déterminée par l'entrée, identifiée par `fiche$empreintes$donnees`, et par `numeros_conserves`, qui reste dans le périmètre (`R/donnees.R:573`, `:686`, lus à `57ee1f3`). Ce qu'elle porte en plus (colonnes hors rôle, noms de lignes, classe, attributs) n'est lu par aucun module : le moteur ne lit l'entrée conservée que par `col()`, colonne de rôle par colonne de rôle (`R/donnees.R:581`, lu). L'empreinte du résultat continue donc d'identifier conjointement l'entrée, la déclaration et le résultat (point 11.1, dernière phrase).
+- **Mesure d'`actuary-approfondi`** (rapportée) : entrée de base ; colonne hors rôle facteur, puis POSIXct ; attribut quelconque ; classe `tbl_df` ; noms de lignes ; attribut `simulation` → même empreinte du résultat.
+- **Révision de M70, point 2.** L'exclusion de l'attribut `simulation` **par son nom** devient sans objet : l'attribut ne se trouvait qu'à ce chemin. Le reste de M70, point 2, tient : liste fermée déclarée dans le code ; **tout autre attribut, à tout autre chemin, est une erreur de programmation**, avec un témoin ; rien n'est ignoré en silence ; la classe `construction` de la racine est vérifiée et non écrite.
+- **Options écartées.**
+  - Lecture stricte du point 11.1 : régression, `construire_table()` refuserait des entrées valides acceptées aujourd'hui.
+  - (b') Copie réduite aux colonnes de rôle : change le contrat de l'objet résultat (ADR 0007, point 6.3), double une entrée déjà identifiée, et coûte environ 2,5 s de plus à 10⁶ lignes (mesure d'`actuary-approfondi`, rapportée).
+  - (c') Forme « empreinte » tolérante aux classes et attributs inconnus : elle les ignorerait en silence.
+  - (d) Ne plus garder la copie dans l'objet : changement de contrat, hors du périmètre de la branche.
+
+**(c) Point 2 de M71 (Q2) — `factor` en forme « empreinte ».**
+- Un facteur est admis en forme « empreinte » **par ses libellés**, sous le type `factor`, comme dans l'empreinte des données (point 2.3). La forme « texte » le refuse toujours (grammaire 1 ; troisième annotation du 19/10/2026, (a), inchangée). C'est une précision de la forme « empreinte » dans le périmètre de `tablexp resultat 1`, non une extension de la grammaire du texte.
+- **Motif.** Les niveaux ne changent aucun résultat : les clés de cellule sont converties en chaînes et triées (`segments_observations()`, `R/exposition.R:291-300`, lu à `57ee1f3`).
+- **Condition de validité.** Le test d'invariance aux niveaux (`tests/unitaires/test_exposition.R:318`, « segmentation : clés indépendantes des niveaux d'un facteur », lu à `57ee1f3`) et le témoin ajouté par #67 doivent rester verts ; s'ils tombent, ce choix est à rouvrir.
+- `ordered` et `factor` aux mêmes libellés s'écrivent pareil.
+
+**(d) Point 3 de M71 (Q3) — libellés de `statut_resultat_code`, et rectification de la cinquième annotation, (d).**
+- Résultat : « témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un tiers ».
+- Code : « MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm ».
+- **Rectification.** La cinquième annotation, (d), dit « MD5 du texte source des fichiers `R/*.R` ». La valeur est le **MD5 du relevé des MD5** (une ligne « `<md5>␣␣R/<fichier>` » par fichier, triés par octets, LF), comme le dit correctement le tableau de la cinquième annotation, (c), ligne « Définition » ; elle n'est pas le MD5 du texte source concaténé. La lecture de (d) se fait avec la présente précision. Le cas « sources introuvables à l'installation » est inchangé.
+
+**(e) Point 4 de M71 (Q4) — régression de #67 dans l'unité contrat.** Dans l'unité contrat, `id_contrat`, `id_tete` et `date_naissance` sont recopiées entières dans `observations` (`R/donnees.R:625-629`, lu à `57ee1f3`) ; un attribut `label` sur l'une d'elles ferait refuser l'empreinte. Correction **dans le commit de #67**, par sous-indiçage, comme dans l'unité tête. C'est une normalisation de la quantité dérivée `observations` : l'entrée et sa copie restent intactes, ce n'est pas une correction des données (`docs/exigences.md` § 2). Témoins dans les deux unités.
+
+**(f) Point 5 de M71 (Q5) — coût.** Surcoût mesuré à 10⁶ lignes (mesure rapportée par la session) : empreinte du résultat de 4,4 à 5,5 s, soit +35 à +60 % sur `construire_table()`, surtout pour l'écriture de `observations`. Jugé acceptable pour la branche (E1.3). L'optimisation est renvoyée à **#71** (« moteur : coût de l'empreinte du résultat (écriture de observations) à 10⁶ lignes »), créée le 20/10/2026 sur accord du mainteneur, rattachée à un lot ultérieur, circuit 3, `moteur:`.
+
+**Effet sur les résultats : aucun** par la présente annotation. L'effet attendu du commit de #67 reste celui de la cinquième annotation (« Effet sur les résultats ») : `fiche/empreintes/resultat` et `/code` comparées par jeton, `statut_resultat_code` (valeur de chaîne, libellés du (d)), `representation_resultat` créé, `fiche/empreintes/@noms`. Le correctif (e) ne change aucune grandeur des références : R1 à R6 n'ont aucun attribut `label` (hypothèse à confirmer par le tableau avant / après du commit de #67). Aucune table finale, aucun verdict : visa d'`actuary`.
+
+Issues : #67 ; #71 (optimisation) ; #49 (Windows et macOS non mesurés). Décision M71, qui révise M70, point 2. Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (huitième) — Extension de M71 Q4 aux facteurs de rôle (M72)
+
+Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M72 ; `docs/feuille-de-route.md`, § 4), prise sur un constat majeur de l'audit léger de #67 et l'avis d'`actuary-approfondi`, rapportée par la session principale de la branche `claude/fiche-rapport` (PR #68), branche à `8a03ccc`. Le texte ci-dessus, annotations comprises, n'est pas réécrit : la présente annotation **étend** la septième annotation du 20/10/2026, (e) (M71, Q4).
+
+**(a) Constat.** Un facteur de rôle catégorie (`sexe`, ou `segment` quand le plan est segmenté) qui porte l'attribut `contrasts`, ou qui est de sous-classe (`c("mafac", "factor")`), est admis par `type_conforme()` (`R/donnees.R`) ; à l'implémentation de #67, il était recopié tel quel dans `observations` et refusé par l'écrivain en forme « empreinte ». `construire_table()` échouait donc sur une entrée valide : régression de #67, du même type que celle de l'unité contrat (septième annotation, (e)). Constat de l'audit et mesure d'`actuary-approfondi`, rapportés par la session ; *non remesurés par `architect`*.
+
+**(b) Décision (M72) : M71 Q4 s'étend aux facteurs `sexe` et `segment`, dans les deux unités.**
+- La copie dans `observations` est normalisée par la fonction locale `categorie()` de `preparer_donnees()` (`R/donnees.R:642-647`, lu à `8a03ccc`) : `structure(unclass(x)[i], levels = levels(x), class = if (is.ordered(x)) c("ordered", "factor") else "factor")`.
+- Effet : `contrasts` et tout autre attribut sont retirés (sauf `names`) ; une sous-classe est ramenée à `factor` (ou `ordered`) ; `ordered` reste distinct de `factor` ; les niveaux sont gardés tels quels, ordre et niveaux inutilisés compris. Une chaîne ou un entier est sous-indicé `[i]`, comme le veut M71, Q4.
+- C'est une normalisation de la **quantité dérivée** `observations` : l'entrée et sa copie `lignes_conservees` restent intactes ; ce n'est pas une correction des données (`docs/exigences.md` § 2).
+- **Option écartée** : refuser ces facteurs à la validation. Elle resserrerait le contrat d'entrée pour une métadonnée sans effet sur le résultat.
+- **Témoins** dans les deux unités (tête et contrat), pour `sexe` et pour `segment`.
+
+**(c) Complément de la sixième annotation (empreinte du code, option (iv)) : fichier illisible.** À la reprise d'audit de #67, `empreinte_sources()` (`R/rapport.R:428-440`, lu à `8a03ccc`) rend `NA` quand un fichier de `R/` est illisible (`tools::md5sum` rend `NA`), avec le statut « sources introuvables », au lieu de hacher un relevé qui contiendrait « NA ». C'est l'application de la garde de la cinquième annotation, (c) 3 (« rien n'est deviné ») ; l'installation n'échoue pas.
+
+**Mise en œuvre** : commit `5422404` (#67), avec le reste de #67 ; `8a03ccc`, commit `docs:` minimal de concordance (règle 9, exception « écart de concordance »).
+
+**Effet sur les résultats : aucun** pour les entrées déjà acceptées (mesuré par `actuary-approfondi` et par `audit`, rapporté). L'effet du commit de #67 reste celui des cinquième et septième annotations. Aucune table finale, aucun verdict : visa d'`actuary`.
+
+Issues : #67. Décision M72, qui étend M71, Q4. Branche `claude/fiche-rapport`, PR #68.
