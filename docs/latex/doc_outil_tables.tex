@@ -825,8 +825,11 @@ Deux fichiers de tests portent ces propriétés (section~\ref{sec:batteries})~:
     du générateur de l'appelant, et dans un autre processus R de la même
     machine~; à graines différentes, tirages différents. Les tirages comparés
     couvrent les trois réglages du générateur (\code{runif()}, \code{rnorm()},
-    \code{sample.int()})~; le processus fils les écrit en \code{\%.17g}, format
-    qui restitue un double au bit près. La même batterie vérifie le simulateur
+    \code{sample.int()})~; le processus fils les écrit en \code{\%.17g}, dix-sept
+    chiffres significatifs, que le processus parent relit~: sur la plateforme
+    de référence (glibc), la relecture au bit près est un constat de mesure,
+    non une propriété démontrée (ADR 0011, points 2.4 et 3.2~;
+    section~\ref{sec:empreinte}). La même batterie vérifie le simulateur
     et la construction (sections~\ref{sec:simulation} et~\ref{sec:rapport})
     et compare les plans de référence à leurs références de non-régression
     (section~\ref{sec:non-regression}).
@@ -4582,14 +4585,18 @@ Q1). \code{ecrire\_valeurs()} écrit les valeurs d'une colonne sous deux
 formes, qui ne diffèrent que pour les doubles~: la forme «~empreinte~»
 ci-dessus, seule employée par \code{texte\_canonique()}, et la forme
 «~texte~», pour les textes qu'un relecteur lit et qu'on relit (références de
-non-régression, section~\ref{sec:non-regression}), où un double fini
+non-régression, section~\ref{sec:non-regression}~; texte du plan et de la
+fiche, section~\ref{sec:serialisation}), où un double fini
 s'écrit \code{sprintf("\%.17g", x + 0)} et un non fini comme R l'écrit
 (\code{NA}, \code{NaN}, \code{Inf}, \code{-Inf}), le jeton étant lu, là
-aussi, sur la valeur reçue. \code{\%.17g} restitue un double au bit près là
-où \code{\%.15g} ne le fait pas~; sous la bibliothèque C de GNU (glibc),
-l'écriture est correctement arrondie, et la relecture exacte est un
-\emph{constat de mesure} appuyé sur un argument d'ordre de grandeur, non une
-preuve (ADR 0011, point~3.2). Les entiers, logiques, chaînes, facteurs et
+aussi, sur la valeur reçue. Dix-sept chiffres significatifs suffisent à
+désigner un double sans ambiguïté, quinze non~; encore faut-il que l'écriture
+soit correctement arrondie et la relecture exacte. Sous la bibliothèque C de
+GNU (glibc), l'arrondi correct de l'écriture et la relecture exacte sont des
+\emph{constats de mesure} (ADR 0011, points~2.4 et 3.2~; relecture exacte
+constatée sur 1\,399\,465 doubles), la relecture étant appuyée sur un argument d'ordre de grandeur, non une
+preuve. Sous Windows, ni l'un ni l'autre ne tient toujours (constat sur le
+poste du mainteneur, ADR 0011, point~3.2). Les entiers, logiques, chaînes, facteurs et
 dates s'écrivent de même dans les deux formes. Une forme inconnue est
 refusée (\code{forme\_ecriture\_inconnue}).
 
@@ -4606,9 +4613,10 @@ norme IEC~60559 (IEEE~754), que R exige de toute plateforme (aide de
 dit le format non défini de façon unique, et le plus court texte décimal
 relu à l'identique, parce que la lecture décimale de R n'est pas
 correctement arrondie. \textbf{Statut}~: écriture exacte par construction
-sous glibc, recoupée par un juge indépendant (Python, \code{struct.pack},
-section~\ref{sec:verifications-rapport})~; sous Windows et macOS,
-\textbf{hypothèse non mesurée} (tests sous Windows ajournés, décision M61,
+(norme IEC~60559 exigée par R, ordre des octets fixé, aucune mise en forme
+par la bibliothèque C), recoupée sous glibc par un juge indépendant (Python,
+\code{struct.pack}, section~\ref{sec:verifications-rapport})~; sous Windows
+et macOS, \textbf{non mesurée} (tests sous Windows ajournés, décision M61,
 issue~\#49~; ADR 0011, point~1). L'entrée de
 référence des tests ne porte aucune colonne double~: ses colonnes s'écrivent
 à l'identique sous les représentations~1 et~2, et seul l'en-tête change son
@@ -4796,7 +4804,10 @@ double, celui de la forme «~texte~» (section~\ref{sec:empreinte}~: écriture
 correctement arrondie et relecture exacte constatée sous glibc, non
 démontrée). Un texte écrit sous Windows, dont le dix-septième chiffre peut
 différer, se relit en le même double dans le cas testé~: c'est un
-\emph{constat de mesure}.
+\emph{constat de mesure}, que contredisent d'autres cas~: sous Windows, sur
+551\,008 textes \code{\%.17g}, 5 ont été relus en un autre double, tous
+d'exposant supérieur à 266 (constat sur le poste du mainteneur, ADR 0011,
+point~3.2).
 
 \begin{center}
 \small
