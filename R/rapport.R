@@ -44,6 +44,8 @@
 VERSION_FICHE <- 2L
 ENTETE_CANONIQUE <- "tablexp canonique 2"
 ALGORITHME_EMPREINTE <- "md5"
+# Littéral laissé tel quel : sonde de l'installation en UTF-8 des batteries
+# (tests/harnais.R, sonde_utf8(), M54) ; marqué UTF-8 à l'emploi (#50).
 STATUT_EMPREINTES_NON_CALCULEES <- "non calculée (branche fiche-rapport)"
 
 # Octets UTF-8 des chaînes x (character), entre guillemets droits, avec les
@@ -273,7 +275,7 @@ empreintes_construction <- function(donnees, roles, provenance) {
        fichier = if (is.null(provenance)) NA_character_ else provenance$empreinte,
        algorithme_fichier = if (is.null(provenance)) NA_character_ else provenance$algorithme,
        resultat = NA_character_, code = NA_character_,
-       statut_resultat_code = STATUT_EMPREINTES_NON_CALCULEES)
+       statut_resultat_code = texte_moteur(STATUT_EMPREINTES_NON_CALCULEES))
 }
 
 # Plan canonique (ADR 0011, point 5.1 ; #42), à partir d'un plan validé par
@@ -354,11 +356,11 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     exclusions = etapes[["donnees"]][["resultat"]][["exclusions"]],
     hypothese_censure = if (is.null(pe)) NA_character_ else pe$hypothese_censure,
     graine = if ("graine" %in% names(plan)) plan[["graine"]] else NA_integer_,
-    graine_mention = if ("graine" %in% names(plan)) "graine du plan" else "aucune étape aléatoire",
+    graine_mention = texte_moteur(if ("graine" %in% names(plan)) "graine du plan" else "aucune étape aléatoire"),
     generateur = GENERATEUR,
     provenance = if (is.null(provenance)) NULL else provenance[c("fichier", "empreinte", "algorithme")],
-    provenance_mention = if (is.null(provenance)) "aucun fichier (données construites en mémoire)"
-                         else "fichier lu par la couche de lecture",
+    provenance_mention = texte_moteur(if (is.null(provenance)) "aucun fichier (données construites en mémoire)"
+                                      else "fichier lu par la couche de lecture"),
     empreintes = empreintes,
     avertissements = avertissements
   )
@@ -399,7 +401,9 @@ informations_execution <- function(debut) {
 #     n), puis exactement ses éléments chemin/[1] à chemin/[n] ;
 #   - data.frame : chemin/@colonnes (character), chemin/@lignes (integer),
 #     puis ses colonnes ; noms de lignes automatiques seulement ;
-#   - vecteur atomique nommé : chemin/@noms, puis la ligne chemin ;
+#   - vecteur atomique nommé : chemin/@noms, puis la ligne chemin ; de
+#     longueur 0, refusé à l'écriture (texte coupé après @noms relu sinon comme
+#     une liste nommée vide) ;
 #   - NULL : chemin<TAB>NULL<TAB>0.
 # Segment de chemin d'un élément : son nom, ou [i] (rang) si le nom est
 # absent, vide, NA, en double, ou s'il contient / , une tabulation ou une fin
@@ -434,8 +438,10 @@ TYPES_TEXTE <- c("double", "integer", "logical", "character", "Date", "NULL")
 PROFONDEUR_MAX_TEXTE <- 32L
 
 # Conventions rappelées au relecteur, en tête du texte (hors aller-retour ;
-# troisième annotation, (h)).
-CONVENTIONS_TEXTE <- c(
+# troisième annotation, (h)) ; texte du moteur marqué UTF-8 (#50). Doubles :
+# la relecture au bit près est un constat de mesure sous glibc (ADR 0011,
+# point 3.2), pas une garantie.
+CONVENTIONS_TEXTE <- texte_moteur(c(
   grammaire = paste(
     "une ligne par feuille : chemin<TAB>type<TAB>longueur<TAB>valeurs ; chemins joints par / ; [i] pour un élément",
     "sans nom ou dont le nom ne peut être un segment (nom porté par @noms) ; liste nommée : chemin/@noms puis ses",
@@ -443,24 +449,25 @@ CONVENTIONS_TEXTE <- c(
     "chemin ; data.frame : chemin/@colonnes et chemin/@lignes puis ses colonnes ; NULL : chemin NULL 0 ;",
     sprintf("profondeur au plus %d", PROFONDEUR_MAX_TEXTE)),
   doubles = paste(
-    "le double relu fait foi et %.17g le désigne exactement (aller-retour exact) ; à l'import, toute écriture",
-    "décimale est admise (0.95 comme 0.94999999999999996) ; refusés : décimal non fini, décimal non nul relu 0 ;",
-    "jetons NA, NaN, Inf, -Inf"),
+    "le double relu fait foi ; 17 chiffres significatifs (%.17g) ; relecture au bit près constatée sous glibc, non",
+    "garantie ailleurs ; à l'import, toute écriture décimale est admise (0.95 comme 0.94999999999999996) ; refusés :",
+    "décimal non fini, décimal non nul relu 0 ; jetons NA, NaN, Inf, -Inf"),
   dates = "ISO 8601, AAAA-MM-JJ, année sur quatre chiffres, domaine [0001-01-01, 9999-12-31]",
   "chaînes" = "UTF-8 entre guillemets droits, échappements \\\\ \\n \\r \\t \\\" ; NA sans guillemets, distinct de \"NA\"",
   "délais" = "en jours",
-  codage = "UTF-8, fins de ligne LF")
+  codage = "UTF-8, fins de ligne LF"))
 
 # Blocs de lecture de la fiche (E3.7 ; troisième annotation, (h)) : ce qui a
 # été calculé, avec quelles hypothèses, de quoi rejouer ; chaque champ de la
-# fiche dans un seul bloc (partition contrôlée par les tests). Affectation à
-# valider par actuary (point 6.5).
-BLOCS_LECTURE_FICHE <- list(
-  "calculé" = c("plan", "transition_code", "fin_effective", "unite_observation", "avertissement_unite",
-               "unite_exposition", "par_annee", "recette", "convention"),
-  "hypothèses" = c("exclusions", "hypothese_censure", "hypotheses_brut", "avertissements", "graine",
-                  "graine_mention", "generateur"),
-  rejeu = c("version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "versions", "plateforme"))
+# fiche dans un seul bloc (partition contrôlée par les tests), dans l'ordre
+# des champs de chaque bloc. Affectation validée par actuary le 20/10/2026
+# (ADR 0011, point 6.5). Noms des blocs marqués UTF-8 (#50).
+BLOCS_LECTURE_FICHE <- texte_moteur(list(
+  "calculé" = c("plan", "transition_code", "fin_effective", "unite_observation", "unite_exposition", "par_annee",
+               "recette", "convention"),
+  "hypothèses" = c("exclusions", "hypothese_censure", "hypotheses_brut", "avertissement_unite", "avertissements"),
+  rejeu = c("version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "graine", "graine_mention",
+            "generateur", "versions", "plateforme")))
 
 joindre_chemin <- function(chemin, segment) if (nzchar(chemin)) paste0(chemin, "/", segment) else segment
 
@@ -506,12 +513,22 @@ texte_objet <- function(x, premiere, entete) {
     a <- names(attributes(v))
     if (is.factor(v)) impossible(chemin, "facteur, sans écriture de ses niveaux dans le texte de la grammaire 1")
     if (identical(class(v), "Date")) {
+      # Date à stockage double ou integer seulement (sinon : erreur R brute, ou
+      # écriture relue d'un autre type ; #50).
+      if (!typeof(v) %in% c("double", "integer"))
+        impossible(chemin, sprintf("Date à stockage %s (double ou integer attendu)", typeof(v)))
       if (!all(a %in% c("names", "class"))) impossible(chemin, sprintf("attribut(s) %s", paste(a, collapse = ", ")))
     } else if (is.object(v) || !typeof(v) %in% c("double", "integer", "logical", "character") ||
                !all(a %in% "names")) {
       impossible(chemin, sprintf("valeur de type %s, de classe %s ou d'attribut(s) %s, sans écriture dans le texte",
                                  typeof(v), paste(class(v), collapse = "/"), paste(a, collapse = ", ")))
     }
+    # Vecteur atomique nommé de longueur 0 : refusé (décision de la session
+    # principale, revue finale de #50) ; écrit chemin/@noms character 0 puis
+    # chemin, son texte coupé après la ligne @noms se relirait comme une liste
+    # nommée vide (préfixe accepté, contraire à la troisième annotation, (d)).
+    if (!is.null(names(v)) && !length(v))
+      impossible(chemin, "vecteur atomique nommé de longueur 0, sans écriture distincte d'une liste nommée vide")
     if (!is.null(names(v))) noms_ligne(v, chemin)
     cc <- ecrire_valeurs(v, "texte", chemin)
     ajouter(chemin, cc$type, length(v), cc$octets)
@@ -813,10 +830,11 @@ ecrire_fiche <- function(fiche) {
                 representation = rappel(rep_),
                 lecture = paste(blocs, collapse = " | "),
                 # Note de lecture d'E3.7 (docs/exigences.md), en une ligne.
-                rejeu = paste("vérifier version_fiche, empreintes/representation et empreintes/donnees ; exécuter",
-                              "construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) sur le plan relu",
-                              "de ce texte ; comparer à tolérance par classes (ADR 0009) sur une autre machine, au bit",
-                              "près sur la même (E4.6)")))
+                rejeu = texte_moteur(paste(
+                  "vérifier version_fiche, empreintes/representation et empreintes/donnees ; exécuter",
+                  "construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) sur le plan relu",
+                  "de ce texte ; comparer à tolérance par classes (ADR 0009) sur une autre machine, au bit",
+                  "près sur la même (E4.6)"))))
 }
 
 # Fiche relue des octets `octets` (raw). Ne contrôle pas version_fiche :
