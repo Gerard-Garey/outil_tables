@@ -1168,7 +1168,10 @@ fichiers en ligne de commande).
     \code{observation\_des\_lignes}~; constante
     \code{RESUMES\_PAR\_EMPREINTE}) sont \textbf{résumées} par leur nombre de
     lignes et l'empreinte MD5 de leur représentation canonique (colonnes
-    écrites par \code{ecrire\_valeurs()}, section~\ref{sec:empreinte}),
+    écrites par \code{ecrire\_valeurs()} en forme «~texte~»,
+    section~\ref{sec:empreinte}~; sans colonne double, ces tables s'écrivent
+    de même dans les deux formes, si bien que le passage à la représentation
+    canonique~2 a laissé leurs lignes \code{@empreinte} inchangées),
     non recopiées~: elles ne contiennent que des entiers, des dates et des
     chaînes, sans arithmétique flottante, si bien que le résumé exact ne perd
     aucune détection, et la table «~avant~» se reconstitue en rejouant le plan
@@ -1248,8 +1251,10 @@ terminées par LF, écrit octet par octet~:
     \code{@empreinte} d'une table résumée~;
   \item des \textbf{types} \code{double}, \code{integer}, \code{logical},
     \code{character}, \code{Date}, \code{factor}, \code{NULL}, aux valeurs
-    écrites selon la représentation canonique de l'empreinte
-    (section~\ref{sec:empreinte})~: doubles en \code{\%.17g}, chaînes
+    écrites par l'écrivain de la représentation canonique,
+    \code{ecrire\_valeurs()}, en forme «~texte~»
+    (section~\ref{sec:empreinte})~: doubles en \code{\%.17g} (et non en
+    octets, forme réservée à l'empreinte des données), chaînes
     échappées entre guillemets, sous la même règle de codage, par
     \textbf{refus} et jamais par conversion~;
   \item des \textbf{refus d'écriture}, avec le chemin fautif, pour toute
@@ -1577,7 +1582,16 @@ erreurs. Puis~:
     ligne (texte avant la première tabulation) est la représentation de
     l'objet, le remplace par la représentation de la référence, et exige que
     le MD5 obtenu soit égal à l'empreinte des données de la référence~; il
-    exige aussi que les deux représentations diffèrent. Sans cette garde,
+    exige aussi que les deux représentations diffèrent, et que l'objet ait
+    été construit sur l'entrée qu'on lui passe~: le MD5 du texte canonique
+    de cette entrée, sous la représentation courante, doit être égal à
+    l'empreinte des données de l'objet (réserve M2 de l'audit de l'issue~\#47,
+    levée par l'issue~\#35~; ADR 0009, troisième annotation du 19/10/2026,
+    point~(f)~4, et quatrième, point~(a)). Lors de la transition de
+    l'issue~\#35, la garde a prouvé l'entrée de référence inchangée~: le texte
+    de la représentation~2, sous l'en-tête de la représentation~1, redonne
+    l'empreinte de la référence commitée, preuve refaite hors de R dans le
+    commit de l'issue (ADR 0011, point~2.5). Sans cette garde,
     la transition absorberait le contrôle de l'entrée~: l'entrée de
     référence aux lignes permutées, réellement différente, ne s'écarte des
     références de R1 et de R6 que par l'empreinte des données et celles des
@@ -1619,7 +1633,9 @@ Tout contrôle mécanique est un script, jamais une relecture (\code{CLAUDE.md},
 «~Workflows~», principe~7). Les scripts sont en R de base, sous
 \code{tests/controles/}, et sortent avec un code non nul en cas d'écart. Chacun
 est testé sur des témoins dans \code{tests/unitaires/test\_controles.R}~: il
-doit échouer sur un cas fautif et passer sur le dépôt.
+doit échouer sur un cas fautif et passer sur le dépôt. Fait exception
+\code{ecriture\_doubles.R}, recoupement hors CI dont la batterie unitaire
+garde un échantillon (section~\ref{sec:verifications-rapport}).
 
 \begin{center}
 \small
@@ -1658,6 +1674,11 @@ seule chaîne d'image dans tous les workflows~; invariants du workflow
 ADR 0008, points 3 à 5 \\
 \code{absence\_java.R} & aucune dépendance à Java
 (section~\ref{sec:absence-java}) & ADR 0002, A1~; ADR 0008, point 7~; issue~\#3 \\
+\code{ecriture\_doubles.R} & écriture des doubles de l'empreinte en octets
+IEEE~754 identique, ligne à ligne, à celle d'un juge indépendant (Python,
+\code{struct.pack}) sur $10^6$ doubles tirés sous graine et des cas limites~;
+\textbf{hors CI} (Python requis), non exécuté sous Windows
+(section~\ref{sec:empreinte}) & ADR 0011, points 2.1 et 2.4~; issue~\#35 \\
 \end{longtable}
 \end{center}
 
@@ -4318,7 +4339,7 @@ avec n'importe quel outil MD5.
 
 \medskip
 La fiche porte~: \code{algorithme}~; \code{representation}
-(\code{ENTETE\_CANONIQUE}, \code{"tablexp canonique 1"})~; \code{donnees}~;
+(\code{ENTETE\_CANONIQUE}, \code{"tablexp canonique 2"})~; \code{donnees}~;
 \code{fichier} et \code{algorithme\_fichier}, reçus par \code{provenance}
 (\code{NA} sans fichier)~; \code{resultat} et \code{code}, à \code{NA} avec le
 statut «~non calculée (branche fiche-rapport)~»
@@ -4383,14 +4404,27 @@ annotation du 17/10/2026, point~f)~:
     nom de colonne n'entre pas dans le texte (il est dans \code{fiche\$roles})~:
     renommer une colonne ne change pas l'empreinte~;
   \item \textbf{structure}~: une première ligne
-    \code{tablexp canonique 1<TAB><nombre de lignes><TAB><nombre de colonnes>},
+    \code{tablexp canonique 2<TAB><nombre de lignes><TAB><nombre de colonnes>},
     puis, pour chaque colonne, une ligne d'en-tête \code{\#<rôle><TAB><type>}
     suivie d'une valeur par ligne~; lignes terminées par LF, aucun CR, fichier
     écrit octet par octet~;
-  \item \textbf{valeurs}~: \code{double} écrit en \code{\%.17g} après ajout de
-    0 (le zéro négatif est normalisé~; \code{\%.17g} restitue un double au bit
-    près, \code{\%.15g} ne le fait pas), \code{NA}, \code{NaN}, \code{Inf},
-    \code{-Inf}~; \code{integer} en \code{\%d}~; \code{logical} en
+  \item \textbf{valeurs}~: \code{double} écrit en \textbf{octets IEEE~754}
+    (représentation~2, issue~\#35~; ADR 0011, point~2)~: une valeur finie $x$
+    s'écrit en seize chiffres hexadécimaux minuscules, les huit octets de
+    $x + 0$ dans l'ordre petit-boutiste
+    (\code{writeBin(x + 0, raw(), size = 8, endian = "little")}~; l'ajout de
+    0 normalise le zéro négatif), par exemple \code{666666666666ee3f} pour
+    0,95, \code{000000000000f03f} pour 1 et \code{0100000000000000} pour le
+    plus petit sous-normal~; une valeur non finie s'écrit par un jeton,
+    \code{NA}, \code{NaN}, \code{Inf} ou \code{-Inf}, \textbf{lu sur la
+    valeur reçue}, jamais sur $x + 0$, et non par ses octets~: ceux d'un
+    \code{NA} ou d'un \code{NaN} ne sont pas stables d'une opération à
+    l'autre (\code{NA\_real\_} et \code{NA\_real\_ + 1} n'ont pas les mêmes
+    octets sous x86-64), et l'aide de R ne garantit pas qu'une opération
+    préserve la distinction entre \code{NA} et \code{NaN} (ADR 0011,
+    point~2.2, et seconde annotation du 19/10/2026)~; un double muni d'un
+    attribut de dimension s'écrit comme le vecteur nu~;
+    \code{integer} en \code{\%d}~; \code{logical} en
     \code{TRUE}, \code{FALSE}, \code{NA}~; \code{Date} en \code{\%Y-\%m-\%d}~;
     chaînes et facteurs (convertis en chaînes, les niveaux n'entrent pas)~:
     octets UTF-8 entre guillemets droits, avec cinq échappements
@@ -4405,6 +4439,45 @@ annotation du 17/10/2026, point~f)~:
     l'empreinte ne dépend pas des paramètres régionaux.
 \end{itemize}
 
+\noindent
+\textbf{Deux formes, un seul écrivain} (ADR 0011, point~3~; décision M64,
+Q1). \code{ecrire\_valeurs()} écrit les valeurs d'une colonne sous deux
+formes, qui ne diffèrent que pour les doubles~: la forme «~empreinte~»
+ci-dessus, seule employée par \code{texte\_canonique()}, et la forme
+«~texte~», pour les textes qu'un relecteur lit et qu'on relit (références de
+non-régression, section~\ref{sec:non-regression}), où un double fini
+s'écrit \code{sprintf("\%.17g", x + 0)} et un non fini comme R l'écrit
+(\code{NA}, \code{NaN}, \code{Inf}, \code{-Inf}), le jeton étant lu, là
+aussi, sur la valeur reçue. \code{\%.17g} restitue un double au bit près là
+où \code{\%.15g} ne le fait pas~; sous la bibliothèque C de GNU (glibc),
+l'écriture est correctement arrondie, et la relecture exacte est un
+\emph{constat de mesure} appuyé sur un argument d'ordre de grandeur, non une
+preuve (ADR 0011, point~3.2). Les entiers, logiques, chaînes, facteurs et
+dates s'écrivent de même dans les deux formes. Une forme inconnue est
+refusée (\code{forme\_ecriture\_inconnue}).
+
+\medskip
+\textbf{Pourquoi des octets, et non \code{\%.17g}, dans l'empreinte.}
+L'écriture décimale dépend de la bibliothèque C du système~: sous Windows,
+elle n'arrondit pas toujours correctement le dix-septième chiffre (constat
+sur le poste du mainteneur, ADR 0011, «~Contexte~», mesure~1), si bien qu'à
+données identiques au bit près l'empreinte d'une base portant une colonne
+double différerait d'un poste à l'autre. Les octets ne dépendent que de la
+norme IEC~60559 (IEEE~754), que R exige de toute plateforme (aide de
+\code{double}), et de l'ordre des octets, fixé. Deux autres écritures ont été
+écartées (ADR 0011, point~2.6)~: \code{\%a}, dont l'aide de \code{sprintf}
+dit le format non défini de façon unique, et le plus court texte décimal
+relu à l'identique, parce que la lecture décimale de R n'est pas
+correctement arrondie. \textbf{Statut}~: écriture exacte par construction
+sous glibc, recoupée par un juge indépendant (Python, \code{struct.pack},
+section~\ref{sec:verifications-rapport})~; sous Windows et macOS,
+\textbf{hypothèse non mesurée} (tests sous Windows ajournés, décision M61,
+issue~\#49~; ADR 0011, point~1). L'entrée de
+référence des tests ne porte aucune colonne double~: ses colonnes s'écrivent
+à l'identique sous les représentations~1 et~2, et seul l'en-tête change son
+empreinte.
+
+\medskip
 \noindent
 Le libellé de type de l'en-tête est pris dans une \textbf{liste fermée de six
 chaînes}, par des tests faits dans l'ordre du tableau~\ref{tab:types-canoniques}
@@ -4452,16 +4525,38 @@ section~\ref{sec:troncature-censure}).
 \medskip
 \textbf{Règle durable.} Changer la représentation canonique (libellé, ordre
 des tests, format d'une valeur) change l'empreinte des données de toutes les
-fiches~: c'est un changement de résultat, qui appelle l'incrément de
-\code{version\_fiche} et le visa.
+fiches, parce que la première ligne du texte empreinté porte la version~:
+c'est un changement de résultat, qui appelle l'incrément de la version de la
+représentation (\code{ENTETE\_CANONIQUE}, \code{tablexp canonique N}, portée
+par \code{fiche\$empreintes\$representation}), au plus une fois par branche,
+et le visa (ADR 0011, point~10). Une empreinte nomme ainsi sa définition.
+Cette version est distincte de \code{version\_fiche}, qui numérote la
+structure de la fiche (ensemble des champs et types canoniques). La
+représentation est passée de~1 à~2 avec l'issue~\#35 (doubles en octets)~:
+l'empreinte des données des six plans de référence a changé, l'entrée
+restant la même, ce qu'a prouvé la garde «~entrée différente~»
+(section~\ref{sec:non-regression}, «~Règles durables~»).
 
 \subsection{Vérifications}
 \label{sec:verifications-rapport}
 
 \code{tests/unitaires/test\_construire\_table.R} compare l'empreinte d'un petit
-\code{data.frame}, colonnes facteur et chaîne comprises, à une valeur calculée
-hors de R (texte écrit par \code{printf}, empreinte par \code{md5sum} de GNU
-coreutils). \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
+\code{data.frame}, colonnes facteur, chaîne et double comprises, à une valeur
+calculée hors de R (texte écrit par \code{printf}, octets des doubles par
+\code{struct.pack} de Python, empreinte par \code{md5sum} de GNU
+coreutils). Il vérifie l'écrivain des valeurs dans ses deux formes~: les
+vecteurs de test de l'ADR 0011 (octets calculés hors de R), sous-normaux,
+plus petit normal et maximum, jetons des non-finis lus sur la valeur reçue
+quels que soient leurs octets, zéro négatif, attribut de dimension, mélange
+de valeurs finies et de jetons, longueurs limites, types autres que double
+identiques dans les deux formes, refus~; et un échantillon de $10^5$ doubles
+tirés sous graine, dont le MD5 du texte doit être celui que produit le juge
+Python, hors de R. Le contrôle \code{tests/controles/ecriture\_doubles.R},
+\textbf{hors batterie et hors CI} (durée, dépendance à Python), étend ce
+recoupement à $10^6$ doubles et aux cas limites, ligne à ligne, et sort avec
+un code non nul sur un écart ou si Python est absent~; il ne s'exécute pas
+sous Windows, où le texte \code{\%.17g} qu'il transmet au juge n'est pas
+toujours correctement arrondi. \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
 la même dans des processus R lancés sous \code{LANG=C} et sous
 \code{LANG=C.UTF-8}, égale à cette valeur, et que le rejeu de la fiche redonne
 l'objet. \code{tests/unitaires/test\_construire\_table.R} vérifie aussi
@@ -4489,7 +4584,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
 \catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (2) \\
-\catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 1"} \\
+\catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
 \catalogue{fonctions-rapport}{STATUT\_EMPREINTES\_NON\_CALCULEES} & constante & --- & statut des empreintes du résultat et du code \\
 \catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle & octets canoniques des chaînes~; refus de codage \\
