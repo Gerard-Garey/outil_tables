@@ -375,7 +375,10 @@ CHAMPS_EXIGES <- list(type = c("de", "vers"), valeur = "valeurs", "valeur de cha
 valider_transitions <- function(transitions, plans = names(plans_reference())) {
   if (!is.list(transitions)) return("la liste des transitions n'est pas une liste")
   p <- character(0)
-  issues <- vapply(transitions, function(t) if (is.character(t$issue) && length(t$issue) == 1L) t$issue else NA_character_, "")
+  # Élément non liste (ex. list("#35")) : issue NA ici, problème nommé par la
+  # boucle (jamais t$issue sur un vecteur atomique, erreur R brute).
+  issues <- vapply(transitions, function(t)
+    if (is.list(t) && is.character(t[["issue"]]) && length(t[["issue"]]) == 1L) t[["issue"]] else NA_character_, "")
   for (k in seq_along(transitions)) {
     t <- transitions[[k]]; e <- sprintf("transition %d : ", k)
     if (!is.list(t) || !identical(sort(names(t)), c("changements", "issue", "plans"))) {
@@ -1632,6 +1635,7 @@ local({
   for (cas in list(
     list("nature inconnue", list(tr("#901", "R1", list(chemin = "s/n", nature = "quelconque")))),
     list("issue sans #", list(tr("37", "R1", ch$ajout))),
+    list("élément non liste (list(\"#35\"), au lieu d'une erreur R brute)", list("#35")),
     list("issue en double sur un plan commun", list(tr("#901", c("R1", "R2"), ch$ajout), tr("#901", "R2", ch$retrait))),
     list("plan de référence inconnu", list(tr("#901", "R9", ch$ajout))),
     list("aucun changement", list(tr("#901", "R1"))),
