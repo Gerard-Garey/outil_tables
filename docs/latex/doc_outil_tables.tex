@@ -2406,7 +2406,8 @@ déclaré. Les exclusions sont comptées et listées par motif dans le résultat
 l'étape (\code{resultat\$exclusions}, \code{resultat\$lignes\_exclues}) et
 chacune donne un avertissement \code{exclusion}~; une ligne exclue sous
 plusieurs motifs est comptée sous chacun, et le nombre de lignes distinctes
-exclues est donné à part (\code{resultat\$nombre\_lignes\_exclues}). Si toutes les lignes sont
+exclues est donné à part (\code{resultat\$nombre\_lignes\_exclues}, repris
+par la fiche, section~\ref{sec:fiche}). Si toutes les lignes sont
 exclues, la construction est refusée (\code{aucune\_ligne\_conservee})~; une
 base sans ligne l'est aussi (\code{base\_vide}). Le diagnostic
 \code{diagnostics\$motifs} restitue, pour chaque motif, sa nature (ligne ou
@@ -4361,7 +4362,7 @@ et rangée dans le champ \code{fiche} de l'objet. Elle ne contient
 identiques. Ses champs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \code{version\_fiche} (\code{VERSION\_FICHE}, 2)~; \code{versions}
+  \item \code{version\_fiche} (\code{VERSION\_FICHE}, 3)~; \code{versions}
     (\code{tablexp}, lue dans la description du package installé, et
     \code{R.version.string})~; \code{plateforme} (système, version, machine,
     BLAS par \code{extSoftVersion()}, LAPACK par \code{La\_library()})~;
@@ -4374,7 +4375,11 @@ identiques. Ses champs~:
     (message de l'avertissement \code{unite\_contrat})~;
   \item \code{recette}~; \code{convention} (demandée, native, retenue,
     forcée)~; \code{unite\_exposition}~; \code{par\_annee}~;
-    \code{exclusions} (par motif, avec leur nombre)~; \code{hypothese\_censure}~;
+    \code{exclusions} (par motif, avec leur nombre~; une ligne exclue sous
+    plusieurs motifs déclarés compte sous chacun)~;
+    \code{nombre\_lignes\_exclues} (\code{integer}, nombre de lignes
+    distinctes exclues, \code{0L} sans exclusion~; ci-dessous)~;
+    \code{hypothese\_censure}~;
   \item \code{graine} et \code{graine\_mention} (\code{NA} et «~aucune étape
     aléatoire~» dans cette branche)~; \code{generateur} (\code{GENERATEUR})~;
   \item \code{provenance}, dans l'ordre \code{fichier}, \code{empreinte},
@@ -4456,6 +4461,35 @@ E3.7). Le changement de l'ensemble des champs fait passer
 \code{version\_fiche} de~1 à~2 (ADR 0011, point~10)~; il a été visé par
 \code{actuary} et consigné par la seconde régénération des références
 (section~\ref{sec:non-regression}).
+
+\medskip
+\noindent
+\textbf{Nombre de lignes exclues} (issue~\#57~; décision M69, point~1).
+\code{exclusions} compte les lignes par motif~: une ligne qui porte deux
+motifs déclarés y compte deux fois, si bien que la somme des décomptes
+surestime le volume écarté. \code{nombre\_lignes\_exclues} donne le nombre de
+lignes \emph{distinctes} exclues, repris de l'étape \code{donnees}
+(\code{resultat\$nombre\_lignes\_exclues}, section~\ref{sec:controles-donnees})~:
+c'est le nombre d'éléments de l'union des numéros de lignes exclues sous
+les motifs déclarés. Les lignes conservées étant exactement les autres, le
+rapprochement «~lignes reçues = lignes conservées +
+\code{nombre\_lignes\_exclues}~» est une identité exacte, par
+construction, et non une approximation. Un plan sans exclusion, ou dont les
+motifs déclarés ne portent sur aucune ligne, donne \code{0L}. Le champ suit
+\code{exclusions} dans la fiche et appartient au bloc de lecture
+«~hypothèses~» (ci-dessous, «~Blocs de lecture~»). Le jugement de
+pertinence des exclusions et leur justification restent à l'entreprise et au
+certificateur~; aucune justification déclarée n'entre dans le plan. La
+question réglementaire des exclusions est traitée par l'issue~\#69, à
+laquelle sont renvoyées les grandeurs qui mesureraient leur importance
+(décès et exposition retirés par les exclusions, SMR des lignes exclues~;
+décision M69, point~1). L'ajout du champ change l'ensemble
+des champs et fait passer \code{version\_fiche} de~2 à~3 (ADR 0011,
+point~10~(c))~; l'incrément est porté par le premier commit de la branche
+\code{claude/fiche-rapport} qui change la définition de la fiche, celui de
+l'issue~\#57, et il est le seul de la branche (ADR 0011, point~10~(a), et
+troisième et quatrième annotations du 20/10/2026). Le changement a été visé
+par \code{actuary}~; aucune table, aucun taux ni aucun verdict ne change.
 
 \noindent
 Les champs qui n'ont pas d'objet (convention et unité d'exposition d'un plan
@@ -4897,6 +4931,7 @@ même (E4.6). L'empreinte du résultat, quand elle sera calculée, ne servira
 de témoin que sur la même machine.
 
 \medskip
+{\sloppy
 \textbf{Blocs de lecture.} La ligne \code{\# lecture} de la fiche écrite
 range ses champs en trois blocs (\code{BLOCS\_LECTURE\_FICHE}), qui suivent
 les trois questions d'E3.7~: ce qui a été \emph{calculé}, avec quelles
@@ -4909,13 +4944,14 @@ point~6.5), est la suivante, dans l'ordre des champs de chaque bloc~:
 \code{fin\_effective}, \code{unite\_observation},
 \code{unite\_exposition}, \code{par\_annee}, \code{recette},
 \code{convention}~; \emph{hypothèses}~: \code{exclusions},
+\code{nombre\_lignes\_exclues},
 \code{hypothese\_censure}, \code{hypotheses\_brut},
 \code{avertissement\_unite}, \code{avertissements}~; \emph{rejeu}~:
 \code{version\_fiche}, \code{roles}, \code{provenance},
 \code{provenance\_mention}, \code{empreintes}, \code{graine},
 \code{graine\_mention}, \code{generateur}, \code{versions},
 \code{plateforme}. Un champ absent de la fiche (\code{hypotheses\_brut}
-sans étape \code{brut}) est omis de la ligne.
+sans étape \code{brut}) est omis de la ligne.\par}
 
 \subsection{Vérifications}
 \label{sec:verifications-rapport}
@@ -5018,7 +5054,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (2) \\
+\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (3) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
 \catalogue{fonctions-rapport}{bornes\_blocs()} & interne & corps échappés (codage \code{bytes}), limite en octets & bornes \code{debut} et \code{fin} des blocs de collage d'\code{octets\_chaines()} et indicateur \code{seule}~: découpage glouton dans l'ordre des lignes, une ligne comptant les octets de son corps plus trois (deux guillemets et LF)~; un bloc de plusieurs lignes fait au plus \code{limite} octets et la ligne suivante n'y tiendrait pas~; une ligne plus longue que \code{limite} forme seule son bloc (\code{seule}) \\
