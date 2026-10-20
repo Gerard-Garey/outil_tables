@@ -4639,8 +4639,11 @@ moment de l'appel par \code{ordres\_canoniques()}
 (\code{R/construire\_table.R}), et non par une constante de premier niveau~:
 sans champ \code{Collate} dans \code{DESCRIPTION}, les fichiers de
 \code{R/} sont évalués par ordre alphabétique à l'installation, et
-\code{construire\_table.R} l'est avant \code{donnees.R} et \code{brut.R},
-dont les constantes ne sont pas encore définies. Aucune valeur n'est
+\code{construire\_table.R} l'est avant \code{donnees.R}, dont les
+constantes (\code{ROLES\_SEGMENTATION}, \code{MOTIFS\_LIGNES},
+\code{MOTIFS\_TETE}) ne sont pas encore définies~; \code{brut.R}
+(\code{ESTIMATEURS\_BRUT}) l'est déjà, mais la fonction lit les trois
+vecteurs au même endroit. Aucune valeur n'est
 retirée en silence~: avant de réordonner, une valeur absente du vecteur
 d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que
 \code{character} arrêtent le calcul par une erreur de programmation
