@@ -2393,7 +2393,12 @@ charge, vide sinon.}
 chaque refus nomme tous les rôles et colonnes en cause~:
 \code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame})~;
 \code{roles\_mal\_formes} (les rôles ne sont pas un vecteur de chaînes nommé,
-sans valeur ni nom manquant)~; \code{role\_inconnu}~;
+de forme exacte \code{character} sans autre attribut que ses noms~--- une
+classe, \code{noquote} ou \code{AsIs} comprises, une dimension ou un
+attribut quelconque sont refusés, par \code{forme\_exacte()}~---, sans
+valeur ni nom manquant ni nom vide~; \code{details\$classe} et
+\code{details\$attributs} donnent la classe et les noms des attributs reçus,
+pour que le refus dise la cause~; issue~\#62)~; \code{role\_inconnu}~;
 \code{role\_declare\_deux\_fois}~; \code{role\_non\_pris\_en\_charge}~;
 \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
@@ -2781,7 +2786,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{date\_hors\_domaine}~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees} ou \code{brut})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et par la fonction d'étape \code{brut} (issue~\#59) \\
 \catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres, dont \code{date\_hors\_domaine} pour les bornes de la période~; transition retenue, début, fin, borne $B$ \\
 \catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
