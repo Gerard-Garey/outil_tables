@@ -624,8 +624,8 @@ colonnes \code{etape}, \code{code}, \code{message} et \code{nombre}~;
 \code{integer}, positif ou nul (issue~\#24). \code{avertir()} lui ajoute une
 ligne, et refuse, par une erreur de programmation (\code{stop()}, sans
 conversion), un code qui n'est pas une chaîne unique sans attribut, ni
-\code{NA} ni vide, au sens de \code{chaine\_unique()} (chaîne nommée ou
-munie d'une classe comprise~; issue~\#60), ou qui n'est pas conforme à
+\code{NA} ni vide, au sens de \code{chaine\_unique()} (une chaîne nommée
+ou munie d'une classe est refusée~; issue~\#60), ou qui n'est pas conforme à
 \code{MOTIF\_CODE\_REFUS}, et un
 nombre qui n'est pas un nombre unique, fini, entier, positif ou nul et au plus
 égal à \code{.Machine\$integer.max}~; sinon il le stocke par
@@ -1114,7 +1114,8 @@ Dans les deux modes, il écrit l'\emph{identifiant de plateforme} (image,
 consigne sans faire échouer le processeur et ses drapeaux (\code{fma},
 \code{avx2}, \code{avx512f}), la version de la glibc, dont vient la
 \code{libm} (sortie de \code{getconf GNU\_LIBC\_VERSION}, à défaut première
-ligne de \code{ldd -{}-version}, «~inconnue~» hors glibc~; issue~\#72),
+ligne de \code{ldd -{}-version}, «~inconnue~» si aucune de ces sorties ne
+désigne la glibc~; issue~\#72),
 \code{ImageOS} et \code{ImageVersion} de l'hôte,
 \code{LC\_COLLATE}, le fuseau horaire, la présence d'un exécutable
 \code{java} et \code{GITHUB\_SHA}. Ces grandeurs consignées n'entrent pas
@@ -2040,8 +2041,13 @@ d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()} et
 \code{chaine\_unique()} (section~\ref{sec:fonctions-outils}), sous le motif
 existant de chaque paramètre~: aucun motif n'est propre à la forme. Hors du
-plan, la même règle s'applique à la graine reçue par \code{sous\_graine()}
-(refus \code{graine\_invalide}, section~\ref{sec:sous-graine}) et, à
+plan, la même règle s'applique notamment à la graine reçue par
+\code{sous\_graine()} (refus \code{graine\_invalide},
+section~\ref{sec:sous-graine}), aux rôles reçus par \code{controler\_roles()}
+(seul attribut admis~: les noms~; refus \code{roles\_mal\_formes},
+section~\ref{sec:controles-donnees}~; issue~\#62), au mode du portefeuille
+simulé (refus \code{portefeuille\_invalide},
+section~\ref{sec:portefeuille-simule}~; issue~\#60) et, à
 l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()}, à la
 segmentation, contrôlée dans sa forme et dans son catalogue par le même
 contrôle que dans le plan, \code{controler\_segmentation()} (refus
@@ -2406,7 +2412,9 @@ classe, \code{noquote} ou \code{AsIs} comprises, une dimension ou un
 attribut quelconque sont refusés, par \code{forme\_exacte()}~---, sans
 valeur ni nom manquant ni nom vide~; \code{details\$classe} et
 \code{details\$attributs} donnent la classe et les noms des attributs reçus,
-pour que le refus dise la cause~; issue~\#62)~; \code{role\_inconnu}~;
+qui désignent la cause quand elle tient à une classe, une dimension ou un
+attribut, mais non quand elle tient à une valeur ou à un nom manquant ou
+vide~; issue~\#62)~; \code{role\_inconnu}~;
 \code{role\_declare\_deux\_fois}~; \code{role\_non\_pris\_en\_charge}~;
 \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
@@ -5149,11 +5157,12 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     (\code{calculer\_taux\_bruts()}), dont l'argument est identique au bit
     près des deux côtés~: l'écart naît dans \code{expm1()}, fonction de la
     bibliothèque mathématique du système (\code{libm} de la glibc~; sur la plateforme de référence, sous
-    Ubuntu~22.04.5, glibc vraisemblablement~2.35, version livrée par
-    Ubuntu~22.04~: \textbf{hypothèse}, non relevée sur l'image, que le
-    script de plateforme consigne désormais (issue~\#72) mais que les
-    références actuelles, produites avant, ne portent pas~; elle sera levée
-    par l'en-tête des références à leur prochaine régénération), et non dans
+    Ubuntu~22.04.5, glibc~2.35~: \emph{constat de mesure}, relevé par le
+    script de plateforme dans le journal du job «~Tests (R 4.3.3)~» de la CI
+    du 20/10/2026, sur l'image de référence, de même empreinte que celle de
+    l'en-tête des références actuelles~; issue~\#72~; les en-têtes des
+    références ne porteront cette version qu'à leur prochaine
+    régénération), et non dans
     LAPACK~; la mesure ne sépare pas la version de la glibc de la variante
     qu'elle choisit selon le processeur (ADR 0008, seconde annotation du
     19/10/2026). De plus, la forme «~empreinte~» distingue \code{NA} de
