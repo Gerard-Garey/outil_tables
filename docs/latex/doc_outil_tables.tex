@@ -2642,7 +2642,11 @@ l'entrée (par exemple \code{label}). Un facteur \code{sexe} ou
 \code{preparer\_donnees()}~: codes sous-indicés, niveaux tels quels (ordre et
 niveaux inutilisés compris), classe ramenée à \code{factor}, ou à
 \code{c("ordered", "factor")} s'il est ordonné~; \code{contrasts}, sous-classe
-et tout autre attribut sont retirés. Motif~: l'empreinte du résultat écrit la
+et tout autre attribut sont retirés. La table des observations porte des
+noms de lignes automatiques, même si une colonne d'identifiant porte
+l'attribut \code{names} (par exemple dans un \code{data.frame} construit par
+\code{list2DF()}), dont \code{data.frame()} tirerait sinon ses noms de
+lignes (\code{row.names = NULL} dans les deux unités). Motif~: l'empreinte du résultat écrit la
 table des observations et arrête le calcul, par une erreur de programmation,
 sur tout attribut ou toute classe hors de sa grammaire
 (section~\ref{sec:empreinte-resultat})~; sans cette normalisation,
@@ -4969,7 +4973,7 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
 \subsubsection*{Empreinte du résultat}
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \textbf{Objet}~: identifier conjointement l'entrée (par
+  \item \textbf{Objet}~: identifier conjointement l'entrée, dans ses colonnes de rôle (par
     \code{fiche\$empreintes\$donnees}, qui est dans le périmètre), la
     déclaration (\code{fiche\$plan}, \code{fiche\$roles}) et le résultat
     (\code{table}, \code{etapes}, \code{avertissements}, reste de la
@@ -5006,11 +5010,15 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     \code{etapes\$donnees\$resultat\$}\allowbreak\code{lignes\_conservees} (décision M71,
     point~1). Cette dernière est la copie de l'entrée privée des lignes
     exclues, avec toutes ses colonnes, sa classe, ses attributs et ses noms de
-    lignes~: elle est entièrement déterminée par l'entrée, identifiée par
-    \code{fiche\$empreintes\$donnees}, et par \code{numeros\_conserves}, qui
+    lignes~: elle est entièrement déterminée par l'entrée, identifiée, dans
+    ses colonnes de rôle, par l'empreinte des données
+    (\code{fiche\$empreintes\$donnees}), et par \code{numeros\_conserves}, qui
     reste dans le périmètre, et ce qu'elle porte en plus (colonnes hors rôle,
     noms de lignes, classe, attributs) n'est lu par aucun module, le moteur
-    ne lisant l'entrée conservée que colonne de rôle par colonne de rôle. La
+    ne lisant l'entrée conservée que colonne de rôle par colonne de rôle. Ce
+    surplus n'est couvert par aucune empreinte~: celle des données ne porte
+    que sur les colonnes de rôle (décision M71, point~1~; ADR 0007,
+    point~9.3). La
     garder dans le périmètre ferait échouer \code{construire\_table()} sur
     des entrées valides que la grammaire ne sait pas écrire~: noms de lignes
     non automatiques dès qu'une exclusion retire une ligne, colonne hors rôle
@@ -5038,10 +5046,14 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     forme «~empreinte~», écrit par ses libellés sous le type \code{factor},
     comme dans l'empreinte des données~; il reste refusé en forme «~texte~»
     (grammaire~1, section~\ref{sec:serialisation}). Seul est admis un
-    facteur dont la première classe est \code{factor} ou \code{ordered} et
-    dont les attributs sont parmi \code{names}, \code{levels} et
-    \code{class}~; tout autre facteur est refusé
+    facteur de classe exactement \code{factor} ou \code{c("ordered", "factor")}
+    et dont les attributs sont parmi \code{names}, \code{levels} et
+    \code{class}~; tout autre facteur, sous-classe comprise (par exemple
+    \code{c("factor", "x")}), est refusé
     (\code{serialisation\_impossible}, converti en erreur de programmation).
+    Aucune construction valide n'est ainsi refusée~: les facteurs de la table
+    des observations sont reconstruits par \code{categorie}, qui ne produit
+    que ces deux classes (section~\ref{sec:unite-observation}).
     Les niveaux ne sont pas écrits, et le libellé de type est \code{factor}
     pour un facteur ordonné ou non (tableau~\ref{tab:types-canoniques})~:
     deux facteurs aux mêmes libellés et aux niveaux différents, ou un
@@ -5059,7 +5071,8 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     puis ajoute \code{execution} (section~\ref{sec:execution}). Le coût
     supplémentaire, dû surtout à l'écriture de la table des observations, a
     été mesuré à $10^6$~lignes et admis pour la branche (décision M71,
-    point~5~; E1.3)~; son optimisation, qui devra garder le même texte
+    point~5~; E1.3~; mesures consignées par l'ADR 0011, septième annotation
+    du 20/10/2026, (f), et par M71)~; son optimisation, qui devra garder le même texte
     empreinté, est l'objet de l'issue~\#71.
   \item \textbf{Statut}~: écriture exacte (octets fixés, MD5 d'octets), mais
     valeur \textbf{dépendante de la plateforme}~: à entrée, plan et code
@@ -5074,9 +5087,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     grandeur est calculée par \code{-expm1(-borne)}
     (\code{calculer\_taux\_bruts()}), dont l'argument est identique au bit
     près des deux côtés~: l'écart naît dans \code{expm1()}, fonction de la
-    bibliothèque mathématique du système (\code{libm} de la glibc, en~2.35
-    sous l'Ubuntu~22.04.5 de la plateforme de référence, version de la
-    distribution non consignée par le script de plateforme), et non dans
+    bibliothèque mathématique du système (\code{libm} de la glibc~; sur la plateforme de référence, sous
+    Ubuntu~22.04.5, glibc vraisemblablement~2.35, version livrée par
+    Ubuntu~22.04, hypothèse non relevée sur l'image~: le script de plateforme
+    consigne le système mais pas la version de la glibc), et non dans
     LAPACK~; la mesure ne sépare pas la version de la glibc de la variante
     qu'elle choisit selon le processeur (ADR 0008, seconde annotation du
     19/10/2026). De plus, la forme «~empreinte~» distingue \code{NA} de
@@ -5392,7 +5406,11 @@ de la fiche (\code{ORDRE\_CHAMPS\_FICHE}, issue~\#64)~:
 \code{hypotheses\_brut}, \code{avertissements}~; \emph{rejeu}~:
 \code{version\_fiche}, \code{versions}, \code{plateforme}, \code{roles},
 \code{provenance}, \code{provenance\_mention}, \code{empreintes},
-\code{graine}, \code{graine\_mention}, \code{generateur}. Un champ absent de la fiche (\code{hypotheses\_brut}
+\code{graine}, \code{graine\_mention}, \code{generateur}. Le champ
+\code{empreintes} est rangé en «~rejeu~» à cause de l'empreinte des données,
+préalable du rejeu~; il porte aussi l'empreinte du résultat, simple témoin
+d'identité sur la même machine (\code{statut\_resultat\_code},
+section~\ref{sec:empreinte-resultat}), et celle du code. Un champ absent de la fiche (\code{hypotheses\_brut}
 sans étape \code{brut}) est omis de la ligne.\par}
 
 \subsection{Vérifications}
@@ -5570,7 +5588,7 @@ ses tests d'invariance (plan sans \code{brut}, plan sans
 \catalogue{fonctions-rapport}{BLOCS\_LECTURE\_FICHE} & constante & --- & partition des champs de la fiche en trois blocs (E3.7)~: \code{calculé}, \code{hypothèses}, \code{rejeu}, champs de chaque bloc dans l'ordre de \code{ORDRE\_CHAMPS\_FICHE}~; rappelée par la ligne d'en-tête \code{\# lecture} \\
 \catalogue{fonctions-rapport}{joindre\_chemin()} & interne & chemin, segment & chemin d'un élément, segments séparés par \code{/} \\
 \catalogue{fonctions-rapport}{segments\_texte()} & interne & noms, longueur & segment de chemin de chaque élément~: son nom, ou \code{[i]} (rang) si le nom est absent, vide, \code{NA}, en double, contient \code{/}, une tabulation ou une fin de ligne, ou commence par \code{@}, \code{\#} ou \code{[} \\
-\catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête, forme & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"} (défaut~: plan, fiche) ou \code{"empreinte"} (\code{empreinte\_resultat()})~; refus \code{serialisation\_impossible} (facteur en forme \code{"texte"}~; en forme \code{"empreinte"}, facteur de classe autre que \code{factor} ou \code{ordered} ou d'attribut autre que \code{names}, \code{levels}, \code{class}~; classe ou attribut non écrits, \code{Date} de stockage autre que \code{double} ou \code{integer}, vecteur atomique nommé de longueur~0, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}) \\
+\catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête, forme & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"} (défaut~: plan, fiche) ou \code{"empreinte"} (\code{empreinte\_resultat()})~; refus \code{serialisation\_impossible} (facteur en forme \code{"texte"}~; en forme \code{"empreinte"}, facteur de classe autre qu'exactement \code{factor} ou \code{c("ordered", "factor")} ou d'attribut autre que \code{names}, \code{levels}, \code{class}~; classe ou attribut non écrits, \code{Date} de stockage autre que \code{double} ou \code{integer}, vecteur atomique nommé de longueur~0, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}) \\
 \catalogue{fonctions-rapport}{valeurs\_texte()} & interne & type, textes d'une ligne, refus & valeurs relues sans évaluation~; refus \code{texte\_valeur\_invalide}, \code{texte\_double\_}\allowbreak\code{sous\_depassement} (décimal non nul relu 0) \\
 \catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne} \\
 \catalogue{fonctions-rapport}{ecrire\_plan()} & exportée & plan & octets du texte du plan, écrit tel qu'il est reçu, sans validation ni canonisation \\
