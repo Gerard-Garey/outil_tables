@@ -1112,11 +1112,19 @@ exécutables sur le poste Windows du mainteneur, dont la BLAS est celle de R.
 Dans les deux modes, il écrit l'\emph{identifiant de plateforme} (image,
 \code{R.version.string}, BLAS, LAPACK et sa version, \code{sessionInfo()}) et
 consigne sans faire échouer le processeur et ses drapeaux (\code{fma},
-\code{avx2}, \code{avx512f}), \code{ImageOS} et \code{ImageVersion} de l'hôte,
+\code{avx2}, \code{avx512f}), la version de la glibc, dont vient la
+\code{libm} (sortie de \code{getconf GNU\_LIBC\_VERSION}, à défaut première
+ligne de \code{ldd -{}-version}, «~inconnue~» hors glibc~; issue~\#72),
+\code{ImageOS} et \code{ImageVersion} de l'hôte,
 \code{LC\_COLLATE}, le fuseau horaire, la présence d'un exécutable
-\code{java} et \code{GITHUB\_SHA}. Ce bloc est reporté dans le message de
+\code{java} et \code{GITHUB\_SHA}. Ces grandeurs consignées n'entrent pas
+dans l'identifiant de plateforme~: elles ne déclenchent aucune bascule. Ce
+bloc est reporté dans le message de
 chaque commit de référence et dans l'en-tête de chaque fichier de référence
-(section~\ref{sec:non-regression}).
+(section~\ref{sec:non-regression}), sous la clé «~plateforme consignée~»
+pour les grandeurs consignées~; la version de la glibc, ajoutée après la
+dernière régénération, n'y figurera qu'à la prochaine~: les références
+actuelles ne la portent pas.
 
 \begin{encadre}
 \small
@@ -5142,8 +5150,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     près des deux côtés~: l'écart naît dans \code{expm1()}, fonction de la
     bibliothèque mathématique du système (\code{libm} de la glibc~; sur la plateforme de référence, sous
     Ubuntu~22.04.5, glibc vraisemblablement~2.35, version livrée par
-    Ubuntu~22.04, hypothèse non relevée sur l'image~: le script de plateforme
-    consigne le système mais pas la version de la glibc), et non dans
+    Ubuntu~22.04~: \textbf{hypothèse}, non relevée sur l'image, que le
+    script de plateforme consigne désormais (issue~\#72) mais que les
+    références actuelles, produites avant, ne portent pas~; elle sera levée
+    par l'en-tête des références à leur prochaine régénération), et non dans
     LAPACK~; la mesure ne sépare pas la version de la glibc de la variante
     qu'elle choisit selon le processeur (ADR 0008, seconde annotation du
     19/10/2026). De plus, la forme «~empreinte~» distingue \code{NA} de
@@ -5161,9 +5171,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{Objet}~: identifier le \textbf{texte source} du moteur
     effectivement installé, modifications non commitées comprises~; non son
-    comportement numérique, qui dépend aussi de R, du BLAS et de la
-    \code{libm}, consignés à part (\code{fiche\$versions},
-    \code{fiche\$plateforme}).
+    comportement numérique, qui dépend aussi de R et du BLAS, consignés à
+    part (\code{fiche\$versions}, \code{fiche\$plateforme}), et de la
+    \code{libm}, dont la fiche ne consigne pas la version (le script de
+    plateforme la consigne, issue~\#72).
   \item \textbf{Définition} (option~(iv), décision M70, point~1)~: le MD5 du
     \emph{relevé des MD5} des fichiers \code{R/*.R}, et non celui de leur
     texte concaténé~: une ligne \code{<md5>}, deux espaces,
