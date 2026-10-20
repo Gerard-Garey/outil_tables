@@ -550,3 +550,34 @@ Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M72
 **Effet sur les résultats : aucun** pour les entrées déjà acceptées (mesuré par `actuary-approfondi` et par `audit`, rapporté). L'effet du commit de #67 reste celui des cinquième et septième annotations. Aucune table finale, aucun verdict : visa d'`actuary`.
 
 Issues : #67. Décision M72, qui étend M71, Q4. Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (neuvième) — renvois périmés au code : `canoniser_plan()` et `tools::md5sum` (décision M77, (a))
+
+Rédigée par `architect-approfondi` à l'ouverture de la branche `claude/forme-exacte-suite` (sixième branche), sur `main` à `a6a74df`, d'après le point d'étape du 20/10/2026 qui a suivi la fusion de la PR #68, et sur décision du mainteneur du même jour (M77, (a)). Elle suit le modèle de la troisième annotation du 20/10/2026 de l'ADR 0009. Le texte ci-dessus, annotations comprises, n'est pas réécrit. La présente annotation dit seulement où se lisent aujourd'hui les objets que deux passages désignent ; les constats de ces passages sont inchangés.
+
+**(a) Annotation du 20/10/2026 (première), (a), point 5.1 (g)**. Cette annotation a été rédigée à `da565c7`. Elle situe `canoniser_plan()` en `R/rapport.R:309-315` et la condition `!is.integer(g)` en `R/rapport.R:313`. À `da565c7`, ces lignes étaient exactes : `canoniser_plan()` était définie en `:294`, et les lignes 309 à 315 portaient le bloc de la graine. À `a6a74df` :
+- `canoniser_plan()` est définie en `R/rapport.R:476` ;
+- le bloc de la graine (`if ("graine" %in% names(p))`) occupe les lignes 491 à 497, à l'identique, caractère pour caractère ;
+- la condition `if (!is.integer(g) || anyNA(g)) non_canonique("graine")` est en `:495`.
+
+Depuis #63 (`bc75978`), la signature a un quatrième argument, `ordres` (quatrième annotation du 20/10/2026). Le traitement de la graine n'a pas changé : le constat du point (a) reste exact.
+
+**(b) Annotation du 20/10/2026 (cinquième), « Compatibilité de (iv) avec l'architecture », point 1**. Cette annotation a été rédigée à `af54361`. Elle dit que `tools` « est déjà employé, `R/rapport.R:259` ». À `af54361`, la ligne 259 était l'appel `tools::md5sum` d'`empreinte_donnees()`. À `a6a74df`, `tools::md5sum` est appelée en trois endroits de `R/rapport.R` :
+- `:324`, dans `empreinte_donnees()` : c'est l'appel que désignait l'annotation ;
+- `:370`, dans `md5_octets()` ;
+- `:436`, dans `empreinte_sources()`, qui calcule l'empreinte du code selon l'option (iv) (M70).
+
+`md5_octets()` et `empreinte_sources()` ont été introduites par #67 (`5422404`). La prémisse du passage, « `tools` est déjà employé par le module `rapport` », reste vraie.
+
+**Mesures** (`architect-approfondi`, 20/10/2026, *vérifié*) :
+- `grep -n 'canoniser_plan <- function\|tools::md5sum' R/*.R` à `a6a74df` rend `R/rapport.R:476` pour la définition, et `:324`, `:370`, `:436` pour les appels (plus un commentaire en `:13`) ;
+- `grep -n 'if ("graine" %in% names(p))' R/rapport.R` rend `:491` ; `sed -n 491,497p R/rapport.R` reproduit les sept lignes de `git show da565c7:R/rapport.R | sed -n 309,315p` ;
+- `git show da565c7:R/rapport.R | grep -n 'canoniser_plan <- function\|is.integer(g)'` rend `:294` et `:313` ;
+- `git show af54361:R/rapport.R | grep -n 'tools::md5sum\|^empreinte_donnees'` rend `:259` (appel) et `:255` (définition d'`empreinte_donnees()`) ;
+- `git log -S` situe l'ajout de l'argument `ordres` en `bc75978`, et la création de `md5_octets()` et d'`empreinte_sources()` en `5422404`.
+
+**Portée.** Les autres renvois `fichier:ligne` du présent ADR ne sont pas remesurés ici. Chacun se lit au SHA de rédaction de la section qui le porte, quand elle le nomme, et le nom de l'objet fait foi. C'est la convention ajoutée le même jour au gabarit des ADR (`docs/adr/0000-gabarit.md`, M77, (b)) ; elle vaut pour les renvois à venir et sert de règle de lecture pour les renvois existants. Les numéros de ligne cités dans la présente annotation datent de `a6a74df`.
+
+**Effet sur les résultats : aucun.** Aucun code n'est modifié par cette annotation.
+
+Issues : #63 ; #67. Décision M77, (a). ADR 0009, troisième annotation du 20/10/2026 (modèle). Branche `claude/forme-exacte-suite`.
