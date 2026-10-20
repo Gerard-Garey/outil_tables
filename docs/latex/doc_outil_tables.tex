@@ -974,7 +974,7 @@ session n'est pas en UTF-8, \code{installer\_tablexp()} lance donc
 (\code{locale\_installation()}), et échoue s'il n'y en a aucune~; la locale
 d'exécution des batteries reste libre. Après le chargement, une sonde
 (\code{sonde\_utf8()}) vérifie qu'un littéral non ASCII du moteur, la
-constante \code{STATUT\_EMPREINTES\_NON\_CALCULEES}, est de l'UTF-8 valide et
+constante \code{STATUT\_EMPREINTE\_RESULTAT}, est de l'UTF-8 valide et
 inchangé par la conversion~; sinon la batterie échoue. Limite admise~: une
 installation hors UTF-8 sous une session UTF-8 passe la sonde, sans effet sur
 les résultats (constat de l'audit consigné par l'ADR 0007~: le plan de
@@ -4990,7 +4990,6 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (2) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
-\catalogue{fonctions-rapport}{STATUT\_EMPREINTES\_NON\_CALCULEES} & constante & --- & statut des empreintes du résultat et du code \\
 \catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle & octets canoniques des chaînes~; refus de codage \\
 \catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
 \catalogue{fonctions-rapport}{texte\_date()} & interne & jours depuis 1970-01-01, entiers, finis, dans le domaine & écriture ISO~8601 AAAA-MM-JJ, année sur quatre chiffres~; partagée par \code{ecrire\_valeurs()} et le contrôle de canonicité du lecteur (\code{valeurs\_texte()}) \\
