@@ -253,9 +253,13 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
   }
   rownames(avertissements) <- NULL
 
-  structure(
+  x <- structure(
     list(table = NULL, etapes = etapes, avertissements = avertissements,
-         fiche = assembler_fiche(roles, plan, recette, etapes, avertissements, empreintes, provenance),
-         execution = informations_execution(debut)),
+         fiche = assembler_fiche(roles, plan, recette, etapes, avertissements, empreintes, provenance)),
     class = "construction")
+  # Empreinte du résultat sur l'objet assemblé, avant execution, hors de son
+  # périmètre (ADR 0011, point 11.1 ; #67).
+  x$fiche$empreintes$resultat <- empreinte_resultat(x)
+  x$execution <- informations_execution(debut)
+  x
 }

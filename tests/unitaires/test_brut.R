@@ -517,10 +517,13 @@ invariance_sans_brut <- function(x, donnees, roles) {
   garde <- z$avertissements$etape != "brut"
   z$avertissements <- z$avertissements[garde, , drop = FALSE]; rownames(z$avertissements) <- NULL
   z$fiche$avertissements <- z$avertissements
+  # Empreinte du résultat (#67) : celle de l'objet privé des ajouts de l'étape,
+  # recalculée sur lui (elle couvre tout l'objet hors execution).
+  z$fiche$empreintes$resultat <- tablexp:::empreinte_resultat(z)
   if (!identical(names(y$fiche), CHAMPS_FICHE_SANS_BRUT)) "champs de la fiche du plan sans brut"
   else identical(y, z)
 }
-verifier("invariance du plan sans brut (cas C, poisson et binomial) : fiche sans hypotheses_brut ; objet identical() à celui du plan avec brut hors etapes$brut, fiche$plan, fiche$hypotheses_brut et avertissements de l'étape brut",
+verifier("invariance du plan sans brut (cas C, poisson et binomial) : fiche sans hypotheses_brut ; objet identical() à celui du plan avec brut hors etapes$brut, fiche$plan, fiche$hypotheses_brut et avertissements de l'étape brut, empreinte du résultat recalculée sur l'objet ainsi privé (#67)",
          invariance_sans_brut(XC, DC, ROLES_C))
 verifier("invariance du plan sans brut (cas C, par_annee = TRUE, poisson seul) : même contrôle",
          invariance_sans_brut(construire_table(DC, ROLES_C, plan_brut(estimateurs = "poisson", par_annee = TRUE)),

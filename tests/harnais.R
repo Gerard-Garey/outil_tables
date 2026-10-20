@@ -310,11 +310,13 @@ locale_installation <- function() {
   locale_utf8_disponible()
 }
 
-# Sonde : STATUT_EMPREINTES_NON_CALCULEES (R/rapport.R, « non calculée »),
-# littéral non ASCII du moteur écrit dans la fiche, donc dans les
-# références ; il doit être de l'UTF-8 valide, inchangé par enc2utf8().
+# Sonde : STATUT_EMPREINTE_RESULTAT (R/rapport.R, « résultat : témoin
+# d'identité… »), littéral non ASCII du moteur écrit dans la fiche
+# (statut_resultat_code), donc dans les références ; il doit être de l'UTF-8
+# valide, inchangé par enc2utf8() (#67 : reportée depuis le statut « non
+# calculée », retiré).
 sonde_utf8 <- function() {
-  x <- get("STATUT_EMPREINTES_NON_CALCULEES", envir = asNamespace("tablexp"))
+  x <- get("STATUT_EMPREINTE_RESULTAT", envir = asNamespace("tablexp"))
   grepl("[^\001-\177]", x, useBytes = TRUE) && validUTF8(x) &&
     identical(charToRaw(enc2utf8(x)), charToRaw(x))
 }
@@ -365,7 +367,7 @@ installer_tablexp <- function(racine = racine_depot()) {
     quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
   }
   if (!isTRUE(sonde_utf8())) {
-    cat(sprintf("ECHEC : tablexp installé hors locale UTF-8 (sonde sur STATUT_EMPREINTES_NON_CALCULEES, %s)\n", lib))
+    cat(sprintf("ECHEC : tablexp installé hors locale UTF-8 (sonde sur STATUT_EMPREINTE_RESULTAT, %s)\n", lib))
     quit(save = "no", status = 1L, runLast = FALSE)  # sortie délibérée : sans la garde .Last
   }
   .harnais$bibliotheque <- lib  # transmise aux sous-processus par executer_rscript()

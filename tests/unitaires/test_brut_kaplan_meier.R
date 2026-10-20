@@ -477,9 +477,11 @@ invariance_sans_km <- function(x, donnees, roles) {
   z$fiche$plan <- p
   z$fiche$hypotheses_brut <- b$parametres[c("estimateurs", "niveau", "exposition_initiale", "tolerance_effectif",
                                             "hypotheses", "statuts")]
+  # Empreinte du résultat (#67) : recalculée sur l'objet privé des ajouts.
+  z$fiche$empreintes$resultat <- tablexp:::empreinte_resultat(z)
   identical(y, z)
 }
-verifier("invariance du plan sans kaplan_meier (cas C, trois estimateurs) : objet identical() à celui du plan avec kaplan_meier privé de ses seuls ajouts",
+verifier("invariance du plan sans kaplan_meier (cas C, trois estimateurs) : objet identical() à celui du plan avec kaplan_meier privé de ses seuls ajouts (empreinte du résultat recalculée sur lui, #67)",
          invariance_sans_km(XC, DC, ROLES))
 verifier("invariance du plan sans kaplan_meier (cas K) : même contrôle", invariance_sans_km(XK, DK, ROLES))
 verifier("deux constructions identical() hors execution ; rejeu de la fiche identical() (cas C, trois estimateurs)",

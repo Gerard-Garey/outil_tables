@@ -394,10 +394,19 @@ verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générat
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
-verifier("fiche : empreintes (algorithme md5 nommé, données en 32 chiffres hexadécimaux ; résultat et code non calculés)",
-         identical(f$empreintes$algorithme, "md5") && grepl("^[0-9a-f]{32}$", f$empreintes$donnees) &&
-           is.na(f$empreintes$resultat) && is.na(f$empreintes$code) &&
-           identical(f$empreintes$statut_resultat_code, "non calculée (branche fiche-rapport)"))
+verifier(paste("fiche : empreintes (algorithme md5 nommé ; données, résultat et code en 32 chiffres hexadécimaux ;",
+               "representation_resultat avant resultat ; statut des deux empreintes, code calculé) (#67)"),
+         identical(names(f$empreintes), c("algorithme", "representation", "donnees", "fichier", "algorithme_fichier",
+                                          "representation_resultat", "resultat", "code", "statut_resultat_code")) &&
+           identical(f$empreintes$algorithme, "md5") && grepl("^[0-9a-f]{32}$", f$empreintes$donnees) &&
+           identical(f$empreintes$representation_resultat, "tablexp resultat 1") &&
+           grepl("^[0-9a-f]{32}$", f$empreintes$resultat) && grepl("^[0-9a-f]{32}$", f$empreintes$code) &&
+           identical(f$empreintes$statut_resultat_code, paste(
+             "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un",
+             "tiers ; code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine",
+             "des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement numérique,",
+             "qui dépend aussi de R, du BLAS et de la libm")) &&
+           identical(Encoding(f$empreintes$statut_resultat_code), "UTF-8"))
 verifier("fiche : versions (tablexp, R) et plateforme (sysname, release, machine, blas, lapack)",
          identical(names(f$versions), c("tablexp", "R")) && identical(f$versions$R, R.version.string) &&
            identical(names(f$plateforme), c("sysname", "release", "machine", "blas", "lapack")))
@@ -542,6 +551,197 @@ verifier("empreinte : chaîne marquée UTF-8 invalide -> refus chaine_non_utf8",
 })
 verifier("empreinte de la fiche = empreinte_donnees des données reçues (avant exclusions)",
          identical(x$fiche$empreintes$donnees, empreinte_donnees(BASE, ROLES)))
+
+# --- empreinte du résultat (ADR 0011, point 11 ; cinquième annotation du 20/10/2026 ; #67) ---
+#
+# Natures : identité exacte (deux constructions, rejeu) ; valeur calculée à la
+# main par un autre outil (texte du petit objet XT écrit et haché en Python,
+# hashlib.md5, struct.pack('<d', x).hex() pour les doubles, hors R : 1057
+# octets, md5 62ba547dde2bde7096af769a0af2a372) ; témoins de sensibilité et
+# d'insensibilité sur des copies.
+empreinte_resultat <- tablexp:::empreinte_resultat
+# Double suivant d'un ulp (mot de poids faible des octets IEEE 754 + 1 ; v
+# fini, non nul, de mot faible inférieur à .Machine$integer.max).
+ulp_suivant <- function(v) {
+  i <- readBin(writeBin(v, raw(), size = 8L, endian = "little"), "integer", n = 2L, size = 4L, endian = "little")
+  i[1L] <- i[1L] + 1L
+  readBin(writeBin(i, raw(), size = 4L, endian = "little"), "double", size = 8L, endian = "little")
+}
+verifier("empreinte du résultat (identité exacte) : égale sur deux constructions et au rejeu de la fiche, recalculée égale sur l'objet",
+         identical(construire_table(BASE, ROLES, plan_type())$fiche$empreintes$resultat, x$fiche$empreintes$resultat) &&
+           identical(construire_table(BASE, f$roles, f$plan, f$provenance)$fiche$empreintes$resultat,
+                     x$fiche$empreintes$resultat) &&
+           identical(empreinte_resultat(x), x$fiche$empreintes$resultat))
+verifier("empreinte du résultat : inchangée quand execution, fiche$versions, fiche$plateforme, resultat, code ou statut_resultat_code changent", {
+  y <- x
+  y$execution <- list(debut = Sys.time() + 3600, duree_secondes = 1e9)
+  y$fiche$versions <- list(tablexp = "9.9.9", R = "R version 0")
+  y$fiche$plateforme$machine <- "autre"; y$fiche$plateforme$blas <- "autre BLAS"
+  y$fiche$empreintes$resultat <- "0"; y$fiche$empreintes$code <- NA_character_
+  y$fiche$empreintes$statut_resultat_code <- "autre"
+  identical(empreinte_resultat(y), x$fiche$empreintes$resultat)
+})
+verifier("empreinte du résultat (témoin) : changée par un ulp d'un double du périmètre (exposition_jours[1]), et par la représentation", {
+  y <- x
+  v <- y$etapes$exposition$resultat$exposition$exposition_jours[1L]
+  w <- ulp_suivant(v)
+  y$etapes$exposition$resultat$exposition$exposition_jours[1L] <- w
+  z <- x; z$fiche$empreintes$representation_resultat <- "tablexp resultat 0"
+  w != v && abs(w - v) <= abs(v) * 2^-52 && !identical(empreinte_resultat(y), x$fiche$empreintes$resultat) &&
+    !identical(empreinte_resultat(z), x$fiche$empreintes$resultat)
+})
+verifier("empreinte du résultat (témoin) : changée par l'empreinte des données, le plan et les rôles (dans le périmètre)", {
+  a <- x; a$fiche$empreintes$donnees <- "0"
+  b <- x; b$fiche$plan$delai_declaration <- 1
+  r <- x; names(r$fiche$roles)[1L] <- "autre"
+  length(unique(c(x$fiche$empreintes$resultat, empreinte_resultat(a), empreinte_resultat(b), empreinte_resultat(r)))) == 4L
+})
+XT <- structure(list(
+  table = NULL,
+  etapes = list(donnees = list(resultat = list(
+                  lignes_conservees = structure(data.frame(t = as.POSIXct(0, origin = "1970-01-01", tz = "UTC"),
+                                                           f = factor("a")), simulation = list(graine = 1L)),
+                  numeros_conserves = 1L)),
+                e = list(v = c(0.95, -0, NA, NaN, Inf, -Inf), n = c(a = 1L, b = NA), d = D(c("2024-02-29", NA)),
+                         f = factor(c("y", "x")))),
+  avertissements = data.frame(code = tablexp:::texte_moteur(c("é", NA)), nombre = c(2L, 0L), stringsAsFactors = FALSE),
+  fiche = list(versions = list(R = "x"), plateforme = list(s = "y"),
+               empreintes = list(algorithme = "md5", representation_resultat = "tablexp resultat 1",
+                                 resultat = "z", code = NA_character_, statut_resultat_code = "s"),
+               ok = TRUE, l = list(1.5, "a\tb\"c")),
+  execution = list(debut = 1)), class = "construction")
+verifier(paste("empreinte du résultat (valeur calculée à la main, hors R, Python) : 62ba547dde2bde7096af769a0af2a372",
+               "(doubles en octets, jetons, -0, Date, facteur, chaînes échappées, data.frame, liste sans noms ;",
+               "lignes_conservees, versions, plateforme, trois champs d'empreinte et execution hors du texte)"),
+         identical(empreinte_resultat(XT), "62ba547dde2bde7096af769a0af2a372"))
+verifier("empreinte du résultat : lignes_conservees hors du périmètre (colonne, classe, attribut ou noms de lignes de l'entrée sans effet ; M71, Q1, #67)", {
+  y <- x
+  lc <- y$etapes$donnees$resultat$lignes_conservees
+  lc$autre <- as.POSIXct(0, origin = "1970-01-01", tz = "UTC"); attr(lc, "simulation") <- list(a = 1); attr(lc, "foo") <- 1
+  y$etapes$donnees$resultat$lignes_conservees <- lc
+  identical(empreinte_resultat(y), x$fiche$empreintes$resultat)
+})
+verifier("empreinte du résultat : attribut inattendu (dont simulation hors de lignes_conservees), classe autre que construction ou valeur sans écriture -> erreur de programmation", {
+  msg <- function(expr) tryCatch({ force(expr); "" }, refus_tablexp = function(e) "refus", error = function(e) conditionMessage(e))
+  prog <- function(m) grepl("erreur de programmation", m, fixed = TRUE)
+  a <- x; attr(a$etapes$exposition$resultat$exposition, "foo") <- 1
+  b <- x; attr(b$etapes$donnees$resultat$observations, "simulation") <- list(a = 1)
+  c_ <- x; class(c_) <- c("construction", "autre")
+  d <- x; d$etapes$exposition$resultat$exposition$age <- as.POSIXct(0, origin = "1970-01-01", tz = "UTC")
+  e <- x; attr(e$fiche$roles, "foo") <- "x"
+  all(vapply(list(msg(empreinte_resultat(a)), msg(empreinte_resultat(b)), msg(empreinte_resultat(c_)),
+                  msg(empreinte_resultat(unclass(x))), msg(empreinte_resultat(d)), msg(empreinte_resultat(e))), prog, NA))
+})
+verifier("empreinte du résultat : colonne de rôle catégorie en facteur admise (type factor, libellés), niveaux permutés sans effet", {
+  b1 <- BASE; b1$sexe <- factor(b1$sexe, levels = c("H", "F"))
+  b2 <- BASE; b2$sexe <- factor(b2$sexe, levels = c("F", "H"))
+  e1 <- construire_table(b1, ROLES, plan_type())$fiche$empreintes$resultat
+  grepl("^[0-9a-f]{32}$", e1) && identical(e1, construire_table(b2, ROLES, plan_type())$fiche$empreintes$resultat)
+})
+# Attributs de colonne de l'entrée (label) sur chaque colonne de rôle, dans
+# les deux unités (#67, M71, Q4) : la construction est acceptée et son
+# empreinte égale celle de la même entrée sans attribut (observations recopie
+# les colonnes par sous-indiçage, qui retire ces attributs).
+for (u in c("tete", "contrat")) {
+  r_u <- if (u == "tete") ROLES else ROLES[names(ROLES) != "id_tete"]
+  verifier(sprintf("empreinte du résultat, unité %s : attribut label sur chaque colonne de rôle -> construction acceptée, empreinte égale à celle sans attribut", u), {
+    ref_u <- construire_table(BASE, r_u, plan_type())
+    ok <- identical(ref_u$fiche$unite_observation, u)
+    for (col in unname(r_u)) {
+      b <- BASE; attr(b[[col]], "label") <- "Libellé"
+      e <- tryCatch(construire_table(b, r_u, plan_type())$fiche$empreintes$resultat, error = function(err) conditionMessage(err))
+      ok <- ok && identical(e, ref_u$fiche$empreintes$resultat)
+    }
+    ok
+  })
+}
+# Unité contrat avec id_tete déclaré (transition en_cours -> rachat, rôles
+# complets) : la copie id_t[i] d'observations est exercée (audit de #67).
+PLAN_RACHAT <- modifier(plan_type(), transition = RA)
+verifier("empreinte du résultat, unité contrat avec id_tete déclaré : attribut label sur la colonne de tête -> construction acceptée, empreinte égale à celle sans attribut", {
+  x0 <- construire_table(BASE, ROLES, PLAN_RACHAT)
+  b <- BASE; attr(b$tete, "label") <- "Libellé"
+  e <- tryCatch(construire_table(b, ROLES, PLAN_RACHAT)$fiche$empreintes$resultat, error = function(err) conditionMessage(err))
+  identical(x0$fiche$unite_observation, "contrat") && "id_tete" %in% names(x0$etapes$donnees$resultat$observations) &&
+    identical(e, x0$fiche$empreintes$resultat)
+})
+# Facteurs de rôle catégorie (sexe ; segment segmenté) recopiés normalisés
+# dans observations (#67, M72), dans les deux unités : contrasts, sous-classe
+# ou sous-classe d'ordered -> construction acceptée, empreinte égale à celle du
+# facteur simple (de l'ordered) aux mêmes libellés.
+BASE_SEG <- BASE; BASE_SEG$seg <- c("A", "B", "A", "A")
+ROLES_SEG <- c(ROLES, segment = "seg")
+for (u_ in list(list("tête", plan_type()), list("contrat", PLAN_RACHAT))) {
+  for (r_ in list(list("sexe", "sexe"), list("segment", "seg"))) {
+    verifier(sprintf("empreinte du résultat, unité %s, %s en facteur avec contrasts, de sous-classe mafac/factor ou x/ordered/factor -> construction acceptée, empreinte égale à celle du facteur simple (de l'ordered)",
+                     u_[[1L]], r_[[1L]]), {
+      pl <- u_[[2L]]
+      if (r_[[1L]] == "segment") pl$segmentation <- "segment"
+      col <- r_[[2L]]
+      emp <- function(v) {
+        b <- BASE_SEG; b[[col]] <- v
+        tryCatch(construire_table(b, ROLES_SEG, pl)$fiche$empreintes$resultat, error = function(err) conditionMessage(err))
+      }
+      fs <- factor(BASE_SEG[[col]]); fo <- factor(BASE_SEG[[col]], ordered = TRUE)
+      ct <- fs; contrasts(ct) <- contr.sum(2)
+      sc <- fs; class(sc) <- c("mafac", "factor")
+      so <- fo; class(so) <- c("x", "ordered", "factor")
+      ef <- emp(fs); eo <- emp(fo)
+      grepl("^[0-9a-f]{32}$", ef) && grepl("^[0-9a-f]{32}$", eo) &&
+        identical(emp(ct), ef) && identical(emp(sc), ef) && identical(emp(so), eo)
+    })
+  }
+}
+verifier("texte de la fiche : facteur toujours refusé en forme texte (grammaire 1), admis en forme empreinte", {
+  o <- list(f = factor("a"))
+  leve_refus(tablexp:::texte_objet(o, "t", character(0)), "serialisation_impossible") &&
+    is.raw(tablexp:::texte_objet(o, "t", character(0), "empreinte"))
+})
+
+# --- empreinte du code (option (iv), M70 ; cinquième annotation du 20/10/2026, (c) ; #67) ---
+#
+# Nature : valeur recalculée par un autre outil (md5sum de GNU coreutils, sur
+# R/*.R de la racine installée par la batterie), ou à défaut recalculée en R
+# sans empreinte_sources().
+recalcul_code <- function(racine) {
+  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
+  t <- tempfile(); on.exit(unlink(t))
+  writeBin(charToRaw(paste0(md5, "  R/", fichiers, "\n", collapse = "")), t)
+  unname(tools::md5sum(t))
+}
+CODE <- tablexp:::EMPREINTE_CODE
+verifier("empreinte du code : non NA, égale au recalcul en R sur R/*.R de la racine installée, et à fiche$empreintes$code",
+         is.character(CODE) && length(CODE) == 1L && !is.na(CODE) && identical(CODE, recalcul_code(RACINE)) &&
+           identical(f$empreintes$code, CODE))
+if (nzchar(Sys.which("md5sum")) && nzchar(Sys.which("sh"))) {
+  verifier("empreinte du code (autre outil) : égale à `LC_ALL=C md5sum R/*.R | md5sum` à la racine installée", {
+    s <- system2("sh", c("-c", shQuote(sprintf("cd %s && LC_ALL=C md5sum R/*.R | md5sum", shQuote(RACINE)))), stdout = TRUE)
+    identical(sub(" .*$", "", s), CODE)
+  })
+} else cat("  (md5sum ou sh absent : comparaison à l'autre outil non faite ; recalcul en R seulement)\n")
+verifier("empreinte du code : R/ ne contient que des fichiers *.R (R CMD INSTALL évalue aussi .r, .S, .s, .q)",
+         all(grepl("[.]R$", list.files(file.path(RACINE, "R"), all.files = TRUE, no.. = TRUE))))
+verifier("empreinte du code : sources introuvables -> NA (sans DESCRIPTION, autre paquet, sans R/rapport.R, fichier illisible), statut nommé ; racine conforme -> recalcul", {
+  es <- tablexp:::empreinte_sources
+  r <- tempfile("racine_"); dir.create(file.path(r, "R"), recursive = TRUE)
+  sans_description <- es(r)
+  writeLines(c("Package: autre", "Version: 1"), file.path(r, "DESCRIPTION"))
+  autre <- es(r)
+  writeLines(c("Package: tablexp", "Version: 1"), file.path(r, "DESCRIPTION"))
+  sans_rapport <- es(r)
+  writeLines("x <- 1", file.path(r, "R", "rapport.R")); writeLines("y <- 2", file.path(r, "R", "a.R"))
+  writeLines("z <- 3", file.path(r, "R", "b.r"))
+  st <- tablexp:::statut_empreintes(NA_character_)
+  conforme <- es(r); attendu <- recalcul_code(r)
+  # Fichier illisible (lien cassé) : md5sum rend NA -> NA (audit de #67).
+  casse <- if (isTRUE(file.symlink(file.path(r, "absent.R"), file.path(r, "R", "z.R")))) es(r) else NA_character_
+  unlink(r, recursive = TRUE)
+  is.na(sans_description) && is.na(autre) && is.na(sans_rapport) && identical(conforme, attendu) && is.na(casse) &&
+    grepl("code : non calculée, sources introuvables à l'installation", st, fixed = TRUE) &&
+    startsWith(st, "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6)") &&
+    identical(Encoding(st), "UTF-8") && !grepl("introuvables", tablexp:::statut_empreintes("0"), fixed = TRUE)
+})
 
 # --- portefeuille simulé (#10) : identités exactes et recoupement -----------
 

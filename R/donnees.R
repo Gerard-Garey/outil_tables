@@ -622,17 +622,29 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
   } else {
     i <- seq_along(ent)
     id_c <- col("id_contrat")
-    observations <- data.frame(unite = if (is.null(id_c)) numeros else id_c,
+    # Sous-indiçage [i], comme dans l'unité tête : les colonnes recopiées
+    # perdent les attributs de colonne de l'entrée (label…), que l'empreinte du
+    # résultat refuserait ; valeurs, type et classe inchangés (#67, M71).
+    observations <- data.frame(unite = if (is.null(id_c)) numeros else id_c[i],
                                ligne = numeros, nb_lignes = rep(1L, length(i)),
                                stringsAsFactors = FALSE)
-    if (!is.null(id_t)) observations$id_tete <- id_t  # rééchantillonnage par têtes (E2.14)
-    observations$date_naissance <- col("date_naissance")
+    if (!is.null(id_t)) observations$id_tete <- id_t[i]  # rééchantillonnage par têtes (E2.14)
+    observations$date_naissance <- col("date_naissance")[i]
     composante_ligne <- seq_along(i)
   }
   # Sexe s'il est déclaré ; segment s'il est employé par la segmentation ;
-  # type d'origine conservé.
-  if ("sexe" %in% names(roles)) observations$sexe <- col("sexe")[i]
-  if ("segment" %in% segmentation) observations$segment <- col("segment")[i]
+  # type d'origine conservé. Un facteur est recopié sous forme normalisée
+  # (#67, M72) : classe ramenée à factor, ou ordered s'il est ordonné ;
+  # niveaux tels quels (ordre et niveaux inutilisés compris) ; tout autre
+  # attribut (contrasts, sous-classe…) retiré, que l'empreinte du résultat
+  # refuserait. Chaîne ou entier : sous-indiçage [i], qui retire les
+  # attributs de colonne (M71, Q4).
+  categorie <- function(x)
+    if (is.factor(x)) structure(unclass(x)[i], levels = levels(x),
+                                class = if (is.ordered(x)) c("ordered", "factor") else "factor")
+    else x[i]
+  if ("sexe" %in% names(roles)) observations$sexe <- categorie(col("sexe"))
+  if ("segment" %in% segmentation) observations$segment <- categorie(col("segment"))
   if (unite == "tete") {
     observations$debut <- as_date(fusion$debut); observations$fin <- as_date(fusion$fin)
     observations$cause <- cause_k
