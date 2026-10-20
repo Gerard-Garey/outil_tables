@@ -600,3 +600,67 @@ Dans tous les cas, le message de la garde devra nommer cette cause possible. Une
 **Effet sur les résultats : aucun.** Aucun code n'est modifié ; la garde est inchangée et reste juste pour B4 ((b)).
 
 Issues : #35, #19, #47 (garde de la troisième annotation, (f)). ADR 0011, points 2.5 et 10. Branche `claude/fiche-serialisation`, PR #51.
+
+## Annotation du 20 octobre 2026 (seconde) — `fiche/empreintes/resultat` et `fiche/empreintes/code` : comparaison de forme par jeton, limitée à ces deux chemins, valeurs réelles dans l'en-tête (#67)
+
+Rédigée par `architect-approfondi` d'après la décision du mainteneur du 20/10/2026 (M69, point 4 ; `docs/feuille-de-route.md`, § 4). Branche `claude/fiche-rapport`, PR #68, à `af54361`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Elle tranche le risque (1) du § 1.5 de la feuille de route **avant** le commit de #67, comme le prévoit l'ordre des commits.
+
+**(a) Problème.** #67 calcule deux grandeurs qui valent `NA` dans R1 à R6 depuis leur création (ADR 0011, point 11, et annotation du 20/10/2026, cinquième) :
+- `fiche/empreintes/resultat` n'est valable que **sur la même machine** (ADR 0011, point 11.2). R4 et R5 diffèrent d'un ulp entre la plateforme de référence et un autre hôte (ADR 0011, contexte, mesure 6) ;
+- `fiche/empreintes/code` change à **chaque commit `moteur:`**.
+
+Comparées en valeur, la première ferait échouer la batterie sur tout autre exécuteur, et la seconde demanderait une régénération à chaque commit `moteur:`.
+
+**(b) Décision : option (a), jeton.**
+- **Où.** La substitution se fait dans `aplatir_construction()` (`tests/reference/outils_reference.R:238`) et nulle part ailleurs. Le producteur et la batterie passent tous deux par cette fonction : la substitution est donc la même des deux côtés.
+- **Quoi.** La valeur de chacun des deux chemins `fiche/empreintes/resultat` et `fiche/empreintes/code` est remplacée par le jeton `"<md5>"` (chaîne, longueur 1) **si et seulement si** c'est un `character` de longueur 1 de la forme `^[0-9a-f]{32}$`.
+- **Toute autre valeur est gardée telle quelle** : `NA`, majuscules, longueur ou type différents. Elle est donc comparée exactement au jeton de la référence, et la comparaison relève un écart. Une empreinte redevenue `NA` par régression, ou mal formée, est ainsi détectée.
+- **Structure inchangée.** Le chemin, le type et la longueur restent comparés (point 3.1), et le jeton relève de la classe exacte (point 3.4).
+
+**(c) Condition 1 — portée fermée.** Le jeton ne s'applique qu'aux **deux chemins nommés**, jamais par une règle générique sur la forme hexadécimale. Une telle règle masquerait deux sortes de grandeurs exactes et portables :
+- `fiche/empreintes/donnees`, comparée en premier par la garde « entrée différente » (point 3.2) ;
+- les lignes `@empreinte` des tables résumées (point 1.2 ; `tests/reference/R1.tsv:47-61`, *vérifié* : cinq lignes `@empreinte` de 32 caractères hexadécimaux).
+
+**(d) Condition 2 — valeurs réelles dans l'en-tête, hors comparaison**, comme `fiche$versions` et `fiche$plateforme` (points 2.2 et 7.1).
+- `entete_reference()` (`tests/reference/outils_reference.R:750-755`) écrit deux clés, `fiche$empreintes/resultat` et `fiche$empreintes/code`, sur le modèle des clés `fiche$versions/…`.
+- Ces valeurs disent de quel code et de quel résultat la référence a été produite sur la plateforme de référence.
+- La comparaison ne les lit jamais.
+
+**(e) Ce qui reste comparé exactement** :
+- `fiche/empreintes/statut_resultat_code` ;
+- `fiche/empreintes/representation_resultat`, si l'annotation de l'ADR 0011 est retenue ;
+- `algorithme`, `representation`, `donnees`, `fichier` et `algorithme_fichier` ;
+- toute autre grandeur.
+
+**(f) Ce que le jeton ne teste pas.** Les propriétés des deux empreintes se testent dans les **batteries** (tests unitaires de #67), pas par les références :
+- pour le résultat : identité sur deux constructions et au rejeu sur la même machine ; sensibilité à un ulp ; insensibilité à `execution`, `fiche$versions` et `fiche$plateforme` ; recalcul hors R ;
+- pour le code : `NA` exclu ; égalité au recalcul sur `R/*.R` de l'arbre installé.
+
+La référence ne vérifie que la **forme**.
+
+**(g) Format inchangé : `tablexp reference 1`.**
+- Le point 9.2 réserve l'incrément aux changements de grammaire (type, ligne `@`, échappement), et le jeton n'en introduit aucun : c'est une chaîne valide.
+- La présente annotation modifie le **périmètre** (point 1.1 : deux valeurs remplacées par un jeton) et l'**en-tête** (points 2.2 et 7.1 : deux clés).
+- Les six fichiers sont de toute façon régénérés par la régénération unique de la branche (étape (9) du § 1.5).
+- Option écartée : `tablexp reference 2`, une version de format sans changement de grammaire.
+
+**(h) Options écartées.**
+- **Retrait des deux chemins de l'aplatissement**, comme `fiche$versions` et `fiche$plateforme` (`tests/reference/outils_reference.R:242`). On perdrait le contrôle de structure (présence, type, longueur) et la détection d'une empreinte redevenue `NA`.
+- **Règle générique sur la forme hexadécimale** : exclue par la condition 1.
+- **Comparaison en valeur** : voir (a).
+
+**(i) Témoins** (point 3.6), dans `tests/test_reproductibilite.R`, sur des copies temporaires :
+1. une empreinte de résultat ou de code `NA` ou mal formée donne un écart sur son chemin ;
+2. une altération de `fiche/empreintes/donnees` reste « entrée différente » : le jeton ne s'y applique pas ;
+3. une ligne `@empreinte` altérée reste un écart ;
+4. l'en-tête porte les deux valeurs réelles, et une modification de ces valeurs dans l'en-tête ne change pas la comparaison ;
+5. l'aller-retour `lire(ecrire(aplatir(x)))` reste `identical`.
+
+**(j) Transition #47** (troisième annotation du 19/10/2026), pour les six plans :
+- `fiche/empreintes/resultat` et `fiche/empreintes/code`, de `NA` à `"<md5>"` : nature « valeur de chaîne » ;
+- `fiche/empreintes/statut_resultat_code` : « valeur de chaîne » ;
+- la création de `representation_resultat` et le changement de `fiche/empreintes/@noms` suivent l'annotation de l'ADR 0011.
+
+**Effet sur les résultats : aucun** par cette annotation. Elle fixe la forme de comparaison avant le code de #67.
+
+Issues : #67 ; #47. Décision M69. ADR 0011, point 11 et annotation du 20/10/2026 (cinquième). Branche `claude/fiche-rapport`, PR #68.
