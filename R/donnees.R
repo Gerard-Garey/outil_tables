@@ -291,6 +291,23 @@ controler_roles <- function(donnees, roles, segmentation) {
 
 # --- paramètres de l'étape ----------------------------------------------------
 
+# Contrôle de la segmentation d'une fonction d'étape (#59), seul endroit où
+# s'écrivent sa forme et son catalogue : vecteur character sans attribut (ni
+# names, ni dim, ni classe), sans NA ni doublon, dont chaque clé est prise dans
+# ROLES_SEGMENTATION (vide explicite admis ; la chaîne vide n'en fait pas
+# partie). Sinon refus sous le motif segmentation_invalide, au nom de l'étape
+# appelante `etape` ("donnees", "brut"). Rend NULL sans rien modifier.
+controler_segmentation <- function(segmentation, etape) {
+  if (!forme_exacte(segmentation, "character") || anyNA(segmentation) || anyDuplicated(segmentation) ||
+      !all(segmentation %in% ROLES_SEGMENTATION))
+    refuser(etape, "segmentation_invalide",
+            sprintf(paste("La segmentation doit être un vecteur de chaînes sans attribut, sans doublon,",
+                          "pris dans %s (vide explicite admis)."),
+                    liste_guillemets(ROLES_SEGMENTATION)),
+            list(segmentation = segmentation))
+  invisible(NULL)
+}
+
 # Contrôle les paramètres que l'étape `donnees` reçoit ; rend la ligne de
 # TRANSITIONS et les bornes de la période (jours depuis 1970-01-01).
 # Forme exacte (#23, forme_exacte()) : chaque valeur a son type de base exact
@@ -343,13 +360,7 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
                     format(periode[["debut"]]), format(structure(fin_effective, class = "Date")),
                     format(periode[["fin"]]), format(delai_declaration)),
             list(debut = periode[["debut"]], fin_effective = structure(fin_effective, class = "Date")))
-  if (!forme_exacte(segmentation, "character") || anyNA(segmentation) || anyDuplicated(segmentation) ||
-      !all(segmentation %in% ROLES_SEGMENTATION))
-    refuser("donnees", "segmentation_invalide",
-            sprintf(paste("La segmentation doit être un vecteur de chaînes sans attribut, sans doublon,",
-                          "pris dans %s (vide explicite admis)."),
-                    liste_guillemets(ROLES_SEGMENTATION)),
-            list(segmentation = segmentation))
+  controler_segmentation(segmentation, "donnees")
   if (!forme_exacte(exclusions, "character") || anyNA(exclusions) || anyDuplicated(exclusions))
     refuser("donnees", "exclusions_invalides",
             paste("Les règles d'exclusion doivent être un vecteur de codes de motif sans attribut, sans doublon",
