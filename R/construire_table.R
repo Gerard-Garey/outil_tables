@@ -69,11 +69,16 @@ PARAMETRES_ETAPES <- list(
     stringsAsFactors = FALSE)
 )
 
+# Liste aux noms complets (non NULL, sans NA, non vides ; liste vide admise
+# sans noms), sans autre attribut que names (ni data.frame, ni dim, ni classe ; #23). Les doublons ne sont pas
+# contrôlés : le contrôle de `etapes` les admet, pour que le refus nommé
+# etape_en_double les signale ensuite (#60).
+noms_complets <- function(x) forme_exacte(x, "list", "names") &&
+  (!length(x) || (!is.null(names(x)) && !anyNA(names(x)) && all(nzchar(names(x)))))
+
 # Liste nommée aux noms uniques, non vides, non manquants, sans autre
-# attribut que names (ni data.frame, ni dim, ni classe ; #23).
-liste_nommee <- function(x) forme_exacte(x, "list", "names") &&
-  (!length(x) || (!is.null(names(x)) && !anyNA(names(x)) && all(nzchar(names(x))) &&
-                    !anyDuplicated(names(x))))
+# attribut que names (#23) : noms_complets() sans doublon.
+liste_nommee <- function(x) noms_complets(x) && !anyDuplicated(names(x))
 
 # Valide le plan entier, sans rien exécuter (ADR 0007, point 5.4). Rend le
 # plan, inchangé et invisible ; refuse (module construire_table pour les
@@ -98,8 +103,7 @@ valider_plan <- function(plan) {
                        liste_guillemets(manquants)),
                list(champ = manquants))
   etapes <- plan[["etapes"]]
-  if (!forme_exacte(etapes, "list", "names") ||
-      (length(etapes) && (is.null(names(etapes)) || anyNA(names(etapes)) || !all(nzchar(names(etapes))))))
+  if (!noms_complets(etapes))
     refus_plan("etapes_mal_formees",
                paste("Le champ « etapes » doit être une liste nommée (nom d'étape -> liste de ses paramètres),",
                      "sans autre attribut que ses noms."))
