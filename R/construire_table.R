@@ -182,8 +182,10 @@ valider_plan <- function(plan) {
 # ensemble (ADR 0011, point 5.1 (h), quatrième annotation du 20/10/2026 ; #63),
 # liste nommée par le chemin du champ dans le plan. Une fonction, non une
 # constante de premier niveau : les fichiers de R/ sont évalués par ordre
-# alphabétique à l'installation, `construire_table.R` avant `donnees.R` et
-# `brut.R`, dont les constantes ne sont pas encore définies.
+# alphabétique à l'installation, `construire_table.R` avant `donnees.R`,
+# dont les constantes (ROLES_SEGMENTATION, MOTIFS_*) ne sont pas encore
+# définies ; `brut.R` (ESTIMATEURS_BRUT) l'est déjà, mais la fonction les
+# lit toutes trois au même endroit.
 ordres_canoniques <- function()
   list(segmentation = ROLES_SEGMENTATION,
        "etapes/donnees/exclusions" = c(MOTIFS_LIGNES, MOTIFS_TETE),
