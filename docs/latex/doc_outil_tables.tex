@@ -1950,8 +1950,10 @@ Exemple de plan (vivant $\to$ décédé, par sexe, sans exclusion)~:\\[2pt]
 \subsection{Exécution}
 \label{sec:execution}
 
-{\sloppy\hbadness=10000 \code{construire\_table()} procède dans cet ordre~: validation du plan~;
-contrôle des rôles (\code{controler\_roles()})~; déduction de la recette et,
+{\sloppy\hbadness=10000 \code{construire\_table()} procède dans cet ordre~: validation du plan,
+puis sa mise sous forme canonique, une seule fois (\code{canoniser\_plan()},
+section~\ref{sec:fiche})~; les étapes et la fiche ne voient que le plan
+canonique~; contrôle des rôles (\code{controler\_roles()})~; déduction de la recette et,
 si le plan comprend l'étape \code{exposition}, de la convention retenue~;
 contrôle de la provenance~; calcul de l'empreinte des données reçues
 (section~\ref{sec:empreinte}). Tout refus possible avant le calcul a donc lieu
@@ -2008,7 +2010,10 @@ lecteurs~:
 
 \noindent
 Ajouter un champ est compatible~; renommer ou retirer un champ change le
-contrat partagé «~objet résultat~» (ADR 0007, point 6.3).
+contrat partagé «~objet résultat~» (ADR 0007, point 6.3). C'est à ce titre que
+le retrait des quatre copies de premier niveau de la fiche
+(section~\ref{sec:fiche}) a été décidé par le mainteneur (décision M64,
+question~Q2~; issue~\#42).
 
 \subsection{Vérifications}
 \label{sec:verifications-construction}
@@ -4299,20 +4304,21 @@ la sérialisation de la fiche viendront avec la branche
 
 La \emph{fiche de construction} est la description lisible par machine d'une
 construction, qui suffit à la rejouer à l'identique (E4.5~; ADR 0005,
-point 6~; ADR 0007, point 6.2). Elle est assemblée par \code{assembler\_fiche()}
+point 6~; ADR 0007, point 6.2, précisé par l'ADR 0011, point~5). Elle est assemblée par \code{assembler\_fiche()}
 et rangée dans le champ \code{fiche} de l'objet. Elle ne contient
 \textbf{aucun horodatage}~: deux constructions identiques ont des fiches
 identiques. Ses champs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \code{version\_fiche} (\code{VERSION\_FICHE}, 1)~; \code{versions}
+  \item \code{version\_fiche} (\code{VERSION\_FICHE}, 2)~; \code{versions}
     (\code{tablexp}, lue dans la description du package installé, et
     \code{R.version.string})~; \code{plateforme} (système, version, machine,
     BLAS par \code{extSoftVersion()}, LAPACK par \code{La\_library()})~;
-  \item \code{roles}~; \code{plan}, le plan \textbf{reçu, inchangé}~;
-  \item \code{transition} et son code interne \code{transition\_code}~;
-    \code{periode}, \code{delai\_declaration} et \code{fin\_effective}~;
-    \code{segmentation}~;
+  \item \code{roles}, dans l'ordre du catalogue des rôles
+    (\code{CATALOGUE\_ROLES})~; \code{plan}, le \textbf{plan canonique}
+    (ci-dessous)~;
+  \item \code{transition\_code}, code interne de la transition retenue~;
+    \code{fin\_effective}~;
   \item \sloppy\hbadness=10000 \code{unite\_observation} et, s'il y a lieu, \code{avertissement\_unite}
     (message de l'avertissement \code{unite\_contrat})~;
   \item \code{recette}~; \code{convention} (demandée, native, retenue,
@@ -4320,7 +4326,8 @@ identiques. Ses champs~:
     \code{exclusions} (par motif, avec leur nombre)~; \code{hypothese\_censure}~;
   \item \code{graine} et \code{graine\_mention} (\code{NA} et «~aucune étape
     aléatoire~» dans cette branche)~; \code{generateur} (\code{GENERATEUR})~;
-  \item \code{provenance} et \code{provenance\_mention} («~aucun fichier
+  \item \code{provenance}, dans l'ordre \code{fichier}, \code{empreinte},
+    \code{algorithme}, et \code{provenance\_mention} («~aucun fichier
     (données construites en mémoire)~» si \code{provenance} est \code{NULL})~;
   \item \code{empreintes} (section~\ref{sec:empreinte})~; \code{avertissements}~;
   \item \code{hypotheses\_brut}, \textbf{seulement si l'étape \code{brut} est
@@ -4329,9 +4336,63 @@ identiques. Ses champs~:
     \code{tolerance\_effectif}, \code{hypotheses} et \code{statuts}, plus
     \code{ensemble\_a\_risque} et \code{denominateur\_instants} si
     l'estimateur \code{kaplan\_meier} est retenu
-    (section~\ref{sec:brut-resultat}). Un plan sans étape \code{brut} a donc
-    exactement les champs de la fiche antérieure au module.
+    (section~\ref{sec:brut-resultat}). Un plan sans étape \code{brut} n'a
+    pas ce champ.
 \end{itemize}
+
+\noindent
+\textbf{Plan canonique} (ADR 0011, points 5.1 et 5.2~; issue~\#42). Deux plans
+de même sens doivent donner la même fiche et le même objet~: avant
+l'issue~\#42, un plan aux champs permutés, à borne de période stockée en
+entier ou au délai \code{0L} donnait des fiches différentes, et, pour la
+période, des paramètres d'étape différents (ADR 0011, «~Contexte~»,
+mesure~3). \code{construire\_table()}
+applique donc \code{canoniser\_plan()} une seule fois, juste après
+\code{valider\_plan()}~: champs de premier niveau dans l'ordre de
+\code{CHAMPS\_PLAN}~; \code{transition} dans l'ordre \code{depart},
+\code{arrivee}~; \code{periode} dans l'ordre \code{debut}, \code{fin},
+chaque borne de classe \code{Date} à stockage \code{double}~;
+\code{delai\_declaration} en \code{double}~; \code{graine} en
+\code{integer} (sans effet dans cette branche, où toute graine est
+refusée)~; paramètres de chaque étape dans l'ordre de
+\code{PARAMETRES\_ETAPES}~; toute autre valeur inchangée. Les conversions
+sont sans perte (tout entier de R est un double exact) et la canonisation
+est idempotente. Un stockage que la liste fermée de ces conversions ne
+prévoit pas arrête le calcul par une erreur de programmation~: il ne peut
+venir que d'un plan non validé. Le plan canonique n'est pas un plan
+«~résolu~»~: une convention déclarée \code{plus\_fine} y reste
+\code{plus\_fine}, la convention retenue étant dans
+\code{fiche\$convention}, car réécrire une déclaration par sa résolution
+serait une autre déclaration (aucun défaut implicite, ADR 0007, point 5.1).
+Le \emph{plan effectif} d'E4.5 est ainsi la paire formée du plan canonique
+et des paramètres retenus (paramètres effectifs des étapes et, dans la fiche,
+\code{transition\_code}, \code{fin\_effective}, \code{unite\_observation},
+\code{recette}, \code{convention}, \code{unite\_exposition},
+\code{par\_annee}, \code{hypothese\_censure}, \code{hypotheses\_brut})
+(note de lecture d'E4.5, décision M64, Q6). L'ordre des rôles et celui des
+noms de la provenance n'ont d'effet ni sur les étapes ni sur l'empreinte des
+données~; la fiche les consigne dans un ordre fixe (décision M64, Q4).
+L'\textbf{asymétrie est voulue}~: les données sont empreintées telles
+qu'elles sont reçues, parce que l'empreinte identifie l'entrée, tandis que
+le plan est canonisé selon son sens, parce que la fiche identifie la
+déclaration.
+
+\medskip
+\noindent
+\textbf{Copies retirées} (issue~\#42, avec l'issue~\#22, point~6~; décision
+M64, Q2). Jusqu'à la version~1 de la fiche, \code{transition},
+\code{periode}, \code{delai\_declaration} et \code{segmentation} figuraient
+à la fois dans \code{fiche\$plan} et au premier niveau de la fiche, sans que
+celle-ci dise laquelle faisait foi, \code{periode} voisinant en outre
+\code{fin\_effective}. Ces quatre copies sont retirées~; restent
+\code{transition\_code} et \code{fin\_effective}, qui sont des paramètres
+retenus et non des copies, ainsi que les reprises de l'objet nécessaires à une
+fiche autosuffisante (\code{convention}, \code{recette},
+\code{exclusions}, \code{avertissements}, \code{hypotheses\_brut}~;
+E3.7). Le changement de l'ensemble des champs fait passer
+\code{version\_fiche} de~1 à~2 (ADR 0011, point~10)~; il a été visé par
+\code{actuary} et consigné par la seconde régénération des références
+(section~\ref{sec:non-regression}).
 
 \noindent
 Les champs qui n'ont pas d'objet (convention et unité d'exposition d'un plan
@@ -4639,7 +4700,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche \\
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}~; idempotente~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
-\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
+\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme})~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
 \catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_PLAN} & constante & --- & \code{"tablexp plan 1"}, première ligne du texte du plan (nature et version de la grammaire) \\
 \catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_FICHE} & constante & --- & \code{"tablexp fiche 1"}, première ligne du texte de la fiche \\
