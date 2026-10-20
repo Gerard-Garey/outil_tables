@@ -365,63 +365,10 @@ SANS_REFERENCE_17 <- character(0)
 # déclaré non observé). Un plan non listé passe par le test ordinaire de la
 # comparaison au fichier.
 # Transitions #35 et #42 closes par la régénération unique de B4 (run CI
-# 39315172327, d18c269 ; ADR 0009, point 9.5) ; liste vide jusqu'à #57.
-# Transition de #57 (ADR 0011, quatrième annotation du 20/10/2026, (f) ;
-# version_fiche 2 -> 3) : champ nombre_lignes_exclues de la fiche. R1 à R6
-# ne déclarent aucune exclusion (plan_reference(), exclusions vides) : valeur
-# attendue 0L, relevant du tableau avant / après (nature « ajout »). Les noms
-# de la fiche gagnent nombre_lignes_exclues (21 -> 22 noms dans la référence,
-# qui ne porte ni versions ni plateforme).
-# Transition de #64 (ordre des champs de la fiche, ORDRE_CHAMPS_FICHE ; avis
-# d'actuary du 20/10/2026, étape (1)) : seul l'ordre de fiche/@noms change, la valeur est un
-# vecteur de 22 noms. Les deux transitions portent sur le même chemin
-# fiche/@noms, que l'union des changements (règle ci-dessus) n'admet qu'en
-# déclarations identiques (un vecteur entier et une autre déclaration de
-# valeurs sur un même chemin sont une erreur) : #57 et #64 déclarent donc le
-# même vecteur, celui de l'état final de la branche (noms de #57 dans l'ordre
-# de #64), qui s'applique une fois ; retirer l'une des deux déclarations sans
-# l'autre ne change donc rien. Chaque déclaration reste observée sur la
-# référence commitée (21 noms, ordre antérieur). L'ordre des lignes aplaties
-# ne compte pas : la comparaison se fait chemin par chemin. Transitions à
-# retirer toutes deux à la régénération unique de fin de branche (CI, session
-# principale) : en retirer une seule laisse l'autre déclarer un changement que
-# la référence régénérée ne porte plus, et la batterie échoue par « changement
-# déclaré non observé ».
-# Transition de #67 (ADR 0011, point 11, cinquième et sixième annotations du
-# 20/10/2026 ; ADR 0009, annotation du 20/10/2026, seconde) : empreintes du
-# résultat et du code calculées, comparées par jeton (aplatir_construction(),
-# JETON_MD5) ; statut_resultat_code remplacé ; champ representation_resultat
-# créé avant resultat (fiche$empreintes : 8 -> 9 noms), sans incrément de
-# version_fiche (déjà 3 par #57 dans la branche, point 10 (a)). Chemins
-# distincts de ceux de #57 et #64 : l'union ne les combine pas. Littéral du
-# statut en échappements \u (marqué UTF-8 en toute locale ; les littéraux non
-# ASCII de ce fichier ne le sont pas en locale C).
-STATUT_RESULTAT_CODE_67 <- paste(
-  "r\u00e9sultat : t\u00e9moin d'identit\u00e9 sur la m\u00eame machine seulement (E3.6, E4.6), jamais crit\u00e8re de",
-  "rejeu chez un tiers ; code : MD5 du relev\u00e9 des MD5 des fichiers R/*.R, fait \u00e0 l'installation (recalcul",
-  "depuis la racine des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement",
-  "num\u00e9rique, qui d\u00e9pend aussi de R, du BLAS et de la libm")
-NOMS_EMPREINTES_67 <- c("algorithme", "representation", "donnees", "fichier", "algorithme_fichier",
-                        "representation_resultat", "resultat", "code", "statut_resultat_code")
-NOMS_FICHE_REFERENCE_FINAL <- c(
-  "version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "plan", "transition_code",
-  "fin_effective", "unite_observation", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-  "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure", "hypotheses_brut", "graine",
-  "graine_mention", "generateur", "avertissements")
-TRANSITIONS_EN_COURS <- list(
-  list(issue = "#57", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
-    list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 3L),
-    list(chemin = "fiche/nombre_lignes_exclues", nature = "ajout", type = "integer", longueur = 1L),
-    list(chemin = "fiche/@noms", nature = "valeur de chaîne", valeurs = NOMS_FICHE_REFERENCE_FINAL))),
-  list(issue = "#64", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
-    list(chemin = "fiche/@noms", nature = "valeur de chaîne", valeurs = NOMS_FICHE_REFERENCE_FINAL))),
-  list(issue = "#67", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
-    list(chemin = "fiche/empreintes/@noms", nature = "valeur de chaîne", valeurs = NOMS_EMPREINTES_67),
-    list(chemin = "fiche/empreintes/representation_resultat", nature = "ajout", type = "character", longueur = 1L),
-    list(chemin = "fiche/empreintes/resultat", nature = "valeur de chaîne", valeurs = "<md5>"),
-    list(chemin = "fiche/empreintes/code", nature = "valeur de chaîne", valeurs = "<md5>"),
-    list(chemin = "fiche/empreintes/statut_resultat_code", nature = "valeur de chaîne",
-         valeurs = STATUT_RESULTAT_CODE_67))))
+# 39315172327, d18c269) ; transitions #57, #64 et #67 closes ensemble par la
+# régénération unique de B5 (run CI 39435673257, 5757c30 ; ADR 0009, point
+# 9.5). Liste vide.
+TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
