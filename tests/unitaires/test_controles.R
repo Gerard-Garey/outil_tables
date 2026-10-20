@@ -467,6 +467,24 @@ for (cas in list(
            if (length(d) == 1L && grepl(cas$motif, d, fixed = TRUE, useBytes = TRUE)) TRUE
            else paste("écarts :", paste(d, collapse = " ; ")))
 }
+# Version de la glibc (issue #72) : consignée, hors identifiant contrôlé.
+verifier("plateforme : analyser_glibc lit getconf, puis ldd, sinon « inconnue »",
+         identical(env_plateforme$analyser_glibc("glibc 2.35"), "glibc 2.35") &&
+           identical(env_plateforme$analyser_glibc("getconf: Unrecognized variable", "ldd (Ubuntu GLIBC 2.35-0ubuntu3.8) 2.35"),
+                     "ldd (Ubuntu GLIBC 2.35-0ubuntu3.8) 2.35") &&
+           identical(env_plateforme$analyser_glibc(character(0), "musl libc (x86_64)"), "inconnue") &&
+           identical(env_plateforme$analyser_glibc(), "inconnue"))
+verifier("plateforme : version_glibc() rend une chaîne unique, sans erreur ni avertissement",
+         {
+           avert <- character(0)
+           v <- withCallingHandlers(env_plateforme$version_glibc(),
+                                    warning = function(w) { avert <<- c(avert, conditionMessage(w)); invokeRestart("muffleWarning") })
+           is.character(v) && length(v) == 1L && nzchar(v) && !length(avert)
+         })
+verifier("plateforme : la glibc figure dans consignes_plateforme(), pas dans lignes_identifiant()",
+         "glibc (libm)" %in% names(env_plateforme$consignes_plateforme()) &&
+           !any(grepl("glibc", env_plateforme$lignes_identifiant(conforme), ignore.case = TRUE)) &&
+           any(grepl("glibc (libm)", env_plateforme$lignes_consignees(), fixed = TRUE)))
 # GITHUB_STEP_SUMMARY vidée : le résumé du job CI ne reçoit que le relevé de
 # l'étape « Plateforme (mode strict) », pas ceux des témoins.
 r <- executer_rscript(file.path(CONTROLES, "plateforme.R"), env = "GITHUB_STEP_SUMMARY=")
