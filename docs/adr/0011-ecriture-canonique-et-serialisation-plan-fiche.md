@@ -479,3 +479,15 @@ Tout est compris dans l'incrément `version_fiche` 2 → 3. Aucune table finale 
 2. **Attribut `simulation` de `lignes_conservees`** : (a) exclu de l'empreinte du résultat par son nom, sur une liste fermée, tout autre attribut étant une erreur de programmation ; (b) écrit dans le texte empreinté (extension de grammaire) ; (c) retiré de l'objet par le moteur (issue séparée, contrat « objet résultat »). **Recommandation : (a).**
 
 Issues : #67 ; #22 (point 1) ; #49 (Windows et macOS non mesurés). Décision M69 (mise en regard demandée) ; décision définitive attendue. Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (sixième) — Décision du mainteneur sur la cinquième annotation (M70)
+
+Rédigée par `architect` d'après la décision du mainteneur du 20/10/2026 (M70 ; `docs/feuille-de-route.md`, § 4), rapportée par la session principale de la branche `claude/fiche-rapport` (PR #68), branche à `df74de8`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Les questions 1 et 2 de la cinquième annotation du 20/10/2026 sont tranchées selon leur recommandation.
+
+1. **Question 1 — empreinte du code (point 11.4) : option (iv) retenue.** `fiche$empreintes$code` est le MD5 des sources `R/*.R`, calculé par le code de premier niveau du package pendant `R CMD INSTALL`, selon la définition, la garde et le test d'égalité au recalcul de la cinquième annotation, (c). Si les sources sont introuvables à l'installation, l'empreinte vaut `NA` et `statut_resultat_code` le dit en toutes lettres ; l'installation n'échoue pas. L'option (i), manifeste sous `inst/` vérifié par la CI, n'est plus qu'un **repli documenté**, à rouvrir par une nouvelle annotation si le mécanisme de (iv) se révèle défaillant (garde ou test en échec, plateforme non conforme, #49). Le point 11.4 se lit désormais avec cette décision.
+2. **Question 2 — attribut `simulation` de `etapes/donnees/resultat/lignes_conservees` : option (a) retenue.** L'attribut est exclu de l'empreinte du résultat **par son nom**, sur une liste fermée déclarée dans le code (un seul nom aujourd'hui). Tout autre attribut inattendu est une **erreur de programmation**, avec un témoin ; rien n'est ignoré en silence. La classe `construction` de la racine est vérifiée et non écrite (cinquième annotation, (b)). Les options (b), extension de grammaire, et (c), retrait par le moteur, sont écartées pour les raisons données en (b) de la cinquième annotation.
+3. **Ordre des commits** : #57, porteur de l'incrément `version_fiche` 2 → 3, précède #63 (quatrième annotation du 20/10/2026, (f) ; `docs/feuille-de-route.md`, § 1.5). Déjà écrit, acté sans changement.
+
+**Effet sur les résultats : aucun** par la présente annotation. L'effet attendu du commit de #67 est celui de la cinquième annotation (« Effet sur les résultats »), lu sans alternative ; aucune table finale, aucun verdict : visa d'`actuary`.
+
+Issues : #67 ; #57, #63 (ordre des commits) ; #49 (Windows et macOS non mesurés). Décision M70. Branche `claude/fiche-rapport`, PR #68.
