@@ -2031,8 +2031,10 @@ existant de chaque paramètre~: aucun motif n'est propre à la forme. Hors du
 plan, la même règle s'applique à la graine reçue par \code{sous\_graine()}
 (refus \code{graine\_invalide}, section~\ref{sec:sous-graine}) et, à
 l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()}, à la
-forme seule de la segmentation (refus \code{segmentation\_invalide} du module
-\code{brut}, section~\ref{sec:brut-etape}~; issue~\#43). Pour
+segmentation, contrôlée dans sa forme et dans son catalogue par le même
+contrôle que dans le plan, \code{controler\_segmentation()} (refus
+\code{segmentation\_invalide} du module \code{brut},
+section~\ref{sec:brut-etape}~; issues~\#43 et~\#59). Pour
 chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
@@ -2411,7 +2413,9 @@ données~; \code{details\$bornes} nomme les bornes en cause)~; \code{delai\_inva
 n'est pas un nombre unique, \code{integer} ou \code{double}, sans attribut,
 entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
 (autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
-doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
+doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis~;
+contrôle \code{controler\_segmentation()}, partagé avec la fonction d'étape
+\code{calculer\_taux\_bruts()}, section~\ref{sec:brut-etape})~;
 \code{exclusions\_invalides} (autre chose qu'un vecteur \code{character} sans
 attribut, sans \code{NA} ni doublon, vide explicite admis)~;
 \code{exclusion\_inconnue} (code absent de la liste fermée des motifs). Les
@@ -2768,6 +2772,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{date\_hors\_domaine}~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees} ou \code{brut})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et par la fonction d'étape \code{brut} (issue~\#59) \\
 \catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres, dont \code{date\_hors\_domaine} pour les bornes de la période~; transition retenue, début, fin, borne $B$ \\
 \catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
@@ -3308,17 +3313,33 @@ $\times$ année relèverait d'une autre spécification). Si le binomial et
 \code{kaplan\_meier} sont tous deux déclarés sous \code{par\_annee},
 \code{binomial\_par\_annee} est levé en premier.
 La fonction d'étape contrôle en outre, en tête et avant
-\code{controler\_parametres\_brut()}, la \emph{forme seule} de la
-segmentation qu'elle reçoit~: \code{segmentation\_invalide}, module
-\code{brut} (autre chose qu'un vecteur \code{character} sans attribut, sans
-\code{NA} ni doublon~; vide explicite admis~; issue~\#43). Le même code est
-porté par le module qui détecte la condition (ADR 0007, annotation du
-17/10/2026, point~d)~: dans le plan, la segmentation est déjà refusée sous ce
-code par \code{controler\_parametres\_donnees()}, module \code{donnees},
-que \code{valider\_plan()} appelle, et qui contrôle aussi son appartenance
-aux rôles admis (section~\ref{sec:controles-donnees})~; ce contrôle-ci ne
-sert qu'à l'appel direct de la fonction d'étape, et une forme invalide y est
-signalée avant un estimateur inconnu.
+\code{controler\_parametres\_brut()}, la forme et le catalogue de la
+segmentation qu'elle reçoit, par \code{controler\_segmentation()} du module
+\code{donnees}~: \code{segmentation\_invalide}, module \code{brut} (autre
+chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
+doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, soit
+\code{sexe} et \code{segment}~; vide explicite admis~; issues~\#43
+et~\#59). Une clé hors de ce catalogue est donc refusée à l'appel direct,
+qu'elle désigne une colonne de la table d'exposition (\code{"age"},
+\code{"evenements"}) ou non (\code{"region"}), de même que la chaîne vide,
+qui n'en fait pas partie~: sans ce contrôle, une clé hors du catalogue
+présente dans la table serait employée comme clé de segmentation sans
+avoir été déclarée comme rôle (\code{"age"} dupliquerait la clé d'âge dans
+la table résultat), et une clé absente de la table ne serait signalée que
+par une erreur de programmation sur les colonnes manquantes. Sur le
+chemin Kaplan-Meier, ce contrôle précède celui de
+\code{controler\_parametres\_donnees()} que l'estimateur rappelle
+(section~\ref{sec:brut-kaplan-meier}), si bien qu'une segmentation invalide
+y est refusée sous le module \code{brut}. Le même code est porté par le
+module qui détecte la condition (ADR 0007, annotation du 17/10/2026,
+point~d)~: dans le plan, la segmentation est déjà refusée sous ce code par
+\code{controler\_parametres\_donnees()}, module \code{donnees}, que
+\code{valider\_plan()} appelle et qui emploie le même contrôle
+(section~\ref{sec:controles-donnees})~; la forme et le catalogue de la
+segmentation ne sont écrits qu'à un endroit, et le message du refus est le
+même dans les deux modules. Ce contrôle-ci ne sert qu'à l'appel direct de
+la fonction d'étape, et une segmentation invalide y est signalée avant un
+estimateur inconnu.
 
 \medskip
 \textbf{Quantiles supérieurs.} Ils sont calculés par la queue supérieure
