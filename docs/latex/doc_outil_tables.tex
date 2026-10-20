@@ -4403,14 +4403,26 @@ applique donc \code{canoniser\_plan()} une seule fois, juste après
 \code{CHAMPS\_PLAN}~; \code{transition} dans l'ordre \code{depart},
 \code{arrivee}~; \code{periode} dans l'ordre \code{debut}, \code{fin},
 chaque borne de classe \code{Date} à stockage \code{double}~;
-\code{delai\_declaration} en \code{double}~; \code{graine} en
-\code{integer} (sans effet dans cette branche, où toute graine est
-refusée)~; paramètres de chaque étape dans l'ordre de
+\code{delai\_declaration} en \code{double}~; \code{graine}~: un
+\code{integer} sans \code{NA} est rendu tel quel, quelle que soit sa
+longueur, et un \code{double} unique, fini, à valeur entière et de valeur
+absolue au plus \code{.Machine\$integer.max} est converti en
+\code{integer}, parce que \code{set.seed()} convertit son argument en entier
+et que deux graines de même valeur doivent donner la même fiche~; toute autre
+graine est une erreur de programmation (ADR 0011, annotation du 20/10/2026 du
+point~5.1~(g)). Cette conversion est \textbf{sans effet dans cette branche}~:
+aucune étape ne tire d'aléa, si bien que \code{valider\_plan()} refuse toute
+graine (\code{graine\_inattendue}) avant la canonisation~; le contrat de
+validation de la graine sera fixé avec la première étape aléatoire
+(issue~\#61)~; paramètres de chaque étape dans l'ordre de
 \code{PARAMETRES\_ETAPES}~; toute autre valeur inchangée. Les conversions
 sont sans perte (tout entier de R est un double exact) et la canonisation
 est idempotente. Un stockage que la liste fermée de ces conversions ne
-prévoit pas arrête le calcul par une erreur de programmation~: il ne peut
-venir que d'un plan non validé. Le plan canonique n'est pas un plan
+prévoit pas, une étape absente du catalogue, ou un nom d'étape ou de
+paramètre en double, qui serait sinon réduit en silence à sa première
+occurrence, arrête le calcul par une erreur de programmation~: il ne peut
+venir que d'un plan non validé, \code{valider\_plan()} refusant ces cas en
+amont. Le plan canonique n'est pas un plan
 «~résolu~»~: une convention déclarée \code{plus\_fine} y reste
 \code{plus\_fine}, la convention retenue étant dans
 \code{fiche\$convention}, car réécrire une déclaration par sa résolution
@@ -4987,7 +4999,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche \\
-\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}~; idempotente~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
+\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}~; idempotente~; erreur de programmation sur un stockage non prévu ou un nom d'étape ou de paramètre en double~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
 \catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme})~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
 \catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_PLAN} & constante & --- & \code{"tablexp plan 1"}, première ligne du texte du plan (nature et version de la grammaire) \\
