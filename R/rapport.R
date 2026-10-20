@@ -5,7 +5,8 @@
 #
 #  - ecrire_valeurs() : écrivain unique des valeurs d'une colonne, en octets,
 #    en deux formes, « empreinte » (doubles en octets IEEE 754) et « texte »
-#    (doubles en %.17g) (ADR 0011, points 2 et 3 ; #35) ;
+#    (doubles en %.17g) (ADR 0011, points 2 et 3 ; #35) ; texte_date() : écriture
+#    ISO d'une date, partagée avec le lecteur (#19, #50) ;
 #  - texte_canonique() : représentation textuelle canonique des données
 #    reçues (ADR 0007, point 9.3 ; ADR 0011, point 2), en octets ;
 #  - empreinte_donnees(), empreintes_construction() : MD5 par
@@ -104,6 +105,15 @@ octets_lignes <- function(textes) {
   charToRaw(paste0(textes, "\n", collapse = ""))
 }
 
+# Écriture ISO 8601 AAAA-MM-JJ, année sur quatre chiffres (ADR 0011, point 4 ;
+# #19), de jours `u` depuis 1970-01-01 entiers, finis et dans le domaine
+# (contrôlés par l'appelant) ; partagée par l'écrivain (ecrire_valeurs()) et
+# par le contrôle de canonicité du lecteur (valeurs_texte()) (#19, #50).
+texte_date <- function(u) {
+  cd <- composantes_date(u)
+  sprintf("%04d-%02d-%02d", cd$an, cd$mois + 1L, cd$jour)
+}
+
 # Écrivain unique des valeurs d'une colonne (ADR 0011, point 3.1) : type
 # canonique et octets, selon la forme, « empreinte » (texte empreinté : doubles
 # en octets IEEE 754) ou « texte » (fiche, références de non-régression :
@@ -196,10 +206,7 @@ ecrire_valeurs <- function(x, forme, role) {
               list(role = role, lignes = which(dates_hors_domaine(j))))
     txt <- ifelse(is.nan(u), "NaN", "NA")
     k <- !is.na(u)
-    if (any(k)) {
-      cd <- composantes_date(u[k])
-      txt[k] <- sprintf("%04d-%02d-%02d", cd$an, cd$mois + 1L, cd$jour)
-    }
+    if (any(k)) txt[k] <- texte_date(u[k])
     return(list(type = "Date", octets = octets_lignes(txt[match(j, u)])))
   }
   if (is.object(x))
@@ -627,10 +634,7 @@ valeurs_texte <- function(type, s, refus) {
       forme <- grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", s)
       u <- as.double(unclass(as.Date(ifelse(forme, s, NA_character_), format = "%Y-%m-%d")))
       faux <- !jeton & (!forme | is.na(u) | dates_hors_domaine(u))
-      if (!any(faux) && any(!jeton)) {
-        cd <- composantes_date(u[!jeton])
-        faux[!jeton] <- sprintf("%04d-%02d-%02d", cd$an, cd$mois + 1L, cd$jour) != s[!jeton]
-      }
+      if (!any(faux) && any(!jeton)) faux[!jeton] <- texte_date(u[!jeton]) != s[!jeton]
       if (any(faux)) invalide("date hors de la forme AAAA-MM-JJ, inexistante ou hors du domaine [0001-01-01, 9999-12-31]",
                               which(faux))
       u[s == "NaN"] <- NaN
