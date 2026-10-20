@@ -554,6 +554,13 @@ for (k in cas_segmentation)
                   error = function(e) e)
     inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "brut")
   })
+# Chemin Kaplan-Meier (#59, sec:brut-etape) : le catalogue est contrôlé avant le
+# calcul de l'estimateur, sans observations ni transition à fournir.
+verifier("calculer_taux_bruts(estimateurs = kaplan_meier, segmentation region hors catalogue) : refus segmentation_invalide, module brut", {
+  r <- tryCatch(calculer_taux_bruts(EC_SEXE, "region", FALSE, "dernier_anniversaire", "u", "kaplan_meier", 0.95),
+                error = function(e) e)
+  inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "brut")
+})
 verifier("controler_segmentation : mêmes message et détails aux deux étapes, module de l'étape appelante (#59)", {
   cs <- tablexp:::controler_segmentation
   e <- function(etape) tryCatch(cs("region", etape), error = function(e) e)

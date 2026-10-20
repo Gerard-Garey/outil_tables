@@ -1928,6 +1928,9 @@ local({
              grepl("date_hors_domaine", tryCatch(valeurs_lues("Date", "0000-12-31", "(f)", "x"), error = function(e) conditionMessage(e)), fixed = TRUE))
   verifier("références, Date : 0001-01-01 et 9999-12-31 relues à l'identique par valeurs_lues (témoins des bornes)",
            identical(valeurs_lues("Date", c("0001-01-01", "9999-12-31"), "(f)", "x"), J(c(-719162, 2932896))))
+  verifier("références, Date : bornes JOURS_DATES_REFERENCE du lecteur = dates_hors_domaine() du moteur (bornes dans le domaine, bornes -1 et +1 hors domaine)",
+           !any(tablexp:::dates_hors_domaine(JOURS_DATES_REFERENCE)) &&
+             all(tablexp:::dates_hors_domaine(JOURS_DATES_REFERENCE + c(-1, 1))))
 })
 
 # --- plan canonique : plans de référence déjà canoniques ; transitions d'une même issue (#42) ---
