@@ -377,7 +377,7 @@ verifier("objet : exposition par (sexe, âge), colonnes de la spécification (A.
 CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
                   "fin_effective", "unite_observation",
                   "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                  "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
+                  "nombre_lignes_exclues", "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
                   "provenance_mention", "empreintes", "avertissements")
 f <- x$fiche
 verifier("fiche : champs de l'ADR 0007 (point 6.2) et de la spécification (A.3)", identical(names(f), CHAMPS_FICHE))
@@ -388,9 +388,9 @@ verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôl
                                         retenue = "dernier_anniversaire", forcee = FALSE)) &&
            identical(f$unite_observation, "tete") && is.na(f$avertissement_unite) &&
            identical(f$transition_code, "vivant_decede") && identical(f$fin_effective, D("2024-12-31")))
-verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 2",
+verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 3 (#57)",
          identical(f$graine, NA_integer_) && identical(f$graine_mention, "aucune étape aléatoire") &&
-           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 2L))
+           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 3L))
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
@@ -415,6 +415,40 @@ verifier("fiche : provenance reçue consignée (fichier, empreinte, algorithme)"
          identical(xp$fiche$provenance$fichier, "base.csv") &&
            identical(xp$fiche$empreintes$fichier, "0123456789abcdef0123456789abcdef") &&
            identical(xp$fiche$empreintes$algorithme_fichier, "md5"))
+# nombre_lignes_exclues (#57) : lignes distinctes exclues, à côté du décompte
+# par motif. Valeurs calculées à la main : C5 porte deux motifs déclarés
+# (cause « Rachat » hors modalités, sortie avant l'entrée), C6 un seul (sortie
+# avant l'entrée) ; décompte par motif 1 et 2 (somme 3), lignes distinctes 2.
+local({
+  BASE_X <- rbind(BASE, data.frame(
+    contrat = c("C5", "C6"), tete = c("T5", "T6"), sexe = c("H", "F"),
+    naissance = D(c("1950-01-01", "1950-01-01")), entree = D(c("2018-01-01", "2018-01-01")),
+    sortie = D(c("2017-01-01", "2017-06-01")), cause = c("Rachat", "deces"), stringsAsFactors = FALSE))
+  motifs <- c("cause_hors_modalites", "sortie_avant_entree")
+  plan_x <- modifier(plan_type(), etapes = list(donnees = list(exclusions = motifs),
+                                                 exposition = list(convention = "plus_fine", par_annee = FALSE)))
+  y <- construire_table(BASE_X, ROLES, plan_x)
+  fx <- y$fiche
+  verifier("#57 : deux motifs sur une ligne, un sur l'autre -> exclusions$nombre c(1, 2) (somme 3), nombre_lignes_exclues 2L",
+           identical(fx$exclusions$motif, motifs) && identical(fx$exclusions$nombre, c(1L, 2L)) &&
+             identical(fx$nombre_lignes_exclues, 2L) && sum(fx$exclusions$nombre) != fx$nombre_lignes_exclues)
+  verifier("#57 : identité exacte lignes reçues = lignes conservées + nombre_lignes_exclues (6 = 4 + 2)",
+           nrow(BASE_X) == 6L &&
+             nrow(y$etapes$donnees$resultat$lignes_conservees) + fx$nombre_lignes_exclues == nrow(BASE_X) &&
+             identical(fx$nombre_lignes_exclues, y$etapes$donnees$resultat$nombre_lignes_exclues))
+  verifier("#57 : nombre_lignes_exclues = lignes distinctes de lignes_exclues (union des numéros), integer de longueur 1",
+           identical(fx$nombre_lignes_exclues,
+                     length(unique(unlist(y$etapes$donnees$resultat$lignes_exclues, use.names = FALSE)))) &&
+             is.integer(fx$nombre_lignes_exclues) && length(fx$nombre_lignes_exclues) == 1L)
+  verifier("#57 : aller-retour lire_fiche(ecrire_fiche(fiche)) identical(), champ écrit en integer de longueur 1",
+           identical(lire_fiche(ecrire_fiche(fx)), fx) &&
+             any(grepl("^nombre_lignes_exclues\tinteger\t1\t2$",
+                       strsplit(rawToChar(ecrire_fiche(fx)), "\n", fixed = TRUE)[[1L]])))
+  z <- construire_table(BASE, ROLES, plan_x)$fiche
+  verifier("#57 : exclusions déclarées sans ligne porteuse -> 0L et décomptes nuls c(0, 0) ; plan sans exclusion -> 0L, aucun décompte",
+           identical(z$nombre_lignes_exclues, 0L) && identical(z$exclusions$nombre, c(0L, 0L)) &&
+             identical(f$nombre_lignes_exclues, 0L) && identical(f$exclusions$nombre, integer(0)))
+})
 verifier("unité contrat sans id_tete : avertissement inscrit dans l'objet et dans la fiche", {
   y <- construire_table(BASE, ROLES[names(ROLES) != "id_tete"], plan_type())
   identical(y$fiche$unite_observation, "contrat") && !is.na(y$fiche$avertissement_unite) &&
@@ -1048,7 +1082,7 @@ local({
   verifier("construire_table : rejeu de la fiche (rôles, plan canonique, provenance) identical() hors execution",
            identical(sans_execution(construire_table(BASE, y$fiche$roles, y$fiche$plan, y$fiche$provenance)), x0) &&
              identical(y$fiche$plan, pb))
-  verifier("fiche : version 2, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
-           identical(x0$fiche$version_fiche, 2L) &&
+  verifier("fiche : version 3, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
+           identical(x0$fiche$version_fiche, 3L) &&
              !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
 })

@@ -495,11 +495,12 @@ local({
   b <- tablexp:::BLOCS_LECTURE_FICHE
   verifier("BLOCS_LECTURE_FICHE : trois blocs (calculé, hypothèses, rejeu), aucun champ en double",
            identical(names(b), c("calculé", "hypothèses", "rejeu")) && !anyDuplicated(unlist(b)))
-  verifier("BLOCS_LECTURE_FICHE : affectation validée par actuary le 20/10/2026 (ADR 0011, point 6.5), ordre des champs compris",
+  verifier("BLOCS_LECTURE_FICHE : affectation validée par actuary le 20/10/2026 (ADR 0011, point 6.5 ; nombre_lignes_exclues après exclusions, #57), ordre des champs compris",
            identical(unname(b), list(
              c("plan", "transition_code", "fin_effective", "unite_observation", "unite_exposition", "par_annee", "recette",
                "convention"),
-             c("exclusions", "hypothese_censure", "hypotheses_brut", "avertissement_unite", "avertissements"),
+             c("exclusions", "nombre_lignes_exclues", "hypothese_censure", "hypotheses_brut", "avertissement_unite",
+               "avertissements"),
              c("version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "graine", "graine_mention",
                "generateur", "versions", "plateforme"))))
   presents <- intersect(unlist(b), names(x$fiche))

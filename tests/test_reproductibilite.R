@@ -360,8 +360,23 @@ SANS_REFERENCE_17 <- character(0)
 # déclaré non observé). Un plan non listé passe par le test ordinaire de la
 # comparaison au fichier.
 # Transitions #35 et #42 closes par la régénération unique de B4 (run CI
-# 39315172327, d18c269 ; ADR 0009, point 9.5) : liste vide.
-TRANSITIONS_EN_COURS <- list()
+# 39315172327, d18c269 ; ADR 0009, point 9.5) ; liste vide jusqu'à #57.
+# Transition de #57 (ADR 0011, quatrième annotation du 20/10/2026, (f) ;
+# version_fiche 2 -> 3) : champ nombre_lignes_exclues de la fiche. R1 à R6
+# ne déclarent aucune exclusion (plan_reference(), exclusions vides) : valeur
+# attendue 0L, relevant du tableau avant / après (nature « ajout »). Les noms
+# de la fiche gagnent nombre_lignes_exclues après exclusions (21 -> 22 noms
+# dans la référence, qui ne porte ni versions ni plateforme). Transition à
+# retirer à la régénération unique de fin de branche (CI, session principale).
+TRANSITIONS_EN_COURS <- list(
+  list(issue = "#57", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
+    list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 3L),
+    list(chemin = "fiche/nombre_lignes_exclues", nature = "ajout", type = "integer", longueur = 1L),
+    list(chemin = "fiche/@noms", nature = "valeur de chaîne",
+         valeurs = c("version_fiche", "roles", "plan", "transition_code", "fin_effective", "unite_observation",
+                     "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
+                     "nombre_lignes_exclues", "hypothese_censure", "graine", "graine_mention", "generateur",
+                     "provenance", "provenance_mention", "empreintes", "avertissements", "hypotheses_brut")))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -1895,6 +1910,11 @@ local({
              identical(lire_plan(ecrire_plan(p$plan)), p$plan))
     f <- lire_fiche(ecrire_fiche(x$fiche))
     verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
+    # #57 : lignes reçues = lignes conservées + lignes distinctes exclues ;
+    # aucune exclusion déclarée dans R1 à R6, donc 0L et aucune ligne écartée.
+    verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (0L, integer) (#57)", id),
+             identical(x$fiche$nombre_lignes_exclues, 0L) &&
+               nrow(jeu_ref$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
     y <- construire_table(jeu_ref$donnees, f$roles, valider_plan(f$plan), f$provenance)
     verifier(sprintf("%s : rejeu sur le plan relu de la fiche écrite identical() hors execution", id),
              identical(sans_execution(y), sans_execution(x)))

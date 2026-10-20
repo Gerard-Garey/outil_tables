@@ -42,7 +42,9 @@
 # de l'empreinte écrits en octets IEEE 754 (ADR 0011, points 2 et 10 ; #35).
 # Fiche 2 : plan canonique, rôles et provenance dans l'ordre canonique, copies
 # de premier niveau du plan retirées (ADR 0011, points 5.1 à 5.5 ; #42, #22).
-VERSION_FICHE <- 2L
+# Fiche 3 : champ nombre_lignes_exclues (#57) ; premier commit de la cinquième
+# branche qui change la définition de la fiche (point 10 (a)).
+VERSION_FICHE <- 3L
 ENTETE_CANONIQUE <- "tablexp canonique 2"
 ALGORITHME_EMPREINTE <- "md5"
 # Littéral laissé tel quel : sonde de l'installation en UTF-8 des batteries
@@ -407,6 +409,9 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     unite_exposition = if (is.null(pe)) NA_character_ else pe$unite_exposition,
     par_annee = if (is.null(pe)) NA else pe$par_annee,
     exclusions = etapes[["donnees"]][["resultat"]][["exclusions"]],
+    # Lignes distinctes exclues (une ligne à deux motifs déclarés n'y compte
+    # qu'une fois, `exclusions` la compte sous chaque motif ; #57).
+    nombre_lignes_exclues = etapes[["donnees"]][["resultat"]][["nombre_lignes_exclues"]],
     hypothese_censure = if (is.null(pe)) NA_character_ else pe$hypothese_censure,
     graine = if ("graine" %in% names(plan)) plan[["graine"]] else NA_integer_,
     graine_mention = texte_moteur(if ("graine" %in% names(plan)) "graine du plan" else "aucune étape aléatoire"),
@@ -514,11 +519,13 @@ CONVENTIONS_TEXTE <- texte_moteur(c(
 # été calculé, avec quelles hypothèses, de quoi rejouer ; chaque champ de la
 # fiche dans un seul bloc (partition contrôlée par les tests), dans l'ordre
 # des champs de chaque bloc. Affectation validée par actuary le 20/10/2026
-# (ADR 0011, point 6.5). Noms des blocs marqués UTF-8 (#50).
+# (ADR 0011, point 6.5) ; nombre_lignes_exclues à côté d'exclusions, dans les
+# hypothèses (avis d'actuary, M69 ; #57). Noms des blocs marqués UTF-8 (#50).
 BLOCS_LECTURE_FICHE <- texte_moteur(list(
   "calculé" = c("plan", "transition_code", "fin_effective", "unite_observation", "unite_exposition", "par_annee",
                "recette", "convention"),
-  "hypothèses" = c("exclusions", "hypothese_censure", "hypotheses_brut", "avertissement_unite", "avertissements"),
+  "hypothèses" = c("exclusions", "nombre_lignes_exclues", "hypothese_censure", "hypotheses_brut",
+                  "avertissement_unite", "avertissements"),
   rejeu = c("version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "graine", "graine_mention",
             "generateur", "versions", "plateforme")))
 

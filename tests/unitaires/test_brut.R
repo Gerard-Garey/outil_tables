@@ -497,7 +497,7 @@ verifier("objet : etapes$brut (parametres, resultat, diagnostics), table NULL", 
 CHAMPS_FICHE_SANS_BRUT <- c("version_fiche", "versions", "plateforme", "roles", "plan", "transition_code",
                      "fin_effective", "unite_observation",
                      "avertissement_unite", "recette", "convention", "unite_exposition", "par_annee", "exclusions",
-                     "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
+                     "nombre_lignes_exclues", "hypothese_censure", "graine", "graine_mention", "generateur", "provenance",
                      "provenance_mention", "empreintes", "avertissements")
 verifier("fiche : hypotheses_brut en fin de liste si l'étape brut est exécutée, copie des paramètres de l'étape", {
   f <- XC$fiche
