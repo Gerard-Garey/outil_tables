@@ -5453,9 +5453,15 @@ collés par un \code{paste()}, puis convertis en octets par un seul
 par ligne. Une valeur manquante prend le corps «~un guillemet~»~: sa ligne
 s'écrit de trois guillemets suivis d'un LF, puis est ramenée à \code{NA} et
 LF par un \code{gsub()}. Ce marqueur ne peut pas apparaître dans une autre
-ligne~: un corps échappé ne contient de guillemet que précédé d'une barre
-oblique inverse, si bien qu'aucune autre ligne ne porte trois guillemets de
-suite avant sa fin de ligne. Les blocs sont bornés par \code{bornes\_blocs()}
+ligne~: les cinq échappements étant appliqués à la barre oblique inverse
+d'abord, puis à LF, CR, la tabulation et au guillemet, un corps
+échappé ne contient ni LF ni guillemet qui ne soit précédé d'une barre
+oblique inverse~; il ne commence donc jamais par un guillemet et n'en porte
+jamais deux de suite. Une autre ligne, guillemet ouvrant, corps, guillemet
+fermant et LF, porte ainsi au plus deux guillemets consécutifs (le dernier
+caractère du corps et le guillemet fermant, ou les deux guillemets d'un corps
+vide) devant sa fin de ligne, jamais trois, et le motif, qui se termine par
+LF, ne peut pas chevaucher deux lignes. Les blocs sont bornés par \code{bornes\_blocs()}
 à $2^{30}$ octets de texte avant ce \code{gsub()}, sous la limite de
 $2^{31} - 1$ octets d'une chaîne R (aide \code{Memory-limits})~; une ligne
 plus longue que la borne forme seule son bloc et s'écrit directement en
@@ -5469,9 +5475,11 @@ de bloc, de 1 à $2^{30}$ octets, dans la session et dans un sous-processus
 lancé sous \code{LC\_ALL=C}~; il vérifie les bornes rendues par
 \code{bornes\_blocs()} sur 45 bornes et 3 jeux de corps (partition des
 lignes dans l'ordre, bloc de plusieurs lignes d'au plus la borne et maximal,
-ligne trop longue seule dans son bloc et seule marquée). L'identité des
-octets est ainsi \emph{constatée} sur ces cas, l'argument du marqueur en
-donnant la raison. Le script \code{tests/mesures/octets\_chaines.R}, hors
+ligne trop longue seule dans son bloc et seule marquée). Les statuts
+sont distincts~: l'argument du marqueur \emph{établit}, par raisonnement sur
+la construction, que la substitution ne porte que sur les lignes des valeurs
+manquantes~; l'identité des octets à ceux de l'écriture antérieure n'est que
+\emph{constatée} sur ces cas. Le script \code{tests/mesures/octets\_chaines.R}, hors
 batterie et sans seuil, mesure la durée et la mémoire de cette écriture et
 de l'empreinte à deux rôles caractère sur un jeu déterministe.
 
