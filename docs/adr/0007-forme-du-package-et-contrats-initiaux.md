@@ -557,3 +557,24 @@ Les deux fonctions étant internes, un renommage ne touche aucun contrat partag�
 **Effet sur les résultats : aucun.** Rien n'est modifié dans le code par cette annotation.
 
 Issues : #56 ; #38 ; #22 (point 7, clos). Décision M68.
+
+## Annotation du 20 octobre 2026 (seconde) — renvois périmés au code après #67 et #22, point 1 (constat m6 de la revue finale de `claude/fiche-rapport`)
+
+Rédigée par `architect` en fin de branche `claude/fiche-rapport` (PR #68, à `63b4bc5`), d'après le constat mineur m6 de la revue finale d'`audit` (effort `high`). Le texte ci-dessus, annotations comprises, n'est pas réécrit : la présente annotation dit seulement où se lisent aujourd'hui les objets que trois passages désignent.
+
+**(a) Seconde annotation du 17/10/2026, (a), deuxième tiret** : la sonde UTF-8 du harnais ne lit plus `STATUT_EMPREINTES_NON_CALCULEES` (`R/rapport.R:34`). Cette constante a été retirée par le commit de #67 (`5422404`) : les empreintes du résultat et du code sont désormais calculées. La sonde lit le littéral non ASCII `STATUT_EMPREINTE_RESULTAT`, défini en `R/rapport.R:68` à `63b4bc5` (`tests/harnais.R:313-320` et `:370` ; critère « sonde UTF-8 reportée » de #67, `docs/feuille-de-route.md`, § 1.5). Le principe de la sonde, son contrôle et sa limite admise ((d)) sont inchangés.
+
+**(b) Même annotation, (c)** : `octets_chaines()` n'est plus en `R/rapport.R:41`. Elle est définie en `R/rapport.R:106` à `63b4bc5` (en `:57` à `2146717`). Depuis #22, point 1 (`b1ed03b`), elle écrit les chaînes par blocs bornés par `bornes_blocs()` (`R/rapport.R:83`). Les octets écrits sont identiques à l'écriture précédente (mesure du commit) ; la règle de refus des chaînes indéterminées, que suit l'outillage des tests, est inchangée.
+
+**(c) Point 9.2, `resultat` et `code`** : le texte « à `NA` dans cette branche avec le statut « non calculée (branche `fiche-rapport`) » » décrit l'état de la première branche. Ce report a pris fin avec #67 (ADR 0011, point 11, et annotations du 20/10/2026, cinquième à huitième). Les deux champs sont calculés. Leur statut porte les libellés de M71, point 3 (`statut_empreintes()`, `R/rapport.R:359`). Un champ `representation_resultat` s'ajoute (`fiche$empreintes`, neuf champs ; `tests/reference/R1.tsv:191`).
+
+**Mesures** (`architect`, 20/10/2026, *vérifié*) :
+- `grep -n 'STATUT_EMPREINTE\|^octets_chaines\|^bornes_blocs\|^statut_empreintes' R/rapport.R` à `63b4bc5` rend les lignes 68, 106, 83 et 359 ;
+- `git show 2146717:R/rapport.R` rend `STATUT_EMPREINTES_NON_CALCULEES` en ligne 50 et `octets_chaines` en ligne 57 ;
+- `git log -S'STATUT_EMPREINTES_NON_CALCULEES <-' -- R/rapport.R` rend `5422404` (retrait).
+
+Les numéros de ligne cités ici datent de `63b4bc5` et vieilliront à leur tour : le nom de l'objet fait foi.
+
+**Effet sur les résultats : aucun.** Aucun code n'est modifié par cette annotation.
+
+Issues : #67 ; #22 (point 1). Décision M54 (sonde) ; M71, point 3 (libellés). Branche `claude/fiche-rapport`, PR #68.

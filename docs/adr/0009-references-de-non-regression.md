@@ -664,3 +664,21 @@ La référence ne vérifie que la **forme**.
 **Effet sur les résultats : aucun** par cette annotation. Elle fixe la forme de comparaison avant le code de #67.
 
 Issues : #67 ; #47. Décision M69. ADR 0011, point 11 et annotation du 20/10/2026 (cinquième). Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (troisième) — renvois périmés au code (constat m6 de la revue finale de `claude/fiche-rapport`)
+
+Rédigée par `architect` en fin de branche `claude/fiche-rapport` (PR #68, à `63b4bc5`), d'après le constat mineur m6 de la revue finale d'`audit` (effort `high`). Le texte ci-dessus, annotations comprises, n'est pas réécrit : la présente annotation dit seulement où se lisent aujourd'hui les objets que deux passages désignent.
+
+**(a) Troisième annotation du 17/10/2026, (e), « Corrections »** : `octets_chaines()` n'est plus en `R/rapport.R:41`. Elle est définie en `R/rapport.R:106` à `63b4bc5` (en `:57` à `2146717`). Depuis #22, point 1 (`b1ed03b`), elle écrit par blocs bornés par `bornes_blocs()` (`R/rapport.R:83`), aux mêmes octets. La règle que suit l'outillage est inchangée : refus des chaînes indéterminées, jamais de conversion. L'outillage l'applique par `utf8_ou_refus()` (`tests/reference/outils_reference.R:13`, `:162`).
+
+**(b) Annotation du 18/10/2026, complément (e), point 3.3** : `colonne_canonique()` (`R/rapport.R:109`) n'existe plus. Elle a été retirée par l'écriture canonique de B4 (`4610d17`, ADR 0011, point 7). L'écriture `sprintf("%.17g", x + 0)` se lit aujourd'hui dans la fonction locale `doubles_texte()` d'`ecrire_valeurs()`, forme « texte » (`R/rapport.R:240-246` à `63b4bc5`). L'outillage des références l'appelle par `tablexp:::ecrire_valeurs(v, "texte", n)` (`tests/reference/outils_reference.R:223`). Le constat est inchangé : −0 s'écrit 0. Mesure d'`architect` du 20/10/2026 (*vérifiée*) : `ecrire_valeurs(c(-0, 0), "texte", "t")$octets` vaut `30 0a 30 0a`, soit « 0 », « 0 ».
+
+**Mesures** (`architect`, 20/10/2026, *vérifié*) :
+- `grep -n '^octets_chaines\|^bornes_blocs\|sprintf("%.17g", x + 0)' R/rapport.R` à `63b4bc5` rend les lignes 106, 83, 242 et 244 ;
+- `git log -S'colonne_canonique <- function' -- R/` rend `4610d17` (dernier commit qui touche la définition) et `125f3a3` (création).
+
+Les numéros de ligne cités ici datent de `63b4bc5` : le nom de l'objet fait foi.
+
+**Effet sur les résultats : aucun.** Aucun code n'est modifié par cette annotation.
+
+Issues : #22 (point 1) ; #67. ADR 0007, annotation du 20/10/2026 (seconde). Branche `claude/fiche-rapport`, PR #68.
