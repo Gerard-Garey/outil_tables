@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{19/10/2026}
+\newcommand{\datedoc}{20/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1280,7 +1280,15 @@ produite hors de la CI.
     côtés, est comparée en premier~; si elle diffère, le plan est en échec
     «~entrée différente~», et la comparaison se poursuit et s'imprime sous
     cette mention, ses écarts n'étant pas interprétables comme un tableau
-    avant / après.
+    avant / après. L'impression nomme les causes possibles~: le simulateur a
+    changé pour cette graine (ADR 0009, point 4.2), ou la plateforme a
+    produit un tirage différent (ADR 0008, hypothèse sur la bibliothèque
+    mathématique du système)~; et, quand la représentation canonique
+    (\code{fiche/empreintes/representation}) diffère entre la référence et
+    l'objet, une troisième~: la définition de la représentation a changé,
+    l'entrée pouvant alors être inchangée, ce que seule prouve la garde
+    «~entrée différente~» des transitions («~Règles durables~», ci-dessous~;
+    ADR 0009, troisième annotation du 19/10/2026, point~(f)).
   \item \textbf{Structure, exacte}~: même ensemble de chemins, mêmes types et
     longueurs, mêmes positions des \code{NA}~; tout écart (chemin manquant,
     en trop, type, longueur) est structurel et fait échouer le plan.
@@ -1437,7 +1445,15 @@ d'\code{actuary}), pour le seul changement de type du nombre de cellules de
 l'étape \code{exposition}, passé de \code{double} à \code{integer} à valeur
 inchangée (issue~\#37)~: le corps de chaque fichier ne change que de cette
 ligne, et toutes les autres grandeurs sont restées identiques au bit près
-(ADR 0009, seconde annotation du 19/10/2026, point~(a)).
+(ADR 0009, seconde annotation du 19/10/2026, point~(a)). Elles l'ont été
+\textbf{une seconde fois}, le 19/10/2026, en mode \code{regeneration} sur
+tous les plans (exécution 39315172327 du workflow, calcul sur
+\code{d18c269}, commit \code{50837f6}, visa d'\code{actuary}, sur ordre du
+mainteneur), pour les seuls changements de la fiche annoncés en transition
+par les issues~\#35 (représentation canonique et, par son en-tête,
+empreinte des données, l'entrée étant prouvée inchangée par la garde
+«~entrée différente~») et~\#42 (version de la fiche, champs retirés)~:
+toutes les autres grandeurs sont restées identiques au bit près.
 
 \begin{encadre}
 \small
@@ -1481,22 +1497,115 @@ passer un écart est interdit sans tableau avant / après et visa. Un fichier de
 \code{tests/reference/} ne change que par un commit de la session principale
 qui cite une exécution du workflow et un visa. \textbf{Transition d'un
 changement de résultat annoncé} (ADR 0009, point 9.5, règle retenue par le
-mainteneur le 19/10/2026)~: quand un commit change un résultat avant la
-régénération des références, il déclare dans
-\code{tests/test\_reproductibilite.R} la liste \code{A\_REGENERER\_<n>}
-des plans concernés (\code{<n>}~: numéro de l'issue), avec le ou les chemins
-admis à changer et la nature exacte du changement (type converti sans perte,
-ou valeurs nouvelles nommées chemin par chemin). Pour chaque plan listé, un
-test ordinaire compare la référence à l'objet après n'avoir corrigé que le
-changement annoncé et exige l'absence de tout autre écart~; la comparaison
-stricte, et tout contrôle des références que le changement fait échouer,
-sont des échecs attendus renvoyant à l'issue. Le commit des références vide
-la liste~: un plan resté listé après la régénération ferait échouer la
-batterie par succès inattendu. Une tolérance élargie ou un chemin admis
-«~quel que soit l'écart~» n'est pas une transition mais un changement de
-résultat déguisé~; la règle ne dispense ni du tableau avant / après, ni du
-visa. Elle a servi une première fois pour l'issue~\#37
-(\code{A\_REGENERER\_37}, vidée par le commit des références).
+mainteneur le 19/10/2026~; mise en œuvre générique par l'issue~\#47, ADR
+0009, troisième et quatrième annotations du 19/10/2026, cette dernière
+actant l'extension de la garde «~entrée différente~», décision M64)~: quand
+un commit change un résultat avant la régénération des références, il
+déclare sa \emph{transition} dans la liste unique
+\code{TRANSITIONS\_EN\_COURS} de \code{tests/test\_reproductibilite.R},
+vide hors transition. Une transition porte trois champs, et eux seuls~:
+l'issue (de la forme \code{\#N}), les plans de référence concernés et les
+changements admis (au moins un). Une issue peut porter plusieurs
+transitions, à condition que leurs plans soient deux à deux disjoints~: un
+même retrait n'a pas toujours la même structure sur tous les plans (avant
+l'issue~\#42, \code{fiche/segmentation} était de longueur 0 dans R2 et de
+longueur 1 ailleurs), alors qu'une transition en déclare une seule. Chaque
+changement nomme un chemin et une \textbf{nature}, prise dans une liste
+fermée de cinq et déclarée exactement~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{type}~: conversion sans perte de \code{double} vers
+    \code{integer}, ou l'inverse~; la référence est du type de départ
+    déclaré~;
+  \item \textbf{valeur}~: valeurs numériques nouvelles d'une grandeur
+    \code{double} ou \code{integer}, avec ou sans positions. Avec positions,
+    la longueur est conservée et chaque position déclarée change~; sans
+    positions, le vecteur déclaré remplace le vecteur entier. C'est ainsi, et
+    seulement ainsi, que se déclare un changement de longueur~: une nature
+    «~longueur~» admettrait des valeurs quelconques. La longueur nouvelle est
+    au moins 1 (valeurs non vides exigées)~: le passage d'un vecteur à la
+    longueur 0 n'est pas déclarable, et il est exclu jusqu'à décision
+    contraire~;
+  \item \textbf{valeur de chaîne}~: de même pour une grandeur
+    \code{character} (version, empreinte)~;
+  \item \textbf{ajout}~: un chemin absent de la référence, présent dans
+    l'objet avec le type et la longueur déclarés~; ses valeurs, sans
+    «~avant~», entrent dans le tableau avant / après de la régénération, sous
+    visa~;
+  \item \textbf{retrait}~: un chemin présent dans la référence seule, avec
+    le type et la longueur déclarés.
+\end{itemize}
+
+\noindent
+Un test ordinaire refuse une liste mal formée (champs, forme de l'issue,
+plans, natures et leurs champs, valeurs, positions). Pour chaque plan
+listé, les changements de toutes les transitions qui le portent
+\textbf{s'unissent}~: deux déclarations identiques s'appliquent une fois~;
+deux valeurs différentes à une même position, un vecteur entier et une autre
+déclaration de valeurs sur le même chemin, deux conversions de type, un ajout
+ou un retrait combiné à une autre nature sur le même chemin sont des
+erreurs. Puis~:
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item un \textbf{test ordinaire «~seul écart~»} aligne la référence
+    commitée sur les changements déclarés, dans l'ordre type, valeur, valeur
+    de chaîne, ajout, retrait, et exige que la comparaison ne relève alors
+    aucun autre écart, aux tolérances près~; il exige aussi la réciproque~:
+    \textbf{tout changement déclaré est observé} sur la référence commitée
+    telle qu'elle est lue (type égal au type de départ, valeurs différentes,
+    chemin ajouté absent, chemin retiré présent), l'observation des valeurs
+    se jugeant après la seule conversion de type, qui ne change aucune
+    valeur~;
+  \item la \textbf{comparaison stricte} est un échec attendu, un seul par
+    plan, rattaché à l'issue de la première transition de la liste qui porte
+    le plan~: une comparaison est un seul test, la régénération porte sur un
+    plan entier et jamais sur une issue seule, et le harnais attend une issue
+    par échec attendu. Le test des doubles sans tolérance déclarée n'est un
+    échec attendu que si la référence commitée en porte~; un test ordinaire
+    exige alors que ces doubles soient tous admis par une transition (type
+    converti depuis \code{double}, ou retrait déclaré de type
+    \code{double})~;
+  \item \textbf{garde «~entrée différente~»} (point 3.2 de l'ADR 0009,
+    étendu)~: un changement de l'empreinte des données
+    (\code{fiche/empreintes/donnees}) n'est admis qu'en valeur de chaîne sans
+    positions, avec un changement de \code{fiche/empreintes/representation}
+    dans l'union du plan, car seule une définition nouvelle de la
+    représentation canonique change l'empreinte d'une entrée inchangée
+    (section~\ref{sec:empreinte})~; et un test ordinaire de garde doit
+    prouver que l'entrée est inchangée. Il calcule par le package le texte
+    canonique de l'entrée de référence, vérifie que l'en-tête de sa première
+    ligne (texte avant la première tabulation) est la représentation de
+    l'objet, le remplace par la représentation de la référence, et exige que
+    le MD5 obtenu soit égal à l'empreinte des données de la référence~; il
+    exige aussi que les deux représentations diffèrent. Sans cette garde,
+    la transition absorberait le contrôle de l'entrée~: l'entrée de
+    référence aux lignes permutées, réellement différente, ne s'écarte des
+    références de R1 et de R6 que par l'empreinte des données et celles des
+    deux tables résumées, les autres écarts restant sous tolérance (constat
+    sur une permutation par plan, section~\ref{sec:empreinte}), si bien que déclarer
+    ces trois chaînes suffit à faire passer le test «~seul écart~»~; un
+    témoin de la batterie rejoue ce constat sur R6 et exige l'échec de la
+    garde. Si la preuve échoue, aucune transition n'est possible~: c'est
+    un changement de l'entrée de référence (ADR 0009, point 4.2), qui
+    régénère tous les plans, sous visa.
+\end{enumerate}
+
+\noindent
+Le commit des références de la session principale retire la transition~:
+un plan resté listé après la régénération fait échouer la batterie, le test
+«~seul écart~» relevant un changement déclaré non observé et la comparaison
+stricte devenant un succès inattendu. Une tolérance élargie ou un chemin
+admis «~quel que soit l'écart~» n'est pas une transition mais un changement
+de résultat déguisé~; la règle ne dispense ni du tableau avant / après, ni
+du visa. Elle a servi une première fois pour l'issue~\#37, sous une forme
+propre à cette issue (\code{A\_REGENERER\_37}, vidée par le commit des
+références, puis remplacée par la liste unique), puis pour les issues~\#35
+et~\#42, dont les transitions ont été closes par la seconde régénération
+(«~Références existantes~», ci-dessus)~: la liste est vide depuis. Chaque
+nature, l'union et ses conflits, l'observation, la forme de la liste, le
+rattachement de l'échec attendu, les doubles restants et la garde sont
+exercés par des témoins de la batterie, sur des objets en mémoire et jamais
+sur \code{tests/reference/}.
 
 % =============================================================================
 \section{Contrôles du dépôt}
