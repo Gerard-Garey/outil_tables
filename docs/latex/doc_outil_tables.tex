@@ -5049,10 +5049,16 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     valeur sans écriture dans le texte (par exemple un \code{POSIXct})
     arrêtent le calcul par une \textbf{erreur de programmation}, qui nomme le
     chemin~: le refus de l'écrivain est converti, rien n'est ignoré en
-    silence. Une entrée valide n'y conduit pas, la table des observations
-    étant normalisée par l'étape \code{donnees}
-    (section~\ref{sec:unite-observation}, «~Copie des colonnes dans la table
-    des observations~»).
+    silence. Aucune entrée valide connue n'y conduit~: c'est un
+    \emph{constat} sur les témoins de la batterie unitaire (attributs de
+    colonne, facteurs munis de \code{contrasts} ou de sous-classe, colonnes
+    d'identifiant nommées, dans les deux unités), non une propriété
+    démontrée. Il repose sur la normalisation de la table des observations
+    par l'étape \code{donnees} (section~\ref{sec:unite-observation},
+    «~Copie des colonnes dans la table des observations~»)~; une colonne
+    recopiée sans normalisation le contredirait, comme l'a montré la
+    régression des noms de lignes corrigée par l'issue~\#67, survenue alors
+    que cette normalisation existait déjà.
   \item \textbf{Facteurs} (décision M71, point~2)~: un facteur est admis en
     forme «~empreinte~», écrit par ses libellés sous le type \code{factor},
     comme dans l'empreinte des données~; il reste refusé en forme «~texte~»
@@ -5062,9 +5068,9 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     \code{class}~; tout autre facteur, sous-classe comprise (par exemple
     \code{c("factor", "x")}), est refusé
     (\code{serialisation\_impossible}, converti en erreur de programmation).
-    Aucune construction valide n'est ainsi refusée~: les facteurs de la table
-    des observations sont reconstruits par \code{categorie}, qui ne produit
-    que ces deux classes (section~\ref{sec:unite-observation}).
+    Aucune construction valide n'est ainsi refusée, par construction~: les
+    facteurs de la table des observations sont reconstruits par
+    \code{categorie}, qui ne produit que ces deux classes (section~\ref{sec:unite-observation}).
     Les niveaux ne sont pas écrits, et le libellé de type est \code{factor}
     pour un facteur ordonné ou non (tableau~\ref{tab:types-canoniques})~:
     deux facteurs aux mêmes libellés et aux niveaux différents, ou un
