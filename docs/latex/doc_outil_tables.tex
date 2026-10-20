@@ -996,6 +996,26 @@ section~\ref{sec:empreinte}).
 
 \medskip
 \noindent
+\textbf{Contrôle sous la locale C} (issue~\#66). Les batteries installant
+toujours \code{tablexp} sous une locale UTF-8, une régression propre à un
+package installé et exécuté sous la locale C leur échapperait~; des défauts
+de cette nature ont déjà été trouvés par lancement manuel (refus
+d'\code{ecrire\_fiche()}, ci-dessus). Le contrôle
+\code{tests/controles/locale\_c.R} (tableau~\ref{tab:scripts-controle})
+installe donc l'arbre de travail sous \code{LC\_ALL=C} et sous la première
+locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
+l'installation, les plans de référence R1 à R6 sur l'entrée de référence,
+écrit, relit et réécrit leur fiche et leur plan, puis compare octet à octet
+les douze textes obtenus sous les deux locales~; le moindre écart le fait
+sortir avec un code non nul. Il est une étape bloquante du job «~Tests
+(R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~: l'identité des
+textes est un \emph{constat} sur la machine qui exécute le contrôle (la
+plateforme de référence en CI) et sur ces six plans, non une propriété
+démontrée~; il ne couvre ni une locale latin-1, ni Windows (issue~\#49), ni
+des données de l'utilisateur à chaînes non ASCII.
+
+\medskip
+\noindent
 Une \textbf{garde de sortie} (\code{.Last()}) fait sortir avec le code~1 tout
 processus qui a chargé le harnais et se termine avant la ligne de bilan, même
 par \code{quit(status = 0)}. Le harnais est lui-même testé
@@ -1678,7 +1698,11 @@ Tout contrôle mécanique est un script, jamais une relecture (\code{CLAUDE.md},
 est testé sur des témoins dans \code{tests/unitaires/test\_controles.R}~: il
 doit échouer sur un cas fautif et passer sur le dépôt. Fait exception
 \code{ecriture\_doubles.R}, recoupement hors CI dont la batterie unitaire
-garde un échantillon (section~\ref{sec:verifications-rapport}).
+garde un échantillon (section~\ref{sec:verifications-rapport})~; pour
+\code{locale\_c.R}, dont l'exécution complète (deux installations, six plans)
+est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
+marché~: une racine sans package sort en échec et nomme l'installation
+sous \code{LC\_ALL=C}.
 
 \begin{center}
 \small
@@ -1717,6 +1741,15 @@ seule chaîne d'image dans tous les workflows~; invariants du workflow
 ADR 0008, points 3 à 5 \\
 \code{absence\_java.R} & aucune dépendance à Java
 (section~\ref{sec:absence-java}) & ADR 0002, A1~; ADR 0008, point 7~; issue~\#3 \\
+\code{locale\_c.R} & \code{tablexp} installé dans deux bibliothèques
+temporaires, l'une sous \code{LC\_ALL=C}, l'autre sous la première locale
+UTF-8 disponible, et exécuté dans un sous-processus sous la locale de son
+installation, qui vérifie d'abord la locale effective~; pour R1 à R6,
+fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
+puis les douze textes comparés octet à octet entre C et UTF-8, sans écart
+admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
+(installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
+batteries & ADR 0007, point 11~; M54~; issue~\#66 \\
 \code{ecriture\_doubles.R} & écriture des doubles de l'empreinte en octets
 IEEE~754 identique, ligne à ligne, à celle d'un juge indépendant (Python,
 \code{struct.pack}) sur $10^6$ doubles tirés sous graine et des cas limites~;
