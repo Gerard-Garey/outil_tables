@@ -124,6 +124,13 @@ jobs:
       - name: Identité des batteries et de l'image
         if: ${{ !cancelled() }}
         run: Rscript tests/controles/identite_batteries.R
+      # Issue #66 : les batteries installent tablexp en UTF-8 ; ce contrôle
+      # l'installe et l'exécute aussi sous la locale C (R1 à R6, fiche et plan,
+      # identiques octet à octet à ceux écrits en UTF-8). Hors liste des
+      # batteries de CLAUDE.md : contrôle à part, comme les trois précédents.
+      - name: Locale C (installation et exécution)
+        if: ${{ !cancelled() }}
+        run: Rscript tests/controles/locale_c.R
 
   # ADR 0008, point 7 ; issue #3. Métadonnées de l'instantané daté du CRAN
   # (date dans tests/controles/absence_java.R), lues sans rien installer ;
