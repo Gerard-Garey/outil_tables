@@ -35,8 +35,8 @@
 #  variance et bornes NA à q = 0 et q = 1 (A.7) ; pas de survie cumulée par
 #  segment (A.14 question 2).
 #  Ce module n'appelle que `donnees` (liste_guillemets(),
-#  controler_parametres_donnees(), controler_segmentation()), `exposition` (fenetres_observations(),
-#  segments_observations(), extraire_composantes(), position_dans_cellule(),
+#  controler_parametres_donnees(), controler_segmentation()), `exposition`
+#  (fenetres_observations(), segments_observations(), extraire_composantes(), position_dans_cellule(),
 #  somme_par_cellule()) et `outils` (ADR 0007, point 2.1).
 # -----------------------------------------------------------------------------
 
