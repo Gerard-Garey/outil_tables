@@ -189,7 +189,9 @@ message_aucune_recette <- function(requis, manquants)
           RECETTE_BRANCHE, liste_guillemets(requis), liste_guillemets(manquants))
 
 # Contrôle `roles` (vecteur de chaînes nommé rôle -> colonne, ADR 0007,
-# point 4.1) contre le catalogue et `donnees`. Ordre des contrôles :
+# point 4.1) contre le catalogue et `donnees`. Forme exacte (#62,
+# forme_exacte()) : type character, seul attribut names (ni classe, ni dim,
+# ni attribut quelconque), sans nom ni valeur manquants. Ordre des contrôles :
 # forme, rôle inconnu, rôle déclaré deux fois, rôle non pris en charge,
 # colonne absente, colonne ambiguë (nom présent plusieurs fois dans
 # `donnees`), colonne déclarée deux fois, type incompatible, date hors du
@@ -200,12 +202,13 @@ controler_roles <- function(donnees, roles, segmentation) {
     refuser("donnees", "donnees_mal_formees",
             "Les données doivent être un data.frame (le moteur ne lit pas de fichier).",
             list(classe = class(donnees)))
-  if (!is.character(roles) || is.null(names(roles)) || anyNA(roles) ||
-      anyNA(names(roles)) || any(!nzchar(names(roles))) || !is.null(dim(roles)))
+  if (!forme_exacte(roles, "character", "names") || is.null(names(roles)) ||
+      anyNA(roles) || anyNA(names(roles)) || any(!nzchar(names(roles))))
     refuser("donnees", "roles_mal_formes",
             paste("Les rôles doivent être un vecteur de chaînes nommé (nom du rôle -> nom",
-                  "de colonne), sans valeur ni nom manquant (ADR 0007, point 4.1)."),
-            list(classe = class(roles)))
+                  "de colonne), sans autre attribut que ses noms, sans valeur",
+                  "ni nom manquant (ADR 0007, point 4.1)."),
+            list(classe = class(roles), attributs = names(attributes(roles))))
   r <- names(roles)
   inconnus <- setdiff(r, CATALOGUE_ROLES$role)
   if (length(inconnus))

@@ -318,6 +318,16 @@ verifier("construire_table : rôle requis absent (date_sortie) -> refus aucune_r
 })
 verifier("construire_table : rôle employé par la segmentation absent -> refus role_requis_manquant",
          leve_refus(construire_table(BASE, ROLES[names(ROLES) != "sexe"], plan_type()), "role_requis_manquant"))
+# Forme exacte des rôles (#62) par le point d'entrée : un attribut, une
+# classe ou un dim est refusé sous roles_mal_formes avant toute exécution
+# (construire_table() appelle controler_roles() avant preparer_donnees()).
+ROLES_FORME <- list(
+  attribut = structure(ROLES, foo = 1), classe = noquote(ROLES),
+  dim = array(unname(ROLES), dim = length(ROLES), dimnames = list(names(ROLES))))
+for (k in names(ROLES_FORME))
+  verifier(sprintf("construire_table : rôles avec %s -> refus roles_mal_formes", k),
+           leve_refus(construire_table(BASE, ROLES_FORME[[k]], plan_type()),
+                      "roles_mal_formes"))
 verifier("construire_table : provenance mal formée -> refus provenance_invalide",
          leve_refus(construire_table(BASE, ROLES, plan_type(), provenance = list(fichier = "a.csv")),
                     "provenance_invalide"))
