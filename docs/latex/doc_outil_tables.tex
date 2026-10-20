@@ -1254,7 +1254,10 @@ terminées par LF, écrit octet par octet~:
     écrites par l'écrivain de la représentation canonique,
     \code{ecrire\_valeurs()}, en forme «~texte~»
     (section~\ref{sec:empreinte})~: doubles en \code{\%.17g} (et non en
-    octets, forme réservée à l'empreinte des données), chaînes
+    octets, forme réservée à l'empreinte des données), dates sur quatre
+    chiffres d'année, jeton \code{NaN} distinct de \code{NA}, relues par
+    l'outillage, sans installer \code{tablexp}, à la condition que la
+    réécriture de la valeur lue redonne le texte (issue~\#19), chaînes
     échappées entre guillemets, sous la même règle de codage, par
     \textbf{refus} et jamais par conversion~;
   \item des \textbf{refus d'écriture}, avec le chemin fautif, pour toute
@@ -2159,6 +2162,16 @@ Les types sont contrôlés sans conversion (E4.4)~: une colonne de dates doit
 être de classe \code{Date}, exactement, à valeurs entières et finies~; une
 colonne \code{POSIXct}, une chaîne ou un nombre sont refusés
 (\code{type\_incompatible}), la conversion revenant à la couche de lecture.
+Au contrôle de type, une valeur manquante, stockée \code{NA} ou \code{NaN},
+est admise (les motifs de lignes en décident ensuite), et les deux restent
+distinctes dans l'empreinte (section~\ref{sec:empreinte}). Une
+date de type conforme doit en outre appartenir au \textbf{domaine}
+[0001-01-01, 9999-12-31]~: hors de lui, aucune écriture ISO~8601 à quatre
+chiffres d'année n'existe, et la date est refusée
+(\code{date\_hors\_domaine}, lignes citées) avant tout calcul, empreinte
+comprise (\code{dates\_hors\_domaine()}~; ADR 0011, point~4~; décision
+M64, Q7~; issue~\#19). Les années 1 à 999 sont admises~; une naissance
+aussi ancienne est relevée par le motif \code{age\_aberrant}.
 Les modalités des rôles catégoriels sont comparées après conversion en
 chaîne, en respectant la casse~: \code{H} et \code{F} pour \code{sexe}~;
 \code{deces}, \code{rachat}, \code{terme}, \code{autre} et \code{en\_cours}
@@ -2224,7 +2237,9 @@ sans valeur ni nom manquant)~; \code{role\_inconnu}~;
 \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
 \code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
-\code{type\_incompatible}~; \code{aucune\_recette} (un rôle requis manque~; le
+\code{type\_incompatible}~; \code{date\_hors\_domaine} (une colonne de
+date porte une date hors de [0001-01-01, 9999-12-31])~;
+\code{aucune\_recette} (un rôle requis manque~; le
 message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
 (un rôle employé par la segmentation n'est pas déclaré).
 
@@ -2239,7 +2254,9 @@ vivant $\to$ décédé et en cours $\to$ racheté le sont, constante
 \code{TRANSITIONS})~; \code{periode\_invalide} (liste qui n'est pas nue, de
 champs autres qu'exactement \code{debut} et \code{fin}, ou d'un élément de
 plus~; bornes manquantes, non \code{Date}, non entières ou munies d'un autre
-attribut que la classe \code{Date})~; \code{delai\_invalide} (délai qui
+attribut que la classe \code{Date})~; \code{date\_hors\_domaine} (borne
+de la période hors de [0001-01-01, 9999-12-31], même domaine que les
+données)~; \code{delai\_invalide} (délai qui
 n'est pas un nombre unique, \code{integer} ou \code{double}, sans attribut,
 entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
 (autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
@@ -2403,10 +2420,15 @@ $+\infty$, \code{censure} sinon~; le décès n'est compté qu'une fois.
 Le calcul de la fusion est vectorisé par un maximum cumulé décalé par tête,
 exact en \code{double} tant que (nombre de têtes) $\times$ (étendue des dates,
 en jours, $+ 1$) reste inférieur à $2^{52}$. Au-delà, le moteur refuse
-(\code{dates\_hors\_plage}) au lieu de fusionner inexactement~; pour $10^6$
-têtes, il faudrait une étendue d'environ $4{,}5\cdot 10^{9}$ jours, ce que
-seules des dates aberrantes atteignent. C'est une limite d'implémentation, non
-un motif de ligne~: elle n'est pas excluable.
+(\code{dates\_hors\_plage}, dont le message cite l'étendue et le nombre de
+têtes) au lieu de fusionner inexactement. Depuis le refus des dates hors du
+domaine (issue~\#19), l'étendue est au plus de 3\,652\,060~jours~: par
+\code{construire\_table()}, le refus n'est atteint qu'au-delà d'environ
+$1{,}23\cdot 10^{9}$ têtes ($2^{52}/3\,652\,060$), sous le plus grand
+entier de R~; la garde est conservée (avis d'\code{actuary}), une étendue
+plus grande restant possible par un appel direct de la fonction de fusion.
+C'est une limite d'implémentation, non un motif de ligne~: elle n'est pas
+excluable.
 
 \subsubsection*{Observation après le décès~: lecture~B de E2.4}
 
@@ -2510,7 +2532,11 @@ de fusion F1 à F7 de la spécification (chevauchement, contiguïté, écart d'u
 jour, décès sur deux contrats, observation après décès, deux décès,
 naissances discordantes) ont des attendus calculés à la main~; la fusion est
 vérifiée en outre contre un second algorithme, une boucle naïve écrite dans
-le test.
+le test. Le domaine des dates est vérifié à ses bornes~: 0001-01-01 et
+9999-12-31 admis, la veille et le lendemain (années 0 et 10\,000) refusés
+(\code{date\_hors\_domaine}), pour les colonnes de date comme pour les
+bornes de la période~; la garde \code{dates\_hors\_plage} l'est à l'étendue
+maximale du domaine, de part et d'autre du nombre de têtes limite.
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-donnees}
@@ -2551,8 +2577,8 @@ le test.
 \catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles~; rend les rôles inchangés \\
-\catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres~; transition retenue, début, fin, borne $B$ \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{date\_hors\_domaine}~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres, dont \code{date\_hors\_domaine} pour les bornes de la période~; transition retenue, début, fin, borne $B$ \\
 \catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
 \catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
@@ -4425,7 +4451,17 @@ annotation du 17/10/2026, point~f)~:
     point~2.2, et seconde annotation du 19/10/2026)~; un double muni d'un
     attribut de dimension s'écrit comme le vecteur nu~;
     \code{integer} en \code{\%d}~; \code{logical} en
-    \code{TRUE}, \code{FALSE}, \code{NA}~; \code{Date} en \code{\%Y-\%m-\%d}~;
+    \code{TRUE}, \code{FALSE}, \code{NA}~; \code{Date} en ISO~8601,
+    l'année toujours sur quatre chiffres
+    (\code{sprintf("\%04d-\%02d-\%02d", ...)} sur les composantes de la
+    date, \code{composantes\_date()}~; \code{format.Date} écrivait
+    \code{999-01-01} sans zéro initial), et une date manquante par un jeton
+    lu sur la valeur reçue, \code{NA} ou \code{NaN}, sans les confondre,
+    comme pour un double (ADR 0011, point~4, et seconde annotation du
+    19/10/2026, point~(d)~; issue~\#19)~; l'écrivain refuse, en garde-fou des
+    contrôles de l'étape \code{donnees}, une date hors du domaine
+    (\code{date\_hors\_domaine}) et une date non entière
+    (\code{date\_non\_entiere}~: 100 et 100,5 jours s'écriraient de même)~;
     chaînes et facteurs (convertis en chaînes, les niveaux n'entrent pas)~:
     octets UTF-8 entre guillemets droits, avec cinq échappements
     (\verb|\\|, \verb|\n|, \verb|\r|, \verb|\t|, \verb|\"|), \code{NA} sans
@@ -4502,7 +4538,9 @@ tests.}
 \textcolor{financeblue}{\textbf{Test}} \\
 1 & \code{factor} & facteur, ordonné ou non \\
 2 & \code{Date} & classe exactement \code{Date} (une classe \code{Date}
-augmentée échoue et tombe au test~3) \\
+augmentée échoue et tombe au test~3)~; valeur hors de [0001-01-01,
+9999-12-31] ou non entière refusée (\code{date\_hors\_domaine},
+\code{date\_non\_entiere}) \\
 3 & refus & toute autre classe (\code{POSIXct}, \code{difftime}, \code{AsIs}\ldots) \\
 4 & \code{character} & chaîne \\
 5 & \code{integer} & entier \\
@@ -4556,7 +4594,13 @@ Python, hors de R. Le contrôle \code{tests/controles/ecriture\_doubles.R},
 recoupement à $10^6$ doubles et aux cas limites, ligne à ligne, et sort avec
 un code non nul sur un écart ou si Python est absent~; il ne s'exécute pas
 sous Windows, où le texte \code{\%.17g} qu'il transmet au juge n'est pas
-toujours correctement arrondi. \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
+toujours correctement arrondi. Les dates sont vérifiées sur quatre chiffres
+d'année (0001, 0019, 0999, 9999), sur tous les jours de 1930 à 2024
+(identiques à l'écriture de \code{format.Date}, si bien que les références,
+dont les dates sont dans cet intervalle, n'ont pas changé), avec les jetons
+\code{NA} et \code{NaN} distincts (deux empreintes calculées hors de R) et
+les refus \code{date\_hors\_domaine} et \code{date\_non\_entiere}~;
+\code{construire\_table()} traite une date \code{NaN} comme un manquant. \code{tests/test\_reproductibilite.R} vérifie que l'empreinte est
 la même dans des processus R lancés sous \code{LANG=C} et sous
 \code{LANG=C.UTF-8}, égale à cette valeur, et que le rejeu de la fiche redonne
 l'objet. \code{tests/unitaires/test\_construire\_table.R} vérifie aussi
@@ -4589,7 +4633,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{STATUT\_EMPREINTES\_NON\_CALCULEES} & constante & --- & statut des empreintes du résultat et du code \\
 \catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle & octets canoniques des chaînes~; refus de codage \\
 \catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
-\catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g})~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique} \\
+\catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g})~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique}, et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
 \catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire \\
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
