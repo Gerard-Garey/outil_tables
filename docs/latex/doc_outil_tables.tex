@@ -2096,6 +2096,7 @@ processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\
 \catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine \\
 \catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; par \code{forme\_exacte()} (issue~\#23) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
+\catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat}) \\
 \end{longtable}
 }
@@ -4420,7 +4421,13 @@ aucune étape ne tire d'aléa, si bien que \code{valider\_plan()} refuse toute
 graine (\code{graine\_inattendue}) avant la canonisation~; le contrat de
 validation de la graine sera fixé avec la première étape aléatoire
 (issue~\#61)~; paramètres de chaque étape dans l'ordre de
-\code{PARAMETRES\_ETAPES}~; toute autre valeur inchangée. Les conversions
+\code{PARAMETRES\_ETAPES}~; valeurs des trois champs qui forment un
+ensemble dans l'ordre de leur catalogue (ci-dessous, issue~\#63)~:
+\code{segmentation} dans l'ordre de \code{ROLES\_SEGMENTATION},
+\code{etapes\$donnees\$exclusions} dans l'ordre du catalogue des motifs
+\code{c(MOTIFS\_LIGNES, MOTIFS\_TETE)} (tableau~\ref{tab:motifs}),
+\code{etapes\$brut\$estimateurs} dans l'ordre de \code{ESTIMATEURS\_BRUT}~;
+toute autre valeur inchangée. Les conversions
 sont sans perte (tout entier de R est un double exact) et la canonisation
 est idempotente. Un stockage que la liste fermée de ces conversions ne
 prévoit pas, une étape absente du catalogue, ou un nom d'étape ou de
@@ -4444,6 +4451,59 @@ L'\textbf{asymétrie est voulue}~: les données sont empreintées telles
 qu'elles sont reçues, parce que l'empreinte identifie l'entrée, tandis que
 le plan est canonisé selon son sens, parce que la fiche identifie la
 déclaration.
+
+\medskip
+\noindent
+\textbf{Ordre des valeurs des champs ensembles} (issue~\#63~; ADR 0011,
+quatrième annotation du 20/10/2026, qui révise le point~5.1~(h)~; décision
+M69, point~2). \code{segmentation}, \code{exclusions} et \code{estimateurs}
+sont des ensembles~: \code{valider\_plan()} y refuse les doublons, si bien
+que deux plans qui ne diffèrent que par l'ordre de ces valeurs ont le même
+sens et doivent, selon la règle ci-dessus, donner la même fiche. Tant que
+cet ordre était conservé tel qu'il était déclaré, la fiche se contredisait
+pour \code{estimateurs}~: \code{fiche\$plan} gardait l'ordre déclaré, alors
+que \code{fiche\$hypotheses\_brut\$estimateurs} et les résultats de l'étape
+\code{brut} sont toujours dans l'ordre de \code{ESTIMATEURS\_BRUT}
+(section~\ref{sec:brut})~; pour \code{exclusions} et \code{segmentation},
+seul l'ordre de présentation changeait (lignes et colonnes des étapes,
+ordre des avertissements \code{exclusion}), aucune valeur. Les vecteurs
+d'ordre sont passés en argument à \code{canoniser\_plan()}
+(\code{ordres}, liste nommée par le chemin du champ dans le plan~:
+\code{segmentation}, \code{etapes/donnees/exclusions},
+\code{etapes/brut/estimateurs}), comme \code{CHAMPS\_PLAN} et
+\code{PARAMETRES\_ETAPES}~: \code{canoniser\_plan()} ne lit ainsi aucune
+constante d'un autre module, le seul endroit qui sait quel champ suit quel
+catalogue est l'appel, et la fonction se teste avec des catalogues
+fabriqués~; ce choix de localité n'est pas imposé par le graphe des
+modules, qui autoriserait la lecture directe. La liste est construite au
+moment de l'appel par \code{ordres\_canoniques()}
+(\code{R/construire\_table.R}), et non par une constante de premier niveau~:
+sans champ \code{Collate} dans \code{DESCRIPTION}, les fichiers de
+\code{R/} sont évalués par ordre alphabétique à l'installation, et
+\code{construire\_table.R} l'est avant \code{donnees.R} et \code{brut.R},
+dont les constantes ne sont pas encore définies. Aucune valeur n'est
+retirée en silence~: avant de réordonner, une valeur absente du vecteur
+d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que
+\code{character} arrêtent le calcul par une erreur de programmation
+(garde défensive, \code{valider\_plan()} refusant ces cas en amont)~; une
+étape absente du plan (plan sans \code{brut}) n'a rien à canoniser. Un
+emboîtement de segments, s'il devient nécessaire avec plusieurs variables
+de segmentation, sera porté par un paramètre déclaré à part, jamais par
+l'ordre de \code{segmentation}. \textbf{Effet}~: les plans R1 à R6, déjà
+dans l'ordre canonique, sont inchangés~; pour un plan non canonique sur
+l'un de ces champs, \code{fiche\$plan} et l'ordre de présentation des
+étapes et des avertissements changent, aucune valeur numérique. La forme
+canonique des valeurs du plan fait partie de ce que numérote
+\code{version\_fiche}~: une fiche de version~3 garantit cet ordre, une
+fiche de version~2 ne le garantit pas~; l'issue~\#63 tombe sous l'incrément de~2 à~3
+porté par l'issue~\#57 (ADR 0011, point~10). Les tests de
+\code{tests/unitaires/test\_construire\_table.R} vérifient, pour chacun des
+trois champs et pour les trois ensemble, que l'objet d'un plan permuté est
+\code{identical()} hors \code{execution} à celui du plan canonique, fiche
+comprise, que la canonisation est idempotente et que son résultat reste
+valide, que le rejeu de la fiche d'un plan permuté redonne l'objet, et que
+la valeur inconnue, le doublon et l'attribut donnent l'erreur de
+programmation.
 
 \medskip
 \noindent
@@ -5066,7 +5126,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche \\
-\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}~; idempotente~; erreur de programmation sur un stockage non prévu ou un nom d'étape ou de paramètre en double~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
+\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
 \catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme})~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
 \catalogue{fonctions-rapport}{PREMIERE\_LIGNE\_PLAN} & constante & --- & \code{"tablexp plan 1"}, première ligne du texte du plan (nature et version de la grammaire) \\
