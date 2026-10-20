@@ -244,6 +244,18 @@ verifier("ordre des modules : passe sur un graphe conforme (simulation -> donnee
          passe(controle("graphe_modules.R", shQuote(d))))
 unlink(d, recursive = TRUE)
 
+# --- tablexp sous la locale C (issue #66) -------------------------------------
+# Le contrôle complet (deux installations, R1 à R6 sous C et sous UTF-8) dure
+# une trentaine de secondes : il est une étape de la CI, non rejouée ici. Seul
+# le chemin d'échec bon marché l'est : une racine sans package sort en code 1
+# et nomme l'installation en échec.
+
+racine_sans_package <- tempfile("racine_sans_package_")
+dir.create(racine_sans_package)
+verifier("locale C : racine sans package -> échec, installation sous LC_ALL=C nommée",
+         echoue(controle("locale_c.R", shQuote(racine_sans_package)), "installation sous LC_ALL=C en échec"))
+unlink(racine_sans_package, recursive = TRUE)
+
 # --- identité des batteries et de l'image (CLAUDE.md, BATTERIES, ci.yml) -----
 
 verifier("identité des batteries : passe sur le dépôt", passe(controle("identite_batteries.R")))
