@@ -621,6 +621,28 @@ verifier("empreinte du résultat : lignes_conservees hors du périmètre (colonn
   y$etapes$donnees$resultat$lignes_conservees <- lc
   identical(empreinte_resultat(y), x$fiche$empreintes$resultat)
 })
+# retirer() de empreinte_resultat() ignore un chemin absent : un champ renommé
+# rentrerait en silence dans le périmètre (son contenu, la version de R par
+# exemple, ferait varier l'empreinte). Chaque chemin de CHEMINS_HORS_RESULTAT
+# existe donc dans une construction sans brut et dans une avec brut (poisson,
+# binomial ; kaplan_meier) ; execution, ajouté après le calcul de l'empreinte,
+# est le seul absent de l'objet que reçoit empreinte_resultat().
+verifier("empreinte du résultat : chaque chemin de CHEMINS_HORS_RESULTAT, sauf execution, existe dans une construction sans brut, avec brut, avec kaplan_meier", {
+  existe <- function(v, segments) {
+    for (sg in segments) { if (!is.list(v) || !sg %in% names(v)) return(FALSE); v <- v[[sg]] }
+    TRUE
+  }
+  chemins <- setdiff(tablexp:::CHEMINS_HORS_RESULTAT, "execution")
+  etapes_brut <- function(est) {
+    e <- plan_type()$etapes; e$brut <- list(estimateurs = est, niveau = 0.95); modifier(plan_type(), etapes = e)
+  }
+  plans <- list(plan_type(), etapes_brut(c("poisson", "binomial")), etapes_brut("kaplan_meier"))
+  length(chemins) == length(tablexp:::CHEMINS_HORS_RESULTAT) - 1L && "execution" %in% tablexp:::CHEMINS_HORS_RESULTAT &&
+    all(vapply(plans, function(pl) {
+      z <- construire_table(BASE, ROLES, pl)
+      all(vapply(strsplit(chemins, "/", fixed = TRUE), function(sg) existe(z, sg), logical(1L))) && "execution" %in% names(z)
+    }, logical(1L)))
+})
 verifier("empreinte du résultat : attribut inattendu (dont simulation hors de lignes_conservees), classe autre que construction ou valeur sans écriture -> erreur de programmation", {
   msg <- function(expr) tryCatch({ force(expr); "" }, refus_tablexp = function(e) "refus", error = function(e) conditionMessage(e))
   prog <- function(m) grepl("erreur de programmation", m, fixed = TRUE)
@@ -665,6 +687,28 @@ verifier("empreinte du résultat, unité contrat avec id_tete déclaré : attrib
   identical(x0$fiche$unite_observation, "contrat") && "id_tete" %in% names(x0$etapes$donnees$resultat$observations) &&
     identical(e, x0$fiche$empreintes$resultat)
 })
+# Colonne d'identifiant portant l'attribut names (data.frame construit par
+# list2DF) : data.frame() en tirait les noms de lignes d'observations, que
+# l'empreinte du résultat refuse (régression de #67, revue finale). La
+# construction aboutit, observations porte des noms de lignes automatiques,
+# l'entrée est intacte et l'empreinte égale celle de l'entrée sans noms.
+# Les deux premiers cas échouaient avant la correction ; le troisième
+# (id_tete recopiée par `$<-` en unité contrat) aboutissait déjà et protège
+# ce chemin.
+for (cas_ in list(list("tete", "tete", plan_type(), ROLES),
+                  list("contrat", "contrat", PLAN_RACHAT, ROLES),
+                  list("contrat", "tete", PLAN_RACHAT, ROLES))) {
+  verifier(sprintf("empreinte du résultat, unité %s, colonne %s portant names (list2DF) -> construction acceptée, noms de lignes d'observations automatiques, entrée intacte, empreinte égale à celle sans names",
+                   cas_[[1L]], cas_[[2L]]), {
+    l <- as.list(BASE); l[[cas_[[2L]]]] <- setNames(l[[cas_[[2L]]]], paste0("n", seq_len(nrow(BASE))))
+    b <- list2DF(l); b0 <- b
+    x0 <- construire_table(BASE, cas_[[4L]], cas_[[3L]])
+    x <- tryCatch(construire_table(b, cas_[[4L]], cas_[[3L]]), error = function(err) conditionMessage(err))
+    !is.null(names(b[[cas_[[2L]]]])) && is.list(x) && identical(x$fiche$unite_observation, cas_[[1L]]) &&
+      identical(attr(x$etapes$donnees$resultat$observations, "row.names"), seq_len(nrow(x$etapes$donnees$resultat$observations))) &&
+      identical(b, b0) && identical(x$fiche$empreintes$resultat, x0$fiche$empreintes$resultat)
+  })
+}
 # Facteurs de rôle catégorie (sexe ; segment segmenté) recopiés normalisés
 # dans observations (#67, M72), dans les deux unités : contrasts, sous-classe
 # ou sous-classe d'ordered -> construction acceptée, empreinte égale à celle du
@@ -696,6 +740,13 @@ verifier("texte de la fiche : facteur toujours refusé en forme texte (grammaire
   o <- list(f = factor("a"))
   leve_refus(tablexp:::texte_objet(o, "t", character(0)), "serialisation_impossible") &&
     is.raw(tablexp:::texte_objet(o, "t", character(0), "empreinte"))
+})
+verifier("texte empreinté : facteur admis seulement de classe exactement factor ou c(ordered, factor) ; c(factor, x) et c(ordered, factor, x) refusés", {
+  sous <- function(cl) { f <- factor(c("a", "b")); class(f) <- cl; list(f = f) }
+  leve_refus(tablexp:::texte_objet(sous(c("factor", "x")), "t", character(0), "empreinte"), "serialisation_impossible") &&
+    leve_refus(tablexp:::texte_objet(sous(c("ordered", "factor", "x")), "t", character(0), "empreinte"), "serialisation_impossible") &&
+    is.raw(tablexp:::texte_objet(sous("factor"), "t", character(0), "empreinte")) &&
+    is.raw(tablexp:::texte_objet(sous(c("ordered", "factor")), "t", character(0), "empreinte"))
 })
 
 # --- empreinte du code (option (iv), M70 ; cinquième annotation du 20/10/2026, (c) ; #67) ---

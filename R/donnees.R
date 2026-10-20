@@ -615,9 +615,12 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
     cause_k[deces] <- "deces"
     composante_ligne <- integer(length(o)); composante_ligne[o] <- k
     i <- fusion$premiere
+    # row.names = NULL (ici et dans l'unité contrat) : data.frame() prendrait
+    # les noms de lignes dans l'attribut names d'une colonne d'identifiant
+    # (list2DF), que l'empreinte du résultat refuserait (#67).
     observations <- data.frame(unite = id_t[i], ligne = numeros[i],
                                nb_lignes = tabulate(k, nbins = length(fusion$debut)),
-                               stringsAsFactors = FALSE)
+                               stringsAsFactors = FALSE, row.names = NULL)
     observations$date_naissance <- col("date_naissance")[i]
   } else {
     i <- seq_along(ent)
@@ -627,7 +630,7 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
     # résultat refuserait ; valeurs, type et classe inchangés (#67, M71).
     observations <- data.frame(unite = if (is.null(id_c)) numeros else id_c[i],
                                ligne = numeros, nb_lignes = rep(1L, length(i)),
-                               stringsAsFactors = FALSE)
+                               stringsAsFactors = FALSE, row.names = NULL)
     if (!is.null(id_t)) observations$id_tete <- id_t[i]  # rééchantillonnage par têtes (E2.14)
     observations$date_naissance <- col("date_naissance")[i]
     composante_ligne <- seq_along(i)

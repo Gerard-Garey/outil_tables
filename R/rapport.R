@@ -382,10 +382,11 @@ md5_octets <- function(octets) {
 # refuse une partie admise par le moteur (facteur, POSIXct, noms de lignes non
 # automatiques dès qu'une exclusion retire une ligne, classe tbl_df, attribut
 # quelconque, dont `simulation`, sixième annotation du 20/10/2026, point 2),
-# mesuré. Copie de l'entrée, non calculée : l'entrée est identifiée par
-# fiche$empreintes$donnees et les lignes retenues par numeros_conserves, dans
-# le périmètre. L'attribut `simulation` sort avec elle (son exclusion par son
-# nom, M70 point 2, devient sans objet).
+# mesuré. Copie de l'entrée, non calculée : l'entrée est identifiée, dans ses
+# colonnes de rôle, par l'empreinte des données (M71, point 1 ; les colonnes
+# hors rôle ne sont pas couvertes, ADR 0007, point 9.3) et les lignes
+# retenues par numeros_conserves, dans le périmètre. L'attribut `simulation`
+# sort avec elle (son exclusion par son nom, M70 point 2, devient sans objet).
 CHEMINS_HORS_RESULTAT <- c("execution", "fiche/versions", "fiche/plateforme", "fiche/empreintes/resultat",
                            "fiche/empreintes/code", "fiche/empreintes/statut_resultat_code",
                            "etapes/donnees/resultat/lignes_conservees")
@@ -751,7 +752,8 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
       # colonne de rôle catégorie reçue en facteur (#67, M71, Q2 : niveaux sans
       # effet, condition de validité testée).
       if (forme != "empreinte") impossible(chemin, "facteur, sans écriture de ses niveaux dans le texte de la grammaire 1")
-      if (!class(v)[1L] %in% c("factor", "ordered") || !all(a %in% c("names", "levels", "class")))
+      if (!(identical(class(v), "factor") || identical(class(v), c("ordered", "factor"))) ||
+          !all(a %in% c("names", "levels", "class")))
         impossible(chemin, sprintf("facteur de classe %s ou d'attribut(s) %s", paste(class(v), collapse = "/"),
                                    paste(a, collapse = ", ")))
     } else if (identical(class(v), "Date")) {
