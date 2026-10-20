@@ -1019,7 +1019,7 @@ local({
 # exacte : deux plans de même sens donnent des objets identical() hors
 # execution (le stockage d'une Date est invisible aux références).
 local({
-  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES)
+  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES, tablexp:::ordres_canoniques())
   erreur <- function(expr) inherits(tryCatch({ force(expr); NULL }, error = function(e) e), "error")
   J <- function(j) structure(j, class = "Date")
   pb <- modifier(plan_type(), etapes = c(plan_type()$etapes,
@@ -1085,4 +1085,75 @@ local({
   verifier("fiche : version 3, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
            identical(x0$fiche$version_fiche, 3L) &&
              !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
+
+  # Ordre canonique des valeurs de segmentation, exclusions et estimateurs (#63 ;
+  # ADR 0011, quatrième annotation du 20/10/2026). Valeur calculée à la main :
+  # ordres des catalogues ; identité exacte : objets identical() hors execution,
+  # fiche comprise, sur un portefeuille simulé (n = 5 000, graine 7) auquel est
+  # ajouté un rôle segment constant par tête (trois segments).
+  ord <- tablexp:::ordres_canoniques()
+  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête ; estimateurs = poisson, binomial, kaplan_meier",
+           identical(names(ord), c("segmentation", "etapes/donnees/exclusions", "etapes/brut/estimateurs")) &&
+             identical(ord$segmentation, c("sexe", "segment")) &&
+             identical(ord[["etapes/brut/estimateurs"]], c("poisson", "binomial", "kaplan_meier")) &&
+             identical(ord[["etapes/donnees/exclusions"]], c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE)))
+  SIM63 <- simuler_portefeuille(LOI, modifier(PF, n = 5000), PER, 7L)
+  SIM63$segment <- paste0("s", SIM63$id_tete %% 3L)
+  ROLES63 <- c(ROLES_SIM, segment = "segment")
+  EXC <- c("sortie_avant_entree", "age_aberrant", "tete_sexe_incoherent")
+  EST <- c("poisson", "binomial", "kaplan_meier")
+  SEG <- c("sexe", "segment")
+  plan63 <- function(seg, exc, est)
+    list(transition = VD, periode = PER, delai_declaration = 0, segmentation = seg,
+         etapes = list(donnees = list(exclusions = exc),
+                       exposition = list(convention = "plus_fine", par_annee = FALSE),
+                       brut = list(estimateurs = est, niveau = 0.95)))
+  canon63 <- plan63(SEG, EXC, EST)
+  verifier("canoniser_plan (ordre des valeurs) : plan déjà canonique rendu identical(), idempotente, valide ; exclusions vides et segmentation vide inchangées",
+           identical(cn(canon63), canon63) && identical(valider_plan(canon63), canon63) &&
+             identical(cn(plan63(character(0), character(0), "poisson")), plan63(character(0), character(0), "poisson")))
+  permutations <- list(
+    "segmentation seule" = plan63(rev(SEG), EXC, EST),
+    "exclusions seules" = plan63(SEG, EXC[c(3, 1, 2)], EST),
+    "estimateurs seuls" = plan63(SEG, EXC, EST[c(3, 1, 2)]),
+    "les trois champs" = plan63(rev(SEG), rev(EXC), rev(EST)),
+    "les trois champs et les permutations du point 5.1" = {
+      q <- plan63(rev(SEG), EXC[c(2, 3, 1)], EST[c(2, 3, 1)])
+      list(etapes = list(donnees = q$etapes$donnees,
+                         exposition = list(par_annee = FALSE, convention = "plus_fine"),
+                         brut = list(niveau = 0.95, estimateurs = q$etapes$brut$estimateurs)),
+           segmentation = q$segmentation, periode = list(fin = PER$fin, debut = PER$debut),
+           delai_declaration = 0L, transition = list(arrivee = "deces", depart = "vivant"))
+    })
+  x63 <- sans_execution(construire_table(SIM63, ROLES63, canon63))
+  for (n in names(permutations)) {
+    q <- permutations[[n]]
+    verifier(sprintf("canoniser_plan (ordre des valeurs, %s) : canon = plan canonique, idempotente, valider_plan(canon) le rend inchangé", n),
+             !identical(q, canon63) && identical(cn(q), canon63) && identical(cn(cn(q)), cn(q)) &&
+               identical(valider_plan(cn(q)), cn(q)))
+    verifier(sprintf("construire_table (ordre des valeurs, %s) : objet identical() hors execution à celui du plan canonique, fiche comprise", n),
+             identical(sans_execution(construire_table(SIM63, ROLES63, q)), x63))
+  }
+  verifier("construire_table (ordre des valeurs) : fiche$plan et fiche$hypotheses_brut$estimateurs dans l'ordre des catalogues",
+           identical(x63$fiche$plan$segmentation, SEG) && identical(x63$fiche$plan$etapes$donnees$exclusions, EXC) &&
+             identical(x63$fiche$plan$etapes$brut$estimateurs, EST) &&
+             identical(x63$fiche$hypotheses_brut$estimateurs, EST))
+  verifier("construire_table (ordre des valeurs) : rejeu de la fiche d'un plan permuté identical() hors execution",
+           identical(sans_execution(construire_table(SIM63, ROLES63, construire_table(SIM63, ROLES63, permutations[[4L]])$fiche$plan)), x63))
+  # Erreur de programmation sur une valeur hors du vecteur d'ordre, un doublon ou
+  # un attribut, passés directement à canoniser_plan() (jamais retirés en silence).
+  verifier("canoniser_plan (ordre des valeurs) : valeur inconnue, doublon ou attribut -> erreur de programmation pour chacun des trois champs",
+           erreur(cn(plan63(c("sexe", "inconnu"), EXC, EST))) && erreur(cn(plan63(c("sexe", "sexe"), EXC, EST))) &&
+             erreur(cn(plan63(SEG, c(EXC, "inconnu"), EST))) && erreur(cn(plan63(SEG, c(EXC, EXC[1L]), EST))) &&
+             erreur(cn(plan63(SEG, EXC, c("poisson", "inconnu")))) && erreur(cn(plan63(SEG, EXC, c("poisson", "poisson")))) &&
+             erreur(cn(plan63(SEG, EXC, c(a = "poisson")))) && erreur(cn(plan63(SEG, EXC, NA_character_))) &&
+             erreur(cn(plan63(1L, EXC, EST))) &&
+             grepl("erreur de programmation", conditionMessage(tryCatch(cn(plan63(SEG, EXC, c("poisson", "inconnu"))),
+                                                                       error = function(e) e)), fixed = TRUE))
+  verifier("canoniser_plan (ordre des valeurs) : catalogues fabriqués ; étape absente du plan -> rien à canoniser ; liste ordres vide -> valeurs inchangées",
+           identical(tablexp:::canoniser_plan(plan63(c("a", "b"), EXC, EST), tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES,
+                                              list(segmentation = c("b", "a")))$segmentation, c("b", "a")) &&
+             identical(cn(plan_type()), plan_type()) &&
+             identical(tablexp:::canoniser_plan(plan63(rev(SEG), rev(EXC), rev(EST)), tablexp:::CHAMPS_PLAN,
+                                                tablexp:::PARAMETRES_ETAPES, list())$etapes$brut$estimateurs, rev(EST)))
 })

@@ -16,7 +16,9 @@
 #  - controler_provenance() : argument `provenance` de construire_table()
 #    (point 3.1) ;
 #  - canoniser_plan() : plan canonique (ADR 0011, point 5.1 ; #42), appelé
-#    une fois par construire_table(), après valider_plan() ;
+#    une fois par construire_table(), après valider_plan() ; valeurs des
+#    champs ensembles (estimateurs, exclusions, segmentation) dans l'ordre de
+#    l'argument `ordres` (quatrième annotation du 20/10/2026 ; #63) ;
 #  - assembler_fiche() : fiche en mémoire (point 6.2), sans horodatage ;
 #    plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre
 #    (fichier, empreinte, algorithme) (ADR 0011, points 5.2 à 5.4) ;
@@ -330,13 +332,19 @@ empreintes_construction <- function(donnees, roles, provenance) {
        statut_resultat_code = texte_moteur(STATUT_EMPREINTES_NON_CALCULEES))
 }
 
-# Plan canonique (ADR 0011, point 5.1 ; #42), à partir d'un plan validé par
-# valider_plan() ; `champs` et `parametres` sont CHAMPS_PLAN et
-# PARAMETRES_ETAPES, passés par construire_table() (point 9.3 : le module ne
-# lit pas les constantes de l'orchestration). Champs dans l'ordre de
-# `champs` ; transition (depart, arrivee) ; periode (debut, fin) ; étapes
+# Plan canonique (ADR 0011, point 5.1 ; #42 ; quatrième annotation du
+# 20/10/2026, #63), à partir d'un plan validé par valider_plan() ; `champs`,
+# `parametres` et `ordres` sont CHAMPS_PLAN, PARAMETRES_ETAPES et les vecteurs
+# d'ordre des trois champs ensembles, passés par construire_table() (point 9.3 :
+# le module ne lit pas les constantes des autres modules). Champs dans l'ordre
+# de `champs` ; transition (depart, arrivee) ; periode (debut, fin) ; étapes
 # dans l'ordre reçu (imposé par valider_plan()), paramètres de chaque étape
-# dans l'ordre de parametres[[étape]]$parametre ; toute autre valeur
+# dans l'ordre de parametres[[étape]]$parametre ; valeurs des champs ensembles
+# dans l'ordre de `ordres`, liste nommée par le chemin du champ dans le plan
+# (« segmentation », « etapes/donnees/exclusions », « etapes/brut/estimateurs ») ;
+# un chemin dont l'étape est absente du plan n'a rien à canoniser ; une valeur
+# hors du vecteur d'ordre, un doublon ou un attribut sont une erreur de
+# programmation, jamais une valeur retirée en silence ; toute autre valeur
 # inchangée. Stockages admis, liste fermée, conversions sans perte : borne de
 # période Date à stockage double ou integer -> Date double ; délai integer ou
 # double -> double ; graine integer, ou double entier dans l'étendue des
@@ -347,9 +355,9 @@ empreintes_construction <- function(donnees, roles, provenance) {
 # occurrence, #42). Idempotente : un plan canonique est rendu
 # identical(). Ce n'est pas un plan résolu (point 5.2 : convention demandée
 # inchangée).
-canoniser_plan <- function(plan, champs, parametres) {
+canoniser_plan <- function(plan, champs, parametres, ordres) {
   non_canonique <- function(champ)
-    stop(sprintf("canoniser_plan() : stockage non canonisable pour « %s » (erreur de programmation : plan non validé).",
+    stop(sprintf("canoniser_plan() : valeur ou stockage non canonisable pour « %s » (erreur de programmation : plan non validé).",
                  champ), call. = FALSE)
   borne <- function(x, champ) {
     if (!identical(class(x), "Date") || !typeof(x) %in% c("double", "integer")) non_canonique(champ)
@@ -375,6 +383,22 @@ canoniser_plan <- function(plan, champs, parametres) {
     if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) || !setequal(names(e[[n]]), parametres[[n]]$parametre))
       non_canonique(sprintf("etapes$%s", n))
   p[["etapes"]] <- stats::setNames(lapply(names(e), function(n) e[[n]][parametres[[n]]$parametre]), names(e))
+  # Champs ensembles : valeurs dans l'ordre du vecteur d'ordre (contrôle avant
+  # de réordonner : o[o %in% x] seul perdrait une valeur inconnue sans le dire).
+  ordonner <- function(q, cle, o, chemin) {
+    if (!cle[1L] %in% names(q)) return(q)
+    if (length(cle) > 1L) {
+      q[[cle[1L]]] <- ordonner(q[[cle[1L]]], cle[-1L], o, chemin)
+      return(q)
+    }
+    x <- q[[cle]]
+    if (!is.character(x) || !is.null(attributes(x)) || anyNA(x) || anyDuplicated(x) || !all(x %in% o))
+      non_canonique(chemin)
+    q[[cle]] <- o[o %in% x]
+    q
+  }
+  for (chemin in names(ordres))
+    p <- ordonner(p, strsplit(chemin, "/", fixed = TRUE)[[1L]], ordres[[chemin]], chemin)
   p
 }
 

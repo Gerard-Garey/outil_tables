@@ -1880,7 +1880,7 @@ local({
 # --- plan canonique : plans de référence déjà canoniques ; transitions d'une même issue (#42) ---
 
 local({
-  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES)
+  cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES, tablexp:::ordres_canoniques())
   for (id in names(plans_reference())) {
     p <- plans_reference()[[id]]$plan
     verifier(sprintf("%s : plan de référence déjà canonique (canoniser_plan() le rend identical())", id), identical(cn(p), p))
