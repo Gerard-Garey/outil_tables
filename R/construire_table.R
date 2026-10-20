@@ -28,9 +28,12 @@ CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentat
 
 # Étapes de la branche, dans l'ordre des modules : fonction d'étape (module),
 # étapes préalables dont les résultats sont employés (colonne liste, vecteur
-# vide sans préalable ; #15, spécification d'actuary, A.9 : `brut` emploie
-# les observations de `donnees` pour l'estimateur de Kaplan-Meier), tirage
-# d'un aléa.
+# vide sans préalable ; #15, spécification d'actuary, A.9, et #38 : `brut`
+# emploie les fenêtres transmises par `exposition`, et non plus les
+# observations de `donnees`, pour l'estimateur de Kaplan-Meier ; `donnees`
+# reste dans les préalables de `brut`, préalable transitif par `exposition` :
+# les détails du refus etape_prealable_manquante sont figés par les témoins
+# de tests/unitaires/test_brut_kaplan_meier.R, #27), tirage d'un aléa.
 ETAPES <- data.frame(
   etape = c("donnees", "exposition", "brut"),
   module = c("donnees", "exposition", "brut"),

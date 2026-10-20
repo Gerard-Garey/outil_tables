@@ -264,20 +264,28 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
 
 # Estimateur de Kaplan-Meier sur l'âge (#15, A.1 à A.7), par cellule de la
 # table d'exposition.
-#   observations : observations de l'étape `donnees` ;
-#   exposition   : table de l'étape `exposition` (lignes et ordre repris) ;
+#   observations : fenêtres transmises par l'étape `exposition` (objet
+#                  fenetres_exposition, construire_table(), #38) ou, en
+#                  appel direct, observations de l'étape `donnees`
+#                  (data.frame) ;
+#   exposition   : table de l'étape `exposition`, appariée par clé (segment,
+#                  âge), quel que soit l'ordre de ses lignes ;
 #   segmentation, transition, periode, delai_declaration : champs du plan ;
 #   convention   : convention d'âge retenue par l'étape `exposition` ;
 #   niveau       : niveau de confiance de l'intervalle asymptotique ;
 #   parametres_exposition : paramètres de l'étape `exposition`
 #                  (fin_effective, transition), contrôlés à l'égalité exacte
 #                  contre la période et la transition recalculées ici.
-# Rend list(table, sauts, diagnostics) : table aux lignes de la table
-# d'exposition (clés, age, evenements, instants_evenement, taux, variance,
-# borne_inf_asymptotique, borne_sup_asymptotique, etat) ; sauts, une ligne
-# par (segment, instant d'événement), triée par segment puis par instant.
-# Fenêtres et événements à l'identique de calculer_exposition()
-# (fenetres_observations(), T5) ; observation retenue : a < b, ou un
+# Rend list(table, sauts, diagnostics) : table aux lignes et dans l'ordre de
+# la table d'exposition (clés, age, evenements, instants_evenement, taux,
+# variance, borne_inf_asymptotique, borne_sup_asymptotique, etat) ; sauts,
+# une ligne par (segment, instant d'événement), triée par segment puis par
+# instant.
+# Fenêtres et événements : ceux de calculer_exposition() lorsqu'ils sont
+# transmis ; recalculés par fenetres_observations() (T5) et
+# segments_observations(), à l'identique de calculer_exposition(),
+# seulement en appel direct sur un data.frame ;
+# observation retenue : a < b, ou un
 # événement (a <= s = b). Calcul en O(n log n) : r(t) = #{K_a <= t} -
 # #{K_b < t} par findInterval() ; couverture, union des [K_a, K_b) non
 # vides, par cummax().
