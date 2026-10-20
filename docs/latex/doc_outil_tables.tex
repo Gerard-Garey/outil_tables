@@ -1757,7 +1757,14 @@ garde un échantillon (section~\ref{sec:verifications-rapport})~; pour
 \code{locale\_c.R}, dont l'exécution complète (deux installations, six plans)
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
-sous \code{LC\_ALL=C}.
+sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
+(\code{sys.source()}), vérifie que \code{LOCALES\_UTF8}, dupliquée de \code{tests/harnais.R}, y
+est identique à celle du harnais et que \code{locale\_utf8\_disponible()}
+y rend la même locale que celle du harnais, et teste la fonction \code{ecart\_octets} du script,
+qui rédige le message d'un écart de la comparaison octet à octet et
+que le chemin d'échec bon marché n'atteint pas, sur des attendus écrits à
+la main (textes identiques, premier octet différent à la deuxième ligne,
+longueurs inégales à préfixe commun, dans les deux sens).
 
 \begin{center}
 \small
