@@ -4945,6 +4945,37 @@ les refus \code{date\_hors\_domaine} et \code{date\_non\_entiere}~;
 \code{construire\_table()} traite une date \code{NaN} comme un manquant.
 
 \medskip
+\textbf{Écriture des chaînes} (\code{octets\_chaines()}, issue~\#22,
+point~1). Les chaînes sont écrites par blocs de lignes~: les corps échappés,
+marqués \code{bytes} pour être copiés sans traduction en toute locale, sont
+collés par un \code{paste()}, puis convertis en octets par un seul
+\code{charToRaw()} par bloc, au lieu d'une liste de trois vecteurs d'octets
+par ligne. Une valeur manquante prend le corps «~un guillemet~»~: sa ligne
+s'écrit de trois guillemets suivis d'un LF, puis est ramenée à \code{NA} et
+LF par un \code{gsub()}. Ce marqueur ne peut pas apparaître dans une autre
+ligne~: un corps échappé ne contient de guillemet que précédé d'une barre
+oblique inverse, si bien qu'aucune autre ligne ne porte trois guillemets de
+suite avant sa fin de ligne. Les blocs sont bornés par \code{bornes\_blocs()}
+à $2^{30}$ octets de texte avant ce \code{gsub()}, sous la limite de
+$2^{31} - 1$ octets d'une chaîne R (aide \code{Memory-limits})~; une ligne
+plus longue que la borne forme seule son bloc et s'écrit directement en
+octets. La règle d'écriture des chaînes (section~\ref{sec:empreinte}) est
+inchangée. \code{tests/unitaires/test\_construire\_table.R} compare les
+octets produits à ceux de l'écriture antérieure, recopiée dans le test comme
+oracle, sur 17 cas adverses (\code{NA} et \code{"NA"}, chaîne vide, chaînes
+non ASCII en UTF-8 et en latin-1, cinq échappements, suites de guillemets,
+répétitions, longueurs~0 et~1, ligne de plus de 5\,000 octets) pour 8 bornes
+de bloc, de 1 à $2^{30}$ octets, dans la session et dans un sous-processus
+lancé sous \code{LC\_ALL=C}~; il vérifie les bornes rendues par
+\code{bornes\_blocs()} sur 45 bornes et 3 jeux de corps (partition des
+lignes dans l'ordre, bloc de plusieurs lignes d'au plus la borne et maximal,
+ligne trop longue seule dans son bloc et seule marquée). L'identité des
+octets est ainsi \emph{constatée} sur ces cas, l'argument du marqueur en
+donnant la raison. Le script \code{tests/mesures/octets\_chaines.R}, hors
+batterie et sans seuil, mesure la durée et la mémoire de cette écriture et
+de l'empreinte à deux rôles caractère sur un jeu déterministe.
+
+\medskip
 \code{tests/unitaires/test\_serialisation.R} vérifie le texte du plan et de
 la fiche (section~\ref{sec:serialisation})~: forme des octets, première
 ligne et en-tête hors aller-retour~; aller-retour \code{identical()} sur des
@@ -4990,7 +5021,8 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (2) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
-\catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle & octets canoniques des chaînes~; refus de codage \\
+\catalogue{fonctions-rapport}{bornes\_blocs()} & interne & corps échappés (codage \code{bytes}), limite en octets & bornes \code{debut} et \code{fin} des blocs de collage d'\code{octets\_chaines()} et indicateur \code{seule}~: découpage glouton dans l'ordre des lignes, une ligne comptant les octets de son corps plus trois (deux guillemets et LF)~; un bloc de plusieurs lignes fait au plus \code{limite} octets et la ligne suivante n'y tiendrait pas~; une ligne plus longue que \code{limite} forme seule son bloc (\code{seule}) \\
+\catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle, \code{limite} (facultative, $2^{30}$ octets, réservée aux tests du découpage) & octets canoniques des chaînes~; refus de codage~; écriture par blocs de lignes (\code{bornes\_blocs()}), un \code{paste()} et un \code{charToRaw()} par bloc, une ligne plus longue que \code{limite} écrite seule \\
 \catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
 \catalogue{fonctions-rapport}{texte\_date()} & interne & jours depuis 1970-01-01, entiers, finis, dans le domaine & écriture ISO~8601 AAAA-MM-JJ, année sur quatre chiffres~; partagée par \code{ecrire\_valeurs()} et le contrôle de canonicité du lecteur (\code{valeurs\_texte()}) \\
 \catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g})~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique}, et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
