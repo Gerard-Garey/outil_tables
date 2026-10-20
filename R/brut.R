@@ -36,8 +36,9 @@
 #  segment (A.14 question 2).
 #  Ce module n'appelle que `donnees` (liste_guillemets(),
 #  controler_parametres_donnees(), controler_segmentation()), `exposition`
-#  (fenetres_observations(), segments_observations(), extraire_composantes(), position_dans_cellule(),
-#  somme_par_cellule()) et `outils` (ADR 0007, point 2.1).
+#  (fenetres_observations(), segments_observations(), extraire_composantes(),
+#  position_dans_cellule(), somme_par_cellule()) et `outils` (ADR 0007,
+#  point 2.1).
 # -----------------------------------------------------------------------------
 
 # Estimateurs disponibles, dans l'ordre canonique des résultats (A.4).
