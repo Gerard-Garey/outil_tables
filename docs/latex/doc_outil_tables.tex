@@ -1602,7 +1602,7 @@ erreurs. Puis~:
     représentation canonique change l'empreinte d'une entrée inchangée
     (section~\ref{sec:empreinte})~; et un test ordinaire de garde doit
     prouver que l'entrée est inchangée. Il calcule par le package le texte
-    canonique de l'entrée de référence, vérifie que l'en-tête de sa première
+    canonique de l'entrée de référence (données et rôles déclarés), vérifie que l'en-tête de sa première
     ligne (texte avant la première tabulation) est la représentation de
     l'objet, le remplace par la représentation de la référence, et exige que
     le MD5 obtenu soit égal à l'empreinte des données de la référence~; il
@@ -1619,13 +1619,29 @@ erreurs. Puis~:
     la transition absorberait le contrôle de l'entrée~: l'entrée de
     référence aux lignes permutées, réellement différente, ne s'écarte des
     références de R1 et de R6 que par l'empreinte des données et celles des
-    deux tables résumées, les autres écarts restant sous tolérance (constat
-    sur une permutation par plan, section~\ref{sec:empreinte}), si bien que déclarer
-    ces trois chaînes suffit à faire passer le test «~seul écart~»~; un
-    témoin de la batterie rejoue ce constat sur R6 et exige l'échec de la
-    garde. Si la preuve échoue, aucune transition n'est possible~: c'est
-    un changement de l'entrée de référence (ADR 0009, point 4.2), qui
-    régénère tous les plans, sous visa.
+    deux tables résumées, les autres écarts restant sous tolérance, si bien
+    que déclarer ces trois chaînes suffit à faire passer le test «~seul
+    écart~». C'est un constat sur une permutation par plan~: pour R1, la
+    permutation tirée par \code{set.seed(1)} et \code{sample.int()} (ADR
+    0009, troisième annotation du 19/10/2026, point~(f)~1)~; pour R6, la
+    permutation tirée sous la graine 20261019 (\code{GRAINE\_PERMUTATION}),
+    dont un témoin de la batterie rejoue le constat et exige l'échec de la
+    garde (section~\ref{sec:empreinte}). Si la preuve échoue, aucune
+    transition n'est possible~: c'est un changement de l'entrée de référence
+    (ADR 0009, point 4.2), qui régénère tous les plans, sous visa.
+    \textbf{Limite de la garde} (ADR 0009, annotation du 20/10/2026)~: elle
+    ne remplace que l'en-tête de la première ligne et suppose donc qu'une
+    représentation nouvelle ne change rien d'autre dans le texte de l'entrée
+    de référence. C'était vrai pour l'issue~\#35, l'entrée n'ayant aucune
+    colonne double, et pour l'issue~\#19, ses dates étant entre 1930 et 2024.
+    Une représentation qui changerait l'écriture d'un type présent dans
+    l'entrée (entier, chaîne, date) ou la forme de la première ligne ferait
+    échouer la garde \emph{à tort}~: l'erreur est conservatrice, la garde ne
+    pouvant conclure à tort à une entrée inchangée (hors collision MD5), mais
+    son diagnostic «~l'entrée a changé~» serait faux. La branche qui fera un
+    tel changement choisira d'abord, par annotation de l'ADR 0009, sa voie~:
+    de préférence un écrivain figé de la représentation précédente, dans les
+    tests, pendant la transition.
 \end{enumerate}
 
 \noindent
