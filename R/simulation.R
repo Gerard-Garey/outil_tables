@@ -190,8 +190,8 @@ controler_portefeuille <- function(portefeuille, periode) {
     refuser("simulation", "periode_invalide",
             sprintf("Période vide : début %s postérieur à la fin %s.", format(periode[["debut"]]), format(periode[["fin"]])),
             list(periode = periode))
-  # Champs lus par [[ ]] (jamais $, qui apparie les noms partiels) ; mode : chaîne
-  # unique de forme exacte (chaine_unique(), #60).
+  # Champs lus par [[ ]] (jamais $, qui apparie les noms partiels) ; ici, le
+  # mode : chaîne unique de forme exacte (chaine_unique(), #60).
   mode <- if (is.list(portefeuille)) portefeuille[["mode"]] else NULL
   if (!chaine_unique(mode) || !(mode %in% names(CHAMPS_PORTEFEUILLE)))
     refuser("simulation", "portefeuille_invalide",

@@ -237,9 +237,9 @@ verifier("portefeuille : age_min >= age_max refusé",
          leve_refus(simuler(loi(), modifyList(PF, list(age_min = 75)), PER, GRAINE), "portefeuille_invalide"))
 verifier("portefeuille : mode inconnu refusé",
          leve_refus(simuler(loi(), modifyList(PF, list(mode = "agregats")), PER, GRAINE), "portefeuille_invalide"))
-# Forme exacte du mode (#60) : chaîne unique sans nom ni attribut ; champ lu par
-# [[ ]], jamais par $ (appariement partiel). Le message distingue le refus du
-# mode du refus des champs (un mode lu par $ passerait au contrôle suivant).
+# Forme exacte du mode (#60) : chaîne unique sans nom ni attribut ; champ lu
+# par [[ ]], jamais par $ (appariement partiel). Le message distingue le refus
+# du mode du refus des champs (un mode lu par $ passerait au contrôle suivant).
 message_refus <- function(expr)
   tryCatch({ force(expr); NA_character_ }, refus_tablexp = function(c) conditionMessage(c))
 MODES_MAL_FORMES <- list(

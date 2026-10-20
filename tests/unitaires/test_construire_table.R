@@ -52,9 +52,9 @@ verifier("valider_plan : signature (plan) ; plan valide rendu inchangé",
 
 # --- refus de valider_plan (valeur calculée à la main : codes) ----------------
 
-# Noms incomplets (#60) : noms_complets() est le prédicat commun de liste_nommee()
-# (plan, paramètres : doublons refusés) et du contrôle de `etapes` (doublons admis
-# à ce stade, signalés ensuite par etape_en_double).
+# Noms incomplets (#60) : noms_complets() est le prédicat commun de
+# liste_nommee() (plan, paramètres : doublons refusés) et du contrôle de
+# `etapes` (doublons admis à ce stade, signalés ensuite par etape_en_double).
 avec_noms <- function(x, noms) { names(x) <- noms; x }
 etapes_deux <- function(noms)
   avec_noms(list(list(exclusions = character(0)), list(convention = "plus_fine", par_annee = FALSE)), noms)
