@@ -689,8 +689,15 @@ accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
 \catalogue{fonctions-outils}{avertir()} & interne & accumulateur, \code{etape},
 \code{code}, \code{message}, \code{nombre} & accumulateur augmenté d'une ligne,
-sans \code{warning()}~; \code{stop()} si le code ou le nombre est mal formé
-(section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
+message marqué UTF-8 par \code{texte\_moteur()}, sans \code{warning()}~;
+\code{stop()} si le code ou le nombre est mal formé
+(section~\ref{sec:avertissements}~; issues~\#9, \#24 et~\#50) \\
+\catalogue{fonctions-outils}{texte\_moteur()} & interne & \code{x}, chaîne ou
+liste (\code{data.frame} compris) & le même objet, chaînes et noms non ASCII
+du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
+réservée au texte du moteur, jamais aux données, rôles ou plan de
+l'utilisateur (section~\ref{sec:harnais}, «~Locale de
+l'installation~»~; issue~\#50) \\
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
 explicite, sans défaut ni attribut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
@@ -970,7 +977,19 @@ installation hors UTF-8 sous une session UTF-8 passe la sonde, sans effet sur
 les résultats (constat de l'audit consigné par l'ADR 0007~: le plan de
 référence R1 aplati sous les deux locales donne le même fichier). La sonde ne
 protège que les batteries~: une garde au chargement du package, pour tout
-usage, est l'objet de l'issue~\#25.
+usage, est l'objet de l'issue~\#25. Le \textbf{texte produit par le moteur}
+(messages d'avertissement, mentions, hypothèses et statuts de l'étape
+\code{brut}, unité d'exposition, hypothèse de censure, en-tête du texte du
+plan et de la fiche) est en outre marqué UTF-8 par \code{texte\_moteur()},
+quelle que soit la locale d'installation ou d'exécution~: sans ce marquage,
+un package installé ou exécuté sous la locale C laissait des chaînes non
+ASCII du moteur sans codage déclaré, et \code{ecrire\_fiche()} refusait la
+fiche (constat de la revue finale de l'issue~\#50). Mesuré pour R1~: même
+texte de fiche, octet pour octet, dans les quatre combinaisons d'installation
+et d'exécution sous C et C.UTF-8. Le marquage ne vaut que pour le texte du
+moteur~: une chaîne non ASCII non marquée des données, des rôles ou du plan
+de l'utilisateur reste refusée (\code{chaine\_codage\_indetermine},
+section~\ref{sec:empreinte}).
 
 \medskip
 \noindent
@@ -4695,11 +4714,20 @@ version portée par le texte.
     $n$), puis exactement ses éléments \code{chemin/[1]} à
     \code{chemin/[$n$]}~; un \code{data.frame} a ses lignes
     \code{chemin/@colonnes} et \code{chemin/@lignes}, puis ses colonnes
-    (noms de lignes automatiques seulement)~; un vecteur atomique nommé a sa
-    ligne \code{chemin/@noms}, puis sa ligne de valeurs~; \code{NULL}
-    s'écrit \code{chemin<TAB>NULL<TAB>0}. Conséquence~: \textbf{un texte
-    coupé à une frontière de ligne est toujours refusé}, faute de quoi un
-    fichier tronqué serait relu comme un objet plus court~;
+    (noms de lignes automatiques seulement)~; un vecteur atomique nommé, de
+    longueur au moins~1, a sa ligne \code{chemin/@noms}, puis sa ligne de
+    valeurs~; \code{NULL} s'écrit \code{chemin<TAB>NULL<TAB>0}.
+    Conséquence~: \textbf{tout texte écrit par \code{ecrire\_plan()} ou
+    \code{ecrire\_fiche()} dont on retire au moins une ligne du corps, en le
+    coupant à une frontière de ligne, est refusé à la lecture}, faute de quoi
+    un fichier tronqué serait relu comme un objet plus court. Un vecteur
+    atomique nommé de longueur~0 est pour cela refusé à l'écriture~: sa ligne
+    \code{@noms} seule est aussi l'écriture complète d'une liste nommée vide,
+    si bien que son texte privé de la ligne de valeurs serait relu sans refus
+    (ADR 0011, seconde annotation du 20/10/2026~; aucun plan valide ni aucune
+    fiche du package n'en contient). \textbf{Limite admise}~: un texte édité
+    à la main qui porte un tel vecteur est relu sans refus, si bien que le
+    lecteur admet un objet que l'écrivain refuse~;
   \item \textbf{types}~: \code{double}, \code{integer}, \code{logical},
     \code{character}, \code{Date}, \code{NULL} (\code{TYPES\_TEXTE})~;
     valeurs écrites par \code{ecrire\_valeurs()} en forme «~texte~»
@@ -4785,7 +4813,7 @@ fautif dans \code{details\$chemin}).}
 \code{texte\_chemin\_inattendu} & chemin autre que celui qu'attend la structure~: élément manquant ou en trop, ligne après la fin de l'objet, corps qui ne commence ni par \code{@noms} ni par \code{@longueur} \\
 \code{texte\_valeur\_invalide} & valeur hors de l'écriture de son type~: chaîne sans guillemets droits ou à échappement inconnu~; double qui n'est ni un décimal lu en un double fini ni un jeton~; entier non canonique ou hors de l'étendue des entiers~; logique autre que \code{TRUE}, \code{FALSE}, \code{NA}~; date hors de la forme AAAA-MM-JJ, inexistante, hors du domaine ou non canonique \\
 \code{texte\_double\_sous\_depassement} & décimal non nul relu~0 \\
-\code{serialisation\_impossible} & à l'écriture~: racine qui n'est pas une liste~; facteur~; classe ou attribut hors de la grammaire~; \code{data.frame} classé ou aux noms de lignes non automatiques~; colonne non atomique~; profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}~; objet \code{construction} entier passé à \code{ecrire\_fiche()} au lieu de sa fiche \\
+\code{serialisation\_impossible} & à l'écriture~: racine qui n'est pas une liste~; facteur~; classe ou attribut hors de la grammaire~; \code{data.frame} classé ou aux noms de lignes non automatiques~; colonne non atomique~; \code{Date} de stockage autre que \code{double} ou \code{integer}~; vecteur atomique nommé de longueur~0~; profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}~; objet \code{construction} entier passé à \code{ecrire\_fiche()} au lieu de sa fiche \\
 \end{longtable}
 \end{center}
 
@@ -4826,8 +4854,19 @@ les trois questions d'E3.7~: ce qui a été \emph{calculé}, avec quelles
 \emph{hypothèses}, de quoi \emph{rejouer}. Un test vérifie que les blocs
 partitionnent les champs de la fiche (aucun champ manquant, en double ni
 étranger), si bien qu'un champ ajouté sans bloc fait échouer la batterie.
-L'affectation des champs aux blocs est une proposition, soumise au jugement
-d'\code{actuary} sur la lisibilité de la fiche (ADR 0011, point~6.5).
+L'affectation, validée par \code{actuary} le 20/10/2026 (ADR 0011,
+point~6.5), est la suivante, dans l'ordre des champs de chaque bloc~:
+\emph{calculé}~: \code{plan}, \code{transition\_code},
+\code{fin\_effective}, \code{unite\_observation},
+\code{unite\_exposition}, \code{par\_annee}, \code{recette},
+\code{convention}~; \emph{hypothèses}~: \code{exclusions},
+\code{hypothese\_censure}, \code{hypotheses\_brut},
+\code{avertissement\_unite}, \code{avertissements}~; \emph{rejeu}~:
+\code{version\_fiche}, \code{roles}, \code{provenance},
+\code{provenance\_mention}, \code{empreintes}, \code{graine},
+\code{graine\_mention}, \code{generateur}, \code{versions},
+\code{plateforme}. Un champ absent de la fiche (\code{hypotheses\_brut}
+sans étape \code{brut}) est omis de la ligne.
 
 \subsection{Vérifications}
 \label{sec:verifications-rapport}
@@ -4905,6 +4944,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{STATUT\_EMPREINTES\_NON\_CALCULEES} & constante & --- & statut des empreintes du résultat et du code \\
 \catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle & octets canoniques des chaînes~; refus de codage \\
 \catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
+\catalogue{fonctions-rapport}{texte\_date()} & interne & jours depuis 1970-01-01, entiers, finis, dans le domaine & écriture ISO~8601 AAAA-MM-JJ, année sur quatre chiffres~; partagée par \code{ecrire\_valeurs()} et le contrôle de canonicité du lecteur (\code{valeurs\_texte()}) \\
 \catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g})~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique}, et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
 \catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire \\
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
@@ -4921,7 +4961,7 @@ section~\ref{sec:empreinte} (issue~\#21).
 \catalogue{fonctions-rapport}{BLOCS\_LECTURE\_FICHE} & constante & --- & partition des champs de la fiche en trois blocs (E3.7)~: \code{calculé}, \code{hypothèses}, \code{rejeu}~; rappelée par la ligne d'en-tête \code{\# lecture} \\
 \catalogue{fonctions-rapport}{joindre\_chemin()} & interne & chemin, segment & chemin d'un élément, segments séparés par \code{/} \\
 \catalogue{fonctions-rapport}{segments\_texte()} & interne & noms, longueur & segment de chemin de chaque élément~: son nom, ou \code{[i]} (rang) si le nom est absent, vide, \code{NA}, en double, contient \code{/}, une tabulation ou une fin de ligne, ou commence par \code{@}, \code{\#} ou \code{[} \\
-\catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"}~; refus \code{serialisation\_impossible} (facteur, classe ou attribut non écrits, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}) \\
+\catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"}~; refus \code{serialisation\_impossible} (facteur, classe ou attribut non écrits, \code{Date} de stockage autre que \code{double} ou \code{integer}, vecteur atomique nommé de longueur~0, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE}) \\
 \catalogue{fonctions-rapport}{valeurs\_texte()} & interne & type, textes d'une ligne, refus & valeurs relues sans évaluation~; refus \code{texte\_valeur\_invalide}, \code{texte\_double\_}\allowbreak\code{sous\_depassement} (décimal non nul relu 0) \\
 \catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne} \\
 \catalogue{fonctions-rapport}{ecrire\_plan()} & exportée & plan & octets du texte du plan, écrit tel qu'il est reçu, sans validation ni canonisation \\
