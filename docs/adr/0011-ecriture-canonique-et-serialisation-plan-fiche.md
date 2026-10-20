@@ -279,3 +279,57 @@ Les motifs sont nommés ici parce que la décision M66 et le constat C3 demanden
 **Effet sur les résultats : aucun.** R1 à R6 ne contiennent ni liste sans noms, ni facteur, ni Date integer dans leurs fiches (point (d) ; plans canoniques : dates en double, point 5.1) ; le format des références est inchangé ; les fonctions touchées n'ont jamais été publiées. Il s'agit d'un changement de comportement de fonctions nouvelles de B4, sans incrément de version (point 10 (a)) et sans visa.
 
 Issues : #50 ; #49 (taille de pile sous Windows, non mesurée) ; #64 (ordre des champs du corps, cinquième branche). Décision M66. Branche `claude/fiche-serialisation`, PR #51.
+
+## Annotation du 20 octobre 2026 — point 5.1 (g) : domaine de la graine canonisée
+
+Rédigée par `architect` sur recommandation d'`actuary-approfondi` (validation de fin de branche du 20/10/2026), branche `claude/fiche-serialisation` (B4, PR #51), tête `da565c7`. Le texte ci-dessus n'est pas réécrit. Les mesures citées ont été refaites par `architect` sous R 4.3.3, `tablexp` installé depuis l'arbre de travail à `da565c7` (environnement cloud, hors plateforme de référence) ; elles concordent avec celles d'`actuary` du même jour.
+
+**(a) Constat** (#42, commit `3b62dff`). Le point 5.1 (g) dit seulement « `graine` … en integer ». `canoniser_plan()` (`R/rapport.R:309-315`) traite la graine plus finement :
+- un `integer` sans `NA` est rendu tel quel, **quelle que soit sa longueur** (*vérifié* : `integer(0)` et `1:2` rendus inchangés) ;
+- un `double` de longueur 1, fini, à valeur entière et de valeur absolue au plus `.Machine$integer.max` est converti en `integer` (*vérifié* : `20261016` donne `20261016L`, `-2147483647` donne `-2147483647L`) ;
+- toute autre valeur est une **erreur de programmation** (`stop()`, « stockage non canonisable pour « graine » … plan non validé »). C'est le cas d'un `double` non entier, hors étendue, `NA`, `NaN` ou infini, ou de longueur autre que 1, et d'un `integer` qui contient un `NA`. *Vérifié* sur `1.5`, `2^31`, `NA_real_`, `NaN`, `Inf`, `c(1, 2)`, `numeric(0)`, `NA_integer_` et `c(1L, NA)`. Pour les autres types (`character`, `logical`…), le constat vient de la lecture de la condition `!is.integer(g)` (`R/rapport.R:313`).
+
+**(b) Motif.** Deux plans de même sens doivent donner la même fiche (point 5.1). Or `set.seed()` convertit son argument en entier : `set.seed(20261016)` et `set.seed(20261016L)` donnent les mêmes tirages (*vérifié* : `runif(3)` `identical`). La même équivalence vaut pour `sous_graine(7)` et `sous_graine(7L)` (mesure d'`actuary` rapportée par #61, non refaite ici).
+
+**(c) Portée : aucun effet dans B4.** Aucune étape du catalogue ne tire d'aléa (*vérifié* : `any(ETAPES$aleatoire)` vaut `FALSE`). `valider_plan()` refuse donc toute graine (`graine_inattendue`, `R/construire_table.R:139-142`), et `canoniser_plan()` n'est appelée qu'après `valider_plan()` (`R/construire_table.R:193`). Par `construire_table()`, ni la branche `double` ni le cas d'un `integer` de longueur autre que 1 ne sont atteignables.
+
+**(d) Contrat renvoyé à la première étape aléatoire (#61).** Le contrat de validation de la graine sera fixé par la branche qui introduira la première étape aléatoire (bootstrap, E2.14). Il couvrira les types admis, la longueur 1, l'étendue et un refus nommé dans `valider_plan()`, posé **avant** `canoniser_plan()`. Ce contrat devra rester cohérent avec la liste de (a), de l'une de deux façons :
+1. ou bien `valider_plan()` admet le `double` entier, et la conversion de `canoniser_plan()` demeure ;
+2. ou bien il ne l'admet pas, et la branche `double` de `canoniser_plan()` est retirée **dans le même commit**.
+
+Dans les deux cas, `valider_plan()` imposera la longueur 1 : le cas « `integer` de longueur autre que 1 rendu tel quel » cessera alors d'être atteignable, et ce même commit pourra resserrer `canoniser_plan()` en conséquence. Un élément à verser au choix, sans le trancher ici (*raisonnement, non mesuré*) : un plan relu de son texte porte la graine dans le type écrit sur sa ligne (point 6.1). Un plan canonique l'écrit `integer`, mais un plan édité à la main peut l'écrire `double`. L'option 1 rend donc l'import (E5.4) plus tolérant ; l'option 2 en fait un refus nommé.
+
+**Effet sur les résultats : aucun.** Rien n'est modifié ici : l'annotation consigne le comportement déjà livré par `3b62dff`, qui n'est pas atteignable dans B4.
+
+Issues : #61 (validation de la graine), #42 ; #43 (forme exacte de `sous_graine()`, close par la PR #52). Branche `claude/fiche-serialisation`, PR #51.
+
+## Annotation du 20 octobre 2026 (seconde) — troisième annotation, (d) : un vecteur atomique nommé de longueur 0 est refusé à l'écriture
+
+Rédigée par `architect` d'après un constat de la revue finale complète d'`audit` (effort `high`, règle 10) sur B4 à `da565c7`, et d'après la décision de la session principale du 20/10/2026 ; mise en œuvre confiée à `coder-approfondi`, **non commitée à la rédaction** (pas de SHA). Branche `claude/fiche-serialisation`, PR #51. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Constat.** La troisième annotation du 19/10/2026, (d), conclut : « Un texte coupé à une frontière de ligne est donc toujours refusé. » L'audit montre que c'est faux quand l'objet **finit** par un vecteur atomique **nommé de longueur 0**. `architect` l'a reproduit (*vérifié*, R 4.3.3, `da565c7`) : le corps de `ecrire_plan(list(a = 1, v = setNames(numeric(0), character(0))))` se termine par les deux lignes `v/@noms<TAB>character<TAB>0` et `v<TAB>double<TAB>0`. Privé de sa dernière ligne, le texte est relu **sans refus**, et `v` revient sous la forme `setNames(list(), character(0))`, liste nommée vide.
+
+**Cause.** Un vecteur atomique nommé déclare son effectif sur sa ligne de valeurs, et non sur sa ligne `@noms`. Pour n = 0, la ligne `chemin/@noms<TAB>character<TAB>0` seule est aussi l'écriture **complète** d'une liste nommée vide ((e) de la même annotation). Le préfixe est donc un texte valide. Pour n ≥ 1, la coupure après `@noms` est refusée (*vérifié* sur `c(p = 1)`) : seul le cas n = 0 est en défaut.
+
+**(b) Atteignabilité : nulle par le package.** Selon la mesure d'`audit`, aucune fiche produite par le package ni aucun plan valide ne contient un vecteur atomique nommé de longueur 0. `architect` l'a recoupé sur deux champs (*vérifié*) : `valider_plan()` refuse `segmentation` et `etapes$donnees$exclusions` valant `setNames(character(0), character(0))` (vecteur « sans attribut » exigé).
+
+**(c) Décision** (session principale, 20/10/2026). `texte_objet()` **refuse à l'écriture**, par `serialisation_impossible` avec le chemin dans `details$chemin`, tout vecteur atomique de longueur 0 qui porte un attribut `names`. Cela vaut pour tous les types écrits, `Date` comprise : `atome()` admet aujourd'hui une `Date` nommée. La **grammaire 1 est inchangée** : aucune forme de ligne nouvelle, aucune version. La promesse de (d) est tenue par la restriction de l'écrivain, et se lit désormais ainsi : tout texte écrit par `ecrire_plan()` ou `ecrire_fiche()` dont on retire au moins une ligne du corps, en le coupant à une frontière de ligne, est refusé à la lecture.
+
+**(d) Conséquence sur le point 6.4.** Le domaine de l'aller-retour exclut le vecteur atomique nommé de longueur 0, qui ne s'écrit plus. Parmi les cas adverses de #50, « vecteurs vides » se lit « vecteurs vides sans noms ». Les listes vides, nommées ou non, restent dans le domaine ((e) de la troisième annotation).
+
+**(e) Options écartées.**
+- **Déclarer l'effectif d'un vecteur nommé sur sa ligne `@noms`, ou ajouter une ligne `@longueur`** : la forme de ligne change, et chaque vecteur nommé de chaque fiche reçoit une ligne de plus à lire, pour un cas qu'aucune fiche ni aucun plan valide n'atteint ((b)).
+- **Refuser à la lecture une ligne `@noms` de longueur 0 qui n'est suivie d'aucune ligne de valeurs** : impossible, car c'est l'écriture complète et légitime d'une liste nommée vide.
+
+**(f) Objection mineure d'`architect`, recommandation non tranchée.** Après la restriction, le lecteur continuera d'accepter un texte **édité à la main** qui porte `v/@noms<TAB>character<TAB>0` suivi de `v<TAB>double<TAB>0` (*vérifié* à `da565c7` : `lire_plan(ecrire_plan(x))` est `identical` à `x`). Il rendra alors un objet que l'écrivain refuse : la langue lue sera plus large que la langue écrite, et l'équivalence « tout texte lu se réécrit » ne tiendra plus. **Recommandation** : dans le même commit, refuser aussi ce cas à la lecture, par un motif `texte_*` (par exemple `texte_ligne_mal_formee`), avec son témoin. La promesse de (c) n'en dépend pas. La décision revient à la session principale ; si le refus n'est pas ajouté, l'écart est consigné comme limite admise dans le commit.
+
+**Tests attendus** dans le commit de `coder-approfondi` :
+- refus à l'écriture de `setNames(numeric(0), character(0))`, de `setNames(character(0), character(0))` et d'une `Date` nommée de longueur 0 ;
+- un vecteur nommé non vide et un vecteur vide sans noms restent écrits ;
+- le témoin des préfixes stricts est étendu à un objet qui finit par un vecteur nommé non vide.
+
+**Surface documentaire** (correction postérieure au passage de `docwriter`, revue sur son diff, règle 10) : `docs/latex/doc_outil_tables.tex`, l. ~4701 (« coupé à une frontière de ligne est toujours refusé ») et la liste des causes de `serialisation_impossible` ; commentaire `R/rapport.R:393-395`.
+
+**Effet sur les résultats : aucun.** Les fiches de R1 à R6 ne contiennent aucun vecteur atomique nommé de longueur 0 (mesure d'`audit`). Il s'agit d'un changement de comportement d'une fonction nouvelle de B4, jamais publiée : pas d'incrément de version (point 10 (a)), pas de visa.
+
+Issues : #50. Prolonge la troisième annotation du 19/10/2026 (décision M66). Branche `claude/fiche-serialisation`, PR #51.

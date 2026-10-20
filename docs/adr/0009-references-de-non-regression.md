@@ -572,3 +572,31 @@ La modification et ses témoins entrent dans le commit de #42 (`coder-approfondi
 **Effet sur les résultats** : aucun. La décision n'organise que les tests.
 
 Issues : #42, #35, #47. ADR 0011 (accepté, M64). Décision M64.
+
+## Annotation du 20 octobre 2026 — garde « entrée différente » (point 3.2) : limite de `entree_inchangee()` quand une nouvelle représentation change le corps du texte de l'entrée
+
+Rédigée par `architect` d'après un constat de `/code-review` lors de la revue finale de B4 (règle 10), branche `claude/fiche-serialisation`, PR #51, tête `da565c7`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. **Rien n'est implémenté** : l'annotation consigne une limite et ce qu'il faudra faire le jour où elle sera atteinte.
+
+**(a) Constat.** `entree_inchangee()` (`tests/test_reproductibilite.R:558-586`) reconstruit le texte canonique de l'entrée de référence sous l'ancienne représentation de la façon suivante : elle prend le texte courant, produit par le package, et remplace **seulement** l'en-tête de sa première ligne (les octets avant la première tabulation) par la valeur `fiche/empreintes/representation` de la référence. Le reste du texte est gardé tel quel, y compris la fin de la première ligne (nombre de lignes, nombre de colonnes). La garde **suppose** donc qu'une nouvelle représentation ne change rien d'autre que cet en-tête pour l'entrée de référence.
+
+**(b) Pourquoi c'était vrai pour B4.**
+- **#35** change l'écriture des doubles. Or les colonnes à rôle de l'entrée de référence sont `integer` (`id_contrat`, `id_tete`), `character` (`sexe`, `cause_sortie`) et `Date` (`date_naissance`, `date_entree`, `date_sortie`, de stockage double mais écrites en dates ISO, non en doubles). Aucune colonne n'est un double nu (*vérifié* à `da565c7`, `typeof` des colonnes de `jeu_reference()`).
+- **#19** ne change l'écriture des dates qu'hors de [1000, 9999], alors que les dates de l'entrée de référence vont de 1930 à 2024.
+
+Mesure à `da565c7` (*vérifiée*) : première ligne `tablexp canonique 2<TAB>100000<TAB>7`, MD5 `35ca55371e72f0f0103993d70e3a64d3`, égal à `fiche/empreintes/donnees` de `tests/reference/R1.tsv`.
+
+**(c) Nature de la limite.**
+1. **Déjà prévue en principe.** La troisième annotation du 19/10/2026, (f) 4, range dans les échecs de la preuve « une définition nouvelle qui changerait d'autres octets du texte de l'entrée que la première ligne ». Elle renvoie alors au changement de l'entrée de référence du point 4.2.
+2. **L'erreur est conservatrice** (*raisonnement*). Un futur changement de représentation qui modifie l'écriture d'un type présent dans l'entrée (`integer`, `character`, `Date`) ou la forme de la première ligne ferait échouer la garde **à tort** : elle conclurait que l'entrée a changé (message « l'entrée a changé », `tests/test_reproductibilite.R:585`). La garde ne peut pas, à l'inverse, conclure à tort que l'entrée est inchangée, sauf collision MD5, hypothèse non retenue.
+3. **Le diagnostic serait inexact.** Dans ce cas, l'entrée n'a pas changé : seul son texte a changé. Suivre la voie du point 4.2 (régénération de tous les plans, tableau des grandeurs agrégées, mention « l'entrée a changé » dans le commit) consignerait une cause fausse et ferait perdre le tableau avant / après grandeur par grandeur de la fiche.
+
+**(d) Ce qu'il faudra faire à ce moment-là.** La branche qui modifie l'écriture d'un type présent dans l'entrée de référence, ou la forme de la première ligne du texte canonique, choisit par annotation du présent ADR, **avant** son commit `moteur:`, l'une des voies suivantes :
+1. **Écrivain de la représentation précédente conservé le temps de la transition**, dans les tests et non dans le package : une copie figée, indépendante du moteur, à la manière de `texte_dates()` (`tests/reference/outils_reference.R`, #19). La garde calcule alors le texte de l'entrée sous l'ancienne représentation avec cet écrivain, au lieu de remplacer l'en-tête, et exige son MD5 égal à `fiche/empreintes/donnees` de la référence. Le contrôle de la réserve M2 (MD5 du texte courant égal à l'empreinte de l'objet) reste inchangé. L'écrivain figé est retiré par le commit des références qui ferme la transition. C'est la voie mécanique (`CLAUDE.md`, « Workflows », principe 7) : **recommandée**.
+2. **Preuve hors de R de l'entrée inchangée**, comme pour #35 (ADR 0011, point 2.5), consignée dans le commit. Elle complète la voie 1 sans la remplacer : seule, elle laisserait la garde de la batterie en échec.
+3. **Voie du point 4.2 assumée**, quand le changement de représentation coïncide avec un vrai changement de l'entrée (par exemple une modification du simulateur) : régénération de tous les plans, tableau des grandeurs agrégées, visa.
+
+Dans tous les cas, le message de la garde devra nommer cette cause possible. Une garde qui échoue alors que seule `representation` est déclarée changée signale une nouvelle définition qui touche le corps du texte, et non une entrée changée : c'est le diagnostic à poser d'abord.
+
+**Effet sur les résultats : aucun.** Aucun code n'est modifié ; la garde est inchangée et reste juste pour B4 ((b)).
+
+Issues : #35, #19, #47 (garde de la troisième annotation, (f)). ADR 0011, points 2.5 et 10. Branche `claude/fiche-serialisation`, PR #51.
