@@ -36,7 +36,15 @@
 #  Arithmétique de dates entière et vectorisée (calendrier grégorien
 #  proleptique), écrite indépendamment de celle du simulateur, qu'aucun
 #  module du moteur n'appelle (ADR 0007, point 2.1) ; vérifiée contre
-#  as.Date() et age_revolu() dans les tests.
+#  as.Date() et age_revolu() dans les tests. Elle double volontairement
+#  composantes_date() de `donnees` (enveloppe de as.POSIXlt, dont dépend
+#  age_revolu()) et les jours civils du simulateur (M89, #22 point 3) : trois
+#  implémentations indépendantes de la même convention du 29/02 (T2), dont
+#  l'accord est vérifié sur [0001-01-01, 9999-12-31] (tests/unitaires/
+#  test_exposition.R) : exhaustif pour la décomposition et les jours civils,
+#  exhaustif sur les naissances à six âges et sur les naissances voisines du
+#  29/02 à tous les âges pour les anniversaires, par tirage et par balayage
+#  pour les âges ; ne pas les unifier sans reprendre ce test.
 #  Ce module n'appelle que `donnees` et `outils` (ADR 0007, point 2.1).
 # -----------------------------------------------------------------------------
 

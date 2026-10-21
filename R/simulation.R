@@ -135,7 +135,14 @@ loi_effective <- function(loi_t, cause, sexes) {
 
 # Jours depuis 1970-01-01 de la date civile (an, mois 1-12, jour), calendrier
 # grégorien proleptique (algorithme « days from civil », arithmétique
-# entière ; vectorisé ; vérifié contre as.Date dans les tests).
+# entière ; vectorisé ; vérifié contre as.Date dans les tests). Implémentation
+# volontairement indépendante de celle du module `exposition` (M89, #22
+# point 3) : le sens inverse, la décomposition d'un jour en composantes, passe
+# par composantes_date() de `donnees`, simple enveloppe de as.POSIXlt ; l'accord
+# des trois arithmétiques est vérifié sur [0001-01-01, 9999-12-31]
+# (tests/unitaires/test_exposition.R) : exhaustif pour la décomposition et les
+# jours civils, partiel (six âges, naissances voisines du 29/02, tirage et
+# balayage) pour les anniversaires et les âges.
 jours_civils <- function(an, mois, jour) {
   a <- an - (mois <= 2L)
   ere <- a %/% 400L
