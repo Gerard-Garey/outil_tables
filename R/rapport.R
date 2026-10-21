@@ -170,6 +170,46 @@ octets_lignes <- function(textes) {
   charToRaw(paste0(textes, "\n", collapse = ""))
 }
 
+# Octets des lignes textes[i] (une valeur par ligne, LF final), égaux à
+# octets_lignes(textes[i]) : chaque valeur de `textes` est écrite une fois,
+# puis ses octets sont recopiés par indice (sequence()), sans une chaîne par
+# ligne (#71). `textes` : ASCII (dates) ; `i` : indices dans `textes`, sans NA.
+octets_lignes_indices <- function(textes, i) {
+  if (!length(i)) return(raw(0))
+  octets <- octets_lignes(textes)
+  longueur <- nchar(textes, type = "bytes") + 1L
+  debut <- cumsum(longueur) - longueur + 1L
+  octets[sequence(longueur[i], from = debut[i])]
+}
+
+# Octets de sprintf("%d", x) (integer), une valeur par ligne, LF final, écrits
+# en raw sans chaîne intermédiaire (#71) : une colonne d'octets par valeur
+# (signe, nc chiffres, LF ; nc chiffres de max(|x|), deux au moins pour
+# « NA »), les places inoccupées à 0x00, retirées à la fin (aucun octet 0x00
+# dans l'écriture). Chiffre de rang k > 0 écrit si le quotient par 10^k est
+# non nul (aucun zéro de tête) ; NA s'écrit « NA ».
+octets_entiers <- function(x) {
+  if (!length(x)) return(raw(0))
+  x <- as.vector(x)
+  na <- is.na(x)
+  q <- abs(x)
+  q[na] <- 0L
+  nc <- max(2L, nchar(sprintf("%d", max(q))))
+  rangs <- vector("list", nc + 2L)
+  rangs[[nc + 2L]] <- rep.int(as.raw(0x0a), length(x))
+  unite <- q %% 10L + 48L
+  unite[na] <- 0x41L
+  rangs[[nc + 1L]] <- as.raw(unite)
+  for (r in nc:2) {
+    q <- q %/% 10L
+    rangs[[r]] <- as.raw((q %% 10L + 48L) * (q > 0L))
+  }
+  rangs[[nc]][na] <- as.raw(0x4e)
+  rangs[[1L]] <- as.raw(0x2dL * (!na & x < 0L))
+  m <- do.call(rbind, rangs)
+  m[m != as.raw(0L)]
+}
+
 # Écriture ISO 8601 AAAA-MM-JJ, année sur quatre chiffres (ADR 0011, point 4 ;
 # #19), de jours `u` depuis 1970-01-01 entiers, finis et dans le domaine
 # (contrôlés par l'appelant) ; partagée par l'écrivain (ecrire_valeurs()) et
@@ -272,7 +312,7 @@ ecrire_valeurs <- function(x, forme, role) {
     txt <- ifelse(is.nan(u), "NaN", "NA")
     k <- !is.na(u)
     if (any(k)) txt[k] <- texte_date(u[k])
-    return(list(type = "Date", octets = octets_lignes(txt[match(j, u)])))
+    return(list(type = "Date", octets = octets_lignes_indices(txt, match(j, u))))
   }
   if (is.object(x))
     refuser("rapport", "type_non_canonique",
@@ -280,7 +320,7 @@ ecrire_valeurs <- function(x, forme, role) {
                     paste(class(x), collapse = "/")),
             list(role = role))
   if (is.character(x)) return(list(type = "character", octets = octets_chaines(x, role)))
-  if (is.integer(x)) return(list(type = "integer", octets = octets_lignes(sprintf("%d", x))))
+  if (is.integer(x)) return(list(type = "integer", octets = octets_entiers(x)))
   if (is.double(x)) {
     x <- as.vector(x)
     return(list(type = "double", octets = if (!length(x)) raw(0) else if (forme == "empreinte") doubles_empreinte(x)
