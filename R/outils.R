@@ -11,6 +11,8 @@
 #    (forme canonique des valeurs du plan, #23) ;
 #  - liste_aux_noms() et chaine_unique() : les deux contrôles de forme qui s'y
 #    appuient, partagés par les modules (#48) ;
+#  - noms_complets() : la règle des noms complets, écrite une seule fois et
+#    partagée par les modules et l'orchestration (#22, notes de B6) ;
 #  - texte_moteur() : texte produit par le moteur marqué UTF-8, quelle que
 #    soit la locale d'installation ou d'exécution (#50).
 #
@@ -81,6 +83,12 @@ liste_aux_noms <- function(x, noms) {
 chaine_unique <- function(v) {
   forme_exacte(v, "character") && length(v) == 1L && !is.na(v) && nzchar(v)
 }
+
+# Noms complets (#60, #62 ; #22, notes de B6) : présents (non NULL), sans NA et
+# non vides. Prédicat sur les noms seuls, `names(x)` : la forme de l'objet, les
+# doublons et la liste vide sans noms sont l'affaire de l'appelant. Rend TRUE ou
+# FALSE, jamais NA.
+noms_complets <- function(noms) !is.null(noms) && !anyNA(noms) && all(nzchar(noms))
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
 # data.frame (etape, code, message, nombre), restitué dans l'objet. avertir()
