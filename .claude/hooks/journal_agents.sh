@@ -98,7 +98,7 @@ ligne = {
 }
 def meta_present(c):
     try:
-        return isinstance(c, str) and os.path.exists(c[:-len(".jsonl")] + ".meta.json")
+        return isinstance(c, str) and c.endswith(".jsonl") and os.path.exists(c[:-len(".jsonl")] + ".meta.json")
     except Exception:
         return False
 
