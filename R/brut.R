@@ -274,7 +274,9 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
 #   exposition   : table de l'étape `exposition`, appariée par clé (segment,
 #                  âge), quel que soit l'ordre de ses lignes ;
 #   segmentation, transition, periode, delai_declaration : champs du plan,
-#                  déjà contrôlés par calculer_taux_bruts() (#22) ;
+#                  non contrôlés ici : contrôlés par calculer_taux_bruts() en
+#                  appel direct, par valider_plan() sous construire_table()
+#                  (controler = FALSE) (#22) ;
 #   convention   : convention d'âge retenue par l'étape `exposition` ;
 #   niveau       : niveau de confiance de l'intervalle asymptotique ;
 #   parametres_exposition : paramètres de l'étape `exposition`
@@ -295,8 +297,12 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
 # vides, par cummax().
 taux_kaplan_meier <- function(observations, exposition, segmentation, transition, periode,
                               delai_declaration, convention, niveau, parametres_exposition) {
-  # Garde (#22) : la segmentation est contrôlée par calculer_taux_bruts() ; un
-  # doublon donnerait une table à colonne parasite (sexe.1), non un refus.
+  # Garde (#22) : la segmentation est contrôlée en amont (calculer_taux_bruts(),
+  # ou valider_plan() sous construire_table()) ; ce garde protège l'appel
+  # direct de cette fonction et, par elle, le chemin Kaplan-Meier de
+  # calculer_taux_bruts(controler = FALSE) ; les autres estimateurs ne sont pas
+  # gardés sous FALSE. Un doublon donnerait une table à colonne parasite
+  # (sexe.1), non un refus.
   if (anyDuplicated(segmentation))
     stop("taux_kaplan_meier() : segmentation avec doublon (erreur de programmation).", call. = FALSE)
   p <- valeurs_parametres_donnees(transition, periode, delai_declaration)
@@ -493,7 +499,12 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
 #                      transition, la période et le délai ; FALSE, réservé à
 #                      construire_table() qui les a contrôlés (valider_plan()),
 #                      n'en refait aucun (#22 ; seule la valeur FALSE les
-#                      omet).
+#                      omet) : avec FALSE, aucune entrée n'est gardée ici,
+#                      l'appelant, construire_table(), a tout contrôlé ; le
+#                      garde de doublon de taux_kaplan_meier() garde l'appel
+#                      direct de cette fonction et, par elle, le chemin
+#                      Kaplan-Meier de calculer_taux_bruts(controler = FALSE) ;
+#                      les autres estimateurs ne sont pas gardés sous FALSE.
 # Rend list(parametres, resultat, diagnostics, avertissements) ;
 # resultat : une table par estimateur retenu, dans l'ordre canonique, aux
 # mêmes lignes et dans le même ordre que la table d'exposition (zéro ligne

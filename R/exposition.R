@@ -41,10 +41,10 @@
 #  age_revolu()) et les jours civils du simulateur (M89, #22 point 3) : trois
 #  implémentations indépendantes de la même convention du 29/02 (T2), dont
 #  l'accord est vérifié sur [0001-01-01, 9999-12-31] (tests/unitaires/
-#  test_exposition.R) : exhaustif pour la décomposition et les jours civils,
-#  exhaustif sur les naissances à six âges et sur les naissances voisines du
-#  29/02 à tous les âges pour les anniversaires, par tirage et par balayage
-#  pour les âges ; ne pas les unifier sans reprendre ce test.
+#  test_exposition.R) : exhaustif pour la décomposition et les jours civils ;
+#  pour les anniversaires, exhaustif sur le sous-domaine énuméré (six âges ;
+#  28/02, 29/02 et 01/03 des années bissextiles), partiel sur le domaine ; pour
+#  les âges, par tirage et balayage ; ne pas les unifier sans reprendre ce test.
 #  Ce module n'appelle que `donnees` et `outils` (ADR 0007, point 2.1).
 # -----------------------------------------------------------------------------
 
@@ -361,7 +361,9 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #                       et la convention ; FALSE, réservé à construire_table()
 #                       qui les a contrôlés (valider_plan(), controler_roles(),
 #                       deduire_recette(), resoudre_convention()), n'en refait
-#                       aucun (#22 ; seule la valeur FALSE les omet).
+#                       aucun (#22 ; seule la valeur FALSE les omet) : avec
+#                       FALSE, aucune entrée n'est gardée ici, l'appelant,
+#                       construire_table(), a tout contrôlé.
 # Rend list(parametres, resultat, diagnostics, avertissements, fenetres) ;
 # fenetres (#38) : objet de classe `fenetres_exposition`, fenêtres des
 # observations (composantes, calendrier, a, b, evenement :
