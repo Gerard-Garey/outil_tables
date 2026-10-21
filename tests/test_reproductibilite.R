@@ -637,11 +637,36 @@ issue_des_restes <- function(transitions) {
   (if (length(t)) t else transitions)[[1L]]$issue
 }
 
+# Oracle de l'empreinte du résultat (#71) : empreinte_resultat(), texte_objet()
+# et ecrire_valeurs() du package, réévalués dans un environnement où les
+# écrivains des entiers et des dates sont ceux d'avant #71 (R/rapport.R à
+# 5a95f9c : octets_lignes(sprintf("%d", x)) et octets_lignes(txt[match(j,
+# u)])). Les références ne comparent que le jeton de l'empreinte (ADR 0009,
+# seconde annotation du 20/10/2026) : l'égalité à l'oracle en garde la valeur,
+# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R6 ne
+# portent aucun entier ni aucune date négatifs : le signe est gardé par les
+# tests unitaires des écrivains, non par cet oracle.
+oracle_empreinte_resultat <- local({
+  ns <- asNamespace("tablexp")
+  e <- new.env(parent = ns)
+  e$octets_entiers <- function(x) ns$octets_lignes(sprintf("%d", x))
+  e$octets_lignes_indices <- function(textes, i) ns$octets_lignes(textes[i])
+  for (f in c("ecrire_valeurs", "texte_objet", "empreinte_resultat")) {
+    g <- get(f, envir = ns)
+    environment(g) <- e
+    assign(f, g, envir = e)
+  }
+  e$empreinte_resultat
+})
+
 jeu_ref <- jeu_reference()
 aplatis <- list()
 for (p in plans_reference()) {
   id <- p$identifiant
   x_ref <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan)
+  verifier(sprintf("%s : empreinte du résultat égale à celle de l'oracle d'avant #71 (écrivains des entiers et des dates par une chaîne par ligne)", id),
+           grepl("^[0-9a-f]{32}$", x_ref$fiche$empreintes$resultat) &&
+             identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
   g <- tryCatch(aplatir_construction(x_ref), refus_reference = function(e) e)
   verifier(sprintf("%s : aplatissement sans refus d'écriture", id),
            if (inherits(g, "refus_reference")) conditionMessage(g) else TRUE)

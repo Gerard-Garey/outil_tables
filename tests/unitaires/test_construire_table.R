@@ -1167,6 +1167,58 @@ local({
   })
 })
 
+# --- écriture des entiers et des dates sans chaîne par ligne (#71) ---
+#
+# Oracle : écrivains d'avant #71 (R/rapport.R à 5a95f9c), recopiés ici :
+# entier par octets_lignes(sprintf("%d", x)), date par
+# octets_lignes(txt[match(j, u)]), soit octets_lignes(textes[i]) pour
+# octets_lignes_indices(textes, i). Identité exacte des octets, dans les deux
+# formes. Valeurs pseudo-aléatoires sans générateur : (k * 2654435761) mod
+# (2^32 - 1) - (2^31 - 1), exact en double (produit < 2^53), dans
+# [-(2^31 - 1), 2^31 - 1].
+local({
+  ol <- tablexp:::octets_lignes
+  oe <- tablexp:::octets_entiers
+  oli <- tablexp:::octets_lignes_indices
+  ev <- tablexp:::ecrire_valeurs
+  oracle <- function(x) ol(sprintf("%d", x))
+  im <- .Machine$integer.max
+  k <- seq_len(1e5)
+  CAS <- list(integer(0), NA_integer_, 0L, 7L, -1L, c(NA_integer_, NA), c(a = 1L, b = -2L, c = NA), matrix(c(1:5, NA), 2L),
+              c(0L, 1L, -1L, 9L, 10L, -10L, 99L, 100L, -100L, im, -im, 999999999L, 1000000000L, -1000000000L, NA),
+              rep(7L, 50L), -(1:2000), 1:1e5, rep(c(NA, 3L), 1000L),
+              as.integer((k * 2654435761) %% (2^32 - 1) - (2^31 - 1)))
+  verifier(sprintf("octets_entiers() et ecrire_valeurs(integer), deux formes : octets identiques à octets_lignes(sprintf(\"%%d\", x)), %d cas (vide, NA, 0, signes, 1 à 10 chiffres, ±(2^31 - 1), noms, dim, constante, 10^5 valeurs)",
+                   length(CAS)), {
+    ko <- which(!vapply(CAS, function(x) identical(oe(x), oracle(x)) && identical(ev(x, "empreinte", "x")$octets, oracle(x)) &&
+                                         identical(ev(x, "texte", "x")$octets, oracle(x)) &&
+                                         identical(ev(x, "texte", "x")$type, "integer"), NA))
+    if (!length(ko)) TRUE else paste("cas en écart :", paste(ko, collapse = ", "))
+  })
+  verifier("octets_entiers() : sortie à la main (NA, 0, -1, 2147483647, -2147483647, 10)",
+           identical(rawToChar(oe(c(NA, 0L, -1L, im, -im, 10L))), "NA\n0\n-1\n2147483647\n-2147483647\n10\n"))
+  TXT <- c("1970-01-01", "NA", "NaN", "", "0001-01-01", "x")
+  INDICES <- list(integer(0), 1L, 4L, c(4L, 4L), 6:1, rep(2:3, 100L), c(1L, 1L, 5L, 4L, 1L), (k %% 6L) + 1L)
+  verifier(sprintf("octets_lignes_indices() : octets identiques à octets_lignes(textes[i]), %d suites d'indices (vide, texte vide, répétitions, ordre inverse, 10^5 indices)",
+                   length(INDICES)), {
+    ko <- which(!vapply(INDICES, function(i) identical(oli(TXT, i), ol(TXT[i])), NA))
+    if (!length(ko)) TRUE else paste("suites en écart :", paste(ko, collapse = ", "))
+  })
+  verifier("ecrire_valeurs(Date), deux formes : octets identiques à l'écriture d'avant #71 (texte des valeurs distinctes, une chaîne par ligne), NA, NaN, stockage integer, valeurs répétées, 10^5 jours du domaine", {
+    J <- function(j) structure(j, class = "Date")
+    avant <- function(x) {
+      j <- as.vector(unclass(x)); u <- unique(j)
+      txt <- ifelse(is.nan(u), "NaN", "NA"); a <- !is.na(u)
+      if (any(a)) txt[a] <- tablexp:::texte_date(u[a])
+      ol(txt[match(j, u)])
+    }
+    dates <- list(J(numeric(0)), J(NA), J(NaN), J(c(0, NA, NaN, 0, -719162, 2932896, NA)), J(c(3L, NA, 3L, 0L)),
+                  J(-719162 + (k * 2654435761) %% 3652059))
+    all(vapply(dates, function(x) identical(ev(x, "empreinte", "d")$octets, avant(x)) &&
+                                    identical(ev(x, "texte", "d")$octets, avant(x)), NA))
+  })
+})
+
 # --- dates : année sur quatre chiffres, refus hors du domaine (#19 ; ADR 0011, point 4) ---
 
 # Nature des attendus : textes écrits à la main ; jours depuis 1970-01-01 des
