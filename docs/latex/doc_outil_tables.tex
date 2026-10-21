@@ -3023,18 +3023,23 @@ L'arithmétique des dates du module (années bissextiles, anniversaires,
 indépendamment de celle du simulateur~; elle est recoupée par \code{as.Date()}
 et comparée à \code{age\_revolu()} du module \code{donnees}, écrite
 indépendamment, dans les tests. Trois implémentations de la convention du
-29~février (section~\ref{sec:conventions-temps}) coexistent ainsi
-\textbf{volontairement} (décision M89, issue~\#22, point~3)~: celle du module
+29~février (section~\ref{sec:conventions-temps}) sont
+\textbf{volontairement} conservées (décision M89, issue~\#22, point~3)~: celle du module
 \code{donnees} (\code{composantes\_date()}, enveloppe de \code{as.POSIXlt},
 sur laquelle repose \code{age\_revolu()}), celle-ci, et les jours civils du
 simulateur (\code{jours\_civils()}, \code{jour\_anniversaire()},
 \code{age\_anniversaire()}, section~\ref{sec:simulation}), qu'aucun module
-du moteur n'appelle (ADR 0007, point~2.1). Elles ne sont pas unifiées~:
-chacune sert de contrôle aux deux autres, et le simulateur, qui produit les
+du moteur n'appelle (ADR 0007, point~2.1). Le motif de ne pas les unifier,
+qui relève de la présente rédaction et non de la décision M89, est double~:
+elles se contrôlent l'une l'autre par comparaison directe pour la
+décomposition d'un jour, les jours civils et les âges, et par l'intermédiaire
+de \code{as.Date()}, oracle commun, pour les anniversaires et les bornes du
+domaine~; et le simulateur, qui produit les
 jeux sur lesquels le moteur est vérifié, ne partage pas avec lui une erreur
-de calendrier qu'aucune comparaison ne révélerait alors. Leur accord sur le
+de calendrier que la comparaison du moteur à la loi vraie des jeux simulés
+ne révélerait pas. Leur accord sur le
 domaine [0001-01-01, 9999-12-31] est vérifié, avec \code{as.Date()} pour
-oracle (section~\ref{sec:verifications-exposition})~: exhaustivement pour
+oracle des anniversaires et des bornes (section~\ref{sec:verifications-exposition})~: exhaustivement pour
 la décomposition d'un jour en année, mois et jour et pour les jours civils,
 partiellement pour les anniversaires et les âges.
 
@@ -3282,7 +3287,8 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 point~3~; section~\ref{sec:recettes}, «~Statut des valeurs~»).
 \code{tests/unitaires/test\_exposition.R} compare les implémentations des
 modules \code{donnees}, \code{exposition} et du simulateur, sans les
-modifier, avec \code{as.Date()} pour oracle externe~:
+modifier, avec \code{as.Date()} pour oracle externe des anniversaires et
+des bornes~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{décomposition}, exhaustive~: pour chaque jour du
     0001-01-01 au 9999-12-31, \code{composantes\_date()} et
@@ -3311,7 +3317,9 @@ modifier, avec \code{as.Date()} pour oracle externe~:
   \item \textbf{témoin écrit à la main}~: pour une naissance le
     29~février de l'an 4, anniversaires et âges aux années séculaires
     communes (le 1\textsuperscript{er}~mars) et bissextiles (le
-    29~février), par les trois arithmétiques.
+    29~février), les anniversaires par les deux fonctions qui les
+    calculent (\code{anniversaire\_age()} et \code{jour\_anniversaire()}),
+    les âges par les trois fonctions d'âge.
 \end{itemize}
 L'accord exhaustif couvre tous les jours du domaine (vérification par
 énumération, sur la plateforme où la batterie s'exécute)~; l'accord partiel
@@ -5275,7 +5283,8 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     du 20/10/2026, (f), et par M71)~; son optimisation, qui devait garder le même texte
     empreinté, est l'objet de l'issue~\#71. Celle-ci a réécrit l'écriture
     des entiers et des dates sans une chaîne par ligne, à texte empreinté
-    inchangé octet pour octet (section~\ref{sec:verifications-rapport},
+    inchangé octet pour octet, identité \emph{constatée} sur les cas
+    vérifiés, non démontrée (section~\ref{sec:verifications-rapport},
     «~Écriture des entiers et des dates~»). Le gain est un constat de
     mesure à $10^6$~lignes, hors plateforme de référence, consigné avec le
     commit \code{cf24e73}~; la cible de l'issue, un temps d'empreinte du
@@ -5724,7 +5733,8 @@ référence est égale à celle que donne un oracle, \code{empreinte\_resultat()
 réévaluée avec les écrivains antérieurs des entiers et des dates~; l'oracle
 remplace une valeur figée, l'empreinte du résultat ne valant que sur une
 même machine (section~\ref{sec:empreinte-resultat}). Les plans de référence
-ne portent aucun entier ni aucune date négatifs~: le signe est gardé par les
+ne portent aucun entier négatif (les dates s'écrivent en ISO, sans
+signe)~: le signe des entiers est gardé par les
 tests unitaires, non par cet oracle. Les statuts sont ceux de l'écriture
 des chaînes~: l'identité des octets à ceux de l'écriture antérieure est
 \emph{constatée} sur ces cas, non démontrée. Le script
