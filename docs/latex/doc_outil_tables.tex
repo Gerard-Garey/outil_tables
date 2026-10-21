@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{20/10/2026}
+\newcommand{\datedoc}{21/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -572,7 +572,9 @@ que le contrôle de la forme exacte d'une valeur reçue, \code{forme\_exacte()}
 les deux contrôles de forme qui s'y appuient, partagés par les modules~:
 \code{liste\_aux\_noms()} (liste nue aux noms exacts) et
 \code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
-issue~\#48). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+issue~\#48), ainsi que la règle des noms complets, \code{noms\_complets()}
+(noms présents, sans \code{NA} ni nom vide), écrite une seule fois pour le
+contrôle des rôles et pour celui du plan (issue~\#22). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -2055,8 +2057,9 @@ section~\ref{sec:sous-graine}), aux rôles reçus par \code{controler\_roles()}
 section~\ref{sec:controles-donnees}~; issue~\#62), au mode du portefeuille
 simulé (refus \code{portefeuille\_invalide},
 section~\ref{sec:portefeuille-simule}~; issue~\#60) et, à
-l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()}, à la
-segmentation, contrôlée dans sa forme et dans son catalogue par le même
+l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()} (argument
+\code{controler} à sa valeur par défaut, \code{TRUE}~;
+section~\ref{sec:execution}), à la segmentation, contrôlée dans sa forme et dans son catalogue par le même
 contrôle que dans le plan, \code{controler\_segmentation()} (refus
 \code{segmentation\_invalide} du module \code{brut},
 section~\ref{sec:brut-etape}~; issues~\#43 et~\#59). Pour
@@ -2088,7 +2091,10 @@ sont des listes nommées \textbf{nues}, dont le seul attribut admis est
 celui des noms~: un \code{data.frame}, un objet de classe ou une liste
 munie d'un autre attribut est refusé sous \code{plan\_mal\_forme},
 \code{etapes\_mal\_formees} ou \code{parametres\_mal\_formes} (issue~\#23).
-Leurs noms sont présents, non vides et non manquants (\code{noms\_complets()})~;
+Leurs noms sont présents, non vides et non manquants
+(\code{liste\_noms\_complets()}, qui leur applique la règle
+\code{noms\_complets()} du module \code{outils},
+section~\ref{sec:fonctions-outils})~;
 un nom en double est refusé sous \code{plan\_mal\_forme} ou
 \code{parametres\_mal\_formes} (\code{liste\_nommee()}), mais, dans
 \code{etapes}, sous \code{etape\_en\_double}, qui nomme les étapes répétées, et
@@ -2097,7 +2103,8 @@ Elle ne réimplémente pas les contrôles de valeur~: elle appelle ceux des modu
 (\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
 \code{controler\_parametres\_brut()}), dont les codes et le module sont ainsi identiques, quelle que soit la
 fonction qui détecte la condition (ADR 0007, annotation du 17/10/2026,
-point~d).\par}
+point~d). Dans une construction, ces contrôles ne sont faits que là~: les
+fonctions d'étape ne les refont pas (section~\ref{sec:execution}).\par}
 
 \begin{encadre}
 \small
@@ -2124,7 +2131,16 @@ canonique~; contrôle des rôles (\code{controler\_roles()})~; déduction de la 
 si le plan comprend l'étape \code{exposition}, de la convention retenue~;
 contrôle de la provenance~; calcul de l'empreinte des données reçues
 (section~\ref{sec:empreinte}). Tout refus possible avant le calcul a donc lieu
-avant la première étape. Les étapes s'exécutent ensuite dans l'ordre du plan,
+avant la première étape. Chaque contrôle n'y est exécuté qu'une fois
+(issue~\#22)~: \code{construire\_table()} appelle chaque fonction d'étape
+avec son argument interne \code{controler = FALSE}, sous lequel elle ne
+refait aucun de ces contrôles (ses paramètres et, selon l'étape, les rôles,
+la recette, la convention et la segmentation), et reprend les valeurs qui en dérivent par des fonctions
+qui ne contrôlent rien (\code{valeurs\_parametres\_donnees()},
+\code{recette\_branche()}, \code{convention\_retenue()}). Appelée
+directement, avec la valeur par défaut \code{controler = TRUE}, une fonction
+d'étape fait elle-même ses contrôles, chacun une fois, et en lève les
+refus~; seule la valeur \code{FALSE} les omet. Les étapes s'exécutent ensuite dans l'ordre du plan,
 chacune par sa fonction d'étape, qui rend ses paramètres effectifs, son
 résultat, ses diagnostics et ses avertissements~; l'étape \code{exposition}
 lit la table des observations de l'étape \code{donnees}~; l'étape \code{brut}
@@ -2197,6 +2213,20 @@ d'un autre attribut est refusée sous le motif du paramètre, porté par le
 module qui le contrôle~; issue~\#23), la cohérence entre \code{ETAPES} et les fonctions
 d'étape appelées, la structure de l'objet et de la fiche, et des identités
 exactes sur un portefeuille simulé (section~\ref{sec:verifications-exposition}).
+Il vérifie aussi que les contrôles ne sont pas répétés (issue~\#22)~: le
+nombre d'exécutions de chaque contrôle, compté par \code{trace()} sur
+l'espace de noms installé, vaut un par construction (plan avec ou sans
+\code{kaplan\_meier}, plan réduit à l'étape \code{donnees}~; aucun contrôle
+n'est exécuté au-delà d'un refus de \code{valider\_plan()}), et un par contrôle que fait chaque
+fonction d'étape appelée directement, \code{taux\_kaplan\_meier()} n'en
+faisant aucun~; les refus de l'appel direct gardent leur module et leur
+motif~; seule la valeur \code{FALSE} de \code{controler} omet les
+contrôles~; sur des entrées valides, chaque fonction d'étape rend sous
+\code{controler = FALSE} un objet \code{identical()} à celui de l'appel
+avec contrôle, et chaque valeur dérivée sans contrôle est égale à celle que
+rend le contrôle correspondant~; une segmentation dupliquée passée à
+\code{taux\_kaplan\_meier()} arrête le calcul par une erreur de
+programmation, non par un refus.
 \code{tests/test\_reproductibilite.R} vérifie que deux constructions
 identiques sont \code{identical()} hors \code{execution}, dans le même
 processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\par}
@@ -2288,7 +2318,10 @@ fenêtre d'observation.
     calcul, conséquence de la formule (spécification, A.0, T2), validée par
     \code{actuary} le 17/10/2026, d'impact négligeable (un jour d'exposition
     déplacé entre deux âges, pour les seules naissances du 29~février)~;
-    aucune source juridique n'est établie à son sujet.
+    aucune source juridique n'est établie à son sujet. Elle est appliquée
+    par trois arithmétiques de dates écrites indépendamment (modules
+    \code{donnees} et \code{exposition}, simulateur), dont l'accord est
+    vérifié (section~\ref{sec:verifications-exposition}).
   \item \textbf{Période d'observation et délai de déclaration.} La période
     $[\text{début}, \text{fin}]$ est déclarée par le plan, fin incluse, jamais
     déduite des données (E2.5). Le délai de déclaration est un nombre entier
@@ -2436,7 +2469,11 @@ message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
 
 \medskip
 {\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
-reçoit~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
+reçoit, les cinq premiers motifs ci-dessous par
+\code{controler\_transition\_periode()}, qui contrôle la transition, la
+période et le délai et que la fonction d'étape \code{brut} appelle aussi
+pour \code{kaplan\_meier} en appel direct (section~\ref{sec:brut-etape}),
+les suivants par elle-même~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
 \code{data.frame} ou une liste munie d'un autre attribut que ses noms~---, de
 champs autres qu'exactement \code{depart} et \code{arrivee}, ou d'un élément
 de plus, même nommé \code{NA}~; état qui n'est pas une chaîne unique sans
@@ -2453,7 +2490,7 @@ entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
 (autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
 doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis~;
 contrôle \code{controler\_segmentation()}, partagé avec la fonction d'étape
-\code{calculer\_taux\_bruts()}, section~\ref{sec:brut-etape})~;
+\code{calculer\_taux\_bruts()} en appel direct, section~\ref{sec:brut-etape})~;
 \code{exclusions\_invalides} (autre chose qu'un vecteur \code{character} sans
 attribut, sans \code{NA} ni doublon, vide explicite admis)~;
 \code{exclusion\_inconnue} (code absent de la liste fermée des motifs). Les
@@ -2463,7 +2500,13 @@ refusé sous ce motif et non sous \code{exclusion\_inconnue}. Les noms de champs
 appariement partiel. Le même contrôle est appelé par \code{valider\_plan()},
 avant toute étape~: un code désigne une condition, quelle que soit la fonction
 qui la détecte, et le refus porte le module \code{donnees} (ADR 0007,
-annotation du 17/10/2026, point~d).\par}
+annotation du 17/10/2026, point~d). Dans une construction, il n'est appelé
+que là, une fois~: \code{preparer\_donnees()}, appelée avec
+\code{controler = FALSE}, ne contrôle ni ces paramètres ni les rôles, déjà
+contrôlés, et reprend la transition retenue, les bornes de la période et la
+borne $B$ par \code{valeurs\_parametres\_donnees()}~; appelée directement,
+elle appelle ce contrôle, puis \code{controler\_roles()}
+(section~\ref{sec:execution}).\par}
 
 \subsubsection*{Motifs d'invalidité des lignes}
 
@@ -2875,7 +2918,13 @@ les créent. \code{deduire\_recette()} retient la recette dont tous les rôles
 requis sont déclarés, ou refuse (\code{aucune\_recette}, le message nommant la
 recette et les rôles absents)~; dans \code{construire\_table()}, le même
 manque est détecté plus tôt par le contrôle des rôles, avec le même code et le
-module \code{donnees}.
+module \code{donnees}. \code{construire\_table()} appelle
+\code{deduire\_recette()} une fois, avant toute étape~; la fonction d'étape,
+appelée avec \code{controler = FALSE} (section~\ref{sec:execution}), ne la
+rappelle pas et lit la recette de la branche, sa convention native et ses
+rôles requis par \code{recette\_branche()}, qui ne contrôle rien~; appelée
+directement, elle appelle \code{deduire\_recette()}. Cette lecture sans
+contrôle vaut tant que la branche n'a qu'une recette.
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -2973,7 +3022,21 @@ L'arithmétique des dates du module (années bissextiles, anniversaires,
 1\textsuperscript{er}~janvier) est entière et vectorisée, écrite
 indépendamment de celle du simulateur~; elle est recoupée par \code{as.Date()}
 et comparée à \code{age\_revolu()} du module \code{donnees}, écrite
-indépendamment, dans les tests.
+indépendamment, dans les tests. Trois implémentations de la convention du
+29~février (section~\ref{sec:conventions-temps}) coexistent ainsi
+\textbf{volontairement} (décision M89, issue~\#22, point~3)~: celle du module
+\code{donnees} (\code{composantes\_date()}, enveloppe de \code{as.POSIXlt},
+sur laquelle repose \code{age\_revolu()}), celle-ci, et les jours civils du
+simulateur (\code{jours\_civils()}, \code{jour\_anniversaire()},
+\code{age\_anniversaire()}, section~\ref{sec:simulation}), qu'aucun module
+du moteur n'appelle (ADR 0007, point~2.1). Elles ne sont pas unifiées~:
+chacune sert de contrôle aux deux autres, et le simulateur, qui produit les
+jeux sur lesquels le moteur est vérifié, ne partage pas avec lui une erreur
+de calendrier qu'aucune comparaison ne révélerait alors. Leur accord sur le
+domaine [0001-01-01, 9999-12-31] est vérifié, avec \code{as.Date()} pour
+oracle (section~\ref{sec:verifications-exposition})~: exhaustivement pour
+la décomposition d'un jour en année, mois et jour et pour les jours civils,
+partiellement pour les anniversaires et les âges.
 
 \subsection{Troncature à gauche et censure à droite}
 \label{sec:troncature-censure}
@@ -3214,6 +3277,46 @@ par âge au dernier anniversaire~; avec \code{par\_annee}, somme sur les années
 égale à l'exposition par âge seul, en jours. La segmentation est vérifiée
 avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 
+\medskip
+\textbf{Accord des trois arithmétiques de dates} (décision M89, issue~\#22,
+point~3~; section~\ref{sec:recettes}, «~Statut des valeurs~»).
+\code{tests/unitaires/test\_exposition.R} compare les implémentations des
+modules \code{donnees}, \code{exposition} et du simulateur, sans les
+modifier, avec \code{as.Date()} pour oracle externe~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{décomposition}, exhaustive~: pour chaque jour du
+    0001-01-01 au 9999-12-31, \code{composantes\_date()} et
+    \code{composantes\_jour()} donnent la même année, le même mois et le
+    même jour~; les jours voisins des bornes tombent dans les années 0
+    et 10\,000~;
+  \item \textbf{jours civils}, exhaustifs~: pour chaque jour du domaine,
+    \code{jours\_civils()} appliquée aux composantes rend le jour de départ,
+    \code{annee\_du\_jour()} et \code{annee\_calendrier()} rendent son année,
+    et \code{premier\_janvier()} égale \code{jours\_civils()} au
+    1\textsuperscript{er}~janvier de chacune des années 1 à 10\,001~;
+  \item \textbf{anniversaires}, partiels~: \code{anniversaire\_age()} et
+    \code{jour\_anniversaire()} égalent l'oracle (le 29~février d'une année
+    commune remplacé par le 1\textsuperscript{er}~mars, convention T2) pour
+    toutes les naissances du domaine aux âges 0, 1, 3, 4, 100 et 130, et
+    pour les naissances des 28~février, 29~février et
+    1\textsuperscript{er}~mars de chaque année bissextile à tous les âges
+    de 0 à 130, tant que l'anniversaire reste dans le domaine~;
+  \item \sloppy \textbf{âges au dernier anniversaire}, partiels~: les
+    trois fonctions d'âge, \code{age\_revolu()}, \code{age\_anniversaire()}
+    et \code{age\_dernier\_anniversaire()}, concordent sur un tirage de couples
+    (naissance, jour) sous graine locale (\code{sous\_graine()}), naissances
+    du 29~février comprises, et sur un balayage des 28~février,
+    29~février et 1\textsuperscript{er}~mars postérieurs aux naissances du
+    29~février des années 4, 1964 et 2000~;
+  \item \textbf{témoin écrit à la main}~: pour une naissance le
+    29~février de l'an 4, anniversaires et âges aux années séculaires
+    communes (le 1\textsuperscript{er}~mars) et bissextiles (le
+    29~février), par les trois arithmétiques.
+\end{itemize}
+L'accord exhaustif couvre tous les jours du domaine (vérification par
+énumération, sur la plateforme où la batterie s'exécute)~; l'accord partiel
+n'est constaté que sur les cas énumérés.
+
 \subsection{Fonctions du module}
 \label{sec:fonctions-exposition}
 
@@ -3341,7 +3444,10 @@ tous les estimateurs la table de la seconde.
 \medskip
 \textbf{Refus du module \code{brut}}, levés par
 \code{controler\_parametres\_brut()}, que \code{valider\_plan()} appelle avant
-toute étape et que la fonction d'étape rappelle~: \code{estimateurs\_invalides}
+toute étape et que la fonction d'étape appelle en appel direct seulement
+(\code{controler = TRUE}, valeur par défaut~; \code{construire\_table()}
+l'appelle avec \code{controler = FALSE}, section~\ref{sec:execution})~:
+\code{estimateurs\_invalides}
 (pas un vecteur \code{character}, attribut~--- noms, dimension ou classe~---,
 vide, \code{NA} ou doublon)~; \code{estimateur\_inconnu}, contrôlé
 après la forme~: un vecteur nommé de noms inconnus relève du motif
@@ -3355,7 +3461,7 @@ même raison de couverture (un estimateur de période sur une cellule âge
 $\times$ année relèverait d'une autre spécification). Si le binomial et
 \code{kaplan\_meier} sont tous deux déclarés sous \code{par\_annee},
 \code{binomial\_par\_annee} est levé en premier.
-La fonction d'étape contrôle en outre, en tête et avant
+En appel direct, la fonction d'étape contrôle en outre, en tête et avant
 \code{controler\_parametres\_brut()}, la forme et le catalogue de la
 segmentation qu'elle reçoit, par \code{controler\_segmentation()} du module
 \code{donnees}~: \code{segmentation\_invalide}, module \code{brut} (autre
@@ -3370,10 +3476,15 @@ présente dans la table serait employée comme clé de segmentation sans
 avoir été déclarée comme rôle (\code{"age"} dupliquerait la clé d'âge dans
 la table résultat), et une clé absente de la table ne serait signalée que
 par une erreur de programmation sur les colonnes manquantes. Sur le
-chemin Kaplan-Meier, ce contrôle précède celui de
-\code{controler\_parametres\_donnees()} que l'estimateur rappelle
-(section~\ref{sec:brut-kaplan-meier}), si bien qu'une segmentation invalide
-y est refusée sous le module \code{brut}. Le même code est porté par le
+chemin Kaplan-Meier, la fonction d'étape contrôle ensuite, en appel direct,
+la transition, la période et le délai par
+\code{controler\_transition\_periode()} du module \code{donnees} (refus de ce
+module, section~\ref{sec:controles-donnees}), sans recontrôler la
+segmentation ni contrôler d'exclusions~; l'estimateur
+\code{taux\_kaplan\_meier()} ne contrôle rien lui-même
+(section~\ref{sec:brut-kaplan-meier}). Une segmentation invalide y est donc
+refusée sous le module \code{brut}, une transition inconnue sous le module
+\code{donnees}. Le même code est porté par le
 module qui détecte la condition (ADR 0007, annotation du 17/10/2026,
 point~d)~: dans le plan, la segmentation est déjà refusée sous ce code par
 \code{controler\_parametres\_donnees()}, module \code{donnees}, que
@@ -3621,7 +3732,13 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     transition et segmentation, dont dépendent les fenêtres et les segments~;
     convention retenue, qui n'entre pas dans leur calcul et dont le contrôle
     vérifie la cohérence avec la convention de l'étape \code{exposition}~; un
-    écart est une erreur de programmation. Les observations elles-mêmes ne
+    écart est une erreur de programmation. \code{taux\_kaplan\_meier()} ne
+    lève aucun refus~: la transition, la période, le délai et la
+    segmentation qu'il reçoit ont été contrôlés par \code{valider\_plan()}
+    dans une construction, par la fonction d'étape en appel direct
+    (section~\ref{sec:brut-etape}), et il en reprend les valeurs par
+    \code{valeurs\_parametres\_donnees()}, qui ne contrôle rien
+    (issue~\#22). Les observations elles-mêmes ne
     sont pas contrôlées~: seul \code{construire\_table()} transmet cet objet,
     produit par \code{calculer\_exposition()} à partir des observations de
     l'étape \code{donnees} de la même exécution. En appel
@@ -3731,7 +3848,9 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     étant triés et les cellules étant des intervalles disjoints de cette
     échelle, les instants d'une même cellule forment une plage contiguë, sur
     laquelle se font les sommes cumulées de $\log(1 - d_j/r_j)$ et de
-    $\Sigma$. Gardes-fous, erreurs de programmation et non refus~: la période
+    $\Sigma$. Gardes-fous, erreurs de programmation et non refus~: la
+    segmentation ne doit pas porter de clé en double (sans quoi la table
+    aurait une colonne parasite~; issue~\#22), garde-fou vérifié en premier~; la période
     et la transition doivent être celles de l'étape \code{exposition}~; les
     fenêtres transmises doivent porter les mêmes début et borne de période,
     transition, segmentation et convention (ci-dessus, «~Données~»)~; la clé
@@ -6063,7 +6182,11 @@ synthétiques (valeurs de la spécification, et recoupement par
 \code{stats::integrate()}, que le simulateur n'emploie pas)~; les dates
 d'anniversaire, 29~février compris (recoupement par \code{as.Date()}~;
 comparaison à \code{age\_revolu()} du module \code{donnees}, écrite
-indépendamment)~; la cohérence exacte des lignes et l'âge révolu à
+indépendamment~; l'accord des jours civils et des anniversaires du
+simulateur avec les arithmétiques des modules \code{donnees} et
+\code{exposition} est vérifié en outre par
+\code{tests/unitaires/test\_exposition.R},
+section~\ref{sec:verifications-exposition})~; la cohérence exacte des lignes et l'âge révolu à
 l'entrée~; le passage du module \code{donnees} sans exclusion, pour les deux
 transitions~; l'identité des jeux à graine égale et la restauration de l'état
 du générateur de l'appelant~; chaque refus, dont \code{table\_trop\_courte}
