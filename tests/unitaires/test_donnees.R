@@ -91,6 +91,33 @@ verifier("rôles non nommés : refus roles_mal_formes",
          leve_refus(prep(roles = unname(ROLES)), "roles_mal_formes"))
 verifier("rôles en liste : refus roles_mal_formes",
          leve_refus(prep(roles = as.list(ROLES)), "roles_mal_formes"))
+# Forme exacte des rôles (#62, forme_exacte()) : vecteur character dont le
+# seul attribut est names. Chaque témoin porte un attribut de plus, ou un dim,
+# sur des rôles valides par ailleurs : refus roles_mal_formes, par
+# controler_roles() appelée directement et par preparer_donnees() ; ROLES nu
+# est admis.
+cr <- tablexp:::controler_roles
+ROLES_REFUSES <- list(
+  "attribut quelconque (foo)" = structure(ROLES, foo = 1),
+  "classe noquote" = noquote(ROLES),
+  "classe AsIs (I)" = I(ROLES),
+  "classe quelconque (bar)" = structure(ROLES, class = "bar"),
+  "attribut comment" = structure(ROLES, comment = "x"),
+  "attribut foo et classe bar" = structure(ROLES, foo = 1, class = "bar"),
+  "tableau a une dimension (dim, dimnames)" =
+    array(unname(ROLES), dim = length(ROLES), dimnames = list(names(ROLES))),
+  "matrice a une colonne (dim, dimnames)" =
+    matrix(unname(ROLES), ncol = 1L, dimnames = list(names(ROLES), NULL)))
+for (k in names(ROLES_REFUSES))
+  verifier(sprintf("rôles, forme exacte : %s -> refus roles_mal_formes (controler_roles et preparer_donnees)", k),
+           leve_refus(cr(BASE, ROLES_REFUSES[[k]], "sexe"), "roles_mal_formes") &&
+             leve_refus(prep(roles = ROLES_REFUSES[[k]]), "roles_mal_formes"))
+x <- refus(cr(BASE, structure(ROLES, foo = 1), "sexe"))
+verifier("rôles, forme exacte : message et détails du refus nomment l'attribut en cause",
+         identical(x$motif, "roles_mal_formes") && isTRUE(contient(x, "sans autre attribut que ses noms")) &&
+           identical(x$details, list(classe = "character", attributs = c("names", "foo"))))
+verifier("rôles, forme exacte : vecteur nommé sans autre attribut admis (controler_roles rend les rôles inchangés)",
+         identical(cr(BASE, ROLES, "sexe"), ROLES) && identical(attributes(ROLES), list(names = names(ROLES))))
 x <- refus(prep(roles = c(ROLES, age_exact = "autre_colonne")))
 verifier("rôle inconnu : refus role_inconnu, message nomme rôle et colonne",
          identical(x$motif, "role_inconnu") && isTRUE(contient(x, "age_exact", "autre_colonne")) &&

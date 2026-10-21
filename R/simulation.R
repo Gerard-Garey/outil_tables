@@ -182,16 +182,18 @@ date_unique <- function(x) identical(class(x), "Date") && length(x) == 1L && !is
 
 controler_portefeuille <- function(portefeuille, periode) {
   if (!liste_aux_noms(periode, c("debut", "fin")) ||
-      !date_unique(periode$debut) || !date_unique(periode$fin))
+      !date_unique(periode[["debut"]]) || !date_unique(periode[["fin"]]))
     refuser("simulation", "periode_invalide",
             "La période d'observation doit être une liste (debut, fin) de deux dates (classe Date).",
             list(periode = periode))
-  if (periode$debut > periode$fin)
+  if (periode[["debut"]] > periode[["fin"]])
     refuser("simulation", "periode_invalide",
-            sprintf("Période vide : début %s postérieur à la fin %s.", format(periode$debut), format(periode$fin)),
+            sprintf("Période vide : début %s postérieur à la fin %s.", format(periode[["debut"]]), format(periode[["fin"]])),
             list(periode = periode))
-  mode <- if (is.list(portefeuille)) portefeuille$mode else NULL
-  if (!is.character(mode) || length(mode) != 1L || !(mode %in% names(CHAMPS_PORTEFEUILLE)))
+  # Champs lus par [[ ]] (jamais $, qui apparie les noms partiels) ; ici, le
+  # mode : chaîne unique de forme exacte (chaine_unique(), #60).
+  mode <- if (is.list(portefeuille)) portefeuille[["mode"]] else NULL
+  if (!chaine_unique(mode) || !(mode %in% names(CHAMPS_PORTEFEUILLE)))
     refuser("simulation", "portefeuille_invalide",
             sprintf("Portefeuille : liste avec un champ mode pris dans %s.",
                     liste_guillemets(names(CHAMPS_PORTEFEUILLE))),
@@ -209,16 +211,16 @@ controler_portefeuille <- function(portefeuille, periode) {
   reel <- function(v) is.numeric(v) && length(v) == 1L && is.finite(v)
   entier <- function(v) reel(v) && v == trunc(v)
   invalide <- function(msg) refuser("simulation", "portefeuille_invalide", paste("Portefeuille :", msg))
-  if (!entier(p$n) || p$n < 1 || p$n > .Machine$integer.max) invalide("n entier >= 1.")
-  if (!reel(p$proportion_hommes) || p$proportion_hommes < 0 || p$proportion_hommes > 1)
+  if (!entier(p[["n"]]) || p[["n"]] < 1 || p[["n"]] > .Machine$integer.max) invalide("n entier >= 1.")
+  if (!reel(p[["proportion_hommes"]]) || p[["proportion_hommes"]] < 0 || p[["proportion_hommes"]] > 1)
     invalide("proportion_hommes réel dans [0, 1].")
-  fin <- as.numeric(periode$fin)
+  fin <- as.numeric(periode[["fin"]])
   if (mode == "uniforme") {
-    if (!reel(p$age_min) || !reel(p$age_max) || p$age_min * 365.25 < 1 || p$age_min >= p$age_max)
+    if (!reel(p[["age_min"]]) || !reel(p[["age_max"]]) || p[["age_min"]] * 365.25 < 1 || p[["age_min"]] >= p[["age_max"]])
       invalide("âges réels finis, age_min d'au moins un jour (1/365,25) et age_min < age_max.")
-    if (!date_unique(p$origine) || p$origine > periode$debut)
+    if (!date_unique(p[["origine"]]) || p[["origine"]] > periode[["debut"]])
       invalide("origine : date (classe Date) antérieure ou égale au début de la période.")
-    age_bas <- age_revolu_minimal(round(p$age_min * 365.25))
+    age_bas <- age_revolu_minimal(round(p[["age_min"]] * 365.25))
     # Borne haute (erratum d'actuary du 17/10/2026, point 4). Soit span(y)
     # le nombre de jours de la naissance à l'anniversaire y (T2) : pour
     # y <= 130 (âges des tables des tests), span(y) >= 365,25 y - 2,75
@@ -233,17 +235,17 @@ controler_portefeuille <- function(portefeuille, periode) {
     # -3,75 (atteint pour y = 207, naissance au 2096-03-01 ; premier
     # y < -2,75 à y = 204) : la même preuve donne une marge de 4,25 / 365,25,
     # encore inférieure au « + 1 » d'age_haut.
-    age_haut <- p$age_max + (fin + 1 - as.numeric(p$origine)) / 365.25 + 1
+    age_haut <- p[["age_max"]] + (fin + 1 - as.numeric(p[["origine"]])) / 365.25 + 1
   } else {
-    if (!entier(p$age) || p$age < 1) invalide("âge exact entier >= 1.")
-    if (!date_unique(p$date_entree) || p$date_entree > periode$fin)
+    if (!entier(p[["age"]]) || p[["age"]] < 1) invalide("âge exact entier >= 1.")
+    if (!date_unique(p[["date_entree"]]) || p[["date_entree"]] > periode[["fin"]])
       invalide("date_entree : date (classe Date) antérieure ou égale à la fin de la période.")
-    ce <- composantes_date(as.numeric(p$date_entree))
+    ce <- composantes_date(as.numeric(p[["date_entree"]]))
     if (ce$mois == 1L && ce$jour == 29L)
       refuser("simulation", "entree_29_fevrier",
               "Mode âge exact : une entrée le 29/02 est refusée (la naissance « x années avant » serait ambiguë).",
-              list(date_entree = p$date_entree))
-    age_bas <- p$age
+              list(date_entree = p[["date_entree"]]))
+    age_bas <- p[["age"]]
     # Borne haute : même preuve qu'en mode uniforme, avec B - n =
     # (B - date_entree) + span(age) et, pour age <= 130, span(age) <=
     # 365,25 age + 0,75 (maximum exact +0,75 mesuré sur les mêmes
@@ -251,7 +253,7 @@ controler_portefeuille <- function(portefeuille, periode) {
     # + 3,5 / 365,25 < age_haut. Domaine : au-delà de 130, le maximum mesuré
     # jusqu'à 260 reste +0,75 et le minimum devient -3,75 (mode uniforme) :
     # marge de 4,5 / 365,25, encore inférieure au « + 1 ».
-    age_haut <- p$age + (fin + 1 - as.numeric(p$date_entree)) / 365.25 + 1
+    age_haut <- p[["age"]] + (fin + 1 - as.numeric(p[["date_entree"]])) / 365.25 + 1
   }
   list(mode = mode, age_bas = age_bas, age_haut = age_haut)
 }

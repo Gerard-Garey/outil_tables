@@ -52,6 +52,13 @@ verifier("valider_plan : signature (plan) ; plan valide rendu inchangé",
 
 # --- refus de valider_plan (valeur calculée à la main : codes) ----------------
 
+# Noms incomplets (#60) : noms_complets() est le prédicat commun de
+# liste_nommee() (plan, paramètres : doublons refusés) et du contrôle de
+# `etapes` (doublons admis à ce stade, signalés ensuite par etape_en_double).
+avec_noms <- function(x, noms) { names(x) <- noms; x }
+etapes_deux <- function(noms)
+  avec_noms(list(list(exclusions = character(0)), list(convention = "plus_fine", par_annee = FALSE)), noms)
+
 cas_refus <- list(
   list("plan non liste", "plan_mal_forme", "a"),
   list("plan sans noms", "plan_mal_forme", list(1, 2)),
@@ -71,6 +78,21 @@ cas_refus <- list(
   list("étape en double", "etape_en_double",
        modifier(plan_type(), etapes = list(donnees = list(exclusions = character(0)),
                                            donnees = list(exclusions = character(0))))),
+  list("etapes : un nom vide", "etapes_mal_formees",
+       modifier(plan_type(), etapes = etapes_deux(c("donnees", "")))),
+  list("etapes : un nom NA", "etapes_mal_formees",
+       modifier(plan_type(), etapes = etapes_deux(c("donnees", NA)))),
+  list("etapes : deux noms vides (incomplets avant doublons)", "etapes_mal_formees",
+       modifier(plan_type(), etapes = etapes_deux(c("", "")))),
+  list("etapes : deux noms identiques (doublons admis par le contrôle de forme)", "etape_en_double",
+       modifier(plan_type(), etapes = etapes_deux(c("donnees", "donnees")))),
+  list("plan : un nom vide", "plan_mal_forme", avec_noms(plan_type(), c("", names(plan_type())[-1L]))),
+  list("plan : un nom NA", "plan_mal_forme", avec_noms(plan_type(), c(NA, names(plan_type())[-1L]))),
+  list("plan : deux noms identiques", "plan_mal_forme",
+       avec_noms(plan_type(), c(names(plan_type())[1L], names(plan_type())[1L], names(plan_type())[-(1:2)]))),
+  list("paramètres d'une étape : deux noms identiques", "parametres_mal_formes",
+       modifier(plan_type(), etapes = list(donnees = avec_noms(list(character(0), character(0)),
+                                                               c("exclusions", "exclusions"))))),
   list("étapes hors ordre", "etapes_hors_ordre",
        modifier(plan_type(), etapes = rev(plan_type()$etapes))),
   list("exposition sans donnees", "etape_prealable_manquante",
@@ -296,6 +318,16 @@ verifier("construire_table : rôle requis absent (date_sortie) -> refus aucune_r
 })
 verifier("construire_table : rôle employé par la segmentation absent -> refus role_requis_manquant",
          leve_refus(construire_table(BASE, ROLES[names(ROLES) != "sexe"], plan_type()), "role_requis_manquant"))
+# Forme exacte des rôles (#62) par le point d'entrée : un attribut, une
+# classe ou un dim est refusé sous roles_mal_formes avant toute exécution
+# (construire_table() appelle controler_roles() avant preparer_donnees()).
+ROLES_FORME <- list(
+  attribut = structure(ROLES, foo = 1), classe = noquote(ROLES),
+  dim = array(unname(ROLES), dim = length(ROLES), dimnames = list(names(ROLES))))
+for (k in names(ROLES_FORME))
+  verifier(sprintf("construire_table : rôles avec %s -> refus roles_mal_formes", k),
+           leve_refus(construire_table(BASE, ROLES_FORME[[k]], plan_type()),
+                      "roles_mal_formes"))
 verifier("construire_table : provenance mal formée -> refus provenance_invalide",
          leve_refus(construire_table(BASE, ROLES, plan_type(), provenance = list(fichier = "a.csv")),
                     "provenance_invalide"))

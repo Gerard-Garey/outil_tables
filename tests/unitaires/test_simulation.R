@@ -237,6 +237,27 @@ verifier("portefeuille : age_min >= age_max refusé",
          leve_refus(simuler(loi(), modifyList(PF, list(age_min = 75)), PER, GRAINE), "portefeuille_invalide"))
 verifier("portefeuille : mode inconnu refusé",
          leve_refus(simuler(loi(), modifyList(PF, list(mode = "agregats")), PER, GRAINE), "portefeuille_invalide"))
+# Forme exacte du mode (#60) : chaîne unique sans nom ni attribut ; champ lu
+# par [[ ]], jamais par $ (appariement partiel). Le message distingue le refus
+# du mode du refus des champs (un mode lu par $ passerait au contrôle suivant).
+message_refus <- function(expr)
+  tryCatch({ force(expr); NA_character_ }, refus_tablexp = function(c) conditionMessage(c))
+MODES_MAL_FORMES <- list(
+  list("mode nommé", c(m = "uniforme")),
+  list("mode à attribut", structure("uniforme", foo = "x")),
+  list("mode facteur", factor("uniforme")),
+  list("mode NA", NA_character_),
+  list("mode vide", ""),
+  list("mode de longueur 2", c("uniforme", "uniforme")))
+for (k in MODES_MAL_FORMES)
+  verifier(sprintf("portefeuille : %s refusé (portefeuille_invalide), message du mode", k[[1]]),
+           leve_refus(simuler(loi(), modifyList(PF, list(mode = k[[2]])), PER, GRAINE), "portefeuille_invalide") &&
+             grepl("avec un champ mode", message_refus(simuler(loi(), modifyList(PF, list(mode = k[[2]])), PER, GRAINE)),
+                   fixed = TRUE))
+PF_PARTIEL <- PF; names(PF_PARTIEL)[names(PF_PARTIEL) == "mode"] <- "mode_x"
+verifier("portefeuille : champ « mode_x » non apparié à « mode » (lecture par [[ ]]), message du mode",
+         leve_refus(simuler(loi(), PF_PARTIEL, PER, GRAINE), "portefeuille_invalide") &&
+           grepl("avec un champ mode", message_refus(simuler(loi(), PF_PARTIEL, PER, GRAINE)), fixed = TRUE))
 verifier("période : début postérieur à la fin refusé (periode_invalide)",
          leve_refus(simuler(loi(), PF, list(debut = PER$fin, fin = PER$debut), GRAINE), "periode_invalide"))
 verifier("période : dates non Date refusées (periode_invalide)",

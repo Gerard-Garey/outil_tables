@@ -1922,6 +1922,15 @@ local({
            all(vapply(list(J(-719163), J(2932897), J(100.5)), function(w)
              inherits(tryCatch(ecrire_reference(list(types = c(x = "Date"), valeurs = list(x = w)), tempfile()),
                                refus_reference = function(e) e), "refus_reference"), NA)))
+  # Lecteur : même domaine que l'écrivain du moteur (#65).
+  verifier("références, Date : lecture de 0000-12-31 (fichier ou valeurs_lues) -> erreur « date_hors_domaine »",
+           grepl("date_hors_domaine", refus_lecture(function(t) sub("\t0001-01-01\t", "\t0000-12-31\t", t, fixed = TRUE)), fixed = TRUE) &&
+             grepl("date_hors_domaine", tryCatch(valeurs_lues("Date", "0000-12-31", "(f)", "x"), error = function(e) conditionMessage(e)), fixed = TRUE))
+  verifier("références, Date : 0001-01-01 et 9999-12-31 relues à l'identique par valeurs_lues (témoins des bornes)",
+           identical(valeurs_lues("Date", c("0001-01-01", "9999-12-31"), "(f)", "x"), J(c(-719162, 2932896))))
+  verifier("références, Date : bornes JOURS_DATES_REFERENCE du lecteur = dates_hors_domaine() du moteur (bornes dans le domaine, bornes -1 et +1 hors domaine)",
+           !any(tablexp:::dates_hors_domaine(JOURS_DATES_REFERENCE)) &&
+             all(tablexp:::dates_hors_domaine(JOURS_DATES_REFERENCE + c(-1, 1))))
 })
 
 # --- plan canonique : plans de référence déjà canoniques ; transitions d'une même issue (#42) ---

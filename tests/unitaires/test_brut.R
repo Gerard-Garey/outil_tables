@@ -529,11 +529,17 @@ verifier("invariance du plan sans brut (cas C, par_annee = TRUE, poisson seul) :
          invariance_sans_brut(construire_table(DC, ROLES_C, plan_brut(estimateurs = "poisson", par_annee = TRUE)),
                               DC, ROLES_C))
 
-# Forme exacte de la segmentation à l'appel direct de calculer_taux_bruts()
-# (#43) : hors du chemin Kaplan-Meier, elle n'était pas contrôlée. Table
-# d'exposition munie d'une colonne `sexe`, pour que seule la forme échoue.
-EC_SEXE <- cbind(EC, sexe = "H")
+# Forme exacte et catalogue de la segmentation à l'appel direct de
+# calculer_taux_bruts() (#43, #59) : hors du chemin Kaplan-Meier, ils n'étaient
+# pas contrôlés. Table d'exposition munie des colonnes `sexe` et `region` (et
+# d'une colonne `age` déjà présente), pour que seule la segmentation échoue.
+EC_SEXE <- cbind(EC, sexe = "H", region = "R")
 cas_segmentation <- list(
+  list("age (clé réservée, dupliquerait la colonne)", "age"),
+  list("evenements (clé réservée)", "evenements"),
+  list("chaîne vide", ""),
+  list("region (colonne présente, hors catalogue)", "region"),
+  list("sexe puis hors catalogue", c("sexe", "region")),
   list("nommée", c(a = "sexe")),
   list("matrix", matrix("sexe")),
   list("à attribut quelconque", structure("sexe", foo = "x")),
@@ -548,6 +554,23 @@ for (k in cas_segmentation)
                   error = function(e) e)
     inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "brut")
   })
+# Chemin Kaplan-Meier (#59, sec:brut-etape) : le catalogue est contrôlé avant le
+# calcul de l'estimateur, sans observations ni transition à fournir.
+verifier("calculer_taux_bruts(estimateurs = kaplan_meier, segmentation region hors catalogue) : refus segmentation_invalide, module brut", {
+  r <- tryCatch(calculer_taux_bruts(EC_SEXE, "region", FALSE, "dernier_anniversaire", "u", "kaplan_meier", 0.95),
+                error = function(e) e)
+  inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "brut")
+})
+verifier("controler_segmentation : mêmes message et détails aux deux étapes, module de l'étape appelante (#59)", {
+  cs <- tablexp:::controler_segmentation
+  e <- function(etape) tryCatch(cs("region", etape), error = function(e) e)
+  d <- e("donnees"); b <- e("brut")
+  inherits(d, "refus_tablexp") && inherits(b, "refus_tablexp") &&
+    identical(d$module, "donnees") && identical(b$module, "brut") &&
+    identical(d$motif, "segmentation_invalide") && identical(b$motif, "segmentation_invalide") &&
+    identical(conditionMessage(d), conditionMessage(b)) && identical(d$details, b$details) &&
+    is.null(cs(character(0), "brut")) && is.null(cs(c("sexe", "segment"), "donnees"))
+})
 verifier("calculer_taux_bruts : segmentation valide (character(0) et \"sexe\") admise, colonnes de segmentation en tête", {
   r0 <- calculer_taux_bruts(EC_SEXE, character(0), FALSE, "dernier_anniversaire", "u", "poisson", 0.95)
   r1 <- calculer_taux_bruts(EC_SEXE, "sexe", FALSE, "dernier_anniversaire", "u", "poisson", 0.95)

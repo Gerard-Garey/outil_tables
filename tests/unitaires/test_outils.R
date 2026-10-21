@@ -69,6 +69,19 @@ verifier("avertir() : aucun warning() émis",
          is.null(tryCatch({ avertir(a0, "donnees", "code", "msg", 1); NULL }, warning = function(w) w)))
 verifier("avertir() : code mal formé -> erreur de programmation",
          inherits(tryCatch(avertir(a0, "donnees", "Code Libre", "msg", 1), error = function(e) e), "error"))
+# Code : chaîne unique de forme exacte (chaine_unique(), #60) ; erreur de
+# programmation (stop()), jamais un refus typé.
+erreur_code <- function(expr) {
+  e <- tryCatch({ expr; NULL }, error = function(e) e)
+  inherits(e, "error") && !inherits(e, "refus_tablexp") &&
+    grepl("'code'", conditionMessage(e), fixed = TRUE)
+}
+for (cas in list(list("nommé", c(a = "code")), list("à attribut", structure("code", foo = "x")),
+                 list("NA", NA_character_), list("vide", ""), list("facteur", factor("code")),
+                 list("longueur 2", c("code", "code")), list("longueur 0", character(0)),
+                 list("NULL", NULL), list("numérique", 1)))
+  verifier(sprintf("avertir() : code %s -> erreur de programmation (#60)", cas[[1L]]),
+           erreur_code(avertir(a0, "donnees", cas[[2L]], "msg", 1)))
 
 # --- générateur et graine locale ---------------------------------------------
 

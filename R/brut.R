@@ -35,9 +35,10 @@
 #  variance et bornes NA à q = 0 et q = 1 (A.7) ; pas de survie cumulée par
 #  segment (A.14 question 2).
 #  Ce module n'appelle que `donnees` (liste_guillemets(),
-#  controler_parametres_donnees()), `exposition` (fenetres_observations(),
-#  segments_observations(), extraire_composantes(), position_dans_cellule(),
-#  somme_par_cellule()) et `outils` (ADR 0007, point 2.1).
+#  controler_parametres_donnees(), controler_segmentation()), `exposition`
+#  (fenetres_observations(), segments_observations(), extraire_composantes(),
+#  position_dans_cellule(), somme_par_cellule()) et `outils` (ADR 0007,
+#  point 2.1).
 # -----------------------------------------------------------------------------
 
 # Estimateurs disponibles, dans l'ordre canonique des résultats (A.4).
@@ -264,20 +265,28 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
 
 # Estimateur de Kaplan-Meier sur l'âge (#15, A.1 à A.7), par cellule de la
 # table d'exposition.
-#   observations : observations de l'étape `donnees` ;
-#   exposition   : table de l'étape `exposition` (lignes et ordre repris) ;
+#   observations : fenêtres transmises par l'étape `exposition` (objet
+#                  fenetres_exposition, construire_table(), #38) ou, en
+#                  appel direct, observations de l'étape `donnees`
+#                  (data.frame) ;
+#   exposition   : table de l'étape `exposition`, appariée par clé (segment,
+#                  âge), quel que soit l'ordre de ses lignes ;
 #   segmentation, transition, periode, delai_declaration : champs du plan ;
 #   convention   : convention d'âge retenue par l'étape `exposition` ;
 #   niveau       : niveau de confiance de l'intervalle asymptotique ;
 #   parametres_exposition : paramètres de l'étape `exposition`
 #                  (fin_effective, transition), contrôlés à l'égalité exacte
 #                  contre la période et la transition recalculées ici.
-# Rend list(table, sauts, diagnostics) : table aux lignes de la table
-# d'exposition (clés, age, evenements, instants_evenement, taux, variance,
-# borne_inf_asymptotique, borne_sup_asymptotique, etat) ; sauts, une ligne
-# par (segment, instant d'événement), triée par segment puis par instant.
-# Fenêtres et événements à l'identique de calculer_exposition()
-# (fenetres_observations(), T5) ; observation retenue : a < b, ou un
+# Rend list(table, sauts, diagnostics) : table aux lignes et dans l'ordre de
+# la table d'exposition (clés, age, evenements, instants_evenement, taux,
+# variance, borne_inf_asymptotique, borne_sup_asymptotique, etat) ; sauts,
+# une ligne par (segment, instant d'événement), triée par segment puis par
+# instant.
+# Fenêtres et événements : ceux de calculer_exposition() lorsqu'ils sont
+# transmis ; recalculés par fenetres_observations() (T5) et
+# segments_observations(), à l'identique de calculer_exposition(),
+# seulement en appel direct sur un data.frame ;
+# observation retenue : a < b, ou un
 # événement (a <= s = b). Calcul en O(n log n) : r(t) = #{K_a <= t} -
 # #{K_b < t} par findInterval() ; couverture, union des [K_a, K_b) non
 # vides, par cummax().
@@ -480,14 +489,9 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
 calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention, unite_exposition,
                                 estimateurs, niveau, observations = NULL, transition = NULL,
                                 periode = NULL, delai_declaration = NULL, parametres_exposition = NULL) {
-  # Forme seule de la segmentation (#43, forme_exacte()) : type, attributs, NA,
-  # doublons ; appel direct de la fonction d'étape. Le catalogue
-  # ROLES_SEGMENTATION est contrôlé en amont par valider_plan() et, sur le
-  # chemin Kaplan-Meier, par controler_parametres_donnees().
-  if (!forme_exacte(segmentation, "character") || anyNA(segmentation) || anyDuplicated(segmentation))
-    refuser("brut", "segmentation_invalide",
-            "La segmentation doit être un vecteur de chaînes sans attribut, sans doublon ni NA (vide explicite admis).",
-            list(segmentation = segmentation))
+  # Forme et catalogue de la segmentation (#43, #59) : appel direct de la
+  # fonction d'étape, comme sur le chemin Kaplan-Meier.
+  controler_segmentation(segmentation, "brut")
   controler_parametres_brut(estimateurs, niveau, par_annee)
   retenus <- ESTIMATEURS_BRUT[ESTIMATEURS_BRUT %in% estimateurs]
   cles <- c(segmentation, "age", if (isTRUE(par_annee)) "annee")

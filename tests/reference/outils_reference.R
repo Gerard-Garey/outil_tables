@@ -444,6 +444,11 @@ texte_dates <- function(v) {
   t
 }
 
+# Domaine des dates [0001-01-01, 9999-12-31] (ADR 0011, point 4 ; #65), en
+# jours depuis 1970-01-01 : mêmes bornes que dates_hors_domaine() du moteur
+# (non appelée ici, comme texte_dates()). Hors domaine : refus à la lecture.
+JOURS_DATES_REFERENCE <- c(-719162, 2932896)
+
 valeurs_lues <- function(type, s, fichier, chemin) {
   canonique <- function(v, texte) {
     if (!identical(texte, s)) erreur_lecture(fichier, sprintf("%s : valeur non canonique pour le type %s", chemin, type))
@@ -459,6 +464,8 @@ valeurs_lues <- function(type, s, fichier, chemin) {
     # par la réécriture de la valeur lue, texte_dates().
     Date = { u <- as.double(unclass(as.Date(ifelse(s %in% c("NA", "NaN"), NA_character_, s), format = "%Y-%m-%d")))
              u[s == "NaN"] <- NaN
+             if (any(!is.na(u) & (u < JOURS_DATES_REFERENCE[1L] | u > JOURS_DATES_REFERENCE[2L])))
+               erreur_lecture(fichier, sprintf("%s : date_hors_domaine : date hors du domaine [0001-01-01, 9999-12-31], sans écriture canonique", chemin))
              v <- structure(u, class = "Date")
              canonique(v, texte_dates(v)) },
     character = , factor = desechapper(s, fichier, chemin),

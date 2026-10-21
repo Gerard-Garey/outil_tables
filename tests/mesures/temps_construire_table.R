@@ -9,7 +9,10 @@
 #  pour les deux transitions, avec et sans découpage par année ; puis le
 #  temps de l'étape `brut` (#14, #15) : construction avec brut (poisson,
 #  binomial), avec Kaplan-Meier en plus, et appel direct de l'estimateur de
-#  Kaplan-Meier (taux_kaplan_meier()) sur les résultats de la construction.
+#  Kaplan-Meier (taux_kaplan_meier()) sur les résultats de la construction :
+#  cet appel passe les observations (data.frame) et mesure donc la voie de
+#  recalcul des fenêtres, non la voie de construire_table(), qui transmet
+#  les fenêtres de l'étape `exposition` (#38).
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/mesures/temps_construire_table.R [n ...]
@@ -81,7 +84,7 @@ for (n in TAILLES) {
   k <- chrono(tablexp:::taux_kaplan_meier(et$donnees$resultat$observations, et$exposition$resultat$exposition,
                                           "sexe", vd, PER, 90, et$exposition$parametres$convention$retenue, 0.95,
                                           et$exposition$parametres))
-  cat(sprintf("  taux_kaplan_meier(), appel direct : %.2f s\n", k$secondes))
+  cat(sprintf("  taux_kaplan_meier(), appel direct sur les observations (fenêtres recalculées) : %.2f s\n", k$secondes))
   verifier(sprintf("mesure n = %.0f exécutée", n), TRUE)
 }
 bilan()

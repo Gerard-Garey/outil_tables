@@ -578,3 +578,22 @@ Les numéros de ligne cités ici datent de `63b4bc5` et vieilliront à leur tour
 **Effet sur les résultats : aucun.** Aucun code n'est modifié par cette annotation.
 
 Issues : #67 ; #22 (point 1). Décision M54 (sonde) ; M71, point 3 (libellés). Branche `claude/fiche-rapport`, PR #68.
+
+## Annotation du 20 octobre 2026 (troisième) — seconde annotation du 19/10/2026, (h) : issue retenue par #56, l'argument `observations` garde son nom
+
+Rédigée par `architect-approfondi` en fin de branche `claude/forme-exacte-suite` (PR #75, à `1acc6e8`). Les numéros de ligne cités ici datent de `1acc6e8` ; le nom de l'objet fait foi (gabarit des ADR, convention du 20/10/2026, M77, (b)). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Constat.** La seconde annotation du 19/10/2026, (h), renvoyait un renommage éventuel de l'argument `observations` à « la table étape → fonction (#22, point 7) ». Ce point a été clos par constat, sans code (P2). L'annotation du 20/10/2026 (première), (b), a donc renvoyé le choix à #56, avec deux issues admises, au choix de `coder`. `coder` l'a relevé de nouveau sur #56 (message de `5a6dd1b`, « Non fait ») : le renvoi « #22 pt 7 » de (h) est périmé, et (h) reste muet sur l'issue retenue.
+
+**(b) Issue retenue : la première de l'annotation du 20/10/2026, (b).** L'argument garde son nom ; aucune signature ne change. Les commentaires corrigés par #56 (`5a6dd1b`) disent les deux types reçus. *Vérifié* sur `1acc6e8` (`git show HEAD:R/brut.R`, `git show HEAD:NAMESPACE`) :
+- en-tête de `taux_kaplan_meier()`, `R/brut.R:268-271` : « fenêtres transmises par l'étape `exposition` (objet fenetres_exposition, construire_table(), #38) ou, en appel direct, observations de l'étape `donnees` (data.frame) » ;
+- en-tête de `calculer_taux_bruts()`, `R/brut.R:477-478` : même lecture ;
+- signatures inchangées, `R/brut.R:293` et `:490` ;
+- `construire_table()` passe toujours `observations = fenetres` (`R/construire_table.R:244`) ;
+- aucune des deux fonctions n'est exportée (0 occurrence dans `NAMESPACE`).
+
+Les arbres syntaxiques de `R/` sont identiques à la tête précédente (`parse`, `keep.source = FALSE`, mesure du commit `5a6dd1b`, *non remesurée ici*). Ni le renommage ni aucune autre suite n'est prévu. Une demande ultérieure de renommage deviendrait une issue, sans contrat partagé touché, puisque les deux fonctions sont internes.
+
+**Effet sur les résultats : aucun.** Rien n'est modifié dans le code par cette annotation ; #56 n'a changé que des commentaires et un libellé de mesure.
+
+Issues : #56 (close à la fusion de la PR #75) ; #38 ; #22 (point 7, clos). Décisions M68, M74.

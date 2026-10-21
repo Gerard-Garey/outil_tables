@@ -623,7 +623,10 @@ colonnes \code{etape}, \code{code}, \code{message} et \code{nombre}~;
 \code{nombre}, un dénombrement (lignes, cellules, têtes), est stocké en
 \code{integer}, positif ou nul (issue~\#24). \code{avertir()} lui ajoute une
 ligne, et refuse, par une erreur de programmation (\code{stop()}, sans
-conversion), un code qui n'est pas conforme à \code{MOTIF\_CODE\_REFUS} et un
+conversion), un code qui n'est pas une chaîne unique sans attribut, ni
+\code{NA} ni vide, au sens de \code{chaine\_unique()} (une chaîne nommée
+ou munie d'une classe est refusée~; issue~\#60), ou qui n'est pas conforme à
+\code{MOTIF\_CODE\_REFUS}, et un
 nombre qui n'est pas un nombre unique, fini, entier, positif ou nul et au plus
 égal à \code{.Machine\$integer.max}~; sinon il le stocke par
 \code{as.integer()}.
@@ -690,8 +693,9 @@ accumulateur vide des avertissements métier, colonne \code{nombre} en
 \catalogue{fonctions-outils}{avertir()} & interne & accumulateur, \code{etape},
 \code{code}, \code{message}, \code{nombre} & accumulateur augmenté d'une ligne,
 message marqué UTF-8 par \code{texte\_moteur()}, sans \code{warning()}~;
-\code{stop()} si le code ou le nombre est mal formé
-(section~\ref{sec:avertissements}~; issues~\#9, \#24 et~\#50) \\
+\code{stop()} si le code (chaîne unique au sens de \code{chaine\_unique()},
+conforme à \code{MOTIF\_CODE\_REFUS}) ou le nombre est mal formé
+(section~\ref{sec:avertissements}~; issues~\#9, \#24, \#50 et~\#60) \\
 \catalogue{fonctions-outils}{texte\_moteur()} & interne & \code{x}, chaîne ou
 liste (\code{data.frame} compris) & le même objet, chaînes et noms non ASCII
 du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
@@ -1108,11 +1112,20 @@ exécutables sur le poste Windows du mainteneur, dont la BLAS est celle de R.
 Dans les deux modes, il écrit l'\emph{identifiant de plateforme} (image,
 \code{R.version.string}, BLAS, LAPACK et sa version, \code{sessionInfo()}) et
 consigne sans faire échouer le processeur et ses drapeaux (\code{fma},
-\code{avx2}, \code{avx512f}), \code{ImageOS} et \code{ImageVersion} de l'hôte,
+\code{avx2}, \code{avx512f}), la version de la glibc, dont vient la
+\code{libm} (sortie de \code{getconf GNU\_LIBC\_VERSION}, à défaut première
+ligne de \code{ldd -{}-version}, «~inconnue~» si aucune de ces sorties ne
+désigne la glibc~; issue~\#72),
+\code{ImageOS} et \code{ImageVersion} de l'hôte,
 \code{LC\_COLLATE}, le fuseau horaire, la présence d'un exécutable
-\code{java} et \code{GITHUB\_SHA}. Ce bloc est reporté dans le message de
+\code{java} et \code{GITHUB\_SHA}. Ces grandeurs consignées n'entrent pas
+dans l'identifiant de plateforme~: elles ne déclenchent aucune bascule. Ce
+bloc est reporté dans le message de
 chaque commit de référence et dans l'en-tête de chaque fichier de référence
-(section~\ref{sec:non-regression}).
+(section~\ref{sec:non-regression}), sous la clé «~plateforme consignée~»
+pour les grandeurs consignées~; la version de la glibc, ajoutée après la
+dernière régénération, n'y figurera qu'à la prochaine~: les références
+actuelles ne la portent pas.
 
 \begin{encadre}
 \small
@@ -2028,11 +2041,18 @@ d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()} et
 \code{chaine\_unique()} (section~\ref{sec:fonctions-outils}), sous le motif
 existant de chaque paramètre~: aucun motif n'est propre à la forme. Hors du
-plan, la même règle s'applique à la graine reçue par \code{sous\_graine()}
-(refus \code{graine\_invalide}, section~\ref{sec:sous-graine}) et, à
+plan, la même règle s'applique notamment à la graine reçue par
+\code{sous\_graine()} (refus \code{graine\_invalide},
+section~\ref{sec:sous-graine}), aux rôles reçus par \code{controler\_roles()}
+(seul attribut admis~: les noms~; refus \code{roles\_mal\_formes},
+section~\ref{sec:controles-donnees}~; issue~\#62), au mode du portefeuille
+simulé (refus \code{portefeuille\_invalide},
+section~\ref{sec:portefeuille-simule}~; issue~\#60) et, à
 l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()}, à la
-forme seule de la segmentation (refus \code{segmentation\_invalide} du module
-\code{brut}, section~\ref{sec:brut-etape}~; issue~\#43). Pour
+segmentation, contrôlée dans sa forme et dans son catalogue par le même
+contrôle que dans le plan, \code{controler\_segmentation()} (refus
+\code{segmentation\_invalide} du module \code{brut},
+section~\ref{sec:brut-etape}~; issues~\#43 et~\#59). Pour
 chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
@@ -2061,6 +2081,11 @@ sont des listes nommées \textbf{nues}, dont le seul attribut admis est
 celui des noms~: un \code{data.frame}, un objet de classe ou une liste
 munie d'un autre attribut est refusé sous \code{plan\_mal\_forme},
 \code{etapes\_mal\_formees} ou \code{parametres\_mal\_formes} (issue~\#23).
+Leurs noms sont présents, non vides et non manquants (\code{noms\_complets()})~;
+un nom en double est refusé sous \code{plan\_mal\_forme} ou
+\code{parametres\_mal\_formes} (\code{liste\_nommee()}), mais, dans
+\code{etapes}, sous \code{etape\_en\_double}, qui nomme les étapes répétées, et
+non sous \code{etapes\_mal\_formees} (issue~\#60).
 Elle ne réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
 (\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
 \code{controler\_parametres\_brut()}), dont les codes et le module sont ainsi identiques, quelle que soit la
@@ -2193,7 +2218,8 @@ processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{graine}) \\
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa \\
 \catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine \\
-\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; par \code{forme\_exacte()} (issue~\#23) \\
+\catalogue{fonctions-construire-table}{noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms présents, non vides et non manquants, ou vide (sans noms admis)~; doublons non contrôlés~; par \code{forme\_exacte()}~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#23 et~\#60) \\
+\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
@@ -2381,7 +2407,14 @@ charge, vide sinon.}
 chaque refus nomme tous les rôles et colonnes en cause~:
 \code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame})~;
 \code{roles\_mal\_formes} (les rôles ne sont pas un vecteur de chaînes nommé,
-sans valeur ni nom manquant)~; \code{role\_inconnu}~;
+de forme exacte \code{character} sans autre attribut que ses noms~--- une
+classe, \code{noquote} ou \code{AsIs} comprises, une dimension ou un
+attribut quelconque sont refusés, par \code{forme\_exacte()}~---, sans
+valeur ni nom manquant ni nom vide~; \code{details\$classe} et
+\code{details\$attributs} donnent la classe et les noms des attributs reçus,
+qui désignent la cause quand elle tient à une classe, une dimension ou un
+attribut, mais non quand elle tient à une valeur ou à un nom manquant ou
+vide~; issue~\#62)~; \code{role\_inconnu}~;
 \code{role\_declare\_deux\_fois}~; \code{role\_non\_pris\_en\_charge}~;
 \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
@@ -2411,7 +2444,9 @@ données~; \code{details\$bornes} nomme les bornes en cause)~; \code{delai\_inva
 n'est pas un nombre unique, \code{integer} ou \code{double}, sans attribut,
 entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
 (autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
-doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis)~;
+doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis~;
+contrôle \code{controler\_segmentation()}, partagé avec la fonction d'étape
+\code{calculer\_taux\_bruts()}, section~\ref{sec:brut-etape})~;
 \code{exclusions\_invalides} (autre chose qu'un vecteur \code{character} sans
 attribut, sans \code{NA} ni doublon, vide explicite admis)~;
 \code{exclusion\_inconnue} (code absent de la liste fermée des motifs). Les
@@ -2767,7 +2802,8 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{date\_hors\_domaine}~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees} ou \code{brut})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et par la fonction d'étape \code{brut} (issue~\#59) \\
 \catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres, dont \code{date\_hors\_domaine} pour les bornes de la période~; transition retenue, début, fin, borne $B$ \\
 \catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
@@ -3308,17 +3344,33 @@ $\times$ année relèverait d'une autre spécification). Si le binomial et
 \code{kaplan\_meier} sont tous deux déclarés sous \code{par\_annee},
 \code{binomial\_par\_annee} est levé en premier.
 La fonction d'étape contrôle en outre, en tête et avant
-\code{controler\_parametres\_brut()}, la \emph{forme seule} de la
-segmentation qu'elle reçoit~: \code{segmentation\_invalide}, module
-\code{brut} (autre chose qu'un vecteur \code{character} sans attribut, sans
-\code{NA} ni doublon~; vide explicite admis~; issue~\#43). Le même code est
-porté par le module qui détecte la condition (ADR 0007, annotation du
-17/10/2026, point~d)~: dans le plan, la segmentation est déjà refusée sous ce
-code par \code{controler\_parametres\_donnees()}, module \code{donnees},
-que \code{valider\_plan()} appelle, et qui contrôle aussi son appartenance
-aux rôles admis (section~\ref{sec:controles-donnees})~; ce contrôle-ci ne
-sert qu'à l'appel direct de la fonction d'étape, et une forme invalide y est
-signalée avant un estimateur inconnu.
+\code{controler\_parametres\_brut()}, la forme et le catalogue de la
+segmentation qu'elle reçoit, par \code{controler\_segmentation()} du module
+\code{donnees}~: \code{segmentation\_invalide}, module \code{brut} (autre
+chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
+doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, soit
+\code{sexe} et \code{segment}~; vide explicite admis~; issues~\#43
+et~\#59). Une clé hors de ce catalogue est donc refusée à l'appel direct,
+qu'elle désigne une colonne de la table d'exposition (\code{"age"},
+\code{"evenements"}) ou non (\code{"region"}), de même que la chaîne vide,
+qui n'en fait pas partie~: sans ce contrôle, une clé hors du catalogue
+présente dans la table serait employée comme clé de segmentation sans
+avoir été déclarée comme rôle (\code{"age"} dupliquerait la clé d'âge dans
+la table résultat), et une clé absente de la table ne serait signalée que
+par une erreur de programmation sur les colonnes manquantes. Sur le
+chemin Kaplan-Meier, ce contrôle précède celui de
+\code{controler\_parametres\_donnees()} que l'estimateur rappelle
+(section~\ref{sec:brut-kaplan-meier}), si bien qu'une segmentation invalide
+y est refusée sous le module \code{brut}. Le même code est porté par le
+module qui détecte la condition (ADR 0007, annotation du 17/10/2026,
+point~d)~: dans le plan, la segmentation est déjà refusée sous ce code par
+\code{controler\_parametres\_donnees()}, module \code{donnees}, que
+\code{valider\_plan()} appelle et qui emploie le même contrôle
+(section~\ref{sec:controles-donnees})~; la forme et le catalogue de la
+segmentation ne sont écrits qu'à un endroit, et le message du refus est le
+même dans les deux modules. Ce contrôle-ci ne sert qu'à l'appel direct de
+la fonction d'étape, et une segmentation invalide y est signalée avant un
+estimateur inconnu.
 
 \medskip
 \textbf{Quantiles supérieurs.} Ils sont calculés par la queue supérieure
@@ -5105,9 +5157,12 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     (\code{calculer\_taux\_bruts()}), dont l'argument est identique au bit
     près des deux côtés~: l'écart naît dans \code{expm1()}, fonction de la
     bibliothèque mathématique du système (\code{libm} de la glibc~; sur la plateforme de référence, sous
-    Ubuntu~22.04.5, glibc vraisemblablement~2.35, version livrée par
-    Ubuntu~22.04, hypothèse non relevée sur l'image~: le script de plateforme
-    consigne le système mais pas la version de la glibc), et non dans
+    Ubuntu~22.04.5, glibc~2.35~: \emph{constat de mesure}, relevé par le
+    script de plateforme dans le journal du job «~Tests (R 4.3.3)~» de la CI
+    du 20/10/2026, sur l'image de référence, de même empreinte que celle de
+    l'en-tête des références actuelles~; issue~\#72~; les en-têtes des
+    références ne porteront cette version qu'à leur prochaine
+    régénération), et non dans
     LAPACK~; la mesure ne sépare pas la version de la glibc de la variante
     qu'elle choisit selon le processeur (ADR 0008, seconde annotation du
     19/10/2026). De plus, la forme «~empreinte~» distingue \code{NA} de
@@ -5125,9 +5180,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{Objet}~: identifier le \textbf{texte source} du moteur
     effectivement installé, modifications non commitées comprises~; non son
-    comportement numérique, qui dépend aussi de R, du BLAS et de la
-    \code{libm}, consignés à part (\code{fiche\$versions},
-    \code{fiche\$plateforme}).
+    comportement numérique, qui dépend aussi de R et du BLAS, consignés à
+    part (\code{fiche\$versions}, \code{fiche\$plateforme}), et de la
+    \code{libm}, dont la fiche ne consigne pas la version (le script de
+    plateforme la consigne, issue~\#72).
   \item \textbf{Définition} (option~(iv), décision M70, point~1)~: le MD5 du
     \emph{relevé des MD5} des fichiers \code{R/*.R}, et non celui de leur
     texte concaténé~: une ligne \code{<md5>}, deux espaces,
@@ -5765,6 +5821,13 @@ par défaut (\code{CHAMPS\_PORTEFEUILLE}), selon deux modes~:\par}
 \end{itemize}
 
 \noindent
+Le champ \code{mode} est une chaîne unique sans attribut, ni \code{NA} ni
+vide, au sens de \code{chaine\_unique()} (une chaîne nommée ou munie d'une
+classe est refusée), prise parmi \code{uniforme} et \code{age\_exact}~; le
+portefeuille porte exactement les champs de son mode, sans champ manquant,
+inconnu ni en double, et ses champs sont lus par leur nom exact, sans
+appariement partiel (un champ \code{mode\_x} ne tient pas lieu de
+\code{mode})~; sinon refus \code{portefeuille\_invalide} (issue~\#60).
 Pour garantir une naissance strictement antérieure à l'entrée, il faut
 $\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondit
 au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier

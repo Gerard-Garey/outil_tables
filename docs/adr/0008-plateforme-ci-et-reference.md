@@ -327,3 +327,29 @@ L'empreinte des données vaut `f3519cc1b73ab0d1fcc6ad89dc6d595c` dans les trois 
 **Effet sur les résultats** : aucun. L'annotation consigne une mesure.
 
 Issues : #17 ; ADR 0011 (point 11) ; ADR 0009 (annotation du 19/10/2026).
+
+## Annotation du 20 octobre 2026 — version de la glibc de la plateforme de référence consignée par le script de plateforme (#72) : glibc 2.35, hors identifiant
+
+Rédigée par `architect-approfondi` en fin de branche `claude/forme-exacte-suite` (PR #75, à `1acc6e8`), après le correctif rapide #72 (PR #76, commit `4bf21a3`, fusion `d2b1c3c`, fusionnée dans la branche en `1bd95ea`). Les numéros de ligne cités ici datent de `1acc6e8` ; le nom de l'objet fait foi (gabarit des ADR, convention du 20/10/2026, M77, (b)). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Ce qui change.** Trois passages disent la version de la glibc de l'image « non consignée » ou ne la nomment pas :
+- l'annotation du 19/10/2026, « Ce qu'elle n'établit pas » (l. 303) : « version de la glibc de l'image non consignée » ;
+- la seconde annotation du 19/10/2026, titre et « Mesure » (l. 309 et 313), qui comparent un hôte sous glibc 2.39 à la plateforme de référence sans pouvoir nommer la version de celle-ci ;
+- la même annotation, « Ce que la mesure établit » (l. 323) : « 2.39 au lieu de celle de l'image `rocker/r-ver:4.3.3`, non consignée ».
+
+Depuis #72, le script de plateforme consigne cette version parmi les grandeurs **consignées sans faire échouer** du point 5, sous le libellé « glibc (libm) » (`consignes_plateforme()` et `version_glibc()`, `tests/controles/plateforme.R` : `getconf GNU_LIBC_VERSION`, à défaut première ligne de `ldd --version`, « inconnue » hors glibc). Elle reste **hors de l'identifiant de plateforme** : `lignes_identifiant()` est inchangée, la grandeur ne va que dans `lignes_consignees()`. Elle ne déclenche donc aucune bascule et ne change ni les constantes attendues (`R_ATTENDU`, `LA_VERSION_ATTENDUE`, `MOTIF_BLAS`, `MOTIF_LAPACK`, `MOTIF_IMAGE`), ni le contrôle `--exiger`.
+
+**(b) Mesure.** Job « Tests (R 4.3.3) » 118844105503 de l'exécution CI 39485319324, sur `54e1b99` de `claude/forme-exacte-suite` (événement `pull_request`, conclusion `success`), image `rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309`, processeur AMD EPYC 9V45 : le bloc « Consigné sans contrôle » affiche `glibc (libm) : glibc 2.35`. Relevé d'`actuary`, remesuré par `architect` le 20/10/2026 (*vérifié*) :
+- `gh api repos/Gerard-Garey/outil_tables/actions/jobs/118844105503` rend `head_sha` `54e1b99…`, `run_id` 39485319324, conclusion `success` ;
+- le journal du job (`gh api …/jobs/118844105503/logs`) porte la ligne `glibc (libm)                  : glibc 2.35` sous « Consigné sans contrôle » ;
+- les neuf lignes de son bloc « Identifiant de plateforme (ADR 0008, point 5) » sont identiques, caractère pour caractère, aux lignes `# plateforme : ` de l'en-tête des six références commitées (`tests/reference/R1.tsv` à `R6.tsv`, l. 4 à 12 ; `diff` vide pour chacune), produites par la régénération `192180c` (exécution 39435673257).
+
+**(c) Portée.**
+- **Version de la glibc à la régénération `192180c`** : 2.35, *vérifiée par construction* et non par relevé direct. La glibc fait partie du système de fichiers de l'image, que fixe son empreinte `sha256:732d…` (point 1) ; le conteneur ne tient pas sa bibliothèque C de l'hôte. Même empreinte, donc même glibc. Le relevé direct entrera dans l'en-tête des références, sous la clé `plateforme consignée`, à la prochaine régénération seulement : les en-têtes actuels n'ont pas de ligne glibc (`tests/reference/R4.tsv`, l. 13 à 20, *vérifié*).
+- **Seconde annotation du 19/10/2026** : l'hôte cloud différait de la plateforme de référence par la glibc (**2.39 au lieu de 2.35**), le fondeur du processeur, et la BLAS et la LAPACK (3.12.0 au lieu de 3.10.0). Ce trio est maintenant nommé, mais la cause de l'écart d'un ulp sur R4 et R5 (`-expm1(-borne)`) reste **non séparée** : aucune exécution n'a fait varier une seule de ces variables. Le constat et ses conséquences sont inchangés.
+- **Annotation du 19/10/2026 (première)** : la réserve reste ouverte pour un exécuteur sans FMA. Que les trois modèles AMD observés emploient la même variante de `exp`, `log` et `pow` reste une *hypothèse* : la version de la glibc est connue (2.35), mais sa source n'a pas été relue.
+- **Hors CI** : la ligne n'apparaît que là où le script de plateforme s'exécute. La fiche de construction (`fiche$plateforme`, `assembler_fiche()`, `R/rapport.R`) ne consigne pas la bibliothèque C ; c'est l'objet de l'issue proposée N14 (`docs/feuille-de-route.md`, § 3), qui demande une décision sur `VERSION_FICHE` (ADR 0011).
+
+**Effet sur les résultats** : aucun. Les références, les tolérances, l'identifiant de plateforme et la règle de bascule sont inchangés ; seul le journal des jobs R porte une ligne consignée de plus.
+
+Issues : #72 (fermée par la PR #76) ; #17 ; N14 (proposée). Décision M75. ADR 0009 (en-tête des références) ; ADR 0011 (point 11, empreinte du résultat de même machine).

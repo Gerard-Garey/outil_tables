@@ -88,14 +88,15 @@ chaine_unique <- function(v) {
 # nombre : dénombrement, stocké en integer (#24) ; une valeur non entière, NA,
 # infinie, négative, supérieure à .Machine$integer.max ou de longueur
 # différente de 1 est une erreur de programmation du package : stop(), sans
-# conversion.
+# conversion ; de même un code qui n'est pas une chaîne unique de forme exacte
+# (chaine_unique() : ni nom, ni attribut, ni NA ; #60).
 avertissements_vides <- function() {
   data.frame(etape = character(0), code = character(0), message = character(0),
              nombre = integer(0), stringsAsFactors = FALSE)
 }
 
 avertir <- function(acc, etape, code, message, nombre) {
-  if (!is.character(code) || length(code) != 1L || !grepl(MOTIF_CODE_REFUS, code))
+  if (!chaine_unique(code) || !grepl(MOTIF_CODE_REFUS, code))
     stop("avertir() : 'code' doit être un code court (minuscules, chiffres, '_').",
          call. = FALSE)
   if (!is.numeric(nombre) || length(nombre) != 1L || is.na(nombre) ||
