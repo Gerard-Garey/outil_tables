@@ -687,6 +687,13 @@ son propre motif (issue~\#48) \\
 \code{TRUE} si \code{v} est de forme exacte \code{character}, sans aucun
 attribut (noms compris), de longueur~1, ni \code{NA} ni vide, \code{FALSE}
 sinon, jamais \code{NA}~; ne refuse pas (issue~\#48) \\
+\catalogue{fonctions-outils}{noms\_complets()} & interne & \code{noms}
+(\code{names(x)}) & \code{TRUE} si les noms sont présents (non \code{NULL}),
+sans \code{NA} et non vides, \code{FALSE} sinon, jamais \code{NA}~; prédicat
+sur les noms seuls~: la forme de l'objet, les doublons et la liste vide sans
+noms relèvent de l'appelant~; seul endroit où s'écrit la règle, partagée par
+\code{controler\_roles()} et \code{liste\_noms\_complets()} (issues~\#22,
+\#60 et~\#62) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -2218,8 +2225,8 @@ processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{graine}) \\
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa \\
 \catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine \\
-\catalogue{fonctions-construire-table}{noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms présents, non vides et non manquants, ou vide (sans noms admis)~; doublons non contrôlés~; par \code{forme\_exacte()}~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#23 et~\#60) \\
-\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
+\catalogue{fonctions-construire-table}{liste\_noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms, par \code{forme\_exacte()}) aux noms complets au sens de \code{noms\_complets()} (module \code{outils}~: présents, non vides et non manquants), ou vide (sans noms admis)~; doublons non contrôlés~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#22, \#23 et~\#60) \\
+\catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{liste\_noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
@@ -2803,14 +2810,17 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
-\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees} ou \code{brut})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et par la fonction d'étape \code{brut} (issue~\#59) \\
-\catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus des paramètres, dont \code{date\_hors\_domaine} pour les bornes de la période~; transition retenue, début, fin, borne $B$ \\
+\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees} ou \code{brut})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, en appel direct (\code{controler = TRUE}), par la fonction d'étape \code{brut} (issues~\#22 et~\#59) \\
+\catalogue{fonctions-donnees}{ligne\_transition()} & interne & transition (\code{list(depart, arrivee)}, de forme déjà contrôlée) & ligne de \code{TRANSITIONS} de la transition, zéro ligne si elle n'est pas prise en charge~; seul endroit où s'écrit la recherche (issue~\#22) \\
+\catalogue{fonctions-donnees}{valeurs\_parametres\_donnees()} & interne & transition, période, délai, déjà contrôlés & transition retenue (\code{ligne\_transition()}), début, fin, borne $B$ (jours depuis 1970-01-01)~; ne contrôle rien~; employée par les fonctions d'étape appelées avec \code{controler = FALSE} et par \code{taux\_kaplan\_meier()} (issue~\#22) \\
+\catalogue{fonctions-donnees}{controler\_transition\_periode()} & interne & transition, période, délai & refus de la transition, de la période (dont \code{date\_hors\_domaine} pour ses bornes), du délai et de la période vide, dans cet ordre~; rend la transition retenue, le début, la fin et la borne $B$, calculés par la fonction sans contrôle de la ligne précédente~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, pour \code{kaplan\_meier} en appel direct, par la fonction d'étape \code{brut} (issue~\#22) \\
+\catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus de la transition, de la période et du délai par le contrôle de la ligne précédente, puis de la segmentation et des exclusions~; transition retenue, début, fin, borne $B$ \\
 \catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
 \catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
 \catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation & numéros des lignes porteuses de chaque motif \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
-\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, transition, période, délai, segmentation, exclusions & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, transition, période, délai, segmentation, exclusions, \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni les paramètres ni les rôles ne sont recontrôlés (issue~\#22) \\
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
@@ -3230,9 +3240,11 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 \catalogue{fonctions-exposition}{CONVENTION\_NATIVE} & constante & --- & convention native de chaque recette \\
 \catalogue{fonctions-exposition}{UNITES\_EXPOSITION} & constante & --- & unité de l'exposition par convention \\
 \catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE} & constante & --- & hypothèse de censure non informative, inscrite dans la fiche \\
-\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis~; refus \code{aucune\_recette} \\
+\catalogue{fonctions-exposition}{recette\_branche()} & interne & --- & recette de la branche, convention native, rôles requis, sans contrôle des rôles~; employée par \code{deduire\_recette()} et par \code{calculer\_exposition()} appelée avec \code{controler = FALSE} (issue~\#22) \\
+\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis (\code{recette\_branche()})~; refus \code{aucune\_recette} \\
 \catalogue{fonctions-exposition}{controler\_parametres\_exposition()} & interne & convention, \code{par\_annee} & refus des valeurs \\
-\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & convention retenue et forçage~; refus \code{convention\_plus\_fine} \\
+\catalogue{fonctions-exposition}{convention\_retenue()} & interne & convention demandée, native & convention demandée, native, retenue (la native pour \code{plus\_fine}, la demandée sinon) et forçage, sans contrôle~; employée par \code{resoudre\_convention()} et par \code{calculer\_exposition()} appelée avec \code{controler = FALSE} (issue~\#22) \\
+\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & convention retenue et forçage (\code{convention\_retenue()})~; refus \code{convention\_plus\_fine} \\
 \catalogue{fonctions-exposition}{an\_bissextile()} & interne & années & bissextilité grégorienne \\
 \catalogue{fonctions-exposition}{bissextiles\_anterieures()} & interne & années & nombre d'années bissextiles antérieures \\
 \catalogue{fonctions-exposition}{premier\_janvier()} & interne & années & jour du 1\textsuperscript{er}~janvier \\
@@ -3254,7 +3266,7 @@ avec des facteurs aux niveaux permutés, en chaîne et en entier.\par}
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
-\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee} & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38) \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee}, \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni les paramètres, ni la recette, ni la convention ne sont recontrôlés (issue~\#22) \\
 \end{longtable}
 }
 
@@ -4372,11 +4384,11 @@ $q$, spécification, A.4)~: sa garantie est le cas K
 \catalogue{fonctions-brut}{HYPOTHESES\_BRUT} & constante & --- & textes des hypothèses, par estimateur et pour la probabilité, inscrits dans les paramètres et dans la fiche \\
 \catalogue{fonctions-brut}{PORTEE\_PROBABILITE} & constante & --- & portée de la probabilité de Poisson selon la cellule (année d'âge, année civile, âge $\times$ année) \\
 \catalogue{fonctions-brut}{STATUTS\_BRUT} & constante & --- & statut, loi supposée et calcul de chaque grandeur (tableau~\ref{tab:statuts-brut}) \\
-\catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} et par la fonction d'étape \\
+\catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} et, en appel direct (\code{controler = TRUE}), par la fonction d'étape (issue~\#22) \\
 \catalogue{fonctions-brut}{taux\_poisson()} & interne & $D$, $E^c$, niveau & taux, bornes exactes et asymptotiques, état (section~\ref{sec:brut-poisson}) \\
 \catalogue{fonctions-brut}{taux\_binomial()} & interne & $D$, $E^i$, niveau, tolérance & taux, bornes, état, cellules où $D = E^i > 0$ (section~\ref{sec:brut-binomial}) \\
 \catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & fenêtres transmises par l'étape \code{exposition} ou observations (appel direct), table d'exposition, segmentation, transition, période, délai, convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
-\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), transition, période, délai, paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat}) \\
+\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), transition, période, délai, paramètres de l'étape \code{exposition}~; \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat})~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni la segmentation, ni les paramètres de l'étape, ni (pour \code{kaplan\_meier}) la transition, la période et le délai ne sont recontrôlés (issue~\#22) \\
 \end{longtable}
 }
 
