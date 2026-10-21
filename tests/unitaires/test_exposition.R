@@ -14,10 +14,13 @@
 #  - recoupement : arithmétique de dates du module contre as.Date() ;
 #  - âge au dernier anniversaire comparé à age_revolu() du module donnees,
 #    dont l'exposition ne se sert pas ;
-#  - accord exhaustif des trois arithmétiques de dates (donnees, exposition,
-#    simulateur) sur [0001-01-01, 9999-12-31], as.Date() comme oracle, plus
-#    un tirage sous graine locale et un témoin à valeurs écrites à la main
-#    (M89, #22 point 3).
+#  - accord des trois arithmétiques de dates (donnees, exposition, simulateur)
+#    sur [0001-01-01, 9999-12-31], as.Date() comme oracle des anniversaires et
+#    des bornes, comparaison directe pour la décomposition, les jours civils
+#    et les âges : exhaustif pour la décomposition et les jours civils,
+#    exhaustif sur le sous-domaine énuméré et partiel sur le domaine pour les
+#    anniversaires, par tirage sous graine locale et balayage pour les âges,
+#    plus un témoin à valeurs écrites à la main (M89, #22 point 3).
 #  Les cas passent par construire_table() (étapes donnees puis exposition).
 # -----------------------------------------------------------------------------
 
@@ -322,7 +325,7 @@ ACC_CJ <- composantes_jour(ACC_T)
 ACC_CAL <- tablexp:::calendrier(1, 10000)
 
 verifier("accord des trois arithmétiques (T2), décomposition (exhaustif, chaque jour du 0001-01-01 au 9999-12-31, as.Date comme oracle de bornes) : composantes_date() == composantes_jour() (an, mois, jour) ; années 0 et 10000 aux jours voisins des bornes",
-         {
+         local({
            b <- c(ACC_JMIN - 1, ACC_JMIN, ACC_JMAX, ACC_JMAX + 1)
            bd <- composantes_date(b); bj <- composantes_jour(b)
            if (!identical(ACC_JMAX - ACC_JMIN + 1, as.numeric(length(ACC_T)))) "domaine"
@@ -334,15 +337,15 @@ verifier("accord des trois arithmétiques (T2), décomposition (exhaustif, chaqu
            else if (!identical(c(bd$mois + 1L, bd$jour), c(12L, 1L, 12L, 1L, 31L, 1L, 31L, 1L)) ||
                     !identical(as.numeric(c(bj$mois, bj$jour)), c(12, 1, 12, 1, 31, 1, 31, 1))) "mois et jour aux bornes"
            else TRUE
-         })
+         }))
 verifier("accord des trois arithmétiques (T2), jours civils (exhaustif, chaque jour du 0001-01-01 au 9999-12-31) : jours_civils(composantes_date(t)) == t ; annee_du_jour() et annee_calendrier() == année de composantes_date() ; premier_janvier(1:10001) == jours_civils(1:10001, 1, 1)",
-         {
+         local({
            if (!identical(jours_civils(ACC_CD$an, ACC_CD$mois + 1L, ACC_CD$jour), as.numeric(ACC_T))) "aller-retour"
            else if (!all(annee_du_jour(ACC_T) == ACC_CD$an)) "annee_du_jour"
            else if (!all(tablexp:::annee_calendrier(ACC_CAL, ACC_T) == ACC_CD$an)) "annee_calendrier"
            else if (!identical(as.numeric(premier_janvier(1:10001)), jours_civils(1:10001, 1L, 1L))) "premier_janvier"
            else TRUE
-         })
+         }))
 
 # Oracle des anniversaires : as.Date() de « année-mois-jour » pour les 366
 # couples (mois, jour) de chacune des années 1 à 9999 ; le 29/02 d'une année
@@ -352,17 +355,17 @@ verifier("accord des trois arithmétiques (T2), jours civils (exhaustif, chaque 
 ACC_NJ <- c(31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 ACC_DEC <- c(0, cumsum(ACC_NJ))[1:12]                        # couples avant le mois m (1-12)
 ACC_MOIS <- rep(1:12, ACC_NJ); ACC_JOUR <- sequence(ACC_NJ)  # les 366 couples
-ACC_ORACLE <- {
+ACC_ORACLE <- local({
   y <- rep(1:9999, times = 366L)
   o <- as.numeric(as.Date(sprintf("%04d-%02d-%02d", y, rep(ACC_MOIS, each = 9999L), rep(ACC_JOUR, each = 9999L)),
                           format = "%Y-%m-%d"))
   m <- is.na(o)
   o[m] <- as.numeric(as.Date(sprintf("%04d-03-01", y[m]), format = "%Y-%m-%d"))
   o
-}
+})
 ACC_COUPLE <- ACC_DEC[ACC_CD$mois + 1L] + ACC_CD$jour       # couple (mois, jour) de chaque jour du domaine
-verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif : toutes les naissances du domaine, âges 0, 1, 3, 4, 100 et 130 tant que an + x <= 9999) : anniversaire_age() == jour_anniversaire() == as.Date() (29/02 -> 01/03 des années communes)",
-         {
+verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif sur le sous-domaine énuméré, partiel sur le domaine : toutes les naissances du domaine, aux six âges 0, 1, 3, 4, 100 et 130 tant que an + x <= 9999) : anniversaire_age() == jour_anniversaire() == as.Date() (29/02 -> 01/03 des années communes)",
+         local({
            res <- TRUE
            for (x in c(0L, 1L, 3L, 4L, 100L, 130L)) {
              k <- ACC_CD$an + x <= 9999
@@ -372,9 +375,9 @@ verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif : toute
              if (!identical(jour_anniversaire(cd, x), att)) { res <- sprintf("jour_anniversaire, x = %d", x); break }
            }
            res
-         })
-verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif : 28/02, 29/02 et 01/03 de chaque année bissextile, tous les âges de 0 à 130 tant que an + x <= 9999) : anniversaire_age() == jour_anniversaire() == as.Date()",
-         {
+         }))
+verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif sur le sous-domaine énuméré, partiel sur le domaine : 28/02, 29/02 et 01/03 de chaque année bissextile, tous les âges de 0 à 130 tant que an + x <= 9999) : anniversaire_age() == jour_anniversaire() == as.Date()",
+         local({
            bis <- as.numeric(as.Date(sprintf("%04d-02-29", 1:9999), format = "%Y-%m-%d"))
            an_b <- (1:9999)[!is.na(bis)]
            n <- as.numeric(as.Date(sprintf("%04d-%02d-%02d", rep(an_b, each = 3L), c(2L, 2L, 3L), c(28L, 29L, 1L)),
@@ -389,15 +392,15 @@ verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif : 28/02
              if (!identical(jour_anniversaire(lapply(cd, `[`, k), x), att)) { res <- sprintf("jour_anniversaire, x = %d", x); break }
            }
            res
-         })
+         }))
 
 # Âge au dernier anniversaire : les trois fonctions sur un tirage (graine
 # locale) de couples (naissance, jour) couvrant le domaine, dont des naissances
 # au 29/02, puis sur un balayage des jours voisins du 29/02.
-ACC_29 <- {
+ACC_29 <- local({
   b <- as.numeric(as.Date(sprintf("%04d-02-29", 1:9999), format = "%Y-%m-%d"))
   b[!is.na(b)]
-}
+})
 accord_ages <- function(n, t) {
   r1 <- age_revolu(n, t)
   r2 <- age_dernier_anniversaire(ACC_CAL, composantes_jour(n), t)
@@ -407,7 +410,7 @@ accord_ages <- function(n, t) {
   else TRUE
 }
 verifier("accord des trois arithmétiques (T2), âge au dernier anniversaire (tirage sous graine locale 20261021 : 2,2·10^5 couples (naissance, jour <= 131 ans plus tard) de naissances sur tout le domaine, dont 2·10^4 au 29/02) : age_revolu() == age_dernier_anniversaire() == age_anniversaire()",
-         {
+         local({
            tir <- tablexp:::sous_graine(20261021L, {
              n <- c(sample(ACC_JMIN:ACC_JMAX, 2e5, replace = TRUE), sample(ACC_29, 2e4, replace = TRUE))
              list(n = n, t = n + floor(runif(length(n)) * (pmin(n + 131 * 366, ACC_JMAX) - n + 1)))
@@ -416,9 +419,9 @@ verifier("accord des trois arithmétiques (T2), âge au dernier anniversaire (ti
            if (length(n) < 2e5 || sum(n %in% ACC_29) < 1e4) "taille du tirage"
            else if (any(t < n | t > ACC_JMAX)) "tirage hors domaine"
            else accord_ages(n, t)
-         })
+         }))
 verifier("accord des trois arithmétiques (T2), âge au dernier anniversaire (balayage : naissances au 29/02 des années 4, 1964 et 2000 ; tous les 28/02, 29/02 et 01/03 des années 1 à 9999 postérieurs à la naissance) : age_revolu() == age_dernier_anniversaire() == age_anniversaire()",
-         {
+         local({
            t <- sort(unique(c(as.numeric(as.Date(sprintf("%04d-%02d-%02d", rep(1:9999, each = 2L), c(2L, 3L), c(28L, 1L)),
                                                   format = "%Y-%m-%d")), ACC_29)))
            res <- TRUE
@@ -429,7 +432,7 @@ verifier("accord des trois arithmétiques (T2), âge au dernier anniversaire (ba
              if (!isTRUE(r)) { res <- sprintf("%s, naissance du 29/02/%d", r, an); break }
            }
            res
-         })
+         }))
 
 # Témoin à valeurs écrites à la main (T2) : naissance au 29/02/0004, années
 # séculaires communes 100, 1700, 1800, 1900, 2100, 9900 (anniversaire au 01/03)
@@ -440,15 +443,15 @@ ACC_ANNIV <- as.numeric(as.Date(c("0100-03-01", "0400-02-29", "1600-02-29", "170
                                  "1900-03-01", "2000-02-29", "2100-03-01", "9600-02-29", "9900-03-01"),
                                format = "%Y-%m-%d"))
 ACC_N0 <- as.numeric(as.Date("0004-02-29", format = "%Y-%m-%d"))
-verifier("accord des trois arithmétiques (T2), témoin à la main : naissance 0004-02-29, anniversaires aux années séculaires communes 100, 1700, 1800, 1900, 2100, 9900 (01/03) et bissextiles 400, 1600, 2000, 9600 (29/02), par les trois arithmétiques",
-         {
+verifier("accord des trois arithmétiques (T2), témoin à la main : naissance 0004-02-29, anniversaires aux années séculaires communes 100, 1700, 1800, 1900, 2100, 9900 (01/03) et bissextiles 400, 1600, 2000, 9600 (29/02), par les deux fonctions qui les calculent (anniversaire_age(), jour_anniversaire())",
+         local({
            cn <- composantes_date(ACC_N0)
            if (!identical(anniversaire_age(ACC_CAL, composantes_jour(ACC_N0), ACC_X), ACC_ANNIV)) "anniversaire_age"
            else if (!identical(jour_anniversaire(cn, ACC_X), ACC_ANNIV)) "jour_anniversaire"
            else TRUE
-         })
+         }))
 verifier("accord des trois arithmétiques (T2), témoin à la main : même naissance, âge au 28/02 (x - 1), au 01/03 (x) et, les années bissextiles 400, 1600, 2000, 9600, au 29/02 (x), par les trois fonctions d'âge ; lendemain du 28/02 décomposé par composantes_date() et composantes_jour() (01/03 ou 29/02)",
-         {
+         local({
            bis <- c(2L, 3L, 7L, 9L)                                # rangs de 400, 1600, 2000, 9600 dans ACC_AN
            d28 <- as.numeric(as.Date(sprintf("%04d-02-28", ACC_AN), format = "%Y-%m-%d"))
            d01 <- as.numeric(as.Date(sprintf("%04d-03-01", ACC_AN), format = "%Y-%m-%d"))
@@ -474,7 +477,7 @@ verifier("accord des trois arithmétiques (T2), témoin à la main : même naiss
            else if (!identical(as.numeric(c(lendemain$mois + 1L, lendemain$jour)), att_mj)) "lendemain du 28/02 (composantes_date)"
            else if (!identical(as.numeric(c(lendemain_j$mois, lendemain_j$jour)), att_mj)) "lendemain du 28/02 (composantes_jour)"
            else TRUE
-         })
+         }))
 
 # Libération du bloc (pic mesuré : plus d'un Go) : les vecteurs du domaine
 # entier ne restent pas en vie jusqu'à la fin du fichier.

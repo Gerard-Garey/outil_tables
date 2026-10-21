@@ -644,8 +644,9 @@ issue_des_restes <- function(transitions) {
 # u)])). Les références ne comparent que le jeton de l'empreinte (ADR 0009,
 # seconde annotation du 20/10/2026) : l'égalité à l'oracle en garde la valeur,
 # sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R6 ne
-# portent aucun entier ni aucune date négatifs : le signe est gardé par les
-# tests unitaires des écrivains, non par cet oracle.
+# portent aucun entier négatif (les dates s'écrivent en ISO, sans signe) : le
+# signe des entiers est gardé par les tests unitaires des écrivains, non par
+# cet oracle.
 oracle_empreinte_resultat <- local({
   ns <- asNamespace("tablexp")
   e <- new.env(parent = ns)
