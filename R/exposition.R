@@ -264,8 +264,11 @@ nombre_cellules <- function(n_age, n_an,
 # ancienne à l'année qui suit la cellule de B (âges atteints au plus à B,
 # plus une cellule) ; sortie (Inf pour une observation en cours) ; fenêtre
 # [a, b), a = max(entrée, D), b = min(sortie, B) ; evenement : cause cible et
-# D <= s < B ; sortie_concurrente : autre cause, hors observation en cours,
-# observation close dans la fenêtre.
+# D <= s < B ; sortie_concurrente : autre cause, observation close dans la
+# fenêtre. L'observation en cours est exclue par is.finite(sortie) seul :
+# preparer_donnees() rend NA la fin de toute observation de cause `en_cours`
+# (sortie finie <=> cause différente de `en_cours`, témoin dans
+# tests/unitaires/test_exposition.R).
 fenetres_observations <- function(observations, debut_p, borne, cible) {
   nai <- as.numeric(observations$date_naissance)
   entree <- as.numeric(observations$debut)
@@ -278,7 +281,7 @@ fenetres_observations <- function(observations, debut_p, borne, cible) {
   list(composantes = cn, calendrier = cal, sortie = sortie,
        a = pmax(entree, debut_p), b = pmin(sortie, borne),
        evenement = dans_fenetre & cause == cible,
-       sortie_concurrente = dans_fenetre & cause != cible & cause != "en_cours")
+       sortie_concurrente = dans_fenetre & cause != cible)
 }
 
 # Segments : combinaisons des clés de segmentation. Les clés ne dépendent

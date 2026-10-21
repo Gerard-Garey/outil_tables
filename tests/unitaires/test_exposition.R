@@ -440,3 +440,60 @@ verifier("calculer_exposition : garde de présence avant le tabulate() de prése
     grepl("^Le décompte de présence des âges compterait ", conditionMessage(refus)) && identical(j_refus, "garde") &&
     identical(journal[1:2], c("garde", "tabulate")) && identical(r, appeler(original))
 })
+
+# --- observation en cours : sortie finie <=> cause différente de `en_cours` (#22, point 5) ---
+
+# Nature : valeur calculée à la main. Dans fenetres_observations(), la sortie
+# concurrente n'exclut l'observation en cours que par is.finite(sortie)
+# (aucune condition sur la cause) : l'invariant est porté par donnees. Une
+# ligne `en_cours` de sortie antérieure à la fin de la période est refusée
+# (motif en_cours_avant_fin) ; de sortie égale ou postérieure à la fin, ou
+# absente, elle est acceptée et sa fin d'observation est rendue NA (+Inf pour
+# l'exposition), dans l'unité contrat comme dans l'unité tête. Trois contrats
+# de trois têtes ; la ligne 2 est en cours.
+EC <- function(sortie, cause = "en_cours")
+  data.frame(c = c("A", "B", "C"), t = c("T1", "T2", "T3"),
+             n = D(c("1950-03-15", "1960-07-01", "1945-06-06")),
+             e = D(rep("2016-01-01", 3)),
+             s = D(c("2019-12-31", sortie, "2022-03-01")), k = c("rachat", cause, "deces"),
+             stringsAsFactors = FALSE)
+EC_ROLES <- c(id_contrat = "c", id_tete = "t", date_naissance = "n", date_entree = "e",
+              date_sortie = "s", cause_sortie = "k")
+EC_ARGS <- function(d, transition)
+  list(d, EC_ROLES, transition, PER, 0, character(0), character(0))
+for (u in list(list(nom = "contrat", tr = RA), list(nom = "tête", tr = VD))) {
+  for (s in c("2023-05-01", "2024-12-30")) {
+    x <- tryCatch({ do.call(tablexp:::preparer_donnees, EC_ARGS(EC(s), u$tr)); NULL },
+                  refus_tablexp = function(e) e)
+    verifier(sprintf("en_cours de sortie %s < fin de la période, unité %s : refus ligne_invalide par en_cours_avant_fin seul, ligne 2", s, u$nom),
+             if (is.null(x)) "aucun refus" else if (!identical(x$motif, "ligne_invalide")) x$motif
+             else if (!identical(names(x$details$decompte), "en_cours_avant_fin")) "motif"
+             else if (!identical(x$details$lignes, list(en_cours_avant_fin = 2L))) "numéros de ligne"
+             else TRUE)
+  }
+  for (s in c("2024-12-31", "2026-01-01", NA)) {
+    r <- do.call(tablexp:::preparer_donnees, EC_ARGS(EC(s), u$tr))$resultat$observations
+    verifier(sprintf("en_cours de sortie %s >= fin de la période ou absente, unité %s : acceptée, fin NA, cause en_cours (sortie finie <=> cause différente de en_cours)",
+                     s, u$nom),
+             if (!identical(is.na(r$fin), c(FALSE, TRUE, FALSE))) "fin NA attendue pour la seule ligne 2"
+             else if (!identical(r$cause == "en_cours", is.na(r$fin))) "invariant violé"
+             else TRUE)
+  }
+}
+verifier("tête de deux contrats dont un en cours (sortie postérieure à la fin) : fusion en cours de fin NA ; tête dont le second intervalle est en cours : fin finie pour le premier, NA pour le second ; sortie_concurrente vraie pour la seule sortie close dans la fenêtre",
+         {
+           d <- data.frame(c = c("A", "B", "C", "D"), t = c("T1", "T1", "T2", "T2"),
+                           n = D(rep("1950-03-15", 4)),
+                           e = D(c("2016-01-01", "2018-01-01", "2016-01-01", "2023-01-01")),
+                           s = D(c("2019-12-31", NA, "2020-12-31", "2026-06-01")),
+                           k = c("rachat", "en_cours", "rachat", "en_cours"), stringsAsFactors = FALSE)
+           obs <- tablexp:::preparer_donnees(d, EC_ROLES, VD, PER, 0, character(0), character(0))$resultat$observations
+           f <- tablexp:::fenetres_observations(obs, as.numeric(PER$debut), as.numeric(PER$fin) + 1, "deces")
+           if (!identical(obs$unite, c("T1", "T2", "T2"))) "observations"
+           else if (!identical(obs$cause, c("en_cours", "censure", "en_cours"))) "causes"
+           else if (!identical(is.na(obs$fin), c(TRUE, FALSE, TRUE))) "fins NA"
+           else if (!identical(is.finite(f$sortie), c(FALSE, TRUE, FALSE))) "sorties finies"
+           else if (!identical(f$sortie_concurrente, c(FALSE, TRUE, FALSE))) "sorties concurrentes"
+           else if (!identical(f$evenement, c(FALSE, FALSE, FALSE))) "événements"
+           else TRUE
+         })
