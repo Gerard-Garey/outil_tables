@@ -10,6 +10,13 @@
 #  (docs/agents/routage.md, § 7 et § 8) et a relever le modele servi, que la
 #  session principale compare au modele demande (non visible du hook, § 5.3).
 #
+#  Une ligne sans agent et sans appel porte en plus une
+#  cle « diagnostic » : nom de l'evenement et presence (booleens) de
+#  agent_id, de agent_transcript_path et du fichier .meta.json attendu, sans
+#  aucun contenu (ni prompt, ni texte, ni chemin). Les autres lignes gardent
+#  leur format (issue #74). Le bilan affiche « ? » aussi pour une ligne sans
+#  agent qui a des appels : celle-la ne porte pas la cle.
+#
 #  Ne mesure ni l'effort (non expose dans le transcript) ni les tokens de
 #  sortie (valeurs partielles de streaming dans le transcript). Le transcript
 #  est ecrit de facon asynchrone : appels et contexte sont des minorants
@@ -89,6 +96,19 @@ ligne = {
     "contexte_final": contexte,
     "duree_s": duree,
 }
+def meta_present(c):
+    try:
+        return isinstance(c, str) and os.path.exists(c[:-len(".jsonl")] + ".meta.json")
+    except Exception:
+        return False
+
+if not agent and not ids:
+    ligne["diagnostic"] = {
+        "evenement": e.get("hook_event_name") or "",
+        "agent_id": bool(aid),
+        "agent_transcript_path": bool(e.get("agent_transcript_path")),
+        "meta_json": meta_present(chemin),
+    }
 with open(os.environ["JOURNAL"], "a", encoding="utf-8") as f:
     f.write(json.dumps(ligne, ensure_ascii=False) + "\n")
 PY
