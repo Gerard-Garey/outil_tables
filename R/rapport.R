@@ -33,6 +33,8 @@
 #    à sa place dans ORDRE_CHAMPS_FICHE (#64 ; #14, spécification d'actuary,
 #    A.5), avec la convention d'ensemble à risque et le dénominateur des
 #    instants si Kaplan-Meier est retenu (#15, A.9) ;
+#  - bibliotheque_c() : bibliothèque C de fiche$plateforme$bibliotheque_c,
+#    lue par extSoftVersion(), sinon mention « non relevée » (#77) ;
 #  - ordonner_fiche() : réordonnancement pur de la fiche selon un ordre de
 #    champs, erreur de programmation si un champ présent n'y figure pas (#64) ;
 #  - informations_execution() : horodatage, durée, session abrégée, hors de
@@ -53,7 +55,12 @@
 # de premier niveau du plan retirées (ADR 0011, points 5.1 à 5.5 ; #42, #22).
 # Fiche 3 : champ nombre_lignes_exclues (#57) ; premier commit de la cinquième
 # branche qui change la définition de la fiche (point 10 (a)).
-VERSION_FICHE <- 3L
+# Fiche 4 : champ bibliotheque_c sous plateforme (#77) ; sans l'incrément, son
+# absence dans une fiche 3 se confondrait avec la mention « non relevée »
+# (point 10 (c)). Le champ est hors empreinte du résultat (fiche/plateforme est
+# dans CHEMINS_HORS_RESULTAT), l'incrément la change (fiche/version_fiche
+# n'y est pas).
+VERSION_FICHE <- 4L
 ENTETE_CANONIQUE <- "tablexp canonique 2"
 ALGORITHME_EMPREINTE <- "md5"
 # Première ligne du texte empreinté du résultat, consignée dans
@@ -560,6 +567,25 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   p
 }
 
+# Bibliothèque C consignée dans fiche$plateforme$bibliotheque_c (#77) : valeur
+# de extSoftVersion()[["iconv"]], que R 4.3.3 construit dans do_eSoftVersion()
+# (src/main/platform.c, l. 3592-3607) selon quatre formes, testées dans cet
+# ordre : « GNU libiconv X.Y » (ou « Apple or GNU libiconv X.Y » sous macOS)
+# si R est lié à GNU libiconv, même sur un système glibc ; « win_iconv »
+# sous Windows ; « glibc X.Y » (gnu_get_libc_version(), version de la glibc
+# chargée à l'exécution) sous glibc sans libiconv ; « unknown » sinon. Le
+# champ n'identifie donc la glibc, d'où vient la libm, que si sa valeur
+# commence par « glibc » ; autrement il désigne l'implémentation d'iconv.
+# « unknown » est la valeur brute de R, distincte de la mention « non
+# relevée » (MENTION_BIBLIOTHEQUE_C_NON_RELEVEE), rendue quand la valeur est
+# vide, absente ou non texte : rien n'est deviné.
+# `versions` : extSoftVersion(), paramètre pour les tests.
+MENTION_BIBLIOTHEQUE_C_NON_RELEVEE <- "non relevée"
+bibliotheque_c <- function(versions = extSoftVersion()) {
+  v <- if (is.character(versions) && "iconv" %in% names(versions)) versions[["iconv"]] else NA_character_
+  texte_moteur(if (length(v) == 1L && !is.na(v) && nzchar(trimws(v))) v else MENTION_BIBLIOTHEQUE_C_NON_RELEVEE)
+}
+
 # Fiche de construction en mémoire (ADR 0007, point 6.2 ; A.3) : aucun
 # horodatage. `plan` est le plan canonique (canoniser_plan(), ADR 0011,
 # point 5.2), qui fait foi : la fiche n'en porte pas de copie au premier
@@ -578,7 +604,7 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     versions = list(tablexp = as.character(utils::packageVersion("tablexp")), R = R.version.string),
     plateforme = list(sysname = Sys.info()[["sysname"]], release = Sys.info()[["release"]],
                       machine = Sys.info()[["machine"]], blas = extSoftVersion()[["BLAS"]],
-                      lapack = La_library()),
+                      lapack = La_library(), bibliotheque_c = bibliotheque_c()),
     roles = roles[order(match(names(roles), CATALOGUE_ROLES$role))],
     plan = plan,
     transition_code = pd$transition,
