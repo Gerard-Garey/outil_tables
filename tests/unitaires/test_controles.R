@@ -505,14 +505,18 @@ verifier("plateforme : mode strict hors plateforme de référence -> code non nu
 
 CONCORDANCE <- file.path(RACINE, "tests", "concordance_doc_moteur.R")
 concordance <- function(...) executer_rscript(CONCORDANCE, c(...))
+# Écriture en octets (useBytes = TRUE) : sous la locale C, writeLines() sans
+# useBytes convertit les chaînes marquées UTF-8 vers le codage natif et écrit
+# « <U+00E9> » à la place de « é » (#70). Pas d'enc2utf8() : sous la locale C, il
+# change en « <c3><a9> » une chaîne non marquée qui porte des octets UTF-8.
 latex_temoin <- function(lignes) {
   d <- tempfile("latex_temoin_"); dir.create(d)
-  writeLines(lignes, file.path(d, "temoin.tex"))
+  writeLines(lignes, file.path(d, "temoin.tex"), useBytes = TRUE)
   d
 }
 attente_temoin <- function(lignes) {
   f <- tempfile("attente_", fileext = ".csv")
-  writeLines(c("type,nom,issue,motif", lignes), f)
+  writeLines(c("type,nom,issue,motif", lignes), f, useBytes = TRUE)
   f
 }
 # Témoins construits sur les sources des catalogues requis (exports,

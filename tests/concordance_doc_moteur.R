@@ -166,6 +166,31 @@ WHITELIST_FICHE <- c("NA", "NULL", "integer", "unite_contrat", "R.version.string
 cat(R.version.string, "\n")
 installer_tablexp(RACINE)
 
+# Chaînes en octets UTF-8 non marqués, convertis à la source (document lu, noms
+# et valeurs tirés du package), une seule fois. Sous la locale C, une chaîne
+# marquée UTF-8 se comporte autrement qu'un littéral de ce script (non marqué) :
+# cat() l'écrit « <U+00E9> », sprintf() la mêle à un littéral accentué en
+# « <c2><ab> », et %in%/match() ne l'égalent pas à la même chaîne non marquée.
+# Tout le texte comparé ou affiché ici est donc non marqué : un motif accentué
+# (« bloc hypothèses : document ») se retrouve dans la sortie du script lancé
+# par les tests, et le verdict est celui de la locale UTF-8 (#70). Positions de
+# regexpr()/substring()/nchar() : en octets sous C, en caractères sous UTF-8,
+# mais toujours sur des chaînes de même régime, donc cohérentes entre elles.
+# Listes et noms traités ; sans effet en locale UTF-8.
+octets_utf8 <- function(x) {
+  if (is.list(x)) x[] <- lapply(x, octets_utf8)
+  else if (is.character(x)) {
+    u <- !is.na(x) & Encoding(x) == "UTF-8"
+    if (any(u)) {
+      y <- x[u]
+      Encoding(y) <- "unknown"
+      x[u] <- y
+    }
+  }
+  if (!is.null(names(x))) names(x) <- octets_utf8(names(x))
+  x
+}
+
 # Retire les commentaires LaTeX : sur chaque ligne, tout ce qui suit le
 # premier `%` précédé d'un nombre pair (zéro compris) de barres obliques
 # inverses (`\%` est un pour-cent, `\\%` une fin de ligne suivie d'un
@@ -191,7 +216,8 @@ texte_latex <- function(dossier) {
   tex <- if (dir.exists(dossier))
     list.files(dossier, pattern = "\\.tex$", recursive = TRUE, full.names = TRUE) else character(0)
   if (!length(tex)) return(character(0))
-  texte <- unlist(lapply(tex, readLines, warn = FALSE, encoding = "UTF-8"))
+  # Sans encoding = : chaînes non marquées (voir octets_utf8()).
+  texte <- unlist(lapply(tex, readLines, warn = FALSE))
   retirer_commentaires(texte)
 }
 
@@ -263,7 +289,7 @@ fonction_existe <- function(nom) {
 # catalogue -> noms. Les définitions de premier niveau sont lues par le même
 # code que le contrôle de l'ordre des modules.
 NS <- asNamespace("tablexp")
-SOURCES_CATALOGUES <- local({
+SOURCES_CATALOGUES <- octets_utf8(local({
   g <- new.env()
   sys.source(file.path(RACINE, "tests", "controles", "graphe_modules.R"), envir = g)
   dossier_r <- file.path(RACINE, "R")
@@ -276,14 +302,14 @@ SOURCES_CATALOGUES <- local({
     fonctions,
     list(roles = tablexp::catalogue_roles()$role,
          recettes = NS[["RECETTE_BRANCHE"]]))
-})
+}))
 # Catalogues où `()` marque une fonction ; ailleurs, aucun nom n'en porte.
 avec_fonctions <- function(catalogue) catalogue == "exports" || startsWith(catalogue, "fonctions-")
 
 texte <- texte_latex(DOSSIER_LATEX)
 entrees <- entrees_catalogue(texte)
 cites <- sort(unique(c(citations_latex(texte), entrees$nom[entrees$fonction])))
-exports <- sort(getNamespaceExports("tablexp"))
+exports <- octets_utf8(sort(getNamespaceExports("tablexp")))
 attente <- if (file.exists(FICHIER_ATTENTE))
   utils::read.csv(FICHIER_ATTENTE, colClasses = "character",
                   strip.white = TRUE) else
@@ -467,7 +493,7 @@ valeurs_citees <- function(nom) {
       if (length(c) >= 4L) regmatches(c[4L], gregexpr("\\(([0-9]+)\\)", c[4L]))[[1L]]))
     c(sub("^.*[^0-9]", "", a), gsub("[()]", "", cat_))
   } else {
-    valeur <- NS[[nom]]
+    valeur <- octets_utf8(NS[[nom]])
     prefixe <- sub("[0-9]+$", "", valeur)
     m <- regmatches(plein, gregexpr(paste0(prefixe, "[0-9]+"), plein, fixed = FALSE))[[1L]]
     substring(m, nchar(prefixe) + 1L)
@@ -505,12 +531,12 @@ fiches_temoins <- local({
   list(sans_brut = tablexp::construire_table(base, roles, plan)$fiche,
        avec_brut = tablexp::construire_table(base, roles, plan_brut, provenance)$fiche)
 })
-champs_avec <- names(fiches_temoins$avec_brut)
-champs_sans <- names(fiches_temoins$sans_brut)
+champs_avec <- octets_utf8(names(fiches_temoins$avec_brut))
+champs_sans <- octets_utf8(names(fiches_temoins$sans_brut))
 # Noms à tous les niveaux (listes et data.frames).
 noms_recursifs <- function(x) if (is.list(x)) c(names(x), unlist(lapply(x, noms_recursifs), use.names = FALSE)) else names(x)
-noms_fiche <- unique(unlist(lapply(fiches_temoins, noms_recursifs), use.names = FALSE))
-noms_tablexp <- ls(NS, all.names = TRUE)
+noms_fiche <- octets_utf8(unique(unlist(lapply(fiches_temoins, noms_recursifs), use.names = FALSE)))
+noms_tablexp <- octets_utf8(ls(NS, all.names = TRUE))
 cat(sprintf("Champs de la fiche : %d avec étape brut, %d sans (conditionnels : %s)\n",
             length(champs_avec), length(champs_sans), paste(setdiff(champs_avec, champs_sans), collapse = ", ")))
 
@@ -529,7 +555,7 @@ controle_fiche("champs_fiche", "liste des champs de la fiche du document égale 
   tous <- sans_echappement(unlist(regmatches(bloc_liste, gregexpr("(?<=\\\\code\\{)[^{}]+(?=\\})", bloc_liste, perl = TRUE))))
   fonctions <- unique(sub("\\(.*\\)$", "", tous[grepl("\\(.*\\)$", tous)]))
   nommes <- unique(tous[!grepl("\\(.*\\)$", tous)])
-  inconnus <- c(nommes[!(nommes %in% c(noms_fiche, noms_tablexp, NS[["ESTIMATEURS_BRUT"]], WHITELIST_FICHE))],
+  inconnus <- c(nommes[!(nommes %in% c(noms_fiche, noms_tablexp, octets_utf8(NS[["ESTIMATEURS_BRUT"]]), WHITELIST_FICHE))],
                 fonctions[!vapply(fonctions, function(f) isTRUE(fonction_existe(f)), logical(1L))])
   ecarts <- c(if (!all(champs_sans %in% champs_avec)) "fiche sans étape brut : champs absents de la fiche avec étape brut",
               if (length(manquants)) paste("champs de la fiche absents du document :", paste(manquants, collapse = ", ")),
@@ -543,7 +569,7 @@ controle_fiche("champs_fiche", "liste des champs de la fiche du document égale 
 
 # 5c. Blocs de lecture : \emph{<bloc>}~: champs..., jusqu'au bloc suivant ou
 # au point qui clôt l'énumération.
-blocs_code <- tablexp:::BLOCS_LECTURE_FICHE
+blocs_code <- octets_utf8(tablexp:::BLOCS_LECTURE_FICHE)
 ancres_blocs <- vapply(names(blocs_code), function(b)
   as.integer(regexpr(sprintf("\\emph{%s}~:", b), plein, fixed = TRUE)), integer(1L))
 controle_fiche("blocs_lecture", "blocs de lecture du document égaux à BLOCS_LECTURE_FICHE (blocs, champs, ordre)",
