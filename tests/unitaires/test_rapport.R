@@ -449,7 +449,7 @@ verifier("U21 : phrase de plateforme une fois ; « pas de date » ; conventions 
     hors <- setdiff(tablexp:::CHEMINS_HORS_RESULTAT, "execution")
     if (length(integ) != 1L ||
         !grepl(paste0("Hors du périmètre de cette empreinte, et donc de ce contrôle : ", paste(html(hors), collapse = ", "),
-                      " ; leurs valeurs sont restituées telles que lues dans l'objet, sans vérification.</p>"), integ, fixed = TRUE))
+                      " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.</p>"), integ, fixed = TRUE))
       e <- c(e, paste(id, ": phrase du contrôle d'intégrité"))
     if (!"<p>Validations : non produites par cette version (chemin etapes/validation absent de l'objet).</p>" %in% l ||
         !"<p>Table finale et comparaisons : non produites par cette version (chemin table : NULL).</p>" %in% l)

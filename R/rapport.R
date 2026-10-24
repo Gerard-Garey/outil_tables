@@ -578,7 +578,7 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
 
 # Bibliothèque C consignée dans fiche$plateforme$bibliotheque_c (#77) : valeur
 # de extSoftVersion()[["iconv"]], que R 4.3.3 construit dans do_eSoftVersion()
-# (src/main/platform.c, l. 3592-3607) selon quatre formes, testées dans cet
+# (src/main/platform.c, l. 3592-3610) selon quatre formes, testées dans cet
 # ordre : « GNU libiconv X.Y » (ou « Apple or GNU libiconv X.Y » sous macOS)
 # si R est lié à GNU libiconv, même sur un système glibc ; « win_iconv »
 # sous Windows ; « glibc X.Y » (gnu_get_libc_version(), version de la glibc
@@ -1306,7 +1306,7 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   # Suite de la même phrase (décision d'actuary, reprise de #87) : chemins de
   # setdiff(CHEMINS_HORS_RESULTAT, "execution") insérés entre les deux morceaux.
   integrite_hors_1 = " Hors du périmètre de cette empreinte, et donc de ce contrôle : ",
-  integrite_hors_2 = " ; leurs valeurs sont restituées telles que lues dans l'objet, sans vérification.",
+  integrite_hors_2 = " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.",
   etape_absente_1 = "Étape « ",
   etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
   etape_absente_3 = " absent de l'objet).",

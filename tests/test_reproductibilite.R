@@ -700,7 +700,7 @@ controler_rapport_fige <- function(x, l, id) {
       !"bibliotheque_c" %in% names(x$fiche$plateforme)) e <- c(e, "U21 : fiche/plateforme")
   integ <- grep("^<p>Contr\u00f4le d'int\u00e9grit\u00e9 : ", ident, value = TRUE)
   hors <- paste(html(setdiff(tablexp:::CHEMINS_HORS_RESULTAT, "execution")), collapse = ", ")
-  if (length(integ) != 1L || !grepl(paste0("de ce contr\u00f4le : ", hors, " ; leurs valeurs"), integ, fixed = TRUE))
+  if (length(integ) != 1L || !grepl(paste0("de ce contr\u00f4le : ", hors, " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume cro\u00eet avec la base) est lu dans l'objet, sans v\u00e9rification.</p>"), integ, fixed = TRUE))
     e <- c(e, "U21 : phrase du contrôle d'intégrité")
   rj <- section_de("rejeu")
   if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))

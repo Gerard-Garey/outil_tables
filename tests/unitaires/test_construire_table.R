@@ -445,7 +445,7 @@ verifier("fiche : versions (tablexp, R) et plateforme (sysname, release, machine
          identical(names(f$versions), c("tablexp", "R")) && identical(f$versions$R, R.version.string) &&
            identical(names(f$plateforme), c("sysname", "release", "machine", "blas", "lapack", "bibliotheque_c")))
 # Bibliothèque C (#77) : source lue dans src/main/platform.c de R 4.3.3
-# (do_eSoftVersion(), l. 3592-3607, quatre formes dans cet ordre : « GNU
+# (do_eSoftVersion(), l. 3592-3610, quatre formes dans cet ordre : « GNU
 # libiconv X.Y » ou « Apple or GNU libiconv X.Y » (macOS) si R est lié à GNU
 # libiconv, « win_iconv » sous Windows, « glibc X.Y » sous glibc sans
 # libiconv, « unknown » sinon).
