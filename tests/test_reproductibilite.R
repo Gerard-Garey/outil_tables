@@ -668,6 +668,13 @@ for (p in plans_reference()) {
   verifier(sprintf("%s : empreinte du résultat égale à celle de l'oracle d'avant #71 (écrivains des entiers et des dates par une chaîne par ligne)", id),
            grepl("^[0-9a-f]{32}$", x_ref$fiche$empreintes$resultat) &&
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
+  # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
+  # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
+  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 8 à 12 « identique », 13 « non vérifiée »", id), {
+    r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)))
+    identical(sans_execution(r$construction), sans_execution(x_ref)) &&
+      identical(r$bilan$verdict[8:13], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
+  })
   g <- tryCatch(aplatir_construction(x_ref), refus_reference = function(e) e)
   verifier(sprintf("%s : aplatissement sans refus d'écriture", id),
            if (inherits(g, "refus_reference")) conditionMessage(g) else TRUE)

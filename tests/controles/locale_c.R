@@ -19,9 +19,11 @@
 #       tests/reference/outils_reference.R), construire_table(), puis
 #       ecrire_fiche(x$fiche) et ecrire_plan(x$fiche$plan), relus par
 #       lire_fiche() et lire_plan() : aller-retour identical(), et réécriture
-#       de l'objet relu identique octet à octet au texte écrit ;
-#    3. les textes (fiche et plan de R1 à R6) écrits sous C et sous UTF-8
-#       sont comparés octet à octet. Aucune différence n'est admise : à
+#       de l'objet relu identique octet à octet au texte écrit ; pour R1,
+#       rejouer_fiche() sur la fiche relue : chaînes non ASCII du bilan
+#       marquées UTF-8 (#86) ;
+#    3. les textes (fiche et plan de R1 à R6, bilan du rejeu de R1) écrits
+#       sous C et sous UTF-8 sont comparés octet à octet. Aucune différence n'est admise : à
 #       entrées, rôles, plan et graine identiques sur la même machine, la
 #       locale ne change aucun octet de la fiche ni du plan, empreinte du
 #       code (MD5 du relevé des MD5 de R/*.R, fait à l'installation :
@@ -95,6 +97,15 @@ travailleur <- function(args) {
       if (!identical(lire_plan(tp), f$plan)) d("plan : lire_plan(ecrire_plan(p)) n'est pas identical() au plan")
       if (!identical(ecrire_fiche(lire_fiche(tf)), tf)) d("fiche : réécriture de la fiche relue différente du texte écrit")
       if (!identical(ecrire_plan(lire_plan(tp)), tp)) d("plan : réécriture du plan relu différente du texte écrit")
+      # Bilan du rejeu outillé de R1 (#86, T10) : chaînes non ASCII marquées
+      # UTF-8 ; octets des cinq colonnes, une cellule par ligne, comparés
+      # ensuite entre les deux installations.
+      if (identical(id, "R1")) {
+        v <- unlist(rejouer_fiche(jeu$donnees, lire_fiche(tf))$bilan, use.names = FALSE)
+        if (any(grepl("[^\001-\177]", v, useBytes = TRUE) & Encoding(v) != "UTF-8"))
+          d("bilan du rejeu : chaîne non ASCII non marquée UTF-8")
+        writeBin(unlist(lapply(v, function(s) c(charToRaw(s), as.raw(10L)))), file.path(sortie, "R1.bilan.txt"))
+      }
       NULL
     }, error = function(e) e)
     if (inherits(r, "error")) d(sprintf("erreur [%s] : %s", paste(class(r)[1L], collapse = "/"), conditionMessage(r)))
@@ -190,9 +201,17 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
     if (!length(a) || !identical(a, b))
       defauts <- c(defauts, sprintf("%s : texte écrit sous C différent de celui écrit sous %s (%s)", nom, utf8, ecart_octets(a, b)))
   }
-  if (n_comparees != 2L * length(IDENTIFIANTS) && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
+  # Bilan du rejeu de R1 (#86, T10) : octets des cinq colonnes.
+  f <- file.path(vapply(cas, `[[`, "", "sortie"), "R1.bilan.txt")
+  if (!all(file.exists(f))) defauts <- c(defauts, "R1.bilan.txt : bilan du rejeu absent") else {
+    a <- readBin(f[1L], "raw", file.size(f[1L])); b <- readBin(f[2L], "raw", file.size(f[2L]))
+    n_comparees <- n_comparees + 1L
+    if (!length(a) || !identical(a, b))
+      defauts <- c(defauts, sprintf("R1.bilan.txt : bilan du rejeu sous C différent de celui sous %s (%s)", utf8, ecart_octets(a, b)))
+  }
+  if (n_comparees != 2L * length(IDENTIFIANTS) + 1L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
-  cat(sprintf("  OK : %d textes (fiche et plan de %s) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
+  cat(sprintf("  OK : %d textes (fiche et plan de %s, bilan du rejeu de R1) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
               n_comparees, paste(range(IDENTIFIANTS), collapse = " à "), utf8, duree(t_debut)))
   invisible(TRUE)
 }

@@ -61,6 +61,12 @@
 # dans CHEMINS_HORS_RESULTAT), l'incrément la change (fiche/version_fiche
 # n'y est pas).
 VERSION_FICHE <- 4L
+# Versions de fiche admises au rejeu outillé (rejouer_fiche(), ADR 0012,
+# point 3.5 ; #86) : la version courante seule ; ici, et non dans
+# R/construire_table.R, évalué avant ce fichier. Élargir demande, version par
+# version, une annotation qui montre que les champs lus par le rejeu ont la
+# même structure et le même sens.
+VERSIONS_FICHE_REJEU <- VERSION_FICHE
 ENTETE_CANONIQUE <- "tablexp canonique 2"
 ALGORITHME_EMPREINTE <- "md5"
 # Première ligne du texte empreinté du résultat, consignée dans
