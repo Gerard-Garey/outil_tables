@@ -597,3 +597,33 @@ Rédigée par `architect-approfondi` (Fable, consultation 1/3 de la branche `cla
 **Effet sur les résultats : aucun.** Fonctions nouvelles ; aucune version du point 10 ne change par la présente annotation (l'incrément de `version_fiche` 3 → 4 relève de #77, annotation à venir au commit (2)).
 
 Issues : #86, #87 ; #77 (version admise au rejeu). ADR 0012. Branche `claude/rapport-fige`, PR #88.
+
+## Annotation du 24 octobre 2026 (seconde) — point 10 (c) : `version_fiche` 3 → 4 pour le champ `fiche$plateforme$bibliotheque_c` (#77)
+
+Rédigée par `architect` au commit (2) de la branche `claude/rapport-fige` (PR #88), selon le plan accepté (M93 ; feuille de route, § 1.8) et la réserve R3 du visa d'`actuary-approfondi` du 24/10/2026. Elle tranche le critère 4 de #77. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne relevés sur l'arbre de travail du commit (2), parti de `b24c432` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Décision : `VERSION_FICHE` passe de 3L à 4L** (`R/rapport.R:63`). C'est l'application du point 10 (c) : l'ensemble des champs de la fiche change, puisqu'un champ s'ajoute sous `plateforme`. Sans l'incrément, une fiche de version 3, qui n'a pas le champ, ne se distinguerait pas d'une fiche de version 4 où la bibliothèque C n'a pas été relevée. Les deux cas ont un sens différent : « champ inexistant à cette version » d'un côté, « relevé tenté, sans valeur » de l'autre. Seul le numéro de version les sépare. Le point 10 (a) est respecté : c'est le seul incrément de `version_fiche` de la branche (M83 ; #70 n'ajoute aucun champ).
+
+**(b) Le champ.** `fiche$plateforme$bibliotheque_c` est le **dernier** champ de `plateforme`, après `lapack` (`assembler_fiche()`, `R/rapport.R:607`). Sa valeur est rendue par `bibliotheque_c()` (`R/rapport.R:584`). C'est `extSoftVersion()[["iconv"]]` telle quelle, la valeur brute `unknown` de R comprise. Si la valeur est vide, absente ou n'est pas un texte, le champ vaut la mention « non relevée » (constante `MENTION_BIBLIOTHEQUE_C_NON_RELEVEE`, `R/rapport.R:583`). Rien n'est deviné : pas de seconde source, pas d'appel système. *Vérifié* par `architect` le 24/10/2026 (R 4.3.3, hôte cloud, `tablexp` installé depuis l'arbre de travail dans une bibliothèque temporaire) : `bibliotheque_c()` rend `glibc 2.39` ; `unknown` reste `unknown` ; une chaîne vide, un vecteur sans `iconv` ou une liste rendent « non relevée » ; `VERSION_FICHE` vaut 4.
+
+**(c) Ce que dit la valeur : lecture du source de R 4.3.3.** La valeur vient de `do_eSoftVersion()`, `src/main/platform.c`, l. 3592-3610 (tag svn `R-4-3-3` ; même fichier dans l'archive CRAN `R-4.3.3.tar.gz`, SHA-256 `80851231393b85bf3877ee9e39b282e750ed864c5ec60cbd68e6e139f0520330`). Le préprocesseur retient le premier cas vrai, dans cet ordre :
+
+1. `_LIBICONV_VERSION` : « GNU libiconv X.Y », ou « Apple or GNU libiconv X.Y » sous macOS ;
+2. `_WIN32` : « win_iconv » ;
+3. `__GLIBC__` : « glibc » suivi de `gnu_get_libc_version()`, fonction **appelée à l'exécution**, qui donne la glibc chargée et non celle de la compilation ;
+4. sinon « unknown ».
+
+*Vérifié* par `architect` le 24/10/2026 sur `https://svn.r-project.org/R/tags/R-4-3-3/src/main/platform.c`. Le critère 1 de #77 est rempli : la valeur n'est pas une version de compilation, et le repli de la feuille de route (§ 1.8, « Risque » : option B de M93) n'a pas lieu. **Limite de lecture** : le champ ne désigne la glibc, donc la `libm` dont viennent les écarts d'un ulp entre plateformes (ADR 0008, seconde annotation du 19/10/2026), **que si sa valeur commence par « glibc »**. Dans les autres cas, il désigne l'implémentation d'iconv (libiconv, win_iconv) ou rien (`unknown`), jamais la `libm`. Un lecteur de la fiche, et le rapport figé (#87), le présentent sous ce nom, sans en tirer davantage. Le critère 2 de #77, la valeur mesurée sous Windows (`win_iconv` attendu d'après le cas 2), sera fourni par le mainteneur. Jusque-là, cette valeur reste *non vérifiée* par mesure.
+
+**(d) Effet sur les empreintes et les références.**
+
+- **Le champ ne change pas l'empreinte du résultat.** `fiche/plateforme` est dans `CHEMINS_HORS_RESULTAT` (`R/rapport.R:437` ; point 11.1 et septième annotation du 20/10/2026).
+- **L'incrément la change.** `fiche/version_fiche` est empreinté. L'empreinte du résultat change donc pour R1 à R6, ainsi que la grandeur de référence `fiche/version_fiche` (3 → 4 ; `tests/reference/R1.tsv:186` vaut 3 avant le commit). Ces six plans, plus le jeton de l'empreinte du code, font tout le tableau avant / après du commit (2) (M113). Toute autre ligne d'écart est une régression.
+- **En-têtes des références.** Le champ n'entre pas dans les grandeurs des références, parce que l'outillage retire `fiche$plateforme` (`tests/reference/outils_reference.R:251`). Il apparaît dans leur en-tête, hors comparaison, par la ligne `fiche$plateforme/bibliotheque_c` d'`entete_reference()` (ADR 0009, points 2.2 et 7.1, inchangés).
+- **Visa et régénération.** Aucune table finale, aucun verdict et aucune valeur de table homologuée ne change : le visa d'`actuary` suffit (M83). Les références sont régénérées une seule fois pour la branche, sur la CI, par la session principale, juste après le commit (2) (point 10 (a) ; M63).
+
+**(e) Relecture des fiches de version 3.** Une fiche de version 3, sans le champ, est relue par `lire_fiche()` (`R/rapport.R:1150`) sans refus, et l'objet relu est `identical` à l'original (mesure d'`audit`, 24/10/2026). C'est le comportement prévu : `lire_fiche()` ne contrôle pas `version_fiche` ((i) de la troisième annotation du 19/10/2026 ; annotation du 24/10/2026, (a)). Le refus d'une version non admise relève du rejeu outillé, `rejouer_fiche()` (#86, commit (3)) : `VERSIONS_FICHE_REJEU` y vaudra la version finale de la branche, soit 4 (ADR 0012, point 3.5). Une fiche de version 3 y sera refusée par `version_fiche_non_admise`, sans migration (point 10 (d)).
+
+**Effet sur les résultats.** `fiche/version_fiche` passe de 3 à 4, et l'empreinte du résultat de R1 à R6 change en conséquence. Le nouveau champ est hors empreinte et hors grandeurs de référence. Aucune autre version du point 10 ne change : `tablexp canonique 2`, `tablexp resultat 1`, `tablexp plan 1`, `tablexp fiche 1` et `tablexp reference 1` restent identiques, puisque la grammaire écrit le nouveau champ comme toute chaîne.
+
+Issues : #77 (critères 1 et 4 ; critère 2 en attente du mainteneur) ; #86 (version admise au rejeu). ADR 0008 (réserve sur la `libm`), ADR 0009 (points 2.2 et 7.1), ADR 0012 (point 3.5). Décisions M83, M93, M113. Branche `claude/rapport-fige`, PR #88.
