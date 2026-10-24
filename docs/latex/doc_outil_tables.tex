@@ -1146,9 +1146,10 @@ dans l'identifiant de plateforme~: elles ne déclenchent aucune bascule. Ce
 bloc est reporté dans le message de
 chaque commit de référence et dans l'en-tête de chaque fichier de référence
 (section~\ref{sec:non-regression}), sous la clé «~plateforme consignée~»
-pour les grandeurs consignées~; la version de la glibc, ajoutée après la
-dernière régénération, n'y figurera qu'à la prochaine~: les références
-actuelles ne la portent pas.
+pour les grandeurs consignées~; la version de la glibc y figure depuis la
+régénération du 24/10/2026 (ligne «~glibc (libm)~»), à côté de
+\code{fiche\$plateforme\$bibliotheque\_c}, consignée par la fiche elle-même
+(section~\ref{sec:fiche}).
 
 \begin{encadre}
 \small
@@ -1594,7 +1595,19 @@ issues~\#57 (\code{version\_fiche} de~2 à~3, champ
 \code{representation\_resultat}, empreintes du résultat et du code
 comparées par jeton, statut \code{statut\_resultat\_code})~: toutes les
 autres grandeurs sont restées identiques au bit près, et l'empreinte des
-données est inchangée.
+données est inchangée. Elles l'ont été \textbf{une quatrième fois}, le
+24/10/2026, en mode \code{regeneration} sur tous les plans (exécution
+40111528681 du workflow, calcul sur \code{a96cf7f}, commit \code{26f7a29},
+visa d'\code{actuary}, sur ordre du mainteneur), régénération unique de la
+branche \code{claude/rapport-fige}, pour le seul passage de
+\code{version\_fiche} de~3 à~4 (issue~\#77, champ
+\code{fiche\$plateforme\$bibliotheque\_c}, section~\ref{sec:fiche})~:
+\code{fiche/version\_fiche} est la seule grandeur en écart~; l'empreinte du
+résultat, comparée par jeton, change en conséquence, ainsi que l'empreinte
+du code, \code{R/} ayant changé (en-tête \code{0be71b0b\ldots} devenu
+\code{2cc03eab\ldots}), et toutes les autres grandeurs sont restées
+identiques au bit près~; l'en-tête gagne la ligne
+\code{fiche\$plateforme/bibliotheque\_c}, hors comparaison.
 
 \begin{encadre}
 \small
@@ -4705,10 +4718,14 @@ identiques. Ses champs, dans cet ordre, en huit blocs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{identification}~: \code{version\_fiche}
-    (\code{VERSION\_FICHE}, 3)~; \code{versions}
+    (\code{VERSION\_FICHE}, 4)~; \code{versions}
     (\code{tablexp}, lue dans la description du package installé, et
-    \code{R.version.string})~; \code{plateforme} (système, version, machine,
-    BLAS par \code{extSoftVersion()}, LAPACK par \code{La\_library()})~;
+    \code{R.version.string})~; \code{plateforme}, dans l'ordre
+    \code{sysname}, \code{release} et \code{machine} (système, version,
+    machine, lus par \code{Sys.info()}), \code{blas} (BLAS, par
+    \code{extSoftVersion()}), \code{lapack} (LAPACK, par
+    \code{La\_library()}) et \code{bibliotheque\_c} (bibliothèque C, par
+    \code{extSoftVersion()}~; ci-dessous, «~Bibliothèque C~»)~;
   \item \textbf{données}~: \code{roles}, dans l'ordre du catalogue des rôles
     (\code{CATALOGUE\_ROLES})~; \code{provenance}, dans l'ordre
     \code{fichier}, \code{empreinte}, \code{algorithme}, et
@@ -4868,7 +4885,7 @@ dans l'ordre canonique, sont inchangés~; pour un plan non canonique sur
 l'un de ces champs, \code{fiche\$plan} et l'ordre de présentation des
 étapes et des avertissements changent, aucune valeur numérique. La forme
 canonique des valeurs du plan fait partie de ce que numérote
-\code{version\_fiche}~: une fiche de version~3 garantit cet ordre, une
+\code{version\_fiche}~: une fiche de version~3 ou ultérieure garantit cet ordre, une
 fiche de version~2 ne le garantit pas~; l'issue~\#63 tombe sous l'incrément de~2 à~3
 porté par l'issue~\#57 (ADR 0011, point~10). Les tests de
 \code{tests/unitaires/test\_construire\_table.R} vérifient, pour chacun des
@@ -4925,6 +4942,64 @@ point~10~(c))~; l'incrément est porté par le premier commit de la branche
 l'issue~\#57, et il est le seul de la branche (ADR 0011, point~10~(a), et
 troisième et quatrième annotations du 20/10/2026). Le changement a été visé
 par \code{actuary}~; aucune table, aucun taux ni aucun verdict ne change.
+
+\medskip
+\begingroup\sloppy
+\noindent
+\textbf{Bibliothèque C} (issue~\#77~; ADR 0011, seconde annotation du
+24/10/2026). \code{fiche\$plateforme\$}\allowbreak\code{bibliotheque\_c}, dernier
+sous-champ de \code{plateforme}, est rendu par \code{bibliotheque\_c()}~:
+c'est l'élément \code{iconv} de \code{extSoftVersion()}, tel quel. R~4.3.3
+construit cette valeur dans la fonction C \code{do\_eSoftVersion} du
+fichier \code{src/main/platform.c} de ses sources (étiquette
+\code{R-4-3-3} du dépôt Subversion de R,
+\url{https://svn.r-project.org/R/tags/R-4-3-3/src/main/platform.c},
+l.~3592--3610, relu le 24/10/2026), où le préprocesseur retient la
+première de quatre formes, dans cet ordre~:
+\begin{enumerate}[leftmargin=*, itemsep=1pt]
+  \item «~GNU libiconv X.Y~» («~Apple or GNU libiconv X.Y~» sous macOS) si
+    R est lié à la bibliothèque GNU libiconv, \textbf{même sur un système
+    glibc}~;
+  \item «~win\_iconv~» sous Windows~;
+  \item «~glibc X.Y~» sous la glibc sans libiconv, la version étant celle
+    que rend la fonction C \code{gnu\_get\_libc\_version} \textbf{à
+    l'exécution}, donc celle de la glibc chargée et non celle de la
+    compilation~;
+  \item «~unknown~» sinon, gardé tel quel.
+\end{enumerate}
+\textbf{Le champ n'identifie la glibc}, donc la bibliothèque mathématique
+(\code{libm}) dont viennent les écarts d'un ulp entre machines
+(section~\ref{sec:empreinte-resultat}), \textbf{que si sa valeur commence
+par «~glibc~»}~; sinon il désigne l'implémentation d'iconv (libiconv,
+win\_iconv) ou rien («~unknown~»), jamais la \code{libm}, et la fiche n'en
+dit pas davantage. Rien n'est deviné~: si l'élément est absent,
+\code{NA}, vide ou fait de blancs, ou n'est pas un texte, le champ vaut la
+mention «~non relevée~»
+(\code{MENTION\_BIBLIOTHEQUE\_C\_NON\_RELEVEE}), distincte de la valeur
+brute «~unknown~» de R. Sur un hôte hors de la plateforme de référence
+(Ubuntu~24.04.5, R~4.3.3~; \emph{constat de mesure} du 24/10/2026), la
+fonction rend «~glibc 2.39~»~; sur la plateforme de référence, l'en-tête
+des références régénérées le 24/10/2026 porte «~glibc 2.35~»
+(section~\ref{sec:non-regression}). La forme Windows («~win\_iconv~»,
+attendue d'après le cas~2) n'a pas encore été mesurée~: elle reste
+\emph{non vérifiée} par mesure (critère~2 de l'issue~\#77, à fournir par le
+mainteneur). Comme tout \code{fiche\$plateforme}, le champ est
+\textbf{hors du périmètre} de l'empreinte du résultat
+(\code{CHEMINS\_HORS\_RESULTAT}, section~\ref{sec:empreinte-resultat}) et
+des grandeurs des références, dont il n'occupe que l'en-tête. Son ajout
+change l'ensemble des champs et fait passer \code{version\_fiche} de~3
+à~4 (ADR 0011, point~10~(c))~: sans l'incrément, une fiche de version~3,
+qui n'a pas le champ («~champ inexistant à cette version~»), ne se
+distinguerait pas d'une fiche où la bibliothèque n'a pas été relevée
+(«~relevé tenté, sans valeur~»). C'est le seul incrément de la branche
+\code{claude/rapport-fige}~; \code{fiche\$version\_fiche} étant dans le
+périmètre de l'empreinte du résultat, celle-ci change pour les six plans
+de référence. Ces deux valeurs, avec l'empreinte du code, que change tout
+commit de \code{R/}, sont les seules des références qui aient changé (visa
+d'\code{actuary} du 24/10/2026, décision M83~;
+section~\ref{sec:non-regression}). Aucune table, aucun taux ni aucun
+verdict ne change.\par
+\endgroup
 
 \noindent
 Les champs qui n'ont pas d'objet (convention et unité d'exposition d'un plan
@@ -5322,9 +5397,9 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     Ubuntu~22.04.5, glibc~2.35~: \emph{constat de mesure}, relevé par le
     script de plateforme dans le journal du job «~Tests (R 4.3.3)~» de la CI
     du 20/10/2026, sur l'image de référence, de même empreinte que celle de
-    l'en-tête des références actuelles~; issue~\#72~; les en-têtes des
-    références ne porteront cette version qu'à leur prochaine
-    régénération), et non dans
+    l'en-tête des références~; issue~\#72~; les en-têtes des
+    références la portent depuis leur régénération du 24/10/2026, sous
+    «~glibc (libm)~» et sous \code{fiche\$plateforme/bibliotheque\_c}), et non dans
     LAPACK~; la mesure ne sépare pas la version de la glibc de la variante
     qu'elle choisit selon le processeur (ADR 0008, seconde annotation du
     19/10/2026). De plus, la forme «~empreinte~» distingue \code{NA} de
@@ -5344,8 +5419,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     effectivement installé, modifications non commitées comprises~; non son
     comportement numérique, qui dépend aussi de R et du BLAS, consignés à
     part (\code{fiche\$versions}, \code{fiche\$plateforme}), et de la
-    \code{libm}, dont la fiche ne consigne pas la version (le script de
-    plateforme la consigne, issue~\#72).
+    \code{libm}, dont la fiche ne consigne la version que par
+    \code{fiche\$plateforme\$bibliotheque\_c}, et seulement quand sa valeur
+    commence par «~glibc~» (section~\ref{sec:fiche}, «~Bibliothèque C~»~;
+    issue~\#77)~; le script de plateforme la consigne aussi (issue~\#72).
   \item \textbf{Définition} (option~(iv), décision M70, point~1)~: le MD5 du
     \emph{relevé des MD5} des fichiers \code{R/*.R}, et non celui de leur
     texte concaténé~: une ligne \code{<md5>}, deux espaces,
@@ -5838,7 +5915,7 @@ ses tests d'invariance (plan sans \code{brut}, plan sans
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (3) \\
+\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (4) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
 \catalogue{fonctions-rapport}{REPRESENTATION\_RESULTAT} & constante & --- & \code{"tablexp resultat 1"}, première ligne du texte empreinté du résultat et \code{fiche\$empreintes\$}\allowbreak\code{representation\_resultat} \\
@@ -5863,6 +5940,8 @@ ses tests d'invariance (plan sans \code{brut}, plan sans
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
+\catalogue{fonctions-rapport}{MENTION\_BIBLIOTHEQUE\_C\_NON\_RELEVEE} & constante & --- & mention «~non relevée~» de \code{fiche\$plateforme\$}\allowbreak\code{bibliotheque\_c}, quand la valeur lue est absente, \code{NA}, vide ou faite de blancs, ou n'est pas un texte (section~\ref{sec:fiche}) \\
+\catalogue{fonctions-rapport}{bibliotheque\_c()} & interne & versions des bibliothèques (par défaut celles de R~; paramètre pour les tests) & élément \code{iconv}, tel quel («~unknown~» compris), sinon la mention «~non relevée~» (constante ci-dessus)~; n'identifie la glibc que si la valeur commence par «~glibc~» (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme})~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée~; champs réordonnés par \code{ordonner\_fiche()} selon \code{ORDRE\_CHAMPS\_FICHE} \\
 \catalogue{fonctions-rapport}{ordonner\_fiche()} & interne & fiche, ordre & fiche réordonnée selon l'ordre, réduit aux champs présents (\code{hypotheses\_brut} absent sans étape \code{brut})~; erreur de programmation sur un champ présent hors de l'ordre, jamais retiré en silence \\
 \catalogue{fonctions-rapport}{ORDRE\_CHAMPS\_FICHE} & constante & --- & ordre des champs de la fiche en huit blocs (identification, données, plan, paramètres retenus, exclusions, hypothèses, aléa, avertissements)~; source unique de l'ordre du corps de la fiche écrite \\

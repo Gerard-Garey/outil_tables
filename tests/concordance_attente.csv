@@ -1,7 +1,4 @@
 type,nom,issue,motif
-fiche,VERSION_FICHE,#77,document en retard sur VERSION_FICHE 4 (docwriter en fin de branche)
-entree,fonctions-rapport:bibliotheque_c,#77,fonction nouvelle absente du catalogue du document (docwriter en fin de branche)
-entree,fonctions-rapport:MENTION_BIBLIOTHEQUE_C_NON_RELEVEE,#77,constante nouvelle absente du catalogue du document (docwriter en fin de branche)
 export,rejouer_fiche,#86,export nouveau absent du document (docwriter en fin de branche)
 entree,exports:rejouer_fiche,#86,export nouveau absent du catalogue des exports du document (docwriter en fin de branche)
 entree,fonctions-construire-table:rejouer_fiche,#86,fonction nouvelle absente du catalogue du document (docwriter en fin de branche)
