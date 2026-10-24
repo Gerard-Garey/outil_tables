@@ -941,7 +941,10 @@ valeur courante~; la liste des champs de la fiche
 ordre, et chaque identifiant qu'elle cite est un nom de la fiche, un objet
 de \code{tablexp}, un estimateur ou un littéral d'une liste blanche du
 script~; les blocs de lecture sont ceux de \code{BLOCS\_LECTURE\_FICHE}
-(blocs, champs et ordre). Le format des citations et des catalogues qu'elle lit est fixé par
+(blocs, champs et ordre). Enfin, aucun nom de fonction n'est coupé par
+\code{\textbackslash allowbreak} entre deux \code{\textbackslash code\{\}}~: le
+fragment final serait lu comme une fonction et le nom entier échapperait au
+contrôle d'existence (issue~\#84). Le format des citations et des catalogues qu'elle lit est fixé par
 \code{docs/latex/CONVENTIONS.md} (section~3)~; les tableaux de fonctions de
 chaque module en sont la principale application (E4.9). Sans \code{-{}-strict}, elle
 rend compte des écarts sans échouer.
