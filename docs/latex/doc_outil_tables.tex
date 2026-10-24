@@ -383,7 +383,9 @@ et censure (section~\ref{sec:exposition}) & présent \\
 \code{R/simulation.R} & simulateur (section~\ref{sec:simulation})~; hors de la
 chaîne du moteur & présent \\
 \code{R/construire\_table.R} & point d'entrée unique, validation du plan,
-orchestration seule, aucun calcul (section~\ref{sec:construction}) & présent \\
+orchestration seule, aucun calcul (section~\ref{sec:construction})~; rejeu
+outillé d'une fiche, qui contrôle puis appelle le point d'entrée sans
+exécuter d'étape (section~\ref{sec:rejeu}) & présent \\
 \end{longtable}
 \end{center}
 
@@ -1857,8 +1859,9 @@ temporaires, l'une sous \code{LC\_ALL=C}, l'autre sous la première locale
 UTF-8 disponible, et exécuté dans un sous-processus sous la locale de son
 installation, qui vérifie d'abord la locale effective~; pour R1 à R6,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
-puis les douze textes comparés octet à octet entre C et UTF-8, sans écart
-admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
+et, pour R1, bilan du rejeu outillé (chaînes non ASCII marquées UTF-8),
+puis ces textes, deux par plan et le bilan, comparés octet à octet entre C
+et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11~; M54~; issue~\#66 \\
 \code{ecriture\_doubles.R} & écriture des doubles de l'empreinte en octets
@@ -2229,6 +2232,381 @@ le retrait des quatre copies de premier niveau de la fiche
 (section~\ref{sec:fiche}) a été décidé par le mainteneur (décision M64,
 question~Q2~; issue~\#42).
 
+\subsection{Rejeu outillé}
+\label{sec:rejeu}
+\begingroup\sloppy
+
+Le \emph{rejeu} est l'exécution de
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
+sur les données qu'une fiche de construction identifie, pour retrouver la
+construction qu'elle décrit (E3.7). La note de lecture d'E3.7 du 19/10/2026
+(décision M64~; ADR 0011, point~12) en fait un critère en quatre temps~: le
+relecteur (1)~vérifie \code{version\_fiche}, la représentation canonique et
+l'empreinte des données de la fiche~; (2)~exécute la construction sur le plan
+relu du texte de la fiche~; (3)~compare les grandeurs à tolérance par classes
+(section~\ref{sec:non-regression}) sur une autre machine, au bit près sur la
+même (E4.6)~; (4)~n'emploie l'empreinte du résultat que comme témoin sur la
+même machine (section~\ref{sec:empreinte-resultat}). Le \emph{rejeu outillé},
+fonction exportée \code{rejouer\_fiche(donnees, fiche)} de
+\code{R/construire\_table.R} (issue~\#86~; ADR 0012, point~3, précisé par sa
+seconde annotation du 24/10/2026), outille les temps (1), (2) et~(4) ---
+pour le temps~(2), la relecture du texte de la fiche reste à l'appelant,
+par \code{lire\_fiche()} ---, et le cas «~même machine~» du temps~(3) par le
+seul témoin de l'empreinte du résultat, qui ne localise pas un écart~; la
+comparaison à tolérance par classes sur une autre machine reste hors de
+l'outil (ci-dessous, «~Limites~»).
+
+\medskip
+\noindent
+\textbf{Une fonction de contrôle, non un second point d'entrée} (ADR 0012,
+points 3.2 et 3.3). \code{rejouer\_fiche()} n'exécute aucune étape et
+n'appelle aucune fonction d'étape~: elle contrôle la fiche et les données,
+puis appelle \code{construire\_table()} \textbf{exactement une fois}, avec
+les rôles, le plan et la provenance \textbf{lus dans la fiche}, sans en
+recevoir d'autres~; \code{construire\_table()} reste la seule fonction qui
+exécute un plan, et sa signature est inchangée. Elle vit dans
+\code{R/construire\_table.R} parce que le module \code{rapport}, qui porte la
+fiche et ses empreintes, ne peut pas appeler \code{construire\_table()}
+(section~\ref{sec:graphe})~; un troisième fichier transversal, écarté,
+aurait changé la forme du package pour une seule fonction. Elle reçoit un
+\code{data.frame}, jamais un fichier (E4.4)~: la fiche est relue de ses
+octets par \code{lire\_fiche()} chez l'appelant, ou prise dans
+\code{x\$fiche}.
+
+\medskip
+\noindent
+\textbf{Étapes}, dans cet ordre~; le rejeu s'arrête au premier refus, sans
+appeler \code{construire\_table()}~:
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item \textbf{nature des arguments}, la fiche d'abord~: un objet
+    \code{construction} ou \code{rejeu} reçu à la place de la fiche, ou une
+    fiche qui n'est pas une liste nommée aux noms uniques, sans autre
+    attribut que ses noms (\code{liste\_nommee()}), est refusé sous
+    \code{fiche\_non\_conforme}~; puis des données qui ne sont pas un
+    \code{data.frame} sont refusées par \code{controler\_roles()}, sous le
+    motif \code{donnees\_mal\_formees} du module \code{donnees}, avec le
+    message même qu'en donnerait \code{construire\_table()}~;
+  \item \textbf{forme des champs que le rejeu lit lui-même}~:
+    \code{version\_fiche}, \code{integer} de longueur~1, non \code{NA}, sans
+    attribut (forme exacte~: un \code{double} relu d'un texte édité est
+    refusé)~; \code{empreintes}, liste nommée aux noms uniques, sans autre
+    attribut que ses noms, et, si elle l'est, ses éléments
+    \code{algorithme}, \code{representation} et \code{donnees}, chacun
+    chaîne unique, non vide, non \code{NA}, sans attribut
+    (\code{chaine\_unique()})~; noms \code{roles}, \code{plan} et
+    \code{provenance} présents (\code{provenance} peut valoir
+    \code{NULL}). \textbf{Tous} les champs en défaut sont cités dans un seul
+    refus \code{fiche\_non\_conforme}~; aucun n'est complété ni converti. Le
+    contenu de \code{roles}, \code{plan} et \code{provenance} est laissé à
+    l'étape~6~;
+  \item \textbf{version admise}~: \code{version\_fiche} appartient à
+    \code{VERSIONS\_FICHE\_REJEU}, sinon refus
+    \code{version\_fiche\_non\_admise}. Le contrôle précède ceux du contenu,
+    parce que la version donne le sens des autres champs~;
+  \item \textbf{algorithme de l'empreinte des données}~:
+    \code{empreintes\$algorithme} égal à \code{ALGORITHME\_EMPREINTE}, sinon
+    \code{algorithme\_empreinte\_inconnu}~;
+  \item \textbf{représentation canonique}~: \code{empreintes\$representation}
+    égale à \code{ENTETE\_CANONIQUE}, sinon \code{representation\_non\_admise}~:
+    un recalcul sous une autre définition échouerait toujours, sous un motif
+    trompeur~;
+  \item \textbf{entrées de la construction}~: la séquence de contrôles de
+    \code{construire\_table()} (section~\ref{sec:execution}), refaite en
+    entier, dans son ordre, sur les champs de la fiche~:
+    \code{valider\_plan()}, \code{canoniser\_plan()},
+    \code{controler\_roles()} sur la segmentation canonique,
+    \code{deduire\_recette()}, \code{resoudre\_convention()} si l'étape
+    \code{exposition} est au plan, \code{controler\_provenance()}. Ces
+    refus gardent leur module, leur motif et leur message
+    (\code{colonne\_absente}, \code{type\_incompatible},
+    \code{plan\_mal\_forme}, \code{convention\_invalide},
+    \code{provenance\_invalide}\ldots). La séquence est dupliquée, non
+    factorisée, pour ne pas modifier \code{construire\_table()}~; un test
+    vérifie qu'elle donne le même refus par les deux chemins. Elle précède
+    l'empreinte des données, qui, calculée la première, nommerait mal la
+    cause~: une colonne de rôle absente donnerait \code{type\_non\_canonique}
+    (module \code{rapport}) et une date en \code{character} une empreinte
+    discordante, au lieu de \code{colonne\_absente} et de
+    \code{type\_incompatible} (ADR 0012, «~Contexte~», mesures
+    d'\code{actuary})~;
+  \item \textbf{empreinte des données}~: recalculée par
+    \code{empreinte\_donnees(donnees, fiche\$roles)} et comparée à
+    \code{fiche\$empreintes\$donnees}, sinon
+    \code{empreinte\_donnees\_discordante}. Elle est donc calculée deux fois
+    par rejeu, ici et dans \code{construire\_table()}, qui ne reçoit pas
+    d'empreinte~: la lui transmettre aurait changé la signature du point
+    d'entrée~;
+  \item \textbf{construction}~:
+    \code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)},
+    une fois. Si l'empreinte des données de l'objet rendu diffère de celle
+    de l'étape~7, le rejeu s'arrête sur une erreur de programmation
+    (garde-fou, non un refus)~;
+  \item \textbf{témoins}, consignés dans le bilan, jamais motifs de refus
+    (ci-dessous).
+\end{enumerate}
+
+\noindent
+\textbf{Versions admises~: la version courante seule} (ADR 0012, point~3.5).
+\code{VERSIONS\_FICHE\_REJEU} vaut \code{VERSION\_FICHE}, écrite comme une
+expression et non comme un littéral (un test exige leur identité)~; elle est
+rangée dans \code{R/rapport.R}, à côté de \code{VERSION\_FICHE}, parce
+qu'une constante de premier niveau de \code{R/construire\_table.R} ne peut
+pas lire une constante de \code{R/rapport.R}, évalué après lui à
+l'installation (section~\ref{sec:fiche}, «~Ordre des valeurs des champs
+ensembles~»)~; \code{rejouer\_fiche()} la lit à l'appel. Trois raisons~:
+aucune conversion silencieuse d'une fiche d'une autre version (ADR 0011,
+point~10~(d))~; une telle fiche donnerait de toute façon un témoin
+«~différente~», même sur la même machine, \code{version\_fiche} étant dans le
+périmètre de l'empreinte du résultat~; aucune fiche d'une version antérieure
+n'a été livrée hors des tests. Admettre une version antérieure demandera de
+montrer, version par version, que les champs lus par le rejeu ont la même
+structure et le même sens. Une fiche de version~3, relue sans refus par
+\code{lire\_fiche()}, qui ne contrôle pas la version, est ainsi refusée par
+\code{rejouer\_fiche()}.
+
+\medskip
+\noindent
+\textbf{Textes des refus.} Les cinq motifs propres au rejeu sont levés sous
+le module \code{construire\_table}, comme les refus de \code{valider\_plan()}
+(tableau~\ref{tab:refus-rejeu})~; les refus délégués (étape~1 pour les
+données, étape~6) gardent leur module. Chaque message cite la valeur lue et
+la valeur attendue. La version de \code{tablexp} et les empreintes du
+code y sont écrites par \code{texte\_lu()}~: «~absente~» si la valeur
+manque, elle-même si c'est une chaîne unique sans attribut (\code{NA} écrit
+«~NA~»), «~illisible (\emph{type} de longueur \emph{n})~» sinon. Dans toute
+valeur lue dans la fiche et insérée dans un message, les caractères de
+contrôle (U+0001 à U+001F, U+007F) sont remplacés par une espace
+(\code{sans\_controle()})~; les \code{details} et le bilan gardent la valeur
+brute. Les formes lues de l'étape~2 sont
+écrites par \code{decrire\_forme()}~: «~champ absent~», ou «~\emph{type} de
+longueur \emph{n}~», complété au besoin par «~, NA~», «~, vide~»,
+«~, attribut(s) \emph{noms}~» (les noms d'une liste ne sont pas cités comme
+attribut), «~, noms en double~: \emph{noms}~» et «~, noms incomplets~».
+Dans le tableau, un crochet désigne une valeur insérée.
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{5.5cm}p{6.7cm}p{2.4cm}@{}}
+\caption{Refus propres au rejeu outillé (module \code{construire\_table}).}
+\label{tab:refus-rejeu}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Motif et étape}} &
+\textcolor{financeblue}{\textbf{Message}} &
+\textcolor{financeblue}{\textbf{\code{details}}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Motif et étape}} &
+\textcolor{financeblue}{\textbf{Message}} &
+\textcolor{financeblue}{\textbf{\code{details}}} \\
+\endhead
+\code{fiche\_non\_conforme}, étape~1 (objet \code{construction}) & «~Rejeu~: objet \code{`construction`} reçu à la place de sa fiche~; passer \code{x\$fiche}, ou la fiche relue de son texte par \code{lire\_fiche()}.~» & \code{champ} «~(fiche)~», \code{lu} «~construction~», \code{attendu} «~liste nommée~» \\
+\code{fiche\_non\_conforme}, étape~1 (objet \code{rejeu}) & «~Rejeu~: objet \code{`rejeu`} reçu à la place d'une fiche~; passer \code{r\$construction\$fiche}.~» & idem, \code{lu} «~rejeu~» \\
+\code{fiche\_non\_conforme}, étape~1 (autre objet) & «~Rejeu~: la fiche doit être une liste nommée aux noms uniques, sans autre attribut que ses noms~; reçu~: objet de classe [classes] (type [type]). Le rejeu ne lit aucun fichier~: relire la fiche de ses octets par \code{lire\_fiche(readBin(fichier, "raw", file.size(fichier)))}, ou passer \code{x\$fiche}.~» & idem, \code{lu} les classes \\
+\code{fiche\_non\_conforme}, étape~2 & «~Fiche non conforme au rejeu~: «~[champ]~»~: [forme lue] au lieu de [forme attendue]~; \ldots{} Le rejeu ne lit que ces champs avant \code{construire\_table()}~; aucun n'est complété ni converti.~» Formes attendues~: «~integer de longueur 1, non NA, sans attribut~» (\code{version\_fiche})~; «~liste nommée aux noms uniques, sans autre attribut que ses noms~» (\code{empreintes})~; «~chaîne unique, non vide, non NA, sans attribut~» (ses trois éléments)~; «~champ présent~» (\code{roles}, \code{plan})~; «~champ présent (NULL admis)~» (\code{provenance}) & \code{champ}, \code{lu}, \code{attendu}~: un élément par champ en défaut, dans l'ordre de l'étape \\
+\code{version\_fiche\_non\_admise}, étape~3 & «~Version de fiche non admise au rejeu~: version\_fiche [version lue] lue, version(s) admise(s) par ce code~: [\code{VERSIONS\_FICHE\_REJEU}]. Fiche produite par tablexp [version de la fiche], empreinte du code [empreinte du code de la fiche]~; code installé~: tablexp [version installée], empreinte du code [\code{EMPREINTE\_CODE}]. Aucune conversion de fiche n'est faite~: rejouer cette fiche avec le code dont l'empreinte est celle de la fiche.~» La version de la fiche est «~absente~» si \code{versions} manque ou est une liste sans élément \code{tablexp} & \code{lu}, \code{admises}, \code{tablexp}, \code{code}, \code{code\_installe} \\
+\code{algorithme\_empreinte\_inconnu}, étape~4 & «~Algorithme d'empreinte «~[lu]~» lu dans la fiche, «~[\code{ALGORITHME\_EMPREINTE}]~» attendu~: ce code ne calcule l'empreinte des données que par cet algorithme~; aucune comparaison n'est possible.~» & \code{lu}, \code{attendu} \\
+\code{representation\_non\_admise}, étape~5 & «~Représentation canonique «~[lue]~» lue dans la fiche, «~[\code{ENTETE\_CANONIQUE}]~» attendue~: ce code calcule l'empreinte des données sous cette seule définition, et une empreinte d'une autre définition ne lui est jamais égale~; aucune conversion n'est faite.~» & \code{lu}, \code{attendu} \\
+\code{empreinte\_donnees\_discordante}, étape~7 & «~Empreinte des données discordante~: [empreinte de la fiche] lue dans la fiche, [empreinte recalculée] recalculée sur les données reçues ([nombre] lignes). L'empreinte porte sur la représentation «~[\code{ENTETE\_CANONIQUE}]~» des colonnes des rôles de la fiche ([colonnes, entre guillemets]), lignes dans l'ordre reçu~: un autre ordre des lignes, une valeur ou un type de colonne différents suffisent à la changer~; les colonnes hors rôles n'y entrent pas.~» & \code{lu}, \code{attendu}, \code{lignes}, \code{colonnes} \\
+\end{longtable}
+}
+
+\noindent
+Le message de \code{version\_fiche\_non\_admise} cite l'empreinte du code,
+et non la seule version du package, parce que celle-ci, déclarée dans
+\code{DESCRIPTION}, est immobile (\code{0.0.0.9000}) et ne permet pas de
+retrouver le code d'une fiche~; le moyen de passer d'une fiche au code qui
+l'a produite reste à choisir (issue~\#89, ouverte).
+
+\medskip
+\noindent
+\textbf{Objet rendu et bilan de rejeu} (ADR 0012, points 3.1 et 3.6).
+\code{rejouer\_fiche()} rend une liste nommée de classe S3 \code{rejeu} à deux
+éléments~: \code{construction}, l'objet rendu par \code{construire\_table()},
+\textbf{sans modification ni attribut} --- il reste \code{identical()} hors
+\code{execution} à un original, et le périmètre de l'empreinte du résultat
+n'est pas touché ---, et \code{bilan}, un \code{data.frame} de treize lignes
+et cinq colonnes \code{character}, sans \code{NA} (\code{controle},
+\code{attendu}, \code{lu}, \code{verdict}, \code{statut})~: sept contrôles,
+puis six témoins (tableau~\ref{tab:bilan-rejeu}). La colonne \code{lu}
+porte ce que reçoit le rejeu (la fiche, et les données pour la première
+ligne), la colonne \code{attendu} ce que le code installé exige ou obtient.
+Le bilan \textbf{n'entre pas dans l'objet}~: un champ ou un attribut de plus
+ferait que l'objet rejoué ne serait plus \code{identical()} à un original,
+changerait le périmètre de l'empreinte du résultat, et
+\code{empreinte\_resultat()} s'arrête sur une erreur de programmation devant
+tout attribut inconnu. Un bilan n'existe
+que pour un rejeu abouti~: ses sept lignes de contrôle valent donc toujours
+«~conforme~»~; elles disent ce qui a été contrôlé, sur quelles valeurs. Un
+refus est une condition R (section~\ref{sec:refus}) et ne rend aucun bilan.
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.8cm}p{5.1cm}p{2.2cm}p{2.5cm}@{}}
+\caption{Bilan de rejeu~: une ligne par contrôle, puis par témoin.}
+\label{tab:bilan-rejeu}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{\code{controle}}} &
+\textcolor{financeblue}{\textbf{\code{attendu}~/ \code{lu}}} &
+\textcolor{financeblue}{\textbf{\code{verdict}}} &
+\textcolor{financeblue}{\textbf{\code{statut}}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{\code{controle}}} &
+\textcolor{financeblue}{\textbf{\code{attendu}~/ \code{lu}}} &
+\textcolor{financeblue}{\textbf{\code{verdict}}} &
+\textcolor{financeblue}{\textbf{\code{statut}}} \\
+\endhead
+\code{nature\_arguments} & «~fiche~: liste nommée~; donnees~: data.frame~» / «~fiche~: liste nommée de [n] champs~; donnees~: classe [classes], [n] lignes, [m] colonnes~» & conforme & contrôle de forme \\
+\code{forme\_fiche} & formes exigées à l'étape~2 / «~champs lus de la forme attendue~» & conforme & contrôle de forme \\
+\code{version\_fiche} & \code{VERSIONS\_FICHE\_REJEU} / \code{version\_fiche} de la fiche & conforme & comparaison exacte \\
+\code{algorithme\_empreinte} & \code{ALGORITHME\_EMPREINTE} / \code{empreintes\$algorithme} & conforme & comparaison exacte \\
+\code{representation} & \code{ENTETE\_CANONIQUE} / \code{empreintes\$representation} & conforme & comparaison exacte \\
+\code{entrees\_construction} & «~valider\_plan(), controler\_roles(), recette et convention, controler\_provenance()~: aucun refus~» / «~étapes~: [étapes du plan]~; rôles~: [rôles de la fiche]~; recette~: [recette déduite]~; provenance~: [fichier, ou NULL]~» & conforme & contrôles délégués aux modules \\
+\code{empreinte\_donnees} & empreinte recalculée / \code{empreintes\$donnees} & conforme & exacte~; sans rôle de sécurité \\
+\code{temoin\_code} & \code{EMPREINTE\_CODE} / \code{empreintes\$code} & V1 & exacte~; sans rôle de sécurité \\
+\code{temoin\_versions} & \code{versions} de la fiche rendue / de la fiche reçue, en paires «~nom=valeur~» jointes par «~;~» & V2 & comparaison exacte \\
+\code{temoin\_plateforme} & idem pour \code{plateforme} & V2 & comparaison exacte \\
+\code{temoin\_fiche} & «~fiche rendue par construire\_table(), hors versions, plateforme, empreintes/resultat, empreintes/code, empreintes/statut\_resultat\_code~» / «~fiche reçue, même périmètre~» & V3 & comparaison exacte \\
+\code{temoin\_empreinte\_resultat} & empreinte du résultat de l'objet rendu / \code{empreintes\$resultat} de la fiche & V1 & témoin, même machine seulement \\
+\code{temoin\_empreinte\_fichier} & «~non recalculée par le moteur (couche de lecture, E4.4)~» / \code{empreintes\$fichier} & non vérifiée & reprise de la fiche, non vérifiée par le moteur \\
+\end{longtable}
+}
+
+\noindent
+Les libellés forment des ensembles fermés, au féminin singulier (ADR 0012,
+seconde annotation du 24/10/2026, (a)~4). Verdicts~: «~conforme~»,
+«~identique~», «~différente~», «~différente~: \emph{chemins}~», «~non
+déterminable~», «~non vérifiée~». Statuts~: «~contrôle de forme~»,
+«~comparaison exacte~», «~contrôles délégués aux modules~», «~exacte~; sans
+rôle de sécurité~», «~témoin, même machine seulement~», «~reprise de la
+fiche, non vérifiée par le moteur~». Les verdicts des témoins suivent trois
+règles~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{V1} (\code{verdict\_chaines()}, empreintes du code et du
+    résultat)~: «~non déterminable~» si l'un des deux côtés n'est pas une
+    chaîne unique, non vide, non \code{NA}, sans attribut
+    (\code{chaine\_unique()}) --- deux \code{NA} ne prouvent pas une
+    identité ---, sinon «~identique~» ou «~différente~»~;
+  \item \textbf{V2} (\code{verdict\_liste()}, \code{versions} et
+    \code{plateforme})~: «~non déterminable~» si le côté de la fiche reçue
+    n'est pas une liste sans classe aux noms complets, sinon la règle~V3 sur
+    ces deux listes, champ par champ, les noms étant lus dans la fiche et
+    dans l'objet rendu (le champ \code{bibliotheque\_c} y entre ainsi sans
+    retouche)~;
+  \item \textbf{V3} (\code{verdict\_chemins()}, fiche)~: «~identique~» si
+    les deux côtés sont \code{identical()}, sinon «~différente~: ~» suivi
+    des chemins qui diffèrent, joints par «~,~». Les chemins sont ceux de
+    \code{champs\_differents()}~: deux listes nommées sans classe, aux noms
+    complets et uniques, sont parcourues sur l'union de leurs noms (ordre de
+    la fiche rendue, puis noms propres à la fiche reçue)~; un nom présent
+    d'un seul côté est cité «~(absent de la fiche reçue)~» ou «~(absent de la
+    fiche rendue)~»~; toute autre valeur est une feuille, citée par son
+    chemin~; un nœud qui diffère sans qu'aucun de ses enfants diffère est
+    cité «~(ordre des champs ou attributs)~». Pour le témoin de la fiche,
+    les deux côtés sont d'abord privés de \code{versions},
+    \code{plateforme}, \code{empreintes/resultat}, \code{empreintes/code} et
+    \code{empreintes/statut\_resultat\_code}
+    (\code{perimetre\_temoin\_fiche()}).
+\end{itemize}
+
+\noindent
+\textbf{Ce que dit chaque ligne} (E2.20). Les lignes~1 et~2 sont des
+contrôles de forme, exacts~; les lignes~3 à~5 comparent exactement des
+libellés (version, nom de l'algorithme, en-tête de la représentation), non
+des empreintes~; la ligne~6 dit seulement que les contrôles des modules
+n'ont rien refusé, sans rien ajouter à ce qu'ils vérifient~; la ligne~7 est
+l'égalité exacte de deux MD5~: l'empreinte des données est portable (exacte
+sous glibc, non mesurée ailleurs~; section~\ref{sec:empreinte}) et, comme
+toute empreinte du projet, sans rôle de sécurité~: elle identifie un
+contenu, elle ne le protège pas contre une modification délibérée. Les
+témoins \textbf{signalent et ne refusent jamais}~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{code}~: égalité exacte de l'empreinte du code de la fiche et
+    de celle du code installé (section~\ref{sec:empreinte-resultat},
+    «~Empreinte du code~»), qui identifie le texte source et non le
+    comportement numérique~; rejouer une fiche avec un code corrigé est un
+    usage légitime (analyse de sensibilité d'un certificateur), d'où un
+    signal et non un refus~; «~non déterminable~» si l'une des deux vaut
+    \code{NA} (sources introuvables à l'installation)~;
+  \item \textbf{versions} et \textbf{plateforme}~: comparaison exacte des
+    chaînes~; un écart dit que l'environnement diffère, sans juger de son
+    effet~;
+  \item \textbf{fiche}~: un écart révèle un code au comportement différent
+    sur ce que la fiche consigne (recette, convention, fin effective,
+    hypothèses, décomptes d'exclusion, avertissements)~; la fiche ne portant
+    ni exposition ni taux, un écart de dernier bit des grandeurs calculées
+    n'y apparaît que par l'empreinte du résultat. La stabilité de ce témoin
+    d'une machine à l'autre n'est pas mesurée directement~; elle a un
+    \emph{constat} indirect sur deux machines Linux x86\_64, par les
+    références de non-régression (glibc~2.35 et processeur AMD EPYC~7763~;
+    glibc~2.39 et processeur Intel Xeon~: R1 à R6 identiques sur tout le
+    périmètre du témoin), et n'est pas mesurée hors glibc~;
+  \item \textbf{empreinte du résultat}~: témoin d'identité sur la même machine
+    seulement (section~\ref{sec:empreinte-resultat})~; «~différente~» quand
+    les témoins du code, des versions, de la plateforme et de la fiche sont
+    «~identique~» est un \textbf{signal d'écart à E4.6} si la machine est la
+    même, ce que le bilan ne peut pas établir seul~: la fiche ne consigne
+    pas le processeur~; sinon c'est un écart
+    possible et attendu (les empreintes du résultat de R4 et R5 diffèrent
+    entre la plateforme de référence et un hôte hors de celle-ci, par un
+    ulp d'une grandeur, section~\ref{sec:empreinte-resultat}),
+    et le critère reste la comparaison à tolérance par classes, hors de
+    l'outil~;
+  \item \textbf{empreinte du fichier}~: recopiée de la provenance par la
+    couche de lecture et non recalculée par le moteur, qui ne lit aucun
+    fichier~: toujours «~non vérifiée~».
+\end{itemize}
+
+\noindent
+\textbf{Limites} (ADR 0012, point~3.9, et seconde annotation du
+24/10/2026, (a)~7 et~8~; constats de \code{tests/unitaires/test\_rejeu.R}).
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{L'identité de l'objet ne vaut qu'à colonnes identiques.} Une
+    colonne hors rôles ajoutée aux données ou retirée ne change pas
+    l'empreinte des données, qui ne porte que sur les colonnes des rôles~:
+    le rejeu passe, les témoins du code, des versions, de la plateforme, de
+    la fiche et de l'empreinte du résultat valent «~identique~» (celui du
+    fichier, toujours «~non vérifiée~»), mais l'objet
+    rendu n'est pas \code{identical()} à l'original, qui ne diffère que par
+    \code{etapes/donnees/resultat/lignes\_conservees}, copie de l'entrée
+    hors du périmètre de l'empreinte du résultat (décision M71).
+  \item \textbf{Un plan modifié dans la fiche ne se voit que par ses échos.}
+    La fiche ne porte pas d'empreinte d'elle-même (voulu)~: le plan de la
+    fiche reçue est celui que la construction emploie, si bien que la fiche
+    rendue porte le même plan. Une modification du plan n'apparaît au
+    témoin de la fiche que par ce qu'elle change ailleurs dans la fiche (un
+    \code{niveau} modifié se lit dans \code{hypotheses\_brut/niveau}), et à
+    l'empreinte du résultat sur la même machine~; une modification sans
+    écho dans la fiche passerait inaperçue de ce témoin.
+  \item \textbf{Lignes permutées}~: refusées (empreinte des données
+    discordante)~; le refus est fondé, l'exposition et les taux n'étant pas
+    \code{identical()} sous un autre ordre de sommation (ADR 0012,
+    «~Contexte~», mesure d'\code{actuary}).
+  \item \textbf{Colonne de rôle renommée}~: refusée (\code{colonne\_absente})
+    si les rôles de la fiche ne sont pas adaptés~; adaptés, le rejeu passe,
+    le témoin de la fiche vaut «~identique~» et celui de l'empreinte du
+    résultat «~différente~», les rôles étant dans son périmètre.
+  \item \textbf{Provenance}~: une fiche sans provenance et la même avec
+    provenance se rejouent toutes deux, avec des empreintes du résultat
+    distinctes, \code{fiche\$provenance} étant dans le périmètre.
+  \item \textbf{\code{construire\_table()} appelée directement ne contrôle
+    pas la version}~: une fiche de version non admise s'y exécute sans refus,
+    et \code{lire\_fiche()} ne la contrôle pas non plus. Seul le rejeu
+    outillé applique ce contrôle.
+  \item \textbf{Le temps~(3) n'est pas outillé}~: la comparaison à
+    tolérance par classes sur une autre machine demande un artefact de
+    valeurs et relèverait d'une issue à part, si le besoin est confirmé
+    (ADR 0012, «~Conséquences~»).
+\end{itemize}
+
+\noindent
+Les textes fixes et composés du bilan sont du texte du moteur, marqué
+UTF-8 (\code{texte\_moteur()})~; les comparaisons portent sur les valeurs
+brutes. Le bilan du rejeu de R1 est identique octet à octet sous la locale
+C et sous une locale UTF-8 (constat du contrôle
+\code{tests/controles/locale\_c.R}, section~\ref{sec:scripts-controle}).\par
+\endgroup
+
 \subsection{Vérifications}
 \label{sec:verifications-construction}
 
@@ -2257,6 +2635,31 @@ programmation, non par un refus.
 \code{tests/test\_reproductibilite.R} vérifie que deux constructions
 identiques sont \code{identical()} hors \code{execution}, dans le même
 processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\par}
+
+\medskip
+{\sloppy \textbf{Rejeu outillé} (section~\ref{sec:rejeu}~; issue~\#86).
+\code{tests/unitaires/test\_rejeu.R} vérifie le contrat (fonction
+exportée, arguments \code{donnees} et \code{fiche},
+\code{VERSIONS\_FICHE\_REJEU} \code{identical()} à \code{VERSION\_FICHE})~;
+la structure d'un rejeu réussi (classe, colonnes, lignes, libellés et
+valeurs du bilan~; objet rendu \code{identical()} hors \code{execution} à
+l'original~; données et fiche inchangées~; même rejeu avec \code{x\$fiche}
+qu'avec la fiche relue de son texte)~; chaque refus, avec son module, son
+motif, ses \code{details} et les valeurs lue et attendue de son message~;
+l'ordre des contrôles, sur des fiches qui en violent deux à la fois~; pour
+chaque refus délégué, l'égalité du module, du motif, du message et des
+\code{details} avec ceux de \code{construire\_table()} appelée directement
+sur les champs de la fiche~; le nombre d'appels de
+\code{construire\_table()}, compté par \code{trace()} sur l'espace de noms
+installé~: aucun sur un refus, un sur un rejeu réussi~; les verdicts des
+témoins sur des fiches modifiées~; les cas adverses de la section
+\ref{sec:rejeu}, «~Limites~», testés tels que constatés.
+\code{tests/test\_reproductibilite.R} rejoue, pour les six plans de
+référence, la fiche écrite puis relue~: objet \code{identical()} hors
+\code{execution} à l'objet de référence, témoins du code, des versions, de
+la plateforme, de la fiche et de l'empreinte du résultat «~identique~»,
+empreinte du fichier «~non vérifiée~». \code{tests/controles/locale\_c.R}
+compare les octets du bilan du rejeu de R1 sous les deux locales.\par}
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-construire-table}
@@ -2287,6 +2690,16 @@ processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
+\catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», pour un message ou le bilan du rejeu \\
+\catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & caractères de contrôle remplacés par une espace, marque d'encodage conservée~; messages de refus du rejeu seulement \\
+\catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets (section~\ref{sec:rejeu}) \\
+\catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & paires «~nom=valeur~» jointes par «~;~», ou \code{texte\_lu()} d'une autre valeur~; colonnes du bilan pour \code{versions} et \code{plateforme} \\
+\catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
+\catalogue{fonctions-construire-table}{verdict\_chemins()} & interne & fiche rendue, fiche reçue, racine & verdict~V3~: «~identique~» ou «~différente~:~» et les chemins \\
+\catalogue{fonctions-construire-table}{verdict\_chaines()} & interne & attendu, lu & verdict~V1~: «~non déterminable~» si l'un n'est pas une chaîne unique, sinon «~identique~» ou «~différente~» \\
+\catalogue{fonctions-construire-table}{verdict\_liste()} & interne & liste rendue, liste reçue, racine & verdict~V2~: «~non déterminable~» si la liste reçue n'est pas une liste sans classe aux noms complets, sinon \code{verdict\_chemins()} \\
+\catalogue{fonctions-construire-table}{perimetre\_temoin\_fiche()} & interne & fiche & fiche privée de \code{versions}, \code{plateforme} et des trois dernières empreintes, périmètre du témoin de la fiche \\
+\catalogue{fonctions-construire-table}{rejouer\_fiche()} & exportée & données, fiche & objet de classe \code{rejeu} (\code{construction}, \code{bilan})~; contrôles, puis \code{construire\_table()} une fois~; refus nommés du module \code{construire\_table} (section~\ref{sec:rejeu}) \\
 \end{longtable}
 }
 
@@ -4701,10 +5114,12 @@ Le module \code{rapport} porte les quantités des rapports, pas leur rendu
 (section~\ref{sec:empreinte}), du résultat et du code
 (section~\ref{sec:empreinte-resultat}~; issue~\#67) et le texte du plan et
 de la fiche (section~\ref{sec:serialisation}~; ADR 0011, qui remplace le
-point~12 de l'ADR 0007). Le rapport figé HTML, l'écriture des tables et le
-rejeu outillé, avec le contrôle de \code{version\_fiche}, viendront avec la
-branche \code{claude/rapport-fige} (décision M68, C.3~; ADR 0011, troisième
-annotation du 20/10/2026).
+point~12 de l'ADR 0007). Le rejeu outillé, avec le contrôle de
+\code{version\_fiche}, est dans \code{R/construire\_table.R}, le module
+\code{rapport} ne pouvant pas appeler \code{construire\_table()}
+(section~\ref{sec:rejeu}~; ADR 0012, point~3). Le rapport figé HTML et
+l'écriture des tables viendront avec la branche \code{claude/rapport-fige}
+(décision M68, C.3~; ADR 0011, troisième annotation du 20/10/2026).
 
 \subsection{Fiche de construction}
 \label{sec:fiche}
@@ -5006,7 +5421,11 @@ Les champs qui n'ont pas d'objet (convention et unité d'exposition d'un plan
 sans étape \code{exposition}) valent \code{NULL} ou \code{NA}. \textbf{Rejeu}~:
 \code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
 redonne un objet \code{identical()} hors \code{execution}~; c'est un test de
-la batterie de reproductibilité, aussi à partir du texte de la fiche. La
+la batterie de reproductibilité, aussi à partir du texte de la fiche. Le
+rejeu outillé, \code{rejouer\_fiche(donnees, fiche)}, fait cet appel après
+avoir contrôlé la fiche et les données, et refuse en particulier une fiche
+dont \code{version\_fiche} n'est pas une version admise, la version
+courante seule (\code{VERSIONS\_FICHE\_REJEU}~; section~\ref{sec:rejeu}). La
 fiche s'écrit et se relit en texte (section~\ref{sec:serialisation}), sous
 les contraintes posées par l'ADR 0007, point 12.2 (texte lisible par un
 relecteur, aller-retour identique, nombres compris, aucune évaluation de
@@ -5683,9 +6102,11 @@ reçoit exactement les refus d'un plan construit en mémoire (ADR 0011,
 point~9.2). Pour un plan canonique, \code{lire\_plan(ecrire\_plan(p))} est
 \code{identical()} à \code{p}~; pour un autre plan, au stockage des dates
 près. \code{lire\_fiche()} ne contrôle pas \code{version\_fiche}~: ce
-contrôle appartient au rejeu, que la branche \code{claude/rapport-fige}
-outillera avec un refus nommé (ADR 0011, troisième annotation du 19/10/2026,
-point~(i), et troisième annotation du 20/10/2026~; décision M68, C.3).
+contrôle appartient au rejeu, et le rejeu outillé \code{rejouer\_fiche()}
+refuse une version non admise sous le motif \code{version\_fiche\_non\_admise}
+(section~\ref{sec:rejeu}~; ADR 0011, troisième annotation du 19/10/2026,
+point~(i), troisième annotation du 20/10/2026 et annotation du 24/10/2026~;
+ADR 0012, point~3.5).
 
 \medskip
 \textbf{Rejeu par un tiers} (E3.7 et sa note de lecture du 19/10/2026~; ADR
@@ -5697,7 +6118,10 @@ sur le plan relu du texte~; il compare les grandeurs à tolérance par classes
 (section~\ref{sec:non-regression}) sur une autre machine, au bit près sur la
 même (E4.6). L'empreinte du résultat ne sert de témoin que sur la même
 machine (section~\ref{sec:empreinte-resultat})~: sur une autre machine, une
-empreinte du résultat différente n'est pas un échec du rejeu.
+empreinte du résultat différente n'est pas un échec du rejeu. Le rejeu
+outillé, \code{rejouer\_fiche()}, fait les vérifications, l'exécution et la
+comparaison des témoins sur la même machine~; la comparaison à tolérance par
+classes sur une autre machine n'est pas outillée (section~\ref{sec:rejeu}).
 
 \medskip
 {\sloppy
@@ -5916,6 +6340,7 @@ ses tests d'invariance (plan sans \code{brut}, plan sans
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
 \catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (4) \\
+\catalogue{fonctions-rapport}{VERSIONS\_FICHE\_REJEU} & constante & --- & versions de fiche admises au rejeu outillé~: \code{VERSION\_FICHE}, la version courante seule (section~\ref{sec:rejeu}) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
 \catalogue{fonctions-rapport}{REPRESENTATION\_RESULTAT} & constante & --- & \code{"tablexp resultat 1"}, première ligne du texte empreinté du résultat et \code{fiche\$empreintes\$}\allowbreak\code{representation\_resultat} \\
@@ -6427,6 +6852,7 @@ fonctions de leur module.
 \catalogue{exports}{simuler\_portefeuille()} & \code{simulation} & point d'entrée du simulateur~: jeu simulé sous une loi vraie et une graine & \ref{sec:simulation} \\
 \catalogue{exports}{valider\_plan()} & \code{construire\_table} & validateur du plan, contrôle de saisie que l'application appellera (E4.3) & \ref{sec:plan} \\
 \catalogue{exports}{construire\_table()} & \code{construire\_table} & point d'entrée unique~: exécute un plan de construction et retourne l'objet \code{construction} & \ref{sec:construction} \\
+\catalogue{exports}{rejouer\_fiche()} & \code{construire\_table} & rejeu outillé d'une fiche (E3.7)~: contrôles, un appel de \code{construire\_table()}, bilan de rejeu & \ref{sec:rejeu} \\
 \catalogue{exports}{ecrire\_plan()} & \code{rapport} & texte du plan en octets UTF-8, pour l'export du plan (E5.4)~; l'appelant écrit le fichier & \ref{sec:serialisation} \\
 \catalogue{exports}{lire\_plan()} & \code{rapport} & plan relu d'octets, sans évaluation, pour l'import du plan (E5.4)~; non validé & \ref{sec:serialisation} \\
 \catalogue{exports}{ecrire\_fiche()} & \code{rapport} & texte de la fiche de construction en octets UTF-8~; l'appelant écrit le fichier & \ref{sec:serialisation} \\
@@ -6481,7 +6907,7 @@ E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, stat
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
 E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
 E3.6 & empreintes des données reçues, du fichier, du résultat et du code~; dépendance de l'empreinte du résultat à la plateforme (en partie~: le rapport figé viendra avec son module) & \ref{sec:empreinte}, \ref{sec:empreinte-resultat} \\
-E3.7 & relecture sans le code, rejeu à partir de la fiche & \ref{sec:fiche}, \ref{sec:serialisation} \\
+E3.7 & relecture sans le code, rejeu à partir de la fiche, rejeu outillé & \ref{sec:fiche}, \ref{sec:serialisation}, \ref{sec:rejeu} \\
 E4.1 & R 4.3.3, package \code{tablexp}, point d'entrée unique, modules & \ref{sec:fichiers-package}, \ref{sec:construction} \\
 E4.2 & packages de priorité \code{base}~; aucune dépendance à Java & \ref{sec:scripts-controle}, \ref{sec:absence-java} \\
 E4.3 & frontière calcul / affichage~; contrôles de saisie dans le package & \ref{sec:separation}, \ref{sec:plan} \\
