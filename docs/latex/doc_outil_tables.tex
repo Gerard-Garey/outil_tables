@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{21/10/2026}
+\newcommand{\datedoc}{24/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -926,11 +926,22 @@ avec renvoi à l'issue qui la documentera, où elle compte en échec attendu~;
 chaque catalogue recensé par le document (fonctions exportées, définitions
 de premier niveau de chaque fichier de \code{R/}, rôles, recettes
 d'exposition) est égal, nom pour nom, à sa source dans le code~; toute ligne de
-la liste d'attente désigne un export, un catalogue requis ou une entrée d'un
+la liste d'attente désigne un export, un catalogue requis, une entrée d'un
 catalogue requis déjà écrit (type \code{entree}, de la forme
 \code{<catalogue>:<nom>}, pour une définition ajoutée à un module dont le
-tableau existe déjà) et renvoie à une issue~; une entrée en attente absente du
-document compte en échec attendu, présente elle est un succès inattendu. Le format des citations et des catalogues qu'elle lit est fixé par
+tableau existe déjà) ou une valeur citée (type \code{fiche}, ci-dessous) et renvoie à une issue~; une entrée en attente absente du
+document compte en échec attendu, présente elle est un succès inattendu.
+Elle compare en outre au package les valeurs que le document cite
+(issue~\#70)~: chaque constante de version (\code{VERSION\_FICHE} et les
+quatre premières lignes \code{ENTETE\_CANONIQUE},
+\code{REPRESENTATION\_RESULTAT}, \code{PREMIERE\_LIGNE\_PLAN},
+\code{PREMIERE\_LIGNE\_FICHE}) est citée, et toute valeur citée est la
+valeur courante~; la liste des champs de la fiche
+(section~\ref{sec:fiche}) a les champs de \code{names(fiche)}, dans leur
+ordre, et chaque identifiant qu'elle cite est un nom de la fiche, un objet
+de \code{tablexp}, un estimateur ou un littéral d'une liste blanche du
+script~; les blocs de lecture sont ceux de \code{BLOCS\_LECTURE\_FICHE}
+(blocs, champs et ordre). Le format des citations et des catalogues qu'elle lit est fixé par
 \code{docs/latex/CONVENTIONS.md} (section~3)~; les tableaux de fonctions de
 chaque module en sont la principale application (E4.9). Sans \code{-{}-strict}, elle
 rend compte des écarts sans échouer.
