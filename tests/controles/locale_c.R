@@ -19,13 +19,14 @@
 #       tests/reference/outils_reference.R), construire_table(), puis
 #       ecrire_fiche(x$fiche) et ecrire_plan(x$fiche$plan), relus par
 #       lire_fiche() et lire_plan() : aller-retour identical(), et réécriture
-#       de l'objet relu identique octet à octet au texte écrit ; pour R1,
-#       rejouer_fiche() sur la fiche relue : chaînes non ASCII du bilan
-#       marquées UTF-8 (#86) ;
-#    3. les textes (fiche et plan de R1 à R6, bilan du rejeu de R1) écrits
-#       sous C et sous UTF-8 sont comparés octet à octet. Aucune différence n'est admise : à
-#       entrées, rôles, plan et graine identiques sur la même machine, la
-#       locale ne change aucun octet de la fiche ni du plan, empreinte du
+#       de l'objet relu identique octet à octet au texte écrit ; rapport figé
+#       ecrire_rapport(x) (#87, C1) ; pour R1, rejouer_fiche() sur la fiche
+#       relue : chaînes non ASCII du bilan marquées UTF-8 (#86) ;
+#    3. les textes (fiche, plan et rapport figé de R1 à R6, bilan du rejeu de
+#       R1) écrits sous C et sous UTF-8 sont comparés octet à octet. Aucune
+#       différence n'est admise : à entrées, rôles, plan et graine identiques
+#       sur la même machine, la locale ne change aucun octet de la fiche, du
+#       plan ni du rapport, empreinte du
 #       code (MD5 du relevé des MD5 de R/*.R, fait à l'installation :
 #       indépendant de la locale) et empreinte du résultat (« même machine »)
 #       comprises.
@@ -93,6 +94,10 @@ travailleur <- function(args) {
       if (!is.raw(tf) || !is.raw(tp)) stop("texte non écrit en octets (raw)")
       writeBin(tf, file.path(sortie, paste0(id, ".fiche.txt")))
       writeBin(tp, file.path(sortie, paste0(id, ".plan.txt")))
+      # Rapport figé (#87, C1) : octets comparés ensuite entre les deux installations.
+      tr <- ecrire_rapport(x)
+      if (!is.raw(tr)) stop("rapport figé non écrit en octets (raw)")
+      writeBin(tr, file.path(sortie, paste0(id, ".rapport.txt")))
       if (!identical(lire_fiche(tf), f)) d("fiche : lire_fiche(ecrire_fiche(f)) n'est pas identical() à f")
       if (!identical(lire_plan(tp), f$plan)) d("plan : lire_plan(ecrire_plan(p)) n'est pas identical() au plan")
       if (!identical(ecrire_fiche(lire_fiche(tf)), tf)) d("fiche : réécriture de la fiche relue différente du texte écrit")
@@ -183,7 +188,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
   if (length(defauts)) echec()
   for (c_ in cas) {
-    cat(sprintf("  R1 à R6, fiche et plan, sous LC_ALL=%s :\n", c_$locale))
+    cat(sprintf("  R1 à R6, fiche, plan et rapport figé, sous LC_ALL=%s :\n", c_$locale))
     e <- executer(script, racine, c_$lib, c_$locale, c_$attendu, c_$sortie)
     cat(paste0("  ", e$sortie), sep = "\n")
     cat(sprintf("  durée : %s\n", e$duree))
@@ -192,7 +197,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   if (length(defauts)) echec()
   # Comparaison octet à octet : textes écrits sous C contre sous UTF-8.
   n_comparees <- 0L
-  for (id in IDENTIFIANTS) for (nature in c("fiche", "plan")) {
+  for (id in IDENTIFIANTS) for (nature in c("fiche", "plan", "rapport")) {
     nom <- sprintf("%s.%s.txt", id, nature)
     f <- file.path(vapply(cas, `[[`, "", "sortie"), nom)
     if (!all(file.exists(f))) { defauts <- c(defauts, sprintf("%s : texte absent (%s)", nom, paste(basename(dirname(f))[!file.exists(f)], collapse = ", "))); next }
@@ -209,9 +214,9 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
     if (!length(a) || !identical(a, b))
       defauts <- c(defauts, sprintf("R1.bilan.txt : bilan du rejeu sous C différent de celui sous %s (%s)", utf8, ecart_octets(a, b)))
   }
-  if (n_comparees != 2L * length(IDENTIFIANTS) + 1L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
+  if (n_comparees != 3L * length(IDENTIFIANTS) + 1L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
-  cat(sprintf("  OK : %d textes (fiche et plan de %s, bilan du rejeu de R1) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
+  cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu de R1) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
               n_comparees, paste(range(IDENTIFIANTS), collapse = " à "), utf8, duree(t_debut)))
   invisible(TRUE)
 }

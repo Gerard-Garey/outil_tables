@@ -39,11 +39,11 @@ refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function
 
 # --- exports et signature -------------------------------------------------------
 
-verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, lire_fiche,",
-               "lire_plan, rejouer_fiche, simuler_portefeuille, table_reference, valider_plan (ADR 0007, point 3.4 ;",
-               "#9, #10, #11, #50, #86)"),
+verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, ecrire_rapport,",
+               "lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_reference, valider_plan (ADR 0007,",
+               "point 3.4 ; #9, #10, #11, #50, #86, #87)"),
          identical(sort(getNamespaceExports("tablexp")),
-                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "lire_fiche",
+                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "ecrire_rapport", "lire_fiche",
                      "lire_plan", "rejouer_fiche", "simuler_portefeuille", "table_reference", "valider_plan")))
 verifier("construire_table : signature (donnees, roles, plan, provenance = NULL)",
          identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance")) &&
