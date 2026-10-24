@@ -207,3 +207,36 @@ Rédigée par `architect-approfondi` (Fable, même consultation que le corps, 1/
 **Effet sur les résultats : aucun** par la présente annotation (voir « Conséquences »).
 
 Issues : #86, #87 (débloquées), #89 (créée), #77 (corrigée par commentaire). Décisions M107 à M114. Branche `claude/rapport-fige`, PR #88 ; commit `2699599`.
+
+## Annotation du 24 octobre 2026 (seconde) — compléments et corrections des spécifications de #86 et #87 ; réserve de M112 levée
+
+Rédigée par `architect` d'après les deux spécifications d'`actuary-approfondi` du 24/10/2026 (sur `26f7a29` ; #86, § 0 et § 5 ; #87, § 6), retenues par la session principale de la branche `claude/rapport-fige` (PR #88) le même jour. Le corps et la première annotation ne sont pas réécrits ; les points ci-dessous les précisent ou les corrigent, dans leur esprit (points 2.5 à 2.7, 3.4 à 3.9). Aucun ne contredit les décisions M107 à M114 ; aucun ne touche une table finale, un verdict, l'objet `construction`, la fiche, la signature de `construire_table()` ni un contrat partagé au-delà des deux exports déjà actés : pas de décision du mainteneur requise.
+
+**(a) Rejeu, `rejouer_fiche()` (#86).**
+
+1. **Point 3.4, étape 6** : la séquence est celle de `construire_table()` en entier (`R/construire_table.R:215-221`) — `valider_plan()`, `canoniser_plan()`, `controler_roles()` sur la segmentation canonique, `deduire_recette()`, `resoudre_convention()` si l'étape `exposition` est au plan, `controler_provenance()` —, et non trois contrôles. Elle est **dupliquée** dans `rejouer_fiche()`, sans factorisation, pour ne pas modifier `construire_table()` ; un test vérifie que le motif obtenu est le même par les deux chemins.
+2. **Point 3.4, étape 1** : des données qui ne sont pas un `data.frame` n'ont pas de motif propre ; le refus est délégué au motif existant `donnees_mal_formees` (module `donnees`), message de `controler_roles()` mot pour mot. Les motifs propres au rejeu restent cinq (point 3.8).
+3. **Point 3.6, statuts** : les contrôles 4 et 5 comparent des libellés (`md5`, `ENTETE_CANONIQUE`), non des empreintes : statut « comparaison exacte », et non « exacte ; sans rôle de sécurité » (réservé au contrôle 7 et au témoin code).
+4. **Point 3.6, libellés** : ensemble **fermé, au féminin singulier** — verdicts « conforme », « identique », « différente », « différente : <chemins ou noms> », « non déterminable », « non vérifiée » ; six statuts (« contrôle de forme », « comparaison exacte », « contrôles délégués aux modules », « exacte ; sans rôle de sécurité », « témoin, même machine seulement », « reprise de la fiche, non vérifiée par le moteur »). Les formes « différent » et « identiques » du corps sont remplacées.
+5. **Point 3.1, « ceux qui passent compris »** : un bilan n'existe que pour un rejeu abouti ; ses lignes de contrôle valent donc toujours « conforme ». Un refus est une condition R et ne rend aucun bilan.
+6. **Point 3.6, témoin « fiche » retenu** par la spécification (périmètre : fiche rendue contre fiche reçue, hors `versions`, `plateforme`, `empreintes/resultat`, `empreintes/code`, `empreintes/statut_resultat_code` ; « identique » ssi `identical()`, sinon « différente : » suivi des chemins des feuilles qui diffèrent). **La réserve de M112 est levée.**
+7. **Point 3.9, plan modifié** : « indétectable ailleurs » est inexact en présence du témoin « fiche » ; lire « détectable seulement par ses échos dans la fiche (recette, convention, décomptes…), sans garantie » — la fiche ne porte toujours pas d'empreinte d'elle-même.
+8. **Point 3.9, colonne de rôle renommée** : le rejeu ne passe qu'avec `fiche$roles` adapté, et le témoin de l'empreinte du résultat vaut alors « différente » (les rôles sont dans le périmètre).
+9. **Point 3.5** : `VERSIONS_FICHE_REJEU <- VERSION_FICHE`, **expression** et non littéral, dans `R/rapport.R` après `VERSION_FICHE` ; un test exige `identical(VERSIONS_FICHE_REJEU, VERSION_FICHE)`.
+
+**(b) Rapport figé, `ecrire_rapport()` (#87).**
+
+1. **Points 2.2 et 2.7, dimension des tables non bornées** : lue par la **structure** de l'objet (`nrow()`, `length()`), non « lue dans les diagnostics » ; lire une dimension de structure n'est pas un calcul au sens du point 2.2.
+2. **Point 2.7** : `etapes/donnees/resultat/observation_des_lignes` s'ajoute à la liste des tables non bornées (chemin et dimension cités, valeurs non reproduites).
+3. **Point 2.5, contrôle 3** : une erreur d'`empreinte_resultat()` (attribut inconnu, structure altérée) est convertie en refus `objet_modifie` (« empreinte du résultat non recalculable »), non laissée en erreur de programmation : la fonction est exportée et reçoit l'objet de l'appelant.
+4. **Point 2.5, contrôle 1 précisé et quatrième contrôle** : la classe s'exige par `identical(class(x), "construction")`, et une fiche qui n'est pas une liste est refusée sous le même motif ; un quatrième contrôle refuse en `rapport_objet_invalide` tout élément de l'objet non couvert par `SECTIONS_RAPPORT` (racine inconnue, `etapes/<e>` ou `fiche/<f>` sans section, racine « non produite » présente) : **rien n'est omis en silence**.
+5. **Point 2.1, codage** : règles pour des octets identiques sous locale C (mesures m-c à m-e de la spécification) — tout texte non ASCII assemblé est marqué UTF-8 (`texte_moteur()`, `Encoding<-` sur la sortie de l'écrivain), échappement par `gsub(fixed = TRUE)` sans `useBytes`, aucun accès à `CONVENTIONS_TEXTE` par un nom non ASCII, octets finaux par `charToRaw(enc2utf8(·))` ; contrôle mécanique par `tests/controles/locale_c.R` (C1).
+6. **Point 5, contrôle statique « sur un double »** : `all.names()` ne voit pas le type des arguments et ne peut donc pas discriminer `paste()` sur un double. Dispositif retenu, selon l'alternative déjà prévue par le corps : (i) contrôle statique des **noms** interdits dans la section « Rapport figé » (`format`, `formatC`, `sprintf`, `as.character`, `cat`, `Sys.time`… ; `paste`/`paste0` admis) ; (ii) contrôles dynamiques d'octets ; (iii) revue ligne à ligne par `audit` de chaque `paste()`/`paste0()`.
+7. **Point 2.7, section « Rejeu »** : la ligne `# rejeu` de la fiche est reprise par une constante `TEXTE_REJEU_FICHE`, **extraite** du littéral d'`ecrire_fiche()` et employée par lui sans changer un octet de la fiche (MD5 des fiches R1 à R6 avant et après, cités dans le commit).
+8. **Point 2.6** : la largeur des intervalles fait l'objet d'une mention « non produite par cette version » (quantité nouvelle hors périmètre, point 2.2).
+9. **Point 2.7, doublons fiche ↔ étapes** : la fiche est restituée **en entier**, y compris ce qu'elle recopie d'une étape ; pas de renvoi « identique à … ».
+10. **Point 2.7, ligne « code du rendu »** : le rapport cite `EMPREINTE_CODE` du code qui l'écrit, distincte de `fiche/empreintes/code` (code qui a construit l'objet). Elle reste une constante du package, sans lecture d'horloge ni d'environnement : le point 2.4 est respecté.
+
+**Effet sur les résultats : aucun.** Objet, fiche (octets compris), `VERSION_FICHE` et références inchangés ; seule l'empreinte du code change à chaque commit sous `R/`, comparée par jeton (point 1.5).
+
+Issues : #86, #87. Décisions M107 à M114 (M112 levée par (a) 6). Branche `claude/rapport-fige`, PR #88.
