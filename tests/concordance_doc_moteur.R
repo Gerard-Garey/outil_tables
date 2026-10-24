@@ -93,6 +93,28 @@
 #       (citation, liste, blocs) est absente du document est sauté ; sur
 #       docs/latex/, une ancre absente est un écart.
 #
+#    6. aucun nom coupé par \allowbreak entre deux \code{} (#84, partie
+#       mécanique ; la règle de rédaction relève de CONVENTIONS.md). Deux
+#       motifs interdits, cherchés sur le texte joint (commentaires retirés) :
+#       - \code{...}\allowbreak\code{...(} : un \allowbreak qui suit la fin d'un
+#         \code{} (blancs admis entre les deux : un `%` de fin de ligne, retiré
+#         avec le commentaire, les colle) et précède un \code{} contenant une
+#         parenthèse ouvrante, directement, après des espaces ou fins de ligne
+#         (ignorés par LaTeX après une macro) ou après {} (sans blanc après).
+#         Le fragment \code{b()} de \code{a\_}\allowbreak\code{b()} serait lu
+#         par le contrôle 1 comme la fonction b, et le nom entier échapperait
+#         au contrôle. Un \allowbreak séparateur (\code{f()},
+#         \allowbreak \code{g()}) n'est pas touché : une virgule ou du texte le
+#         sépare du \code{} précédent. Limite : le même \allowbreak après de
+#         simples blancs (\code{f()} \allowbreak \code{g()}) est lu comme une
+#         coupure, alors qu'il est redondant avec le blanc ;
+#       - \code{f(}\allowbreak\code{x)} : un \code{} à parenthèse ouverte non
+#         fermée, suivi de \allowbreak (nom coupé dans ses arguments, que le
+#         contrôle 1 ne lit pas non plus).
+#       Aucune ancre n'est exigée (une interdiction est vérifiée à vide).
+#       Hors du motif : \hspace{0pt}, \- et \linebreak[0], qui coupent aussi
+#       sans que ce contrôle les voie.
+#
 #  docs/latex/ doit exister (LATEX_EXIGE) ; un dossier donné par --latex doit
 #  exister ; une option sans valeur est un échec.
 #
@@ -551,6 +573,23 @@ controle_fiche("blocs_lecture", "blocs de lecture du document égaux à BLOCS_LE
     if (length(ecarts)) paste(ecarts, collapse = " ; ") else TRUE
   }
 })
+
+fichier_courant("6. aucun nom coupé par \\allowbreak entre deux \\code{} (#84)")
+# Motifs interdits, cherchés sur `plein` (fichiers joints par des fins de
+# ligne). (1) fin d'un \code{}, éventuellement des blancs (un `%` de fin de
+# ligne, retiré avec le commentaire, colle pourtant les deux), \allowbreak,
+# puis des blancs (LaTeX les ignore après une macro) ou {} sans blanc, un
+# \code{} qui contient une parenthèse ouvrante
+# (fragment final d'un nom de fonction coupé) ; (2) \code{} à parenthèse
+# ouverte non fermée, puis \allowbreak (nom coupé dans ses arguments).
+MOTIFS_ALLOWBREAK_CODE <- c(
+  "\\\\code\\{[^{}]*\\}\\s*\\\\allowbreak(\\s*|\\{\\})\\\\code\\{[^{}]*\\(",
+  "\\\\code\\{[^{}]*\\([^{})]*\\}\\s*\\\\allowbreak")
+coupes <- unlist(lapply(MOTIFS_ALLOWBREAK_CODE, function(re) regmatches(plein, gregexpr(re, plein))[[1L]]))
+verifier("aucun nom de fonction coupé par \\allowbreak entre deux \\code{} (\\code{}\\allowbreak\\code{...( ; \\code{f(}\\allowbreak)",
+         if (!length(coupes)) TRUE
+         else sprintf("%d occurrence(s) : %s", length(coupes),
+                      paste(sprintf("« %s »", gsub("\n", " ", coupes)), collapse = ", ")))
 
 if (!STRICT) cat("\nMode rapport : code de sortie 0 même en cas d'écart (--strict pour échouer).\n")
 bilan(code_sortie = STRICT)

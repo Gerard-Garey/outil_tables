@@ -809,3 +809,48 @@ verifier("concordance fiche : ligne d'attente de type fiche à nom inconnu -> é
          echoue(concordance("--strict", "--latex", shQuote(d_juste), "--attente",
                             shQuote(attente_temoin("fiche,VERSION_INCONNUE,#70,x"))), "hors de : VERSION_FICHE"))
 unlink(c(d_ecart, d_juste, attente_fiche_v, attente_vide), recursive = TRUE)
+
+# --- concordance : aucun nom coupé par \allowbreak entre deux \code{} (#84) --
+#
+# Contrôle 6 : deux motifs interdits, \code{}\allowbreak\code{...( et
+# \code{...(...}\allowbreak (parenthèse ouverte non fermée). Témoins sur le
+# document minimal du bloc #70 (état juste) auquel on ajoute des lignes : les
+# formes interdites sont groupées (même ligne, coupure de ligne après
+# \allowbreak, espace après \allowbreak, \allowbreak{}, nom coupé dans ses
+# arguments, `%` de fin de ligne), de même que les emplois légitimes de
+# \allowbreak, qui doivent passer (dont un \allowbreak séparateur entre deux
+# citations).
+attente_vide <- attente_temoin(character(0))
+coupes_interdites <- c(
+  "Nom coupé~: \\code{kaplan\\_meier\\_}\\allowbreak\\code{ensemble()}.",
+  "Coupure de ligne~: \\code{tests/}\\allowbreak",
+  "\\code{fichier(x, y)}.",
+  "Espace~: \\code{tablexp::}\\allowbreak \\code{construire\\_table()}.",
+  "Accolades~: \\code{lire\\_}\\allowbreak{}\\code{plan()}.",
+  "Arguments~: \\code{construire\\_table(}\\allowbreak\\code{donnees)}.",
+  "Pour-cent~: \\code{lire\\_}%",
+  "\\allowbreak\\code{plan()}.")
+allowbreak_licites <- c(
+  # chemins et noms sans parenthèse (usage du document), parenthèse avant ou
+  # après le \code{}, \allowbreak séparateur (virgule ou texte avant, {} suivi
+  # d'un blanc)
+  "Chemin~: \\code{etapes/}\\allowbreak\\code{donnees/}\\allowbreak\\code{exclusions} (\\code{c(MOTIFS\\_LIGNES,} \\code{MOTIFS\\_TETE)}).",
+  "Voir (\\code{docs/}\\allowbreak\\code{feuille-de-route.md}, §~2) et \\code{construire\\_table()}.",
+  "Nom~: \\code{kaplan\\_meier\\_}\\allowbreak\\code{ensemble\\_a\\_risque\\_vide}~; \\code{set.seed()}.",
+  "Séparateurs~: \\code{construire\\_table()}, \\allowbreak \\code{set.seed()}~; \\code{stats::sd()}~: \\allowbreak \\code{tools::md5sum()}",
+  "et \\code{construire\\_table()}\\allowbreak{} \\code{set.seed()}.",
+  "% \\code{commentaire\\_}\\allowbreak\\code{retire()} : ligne commentée")
+verifier("concordance \\allowbreak : témoin exact (usages licites de \\allowbreak) -> code 0",
+         { d <- latex_temoin(fiche_temoin(phrase = allowbreak_licites)); on.exit(unlink(d, recursive = TRUE))
+           passe(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide))) })
+verifier("concordance \\allowbreak : six noms coupés (même ligne, fin de ligne, espace, {}, arguments, après `%`) -> échec",
+         { d <- latex_temoin(fiche_temoin(phrase = coupes_interdites)); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                       c("aucun nom de fonction coupé par \\allowbreak entre deux \\code{}",
+                         "6 occurrence(s)", "« \\code{kaplan\\_meier\\_}\\allowbreak\\code{ensemble( »",
+                         "« \\code{tests/}\\allowbreak \\code{fichier( »",
+                         "« \\code{tablexp::}\\allowbreak \\code{construire\\_table( »",
+                         "« \\code{lire\\_}\\allowbreak{}\\code{plan( »",
+                         "« \\code{construire\\_table(}\\allowbreak »",
+                         "« \\code{lire\\_} \\allowbreak\\code{plan( »")) })
+unlink(attente_vide)
