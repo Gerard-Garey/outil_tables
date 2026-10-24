@@ -261,8 +261,13 @@ unlink(racine_sans_package, recursive = TRUE)
 # du harnais : l'égalité est contrôlée ici. ecart_octets() (message d'écart de
 # la comparaison octet à octet) n'est pas atteinte par le chemin d'échec bon
 # marché ci-dessus : attendus écrits à la main.
+# Chargement par parse(encoding = "UTF-8"), comme le harnais lit les tests
+# (tests/test_unitaires.R) : sys.source() sans encodage laisse les littéraux
+# non ASCII de locale_c.R « unknown » alors que les attendus ci-dessous sont
+# marqués UTF-8, et identical() rend alors FALSE sous la locale C (issue #81).
+# La garde sys.nframe() == 0L reste sans effet : eval() ouvre un cadre.
 env_locale_c <- new.env()
-sys.source(file.path(CONTROLES, "locale_c.R"), envir = env_locale_c)
+for (expr_ in parse(file.path(CONTROLES, "locale_c.R"), encoding = "UTF-8")) eval(expr_, env_locale_c)
 verifier("locale C : sourcé, locale_c.R ne définit que des fonctions et constantes ; LOCALES_UTF8 identique à celle du harnais",
          identical(env_locale_c$LOCALES_UTF8, LOCALES_UTF8) && is.function(env_locale_c$ecart_octets) &&
            is.function(env_locale_c$locale_utf8_disponible) &&
