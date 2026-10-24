@@ -13,25 +13,27 @@
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
 # plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
 # plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
+# plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 5757c30e3856f1acbec6174b5edf576d580f77c5
+# plateforme consignée : GITHUB_SHA                    : a96cf7f7e2fa615f2efb5abeaf9c870af522f182
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
-# fiche$plateforme/release : 7.0.0-1017-azure
+# fiche$plateforme/release : 6.17.0-1022-azure
 # fiche$plateforme/machine : x86_64
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
-# fiche$empreintes/resultat : be09a61a8878857533009c5a7bb4ccdb
-# fiche$empreintes/code : 0be71b0b7afea6ff8f2fffe42b111187
-# commit : 5757c30e3856f1acbec6174b5edf576d580f77c5
-# execution : 39435673257
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/39435673257
+# fiche$plateforme/bibliotheque_c : glibc 2.35
+# fiche$empreintes/resultat : db4723d480cc17387738b771f104e53b
+# fiche$empreintes/code : 2cc03eab602122f57f598b6c6a2ece9e
+# commit : a96cf7f7e2fa615f2efb5abeaf9c870af522f182
+# execution : 40111528681
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/40111528681
 # mode : regeneration
-# date : 2026-10-20 14:02:56 UTC
+# date : 2026-10-24 16:26:25 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -183,7 +185,7 @@ avertissements/code	character	1	"fenetres_vides"
 avertissements/message	character	1	"Relevé : 12079 observation(s) sans intersection avec la période d'observation."
 avertissements/nombre	integer	1	12079
 fiche/@noms	character	22	"version_fiche"	"roles"	"provenance"	"provenance_mention"	"empreintes"	"plan"	"transition_code"	"fin_effective"	"unite_observation"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"nombre_lignes_exclues"	"avertissement_unite"	"hypothese_censure"	"hypotheses_brut"	"graine"	"graine_mention"	"generateur"	"avertissements"
-fiche/version_fiche	integer	1	3
+fiche/version_fiche	integer	1	4
 fiche/roles/@noms	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/roles	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/provenance	NULL	0
