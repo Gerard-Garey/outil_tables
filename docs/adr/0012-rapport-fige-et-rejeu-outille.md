@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-24
 ---
 
@@ -38,7 +38,7 @@ date: 2026-10-24
 
 ## Décision
 
-Proposée par `architect` le 24/10/2026 ; **arrêtée par le mainteneur le … (à compléter)**. Chaque point donne son effet sur les résultats.
+Proposée par `architect` le 24/10/2026 ; **arrêtée par le mainteneur le 24/10/2026, sans réserve (décision M107 ; questions 1 à 6 tranchées par M108 à M112 et M114, annotation en fin d'ADR)**. Chaque point donne son effet sur les résultats.
 
 ### 1. Lieu du rendu : le package, module `rapport`, fichier `R/rapport.R`
 
@@ -184,3 +184,26 @@ Rendu : octets identiques pour deux rendus du même objet, pour deux constructio
 6. **Issue proposée par `actuary`** (« Identifier le code d'une fiche : `Version` de `DESCRIPTION` immobile, empreinte du code sans correspondance avec un commit », `enhancement`, `needs-triage`) : création ? **Recommandation : oui**, hors plan, décision d'`architect` à la prochaine revue.
 
 Issues : #86, #87 (bloquées par l'acceptation du présent ADR) ; #77 (version admise au rejeu : 4 si l'incrément est retenu) ; #83 (10⁷ lignes), #49 (Windows, macOS) ; Q36 (vue arrondie, lignes exclues, onglets). Décisions M93, M97, M103, M106. Branche `claude/rapport-fige`, PR #88.
+
+## Annotation du 24 octobre 2026 — ADR accepté par le mainteneur (décision M107) ; questions 1 à 6 closes
+
+Rédigée par `architect-approfondi` (Fable, même consultation que le corps, 1/3 de la branche) d'après les réponses du mainteneur du 24/10/2026, rapportées par la session principale de la branche `claude/rapport-fige` (PR #88) ; corps de l'ADR commité en `2699599`. Le texte ci-dessus n'est pas réécrit ; seul l'en-tête `status` passe de `proposed` à `accepted` et la ligne « arrêtée par le mainteneur » est complétée. La mention « Statut : `proposed` » du premier paragraphe, le conditionnel des points soumis et la phrase du point 4 « portées “sous réserve de l'acceptation de l'ADR 0012” » se lisent à la lumière de la présente annotation.
+
+**(a) Acceptation.** L'ADR 0012 est **accepté sans réserve** le 24/10/2026 (M107) : les points 1 à 5 de la décision valent tels quels ; #86 et #87 sont débloquées (M97 satisfaite) ; aucun code n'a été écrit avant cette acceptation.
+
+**(b) Questions closes**, chacune selon la recommandation :
+
+1. **E4.1 — option (a)** (M108) : note de lecture datée dans `docs/exigences.md`, sans changement de l'exigence — le « rendu » exclu du module `rapport` est l'affichage interactif ; le rapport figé, livrable d'E3.5, est produit par le module `rapport` en octets, le fichier étant écrit par l'appelant. La session principale l'écrit elle-même dans `docs/exigences.md` (document du mainteneur). L'écart déclaré au point 1.2 est donc levé : E4.1, l'ADR 0004, l'ADR 0005 et le présent ADR se lisent ensemble sans contradiction.
+2. **`CLAUDE.md`, « Architecture » — texte du point 1.3 accepté tel quel** (M109) ; commit `claude:` par la session principale.
+3. **Noms** (M110) : `ecrire_rapport()`, `rejouer_fiche()`, classe `rejeu`, acceptés.
+4. **Chaînes entre guillemets droits** dans le rapport, identiques à la fiche et aux `.tsv` (M111) : accepté.
+5. **Témoin « fiche »** du bilan de rejeu (point 3.6) : **retenu sous réserve de la spécification d'`actuary`** (M112) — c'est la seule réserve subsistante, et elle porte sur la spécification de #86, non sur l'ADR.
+6. **Issue d'`actuary`** : créée hors branche sur accord du mainteneur, c'est **#89** (M114), « Identifier le code d'une fiche : `Version` de `DESCRIPTION` immobile (0.0.0.9000), empreinte du code sans correspondance avec un commit », `enhancement`, `needs-triage` ; décision d'`architect` à une revue ultérieure. Le message de `version_fiche_non_admise` cite l'empreinte du code dès #86 (point 3.5), sans attendre #89.
+
+**(c) Annotations conditionnelles levées.** Les annotations du 24/10/2026 des ADR 0005 et 0011, rédigées « sous réserve de l'acceptation de l'ADR 0012 », valent à compter de la présente annotation ; leur mention de statut est mise à jour sans réécriture du reste.
+
+**(d) #77.** Le corps de #77 (critère 3 et « Impact attendu », qui annonçaient l'empreinte du résultat inchangée) a été corrigé le 24/10/2026 par un commentaire daté de l'issue (M113), conformément au constat d'`actuary` confirmé dans le contexte du présent ADR : l'incrément de `version_fiche` change l'empreinte du résultat de R1 à R6 ; le commit (2) part donc d'un critère juste.
+
+**Effet sur les résultats : aucun** par la présente annotation (voir « Conséquences »).
+
+Issues : #86, #87 (débloquées), #89 (créée), #77 (corrigée par commentaire). Décisions M107 à M114. Branche `claude/rapport-fige`, PR #88 ; commit `2699599`.
