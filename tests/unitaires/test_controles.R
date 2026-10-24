@@ -711,3 +711,101 @@ unlink(c(vide, cite, inconnu, inconnu_args, cite_args, complet, incomplet, en_tr
          cat_inconnu, sans_roles, forme), recursive = TRUE)
 unlink(c(attente_ok, attente_cat, attente_vide, attente_perimee, attente_sans_issue,
          attente_cat_inconnu, attente_type, attente_doublon, attente_ancienne))
+
+# --- concordance : constantes de version et fiche de construction (#70) ------
+#
+# Témoins construits sur les valeurs du package (constantes, ORDRE_CHAMPS_FICHE
+# et BLOCS_LECTURE_FICHE ; leur égalité à names(fiche) est contrôlée par
+# test_serialisation.R), pour rester valables quand la fiche évolue : la
+# concordance est lancée sur un document minimal qui reprend les formes lues
+# (liste d'items à partir de \textbf{identification}, paragraphe
+# \emph{<bloc>}~:, citations des constantes, ligne de catalogue), dans l'état
+# juste, puis avec des écarts ; les écarts de constantes, de noms fantômes et
+# de blocs, qui se signalent par des messages distincts, sont groupés par
+# témoin (un lancement du script coûte quelques secondes).
+attente_vide <- attente_temoin(character(0))  # la précédente est supprimée plus haut
+NS_TABLEXP <- asNamespace("tablexp")
+V_FICHE <- NS_TABLEXP[["VERSION_FICHE"]]
+CHAMPS_FICHE <- NS_TABLEXP[["ORDRE_CHAMPS_FICHE"]]
+BLOCS_FICHE <- NS_TABLEXP[["BLOCS_LECTURE_FICHE"]]
+numero <- function(nom) as.integer(sub("^.*[^0-9]", "", NS_TABLEXP[[nom]]))
+code_champs <- function(x, sep) paste(sprintf("\\code{%s}", echapper(x)), collapse = sep)
+# Lignes du document minimal ; chaque argument remplace la valeur juste.
+# `ajout` : texte ajouté à la fin de la liste des champs ; `phrase` : ligne
+# ajoutée après la liste.
+fiche_temoin <- function(version = V_FICHE, version_catalogue = V_FICHE, champs = CHAMPS_FICHE,
+                         blocs = BLOCS_FICHE, entete = numero("ENTETE_CANONIQUE"),
+                         resultat = numero("REPRESENTATION_RESULTAT"),
+                         plan = numero("PREMIERE_LIGNE_PLAN"), fiche = numero("PREMIERE_LIGNE_FICHE"),
+                         ajout = "", phrase = character(0)) {
+  c(sub("\\catalogue{fonctions-rapport}{VERSION\\_FICHE}",
+        sprintf("\\catalogue{fonctions-rapport}{VERSION\\_FICHE} & constante & --- & version de la fiche (%s) \\\\", version_catalogue),
+        CATALOGUES_COMPLETS, fixed = TRUE),
+    "\\begin{itemize}",
+    sprintf("  \\item \\textbf{identification}~: %s (\\code{VERSION\\_FICHE}, %s)~; %s%s", code_champs(champs[1L], ""),
+            version, code_champs(champs[-1L], "~; "), ajout),
+    "\\end{itemize}",
+    phrase,
+    sprintf("(\\code{ENTETE\\_CANONIQUE}, \\code{\"tablexp canonique %s\"})", entete),
+    sprintf("\\code{tablexp resultat %s} (\\code{REPRESENTATION\\_RESULTAT})", resultat),
+    sprintf("\\code{tablexp plan %s} (\\code{PREMIERE\\_LIGNE\\_PLAN}) et \\code{tablexp fiche %s}", plan, fiche),
+    paste0(paste(sprintf("\\emph{%s}~: %s", names(blocs), vapply(blocs, code_champs, "", sep = ", ")), collapse = "~; "), "."))
+}
+# Vrai si le code de sortie est non nul et que la sortie contient chaque motif.
+echoue_tous <- function(r, motifs) {
+  v <- vapply(motifs, function(m) isTRUE(echoue(r, m)), logical(1L))
+  if (all(v)) TRUE else paste("motifs non signalés :", paste(motifs[!v], collapse = " | "), "| sortie :",
+                              paste(r$sortie, collapse = " | "))
+}
+# Témoins à écarts, chacun avec les motifs que la sortie doit tous contenir.
+ecarts_fiche <- list(
+  list("six écarts de constantes (VERSION_FICHE dans la liste et dans le catalogue, quatre en-têtes)",
+       fiche_temoin(version = V_FICHE - 1L, version_catalogue = V_FICHE + 1L, entete = 9L, resultat = 9L, plan = 9L, fiche = 9L),
+       c(sprintf("VERSION_FICHE citée avec sa valeur (%d)", V_FICHE),
+         sprintf("le document cite %d, %d, le package %d", V_FICHE - 1L, V_FICHE + 1L, V_FICHE),
+         "ENTETE_CANONIQUE citée avec sa valeur", "REPRESENTATION_RESULTAT citée avec sa valeur",
+         "PREMIERE_LIGNE_PLAN citée avec sa valeur", "PREMIERE_LIGNE_FICHE citée avec sa valeur")),
+  list("VERSION_FICHE citée en prose (« La constante \\code{VERSION\\_FICHE} vaut N. »)",
+       fiche_temoin(phrase = sprintf("La constante \\code{VERSION\\_FICHE} vaut %d.", V_FICHE - 1L)),
+       sprintf("le document cite %d, le package %d", V_FICHE - 1L, V_FICHE)),
+  list("champ de la fiche absent du document (nombre_lignes_exclues)",
+       fiche_temoin(champs = setdiff(CHAMPS_FICHE, "nombre_lignes_exclues")),
+       "champs de la fiche absents du document : nombre_lignes_exclues"),
+  list("ordre des champs", fiche_temoin(champs = CHAMPS_FICHE[c(2L, 1L, seq_along(CHAMPS_FICHE)[-(1:2)])]),
+       "ordre du document"),
+  list("trois noms fantômes (en tête de clause, après « et », après une virgule)",
+       fiche_temoin(ajout = " \\code{versions} et \\code{fantome\\_et}, \\code{fantome\\_virgule}~; \\code{fantome\\_tete}"),
+       "absents de la fiche, du package et de la liste blanche : fantome_et, fantome_virgule, fantome_tete"),
+  list("fonction citée avec () inconnue dans la liste des champs",
+       fiche_temoin(ajout = " \\code{fonction\\_fantome()}"),
+       "absents de la fiche, du package et de la liste blanche : fonction_fantome"),
+  list("trois écarts de blocs de lecture (champ absent, ordre d'un bloc, bloc en plus)",
+       fiche_temoin(blocs = c(Map(function(champs, b) if (b == "hypothèses") setdiff(champs, "nombre_lignes_exclues")
+                                                      else if (b == "calculé") rev(champs) else champs,
+                                  BLOCS_FICHE, names(BLOCS_FICHE)), list(en_plus = "plan"))),
+       c("bloc hypothèses : document", "bloc calculé : document", "bloc(s) dans le document")),
+  list("ordre des blocs de lecture (hypothèses avant calculé)", fiche_temoin(blocs = BLOCS_FICHE[c(2L, 1L, 3L)]),
+       "ordre des blocs du document : hypothèses, calculé, rejeu ; ordre du package : calculé, hypothèses, rejeu")
+)
+verifier("concordance fiche : témoin exact -> code 0 (constantes, champs, blocs)",
+         { d <- latex_temoin(fiche_temoin()); on.exit(unlink(d, recursive = TRUE))
+           passe(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide))) })
+for (cas in ecarts_fiche) {
+  d <- latex_temoin(cas[[2L]])
+  verifier(sprintf("concordance fiche : %s -> échec", cas[[1L]]),
+           echoue_tous(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)), cas[[3L]]))
+  unlink(d, recursive = TRUE)
+}
+# Liste d'attente (type fiche) : écart déclaré -> échec attendu ; document juste
+# et ligne encore là -> succès inattendu ; nom hors de la liste -> échec.
+d_ecart <- latex_temoin(fiche_temoin(version = V_FICHE - 1L)); d_juste <- latex_temoin(fiche_temoin())
+attente_fiche_v <- attente_temoin("fiche,VERSION_FICHE,#70,document en retard")
+verifier("concordance fiche : écart déclaré en attente (type fiche) -> code 0",
+         passe(concordance("--strict", "--latex", shQuote(d_ecart), "--attente", shQuote(attente_fiche_v))))
+verifier("concordance fiche : document juste et ligne encore en attente -> succès inattendu, échec",
+         echoue(concordance("--strict", "--latex", shQuote(d_juste), "--attente", shQuote(attente_fiche_v)),
+                "succès inattendu"))
+verifier("concordance fiche : ligne d'attente de type fiche à nom inconnu -> échec",
+         echoue(concordance("--strict", "--latex", shQuote(d_juste), "--attente",
+                            shQuote(attente_temoin("fiche,VERSION_INCONNUE,#70,x"))), "hors de : VERSION_FICHE"))
+unlink(c(d_ecart, d_juste, attente_fiche_v, attente_vide), recursive = TRUE)
