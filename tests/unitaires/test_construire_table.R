@@ -52,9 +52,10 @@ verifier("valider_plan : signature (plan) ; plan valide rendu inchangé",
 
 # --- refus de valider_plan (valeur calculée à la main : codes) ----------------
 
-# Noms incomplets (#60) : noms_complets() est le prédicat commun de
-# liste_nommee() (plan, paramètres : doublons refusés) et du contrôle de
-# `etapes` (doublons admis à ce stade, signalés ensuite par etape_en_double).
+# Noms incomplets (#60) : liste_noms_complets() (noms_complets() de outils.R) est
+# le prédicat commun de liste_nommee() (plan, paramètres : doublons refusés) et
+# du contrôle de `etapes` (doublons admis à ce stade, signalés ensuite par
+# etape_en_double).
 avec_noms <- function(x, noms) { names(x) <- noms; x }
 etapes_deux <- function(noms)
   avec_noms(list(list(exclusions = character(0)), list(convention = "plus_fine", par_annee = FALSE)), noms)
@@ -1166,6 +1167,58 @@ local({
   })
 })
 
+# --- écriture des entiers et des dates sans chaîne par ligne (#71) ---
+#
+# Oracle : écrivains d'avant #71 (R/rapport.R à 5a95f9c), recopiés ici :
+# entier par octets_lignes(sprintf("%d", x)), date par
+# octets_lignes(txt[match(j, u)]), soit octets_lignes(textes[i]) pour
+# octets_lignes_indices(textes, i). Identité exacte des octets, dans les deux
+# formes. Valeurs pseudo-aléatoires sans générateur : (k * 2654435761) mod
+# (2^32 - 1) - (2^31 - 1), exact en double (produit < 2^53), dans
+# [-(2^31 - 1), 2^31 - 1].
+local({
+  ol <- tablexp:::octets_lignes
+  oe <- tablexp:::octets_entiers
+  oli <- tablexp:::octets_lignes_indices
+  ev <- tablexp:::ecrire_valeurs
+  oracle <- function(x) ol(sprintf("%d", x))
+  im <- .Machine$integer.max
+  k <- seq_len(1e5)
+  CAS <- list(integer(0), NA_integer_, 0L, 7L, -1L, c(NA_integer_, NA), c(a = 1L, b = -2L, c = NA), matrix(c(1:5, NA), 2L),
+              c(0L, 1L, -1L, 9L, 10L, -10L, 99L, 100L, -100L, im, -im, 999999999L, 1000000000L, -1000000000L, NA),
+              rep(7L, 50L), -(1:2000), 1:1e5, rep(c(NA, 3L), 1000L),
+              as.integer((k * 2654435761) %% (2^32 - 1) - (2^31 - 1)))
+  verifier(sprintf("octets_entiers() et ecrire_valeurs(integer), deux formes : octets identiques à octets_lignes(sprintf(\"%%d\", x)), %d cas (vide, NA, 0, signes, 1 à 10 chiffres, ±(2^31 - 1), noms, dim, constante, 10^5 valeurs)",
+                   length(CAS)), {
+    ko <- which(!vapply(CAS, function(x) identical(oe(x), oracle(x)) && identical(ev(x, "empreinte", "x")$octets, oracle(x)) &&
+                                         identical(ev(x, "texte", "x")$octets, oracle(x)) &&
+                                         identical(ev(x, "texte", "x")$type, "integer"), NA))
+    if (!length(ko)) TRUE else paste("cas en écart :", paste(ko, collapse = ", "))
+  })
+  verifier("octets_entiers() : sortie à la main (NA, 0, -1, 2147483647, -2147483647, 10)",
+           identical(rawToChar(oe(c(NA, 0L, -1L, im, -im, 10L))), "NA\n0\n-1\n2147483647\n-2147483647\n10\n"))
+  TXT <- c("1970-01-01", "NA", "NaN", "", "0001-01-01", "x")
+  INDICES <- list(integer(0), 1L, 4L, c(4L, 4L), 6:1, rep(2:3, 100L), c(1L, 1L, 5L, 4L, 1L), (k %% 6L) + 1L)
+  verifier(sprintf("octets_lignes_indices() : octets identiques à octets_lignes(textes[i]), %d suites d'indices (vide, texte vide, répétitions, ordre inverse, 10^5 indices)",
+                   length(INDICES)), {
+    ko <- which(!vapply(INDICES, function(i) identical(oli(TXT, i), ol(TXT[i])), NA))
+    if (!length(ko)) TRUE else paste("suites en écart :", paste(ko, collapse = ", "))
+  })
+  verifier("ecrire_valeurs(Date), deux formes : octets identiques à l'écriture d'avant #71 (texte des valeurs distinctes, une chaîne par ligne), NA, NaN, stockage integer, valeurs répétées, 10^5 jours du domaine", {
+    J <- function(j) structure(j, class = "Date")
+    avant <- function(x) {
+      j <- as.vector(unclass(x)); u <- unique(j)
+      txt <- ifelse(is.nan(u), "NaN", "NA"); a <- !is.na(u)
+      if (any(a)) txt[a] <- tablexp:::texte_date(u[a])
+      ol(txt[match(j, u)])
+    }
+    dates <- list(J(numeric(0)), J(NA), J(NaN), J(c(0, NA, NaN, 0, -719162, 2932896, NA)), J(c(3L, NA, 3L, 0L)),
+                  J(-719162 + (k * 2654435761) %% 3652059))
+    all(vapply(dates, function(x) identical(ev(x, "empreinte", "d")$octets, avant(x)) &&
+                                    identical(ev(x, "texte", "d")$octets, avant(x)), NA))
+  })
+})
+
 # --- dates : année sur quatre chiffres, refus hors du domaine (#19 ; ADR 0011, point 4) ---
 
 # Nature des attendus : textes écrits à la main ; jours depuis 1970-01-01 des
@@ -1440,3 +1493,165 @@ local({
              identical(tablexp:::canoniser_plan(plan63(rev(SEG), rev(EXC), rev(EST)), tablexp:::CHAMPS_PLAN,
                                                 tablexp:::PARAMETRES_ETAPES, list())$etapes$brut$estimateurs, rev(EST)))
 })
+
+# --- contrôles non répétés (#22, point 2 et notes de B6) ----------------------
+#
+# Nature des attendus : valeurs calculées à la main (compte d'exécutions de
+# chaque contrôle, mesuré par trace() sur l'espace de noms installé) et
+# identité exacte (controler = FALSE rend les mêmes objets que controler =
+# TRUE sur des entrées valides ; chaque valeur dérivée égale la valeur rendue
+# par son contrôle).
+# construire_table() contrôle chaque entrée une seule fois, avant toute
+# exécution ; les fonctions d'étape, appelées directement, contrôlent les
+# leurs (refus conservés), sans refaire un contrôle entre elles.
+CONTROLES_22 <- c("controler_roles", "controler_parametres_donnees", "controler_transition_periode",
+                  "controler_segmentation", "controler_parametres_exposition", "controler_parametres_brut",
+                  "deduire_recette", "resoudre_convention")
+COMPTEUR_22 <- new.env()
+compter_controles <- function(expr) {
+  ns <- asNamespace("tablexp")
+  for (nom in CONTROLES_22) assign(nom, 0L, envir = COMPTEUR_22)
+  for (nom in CONTROLES_22)
+    suppressMessages(trace(nom, where = ns, print = FALSE,
+                           tracer = bquote(assign(.(nom), get(.(nom), envir = .(COMPTEUR_22)) + 1L, envir = .(COMPTEUR_22)))))
+  on.exit(for (nom in CONTROLES_22) suppressMessages(untrace(nom, where = ns)))
+  force(expr)
+  vapply(CONTROLES_22, function(nom) get(nom, envir = COMPTEUR_22), integer(1L))
+}
+attendu_22 <- function(...) {
+  x <- stats::setNames(integer(length(CONTROLES_22)), CONTROLES_22)
+  m <- c(...); x[names(m)] <- as.integer(m)
+  x
+}
+ecart_22 <- function(obtenu, attendu) {
+  if (identical(obtenu, attendu)) return(TRUE)
+  sprintf("obtenu %s ; attendu %s", paste(names(obtenu), obtenu, sep = "=", collapse = " "),
+          paste(names(attendu), attendu, sep = "=", collapse = " "))
+}
+plan_km_22 <- modifier(plan_type(), etapes = c(plan_type()$etapes,
+  list(brut = list(estimateurs = c("poisson", "binomial", "kaplan_meier"), niveau = 0.95))))
+plan_pb_22 <- modifier(plan_type(), etapes = c(plan_type()$etapes,
+  list(brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95))))
+plan_donnees_22 <- modifier(plan_type(), etapes = plan_type()$etapes["donnees"])
+
+verifier("contrôles : construire_table() avec donnees, exposition et brut (Kaplan-Meier compris), chaque contrôle exécuté une fois (valeur calculée à la main)",
+         ecart_22(compter_controles(construire_table(BASE, ROLES, plan_km_22)),
+                  attendu_22(controler_roles = 1, controler_parametres_donnees = 1, controler_transition_periode = 1,
+                             controler_segmentation = 1, controler_parametres_exposition = 1,
+                             controler_parametres_brut = 1, deduire_recette = 1, resoudre_convention = 1)))
+verifier("contrôles : construire_table() sans Kaplan-Meier, mêmes comptes (aucun contrôle du chemin Kaplan-Meier)",
+         ecart_22(compter_controles(construire_table(BASE, ROLES, plan_pb_22)),
+                  attendu_22(controler_roles = 1, controler_parametres_donnees = 1, controler_transition_periode = 1,
+                             controler_segmentation = 1, controler_parametres_exposition = 1,
+                             controler_parametres_brut = 1, deduire_recette = 1, resoudre_convention = 1)))
+verifier("contrôles : construire_table() avec l'étape donnees seule, chaque contrôle de ses entrées exécuté une fois, aucun contrôle d'exposition ni de brut",
+         ecart_22(compter_controles(construire_table(BASE, ROLES, plan_donnees_22)),
+                  attendu_22(controler_roles = 1, controler_parametres_donnees = 1, controler_transition_periode = 1,
+                             controler_segmentation = 1, deduire_recette = 1)))
+verifier("contrôles : construire_table() avec plan refusé par valider_plan(), aucun contrôle au-delà du refus",
+         ecart_22(compter_controles(refus(construire_table(BASE, ROLES, modifier(plan_km_22, delai_declaration = -1)))),
+                  attendu_22(controler_parametres_donnees = 1, controler_transition_periode = 1)))
+
+# Appels directs des fonctions d'étape : refus conservés, un contrôle une fois.
+OBS_22 <- tablexp:::preparer_donnees(BASE, ROLES, VD, PER, 0, "sexe", character(0))$resultat$observations
+EXPO_22 <- tablexp:::calculer_exposition(OBS_22, ROLES, VD, PER, 0, "sexe", "plus_fine", FALSE)
+verifier("contrôles : preparer_donnees() en appel direct, contrôle des paramètres puis des rôles, une fois chacun",
+         ecart_22(compter_controles(tablexp:::preparer_donnees(BASE, ROLES, VD, PER, 0, "sexe", character(0))),
+                  attendu_22(controler_roles = 1, controler_parametres_donnees = 1, controler_transition_periode = 1,
+                             controler_segmentation = 1)))
+verifier("contrôles : calculer_exposition() en appel direct, paramètres, recette et convention contrôlés une fois chacun, rôles non contrôlés",
+         ecart_22(compter_controles(tablexp:::calculer_exposition(OBS_22, ROLES, VD, PER, 0, "sexe", "plus_fine", FALSE)),
+                  attendu_22(controler_parametres_donnees = 1, controler_transition_periode = 1, controler_segmentation = 1,
+                             controler_parametres_exposition = 1, deduire_recette = 1, resoudre_convention = 1)))
+appel_brut_22 <- function(estimateurs, observations = EXPO_22$fenetres, ...)
+  tablexp:::calculer_taux_bruts(EXPO_22$resultat$exposition, "sexe", FALSE, EXPO_22$parametres$convention$retenue,
+                                EXPO_22$parametres$unite_exposition, estimateurs, 0.95, observations = observations,
+                                transition = VD, periode = PER, delai_declaration = 0,
+                                parametres_exposition = EXPO_22$parametres, ...)
+verifier("contrôles : calculer_taux_bruts() en appel direct avec Kaplan-Meier, la segmentation contrôlée une fois (module brut) et la transition, la période et le délai une fois, sans second contrôle de segmentation ni d'exclusions",
+         ecart_22(compter_controles(appel_brut_22(c("poisson", "kaplan_meier"))),
+                  attendu_22(controler_segmentation = 1, controler_parametres_brut = 1, controler_transition_periode = 1)))
+verifier("contrôles : calculer_taux_bruts() en appel direct sans Kaplan-Meier, ni transition ni période contrôlées",
+         ecart_22(compter_controles(appel_brut_22(c("poisson", "binomial"))),
+                  attendu_22(controler_segmentation = 1, controler_parametres_brut = 1)))
+verifier("contrôles : taux_kaplan_meier() ne contrôle rien (appelé par calculer_taux_bruts() après ses contrôles)",
+         ecart_22(compter_controles(tablexp:::taux_kaplan_meier(EXPO_22$fenetres, EXPO_22$resultat$exposition, "sexe", VD, PER, 0,
+                                                                 EXPO_22$parametres$convention$retenue, 0.95, EXPO_22$parametres)),
+                  attendu_22()))
+
+verifier("contrôles : taux_kaplan_meier() en appel direct sur un data.frame avec une segmentation dupliquée -> erreur de programmation (garde), non un refus ni une table à colonne parasite",
+         {
+           e <- tryCatch(tablexp:::taux_kaplan_meier(OBS_22, EXPO_22$resultat$exposition, c("sexe", "sexe"), VD, PER, 0,
+                                                     EXPO_22$parametres$convention$retenue, 0.95, EXPO_22$parametres),
+                         error = function(e) e)
+           inherits(e, "error") && !inherits(e, "refus_tablexp") &&
+             grepl("segmentation avec doublon (erreur de programmation)", conditionMessage(e), fixed = TRUE)
+         })
+
+# Refus en appel direct conservés, mêmes modules et mêmes motifs qu'avant.
+refus_22 <- function(expr) { r <- refus(expr); if (is.null(r)) NULL else c(r$module, r$motif) }
+brut_direct_22 <- function(segmentation, transition)
+  tablexp:::calculer_taux_bruts(EXPO_22$resultat$exposition, segmentation, FALSE, "dernier_anniversaire",
+                                EXPO_22$parametres$unite_exposition, "kaplan_meier", 0.95,
+                                observations = EXPO_22$fenetres, transition = transition, periode = PER,
+                                delai_declaration = 0, parametres_exposition = EXPO_22$parametres)
+verifier("contrôles : refus en appel direct conservés (valeur calculée à la main : module et motif)", {
+  r <- list(
+    preparer_donnees_roles = refus_22(tablexp:::preparer_donnees(BASE, structure(ROLES, foo = 1), VD, PER, 0, "sexe", character(0))),
+    preparer_donnees_delai = refus_22(tablexp:::preparer_donnees(BASE, ROLES, VD, PER, -1, "sexe", character(0))),
+    exposition_convention = refus_22(tablexp:::calculer_exposition(OBS_22, ROLES, VD, PER, 0, "sexe", "age_fourni", FALSE)),
+    exposition_recette = refus_22(tablexp:::calculer_exposition(OBS_22, ROLES[names(ROLES) != "date_sortie"], VD, PER, 0, "sexe", "plus_fine", FALSE)),
+    brut_segmentation_km = refus_22(brut_direct_22("pays", VD)),
+    brut_transition_km = refus_22(brut_direct_22("sexe", list(depart = "x", arrivee = "y"))))
+  attendu <- list(preparer_donnees_roles = c("donnees", "roles_mal_formes"),
+                  preparer_donnees_delai = c("donnees", "delai_invalide"),
+                  exposition_convention = c("exposition", "convention_non_mise_en_oeuvre"),
+                  exposition_recette = c("exposition", "aucune_recette"),
+                  brut_segmentation_km = c("brut", "segmentation_invalide"),
+                  brut_transition_km = c("donnees", "transition_inconnue"))
+  if (identical(r, attendu)) TRUE else paste(names(r)[!mapply(identical, r, attendu)], collapse = ", ")
+})
+verifier("contrôles : seule la valeur FALSE omet les contrôles (0, NA, une chaîne et 0L contrôlent comme TRUE)", {
+  r <- lapply(list(0, NA, "non", 0L), function(v)
+    refus_22(tablexp:::preparer_donnees(BASE, ROLES, VD, PER, -1, "sexe", character(0), controler = v)))
+  all(vapply(r, identical, logical(1L), c("donnees", "delai_invalide")))
+})
+
+# controler = FALSE : mêmes objets que controler = TRUE sur des entrées valides.
+verifier("contrôles : preparer_donnees(controler = FALSE) rend le même objet que controler = TRUE",
+         identical(tablexp:::preparer_donnees(BASE, ROLES, VD, PER, 0, "sexe", character(0), controler = FALSE),
+                   tablexp:::preparer_donnees(BASE, ROLES, VD, PER, 0, "sexe", character(0))))
+verifier("contrôles : calculer_exposition(controler = FALSE) rend le même objet que controler = TRUE, convention native et forcée, sans et avec découpage par année", {
+  ok <- vapply(list(c("plus_fine", FALSE), c("age_atteint_annee", FALSE), c("dernier_anniversaire", TRUE),
+                    c("age_atteint_annee", TRUE)), function(a)
+    identical(tablexp:::calculer_exposition(OBS_22, ROLES, VD, PER, 0, "sexe", a[1L], as.logical(a[2L]), controler = FALSE),
+              tablexp:::calculer_exposition(OBS_22, ROLES, VD, PER, 0, "sexe", a[1L], as.logical(a[2L]))), logical(1L))
+  if (all(ok)) TRUE else paste("cas", paste(which(!ok), collapse = ", "))
+})
+verifier("contrôles : calculer_taux_bruts(controler = FALSE) rend le même objet que controler = TRUE, Kaplan-Meier compris",
+         identical(appel_brut_22(c("poisson", "binomial", "kaplan_meier"), controler = FALSE),
+                   appel_brut_22(c("poisson", "binomial", "kaplan_meier"))))
+
+# Les valeurs dérivées sans contrôle égalent celles que rendent les contrôles.
+verifier("contrôles : valeurs_parametres_donnees() égale la valeur rendue par controler_parametres_donnees(), pour chaque transition prise en charge et plusieurs délais", {
+  tr <- tablexp:::TRANSITIONS
+  ok <- unlist(lapply(seq_len(nrow(tr)), function(i) lapply(c(0, 1, 90), function(d) {
+    t <- list(depart = tr$depart[i], arrivee = tr$arrivee[i])
+    identical(tablexp:::valeurs_parametres_donnees(t, PER, d),
+              tablexp:::controler_parametres_donnees(t, PER, d, "sexe", character(0)))
+  })))
+  if (all(ok)) TRUE else "valeurs et contrôle diffèrent"
+})
+verifier("contrôles : recette_branche() égale deduire_recette() et convention_retenue() égale resoudre_convention() (plus_fine, native, forcée)", {
+  r <- identical(tablexp:::recette_branche(), tablexp:::deduire_recette(ROLES)) &&
+    all(vapply(c("plus_fine", "dernier_anniversaire", "age_atteint_annee"), function(cv)
+      identical(tablexp:::convention_retenue(cv, "dernier_anniversaire"),
+                tablexp:::resoudre_convention(cv, "dernier_anniversaire")), logical(1L)))
+  r && isTRUE(tablexp:::convention_retenue("age_atteint_annee", "dernier_anniversaire")$forcee)
+})
+
+# Règle des noms complets (outils.R), écrite une seule fois.
+verifier("noms_complets : présents, sans NA, non vides (valeur calculée à la main)",
+         identical(vapply(list(c("a", "b"), "a", character(0), NULL, c("a", ""), "", c("a", NA), NA_character_),
+                          tablexp:::noms_complets, logical(1L)),
+                   c(TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE)))

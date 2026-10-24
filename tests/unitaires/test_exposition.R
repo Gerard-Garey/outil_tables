@@ -13,7 +13,14 @@
 #    par coder ;
 #  - recoupement : arithmétique de dates du module contre as.Date() ;
 #  - âge au dernier anniversaire comparé à age_revolu() du module donnees,
-#    dont l'exposition ne se sert pas.
+#    dont l'exposition ne se sert pas ;
+#  - accord des trois arithmétiques de dates (donnees, exposition, simulateur)
+#    sur [0001-01-01, 9999-12-31], as.Date() comme oracle des anniversaires et
+#    des bornes, comparaison directe pour la décomposition, les jours civils
+#    et les âges : exhaustif pour la décomposition et les jours civils,
+#    exhaustif sur le sous-domaine énuméré et partiel sur le domaine pour les
+#    anniversaires, par tirage sous graine locale et balayage pour les âges,
+#    plus un témoin à valeurs écrites à la main (M89, #22 point 3).
 #  Les cas passent par construire_table() (étapes donnees puis exposition).
 # -----------------------------------------------------------------------------
 
@@ -294,6 +301,189 @@ verifier("age_dernier_anniversaire (valeur calculée à la main, T2) : 1964-02-2
                                             as.numeric(D(c("2021-02-28", "2021-03-01", "2024-02-29")))),
                    c(56, 57, 60)))
 
+# --- accord des trois arithmétiques de dates (T2) ----------------------------------
+#
+# La duplication est voulue (M89, #22 point 3) : composantes_date() (donnees,
+# enveloppe de as.POSIXlt), composantes_jour() et ses compagnes (exposition) et
+# les jours civils du simulateur (jours_civils(), jour_anniversaire(),
+# age_anniversaire()) sont trois implémentations indépendantes ; ce bloc
+# établit leur accord sur tout le domaine [0001-01-01, 9999-12-31], contre
+# as.Date() comme oracle externe. Les fonctions de ces modules ne sont pas
+# modifiées.
+
+composantes_date <- tablexp:::composantes_date
+jours_civils <- tablexp:::jours_civils
+jour_anniversaire <- tablexp:::jour_anniversaire
+age_anniversaire <- tablexp:::age_anniversaire
+premier_janvier <- tablexp:::premier_janvier
+age_revolu <- tablexp:::age_revolu
+ACC_JMIN <- as.numeric(D("0001-01-01"))
+ACC_JMAX <- as.numeric(D("9999-12-31"))
+ACC_T <- ACC_JMIN:ACC_JMAX
+ACC_CD <- composantes_date(ACC_T)
+ACC_CJ <- composantes_jour(ACC_T)
+ACC_CAL <- tablexp:::calendrier(1, 10000)
+
+verifier("accord des trois arithmétiques (T2), décomposition (exhaustif, chaque jour du 0001-01-01 au 9999-12-31, as.Date comme oracle de bornes) : composantes_date() == composantes_jour() (an, mois, jour) ; années 0 et 10000 aux jours voisins des bornes",
+         local({
+           b <- c(ACC_JMIN - 1, ACC_JMIN, ACC_JMAX, ACC_JMAX + 1)
+           bd <- composantes_date(b); bj <- composantes_jour(b)
+           if (!identical(ACC_JMAX - ACC_JMIN + 1, as.numeric(length(ACC_T)))) "domaine"
+           else if (!all(ACC_CD$an == ACC_CJ$an)) "année"
+           else if (!all(ACC_CD$mois + 1L == ACC_CJ$mois)) "mois"
+           else if (!all(ACC_CD$jour == ACC_CJ$jour)) "jour"
+           else if (!identical(as.numeric(bd$an), c(0, 1, 9999, 10000))) "années voisines (composantes_date)"
+           else if (!identical(as.numeric(bj$an), c(0, 1, 9999, 10000))) "années voisines (composantes_jour)"
+           else if (!identical(c(bd$mois + 1L, bd$jour), c(12L, 1L, 12L, 1L, 31L, 1L, 31L, 1L)) ||
+                    !identical(as.numeric(c(bj$mois, bj$jour)), c(12, 1, 12, 1, 31, 1, 31, 1))) "mois et jour aux bornes"
+           else TRUE
+         }))
+verifier("accord des trois arithmétiques (T2), jours civils (exhaustif, chaque jour du 0001-01-01 au 9999-12-31) : jours_civils(composantes_date(t)) == t ; annee_du_jour() et annee_calendrier() == année de composantes_date() ; premier_janvier(1:10001) == jours_civils(1:10001, 1, 1)",
+         local({
+           if (!identical(jours_civils(ACC_CD$an, ACC_CD$mois + 1L, ACC_CD$jour), as.numeric(ACC_T))) "aller-retour"
+           else if (!all(annee_du_jour(ACC_T) == ACC_CD$an)) "annee_du_jour"
+           else if (!all(tablexp:::annee_calendrier(ACC_CAL, ACC_T) == ACC_CD$an)) "annee_calendrier"
+           else if (!identical(as.numeric(premier_janvier(1:10001)), jours_civils(1:10001, 1L, 1L))) "premier_janvier"
+           else TRUE
+         }))
+
+# Oracle des anniversaires : as.Date() de « année-mois-jour » pour les 366
+# couples (mois, jour) de chacune des années 1 à 9999 ; le 29/02 d'une année
+# commune (NA) est remplacé par le 01/03 (T2). Rangé par couple (mois, jour)
+# puis par année : l'anniversaire de (mois, jour) l'année y est à
+# ACC_ORACLE[(couple - 1) * 9999 + y].
+ACC_NJ <- c(31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+ACC_DEC <- c(0, cumsum(ACC_NJ))[1:12]                        # couples avant le mois m (1-12)
+ACC_MOIS <- rep(1:12, ACC_NJ); ACC_JOUR <- sequence(ACC_NJ)  # les 366 couples
+ACC_ORACLE <- local({
+  y <- rep(1:9999, times = 366L)
+  o <- as.numeric(as.Date(sprintf("%04d-%02d-%02d", y, rep(ACC_MOIS, each = 9999L), rep(ACC_JOUR, each = 9999L)),
+                          format = "%Y-%m-%d"))
+  m <- is.na(o)
+  o[m] <- as.numeric(as.Date(sprintf("%04d-03-01", y[m]), format = "%Y-%m-%d"))
+  o
+})
+ACC_COUPLE <- ACC_DEC[ACC_CD$mois + 1L] + ACC_CD$jour       # couple (mois, jour) de chaque jour du domaine
+verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif sur le sous-domaine énuméré, partiel sur le domaine : toutes les naissances du domaine, aux six âges 0, 1, 3, 4, 100 et 130 tant que an + x <= 9999) : anniversaire_age() == jour_anniversaire() == as.Date() (29/02 -> 01/03 des années communes)",
+         local({
+           res <- TRUE
+           for (x in c(0L, 1L, 3L, 4L, 100L, 130L)) {
+             k <- ACC_CD$an + x <= 9999
+             cd <- lapply(ACC_CD, `[`, k); cj <- lapply(ACC_CJ, `[`, k)
+             att <- ACC_ORACLE[(ACC_COUPLE[k] - 1) * 9999 + cd$an + x]
+             if (!identical(anniversaire_age(ACC_CAL, cj, x), att)) { res <- sprintf("anniversaire_age, x = %d", x); break }
+             if (!identical(jour_anniversaire(cd, x), att)) { res <- sprintf("jour_anniversaire, x = %d", x); break }
+           }
+           res
+         }))
+verifier("accord des trois arithmétiques (T2), anniversaires (exhaustif sur le sous-domaine énuméré, partiel sur le domaine : 28/02, 29/02 et 01/03 de chaque année bissextile, tous les âges de 0 à 130 tant que an + x <= 9999) : anniversaire_age() == jour_anniversaire() == as.Date()",
+         local({
+           bis <- as.numeric(as.Date(sprintf("%04d-02-29", 1:9999), format = "%Y-%m-%d"))
+           an_b <- (1:9999)[!is.na(bis)]
+           n <- as.numeric(as.Date(sprintf("%04d-%02d-%02d", rep(an_b, each = 3L), c(2L, 2L, 3L), c(28L, 29L, 1L)),
+                                   format = "%Y-%m-%d"))
+           cd <- composantes_date(n); cj <- composantes_jour(n)
+           couple <- ACC_DEC[cd$mois + 1L] + cd$jour
+           res <- TRUE
+           for (x in 0:130) {
+             k <- cd$an + x <= 9999
+             att <- ACC_ORACLE[(couple[k] - 1) * 9999 + cd$an[k] + x]
+             if (!identical(anniversaire_age(ACC_CAL, lapply(cj, `[`, k), x), att)) { res <- sprintf("anniversaire_age, x = %d", x); break }
+             if (!identical(jour_anniversaire(lapply(cd, `[`, k), x), att)) { res <- sprintf("jour_anniversaire, x = %d", x); break }
+           }
+           res
+         }))
+
+# Âge au dernier anniversaire : les trois fonctions sur un tirage (graine
+# locale) de couples (naissance, jour) couvrant le domaine, dont des naissances
+# au 29/02, puis sur un balayage des jours voisins du 29/02.
+ACC_29 <- local({
+  b <- as.numeric(as.Date(sprintf("%04d-02-29", 1:9999), format = "%Y-%m-%d"))
+  b[!is.na(b)]
+})
+accord_ages <- function(n, t) {
+  r1 <- age_revolu(n, t)
+  r2 <- age_dernier_anniversaire(ACC_CAL, composantes_jour(n), t)
+  r3 <- age_anniversaire(composantes_date(n), composantes_date(t)$an, t)
+  if (!identical(as.numeric(r1), as.numeric(r2))) "age_dernier_anniversaire"
+  else if (!identical(as.numeric(r1), as.numeric(r3))) "age_anniversaire"
+  else TRUE
+}
+verifier("accord des trois arithmétiques (T2), âge au dernier anniversaire (tirage sous graine locale 20261021 : 2,2·10^5 couples (naissance, jour <= 131 ans plus tard) de naissances sur tout le domaine, dont 2·10^4 au 29/02) : age_revolu() == age_dernier_anniversaire() == age_anniversaire()",
+         local({
+           tir <- tablexp:::sous_graine(20261021L, {
+             n <- c(sample(ACC_JMIN:ACC_JMAX, 2e5, replace = TRUE), sample(ACC_29, 2e4, replace = TRUE))
+             list(n = n, t = n + floor(runif(length(n)) * (pmin(n + 131 * 366, ACC_JMAX) - n + 1)))
+           })
+           n <- tir$n; t <- tir$t
+           if (length(n) < 2e5 || sum(n %in% ACC_29) < 1e4) "taille du tirage"
+           else if (any(t < n | t > ACC_JMAX)) "tirage hors domaine"
+           else accord_ages(n, t)
+         }))
+verifier("accord des trois arithmétiques (T2), âge au dernier anniversaire (balayage : naissances au 29/02 des années 4, 1964 et 2000 ; tous les 28/02, 29/02 et 01/03 des années 1 à 9999 postérieurs à la naissance) : age_revolu() == age_dernier_anniversaire() == age_anniversaire()",
+         local({
+           t <- sort(unique(c(as.numeric(as.Date(sprintf("%04d-%02d-%02d", rep(1:9999, each = 2L), c(2L, 3L), c(28L, 1L)),
+                                                  format = "%Y-%m-%d")), ACC_29)))
+           res <- TRUE
+           for (an in c(4L, 1964L, 2000L)) {
+             n0 <- as.numeric(as.Date(sprintf("%04d-02-29", an), format = "%Y-%m-%d"))
+             tt <- t[t >= n0]
+             r <- accord_ages(rep(n0, length(tt)), tt)
+             if (!isTRUE(r)) { res <- sprintf("%s, naissance du 29/02/%d", r, an); break }
+           }
+           res
+         }))
+
+# Témoin à valeurs écrites à la main (T2) : naissance au 29/02/0004, années
+# séculaires communes 100, 1700, 1800, 1900, 2100, 9900 (anniversaire au 01/03)
+# et bissextiles 400, 1600, 2000, 9600 (anniversaire au 29/02), âge x = année - 4.
+ACC_AN <- c(100L, 400L, 1600L, 1700L, 1800L, 1900L, 2000L, 2100L, 9600L, 9900L)
+ACC_X <- c(96L, 396L, 1596L, 1696L, 1796L, 1896L, 1996L, 2096L, 9596L, 9896L)
+ACC_ANNIV <- as.numeric(as.Date(c("0100-03-01", "0400-02-29", "1600-02-29", "1700-03-01", "1800-03-01",
+                                 "1900-03-01", "2000-02-29", "2100-03-01", "9600-02-29", "9900-03-01"),
+                               format = "%Y-%m-%d"))
+ACC_N0 <- as.numeric(as.Date("0004-02-29", format = "%Y-%m-%d"))
+verifier("accord des trois arithmétiques (T2), témoin à la main : naissance 0004-02-29, anniversaires aux années séculaires communes 100, 1700, 1800, 1900, 2100, 9900 (01/03) et bissextiles 400, 1600, 2000, 9600 (29/02), par les deux fonctions qui les calculent (anniversaire_age(), jour_anniversaire())",
+         local({
+           cn <- composantes_date(ACC_N0)
+           if (!identical(anniversaire_age(ACC_CAL, composantes_jour(ACC_N0), ACC_X), ACC_ANNIV)) "anniversaire_age"
+           else if (!identical(jour_anniversaire(cn, ACC_X), ACC_ANNIV)) "jour_anniversaire"
+           else TRUE
+         }))
+verifier("accord des trois arithmétiques (T2), témoin à la main : même naissance, âge au 28/02 (x - 1), au 01/03 (x) et, les années bissextiles 400, 1600, 2000, 9600, au 29/02 (x), par les trois fonctions d'âge ; lendemain du 28/02 décomposé par composantes_date() et composantes_jour() (01/03 ou 29/02)",
+         local({
+           bis <- c(2L, 3L, 7L, 9L)                                # rangs de 400, 1600, 2000, 9600 dans ACC_AN
+           d28 <- as.numeric(as.Date(sprintf("%04d-02-28", ACC_AN), format = "%Y-%m-%d"))
+           d01 <- as.numeric(as.Date(sprintf("%04d-03-01", ACC_AN), format = "%Y-%m-%d"))
+           d29 <- as.numeric(as.Date(sprintf("%04d-02-29", ACC_AN[bis]), format = "%Y-%m-%d"))
+           lit28 <- c(95, 395, 1595, 1695, 1795, 1895, 1995, 2095, 9595, 9895)
+           lit01 <- c(96, 396, 1596, 1696, 1796, 1896, 1996, 2096, 9596, 9896)
+           lit29 <- c(396, 1596, 1996, 9596)
+           ages <- function(t) {
+             n <- rep(ACC_N0, length(t))
+             list(as.numeric(age_revolu(n, t)),
+                  as.numeric(age_dernier_anniversaire(ACC_CAL, composantes_jour(n), t)),
+                  as.numeric(age_anniversaire(composantes_date(n), composantes_date(t)$an, t)))
+           }
+           tous <- function(a, att) all(vapply(a, identical, NA, att))
+           lendemain <- composantes_date(d28 + 1); lendemain_j <- composantes_jour(d28 + 1)
+           # (mois, jour) du lendemain du 28/02 : 01/03 (3, 1) les années communes, 29/02 (2, 29) les bissextiles
+           att_mj <- c(3, 2, 2, 3, 3, 3, 2, 3, 2, 3, 1, 29, 29, 1, 1, 1, 29, 1, 29, 1)
+           if (!tous(ages(d28), lit28)) "28/02"
+           else if (!tous(ages(d01), lit01)) "01/03"
+           else if (!tous(ages(d29), lit29)) "29/02"
+           else if (!identical(as.numeric(lendemain$an), as.numeric(ACC_AN)) ||
+                    !identical(as.numeric(lendemain_j$an), as.numeric(ACC_AN))) "année du lendemain du 28/02"
+           else if (!identical(as.numeric(c(lendemain$mois + 1L, lendemain$jour)), att_mj)) "lendemain du 28/02 (composantes_date)"
+           else if (!identical(as.numeric(c(lendemain_j$mois, lendemain_j$jour)), att_mj)) "lendemain du 28/02 (composantes_jour)"
+           else TRUE
+         }))
+
+# Libération du bloc (pic mesuré : plus d'un Go) : les vecteurs du domaine
+# entier ne restent pas en vie jusqu'à la fin du fichier.
+rm(list = ls(pattern = "^ACC_|^accord_ages$"))
+invisible(gc())
+
 # --- segmentation -----------------------------------------------------------------
 
 verifier("segmentation sexe x segment : une plage d'âges par segment, segments ordonnés (radix), types conservés", {
@@ -440,3 +630,60 @@ verifier("calculer_exposition : garde de présence avant le tabulate() de prése
     grepl("^Le décompte de présence des âges compterait ", conditionMessage(refus)) && identical(j_refus, "garde") &&
     identical(journal[1:2], c("garde", "tabulate")) && identical(r, appeler(original))
 })
+
+# --- observation en cours : sortie finie <=> cause différente de `en_cours` (#22, point 5) ---
+
+# Nature : valeur calculée à la main. Dans fenetres_observations(), la sortie
+# concurrente n'exclut l'observation en cours que par is.finite(sortie)
+# (aucune condition sur la cause) : l'invariant est porté par donnees. Une
+# ligne `en_cours` de sortie antérieure à la fin de la période est refusée
+# (motif en_cours_avant_fin) ; de sortie égale ou postérieure à la fin, ou
+# absente, elle est acceptée et sa fin d'observation est rendue NA (+Inf pour
+# l'exposition), dans l'unité contrat comme dans l'unité tête. Trois contrats
+# de trois têtes ; la ligne 2 est en cours.
+EC <- function(sortie, cause = "en_cours")
+  data.frame(c = c("A", "B", "C"), t = c("T1", "T2", "T3"),
+             n = D(c("1950-03-15", "1960-07-01", "1945-06-06")),
+             e = D(rep("2016-01-01", 3)),
+             s = D(c("2019-12-31", sortie, "2022-03-01")), k = c("rachat", cause, "deces"),
+             stringsAsFactors = FALSE)
+EC_ROLES <- c(id_contrat = "c", id_tete = "t", date_naissance = "n", date_entree = "e",
+              date_sortie = "s", cause_sortie = "k")
+EC_ARGS <- function(d, transition)
+  list(d, EC_ROLES, transition, PER, 0, character(0), character(0))
+for (u in list(list(nom = "contrat", tr = RA), list(nom = "tête", tr = VD))) {
+  for (s in c("2023-05-01", "2024-12-30")) {
+    x <- tryCatch({ do.call(tablexp:::preparer_donnees, EC_ARGS(EC(s), u$tr)); NULL },
+                  refus_tablexp = function(e) e)
+    verifier(sprintf("en_cours de sortie %s < fin de la période, unité %s : refus ligne_invalide par en_cours_avant_fin seul, ligne 2", s, u$nom),
+             if (is.null(x)) "aucun refus" else if (!identical(x$motif, "ligne_invalide")) x$motif
+             else if (!identical(names(x$details$decompte), "en_cours_avant_fin")) "motif"
+             else if (!identical(x$details$lignes, list(en_cours_avant_fin = 2L))) "numéros de ligne"
+             else TRUE)
+  }
+  for (s in c("2024-12-31", "2026-01-01", NA)) {
+    r <- do.call(tablexp:::preparer_donnees, EC_ARGS(EC(s), u$tr))$resultat$observations
+    verifier(sprintf("en_cours de sortie %s >= fin de la période ou absente, unité %s : acceptée, fin NA, cause en_cours (sortie finie <=> cause différente de en_cours)",
+                     s, u$nom),
+             if (!identical(is.na(r$fin), c(FALSE, TRUE, FALSE))) "fin NA attendue pour la seule ligne 2"
+             else if (!identical(r$cause == "en_cours", is.na(r$fin))) "invariant violé"
+             else TRUE)
+  }
+}
+verifier("tête de deux contrats dont un en cours (sortie postérieure à la fin) : fusion en cours de fin NA ; tête dont le second intervalle est en cours : fin finie pour le premier, NA pour le second ; sortie_concurrente vraie pour la seule sortie close dans la fenêtre",
+         {
+           d <- data.frame(c = c("A", "B", "C", "D"), t = c("T1", "T1", "T2", "T2"),
+                           n = D(rep("1950-03-15", 4)),
+                           e = D(c("2016-01-01", "2018-01-01", "2016-01-01", "2023-01-01")),
+                           s = D(c("2019-12-31", NA, "2020-12-31", "2026-06-01")),
+                           k = c("rachat", "en_cours", "rachat", "en_cours"), stringsAsFactors = FALSE)
+           obs <- tablexp:::preparer_donnees(d, EC_ROLES, VD, PER, 0, character(0), character(0))$resultat$observations
+           f <- tablexp:::fenetres_observations(obs, as.numeric(PER$debut), as.numeric(PER$fin) + 1, "deces")
+           if (!identical(obs$unite, c("T1", "T2", "T2"))) "observations"
+           else if (!identical(obs$cause, c("en_cours", "censure", "en_cours"))) "causes"
+           else if (!identical(is.na(obs$fin), c(TRUE, FALSE, TRUE))) "fins NA"
+           else if (!identical(is.finite(f$sortie), c(FALSE, TRUE, FALSE))) "sorties finies"
+           else if (!identical(f$sortie_concurrente, c(FALSE, TRUE, FALSE))) "sorties concurrentes"
+           else if (!identical(f$evenement, c(FALSE, FALSE, FALSE))) "événements"
+           else TRUE
+         })

@@ -12,7 +12,11 @@
 #  Kaplan-Meier (taux_kaplan_meier()) sur les résultats de la construction :
 #  cet appel passe les observations (data.frame) et mesure donc la voie de
 #  recalcul des fenêtres, non la voie de construire_table(), qui transmet
-#  les fenêtres de l'étape `exposition` (#38).
+#  les fenêtres de l'étape `exposition` (#38). Empreintes (#71) : temps
+#  d'empreinte_resultat() sur l'objet de la construction avec brut (poisson,
+#  binomial) et d'empreinte_donnees() sur le jeu simulé, REPETITIONS mesures
+#  chacune après gc(), médiane et étendue, avec la valeur de l'empreinte
+#  (comparaison avant / après).
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/mesures/temps_construire_table.R [n ...]
@@ -45,6 +49,18 @@ plan <- function(transition, par_annee)
   list(transition = transition, periode = PER, delai_declaration = 90, segmentation = "sexe",
        etapes = list(donnees = list(exclusions = character(0)),
                      exposition = list(convention = "plus_fine", par_annee = par_annee)))
+REPETITIONS <- 5L
+# Médiane, minimum et maximum de REPETITIONS mesures de f(), gc() avant chacune.
+repetitions <- function(f) {
+  r <- numeric(REPETITIONS)
+  for (k in seq_len(REPETITIONS)) {
+    invisible(gc())
+    t0 <- proc.time()[["elapsed"]]
+    v <- f()
+    r[k] <- proc.time()[["elapsed"]] - t0
+  }
+  sprintf("médiane %.2f s (%.2f à %.2f, %d mesures), empreinte %s", stats::median(r), min(r), max(r), REPETITIONS, v)
+}
 chrono <- function(expr) {
   t0 <- proc.time()[["elapsed"]]
   v <- expr
@@ -75,6 +91,8 @@ for (n in TAILLES) {
   pb$etapes$brut <- list(estimateurs = c("poisson", "binomial"), niveau = 0.95)
   xb <- chrono(construire_table(s$valeur, ROLES, pb))
   cat(sprintf("  construire_table, vivant -> décédé, brut (poisson, binomial) : %.1f s\n", xb$secondes))
+  cat(sprintf("  empreinte_resultat(), même objet : %s\n", repetitions(function() tablexp:::empreinte_resultat(xb$valeur))))
+  cat(sprintf("  empreinte_donnees(), jeu simulé : %s\n", repetitions(function() tablexp:::empreinte_donnees(s$valeur, ROLES))))
   pb$etapes$brut$estimateurs <- c("poisson", "binomial", "kaplan_meier")
   xk <- chrono(construire_table(s$valeur, ROLES, pb))
   sk <- xk$valeur$etapes$brut$resultat$kaplan_meier_sauts

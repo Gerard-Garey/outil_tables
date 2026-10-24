@@ -202,8 +202,7 @@ controler_roles <- function(donnees, roles, segmentation) {
     refuser("donnees", "donnees_mal_formees",
             "Les données doivent être un data.frame (le moteur ne lit pas de fichier).",
             list(classe = class(donnees)))
-  if (!forme_exacte(roles, "character", "names") || is.null(names(roles)) ||
-      anyNA(roles) || anyNA(names(roles)) || any(!nzchar(names(roles))))
+  if (!forme_exacte(roles, "character", "names") || !noms_complets(names(roles)) || anyNA(roles))
     refuser("donnees", "roles_mal_formes",
             paste("Les rôles doivent être un vecteur de chaînes nommé (nom du rôle -> nom",
                   "de colonne), sans autre attribut que ses noms, sans valeur",
@@ -311,14 +310,33 @@ controler_segmentation <- function(segmentation, etape) {
   invisible(NULL)
 }
 
-# Contrôle les paramètres que l'étape `donnees` reçoit ; rend la ligne de
-# TRANSITIONS et les bornes de la période (jours depuis 1970-01-01).
+# Ligne de TRANSITIONS de la transition `transition` (list(depart, arrivee) de
+# forme déjà contrôlée) ; zéro ligne si elle n'est pas prise en charge. Seul
+# endroit où s'écrit la recherche.
+ligne_transition <- function(transition)
+  TRANSITIONS[TRANSITIONS$depart == transition[["depart"]] & TRANSITIONS$arrivee == transition[["arrivee"]], ,
+              drop = FALSE]
+
+# Valeurs que les paramètres de transition, de période et de délai déjà
+# contrôlés donnent (#22) : list(transition, debut, fin, borne), la ligne de
+# TRANSITIONS, les bornes de la période et la borne B = fin - délai + 1 (jours
+# depuis 1970-01-01). Ne contrôle rien : rendue par controler_transition_periode()
+# et employée telle quelle par les fonctions d'étape que construire_table()
+# appelle après valider_plan() (argument `controler = FALSE`).
+valeurs_parametres_donnees <- function(transition, periode, delai_declaration) {
+  fin <- as.numeric(periode[["fin"]])
+  list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]), fin = fin,
+       borne = (fin - delai_declaration) + 1)
+}
+
+# Contrôle la transition, la période d'observation et le délai de déclaration
+# d'une fonction d'étape ; rend valeurs_parametres_donnees().
 # Forme exacte (#23, forme_exacte()) : chaque valeur a son type de base exact
 # et ne porte aucun attribut (ni names, ni dim, ni classe), hormis les noms
 # des listes `transition` et `periode` et la classe Date des bornes de la
-# période ; sinon refus sous le motif du paramètre.
-controler_parametres_donnees <- function(transition, periode, delai_declaration,
-                                         segmentation, exclusions) {
+# période ; sinon refus sous le motif du paramètre. Ordre : transition,
+# période, délai, période vide.
+controler_transition_periode <- function(transition, periode, delai_declaration) {
   if (!liste_aux_noms(transition, c("depart", "arrivee")) || !chaine_unique(transition[["depart"]]) ||
       !chaine_unique(transition[["arrivee"]]))
     refuser("donnees", "transition_inconnue",
@@ -326,8 +344,7 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
                   "de champs exactement depart et arrivee, sans autre attribut (ADR 0007, point 5.1)."),
             list(transition = transition))
   depart <- transition[["depart"]]; arrivee <- transition[["arrivee"]]
-  k <- which(TRANSITIONS$depart == depart & TRANSITIONS$arrivee == arrivee)
-  if (!length(k))
+  if (!nrow(ligne_transition(transition)))
     refuser("donnees", "transition_inconnue",
             sprintf("Transition non prise en charge : %s -> %s (prises en charge : %s).",
                     depart, arrivee,
@@ -363,6 +380,16 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
                     format(periode[["debut"]]), format(structure(fin_effective, class = "Date")),
                     format(periode[["fin"]]), format(delai_declaration)),
             list(debut = periode[["debut"]], fin_effective = structure(fin_effective, class = "Date")))
+  valeurs_parametres_donnees(transition, periode, delai_declaration)
+}
+
+# Contrôle les paramètres que l'étape `donnees` reçoit ; rend la ligne de
+# TRANSITIONS et les bornes de la période (controler_transition_periode()).
+# Ordre : transition, période, délai, période vide, segmentation (motif
+# segmentation_invalide), exclusions.
+controler_parametres_donnees <- function(transition, periode, delai_declaration,
+                                         segmentation, exclusions) {
+  p <- controler_transition_periode(transition, periode, delai_declaration)
   controler_segmentation(segmentation, "donnees")
   if (!forme_exacte(exclusions, "character") || anyNA(exclusions) || anyDuplicated(exclusions))
     refuser("donnees", "exclusions_invalides",
@@ -374,8 +401,7 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
     refuser("donnees", "exclusion_inconnue",
             sprintf("Code d'exclusion inconnu : %s (liste fermée des motifs).", liste_guillemets(inconnus)),
             list(exclusions = inconnus))
-  list(transition = TRANSITIONS[k, , drop = FALSE], debut = debut, fin = fin,
-       borne = fin_effective + 1)
+  p
 }
 
 # --- motifs de ligne et de tête (A.1) -----------------------------------------
@@ -544,17 +570,25 @@ fusionner_intervalles <- function(g, entree, fin) {
 #   periode            : list(debut, fin), dates ; fin incluse (A.0, T4) ;
 #   delai_declaration  : entier de jours >= 0 ;
 #   segmentation       : sous-ensemble de c("sexe", "segment"), vide admis ;
-#   exclusions         : codes de motif exclus, vide admis.
+#   exclusions         : codes de motif exclus, vide admis ;
+#   controler          : TRUE (appel direct) contrôle les paramètres puis les
+#                        rôles ; FALSE, réservé à construire_table() qui les a
+#                        contrôlés (valider_plan(), controler_roles()), n'en
+#                        refait aucun (#22 ; seule la valeur FALSE les omet).
 # Rend list(parametres, resultat, diagnostics, avertissements) ; les lignes
 # conservées (resultat$lignes_conservees) sont celles de l'entrée, inchangées
 # (`donnees` lui-même s'il n'y a aucune exclusion) ;
 # resultat$observation_des_lignes donne, pour chaque ligne conservée, le
 # numéro de son observation (composante fusionnée ou contrat).
 preparer_donnees <- function(donnees, roles, transition, periode, delai_declaration,
-                             segmentation, exclusions) {
-  p <- controler_parametres_donnees(transition, periode, delai_declaration,
-                                    segmentation, exclusions)
-  controler_roles(donnees, roles, segmentation)
+                             segmentation, exclusions, controler = TRUE) {
+  if (isFALSE(controler)) {
+    p <- valeurs_parametres_donnees(transition, periode, delai_declaration)
+  } else {
+    p <- controler_parametres_donnees(transition, periode, delai_declaration,
+                                      segmentation, exclusions)
+    controler_roles(donnees, roles, segmentation)
+  }
   n <- nrow(donnees)
   if (!n) refuser("donnees", "base_vide", "La base d'observation ne contient aucune ligne.")
   ev <- evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation)

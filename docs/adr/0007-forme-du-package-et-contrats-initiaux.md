@@ -597,3 +597,44 @@ Les arbres syntaxiques de `R/` sont identiques à la tête précédente (`parse`
 **Effet sur les résultats : aucun.** Rien n'est modifié dans le code par cette annotation ; #56 n'a changé que des commentaires et un libellé de mesure.
 
 Issues : #56 (close à la fusion de la PR #75) ; #38 ; #22 (point 7, clos). Décisions M68, M74.
+
+## Annotation du 21 octobre 2026 — annotation du 17/10/2026, (d) : contrôles de `donnees` exécutés une seule fois par construction, argument interne `controler` (#22, point 2 ; constat m6 de la revue finale de `claude/dette-moteur`, m2 de l'audit de #22 pt 2)
+
+Rédigée par `architect-approfondi` en fin de branche `claude/dette-moteur` (PR #80, à `a303e5b`). Les numéros de ligne cités ici datent de `a303e5b` ; le nom de l'objet fait foi (gabarit des ADR, M77, (b)). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Constat.** L'annotation du 17/10/2026, (d), troisième alinéa, écrit des contrôles de `donnees` appelés par `valider_plan()` : « Leur second appel, dans `preparer_donnees()`, est conservé : il protège la fonction d'étape appelée directement, et son coût est négligeable. » Ce n'est plus exact depuis `fa4ca6f` (#22, point 2). Les trois fonctions d'étape `preparer_donnees()` (`R/donnees.R:583-591`), `calculer_exposition()` (`R/exposition.R:387-399`) et `calculer_taux_bruts()` (`R/brut.R:502-511`) portent un dernier argument interne `controler`, de valeur par défaut `TRUE`. `construire_table()` les appelle avec `controler = FALSE` (`R/construire_table.R:233`, `:239`, `:250`), après avoir tout contrôlé une fois en amont : `valider_plan()` (qui appelle `controler_parametres_donnees()`, `controler_parametres_exposition()` et `controler_parametres_brut()`, `R/construire_table.R:176-184`), `controler_roles()`, `deduire_recette()` et `resoudre_convention()` (`:215-220`). Seule la valeur `FALSE` omet les contrôles (`isFALSE()`).
+
+Le second appel n'a donc lieu qu'en **appel direct** de la fonction d'étape, sous la valeur par défaut. Il garde son rôle : protéger la fonction d'étape appelée hors de `construire_table()` (point 11.3). Les codes de refus restent ceux de (d), « un code par condition, quelle que soit la fonction qui la détecte » : seuls les appels redondants sont retirés.
+
+**(b) Mesure.** Nombre d'exécutions de chaque contrôle pendant un appel de `construire_table()` (plan à trois étapes `donnees`, `exposition`, `brut`, estimateurs Poisson, binomial et Kaplan-Meier ; base de quatre lignes de `tests/unitaires/test_construire_table.R`), compté par `trace()` sur l'espace de noms installé, `a7091c4` → `a303e5b` (*vérifié* le 21/10/2026 par `architect-approfondi`, R 4.3.3, `LC_ALL=C.UTF-8`, deux bibliothèques temporaires installées depuis `git archive`) :
+
+| Contrôle | `a7091c4` | `a303e5b` |
+|---|---|---|
+| `controler_segmentation()` | 5 | 1 |
+| `controler_parametres_donnees()` | 4 | 1 |
+| `controler_roles()` | 2 | 1 |
+| `controler_parametres_exposition()` | 2 | 1 |
+| `controler_parametres_brut()` | 2 | 1 |
+| `deduire_recette()` | 2 | 1 |
+| `resoudre_convention()` | 2 | 1 |
+| `controler_transition_periode()` | absente | 1 |
+
+`controler_transition_periode()` est née de la scission de `controler_parametres_donnees()` par `fa4ca6f`. Ces comptes sont figés par les tests de `tests/unitaires/test_construire_table.R` (`compter_controles()`, `88a5984`), sur les chemins avec et sans Kaplan-Meier, et en appel direct de chaque fonction d'étape.
+
+**(c) Contrats de l'ADR inchangés.** L'argument `controler` ne touche aucun contrat de cet ADR ni aucun contrat partagé (`docs/agents/routage.md`, § 4.2) :
+- les fonctions d'étape sont internes : `NAMESPACE` est identique à `a7091c4` (`git diff --stat a7091c4 a303e5b -- NAMESPACE` vide, *vérifié*) ;
+- la signature de `construire_table(donnees, roles, plan, provenance = NULL)` est inchangée (`formals()` sur les deux SHA installés, *vérifié*) ;
+- la table étape → fonction (point 3.1, constante `ETAPES`, `R/construire_table.R:37`) est inchangée, et le test « ETAPES et construire_table() concordent » (`tests/unitaires/test_construire_table.R:373`) passe (constat d'`audit` sur #22 pt 2, *non remesuré ici*) ;
+- le graphe d'appels du point 2.1 est inchangé : `LC_ALL=C.UTF-8 Rscript tests/controles/graphe_modules.R` à `a303e5b` rend « OK : graphe d'appels conforme à l'ADR 0007, aucun appel dynamique interdit » (*vérifié*). Le prédicat `noms_complets()`, déplacé dans `R/outils.R` (note (3) de fin de B6), n'ajoute aucune arête.
+
+Option écartée par `coder` (message de `fa4ca6f`) : découper chaque fonction d'étape en une fonction qui contrôle et une fonction interne qui ne contrôle pas. Elle aurait changé `ETAPES` et la table étape → fonction du point 3.1.
+
+**(d) Réserve : la recette relue sous `controler = FALSE`.** Relevée par `/code-review` et par `actuary-approfondi` à la revue finale. Sous `controler = FALSE`, `calculer_exposition()` relit la recette par `recette_branche()` (`R/exposition.R:391`), sans regarder les rôles. Elle n'emploie pas la recette que `construire_table()` a déduite (`R/construire_table.R:217`) et qu'elle inscrit dans la fiche (`:271`). La convention retenue est recalculée de même par `convention_retenue()`.
+
+Les deux sources coïncident tant que la branche n'a qu'une recette : `deduire_recette()` rend `recette_branche()` après le seul contrôle des rôles requis (`R/exposition.R:82-89`, lecture du code, *vérifié*). Avec une deuxième recette, l'étape retiendrait la recette de la branche sans refus, tandis que la fiche en déclarerait une autre. C'est une **seconde source** au sens de l'annotation du 17/10/2026, (c), deuxième effet, que cet ADR écarte. La réserve est portée par **#82** (créée le 21/10/2026, M92), qui évalue aussi la forme plus profonde proposée par `/code-review` : transmettre aux fonctions d'étape les valeurs validées par `construire_table()` (`p`, `recette`, `conv`). Elle supprimerait les fonctions jumelles sans contrôle (`valeurs_parametres_donnees()`, `recette_branche()`, `convention_retenue()`) et l'argument `controler`. #82 doit être résolue avant l'ajout d'une deuxième recette (`docs/feuille-de-route.md`, § 3).
+
+**(e) Piste écartée consignée : table étape → fonction appelée par nom (#22, point 7).** Le commentaire de #22 du 19/10/2026 (6273510518) annonçait que cette piste serait consignée par annotation de cet ADR ; elle ne l'avait pas été. La piste : remplacer le `switch()` de `construire_table()` par un appel à la fonction nommée dans `ETAPES$fonction`. Elle est écartée pour deux raisons. Elle ne factorise rien, car les arguments diffèrent d'une étape à l'autre. Et elle demanderait `get()`, `match.fun()` ou `do.call()` sur un nom, que le contrôle du graphe interdit (point 2.1). Le risque visé (étape déclarée mais absente du `switch`) est couvert par le test « ETAPES et construire_table() concordent ». Le point 3.1 (« table de correspondance étape → fonction d'étape ») reste tenu par `ETAPES` et ce test. Ni `fa4ca6f` ni #82 ne rouvrent la question.
+
+**Effet sur les résultats : aucun.** R1 à R6 identiques hors `execution` et hors empreinte du code (message de `fa4ca6f` ; batterie de reproductibilité de la branche, *non remesurée ici*). Cette annotation ne modifie aucun code.
+
+Issues : #22 (points 2 et 7) ; #82. Décisions M82, M92. Branche `claude/dette-moteur`, PR #80.

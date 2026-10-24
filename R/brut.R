@@ -7,7 +7,8 @@
 #
 #  - controler_parametres_brut() : paramètres de l'étape (estimateurs,
 #    niveau) et refus du binomial et de Kaplan-Meier sous découpage par
-#    année ; appelée par valider_plan() et par la fonction d'étape ;
+#    année ; appelée par valider_plan() et, en appel direct, par la fonction
+#    d'étape ;
 #  - taux_poisson(), taux_binomial() : estimateur, intervalles exacts et
 #    asymptotiques et état de chaque cellule ;
 #  - taux_kaplan_meier() : estimateur de Kaplan-Meier sur l'âge (#15),
@@ -35,7 +36,8 @@
 #  variance et bornes NA à q = 0 et q = 1 (A.7) ; pas de survie cumulée par
 #  segment (A.14 question 2).
 #  Ce module n'appelle que `donnees` (liste_guillemets(),
-#  controler_parametres_donnees(), controler_segmentation()), `exposition`
+#  controler_transition_periode(), valeurs_parametres_donnees(),
+#  controler_segmentation()), `exposition`
 #  (fenetres_observations(), segments_observations(), extraire_composantes(),
 #  position_dans_cellule(), somme_par_cellule()) et `outils` (ADR 0007,
 #  point 2.1).
@@ -271,7 +273,10 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
 #                  (data.frame) ;
 #   exposition   : table de l'étape `exposition`, appariée par clé (segment,
 #                  âge), quel que soit l'ordre de ses lignes ;
-#   segmentation, transition, periode, delai_declaration : champs du plan ;
+#   segmentation, transition, periode, delai_declaration : champs du plan,
+#                  non contrôlés ici : contrôlés par calculer_taux_bruts() en
+#                  appel direct, par valider_plan() sous construire_table()
+#                  (controler = FALSE) (#22) ;
 #   convention   : convention d'âge retenue par l'étape `exposition` ;
 #   niveau       : niveau de confiance de l'intervalle asymptotique ;
 #   parametres_exposition : paramètres de l'étape `exposition`
@@ -292,7 +297,15 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
 # vides, par cummax().
 taux_kaplan_meier <- function(observations, exposition, segmentation, transition, periode,
                               delai_declaration, convention, niveau, parametres_exposition) {
-  p <- controler_parametres_donnees(transition, periode, delai_declaration, segmentation, character(0))
+  # Garde (#22) : la segmentation est contrôlée en amont (calculer_taux_bruts(),
+  # ou valider_plan() sous construire_table()) ; ce garde protège l'appel
+  # direct de cette fonction et, par elle, le chemin Kaplan-Meier de
+  # calculer_taux_bruts(controler = FALSE) ; les autres estimateurs ne sont pas
+  # gardés sous FALSE. Un doublon donnerait une table à colonne parasite
+  # (sexe.1), non un refus.
+  if (anyDuplicated(segmentation))
+    stop("taux_kaplan_meier() : segmentation avec doublon (erreur de programmation).", call. = FALSE)
+  p <- valeurs_parametres_donnees(transition, periode, delai_declaration)
   if (!identical(p$borne - 1, as.numeric(parametres_exposition$fin_effective)) ||
       !identical(p$transition$code, parametres_exposition$transition))
     stop(paste("taux_kaplan_meier() : période ou transition différente de celle de l'étape exposition",
@@ -480,7 +493,18 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
 #                      periode, delai_declaration : champs du plan, et
 #                      parametres_exposition : paramètres de l'étape
 #                      `exposition` ; requis par Kaplan-Meier seulement
-#                      (NULL sinon admis).
+#                      (NULL sinon admis) ;
+#   controler        : TRUE (appel direct) contrôle la segmentation, les
+#                      paramètres de l'étape et, pour Kaplan-Meier, la
+#                      transition, la période et le délai ; FALSE, réservé à
+#                      construire_table() qui les a contrôlés (valider_plan()),
+#                      n'en refait aucun (#22 ; seule la valeur FALSE les
+#                      omet) : avec FALSE, aucune entrée n'est gardée ici,
+#                      l'appelant, construire_table(), a tout contrôlé ; le
+#                      garde de doublon de taux_kaplan_meier() garde l'appel
+#                      direct de cette fonction et, par elle, le chemin
+#                      Kaplan-Meier de calculer_taux_bruts(controler = FALSE) ;
+#                      les autres estimateurs ne sont pas gardés sous FALSE.
 # Rend list(parametres, resultat, diagnostics, avertissements) ;
 # resultat : une table par estimateur retenu, dans l'ordre canonique, aux
 # mêmes lignes et dans le même ordre que la table d'exposition (zéro ligne
@@ -488,11 +512,14 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
 # (une ligne par instant d'événement).
 calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention, unite_exposition,
                                 estimateurs, niveau, observations = NULL, transition = NULL,
-                                periode = NULL, delai_declaration = NULL, parametres_exposition = NULL) {
-  # Forme et catalogue de la segmentation (#43, #59) : appel direct de la
-  # fonction d'étape, comme sur le chemin Kaplan-Meier.
-  controler_segmentation(segmentation, "brut")
-  controler_parametres_brut(estimateurs, niveau, par_annee)
+                                periode = NULL, delai_declaration = NULL, parametres_exposition = NULL,
+                                controler = TRUE) {
+  # Forme et catalogue de la segmentation (#43, #59), paramètres de l'étape :
+  # appel direct de la fonction d'étape.
+  if (!isFALSE(controler)) {
+    controler_segmentation(segmentation, "brut")
+    controler_parametres_brut(estimateurs, niveau, par_annee)
+  }
   retenus <- ESTIMATEURS_BRUT[ESTIMATEURS_BRUT %in% estimateurs]
   cles <- c(segmentation, "age", if (isTRUE(par_annee)) "annee")
   requises <- c(cles, "evenements", "exposition_centrale",
@@ -557,6 +584,9 @@ calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention,
     if (is.null(observations))
       stop("calculer_taux_bruts() : observations requises par Kaplan-Meier (erreur de programmation).",
            call. = FALSE)
+    # Transition, période et délai (la segmentation l'a été ci-dessus) ; leurs
+    # valeurs sont reprises par taux_kaplan_meier().
+    if (!isFALSE(controler)) controler_transition_periode(transition, periode, delai_declaration)
     km <- taux_kaplan_meier(observations, exposition, segmentation, transition, periode,
                             delai_declaration, convention, niveau, parametres_exposition)
     if (!identical(km$table$evenements, exposition$evenements))

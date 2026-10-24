@@ -69,17 +69,17 @@ PARAMETRES_ETAPES <- list(
     stringsAsFactors = FALSE)
 )
 
-# Liste aux noms complets (non NULL, sans NA, non vides ; liste vide admise
+# Liste aux noms complets (noms_complets() de R/outils.R ; liste vide admise
 # sans noms), sans autre attribut que names (ni data.frame, ni dim, ni
 # classe ; #23). Les doublons ne sont pas contrôlés : le contrôle de `etapes`
 # les admet, pour que le refus nommé etape_en_double les signale ensuite
 # (#60).
-noms_complets <- function(x) forme_exacte(x, "list", "names") &&
-  (!length(x) || (!is.null(names(x)) && !anyNA(names(x)) && all(nzchar(names(x)))))
+liste_noms_complets <- function(x) forme_exacte(x, "list", "names") &&
+  (!length(x) || noms_complets(names(x)))
 
 # Liste nommée aux noms uniques, non vides, non manquants, sans autre
-# attribut que names (#23) : noms_complets() sans doublon.
-liste_nommee <- function(x) noms_complets(x) && !anyDuplicated(names(x))
+# attribut que names (#23) : liste_noms_complets() sans doublon.
+liste_nommee <- function(x) liste_noms_complets(x) && !anyDuplicated(names(x))
 
 # Valide le plan entier, sans rien exécuter (ADR 0007, point 5.4). Rend le
 # plan, inchangé et invisible ; refuse (module construire_table pour les
@@ -104,7 +104,7 @@ valider_plan <- function(plan) {
                        liste_guillemets(manquants)),
                list(champ = manquants))
   etapes <- plan[["etapes"]]
-  if (!noms_complets(etapes))
+  if (!liste_noms_complets(etapes))
     refus_plan("etapes_mal_formees",
                paste("Le champ « etapes » doit être une liste nommée (nom d'étape -> liste de ses paramètres),",
                      "sans autre attribut que ses noms."))
@@ -210,7 +210,8 @@ ordres_canoniques <- function()
 construire_table <- function(donnees, roles, plan, provenance = NULL) {
   debut <- Sys.time()
   # Validation entière avant toute exécution : plan, rôles, recette et
-  # convention, provenance.
+  # convention, provenance. Chaque contrôle s'exécute ici une seule fois : les
+  # fonctions d'étape, appelées avec controler = FALSE, n'en refont aucun (#22).
   plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
   controler_roles(donnees, roles, plan[["segmentation"]])
   recette <- deduire_recette(roles)
@@ -229,12 +230,13 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
                                  transition = plan[["transition"]], periode = plan[["periode"]],
                                  delai_declaration = plan[["delai_declaration"]],
                                  segmentation = plan[["segmentation"]],
-                                 exclusions = pe[["exclusions"]]),
+                                 exclusions = pe[["exclusions"]], controler = FALSE),
       exposition = calculer_exposition(etapes[["donnees"]][["resultat"]][["observations"]], roles,
                                        transition = plan[["transition"]], periode = plan[["periode"]],
                                        delai_declaration = plan[["delai_declaration"]],
                                        segmentation = plan[["segmentation"]],
-                                       convention = pe[["convention"]], par_annee = pe[["par_annee"]]),
+                                       convention = pe[["convention"]], par_annee = pe[["par_annee"]],
+                                       controler = FALSE),
       brut = calculer_taux_bruts(etapes[["exposition"]][["resultat"]][["exposition"]],
                                  segmentation = plan[["segmentation"]],
                                  par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
@@ -244,7 +246,8 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
                                  observations = fenetres,
                                  transition = plan[["transition"]], periode = plan[["periode"]],
                                  delai_declaration = plan[["delai_declaration"]],
-                                 parametres_exposition = etapes[["exposition"]][["parametres"]]),
+                                 parametres_exposition = etapes[["exposition"]][["parametres"]],
+                                 controler = FALSE),
       stop(sprintf("construire_table() : étape « %s » sans fonction d'étape (erreur de programmation).", nom),
            call. = FALSE))
     etapes[[nom]] <- r[c("parametres", "resultat", "diagnostics")]
