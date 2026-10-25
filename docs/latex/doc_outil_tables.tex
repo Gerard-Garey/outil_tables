@@ -816,7 +816,9 @@ Les tirages ne dépendent donc que de la graine~: ni de l'état du générateur
 de l'appelant, ni de son réglage, que \code{sous\_graine()} laisse inchangés.
 Le simulateur (section~\ref{sec:simulation}) est, à cette date, la seule
 fonction du package qui tire un aléa~; il reçoit sa graine en argument et la
-consigne, avec \code{GENERATEUR}, dans le jeu simulé.
+consigne, avec \code{GENERATEUR}, dans le jeu simulé (et, pour des défauts
+paramétrés, une seconde graine déclarée, distincte,
+section~\ref{sec:defauts-parametres}).
 
 \medskip
 \textbf{Limite.} La réserve de la méthode normale de Box-Muller d'un appelant,
@@ -6889,13 +6891,17 @@ gauche et censure par la période~; elle reste celle des modes
 \code{uniforme} et \code{age\_exact}. Les modes multi-contrats
 \code{uniforme\_multi} et \code{age\_exact\_multi} y ajoutent des têtes
 portant un nombre aléatoire de contrats, de loi déclarée (issue~\#92~;
-section~\ref{sec:portefeuille-simule}). Les autres formes de données
-(agrégats, stocks successifs) et l'injection de défauts paramétrés viendront
-avec une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2). Son point
+section~\ref{sec:portefeuille-simule}). Des \emph{défauts paramétrés}
+peuvent être injectés dans le jeu propre (issue~\#93~;
+section~\ref{sec:defauts-parametres}). Les autres formes de données
+(agrégats, stocks successifs) viendront avec une branche ultérieure
+(\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2). Son point
 d'entrée est \code{simuler\_portefeuille(loi, portefeuille, periode,
-graine)}, exporté (ADR 0007, point 3.2). Le contenu de fond vient de la
+graine, defauts = NULL)}, exporté (ADR 0007, point 3.2, et annotation du
+25/10/2026, point~(b)). Le contenu de fond vient de la
 spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
-17/10/2026, et, pour les têtes multi-contrats, de la spécification commune
+17/10/2026, et, pour les têtes multi-contrats et les défauts paramétrés,
+de la spécification commune
 des issues~\#92 et~\#93 (\code{actuary}, 25/10/2026), dont le mainteneur a
 retenu les recommandations (décisions M131 à M136~; ADR 0007, annotation du
 25/10/2026).
@@ -7306,7 +7312,252 @@ lignes~: les tests n'en vérifient que la positivité.
 \code{periode\_invalide}, \code{entree\_29\_fevrier}, \code{table\_trop\_courte}
 et \code{qx\_egal\_a\_un}~; et, par \code{sous\_graine()}, \code{graine\_invalide}.
 Les modes multi-contrats n'ajoutent aucun code~: \code{loi\_contrats} et la
-garde de débordement sont refusés sous \code{portefeuille\_invalide}.\par}
+garde de débordement sont refusés sous \code{portefeuille\_invalide}. Les
+défauts paramétrés en ajoutent deux, \code{defauts\_invalides} et
+\code{defauts\_ineligibles} (section~\ref{sec:defauts-parametres}).\par}
+
+\subsection{Défauts paramétrés}
+\label{sec:defauts-parametres}
+
+Un \emph{défaut paramétré} est une altération déterministe d'une ligne ou
+d'une tête du \emph{jeu propre}, le jeu que \code{simuler\_portefeuille()}
+tire sous la loi vraie et la graine, avant toute injection (\code{CONTEXT.md}~;
+issue~\#93~; décisions M132 à M134 et M136~; ADR 0007, annotation du
+25/10/2026, points 6 à 9). Il sert à vérifier les contrôles du module
+\code{donnees}~: chaque défaut est consigné avec le motif d'exclusion ou le
+code de refus que ce module doit produire.
+
+\subsubsection*{Argument \code{defauts}}
+
+{\sloppy\hbadness=10000 La signature est
+\code{simuler\_portefeuille(loi, portefeuille, periode, graine, defauts = NULL)}.
+La valeur \code{NULL} signifie «~aucun défaut injecté~»~: le jeu rendu est
+le jeu propre, sans attribut \code{defauts}, identique à celui de l'appel à
+quatre arguments. Ce n'est pas une graine par défaut~: \code{graine} reste
+requise, sans valeur par défaut (section~\ref{sec:sous-graine})~; la forme
+est celle de l'argument \code{provenance = NULL} de
+\code{construire\_table()}, où \code{NULL} désigne l'absence de l'objet. Une
+fonction séparée, qui altérerait un jeu reçu, est écartée~: rien ne
+garantirait que ce jeu soit propre ni tiré par le simulateur, et
+l'attribut ne pourrait plus attester la disjonction ni l'ordre des tirages
+(décision M132).\par}
+
+\medskip
+Sinon, \code{defauts} est une liste nue (seul attribut les noms) de champs
+exactement \code{graine} et \code{declarations}~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{graine}~: la graine des défauts, déclarée, sans défaut
+    (M133), de la forme exigée par \code{sous\_graine()} (nombre entier
+    unique, fini, sans attribut, de valeur absolue au plus
+    \code{.Machine\$integer.max}), et \textbf{différente de la graine du
+    jeu}. \code{sous\_graine()} réinitialise le générateur à chaque appel~:
+    sous la même graine, la sélection des défauts reprendrait les premiers
+    nombres du jeu propre, ceux qui ont tiré le sexe~: en mode
+    \code{uniforme}, où toutes les lignes sont éligibles dans l'ordre du
+    tirage, une sélection $u_i < \text{taux}$ avec un taux au plus égal à la
+    proportion d'hommes ne retiendrait que des hommes ($u_i < \text{taux}$
+    entraîne $u_i < \text{proportion\_hommes}$)~: une exclusion informative
+    non déclarée (mesure consignée par l'ADR 0007,
+    annotation du 25/10/2026, point~(f)~; réponse d'\code{actuary} du
+    25/10/2026). Le refus porte sur l'égalité seule~: deux graines voisines
+    sont admises~;
+  \item \code{declarations}~: une liste sans aucun attribut, vide admise
+    (le jeu est alors le jeu propre, avec un attribut \code{defauts} sans
+    ligne), de déclarations traitées dans l'ordre reçu. Chacune est une
+    liste nue de champs \code{type}, \code{cible} et exactement l'un de
+    \code{taux} (réel de $[0, 1]$, tirage de Bernoulli) et \code{nombre}
+    (entier positif ou nul, tirage sans remise), de type \code{double} ou
+    \code{integer} sans attribut. \code{type} est un type du catalogue
+    (tableau~\ref{tab:catalogue-defauts}) ou une combinaison admise.
+    \code{cible}, sous-ensemble non vide, sans doublon, de \code{deces},
+    \code{rachat} et \code{en\_cours} (causes de sortie du jeu propre), est
+    requise pour un type de ligne et interdite pour un type de tête.
+\end{itemize}
+
+\noindent
+Les noms des listes sont comparés sans tri (issue~\#100). Une cible
+disjointe, par construction, des causes que le catalogue admet pour le type
+(pour une combinaison, pour tous ses types) est refusée, en taux comme en
+nombre, zéro compris~: aucune ligne n'y serait éligible, quel que soit le
+jeu. Un ensemble d'éligibles vide qui dépend du jeu tiré (condition
+d'entrée, conditions de tête, cause absente du jeu propre) n'est pas refusé
+à ce stade~: en taux, il donne zéro unité retenue, tracé dans les
+décomptes~; en nombre, il relève du refus \code{defauts\_ineligibles}
+ci-dessous.
+
+\subsubsection*{Catalogue}
+
+Le catalogue (\code{CATALOGUE\_DEFAUTS}) compte quinze types de ligne, dont
+quatorze correspondent chacun à un motif de ligne du module \code{donnees}
+et le quinzième, \code{date\_hors\_domaine}, au refus du même nom, et trois
+types de tête, chacun lié à un motif de tête. Les altérations sont
+déterministes~; sans exclusion déclarée, chaque motif attendu conduit au
+refus \code{ligne\_invalide} (section~\ref{sec:controles-donnees}). Les
+éligibles d'un type de ligne sont les lignes dont la cause de sortie (dans
+le jeu propre) est à la fois admise par le catalogue et dans la cible.
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.9cm}p{0.9cm}p{2.5cm}p{5.9cm}@{}}
+\caption{Catalogue des défauts paramétrés (\code{CATALOGUE\_DEFAUTS}~;
+spécification d'\code{actuary} du 25/10/2026). Le motif attendu porte le
+nom du type, sauf pour \code{date\_hors\_domaine} (refus).}
+\label{tab:catalogue-defauts}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Type}} &
+\textcolor{financeblue}{\textbf{Unité}} &
+\textcolor{financeblue}{\textbf{Éligibles}} &
+\textcolor{financeblue}{\textbf{Altération}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Type}} &
+\textcolor{financeblue}{\textbf{Unité}} &
+\textcolor{financeblue}{\textbf{Éligibles}} &
+\textcolor{financeblue}{\textbf{Altération}} \\
+\endhead
+\code{contrat\_duplique} & ligne & toutes & copie de la ligne ajoutée en fin de jeu~; motif attendu sur l'original et sur la copie \\
+\code{id\_contrat\_manquant} & ligne & toutes & \code{id\_contrat} manquant \\
+\code{id\_tete\_manquant} & ligne & toutes & \code{id\_tete} manquant \\
+\code{naissance\_manquante} & ligne & toutes & date de naissance manquante \\
+\code{entree\_manquante} & ligne & toutes & date d'entrée manquante \\
+\code{sortie\_manquante} & ligne & décès, rachat & date de sortie manquante \\
+\code{cause\_manquante} & ligne & toutes & cause de sortie manquante \\
+\code{cause\_hors\_modalites} & ligne & décès, rachat & cause de sortie en majuscules (\code{toupper()}) \\
+\code{sexe\_manquant} & ligne & toutes & sexe manquant \\
+\code{sexe\_hors\_modalites} & ligne & toutes & sexe en minuscule (\code{tolower()}) \\
+\code{naissance\_apres\_entree} & ligne & toutes & naissance $=$ entrée $+ 1$ jour \\
+\code{sortie\_avant\_entree} & ligne & décès, rachat & sortie $=$ entrée $- 1$ jour \\
+\code{en\_cours\_avant\_fin} & ligne & en cours, entrée antérieure à la fin & sortie $=$ entrée \\
+\code{age\_aberrant} & ligne & toutes & naissance au 1\textsuperscript{er} janvier de l'année d'entrée moins 150 \\
+\code{date\_hors\_domaine} & ligne & toutes & naissance au 31~décembre de l'an 0~; refus \code{date\_hors\_domaine}, aucun motif \\
+\code{tete\_naissance\_incoherente} & tête & au moins deux lignes & naissance de la dernière ligne de la tête moins un jour \\
+\code{tete\_sexe\_incoherent} & tête & au moins deux lignes & sexe de la dernière ligne de la tête inversé \\
+\code{tete\_observee\_apres\_deces} & tête & au moins deux lignes, dont une à décès & la dernière ligne de la tête autre que sa première ligne à décès devient en cours, sortie manquante \\
+\end{longtable}
+}
+
+{\sloppy\hbadness=10000 \noindent
+Les éligibilités de \code{sortie\_manquante} et de
+\code{sortie\_avant\_entree} excluent les lignes en cours, qui n'ont pas de
+date de sortie. Celle de \code{cause\_hors\_modalites} les exclut aussi,
+pour que le défaut ne lève pas un autre motif~: sur une ligne en cours, il
+lèverait aussi \code{sortie\_manquante} (interférence mesurée sur le
+prototype de la spécification).
+Une \textbf{combinaison} de types sur une même ligne n'est admise que si
+elle figure dans la liste fermée \code{COMBINAISONS\_DEFAUTS}, qui ne
+contient que \code{cause\_manquante} et \code{sexe\_manquant} (issue~\#57)~;
+chaque ligne retenue reçoit toutes ses altérations, et les types sont
+consignés dans l'ordre du catalogue, quel que soit l'ordre de saisie. Toute
+combinaison nouvelle demande l'avis d'\code{actuary}. Trois motifs du module
+\code{donnees} sont \textbf{hors du périmètre}, faute de colonne dans le jeu
+simulé~: \code{annee\_naissance\_incoherente}, \code{segment\_manquant} et
+\code{tete\_segment\_incoherent} (M136)~; un test de clôture vérifie que les
+motifs attendus du catalogue, réunis à ces trois, sont exactement les motifs
+du module \code{donnees}, si bien qu'un motif ajouté sans décision sur le
+simulateur fait échouer la batterie.\par}
+
+\medskip
+\noindent
+\textbf{Non-circularité.} Les colonnes \code{motif\_attendu} et
+\code{refus\_attendu} de l'attribut sont \emph{lues dans le catalogue},
+écrit en dur d'après la spécification~; le simulateur n'appelle aucun
+contrôle du module \code{donnees} pour les établir. Ce n'est pas le graphe
+des modules, qui admettrait l'appel (\code{simulation} peut appeler
+\code{donnees}), mais cette règle qui l'interdit~: une attente calculée par
+le code qu'elle sert à vérifier ne vérifierait rien.
+
+\subsubsection*{Ordre des tirages, disjonction et graine}
+
+Les défauts s'injectent \textbf{après le tirage complet du jeu propre}, qui
+n'en est pas changé~: ses lignes non altérées et son attribut
+\code{simulation} sont identiques dans le jeu altéré. Un seul appel de
+\code{sous\_graine()}, sous la graine des défauts, traite les déclarations
+dans l'ordre reçu (\code{ORDRE\_TIRAGES\_DEFAUTS})~: pour chacune, les
+éligibles sont les unités (lignes du jeu propre, ou têtes) \textbf{non
+encore altérées}, en ordre croissant~; avec \code{taux}, une unité est
+retenue si \code{runif(nombre d'éligibles) < taux}~; avec \code{nombre}, les
+unités retenues sont \code{sort(eligibles[sample.int(nombre d'eligibles, nombre)])}.
+\textbf{Disjonction}~: une ligne est altérée au plus une fois~; une tête
+retenue rend toutes ses lignes inéligibles ensuite~; une tête n'est
+éligible à un défaut de tête que si aucune de ses lignes n'est déjà
+altérée. Les copies de \code{contrat\_duplique} prennent les numéros de
+ligne $N + 1, N + 2, \dots$, $N$ étant le nombre de lignes du jeu propre,
+dans l'ordre des déclarations puis des lignes, avec les valeurs de
+l'original.
+
+\subsubsection*{Attribut \code{defauts}}
+
+Le jeu altéré porte un attribut \code{defauts}, \textbf{séparé} de
+l'attribut \code{simulation}, qui reste celui du jeu propre (M134)~; il
+est absent si \code{defauts = NULL}. Ses champs, dans cet ordre~:
+\code{parametre} (l'argument reçu, tel quel), \code{graine},
+\code{generateur}, \code{ordre\_tirages} (\code{ORDRE\_TIRAGES\_DEFAUTS}),
+\code{validite}, \code{lignes} et \code{decomptes}.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{lignes}~: un \code{data.frame} d'une ligne par couple (ligne,
+    motif), de colonnes \code{ligne} (numéro dans le jeu altéré),
+    \code{declaration}, \code{defaut}, \code{unite} (le défaut porte sur une
+    \code{ligne} ou une \code{tete}), \code{role} (ce qu'est la ligne pour
+    l'altération~: \code{alteree}, ligne modifiée~; \code{copie}, doublon
+    ajouté~; \code{original}, ligne dupliquée, non modifiée~; \code{tete},
+    autre ligne d'une tête en défaut, non modifiée), \code{motif\_attendu},
+    \code{refus\_attendu} et \code{premier\_deces} (pour
+    \code{tete\_observee\_apres\_deces}, la date du premier décès de la
+    tête). Pour un défaut de tête, toutes les lignes de la tête sont
+    déclarées, le module \code{donnees} levant le motif sur chacune~;
+  \item \code{decomptes}~: lignes du jeu propre, copies, lignes du jeu
+    altéré~; \code{lignes\_en\_defaut}, lignes qui portent un motif ou un
+    refus attendu, originaux et lignes \code{tete} compris~;
+    \code{lignes\_alterees}, lignes modifiées ou ajoutées (rôles
+    \code{alteree} et \code{copie})~; par déclaration, le nombre
+    d'éligibles et d'unités retenues~;
+  \item \code{validite}~: les \textbf{conditions de validité} des attentes,
+    consignées avec leur texte~: les sept rôles déclarés, chacun sur la
+    colonne du même nom~; un plan dont la période est celle de la
+    simulation~; un délai de déclaration nul. Pour
+    \code{tete\_observee\_apres\_deces}, le motif n'est attendu que si le
+    premier décès de la tête précède $\text{fin} - \text{délai} + 1$, ce
+    qui est toujours le cas sous un délai nul. \code{date\_hors\_domaine}
+    mène au refus du même nom quelles que soient les exclusions déclarées.
+    Si aucune ligne n'a été retenue pour \code{date\_hors\_domaine}~: avec
+    toutes les exclusions des motifs attendus déclarées, les lignes exclues
+    par le module \code{donnees} sont celles de l'attribut, motif par
+    motif~; sans exclusion, le module refuse (\code{ligne\_invalide}).
+\end{itemize}
+
+\noindent
+L'attribut survit à l'exclusion dans la table des lignes conservées de
+l'étape \code{donnees}~; \code{construire\_table()} et
+\code{ecrire\_rapport()} acceptent le jeu altéré. Il n'entre ni dans
+l'empreinte des données, qui ne lit que les colonnes à rôle, ni dans
+l'empreinte du résultat, la table des lignes conservées en étant exclue
+(section~\ref{sec:empreinte-resultat})~: à colonnes égales, un jeu avec ou
+sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
+
+\subsubsection*{Refus}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{defauts\_invalides} (module \code{simulation})~: forme ou
+    valeur de \code{defauts} ou d'une déclaration, type inconnu,
+    combinaison non admise, \code{cible} manquante, interdite, mal formée
+    ou disjointe par construction, \code{taux} et \code{nombre} tous deux
+    présents ou tous deux absents, graine des défauts mal formée ou égale à
+    celle du jeu. Il est levé \textbf{avant tout tirage}, après les
+    contrôles de la loi, du portefeuille et de la couverture, et avant le
+    contrôle de la graine du jeu par \code{sous\_graine()}~: si la graine
+    du jeu et les défauts sont tous deux invalides, le refus est
+    \code{defauts\_invalides}~; il ne dépend pas de la graine.
+  \item \code{defauts\_ineligibles} (module \code{simulation})~: un
+    \code{nombre} dépasse le nombre d'unités éligibles. Il est levé
+    \textbf{après le tirage du jeu propre}, dont il dépend~: à la
+    différence du précédent, il dépend de la graine du jeu.
+\end{itemize}
+
+\noindent
+L'état du générateur de l'appelant est restauré dans tous les cas, comme
+pour tout tirage sous \code{sous\_graine()}.
 
 \subsection{Constats de simulation}
 \label{sec:constats-simulation}
@@ -7565,6 +7816,72 @@ entre unité contrat et unité tête.
 \end{itemize}
 \end{encadre}
 
+\subsubsection*{Défauts paramétrés~: jeu à exclusion informative}
+
+Un jeu à défauts (section~\ref{sec:defauts-parametres}) est vérifié par des
+identités exactes (lignes non altérées et attribut \code{simulation}
+identiques au jeu propre~; lignes modifiées, établies par comparaison au
+jeu propre, égales aux lignes de rôle \code{alteree}~; tirages rejoués sous
+la graine des défauts~; lignes exclues par le module \code{donnees} égales
+à l'attribut, motif par motif) et par un constat de simulation sur un jeu à
+\emph{exclusion informative}, préparé pour l'issue~\#69~: mode
+\code{uniforme}, $10^{5}$ contrats, loi vraie et portefeuille de l'entrée de
+référence, graine 20261016, période du 2015-01-01 au 2019-12-31~; défauts
+sous la graine 20261025, \code{sexe\_manquant} sur les lignes à décès au
+taux 0,5 et sur les lignes à rachat ou en cours au taux 0,02. Exclure le
+motif \code{sexe\_manquant} retire alors la moitié des décès mais une faible
+part de l'exposition~: le taux brut est biaisé vers le bas, ce qu'un
+contrôle de l'exclusion doit révéler. Niveau $\alpha = 10^{-3}$, deux
+tests, $a = \alpha/2$ chacun.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Décès exclus} (fausse alarme \emph{exacte}). Soit $D_w$ le
+    nombre de lignes à décès datées dans la période du jeu propre et $K_D$
+    le nombre de celles dont le sexe est retiré. Conditionnellement au jeu
+    propre, chaque ligne à décès étant retenue par un tirage uniforme
+    indépendant au taux 0,5, $K_D$ suit \emph{exactement}
+    $\mathcal{B}(D_w, 0{,}5)$~; région bilatérale exacte
+    $[\text{qbinom}(a/2, D_w, 0{,}5), \text{qbinom}(1 - a/2, D_w, 0{,}5)]$,
+    fausse alarme exacte calculée et écrite par le test (elle dépend de
+    $D_w$, qui dépend de la graine du jeu).
+  \item \textbf{Exposition exclue} (fausse alarme \emph{bornée exactement}).
+    Soit $e_\ell$ le nombre de jours d'exposition dans la période de la
+    ligne $\ell$ du jeu propre, $p_\ell$ son taux de sélection (0,5 ou
+    0,02) et $E_e = \sum_\ell B_\ell\, e_\ell$ l'exposition exclue, les
+    $B_\ell$ étant des variables de Bernoulli indépendantes de paramètre
+    $p_\ell$. Les termes étant bornés par $0$ et $e_\ell$, l'inégalité de
+    Hoeffding donne
+    $P\bigl(|E_e - \sum_\ell p_\ell e_\ell| \ge s\bigr) \le
+    2\exp\bigl(-2 s^{2} / \sum_\ell e_\ell^{2}\bigr) = a$ pour
+    $s = \sqrt{\sum_\ell e_\ell^{2} \ln(2/a) / 2}$~: la fausse alarme est
+    au plus $a$, sans approximation (W.~Hoeffding, \emph{Probability
+    inequalities for sums of bounded random variables}, \emph{Journal of
+    the American Statistical Association}, 58, 1963, p.~13--30~; numéro du
+    théorème non vérifié sur l'original). Ce test est un
+    \textbf{garde-fou de faible puissance} (avis d'\code{actuary} du
+    25/10/2026)~: la borne, valable pour toute loi bornée, est large~; la
+    vérification forte de l'exposition exclue est portée par les identités
+    et le rejeu des tirages.
+  \item \textbf{Identités exactes} entre le jeu propre et le jeu altéré,
+    construits par le moteur, l'exclusion \code{sexe\_manquant} étant
+    déclarée pour le second~: écart des décès $= K_D$~; écart des jours
+    d'exposition $= E_e$~; lignes exclues $=$ lignes altérées. Rejeu~: les
+    lignes retenues sont celles que redonnent, sous la graine des défauts,
+    \code{runif()} sur les lignes à décès puis sur les autres.
+\end{itemize}
+
+\noindent
+\textbf{Statuts} (E2.20)~: loi de $K_D$, région et fausse alarme~:
+résultats exacts~; borne de Hoeffding~: borne exacte de la fausse alarme,
+non sa valeur~; identités et rejeu~: exacts, déterministes~; passage des
+deux tests~: constat de simulation. L'erreur Monte-Carlo est celle de la
+sélection des défauts, mesurée par les régions~; aucune erreur
+d'estimation n'intervient, les décomptes étant comparés à leur loi exacte
+ou à une borne. Les valeurs observées (proportions de lignes altérées, de
+décès et d'exposition exclus, taux bruts avant et après exclusion) sont
+imprimées par la batterie, sans verdict, et ne sont pas reproduites ici
+(E3.4).
+
 \subsection{Vérifications}
 \label{sec:verifications-simulation}
 
@@ -7592,7 +7909,20 @@ identifiants~; la cohérence des lignes, la naissance et le sexe constants
 par tête, le décès commun~; les décomptes de l'attribut refaits sur les
 lignes~; les familles~A et~B et leurs identités~; chaque refus de
 \code{loi\_contrats} et la garde de débordement, sans tirage, pour \code{n}
-en \code{double} comme en \code{integer}.
+en \code{double} comme en \code{integer}. Pour les défauts paramétrés
+(issue~\#93)~: le catalogue, les combinaisons et l'ordre des tirages
+comparés aux littéraux de la spécification, recopiés dans le test et non lus
+dans le package~; le test de clôture des motifs~; \code{defauts = NULL}
+identique à l'appel sans l'argument~; l'identité des lignes non altérées et
+de l'attribut \code{simulation}~; les champs et colonnes de l'attribut
+\code{defauts}~; le rejeu des tirages, la disjonction, les copies, chaque
+altération, valeur par valeur~; sur un jeu \code{uniforme\_multi} portant
+chaque type, les lignes exclues par \code{preparer\_donnees()} égales à
+l'attribut, motif par motif, le refus \code{ligne\_invalide} sans
+exclusion et le refus \code{date\_hors\_domaine} sur un jeu à part~;
+\code{construire\_table()} et \code{ecrire\_rapport()} sur le jeu altéré~;
+chaque refus, leur ordre et la restauration de l'aléa de l'appelant~; le
+constat ci-dessus.
 \code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
 identique, attribut compris, dans un autre processus R.
 
@@ -7622,6 +7952,9 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_MULTI} & constante & --- & ordre des tirages de chaque mode multi-contrats, consigné \\
 \catalogue{fonctions-simulation}{CHAMPS\_PORTEFEUILLE} & constante & --- & champs requis du portefeuille, par mode \\
 \catalogue{fonctions-simulation}{MODE\_BASE} & constante & --- & mode de base de chaque mode (mêmes champs communs, contrôles et bornes d'âge) \\
+\catalogue{fonctions-simulation}{CATALOGUE\_DEFAUTS} & constante & --- & catalogue des 18 types de défauts paramétrés~: unité, causes éligibles, condition, altération, motif et refus attendus, écrits en dur (tableau~\ref{tab:catalogue-defauts}) \\
+\catalogue{fonctions-simulation}{COMBINAISONS\_DEFAUTS} & constante & --- & combinaisons de types admises sur une même ligne (liste fermée) \\
+\catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_DEFAUTS} & constante & --- & ordre des tirages des défauts, consigné dans l'attribut \code{defauts} \\
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
 \catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs \\
@@ -7634,7 +7967,9 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
 \catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
-\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation} \\
+\catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu & refus \code{defauts\_invalides}, avant tout tirage~; déclarations normalisées (types rangés dans l'ordre du catalogue, cible, taux ou nombre) \\
+\catalogue{fonctions-simulation}{injecter\_defauts()} & interne & jeu propre, défauts contrôlés, défauts reçus, période & sélection sous la graine des défauts, refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de jeu~; jeu altéré et attribut \code{defauts} \\
+\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine, défauts (\code{NULL} par défaut) & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation}~; jeu altéré et attribut \code{defauts} si des défauts sont déclarés \\
 \end{longtable}
 }
 
@@ -7726,7 +8061,7 @@ E2.9 & segmentation déclarée, vide explicite admis (le test d'homogénéité v
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
 E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
-E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, constat de simulation~; retrouver la loi vraie par les taux bruts & \ref{sec:simulation}, \ref{sec:constats-brut} \\
+E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut} \\
