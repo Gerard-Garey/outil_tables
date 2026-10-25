@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{24/10/2026}
+\newcommand{\datedoc}{25/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1039,14 +1039,38 @@ d'\code{ecrire\_fiche()}, ci-dessus). Le contrôle
 installe donc l'arbre de travail sous \code{LC\_ALL=C} et sous la première
 locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
 l'installation, les plans de référence R1 à R6 sur l'entrée de référence,
-écrit, relit et réécrit leur fiche et leur plan, puis compare octet à octet
-les douze textes obtenus sous les deux locales~; le moindre écart le fait
-sortir avec un code non nul. Il est une étape bloquante du job «~Tests
-(R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~: l'identité des
-textes est un \emph{constat} sur la machine qui exécute le contrôle (la
-plateforme de référence en CI) et sur ces six plans, non une propriété
-démontrée~; il ne couvre ni une locale latin-1, ni Windows (issue~\#49), ni
-des données de l'utilisateur à chaînes non ASCII.
+écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
+pour R1, le bilan du rejeu outillé, puis compare octet à octet les textes
+obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
+moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
+du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
+l'identité des textes est un \emph{constat} sur la machine qui exécute le
+contrôle (la plateforme de référence en CI) et sur ces six plans, non une
+propriété démontrée~; il ne couvre ni une locale latin-1, ni Windows
+(issue~\#49), ni des données de l'utilisateur à chaînes non ASCII.
+
+\medskip
+\noindent
+\textbf{Batterie unitaire sous la locale C} (issue~\#91). Le contrôle
+précédent ne rejoue que les six plans de référence~: un défaut propre à un
+test unitaire sous la locale C (chaînes marquées UTF-8 mêlées à des chaînes
+non marquées, par exemple) lui échappe. L'étape «~Locale~C~: tests
+unitaires~» du job «~Tests (R 4.3.3)~», placée après l'étape «~Locale~C
+(installation et exécution)~» et sous la même condition
+\code{\$\{\{ !cancelled() \}\}}, affiche d'abord la locale effective et
+l'indicateur UTF-8 de la session, puis relance
+\code{tests/test\_unitaires.R} sous \code{env -u LANG LC\_ALL=C}~; un échec
+de la batterie fait échouer l'étape. Comme pour toute batterie,
+\code{installer\_tablexp()} installe alors \code{tablexp} sous la première
+locale UTF-8 disponible (ci-dessus)~: l'étape couvre l'\emph{exécution} des
+tests sous la locale C, non l'installation, que couvre
+\code{tests/controles/locale\_c.R}. Son nom ne commence pas par
+«~Batterie~:~»~: elle n'est pas une quatrième batterie et reste hors de la
+liste des batteries de \code{CLAUDE.md} et du contrôle
+\code{tests/controles/identite\_batteries.R} (décision M123).
+\textbf{Statut}~: un succès est un \emph{constat} sur la plateforme de
+référence, sous la locale C de son image~; il ne couvre ni une locale
+latin-1 ni Windows.
 
 \medskip
 \noindent
@@ -1201,7 +1225,9 @@ jour~; aucun fichier sensible versionné \\
 «~Tests (R 4.3.3)~» & conteneur de la plateforme de référence & bascule vers
 la BLAS et la LAPACK de référence~; script de plateforme en mode strict~; les
 trois batteries~; liste blanche de \code{DESCRIPTION}~; ordre des modules~;
-identité des batteries et de l'image. Les étapes des batteries et des
+identité des batteries et de l'image~; contrôle sous la locale C
+(installation et exécution), puis batterie unitaire relancée sous la locale C
+stricte (section~\ref{sec:harnais}), hors liste des batteries. Les étapes des batteries et des
 contrôles, sous la condition \code{\$\{\{ !cancelled() \}\}}, s'exécutent
 même si une étape antérieure échoue, pour que tous les écarts soient
 visibles~; le job reste en échec. L'étape du script de plateforme, sans
