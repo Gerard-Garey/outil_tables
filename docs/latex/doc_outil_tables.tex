@@ -689,10 +689,11 @@ refuse sous son propre motif (section~\ref{sec:plan}~; issue~\#23) \\
 ni \code{data.frame}, ni classe) d'autant d'éléments que \code{noms}, aux
 mêmes noms, sans nom manquant ni doublé, comparés \emph{sans tri}
 (\code{anyNA()}, \code{anyDuplicated()}, \code{setequal()}), \code{FALSE}
-sinon (liste sans noms comprise), jamais une erreur~; sous la précondition
-de noms attendus ASCII, vraie de tous les appelants, le résultat ne dépend
-pas de la locale, même pour un nom reçu non ASCII de codage indéterminé ou
-aux octets invalides (le tri \code{sort(method = "radix")} de la version
+sinon (liste sans noms comprise)~; sous la précondition de noms attendus
+ASCII, vraie de tous les appelants, jamais une erreur, et le résultat ne
+dépend pas de la locale, même pour un nom reçu non ASCII de codage
+indéterminé ou aux octets invalides~; hors de cette précondition, aucune
+de ces deux propriétés n'est garantie (le tri \code{sort(method = "radix")} de la version
 antérieure levait alors une erreur R~; issue~\#100)~; le contenu des
 éléments, lus par \code{[[ ]]}, est contrôlé par l'appelant, qui refuse sous
 son propre motif (issue~\#48) \\
@@ -7173,8 +7174,11 @@ décisions M131 et M135), le modèle distingue la tête et ses contrats~:
     c'est-à-dire faire survivre la tête jusqu'à elle, créerait un
     \emph{biais de temps immortel}~: entre sa première et sa dernière entrée,
     la tête serait exposée sans pouvoir décéder, et la mortalité observée
-    serait sous-estimée (variante écartée, décision M135~; le test~B1
-    ci-dessous la détecte)~;
+    serait sous-estimée (variante écartée, décision M135~: le test~B1
+    ci-dessous l'a détectée, avec $Z = -16{,}3$, sur le prototype de la
+    spécification commune de l'issue~\#92~; constat de simulation sur le
+    prototype, que la batterie ne rejoue pas, la variante n'étant pas codée
+    dans le package)~;
   \item \textbf{sortie}~: avec $B = \text{fin} + 1$ et $t_{r,k}$ l'instant de
     rachat latent du contrat $k$, décès si $t_d \le t_{r,k}$ et $t_d < B$,
     rachat si $t_{r,k} < t_d$ et $t_{r,k} < B$, en cours sinon~; à égalité,
@@ -7360,8 +7364,10 @@ exactement \code{graine} et \code{declarations}~:
     jeu}. \code{sous\_graine()} réinitialise le générateur à chaque appel~:
     sous la même graine, la sélection des défauts reprendrait les premiers
     nombres du jeu propre, ceux qui ont tiré le sexe~: en mode
-    \code{uniforme}, où toutes les lignes sont éligibles dans l'ordre du
-    tirage, une sélection $u_i < \text{taux}$ avec un taux au plus égal à la
+    \code{uniforme}, pour une première déclaration, exprimée en
+    \code{taux}, dont le type et la cible admettent les trois causes de
+    sortie (toutes les lignes sont alors éligibles, dans l'ordre du
+    tirage), une sélection $u_i < \text{taux}$ avec un taux au plus égal à la
     proportion d'hommes ne retiendrait que des hommes ($u_i < \text{taux}$
     entraîne $u_i < \text{proportion\_hommes}$)~: une exclusion informative
     non déclarée (mesure consignée par l'ADR 0007,
@@ -7554,7 +7560,7 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
     contrôles de la loi, du portefeuille et de la couverture, et avant le
     contrôle de la graine du jeu par \code{sous\_graine()}~: si la graine
     du jeu et les défauts sont tous deux invalides, le refus est
-    \code{defauts\_invalides}~; il ne dépend pas de la graine.
+    \code{defauts\_invalides}~; il ne dépend d'aucun tirage.
   \item \code{defauts\_ineligibles} (module \code{simulation})~: un
     \code{nombre} dépasse le nombre d'unités éligibles. Il est levé
     \textbf{après le tirage du jeu propre}, dont il dépend~: à la
@@ -7683,7 +7689,8 @@ même jour, aucun contrat n'est non souscrit. Avec
 $\mu = -\ln(1 - q_{60}) = 0{,}00818659807815$ et
 $\rho = -\ln 0{,}7 = 0{,}356674943939$ (forces sur l'année d'âge), soit
 $N_c$ le nombre de têtes qui décèdent dans l'année avec exactement $c$
-contrats en cours. Les têtes étant indépendantes, $N_c$ suit
+contrats en cours. Les têtes étant indépendantes (hypothèse sur le
+générateur, conditions de validité ci-dessous), $N_c$ suit
 \emph{exactement} la loi binomiale $\mathcal{B}(n, \pi_c)$, avec
 $\pi_c = \sum_K p_K\, \pi_c(K)$ et
 \begin{align*}
@@ -7703,6 +7710,24 @@ partage égal du niveau $\alpha = 10^{-3}$ (inégalité de l'union,
 $a_k = \alpha/7 \approx 1{,}429 \cdot 10^{-4}$)~; fausse alarme familiale
 bornée par $\sum_k FA_k = 9{,}566 \cdot 10^{-4} \le \alpha$, sans
 hypothèse d'indépendance.
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Hypothèse nulle}~: les lignes sont tirées sous le modèle
+    déclaré (décès de la table de Gompertz-Makeham des tests, rachat
+    constant, \code{loi\_contrats}, décès et rachats en risques concurrents
+    indépendants) et le moteur compte exactement les décès en unité tête.
+  \item \textbf{Statistique}~: les sept décomptes du
+    tableau~\ref{tab:constat-multi-a}, faits sur les lignes (A1 à A6) ou lus
+    dans la sortie du moteur (A7).
+  \item \textbf{Loi de référence, région et fausse alarme}~: ci-dessus et
+    tableau~\ref{tab:constat-multi-a}~; fausse alarme exacte par test,
+    bornée exactement pour la famille.
+  \item \textbf{Conditions de validité}~: l'indépendance des têtes, qui
+    rend les lois binomiales exactes, est celle de tirages successifs d'un
+    même flux du générateur~: hypothèse sur le générateur, non démontrée~;
+    la loi tirée de $K$ coïncide avec la loi déclarée à $10^{-12}$ près
+    (approximation numérique, encadré ci-dessous)~; aucune condition
+    d'effectif, les lois étant exactes pour tout $n$.
+\end{itemize}
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -7745,12 +7770,23 @@ contrat et unité tête ont, sous le modèle, les valeurs exactes
 $E[D_c]/E[D_t] = 1{,}572784$, $E[E_c]/E[E_t] = 1{,}572448$, d'où un
 rapport des taux attendus de $1{,}000214$, et
 $\varphi = E[C^{2}]/E[C] = 1{,}900216$, $C$ étant le nombre de contrats en
-cours au décès d'une tête décédée~: en unité contrat, le taux est sans biais
-notable, mais les décès d'une même tête n'étant pas indépendants,
-l'intervalle nominal y est trop étroit d'un facteur
-$\sqrt{\varphi} \approx 1{,}38$ (valeurs vérifiées par le test à
+cours au décès d'une tête décédée. L'écart du rapport des taux à~1 vient
+seulement du décompte de l'exposition en jours entiers (l'exposition
+s'arrête au début du jour de sortie, section~\ref{sec:loi-vraie})~: en
+temps continu, le taux
+attendu vaut $\mu$ dans les deux unités et le rapport vaut exactement~1. En
+unité contrat, le taux est donc sans biais notable~; mais un même décès y
+est compté $C$~fois, une fois par contrat en cours, de sorte que les décès
+comptés ne sont pas des événements indépendants~: en temps continu,
+l'écart entre les décès comptés et les décès attendus sur l'exposition
+(processus de comptage compensé) a une variance égale à $\varphi$~fois le
+nombre attendu de décès comptés, alors que l'intervalle nominal la suppose
+égale à ce nombre (loi de Poisson)~; il sous-estime donc l'erreur
+d'estimation du taux en unité contrat et il est trop étroit d'un facteur
+$\sqrt{\varphi} \approx 1{,}38$ (résultat asymptotique, grande
+exposition). Les quatre valeurs sont vérifiées par le test à
 $5 \cdot 10^{-7}$ près~; les valeurs observées sont imprimées sans
-verdict).
+verdict.
 
 \medskip
 \noindent
@@ -7772,13 +7808,26 @@ tests~: B1, décès en unité tête~; B2, rachat en unité contrat.
     une martingale du processus de comptage, et $Z$ est asymptotiquement
     normal centré réduit (P.\,K.~Andersen, Ø.~Borgan, R.\,D.~Gill,
     N.~Keiding, \emph{Statistical Models Based on Counting Processes},
-    Springer, 1993~; page non vérifiée)~; région $|Z| \le 3{,}4808$,
+    Springer, 1993, sections~II.5, « Limit Theory », et V.1, « One-Sample
+    Tests »~: intitulés lus dans la table des matières, contenu non
+    vérifié)~; région $|Z| \le 3{,}4808$,
     quantile d'ordre $1 - 10^{-3}/4$ de la loi normale à $10^{-4}$ près.
   \item \textbf{Fausse alarme}~: nominale, $5 \cdot 10^{-4}$ par test et
     $10^{-3}$ pour les deux (inégalité de l'union)~; \emph{non exacte}
     (statut asymptotique, accepté comme tel par le mainteneur, M131).
-  \item \textbf{Conditions de validité}~: des nombres d'événements
-    attendus grands, ce que donnent $10^{5}$ têtes~; l'arrêt de
+  \item \textbf{Conditions de validité}~: des processus de comptage à
+    sauts unitaires, ce qui fixe le choix des unités~: le décès est testé en
+    unité tête (B1), car en unité contrat un décès compte une fois par
+    contrat en cours et le processus saute de $C$~; le rachat est testé en
+    unité contrat (B2), chaque contrat ayant son propre instant de rachat
+    latent, et le rachat d'un contrat étant un événement unique~; une
+    censure (rachat concurrent, fin de période) et une troncature (entrée
+    en observation) indépendantes du risque testé, ce que donne le modèle
+    par construction (risques concurrents indépendants, temps latents tirés
+    à partir de l'entrée du contrat (rachat) ou de la première entrée de
+    la tête (décès), la force ne dépendant que de l'âge atteint)~; des
+    têtes indépendantes (hypothèse sur le générateur, non démontrée)~; des nombres d'événements attendus grands, ce que
+    donnent $10^{5}$ têtes~; l'arrêt de
     l'exposition au début du jour de sortie (section~\ref{sec:loi-vraie})
     décalerait la moyenne de $Z$ d'environ $0{,}02$ écart-type selon la
     spécification~: \emph{hypothèse non mesurée}. Borne de robustesse,
@@ -7802,13 +7851,16 @@ entre unité contrat et unité tête.
 \small
 \textbf{Statuts et sources d'erreur des familles A et B} (E2.20).
 \begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
-  \item \emph{Résultats exacts}~: les lois binomiales de la famille~A, la
-    forme close de $\pi_c$, les régions et les $FA_k$, l'inégalité de
+  \item \emph{Résultats exacts}~: les lois binomiales de la famille~A
+    (sous l'hypothèse d'indépendance des têtes, hypothèse sur le
+    générateur, non démontrée), la forme close de $\pi_c$, les régions et les $FA_k$, l'inégalité de
     l'union, les valeurs des rapports entre unité contrat et unité tête,
     les identités des deux familles, la borne de robustesse (calcul sur la
     loi normale).
-  \item \emph{Résultat asymptotique}~: la loi normale de $Z$ (famille~B),
-    donc sa fausse alarme nominale.
+  \item \emph{Résultats asymptotiques}~: la loi normale de $Z$
+    (famille~B), donc sa fausse alarme nominale~; le facteur
+    $\sqrt{\varphi}$ d'élargissement de l'intervalle en unité contrat
+    (famille~A).
   \item \emph{Approximations numériques}~: l'écart d'au plus $10^{-12}$
     entre la loi déclarée et la loi tirée de $K$~; l'évaluation en virgule
     flottante des probabilités, quantiles et $FA_k$.
@@ -7818,7 +7870,9 @@ entre unité contrat et unité tête.
   \item \emph{Erreur Monte-Carlo}~: la dispersion due au nombre fini de
     têtes simulées, que mesurent les régions~; \emph{erreur d'estimation}~:
     elle n'intervient pas, les décomptes étant comparés aux probabilités
-    exactes (famille~A) ou à la force vraie (famille~B), sans taux estimé.
+    exactes (famille~A) ou à la force vraie (famille~B), sans taux
+    estimé~; le facteur $\sqrt{\varphi}$ porte sur l'erreur d'estimation
+    d'un taux en unité contrat, hors des tests.
 \end{itemize}
 \end{encadre}
 
@@ -7844,9 +7898,9 @@ tests, $a = \alpha/2$ chacun.
   \item \textbf{Décès exclus} (fausse alarme \emph{exacte}). Soit $D_w$ le
     nombre de lignes à décès datées dans la période du jeu propre et $K_D$
     le nombre de celles dont le sexe est retiré. Conditionnellement au jeu
-    propre, chaque ligne à décès étant retenue par un tirage uniforme
-    indépendant au taux 0,5, $K_D$ suit \emph{exactement}
-    $\mathcal{B}(D_w, 0{,}5)$~; région bilatérale exacte
+    propre, chaque ligne à décès étant retenue par un tirage uniforme au
+    taux 0,5, ces tirages étant indépendants entre eux et du jeu propre,
+    $K_D$ suit \emph{exactement} $\mathcal{B}(D_w, 0{,}5)$~; région bilatérale exacte
     $[\text{qbinom}(a/2, D_w, 0{,}5), \text{qbinom}(1 - a/2, D_w, 0{,}5)]$,
     fausse alarme exacte calculée et écrite par le test (elle dépend de
     $D_w$, qui dépend de la graine du jeu).
@@ -7855,7 +7909,8 @@ tests, $a = \alpha/2$ chacun.
     ligne $\ell$ du jeu propre, $p_\ell$ son taux de sélection (0,5 ou
     0,02) et $E_e = \sum_\ell B_\ell\, e_\ell$ l'exposition exclue, les
     $B_\ell$ étant des variables de Bernoulli indépendantes de paramètre
-    $p_\ell$. Les termes étant bornés par $0$ et $e_\ell$, l'inégalité de
+    $p_\ell$, conditionnellement au jeu propre (même hypothèse
+    d'indépendance que ci-dessus). Les termes étant bornés par $0$ et $e_\ell$, l'inégalité de
     Hoeffding donne
     $P\bigl(|E_e - \sum_\ell p_\ell e_\ell| \ge s\bigr) \le
     2\exp\bigl(-2 s^{2} / \sum_\ell e_\ell^{2}\bigr) = a$ pour
@@ -7874,11 +7929,28 @@ tests, $a = \alpha/2$ chacun.
     d'exposition $= E_e$~; lignes exclues $=$ lignes altérées. Rejeu~: les
     lignes retenues sont celles que redonnent, sous la graine des défauts,
     \code{runif()} sur les lignes à décès puis sur les autres.
+  \item \textbf{Hypothèse nulle} des deux tests~: conditionnellement au jeu
+    propre, chaque ligne éligible est altérée par un tirage uniforme
+    indépendant, au taux déclaré pour sa cause de sortie (l'exclusion
+    exacte des lignes altérées par le moteur relève des identités exactes
+    ci-dessus, non de ces deux tests).
+  \item \textbf{Conditions de validité}~: l'indépendance des tirages des
+    défauts entre eux et à l'égard du jeu propre, qui rend exacte la loi
+    de $K_D$ et légitime la borne de Hoeffding, est une hypothèse sur le
+    générateur, non démontrée, pour deux flux tirés sous deux graines
+    distinctes (20261016 pour le jeu, 20261025 pour les défauts)~; elle est
+    fausse à coup sûr pour deux graines égales, les défauts reprenant
+    alors les premiers nombres du jeu propre, d'où le refus
+    \code{defauts\_invalides} d'une graine des défauts égale à celle du jeu
+    (section~\ref{sec:defauts-parametres})~; les deux tests sont
+    conditionnels au jeu propre, sans condition d'effectif (loi exacte,
+    borne valable pour tout nombre de lignes).
 \end{itemize}
 
 \noindent
 \textbf{Statuts} (E2.20)~: loi de $K_D$, région et fausse alarme~:
-résultats exacts~; borne de Hoeffding~: borne exacte de la fausse alarme,
+résultats exacts, sous l'hypothèse d'indépendance des tirages des défauts
+(hypothèse sur le générateur, non démontrée)~; borne de Hoeffding~: borne exacte de la fausse alarme,
 non sa valeur~; identités et rejeu~: exacts, déterministes~; passage des
 deux tests~: constat de simulation. L'erreur Monte-Carlo est celle de la
 sélection des défauts, mesurée par les régions~; aucune erreur
@@ -8093,6 +8165,15 @@ E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, 
 \label{sec:references}
 
 \begin{itemize}[leftmargin=*, itemsep=3pt]
+  \item P.\,K.~Andersen, Ø.~Borgan, R.\,D.~Gill, N.~Keiding,
+    \emph{Statistical Models Based on Counting Processes}, Springer, 1993
+    (sections~II.5 et V.1~: intitulés lus dans la table des matières,
+    contenu non vérifié)~; section~\ref{sec:constats-simulation}, famille~B.
+  \item W.~Hoeffding, \emph{Probability inequalities for sums of bounded
+    random variables}, \emph{Journal of the American Statistical
+    Association}, 58, 1963, p.~13--30 (numéro du théorème non vérifié sur
+    l'original)~; section~\ref{sec:constats-simulation}, défauts
+    paramétrés.
   \item M.~Matsumoto, T.~Nishimura, \emph{Mersenne Twister: a
     623-dimensionally equidistributed uniform pseudo-random number generator},
     \emph{ACM Transactions on Modeling and Computer Simulation}, 8, 1998,
