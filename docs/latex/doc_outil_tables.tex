@@ -2117,7 +2117,9 @@ section~\ref{sec:sous-graine}), aux rôles reçus par \code{controler\_roles()}
 (seul attribut admis~: les noms~; refus \code{roles\_mal\_formes},
 section~\ref{sec:controles-donnees}~; issue~\#62), au mode du portefeuille
 simulé (refus \code{portefeuille\_invalide},
-section~\ref{sec:portefeuille-simule}~; issue~\#60), aux bornes de la
+section~\ref{sec:portefeuille-simule}~; issue~\#60), au portefeuille simulé
+lui-même (liste nue) et à ses champs numériques et de date (même refus~;
+issue~\#78), aux bornes de la
 période du simulateur (même forme que celles du plan~; refus
 \code{periode\_invalide}) et aux facteurs de la loi vraie (\code{double} ou
 \code{integer}, seul attribut les noms~; refus \code{loi\_invalide},
@@ -6986,6 +6988,22 @@ portefeuille porte exactement les champs de son mode, sans champ manquant,
 inconnu ni en double, et ses champs sont lus par leur nom exact, sans
 appariement partiel (un champ \code{mode\_x} ne tient pas lieu de
 \code{mode})~; sinon refus \code{portefeuille\_invalide} (issue~\#60).
+Le portefeuille lui-même est de \emph{forme exacte}
+(\code{forme\_exacte()}~; issue~\#78)~: une \textbf{liste nue}, dont le seul
+attribut admis est celui des noms~; un \code{data.frame}, une liste munie
+d'une classe ou d'un autre attribut sont refusés
+(\code{portefeuille\_invalide}), et les noms des champs sont comparés sans
+tri. Ses champs numériques (\code{n}, \code{proportion\_hommes},
+\code{age\_min}, \code{age\_max}, \code{age}) sont de type de base
+\code{double} ou \code{integer}, de longueur~1, finis et \textbf{sans aucun
+attribut} (ni noms, ni dimension, ni classe)~; \code{origine} et
+\code{date\_entree} sont des dates de la forme des bornes de la période
+ci-dessous (classe \code{Date} seule, sans noms ni autre attribut)~; sinon
+refus \code{portefeuille\_invalide}, au message propre au champ. Un champ
+\code{n} de type \code{integer} plutôt que \code{double}, ou des champs
+dans un autre ordre, donnent les mêmes lignes tirées~; l'attribut
+\code{simulation} consigne le portefeuille tel que reçu, donc toujours une
+liste nue de cette forme.
 Pour garantir une naissance strictement antérieure à l'entrée, il faut
 $\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondit
 au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
