@@ -130,13 +130,21 @@ local({
   # chemin, et le test ne testerait plus texte_chemin_inattendu.
   temoin <- file.path(normalizePath(tempdir(), winslash = "/", mustWork = FALSE), "temoin_serialisation_50")
   unlink(temoin)
-  code <- sprintf("system(\"touch %s\")", temoin)
+  # Témoin en R pur (#110) : file.create() ne dépend d'aucun outil externe (touch
+  # vient de Rtools sous Windows) ; le code crée un fichier s'il est évalué.
+  code <- sprintf("file.create(\"%s\")", temoin)
   # Chemin sans « / » (sinon le segment est [i]) : témoin relatif au dossier
   # temporaire, dossier de travail du bloc.
   ancien <- setwd(tempdir()); on.exit(setwd(ancien))
   unlink("temoin_serialisation_50b")
-  code_relatif <- "system(\"touch temoin_serialisation_50b\")"
-  x <- list(valeur = code, `system("touch x")` = c(code, NA))
+  code_relatif <- "file.create(\"temoin_serialisation_50b\")"
+  # Contre-épreuve : évalué, ce code crée bien le témoin (sans elle, « témoin non
+  # créé » pourrait passer faute de pouvoir créer un témoin).
+  verifier("contre-épreuve : eval(parse(text = code)) crée le témoin, absolu et relatif",
+           { eval(parse(text = code)); eval(parse(text = code_relatif))
+             file.exists(temoin) && file.exists("temoin_serialisation_50b") })
+  unlink(c(temoin, "temoin_serialisation_50b"))
+  x <- list(valeur = code, `file.create("x")` = c(code, NA))
   names(x)[2L] <- code
   y <- aller_retour_plan(x)
   verifier("code R en valeur et en nom : relu comme chaîne, identical(), jamais évalué (témoin non créé)",
