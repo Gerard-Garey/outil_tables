@@ -581,3 +581,432 @@ verifier("forme exacte : portefeuille du mode âge exact, age et date_entree en 
 verifier("forme exacte : attribut simulation$portefeuille consigne le portefeuille reçu, liste nue",
          identical(attr(REF_FORME, "simulation")$portefeuille, PF_FORME) &&
            identical(names(attributes(attr(REF_FORME, "simulation")$portefeuille)), "names"))
+
+# --- têtes multi-contrats (#92) -------------------------------------------------------------
+# Spécification d'actuary-approfondi du 25/10/2026 (#92, § 1 et § 4) ; ADR
+# 0007, annotation du 25/10/2026, (a) à (d). Natures des attendus : littéraux
+# des constantes (contrainte (a)) ; identités exactes (décomptes refaits sur
+# les lignes, comparés à l'attribut et au moteur) ; constats de simulation,
+# famille A (fausse alarme exacte) et famille B (asymptotique). Non-circularité
+# (annotation, (d)) : aucune attente n'est établie par une fonction du module
+# `donnees` ; ses sorties (motifs, relevés, exposition, décès, par
+# construire_table()) sont ce qui est vérifié.
+
+ORDRE_TIRAGES_LU <- tablexp:::ORDRE_TIRAGES
+ORDRE_TIRAGES_MULTI <- tablexp:::ORDRE_TIRAGES_MULTI
+CHAMPS_PORTEFEUILLE <- tablexp:::CHAMPS_PORTEFEUILLE
+verifier("ORDRE_TIRAGES_MULTI égale à son littéral (spécification, § 1)",
+         identical(ORDRE_TIRAGES_MULTI,
+                   list(uniforme_multi = c(
+                          "1. sexe : runif(n) < proportion_hommes",
+                          paste("2. nombre K de contrats par tête : 1 + findInterval(runif(n), cumsum(loi_contrats)[-m]) ;",
+                                "aucun tirage si loi_contrats n'a qu'une probabilité non nulle"),
+                          paste("3. jour d'entrée, par contrat tiré (têtes puis contrats) : sample.int(nombre de jours",
+                                "de [origine, fin], N, replace = TRUE)"),
+                          "4. âge à la première entrée : age_min + (age_max - age_min) * runif(n)",
+                          "5. décès, par tête : rexp(n)",
+                          "6. rachat, par contrat tiré (souscrit ou non) : rexp(N)"),
+                        age_exact_multi = c(
+                          "1. sexe : runif(n) < proportion_hommes",
+                          paste("2. nombre K de contrats par tête : 1 + findInterval(runif(n), cumsum(loi_contrats)[-m]) ;",
+                                "aucun tirage si loi_contrats n'a qu'une probabilité non nulle"),
+                          "3. décès, par tête : rexp(n)",
+                          "4. rachat, par contrat tiré (souscrit ou non) : rexp(N)"))))
+verifier("contrainte (a) : ORDRE_TIRAGES des modes existants égale à son littéral (37ad4d3)",
+         identical(ORDRE_TIRAGES_LU,
+                   c("1. sexe : runif(n) < proportion_hommes",
+                     "2. jour d'entrée : sample.int(nombre de jours de [origine, fin], n, replace = TRUE) (mode uniforme)",
+                     "3. âge à l'entrée : age_min + (age_max - age_min) * runif(n) (mode uniforme)",
+                     "4. décès : rexp(n)",
+                     "5. rachat : rexp(n)")))
+verifier("contrainte (a) : CHAMPS_PORTEFEUILLE des modes existants égaux à leurs littéraux (37ad4d3)",
+         identical(CHAMPS_PORTEFEUILLE[c("uniforme", "age_exact")],
+                   list(uniforme = c("mode", "n", "proportion_hommes", "age_min", "age_max", "origine"),
+                        age_exact = c("mode", "n", "proportion_hommes", "age", "date_entree"))))
+verifier("modes multi-contrats : champs de la spécification (§ 1.1), tous requis",
+         identical(names(CHAMPS_PORTEFEUILLE), c("uniforme", "age_exact", "uniforme_multi", "age_exact_multi")) &&
+           identical(CHAMPS_PORTEFEUILLE[c("uniforme_multi", "age_exact_multi")],
+                     list(uniforme_multi = c("mode", "n", "proportion_hommes", "age_min", "age_max", "origine",
+                                             "loi_contrats"),
+                          age_exact_multi = c("mode", "n", "proportion_hommes", "age", "date_entree", "loi_contrats"))))
+CHAMPS_ATTRIBUT <- c("loi_vraie", "portefeuille", "periode", "graine", "generateur", "ordre_tirages",
+                     "version_r", "decomptes")
+DECOMPTES_EXISTANTS <- c("lignes", "deces", "rachats", "en_cours", "sorties_avant_debut", "entrees_avant_debut")
+DECOMPTES_MULTI <- c("tetes", "contrats_tires", "contrats_non_souscrits", "tetes_decedees_observees",
+                     "tetes_decedees_sans_contrat")
+verifier("contrainte (a) : attribut simulation des modes uniforme et age_exact sans champ ajouté, ordre_tirages = ORDRE_TIRAGES",
+         all(vapply(list(info, attr(sx, "simulation")), function(a)
+           identical(names(a), CHAMPS_ATTRIBUT) && identical(names(a$decomptes), DECOMPTES_EXISTANTS) &&
+             identical(a$ordre_tirages, ORDRE_TIRAGES_LU), logical(1L))))
+
+# Critère 2 : loi_contrats = 1 (loi dégénérée, aucun tirage de K) : mêmes
+# tirages que le mode existant, jeu identical() hors attribut (test exact).
+PF_1E4 <- modifyList(PF, list(n = 1e4))
+PF_X_1E4 <- modifyList(PF_X, list(n = 1e4))
+PER_X2 <- list(debut = E, fin = D("2017-12-31"))
+for (k in list(list("uniforme", PF_1E4, PER), list("age_exact", PF_X_1E4, PER_X2))) {
+  pm <- c(modifyList(k[[2]], list(mode = paste0(k[[1]], "_multi"))), list(loi_contrats = 1))
+  verifier(sprintf("critère 2 : %s_multi avec loi_contrats = 1 identical() au mode %s hors attribut (10^4 têtes)",
+                   k[[1]], k[[1]]),
+           identical(sans_attribut_simulation(simuler(loi(), pm, k[[3]], GRAINE)),
+                     sans_attribut_simulation(simuler(loi(), k[[2]], k[[3]], GRAINE))))
+}
+
+# --- jeu de la famille B (spécification, § 1.6) : uniforme_multi, 10^5 têtes ---------------
+PF_B <- c(modifyList(PF, list(mode = "uniforme_multi")), list(loi_contrats = c(0.6, 0.3, 0.1)))
+t0 <- proc.time()[["elapsed"]]
+sb <- simuler(loi(), PF_B, PER, GRAINE)
+duree_b <- proc.time()[["elapsed"]] - t0
+ib <- attr(sb, "simulation")
+nb <- nrow(sb); NT_B <- 1e5
+lignes_par_tete <- tabulate(sb$id_tete, nbins = NT_B)
+
+verifier("multi : colonnes et types des modes existants (entiers, chaînes, Date), noms de lignes automatiques",
+         identical(names(sb), names(s)) && identical(vapply(sb, typeof, ""), vapply(s, typeof, "")) &&
+           identical(lapply(sb, class), lapply(s, class)) && .row_names_info(sb) == -nb)
+verifier("multi : id_tete de 1 à n, chaque tête écrite (premier contrat toujours souscrit) ; id_contrat = 1..lignes",
+         identical(range(sb$id_tete), c(1L, as.integer(NT_B))) && all(lignes_par_tete >= 1L) &&
+           identical(sb$id_contrat, seq_len(nb)))
+verifier("multi : lignes ordonnées par (id_tete, date_entree)",
+         !is.unsorted(sb$id_tete) &&
+           !any(diff(sb$id_tete) == 0L & diff(as.numeric(sb$date_entree)) < 0))
+verifier("multi : cohérence exacte, naissance < entrée <= sortie <= fin ; entrée dans [origine, fin] ; sortie NA si et seulement si en_cours", {
+  so <- !is.na(sb$date_sortie)
+  all(sb$date_naissance < sb$date_entree) && all(sb$date_entree[so] <= sb$date_sortie[so]) &&
+    all(sb$date_sortie[so] <= PER$fin) && all(sb$date_entree >= PF$origine & sb$date_entree <= PER$fin) &&
+    identical(is.na(sb$date_sortie), sb$cause_sortie == "en_cours")
+})
+prem_b <- !duplicated(sb$id_tete)
+# Âge révolu calculé localement (as.POSIXlt, convention T2 : anniversaire
+# d'une naissance au 29/02 le 01/03 des années non bissextiles), sans
+# fonction du module donnees.
+age_revolu_local <- function(n, t) {
+  a <- as.POSIXlt(n); b <- as.POSIXlt(t)
+  an_t <- b$year + 1900L
+  bis <- (an_t %% 4L == 0L & an_t %% 100L != 0L) | an_t %% 400L == 0L
+  cle_n <- 100L * (a$mon + 1L) + a$mday
+  cle_n[cle_n == 229L & !bis] <- 301L
+  (b$year - a$year) - (cle_n > 100L * (b$mon + 1L) + b$mday)
+}
+verifier("multi : naissance et sexe constants par tête ; âge révolu à la première entrée dans [20, 75]", {
+  i <- match(sb$id_tete, sb$id_tete[prem_b])
+  identical(sb$date_naissance, sb$date_naissance[prem_b][i]) && identical(sb$sexe, sb$sexe[prem_b][i]) &&
+    all(age_revolu_local(sb$date_naissance[prem_b], sb$date_entree[prem_b]) %in% 20:75)
+})
+dec_b <- sb$cause_sortie == "deces"
+jour_deces_b <- rep(NA_real_, NT_B)
+jour_deces_b[sb$id_tete[dec_b]] <- as.numeric(sb$date_sortie[dec_b])
+verifier("multi : décès commun (une seule date de décès par tête), aucune ligne en cours dans une tête décédée, rachats et entrées <= date de décès", {
+  td <- jour_deces_b[sb$id_tete]; avec <- !is.na(td)
+  dates_par_tete <- tapply(as.numeric(sb$date_sortie[dec_b]), sb$id_tete[dec_b], function(v) length(unique(v)))
+  all(dates_par_tete == 1L) && !any(sb$cause_sortie[avec] == "en_cours") &&
+    all(as.numeric(sb$date_entree[avec]) <= td[avec]) &&
+    all(as.numeric(sb$date_sortie[avec & sb$cause_sortie == "rachat"]) <= td[avec & sb$cause_sortie == "rachat"])
+})
+verifier("multi (critère 3) : attribut, champs des modes existants puis contrats en fin ; decomptes, six champs puis cinq",
+         identical(names(ib), c(CHAMPS_ATTRIBUT, "contrats")) &&
+           identical(names(ib$decomptes), c(DECOMPTES_EXISTANTS, DECOMPTES_MULTI)) &&
+           identical(ib$ordre_tirages, ORDRE_TIRAGES_MULTI$uniforme_multi) && length(ib$ordre_tirages) == 6L &&
+           length(ORDRE_TIRAGES_MULTI$age_exact_multi) == 4L &&
+           identical(ORDRE_TIRAGES_MULTI$age_exact_multi[1:2], ORDRE_TIRAGES_MULTI$uniforme_multi[1:2]) &&
+           identical(ib$contrats$loi, c(0.6, 0.3, 0.1)) && identical(ib$portefeuille, PF_B))
+verifier("multi (critère 3) : décomptes de l'attribut = décomptes refaits sur les lignes (identités exactes)", {
+  dc <- ib$decomptes; tp <- ib$contrats$tires_par_tete
+  so <- as.numeric(sb$date_sortie)
+  dc$lignes == nb && dc$deces == sum(dec_b) && dc$rachats == sum(sb$cause_sortie == "rachat") &&
+    dc$en_cours == sum(sb$cause_sortie == "en_cours") &&
+    dc$sorties_avant_debut == sum(!is.na(so) & so < as.numeric(PER$debut)) &&
+    dc$entrees_avant_debut == sum(sb$date_entree < PER$debut) &&
+    dc$tetes == NT_B && sum(tp) == NT_B && dc$contrats_tires == sum(seq_along(tp) * tp) &&
+    dc$contrats_non_souscrits == dc$contrats_tires - nb && dc$contrats_non_souscrits > 0L &&
+    dc$tetes_decedees_observees == sum(!is.na(jour_deces_b)) && dc$tetes_decedees_sans_contrat > 0L
+})
+verifier("multi : ordre des tirages 1 et 2 (sexe puis K par inversion) recalculé sous la graine (valeur calculée)", {
+  u <- tablexp:::sous_graine(GRAINE, list(sexe = stats::runif(NT_B), k = stats::runif(NT_B)))
+  K <- 1L + findInterval(u$k, c(0.6, 0.9))
+  identical(tabulate(K, 3L), ib$contrats$tires_par_tete) &&
+    identical(sb$sexe[prem_b], ifelse(u$sexe < 0.5, "H", "F"))
+})
+cat(sprintf(paste("  jeu B (uniforme_multi, 10^5 têtes, loi_contrats = (0,6 ; 0,3 ; 0,1), graine %d) : %d contrats",
+                  "tirés, %d écrits, %d non souscrits, %d têtes multi-contrats, %d têtes décédées dans le jeu,",
+                  "%d décédées sans contrat en cours ; %.1f s\n"),
+            GRAINE, ib$decomptes$contrats_tires, nb, ib$decomptes$contrats_non_souscrits, sum(lignes_par_tete > 1L),
+            ib$decomptes$tetes_decedees_observees, ib$decomptes$tetes_decedees_sans_contrat, duree_b))
+
+# Moteur sur le jeu B : décès en unité tête, rachat en unité contrat. Plan
+# sans délai de déclaration, segmenté par sexe, Poisson seul.
+plan_multi <- function(transition, periode, segmentation)
+  list(transition = transition, periode = periode, delai_declaration = 0, segmentation = segmentation,
+       etapes = list(donnees = list(exclusions = character(0)),
+                     exposition = list(convention = "plus_fine", par_annee = FALSE),
+                     brut = list(estimateurs = "poisson", niveau = 0.95)))
+VD <- list(depart = "vivant", arrivee = "deces"); RA <- list(depart = "en_cours", arrivee = "rachat")
+ROLES_SANS_TETE <- ROLES_SIM[names(ROLES_SIM) != "id_tete"]
+t0 <- proc.time()[["elapsed"]]
+xb_d <- construire_table(sb, ROLES_SIM, plan_multi(VD, PER, "sexe"))
+xb_r <- construire_table(sb, ROLES_SIM, plan_multi(RA, PER, "sexe"))
+duree_mb <- proc.time()[["elapsed"]] - t0
+
+# Fenêtres d'exposition des lignes, en jours (T1 : [entrée, sortie), censure
+# à B = fin + 1, troncature au début), calculées ici sur les lignes, sans le
+# module `donnees`.
+fenetres_jours <- function(d, periode) {
+  borne <- as.numeric(periode$fin) + 1
+  f <- as.numeric(d$date_sortie); f[is.na(f)] <- borne
+  list(s = pmax(as.numeric(d$date_entree), as.numeric(periode$debut)), f = pmin(f, borne))
+}
+# Réunion par tête des fenêtres [s, f) : lignes triées par (tête, s) ;
+# maximum courant des fins des lignes précédentes de la tête (rang par rang).
+union_jours <- function(tete, s, f) {
+  n <- length(tete); prem <- c(TRUE, tete[-1L] != tete[-n])
+  rang <- seq_len(n) - cummax(ifelse(prem, seq_len(n), 0L)) + 1L
+  M <- rep(-Inf, n)
+  for (r in seq_len(max(rang))[-1L]) { i <- which(rang == r); M[i] <- pmax(M[i - 1L], f[i - 1L]) }
+  sum(pmax(0, f - pmax(s, M)))
+}
+fb <- fenetres_jours(sb, PER)
+dans_periode <- function(d) !is.na(d$date_sortie) & d$date_sortie >= PER$debut & d$date_sortie <= PER$fin
+verifier("multi, moteur, décès en unité tête : unité tete, les 20 motifs à 0, aucune exclusion",
+         identical(xb_d$etapes$donnees$parametres$unite_observation, "tete") &&
+           nrow(xb_d$etapes$donnees$diagnostics$motifs) == 20L &&
+           all(xb_d$etapes$donnees$diagnostics$motifs$nombre == 0L) &&
+           xb_d$etapes$donnees$resultat$nombre_lignes_exclues == 0L &&
+           all(xb_r$etapes$donnees$diagnostics$motifs$nombre == 0L))
+verifier("multi, moteur (identité exacte) : décès en unité tête = têtes distinctes à décès daté dans la période",
+         sum(xb_d$etapes$brut$resultat$poisson$evenements) ==
+           length(unique(sb$id_tete[dec_b & dans_periode(sb)])))
+verifier("multi, moteur (identité exacte) : rachats en unité contrat = lignes à rachat datées dans la période",
+         sum(xb_r$etapes$brut$resultat$poisson$evenements) == sum(sb$cause_sortie == "rachat" & dans_periode(sb)))
+expo_union_b <- union_jours(sb$id_tete, fb$s, fb$f)
+expo_somme_b <- sum(pmax(0, fb$f - fb$s))
+verifier("multi, moteur (identité exacte) : exposition en jours, unité tête = réunion des fenêtres par tête",
+         sum(xb_d$etapes$exposition$resultat$exposition$exposition_jours) == expo_union_b)
+verifier("multi, moteur (identité exacte) : exposition en jours, unité contrat = somme des fenêtres des lignes",
+         sum(xb_r$etapes$exposition$resultat$exposition$exposition_jours) == expo_somme_b)
+
+# Famille B (spécification, § 1.6) : Z = (sum D - sum mu_x E_x) / sqrt(sum
+# mu_x E_x), sommes sur les cellules (sexe, âge) du moteur, mu_x force vraie
+# (loi vraie, -ln(1 - f_s q_x)), E_x exposition centrale en années d'âge.
+# Statut ASYMPTOTIQUE : Z est asymptotiquement N(0, 1) (processus de
+# comptage, Andersen, Borgan, Gill et Keiding, 1993, page non vérifiée) ;
+# fausse alarme nominale 2 x (1 - Phi(3,4808)) = 5.10^-4 par test, 10^-3 pour
+# les deux, non exacte. L'arrondi des sorties au jour (T1) biaise E[Z]
+# d'environ 0,02 écart-type selon la spécification (hypothèse non mesurée).
+# Robustesse (calcul exact sur la loi normale, seuil 3,4808) : un décalage
+# delta de la moyenne de Z porte la fausse alarme de chaque test,
+# pnorm(-3,4808 - delta) + pnorm(-3,4808 + delta), de 4,999.10^-4
+# (delta = 0) à 5,012.10^-4 (delta = 0,02) et 5,326.10^-4 (delta = 0,1).
+# Valeurs informatives, sans verdict : X^2 / ddl par cellule ; phi^ = sum C^2
+# / sum C (C : lignes à décès d'une tête, dans la période), rapports des
+# décès et des expositions en unité contrat et en unité tête.
+SEUIL_Z <- 3.4808
+verifier("famille B : seuil |Z| <= 3,4808 = quantile de N(0, 1) d'ordre 1 - 10^-3 / 4 à 1e-4",
+         abs(stats::qnorm(1 - 1e-3 / 4) - SEUIL_Z) < 1e-4)
+mu_vraie <- function(cause, sexe, age) {
+  f <- if (cause == "deces") c(H = 1, F = 0.6) else c(H = 1, F = 1)
+  q <- if (cause == "deces") GM$qx[match(age, GM$age)] else rep(0.05, length(age))
+  -log1p(-pmin(f[sexe] * q, 1))
+}
+for (b in list(list(id = "B1", nom = "décès, unité tête", x = xb_d, cause = "deces"),
+               list(id = "B2", nom = "rachat, unité contrat", x = xb_r, cause = "rachat"))) {
+  pt <- b$x$etapes$brut$resultat$poisson
+  att <- mu_vraie(b$cause, pt$sexe, pt$age) * pt$exposition_centrale
+  z <- (sum(pt$evenements) - sum(att)) / sqrt(sum(att))
+  x2 <- sum(((pt$evenements - att)^2 / att)[att > 0]) / sum(att > 0)
+  ligne <- sprintf(paste("constat de simulation (asymptotique) %s, %s : Z = %.4f, |Z| <= %.4f (D = %d, attendu",
+                         "sum mu E = %.2f ; 10^5 têtes, graine %d ; fausse alarme nominale 5e-4, non exacte) ;",
+                         "informatif : X^2/ddl = %.4f sur %d cellules"),
+                   b$id, b$nom, z, SEUIL_Z, sum(pt$evenements), sum(att), GRAINE, x2, sum(att > 0))
+  cat("  ", ligne, "\n", sep = "")
+  verifier(ligne, abs(z) <= SEUIL_Z)
+}
+C_b <- tabulate(sb$id_tete[dec_b & dans_periode(sb)], nbins = NT_B); C_b <- C_b[C_b > 0L]
+cat(sprintf(paste("  famille B, informatif (sans verdict) : décès unité contrat / unité tête = %d / %d = %.4f ;",
+                  "exposition unité contrat / unité tête = %.4f ; phi^ = sum C^2 / sum C = %.4f ; moteur %.1f s\n"),
+            sum(C_b), length(C_b), sum(C_b) / length(C_b), expo_somme_b / expo_union_b,
+            sum(C_b^2) / sum(C_b), duree_mb))
+
+# --- famille A (spécification, § 1.6) : age_exact_multi, fausse alarme exacte ---------------
+# n = 3.10^5 têtes, hommes, x = 60, entrée 2016-03-15 (anniversaire), période
+# [2016-03-15, 2017-03-14] : l'année d'âge 60 entière (L = 365 jours), sans
+# censure avant B = anniv(61). Décès Gompertz-Makeham (q_60), rachat q^r =
+# 0,30, loi_contrats = (0,5 ; 0,3 ; 0,2), graine 20261025. mu = -ln(1 - q_60),
+# rho = -ln(0,7). N_c = nombre de têtes ayant c contrats en cours à leur
+# décès dans l'année : N_c ~ Bin(n, pi_c) exactement, pi_c = sum_K p_K
+# pi_c(K), pi_c(K) = C(K, c) sum_{j=0}^{K-c} C(K-c, j) (-1)^j mu / (mu + (c
+# + j) rho) (1 - e^{-(mu + (c + j) rho)}) (forme close ; recoupement par
+# stats::integrate). Têtes à k lignes ~ Bin(n, p_k) (aucun contrat non
+# souscrit : toutes les entrées valent e_(1)). Sept tests binomiaux,
+# Bonferroni, alpha = 10^-3, a_k = alpha / 7 ; régions bilatérales exactes
+# [qbinom(a_k/2), qbinom(1 - a_k/2)] et fausses alarmes exactes FA_k,
+# recalculées ici et comparées à celles de la spécification.
+N_A <- 3e5; ALPHA_A <- 1e-3; K_A <- 7L; A_K <- ALPHA_A / K_A; GRAINE_A <- 20261025L
+P_K <- c(0.5, 0.3, 0.2)
+PER_A <- list(debut = E, fin = D("2017-03-14")); B_A <- as.numeric(PER_A$fin) + 1
+R30 <- table_constante(0.30, 0:120, "rachat constant 30 %")
+mu_a <- -log(1 - q(60)); rho_a <- -log(0.7)
+pi_cK <- function(c, K) choose(K, c) * sum(vapply(0:(K - c), function(j)
+  choose(K - c, j) * (-1)^j * mu_a / (mu_a + (c + j) * rho_a) * (1 - exp(-(mu_a + (c + j) * rho_a))), numeric(1L)))
+pi_cK_integrale <- function(c, K) stats::integrate(function(t)
+  mu_a * exp(-mu_a * t) * choose(K, c) * exp(-c * rho_a * t) * (1 - exp(-rho_a * t))^(K - c),
+  0, 1, rel.tol = 1e-13)$value
+pi_c <- vapply(0:3, function(c) sum(vapply(max(c, 1L):3, function(K) P_K[K] * pi_cK(c, K), numeric(1L))), numeric(1L))
+pi_c_int <- vapply(0:3, function(c) sum(vapply(max(c, 1L):3, function(K) P_K[K] * pi_cK_integrale(c, K), numeric(1L))),
+                   numeric(1L))
+verifier("famille A : pi_0 à pi_3, forme close = stats::integrate (recoupement) à 1e-12 relatif",
+         proche(pi_c, pi_c_int, rel = 1e-12, abs = 0))
+verifier("famille A : mu = 0,00818659807815 et rho = 0,356674943939 de la spécification, à l'arrondi de leur dernière décimale (5e-15 et 5e-13)",
+         isTRUE(proche(mu_a, 0.00818659807815, rel = 0, abs = 5e-15)) && isTRUE(proche(rho_a, 0.356674943939, rel = 0, abs = 5e-13)))
+TESTS_A <- list(
+  list(id = "A1", nom = "têtes à 1 ligne", p = P_K[1], region_spec = c(148958, 151042), fa_spec = 1.408e-4),
+  list(id = "A2", nom = "têtes à 2 lignes", p = P_K[2], region_spec = c(89046, 90955), fa_spec = 1.419e-4),
+  list(id = "A3", nom = "têtes à 3 lignes", p = P_K[3], region_spec = c(59168, 60835), fa_spec = 1.408e-4),
+  list(id = "A4", nom = "N_1", p = pi_c[2], p_spec = 0.00416937354957, region_spec = c(1119, 1387), fa_spec = 1.380e-4),
+  list(id = "A5", nom = "N_2", p = pi_c[3], p_spec = 0.00224283291693, region_spec = c(577, 774), fa_spec = 1.329e-4),
+  list(id = "A6", nom = "N_3", p = pi_c[4], p_spec = 0.00100193504543, region_spec = c(237, 369), fa_spec = 1.231e-4),
+  list(id = "A7", nom = "D à 60 ans, Poisson, unité tête (moteur)", p = sum(pi_c[2:4]), p_spec = 0.00741414151193,
+       region_spec = c(2048, 2405), fa_spec = 1.390e-4))
+verifier("famille A : p de A4 à A7 (forme close) = valeurs de la spécification à 1e-14",
+         proche(vapply(TESTS_A[4:7], `[[`, numeric(1L), "p"), vapply(TESTS_A[4:7], `[[`, numeric(1L), "p_spec"),
+                rel = 0, abs = 1e-14))
+
+t0 <- proc.time()[["elapsed"]]
+sa <- simuler(loi(rachat = R30),
+              list(mode = "age_exact_multi", n = N_A, proportion_hommes = 1, age = 60, date_entree = E,
+                   loi_contrats = P_K), PER_A, GRAINE_A)
+xa_t <- construire_table(sa, ROLES_SIM, plan_multi(VD, PER_A, character(0)))
+xa_c <- construire_table(sa, ROLES_SANS_TETE, plan_multi(VD, PER_A, character(0)))
+duree_a <- proc.time()[["elapsed"]] - t0
+ia <- attr(sa, "simulation")
+dec_a <- sa$cause_sortie == "deces"
+C_a <- tabulate(sa$id_tete[dec_a], nbins = N_A)
+N_c <- tabulate(C_a[C_a > 0L], nbins = 3L)
+L_k <- tabulate(tabulate(sa$id_tete, nbins = N_A), nbins = 3L)
+pt_a <- xa_t$etapes$brut$resultat$poisson; pc_a <- xa_c$etapes$brut$resultat$poisson
+verifier("famille A : toutes les entrées le 2016-03-15, aucun contrat non souscrit, têtes à k lignes = tires_par_tete (identité exacte)",
+         all(sa$date_entree == E) && ia$decomptes$contrats_non_souscrits == 0L &&
+           identical(L_k, ia$contrats$tires_par_tete) &&
+           identical(ia$ordre_tirages, ORDRE_TIRAGES_MULTI$age_exact_multi))
+verifier("famille A, moteur : une seule cellule (âge 60), dans chaque unité ; unités tete et contrat",
+         identical(pt_a$age, 60L) && identical(pc_a$age, 60L) &&
+           identical(xa_t$etapes$donnees$parametres$unite_observation, "tete") &&
+           identical(xa_c$etapes$donnees$parametres$unite_observation, "contrat"))
+OBSERVE_A <- c(L_k, N_c, pt_a$evenements)
+fa_a <- numeric(K_A)
+for (k in seq_len(K_A)) {
+  tk <- TESTS_A[[k]]
+  lo <- stats::qbinom(A_K / 2, N_A, tk$p); hi <- stats::qbinom(1 - A_K / 2, N_A, tk$p)
+  fa_a[k] <- stats::pbinom(lo - 1, N_A, tk$p) + stats::pbinom(hi, N_A, tk$p, lower.tail = FALSE)
+  verifier(sprintf("famille A, %s : région [%d, %d] = région de la spécification ; FA_k = %.4g = %.4g de la spécification (4 chiffres)",
+                   tk$id, lo, hi, fa_a[k], tk$fa_spec),
+           identical(c(lo, hi), tk$region_spec) && isTRUE(proche(signif(fa_a[k], 4), tk$fa_spec, rel = 1e-12, abs = 0)))
+  ligne <- sprintf(paste("constat de simulation (exact) %s, %s : %d dans [%d, %d] (n = %g têtes, p = %.12g,",
+                         "a_k = %.4g, fausse alarme exacte FA_k = %.4g ; graine %d)"),
+                   tk$id, tk$nom, OBSERVE_A[k], lo, hi, N_A, tk$p, A_K, fa_a[k], GRAINE_A)
+  cat("  ", ligne, "\n", sep = "")
+  verifier(ligne, OBSERVE_A[k] >= lo && OBSERVE_A[k] <= hi)
+}
+ligne <- sprintf(paste("famille A : fausse alarme familiale <= sum(FA_k) = %.4g <= alpha = %g (Bonferroni, K = %d,",
+                       "sans hypothèse d'indépendance ; spécification : 9,566e-4)"), sum(fa_a), ALPHA_A, K_A)
+cat("  ", ligne, "\n", sep = "")
+verifier(ligne, sum(fa_a) <= ALPHA_A && isTRUE(proche(signif(sum(fa_a), 4), 9.566e-4, rel = 1e-12, abs = 0)))
+
+# Identités exactes de la famille A (spécification, § 1.6).
+fa_j <- fenetres_jours(sa, PER_A)
+o_a <- order(sa$id_tete, fa_j$f, method = "radix")
+fin_tete_a <- fa_j$f[o_a][!duplicated(sa$id_tete[o_a], fromLast = TRUE)]
+verifier("famille A (identité exacte) : D unité tête (moteur) = sum N_c ; D unité contrat (moteur) = sum c N_c",
+         pt_a$evenements == sum(N_c) && pc_a$evenements == sum(seq_len(3L) * N_c))
+verifier("famille A (identité exacte) : exposition en jours, unité tête = sum_têtes (max_k f_k - E) ; unité contrat = sum (f_k - E)",
+         xa_t$etapes$exposition$resultat$exposition$exposition_jours == sum(fin_tete_a - as.numeric(E)) &&
+           xa_c$etapes$exposition$resultat$exposition$exposition_jours == sum(fa_j$f - as.numeric(E)))
+verifier("famille A (identité exacte) : chevauchements + contiguïtés = lignes - têtes ; aucun intervalle disjoint ; les 20 motifs à 0", {
+  rl <- xa_t$etapes$donnees$diagnostics$releves
+  mo <- xa_t$etapes$donnees$diagnostics$motifs
+  rl$chevauchements + rl$contiguites == nrow(sa) - N_A && rl$disjoints == 0L &&
+    nrow(mo) == 20L && all(mo$nombre == 0L)
+})
+
+# Écart entre unité tête et unité contrat (spécification, § 1.6) : valeurs
+# exactes sous le modèle simulé. Exposition en jours (T1) : un jour d de
+# l'année est exposé si l'instant de sortie est >= d / L, d'où E[E] = (n/L)
+# sum_{d=1}^{L} S(d/L), S_K(t) = e^{-mu t} (1 - (1 - e^{-rho t})^K) pour la
+# tête, K e^{-(mu + rho) t} pour ses contrats.
+L_A <- 365; dd <- seq_len(L_A) / L_A
+EE_t <- N_A / L_A * sum(vapply(1:3, function(K) P_K[K] * sum(exp(-mu_a * dd) * (1 - (1 - exp(-rho_a * dd))^K)),
+                               numeric(1L)))
+EE_c <- N_A / L_A * sum(vapply(1:3, function(K) P_K[K] * K * sum(exp(-(mu_a + rho_a) * dd)), numeric(1L)))
+ED_t <- N_A * sum(pi_c[2:4]); ED_c <- N_A * sum(1:3 * pi_c[2:4])
+phi_a <- sum((1:3)^2 * pi_c[2:4]) / sum(1:3 * pi_c[2:4])
+ecart_ut <- c(ED_c / ED_t, EE_c / EE_t, (ED_c / EE_c) / (ED_t / EE_t), phi_a)
+verifier(sprintf(paste("famille A, unité tête / unité contrat (valeurs exactes) : E[D_c]/E[D_t] = %.6f, E[E_c]/E[E_t] = %.6f,",
+                       "rapport des taux = %.6f, phi = %.6f, égaux à la spécification à 5e-7"),
+                 ecart_ut[1], ecart_ut[2], ecart_ut[3], ecart_ut[4]),
+         proche(ecart_ut, c(1.572784, 1.572448, 1.000214, 1.900216), rel = 0, abs = 5e-7))
+cat(sprintf(paste("  famille A, informatif (sans verdict) : observé D_c/D_t = %.4f (exact %.6f), E_c/E_t = %.4f",
+                  "(exact %.6f), rapport des taux %.6f (exact %.6f), phi^ = %.4f (exact %.6f) ; l'intervalle",
+                  "nominal en unité contrat est trop étroit d'un facteur sqrt(phi) = %.4f ; têtes décédées sans",
+                  "contrat en cours %d (attendu n pi_0 = %.1f) ; %.1f s\n"),
+            pc_a$evenements / pt_a$evenements, ecart_ut[1],
+            pc_a$exposition_centrale / pt_a$exposition_centrale, ecart_ut[2],
+            pc_a$taux / pt_a$taux, ecart_ut[3], sum((1:3)^2 * N_c) / sum(1:3 * N_c), phi_a, sqrt(phi_a),
+            ia$decomptes$tetes_decedees_sans_contrat, N_A * pi_c[1], duree_a))
+
+# --- loi_contrats : refus (critère 7) et formes admises ---------------------------------------
+PF_M <- c(modifyList(PF_FORME, list(mode = "uniforme_multi")), list(loi_contrats = c(0.6, 0.3, 0.1)))
+LOI_CONTRATS_FORME <- list(
+  list("nommée", c(a = 0.6, b = 0.3, c = 0.1)),
+  list("à attribut", structure(c(0.6, 0.3, 0.1), foo = "x")),
+  list("matrice 1 x 3", matrix(c(0.6, 0.3, 0.1), 1L)),
+  list("de classe", structure(c(0.6, 0.3, 0.1), class = "x")),
+  list("caractère", c("0.6", "0.3", "0.1")),
+  list("logique", TRUE),
+  list("liste", list(0.6, 0.3, 0.1)),
+  list("vide", numeric(0)),
+  list("NULL", NULL),
+  list("valeur manquante", c(0.6, NA, 0.4)),
+  list("valeur infinie", c(Inf, 0.3)),
+  list("valeur négative", c(1.2, -0.2)),
+  list("dernière probabilité nulle (p_m = 0)", c(0.7, 0.3, 0)),
+  list("somme 0,9", c(0.6, 0.3)),
+  list("somme 1 + 1e-11", c(0.6, 0.4 + 1e-11)))
+for (k in LOI_CONTRATS_FORME) {
+  pf <- PF_M; pf["loi_contrats"] <- list(k[[2]])
+  verifier(sprintf("loi_contrats %s -> refus portefeuille_invalide, message du champ", k[[1]]),
+           leve_refus(simuler(loi(), pf, PER, GRAINE), "portefeuille_invalide") &&
+             grepl("loi_contrats : probabilités", message_refus(simuler(loi(), pf, PER, GRAINE)), fixed = TRUE))
+}
+verifier("loi_contrats absente d'un mode multi -> refus portefeuille_invalide (champ manquant, aucun défaut implicite)",
+         leve_refus(simuler(loi(), PF_M[names(PF_M) != "loi_contrats"], PER, GRAINE), "portefeuille_invalide"))
+verifier("loi_contrats dans un mode existant -> refus portefeuille_invalide (champ inconnu)",
+         leve_refus(simuler(loi(), c(PF_FORME, list(loi_contrats = 1)), PER, GRAINE), "portefeuille_invalide"))
+verifier("garde de débordement : n x length(loi_contrats) > .Machine$integer.max -> refus portefeuille_invalide, sans tirage", {
+  set.seed(5L); avant <- globalenv()$.Random.seed
+  leve_refus(simuler(loi(), modifyList(PF_M, list(n = 1e9)), PER, GRAINE), "portefeuille_invalide") &&
+    grepl("integer.max", message_refus(simuler(loi(), modifyList(PF_M, list(n = 1e9)), PER, GRAINE)), fixed = TRUE) &&
+    identical(globalenv()$.Random.seed, avant)
+})
+verifier("garde de débordement : n = 1000000000L (integer) -> refus portefeuille_invalide, sans débordement integer, sans tirage", {
+  set.seed(6L); avant <- globalenv()$.Random.seed
+  pf <- modifyList(PF_M, list(n = 1000000000L))
+  leve_refus(simuler(loi(), pf, PER, GRAINE), "portefeuille_invalide") &&
+    grepl("(3000000000)", message_refus(simuler(loi(), pf, PER, GRAINE)), fixed = TRUE) &&
+    identical(globalenv()$.Random.seed, avant)
+})
+verifier("loi_contrats admises : integer, somme à 1e-13 près ; loi dégénérée c(0, 1) : K = 2 pour toute tête, sans tirage de K", {
+  r1 <- simuler(loi(), modifyList(PF_M, list(loi_contrats = c(0L, 1L))), PER, GRAINE)
+  r2 <- simuler(loi(), modifyList(PF_M, list(loi_contrats = c(0.6, 0.3, 0.1 + 1e-13))), PER, GRAINE)
+  x2 <- simuler(loi(), modifyList(PF_X, list(mode = "age_exact_multi", n = 1000, loi_contrats = c(0, 1))), PER_X2, GRAINE)
+  # Sans tirage de K, les tirages du mode age_exact_multi sont sexe, décès (n),
+  # rachat (2 n) : le sexe et l'instant de décès de chaque tête sont ceux du
+  # mode age_exact ; une tête dont le décès figure dans les deux jeux a donc la
+  # même date de décès dans les deux.
+  x1 <- simuler(loi(), PF_X, PER_X2, GRAINE)
+  d1 <- x1$cause_sortie == "deces"; d2 <- x2$cause_sortie == "deces"
+  commun <- intersect(x1$id_tete[d1], x2$id_tete[d2])
+  identical(attr(r1, "simulation")$contrats$tires_par_tete, c(0L, 1000L)) &&
+    identical(attr(r1, "simulation")$contrats$loi, c(0, 1)) && is.data.frame(r2) &&
+    identical(attr(x2, "simulation")$contrats$tires_par_tete, c(0L, 1000L)) && nrow(x2) == 2000L &&
+    identical(x2$sexe[!duplicated(x2$id_tete)], x1$sexe) && length(commun) > 0L &&
+    identical(x1$date_sortie[d1][match(commun, x1$id_tete[d1])], x2$date_sortie[d2][match(commun, x2$id_tete[d2])])
+})

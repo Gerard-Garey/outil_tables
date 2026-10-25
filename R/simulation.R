@@ -22,7 +22,13 @@
 #  Hypothèse de répartition dans l'année (A.2) : force constante par âge
 #  entier, dans l'échelle des années d'âge (A.0, T3 : une année d'âge de
 #  L_x = anniv(x+1) - anniv(x) jours vaut 1) ; risques concurrents
-#  indépendants. Une tête = un contrat dans cette branche.
+#  indépendants. Modes `uniforme` et `age_exact` : une tête = un contrat.
+#  Modes `uniforme_multi` et `age_exact_multi` (#92 ; ADR 0007, annotation
+#  du 25/10/2026, (c), points 1 à 5) : K contrats tirés par tête, K de loi
+#  déclarée, indépendant de la mortalité et du rachat ; sexe, naissance et
+#  décès par tête, décès tiré à partir de la première entrée ; entrée et
+#  rachat par contrat ; un contrat dont l'entrée suit l'instant de décès de
+#  la tête n'est pas écrit (contrat non souscrit).
 #  Aléa : tous les tirages sous sous_graine() (outils), dans l'ordre fixé par
 #  la spécification, qui fait partie du contrat de reproductibilité.
 #  Ce module n'appelle que `donnees` et `outils` ; aucun module du moteur ne
@@ -42,10 +48,38 @@ ORDRE_TIRAGES <- c("1. sexe : runif(n) < proportion_hommes",
                    "4. décès : rexp(n)",
                    "5. rachat : rexp(n)")
 
+# Ordre des tirages des modes multi-contrats (#92 ; ADR 0007, annotation du
+# 25/10/2026, (c), point 3), consigné de même ; ORDRE_TIRAGES, celui des
+# modes existants, est inchangé. N = nombre de contrats tirés = sum(K).
+ORDRE_TIRAGES_MULTI <- list(
+  uniforme_multi = c(
+    "1. sexe : runif(n) < proportion_hommes",
+    paste("2. nombre K de contrats par tête : 1 + findInterval(runif(n), cumsum(loi_contrats)[-m]) ;",
+          "aucun tirage si loi_contrats n'a qu'une probabilité non nulle"),
+    paste("3. jour d'entrée, par contrat tiré (têtes puis contrats) : sample.int(nombre de jours",
+          "de [origine, fin], N, replace = TRUE)"),
+    "4. âge à la première entrée : age_min + (age_max - age_min) * runif(n)",
+    "5. décès, par tête : rexp(n)",
+    "6. rachat, par contrat tiré (souscrit ou non) : rexp(N)"),
+  age_exact_multi = c(
+    "1. sexe : runif(n) < proportion_hommes",
+    paste("2. nombre K de contrats par tête : 1 + findInterval(runif(n), cumsum(loi_contrats)[-m]) ;",
+          "aucun tirage si loi_contrats n'a qu'une probabilité non nulle"),
+    "3. décès, par tête : rexp(n)",
+    "4. rachat, par contrat tiré (souscrit ou non) : rexp(N)"))
+
 # Champs du portefeuille, par mode : tous requis, aucun défaut implicite.
+# Dans tous les modes, n est le nombre de têtes.
 CHAMPS_PORTEFEUILLE <- list(
   uniforme = c("mode", "n", "proportion_hommes", "age_min", "age_max", "origine"),
-  age_exact = c("mode", "n", "proportion_hommes", "age", "date_entree"))
+  age_exact = c("mode", "n", "proportion_hommes", "age", "date_entree"),
+  uniforme_multi = c("mode", "n", "proportion_hommes", "age_min", "age_max", "origine", "loi_contrats"),
+  age_exact_multi = c("mode", "n", "proportion_hommes", "age", "date_entree", "loi_contrats"))
+
+# Mode de base d'un mode multi-contrats : mêmes champs, mêmes contrôles, mêmes
+# bornes d'âge.
+MODE_BASE <- c(uniforme = "uniforme", age_exact = "age_exact",
+               uniforme_multi = "uniforme", age_exact_multi = "age_exact")
 
 # --- tables synthétiques ------------------------------------------------------
 
@@ -245,7 +279,7 @@ controler_portefeuille <- function(portefeuille, periode) {
   if (!reel(p[["proportion_hommes"]]) || p[["proportion_hommes"]] < 0 || p[["proportion_hommes"]] > 1)
     invalide("proportion_hommes réel dans [0, 1], de type double ou integer, sans attribut.")
   fin <- as.numeric(periode[["fin"]])
-  if (mode == "uniforme") {
+  if (MODE_BASE[[mode]] == "uniforme") {
     if (!reel(p[["age_min"]]) || !reel(p[["age_max"]]) || p[["age_min"]] * 365.25 < 1 || p[["age_min"]] >= p[["age_max"]])
       invalide(paste("âges réels finis, de type double ou integer, sans attribut ;",
                      "age_min d'au moins un jour (1/365,25) et age_min < age_max."))
@@ -287,6 +321,27 @@ controler_portefeuille <- function(portefeuille, periode) {
     # jusqu'à 260 reste +0,75 et le minimum devient -3,75 (mode uniforme) :
     # marge de 4,5 / 365,25, encore inférieure au « + 1 ».
     age_haut <- p[["age"]] + (fin + 1 - as.numeric(p[["date_entree"]])) / 365.25 + 1
+  }
+  # Modes multi-contrats (#92) : les bornes d'âge restent valables, la
+  # naissance étant fixée à la première entrée et les entrées suivantes
+  # restant dans [origine, fin] (uniforme_multi) ou égales à date_entree.
+  # loi_contrats : probabilités p_1, ..., p_m de K sur {1, ..., m} ; forme
+  # exacte double ou integer sans aucun attribut ; p_m > 0 (m est le plus
+  # grand nombre tirable) ; somme 1 à 1e-12 près. Loi effectivement tirée :
+  # (p_1, ..., p_{m-1}, 1 - F_{m-1}), à moins de 1e-12 de la loi déclarée
+  # (approximation numérique).
+  if (mode != MODE_BASE[[mode]]) {
+    lc <- p[["loi_contrats"]]
+    if (!forme_exacte(lc, c("double", "integer")) || !length(lc) || any(!is.finite(lc)) || any(lc < 0) ||
+        lc[length(lc)] <= 0 || abs(sum(lc) - 1) > 1e-12)
+      invalide(paste("loi_contrats : probabilités p_1, ..., p_m (m >= 1) du nombre de contrats par tête,",
+                     "réels finis >= 0, de type double ou integer, sans attribut, p_m > 0, de somme 1",
+                     "à 1e-12 près."))
+    # Garde de débordement : le nombre de contrats tirés, au plus n x m,
+    # est un entier R.
+    if (as.numeric(p[["n"]]) * length(lc) > .Machine$integer.max)
+      invalide(sprintf("n x length(loi_contrats) (%.0f) dépasse .Machine$integer.max (%d).",
+                       as.numeric(p[["n"]]) * length(lc), .Machine$integer.max))
   }
   list(mode = mode, age_bas = age_bas, age_haut = age_haut)
 }
@@ -360,7 +415,9 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 
 # --- point d'entrée ---------------------------------------------------------------
 
-# Simule un portefeuille de n contrats (une tête par contrat).
+# Simule un portefeuille de n têtes : une tête par contrat (modes `uniforme`
+# et `age_exact`), ou K contrats tirés par tête (modes `uniforme_multi` et
+# `age_exact_multi`, #92).
 #   loi          : list(deces = list(table, facteurs), rachat = list(table,
 #                  facteurs)) ; table : `table_reference` (H et F, ou
 #                  `ensemble`) ; facteurs : c(H = , F = ), double ou integer, seul
@@ -374,13 +431,21 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 #                  365,25) jours ; ou list(mode = "age_exact", n,
 #                  proportion_hommes, age, date_entree) — entrée à l'âge
 #                  exact `age` à la date `date_entree` (constat de
-#                  simulation) ;
+#                  simulation) ; ou les modes `uniforme_multi` et
+#                  `age_exact_multi`, aux mêmes champs plus `loi_contrats`
+#                  (probabilités p_1, ..., p_m du nombre K de contrats par
+#                  tête) : en `uniforme_multi`, entrées iid par contrat sur
+#                  les jours de [origine, fin] et âge à la première entrée
+#                  uniforme sur [age_min, age_max) ; en `age_exact_multi`,
+#                  tous les contrats entrent à `date_entree` ;
 #   periode      : list(debut, fin), dates (classe Date seule, #58) ;
 #                  censure à B = fin + 1 ;
 #   graine       : entier explicite (sous_graine, générateur GENERATEUR).
 # Rend un data.frame (id_contrat, id_tete, sexe, date_naissance, date_entree,
 # date_sortie, cause_sortie) avec l'attribut `simulation`. Toutes les lignes
-# sont gardées, y compris celles sorties avant le début de la période.
+# sont gardées, y compris celles sorties avant le début de la période ; seuls
+# manquent les contrats non souscrits (modes multi-contrats), décomptés dans
+# l'attribut.
 simuler_portefeuille <- function(loi, portefeuille, periode, graine) {
   if (!liste_aux_noms(loi, names(CAUSES_SIMULEES)))
     refuser("simulation", "loi_invalide",
@@ -396,35 +461,53 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine) {
   controler_couverture(effective, ctl$age_bas, ctl$age_haut, sexes)
   debut <- as.numeric(periode$debut); fin <- as.numeric(periode$fin); borne <- fin + 1
 
-  # Tirages, dans l'ordre fixé (ORDRE_TIRAGES).
+  # Tirages, dans l'ordre fixé (ORDRE_TIRAGES ; modes multi-contrats :
+  # ORDRE_TIRAGES_MULTI). Modes existants : K = 1 par tête sans tirage (loi
+  # dégénérée), N = n : tirages et ordre inchangés (ADR 0007, annotation du
+  # 25/10/2026, (a)).
+  multi <- ctl$mode != MODE_BASE[[ctl$mode]]
+  uniforme <- MODE_BASE[[ctl$mode]] == "uniforme"
+  lc <- if (multi) p[["loi_contrats"]] else 1
+  m <- length(lc)
   tirages <- sous_graine(graine, {
     u_sexe <- stats::runif(n)
-    if (ctl$mode == "uniforme") {
-      j_entree <- sample.int(as.integer(fin - as.numeric(p$origine) + 1), n, replace = TRUE)
+    # K par inversion explicite ; aucun tirage si la loi n'a qu'une
+    # probabilité non nulle (p_m > 0 : K = m).
+    K <- if (sum(lc > 0) == 1L) rep.int(m, n) else 1L + findInterval(stats::runif(n), cumsum(lc)[-m])
+    nk <- sum(K)
+    if (uniforme) {
+      j_entree <- sample.int(as.integer(fin - as.numeric(p$origine) + 1), nk, replace = TRUE)
       u_age <- stats::runif(n)
     } else {
       j_entree <- u_age <- NULL
     }
-    list(u_sexe = u_sexe, j_entree = j_entree, u_age = u_age,
-         e_deces = stats::rexp(n), e_rachat = stats::rexp(n))
+    list(u_sexe = u_sexe, K = K, j_entree = j_entree, u_age = u_age,
+         e_deces = stats::rexp(n), e_rachat = stats::rexp(nk))
   })
 
+  # Contrats tirés, dans l'ordre des tirages (têtes, puis contrats) : tête de
+  # chaque contrat, entrée ; première entrée e_(1) de chaque tête (toute tête
+  # a au moins un contrat) ; lignes ordonnées par (tête, entrée, rang de
+  # tirage), tri radix stable.
+  K <- tirages$K; nk <- length(tirages$e_rachat)
+  tete <- rep.int(seq_len(n), K)
   sexe <- ifelse(tirages$u_sexe < p$proportion_hommes, "H", "F")
-  if (ctl$mode == "uniforme") {
-    entree <- as.numeric(p$origine) + tirages$j_entree - 1
+  entree <- if (uniforme) as.numeric(p$origine) + tirages$j_entree - 1 else rep(as.numeric(p$date_entree), nk)
+  o <- order(tete, entree, method = "radix")
+  e1 <- entree[o[!duplicated(tete[o])]]
+  if (uniforme) {
     age_entree <- p$age_min + (p$age_max - p$age_min) * tirages$u_age
-    naissance <- entree - round(age_entree * 365.25)
+    naissance <- e1 - round(age_entree * 365.25)
   } else {
-    entree <- rep(as.numeric(p$date_entree), n)
     ce <- composantes_date(as.numeric(p$date_entree))
     naissance <- rep(jours_civils(ce$an - as.integer(p$age), ce$mois + 1L, ce$jour), n)
   }
 
-  # Âge exact à l'entrée, recalculé depuis les dates (T2, T3).
+  # Âge exact à la première entrée, par tête, recalculé depuis les dates (T2, T3).
   cn <- composantes_distinctes(naissance)
-  x0 <- age_anniversaire(cn, composantes_distinctes(entree)$an, entree)
+  x0 <- age_anniversaire(cn, composantes_distinctes(e1)$an, e1)
   a0 <- jour_anniversaire(cn, x0)
-  frac0 <- (entree - a0) / (jour_anniversaire(cn, x0 + 1L) - a0)
+  frac0 <- (e1 - a0) / (jour_anniversaire(cn, x0 + 1L) - a0)
   # Assertion : les âges effectivement parcourus (de l'entrée à l'instant B)
   # restent dans les bornes a priori [age_bas, age_haut] de
   # controler_portefeuille(), donc dans la table ; un écart serait une
@@ -436,48 +519,90 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine) {
                  min(x0), max(x_borne), as.integer(floor(ctl$age_bas)), as.integer(floor(ctl$age_haut))),
          call. = FALSE)
 
-  lat <- list()
-  for (cause in names(CAUSES_SIMULEES)) {
-    instant <- rep(Inf, n); jour <- rep(NA_real_, n)
-    e <- tirages[[paste0("e_", cause)]]
+  # Temps latent d'une transition pour des unités (têtes ou contrats) de
+  # composantes de naissance cnu, d'âge x0u et de fraction frac0u au jour de
+  # départ du, de sexe su, de tirages e.
+  latent <- function(cause, cnu, x0u, frac0u, du, su, e) {
+    instant <- rep(Inf, length(e)); jour <- rep(NA_real_, length(e))
     for (s in sexes) {
-      idx <- which(sexe == s)
+      idx <- which(su == s)
       if (!length(idx)) next
       t <- temps_latent(effective[effective$cause == cause & effective$sexe == s, , drop = FALSE],
-                        lapply(cn, `[`, idx), x0[idx], frac0[idx], entree[idx], e[idx])
+                        lapply(cnu, `[`, idx), x0u[idx], frac0u[idx], du[idx], e[idx])
       instant[idx] <- t$instant; jour[idx] <- t$jour
     }
-    lat[[cause]] <- list(instant = instant, jour = jour)
+    list(instant = instant, jour = jour)
+  }
+  # Décès par tête, à partir de la première entrée ; rachat par contrat, à
+  # partir de son entrée, à l'âge de la tête (modes existants : contrat = tête).
+  dc <- latent("deces", cn, x0, frac0, e1, sexe, tirages$e_deces)
+  if (multi) {
+    cnk <- lapply(cn, `[`, tete)
+    xk <- age_anniversaire(cnk, composantes_distinctes(entree)$an, entree)
+    ak <- jour_anniversaire(cnk, xk)
+    fk <- (entree - ak) / (jour_anniversaire(cnk, xk + 1L) - ak)
+    rc <- latent("rachat", cnk, xk, fk, entree, sexe[tete], tirages$e_rachat)
+  } else {
+    rc <- latent("rachat", cn, x0, frac0, entree, sexe, tirages$e_rachat)
   }
 
   # Sortie : minimum des deux temps latents et de la censure à B, en temps
-  # continu ; égalité (probabilité nulle) attribuée au décès.
-  td <- lat$deces$instant; tr <- lat$rachat$instant
+  # continu ; égalité (probabilité nulle) attribuée au décès. Décès commun
+  # aux contrats de la tête en cours à son instant.
+  td <- dc$instant[tete]; tr <- rc$instant
   est_deces <- td <= tr & td < borne
   est_rachat <- tr < td & tr < borne
-  cause_sortie <- rep("en_cours", n)
+  cause_sortie <- rep("en_cours", nk)
   cause_sortie[est_deces] <- "deces"; cause_sortie[est_rachat] <- "rachat"
-  sortie <- rep(NA_real_, n)
-  sortie[est_deces] <- lat$deces$jour[est_deces]
-  sortie[est_rachat] <- lat$rachat$jour[est_rachat]
+  sortie <- rep(NA_real_, nk)
+  sortie[est_deces] <- dc$jour[tete][est_deces]
+  sortie[est_rachat] <- rc$jour[est_rachat]
   if (anyNA(sortie[cause_sortie != "en_cours"]))
     stop("simuler_portefeuille() : événement sans date (erreur de programmation).", call. = FALSE)
+  # Contrat non souscrit : un contrat n'est écrit que si son entrée précède
+  # l'instant de décès de la tête (double de temps_latent()). Un contrat entré
+  # le jour de la première entrée l'est toujours : l'instant de décès suit
+  # e_(1) (tirage exponentiel > 0) ; la règle ne dépend donc d'aucun arrondi
+  # qui rendrait cet instant égal à e_(1). Modes existants : toutes les lignes.
+  ecrit <- entree <= e1[tete] | entree < td
+  sel <- o[ecrit[o]]
+  if (any(sortie[sel][est_deces[sel]] < entree[sel][est_deces[sel]]))
+    stop("simuler_portefeuille() : décès antérieur à l'entrée d'un contrat écrit (erreur de programmation).",
+         call. = FALSE)
 
   en_date <- function(j) structure(as.numeric(j), class = "Date")
-  resultat <- data.frame(id_contrat = seq_len(n), id_tete = seq_len(n), sexe = sexe,
-                         date_naissance = en_date(naissance), date_entree = en_date(entree),
-                         date_sortie = en_date(sortie), cause_sortie = cause_sortie,
+  # id_tete : seq_len(n) dans les modes existants (même objet qu'avant #92).
+  resultat <- data.frame(id_contrat = seq_len(length(sel)), id_tete = if (multi) tete[sel] else seq_len(n),
+                         sexe = sexe[tete][sel],
+                         date_naissance = en_date(naissance[tete][sel]), date_entree = en_date(entree[sel]),
+                         date_sortie = en_date(sortie[sel]), cause_sortie = cause_sortie[sel],
                          stringsAsFactors = FALSE)
+  so <- sortie[sel]
+  decomptes <- list(lignes = length(sel), deces = sum(est_deces[sel]), rachats = sum(est_rachat[sel]),
+                    en_cours = sum(cause_sortie[sel] == "en_cours"),
+                    sorties_avant_debut = sum(!is.na(so) & so < debut),
+                    entrees_avant_debut = sum(entree[sel] < debut))
+  if (multi) {
+    # Têtes dont le décès figure dans le jeu (au moins une ligne à décès) ;
+    # têtes décédées avant B sans contrat en cours à leur décès (aucune ligne
+    # à décès : décès absent du jeu).
+    observee <- tabulate(tete[sel][est_deces[sel]], nbins = n) > 0L
+    decomptes <- c(decomptes, list(tetes = n, contrats_tires = nk, contrats_non_souscrits = nk - length(sel),
+                                   tetes_decedees_observees = sum(observee),
+                                   tetes_decedees_sans_contrat = sum(dc$instant < borne & !observee)))
+  }
   attr(resultat, "simulation") <- list(
     loi_vraie = list(tables = lapply(loi, `[[`, "table"), facteurs = lapply(loi, `[[`, "facteurs"),
                      effective = effective, transitions = CAUSES_SIMULEES,
                      hypothese_repartition = HYPOTHESE_REPARTITION, sexes_controles = sexes),
     portefeuille = portefeuille, periode = periode,
-    graine = as.integer(graine), generateur = GENERATEUR, ordre_tirages = ORDRE_TIRAGES,
+    graine = as.integer(graine), generateur = GENERATEUR,
+    ordre_tirages = if (multi) ORDRE_TIRAGES_MULTI[[ctl$mode]] else ORDRE_TIRAGES,
     version_r = R.version.string,
-    decomptes = list(lignes = n, deces = sum(est_deces), rachats = sum(est_rachat),
-                     en_cours = sum(cause_sortie == "en_cours"),
-                     sorties_avant_debut = sum(!is.na(sortie) & sortie < debut),
-                     entrees_avant_debut = sum(entree < debut)))
+    decomptes = decomptes)
+  # Modes multi-contrats : champ ajouté en fin seulement (annotation du
+  # 25/10/2026, (c), point 5).
+  if (multi)
+    attr(resultat, "simulation")$contrats <- list(loi = as.double(lc), tires_par_tete = tabulate(K, nbins = m))
   resultat
 }
