@@ -12,10 +12,16 @@
 #
 #  Une ligne sans agent et sans appel porte en plus une
 #  cle « diagnostic » : nom de l'evenement et presence (booleens) de
-#  agent_id, de agent_transcript_path et du fichier .meta.json attendu, sans
+#  agent_id, de agent_transcript_path et du fichier .meta.json attendu, puis
+#  « transcript » : "present" ou "absent" selon l'existence du fichier de
+#  transcript lui-meme AU MOMENT DU HOOK (il est ecrit de facon asynchrone ;
+#  absent aussi quand aucun chemin n'est connu), sans
 #  aucun contenu (ni prompt, ni texte, ni chemin). Les autres lignes gardent
-#  leur format (issue #74). Le bilan affiche « ? » aussi pour une ligne sans
-#  agent qui a des appels : celle-la ne porte pas la cle.
+#  leur format (issues #74 et #95). Le bilan compte a part les lignes dont le
+#  transcript est absent et garde « ? » pour les lignes sans agent dont le
+#  transcript est present ou non renseigne (lignes anterieures a #95), ainsi
+#  que pour une ligne sans agent qui a des appels : celle-la ne porte pas la
+#  cle diagnostic.
 #
 #  Ne mesure ni l'effort (non expose dans le transcript) ni les tokens de
 #  sortie (valeurs partielles de streaming dans le transcript). Le transcript
@@ -102,12 +108,19 @@ def meta_present(c):
     except Exception:
         return False
 
+def transcript_present(c):
+    try:
+        return isinstance(c, str) and c != "" and os.path.isfile(c)
+    except Exception:
+        return False
+
 if not agent and not ids:
     ligne["diagnostic"] = {
         "evenement": e.get("hook_event_name") or "",
         "agent_id": bool(aid),
         "agent_transcript_path": bool(e.get("agent_transcript_path")),
         "meta_json": meta_present(chemin),
+        "transcript": "present" if transcript_present(chemin) else "absent",
     }
 with open(os.environ["JOURNAL"], "a", encoding="utf-8") as f:
     f.write(json.dumps(ligne, ensure_ascii=False) + "\n")

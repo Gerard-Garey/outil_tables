@@ -11,6 +11,12 @@
 #  docs/agents/routage.md, § 8. Aucune donnee de consommation n'est estimee :
 #  seules les grandeurs lues dans les transcripts sont restituees.
 #
+#  Une ligne dont la cle « diagnostic » porte "transcript": "absent" (hook
+#  SubagentStop sans fichier de transcript, issue #95) n'est pas un agent du
+#  projet : elle n'entre pas dans le tableau et est comptee a part, en pied.
+#  « ? » ne designe plus que les lignes sans agent dont le transcript est
+#  present ou non renseigne (lignes anterieures a #95 comprises).
+#
 #  Usage : bash .claude/outils/bilan_journal.sh [journal]
 ###############################################################################
 set -euo pipefail
@@ -26,10 +32,17 @@ done
 import json, sys
 from collections import defaultdict
 der, nb = {}, defaultdict(int)
+sans_transcript = 0
 for l in open(sys.argv[1], encoding="utf-8"):
     try:
         d = json.loads(l)
     except Exception:
+        continue
+    if not isinstance(d, dict):
+        continue
+    diag = d.get("diagnostic")
+    if isinstance(diag, dict) and diag.get("transcript") == "absent":
+        sans_transcript += 1
         continue
     k = (d.get("session"), d.get("id")) if d.get("id") else (None, len(der))
     der[k] = d
@@ -45,4 +58,5 @@ for (a, m), v in sorted(g.items()):
     print("%-24s %-28s %5d %8d %7d %12s %12s %9s" % (a, m[:28], len(v), sum(x["_reprises"] for x in v),
           sum(x.get("appels") or 0 for x in v),
           round(sum(ctx)/len(ctx)) if ctx else "-", max(ctx) if ctx else "-", "%ds" % round(sum(du)/len(du)) if du else "-"))
+print("evenements SubagentStop sans transcript au moment du hook (hors tableau) : %d" % sans_transcript)
 PY
