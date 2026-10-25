@@ -112,10 +112,17 @@ loi_effective <- function(loi_t, cause, sexes) {
     refuser("simulation", "loi_invalide",
             sprintf("Loi « %s » : table prospective (colonne annee) non prise en charge par le simulateur minimal.", cause),
             list(cause = cause))
-  if (!is.numeric(f) || length(f) != 2L || !identical(sort(names(f)), c("F", "H")) ||
+  # Facteurs : forme exacte (#58, forme_exacte()) : double ou integer, seul
+  # attribut names (ni classe, ni dim), de noms exactement H et F, sans tri :
+  # setequal() ne dépend pas de la locale et ne lève pas pour un nom non ASCII
+  # natif (locale C) ou en octets invalides (sort(method = "radix") lève alors,
+  # mesuré) ; des facteurs sans noms, un nom NA ou doublé sont refusés.
+  if (!forme_exacte(f, c("double", "integer"), "names") || length(f) != 2L ||
+      anyNA(names(f)) || anyDuplicated(names(f)) || !setequal(names(f), c("H", "F")) ||
       any(!is.finite(f)) || any(f < 0))
     refuser("simulation", "loi_invalide",
-            sprintf("Loi « %s » : facteurs = c(H = , F = ), réels finis >= 0.", cause),
+            sprintf(paste("Loi « %s » : facteurs = c(H = , F = ), réels finis >= 0, de type double ou integer,",
+                          "sans autre attribut que les noms."), cause),
             list(cause = cause, facteurs = f))
   morceaux <- lapply(sexes, function(s) {
     t <- if (s %in% tab$sexe) tab[tab$sexe == s, , drop = FALSE] else tab[tab$sexe == "ensemble", , drop = FALSE]
@@ -184,14 +191,19 @@ age_anniversaire <- function(cn, an_t, t) {
 
 # --- contrôle des entrées ------------------------------------------------------
 
-date_unique <- function(x) identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
+# Date unique : la forme de date1() de controler_transition_periode() (donnees ;
+# #58) : stockage double ou integer, seul attribut la classe "Date" exacte (ni
+# noms, ni autre attribut), longueur 1, finie, en jours entiers.
+date_unique <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
+  identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
   is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
 
 controler_portefeuille <- function(portefeuille, periode) {
   if (!liste_aux_noms(periode, c("debut", "fin")) ||
       !date_unique(periode[["debut"]]) || !date_unique(periode[["fin"]]))
     refuser("simulation", "periode_invalide",
-            "La période d'observation doit être une liste (debut, fin) de deux dates (classe Date).",
+            paste("La période d'observation doit être une liste (debut, fin) de deux dates (classe Date,",
+                  "sans autre attribut)."),
             list(periode = periode))
   if (periode[["debut"]] > periode[["fin"]])
     refuser("simulation", "periode_invalide",
@@ -337,8 +349,8 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 # Simule un portefeuille de n contrats (une tête par contrat).
 #   loi          : list(deces = list(table, facteurs), rachat = list(table,
 #                  facteurs)) ; table : `table_reference` (H et F, ou
-#                  `ensemble`) ; facteurs : c(H = , F = ) appliqués à q_x,
-#                  plafond 1 ;
+#                  `ensemble`) ; facteurs : c(H = , F = ), double ou integer, seul
+#                  attribut les noms (#58), appliqués à q_x, plafond 1 ;
 #   portefeuille : list(mode = "uniforme", n, proportion_hommes, age_min,
 #                  age_max, origine) — entrée uniforme discrète sur les jours
 #                  de [origine, fin], âge à l'entrée uniforme continu sur
@@ -347,7 +359,8 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 #                  proportion_hommes, age, date_entree) — entrée à l'âge
 #                  exact `age` à la date `date_entree` (constat de
 #                  simulation) ;
-#   periode      : list(debut, fin), dates ; censure à B = fin + 1 ;
+#   periode      : list(debut, fin), dates (classe Date seule, #58) ;
+#                  censure à B = fin + 1 ;
 #   graine       : entier explicite (sous_graine, générateur GENERATEUR).
 # Rend un data.frame (id_contrat, id_tete, sexe, date_naissance, date_entree,
 # date_sortie, cause_sortie) avec l'attribut `simulation`. Toutes les lignes

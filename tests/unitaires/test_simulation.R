@@ -395,3 +395,82 @@ LISTES_FORME <- list(
        function() { p <- PER; class(p) <- "x"; simuler(loi(), PF_FORME, p, GRAINE) }))
 for (k in LISTES_FORME)
   verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[2]]), leve_refus(k[[3]](), k[[2]]))
+
+# --- forme exacte des bornes de la période et des facteurs (#58) -------------------
+# Bornes : la forme de date1() de controler_transition_periode() (donnees) :
+# double ou integer, seul attribut la classe "Date" exacte, sous periode_invalide.
+# Facteurs : forme_exacte(f, c("double", "integer"), "names"), noms H et F
+# comparés après un tri radix, sous loi_invalide. Les formes admises restent
+# admises ; le jeu tiré ne dépend ni du stockage des bornes ni de celui des
+# facteurs (les tirages sont identiques, seul l'attribut `simulation` consigne
+# la forme reçue).
+nommee <- function(d) structure(c(a = unclass(d)), class = "Date")
+attribuee <- function(d) { attr(d, "foo") <- "x"; d }
+classe_plus <- function(d) structure(unclass(d), class = c("Date", "x"))
+vers_integer <- function(d) structure(as.integer(unclass(d)), class = "Date")
+avec_attr <- function(f, nom, v) { attr(f, nom) <- v; f }
+MATRICE_1x2 <- function(f) structure(unclass(f), dim = c(1L, 2L))
+PERIODE_FORME <- list(
+  list("debut nommée (Date nommée)", function() list(debut = nommee(PER$debut), fin = PER$fin)),
+  list("fin nommée", function() list(debut = PER$debut, fin = nommee(PER$fin))),
+  list("debut à attribut quelconque", function() list(debut = attribuee(PER$debut), fin = PER$fin)),
+  list("fin à attribut quelconque", function() list(debut = PER$debut, fin = attribuee(PER$fin))),
+  list("debut de classe c(\"Date\", \"x\")", function() list(debut = classe_plus(PER$debut), fin = PER$fin)),
+  list("debut en caractère de classe Date", function()
+    list(debut = structure("2015-01-01", class = "Date"), fin = PER$fin)),
+  list("fin non entière (jour fractionnaire)", function()
+    list(debut = PER$debut, fin = structure(unclass(PER$fin) + 0.5, class = "Date"))))
+for (k in PERIODE_FORME) {
+  verifier(sprintf("forme exacte : période, %s -> refus periode_invalide", k[[1]]),
+           leve_refus(simuler(loi(), PF_FORME, k[[2]](), GRAINE), "periode_invalide"))
+  verifier(sprintf("forme exacte : période, %s -> message de forme", k[[1]]),
+           grepl("sans autre attribut", message_refus(simuler(loi(), PF_FORME, k[[2]](), GRAINE)), fixed = TRUE))
+}
+
+FACTEURS_FORME <- list(
+  list("attribut quelconque", avec_attr(c(H = 1, F = 0.6), "foo", "x")),
+  list("classe", structure(c(H = 1, F = 0.6), class = "x")),
+  list("matrice 1 x 2 sans noms de dimension", MATRICE_1x2(c(H = 1, F = 0.6))),
+  list("sans noms", c(1, 0.6)),
+  list("noms en minuscules", c(h = 1, f = 0.6)),
+  list("noms H et H", c(H = 1, H = 0.6)),
+  list("nom NA", structure(c(1, 0.6), names = c("H", NA))),
+  list("caractère", c(H = "1", F = "0.6")),
+  list("logique", c(H = TRUE, F = FALSE)),
+  list("valeur manquante", c(H = 1, F = NA_real_)),
+  list("valeur infinie", c(H = 1, F = Inf)),
+  list("trois éléments", c(H = 1, F = 0.6, X = 1)),
+  # Octets construits par rawToChar() (chaînes natives non marquées, quelle que
+  # soit la locale du test) : é en UTF-8 (non ASCII natif en locale C) et un
+  # octet invalide en UTF-8 ; le refus nommé remplace l'erreur de sort(method =
+  # "radix") (« Character encoding must be UTF-8, Latin-1 or bytes »).
+  list("nom non ASCII natif", structure(c(1, 0.6), names = c(rawToChar(as.raw(c(0xc3, 0xa9))), "H"))),
+  list("nom en octets invalides", structure(c(1, 0.6), names = c(rawToChar(as.raw(0xc9)), "H"))))
+for (k in FACTEURS_FORME) {
+  verifier(sprintf("forme exacte : facteurs, %s -> refus loi_invalide", k[[1]]),
+           leve_refus(simuler(loi(f_deces = k[[2]]), PF_FORME, PER, GRAINE), "loi_invalide"))
+  verifier(sprintf("forme exacte : facteurs de rachat, %s -> refus loi_invalide", k[[1]]),
+           leve_refus(simuler(loi(f_rachat = k[[2]]), PF_FORME, PER, GRAINE), "loi_invalide"))
+}
+verifier("forme exacte : facteurs à attribut -> message de forme (sans autre attribut que les noms)",
+         grepl("sans autre attribut que les noms",
+               message_refus(simuler(loi(f_deces = avec_attr(c(H = 1, F = 0.6), "foo", "x")), PF_FORME, PER, GRAINE)),
+               fixed = TRUE))
+
+# Formes admises : mêmes tirages, seul l'attribut `simulation` diffère.
+sans_attribut_simulation <- function(x) { attr(x, "simulation") <- NULL; x }
+REF_FORME <- simuler(loi(), PF_FORME, PER, GRAINE)
+verifier("forme exacte : bornes en stockage integer admises, tirages identiques",
+         identical(sans_attribut_simulation(
+           simuler(loi(), PF_FORME, list(debut = vers_integer(PER$debut), fin = vers_integer(PER$fin)), GRAINE)),
+           sans_attribut_simulation(REF_FORME)))
+verifier("forme exacte : facteurs integer admis, tirages identiques à ceux des facteurs double",
+         identical(sans_attribut_simulation(simuler(loi(f_rachat = c(H = 1L, F = 1L)), PF_FORME, PER, GRAINE)),
+                   sans_attribut_simulation(REF_FORME)))
+verifier("forme exacte : noms des facteurs permutés c(F, H) admis, tirages identiques",
+         identical(sans_attribut_simulation(simuler(loi(f_deces = c(F = 0.6, H = 1)), PF_FORME, PER, GRAINE)),
+                   sans_attribut_simulation(REF_FORME)))
+verifier("forme exacte : entrée valide, attribut simulation$periode et $loi_vraie$facteurs de forme canonique",
+         identical(attr(REF_FORME, "simulation")$periode, PER) &&
+           identical(attr(REF_FORME, "simulation")$loi_vraie$facteurs,
+                     list(deces = c(H = 1, F = 0.6), rachat = c(H = 1, F = 1))))
