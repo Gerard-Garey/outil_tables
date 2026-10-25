@@ -5932,7 +5932,12 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     (ADR 0011, septième annotation du 20/10/2026, (d)). Ce relevé est la
     sortie de \code{md5sum}, si bien qu'un tiers recalcule l'empreinte depuis
     la racine des sources par \code{LC\_ALL=C md5sum R/*.R | md5sum}, la
-    locale \code{C} fixant l'ordre des fichiers.
+    locale \code{C} fixant l'ordre des fichiers~; sous Windows, le
+    \code{md5sum} de Rtools (MSYS2) écrit par défaut en mode binaire et
+    préfixe les noms par «~*~», et la commande s'écrit
+    \code{LC\_ALL=C md5sum -t R/*.R | md5sum}, l'option \code{-t} (mode
+    texte) étant sans effet sur la sortie du \code{md5sum} de GNU sous Linux
+    (issue~\#101).
   \item \sloppy \textbf{Calcul}~: \code{EMPREINTE\_CODE}, constante de premier niveau
     de \code{R/rapport.R}, vaut \code{empreinte\_sources(".")}. Elle est
     évaluée une seule fois, pendant \code{R CMD INSTALL}, qui exécute le code
@@ -6740,7 +6745,8 @@ dans les deux unités (décisions M71, point~4, et M72). Pour le code~:
 \code{EMPREINTE\_CODE} n'est pas \code{NA} et égale le recalcul fait par la
 batterie sur \code{R/*.R} de la racine qu'elle a installée, en R et, si
 \code{md5sum} et \code{sh} sont présents, par
-\code{LC\_ALL=C md5sum R/*.R | md5sum}~; \code{R/} ne contient que des
+\code{LC\_ALL=C md5sum -t R/*.R | md5sum} (mode texte explicite, pour le
+\code{md5sum} de Rtools sous Windows~; issue~\#101)~; \code{R/} ne contient que des
 fichiers \code{*.R}~; \code{empreinte\_sources()} rend \code{NA} sans
 \code{DESCRIPTION}, pour un autre paquet, sans \code{R/rapport.R} et pour
 un fichier illisible (lien cassé), et le recalcul sur une racine conforme~;
