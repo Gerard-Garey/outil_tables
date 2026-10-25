@@ -316,9 +316,37 @@ fenetres_observations <- function(observations, debut_p, borne, cible) {
 # une ligne par segment, dans l'ordre des indices.
 segments_observations <- function(observations, segmentation) {
   n_obs <- nrow(observations)
+  # Valeurs distinctes (sans NA) en ordre d'octets de la représentation que
+  # hache l'empreinte des données (octets_chaines() : enc2utf8, erratum A.3,
+  # point 4), donc indépendant du marquage. Le tri radix lève « Character
+  # encoding must be UTF-8, Latin-1 or bytes » sur une chaîne non ASCII
+  # d'encodage `unknown`, forme que donne read.csv() d'un CSV UTF-8 (#106) :
+  # le tri porte sur une copie marquée `bytes`, comparée octet à octet sans
+  # traduction, sous C comme sous une locale UTF-8. Avant le tri, même critère
+  # `locale_connue` qu'octets_chaines() : dans une session UTF-8 ou latin-1,
+  # toutes les chaînes passent par enc2utf8() ; sinon (locale C) seules les
+  # chaînes marquées latin-1 sont converties, les `unknown` gardent leurs
+  # octets (enc2utf8 les échapperait en <c3><a9>). Ce n'est pas l'ordre de
+  # l'ancien tri radix : mesuré sur c(ÿ latin-1, € UTF-8, "a"), il donnait
+  # a, €, ÿ (octet natif ff après e2 82 ac), l'ordre actuel est a, ÿ, € (c3 bf
+  # avant e2 82 ac). La branche de locale latin-1 n'est pas testée sur la CI
+  # (aucune locale latin-1 installée). Les valeurs rendues gardent leur
+  # encodage d'origine.
+  ordre_octets <- function(v) {
+    u <- unique(v)
+    u <- u[!is.na(u)]
+    if (!is.character(u)) return(u[order(u, method = "radix")])
+    l <- l10n_info()
+    connue <- isTRUE(l[["UTF-8"]]) || isTRUE(l[["Latin-1"]])
+    latin1 <- Encoding(u) == "latin1"
+    w <- u
+    if (connue) w <- enc2utf8(w) else if (any(latin1)) w[latin1] <- enc2utf8(w[latin1])
+    Encoding(w) <- "bytes"
+    u[order(w, method = "radix")]
+  }
   if (length(segmentation)) {
     cles <- lapply(observations[segmentation], function(v) if (is.integer(v)) v else as.character(v))
-    codes <- lapply(cles, function(v) match(v, sort(unique(v), method = "radix")))
+    codes <- lapply(cles, function(v) match(v, ordre_octets(v)))
     o <- do.call(order, c(unname(codes), list(method = "radix")))
     cle_triee <- do.call(paste, c(unname(codes), list(sep = "\r")))[o]
     nouvelle <- c(TRUE, cle_triee[-1L] != cle_triee[-length(cle_triee)])

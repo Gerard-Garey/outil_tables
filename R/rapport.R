@@ -396,8 +396,20 @@ controler_provenance <- function(provenance) {
   invisible(TRUE)
 }
 
-# Empreintes de la fiche (ADR 0007, point 9.2).
+# Empreintes de la fiche (ADR 0007, point 9.2). Précondition : roles et
+# provenance ont passé controler_roles() et controler_provenance().
+# Les chaînes de l'appelant que la fiche écrit (valeurs des rôles, c'est-à-dire
+# noms de colonnes, et provenance) ne passent pas par empreinte_donnees(), qui
+# n'écrit que les valeurs des colonnes : une chaîne non ASCII de codage
+# indéterminé (nom de colonne ou chemin natif sous la locale C) n'était
+# refusée qu'à l'écriture de la fiche, par empreinte_resultat(), en erreur de
+# programmation après tous les calculs (#106). Elles sont contrôlées ici, avant
+# tout calcul, par octets_chaines(), mêmes refus et mêmes chemins
+# (« fiche/roles », « fiche/provenance/<champ> »).
 empreintes_construction <- function(donnees, roles, provenance) {
+  octets_chaines(unname(roles), "fiche/roles")
+  for (champ in names(provenance))
+    octets_chaines(provenance[[champ]], joindre_chemin("fiche/provenance", champ))
   list(algorithme = ALGORITHME_EMPREINTE, representation = ENTETE_CANONIQUE,
        donnees = empreinte_donnees(donnees, roles),
        fichier = if (is.null(provenance)) NA_character_ else provenance$empreinte,
