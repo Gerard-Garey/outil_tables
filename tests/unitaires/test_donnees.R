@@ -134,6 +134,17 @@ for (role in NON_PRIS) {
 x <- refus(prep(roles = replace(ROLES, "sexe", "genre")))
 verifier("colonne absente : refus colonne_absente, message nomme rôle et colonne",
          identical(x$motif, "colonne_absente") && isTRUE(contient(x, "genre", "sexe")))
+# Rôle ou colonne au codage bytes (#111) : refus nommé, message lisible, sans erreur R.
+OCTETS <- "\xe9t\xe9"; Encoding(OCTETS) <- "bytes"
+x <- refus(prep(roles = replace(ROLES, "sexe", OCTETS)))
+verifier("colonne absente au codage bytes : refus colonne_absente, chaîne remplacée par un repère",
+         identical(x$motif, "colonne_absente") && isTRUE(contient(x, "<chaîne d'encodage bytes>", "sexe")))
+x <- refus(prep(roles = c(ROLES, stats::setNames("autre_colonne", OCTETS))))
+verifier("rôle inconnu au codage bytes : refus role_inconnu, chaîne remplacée par un repère",
+         identical(x$motif, "role_inconnu") && isTRUE(contient(x, "<chaîne d'encodage bytes>", "autre_colonne")))
+x <- refus(prep(transition = list(depart = OCTETS, arrivee = "deces")))
+verifier("transition au codage bytes : refus transition_inconnue, chaîne remplacée par un repère",
+         identical(x$motif, "transition_inconnue") && isTRUE(contient(x, "<chaîne d'encodage bytes> -> deces")))
 x <- refus(prep(roles = replace(ROLES, "id_contrat", "tete")))
 verifier("colonne déclarée deux fois : refus colonne_declaree_deux_fois, message nomme colonne et rôles",
          identical(x$motif, "colonne_declaree_deux_fois") &&
@@ -790,6 +801,59 @@ for (k in names(CHAINES_ATTR)) {
 }
 verifier("table_reference : nom, statut, source et forme_origine nus admis (inchangé)",
          inherits(tr(forme_origine = "qx"), "table_reference"))
+# Nom au codage bytes (#111) : cité sous un repère dans le message, sans erreur R ;
+# le nom de l'objet reste celui reçu. Pour un nom ordinaire, le texte est inchangé.
+TR_SEXE <- TR; TR_SEXE$sexe[1L] <- "Z"
+TR_EN_PLUS <- TR; TR_EN_PLUS$zz <- 1
+NOM_BYTES_CAS <- list(
+  list("statut inconnu", list(statut = "zzz"), "table_statut_inconnu"),
+  list("source vide", list(source = ""), "table_source_manquante"),
+  list("paramètres manquants", list(parametres = NULL), "table_parametres_manquants"),
+  list("paramètres inattendus", list(statut = "importee", parametres = list(A = 1)), "table_parametres_inattendus"),
+  list("forme_origine inconnue", list(forme_origine = "zz"), "table_forme_inconnue"),
+  list("x non data.frame", list(x = 1), "table_mal_formee"),
+  list("colonne inconnue", list(x = TR_EN_PLUS), "table_colonne_inconnue"),
+  list("sexe hors modalités", list(x = TR_SEXE), "table_sexe_hors_modalites"))
+for (k in NOM_BYTES_CAS) {
+  x <- refus(do.call(tr, c(list(nom = OCTETS), k[[2]])))
+  verifier(sprintf("table_reference : nom au codage bytes, %s -> refus %s, nom remplacé par un repère", k[[1]], k[[3]]),
+           identical(x$motif, k[[3]]) && isTRUE(contient(x, "Table « <chaîne d'encodage bytes> »")) ||
+             identical(x$motif, k[[3]]) && isTRUE(contient(x, "Table synthétique « <chaîne d'encodage bytes> »")))
+  y <- refus(do.call(tr, c(list(nom = "essai"), k[[2]])))
+  verifier(sprintf("table_reference : nom ordinaire, %s -> même refus, nom cité tel quel", k[[1]]),
+           identical(y$motif, k[[3]]) &&
+             identical(conditionMessage(y), sub("<chaîne d'encodage bytes>", "essai", conditionMessage(x), fixed = TRUE)))
+}
+verifier("table_reference : nom au codage bytes admis hors refus, nom de l'objet inchangé",
+         identical(attr(tr(nom = OCTETS), "nom"), OCTETS))
+# Sous LC_ALL=C (sous-processus, bibliothèque des batteries) : un nom qui n'est pas bytes
+# est cité exactement comme le ferait sprintf() sur le nom reçu (oracle : la formule
+# d'avant #111, octet pour octet, sans traduction ajoutée par le masquage (un nom latin1
+# reste « déc » en UTF-8 valide, jamais « d<e9>c ») ; le nom bytes est remplacé par le repère.
+script_nom <- tempfile(fileext = ".R")
+writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(.harnais$bibliotheque)),
+  "tr <- function(nom) tryCatch(table_reference(data.frame(age = 0:1, sexe = 'ensemble', qx = c(.1, .2)), nom, 'zzz', 's'),",
+  "                             refus_tablexp = function(c) conditionMessage(c))",
+  "L1 <- 'd\\xe9c'; Encoding(L1) <- 'latin1'; B <- 'd\\xe9c'; Encoding(B) <- 'bytes'",
+  "gabarit <- paste0('Table \\u00ab %s \\u00bb : statut (cha\\u00eene sans attribut) \\u00e0 prendre dans ',",
+  "  '\\u00ab synthetique \\u00bb, \\u00ab embarquee \\u00bb, \\u00ab importee \\u00bb.')",
+  "repere <- '<cha\\u00eene d\\'encodage bytes>'",
+  "cas <- list(ascii = list('essai', 'essai'), latin1 = list(L1, L1), utf8 = list('d\\u00e9c\\u00e8s', 'd\\u00e9c\\u00e8s'),",
+  "            bytes = list(B, repere))",
+  "cat('LOCALE', Sys.getlocale('LC_CTYPE'), '\\n')",
+  "for (k in names(cas)) {",
+  "  m <- tr(cas[[k]][[1]]); e <- sprintf(gabarit, cas[[k]][[2]])",
+  "  cat('CAS', k, identical(charToRaw(m), charToRaw(e)), if (!identical(charToRaw(m), charToRaw(e))) paste(charToRaw(m), collapse = ''), '\\n')",
+  "}"), script_nom)
+r_nom <- executer_rscript(script_nom, env = "LC_ALL=C")
+unlink(script_nom)
+for (k in c("ascii", "latin1", "utf8", "bytes"))
+  verifier(sprintf("table_reference : nom %s sous LC_ALL=C, message égal octet pour octet à sprintf() sur le nom (repère pour bytes)", k), {
+    loc <- trimws(sub("^LOCALE ", "", grep("^LOCALE ", r_nom$sortie, value = TRUE)))
+    l <- grep(paste0("^CAS ", k, " "), r_nom$sortie, value = TRUE)
+    if (r_nom$statut == 0L && identical(loc, "C") && length(l) == 1L && grepl(" TRUE ", paste0(l, " "), fixed = TRUE)) TRUE
+    else paste("statut", r_nom$statut, ":", paste(r_nom$sortie, collapse = " | "))
+  })
 # Un nom d'état vide était refusé au second contrôle de la transition (non prise
 # en charge) ; il l'est au premier (forme), sous le même motif.
 verifier("transition : nom d'état vide (depart, puis arrivee) -> refus transition_inconnue",

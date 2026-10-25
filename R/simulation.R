@@ -316,7 +316,9 @@ controler_portefeuille <- function(portefeuille, periode) {
   # Forme exacte du portefeuille (#78, forme_exacte()) : liste nue, seul
   # attribut names (ni data.frame, ni classe, ni attribut quelconque). Noms
   # comparés plus bas sans tri (setdiff, anyDuplicated), indépendamment de la
-  # locale.
+  # locale ; la comparaison ne lève pas sur un nom marqué « bytes » (#111), et sa
+  # citation dans sprintf() est masquée par liste_guillemets(). Noms attendus et
+  # manquants : CHAMPS_PORTEFEUILLE (ASCII).
   if (!forme_exacte(portefeuille, "list", "names"))
     refuser("simulation", "portefeuille_invalide",
             paste("Portefeuille : liste nue attendue (ni data.frame, ni classe, aucun attribut",
@@ -324,7 +326,11 @@ controler_portefeuille <- function(portefeuille, periode) {
             list(classe = class(portefeuille)))
   # Champs lus par [[ ]] (jamais $, qui apparie les noms partiels) ; ici, le
   # mode : chaîne unique de forme exacte (chaine_unique(), #60).
-  mode <- portefeuille[["mode"]]
+  # Position trouvée par match(), qui ne lève pas sur un nom « bytes » ; [["mode"]]
+  # lèverait ici (« translating strings with "bytes" encoding is not allowed »,
+  # mesuré sous C.UTF-8 et sous C) si un nom « bytes » précédait ou remplaçait mode.
+  i_mode <- match("mode", names(portefeuille))
+  mode <- if (is.na(i_mode)) NULL else portefeuille[[i_mode]]
   if (!chaine_unique(mode) || !(mode %in% names(CHAMPS_PORTEFEUILLE)))
     refuser("simulation", "portefeuille_invalide",
             sprintf("Portefeuille : liste avec un champ mode pris dans %s.",
@@ -502,14 +508,8 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 controler_defauts <- function(defauts, graine) {
   invalide <- function(msg, details = list())
     refuser("simulation", "defauts_invalides", paste("Défauts :", msg), details)
-  # Chaîne de l'utilisateur citée dans un message : une chaîne marquée
-  # « bytes » ferait lever sprintf() (« translating strings with "bytes"
-  # encoding is not allowed », mesuré sous C.UTF-8) ; elle n'est pas citée.
-  montrer <- function(v) {
-    v <- as.character(v)
-    v[!is.na(v) & Encoding(v) == "bytes"] <- "<chaîne d'encodage bytes>"
-    v
-  }
+  # Chaînes de l'utilisateur citées par liste_guillemets(), qui masque les
+  # chaînes marquées « bytes » (sprintf() lèverait ; #111).
   # Noms reçus comparés aux noms admis, sans tri ; rend la chaîne d'écart, ou "".
   ecart_noms <- function(x, requis, admis) {
     n <- names(x)
@@ -520,7 +520,7 @@ controler_defauts <- function(defauts, graine) {
     if (!length(manquants) && !length(inconnus)) return("")
     sprintf("champs attendus %s ; manquants : %s ; inconnus : %s", liste_guillemets(admis),
             if (length(manquants)) liste_guillemets(manquants) else "aucun",
-            if (length(inconnus)) liste_guillemets(montrer(inconnus)) else "aucun")
+            if (length(inconnus)) liste_guillemets(inconnus) else "aucun")
   }
   forme_graine <- function(g) forme_exacte(g, c("double", "integer")) && length(g) == 1L && !is.na(g) &&
     is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max
@@ -557,11 +557,11 @@ controler_defauts <- function(defauts, graine) {
       inv("type : chaîne (ou vecteur de chaînes d'une combinaison admise) sans attribut, sans NA ni doublon.")
     if (length(type) == 1L) {
       if (!(type %in% CATALOGUE_DEFAUTS$defaut))
-        inv(sprintf("type « %s » inconnu ; types admis : %s.", montrer(type),
+        inv(sprintf("type %s inconnu ; types admis : %s.", liste_guillemets(type),
                     liste_guillemets(CATALOGUE_DEFAUTS$defaut)))
     } else if (!any(vapply(COMBINAISONS_DEFAUTS, function(cmb)
       length(cmb) == length(type) && all(type %in% cmb), logical(1L)))) {
-      inv(sprintf("combinaison %s non admise ; combinaisons admises : %s.", liste_guillemets(montrer(type)),
+      inv(sprintf("combinaison %s non admise ; combinaisons admises : %s.", liste_guillemets(type),
                   paste(vapply(COMBINAISONS_DEFAUTS, liste_guillemets, character(1L)), collapse = " ; ")))
     }
     unite <- CATALOGUE_DEFAUTS$unite[match(type[1L], CATALOGUE_DEFAUTS$defaut)]

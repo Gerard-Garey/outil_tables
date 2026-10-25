@@ -61,7 +61,19 @@ avec_noms <- function(x, noms) { names(x) <- noms; x }
 etapes_deux <- function(noms)
   avec_noms(list(list(exclusions = character(0)), list(convention = "plus_fine", par_annee = FALSE)), noms)
 
+# Chaîne au codage bytes dans le plan (#111) : sprintf() lèverait une erreur R dans le
+# message ; le refus nomme le motif, sans citer la chaîne.
+OCTETS_PLAN <- "\xe9t\xe9"; Encoding(OCTETS_PLAN) <- "bytes"
 cas_refus <- list(
+  list("transition : départ au codage bytes", "transition_inconnue",
+       modifier(plan_type(), transition = list(depart = OCTETS_PLAN, arrivee = "deces"))),
+  list("transition : arrivée au codage bytes", "transition_inconnue",
+       modifier(plan_type(), transition = list(depart = "vivant", arrivee = OCTETS_PLAN))),
+  list("convention au codage bytes", "convention_invalide",
+       modifier(plan_type(), etapes = list(donnees = list(exclusions = character(0)),
+                                           exposition = list(convention = OCTETS_PLAN, par_annee = FALSE)))),
+  list("champ du plan au nom bytes", "champ_inconnu",
+       { p <- plan_type(); p <- c(p, list(1)); names(p)[length(p)] <- OCTETS_PLAN; p }),
   list("plan non liste", "plan_mal_forme", "a"),
   list("plan sans noms", "plan_mal_forme", list(1, 2)),
   list("plan vide", "plan_mal_forme", list()),

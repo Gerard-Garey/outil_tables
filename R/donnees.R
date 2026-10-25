@@ -179,7 +179,19 @@ type_conforme <- function(x, type) {
 
 # --- refus au niveau des rôles (A.1) ------------------------------------------
 
-liste_guillemets <- function(x) paste0("« ", x, " »", collapse = ", ")
+# Chaînes de l'utilisateur citées dans un message : seule règle de masquage du
+# package (#111). Une chaîne marquée « bytes » ferait lever sprintf()
+# (« translating strings with "bytes" encoding is not allowed », mesuré sous
+# C.UTF-8 et sous C) au lieu du refus ; elle est citée sous un repère. Rend le
+# vecteur masqué, sans paste : une chaîne qui n'est pas « bytes » reste telle
+# quelle (encodage compris).
+citer <- function(x) {
+  if (!is.character(x)) x <- as.character(x)
+  x[!is.na(x) & Encoding(x) == "bytes"] <- "<chaîne d'encodage bytes>"
+  x
+}
+
+liste_guillemets <- function(x) paste0("« ", citer(x), " »", collapse = ", ")
 
 # Message du refus `aucune_recette` (texte unique, repris par le module
 # `exposition`, deduire_recette()).
@@ -344,12 +356,14 @@ controler_transition_periode <- function(transition, periode, delai_declaration)
                   "de champs exactement depart et arrivee, sans autre attribut (ADR 0007, point 5.1)."),
             list(transition = transition))
   depart <- transition[["depart"]]; arrivee <- transition[["arrivee"]]
-  if (!nrow(ligne_transition(transition)))
+  if (!nrow(ligne_transition(transition))) {
+    # États cités par citer() : masqués s'ils sont marqués « bytes » (#111).
     refuser("donnees", "transition_inconnue",
             sprintf("Transition non prise en charge : %s -> %s (prises en charge : %s).",
-                    depart, arrivee,
+                    citer(depart), citer(arrivee),
                     paste(TRANSITIONS$depart, "->", TRANSITIONS$arrivee, collapse = ", ")),
             list(transition = transition))
+  }
   # Stockage double ou integer admis (inchangé), seul attribut : la classe.
   date1 <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
     identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
@@ -785,37 +799,40 @@ FORMES_ORIGINE <- c("qx", "lx")
 table_reference <- function(x, nom, statut, source, parametres = NULL, forme_origine = "qx") {
   if (!chaine_unique(nom))
     refuser("donnees", "table_nom_manquant", "La table de référence doit avoir un nom (chaîne non vide, sans attribut).")
+  # Nom cité dans les messages : masqué s'il est marqué « bytes » (#111) ; `nom`
+  # lui-même reste celui de l'objet.
+  nom_cite <- citer(nom)
   if (!chaine_unique(statut) || !(statut %in% STATUTS_TABLE))
     refuser("donnees", "table_statut_inconnu",
-            sprintf("Table « %s » : statut (chaîne sans attribut) à prendre dans %s.", nom, liste_guillemets(STATUTS_TABLE)),
+            sprintf("Table « %s » : statut (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(STATUTS_TABLE)),
             list(statut = statut))
   if (!chaine_unique(source))
     refuser("donnees", "table_source_manquante",
-            sprintf("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom))
+            sprintf("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom_cite))
   if (statut == "synthetique" && (!is.list(parametres) || !length(parametres)))
     refuser("donnees", "table_parametres_manquants",
-            sprintf("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom))
+            sprintf("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom_cite))
   if (statut != "synthetique" && !is.null(parametres))
     refuser("donnees", "table_parametres_inattendus",
-            sprintf("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom, statut))
+            sprintf("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, statut))
   if (!chaine_unique(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
     refuser("donnees", "table_forme_inconnue",
-            sprintf("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom, liste_guillemets(FORMES_ORIGINE)))
+            sprintf("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(FORMES_ORIGINE)))
   if (!is.data.frame(x))
-    refuser("donnees", "table_mal_formee", sprintf("Table « %s » : un data.frame est attendu.", nom))
+    refuser("donnees", "table_mal_formee", sprintf("Table « %s » : un data.frame est attendu.", nom_cite))
   colonnes <- c("age", "sexe", "qx", if ("annee" %in% names(x)) "annee")
   manquantes <- setdiff(c("age", "sexe", "qx"), names(x))
   if (length(manquantes))
     refuser("donnees", "table_colonne_manquante",
-            sprintf("Table « %s » : colonne(s) manquante(s) %s.", nom, liste_guillemets(manquantes)),
+            sprintf("Table « %s » : colonne(s) manquante(s) %s.", nom_cite, liste_guillemets(manquantes)),
             list(colonne = manquantes))
   en_trop <- setdiff(names(x), colonnes)
   if (length(en_trop))
     refuser("donnees", "table_colonne_inconnue",
             sprintf("Table « %s » : colonne(s) inconnue(s) %s (admises : age, sexe, qx, annee).",
-                    nom, liste_guillemets(en_trop)),
+                    nom_cite, liste_guillemets(en_trop)),
             list(colonne = en_trop))
-  if (!nrow(x)) refuser("donnees", "table_vide", sprintf("Table « %s » : aucune ligne.", nom))
+  if (!nrow(x)) refuser("donnees", "table_vide", sprintf("Table « %s » : aucune ligne.", nom_cite))
   mal_typees <- c(
     age = !type_conforme(x$age, "entier_positif") || anyNA(x$age),
     sexe = !type_conforme(x$sexe, "categorie") || anyNA(x$sexe),
@@ -824,13 +841,13 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (any(mal_typees))
     refuser("donnees", "table_colonne_mal_typee",
             sprintf("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; sexe : chaîne ; qx : double).",
-                    nom, liste_guillemets(names(mal_typees)[mal_typees])),
+                    nom_cite, liste_guillemets(names(mal_typees)[mal_typees])),
             list(colonne = names(mal_typees)[mal_typees]))
   sexe <- as.character(x$sexe)
   hors <- which(!(sexe %in% SEXES_TABLE))
   if (length(hors))
     refuser("donnees", "table_sexe_hors_modalites",
-            sprintf("Table « %s » : sexe hors de %s aux lignes %s.", nom, liste_guillemets(SEXES_TABLE),
+            sprintf("Table « %s » : sexe hors de %s aux lignes %s.", nom_cite, liste_guillemets(SEXES_TABLE),
                     paste(utils::head(hors, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = hors))
   # « ensemble » (table sans distinction de sexe) ne coexiste pas avec H ou
@@ -839,19 +856,19 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   melange <- unique(annee0[annee0 %in% annee0[sexe == "ensemble"] & annee0 %in% annee0[sexe != "ensemble"]])
   if (length(melange))
     refuser("donnees", "table_sexes_melanges",
-            sprintf("Table « %s » : la modalité « ensemble » coexiste avec H ou F%s.", nom,
+            sprintf("Table « %s » : la modalité « ensemble » coexiste avec H ou F%s.", nom_cite,
                     if ("annee" %in% names(x)) sprintf(" (années %s)", paste(utils::head(melange, NB_LIGNES_CITEES), collapse = ", ")) else ""),
             list(annees = if ("annee" %in% names(x)) melange else NULL))
   non_fini <- which(!is.finite(x$qx))
   if (length(non_fini))
     refuser("donnees", "table_qx_non_fini",
-            sprintf("Table « %s » : q_x manquant ou non fini aux lignes %s.", nom,
+            sprintf("Table « %s » : q_x manquant ou non fini aux lignes %s.", nom_cite,
                     paste(utils::head(non_fini, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = non_fini))
   hors_bornes <- which(x$qx < 0 | x$qx > 1)
   if (length(hors_bornes))
     refuser("donnees", "table_qx_hors_bornes",
-            sprintf("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom,
+            sprintf("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom_cite,
                     paste(utils::head(hors_bornes, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = hors_bornes))
   age <- as.integer(x$age)
@@ -860,7 +877,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   doublons <- which(duplicated(paste(cle, age, sep = "\r")))
   if (length(doublons))
     refuser("donnees", "table_age_double",
-            sprintf("Table « %s » : âge en double au sein d'un même sexe%s, lignes %s.", nom,
+            sprintf("Table « %s » : âge en double au sein d'un même sexe%s, lignes %s.", nom_cite,
                     if (is.null(annee)) "" else " et d'une même année",
                     paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = doublons))
@@ -871,14 +888,14 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   decroit <- which(meme & pas < 0L)
   if (length(decroit))
     refuser("donnees", "table_ages_non_croissants",
-            sprintf("Table « %s » : âges non croissants au sein d'un même sexe, lignes %s.", nom,
+            sprintf("Table « %s » : âges non croissants au sein d'un même sexe, lignes %s.", nom_cite,
                     paste(utils::head(o[decroit + 1L], NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = o[decroit + 1L]))
   trous <- which(meme & pas > 1L)
   if (length(trous))
     refuser("donnees", "table_ages_non_contigus",
             sprintf("Table « %s » : âges non contigus (âge manquant) au sein d'un même sexe, entre les lignes %s.",
-                    nom, paste(sprintf("%d et %d", o[trous], o[trous + 1L])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
+                    nom_cite, paste(sprintf("%d et %d", o[trous], o[trous + 1L])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
                                collapse = ", ")),
             list(lignes = o[trous + 1L]))
   t <- data.frame(age = age, sexe = sexe, qx = as.numeric(x$qx), stringsAsFactors = FALSE)

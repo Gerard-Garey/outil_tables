@@ -561,6 +561,28 @@ for (k in NOMS_PF_FORME)
   verifier(sprintf("forme exacte : portefeuille, %s -> refus portefeuille_invalide", k[[1]]),
            leve_refus(simuler(loi(), k[[2]], PER, GRAINE), "portefeuille_invalide"))
 
+# Nom de champ marqué « bytes » (#111) : sa citation dans sprintf() lèverait une erreur R
+# (« translating strings with "bytes" encoding is not allowed ») ; en première position
+# ou en l'absence de mode, la lecture [["mode"]] lèverait aussi. Le refus
+# portefeuille_invalide cite le nom sous un repère. Mode marqué « bytes » : refusé aussi.
+NOM_BYTES <- "\xe9t\xe9"; Encoding(NOM_BYTES) <- "bytes"
+nom_en <- function(p, i) { names(p)[i] <- NOM_BYTES; p }
+PF_BYTES <- list(
+  list("champ de plus en dernière position", plus_champ(PF_FORME, NOM_BYTES), TRUE),
+  list("champ de plus en première position", nom_en(c(list(1), PF_FORME), 1L), TRUE),
+  list("champ de plus en seconde position", nom_en(c(PF_FORME[1], list(1), PF_FORME[-1]), 2L), TRUE),
+  list("champ mode renommé (première position, mode absent)", nom_en(PF_FORME, 1L), FALSE),
+  list("champ n renommé (seconde position)", nom_en(PF_FORME, 2L), TRUE),
+  list("champ en première position, mode âge exact", nom_en(c(list(1), PF_AGE), 1L), TRUE),
+  list("mode d'encodage bytes", modifyList(PF_FORME, list(mode = NOM_BYTES)), FALSE))
+for (k in PF_BYTES) {
+  verifier(sprintf("forme exacte : portefeuille, %s, nom d'encodage bytes -> refus portefeuille_invalide", k[[1]]),
+           leve_refus(simuler(loi(), k[[2]], PER, GRAINE), "portefeuille_invalide"))
+  if (k[[3]])
+    verifier(sprintf("forme exacte : portefeuille, %s, nom d'encodage bytes -> nom remplacé par un repère", k[[1]]),
+             grepl("inconnus : « <chaîne d'encodage bytes> »", message_refus(simuler(loi(), k[[2]], PER, GRAINE)), fixed = TRUE))
+}
+
 # Formes admises : stockage integer des champs numériques et des dates, ordre
 # des champs permuté ; mêmes tirages, seul l'attribut `simulation` diffère.
 verifier("forme exacte : champs numériques en integer admis, tirages identiques",

@@ -106,7 +106,7 @@ controler_parametres_exposition <- function(convention, par_annee) {
             list(convention = convention))
   if (!(convention %in% VALEURS_CONVENTION))
     refuser("exposition", "convention_invalide",
-            sprintf("Convention d'âge inconnue « %s » (valeurs admises : %s).", convention,
+            sprintf("Convention d'âge inconnue %s (valeurs admises : %s).", liste_guillemets(convention),
                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (!forme_exacte(par_annee, "logical") || length(par_annee) != 1L || is.na(par_annee))
