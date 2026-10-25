@@ -131,6 +131,18 @@ jobs:
       - name: Locale C (installation et exécution)
         if: ${{ !cancelled() }}
         run: Rscript tests/controles/locale_c.R
+      # Issue #91 : la batterie unitaire est lancée une seconde fois, sous la
+      # locale C stricte (LANG retirée, LC_ALL=C), pour les défauts propres aux
+      # tests (chaînes marquées UTF-8 mêlées à des chaînes non marquées, comme
+      # #81). Hors liste des batteries de CLAUDE.md : le nom ne commence pas par
+      # « Batterie : » (identite_batteries.R). La locale effective est affichée
+      # avant la batterie, pour qu'on vérifie dans le journal qu'elle vaut C.
+      - name: "Locale C : tests unitaires"
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          env -u LANG LC_ALL=C Rscript -e 'cat("Locale effective :", Sys.getlocale(), "\n"); cat("UTF-8 :", l10n_info()[["UTF-8"]], "\n")'
+          env -u LANG LC_ALL=C Rscript tests/test_unitaires.R
 
   # ADR 0008, point 7 ; issue #3. Métadonnées de l'instantané daté du CRAN
   # (date dans tests/controles/absence_java.R), lues sans rien installer ;
