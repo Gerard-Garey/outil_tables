@@ -539,6 +539,168 @@ verifier("segmentation : segment entier rendu en integer et trié sur sa valeur 
   is.integer(t$segment) && identical(unique(t$segment), c(2L, 10L))
 })
 
+# Segment non ASCII non marqué (#106) : le tri radix des valeurs de segment
+# levait « Character encoding must be UTF-8, Latin-1 or bytes » sous une locale
+# UTF-8 (forme que donne read.csv() d'un CSV UTF-8). Les témoins s'exécutent
+# sous la locale C et sous la première locale UTF-8 disponible, posées sur
+# LC_CTYPE quelle que soit la locale de la session (donc dans les deux
+# lancements, C stricte et C.UTF-8). Attendu : sous UTF-8, construction, segments
+# dans l'ordre des octets, calculé ici par charToRaw() et non par le code
+# testé ; sous C, la chaîne native est refusée (chaine_codage_indetermine,
+# ADR 0007, point 9.3), les chaînes marquées UTF-8 et ASCII se construisent.
+sous_ctype <- function(locale, expr) {
+  ancienne <- Sys.getlocale("LC_CTYPE")
+  on.exit(Sys.setlocale("LC_CTYPE", ancienne))
+  if (!nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", locale)))) stop("locale indisponible : ", locale)
+  force(expr)
+}
+LOCALE_UTF8 <- locale_utf8_disponible()
+verifier("#106 : une locale UTF-8 est disponible pour les témoins (sinon la moitié des témoins ne porte pas)",
+         nzchar(LOCALE_UTF8) || "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
+natif <- function(...) rawToChar(as.raw(c(...)))   # octets tels quels, encodage `unknown`
+SEG_NATIFS <- c(natif(0xc3, 0xa9), "b", natif(0xc2, 0xb0), "Z", natif(0xe2, 0x82, 0xac), natif(0xc3, 0xbf), "a")
+SEG_UTF8 <- SEG_NATIFS; Encoding(SEG_UTF8) <- "UTF-8"
+SEG_MIXTE <- SEG_UTF8; SEG_MIXTE[1L] <- SEG_NATIFS[1L]   # première valeur native, les autres marquées UTF-8
+SEG_ASCII <- c("b", "B", "a", "_", "Z", "10", "2")
+octets_hex <- function(x) vapply(x, function(s) paste(sprintf("%02x", as.integer(charToRaw(s))), collapse = ""),
+                                 "", USE.NAMES = FALSE)
+ordre_octets_ref <- function(x) { h <- unique(octets_hex(x)); h[order(h, method = "radix")] }
+donnees_106 <- function(seg) {
+  base <- data.frame(n = D(c("1960-07-01", "1945-10-15", "1950-01-10")),
+                     e = D(c("2020-03-01", "2016-05-20", "2010-06-01")),
+                     s = D(c(NA, "2019-02-10", NA)), c = c("en_cours", "deces", "en_cours"),
+                     stringsAsFactors = FALSE)
+  d <- base[rep_len(1:3, length(seg)), ]
+  rownames(d) <- NULL
+  d$sg <- seg
+  d
+}
+ROLES_106 <- c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c", segment = "sg")
+PLAN_106 <- list(transition = VD, periode = PER, delai_declaration = 0, segmentation = "segment",
+                 etapes = list(donnees = list(exclusions = character(0)),
+                               exposition = list(convention = "plus_fine", par_annee = FALSE)))
+exposition_106 <- function(seg, roles = ROLES_106, provenance = NULL)
+  construire_table(donnees_106(seg), roles, PLAN_106, provenance)$etapes$exposition$resultat$exposition
+segments_106 <- function(seg) octets_hex(unique(exposition_106(seg)$segment))
+for (loc in c("C", LOCALE_UTF8)) {
+  utf8 <- !identical(loc, "C")
+  verifier(sprintf("#106 : locale %s, segments ASCII et segments marqués UTF-8 : ordre des octets (charToRaw), inchangé", loc),
+           sous_ctype(loc, {
+             if (!identical(segments_106(SEG_ASCII), ordre_octets_ref(SEG_ASCII))) "ASCII"
+             else if (!identical(segments_106(SEG_UTF8), ordre_octets_ref(SEG_UTF8))) "marqués UTF-8"
+             else if (!identical(segments_106(factor(SEG_UTF8)), ordre_octets_ref(SEG_UTF8))) "facteur marqué UTF-8"
+             else TRUE
+           }))
+  verifier(sprintf("#106 : locale %s, segment non ASCII natif en première ligne (chaîne, facteur, première valeur seule native) : %s",
+                   loc, if (utf8) "construction, segments dans l'ordre des octets, mêmes valeurs qu'en UTF-8 marqué"
+                              else "refus chaine_codage_indetermine"),
+           sous_ctype(loc, {
+             if (utf8) {
+               ref <- exposition_106(SEG_UTF8)
+               tabs <- list(chaine = exposition_106(SEG_NATIFS), facteur = exposition_106(factor(SEG_NATIFS)),
+                            mixte = exposition_106(SEG_MIXTE))
+               ko <- names(tabs)[!vapply(tabs, function(t)
+                 identical(octets_hex(unique(t$segment)), ordre_octets_ref(SEG_NATIFS)) &&
+                   identical(t$exposition_jours, ref$exposition_jours) && identical(t$evenements, ref$evenements),
+                 logical(1L))]
+               if (length(ko)) paste("écart :", paste(ko, collapse = ", ")) else TRUE
+             } else {
+               r <- c(leve_refus(exposition_106(SEG_NATIFS), "chaine_codage_indetermine"),
+                      leve_refus(exposition_106(factor(SEG_NATIFS)), "chaine_codage_indetermine"),
+                      leve_refus(exposition_106(SEG_MIXTE), "chaine_codage_indetermine"))
+               if (all(r == "TRUE")) TRUE else paste(r[r != "TRUE"], collapse = " ; ")
+             }
+           }))
+  verifier(sprintf("#106 : locale %s, segments_observations() ne lève pas sur un segment non ASCII natif en première valeur (chaîne, facteur) ni marqué latin-1 : segments dans l'ordre des octets, indices g de chaque ligne", loc),
+           sous_ctype(loc, {
+             res <- lapply(list(chaine = SEG_NATIFS, facteur = factor(SEG_NATIFS)), function(sg) {
+               r <- tablexp:::segments_observations(data.frame(segment = sg, stringsAsFactors = FALSE), "segment")
+               identical(octets_hex(r$segments$segment), ordre_octets_ref(SEG_NATIFS)) &&
+                 identical(octets_hex(r$segments$segment[r$g]), octets_hex(SEG_NATIFS))
+             })
+             l1 <- c(natif(0xe9), "b", natif(0xb0)); Encoding(l1) <- "latin1"   # marqué latin-1 : ordre des octets UTF-8
+             r <- tablexp:::segments_observations(data.frame(segment = c(l1, SEG_UTF8[5L]), stringsAsFactors = FALSE), "segment")
+             res$latin1 <- identical(octets_hex(enc2utf8(r$segments$segment)),
+                                     ordre_octets_ref(enc2utf8(c(l1, SEG_UTF8[5L]))))
+             if (all(unlist(res))) TRUE else paste("écart :", paste(names(res)[!unlist(res)], collapse = ", "))
+           }))
+  # Cas connexe : nom de colonne (valeur d'un rôle) et chemin de provenance, écrits dans
+  # la fiche mais absents de l'empreinte des données. Sous C, la chaîne native n'était
+  # refusée qu'à l'écriture de la fiche, en « erreur de programmation » après tous les
+  # calculs (empreinte_resultat()).
+  verifier(sprintf("#106 : locale %s, nom de colonne natif déclaré en rôle, provenance native : %s",
+                   loc, if (utf8) "construction" else "refus chaine_codage_indetermine avant tout calcul"),
+           sous_ctype(loc, {
+             colonne <- paste0("s", natif(0xc3, 0xa9))
+             d <- donnees_106(SEG_ASCII); names(d)[names(d) == "sg"] <- colonne
+             roles <- ROLES_106; roles[["segment"]] <- colonne
+             prov <- list(fichier = paste0("f", natif(0xc3, 0xa9), ".csv"), empreinte = "0", algorithme = "md5")
+             f_roles <- function() construire_table(d, roles, PLAN_106)
+             f_prov <- function() construire_table(donnees_106(SEG_ASCII), ROLES_106, PLAN_106, prov)
+             if (utf8) {
+               if (!identical(f_roles()$fiche$roles[["segment"]], colonne)) "rôle non recopié dans la fiche"
+               else if (!identical(f_prov()$fiche$provenance$fichier, prov$fichier)) "provenance non recopiée"
+               else TRUE
+             } else {
+               r <- c(leve_refus(f_roles(), "chaine_codage_indetermine"),
+                      leve_refus(f_prov(), "chaine_codage_indetermine"))
+               if (all(r == "TRUE")) TRUE else paste(r[r != "TRUE"], collapse = " ; ")
+             }
+           }))
+}
+# Ordre des segments indépendant du marquage (erratum A.3, point 4) : trois jeux de
+# mêmes chaînes, marquées différemment, donnent mêmes empreintes des données, même
+# ordre des segments (octets UTF-8, comparé à charToRaw(enc2utf8(.)) hors du code
+# testé), mêmes expositions et événements, même empreinte du résultat. A : ÿ
+# latin-1, € et é UTF-8 ; B : tout en UTF-8 ; C : ÿ et é latin-1 (représentables),
+# € UTF-8. Aucun `unknown` : les trois jeux se construisent sous C comme sous UTF-8.
+# Le témoin direct mêle `unknown` et latin-1 marqué : les `unknown` gardent leurs
+# octets (sous C, enc2utf8 les échapperait), seules les chaînes latin-1 sont converties.
+natif_l1 <- function(...) { x <- rawToChar(as.raw(c(...))); Encoding(x) <- "latin1"; x }
+utf8_sauf_unknown <- function(x) { l <- Encoding(x) == "latin1"; x[l] <- enc2utf8(x[l]); x }
+JEU_A <- c(natif_l1(0xff), SEG_UTF8[5L], SEG_UTF8[1L], "a")
+JEU_B <- enc2utf8(JEU_A)
+JEU_C <- c(natif_l1(0xff), SEG_UTF8[5L], natif_l1(0xe9), "a")
+table_106 <- function(seg) construire_table(donnees_106(seg), ROLES_106, PLAN_106)
+for (loc in c("C", LOCALE_UTF8)) {
+  verifier(sprintf("#106 : locale %s, mêmes chaînes marquées latin-1, UTF-8 ou mêlées : mêmes empreintes des données, même ordre des segments (octets UTF-8), mêmes expositions, événements et empreinte du résultat", loc),
+           sous_ctype(loc, {
+             tabs <- lapply(list(A = JEU_A, B = JEU_B, C = JEU_C), table_106)
+             expo <- lapply(tabs, function(t) t$etapes$exposition$resultat$exposition)
+             emp <- function(champ) vapply(tabs, function(t) t$fiche$empreintes[[champ]], "")
+             ref <- ordre_octets_ref(enc2utf8(JEU_A))
+             if (length(unique(emp("donnees"))) != 1L) "précondition : empreintes des données différentes"
+             else if (!all(vapply(expo, function(e) identical(octets_hex(enc2utf8(unique(e$segment))), ref), NA)))
+               "ordre des segments"
+             else if (!all(vapply(expo[-1L], function(e) identical(e$exposition_jours, expo$A$exposition_jours) &&
+                                    identical(e$evenements, expo$A$evenements), NA)))
+               "exposition_jours ou evenements"
+             else if (length(unique(emp("resultat"))) != 1L) "empreinte du résultat"
+             else TRUE
+           }))
+  verifier(sprintf("#106 : locale %s, segments_observations() sur un mélange `unknown` (natif) et latin-1 marqué ne lève pas : segments dans l'ordre des octets UTF-8", loc),
+           sous_ctype(loc, {
+             sg <- c(SEG_NATIFS[1L], natif_l1(0xff), "a", natif_l1(0xe0))   # é natif, ÿ et à latin-1 (pas de é latin-1 : sous C, deux chaînes distinctes de mêmes octets UTF-8)
+             r <- tryCatch(tablexp:::segments_observations(data.frame(segment = sg, stringsAsFactors = FALSE), "segment"),
+                           error = function(e) conditionMessage(e))
+             if (is.character(r)) r
+             else if (!identical(octets_hex(utf8_sauf_unknown(r$segments$segment)),
+                                 ordre_octets_ref(utf8_sauf_unknown(sg)))) "ordre"
+             else TRUE
+           }))
+}
+verifier("#106 : octets invalides en UTF-8 (0xc9) : nom de colonne déclaré en rôle refusé chaine_non_utf8 sous UTF-8, chaine_codage_indetermine sous C ; segment : mêmes refus",
+         {
+           colonne <- paste0("s", natif(0xc9))
+           d <- donnees_106(SEG_ASCII); names(d)[names(d) == "sg"] <- colonne
+           roles <- ROLES_106; roles[["segment"]] <- colonne
+           r <- c(sous_ctype("C", leve_refus(construire_table(d, roles, PLAN_106), "chaine_codage_indetermine")),
+                  sous_ctype(LOCALE_UTF8, leve_refus(construire_table(d, roles, PLAN_106), "chaine_non_utf8")),
+                  sous_ctype("C", leve_refus(exposition_106(c(natif(0xc9), "a", "b")), "chaine_codage_indetermine")),
+                  sous_ctype(LOCALE_UTF8, leve_refus(exposition_106(c(natif(0xc9), "a", "b")), "chaine_non_utf8")))
+           if (all(r == "TRUE")) TRUE else paste(r[r != "TRUE"], collapse = " ; ")
+         })
+
 # Nombre de cellules en integer (#37) : diagnostics$cellules de l'étape est un
 # integer égal au nombre de lignes de la table (sans et avec par_annee, table
 # vide, plusieurs segments) ; nombre_cellules() refuse au-delà de
