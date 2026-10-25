@@ -67,15 +67,25 @@ forme_exacte <- function(x, types, attributs = character(0)) {
 
 # Liste nue aux noms exactement `noms` (#48) : forme_exacte() de type list, seul
 # attribut names (ni data.frame, ni classe), autant d'éléments que de noms, et
-# mêmes noms une fois triés par sort(method = "radix"), indépendant de la
-# locale. La longueur est contrôlée à part : sort() retire un nom NA, qui
-# passerait sinon avec un élément de plus. as.character() : sort(NULL) est une
-# erreur, une liste sans noms doit être refusée (FALSE), pas lever. Les
+# mêmes noms, sans NA ni doublon, comparés sans tri. Pas de sort() : le tri
+# radix lève « Character encoding must be UTF-8, Latin-1 or bytes » sur un nom
+# non ASCII d'encodage `unknown` ou aux octets invalides, selon sa position
+# (#100). Précondition : noms attendus ASCII (tous les appelants) ; la
+# comparaison ne dépend alors pas de la locale et ne lève pas, quel que soit
+# l'encodage d'un nom reçu (natif, octets invalides, bytes : FALSE). Avec des
+# noms attendus non ASCII, setequal() passe par match(), qui traduit les
+# encodages : le résultat peut dépendre de la locale, et un nom marqué `bytes`
+# lève sous C.UTF-8 (mesuré par l'audit). La longueur est contrôlée à part ;
+# avec NA et doublons écartés, setequal() donne l'égalité des ensembles de
+# noms. as.character() : une liste sans noms (names(x) NULL) donne
+# character(0), que setequal() refuse (FALSE) si des noms sont attendus. Les
 # éléments se lisent par [[ ]] (jamais $, qui apparie les noms partiels). Rend
 # TRUE ou FALSE ; le contenu des éléments est l'affaire de l'appelant.
 liste_aux_noms <- function(x, noms) {
-  forme_exacte(x, "list", "names") && length(x) == length(noms) &&
-    identical(sort(as.character(names(x)), method = "radix"), sort(noms, method = "radix"))
+  forme_exacte(x, "list", "names") && length(x) == length(noms) && {
+    n <- as.character(names(x))
+    !anyNA(n) && !anyDuplicated(n) && setequal(n, noms)
+  }
 }
 
 # Chaîne unique (#48) : forme exacte character (aucun attribut, names compris),

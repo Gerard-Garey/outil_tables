@@ -220,6 +220,32 @@ for (k in cas_liste)
   verifier(sprintf("liste_aux_noms : %s -> %s (valeur calculée à la main)", k[[1]], k[[4]]),
            identical(liste_aux_noms(k[[2]], k[[3]]), k[[4]]))
 
+# #100 : un nom non ASCII d'encodage `unknown` (octets UTF-8 de « é » lus sous
+# la locale C) ou aux octets invalides (0xC9 seul) ne fait pas lever la
+# comparaison, quelle que soit sa position (le tri radix levait « Character
+# encoding must be UTF-8, Latin-1 or bytes » en première position, mesuré sur
+# l'ancien code ; en seconde position il rendait FALSE). Le résultat est
+# évalué sous tryCatch : une erreur est consignée comme échec de l'assertion,
+# elle n'interrompt pas le fichier.
+E_NAT <- rawToChar(as.raw(c(0xc3, 0xa9)))
+E_INV <- rawToChar(as.raw(0xc9))
+liste_ou_erreur <- function(x, noms)
+  tryCatch(liste_aux_noms(x, noms), error = function(e) paste("erreur :", conditionMessage(e)))
+cas_liste_encodage <- list(
+  list("nom natif non ASCII en 1re position", setNames(list(1, 2), c(E_NAT, "b")), AB, FALSE),
+  list("nom natif non ASCII en 2e position", setNames(list(1, 2), c("a", E_NAT)), AB, FALSE),
+  list("octets invalides en 1re position", setNames(list(1, 2), c(E_INV, "b")), AB, FALSE),
+  list("octets invalides en 2e position", setNames(list(1, 2), c("a", E_INV)), AB, FALSE),
+  list("octets invalides en 1re position, nom attendu b", setNames(list(1, 2), c(E_INV, "b")), c("b", "a"), FALSE),
+  list("deux noms non ASCII natifs distincts", setNames(list(1, 2), c(E_NAT, E_INV)), AB, FALSE),
+  list("deux mêmes noms aux octets invalides (doublon)", setNames(list(1, 2), c(E_INV, E_INV)), AB, FALSE),
+  list("nom UTF-8 déclaré non ASCII en 1re position", setNames(list(1, 2), c("é", "b")), AB, FALSE),
+  list("nom natif non ASCII attendu et présent (aucune erreur)", setNames(list(1, 2), c("b", E_NAT)), c(E_NAT, "b"), TRUE),
+  list("octets invalides attendus et présents (aucune erreur)", setNames(list(1, 2), c(E_INV, "b")), c("b", E_INV), TRUE))
+for (k in cas_liste_encodage)
+  verifier(sprintf("liste_aux_noms (#100) : %s -> %s (valeur calculée à la main)", k[[1]], k[[4]]),
+           identical(liste_ou_erreur(k[[2]], k[[3]]), k[[4]]))
+
 cas_chaine <- list(
   list("chaîne nue", "a", TRUE),
   list("chaîne d'un blanc (non vide)", " ", TRUE),
