@@ -833,9 +833,12 @@ CODE <- tablexp:::EMPREINTE_CODE
 verifier("empreinte du code : non NA, égale au recalcul en R sur R/*.R de la racine installée, et à fiche$empreintes$code",
          is.character(CODE) && length(CODE) == 1L && !is.na(CODE) && identical(CODE, recalcul_code(RACINE)) &&
            identical(f$empreintes$code, CODE))
+# -t : mode texte explicite ; le md5sum de Rtools (MSYS2) écrit par défaut en mode binaire
+# et préfixe les noms par « * » (#101). Le second md5sum lit l'entrée standard, dont seul le
+# premier champ importe : son mode ne change pas le condensé.
 if (nzchar(Sys.which("md5sum")) && nzchar(Sys.which("sh"))) {
-  verifier("empreinte du code (autre outil) : égale à `LC_ALL=C md5sum R/*.R | md5sum` à la racine installée", {
-    s <- system2("sh", c("-c", shQuote(sprintf("cd %s && LC_ALL=C md5sum R/*.R | md5sum", shQuote(RACINE)))), stdout = TRUE)
+  verifier("empreinte du code (autre outil) : égale à `LC_ALL=C md5sum -t R/*.R | md5sum` à la racine installée", {
+    s <- system2("sh", c("-c", shQuote(sprintf("cd %s && LC_ALL=C md5sum -t R/*.R | md5sum", shQuote(RACINE)))), stdout = TRUE)
     identical(sub(" .*$", "", s), CODE)
   })
 } else cat("  (md5sum ou sh absent : comparaison à l'autre outil non faite ; recalcul en R seulement)\n")
