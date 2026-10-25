@@ -2117,7 +2117,11 @@ section~\ref{sec:sous-graine}), aux rôles reçus par \code{controler\_roles()}
 (seul attribut admis~: les noms~; refus \code{roles\_mal\_formes},
 section~\ref{sec:controles-donnees}~; issue~\#62), au mode du portefeuille
 simulé (refus \code{portefeuille\_invalide},
-section~\ref{sec:portefeuille-simule}~; issue~\#60) et, à
+section~\ref{sec:portefeuille-simule}~; issue~\#60), aux bornes de la
+période du simulateur (même forme que celles du plan~; refus
+\code{periode\_invalide}) et aux facteurs de la loi vraie (\code{double} ou
+\code{integer}, seul attribut les noms~; refus \code{loi\_invalide},
+section~\ref{sec:loi-vraie}~; issue~\#58) et, à
 l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()} (argument
 \code{controler} à sa valeur par défaut, \code{TRUE}~;
 section~\ref{sec:execution}), à la segmentation, contrôlée dans sa forme et dans son catalogue par le même
@@ -6853,7 +6857,18 @@ spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
 La loi vraie est une liste de deux lois, \code{deces} et \code{rachat}~;
 chacune associe une table de référence (classe \code{table\_reference},
 section~\ref{sec:table-reference}) et un facteur par sexe, \code{c(H = , F = )},
-réel fini $\ge 0$. La loi vraie et chacune de ses deux lois sont des
+réel fini $\ge 0$. Les facteurs sont de \emph{forme exacte}
+(\code{forme\_exacte()}, section~\ref{sec:fonctions-outils}~; issue~\#58)~:
+un vecteur de type de base \code{double} ou \code{integer}, de longueur~2,
+dont le seul attribut admis est celui des noms, qui sont exactement
+\code{H} et \code{F}, dans un ordre quelconque, sans nom manquant ni
+doublé~; un vecteur sans noms, muni d'une classe, d'une dimension ou d'un
+autre attribut, de type logique, ou portant un autre nom, même non ASCII,
+est refusé (\code{loi\_invalide}). Les noms sont comparés sans tri, si bien
+que le contrôle ne dépend pas de la locale et ne lève pas d'erreur R sur un
+nom non ASCII de codage indéterminé ou aux octets invalides~; un facteur
+de type \code{integer} et l'ordre \code{c(F = , H = )} donnent les mêmes
+lignes tirées. La loi vraie et chacune de ses deux lois sont des
 \textbf{listes nues}, dont le seul attribut admis est celui des noms,
 d'exactement autant d'éléments que de noms attendus (\code{deces} et
 \code{rachat}~; \code{table} et \code{facteurs}), dans un ordre
@@ -6978,7 +6993,10 @@ au moins égal à 1 en mode âge exact~; ces conditions sont contrôlées
 (\code{portefeuille\_invalide}). La période d'observation est une liste
 nue, de champs exactement \code{debut} et \code{fin} (même contrôle
 \code{liste\_aux\_noms()} que la loi vraie~; refus \code{periode\_invalide}),
-de deux dates (classe \code{Date}) uniques, non manquantes, finies et entières~; la censure a lieu à l'instant
+de deux dates uniques, non manquantes, finies et entières, de la forme
+exacte des bornes de la période du plan (section~\ref{sec:plan})~: stockage
+\code{double} ou \code{integer}, seul attribut la classe \code{Date}
+exacte, sans noms ni autre attribut ni classe ajoutée (issue~\#58)~; la censure a lieu à l'instant
 $B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
 
 \subsubsection*{Algorithme}
@@ -7232,12 +7250,12 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{CHAMPS\_PORTEFEUILLE} & constante & --- & champs requis du portefeuille, par mode \\
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
-\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
 \catalogue{fonctions-simulation}{age\_anniversaire()} & interne & composantes, année, jour & âge au dernier anniversaire \\
-\catalogue{fonctions-simulation}{date\_unique()} & interne & valeur & date unique entière et finie \\
+\catalogue{fonctions-simulation}{date\_unique()} & interne & valeur & date unique entière et finie, de forme exacte (classe \code{Date} seule, stockage \code{double} ou \code{integer}) \\
 \catalogue{fonctions-simulation}{controler\_portefeuille()} & interne & portefeuille, période & refus des entrées~; bornes d'âge a priori \\
 \catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
