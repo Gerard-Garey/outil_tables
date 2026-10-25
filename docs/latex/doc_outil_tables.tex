@@ -1030,7 +1030,10 @@ texte de fiche, octet pour octet, dans les quatre combinaisons d'installation
 et d'exécution sous C et C.UTF-8. Le marquage ne vaut que pour le texte du
 moteur~: une chaîne non ASCII non marquée des données, des rôles ou du plan
 de l'utilisateur reste refusée (\code{chaine\_codage\_indetermine},
-section~\ref{sec:empreinte}).
+section~\ref{sec:empreinte})~; pour les données, les rôles et la
+provenance, le refus a lieu avant la première étape
+(section~\ref{sec:execution}~; issue~\#106 pour les rôles et la
+provenance).
 
 \medskip
 \noindent
@@ -2200,9 +2203,16 @@ puis sa mise sous forme canonique, une seule fois (\code{canoniser\_plan()},
 section~\ref{sec:fiche})~; les étapes et la fiche ne voient que le plan
 canonique~; contrôle des rôles (\code{controler\_roles()})~; déduction de la recette et,
 si le plan comprend l'étape \code{exposition}, de la convention retenue~;
-contrôle de la provenance~; calcul de l'empreinte des données reçues
-(section~\ref{sec:empreinte}). Tout refus possible avant le calcul a donc lieu
-avant la première étape. Chaque contrôle n'y est exécuté qu'une fois
+contrôle de la provenance~; contrôle du codage des chaînes que la fiche
+écrira hors des données, valeurs des rôles (noms de colonnes) et champs de
+la provenance, par l'écrivain de l'empreinte (\code{octets\_chaines()},
+refus \code{chaine\_codage\_bytes}, \code{chaine\_non\_utf8} et
+\code{chaine\_codage\_indetermine}~; issue~\#106)~; calcul de l'empreinte
+des données reçues (section~\ref{sec:empreinte}). Tout refus possible avant
+le calcul a donc lieu avant la première étape~; un nom de colonne ou un
+chemin non ASCII de codage indéterminé, sous la locale C, n'est plus refusé
+après tous les calculs, à l'écriture de la fiche, en erreur de
+programmation. Chaque contrôle n'y est exécuté qu'une fois
 (issue~\#22)~: \code{construire\_table()} appelle chaque fonction d'étape
 avec son argument interne \code{controler = FALSE}, sous lequel elle ne
 refait aucun de ces contrôles (ses paramètres et, selon l'étape, les rôles,
@@ -3625,12 +3635,37 @@ fermeture (erratum A.3, point~1).\par}
 \medskip
 \textbf{Clés de segmentation.} Leur ordre et leur type ne dépendent ni des
 niveaux d'un facteur ni de la classe reçue~: \code{sexe}, et \code{segment}
-reçu en chaîne ou en facteur, sont rendus en chaînes et triés en ordre
-d'octets~; un \code{segment} entier est rendu en entier et trié par valeur.
-L'empreinte des données ignore les niveaux d'un facteur
-(section~\ref{sec:empreinte})~: sans cette règle, deux entrées de même
-empreinte pourraient donner des tables ordonnées différemment (erratum A.3,
-point~4).
+reçu en chaîne ou en facteur, sont rendus en chaînes et triés dans
+l'\textbf{ordre des octets UTF-8 de la représentation que hache l'empreinte
+des données} (section~\ref{sec:empreinte}), quel que soit le marquage
+d'encodage des chaînes reçues (UTF-8, latin-1 ou non marqué)~; un
+\code{segment} entier est rendu en entier et trié par valeur.
+L'empreinte des données ignore les niveaux d'un facteur et ne dépend pas
+du marquage~: sans cette règle, deux entrées de même empreinte pourraient
+donner des tables ordonnées différemment (erratum A.3, point~4). Le tri
+porte sur une copie des valeurs distinctes marquée \code{bytes}, comparée
+octet à octet sans traduction, après la conversion en UTF-8 que fait
+l'écriture de l'empreinte (\code{octets\_chaines()})~: dans une session de
+locale UTF-8 ou latin-1, toutes les chaînes sont converties par
+\code{enc2utf8()}~; sous une autre locale (la locale C), seules les chaînes
+marquées latin-1 le sont, une chaîne non marquée gardant ses octets~; les
+valeurs rendues gardent leur encodage d'origine. Ainsi, sur les segments
+«~ÿ~» (marqué latin-1), «~€~» (marqué UTF-8) et «~a~», l'ordre est
+«~a~», «~ÿ~», «~€~» (octets \code{61}, \code{c3 bf}, \code{e2 82 ac}), sous
+la locale C comme sous C.UTF-8. \textbf{Défaut corrigé} (issue~\#106)~:
+jusque-là, le tri de R (\code{sort(method = "radix")}) rangeait une chaîne
+latin-1 sur son octet natif (\code{ff} pour «~ÿ~», d'où l'ordre «~a~»,
+«~€~», «~ÿ~», contraire à la règle) et levait une erreur R sur une valeur
+non ASCII non marquée, forme que donne \code{read.csv()} d'un fichier UTF-8~;
+seul l'ordre des segments a changé, non leurs valeurs ni l'empreinte des
+données. La branche de la locale latin-1 n'est pas exercée en CI, aucune
+locale latin-1 n'y étant installée. \emph{Cas limite d'une fonction interne}~:
+sous la locale C, un «~é~» non marqué et un «~é~» marqué latin-1 sont deux
+valeurs distinctes pour \code{unique()} et \code{match()}, donc deux
+segments si l'on appelle \code{segments\_observations()} directement~; le
+cas n'est pas atteignable par \code{construire\_table()}, qui refuse la
+chaîne non marquée sous cette locale avant toute étape
+(\code{chaine\_codage\_indetermine}).
 
 \medskip
 \textbf{Paramètres effectifs, diagnostics, avertissements.} Les paramètres
@@ -3858,7 +3893,7 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{somme\_par\_cellule()} & interne & cellules, valeurs & sommes par cellule, zéros explicites \\
 \catalogue{fonctions-exposition}{nombre\_cellules()} & interne & nombres d'âges par segment, nombre d'années~; libellé et nom du décompte, facultatifs & nombre de cellules de la table, en \code{integer}~; refus \code{trop\_de\_cellules} au-delà de \code{.Machine\$integer.max} (issue~\#37)~; appelée aussi, avant le décompte de présence des âges, sur le produit du nombre de segments par l'étendue des âges, avec son propre libellé et le décompte \code{couples\_presence} (issue~\#45) \\
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
-\catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur \\
+\catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur ni du marquage d'encodage (ordre des octets UTF-8 de l'empreinte des données) \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
 \catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee}, \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni les paramètres, ni la recette, ni la convention ne sont recontrôlés (issue~\#22) \\
 \end{longtable}
@@ -6782,7 +6817,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire \\
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
-\catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche, dans l'ordre de la section~\ref{sec:fiche}~; \code{resultat} à \code{NA}, posé ensuite par \code{construire\_table()}~; \code{code} égal à \code{EMPREINTE\_CODE} \\
+\catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche, dans l'ordre de la section~\ref{sec:fiche}~; \code{resultat} à \code{NA}, posé ensuite par \code{construire\_table()}~; \code{code} égal à \code{EMPREINTE\_CODE}~; contrôle d'abord, par \code{octets\_chaines()}, le codage des valeurs des rôles et des champs de la provenance (refus de codage, issue~\#106) \\
 \catalogue{fonctions-rapport}{statut\_empreintes()} & interne & empreinte du code & \code{statut\_resultat\_code}~: libellé du résultat, \code{" ; "}, libellé du code calculé ou, si l'empreinte du code est \code{NA}, des sources introuvables~; marqué UTF-8 \\
 \catalogue{fonctions-rapport}{md5\_octets()} & interne & octets & MD5 des octets, écrits en binaire dans un fichier temporaire supprimé à la sortie \\
 \catalogue{fonctions-rapport}{CHEMINS\_HORS\_RESULTAT} & constante & --- & liste fermée des sept chemins hors du périmètre de l'empreinte du résultat (section~\ref{sec:empreinte-resultat}) \\
