@@ -33,6 +33,8 @@
 #    à sa place dans ORDRE_CHAMPS_FICHE (#64 ; #14, spécification d'actuary,
 #    A.5), avec la convention d'ensemble à risque et le dénominateur des
 #    instants si Kaplan-Meier est retenu (#15, A.9) ;
+#  - bibliotheque_c() : bibliothèque C de fiche$plateforme$bibliotheque_c,
+#    lue par extSoftVersion(), sinon mention « non relevée » (#77) ;
 #  - ordonner_fiche() : réordonnancement pur de la fiche selon un ordre de
 #    champs, erreur de programmation si un champ présent n'y figure pas (#64) ;
 #  - informations_execution() : horodatage, durée, session abrégée, hors de
@@ -40,7 +42,10 @@
 #  - ecrire_plan(), lire_plan(), ecrire_fiche(), lire_fiche() : sérialisation
 #    du plan et de la fiche, texte en octets UTF-8 <-> objet, lecture sans
 #    évaluation, fichier chez l'appelant (ADR 0011, points 6, 8 et 9 ; #50) ;
-#    exportées (E5.4, E3.7) ; lire_plan() ne valide pas le plan (point 9.2).
+#    exportées (E5.4, E3.7) ; lire_plan() ne valide pas le plan (point 9.2) ;
+#  - ecrire_rapport() : rapport figé HTML en octets, sans calcul, après
+#    contrôle d'intégrité de l'objet (ADR 0012, point 2 ; #87) ; exportée ;
+#    section « Rapport figé » en fin de fichier.
 #
 #  Ce module n'appelle que les modules qui le précèdent (ADR 0007, point 2.1).
 # -----------------------------------------------------------------------------
@@ -53,7 +58,18 @@
 # de premier niveau du plan retirées (ADR 0011, points 5.1 à 5.5 ; #42, #22).
 # Fiche 3 : champ nombre_lignes_exclues (#57) ; premier commit de la cinquième
 # branche qui change la définition de la fiche (point 10 (a)).
-VERSION_FICHE <- 3L
+# Fiche 4 : champ bibliotheque_c sous plateforme (#77) ; sans l'incrément, son
+# absence dans une fiche 3 se confondrait avec la mention « non relevée »
+# (point 10 (c)). Le champ est hors empreinte du résultat (fiche/plateforme est
+# dans CHEMINS_HORS_RESULTAT), l'incrément la change (fiche/version_fiche
+# n'y est pas).
+VERSION_FICHE <- 4L
+# Versions de fiche admises au rejeu outillé (rejouer_fiche(), ADR 0012,
+# point 3.5 ; #86) : la version courante seule ; ici, et non dans
+# R/construire_table.R, évalué avant ce fichier. Élargir demande, version par
+# version, une annotation qui montre que les champs lus par le rejeu ont la
+# même structure et le même sens.
+VERSIONS_FICHE_REJEU <- VERSION_FICHE
 ENTETE_CANONIQUE <- "tablexp canonique 2"
 ALGORITHME_EMPREINTE <- "md5"
 # Première ligne du texte empreinté du résultat, consignée dans
@@ -560,6 +576,25 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   p
 }
 
+# Bibliothèque C consignée dans fiche$plateforme$bibliotheque_c (#77) : valeur
+# de extSoftVersion()[["iconv"]], que R 4.3.3 construit dans do_eSoftVersion()
+# (src/main/platform.c, l. 3592-3610) selon quatre formes, testées dans cet
+# ordre : « GNU libiconv X.Y » (ou « Apple or GNU libiconv X.Y » sous macOS)
+# si R est lié à GNU libiconv, même sur un système glibc ; « win_iconv »
+# sous Windows ; « glibc X.Y » (gnu_get_libc_version(), version de la glibc
+# chargée à l'exécution) sous glibc sans libiconv ; « unknown » sinon. Le
+# champ n'identifie donc la glibc, d'où vient la libm, que si sa valeur
+# commence par « glibc » ; autrement il désigne l'implémentation d'iconv.
+# « unknown » est la valeur brute de R, distincte de la mention « non
+# relevée » (MENTION_BIBLIOTHEQUE_C_NON_RELEVEE), rendue quand la valeur est
+# vide, absente ou non texte : rien n'est deviné.
+# `versions` : extSoftVersion(), paramètre pour les tests.
+MENTION_BIBLIOTHEQUE_C_NON_RELEVEE <- "non relevée"
+bibliotheque_c <- function(versions = extSoftVersion()) {
+  v <- if (is.character(versions) && "iconv" %in% names(versions)) versions[["iconv"]] else NA_character_
+  texte_moteur(if (length(v) == 1L && !is.na(v) && nzchar(trimws(v))) v else MENTION_BIBLIOTHEQUE_C_NON_RELEVEE)
+}
+
 # Fiche de construction en mémoire (ADR 0007, point 6.2 ; A.3) : aucun
 # horodatage. `plan` est le plan canonique (canoniser_plan(), ADR 0011,
 # point 5.2), qui fait foi : la fiche n'en porte pas de copie au premier
@@ -578,7 +613,7 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     versions = list(tablexp = as.character(utils::packageVersion("tablexp")), R = R.version.string),
     plateforme = list(sysname = Sys.info()[["sysname"]], release = Sys.info()[["release"]],
                       machine = Sys.info()[["machine"]], blas = extSoftVersion()[["BLAS"]],
-                      lapack = La_library()),
+                      lapack = La_library(), bibliotheque_c = bibliotheque_c()),
     roles = roles[order(match(names(roles), CATALOGUE_ROLES$role))],
     plan = plan,
     transition_code = pd$transition,
@@ -1111,16 +1146,529 @@ ecrire_fiche <- function(fiche) {
                 representation = rappel(rep_),
                 lecture = paste(blocs, collapse = " | "),
                 # Note de lecture d'E3.7 (docs/exigences.md), en une ligne.
-                rejeu = texte_moteur(paste(
-                  "vérifier version_fiche, empreintes/representation et empreintes/donnees ; exécuter",
-                  "construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) sur le plan relu",
-                  "de ce texte ; comparer à tolérance par classes (ADR 0009) sur une autre machine, au bit",
-                  "près sur la même (E4.6)"))))
+                rejeu = TEXTE_REJEU_FICHE))
 }
+
+# Note de lecture d'E3.7 (docs/exigences.md), en une ligne : ligne « # rejeu »
+# de l'en-tête de la fiche écrite (ecrire_fiche()), reprise telle quelle par la
+# section « Rejeu » du rapport figé (ADR 0012, seconde annotation du 24/10/2026,
+# (b) 7 ; #87) ; texte du moteur marqué UTF-8 (#50). Extraite du littéral
+# d'ecrire_fiche() sans changer un octet de la fiche.
+TEXTE_REJEU_FICHE <- texte_moteur(paste(
+  "vérifier version_fiche, empreintes/representation et empreintes/donnees ; exécuter",
+  "construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) sur le plan relu",
+  "de ce texte ; comparer à tolérance par classes (ADR 0009) sur une autre machine, au bit",
+  "près sur la même (E4.6)"))
 
 # Fiche relue des octets `octets` (raw). Ne contrôle pas version_fiche :
 # c'est l'affaire du rejeu (troisième annotation, (i) ; point 12 (1)). Rejeu
 # (E3.7) : construire_table(donnees, f$roles, f$plan, f$provenance).
 lire_fiche <- function(octets) {
   lire_texte(octets, PREMIERE_LIGNE_FICHE, "fiche")
+}
+
+# --- Rapport figé (ADR 0012, point 2 ; #87) ---
+#
+# ecrire_rapport(x) : octets UTF-8 d'un document HTML qui restitue, sans
+# recalcul, l'objet `construction` x rendu par construire_table() (E3.5, E3.6 ;
+# ADR 0012, point 2, et seconde annotation du 24/10/2026, (b) ; spécification
+# d'actuary du 24/10/2026). Le package rend des octets, l'appelant écrit le
+# fichier (writeBin ; ADR 0011, point 8.1) ; LF seul, LF final, sans BOM.
+#
+# Règles de la section, contrôlées par les tests (tests/unitaires/test_rapport.R) :
+#  - aucun calcul : chaque valeur est lue dans l'objet, dans l'ordre de l'objet,
+#    et écrite par l'écrivain unique ecrire_valeurs(·, "texte", ·) (doubles en
+#    %.17g), puis échappée par echapper_html() ; nrow(), length() et names() ne
+#    sont que des lectures de structure ;
+#  - aucune lecture de `execution`, d'une horloge, de la session ni d'une
+#    option : deux constructions identiques hors `execution` donnent les mêmes
+#    octets ;
+#  - codage (locale C comprise, contrôle tests/controles/locale_c.R) : tout
+#    texte non ASCII assemblé est marqué UTF-8 avant paste() (texte_moteur()
+#    pour les textes du moteur, Encoding<- pour la sortie de l'écrivain,
+#    enc2utf8() pour les noms), échappement par gsub(fixed = TRUE) sans
+#    useBytes (qui retirerait la marque), aucun accès à CONVENTIONS_TEXTE par
+#    un nom non ASCII ;
+#  - aucun appel à format, formatC, sprintf, as.character, cat ni à une
+#    fonction d'horloge ou d'environnement dans cette section (contrôle
+#    statique du test) ; paste() et paste0() n'y reçoivent que des
+#    littéraux, des sorties d'echapper_html() ou de l'écrivain, et des textes
+#    du moteur.
+
+# Sections du rapport, dans l'ordre du document (ADR 0012, point 2.6) :
+# identifiant (ancre), titre, nature (texte, objet, etape, renvoi,
+# non_produite), étape du catalogue (nature etape), racines (chemins dans
+# l'objet, ordre d'affichage) et renvois (chemins cités, nature renvoi).
+# Chaque élément de names(x) hors execution, chaque etapes/<e> et chaque
+# fiche/<f> est couvert par une racine ; les racines fiche/* des sections 2 à 6
+# sont ORDRE_CHAMPS_FICHE. Le module ne lit pas ETAPES (graphe d'appels) : la
+# concordance des sections `etape` avec ETAPES$etape est un test.
+SECTIONS_RAPPORT <- data.frame(
+  section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
+              "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements",
+              "validations", "table_finale", "rejeu"),
+  titre = texte_moteur(c(
+    "Lecture du rapport",
+    "Identification : empreintes, versions et plateforme",
+    "Graine et générateur",
+    "Rôles, provenance, recette et unité d'observation",
+    "Plan de construction (plan canonique), transition et fin effective de la période",
+    "Paramètres retenus et hypothèses consignés dans la fiche",
+    "Étape donnees : exclusions, unité d'observation et relevés",
+    "Étape exposition : convention d'âge, exposition et événements par cellule",
+    "Étape brut : taux bruts et intervalles",
+    "Indicateurs de suffisance",
+    "Avertissements",
+    "Validations",
+    "Table finale et comparaisons",
+    "Rejeu")),
+  nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
+             "objet", "non_produite", "non_produite", "texte"),
+  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, NA, NA, NA),
+  racines = I(list(
+    character(0),
+    c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
+    c("fiche/graine", "fiche/graine_mention", "fiche/generateur"),
+    c("fiche/roles", "fiche/provenance", "fiche/provenance_mention", "fiche/recette", "fiche/unite_observation",
+      "fiche/avertissement_unite"),
+    c("fiche/plan", "fiche/transition_code", "fiche/fin_effective"),
+    c("fiche/convention", "fiche/unite_exposition", "fiche/par_annee", "fiche/exclusions",
+      "fiche/nombre_lignes_exclues", "fiche/hypothese_censure", "fiche/hypotheses_brut", "fiche/avertissements"),
+    "etapes/donnees",
+    "etapes/exposition",
+    "etapes/brut",
+    character(0),
+    "avertissements",
+    "etapes/validation",
+    "table",
+    character(0))),
+  renvois = I(list(
+    character(0), character(0), character(0), character(0), character(0), character(0), character(0),
+    character(0), character(0), c("etapes/exposition/resultat/exposition", "etapes/brut/resultat"),
+    character(0), character(0), character(0), character(0))),
+  stringsAsFactors = FALSE)
+
+# Tables dont le volume croît avec la base : chemin, type et dimension (lus
+# dans la structure de l'objet), valeurs non reproduites (ADR 0012, point 2.7 ;
+# seconde annotation du 24/10/2026, (b) 1 et 2).
+CHEMINS_STRUCTURE_SEULE <- c("etapes/donnees/resultat/lignes_conservees", "etapes/donnees/resultat/numeros_conserves",
+                             "etapes/donnees/resultat/lignes_exclues", "etapes/donnees/resultat/observations",
+                             "etapes/donnees/resultat/observation_des_lignes",
+                             "etapes/brut/resultat/kaplan_meier_sauts")
+
+# Textes fixes du rapport (spécification d'actuary, § 2), marqués UTF-8 ; noms
+# ASCII. Les morceaux qui encadrent une valeur se terminent ou commencent par
+# l'espace qui les en sépare.
+MENTIONS_RAPPORT <- texte_moteur(c(
+  titre_document = "Rapport figé de construction (tablexp)",
+  lecture_1 = paste(
+    "Ce document est le rapport figé d'une construction de tablexp : il restitue, sans recalcul, l'objet rendu",
+    "par construire_table() (E3.5, E3.6). Aucune valeur n'y est calculée : chaque valeur est lue dans l'objet et",
+    "écrite telle quelle, dans l'ordre de l'objet ; chaque tableau cite le chemin de ses valeurs dans l'objet."),
+  lecture_2 = paste(
+    "Ce rapport ne porte pas de date ; la construction est identifiée par ses empreintes. Le rapport ne lit rien",
+    "dans execution (date, durée, session) : deux constructions identiques hors execution donnent le même",
+    "rapport, octet pour octet."),
+  lecture_3 = "Conventions d'écriture, identiques à celles de l'en-tête de la fiche de construction :",
+  lecture_4 = paste(
+    "Aucun arrondi : 0,95 s'écrit 0.94999999999999996, écriture à 17 chiffres significatifs du double le plus",
+    "proche de 0,95."),
+  lecture_5 = paste(
+    "Un data.frame est présenté en table de colonnes (une colonne par colonne de l'objet, avec son type ; valeurs",
+    "dans l'ordre des lignes de l'objet) ; tout autre élément en table de lignes (chemin, type, longueur,",
+    "valeurs), comme le corps de la fiche ; plusieurs valeurs d'une même ligne sont séparées par un retour à la",
+    "ligne. Les tables dont le volume croît avec la base sont citées par leur chemin, leur type et leur",
+    "dimension, sans leurs valeurs."),
+  lecture_6 = paste(
+    "Statuts des résultats (E2.20) : résultat exact, résultat asymptotique, approximation numérique, constat de",
+    "simulation ; ils ne se confondent pas. Le statut de chaque grandeur des taux bruts est donné par le tableau",
+    "etapes/brut/parametres/statuts."),
+  lecture_7_debut = "Écrit par ecrire_rapport() ; empreinte du code de tablexp qui a écrit ce rapport : ",
+  lecture_7_fin = ". Elle peut différer de fiche/empreintes/code, empreinte du code qui a construit l'objet.",
+  empreinte_algorithme = paste(
+    "algorithme : MD5 (fiche/empreintes/algorithme), sans rôle de sécurité : une empreinte identifie un objet,",
+    "elle ne le protège pas contre une modification délibérée."),
+  empreinte_donnees = paste(
+    "données (fiche/empreintes/donnees) : représentation canonique (fiche/empreintes/representation) des",
+    "colonnes des rôles telles que reçues par le moteur, toutes les lignes dans l'ordre reçu ; les colonnes hors",
+    "rôles n'y entrent pas ; portable : exacte sous glibc, non mesurée ailleurs."),
+  empreinte_fichier = paste(
+    "fichier (fiche/empreintes/fichier, fiche/empreintes/algorithme_fichier) : calculée par la couche de lecture",
+    "sur les octets du fichier lu et recopiée de la provenance ; non vérifiée par le moteur."),
+  empreinte_resultat_code = paste(
+    "résultat et code : statut consigné dans fiche/empreintes/statut_resultat_code (tableau ci-dessus)."),
+  plateforme = paste(
+    "L'empreinte du résultat dépend de la plateforme (R, BLAS, LAPACK, bibliothèque C) ; elle n'est un témoin",
+    "d'identité que sur la même machine (E3.6, E4.6)."),
+  integrite = paste(
+    "Contrôle d'intégrité : avant l'écriture de ce rapport, l'empreinte du résultat a été recalculée sur",
+    "l'objet et trouvée égale à fiche/empreintes/resultat."),
+  # Suite de la même phrase (décision d'actuary, reprise de #87) : chemins de
+  # setdiff(CHEMINS_HORS_RESULTAT, "execution") insérés entre les deux morceaux.
+  integrite_hors_1 = " Hors du périmètre de cette empreinte, et donc de ce contrôle : ",
+  integrite_hors_2 = " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.",
+  etape_absente_1 = "Étape « ",
+  etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
+  etape_absente_3 = " absent de l'objet).",
+  validations = "Validations : non produites par cette version (chemin etapes/validation absent de l'objet).",
+  table_finale = "Table finale et comparaisons : non produites par cette version (chemin table : NULL).",
+  largeur = "Largeur des intervalles : non produite par cette version.",
+  racine_absente = "absent de l'objet",
+  structure_seule = "non reproduites (volume croissant avec la base)",
+  structure_colonnes = " ; colonnes : ",
+  structure_exclues = " ; nombre de lignes par motif : etapes/donnees/resultat/exclusions",
+  brut_note = paste(
+    "La colonne taux porte une force de transition pour l'estimateur poisson (D / E^c) et une probabilité pour",
+    "binomial (D / E^i) et kaplan_meier ; un taux brut se désigne avec son estimateur."),
+  brut_legende = paste(
+    "Les mots « exact » et « asymptotique » des noms de colonnes désignent la formule de l'intervalle, non une",
+    "couverture garantie : le statut de chaque grandeur et de chaque intervalle est celui du tableau ci-dessus",
+    "(colonnes statut, loi_supposee et calcul), qui fait foi."),
+  brut_binomial = paste(
+    "Intervalle binomial « exact » (colonnes borne_inf_exacte et borne_sup_exacte de",
+    "etapes/brut/resultat/binomial) : la formule par quantiles de lois bêta suppose D ~ Bin(E^i, q) avec E^i",
+    "entier ; sous troncature à gauche et censure, l'exposition initiale E^i n'est en général pas entière, et la",
+    "formule en est alors le prolongement continu, de couverture non établie."),
+  suffisance_intro = paste(
+    "Indicateurs de suffisance (E2.15 : exposition et événements par âge et par segment, largeur des",
+    "intervalles) : ils signalent ce que les données portent, sans rien interdire. Le rapport n'en calcule",
+    "aucun ; ceux que l'objet porte sont aux chemins suivants :"),
+  suffisance_exposition = paste(
+    "Exposition et événements par cellule : etapes/exposition/resultat/exposition (section Étape exposition)."),
+  suffisance_exposition_absente = "Exposition et événements par cellule : non demandée par le plan.",
+  suffisance_brut = paste(
+    "Événements, exposition et bornes d'intervalle par estimateur : etapes/brut/resultat (section Étape brut)."),
+  suffisance_brut_absente = "Événements, exposition et bornes d'intervalle par estimateur : non demandée par le plan.",
+  rejeu_1 = "Ligne de rejeu de la fiche de construction (en-tête de la fiche écrite par ecrire_fiche()) : ",
+  rejeu_2 = paste(
+    "Rejeu outillé : rejouer_fiche(donnees, fiche) reçoit le data.frame des données et la fiche relue de son",
+    "texte par lire_fiche() ; elle contrôle la fiche et les données (version de fiche, algorithme et",
+    "représentation des empreintes, contrôles d'entrée, empreinte des données), refuse à la première",
+    "discordance, puis appelle construire_table() une seule fois ; elle rend la construction et un bilan de",
+    "rejeu. Le rapport de la construction rejouée s'écrit par ecrire_rapport() appliquée à l'élément",
+    "construction de ce résultat."),
+  rejeu_3 = "Le bilan d'un rejeu n'entre pas dans l'objet : ce rapport ne le porte pas."))
+
+# En-tête du document (forme fixe, spécification d'actuary, § 4) ; le titre
+# est inséré par ecrire_rapport().
+STYLE_RAPPORT <- c(
+  "<style>",
+  "body{font-family:sans-serif;margin:1em 2em;line-height:1.4}",
+  "table{border-collapse:collapse;margin:0.5em 0 1em 0}",
+  "th,td{border:1px solid #999;padding:0.15em 0.4em;vertical-align:top;text-align:left}",
+  "td,code{font-family:monospace}",
+  "caption{text-align:left;font-weight:bold;padding:0.2em 0}",
+  "</style>")
+
+# Échappement HTML de tout texte inséré (valeurs, chemins, noms, titres, textes
+# fixes) : & d'abord, puis <, >, ". gsub(fixed = TRUE) sans useBytes : la
+# marque UTF-8 est conservée (useBytes la retire, mesuré).
+echapper_html <- function(s) {
+  s <- gsub("&", "&amp;", s, fixed = TRUE)
+  s <- gsub("<", "&lt;", s, fixed = TRUE)
+  s <- gsub(">", "&gt;", s, fixed = TRUE)
+  gsub("\"", "&quot;", s, fixed = TRUE)
+}
+
+# Valeurs de v écrites par l'écrivain unique en forme « texte » (chemin : rôle
+# des refus) : type canonique et texte, une valeur par ligne séparée par LF,
+# sans LF final ("" pour aucune valeur), marqué UTF-8.
+texte_valeurs <- function(v, chemin) {
+  w <- ecrire_valeurs(v, "texte", chemin)
+  o <- w$octets
+  s <- if (length(o)) rawToChar(o[-length(o)]) else ""
+  Encoding(s) <- "UTF-8"
+  list(type = w$type, texte = s)
+}
+
+# Entier n (nrow(), length()) écrit par l'écrivain, pour une cellule HTML.
+texte_entier <- function(n, chemin) texte_valeurs(n, chemin)$texte
+
+# Valeur v décrite pour un message de refus : NULL -> NULL ; atomique de
+# longueur 1 de type double, integer, logical ou character sans attribut ->
+# « <écriture> (<type>) », ex. « 3 (integer) » ; sinon, ou si l'écrivain
+# refuse, « objet de type <typeof>, de classe <classes> ».
+decrire_valeur <- function(v) {
+  if (is.null(v)) return(NULL)
+  if (is.atomic(v) && length(v) == 1L && is.null(attributes(v)) &&
+      typeof(v) %in% c("double", "integer", "logical", "character")) {
+    w <- tryCatch(texte_valeurs(v, "valeur"), refus_tablexp = function(e) NULL)
+    if (!is.null(w)) return(paste0(w$texte, " (", w$type, ")"))
+  }
+  paste0(texte_moteur("objet de type "), typeof(v), texte_moteur(", de classe "), paste(class(v), collapse = "/"))
+}
+
+# Valeur v pour un message de refus : chaîne unique non NA sans attribut ni
+# caractère de contrôle -> elle-même ; NULL -> « absente » ; sinon
+# decrire_valeur(v) (message sur une seule ligne ; décision d'actuary, reprise
+# de #87). Contrôle : U+0000 à U+001F, U+007F à U+009F (NEL compris), U+2028,
+# U+2029, lus par utf8ToInt() sur les octets UTF-8 (même résultat sous les
+# locales C et UTF-8 ; NA si la chaîne n'est pas de l'UTF-8 valide). Seule une
+# chaîne latin-1 est convertie : enc2utf8() d'une chaîne non marquée sous la
+# locale C en échappe les octets non ASCII (« <e2><80><a8> »), mesuré.
+valeur_message <- function(v) {
+  if (is.null(v)) return(texte_moteur("absente"))
+  if (chaine_unique(v)) {
+    p <- utf8ToInt(if (identical(Encoding(v), "latin1")) enc2utf8(v) else v)
+    if (!anyNA(p) && !any(p <= 0x1F | (p >= 0x7F & p <= 0x9F) | p == 0x2028 | p == 0x2029)) return(v)
+  }
+  decrire_valeur(v)
+}
+
+# Élément de chemin `chemin` (segments joints par /) de l'objet x : present
+# FALSE si un segment manque (ou si son parent n'est pas une liste).
+lire_racine <- function(x, chemin) {
+  v <- x
+  for (s in strsplit(chemin, "/", fixed = TRUE)[[1L]]) {
+    if (!is.list(v) || !(s %in% names(v))) return(list(present = FALSE, valeur = NULL))
+    v <- v[[s]]
+  }
+  list(present = TRUE, valeur = v)
+}
+
+# Contrôles avant le rendu (ADR 0012, point 2.5, et seconde annotation du
+# 24/10/2026, (b) 3 et 4), dans l'ordre ; au premier refus, rien n'est rendu.
+controler_rapport <- function(x) {
+  refus <- function(motif, texte, details) refuser("rapport", motif, texte, details)
+  # 1. Classe exacte, et fiche qui est une liste ; un objet qui n'est pas une
+  #    liste est décrit aussi par son type (classe « construction » posée sur
+  #    un vecteur, par exemple).
+  origine <- texte_moteur(" (objet rendu par construire_table(), ou élément construction du résultat de rejouer_fiche()).")
+  if (!is.list(x))
+    refus("rapport_objet_invalide",
+          paste0(texte_moteur("Rapport figé : objet de type "), typeof(x),
+                 texte_moteur(" au lieu d'une liste de classe « construction »"), origine),
+          list(lu = class(x), attendu = "construction"))
+  if (!identical(class(x), "construction"))
+    refus("rapport_objet_invalide",
+          paste0(texte_moteur("Rapport figé : objet de classe « "), paste(class(x), collapse = "/"),
+                 texte_moteur(" » au lieu de « construction »"), origine),
+          list(lu = class(x), attendu = "construction"))
+  f <- x[["fiche"]]
+  if (!is.list(f)) {
+    d <- decrire_valeur(f)
+    refus("rapport_objet_invalide",
+          paste0(texte_moteur("Rapport figé : objet de classe « construction » dont la fiche est "),
+                 if (is.null(d)) texte_moteur("absente") else d, texte_moteur(" au lieu d'une liste.")),
+          list(chemin = "fiche", lu = f, attendu = "list"))
+  }
+  # 2. Version de la fiche : la version courante seule (même motif que le rejeu).
+  v <- f[["version_fiche"]]
+  if (!identical(v, VERSION_FICHE)) {
+    ve <- f[["versions"]]
+    em <- f[["empreintes"]]
+    d <- decrire_valeur(v)
+    refus("version_fiche_non_admise",
+          paste0(texte_moteur("Rapport figé : version de fiche "), if (is.null(d)) texte_moteur("absente") else d,
+                 texte_moteur(" au lieu de "), decrire_valeur(VERSION_FICHE),
+                 texte_moteur(" (seule version admise par ce code) ; objet construit par tablexp "),
+                 valeur_message(if (is.list(ve)) ve[["tablexp"]]), texte_moteur(", empreinte du code "),
+                 valeur_message(if (is.list(em)) em[["code"]]), texte_moteur(" ; code installé : empreinte "),
+                 valeur_message(EMPREINTE_CODE),
+                 texte_moteur(paste(". Aucune conversion n'est faite : le rapport d'un objet d'une autre version",
+                                    "s'écrit avec le code qui l'a construit."))),
+          list(lu = v, attendu = VERSION_FICHE))
+  }
+  # 3. Intégrité : empreinte du résultat recalculée égale à celle consignée ;
+  #    une erreur du recalcul (attribut inconnu, structure altérée) est un objet
+  #    modifié, non une erreur de programmation.
+  em <- f[["empreintes"]]
+  b <- if (is.list(em)) em[["resultat"]]
+  a <- tryCatch(empreinte_resultat(x), error = function(e) e)
+  if (inherits(a, "error"))
+    refus("objet_modifie",
+          paste0(texte_moteur("Rapport figé : objet modifié après sa construction : empreinte du résultat non recalculable ("),
+                 conditionMessage(a), texte_moteur(") ; fiche/empreintes/resultat vaut "), valeur_message(b), "."),
+          list(lu = b, attendu = NA_character_))
+  if (!identical(a, b))
+    refus("objet_modifie",
+          paste0(texte_moteur("Rapport figé : objet modifié après sa construction : empreinte du résultat recalculée "),
+                 a, texte_moteur(" au lieu de "), valeur_message(b),
+                 texte_moteur(paste(" (fiche/empreintes/resultat). Le rapport ne restitue un objet que tel que",
+                                    "construire_table() l'a rendu."))),
+          list(lu = b, attendu = a))
+  # 4. Aucun élément hors des sections : rien n'est omis en silence.
+  non_prevu <- function(chemin)
+    refus("rapport_objet_invalide",
+          paste0(texte_moteur("Rapport figé : élément « "), chemin,
+                 texte_moteur(paste(" » de l'objet non prévu par les sections de ce rapport ; un objet de cette",
+                                    "version de fiche n'en porte pas, et le rapport n'omet aucun élément en silence."))),
+          list(chemin = chemin))
+  hors <- setdiff(names(x), c("table", "etapes", "avertissements", "fiche", "execution"))
+  if (length(hors)) non_prevu(hors[1L])
+  racines <- unlist(SECTIONS_RAPPORT$racines, use.names = FALSE)
+  couvert <- function(chemin) any(racines == chemin | startsWith(chemin, paste0(racines, "/")))
+  for (e in names(x[["etapes"]])) if (!couvert(joindre_chemin("etapes", e))) non_prevu(joindre_chemin("etapes", e))
+  for (n in names(f)) if (!couvert(joindre_chemin("fiche", n))) non_prevu(joindre_chemin("fiche", n))
+  for (r in unlist(SECTIONS_RAPPORT$racines[SECTIONS_RAPPORT$nature == "non_produite"], use.names = FALSE)) {
+    l <- lire_racine(x, r)
+    if (l$present && !is.null(l$valeur)) non_prevu(r)
+  }
+  invisible(TRUE)
+}
+
+# Table de colonnes d'un data.frame v de chemin `chemin` : légende (chemin,
+# lignes, colonnes), en-tête (segment du nom de colonne, type), une ligne <tr>
+# par ligne de l'objet, dans son ordre ; valeurs par l'écrivain.
+table_colonnes <- function(v, chemin) {
+  s <- segments_texte(enc2utf8(names(v)), length(v))
+  n <- nrow(v)
+  entetes <- character(length(v))
+  colonnes <- vector("list", length(v))
+  for (i in seq_along(v)) {
+    w <- texte_valeurs(v[[i]], joindre_chemin(chemin, s[i]))
+    entetes[i] <- paste0("<th>", echapper_html(s[i]), "<br>", echapper_html(w$type), "</th>")
+    colonnes[[i]] <- if (n) strsplit(echapper_html(w$texte), "\n", fixed = TRUE)[[1L]] else character(0)
+    if (length(colonnes[[i]]) != n)
+      stop(paste0("table_colonnes() : colonne ", joindre_chemin(chemin, s[i]),
+                  " sans une valeur par ligne (erreur de programmation)."),
+           call. = FALSE)
+  }
+  corps <- if (length(v) && n) paste0("<tr><td>", do.call(paste, c(unname(colonnes), sep = "</td><td>")), "</td></tr>")
+  c("<table>",
+    paste0("<caption><code>", echapper_html(chemin), "</code> : data.frame ; lignes : ", texte_entier(n, chemin),
+           " ; colonnes : ", texte_entier(length(v), chemin), "</caption>"),
+    "<thead>", paste0("<tr>", paste(entetes, collapse = ""), "</tr>"), "</thead>",
+    "<tbody>", corps, "</tbody>", "</table>")
+}
+
+# Lignes HTML des racines `racines` de l'objet x, parcourues dans l'ordre de
+# l'objet (segments de chemin de la fiche, segments_texte() et
+# joindre_chemin()) : table de lignes chemin | type | longueur | valeurs (les
+# lignes du texte de la grammaire 1, texte_objet()), interrompue par une table
+# de colonnes à chaque data.frame ; structure seule pour CHEMINS_STRUCTURE_SEULE ;
+# racine absente : « absent de l'objet ». `apres` : lignes HTML insérées après
+# la table de colonnes du chemin qui les nomme.
+lignes_racines <- function(x, racines, apres = list()) {
+  sortie <- character(0)
+  en_cours <- character(0)
+  fermer <- function() {
+    if (length(en_cours))
+      sortie <<- c(sortie, "<table>", "<thead>", "<tr><th>chemin</th><th>type</th><th>longueur</th><th>valeurs</th></tr>",
+                   "</thead>", "<tbody>", en_cours, "</tbody>", "</table>")
+    en_cours <<- character(0)
+  }
+  # Une ligne de la table de lignes ; `valeurs` est déjà échappé.
+  ligne <- function(chemin, type, longueur, valeurs)
+    en_cours <<- c(en_cours, paste0("<tr><td>", echapper_html(chemin), "</td><td>", echapper_html(type), "</td><td>",
+                                    longueur, "</td><td>", valeurs, "</td></tr>"))
+  vecteur <- function(v, chemin) {
+    w <- texte_valeurs(v, chemin)
+    ligne(chemin, w$type, texte_entier(length(v), chemin), gsub("\n", "<br>", echapper_html(w$texte), fixed = TRUE))
+  }
+  noms <- function(v, chemin) {
+    if (is.null(names(v))) ligne(joindre_chemin(chemin, "@longueur"), "integer", texte_entier(1L, chemin),
+                                 texte_entier(length(v), chemin))
+    else vecteur(names(v), joindre_chemin(chemin, "@noms"))
+  }
+  structure_seule <- function(v, chemin) {
+    mention <- echapper_html(MENTIONS_RAPPORT[["structure_seule"]])
+    if (is.data.frame(v)) {
+      colonnes <- gsub("\n", " ", echapper_html(texte_valeurs(names(v), joindre_chemin(chemin, "@colonnes"))$texte),
+                       fixed = TRUE)
+      ligne(chemin, "data.frame", texte_entier(nrow(v), chemin),
+            paste0(mention, echapper_html(MENTIONS_RAPPORT[["structure_colonnes"]]), colonnes))
+    } else {
+      ligne(chemin, typeof(v), texte_entier(length(v), chemin),
+            paste0(mention, if (identical(chemin, "etapes/donnees/resultat/lignes_exclues"))
+                              echapper_html(MENTIONS_RAPPORT[["structure_exclues"]])))
+    }
+  }
+  noeud <- function(v, chemin) {
+    if (chemin %in% CHEMINS_STRUCTURE_SEULE) return(structure_seule(v, chemin))
+    if (is.null(v)) return(ligne(chemin, "NULL", texte_entier(0L, chemin), ""))
+    if (is.data.frame(v)) {
+      fermer()
+      sortie <<- c(sortie, table_colonnes(v, chemin), apres[[chemin]])
+      return(invisible())
+    }
+    if (is.list(v)) {
+      noms(v, chemin)
+      s <- segments_texte(if (is.null(names(v))) NULL else enc2utf8(names(v)), length(v))
+      for (i in seq_along(v)) noeud(v[[i]], joindre_chemin(chemin, s[i]))
+      return(invisible())
+    }
+    if (!is.null(names(v))) noms(v, chemin)
+    vecteur(v, chemin)
+  }
+  for (r in racines) {
+    l <- lire_racine(x, r)
+    if (l$present) noeud(l$valeur, r)
+    else ligne(r, "", "", echapper_html(MENTIONS_RAPPORT[["racine_absente"]]))
+  }
+  fermer()
+  sortie
+}
+
+# Un paragraphe, un élément de liste : texte échappé.
+paragraphe <- function(...) paste0("<p>", echapper_html(paste0(...)), "</p>")
+element_liste <- function(...) paste0("<li>", echapper_html(paste0(...)), "</li>")
+
+# Corps HTML de la section k de SECTIONS_RAPPORT pour l'objet x (contrôlé).
+corps_section <- function(x, k) {
+  m <- MENTIONS_RAPPORT
+  id <- SECTIONS_RAPPORT$section[k]
+  nature <- SECTIONS_RAPPORT$nature[k]
+  racines <- SECTIONS_RAPPORT$racines[[k]]
+  etapes <- names(x[["etapes"]])
+  if (identical(id, "lecture")) {
+    conventions <- vapply(seq_along(CONVENTIONS_TEXTE), function(i)
+      element_liste(names(CONVENTIONS_TEXTE)[i], " : ", CONVENTIONS_TEXTE[i]), "")
+    return(c(paragraphe(m[["lecture_1"]]), paragraphe(m[["lecture_2"]]), paragraphe(m[["lecture_3"]]),
+             "<ul>", conventions, "</ul>",
+             paragraphe(m[["lecture_4"]]), paragraphe(m[["lecture_5"]]), paragraphe(m[["lecture_6"]]),
+             paragraphe(m[["lecture_7_debut"]], texte_valeurs(EMPREINTE_CODE, "EMPREINTE_CODE")$texte,
+                        m[["lecture_7_fin"]])))
+  }
+  if (identical(id, "identification"))
+    return(c(lignes_racines(x, racines),
+             "<ul>", element_liste(m[["empreinte_algorithme"]]), element_liste(m[["empreinte_donnees"]]),
+             element_liste(m[["empreinte_fichier"]]), element_liste(m[["empreinte_resultat_code"]]), "</ul>",
+             paragraphe(m[["plateforme"]]),
+             paragraphe(m[["integrite"]], m[["integrite_hors_1"]],
+                        paste(setdiff(CHEMINS_HORS_RESULTAT, "execution"), collapse = ", "), m[["integrite_hors_2"]])))
+  if (identical(nature, "objet")) return(lignes_racines(x, racines))
+  if (identical(nature, "etape")) {
+    e <- SECTIONS_RAPPORT$etape[k]
+    if (!(e %in% etapes))
+      return(paragraphe(m[["etape_absente_1"]], e, m[["etape_absente_2"]], e, m[["etape_absente_3"]]))
+    if (!identical(e, "brut")) return(lignes_racines(x, racines))
+    # Étape brut : note sur la colonne taux en tête ; légendes immédiatement
+    # après le tableau des statuts (spécification d'actuary, § 2.4).
+    legendes <- c(paragraphe(m[["brut_legende"]]),
+                  if ("binomial" %in% x[["etapes"]][["brut"]][["parametres"]][["estimateurs"]])
+                    paragraphe(m[["brut_binomial"]]))
+    return(c(paragraphe(m[["brut_note"]]),
+             lignes_racines(x, racines, list("etapes/brut/parametres/statuts" = legendes))))
+  }
+  if (identical(id, "suffisance"))
+    return(c(paragraphe(m[["suffisance_intro"]]), "<ul>",
+             element_liste(m[[if ("exposition" %in% etapes) "suffisance_exposition" else "suffisance_exposition_absente"]]),
+             element_liste(m[[if ("brut" %in% etapes) "suffisance_brut" else "suffisance_brut_absente"]]),
+             element_liste(m[["largeur"]]), "</ul>"))
+  if (identical(id, "validations")) return(paragraphe(m[["validations"]]))
+  if (identical(id, "table_finale")) return(paragraphe(m[["table_finale"]]))
+  if (identical(id, "rejeu"))
+    return(c(paragraphe(m[["rejeu_1"]], TEXTE_REJEU_FICHE), paragraphe(m[["rejeu_2"]]), paragraphe(m[["rejeu_3"]])))
+  stop(paste0("corps_section() : section ", id, " sans rendu (erreur de programmation)."), call. = FALSE)
+}
+
+# Rapport figé de l'objet `construction` x (ADR 0012, point 2) : contrôles
+# (controler_rapport()), puis octets UTF-8 du document HTML, LF seul, LF final,
+# sans BOM. Aucune option : le rapport a une forme. L'appelant écrit le fichier
+# (writeBin(ecrire_rapport(x), "rapport.html")).
+ecrire_rapport <- function(x) {
+  controler_rapport(x)
+  titre <- echapper_html(MENTIONS_RAPPORT[["titre_document"]])
+  ids <- SECTIONS_RAPPORT$section
+  titres <- echapper_html(SECTIONS_RAPPORT$titre)
+  sections <- lapply(seq_along(ids), function(k)
+    c(paste0("<section id=\"", ids[k], "\">"), paste0("<h2>", titres[k], "</h2>"), corps_section(x, k), "</section>"))
+  lignes <- c("<!DOCTYPE html>", "<html lang=\"fr\">", "<head>", "<meta charset=\"utf-8\">",
+              paste0("<title>", titre, "</title>"), STYLE_RAPPORT, "</head>", "<body>",
+              paste0("<h1>", titre, "</h1>"),
+              "<nav><ol>", paste0("<li><a href=\"#", ids, "\">", titres, "</a></li>"), "</ol></nav>",
+              unlist(sections, use.names = FALSE),
+              "</body>", "</html>")
+  charToRaw(enc2utf8(paste0(lignes, "\n", collapse = "")))
 }

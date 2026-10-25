@@ -68,3 +68,19 @@ Le format de sérialisation reporté par l'annotation du 16/10/2026 est fixé pa
 **Effet sur les résultats** : aucun par cette annotation (voir ADR 0011, « Conséquences »).
 
 Issues : #42, #22 (point 6), #50 ; ADR 0011.
+
+## Annotation du 24 octobre 2026 — point 7 (b) et « Conséquences » : le rapport figé est rendu par le module `rapport` en octets, écart déclaré avec E4.1 ; point 6 : le rejeu a une fonction (ADR 0012)
+
+Rédigée par `architect-approfondi` (Fable, consultation 1/3 de la branche `claude/rapport-fige`, B8, PR #88 ; `docs/agents/routage.md`, § 4.1.3 ; décision M97). Statut : **acceptée** — rédigée « sous réserve de l'acceptation de l'ADR 0012 », réserve levée le 24/10/2026 par l'acceptation de l'ADR 0012 (décision M107 ; E4.1 lu par note de lecture, option (a), M108 : l'écart du point (b) ci-dessous est levé). Le texte du 14/10/2026 et les annotations des 16 et 19/10/2026 ne sont pas réécrits.
+
+**(a) Point 7 (b) et « Conséquences » (« module `rapport` (fiche, rapport figé, en-têtes de métadonnées) ») : confirmés, précisés.** Le rapport figé HTML autonome est produit par le module `rapport`, dans `R/rapport.R`, par la fonction exportée `ecrire_rapport(x)` qui rend des **octets** UTF-8 ; le fichier est écrit par l'appelant, comme la fiche (ADR 0011, point 8.1), ce qui est la lecture que l'ADR 0012 donne de l'ADR 0004, point 3 (« le moteur fournit l'objet et ses métadonnées, l'application les écrit » : l'application écrit le **fichier**). Le document est construit sur l'objet retourné, sans calcul, chaque nombre écrit par l'écrivain unique en `%.17g`, sans horodatage, avec un contrôle d'intégrité par l'empreinte du résultat avant le rendu (ADR 0012, points 1 et 2).
+
+**(b) Écart déclaré avec E4.1.** E4.1 range dans le module `rapport` les « quantités du rapport, pas son rendu ». La présente annotation et l'ADR 0012 s'en écartent si « rendu » désigne le rapport figé ; ils y sont conformes si « rendu » désigne l'affichage interactif (`app/affichage.R`), lecture que l'ADR 0012 recommande (question 1) et qui rend E4.1, l'ADR 0004 et le présent ADR cohérents entre eux. La décision revient au mainteneur, par note de lecture ou amendement de `docs/exigences.md`.
+
+**(c) Point 6 (« Rejouer la fiche sur les mêmes données redonne la même table : c'est un test »).** Le rejeu reste un test (`tests/test_reproductibilite.R`) et devient aussi une **fonction exportée**, `rejouer_fiche(donnees, fiche)`, dans `R/construire_table.R`, qui applique les contrôles du point 12 de l'ADR 0011 dans un ordre fixé, refuse par un motif nommé à la première discordance, appelle `construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)` une seule fois, et rend l'objet avec un bilan séparé (contrôles et témoins), hors de l'objet (ADR 0012, point 3). « Redonne la même table » se lit toujours au sens d'E4.6 : au bit près sur la même machine, à tolérance par classes ailleurs ; l'empreinte du résultat n'est qu'un témoin.
+
+**(d) Point 7 (a) et (d), inchangés** : tables CSV et xlsx à en-tête reportées à la première branche qui produit une table finale (M93) ; PDF hors v1. Le rapport figé du suivi d'expérience (Q26) rouvrira la question d'un module `rendu` (ADR 0012, point 1.4).
+
+**Effet sur les résultats** : aucun (voir ADR 0012, « Conséquences »).
+
+Issues : #86, #87 ; ADR 0012. Branche `claude/rapport-fige`, PR #88.

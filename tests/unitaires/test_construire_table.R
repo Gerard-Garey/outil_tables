@@ -39,11 +39,12 @@ refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function
 
 # --- exports et signature -------------------------------------------------------
 
-verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, lire_fiche,",
-               "lire_plan, simuler_portefeuille, table_reference, valider_plan (ADR 0007, point 3.4 ; #9, #10, #11, #50)"),
+verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, ecrire_rapport,",
+               "lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_reference, valider_plan (ADR 0007,",
+               "point 3.4 ; #9, #10, #11, #50, #86, #87)"),
          identical(sort(getNamespaceExports("tablexp")),
-                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "lire_fiche",
-                     "lire_plan", "simuler_portefeuille", "table_reference", "valider_plan")))
+                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "ecrire_rapport", "lire_fiche",
+                     "lire_plan", "rejouer_fiche", "simuler_portefeuille", "table_reference", "valider_plan")))
 verifier("construire_table : signature (donnees, roles, plan, provenance = NULL)",
          identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance")) &&
            is.null(formals(construire_table)$provenance))
@@ -421,9 +422,9 @@ verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôl
                                         retenue = "dernier_anniversaire", forcee = FALSE)) &&
            identical(f$unite_observation, "tete") && is.na(f$avertissement_unite) &&
            identical(f$transition_code, "vivant_decede") && identical(f$fin_effective, D("2024-12-31")))
-verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 3 (#57)",
+verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 4 (#57, #77)",
          identical(f$graine, NA_integer_) && identical(f$graine_mention, "aucune étape aléatoire") &&
-           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 3L))
+           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 4L))
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
@@ -440,9 +441,31 @@ verifier(paste("fiche : empreintes (algorithme md5 nommé ; données, résultat 
              "des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement numérique,",
              "qui dépend aussi de R, du BLAS et de la libm")) &&
            identical(Encoding(f$empreintes$statut_resultat_code), "UTF-8"))
-verifier("fiche : versions (tablexp, R) et plateforme (sysname, release, machine, blas, lapack)",
+verifier("fiche : versions (tablexp, R) et plateforme (sysname, release, machine, blas, lapack, bibliotheque_c) (#77)",
          identical(names(f$versions), c("tablexp", "R")) && identical(f$versions$R, R.version.string) &&
-           identical(names(f$plateforme), c("sysname", "release", "machine", "blas", "lapack")))
+           identical(names(f$plateforme), c("sysname", "release", "machine", "blas", "lapack", "bibliotheque_c")))
+# Bibliothèque C (#77) : source lue dans src/main/platform.c de R 4.3.3
+# (do_eSoftVersion(), l. 3592-3610, quatre formes dans cet ordre : « GNU
+# libiconv X.Y » ou « Apple or GNU libiconv X.Y » (macOS) si R est lié à GNU
+# libiconv, « win_iconv » sous Windows, « glibc X.Y » sous glibc sans
+# libiconv, « unknown » sinon).
+verifier("fiche : plateforme$bibliotheque_c, un texte unique non vide, égal à extSoftVersion()[[\"iconv\"]] quand elle est renseignée",
+         is.character(f$plateforme$bibliotheque_c) && length(f$plateforme$bibliotheque_c) == 1L &&
+           !is.na(f$plateforme$bibliotheque_c) && nzchar(f$plateforme$bibliotheque_c) &&
+           is.null(attributes(f$plateforme$bibliotheque_c)) &&
+           identical(f$plateforme$bibliotheque_c,
+                     if (nzchar(extSoftVersion()[["iconv"]])) extSoftVersion()[["iconv"]]
+                     else tablexp:::MENTION_BIBLIOTHEQUE_C_NON_RELEVEE))
+verifier("bibliotheque_c() : valeur d'iconv rendue telle quelle (glibc, win_iconv, libiconv, unknown) ; vide, blanche, NA, absente ou non texte : « non relevée », UTF-8",
+         identical(tablexp:::bibliotheque_c(c(zlib = "1.3", iconv = "glibc 2.35")), "glibc 2.35") &&
+           identical(tablexp:::bibliotheque_c(c(iconv = "win_iconv")), "win_iconv") &&
+           identical(tablexp:::bibliotheque_c(c(iconv = "GNU libiconv 1.16")), "GNU libiconv 1.16") &&
+           identical(tablexp:::bibliotheque_c(c(iconv = "unknown")), "unknown") &&
+           all(vapply(list(c(iconv = ""), c(iconv = "  "), c(iconv = NA_character_), c(zlib = "1.3"), character(0), NULL,
+                           c(iconv = 1L), c("glibc 2.35")),
+                      function(v) identical(tablexp:::bibliotheque_c(v), "non relevée") &&
+                        identical(Encoding(tablexp:::bibliotheque_c(v)), "UTF-8"), logical(1L))) &&
+           identical(tablexp:::MENTION_BIBLIOTHEQUE_C_NON_RELEVEE, "non relevée"))
 verifier("fiche : aucun horodatage (aucun POSIXct ni POSIXlt dans la fiche)", {
   classes <- unlist(rapply(f, function(v) class(v)[1L], how = "unlist"))
   !any(classes %in% c("POSIXct", "POSIXlt"))
@@ -610,9 +633,21 @@ verifier("empreinte du résultat : inchangée quand execution, fiche$versions, f
   y$execution <- list(debut = Sys.time() + 3600, duree_secondes = 1e9)
   y$fiche$versions <- list(tablexp = "9.9.9", R = "R version 0")
   y$fiche$plateforme$machine <- "autre"; y$fiche$plateforme$blas <- "autre BLAS"
+  y$fiche$plateforme$bibliotheque_c <- "autre bibliothèque C"
   y$fiche$empreintes$resultat <- "0"; y$fiche$empreintes$code <- NA_character_
   y$fiche$empreintes$statut_resultat_code <- "autre"
   identical(empreinte_resultat(y), x$fiche$empreintes$resultat)
+})
+verifier("empreinte du résultat : fiche$plateforme$bibliotheque_c ajouté, changé ou retiré ne la change pas ; version_fiche incrémentée la change (#77)", {
+  p <- x$fiche$plateforme
+  sans <- x; sans$fiche$plateforme$bibliotheque_c <- NULL
+  autre <- x; autre$fiche$plateforme$bibliotheque_c <- tablexp:::MENTION_BIBLIOTHEQUE_C_NON_RELEVEE
+  v3 <- x; v3$fiche$version_fiche <- 3L
+  identical(names(p), c("sysname", "release", "machine", "blas", "lapack", "bibliotheque_c")) &&
+    identical(empreinte_resultat(sans), x$fiche$empreintes$resultat) &&
+    identical(empreinte_resultat(autre), x$fiche$empreintes$resultat) &&
+    identical(x$fiche$version_fiche, tablexp:::VERSION_FICHE) && identical(tablexp:::VERSION_FICHE, 4L) &&
+    !identical(empreinte_resultat(v3), x$fiche$empreintes$resultat)
 })
 verifier("empreinte du résultat (témoin) : changée par un ulp d'un double du périmètre (exposition_jours[1]), et par la représentation", {
   y <- x
@@ -1418,8 +1453,8 @@ local({
   verifier("construire_table : rejeu de la fiche (rôles, plan canonique, provenance) identical() hors execution",
            identical(sans_execution(construire_table(BASE, y$fiche$roles, y$fiche$plan, y$fiche$provenance)), x0) &&
              identical(y$fiche$plan, pb))
-  verifier("fiche : version 3, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
-           identical(x0$fiche$version_fiche, 3L) &&
+  verifier("fiche : version 4, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
+           identical(x0$fiche$version_fiche, 4L) &&
              !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
 
   # Ordre canonique des valeurs de segmentation, exclusions et estimateurs (#63 ;

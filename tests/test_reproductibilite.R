@@ -29,6 +29,9 @@
 #  transitions de changement de résultat annoncé (ADR 0009, point 9.5, #47) :
 #  liste unique TRANSITIONS_EN_COURS (vide hors transition), utilitaire
 #  générique et témoins de chaque nature, de l'union et du succès inattendu.
+#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R6 (sections et
+#  leur ordre, cellules décimales en %.17g, textes fixes, section brut ; taille
+#  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -660,6 +663,62 @@ oracle_empreinte_resultat <- local({
   e$empreinte_resultat
 })
 
+# Rapport figé (#87, U24) : contrôles du document de R1 à R6 à 10^5 lignes
+# (spécification d'actuary du 24/10/2026, U14, U18, U21, U22, repris de
+# tests/unitaires/test_rapport.R) ; rend TRUE ou la liste des écarts.
+controler_rapport_fige <- function(x, l, id) {
+  html <- function(s) {
+    for (r in list(c("&", "&amp;"), c("<", "&lt;"), c(">", "&gt;"), c("\"", "&quot;"))) s <- gsub(r[1L], r[2L], s, fixed = TRUE)
+    s
+  }
+  section_de <- function(id) {
+    d <- match(paste0("<section id=\"", id, "\">"), l)
+    if (is.na(d)) character(0) else l[d:(d - 1L + match("</section>", l[d:length(l)]))]
+  }
+  S <- tablexp:::SECTIONS_RAPPORT
+  e <- character(0)
+  # U14 : sections et nav dans l'ordre de SECTIONS_RAPPORT.
+  sec <- sub("^<section id=\"([a-z_]+)\">$", "\\1", grep("^<section id=", l, value = TRUE))
+  nav <- sub("^<li><a href=\"#([a-z_]+)\">.*$", "\\1", grep("^<li><a href=\"#", l, value = TRUE))
+  if (!identical(sec, S$section) || !identical(nav, S$section)) e <- c(e, "U14 : sections ou nav")
+  # U18 : cellules décimales en %.17g.
+  td <- unlist(regmatches(l, gregexpr("<td>[^<]*(<br>[^<]*)*</td>", l)))
+  c_ <- unlist(strsplit(sub("^<td>(.*)</td>$", "\\1", td), "<br>", fixed = TRUE))
+  d <- c_[grepl("^[-+]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][-+]?[0-9]+)?$", c_)]
+  if (!length(d) || any(d != sprintf("%.17g", as.numeric(d)))) e <- c(e, "U18 : cellule décimale hors %.17g")
+  if (id == "R2") { if (!any(grepl(">0.98999999999999999<", l, fixed = TRUE))) e <- c(e, "U18 : niveau 0,99") }
+  else if (!any(grepl(">0.94999999999999996<", l, fixed = TRUE)) || any(grepl(">0.95<", l, fixed = TRUE)))
+    e <- c(e, "U18 : niveau 0,95")
+  # U21 : textes fixes, plateforme, rejeu, sections 12 et 13.
+  if (sum(grepl("L'empreinte du r\u00e9sultat d\u00e9pend de la plateforme", l, fixed = TRUE)) != 1L) e <- c(e, "U21 : plateforme")
+  if (!any(grepl("Ce rapport ne porte pas de date", l, fixed = TRUE))) e <- c(e, "U21 : pas de date")
+  ct <- tablexp:::CONVENTIONS_TEXTE
+  if (!all(paste0("<li>", html(names(ct)), " : ", html(unname(ct)), "</li>") %in% l)) e <- c(e, "U21 : conventions")
+  ident <- section_de("identification")
+  if (sum(grepl("^<li>(algorithme|donn\u00e9es|fichier|r\u00e9sultat et code) ", ident)) != 4L) e <- c(e, "U21 : empreintes")
+  if (!all(vapply(names(x$fiche$plateforme), function(n) any(startsWith(ident, paste0("<tr><td>fiche/plateforme/", n, "</td>"))), NA)) ||
+      !"bibliotheque_c" %in% names(x$fiche$plateforme)) e <- c(e, "U21 : fiche/plateforme")
+  integ <- grep("^<p>Contr\u00f4le d'int\u00e9grit\u00e9 : ", ident, value = TRUE)
+  hors <- paste(html(setdiff(tablexp:::CHEMINS_HORS_RESULTAT, "execution")), collapse = ", ")
+  if (length(integ) != 1L || !grepl(paste0("de ce contr\u00f4le : ", hors, " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume cro\u00eet avec la base) est lu dans l'objet, sans v\u00e9rification.</p>"), integ, fixed = TRUE))
+    e <- c(e, "U21 : phrase du contrôle d'intégrité")
+  rj <- section_de("rejeu")
+  if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))
+    e <- c(e, "U21 : rejeu")
+  if (!any(grepl("<p>Validations : non produites par cette version", l, fixed = TRUE)) ||
+      !any(grepl("<p>Table finale et comparaisons : non produites par cette version", l, fixed = TRUE))) e <- c(e, "U21 : sections 12 et 13")
+  # U22 : section brut.
+  b <- section_de("etape_brut")
+  st <- grep("<caption><code>etapes/brut/parametres/statuts</code>", b, fixed = TRUE)
+  re <- grep("<caption><code>etapes/brut/resultat/", b, fixed = TRUE)
+  if (length(st) != 1L || !length(re) || st > re[1L]) e <- c(e, "U22 : ordre des légendes")
+  if (any(startsWith(b, "<p>Intervalle binomial \u00ab exact \u00bb")) != ("binomial" %in% x$etapes$brut$parametres$estimateurs))
+    e <- c(e, "U22 : légende binomiale")
+  if (id == "R6" && !any(grepl("^<tr><td>etapes/brut/resultat/kaplan_meier_sauts</td><td>data.frame</td><td>[0-9]+</td><td>non reproduites", b)))
+    e <- c(e, "U22 : kaplan_meier_sauts")
+  if (length(e)) e else TRUE
+}
+
 jeu_ref <- jeu_reference()
 aplatis <- list()
 for (p in plans_reference()) {
@@ -668,6 +727,27 @@ for (p in plans_reference()) {
   verifier(sprintf("%s : empreinte du résultat égale à celle de l'oracle d'avant #71 (écrivains des entiers et des dates par une chaîne par ligne)", id),
            grepl("^[0-9a-f]{32}$", x_ref$fiche$empreintes$resultat) &&
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
+  # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
+  # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
+  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 8 à 12 « identique », 13 « non vérifiée »", id), {
+    r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)))
+    identical(sans_execution(r$construction), sans_execution(x_ref)) &&
+      identical(r$bilan$verdict[8:13], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
+  })
+  # Rapport figé (#87, U24, U25) : contrôles du document ; taille (octets) et
+  # durée du rendu imprimées (constat, sans seuil ; critère 7 de #87).
+  t_rapport <- system.time(o_rapport <- ecrire_rapport(x_ref))[["elapsed"]]
+  cat(sprintf("  -- %s : rapport figé, %d octets, rendu en %.2f s\n", id, length(o_rapport), t_rapport))
+  verifier(sprintf("%s : rapport figé (U24) : sections et nav, cellules décimales en %%.17g, textes fixes, section brut", id), {
+    l <- strsplit(rawToChar(o_rapport), "\n", fixed = TRUE)[[1L]]
+    Encoding(l) <- "UTF-8"
+    controler_rapport_fige(x_ref, l, id)
+  })
+  verifier(sprintf("%s : ligne « # rejeu » de la fiche écrite égale à TEXTE_REJEU_FICHE (U25)", id), {
+    l <- strsplit(rawToChar(ecrire_fiche(x_ref$fiche)), "\n", fixed = TRUE)[[1L]]
+    Encoding(l) <- "UTF-8"
+    identical(l[startsWith(l, "# rejeu : ")], paste0("# rejeu : ", tablexp:::TEXTE_REJEU_FICHE))
+  })
   g <- tryCatch(aplatir_construction(x_ref), refus_reference = function(e) e)
   verifier(sprintf("%s : aplatissement sans refus d'écriture", id),
            if (inherits(g, "refus_reference")) conditionMessage(g) else TRUE)
