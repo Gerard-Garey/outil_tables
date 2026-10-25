@@ -285,6 +285,72 @@ verifier("locale C : ecart_octets() — longueurs inégales à préfixe commun (
            identical(env_locale_c$ecart_octets(octets_("ab\ncd\nef"), octets_("ab\ncd")),
                      "longueurs 8 et 5 octets ; premier octet différent : 6 (ligne 2)"))
 
+# --- tablexp sous une locale latin-1 (issue #115) -------------------------------
+# Comme pour la locale C : le contrôle complet (deux installations, R1 à R6 et
+# quatre jeux de segments sous latin-1 et sous UTF-8) est une étape de la CI,
+# non rejouée ici. Chemins d'échec bon marché : racine sans package (la locale
+# est générée par localedef, l'installation sous latin-1 échoue et est nommée) ;
+# localedef introuvable (PATH réduit à sh, sed, uname, rm, que le script R
+# lance) : échec nommé, jamais un saut silencieux du contrôle.
+# Ces deux tests dépendent de l'environnement et se sautent, avec leur raison,
+# quand il ne le permet pas : le premier hors POSIX ou si la locale latin-1 ne
+# peut pas être générée (critère de locale_latin1.R : generer_locale_latin1()
+# réussit) ; le second hors POSIX, sans sh, sed, uname ou rm, ou si un lien
+# symbolique échoue (privilèges requis sous Windows).
+
+env_latin1 <- new.env()
+for (expr_ in parse(file.path(CONTROLES, "locale_latin1.R"), encoding = "UTF-8")) eval(expr_, env_latin1)
+
+raison_saut <- if (.Platform$OS.type != "unix") "plateforme non POSIX" else
+  if (!nzchar(Sys.which("localedef"))) "localedef introuvable" else
+  if (!nzchar(env_latin1$locale_utf8_disponible())) "aucune locale UTF-8 disponible" else {
+    dossier_ <- tempfile("locale_generee_"); dir.create(dossier_)
+    g_ <- env_latin1$generer_locale_latin1(dossier_)
+    unlink(dossier_, recursive = TRUE)
+    if (g_$ok) "" else "locale fr_FR.ISO-8859-1 non générable par localedef (par exemple sources fr_FR ou charmap ISO-8859-1 absents)"
+  }
+if (!nzchar(raison_saut)) {
+  racine_sans_package <- tempfile("racine_sans_package_")
+  dir.create(racine_sans_package)
+  verifier("locale latin-1 : racine sans package -> échec, installation sous LC_ALL=fr_FR.ISO-8859-1 nommée",
+           echoue(controle("locale_latin1.R", shQuote(racine_sans_package)),
+                  "installation sous LC_ALL=fr_FR.ISO-8859-1 en échec"))
+  unlink(racine_sans_package, recursive = TRUE)
+} else cat(sprintf("  [sauté] locale latin-1 : racine sans package : %s\n", raison_saut))
+
+cmds_ <- c("sh", "sed", "uname", "rm")
+chemin_reduit <- tempfile("chemin_reduit_")
+dir.create(chemin_reduit)
+liens_ <- .Platform$OS.type == "unix" && all(nzchar(Sys.which(cmds_))) &&
+  all(file.symlink(Sys.which(cmds_), file.path(chemin_reduit, cmds_)))
+if (liens_) {
+  verifier("locale latin-1 : localedef introuvable -> échec nommé (aucun saut silencieux)",
+           echoue(executer_rscript(file.path(CONTROLES, "locale_latin1.R"), shQuote(RACINE),
+                                   env = paste0("PATH=", chemin_reduit)),
+                  "locale latin-1 non générée par localedef"))
+} else cat("  [sauté] locale latin-1 : localedef introuvable : plateforme non POSIX, sh, sed, uname ou rm absent, ou lien symbolique impossible\n")
+unlink(chemin_reduit, recursive = TRUE)
+
+# Jeux de segments du contrôle, sourcé (mêmes précautions que locale_c.R) :
+# marquage des chaînes et ordre de référence, vérifiés dans la session courante
+# (UTF-8 ou C) ; le jeu mêlé, qui emploie des chaînes natives de la session, ne
+# l'est que sous une session UTF-8 (sous C, les octets natifs sont du latin-1).
+verifier("locale latin-1 : sourcé, locale_latin1.R ne définit que des fonctions et constantes ; LOCALES_UTF8 identique à celle du harnais",
+         identical(env_latin1$LOCALES_UTF8, LOCALES_UTF8) && is.function(env_latin1$valeurs_segment) &&
+           identical(env_latin1$locale_utf8_disponible(), locale_utf8_disponible()))
+verifier("locale latin-1 : jeux de segments — marquages (latin-1, UTF-8) et octets UTF-8 de référence, ordre des octets",
+         {
+           l1 <- env_latin1$valeurs_segment("latin1"); u8 <- env_latin1$valeurs_segment("utf8")
+           identical(Encoding(l1), c("latin1", "unknown", "latin1", "latin1")) &&
+             identical(Encoding(u8), c("UTF-8", "unknown", "UTF-8", "UTF-8")) &&
+             identical(env_latin1$hex_octets(enc2utf8(l1)), c("c3bf", "61", "c3a9", "c3a0")) &&
+             identical(env_latin1$ordre_reference(l1), c("61", "c3a0", "c3a9", "c3bf")) &&
+             identical(env_latin1$ordre_reference(u8), c("61", "c3a9", "c3bf", "e282ac")) &&
+             (!isTRUE(l10n_info()[["UTF-8"]]) ||
+                identical(env_latin1$ordre_reference(env_latin1$valeurs_segment("mixte")),
+                          c("61", "c3a0", "c3a9", "c3bf", "e282ac")))
+         })
+
 # --- identité des batteries et de l'image (CLAUDE.md, BATTERIES, ci.yml) -----
 
 verifier("identité des batteries : passe sur le dépôt", passe(controle("identite_batteries.R")))
