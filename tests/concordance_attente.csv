@@ -1,1 +1,6 @@
 type,nom,issue,motif
+entree,fonctions-simulation:CATALOGUE_DEFAUTS,#93,"catalogue des défauts paramétrés (ADR 0007, annotation du 25/10/2026, (c), point 6) ; documenté par docwriter en fin de branche (règle 9)"
+entree,fonctions-simulation:COMBINAISONS_DEFAUTS,#93,"combinaisons de défauts admises sur une ligne (ADR 0007, annotation du 25/10/2026, (c), point 6) ; documenté par docwriter en fin de branche (règle 9)"
+entree,fonctions-simulation:ORDRE_TIRAGES_DEFAUTS,#93,"ordre des tirages des défauts (ADR 0007, annotation du 25/10/2026, (c), point 7) ; documenté par docwriter en fin de branche (règle 9)"
+entree,fonctions-simulation:controler_defauts,#93,"contrôle de l'argument defauts, refus defauts_invalides (ADR 0007, annotation du 25/10/2026, (c), point 9) ; documenté par docwriter en fin de branche (règle 9)"
+entree,fonctions-simulation:injecter_defauts,#93,"injection des défauts après le jeu propre, attribut defauts, refus defauts_ineligibles (ADR 0007, annotation du 25/10/2026, (c), points 7 à 9) ; documenté par docwriter en fin de branche (règle 9)"
