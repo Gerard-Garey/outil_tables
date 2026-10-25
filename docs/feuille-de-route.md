@@ -91,7 +91,7 @@ PR #96, fusionnée le 25/10/2026 par commit de fusion `d788d84` (parents `e139ca
 
 **Acceptée par le mainteneur le 25/10/2026 (M149)**, sur recommandation du point d'étape d'`architect-approfondi` du même jour (D2), avec D1 modifiée par le mainteneur (M148). Elle réunit les écritures du moteur dont les octets doivent être les mêmes sur toute plateforme et sous toute locale : écriture des doubles en forme « texte » (#104), commande de recalcul de l'empreinte du code donnée aux tiers (#107), contrôle sous une locale latin-1 (#115), témoins des tests en R pur (#110). Contrat partagé « format du plan et de la fiche » (ADR 0011 ; `docs/agents/routage.md`, § 4.2). Les numéros de ligne cités datent de `d788d84` ; le nom de l'objet fait foi (convention des renvois, M77, (b)).
 
-- **Branche** : partie de `main` (`d788d84`) ; PR à venir, ouverte en brouillon à la création.
+- **Branche** : partie de `main` (`d788d84`) ; PR #116, ouverte en brouillon à la création.
 - **Préalables** : aucun pour #110 et #115. Pour #104 : spécification d'`actuary-approfondi` avec protocole d'évaluation du coût (étape (3')), prototype mesuré (3a) et **point de décision du mainteneur** avant toute intégration au moteur (M148). Pour #107 : la même spécification (texte du libellé, sort de `VERSION_FICHE`) et l'annotation de l'ADR 0011 (étape (3c)).
 - **Périmètre** (fermé, quatre issues) :
   - [ ] #110 — témoins `system("touch …")` de `tests/unitaires/test_serialisation.R` écrits en R pur — circuit 3 : `coder` → `audit` — `tests:` (M152). Critères : ceux de son corps ; vérification sous Windows à l'étape (5).
