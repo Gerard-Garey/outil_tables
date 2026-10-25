@@ -687,9 +687,13 @@ refuse sous son propre motif (section~\ref{sec:plan}~; issue~\#23) \\
 \code{noms} (noms attendus) & \code{TRUE} si \code{x} est une liste nue
 (\code{forme\_exacte()} de type \code{list}, seul attribut admis~: les noms~;
 ni \code{data.frame}, ni classe) d'autant d'éléments que \code{noms}, aux
-mêmes noms une fois triés par \code{sort(method = "radix")}, indépendamment
-de la locale, \code{FALSE} sinon (liste sans noms comprise)~; la longueur est
-comparée à part, \code{sort()} retirant un nom \code{NA}~; le contenu des
+mêmes noms, sans nom manquant ni doublé, comparés \emph{sans tri}
+(\code{anyNA()}, \code{anyDuplicated()}, \code{setequal()}), \code{FALSE}
+sinon (liste sans noms comprise), jamais une erreur~; sous la précondition
+de noms attendus ASCII, vraie de tous les appelants, le résultat ne dépend
+pas de la locale, même pour un nom reçu non ASCII de codage indéterminé ou
+aux octets invalides (le tri \code{sort(method = "radix")} de la version
+antérieure levait alors une erreur R~; issue~\#100)~; le contenu des
 éléments, lus par \code{[[ ]]}, est contrôlé par l'appelant, qui refuse sous
 son propre motif (issue~\#48) \\
 \catalogue{fonctions-outils}{chaine\_unique()} & interne & \code{v} &
