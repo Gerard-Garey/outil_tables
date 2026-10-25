@@ -224,8 +224,12 @@ texte_latex <- function(dossier) {
 # Citations \code{nom()} ou \code{pkg::nom()}.
 citations_latex <- function(texte) {
   # \code{nom()} ou \code{nom(arguments)}, souligné échappé \_ admis ; les
-  # arguments ne contiennent pas d'accolade.
-  m <- unlist(regmatches(texte, gregexpr("\\\\code\\{[A-Za-z0-9._\\\\:]+\\([^{}]*\\)\\}", texte)))
+  # arguments ne contiennent pas d'accolade. Cherchées sur le texte joint par
+  # des fins de ligne (comme `plein`, contrôles 5 et 6) : la liste d'arguments
+  # peut courir sur plusieurs lignes (#90). `[^{}]*` ne franchit pas d'accolade :
+  # \code{f(}\allowbreak\code{x)} n'est toujours pas une citation.
+  plein <- paste(texte, collapse = "\n")
+  m <- unlist(regmatches(plein, gregexpr("\\\\code\\{[A-Za-z0-9._\\\\:]+\\([^{}]*\\)\\}", plein)))
   m <- gsub("\\\\_", "_", sub("\\(.*$", "", sub("^\\\\code\\{", "", m)))
   sort(unique(m))
 }
