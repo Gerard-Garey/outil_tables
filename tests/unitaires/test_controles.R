@@ -603,6 +603,24 @@ verifier("concordance : fonction citée avec arguments introuvable -> échec",
 verifier("concordance : export cité avec arguments -> lu comme cité (succès inattendu en attente)",
          echoue(concordance("--strict", "--latex", shQuote(cite_args), "--attente", shQuote(attente_ok)),
                 "succès inattendu"))
+# Citation \code{nom(...)} répartie sur deux lignes ou plus (#90) : lue comme
+# une citation sur une ligne ; un témoin de chaque issue du contrôle 1.
+inconnu_2l <- latex_temoin(c("\\code{construire\\_table(donnees, roles, plan)} et",
+                             "\\code{fantome\\_deux\\_lignes(x,", "  y = 2)}."))
+inconnu_3l <- latex_temoin(c("\\code{fantome\\_trois\\_lignes(x,", "  y = 2,", "  z = 3)}."))
+cite_2l <- latex_temoin(c("\\code{construire\\_table(donnees,", "  roles, plan)}."))
+base_2l <- latex_temoin(c("\\code{tools::md5sum(files,", "  x)} et \\code{set.seed(", "1)}."))
+verifier("concordance : fonction citée introuvable, \\code{nom(...)} sur deux lignes -> échec (#90)",
+         echoue(concordance("--strict", "--latex", shQuote(inconnu_2l), "--attente", shQuote(attente_cat)),
+                "fantome_deux_lignes() existe"))
+verifier("concordance : fonction citée introuvable, \\code{nom(...)} sur trois lignes -> échec (#90)",
+         echoue(concordance("--strict", "--latex", shQuote(inconnu_3l), "--attente", shQuote(attente_cat)),
+                "fantome_trois_lignes() existe"))
+verifier("concordance : export cité sur deux lignes -> lu comme cité (succès inattendu en attente) (#90)",
+         echoue(concordance("--strict", "--latex", shQuote(cite_2l), "--attente", shQuote(attente_ok)),
+                "succès inattendu"))
+verifier("concordance : fonctions de base citées sur deux lignes (pkg::nom et nom) -> code 0 (#90)",
+         passe(concordance("--strict", "--latex", shQuote(base_2l), "--attente", shQuote(attente_ok))))
 verifier("concordance : --latex sans valeur -> échec",
          echoue(concordance("--strict", "--latex")))
 verifier("concordance : --latex vers un dossier inexistant -> échec",
@@ -716,7 +734,7 @@ verifier("concordance : ligne d'attente en double -> échec",
 verifier("concordance : liste d'attente à l'ancien format (nom, issue, motif) -> échec",
          echoue(concordance("--strict", "--latex", shQuote(complet), "--attente", shQuote(attente_ancienne)),
                 "colonnes lues : nom, issue, motif"))
-unlink(c(vide, cite, inconnu, inconnu_args, cite_args, complet, incomplet, en_trop, doublon,
+unlink(c(vide, cite, inconnu, inconnu_args, cite_args, inconnu_2l, inconnu_3l, cite_2l, base_2l, complet, incomplet, en_trop, doublon,
          cat_inconnu, sans_roles, forme), recursive = TRUE)
 unlink(c(attente_ok, attente_cat, attente_vide, attente_perimee, attente_sans_issue,
          attente_cat_inconnu, attente_type, attente_doublon, attente_ancienne))
