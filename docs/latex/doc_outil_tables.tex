@@ -1658,10 +1658,11 @@ identiques au bit près~; l'en-tête gagne la ligne
     En particulier, l'estimateur \code{kaplan\_meier} n'est figé que sous
     \code{dernier\_anniversaire} (R6)~; sa branche \code{age\_atteint\_annee}
     n'a pas de référence (avis d'\code{actuary} au visa).
-  \item L'entrée n'exerce pas la fusion des contrats par tête~: le
-    simulateur minimal tire une tête par contrat
+  \item L'entrée n'exerce pas la fusion des contrats par tête~: elle est
+    tirée en mode \code{uniforme}, une tête par contrat
     (section~\ref{sec:simulation}). La fusion n'est couverte que par les
-    tests unitaires (section~\ref{sec:verifications-donnees}).
+    tests unitaires (section~\ref{sec:verifications-donnees}, et, sur des
+    jeux à têtes multi-contrats, section~\ref{sec:constats-simulation}).
   \item R6 comprend une cellule définie à $\hat q_x = 1$ avec un seul exposé
     à risque~: la référence fige ce cas d'instabilité de l'estimateur
     produit-limite sous troncature (section~\ref{sec:brut-kaplan-meier}),
@@ -6881,16 +6882,23 @@ multi-états exécuté en avant (E2.19~; ADR 0003, point 9)~: il produit des
 lignes individuelles portant les rôles du catalogue, sur lesquelles le moteur
 est vérifié. Il reproduit le même modèle que le moteur, pas le même code~: il
 n'appelle que \code{donnees} et \code{outils}, et aucun module du moteur ne
-l'appelle (section~\ref{sec:graphe}). La version de cette branche est
-\emph{minimale}~: deux transitions concurrentes, vivant $\to$ décédé et en
-cours $\to$ racheté, une tête par contrat, troncature à gauche et censure par
-la période. Les autres formes de données (agrégats, stocks successifs), les
-têtes multi-contrats et l'injection de défauts paramétrés viendront avec une
-branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2). Son point
+l'appelle (section~\ref{sec:graphe}). Sa première version, dite
+\emph{minimale} (issue~\#10), porte deux transitions concurrentes, vivant
+$\to$ décédé et en cours $\to$ racheté, une tête par contrat, troncature à
+gauche et censure par la période~; elle reste celle des modes
+\code{uniforme} et \code{age\_exact}. Les modes multi-contrats
+\code{uniforme\_multi} et \code{age\_exact\_multi} y ajoutent des têtes
+portant un nombre aléatoire de contrats, de loi déclarée (issue~\#92~;
+section~\ref{sec:portefeuille-simule}). Les autres formes de données
+(agrégats, stocks successifs) et l'injection de défauts paramétrés viendront
+avec une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2). Son point
 d'entrée est \code{simuler\_portefeuille(loi, portefeuille, periode,
 graine)}, exporté (ADR 0007, point 3.2). Le contenu de fond vient de la
 spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
-17/10/2026.
+17/10/2026, et, pour les têtes multi-contrats, de la spécification commune
+des issues~\#92 et~\#93 (\code{actuary}, 25/10/2026), dont le mainteneur a
+retenu les recommandations (décisions M131 à M136~; ADR 0007, annotation du
+25/10/2026).
 
 \subsection{Loi vraie et tables synthétiques}
 \label{sec:loi-vraie}
@@ -6999,10 +7007,11 @@ simulateur la refuse (\code{qx\_egal\_a\_un}).
 \subsubsection*{Entrées}
 
 {\sloppy\hbadness=10000 Le portefeuille est une liste dont tous les champs sont requis, sans valeur
-par défaut (\code{CHAMPS\_PORTEFEUILLE}), selon deux modes~:\par}
+par défaut (\code{CHAMPS\_PORTEFEUILLE}), selon quatre modes~; dans tous,
+\code{n} est le nombre de \emph{têtes}~:\par}
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \code{uniforme}~: \code{n} contrats, \code{proportion\_hommes},
+  \item \code{uniforme}~: \code{n} têtes d'un contrat chacune, \code{proportion\_hommes},
     \code{age\_min}, \code{age\_max}, \code{origine} (date au plus égale au
     début de la période)~; le jour d'entrée est uniforme discret sur les jours
     de $[\text{origine}, \text{fin}]$, l'âge à l'entrée uniforme continu sur
@@ -7016,13 +7025,59 @@ par défaut (\code{CHAMPS\_PORTEFEUILLE}), selon deux modes~:\par}
     l'entrée. Ce mode sert au constat de simulation
     (section~\ref{sec:constats-simulation}). Une entrée le 29~février est
     refusée (\code{entree\_29\_fevrier})~: la naissance «~\code{age} années
-    avant~» serait ambiguë.
+    avant~» serait ambiguë~;
+  \item \code{uniforme\_multi}~: les champs du mode \code{uniforme}, plus
+    \code{loi\_contrats}~; chaque tête porte $K$ contrats, dont les jours
+    d'entrée $e_1, \dots, e_K$ sont tirés indépendamment, uniformes discrets
+    sur les jours de $[\text{origine}, \text{fin}]$~; l'âge à la
+    \emph{première} entrée $e_{(1)} = \min_k e_k$ est uniforme continu sur
+    $[\text{age\_min}, \text{age\_max})$, et la naissance est $e_{(1)}$ moins
+    $\operatorname{round}(\text{âge} \times 365{,}25)$ jours~;
+  \item \code{age\_exact\_multi}~: les champs du mode \code{age\_exact}, plus
+    \code{loi\_contrats}~; chaque tête porte $K$ contrats, tous entrés le
+    jour \code{date\_entree}, à l'âge exact \code{age}.
 \end{itemize}
+
+\noindent
+Le \emph{mode de base} d'un mode multi-contrats (\code{MODE\_BASE})~:
+\code{uniforme} pour \code{uniforme\_multi}, \code{age\_exact} pour
+\code{age\_exact\_multi}~; ses champs communs, leurs contrôles et les bornes
+d'âge (ci-dessous) sont ceux du mode de base. \code{loi\_contrats} donne les
+probabilités $p_1, \dots, p_m$ du nombre $K$ de contrats d'une tête, sur
+$\{1, \dots, m\}$~: loi discrète finie, déclarée, sans famille
+paramétrique ni valeur par défaut. Il est de forme exacte~: type de base
+\code{double} ou \code{integer}, sans aucun attribut, de longueur
+$m \ge 1$, de valeurs finies et positives ou nulles, $p_m > 0$ ($m$ est le
+plus grand nombre de contrats tirable) et
+$\bigl|\sum_k p_k - 1\bigr| \le 10^{-12}$~; sinon refus
+\code{portefeuille\_invalide}, au message propre au champ. Le tirage par
+inversion (ci-dessous) emploie la loi
+$(p_1, \dots, p_{m-1}, 1 - F_{m-1})$, $F_{m-1} = p_1 + \dots + p_{m-1}$,
+qui s'écarte de la loi déclarée d'au plus $10^{-12}$ sur $p_m$
+(\emph{approximation numérique}, bornée par le contrôle de la somme). $K$
+est tiré indépendamment de la mortalité et du rachat~: le simulateur ne
+représente aucune antisélection, et une dépendance entre $K$ et la mortalité
+est hors du périmètre. Le nombre de contrats tirés, au plus $n \times m$,
+doit être un entier R~: si $n \times m$, calculé en \code{double}, dépasse
+\code{.Machine\$integer.max}, le portefeuille est refusé
+(\code{portefeuille\_invalide}) avant tout tirage. \code{loi\_contrats} est
+requis dans un mode multi-contrats et refusé, comme champ inconnu, dans les
+modes \code{uniforme} et \code{age\_exact}, dont rien ne change~: leur
+attribut, leurs champs et leurs tirages sont ceux de la version minimale,
+et l'entrée de référence (section~\ref{sec:non-regression}) est inchangée
+(ADR 0007, annotation du 25/10/2026, point~(a)~; constat~: l'empreinte des
+données des plans de référence, comparée par la batterie de
+reproductibilité, est la même, et les tests unitaires comparent les champs,
+l'ordre des tirages et les champs de l'attribut des modes existants à leurs
+littéraux). Avec
+\code{loi\_contrats = 1}, un mode multi-contrats tire exactement les mêmes
+nombres que son mode de base et rend les mêmes lignes, hors attribut
+(constat des tests pour les deux paires de modes).
 
 \noindent
 Le champ \code{mode} est une chaîne unique sans attribut, ni \code{NA} ni
 vide, au sens de \code{chaine\_unique()} (une chaîne nommée ou munie d'une
-classe est refusée), prise parmi \code{uniforme} et \code{age\_exact}~; le
+classe est refusée), prise parmi les quatre modes~; le
 portefeuille porte exactement les champs de son mode, sans champ manquant,
 inconnu ni en double, et ses champs sont lus par leur nom exact, sans
 appariement partiel (un champ \code{mode\_x} ne tient pas lieu de
@@ -7045,8 +7100,9 @@ dans un autre ordre, donnent les mêmes lignes tirées~; l'attribut
 liste nue de cette forme.
 Pour garantir une naissance strictement antérieure à l'entrée, il faut
 $\text{age\_min} \times 365{,}25 \ge 1$ (la fonction \code{round()} de R arrondit
-au pair~: $\operatorname{round}(0{,}5) = 0$) en mode uniforme, et un âge entier
-au moins égal à 1 en mode âge exact~; ces conditions sont contrôlées
+au pair~: $\operatorname{round}(0{,}5) = 0$) dans les modes \code{uniforme} et
+\code{uniforme\_multi}, et un âge entier au moins égal à 1 dans les modes
+\code{age\_exact} et \code{age\_exact\_multi}~; ces conditions sont contrôlées
 (\code{portefeuille\_invalide}). La période d'observation est une liste
 nue, de champs exactement \code{debut} et \code{fin} (même contrôle
 \code{liste\_aux\_noms()} que la loi vraie~; refus \code{periode\_invalide}),
@@ -7062,7 +7118,9 @@ $B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
   \item Pour chaque transition et chaque tête, un \textbf{temps latent} est
     tiré par inversion du risque cumulé $H$, linéaire par morceaux sur l'âge
     (force constante par âge entier)~: l'âge de l'événement est celui où $H$
-    atteint $H(a_0) + E$, avec $a_0$ l'âge exact à l'entrée et
+    atteint $H(a_0) + E$, avec $a_0$ l'âge exact à l'entrée (pour le décès
+    d'une tête multi-contrats, à sa première entrée~; pour le rachat d'un de
+    ses contrats, à l'entrée de ce contrat) et
     $E \sim \mathrm{Exp}(1)$, cherché par \code{findInterval()}
     (\code{temps\_latent()}).
   \item La sortie est le \textbf{minimum} des deux temps latents et de la
@@ -7078,6 +7136,48 @@ $B = \text{fin} + 1$ (le simulateur n'a pas de délai de déclaration).
     l'arrondi de la virgule flottante.
 \end{enumerate}
 
+\subsubsection*{Têtes multi-contrats}
+
+Dans les modes \code{uniforme\_multi} et \code{age\_exact\_multi} (issue~\#92~;
+décisions M131 et M135), le modèle distingue la tête et ses contrats~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{par tête}~: le sexe, la naissance (ci-dessus) et le
+    \textbf{décès}, temps latent tiré à partir de la première entrée
+    $e_{(1)}$, à l'âge exact de la tête à cette date~;
+  \item \textbf{par contrat}~: l'entrée $e_k$ et le \textbf{rachat}, temps
+    latent tiré à partir de $e_k$, à l'âge de la tête à cette date~; décès et
+    rachats sont des risques concurrents indépendants~;
+  \item \textbf{contrat non souscrit}~: soit $t_d$ l'instant (continu) de
+    décès latent de la tête~; un contrat n'est écrit que si $e_k < t_d$. Le
+    premier contrat l'est toujours, $t_d$ suivant strictement $e_{(1)}$ (le
+    tirage exponentiel est strictement positif). Le code écrit la règle
+    «~$e_k \le e_{(1)}$ ou $e_k < t_d$~»~: la première clause est une garde
+    contre un arrondi en virgule flottante qui rendrait $t_d$ égal à
+    $e_{(1)}$, sans effet en arithmétique exacte, où $e_k \le e_{(1)}$
+    entraîne $e_k = e_{(1)} < t_d$. Un contrat non souscrit n'est pas écrit
+    et il est compté dans l'attribut (\code{contrats\_non\_souscrits},
+    ci-dessous). Tirer le décès à partir de la \emph{dernière} entrée,
+    c'est-à-dire faire survivre la tête jusqu'à elle, créerait un
+    \emph{biais de temps immortel}~: entre sa première et sa dernière entrée,
+    la tête serait exposée sans pouvoir décéder, et la mortalité observée
+    serait sous-estimée (variante écartée, décision M135~; le test~B1
+    ci-dessous la détecte)~;
+  \item \textbf{sortie}~: avec $B = \text{fin} + 1$ et $t_{r,k}$ l'instant de
+    rachat latent du contrat $k$, décès si $t_d \le t_{r,k}$ et $t_d < B$,
+    rachat si $t_{r,k} < t_d$ et $t_{r,k} < B$, en cours sinon~; à égalité,
+    le décès l'emporte. Le décès est commun à la tête~: tous ses contrats en
+    cours à cet instant sortent par \code{deces}, à la même date. Une
+    assertion vérifie que la date de décès n'est antérieure à l'entrée
+    d'aucun contrat écrit~: un écart serait une erreur de programmation,
+    jamais un refus~;
+  \item \textbf{bornes d'âge}~: celles du mode de base restent valables, la
+    naissance étant fixée à partir de la première entrée et les entrées
+    suivantes restant dans $[\text{origine}, \text{fin}]$ (ou égales à
+    \code{date\_entree})~; l'assertion sur les âges parcourus porte sur
+    chaque tête.
+\end{itemize}
+
 \subsubsection*{Ordre des tirages et graine}
 
 Les tirages ont lieu sous \code{sous\_graine()}, avec la graine reçue en
@@ -7086,8 +7186,26 @@ dans un ordre fixé, qui fait partie du contrat de reproductibilité et est
 consigné (\code{ORDRE\_TIRAGES})~: (1) sexe, \code{runif(n)} comparé à la
 proportion d'hommes~; (2) jour d'entrée, \code{sample.int()} avec remise~;
 (3) âge à l'entrée, \code{runif(n)}~; (4) décès, \code{rexp(n)}~; (5) rachat,
-\code{rexp(n)}. En mode âge exact, (2) et (3) ne sont pas tirés. Changer cet
-ordre change tout jeu simulé~: c'est un changement de résultat.
+\code{rexp(n)}. En mode âge exact, (2) et (3) ne sont pas tirés. Les modes
+multi-contrats ont leur propre ordre, consigné de même
+(\code{ORDRE\_TIRAGES\_MULTI}), sous un seul appel de \code{sous\_graine()},
+$N = \sum K$ désignant le nombre de contrats tirés~: en
+\code{uniforme\_multi}, (1) sexe, \code{runif(n)}~; (2) nombre $K$ de
+contrats par tête, par inversion explicite,
+\code{1 + findInterval(runif(n), cumsum(loi\_contrats)[-m])}~; (3) jour
+d'entrée de chaque contrat tiré, têtes puis contrats, \code{sample.int()}
+avec remise, $N$ tirages~; (4) âge à la première entrée, \code{runif(n)}~;
+(5) décès par tête, \code{rexp(n)}~; (6) rachat de chaque contrat tiré,
+souscrit ou non, \code{rexp(N)}~; en \code{age\_exact\_multi}, (1), (2),
+puis décès \code{rexp(n)} et rachat \code{rexp(N)}. Quand
+\code{loi\_contrats} n'a qu'une probabilité non nulle, $K$ n'est pas tiré
+(il vaut $m$)~: d'où l'identité des tirages avec le mode de base pour
+\code{loi\_contrats = 1}. L'inversion explicite, plutôt que
+\code{sample()} avec probabilités, fixe dans le contrat l'ordre et le nombre
+des tirages, que l'implémentation de \code{sample()} déterminerait
+sinon. Les lignes sont rangées par tête, puis par date d'entrée, puis par
+rang de tirage (tri stable). Changer l'un de ces ordres change tout jeu
+simulé~: c'est un changement de résultat.
 
 \subsubsection*{Couverture de la table~: aucune extrapolation}
 
@@ -7145,12 +7263,16 @@ vaut 96 (erratum A.2, point~1), couverte par la table de 0 à 120 ans.
 \subsubsection*{Sortie}
 
 {\sloppy\hbadness=10000 \code{simuler\_portefeuille()} rend un \code{data.frame} de colonnes
-\code{id\_contrat}, \code{id\_tete} (égal à \code{id\_contrat}), \code{sexe},
+\code{id\_contrat}, \code{id\_tete} (égal à \code{id\_contrat} dans les modes
+\code{uniforme} et \code{age\_exact}~; de 1 à \code{n} dans les modes
+multi-contrats, où \code{id\_contrat} numérote de 1 au nombre de lignes les
+contrats écrits, dans l'ordre des lignes), \code{sexe},
 \code{date\_naissance}, \code{date\_entree}, \code{date\_sortie} (manquante si
-la tête est en cours à la fin) et \code{cause\_sortie} (\code{deces},
+le contrat est en cours à la fin) et \code{cause\_sortie} (\code{deces},
 \code{rachat} ou \code{en\_cours}), qui portent les noms des rôles du
 catalogue. Toutes les lignes sont conservées, y compris celles sorties avant
-le début de la période, qui exercent la troncature à gauche. Les lignes sont
+le début de la période, qui exercent la troncature à gauche~; seuls manquent
+les contrats non souscrits des modes multi-contrats. Les lignes sont
 cohérentes au sens exact, $\text{naissance} < \text{entrée} \le \text{sortie}
 \le \text{fin}$, et passent les contrôles du module \code{donnees} sans
 exclusion, pour les deux transitions (constat des tests).\par}
@@ -7161,12 +7283,30 @@ effective par transition et par sexe avec $q_x$ et $\mu_x$, transitions,
 hypothèse de répartition, \code{sexes\_controles})~; le portefeuille et la
 période reçus~; la graine, \code{GENERATEUR} et l'ordre des tirages~; la
 version de R~; des décomptes (lignes, décès, rachats, en cours, sorties et
-entrées antérieures au début de la période).
+entrées antérieures au début de la période). Dans les modes
+\code{uniforme} et \code{age\_exact}, il n'a pas d'autre champ. Dans les
+modes multi-contrats, il a les mêmes champs, dans le même ordre, puis des
+ajouts \emph{en fin seulement}~: l'ordre des tirages est celui du mode~;
+\code{decomptes} garde ses six champs, \code{lignes} comptant les contrats
+écrits, suivis de \code{tetes} ($n$), \code{contrats\_tires} ($N$),
+\code{contrats\_non\_souscrits} ($N$ moins le nombre de lignes),
+\code{tetes\_decedees\_observees} (têtes qui ont au moins une ligne à
+décès) et \code{tetes\_decedees\_sans\_contrat} (têtes dont le décès latent
+précède $B$ sans qu'aucun de leurs contrats écrits ne soit en cours à cet
+instant, tous étant déjà rachetés~: leur décès n'apparaît sur aucune
+ligne)~; un champ final \code{contrats} porte la loi déclarée
+(\code{loi}, en \code{double}) et le nombre de têtes par nombre de contrats
+tirés (\code{tires\_par\_tete}). Tous ces décomptes se recomptent sur les
+lignes et sur \code{tires\_par\_tete}, sauf
+\code{tetes\_decedees\_sans\_contrat}, qui porte sur des décès absents des
+lignes~: les tests n'en vérifient que la positivité.
 
 \medskip
 {\sloppy\hbadness=10000 Refus du simulateur~: \code{loi\_invalide}, \code{portefeuille\_invalide},
 \code{periode\_invalide}, \code{entree\_29\_fevrier}, \code{table\_trop\_courte}
-et \code{qx\_egal\_a\_un}~; et, par \code{sous\_graine()}, \code{graine\_invalide}.\par}
+et \code{qx\_egal\_a\_un}~; et, par \code{sous\_graine()}, \code{graine\_invalide}.
+Les modes multi-contrats n'ajoutent aucun code~: \code{loi\_contrats} et la
+garde de débordement sont refusés sous \code{portefeuille\_invalide}.\par}
 
 \subsection{Constats de simulation}
 \label{sec:constats-simulation}
@@ -7261,6 +7401,170 @@ batterie à chaque exécution~; elles ne sont pas reproduites ici (E3.4).
 \end{itemize}
 \end{encadre}
 
+\subsubsection*{Têtes multi-contrats~: familles A et B}
+
+Les modes multi-contrats (issue~\#92) sont vérifiés par deux familles de
+constats de simulation, qui se distinguent par le statut de leur fausse
+alarme~: \emph{exacte} pour la famille~A, \emph{nominale asymptotique} pour
+la famille~B (décision M131~; ADR 0007, annotation du 25/10/2026,
+point~(d)). Les attentes viennent de formules fermées, de décomptes faits
+directement sur les lignes et de l'attribut~; aucune n'est établie par une
+fonction du module \code{donnees} (l'âge révolu est recalculé dans le test),
+dont les sorties, par \code{construire\_table()}, sont ce qui est vérifié
+(non-circularité).
+
+\medskip
+\noindent
+\textbf{Famille A (fausse alarme exacte), mode \code{age\_exact\_multi}.}
+$n = 3 \cdot 10^{5}$ têtes, toutes des hommes, d'âge exact $x = 60$ à
+l'entrée, le 2016-03-15, période du 2016-03-15 au 2017-03-14~: l'année
+d'âge 60 est observée entière ($L = 365$ jours), sans censure avant
+$B = \operatorname{anniv}(61)$~; décès de la table de Gompertz-Makeham des
+tests, rachat constant $q^{r} = 0{,}30$, $\text{loi\_contrats} =
+(0{,}5~; 0{,}3~; 0{,}2)$, graine 20261025. Toutes les entrées ayant lieu le
+même jour, aucun contrat n'est non souscrit. Avec
+$\mu = -\ln(1 - q_{60}) = 0{,}00818659807815$ et
+$\rho = -\ln 0{,}7 = 0{,}356674943939$ (forces sur l'année d'âge), soit
+$N_c$ le nombre de têtes qui décèdent dans l'année avec exactement $c$
+contrats en cours. Les têtes étant indépendantes, $N_c$ suit
+\emph{exactement} la loi binomiale $\mathcal{B}(n, \pi_c)$, avec
+$\pi_c = \sum_K p_K\, \pi_c(K)$ et
+\begin{align*}
+  \pi_c(K) &= \int_0^1 \mu e^{-\mu t} \binom{K}{c} e^{-c \rho t}
+  \bigl(1 - e^{-\rho t}\bigr)^{K-c} \,\mathrm{d}t \\
+  &= \binom{K}{c} \sum_{j=0}^{K-c} \binom{K-c}{j} (-1)^{j}
+  \frac{\mu}{\mu + (c+j)\rho}\Bigl(1 - e^{-(\mu + (c+j)\rho)}\Bigr)
+\end{align*}
+(développement binomial de $(1 - e^{-\rho t})^{K-c}$~; résultat exact,
+recoupé par \code{stats::integrate()} à $10^{-12}$ relatif)~; le nombre de
+têtes à $k$ lignes suit $\mathcal{B}(n, p_k)$, et le nombre de décès à
+60~ans compté par le moteur en unité tête (estimateur \code{poisson}) est
+$\sum_{c \ge 1} N_c$, de loi $\mathcal{B}\bigl(n, \sum_{c \ge 1}
+\pi_c\bigr)$. Sept tests binomiaux bilatéraux exacts, de région
+$[\text{qbinom}(a_k/2, n, p), \text{qbinom}(1 - a_k/2, n, p)]$, avec un
+partage égal du niveau $\alpha = 10^{-3}$ (inégalité de l'union,
+$a_k = \alpha/7 \approx 1{,}429 \cdot 10^{-4}$)~; fausse alarme familiale
+bornée par $\sum_k FA_k = 9{,}566 \cdot 10^{-4} \le \alpha$, sans
+hypothèse d'indépendance.
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{2.8cm}p{3.2cm}p{2.2cm}@{}}
+\caption{Famille A~: probabilité exacte sous le modèle, région
+d'acceptation et fausse alarme exacte
+(\code{tests/unitaires/test\_simulation.R}).}
+\label{tab:constat-multi-a}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Test}} &
+\textcolor{financeblue}{\textbf{$p$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Test}} &
+\textcolor{financeblue}{\textbf{$p$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endhead
+A1. têtes à 1 ligne & $0{,}5$ & $[148\,958\,;\ 151\,042]$ & $1{,}408\cdot 10^{-4}$ \\
+A2. têtes à 2 lignes & $0{,}3$ & $[89\,046\,;\ 90\,955]$ & $1{,}419\cdot 10^{-4}$ \\
+A3. têtes à 3 lignes & $0{,}2$ & $[59\,168\,;\ 60\,835]$ & $1{,}408\cdot 10^{-4}$ \\
+A4. $N_1$ & $0{,}00416937354957$ & $[1\,119\,;\ 1\,387]$ & $1{,}380\cdot 10^{-4}$ \\
+A5. $N_2$ & $0{,}00224283291693$ & $[577\,;\ 774]$ & $1{,}329\cdot 10^{-4}$ \\
+A6. $N_3$ & $0{,}00100193504543$ & $[237\,;\ 369]$ & $1{,}231\cdot 10^{-4}$ \\
+A7. décès à 60~ans, moteur, unité tête & $0{,}00741414151193$ & $[2\,048\,;\ 2\,405]$ & $1{,}390\cdot 10^{-4}$ \\
+\end{longtable}
+}
+
+\noindent
+Les \emph{identités exactes} de la famille~A, déterministes, sans fausse
+alarme~: décès en unité tête $= \sum_c N_c$ et en unité contrat
+$= \sum_c c\, N_c$ (moteur)~; exposition en jours, en unité tête,
+$= \sum_{\text{têtes}} (\max_k f_k - e)$ et, en unité contrat,
+$= \sum (f_k - e)$, $f_k$ étant la fin de la fenêtre du contrat~$k$ et $e$
+l'entrée commune~; chevauchements et contiguïtés $=$ lignes $-$ têtes,
+aucun intervalle disjoint, aucun des vingt motifs. Les rapports entre unité
+contrat et unité tête ont, sous le modèle, les valeurs exactes
+$E[D_c]/E[D_t] = 1{,}572784$, $E[E_c]/E[E_t] = 1{,}572448$, d'où un
+rapport des taux attendus de $1{,}000214$, et
+$\varphi = E[C^{2}]/E[C] = 1{,}900216$, $C$ étant le nombre de contrats en
+cours au décès d'une tête décédée~: en unité contrat, le taux est sans biais
+notable, mais les décès d'une même tête n'étant pas indépendants,
+l'intervalle nominal y est trop étroit d'un facteur
+$\sqrt{\varphi} \approx 1{,}38$ (valeurs vérifiées par le test à
+$5 \cdot 10^{-7}$ près~; les valeurs observées sont imprimées sans
+verdict).
+
+\medskip
+\noindent
+\textbf{Famille B (fausse alarme nominale asymptotique), mode
+\code{uniforme\_multi}.} $10^{5}$ têtes, loi vraie, portefeuille et période
+de l'entrée de référence (section~\ref{sec:non-regression}), graine
+20261016, $\text{loi\_contrats} = (0{,}6~; 0{,}3~; 0{,}1)$~; moteur sans
+délai de déclaration, segmenté par sexe, estimateur \code{poisson}. Deux
+tests~: B1, décès en unité tête~; B2, rachat en unité contrat.
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Hypothèse nulle}~: les lignes sont tirées sous la loi vraie
+    et le moteur compte exactement les événements et l'exposition.
+  \item \textbf{Statistique}~: $Z = \bigl(\sum_x D_x - \sum_x \mu_x
+    E^{c}_x\bigr) \big/ \sqrt{\textstyle\sum_x \mu_x E^{c}_x}$, sommes sur
+    les cellules (sexe, âge) du moteur, $\mu_x$ force vraie
+    ($-\ln(1 - f_s q_x)$), $E^{c}_x$ exposition centrale en années d'âge.
+  \item \textbf{Loi de référence et région}~: sous l'hypothèse nulle, le
+    nombre d'événements moins l'intégrale de la force sur l'exposition est
+    une martingale du processus de comptage, et $Z$ est asymptotiquement
+    normal centré réduit (P.\,K.~Andersen, Ø.~Borgan, R.\,D.~Gill,
+    N.~Keiding, \emph{Statistical Models Based on Counting Processes},
+    Springer, 1993~; page non vérifiée)~; région $|Z| \le 3{,}4808$,
+    quantile d'ordre $1 - 10^{-3}/4$ de la loi normale à $10^{-4}$ près.
+  \item \textbf{Fausse alarme}~: nominale, $5 \cdot 10^{-4}$ par test et
+    $10^{-3}$ pour les deux (inégalité de l'union)~; \emph{non exacte}
+    (statut asymptotique, accepté comme tel par le mainteneur, M131).
+  \item \textbf{Conditions de validité}~: des nombres d'événements
+    attendus grands, ce que donnent $10^{5}$ têtes~; l'arrêt de
+    l'exposition au début du jour de sortie (section~\ref{sec:loi-vraie})
+    décalerait la moyenne de $Z$ d'environ $0{,}02$ écart-type selon la
+    spécification~: \emph{hypothèse non mesurée}. Borne de robustesse,
+    calcul exact sur la loi normale~: un décalage $\delta$ de la moyenne de
+    $Z$ porte la fausse alarme de chaque test à
+    $\Phi(-3{,}4808 - \delta) + \Phi(-3{,}4808 + \delta)$, soit
+    $4{,}999 \cdot 10^{-4}$ pour $\delta = 0$, $5{,}012 \cdot 10^{-4}$ pour
+    $\delta = 0{,}02$ et $5{,}326 \cdot 10^{-4}$ pour $\delta = 0{,}1$.
+\end{itemize}
+Identités exactes de la famille~B~: aucun motif ni aucune exclusion dans les
+deux transitions~; décès en unité tête $=$ têtes distinctes ayant un décès
+daté dans la période~; rachats en unité contrat $=$ lignes à rachat datées
+dans la période~; exposition en jours, en unité tête, $=$ réunion des
+fenêtres de la tête et, en unité contrat, $=$ somme des fenêtres des
+lignes~; décomptes de l'attribut $=$ décomptes refaits sur les lignes.
+Valeurs informatives, imprimées sans verdict~: $X^{2}$ par degré de liberté
+sur les cellules, $\hat\varphi$, rapports des décès et des expositions
+entre unité contrat et unité tête.
+
+\begin{encadre}
+\small
+\textbf{Statuts et sources d'erreur des familles A et B} (E2.20).
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
+  \item \emph{Résultats exacts}~: les lois binomiales de la famille~A, la
+    forme close de $\pi_c$, les régions et les $FA_k$, l'inégalité de
+    l'union, les valeurs des rapports entre unité contrat et unité tête,
+    les identités des deux familles, la borne de robustesse (calcul sur la
+    loi normale).
+  \item \emph{Résultat asymptotique}~: la loi normale de $Z$ (famille~B),
+    donc sa fausse alarme nominale.
+  \item \emph{Approximations numériques}~: l'écart d'au plus $10^{-12}$
+    entre la loi déclarée et la loi tirée de $K$~; l'évaluation en virgule
+    flottante des probabilités, quantiles et $FA_k$.
+  \item \emph{Hypothèse non mesurée}~: le décalage de la moyenne de $Z$ dû
+    à l'arrondi au jour.
+  \item \emph{Constat de simulation}~: le passage des neuf tests.
+  \item \emph{Erreur Monte-Carlo}~: la dispersion due au nombre fini de
+    têtes simulées, que mesurent les régions~; \emph{erreur d'estimation}~:
+    elle n'intervient pas, les décomptes étant comparés aux probabilités
+    exactes (famille~A) ou à la force vraie (famille~B), sans taux estimé.
+\end{itemize}
+\end{encadre}
+
 \subsection{Vérifications}
 \label{sec:verifications-simulation}
 
@@ -7277,7 +7581,18 @@ section~\ref{sec:verifications-exposition})~; la cohérence exacte des lignes et
 l'entrée~; le passage du module \code{donnees} sans exclusion, pour les deux
 transitions~; l'identité des jeux à graine égale et la restauration de l'état
 du générateur de l'appelant~; chaque refus, dont \code{table\_trop\_courte}
-indépendant de la graine~; le constat ci-dessus.
+indépendant de la graine~; le constat ci-dessus. Pour les modes
+multi-contrats (issue~\#92), il vérifie en outre~: les champs, l'ordre des
+tirages et l'attribut des modes existants comparés à leurs littéraux~;
+\code{ORDRE\_TIRAGES\_MULTI} comparée à son littéral et les deux premiers
+tirages rejoués sous la graine~; l'identité, hors attribut, d'un mode
+multi-contrats de \code{loi\_contrats = 1} et de son mode de base, pour les
+deux paires~; les colonnes, les types, l'ordre des lignes et les
+identifiants~; la cohérence des lignes, la naissance et le sexe constants
+par tête, le décès commun~; les décomptes de l'attribut refaits sur les
+lignes~; les familles~A et~B et leurs identités~; chaque refus de
+\code{loi\_contrats} et la garde de débordement, sans tirage, pour \code{n}
+en \code{double} comme en \code{integer}.
 \code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
 identique, attribut compris, dans un autre processus R.
 
@@ -7303,8 +7618,10 @@ identique, attribut compris, dans un autre processus R.
 \endhead
 \catalogue{fonctions-simulation}{CAUSES\_SIMULEES} & constante & --- & causes produites et transitions associées \\
 \catalogue{fonctions-simulation}{HYPOTHESE\_REPARTITION} & constante & --- & hypothèse consignée~: force constante par âge entier, risques indépendants \\
-\catalogue{fonctions-simulation}{ORDRE\_TIRAGES} & constante & --- & ordre des tirages, consigné \\
+\catalogue{fonctions-simulation}{ORDRE\_TIRAGES} & constante & --- & ordre des tirages des modes \code{uniforme} et \code{age\_exact}, consigné \\
+\catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_MULTI} & constante & --- & ordre des tirages de chaque mode multi-contrats, consigné \\
 \catalogue{fonctions-simulation}{CHAMPS\_PORTEFEUILLE} & constante & --- & champs requis du portefeuille, par mode \\
+\catalogue{fonctions-simulation}{MODE\_BASE} & constante & --- & mode de base de chaque mode (mêmes champs communs, contrôles et bornes d'âge) \\
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
 \catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs \\
@@ -7313,11 +7630,11 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
 \catalogue{fonctions-simulation}{age\_anniversaire()} & interne & composantes, année, jour & âge au dernier anniversaire \\
 \catalogue{fonctions-simulation}{date\_unique()} & interne & valeur & date unique entière et finie, de forme exacte (classe \code{Date} seule, stockage \code{double} ou \code{integer}) \\
-\catalogue{fonctions-simulation}{controler\_portefeuille()} & interne & portefeuille, période & refus des entrées~; bornes d'âge a priori \\
+\catalogue{fonctions-simulation}{controler\_portefeuille()} & interne & portefeuille, période & refus des entrées, dont \code{loi\_contrats} et la garde de débordement des modes multi-contrats~; bornes d'âge a priori \\
 \catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
 \catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
-\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine & jeu simulé et attribut \code{simulation} \\
+\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation} \\
 \end{longtable}
 }
 
@@ -7409,7 +7726,7 @@ E2.9 & segmentation déclarée, vide explicite admis (le test d'homogénéité v
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
 E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
-E2.19 & simulateur~: loi vraie, entrées, sorties concurrentes, censure, constat de simulation~; retrouver la loi vraie par les taux bruts & \ref{sec:simulation}, \ref{sec:constats-brut} \\
+E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, constat de simulation~; retrouver la loi vraie par les taux bruts & \ref{sec:simulation}, \ref{sec:constats-brut} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut} \\
