@@ -1010,3 +1010,477 @@ verifier("loi_contrats admises : integer, somme à 1e-13 près ; loi dégénér�
     identical(x2$sexe[!duplicated(x2$id_tete)], x1$sexe) && length(commun) > 0L &&
     identical(x1$date_sortie[d1][match(commun, x1$id_tete[d1])], x2$date_sortie[d2][match(commun, x2$id_tete[d2])])
 })
+
+# --- défauts paramétrés (#93) -------------------------------------------------------------
+# Spécification d'actuary-approfondi du 25/10/2026 (#92, § 2 et § 4, #93) ;
+# réponse d'actuary à la question (f) (#93, 25/10/2026) ; ADR 0007,
+# annotation du 25/10/2026, (c), points 6 à 9, et (d). Natures des attendus :
+# littéraux de la spécification (catalogue, § 2.2, recopié ici, non lu dans
+# le package) ; identités exactes (décomptes et sélections refaits sur les
+# lignes, ordre des tirages rejoué sous la graine des défauts) ; constat de
+# simulation du § 2.6 (fausse alarme exacte pour les décès exclus, borne
+# exacte de Hoeffding pour l'exposition exclue). Non-circularité : les
+# sorties du module `donnees` (preparer_donnees(), construire_table()) sont
+# confrontées à l'attribut `defauts`, jamais employées pour l'établir.
+
+CATALOGUE_DEFAUTS <- tablexp:::CATALOGUE_DEFAUTS
+TOUS_MOTIFS <- c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE)
+GRAINE_DEF <- 20261025L
+TOUTES <- c("deces", "rachat", "en_cours"); DR <- c("deces", "rachat")
+# Catalogue de la spécification, § 2.2 : type, unité, causes éligibles
+# (types de ligne), condition, motif attendu (NA : refus date_hors_domaine).
+SPEC_DEFAUTS <- list(
+  list("contrat_duplique", "ligne", TOUTES, "", "contrat_duplique"),
+  list("id_contrat_manquant", "ligne", TOUTES, "", "id_contrat_manquant"),
+  list("id_tete_manquant", "ligne", TOUTES, "", "id_tete_manquant"),
+  list("naissance_manquante", "ligne", TOUTES, "", "naissance_manquante"),
+  list("entree_manquante", "ligne", TOUTES, "", "entree_manquante"),
+  list("sortie_manquante", "ligne", DR, "", "sortie_manquante"),
+  list("cause_manquante", "ligne", TOUTES, "", "cause_manquante"),
+  list("cause_hors_modalites", "ligne", DR, "", "cause_hors_modalites"),
+  list("sexe_manquant", "ligne", TOUTES, "", "sexe_manquant"),
+  list("sexe_hors_modalites", "ligne", TOUTES, "", "sexe_hors_modalites"),
+  list("naissance_apres_entree", "ligne", TOUTES, "", "naissance_apres_entree"),
+  list("sortie_avant_entree", "ligne", DR, "", "sortie_avant_entree"),
+  list("en_cours_avant_fin", "ligne", "en_cours", "entree_avant_fin", "en_cours_avant_fin"),
+  list("age_aberrant", "ligne", TOUTES, "", "age_aberrant"),
+  list("date_hors_domaine", "ligne", TOUTES, "", NA_character_),
+  list("tete_naissance_incoherente", "tete", TOUTES, "tete_multi", "tete_naissance_incoherente"),
+  list("tete_sexe_incoherent", "tete", TOUTES, "tete_multi", "tete_sexe_incoherent"),
+  list("tete_observee_apres_deces", "tete", TOUTES, "tete_multi_deces", "tete_observee_apres_deces"))
+SPEC_TYPE <- vapply(SPEC_DEFAUTS, `[[`, "", 1L)
+verifier("défauts, catalogue (§ 2.2) : types, unités, causes éligibles, conditions, motifs et refus attendus = spécification", {
+  cat_ok <- identical(CATALOGUE_DEFAUTS$defaut, SPEC_TYPE) &&
+    identical(CATALOGUE_DEFAUTS$unite, vapply(SPEC_DEFAUTS, `[[`, "", 2L)) &&
+    identical(CATALOGUE_DEFAUTS$condition, vapply(SPEC_DEFAUTS, `[[`, "", 4L)) &&
+    identical(CATALOGUE_DEFAUTS$motif_attendu, vapply(SPEC_DEFAUTS, `[[`, "", 5L)) &&
+    identical(CATALOGUE_DEFAUTS$refus_attendu, ifelse(is.na(CATALOGUE_DEFAUTS$motif_attendu), "date_hors_domaine",
+                                                      "ligne_invalide"))
+  lignes_ok <- all(vapply(seq_along(SPEC_DEFAUTS), function(i) SPEC_DEFAUTS[[i]][[2L]] == "tete" ||
+    identical(TOUTES[unlist(CATALOGUE_DEFAUTS[i, TOUTES])], SPEC_DEFAUTS[[i]][[3L]]), logical(1L)))
+  cat_ok && lignes_ok
+})
+verifier("défauts, test de clôture : motifs attendus du catalogue + 3 motifs hors périmètre = c(MOTIFS_LIGNES, MOTIFS_TETE)", {
+  m <- c(CATALOGUE_DEFAUTS$motif_attendu[!is.na(CATALOGUE_DEFAUTS$motif_attendu)],
+         "annee_naissance_incoherente", "segment_manquant", "tete_segment_incoherent")
+  !anyDuplicated(m) && length(m) == length(TOUS_MOTIFS) && setequal(m, TOUS_MOTIFS)
+})
+verifier("défauts : COMBINAISONS_DEFAUTS et ORDRE_TIRAGES_DEFAUTS égales à leurs littéraux (spécification, § 2.3 et § 2.4)",
+         identical(tablexp:::COMBINAISONS_DEFAUTS, list(c("cause_manquante", "sexe_manquant"))) &&
+           identical(tablexp:::ORDRE_TIRAGES_DEFAUTS, c(
+             paste("0. après le tirage complet du jeu propre, un seul sous_graine(defauts$graine), graine différente",
+                   "de celle du jeu ; déclarations traitées dans l'ordre reçu"),
+             paste("1. éligibles : unités non encore altérées, en ordre croissant (lignes du jeu propre ; têtes dont",
+                   "aucune ligne n'est altérée) ; une tête retenue rend toutes ses lignes inéligibles ensuite"),
+             "2. taux : unités retenues = éligibles[runif(nombre d'éligibles) < taux]",
+             "3. nombre : unités retenues = sort(éligibles[sample.int(nombre d'éligibles, nombre)])")))
+
+# Critère 1 : defauts = NULL, jeu identical() à l'appel sans l'argument, sans attribut defauts.
+PF_M_1E3 <- modifyList(PF_M, list(n = 1000))
+verifier("défauts (critère 1) : defauts = NULL -> jeu identical() à l'appel sans l'argument, aucun attribut defauts (uniforme, uniforme_multi, age_exact_multi)", {
+  px <- modifyList(PF_X, list(mode = "age_exact_multi", loi_contrats = c(0.5, 0.5)))
+  all(vapply(list(list(PF_FORME, PER), list(PF_M_1E3, PER), list(px, PER_X2)), function(a) {
+    r <- simuler(loi(), a[[1]], a[[2]], GRAINE, defauts = NULL)
+    identical(r, simuler(loi(), a[[1]], a[[2]], GRAINE)) && is.null(attr(r, "defauts"))
+  }, logical(1L)))
+})
+
+# Jeu catalogue (critère 3) : uniforme_multi, 5 000 têtes, nombre = 5 par
+# type (hors date_hors_domaine, jeu à part) et pour la combinaison admise.
+PF_CAT <- modifyList(PF_M, list(n = 5000))
+DECL_CAT <- c(lapply(setdiff(SPEC_TYPE, "date_hors_domaine"), function(t)
+  if (CATALOGUE_DEFAUTS$unite[CATALOGUE_DEFAUTS$defaut == t] == "ligne")
+    list(type = t, cible = TOUTES, nombre = 5) else list(type = t, nombre = 5)),
+  list(list(type = c("cause_manquante", "sexe_manquant"), cible = TOUTES, nombre = 5)))
+DEF_CAT <- list(graine = GRAINE_DEF, declarations = DECL_CAT)
+t0 <- proc.time()[["elapsed"]]
+sc0 <- simuler(loi(), PF_CAT, PER, GRAINE)
+set.seed(11L); avant <- globalenv()$.Random.seed
+sc <- simuler(loi(), PF_CAT, PER, GRAINE, defauts = DEF_CAT)
+duree_cat <- proc.time()[["elapsed"]] - t0
+verifier("défauts : appelant sous set.seed(11) : .Random.seed global inchangé après une injection",
+         identical(globalenv()$.Random.seed, avant))
+idf <- attr(sc, "defauts"); lg <- idf$lignes; N0 <- nrow(sc0)
+verifier("défauts (critère 2) : attribut simulation identical() à celui du jeu propre ; mêmes colonnes et types",
+         identical(attr(sc, "simulation"), attr(sc0, "simulation")) && identical(names(sc), names(sc0)) &&
+           identical(lapply(sc, class), lapply(sc0, class)) && identical(vapply(sc, typeof, ""), vapply(sc0, typeof, "")) &&
+           .row_names_info(sc) == -nrow(sc))
+verifier("défauts (critère 2) : lignes non altérées identiques au jeu propre, colonne par colonne", {
+  ln <- setdiff(seq_len(N0), lg$ligne)
+  length(ln) > 0L && all(vapply(names(sc0), function(v) identical(sc[[v]][ln], sc0[[v]][ln]), logical(1L)))
+})
+verifier("défauts : attribut defauts, champs dans l'ordre (parametre, graine, generateur, ordre_tirages, validite, lignes, decomptes)",
+         identical(names(idf), c("parametre", "graine", "generateur", "ordre_tirages", "validite", "lignes", "decomptes")) &&
+           identical(idf$parametre, DEF_CAT) && identical(idf$graine, GRAINE_DEF) && identical(idf$generateur, GENERATEUR) &&
+           identical(idf$ordre_tirages, tablexp:::ORDRE_TIRAGES_DEFAUTS) &&
+           identical(idf$validite$periode, PER) && identical(idf$validite$delai_declaration, 0) &&
+           identical(unname(idf$validite$roles), names(ROLES_SIM)) && identical(names(idf$validite$roles), names(ROLES_SIM)))
+verifier("défauts : lignes de l'attribut, colonnes (ligne, declaration, defaut, unite, role, motif_attendu, refus_attendu, premier_deces) et types",
+         identical(names(lg), c("ligne", "declaration", "defaut", "unite", "role", "motif_attendu", "refus_attendu",
+                                "premier_deces")) &&
+           is.integer(lg$ligne) && is.integer(lg$declaration) && identical(class(lg$premier_deces), "Date") &&
+           all(lg$role %in% c("alteree", "copie", "original", "tete")) &&
+           identical(lg$motif_attendu, CATALOGUE_DEFAUTS$motif_attendu[match(lg$defaut, CATALOGUE_DEFAUTS$defaut)]))
+
+# Ordre des tirages rejoué (identité exacte) : éligibles recalculés d'après
+# le catalogue de la spécification (SPEC_DEFAUTS), disjonction comprise,
+# sous sous_graine(GRAINE_DEF), déclarations dans l'ordre reçu.
+rejouer_defauts <- function(jeu, decl, graine, fin) {
+  n <- nrow(jeu); nt <- max(jeu$id_tete); alt <- logical(n); out <- vector("list", length(decl))
+  tablexp:::sous_graine(graine, for (k in seq_along(decl)) {
+    d <- decl[[k]]; sp <- SPEC_DEFAUTS[match(d$type, SPEC_TYPE)]
+    if (sp[[1]][[2]] == "ligne") {
+      ok <- !alt & jeu$cause_sortie %in% d$cible
+      for (x in sp) {
+        ok <- ok & jeu$cause_sortie %in% x[[3]]
+        if (x[[4]] == "entree_avant_fin") ok <- ok & as.numeric(jeu$date_entree) < fin
+      }
+    } else {
+      ok <- tabulate(jeu$id_tete, nt) >= 2L & tabulate(jeu$id_tete[alt], nt) == 0L
+      if (sp[[1]][[4]] == "tete_multi_deces") ok <- ok & tabulate(jeu$id_tete[jeu$cause_sortie == "deces"], nt) > 0L
+    }
+    el <- which(ok)
+    r <- if (!is.null(d$taux)) el[stats::runif(length(el)) < d$taux] else sort(el[sample.int(length(el), d$nombre)])
+    if (sp[[1]][[2]] == "ligne") alt[r] <- TRUE else alt[jeu$id_tete %in% r] <- TRUE
+    out[[k]] <- list(retenues = r, eligibles = length(el))
+  })
+  out
+}
+rj <- rejouer_defauts(sc0, DECL_CAT, GRAINE_DEF, as.numeric(PER$fin))
+verifier("défauts : ordre des tirages rejoué sous la graine des défauts = unités retenues et éligibles consignés (identité exacte)", {
+  dd <- idf$decomptes$declarations
+  identical(dd$eligibles, vapply(rj, `[[`, 0L, "eligibles")) && all(dd$retenues == 5L) &&
+    all(vapply(seq_along(DECL_CAT), function(k) {
+      l <- lg[lg$declaration == k, , drop = FALSE]
+      u <- if (DECL_CAT[[k]]$type[1L] %in% SPEC_TYPE[16:18]) sort(unique(sc0$id_tete[l$ligne]))
+           else sort(unique(l$ligne[l$role != "copie"]))
+      identical(u, rj[[k]]$retenues)
+    }, logical(1L)))
+})
+verifier("défauts : disjonction, une ligne n'appartient qu'à une déclaration ; une tête altérée n'a aucune ligne dans une autre déclaration", {
+  decl_par_ligne <- tapply(lg$declaration, lg$ligne, function(v) length(unique(v)))
+  tetes_t <- unique(sc0$id_tete[lg$ligne[lg$unite == "tete"]])
+  all(decl_par_ligne == 1L) &&
+    !any(sc0$id_tete[lg$ligne[lg$unite == "ligne" & lg$ligne <= N0]] %in% tetes_t)
+})
+verifier("défauts : copies (contrat_duplique) en fin de jeu, lignes N + 1 à N + 5, valeurs de l'original ; décomptes", {
+  o <- lg$ligne[lg$role == "original"]; cp <- lg$ligne[lg$role == "copie"]
+  identical(cp, N0 + 1:5) && nrow(sc) == N0 + 5L &&
+    all(vapply(names(sc0), function(v) identical(sc[[v]][cp], sc0[[v]][o]) && identical(sc[[v]][o], sc0[[v]][o]),
+               logical(1L))) &&
+    idf$decomptes$lignes_jeu_propre == N0 && idf$decomptes$copies == 5L && idf$decomptes$lignes == N0 + 5L &&
+    idf$decomptes$lignes_en_defaut == length(unique(lg$ligne))
+})
+verifier("défauts : altérations déterministes (spécification, § 2.2), valeur par valeur", {
+  a <- function(t) lg$ligne[lg$defaut == t & lg$role == "alteree" & lg$declaration != length(DECL_CAT)]
+  j0 <- function(v, t) as.numeric(sc0[[v]][a(t)]); j1 <- function(v, t) as.numeric(sc[[v]][a(t)])
+  an_e <- as.POSIXlt(sc0$date_entree[a("age_aberrant")])$year + 1900L
+  comb <- lg$ligne[lg$declaration == length(DECL_CAT)]
+  t_obs <- lg[lg$defaut == "tete_observee_apres_deces", , drop = FALSE]
+  all(is.na(sc$id_contrat[a("id_contrat_manquant")])) && all(is.na(sc$id_tete[a("id_tete_manquant")])) &&
+    all(is.na(sc$date_naissance[a("naissance_manquante")])) && all(is.na(sc$date_entree[a("entree_manquante")])) &&
+    all(is.na(sc$date_sortie[a("sortie_manquante")])) && all(is.na(sc$cause_sortie[a("cause_manquante")])) &&
+    identical(sc$cause_sortie[a("cause_hors_modalites")], toupper(sc0$cause_sortie[a("cause_hors_modalites")])) &&
+    all(is.na(sc$sexe[a("sexe_manquant")])) &&
+    identical(sc$sexe[a("sexe_hors_modalites")], tolower(sc0$sexe[a("sexe_hors_modalites")])) &&
+    identical(j1("date_naissance", "naissance_apres_entree"), j0("date_entree", "naissance_apres_entree") + 1) &&
+    identical(j1("date_sortie", "sortie_avant_entree"), j0("date_entree", "sortie_avant_entree") - 1) &&
+    identical(j1("date_sortie", "en_cours_avant_fin"), j0("date_entree", "en_cours_avant_fin")) &&
+    identical(sc$date_naissance[a("age_aberrant")], as.Date(sprintf("%04d-01-01", an_e - 150L))) &&
+    identical(j1("date_naissance", "tete_naissance_incoherente"), j0("date_naissance", "tete_naissance_incoherente") - 1) &&
+    identical(sc$sexe[a("tete_sexe_incoherent")], ifelse(sc0$sexe[a("tete_sexe_incoherent")] == "H", "F", "H")) &&
+    all(sc$cause_sortie[a("tete_observee_apres_deces")] == "en_cours") &&
+    all(is.na(sc$date_sortie[a("tete_observee_apres_deces")])) &&
+    all(is.na(sc$cause_sortie[comb]) & is.na(sc$sexe[comb])) && length(comb) == 10L &&
+    identical(as.vector(table(lg$defaut[lg$declaration == length(DECL_CAT)])), c(5L, 5L)) &&
+    length(t_obs$ligne) > 0L
+})
+# Lignes effectivement modifiées, établies par comparaison au jeu propre
+# (valeur par valeur, NA compris), et non lues dans l'attribut.
+modifiees <- function(jeu, jeu0, lignes) {
+  egal <- Reduce(`&`, lapply(names(jeu0), function(v) {
+    a <- jeu[[v]][lignes]; b <- jeu0[[v]][lignes]
+    e <- (is.na(a) & is.na(b)) | (!is.na(a) & !is.na(b) & a == b)
+    e & !is.na(e)
+  }))
+  lignes[!egal]
+}
+verifier("défauts : lignes du jeu propre effectivement modifiées = lignes de rôle alteree de l'attribut (identité exacte) ; decomptes$lignes_alterees = modifiées + copies, < lignes_en_defaut",
+         identical(modifiees(sc, sc0, seq_len(N0)), sort(unique(lg$ligne[lg$role == "alteree"]))) &&
+           idf$decomptes$lignes_alterees == length(modifiees(sc, sc0, seq_len(N0))) + 5L &&
+           idf$decomptes$lignes_alterees < idf$decomptes$lignes_en_defaut)
+# Défauts de tête (spécification, § 2.2) : toutes les lignes de la tête
+# déclarées ; seule modifiée (comparaison au jeu propre) la dernière ligne, ou
+# pour tete_observee_apres_deces la dernière autre que la première à décès,
+# dont la date est premier_deces.
+tetes_conformes <- function(jeu, jeu0, lt) {
+  all(vapply(split(lt, lt$declaration * 1e6 + jeu0$id_tete[lt$ligne]), function(x) {
+    li <- which(jeu0$id_tete == jeu0$id_tete[x$ligne[1L]])
+    p <- li[jeu0$cause_sortie[li] == "deces"][1L]
+    obs <- x$defaut[1L] == "tete_observee_apres_deces"
+    l_att <- if (obs) max(li[li != p]) else max(li)
+    length(li) >= 2L && identical(x$ligne, li) && identical(modifiees(jeu, jeu0, li), l_att) &&
+      identical(x$ligne[x$role == "alteree"], l_att) &&
+      (if (obs) all(x$premier_deces == jeu0$date_sortie[p]) else all(is.na(x$premier_deces)))
+  }, logical(1L)))
+}
+verifier("défauts de tête, jeu catalogue : lignes déclarées, ligne modifiée et premier_deces conformes à la spécification (§ 2.2)",
+         tetes_conformes(sc, sc0, lg[lg$unite == "tete", , drop = FALSE]) &&
+           length(unique(lg$declaration[lg$unite == "tete"])) == 3L)
+verifier("défauts de tête, têtes à 3 lignes (age_exact_multi, loi_contrats = (0, 0, 1), 80 ans) : dernière ligne autre que la première à décès, dernière ligne", {
+  px3 <- modifyList(PF_X, list(mode = "age_exact_multi", n = 2000, age = 80, loi_contrats = c(0, 0, 1)))
+  d3 <- list(graine = GRAINE_DEF, declarations = list(list(type = "tete_observee_apres_deces", taux = 1),
+                                                      list(type = "tete_naissance_incoherente", taux = 0.1)))
+  j0 <- simuler(loi(), px3, PER_X2, GRAINE); j1 <- simuler(loi(), px3, PER_X2, GRAINE, defauts = d3)
+  l <- attr(j1, "defauts")$lignes
+  all(tabulate(j0$id_tete) == 3L) && all(table(l$declaration) > 0L) && length(unique(l$declaration)) == 2L &&
+    tetes_conformes(j1, j0, l)
+})
+cat(sprintf("  jeu catalogue (uniforme_multi, 5 000 têtes, graine %d, graine des défauts %d) : %d lignes propres, %d copies, %d lignes en défaut ; %.1f s\n",
+            GRAINE, GRAINE_DEF, N0, idf$decomptes$copies, idf$decomptes$lignes_en_defaut, duree_cat))
+
+# Critère 3 : confrontation au module donnees (vérification, non source de l'attente).
+VD <- list(depart = "vivant", arrivee = "deces")
+attendus_par_motif <- lapply(stats::setNames(TOUS_MOTIFS, TOUS_MOTIFS), function(m)
+  sort(unique(lg$ligne[lg$motif_attendu %in% m])))
+rp <- preparer_donnees(sc, ROLES_SIM, VD, PER, 0, "sexe", TOUS_MOTIFS)
+verifier("défauts (critère 3) : toutes exclusions déclarées -> lignes_exclues de preparer_donnees() = lignes de l'attribut, motif par motif (20 motifs)",
+         identical(names(rp$resultat$lignes_exclues), TOUS_MOTIFS) &&
+           all(vapply(TOUS_MOTIFS, function(m) identical(rp$resultat$lignes_exclues[[m]], attendus_par_motif[[m]]),
+                      logical(1L))) &&
+           rp$resultat$nombre_lignes_exclues == idf$decomptes$lignes_en_defaut)
+verifier("défauts (critère 3) : chaque motif du catalogue exercé (17 motifs non vides, 3 hors périmètre vides)",
+         identical(names(attendus_par_motif)[lengths(attendus_par_motif) > 0L],
+                   TOUS_MOTIFS[TOUS_MOTIFS %in% CATALOGUE_DEFAUTS$motif_attendu]) &&
+           sum(lengths(attendus_par_motif) > 0L) == 17L)
+verifier("défauts (critère 3) : aucune exclusion -> refus ligne_invalide, details$lignes = lignes de l'attribut, motif par motif", {
+  e <- tryCatch(preparer_donnees(sc, ROLES_SIM, VD, PER, 0, "sexe", character(0)), refus_tablexp = function(e) e)
+  inherits(e, "refus_tablexp") && identical(e$motif, "ligne_invalide") &&
+    identical(e$details$lignes, attendus_par_motif[lengths(attendus_par_motif) > 0L])
+})
+verifier("défauts : construire_table() accepte le jeu altéré (attribut defauts), exclusions des motifs attendus déclarées", {
+  x <- construire_table(sc, ROLES_SIM, list(transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = TOUS_MOTIFS), exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95))))
+  inherits(x, "construction") && x$etapes$donnees$resultat$nombre_lignes_exclues == idf$decomptes$lignes_en_defaut
+})
+verifier("défauts (critère 3) : jeu à part, date_hors_domaine -> naissance 0000-12-31, refus date_hors_domaine sur les lignes de l'attribut", {
+  sh <- simuler(loi(), PF_CAT, PER, GRAINE,
+                defauts = list(graine = GRAINE_DEF, declarations = list(list(type = "date_hors_domaine", cible = TOUTES,
+                                                                              nombre = 5))))
+  l <- attr(sh, "defauts")$lignes
+  e <- tryCatch(preparer_donnees(sh, ROLES_SIM, VD, PER, 0, "sexe", TOUS_MOTIFS), refus_tablexp = function(e) e)
+  nrow(l) == 5L && all(is.na(l$motif_attendu)) && all(l$refus_attendu == "date_hors_domaine") &&
+    all(unclass(sh$date_naissance[l$ligne]) == -719163) &&
+    with(as.POSIXlt(as.Date(-719163)), year + 1900L == 0L && mon == 11L && mday == 31L) &&
+    inherits(e, "refus_tablexp") && identical(e$motif, "date_hors_domaine") &&
+    identical(e$details$lignes, list(date_naissance = l$ligne))
+})
+verifier("défauts : reproductibilité, même appel identical()",
+         identical(sc, simuler(loi(), PF_CAT, PER, GRAINE, defauts = DEF_CAT)))
+verifier("défauts : combinaison saisie dans l'autre ordre -> même jeu, même attribut hors parametre (types rangés dans l'ordre du catalogue)", {
+  inv <- DEF_CAT; k <- length(inv$declarations)
+  inv$declarations[[k]]$type <- rev(inv$declarations[[k]]$type)
+  si <- simuler(loi(), PF_CAT, PER, GRAINE, defauts = inv)
+  a <- attr(si, "defauts")
+  identical(a$parametre, inv) && identical(a[names(a) != "parametre"], idf[names(idf) != "parametre"]) &&
+    identical(unclass(si)[seq_along(si)], unclass(sc)[seq_along(sc)]) &&
+    identical(a$decomptes$declarations$defaut[k], "cause_manquante + sexe_manquant")
+})
+verifier("défauts : ecrire_rapport() rend le rapport figé d'une construction issue du jeu à défauts (exclusions déclarées)", {
+  x <- construire_table(sc, ROLES_SIM, list(transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = TOUS_MOTIFS), exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95))))
+  o <- ecrire_rapport(x)
+  is.raw(o) && length(o) > 0L
+})
+verifier("défauts : declarations vide admise, jeu identical() au jeu propre hors attribut defauts", {
+  r <- simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list()))
+  a <- attr(r, "defauts"); attr(r, "defauts") <- NULL
+  identical(r, simuler(loi(), PF_M_1E3, PER, GRAINE)) && nrow(a$lignes) == 0L
+})
+
+# Critère 5 : refus defauts_invalides (avant tout tirage) et defauts_ineligibles.
+D1 <- list(type = "sexe_manquant", cible = "deces", taux = 0.5)
+OCTETS <- "d\u00e9c"; Encoding(OCTETS) <- "bytes"
+DEFAUTS_INVALIDES <- list(
+  list("defauts non liste", 1),
+  list("defauts data.frame", data.frame(graine = 1L)),
+  list("defauts de classe", structure(list(graine = 1L, declarations = list()), class = "x")),
+  list("graine manquante", list(declarations = list(D1))),
+  list("champ inconnu", list(graine = 1L, declarations = list(D1), seed = 2L)),
+  list("noms en double", list(graine = 1L, graine = 2L)),
+  list("champ au nom non ASCII", list(graine = 1L, declarations = list(D1), "défauts" = 1)),
+  list("graine non entière", list(graine = 1.5, declarations = list(D1))),
+  list("graine NA", list(graine = NA_integer_, declarations = list(D1))),
+  list("graine caractère", list(graine = "1", declarations = list(D1))),
+  list("graine nommée", list(graine = c(g = 1L), declarations = list(D1))),
+  list("graine hors entier R", list(graine = 2^31, declarations = list(D1))),
+  list("declarations nommées", list(graine = 1L, declarations = list(a = D1))),
+  list("declarations non liste", list(graine = 1L, declarations = "sexe_manquant")),
+  list("déclaration non liste", list(graine = 1L, declarations = list("sexe_manquant"))),
+  list("type inconnu", list(graine = 1L, declarations = list(list(type = "doublon", cible = "deces", taux = 0.1)))),
+  list("type manquant", list(graine = 1L, declarations = list(list(cible = "deces", taux = 0.1)))),
+  list("type NA", list(graine = 1L, declarations = list(list(type = NA_character_, cible = "deces", taux = 0.1)))),
+  list("combinaison non admise", list(graine = 1L, declarations = list(
+    list(type = c("sexe_manquant", "entree_manquante"), cible = "deces", taux = 0.1)))),
+  list("combinaison en double", list(graine = 1L, declarations = list(
+    list(type = c("sexe_manquant", "sexe_manquant"), cible = "deces", taux = 0.1)))),
+  list("cible manquante (type de ligne)", list(graine = 1L, declarations = list(list(type = "sexe_manquant", taux = 0.1)))),
+  list("cible interdite (type de tête)", list(graine = 1L, declarations = list(
+    list(type = "tete_sexe_incoherent", cible = "deces", nombre = 1)))),
+  list("cible inconnue", list(graine = 1L, declarations = list(list(type = "sexe_manquant", cible = "terme", taux = 0.1)))),
+  list("cible vide", list(graine = 1L, declarations = list(list(type = "sexe_manquant", cible = character(0), taux = 0.1)))),
+  list("cible en double", list(graine = 1L, declarations = list(
+    list(type = "sexe_manquant", cible = c("deces", "deces"), taux = 0.1)))),
+  list("taux et nombre", list(graine = 1L, declarations = list(
+    list(type = "sexe_manquant", cible = "deces", taux = 0.1, nombre = 1)))),
+  list("ni taux ni nombre", list(graine = 1L, declarations = list(list(type = "sexe_manquant", cible = "deces")))),
+  list("taux > 1", list(graine = 1L, declarations = list(list(type = "sexe_manquant", cible = "deces", taux = 1.5)))),
+  list("taux NA", list(graine = 1L, declarations = list(list(type = "sexe_manquant", cible = "deces", taux = NA_real_)))),
+  list("nombre négatif", list(graine = 1L, declarations = list(list(type = "sexe_manquant", cible = "deces", nombre = -1)))),
+  list("nombre non entier", list(graine = 1L, declarations = list(list(type = "sexe_manquant", cible = "deces", nombre = 1.5)))),
+  list("champ inconnu d'une déclaration", list(graine = 1L, declarations = list(
+    list(type = "sexe_manquant", cible = "deces", taux = 0.1, poids = 1)))),
+  list("type en octets invalides", list(graine = 1L, declarations = list(
+    list(type = "\xff\xfe", cible = "deces", taux = 0.1)))),
+  list("type d'encodage bytes (non cité dans le message)", list(graine = 1L, declarations = list(
+    list(type = OCTETS, cible = "deces", taux = 0.1)))),
+  list("combinaison avec un type d'encodage bytes", list(graine = 1L, declarations = list(
+    list(type = c("sexe_manquant", OCTETS), cible = "deces", taux = 0.1)))),
+  list("champ de defauts au nom d'encodage bytes", stats::setNames(list(1L, list(D1)), c("graine", OCTETS))),
+  list("champ d'une déclaration au nom d'encodage bytes", list(graine = 1L, declarations = list(
+    stats::setNames(list("sexe_manquant", "deces", 0.1), c("type", "cible", OCTETS))))),
+  # Cible disjointe par construction des causes admises par le catalogue
+  # (complément de spécification d'actuary, 25/10/2026), taux ou nombre.
+  list("sortie_manquante, cible en_cours (vide par construction), taux", list(graine = 1L, declarations = list(
+    list(type = "sortie_manquante", cible = "en_cours", taux = 0.5)))),
+  list("sortie_manquante, cible en_cours (vide par construction), nombre = 1", list(graine = 1L, declarations = list(
+    list(type = "sortie_manquante", cible = "en_cours", nombre = 1)))),
+  list("sortie_manquante, cible en_cours (vide par construction), nombre = 0", list(graine = 1L, declarations = list(
+    list(type = "sortie_manquante", cible = "en_cours", nombre = 0)))),
+  list("en_cours_avant_fin, cible deces (vide par construction), taux", list(graine = 1L, declarations = list(
+    list(type = "en_cours_avant_fin", cible = "deces", taux = 0.5)))),
+  list("en_cours_avant_fin, cible deces (vide par construction), nombre = 1", list(graine = 1L, declarations = list(
+    list(type = "en_cours_avant_fin", cible = "deces", nombre = 1)))),
+  list("en_cours_avant_fin, cible deces (vide par construction), nombre = 0", list(graine = 1L, declarations = list(
+    list(type = "en_cours_avant_fin", cible = "deces", nombre = 0)))))
+for (k in DEFAUTS_INVALIDES) {
+  set.seed(21L); avant <- globalenv()$.Random.seed
+  verifier(sprintf("défauts : %s -> refus defauts_invalides, avant tout tirage (graine du jeu invalide non atteinte), aléa de l'appelant inchangé",
+                   k[[1]]),
+           leve_refus(simuler(loi(), PF_M_1E3, PER, 1.5, defauts = k[[2]]), "defauts_invalides") &&
+             leve_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = k[[2]]), "defauts_invalides") &&
+             identical(globalenv()$.Random.seed, avant))
+}
+verifier("défauts : ordre des refus figé, graine du jeu invalide et défauts invalides -> defauts_invalides ; graine du jeu invalide et défauts valides -> graine_invalide", {
+  d_inv <- list(graine = 1L, declarations = list(list(type = "sortie_manquante", cible = "en_cours", nombre = 0)))
+  isTRUE(leve_refus(simuler(loi(), PF_M_1E3, PER, 1.5, defauts = d_inv), "defauts_invalides")) &&
+    isTRUE(leve_refus(simuler(loi(), PF_M_1E3, PER, 1.5, defauts = list(graine = 1L, declarations = list(D1))),
+                      "graine_invalide")) &&
+    grepl("cible « en_cours » disjointe des causes admises pour sortie_manquante (« deces », « rachat »)",
+          message_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = d_inv)), fixed = TRUE)
+})
+verifier("défauts : graine des défauts égale à celle du jeu (double puis integer) -> refus defauts_invalides, texte et détails d'actuary", {
+  e1 <- tryCatch(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = as.double(GRAINE), declarations = list(D1))),
+                 refus_tablexp = function(e) e)
+  e2 <- tryCatch(simuler(loi(), PF_M_1E3, PER, as.double(GRAINE), defauts = list(graine = GRAINE, declarations = list(D1))),
+                 refus_tablexp = function(e) e)
+  all(vapply(list(e1, e2), function(e) inherits(e, "refus_tablexp") && identical(e$motif, "defauts_invalides") &&
+    grepl("La graine des défauts doit différer de la graine du jeu : avec la même graine", conditionMessage(e), fixed = TRUE) &&
+    identical(names(e$details), c("parametre", "graine", "graine_defauts")) &&
+    identical(e$details$parametre, "defauts$graine"), logical(1L))) &&
+    identical(e1$details$graine_defauts, as.double(GRAINE)) && identical(e2$details$graine, as.double(GRAINE))
+})
+verifier("défauts : graine des défauts = graine du jeu + 1 admise",
+         is.data.frame(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = GRAINE + 1L, declarations = list(D1)))))
+verifier("défauts : nombre > éligibles -> refus defauts_ineligibles (après le tirage du jeu propre), aléa de l'appelant inchangé", {
+  set.seed(22L); avant <- globalenv()$.Random.seed
+  d_tete <- list(graine = GRAINE_DEF, declarations = list(list(type = "tete_sexe_incoherent", nombre = 1)))
+  # Vide qui dépend du jeu : aucun rachat tiré (loi de rachat nulle).
+  d_ligne <- list(graine = GRAINE_DEF, declarations = list(D1, list(type = "sortie_manquante", cible = "rachat", nombre = 1)))
+  isTRUE(leve_refus(simuler(loi(), PF_FORME, PER, GRAINE, defauts = d_tete), "defauts_ineligibles")) &&
+    isTRUE(leve_refus(simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = d_ligne), "defauts_ineligibles")) &&
+    grepl("déclaration 2 (sortie_manquante) : nombre = 1 dépasse le nombre d'unités éligibles (0)",
+          message_refus(simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = d_ligne)), fixed = TRUE) &&
+    identical(globalenv()$.Random.seed, avant)
+})
+verifier("défauts : vide qui dépend du jeu, en taux -> admis, 0 unité retenue tracée dans decomptes", {
+  r <- simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "sortie_manquante", cible = "rachat", taux = 0.5))))
+  dd <- attr(r, "defauts")$decomptes$declarations
+  identical(dd$eligibles, 0L) && identical(dd$retenues, 0L) && nrow(attr(r, "defauts")$lignes) == 0L
+})
+
+# Critère 4 : jeu à exclusion informative pour #69 (spécification, § 2.6).
+# Mode uniforme, 10^5 contrats, loi et portefeuille de jeu_reference(),
+# période [2015-01-01, 2019-12-31] ; sexe_manquant sur les lignes à décès
+# (taux 0,5) et sur les lignes à rachat ou en cours (taux 0,02). Niveau
+# alpha = 10^-3, K = 2 tests, a = alpha / 2 chacun.
+# - Décès exclus : conditionnellement au jeu propre, K_D (décès datés dans la
+#   période, sexe retiré) ~ Bin(D_w, 0,5) EXACTEMENT ; région bilatérale
+#   [qbinom(a/2), qbinom(1 - a/2)], fausse alarme exacte.
+# - Exposition exclue : GARDE-FOU à fausse alarme garantie (borne exacte de
+#   Hoeffding), de faible puissance (+/- 0,008 sur un taux de 0,02 à environ
+#   50 % de puissance, avis d'actuary du 25/10/2026) ; la vérification forte
+#   est portée par les identités exactes et le rejeu des tirages.
+#   E_e (jours dans la période) = sum_l B_l e_l, B_l
+#   Bernoulli indépendants de probabilité p_l ; inégalité de Hoeffding (1963)
+#   pour des termes dans [0, e_l] : P(|E_e - sum p_l e_l| >= s) <= a avec
+#   s = sqrt(sum e_l^2 ln(2/a) / 2) : BORNE EXACTE de la fausse alarme.
+# - Identités exactes entre jeu propre et jeu altéré (moteur, exclusion
+#   sexe_manquant déclarée) : écart des décès = K_D ; écart des jours = E_e.
+PER_26 <- list(debut = D("2015-01-01"), fin = D("2019-12-31"))
+DEF_26 <- list(graine = GRAINE_DEF, declarations = list(
+  list(type = "sexe_manquant", cible = "deces", taux = 0.5),
+  list(type = "sexe_manquant", cible = c("rachat", "en_cours"), taux = 0.02)))
+t0 <- proc.time()[["elapsed"]]
+s26_0 <- simuler(loi(), PF, PER_26, GRAINE)
+s26 <- simuler(loi(), PF, PER_26, GRAINE, defauts = DEF_26)
+plan_26 <- function(ex) list(transition = VD, periode = PER_26, delai_declaration = 0, segmentation = character(0),
+                             etapes = list(donnees = list(exclusions = ex),
+                                           exposition = list(convention = "plus_fine", par_annee = FALSE),
+                                           brut = list(estimateurs = "poisson", niveau = 0.95)))
+x26_0 <- construire_table(s26_0, ROLES_SIM, plan_26(character(0)))
+x26 <- construire_table(s26, ROLES_SIM, plan_26("sexe_manquant"))
+duree_26 <- proc.time()[["elapsed"]] - t0
+sel26 <- attr(s26, "defauts")$lignes$ligne
+f26 <- fenetres_jours(s26_0, PER_26); e26 <- pmax(0, f26$f - f26$s)
+dw26 <- s26_0$cause_sortie == "deces" & !is.na(s26_0$date_sortie) & s26_0$date_sortie >= PER_26$debut &
+  s26_0$date_sortie <= PER_26$fin
+D_w <- sum(dw26); K_D <- sum(dw26[sel26]); E_e <- sum(e26[sel26])
+p26 <- ifelse(s26_0$cause_sortie == "deces", 0.5, 0.02)
+A_26 <- 1e-3 / 2
+lo26 <- stats::qbinom(A_26 / 2, D_w, 0.5); hi26 <- stats::qbinom(1 - A_26 / 2, D_w, 0.5)
+fa26 <- stats::pbinom(lo26 - 1, D_w, 0.5) + stats::pbinom(hi26, D_w, 0.5, lower.tail = FALSE)
+EE_e <- sum(p26 * e26); s_h <- sqrt(sum(e26^2) * log(2 / A_26) / 2)
+verifier("constat § 2.6 : rejeu des tirages (identité exacte), lignes à décès runif < 0,5 puis lignes à rachat ou en cours runif < 0,02", {
+  i_d <- which(s26_0$cause_sortie == "deces"); i_a <- which(s26_0$cause_sortie != "deces")
+  u <- tablexp:::sous_graine(GRAINE_DEF, list(stats::runif(length(i_d)), stats::runif(length(i_a))))
+  identical(sel26, c(i_d[u[[1]] < 0.5], i_a[u[[2]] < 0.02])) && all(is.na(s26$sexe[sel26])) &&
+    all(attr(s26, "defauts")$lignes$motif_attendu == "sexe_manquant")
+})
+ligne <- sprintf(paste("constat de simulation (exact) § 2.6, décès exclus : K_D = %d dans [%d, %d] (D_w = %d décès datés",
+                       "dans la période, p = 0,5, a = %g, fausse alarme exacte %.4g ; graines %d et %d)"),
+                 K_D, lo26, hi26, D_w, A_26, fa26, GRAINE, GRAINE_DEF)
+cat("  ", ligne, "\n", sep = "")
+verifier(ligne, K_D >= lo26 && K_D <= hi26 && fa26 <= A_26)
+ligne <- sprintf(paste("constat de simulation § 2.6, exposition exclue, garde-fou à fausse alarme garantie (borne exacte de",
+                       "Hoeffding, faible puissance ; vérification forte : identités et rejeu) : E_e = %.0f j, |E_e - %.1f|",
+                       "= %.1f <= s = %.1f j (fausse alarme <= a = %g)"),
+                 E_e, EE_e, abs(E_e - EE_e), s_h, A_26)
+cat("  ", ligne, "\n", sep = "")
+verifier(ligne, abs(E_e - EE_e) <= s_h)
+g26 <- function(x) c(D = sum(x$etapes$brut$resultat$poisson$evenements),
+                     E = sum(x$etapes$brut$resultat$poisson$exposition_centrale),
+                     J = sum(x$etapes$exposition$resultat$exposition$exposition_jours))
+a0 <- g26(x26_0); a1 <- g26(x26)
+verifier("constat § 2.6 (identités exactes) : décès propre - altéré = K_D ; jours propre - altéré = E_e ; lignes exclues = lignes altérées",
+         a0[["D"]] - a1[["D"]] == K_D && a0[["J"]] - a1[["J"]] == E_e &&
+           x26$etapes$donnees$resultat$nombre_lignes_exclues == length(sel26) &&
+           identical(x26$etapes$donnees$resultat$lignes_exclues$sexe_manquant, sort(sel26)))
+cat(sprintf(paste("  constat § 2.6, informatif : %d lignes altérées sur %d (%.2f %%) ; décès exclus %.1f %% (région [%.1f %%, %.1f %%]) ;",
+                  "exposition exclue %.2f %% (attendue %.2f %% +/- %.2f pt) ; taux brut global %.5f -> %.5f ; %.1f s\n"),
+            length(sel26), nrow(s26_0), 100 * length(sel26) / nrow(s26_0), 100 * K_D / D_w, 100 * lo26 / D_w,
+            100 * hi26 / D_w, 100 * E_e / sum(e26), 100 * EE_e / sum(e26), 100 * s_h / sum(e26),
+            a0[["D"]] / a0[["E"]], a1[["D"]] / a1[["E"]], duree_26))
