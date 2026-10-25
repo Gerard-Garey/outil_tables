@@ -124,7 +124,11 @@ verifier("aller-retour : stockage des doubles entiers et des integer conservé (
 # --- un texte qui contient du code est une donnée ou un refus (identité exacte) --
 
 local({
-  temoin <- file.path(tempdir(), "temoin_serialisation_50")
+  # Chemin du témoin en « / » seuls (#103) : sous Windows, tempdir() contient des
+  # « \ », que le piège chemin_barre ne protège pas (seuls les guillemets sont
+  # échappés) ; le lecteur le refuserait en texte_valeur_invalide, avant le
+  # chemin, et le test ne testerait plus texte_chemin_inattendu.
+  temoin <- file.path(normalizePath(tempdir(), winslash = "/", mustWork = FALSE), "temoin_serialisation_50")
   unlink(temoin)
   code <- sprintf("system(\"touch %s\")", temoin)
   # Chemin sans « / » (sinon le segment est [i]) : témoin relatif au dossier

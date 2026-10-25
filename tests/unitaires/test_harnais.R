@@ -285,7 +285,10 @@ local({
 
 # locale_utf8_disponible() : aucune candidate disponible -> "" (le test de la
 # batterie de reproductibilité échoue alors explicitement), LC_CTYPE restaurée.
-r <- temoin(c('LOCALES_UTF8 <- c("xx_XX.UTF-8", "yy_YY.utf8")',
+# Candidates inventées avec un modificateur « @tablexp » : refusées par setlocale
+# sous glibc (locale non installée) comme par l'UCRT de Windows (mesuré), alors
+# que l'UCRT accepte des noms de pays inventés comme « xx_XX.UTF-8 » (#102).
+r <- temoin(c('LOCALES_UTF8 <- c("xx_XX.UTF-8@tablexp", "yy_YY.utf8@tablexp")',
               'avant <- Sys.getlocale("LC_CTYPE")',
               'cat("DISPO[", locale_utf8_disponible(), "] RESTAUREE ", identical(Sys.getlocale("LC_CTYPE"), avant), "\\n", sep = "")',
               'verifier("vrai", TRUE)', "bilan()"))
