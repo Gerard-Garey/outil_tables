@@ -209,9 +209,18 @@ controler_portefeuille <- function(portefeuille, periode) {
     refuser("simulation", "periode_invalide",
             sprintf("Période vide : début %s postérieur à la fin %s.", format(periode[["debut"]]), format(periode[["fin"]])),
             list(periode = periode))
+  # Forme exacte du portefeuille (#78, forme_exacte()) : liste nue, seul
+  # attribut names (ni data.frame, ni classe, ni attribut quelconque). Noms
+  # comparés plus bas sans tri (setdiff, anyDuplicated), indépendamment de la
+  # locale.
+  if (!forme_exacte(portefeuille, "list", "names"))
+    refuser("simulation", "portefeuille_invalide",
+            paste("Portefeuille : liste nue attendue (ni data.frame, ni classe, aucun attribut",
+                  "autre que les noms)."),
+            list(classe = class(portefeuille)))
   # Champs lus par [[ ]] (jamais $, qui apparie les noms partiels) ; ici, le
   # mode : chaîne unique de forme exacte (chaine_unique(), #60).
-  mode <- if (is.list(portefeuille)) portefeuille[["mode"]] else NULL
+  mode <- portefeuille[["mode"]]
   if (!chaine_unique(mode) || !(mode %in% names(CHAMPS_PORTEFEUILLE)))
     refuser("simulation", "portefeuille_invalide",
             sprintf("Portefeuille : liste avec un champ mode pris dans %s.",
@@ -227,18 +236,22 @@ controler_portefeuille <- function(portefeuille, periode) {
                     if (length(inconnus)) liste_guillemets(inconnus) else "aucun"),
             list(manquants = manquants, inconnus = inconnus))
   p <- portefeuille
-  reel <- function(v) is.numeric(v) && length(v) == 1L && is.finite(v)
+  # Champs numériques : forme exacte (#78), double ou integer sans aucun
+  # attribut (ni names, ni dim, ni classe), longueur 1, fini.
+  reel <- function(v) forme_exacte(v, c("double", "integer")) && length(v) == 1L && is.finite(v)
   entier <- function(v) reel(v) && v == trunc(v)
   invalide <- function(msg) refuser("simulation", "portefeuille_invalide", paste("Portefeuille :", msg))
-  if (!entier(p[["n"]]) || p[["n"]] < 1 || p[["n"]] > .Machine$integer.max) invalide("n entier >= 1.")
+  if (!entier(p[["n"]]) || p[["n"]] < 1 || p[["n"]] > .Machine$integer.max) invalide("n entier >= 1, de type double ou integer, sans attribut.")
   if (!reel(p[["proportion_hommes"]]) || p[["proportion_hommes"]] < 0 || p[["proportion_hommes"]] > 1)
-    invalide("proportion_hommes réel dans [0, 1].")
+    invalide("proportion_hommes réel dans [0, 1], de type double ou integer, sans attribut.")
   fin <- as.numeric(periode[["fin"]])
   if (mode == "uniforme") {
     if (!reel(p[["age_min"]]) || !reel(p[["age_max"]]) || p[["age_min"]] * 365.25 < 1 || p[["age_min"]] >= p[["age_max"]])
-      invalide("âges réels finis, age_min d'au moins un jour (1/365,25) et age_min < age_max.")
+      invalide(paste("âges réels finis, de type double ou integer, sans attribut ;",
+                     "age_min d'au moins un jour (1/365,25) et age_min < age_max."))
     if (!date_unique(p[["origine"]]) || p[["origine"]] > periode[["debut"]])
-      invalide("origine : date (classe Date) antérieure ou égale au début de la période.")
+      invalide(paste("origine : date (classe Date, sans autre attribut) antérieure ou égale",
+                     "au début de la période."))
     age_bas <- age_revolu_minimal(round(p[["age_min"]] * 365.25))
     # Borne haute (erratum d'actuary du 17/10/2026, point 4). Soit span(y)
     # le nombre de jours de la naissance à l'anniversaire y (T2) : pour
@@ -256,9 +269,10 @@ controler_portefeuille <- function(portefeuille, periode) {
     # encore inférieure au « + 1 » d'age_haut.
     age_haut <- p[["age_max"]] + (fin + 1 - as.numeric(p[["origine"]])) / 365.25 + 1
   } else {
-    if (!entier(p[["age"]]) || p[["age"]] < 1) invalide("âge exact entier >= 1.")
+    if (!entier(p[["age"]]) || p[["age"]] < 1) invalide("âge exact entier >= 1, de type double ou integer, sans attribut.")
     if (!date_unique(p[["date_entree"]]) || p[["date_entree"]] > periode[["fin"]])
-      invalide("date_entree : date (classe Date) antérieure ou égale à la fin de la période.")
+      invalide(paste("date_entree : date (classe Date, sans autre attribut) antérieure ou égale",
+                     "à la fin de la période."))
     ce <- composantes_date(as.numeric(p[["date_entree"]]))
     if (ce$mois == 1L && ce$jour == 29L)
       refuser("simulation", "entree_29_fevrier",
@@ -351,7 +365,9 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 #                  facteurs)) ; table : `table_reference` (H et F, ou
 #                  `ensemble`) ; facteurs : c(H = , F = ), double ou integer, seul
 #                  attribut les noms (#58), appliqués à q_x, plafond 1 ;
-#   portefeuille : list(mode = "uniforme", n, proportion_hommes, age_min,
+#   portefeuille : liste nue (seul attribut les noms, #78), champs numériques
+#                  double ou integer sans attribut, dates de classe Date seule ;
+#                  list(mode = "uniforme", n, proportion_hommes, age_min,
 #                  age_max, origine) — entrée uniforme discrète sur les jours
 #                  de [origine, fin], âge à l'entrée uniforme continu sur
 #                  [age_min, age_max), naissance = entrée - round(âge *

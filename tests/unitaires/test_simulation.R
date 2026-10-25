@@ -474,3 +474,110 @@ verifier("forme exacte : entrée valide, attribut simulation$periode et $loi_vra
          identical(attr(REF_FORME, "simulation")$periode, PER) &&
            identical(attr(REF_FORME, "simulation")$loi_vraie$facteurs,
                      list(deces = c(H = 1, F = 0.6), rachat = c(H = 1, F = 1))))
+
+# --- forme exacte du portefeuille et de ses champs numériques (#78) ----------------------
+# Portefeuille : liste nue (forme_exacte(x, "list", "names")) ; champs
+# numériques : double ou integer, longueur 1, aucun attribut ; dates : Date
+# seule, comme les bornes de la période (#58) ; noms comparés sans tri
+# (setdiff, anyDuplicated). Refus sous le motif existant portefeuille_invalide,
+# testé par motif et par message ; les formes admises le restent, avec les
+# mêmes tirages. Réserve 2 de l'audit de #58 : origine et date_entree, dont le
+# message dit désormais « sans autre attribut ».
+PF_AGE <- PF_X
+PORTEFEUILLE_FORME <- list(
+  list("data.frame (uniforme)", PF_FORME, function(p) as.data.frame(p)),
+  list("data.frame (âge exact)", PF_AGE, function(p) as.data.frame(p)),
+  list("liste classée (uniforme)", PF_FORME, function(p) structure(p, class = "maclasse")),
+  list("liste classée (âge exact)", PF_AGE, function(p) structure(p, class = "maclasse")),
+  list("liste de classe c(\"list\", \"x\")", PF_FORME, function(p) structure(p, class = c("list", "x"))),
+  list("liste portant un attribut (uniforme)", PF_FORME, function(p) avec_attr(p, "foo", "x")),
+  list("liste portant un attribut (âge exact)", PF_AGE, function(p) avec_attr(p, "foo", "x")),
+  list("vecteur atomique nommé", PF_FORME, function(p) c(mode = "uniforme", n = "1000")),
+  list("NULL", PF_FORME, function(p) NULL))
+for (k in PORTEFEUILLE_FORME) {
+  pf <- k[[3]](k[[2]]); per <- PER
+  verifier(sprintf("forme exacte : portefeuille, %s -> refus portefeuille_invalide", k[[1]]),
+           leve_refus(simuler(loi(), pf, per, GRAINE), "portefeuille_invalide"))
+  verifier(sprintf("forme exacte : portefeuille, %s -> message de forme", k[[1]]),
+           grepl("liste nue attendue", message_refus(simuler(loi(), pf, per, GRAINE)), fixed = TRUE))
+}
+
+# Champs numériques : (cas, portefeuille de base, champ, valeur reçue, début du message).
+CHAMPS_FORME <- list(
+  list("n nommé", PF_FORME, "n", c(a = 1000), "Portefeuille : n entier"),
+  list("n nommé en integer", PF_FORME, "n", c(a = 1000L), "Portefeuille : n entier"),
+  list("n en matrice 1 x 1", PF_FORME, "n", matrix(1000), "Portefeuille : n entier"),
+  list("n à attribut", PF_FORME, "n", structure(1000, foo = "x"), "Portefeuille : n entier"),
+  list("n de classe", PF_FORME, "n", structure(1000, class = "x"), "Portefeuille : n entier"),
+  list("proportion_hommes à attribut", PF_FORME, "proportion_hommes", structure(0.5, foo = "x"), "Portefeuille : proportion_hommes réel"),
+  list("proportion_hommes nommée", PF_FORME, "proportion_hommes", c(a = 0.5), "Portefeuille : proportion_hommes réel"),
+  list("age_min nommé", PF_FORME, "age_min", c(a = 20), "Portefeuille : âges réels"),
+  list("age_max à attribut", PF_FORME, "age_max", structure(75, foo = "x"), "Portefeuille : âges réels"),
+  list("age_max en matrice 1 x 1", PF_FORME, "age_max", matrix(75), "Portefeuille : âges réels"),
+  list("age nommé", PF_AGE, "age", c(a = 60), "Portefeuille : âge exact entier"),
+  list("age à attribut", PF_AGE, "age", structure(60, foo = "x"), "Portefeuille : âge exact entier"),
+  list("age de classe", PF_AGE, "age", structure(60, class = "x"), "Portefeuille : âge exact entier"))
+for (k in CHAMPS_FORME) {
+  pf <- modifyList(k[[2]], setNames(list(k[[4]]), k[[3]]))
+  verifier(sprintf("forme exacte : portefeuille, %s -> refus portefeuille_invalide", k[[1]]),
+           leve_refus(simuler(loi(), pf, PER, GRAINE), "portefeuille_invalide"))
+  verifier(sprintf("forme exacte : portefeuille, %s -> message du champ, sans attribut", k[[1]]),
+           grepl(k[[5]], message_refus(simuler(loi(), pf, PER, GRAINE)), fixed = TRUE) &&
+             grepl("sans attribut", message_refus(simuler(loi(), pf, PER, GRAINE)), fixed = TRUE))
+}
+
+# Dates du portefeuille (réserve 2 de l'audit de #58) : nommée, à attribut,
+# classe ajoutée, caractère de classe Date.
+DATES_PF_FORME <- list(
+  list("origine nommée", PF_FORME, "origine", nommee(PF_FORME$origine), "origine : date"),
+  list("origine à attribut", PF_FORME, "origine", attribuee(PF_FORME$origine), "origine : date"),
+  list("origine de classe c(\"Date\", \"x\")", PF_FORME, "origine", classe_plus(PF_FORME$origine), "origine : date"),
+  list("origine en caractère de classe Date", PF_FORME, "origine",
+       structure("2005-01-01", class = "Date"), "origine : date"),
+  list("date_entree nommée", PF_AGE, "date_entree", nommee(PF_AGE$date_entree), "date_entree : date"),
+  list("date_entree à attribut", PF_AGE, "date_entree", attribuee(PF_AGE$date_entree), "date_entree : date"),
+  list("date_entree de classe c(\"Date\", \"x\")", PF_AGE, "date_entree",
+       classe_plus(PF_AGE$date_entree), "date_entree : date"))
+for (k in DATES_PF_FORME) {
+  pf <- modifyList(k[[2]], setNames(list(k[[4]]), k[[3]]))
+  verifier(sprintf("forme exacte : portefeuille, %s -> refus portefeuille_invalide", k[[1]]),
+           leve_refus(simuler(loi(), pf, PER, GRAINE), "portefeuille_invalide"))
+  verifier(sprintf("forme exacte : portefeuille, %s -> message de forme (sans autre attribut)", k[[1]]),
+           grepl(k[[5]], message_refus(simuler(loi(), pf, PER, GRAINE)), fixed = TRUE) &&
+             grepl("sans autre attribut", message_refus(simuler(loi(), pf, PER, GRAINE)), fixed = TRUE))
+}
+
+# Noms des champs comparés sans tri : un nom de plus non ASCII natif, en octets
+# invalides, NA ou doublé est refusé sous portefeuille_invalide (aucune erreur R).
+plus_champ <- function(p, nom) { p <- c(p, list(1)); names(p)[length(p)] <- nom; p }
+NOMS_PF_FORME <- list(
+  list("champ de plus au nom non ASCII natif", plus_champ(PF_FORME, rawToChar(as.raw(c(0xc3, 0xa9))))),
+  list("champ de plus au nom en octets invalides", plus_champ(PF_FORME, rawToChar(as.raw(0xc9)))),
+  list("champ de plus au nom NA", plus_champ(PF_FORME, NA_character_)),
+  list("champ n doublé", plus_champ(PF_FORME, "n")),
+  list("champ mode doublé", c(PF_FORME, list(mode = "uniforme"))),
+  list("liste sans noms", unname(PF_FORME)))
+for (k in NOMS_PF_FORME)
+  verifier(sprintf("forme exacte : portefeuille, %s -> refus portefeuille_invalide", k[[1]]),
+           leve_refus(simuler(loi(), k[[2]], PER, GRAINE), "portefeuille_invalide"))
+
+# Formes admises : stockage integer des champs numériques et des dates, ordre
+# des champs permuté ; mêmes tirages, seul l'attribut `simulation` diffère.
+verifier("forme exacte : champs numériques en integer admis, tirages identiques",
+         identical(sans_attribut_simulation(
+           simuler(loi(), modifyList(PF_FORME, list(n = 1000L, age_min = 20L, age_max = 75L)), PER, GRAINE)),
+           sans_attribut_simulation(REF_FORME)))
+verifier("forme exacte : origine en stockage integer admise, tirages identiques",
+         identical(sans_attribut_simulation(
+           simuler(loi(), modifyList(PF_FORME, list(origine = vers_integer(PF_FORME$origine))), PER, GRAINE)),
+           sans_attribut_simulation(REF_FORME)))
+verifier("forme exacte : champs du portefeuille permutés admis, tirages identiques",
+         identical(sans_attribut_simulation(simuler(loi(), rev(PF_FORME), PER, GRAINE)),
+                   sans_attribut_simulation(REF_FORME)))
+verifier("forme exacte : portefeuille du mode âge exact, age et date_entree en integer admis, tirages identiques",
+         identical(sans_attribut_simulation(
+           simuler(loi(), modifyList(PF_AGE, list(age = 60L, date_entree = vers_integer(PF_AGE$date_entree))), PER, GRAINE)),
+           sans_attribut_simulation(simuler(loi(), PF_AGE, PER, GRAINE))))
+verifier("forme exacte : attribut simulation$portefeuille consigne le portefeuille reçu, liste nue",
+         identical(attr(REF_FORME, "simulation")$portefeuille, PF_FORME) &&
+           identical(names(attributes(attr(REF_FORME, "simulation")$portefeuille)), "names"))
