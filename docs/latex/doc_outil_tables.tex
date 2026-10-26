@@ -1056,8 +1056,47 @@ moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
 l'identité des textes est un \emph{constat} sur la machine qui exécute le
 contrôle (la plateforme de référence en CI) et sur ces six plans, non une
-propriété démontrée~; il ne couvre ni une locale latin-1, ni Windows
-(issue~\#49), ni des données de l'utilisateur à chaînes non ASCII.
+propriété démontrée~; il ne couvre ni une locale latin-1 (contrôle
+suivant), ni Windows (issue~\#49), ni des données de l'utilisateur à chaînes
+non ASCII.
+
+\medskip
+\noindent
+\textbf{Locale latin-1} (issue~\#115). Sous une locale latin-1,
+\code{octets\_chaines()} et l'ordre des segments
+(\code{segments\_observations()}, section~\ref{sec:troncature-censure})
+suivent une branche propre~: la session y est traitée comme une session
+UTF-8, toutes les chaînes passant par \code{enc2utf8()}. Aucune batterie ne
+s'exécute sous une telle locale, et \code{locale\_c.R} ne compare que C et
+UTF-8~: sans contrôle dédié, une régression de cette branche, qui
+toucherait l'empreinte des données, l'ordre des segments, la fiche ou le
+rapport figé, passerait la CI. Le contrôle
+\code{tests/controles/locale\_latin1.R} (tableau~\ref{tab:scripts-controle})
+génère la locale \code{fr\_FR.ISO-8859-1} par \code{localedef} dans un
+dossier temporaire, sans droits particuliers, et \textbf{échoue}, sans
+jamais sauter, s'il ne peut pas la générer~; il installe l'arbre de travail
+sous cette locale et sous la première locale UTF-8 disponible, puis
+exécute dans chaque cas, sous la locale de l'installation et après avoir
+vérifié la locale effective, les plans de référence R1 à R6 et quatre jeux
+de segments non ASCII (valeurs natives non marquées, marquées latin-1,
+marquées UTF-8, et mêlées~: «~ÿ~» natif et «~€~» UTF-8), construits à
+partir de leurs octets avec un marquage explicite~; il écrit la fiche, le
+plan et le rapport figé de chaque construction et, pour chaque jeu, l'ordre
+des segments. Les 34~textes (trois par plan de référence, quatre par jeu)
+sont comparés octet à octet entre les deux sessions, sans écart admis~; dans
+chaque session, l'ordre des segments est en outre comparé à un ordre de
+référence par octets UTF-8, calculé par le script hors du code testé. Il est
+l'étape «~Locale latin-1 (installation et exécution)~» du job «~Tests
+(R 4.3.3)~», qui installe le paquet Debian \code{locales} si les sources de
+locales manquent à l'image, hors de la liste des batteries.
+\textbf{Sensibilité}, \emph{constat de mesure}~: retirer la branche
+latin-1 de la condition de locale connue d'\code{octets\_chaines()} fait
+échouer R1 à R6~; la retirer de celle de l'ordre des segments ne fait
+échouer que le jeu mêlé, seul à la détecter (code~1 dans les deux cas).
+\textbf{Statut}~: l'identité des textes est un \emph{constat} sur la
+machine qui exécute le contrôle et sur ces plans et ces jeux, non une
+propriété démontrée~; il ne couvre ni Windows (issue~\#49) ni la batterie
+unitaire exécutée sous une locale latin-1.
 
 \medskip
 \noindent
@@ -1237,7 +1276,8 @@ la BLAS et la LAPACK de référence~; script de plateforme en mode strict~; les
 trois batteries~; liste blanche de \code{DESCRIPTION}~; ordre des modules~;
 identité des batteries et de l'image~; contrôle sous la locale C
 (installation et exécution), puis batterie unitaire relancée sous la locale C
-stricte (section~\ref{sec:harnais})~; écriture «~texte~» des doubles
+stricte (section~\ref{sec:harnais})~; contrôle sous une locale latin-1
+(installation et exécution)~; écriture «~texte~» des doubles
 recoupée par les juges glibc et Python (tableau~\ref{tab:scripts-controle}), hors liste des batteries. Les étapes des batteries et des
 contrôles, sous la condition \code{\$\{\{ !cancelled() \}\}}, s'exécutent
 même si une étape antérieure échoue, pour que tous les écarts soient
@@ -1861,7 +1901,20 @@ y rend la même locale que celle du harnais, et teste la fonction \code{ecart\_o
 qui rédige le message d'un écart de la comparaison octet à octet et
 que le chemin d'échec bon marché n'atteint pas, sur des attendus écrits à
 la main (textes identiques, premier octet différent à la deuxième ligne,
-longueurs inégales à préfixe commun, dans les deux sens).
+longueurs inégales à préfixe commun, dans les deux sens). Pour
+\code{locale\_latin1.R}, de même exécuté en entier par une étape de la CI,
+la batterie rejoue deux chemins d'échec bon marché (racine sans package~:
+l'installation sous \code{fr\_FR.ISO-8859-1} est nommée en échec~;
+\code{localedef} introuvable~: échec nommé, jamais un saut), vérifie que
+le script sourcé ne fait que définir ses fonctions et constantes, avec
+\code{LOCALES\_UTF8} identique à celle du harnais, et teste le marquage de
+ses jeux de segments et son ordre de référence. Les deux chemins d'échec
+dépendent de l'environnement~: ils se sautent, avec un saut
+\textbf{annoncé} («~[sauté]~» et sa raison), hors POSIX (Windows), si la
+locale latin-1 ne peut pas y être générée, ou si les commandes ou le lien
+symbolique qu'ils emploient manquent~; la batterie unitaire reste ainsi
+exécutable sous Windows, tandis que le contrôle lui-même n'y saute jamais
+en silence.
 
 \begin{center}
 \small
@@ -1910,6 +1963,17 @@ marquées UTF-8), puis ces textes, trois par plan et le bilan, comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11~; M54~; issue~\#66 \\
+\code{locale\_latin1.R} & \code{tablexp} installé dans deux bibliothèques
+temporaires, l'une sous \code{fr\_FR.ISO-8859-1}, générée par
+\code{localedef} (échec, jamais de saut, si elle ne peut pas l'être), l'autre
+sous la première locale UTF-8 disponible, et exécuté sous la locale de son
+installation, vérifiée d'abord~; pour R1 à R6 et quatre jeux de segments non
+ASCII (natifs, latin-1, UTF-8, mêlés), fiche, plan et rapport figé écrits,
+ordre des segments écrit et comparé à un ordre par octets UTF-8, puis
+34~textes comparés octet à octet entre latin-1 et UTF-8, sans écart admis
+(section~\ref{sec:harnais})~; étape «~Locale latin-1 (installation et
+exécution)~» du job «~Tests (R 4.3.3)~», hors liste des batteries &
+ADR 0007, point 9.3~; issues~\#106 et~\#115 \\
 \code{ecriture\_doubles.R} & écriture des doubles de l'empreinte en octets
 IEEE~754 identique, ligne à ligne, à celle d'un juge indépendant (Python,
 \code{struct.pack}) sur $10^6$ doubles tirés sous graine et des cas limites~;
@@ -3681,8 +3745,11 @@ latin-1 sur son octet natif (\code{ff} pour «~ÿ~», d'où l'ordre «~a~»,
 «~€~», «~ÿ~», contraire à la règle) et levait une erreur R sur une valeur
 non ASCII non marquée, forme que donne \code{read.csv()} d'un fichier UTF-8~;
 seul l'ordre des segments a changé, non leurs valeurs ni l'empreinte des
-données. La branche de la locale latin-1 n'est pas exercée en CI, aucune
-locale latin-1 n'y étant installée. \emph{Cas limite d'une fonction interne}~:
+données. La branche de la locale latin-1 est exercée en CI par le contrôle
+\code{tests/controles/locale\_latin1.R} (issue~\#115~;
+section~\ref{sec:harnais}, «~Locale latin-1~»)~: l'ordre des segments
+non ASCII y est le même sous \code{fr\_FR.ISO-8859-1} et sous une locale
+UTF-8, et égal à l'ordre des octets UTF-8 (\emph{constat}). \emph{Cas limite d'une fonction interne}~:
 sous la locale C, un «~é~» non marqué et un «~é~» marqué latin-1 sont deux
 valeurs distinctes pour \code{unique()} et \code{match()}, donc deux
 segments si l'on appelle \code{segments\_observations()} directement~; le
