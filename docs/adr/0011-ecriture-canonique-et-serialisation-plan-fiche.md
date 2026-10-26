@@ -627,3 +627,162 @@ Rédigée par `architect` au commit (2) de la branche `claude/rapport-fige` (PR 
 **Effet sur les résultats.** `fiche/version_fiche` passe de 3 à 4, et l'empreinte du résultat de R1 à R6 change en conséquence. Le nouveau champ est hors empreinte et hors grandeurs de référence. Aucune autre version du point 10 ne change : `tablexp canonique 2`, `tablexp resultat 1`, `tablexp plan 1`, `tablexp fiche 1` et `tablexp reference 1` restent identiques, puisque la grammaire écrit le nouveau champ comme toute chaîne.
 
 Issues : #77 (critères 1 et 4 ; critère 2 en attente du mainteneur) ; #86 (version admise au rejeu). ADR 0008 (réserve sur la `libm`), ADR 0009 (points 2.2 et 7.1), ADR 0012 (point 3.5). Décisions M83, M93, M113. Branche `claude/rapport-fige`, PR #88.
+
+## Annotation du 26 octobre 2026 — point 2.6, option (v) rouverte pour la seule forme « texte » (#104, option (b)) ; points 3.1 et 3.2 ; point 11 : commande de recalcul de l'empreinte du code (#107)
+
+Rédigée par `architect-approfondi` à l'étape (3c) de la branche `claude/ecriture-portable` (B10, PR #116), selon le plan accepté (M149 ; `docs/feuille-de-route.md`, § 1.10) et la décision du mainteneur du 26/10/2026 (M161). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne relevés à `3b42737` ; le nom de l'objet fait foi (M77, (b)).
+
+Sources :
+- spécification commune de #104 et #107 par `actuary-approfondi` (étape (3'), https://github.com/Gerard-Garey/outil_tables/issues/104#issuecomment-6410091378, annexe https://github.com/Gerard-Garey/outil_tables/issues/104#issuecomment-6410096535 ; partie B, https://github.com/Gerard-Garey/outil_tables/issues/107#issuecomment-6410091639) ;
+- rapport de mesure de l'étape (3a) par `coder-approfondi` (https://github.com/Gerard-Garey/outil_tables/pull/116#issuecomment-6411554386) ;
+- avis et visa d'`actuary` sur l'étape (3b) (https://github.com/Gerard-Garey/outil_tables/pull/116#issuecomment-6412066357) ;
+- commits `53e225b` (prototype et scripts de mesure sous `tests/mesures/ecriture_17g/`) et `3b42737` (intégration), messages compris.
+
+Les mesures de ces sources ont été faites sous R 4.3.3, glibc 2.39 et Python 3.13.17, sur un hôte cloud à un cœur, **hors plateforme de référence**. Celles qu'`architect` a refaites pour la présente annotation sont marquées « remesuré ».
+
+**(a) Décision : la forme « texte » des doubles est calculée par `tablexp`, sans la bibliothèque C.** Le mainteneur a retenu l'option (b) de #104 le 26/10/2026 (M161), au point de décision prévu par M148, sur le rapport de (3a) : seuils S0 à S7 tenus, recommandation (b). Intégration par `3b42737`.
+
+1. **Ce qui change.** La fermeture `doubles_texte()` d'`ecrire_valeurs()` (`R/rapport.R:561`) appelle `octets_17g()` (`R/rapport.R:474`) au lieu de `sprintf("%.17g", x + 0)`. L'algorithme est le V1 de la spécification, un développement décimal exact :
+   - a = m·2^e, avec m impair, lu sur les octets IEEE 754 ;
+   - Z = m·2^e, ou Z = m·5^(−e) si e < 0, en tranches de base 10⁷ (`BASE_TRANCHES`) ;
+   - arrondi sur les chiffres de Z.
+
+   Les invariants sont I1 à I5. Aucun double n'est mis en forme par `sprintf()`, `format()`, `formatC()` ni `as.character()` : les chiffres sont calculés sur des entiers exacts, inférieurs à 2⁵³. La table des puissances `PUISSANCES_TRANCHES` (`R/rapport.R:319`) est une constante d'installation (avis d'`actuary`, Q2).
+2. **Ce qui ne change pas dans la définition du texte.**
+   - 17 chiffres significatifs, forme `%.17g` de la norme C :
+     - notation fixe si −4 ≤ X < 17, sinon exposant signé d'au moins deux chiffres ;
+     - zéros de fin retirés, point retiré s'il ne reste rien après lui.
+   - Arrondi au plus proche, égalité vers le chiffre pair.
+   - Écriture de `x + 0` (`-0` s'écrit `0`).
+   - Jetons `NA`, `NaN`, `Inf`, `-Inf` lus sur la valeur reçue, par la règle de `doubles_empreinte()`.
+   - Sous glibc, les octets sont ceux d'avant : la glibc est l'oracle. Aucun double écrit ne change (point (c)).
+3. **Portée de la réouverture.** L'option (v) du point 2.6 est rouverte **pour la seule forme « texte »**. Pour la forme « empreinte » (point 2), le choix des octets IEEE 754 et le rejet des options (i) à (vi) restent entiers : l'empreinte n'a pas à être lisible, et ses octets sont exacts par construction à moindre coût (point 2.4).
+4. **Inchangés aussi :**
+   - le lecteur (point 6.3, `as.numeric`) ;
+   - l'écrivain unique (point 3.1) ;
+   - les versions du point 10. *Vérifié* : le diff de `3b42737` sous `R/` ne touche aucune constante de version ni aucune première ligne `tablexp plan 1`, `tablexp fiche 1`, `tablexp canonique 2`, `tablexp resultat 1`, `tablexp reference 1` (`git show 3b42737 -- R/ | grep -n '^[-+].*VERSION'` rend une sortie vide).
+   - Seul le libellé `CONVENTIONS_TEXTE["doubles"]` (`R/rapport.R:1026`) change. Il n'entre dans aucune version : c'est une valeur de chaîne de l'en-tête, visée par `actuary` (point (d)).
+
+**(b) Réponse aux trois motifs du rejet de l'option (v), point 2.6 : « lourd, lent, et ne règle pas la lecture ».**
+
+1. **« Lourd »**
+   - **Code.** Le prototype compte 181 lignes non vides hors commentaires (S6, seuil de 250). *Remesuré* sur le diff de `3b42737` dans `R/rapport.R` : +186 et −11 lignes de code. La commande est `git show 3b42737 -- R/rapport.R`, filtrée sur les lignes ajoutées ou retirées, non vides et hors commentaires ; ce décompte comprend le libellé de `CONVENTIONS_TEXTE`.
+   - **Fonctions.** R de base seulement ; la liste des fonctions employées est relevée par `getParseData` (rapport de (3a), § 7). `%%` et `%/%` ne portent que sur des entiers.
+   - **Grands entiers.** Les « plus de 1 000 bits pour les sous-normaux » du point 2.6 sont réels : Z a jusqu'à 767 chiffres, soit 108 tranches. Leur coût est borné :
+     - table de 2 098 × 108 tranches, 1,7 Mo, construite en 0,069 s ; installation allongée de 0,46 s (S5) ;
+     - mémoire maximale de 148,4 Mo à 10⁶ doubles au pire (sous-normaux), contre 267 Mo pour `sprintf` ; c'est l'effet de blocs de 2¹⁴ valeurs et de matrices de 2¹⁸ éléments au plus (S4).
+   - **Prix réel : la maintenance.**
+     - une preuve d'environ une page, I1 à I5 (point (c)) ;
+     - les témoins T1 à T3 dans la batterie unitaire ;
+     - le contrôle hors batterie `tests/controles/ecriture_doubles_texte.R`, exécuté par une étape de CI hors des étapes « Batterie : ».
+   - Le prototype et ses scripts de mesure sont conservés sous `tests/mesures/ecriture_17g/` (`53e225b`, M161).
+2. **« Lent »**
+   - **Coût par double (S1).** 8,97 à 11,53 µs sur les doubles de R1 à R6, contre 1,06 à 1,16 µs pour `sprintf`. Au pire cas, uniforme en exposant : 15,45 µs. Sous-normaux seuls : 25,61 µs, hors seuil.
+   - **Coût par appel (S2).** 0,445 ms.
+   - **Artefacts (S3).** Au plus +1,54 ms par plan, +3,08 ms par fiche et +0,078 s par rapport figé ; +0,37 s pour les six `.tsv`.
+   - **Coût projeté.** Environ **+5 s** pour une construction prospective qui écrit environ 4,4·10⁵ doubles : 5,1 s à 11,5 µs par double. Les densités de doubles des étapes à venir sont des *hypothèses* de la spécification, non mesurées.
+   - **Batterie (S7, seuil de +15 s).**
+     - Les témoins T1 à T3 coûtent environ 2,8 s (avis d'`actuary`).
+     - Mesuré par composantes, S7 vaut **environ 4,9 s** (message de `3b42737`).
+   - *Remesuré* par `architect` le 26/10/2026 : `LC_ALL=C.UTF-8 Rscript tests/controles/ecriture_doubles_texte.R` écrit 2 423 344 doubles en 26,15 s, soit 10,79 µs par double.
+   - **Conclusion.** Le surcoût est d'un ordre de grandeur par double. Mais il porte sur le **nombre de doubles écrits** en forme « texte », non sur le volume de calcul (base de mesure du § 1.10 de la feuille de route : 0 double écrit par `construire_table()`). Il est imperceptible sur R1 à R6. Au scénario prospectif, il reste en deçà du coût d'une construction à 10⁶ lignes, soit 9 à 16 s ; ce repère est une déduction de la spécification (A.4), tirée de #71 et non remesurée.
+   - La voie V3 (double-double), plus rapide, reste en réserve dans la spécification. Elle n'est pas mesurée et n'est pas décidée.
+3. **« Ne règle pas la lecture »**
+   - **Le motif reste vrai pour un décimal quelconque.** Le lecteur (point 6.3, et `double_lu()` des références, ADR 0009) lit par `as.numeric`, qui n'est pas correctement arrondi (point 2.6 (iii)). L'option (b) ne change pas le lecteur.
+   - **Ce qu'elle règle : l'écriture.** Celle-ci est exacte par construction et mesurée (point (c)). Elle ne dépend plus de la bibliothèque C : c'est l'objet de #104, puisque 36 694 textes sur 551 008 étaient faux au 17ᵉ chiffre sous Windows (contexte, point 1).
+   - **Ce qu'elle rend possible.** Pour un texte écrit par `tablexp`, le contrôle `ecrire(as.numeric(t)) == t` décide l'aller-retour texte par texte, sur toute plateforme : 17 chiffres correctement arrondis désignent un seul double (spécification, A.3).
+   - Ce contrôle n'est **pas** implanté. Aligner `double_lu()` et `formateur_glibc` sur l'écrivain du moteur est une suite possible de la spécification (A.6). Elle n'est pas décidée et sort de la présente annotation.
+
+**(c) Statut de l'écriture « texte »** (`CLAUDE.md`, « Rigueur » : les statuts ne se confondent pas).
+
+1. **Constat de mesure, qui fait foi.**
+   - **Rapport de (3a).** 0 écart à la glibc et 0 écart à Python sur 1 177 468 doubles finis, dont 68 886 égalités exactes. Les 2 213 non-finis à charge utile variée sont identiques. Les 18 artefacts et les 6 `.tsv` de R1 à R6 sont identiques octet pour octet.
+   - **Contrôle à deux juges** de `3b42737`, `tests/controles/ecriture_doubles_texte.R`. Il porte sur 2 423 344 doubles construits par leurs bits, sans lecture d'un décimal : T1, T2, T3, un échantillon de 10⁶ doubles, 1,2·10⁶ égalités exactes ou voisines et 2 007 non-finis.
+   - *Remesuré* par `architect` le 26/10/2026, même commande que ci-dessus :
+     - « Juge glibc (glibc 2.39) : 2423344 ligne(s), 0 écart(s) » ;
+     - « Juge Python 3.13.17 : 2423344 ligne(s), 0 écart(s) » ;
+     - table des puissances : « 2098 ligne(s), 0 écart(s) aux entiers exacts » ;
+     - MD5 de T2 et de T3 égaux aux constantes de la batterie (`984842c3…`, `eb6320f3…`) ;
+     - sortie « OK », code 0.
+2. **Exactitude par construction : esquisse de preuve.**
+   - I1 à I5 n'emploient que des opérations IEEE 754 exactes sur des entiers inférieurs à 2⁵³ (spécification, A.1 et A.3).
+   - C'est un statut **distinct** du constat. Il ne deviendra une preuve qu'une fois **rédigée par `docwriter`** dans `docs/latex/` (étape (6), passage unique) et **validée par `actuary`**.
+   - **Tant que la preuve n'est pas validée, la mesure fait foi.**
+3. **Indépendance de la plateforme.**
+   - Elle découle du même argument. Sous Windows, elle reste une *hypothèse* jusqu'à l'étape (5) ; sous macOS, elle n'est pas mesurée (M61).
+   - Sous Windows, le contrôle saute le juge glibc. Python reste alors seul juge.
+   - L'indépendance du `dtoa` de CPython vis-à-vis de la glibc est une *hypothèse* de la spécification.
+4. **Condition du visa d'`actuary` : levée par la CI.** Les MD5 de T2 et de T3 avaient été mesurés sous la glibc 2.39 ; le visa exigeait leur confirmation sous la glibc 2.35 de la CI.
+   - *Vérifié* par `architect` sur le journal du job « Tests (R 4.3.3) » de l'exécution 40308275084 (`3b42737`, verte sur les quatre jobs), étape « Écriture %.17g des doubles (juges glibc et Python) » :
+     - MD5 de T2 `984842c362108e4bae2a28ee0b3332bc` et de T3 `eb6320f37c34702827a4b66fa6f0b5c4`, égaux aux constantes de la batterie ;
+     - « Juge glibc (glibc 2.35) : 2423344 ligne(s), 0 écart(s) » ;
+     - « Juge Python 3.10.12 : 2423344 ligne(s), 0 écart(s) » ;
+     - table des puissances à 0 écart.
+   - Le constat de mesure vaut donc sous deux versions de la glibc et deux de Python.
+
+**(d) Points 3.1 et 3.2, lus avec la présente annotation.**
+
+1. **Point 3.1.**
+   - La parenthèse « double par `sprintf("%.17g", x + 0)`, jetons `NA`, `NaN`, `Inf`, `-Inf` tels que R les écrit » se lit désormais ainsi : « double fini de `x + 0` en 17 chiffres significatifs, forme `%.17g` de la norme C, arrondi au plus proche, égalité vers le chiffre pair, calculé par `tablexp` sans la bibliothèque C (`octets_17g()`) ; jetons `NA`, `NaN`, `Inf`, `-Inf` posés par l'écrivain, sur la règle de `doubles_empreinte()` ».
+   - Les jetons sont identiques à ceux de R : 0 écart sur les non-finis de (3a) et du contrôle.
+   - Le reste du point 3.1 est inchangé.
+2. **Point 3.2, écriture.**
+   - Avant : « sous glibc, preuve d'aller-retour pour l'écriture (arrondi correct) ».
+   - Désormais : « sur toute plateforme, écriture exacte par construction (esquisse I1 à I5, à valider), mesurée sous glibc (point (c)) ».
+3. **Point 3.2, relecture par `as.numeric` : inchangée.**
+   - Elle **reste un constat de mesure**, appuyé sur l'argument du point 3.2, **non une preuve** :
+     - 1 399 465 textes relus exactement (`m2.R`, corps de l'ADR) ;
+     - 0 relecture fausse sur 1 177 468 dans le rapport de (3a).
+   - Sous Windows, le constat de `ddf77bd` relevait **5 relectures fausses au-delà de l'exposant 266**. Elles portaient sur des textes mal arrondis par l'UCRT.
+   - Que des textes corrects les fassent disparaître est une *hypothèse*. Elle sera **mesurée à l'étape (5)** :
+     - écriture de l'échantillon sous Windows et MD5 du texte comparé à celui de la CI ;
+     - relecture `identical` de l'échantillon par `as.numeric`.
+   - Alerte d'`actuary` : l'échantillon de (3a) ne se régénère pas à l'identique sous Windows. Il faut transporter ses octets (`x.bin`) ou suivre la recette « bits seulement » du contrôle.
+4. **Libellé.**
+   - `CONVENTIONS_TEXTE["doubles"]` (`R/rapport.R:1026`) dit, mot pour mot selon le visa d'`actuary` : « 17 chiffres significatifs (forme %.17g de la norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par tablexp sans la bibliothèque C ; **relecture au bit près constatée sous glibc, non garantie ailleurs** ».
+   - Si l'étape (5) donne 0 erreur de relecture sous Windows sur l'échantillon complet, la spécification (A.6) propose d'écrire « sous glibc et sous Windows ».
+   - Ce serait un changement de libellé, donc de résultat, soumis au visa d'`actuary`. Il sort de la présente annotation.
+
+**(e) Point 11 : commande de recalcul de l'empreinte du code donnée aux tiers (#107).**
+
+1. **Constat.**
+   - La cinquième annotation du 20/10/2026, (c) et (d), donne la commande `LC_ALL=C md5sum R/*.R | md5sum`. `STATUT_EMPREINTE_CODE` (`R/rapport.R:91`) la reprend, et elle est écrite dans chaque fiche.
+   - Sous Windows, le `md5sum` de Rtools ou de MSYS2 lit en mode binaire et écrit `<md5> *R/…`. Le relevé, donc l'empreinte, diffère (#107 ; constat M2 de l'audit de #101, PR #105).
+2. **Décision (M151 ; spécification, B.1) : la commande donnée aux tiers devient `LC_ALL=C md5sum -t R/*.R | md5sum`.** Le libellé de `STATUT_EMPREINTE_CODE` est le texte de la spécification B.1, mot pour mot :
+
+   « code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine des sources, avec le md5sum de GNU coreutils : LC_ALL=C md5sum -t R/*.R | md5sum) ; identifie le texte source, non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm »
+
+   Visa d'`actuary` au commit (4).
+3. **Définition de l'empreinte du code : inchangée** (option (iv), M70). C'est le MD5 du relevé « `<md5>␣␣R/<fichier>` », fichiers triés par octets, LF, calculé à l'installation. Seule la commande donnée aux tiers change.
+4. **Portée.**
+   - **GNU/Linux** : *vérifié* par la spécification à `abda2d8` (coreutils 9.4). *Remesuré* par `architect` à `3b42737`, coreutils 9.4 :
+     - sans `-t` comme avec `-t`, `840b6477efc78532d47fbcf72def762e`, égal à l'empreinte du code de `3b42737` (message du commit) ;
+     - avec `-b`, `bccfafbff26a87983ecf69e6c3fbbd1d`.
+   - **Windows avec Rtools ou MSYS2** (coreutils 8.32) : `-t` rend la bonne valeur.
+     - C'est *rapporté*, non mesuré par la spécification : #101, `adef8e4`. Le test unitaire « empreinte du code (autre outil) » (`tests/unitaires/test_construire_table.R:852`) exécute déjà `md5sum -t`.
+     - La mesure est faite à l'étape (5).
+   - **macOS** : *non vérifié*. Le `md5sum` de GNU n'y est pas installé par défaut (*hypothèse*). La mention « GNU coreutils » inscrit cette portée dans la fiche elle-même.
+5. **`VERSION_FICHE` : pas d'incrément** (point 10 (c) : seule une valeur de chaîne change ; M151, confirmée par la spécification, B.2).
+6. **Effet attendu du commit (4)**, non de la présente annotation.
+   - `fiche/empreintes/statut_resultat_code` change dans les six `.tsv`, une ligne chacun. Changent aussi la fiche écrite et le rapport figé.
+   - L'empreinte du résultat est inchangée : le chemin est dans `CHEMINS_HORS_RESULTAT`, `R/rapport.R:716`.
+   - Le témoin « fiche » du rejeu est inchangé : `perimetre_temoin_fiche()`, `R/construire_table.R:386`.
+   - Aucune table finale ni aucun verdict : visa d'`actuary`.
+   - **Une régénération**, la seule de la branche, sur la CI, par la session principale.
+   - À compter du commit (4), la cinquième annotation du 20/10/2026, (c) et (d), se lit avec la commande à `-t`.
+
+**Effet sur les résultats : aucun** par la présente annotation.
+- **`3b42737`** (tableau avant / après dans son message ; visa d'`actuary`) :
+  - le libellé « doubles » des plans, fiches et rapports figés de R1 à R6 change (18 lignes) ;
+  - le jeton de l'empreinte du code change ;
+  - six `.tsv`, empreinte du résultat et doubles écrits sont inchangés.
+- **Commit (4)** : point (e) 6.
+
+**Ce que l'annotation ne règle pas.**
+- La rédaction et la validation de la preuve I1 à I5, à l'étape (6).
+- Les mesures sous Windows, à l'étape (5), et sous macOS (M61, #49).
+- L'alignement de `double_lu()` et de `formateur_glibc` sur l'écrivain du moteur (spécification, A.6).
+- Le libellé « sous glibc et sous Windows ».
+- La voie V3.
+
+Issues : #104, #107 ; #35 (constat de l'UCRT, contexte, point 1) ; #49 (Windows, macOS) ; #101 (`md5sum -t` sous Windows). Décisions M148, M151, M161. ADR 0012 (point 2.3, annotation du 26/10/2026). Branche `claude/ecriture-portable`, PR #116.
