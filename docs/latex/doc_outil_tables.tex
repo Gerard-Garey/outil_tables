@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{25/10/2026}
+\newcommand{\datedoc}{26/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1237,7 +1237,8 @@ la BLAS et la LAPACK de référence~; script de plateforme en mode strict~; les
 trois batteries~; liste blanche de \code{DESCRIPTION}~; ordre des modules~;
 identité des batteries et de l'image~; contrôle sous la locale C
 (installation et exécution), puis batterie unitaire relancée sous la locale C
-stricte (section~\ref{sec:harnais}), hors liste des batteries. Les étapes des batteries et des
+stricte (section~\ref{sec:harnais})~; écriture «~texte~» des doubles
+recoupée par les juges glibc et Python (tableau~\ref{tab:scripts-controle}), hors liste des batteries. Les étapes des batteries et des
 contrôles, sous la condition \code{\$\{\{ !cancelled() \}\}}, s'exécutent
 même si une étape antérieure échoue, pour que tous les écarts soient
 visibles~; le job reste en échec. L'étape du script de plateforme, sans
@@ -1844,9 +1845,12 @@ Tout contrôle mécanique est un script, jamais une relecture (\code{CLAUDE.md},
 «~Workflows~», principe~7). Les scripts sont en R de base, sous
 \code{tests/controles/}, et sortent avec un code non nul en cas d'écart. Chacun
 est testé sur des témoins dans \code{tests/unitaires/test\_controles.R}~: il
-doit échouer sur un cas fautif et passer sur le dépôt. Fait exception
+doit échouer sur un cas fautif et passer sur le dépôt. Font exception
 \code{ecriture\_doubles.R}, recoupement hors CI dont la batterie unitaire
-garde un échantillon (section~\ref{sec:verifications-rapport})~; pour
+garde un échantillon (section~\ref{sec:verifications-rapport}), et
+\code{ecriture\_doubles\_texte.R}, recoupement par deux juges dont la
+batterie unitaire garde les témoins T1 à T3 et que la CI exécute en entier
+(même section)~; pour
 \code{locale\_c.R}, dont l'exécution complète (deux installations, six plans)
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
@@ -1911,6 +1915,20 @@ IEEE~754 identique, ligne à ligne, à celle d'un juge indépendant (Python,
 \code{struct.pack}) sur $10^6$ doubles tirés sous graine et des cas limites~;
 \textbf{hors CI} (Python requis), non exécuté sous Windows
 (section~\ref{sec:empreinte}) & ADR 0011, points 2.1 et 2.4~; issue~\#35 \\
+\code{ecriture\_doubles\_}\newline\code{texte.R} & écriture des doubles en
+forme «~texte~» (\code{\%.17g} calculé par \code{tablexp}) identique, ligne
+à ligne, à celle de deux juges, la glibc (\code{sprintf}, sauté sous
+Windows) et Python (\code{format}), sur plus de $10^{6}$ doubles construits
+par leurs octets ou par des opérations sous graine, sans lecture d'un
+décimal (T1, T2, T3, un échantillon de $10^{6}$ doubles, des égalités
+exactes tirées, leurs voisins et leurs opposés, des non-finis à charge
+utile)~; nombre d'égalités exactes exigé dans chaque partie~; MD5 des textes
+de T2 et de T3 égaux aux constantes de la batterie unitaire~; table des
+puissances égale aux entiers exacts de Python~; code~1 si Python est absent.
+\textbf{Hors batterie}~; étape «~Écriture \%.17g des doubles (juges glibc
+et Python)~» du job «~Tests (R 4.3.3)~», hors liste des batteries
+(section~\ref{sec:empreinte}) & ADR 0011, annotation du 26/10/2026~; M161~;
+issue~\#104 \\
 \end{longtable}
 \end{center}
 
@@ -5656,27 +5674,39 @@ ci-dessus, seule employée par \code{texte\_canonique()} et par le texte
 empreinté du résultat (section~\ref{sec:empreinte-resultat}), et la forme
 «~texte~», pour les textes qu'un relecteur lit et qu'on relit (références de
 non-régression, section~\ref{sec:non-regression}~; texte du plan et de la
-fiche, section~\ref{sec:serialisation}), où un double fini
-s'écrit \code{sprintf("\%.17g", x + 0)} et un non fini comme R l'écrit
-(\code{NA}, \code{NaN}, \code{Inf}, \code{-Inf}), le jeton étant lu, là
+fiche, section~\ref{sec:serialisation}), où un double fini $x$
+s'écrit en dix-sept chiffres significatifs, forme \code{\%.17g}, calculés
+par \code{tablexp} sans la bibliothèque C (\code{octets\_17g()}~; issue~\#104,
+ci-dessous, «~Écriture «~texte~» des doubles~»), et un non fini par son
+jeton (\code{NA}, \code{NaN}, \code{Inf}, \code{-Inf}), le jeton étant lu, là
 aussi, sur la valeur reçue. Dix-sept chiffres significatifs suffisent à
 désigner un double sans ambiguïté, quinze non~; encore faut-il que l'écriture
-soit correctement arrondie et la relecture exacte. Sous la bibliothèque C de
-GNU (glibc), l'arrondi correct de l'écriture et la relecture exacte sont des
-\emph{constats de mesure} (ADR 0011, points~2.4 et 3.2~; relecture exacte
-constatée sur 1\,399\,465 doubles), la relecture étant appuyée sur un argument d'ordre de grandeur, non une
-preuve. Sous Windows, ni l'un ni l'autre ne tient toujours (constat sur le
-poste du mainteneur, ADR 0011, point~3.2). Les entiers, logiques, chaînes, facteurs et
+soit correctement arrondie et la relecture exacte. L'arrondi correct de
+l'écriture est établi par construction, sur toute plateforme, par une
+esquisse de preuve à valider, et \emph{constaté} par deux juges
+indépendants (ci-dessous). La relecture exacte reste un \emph{constat de
+mesure} sous la bibliothèque C de GNU (glibc) (ADR 0011, point~3.2~;
+relecture exacte constatée sur 1\,399\,465 doubles), appuyé sur un argument
+d'ordre de grandeur, non une preuve. Sous Windows, avant l'issue~\#104,
+l'écriture par la bibliothèque C n'était pas toujours correctement
+arrondie, et la relecture n'était pas toujours exacte (constat sur le poste
+du mainteneur, ADR 0011, point~3.2)~; ni l'écriture de \code{tablexp} ni la
+relecture n'y sont encore mesurées (\textbf{hypothèse}~; décision M61,
+issue~\#49). Les entiers, logiques, chaînes, facteurs et
 dates s'écrivent de même dans les deux formes. Une forme inconnue est
 refusée (\code{forme\_ecriture\_inconnue}).
 
 \medskip
 \textbf{Pourquoi des octets, et non \code{\%.17g}, dans l'empreinte.}
-L'écriture décimale dépend de la bibliothèque C du système~: sous Windows,
+L'écriture décimale par la bibliothèque C (\code{sprintf}) dépend du système~: sous Windows,
 elle n'arrondit pas toujours correctement le dix-septième chiffre (constat
 sur le poste du mainteneur, ADR 0011, «~Contexte~», mesure~1), si bien qu'à
 données identiques au bit près l'empreinte d'une base portant une colonne
-double différerait d'un poste à l'autre. Les octets ne dépendent que de la
+double différerait d'un poste à l'autre. L'issue~\#104 a rouvert le calcul
+de l'écriture décimale par \code{tablexp} (option~(v) de l'ADR 0011,
+point~2.6), \textbf{pour la seule forme «~texte~»} (ADR 0011, annotation du
+26/10/2026, (a)~3)~: l'empreinte n'a pas à être lisible, et ses octets sont
+exacts par construction sans aucun calcul de chiffres. Les octets ne dépendent que de la
 norme IEC~60559 (IEEE~754), que R exige de toute plateforme (aide de
 \code{double}), et de l'ordre des octets, fixé. Deux autres écritures ont été
 écartées (ADR 0011, point~2.6)~: \code{\%a}, dont l'aide de \code{sprintf}
@@ -5753,6 +5783,211 @@ représentation est passée de~1 à~2 avec l'issue~\#35 (doubles en octets)~:
 l'empreinte des données des six plans de référence a changé, l'entrée
 restant la même, ce qu'a prouvé la garde «~entrée différente~»
 (section~\ref{sec:non-regression}, «~Règles durables~»).
+
+\subsubsection*{Écriture «~texte~» des doubles}
+
+\textbf{Règle} (issue~\#104~; décisions M148 et M161~; ADR 0011,
+annotation du 26/10/2026). En forme «~texte~», \code{ecrire\_valeurs()}
+écrit les doubles par \code{octets\_17g()}~: aucun double n'y est mis en
+forme par \code{sprintf()}, \code{format()}, \code{formatC()} ni
+\code{as.character()}~; les chiffres sont calculés par \code{tablexp} sur des
+entiers exacts, puis écrits en octets ASCII, une valeur par ligne, LF final.
+La ligne \code{doubles} de \code{CONVENTIONS\_TEXTE}, en en-tête des plans,
+des fiches et des rapports figés, le dit au relecteur, mot pour mot~:
+«~le double relu fait foi~; 17 chiffres significatifs (forme \%.17g de la
+norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par
+tablexp sans la bibliothèque C~; relecture au bit près constatée sous glibc,
+non garantie ailleurs~; à l'import, toute écriture décimale est admise (0.95
+comme 0.94999999999999996)~; refusés~: décimal non fini, décimal non nul
+relu 0~; jetons NA, NaN, Inf, -Inf~».
+
+\medskip
+\noindent
+\textbf{Raison.} Avant l'issue~\#104, la forme «~texte~» était
+\code{sprintf("\%.17g", x + 0)}, écrite par la bibliothèque C du système~:
+sous Windows, 36\,694 textes sur 551\,008 y différaient de l'arrondi correct
+au dix-septième chiffre (constat sur le poste du mainteneur, ADR 0011,
+«~Contexte~», point~1), si bien que plan, fiche et rapport figé n'avaient pas
+les mêmes octets d'une plateforme à l'autre. Le calcul par \code{tablexp}
+retire cette dépendance. Son prix est la maintenance (le code ci-dessous, la
+preuve, les témoins de la batterie et un contrôle à deux juges) et un coût
+par double écrit d'un ordre de grandeur supérieur à celui de
+\code{sprintf}~; ce coût porte sur les seuls doubles écrits en forme
+«~texte~» (plan, fiche, rapport figé, références), non sur le calcul~:
+\code{construire\_table()} n'en écrit aucun (mesures de l'étape~(3a) et
+seuils~S0 à~S7~: ADR 0011, annotation du 26/10/2026, (b)). Sous la glibc, les
+octets sont ceux d'avant~: aucun double écrit n'a changé (même source,
+(a)~2).
+
+\medskip
+\noindent
+\textbf{Définition du texte.} Un non fini s'écrit par son jeton, lu sur la
+valeur reçue comme en forme «~empreinte~»~: \code{NA} si \code{is.na()} et
+non \code{is.nan()}, \code{NaN}, \code{Inf} ou \code{-Inf}. Un fini $x$
+s'écrit depuis $y = x + 0$~: le zéro négatif devient~0, écrit \code{0}. Pour
+$y \neq 0$, soit $a = |y|$, $D = d_1 d_2 \ldots d_{17}$ ($d_1 \neq 0$) et $X$
+les dix-sept chiffres et l'exposant décimal de l'arrondi de $a$ à dix-sept
+chiffres significatifs, \textbf{au plus proche, égalité vers le chiffre
+pair}~: $a \approx d_1{,}d_2 \ldots d_{17} \cdot 10^{X}$, $X$ étant pris
+\emph{après} l'arrondi. Si $-4 \le X < 17$, notation fixe à $16 - X$
+décimales~; sinon notation \code{d.ddde+XX}, exposant signé sur deux
+chiffres au moins (trois au-delà de~99)~; dans les deux cas, les zéros de fin
+de la partie décimale sont retirés, et le point s'il ne reste rien après
+lui~; le séparateur est toujours le point~; un \code{-} précède le texte si
+$y < 0$. Ainsi $0{,}95$ s'écrit \code{0.94999999999999996}, $10^{-5}$
+\code{1.0000000000000001e-05}, $10^{17}$ \code{1e+17} et $2^{-25}$, dont le
+développement décimal exact $2{,}98023223876953125 \cdot 10^{-8}$ tombe
+exactement entre deux textes à dix-sept chiffres, \code{2.9802322387695312e-08}
+(dix-septième chiffre pair). C'est la forme de la conversion \code{g} de la
+norme C à la précision~17, sans le drapeau \code{\#}~: le texte de la norme
+n'a pas été relu pour le présent document, et la conformité de la forme,
+frontières de notation comprises ($10^{16}$, $10^{17}$, $10^{-4}$,
+$10^{-5}$), est un \emph{constat de mesure} (identité aux deux juges,
+ci-dessous).
+
+\medskip
+\noindent
+\textbf{Calcul} (algorithme~V1 de la spécification d'\code{actuary}, issue~\#104).
+Les grands entiers sont écrits en tranches de base $B = 10^{7}$
+(\code{BASE\_TRANCHES}), poids faible d'abord, stockées en doubles.
+\code{chiffres\_17()} lit $a = m \cdot 2^{e}$ sur les octets, forme l'entier
+décimal exact~$Z$ comme le produit de $m$ (trois tranches) par la ligne~$e$
+de la \textbf{table des puissances} \code{PUISSANCES\_TRANCHES}, puis
+arrondit sur les quatre tranches non nulles les plus hautes de~$Z$. La
+table porte $5^{-e}$ si $e < 0$ et $2^{e}$ si $e \ge 0$, pour $e$ de $-1074$
+à $1023$ (2\,098~lignes, 108~tranches au plus, pour $5^{1074}$)~; c'est une
+constante calculée \textbf{à l'installation} du package par
+\code{table\_puissances\_tranches()}, par multiplications successives par~5
+et par~2. Les retenues sont reportées par \code{reporter\_retenues()}, qui
+divise chaque tranche par la base au moyen de \code{diviser\_tranche()}.
+\code{positions\_17g()} met les chiffres et l'exposant dans la forme
+ci-dessus, et \code{octets\_17g()} assemble les octets et pose les jetons des
+non-finis. Les opérateurs \code{\%\%} et \code{\%/\%} ne portent que sur des
+entiers (type \code{integer})~; \code{max.col()} reçoit toujours
+\code{ties.method} \code{"first"} ou \code{"last"}, si bien qu'aucun tirage
+n'est fait dans le générateur (la valeur par défaut, \code{"random"}, en
+ferait un~; \code{.Random.seed} inchangé, vérifié par la batterie). La
+mémoire est bornée~: blocs de $2^{14}$ valeurs, matrices de tranches d'au
+plus $2^{18}$ éléments.
+
+\medskip
+\noindent
+\textbf{Esquisse de preuve} (invariants~I1 à~I5 de la spécification
+d'\code{actuary}). L'arithmétique des doubles de R est celle de la norme
+IEC~60559 (binary64), que R exige de toute plateforme~: un entier de
+$[0, 2^{53})$ y est représenté exactement, et une somme, une différence ou
+un produit de tels entiers dont le résultat exact est dans $[0, 2^{53})$ est
+calculé exactement.
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{I1, décomposition exacte}~: $a = m \cdot 2^{e}$ exactement,
+    avec $m$ impair, $1 \le m < 2^{53}$ et $-1074 \le e \le 1023$. Par
+    définition du format binary64, un double fini positif de champ
+    d'exposant $E$ (11~bits) et de fraction $f$ (52~bits) vaut
+    $(2^{52} + f) \cdot 2^{E - 1075}$ si $E > 0$, et $f \cdot 2^{-1074}$ si
+    $E = 0$ (sous-normal). $E$ et $f$ sont lus sur les octets petit-boutistes
+    (\code{writeBin()}) et recomposés par produits par~256 et sommes
+    d'entiers inférieurs à $2^{53}$, donc exactement. Tant que $m$ est pair,
+    $m \leftarrow m/2$ et $e \leftarrow e + 1$~: la moitié d'un entier pair
+    est exacte. Au plus grand champ, $E = 2046$, $e \le 2046 - 1075 + 52 = 1023$.
+  \item \textbf{I2, entier décimal exact}~: si $e \ge 0$, $Z = m \cdot
+    2^{e}$ et $s = 0$~; si $e < 0$, $Z = m \cdot 5^{-e}$ et $s = -e$, puisque
+    $2^{e} = 5^{-e} \cdot 10^{e}$. Dans les deux cas, $a = Z \cdot 10^{-s}$
+    exactement~; $Z$ a au plus 767~chiffres ($m$ en a au plus~16,
+    $5^{1074}$ en a~751).
+  \item \textbf{I3, exactitude des opérations}~: toute valeur intermédiaire
+    est un entier de $[0, 2^{53})$. Une tranche est inférieure à $10^{7}$~;
+    $m = r_0 + B r_1 + B^{2} q_2$ avec $r_0, r_1 < 10^{7}$ et $q_2 \le 90$
+    (car $m < 2^{53} < 91 \cdot 10^{14}$)~; chaque tranche du produit reçoit
+    au plus trois produits, chacun inférieur à $10^{14}$, soit moins de
+    $3 \cdot 10^{14} < 2^{53} \approx 9{,}007 \cdot 10^{15}$~; à la
+    construction de la table, une tranche multipliée par~5 ou par~2 reste
+    inférieure à $5 \cdot 10^{7}$.
+  \item \textbf{I4, division par la base}~: pour un entier $v \in [0,
+    2^{53})$, \code{diviser\_tranche()} rend $q = \lfloor v/B \rfloor$ et
+    $r = v - qB \in [0, B)$ exactement, quel que soit l'arrondi du
+    quotient~: le quotient calculé, arrondi au plus proche, diffère de $v/B$
+    d'au plus $v/B \cdot 2^{-53} < 10^{-7}$, si bien que sa partie entière diffère de $\lfloor
+    v/B \rfloor$ d'au plus une unité~; $r$ est calculé exactement (I3), et
+    la correction d'une unité ($r < 0$~: $q - 1$ et $r + B$~; $r \ge B$~:
+    $q + 1$ et $r - B$) rétablit $0 \le r < B$. Chaque passe du report des
+    retenues conserve la valeur $\sum_j v_j B^{j}$~; les retenues décroissent
+    d'une passe à l'autre (au plus $3 \cdot 10^{7}$, puis au plus~3, puis
+    au plus~1, qui monte d'une tranche par passe), si bien que le report
+    s'arrête, quand toutes les tranches sont dans $[0, B)$, sur l'écriture
+    unique de~$Z$ en base~$B$. La largeur réservée suffit à $Z$~; une
+    retenue sur la dernière tranche est un garde-fou d'erreur de
+    programmation.
+  \item \textbf{I5, arrondi correct}~: soit $Z = \sum_{k=1}^{N} d_k
+    10^{N-k}$, $d_1 \neq 0$, d'où $a = d_1{,}d_2 \ldots d_N \cdot 10^{X}$
+    avec $X = N - 1 - s$. Si $N \le 17$, $D$ est $d_1 \ldots d_N$ complété
+    de zéros, sans arrondi. Sinon, $H = d_1 \ldots d_{17}$ et le reste
+    $\rho = \sum_{k \ge 18} d_k 10^{N-k} \in [0, 10^{N-17})$ donnent $a =
+    (H + \rho / 10^{N-17}) \cdot 10^{X - 16}$. L'arrondi au plus proche,
+    égalité vers le pair, monte à $H + 1$ si et seulement si $\rho /
+    10^{N-17} > 1/2$, ou $= 1/2$ et $H$ impair (c'est-à-dire $d_{17}$
+    impair)~; or $\rho / 10^{N-17} > 1/2$ si et seulement si $d_{18} > 5$,
+    ou $d_{18} = 5$ et un $d_k$ ($k \ge 19$) est non nul, et $\rho /
+    10^{N-17} = 1/2$ si et seulement si $d_{18} = 5$ et tous les $d_k$
+    ($k \ge 19$) sont nuls. C'est le test du code~: $d_1 \ldots d_{18}$ sont
+    lus dans les quatre tranches les plus hautes de~$Z$ (au moins
+    22~chiffres~; trois tranches nulles sont toujours réservées sous~$Z$,
+    pour qu'il y en ait quatre même quand $Z$ en compte moins), et l'existence d'un $d_k$ non nul ($k \ge 19$)
+    sur les chiffres restants de ces tranches et sur l'existence d'une
+    tranche non nulle plus basse. Si $H + 1 = 10^{17}$, $D$ vaut~1 suivi de
+    seize zéros et $X$ augmente de~1. $D \cdot 10^{X - 16}$ est donc l'arrondi
+    correct de $a$ à dix-sept chiffres significatifs.
+\end{itemize}
+\textbf{Égalités exactes.} Une égalité ($\rho / 10^{N-17} = 1/2$) exige
+$Z = (10H + 5) \cdot 10^{N-18}$, avec $10H + 5$ impair, donc $N \ge 18$ et
+une valuation~2 de $Z$ égale à $N - 18$. Si $e \ge 0$, cette valuation est
+$e$ ($m$ impair), et $10^{N-1} \le Z < 2^{53 + e} = 2^{N + 35}$ exigerait
+$N < 17$~: contradiction. Si $e < 0$, $Z = m \cdot 5^{-e}$ est impair,
+donc $N = 18$~: $m \cdot 5^{n} \in [10^{17}, 10^{18})$ avec $n = -e$,
+possible seulement pour $n$ de~2 à~25. Exemples~: $2^{-25}$ ($m = 1$,
+$5^{25} = 298\,023\,223\,876\,953\,125$) et $2^{50} + 0{,}25$, écrit
+\code{1125899906842624.2}. Ces cas sont les seuls où la règle d'égalité
+vers le pair joue~; les témoins de la batterie et le contrôle à deux juges
+les énumèrent.
+
+\medskip
+\noindent
+\textbf{Statut} (E2.20~; ADR 0011, annotation du 26/10/2026, (c)).
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Résultat exact, en esquisse}~: l'argument ci-dessus
+    n'emploie que des opérations exactes sur des entiers inférieurs à
+    $2^{53}$, sous la seule norme IEC~60559 exigée par R~; il rend l'écriture
+    correctement arrondie et indépendante de la plateforme. Il ne vaut
+    \textbf{preuve} qu'une fois validé par \code{actuary}~; \textbf{tant qu'il
+    ne l'est pas, la mesure fait foi}. Sous Windows, l'indépendance de la
+    plateforme reste une \textbf{hypothèse} jusqu'à sa mesure (décision M61,
+    issue~\#49)~; sous macOS, elle n'est pas mesurée.
+  \item \textbf{Constat de mesure}~: 0~écart à la glibc~2.39 et 0~écart à
+    Python~3.13.17 sur 1\,177\,468 doubles finis, dont 68\,886 égalités
+    exactes, pour le prototype
+    \code{tests/mesures/ecriture\_17g/ecriture\_17g.R}, dont le code du
+    moteur est repris, hors plateforme de référence (rapport de mesure de
+    l'étape~(3a), pull request~\#116~; prototype et scripts de mesure
+    conservés sous \code{tests/mesures/ecriture\_17g/}, hors batterie et
+    sans seuil)~; puis, pour le moteur, 0~écart à la
+    glibc~2.35 et 0~écart à Python~3.10.12 sur 2\,423\,344 doubles, sur la
+    plateforme de référence (contrôle
+    \code{tests/controles/ecriture\_doubles\_texte.R}, exécution
+    40308275084 de la CI, commit \code{3b42737}). Le constat vaut donc sous
+    deux versions de la glibc et deux de Python~; que le juge Python soit
+    indépendant de la glibc pour les chiffres est une \textbf{hypothèse}
+    (CPython a sa propre conversion, dont la source n'a pas été relue).
+  \item \textbf{Relecture}~: inchangée par l'issue~\#104, \emph{constat de
+    mesure} sous glibc, non une preuve (ci-dessus, «~Deux formes, un seul
+    écrivain~»). Pour un texte écrit par \code{tablexp}, le contrôle
+    «~réécrire la valeur relue redonne le texte~» déciderait l'aller-retour
+    texte par texte sur toute plateforme, dix-sept chiffres correctement
+    arrondis désignant un seul double~; ce contrôle n'est pas implanté dans
+    le lecteur des références (section~\ref{sec:non-regression}), qui
+    compare hors Windows le texte lu à \code{sprintf} de la bibliothèque C
+    et n'en contrôle sous Windows que la forme.
+\end{itemize}
+Les témoins de la batterie unitaire et le contrôle à deux juges sont décrits
+à la section~\ref{sec:verifications-rapport}.
 
 \subsection{Empreintes du résultat et du code}
 \label{sec:empreinte-resultat}
@@ -6132,12 +6367,14 @@ l'écriture \code{\%.17g} que l'export réécrit. Un décimal non nul relu~0
 M66)~: l'erreur relative serait de 100~\%, et un délai de déclaration écrit
 \code{1e-400} passerait la validation comme~0. \textbf{Statut} de
 l'aller-retour~: exact pour tous les types sauf \code{double}~; pour un
-double, celui de la forme «~texte~» (section~\ref{sec:empreinte}~: écriture
-correctement arrondie et relecture exacte constatée sous glibc, non
-démontrée). Un texte écrit sous Windows, dont le dix-septième chiffre peut
+double, celui de la forme «~texte~» (section~\ref{sec:empreinte}, «~Écriture
+«~texte~» des doubles~»~: écriture correctement arrondie, établie par une
+esquisse de preuve à valider et constatée par deux juges~; relecture exacte
+constatée sous glibc, non démontrée). Un texte écrit sous Windows par la
+bibliothèque C, avant l'issue~\#104, dont le dix-septième chiffre pouvait
 différer, se relit en le même double dans le cas testé~: c'est un
 \emph{constat de mesure}, que contredisent d'autres cas~: sous Windows, sur
-551\,008 textes \code{\%.17g}, 5 ont été relus en un autre double, tous
+551\,008 textes \code{\%.17g} de la bibliothèque C, 5 ont été relus en un autre double, tous
 d'exposant supérieur à 266 (constat sur le poste du mainteneur, ADR 0011,
 point~3.2).
 
@@ -6607,7 +6844,44 @@ Python, hors de R. Le contrôle \code{tests/controles/ecriture\_doubles.R},
 recoupement à $10^6$ doubles et aux cas limites, ligne à ligne, et sort avec
 un code non nul sur un écart ou si Python est absent~; il ne s'exécute pas
 sous Windows, où le texte \code{\%.17g} qu'il transmet au juge n'est pas
-toujours correctement arrondi. Les dates sont vérifiées sur quatre chiffres
+toujours correctement arrondi.
+
+\medskip
+\textbf{Écriture «~texte~» des doubles} (\code{octets\_17g()}, issue~\#104~;
+section~\ref{sec:empreinte}, «~Écriture «~texte~» des doubles~»). Dans
+\code{tests/unitaires/test\_construire\_table.R}, aucun test ne prend
+\code{sprintf()} pour juge~; les entrées sont construites par leurs octets
+(\code{readBin()}) ou par des opérations exactes (divisions par~2, produits
+d'entiers inférieurs à $2^{53}$), sans lecture d'un décimal, et les attendus
+sont ceux de deux juges extérieurs à \code{tablexp}, la glibc
+(\code{sprintf("\%.17g", x + 0)} de R) et Python (\code{format(x + 0.0,
+'.17g')}), identiques entre eux~: \emph{T1}, 29~doubles (sous-normaux,
+bornes du format, frontières de notation, égalités exactes et leurs
+voisins), textes attendus écrits en dur~; \emph{T2}, les égalités exactes
+énumérées sans générateur ($m$ impair, $m \cdot 5^{n} \in [10^{17},
+10^{18})$, $n$ de~2 à~25, $x = m \cdot 2^{-n}$), leurs voisins à $\pm 1$~ulp
+et leurs opposés, et \emph{T3}, $10^{5}$ doubles tirés sous graine par leurs
+octets, chacun comparé par le MD5 du texte attendu~; les jetons des
+non-finis (\code{NA}, \code{NA + 1}, \code{NaN}, \code{-NaN} donné par ses
+octets, \code{Inf}, \code{-Inf}), les longueurs~0 et~1 et le mélange de
+finis et de non-finis~; \code{.Random.seed} inchangé par l'écriture~; la
+table des puissances égale à son recalcul, entière, aux tranches dans
+$[0, 10^{7})$. \code{tests/unitaires/test\_serialisation.R} vérifie sans
+condition de plateforme l'écriture d'un niveau construit par ses octets
+(\code{4.8005694404694591e-06}, que la bibliothèque C de Windows écrit
+\code{4.800569440469459e-06}) et la relecture de ces deux textes en le même
+double (constat de mesure). Le contrôle
+\code{tests/controles/ecriture\_doubles\_texte.R}
+(tableau~\ref{tab:scripts-controle}), \textbf{hors batterie} (durée,
+dépendance à Python) et exécuté par une étape de la CI, recoupe l'écriture
+du moteur sur plus de $10^{6}$ doubles, compare chaque ligne aux deux
+juges, exige le nombre d'égalités exactes de chaque partie et recalcule les
+MD5 de T2 et de T3. \textbf{Statut}~: les attendus sont des \emph{constats}
+de deux juges, non des valeurs démontrées~; l'arrondi correct relève de
+l'esquisse de preuve.
+
+\medskip
+Les dates sont vérifiées sur quatre chiffres
 d'année (0001, 0019, 0999, 9999), sur tous les jours de 1930 à 2024
 (identiques à l'écriture de \code{format.Date}, si bien que les références,
 dont les dates sont dans cet intervalle, n'ont pas changé), avec les jetons
@@ -6777,7 +7051,10 @@ l'échappement de modalités et de noms de colonne qui contiennent
 \code{<}, \code{>}, \code{\&} et \code{"}~; l'ordre des sections et la
 concordance de leurs étapes avec \code{ETAPES}~; la couverture de l'objet par
 les racines~; les mentions «~non demandée par le plan~»~; l'égalité de
-chaque cellule décimale à l'écriture \code{\%.17g} de sa valeur~; la
+chaque cellule décimale à l'écriture «~texte~» de sa valeur par l'écrivain
+du moteur (\code{ecrire\_valeurs()}, et non plus \code{sprintf()}~: ce
+test vérifie que les cellules passent par l'écrivain, dont l'exactitude
+relève des témoins T1 à T3 et du contrôle à deux juges, ci-dessus)~; la
 présence, dans le rapport, de chaque ligne du corps de la fiche écrite~; le
 contrôle statique des noms interdits, sur un témoin et sur
 \code{R/rapport.R}~; les textes fixes et leur place (légendes du tableau des
@@ -6824,7 +7101,15 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{octets\_lignes\_indices()} & interne & textes ASCII, indices sans \code{NA} & octets des lignes \code{textes[i]}, égaux à ceux d'\code{octets\_lignes()} sur ces lignes~; chaque texte écrit une fois, ses octets recopiés par indice (\code{sequence()})~; écriture des dates (issue~\#71) \\
 \catalogue{fonctions-rapport}{octets\_entiers()} & interne & entiers (\code{integer}) & octets de \code{sprintf("\%d", x)}, une valeur par ligne, écrits en octets sans chaîne intermédiaire~; écriture des entiers (issue~\#71) \\
 \catalogue{fonctions-rapport}{texte\_date()} & interne & jours depuis 1970-01-01, entiers, finis, dans le domaine & écriture ISO~8601 AAAA-MM-JJ, année sur quatre chiffres~; partagée par \code{ecrire\_valeurs()} et le contrôle de canonicité du lecteur (\code{valeurs\_texte()}) \\
-\catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g})~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique}, et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
+\catalogue{fonctions-rapport}{BASE\_TRANCHES} & constante & --- & base $10^{7}$ des tranches des grands entiers de l'écriture «~texte~» des doubles (section~\ref{sec:empreinte}, «~Écriture «~texte~» des doubles~»), poids faible d'abord~; produits et sommes de tranches restent des entiers inférieurs à $2^{53}$ (I3) \\
+\catalogue{fonctions-rapport}{diviser\_tranche()} & interne & entiers de $[0, 2^{53})$ (vecteur ou matrice) & quotient et reste exacts par la base, quel que soit l'arrondi du quotient (correction d'une unité~; I4)~; ni \code{\%\%} ni \code{\%/\%} sur des doubles \\
+\catalogue{fonctions-rapport}{reporter\_retenues()} & interne & matrice de tranches (une ligne par entier) & tranches dans $[0, 10^{7})$, retenues reportées jusqu'à épuisement~; arrêt en erreur de programmation si la dernière tranche produit une retenue \\
+\catalogue{fonctions-rapport}{table\_puissances\_tranches()} & interne & --- & table des puissances~: $5^{-e}$ si $e < 0$, $2^{e}$ sinon, $e$ de $-1074$ à $1023$, en tranches (matrice et longueur de chaque ligne), par multiplications successives par~5 et par~2 \\
+\catalogue{fonctions-rapport}{PUISSANCES\_TRANCHES} & constante & --- & table des puissances, calculée à l'installation~; 2\,098~lignes, 108~tranches au plus \\
+\catalogue{fonctions-rapport}{chiffres\_17()} & interne & doubles finis $> 0$ & dix-sept chiffres arrondis au plus proche, égalité vers le pair, et exposant décimal (I1 à I5)~; entier décimal exact calculé en tranches, groupé par classe de longueur de la table \\
+\catalogue{fonctions-rapport}{positions\_17g()} & interne & doubles finis non nuls & octets ASCII de la forme \code{\%.17g} (notation fixe ou à exposant, zéros de fin retirés, signe), une colonne par valeur \\
+\catalogue{fonctions-rapport}{octets\_17g()} & interne & doubles & octets de l'écriture «~texte~», une valeur par ligne, LF final~; \code{x + 0}, jetons \code{NA}, \code{NaN}, \code{Inf}, \code{-Inf} lus sur la valeur reçue~; par blocs de $2^{14}$ valeurs~; appelée par \code{ecrire\_valeurs()} \\
+\catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g}, calculé par \code{octets\_17g()}, issue~\#104)~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique}, et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
 \catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire \\
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
