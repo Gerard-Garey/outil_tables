@@ -786,3 +786,20 @@ Les mesures de ces sources ont été faites sous R 4.3.3, glibc 2.39 et Python 3
 - La voie V3.
 
 Issues : #104, #107 ; #35 (constat de l'UCRT, contexte, point 1) ; #49 (Windows, macOS) ; #101 (`md5sum -t` sous Windows). Décisions M148, M151, M161. ADR 0012 (point 2.3, annotation du 26/10/2026). Branche `claude/ecriture-portable`, PR #116.
+
+## Annotation du 26 octobre 2026 (seconde) — annotation du matin, (c) 2, (d) 2 et (e) 4 : preuve I1 à I5 validée sous l'hypothèse H (#104) ; portée Windows de `md5sum -t` mesurée (#107)
+
+Rédigée par `architect` à l'étape (6) de la branche `claude/ecriture-portable` (PR #116), à `73e31cb`. Le texte ci-dessus, annotations comprises, n'est pas réécrit : la présente note dit seulement comment lire trois points de l'annotation du matin.
+
+**(a) Points (c) 2 et (d) 2 : la preuve n'est plus une « esquisse à valider ».**
+- `actuary-approfondi` a validé la preuve I1 à I5, rédigée par `docwriter` dans `docs/latex/`, **sous l'hypothèse H** : les opérations +, −, ×, / de R sont celles de la norme IEC 60559, correctement arrondies. H dépasse l'aide de `double`, qui n'exige que des *valeurs* IEC 60559. La documentation porte ce texte depuis `4dc15fa`.
+- Statut : **résultat exact sous H** pour les dix-sept chiffres et l'exposant. La mise en forme (`positions_17g()` : notation, zéros de fin, signe) reste un **constat de mesure**. Sous Windows, H et l'identité des octets restent une *hypothèse* jusqu'à l'étape (5) (M153) ; sous macOS, rien n'est mesuré (M61, #49).
+- Le point (c) 2 (« tant que la preuve n'est pas validée, la mesure fait foi ») se lit donc ainsi : sous glibc, preuve sous H et constat de mesure concordent ; ailleurs, le statut est celui du point précédent. Le point (d) 2 se lit : « sur toute plateforme qui satisfait H, écriture exacte par construction (preuve I1 à I5, validée par `actuary`), mesurée sous glibc ». La première puce de « Ce que l'annotation ne règle pas » est réglée.
+
+**(b) Point (e) 4 : la portée Windows de `md5sum -t` est un constat de mesure, non un rapport.**
+- Constat de mesure **sur le poste du mainteneur**, à une version antérieure du code : Rtools 4.3, coreutils 8.32, relevé du 25/10/2026 à `1c48475` (#49, https://github.com/Gerard-Garey/outil_tables/issues/49#issuecomment-6396525123). Sans `-t`, `6fb4e0c8…` ; avec `-t`, `660565ff…`, égal à `EMPREINTE_CODE`. La documentation porte ce texte depuis `28dfc64`.
+- Ce n'est pas une mesure à l'état final de la branche : la remesure reste prévue à l'étape (5).
+
+**Effet sur les résultats : aucun.** Aucun code n'est modifié par la présente note.
+
+Issues : #104, #107 ; #49. Décisions M153, M61. Branche `claude/ecriture-portable`, PR #116.
