@@ -210,12 +210,34 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      # Cache des archives .deb de l'étape suivante (actions/cache, action de
+      # GitHub, épinglée par SHA) : le miroir d'Ubuntu sert parfois
+      # texlive-fonts-extra (629 Mo) trop lentement pour le délai du job
+      # (« Paquets TeX » annulé au délai de 20 min : ed5221a, aa1cf0b). Le
+      # cache n'apporte que des archives : apt les vérifie contre l'index
+      # signé avant de les installer et télécharge celles qui manquent ou ont
+      # changé ; les versions installées restent celles de l'index, affichées
+      # par dpkg-query. Clé : contenu de ci.yml (liste des paquets) ; une clé
+      # nouvelle repart du dernier cache (restore-keys), purgé des archives
+      # que l'index ne sert plus (autoclean). Sauvegarde après un job réussi.
+      - name: Cache des paquets TeX
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/paquets-tex
+          key: paquets-tex-ubuntu-24.04-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: paquets-tex-ubuntu-24.04-
       - name: Paquets TeX
         run: |
           set -euo pipefail
           paquets="texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-lang-french texlive-pictures texlive-plain-generic"
+          archives="$HOME/paquets-tex"
+          mkdir -p "$archives/partial"
+          echo "Archives restaurées du cache : $(find "$archives" -maxdepth 1 -name '*.deb' | wc -l)"
           sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends $paquets
+          sudo apt-get install -y -q --no-install-recommends -o Acquire::Retries=3 -o Dir::Cache::Archives="$archives" $paquets
+          sudo apt-get -q -o Dir::Cache::Archives="$archives" autoclean
+          sudo rm -rf "$archives/partial" "$archives/lock"
+          echo "Archives après installation : $(find "$archives" -maxdepth 1 -name '*.deb' | wc -l) ($(du -sh "$archives" | cut -f1))"
           dpkg-query -W -f='${Package} ${Version}\n' $paquets
           pdflatex --version | sed -n 1p
       - name: Compilation de docs/latex/doc_outil_tables.tex
