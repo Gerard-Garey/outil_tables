@@ -6279,9 +6279,12 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     relevé, donc l'empreinte (issue~\#101). \textbf{Portée}~: sous GNU/Linux,
     \emph{constat de mesure} (coreutils~9.4)~: avec ou sans \code{-t}, la
     commande rend la valeur de \code{empreinte\_sources()}, et avec
-    \code{-b} une autre valeur~; sous Windows avec Rtools ou MSYS2
-    (coreutils~8.32), la valeur juste avec \code{-t} est \emph{rapportée}
-    (issue~\#101), non mesurée sur la plateforme de référence~; sous macOS,
+    \code{-b} une autre valeur~; sous Windows avec Rtools~4.3
+    (MSYS2, coreutils~8.32), \emph{constat de mesure sur le poste du
+    mainteneur}, à une version antérieure du code (relevé du 25/10/2026 à
+    \code{1c48475}, issues~\#49 et~\#101)~: sans \code{-t}, une autre
+    valeur~; avec \code{-t}, celle de \code{EMPREINTE\_CODE}. À remesurer
+    à l'étape~(5)~; sous macOS,
     \textbf{non mesurée} (décision M61)~: le \code{md5sum} de GNU n'y est
     pas installé par défaut (hypothèse), et la commande ne vaut qu'avec lui,
     d'où la mention «~GNU coreutils~» dans le libellé.
