@@ -6167,14 +6167,23 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     texte concaténé~: une ligne \code{<md5>}, deux espaces,
     \code{R/<fichier>}, LF, par fichier, les fichiers triés par octets
     (ADR 0011, septième annotation du 20/10/2026, (d)). Ce relevé est la
-    sortie de \code{md5sum}, si bien qu'un tiers recalcule l'empreinte depuis
-    la racine des sources par \code{LC\_ALL=C md5sum R/*.R | md5sum}, la
-    locale \code{C} fixant l'ordre des fichiers~; sous Windows, le
-    \code{md5sum} de Rtools (MSYS2) écrit par défaut en mode binaire et
-    préfixe les noms par «~*~», et la commande s'écrit
-    \code{LC\_ALL=C md5sum -t R/*.R | md5sum}, l'option \code{-t} (mode
-    texte) étant sans effet sur la sortie du \code{md5sum} de GNU sous Linux
-    (issue~\#101).
+    sortie de \code{md5sum} de GNU coreutils, si bien qu'un tiers recalcule
+    l'empreinte depuis la racine des sources par
+    \code{LC\_ALL=C md5sum -t R/*.R | md5sum}, commande donnée aux tiers
+    par la fiche elle-même (libellé ci-dessous~; issue~\#107, décision M151~;
+    ADR 0011, annotation du 26/10/2026, (e)), la locale \code{C} fixant
+    l'ordre des fichiers. L'option \code{-t} (mode texte) est
+    nécessaire sous Windows~: le \code{md5sum} de Rtools (MSYS2) lit par
+    défaut en mode binaire et préfixe les noms par «~*~», ce qui change le
+    relevé, donc l'empreinte (issue~\#101). \textbf{Portée}~: sous GNU/Linux,
+    \emph{constat de mesure} (coreutils~9.4)~: avec ou sans \code{-t}, la
+    commande rend la valeur de \code{empreinte\_sources()}, et avec
+    \code{-b} une autre valeur~; sous Windows avec Rtools ou MSYS2
+    (coreutils~8.32), la valeur juste avec \code{-t} est \emph{rapportée}
+    (issue~\#101), non mesurée sur la plateforme de référence~; sous macOS,
+    \textbf{non mesurée} (décision M61)~: le \code{md5sum} de GNU n'y est
+    pas installé par défaut (hypothèse), et la commande ne vaut qu'avec lui,
+    d'où la mention «~GNU coreutils~» dans le libellé.
   \item \sloppy \textbf{Calcul}~: \code{EMPREINTE\_CODE}, constante de premier niveau
     de \code{R/rapport.R}, vaut \code{empreinte\_sources(".")}. Elle est
     évaluée une seule fois, pendant \code{R CMD INSTALL}, qui exécute le code
@@ -6235,8 +6244,8 @@ moteur marqué UTF-8 (décision M71, point~3). Les trois libellés sont~:
   \item «~résultat~: témoin d'identité sur la même machine seulement (E3.6,
     E4.6), jamais critère de rejeu chez un tiers~»~;
   \item «~code~: MD5 du relevé des MD5 des fichiers \code{R/*.R}, fait à
-    l'installation (recalcul depuis la racine des sources~:
-    \code{LC\_ALL=C md5sum R/*.R | md5sum})~; identifie le texte source, non
+    l'installation (recalcul depuis la racine des sources, avec le md5sum de
+    GNU coreutils~: \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; identifie le texte source, non
     le comportement numérique, qui dépend aussi de R, du BLAS et de la
     libm~»~;
   \item «~code~: non calculée, sources introuvables à l'installation~».
@@ -7118,7 +7127,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{md5\_octets()} & interne & octets & MD5 des octets, écrits en binaire dans un fichier temporaire supprimé à la sortie \\
 \catalogue{fonctions-rapport}{CHEMINS\_HORS\_RESULTAT} & constante & --- & liste fermée des sept chemins hors du périmètre de l'empreinte du résultat (section~\ref{sec:empreinte-resultat}) \\
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture \\
-\catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
+\catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
 \catalogue{fonctions-rapport}{MENTION\_BIBLIOTHEQUE\_C\_NON\_RELEVEE} & constante & --- & mention «~non relevée~» de \code{fiche\$plateforme\$}\allowbreak\code{bibliotheque\_c}, quand la valeur lue est absente, \code{NA}, vide ou faite de blancs, ou n'est pas un texte (section~\ref{sec:fiche}) \\
