@@ -681,11 +681,17 @@ controler_rapport_fige <- function(x, l, id) {
   sec <- sub("^<section id=\"([a-z_]+)\">$", "\\1", grep("^<section id=", l, value = TRUE))
   nav <- sub("^<li><a href=\"#([a-z_]+)\">.*$", "\\1", grep("^<li><a href=\"#", l, value = TRUE))
   if (!identical(sec, S$section) || !identical(nav, S$section)) e <- c(e, "U14 : sections ou nav")
-  # U18 : cellules décimales en %.17g.
+  # U18 : cellules décimales égales à l'écriture « texte » de l'écrivain
+  # unique du moteur (ecrire_valeurs(), #104) : U18 vérifie que les cellules
+  # passent par cet écrivain ; son exactitude (%.17g correctement arrondi)
+  # relève des témoins T1 à T3 de la batterie unitaire et du contrôle
+  # tests/controles/ecriture_doubles_texte.R. Aucune condition de plateforme.
   td <- unlist(regmatches(l, gregexpr("<td>[^<]*(<br>[^<]*)*</td>", l)))
   c_ <- unlist(strsplit(sub("^<td>(.*)</td>$", "\\1", td), "<br>", fixed = TRUE))
   d <- c_[grepl("^[-+]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][-+]?[0-9]+)?$", c_)]
-  if (!length(d) || any(d != sprintf("%.17g", as.numeric(d)))) e <- c(e, "U18 : cellule décimale hors %.17g")
+  ecrit <- if (length(d)) strsplit(rawToChar(tablexp:::ecrire_valeurs(as.numeric(d), "texte", "x")$octets), "\n",
+                                   fixed = TRUE)[[1L]]
+  if (!length(d) || any(d != ecrit)) e <- c(e, "U18 : cellule décimale hors de l'écriture du moteur")
   if (id == "R2") { if (!any(grepl(">0.98999999999999999<", l, fixed = TRUE))) e <- c(e, "U18 : niveau 0,99") }
   else if (!any(grepl(">0.94999999999999996<", l, fixed = TRUE)) || any(grepl(">0.95<", l, fixed = TRUE)))
     e <- c(e, "U18 : niveau 0,95")
