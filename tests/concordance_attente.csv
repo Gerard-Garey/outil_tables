@@ -1,9 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-rapport:BASE_TRANCHES,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
-entree,fonctions-rapport:diviser_tranche,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
-entree,fonctions-rapport:reporter_retenues,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
-entree,fonctions-rapport:table_puissances_tranches,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
-entree,fonctions-rapport:PUISSANCES_TRANCHES,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
-entree,fonctions-rapport:chiffres_17,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
-entree,fonctions-rapport:positions_17g,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
-entree,fonctions-rapport:octets_17g,#104,"écriture %.17g calculée par tablexp (étape (3b)) ; catalogue écrit par docwriter en fin de branche, étape (6)"
