@@ -450,8 +450,8 @@ verifier(paste("fiche : empreintes (algorithme md5 nommé ; données, résultat 
            identical(f$empreintes$statut_resultat_code, paste(
              "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un",
              "tiers ; code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine",
-             "des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement numérique,",
-             "qui dépend aussi de R, du BLAS et de la libm")) &&
+             "des sources, avec le md5sum de GNU coreutils : LC_ALL=C md5sum -t R/*.R | md5sum) ; identifie le texte source,",
+             "non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm")) &&
            identical(Encoding(f$empreintes$statut_resultat_code), "UTF-8"))
 verifier("fiche : versions (tablexp, R) et plateforme (sysname, release, machine, blas, lapack, bibliotheque_c) (#77)",
          identical(names(f$versions), c("tablexp", "R")) && identical(f$versions$R, R.version.string) &&
@@ -1099,6 +1099,119 @@ local({
     d <- match(as.integer(o[o != as.raw(0x0a)]), c(48:57, 97:102)) - 1L
     b <- as.raw(d[c(TRUE, FALSE)] * 16L + d[c(FALSE, TRUE)])
     length(o) == 17L * length(ech) && identical(readBin(b, "double", n = length(ech), size = 8L, endian = "little"), ech + 0)
+  })
+
+  # Forme « texte » : %.17g correctement arrondi, calculé par tablexp
+  # (octets_17g(), #104 ; M148 ; avis d'actuary sur (3b)). Le test n'appelle
+  # jamais sprintf() comme juge. Entrées construites par readBin() d'octets ou
+  # par des opérations IEEE exactes (divisions par 2, produits d'entiers
+  # < 2^53), sans as.numeric() d'un décimal ni libm ; générateur sous
+  # sous_graine(). Natures des attendus : valeurs calculées hors de tablexp
+  # par deux juges, la glibc (sprintf("%.17g", x + 0) de R 4.3.3, glibc 2.39)
+  # et Python 3.13 (format(x + 0.0, '.17g') sur les octets relus par
+  # struct.unpack('<d')), identiques entre eux et au moteur (T1 : textes
+  # écrits en dur ; T2, T3 : MD5 du texte attendu, produits par les scripts
+  # de l'avis d'actuary, q3/temoins.R et q3/t3.R, sur le prototype de
+  # tests/mesures/ecriture_17g/ecriture_17g.R) ; recoupement hors batterie
+  # sur plus de 10^6 doubles par tests/controles/ecriture_doubles_texte.R, qui
+  # recalcule ces MD5 et les compare à ceux-ci (non une assertion de la
+  # batterie).
+  de_hex <- function(h) readBin(as.raw(strtoi(substring(h, seq(15L, 1L, -2L), seq(16L, 2L, -2L)), 16L)),
+                                "double", n = 1L, size = 8L, endian = "little")
+  md5_texte <- function(o) { f <- tempfile(); writeBin(o, f); m <- unname(tools::md5sum(f)); unlink(f); m }
+  verifier("écriture %.17g, T1 : 29 doubles construits par leurs octets (sous-normaux, bornes, frontières de notation, égalités exactes, voisins), texte des deux juges glibc et Python", {
+    cas <- c("0000000000000001", "4.9406564584124654e-324", "8000000000000001", "-4.9406564584124654e-324",
+             "000fffffffffffff", "2.2250738585072009e-308", "0010000000000000", "2.2250738585072014e-308",
+             "7fefffffffffffff", "1.7976931348623157e+308", "ffefffffffffffff", "-1.7976931348623157e+308",
+             "4341c37937e07fff", "9999999999999998", "4341c37937e08000", "10000000000000000",
+             "4376345785d89fff", "99999999999999984", "4376345785d8a000", "1e+17",
+             "4376345785d8a001", "1.0000000000000002e+17", "3f1a36e2eb1c432d", "0.0001",
+             "3f1a36e2eb1c432c", "9.9999999999999991e-05", "3ee4f8b588e368f1", "1.0000000000000001e-05",
+             "54b249ad2594c37d", "1e+100", "2b2bff2ee48e0530", "1e-100",
+             "4340000000000000", "9007199254740992", "4340000000000001", "9007199254740994",
+             "43e0000000000000", "9.2233720368547758e+18", "3ed422927add0ecb", "4.8005694404694591e-06",
+             "3ed422927add0ecc", "4.8005694404694599e-06", "3e60000000000000", "2.9802322387695312e-08",
+             "4310000000000001", "1125899906842624.2", "3d06849b86a12b9b", "1e-14",
+             "5fb317e5ef3ab327", "1e+153", "009c16c5c5253575", "1e-305",
+             "0000000000000000", "0", "8000000000000000", "0")
+    cas <- matrix(cas, 2L)
+    x <- vapply(cas[1L, ], de_hex, 0)
+    deux_m25 <- 1; for (i in 1:25) deux_m25 <- deux_m25 / 2
+    x <- c(x, 3 * deux_m25)
+    attendu <- c(cas[2L, ], "8.9406967163085938e-08")
+    l <- lignes(unname(x), "texte")
+    if (identical(l, attendu)) TRUE
+    else paste(sprintf("%s -> %s", attendu, l)[l != attendu], collapse = " ; ")
+  })
+  verifier("écriture %.17g, non finis : NA, NA + 1, NaN, -NaN (octets), Inf, -Inf -> NA, NA, NaN, NaN, Inf, -Inf ; longueurs 0 et 1 ; mélange de finis et de non finis, positions conservées", {
+    moins_nan <- de_hex("fff8000000000000")
+    nf <- c(NA_real_, NA_real_ + 1, NaN, moins_nan, Inf, -Inf)
+    un_demi <- de_hex("3fe0000000000000")
+    is.nan(moins_nan) &&
+      identical(lignes(nf, "texte"), c("NA", "NA", "NaN", "NaN", "Inf", "-Inf")) &&
+      identical(ev(numeric(0), "texte", "x")$octets, raw(0)) && identical(tablexp:::octets_17g(numeric(0)), raw(0)) &&
+      identical(texte(un_demi, "texte"), "0.5\n") && identical(texte(NA_real_, "texte"), "NA\n") &&
+      identical(lignes(c(nf[1:3], un_demi, -0, nf[4:6], -un_demi, de_hex("0000000000000001")), "texte"),
+                c("NA", "NA", "NaN", "0.5", "0", "NaN", "Inf", "-Inf", "-0.5", "4.9406564584124654e-324"))
+  })
+  verifier("écriture %.17g : .Random.seed inchangé après l'écriture (aucun tirage)", {
+    graine <- function() if (exists(".Random.seed", globalenv())) get(".Random.seed", globalenv())
+    avant <- graine()
+    ev(c(ech[1:1000], NA, NaN, Inf), "texte", "x")
+    identical(graine(), avant)
+  })
+  verifier("écriture %.17g, table des puissances : constante d'installation égale à son recalcul (identical), 2 098 lignes, 108 tranches au plus, tranches entières dans [0, 10^7), ligne 1075 égale à 1", {
+    tp <- tablexp:::PUISSANCES_TRANCHES
+    tr <- tp$tranches
+    identical(tp, tablexp:::table_puissances_tranches()) && nrow(tr) == 2098L && length(tp$longueur) == 2098L &&
+      max(tp$longueur) == 108L && ncol(tr) == 108L && all(tr >= 0 & tr < 1e7 & tr == floor(tr)) &&
+      tp$longueur[1075L] == 1L && identical(tr[1075L, ], c(1, rep(0, 107L)))
+  })
+  verifier("écriture %.17g, T2 : égalités exactes énumérées sans générateur (m impair, m·5^n dans [10^17, 10^18), n de 2 à 25, x = m·2^-n), voisins à ±1 ulp et opposés : 121 308 doubles, MD5 du texte des juges", {
+    # Construction de q3/temoins.R (témoin A de l'avis d'actuary), recopiée.
+    puissance <- function(b, n) { p <- 1; for (i in seq_len(n)) p <- p * b; p }
+    dix17 <- puissance(10, 17); dix18 <- puissance(10, 18); deux53 <- puissance(2, 53); deux32 <- puissance(2, 32)
+    egalites <- unlist(lapply(2:25, function(n) {
+      p5 <- puissance(5, n)
+      d2 <- 1; for (i in seq_len(n)) d2 <- d2 / 2
+      lo <- ceiling(dix17 / p5); hi <- min(floor(dix18 / p5), deux53 - 1)
+      while (lo * p5 < dix17) lo <- lo + 1
+      while (hi * p5 >= dix18) hi <- hi - 1
+      if (lo %% 2 == 0) lo <- lo + 1
+      if (hi %% 2 == 0) hi <- hi - 1
+      nb <- (hi - lo) / 2 + 1
+      m <- if (nb <= 1000) seq(lo, hi, by = 2) else unique(c(lo + 2 * floor((0:999) * ((nb - 1) / 999)), lo + 2, hi - 2))
+      m * d2
+    }))
+    # Voisins à ±1 ulp par les bits : mots de 32 bits (hi, lo) des octets
+    # petit-boutistes, lo ± 1 avec report sur hi.
+    mots <- function(v) {
+      o <- matrix(as.integer(writeBin(v, raw(), size = 8L, endian = "little")), 8L)
+      list(hi = ((o[8L, ] * 256 + o[7L, ]) * 256 + o[6L, ]) * 256 + o[5L, ],
+           lo = ((o[4L, ] * 256 + o[3L, ]) * 256 + o[2L, ]) * 256 + o[1L, ])
+    }
+    de_mots <- function(hi, lo) {
+      o <- matrix(as.raw(0), 8L, length(hi))
+      for (k in 1:4) { o[k, ] <- as.raw(lo %% 256); lo <- lo %/% 256 }
+      for (k in 5:8) { o[k, ] <- as.raw(hi %% 256); hi <- hi %/% 256 }
+      readBin(as.vector(o), "double", n = length(hi), size = 8L, endian = "little")
+    }
+    voisin <- function(v, k) {
+      w <- mots(v); lo <- w$lo + k; hi <- w$hi
+      b <- lo < 0; lo[b] <- lo[b] + deux32; hi[b] <- hi[b] - 1
+      b <- lo >= deux32; lo[b] <- lo[b] - deux32; hi[b] <- hi[b] + 1
+      de_mots(hi, lo)
+    }
+    a <- c(egalites, voisin(egalites, -1), voisin(egalites, 1))
+    a <- c(a, -a)
+    m <- md5_texte(ev(a, "texte", "x")$octets)
+    if (length(a) == 121308L && identical(m, "984842c362108e4bae2a28ee0b3332bc")) TRUE
+    else sprintf("%d doubles, MD5 %s au lieu de 984842c362108e4bae2a28ee0b3332bc", length(a), m)
+  })
+  verifier("écriture %.17g, T3 : échantillon de 10^5 doubles « bits seulement » (graine 20261019, recette de la forme empreinte), MD5 du texte des juges", {
+    m <- md5_texte(ev(ech, "texte", "x")$octets)
+    if (identical(m, "eb6320f37c34702827a4b66fa6f0b5c4")) TRUE
+    else sprintf("MD5 %s au lieu de eb6320f37c34702827a4b66fa6f0b5c4", m)
   })
 
   # Empreinte des données : NA et NaN se distinguent ; les variantes d'octets

@@ -240,3 +240,22 @@ Rédigée par `architect` d'après les deux spécifications d'`actuary-approfond
 **Effet sur les résultats : aucun.** Objet, fiche (octets compris), `VERSION_FICHE` et références inchangés ; seule l'empreinte du code change à chaque commit sous `R/`, comparée par jeton (point 1.5).
 
 Issues : #86, #87. Décisions M107 à M114 (M112 levée par (a) 6). Branche `claude/rapport-fige`, PR #88.
+
+## Annotation du 26 octobre 2026 — point 2.3 : la forme « texte » des doubles est calculée par `tablexp`, sans la bibliothèque C (#104)
+
+Rédigée par `architect-approfondi` à l'étape (3c) de la branche `claude/ecriture-portable` (B10, PR #116), avec l'annotation du 26/10/2026 de l'ADR 0011 ; décision du mainteneur M161. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne relevés à `3b42737` ; le nom de l'objet fait foi (M77, (b)).
+
+1. **Constat.** Le point 2.3 décrit le double écrit par `ecrire_valeurs(x, "texte")` comme `sprintf("%.17g", x + 0)`. C'est inexact depuis `3b42737`. La fermeture `doubles_texte()` (`R/rapport.R:561`) appelle désormais `octets_17g()` (`R/rapport.R:474`).
+2. **Lecture du point 2.3.** Le passage se lit : « double fini de `x + 0` en 17 chiffres significatifs, forme `%.17g` de la norme C, arrondi au plus proche, égalité vers le chiffre pair, calculé par `tablexp` sans la bibliothèque C ».
+   - Sous glibc, les octets écrits sont les mêmes qu'avant. Ils ont été mesurés à 0 écart à la glibc et à Python (ADR 0011, annotation du 26/10/2026, (c)).
+   - Sous Windows, des octets identiques à ceux de la glibc restent une *hypothèse*, que l'étape (5) mesurera.
+3. **La règle du point 2.3 ne change pas.**
+   - Un seul écrivain, sans arrondi.
+   - Rapport, fiche écrite et `.tsv` identiques caractère pour caractère.
+   - Mêmes interdits sur un double : `format()`, `formatC()`, `prettyNum()`, `as.character()`, `paste()`. `octets_17g()` n'en emploie aucun ; le relevé figure au § 7 du rapport de (3a), https://github.com/Gerard-Garey/outil_tables/pull/116#issuecomment-6411554386.
+   - La phrase citée de la ligne `doubles` de `CONVENTIONS_TEXTE`, « relecture au bit près constatée sous glibc, non garantie ailleurs », figure mot pour mot dans le nouveau libellé (`R/rapport.R:1026-1029`). La reprise qu'en fait le document reste donc exacte. Le libellé complet a changé : seul `docwriter` (étape (6)) cite le nouveau texte.
+4. **Le contexte de l'ADR reste vrai.** Sa ligne « Écriture des nombres sous `OutDec = ","`… » est une mesure datée de `sprintf`. Elle reste vraie, mais l'écrivain du rapport ne passe plus par `sprintf` pour un double.
+
+**Effet sur les résultats : aucun** par la présente annotation. Le seul effet de `3b42737` sur les six rapports figés de R1 à R6 porte sur la ligne « doubles » des conventions et sur l'empreinte du code (pied du rapport et tableau de la fiche) (tableau avant / après du commit, visa d'`actuary`).
+
+Issues : #104. ADR 0011 (annotation du 26/10/2026). Décision M161. Branche `claude/ecriture-portable`, PR #116.

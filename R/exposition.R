@@ -329,8 +329,8 @@ segments_observations <- function(observations, segmentation) {
   # octets (enc2utf8 les échapperait en <c3><a9>). Ce n'est pas l'ordre de
   # l'ancien tri radix : mesuré sur c(ÿ latin-1, € UTF-8, "a"), il donnait
   # a, €, ÿ (octet natif ff après e2 82 ac), l'ordre actuel est a, ÿ, € (c3 bf
-  # avant e2 82 ac). La branche de locale latin-1 n'est pas testée sur la CI
-  # (aucune locale latin-1 installée). Les valeurs rendues gardent leur
+  # avant e2 82 ac). La branche de locale latin-1 est exercée sur la CI par
+  # tests/controles/locale_latin1.R (#115). Les valeurs rendues gardent leur
   # encodage d'origine.
   ordre_octets <- function(v) {
     u <- unique(v)

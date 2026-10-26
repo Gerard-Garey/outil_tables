@@ -130,13 +130,21 @@ local({
   # chemin, et le test ne testerait plus texte_chemin_inattendu.
   temoin <- file.path(normalizePath(tempdir(), winslash = "/", mustWork = FALSE), "temoin_serialisation_50")
   unlink(temoin)
-  code <- sprintf("system(\"touch %s\")", temoin)
+  # Témoin en R pur (#110) : file.create() ne dépend d'aucun outil externe (touch
+  # vient de Rtools sous Windows) ; le code crée un fichier s'il est évalué.
+  code <- sprintf("file.create(\"%s\")", temoin)
   # Chemin sans « / » (sinon le segment est [i]) : témoin relatif au dossier
   # temporaire, dossier de travail du bloc.
   ancien <- setwd(tempdir()); on.exit(setwd(ancien))
   unlink("temoin_serialisation_50b")
-  code_relatif <- "system(\"touch temoin_serialisation_50b\")"
-  x <- list(valeur = code, `system("touch x")` = c(code, NA))
+  code_relatif <- "file.create(\"temoin_serialisation_50b\")"
+  # Contre-épreuve : évalué, ce code crée bien le témoin (sans elle, « témoin non
+  # créé » pourrait passer faute de pouvoir créer un témoin).
+  verifier("contre-épreuve : eval(parse(text = code)) crée le témoin, absolu et relatif",
+           { eval(parse(text = code)); eval(parse(text = code_relatif))
+             file.exists(temoin) && file.exists("temoin_serialisation_50b") })
+  unlink(c(temoin, "temoin_serialisation_50b"))
+  x <- list(valeur = code, `file.create("x")` = c(code, NA))
   names(x)[2L] <- code
   y <- aller_retour_plan(x)
   verifier("code R en valeur et en nom : relu comme chaîne, identical(), jamais évalué (témoin non créé)",
@@ -281,15 +289,21 @@ local({
 # --- doubles relus par as.numeric (Q3, « lecteur de forme ») ---------------------
 
 local({
+  # Niveau construit par ses octets IEEE 754 (3ed422927add0ecb), non par la
+  # lecture d'un décimal ; texte attendu de la glibc et de Python (T1 de
+  # test_construire_table.R). Inconditionnel depuis #104 (M148) : l'écriture
+  # est calculée par tablexp, sans la bibliothèque C, sur toute plateforme.
+  niveau <- readBin(as.raw(c(0xcb, 0x0e, 0xdd, 0x7a, 0x92, 0x22, 0xd4, 0x3e)), "double", n = 1L, size = 8L,
+                    endian = "little")
   p <- plan_complet()
-  p$etapes$brut$niveau <- 4.8005694404694591e-06
+  p$etapes$brut$niveau <- niveau
   t <- rawToChar(ecrire_plan(p))
-  verifier("Q3 : le niveau 4.8005694404694591e-06 s'écrit en %.17g (forme glibc)",
+  verifier("Q3 : le niveau 4.8005694404694591e-06 s'écrit en %.17g correctement arrondi (calculé par tablexp, #104), sur toute plateforme",
            grepl("etapes/brut/niveau\tdouble\t1\t4.8005694404694591e-06\n", t, fixed = TRUE))
   w <- sub("4.8005694404694591e-06", "4.800569440469459e-06", t, fixed = TRUE)
-  verifier("Q3 (constat de mesure) : 4.800569440469459e-06 (forme Windows) se relit comme 4.8005694404694591e-06, même double",
-           identical(lire_plan(charToRaw(w)), p) &&
-             identical(lire_plan(charToRaw(w))$etapes$brut$niveau, as.numeric("4.8005694404694591e-06")))
+  verifier("Q3 (constat de mesure) : 4.800569440469459e-06 (forme de l'UCRT de Windows) se relit comme 4.8005694404694591e-06, même double",
+           identical(lire_plan(charToRaw(w)), p) && identical(lire_plan(charToRaw(w))$etapes$brut$niveau, niveau) &&
+             identical(lire_plan(charToRaw(t))$etapes$brut$niveau, niveau))
   m <- sub("0.94999999999999996", "0.95", rawToChar(ecrire_plan(plan_complet())), fixed = TRUE)
   verifier("Q3 : plan édité à la main (niveau 0.95, 9.5e-1, +.95) relu identical() au plan d'origine",
            all(vapply(c("0.95", "9.5e-1", "+.95", "0.950"), function(s)
@@ -492,7 +506,7 @@ local({
            any(grepl("@longueur", l, fixed = TRUE) & startsWith(l, "# grammaire") & grepl("profondeur au plus 32", l, fixed = TRUE)) &&
              any(startsWith(l, "# doubles") & grepl("décimal non nul relu 0", l, fixed = TRUE)) &&
              any(startsWith(l, "# doubles") &
-                   grepl("17 chiffres significatifs (%.17g) ; relecture au bit près constatée sous glibc, non garantie ailleurs",
+                   grepl("17 chiffres significatifs (forme %.17g de la norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par tablexp sans la bibliothèque C ; relecture au bit près constatée sous glibc, non garantie ailleurs",
                          l, fixed = TRUE)) &&
              !any(grepl("aller-retour exact", l, fixed = TRUE)) &&
              any(startsWith(l, "# rejeu") & grepl("construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)", l, fixed = TRUE)))

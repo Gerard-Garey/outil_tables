@@ -143,6 +143,42 @@ jobs:
           set -euo pipefail
           env -u LANG LC_ALL=C Rscript -e 'cat("Locale effective :", Sys.getlocale(), "\n"); cat("UTF-8 :", l10n_info()[["UTF-8"]], "\n")'
           env -u LANG LC_ALL=C Rscript tests/test_unitaires.R
+      # Issue #115 : la branche latin-1 d'octets_chaines() et de l'ordre des
+      # segments (segments_observations()) ne s'exécute dans aucune batterie.
+      # Ce contrôle génère la locale fr_FR.ISO-8859-1 par localedef (sans
+      # droits particuliers), y installe et y exécute tablexp (R1 à R6, jeux de
+      # segments non ASCII natifs, latin-1, UTF-8 et mêlés), et compare les
+      # textes écrits, octet à octet, à ceux d'une session UTF-8. Si les
+      # sources de locales sont absentes de l'image (/usr/share/i18n), le
+      # paquet `locales` est installé ; si la locale ne peut pas être générée,
+      # le contrôle échoue (aucun saut). Hors liste des batteries de CLAUDE.md.
+      - name: Locale latin-1 (installation et exécution)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          if [ ! -f /usr/share/i18n/locales/fr_FR ] || [ ! -e /usr/share/i18n/charmaps/ISO-8859-1.gz ]; then
+            apt-get update -q
+            apt-get install -y -q --no-install-recommends locales
+          fi
+          Rscript tests/controles/locale_latin1.R
+      # Issue #104 : l'écriture %.17g des doubles est calculée par tablexp
+      # (octets_17g()). Ce contrôle la recoupe, sur plus de 10^6 doubles
+      # construits par leurs octets, avec deux juges : la glibc de l'image
+      # (sprintf) et Python (format(x, '.17g')) ; il recalcule les MD5 des
+      # témoins T2 et T3 de la batterie unitaire et vérifie la table des
+      # puissances contre les entiers exacts de Python. python3 est installé
+      # s'il manque à l'image ; son absence fait échouer le contrôle (aucun
+      # saut). Hors liste des batteries de CLAUDE.md.
+      - name: Écriture %.17g des doubles (juges glibc et Python)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          if ! command -v python3 > /dev/null; then
+            apt-get update -q
+            apt-get install -y -q --no-install-recommends python3
+          fi
+          python3 --version
+          Rscript tests/controles/ecriture_doubles_texte.R
 
   # ADR 0008, point 7 ; issue #3. Métadonnées de l'instantané daté du CRAN
   # (date dans tests/controles/absence_java.R), lues sans rien installer ;

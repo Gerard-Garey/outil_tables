@@ -363,17 +363,22 @@ verifier("tables de colonnes : chaque cellule égale à l'écriture échappée d
 # --- U18 : nombres, écriture %.17g (identité exacte) ---------------------------
 
 # Cellules <td> découpées sur <br> ; chaque cellule décimale (regex de
-# valeurs_texte()) égale à son écriture %.17g.
+# valeurs_texte()) égale à son écriture par l'écrivain unique du moteur
+# (ecrire_valeurs(), forme « texte », #104) : U18 vérifie que les cellules
+# passent par cet écrivain ; son exactitude (%.17g correctement arrondi)
+# relève des témoins T1 à T3 (test_construire_table.R) et du contrôle
+# tests/controles/ecriture_doubles_texte.R. Aucune condition de plateforme.
+ecriture_texte <- function(v) strsplit(rawToChar(tablexp:::ecrire_valeurs(v, "texte", "x")$octets), "\n", fixed = TRUE)[[1L]]
 cellules_decimales <- function(l) {
   td <- unlist(regmatches(l, gregexpr("<td>[^<]*(<br>[^<]*)*</td>", l)))
   c_ <- unlist(strsplit(sub("^<td>(.*)</td>$", "\\1", td), "<br>", fixed = TRUE))
   c_[grepl("^[-+]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][-+]?[0-9]+)?$", c_)]
 }
-verifier("U18 : toute cellule décimale égale à sprintf(\"%.17g\") de sa valeur ; 0.94999999999999996 présent et >0.95< absent (R1) ; 0.98999999999999999 (R2)", {
+verifier("U18 : toute cellule décimale égale à l'écriture « texte » du moteur (ecrire_valeurs) de sa valeur ; 0.94999999999999996 présent et >0.95< absent (R1) ; 0.98999999999999999 (R2)", {
   e <- character(0)
   for (id in names(L)) {
     d <- cellules_decimales(L[[id]])
-    faux <- d[d != sprintf("%.17g", as.numeric(d))]
+    faux <- d[d != ecriture_texte(as.numeric(d))]
     if (!length(d) || length(faux)) e <- c(e, sprintf("%s : %s", id, paste(utils::head(faux, 3L), collapse = ", ")))
   }
   s1 <- texte_de(o1)
