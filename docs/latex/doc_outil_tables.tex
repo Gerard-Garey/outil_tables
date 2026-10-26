@@ -1089,10 +1089,15 @@ référence par octets UTF-8, calculé par le script hors du code testé. Il est
 l'étape «~Locale latin-1 (installation et exécution)~» du job «~Tests
 (R 4.3.3)~», qui installe le paquet Debian \code{locales} si les sources de
 locales manquent à l'image, hors de la liste des batteries.
-\textbf{Sensibilité}, \emph{constat de mesure}~: retirer la branche
-latin-1 de la condition de locale connue d'\code{octets\_chaines()} fait
-échouer R1 à R6~; la retirer de celle de l'ordre des segments ne fait
-échouer que le jeu mêlé, seul à la détecter (code~1 dans les deux cas).
+\textbf{Sensibilité}, \emph{constat de mesure} (26/10/2026, sur deux
+copies de l'arbre de travail à \code{3df1b38}, chacune portant une seule
+mutation, contrôle lancé par
+\code{LC\_ALL=C.UTF-8 Rscript tests/controles/locale\_latin1.R})~:
+retirer la branche latin-1 de la condition de locale connue
+d'\code{octets\_chaines()} fait échouer, dans la session latin-1, R1 à R6
+et les quatre jeux de segments~; la retirer de celle de l'ordre des segments
+ne fait échouer que le jeu mêlé, seul à la détecter~; la session UTF-8 passe
+dans les deux cas, et le contrôle sort avec le code~1.
 \textbf{Statut}~: l'identité des textes est un \emph{constat} sur la
 machine qui exécute le contrôle et sur ces plans et ces jeux, non une
 propriété démontrée~; il ne couvre ni Windows (issue~\#49) ni la batterie
