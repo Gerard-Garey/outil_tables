@@ -97,7 +97,7 @@ PR #116, fusionnée le 26/10/2026 par commit de fusion `8bd29dd` (parents `56383
 
 **Acceptée par le mainteneur le 26/10/2026 (M163, M164)**, sur le point d'étape d'`architect-approfondi` du 26/10/2026 (D1, D2) ; les conditions de (A) fixées par M157 ne sont pas réunies. La branche porte les suites de la huitième (rapport figé, rejeu, empreintes) dans `R/rapport.R` et `R/construire_table.R`, plus le libellé « doubles » reporté par M162 (#120). Contrats partagés : « format du plan et de la fiche » (ADR 0011) et texte du rapport figé (ADR 0012). Les numéros de ligne datent de `8bd29dd` ; le nom de l'objet fait foi (M77, (b)).
 
-- **Branche** : partie de `main` (`8bd29dd`) ; PR #N, ouverte en brouillon à la création.
+- **Branche** : partie de `main` (`8bd29dd`) ; PR #125, ouverte en brouillon à la création.
 - **Préalables** : aucun pour #83 et #114. Pour #94 et #120, textes fixés à l'étape (0'). Pour #89, annotation de l'ADR 0011 à l'étape (5) (voie de M126, chemin du script).
 - **Périmètre** (fermé, cinq issues) :
   - [ ] #83 — `octets_entiers()` (`R/rapport.R:213`) par blocs d'environ 2²⁰ valeurs.
