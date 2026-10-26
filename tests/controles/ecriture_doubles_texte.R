@@ -308,7 +308,7 @@ writeLines(c(
   "print('Table des puissances : %d ligne(s), %d écart(s) aux entiers exacts' % (len(lg), faux))",
   "sys.exit(1 if ecarts or len(r) != len(lignes) or faux or faux_eg or len(lg) != 2098 else 0)"),
   script, useBytes = TRUE)
-t_juge <- system.time(statut <- system2(python, c("-I", script, f_x, f_r, f_tp, f_lg, ncol(tp$tranches), f_tr)))[["elapsed"]]
+t_juge <- system.time(statut <- system2(python, c("-I", shQuote(c(script, f_x, f_r, f_tp, f_lg)), ncol(tp$tranches), shQuote(f_tr))))[["elapsed"]]
 cat(sprintf("Juge Python : %.2f s, code %d\n", t_juge, statut))
 if (statut != 0L) ecarts <- ecarts + 1L
 
