@@ -7053,7 +7053,10 @@ ligne et en-tête hors aller-retour~; aller-retour \code{identical()} sur des
 cas adverses (\code{NA} et \code{"NA"}, \code{NA} et \code{NaN}, chaînes non
 ASCII, doubles extrêmes et sous-normaux, dates aux bornes du domaine, listes
 et vecteurs vides, \code{NULL}, noms qui ne peuvent pas être des segments)~;
-code R en valeur, en nom ou en chemin, jamais évalué (témoin non créé), et
+code R en valeur, en nom ou en chemin, jamais évalué (témoin non créé~;
+le code piégé, \code{file.create()} en R pur, chemin absolu et relatif,
+crée bien le témoin quand on l'évalue, contre-épreuve faite avant les tests
+puis témoin supprimé~; issue~\#110), et
 absence d'appel à une fonction d'évaluation dans les lecteurs~; chaque refus
 de la lecture et de l'écriture, avec son numéro de ligne ou son chemin~;
 lecteur de forme des doubles et refus du sous-dépassement~; plan importé
