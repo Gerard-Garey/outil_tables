@@ -450,8 +450,8 @@ verifier(paste("fiche : empreintes (algorithme md5 nommé ; données, résultat 
            identical(f$empreintes$statut_resultat_code, paste(
              "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un",
              "tiers ; code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine",
-             "des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement numérique,",
-             "qui dépend aussi de R, du BLAS et de la libm")) &&
+             "des sources, avec le md5sum de GNU coreutils : LC_ALL=C md5sum -t R/*.R | md5sum) ; identifie le texte source,",
+             "non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm")) &&
            identical(Encoding(f$empreintes$statut_resultat_code), "UTF-8"))
 verifier("fiche : versions (tablexp, R) et plateforme (sysname, release, machine, blas, lapack, bibliotheque_c) (#77)",
          identical(names(f$versions), c("tablexp", "R")) && identical(f$versions$R, R.version.string) &&

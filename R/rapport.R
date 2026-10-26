@@ -89,8 +89,8 @@ REPRESENTATION_RESULTAT <- "tablexp resultat 1"
 # batteries (tests/harnais.R, sonde_utf8(), M54).
 STATUT_EMPREINTE_RESULTAT <- "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un tiers"
 STATUT_EMPREINTE_CODE <- paste("code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis",
-                               "la racine des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non",
-                               "le comportement numérique, qui dépend aussi de R, du BLAS et de la libm")
+                               "la racine des sources, avec le md5sum de GNU coreutils : LC_ALL=C md5sum -t R/*.R | md5sum) ;",
+                               "identifie le texte source, non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm")
 STATUT_CODE_INTROUVABLE <- "code : non calculée, sources introuvables à l'installation"
 
 # Bornes des blocs de collage d'octets_chaines() (#22, point 1) : une ligne
@@ -747,7 +747,8 @@ empreinte_resultat <- function(x) {
 # Empreinte des sources du package (option (iv), M70 ; cinquième annotation
 # du 20/10/2026, (c)) : MD5 du texte « <md5><2 espaces>R/<fichier> », une
 # ligne par fichier R/*.R, fichiers triés par octets, LF ; égale à
-# `LC_ALL=C md5sum R/*.R | md5sum`. `racine` doit être la racine des sources
+# `LC_ALL=C md5sum -t R/*.R | md5sum` (-t : mode texte ; sans lui, le md5sum de
+# Rtools écrit « * » devant les noms, rapporté en #107). `racine` doit être la racine des sources
 # de tablexp (DESCRIPTION lisible, Package: tablexp, R/rapport.R présent) ;
 # sinon, ou si un fichier de R/ est illisible, NA : rien n'est deviné.
 # Fonctions de base seulement, aucune constante d'un autre module (ordre
