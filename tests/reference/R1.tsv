@@ -11,14 +11,14 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
+# plateforme consignée : Processeur                    : AMD EPYC 9V74 80-Core Processor
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : a96cf7f7e2fa615f2efb5abeaf9c870af522f182
+# plateforme consignée : GITHUB_SHA                    : 1e7565ea0a96a9eb93b861f21cd2ca94f2ae6117
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -28,12 +28,12 @@
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
 # fiche$empreintes/resultat : ba93834c033ef325ba5b19b0906a4c9a
-# fiche$empreintes/code : 2cc03eab602122f57f598b6c6a2ece9e
-# commit : a96cf7f7e2fa615f2efb5abeaf9c870af522f182
-# execution : 40111528681
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/40111528681
+# fiche$empreintes/code : 369798534cf73b02f9aa20f1bc72e2ba
+# commit : 1e7565ea0a96a9eb93b861f21cd2ca94f2ae6117
+# execution : 40311393253
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/40311393253
 # mode : regeneration
-# date : 2026-10-24 16:26:25 UTC
+# date : 2026-10-26 10:58:00 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -199,7 +199,7 @@ fiche/empreintes/algorithme_fichier	character	1	NA
 fiche/empreintes/representation_resultat	character	1	"tablexp resultat 1"
 fiche/empreintes/resultat	character	1	"<md5>"
 fiche/empreintes/code	character	1	"<md5>"
-fiche/empreintes/statut_resultat_code	character	1	"résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un tiers ; code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine des sources : LC_ALL=C md5sum R/*.R | md5sum) ; identifie le texte source, non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm"
+fiche/empreintes/statut_resultat_code	character	1	"résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un tiers ; code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine des sources, avec le md5sum de GNU coreutils : LC_ALL=C md5sum -t R/*.R | md5sum) ; identifie le texte source, non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm"
 fiche/plan/@noms	character	5	"transition"	"periode"	"delai_declaration"	"segmentation"	"etapes"
 fiche/plan/transition/@noms	character	2	"depart"	"arrivee"
 fiche/plan/transition/depart	character	1	"vivant"
