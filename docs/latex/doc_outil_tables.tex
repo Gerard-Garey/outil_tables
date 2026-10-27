@@ -581,7 +581,9 @@ les deux contrôles de forme qui s'y appuient, partagés par les modules~:
 \code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
 issue~\#48), ainsi que la règle des noms complets, \code{noms\_complets()}
 (noms présents, sans \code{NA} ni nom vide), écrite une seule fois pour le
-contrôle des rôles et pour celui du plan (issue~\#22). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+contrôle des rôles et pour celui du plan (issue~\#22), et la règle unique de
+citation d'une valeur dans un message de refus,
+\code{neutraliser\_citation()} (section~\ref{sec:refus}~; issue~\#94). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -617,6 +619,75 @@ est préférée à un objet portant \code{ok = FALSE}, forme d'\code{outil\_USP}
 un tel objet peut être lu par mégarde comme une construction partielle, une
 condition ne le peut pas. Les codes de refus de chaque module sont recensés
 dans la partie du module.
+
+\medskip
+\noindent
+\textbf{Citation d'une valeur dans un message} (issue~\#94). Une valeur
+reçue (chaîne de l'utilisateur, champ lu dans une fiche ou un texte, classe,
+chemin, message d'une erreur) citée dans le \code{message} d'un refus passe
+par une règle unique, \code{neutraliser\_citation()}
+(section~\ref{sec:fonctions-outils}), appliquée à chaque élément, aux
+sites qui citent une telle valeur~: \code{citer()} et
+\code{liste\_guillemets()} (modules \code{donnees}, \code{exposition},
+\code{brut}, \code{simulation} et contrôle du plan), \code{sans\_controle()}
+(rejeu outillé), \code{valeur\_message()} et \code{decrire\_valeur()}
+(rapport figé), lecture du texte du plan et de la fiche~; la valeur
+exacte reste dans les \code{details}. La règle porte sur le texte des refus,
+jamais sur une valeur écrite ni empreintée. Par élément~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{NA} reste \code{NA}~;
+  \item une chaîne d'encodage \code{bytes} est remplacée par le repère
+    «~<chaîne d'encodage bytes>~», sans réinterprétation de ses octets
+    (\code{sprintf()} lèverait sur elle l'erreur R «~translating strings
+    with "bytes" encoding is not allowed~» au lieu du refus~; issue~\#111)~;
+  \item une chaîne marquée latin-1 est d'abord convertie par
+    \code{enc2utf8()}, qui la lit selon la page de code CP1252 (aide
+    \code{?Encoding} de R~4.3.3, «~Details~», pour R~3.5.0 et suivants~;
+    constaté sous les locales C et C.UTF-8)~: les octets 0x80 à 0x9F y
+    deviennent des caractères imprimables («~€~», «~œ~», «~’~»\ldots), non
+    des caractères de contrôle, et les cinq positions que CP1252 ne définit
+    pas (0x81, 0x8D, 0x8F, 0x90, 0x9D) sont écrites \code{<81>}\ldots{} par
+    \code{enc2utf8()} elle-même~;
+  \item dans une chaîne UTF-8 valide (marquée UTF-8, convertie, ou non
+    marquée aux octets UTF-8 valides), chaque point de code des catégories
+    Unicode Cc, Zl et Zp --- U+0000 à U+001F, U+007F, U+0080 à U+009F,
+    U+2028 et U+2029, soit 67 points de code, dont U+0000 qu'aucune
+    chaîne R ne contient --- s'écrit \code{<U+XXXX>} (quatre chiffres
+    hexadécimaux majuscules)~; cet ensemble contient tous les séparateurs
+    de ligne (LF, VT, FF, CR, U+001C à U+001E, NEL, U+2028, U+2029)~;
+  \item une chaîne qui n'est pas de l'UTF-8 valide est citée octet par
+    octet~: un octet de 0x80 à 0xFF s'écrit \code{<xx>} (hexadécimal
+    minuscule), un octet de 0x00 à 0x1F ou 0x7F \code{<U+00XX>}, les autres
+    tels quels.
+\end{itemize}
+Les notations sont celles de \code{?iconv} (R~4.3.3)~: \code{<xx>} pour
+\code{sub = "byte"}, \code{<U+xxxx>} pour \code{sub = "Unicode"}. Le travail
+porte sur les octets (\code{charToRaw()}, \code{utf8ToInt()})~: la sortie
+est la même sous les locales C et UTF-8 (constat des tests et de
+\code{tests/controles/locale\_c.R}). Le résultat est marqué UTF-8 s'il
+contient un octet non ASCII. Un message de refus qui cite une valeur tient
+ainsi sur une ligne. \code{tests/unitaires/test\_outils.R} vérifie la
+règle et son prédicat sur onze caractères (VT, FF, LF, CR, tabulation,
+U+0001, U+007F, NEL, U+009F, U+2028, U+2029), sur l'ensemble des points de
+code de U+0001 à U+FFFF hors demi-codets (U+D800 à U+DFFF), dont il
+retrouve exactement les 66 de l'ensemble, U+0000 mis à part, sur des caractères de format et «~é~» cités tels quels, sur
+\code{NA}, une chaîne \code{bytes}, des octets qui ne sont pas de l'UTF-8
+valide, une chaîne latin-1 et une chaîne native UTF-8, et son
+idempotence~; les sites qui l'appliquent sont testés avec leur module.
+\textbf{Limites acceptées}~: les caractères de format
+(catégorie Cf~: U+200B à U+200F, U+202A à U+202E, U+2066 à U+2069, U+FEFF)
+ne sont pas neutralisés, parce qu'ils ne coupent pas une ligne et sont
+légitimes dans certains noms (U+200C et U+200D)~; un contrôle
+bidirectionnel peut donc réordonner l'affichage d'une valeur citée~; le
+caractère «~<~» n'est pas échappé, si bien qu'un «~<U+000A>~» tapé tel
+quel se cite comme un LF. \code{citation\_a\_neutraliser()} est le prédicat
+de la règle (vrai pour un élément que la règle ne cite pas tel quel), et
+\code{citer()}, \code{sans\_controle()} (rejeu) l'appliquent sous leur
+nom. L'écrivain du texte du plan et de la fiche (\code{texte\_objet()})
+remplace en outre par une espace les caractères de contrôle des lignes
+d'en-tête «~\# nom~: valeur~» qu'il écrit (fonction locale
+\code{propre})~: ce sont des octets écrits, non un message de refus, et ce
+remplacement reste hors de la règle.
 
 \subsection{Avertissements métier}
 \label{sec:avertissements}
@@ -723,6 +794,22 @@ du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
 réservée au texte du moteur, jamais aux données, rôles ou plan de
 l'utilisateur (section~\ref{sec:harnais}, «~Locale de
 l'installation~»~; issue~\#50) \\
+\catalogue{fonctions-outils}{neutraliser\_citation()} & interne & \code{x}
+(converti par \code{as.character()} s'il n'est pas de type
+\code{character}) & vecteur de même longueur, sans noms, chaque élément
+cité selon la règle unique des valeurs citées dans un message de refus~:
+\code{NA} conservé, repère pour une chaîne \code{bytes}, latin-1 converti,
+\code{<U+XXXX>} pour un caractère des catégories Cc, Zl et Zp,
+\code{<xx>} pour un octet hors UTF-8 valide~; marqué UTF-8 s'il est non
+ASCII (section~\ref{sec:refus}, «~Citation d'une valeur dans un
+message~»~; issue~\#94) \\
+\catalogue{fonctions-outils}{citation\_a\_neutraliser()} & interne &
+\code{x}, comme ci-dessus & vecteur logique, \code{TRUE} pour un élément
+que la règle ne cite pas tel quel (chaîne \code{bytes}, octets hors UTF-8
+valide, caractère de l'ensemble neutralisé), \code{FALSE} pour \code{NA}
+et pour une chaîne citée telle quelle, conversion latin-1 et marque UTF-8
+mises à part~; l'ensemble n'est défini qu'une fois, dans la règle
+(issue~\#94) \\
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
 explicite, sans défaut ni attribut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
@@ -1050,7 +1137,11 @@ installe donc l'arbre de travail sous \code{LC\_ALL=C} et sous la première
 locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
 l'installation, les plans de référence R1 à R6 sur l'entrée de référence,
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
-pour R1, le bilan du rejeu outillé, puis compare octet à octet les textes
+pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
+outillé et deux refus \code{objet\_modifie} du rapport figé, qui citent
+des valeurs à caractères de contrôle ou non ASCII, et la citation d'une
+chaîne latin-1~; issue~\#94), qui doivent être marqués UTF-8 et tenir sur une
+ligne, puis compare octet à octet les textes
 obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
@@ -1964,7 +2055,9 @@ UTF-8 disponible, et exécuté dans un sous-processus sous la locale de son
 installation, qui vérifie d'abord la locale effective~; pour R1 à R6,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
-marquées UTF-8), puis ces textes, trois par plan et le bilan, comparés
+marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
+issue~\#94), puis ces textes, trois par plan, le bilan et les messages,
+soit vingt, comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11~; M54~; issue~\#66 \\
@@ -2515,11 +2608,22 @@ données, étape~6) gardent leur module. Chaque message cite la valeur lue et
 la valeur attendue. La version de \code{tablexp} et les empreintes du
 code y sont écrites par \code{texte\_lu()}~: «~absente~» si la valeur
 manque, elle-même si c'est une chaîne unique sans attribut (\code{NA} écrit
-«~NA~»), «~illisible (\emph{type} de longueur \emph{n})~» sinon. Dans toute
-valeur lue dans la fiche et insérée dans un message, les caractères de
-contrôle (U+0001 à U+001F, U+007F) sont remplacés par une espace
-(\code{sans\_controle()})~; les \code{details} et le bilan gardent la valeur
-brute. Les formes lues de l'étape~2 sont
+«~NA~»), «~illisible (\emph{type} de longueur \emph{n})~» sinon. Toute
+valeur lue dans la fiche et insérée dans un message (classes de l'objet
+reçu, valeurs et noms lus) est citée selon la règle unique des refus
+(section~\ref{sec:refus}, «~Citation d'une valeur dans un message~»~:
+caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>},
+octets hors UTF-8 valide \code{<xx>}, chaîne \code{bytes} sous un repère~;
+\code{sans\_controle()}, issue~\#94)~; les \code{details} et le bilan
+gardent la valeur brute. Le message est marqué UTF-8 sous toute locale
+(gabarits passés par \code{texte\_moteur()}). Une valeur d'encodage
+\code{bytes} donne ainsi le refus nommé de l'étape, et non l'erreur R
+«~translating strings with "bytes" encoding is not allowed~»~:
+\code{empreintes\$algorithme} d'encodage \code{bytes} est refusé sous
+\code{algorithme\_empreinte\_inconnu}, et une fiche dont une classe est
+d'encodage \code{bytes} sous \code{fiche\_non\_conforme} (classes lues par
+\code{\%in\%}, là où \code{inherits()} lève cette erreur, constat sous les
+locales C et C.UTF-8). Les formes lues de l'étape~2 sont
 écrites par \code{decrire\_forme()}~: «~champ absent~», ou «~\emph{type} de
 longueur \emph{n}~», complété au besoin par «~, NA~», «~, vide~»,
 «~, attribut(s) \emph{noms}~» (les noms d'une liste ne sont pas cités comme
@@ -2797,13 +2901,18 @@ sur les champs de la fiche~; le nombre d'appels de
 \code{construire\_table()}, compté par \code{trace()} sur l'espace de noms
 installé~: aucun sur un refus, un sur un rejeu réussi~; les verdicts des
 témoins sur des fiches modifiées~; les cas adverses de la section
-\ref{sec:rejeu}, «~Limites~», testés tels que constatés.
+\ref{sec:rejeu}, «~Limites~», testés tels que constatés~; la citation
+des valeurs lues dans les messages (VT, FF, NEL et U+2028 écrits
+\code{<U+XXXX>}, message sur une ligne et marqué UTF-8) et le refus nommé,
+au lieu d'une erreur R, d'un algorithme ou d'une classe d'encodage
+\code{bytes} (issue~\#94).
 \code{tests/test\_reproductibilite.R} rejoue, pour les six plans de
 référence, la fiche écrite puis relue~: objet \code{identical()} hors
 \code{execution} à l'objet de référence, témoins du code, des versions, de
 la plateforme, de la fiche et de l'empreinte du résultat «~identique~»,
 empreinte du fichier «~non vérifiée~». \code{tests/controles/locale\_c.R}
-compare les octets du bilan du rejeu de R1 sous les deux locales.\par}
+compare les octets du bilan du rejeu de R1, et ceux de messages de refus
+du rejeu, sous les deux locales.\par}
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-construire-table}
@@ -2835,7 +2944,7 @@ compare les octets du bilan du rejeu de R1 sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», pour un message ou le bilan du rejeu \\
-\catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & caractères de contrôle remplacés par une espace, marque d'encodage conservée~; messages de refus du rejeu seulement \\
+\catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu seulement \\
 \catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets (section~\ref{sec:rejeu}) \\
 \catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & paires «~nom=valeur~» jointes par «~;~», ou \code{texte\_lu()} d'une autre valeur~; colonnes du bilan pour \code{versions} et \code{plateforme} \\
 \catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
@@ -3434,7 +3543,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
 \catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
 \catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
-\catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & seule règle de masquage des chaînes de l'utilisateur citées dans un message~: le même vecteur, chaque chaîne marquée \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~», toute autre chaîne (\code{NA} compris) laissée telle quelle, encodage compris, sans \code{paste} ni traduction~; une chaîne \code{bytes} ferait lever \code{sprintf()} au lieu du refus (issue~\#111) \\
+\catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages, chaque chaîne passée d'abord par \code{citer()} (issue~\#111) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
@@ -6533,7 +6642,16 @@ fautif dans \code{details\$chemin}).}
 
 \noindent
 L'écriture peut aussi lever les refus de l'écrivain des valeurs (codage d'une
-chaîne, date hors du domaine~; section~\ref{sec:empreinte}).
+chaîne, date hors du domaine~; section~\ref{sec:empreinte}). Le message
+d'un refus de lecture («~Lecture du texte de [nature], ligne [n]~:
+[\ldots].~», sans numéro de ligne quand le refus n'en a pas) est marqué
+UTF-8 sous toute locale~; la première ligne lue
+(\code{texte\_version\_inconnue}), le type lu
+(\code{texte\_type\_inconnu}), le chemin en double
+(\code{texte\_chemin\_en\_double}) et la valeur fautive
+(\code{texte\_valeur\_invalide}) y sont cités selon la règle unique des
+refus (section~\ref{sec:refus}, «~Citation d'une valeur dans un
+message~»~; issue~\#94).
 
 \subsubsection*{Plan importé, fiche relue, rejeu}
 
@@ -6737,11 +6855,22 @@ Une valeur lue y est «~décrite~» par \code{decrire\_valeur()}~: un atomique
 de longueur~1 sans attribut, de type \code{double}, \code{integer},
 \code{logical} ou \code{character}, s'écrit par l'écrivain suivi de son
 type (\code{3 (integer)}, \code{4 (double)}), toute autre valeur «~objet de
-type [type], de classe [classes]~». Une valeur insérée telle quelle
-(version, empreinte) passe par \code{valeur\_message()}~: elle-même si c'est
-une chaîne unique sans caractère de contrôle (U+0000 à U+001F, U+007F à
-U+009F, U+2028, U+2029), «~absente~» si elle manque, décrite sinon~: un
-message tient sur une ligne. \code{version\_fiche\_non\_admise} est le
+type [type], de classe [classes]~»~; l'écriture et les classes sont citées
+selon la règle unique des refus (section~\ref{sec:refus}, «~Citation d'une
+valeur dans un message~»~: les échappements \verb|\\|, \verb|\n|,
+\verb|\r|, \verb|\t| et \verb|\"| de l'écriture des chaînes restent
+tels quels, les autres caractères de l'ensemble neutralisé, VT, FF, NEL,
+U+2028\ldots, s'écrivent \code{<U+XXXX>}). Les attributs sont lus avant la
+longueur, que \code{length()} calculerait en levant une erreur R sur une
+classe d'encodage \code{bytes}. Une valeur insérée telle quelle
+(version, empreinte) passe par \code{valeur\_message()}~: citée par la
+règle si c'est une chaîne unique que la règle cite telle quelle
+(\code{citation\_a\_neutraliser()} faux~: ni caractère de l'ensemble
+neutralisé, ni octets hors UTF-8 valide, ni encodage \code{bytes}~; une
+chaîne latin-1 est convertie et le résultat marqué UTF-8), «~absente~» si
+elle manque, décrite sinon~; les classes de l'objet reçu (contrôle~1), le chemin d'un élément non prévu (contrôle~4)
+et le message d'une erreur du recalcul (contrôle~3) sont cités par la
+règle~: un message tient sur une ligne. \code{version\_fiche\_non\_admise} est le
 \textbf{même motif} que celui du rejeu outillé, levé ici sous le module
 \code{rapport} et là sous le module \code{construire\_table}~; le texte du
 message diffère.
@@ -6769,7 +6898,11 @@ sections (contrôle~4). Les chemins hors du périmètre
 (\code{CHEMINS\_HORS\_RESULTAT} sauf \code{execution}~: \code{fiche\$versions},
 \code{fiche\$plateforme}, les trois dernières empreintes et
 \code{etapes\$donnees\$resultat\$}\allowbreak\code{lignes\_conservees}) échappent au
-contrôle~; le rapport le dit dans la phrase qui suit le contrôle (ci-dessous).
+contrôle, à une exception près~: \code{fiche\$empreintes\$resultat}, exclue
+du texte empreinté puisqu'elle en est l'empreinte, est la valeur à laquelle
+le contrôle compare le recalcul. Le rapport le dit dans la phrase qui suit
+le contrôle (ci-dessous), qui nomme cette valeur et n'énumère comme hors du
+contrôle que les cinq autres chemins (issue~\#94).
 
 \medskip
 \noindent
@@ -6886,9 +7019,11 @@ et de deux phrases~:
     (E3.6, E4.6).~»~;
   \item «~Contrôle d'intégrité~: avant l'écriture de ce rapport, l'empreinte
     du résultat a été recalculée sur l'objet et trouvée égale à
-    fiche/empreintes/resultat. Hors du périmètre de cette empreinte, et donc
-    de ce contrôle~: [chemins de \code{CHEMINS\_HORS\_RESULTAT} sauf
-    \code{execution}, joints par «~,~»]~; ce que le rapport en restitue
+    fiche/empreintes/resultat, la valeur consignée à laquelle ce contrôle la
+    compare (exclue du texte empreinté, puisqu'elle en est l'empreinte).
+    Hors du périmètre de cette empreinte, et donc de ce contrôle~: [chemins
+    de \code{CHEMINS\_HORS\_RESULTAT} sauf \code{execution} et
+    \code{fiche/empreintes/resultat}, joints par «~,~»]~; ce que le rapport en restitue
     (valeurs, ou structure seule pour une table dont le volume croît avec la
     base) est lu dans l'objet, sans vérification.~»
 \end{itemize}
@@ -7184,7 +7319,10 @@ identiques hors \code{execution}, sous d'autres valeurs de \code{OutDec},
 après \code{saveRDS()} puis \code{readRDS()}~; l'objet inchangé par
 l'écriture~; chaque refus des quatre contrôles, avec son motif, son module
 et ses \code{details}, dont un double altéré d'un ulp, un attribut ajouté et
-une valeur de version ou d'empreinte à décrire~; l'absence de toute
+une valeur de version ou d'empreinte à décrire~; la citation, selon la
+règle unique des refus, de classes, de valeurs de version (VT, FF, NEL,
+U+2028), du message d'une erreur du recalcul et d'un chemin non prévu, sur
+une ligne et marquée UTF-8 (issue~\#94)~; l'absence de toute
 ressource externe et la liste fermée des balises et entités~;
 l'échappement de modalités et de noms de colonne qui contiennent
 \code{<}, \code{>}, \code{\&} et \code{"}~; l'ordre des sections et la
