@@ -460,3 +460,18 @@ local({
     else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
   })
 })
+# Noms d'attributs d'un champ cités par neutraliser_citation() dans le refus
+# fiche_non_conforme (decrire_forme(), revue finale de #94) : attribut « a<LF>b »
+# cité a<U+000A>b, « a<VT>b » a<U+000B>b ; message sur une ligne, marqué UTF-8.
+for (k in list(list("LF", "a\nb", "a<U+000A>b"), list("VT", "a\u000bb", "a<U+000B>b")))
+  verifier(sprintf("T11 version_fiche à l'attribut « a<%s>b » : refus fiche_non_conforme, attribut cité %s, une ligne, UTF-8",
+                   k[[1L]], k[[3L]]), {
+    v <- 4L; attr(v, k[[2L]]) <- 1
+    lu <- paste0("integer de longueur 1, attribut(s) ", k[[3L]])
+    r <- refus_de(rejouer_fiche(BASE, fiche_modifiee(version_fiche = v)))
+    ok <- controle_refus(r, "construire_table", "fiche_non_conforme",
+                         list(champ = "version_fiche", lu = lu, attendu = "integer de longueur 1, non NA, sans attribut"),
+                         paste0("« version_fiche » : ", lu, " au lieu de"))
+    if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
+    else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
+  })

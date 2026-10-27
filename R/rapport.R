@@ -1182,7 +1182,7 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
 # message)` lève le refus de la ligne. Rend le vecteur, sans noms.
 valeurs_texte <- function(type, s, refus) {
   invalide <- function(quoi, i, motif = "texte_valeur_invalide")
-    refus(motif, sprintf("%s (valeur %d : %s)", quoi, i[1L], neutraliser_citation(s[i[1L]])))
+    refus(motif, sprintf(texte_moteur("%s (valeur %d : %s)"), texte_moteur(quoi), i[1L], neutraliser_citation(s[i[1L]])))
   switch(type,
     character = {
       na <- s == "NA"
@@ -1243,16 +1243,20 @@ valeurs_texte <- function(type, s, refus) {
 # Objet (liste) relu des octets `octets` de première ligne attendue
 # `premiere` ; `nature` (« plan », « fiche ») pour les messages.
 lire_texte <- function(octets, premiere, nature) {
-  # Message marqué UTF-8 sous toute locale (#94), par texte_moteur().
-  refus <- function(motif, message, ligne = NA_integer_)
+  # Message marqué UTF-8 sous toute locale (#94), par texte_moteur(). Toute
+  # valeur reçue citée dans un message (classe, première ligne, type, chemin,
+  # colonne, valeur) passe par neutraliser_citation() (R/outils.R, #94) ; la
+  # classe, le chemin ou la colonne bruts sont dans `details`.
+  refus <- function(motif, message, ligne = NA_integer_, details = list())
     refuser("rapport", motif,
             texte_moteur(sprintf("Lecture du texte de %s%s : %s.", nature,
                                  if (is.na(ligne)) "" else sprintf(", ligne %d", ligne), message)),
-            list(ligne = ligne))
+            c(list(ligne = ligne), details))
   if (!is.raw(octets))
-    refus("texte_non_octets", sprintf(paste("le texte doit être reçu en octets (raw), pas en %s ; lire un",
-                                            "fichier par readBin(fichier, \"raw\", file.size(fichier))"),
-                                      paste(class(octets), collapse = "/")))
+    refus("texte_non_octets", sprintf(texte_moteur(paste("le texte doit être reçu en octets (raw), pas en %s ; lire un",
+                                                         "fichier par readBin(fichier, \"raw\", file.size(fichier))")),
+                                      paste(neutraliser_citation(class(octets)), collapse = "/")),
+          details = list(classe = class(octets)))
   if (!length(octets)) refus("texte_version_inconnue", sprintf("texte vide (première ligne « %s » attendue)", premiere))
   lf <- as.raw(0x0a)
   ligne_de <- function(i) 1L + sum(octets[seq_len(i - 1L)] == lf)
@@ -1270,7 +1274,7 @@ lire_texte <- function(octets, premiere, nature) {
   if (length(faux)) refus("texte_utf8_invalide", "octets qui ne sont pas de l'UTF-8 valide", faux[1L])
   if (!identical(l[1L], premiere))
     refus("texte_version_inconnue",
-          sprintf("première ligne « %s » au lieu de « %s » (nature ou version de grammaire inconnue, aucune migration)",
+          sprintf(texte_moteur("première ligne « %s » au lieu de « %s » (nature ou version de grammaire inconnue, aucune migration)"),
                   neutraliser_citation(l[1L]), premiere), 1L)
   k <- 2L
   while (k <= length(l) && startsWith(l[k], "#")) k <- k + 1L
@@ -1285,7 +1289,7 @@ lire_texte <- function(octets, premiere, nature) {
             "ligne hors de la forme chemin<TAB>type<TAB>longueur<TAB>valeurs (champ vide, longueur illisible, ligne d'en-tête dans le corps)",
             numeros[i])
     if (!f[2L] %in% TYPES_TEXTE)
-      refus("texte_type_inconnu", sprintf("type « %s » inconnu (types admis : %s)", neutraliser_citation(f[2L]),
+      refus("texte_type_inconnu", sprintf(texte_moteur("type « %s » inconnu (types admis : %s)"), neutraliser_citation(f[2L]),
                                           paste(TYPES_TEXTE, collapse = ", ")),
             numeros[i])
     if (f[2L] == "NULL" && f[3L] != "0")
@@ -1313,9 +1317,11 @@ lire_texte <- function(octets, premiere, nature) {
   k <- 1L
   inattendu <- function(attendu)
     refus("texte_chemin_inattendu",
-          if (k > n) sprintf("fin du texte, « %s » attendu", attendu)
-          else sprintf("chemin « %s » au lieu de « %s » (structure incohérente)", chemins[k], attendu),
-          if (k > n) length(l) else numeros[k])
+          if (k > n) sprintf(texte_moteur("fin du texte, « %s » attendu"), neutraliser_citation(attendu))
+          else sprintf(texte_moteur("chemin « %s » au lieu de « %s » (structure incohérente)"),
+                       neutraliser_citation(chemins[k]), neutraliser_citation(attendu)),
+          if (k > n) length(l) else numeros[k],
+          if (k > n) list(attendu = attendu) else list(chemin = chemins[k], attendu = attendu))
   lue <- function(i) {
     f <- champs[[i]]
     if (f[2L] == "NULL") return(NULL)
@@ -1382,10 +1388,13 @@ lire_texte <- function(octets, premiere, nature) {
         ligne <- numeros[k]
         x <- noeud(cc)
         if (!is.atomic(x) || is.null(x))
-          refus("texte_ligne_mal_formee", sprintf("colonne « %s » non atomique", cc), ligne)
+          refus("texte_ligne_mal_formee", sprintf(texte_moteur("colonne « %s » non atomique"), neutraliser_citation(cc)),
+                ligne, list(colonne = cc))
         if (length(x) != nl)
-          refus("texte_longueur_incoherente", sprintf("colonne « %s » de %d valeur(s) pour %d ligne(s)", cc, length(x), nl),
-                ligne)
+          refus("texte_longueur_incoherente",
+                sprintf(texte_moteur("colonne « %s » de %d valeur(s) pour %d ligne(s)"), neutraliser_citation(cc),
+                        length(x), nl),
+                ligne, list(colonne = cc))
         v[i] <- list(x)
       }
       names(v) <- colonnes
@@ -1397,7 +1406,10 @@ lire_texte <- function(octets, premiere, nature) {
   }
   if (!chemins[1L] %in% c("@noms", "@longueur")) inattendu("@noms ou @longueur")
   x <- noeud("")
-  if (k <= n) refus("texte_chemin_inattendu", sprintf("chemin « %s » après la fin de l'objet", chemins[k]), numeros[k])
+  if (k <= n)
+    refus("texte_chemin_inattendu", sprintf(texte_moteur("chemin « %s » après la fin de l'objet"),
+                                            neutraliser_citation(chemins[k])),
+          numeros[k], list(chemin = chemins[k]))
   x
 }
 

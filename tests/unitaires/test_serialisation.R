@@ -705,3 +705,82 @@ for (k in list(list("VT", "\u000b", "<U+000B>"), list("NEL", "\u0085", "<U+0085>
     else if (grepl("[\n\v\f]", m) || grepl(k[[2L]], m, fixed = TRUE)) "caractère écrit en clair ou message sur plusieurs lignes"
     else if (!identical(Encoding(m), "UTF-8")) "message non marqué UTF-8" else TRUE
   })
+
+# Chemin et colonne cités par neutraliser_citation() (revue finale de #94) :
+# chemin inattendu, chemin après la fin de l'objet, colonne non atomique et
+# colonne de longueur incohérente, avec VT et NEL écrits <U+XXXX> ; message sur
+# une ligne, marqué UTF-8, sans octet échappé (« é » gardé tel quel : gabarit
+# marqué par texte_moteur(), sous la locale C aussi) ; chemin ou colonne bruts
+# dans les details.
+for (k in list(list("VT", "\u000b", "<U+000B>"), list("NEL", "\u0085", "<U+0085>"))) {
+  p <- paste0("é", k[[2L]]); q <- paste0("é", k[[3L]])
+  cas <- list(
+    list("chemin inattendu", "texte_chemin_inattendu",
+         c("tablexp plan 1", "@noms\tcharacter\t2\t\"a\"\t\"b\"", "a\tdouble\t1\t1", paste0("b", p, "\tdouble\t1\t1")),
+         paste0("chemin « b", q, " » au lieu de « b »"), list(chemin = paste0("b", p), attendu = "b")),
+    list("chemin après la fin de l'objet", "texte_chemin_inattendu",
+         c("tablexp plan 1", "@noms\tcharacter\t1\t\"a\"", "a\tdouble\t1\t1", paste0("z", p, "\tdouble\t1\t1")),
+         paste0("chemin « z", q, " » après la fin de l'objet"), list(chemin = paste0("z", p))),
+    list("colonne non atomique", "texte_ligne_mal_formee",
+         c("tablexp plan 1", "@noms\tcharacter\t1\t\"d\"", paste0("d/@colonnes\tcharacter\t1\t\"x", p, "\""),
+           "d/@lignes\tinteger\t1\t1", paste0("d/x", p, "/@noms\tcharacter\t1\t\"r\""), paste0("d/x", p, "/r\tdouble\t1\t1")),
+         paste0("colonne « d/x", q, " » non atomique"), list(colonne = paste0("d/x", p))),
+    list("colonne de longueur incohérente", "texte_longueur_incoherente",
+         c("tablexp plan 1", "@noms\tcharacter\t1\t\"d\"", paste0("d/@colonnes\tcharacter\t1\t\"x", p, "\""),
+           "d/@lignes\tinteger\t1\t2", paste0("d/x", p, "\tdouble\t1\t1")),
+         paste0("colonne « d/x", q, " » de 1 valeur(s) pour 2 ligne(s)"), list(colonne = paste0("d/x", p))))
+  for (c_ in cas)
+    verifier(sprintf("lire_plan, refus %s avec %s : %s, cité %s, une ligne, UTF-8, brut dans les details",
+                     c_[[1L]], k[[1L]], c_[[2L]], k[[3L]]), {
+      r <- refus_de(lire_plan(charToRaw(paste0(paste(c_[[3L]], collapse = "\n"), "\n"))))
+      m <- if (is.null(r)) "" else conditionMessage(r)
+      if (is.null(r)) "aucun refus" else if (!identical(r$motif, c_[[2L]])) sprintf("motif %s", r$motif)
+      else if (!grepl(c_[[4L]], m, fixed = TRUE)) sprintf("message sans « %s » : %s", c_[[4L]], m)
+      else if (grepl("[\n\v\f]", m) || grepl(k[[2L]], m, fixed = TRUE)) "caractère écrit en clair ou message sur plusieurs lignes"
+      else if (grepl("<c[23]>", m)) "octets échappés dans le message"
+      else if (!identical(Encoding(m), "UTF-8")) "message non marqué UTF-8"
+      else if (!identical(r$details[names(c_[[5L]])], c_[[5L]])) "details sans la valeur brute" else TRUE
+    })
+}
+verifier("lire_plan, refus d'un objet de classe « a<LF>b » : texte_non_octets, classe citée a<U+000A>b, une ligne, brute dans details$classe", {
+  r <- refus_de(lire_plan(structure(1, class = "a\nb")))
+  m <- if (is.null(r)) "" else conditionMessage(r)
+  if (is.null(r)) "aucun refus" else if (!identical(r$motif, "texte_non_octets")) sprintf("motif %s", r$motif)
+  else if (!grepl("pas en a<U+000A>b ;", m, fixed = TRUE)) sprintf("message : %s", m)
+  else if (grepl("[\n\v\f]", m)) "message sur plusieurs lignes"
+  else if (!identical(r$details$classe, "a\nb")) "details sans la classe brute" else TRUE
+})
+
+# Gabarits du lecteur citant une valeur reçue non ASCII (revue finale de #94) :
+# première ligne inconnue, type inconnu, valeur illisible. Entrées construites
+# en octets bruts (as.raw, charToRaw), attendus décodés d'octets : aucun
+# littéral non ASCII, que le parseur fausse sous la locale C. Message sur une
+# ligne, marqué UTF-8, sans octet échappé (<c2>, <c3>) sous la locale de la
+# batterie, la citation « é » (c3 a9) gardée telle quelle.
+u8 <- function(...) { x <- rawToChar(as.raw(c(...))); Encoding(x) <- "UTF-8"; x }
+e_acute <- c(0xc3, 0xa9)
+tete_ <- charToRaw("tablexp plan 1\n@noms\tcharacter\t1\t\"a\"\n")
+cas_u8 <- list(
+  list("première ligne inconnue", "texte_version_inconnue",
+       c(charToRaw("tablexp plan 1"), as.raw(e_acute), as.raw(c(0x0b, 0x0a)), tete_[-(1:15)]),
+       u8(0x70, 0x72, 0x65, 0x6d, 0x69, 0xc3, 0xa8, 0x72, 0x65, 0x20, 0x6c, 0x69, 0x67, 0x6e, 0x65, 0x20, 0xc2, 0xab, 0x20),
+       paste0("tablexp plan 1", u8(e_acute), "<U+000B>")),
+  list("type inconnu", "texte_type_inconnu",
+       c(tete_, charToRaw("a\ttyp"), as.raw(e_acute), charToRaw("\t1\t1\n")),
+       u8(0x74, 0x79, 0x70, 0x65, 0x20, 0xc2, 0xab, 0x20),
+       paste0("typ", u8(e_acute))),
+  list("valeur illisible (quoi non ASCII)", "texte_valeur_invalide",
+       c(tete_, charToRaw("a\tinteger\t1\t1"), as.raw(e_acute), charToRaw("\n")),
+       paste0("l'", u8(e_acute), "tendue"),
+       paste0("valeur 1 : 1", u8(e_acute))))
+for (c_ in cas_u8)
+  verifier(sprintf("lire_plan, %s, entrée en octets bruts : %s, une ligne, UTF-8, sans <c2>/<c3>", c_[[1L]], c_[[2L]]), {
+    r <- refus_de(lire_plan(c_[[3L]]))
+    m <- if (is.null(r)) "" else conditionMessage(r)
+    if (is.null(r)) "aucun refus" else if (!identical(r$motif, c_[[2L]])) sprintf("motif %s", r$motif)
+    else if (!grepl(c_[[4L]], m, fixed = TRUE)) "début du gabarit absent ou altéré"
+    else if (!grepl(c_[[5L]], m, fixed = TRUE)) "citation absente ou altérée"
+    else if (grepl("<c[23]>", m)) "octets échappés dans le message"
+    else if (grepl("[\n\v\f]", m)) "message sur plusieurs lignes"
+    else if (!identical(Encoding(m), "UTF-8")) "message non marqué UTF-8" else TRUE
+  })

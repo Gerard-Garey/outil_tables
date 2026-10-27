@@ -313,7 +313,7 @@ decrire_forme <- function(conteneur, nom) {
   else if (is.character(v) && length(v) == 1L && !nzchar(v)) s <- paste0(s, ", vide")
   a <- names(attributes(v))
   if (is.list(v)) a <- setdiff(a, "names")
-  if (length(a)) s <- paste0(s, ", attribut(s) ", paste(a, collapse = ", "))
+  if (length(a)) s <- paste0(s, ", attribut(s) ", paste(sans_controle(a), collapse = ", "))
   n <- names(v)
   if (!is.null(n)) {
     complets <- n[!is.na(n) & nzchar(n)]
