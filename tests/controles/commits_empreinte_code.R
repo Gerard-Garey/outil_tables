@@ -44,10 +44,11 @@
 #       inexploitable ; un écart sur un commit présent d'un clone superficiel
 #       est concluant aussi) ;
 #    3  NON DÉTERMINABLE : aucun commit sur un clone superficiel, ou commit
-#       d'un .tsv absent d'un clone superficiel ; ou aucun commit (resp.
-#       empreinte différente), alors qu'au moins un commit lu n'a pas
-#       d'empreinte parce qu'une entrée de R/ n'est pas un fichier ordinaire
-#       (lien symbolique, sous-module, dossier nommé *.R) : ces commits sont
+#       d'un .tsv absent d'un clone superficiel ; en mode historique, aucun
+#       commit alors qu'au moins un commit lu n'a pas d'empreinte parce qu'une
+#       entrée de R/ n'est pas un fichier ordinaire (lien symbolique,
+#       sous-module, dossier nommé *.R) ; en mode références, le commit de
+#       l'en-tête lui-même n'a pas d'empreinte (même cause) ; ces commits sont
 #       nommés. Une absence n'est jamais concluante sur un historique tronqué
 #       ni devant un commit non évaluable. Mode historique, clone superficiel :
 #       une liste de commits est valable mais peut être incomplète (dit).
