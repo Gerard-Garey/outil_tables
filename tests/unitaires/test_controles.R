@@ -947,3 +947,220 @@ verifier("concordance \\allowbreak : six noms coupés (même ligne, fin de ligne
                          "« \\code{construire\\_table(}\\allowbreak »",
                          "« \\code{lire\\_} \\allowbreak\\code{plan( »")) })
 unlink(attente_vide)
+
+# --- commits d'une empreinte du code (ADR 0011, annotation du 27/10/2026, (e) ; #89) ---
+# Mode « arbre » et refus : sans git, aussi dans le job « Tests (R 4.3.3) ». Le
+# parcours de l'historique exige git, absent du conteneur de ce job, et un clone
+# complet : il est testé plus bas sur des dépôts synthétiques (seulement si git
+# est présent), et `Rscript tests/controles/commits_empreinte_code.R historique
+# <empreinte>` ou `references` sur le dépôt réel se lance hors CI.
+# Nature des attendus : égalité exacte à l'empreinte installée (EMPREINTE_CODE)
+# et au recalcul en R d'un témoin ; codes de sortie et motifs du refus.
+
+COMMITS <- "commits_empreinte_code.R"
+recalcul_releve <- function(racine) {
+  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
+  t <- tempfile(); on.exit(unlink(t))
+  writeBin(charToRaw(paste0(md5, "  R/", fichiers, "\n", collapse = "")), t)
+  unname(tools::md5sum(t))
+}
+verifier("commits_empreinte_code arbre : l'empreinte des R/*.R du dépôt est EMPREINTE_CODE (recalcul indépendant, sans tablexp)", {
+  r <- controle(COMMITS, "arbre", "--racine", shQuote(RACINE))
+  r$statut == 0L && identical(r$sortie, tablexp:::EMPREINTE_CODE)
+})
+verifier("commits_empreinte_code arbre : sans --racine, la racine du dépôt (même empreinte)", {
+  r <- controle(COMMITS, "arbre")
+  r$statut == 0L && identical(r$sortie, tablexp:::EMPREINTE_CODE)
+})
+verifier("commits_empreinte_code arbre : racine témoin (fichiers .r et cachés ignorés, dossier hors R/) = empreinte_sources() et recalcul en R", {
+  d <- tempfile("racine_commits_"); dir.create(file.path(d, "R"), recursive = TRUE); on.exit(unlink(d, recursive = TRUE))
+  writeLines(c("Package: tablexp", "Version: 1"), file.path(d, "DESCRIPTION"))
+  writeLines("x <- 1", file.path(d, "R", "rapport.R")); writeLines("y <- 2", file.path(d, "R", "a.R"))
+  writeLines("z <- 3", file.path(d, "R", "b.r")); writeLines("w <- 4", file.path(d, "R", ".c.R"))
+  r <- controle(COMMITS, "arbre", "--racine", shQuote(d))
+  r$statut == 0L && identical(r$sortie, recalcul_releve(d)) && identical(r$sortie, tablexp:::empreinte_sources(d))
+})
+verifier("commits_empreinte_code arbre : sources introuvables (sans DESCRIPTION, autre paquet, sans R/rapport.R) -> refus code 1, rien de deviné", {
+  d <- tempfile("racine_commits_"); dir.create(file.path(d, "R"), recursive = TRUE); on.exit(unlink(d, recursive = TRUE))
+  r1 <- controle(COMMITS, "arbre", "--racine", shQuote(d))
+  writeLines("Package: autre", file.path(d, "DESCRIPTION")); writeLines("x <- 1", file.path(d, "R", "rapport.R"))
+  r2 <- controle(COMMITS, "arbre", "--racine", shQuote(d))
+  writeLines("Package: tablexp", file.path(d, "DESCRIPTION")); file.remove(file.path(d, "R", "rapport.R"))
+  writeLines("y <- 2", file.path(d, "R", "a.R"))
+  r3 <- controle(COMMITS, "arbre", "--racine", shQuote(d))
+  all(vapply(list(r1, r2, r3), function(r) r$statut == 1L && grepl("sources introuvables", r$sortie[1L], fixed = TRUE), NA))
+})
+for (cas in list(
+  list(args = character(0), motif = "mode attendu"),
+  list(args = "inconnu", motif = "mode attendu"),
+  list(args = "historique", motif = "32 caractères hexadécimaux minuscules"),
+  list(args = c("historique", "369798534cf73b02f9aa20f1bc72e2b"), motif = "32 caractères hexadécimaux minuscules"),
+  list(args = c("historique", "369798534cf73b02f9aa20f1bc72e2baa"), motif = "32 caractères hexadécimaux minuscules"),
+  list(args = c("historique", "369798534CF73B02F9AA20F1BC72E2BA"), motif = "32 caractères hexadécimaux minuscules"),
+  list(args = c("historique", "369798534cf73b02f9aa20f1bc72e2bg"), motif = "32 caractères hexadécimaux minuscules"),
+  list(args = c("arbre", "x"), motif = "ne prend pas d'argument"),
+  list(args = c("references", "x"), motif = "ne prend pas d'argument"))) {
+  # Racine : dossier vide hors dépôt ; le refus de l'argument précède tout appel à git.
+  d <- tempfile("racine_commits_"); dir.create(d)
+  verifier(sprintf("commits_empreinte_code : refus code 1 avant tout appel à git (%s)", paste(c(cas$args, "-"), collapse = " ")),
+           { r <- controle(COMMITS, shQuote(cas$args), "--racine", shQuote(d))
+             r$statut == 1L && length(r$sortie) == 1L && startsWith(r$sortie, "REFUS : ") && grepl(cas$motif, r$sortie, fixed = TRUE, useBytes = TRUE) })
+  unlink(d, recursive = TRUE)
+}
+verifier("commits_empreinte_code historique : empreinte bien formée sur une racine hors d'un dépôt (ou sans git) -> refus nommé, code 1", {
+  d <- tempfile("racine_commits_"); dir.create(d); on.exit(unlink(d, recursive = TRUE))
+  r <- controle(COMMITS, "historique", "369798534cf73b02f9aa20f1bc72e2ba", "--racine", shQuote(d))
+  r$statut == 1L && startsWith(r$sortie[1L], "REFUS : ") &&
+    grepl(if (nzchar(Sys.which("git"))) "racine hors d'un dépôt git" else "git absent", r$sortie[1L], fixed = TRUE, useBytes = TRUE)
+})
+
+# Parcours de l'historique sur dépôts synthétiques (#89). Dépôts dans
+# tempfile(), toujours désignés par --racine, jamais le dépôt réel ; git appelé
+# avec une identité, sans signature ni conversion de fins de ligne ; GIT_DIR,
+# GIT_WORK_TREE et GIT_INDEX_FILE neutralisés pour chaque appel. Sans git
+# (conteneur du job « Tests (R 4.3.3) » : ces assertions n'y tournent pas) :
+# « [sauté] » affiché, aucune assertion enregistrée. Attendus : égalités
+# exactes des SHA, de leur ordre et des codes de sortie ; empreintes attendues
+# par le recalcul en R du relevé (recalcul_releve), non par le script.
+if (nzchar(Sys.which("git"))) {
+  sans_env_git <- function(f) function(...) {
+    v <- Sys.getenv(c("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"), unset = NA)
+    Sys.unsetenv(names(v))
+    on.exit(for (n in names(v)) if (!is.na(v[[n]])) do.call(Sys.setenv, stats::setNames(list(v[[n]]), n)))
+    f(...)
+  }
+  git_t <- sans_env_git(function(dir, ...) {
+    r <- suppressWarnings(system2("git", c("-C", shQuote(dir), "-c", "user.name=Test",
+                                           "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false",
+                                           "-c", "core.autocrlf=false", "-c", "init.defaultBranch=main", c(...)),
+                                  stdout = TRUE, stderr = TRUE))
+    if (!is.null(attr(r, "status"))) stop("git a échoué : ", paste(c(...), collapse = " "), " | ", paste(r, collapse = " "))
+    as.character(r)
+  })
+  controle_t <- sans_env_git(controle)
+  ecrire_octets <- function(dir, rel, texte) {
+    f <- file.path(dir, rel); dir.create(dirname(f), recursive = TRUE, showWarnings = FALSE)
+    writeBin(charToRaw(texte), f)
+  }
+  # Un commit : fichiers écrits (nom relatif = contenu), fichiers supprimés ; rend le SHA.
+  etape <- function(dir, message, ecrits = list(), supprimes = character(0)) {
+    for (n in names(ecrits)) ecrire_octets(dir, n, ecrits[[n]])
+    for (n in supprimes) file.remove(file.path(dir, n))
+    git_t(dir, "add", "-A"); git_t(dir, "commit", "-q", "-m", shQuote(message))
+    git_t(dir, "rev-parse", "HEAD")
+  }
+  # Empreinte attendue d'un jeu de fichiers R/ (nom -> contenu), par recalcul en R.
+  attendue <- function(fichiers) {
+    d <- tempfile("attendue_"); on.exit(unlink(d, recursive = TRUE))
+    for (n in names(fichiers)) ecrire_octets(d, file.path("R", n), fichiers[[n]])
+    recalcul_releve(d)
+  }
+  shas_de <- function(r) regmatches(r$sortie, regexpr("^[0-9a-f]{40}", r$sortie))
+  historique <- function(empreinte, racine) controle_t(COMMITS, "historique", empreinte, "--racine", shQuote(racine))
+  references <- function(racine, ...) {
+    d <- file.path(racine, "tests", "reference"); dir.create(d, recursive = TRUE, showWarnings = FALSE)
+    on.exit(unlink(d, recursive = TRUE))
+    lots <- list(...)
+    for (i in seq_along(lots))
+      writeLines(c(sprintf("# fiche$empreintes/code : %s", lots[[i]][1L]), sprintf("# commit : %s", lots[[i]][2L]), "colonne", "1"),
+                 file.path(d, sprintf("T%d.tsv", i)))
+    controle_t(COMMITS, "references", "--racine", shQuote(racine))
+  }
+  DESC <- "Package: tablexp\nVersion: 1\n"
+  A1 <- list(rapport.R = "x <- 1\n", a.R = "a <- 1\n")
+  A2 <- list(rapport.R = "x <- 1\n", a.R = "a <- 2\n")
+  A3 <- list(rapport.R = "x <- 1\n", a.R = "a <- 3\n")
+  court <- function(sha) substr(sha, 1L, 7L)
+
+  depot <- tempfile("depot_commits_"); dir.create(depot)
+  git_t(depot, "init", "-q")
+  c1 <- etape(depot, "c1 empreinte E1", list(DESCRIPTION = DESC, `R/rapport.R` = A1$rapport.R, `R/a.R` = A1$a.R))
+  c2 <- etape(depot, "c2 empreinte E2", list(`R/a.R` = A2$a.R))
+  c3 <- etape(depot, "c3 hors R/, classe de c2", list(`LISEZMOI` = "texte\n"))
+  c4 <- etape(depot, "c4 retour du texte de c1 : classe reformee", list(`R/a.R` = A1$a.R))
+  c5 <- etape(depot, "c5 autre paquet, R/ de E1", list(DESCRIPTION = "Package: autre\n"))
+  c6 <- etape(depot, "c6 tablexp sans R/rapport.R", list(DESCRIPTION = DESC), "R/rapport.R")
+  c7 <- etape(depot, "c7 empreinte E3", list(`R/rapport.R` = A3$rapport.R, `R/a.R` = A3$a.R))
+  E1 <- attendue(A1); E2 <- attendue(A2); E3 <- attendue(A3)
+  E6 <- attendue(list(a.R = A1$a.R))   # empreinte que c6 aurait avec la formule sans la garde
+
+  verifier("commits_empreinte_code historique (dépôt synthétique) : classe E1 = c1 puis c4 (du plus ancien au plus récent), ni c5 (autre paquet) ni c6 (sans R/rapport.R) -> code 0", {
+    r <- historique(E1, depot)
+    r$statut == 0L && identical(shas_de(r), c(c1, c4))
+  })
+  verifier("commits_empreinte_code historique (dépôt synthétique) : classe E2 = c2 puis c3 (commit hors R/ dans la classe de son parent) -> code 0", {
+    r <- historique(E2, depot)
+    r$statut == 0L && identical(shas_de(r), c(c2, c3))
+  })
+  verifier("commits_empreinte_code historique (dépôt synthétique) : E3 = c7 seul ; l'en-tête compte les commits trouvés sur les commits lus", {
+    r <- historique(E3, depot)
+    r$statut == 0L && identical(shas_de(r), c7) && grepl("1 commit(s) sur 7 lus", r$sortie[1L], fixed = TRUE)
+  })
+  verifier("commits_empreinte_code historique (dépôt synthétique) : l'empreinte que c6 aurait sans la garde n'est celle d'aucun commit -> code 2 (historique complet)", {
+    r <- historique(E6, depot)
+    r$statut == 2L && grepl("aucun commit", r$sortie[1L], fixed = TRUE)
+  })
+  verifier("commits_empreinte_code historique (dépôt synthétique) : empreinte absente d'un historique complet -> code 2", {
+    historique(strrep("0", 32L), depot)$statut == 2L
+  })
+  verifier("commits_empreinte_code references (dépôt synthétique) : commit dans la classe de l'empreinte -> code 0 ; écart -> code 2 (commit d'une autre classe, commit absent) ; l'écart l'emporte sur le reste", {
+    ok <- references(depot, c(E1, court(c4)))
+    ec1 <- references(depot, c(E1, court(c2)))
+    ec2 <- references(depot, c(E1, "abcdef0"))
+    ok$statut == 0L && startsWith(ok$sortie[1L], "OK ") && ec1$statut == 2L && grepl("ECART", ec1$sortie[1L], fixed = TRUE) &&
+      ec2$statut == 2L && grepl("absent de l'historique", ec2$sortie[1L], fixed = TRUE)
+  })
+
+  clone <- tempfile("clone_commits_")
+  git_t(depot, "clone", "-q", "--depth", "1", shQuote(paste0("file://", normalizePath(depot, winslash = "/"))), shQuote(clone))
+  verifier("commits_empreinte_code historique (clone --depth 1) : empreinte d'un commit tronqué -> code 3 (non déterminable), jamais 2", {
+    r <- historique(E1, clone)
+    r$statut == 3L && grepl("NON DÉTERMINABLE", r$sortie[1L], fixed = TRUE, useBytes = TRUE)
+  })
+  verifier("commits_empreinte_code historique (clone --depth 1) : empreinte du commit présent -> code 0, avec l'avertissement de liste possiblement incomplète", {
+    r <- historique(E3, clone)
+    r$statut == 0L && identical(shas_de(r), c7) && any(grepl("clone superficiel", r$sortie, fixed = TRUE))
+  })
+  verifier("commits_empreinte_code references (clone --depth 1) : commit tronqué -> code 3 (non déterminable), jamais l'écart", {
+    r <- references(clone, c(E1, court(c1)))
+    r$statut == 3L && grepl("NON DÉTERMINABLE ", r$sortie[1L], fixed = TRUE, useBytes = TRUE)
+  })
+
+  # Témoin : un blob de R/ identique à DESCRIPTION (même oid). Mesuré avant
+  # correction : le mode arbre rend f25008aa..., le mode historique code 2.
+  temoin <- tempfile("depot_commits_"); dir.create(temoin)
+  git_t(temoin, "init", "-q")
+  ct <- etape(temoin, "temoin : R/z.R identique a DESCRIPTION",
+              list(DESCRIPTION = "Package: tablexp\n", `R/z.R` = "Package: tablexp\n", `R/rapport.R` = "x <- 1\n"))
+  verifier("commits_empreinte_code historique (blob de R/ identique à DESCRIPTION) : le commit est trouvé (empreinte f25008aa..., égale au mode arbre et au recalcul)", {
+    et <- attendue(list(z.R = "Package: tablexp\n", rapport.R = "x <- 1\n"))
+    ra <- controle_t(COMMITS, "arbre", "--racine", shQuote(temoin))
+    r <- historique(et, temoin)
+    identical(et, "f25008aa31052c6a55f54e21d021da59") && identical(ra$sortie, et) && r$statut == 0L && identical(shas_de(r), ct)
+  })
+
+  # Entrée non ordinaire de R/ : lien symbolique (120000) posé par l'index, sans
+  # dépendre du système de fichiers. Le commit n'a pas d'empreinte (NA) : aucun
+  # commit trouvé ne vaut pas « non commité » -> code 3, commit nommé.
+  lien <- tempfile("depot_commits_"); dir.create(lien)
+  git_t(lien, "init", "-q")
+  ecrire_octets(lien, "cible", "a.R")
+  oid_lien <- git_t(lien, "hash-object", "-w", shQuote(file.path(lien, "cible")))
+  file.remove(file.path(lien, "cible"))
+  for (n in names(A1)) ecrire_octets(lien, file.path("R", n), A1[[n]])
+  ecrire_octets(lien, "DESCRIPTION", DESC)
+  git_t(lien, "add", "-A"); git_t(lien, "update-index", "--add", "--cacheinfo", shQuote(paste0("120000,", oid_lien, ",R/b.R")))
+  git_t(lien, "commit", "-q", "-m", shQuote("lien symbolique dans R/"))
+  cl <- git_t(lien, "rev-parse", "HEAD")
+  verifier("commits_empreinte_code historique (lien symbolique dans R/) : aucun commit mais un commit non évaluable -> code 3 nommant ce commit, jamais 2", {
+    r <- historique(strrep("0", 32L), lien)
+    r$statut == 3L && grepl("NON DÉTERMINABLE", r$sortie[1L], fixed = TRUE, useBytes = TRUE) && grepl(cl, r$sortie[1L], fixed = TRUE)
+  })
+  verifier("commits_empreinte_code references (lien symbolique dans R/) : commit non évaluable -> code 3 ; un écart par ailleurs l'emporte (code 2)", {
+    r3 <- references(lien, c(strrep("0", 32L), court(cl)))
+    r2 <- references(lien, c(strrep("0", 32L), court(cl)), c(strrep("0", 32L), "abcdef0"))
+    r3$statut == 3L && grepl("NON DÉTERMINABLE", r3$sortie[1L], fixed = TRUE, useBytes = TRUE) && r2$statut == 2L
+  })
+  unlink(c(depot, clone, temoin, lien), recursive = TRUE)
+} else cat("  [sauté] commits_empreinte_code : git absent : parcours de l'historique sur dépôts synthétiques non exécuté\n")
