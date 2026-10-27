@@ -629,12 +629,24 @@ reçue (chaîne de l'utilisateur, champ lu dans une fiche ou un texte, classe,
 chemin, message d'une erreur) citée dans le \code{message} d'un refus passe
 par une règle unique, \code{neutraliser\_citation()}
 (section~\ref{sec:fonctions-outils}), appliquée à chaque élément, aux
-sites qui citent une telle valeur~: \code{citer()} et
+sites suivants~: \code{citer()} et
 \code{liste\_guillemets()} (modules \code{donnees}, \code{exposition},
 \code{brut}, \code{simulation} et contrôle du plan), \code{sans\_controle()}
 (rejeu outillé), \code{valeur\_message()} et \code{decrire\_valeur()}
-(rapport figé), lecture du texte du plan et de la fiche~; la valeur
-exacte reste dans les \code{details}. La règle porte sur le texte des refus,
+(rapport figé), lecture du texte du plan et de la fiche,
+\code{ecrire\_fiche()} (nom de champ d'encodage \code{bytes}),
+\code{controler\_rapport()} (classes de l'objet, nom de champ d'encodage
+\code{bytes}, message d'une erreur du recalcul de l'empreinte du
+résultat, chemin d'un élément non prévu) et \code{rejouer\_fiche()}
+(classes de la fiche, nom de champ d'encodage \code{bytes})~; la valeur
+exacte reste dans les \code{details}. \textbf{Limite}~: la règle n'est
+pas encore appliquée aux autres refus qui citent une valeur reçue, dont,
+sans prétendre à l'exhaustivité, \code{type\_incompatible} du module
+\code{donnees} (nom de colonne et classe), \code{type\_non\_canonique}
+(classe), \code{serialisation\_impossible} (classes et chemin) et
+\code{texte\_non\_octets} (classe) du module \code{rapport}~: un
+caractère de contrôle ou un séparateur de ligne reçu peut y apparaître
+brut dans le \code{message}. La règle porte sur le texte des refus,
 jamais sur une valeur écrite ni empreintée. Par élément~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{NA} reste \code{NA}~;
@@ -1172,9 +1184,9 @@ locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
 l'installation, les plans de référence R1 à R6 sur l'entrée de référence,
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
 pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
-outillé et deux refus \code{objet\_modifie} du rapport figé, qui citent
-des valeurs à caractères de contrôle ou non ASCII, et la citation d'une
-chaîne latin-1~; issue~\#94), qui doivent être marqués UTF-8 et tenir sur une
+outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
+citent des valeurs à caractères de contrôle ou non ASCII, et la citation
+d'une chaîne latin-1~; issue~\#94), qui doivent être marqués UTF-8 et tenir sur une
 ligne, puis compare octet à octet les textes
 obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
@@ -2762,9 +2774,11 @@ branche est absente du clone), ou, en mode \code{references}, écart
 l'en-tête, en-tête inexploitable~; un écart sur un commit présent d'un
 clone superficiel est concluant aussi)~; \textbf{3}, non déterminable~:
 aucun commit, ou commit d'un \code{.tsv} absent, sur un clone
-superficiel, ou aucun commit (en mode \code{references}, empreinte
-différente) alors qu'un commit lu n'a pas d'empreinte parce qu'une entrée
-de \code{R/} nommée \code{*.R} n'est pas un fichier ordinaire (lien
+superficiel, ou, en mode \code{historique}, aucun commit alors qu'un
+commit lu n'a pas d'empreinte, ou, en mode \code{references}, empreinte
+différente parce que le commit de l'en-tête lui-même n'a pas
+d'empreinte~; un commit n'a pas d'empreinte quand une entrée de
+\code{R/} nommée \code{*.R} n'est pas un fichier ordinaire (lien
 symbolique, sous-module, dossier)~: ces commits sont nommés. En mode
 \code{references}, l'écart~(2) l'emporte sur le non déterminable~(3).
 \textbf{Limites}~:
