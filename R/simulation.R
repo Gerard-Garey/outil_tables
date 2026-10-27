@@ -317,8 +317,9 @@ controler_portefeuille <- function(portefeuille, periode) {
   # attribut names (ni data.frame, ni classe, ni attribut quelconque). Noms
   # comparés plus bas sans tri (setdiff, anyDuplicated), indépendamment de la
   # locale ; la comparaison ne lève pas sur un nom marqué « bytes » (#111), et sa
-  # citation dans sprintf() est masquée par liste_guillemets(). Noms attendus et
-  # manquants : CHAMPS_PORTEFEUILLE (ASCII).
+  # citation passe par liste_guillemets(), règle neutraliser_citation()
+  # (R/outils.R ; #111, #94). Noms attendus et manquants : CHAMPS_PORTEFEUILLE
+  # (ASCII).
   if (!forme_exacte(portefeuille, "list", "names"))
     refuser("simulation", "portefeuille_invalide",
             paste("Portefeuille : liste nue attendue (ni data.frame, ni classe, aucun attribut",
@@ -508,8 +509,8 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 controler_defauts <- function(defauts, graine) {
   invalide <- function(msg, details = list())
     refuser("simulation", "defauts_invalides", paste("Défauts :", msg), details)
-  # Chaînes de l'utilisateur citées par liste_guillemets(), qui masque les
-  # chaînes marquées « bytes » (sprintf() lèverait ; #111).
+  # Chaînes de l'utilisateur citées par liste_guillemets() : règle
+  # neutraliser_citation() (R/outils.R ; #111, #94).
   # Noms reçus comparés aux noms admis, sans tri ; rend la chaîne d'écart, ou "".
   ecart_noms <- function(x, requis, admis) {
     n <- names(x)

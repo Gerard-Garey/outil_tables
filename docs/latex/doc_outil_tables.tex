@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{26/10/2026}
+\newcommand{\datedoc}{27/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -581,7 +581,11 @@ les deux contrôles de forme qui s'y appuient, partagés par les modules~:
 \code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
 issue~\#48), ainsi que la règle des noms complets, \code{noms\_complets()}
 (noms présents, sans \code{NA} ni nom vide), écrite une seule fois pour le
-contrôle des rôles et pour celui du plan (issue~\#22). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+contrôle des rôles et pour celui du plan (issue~\#22), et la règle unique de
+citation d'une valeur dans un message de refus,
+\code{neutraliser\_citation()} (section~\ref{sec:refus}~; issue~\#94),
+avec le relevé des noms d'encodage \code{bytes} d'un objet reçu,
+\code{noms\_bytes()} (issue~\#114). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -617,6 +621,128 @@ est préférée à un objet portant \code{ok = FALSE}, forme d'\code{outil\_USP}
 un tel objet peut être lu par mégarde comme une construction partielle, une
 condition ne le peut pas. Les codes de refus de chaque module sont recensés
 dans la partie du module.
+
+\medskip
+\noindent
+\textbf{Citation d'une valeur dans un message} (issue~\#94). Une valeur
+reçue (chaîne de l'utilisateur, champ lu dans une fiche ou un texte, classe,
+chemin, message d'une erreur) citée dans le \code{message} d'un refus passe
+par une règle unique, \code{neutraliser\_citation()}
+(section~\ref{sec:fonctions-outils}), appliquée à chaque élément, aux
+sites suivants~: \code{citer()} et
+\code{liste\_guillemets()} (modules \code{donnees}, \code{exposition},
+\code{brut}, \code{simulation} et contrôle du plan), \code{sans\_controle()}
+(rejeu outillé), \code{valeur\_message()} et \code{decrire\_valeur()}
+(rapport figé), lecture du texte du plan et de la fiche (classe de
+l'objet reçu, première ligne, type, chemin et chemin attendu, colonne,
+valeur), \code{ecrire\_fiche()} (nom de champ d'encodage \code{bytes}),
+\code{controler\_rapport()} (classes de l'objet, nom de champ d'encodage
+\code{bytes}, message d'une erreur du recalcul de l'empreinte du
+résultat, chemin d'un élément non prévu) et \code{rejouer\_fiche()}
+(classes de la fiche, nom de champ d'encodage \code{bytes}, noms et
+attributs de la forme lue). La valeur citée étant une valeur reçue, elle
+reste brute dans les \code{details} (classe, chemin, colonne, nom
+d'encodage \code{bytes}\ldots), à trois précisions près~: pour
+\code{fiche\_non\_conforme}, à l'étape~2 du rejeu, \code{details\$lu} est
+la description de forme (section~\ref{sec:rejeu}), citée par la même
+règle, et la valeur exacte est celle de la fiche reçue au chemin
+\code{details\$champ}~; pour la lecture du texte du plan et de la fiche,
+la valeur reçue brute est dans les \code{details} (\code{classe},
+\code{chemin}, \code{colonne}, \code{attendu}) ou, à défaut, dans le
+texte reçu à la ligne \code{details\$ligne}~; pour
+\code{version\_fiche\_non\_admise}, à l'étape~3 du rejeu, les
+\code{details} \code{tablexp}, \code{code} et \code{code\_installe} sont
+la sortie de \code{texte\_lu()} (section~\ref{sec:rejeu})~: la chaîne
+elle-même si c'est une chaîne unique sans attribut, sinon «~absente~» ou «~illisible (\emph{type} de
+longueur \emph{n})~», la version lue \code{details\$lu} restant brute.
+\textbf{Limite}~: la règle
+n'est pas encore appliquée aux autres refus qui citent une valeur reçue,
+dont, sans prétendre à l'exhaustivité, \code{type\_incompatible} du
+module \code{donnees} (nom de colonne et classe),
+\code{type\_non\_canonique} (classe) et \code{serialisation\_impossible}
+(classes et chemin) du module \code{rapport}~: un
+caractère de contrôle ou un séparateur de ligne reçu peut y apparaître
+brut dans le \code{message}. La règle porte sur le texte des refus,
+jamais sur une valeur écrite ni empreintée. Par élément~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{NA} reste \code{NA}~;
+  \item une chaîne d'encodage \code{bytes} est remplacée par le repère
+    «~<chaîne d'encodage bytes>~», sans réinterprétation de ses octets
+    (\code{sprintf()} lèverait sur elle l'erreur R «~translating strings
+    with "bytes" encoding is not allowed~» au lieu du refus~; issue~\#111)~;
+  \item une chaîne marquée latin-1 est d'abord convertie par
+    \code{enc2utf8()}, qui la lit selon la page de code CP1252 (aide
+    \code{?Encoding} de R~4.3.3, «~Details~», pour R~3.5.0 et suivants~;
+    constaté sous les locales C et C.UTF-8)~: les octets 0x80 à 0x9F y
+    deviennent des caractères imprimables («~€~», «~œ~», «~’~»\ldots), non
+    des caractères de contrôle, et les cinq positions que CP1252 ne définit
+    pas (0x81, 0x8D, 0x8F, 0x90, 0x9D) sont écrites \code{<81>}\ldots{} par
+    \code{enc2utf8()} elle-même~;
+  \item dans une chaîne UTF-8 valide (marquée UTF-8, convertie, ou non
+    marquée aux octets UTF-8 valides), chaque point de code des catégories
+    Unicode Cc, Zl et Zp --- U+0000 à U+001F, U+007F, U+0080 à U+009F,
+    U+2028 et U+2029, soit 67 points de code, dont U+0000 qu'aucune
+    chaîne R ne contient --- s'écrit \code{<U+XXXX>} (quatre chiffres
+    hexadécimaux majuscules)~; cet ensemble contient tous les séparateurs
+    de ligne (LF, VT, FF, CR, U+001C à U+001E, NEL, U+2028, U+2029)~;
+  \item une chaîne qui n'est pas de l'UTF-8 valide est citée octet par
+    octet~: un octet de 0x80 à 0xFF s'écrit \code{<xx>} (hexadécimal
+    minuscule), un octet de 0x00 à 0x1F ou 0x7F \code{<U+00XX>}, les autres
+    tels quels.
+\end{itemize}
+Les notations sont celles de \code{?iconv} (R~4.3.3)~: \code{<xx>} pour
+\code{sub = "byte"}, \code{<U+xxxx>} pour \code{sub = "Unicode"}. Le travail
+porte sur les octets (\code{charToRaw()}, \code{utf8ToInt()})~: la sortie
+est la même sous les locales C et UTF-8 (constat des tests et de
+\code{tests/controles/locale\_c.R}). Le résultat est marqué UTF-8 s'il
+contient un octet non ASCII. Un message de refus qui cite une valeur tient
+ainsi sur une ligne. \code{tests/unitaires/test\_outils.R} vérifie la
+règle et son prédicat sur onze caractères (VT, FF, LF, CR, tabulation,
+U+0001, U+007F, NEL, U+009F, U+2028, U+2029), sur l'ensemble des points de
+code de U+0001 à U+FFFF hors demi-codets (U+D800 à U+DFFF), dont il
+retrouve exactement les 66 de l'ensemble, U+0000 mis à part, sur des caractères de format et «~é~» cités tels quels, sur
+\code{NA}, une chaîne \code{bytes}, des octets qui ne sont pas de l'UTF-8
+valide, une chaîne latin-1 et une chaîne native UTF-8, et son
+idempotence~; les sites qui l'appliquent sont testés avec leur module.
+\textbf{Limites acceptées}~: les caractères de format
+(catégorie Cf~: U+200B à U+200F, U+202A à U+202E, U+2066 à U+2069, U+FEFF)
+ne sont pas neutralisés, parce qu'ils ne coupent pas une ligne et sont
+légitimes dans certains noms (U+200C et U+200D)~; un contrôle
+bidirectionnel peut donc réordonner l'affichage d'une valeur citée~; le
+caractère «~<~» n'est pas échappé, si bien qu'un «~<U+000A>~» tapé tel
+quel se cite comme un LF. \code{citation\_a\_neutraliser()} est le prédicat
+de la règle (vrai pour un élément que la règle ne cite pas tel quel), et
+\code{citer()}, \code{sans\_controle()} (rejeu) l'appliquent sous leur
+nom. L'écrivain du texte du plan et de la fiche (\code{texte\_objet()})
+remplace en outre par une espace les caractères de contrôle des lignes
+d'en-tête «~\# nom~: valeur~» qu'il écrit (fonction locale
+\code{propre})~: ce sont des octets écrits, non un message de refus, et ce
+remplacement reste hors de la règle.
+
+\medskip
+\noindent
+\textbf{Noms d'encodage \code{bytes}} (issue~\#114). Une lecture par nom
+(\code{x[["champ"]]}, \code{x\$champ}) lève l'erreur R «~translating
+strings with "bytes" encoding is not allowed~» dès qu'elle rencontre un
+nom d'encodage \code{bytes} placé avant le nom cherché ou à sa place
+(constat sous les locales C et C.UTF-8). Les fonctions qui lisent par nom
+une fiche ou un objet reçu --- \code{rejouer\_fiche()},
+\code{ecrire\_fiche()} et le contrôle du rapport figé
+(\code{controler\_rapport()}) --- relèvent donc d'abord, par
+\code{noms\_bytes()}, les noms de premier niveau de cet encodage, et
+refusent sous un motif nommé quelle que soit la position du nom, le nom
+étant cité par la règle ci-dessus (repère) et gardé brut dans
+\code{details\$lu}~: \code{fiche\_non\_conforme} au rejeu
+(section~\ref{sec:rejeu}), \code{chaine\_codage\_bytes} à l'écriture de la
+fiche (section~\ref{sec:serialisation}), \code{objet\_modifie} au rapport
+figé (tableau~\ref{tab:refus-rapport}). Les noms sont lus par
+\code{attr(x, "names", exact = TRUE)} et non par \code{names()}, fonction
+générique qui dispatche sur la classe et lève la même erreur sur une
+liste dont la classe est d'encodage \code{bytes}. \textbf{Limite}~: seul
+le premier niveau est contrôlé~; un nom d'encodage \code{bytes} à un
+niveau inférieur de la fiche (par exemple dans \code{empreintes}) fait
+encore lever cette erreur R par les trois fonctions (constat), au lieu
+d'un refus nommé.
 
 \subsection{Avertissements métier}
 \label{sec:avertissements}
@@ -708,6 +834,13 @@ sur les noms seuls~: la forme de l'objet, les doublons et la liste vide sans
 noms relèvent de l'appelant~; seul endroit où s'écrit la règle, partagée par
 \code{controler\_roles()} et \code{liste\_noms\_complets()} (issues~\#22,
 \#60 et~\#62) \\
+\catalogue{fonctions-outils}{noms\_bytes()} & interne & \code{x} &
+positions (\code{integer}, jamais \code{NA}) des noms de premier niveau
+d'encodage \code{bytes}, \code{integer(0)} si \code{x} n'a pas de noms ou
+aucun de ce codage~; noms lus par \code{attr(x, "names", exact = TRUE)},
+non par \code{names()}, qui dispatche sur la classe et lève sur une classe
+d'encodage \code{bytes}~; contrôle préalable à toute lecture par nom d'un
+objet reçu (section~\ref{sec:refus}~; issue~\#114) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -723,6 +856,22 @@ du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
 réservée au texte du moteur, jamais aux données, rôles ou plan de
 l'utilisateur (section~\ref{sec:harnais}, «~Locale de
 l'installation~»~; issue~\#50) \\
+\catalogue{fonctions-outils}{neutraliser\_citation()} & interne & \code{x}
+(converti par \code{as.character()} s'il n'est pas de type
+\code{character}) & vecteur de même longueur, sans noms, chaque élément
+cité selon la règle unique des valeurs citées dans un message de refus~:
+\code{NA} conservé, repère pour une chaîne \code{bytes}, latin-1 converti,
+\code{<U+XXXX>} pour un caractère des catégories Cc, Zl et Zp,
+\code{<xx>} pour un octet hors UTF-8 valide~; marqué UTF-8 s'il est non
+ASCII (section~\ref{sec:refus}, «~Citation d'une valeur dans un
+message~»~; issue~\#94) \\
+\catalogue{fonctions-outils}{citation\_a\_neutraliser()} & interne &
+\code{x}, comme ci-dessus & vecteur logique, \code{TRUE} pour un élément
+que la règle ne cite pas tel quel (chaîne \code{bytes}, octets hors UTF-8
+valide, caractère de l'ensemble neutralisé), \code{FALSE} pour \code{NA}
+et pour une chaîne citée telle quelle, conversion latin-1 et marque UTF-8
+mises à part~; l'ensemble n'est défini qu'une fois, dans la règle
+(issue~\#94) \\
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
 explicite, sans défaut ni attribut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
@@ -1050,7 +1199,11 @@ installe donc l'arbre de travail sous \code{LC\_ALL=C} et sous la première
 locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
 l'installation, les plans de référence R1 à R6 sur l'entrée de référence,
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
-pour R1, le bilan du rejeu outillé, puis compare octet à octet les textes
+pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
+outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
+citent des valeurs à caractères de contrôle ou non ASCII, et la citation
+d'une chaîne latin-1~; issue~\#94), qui doivent être marqués UTF-8 et tenir sur une
+ligne, puis compare octet à octet les textes
 obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
@@ -1919,7 +2072,12 @@ dépendent de l'environnement~: ils se sautent, avec un saut
 locale latin-1 ne peut pas y être générée, ou si les commandes ou le lien
 symbolique qu'ils emploient manquent~; la batterie unitaire reste ainsi
 exécutable sous Windows, tandis que le contrôle lui-même n'y saute jamais
-en silence.
+en silence. Pour \code{commits\_empreinte\_code.R}, qui n'est pas une règle
+du dépôt mais l'outil qui retrouve les commits d'une empreinte du code, la
+batterie exécute le mode \code{arbre} et les refus, et ne parcourt
+l'historique, sur des dépôts synthétiques, que si git est présent, avec un
+saut annoncé sinon (section~\ref{sec:rejeu}, «~Retrouver le code d'une
+fiche~»).
 
 \begin{center}
 \small
@@ -1964,7 +2122,9 @@ UTF-8 disponible, et exécuté dans un sous-processus sous la locale de son
 installation, qui vérifie d'abord la locale effective~; pour R1 à R6,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
-marquées UTF-8), puis ces textes, trois par plan et le bilan, comparés
+marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
+issue~\#94), puis ces textes, trois par plan, le bilan et les messages,
+soit vingt, comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11~; M54~; issue~\#66 \\
@@ -1998,6 +2158,15 @@ puissances égale aux entiers exacts de Python~; code~1 si Python est absent.
 et Python)~» du job «~Tests (R 4.3.3)~», hors liste des batteries
 (section~\ref{sec:empreinte}) & ADR 0011, annotation du 26/10/2026~; M161~;
 issue~\#104 \\
+\code{commits\_empreinte\_}\newline\code{code.R} & commits dont les
+\code{R/*.R} ont une empreinte du code donnée, recalculée sur les blobs de
+l'historique git sans charger \code{tablexp} (mode \code{historique})~;
+empreinte de la racine (mode \code{arbre}, égale à \code{EMPREINTE\_CODE}
+en batterie)~; concordance des en-têtes des références (mode
+\code{references})~; codes de sortie 0 à~3 (trouvé, refus, aucun commit ou
+écart, non déterminable). \textbf{Hors CI} pour l'historique, lancé à la
+main sur un clone complet (section~\ref{sec:rejeu}) & ADR 0011, annotation
+du 27/10/2026, (e)~; M126, M166~; issue~\#89 \\
 \end{longtable}
 \end{center}
 
@@ -2421,7 +2590,10 @@ octets par \code{lire\_fiche()} chez l'appelant, ou prise dans
 appeler \code{construire\_table()}~:
 \begin{enumerate}[leftmargin=*, itemsep=2pt]
   \item \textbf{nature des arguments}, la fiche d'abord~: un objet
-    \code{construction} ou \code{rejeu} reçu à la place de la fiche, ou une
+    \code{construction} ou \code{rejeu} reçu à la place de la fiche, une
+    liste dont un nom de premier niveau, à toute position, est d'encodage
+    \code{bytes} (\code{noms\_bytes()}~; section~\ref{sec:refus}, «~Noms
+    d'encodage \code{bytes}~»~; issue~\#114), ou une
     fiche qui n'est pas une liste nommée aux noms uniques, sans autre
     attribut que ses noms (\code{liste\_nommee()}), est refusé sous
     \code{fiche\_non\_conforme}~; puis des données qui ne sont pas un
@@ -2515,15 +2687,34 @@ données, étape~6) gardent leur module. Chaque message cite la valeur lue et
 la valeur attendue. La version de \code{tablexp} et les empreintes du
 code y sont écrites par \code{texte\_lu()}~: «~absente~» si la valeur
 manque, elle-même si c'est une chaîne unique sans attribut (\code{NA} écrit
-«~NA~»), «~illisible (\emph{type} de longueur \emph{n})~» sinon. Dans toute
-valeur lue dans la fiche et insérée dans un message, les caractères de
-contrôle (U+0001 à U+001F, U+007F) sont remplacés par une espace
-(\code{sans\_controle()})~; les \code{details} et le bilan gardent la valeur
-brute. Les formes lues de l'étape~2 sont
+«~NA~»), «~illisible (\emph{type} de longueur \emph{n})~» sinon~; elles
+sont rangées sous cette forme dans les \code{details} de
+\code{version\_fiche\_non\_admise} (\code{tablexp}, \code{code},
+\code{code\_installe}), la version lue y restant brute
+(\code{details\$lu}). Toute
+valeur lue dans la fiche et insérée dans un message (classes de l'objet
+reçu, valeurs et noms lus) est citée selon la règle unique des refus
+(section~\ref{sec:refus}, «~Citation d'une valeur dans un message~»~:
+caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>},
+octets hors UTF-8 valide \code{<xx>}, chaîne \code{bytes} sous un repère~;
+\code{sans\_controle()}, issue~\#94)~; les \code{details} et le bilan
+gardent la valeur brute. Le message est marqué UTF-8 sous toute locale
+(gabarits passés par \code{texte\_moteur()}). Une valeur d'encodage
+\code{bytes} donne ainsi le refus nommé de l'étape, et non l'erreur R
+«~translating strings with "bytes" encoding is not allowed~»~:
+\code{empreintes\$algorithme} d'encodage \code{bytes} est refusé sous
+\code{algorithme\_empreinte\_inconnu}, et une fiche dont une classe est
+d'encodage \code{bytes} sous \code{fiche\_non\_conforme} (classes lues par
+\code{\%in\%}, là où \code{inherits()} lève cette erreur, constat sous les
+locales C et C.UTF-8). Les formes lues de l'étape~2 sont
 écrites par \code{decrire\_forme()}~: «~champ absent~», ou «~\emph{type} de
 longueur \emph{n}~», complété au besoin par «~, NA~», «~, vide~»,
 «~, attribut(s) \emph{noms}~» (les noms d'une liste ne sont pas cités comme
-attribut), «~, noms en double~: \emph{noms}~» et «~, noms incomplets~».
+attribut), «~, noms en double~: \emph{noms}~» et «~, noms incomplets~»~;
+les noms d'attributs et les noms en double y sont cités par la règle
+unique. Pour ces formes, \code{details\$lu} est ce texte descriptif, et
+non la valeur brute~: la valeur exacte est celle de la fiche reçue au
+chemin \code{details\$champ}.
 Dans le tableau, un crochet désigne une valeur insérée.
 
 {\footnotesize
@@ -2543,6 +2734,7 @@ Dans le tableau, un crochet désigne une valeur insérée.
 \endhead
 \code{fiche\_non\_conforme}, étape~1 (objet \code{construction}) & «~Rejeu~: objet \code{`construction`} reçu à la place de sa fiche~; passer \code{x\$fiche}, ou la fiche relue de son texte par \code{lire\_fiche()}.~» & \code{champ} «~(fiche)~», \code{lu} «~construction~», \code{attendu} «~liste nommée~» \\
 \code{fiche\_non\_conforme}, étape~1 (objet \code{rejeu}) & «~Rejeu~: objet \code{`rejeu`} reçu à la place d'une fiche~; passer \code{r\$construction\$fiche}.~» & idem, \code{lu} «~rejeu~» \\
+\code{fiche\_non\_conforme}, étape~1 (nom d'encodage \code{bytes}) & «~Rejeu~: la fiche porte un nom de champ d'encodage «~bytes~» (champ n\textsuperscript{o} [position du premier] : [nom cité]), non convertible en UTF-8 sans deviner~; aucun champ du premier niveau n'est lu par nom. Une fiche produite par le moteur ou relue par \code{lire\_fiche()} n'en porte pas.~» & \code{champ} «~(fiche)~», \code{lu} les noms \code{bytes} bruts, \code{attendu} «~noms de champ sans encodage bytes~» \\
 \code{fiche\_non\_conforme}, étape~1 (autre objet) & «~Rejeu~: la fiche doit être une liste nommée aux noms uniques, sans autre attribut que ses noms~; reçu~: objet de classe [classes] (type [type]). Le rejeu ne lit aucun fichier~: relire la fiche de ses octets par \code{lire\_fiche(readBin(fichier, "raw", file.size(fichier)))}, ou passer \code{x\$fiche}.~» & idem, \code{lu} les classes \\
 \code{fiche\_non\_conforme}, étape~2 & «~Fiche non conforme au rejeu~: «~[champ]~»~: [forme lue] au lieu de [forme attendue]~; \ldots{} Le rejeu ne lit que ces champs avant \code{construire\_table()}~; aucun n'est complété ni converti.~» Formes attendues~: «~integer de longueur 1, non NA, sans attribut~» (\code{version\_fiche})~; «~liste nommée aux noms uniques, sans autre attribut que ses noms~» (\code{empreintes})~; «~chaîne unique, non vide, non NA, sans attribut~» (ses trois éléments)~; «~champ présent~» (\code{roles}, \code{plan})~; «~champ présent (NULL admis)~» (\code{provenance}) & \code{champ}, \code{lu}, \code{attendu}~: un élément par champ en défaut, dans l'ordre de l'étape \\
 \code{version\_fiche\_non\_admise}, étape~3 & «~Version de fiche non admise au rejeu~: version\_fiche [version lue] lue, version(s) admise(s) par ce code~: [\code{VERSIONS\_FICHE\_REJEU}]. Fiche produite par tablexp [version de la fiche], empreinte du code [empreinte du code de la fiche]~; code installé~: tablexp [version installée], empreinte du code [\code{EMPREINTE\_CODE}]. Aucune conversion de fiche n'est faite~: rejouer cette fiche avec le code dont l'empreinte est celle de la fiche.~» La version de la fiche est «~absente~» si \code{versions} manque ou est une liste sans élément \code{tablexp} & \code{lu}, \code{admises}, \code{tablexp}, \code{code}, \code{code\_installe} \\
@@ -2556,8 +2748,100 @@ Dans le tableau, un crochet désigne une valeur insérée.
 Le message de \code{version\_fiche\_non\_admise} cite l'empreinte du code,
 et non la seule version du package, parce que celle-ci, déclarée dans
 \code{DESCRIPTION}, est immobile (\code{0.0.0.9000}) et ne permet pas de
-retrouver le code d'une fiche~; le moyen de passer d'une fiche au code qui
-l'a produite reste à choisir (issue~\#89, ouverte).
+retrouver le code d'une fiche~: elle ne s'incrémente qu'aux jalons de
+livraison (décision M126).
+
+\medskip
+\noindent
+\textbf{Retrouver le code d'une fiche} (issue~\#89~; ADR 0011, annotation
+du 27/10/2026, (e)~; décisions M126 et M166). On passe de
+\code{fiche\$empreintes\$code} aux commits qui l'ont produite en
+\textbf{recalculant l'empreinte du code dans l'historique git}, par le
+script \code{tests/controles/commits\_empreinte\_code.R}, en R de base,
+hors du package (le moteur ne dépend pas de git, et un package installé n'a
+pas d'historique) et sans charger \code{tablexp}~: son recalcul est
+indépendant de \code{empreinte\_sources()} et la recoupe. Aucun registre
+«~empreinte~$\to$~commit~» n'est tenu, et la version du package n'est pas
+incrémentée à chaque fusion. Le script applique la définition et la garde
+de l'empreinte du code (section~\ref{sec:empreinte-resultat}, «~Empreinte
+du code~»)~: fichiers de premier niveau de \code{R/} dont le nom finit par
+\code{.R}, ni cachés ni dossiers, triés par octets~; MD5 de chaque
+fichier~; relevé «~\code{<md5>}, deux espaces, \code{R/<fichier>}~», une
+ligne par fichier, LF~; MD5 du relevé~; pas d'empreinte, jamais devinée,
+pour un commit sans \code{DESCRIPTION} de «~Package: tablexp~» ou sans
+\code{R/rapport.R}. Dans l'historique, il calcule sur les \emph{blobs}
+(\code{git cat-file}), non sur un arbre extrait, et lit les noms de
+\code{R/} en octets (\code{git ls-tree -z}), si bien que le résultat ne
+dépend pas de l'arbre de travail. Trois modes, lancés depuis la racine du
+dépôt~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{historique <empreinte>}~: l'empreinte, 32 caractères
+    hexadécimaux minuscules, est refusée sous une autre forme avant tout
+    appel à git~; le script parcourt les commits de toutes les références
+    locales (\code{git rev-list -{}-all}), sauf \code{refs/stash}, un code
+    remisé n'étant pas commité, et liste, du plus ancien au plus récent,
+    ceux dont \code{R/*.R} a cette empreinte (SHA complet, date, sujet)~;
+  \item \code{arbre}~: empreinte des \code{R/*.R} de la racine, sans git~;
+    la batterie unitaire exige son égalité à \code{EMPREINTE\_CODE}~;
+  \item \code{references}~: hors batteries et hors CI, pour chaque
+    \code{tests/reference/*.tsv}, vérifie que le commit de l'en-tête
+    \code{\# commit} est dans la classe de l'empreinte de l'en-tête
+    \code{\# fiche\$empreintes/code}.
+\end{itemize}
+Codes de sortie distincts, rien n'étant deviné~: \textbf{0}, commits
+trouvés, empreinte rendue ou références concordantes~; \textbf{1}, refus
+nommé seulement (argument, git absent, racine hors d'un dépôt, sources
+introuvables, aucun \code{.tsv})~; \textbf{2}, conclusion négative~: aucun
+commit sur un historique complet (le code n'était pas commité, ou sa
+branche est absente du clone), ou, en mode \code{references}, écart
+(commit absent d'un historique complet, ambigu, empreinte différente de
+l'en-tête, en-tête inexploitable~; un écart sur un commit présent d'un
+clone superficiel est concluant aussi)~; \textbf{3}, non déterminable~:
+aucun commit, ou commit d'un \code{.tsv} absent, sur un clone
+superficiel, ou, en mode \code{historique}, aucun commit alors qu'un
+commit lu n'a pas d'empreinte, ou, en mode \code{references}, empreinte
+différente parce que le commit de l'en-tête lui-même n'a pas
+d'empreinte~; un commit n'a pas d'empreinte quand une entrée de
+\code{R/} nommée \code{*.R} n'est pas un fichier ordinaire (lien
+symbolique, sous-module, dossier)~: ces commits sont nommés. En mode
+\code{references}, l'écart~(2) l'emporte sur le non déterminable~(3).
+\textbf{Limites}~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item une empreinte désigne une \textbf{classe de commits}~: tout commit
+    qui ne touche pas \code{R/*.R} garde l'empreinte de son parent. La
+    classe identifie le code R, non le package entier~: deux commits d'une
+    classe peuvent différer par \code{DESCRIPTION}, \code{NAMESPACE},
+    \code{inst/} ou un fichier caché~; qu'aucun résultat n'en dépende est
+    une \textbf{hypothèse}, non mesurée, et le relecteur lit ces écarts par
+    \code{git diff} entre deux commits de la classe~;
+  \item sur un \textbf{clone superficiel}, une liste trouvée est valable
+    mais peut être incomplète, et une absence n'est jamais concluante (le
+    script le dit)~; le contrôle de l'historique se lance donc à la main,
+    sur un clone complet (\code{git fetch -{}-unshallow} au besoin)~: le
+    job «~Tests (R~4.3.3)~» tourne sans git, et les autres jobs de la CI
+    reçoivent un historique de profondeur~1 (\emph{hypothèse}, d'après le
+    défaut d'\code{actions/checkout}, non relu~; ADR 0011, annotation du
+    27/10/2026, (e)~4)~; \code{.github/workflows/ci.yml} n'est pas modifié
+    (M166)~;
+  \item un commit perdu (branche supprimée sans fusion, historique réécrit)
+    rend sa fiche introuvable~: le script le dit, il ne le répare pas. La
+    règle de fusion par commit de fusion, jamais par squash ni rebase,
+    garde accessibles depuis \code{main} les commits d'une branche
+    fusionnée~;
+  \item le MD5 d'un blob est celui du fichier extrait sous la règle
+    \code{eol=lf} de \code{.gitattributes}~; un arbre extrait avec d'autres
+    fins de ligne aurait une autre empreinte (limite déjà connue de la
+    commande des tiers).
+\end{itemize}
+\code{tests/unitaires/test\_controles.R} vérifie en batterie le mode
+\code{arbre} (égalité à \code{EMPREINTE\_CODE}, fichiers \code{.r} et
+cachés ignorés, sources introuvables refusées) et les refus sans git~; le
+parcours de l'historique, sur des dépôts synthétiques créés sous
+\code{tempfile()} (ordre, garde, classe, codes 0, 2 et~3, clone de
+profondeur~1, blob partagé avec \code{DESCRIPTION}, lien symbolique, code
+remisé, noms que git cite entre guillemets, mode \code{references}), n'est
+exécuté que si git est présent~: il est sauté, avec un saut
+\textbf{annoncé} («~[sauté]~»), dans le job «~Tests (R~4.3.3)~».
 
 \medskip
 \noindent
@@ -2797,13 +3081,20 @@ sur les champs de la fiche~; le nombre d'appels de
 \code{construire\_table()}, compté par \code{trace()} sur l'espace de noms
 installé~: aucun sur un refus, un sur un rejeu réussi~; les verdicts des
 témoins sur des fiches modifiées~; les cas adverses de la section
-\ref{sec:rejeu}, «~Limites~», testés tels que constatés.
+\ref{sec:rejeu}, «~Limites~», testés tels que constatés~; la citation
+des valeurs lues dans les messages (VT, FF, NEL et U+2028 écrits
+\code{<U+XXXX>}, message sur une ligne et marqué UTF-8) et le refus nommé,
+au lieu d'une erreur R, d'un algorithme ou d'une classe d'encodage
+\code{bytes} (issue~\#94), et d'un nom d'encodage \code{bytes} au
+premier niveau de la fiche, en première, quatrième et dernière positions
+(issue~\#114).
 \code{tests/test\_reproductibilite.R} rejoue, pour les six plans de
 référence, la fiche écrite puis relue~: objet \code{identical()} hors
 \code{execution} à l'objet de référence, témoins du code, des versions, de
 la plateforme, de la fiche et de l'empreinte du résultat «~identique~»,
 empreinte du fichier «~non vérifiée~». \code{tests/controles/locale\_c.R}
-compare les octets du bilan du rejeu de R1 sous les deux locales.\par}
+compare les octets du bilan du rejeu de R1, et ceux de messages de refus
+du rejeu, sous les deux locales.\par}
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-construire-table}
@@ -2835,7 +3126,7 @@ compare les octets du bilan du rejeu de R1 sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», pour un message ou le bilan du rejeu \\
-\catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & caractères de contrôle remplacés par une espace, marque d'encodage conservée~; messages de refus du rejeu seulement \\
+\catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu seulement \\
 \catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets (section~\ref{sec:rejeu}) \\
 \catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & paires «~nom=valeur~» jointes par «~;~», ou \code{texte\_lu()} d'une autre valeur~; colonnes du bilan pour \code{versions} et \code{plateforme} \\
 \catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
@@ -3434,7 +3725,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
 \catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
 \catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
-\catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & seule règle de masquage des chaînes de l'utilisateur citées dans un message~: le même vecteur, chaque chaîne marquée \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~», toute autre chaîne (\code{NA} compris) laissée telle quelle, encodage compris, sans \code{paste} ni traduction~; une chaîne \code{bytes} ferait lever \code{sprintf()} au lieu du refus (issue~\#111) \\
+\catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages, chaque chaîne passée d'abord par \code{citer()} (issue~\#111) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
@@ -5762,9 +6053,21 @@ relecture exacte constatée sur 1\,399\,465 doubles), appuyé sur un argument
 d'ordre de grandeur, non une preuve. Sous Windows, avant l'issue~\#104,
 l'écriture par la bibliothèque C n'était pas toujours correctement
 arrondie, et la relecture n'était pas toujours exacte (constat sur le poste
-du mainteneur, ADR 0011, point~3.2)~; ni~H, ni l'identité des octets
-écrits par \code{tablexp}, ni la relecture n'y sont encore mesurées
-(\textbf{hypothèse} jusqu'à l'étape~(5), décision M153~; décision M61,
+du mainteneur, ADR 0011, point~3.2). Avec l'écriture par \code{tablexp},
+l'identité des octets écrits sous Windows (R~4.3.3 ucrt) à ceux de la
+plateforme de référence et la relecture exacte y sont désormais des
+\emph{constats de mesure}, rapportés de l'étape~(5) de la pull
+request~\#116, sur le poste du mainteneur (ADR 0011, annotation du
+27/10/2026, (a) et~(b))~: les empreintes MD5 des textes des témoins T2 et
+T3 y sont égales à celles de la CI, et 999\,493 doubles finis, tirés
+uniformément sur les motifs de 64~bits, écrits puis relus, ne donnent
+aucune relecture fausse. Cet échantillon n'est pas celui que prévoyait le
+protocole (celui de l'étape~(3a)), et il est dominé par des exposants hors
+des grandeurs d'un plan ou d'une fiche~; 0~faute sur 999\,493 borne le taux
+de faute à $3{,}0 \cdot 10^{-6}$ par double (niveau 95~\%, borne
+unilatérale de Clopper-Pearson), pour cette seule loi d'échantillonnage.
+H n'y est pas mesurée et reste une \textbf{hypothèse}, que ce constat ne
+contredit pas~; sous macOS, rien n'est mesuré (décision M61,
 issue~\#49). Les entiers, logiques, chaînes, facteurs et
 dates s'écrivent de même dans les deux formes. Une forme inconnue est
 refusée (\code{forme\_ecriture\_inconnue}).
@@ -5869,10 +6172,17 @@ La ligne \code{doubles} de \code{CONVENTIONS\_TEXTE}, en en-tête des plans,
 des fiches et des rapports figés, le dit au relecteur, mot pour mot~:
 «~le double relu fait foi~; 17 chiffres significatifs (forme \%.17g de la
 norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par
-tablexp sans la bibliothèque C~; relecture au bit près constatée sous glibc,
-non garantie ailleurs~; à l'import, toute écriture décimale est admise (0.95
-comme 0.94999999999999996)~; refusés~: décimal non fini, décimal non nul
-relu 0~; jetons NA, NaN, Inf, -Inf~».
+tablexp sans la bibliothèque C~; relecture au bit près constatée sous glibc
+et sous Windows (R 4.3.3 ucrt), non garantie ailleurs~; à l'import, toute
+écriture décimale est admise (0.95 comme 0.94999999999999996)~; refusés~:
+décimal non fini, décimal non nul relu 0~; jetons NA, NaN, Inf, -Inf~»
+(depuis l'issue~\#120~; auparavant «~relecture au bit près constatée sous
+glibc, non garantie ailleurs~»). «~Non garantie ailleurs~» n'implique
+aucune garantie sous glibc ni sous Windows~: la relecture au bit près n'est
+démontrée sur aucune plateforme (\code{?NumericConstants}, R~4.3.3~: «~one
+of the nearest representable numbers~»)~; elle y est seulement constatée.
+«~(R 4.3.3 ucrt)~» désigne la seule compilation de R mesurée sous Windows
+(ADR 0011, annotation du 27/10/2026, (d)~3).
 
 \medskip
 \noindent
@@ -6064,9 +6374,12 @@ en a au plus 1\,000, sinon 1\,000 réparties et les bornes~; contrôle~:
     conversion \code{g} de la norme C est un \emph{constat de mesure}. Elle
     n'emploie que des opérations sur des \code{integer} et \code{max.col()}
     à \code{ties.method} fixé.
-  \item Sous Windows, ni~H ni l'identité des octets ne sont mesurées~:
-    \textbf{hypothèse} jusqu'à l'étape~(5) (M153). Sous macOS~: non mesurées
-    (M61, \#49).
+  \item Sous Windows (R~4.3.3 ucrt), l'identité des octets à ceux de la
+    plateforme de référence est un \emph{constat de mesure} rapporté de
+    l'étape~(5) de la pull request~\#116 (empreintes MD5 des textes de T2
+    et T3 égales à celles de la CI~; ADR 0011, annotation du 27/10/2026,
+    (b))~; H n'y est pas mesurée et reste une \textbf{hypothèse}. Sous
+    macOS~: non mesurées (M61, \#49).
   \item \textbf{Constat de mesure}~: 0~écart à la glibc~2.39 et 0~écart à
     Python~3.13.17 sur 1\,177\,468 doubles finis, dont 68\,886 égalités
     exactes, pour le prototype
@@ -6083,8 +6396,8 @@ en a au plus 1\,000, sinon 1\,000 réparties et les bornes~; contrôle~:
     indépendant de la glibc pour les chiffres est une \textbf{hypothèse}
     (CPython a sa propre conversion, dont la source n'a pas été relue).
   \item \textbf{Relecture}~: inchangée par l'issue~\#104, \emph{constat de
-    mesure} sous glibc, non une preuve (ci-dessus, «~Deux formes, un seul
-    écrivain~»). Pour un texte écrit par \code{tablexp}, le contrôle
+    mesure} sous glibc et sous Windows (R~4.3.3 ucrt), non une preuve
+    (ci-dessus, «~Deux formes, un seul écrivain~»). Pour un texte écrit par \code{tablexp}, le contrôle
     «~réécrire la valeur relue redonne le texte~» déciderait l'aller-retour
     texte par texte sur toute plateforme, dix-sept chiffres correctement
     arrondis désignant un seul double~; ce contrôle n'est pas implanté dans
@@ -6288,8 +6601,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     (MSYS2, coreutils~8.32), \emph{constat de mesure sur le poste du
     mainteneur}, à une version antérieure du code (relevé du 25/10/2026 à
     \code{1c48475}, issues~\#49 et~\#101)~: sans \code{-t}, une autre
-    valeur~; avec \code{-t}, celle de \code{EMPREINTE\_CODE}. À remesurer
-    à l'étape~(5)~; sous macOS,
+    valeur~; avec \code{-t}, celle de \code{EMPREINTE\_CODE}~; remesuré
+    sous Git Bash (coreutils~8.32) à l'état final de la dixième branche
+    (\code{aa1cf0b}, dont les \code{R/*.R} sont ceux de \code{8bd29dd}),
+    même constat, rapporté (ADR 0011, annotation du 27/10/2026, (c))~; sous macOS,
     \textbf{non mesurée} (décision M61)~: le \code{md5sum} de GNU n'y est
     pas installé par défaut (hypothèse), et la commande ne vaut qu'avec lui,
     d'où la mention «~GNU coreutils~» dans le libellé.
@@ -6488,7 +6803,7 @@ l'aller-retour~: exact pour tous les types sauf \code{double}~; pour un
 double, celui de la forme «~texte~» (section~\ref{sec:empreinte}, «~Écriture
 «~texte~» des doubles~»~: écriture correctement arrondie, établie par une
 preuve (hypothèse~H) et constatée par deux juges~; relecture exacte
-constatée sous glibc, non démontrée). Un texte écrit sous Windows par la
+constatée sous glibc et sous Windows (R~4.3.3 ucrt), non démontrée). Un texte écrit sous Windows par la
 bibliothèque C, avant l'issue~\#104, dont le dix-septième chiffre pouvait
 différer, se relit en le même double dans le cas testé~: c'est un
 \emph{constat de mesure}, que contredisent d'autres cas~: sous Windows, sur
@@ -6501,8 +6816,16 @@ point~3.2).
 \rowcolors{2}{tablerow}{white}
 \begin{longtable}{@{}p{5.4cm}p{9.4cm}@{}}
 \caption{Refus de la lecture et de l'écriture du texte (module
-\code{rapport}~; numéro de la ligne fautive dans \code{details\$ligne}, chemin
-fautif dans \code{details\$chemin}).}
+\code{rapport}~; à la lecture, numéro de la ligne fautive dans
+\code{details\$ligne} (\code{NA} pour \code{texte\_non\_octets} et pour un texte vide), et en outre
+classe reçue dans \code{details\$classe} (\code{texte\_non\_octets}), chemin
+lu et chemin attendu dans \code{details\$chemin} et \code{details\$attendu}
+(\code{texte\_chemin\_inattendu}~; \code{chemin} seul pour une ligne après
+la fin de l'objet, \code{attendu} seul en fin de texte), colonne dans
+\code{details\$colonne} (\code{texte\_ligne\_mal\_formee} et
+\code{texte\_longueur\_incoherente}, colonne non atomique ou d'une autre
+longueur que \code{@lignes})~; à l'écriture, chemin fautif dans
+\code{details\$chemin}).}
 \label{tab:refus-texte}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Motif}} &
@@ -6533,7 +6856,24 @@ fautif dans \code{details\$chemin}).}
 
 \noindent
 L'écriture peut aussi lever les refus de l'écrivain des valeurs (codage d'une
-chaîne, date hors du domaine~; section~\ref{sec:empreinte}).
+chaîne, date hors du domaine~; section~\ref{sec:empreinte})~;
+\code{ecrire\_fiche()} refuse ainsi sous \code{chaine\_codage\_bytes}, rôle
+«~@noms~», une fiche dont un nom de premier niveau, à toute position, est
+d'encodage \code{bytes}, avant toute lecture par nom (message «~Rôle
+«~@noms~»~: chaîne au codage «~bytes~», non convertible en UTF-8 sans
+deviner. Nom de champ n\textsuperscript{o} [position du premier] de la fiche~: [nom
+cité].~»~; \code{details}~: \code{role}, \code{lignes}, les positions,
+\code{lu}, les noms bruts~; section~\ref{sec:refus}, «~Noms d'encodage
+\code{bytes}~»~; issue~\#114). Le message
+d'un refus de lecture («~Lecture du texte de [nature], ligne [n]~:
+[\ldots].~», sans numéro de ligne quand le refus n'en a pas) est marqué
+UTF-8 sous toute locale~; la première ligne lue
+(\code{texte\_version\_inconnue}), le type lu
+(\code{texte\_type\_inconnu}), le chemin en double
+(\code{texte\_chemin\_en\_double}) et la valeur fautive
+(\code{texte\_valeur\_invalide}) y sont cités selon la règle unique des
+refus (section~\ref{sec:refus}, «~Citation d'une valeur dans un
+message~»~; issue~\#94).
 
 \subsubsection*{Plan importé, fiche relue, rejeu}
 
@@ -6567,6 +6907,10 @@ empreinte du résultat différente n'est pas un échec du rejeu. Le rejeu
 outillé, \code{rejouer\_fiche()}, fait les vérifications, l'exécution et la
 comparaison des témoins sur la même machine~; la comparaison à tolérance par
 classes sur une autre machine n'est pas outillée (section~\ref{sec:rejeu}).
+Pour retrouver le code qui a produit la fiche, le relecteur recherche
+\code{fiche\$empreintes\$code} dans l'historique git par
+\code{tests/controles/commits\_empreinte\_code.R} (section~\ref{sec:rejeu},
+«~Retrouver le code d'une fiche~»~; issue~\#89).
 
 \medskip
 {\sloppy
@@ -6655,8 +6999,9 @@ structure de l'objet. \textbf{Aucun arrondi}~: 0{,}95 s'écrit
 double le plus proche~; un certificateur ne recalcule un taux et ses bornes
 au bit près qu'à cette précision, et une vue arrondie, si elle est voulue,
 s'ajoutera sans remplacer celle-ci (question Q36 ouverte). La relecture au
-bit près de cette écriture est \emph{constatée} sous glibc, non garantie
-ailleurs (ligne \code{doubles} de \code{CONVENTIONS\_TEXTE}). Aucune autre
+bit près de cette écriture est \emph{constatée} sous glibc et sous Windows
+(R~4.3.3 ucrt), non garantie ailleurs, ni démontrée nulle part (ligne
+\code{doubles} de \code{CONVENTIONS\_TEXTE}). Aucune autre
 mise en forme d'un nombre n'est admise dans la section du rapport~: un test
 lit son code par \code{parse()} et refuse tout appel à \code{format},
 \code{formatC}, \code{sprintf}, \code{as.character}, \code{cat}, à une
@@ -6698,7 +7043,11 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
   \item \textbf{intégrité}~: l'empreinte du résultat, recalculée sur l'objet
     reçu par \code{empreinte\_resultat()}, est égale à
     \code{fiche\$empreintes\$resultat}~; une erreur du recalcul (attribut
-    inconnu, structure altérée) est elle aussi un objet modifié~;
+    inconnu, structure altérée) est elle aussi un objet modifié, de même
+    qu'un nom d'encodage \code{bytes} au premier niveau de l'objet ou de sa
+    fiche, à toute position, qui rend l'empreinte non recalculable et que le
+    contrôle relève dès le contrôle~1, avant toute lecture par nom
+    (\code{noms\_bytes()}~; issue~\#114)~;
   \item \textbf{couverture}~: aucun élément de l'objet hors des sections~:
     tout élément de premier niveau autre que \code{table}, \code{etapes},
     \code{avertissements}, \code{fiche} et \code{execution}, toute étape ou
@@ -6724,6 +7073,7 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
 \endhead
 \code{rapport\_objet\_invalide}, contrôle~1 (pas une liste) & «~Rapport figé~: objet de type [type] au lieu d'une liste de classe «~construction~» (objet rendu par \code{construire\_table()}, ou élément construction du résultat de \code{rejouer\_fiche()}).~» & \code{lu} (classes), \code{attendu} «~construction~» \\
 \code{rapport\_objet\_invalide}, contrôle~1 (autre classe) & «~Rapport figé~: objet de classe «~[classes]~» au lieu de «~construction~» (objet rendu par \ldots)~» & idem \\
+\code{objet\_modifie}, contrôle~1 (nom d'encodage \code{bytes} de l'objet, relevé avant la forme de la fiche~; puis de la fiche, une fois établi qu'elle est une liste) & «~Rapport figé~: objet modifié après sa construction~: empreinte du résultat non recalculable (nom de champ d'encodage «~bytes~»~: champ n\textsuperscript{o} [position du premier] de [l'objet, ou la fiche], cité [nom cité]). Le rapport ne restitue un objet que tel que construire\_table() l'a rendu.~» & \code{chemin} (vide, ou «~fiche~»), \code{lignes} (positions), \code{lu} (noms bruts) \\
 \code{rapport\_objet\_invalide}, contrôle~1 (fiche) & «~Rapport figé~: objet de classe «~construction~» dont la fiche est [valeur décrite, ou «~absente~»] au lieu d'une liste.~» & \code{chemin} «~fiche~», \code{lu} (valeur brute), \code{attendu} «~list~» \\
 \code{version\_fiche\_non\_admise}, contrôle~2 & «~Rapport figé~: version de fiche [valeur décrite, ou «~absente~»] au lieu de [\code{VERSION\_FICHE} décrite] (seule version admise par ce code)~; objet construit par tablexp [version de la fiche], empreinte du code [empreinte du code de la fiche]~; code installé~: empreinte [\code{EMPREINTE\_CODE}]. Aucune conversion n'est faite~: le rapport d'un objet d'une autre version s'écrit avec le code qui l'a construit.~» & \code{lu} (valeur brute), \code{attendu} \\
 \code{objet\_modifie}, contrôle~3 (empreinte différente) & «~Rapport figé~: objet modifié après sa construction~: empreinte du résultat recalculée [recalculée] au lieu de [consignée] (fiche/empreintes/resultat). Le rapport ne restitue un objet que tel que construire\_table() l'a rendu.~» & \code{lu} (consignée), \code{attendu} (recalculée) \\
@@ -6737,11 +7087,22 @@ Une valeur lue y est «~décrite~» par \code{decrire\_valeur()}~: un atomique
 de longueur~1 sans attribut, de type \code{double}, \code{integer},
 \code{logical} ou \code{character}, s'écrit par l'écrivain suivi de son
 type (\code{3 (integer)}, \code{4 (double)}), toute autre valeur «~objet de
-type [type], de classe [classes]~». Une valeur insérée telle quelle
-(version, empreinte) passe par \code{valeur\_message()}~: elle-même si c'est
-une chaîne unique sans caractère de contrôle (U+0000 à U+001F, U+007F à
-U+009F, U+2028, U+2029), «~absente~» si elle manque, décrite sinon~: un
-message tient sur une ligne. \code{version\_fiche\_non\_admise} est le
+type [type], de classe [classes]~»~; l'écriture et les classes sont citées
+selon la règle unique des refus (section~\ref{sec:refus}, «~Citation d'une
+valeur dans un message~»~: les échappements \verb|\\|, \verb|\n|,
+\verb|\r|, \verb|\t| et \verb|\"| de l'écriture des chaînes restent
+tels quels, les autres caractères de l'ensemble neutralisé, VT, FF, NEL,
+U+2028\ldots, s'écrivent \code{<U+XXXX>}). Les attributs sont lus avant la
+longueur, que \code{length()} calculerait en levant une erreur R sur une
+classe d'encodage \code{bytes}. Une valeur insérée telle quelle
+(version, empreinte) passe par \code{valeur\_message()}~: citée par la
+règle si c'est une chaîne unique que la règle cite telle quelle
+(\code{citation\_a\_neutraliser()} faux~: ni caractère de l'ensemble
+neutralisé, ni octets hors UTF-8 valide, ni encodage \code{bytes}~; une
+chaîne latin-1 est convertie et le résultat marqué UTF-8), «~absente~» si
+elle manque, décrite sinon~; les classes de l'objet reçu (contrôle~1), le chemin d'un élément non prévu (contrôle~4)
+et le message d'une erreur du recalcul (contrôle~3) sont cités par la
+règle~: un message tient sur une ligne. \code{version\_fiche\_non\_admise} est le
 \textbf{même motif} que celui du rejeu outillé, levé ici sous le module
 \code{rapport} et là sous le module \code{construire\_table}~; le texte du
 message diffère.
@@ -6769,7 +7130,11 @@ sections (contrôle~4). Les chemins hors du périmètre
 (\code{CHEMINS\_HORS\_RESULTAT} sauf \code{execution}~: \code{fiche\$versions},
 \code{fiche\$plateforme}, les trois dernières empreintes et
 \code{etapes\$donnees\$resultat\$}\allowbreak\code{lignes\_conservees}) échappent au
-contrôle~; le rapport le dit dans la phrase qui suit le contrôle (ci-dessous).
+contrôle, à une exception près~: \code{fiche\$empreintes\$resultat}, exclue
+du texte empreinté puisqu'elle en est l'empreinte, est la valeur à laquelle
+le contrôle compare le recalcul. Le rapport le dit dans la phrase qui suit
+le contrôle (ci-dessous), qui nomme cette valeur et n'énumère comme hors du
+contrôle que les cinq autres chemins (issue~\#94).
 
 \medskip
 \noindent
@@ -6886,9 +7251,11 @@ et de deux phrases~:
     (E3.6, E4.6).~»~;
   \item «~Contrôle d'intégrité~: avant l'écriture de ce rapport, l'empreinte
     du résultat a été recalculée sur l'objet et trouvée égale à
-    fiche/empreintes/resultat. Hors du périmètre de cette empreinte, et donc
-    de ce contrôle~: [chemins de \code{CHEMINS\_HORS\_RESULTAT} sauf
-    \code{execution}, joints par «~,~»]~; ce que le rapport en restitue
+    fiche/empreintes/resultat, la valeur consignée à laquelle ce contrôle la
+    compare (exclue du texte empreinté, puisqu'elle en est l'empreinte).
+    Hors du périmètre de cette empreinte, et donc de ce contrôle~: [chemins
+    de \code{CHEMINS\_HORS\_RESULTAT} sauf \code{execution} et
+    \code{fiche/empreintes/resultat}, joints par «~,~»]~; ce que le rapport en restitue
     (valeurs, ou structure seule pour une table dont le volume croît avec la
     base) est lu dans l'objet, sans vérification.~»
 \end{itemize}
@@ -7054,14 +7421,26 @@ de l'empreinte à deux rôles caractère sur un jeu déterministe.
 (section~\ref{sec:empreinte}) est inchangée~: un \code{integer} s'écrit
 comme \code{sprintf("\%d", x)}, une date en ISO~8601~; seul l'assemblage
 des octets change, qui ne passe plus par une chaîne par ligne.
-\code{octets\_entiers()} forme une matrice d'octets d'une colonne par
+\code{octets\_entiers()} traite la colonne par blocs de $2^{20}$ valeurs
+consécutives (argument \code{bloc}, qui ne sert qu'aux tests du découpage~;
+issue~\#83), dont les octets sont concaténés dans l'ordre. Pour chaque
+bloc, elle forme une matrice d'octets d'une colonne par
 valeur et d'une ligne par position (signe, chiffres, LF), le nombre de
-chiffres étant celui de la plus grande valeur absolue, deux au moins pour
+chiffres étant celui de la plus grande valeur absolue du bloc, deux au moins pour
 le jeton \code{NA}~; un chiffre de rang $k > 0$ n'est écrit que si le
 quotient de la valeur absolue par $10^k$ est non nul, si bien qu'aucun zéro
 de tête n'apparaît~; les places inoccupées valent l'octet nul, qui
 n'apparaît dans aucune écriture et que la lecture de la matrice colonne par
-colonne retire. \code{octets\_lignes\_indices()} écrit une fois chaque date
+colonne retire. Chaque valeur s'écrit ainsi sans remplissage et sans
+dépendre de ses voisines~: le découpage en blocs ne change aucun octet, ce
+qui découle de la construction (il ne fixe que la hauteur des matrices,
+dont les places inoccupées sont retirées). Il borne le travail
+transitoire, dont le plus gros objet est le masque logique des places
+occupées d'un bloc, de $4(n_c + 2)$~octets par valeur pour $n_c$ chiffres~; la sortie et sa copie lors de la concaténation restent
+proportionnelles à la longueur de la colonne, que \code{ecrire\_valeurs()}
+rend entière. La baisse du pic mémoire est un constat de mesure, hors
+plateforme de référence, consigné avec le commit \code{2b4ebda}.
+\code{octets\_lignes\_indices()} écrit une fois chaque date
 distincte, puis recopie ses octets, LF compris, aux lignes où elle figure,
 par \code{sequence()}~; les jetons \code{NA} et \code{NaN} d'une date
 manquante sont lus comme avant sur la valeur reçue. Dans les deux formes,
@@ -7071,7 +7450,11 @@ manquante sont lus comme avant sur la valeur reçue. Dans les deux formes,
 les entiers, 14 cas (vecteur vide, \code{NA}, zéro, signes, de 1 à 10
 chiffres, $\pm(2^{31} - 1)$, noms, dimension, constante, $10^5$ valeurs
 pseudo-aléatoires sans générateur), par \code{octets\_entiers()} et par
-\code{ecrire\_valeurs()} dans les deux formes, plus une sortie écrite à la
+\code{ecrire\_valeurs()} dans les deux formes, puis par
+\code{octets\_entiers()} avec des blocs de 1, 2, 3, 7, 1\,000 et $10^6$
+valeurs, plus une colonne de $2^{20} + 3$ valeurs découpée en deux blocs de
+largeurs différentes (\code{NA} et entier négatif dans le second), et une
+sortie écrite à la
 main~; pour \code{octets\_lignes\_indices()}, 8 suites d'indices (vide,
 texte vide, répétitions, ordre inverse, $10^5$ indices)~; pour les dates,
 \code{NA}, \code{NaN}, stockage \code{integer}, valeurs répétées et $10^5$
@@ -7168,7 +7551,14 @@ identiques hors \code{execution}, sous d'autres valeurs de \code{OutDec},
 après \code{saveRDS()} puis \code{readRDS()}~; l'objet inchangé par
 l'écriture~; chaque refus des quatre contrôles, avec son motif, son module
 et ses \code{details}, dont un double altéré d'un ulp, un attribut ajouté et
-une valeur de version ou d'empreinte à décrire~; l'absence de toute
+une valeur de version ou d'empreinte à décrire~; la citation, selon la
+règle unique des refus, de classes, de valeurs de version (VT, FF, NEL,
+U+2028), du message d'une erreur du recalcul et d'un chemin non prévu, sur
+une ligne et marquée UTF-8 (issue~\#94)~; le refus nommé, au lieu d'une
+erreur R, d'un nom d'encodage \code{bytes} de l'objet ou de sa fiche, en
+première, quatrième et dernière positions, par \code{ecrire\_fiche()}
+(\code{chaine\_codage\_bytes}) et par \code{ecrire\_rapport()}
+(\code{objet\_modifie}~; issue~\#114)~; l'absence de toute
 ressource externe et la liste fermée des balises et entités~;
 l'échappement de modalités et de noms de colonne qui contiennent
 \code{<}, \code{>}, \code{\&} et \code{"}~; l'ordre des sections et la
@@ -7222,7 +7612,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle, \code{limite} (facultative, $2^{30}$ octets, réservée aux tests du découpage) & octets canoniques des chaînes~; refus de codage~; écriture par blocs de lignes (\code{bornes\_blocs()}), un \code{paste()} et un \code{charToRaw()} par bloc, une ligne plus longue que \code{limite} écrite seule \\
 \catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
 \catalogue{fonctions-rapport}{octets\_lignes\_indices()} & interne & textes ASCII, indices sans \code{NA} & octets des lignes \code{textes[i]}, égaux à ceux d'\code{octets\_lignes()} sur ces lignes~; chaque texte écrit une fois, ses octets recopiés par indice (\code{sequence()})~; écriture des dates (issue~\#71) \\
-\catalogue{fonctions-rapport}{octets\_entiers()} & interne & entiers (\code{integer}) & octets de \code{sprintf("\%d", x)}, une valeur par ligne, écrits en octets sans chaîne intermédiaire~; écriture des entiers (issue~\#71) \\
+\catalogue{fonctions-rapport}{octets\_entiers()} & interne & entiers (\code{integer})~; \code{bloc} (défaut $2^{20}$, tests seulement) & octets de \code{sprintf("\%d", x)}, une valeur par ligne, écrits en octets sans chaîne intermédiaire, par blocs de \code{bloc} valeurs~; écriture des entiers (issues~\#71 et~\#83) \\
 \catalogue{fonctions-rapport}{texte\_date()} & interne & jours depuis 1970-01-01, entiers, finis, dans le domaine & écriture ISO~8601 AAAA-MM-JJ, année sur quatre chiffres~; partagée par \code{ecrire\_valeurs()} et le contrôle de canonicité du lecteur (\code{valeurs\_texte()}) \\
 \catalogue{fonctions-rapport}{BASE\_TRANCHES} & constante & --- & base $10^{7}$ des tranches des grands entiers de l'écriture «~texte~» des doubles (section~\ref{sec:empreinte}, «~Écriture «~texte~» des doubles~»), poids faible d'abord~; produits et sommes de tranches restent des entiers inférieurs à $2^{53}$ (I3) \\
 \catalogue{fonctions-rapport}{diviser\_tranche()} & interne & entiers de $[0, 2^{53})$ (vecteur ou matrice) & quotient et reste exacts par la base, quel que soit l'arrondi du quotient (correction d'une unité~; I4)~; ni \code{\%\%} ni \code{\%/\%} sur des doubles \\
@@ -7263,7 +7653,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne} \\
 \catalogue{fonctions-rapport}{ecrire\_plan()} & exportée & plan & octets du texte du plan, écrit tel qu'il est reçu, sans validation ni canonisation \\
 \catalogue{fonctions-rapport}{lire\_plan()} & exportée & octets & plan relu, \textbf{non validé}~: à passer à \code{valider\_plan()} ou à \code{construire\_table()} \\
-\catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier)~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}, \code{TEXTE\_REJEU\_FICHE}) \\
+\catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier~; \code{chaine\_codage\_bytes} pour un nom de premier niveau d'encodage \code{bytes})~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}, \code{TEXTE\_REJEU\_FICHE}) \\
 \catalogue{fonctions-rapport}{TEXTE\_REJEU\_FICHE} & constante & --- & ligne \code{\# rejeu} de la fiche écrite (note de lecture d'E3.7 en une ligne), reprise par la section «~Rejeu~» du rapport figé~; texte du moteur marqué UTF-8 \\
 \catalogue{fonctions-rapport}{lire\_fiche()} & exportée & octets & fiche relue, dont le rejeu est \code{construire\_table(donnees, f\$roles, f\$plan, f\$provenance)}, outillé par \code{rejouer\_fiche()}~; ne contrôle pas \code{version\_fiche} \\
 \catalogue{fonctions-rapport}{SECTIONS\_RAPPORT} & constante & --- & les quatorze sections du rapport figé, dans l'ordre~: identifiant, titre, nature, étape, racines, renvois (tableau~\ref{tab:sections-rapport}) \\

@@ -803,3 +803,144 @@ Rédigée par `architect` à l'étape (6) de la branche `claude/ecriture-portabl
 **Effet sur les résultats : aucun.** Aucun code n'est modifié par la présente note.
 
 Issues : #104, #107 ; #49. Décisions M153, M61. Branche `claude/ecriture-portable`, PR #116.
+
+## Annotation du 27 octobre 2026 — suites de l'étape (5) de la PR #116 : point 3.2, annotations du 26/10/2026 ; nouveau libellé « doubles » (#120) ; point 11.4 : retrouver le commit d'une fiche par son empreinte du code (#89, M126)
+
+Rédigée par `architect-approfondi` à l'étape (5) de la branche `claude/rapport-suites` (B11, PR #125), à `7dc544b`, selon le plan accepté (M164 ; `docs/feuille-de-route.md`, § 1.11) et les décisions M126, M162, M166 et M167. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne du présent ADR et du code relevés à `7dc544b` ; le nom de l'objet fait foi (M77, (b)).
+
+Sources :
+- compte rendu de l'étape (5) de la PR #116, session locale du mainteneur sous Windows, tête `aa1cf0b` (https://github.com/Gerard-Garey/outil_tables/pull/116#issuecomment-6416825735). Ses mesures sont **rapportées** : `architect` n'a pas d'hôte Windows et ne les a pas refaites ;
+- texte et statut du libellé « doubles » fixés par `actuary-approfondi` à l'étape (0') (https://github.com/Gerard-Garey/outil_tables/issues/120#issuecomment-6420201197), intégrés par `7dc544b` avec son visa ;
+- handoff du 26/10/2026, point 4 (https://github.com/Gerard-Garey/outil_tables/pull/125#issuecomment-6421874521) ;
+- issue #89 et décision M126.
+
+Les mesures d'`architect` sont faites sous R 4.3.3, sur un hôte cloud Linux (glibc), hors plateforme de référence, avec `tablexp` installé depuis l'arbre de `7dc544b` dans une bibliothèque temporaire hors dépôt. Elles sont marquées *vérifié*.
+
+**(a) Point 3.2 et annotation du 26/10/2026, (d) 3 : relecture sous Windows mesurée, sur un autre échantillon que celui annoncé.**
+
+1. **Protocole annoncé** ((d) 3, l. 737-740) :
+   - écrire sous Windows l'échantillon de (3a), transporté par ses octets (`x.bin`) ou reconstruit par la recette « bits seulement » ;
+   - comparer le MD5 de son texte à celui de la CI ;
+   - relire l'échantillon par `as.numeric`.
+2. **Mesures faites** (rapportées ; R 4.3.3 ucrt ; `aa1cf0b`) :
+   - **Relecture.** 10⁶ motifs de 64 bits tirés au hasard (Mersenne-Twister, graine 20261026) donnent 999 493 doubles finis. Écrits par `ecrire_valeurs(x, "texte", …)` puis relus, aucun ne trahit `identical(as.numeric(texte), x + 0)` : 0 relecture fausse. Sur les mêmes doubles, `sprintf("%.17g")` de l'UCRT donne 122 738 textes différents et 18 relectures fausses.
+   - **Écriture.** Le contrôle à deux juges `tests/controles/ecriture_doubles_texte.R` porte sur 2 423 344 doubles construits par leurs bits. Les MD5 du texte de T2 et de T3 sont égaux aux constantes de la batterie, celles de la CI. Le juge Python 3.14.7 trouve 0 écart ; le juge glibc est sauté sous Windows.
+3. **Écart de protocole.**
+   - L'échantillon relu n'est pas celui de (3a), et aucun MD5 de son texte n'a été comparé à la CI. Les MD5 comparés sont ceux de T2 et de T3, construits par leurs bits.
+   - L'hypothèse de (d) 3 (« des textes corrects font disparaître les relectures fausses ») est donc appuyée par un constat **sur un autre échantillon** : 18 fautes avec l'UCRT, 0 avec `tablexp`. Ce n'est pas le protocole annoncé.
+   - Cet échantillon est uniforme sur les motifs de 64 bits. Il est donc dominé par des exposants hors des grandeurs d'un plan ou d'une fiche (lecture d'`actuary`, (0') de #120).
+4. **Statut : la relecture reste un constat de mesure, garanti nulle part.**
+   - `as.numeric` relit par le code C propre à R, qui rend « one of the nearest representable numbers » (`?NumericConstants`, R 4.3.3). Ce n'est pas un arrondi correct garanti.
+   - Le constat porte désormais sur deux plateformes :
+     - sous glibc : 1 399 465 textes (`m2.R`, corps) et 1 177 468 textes ((3a)) ;
+     - sous Windows, R 4.3.3 ucrt : 999 493 doubles (point 2).
+   - Avec 0 faute sur 999 493 doubles, `actuary` borne le taux de faute à 3,0·10⁻⁶ par double (95 %, Clopper-Pearson unilatérale). Cette borne ne vaut que pour cette loi d'échantillonnage.
+   - Ailleurs (macOS, autres versions ou compilations de R), la relecture n'est pas mesurée (M61, #49).
+5. **Corps du point 3.2 (l. 75).** Le constat de `ddf77bd` y reste : 36 694 textes faux sur 551 008 et 5 relectures fausses au-delà de l'exposant 266. Il décrit les textes de l'UCRT, donc l'ancien écrivain. Pour l'écrivain de `tablexp` (`3b42737`), il se lit avec le point 2 ci-dessus.
+
+**(b) Annotation du 26/10/2026, (c) 3, et seconde annotation du 26/10/2026, (a) : écriture sous Windows.**
+- Les deux passages disaient : « Sous Windows, elle reste une hypothèse jusqu'à l'étape (5) » et « H et l'identité des octets restent une hypothèse jusqu'à l'étape (5) ».
+- Ils se lisent désormais ainsi :
+  - l'identité des octets écrits sous Windows et sous glibc est un **constat de mesure** sous R 4.3.3 ucrt (point (a) 2, rapporté) ;
+  - H reste une *hypothèse*, que ce constat ne contredit pas ;
+  - sous macOS, rien n'est mesuré.
+
+**(c) Annotation du 26/10/2026, (e) 4, et seconde annotation du 26/10/2026, (b) : `md5sum -t` remesuré à l'état final de B10.**
+- Mesure rapportée, à `aa1cf0b`, sous Git Bash (GNU coreutils 8.32) :
+  - `LC_ALL=C md5sum -t R/*.R | md5sum` rend `369798534cf73b02f9aa20f1bc72e2ba`, égal à `tablexp:::EMPREINTE_CODE` ;
+  - sans `-t`, la commande rend `c70c41d274b785d0e1ec4158a87896de`.
+- *Vérifié* par `architect` :
+  - `git diff --stat aa1cf0b 8bd29dd -- R/` est vide ;
+  - l'empreinte des `R/*.R` de `8bd29dd`, recalculée sur les blobs (méthode du point (e) 3), vaut `369798534…`.
+- La remesure « prévue à l'étape (5) » est faite : la portée Windows de `-t` est un constat de mesure à l'état final de B10.
+
+**(d) Annotation du 26/10/2026, (d) 4 (l. 741-744) : nouveau libellé « doubles ».**
+1. **Texte.** Depuis `7dc544b` (#120 ; M162, M167 ; visa d'`actuary`), `CONVENTIONS_TEXTE["doubles"]` (`R/rapport.R:1039-1043`) vaut, mot pour mot :
+
+   « le double relu fait foi ; 17 chiffres significatifs (forme %.17g de la norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par tablexp sans la bibliothèque C ; relecture au bit près constatée sous glibc et sous Windows (R 4.3.3 ucrt), non garantie ailleurs ; à l'import, toute écriture décimale est admise (0.95 comme 0.94999999999999996) ; refusés : décimal non fini, décimal non nul relu 0 ; jetons NA, NaN, Inf, -Inf »
+
+   *Vérifié* : la valeur installée a les mêmes octets que ce texte, sous `LC_ALL=C.utf8` comme sous `LC_ALL=C`.
+2. **Ce qui change.** La clause citée par (d) 4, « relecture au bit près constatée sous glibc, non garantie ailleurs », n'existe plus. Elle devient « relecture au bit près constatée sous glibc et sous Windows (R 4.3.3 ucrt), non garantie ailleurs ».
+3. **Lecture de la clause** (`actuary`, (0') de #120) :
+   - « (R 4.3.3 ucrt) » désigne la compilation mesurée ; aucune autre compilation de R pour Windows n'est mesurée ;
+   - « constatée » porte le statut ;
+   - « non garantie ailleurs » ne veut pas dire que la relecture est garantie sous glibc ou sous Windows : elle n'est garantie nulle part (point (a) 4).
+4. **Condition de (d) 4.** Elle demandait « 0 erreur de relecture sous Windows sur l'échantillon complet ». Elle est remplie sur l'échantillon du point (a) 2, non sur celui de (3a) (point (a) 3). Le mainteneur a retenu le changement sur ce constat (M162, M167).
+5. **Effet de `7dc544b`** (tableau avant / après de son message) :
+   - 18 lignes portent le libellé : ligne 3 des plans et des fiches, ligne 39 des rapports figés, pour R1 à R6 ;
+   - l'empreinte du code change aussi (M70) ;
+   - aucun `.tsv` ne change, ni l'empreinte du résultat, ni `version_fiche` ; aucune régénération.
+   - *Vérifié* sur R1 : la ligne 39 du rapport figé et la ligne 3 de la fiche portent le nouveau libellé ; `git diff --stat 8bd29dd 7dc544b -- tests/reference/` est vide.
+6. **« Ce que l'annotation ne règle pas »** (annotation du 26/10/2026, l. 781-786) :
+   - la quatrième puce (libellé « sous glibc et sous Windows ») est réglée ;
+   - la deuxième puce (mesures sous Windows et sous macOS) est réglée pour Windows seulement ; macOS reste ouvert (M61, #49).
+
+**(e) Point 11.4 : retrouver le commit d'une fiche par son empreinte du code (#89 ; M126, M166).**
+
+1. **Décision** (M126, 25/10/2026 ; M166, 26/10/2026).
+   - Le passage de la fiche au code se fait en **recalculant l'empreinte du code dans l'historique git**. Il n'y a ni registre empreinte → commit tenu par la CI, ni incrément de `Version` à chaque fusion qui touche `R/`. Ce sont les deux voies de #89 ; le recalcul les remplace.
+   - `Version` de `DESCRIPTION` ne s'incrémente qu'**aux jalons de livraison** (M126). Elle ne s'incrémente pas dans B11 (M166). `fiche$versions$tablexp` reste donc `0.0.0.9000`. Le motif `version_fiche_non_admise` cite `fiche$empreintes$code` (ADR 0012, point 3.5) : c'est cette valeur que le tiers donne au script.
+   - Le moteur ne change pas. L'empreinte du code garde la définition de l'option (iv) (M70) ; `STATUT_EMPREINTE_CODE` et la commande à `-t` (M151) sont inchangés.
+2. **Chemin du script : `tests/controles/commits_empreinte_code.R`.** C'est le chemin annoncé par la fiche de la branche (§ 1.11, « au chemin fixé en (5) »).
+   - **Hors de `R/`.** Le moteur ne dépend pas de git (ADR 0008, point 11), et le package installé n'a pas d'historique.
+   - **Sous `tests/controles/`.** Ce dossier réunit les contrôles mécaniques en R de base, lancés par `Rscript` depuis la racine (principe 7 des workflows). Il accueille déjà un script hors CI, `ecriture_doubles.R`. Le domaine de commit est `tests:`, celui que fixe le § 1.11.
+   - **En R de base, non en shell.** Le test de batterie doit tourner dans le conteneur de la CI, qui a R et pas git. Le script doit aussi tourner sous Windows sans Git Bash ; git n'y est appelé, par `system2()`, que dans les modes qui lisent l'historique.
+   - **Options écartées** :
+     - `.claude/outils/` : outillage des agents, domaine `claude:`, non destiné aux tiers ;
+     - `inst/` : le script serait installé avec le package, qui n'a pas d'historique ;
+     - `tests/reference/` : le script sert toute fiche, pas seulement les références ;
+     - un script shell : non portable sous Windows sans Git Bash, et non exécutable par la batterie dans le conteneur.
+3. **Contrat du script.** Les noms d'options sont indicatifs et fixés par `coder`.
+   - **Formule.** C'est celle de `STATUT_EMPREINTE_CODE` et d'`empreinte_sources()` (`R/rapport.R:769`) :
+     - fichiers de premier niveau de `R/` dont le nom finit par `.R`, triés par octets ;
+     - MD5 de chaque fichier ;
+     - relevé « `<md5>␣␣R/<fichier>` », une ligne par fichier, LF ;
+     - MD5 du relevé.
+   - **Même garde qu'`empreinte_sources()`.** Un commit sans `DESCRIPTION` de `Package: tablexp`, ou sans `R/rapport.R`, n'a pas d'empreinte.
+   - **Indépendance.** Le script ne charge pas `tablexp`. Il doit fonctionner sur tout commit, et son recalcul indépendant recoupe `empreinte_sources()`.
+   - **Mode « historique »**, argument : une empreinte de 32 caractères hexadécimaux minuscules, refusée sinon.
+     - Le script parcourt les commits de toutes les références locales (`git rev-list --all`).
+     - Pour chaque commit, il calcule l'empreinte sur les **blobs** (`git cat-file`), non sur un arbre extrait : le résultat ne dépend pas de l'arbre de travail.
+     - Il rend la liste des commits de cette empreinte, du plus ancien au plus récent : SHA complet, date, sujet.
+   - **Une empreinte désigne une classe de commits.** Tout commit qui ne touche pas `R/*.R` garde l'empreinte de son parent. *Vérifié* sur le clone de cette consultation :
+     - 392 commits accessibles portent 73 empreintes distinctes ;
+     - 19 commits ont `369798534cf73b02f9aa20f1bc72e2ba`, de `1e7565e` à `4f22b86`, fusions comprises.
+
+     Tous les commits d'une classe portent le même texte `R/*.R`.
+   - **Mode « arbre »**, sans git : empreinte des `R/*.R` de la racine courante, même formule. Le test de batterie l'appelle et exige l'égalité à `EMPREINTE_CODE` installée (critère 2 de #89 au § 1.11). Ce recalcul indépendant s'ajoute au test d'égalité de la batterie (cinquième annotation du 20/10/2026, (c) 4).
+   - **Mode « références »**, hors batteries et hors CI. Pour chaque `tests/reference/*.tsv`, le script lit les lignes d'en-tête `# fiche$empreintes/code` et `# commit`, puis vérifie que ce commit figure dans la classe de cette empreinte (critère 3).
+   - **Sorties distinctes, rien n'est deviné.**
+     - Commits trouvés : la liste, code 0. Sur un clone superficiel, la liste est valable mais peut être incomplète, et le script le dit.
+     - Aucun commit, historique complet : « aucun commit des références locales n'a cette empreinte ». Le code était non commité, ou sa branche est absente du clone.
+     - Aucun commit, clone superficiel : **non déterminable**, sortie en échec distincte. Une absence n'est jamais concluante sur un historique tronqué.
+     - git absent, ou racine hors d'un dépôt : refus nommé.
+4. **Limite du checkout superficiel.**
+   - *Vérifié* : le clone de la présente session est superficiel. `git rev-parse --is-shallow-repository` rend `true`, avec 6 bornes dans `.git/shallow` ; `1e7565e` y reste accessible.
+   - **Sur la CI**, le job « Tests (R 4.3.3) » tourne dans un conteneur sans git. `.git` y est absent, l'arbre étant téléchargé par l'API REST (ADR 0008, point 11). Seul le mode « arbre » y a un sens.
+   - Les autres jobs ont git, mais `actions/checkout` n'y reçoit pas de `fetch-depth` (*vérifié* : aucune occurrence dans `.github/workflows/ci.yml`). Leur profondeur par défaut est 1 (*hypothèse* : documentation d'`actions/checkout`, non relue dans cette consultation).
+   - Rendre l'historique à la CI demanderait de modifier `ci.yml`, ce que M166 exclut : la clé du cache TeX en dépend. Le contrôle de l'historique se lance donc à la main, sur un clone complet (`git fetch --unshallow` au besoin). Le point 11 de l'ADR 0008 (« un contrôle qui lit l'historique reste dans “Contrôles du dépôt”, sur l'hôte ») n'est pas contredit : il dit où placer un tel contrôle s'il entre à la CI, ce qui n'est pas le cas ici.
+   - **Ce qui garde un commit accessible.** La règle « commit de fusion, jamais squash ni rebase » (`CLAUDE.md`, « Git et GitHub ») laisse les commits d'une branche fusionnée accessibles depuis `main`. Un commit perdu (branche non fusionnée et supprimée, réécriture d'historique) rend sa fiche introuvable. Le script le dit, il ne le répare pas.
+5. **Équivalence entre blob et fichier extrait.**
+   - `.gitattributes` impose `* text=auto eol=lf` depuis le premier commit (`54af049`), et l'historique ne contient aucune ligne avec CR dans les `R/*.R` (*vérifié* : 0 ligne sur les 63 commits accessibles qui touchent `R/`).
+   - Le MD5 d'un blob est donc celui du fichier que `R CMD INSTALL` lit depuis un arbre extrait sous cette règle.
+   - Un arbre extrait autrement (fins de ligne converties en CRLF par un réglage local) donnerait une autre empreinte ; c'est la limite déjà connue de la commande des tiers (annotation du 26/10/2026, (e)).
+6. **Ce que l'empreinte du code ne couvre pas.**
+   - Elle couvre `R/*.R` seulement (point 11.4 ; cinquième annotation du 20/10/2026, (c) 5). Deux commits d'une même classe peuvent donc différer par `DESCRIPTION`, `NAMESPACE` ou `inst/`.
+   - Que ces écarts ne changent aucun résultat est une *hypothèse*, non mesurée. Le script et sa documentation le disent : la classe identifie le code R, non le package entier. Le relecteur lit ces écarts par `git diff` entre deux commits de la classe.
+7. **Mesure préalable.** La formule du point 3 est *vérifiée* par un prototype en shell hors dépôt (fonction de session, aucun fichier écrit dans le dépôt).
+   - L'empreinte des blobs `R/*.R` de `1e7565e` et de `8bd29dd` vaut `369798534cf73b02f9aa20f1bc72e2ba`. C'est la valeur de `# fiche$empreintes/code` des six `.tsv`, dont l'en-tête `# commit` est `1e7565e…`.
+   - L'empreinte des blobs de `7dc544b` vaut `fadee742f19f4aa45b8b4c6ba101266a`. C'est `tablexp:::EMPREINTE_CODE` installé et la sortie de `LC_ALL=C md5sum -t R/*.R | md5sum`.
+   - Le parcours des 392 commits a pris 11 s, un processus par blob. C'est un ordre de grandeur, non un seuil.
+8. **Tests.**
+   - En batterie : le mode « arbre » est égal à `EMPREINTE_CODE`. Le refus d'une empreinte mal formée n'appelle pas git.
+   - Hors batteries : le mode « références » retrouve le commit d'en-tête des six `.tsv`.
+   - `.github/workflows/ci.yml` est inchangé (M166).
+9. **Documentation**, à l'étape (7), par `docwriter`, à partir de la surface d'impact listée par `coder` :
+   - la ligne « Hors CI » de `README.md` ;
+   - la section du rejeu dans `docs/latex/`, qui dit comment passer de `fiche$empreintes$code` aux commits, avec les limites des points 4 à 6.
+
+   L'entrée « Empreinte » de `CONTEXT.md` sera complétée par `architect` après le commit de #89.
+
+**Effet sur les résultats : aucun**, ni par la présente annotation, ni par #89. Le script est hors du package. Aucune constante du moteur, aucune version du point 10 et aucune grandeur de référence ne change. Si `coder` touche `R/`, le jeton de l'empreinte du code change ; le § 1.11 ne le prévoit pas.
+
+Issues : #89, #120 ; #104, #107 ; #49 (macOS). Décisions M61, M126, M162, M164, M166, M167. ADR 0008 (point 11) ; ADR 0012 (point 3.5 ; annotation du 27/10/2026). Branche `claude/rapport-suites`, PR #125.

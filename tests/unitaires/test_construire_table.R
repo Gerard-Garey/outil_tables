@@ -1358,6 +1358,13 @@ local({
                                          identical(ev(x, "texte", "x")$type, "integer"), NA))
     if (!length(ko)) TRUE else paste("cas en écart :", paste(ko, collapse = ", "))
   })
+  # Traitement par blocs (#83) : tailles de bloc de 1 à plus que la colonne, blocs de
+  # largeurs différentes (nc propre à chaque bloc), NA et signes à cheval sur deux blocs.
+  verifier(sprintf("octets_entiers(x, bloc) : octets identiques à l'oracle pour les blocs 1, 2, 3, 7, 1000 et 10^6 sur %d cas ; une colonne de 2^20 + 3 valeurs (bloc par défaut), largeurs mêlées, découpée en deux blocs", length(CAS)), {
+    ko <- which(!vapply(CAS, function(x) all(vapply(c(1, 2, 3, 7, 1000, 1e6), function(b) identical(oe(x, bloc = b), oracle(x)), NA)), NA))
+    grand <- c(rep(5L, 2^20), 1234567890L, NA, -7L)
+    if (length(ko)) paste("cas en écart :", paste(ko, collapse = ", ")) else identical(oe(grand), oracle(grand))
+  })
   verifier("octets_entiers() : sortie à la main (NA, 0, -1, 2147483647, -2147483647, 10)",
            identical(rawToChar(oe(c(NA, 0L, -1L, im, -im, 10L))), "NA\n0\n-1\n2147483647\n-2147483647\n10\n"))
   TXT <- c("1970-01-01", "NA", "NaN", "", "0001-01-01", "x")
