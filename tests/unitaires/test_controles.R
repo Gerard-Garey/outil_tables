@@ -1162,5 +1162,58 @@ if (nzchar(Sys.which("git"))) {
     r2 <- references(lien, c(strrep("0", 32L), court(cl)), c(strrep("0", 32L), "abcdef0"))
     r3$statut == 3L && grepl("NON DÉTERMINABLE", r3$sortie[1L], fixed = TRUE, useBytes = TRUE) && r2$statut == 2L
   })
-  unlink(c(depot, clone, temoin, lien), recursive = TRUE)
+
+  # Code remisé (git stash) : le commit « WIP on … » est dans refs/stash, que
+  # git rev-list --all lit. Mesuré avant correction : l'empreinte du code remisé
+  # était « trouvée » (code 0, 1 commit sur 3 lus) ; attendu : non commité, code 2.
+  remise <- tempfile("depot_commits_"); dir.create(remise)
+  git_t(remise, "init", "-q")
+  cr <- etape(remise, "c1 empreinte E1", list(DESCRIPTION = DESC, `R/rapport.R` = A1$rapport.R, `R/a.R` = A1$a.R))
+  ecrire_octets(remise, "R/rapport.R", "x <- 2\n")
+  Erem <- attendue(list(rapport.R = "x <- 2\n", a.R = A1$a.R))
+  git_t(remise, "stash", "-q")
+  verifier("commits_empreinte_code historique (code remisé, git stash) : l'empreinte du code remisé n'est celle d'aucun commit -> code 2 (non commité), pas le commit « WIP on … »", {
+    r <- historique(Erem, remise)
+    length(git_t(remise, "stash", "list")) == 1L && r$statut == 2L && !any(grepl("WIP", r$sortie, fixed = TRUE))
+  })
+  verifier("commits_empreinte_code historique (code remisé, git stash) : l'empreinte du commit c1 est trouvée seule, sur 1 commit lu (les commits du remisage ne sont pas lus)", {
+    r <- historique(E1, remise)
+    r$statut == 0L && identical(shas_de(r), cr) && grepl("1 commit(s) sur 1 lus", r$sortie[1L], fixed = TRUE)
+  })
+
+  # Noms de R/ que git cite entre guillemets (", \\, tabulation, saut de ligne) :
+  # posés par l'index (--cacheinfo), sans dépendre du système de fichiers.
+  # Mesuré avant correction : ces fichiers étaient écartés en silence, le commit
+  # n'était pas trouvé (code 2, faux négatif) ; attendu : trouvé, code 0.
+  noms_cites <- c(rapport.R = "x <- 1\n", `a"b.R` = "a <- 1\n", `a\\b.R` = "a <- 2\n",
+                  `t\tb.R` = "a <- 3\n", `n\nc.R` = "a <- 4\n")
+  releve_de <- function(fichiers) {   # relevé attendu sans fichier sur disque
+    fichiers <- fichiers[order(names(fichiers), method = "radix")]
+    md5 <- vapply(fichiers, function(x) { t <- tempfile(); on.exit(unlink(t)); writeBin(charToRaw(x), t); unname(tools::md5sum(t)) }, "")
+    t <- tempfile(); on.exit(unlink(t))
+    writeBin(charToRaw(paste0(md5, "  R/", names(fichiers), "\n", collapse = "")), t)
+    unname(tools::md5sum(t))
+  }
+  cites <- tempfile("depot_commits_"); dir.create(cites)
+  git_t(cites, "init", "-q")
+  pose <- function(chemin, texte) {
+    f <- tempfile(); on.exit(unlink(f)); writeBin(charToRaw(texte), f)
+    oid <- git_t(cites, "hash-object", "-w", shQuote(f))
+    git_t(cites, "update-index", "--add", "--cacheinfo", shQuote(paste0("100644,", oid, ",", chemin)))
+  }
+  pose("DESCRIPTION", DESC)
+  for (n in names(noms_cites)) pose(paste0("R/", n), noms_cites[[n]])
+  git_t(cites, "commit", "-q", "-m", shQuote("noms cites dans R/"))
+  cc <- git_t(cites, "rev-parse", "HEAD")
+  verifier("commits_empreinte_code historique (noms de R/ cités par git : guillemet, barre oblique inverse, tabulation, saut de ligne) : le commit est trouvé, empreinte du recalcul en R (code 0)", {
+    r <- historique(releve_de(noms_cites), cites)
+    r$statut == 0L && identical(shas_de(r), cc)
+  })
+  verifier("commits_empreinte_code historique (noms de R/ cités par git) : sans l'un des fichiers, l'empreinte n'est pas celle du commit -> code 2 (aucun fichier ignoré)", {
+    historique(releve_de(noms_cites[-2L]), cites)$statut == 2L
+  })
+  verifier("commits_empreinte_code references (noms de R/ cités par git) : commit dans la classe de l'empreinte -> code 0", {
+    references(cites, c(releve_de(noms_cites), court(cc)))$statut == 0L
+  })
+  unlink(c(depot, clone, temoin, lien, remise, cites), recursive = TRUE)
 } else cat("  [sauté] commits_empreinte_code : git absent : parcours de l'historique sur dépôts synthétiques non exécuté\n")

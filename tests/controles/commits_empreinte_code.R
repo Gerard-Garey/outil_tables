@@ -25,7 +25,8 @@
 #        sinon, avant tout appel à git). Parcourt git rev-list --all ; liste,
 #        du plus ancien au plus récent, les commits dont R/*.R a cette
 #        empreinte : SHA complet, date de validation, sujet. Calcul sur les
-#        blobs (git cat-file), indépendant de l'arbre de travail.
+#        blobs (git cat-file), indépendant de l'arbre de travail. refs/stash
+#        est exclue du parcours : un code remisé (git stash) n'est pas commité.
 #    arbre : empreinte des R/*.R de la racine courante, sans git (test de
 #        batterie : égale à EMPREINTE_CODE installée). Une ligne : l'empreinte.
 #    references : hors batteries et hors CI. Pour chaque tests/reference/*.tsv,
@@ -36,18 +37,20 @@
 #    0  commits trouvés / empreinte rendue / références concordantes ;
 #    1  refus nommé SEULEMENT (argument, git absent, racine hors d'un dépôt,
 #       sources introuvables, aucun .tsv) ;
-#    2  conclusion négative, historique complet : aucun commit (mode
+#    2  conclusion négative : aucun commit sur un historique complet (mode
 #       historique : le code était non commité, ou sa branche est absente du
-#       clone) ; écart (mode références : commit absent, ambigu, empreinte
-#       différente de l'en-tête, en-tête inexploitable) ;
+#       clone), ou écart (mode références : commit absent d'un historique
+#       complet, ambigu, empreinte différente de l'en-tête, en-tête
+#       inexploitable ; un écart sur un commit présent d'un clone superficiel
+#       est concluant aussi) ;
 #    3  NON DÉTERMINABLE : aucun commit sur un clone superficiel, ou commit
 #       d'un .tsv absent d'un clone superficiel ; ou aucun commit (resp.
 #       empreinte différente), alors qu'au moins un commit lu n'a pas
 #       d'empreinte parce qu'une entrée de R/ n'est pas un fichier ordinaire
 #       (lien symbolique, sous-module, dossier nommé *.R) : ces commits sont
 #       nommés. Une absence n'est jamais concluante sur un historique tronqué
-#       ni devant un commit non évaluable. Sur un clone superficiel, une liste
-#       de commits est valable mais peut être incomplète (dit).
+#       ni devant un commit non évaluable. Mode historique, clone superficiel :
+#       une liste de commits est valable mais peut être incomplète (dit).
 #    Mode références : écart (2) avant non déterminable (3).
 #
 #  Limites (ADR 0011, annotation du 27/10/2026, (e) 4 à 6)
@@ -63,6 +66,8 @@
 #    - Les fichiers R/ qui ne sont pas des fichiers ordinaires (lien
 #      symbolique, sous-module, dossier nommé *.R) rendent NA (rien n'est
 #      deviné).
+#    - Les noms de R/ sont lus par git ls-tree -z, en octets, sans guillemets
+#      (git cite sinon les noms à ", \, tabulation ou saut de ligne).
 # -----------------------------------------------------------------------------
 
 ARGS <- commandArgs(trailingOnly = TRUE)
@@ -169,7 +174,9 @@ lire_blobs <- function(oids) {
 # Empreinte de chaque commit de rev-list --all, sur les blobs. data.frame
 # (sha, empreinte), du plus ancien au plus récent (parents avant enfants).
 empreintes_historique <- function() {
-  rl <- git(c("rev-list", "--all", "--topo-order", "--reverse"))
+  # --exclude=refs/stash avant --all : le remisage (git stash) crée des commits
+  # « WIP on … » qui portent du code non commité.
+  rl <- git(c("rev-list", "--exclude=refs/stash", "--all", "--topo-order", "--reverse"))
   if (rl$statut != 0L || !length(rl$sortie)) refus("git rev-list --all n'a rendu aucun commit")
   commits <- rl$sortie
   oid_de <- function(suffixe) {
@@ -185,13 +192,26 @@ empreintes_historique <- function() {
   # Contenu de chaque arbre R/ distinct : (mode, type, oid, nom) des entrées.
   arbres <- unique(stats::na.omit(arbre_r))
   entrees <- stats::setNames(lapply(arbres, function(a) {
-    l <- git(c("-c", "core.quotepath=off", "ls-tree", a))
+    # -z : entrées « <mode> <type> <oid>\t<nom> » séparées par NUL, noms bruts
+    # (ni guillemets ni échappements) lus en octets.
+    t <- tempfile()
+    l <- git(c("ls-tree", "-z", a), fichier = t)
     if (l$statut != 0L) refus("git ls-tree a échoué sur ", a)
-    m <- regmatches(l$sortie, regexec("^([0-7]+) ([a-z]+) ([0-9a-f]+)\t(.*)$", l$sortie))
-    m <- m[lengths(m) == 5L]
-    d <- data.frame(mode = vapply(m, `[`, "", 2L), type = vapply(m, `[`, "", 3L),
-                    oid = vapply(m, `[`, "", 4L), nom = vapply(m, `[`, "", 5L))
-    d <- d[grepl("[.]R$", d$nom) & !startsWith(d$nom, "."), , drop = FALSE]
+    tampon <- readBin(t, "raw", file.size(t)); unlink(t)
+    fins <- c(0L, which(tampon == as.raw(0L)))
+    if (length(tampon) && fins[length(fins)] != length(tampon)) refus("sortie de git ls-tree -z tronquée sur ", a)
+    morceaux <- lapply(seq_len(length(fins) - 1L), function(k) tampon[(fins[k] + 1L):(fins[k + 1L] - 1L)])
+    lire <- function(x) {
+      tab <- which(x == as.raw(9L))[1L]
+      if (is.na(tab)) refus("entrée illisible de git ls-tree sur ", a)
+      champs <- strsplit(rawToChar(x[seq_len(tab - 1L)]), " ", fixed = TRUE)[[1L]]
+      if (length(champs) != 3L) refus("entrée illisible de git ls-tree sur ", a)
+      c(champs, rawToChar(x[-seq_len(tab)]))
+    }
+    m <- lapply(morceaux, lire)
+    d <- data.frame(mode = vapply(m, `[`, "", 1L), type = vapply(m, `[`, "", 2L),
+                    oid = vapply(m, `[`, "", 3L), nom = vapply(m, `[`, "", 4L))
+    d <- d[grepl("[.]R$", d$nom, useBytes = TRUE) & !grepl("^[.]", d$nom, useBytes = TRUE), , drop = FALSE]
     d[order(d$nom, method = "radix"), , drop = FALSE]
   }), arbres)
   ordinaire <- function(d) d$type == "blob" & d$mode %in% c("100644", "100755")
@@ -248,8 +268,9 @@ phrase_indetermines <- function() sprintf("%d commit(s) lu(s) sans empreinte à 
   if (length(INDETERMINES) > 10L) sprintf(" et %d autre(s)", length(INDETERMINES) - 10L) else "")
 NOTE_CLASSE <- paste("Une empreinte désigne une classe de commits : ceux qui ne touchent pas R/*.R gardent celle de leur parent.",
                      "La classe identifie le code R, non le package entier (DESCRIPTION, NAMESPACE, inst/ peuvent différer).")
-NOTE_SUPERFICIEL <- sprintf("ATTENTION : clone superficiel (%d commit(s) lus) ; la liste est valable mais peut être incomplète. %s",
-                            nrow(H), "Pour l'historique complet : git fetch --unshallow.")
+NOTE_SUPERFICIEL <- sprintf("ATTENTION : clone superficiel (%d commit(s) lus) ; %s Pour l'historique complet : git fetch --unshallow.",
+  nrow(H), if (MODE == "historique") "la liste est valable mais peut être incomplète."
+           else "un commit absent est non déterminable (code 3) ; un écart sur un commit présent reste concluant (code 2).")
 
 if (MODE == "historique") {
   trouves <- H$sha[!is.na(H$empreinte) & H$empreinte == EMPREINTE]
