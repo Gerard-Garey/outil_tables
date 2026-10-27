@@ -2044,7 +2044,12 @@ dépendent de l'environnement~: ils se sautent, avec un saut
 locale latin-1 ne peut pas y être générée, ou si les commandes ou le lien
 symbolique qu'ils emploient manquent~; la batterie unitaire reste ainsi
 exécutable sous Windows, tandis que le contrôle lui-même n'y saute jamais
-en silence.
+en silence. Pour \code{commits\_empreinte\_code.R}, qui n'est pas une règle
+du dépôt mais l'outil qui retrouve les commits d'une empreinte du code, la
+batterie exécute le mode \code{arbre} et les refus, et ne parcourt
+l'historique, sur des dépôts synthétiques, que si git est présent, avec un
+saut annoncé sinon (section~\ref{sec:rejeu}, «~Retrouver le code d'une
+fiche~»).
 
 \begin{center}
 \small
@@ -2125,6 +2130,15 @@ puissances égale aux entiers exacts de Python~; code~1 si Python est absent.
 et Python)~» du job «~Tests (R 4.3.3)~», hors liste des batteries
 (section~\ref{sec:empreinte}) & ADR 0011, annotation du 26/10/2026~; M161~;
 issue~\#104 \\
+\code{commits\_empreinte\_}\newline\code{code.R} & commits dont les
+\code{R/*.R} ont une empreinte du code donnée, recalculée sur les blobs de
+l'historique git sans charger \code{tablexp} (mode \code{historique})~;
+empreinte de la racine (mode \code{arbre}, égale à \code{EMPREINTE\_CODE}
+en batterie)~; concordance des en-têtes des références (mode
+\code{references})~; codes de sortie 0 à~3 (trouvé, refus, aucun commit ou
+écart, non déterminable). \textbf{Hors CI} pour l'historique, lancé à la
+main sur un clone complet (section~\ref{sec:rejeu}) & ADR 0011, annotation
+du 27/10/2026, (e)~; M126, M166~; issue~\#89 \\
 \end{longtable}
 \end{center}
 
@@ -2698,8 +2712,98 @@ Dans le tableau, un crochet désigne une valeur insérée.
 Le message de \code{version\_fiche\_non\_admise} cite l'empreinte du code,
 et non la seule version du package, parce que celle-ci, déclarée dans
 \code{DESCRIPTION}, est immobile (\code{0.0.0.9000}) et ne permet pas de
-retrouver le code d'une fiche~; le moyen de passer d'une fiche au code qui
-l'a produite reste à choisir (issue~\#89, ouverte).
+retrouver le code d'une fiche~: elle ne s'incrémente qu'aux jalons de
+livraison (décision M126).
+
+\medskip
+\noindent
+\textbf{Retrouver le code d'une fiche} (issue~\#89~; ADR 0011, annotation
+du 27/10/2026, (e)~; décisions M126 et M166). On passe de
+\code{fiche\$empreintes\$code} aux commits qui l'ont produite en
+\textbf{recalculant l'empreinte du code dans l'historique git}, par le
+script \code{tests/controles/commits\_empreinte\_code.R}, en R de base,
+hors du package (le moteur ne dépend pas de git, et un package installé n'a
+pas d'historique) et sans charger \code{tablexp}~: son recalcul est
+indépendant de \code{empreinte\_sources()} et la recoupe. Aucun registre
+«~empreinte~$\to$~commit~» n'est tenu, et la version du package n'est pas
+incrémentée à chaque fusion. Le script applique la définition et la garde
+de l'empreinte du code (section~\ref{sec:empreinte-resultat}, «~Empreinte
+du code~»)~: fichiers de premier niveau de \code{R/} dont le nom finit par
+\code{.R}, ni cachés ni dossiers, triés par octets~; MD5 de chaque
+fichier~; relevé «~\code{<md5>}, deux espaces, \code{R/<fichier>}~», une
+ligne par fichier, LF~; MD5 du relevé~; pas d'empreinte, jamais devinée,
+pour un commit sans \code{DESCRIPTION} de «~Package: tablexp~» ou sans
+\code{R/rapport.R}. Dans l'historique, il calcule sur les \emph{blobs}
+(\code{git cat-file}), non sur un arbre extrait, et lit les noms de
+\code{R/} en octets (\code{git ls-tree -z}), si bien que le résultat ne
+dépend pas de l'arbre de travail. Trois modes, lancés depuis la racine du
+dépôt~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{historique <empreinte>}~: l'empreinte, 32 caractères
+    hexadécimaux minuscules, est refusée sous une autre forme avant tout
+    appel à git~; le script parcourt les commits de toutes les références
+    locales (\code{git rev-list -{}-all}), sauf \code{refs/stash}, un code
+    remisé n'étant pas commité, et liste, du plus ancien au plus récent,
+    ceux dont \code{R/*.R} a cette empreinte (SHA complet, date, sujet)~;
+  \item \code{arbre}~: empreinte des \code{R/*.R} de la racine, sans git~;
+    la batterie unitaire exige son égalité à \code{EMPREINTE\_CODE}~;
+  \item \code{references}~: hors batteries et hors CI, pour chaque
+    \code{tests/reference/*.tsv}, vérifie que le commit de l'en-tête
+    \code{\# commit} est dans la classe de l'empreinte de l'en-tête
+    \code{\# fiche\$empreintes/code}.
+\end{itemize}
+Codes de sortie distincts, rien n'étant deviné~: \textbf{0}, commits
+trouvés, empreinte rendue ou références concordantes~; \textbf{1}, refus
+nommé seulement (argument, git absent, racine hors d'un dépôt, sources
+introuvables, aucun \code{.tsv})~; \textbf{2}, conclusion négative~: aucun
+commit sur un historique complet (le code n'était pas commité, ou sa
+branche est absente du clone), ou, en mode \code{references}, écart
+(commit absent d'un historique complet, ambigu, empreinte différente de
+l'en-tête, en-tête inexploitable~; un écart sur un commit présent d'un
+clone superficiel est concluant aussi)~; \textbf{3}, non déterminable~:
+aucun commit, ou commit d'un \code{.tsv} absent, sur un clone
+superficiel, ou aucun commit (en mode \code{references}, empreinte
+différente) alors qu'un commit lu n'a pas d'empreinte parce qu'une entrée
+de \code{R/} nommée \code{*.R} n'est pas un fichier ordinaire (lien
+symbolique, sous-module, dossier)~: ces commits sont nommés. En mode
+\code{references}, l'écart~(2) l'emporte sur le non déterminable~(3).
+\textbf{Limites}~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item une empreinte désigne une \textbf{classe de commits}~: tout commit
+    qui ne touche pas \code{R/*.R} garde l'empreinte de son parent. La
+    classe identifie le code R, non le package entier~: deux commits d'une
+    classe peuvent différer par \code{DESCRIPTION}, \code{NAMESPACE},
+    \code{inst/} ou un fichier caché~; qu'aucun résultat n'en dépende est
+    une \textbf{hypothèse}, non mesurée, et le relecteur lit ces écarts par
+    \code{git diff} entre deux commits de la classe~;
+  \item sur un \textbf{clone superficiel}, une liste trouvée est valable
+    mais peut être incomplète, et une absence n'est jamais concluante (le
+    script le dit)~; le contrôle de l'historique se lance donc à la main,
+    sur un clone complet (\code{git fetch -{}-unshallow} au besoin)~: le
+    job «~Tests (R~4.3.3)~» tourne sans git, et les autres jobs de la CI
+    reçoivent un historique de profondeur~1 (\emph{hypothèse}, d'après le
+    défaut d'\code{actions/checkout}, non relu~; ADR 0011, annotation du
+    27/10/2026, (e)~4)~; \code{.github/workflows/ci.yml} n'est pas modifié
+    (M166)~;
+  \item un commit perdu (branche supprimée sans fusion, historique réécrit)
+    rend sa fiche introuvable~: le script le dit, il ne le répare pas. La
+    règle de fusion par commit de fusion, jamais par squash ni rebase,
+    garde accessibles depuis \code{main} les commits d'une branche
+    fusionnée~;
+  \item le MD5 d'un blob est celui du fichier extrait sous la règle
+    \code{eol=lf} de \code{.gitattributes}~; un arbre extrait avec d'autres
+    fins de ligne aurait une autre empreinte (limite déjà connue de la
+    commande des tiers).
+\end{itemize}
+\code{tests/unitaires/test\_controles.R} vérifie en batterie le mode
+\code{arbre} (égalité à \code{EMPREINTE\_CODE}, fichiers \code{.r} et
+cachés ignorés, sources introuvables refusées) et les refus sans git~; le
+parcours de l'historique, sur des dépôts synthétiques créés sous
+\code{tempfile()} (ordre, garde, classe, codes 0, 2 et~3, clone de
+profondeur~1, blob partagé avec \code{DESCRIPTION}, lien symbolique, code
+remisé, noms que git cite entre guillemets, mode \code{references}), n'est
+exécuté que si git est présent~: il est sauté, avec un saut
+\textbf{annoncé} («~[sauté]~»), dans le job «~Tests (R~4.3.3)~».
 
 \medskip
 \noindent
@@ -6459,8 +6563,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     (MSYS2, coreutils~8.32), \emph{constat de mesure sur le poste du
     mainteneur}, à une version antérieure du code (relevé du 25/10/2026 à
     \code{1c48475}, issues~\#49 et~\#101)~: sans \code{-t}, une autre
-    valeur~; avec \code{-t}, celle de \code{EMPREINTE\_CODE}. À remesurer
-    à l'étape~(5)~; sous macOS,
+    valeur~; avec \code{-t}, celle de \code{EMPREINTE\_CODE}~; remesuré
+    sous Git Bash (coreutils~8.32) à l'état final de la dixième branche
+    (\code{aa1cf0b}, dont les \code{R/*.R} sont ceux de \code{8bd29dd}),
+    même constat, rapporté (ADR 0011, annotation du 27/10/2026, (c))~; sous macOS,
     \textbf{non mesurée} (décision M61)~: le \code{md5sum} de GNU n'y est
     pas installé par défaut (hypothèse), et la commande ne vaut qu'avec lui,
     d'où la mention «~GNU coreutils~» dans le libellé.
@@ -6755,6 +6861,10 @@ empreinte du résultat différente n'est pas un échec du rejeu. Le rejeu
 outillé, \code{rejouer\_fiche()}, fait les vérifications, l'exécution et la
 comparaison des témoins sur la même machine~; la comparaison à tolérance par
 classes sur une autre machine n'est pas outillée (section~\ref{sec:rejeu}).
+Pour retrouver le code qui a produit la fiche, le relecteur recherche
+\code{fiche\$empreintes\$code} dans l'historique git par
+\code{tests/controles/commits\_empreinte\_code.R} (section~\ref{sec:rejeu},
+«~Retrouver le code d'une fiche~»~; issue~\#89).
 
 \medskip
 {\sloppy
