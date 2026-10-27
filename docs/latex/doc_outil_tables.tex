@@ -642,14 +642,20 @@ résultat, chemin d'un élément non prévu) et \code{rejouer\_fiche()}
 (classes de la fiche, nom de champ d'encodage \code{bytes}, noms et
 attributs de la forme lue). La valeur citée étant une valeur reçue, elle
 reste brute dans les \code{details} (classe, chemin, colonne, nom
-d'encodage \code{bytes}\ldots), à deux précisions près~: pour
+d'encodage \code{bytes}\ldots), à trois précisions près~: pour
 \code{fiche\_non\_conforme}, à l'étape~2 du rejeu, \code{details\$lu} est
 la description de forme (section~\ref{sec:rejeu}), citée par la même
 règle, et la valeur exacte est celle de la fiche reçue au chemin
 \code{details\$champ}~; pour la lecture du texte du plan et de la fiche,
 la valeur reçue brute est dans les \code{details} (\code{classe},
 \code{chemin}, \code{colonne}, \code{attendu}) ou, à défaut, dans le
-texte reçu à la ligne \code{details\$ligne}. \textbf{Limite}~: la règle
+texte reçu à la ligne \code{details\$ligne}~; pour
+\code{version\_fiche\_non\_admise}, à l'étape~3 du rejeu, les
+\code{details} \code{tablexp}, \code{code} et \code{code\_installe} sont
+la sortie de \code{texte\_lu()} (section~\ref{sec:rejeu})~: la chaîne
+elle-même si c'est une chaîne unique sans attribut, sinon «~absente~» ou «~illisible (\emph{type} de
+longueur \emph{n})~», la version lue \code{details\$lu} restant brute.
+\textbf{Limite}~: la règle
 n'est pas encore appliquée aux autres refus qui citent une valeur reçue,
 dont, sans prétendre à l'exhaustivité, \code{type\_incompatible} du
 module \code{donnees} (nom de colonne et classe),
@@ -2681,7 +2687,11 @@ données, étape~6) gardent leur module. Chaque message cite la valeur lue et
 la valeur attendue. La version de \code{tablexp} et les empreintes du
 code y sont écrites par \code{texte\_lu()}~: «~absente~» si la valeur
 manque, elle-même si c'est une chaîne unique sans attribut (\code{NA} écrit
-«~NA~»), «~illisible (\emph{type} de longueur \emph{n})~» sinon. Toute
+«~NA~»), «~illisible (\emph{type} de longueur \emph{n})~» sinon~; elles
+sont rangées sous cette forme dans les \code{details} de
+\code{version\_fiche\_non\_admise} (\code{tablexp}, \code{code},
+\code{code\_installe}), la version lue y restant brute
+(\code{details\$lu}). Toute
 valeur lue dans la fiche et insérée dans un message (classes de l'objet
 reçu, valeurs et noms lus) est citée selon la règle unique des refus
 (section~\ref{sec:refus}, «~Citation d'une valeur dans un message~»~:
@@ -6807,7 +6817,7 @@ point~3.2).
 \begin{longtable}{@{}p{5.4cm}p{9.4cm}@{}}
 \caption{Refus de la lecture et de l'écriture du texte (module
 \code{rapport}~; à la lecture, numéro de la ligne fautive dans
-\code{details\$ligne} (\code{NA} pour \code{texte\_non\_octets}), et en outre
+\code{details\$ligne} (\code{NA} pour \code{texte\_non\_octets} et pour un texte vide), et en outre
 classe reçue dans \code{details\$classe} (\code{texte\_non\_octets}), chemin
 lu et chemin attendu dans \code{details\$chemin} et \code{details\$attendu}
 (\code{texte\_chemin\_inattendu}~; \code{chemin} seul pour une ligne après
