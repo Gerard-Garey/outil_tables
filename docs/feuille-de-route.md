@@ -116,7 +116,7 @@ PR #116, fusionnée le 26/10/2026 par commit de fusion `8bd29dd` (parents `56383
   - [ ] #89 — identifier le code d'une fiche, voie de M126.
     - Circuit 3 : `coder` → `audit` ; `tests:`.
     - Critères :
-      - script hors de `R/`, au chemin fixé en (5), qui rend les commits dont `R/*.R` a l'empreinte donnée (formule de `STATUT_EMPREINTE_CODE`) ;
+      - script hors de `R/`, au chemin fixé en (5) : `tests/controles/commits_empreinte_code.R` (ADR 0011, annotation du 27/10/2026, (e)), qui rend les commits dont `R/*.R` a l'empreinte donnée (formule de `STATUT_EMPREINTE_CODE`) ;
       - en batterie, test sur l'état courant (empreinte de l'arbre = `EMPREINTE_CODE`) ;
       - hors batteries, contrôle de l'historique qui retrouve le commit de l'en-tête de chaque `.tsv` de `tests/reference/` ;
       - `.github/workflows/ci.yml` inchangé (M166) ; pas d'incrément de `Version`.
