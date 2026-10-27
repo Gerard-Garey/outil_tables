@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{26/10/2026}
+\newcommand{\datedoc}{27/10/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -7054,14 +7054,26 @@ de l'empreinte à deux rôles caractère sur un jeu déterministe.
 (section~\ref{sec:empreinte}) est inchangée~: un \code{integer} s'écrit
 comme \code{sprintf("\%d", x)}, une date en ISO~8601~; seul l'assemblage
 des octets change, qui ne passe plus par une chaîne par ligne.
-\code{octets\_entiers()} forme une matrice d'octets d'une colonne par
+\code{octets\_entiers()} traite la colonne par blocs de $2^{20}$ valeurs
+consécutives (argument \code{bloc}, qui ne sert qu'aux tests du découpage~;
+issue~\#83), dont les octets sont concaténés dans l'ordre. Pour chaque
+bloc, elle forme une matrice d'octets d'une colonne par
 valeur et d'une ligne par position (signe, chiffres, LF), le nombre de
-chiffres étant celui de la plus grande valeur absolue, deux au moins pour
+chiffres étant celui de la plus grande valeur absolue du bloc, deux au moins pour
 le jeton \code{NA}~; un chiffre de rang $k > 0$ n'est écrit que si le
 quotient de la valeur absolue par $10^k$ est non nul, si bien qu'aucun zéro
 de tête n'apparaît~; les places inoccupées valent l'octet nul, qui
 n'apparaît dans aucune écriture et que la lecture de la matrice colonne par
-colonne retire. \code{octets\_lignes\_indices()} écrit une fois chaque date
+colonne retire. Chaque valeur s'écrit ainsi sans remplissage et sans
+dépendre de ses voisines~: le découpage en blocs ne change aucun octet, ce
+qui découle de la construction (il ne fixe que la hauteur des matrices,
+dont les places inoccupées sont retirées). Il borne le travail
+transitoire, dont le plus gros objet est le masque logique des places
+occupées d'un bloc, de $4(n_c + 2)$~octets par valeur pour $n_c$ chiffres~; la sortie et sa copie lors de la concaténation restent
+proportionnelles à la longueur de la colonne, que \code{ecrire\_valeurs()}
+rend entière. La baisse du pic mémoire est un constat de mesure, hors
+plateforme de référence, consigné avec le commit \code{2b4ebda}.
+\code{octets\_lignes\_indices()} écrit une fois chaque date
 distincte, puis recopie ses octets, LF compris, aux lignes où elle figure,
 par \code{sequence()}~; les jetons \code{NA} et \code{NaN} d'une date
 manquante sont lus comme avant sur la valeur reçue. Dans les deux formes,
@@ -7071,7 +7083,11 @@ manquante sont lus comme avant sur la valeur reçue. Dans les deux formes,
 les entiers, 14 cas (vecteur vide, \code{NA}, zéro, signes, de 1 à 10
 chiffres, $\pm(2^{31} - 1)$, noms, dimension, constante, $10^5$ valeurs
 pseudo-aléatoires sans générateur), par \code{octets\_entiers()} et par
-\code{ecrire\_valeurs()} dans les deux formes, plus une sortie écrite à la
+\code{ecrire\_valeurs()} dans les deux formes, puis par
+\code{octets\_entiers()} avec des blocs de 1, 2, 3, 7, 1\,000 et $10^6$
+valeurs, plus une colonne de $2^{20} + 3$ valeurs découpée en deux blocs de
+largeurs différentes (\code{NA} et entier négatif dans le second), et une
+sortie écrite à la
 main~; pour \code{octets\_lignes\_indices()}, 8 suites d'indices (vide,
 texte vide, répétitions, ordre inverse, $10^5$ indices)~; pour les dates,
 \code{NA}, \code{NaN}, stockage \code{integer}, valeurs répétées et $10^5$
@@ -7222,7 +7238,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{octets\_chaines()} & interne & chaînes, rôle, \code{limite} (facultative, $2^{30}$ octets, réservée aux tests du découpage) & octets canoniques des chaînes~; refus de codage~; écriture par blocs de lignes (\code{bornes\_blocs()}), un \code{paste()} et un \code{charToRaw()} par bloc, une ligne plus longue que \code{limite} écrite seule \\
 \catalogue{fonctions-rapport}{octets\_lignes()} & interne & textes ASCII & octets, une valeur par ligne \\
 \catalogue{fonctions-rapport}{octets\_lignes\_indices()} & interne & textes ASCII, indices sans \code{NA} & octets des lignes \code{textes[i]}, égaux à ceux d'\code{octets\_lignes()} sur ces lignes~; chaque texte écrit une fois, ses octets recopiés par indice (\code{sequence()})~; écriture des dates (issue~\#71) \\
-\catalogue{fonctions-rapport}{octets\_entiers()} & interne & entiers (\code{integer}) & octets de \code{sprintf("\%d", x)}, une valeur par ligne, écrits en octets sans chaîne intermédiaire~; écriture des entiers (issue~\#71) \\
+\catalogue{fonctions-rapport}{octets\_entiers()} & interne & entiers (\code{integer})~; \code{bloc} (défaut $2^{20}$, tests seulement) & octets de \code{sprintf("\%d", x)}, une valeur par ligne, écrits en octets sans chaîne intermédiaire, par blocs de \code{bloc} valeurs~; écriture des entiers (issues~\#71 et~\#83) \\
 \catalogue{fonctions-rapport}{texte\_date()} & interne & jours depuis 1970-01-01, entiers, finis, dans le domaine & écriture ISO~8601 AAAA-MM-JJ, année sur quatre chiffres~; partagée par \code{ecrire\_valeurs()} et le contrôle de canonicité du lecteur (\code{valeurs\_texte()}) \\
 \catalogue{fonctions-rapport}{BASE\_TRANCHES} & constante & --- & base $10^{7}$ des tranches des grands entiers de l'écriture «~texte~» des doubles (section~\ref{sec:empreinte}, «~Écriture «~texte~» des doubles~»), poids faible d'abord~; produits et sommes de tranches restent des entiers inférieurs à $2^{53}$ (I3) \\
 \catalogue{fonctions-rapport}{diviser\_tranche()} & interne & entiers de $[0, 2^{53})$ (vecteur ou matrice) & quotient et reste exacts par la base, quel que soit l'arrondi du quotient (correction d'une unité~; I4)~; ni \code{\%\%} ni \code{\%/\%} sur des doubles \\
