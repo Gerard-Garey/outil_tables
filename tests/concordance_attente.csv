@@ -1,2 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-outils:noms_bytes,#114,"positions des noms d'encodage bytes d'un objet reçu, contrôle avant lecture par nom ; documentée par docwriter en fin de branche (règle 9)"
