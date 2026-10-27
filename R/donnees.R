@@ -179,17 +179,13 @@ type_conforme <- function(x, type) {
 
 # --- refus au niveau des rôles (A.1) ------------------------------------------
 
-# Chaînes de l'utilisateur citées dans un message : seule règle de masquage du
-# package (#111). Une chaîne marquée « bytes » ferait lever sprintf()
-# (« translating strings with "bytes" encoding is not allowed », mesuré sous
-# C.UTF-8 et sous C) au lieu du refus ; elle est citée sous un repère. Rend le
-# vecteur masqué, sans paste : une chaîne qui n'est pas « bytes » reste telle
-# quelle (encodage compris).
-citer <- function(x) {
-  if (!is.character(x)) x <- as.character(x)
-  x[!is.na(x) & Encoding(x) == "bytes"] <- "<chaîne d'encodage bytes>"
-  x
-}
+# Chaînes de l'utilisateur citées dans un message (#111, #94) : règle unique
+# neutraliser_citation() (R/outils.R) : chaîne « bytes » citée sous un
+# repère (sprintf() lèverait « translating strings with "bytes" encoding is
+# not allowed » au lieu du refus), caractères de contrôle et séparateurs de
+# ligne écrits <U+XXXX>, octets qui ne sont pas de l'UTF-8 valide écrits
+# <xx>, marque UTF-8. Rend le vecteur neutralisé, sans paste ; NA reste NA.
+citer <- function(x) neutraliser_citation(x)
 
 liste_guillemets <- function(x) paste0("« ", citer(x), " »", collapse = ", ")
 
@@ -357,7 +353,7 @@ controler_transition_periode <- function(transition, periode, delai_declaration)
             list(transition = transition))
   depart <- transition[["depart"]]; arrivee <- transition[["arrivee"]]
   if (!nrow(ligne_transition(transition))) {
-    # États cités par citer() : masqués s'ils sont marqués « bytes » (#111).
+    # États cités par citer() : règle neutraliser_citation() (R/outils.R ; #111, #94).
     refuser("donnees", "transition_inconnue",
             sprintf("Transition non prise en charge : %s -> %s (prises en charge : %s).",
                     citer(depart), citer(arrivee),
@@ -799,8 +795,8 @@ FORMES_ORIGINE <- c("qx", "lx")
 table_reference <- function(x, nom, statut, source, parametres = NULL, forme_origine = "qx") {
   if (!chaine_unique(nom))
     refuser("donnees", "table_nom_manquant", "La table de référence doit avoir un nom (chaîne non vide, sans attribut).")
-  # Nom cité dans les messages : masqué s'il est marqué « bytes » (#111) ; `nom`
-  # lui-même reste celui de l'objet.
+  # Nom cité dans les messages : règle neutraliser_citation() (R/outils.R ;
+  # #111, #94) ; `nom` lui-même reste celui de l'objet.
   nom_cite <- citer(nom)
   if (!chaine_unique(statut) || !(statut %in% STATUTS_TABLE))
     refuser("donnees", "table_statut_inconnu",

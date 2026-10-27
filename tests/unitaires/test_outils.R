@@ -286,3 +286,67 @@ verifier("sous_graine : graines nues 1 et 1L admises, même tirage (0,2655087 so
   u1 <- sous_graine(1, runif(1)); u2 <- sous_graine(1L, runif(1))
   identical(u1, u2) && abs(u1 - 0.2655087) < 1e-7
 })
+
+# --- neutralisation d'une valeur citée dans un message de refus (#94) ---------
+# Attendus calculés à la main : ensemble Cc ∪ Zl ∪ Zp (C0, DEL, C1 dont NEL,
+# U+2028, U+2029) écrit <U+XXXX> ; octets d'une chaîne qui n'est pas de
+# l'UTF-8 valide écrits <xx> (>= 0x80) ou <U+00XX> (C0, DEL) ; « bytes » sous
+# un repère ; marque UTF-8 dès qu'un caractère n'est pas ASCII. Chaînes
+# construites par leurs points de code (intToUtf8) ou leurs octets (rawToChar),
+# indépendamment de la locale.
+neutraliser_citation <- tablexp:::neutraliser_citation
+citation_a_neutraliser <- tablexp:::citation_a_neutraliser
+u <- function(...) intToUtf8(c(...))
+octets_de <- function(...) rawToChar(as.raw(c(...)))
+for (k in list(list("VT", 0x0B, "<U+000B>"), list("FF", 0x0C, "<U+000C>"), list("LF", 0x0A, "<U+000A>"),
+               list("CR", 0x0D, "<U+000D>"), list("TAB", 0x09, "<U+0009>"), list("SOH", 0x01, "<U+0001>"),
+               list("DEL", 0x7F, "<U+007F>"), list("NEL", 0x85, "<U+0085>"), list("U+009F", 0x9F, "<U+009F>"),
+               list("U+2028", 0x2028, "<U+2028>"), list("U+2029", 0x2029, "<U+2029>")))
+  verifier(sprintf("neutraliser_citation : %s -> %s, ASCII non marqué, une ligne ; prédicat TRUE", k[[1L]], k[[3L]]), {
+    r <- neutraliser_citation(u(0x61, k[[2L]], 0x62))
+    identical(charToRaw(r), charToRaw(paste0("a", k[[3L]], "b"))) && identical(Encoding(r), "unknown") &&
+      isTRUE(citation_a_neutraliser(u(0x61, k[[2L]], 0x62)))
+  })
+verifier("neutraliser_citation : ensemble de 66 points de code représentables de U+0001 à U+FFFF (Cc, Zl, Zp ; U+0000 hors chaîne R)", {
+  k <- setdiff(1:0xFFFF, 0xD800:0xDFFF)
+  n <- k[vapply(k, function(i) citation_a_neutraliser(intToUtf8(i)), NA)]
+  identical(n, c(1:0x1F, 0x7F:0x9F, 0x2028L, 0x2029L))
+})
+verifier("neutraliser_citation : caractères de format (ZWJ U+200D, U+202E, U+FEFF) et « é » cités tels quels, marqués UTF-8 ; prédicat FALSE", {
+  s <- c(u(0x61, 0x200D, 0x62), u(0x202E, 0x61), u(0xFEFF), u(0xE9))
+  r <- neutraliser_citation(s)
+  identical(lapply(r, charToRaw), lapply(s, charToRaw)) && all(Encoding(r) == "UTF-8") &&
+    identical(citation_a_neutraliser(s), rep(FALSE, 4L))
+})
+verifier("neutraliser_citation : NA reste NA, ASCII inchangé, vecteur sans noms, prédicat FALSE pour NA", {
+  r <- neutraliser_citation(c(a = NA, b = "x y"))
+  identical(r, c(NA_character_, "x y")) && identical(citation_a_neutraliser(c(NA, "x y")), c(FALSE, FALSE))
+})
+verifier("neutraliser_citation : chaîne « bytes » -> repère « <chaîne d'encodage bytes> » marqué UTF-8 ; prédicat TRUE", {
+  b <- octets_de(0x6d, 0x0b, 0xe9); Encoding(b) <- "bytes"
+  r <- neutraliser_citation(b)
+  identical(charToRaw(r), charToRaw(u(0x3c, utf8ToInt("cha"), 0xee, utf8ToInt("ne d'encodage bytes>")))) &&
+    identical(Encoding(r), "UTF-8") && isTRUE(citation_a_neutraliser(b))
+})
+verifier("neutraliser_citation : octets qui ne sont pas de l'UTF-8 valide -> <xx> et <U+00XX>, ASCII ; prédicat TRUE", {
+  s <- octets_de(0xe2, 0x61, 0x0b, 0xe9, 0x7f)
+  r <- neutraliser_citation(s)
+  identical(r, "<e2>a<U+000B><e9><U+007F>") && identical(Encoding(r), "unknown") && isTRUE(citation_a_neutraliser(s))
+})
+verifier("neutraliser_citation : chaîne marquée latin-1 « âge » convertie, marquée UTF-8 ; prédicat FALSE", {
+  s <- octets_de(0xe2, 0x67, 0x65); Encoding(s) <- "latin1"
+  r <- neutraliser_citation(s)
+  identical(charToRaw(r), as.raw(c(0xc3, 0xa2, 0x67, 0x65))) && identical(Encoding(r), "UTF-8") &&
+    identical(citation_a_neutraliser(s), FALSE)
+})
+verifier("neutraliser_citation : UTF-8 valide non marqué (« é » natif) lu en UTF-8, marqué ; non character converti", {
+  s <- octets_de(0xc3, 0xa9); Encoding(s) <- "unknown"
+  r <- neutraliser_citation(s)
+  identical(charToRaw(r), as.raw(c(0xc3, 0xa9))) && identical(Encoding(r), "UTF-8") &&
+    identical(neutraliser_citation(3L), "3")
+})
+verifier("neutraliser_citation : idempotente (une citation neutralisée n'est plus à neutraliser)", {
+  s <- c(u(0x61, 0x0B, 0x85, 0x2028, 0xE9), octets_de(0xe2, 0x0c))
+  r <- neutraliser_citation(s)
+  identical(neutraliser_citation(r), r) && identical(citation_a_neutraliser(r), c(FALSE, FALSE))
+})

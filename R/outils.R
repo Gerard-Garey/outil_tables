@@ -14,7 +14,10 @@
 #  - noms_complets() : la règle des noms complets, écrite une seule fois et
 #    partagée par les modules et l'orchestration (#22, notes de B6) ;
 #  - texte_moteur() : texte produit par le moteur marqué UTF-8, quelle que
-#    soit la locale d'installation ou d'exécution (#50).
+#    soit la locale d'installation ou d'exécution (#50) ;
+#  - neutraliser_citation() et citation_a_neutraliser() : règle unique de
+#    neutralisation d'une valeur citée dans un message de refus (caractères
+#    de contrôle et séparateurs de ligne, encodage ; #94).
 #
 #  Ce fichier n'appelle aucun module (graphe d'appels, ADR 0007, point 2.1 ;
 #  contrôlé par tests/controles/graphe_modules.R).
@@ -153,6 +156,92 @@ texte_moteur <- function(x) {
   }
   if (!is.null(names(x))) names(x) <- texte_moteur(names(x))
   x
+}
+
+# Valeur citée dans un message de refus (#94) : règle unique de
+# neutralisation, appliquée à chaque élément d'un vecteur (texte des refus,
+# jamais des valeurs écrites ni empreintées ; la valeur exacte reste dans les
+# `details` du refus). Ensemble neutralisé : catégories Unicode Cc, Zl et Zp
+# (67 points de code, dont U+0000, qu'aucune chaîne R ne contient) : U+0000 à
+# U+001F (C0), U+007F (DEL), U+0080 à U+009F (C1, dont NEL), U+2028 et
+# U+2029, points de code d'une chaîne UTF-8 (une chaîne latin-1 est d'abord
+# convertie, voir plus bas) ; il contient tous les séparateurs de ligne
+# (LF, VT, FF, CR, U+001C à U+001E, NEL, U+2028, U+2029) : un message
+# neutralisé tient sur une ligne. Les caractères de format (Cf : U+200B à
+# U+200F, U+202A à U+202E, U+2066 à U+2069, U+FEFF) ne sont pas neutralisés :
+# ils ne coupent pas une ligne et sont légitimes dans certains noms (ZWJ,
+# ZWNJ) ; un contrôle bidirectionnel peut réordonner l'affichage d'une valeur
+# citée (limite acceptée). Par élément :
+#   - NA reste NA (l'appelant l'écrit) ;
+#   - une chaîne d'encodage « bytes » devient le repère « <chaîne d'encodage
+#     bytes> », sans réinterprétation de ses octets (sprintf() lèverait
+#     « translating strings with "bytes" encoding is not allowed », #111) ;
+#   - une chaîne marquée latin-1 est convertie par enc2utf8(), qui la lit
+#     selon CP1252 depuis R 3.5.0 (?Encoding, Details ; mesuré sous C et
+#     C.UTF-8) : les octets 0x80 à 0x9F y deviennent des caractères
+#     imprimables (€, …, œ, Œ, ’…), non des C1, et ne sont pas neutralisés ;
+#     les cinq positions non définies (0x81, 0x8D, 0x8F, 0x90, 0x9D) sont
+#     écrites <81>… par enc2utf8(), comme un octet invalide et avec le même
+#     sens ; une chaîne marquée UTF-8, ou d'encodage `unknown` aux octets
+#     UTF-8 valides, est lue en UTF-8 (convention de texte_moteur()) ; chaque
+#     caractère de l'ensemble s'écrit <U+XXXX> (quatre chiffres hexadécimaux
+#     majuscules : l'ensemble est dans le premier plan) ;
+#   - une chaîne qui n'est pas de l'UTF-8 valide est citée octet par octet :
+#     un octet >= 0x80 s'écrit <xx> (hexadécimal minuscule), un octet C0 ou
+#     DEL <U+00XX>, les autres tels quels.
+# Notations de ?iconv (R 4.3.3) : <xx> pour sub = "byte", <U+xxxx> pour
+# sub = "Unicode". Travail sur les octets (charToRaw(), utf8ToInt()) : même
+# sortie sous les locales C et UTF-8. Le résultat est marqué UTF-8 s'il
+# contient un caractère non ASCII. Limite acceptée : « < » n'est pas échappé,
+# un « <U+000A> » tapé tel quel se cite comme un LF.
+neutraliser_citation <- function(x) {
+  if (!is.character(x)) x <- as.character(x)
+  repere <- texte_moteur("<chaîne d'encodage bytes>")
+  une <- function(s) {
+    if (is.na(s)) return(NA_character_)
+    if (Encoding(s) == "bytes") return(repere)
+    if (Encoding(s) == "latin1") s <- enc2utf8(s)
+    if (validUTF8(s)) {
+      p <- utf8ToInt(s)
+      m <- p <= 0x1F | (p >= 0x7F & p <= 0x9F) | p == 0x2028 | p == 0x2029
+      if (!any(m)) {
+        o <- charToRaw(s)
+      } else {
+        morceaux <- lapply(p, function(k) charToRaw(intToUtf8(k)))
+        morceaux[m] <- lapply(sprintf("<U+%04X>", p[m]), charToRaw)
+        o <- unlist(morceaux, use.names = FALSE)
+      }
+    } else {
+      b <- as.integer(charToRaw(s))
+      morceaux <- lapply(b, function(k) as.raw(k))
+      haut <- b >= 0x80
+      ctrl <- b <= 0x1F | b == 0x7F
+      morceaux[haut] <- lapply(sprintf("<%02x>", b[haut]), charToRaw)
+      morceaux[ctrl] <- lapply(sprintf("<U+%04X>", b[ctrl]), charToRaw)
+      o <- unlist(morceaux, use.names = FALSE)
+    }
+    r <- rawToChar(o)
+    Encoding(r) <- if (any(o >= as.raw(0x80))) "UTF-8" else "unknown"
+    r
+  }
+  vapply(x, une, "", USE.NAMES = FALSE)
+}
+
+# Prédicat de la règle (#94) : TRUE pour un élément que neutraliser_citation()
+# ne cite pas tel quel (chaîne « bytes », octets qui ne sont pas de l'UTF-8
+# valide, caractère de l'ensemble neutralisé) ; FALSE pour NA et pour une
+# chaîne citée telle quelle (conversion latin-1 et marque UTF-8 mises à part).
+# L'ensemble n'est défini qu'une fois, dans neutraliser_citation().
+citation_a_neutraliser <- function(x) {
+  if (!is.character(x)) x <- as.character(x)
+  n <- neutraliser_citation(x)
+  vapply(seq_along(x), function(i) {
+    s <- x[i]
+    if (is.na(s)) return(FALSE)
+    if (Encoding(s) == "bytes") return(TRUE)
+    if (Encoding(s) == "latin1") s <- enc2utf8(s)
+    !identical(charToRaw(s), charToRaw(n[i]))
+  }, NA)
 }
 
 # Évalue expr sous la graine `graine` et le générateur GENERATEUR, puis

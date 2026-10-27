@@ -660,3 +660,48 @@ local({
   verifier("R1 d'audit : @longueur égal au reste du texte (2 éléments, 2 lignes) lu",
            identical(lire_plan(texte("2", 2L)), list(1, 1)))
 })
+
+# --- valeurs citées dans les refus de la lecture (#94) ---------------------------
+# Règle unique neutraliser_citation() (R/outils.R) : première ligne, type
+# inconnu et valeur invalide cités avec VT, FF, NEL et U+2028 écrits
+# <U+XXXX> (auparavant : C0 et DEL remplacés par une espace en première ligne,
+# en clair ailleurs) ; message sur une ligne.
+local({
+  ok <- c("tablexp plan 1", "@noms\tcharacter\t2\t\"a\"\t\"b\"", "a\tdouble\t1\t1", "b\tcharacter\t1\t\"x\"")
+  remplacer <- function(i, ligne) { t <- ok; t[i] <- ligne; t }
+  for (k in list(list("VT", 0x0B, "<U+000B>"), list("FF", 0x0C, "<U+000C>"), list("NEL", 0x85, "<U+0085>"),
+                 list("U+2028", 0x2028, "<U+2028>"))) {
+    ch <- intToUtf8(k[[2L]])
+    cas <- list(
+      list("première ligne", "texte_version_inconnue", remplacer(1L, paste0("tablexp", ch, "plan 1")),
+           paste0("première ligne « tablexp", k[[3L]], "plan 1 »")),
+      list("type inconnu", "texte_type_inconnu", remplacer(3L, paste0("a\tdou", ch, "ble\t1\t1")),
+           paste0("type « dou", k[[3L]], "ble » inconnu")),
+      list("valeur invalide", "texte_valeur_invalide", remplacer(4L, paste0("b\tcharacter\t1\tx", ch, "y")),
+           paste0("(valeur 1 : x", k[[3L]], "y)")))
+    for (c_ in cas)
+      verifier(sprintf("lire_plan, refus %s avec %s : %s, cité %s, message sur une ligne", c_[[1L]], k[[1L]], c_[[2L]], k[[3L]]), {
+        r <- refus_de(lire_plan(charToRaw(paste0(paste(c_[[3L]], collapse = "\n"), "\n"))))
+        m <- if (is.null(r)) "" else conditionMessage(r)
+        if (is.null(r)) "aucun refus" else if (!identical(r$motif, c_[[2L]])) sprintf("motif %s", r$motif)
+        else if (!grepl(c_[[4L]], m, fixed = TRUE)) sprintf("message sans « %s » : %s", c_[[4L]], m)
+        else if (grepl(ch, m, fixed = TRUE)) "caractère écrit en clair" else TRUE
+      })
+  }
+})
+
+# Chemin en double cité par neutraliser_citation() (reprise de #94) : VT et NEL
+# écrits <U+XXXX> ; message sur une ligne, marqué UTF-8 (refus de lire_texte()
+# marqués par texte_moteur()). Un chemin d'encodage bytes est impossible : le
+# texte est reçu en octets, ses lignes marquées UTF-8 après validUTF8().
+for (k in list(list("VT", "\u000b", "<U+000B>"), list("NEL", "\u0085", "<U+0085>")))
+  verifier(sprintf("lire_plan, refus chemin en double « a<%s> » : texte_chemin_en_double, cité « a%s », une ligne, UTF-8", k[[1L]], k[[3L]]), {
+    t <- c("tablexp plan 1", "@noms\tcharacter\t2\t\"a\"\t\"b\"", paste0("a", k[[2L]], "\tdouble\t1\t1"),
+           paste0("a", k[[2L]], "\tdouble\t1\t2"))
+    r <- refus_de(lire_plan(charToRaw(paste0(paste(t, collapse = "\n"), "\n"))))
+    m <- if (is.null(r)) "" else conditionMessage(r)
+    if (is.null(r)) "aucun refus" else if (!identical(r$motif, "texte_chemin_en_double")) sprintf("motif %s", r$motif)
+    else if (!grepl(paste0("chemin « a", k[[3L]], " » en double"), m, fixed = TRUE)) sprintf("message : %s", m)
+    else if (grepl("[\n\v\f]", m) || grepl(k[[2L]], m, fixed = TRUE)) "caractère écrit en clair ou message sur plusieurs lignes"
+    else if (!identical(Encoding(m), "UTF-8")) "message non marqué UTF-8" else TRUE
+  })

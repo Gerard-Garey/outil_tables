@@ -381,3 +381,52 @@ verifier("T8 fiche de version 3 fabriquée d'une fiche 4 écrite : lue sans refu
     isTRUE(controle_refus(refus_de(rejouer_fiche(BASE, f3)), "construire_table", "version_fiche_non_admise")) &&
     inherits(construire_table(BASE, f3$roles, f3$plan, f3$provenance), "construction")
 })
+
+# --- T11 : valeurs citées dans les refus du rejeu (#94) -------------------------
+# Règle unique neutraliser_citation() (R/outils.R) : VT, FF, NEL et U+2028
+# cités <U+XXXX>, message sur une ligne et marqué UTF-8, valeur exacte dans les
+# details ; une valeur « bytes » donne le refus nommé au lieu de l'erreur R
+# « translating strings with "bytes" encoding is not allowed » (avant #94).
+for (k in list(list("VT", 0x0B, "<U+000B>"), list("FF", 0x0C, "<U+000C>"), list("NEL", 0x85, "<U+0085>"),
+               list("U+2028", 0x2028, "<U+2028>"))) {
+  s <- intToUtf8(c(0x6d, 0x64, k[[2L]], 0x35))
+  verifier(sprintf("T11 empreintes/algorithme « md<%s>5 » : refus algorithme_empreinte_inconnu, cité « md%s5 », une ligne, UTF-8",
+                   k[[1L]], k[[3L]]), {
+    r <- refus_de(rejouer_fiche(BASE, fiche_modifiee("empreintes/algorithme" = s)))
+    ok <- controle_refus(r, "construire_table", "algorithme_empreinte_inconnu", list(lu = s, attendu = "md5"),
+                         paste0("« md", k[[3L]], "5 »"))
+    if (isTRUE(ok) && grepl(intToUtf8(k[[2L]]), conditionMessage(r), fixed = TRUE)) "caractère écrit en clair"
+    else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
+  })
+  verifier(sprintf("T11 versions/tablexp « a<%s>b », version_fiche 3 : refus version_fiche_non_admise, cité « a%sb »",
+                   k[[1L]], k[[3L]]),
+           controle_refus(refus_de(rejouer_fiche(BASE, fiche_modifiee(version_fiche = 3L,
+                                                                      "versions/tablexp" = intToUtf8(c(0x61, k[[2L]], 0x62))))),
+                          "construire_table", "version_fiche_non_admise", NULL, paste0("tablexp a", k[[3L]], "b,")))
+}
+verifier("T11 empreintes/algorithme d'encodage bytes : refus algorithme_empreinte_inconnu (pas une erreur R), repère cité", {
+  b <- "md\xe95"; Encoding(b) <- "bytes"
+  r <- tryCatch(rejouer_fiche(BASE, fiche_modifiee("empreintes/algorithme" = b)), error = function(e) e)
+  if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+  else controle_refus(r, "construire_table", "algorithme_empreinte_inconnu", list(lu = b, attendu = "md5"),
+                      "« <chaîne d'encodage bytes> »")
+})
+# Classe de la fiche citée par neutraliser_citation() dans le refus
+# fiche_non_conforme (reprise de #94) : classe « a<VT>b » citée <U+000B> ;
+# classe d'encodage bytes : refus nommé (inherits() levait « translating
+# strings with "bytes" encoding is not allowed »), repère cité ; details$lu
+# garde la classe exacte.
+local({
+  b <- "md\xe95"; Encoding(b) <- "bytes"
+  for (k in list(list("a<VT>b", "a\u000bb", "objet de classe a<U+000B>b (type double)"),
+                 list("d'encodage bytes", b, "objet de classe <chaîne d'encodage bytes> (type double)")))
+    verifier(sprintf("T11 fiche structure(1, class = %s) : refus fiche_non_conforme (pas une erreur R), classe citée, une ligne, UTF-8",
+                     k[[1L]]), {
+      r <- tryCatch(rejouer_fiche(data.frame(a = 1), structure(1, class = k[[2L]])), error = function(e) e)
+      if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+      ok <- controle_refus(r, "construire_table", "fiche_non_conforme",
+                           list(champ = "(fiche)", lu = k[[2L]], attendu = "liste nommée"), k[[3L]])
+      if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
+      else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
+    })
+})
