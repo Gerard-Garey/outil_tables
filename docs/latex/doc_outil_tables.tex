@@ -633,18 +633,28 @@ sites suivants~: \code{citer()} et
 \code{liste\_guillemets()} (modules \code{donnees}, \code{exposition},
 \code{brut}, \code{simulation} et contrôle du plan), \code{sans\_controle()}
 (rejeu outillé), \code{valeur\_message()} et \code{decrire\_valeur()}
-(rapport figé), lecture du texte du plan et de la fiche,
-\code{ecrire\_fiche()} (nom de champ d'encodage \code{bytes}),
+(rapport figé), lecture du texte du plan et de la fiche (classe de
+l'objet reçu, première ligne, type, chemin et chemin attendu, colonne,
+valeur), \code{ecrire\_fiche()} (nom de champ d'encodage \code{bytes}),
 \code{controler\_rapport()} (classes de l'objet, nom de champ d'encodage
 \code{bytes}, message d'une erreur du recalcul de l'empreinte du
 résultat, chemin d'un élément non prévu) et \code{rejouer\_fiche()}
-(classes de la fiche, nom de champ d'encodage \code{bytes})~; la valeur
-exacte reste dans les \code{details}. \textbf{Limite}~: la règle n'est
-pas encore appliquée aux autres refus qui citent une valeur reçue, dont,
-sans prétendre à l'exhaustivité, \code{type\_incompatible} du module
-\code{donnees} (nom de colonne et classe), \code{type\_non\_canonique}
-(classe), \code{serialisation\_impossible} (classes et chemin) et
-\code{texte\_non\_octets} (classe) du module \code{rapport}~: un
+(classes de la fiche, nom de champ d'encodage \code{bytes}, noms et
+attributs de la forme lue). La valeur citée étant une valeur reçue, elle
+reste brute dans les \code{details} (classe, chemin, colonne, nom
+d'encodage \code{bytes}\ldots), à deux précisions près~: pour
+\code{fiche\_non\_conforme}, à l'étape~2 du rejeu, \code{details\$lu} est
+la description de forme (section~\ref{sec:rejeu}), citée par la même
+règle, et la valeur exacte est celle de la fiche reçue au chemin
+\code{details\$champ}~; pour la lecture du texte du plan et de la fiche,
+la valeur reçue brute est dans les \code{details} (\code{classe},
+\code{chemin}, \code{colonne}, \code{attendu}) ou, à défaut, dans le
+texte reçu à la ligne \code{details\$ligne}. \textbf{Limite}~: la règle
+n'est pas encore appliquée aux autres refus qui citent une valeur reçue,
+dont, sans prétendre à l'exhaustivité, \code{type\_incompatible} du
+module \code{donnees} (nom de colonne et classe),
+\code{type\_non\_canonique} (classe) et \code{serialisation\_impossible}
+(classes et chemin) du module \code{rapport}~: un
 caractère de contrôle ou un séparateur de ligne reçu peut y apparaître
 brut dans le \code{message}. La règle porte sur le texte des refus,
 jamais sur une valeur écrite ni empreintée. Par élément~:
@@ -2690,7 +2700,11 @@ locales C et C.UTF-8). Les formes lues de l'étape~2 sont
 écrites par \code{decrire\_forme()}~: «~champ absent~», ou «~\emph{type} de
 longueur \emph{n}~», complété au besoin par «~, NA~», «~, vide~»,
 «~, attribut(s) \emph{noms}~» (les noms d'une liste ne sont pas cités comme
-attribut), «~, noms en double~: \emph{noms}~» et «~, noms incomplets~».
+attribut), «~, noms en double~: \emph{noms}~» et «~, noms incomplets~»~;
+les noms d'attributs et les noms en double y sont cités par la règle
+unique. Pour ces formes, \code{details\$lu} est ce texte descriptif, et
+non la valeur brute~: la valeur exacte est celle de la fiche reçue au
+chemin \code{details\$champ}.
 Dans le tableau, un crochet désigne une valeur insérée.
 
 {\footnotesize
@@ -6792,8 +6806,16 @@ point~3.2).
 \rowcolors{2}{tablerow}{white}
 \begin{longtable}{@{}p{5.4cm}p{9.4cm}@{}}
 \caption{Refus de la lecture et de l'écriture du texte (module
-\code{rapport}~; numéro de la ligne fautive dans \code{details\$ligne}, chemin
-fautif dans \code{details\$chemin}).}
+\code{rapport}~; à la lecture, numéro de la ligne fautive dans
+\code{details\$ligne} (\code{NA} pour \code{texte\_non\_octets}), et en outre
+classe reçue dans \code{details\$classe} (\code{texte\_non\_octets}), chemin
+lu et chemin attendu dans \code{details\$chemin} et \code{details\$attendu}
+(\code{texte\_chemin\_inattendu}~; \code{chemin} seul pour une ligne après
+la fin de l'objet, \code{attendu} seul en fin de texte), colonne dans
+\code{details\$colonne} (\code{texte\_ligne\_mal\_formee} et
+\code{texte\_longueur\_incoherente}, colonne non atomique ou d'une autre
+longueur que \code{@lignes})~; à l'écriture, chemin fautif dans
+\code{details\$chemin}).}
 \label{tab:refus-texte}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Motif}} &
