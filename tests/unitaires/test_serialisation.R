@@ -506,7 +506,7 @@ local({
            any(grepl("@longueur", l, fixed = TRUE) & startsWith(l, "# grammaire") & grepl("profondeur au plus 32", l, fixed = TRUE)) &&
              any(startsWith(l, "# doubles") & grepl("décimal non nul relu 0", l, fixed = TRUE)) &&
              any(startsWith(l, "# doubles") &
-                   grepl("17 chiffres significatifs (forme %.17g de la norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par tablexp sans la bibliothèque C ; relecture au bit près constatée sous glibc, non garantie ailleurs",
+                   grepl("17 chiffres significatifs (forme %.17g de la norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par tablexp sans la bibliothèque C ; relecture au bit près constatée sous glibc et sous Windows (R 4.3.3 ucrt), non garantie ailleurs",
                          l, fixed = TRUE)) &&
              !any(grepl("aller-retour exact", l, fixed = TRUE)) &&
              any(startsWith(l, "# rejeu") & grepl("construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)", l, fixed = TRUE)))

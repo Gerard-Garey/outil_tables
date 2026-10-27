@@ -1028,7 +1028,7 @@ PROFONDEUR_MAX_TEXTE <- 32L
 # Conventions rappelées au relecteur, en tête du texte (hors aller-retour ;
 # troisième annotation, (h)) ; texte du moteur marqué UTF-8 (#50). Doubles :
 # la relecture au bit près est un constat de mesure sous glibc (ADR 0011,
-# point 3.2), pas une garantie.
+# point 3.2) et sous Windows (R 4.3.3 ucrt ; #120), garantie nulle part.
 CONVENTIONS_TEXTE <- texte_moteur(c(
   grammaire = paste(
     "une ligne par feuille : chemin<TAB>type<TAB>longueur<TAB>valeurs ; chemins joints par / ; [i] pour un élément",
@@ -1039,8 +1039,8 @@ CONVENTIONS_TEXTE <- texte_moteur(c(
   doubles = paste(
     "le double relu fait foi ; 17 chiffres significatifs (forme %.17g de la norme C), arrondi au plus proche,",
     "égalité vers le chiffre pair, calculé par tablexp sans la bibliothèque C ; relecture au bit près constatée",
-    "sous glibc, non garantie ailleurs ; à l'import, toute écriture décimale est admise (0.95 comme",
-    "0.94999999999999996) ; refusés : décimal non fini, décimal non nul relu 0 ; jetons NA, NaN, Inf, -Inf"),
+    "sous glibc et sous Windows (R 4.3.3 ucrt), non garantie ailleurs ; à l'import, toute écriture décimale est",
+    "admise (0.95 comme 0.94999999999999996) ; refusés : décimal non fini, décimal non nul relu 0 ; jetons NA, NaN, Inf, -Inf"),
   dates = "ISO 8601, AAAA-MM-JJ, année sur quatre chiffres, domaine [0001-01-01, 9999-12-31]",
   "chaînes" = "UTF-8 entre guillemets droits, échappements \\\\ \\n \\r \\t \\\" ; NA sans guillemets, distinct de \"NA\"",
   "délais" = "en jours",
