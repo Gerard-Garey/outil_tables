@@ -5911,9 +5911,21 @@ relecture exacte constatée sur 1\,399\,465 doubles), appuyé sur un argument
 d'ordre de grandeur, non une preuve. Sous Windows, avant l'issue~\#104,
 l'écriture par la bibliothèque C n'était pas toujours correctement
 arrondie, et la relecture n'était pas toujours exacte (constat sur le poste
-du mainteneur, ADR 0011, point~3.2)~; ni~H, ni l'identité des octets
-écrits par \code{tablexp}, ni la relecture n'y sont encore mesurées
-(\textbf{hypothèse} jusqu'à l'étape~(5), décision M153~; décision M61,
+du mainteneur, ADR 0011, point~3.2). Avec l'écriture par \code{tablexp},
+l'identité des octets écrits sous Windows (R~4.3.3 ucrt) à ceux de la
+plateforme de référence et la relecture exacte y sont désormais des
+\emph{constats de mesure}, rapportés de l'étape~(5) de la pull
+request~\#116, sur le poste du mainteneur (ADR 0011, annotation du
+27/10/2026, (a) et~(b))~: les empreintes MD5 des textes des témoins T2 et
+T3 y sont égales à celles de la CI, et 999\,493 doubles finis, tirés
+uniformément sur les motifs de 64~bits, écrits puis relus, ne donnent
+aucune relecture fausse. Cet échantillon n'est pas celui que prévoyait le
+protocole (celui de l'étape~(3a)), et il est dominé par des exposants hors
+des grandeurs d'un plan ou d'une fiche~; 0~faute sur 999\,493 borne le taux
+de faute à $3{,}0 \cdot 10^{-6}$ par double (niveau 95~\%, borne
+unilatérale de Clopper-Pearson), pour cette seule loi d'échantillonnage.
+H n'y est pas mesurée et reste une \textbf{hypothèse}, que ce constat ne
+contredit pas~; sous macOS, rien n'est mesuré (décision M61,
 issue~\#49). Les entiers, logiques, chaînes, facteurs et
 dates s'écrivent de même dans les deux formes. Une forme inconnue est
 refusée (\code{forme\_ecriture\_inconnue}).
@@ -6018,10 +6030,17 @@ La ligne \code{doubles} de \code{CONVENTIONS\_TEXTE}, en en-tête des plans,
 des fiches et des rapports figés, le dit au relecteur, mot pour mot~:
 «~le double relu fait foi~; 17 chiffres significatifs (forme \%.17g de la
 norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par
-tablexp sans la bibliothèque C~; relecture au bit près constatée sous glibc,
-non garantie ailleurs~; à l'import, toute écriture décimale est admise (0.95
-comme 0.94999999999999996)~; refusés~: décimal non fini, décimal non nul
-relu 0~; jetons NA, NaN, Inf, -Inf~».
+tablexp sans la bibliothèque C~; relecture au bit près constatée sous glibc
+et sous Windows (R 4.3.3 ucrt), non garantie ailleurs~; à l'import, toute
+écriture décimale est admise (0.95 comme 0.94999999999999996)~; refusés~:
+décimal non fini, décimal non nul relu 0~; jetons NA, NaN, Inf, -Inf~»
+(depuis l'issue~\#120~; auparavant «~relecture au bit près constatée sous
+glibc, non garantie ailleurs~»). «~Non garantie ailleurs~» n'implique
+aucune garantie sous glibc ni sous Windows~: la relecture au bit près n'est
+démontrée sur aucune plateforme (\code{?NumericConstants}, R~4.3.3~: «~one
+of the nearest representable numbers~»)~; elle y est seulement constatée.
+«~(R 4.3.3 ucrt)~» désigne la seule compilation de R mesurée sous Windows
+(ADR 0011, annotation du 27/10/2026, (d)~3).
 
 \medskip
 \noindent
@@ -6213,9 +6232,12 @@ en a au plus 1\,000, sinon 1\,000 réparties et les bornes~; contrôle~:
     conversion \code{g} de la norme C est un \emph{constat de mesure}. Elle
     n'emploie que des opérations sur des \code{integer} et \code{max.col()}
     à \code{ties.method} fixé.
-  \item Sous Windows, ni~H ni l'identité des octets ne sont mesurées~:
-    \textbf{hypothèse} jusqu'à l'étape~(5) (M153). Sous macOS~: non mesurées
-    (M61, \#49).
+  \item Sous Windows (R~4.3.3 ucrt), l'identité des octets à ceux de la
+    plateforme de référence est un \emph{constat de mesure} rapporté de
+    l'étape~(5) de la pull request~\#116 (empreintes MD5 des textes de T2
+    et T3 égales à celles de la CI~; ADR 0011, annotation du 27/10/2026,
+    (b))~; H n'y est pas mesurée et reste une \textbf{hypothèse}. Sous
+    macOS~: non mesurées (M61, \#49).
   \item \textbf{Constat de mesure}~: 0~écart à la glibc~2.39 et 0~écart à
     Python~3.13.17 sur 1\,177\,468 doubles finis, dont 68\,886 égalités
     exactes, pour le prototype
@@ -6232,8 +6254,8 @@ en a au plus 1\,000, sinon 1\,000 réparties et les bornes~; contrôle~:
     indépendant de la glibc pour les chiffres est une \textbf{hypothèse}
     (CPython a sa propre conversion, dont la source n'a pas été relue).
   \item \textbf{Relecture}~: inchangée par l'issue~\#104, \emph{constat de
-    mesure} sous glibc, non une preuve (ci-dessus, «~Deux formes, un seul
-    écrivain~»). Pour un texte écrit par \code{tablexp}, le contrôle
+    mesure} sous glibc et sous Windows (R~4.3.3 ucrt), non une preuve
+    (ci-dessus, «~Deux formes, un seul écrivain~»). Pour un texte écrit par \code{tablexp}, le contrôle
     «~réécrire la valeur relue redonne le texte~» déciderait l'aller-retour
     texte par texte sur toute plateforme, dix-sept chiffres correctement
     arrondis désignant un seul double~; ce contrôle n'est pas implanté dans
@@ -6637,7 +6659,7 @@ l'aller-retour~: exact pour tous les types sauf \code{double}~; pour un
 double, celui de la forme «~texte~» (section~\ref{sec:empreinte}, «~Écriture
 «~texte~» des doubles~»~: écriture correctement arrondie, établie par une
 preuve (hypothèse~H) et constatée par deux juges~; relecture exacte
-constatée sous glibc, non démontrée). Un texte écrit sous Windows par la
+constatée sous glibc et sous Windows (R~4.3.3 ucrt), non démontrée). Un texte écrit sous Windows par la
 bibliothèque C, avant l'issue~\#104, dont le dix-septième chiffre pouvait
 différer, se relit en le même double dans le cas testé~: c'est un
 \emph{constat de mesure}, que contredisent d'autres cas~: sous Windows, sur
@@ -6821,8 +6843,9 @@ structure de l'objet. \textbf{Aucun arrondi}~: 0{,}95 s'écrit
 double le plus proche~; un certificateur ne recalcule un taux et ses bornes
 au bit près qu'à cette précision, et une vue arrondie, si elle est voulue,
 s'ajoutera sans remplacer celle-ci (question Q36 ouverte). La relecture au
-bit près de cette écriture est \emph{constatée} sous glibc, non garantie
-ailleurs (ligne \code{doubles} de \code{CONVENTIONS\_TEXTE}). Aucune autre
+bit près de cette écriture est \emph{constatée} sous glibc et sous Windows
+(R~4.3.3 ucrt), non garantie ailleurs, ni démontrée nulle part (ligne
+\code{doubles} de \code{CONVENTIONS\_TEXTE}). Aucune autre
 mise en forme d'un nombre n'est admise dans la section du rapport~: un test
 lit son code par \code{parse()} et refuse tout appel à \code{format},
 \code{formatC}, \code{sprintf}, \code{as.character}, \code{cat}, à une
