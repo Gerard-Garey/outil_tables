@@ -205,31 +205,44 @@ octets_lignes_indices <- function(textes, i) {
 }
 
 # Octets de sprintf("%d", x) (integer), une valeur par ligne, LF final, écrits
-# en raw sans chaîne intermédiaire (#71) : une colonne d'octets par valeur
-# (signe, nc chiffres, LF ; nc chiffres de max(|x|), deux au moins pour
-# « NA »), les places inoccupées à 0x00, retirées à la fin (aucun octet 0x00
-# dans l'écriture). Chiffre de rang k > 0 écrit si le quotient par 10^k est
-# non nul (aucun zéro de tête) ; NA s'écrit « NA ».
-octets_entiers <- function(x) {
+# en raw sans chaîne intermédiaire (#71), par blocs de `bloc` valeurs
+# consécutives concaténés à la fin (#83) : le masque transitoire d'un bloc
+# pèse 4·(nc + 2) octets par valeur, et 2^20 valeurs en bornent le pic quelle
+# que soit la longueur de la colonne. `bloc` n'est un argument que pour les
+# tests du découpage. Chaque valeur s'écrit sans remplissage et sans dépendre
+# de ses voisines : le découpage ne change aucun octet.
+#
+# Écriture d'un bloc : une colonne d'octets par valeur (signe, nc chiffres,
+# LF ; nc chiffres de max(|x|) du bloc, deux au moins pour « NA »), les places
+# inoccupées à 0x00, retirées à la fin (aucun octet 0x00 dans l'écriture).
+# Chiffre de rang k > 0 écrit si le quotient par 10^k est non nul (aucun zéro
+# de tête) ; NA s'écrit « NA ».
+octets_entiers <- function(x, bloc = 2^20) {
   if (!length(x)) return(raw(0))
   x <- as.vector(x)
-  na <- is.na(x)
-  q <- abs(x)
-  q[na] <- 0L
-  nc <- max(2L, nchar(sprintf("%d", max(q))))
-  rangs <- vector("list", nc + 2L)
-  rangs[[nc + 2L]] <- rep.int(as.raw(0x0a), length(x))
-  unite <- q %% 10L + 48L
-  unite[na] <- 0x41L
-  rangs[[nc + 1L]] <- as.raw(unite)
-  for (r in nc:2) {
-    q <- q %/% 10L
-    rangs[[r]] <- as.raw((q %% 10L + 48L) * (q > 0L))
+  ecrire_bloc <- function(x) {
+    na <- is.na(x)
+    q <- abs(x)
+    q[na] <- 0L
+    nc <- max(2L, nchar(sprintf("%d", max(q))))
+    rangs <- vector("list", nc + 2L)
+    rangs[[nc + 2L]] <- rep.int(as.raw(0x0a), length(x))
+    unite <- q %% 10L + 48L
+    unite[na] <- 0x41L
+    rangs[[nc + 1L]] <- as.raw(unite)
+    for (r in nc:2) {
+      q <- q %/% 10L
+      rangs[[r]] <- as.raw((q %% 10L + 48L) * (q > 0L))
+    }
+    rangs[[nc]][na] <- as.raw(0x4e)
+    rangs[[1L]] <- as.raw(0x2dL * (!na & x < 0L))
+    m <- do.call(rbind, rangs)
+    m[m != as.raw(0L)]
   }
-  rangs[[nc]][na] <- as.raw(0x4e)
-  rangs[[1L]] <- as.raw(0x2dL * (!na & x < 0L))
-  m <- do.call(rbind, rangs)
-  m[m != as.raw(0L)]
+  n <- length(x)
+  if (n <= bloc) return(ecrire_bloc(x))
+  debuts <- seq(1, n, by = bloc)
+  unlist(lapply(debuts, function(s) ecrire_bloc(x[s:min(s + bloc - 1, n)])), use.names = FALSE)
 }
 
 # Écriture ISO 8601 AAAA-MM-JJ, année sur quatre chiffres (ADR 0011, point 4 ;
