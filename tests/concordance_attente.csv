@@ -1,4 +1,2 @@
 type,nom,issue,motif
-entree,fonctions-outils:neutraliser_citation,#94,"règle unique de neutralisation d'une valeur citée dans un message de refus ; documentée par docwriter en fin de branche (règle 9)"
-entree,fonctions-outils:citation_a_neutraliser,#94,"prédicat de la règle de neutralisation (valeur_message()) ; documenté par docwriter en fin de branche (règle 9)"
 entree,fonctions-outils:noms_bytes,#114,"positions des noms d'encodage bytes d'un objet reçu, contrôle avant lecture par nom ; documentée par docwriter en fin de branche (règle 9)"
