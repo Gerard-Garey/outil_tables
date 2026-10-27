@@ -13,6 +13,7 @@
 #    appuient, partagés par les modules (#48) ;
 #  - noms_complets() : la règle des noms complets, écrite une seule fois et
 #    partagée par les modules et l'orchestration (#22, notes de B6) ;
+#  - noms_bytes() : positions des noms d'encodage « bytes » d'un objet (#114) ;
 #  - texte_moteur() : texte produit par le moteur marqué UTF-8, quelle que
 #    soit la locale d'installation ou d'exécution (#50) ;
 #  - neutraliser_citation() et citation_a_neutraliser() : règle unique de
@@ -102,6 +103,23 @@ chaine_unique <- function(v) {
 # doublons et la liste vide sans noms sont l'affaire de l'appelant. Rend TRUE ou
 # FALSE, jamais NA.
 noms_complets <- function(noms) !is.null(noms) && !anyNA(noms) && all(nzchar(noms))
+
+# Positions des noms d'encodage « bytes » de x (#114) : integer(0) si x n'a pas
+# de noms ou aucun de ce codage. Une lecture par nom, x[["champ"]] ou
+# x$champ, lève « translating strings with "bytes" encoding is not allowed »
+# dès qu'elle rencontre un tel nom placé avant le nom cherché ou à sa place
+# (mesuré, #111, #114) : l'appelant qui lit par nom un objet reçu contrôle
+# d'abord ses noms, pour refuser sous un motif nommé. Encoding() ne traduit
+# rien et ne lève pas. Les noms se lisent par attr(x, "names", exact = TRUE) et
+# non par names() : names() est un générique interne qui dispatche sur la
+# classe de x, et lève la même erreur sur une classe d'encodage « bytes »
+# (rejouer_fiche(data.frame(a = 1), structure(list(a = 1), class = b)), mesuré
+# sous C et C.UTF-8) ; attr() ne dispatche pas. Les appelants qui citent ou
+# restituent les noms repérés les lisent de même. Rend un integer, jamais NA.
+noms_bytes <- function(x) {
+  n <- attr(x, "names", exact = TRUE)
+  if (is.null(n)) integer(0) else which(Encoding(n) == "bytes")
+}
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
 # data.frame (etape, code, message, nombre), restitué dans l'objet. avertir()

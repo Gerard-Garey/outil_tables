@@ -1424,6 +1424,20 @@ ecrire_fiche <- function(fiche) {
     refuser("rapport", "serialisation_impossible",
             "Écriture du texte de fiche : objet `construction` reçu ; écrire sa fiche, x$fiche.",
             list(chemin = ""))
+  # Un nom du premier niveau d'encodage « bytes » : les lectures par nom
+  # ci-dessous lèveraient une erreur R (#114) ; refus sous le motif que
+  # l'écrivain donne à toute chaîne de ce codage (octets_chaines()), pour une
+  # position quelconque du nom ; le nom est cité par neutraliser_citation(),
+  # sa valeur brute est dans les details. Noms lus par attr(), non par names()
+  # (dispatche sur la classe, lève sur une classe bytes ; voir noms_bytes()).
+  nf <- attr(fiche, "names", exact = TRUE)
+  b <- if (is.list(fiche)) noms_bytes(fiche)
+  if (length(b))
+    refuser("rapport", "chaine_codage_bytes",
+            paste0(texte_moteur("Rôle « @noms » : chaîne au codage « bytes », non convertible en UTF-8 sans deviner."),
+                   texte_moteur(" Nom de champ n° "), b[1L], texte_moteur(" de la fiche : "),
+                   neutraliser_citation(nf[b[1L]]), "."),
+            list(role = "@noms", lignes = b, lu = nf[b]))
   rappel <- function(v) if (is.atomic(v) && length(v) == 1L && !is.na(v)) as.character(v) else "absente"
   rep_ <- if (is.list(fiche) && is.list(fiche[["empreintes"]])) fiche[["empreintes"]][["representation"]]
   presents <- if (is.list(fiche)) names(fiche)
@@ -1737,6 +1751,22 @@ controler_rapport <- function(x) {
           paste0(texte_moteur("Rapport figé : objet de classe « "), paste(neutraliser_citation(class(x)), collapse = "/"),
                  texte_moteur(" » au lieu de « construction »"), origine),
           list(lu = class(x), attendu = "construction"))
+  # Un nom d'encodage « bytes » au premier niveau de l'objet : x[["fiche"]]
+  # lèverait une erreur R (#114) ; l'empreinte du résultat n'est pas
+  # recalculable (refus 3, objet_modifie), pour une position quelconque du nom.
+  # Noms lus par attr(), non par names() (voir noms_bytes()).
+  noms_bytes_refus <- function(o, chemin, nb) {
+    no <- attr(o, "names", exact = TRUE)
+    refus("objet_modifie",
+          paste0(texte_moteur("Rapport figé : objet modifié après sa construction : empreinte du résultat non recalculable ("),
+                 texte_moteur("nom de champ d'encodage « bytes » : champ n° "), nb[1L], texte_moteur(" de "),
+                 if (nzchar(chemin)) texte_moteur("la fiche") else texte_moteur("l'objet"), texte_moteur(", cité "),
+                 neutraliser_citation(no[nb[1L]]), texte_moteur(")."),
+                 texte_moteur(" Le rapport ne restitue un objet que tel que construire_table() l'a rendu.")),
+          list(chemin = chemin, lignes = nb, lu = no[nb]))
+  }
+  nb <- noms_bytes(x)
+  if (length(nb)) noms_bytes_refus(x, "", nb)
   f <- x[["fiche"]]
   if (!is.list(f)) {
     d <- decrire_valeur(f)
@@ -1745,6 +1775,8 @@ controler_rapport <- function(x) {
                  if (is.null(d)) texte_moteur("absente") else d, texte_moteur(" au lieu d'une liste.")),
           list(chemin = "fiche", lu = f, attendu = "list"))
   }
+  nb <- noms_bytes(f)
+  if (length(nb)) noms_bytes_refus(f, "fiche", nb)
   # 2. Version de la fiche : la version courante seule (même motif que le rejeu).
   v <- f[["version_fiche"]]
   if (!identical(v, VERSION_FICHE)) {

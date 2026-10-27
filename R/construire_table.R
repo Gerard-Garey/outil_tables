@@ -422,6 +422,20 @@ rejouer_fiche <- function(donnees, fiche) {
     refus_rejeu("fiche_non_conforme",
                 "Rejeu : objet `rejeu` reçu à la place d'une fiche ; passer r$construction$fiche.",
                 list(champ = "(fiche)", lu = "rejeu", attendu = "liste nommée"))
+  # Un nom du premier niveau d'encodage « bytes » : toute lecture par nom
+  # (fiche[["version_fiche"]]...) lèverait une erreur R (#114), position
+  # quelconque du nom ; cité par neutraliser_citation(), valeur brute dans
+  # les details. Noms lus par attr(), non par names() : names() dispatche sur
+  # la classe et lève sur une classe d'encodage bytes (noms_bytes(), mesuré).
+  nf <- attr(fiche, "names", exact = TRUE)
+  b <- if (is.list(fiche)) noms_bytes(fiche)
+  if (length(b))
+    refus_rejeu("fiche_non_conforme",
+                sprintf(gabarit("Rejeu : la fiche porte un nom de champ d'encodage « bytes » (champ n° %d : %s),",
+                                "non convertible en UTF-8 sans deviner ; aucun champ du premier niveau n'est lu par nom. Une fiche",
+                                "produite par le moteur ou relue par lire_fiche() n'en porte pas."),
+                        b[1L], neutraliser_citation(nf[b[1L]])),
+                list(champ = "(fiche)", lu = nf[b], attendu = "noms de champ sans encodage bytes"))
   if (!liste_nommee(fiche))
     refus_rejeu("fiche_non_conforme",
                 sprintf(gabarit("Rejeu : la fiche doit être une liste nommée aux noms uniques, sans autre attribut",

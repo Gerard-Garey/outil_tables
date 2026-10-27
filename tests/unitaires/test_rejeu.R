@@ -411,6 +411,24 @@ verifier("T11 empreintes/algorithme d'encodage bytes : refus algorithme_empreint
   else controle_refus(r, "construire_table", "algorithme_empreinte_inconnu", list(lu = b, attendu = "md5"),
                       "« <chaîne d'encodage bytes> »")
 })
+# Nom d'encodage bytes au premier niveau de la fiche (#114), en première
+# position, au milieu et en dernière : refus fiche_non_conforme au lieu de
+# l'erreur R « translating strings with "bytes" encoding is not allowed »
+# (fiche[["version_fiche"]]... la lève), nom cité par neutraliser_citation()
+# (repère), valeur brute dans details$lu.
+for (k in c(1L, 4L, length(FICHE))) {
+  verifier(sprintf("T11 nom d'encodage bytes en position %d de la fiche : refus fiche_non_conforme (pas une erreur R), repère cité, une ligne, UTF-8", k), {
+    b <- "\xe9t\xe9"; Encoding(b) <- "bytes"
+    fb <- FICHE; n <- names(fb); n[k] <- b; names(fb) <- n
+    r <- tryCatch(rejouer_fiche(BASE, fb), error = function(e) e)
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    ok <- controle_refus(r, "construire_table", "fiche_non_conforme",
+                         list(champ = "(fiche)", lu = b, attendu = "noms de champ sans encodage bytes"),
+                         sprintf("(champ n° %d : <chaîne d'encodage bytes>)", k))
+    if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
+    else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
+  })
+}
 # Classe de la fiche citée par neutraliser_citation() dans le refus
 # fiche_non_conforme (reprise de #94) : classe « a<VT>b » citée <U+000B> ;
 # classe d'encodage bytes : refus nommé (inherits() levait « translating
@@ -429,4 +447,16 @@ local({
       if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
       else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
     })
+  # Même classe sur une liste (#114) : names() est un générique interne qui
+  # dispatche sur la classe et levait la même erreur R (call names(x)) ; les
+  # noms se lisent par attr(). Le cas structure(1, ...) ci-dessus n'est pas une liste.
+  verifier("T11 fiche structure(list(a = 1), class = <encodage bytes>) : refus fiche_non_conforme (pas une erreur R), classe citée, une ligne, UTF-8", {
+    r <- tryCatch(rejouer_fiche(data.frame(a = 1), structure(list(a = 1), class = b)), error = function(e) e)
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    ok <- controle_refus(r, "construire_table", "fiche_non_conforme",
+                         list(champ = "(fiche)", lu = b, attendu = "liste nommée"),
+                         "objet de classe <chaîne d'encodage bytes> (type list)")
+    if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
+    else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
+  })
 })

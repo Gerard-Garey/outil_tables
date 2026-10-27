@@ -350,3 +350,20 @@ verifier("neutraliser_citation : idempotente (une citation neutralisée n'est pl
   r <- neutraliser_citation(s)
   identical(neutraliser_citation(r), r) && identical(citation_a_neutraliser(r), c(FALSE, FALSE))
 })
+
+# noms_bytes() (#114) : positions des noms d'encodage bytes, sans traduction
+# (Encoding() ne lève pas), integer(0) sans noms ou sans nom bytes.
+verifier("noms_bytes : positions des noms bytes (début, milieu, fin), integer(0) sans noms, sans nom bytes, NA ou ASCII", {
+  b <- octets_de(0xe9); Encoding(b) <- "bytes"
+  noms_bytes <- tablexp:::noms_bytes
+  identical(noms_bytes(setNames(list(1, 2, 3), c(b, "a", "b"))), 1L) &&
+    identical(noms_bytes(setNames(list(1, 2, 3), c("a", b, "b"))), 2L) &&
+    identical(noms_bytes(setNames(list(1, 2, 3), c("a", "b", b))), 3L) &&
+    identical(noms_bytes(setNames(list(1, 2, 3), c(b, "a", b))), c(1L, 3L)) &&
+    identical(noms_bytes(list(1, 2)), integer(0)) && identical(noms_bytes(NULL), integer(0)) &&
+    identical(noms_bytes(setNames(list(1, 2), c("a", NA))), integer(0)) &&
+    identical(noms_bytes(setNames(list(1), u(0xe9))), integer(0)) &&
+    # classe d'encodage bytes : names() dispatcherait et lèverait, attr() non
+    identical(noms_bytes(structure(list(a = 1), class = b)), integer(0)) &&
+    identical(noms_bytes(structure(setNames(list(1, 2), c("a", b)), class = b)), 2L)
+})

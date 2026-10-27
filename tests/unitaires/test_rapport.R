@@ -313,6 +313,42 @@ for (cas in list(list("racine", function(x) x, ""), list("etapes", function(x) x
   })
 }
 
+# Nom d'encodage bytes au premier niveau de la fiche ou de l'objet (#114),
+# en première position, au milieu et en dernière : refus nommé au lieu de
+# l'erreur R « translating strings with "bytes" encoding is not allowed »
+# (x[["fiche"]], f[["empreintes"]]... la lèvent), nom cité par
+# neutraliser_citation() (repère), valeur brute dans les details.
+# ecrire_fiche() : chaine_codage_bytes, role « @noms » ; ecrire_rapport() :
+# objet_modifie (empreinte non recalculable), details$chemin « » (objet) ou
+# « fiche ».
+local({
+  pos <- function(n) c(1L, 4L, n)
+  avec_nom_bytes <- function(o, k) { n <- names(o); n[k] <- CLASSE_BYTES; names(o) <- n; o }
+  verdict <- function(r, motif, details, contient) {
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    une_ligne_utf8(r, controle_refus(r, motif, details, contient))
+  }
+  for (k in pos(length(x1$fiche))) {
+    fb <- avec_nom_bytes(x1$fiche, k)
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de la fiche : ecrire_fiche() refuse chaine_codage_bytes (pas une erreur R)", k),
+             verdict(tryCatch(ecrire_fiche(fb), error = function(e) e), "chaine_codage_bytes",
+                     list(role = "@noms", lignes = k, lu = CLASSE_BYTES),
+                     c(sprintf("Nom de champ n° %d de la fiche : <chaîne d'encodage bytes>.", k), "« bytes »")))
+    xb <- x1; xb$fiche <- fb
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de la fiche : ecrire_rapport() refuse objet_modifie, chemin « fiche »", k),
+             verdict(tryCatch(ecrire_rapport(xb), error = function(e) e), "objet_modifie",
+                     list(chemin = "fiche", lignes = k, lu = CLASSE_BYTES),
+                     c("empreinte du résultat non recalculable (", sprintf("champ n° %d de la fiche, cité <chaîne d'encodage bytes>", k))))
+  }
+  for (k in pos(length(x1))) {
+    xb <- avec_nom_bytes(x1, k)
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de l'objet : ecrire_rapport() refuse objet_modifie, chemin vide", k),
+             verdict(tryCatch(ecrire_rapport(xb), error = function(e) e), "objet_modifie",
+                     list(chemin = "", lignes = k, lu = CLASSE_BYTES),
+                     c("empreinte du résultat non recalculable (", sprintf("champ n° %d de l'objet, cité <chaîne d'encodage bytes>", k))))
+  }
+})
+
 # --- U11, U12 : ressources, balises, attributs, entités (valeur calculée à la main) ---
 
 BALISES <- c("!DOCTYPE", "html", "head", "meta", "title", "style", "body", "h1", "h2", "nav", "ol", "ul", "li", "a",
