@@ -525,7 +525,8 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 # conditions_vides() (noms : conditions du catalogue structurellement vides
 # pour le portefeuille ; valeurs : raison citée au refus) ; par défaut,
 # aucune condition vide. Une déclaration dont un type porte l'une d'elles est
-# refusée (ADR 0007, annotation du 05/11/2026, seconde, (c) et (d) ; #112).
+# refusée (ADR 0007, annotation du 05/11/2026, seconde, (c) et (d) ; #112,
+# #135).
 # Rend list(graine,
 # declarations) : graine entière ; pour chaque déclaration, list(type,
 # unite, cible, taux, nombre), cible = causes du catalogue si absente, taux
@@ -595,8 +596,9 @@ controler_defauts <- function(defauts, graine, vides = stats::setNames(character
     # (complément de spécification d'actuary, 25/10/2026). Puis condition du
     # catalogue structurellement vide (`vides`) : refus. Un vide qui dépend
     # du tirage (cause absente du jeu propre, aucune tête à deux lignes en
-    # mode multi, aucune entrée tirée avant la fin) n'est pas refusé ici
-    # (defauts_ineligibles ou eligibles = 0, injecter_defauts()).
+    # mode multi, aucune entrée tirée avant la fin quand origine < fin) n'est
+    # pas refusé ici (defauts_ineligibles ou eligibles = 0,
+    # injecter_defauts()).
     i_cat <- match(type, CATALOGUE_DEFAUTS$defaut)
     if (unite == "ligne") {
       admises <- causes[vapply(causes, function(cs) all(CATALOGUE_DEFAUTS[[cs]][i_cat]), logical(1L))]
@@ -634,10 +636,15 @@ controler_defauts <- function(defauts, graine, vides = stats::setNames(character
 # uniforme et age_exact ; modes multi dont loi_contrats n'a qu'une
 # probabilité, K = 1, p_m > 0) : les conditions des types de tête, qui
 # exigent une tête d'au moins deux lignes (injecter_defauts()), sont vides
-# (#112). `periode` : lue par les conditions qui en dépendent (aucune
-# aujourd'hui). Rend un vecteur nommé : noms, conditions vides (jamais "") ;
-# valeurs, raison formée à partir des valeurs reçues (mode, longueur de
-# loi_contrats), citée par controler_defauts() ; vecteur vide si aucune.
+# (#112). Aucune entrée avant la fin de la période (#135) : la condition
+# entree_avant_fin (entrée < fin) est vide quand date_entree == fin (modes
+# age_exact et age_exact_multi : toute entrée vaut date_entree) ou origine
+# == fin (modes uniforme et uniforme_multi : entrées tirées dans [origine,
+# fin]) ; controler_portefeuille() impose date_entree <= fin et origine <=
+# debut <= fin, ce sont donc exactement les cas vides. Rend un vecteur
+# nommé : noms, conditions vides (jamais "") ; valeurs, raison formée à
+# partir des valeurs reçues (mode, longueur de loi_contrats ; date_entree ou
+# origine, et fin), citée par controler_defauts() ; vecteur vide si aucune.
 conditions_vides <- function(mode, portefeuille, periode) {
   vides <- stats::setNames(character(0), character(0))
   raison <- if (mode == MODE_BASE[[mode]])
@@ -649,6 +656,16 @@ conditions_vides <- function(mode, portefeuille, periode) {
     cond <- cond[nzchar(cond)]
     vides <- c(vides, stats::setNames(rep(raison, length(cond)), cond))
   }
+  fin <- periode[["fin"]]
+  raison <- if (MODE_BASE[[mode]] == "uniforme") {
+    if (as.numeric(portefeuille[["origine"]]) == as.numeric(fin))
+      formuler("aucune entrée avant la fin de la période : origine « %s » égale à la fin « %s »",
+               citer(format(portefeuille[["origine"]])), citer(format(fin)))
+  } else if (as.numeric(portefeuille[["date_entree"]]) == as.numeric(fin)) {
+    formuler("aucune entrée avant la fin de la période : date_entree « %s » égale à la fin « %s »",
+             citer(format(portefeuille[["date_entree"]])), citer(format(fin)))
+  }
+  if (!is.null(raison)) vides <- c(vides, entree_avant_fin = raison)
   vides
 }
 

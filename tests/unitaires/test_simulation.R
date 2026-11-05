@@ -1488,6 +1488,61 @@ verifier("défauts : nom vide (\"\") dans vides -> aucun type sans condition ref
   identical(r$declarations[[1L]]$type, "sortie_manquante") && identical(r_seul$declarations[[1L]]$type, "sortie_manquante") &&
     inherits(e, "refus_tablexp") && grepl("(raison tête)", conditionMessage(e), fixed = TRUE)
 })
+# en_cours_avant_fin quand aucune entrée ne précède la fin (#135 ; ADR 0007,
+# annotation du 05/11/2026, seconde, (c) 2 et (d)) : date_entree == fin
+# (modes age_exact et age_exact_multi), origine == fin (modes uniforme et
+# uniforme_multi, période d'un jour : origine <= debut <= fin). Cible
+# structurellement vide : refus defauts_invalides avant tout tirage, en
+# nombre comme en taux, zéro compris ; graine du jeu NA non atteinte, aléa
+# de l'appelant inchangé. Cas voisins (entrée la veille de la fin) admis.
+FIN <- PER$fin
+PER_FIN <- list(debut = FIN, fin = FIN)
+PF_ENTREE_FIN <- list(
+  uniforme = list(modifyList(PF_FORME, list(origine = FIN)), PER_FIN),
+  age_exact = list(modifyList(PF_X, list(date_entree = FIN)), PER),
+  uniforme_multi = list(modifyList(PF_M_1E3, list(origine = FIN)), PER_FIN),
+  age_exact_multi = list(c(modifyList(PF_X, list(mode = "age_exact_multi", date_entree = FIN)),
+                           list(loi_contrats = c(0.6, 0.3, 0.1))), PER))
+CHAMP_ENTREE <- c(uniforme = "origine", age_exact = "date_entree", uniforme_multi = "origine",
+                  age_exact_multi = "date_entree")
+VALEURS_FIN <- list(list(nombre = 1), list(nombre = 0), list(taux = 0.5), list(taux = 0))
+for (mo in names(PF_ENTREE_FIN)) for (va in VALEURS_FIN) {
+  set.seed(24L); avant <- globalenv()$.Random.seed
+  d_fin <- list(graine = GRAINE_DEF, declarations = list(c(list(type = "en_cours_avant_fin", cible = "en_cours"), va)))
+  e <- lapply(list(NA_integer_, GRAINE), function(g)
+    tryCatch(simuler(loi(), PF_ENTREE_FIN[[mo]][[1L]], PF_ENTREE_FIN[[mo]][[2L]], g, defauts = d_fin),
+             refus_tablexp = function(r) r))
+  verifier(sprintf("défauts : en_cours_avant_fin, %s = %s, mode %s, %s égale à la fin -> refus defauts_invalides avant tout tirage (graine du jeu NA non atteinte), module, détails, raison citée, aléa de l'appelant inchangé",
+                   names(va), format(va[[1L]]), mo, CHAMP_ENTREE[[mo]]),
+           all(vapply(e, function(r) inherits(r, "refus_tablexp") && identical(r$module, "simulation") &&
+             identical(r$motif, "defauts_invalides") &&
+             identical(r$details, list(parametre = "defauts$declarations", declaration = 1L)) &&
+             grepl(sprintf(paste("déclaration 1 : type en_cours_avant_fin : aucune unité éligible par construction",
+                                 "(aucune entrée avant la fin de la période : %s « 2024-12-31 » égale à la fin",
+                                 "« 2024-12-31 »), quel que soit le tirage."), CHAMP_ENTREE[[mo]]),
+                   conditionMessage(r), fixed = TRUE), logical(1L))) &&
+             identical(globalenv()$.Random.seed, avant))
+}
+verifier("défauts : en_cours_avant_fin, entrée la veille de la fin (date_entree, ou origine et début de période) dans les quatre modes -> admis, unités éligibles tracées", {
+  admis <- vapply(names(PF_ENTREE_FIN), function(mo) {
+    ch <- CHAMP_ENTREE[[mo]]
+    pf <- PF_ENTREE_FIN[[mo]][[1L]]; pf[[ch]] <- FIN - 1
+    per <- if (ch == "origine") list(debut = FIN - 1, fin = FIN) else PER
+    r <- simuler(loi(), pf, per, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+      list(type = "en_cours_avant_fin", cible = "en_cours", nombre = 1))))
+    dd <- attr(r, "defauts")$decomptes$declarations
+    is.data.frame(r) && dd$eligibles > 0L && dd$retenues == 1L
+  }, logical(1L))
+  all(admis)
+})
+verifier("défauts : conditions_vides(), date_entree égale à la fin en mode age_exact -> entree_avant_fin seule s'ajoute aux conditions de tête ; date_entree antérieure -> conditions de tête seules", {
+  v_fin <- tablexp:::conditions_vides("age_exact", PF_ENTREE_FIN$age_exact[[1L]], PER)
+  v_avant <- tablexp:::conditions_vides("age_exact", PF_X, PER)
+  identical(names(v_fin), c("tete_multi", "tete_multi_deces", "entree_avant_fin")) &&
+    identical(names(v_avant), c("tete_multi", "tete_multi_deces")) &&
+    identical(unname(v_fin[["entree_avant_fin"]]),
+              "aucune entrée avant la fin de la période : date_entree « 2024-12-31 » égale à la fin « 2024-12-31 »")
+})
 verifier("défauts : graine des défauts égale à celle du jeu (double puis integer) -> refus defauts_invalides, texte et détails d'actuary", {
   e1 <- tryCatch(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = as.double(GRAINE), declarations = list(D1))),
                  refus_tablexp = function(e) e)
