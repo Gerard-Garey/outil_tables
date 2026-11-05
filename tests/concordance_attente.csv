@@ -1,2 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-simulation:conditions_vides,#112,"définie au premier niveau par #112 (ensemble des conditions du catalogue structurellement vides, ADR 0007, annotation du 05/11/2026, seconde, (d)) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
