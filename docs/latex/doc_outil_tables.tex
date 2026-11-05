@@ -670,12 +670,22 @@ caractère non ASCII est marqué UTF-8, a les mêmes octets sous les locales
 C et UTF-8, d'installation comme d'exécution, et tient sur une ligne~; un
 message entièrement ASCII n'est pas marqué, R ne marquant jamais une
 chaîne ASCII. \textbf{Statut}~: la marque est mesurée (\code{Encoding()}
-sur des refus des modules \code{outils} et \code{donnees}, paquet
-installé sous C.UTF-8, sessions C et C.UTF-8)~; l'identité des octets est
+sur des refus des modules \code{outils}, \code{donnees},
+\code{simulation}, \code{rapport} et \code{construire\_table}, paquets
+installés sous C et sous C.UTF-8, chacun exécuté en session C et en
+session C.UTF-8~: dans les quatre combinaisons, messages marqués UTF-8 et
+aux mêmes octets)~; l'identité des octets est
 un \emph{constat} de \code{tests/controles/locale\_c.R}
 (section~\ref{sec:harnais}) sur un refus par module et trois refus de
-lecture du texte du plan, non une propriété démontrée~; une locale
-latin-1 n'est pas mesurée pour les messages.
+lecture du texte du plan, non une propriété démontrée. \textbf{La garantie ne couvre pas une
+installation sous une locale latin-1}~: paquet installé et exécuté sous
+\code{fr\_FR.ISO-8859-1} (locale générée par \code{localedef} dans un
+dossier de locales temporaire), le message du refus \code{colonne\_absente}
+sort non marqué (\code{Encoding()} rend «~unknown~»), n'est pas de l'UTF-8
+valide (\code{validUTF8()} rend \code{FALSE}) et porte l'octet \code{e9}
+pour «~é~»~: c'est du latin-1 natif, non marqué UTF-8, comme déjà au
+commit \code{3ed0301} (\emph{constat} mesuré le 05/11/2026~; la portée de
+la garantie est une question soumise au mainteneur).
 \textbf{Contrôle}~: \code{tests/controles/messages\_refus.R}
 (tableau~\ref{tab:scripts-controle}) lit les fichiers de \code{R/} par
 \code{parse()}, sans charger \code{tablexp}, et vérifie que le gabarit de
@@ -842,14 +852,26 @@ de classe \code{bytes}, ou de nom \code{bytes} et de type non conforme
 d'une sous-liste écrite, rôle «~\emph{chemin}/@noms~»
 (section~\ref{sec:serialisation})~; \code{objet\_modifie} au rapport figé
 pour une fiche de classe \code{bytes} ou une sous-liste de nom ou de classe
-\code{bytes}, l'empreinte du résultat n'étant pas recalculable
-(tableau~\ref{tab:refus-rapport})~; au rejeu, \code{fiche\_non\_conforme}
-à l'étape~2 pour un champ que le rejeu lit lui-même, témoin «~non
-déterminable~» ou «~différente~» sinon (section~\ref{sec:rejeu}). Une
-classe d'encodage \code{bytes} est citée sous le repère de la règle
-ci-dessus. \textbf{Statut et limites}~: \emph{constat} des tests et de
-mesures sous les locales C et C.UTF-8, aux premier, deuxième et troisième
-niveaux de la fiche, non une propriété démontrée pour toute profondeur. Restent hors de cette règle,
+\code{bytes} dans le périmètre de l'empreinte du résultat, l'empreinte
+n'étant pas recalculable (tableau~\ref{tab:refus-rapport})~; au rejeu,
+\code{fiche\_non\_conforme} à l'étape~2 pour un champ que le rejeu lit
+lui-même~; pour \code{roles} et \code{plan}, les refus délégués de
+l'étape~6, tous nommés (un nom \code{bytes} dans \code{plan}~:
+\code{champ\_inconnu}~; dans \code{plan/etapes}~:
+\code{etape\_inconnue}~; dans \code{plan/etapes/brut}~:
+\code{parametre\_inconnu}~; dans \code{plan/transition}~:
+\code{transition\_inconnue}~; dans \code{roles}~: \code{role\_inconnu}~;
+une classe \code{bytes} sur \code{plan/etapes}~:
+\code{etapes\_mal\_formees})~; ailleurs, témoin «~non déterminable~» ou
+«~différente~» (section~\ref{sec:rejeu}). Une classe d'encodage
+\code{bytes} est citée sous le repère de la règle ci-dessus.
+\textbf{Statut et limites}~: pour l'écriture de la fiche, le rapport figé
+et le rejeu, \emph{constat} des tests et de mesures sous les locales C et
+C.UTF-8, aux niveaux~1 à~7 de la fiche, non une propriété démontrée pour
+toute profondeur~; pour le témoin de la fiche (règle~V3,
+section~\ref{sec:rejeu}), la tenue à toute profondeur est une
+\emph{lecture} de la récursion de \code{champs\_differents()}, bornée par
+la fiche rendue, avec un \emph{constat} aux niveaux~2 à~7. Restent hors de cette règle,
 renvoyés à des issues~: une \emph{valeur} chaîne d'encodage \code{bytes}
 dans \code{versions} ou \code{plateforme} fait lever l'erreur R au rejeu
 (lecture des paires du témoin~; issue~\#142, constat)~; une colonne de
@@ -1394,9 +1416,12 @@ non ASCII.
 \textbf{Locale latin-1} (issue~\#115). Sous une locale latin-1,
 \code{octets\_chaines()} et l'ordre des segments
 (\code{segments\_observations()}, section~\ref{sec:troncature-censure})
-suivent une branche propre, écrite une seule fois depuis l'issue~\#113
-dans \code{vers\_utf8\_locale()}~: la session y est traitée comme une session
-UTF-8, toutes les chaînes passant par \code{enc2utf8()}. Aucune batterie ne
+suivent une branche propre~: la session y est traitée comme une session
+UTF-8, toutes les chaînes passant par \code{enc2utf8()}~; depuis
+l'issue~\#113, la condition de cette conversion est écrite une seule fois,
+dans \code{vers\_utf8\_locale()}, tandis que la condition de locale connue
+du refus \code{chaine\_codage\_indetermine} d'\code{octets\_chaines()}
+reste propre à ce refus. Aucune batterie ne
 s'exécute sous une telle locale, et \code{locale\_c.R} ne compare que C et
 UTF-8~: sans contrôle dédié, une régression de cette branche, qui
 toucherait l'empreinte des données, l'ordre des segments, la fiche ou le
@@ -1427,10 +1452,13 @@ retirer la branche latin-1 de la condition de locale connue
 d'\code{octets\_chaines()} fait échouer, dans la session latin-1, R1 à R6
 et les quatre jeux de segments~; la retirer de celle de l'ordre des segments
 ne fait échouer que le jeu mêlé, seul à la détecter~; la session UTF-8 passe
-dans les deux cas, et le contrôle sort avec le code~1. Depuis l'issue~\#113,
-les deux conditions n'en font qu'une, dans \code{vers\_utf8\_locale()}~:
-les deux mutations ci-dessus ne sont plus distinctes, et le constat, daté,
-n'a pas été refait sur le code actuel.
+dans les deux cas, et le contrôle sort avec le code~1. Depuis
+l'issue~\#113, la première mutation porte sur une condition inchangée (la
+condition de locale connue du refus \code{chaine\_codage\_indetermine},
+propre à \code{octets\_chaines()})~; la seconde porterait désormais sur
+\code{vers\_utf8\_locale()}, que partagent la conversion de l'empreinte et
+l'ordre des segments, et toucherait donc les deux. Le constat, daté, n'a pas
+été refait sur le code actuel.
 \textbf{Statut}~: l'identité des textes est un \emph{constat} sur la
 machine qui exécute le contrôle et sur ces plans et ces jeux, non une
 propriété démontrée~; il ne couvre ni Windows (issue~\#49) ni la batterie
@@ -3139,8 +3167,11 @@ règles~:
     d'un seul côté est cité «~(absent de la fiche reçue)~» ou «~(absent de la
     fiche rendue)~»~; toute autre valeur est une feuille, citée par son
     chemin, dont une liste qui porte un nom d'encodage \code{bytes}, à
-    toute profondeur, citée «~différente~» à son chemin sans que ses noms
-    soient lus (issue~\#128)~; un nœud qui diffère sans qu'aucun de ses enfants diffère est
+    toute profondeur (\emph{lecture} de la récursion de
+    \code{champs\_differents()}, bornée par la fiche rendue~;
+    \emph{constat} aux niveaux~2 à~7), citée «~différente~» à son chemin,
+    ou à celui de son plus proche ancêtre qui est une feuille de la fiche
+    rendue, sans que ses noms soient lus (issue~\#128)~; un nœud qui diffère sans qu'aucun de ses enfants diffère est
     cité «~(ordre des champs ou attributs)~». Pour le témoin de la fiche,
     les deux côtés sont d'abord privés de \code{versions},
     \code{plateforme}, \code{empreintes/resultat}, \code{empreintes/code} et
@@ -6274,12 +6305,16 @@ annotation du 17/10/2026, point~f)~:
     indéterminé (\code{chaine\_codage\_indetermine}). La conversion est
     celle de la règle unique \code{vers\_utf8\_locale()} (module
     \code{outils}~; ADR 0007, point~9.3, annotation du 05/11/2026, (g)~;
-    issue~\#113), appelée après les deux premiers refus, qui restent dans
-    le module \code{rapport}~: \code{enc2utf8()} sur toutes les chaînes sous
+    issue~\#113), appelée après les refus \code{chaine\_codage\_bytes}
+    et \code{chaine\_codage\_indetermine}, qui restent dans le module
+    \code{rapport}, et avant le refus \code{chaine\_non\_utf8}, qui porte
+    sur la chaîne convertie~: \code{enc2utf8()} sur toutes les chaînes sous
     une locale UTF-8 ou latin-1, sur les seules chaînes marquées latin-1
-    sinon~; après ces refus, elle équivaut à \code{enc2utf8()} sur tout, en
-    toute locale, une chaîne restante étant ASCII, marquée UTF-8 ou marquée
-    latin-1. L'ordre des segments (section~\ref{sec:troncature-censure})
+    sinon. Elle équivaut, après ces deux refus, à \code{enc2utf8()} sur
+    tout, en toute locale~: sous une locale UTF-8 ou latin-1, les deux
+    règles sont \code{enc2utf8()} par définition~; sous une autre locale,
+    une chaîne restante est ASCII, marquée UTF-8 ou marquée latin-1, et
+    \code{enc2utf8()} ne change que la dernière. L'ordre des segments (section~\ref{sec:troncature-censure})
     appelle la même fonction. Sous ces règles,
     l'empreinte ne dépend pas des paramètres régionaux.
 \end{itemize}
@@ -7317,13 +7352,19 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     \code{lire\_champ()} (issue~\#128)~; hors de ce périmètre
     (\code{versions}, \code{plateforme}), un nom \code{bytes} est refusé
     à l'écriture de la section par \code{chaine\_codage\_bytes}, une
-    classe \code{bytes} par \code{type\_non\_canonique}~;
+    classe \code{bytes} par \code{type\_non\_canonique}~; une autre classe
+    non canonique (par exemple «~zzz~») sur \code{versions} ou
+    \code{plateforme} y est rendue sans refus ni mention, et la classe
+    n'apparaît pas dans le rapport (\emph{constat}~; issue~\#141, en attente
+    de décision)~;
   \item \textbf{couverture}~: aucun élément de l'objet hors des sections~:
     tout élément de premier niveau autre que \code{table}, \code{etapes},
     \code{avertissements}, \code{fiche} et \code{execution}, toute étape ou
     tout champ de la fiche qu'aucune racine de \code{SECTIONS\_RAPPORT} ne
     couvre, et toute racine «~non produite~» présente et non \code{NULL}
-    sont refusés~: \textbf{le rapport n'omet aucun élément en silence}.
+    sont refusés~: \textbf{le rapport n'omet aucun élément en silence}, au
+    sens de la couverture (un attribut comme la classe de \code{versions},
+    ci-dessus, n'est pas un élément).
 \end{enumerate}
 
 {\footnotesize
@@ -7594,8 +7635,9 @@ quels que soient leurs octets, zéro négatif, attribut de dimension, mélange
 de valeurs finies et de jetons, longueurs limites, types autres que double
 identiques dans les deux formes, refus~; les mêmes jetons dans les deux
 formes, par la règle unique \code{jeton\_non\_fini()}, sur \code{NA},
-\code{NA + 1}, \code{NaN}, \code{Inf}, \code{-Inf} et huit motifs de
-\code{NaN} à charge utile construits par leurs octets, seuls ou mêlés à
+\code{NA + 1}, \code{NaN}, \code{Inf}, \code{-Inf} et huit motifs
+d'octets de \code{NaN}, dont ceux de \code{NaN} et de \code{NA\_real\_},
+construits par leurs octets, seuls ou mêlés à
 des finis, le jeton attendu de chaque motif étant écrit en dur d'après
 \code{is.na()} et \code{is.nan()} de R~4.3.3 (témoin d'un changement de R,
 non règle de l'ADR 0011~; issue~\#118)~; et un échantillon de $10^5$ doubles
@@ -8486,8 +8528,8 @@ exactement \code{graine} et \code{declarations}~:
 Les noms des listes sont comparés sans tri (issue~\#100), par la règle
 unique \code{ecart\_noms()}, partagée avec le portefeuille (issue~\#113).
 \textbf{Cible structurellement vide} (ADR 0007, annotation du 05/11/2026,
-seconde, (c) et~(d)~; décisions du mainteneur du 05/11/2026 sur l'avis
-d'\code{actuary}~; issue~\#112). Une déclaration dont aucune unité ne peut
+seconde, (c) et~(d)~; décisions du mainteneur M206, M207 et M208, du
+05/11/2026, sur l'avis d'\code{actuary}~; issues~\#112 et~\#135). Une déclaration dont aucune unité ne peut
 être éligible, et cela se sait \emph{avant tout tirage}, par le seul
 portefeuille déjà contrôlé, la période et le catalogue, quelle que soit la
 graine, est refusée (\code{defauts\_invalides}), en taux comme en
@@ -8508,11 +8550,23 @@ nombre, zéro compris. Deux cas~:
     quand le portefeuille n'a qu'un contrat par tête, dans les modes
     \code{uniforme} et \code{age\_exact}, et dans les modes
     \code{uniforme\_multi} et \code{age\_exact\_multi} dont
-    \code{loi\_contrats} est de longueur~1. Sous la condition $p_m > 0$
-    imposée à \code{loi\_contrats} ($m$ étant sa longueur,
-    section~\ref{sec:portefeuille-simule}), le nombre de contrats vaut~1 pour toute
-    tête quel que soit le tirage si et seulement si $m = 1$~: \code{loi\_contrats = c(0, 1)}, qui donne deux contrats
-    à chaque tête, n'est pas un cas de refus (issue~\#112). La condition
+    \code{loi\_contrats} est de longueur~1. Sur la \emph{loi déclarée},
+    sous la condition $p_m > 0$ imposée à \code{loi\_contrats} ($m$ étant
+    sa longueur, section~\ref{sec:portefeuille-simule}), le nombre de
+    contrats vaut~1 pour toute tête si et seulement si $m = 1$
+    (\emph{résultat exact})~: \code{loi\_contrats = c(0, 1)}, qui donne
+    deux contrats à chaque tête, n'est pas un cas de refus (issue~\#112).
+    La \emph{loi tirée}, $(p_1, \dots, p_{m-1}, 1 - F_{m-1})$, s'écarte de
+    la loi déclarée d'au plus $10^{-12}$ sur $p_m$
+    (section~\ref{sec:portefeuille-simule})~: une loi déclarée dont $p_m$
+    est de cet ordre peut donner une loi tirée de $p_m$ nul. Ainsi
+    \code{loi\_contrats = c(1, 1e-13)} passe le contrôle du portefeuille
+    ($F_1 = 1$, d'où un $p_2$ tiré nul), donne un seul contrat à chaque
+    tête quelle que soit la graine, et n'est pas refusée avant tout
+    tirage~: une déclaration d'un type de tête y est rendue avec zéro
+    éligible en taux, et refusée par \code{defauts\_ineligibles}, après le
+    tirage, en nombre positif (\emph{constat}, deux graines~; issue
+    proposée au mainteneur). La condition
     \code{entree\_avant\_fin} du type \code{en\_cours\_avant\_fin}
     (entrée antérieure à la fin de la période) est vide quand aucune
     entrée ne précède la fin~: \code{date\_entree} égale à la fin dans les
@@ -8543,10 +8597,12 @@ structure de l'attribut \code{defauts}. Le contrôle, dans
 \code{cible} et de la cible disjointe, et précède celui de \code{taux} et
 de \code{nombre}~: une déclaration de taux ou de nombre mal formé sur une
 cible vide reçoit le refus de la cible vide. Un ensemble d'éligibles vide
-qui \emph{dépend du jeu tiré} (cause absente du jeu propre, aucune tête à
-deux lignes dans un mode multi-contrats à plusieurs probabilités, aucune
-entrée tirée avant la fin quand \code{origine} précède la fin) n'est pas
-refusé à ce stade~: en taux, il donne zéro unité retenue, tracé dans les
+qui \emph{dépend du jeu tiré} (cause absente du jeu propre, y compris une
+transition de loi nulle, vide connu de la loi, hors de la règle
+(\emph{constat}~; issue proposée au mainteneur)~; aucune tête à deux lignes
+dans un mode multi-contrats à plusieurs probabilités, sauf l'exception
+ci-dessus d'une loi tirée de $p_m$ nul~; aucune entrée tirée avant la fin
+quand \code{origine} précède la fin) n'est pas refusé à ce stade~: en taux, il donne zéro unité retenue, tracé dans les
 décomptes~; en nombre, il relève du refus \code{defauts\_ineligibles}
 ci-dessous.
 
@@ -8719,7 +8775,12 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
     \code{nombre} dépasse le nombre d'unités éligibles. Il est levé
     \textbf{après le tirage du jeu propre}, dont il dépend~: à la
     différence du précédent, il dépend de la graine du jeu. Il ne couvre
-    plus que les vides qui dépendent du tirage~: un type de tête dans un
+    plus que les vides qui dépendent du tirage, à deux exceptions près,
+    vides connus avant tout tirage mais hors de la règle de la cible
+    structurellement vide~: une transition de loi nulle, et un mode
+    multi-contrats dont la loi tirée de \code{loi\_contrats} a un $p_m$
+    nul, comme \code{c(1, 1e-13)} (ci-dessus~; \emph{constat}~; issue
+    proposée au mainteneur). Un type de tête dans un
     portefeuille à un seul contrat par tête, et \code{en\_cours\_avant\_fin}
     quand aucune entrée ne précède la fin, auparavant refusés ici quand
     \code{nombre} était positif, et rendus avec zéro unité retenue quand il
