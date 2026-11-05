@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-05
 ---
 
@@ -107,3 +107,18 @@ Proposée par `architect-approfondi` sur Fable le 05/11/2026 ; **à arrêter par
 6. **Fiche** : autoriser la branche à faire entrer les hypothèses de la recette dans la fiche par un champ nouveau (incrément de `version_fiche`, régénération R1 à R6 limitée à `fiche/version_fiche` et `fiche/empreintes/resultat`), ou exiger qu'aucun champ n'entre (hypothèses dans `etapes$exposition$parametres` seulement) ?
 
 Issues : #82 (prémisse (P) ; premier commit `moteur:` de la branche) ; #11 (recette `lignes_dates_completes`, spécification A.1 et A.3 : `date_inventaire` « non employé → refus ») ; #92 et #93 (format des jeux simulés) ; #73 (empreinte d'une table de référence, articulation du point 9). Décisions : M6 (Q6), M46, M48, M77 (b), M102, M118, M168, M194, M198. Branche : `claude/recette-stocks-successifs` (proposée, feuille de route § 2) ; rédigé sur `claude/sources-v1` (`[D1]`).
+
+## Annotation du 5 novembre 2026 — acceptation par le mainteneur
+
+*Consignée par la session principale de `claude/sources-v1` ; décision à numéroter en M-n par la porteuse (B12).*
+
+Le mainteneur accepte l'ADR le 05/11/2026 et répond aux six questions fermées par les options recommandées :
+
+1. **Forme empilée** : un seul `data.frame` ; signatures de `construire_table(donnees, roles, plan)` et de `rejouer_fiche(donnees, fiche)` inchangées.
+2. **Grille d'inventaires** : champ de premier niveau conditionnel `inventaires` du plan, sur le modèle de `graine` (requis si la recette déduite est `stocks_successifs`, interdit sinon).
+3. **Rôle `type_ligne`** à modalités fermées, nom et modalités fixés par `actuary` à la spécification de la recette.
+4. **Identifiant requis** par la recette ; la forme sans identifiant est une recette ultérieure.
+5. **`empiler_stocks()`** exporté et **provenance à deux fichiers** : livrés dans la branche de la recette (`claude/recette-stocks-successifs`).
+6. **Fiche** : la branche peut faire entrer les hypothèses de la recette dans la fiche par un champ nouveau ; un seul incrément de `version_fiche` dans la branche, régénération de R1 à R6 limitée à `fiche/version_fiche` et `fiche/empreintes/resultat`, avec tableau avant / après et visa.
+
+Suites : annotations des ADR 0003, 0007 et 0011 proposées à la porteuse (PR #139) ; spécification de la recette par `actuary-approfondi` (circuit 1) avant tout code ; ouverture de `claude/recette-stocks-successifs` soumise à l'autorisation du mainteneur (vague 2, M198).
