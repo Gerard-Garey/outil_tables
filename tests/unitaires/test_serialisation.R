@@ -751,6 +751,64 @@ verifier("lire_plan, refus d'un objet de classe « a<LF>b » : texte_non_octets,
   else if (!identical(r$details$classe, "a\nb")) "details sans la classe brute" else TRUE
 })
 
+# Valeurs citées dans type_non_canonique et serialisation_impossible (#127,
+# constat 2 et critère 3) : rôle, chemin et classe cités par
+# neutraliser_citation() ; VT et U+2028 écrits <U+XXXX>, chaîne bytes en rôle
+# citée sous le repère ; message sur une ligne, marqué UTF-8. Une classe
+# bytes : échec attendu, renvoyé à #128 (fin du bloc) ; un nom d'attribut
+# bytes ne se construit pas en R (attr<- et unserialize() lèvent l'erreur R
+# « translating strings with "bytes" encoding is not allowed », mesuré) ; un
+# nom de liste bytes est refusé avant, sous chaine_codage_bytes (ligne @noms).
+local({
+  OCTETS <- "\xe9t\xe9"; Encoding(OCTETS) <- "bytes"
+  une_ligne_utf8 <- function(r, attendus, brut = NULL) {
+    m <- if (is.null(r)) "" else conditionMessage(r)
+    manque <- Filter(function(f) !grepl(f, m, fixed = TRUE), attendus)
+    if (is.null(r)) "aucun refus" else if (length(manque)) sprintf("message sans « %s » : %s", manque[1L], m)
+    else if (!is.null(brut) && grepl(brut, m, fixed = TRUE)) "caractère écrit en clair"
+    else if (grepl("[\n\v\f]", m, useBytes = TRUE)) "message sur plusieurs lignes"
+    else if (!identical(Encoding(m), "UTF-8")) "message non marqué UTF-8" else TRUE
+  }
+  for (k in list(list("VT", 0x0B, "<U+000B>"), list("U+2028", 0x2028, "<U+2028>"))) {
+    v <- intToUtf8(c(0x61, k[[2L]], 0x62)); q <- paste0("a", k[[3L]], "b"); ch <- intToUtf8(k[[2L]])
+    r <- refus_de(tablexp:::ecrire_valeurs(structure(1, class = v), "texte", v))
+    verifier(sprintf("ecrire_valeurs, rôle et classe « a<%s>b » : type_non_canonique, cités %s, une ligne, UTF-8", k[[1L]], k[[3L]]),
+             if (!is.null(r) && !identical(r$motif, "type_non_canonique")) r$motif
+             else une_ligne_utf8(r, c(paste0("Rôle « ", q, " »"), paste0("classe « ", q, " »")), ch))
+    r <- refus_de(tablexp:::ecrire_valeurs(list(1), "texte", v))
+    verifier(sprintf("ecrire_valeurs, rôle « a<%s>b », type list : type_non_canonique, rôle cité %s", k[[1L]], k[[3L]]),
+             if (!is.null(r) && !identical(r$motif, "type_non_canonique")) r$motif
+             else une_ligne_utf8(r, c(paste0("Rôle « ", q, " »"), "type « list »"), ch))
+    r <- refus_de(ecrire_plan(stats::setNames(list(structure(1, class = v)), v)))
+    verifier(sprintf("ecrire_plan, chemin et classe « a<%s>b » : serialisation_impossible, cités %s, une ligne, UTF-8", k[[1L]], k[[3L]]),
+             if (!is.null(r) && !identical(r$motif, "serialisation_impossible")) r$motif
+             else une_ligne_utf8(r, c(paste0("Écriture du texte, « ", q, " »"), paste0("de classe ", q, " ou")), ch))
+    r <- refus_de(ecrire_plan(list(a = structure(list(1), class = v))))
+    verifier(sprintf("ecrire_plan, liste de classe « a<%s>b » : serialisation_impossible, classe citée %s", k[[1L]], k[[3L]]),
+             if (!is.null(r) && !identical(r$motif, "serialisation_impossible")) r$motif
+             else une_ligne_utf8(r, paste0("liste de classe ", q, " ou"), ch))
+  }
+  r <- refus_de(tablexp:::ecrire_valeurs(structure(1, class = "k"), "texte", OCTETS))
+  verifier("ecrire_valeurs, rôle d'encodage bytes : type_non_canonique, rôle cité sous le repère, sans erreur R",
+           if (!is.null(r) && !identical(r$motif, "type_non_canonique")) r$motif
+           else une_ligne_utf8(r, "Rôle « <chaîne d'encodage bytes> »"))
+  # Classe d'encodage bytes (décision du mainteneur du 05/11/2026 : rattachée
+  # à #128) : défaut connu, inherits() lève l'erreur R « translating strings
+  # with "bytes" encoding is not allowed » avant le refus (mesuré). Attendu :
+  # le refus nommé ; toute autre issue que cette erreur R est un ECHEC.
+  attendu_bytes <- function(expr, motif) {
+    r <- leve_refus(expr, motif)
+    if (isTRUE(r) || grepl("\"bytes\"", r, fixed = TRUE)) r else stop(r, call. = FALSE)
+  }
+  echec_attendu("ecrire_valeurs, classe d'encodage bytes : type_non_canonique", "#128",
+                attendu_bytes(tablexp:::ecrire_valeurs(structure(1, class = OCTETS), "texte", "r"),
+                              "type_non_canonique"))
+  echec_attendu("ecrire_plan, classe d'encodage bytes : serialisation_impossible", "#128",
+                attendu_bytes(ecrire_plan(list(a = structure(1, class = OCTETS))), "serialisation_impossible"))
+  echec_attendu("ecrire_plan, liste de classe d'encodage bytes : serialisation_impossible", "#128",
+                attendu_bytes(ecrire_plan(list(a = structure(list(1), class = OCTETS))), "serialisation_impossible"))
+})
+
 # Gabarits du lecteur citant une valeur reçue non ASCII (revue finale de #94) :
 # première ligne inconnue, type inconnu, valeur illisible. Entrées construites
 # en octets bruts (as.raw, charToRaw), attendus décodés d'octets : aucun

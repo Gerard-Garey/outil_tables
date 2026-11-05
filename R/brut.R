@@ -170,33 +170,33 @@ controler_parametres_brut <- function(estimateurs, niveau, par_annee) {
   if (!forme_exacte(estimateurs, "character") || !length(estimateurs) || anyNA(estimateurs) ||
       anyDuplicated(estimateurs))
     refuser("brut", "estimateurs_invalides",
-            sprintf(paste("Les estimateurs doivent être un vecteur de chaînes non vide, sans attribut,",
-                          "sans doublon ni NA, pris dans %s."),
-                    liste_guillemets(ESTIMATEURS_BRUT)),
+            formuler(paste("Les estimateurs doivent être un vecteur de chaînes non vide, sans attribut,",
+                           "sans doublon ni NA, pris dans %s."),
+                     liste_guillemets(ESTIMATEURS_BRUT)),
             list(estimateurs = estimateurs))
   inconnus <- setdiff(estimateurs, ESTIMATEURS_BRUT)
   if (length(inconnus))
     refuser("brut", "estimateur_inconnu",
-            sprintf("Estimateur(s) inconnu(s) %s (estimateurs disponibles : %s).",
-                    liste_guillemets(inconnus), liste_guillemets(ESTIMATEURS_BRUT)),
+            formuler("Estimateur(s) inconnu(s) %s (estimateurs disponibles : %s).",
+                     liste_guillemets(inconnus), liste_guillemets(ESTIMATEURS_BRUT)),
             list(estimateur = inconnus))
   # Double nu, sans attribut (ni dim, ni names, ni classe).
   if (!forme_exacte(niveau, "double") || length(niveau) != 1L || !is.finite(niveau) ||
       niveau <= 0 || niveau >= 1)
     refuser("brut", "niveau_invalide",
-            paste("Le niveau de confiance doit être un nombre (double) unique, sans attribut, fini,",
-                  "strictement compris entre 0 et 1."),
+            formuler(paste("Le niveau de confiance doit être un nombre (double) unique, sans attribut, fini,",
+                           "strictement compris entre 0 et 1.")),
             list(niveau = niveau))
   if ("binomial" %in% estimateurs && isTRUE(par_annee))
     refuser("brut", "binomial_par_annee",
-            paste("Estimateur binomial refusé sous découpage par année (par_annee = TRUE) : l'exposition",
-                  "initiale n'est pas produite sous par_annee, et une cellule âge x année ne couvre pas",
-                  "une année d'âge entière, si bien que q_x n'y est pas défini."),
+            formuler(paste("Estimateur binomial refusé sous découpage par année (par_annee = TRUE) : l'exposition",
+                           "initiale n'est pas produite sous par_annee, et une cellule âge x année ne couvre pas",
+                           "une année d'âge entière, si bien que q_x n'y est pas défini.")),
             list(estimateur = "binomial", par_annee = par_annee))
   if ("kaplan_meier" %in% estimateurs && isTRUE(par_annee))
     refuser("brut", "kaplan_meier_par_annee",
-            paste("Estimateur de Kaplan-Meier refusé sous découpage par année (par_annee = TRUE) : une",
-                  "cellule âge x année ne couvre pas une année d'âge entière ; q_x n'y est pas défini."),
+            formuler(paste("Estimateur de Kaplan-Meier refusé sous découpage par année (par_annee = TRUE) : une",
+                           "cellule âge x année ne couvre pas une année d'âge entière ; q_x n'y est pas défini.")),
             list(estimateur = "kaplan_meier", par_annee = par_annee))
   invisible(TRUE)
 }

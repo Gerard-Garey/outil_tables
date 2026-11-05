@@ -95,23 +95,23 @@ deduire_recette <- function(roles) {
 controler_parametres_exposition <- function(convention, par_annee) {
   if (!forme_exacte(convention, "character") || length(convention) != 1L || is.na(convention))
     refuser("exposition", "convention_invalide",
-            sprintf("La convention d'âge doit être une chaîne unique, sans attribut, prise dans %s.",
-                    liste_guillemets(VALEURS_CONVENTION)),
+            formuler("La convention d'âge doit être une chaîne unique, sans attribut, prise dans %s.",
+                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (convention %in% setdiff(ORDRE_CONVENTIONS, CONVENTIONS_MISES_EN_OEUVRE))
     refuser("exposition", "convention_non_mise_en_oeuvre",
-            sprintf(paste("Convention d'âge « %s » non mise en oeuvre (rôles d'âge fourni non pris",
-                          "en charge) : la construction est refusée (valeurs admises : %s)."),
-                    convention, liste_guillemets(VALEURS_CONVENTION)),
+            formuler(paste("Convention d'âge « %s » non mise en oeuvre (rôles d'âge fourni non pris",
+                           "en charge) : la construction est refusée (valeurs admises : %s)."),
+                     citer(convention), liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (!(convention %in% VALEURS_CONVENTION))
     refuser("exposition", "convention_invalide",
-            sprintf("Convention d'âge inconnue %s (valeurs admises : %s).", liste_guillemets(convention),
-                    liste_guillemets(VALEURS_CONVENTION)),
+            formuler("Convention d'âge inconnue %s (valeurs admises : %s).", liste_guillemets(convention),
+                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (!forme_exacte(par_annee, "logical") || length(par_annee) != 1L || is.na(par_annee))
     refuser("exposition", "par_annee_invalide",
-            "Le découpage par année (par_annee) doit valoir TRUE ou FALSE, sans attribut.",
+            formuler("Le découpage par année (par_annee) doit valoir TRUE ou FALSE, sans attribut."),
             list(par_annee = par_annee))
   invisible(TRUE)
 }
@@ -134,9 +134,9 @@ resoudre_convention <- function(convention, native) {
   conv <- convention_retenue(convention, native)
   if (match(conv$retenue, ORDRE_CONVENTIONS) < match(native, ORDRE_CONVENTIONS))
     refuser("exposition", "convention_plus_fine",
-            sprintf(paste("Convention d'âge « %s » plus fine que celle que la recette permet",
-                          "(« %s ») : le forçage vers une convention plus fine est refusé."),
-                    conv$retenue, native),
+            formuler(paste("Convention d'âge « %s » plus fine que celle que la recette permet",
+                           "(« %s ») : le forçage vers une convention plus fine est refusé."),
+                     citer(conv$retenue), native),
             list(convention = conv$retenue, convention_native = native))
   conv
 }
@@ -274,7 +274,7 @@ nombre_cellules <- function(n_age, n_an,
   n <- sum(as.double(n_age) * n_an)
   if (n > .Machine$integer.max)
     refuser("exposition", "trop_de_cellules",
-            sprintf(libelle, format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
+            formuler(libelle, format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
             stats::setNames(list(n), diagnostic))
   as.integer(n)
 }

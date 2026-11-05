@@ -181,6 +181,44 @@ for (nom in names(TYPES_KO)) {
            if (is.null(x)) "aucun refus" else if (!identical(x$motif, "type_incompatible")) x$motif
            else contient(x, cas$role, cas$col))
 }
+# Colonne et classe citées par citer() (#127, constat 2 et critère 3) : VT et
+# U+2028 écrits <U+XXXX>, message sur une ligne, marqué UTF-8 ; colonne brute
+# dans les details.
+for (k in list(list("VT", 0x0B, "<U+000B>"), list("U+2028", 0x2028, "<U+2028>"))) {
+  s_ <- intToUtf8(c(0x73, 0x65, k[[2L]], 0x78, 0x65))
+  d <- BASE; names(d)[names(d) == "sexe"] <- s_; d[[s_]] <- structure(1:4, class = s_)
+  x <- refus(prep(d = d, roles = replace(ROLES, "sexe", s_)))
+  verifier(sprintf("type incompatible, colonne et classe « se<%s>xe » : type_incompatible, cités %s, une ligne, UTF-8", k[[1L]], k[[3L]]),
+           if (is.null(x)) "aucun refus" else if (!identical(x$motif, "type_incompatible")) x$motif
+           else if (!isTRUE(contient(x, paste0("colonne « se", k[[3L]], "xe »"), paste0("attendu, se", k[[3L]], "xe reçu"))))
+             contient(x, paste0("colonne « se", k[[3L]], "xe »"), paste0("attendu, se", k[[3L]], "xe reçu"))
+           else if (grepl(intToUtf8(k[[2L]]), conditionMessage(x), fixed = TRUE)) "caractère écrit en clair"
+           else if (!identical(Encoding(conditionMessage(x)), "UTF-8")) "message non marqué UTF-8"
+           else identical(x$details$colonne, s_))
+}
+# Chaîne d'encodage bytes en nom ou en classe de colonne (décision du
+# mainteneur du 05/11/2026 : rattachée à #128, étendue à controler_roles()) :
+# défaut connu, l'extraction de la colonne (`[[.data.frame`) ou dim() lève
+# l'erreur R « translating strings with "bytes" encoding is not allowed »
+# avant le refus (mesuré). Attendu : le refus type_incompatible ; toute autre
+# issue que cette erreur R (autre erreur, autre motif, aucun refus) est un
+# ECHEC, non un échec attendu. Le data.frame est assemblé sans `[[<-` ni
+# `$<-`, qui lèveraient la même erreur.
+local({
+  attendu_bytes <- function(expr, motif) {
+    r <- leve_refus(expr, motif)
+    if (isTRUE(r) || grepl("\"bytes\"", r, fixed = TRUE)) r else stop(r, call. = FALSE)
+  }
+  avec_sexe <- function(nom, valeur) {
+    l <- unclass(BASE); l$sexe <- valeur; names(l)[names(l) == "sexe"] <- nom
+    structure(l, class = "data.frame", row.names = seq_len(nrow(BASE)))
+  }
+  echec_attendu("type incompatible, classe de colonne d'encodage bytes : type_incompatible", "#128",
+                attendu_bytes(prep(d = avec_sexe("sexe", structure(1:4, class = OCTETS))), "type_incompatible"))
+  echec_attendu("type incompatible, nom de colonne d'encodage bytes : type_incompatible", "#128",
+                attendu_bytes(prep(d = avec_sexe(OCTETS, structure(1:4, class = "k")),
+                                   roles = replace(ROLES, "sexe", OCTETS)), "type_incompatible"))
+})
 d <- BASE; d$an <- c(1950.5, 1960, 1945, 1945)
 verifier("type incompatible : annee_naissance non entière",
          leve_refus(prep(d = d, roles = c(ROLES, annee_naissance = "an")), "type_incompatible"))

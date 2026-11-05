@@ -129,7 +129,8 @@ octets_chaines <- function(x, role, limite = 2^30) {
   enc <- Encoding(x)
   if (any(enc == "bytes"))
     refuser("rapport", "chaine_codage_bytes",
-            sprintf("Rôle « %s » : chaîne au codage « bytes », non convertible en UTF-8 sans deviner.", role),
+            formuler("Rôle « %s » : chaîne au codage « bytes », non convertible en UTF-8 sans deviner.",
+                     neutraliser_citation(role)),
             list(role = role, lignes = which(enc == "bytes")))
   non_ascii <- !is.na(x) & grepl("[^\001-\177]", x, useBytes = TRUE)
   locale <- l10n_info()
@@ -137,14 +138,15 @@ octets_chaines <- function(x, role, limite = 2^30) {
   indetermine <- non_ascii & enc == "unknown" & !locale_connue
   if (any(indetermine))
     refuser("rapport", "chaine_codage_indetermine",
-            sprintf(paste("Rôle « %s » : chaîne non ASCII sans codage déclaré dans une session dont la",
-                          "locale n'est ni UTF-8 ni latin-1 : son codage est indéterminé."), role),
+            formuler(paste("Rôle « %s » : chaîne non ASCII sans codage déclaré dans une session dont la",
+                           "locale n'est ni UTF-8 ni latin-1 : son codage est indéterminé."),
+                     neutraliser_citation(role)),
             list(role = role, lignes = which(indetermine)))
   y <- enc2utf8(x)
   invalide <- !is.na(y) & !validUTF8(y)
   if (any(invalide))
     refuser("rapport", "chaine_non_utf8",
-            sprintf("Rôle « %s » : chaîne qui n'est pas de l'UTF-8 valide.", role),
+            formuler("Rôle « %s » : chaîne qui n'est pas de l'UTF-8 valide.", neutraliser_citation(role)),
             list(role = role, lignes = which(invalide)))
   # Échappements sur les valeurs distinctes, vectorisés (cinq gsub). Les
   # corps, marqués `bytes` pour que paste() les copie sans traduction en toute
@@ -536,8 +538,8 @@ ecrire_valeurs <- function(x, forme, role) {
   formes <- c("empreinte", "texte")
   if (!is.character(forme) || length(forme) != 1L || !forme %in% formes)
     refuser("rapport", "forme_ecriture_inconnue",
-            sprintf("Forme d'écriture « %s » inconnue (attendu : %s).",
-                    paste(forme, collapse = "/"), paste(formes, collapse = ", ")),
+            formuler("Forme d'écriture « %s » inconnue (attendu : %s).",
+                     paste(neutraliser_citation(forme), collapse = "/"), paste(formes, collapse = ", ")),
             list(forme = forme))
   # Seize hexadécimaux minuscules et LF par double fini : un octet = deux
   # caractères, quartet fort puis quartet faible.
@@ -588,13 +590,14 @@ ecrire_valeurs <- function(x, forme, role) {
     ni <- is.finite(u) & u != trunc(u)
     if (any(ni))
       refuser("rapport", "date_non_entiere",
-              sprintf("Rôle « %s » : date non entière (%s), sans écriture canonique.", role,
-                      paste(format(utils::head(u[ni], 3L), digits = 15L), collapse = ", ")),
+              formuler("Rôle « %s » : date non entière (%s), sans écriture canonique.", neutraliser_citation(role),
+                       paste(format(utils::head(u[ni], 3L), digits = 15L), collapse = ", ")),
               list(role = role, lignes = which(is.finite(j) & j != trunc(j))))
     hors <- dates_hors_domaine(u)
     if (any(hors))
       refuser("rapport", "date_hors_domaine",
-              sprintf("Rôle « %s » : date hors du domaine [0001-01-01, 9999-12-31], sans écriture canonique.", role),
+              formuler("Rôle « %s » : date hors du domaine [0001-01-01, 9999-12-31], sans écriture canonique.",
+                       neutraliser_citation(role)),
               list(role = role, lignes = which(dates_hors_domaine(j))))
     txt <- ifelse(is.nan(u), "NaN", "NA")
     k <- !is.na(u)
@@ -603,8 +606,8 @@ ecrire_valeurs <- function(x, forme, role) {
   }
   if (is.object(x))
     refuser("rapport", "type_non_canonique",
-            sprintf("Rôle « %s » : classe « %s » sans représentation canonique.", role,
-                    paste(class(x), collapse = "/")),
+            formuler("Rôle « %s » : classe « %s » sans représentation canonique.", neutraliser_citation(role),
+                     paste(neutraliser_citation(class(x)), collapse = "/")),
             list(role = role))
   if (is.character(x)) return(list(type = "character", octets = octets_chaines(x, role)))
   if (is.integer(x)) return(list(type = "integer", octets = octets_entiers(x)))
@@ -618,7 +621,7 @@ ecrire_valeurs <- function(x, forme, role) {
     return(list(type = "logical", octets = octets_lignes(txt)))
   }
   refuser("rapport", "type_non_canonique",
-          sprintf("Rôle « %s » : type « %s » sans représentation canonique.", role, typeof(x)),
+          formuler("Rôle « %s » : type « %s » sans représentation canonique.", neutraliser_citation(role), typeof(x)),
           list(role = role))
 }
 
@@ -660,9 +663,9 @@ controler_provenance <- function(provenance) {
   if (!liste_aux_noms(provenance, c("fichier", "empreinte", "algorithme")) ||
       !all(vapply(provenance, chaine_unique, logical(1L))))
     refuser("rapport", "provenance_invalide",
-            paste("La provenance doit être NULL (données construites en mémoire) ou une liste nue",
-                  "(fichier, empreinte, algorithme) de trois chaînes non vides, sans attribut",
-                  "(ni data.frame, ni classe ; ADR 0007, point 3.1)."),
+            formuler(paste("La provenance doit être NULL (données construites en mémoire) ou une liste nue",
+                           "(fichier, empreinte, algorithme) de trois chaînes non vides, sans attribut",
+                           "(ni data.frame, ni classe ; ADR 0007, point 3.1).")),
             list(provenance = provenance))
   invisible(TRUE)
 }
@@ -740,8 +743,13 @@ CHEMINS_HORS_RESULTAT <- c("execution", "fiche/versions", "fiche/plateforme", "f
 # texte, est une erreur de programmation : rien n'est ignoré en silence.
 # Statut : même machine seulement (point 11.2), témoin d'identité.
 empreinte_resultat <- function(x) {
+  # stop(simpleError()) et non stop(<chaîne>) : stop() traduit une chaîne
+  # marquée UTF-8 vers la locale native (« <U+00C9> » sous C), et le message
+  # d'un refus de texte_objet(), formé par formuler(), est marqué UTF-8 (#127,
+  # mesuré sous C) ; la condition garde ses octets, cités par
+  # controler_rapport() (objet_modifie).
   programmation <- function(message)
-    stop(sprintf("empreinte_resultat() : %s (erreur de programmation).", message), call. = FALSE)
+    stop(simpleError(sprintf("empreinte_resultat() : %s (erreur de programmation).", message)))
   if (!is.list(x) || !identical(class(x), "construction"))
     programmation(sprintf("objet de classe %s au lieu de construction", paste(class(x), collapse = "/")))
   retirer <- function(v, segments) {
@@ -1080,7 +1088,8 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
   tab <- as.raw(0x09); lf <- as.raw(0x0a)
   impossible <- function(chemin, message)
     refuser("rapport", "serialisation_impossible",
-            sprintf("Écriture du texte, « %s » : %s.", if (nzchar(chemin)) chemin else "(racine)", message),
+            formuler("Écriture du texte, « %s » : %s.", if (nzchar(chemin)) neutraliser_citation(chemin) else "(racine)",
+                     message),
             list(chemin = chemin))
   morceaux <- list()
   ajouter <- function(chemin, type, n, octets) {
@@ -1100,7 +1109,7 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
   }
   profonde <- function(chemin, profondeur)
     if (profondeur > PROFONDEUR_MAX_TEXTE)
-      impossible(chemin, sprintf("profondeur %d au-delà de %d", profondeur, PROFONDEUR_MAX_TEXTE))
+      impossible(chemin, formuler("profondeur %d au-delà de %d", profondeur, PROFONDEUR_MAX_TEXTE))
   atome <- function(v, chemin, profondeur) {
     profonde(chemin, profondeur)
     a <- names(attributes(v))
@@ -1111,28 +1120,31 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
       # des données (point 2.3) : le moteur recopie dans l'objet le type d'une
       # colonne de rôle catégorie reçue en facteur (#67, M71, Q2 : niveaux sans
       # effet, condition de validité testée).
-      if (forme != "empreinte") impossible(chemin, "facteur, sans écriture de ses niveaux dans le texte de la grammaire 1")
+      if (forme != "empreinte") impossible(chemin, formuler("facteur, sans écriture de ses niveaux dans le texte de la grammaire 1"))
       if (!(identical(class(v), "factor") || identical(class(v), c("ordered", "factor"))) ||
           !all(a %in% c("names", "levels", "class")))
-        impossible(chemin, sprintf("facteur de classe %s ou d'attribut(s) %s", paste(class(v), collapse = "/"),
-                                   paste(a, collapse = ", ")))
+        impossible(chemin, formuler("facteur de classe %s ou d'attribut(s) %s",
+                                    paste(neutraliser_citation(class(v)), collapse = "/"),
+                                    paste(neutraliser_citation(a), collapse = ", ")))
     } else if (identical(class(v), "Date")) {
       # Date à stockage double ou integer seulement (sinon : erreur R brute, ou
       # écriture relue d'un autre type ; #50).
       if (!typeof(v) %in% c("double", "integer"))
-        impossible(chemin, sprintf("Date à stockage %s (double ou integer attendu)", typeof(v)))
-      if (!all(a %in% c("names", "class"))) impossible(chemin, sprintf("attribut(s) %s", paste(a, collapse = ", ")))
+        impossible(chemin, formuler("Date à stockage %s (double ou integer attendu)", typeof(v)))
+      if (!all(a %in% c("names", "class")))
+        impossible(chemin, formuler("attribut(s) %s", paste(neutraliser_citation(a), collapse = ", ")))
     } else if (is.object(v) || !typeof(v) %in% c("double", "integer", "logical", "character") ||
                !all(a %in% "names")) {
-      impossible(chemin, sprintf("valeur de type %s, de classe %s ou d'attribut(s) %s, sans écriture dans le texte",
-                                 typeof(v), paste(class(v), collapse = "/"), paste(a, collapse = ", ")))
+      impossible(chemin, formuler("valeur de type %s, de classe %s ou d'attribut(s) %s, sans écriture dans le texte",
+                                  typeof(v), paste(neutraliser_citation(class(v)), collapse = "/"),
+                                  paste(neutraliser_citation(a), collapse = ", ")))
     }
     # Vecteur atomique nommé de longueur 0 : refusé (décision de la session
     # principale, revue finale de #50) ; écrit chemin/@noms character 0 puis
     # chemin, son texte coupé après la ligne @noms se relirait comme une liste
     # nommée vide (préfixe accepté, contraire à la troisième annotation, (d)).
     if (!is.null(names(v)) && !length(v))
-      impossible(chemin, "vecteur atomique nommé de longueur 0, sans écriture distincte d'une liste nommée vide")
+      impossible(chemin, formuler("vecteur atomique nommé de longueur 0, sans écriture distincte d'une liste nommée vide"))
     if (!is.null(names(v))) noms_ligne(v, chemin)
     cc <- ecrire_valeurs(v, forme, chemin)
     ajouter(chemin, cc$type, length(v), cc$octets)
@@ -1143,16 +1155,17 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
     if (is.data.frame(v)) {
       a <- names(attributes(v))
       if (!identical(class(v), "data.frame") || !all(a %in% c("names", "class", "row.names")))
-        impossible(chemin, sprintf("data.frame de classe %s ou d'attribut(s) %s",
-                                   paste(class(v), collapse = "/"), paste(a, collapse = ", ")))
+        impossible(chemin, formuler("data.frame de classe %s ou d'attribut(s) %s",
+                                    paste(neutraliser_citation(class(v)), collapse = "/"),
+                                    paste(neutraliser_citation(a), collapse = ", ")))
       if (!identical(attr(v, "row.names"), seq_len(nrow(v))))
-        impossible(chemin, "data.frame aux noms de lignes non automatiques")
+        impossible(chemin, formuler("data.frame aux noms de lignes non automatiques"))
       ajouter(joindre_chemin(chemin, "@colonnes"), "character", length(v),
               octets_chaines(names(v), joindre_chemin(chemin, "@colonnes")))
       ajouter(joindre_chemin(chemin, "@lignes"), "integer", 1L, octets_lignes(sprintf("%d", nrow(v))))
       s <- segments_texte(enc2utf8(names(v)), length(v))
       for (i in seq_along(v)) {
-        if (is.null(v[[i]]) || !is.atomic(v[[i]])) impossible(joindre_chemin(chemin, s[i]), "colonne non atomique")
+        if (is.null(v[[i]]) || !is.atomic(v[[i]])) impossible(joindre_chemin(chemin, s[i]), formuler("colonne non atomique"))
         atome(v[[i]], joindre_chemin(chemin, s[i]), profondeur + 1L)
       }
       return(invisible())
@@ -1160,17 +1173,18 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
     if (is.list(v)) {
       a <- names(attributes(v))
       if (is.object(v) || !all(a %in% "names"))
-        impossible(chemin, sprintf("liste de classe %s ou d'attribut(s) %s",
-                                   paste(class(v), collapse = "/"), paste(a, collapse = ", ")))
+        impossible(chemin, formuler("liste de classe %s ou d'attribut(s) %s",
+                                    paste(neutraliser_citation(class(v)), collapse = "/"),
+                                    paste(neutraliser_citation(a), collapse = ", ")))
       noms_ligne(v, chemin)
       s <- segments_texte(if (is.null(names(v))) NULL else enc2utf8(names(v)), length(v))
       for (i in seq_along(v)) noeud(v[[i]], joindre_chemin(chemin, s[i]), profondeur + 1L)
       return(invisible())
     }
-    if (!is.atomic(v)) impossible(chemin, sprintf("objet de type %s, sans écriture dans le texte", typeof(v)))
+    if (!is.atomic(v)) impossible(chemin, formuler("objet de type %s, sans écriture dans le texte", typeof(v)))
     atome(v, chemin, profondeur)
   }
-  if (!is.list(x) || is.data.frame(x)) impossible("", "l'objet écrit doit être une liste")
+  if (!is.list(x) || is.data.frame(x)) impossible("", formuler("l'objet écrit doit être une liste"))
   noeud(x, "", 0L)
   propre <- function(t) gsub("[\001-\037\177]", " ", enc2utf8(t), useBytes = TRUE)
   tete <- c(premiere, if (length(entete)) sprintf("# %s : %s", propre(names(entete)), propre(entete)))
@@ -1182,13 +1196,13 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
 # message)` lève le refus de la ligne. Rend le vecteur, sans noms.
 valeurs_texte <- function(type, s, refus) {
   invalide <- function(quoi, i, motif = "texte_valeur_invalide")
-    refus(motif, sprintf(texte_moteur("%s (valeur %d : %s)"), texte_moteur(quoi), i[1L], neutraliser_citation(s[i[1L]])))
+    refus(motif, formuler("%s (valeur %d : %s)", quoi, i[1L], neutraliser_citation(s[i[1L]])))
   switch(type,
     character = {
       na <- s == "NA"
       bien <- grepl('^"(?:[^"\\\\]|\\\\[\\\\nrt"])*+"$', s, perl = TRUE, useBytes = TRUE)
       if (any(!na & !bien))
-        invalide("chaîne sans guillemets droits, guillemet nu ou échappement inconnu", which(!na & !bien))
+        invalide(formuler("chaîne sans guillemets droits, guillemet nu ou échappement inconnu"), which(!na & !bien))
       y <- sub('^"(.*)"$', "\\1", s[!na], perl = TRUE, useBytes = TRUE)
       # Désechappement : les paires \\ d'abord, vers l'octet 0xFF (absent de
       # tout texte UTF-8 valide), puis \n, \r, \t, \", puis 0xFF vers \.
@@ -1208,22 +1222,22 @@ valeurs_texte <- function(type, s, refus) {
       v <- suppressWarnings(as.numeric(ifelse(jeton | decimal, s, NA_character_)))
       v[s == "NA"] <- NA_real_
       faux <- !jeton & (!decimal | !is.finite(v))
-      if (any(faux)) invalide("double illisible (ni décimal lu en un double fini, ni NA, NaN, Inf, -Inf)", which(faux))
+      if (any(faux)) invalide(formuler("double illisible (ni décimal lu en un double fini, ni NA, NaN, Inf, -Inf)"), which(faux))
       # Sous-dépassement (M66) : mantisse non nulle relue 0 (-0 compris).
       sous <- decimal & grepl("[1-9]", sub("[eE].*$", "", s)) & v == 0
       if (any(sous))
-        invalide("décimal non nul relu 0 (sous-dépassement des doubles)", which(sous), "texte_double_sous_depassement")
+        invalide(formuler("décimal non nul relu 0 (sous-dépassement des doubles)"), which(sous), "texte_double_sous_depassement")
       v
     },
     integer = {
       v <- suppressWarnings(as.integer(ifelse(grepl("^(0|-?[1-9][0-9]*)$", s), s, NA_character_)))
       faux <- s != "NA" & is.na(v)
-      if (any(faux)) invalide("entier non canonique ou hors de l'étendue des integer", which(faux))
+      if (any(faux)) invalide(formuler("entier non canonique ou hors de l'étendue des integer"), which(faux))
       v
     },
     logical = {
       v <- c("TRUE" = TRUE, "FALSE" = FALSE, "NA" = NA)[s]
-      if (anyNA(names(v))) invalide("logique autre que TRUE, FALSE ou NA", which(is.na(names(v))))
+      if (anyNA(names(v))) invalide(formuler("logique autre que TRUE, FALSE ou NA"), which(is.na(names(v))))
       unname(v)
     },
     Date = {
@@ -1232,7 +1246,7 @@ valeurs_texte <- function(type, s, refus) {
       u <- as.double(unclass(as.Date(ifelse(forme, s, NA_character_), format = "%Y-%m-%d")))
       faux <- !jeton & (!forme | is.na(u) | dates_hors_domaine(u))
       if (!any(faux) && any(!jeton)) faux[!jeton] <- texte_date(u[!jeton]) != s[!jeton]
-      if (any(faux)) invalide("date hors de la forme AAAA-MM-JJ, inexistante ou hors du domaine [0001-01-01, 9999-12-31]",
+      if (any(faux)) invalide(formuler("date hors de la forme AAAA-MM-JJ, inexistante ou hors du domaine [0001-01-01, 9999-12-31]"),
                               which(faux))
       u[s == "NaN"] <- NaN
       structure(u, class = "Date")
@@ -1243,59 +1257,60 @@ valeurs_texte <- function(type, s, refus) {
 # Objet (liste) relu des octets `octets` de première ligne attendue
 # `premiere` ; `nature` (« plan », « fiche ») pour les messages.
 lire_texte <- function(octets, premiere, nature) {
-  # Message marqué UTF-8 sous toute locale (#94), par texte_moteur(). Toute
-  # valeur reçue citée dans un message (classe, première ligne, type, chemin,
-  # colonne, valeur) passe par neutraliser_citation() (R/outils.R, #94) ; la
-  # classe, le chemin ou la colonne bruts sont dans `details`.
+  # Message marqué UTF-8 sous toute locale (#94), formé par formuler() (#127).
+  # Toute valeur reçue citée dans un message (classe, première ligne, type,
+  # longueur, chemin, colonne, valeur) passe par neutraliser_citation()
+  # (R/outils.R, #94) ; la classe, le chemin ou la colonne bruts sont dans
+  # `details`.
   refus <- function(motif, message, ligne = NA_integer_, details = list())
     refuser("rapport", motif,
-            texte_moteur(sprintf("Lecture du texte de %s%s : %s.", nature,
-                                 if (is.na(ligne)) "" else sprintf(", ligne %d", ligne), message)),
+            formuler("Lecture du texte de %s%s : %s.", nature,
+                     if (is.na(ligne)) "" else formuler(", ligne %d", ligne), message),
             c(list(ligne = ligne), details))
   if (!is.raw(octets))
-    refus("texte_non_octets", sprintf(texte_moteur(paste("le texte doit être reçu en octets (raw), pas en %s ; lire un",
-                                                         "fichier par readBin(fichier, \"raw\", file.size(fichier))")),
-                                      paste(neutraliser_citation(class(octets)), collapse = "/")),
+    refus("texte_non_octets", formuler(paste("le texte doit être reçu en octets (raw), pas en %s ; lire un",
+                                             "fichier par readBin(fichier, \"raw\", file.size(fichier))"),
+                                       paste(neutraliser_citation(class(octets)), collapse = "/")),
           details = list(classe = class(octets)))
-  if (!length(octets)) refus("texte_version_inconnue", sprintf("texte vide (première ligne « %s » attendue)", premiere))
+  if (!length(octets)) refus("texte_version_inconnue", formuler("texte vide (première ligne « %s » attendue)", premiere))
   lf <- as.raw(0x0a)
   ligne_de <- function(i) 1L + sum(octets[seq_len(i - 1L)] == lf)
   if (length(octets) >= 3L && identical(octets[1:3], as.raw(c(0xef, 0xbb, 0xbf))))
-    refus("texte_marque_ordre_octets", "marque d'ordre des octets (BOM) en tête du texte, non admise", 1L)
+    refus("texte_marque_ordre_octets", formuler("marque d'ordre des octets (BOM) en tête du texte, non admise"), 1L)
   cr <- which(octets == as.raw(0x0d))
   if (length(cr))
-    refus("texte_retour_chariot", "retour chariot (CR) : fins de ligne CRLF ou CR non admises (LF seul)", ligne_de(cr[1L]))
+    refus("texte_retour_chariot", formuler("retour chariot (CR) : fins de ligne CRLF ou CR non admises (LF seul)"), ligne_de(cr[1L]))
   nul <- which(octets == as.raw(0x00))
-  if (length(nul)) refus("texte_octet_nul", "octet nul", ligne_de(nul[1L]))
-  if (octets[length(octets)] != lf) refus("texte_sans_lf_final", "dernière ligne sans LF final", ligne_de(length(octets)))
+  if (length(nul)) refus("texte_octet_nul", formuler("octet nul"), ligne_de(nul[1L]))
+  if (octets[length(octets)] != lf) refus("texte_sans_lf_final", formuler("dernière ligne sans LF final"), ligne_de(length(octets)))
   l <- strsplit(rawToChar(octets), "\n", fixed = TRUE, useBytes = TRUE)[[1L]]
   Encoding(l) <- "UTF-8"
   faux <- which(!validUTF8(l))
-  if (length(faux)) refus("texte_utf8_invalide", "octets qui ne sont pas de l'UTF-8 valide", faux[1L])
+  if (length(faux)) refus("texte_utf8_invalide", formuler("octets qui ne sont pas de l'UTF-8 valide"), faux[1L])
   if (!identical(l[1L], premiere))
     refus("texte_version_inconnue",
-          sprintf(texte_moteur("première ligne « %s » au lieu de « %s » (nature ou version de grammaire inconnue, aucune migration)"),
-                  neutraliser_citation(l[1L]), premiere), 1L)
+          formuler("première ligne « %s » au lieu de « %s » (nature ou version de grammaire inconnue, aucune migration)",
+                   neutraliser_citation(l[1L]), premiere), 1L)
   k <- 2L
   while (k <= length(l) && startsWith(l[k], "#")) k <- k + 1L
   numeros <- seq.int(k, length.out = length(l) - k + 1L)
   corps <- l[numeros]
-  if (!length(corps)) refus("texte_ligne_mal_formee", "texte sans corps", length(l))
+  if (!length(corps)) refus("texte_ligne_mal_formee", formuler("texte sans corps"), length(l))
   champs <- strsplit(paste0(corps, "\t"), "\t", fixed = TRUE, useBytes = TRUE)
   for (i in seq_along(champs)) {
     f <- champs[[i]]
     if (length(f) < 3L || any(!nzchar(f)) || startsWith(f[1L], "#") || !grepl("^(0|[1-9][0-9]{0,9})$", f[3L]))
       refus("texte_ligne_mal_formee",
-            "ligne hors de la forme chemin<TAB>type<TAB>longueur<TAB>valeurs (champ vide, longueur illisible, ligne d'en-tête dans le corps)",
+            formuler("ligne hors de la forme chemin<TAB>type<TAB>longueur<TAB>valeurs (champ vide, longueur illisible, ligne d'en-tête dans le corps)"),
             numeros[i])
     if (!f[2L] %in% TYPES_TEXTE)
-      refus("texte_type_inconnu", sprintf(texte_moteur("type « %s » inconnu (types admis : %s)"), neutraliser_citation(f[2L]),
-                                          paste(TYPES_TEXTE, collapse = ", ")),
+      refus("texte_type_inconnu", formuler("type « %s » inconnu (types admis : %s)", neutraliser_citation(f[2L]),
+                                           paste(TYPES_TEXTE, collapse = ", ")),
             numeros[i])
     if (f[2L] == "NULL" && f[3L] != "0")
-      refus("texte_longueur_incoherente", sprintf("NULL : longueur 0 attendue, longueur %s déclarée", f[3L]), numeros[i])
+      refus("texte_longueur_incoherente", formuler("NULL : longueur 0 attendue, longueur %s déclarée", neutraliser_citation(f[3L])), numeros[i])
     if (length(f) - 3L != as.numeric(f[3L]))
-      refus("texte_longueur_incoherente", sprintf("longueur déclarée %s, %d valeur(s) lue(s)", f[3L], length(f) - 3L),
+      refus("texte_longueur_incoherente", formuler("longueur déclarée %s, %d valeur(s) lue(s)", neutraliser_citation(f[3L]), length(f) - 3L),
             numeros[i])
   }
   chemins <- vapply(champs, `[`, "", 1L)
@@ -1303,7 +1318,7 @@ lire_texte <- function(octets, premiere, nature) {
   double_ <- which(duplicated(chemins))
   if (length(double_))
     refus("texte_chemin_en_double",
-          sprintf(texte_moteur("chemin « %s » en double"), neutraliser_citation(chemins[double_[1L]])),
+          formuler("chemin « %s » en double", neutraliser_citation(chemins[double_[1L]])),
           numeros[double_[1L]])
   # Profondeur, avant toute reconstruction (troisième annotation, (g)) :
   # segments du chemin, sans le dernier s'il commence par @.
@@ -1311,15 +1326,15 @@ lire_texte <- function(octets, premiere, nature) {
   profondeur <- lengths(segs) - vapply(segs, function(x) startsWith(x[length(x)], "@"), NA)
   trop <- which(profondeur > PROFONDEUR_MAX_TEXTE)
   if (length(trop))
-    refus("texte_profondeur_excessive", sprintf("profondeur %d au-delà de %d", profondeur[trop[1L]], PROFONDEUR_MAX_TEXTE),
+    refus("texte_profondeur_excessive", formuler("profondeur %d au-delà de %d", profondeur[trop[1L]], PROFONDEUR_MAX_TEXTE),
           numeros[trop[1L]])
   n <- length(champs)
   k <- 1L
   inattendu <- function(attendu)
     refus("texte_chemin_inattendu",
-          if (k > n) sprintf(texte_moteur("fin du texte, « %s » attendu"), neutraliser_citation(attendu))
-          else sprintf(texte_moteur("chemin « %s » au lieu de « %s » (structure incohérente)"),
-                       neutraliser_citation(chemins[k]), neutraliser_citation(attendu)),
+          if (k > n) formuler("fin du texte, « %s » attendu", neutraliser_citation(attendu))
+          else formuler("chemin « %s » au lieu de « %s » (structure incohérente)",
+                        neutraliser_citation(chemins[k]), neutraliser_citation(attendu)),
           if (k > n) length(l) else numeros[k],
           if (k > n) list(attendu = attendu) else list(chemin = chemins[k], attendu = attendu))
   lue <- function(i) {
@@ -1337,12 +1352,12 @@ lire_texte <- function(octets, premiere, nature) {
       # Liste sans noms : exactement n éléments [1] à [n].
       nb <- if (type_de(k) == "integer" && champs[[k]][3L] == "1") lue(k)
       if (length(nb) != 1L || is.na(nb) || nb < 0L)
-        refus("texte_ligne_mal_formee", "ligne @longueur autre qu'un integer unique positif ou nul", numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @longueur autre qu'un integer unique positif ou nul"), numeros[k])
       # Borne de l'effectif avant toute allocation : chaque élément occupe au
       # moins une ligne, il ne peut y en avoir plus que de lignes restantes.
       if (nb > n - k)
         refus("texte_longueur_incoherente",
-              sprintf("@longueur %d au-delà des %d ligne(s) restantes (une ligne au moins par élément)", nb, n - k),
+              formuler("@longueur %d au-delà des %d ligne(s) restantes (une ligne au moins par élément)", nb, n - k),
               numeros[k])
       k <<- k + 1L
       v <- vector("list", nb)
@@ -1351,15 +1366,15 @@ lire_texte <- function(octets, premiere, nature) {
     }
     if (identical(chemins[k], joindre_chemin(chemin, "@noms"))) {
       if (type_de(k) != "character")
-        refus("texte_ligne_mal_formee", sprintf("ligne @noms de type %s (character attendu)", type_de(k)), numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @noms de type %s (character attendu)", neutraliser_citation(type_de(k))), numeros[k])
       noms <- lue(k)
       k <<- k + 1L
       if (k <= n && identical(chemins[k], chemin)) {
         # Vecteur atomique nommé.
-        if (type_de(k) == "NULL") refus("texte_ligne_mal_formee", "NULL nommé", numeros[k])
+        if (type_de(k) == "NULL") refus("texte_ligne_mal_formee", formuler("NULL nommé"), numeros[k])
         v <- lue(k)
         if (length(v) != length(noms))
-          refus("texte_longueur_incoherente", sprintf("%d nom(s) pour %d valeur(s)", length(noms), length(v)), numeros[k])
+          refus("texte_longueur_incoherente", formuler("%d nom(s) pour %d valeur(s)", length(noms), length(v)), numeros[k])
         k <<- k + 1L
         names(v) <- noms
         return(v)
@@ -1372,13 +1387,13 @@ lire_texte <- function(octets, premiere, nature) {
     }
     if (identical(chemins[k], joindre_chemin(chemin, "@colonnes")) && nzchar(chemin)) {
       if (type_de(k) != "character")
-        refus("texte_ligne_mal_formee", sprintf("ligne @colonnes de type %s (character attendu)", type_de(k)), numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @colonnes de type %s (character attendu)", neutraliser_citation(type_de(k))), numeros[k])
       colonnes <- lue(k)
       k <<- k + 1L
       if (k > n || !identical(chemins[k], joindre_chemin(chemin, "@lignes"))) inattendu(joindre_chemin(chemin, "@lignes"))
       nl <- if (type_de(k) == "integer") lue(k)
       if (length(nl) != 1L || is.na(nl) || nl < 0L)
-        refus("texte_ligne_mal_formee", "ligne @lignes autre qu'un entier positif ou nul", numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @lignes autre qu'un entier positif ou nul"), numeros[k])
       k <<- k + 1L
       s <- segments_texte(colonnes, length(colonnes))
       v <- vector("list", length(colonnes))
@@ -1388,12 +1403,12 @@ lire_texte <- function(octets, premiere, nature) {
         ligne <- numeros[k]
         x <- noeud(cc)
         if (!is.atomic(x) || is.null(x))
-          refus("texte_ligne_mal_formee", sprintf(texte_moteur("colonne « %s » non atomique"), neutraliser_citation(cc)),
+          refus("texte_ligne_mal_formee", formuler("colonne « %s » non atomique", neutraliser_citation(cc)),
                 ligne, list(colonne = cc))
         if (length(x) != nl)
           refus("texte_longueur_incoherente",
-                sprintf(texte_moteur("colonne « %s » de %d valeur(s) pour %d ligne(s)"), neutraliser_citation(cc),
-                        length(x), nl),
+                formuler("colonne « %s » de %d valeur(s) pour %d ligne(s)", neutraliser_citation(cc),
+                         length(x), nl),
                 ligne, list(colonne = cc))
         v[i] <- list(x)
       }
@@ -1407,8 +1422,8 @@ lire_texte <- function(octets, premiere, nature) {
   if (!chemins[1L] %in% c("@noms", "@longueur")) inattendu("@noms ou @longueur")
   x <- noeud("")
   if (k <= n)
-    refus("texte_chemin_inattendu", sprintf(texte_moteur("chemin « %s » après la fin de l'objet"),
-                                            neutraliser_citation(chemins[k])),
+    refus("texte_chemin_inattendu", formuler("chemin « %s » après la fin de l'objet",
+                                             neutraliser_citation(chemins[k])),
           numeros[k], list(chemin = chemins[k]))
   x
 }
@@ -1434,7 +1449,7 @@ lire_plan <- function(octets) {
 ecrire_fiche <- function(fiche) {
   if (inherits(fiche, "construction"))
     refuser("rapport", "serialisation_impossible",
-            "Écriture du texte de fiche : objet `construction` reçu ; écrire sa fiche, x$fiche.",
+            formuler("Écriture du texte de fiche : objet `construction` reçu ; écrire sa fiche, x$fiche."),
             list(chemin = ""))
   # Un nom du premier niveau d'encodage « bytes » : les lectures par nom
   # ci-dessous lèveraient une erreur R (#114) ; refus sous le motif que
@@ -1446,9 +1461,9 @@ ecrire_fiche <- function(fiche) {
   b <- if (is.list(fiche)) noms_bytes(fiche)
   if (length(b))
     refuser("rapport", "chaine_codage_bytes",
-            paste0(texte_moteur("Rôle « @noms » : chaîne au codage « bytes », non convertible en UTF-8 sans deviner."),
-                   texte_moteur(" Nom de champ n° "), b[1L], texte_moteur(" de la fiche : "),
-                   neutraliser_citation(nf[b[1L]]), "."),
+            formuler(paste("Rôle « @noms » : chaîne au codage « bytes », non convertible en UTF-8 sans deviner.",
+                           "Nom de champ n° %d de la fiche : %s."),
+                     b[1L], neutraliser_citation(nf[b[1L]])),
             list(role = "@noms", lignes = b, lu = nf[b]))
   rappel <- function(v) if (is.atomic(v) && length(v) == 1L && !is.na(v)) as.character(v) else "absente"
   rep_ <- if (is.list(fiche) && is.list(fiche[["empreintes"]])) fiche[["empreintes"]][["representation"]]
@@ -1716,10 +1731,9 @@ decrire_valeur <- function(v) {
   if (is.atomic(v) && is.null(attributes(v)) && length(v) == 1L &&
       typeof(v) %in% c("double", "integer", "logical", "character")) {
     w <- tryCatch(texte_valeurs(v, "valeur"), refus_tablexp = function(e) NULL)
-    if (!is.null(w)) return(paste0(neutraliser_citation(w$texte), " (", w$type, ")"))
+    if (!is.null(w)) return(formuler("%s (%s)", neutraliser_citation(w$texte), w$type))
   }
-  paste0(texte_moteur("objet de type "), typeof(v), texte_moteur(", de classe "),
-         paste(neutraliser_citation(class(v)), collapse = "/"))
+  formuler("objet de type %s, de classe %s", typeof(v), paste(neutraliser_citation(class(v)), collapse = "/"))
 }
 
 # Valeur v pour un message de refus : chaîne unique non NA sans attribut que
@@ -1729,7 +1743,7 @@ decrire_valeur <- function(v) {
 # UTF-8 ; R/outils.R, #94) ; NULL -> « absente » ; sinon decrire_valeur(v)
 # (message sur une seule ligne ; décision d'actuary, reprise de #87).
 valeur_message <- function(v) {
-  if (is.null(v)) return(texte_moteur("absente"))
+  if (is.null(v)) return(formuler("absente"))
   if (chaine_unique(v) && !citation_a_neutraliser(v)) return(neutraliser_citation(v))
   decrire_valeur(v)
 }
@@ -1752,16 +1766,15 @@ controler_rapport <- function(x) {
   # 1. Classe exacte, et fiche qui est une liste ; un objet qui n'est pas une
   #    liste est décrit aussi par son type (classe « construction » posée sur
   #    un vecteur, par exemple).
-  origine <- texte_moteur(" (objet rendu par construire_table(), ou élément construction du résultat de rejouer_fiche()).")
+  origine <- formuler(" (objet rendu par construire_table(), ou élément construction du résultat de rejouer_fiche()).")
   if (!is.list(x))
     refus("rapport_objet_invalide",
-          paste0(texte_moteur("Rapport figé : objet de type "), typeof(x),
-                 texte_moteur(" au lieu d'une liste de classe « construction »"), origine),
+          formuler("Rapport figé : objet de type %s au lieu d'une liste de classe « construction »%s", typeof(x), origine),
           list(lu = class(x), attendu = "construction"))
   if (!identical(class(x), "construction"))
     refus("rapport_objet_invalide",
-          paste0(texte_moteur("Rapport figé : objet de classe « "), paste(neutraliser_citation(class(x)), collapse = "/"),
-                 texte_moteur(" » au lieu de « construction »"), origine),
+          formuler("Rapport figé : objet de classe « %s » au lieu de « construction »%s",
+                   paste(neutraliser_citation(class(x)), collapse = "/"), origine),
           list(lu = class(x), attendu = "construction"))
   # Un nom d'encodage « bytes » au premier niveau de l'objet : x[["fiche"]]
   # lèverait une erreur R (#114) ; l'empreinte du résultat n'est pas
@@ -1770,11 +1783,10 @@ controler_rapport <- function(x) {
   noms_bytes_refus <- function(o, chemin, nb) {
     no <- attr(o, "names", exact = TRUE)
     refus("objet_modifie",
-          paste0(texte_moteur("Rapport figé : objet modifié après sa construction : empreinte du résultat non recalculable ("),
-                 texte_moteur("nom de champ d'encodage « bytes » : champ n° "), nb[1L], texte_moteur(" de "),
-                 if (nzchar(chemin)) texte_moteur("la fiche") else texte_moteur("l'objet"), texte_moteur(", cité "),
-                 neutraliser_citation(no[nb[1L]]), texte_moteur(")."),
-                 texte_moteur(" Le rapport ne restitue un objet que tel que construire_table() l'a rendu.")),
+          formuler(paste("Rapport figé : objet modifié après sa construction : empreinte du résultat non recalculable",
+                         "(nom de champ d'encodage « bytes » : champ n° %d de %s, cité %s).",
+                         "Le rapport ne restitue un objet que tel que construire_table() l'a rendu."),
+                   nb[1L], if (nzchar(chemin)) "la fiche" else "l'objet", neutraliser_citation(no[nb[1L]])),
           list(chemin = chemin, lignes = nb, lu = no[nb]))
   }
   nb <- noms_bytes(x)
@@ -1783,8 +1795,8 @@ controler_rapport <- function(x) {
   if (!is.list(f)) {
     d <- decrire_valeur(f)
     refus("rapport_objet_invalide",
-          paste0(texte_moteur("Rapport figé : objet de classe « construction » dont la fiche est "),
-                 if (is.null(d)) texte_moteur("absente") else d, texte_moteur(" au lieu d'une liste.")),
+          formuler("Rapport figé : objet de classe « construction » dont la fiche est %s au lieu d'une liste.",
+                   if (is.null(d)) "absente" else d),
           list(chemin = "fiche", lu = f, attendu = "list"))
   }
   nb <- noms_bytes(f)
@@ -1796,14 +1808,13 @@ controler_rapport <- function(x) {
     em <- f[["empreintes"]]
     d <- decrire_valeur(v)
     refus("version_fiche_non_admise",
-          paste0(texte_moteur("Rapport figé : version de fiche "), if (is.null(d)) texte_moteur("absente") else d,
-                 texte_moteur(" au lieu de "), decrire_valeur(VERSION_FICHE),
-                 texte_moteur(" (seule version admise par ce code) ; objet construit par tablexp "),
-                 valeur_message(if (is.list(ve)) ve[["tablexp"]]), texte_moteur(", empreinte du code "),
-                 valeur_message(if (is.list(em)) em[["code"]]), texte_moteur(" ; code installé : empreinte "),
-                 valeur_message(EMPREINTE_CODE),
-                 texte_moteur(paste(". Aucune conversion n'est faite : le rapport d'un objet d'une autre version",
-                                    "s'écrit avec le code qui l'a construit."))),
+          formuler(paste("Rapport figé : version de fiche %s au lieu de %s (seule version admise par ce code) ;",
+                         "objet construit par tablexp %s, empreinte du code %s ; code installé : empreinte %s.",
+                         "Aucune conversion n'est faite : le rapport d'un objet d'une autre version",
+                         "s'écrit avec le code qui l'a construit."),
+                   if (is.null(d)) "absente" else d, decrire_valeur(VERSION_FICHE),
+                   valeur_message(if (is.list(ve)) ve[["tablexp"]]), valeur_message(if (is.list(em)) em[["code"]]),
+                   valeur_message(EMPREINTE_CODE)),
           list(lu = v, attendu = VERSION_FICHE))
   }
   # 3. Intégrité : empreinte du résultat recalculée égale à celle consignée ;
@@ -1814,23 +1825,23 @@ controler_rapport <- function(x) {
   a <- tryCatch(empreinte_resultat(x), error = function(e) e)
   if (inherits(a, "error"))
     refus("objet_modifie",
-          paste0(texte_moteur("Rapport figé : objet modifié après sa construction : empreinte du résultat non recalculable ("),
-                 neutraliser_citation(conditionMessage(a)), texte_moteur(") ; fiche/empreintes/resultat vaut "),
-                 valeur_message(b), "."),
+          formuler(paste("Rapport figé : objet modifié après sa construction : empreinte du résultat non recalculable",
+                         "(%s) ; fiche/empreintes/resultat vaut %s."),
+                   neutraliser_citation(conditionMessage(a)), valeur_message(b)),
           list(lu = b, attendu = NA_character_))
   if (!identical(a, b))
     refus("objet_modifie",
-          paste0(texte_moteur("Rapport figé : objet modifié après sa construction : empreinte du résultat recalculée "),
-                 a, texte_moteur(" au lieu de "), valeur_message(b),
-                 texte_moteur(paste(" (fiche/empreintes/resultat). Le rapport ne restitue un objet que tel que",
-                                    "construire_table() l'a rendu."))),
+          formuler(paste("Rapport figé : objet modifié après sa construction : empreinte du résultat recalculée %s",
+                         "au lieu de %s (fiche/empreintes/resultat). Le rapport ne restitue un objet que tel que",
+                         "construire_table() l'a rendu."),
+                   a, valeur_message(b)),
           list(lu = b, attendu = a))
   # 4. Aucun élément hors des sections : rien n'est omis en silence.
   non_prevu <- function(chemin)
     refus("rapport_objet_invalide",
-          paste0(texte_moteur("Rapport figé : élément « "), neutraliser_citation(chemin),
-                 texte_moteur(paste(" » de l'objet non prévu par les sections de ce rapport ; un objet de cette",
-                                    "version de fiche n'en porte pas, et le rapport n'omet aucun élément en silence."))),
+          formuler(paste("Rapport figé : élément « %s » de l'objet non prévu par les sections de ce rapport ; un objet",
+                         "de cette version de fiche n'en porte pas, et le rapport n'omet aucun élément en silence."),
+                   neutraliser_citation(chemin)),
           list(chemin = chemin))
   hors <- setdiff(names(x), c("table", "etapes", "avertissements", "fiche", "execution"))
   if (length(hors)) non_prevu(hors[1L])
