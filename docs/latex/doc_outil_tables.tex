@@ -6200,7 +6200,15 @@ annotation du 17/10/2026, point~f)~:
     l'autre (\code{NA\_real\_} et \code{NA\_real\_ + 1} n'ont pas les mêmes
     octets sous x86-64), et l'aide de R ne garantit pas qu'une opération
     préserve la distinction entre \code{NA} et \code{NaN} (ADR 0011,
-    point~2.2, et seconde annotation du 19/10/2026)~; un double muni d'un
+    point~2.2, et seconde annotation du 19/10/2026)~; le jeton est lu par
+    une règle écrite une seule fois, \code{jeton\_non\_fini()}, qui rend
+    son rang dans \code{JETONS\_NON\_FINIS} (1~\code{NA} si
+    \code{is.na()} et non \code{is.nan()}, 2~\code{NaN}, 3~\code{Inf},
+    4~\code{-Inf}), commune aux formes «~empreinte~» et «~texte~» de
+    l'écrivain (issue~\#118)~; le classement d'un \code{NaN} à charge utile
+    en \code{NA} ou en \code{NaN} est celui de R (\code{is.na()},
+    \code{is.nan()}), non une règle de l'ADR 0011, et la batterie le fixe
+    sur huit motifs par un test témoin~; un double muni d'un
     attribut de dimension s'écrit comme le vecteur nu~;
     \code{integer} en \code{\%d}~; \code{logical} en
     \code{TRUE}, \code{FALSE}, \code{NA}~; \code{Date} en ISO~8601,
@@ -6407,7 +6415,8 @@ ce que la présente documentation ne démontre pas.
 \medskip
 \noindent
 \textbf{Définition du texte.} Un non fini s'écrit par son jeton, lu sur la
-valeur reçue comme en forme «~empreinte~»~: \code{NA} si \code{is.na()} et
+valeur reçue par la même règle qu'en forme «~empreinte~»
+(\code{jeton\_non\_fini()}~; issue~\#118)~: \code{NA} si \code{is.na()} et
 non \code{is.nan()}, \code{NaN}, \code{Inf} ou \code{-Inf}. Un fini $x$
 s'écrit depuis $y = x + 0$~: le zéro négatif devient~0, écrit \code{0}. Pour
 $y \neq 0$, soit $a = |y|$, $D = d_1 d_2 \ldots d_{17}$ ($d_1 \neq 0$) et $X$
@@ -7535,7 +7544,13 @@ vecteurs de test de l'ADR 0011 (octets calculés hors de R), sous-normaux,
 plus petit normal et maximum, jetons des non-finis lus sur la valeur reçue
 quels que soient leurs octets, zéro négatif, attribut de dimension, mélange
 de valeurs finies et de jetons, longueurs limites, types autres que double
-identiques dans les deux formes, refus~; et un échantillon de $10^5$ doubles
+identiques dans les deux formes, refus~; les mêmes jetons dans les deux
+formes, par la règle unique \code{jeton\_non\_fini()}, sur \code{NA},
+\code{NA + 1}, \code{NaN}, \code{Inf}, \code{-Inf} et huit motifs de
+\code{NaN} à charge utile construits par leurs octets, seuls ou mêlés à
+des finis, le jeton attendu de chaque motif étant écrit en dur d'après
+\code{is.na()} et \code{is.nan()} de R~4.3.3 (témoin d'un changement de R,
+non règle de l'ADR 0011~; issue~\#118)~; et un échantillon de $10^5$ doubles
 tirés sous graine, dont le MD5 du texte doit être celui que produit le juge
 Python, hors de R. Le contrôle \code{tests/controles/ecriture\_doubles.R},
 \textbf{hors batterie et hors CI} (durée, dépendance à Python), étend ce
@@ -7840,7 +7855,9 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{PUISSANCES\_TRANCHES} & constante & --- & table des puissances, calculée à l'installation~; 2\,098~lignes, 108~tranches au plus \\
 \catalogue{fonctions-rapport}{chiffres\_17()} & interne & doubles finis $> 0$ & dix-sept chiffres arrondis au plus proche, égalité vers le pair, et exposant décimal (I1 à I5)~; entier décimal exact calculé en tranches, groupé par classe de longueur de la table \\
 \catalogue{fonctions-rapport}{positions\_17g()} & interne & doubles finis non nuls & octets ASCII de la forme \code{\%.17g} (notation fixe ou à exposant, zéros de fin retirés, signe), une colonne par valeur \\
-\catalogue{fonctions-rapport}{octets\_17g()} & interne & doubles & octets de l'écriture «~texte~», une valeur par ligne, LF final~; \code{x + 0}, jetons \code{NA}, \code{NaN}, \code{Inf}, \code{-Inf} lus sur la valeur reçue~; par blocs de $2^{14}$ valeurs~; appelée par \code{ecrire\_valeurs()} \\
+\catalogue{fonctions-rapport}{JETONS\_NON\_FINIS} & constante & --- & les quatre jetons des doubles non finis, \code{NA}, \code{NaN}, \code{Inf}, \code{-Inf}, dans l'ordre de leur rang~; seule liste, pour les deux formes de l'écrivain (ADR 0011, point~2.2~; issue~\#118) \\
+\catalogue{fonctions-rapport}{jeton\_non\_fini()} & interne & doubles non finis & rang du jeton de chaque valeur dans \code{JETONS\_NON\_FINIS}, lu sur la valeur reçue sans opération préalable~: 1 si \code{is.na()} et non \code{is.nan()}, 2 si \code{is.nan()}, 3 si positif, 4 sinon~; règle unique, appelée par \code{octets\_17g()} et par l'écriture «~empreinte~» de \code{ecrire\_valeurs()} (issue~\#118) \\
+\catalogue{fonctions-rapport}{octets\_17g()} & interne & doubles & octets de l'écriture «~texte~», une valeur par ligne, LF final~; \code{x + 0}, jetons \code{NA}, \code{NaN}, \code{Inf}, \code{-Inf} lus sur la valeur reçue par \code{jeton\_non\_fini()}~; par blocs de $2^{14}$ valeurs~; appelée par \code{ecrire\_valeurs()} \\
 \catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g}, calculé par \code{octets\_17g()}, issue~\#104)~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique} (dont toute valeur de classe d'encodage \code{bytes}, facteur reconnu par \code{a\_classe()}~; issue~\#128), et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
 \catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire~; colonnes lues par \code{lire\_champ()} (issue~\#128) \\
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
