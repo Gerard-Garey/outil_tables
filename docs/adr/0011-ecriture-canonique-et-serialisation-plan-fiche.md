@@ -944,3 +944,110 @@ Les mesures d'`architect` sont faites sous R 4.3.3, sur un hôte cloud Linux (gl
 **Effet sur les résultats : aucun**, ni par la présente annotation, ni par #89. Le script est hors du package. Aucune constante du moteur, aucune version du point 10 et aucune grandeur de référence ne change. Si `coder` touche `R/`, le jeton de l'empreinte du code change ; le § 1.11 ne le prévoit pas.
 
 Issues : #89, #120 ; #104, #107 ; #49 (macOS). Décisions M61, M126, M162, M164, M166, M167. ADR 0008 (point 11) ; ADR 0012 (point 3.5 ; annotation du 27/10/2026). Branche `claude/rapport-suites`, PR #125.
+
+## Annotation du 5 novembre 2026 — point 11 : empreinte d'une table de référence lue par le moteur (contenu numérique canonique, première ligne `tablexp table 1`, métadonnées en clair, même empreinte au fichier de provenance) ; points 1.1, 10 et 12 (#73)
+
+Rédigée par `architect` sur la branche documentaire `claude/sources-v1` (`[D1]`, vague 1, ADR 0013 ; décision M194), qui a ce fichier dans sa partition (`docs/feuille-de-route.md`, § 1 et § 1.13, lus sur `claude/dette-regles` à `4fd0e51`). Sources :
+- l'avis d'`actuary` du 05/11/2026, rendu en amont (#73 : « `actuary` en amont ») ;
+- les décisions du mainteneur du 05/11/2026 sur les questions Q1, Q4 et Q5 de cet avis, rapportées par la session principale. Leurs numéros M sont **à consigner par la porteuse** B12 (ADR 0013, point 2) ; la présente annotation les cite comme « décision du mainteneur du 05/11/2026 (Q1, Q4 ou Q5) ».
+
+Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne relevés à `fe9fb57` (`claude/sources-v1`), dont `R/` est identique à `main` à `e007ebb` et à `aa72b7d` (*vérifié* : `git diff --stat e007ebb aa72b7d` ne touche que `.claude/outils/bilan_journal.sh`, `git diff --stat e007ebb fe9fb57` que deux fichiers de `docs/`). B12 modifie `R/donnees.R`, `R/rapport.R` et `R/construire_table.R` : les numéros changeront à sa fusion ; le nom de l'objet fait foi (M77, (b)). Mesures d'`architect` sous R 4.3.3, hôte cloud Linux (glibc), hors plateforme de référence, `tablexp` installé depuis l'arbre de `fe9fb57` dans une bibliothèque temporaire hors dépôt ; elles sont marquées *vérifié*.
+
+**(a) Constat : ce que la fiche ne couvre pas.**
+- Aucune étape de `construire_table()` ne lit aujourd'hui une table de référence : `ETAPES` (`R/construire_table.R:41-48`) compte `donnees`, `exposition` et `brut`. `inst/` est absent (*vérifié* : `ls inst`, « No such file or directory »). Seul le simulateur, hors des étapes, lit des tables, synthétiques (M120).
+- La représentation commune existe : `table_reference()` (`R/donnees.R:795-900`). *Vérifié* sur une table reçue avec les colonnes `annee`, `age`, `sexe` (facteur) et `qx`, puis avec `age` en double à valeurs entières :
+  - l'objet rendu a les colonnes `age`, `sexe`, `qx`, puis `annee` en dernier, quel que soit l'ordre reçu ;
+  - les types sont normalisés : `age` et `annee` en integer, `sexe` en character, `qx` en double ;
+  - les lignes gardent l'ordre reçu : la fonction refuse un âge non croissant au sein d'un groupe (`table_ages_non_croissants`), elle ne trie pas ;
+  - les métadonnées sont des attributs : `nom`, `statut`, `source`, `forme_origine`, `parametres`.
+- Quand une étape lira une table, ni l'empreinte des données (colonnes de rôle de l'entrée, ADR 0007, point 9.3) ni l'empreinte du code (`R/*.R` seuls, M70) ne la couvriront (#73). La présente annotation fixe la définition de l'empreinte qui la couvrira. Elle ne crée aucune empreinte dans le code.
+
+**(b) Objet empreinté : le contenu numérique canonique de la table reçue par le moteur** (décision du mainteneur du 05/11/2026, Q1, option (a), sur l'avis d'`actuary`).
+1. **Objet.** L'objet `table_reference` tel que le moteur le reçoit, **après** la normalisation des types par `table_reference()` et **avant** toute transformation que le plan déclare : décalage d'âge, fermeture, positionnement. Ces transformations sont des paramètres du plan ; elles sont identifiées par `fiche$plan`.
+2. **Colonnes** : `age`, `sexe`, `annee` si elle est présente, `qx`, **dans cet ordre**, fixé par la définition. L'ordre des colonnes de l'objet (`age`, `sexe`, `qx`, `annee`) n'est pas repris : l'empreinte ne doit pas changer si la construction de l'objet change l'ordre de ses colonnes. C'est une décision de forme d'`architect` ; l'ordre est celui de l'avis d'`actuary` (axes, puis valeur).
+3. **Lignes** : dans l'ordre de l'objet, c'est-à-dire l'ordre reçu, comme pour les données (ADR 0007, point 9.3). Ni l'avis d'`actuary` ni la décision Q1 ne traitent ce point : c'est une **proposition** d'`architect`, à confirmer par `actuary` dans la spécification de la branche qui lira la première table. L'autre option est un tri canonique (sexe, année, âge). Elle donnerait la même empreinte à deux tables de même contenu rangées autrement, mais elle demande un ordre déclaré des modalités de `sexe`.
+4. **Écriture.**
+   - Première ligne propre : **`tablexp table 1`**, en ASCII sur le modèle de `tablexp resultat 1` (cinquième annotation du 20/10/2026, (a)). C'est une **sixième version** au tableau du point 10 (point (g) ci-dessous).
+   - Puis le corps, selon la grammaire de ligne du point 6.1 et de la troisième annotation du 19/10/2026, sans ligne d'en-tête `#`. Les valeurs sont en forme « empreinte » (point 2 et seconde annotation du 19/10/2026).
+   - L'objet écrit est un `data.frame` **nu** : ni la classe `table_reference`, ni les attributs de métadonnées. *Vérifié* : `texte_objet()` (`R/rapport.R:1079`) refuse l'objet `table_reference` tel quel (« data.frame de classe table_reference/data.frame ou d'attribut(s) names, class, row.names, nom, statut, source, forme_origine, parametres ») ; il accepte le `data.frame` nu et rend un texte de première ligne `tablexp table 1` dont les `qx` s'écrivent en seize hexadécimaux.
+   - Aucun écrivain nouveau. La table est un **sixième consommateur** de l'écrivain unique `ecrire_valeurs()` (`R/rapport.R:535` ; point 3.1 ; annotation du 24/10/2026, (c)).
+   - La forme exacte de l'aplatissement (racine, chemins) est fixée par `coder` et validée par `actuary`, sous ces règles.
+5. **Algorithme** : MD5 (`ALGORITHME_EMPREINTE`, `R/rapport.R:80`), par `md5_octets()` (`R/rapport.R:705`).
+6. **Sensibilité au dernier bit** (mesure d'`actuary`, refaite par `architect`, *vérifié*). Table de Gompertz-Makeham synthétique sur les âges 20 à 110 (A = 5e-4, B = 3e-5, c = 1,1). On augmente d'un ulp le `qx` de l'âge 60, par ses bits : 0.01003324546365314 devient 0.010033245463653142, soit un écart de 1,73e-18. L'empreinte des `qx` écrits par `ecrire_valeurs(…, "empreinte", "qx")` passe de `c97fca053f9f0b2ff7fe31e3d170899e` à `c73f12b26cafd916b757bd8267fb1ce7`.
+
+**(c) Métadonnées : en clair dans la fiche, hors de l'empreinte de la table** (décision du mainteneur du 05/11/2026, Q1 et Q4).
+- La fiche consigne pour chaque table lue : `nom`, `statut`, `forme_origine`, `source`, `parametres`, la première ligne de la représentation (`tablexp table 1`) et l'empreinte.
+- Ces champs sont dans le périmètre de l'**empreinte du résultat** (point 11.1 : `fiche` n'est exclue que par `fiche/versions`, `fiche/plateforme` et trois champs de `fiche/empreintes`, `CHEMINS_HORS_RESULTAT`, `R/rapport.R:729`). L'empreinte du résultat identifie donc aussi la table et ses métadonnées.
+- Le nom et l'emplacement du champ dans la fiche ne sont **pas fixés** ici : ils dépendent du mode d'entrée de la table (point (h) 1).
+- **`source` pour une table embarquée** (Q4) : la fiche porte le **chemin du fichier de provenance**. L'identité de la source (fac-similé du JO, empreinte du PDF) est consignée **dans le fichier de provenance seulement**.
+  - Décision de forme d'`architect` : ce chemin est relatif à la racine des sources du package (forme `inst/extdata/<fichier>`), jamais absolu. Un chemin absolu, comme celui que rend `system.file()`, dépend de la machine et de la bibliothèque d'installation. Il changerait la fiche, et donc l'empreinte du résultat, d'une installation à l'autre.
+  - Lecture d'`architect`, à confirmer par le mainteneur : Q4 vise les tables embarquées, seules à avoir un fichier de provenance (ADR 0006, point 2). Pour une table importée ou synthétique, `source` reste la chaîne déclarée à `table_reference()`.
+  - `regulatory` est consulté sur ce que le rapport figé cite de la source **avant le premier commit `donnees:`** d'une table lue par le moteur (décision Q4).
+
+**(d) Une même règle pour les trois statuts ; la même empreinte au fichier de provenance** (décision du mainteneur du 05/11/2026, Q1).
+- La définition des points (b) et (c) vaut pour les statuts `embarquee`, `importee` et `synthetique` (`STATUTS_TABLE`, `R/donnees.R:781`).
+- **Fichier de provenance** (ADR 0006, point 2) : l'« empreinte de la table transcrite » qu'il consigne **est** l'empreinte canonique du point (b), calculée par le package. Un script de contrôle mécanique, exécuté par la CI (principe 7 des workflows), recalcule l'empreinte de chaque table embarquée et vérifie l'égalité.
+  - Emplacement proposé : `tests/controles/`, comme les autres contrôles mécaniques en R de base.
+  - Mode d'appel (test d'une batterie existante ou étape de la CI) : fixé au plan de la branche qui embarquera la première table. La liste des batteries de `CLAUDE.md` ne change pas sans ADR.
+- **Ce qui n'entre pas dans l'empreinte de la table** : ni les octets du fichier embarqué, ni le fichier de provenance. Trois motifs :
+  1. les octets dépendent du format de stockage (séparateur, écriture des nombres, fins de ligne), que l'ADR 0006 laisse au plan de la première branche (« Conséquences ») ; deux fichiers de même contenu ont la même empreinte ;
+  2. le fichier de provenance change sans que la table change (date de consultation, contre-vérification) ;
+  3. le moteur calcule sur le contenu, et c'est le contenu que la fiche doit identifier.
+- **Empreinte du code inchangée** : elle reste le MD5 du relevé des `R/*.R` (option (iv), M70), sans extension à `inst/extdata/`. L'étendre mêlerait l'identité du code et celle des données. La classe de commits de #89 changerait aussi de sens (annotation du 27/10/2026, (e) 6).
+- **Table des décalages d'âge** (TH/TF 00-02, ADR 0006, point 1) : elle a **sa propre empreinte**, selon les mêmes règles (contenu canonique après normalisation, écrivain unique, métadonnées en clair). Ses colonnes et sa première ligne seront fixées avec sa représentation interne, que l'ADR 0006 laisse ouverte (« Conséquences », contrat partagé). Elle n'est pas un objet `table_reference`.
+
+**(e) Statut de portabilité : ligne nouvelle au tableau du point 1.1.**
+
+| Empreinte | (P2) objet | (P1) écriture | Statut |
+|---|---|---|---|
+| table, `qx` saisis (`forme_origine = "qx"`) | valeurs transcrites : portables | forme « empreinte », exacte par construction (point 2) | **toute plateforme**, même statut que `donnees` (exact sous glibc ; hypothèse non mesurée sous Windows et macOS, M61, #49) |
+| table, `forme_origine = "lx"` | `qx` calculés à partir des `l_x` | idem | toute plateforme si le calcul n'emploie que les opérations de base de la norme IEC 60559 (addition, soustraction, multiplication, division, correctement arrondies), sans fonction de la `libm` ; *hypothèse* non mesurée hors Linux (#49). Aucun code de conversion n'existe aujourd'hui (*vérifié* : aucune occurrence de `"lx"` dans `R/` hors de `FORMES_ORIGINE`) |
+| table synthétique | `qx` calculés par le package | idem | voir ci-dessous |
+
+**Constat qui dépasse l'avis d'`actuary`** (*vérifié* par lecture). `table_gompertz_makeham()` calcule `qx <- 1 - exp(-A - B * c^ages * (c - 1) / log(c))` (`R/simulation.R:170`) : `exp`, `log` et la puissance viennent de la `libm`. Or la `libm` peut différer au dernier bit d'une plateforme à l'autre (ADR 0008, « Conséquences », réserve sur la `libm` ; seconde annotation du 19/10/2026 : un ulp sur R4 et R5 par `-expm1`). L'empreinte d'une table de Gompertz-Makeham serait alors, au mieux, « même machine seulement ». C'est une *hypothèse* fondée sur cette réserve, non mesurée sur cette fonction. `table_constante()` (`R/simulation.R:183`) ne fait aucune opération sur `q` : son empreinte est portable.
+
+Conséquence avec le refus du point (f) : le rejeu, sur une autre plateforme, d'une construction qui lit une table de Gompertz-Makeham pourrait être refusé alors que les paramètres sont les mêmes. **Sans effet aujourd'hui**, puisque aucune étape de `construire_table()` ne lit une table synthétique (point (a)). La question n'est pas tranchée ici (point (h) 6).
+
+**(f) Écart d'empreinte de table au rejeu : refus nommé** (décision du mainteneur du 05/11/2026, Q5).
+- **Contrôle nouveau** de `rejouer_fiche()` (`R/construire_table.R:402`), placé **juste après** le contrôle 7 (empreinte des données, `R/construire_table.R:525-536`) et **avant** l'appel de `construire_table()` (contrôle 8). Pour chaque table, l'empreinte est recalculée sur la table que reçoit le rejeu et comparée à celle de la fiche.
+- **Motif** : `empreinte_table_discordante` (nom indicatif, fixé par `coder`), module `construire_table`, comme les autres motifs propres au rejeu (ADR 0012, point 3.8). Le message cite l'empreinte lue dans la fiche, l'empreinte calculée, le `nom` et le `statut` de la table. Il suit la règle de rédaction des refus de l'ADR 0007, point 6.4 (annotation du 5 novembre 2026, portée par B12).
+- **Origine de la table au rejeu** (avis d'`actuary`) :
+  - une table **importée** est reçue de l'appelant, comme les données ;
+  - une table **embarquée** est relue **par son nom** dans le package installé ; si elle est absente, refus nommé (proposition : `table_embarquee_absente`).
+- **Pourquoi un refus, alors que l'écart d'empreinte du code n'est qu'un témoin** (ADR 0012, point 3.6 et « Options écartées », l. 160) :
+  - la table est une **entrée** de la construction, au même titre que les données (contrôle 7) ; une autre table, c'est une autre construction ;
+  - rejouer une fiche avec un code corrigé est une analyse de sensibilité légitime, et le résultat reste comparable ;
+  - une table embarquée corrigée change des résultats de positionnement, de comparaison et de simulation (ADR 0006, « Conséquences », règle durable : tableau avant / après et visa) ;
+  - le tiers qui veut mesurer l'effet d'une autre table construit par `construire_table()`, comme pour d'autres rôles ou un autre plan (ADR 0012, « Options écartées », l. 159).
+- Le message de refus le dit, pour qu'un tiers qui rejoue avec un package plus récent, dont une table embarquée a été corrigée, sache pourquoi le rejeu est refusé et comment mesurer l'écart.
+
+**(g) Point 10 : sixième version.**
+
+| Version | Porteur | Ce qu'elle numérote | Création |
+|---|---|---|---|
+| `tablexp table N` | première ligne du texte empreinté de la table, consignée dans la fiche à côté de l'empreinte (point (c)) | la **définition** de l'empreinte d'une table : objet, colonnes et leur ordre, ordre des lignes, grammaire de ligne, forme « empreinte » | créée à 1 par la branche qui lira la première table ; incrément selon le point 10 (a) et (d) |
+
+Un rejeu dont la première ligne lue diffère de la version courante est refusé avant tout recalcul. C'est le raisonnement du contrôle 5 de l'ADR 0012, point 3.4 : une empreinte calculée sous une autre définition n'est jamais égale, et le refus aurait un motif trompeur. Le motif est à fixer avec ce contrôle (point (h) 2).
+
+**(h) Points non fixés par les décisions du 05/11/2026.** Ils sont écrits comme tels ; aucun n'est tranché par la présente annotation.
+1. **Mode d'entrée d'une table dans `construire_table()`** : argument nouveau, ou nom de la table dans le plan.
+   - C'est un **contrat partagé** (signature de `construire_table()` ou format du plan, `docs/agents/routage.md`, § 4.2 ; représentation interne commune, ADR 0006, « Conséquences »).
+   - Si la table est désignée par son nom, le moteur lit une donnée du package installé au moment de l'exécution. Le point 8.1 (« le package n'ouvre aucun fichier pour le plan ni pour la fiche ») et E4.4 (le moteur reçoit un `data.frame`, jamais un fichier) devront dire si cette lecture est admise et sous quelle forme. La cinquième annotation du 20/10/2026, (c), tableau, ligne « Accès fichier à l'exécution », a déjà relevé cette question pour un manifeste.
+   - Ce choix fixe aussi le nom et l'emplacement du champ de la fiche (point (c)).
+2. **Signature de `rejouer_fiche()` pour une table importée.** L'ADR 0012, point 3.1, dit que les rôles, le plan et la provenance viennent de la fiche et que la fonction « n'en reçoit pas d'autres ». Recevoir une table importée de l'appelant demande une annotation de l'ADR 0012 (points 3.1, 3.4 et 3.10 ; « Options écartées », l. 159). Le contrôle de forme (contrôle 2) et le contrôle de version de la représentation (point (g)) entrent dans la même annotation.
+3. **Incrément de `VERSION_FICHE`** (point 10 (c)) : le champ nouveau l'impose. Il est porté par la branche qui lira la première table (`claude/validation-smr-reference`), dans le premier commit qui change la définition de la fiche (point 10 (a)). Sa valeur dépend des incréments faits d'ici là ; seule une branche porteuse peut le faire (ADR 0013, point 2).
+4. **Copie de la table dans l'objet `construction`.** Si une étape garde une copie de la table dans son résultat, l'écrivain refuse ses attributs (mesure du point (b) 4). Ce serait une erreur de programmation de l'empreinte du résultat, du type relevé par M71. La branche devra stocker le `data.frame` nu, ou exclure le chemin par une annotation (`CHEMINS_HORS_RESULTAT`), avec son motif.
+5. **Ordre des lignes** : proposition du point (b) 3, à confirmer par `actuary`.
+6. **Table synthétique calculée par la `libm`** (point (e)) :
+   - (a) refus maintenu : le rejeu d'une telle construction se fait sur la même plateforme ;
+   - (b) écart en témoin pour ce seul cas, contre la règle commune de Q1 ;
+   - (c) la table synthétique entre comme table importée, ses valeurs étant fournies par l'appelant.
+
+   Avis d'`actuary` et décision du mainteneur à prendre au plan de la première branche dont une étape de `construire_table()` lira une table synthétique, pas avant.
+7. **Format et emplacement de stockage d'une table embarquée** : au plan de la première branche (ADR 0006, « Conséquences »). Ils sont sans effet sur l'empreinte (point (d)).
+
+**(i) Point 12 : rejeu par un tiers.** L'étape (1) s'étend : le tiers vérifie aussi l'empreinte de chaque table lue (exacte ; portable selon le point (e)), et il dispose de chaque table importée, comme des données. Les étapes (2) à (4) sont inchangées. Le point 12 se lit avec le point (f) pour le rejeu outillé.
+
+**Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code. La branche qui lira la première table ajoutera un champ à la fiche. Elle incrémentera donc `version_fiche`, ce qui change l'empreinte du résultat de toute construction, R1 à R6 compris (point 10 (c) ; seconde annotation du 24/10/2026, (d)). Le tableau avant / après et la régénération unique relèveront de son plan, avec le visa qu'il appelle.
+
+Issues : #73 (sans fermeture : la mise en œuvre relève de `claude/validation-smr-reference`) ; #49 (Windows et macOS) ; #89 (classes de commits). Décisions : décision du mainteneur du 05/11/2026 (Q1, Q4, Q5 de l'avis d'`actuary`), M-n à consigner par la porteuse ; M70, M71, M120, M194. ADR 0006 (points 1 et 2, « Conséquences ») ; ADR 0007 (points 6.4 et 9.3) ; ADR 0008 (réserve sur la `libm`) ; ADR 0012 (points 3.1, 3.4, 3.6, 3.8 ; « Options écartées », l. 159-160) ; ADR 0013 (point 2). Branche `claude/sources-v1` (`[D1]`).
