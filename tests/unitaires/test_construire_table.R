@@ -1154,6 +1154,28 @@ local({
       identical(lignes(c(nf[1:3], un_demi, -0, nf[4:6], -un_demi, de_hex("0000000000000001")), "texte"),
                 c("NA", "NA", "NaN", "0.5", "0", "NaN", "Inf", "-Inf", "-0.5", "4.9406564584124654e-324"))
   })
+  # Règle unique des jetons des non finis (#118, ADR 0011, point 2.2) : les
+  # formes « empreinte » et « texte » écrivent le même jeton pour chaque non
+  # fini, y compris les NA et NaN à charge utile (octets construits par
+  # readBin(), sans opération qui les altère). Jeton attendu, écrit en dur d'après
+  # is.nan() / is.na() de R 4.3.3 (mesuré) : un NaN de mot bas 1954 (0x7a2) est un
+  # NA ; les autres motifs sont des NaN. Ce classement est celui de R (R_IsNA,
+  # « True for R's NA only », R_ext/Arith.h), non une règle de l'ADR 0011 : le
+  # test est le témoin d'un changement de R (avis d'actuary du 05/11/2026).
+  verifier("jetons des non finis : formes « empreinte » et « texte » identiques sur NA, NaN, Inf, -Inf et 7 motifs de NaN à charge utile, seuls ou mêlés à des finis", {
+    motifs <- c("7ff8000000000000" = "NaN", "fff8000000000000" = "NaN", "7ff8000000000001" = "NaN",
+                "7ff80000000007a2" = "NA", "fff80000000007a2" = "NA", "7ff00000000007a2" = "NA",
+                "7ff0000000000001" = "NaN", "fff0000000000001" = "NaN")
+    pl <- vapply(names(motifs), de_hex, 0, USE.NAMES = FALSE)
+    nf <- c(NA_real_, NA_real_ + 1, NaN, pl, Inf, -Inf)
+    attendu <- c("NA", "NA", "NaN", unname(motifs), "Inf", "-Inf")
+    melange <- c(0.5, nf, -2, nf[1L], 3)
+    nfm <- !is.finite(melange)
+    lm <- lignes(melange, "empreinte"); lt <- lignes(melange, "texte")
+    identical(lignes(nf, "empreinte"), attendu) && identical(lignes(nf, "texte"), attendu) &&
+      length(lm) == length(melange) && length(lt) == length(melange) &&
+      identical(lm[nfm], lt[nfm]) && identical(lt[nfm], c(attendu, "NA"))
+  })
   verifier("écriture %.17g : .Random.seed inchangé après l'écriture (aucun tirage)", {
     graine <- function() if (exists(".Random.seed", globalenv())) get(".Random.seed", globalenv())
     avant <- graine()

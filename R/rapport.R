@@ -478,12 +478,22 @@ positions_17g <- function(y) {
   matrix(sortie, largeur)
 }
 
+# Règle unique des jetons des doubles non finis (ADR 0011, point 2.2), appelée
+# par les deux formes de l'écrivain, « empreinte » (doubles_empreinte()) et
+# « texte » (octets_17g()) : JETONS_NON_FINIS donne les quatre jetons, dans
+# l'ordre de leur rang ; jeton_non_fini(z) rend le rang du jeton de chaque
+# valeur de z (non finie : NA, NaN, Inf ou -Inf), lu sur la valeur reçue :
+# 1 NA (is.na & !is.nan), 2 NaN, 3 Inf, 4 -Inf. Aucune opération sur la valeur
+# avant la lecture (?NA : une opération n'en garantit pas les octets).
+JETONS_NON_FINIS <- c("NA", "NaN", "Inf", "-Inf")
+jeton_non_fini <- function(z) ifelse(is.nan(z), 2L, ifelse(is.na(z), 1L, ifelse(z > 0, 3L, 4L)))
+
 # Octets de l'écriture « texte » d'un vecteur de doubles (une valeur par
 # ligne, LF final), appelée par ecrire_valeurs() (doubles_texte()) ; égaux à
 # ceux de sprintf("%.17g") de la glibc et de format(x, '.17g') de Python sur
 # les témoins (constat de mesure, tests/controles/ecriture_doubles_texte.R) :
 # un fini s'écrit depuis x + 0 (-0 devient 0, « 0 ») ; un non fini par son
-# jeton, lu sur la valeur reçue (NA si is.na & !is.nan, NaN, Inf, -Inf), comme
+# jeton, lu sur la valeur reçue par la règle commune jeton_non_fini(), comme
 # doubles_empreinte(). Par blocs de 2^14 valeurs (mémoire bornée, mesurée à
 # l'étape (3a)).
 octets_17g <- function(x) {
@@ -504,12 +514,11 @@ octets_17g <- function(x) {
   colonnes <- which(fini)
   if (any(!nul)) m[seq_len(nrow(p)), colonnes[!nul]] <- p
   m[1L, colonnes[nul]] <- 48L
-  z <- x[!fini]
-  jeton <- ifelse(is.nan(z), 2L, ifelse(is.na(z), 1L, ifelse(z > 0, 3L, 4L)))
-  jetons <- list(c(78L, 65L), c(78L, 97L, 78L), c(73L, 110L, 102L), c(45L, 73L, 110L, 102L))
-  for (k in seq_along(jetons)) {
+  jeton <- jeton_non_fini(x[!fini])
+  for (k in seq_along(JETONS_NON_FINIS)) {
     i <- which(!fini)[jeton == k]
-    if (length(i)) m[seq_along(jetons[[k]]), i] <- jetons[[k]]
+    t <- as.integer(charToRaw(JETONS_NON_FINIS[k]))
+    if (length(i)) m[seq_along(t), i] <- t
   }
   as.raw(m[m != 0L])
 }
@@ -551,13 +560,13 @@ ecrire_valeurs <- function(x, forme, role) {
   doubles_empreinte <- function(x) {
     fini <- is.finite(x)
     if (all(fini)) return(hexadecimaux(x + 0))
-    # Jeton des non finis, lu sur x : 1 NA, 2 NaN, 3 Inf, 4 -Inf. Les jetons
-    # sont posés par leur position, les lignes finies, dans l'ordre, ensuite.
-    jetons <- c("NA", "NaN", "Inf", "-Inf")
-    z <- x[!fini]
-    jeton <- ifelse(is.nan(z), 2L, ifelse(is.na(z), 1L, ifelse(z > 0, 3L, 4L)))
+    # Jeton des non finis, lu sur x par la règle commune jeton_non_fini() (rang
+    # dans JETONS_NON_FINIS). Les jetons sont posés par leur position, les
+    # lignes finies, dans l'ordre, ensuite.
+    jetons <- JETONS_NON_FINIS
+    jeton <- jeton_non_fini(x[!fini])
     longueur <- rep.int(17, length(x))
-    longueur[!fini] <- c(3, 4, 4, 5)[jeton]
+    longueur[!fini] <- nchar(jetons, type = "bytes")[jeton] + 1
     debut <- cumsum(longueur) - longueur
     sortie <- raw(sum(longueur))
     pos <- debut[!fini]
