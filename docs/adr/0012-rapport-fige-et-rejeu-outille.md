@@ -259,3 +259,33 @@ Rédigée par `architect-approfondi` à l'étape (3c) de la branche `claude/ecri
 **Effet sur les résultats : aucun** par la présente annotation. Le seul effet de `3b42737` sur les six rapports figés de R1 à R6 porte sur la ligne « doubles » des conventions et sur l'empreinte du code (pied du rapport et tableau de la fiche) (tableau avant / après du commit, visa d'`actuary`).
 
 Issues : #104. ADR 0011 (annotation du 26/10/2026). Décision M161. Branche `claude/ecriture-portable`, PR #116.
+
+## Annotation du 27 octobre 2026 — point 2.3 et annotation du 26/10/2026, points 2 et 3 : nouveau libellé « doubles » (#120) ; phrase d'intégrité (#94) ; voie de #89
+
+Rédigée par `architect-approfondi` à l'étape (5) de la branche `claude/rapport-suites` (B11, PR #125), à `7dc544b`, avec l'annotation du 27/10/2026 de l'ADR 0011 ; décisions M126, M165, M166 et M167. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne du présent ADR et du code relevés à `7dc544b` ; le nom de l'objet fait foi (M77, (b)).
+
+1. **Point 2.3 (l. 74) : la citation de la ligne `doubles` est périmée.**
+   - Le point 2.3 cite la ligne `doubles` de `CONVENTIONS_TEXTE` sous la forme « relecture au bit près constatée sous glibc, non garantie ailleurs ».
+   - Depuis `7dc544b` (#120 ; visa d'`actuary`), la clause se lit « relecture au bit près constatée sous glibc et sous Windows (R 4.3.3 ucrt), non garantie ailleurs » (`R/rapport.R:1039-1043`). Le texte complet est cité par l'ADR 0011, annotation du 27/10/2026, (d) 1.
+   - La règle ne change pas : le document reprend la ligne `doubles` telle qu'elle est. *Vérifié* sur R1 : la ligne 39 du rapport figé porte le nouveau libellé.
+   - Statut de la clause : la relecture est un constat de mesure sous glibc et sous Windows (R 4.3.3 ucrt), garanti nulle part (ADR 0011, annotation du 27/10/2026, (a) 4).
+2. **Annotation du 26/10/2026, point 3, quatrième puce (l. 256) : l'affirmation « figure mot pour mot » est devenue fausse.**
+   - Elle était vraie à `3b42737`. Elle ne l'est plus depuis `7dc544b` : la clause de 2.3 n'est plus dans le libellé.
+   - La conclusion qu'elle portait se lit désormais ainsi : la reprise que le rapport fait de la ligne `doubles` est exacte, parce que le rapport recopie `CONVENTIONS_TEXTE`. C'est la citation entre parenthèses du point 2.3 qui était périmée (point 1).
+3. **Annotation du 26/10/2026, point 2, seconde puce : écriture sous Windows.** « Sous Windows, des octets identiques à ceux de la glibc restent une hypothèse, que l'étape (5) mesurera » se lit désormais : constat de mesure sous R 4.3.3 ucrt (MD5 de T2 et de T3 égaux à ceux de la CI, juge Python à 0 écart ; rapporté, ADR 0011, annotation du 27/10/2026, (a) 2 et (b)).
+4. **Phrase d'intégrité changée par #94 (`59bd68c`) : le présent ADR ne la cite pas, aucune annotation n'est requise.**
+   - Le texte de la phrase est celui du (0') de #94 (https://github.com/Gerard-Garey/outil_tables/issues/94#issuecomment-6420213452), lu avec M165. `fiche/empreintes/resultat` est retiré de la liste « hors du périmètre » : c'est la valeur à laquelle le contrôle compare l'empreinte recalculée. La liste reste tirée de `CHEMINS_HORS_RESULTAT` (`R/rapport.R:1954-1955`).
+   - *Vérifié* : à `7dc544b`, avant la présente annotation, `grep` sur le présent ADR ne trouve ni « Hors du périmètre de cette empreinte » ni « trouvée égale ». Les points 2.5 et 2.7 décrivent le contrôle, qui est inchangé, sans en citer la phrase.
+   - Les deux messages cités par le présent ADR restent exacts. Celui du contrôle 3 du point 2.5 (« objet modifié après sa construction : empreinte du résultat recalculée {a} au lieu de {b} ») est en `R/rapport.R:1811-1812`. Celui de la seconde annotation du 24/10/2026, (b) 3 (« empreinte du résultat non recalculable »), est en `:1805`.
+   - La phrase fixe du point 2.7 sur la plateforme est inchangée (`R/rapport.R:1603-1605`).
+   - *Vérifié* sur R1 : la ligne 87 du rapport figé porte la nouvelle phrase.
+5. **Point 3.5 et première annotation du 24/10/2026, (b) 6 : #89 est décidée.**
+   - La voie est celle de M126 : recalcul de l'empreinte du code dans l'historique git, par le script hors package `tests/controles/commits_empreinte_code.R`. `Version` ne s'incrémente qu'aux jalons de livraison. Le détail est dans l'ADR 0011, annotation du 27/10/2026, (e).
+   - Le message de `version_fiche_non_admise` (point 3.5) cite déjà `fiche$empreintes$code`. C'est la valeur que le tiers donne au script ; le message ne change pas.
+
+**Effet sur les résultats : aucun** par la présente annotation. Effets des commits cités (tableaux avant / après de leurs messages, visa d'`actuary`) :
+- `59bd68c` : ligne 87 des rapports figés de R1 à R6 ;
+- `7dc544b` : 18 lignes du libellé (plans, fiches, rapports figés de R1 à R6) ;
+- pour les deux : l'empreinte du code (M70) ; aucun `.tsv`, ni l'empreinte du résultat, ni `version_fiche`.
+
+Issues : #120, #94, #89. ADR 0011 (annotation du 27/10/2026). Décisions M126, M162, M165, M166, M167. Branche `claude/rapport-suites`, PR #125.

@@ -293,14 +293,11 @@ texte_lu <- function(v) {
   sprintf("illisible (%s de longueur %d)", typeof(v), length(v))
 }
 
-# Caractères de contrôle remplacés par une espace (comme lire_texte()), dans
-# les messages de refus seulement ; marque d'encodage conservée (gsub(useBytes
-# = TRUE) la retire, mesuré).
-sans_controle <- function(s) {
-  r <- gsub("[\001-\037\177]", " ", s, useBytes = TRUE)
-  Encoding(r) <- Encoding(s)
-  r
-}
+# Valeur lue dans la fiche, citée dans un message de refus du rejeu : règle
+# unique neutraliser_citation() (R/outils.R, #94) : caractères de contrôle et
+# séparateurs de ligne écrits <U+XXXX>, chaîne « bytes » citée sous un repère
+# (au lieu de l'erreur R de sprintf()), marque UTF-8.
+sans_controle <- function(s) neutraliser_citation(s)
 
 # Forme du champ `nom` de la liste `conteneur`, pour le refus
 # fiche_non_conforme : « champ absent » (nom absent, ou conteneur qui n'est pas
@@ -316,7 +313,7 @@ decrire_forme <- function(conteneur, nom) {
   else if (is.character(v) && length(v) == 1L && !nzchar(v)) s <- paste0(s, ", vide")
   a <- names(attributes(v))
   if (is.list(v)) a <- setdiff(a, "names")
-  if (length(a)) s <- paste0(s, ", attribut(s) ", paste(a, collapse = ", "))
+  if (length(a)) s <- paste0(s, ", attribut(s) ", paste(sans_controle(a), collapse = ", "))
   n <- names(v)
   if (!is.null(n)) {
     complets <- n[!is.na(n) & nzchar(n)]
@@ -403,38 +400,60 @@ perimetre_temoin_fiche <- function(f) {
 # (controle, attendu, lu, verdict, statut) : 7 contrôles, tous « conforme »
 # dans un bilan rendu, puis 6 témoins, jamais motifs de refus.
 rejouer_fiche <- function(donnees, fiche) {
+  # Message marqué UTF-8 sous toute locale (#94) ; les gabarits sont marqués
+  # par texte_moteur() avant sprintf() : sous la locale C, un gabarit non
+  # marqué (paquet installé sous C) mêlé à une citation marquée UTF-8 verrait
+  # ses octets non ASCII échappés (« <c2><ab> »).
   refus_rejeu <- function(motif, message, details = list())
-    refuser("construire_table", motif, message, details)
+    refuser("construire_table", motif, texte_moteur(message), details)
+  gabarit <- function(...) texte_moteur(paste(...))
 
   # 1. Nature des arguments : la fiche d'abord, puis les données (refus
-  #    délégué à controler_roles(), motif donnees_mal_formees).
-  if (inherits(fiche, "construction"))
+  #    délégué à controler_roles(), motif donnees_mal_formees). Classe lue
+  #    par %in% (match()), qui ne lève pas sur une classe d'encodage « bytes »,
+  #    là où inherits() lève (« translating strings with "bytes" encoding is
+  #    not allowed », mesuré sous C et C.UTF-8 ; #94).
+  if ("construction" %in% class(fiche))
     refus_rejeu("fiche_non_conforme",
                 paste("Rejeu : objet `construction` reçu à la place de sa fiche ; passer x$fiche, ou la fiche",
                       "relue de son texte par lire_fiche()."),
                 list(champ = "(fiche)", lu = "construction", attendu = "liste nommée"))
-  if (inherits(fiche, "rejeu"))
+  if ("rejeu" %in% class(fiche))
     refus_rejeu("fiche_non_conforme",
                 "Rejeu : objet `rejeu` reçu à la place d'une fiche ; passer r$construction$fiche.",
                 list(champ = "(fiche)", lu = "rejeu", attendu = "liste nommée"))
+  # Un nom du premier niveau d'encodage « bytes » : toute lecture par nom
+  # (fiche[["version_fiche"]]...) lèverait une erreur R (#114), position
+  # quelconque du nom ; cité par neutraliser_citation(), valeur brute dans
+  # les details. Noms lus par attr(), non par names() : names() dispatche sur
+  # la classe et lève sur une classe d'encodage bytes (noms_bytes(), mesuré).
+  nf <- attr(fiche, "names", exact = TRUE)
+  b <- if (is.list(fiche)) noms_bytes(fiche)
+  if (length(b))
+    refus_rejeu("fiche_non_conforme",
+                sprintf(gabarit("Rejeu : la fiche porte un nom de champ d'encodage « bytes » (champ n° %d : %s),",
+                                "non convertible en UTF-8 sans deviner ; aucun champ du premier niveau n'est lu par nom. Une fiche",
+                                "produite par le moteur ou relue par lire_fiche() n'en porte pas."),
+                        b[1L], neutraliser_citation(nf[b[1L]])),
+                list(champ = "(fiche)", lu = nf[b], attendu = "noms de champ sans encodage bytes"))
   if (!liste_nommee(fiche))
     refus_rejeu("fiche_non_conforme",
-                sprintf(paste("Rejeu : la fiche doit être une liste nommée aux noms uniques, sans autre attribut",
-                              "que ses noms ; reçu : objet de classe %s (type %s). Le rejeu ne lit aucun fichier :",
-                              "relire la fiche de ses octets par lire_fiche(readBin(fichier, \"raw\",",
-                              "file.size(fichier))), ou passer x$fiche."),
-                        paste(class(fiche), collapse = "/"), typeof(fiche)),
+                sprintf(gabarit("Rejeu : la fiche doit être une liste nommée aux noms uniques, sans autre attribut",
+                                "que ses noms ; reçu : objet de classe %s (type %s). Le rejeu ne lit aucun fichier :",
+                                "relire la fiche de ses octets par lire_fiche(readBin(fichier, \"raw\",",
+                                "file.size(fichier))), ou passer x$fiche."),
+                        paste(neutraliser_citation(class(fiche)), collapse = "/"), typeof(fiche)),
                 list(champ = "(fiche)", lu = class(fiche), attendu = "liste nommée"))
   if (!is.data.frame(donnees)) controler_roles(donnees, character(0), character(0))
 
   # 2. Forme des champs lus avant construire_table() : tous les champs en
   #    défaut dans un seul refus ; aucun n'est complété ni converti.
-  attendus <- c(version_fiche = "integer de longueur 1, non NA, sans attribut",
-                empreintes = "liste nommée aux noms uniques, sans autre attribut que ses noms",
-                "empreintes/algorithme" = "chaîne unique, non vide, non NA, sans attribut",
-                "empreintes/representation" = "chaîne unique, non vide, non NA, sans attribut",
-                "empreintes/donnees" = "chaîne unique, non vide, non NA, sans attribut",
-                roles = "champ présent", plan = "champ présent", provenance = "champ présent (NULL admis)")
+  attendus <- texte_moteur(c(version_fiche = "integer de longueur 1, non NA, sans attribut",
+                             empreintes = "liste nommée aux noms uniques, sans autre attribut que ses noms",
+                             "empreintes/algorithme" = "chaîne unique, non vide, non NA, sans attribut",
+                             "empreintes/representation" = "chaîne unique, non vide, non NA, sans attribut",
+                             "empreintes/donnees" = "chaîne unique, non vide, non NA, sans attribut",
+                             roles = "champ présent", plan = "champ présent", provenance = "champ présent (NULL admis)"))
   champ <- lu <- character(0)
   v <- fiche[["version_fiche"]]
   if (!(forme_exacte(v, "integer") && length(v) == 1L && !is.na(v))) {
@@ -451,9 +470,9 @@ rejouer_fiche <- function(donnees, fiche) {
   }
   if (length(champ))
     refus_rejeu("fiche_non_conforme",
-                sprintf(paste("Fiche non conforme au rejeu : %s. Le rejeu ne lit que ces champs avant",
-                              "construire_table() ; aucun n'est complété ni converti."),
-                        paste(sprintf("« %s » : %s au lieu de %s", champ, lu, attendus[champ]), collapse = " ; ")),
+                sprintf(gabarit("Fiche non conforme au rejeu : %s. Le rejeu ne lit que ces champs avant",
+                                "construire_table() ; aucun n'est complété ni converti."),
+                        paste(sprintf(gabarit("« %s » : %s au lieu de %s"), champ, lu, attendus[champ]), collapse = " ; ")),
                 list(champ = champ, lu = lu, attendu = unname(attendus[champ])))
 
   # 3. version_fiche admise : la version donne le sens des autres champs.
@@ -467,10 +486,10 @@ rejouer_fiche <- function(donnees, fiche) {
                 code = texte_lu(e[["code"]]),
                 code_installe = texte_lu(EMPREINTE_CODE))
     refus_rejeu("version_fiche_non_admise",
-                sprintf(paste("Version de fiche non admise au rejeu : version_fiche %d lue, version(s) admise(s)",
-                              "par ce code : %s. Fiche produite par tablexp %s, empreinte du code %s ; code installé :",
-                              "tablexp %s, empreinte du code %s. Aucune conversion de fiche n'est faite : rejouer",
-                              "cette fiche avec le code dont l'empreinte est celle de la fiche."),
+                sprintf(gabarit("Version de fiche non admise au rejeu : version_fiche %d lue, version(s) admise(s)",
+                                "par ce code : %s. Fiche produite par tablexp %s, empreinte du code %s ; code installé :",
+                                "tablexp %s, empreinte du code %s. Aucune conversion de fiche n'est faite : rejouer",
+                                "cette fiche avec le code dont l'empreinte est celle de la fiche."),
                         v, paste(sprintf("%d", VERSIONS_FICHE_REJEU), collapse = ", "),
                         sans_controle(lus$tablexp), sans_controle(lus$code),
                         as.character(utils::packageVersion("tablexp")), sans_controle(lus$code_installe)),
@@ -480,15 +499,15 @@ rejouer_fiche <- function(donnees, fiche) {
   # 4. et 5. Algorithme et représentation de l'empreinte des données.
   if (!identical(e[["algorithme"]], ALGORITHME_EMPREINTE))
     refus_rejeu("algorithme_empreinte_inconnu",
-                sprintf(paste("Algorithme d'empreinte « %s » lu dans la fiche, « %s » attendu : ce code ne calcule",
-                              "l'empreinte des données que par cet algorithme ; aucune comparaison n'est possible."),
+                sprintf(gabarit("Algorithme d'empreinte « %s » lu dans la fiche, « %s » attendu : ce code ne calcule",
+                                "l'empreinte des données que par cet algorithme ; aucune comparaison n'est possible."),
                         sans_controle(e[["algorithme"]]), ALGORITHME_EMPREINTE),
                 list(lu = e[["algorithme"]], attendu = ALGORITHME_EMPREINTE))
   if (!identical(e[["representation"]], ENTETE_CANONIQUE))
     refus_rejeu("representation_non_admise",
-                sprintf(paste("Représentation canonique « %s » lue dans la fiche, « %s » attendue : ce code calcule",
-                              "l'empreinte des données sous cette seule définition, et une empreinte d'une autre",
-                              "définition ne lui est jamais égale ; aucune conversion n'est faite."),
+                sprintf(gabarit("Représentation canonique « %s » lue dans la fiche, « %s » attendue : ce code calcule",
+                                "l'empreinte des données sous cette seule définition, et une empreinte d'une autre",
+                                "définition ne lui est jamais égale ; aucune conversion n'est faite."),
                         sans_controle(e[["representation"]]), ENTETE_CANONIQUE),
                 list(lu = e[["representation"]], attendu = ENTETE_CANONIQUE))
 
@@ -507,11 +526,11 @@ rejouer_fiche <- function(donnees, fiche) {
   empreinte <- empreinte_donnees(donnees, roles)
   if (!identical(empreinte, e[["donnees"]]))
     refus_rejeu("empreinte_donnees_discordante",
-                sprintf(paste("Empreinte des données discordante : %s lue dans la fiche, %s recalculée sur les",
-                              "données reçues (%d lignes). L'empreinte porte sur la représentation « %s » des",
-                              "colonnes des rôles de la fiche (%s), lignes dans l'ordre reçu : un autre ordre des",
-                              "lignes, une valeur ou un type de colonne différents suffisent à la changer ; les",
-                              "colonnes hors rôles n'y entrent pas."),
+                sprintf(gabarit("Empreinte des données discordante : %s lue dans la fiche, %s recalculée sur les",
+                                "données reçues (%d lignes). L'empreinte porte sur la représentation « %s » des",
+                                "colonnes des rôles de la fiche (%s), lignes dans l'ordre reçu : un autre ordre des",
+                                "lignes, une valeur ou un type de colonne différents suffisent à la changer ; les",
+                                "colonnes hors rôles n'y entrent pas."),
                         sans_controle(e[["donnees"]]), empreinte, nrow(donnees), ENTETE_CANONIQUE,
                         sans_controle(liste_guillemets(unname(roles)))),
                 list(lu = e[["donnees"]], attendu = empreinte, lignes = nrow(donnees), colonnes = unname(roles)))

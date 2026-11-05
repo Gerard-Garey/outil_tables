@@ -705,8 +705,10 @@ controler_rapport_fige <- function(x, l, id) {
   if (!all(vapply(names(x$fiche$plateforme), function(n) any(startsWith(ident, paste0("<tr><td>fiche/plateforme/", n, "</td>"))), NA)) ||
       !"bibliotheque_c" %in% names(x$fiche$plateforme)) e <- c(e, "U21 : fiche/plateforme")
   integ <- grep("^<p>Contr\u00f4le d'int\u00e9grit\u00e9 : ", ident, value = TRUE)
-  hors <- paste(html(setdiff(tablexp:::CHEMINS_HORS_RESULTAT, "execution")), collapse = ", ")
-  if (length(integ) != 1L || !grepl(paste0("de ce contr\u00f4le : ", hors, " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume cro\u00eet avec la base) est lu dans l'objet, sans v\u00e9rification.</p>"), integ, fixed = TRUE))
+  hors <- paste(html(setdiff(tablexp:::CHEMINS_HORS_RESULTAT, c("execution", "fiche/empreintes/resultat"))), collapse = ", ")
+  if (length(integ) != 1L ||
+      !grepl(html("trouv\u00e9e \u00e9gale \u00e0 fiche/empreintes/resultat, la valeur consign\u00e9e \u00e0 laquelle ce contr\u00f4le la compare (exclue du texte empreint\u00e9, puisqu'elle en est l'empreinte). Hors du p\u00e9rim\u00e8tre"), integ, fixed = TRUE) ||
+      !grepl(paste0("de ce contr\u00f4le : ", hors, " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume cro\u00eet avec la base) est lu dans l'objet, sans v\u00e9rification.</p>"), integ, fixed = TRUE))
     e <- c(e, "U21 : phrase du contrôle d'intégrité")
   rj <- section_de("rejeu")
   if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))

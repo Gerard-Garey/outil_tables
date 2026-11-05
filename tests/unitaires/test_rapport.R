@@ -158,6 +158,35 @@ verifier("U6 : refus 1 b, fiche qui vaut \"a\" : rapport_objet_invalide, details
                  list(chemin = "fiche", lu = "a", attendu = "list"), "\"a\" (character)")
 })
 
+# Classes citées par neutraliser_citation() (reprise de #94) : refus 1 (classe
+# de l'objet) et refus 1 b (repli de decrire_valeur()) ; classe « a<VT>b »
+# citée <U+000B>, classe d'encodage bytes citée sous le repère (auparavant :
+# erreur R « translating strings with "bytes" encoding is not allowed ») ;
+# details : valeur exacte ; message sur une ligne, marqué UTF-8.
+une_ligne_utf8 <- function(r, ok) {
+  if (!isTRUE(ok)) ok
+  else if (grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
+  else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else TRUE
+}
+CLASSE_BYTES <- local({ b <- "ab\xff"; Encoding(b) <- "bytes"; b })
+for (k in list(list("a<VT>b", "a\u000bb", "a<U+000B>b"), list("d'encodage bytes", CLASSE_BYTES, "<chaîne d'encodage bytes>"))) {
+  verifier(sprintf("U6 : refus 1, objet de classe %s : rapport_objet_invalide (pas une erreur R), classe citée « %s », une ligne, UTF-8",
+                   k[[1L]], k[[3L]]), {
+    r <- tryCatch(ecrire_rapport(structure(list(), class = k[[2L]])), error = function(e) e)
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    une_ligne_utf8(r, controle_refus(r, "rapport_objet_invalide", list(lu = k[[2L]], attendu = "construction"),
+                                     paste0("objet de classe « ", k[[3L]], " » au lieu de « construction »")))
+  })
+  verifier(sprintf("U6 : refus 1 b, fiche structure(1, class = %s) : repli de decrire_valeur(), classe citée « %s », une ligne, UTF-8",
+                   k[[1L]], k[[3L]]), {
+    y <- x1; y$fiche <- structure(1, class = k[[2L]])
+    r <- tryCatch(ecrire_rapport(y), error = function(e) e)
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    une_ligne_utf8(r, controle_refus(r, "rapport_objet_invalide", list(chemin = "fiche", lu = y$fiche, attendu = "list"),
+                                     paste0("dont la fiche est objet de type double, de classe ", k[[3L]], " au lieu d'une liste.")))
+  })
+}
+
 verifier("U7 : refus 2, version_fiche 3L : version_fiche_non_admise (pas objet_modifie), message « 3 (integer) » et « 4 (integer) »", {
   y <- x1; y$fiche$version_fiche <- 3L
   controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(lu = 3L, attendu = 4L),
@@ -174,15 +203,43 @@ verifier("U7 : refus 2, versions$tablexp « a<LF>b » : valeur décrite par l'é
   ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L, attendu = 4L), "\"a\\nb\" (character)")
   if (isTRUE(ok) && grepl("\n", conditionMessage(r), fixed = TRUE)) "message sur plusieurs lignes" else ok
 })
-verifier("U7 : refus 2, versions$tablexp « a<U+0085>b » (NEL) : valeur décrite par l'écrivain, pas écrite en clair", {
+# NEL et U+2028 : décrits par l'écrivain, puis neutralisés <U+XXXX> (règle
+# unique neutraliser_citation(), #94) ; aucun n'est écrit en clair.
+verifier("U7 : refus 2, versions$tablexp « a<U+0085>b » (NEL) : décrite par l'écrivain, NEL cité <U+0085>, pas en clair", {
   y <- x1; y$fiche$version_fiche <- 3L; y$fiche$versions$tablexp <- "a\u0085b"
   r <- refus_de(ecrire_rapport(y))
-  ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L, attendu = 4L), "\"a\u0085b\" (character)")
-  if (isTRUE(ok) && grepl("tablexp a\u0085b,", conditionMessage(r), fixed = TRUE)) "valeur écrite en clair" else ok
+  ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L, attendu = 4L), "\"a<U+0085>b\" (character)")
+  if (isTRUE(ok) && grepl("\u0085", conditionMessage(r), fixed = TRUE)) "NEL écrit en clair" else ok
 })
-verifier("U7 : refus 2, versions$tablexp « a<U+2028>b » : valeur décrite par l'écrivain", {
+verifier("U7 : refus 2, versions$tablexp « a<U+2028>b » : décrite par l'écrivain, U+2028 cité <U+2028>, pas en clair", {
   y <- x1; y$fiche$version_fiche <- 3L; y$fiche$versions$tablexp <- "a\u2028b"
-  controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(lu = 3L), "\"a\u2028b\" (character)")
+  r <- refus_de(ecrire_rapport(y))
+  ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L), "\"a<U+2028>b\" (character)")
+  if (isTRUE(ok) && grepl("\u2028", conditionMessage(r), fixed = TRUE)) "U+2028 écrit en clair" else ok
+})
+verifier("U7 : refus 2, versions$tablexp « a<VT>b » et « a<FF>b » : décrites par l'écrivain, citées <U+000B> et <U+000C> (#94)", {
+  e <- character(0)
+  for (k in list(c("\u000b", "<U+000B>"), c("\u000c", "<U+000C>"))) {
+    y <- x1; y$fiche$version_fiche <- 3L; y$fiche$versions$tablexp <- paste0("a", k[1L], "b")
+    r <- refus_de(ecrire_rapport(y))
+    ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L), paste0("\"a", k[2L], "b\" (character)"))
+    if (!isTRUE(ok)) e <- c(e, ok) else if (grepl(k[1L], conditionMessage(r), fixed = TRUE)) e <- c(e, "caractère écrit en clair")
+  }
+  if (length(e)) e else TRUE
+})
+verifier("U7 : valeur_message() et decrire_valeur() : même règle (neutraliser_citation()) ; \\n de la grammaire inchangé ; octets non UTF-8 décrits par le type (#94)", {
+  vm <- tablexp:::valeur_message; dv <- tablexp:::decrire_valeur
+  inv <- rawToChar(as.raw(c(0x61, 0xe9)))
+  identical(vm("a\u000bb"), "\"a<U+000B>b\" (character)") && identical(dv("a b"), "\"a<U+2029>b\" (character)") &&
+    identical(vm("a\nb"), "\"a\\nb\" (character)") && identical(vm("a b"), "a b") &&
+    identical(vm(inv), "objet de type character, de classe character")
+})
+verifier("U8 : refus 3, empreinte non recalculable : message de l'erreur cité par neutraliser_citation(), une ligne, marqué UTF-8 (#94)", {
+  y <- x1; attr(y$etapes, "truc") <- 1
+  r <- refus_de(ecrire_rapport(y))
+  ok <- controle_refus(r, "objet_modifie", NULL, "empreinte du résultat non recalculable (")
+  if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8"
+  else if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes" else ok
 })
 verifier("U7 : refus 2, versions$tablexp « é » : écrite en clair (caractère non ASCII ordinaire)", {
   y <- x1; y$fiche$version_fiche <- 3L; y$fiche$versions$tablexp <- "\u00e9"
@@ -229,6 +286,68 @@ for (cas in list(list("etapes$validation <- list()", function(x) { x$etapes$vali
                    cas[[1L]], cas[[3L]]),
            controle_refus(refus_de(ecrire_rapport(reconsigne(x1, cas[[2L]]))), "rapport_objet_invalide",
                           list(chemin = cas[[3L]]), cas[[3L]]))
+
+# Chemin cité par neutraliser_citation() dans le refus 4 (reprise de #94) :
+# élément « a<VT>b » hors des sections, à la racine et sous etapes, cité
+# <U+000B> ; details$chemin exact. Un nom d'encodage bytes n'atteint pas le
+# refus 4 : l'empreinte n'est pas recalculable (refus 3, objet_modifie),
+# refus nommé, pas une erreur R.
+for (cas in list(list("racine", function(x) x, ""), list("etapes", function(x) x$etapes, "etapes/"))) {
+  verifier(sprintf("U10 : refus 4, élément « a<VT>b » (%s, empreinte reconsignée) : chemin cité <U+000B>, une ligne, UTF-8", cas[[1L]]), {
+    y <- x1
+    if (cas[[1L]] == "racine") y[["a\u000bb"]] <- 1 else y$etapes[["a\u000bb"]] <- list()
+    r <- refus_de(ecrire_rapport(reconsigne(y, identity)))
+    une_ligne_utf8(r, controle_refus(r, "rapport_objet_invalide", list(chemin = paste0(cas[[3L]], "a\u000bb")),
+                                     paste0("élément « ", cas[[3L]], "a<U+000B>b » de l'objet non prévu")))
+  })
+  verifier(sprintf("U10 : élément de nom d'encodage bytes (%s) : refus objet_modifie (pas une erreur R), une ligne, UTF-8", cas[[1L]]), {
+    y <- x1
+    if (cas[[1L]] == "racine") {
+      y$autre <- 1; n <- names(y); n[length(n)] <- CLASSE_BYTES; names(y) <- n
+    } else {
+      y$etapes$autre <- list(); n <- names(y$etapes); n[length(n)] <- CLASSE_BYTES; names(y$etapes) <- n
+    }
+    r <- tryCatch(ecrire_rapport(y), error = function(e) e)
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    une_ligne_utf8(r, controle_refus(r, "objet_modifie", NULL, "empreinte du résultat non recalculable ("))
+  })
+}
+
+# Nom d'encodage bytes au premier niveau de la fiche ou de l'objet (#114),
+# en première position, au milieu et en dernière : refus nommé au lieu de
+# l'erreur R « translating strings with "bytes" encoding is not allowed »
+# (x[["fiche"]], f[["empreintes"]]... la lèvent), nom cité par
+# neutraliser_citation() (repère), valeur brute dans les details.
+# ecrire_fiche() : chaine_codage_bytes, role « @noms » ; ecrire_rapport() :
+# objet_modifie (empreinte non recalculable), details$chemin « » (objet) ou
+# « fiche ».
+local({
+  pos <- function(n) c(1L, 4L, n)
+  avec_nom_bytes <- function(o, k) { n <- names(o); n[k] <- CLASSE_BYTES; names(o) <- n; o }
+  verdict <- function(r, motif, details, contient) {
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    une_ligne_utf8(r, controle_refus(r, motif, details, contient))
+  }
+  for (k in pos(length(x1$fiche))) {
+    fb <- avec_nom_bytes(x1$fiche, k)
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de la fiche : ecrire_fiche() refuse chaine_codage_bytes (pas une erreur R)", k),
+             verdict(tryCatch(ecrire_fiche(fb), error = function(e) e), "chaine_codage_bytes",
+                     list(role = "@noms", lignes = k, lu = CLASSE_BYTES),
+                     c(sprintf("Nom de champ n° %d de la fiche : <chaîne d'encodage bytes>.", k), "« bytes »")))
+    xb <- x1; xb$fiche <- fb
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de la fiche : ecrire_rapport() refuse objet_modifie, chemin « fiche »", k),
+             verdict(tryCatch(ecrire_rapport(xb), error = function(e) e), "objet_modifie",
+                     list(chemin = "fiche", lignes = k, lu = CLASSE_BYTES),
+                     c("empreinte du résultat non recalculable (", sprintf("champ n° %d de la fiche, cité <chaîne d'encodage bytes>", k))))
+  }
+  for (k in pos(length(x1))) {
+    xb <- avec_nom_bytes(x1, k)
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de l'objet : ecrire_rapport() refuse objet_modifie, chemin vide", k),
+             verdict(tryCatch(ecrire_rapport(xb), error = function(e) e), "objet_modifie",
+                     list(chemin = "", lignes = k, lu = CLASSE_BYTES),
+                     c("empreinte du résultat non recalculable (", sprintf("champ n° %d de l'objet, cité <chaîne d'encodage bytes>", k))))
+  }
+})
 
 # --- U11, U12 : ressources, balises, attributs, entités (valeur calculée à la main) ---
 
@@ -451,8 +570,9 @@ verifier("U21 : phrase de plateforme une fois ; « pas de date » ; conventions 
     if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))
       e <- c(e, paste(id, ": rejeu"))
     integ <- grep("^<p>Contrôle d'intégrité : ", ul, value = TRUE)
-    hors <- setdiff(tablexp:::CHEMINS_HORS_RESULTAT, "execution")
+    hors <- setdiff(tablexp:::CHEMINS_HORS_RESULTAT, c("execution", "fiche/empreintes/resultat"))
     if (length(integ) != 1L ||
+        !grepl(html("trouvée égale à fiche/empreintes/resultat, la valeur consignée à laquelle ce contrôle la compare (exclue du texte empreinté, puisqu'elle en est l'empreinte). Hors du périmètre"), integ, fixed = TRUE) ||
         !grepl(paste0("Hors du périmètre de cette empreinte, et donc de ce contrôle : ", paste(html(hors), collapse = ", "),
                       " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.</p>"), integ, fixed = TRUE))
       e <- c(e, paste(id, ": phrase du contrôle d'intégrité"))
