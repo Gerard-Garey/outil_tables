@@ -322,8 +322,9 @@ segments_observations <- function(observations, segmentation) {
   # encoding must be UTF-8, Latin-1 or bytes » sur une chaîne non ASCII
   # d'encodage `unknown`, forme que donne read.csv() d'un CSV UTF-8 (#106) :
   # le tri porte sur une copie marquée `bytes`, comparée octet à octet sans
-  # traduction, sous C comme sous une locale UTF-8. Avant le tri, même critère
-  # `locale_connue` qu'octets_chaines() : dans une session UTF-8 ou latin-1,
+  # traduction, sous C comme sous une locale UTF-8. Avant le tri, la conversion
+  # de la règle unique qu'appelle aussi octets_chaines(), vers_utf8_locale()
+  # (outils ; #113) : dans une session UTF-8 ou latin-1,
   # toutes les chaînes passent par enc2utf8() ; sinon (locale C) seules les
   # chaînes marquées latin-1 sont converties, les `unknown` gardent leurs
   # octets (enc2utf8 les échapperait en <c3><a9>). Ce n'est pas l'ordre de
@@ -336,11 +337,7 @@ segments_observations <- function(observations, segmentation) {
     u <- unique(v)
     u <- u[!is.na(u)]
     if (!is.character(u)) return(u[order(u, method = "radix")])
-    l <- l10n_info()
-    connue <- isTRUE(l[["UTF-8"]]) || isTRUE(l[["Latin-1"]])
-    latin1 <- Encoding(u) == "latin1"
-    w <- u
-    if (connue) w <- enc2utf8(w) else if (any(latin1)) w[latin1] <- enc2utf8(w[latin1])
+    w <- vers_utf8_locale(u)
     Encoding(w) <- "bytes"
     u[order(w, method = "radix")]
   }

@@ -293,14 +293,33 @@ age_anniversaire <- function(cn, an_t, t) {
   x - (jour_anniversaire(cn, x) > t)
 }
 
+# Jours (numériques) rendus en Date, stockage double : colonnes de dates du
+# jeu simulé et du jeu à défauts (#113 : une seule définition).
+en_date <- function(j) structure(as.numeric(j), class = "Date")
+
 # --- contrôle des entrées ------------------------------------------------------
 
-# Date unique : la forme de date1() de controler_transition_periode() (donnees ;
-# #58) : stockage double ou integer, seul attribut la classe "Date" exacte (ni
-# noms, ni autre attribut), longueur 1, finie, en jours entiers.
-date_unique <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
-  identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
-  is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
+# Dates uniques (bornes de la période, origine, date_entree) : date_unique()
+# (outils ; #58, #113), même règle que les bornes de la période des données.
+
+# Noms reçus d'une liste comparés aux noms admis, sans tri (setdiff,
+# anyDuplicated, anyNA ; #100) : règle unique des noms des arguments du
+# simulateur (portefeuille, defauts et chaque déclaration ; #113). Rend ""
+# si les noms sont complets et admis ; sinon la chaîne d'écart, noms
+# requis absents et noms non admis cités par liste_guillemets() (règle
+# neutraliser_citation(), R/outils.R ; #111, #94 ; un nom marqué « bytes »
+# est cité sous un repère). Une liste sans noms a des noms vides.
+ecart_noms <- function(x, requis, admis) {
+  n <- names(x)
+  if (is.null(n)) n <- rep("", length(x))
+  n <- as.character(n)
+  if (anyNA(n) || anyDuplicated(n)) return("noms manquants ou en double")
+  manquants <- setdiff(requis, n); inconnus <- setdiff(n, admis)
+  if (!length(manquants) && !length(inconnus)) return("")
+  formuler("champs attendus %s ; manquants : %s ; inconnus : %s", liste_guillemets(admis),
+           if (length(manquants)) liste_guillemets(manquants) else "aucun",
+           if (length(inconnus)) liste_guillemets(inconnus) else "aucun")
+}
 
 controler_portefeuille <- function(portefeuille, periode) {
   if (!liste_aux_noms(periode, c("debut", "fin")) ||
@@ -338,15 +357,13 @@ controler_portefeuille <- function(portefeuille, periode) {
             formuler("Portefeuille : liste avec un champ mode pris dans %s.",
                      liste_guillemets(names(CHAMPS_PORTEFEUILLE))),
             list(mode = mode))
+  # Noms comparés par ecart_noms() (#113), règle partagée avec defauts.
   attendus <- CHAMPS_PORTEFEUILLE[[mode]]
-  manquants <- setdiff(attendus, names(portefeuille)); inconnus <- setdiff(names(portefeuille), attendus)
-  if (length(manquants) || length(inconnus) || anyDuplicated(names(portefeuille)))
+  e <- ecart_noms(portefeuille, attendus, attendus)
+  if (nzchar(e))
     refuser("simulation", "portefeuille_invalide",
-            formuler("Portefeuille (mode %s) : champs attendus %s ; manquants : %s ; inconnus : %s.", citer(mode),
-                     liste_guillemets(attendus),
-                     if (length(manquants)) liste_guillemets(manquants) else "aucun",
-                     if (length(inconnus)) liste_guillemets(inconnus) else "aucun"),
-            list(manquants = manquants, inconnus = inconnus))
+            formuler("Portefeuille (mode %s) : %s.", citer(mode), e),
+            list(mode = mode, attendus = attendus, noms = names(portefeuille)))
   p <- portefeuille
   # Champs numériques : forme exacte (#78), double ou integer sans aucun
   # attribut (ni names, ni dim, ni classe), longueur 1, fini.
@@ -511,21 +528,8 @@ controler_defauts <- function(defauts, graine) {
   invalide <- function(msg, details = list())
     refuser("simulation", "defauts_invalides", formuler("Défauts : %s", msg), details)
   # Chaînes de l'utilisateur citées par liste_guillemets() : règle
-  # neutraliser_citation() (R/outils.R ; #111, #94).
-  # Noms reçus comparés aux noms admis, sans tri ; rend la chaîne d'écart, ou "".
-  ecart_noms <- function(x, requis, admis) {
-    n <- names(x)
-    if (is.null(n)) n <- rep("", length(x))
-    n <- as.character(n)
-    if (anyNA(n) || anyDuplicated(n)) return("noms manquants ou en double")
-    manquants <- setdiff(requis, n); inconnus <- setdiff(n, admis)
-    if (!length(manquants) && !length(inconnus)) return("")
-    formuler("champs attendus %s ; manquants : %s ; inconnus : %s", liste_guillemets(admis),
-             if (length(manquants)) liste_guillemets(manquants) else "aucun",
-             if (length(inconnus)) liste_guillemets(inconnus) else "aucun")
-  }
-  forme_graine <- function(g) forme_exacte(g, c("double", "integer")) && length(g) == 1L && !is.na(g) &&
-    is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max
+  # neutraliser_citation() (R/outils.R ; #111, #94). Noms : ecart_noms() ;
+  # graine : forme_graine() (outils), règle de sous_graine() (#113).
   if (!forme_exacte(defauts, "list", "names"))
     invalide(formuler("liste nue attendue, list(graine, declarations) (ni data.frame, ni classe, aucun attribut autre que les noms)."),
              list(parametre = "defauts"))
@@ -750,7 +754,6 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
   lignes <- do.call(rbind, c(list(ligne_df(integer(0), 0L, character(0), character(0), character(0))), morceaux))
   row.names(lignes) <- NULL
 
-  en_date <- function(j) structure(as.numeric(j), class = "Date")
   # Copies : valeurs du jeu propre (une ligne dupliquée n'est pas altérée autrement).
   resultat <- data.frame(id_contrat = c(id_c, jeu$id_contrat[copies]), id_tete = c(id_t, jeu$id_tete[copies]),
                          sexe = c(sexe, jeu$sexe[copies]),
@@ -954,7 +957,6 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
     stop("simuler_portefeuille() : décès antérieur à l'entrée d'un contrat écrit (erreur de programmation).",
          call. = FALSE)
 
-  en_date <- function(j) structure(as.numeric(j), class = "Date")
   # id_tete : seq_len(n) dans les modes existants (même objet qu'avant #92).
   resultat <- data.frame(id_contrat = seq_len(length(sel)), id_tete = if (multi) tete[sel] else seq_len(n),
                          sexe = sexe[tete][sel],

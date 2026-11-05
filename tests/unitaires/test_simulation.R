@@ -397,7 +397,7 @@ for (k in LISTES_FORME)
   verifier(sprintf("forme exacte : %s -> refus %s", k[[1]], k[[2]]), leve_refus(k[[3]](), k[[2]]))
 
 # --- forme exacte des bornes de la période et des facteurs (#58) -------------------
-# Bornes : la forme de date1() de controler_transition_periode() (donnees) :
+# Bornes : la forme de date_unique() (R/outils.R, partagée avec donnees) :
 # double ou integer, seul attribut la classe "Date" exacte, sous periode_invalide.
 # Facteurs : forme_exacte(f, c("double", "integer"), "names"), noms H et F
 # comparés après un tri radix, sous loi_invalide. Les formes admises restent
@@ -560,6 +560,16 @@ NOMS_PF_FORME <- list(
 for (k in NOMS_PF_FORME)
   verifier(sprintf("forme exacte : portefeuille, %s -> refus portefeuille_invalide", k[[1]]),
            leve_refus(simuler(loi(), k[[2]], PER, GRAINE), "portefeuille_invalide"))
+
+# Message des noms manquants ou en double (#113) : règle unique ecart_noms(),
+# comme controler_defauts() ; champ doublé et nom NA le citent (et non plus
+# « manquants : aucun ; inconnus : aucun »).
+for (k in list(list("champ n doublé", c(PF_FORME, list(n = 1))),
+               list("champ de plus au nom NA", plus_champ(PF_FORME, NA_character_)))) {
+  verifier(sprintf("noms de champs : portefeuille, %s -> message « noms manquants ou en double »", k[[1]]),
+           leve_refus(simuler(loi(), k[[2]], PER, GRAINE), "portefeuille_invalide") &&
+             grepl("noms manquants ou en double", message_refus(simuler(loi(), k[[2]], PER, GRAINE)), fixed = TRUE))
+}
 
 # Nom de champ marqué « bytes » (#111) : sa citation dans sprintf() lèverait une erreur R
 # (« translating strings with "bytes" encoding is not allowed ») ; en première position

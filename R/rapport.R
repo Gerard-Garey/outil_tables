@@ -142,7 +142,9 @@ octets_chaines <- function(x, role, limite = 2^30) {
                            "locale n'est ni UTF-8 ni latin-1 : son codage est indéterminé."),
                      neutraliser_citation(role)),
             list(role = role, lignes = which(indetermine)))
-  y <- enc2utf8(x)
+  # Conversion de la règle unique (outils, #113) : après les deux refus, elle
+  # équivaut à enc2utf8() sur tout, en toute locale.
+  y <- vers_utf8_locale(x)
   invalide <- !is.na(y) & !validUTF8(y)
   if (any(invalide))
     refuser("rapport", "chaine_non_utf8",

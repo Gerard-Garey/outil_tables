@@ -374,11 +374,10 @@ controler_transition_periode <- function(transition, periode, delai_declaration)
                      paste(TRANSITIONS$depart, "->", TRANSITIONS$arrivee, collapse = ", ")),
             list(transition = transition))
   }
-  # Stockage double ou integer admis (inchangé), seul attribut : la classe.
-  date1 <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
-    identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
-    is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
-  if (!liste_aux_noms(periode, c("debut", "fin")) || !date1(periode[["debut"]]) || !date1(periode[["fin"]]))
+  # Stockage double ou integer admis (inchangé), seul attribut : la classe
+  # (date_unique(), outils ; #113).
+  if (!liste_aux_noms(periode, c("debut", "fin")) || !date_unique(periode[["debut"]]) ||
+      !date_unique(periode[["fin"]]))
     refuser("donnees", "periode_invalide",
             formuler(paste("La période d'observation doit être une liste de champs exactement debut et fin,",
                            "sans autre attribut, deux dates (classe Date, sans autre attribut) non manquantes.")),

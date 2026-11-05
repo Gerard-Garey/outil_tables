@@ -23,7 +23,12 @@
 #    marqué avant sprintf() (ADR 0007, annotation du 05/11/2026, (c) ; #127) ;
 #  - neutraliser_citation() et citation_a_neutraliser() : règle unique de
 #    neutralisation d'une valeur citée dans un message de refus (caractères
-#    de contrôle et séparateurs de ligne, encodage ; #94).
+#    de contrôle et séparateurs de ligne, encodage ; #94) ;
+#  - forme_graine() et date_unique() : prédicats de forme d'une graine et
+#    d'une date unique, écrits une seule fois (#113) ;
+#  - vers_utf8_locale() : conversion des chaînes en UTF-8 selon la locale de
+#    la session, partagée par l'empreinte des données et l'ordre des segments
+#    (ADR 0007, point 9.3, annotation du 05/11/2026, (g) ; #113, #106).
 #
 #  Ce fichier n'appelle aucun module (graphe d'appels, ADR 0007, point 2.1 ;
 #  contrôlé par tests/controles/graphe_modules.R).
@@ -108,6 +113,37 @@ chaine_unique <- function(v) {
 # doublons et la liste vide sans noms sont l'affaire de l'appelant. Rend TRUE ou
 # FALSE, jamais NA.
 noms_complets <- function(noms) !is.null(noms) && !anyNA(noms) && all(nzchar(noms))
+
+# Forme d'une graine (#43, #113) : forme_exacte() integer ou double (ni names,
+# ni dim, ni classe), longueur 1, ni NA, finie, entière, de valeur absolue au
+# plus .Machine$integer.max. Règle de sous_graine(), partagée avec le contrôle
+# de la graine des défauts du simulateur. Rend TRUE ou FALSE, jamais NA.
+forme_graine <- function(g) forme_exacte(g, c("double", "integer")) && length(g) == 1L && !is.na(g) &&
+  is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max
+
+# Date unique (#58, #113) : stockage double ou integer, seul attribut la classe
+# "Date" exacte (ni noms, ni autre attribut), longueur 1, finie, en jours
+# entiers. Partagée par les bornes de la période d'observation (donnees,
+# simulation) et les dates du portefeuille simulé. Rend TRUE ou FALSE, jamais NA.
+date_unique <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
+  identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
+  is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
+
+# Chaînes x (character) converties en UTF-8 selon la locale de la session
+# (ADR 0007, point 9.3 ; annotation du 05/11/2026, (g) ; #113) : sous une
+# locale UTF-8 ou latin-1 (l10n_info()), enc2utf8() sur tout ; sinon (locale
+# C), sur les seules chaînes marquées latin-1, les autres gardant leurs octets
+# (enc2utf8() échapperait une chaîne non ASCII `unknown` en « <c3><a9> »).
+# Aucun refus : octets_chaines() (rapport) refuse avant l'appel ce que
+# l'empreinte n'admet pas ; l'ordre des segments (exposition) range sans
+# refuser. Rend un character de même longueur, NA conservés.
+vers_utf8_locale <- function(x) {
+  l <- l10n_info()
+  if (isTRUE(l[["UTF-8"]]) || isTRUE(l[["Latin-1"]])) return(enc2utf8(x))
+  latin1 <- Encoding(x) == "latin1"
+  if (any(latin1)) x[latin1] <- enc2utf8(x[latin1])
+  x
+}
 
 # Positions des noms d'encodage « bytes » de x (#114) : integer(0) si x n'a pas
 # de noms ou aucun de ce codage. Une lecture par nom, x[["champ"]] ou
@@ -318,12 +354,10 @@ citation_a_neutraliser <- function(x) {
 # appelant n'est pas dans .Random.seed et n'est pas restaurable ; sans effet
 # sur le moteur, qui tire sous Inversion.
 sous_graine <- function(graine, expr) {
-  # Forme exacte (#43, forme_exacte()) : integer ou double, aucun attribut (ni
+  # Forme exacte (#43, forme_graine()) : integer ou double, aucun attribut (ni
   # names, ni dim, ni classe) ; une graine non canonique ne doit pas être
   # consignée.
-  if (missing(graine) || !forme_exacte(graine, c("double", "integer")) || length(graine) != 1L ||
-      is.na(graine) || !is.finite(graine) || graine != trunc(graine) ||
-      abs(graine) > .Machine$integer.max)
+  if (missing(graine) || !forme_graine(graine))
     refuser("outils", "graine_invalide",
             formuler("La graine doit être un nombre entier unique, explicite et fini, sans attribut."),
             list(graine = if (missing(graine)) NULL else graine))
