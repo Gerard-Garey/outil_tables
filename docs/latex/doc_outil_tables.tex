@@ -588,7 +588,10 @@ issue~\#127), et la règle unique de
 citation d'une valeur dans un message de refus,
 \code{neutraliser\_citation()} (section~\ref{sec:refus}~; issue~\#94),
 avec le relevé des noms d'encodage \code{bytes} d'un objet reçu,
-\code{noms\_bytes()} (issue~\#114). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+\code{noms\_bytes()} (issue~\#114), et les lectures de la classe et d'un
+champ par nom qui ne lèvent pas d'erreur R sur une classe ou un nom de cet
+encodage, \code{a\_classe()}, \code{classe\_bytes()} et
+\code{lire\_champ()} (issue~\#128). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -804,11 +807,52 @@ fiche (section~\ref{sec:serialisation}), \code{objet\_modifie} au rapport
 figé (tableau~\ref{tab:refus-rapport}). Les noms sont lus par
 \code{attr(x, "names", exact = TRUE)} et non par \code{names()}, fonction
 générique qui dispatche sur la classe et lève la même erreur sur une
-liste dont la classe est d'encodage \code{bytes}. \textbf{Limite}~: seul
-le premier niveau est contrôlé~; un nom d'encodage \code{bytes} à un
-niveau inférieur de la fiche (par exemple dans \code{empreintes}) fait
-encore lever cette erreur R par les trois fonctions (constat), au lieu
-d'un refus nommé.
+liste dont la classe est d'encodage \code{bytes}.
+
+\medskip
+\noindent
+\textbf{Classes et noms d'encodage \code{bytes} sous le premier niveau}
+(issue~\#128). La même erreur R est levée, sur une classe d'encodage
+\code{bytes}, par les fonctions qui dispatchent sur la classe
+(\code{inherits()}, \code{is.factor()}, \code{is.data.frame()},
+\code{names()}, \code{length()}, \code{is.na()}, \code{dim()}), et, sur un
+nom de cet encodage, par la lecture \code{x[["champ"]]}~; \code{attr()},
+\code{match()}, \code{\%in\%}, \code{Encoding()}, \code{unclass()} et
+\code{.subset2()} ne la lèvent pas (constat sous les locales C et
+C.UTF-8, R~4.3.3). Trois fonctions de \code{R/outils.R} lisent donc sans
+dispatch ni traduction~: \code{a\_classe()} (une classe nommée par
+l'appelant figure-t-elle dans l'attribut \code{class}~?),
+\code{classe\_bytes()} (l'attribut \code{class} a-t-il un élément
+d'encodage \code{bytes}~? l'appelant retire alors la classe par
+\code{unclass()} avant \code{length()}, \code{names()} ou \code{is.na()})
+et \code{lire\_champ()} (élément d'une liste trouvé par \code{match()} sur
+les noms lus par \code{attr()}, puis lu par position). Les contrôles des
+rôles, l'écrivain unique, l'écriture de la fiche, le contrôle du rapport
+figé et le rejeu outillé les emploient, et refusent sous un motif nommé, à
+toute position du nom~: \code{type\_incompatible} pour une colonne de rôle
+de classe \code{bytes}, ou de nom \code{bytes} et de type non conforme
+(section~\ref{sec:controles-donnees})~; \code{type\_non\_canonique} ou
+\code{serialisation\_impossible} pour une valeur écrite de classe
+\code{bytes}, et \code{chaine\_codage\_bytes} pour un nom \code{bytes}
+d'une sous-liste écrite, rôle «~\emph{chemin}/@noms~»
+(section~\ref{sec:serialisation})~; \code{objet\_modifie} au rapport figé
+pour une fiche de classe \code{bytes} ou une sous-liste de nom ou de classe
+\code{bytes}, l'empreinte du résultat n'étant pas recalculable
+(tableau~\ref{tab:refus-rapport})~; au rejeu, \code{fiche\_non\_conforme}
+à l'étape~2 pour un champ que le rejeu lit lui-même, témoin «~non
+déterminable~» ou «~différente~» sinon (section~\ref{sec:rejeu}). Une
+classe d'encodage \code{bytes} est citée sous le repère de la règle
+ci-dessus. \textbf{Statut et limites}~: \emph{constat} des tests et de
+mesures sous les locales C et C.UTF-8, aux premier, deuxième et troisième
+niveaux de la fiche, non une propriété démontrée pour toute profondeur. Restent hors de cette règle,
+renvoyés à des issues~: une \emph{valeur} chaîne d'encodage \code{bytes}
+dans \code{versions} ou \code{plateforme} fait lever l'erreur R au rejeu
+(lecture des paires du témoin~; issue~\#142, constat)~; une colonne de
+rôle de nom \code{bytes} fait lever l'erreur R dans la préparation des
+données (\code{preparer\_donnees()}, fonction interne), cas que les
+fonctions exportées n'atteignent pas~: \code{construire\_table()} et le
+rejeu refusent ce nom avant la première étape, au calcul des empreintes
+(\code{chaine\_codage\_bytes}, module \code{rapport}~; issue~\#140).
 
 \subsection{Avertissements métier}
 \label{sec:avertissements}
@@ -914,6 +958,24 @@ aucun de ce codage~; noms lus par \code{attr(x, "names", exact = TRUE)},
 non par \code{names()}, qui dispatche sur la classe et lève sur une classe
 d'encodage \code{bytes}~; contrôle préalable à toute lecture par nom d'un
 objet reçu (section~\ref{sec:refus}~; issue~\#114) \\
+\catalogue{fonctions-outils}{a\_classe()} & interne & \code{x},
+\code{classe} & \code{TRUE} si \code{classe} figure dans l'attribut
+\code{class} de \code{x}, lu par \code{attr()}, \code{FALSE} sinon~;
+équivaut à \code{inherits()} pour une classe posée en attribut, sans lever
+d'erreur R sur une classe d'encodage \code{bytes} (section~\ref{sec:refus},
+«~Classes et noms d'encodage \code{bytes} sous le premier niveau~»~;
+issue~\#128) \\
+\catalogue{fonctions-outils}{classe\_bytes()} & interne & \code{x} &
+\code{TRUE} si un élément de l'attribut \code{class} de \code{x} est
+d'encodage \code{bytes}, \code{FALSE} sinon~; l'appelant retire alors la
+classe par \code{unclass()} avant toute fonction qui dispatche
+(issue~\#128) \\
+\catalogue{fonctions-outils}{lire\_champ()} & interne & \code{x} (liste),
+\code{nom} & premier élément de \code{x} de ce nom, \code{NULL} s'il est
+absent, comme \code{x[[nom]]}, mais trouvé par \code{match()} sur les noms
+lus par \code{attr()} et lu par position (\code{.subset2()})~: aucune
+erreur R sur un nom ou une classe d'encodage \code{bytes}, à toute
+position (issue~\#128) \\
 \catalogue{fonctions-outils}{avertissements\_vides()} & interne & --- &
 accumulateur vide des avertissements métier, colonne \code{nombre} en
 \code{integer} (section~\ref{sec:avertissements}~; issues~\#9 et~\#24) \\
@@ -2707,12 +2769,18 @@ appeler \code{construire\_table()}~:
     \code{version\_fiche}, \code{integer} de longueur~1, non \code{NA}, sans
     attribut (forme exacte~: un \code{double} relu d'un texte édité est
     refusé)~; \code{empreintes}, liste nommée aux noms uniques, sans autre
-    attribut que ses noms, et, si elle l'est, ses éléments
-    \code{algorithme}, \code{representation} et \code{donnees}, chacun
+    attribut que ses noms et sans nom d'encodage \code{bytes}, et, si elle
+    est une liste nommée aux noms uniques, ses éléments
+    \code{algorithme}, \code{representation} et \code{donnees}, lus par
+    \code{lire\_champ()}, chacun
     chaîne unique, non vide, non \code{NA}, sans attribut
     (\code{chaine\_unique()})~; noms \code{roles}, \code{plan} et
     \code{provenance} présents (\code{provenance} peut valoir
-    \code{NULL}). \textbf{Tous} les champs en défaut sont cités dans un seul
+    \code{NULL}). Une classe d'encodage \code{bytes} sur l'un de ces champs
+    est un attribut en défaut comme un autre, et un nom de cet encodage dans
+    \code{empreintes} un défaut de forme de ce champ~: ils sont refusés ici,
+    avec les autres défauts, et non par une erreur R (ADR 0012, point~3.4~;
+    décision M202~; issue~\#128). \textbf{Tous} les champs en défaut sont cités dans un seul
     refus \code{fiche\_non\_conforme}~; aucun n'est complété ni converti. Le
     contenu de \code{roles}, \code{plan} et \code{provenance} est laissé à
     l'étape~6~;
@@ -2814,9 +2882,15 @@ locales C et C.UTF-8). Les formes lues de l'étape~2 sont
 écrites par \code{decrire\_forme()}~: «~champ absent~», ou «~\emph{type} de
 longueur \emph{n}~», complété au besoin par «~, NA~», «~, vide~»,
 «~, attribut(s) \emph{noms}~» (les noms d'une liste ne sont pas cités comme
-attribut), «~, noms en double~: \emph{noms}~» et «~, noms incomplets~»~;
-les noms d'attributs et les noms en double y sont cités par la règle
-unique. Pour ces formes, \code{details\$lu} est ce texte descriptif, et
+attribut), «~, noms en double~: \emph{noms}~», «~, noms incomplets~» et
+«~, nom(s) d'encodage bytes (n\textsuperscript{o}~\emph{k}~:
+\emph{repère})~», où \emph{k} est la position du premier de ces noms
+(issue~\#128)~; les noms d'attributs et les noms en double y sont cités un
+à un par la règle unique, si bien qu'un nom \code{bytes} n'efface pas les
+autres. Une valeur de classe d'encodage \code{bytes} est décrite par son
+type et sa longueur sans sa classe, ses attributs, \code{class} compris,
+étant relevés avant (\code{length()}, \code{is.na()} et \code{names()}
+lèveraient l'erreur R sur elle). Pour ces formes, \code{details\$lu} est ce texte descriptif, et
 non la valeur brute~: la valeur exacte est celle de la fiche reçue au
 chemin \code{details\$champ}.
 Dans le tableau, un crochet désigne une valeur insérée.
@@ -3019,7 +3093,12 @@ règles~:
     identité ---, sinon «~identique~» ou «~différente~»~;
   \item \textbf{V2} (\code{verdict\_liste()}, \code{versions} et
     \code{plateforme})~: «~non déterminable~» si le côté de la fiche reçue
-    n'est pas une liste sans classe aux noms complets, sinon la règle~V3 sur
+    n'est pas une liste sans classe aux noms complets, ou porte un nom
+    d'encodage \code{bytes} (une classe de cet encodage étant déjà une
+    classe), la colonne \code{lu} citant alors ce nom sous le repère de la
+    règle unique, ou «~illisible (list de longueur \emph{n})~» pour une
+    classe \code{bytes}~: ces champs sont des témoins, jamais motifs de
+    refus (ADR 0012, point~3.6~; décision M202~; issue~\#128)~; sinon la règle~V3 sur
     ces deux listes, champ par champ, les noms étant lus dans la fiche et
     dans l'objet rendu (le champ \code{bibliotheque\_c} y entre ainsi sans
     retouche)~;
@@ -3031,7 +3110,9 @@ règles~:
     la fiche rendue, puis noms propres à la fiche reçue)~; un nom présent
     d'un seul côté est cité «~(absent de la fiche reçue)~» ou «~(absent de la
     fiche rendue)~»~; toute autre valeur est une feuille, citée par son
-    chemin~; un nœud qui diffère sans qu'aucun de ses enfants diffère est
+    chemin, dont une liste qui porte un nom d'encodage \code{bytes}, à
+    toute profondeur, citée «~différente~» à son chemin sans que ses noms
+    soient lus (issue~\#128)~; un nœud qui diffère sans qu'aucun de ses enfants diffère est
     cité «~(ordre des champs ou attributs)~». Pour le témoin de la fiche,
     les deux côtés sont d'abord privés de \code{versions},
     \code{plateforme}, \code{empreintes/resultat}, \code{empreintes/code} et
@@ -3191,7 +3272,16 @@ des valeurs lues dans les messages (VT, FF, NEL et U+2028 écrits
 au lieu d'une erreur R, d'un algorithme ou d'une classe d'encodage
 \code{bytes} (issue~\#94), et d'un nom d'encodage \code{bytes} au
 premier niveau de la fiche, en première, quatrième et dernière positions
-(issue~\#114).
+(issue~\#114)~; pour l'issue~\#128, un nom d'encodage \code{bytes} dans
+\code{empreintes} (chacune de ses positions) ou une classe de cet encodage
+sur un champ lu par le rejeu (refus \code{fiche\_non\_conforme} à
+l'étape~2, avec un autre défaut de forme dans le même refus), un nom ou
+une classe \code{bytes} dans \code{versions} et \code{plateforme} (rejeu
+rendu, témoin «~non déterminable~»), un nom \code{bytes} aux deuxième et
+troisième niveaux d'autres champs (témoin de la fiche «~différente~» à son
+chemin), des noms en double dont un \code{bytes}, cités un à un, et une
+colonne de rôle de nom \code{bytes} (refus \code{chaine\_codage\_bytes}
+au lieu d'une erreur R).
 \code{tests/test\_reproductibilite.R} rejoue, pour les six plans de
 référence, la fiche écrite puis relue~: objet \code{identical()} hors
 \code{execution} à l'objet de référence, témoins du code, des versions, de
@@ -3229,14 +3319,14 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
-\catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», pour un message ou le bilan du rejeu \\
+\catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», longueur lue sans la classe si celle-ci est d'encodage \code{bytes} (issue~\#128), pour un message ou le bilan du rejeu \\
 \catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu seulement \\
-\catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets (section~\ref{sec:rejeu}) \\
-\catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & paires «~nom=valeur~» jointes par «~;~», ou \code{texte\_lu()} d'une autre valeur~; colonnes du bilan pour \code{versions} et \code{plateforme} \\
-\catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
+\catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets, nom(s) d'encodage \code{bytes}~; valeur de classe \code{bytes} décrite sans sa classe (section~\ref{sec:rejeu}~; issue~\#128) \\
+\catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & paires «~nom=valeur~» jointes par «~;~», noms cités par la règle unique (repère pour un nom \code{bytes}), ou \code{texte\_lu()} d'une autre valeur, liste de classe \code{bytes} comprise~; colonnes du bilan pour \code{versions} et \code{plateforme} (issue~\#128) \\
+\catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; une liste à nom d'encodage \code{bytes} est une feuille (issue~\#128)~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
 \catalogue{fonctions-construire-table}{verdict\_chemins()} & interne & fiche rendue, fiche reçue, racine & verdict~V3~: «~identique~» ou «~différente~:~» et les chemins \\
 \catalogue{fonctions-construire-table}{verdict\_chaines()} & interne & attendu, lu & verdict~V1~: «~non déterminable~» si l'un n'est pas une chaîne unique, sinon «~identique~» ou «~différente~» \\
-\catalogue{fonctions-construire-table}{verdict\_liste()} & interne & liste rendue, liste reçue, racine & verdict~V2~: «~non déterminable~» si la liste reçue n'est pas une liste sans classe aux noms complets, sinon \code{verdict\_chemins()} \\
+\catalogue{fonctions-construire-table}{verdict\_liste()} & interne & liste rendue, liste reçue, racine & verdict~V2~: «~non déterminable~» si la liste reçue n'est pas une liste sans classe aux noms complets ou porte un nom d'encodage \code{bytes}, sinon \code{verdict\_chemins()} \\
 \catalogue{fonctions-construire-table}{perimetre\_temoin\_fiche()} & interne & fiche & fiche privée de \code{versions}, \code{plateforme} et des trois dernières empreintes, périmètre du témoin de la fiche \\
 \catalogue{fonctions-construire-table}{rejouer\_fiche()} & exportée & données, fiche & objet de classe \code{rejeu} (\code{construction}, \code{bilan})~; contrôles, puis \code{construire\_table()} une fois~; refus nommés du module \code{construire\_table} (section~\ref{sec:rejeu}) \\
 \end{longtable}
@@ -3438,7 +3528,12 @@ vide~; issue~\#62)~; \code{role\_inconnu}~;
 \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
 \code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
-\code{type\_incompatible}~; \code{date\_hors\_domaine} (une ou plusieurs
+\code{type\_incompatible} (une colonne de classe d'encodage
+\code{bytes} y est refusée comme toute classe non admise, et une colonne
+de nom \code{bytes} y est jugée sur son type, nom et classe cités sous le
+repère, sans erreur R~; un tel nom est refusé plus loin par le module
+\code{rapport}, \code{chaine\_codage\_bytes}~; section~\ref{sec:refus}~;
+issue~\#128)~; \code{date\_hors\_domaine} (une ou plusieurs
 colonnes de date portent une date hors de [0001-01-01, 9999-12-31]~; le refus
 nomme tous les rôles et colonnes en cause et, dans \code{details\$lignes},
 les lignes de chacun, comme \code{ligne\_invalide})~;
@@ -3828,11 +3923,11 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{composantes\_date()} & interne & jours depuis 1970-01-01 & année, mois, jour \\
 \catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
 \catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
-\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
+\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne de classe d'encodage \code{bytes} étant non conforme sans erreur R (issue~\#128) \\
 \catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees} ou \code{brut})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, en appel direct (\code{controler = TRUE}), par la fonction d'étape \code{brut} (issues~\#22 et~\#59) \\
 \catalogue{fonctions-donnees}{ligne\_transition()} & interne & transition (\code{list(depart, arrivee)}, de forme déjà contrôlée) & ligne de \code{TRANSITIONS} de la transition, zéro ligne si elle n'est pas prise en charge~; seul endroit où s'écrit la recherche (issue~\#22) \\
 \catalogue{fonctions-donnees}{valeurs\_parametres\_donnees()} & interne & transition, période, délai, déjà contrôlés & transition retenue (\code{ligne\_transition()}), début, fin, borne $B$ (jours depuis 1970-01-01)~; ne contrôle rien~; employée par les fonctions d'étape appelées avec \code{controler = FALSE} et par \code{taux\_kaplan\_meier()} (issue~\#22) \\
@@ -6968,7 +7063,14 @@ d'encodage \code{bytes}, avant toute lecture par nom (message «~Rôle
 deviner. Nom de champ n\textsuperscript{o} [position du premier] de la fiche~: [nom
 cité].~»~; \code{details}~: \code{role}, \code{lignes}, les positions,
 \code{lu}, les noms bruts~; section~\ref{sec:refus}, «~Noms d'encodage
-\code{bytes}~»~; issue~\#114). Le message
+\code{bytes}~»~; issue~\#114). Plus bas, l'écrivain refuse de même un nom
+d'encodage \code{bytes} d'une sous-liste (\code{chaine\_codage\_bytes},
+rôle «~\emph{chemin}/@noms~», par exemple «~empreintes/@noms~»), et une
+fiche ou une valeur de classe d'encodage \code{bytes} sous
+\code{serialisation\_impossible} (classe citée sous le repère)~; les lectures par nom et par classe passent par
+\code{lire\_champ()} et \code{a\_classe()} (section~\ref{sec:refus},
+«~Classes et noms d'encodage \code{bytes} sous le premier niveau~»~;
+issue~\#128). Le message
 d'un refus de lecture («~Lecture du texte de [nature], ligne [n]~:
 [\ldots].~», sans numéro de ligne quand le refus n'en a pas) est marqué
 UTF-8 sous toute locale~; la première ligne lue
@@ -7151,7 +7253,14 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     qu'un nom d'encodage \code{bytes} au premier niveau de l'objet ou de sa
     fiche, à toute position, qui rend l'empreinte non recalculable et que le
     contrôle relève dès le contrôle~1, avant toute lecture par nom
-    (\code{noms\_bytes()}~; issue~\#114)~;
+    (\code{noms\_bytes()}~; issue~\#114)~; une fiche de classe
+    d'encodage \code{bytes}, ou une sous-liste de nom ou de classe
+    \code{bytes} dans le périmètre de l'empreinte, la rend aussi non
+    recalculable et est refusée ici, les champs étant lus par
+    \code{lire\_champ()} (issue~\#128)~; hors de ce périmètre
+    (\code{versions}, \code{plateforme}), un nom \code{bytes} est refusé
+    à l'écriture de la section par \code{chaine\_codage\_bytes}, une
+    classe \code{bytes} par \code{type\_non\_canonique}~;
   \item \textbf{couverture}~: aucun élément de l'objet hors des sections~:
     tout élément de premier niveau autre que \code{table}, \code{etapes},
     \code{avertissements}, \code{fiche} et \code{execution}, toute étape ou
@@ -7662,7 +7771,13 @@ une ligne et marquée UTF-8 (issue~\#94)~; le refus nommé, au lieu d'une
 erreur R, d'un nom d'encodage \code{bytes} de l'objet ou de sa fiche, en
 première, quatrième et dernière positions, par \code{ecrire\_fiche()}
 (\code{chaine\_codage\_bytes}) et par \code{ecrire\_rapport()}
-(\code{objet\_modifie}~; issue~\#114)~; l'absence de toute
+(\code{objet\_modifie}~; issue~\#114)~; pour l'issue~\#128, un nom
+\code{bytes} dans \code{empreintes}, \code{versions} ou
+\code{plateforme} (\code{chaine\_codage\_bytes}, rôle
+«~\emph{chemin}/@noms~», ou \code{objet\_modifie}) et une classe
+\code{bytes} sur la fiche ou ses sous-listes
+(\code{serialisation\_impossible}, \code{objet\_modifie} ou
+\code{type\_non\_canonique}), chaque fois au lieu d'une erreur R~; l'absence de toute
 ressource externe et la liste fermée des balises et entités~;
 l'échappement de modalités et de noms de colonne qui contiennent
 \code{<}, \code{>}, \code{\&} et \code{"}~; l'ordre des sections et la
@@ -7726,15 +7841,15 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{chiffres\_17()} & interne & doubles finis $> 0$ & dix-sept chiffres arrondis au plus proche, égalité vers le pair, et exposant décimal (I1 à I5)~; entier décimal exact calculé en tranches, groupé par classe de longueur de la table \\
 \catalogue{fonctions-rapport}{positions\_17g()} & interne & doubles finis non nuls & octets ASCII de la forme \code{\%.17g} (notation fixe ou à exposant, zéros de fin retirés, signe), une colonne par valeur \\
 \catalogue{fonctions-rapport}{octets\_17g()} & interne & doubles & octets de l'écriture «~texte~», une valeur par ligne, LF final~; \code{x + 0}, jetons \code{NA}, \code{NaN}, \code{Inf}, \code{-Inf} lus sur la valeur reçue~; par blocs de $2^{14}$ valeurs~; appelée par \code{ecrire\_valeurs()} \\
-\catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g}, calculé par \code{octets\_17g()}, issue~\#104)~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique}, et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
-\catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire \\
+\catalogue{fonctions-rapport}{ecrire\_valeurs()} & interne & colonne, forme, rôle & libellé de type et octets~; forme \code{"empreinte"} (doubles en octets IEEE~754) ou \code{"texte"} (doubles en \code{\%.17g}, calculé par \code{octets\_17g()}, issue~\#104)~; refus \code{forme\_ecriture\_inconnue}, \code{type\_non\_canonique} (dont toute valeur de classe d'encodage \code{bytes}, facteur reconnu par \code{a\_classe()}~; issue~\#128), et, en garde-fou, \code{date\_hors\_domaine}, \code{date\_non\_entiere} \\
+\catalogue{fonctions-rapport}{texte\_canonique()} & interne & données, rôles, fichier & représentation canonique écrite en binaire~; colonnes lues par \code{lire\_champ()} (issue~\#128) \\
 \catalogue{fonctions-rapport}{empreinte\_donnees()} & interne & données, rôles & MD5 de la représentation canonique \\
 \catalogue{fonctions-rapport}{controler\_provenance()} & interne & provenance & refus \code{provenance\_invalide} \\
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche, dans l'ordre de la section~\ref{sec:fiche}~; \code{resultat} à \code{NA}, posé ensuite par \code{construire\_table()}~; \code{code} égal à \code{EMPREINTE\_CODE}~; contrôle d'abord, par \code{octets\_chaines()}, le codage des valeurs des rôles et des champs de la provenance (refus de codage, issue~\#106) \\
 \catalogue{fonctions-rapport}{statut\_empreintes()} & interne & empreinte du code & \code{statut\_resultat\_code}~: libellé du résultat, \code{" ; "}, libellé du code calculé ou, si l'empreinte du code est \code{NA}, des sources introuvables~; marqué UTF-8 \\
 \catalogue{fonctions-rapport}{md5\_octets()} & interne & octets & MD5 des octets, écrits en binaire dans un fichier temporaire supprimé à la sortie \\
 \catalogue{fonctions-rapport}{CHEMINS\_HORS\_RESULTAT} & constante & --- & liste fermée des sept chemins hors du périmètre de l'empreinte du résultat (section~\ref{sec:empreinte-resultat}) \\
-\catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture \\
+\catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
@@ -7757,7 +7872,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne} \\
 \catalogue{fonctions-rapport}{ecrire\_plan()} & exportée & plan & octets du texte du plan, écrit tel qu'il est reçu, sans validation ni canonisation \\
 \catalogue{fonctions-rapport}{lire\_plan()} & exportée & octets & plan relu, \textbf{non validé}~: à passer à \code{valider\_plan()} ou à \code{construire\_table()} \\
-\catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier~; \code{chaine\_codage\_bytes} pour un nom de premier niveau d'encodage \code{bytes})~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}, \code{TEXTE\_REJEU\_FICHE}) \\
+\catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier~; \code{chaine\_codage\_bytes} pour un nom de premier niveau d'encodage \code{bytes}, et, par l'écrivain, pour un nom de cet encodage plus bas~; \code{serialisation\_impossible} pour une classe de cet encodage~; issues~\#114 et~\#128)~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}, \code{TEXTE\_REJEU\_FICHE}) \\
 \catalogue{fonctions-rapport}{TEXTE\_REJEU\_FICHE} & constante & --- & ligne \code{\# rejeu} de la fiche écrite (note de lecture d'E3.7 en une ligne), reprise par la section «~Rejeu~» du rapport figé~; texte du moteur marqué UTF-8 \\
 \catalogue{fonctions-rapport}{lire\_fiche()} & exportée & octets & fiche relue, dont le rejeu est \code{construire\_table(donnees, f\$roles, f\$plan, f\$provenance)}, outillé par \code{rejouer\_fiche()}~; ne contrôle pas \code{version\_fiche} \\
 \catalogue{fonctions-rapport}{SECTIONS\_RAPPORT} & constante & --- & les quatorze sections du rapport figé, dans l'ordre~: identifiant, titre, nature, étape, racines, renvois (tableau~\ref{tab:sections-rapport}) \\
@@ -7770,9 +7885,9 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{decrire\_valeur()} & interne & valeur & valeur décrite pour un refus~: écriture et type d'un atomique de longueur~1 sans attribut, sinon type et classes~; \code{NULL} pour \code{NULL} \\
 \catalogue{fonctions-rapport}{valeur\_message()} & interne & valeur & la chaîne elle-même si elle est unique et sans caractère de contrôle, «~absente~» si \code{NULL}, sinon \code{decrire\_valeur()}~: message sur une ligne \\
 \catalogue{fonctions-rapport}{lire\_racine()} & interne & objet, chemin & élément de chemin donné, et indicateur de présence \\
-\catalogue{fonctions-rapport}{controler\_rapport()} & interne & objet & les quatre contrôles avant l'écriture et leurs refus nommés (tableau~\ref{tab:refus-rapport}) \\
+\catalogue{fonctions-rapport}{controler\_rapport()} & interne & objet & les quatre contrôles avant l'écriture et leurs refus nommés (tableau~\ref{tab:refus-rapport})~; champs de la fiche lus par \code{lire\_champ()}, si bien qu'une classe ou un nom d'encodage \code{bytes} donne \code{objet\_modifie} au lieu d'une erreur R (issue~\#128) \\
 \catalogue{fonctions-rapport}{table\_colonnes()} & interne & \code{data.frame}, chemin & table de colonnes HTML~: légende, en-tête (nom, type), une ligne par ligne de l'objet \\
-\catalogue{fonctions-rapport}{lignes\_racines()} & interne & objet, racines, insertions & tables de lignes et de colonnes des racines, dans l'ordre de l'objet~; structure seule pour \code{CHEMINS\_STRUCTURE\_SEULE}~; «~absent de l'objet~» \\
+\catalogue{fonctions-rapport}{lignes\_racines()} & interne & objet, racines, insertions & tables de lignes et de colonnes des racines, dans l'ordre de l'objet~; structure seule pour \code{CHEMINS\_STRUCTURE\_SEULE}~; «~absent de l'objet~»~; valeur de classe d'encodage \code{bytes} passée à l'écrivain, qui la refuse (\code{type\_non\_canonique}~; issue~\#128) \\
 \catalogue{fonctions-rapport}{paragraphe()} & interne & textes & paragraphe HTML, texte échappé \\
 \catalogue{fonctions-rapport}{element\_liste()} & interne & textes & élément de liste HTML, texte échappé \\
 \catalogue{fonctions-rapport}{corps\_section()} & interne & objet, rang de la section & corps HTML d'une section de \code{SECTIONS\_RAPPORT}~; erreur de programmation pour une section sans rendu \\
