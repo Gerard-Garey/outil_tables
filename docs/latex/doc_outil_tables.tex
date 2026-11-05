@@ -581,7 +581,10 @@ les deux contrôles de forme qui s'y appuient, partagés par les modules~:
 \code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
 issue~\#48), ainsi que la règle des noms complets, \code{noms\_complets()}
 (noms présents, sans \code{NA} ni nom vide), écrite une seule fois pour le
-contrôle des rôles et pour celui du plan (issue~\#22), et la règle unique de
+contrôle des rôles et pour celui du plan (issue~\#22), le seul point de
+passage des messages de refus, \code{formuler()}
+(section~\ref{sec:refus}, «~Règle de rédaction des messages~»~;
+issue~\#127), et la règle unique de
 citation d'une valeur dans un message de refus,
 \code{neutraliser\_citation()} (section~\ref{sec:refus}~; issue~\#94),
 avec le relevé des noms d'encodage \code{bytes} d'un objet reçu,
@@ -603,7 +606,8 @@ quatre champs~:
   \item \code{motif}~: un code court stable, en minuscules ASCII, chiffres et
     soulignés, conforme au motif \code{MOTIF\_CODE\_REFUS}
     (\verb|^[a-z][a-z0-9_]*$|)~;
-  \item \code{message}~: la phrase qui dit ce qui manque (E5.5)~;
+  \item \code{message}~: la phrase qui dit ce qui manque (E5.5), formée par
+    \code{formuler()} (ci-dessous, «~Règle de rédaction des messages~»)~;
   \item \code{details}~: une liste (rôle, colonne, étape, paramètre, décompte,
     premiers numéros de ligne).
 \end{itemize}
@@ -621,6 +625,67 @@ est préférée à un objet portant \code{ok = FALSE}, forme d'\code{outil\_USP}
 un tel objet peut être lu par mégarde comme une construction partielle, une
 condition ne le peut pas. Les codes de refus de chaque module sont recensés
 dans la partie du module.
+
+\medskip
+\noindent
+\textbf{Règle de rédaction des messages} (issue~\#127~; ADR 0007,
+annotation du 05/11/2026, (c) à~(f)). Tout message de refus du moteur, qu'il
+insère des valeurs ou non, dans tous les modules (\code{outils} compris) et
+dans les aides locales qui lèvent un refus, est formé par
+\code{formuler(gabarit, ...)}, qui vaut
+\code{sprintf(texte\_moteur(gabarit), ...)}~: le gabarit, littéral du
+moteur, est marqué UTF-8 \emph{avant} l'insertion des valeurs (un \code{\%}
+littéral s'y écrit \code{\%\%}). L'ordre importe. Un package installé sous
+la locale C garde ses littéraux non ASCII sans marque
+(section~\ref{sec:harnais}, «~Locale de l'installation~»), et, sous cette
+locale, \code{sprintf()}, \code{paste()} et \code{paste0()} traduisent un
+argument non marqué dès qu'un autre est marqué UTF-8, ce qu'est une valeur
+citée~: les octets non ASCII du gabarit deviennent alors le texte ASCII
+«~<c3><a9>~», que plus rien ne distingue d'une saisie, et marquer le
+message après sa formation vient trop tard (constat consigné par l'ADR 0007,
+annotation du 05/11/2026, (a) et~(b)). Pour la même raison, le marquage
+n'est pas fait dans \code{refuser()}, qui reçoit le message déjà formé~; une
+fonction \code{refuser()} qui recevrait le gabarit et les valeurs aurait changé le
+contrat de la condition, dont le champ \code{message} est reçu formé
+(option écartée, même annotation, (d)). Un argument inséré par \code{\%s}
+est de l'une de trois sortes~: une valeur reçue (des données, des rôles,
+du plan, de la provenance, d'une fiche ou d'un texte lu~: chaîne, nom,
+classe, chemin), citée par \code{neutraliser\_citation()} ou par ses deux
+alias, \code{citer()} et \code{sans\_controle()} (ci-dessous)~; un texte
+déjà formé selon la règle, qui n'est pas cité une seconde fois (résultat
+de \code{formuler()}, de \code{liste\_guillemets()}, dont les guillemets
+sont marqués avant le collage pour la même raison, ou d'une aide de
+message du moteur)~; une constante ASCII. Un nombre inséré par
+\code{\%d}, \code{\%g} ou \code{\%f} n'est pas cité.
+\textbf{Garantie sur le champ \code{message}}~: un message qui contient un
+caractère non ASCII est marqué UTF-8, a les mêmes octets sous les locales
+C et UTF-8, d'installation comme d'exécution, et tient sur une ligne~; un
+message entièrement ASCII n'est pas marqué, R ne marquant jamais une
+chaîne ASCII. \textbf{Statut}~: la marque est mesurée (\code{Encoding()}
+sur des refus des modules \code{outils} et \code{donnees}, paquet
+installé sous C.UTF-8, sessions C et C.UTF-8)~; l'identité des octets est
+un \emph{constat} de \code{tests/controles/locale\_c.R}
+(section~\ref{sec:harnais}) sur un refus par module et trois refus de
+lecture du texte du plan, non une propriété démontrée~; une locale
+latin-1 n'est pas mesurée pour les messages.
+\textbf{Contrôle}~: \code{tests/controles/messages\_refus.R}
+(tableau~\ref{tab:scripts-controle}) lit les fichiers de \code{R/} par
+\code{parse()}, sans charger \code{tablexp}, et vérifie que le gabarit de
+chaque appel de \code{formuler()} est une constante chaîne, ou un
+\code{paste()} ou \code{paste0()} de constantes, aux conversions en même
+nombre que les valeurs~; que chaque valeur insérée par \code{\%s} est de
+l'une des trois sortes ci-dessus (suivie à travers ses affectations
+locales)~; que le message de chaque refus (\code{refuser()},
+\code{refus\_tablexp()} et leurs relais locaux) est formé par
+\code{formuler()} ou par une aide de message, sans \code{sprintf()},
+\code{paste()} ni \code{paste0()}~; qu'une exception figure dans une liste
+fermée, une ligne par site avec sa raison (texte produit par le moteur
+seul~: constante, catalogue, nombre, type R), et que chacune sert encore.
+\textbf{Limites}~: les messages d'avertissement
+(section~\ref{sec:avertissements}) et les erreurs de programmation
+(\code{stop()}) sont hors de la règle~; le script ne contrôle pas le
+contenu d'une valeur citée, et reconnaît un relais ou une aide de message
+par son nom.
 
 \medskip
 \noindent
@@ -655,15 +720,16 @@ texte reçu à la ligne \code{details\$ligne}~; pour
 la sortie de \code{texte\_lu()} (section~\ref{sec:rejeu})~: la chaîne
 elle-même si c'est une chaîne unique sans attribut, sinon «~absente~» ou «~illisible (\emph{type} de
 longueur \emph{n})~», la version lue \code{details\$lu} restant brute.
-\textbf{Limite}~: la règle
-n'est pas encore appliquée aux autres refus qui citent une valeur reçue,
-dont, sans prétendre à l'exhaustivité, \code{type\_incompatible} du
-module \code{donnees} (nom de colonne et classe),
-\code{type\_non\_canonique} (classe) et \code{serialisation\_impossible}
-(classes et chemin) du module \code{rapport}~: un
-caractère de contrôle ou un séparateur de ligne reçu peut y apparaître
-brut dans le \code{message}. La règle porte sur le texte des refus,
-jamais sur une valeur écrite ni empreintée. Par élément~:
+Depuis l'issue~\#127, la règle vaut aussi pour tout autre refus qui
+cite une valeur reçue (règle de rédaction ci-dessus, contrôlée par
+\code{tests/controles/messages\_refus.R}), dont \code{type\_incompatible}
+du module \code{donnees} (rôle, nom de colonne et classe),
+\code{type\_non\_canonique} (rôle et classe) et
+\code{serialisation\_impossible} (chemin, classes et noms d'attributs) du
+module \code{rapport}, où un caractère de contrôle ou un séparateur de
+ligne reçu apparaissait auparavant brut dans le \code{message}. La règle
+porte sur le texte des refus, jamais sur une valeur écrite ni empreintée.
+Par élément~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{NA} reste \code{NA}~;
   \item une chaîne d'encodage \code{bytes} est remplacée par le repère
@@ -863,6 +929,13 @@ du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
 réservée au texte du moteur, jamais aux données, rôles ou plan de
 l'utilisateur (section~\ref{sec:harnais}, «~Locale de
 l'installation~»~; issue~\#50) \\
+\catalogue{fonctions-outils}{formuler()} & interne & \code{gabarit}
+(littéral du moteur), valeurs insérées & message de refus,
+\code{sprintf()} du gabarit marqué d'abord par \code{texte\_moteur()}~;
+seul point de passage de tout message de refus, avec ou sans valeur~;
+valeurs reçues citées par l'appelant, textes formés et constantes ASCII
+seulement (section~\ref{sec:refus}, «~Règle de rédaction des
+messages~»~; issue~\#127) \\
 \catalogue{fonctions-outils}{neutraliser\_citation()} & interne & \code{x}
 (converti par \code{as.character()} s'il n'est pas de type
 \code{character}) & vecteur de même longueur, sans noms, chaque élément
@@ -1180,7 +1253,9 @@ protège que les batteries~: une garde au chargement du package, pour tout
 usage, est l'objet de l'issue~\#25. Le \textbf{texte produit par le moteur}
 (messages d'avertissement, mentions, hypothèses et statuts de l'étape
 \code{brut}, unité d'exposition, hypothèse de censure, en-tête du texte du
-plan et de la fiche) est en outre marqué UTF-8 par \code{texte\_moteur()},
+plan et de la fiche, gabarits des messages de refus, ces derniers par
+\code{formuler()}, section~\ref{sec:refus}) est en outre marqué UTF-8 par
+\code{texte\_moteur()},
 quelle que soit la locale d'installation ou d'exécution~: sans ce marquage,
 un package installé ou exécuté sous la locale C laissait des chaînes non
 ASCII du moteur sans codage déclaré, et \code{ecrire\_fiche()} refusait la
@@ -1210,7 +1285,15 @@ pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
 outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
 citent des valeurs à caractères de contrôle ou non ASCII, et la citation
 d'une chaîne latin-1~; issue~\#94), qui doivent être marqués UTF-8 et tenir sur une
-ligne, puis compare octet à octet les textes
+ligne, et dix-huit refus par module, six modules (\code{donnees},
+\code{exposition}, \code{brut}, \code{simulation}, \code{rapport},
+\code{construire\_table}) citant chacun une valeur reçue non ASCII de
+codage natif non marqué, latin-1 et UTF-8, avec trois refus de la
+lecture du texte du plan (première ligne inconnue, type inconnu, valeur
+illisible), qui doivent en outre ne contenir aucun octet écrit
+«~<xx>~» et garder la valeur citée en octets UTF-8 (issue~\#127~;
+section~\ref{sec:refus}, «~Règle de rédaction des messages~»), puis
+compare octet à octet les textes
 obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
@@ -2130,11 +2213,24 @@ installation, qui vérifie d'abord la locale effective~; pour R1 à R6,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
 marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
-issue~\#94), puis ces textes, trois par plan, le bilan et les messages,
-soit vingt, comparés
+issue~\#94)~; messages de refus par module et de la lecture du texte du
+plan (marqués UTF-8, sur une ligne, sans octet écrit «~<xx>~»~;
+issue~\#127)~; puis ces textes, trois par plan, le bilan, les messages
+de R1 et les messages par module, soit vingt et un, comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
-batteries & ADR 0007, point 11~; M54~; issue~\#66 \\
+batteries & ADR 0007, point 11 et annotation du 05/11/2026, (f)~; M54~;
+issues~\#66 et~\#127 \\
+\code{messages\_refus.R} & règle de rédaction des messages de refus
+(section~\ref{sec:refus})~: fichiers de \code{R/} lus par \code{parse()},
+sans charger \code{tablexp}~; gabarit de \code{formuler()} constant, aux
+conversions en même nombre que les valeurs~; valeur insérée par
+\code{\%s} citée, formée ou constante ASCII~; message de chaque refus
+formé par \code{formuler()} ou une aide de message~; exceptions en liste
+fermée, motivées, toutes employées~; décompte imprimé. Appelé par la
+batterie unitaire (\code{test\_controles.R}), avec un témoin d'échec par
+règle~; pas d'étape propre de la CI & ADR 0007, point 6.4 et annotation
+du 05/11/2026, (c) et~(f)~; M182~; issue~\#127 \\
 \code{locale\_latin1.R} & \code{tablexp} installé dans deux bibliothèques
 temporaires, l'une sous \code{fr\_FR.ISO-8859-1}, générée par
 \code{localedef} (échec, jamais de saut, si elle ne peut pas l'être), l'autre
@@ -2706,7 +2802,8 @@ caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>},
 octets hors UTF-8 valide \code{<xx>}, chaîne \code{bytes} sous un repère~;
 \code{sans\_controle()}, issue~\#94)~; les \code{details} et le bilan
 gardent la valeur brute. Le message est marqué UTF-8 sous toute locale
-(gabarits passés par \code{texte\_moteur()}). Une valeur d'encodage
+(gabarits passés par \code{formuler()}, section~\ref{sec:refus},
+«~Règle de rédaction des messages~»). Une valeur d'encodage
 \code{bytes} donne ainsi le refus nommé de l'étape, et non l'erreur R
 «~translating strings with "bytes" encoding is not allowed~»~:
 \code{empreintes\$algorithme} d'encodage \code{bytes} est refusé sous
@@ -3733,7 +3830,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
 \catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion \\
 \catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
-\catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets pour les messages, chaque chaîne passée d'abord par \code{citer()} (issue~\#111) \\
+\catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees} ou \code{brut})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, en appel direct (\code{controler = TRUE}), par la fonction d'étape \code{brut} (issues~\#22 et~\#59) \\
