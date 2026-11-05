@@ -145,6 +145,20 @@ verifier("rôle inconnu au codage bytes : refus role_inconnu, chaîne remplacée
 x <- refus(prep(transition = list(depart = OCTETS, arrivee = "deces")))
 verifier("transition au codage bytes : refus transition_inconnue, chaîne remplacée par un repère",
          identical(x$motif, "transition_inconnue") && isTRUE(contient(x, "<chaîne d'encodage bytes> -> deces")))
+# Caractères de contrôle et séparateurs de ligne (#94) : citer() et
+# liste_guillemets() appliquent neutraliser_citation() (R/outils.R) ; message
+# sur une ligne, valeur exacte dans les details.
+for (k in list(list("VT", 0x0B, "<U+000B>"), list("FF", 0x0C, "<U+000C>"), list("NEL", 0x85, "<U+0085>"),
+               list("U+2028", 0x2028, "<U+2028>"))) {
+  s <- intToUtf8(c(0x73, 0x65, k[[2L]], 0x78, 0x65))
+  verifier(sprintf("citer() et liste_guillemets() : %s cité %s", k[[1L]], k[[3L]]),
+           identical(tablexp:::citer(c(s, NA)), c(paste0("se", k[[3L]], "xe"), NA)) &&
+             identical(tablexp:::liste_guillemets(s), paste0("« se", k[[3L]], "xe »")))
+  x <- refus(prep(roles = replace(ROLES, "sexe", s)))
+  verifier(sprintf("colonne absente « se<%s>xe » : refus colonne_absente, colonne citée %s, message sur une ligne", k[[1L]], k[[3L]]),
+           identical(x$motif, "colonne_absente") && isTRUE(contient(x, paste0("« se", k[[3L]], "xe »"))) &&
+             !grepl(intToUtf8(k[[2L]]), conditionMessage(x), fixed = TRUE))
+}
 x <- refus(prep(roles = replace(ROLES, "id_contrat", "tete")))
 verifier("colonne déclarée deux fois : refus colonne_declaree_deux_fois, message nomme colonne et rôles",
          identical(x$motif, "colonne_declaree_deux_fois") &&

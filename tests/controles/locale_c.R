@@ -21,9 +21,12 @@
 #       lire_fiche() et lire_plan() : aller-retour identical(), et réécriture
 #       de l'objet relu identique octet à octet au texte écrit ; rapport figé
 #       ecrire_rapport(x) (#87, C1) ; pour R1, rejouer_fiche() sur la fiche
-#       relue : chaînes non ASCII du bilan marquées UTF-8 (#86) ;
-#    3. les textes (fiche, plan et rapport figé de R1 à R6, bilan du rejeu de
-#       R1) écrits sous C et sous UTF-8 sont comparés octet à octet. Aucune
+#       relue : chaînes non ASCII du bilan marquées UTF-8 (#86) ; messages
+#       de refus du rejeu et de objet_modifie (et citation d'une chaîne
+#       latin-1) marqués UTF-8 et sur une ligne (#94) ;
+#    3. les textes (fiche, plan et rapport figé de R1 à R6, bilan du rejeu et
+#       messages de refus de R1) écrits sous C et sous UTF-8 sont comparés
+#       octet à octet. Aucune
 #       différence n'est admise : à entrées, rôles, plan et graine identiques
 #       sur la même machine, la locale ne change aucun octet de la fiche, du
 #       plan ni du rapport, empreinte du
@@ -110,6 +113,28 @@ travailleur <- function(args) {
         if (any(grepl("[^\001-\177]", v, useBytes = TRUE) & Encoding(v) != "UTF-8"))
           d("bilan du rejeu : chaîne non ASCII non marquée UTF-8")
         writeBin(unlist(lapply(v, function(s) c(charToRaw(s), as.raw(10L)))), file.path(sortie, "R1.bilan.txt"))
+        # Messages de refus du rejeu et de objet_modifie (#94, critère 3) :
+        # marqués UTF-8 sous la locale C, sur une ligne ; citation latin-1
+        # (« âge ») convertie et marquée UTF-8 ; octets comparés ensuite entre
+        # les deux installations.
+        refus_msg <- function(expr) tryCatch({ force(expr); NA_character_ },
+                                             refus_tablexp = function(r) conditionMessage(r))
+        u <- function(...) intToUtf8(c(...))
+        fr <- lire_fiche(tf)
+        f1 <- fr; f1$empreintes$algorithme <- u(0x6d, 0x64, 0x0b, 0xe9)
+        f2 <- fr; f2$version_fiche <- 3L; f2$versions$tablexp <- u(0x61, 0x2028, 0x62)
+        y1 <- x; y1$fiche$empreintes$resultat <- u(0xe9)
+        y2 <- x; attr(y2$etapes, "truc") <- 1
+        l1 <- rawToChar(as.raw(c(0xe2, 0x67, 0x65))); Encoding(l1) <- "latin1"
+        m <- c(refus_msg(rejouer_fiche(jeu$donnees, f1)), refus_msg(rejouer_fiche(jeu$donnees, f2)),
+               refus_msg(ecrire_rapport(y1)), refus_msg(ecrire_rapport(y2)), tablexp:::citer(l1))
+        if (anyNA(m)) d("refus attendu non levé (rejeu ou objet_modifie)")
+        else {
+          if (any(Encoding(m) != "UTF-8")) d("message de refus ou citation non marqué UTF-8")
+          if (any(grepl("[\n\v\f]", m, useBytes = TRUE))) d("message de refus sur plusieurs lignes")
+          if (!identical(charToRaw(m[5L]), as.raw(c(0xc3, 0xa2, 0x67, 0x65)))) d("citation latin-1 non convertie en UTF-8")
+          writeBin(unlist(lapply(m, function(s) c(charToRaw(s), as.raw(10L)))), file.path(sortie, "R1.refus.txt"))
+        }
       }
       NULL
     }, error = function(e) e)
@@ -214,9 +239,17 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
     if (!length(a) || !identical(a, b))
       defauts <- c(defauts, sprintf("R1.bilan.txt : bilan du rejeu sous C différent de celui sous %s (%s)", utf8, ecart_octets(a, b)))
   }
-  if (n_comparees != 3L * length(IDENTIFIANTS) + 1L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
+  # Messages de refus du rejeu et de objet_modifie, citation latin-1 (#94).
+  f <- file.path(vapply(cas, `[[`, "", "sortie"), "R1.refus.txt")
+  if (!all(file.exists(f))) defauts <- c(defauts, "R1.refus.txt : messages de refus absents") else {
+    a <- readBin(f[1L], "raw", file.size(f[1L])); b <- readBin(f[2L], "raw", file.size(f[2L]))
+    n_comparees <- n_comparees + 1L
+    if (!length(a) || !identical(a, b))
+      defauts <- c(defauts, sprintf("R1.refus.txt : messages de refus sous C différents de ceux sous %s (%s)", utf8, ecart_octets(a, b)))
+  }
+  if (n_comparees != 3L * length(IDENTIFIANTS) + 2L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
-  cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu de R1) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
+  cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu et messages de refus de R1) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
               n_comparees, paste(range(IDENTIFIANTS), collapse = " à "), utf8, duree(t_debut)))
   invisible(TRUE)
 }
