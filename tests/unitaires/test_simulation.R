@@ -1413,6 +1413,81 @@ verifier("défauts : ordre des refus figé, graine du jeu invalide et défauts i
     grepl("cible « en_cours » disjointe des causes admises pour sortie_manquante (« deces », « rachat »)",
           message_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = d_inv)), fixed = TRUE)
 })
+# Type de tête dans un portefeuille à un seul contrat par tête (#112 ; ADR
+# 0007, annotation du 05/11/2026, seconde, (c) 1 et (d)) : cible
+# structurellement vide, refus defauts_invalides avant tout tirage, en
+# nombre comme en taux, zéro compris. Critère 1 : 3 types x 4 portefeuilles
+# (uniforme, age_exact, et les deux modes multi avec loi_contrats = 1) x 4
+# valeurs ; critère 2 : graine du jeu NA_integer_ (graine_invalide non
+# atteint), aléa de l'appelant inchangé.
+TYPES_TETE <- c("tete_naissance_incoherente", "tete_sexe_incoherent", "tete_observee_apres_deces")
+PF_UN_CONTRAT <- list(
+  uniforme = PF_FORME, age_exact = PF_X,
+  uniforme_multi = modifyList(PF_M_1E3, list(loi_contrats = 1)),
+  age_exact_multi = c(modifyList(PF_X, list(mode = "age_exact_multi")), list(loi_contrats = 1)))
+VALEURS_TETE <- list(list(nombre = 3), list(nombre = 0), list(taux = 0.5), list(taux = 0))
+for (ty in TYPES_TETE) for (mo in names(PF_UN_CONTRAT)) for (va in VALEURS_TETE) {
+  set.seed(23L); avant <- globalenv()$.Random.seed
+  d_vide <- list(graine = GRAINE_DEF, declarations = list(c(list(type = ty), va)))
+  e <- lapply(list(NA_integer_, GRAINE), function(g)
+    tryCatch(simuler(loi(), PF_UN_CONTRAT[[mo]], PER, g, defauts = d_vide), refus_tablexp = function(r) r))
+  verifier(sprintf("défauts : %s, %s = %s, mode %s (un seul contrat par tête) -> refus defauts_invalides avant tout tirage (graine du jeu NA non atteinte), module, détails, message, aléa de l'appelant inchangé",
+                   ty, names(va), format(va[[1L]]), mo),
+           all(vapply(e, function(r) inherits(r, "refus_tablexp") && identical(r$module, "simulation") &&
+             identical(r$motif, "defauts_invalides") &&
+             identical(r$details, list(parametre = "defauts$declarations", declaration = 1L)) &&
+             grepl(sprintf("déclaration 1 : type %s : aucune unité éligible par construction (un seul contrat par tête", ty),
+                   conditionMessage(r), fixed = TRUE), logical(1L))) &&
+             identical(globalenv()$.Random.seed, avant))
+}
+verifier("défauts : type de tête sur un seul contrat par tête, ordre des refus : déclaration de ligne valide en 1, de tête en 2 -> declaration = 2 ; champ cible interdit prioritaire ; taux invalide sur cible vide -> refus de la cible vide", {
+  e2 <- tryCatch(simuler(loi(), PF_FORME, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    D1, list(type = "tete_sexe_incoherent", taux = 0.5)))), refus_tablexp = function(r) r)
+  m_cible <- message_refus(simuler(loi(), PF_FORME, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "tete_sexe_incoherent", cible = "deces", taux = 0.5)))))
+  m_taux <- message_refus(simuler(loi(), PF_FORME, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "tete_sexe_incoherent", taux = 2)))))
+  inherits(e2, "refus_tablexp") && identical(e2$motif, "defauts_invalides") &&
+    identical(e2$details, list(parametre = "defauts$declarations", declaration = 2L)) &&
+    grepl("déclaration 2 : type tete_sexe_incoherent : aucune unité éligible", conditionMessage(e2), fixed = TRUE) &&
+    grepl("type de tête « tete_sexe_incoherent » : champ cible interdit", m_cible, fixed = TRUE) &&
+    grepl("type tete_sexe_incoherent : aucune unité éligible par construction", m_taux, fixed = TRUE)
+})
+verifier("défauts : type de tête en taux, age_exact_multi avec loi_contrats = (0,5 ; 0,5), puis (0 ; 1) (K = 2 pour toute tête, frontière) -> admis, unités éligibles tracées", {
+  admis <- vapply(list(c(0.5, 0.5), c(0, 1)), function(lc) {
+    px2 <- c(modifyList(PF_X, list(mode = "age_exact_multi")), list(loi_contrats = lc))
+    r <- simuler(loi(), px2, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+      list(type = "tete_sexe_incoherent", taux = 0.5))))
+    dd <- attr(r, "defauts")$decomptes$declarations
+    is.data.frame(r) && dd$eligibles > 0L && dd$retenues > 0L
+  }, logical(1L))
+  all(admis)
+})
+verifier("défauts : type de tête sur un seul contrat par tête, raison citée avec le mode reçu (mode de base ; mode multi avec loi_contrats de longueur 1)", {
+  m_base <- message_refus(simuler(loi(), PF_X, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "tete_sexe_incoherent", taux = 0.5)))))
+  m_multi <- message_refus(simuler(loi(), PF_UN_CONTRAT$uniforme_multi, PER, GRAINE, defauts = list(
+    graine = GRAINE_DEF, declarations = list(list(type = "tete_naissance_incoherente", nombre = 1)))))
+  grepl("aucune unité éligible par construction (un seul contrat par tête : mode « age_exact »), quel que soit le tirage.",
+        m_base, fixed = TRUE) &&
+    grepl("aucune unité éligible par construction (un seul contrat par tête : mode « uniforme_multi », loi_contrats de longueur 1), quel que soit le tirage.",
+          m_multi, fixed = TRUE)
+})
+verifier("défauts : controler_defauts() appelé à deux arguments (vides par défaut : aucune condition vide), déclaration de tête valide -> admise", {
+  r <- tablexp:::controler_defauts(list(graine = 1L, declarations = list(list(type = "tete_sexe_incoherent", taux = 0.1))), 2L)
+  identical(r$declarations[[1L]]$type, "tete_sexe_incoherent") && identical(r$declarations[[1L]]$taux, 0.1)
+})
+verifier("défauts : nom vide (\"\") dans vides -> aucun type sans condition refusé ; une condition nommée reste refusée", {
+  d_sans <- list(graine = 1L, declarations = list(list(type = "sortie_manquante", cible = "deces", taux = 0.1)))
+  v <- c("raison de test", "raison tête"); names(v) <- c("", "tete_multi")
+  r <- tablexp:::controler_defauts(d_sans, 2L, v)
+  v_seul <- c("raison de test"); names(v_seul) <- ""
+  r_seul <- tablexp:::controler_defauts(d_sans, 2L, v_seul)
+  e <- tryCatch(tablexp:::controler_defauts(list(graine = 1L, declarations = list(
+    list(type = "tete_sexe_incoherent", taux = 0.1))), 2L, v), refus_tablexp = function(x) x)
+  identical(r$declarations[[1L]]$type, "sortie_manquante") && identical(r_seul$declarations[[1L]]$type, "sortie_manquante") &&
+    inherits(e, "refus_tablexp") && grepl("(raison tête)", conditionMessage(e), fixed = TRUE)
+})
 verifier("défauts : graine des défauts égale à celle du jeu (double puis integer) -> refus defauts_invalides, texte et détails d'actuary", {
   e1 <- tryCatch(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = as.double(GRAINE), declarations = list(D1))),
                  refus_tablexp = function(e) e)
@@ -1428,10 +1503,15 @@ verifier("défauts : graine des défauts = graine du jeu + 1 admise",
          is.data.frame(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = GRAINE + 1L, declarations = list(D1)))))
 verifier("défauts : nombre > éligibles -> refus defauts_ineligibles (après le tirage du jeu propre), aléa de l'appelant inchangé", {
   set.seed(22L); avant <- globalenv()$.Random.seed
-  d_tete <- list(graine = GRAINE_DEF, declarations = list(list(type = "tete_sexe_incoherent", nombre = 1)))
+  # Type de tête, vide qui dépend du tirage : mode multi (au plus n têtes à
+  # deux lignes), nombre = n + 1. Sur un seul contrat par tête (PF_FORME),
+  # refus defauts_invalides avant tout tirage (#112).
+  d_tete <- list(graine = GRAINE_DEF, declarations = list(list(type = "tete_sexe_incoherent", nombre = PF_M_1E3$n + 1)))
+  d_tete_1 <- list(graine = GRAINE_DEF, declarations = list(list(type = "tete_sexe_incoherent", nombre = 1)))
   # Vide qui dépend du jeu : aucun rachat tiré (loi de rachat nulle).
   d_ligne <- list(graine = GRAINE_DEF, declarations = list(D1, list(type = "sortie_manquante", cible = "rachat", nombre = 1)))
-  isTRUE(leve_refus(simuler(loi(), PF_FORME, PER, GRAINE, defauts = d_tete), "defauts_ineligibles")) &&
+  isTRUE(leve_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = d_tete), "defauts_ineligibles")) &&
+    isTRUE(leve_refus(simuler(loi(), PF_FORME, PER, GRAINE, defauts = d_tete_1), "defauts_invalides")) &&
     isTRUE(leve_refus(simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = d_ligne), "defauts_ineligibles")) &&
     grepl("déclaration 2 (sortie_manquante) : nombre = 1 dépasse le nombre d'unités éligibles (0)",
           message_refus(simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = d_ligne)), fixed = TRUE) &&
