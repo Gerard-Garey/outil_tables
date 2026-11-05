@@ -1,6 +1,2 @@
 type,nom,issue,motif
-entree,fonctions-outils:forme_graine,#113,"définie au premier niveau par #113 (prédicat de graine unique, partagé par sous_graine() et le contrôle des défauts du simulateur) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
-entree,fonctions-outils:vers_utf8_locale,#113,"définie par #113 (ADR 0007, annotation du 05/11/2026, (g) : conversion des chaînes selon la locale, partagée par octets_chaines() et l'ordre des segments) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
-entree,fonctions-simulation:ecart_noms,#113,"définie au premier niveau par #113 (règle unique des noms du portefeuille et des défauts) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
-entree,fonctions-simulation:en_date,#113,"définie au premier niveau par #113 (une seule définition, jeu simulé et jeu à défauts) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
 entree,fonctions-simulation:conditions_vides,#112,"définie au premier niveau par #112 (ensemble des conditions du catalogue structurellement vides, ADR 0007, annotation du 05/11/2026, seconde, (d)) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
