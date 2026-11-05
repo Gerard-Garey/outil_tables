@@ -196,28 +196,47 @@ for (k in list(list("VT", 0x0B, "<U+000B>"), list("U+2028", 0x2028, "<U+2028>"))
            else if (!identical(Encoding(conditionMessage(x)), "UTF-8")) "message non marqué UTF-8"
            else identical(x$details$colonne, s_))
 }
-# Chaîne d'encodage bytes en nom ou en classe de colonne (décision du
-# mainteneur du 05/11/2026 : rattachée à #128, étendue à controler_roles()) :
-# défaut connu, l'extraction de la colonne (`[[.data.frame`) ou dim() lève
-# l'erreur R « translating strings with "bytes" encoding is not allowed »
-# avant le refus (mesuré). Attendu : le refus type_incompatible ; toute autre
-# issue que cette erreur R (autre erreur, autre motif, aucun refus) est un
-# ECHEC, non un échec attendu. Le data.frame est assemblé sans `[[<-` ni
+# Chaîne d'encodage bytes en nom ou en classe de colonne (#128, extension de
+# périmètre acceptée par le mainteneur le 05/11/2026, reliquat du critère 3 de
+# #127) : refus type_incompatible, colonne et classe citées sous le repère,
+# message sur une ligne, marqué UTF-8, colonne brute dans les details. Avant
+# #128, `[[.data.frame`, dim() et is.factor() levaient l'erreur R « translating
+# strings with "bytes" encoding is not allowed » (contre-épreuve : ce test
+# échoue sur le code antérieur). Le data.frame est assemblé sans `[[<-` ni
 # `$<-`, qui lèveraient la même erreur.
 local({
-  attendu_bytes <- function(expr, motif) {
-    r <- leve_refus(expr, motif)
-    if (isTRUE(r) || grepl("\"bytes\"", r, fixed = TRUE)) r else stop(r, call. = FALSE)
-  }
   avec_sexe <- function(nom, valeur) {
     l <- unclass(BASE); l$sexe <- valeur; names(l)[names(l) == "sexe"] <- nom
     structure(l, class = "data.frame", row.names = seq_len(nrow(BASE)))
   }
-  echec_attendu("type incompatible, classe de colonne d'encodage bytes : type_incompatible", "#128",
-                attendu_bytes(prep(d = avec_sexe("sexe", structure(1:4, class = OCTETS))), "type_incompatible"))
-  echec_attendu("type incompatible, nom de colonne d'encodage bytes : type_incompatible", "#128",
-                attendu_bytes(prep(d = avec_sexe(OCTETS, structure(1:4, class = "k")),
-                                   roles = replace(ROLES, "sexe", OCTETS)), "type_incompatible"))
+  # Refus ou erreur R (une erreur R est rendue, non propagée : le test échoue
+  # proprement sur le code antérieur).
+  refus_ou_erreur <- function(expr) tryCatch({ force(expr); NULL }, error = function(e) e)
+  une_ligne_utf8 <- function(x, fragments) {
+    r <- contient(x, fragments)
+    if (!isTRUE(r)) r
+    else if (!identical(x$motif, "type_incompatible")) x$motif
+    else if (grepl("[\n\v\f]", conditionMessage(x))) "message sur plusieurs lignes"
+    else if (!identical(Encoding(conditionMessage(x)), "UTF-8")) "message non marqué UTF-8" else TRUE
+  }
+  x <- refus_ou_erreur(prep(d = avec_sexe("sexe", structure(1:4, class = OCTETS))))
+  verifier("type incompatible, classe de colonne d'encodage bytes : type_incompatible, classe citée sous le repère, une ligne, UTF-8", {
+    ok <- if (is.null(x)) "aucun refus" else if (!inherits(x, "refus_tablexp")) conditionMessage(x)
+          else une_ligne_utf8(x, c("rôle « sexe », colonne « sexe »", "<chaîne d'encodage bytes> reçu"))
+    if (isTRUE(ok)) identical(x$details$colonne, "sexe") else ok
+  })
+  x <- refus_ou_erreur(prep(d = avec_sexe(OCTETS, structure(1:4, class = "k")), roles = replace(ROLES, "sexe", OCTETS)))
+  verifier("type incompatible, nom de colonne d'encodage bytes : type_incompatible, colonne citée sous le repère, une ligne, UTF-8", {
+    ok <- if (is.null(x)) "aucun refus" else if (!inherits(x, "refus_tablexp")) conditionMessage(x)
+          else une_ligne_utf8(x, c("rôle « sexe », colonne « <chaîne d'encodage bytes> »", "k reçu"))
+    if (isTRUE(ok)) identical(x$details$colonne, OCTETS) else ok
+  })
+  # Colonne conforme sous un nom bytes : le type est jugé, non le nom (le refus
+  # chaine_codage_bytes de la fiche vient plus tard, module rapport).
+  verifier("nom de colonne d'encodage bytes, type conforme : controler_roles() ne lève rien et rend les rôles",
+           identical(tryCatch(tablexp:::controler_roles(avec_sexe(OCTETS, BASE$sexe), replace(ROLES, "sexe", OCTETS), "sexe"),
+                              error = function(e) conditionMessage(e)),
+                     replace(ROLES, "sexe", OCTETS)))
 })
 d <- BASE; d$an <- c(1950.5, 1960, 1945, 1945)
 verifier("type incompatible : annee_naissance non entière",

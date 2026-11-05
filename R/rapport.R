@@ -574,7 +574,11 @@ ecrire_valeurs <- function(x, forme, role) {
     sortie
   }
   doubles_texte <- function(x) octets_17g(x)
-  if (is.factor(x)) return(list(type = "factor", octets = octets_chaines(as.character(x), role)))
+  # Classe lue par a_classe() (R/outils.R, #128) : is.factor() lève une erreur
+  # R sur une classe d'encodage « bytes » ; une telle classe, facteur ou non,
+  # est refusée plus bas (type_non_canonique), comme toute classe sans
+  # représentation canonique.
+  if (!classe_bytes(x) && a_classe(x, "factor")) return(list(type = "factor", octets = octets_chaines(as.character(x), role)))
   if (identical(class(x), "Date")) {
     # Date : sprintf("%04d-%02d-%02d") sur composantes_date() (année sur quatre
     # chiffres, ADR 0011, point 4), sur les valeurs distinctes seulement ; jeton
@@ -638,7 +642,9 @@ texte_canonique <- function(donnees, roles, fichier) {
   on.exit(close(con))
   writeBin(charToRaw(sprintf("%s\t%d\t%d\n", ENTETE_CANONIQUE, nrow(donnees), length(r))), con)
   for (role in r) {
-    cc <- ecrire_valeurs(donnees[[roles[[role]]]], "empreinte", role)
+    # Colonne lue par lire_champ() (R/outils.R, #128) : donnees[[nom]] lève une
+    # erreur R sur un nom de colonne d'encodage « bytes ».
+    cc <- ecrire_valeurs(lire_champ(donnees, roles[[role]]), "empreinte", role)
     writeBin(charToRaw(sprintf("#%s\t%s\n", role, cc$type)), con)
     writeBin(cc$octets, con)
   }
@@ -752,8 +758,12 @@ empreinte_resultat <- function(x) {
     stop(simpleError(sprintf("empreinte_resultat() : %s (erreur de programmation).", message)))
   if (!is.list(x) || !identical(class(x), "construction"))
     programmation(sprintf("objet de classe %s au lieu de construction", paste(class(x), collapse = "/")))
+  # Une liste de classe ou de nom « bytes » est laissée telle quelle (#128) :
+  # names() et [[ ]] lèveraient une erreur R ; texte_objet() la refuse ensuite
+  # (serialisation_impossible), au lieu d'une erreur R brute.
   retirer <- function(v, segments) {
-    if (!is.list(v) || !segments[1L] %in% names(v)) return(v)
+    if (!is.list(v) || classe_bytes(v) || length(noms_bytes(v)) ||
+        !segments[1L] %in% attr(v, "names", exact = TRUE)) return(v)
     if (length(segments) == 1L) v[[segments]] <- NULL
     else v[[segments[1L]]] <- retirer(v[[segments[1L]]], segments[-1L])
     v
@@ -1113,7 +1123,11 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
   atome <- function(v, chemin, profondeur) {
     profonde(chemin, profondeur)
     a <- names(attributes(v))
-    if (is.factor(v)) {
+    # Classes lues par a_classe() (R/outils.R, #128) : is.factor() et
+    # is.data.frame() lèvent une erreur R sur une classe d'encodage « bytes » ;
+    # la valeur est alors refusée comme toute classe sans écriture
+    # (serialisation_impossible), la classe citée sous le repère.
+    if (a_classe(v, "factor")) {
       # Facteur : refusé dans le texte (grammaire 1, niveaux non écrits ;
       # troisième annotation, (a)) ; admis dans le texte empreinté (aucune
       # relecture), type factor et libellés en chaînes, comme dans l'empreinte
@@ -1152,7 +1166,7 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
   noeud <- function(v, chemin, profondeur) {
     profonde(chemin, profondeur)
     if (is.null(v)) return(ajouter(chemin, "NULL", 0L, raw(0)))
-    if (is.data.frame(v)) {
+    if (a_classe(v, "data.frame")) {
       a <- names(attributes(v))
       if (!identical(class(v), "data.frame") || !all(a %in% c("names", "class", "row.names")))
         impossible(chemin, formuler("data.frame de classe %s ou d'attribut(s) %s",
@@ -1184,7 +1198,7 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
     if (!is.atomic(v)) impossible(chemin, formuler("objet de type %s, sans écriture dans le texte", typeof(v)))
     atome(v, chemin, profondeur)
   }
-  if (!is.list(x) || is.data.frame(x)) impossible("", formuler("l'objet écrit doit être une liste"))
+  if (!is.list(x) || a_classe(x, "data.frame")) impossible("", formuler("l'objet écrit doit être une liste"))
   noeud(x, "", 0L)
   propre <- function(t) gsub("[\001-\037\177]", " ", enc2utf8(t), useBytes = TRUE)
   tete <- c(premiere, if (length(entete)) sprintf("# %s : %s", propre(names(entete)), propre(entete)))
@@ -1447,7 +1461,12 @@ lire_plan <- function(octets) {
 # représentation canonique de l'empreinte des données, les blocs de lecture
 # (BLOCS_LECTURE_FICHE, champs présents dans la fiche) et le rejeu (E3.7).
 ecrire_fiche <- function(fiche) {
-  if (inherits(fiche, "construction"))
+  # Classe lue par a_classe(), non par inherits() (R/outils.R, #128) :
+  # inherits() lève une erreur R sur une classe d'encodage « bytes ». Une
+  # fiche de cette classe est refusée par texte_objet() plus bas
+  # (serialisation_impossible, racine) ; les lectures par nom ci-dessous se
+  # font par lire_champ() et attr(), qui ne dispatchent pas.
+  if (a_classe(fiche, "construction"))
     refuser("rapport", "serialisation_impossible",
             formuler("Écriture du texte de fiche : objet `construction` reçu ; écrire sa fiche, x$fiche."),
             list(chemin = ""))
@@ -1465,14 +1484,19 @@ ecrire_fiche <- function(fiche) {
                            "Nom de champ n° %d de la fiche : %s."),
                      b[1L], neutraliser_citation(nf[b[1L]])),
             list(role = "@noms", lignes = b, lu = nf[b]))
-  rappel <- function(v) if (is.atomic(v) && length(v) == 1L && !is.na(v)) as.character(v) else "absente"
-  rep_ <- if (is.list(fiche) && is.list(fiche[["empreintes"]])) fiche[["empreintes"]][["representation"]]
-  presents <- if (is.list(fiche)) names(fiche)
+  # rappel() : une valeur de classe « bytes » est « absente » (length() lève) ;
+  # elle est refusée par texte_objet() (serialisation_impossible). Un nom
+  # « bytes » de `empreintes` est refusé de même (chaine_codage_bytes,
+  # empreintes/@noms) : sa représentation est lue par lire_champ().
+  rappel <- function(v) if (!classe_bytes(v) && is.atomic(v) && length(v) == 1L && !is.na(v)) as.character(v) else "absente"
+  em <- if (is.list(fiche)) lire_champ(fiche, "empreintes")
+  rep_ <- if (is.list(em)) lire_champ(em, "representation")
+  presents <- if (is.list(fiche)) attr(fiche, "names", exact = TRUE)
   blocs <- vapply(names(BLOCS_LECTURE_FICHE), function(b)
     sprintf("%s : %s", b, paste(intersect(BLOCS_LECTURE_FICHE[[b]], presents), collapse = ", ")), "")
   texte_objet(fiche, PREMIERE_LIGNE_FICHE,
               c(CONVENTIONS_TEXTE,
-                version_fiche = rappel(if (is.list(fiche)) fiche[["version_fiche"]]),
+                version_fiche = rappel(if (is.list(fiche)) lire_champ(fiche, "version_fiche")),
                 representation = rappel(rep_),
                 lecture = paste(blocs, collapse = " | "),
                 # Note de lecture d'E3.7 (docs/exigences.md), en une ligne.
@@ -1802,10 +1826,15 @@ controler_rapport <- function(x) {
   nb <- noms_bytes(f)
   if (length(nb)) noms_bytes_refus(f, "fiche", nb)
   # 2. Version de la fiche : la version courante seule (même motif que le rejeu).
-  v <- f[["version_fiche"]]
+  #    Champs de la fiche et de ses sous-listes lus par lire_champ() (R/outils.R,
+  #    #128), non par [[ ]] : une fiche de classe « bytes » (sans nom « bytes »)
+  #    ou une sous-liste à nom ou à classe « bytes » lèverait une erreur R ;
+  #    l'objet est alors refusé à l'intégrité (3., objet_modifie), l'empreinte
+  #    du résultat n'étant pas recalculable.
+  v <- lire_champ(f, "version_fiche")
   if (!identical(v, VERSION_FICHE)) {
-    ve <- f[["versions"]]
-    em <- f[["empreintes"]]
+    ve <- lire_champ(f, "versions")
+    em <- lire_champ(f, "empreintes")
     d <- decrire_valeur(v)
     refus("version_fiche_non_admise",
           formuler(paste("Rapport figé : version de fiche %s au lieu de %s (seule version admise par ce code) ;",
@@ -1813,15 +1842,16 @@ controler_rapport <- function(x) {
                          "Aucune conversion n'est faite : le rapport d'un objet d'une autre version",
                          "s'écrit avec le code qui l'a construit."),
                    if (is.null(d)) "absente" else d, decrire_valeur(VERSION_FICHE),
-                   valeur_message(if (is.list(ve)) ve[["tablexp"]]), valeur_message(if (is.list(em)) em[["code"]]),
+                   valeur_message(if (is.list(ve)) lire_champ(ve, "tablexp")),
+                   valeur_message(if (is.list(em)) lire_champ(em, "code")),
                    valeur_message(EMPREINTE_CODE)),
           list(lu = v, attendu = VERSION_FICHE))
   }
   # 3. Intégrité : empreinte du résultat recalculée égale à celle consignée ;
   #    une erreur du recalcul (attribut inconnu, structure altérée) est un objet
   #    modifié, non une erreur de programmation.
-  em <- f[["empreintes"]]
-  b <- if (is.list(em)) em[["resultat"]]
+  em <- lire_champ(f, "empreintes")
+  b <- if (is.list(em)) lire_champ(em, "resultat")
   a <- tryCatch(empreinte_resultat(x), error = function(e) e)
   if (inherits(a, "error"))
     refus("objet_modifie",
@@ -1924,6 +1954,11 @@ lignes_racines <- function(x, racines, apres = list()) {
     }
   }
   noeud <- function(v, chemin) {
+    # Valeur de classe d'encodage « bytes » (#128) : names(), length() et
+    # is.data.frame() lèveraient une erreur R ; l'écrivain la refuse
+    # (type_non_canonique, chemin cité), y compris aux chemins que l'empreinte
+    # du résultat exclut (fiche/versions, fiche/plateforme...).
+    if (classe_bytes(v)) return(vecteur(v, chemin))
     if (chemin %in% CHEMINS_STRUCTURE_SEULE) return(structure_seule(v, chemin))
     if (is.null(v)) return(ligne(chemin, "NULL", texte_entier(0L, chemin), ""))
     if (is.data.frame(v)) {

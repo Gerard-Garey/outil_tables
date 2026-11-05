@@ -1,2 +1,5 @@
 type,nom,issue,motif
 entree,fonctions-outils:formuler,#127,"définie par #127 (ADR 0007, annotation du 05/11/2026, (c)) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+entree,fonctions-outils:a_classe,#128,"définie par #128 (lectures sûres sur une classe ou un nom d'encodage bytes) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+entree,fonctions-outils:classe_bytes,#128,"définie par #128 (lectures sûres sur une classe ou un nom d'encodage bytes) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+entree,fonctions-outils:lire_champ,#128,"définie par #128 (lectures sûres sur une classe ou un nom d'encodage bytes) ; catalogue à compléter par docwriter en fin de branche (règle 9)"

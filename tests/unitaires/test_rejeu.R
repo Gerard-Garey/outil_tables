@@ -460,6 +460,197 @@ local({
     else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
   })
 })
+# Nom ou classe d'encodage bytes au deuxième niveau de la fiche, valeur de champ
+# de classe bytes (#128) : refus fiche_non_conforme ou rejeu rendu, au lieu de
+# l'erreur R « translating strings with "bytes" encoding is not allowed »
+# (contre-épreuve : ces tests échouent sur le code antérieur, qui lève cette
+# erreur sauf pour roles et plan, déjà refusés sous leurs motifs). Une erreur R
+# est rendue, non propagée. ADR 0012, points 3.4 et 3.6 : `empreintes`, champ lu
+# par le rejeu lui-même, est refusé à l'étape 2, avec les autres défauts de
+# forme ; `versions` et `plateforme`, témoins, ne sont jamais motifs de refus :
+# le rejeu est rendu, le témoin est « non déterminable ».
+local({
+  b <- "\xe9t\xe9"; Encoding(b) <- "bytes"
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  une_ligne_utf8 <- function(r, ok) {
+    if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
+    else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
+  }
+  verdict <- function(r, details, contient) {
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    une_ligne_utf8(r, controle_refus(r, "construire_table", "fiche_non_conforme", details, contient))
+  }
+  # `empreintes` : nom bytes en position 1, 2, 3 (un des trois champs lus
+  # remplacé : « champ absent » signalé avec `empreintes`) et en dernière
+  # (empreintes seul) ; classe bytes ; avec un autre défaut de forme, un seul
+  # refus les signale ensemble.
+  attendu_e <- "liste nommée aux noms uniques, sans autre attribut que ses noms"
+  attendu_c <- "chaîne unique, non vide, non NA, sans attribut"
+  lu_nom <- function(k) sprintf("list de longueur 9, nom(s) d'encodage bytes (n° %d : <chaîne d'encodage bytes>)", k)
+  trois <- c("algorithme", "representation", "donnees")
+  for (k in c(1:3, length(FICHE$empreintes))) {
+    fb <- FICHE; n <- names(fb$empreintes); n[k] <- b; attr(fb$empreintes, "names") <- n
+    perdu <- k <= 3L
+    verifier(sprintf("T11 nom d'encodage bytes en position %d de fiche$empreintes : refus fiche_non_conforme à l'étape 2 (pas une erreur R), champ empreintes%s, repère cité, une ligne, UTF-8",
+                     k, if (perdu) sprintf(" avec empreintes/%s absent", trois[k]) else " seul"),
+             verdict(attrape(rejouer_fiche(BASE, fb)),
+                     if (perdu) list(champ = c("empreintes", paste0("empreintes/", trois[k])),
+                                     lu = c(lu_nom(k), "champ absent"), attendu = c(attendu_e, attendu_c))
+                     else list(champ = "empreintes", lu = lu_nom(k), attendu = attendu_e),
+                     c("Fiche non conforme au rejeu : « empreintes » : ", lu_nom(k), "au lieu de liste nommée")))
+  }
+  fb <- FICHE; fb$empreintes <- structure(unclass(FICHE$empreintes), class = c("a", b))
+  verifier("T11 fiche$empreintes de classe bytes : refus fiche_non_conforme à l'étape 2 (pas une erreur R), attribut class cité, une ligne, UTF-8",
+           verdict(attrape(rejouer_fiche(BASE, fb)),
+                   list(champ = "empreintes", lu = "list de longueur 9, attribut(s) class", attendu = attendu_e),
+                   "« empreintes » : list de longueur 9, attribut(s) class au lieu de"))
+  fb <- FICHE; n <- names(fb$empreintes); n[2L] <- b; attr(fb$empreintes, "names") <- n; fb$version_fiche <- 4.5
+  verifier("T11 version_fiche 4.5 et fiche$empreintes à nom bytes : un seul refus fiche_non_conforme, les deux champs signalés ensemble",
+           verdict(attrape(rejouer_fiche(BASE, fb)),
+                   list(champ = c("version_fiche", "empreintes", "empreintes/representation"),
+                        lu = c("double de longueur 1", lu_nom(2L), "champ absent"),
+                        attendu = c("integer de longueur 1, non NA, sans attribut", attendu_e, attendu_c)),
+                   c("« version_fiche » : double de longueur 1 au lieu de", "« empreintes » : ", lu_nom(2L))))
+  # `versions` et `plateforme` : témoins, jamais motifs de refus. Nom bytes en
+  # position 1, 2 et dernière, classe bytes : rejeu rendu, témoin « non
+  # déterminable », valeur lue citée sous le repère (nom) ou « illisible »
+  # (classe), sur une ligne, marquée UTF-8 si non ASCII ; les autres lignes du bilan sont
+  # celles du rejeu d'une fiche saine.
+  for (ch in c("versions", "plateforme")) {
+    ligne <- if (ch == "versions") 9L else 10L
+    ok_temoin <- function(r, lu_attendu) {
+      if (inherits(r, "error")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+      lu <- r$bilan$lu[ligne]
+      if (!inherits(r, "rejeu")) "objet non rejeu"
+      else if (!identical(r$bilan$verdict[ligne], "non déterminable")) sprintf("verdict « %s »", r$bilan$verdict[ligne])
+      else if (!identical(r$bilan$verdict[-ligne], R0$bilan$verdict[-ligne])) "autres verdicts changés"
+      else if (!lu_attendu(lu)) sprintf("lu « %s »", lu)
+      else if (grepl("[\n\v\f]", lu)) "valeur sur plusieurs lignes"
+      else if (grepl("[^\001-\177]", lu, useBytes = TRUE) && !identical(Encoding(lu), "UTF-8")) "valeur non ASCII non marquée UTF-8"
+      else TRUE
+    }
+    sain <- paste(names(FICHE[[ch]]), vapply(FICHE[[ch]], function(v) v, ""), sep = "=")
+    for (k in unique(c(1L, 2L, length(FICHE[[ch]])))) {
+      fb <- FICHE; n <- names(fb[[ch]]); n[k] <- b; attr(fb[[ch]], "names") <- n
+      attendu_lu <- paste(replace(sain, k, paste0("<chaîne d'encodage bytes>=", FICHE[[ch]][[k]])), collapse = " ; ")
+      verifier(sprintf("T11 nom d'encodage bytes en position %d de fiche$%s : rejeu rendu (aucun refus), témoin « non déterminable », nom cité sous le repère, une ligne, UTF-8", k, ch),
+               ok_temoin(attrape(rejouer_fiche(BASE, fb)), function(lu) identical(lu, attendu_lu)))
+    }
+    fb <- FICHE; fb[[ch]] <- structure(unclass(FICHE[[ch]]), class = c("a", b))
+    verifier(sprintf("T11 fiche$%s de classe bytes : rejeu rendu (aucun refus), témoin « non déterminable », valeur « illisible (list de longueur %d) »", ch, length(FICHE[[ch]])),
+             ok_temoin(attrape(rejouer_fiche(BASE, fb)),
+                       function(lu) identical(lu, sprintf("illisible (list de longueur %d)", length(FICHE[[ch]])))))
+  }
+  # Valeur de champ de classe bytes (decrire_forme(), m4) : décrite sans sa
+  # classe, attribut `class` cité, au lieu de l'erreur R de length().
+  verifier("T11 version_fiche structure(1L, class = <bytes>) : refus fiche_non_conforme (pas une erreur R), attribut class cité, une ligne, UTF-8",
+           verdict(attrape(rejouer_fiche(BASE, fiche_modifiee(version_fiche = structure(4L, class = b)))),
+                   list(champ = "version_fiche", lu = "integer de longueur 1, attribut(s) class",
+                        attendu = "integer de longueur 1, non NA, sans attribut"),
+                   "« version_fiche » : integer de longueur 1, attribut(s) class au lieu de"))
+  verifier("T11 empreintes/algorithme structure(\"md5\", class = <bytes>) : refus fiche_non_conforme (pas une erreur R), attribut class cité",
+           verdict(attrape(rejouer_fiche(BASE, fiche_modifiee("empreintes/algorithme" = structure("md5", class = b)))),
+                   list(champ = "empreintes/algorithme", lu = "character de longueur 1, attribut(s) class",
+                        attendu = "chaîne unique, non vide, non NA, sans attribut"),
+                   "« empreintes/algorithme » : character de longueur 1, attribut(s) class au lieu de"))
+  verifier("T11 version_fiche liste de classe bytes aux noms en double : refus fiche_non_conforme (pas une erreur R), noms cités un à un",
+           verdict(attrape(rejouer_fiche(BASE, fiche_modifiee(version_fiche = structure(list(1, 2, 3, 4), names = c("a", "a", b, b), class = b)))),
+                   list(champ = "version_fiche",
+                        lu = "list de longueur 4, attribut(s) class, noms en double : a, <chaîne d'encodage bytes>, nom(s) d'encodage bytes (n° 3 : <chaîne d'encodage bytes>)",
+                        attendu = "integer de longueur 1, non NA, sans attribut"),
+                   "noms en double : a, <chaîne d'encodage bytes>, nom(s) d'encodage bytes (n° 3 : <chaîne d'encodage bytes>) au lieu de"))
+  # Noms en double : un nom bytes ne remplace plus toute la liste par le repère.
+  verifier("T11 noms en double a, a, bytes, bytes (vecteur nommé) : « a, <chaîne d'encodage bytes> », non le repère seul",
+           verdict(attrape(rejouer_fiche(BASE, fiche_modifiee(version_fiche = structure(1:4, names = c("a", "a", b, b))))),
+                   list(champ = "version_fiche",
+                        lu = "integer de longueur 4, attribut(s) names, noms en double : a, <chaîne d'encodage bytes>, nom(s) d'encodage bytes (n° 3 : <chaîne d'encodage bytes>)",
+                        attendu = "integer de longueur 1, non NA, sans attribut"),
+                   "noms en double : a, <chaîne d'encodage bytes>, nom(s) d'encodage bytes (n° 3 : <chaîne d'encodage bytes>) au lieu de"))
+  verifier("T11 noms en double a puis noms 'x<VT>y' en double : chaque nom cité séparément (a, x<U+000B>y)",
+           verdict(attrape(rejouer_fiche(BASE, fiche_modifiee(version_fiche = structure(1:4, names = c("a", "a", "x\u000by", "x\u000by"))))),
+                   list(champ = "version_fiche",
+                        lu = "integer de longueur 4, attribut(s) names, noms en double : a, x<U+000B>y",
+                        attendu = "integer de longueur 1, non NA, sans attribut"),
+                   "noms en double : a, x<U+000B>y au lieu de"))
+  # texte_lu() : valeur de classe bytes d'un champ lu par le bilan ou le refus
+  # de version, « illisible » au lieu de l'erreur R de length() ; les témoins ne
+  # sont jamais motifs de refus.
+  verifier("T11 empreintes/code de classe bytes : rejeu sans refus, témoin du code illisible et non déterminable",
+           {
+             r <- attrape(rejouer_fiche(BASE, fiche_modifiee("empreintes/code" = structure("abc", class = b))))
+             if (inherits(r, "error")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else identical(r$bilan$lu[8L], "illisible (character de longueur 1)") && identical(r$bilan$verdict[8L], "non déterminable")
+           })
+  verifier("T11 versions/tablexp de classe bytes : rejeu sans refus, témoin des versions « tablexp=illisible (character de longueur 1) »",
+           {
+             r <- attrape(rejouer_fiche(BASE, fiche_modifiee("versions/tablexp" = structure("abc", class = b))))
+             if (inherits(r, "error")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else startsWith(r$bilan$lu[9L], "tablexp=illisible (character de longueur 1) ; ")
+           })
+  verifier("T11 version_fiche 3 et empreintes/code de classe bytes : refus version_fiche_non_admise, code « illisible (character de longueur 2) »",
+           {
+             r <- attrape(rejouer_fiche(BASE, fiche_modifiee(version_fiche = 3L, "empreintes/code" = structure(c("a", "b"), class = b))))
+             if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else une_ligne_utf8(r, controle_refus(r, "construire_table", "version_fiche_non_admise", NULL,
+                                                   "empreinte du code illisible (character de longueur 2)"))
+           })
+  # Version non admise : la version de tablexp de la fiche se lit par
+  # lire_champ() (versions de classe bytes, ou nom bytes avant `tablexp`), au
+  # lieu de l'erreur R de names() ou de `[[`.
+  verifier("T11 version_fiche 3 et versions de classe bytes : refus version_fiche_non_admise, tablexp lu cité",
+           {
+             fb <- fiche_modifiee(version_fiche = 3L); fb$versions <- structure(unclass(FICHE$versions), class = c("a", b))
+             r <- attrape(rejouer_fiche(BASE, fb))
+             if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else une_ligne_utf8(r, controle_refus(r, "construire_table", "version_fiche_non_admise", NULL,
+                                                   sprintf("Fiche produite par tablexp %s,", FICHE$versions$tablexp)))
+           })
+  verifier("T11 version_fiche 3 et versions à nom bytes avant tablexp : refus version_fiche_non_admise, tablexp lu cité",
+           {
+             fb <- fiche_modifiee(version_fiche = 3L); fb$versions <- structure(list("zzz", "9.9"), names = c(b, "tablexp"))
+             r <- attrape(rejouer_fiche(BASE, fb))
+             if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else une_ligne_utf8(r, controle_refus(r, "construire_table", "version_fiche_non_admise", NULL,
+                                                   "Fiche produite par tablexp 9.9,"))
+           })
+  # Nom d'encodage bytes plus bas dans la fiche (champs de la fiche comparés par
+  # le témoin « fiche », champs_differents()) : `[[` et %in% sur ses noms
+  # lèveraient l'erreur R ; la liste est une feuille, citée « différente » à
+  # son chemin de premier niveau (ou de niveau inférieur si les parents se
+  # descendent). Position 1 de convention, position 1 de hypotheses_brut, et
+  # troisième niveau (hypotheses_brut/hypotheses) : rejeu rendu, ligne 11 du
+  # bilan « différente : <chemin> », sur une ligne, marquée UTF-8.
+  nom_bytes_en <- function(f, chemin, k) {
+    n <- names(f[[chemin]]); n[k] <- b
+    attr(f[[chemin]], "names") <- n
+    f
+  }
+  for (cas in list(list("convention", "convention", 1L), list("hypotheses_brut", "hypotheses_brut", 1L),
+                   list(c("hypotheses_brut", "hypotheses"), "hypotheses_brut/hypotheses", 3L))) {
+    verifier(sprintf("T11 nom d'encodage bytes en position %d de fiche$%s : rejeu rendu (pas une erreur R), ligne 11 « différente : %s », une ligne, UTF-8",
+                     cas[[3L]], paste(cas[[1L]], collapse = "$"), cas[[2L]]),
+             {
+               fb <- nom_bytes_en(FICHE, cas[[1L]], cas[[3L]])
+               r <- attrape(rejouer_fiche(BASE, fb))
+               if (inherits(r, "error")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+               else if (!inherits(r, "rejeu")) "objet non rejeu"
+               else if (!identical(r$bilan$controle[11L], "temoin_fiche")) "ligne 11 : autre témoin"
+               else if (!identical(r$bilan$verdict[11L], paste("différente :", cas[[2L]]))) sprintf("ligne 11 : « %s »", r$bilan$verdict[11L])
+               else if (!identical(Encoding(r$bilan$verdict[11L]), "UTF-8")) "verdict non marqué UTF-8"
+               else TRUE
+             })
+  }
+  # Colonne de rôle de nom bytes (texte_canonique(), lire_champ()) : l'empreinte
+  # des données se calcule, la construction refuse ensuite le rôle bytes
+  # (chaine_codage_bytes, module rapport) au lieu de l'erreur R de `[[`.
+  verifier("T11 colonne de rôle sexe de nom bytes : refus chaine_codage_bytes de la fiche (pas une erreur R), empreinte des données calculée",
+           {
+             d <- BASE; names(d)[names(d) == "sexe"] <- b
+             r <- attrape(rejouer_fiche(d, fiche_modifiee(roles = replace(ROLES, "sexe", b))))
+             if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else controle_refus(r, "rapport", "chaine_codage_bytes", NULL, c("« fiche/roles »", "« bytes »"))
+           })
+})
 # Noms d'attributs d'un champ cités par neutraliser_citation() dans le refus
 # fiche_non_conforme (decrire_forme(), revue finale de #94) : attribut « a<LF>b »
 # cité a<U+000A>b, « a<VT>b » a<U+000B>b ; message sur une ligne, marqué UTF-8.

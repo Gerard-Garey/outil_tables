@@ -289,8 +289,11 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
 # quelle (sans_controle() pour un message).
 texte_lu <- function(v) {
   if (is.null(v)) return("absente")
-  if (is.character(v) && length(v) == 1L && is.null(attributes(v))) return(if (is.na(v)) "NA" else v)
-  sprintf("illisible (%s de longueur %d)", typeof(v), length(v))
+  if (is.character(v) && is.null(attributes(v)) && length(v) == 1L) return(if (is.na(v)) "NA" else v)
+  # length() dispatche sur la classe et lève sur une classe d'encodage
+  # « bytes » (#128) : les attributs sont contrôlés avant length(), qui lit
+  # la valeur sans sa classe.
+  sprintf("illisible (%s de longueur %d)", typeof(v), length(if (classe_bytes(v)) unclass(v) else v))
 }
 
 # Valeur lue dans la fiche, citée dans un message de refus du rejeu : règle
@@ -304,44 +307,62 @@ sans_controle <- function(s) neutraliser_citation(s)
 # une liste), sinon « <type> de longueur <n> », complété au besoin par « , NA »,
 # « , vide », « , attribut(s) <noms> » (names non cité pour une liste, dont
 # les noms sont admis), « , noms en double : <noms> » et « , noms incomplets »
-# (nom vide ou NA ; décision Q-A d'actuary, reprise de #86).
+# (nom vide ou NA ; décision Q-A d'actuary, reprise de #86). Une valeur de
+# classe d'encodage « bytes » est décrite sans sa classe (unclass()) pour
+# length(), is.na() et names(), qui dispatchent et lèveraient une erreur R
+# (#128) ; ses attributs, `class` compris, sont lus avant. Les noms en double
+# sont cités un à un par sans_controle() : un nom « bytes » n'efface pas les
+# autres (#128), et le premier nom « bytes » est cité par sa position, sous un
+# repère (« nom(s) d'encodage bytes (n° k : <repère>) »).
 decrire_forme <- function(conteneur, nom) {
-  if (!is.list(conteneur) || !(nom %in% names(conteneur))) return("champ absent")
-  v <- conteneur[[nom]]
+  if (!is.list(conteneur) || !(nom %in% attr(conteneur, "names", exact = TRUE))) return("champ absent")
+  v <- lire_champ(conteneur, nom)
+  a <- names(attributes(v))
+  if (classe_bytes(v)) v <- unclass(v)
   s <- formuler("%s de longueur %d", typeof(v), length(v))
   if (is.atomic(v) && length(v) == 1L && is.na(v)) s <- paste0(s, ", NA")
   else if (is.character(v) && length(v) == 1L && !nzchar(v)) s <- paste0(s, ", vide")
-  a <- names(attributes(v))
   if (is.list(v)) a <- setdiff(a, "names")
   if (length(a)) s <- paste0(s, ", attribut(s) ", paste(sans_controle(a), collapse = ", "))
   n <- names(v)
   if (!is.null(n)) {
     complets <- n[!is.na(n) & nzchar(n)]
     doubles <- unique(complets[duplicated(complets)])
-    if (length(doubles)) s <- paste0(s, ", noms en double : ", sans_controle(paste(doubles, collapse = ", ")))
+    if (length(doubles)) s <- paste0(s, ", noms en double : ", paste(sans_controle(doubles), collapse = ", "))
     if (anyNA(n) || !all(nzchar(n[!is.na(n)]))) s <- paste0(s, ", noms incomplets")
+    b <- noms_bytes(v)
+    if (length(b)) s <- formuler("%s, nom(s) d'encodage bytes (n° %d : %s)", s, b[1L], sans_controle(n[b[1L]]))
   }
   s
 }
 
 # Paires « nom=valeur » d'une liste nommée de la fiche (versions,
-# plateforme), jointes par « ; » ; texte_lu() d'une autre valeur.
+# plateforme), jointes par « ; » ; texte_lu() d'une autre valeur, dont une
+# liste de classe « bytes » (names() lèverait une erreur R, #128). Les noms
+# sont cités par neutraliser_citation() : un nom « bytes » l'est sous un
+# repère, au lieu de l'erreur R de sprintf() ; ces champs sont des témoins,
+# jamais motifs de refus (ADR 0012, point 3.6).
 paires_lues <- function(l) {
-  if (!is.list(l) || is.null(names(l))) return(texte_lu(l))
-  paste(sprintf("%s=%s", names(l), vapply(l, texte_lu, "")), collapse = " ; ")
+  n <- attr(l, "names", exact = TRUE)
+  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(texte_lu(l))
+  paste(sprintf("%s=%s", neutraliser_citation(n), vapply(l, texte_lu, "")), collapse = " ; ")
 }
 
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
 # fiche reçue (`recu`) (descente D de la spécification de #86) : deux listes
 # nommées sans classe, aux noms complets et uniques, sont parcourues sur
 # l'union de leurs noms (ordre de la fiche rendue, puis noms propres à la fiche
-# reçue) ; toute autre valeur est une feuille. Un nœud qui diffère sans
+# reçue) ; toute autre valeur est une feuille, dont une liste à nom
+# d'encodage « bytes » (#128) : `[[` et %in% sur ses noms lèveraient une erreur
+# R (mesuré) ; la liste est citée « différente » à son chemin. (Une classe
+# « bytes » est déjà une feuille par is.object().) Un nœud qui diffère sans
 # qu'aucun enfant ne diffère est cité « (ordre des champs ou attributs) » ;
 # `racine` nomme le nœud de départ. Rend character(0) si identical().
 champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   if (identical(rendu, recu)) return(character(0))
   ici <- if (length(chemin)) paste(chemin, collapse = "/") else racine
-  descend <- function(v) is.list(v) && !is.object(v) && noms_complets(names(v)) && !anyDuplicated(names(v))
+  descend <- function(v) is.list(v) && !is.object(v) && !length(noms_bytes(v)) &&
+    noms_complets(names(v)) && !anyDuplicated(names(v))
   if (!descend(rendu) || !descend(recu)) return(ici)
   d <- character(0)
   for (n in union(names(rendu), names(recu))) {
@@ -371,9 +392,10 @@ verdict_chaines <- function(attendu, lu) {
 
 # Verdict d'un témoin de liste nommée de la fiche (V2 : versions,
 # plateforme) : « non déterminable » si le côté de la fiche reçue n'est pas une
-# liste sans classe aux noms complets, sinon verdict_chemins().
+# liste sans classe aux noms complets, ou porte un nom d'encodage « bytes »
+# (#128 ; une classe « bytes » est déjà un objet), sinon verdict_chemins().
 verdict_liste <- function(rendu, recu, racine) {
-  if (!is.list(recu) || is.object(recu) || !noms_complets(names(recu)))
+  if (!is.list(recu) || is.object(recu) || length(noms_bytes(recu)) || !noms_complets(names(recu)))
     return(texte_moteur("non déterminable"))
   verdict_chemins(rendu, recu, racine)
 }
@@ -456,10 +478,15 @@ rejouer_fiche <- function(donnees, fiche) {
   if (!(forme_exacte(v, "integer") && length(v) == 1L && !is.na(v))) {
     champ <- c(champ, "version_fiche"); lu <- c(lu, decrire_forme(fiche, "version_fiche"))
   }
+  # `empreintes` : liste_nommee() et anyDuplicated(names()) ne lèvent pas sur un
+  # nom « bytes » (mesuré), qui est signalé sous le champ `empreintes` avec les
+  # autres défauts (#128) ; ses trois champs se lisent par lire_champ(), qui ne
+  # traduit pas les noms (`[[` lèverait).
   e <- fiche[["empreintes"]]
-  if (!liste_nommee(e)) {
+  if (!liste_nommee(e) || length(noms_bytes(e))) {
     champ <- c(champ, "empreintes"); lu <- c(lu, decrire_forme(fiche, "empreintes"))
-  } else for (n in c("algorithme", "representation", "donnees")) if (!chaine_unique(e[[n]])) {
+  }
+  if (liste_nommee(e)) for (n in c("algorithme", "representation", "donnees")) if (!chaine_unique(lire_champ(e, n))) {
     champ <- c(champ, paste0("empreintes/", n)); lu <- c(lu, decrire_forme(e, n))
   }
   for (n in c("roles", "plan", "provenance")) if (!(n %in% names(fiche))) {
@@ -478,8 +505,7 @@ rejouer_fiche <- function(donnees, fiche) {
     # #86) : « absente » si versions manque ou est une liste sans tablexp ;
     # versions[["tablexp"]] d'une liste qui l'a ; versions entier sinon.
     versions <- fiche[["versions"]]
-    lus <- list(tablexp = texte_lu(if (is.list(versions)) { if ("tablexp" %in% names(versions)) versions[["tablexp"]] }
-                                   else versions),
+    lus <- list(tablexp = texte_lu(if (is.list(versions)) lire_champ(versions, "tablexp") else versions),
                 code = texte_lu(e[["code"]]),
                 code_installe = texte_lu(EMPREINTE_CODE))
     refus_rejeu("version_fiche_non_admise",

@@ -155,17 +155,20 @@ entiers_finis <- function(v) {
 
 # TRUE si la colonne x est du type `type` du catalogue. Une colonne-liste,
 # une matrice ou une classe autre que celles admises (POSIXct, difftime...)
-# est refusée.
+# est refusée. Dimension lue par attr() et facteur par a_classe() (R/outils.R,
+# #128) : dim() et is.factor() dispatchent sur la classe et lèvent une erreur R
+# sur une classe d'encodage « bytes » (mesuré) ; la colonne est alors refusée
+# comme toute classe non admise.
 type_conforme <- function(x, type) {
-  if (!is.atomic(x) || !is.null(dim(x))) return(FALSE)
+  if (!is.atomic(x) || !is.null(attr(x, "dim", exact = TRUE))) return(FALSE)
   nu <- !is.object(x)
   chaine <- nu && is.character(x)
   entier <- nu && is.integer(x)
   double_entier <- nu && is.double(x) && entiers_finis(x)
   switch(type,
     identifiant = chaine || entier || double_entier,
-    categorie = chaine || is.factor(x),
-    categorie_ou_entier = chaine || is.factor(x) || entier,
+    categorie = chaine || a_classe(x, "factor"),
+    categorie_ou_entier = chaine || a_classe(x, "factor") || entier,
     date = identical(class(x), "Date") && is.numeric(unclass(x)) &&
       entiers_finis(unclass(x)),
     entier = entier || double_entier,
@@ -262,15 +265,19 @@ controler_roles <- function(donnees, roles, segmentation) {
                      liste_guillemets(col_doubles), liste_guillemets(r[roles %in% col_doubles])),
             list(role = r[roles %in% col_doubles], colonne = col_doubles))
   types <- CATALOGUE_ROLES$type[match(r, CATALOGUE_ROLES$role)]
-  ko <- !vapply(seq_along(r), function(i) type_conforme(donnees[[roles[[i]]]], types[i]),
+  # Colonnes lues par lire_champ() (R/outils.R, #128) : donnees[[nom]] lève une
+  # erreur R sur un nom de colonne d'encodage « bytes » (mesuré) ; la colonne,
+  # présente (colonne_absente a refusé sinon), est jugée sur son type.
+  colonne <- function(i) lire_champ(donnees, roles[[i]])
+  ko <- !vapply(seq_along(r), function(i) type_conforme(colonne(i), types[i]),
                 logical(1L))
   if (any(ko))
     refuser("donnees", "type_incompatible",
             formuler("Type incompatible : %s.",
                      paste(formuler("rôle « %s », colonne « %s » : %s attendu, %s reçu",
                                     citer(r[ko]), citer(roles[ko]), TYPES_ADMIS[types[ko]],
-                                    vapply(r[ko], function(x)
-                                      paste(citer(class(donnees[[roles[[x]]]])), collapse = "/"),
+                                    vapply(which(ko), function(i)
+                                      paste(citer(class(colonne(i))), collapse = "/"),
                                       character(1L))),
                            collapse = " ; ")),
             list(role = r[ko], colonne = unname(roles[ko]), type_attendu = unname(TYPES_ADMIS[types[ko]])))
@@ -279,7 +286,7 @@ controler_roles <- function(donnees, roles, segmentation) {
   # sont cités (ADR 0011, point 4) ; details$lignes : liste nommée rôle ->
   # lignes, comme ligne_invalide.
   hors <- lapply(stats::setNames(which(types == "date"), r[types == "date"]),
-                 function(i) which(dates_hors_domaine(unclass(donnees[[roles[[i]]]]))))
+                 function(i) which(dates_hors_domaine(unclass(colonne(i)))))
   hors <- hors[lengths(hors) > 0L]
   if (length(hors))
     refuser("donnees", "date_hors_domaine",

@@ -755,7 +755,7 @@ verifier("lire_plan, refus d'un objet de classe « a<LF>b » : texte_non_octets,
 # constat 2 et critère 3) : rôle, chemin et classe cités par
 # neutraliser_citation() ; VT et U+2028 écrits <U+XXXX>, chaîne bytes en rôle
 # citée sous le repère ; message sur une ligne, marqué UTF-8. Une classe
-# bytes : échec attendu, renvoyé à #128 (fin du bloc) ; un nom d'attribut
+# bytes : refus nommé depuis #128 (fin du bloc) ; un nom d'attribut
 # bytes ne se construit pas en R (attr<- et unserialize() lèvent l'erreur R
 # « translating strings with "bytes" encoding is not allowed », mesuré) ; un
 # nom de liste bytes est refusé avant, sous chaine_codage_bytes (ligne @noms).
@@ -792,21 +792,33 @@ local({
   verifier("ecrire_valeurs, rôle d'encodage bytes : type_non_canonique, rôle cité sous le repère, sans erreur R",
            if (!is.null(r) && !identical(r$motif, "type_non_canonique")) r$motif
            else une_ligne_utf8(r, "Rôle « <chaîne d'encodage bytes> »"))
-  # Classe d'encodage bytes (décision du mainteneur du 05/11/2026 : rattachée
-  # à #128) : défaut connu, inherits() lève l'erreur R « translating strings
-  # with "bytes" encoding is not allowed » avant le refus (mesuré). Attendu :
-  # le refus nommé ; toute autre issue que cette erreur R est un ECHEC.
-  attendu_bytes <- function(expr, motif) {
-    r <- leve_refus(expr, motif)
-    if (isTRUE(r) || grepl("\"bytes\"", r, fixed = TRUE)) r else stop(r, call. = FALSE)
+  # Classe d'encodage bytes (#128, décision du mainteneur du 05/11/2026) :
+  # refus nommé, classe citée sous le repère, message sur une ligne, marqué
+  # UTF-8. Avant #128, is.factor() et is.data.frame() (inherits()) levaient
+  # l'erreur R « translating strings with "bytes" encoding is not allowed »
+  # (contre-épreuve : ces tests échouent sur le code antérieur). Une erreur R
+  # est rendue par refus_ou_erreur(), non propagée.
+  refus_ou_erreur <- function(expr) tryCatch({ force(expr); NULL }, error = function(e) e)
+  motif_et_ligne <- function(r, motif, attendus) {
+    if (!is.null(r) && !inherits(r, "refus_tablexp")) sprintf("erreur R : %s", conditionMessage(r))
+    else if (!is.null(r) && !identical(r$motif, motif)) r$motif
+    else une_ligne_utf8(r, attendus)
   }
-  echec_attendu("ecrire_valeurs, classe d'encodage bytes : type_non_canonique", "#128",
-                attendu_bytes(tablexp:::ecrire_valeurs(structure(1, class = OCTETS), "texte", "r"),
-                              "type_non_canonique"))
-  echec_attendu("ecrire_plan, classe d'encodage bytes : serialisation_impossible", "#128",
-                attendu_bytes(ecrire_plan(list(a = structure(1, class = OCTETS))), "serialisation_impossible"))
-  echec_attendu("ecrire_plan, liste de classe d'encodage bytes : serialisation_impossible", "#128",
-                attendu_bytes(ecrire_plan(list(a = structure(list(1), class = OCTETS))), "serialisation_impossible"))
+  r <- refus_ou_erreur(tablexp:::ecrire_valeurs(structure(1, class = OCTETS), "texte", "r"))
+  verifier("ecrire_valeurs, classe d'encodage bytes : type_non_canonique, rôle et classe cités (repère), sans erreur R",
+           motif_et_ligne(r, "type_non_canonique", c("Rôle « r »", "classe « <chaîne d'encodage bytes> » sans représentation canonique")))
+  r <- refus_ou_erreur(tablexp:::ecrire_valeurs(structure(1L, levels = "a", class = c("factor", OCTETS)), "texte", "r"))
+  verifier("ecrire_valeurs, classe c(factor, bytes) : type_non_canonique (une classe bytes n'a pas de représentation), sans erreur R",
+           motif_et_ligne(r, "type_non_canonique", "classe « factor/<chaîne d'encodage bytes> » sans représentation canonique"))
+  r <- refus_ou_erreur(ecrire_plan(list(a = structure(1, class = OCTETS))))
+  verifier("ecrire_plan, classe d'encodage bytes : serialisation_impossible, chemin et classe cités (repère), sans erreur R",
+           motif_et_ligne(r, "serialisation_impossible", c("Écriture du texte, « a »", "de classe <chaîne d'encodage bytes> ou")))
+  r <- refus_ou_erreur(ecrire_plan(list(a = structure(list(1), class = OCTETS))))
+  verifier("ecrire_plan, liste de classe d'encodage bytes : serialisation_impossible, classe citée (repère), sans erreur R",
+           motif_et_ligne(r, "serialisation_impossible", c("Écriture du texte, « a »", "liste de classe <chaîne d'encodage bytes> ou")))
+  r <- refus_ou_erreur(ecrire_plan(structure(list(a = 1), class = OCTETS)))
+  verifier("ecrire_plan, racine de classe d'encodage bytes : serialisation_impossible, racine citée, sans erreur R",
+           motif_et_ligne(r, "serialisation_impossible", c("« (racine) »", "liste de classe <chaîne d'encodage bytes> ou")))
 })
 
 # Gabarits du lecteur citant une valeur reçue non ASCII (revue finale de #94) :

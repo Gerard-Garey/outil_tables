@@ -349,6 +349,71 @@ local({
   }
 })
 
+# Nom d'encodage bytes au deuxième niveau de la fiche, classe d'encodage bytes
+# de la fiche ou d'une sous-liste (#128) : refus nommé au lieu de l'erreur R
+# « translating strings with "bytes" encoding is not allowed » (contre-épreuve :
+# ces tests échouent sur le code antérieur). Une erreur R est rendue, non
+# propagée. ecrire_fiche() : `empreintes`, lue par nom pour l'en-tête, refusée
+# sous chaine_codage_bytes (role « empreintes/@noms », comme `versions`) ;
+# classe de la fiche ou d'une sous-liste : serialisation_impossible (chemin
+# cité). ecrire_rapport() : `empreintes` et fiche de classe bytes, objet_modifie
+# (empreinte non recalculable) ; sous-liste exclue de l'empreinte (versions,
+# plateforme) de classe bytes, type_non_canonique à l'écriture de la section.
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  verdict <- function(r, motif, details, contient) {
+    if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+    une_ligne_utf8(r, controle_refus(r, motif, details, contient))
+  }
+  nom_bytes <- function(o, k) { n <- attr(o, "names", exact = TRUE); n[k] <- CLASSE_BYTES; attr(o, "names") <- n; o }
+  for (k in c(1L, 2L, 4L, length(x1$fiche$empreintes))) {
+    fb <- x1$fiche; fb$empreintes <- nom_bytes(x1$fiche$empreintes, k)
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de fiche$empreintes : ecrire_fiche() refuse chaine_codage_bytes, role empreintes/@noms", k),
+             verdict(attrape(ecrire_fiche(fb)), "chaine_codage_bytes", list(role = "empreintes/@noms", lignes = k),
+                     "« bytes »"))
+    xb <- x1; xb$fiche <- fb
+    verifier(sprintf("U10 : nom d'encodage bytes en position %d de fiche$empreintes : ecrire_rapport() refuse objet_modifie (empreinte non recalculable)", k),
+             verdict(attrape(ecrire_rapport(xb)), "objet_modifie", list(attendu = NA_character_),
+                     c("empreinte du résultat non recalculable (", "Rôle « fiche/empreintes/@noms »",
+                       paste("fiche/empreintes/resultat vaut", x1$fiche$empreintes$resultat))))
+  }
+  for (ch in c("versions", "plateforme")) {
+    fb <- x1$fiche; fb[[ch]] <- nom_bytes(x1$fiche[[ch]], 1L); xb <- x1; xb$fiche <- fb
+    verifier(sprintf("U10 : nom d'encodage bytes dans fiche$%s : ecrire_fiche() et ecrire_rapport() refusent chaine_codage_bytes (role %s/@noms)", ch, ch),
+             {
+               r1 <- verdict(attrape(ecrire_fiche(fb)), "chaine_codage_bytes", list(role = paste0(ch, "/@noms"), lignes = 1L), "« bytes »")
+               if (!isTRUE(r1)) r1
+               else verdict(attrape(ecrire_rapport(xb)), "chaine_codage_bytes", list(role = paste0("fiche/", ch, "/@noms"), lignes = 1L), "« bytes »")
+             })
+  }
+  # Classe d'encodage bytes (m2, m3) : fiche entière, puis sous-listes.
+  verifier("U10 : ecrire_fiche(structure(list(a = 1), class = <bytes>)) : refus serialisation_impossible, racine, classe citée (pas une erreur R)",
+           verdict(attrape(ecrire_fiche(structure(list(a = 1), class = CLASSE_BYTES))), "serialisation_impossible",
+                   list(chemin = ""), c("« (racine) »", "liste de classe <chaîne d'encodage bytes> ou")))
+  fc <- structure(x1$fiche, class = CLASSE_BYTES)
+  verifier("U10 : fiche réelle de classe bytes : ecrire_fiche() refuse serialisation_impossible, racine (pas une erreur R)",
+           verdict(attrape(ecrire_fiche(fc)), "serialisation_impossible", list(chemin = ""),
+                   c("« (racine) »", "liste de classe <chaîne d'encodage bytes> ou")))
+  xc <- x1; xc$fiche <- fc
+  verifier("U10 : x$fiche de classe bytes sans nom bytes : ecrire_rapport() refuse objet_modifie, fiche citée (controler_rapport, pas une erreur R)",
+           verdict(attrape(ecrire_rapport(xc)), "objet_modifie", list(attendu = NA_character_),
+                   c("empreinte du résultat non recalculable (", "« fiche » : liste de classe <chaîne d'encodage bytes> ou")))
+  for (ch in c("empreintes", "versions", "plateforme")) {
+    fb <- x1$fiche; fb[[ch]] <- structure(unclass(x1$fiche[[ch]]), class = CLASSE_BYTES); xb <- x1; xb$fiche <- fb
+    verifier(sprintf("U10 : fiche$%s de classe bytes : ecrire_fiche() refuse serialisation_impossible, chemin %s", ch, ch),
+             verdict(attrape(ecrire_fiche(fb)), "serialisation_impossible", list(chemin = ch),
+                     c(sprintf("« %s »", ch), "liste de classe <chaîne d'encodage bytes> ou")))
+    if (ch == "empreintes")
+      verifier("U10 : fiche$empreintes de classe bytes : ecrire_rapport() refuse objet_modifie (pas une erreur R)",
+               verdict(attrape(ecrire_rapport(xb)), "objet_modifie", list(attendu = NA_character_),
+                       c("empreinte du résultat non recalculable (", "« fiche/empreintes » : liste de classe")))
+    else
+      verifier(sprintf("U10 : fiche$%s de classe bytes (hors empreinte du résultat) : ecrire_rapport() refuse type_non_canonique, rôle fiche/%s", ch, ch),
+               verdict(attrape(ecrire_rapport(xb)), "type_non_canonique", list(role = paste0("fiche/", ch)),
+                       "classe « <chaîne d'encodage bytes> » sans représentation canonique"))
+  }
+})
+
 # --- U11, U12 : ressources, balises, attributs, entités (valeur calculée à la main) ---
 
 BALISES <- c("!DOCTYPE", "html", "head", "meta", "title", "style", "body", "h1", "h2", "nav", "ol", "ul", "li", "a",

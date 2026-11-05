@@ -14,6 +14,9 @@
 #  - noms_complets() : la règle des noms complets, écrite une seule fois et
 #    partagée par les modules et l'orchestration (#22, notes de B6) ;
 #  - noms_bytes() : positions des noms d'encodage « bytes » d'un objet (#114) ;
+#  - a_classe(), classe_bytes() et lire_champ() : lectures de la classe et d'un
+#    champ par nom sans dispatch ni traduction, sûres sur une classe ou un nom
+#    d'encodage « bytes » (#128) ;
 #  - texte_moteur() : texte produit par le moteur marqué UTF-8, quelle que
 #    soit la locale d'installation ou d'exécution (#50) ;
 #  - formuler() : seul point de passage des messages de refus, gabarit
@@ -121,6 +124,35 @@ noms_complets <- function(noms) !is.null(noms) && !anyNA(noms) && all(nzchar(nom
 noms_bytes <- function(x) {
   n <- attr(x, "names", exact = TRUE)
   if (is.null(n)) integer(0) else which(Encoding(n) == "bytes")
+}
+
+# Lectures sûres sur un objet reçu dont la classe ou un nom est d'encodage
+# « bytes » (#128). inherits(), is.factor(), is.data.frame(), names(), length(),
+# is.na() et x[["champ"]] dispatchent sur la classe, ou traduisent les noms,
+# et lèvent « translating strings with "bytes" encoding is not allowed »
+# (mesuré sous C et C.UTF-8, R 4.3.3) ; attr(), match(), %in%, Encoding(),
+# unclass() et .subset2() ne le font pas.
+#  - a_classe(x, classe) : TRUE si `classe` figure dans la classe de x, lue par
+#    attr() ; équivaut à inherits(x, classe) pour une classe posée en attribut
+#    (la classe implicite n'est jamais celle d'une classe nommée par les
+#    appelants), sans lever sur une classe « bytes ». Rend TRUE ou FALSE ;
+#  - classe_bytes(x) : TRUE si un élément de l'attribut `class` de x est
+#    d'encodage « bytes » ; l'appelant retire alors la classe par unclass()
+#    avant length(), names() ou is.na() ;
+#  - lire_champ(x, nom) : élément `nom` de la liste x, trouvé par match() sur
+#    les noms lus par attr() puis lu par position (.subset2()), donc sans
+#    erreur R sur un nom ou une classe « bytes », quelle que soit sa position ;
+#    premier élément de ce nom, NULL s'il est absent (comme x[[nom]]).
+a_classe <- function(x, classe) classe %in% attr(x, "class", exact = TRUE)
+
+classe_bytes <- function(x) {
+  cl <- attr(x, "class", exact = TRUE)
+  is.character(cl) && any(Encoding(cl) == "bytes")
+}
+
+lire_champ <- function(x, nom) {
+  k <- match(nom, attr(x, "names", exact = TRUE))
+  if (is.na(k)) NULL else .subset2(x, k)
 }
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
