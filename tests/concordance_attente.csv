@@ -1,7 +1,4 @@
 type,nom,issue,motif
-entree,fonctions-outils:a_classe,#128,"définie par #128 (lectures sûres sur une classe ou un nom d'encodage bytes) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
-entree,fonctions-outils:classe_bytes,#128,"définie par #128 (lectures sûres sur une classe ou un nom d'encodage bytes) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
-entree,fonctions-outils:lire_champ,#128,"définie par #128 (lectures sûres sur une classe ou un nom d'encodage bytes) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
 entree,fonctions-rapport:jeton_non_fini,#118,"définie par #118 (règle unique des jetons des doubles non finis) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
 entree,fonctions-rapport:JETONS_NON_FINIS,#118,"définie par #118 (règle unique des jetons des doubles non finis) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
 entree,fonctions-outils:forme_graine,#113,"définie au premier niveau par #113 (prédicat de graine unique, partagé par sous_graine() et le contrôle des défauts du simulateur) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
