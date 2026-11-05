@@ -22,6 +22,12 @@
 #         - constante chaîne ASCII, ou constante numérique (une constante
 #           non ASCII passe par formuler() : sous la locale C, sprintf()
 #           traduirait ses octets non marqués) ;
+#         - texte_moteur(X), X chaîne constante ou constante du moteur
+#           (affectation de premier niveau de R/, éventuellement indexée par
+#           [, [[ ou $) : texte du moteur marqué UTF-8 avant l'insertion ;
+#           jamais une valeur reçue. Une constante dont l'expression contient
+#           une chaîne non ASCII hors texte_moteur() (constantes_moteur()) est
+#           de codage natif non marqué : elle n'est admise que marquée ainsi ;
 #         - if (...) A else B, A et B admis ;
 #         - paste() ou paste0() de formes admises, sep et collapse
 #           constantes ASCII ;
@@ -36,7 +42,8 @@
 #           premier niveau, expression déparsée, raison) : texte produit par
 #           le moteur seul (constante, catalogue, nombre, type R), ASCII, ou
 #           texte du moteur marqué par texte_moteur() / passé comme gabarit à
-#           formuler() ;
+#           formuler() ; une exception ne couvre jamais une constante non
+#           ASCII non marquée (échec nommé : cas de M1, revue finale de #127) ;
 #    3. message : l'argument message de chaque refus (refuser(),
 #       refus_tablexp() et les relais locaux de RELAIS, appariés comme le
 #       ferait R) est un appel de formuler() ou d'une aide de message, un
@@ -134,7 +141,6 @@ EXCEPTIONS <- exception_lignes(
   c("construire_table.R", "rejouer_fiche", "empreinte", "empreinte recalculée par le moteur (hexadécimal)"),
   c("donnees.R", "message_aucune_recette", "RECETTE_BRANCHE", "constante du moteur"),
   c("donnees.R", "controler_roles", "RECETTE_BRANCHE", "constante du moteur"),
-  c("donnees.R", "controler_roles", "TYPES_ADMIS[types[ko]]", "libellés du catalogue des rôles"),
   c("donnees.R", "controler_roles", "vapply(hors, function(h) paste(utils::head(h, NB_LIGNES_CITEES), collapse = \", \"), character(1L))", "numéros de ligne (which())"),
   c("donnees.R", "controler_transition_periode", "paste(TRANSITIONS$depart, \"->\", TRANSITIONS$arrivee, collapse = \", \")", "catalogue des transitions"),
   c("donnees.R", "controler_transition_periode", "paste(names(hors_p)[hors_p], collapse = \" et \")", "noms des bornes (debut, fin), texte du moteur"),
@@ -219,13 +225,50 @@ affectations <- function(e, sym) {
   res
 }
 
+# Constantes du moteur (affectations de premier niveau qui ne sont pas des
+# fonctions), tous fichiers de `dossier` : liste(noms, non_ascii), où non_ascii
+# est le sous-ensemble des constantes dont l'expression contient une chaîne
+# non ASCII hors d'un appel de texte_moteur(). Une telle constante est de
+# codage natif non marqué : insérée par %s sans texte_moteur(), sprintf()
+# la traduirait sous la locale C (#127, M1 de la revue finale).
+constantes_moteur <- function(dossier) {
+  non_ascii_nues <- function(x) {
+    if (is.character(x)) return(any(!ascii(x[!is.na(x)])))
+    if (!is.call(x)) return(FALSE)
+    if (nom_appel(x) %in% c("texte_moteur", "function")) return(FALSE)
+    for (i in seq_along(x)) { v <- element(x, i); if (!is.null(v) && non_ascii_nues(v)) return(TRUE) }
+    FALSE
+  }
+  noms <- character(0); non_ascii <- character(0)
+  for (f in sort(list.files(dossier, pattern = "\\.[Rr]$", full.names = TRUE))) {
+    ex <- tryCatch(suppressWarnings(parse(f, keep.source = FALSE, encoding = "UTF-8")), error = function(e) NULL)
+    for (e in ex) {
+      if (!(is.call(e) && nom_appel(e) %in% c("<-", "=") && length(e) == 3L && is.symbol(e[[2L]]))) next
+      if (is.call(e[[3L]]) && nom_appel(e[[3L]]) == "function") next
+      noms <- c(noms, as.character(e[[2L]]))
+      if (non_ascii_nues(e[[3L]])) non_ascii <- c(non_ascii, as.character(e[[2L]]))
+    }
+  }
+  list(noms = unique(noms), non_ascii = unique(non_ascii))
+}
+
 analyser <- function(dossier, exceptions) {
   ecarts <- character(0)
+  cst <- constantes_moteur(dossier)
   compte <- c(refus = 0L, formuler = 0L, citees = 0L, exceptions = 0L)
   exceptions$employee <- rep(FALSE, nrow(exceptions))
   fichiers <- sort(list.files(dossier, pattern = "\\.[Rr]$", full.names = TRUE))
   if (!length(fichiers)) return(list(ecarts = sprintf("aucun fichier R dans %s", dossier), compte = compte,
                                      exceptions = exceptions))
+  # Une exception ne couvre jamais une constante non ASCII non marquée : elle
+  # se marque par texte_moteur() à l'insertion (règle 2).
+  for (i in seq_len(nrow(exceptions))) {
+    v <- tryCatch(all.vars(parse(text = exceptions$expression[i], keep.source = FALSE)[[1L]]),
+                  error = function(e) character(0))
+    for (k in intersect(v, cst$non_ascii))
+      ecarts <- c(ecarts, sprintf("%s, %s : exception sur la constante non ASCII non marquée %s (texte_moteur() requis) : %s",
+                                  exceptions$fichier[i], exceptions$fonction[i], k, exceptions$expression[i]))
+  }
   for (f in fichiers) {
     fichier <- basename(f)
     # suppressWarnings() : sous la locale C, parse() avertit pour chaque
@@ -293,6 +336,15 @@ analyser <- function(dossier, exceptions) {
       n <- nom_appel(e)
       if (n %in% CITATIONS) { compte[["citees"]] <<- compte[["citees"]] + 1L; return(TRUE) }
       if (n %in% FORMES || aide(n)) return(TRUE)
+      # texte_moteur(X) marque UTF-8 un texte du moteur : admis pour une
+      # chaîne constante ou une constante du moteur (éventuellement indexée
+      # par [, [[ ou $), jamais pour une valeur reçue.
+      if (n == "texte_moteur" && length(e) == 2L) {
+        racine <- e[[2L]]
+        while (is.call(racine) && nom_appel(racine) %in% c("[", "[[", "$")) racine <- racine[[2L]]
+        return((is.character(racine) && length(racine) == 1L) ||
+               (is.symbol(racine) && as.character(racine) %in% cst$noms))
+      }
       if (n == "(") return(admise(e[[2L]], ctx, vus))
       if (n %in% c("<-", "=") && length(e) == 3L) return(admise(e[[3L]], ctx, vus))
       if (n == "if" && length(e) == 4L) return(admise(e[[3L]], ctx, vus) && admise(e[[4L]], ctx, vus))

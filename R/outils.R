@@ -256,8 +256,10 @@ texte_moteur <- function(x) {
 # (mesuré, ADR 0007, annotation du 05/11/2026, (b)). Règle des arguments
 # insérés par %s : valeur reçue citée par neutraliser_citation() (ou ses
 # alias citer(), sans_controle()), texte déjà formé (formuler(),
-# liste_guillemets()), ou constante ASCII ; un nombre inséré par %d, %g ou
-# %f n'est pas cité. Règle contrôlée par tests/controles/messages_refus.R.
+# liste_guillemets()), constante ASCII, ou texte_moteur() d'une chaîne
+# constante ou d'une constante du moteur (une constante non ASCII non
+# marquée n'est insérée que par texte_moteur()) ; un nombre inséré par %d, %g
+# ou %f n'est pas cité. Règle contrôlée par tests/controles/messages_refus.R.
 formuler <- function(gabarit, ...) sprintf(texte_moteur(gabarit), ...)
 
 # Valeur citée dans un message de refus (#94) : règle unique de

@@ -271,11 +271,15 @@ controler_roles <- function(donnees, roles, segmentation) {
   colonne <- function(i) lire_champ(donnees, roles[[i]])
   ko <- !vapply(seq_along(r), function(i) type_conforme(colonne(i), types[i]),
                 logical(1L))
+  # TYPES_ADMIS (« entières », non ASCII) est une constante du moteur non
+  # marquée : texte_moteur() la marque UTF-8 avant l'insertion par %s (sous
+  # la locale C, sprintf() en écrirait les octets « <c3><a8> » ; #127).
   if (any(ko))
     refuser("donnees", "type_incompatible",
             formuler("Type incompatible : %s.",
                      paste(formuler("rôle « %s », colonne « %s » : %s attendu, %s reçu",
-                                    citer(r[ko]), citer(roles[ko]), TYPES_ADMIS[types[ko]],
+                                    citer(r[ko]), citer(roles[ko]),
+                                    texte_moteur(TYPES_ADMIS[types[ko]]),
                                     vapply(which(ko), function(i)
                                       paste(citer(class(colonne(i))), collapse = "/"),
                                       character(1L))),

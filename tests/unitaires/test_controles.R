@@ -279,6 +279,15 @@ for (cas in list(
   list(nom = "constante non ASCII sous %s",
        fichiers = list(outils = "f <- function() refuser(\"m\", \"a\", formuler(\"x %s\", \"\\u00e9\"))"),
        motif = "valeur insérée par %s sans citation ni forme admise"),
+  # Constante du moteur non ASCII non marquée (M1 de la revue finale de #127) :
+  # insérée par %s sans texte_moteur(), sprintf() la traduirait sous la locale C.
+  list(nom = "constante non ASCII du moteur sous %s sans texte_moteur()",
+       fichiers = list(outils = c("TYPES <- c(date = \"enti\\u00e8res\")",
+                                  "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", TYPES[x]))")),
+       motif = "valeur insérée par %s sans citation ni forme admise : TYPES[x]"),
+  list(nom = "texte_moteur() d'une valeur reçue sous %s",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", texte_moteur(x)))"),
+       motif = "valeur insérée par %s sans citation ni forme admise : texte_moteur(x)"),
   list(nom = "paste() d'une valeur non citée sous %s",
        fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", paste(x, collapse = \", \")))"),
        motif = "valeur insérée par %s sans citation ni forme admise : paste(x"),
@@ -323,6 +332,20 @@ verifier("messages de refus : échoue sur une liste d'exceptions mal formée (li
          echoue(controle("messages_refus.R", shQuote(d), shQuote(e)),
                 "liste d'exceptions : ligne en double, sans raison ou expression non ASCII"))
 unlink(c(d, e), recursive = TRUE)
+# Exception sur une constante non ASCII non marquée : refusée ; la même
+# constante marquée par texte_moteur() à l'insertion passe sans exception.
+constante_non_ascii <- c("TYPES <- c(date = \"enti\\u00e8res\")",
+                         "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", @@))")
+d <- modules_temoins(list(outils = c(constante_non_ascii[1L], sub("@@", "TYPES[x]", constante_non_ascii[2L], fixed = TRUE))))
+e <- exceptions_temoin("outils.R,f,TYPES[x],libelles du catalogue")
+verifier("messages de refus : échoue sur une exception couvrant une constante non ASCII non marquée",
+         echoue(controle("messages_refus.R", shQuote(d), shQuote(e)),
+                "exception sur la constante non ASCII non marquée TYPES (texte_moteur() requis)"))
+unlink(c(d, e), recursive = TRUE)
+d <- modules_temoins(list(outils = c(constante_non_ascii[1L], sub("@@", "texte_moteur(TYPES[x])", constante_non_ascii[2L], fixed = TRUE))))
+verifier("messages de refus : passe sur une constante non ASCII du moteur marquée par texte_moteur(), sans exception",
+         passe(controle("messages_refus.R", shQuote(d), shQuote(sans_exception))))
+unlink(d, recursive = TRUE)
 d <- modules_temoins(list(outils = c(
   "f <- function(x, n) {",
   "  if (n) refuser(\"m\", \"a\", formuler(\"x %s, %d, %s, %s\", citer(x), n, liste_guillemets(x), \"ascii\"))",

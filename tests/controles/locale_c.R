@@ -25,8 +25,9 @@
 #       de refus du rejeu et de objet_modifie (et citation d'une chaîne
 #       latin-1) marqués UTF-8 et sur une ligne (#94) ; puis un refus par
 #       module citant une valeur non ASCII native, latin-1 et UTF-8, et
-#       trois refus de lire_texte() : marqués UTF-8, sans octet « <xx> »
-#       (#127) ;
+#       trois refus de lire_texte() et deux type_incompatible sur un rôle
+#       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
+#       octet « <xx> » (#127) ;
 #    3. les textes (fiche, plan et rapport figé de R1 à R6, bilan du rejeu et
 #       messages de refus de R1, messages de refus par module) écrits sous C
 #       et sous UTF-8 sont comparés
@@ -178,6 +179,25 @@ travailleur <- function(args) {
       if (is.na(m)) { d(sprintf("%s : refus attendu non levé", nom)); next }
       if (!grepl(rawToChar(brut_age), octets_bruts(m), fixed = TRUE, useBytes = TRUE))
         d(sprintf("%s : citation absente ou altérée : %s", nom, m))
+      msgs <- c(msgs, m); noms <- c(noms, nom)
+    }
+    # type_incompatible sur un rôle date (M1 de la revue finale de #127) : le
+    # libellé TYPES_ADMIS["date"] (« valeurs entières finies »), constante du
+    # moteur non ASCII, est inséré par %s ; sans texte_moteur(), sprintf()
+    # l'écrit « enti<c3><a8>res » sous C. Colonne de type character, puis de
+    # classe (chaîne d'encodage bytes, Date) ; octets « è » (c3 a8) du
+    # libellé exigés dans chaque message.
+    classe_bytes <- rawToChar(as.raw(c(0x63, 0x61, 0x66, 0xe9))); Encoding(classe_bytes) <- "bytes"
+    col_date <- structure(18262, class = c(classe_bytes, "Date"))
+    dates <- list("type_incompatible, rôle date, colonne character" = data.frame(d = "2020-01-01"),
+                  "type_incompatible, rôle date, classe bytes" = structure(list(d = col_date), class = "data.frame",
+                                                                          row.names = 1L))
+    for (nom in names(dates)) {
+      m <- refus_msg(tablexp:::controler_roles(dates[[nom]], c(date_entree = "d"), character(0)))
+      if (is.na(m)) { d(sprintf("%s : refus attendu non levé", nom)); next }
+      if (!grepl(rawToChar(as.raw(c(0x65, 0x6e, 0x74, 0x69, 0xc3, 0xa8, 0x72, 0x65, 0x73))), octets_bruts(m),
+                 fixed = TRUE, useBytes = TRUE))
+        d(sprintf("%s : libellé « entières » absent ou altéré : %s", nom, m))
       msgs <- c(msgs, m); noms <- c(noms, nom)
     }
     u8 <- function(...) { x <- rawToChar(as.raw(c(...))); Encoding(x) <- "UTF-8"; x }
