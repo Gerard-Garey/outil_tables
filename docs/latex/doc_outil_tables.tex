@@ -8512,13 +8512,26 @@ nombre, zéro compris. Deux cas~:
     imposée à \code{loi\_contrats} ($m$ étant sa longueur,
     section~\ref{sec:portefeuille-simule}), le nombre de contrats vaut~1 pour toute
     tête quel que soit le tirage si et seulement si $m = 1$~: \code{loi\_contrats = c(0, 1)}, qui donne deux contrats
-    à chaque tête, n'est pas un cas de refus (issue~\#112).
+    à chaque tête, n'est pas un cas de refus (issue~\#112). La condition
+    \code{entree\_avant\_fin} du type \code{en\_cours\_avant\_fin}
+    (entrée antérieure à la fin de la période) est vide quand aucune
+    entrée ne précède la fin~: \code{date\_entree} égale à la fin dans les
+    modes \code{age\_exact} et \code{age\_exact\_multi}, où toute entrée
+    vaut \code{date\_entree}~; \code{origine} égale à la fin dans les modes
+    \code{uniforme} et \code{uniforme\_multi}, où les entrées sont tirées
+    entre \code{origine} et la fin. Le contrôle du portefeuille imposant
+    déjà \code{date\_entree} au plus égale à la fin, et \code{origine} au
+    plus égale au début, lui-même au plus égal à la fin, ces égalités sont
+    exactement les cas vides (issue~\#135).
 \end{itemize}
 Le message nomme le type et la raison, formée à partir des valeurs
 reçues et citée («~Défauts~: déclaration [k]~: type [type]~: aucune
-unité éligible par construction (un seul contrat par tête~: mode
-«~[mode]~», [et, en mode multi, «~loi\_contrats de longueur 1~»]), quel
-que soit le tirage.~»)~; les \code{details} sont \code{parametre}
+unité éligible par construction ([raison]), quel que soit le tirage.~»,
+la raison étant «~un seul contrat par tête~: mode «~[mode]~»~», suivie en
+mode multi-contrats de «~, loi\_contrats de longueur 1~», ou «~aucune
+entrée avant la fin de la période~: date\_entree «~[date]~» égale à la fin
+«~[fin]~»~», \code{origine} au lieu de \code{date\_entree} dans les modes
+\code{uniforme} et \code{uniforme\_multi})~; les \code{details} sont \code{parametre}
 («~defauts\$declarations~») et \code{declaration} (le rang). Raisons du
 refus plutôt que d'un jeu rendu sans unité retenue~: c'est la règle déjà
 appliquée à la cible disjointe~; le refus ne dépend pas de la graine~; un
@@ -8531,7 +8544,8 @@ structure de l'attribut \code{defauts}. Le contrôle, dans
 de \code{nombre}~: une déclaration de taux ou de nombre mal formé sur une
 cible vide reçoit le refus de la cible vide. Un ensemble d'éligibles vide
 qui \emph{dépend du jeu tiré} (cause absente du jeu propre, aucune tête à
-deux lignes dans un mode multi-contrats à plusieurs probabilités) n'est pas
+deux lignes dans un mode multi-contrats à plusieurs probabilités, aucune
+entrée tirée avant la fin quand \code{origine} précède la fin) n'est pas
 refusé à ce stade~: en taux, il donne zéro unité retenue, tracé dans les
 décomptes~; en nombre, il relève du refus \code{defauts\_ineligibles}
 ci-dessous.
@@ -8706,11 +8720,12 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
     \textbf{après le tirage du jeu propre}, dont il dépend~: à la
     différence du précédent, il dépend de la graine du jeu. Il ne couvre
     plus que les vides qui dépendent du tirage~: un type de tête dans un
-    portefeuille à un seul contrat par tête, auparavant refusé ici quand
-    \code{nombre} était positif, et rendu avec zéro unité retenue quand il
-    était nul ou exprimé en taux, est désormais refusé par
+    portefeuille à un seul contrat par tête, et \code{en\_cours\_avant\_fin}
+    quand aucune entrée ne précède la fin, auparavant refusés ici quand
+    \code{nombre} était positif, et rendus avec zéro unité retenue quand il
+    était nul ou exprimé en taux, sont désormais refusés par
     \code{defauts\_invalides}, avant tout tirage, même sous une graine du
-    jeu invalide (issue~\#112).
+    jeu invalide (issues~\#112 et~\#135).
 \end{itemize}
 
 \noindent
@@ -9155,7 +9170,13 @@ et le mode cité, avant le refus \code{graine\_invalide} et sans changer
 l'aléa de l'appelant~; les modes multi-contrats de \code{loi\_contrats}
 $(0{,}5~; 0{,}5)$ et $(0~; 1)$ admis~; un nom vide dans les conditions
 vides sans effet~; \code{defauts\_ineligibles} d'un type de tête repris
-dans un mode multi-contrats avec un nombre supérieur aux éligibles~; le
+dans un mode multi-contrats avec un nombre supérieur aux éligibles~; pour
+\code{en\_cours\_avant\_fin} (issue~\#135), dans les quatre modes, une
+date d'entrée ou une origine égale à la fin~: refus avant tout tirage, en
+taux et en nombre, zéro compris, sous une graine du jeu valide ou
+manquante, avec ses \code{details}, la raison et les dates citées, et
+l'aléa de l'appelant inchangé, et, dans les quatre modes, le cas voisin
+d'une entrée la veille de la fin admis~; \code{conditions\_vides()}~; le
 constat ci-dessus.
 \code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
 identique, attribut compris, dans un autre processus R.
@@ -9203,7 +9224,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
 \catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
 \catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issue~\#112)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; déclarations normalisées (types rangés dans l'ordre du catalogue, cible, taux ou nombre) \\
-\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~; dont les conditions des types de tête pour un seul contrat par tête (section~\ref{sec:defauts-parametres}~; issue~\#112) \\
+\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête (issue~\#112), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres}) \\
 \catalogue{fonctions-simulation}{injecter\_defauts()} & interne & jeu propre, défauts contrôlés, défauts reçus, période & sélection sous la graine des défauts, refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de jeu~; jeu altéré et attribut \code{defauts} \\
 \catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine, défauts (\code{NULL} par défaut) & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation}~; jeu altéré et attribut \code{defauts} si des défauts sont déclarés \\
 \end{longtable}
