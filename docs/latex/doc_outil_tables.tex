@@ -656,14 +656,23 @@ n'est pas fait dans \code{refuser()}, qui reçoit le message déjà formé~; une
 fonction \code{refuser()} qui recevrait le gabarit et les valeurs aurait changé le
 contrat de la condition, dont le champ \code{message} est reçu formé
 (option écartée, même annotation, (d)). Un argument inséré par \code{\%s}
-est de l'une de trois sortes~: une valeur reçue (des données, des rôles,
+est de l'une de quatre sortes~: une valeur reçue (des données, des rôles,
 du plan, de la provenance, d'une fiche ou d'un texte lu~: chaîne, nom,
 classe, chemin), citée par \code{neutraliser\_citation()} ou par ses deux
 alias, \code{citer()} et \code{sans\_controle()} (ci-dessous)~; un texte
 déjà formé selon la règle, qui n'est pas cité une seconde fois (résultat
 de \code{formuler()}, de \code{liste\_guillemets()}, dont les guillemets
 sont marqués avant le collage pour la même raison, ou d'une aide de
-message du moteur)~; une constante ASCII. Un nombre inséré par
+message du moteur)~; une constante ASCII~; le texte d'une chaîne
+constante ou d'une constante du moteur (affectation de premier niveau de
+\code{R/}, éventuellement indexée), marqué par \code{texte\_moteur()}
+au moment de l'insertion, jamais une valeur reçue. Une constante du moteur
+non ASCII est de codage natif non marqué, si bien que, sous la locale C,
+\code{sprintf()} en écrirait les octets «~<c3><a8>~»~: elle n'est insérée
+que sous cette quatrième forme (ainsi le libellé du type \code{date} de \code{TYPES\_ADMIS},
+«~Date (valeurs entières finies)~», dans le refus
+\code{type\_incompatible}).
+Un nombre inséré par
 \code{\%d}, \code{\%g} ou \code{\%f} n'est pas cité.
 \textbf{Garantie sur le champ \code{message}}~: un message qui contient un
 caractère non ASCII est marqué UTF-8, a les mêmes octets sous les locales
@@ -676,8 +685,11 @@ installés sous C et sous C.UTF-8, chacun exécuté en session C et en
 session C.UTF-8~: dans les quatre combinaisons, messages marqués UTF-8 et
 aux mêmes octets)~; l'identité des octets est
 un \emph{constat} de \code{tests/controles/locale\_c.R}
-(section~\ref{sec:harnais}) sur un refus par module et trois refus de
-lecture du texte du plan, non une propriété démontrée. \textbf{La garantie
+(section~\ref{sec:harnais}) sur un refus par module, trois refus de
+lecture du texte du plan et deux refus \code{type\_incompatible} sur un
+rôle date (colonne \code{character}, et classe formée d'une chaîne
+d'encodage \code{bytes} et de \code{Date}), non une propriété
+démontrée. \textbf{La garantie
 ne couvre pas une installation exécutée sous une locale latin-1}~: paquet
 installé et exécuté sous \code{fr\_FR.ISO-8859-1} (locale générée par
 \code{localedef} dans un dossier de locales temporaire), le message du
@@ -697,13 +709,19 @@ sous latin-1~; ce dernier cas donnait encore, au commit \code{3ed0301},
 chaque appel de \code{formuler()} est une constante chaîne, ou un
 \code{paste()} ou \code{paste0()} de constantes, aux conversions en même
 nombre que les valeurs~; que chaque valeur insérée par \code{\%s} est de
-l'une des trois sortes ci-dessus (suivie à travers ses affectations
-locales)~; que le message de chaque refus (\code{refuser()},
+l'une des quatre sortes ci-dessus (suivie à travers ses affectations
+locales), \code{texte\_moteur()} n'étant admis que sur une chaîne
+constante ou une constante du moteur~; que le message de chaque refus (\code{refuser()},
 \code{refus\_tablexp()} et leurs relais locaux) est formé par
 \code{formuler()} ou par une aide de message, sans \code{sprintf()},
 \code{paste()} ni \code{paste0()}~; qu'une exception figure dans une liste
 fermée, une ligne par site avec sa raison (texte produit par le moteur
-seul~: constante, catalogue, nombre, type R), et que chacune sert encore.
+seul~: constante, catalogue, nombre, type R), que chacune sert encore, et
+qu'aucune ne couvre une constante du moteur non ASCII non marquée~: le
+script relève ces constantes (affectations de premier niveau de
+\code{R/} dont l'expression contient une chaîne non ASCII hors d'un appel
+de \code{texte\_moteur()}) et refuse toute exception qui en nomme une,
+puisqu'elle doit être marquée à l'insertion.
 \textbf{Limites}~: les messages d'avertissement
 (section~\ref{sec:avertissements}) et les erreurs de programmation
 (\code{stop()}) sont hors de la règle~; le script ne contrôle pas le
@@ -1403,7 +1421,11 @@ ligne, et dix-huit refus par module, six modules (\code{donnees},
 \code{construire\_table}) citant chacun une valeur reçue non ASCII de
 codage natif non marqué, latin-1 et UTF-8, avec trois refus de la
 lecture du texte du plan (première ligne inconnue, type inconnu, valeur
-illisible), qui doivent en outre ne contenir aucun octet écrit
+illisible) et deux refus \code{type\_incompatible} sur un rôle date
+(colonne \code{character}, et classe formée d'une chaîne d'encodage
+\code{bytes} et de \code{Date}~; le libellé «~entières~» de
+\code{TYPES\_ADMIS} y est exigé en octets UTF-8), soit vingt-trois
+messages, qui doivent en outre ne contenir aucun octet écrit
 «~<xx>~» et garder la valeur citée en octets UTF-8 (issue~\#127~;
 section~\ref{sec:refus}, «~Règle de rédaction des messages~»), puis
 compare octet à octet les textes
@@ -2336,9 +2358,10 @@ installation, qui vérifie d'abord la locale effective~; pour R1 à R6,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
 marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
-issue~\#94)~; messages de refus par module et de la lecture du texte du
-plan (marqués UTF-8, sur une ligne, sans octet écrit «~<xx>~»~;
-issue~\#127)~; puis ces textes, trois par plan, le bilan, les messages
+issue~\#94)~; messages de refus par module, de la lecture du texte du
+plan et de deux refus \code{type\_incompatible} sur un rôle date,
+vingt-trois en tout (marqués UTF-8, sur une ligne, sans octet écrit
+«~<xx>~»~; issue~\#127)~; puis ces textes, trois par plan, le bilan, les messages
 de R1 et les messages par module, soit vingt et un, comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
@@ -2348,7 +2371,10 @@ issues~\#66 et~\#127 \\
 (section~\ref{sec:refus})~: fichiers de \code{R/} lus par \code{parse()},
 sans charger \code{tablexp}~; gabarit de \code{formuler()} constant, aux
 conversions en même nombre que les valeurs~; valeur insérée par
-\code{\%s} citée, formée ou constante ASCII~; message de chaque refus
+\code{\%s} citée, formée, constante ASCII, ou chaîne constante ou
+constante du moteur marquée par \code{texte\_moteur()}~; aucune exception
+sur une constante du moteur non ASCII non marquée (relevé par
+\code{constantes\_moteur}, fonction du script)~; message de chaque refus
 formé par \code{formuler()} ou une aide de message~; exceptions en liste
 fermée, motivées, toutes employées~; décompte imprimé. Appelé par la
 batterie unitaire (\code{test\_controles.R}), avec un témoin d'échec par
