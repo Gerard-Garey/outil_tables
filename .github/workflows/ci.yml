@@ -257,7 +257,7 @@ jobs:
       # nouvelle repart du dernier cache (restore-keys), purgé des archives
       # que l'index ne sert plus (autoclean). Sauvegarde après un job réussi.
       - name: Cache des paquets TeX
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ~/paquets-tex
           key: paquets-tex-ubuntu-24.04-${{ hashFiles('.github/workflows/ci.yml') }}
