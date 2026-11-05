@@ -576,7 +576,7 @@ modules~: l'exécution sous graine locale (section~\ref{sec:reproductibilite}),
 la forme des refus et celle des avertissements (ADR 0007, point 1.2), ainsi
 que le contrôle de la forme exacte d'une valeur reçue, \code{forme\_exacte()}
 (type de base et attributs admis, section~\ref{sec:plan}~; issue~\#23), et
-les deux contrôles de forme qui s'y appuient, partagés par les modules~:
+deux contrôles de forme qui s'y appuient, partagés par les modules~:
 \code{liste\_aux\_noms()} (liste nue aux noms exacts) et
 \code{chaine\_unique()} (chaîne unique sans attribut, ni \code{NA} ni vide~;
 issue~\#48), ainsi que la règle des noms complets, \code{noms\_complets()}
@@ -591,7 +591,12 @@ avec le relevé des noms d'encodage \code{bytes} d'un objet reçu,
 \code{noms\_bytes()} (issue~\#114), et les lectures de la classe et d'un
 champ par nom qui ne lèvent pas d'erreur R sur une classe ou un nom de cet
 encodage, \code{a\_classe()}, \code{classe\_bytes()} et
-\code{lire\_champ()} (issue~\#128). Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
+\code{lire\_champ()} (issue~\#128), et trois règles écrites une seule
+fois et partagées par plusieurs modules (issue~\#113)~: deux autres
+contrôles de forme appuyés sur \code{forme\_exacte()}, celui d'une graine,
+\code{forme\_graine()}, et celui d'une date unique, \code{date\_unique()},
+et la conversion des chaînes en UTF-8 selon la locale,
+\code{vers\_utf8\_locale()}. Il n'appelle aucun module. Sans lui, la fonction de graine locale serait dupliquée
 dans le simulateur et dans le futur bootstrap par têtes, et chaque module
 inventerait sa forme de refus.
 
@@ -944,6 +949,13 @@ sur les noms seuls~: la forme de l'objet, les doublons et la liste vide sans
 noms relèvent de l'appelant~; seul endroit où s'écrit la règle, partagée par
 \code{controler\_roles()} et \code{liste\_noms\_complets()} (issues~\#22,
 \#60 et~\#62) \\
+\catalogue{fonctions-outils}{forme\_graine()} & interne & \code{g} &
+\code{TRUE} si \code{g} est de forme exacte \code{integer} ou \code{double}
+(ni noms, ni dimension, ni classe), de longueur~1, non \code{NA}, finie,
+entière et de valeur absolue au plus \code{.Machine\$integer.max},
+\code{FALSE} sinon, jamais \code{NA}~; ne refuse pas~; règle de
+\code{sous\_graine()}, partagée avec le contrôle de la graine des défauts
+du simulateur (section~\ref{sec:sous-graine}~; issues~\#43 et~\#113) \\
 \catalogue{fonctions-outils}{date\_unique()} & interne & \code{x} &
 \code{TRUE} si \code{x} est une date unique entière et finie, de forme
 exacte (classe \code{Date} seule, stockage \code{double} ou
@@ -951,6 +963,14 @@ exacte (classe \code{Date} seule, stockage \code{double} ou
 règle partagée par les bornes de la période d'observation (modules
 \code{donnees} et \code{simulation}) et par les dates du portefeuille
 simulé (issues~\#58 et~\#113) \\
+\catalogue{fonctions-outils}{vers\_utf8\_locale()} & interne & \code{x}
+(\code{character}) & chaînes converties en UTF-8 selon la locale de la
+session~: \code{enc2utf8()} sur toutes sous une locale UTF-8 ou latin-1
+(\code{l10n\_info()}), sur les seules chaînes marquées latin-1 sinon, les
+autres gardant leurs octets~; même longueur, \code{NA} conservés~; ne refuse
+pas~; règle unique de l'empreinte des données (\code{octets\_chaines()},
+après ses deux premiers refus) et de l'ordre des segments (ADR 0007,
+point~9.3, annotation du 05/11/2026, (g)~; issues~\#106 et~\#113) \\
 \catalogue{fonctions-outils}{noms\_bytes()} & interne & \code{x} &
 positions (\code{integer}, jamais \code{NA}) des noms de premier niveau
 d'encodage \code{bytes}, \code{integer(0)} si \code{x} n'a pas de noms ou
@@ -1017,7 +1037,8 @@ mises à part~; l'ensemble n'est défini qu'une fois, dans la règle
 \catalogue{fonctions-outils}{sous\_graine()} & interne & \code{graine} (entier
 explicite, sans défaut ni attribut), \code{expr} & valeur de \code{expr} évaluée sous la
 graine et \code{GENERATEUR}, état du générateur de l'appelant restauré~; refus
-\code{graine\_invalide} (section~\ref{sec:sous-graine}) \\
+\code{graine\_invalide} si \code{forme\_graine()} est faux
+(section~\ref{sec:sous-graine}) \\
 \end{longtable}
 }
 
@@ -1089,7 +1110,10 @@ tire un aléa (ADR 0007, point 8.1). Elle procède ainsi~:
     noms, ni dimension, ni classe (\code{forme\_exacte()},
     section~\ref{sec:fonctions-outils}~; issue~\#43)~: une graine non
     canonique ne doit pas être consignée~---, non manquant, fini,
-    entier et de valeur absolue au plus \code{.Machine\$integer.max}~; sinon,
+    entier et de valeur absolue au plus \code{.Machine\$integer.max},
+    règle écrite une seule fois, \code{forme\_graine()}, et partagée avec le
+    contrôle de la graine des défauts du simulateur
+    (section~\ref{sec:defauts-parametres}~; issue~\#113)~; sinon,
     et aussi quand la graine est omise, refus \code{graine\_invalide} du module
     \code{outils}. Il n'y a jamais de graine par défaut~: une graine par défaut
     serait une graine non déclarée~;
@@ -1370,7 +1394,8 @@ non ASCII.
 \textbf{Locale latin-1} (issue~\#115). Sous une locale latin-1,
 \code{octets\_chaines()} et l'ordre des segments
 (\code{segments\_observations()}, section~\ref{sec:troncature-censure})
-suivent une branche propre~: la session y est traitée comme une session
+suivent une branche propre, écrite une seule fois depuis l'issue~\#113
+dans \code{vers\_utf8\_locale()}~: la session y est traitée comme une session
 UTF-8, toutes les chaînes passant par \code{enc2utf8()}. Aucune batterie ne
 s'exécute sous une telle locale, et \code{locale\_c.R} ne compare que C et
 UTF-8~: sans contrôle dédié, une régression de cette branche, qui
@@ -1402,7 +1427,10 @@ retirer la branche latin-1 de la condition de locale connue
 d'\code{octets\_chaines()} fait échouer, dans la session latin-1, R1 à R6
 et les quatre jeux de segments~; la retirer de celle de l'ordre des segments
 ne fait échouer que le jeu mêlé, seul à la détecter~; la session UTF-8 passe
-dans les deux cas, et le contrôle sort avec le code~1.
+dans les deux cas, et le contrôle sort avec le code~1. Depuis l'issue~\#113,
+les deux conditions n'en font qu'une, dans \code{vers\_utf8\_locale()}~:
+les deux mutations ci-dessus ne sont plus distinctes, et le constat, daté,
+n'a pas été refait sur le code actuel.
 \textbf{Statut}~: l'identité des textes est un \emph{constat} sur la
 machine qui exécute le contrôle et sur ces plans et ces jeux, non une
 propriété démontrée~; il ne couvre ni Windows (issue~\#49) ni la batterie
@@ -4227,11 +4255,15 @@ du marquage~: sans cette règle, deux entrées de même empreinte pourraient
 donner des tables ordonnées différemment (erratum A.3, point~4). Le tri
 porte sur une copie des valeurs distinctes marquée \code{bytes}, comparée
 octet à octet sans traduction, après la conversion en UTF-8 que fait
-l'écriture de l'empreinte (\code{octets\_chaines()})~: dans une session de
+l'écriture de l'empreinte (\code{octets\_chaines()}), par la même
+fonction, écrite une seule fois, \code{vers\_utf8\_locale()} (module
+\code{outils}~; issue~\#113)~: dans une session de
 locale UTF-8 ou latin-1, toutes les chaînes sont converties par
 \code{enc2utf8()}~; sous une autre locale (la locale C), seules les chaînes
 marquées latin-1 le sont, une chaîne non marquée gardant ses octets~; les
-valeurs rendues gardent leur encodage d'origine. Ainsi, sur les segments
+valeurs rendues gardent leur encodage d'origine. Le tri ne refuse rien~:
+une valeur que l'empreinte refuse est refusée avant la première étape
+(section~\ref{sec:execution}). Ainsi, sur les segments
 «~ÿ~» (marqué latin-1), «~€~» (marqué UTF-8) et «~a~», l'ordre est
 «~a~», «~ÿ~», «~€~» (octets \code{61}, \code{c3 bf}, \code{e2 82 ac}), sous
 la locale C comme sous C.UTF-8. \textbf{Défaut corrigé} (issue~\#106)~:
@@ -4250,7 +4282,14 @@ valeurs distinctes pour \code{unique()} et \code{match()}, donc deux
 segments si l'on appelle \code{segments\_observations()} directement~; le
 cas n'est pas atteignable par \code{construire\_table()}, qui refuse la
 chaîne non marquée sous cette locale avant toute étape
-(\code{chaine\_codage\_indetermine}).
+(\code{chaine\_codage\_indetermine}). \code{tests/unitaires/test\_exposition.R}
+vérifie, sous la locale C et sous une locale UTF-8, que l'ordre des
+segments est celui des octets que hache l'empreinte des données (corps des
+lignes écrites par \code{octets\_chaines()}, rangés par octets hors du code
+de l'ordre des segments), sur des valeurs ASCII, marquées UTF-8 et
+latin-1 mêlées, et, sous UTF-8, natives non marquées, et que ces octets
+sont ceux de \code{vers\_utf8\_locale()} (issue~\#113~; \emph{constat}
+sur ces valeurs).
 
 \medskip
 \textbf{Paramètres effectifs, diagnostics, avertissements.} Les paramètres
@@ -6232,7 +6271,16 @@ annotation du 17/10/2026, point~f)~:
     (\code{chaine\_codage\_bytes}), une chaîne qui n'est pas de l'UTF-8 valide
     (\code{chaine\_non\_utf8}) et, dans une session dont la locale n'est ni
     UTF-8 ni latin-1, une chaîne non ASCII non marquée, dont le codage est
-    indéterminé (\code{chaine\_codage\_indetermine}). Sous ces règles,
+    indéterminé (\code{chaine\_codage\_indetermine}). La conversion est
+    celle de la règle unique \code{vers\_utf8\_locale()} (module
+    \code{outils}~; ADR 0007, point~9.3, annotation du 05/11/2026, (g)~;
+    issue~\#113), appelée après les deux premiers refus, qui restent dans
+    le module \code{rapport}~: \code{enc2utf8()} sur toutes les chaînes sous
+    une locale UTF-8 ou latin-1, sur les seules chaînes marquées latin-1
+    sinon~; après ces refus, elle équivaut à \code{enc2utf8()} sur tout, en
+    toute locale, une chaîne restante étant ASCII, marquée UTF-8 ou marquée
+    latin-1. L'ordre des segments (section~\ref{sec:troncature-censure})
+    appelle la même fonction. Sous ces règles,
     l'empreinte ne dépend pas des paramètres régionaux.
 \end{itemize}
 
@@ -8130,6 +8178,15 @@ portefeuille porte exactement les champs de son mode, sans champ manquant,
 inconnu ni en double, et ses champs sont lus par leur nom exact, sans
 appariement partiel (un champ \code{mode\_x} ne tient pas lieu de
 \code{mode})~; sinon refus \code{portefeuille\_invalide} (issue~\#60).
+Les noms sont comparés par \code{ecart\_noms()}, règle unique des noms
+des arguments du simulateur, partagée avec les défauts (issue~\#113)~:
+un nom manquant (\code{NA}) ou en double donne le message «~Portefeuille
+(mode [mode])~: noms manquants ou en double.~», et un champ absent ou
+inconnu «~Portefeuille (mode [mode])~: champs attendus [champs entre
+guillemets]~; manquants~: [noms entre guillemets, ou «~aucun~»]~;
+inconnus~: [idem].~», mode et noms cités par la règle unique des refus
+(un crochet désigne une valeur insérée)~; les \code{details} sont
+\code{mode}, \code{attendus} et \code{noms} (noms reçus).
 Le portefeuille lui-même est de \emph{forme exacte}
 (\code{forme\_exacte()}~; issue~\#78)~: une \textbf{liste nue}, dont le seul
 attribut admis est celui des noms~; un \code{data.frame}, une liste munie
@@ -8140,7 +8197,9 @@ tri. Ses champs numériques (\code{n}, \code{proportion\_hommes},
 \code{double} ou \code{integer}, de longueur~1, finis et \textbf{sans aucun
 attribut} (ni noms, ni dimension, ni classe)~; \code{origine} et
 \code{date\_entree} sont des dates de la forme des bornes de la période
-ci-dessous (classe \code{Date} seule, sans noms ni autre attribut)~; sinon
+ci-dessous (classe \code{Date} seule, sans noms ni autre attribut~;
+prédicat \code{date\_unique()}, écrit une seule fois dans
+\code{R/outils.R}~; issue~\#113)~; sinon
 refus \code{portefeuille\_invalide}, au message propre au champ. Un champ
 \code{n} de type \code{integer} plutôt que \code{double}, ou des champs
 dans un autre ordre, donnent les mêmes lignes tirées~; l'attribut
@@ -8395,7 +8454,8 @@ exactement \code{graine} et \code{declarations}~:
   \item \code{graine}~: la graine des défauts, déclarée, sans défaut
     (M133), de la forme exigée par \code{sous\_graine()} (nombre entier
     unique, fini, sans attribut, de valeur absolue au plus
-    \code{.Machine\$integer.max}), et \textbf{différente de la graine du
+    \code{.Machine\$integer.max}~; même prédicat, \code{forme\_graine()},
+    écrit une seule fois~; issue~\#113), et \textbf{différente de la graine du
     jeu}. \code{sous\_graine()} réinitialise le générateur à chaque appel~:
     sous la même graine, la sélection des défauts reprendrait les premiers
     nombres du jeu propre, ceux qui ont tiré le sexe~: en mode
@@ -8423,7 +8483,8 @@ exactement \code{graine} et \code{declarations}~:
 \end{itemize}
 
 \noindent
-Les noms des listes sont comparés sans tri (issue~\#100). Une cible
+Les noms des listes sont comparés sans tri (issue~\#100), par la règle
+unique \code{ecart\_noms()}, partagée avec le portefeuille (issue~\#113). Une cible
 disjointe, par construction, des causes que le catalogue admet pour le type
 (pour une combinaison, pour tous ses types) est refusée, en taux comme en
 nombre, zéro compris~: aucune ligne n'y serait éligible, quel que soit le
@@ -9075,7 +9136,9 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
 \catalogue{fonctions-simulation}{age\_anniversaire()} & interne & composantes, année, jour & âge au dernier anniversaire \\
-\catalogue{fonctions-simulation}{controler\_portefeuille()} & interne & portefeuille, période & refus des entrées, dont \code{loi\_contrats} et la garde de débordement des modes multi-contrats~; bornes d'âge a priori \\
+\catalogue{fonctions-simulation}{en\_date()} & interne & jours (numériques) & dates de classe \code{Date}, stockage \code{double}~; seule définition, pour les colonnes de dates du jeu simulé et du jeu à défauts (issue~\#113) \\
+\catalogue{fonctions-simulation}{ecart\_noms()} & interne & liste, noms requis, noms admis & \code{""} si les noms reçus sont complets et admis, sinon le texte de l'écart (noms manquants ou en double, ou champs attendus, manquants et inconnus cités par \code{liste\_guillemets()}), comparé sans tri~; règle unique des noms du portefeuille, de \code{defauts} et de chaque déclaration (section~\ref{sec:defauts-parametres}~; issue~\#113) \\
+\catalogue{fonctions-simulation}{controler\_portefeuille()} & interne & portefeuille, période & refus des entrées, dont \code{loi\_contrats} et la garde de débordement des modes multi-contrats~; noms par \code{ecart\_noms()}, dates par \code{date\_unique()} (issue~\#113)~; bornes d'âge a priori \\
 \catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
 \catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
