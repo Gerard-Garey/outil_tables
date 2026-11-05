@@ -677,15 +677,20 @@ session C.UTF-8~: dans les quatre combinaisons, messages marqués UTF-8 et
 aux mêmes octets)~; l'identité des octets est
 un \emph{constat} de \code{tests/controles/locale\_c.R}
 (section~\ref{sec:harnais}) sur un refus par module et trois refus de
-lecture du texte du plan, non une propriété démontrée. \textbf{La garantie ne couvre pas une
-installation sous une locale latin-1}~: paquet installé et exécuté sous
-\code{fr\_FR.ISO-8859-1} (locale générée par \code{localedef} dans un
-dossier de locales temporaire), le message du refus \code{colonne\_absente}
-sort non marqué (\code{Encoding()} rend «~unknown~»), n'est pas de l'UTF-8
-valide (\code{validUTF8()} rend \code{FALSE}) et porte l'octet \code{e9}
-pour «~é~»~: c'est du latin-1 natif, non marqué UTF-8, comme déjà au
-commit \code{3ed0301} (\emph{constat} mesuré le 05/11/2026~; la portée de
-la garantie est une question soumise au mainteneur).
+lecture du texte du plan, non une propriété démontrée. \textbf{La garantie
+ne couvre pas une installation exécutée sous une locale latin-1}~: paquet
+installé et exécuté sous \code{fr\_FR.ISO-8859-1} (locale générée par
+\code{localedef} dans un dossier de locales temporaire), le message du
+refus \code{colonne\_absente} sort non marqué (\code{Encoding()} rend
+«~unknown~»), n'est pas de l'UTF-8 valide (\code{validUTF8()} rend
+\code{FALSE}) et porte l'octet \code{e9} pour «~é~»~: c'est du latin-1
+natif, non marqué UTF-8, comme déjà au commit \code{3ed0301}
+(\emph{constat} mesuré le 05/11/2026~; la portée de la garantie est une
+question soumise au mainteneur). Les autres combinaisons mesurées donnent
+un message marqué UTF-8 (\emph{constat})~: installation sous latin-1
+exécutée sous C ou sous C.UTF-8, et installation sous C.UTF-8 exécutée
+sous latin-1~; ce dernier cas donnait encore, au commit \code{3ed0301},
+«~unknown~» et l'octet \code{e9}, et la présente règle le corrige.
 \textbf{Contrôle}~: \code{tests/controles/messages\_refus.R}
 (tableau~\ref{tab:scripts-controle}) lit les fichiers de \code{R/} par
 \code{parse()}, sans charger \code{tablexp}, et vérifie que le gabarit de
@@ -8562,11 +8567,13 @@ nombre, zéro compris. Deux cas~:
     est de cet ordre peut donner une loi tirée de $p_m$ nul. Ainsi
     \code{loi\_contrats = c(1, 1e-13)} passe le contrôle du portefeuille
     ($F_1 = 1$, d'où un $p_2$ tiré nul), donne un seul contrat à chaque
-    tête quelle que soit la graine, et n'est pas refusée avant tout
-    tirage~: une déclaration d'un type de tête y est rendue avec zéro
+    tête quelle que soit la graine (résultat exact par lecture~:
+    \code{cumsum(c(1, 1e-13))[-2]} vaut~1 en double et \code{runif()} ne
+    rend jamais~1~; conséquences sur les défauts~: \emph{constat}, deux
+    graines~; issue proposée au mainteneur), et n'est pas refusée avant
+    tout tirage~: une déclaration d'un type de tête y est rendue avec zéro
     éligible en taux, et refusée par \code{defauts\_ineligibles}, après le
-    tirage, en nombre positif (\emph{constat}, deux graines~; issue
-    proposée au mainteneur). La condition
+    tirage, en nombre positif. La condition
     \code{entree\_avant\_fin} du type \code{en\_cours\_avant\_fin}
     (entrée antérieure à la fin de la période) est vide quand aucune
     entrée ne précède la fin~: \code{date\_entree} égale à la fin dans les
