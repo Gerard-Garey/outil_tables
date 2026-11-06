@@ -1791,10 +1791,12 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "couverture garantie : le statut de chaque grandeur et de chaque intervalle est celui du tableau ci-dessus",
     "(colonnes statut, loi_supposee et calcul), qui fait foi."),
   brut_binomial = paste(
-    "Intervalle binomial « exact » (colonnes borne_inf_exacte et borne_sup_exacte de",
-    "etapes/brut/resultat/binomial) : la formule par quantiles de lois bêta suppose D ~ Bin(E^i, q) avec E^i",
-    "entier ; sous troncature à gauche et censure, l'exposition initiale E^i n'est en général pas entière, et la",
-    "formule en est alors le prolongement continu, de couverture non établie."),
+    "Intervalles binomiaux (colonnes borne_inf_exacte, borne_sup_exacte, borne_inf_asymptotique et",
+    "borne_sup_asymptotique de etapes/brut/resultat/binomial) : les deux formules supposent D ~ Bin(E^i, q), ce",
+    "qui ne vaut que pour une cellule observée entière, sans entrée ni censure dans la cellule (E^i est alors le",
+    "nombre d'unités d'observation, entier). Avec une entrée ou une censure dans la cellule, D ne suit pas",
+    "Bin(E^i, q), même si E^i est entier : la couverture des deux intervalles n'est pas établie ; si E^i n'est",
+    "pas entier, la formule par quantiles de lois bêta en est en outre le prolongement continu."),
   suffisance_intro = paste(
     "Indicateurs de suffisance (E2.15 : exposition et événements par âge et par segment, largeur des",
     "intervalles) : ils signalent ce que les données portent, sans rien interdire. Le rapport n'en calcule",

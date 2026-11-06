@@ -64,7 +64,8 @@ DENOMINATEUR_INSTANTS <- 133590L
 ENSEMBLE_A_RISQUE_KM <- "ferme"
 
 # Hypothèses inscrites dans les paramètres de l'étape et dans la fiche (A.1),
-# nommées par leur formule (aucune appellation d'auteur avant #6).
+# nommées par leur formule, sans attribution (M50 Q4, repli (b) ; #31) ; seule
+# appellation gardée : « Kaplan-Meier », nom d'estimateur fixé par E2.12.
 HYPOTHESES_BRUT <- list(
   poisson = paste("force de la transition constante dans la cellule ; sorties concurrentes non",
                   "informatives (hypothese_censure) ; troncature à gauche traitée par la fenêtre",
@@ -120,9 +121,11 @@ STATUTS_BRUT <- data.frame(
           "régime) ; non défini à D = 0"),
     paste("estimateur des moments : E[D] = q E[E^i] exactement sous l'hypothèse de répartition ;",
           "convergent ; non sans biais à effectif fini"),
-    paste("exact sous la loi supposée si E^i est entier ; si E^i n'est pas entier, prolongement",
-          "continu de la formule exacte : couverture non établie"),
-    "asymptotique (E^i q(1-q) -> infini) ; non défini à D = 0 et à D = E^i",
+    paste("exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, E^i",
+          "entier) ; avec une entrée ou une censure dans la cellule, couverture non établie, même si",
+          "E^i est entier (prolongement continu de la formule exacte si E^i n'est pas entier)"),
+    paste("asymptotique (E^i q(1-q) -> infini) pour une cellule observée entière ; avec une entrée ou",
+          "une censure dans la cellule, couverture non établie ; non défini à D = 0 et à D = E^i"),
     paste("résultat exact : maximum de vraisemblance non paramétrique (risques discrets aux instants",
           "d'événement) ; non sans biais à effectif fini"),
     paste("asymptotique (méthode delta sur log P, ensemble à risque -> infini sur toute la cellule) ;",
@@ -144,18 +147,18 @@ STATUTS_BRUT <- data.frame(
     "D / E^c",
     paste("[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et",
           "d'échelle 1 ; borne inférieure 0 si D = 0 ; approximation numérique (qgamma)"),
-    "taux exp(-+ z / sqrt(D)) : Wald sur log mu ; z = qnorm(alpha/2, lower.tail = FALSE)",
+    "taux exp(-+ z / sqrt(D)) : normal sur l'échelle de log mu ; z = qnorm(alpha/2, lower.tail = FALSE)",
     "-expm1(-taux)",
     "1 - exp(-borne), par -expm1(-borne)",
     "1 - exp(-borne), par -expm1(-borne)",
     "D / E^i",
     paste("[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ;",
           "0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"),
-    paste("plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : Wald sur logit q ;",
+    paste("plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : normal sur l'échelle de logit q ;",
           "z = qnorm(alpha/2, lower.tail = FALSE)"),
     "-expm1(sum(log1p(-d/r))) sur les instants d'événement de la cellule",
     "P^2 Sigma, P = exp(sum(log1p(-d/r))) = 1 - q, Sigma = sum d / (r (r - d)) en double",
-    paste("plogis(qlogis(q) -+ z sqrt(Sigma) / q) : Wald sur logit q, Var(logit q) ~ Sigma / q^2 ;",
+    paste("plogis(qlogis(q) -+ z sqrt(Sigma) / q) : normal sur l'échelle de logit q, Var(logit q) ~ Sigma / q^2 ;",
           "z = qnorm(alpha/2, lower.tail = FALSE)"),
     "sans objet"),
   stringsAsFactors = FALSE)
@@ -219,7 +222,7 @@ taux_poisson <- function(D, E, niveau) {
   inf_e[d] <- 0
   inf_e[k] <- stats::qgamma(alpha / 2, D[k]) / E[k]
   sup_e[d] <- stats::qgamma(alpha / 2, D[d] + 1, lower.tail = FALSE) / E[d]
-  # Wald sur log mu, Var(log mu) ~ 1/D : non défini à D = 0.
+  # Normal sur l'échelle de log mu, Var(log mu) ~ 1/D : non défini à D = 0.
   inf_a[k] <- taux[k] * exp(-z / sqrt(D[k]))
   sup_a[k] <- taux[k] * exp(z / sqrt(D[k]))
   list(taux = taux, borne_inf_exacte = inf_e, borne_sup_exacte = sup_e,
@@ -232,8 +235,11 @@ taux_poisson <- function(D, E, niveau) {
 # cellules définies où D = E^i > 0 (q = 1), celles-là mêmes où les bornes
 # asymptotiques sont NA faute de D < E^i. Ei = 0 (D = 0) : état
 # exposition_nulle ; Ei < D : état effectif_inferieur_aux_evenements (le
-# modèle binomial ne s'applique pas). Ei non entier : prolongement continu de
-# la formule exacte (statut « couverture non établie », STATUTS_BRUT).
+# modèle binomial ne s'applique pas). Les deux intervalles supposent D ~
+# Bin(E^i, q), ce qui ne vaut que pour une cellule observée entière (sans
+# entrée ni censure, E^i entier) ; avec une entrée ou une censure dans la
+# cellule, couverture non établie, même si E^i est entier ; Ei non entier :
+# prolongement continu de la formule exacte (STATUTS_BRUT, #31).
 taux_binomial <- function(D, Ei, niveau, tolerance) {
   n <- length(D)
   alpha <- 1 - niveau
@@ -254,8 +260,8 @@ taux_binomial <- function(D, Ei, niveau, tolerance) {
   inf_e[k] <- stats::qbeta(alpha / 2, D[k], N[k] - D[k] + 1)
   sup_e[d] <- 1
   sup_e[m] <- stats::qbeta(alpha / 2, D[m] + 1, N[m] - D[m], lower.tail = FALSE)
-  # Wald sur logit q, Var(logit q) ~ 1/D + 1/(E^i - D) : non défini à D = 0
-  # et à D = E^i.
+  # Normal sur l'échelle de logit q, Var(logit q) ~ 1/D + 1/(E^i - D) : non
+  # défini à D = 0 et à D = E^i.
   l <- stats::qlogis(taux[a])
   s <- z * sqrt(1 / D[a] + 1 / (N[a] - D[a]))
   inf_a[a] <- stats::plogis(l - s)
@@ -424,8 +430,8 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, transition
                                            "ensemble_a_risque_vide"))
   if (!n) etat <- character(0)
 
-  # Taux, variance (méthode delta) et Wald sur logit q (A.3, A.7) ; 0 - x
-  # rend +0 pour une cellule sans événement.
+  # Taux, variance (méthode delta) et intervalle normal sur l'échelle de
+  # logit q (A.3, A.7) ; 0 - x rend +0 pour une cellule sans événement.
   def <- etat == "defini"
   taux <- variance <- inf_a <- sup_a <- rep(NA_real_, n)
   taux[def] <- 0 - expm1(L[def])

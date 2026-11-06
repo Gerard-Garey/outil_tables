@@ -372,7 +372,36 @@ SANS_REFERENCE_17 <- character(0)
 # régénération unique de B5 (run CI 39435673257, 5757c30 ; ADR 0009, point
 # 9.5). Transition #73 (commit (1) de B13, ADR 0015, point 3.4) : fiche 5,
 # champ tables_reference (NULL sans table) après empreintes ; close par la
-# régénération unique (R) de B13.
+# régénération unique (R) de B13. Transitions #31 (commit (5) de B13 ;
+# spécification d'actuary-approfondi, #31, commentaire 6689740204, § 4) :
+# textes des lignes 3, 8, 9 et 12 de STATUTS_BRUT (statut et calcul), dans
+# l'étape brut et dans la fiche ; une transition par jeu de positions (R4 :
+# Poisson seul ; R6 : Kaplan-Meier en plus), plans deux à deux disjoints ;
+# valeurs en littéral (échappements \u : chaînes UTF-8 en toute locale),
+# jamais lues dans le package ; closes par la régénération unique (R) de B13.
+STATUT_8_31 <- paste(
+  "exact sous la loi suppos\u00e9e pour une cellule observ\u00e9e enti\u00e8re (sans entr\u00e9e ni censure, E^i entier) ;",
+  "avec une entr\u00e9e ou une censure dans la cellule, couverture non \u00e9tablie, m\u00eame si E^i est entier",
+  "(prolongement continu de la formule exacte si E^i n'est pas entier)")
+STATUT_9_31 <- paste(
+  "asymptotique (E^i q(1-q) -> infini) pour une cellule observ\u00e9e enti\u00e8re ; avec une entr\u00e9e ou une",
+  "censure dans la cellule, couverture non \u00e9tablie ; non d\u00e9fini \u00e0 D = 0 et \u00e0 D = E^i")
+CALCUL_3_31 <- "taux exp(-+ z / sqrt(D)) : normal sur l'\u00e9chelle de log mu ; z = qnorm(alpha/2, lower.tail = FALSE)"
+CALCUL_9_31 <- paste("plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : normal sur l'\u00e9chelle de logit q ;",
+                     "z = qnorm(alpha/2, lower.tail = FALSE)")
+CALCUL_12_31 <- paste("plogis(qlogis(q) -+ z sqrt(Sigma) / q) : normal sur l'\u00e9chelle de logit q,",
+                      "Var(logit q) ~ Sigma / q^2 ; z = qnorm(alpha/2, lower.tail = FALSE)")
+changements_31 <- function(statut, calcul) {
+  ch <- list()
+  for (racine in c("etapes/brut/parametres/statuts", "fiche/hypotheses_brut/statuts")) {
+    if (length(statut))
+      ch <- c(ch, list(list(chemin = paste0(racine, "/statut"), nature = "valeur de chaîne",
+                            valeurs = unname(statut), positions = as.integer(names(statut)))))
+    ch <- c(ch, list(list(chemin = paste0(racine, "/calcul"), nature = "valeur de chaîne",
+                          valeurs = unname(calcul), positions = as.integer(names(calcul)))))
+  }
+  ch
+}
 TRANSITIONS_EN_COURS <- list(
   list(issue = "#73", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
     list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 5L),
@@ -382,7 +411,14 @@ TRANSITIONS_EN_COURS <- list(
                      "plan", "transition_code", "fin_effective", "unite_observation", "recette", "convention",
                      "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues", "avertissement_unite",
                      "hypothese_censure", "hypotheses_brut", "graine", "graine_mention", "generateur",
-                     "avertissements")))))
+                     "avertissements")))),
+  list(issue = "#31", plans = c("R1", "R2", "R3", "R5"),
+       changements = changements_31(c("8" = STATUT_8_31, "9" = STATUT_9_31),
+                                    c("3" = CALCUL_3_31, "9" = CALCUL_9_31))),
+  list(issue = "#31", plans = "R6",
+       changements = changements_31(c("8" = STATUT_8_31, "9" = STATUT_9_31),
+                                    c("3" = CALCUL_3_31, "9" = CALCUL_9_31, "12" = CALCUL_12_31))),
+  list(issue = "#31", plans = "R4", changements = changements_31(character(0), c("3" = CALCUL_3_31))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -731,7 +767,7 @@ controler_rapport_fige <- function(x, l, id) {
   st <- grep("<caption><code>etapes/brut/parametres/statuts</code>", b, fixed = TRUE)
   re <- grep("<caption><code>etapes/brut/resultat/", b, fixed = TRUE)
   if (length(st) != 1L || !length(re) || st > re[1L]) e <- c(e, "U22 : ordre des légendes")
-  if (any(startsWith(b, "<p>Intervalle binomial \u00ab exact \u00bb")) != ("binomial" %in% x$etapes$brut$parametres$estimateurs))
+  if (any(startsWith(b, "<p>Intervalles binomiaux (colonnes borne_inf_exacte")) != ("binomial" %in% x$etapes$brut$parametres$estimateurs))
     e <- c(e, "U22 : légende binomiale")
   if (id == "R6" && !any(grepl("^<tr><td>etapes/brut/resultat/kaplan_meier_sauts</td><td>data.frame</td><td>[0-9]+</td><td>non reproduites", b)))
     e <- c(e, "U22 : kaplan_meier_sauts")

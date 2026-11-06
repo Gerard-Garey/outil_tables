@@ -659,7 +659,7 @@ verifier("U22 : etape_brut : légende de etapes/brut/parametres/statuts avant la
     fin <- st - 1L + match("</table>", b[st:length(b)])
     if (is.na(fin) || !startsWith(b[fin + 1L], "<p>Les mots « exact » et « asymptotique »"))
       e <- c(e, paste(id, ": légende hors de sa place"))
-    bin <- any(startsWith(b, "<p>Intervalle binomial « exact »"))
+    bin <- any(startsWith(b, "<p>Intervalles binomiaux (colonnes borne_inf_exacte"))
     if (bin != (id != "R4")) e <- c(e, paste(id, ": légende binomiale"))
   }
   b <- section_de(L$R6, "etape_brut")

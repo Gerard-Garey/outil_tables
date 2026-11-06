@@ -293,13 +293,13 @@ verifier("T1 (valeur calculée à la main) : retirés 182 jours et 2 décès (ni
                   identical(a$etat, "produite") && identical(a$tetes_touchees, 3L) &&
                   identical(a$tetes_indeterminees, 0L)) TRUE else "états")
 })
-verifier("T1 (valeur calculée à la main) : A = 182/363, SMR = 363/91, exact [0,4830877369 ; 14,4096792494] (qgamma), Wald [0,9976422872 ; 15,9498137508], f = 182/726", {
+verifier("T1 (valeur calculée à la main) : A = 182/363, SMR = 363/91, exact [0,4830877369 ; 14,4096792494] (qgamma), asymptotique (échelle log) [0,9976422872 ; 15,9498137508], f = 182/726", {
   s <- de(I1$smr_comparateur_1, "total", "A")
   tous(A = proche(s$attendus, 182 / 363, 1e-14, 0), smr = proche(s$smr, 363 / 91, 1e-14, 0),
        exact = proche(c(s$borne_inf_exacte, s$borne_sup_exacte), c(0.4830877369, 14.4096792494), 1e-10, 0),
        qgamma = proche(c(s$borne_inf_exacte, s$borne_sup_exacte),
                        c(qg(0.025, 2, 182 / 363), stats::qgamma(0.025, 3, lower.tail = FALSE) / (182 / 363)), 1e-14, 0),
-       wald = proche(c(s$borne_inf_asymptotique, s$borne_sup_asymptotique), c(0.9976422872, 15.9498137508), 1e-10, 0),
+       asymptotique = proche(c(s$borne_inf_asymptotique, s$borne_sup_asymptotique), c(0.9976422872, 15.9498137508), 1e-10, 0),
        f = proche(s$rapport_variance, 182 / 726, 1e-14, 0),
        etat = if (identical(s$etat, "produite") && identical(de(I1$smr_comparateur_1, "entree_manquante", "A")$etat,
                                                               "aucune_ligne_mesurable")) TRUE else "états")
@@ -459,11 +459,11 @@ verifier("T7 (valeur calculée à la main) : A = 0 et D = 0 -> aucun_attendu ; A
   identical(a$etat, "aucun_attendu") && identical(b$etat, "observe_sans_attendu") && is.na(a$smr) && is.na(b$smr) &&
     is.na(a$rapport_variance)
 })
-verifier("T7 (valeur calculée à la main) : D = 0 et A > 0 -> SMR 0, borne exacte [0 ; qgamma(0,975 ; 1) / A], Wald NA", {
+verifier("T7 (valeur calculée à la main) : D = 0 et A > 0 -> SMR 0, borne exacte [0 ; qgamma(0,975 ; 1) / A], asymptotique (échelle log) NA", {
   s <- s1(0L, 0.5, 2L, 1)
   tous(A = proche(s$attendus, 1, 1e-15, 0), smr = proche(s$smr, 0, 0, 0),
        b = proche(c(s$borne_inf_exacte, s$borne_sup_exacte), c(0, stats::qgamma(0.025, 1, lower.tail = FALSE)), 1e-15, 0),
-       w = if (is.na(s$borne_inf_asymptotique) && identical(s$etat, "produite")) TRUE else "Wald")
+       w = if (is.na(s$borne_inf_asymptotique) && identical(s$etat, "produite")) TRUE else "asymptotique (échelle log)")
 })
 verifier("T7 (valeur calculée à la main) : cellule sans exposition retenue restituée à part, hors du SMR", {
   s <- s1(c(1L, 1L), c(0.5, 0.3), 2L, 1, ages_e = 65:66)
