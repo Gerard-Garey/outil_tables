@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{05/11/2026}
+\newcommand{\datedoc}{06/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -278,6 +278,12 @@ reçoit un \code{data.frame} et la déclaration des \emph{rôles} de ses colonne
 jamais un fichier~; la lecture des fichiers, et les conversions de type qui
 l'accompagnent, relèvent d'une couche mince hors du moteur, qui n'existe pas
 encore (E4.4). Le moteur refuse un type incompatible, il ne le convertit pas.
+Une table de référence n'est pas une observation~: elle entre en objet
+\code{table\_reference}, par l'argument \code{tables\_reference} de
+\code{construire\_table()} et de \code{rejouer\_fiche()}, et une table
+embarquée est une constante du package lue à l'installation, jamais un
+fichier ouvert à l'exécution (note de lecture d'E4.4 du 06/11/2026~; ADR
+0015, points~1 et~6~; section~\ref{sec:tables-reference-recues}).
 
 \begin{center}
 \small
@@ -329,7 +335,8 @@ Le package \code{tablexp} est à la racine du dépôt (ADR 0007, point 1.1)~:
     points d'entrée et les fonctions que l'application appelle (contrôles de
     saisie à sens métier, constructeurs d'objets partagés) ou qu'un tiers
     appelle hors de l'application (rejeu outillé, rapport figé~; ADR 0012,
-    points~2.8 et~3.10), recensées dans
+    points~2.8 et~3.10~; accesseur des tables embarquées, appelé aussi par
+    l'application~; ADR 0015, point~6.2), recensées dans
     l'index (section~\ref{sec:index-exports})~; aucune méthode S3 n'est
     exportée~;
   \item \code{R/}~: un fichier par module et deux fichiers transversaux
@@ -1307,8 +1314,9 @@ tableau existe déjà) ou une valeur citée (type \code{fiche}, ci-dessous) et r
 document compte en échec attendu, présente elle est un succès inattendu.
 Elle compare en outre au package les valeurs que le document cite
 (issue~\#70)~: chaque constante de version (\code{VERSION\_FICHE} et les
-quatre premières lignes \code{ENTETE\_CANONIQUE},
-\code{REPRESENTATION\_RESULTAT}, \code{PREMIERE\_LIGNE\_PLAN},
+cinq premières lignes \code{ENTETE\_CANONIQUE},
+\code{REPRESENTATION\_RESULTAT}, \code{REPRESENTATION\_TABLE}~--- ajoutée
+par l'issue~\#73~---, \code{PREMIERE\_LIGNE\_PLAN},
 \code{PREMIERE\_LIGNE\_FICHE}) est citée, et toute valeur citée est la
 valeur courante~; la liste des champs de la fiche
 (section~\ref{sec:fiche}) a les champs de \code{names(fiche)}, dans leur
@@ -2521,7 +2529,7 @@ relève du mainteneur.
 \label{sec:construction}
 
 Le package a un point d'entrée unique,
-\code{construire\_table(donnees, roles, plan, provenance = NULL)}, qui exécute
+\code{construire\_table(donnees, roles, plan, provenance = NULL, tables\_reference = NULL)}, qui exécute
 un \emph{plan de construction} d'un bloc et retourne un objet complet
 (ADR 0004~; ADR 0005~; ADR 0007, point 3.1). \code{R/construire\_table.R} se
 limite à l'orchestration~: il valide le plan, appelle une fonction d'étape par
@@ -2529,7 +2537,16 @@ module dans l'ordre du plan et assemble l'objet, sans aucun calcul. Le
 quatrième argument, \code{provenance}, facultatif, est la voie par laquelle la
 couche de lecture transmet le nom du fichier lu, son empreinte et l'algorithme
 de celle-ci~; \code{NULL} signifie «~données construites en mémoire, aucun
-fichier~», ce que la fiche écrit (section~\ref{sec:fiche}).
+fichier~», ce que la fiche écrit (section~\ref{sec:fiche}). Le cinquième,
+\code{tables\_reference}, facultatif lui aussi, porte les tables de
+référence que lisent les étapes du plan, chacune sous une clé que le plan
+cite (section~\ref{sec:tables-reference-recues}~; ADR 0015, point~1)~;
+\code{NULL} signifie «~aucune table de référence~». Ces deux arguments
+nommés facultatifs ne changent ni la signature
+\code{construire\_table(donnees, roles, plan)} des ADR 0004 et 0005 ni les
+appels qui les omettent (ADR 0007, point~3.1)~; \code{donnees} reste le
+seul porteur des observations, et aucun des deux ne porte une seconde table
+d'observations (ADR 0014, point~9).
 
 \subsection{Plan de construction et validation}
 \label{sec:plan}
@@ -2715,7 +2732,9 @@ puis sa mise sous forme canonique, une seule fois (\code{canoniser\_plan()},
 section~\ref{sec:fiche})~; les étapes et la fiche ne voient que le plan
 canonique~; contrôle des rôles (\code{controler\_roles()})~; déduction de la recette et,
 si le plan comprend l'étape \code{exposition}, de la convention retenue~;
-contrôle de la provenance~; contrôle du codage des chaînes que la fiche
+contrôle de la provenance~; contrôle des tables de référence reçues
+(\code{controler\_tables\_reference()},
+section~\ref{sec:tables-reference-recues})~; contrôle du codage des chaînes que la fiche
 écrira hors des données, valeurs des rôles (noms de colonnes) et champs de
 la provenance, par l'écrivain de l'empreinte (\code{octets\_chaines()},
 refus \code{chaine\_codage\_bytes}, \code{chaine\_non\_utf8} et
@@ -2763,6 +2782,145 @@ section~\ref{sec:empreinte-resultat}), la range dans
 \code{fiche\$empreintes\$resultat}, puis ajoute \code{execution}, hors du
 périmètre de l'empreinte.\par}
 
+\subsection{Tables de référence reçues}
+\label{sec:tables-reference-recues}
+\begingroup\sloppy
+
+\textbf{Mode d'entrée} (ADR 0015, point~1~; décision M239~; issue~\#73).
+Une table de référence --- table importée, table synthétique, table
+embarquée --- n'est ni une observation ni une déclaration~: elle entre dans
+la construction par l'argument \code{tables\_reference} de
+\code{construire\_table()}, qui vaut \code{NULL} (aucune table) ou une liste
+nommée d'objets \code{table\_reference} rendus par \code{table\_reference()}
+(section~\ref{sec:table-reference}). Les noms de cette liste sont des
+\emph{clés de table}~: des étiquettes locales de la construction, libres, distinctes du
+\code{nom} de la table, qui est son attribut. \textbf{Le plan cite une clé,
+jamais une valeur}~: un paramètre d'étape qui lit une table est une chaîne
+unique, la clé~; les chemins de ces paramètres, de la forme
+\code{etapes/<étape>/<paramètre>}, forment la constante
+\code{PARAMETRES\_CLE\_TABLE}, et chacun désigne un paramètre de type
+\code{character} de \code{PARAMETRES\_ETAPES} (un test le vérifie). Le plan
+reste ainsi une déclaration canonisable et sérialisable sans extension de la
+grammaire du texte~: \code{fiche\$plan} porte la clé, et
+\code{fiche\$tables\_reference} l'identité de la table qu'elle désignait
+(section~\ref{sec:fiche}, «~Tables de référence~»). À la construction,
+une table embarquée n'est pas cherchée par le moteur~: l'appelant l'obtient
+par l'accesseur \code{table\_embarquee()} (section~\ref{sec:table-reference})
+et la passe comme les autres~; seul le rejeu la relit lui-même dans le
+package, par son nom (section~\ref{sec:rejeu}, étape~7~bis). L'objet \code{construction} ne garde \textbf{aucune
+copie} d'une table reçue (section~\ref{sec:objet-resultat}).
+
+\medskip
+\noindent
+\textbf{Options écartées} (ADR 0015, «~Options écartées~»). (i)~Un objet
+\code{table\_reference} comme valeur d'un paramètre du plan~: l'écrivain du
+texte refuse un \code{data.frame} à attributs~; il faudrait étendre la
+grammaire du plan ou dépouiller l'objet à la canonisation,
+\code{fiche\$plan} porterait les valeurs, et \code{valider\_plan()},
+exportée pour l'application, validerait une donnée. (ii)~Le nom d'une table
+embarquée dans le plan, chargée par \code{construire\_table()} elle-même~:
+deux formes du même paramètre selon le statut et deux chemins d'entrée à
+contrôler, là où un accesseur exporté laisse au moteur un seul mode
+d'entrée. (iii)~Des données en liste (observations et tables)~: la table de
+référence n'est pas une observation (ADR 0014, point~9), et les signatures,
+le catalogue des rôles et l'empreinte des données changeraient. (iv)~Les
+valeurs de toute table non embarquée écrites dans la fiche~: la fiche
+cesserait d'identifier une entrée pour la porter, ce qu'elle ne fait pas
+pour les données, identifiées par leur seule empreinte
+(section~\ref{sec:fiche}), et le tiers qui rejoue dispose de chaque table
+importée comme des données.
+
+\medskip
+\noindent
+\textbf{Contrôle des tables reçues} (\code{controler\_tables\_reference()}~;
+ADR 0015, point~1.3, rendu plus strict par la décision M249). Il s'exécute
+dans \code{construire\_table()} après le contrôle de la provenance et avant
+l'empreinte des données et toute étape (section~\ref{sec:execution}), une
+seule fois~; ses refus sont levés sous le module \code{construire\_table},
+dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item \textbf{forme} (\code{controler\_forme\_tables()}), refus
+    \code{tables\_reference\_mal\_formees}~: l'argument est \code{NULL}, ou
+    une liste nommée aux noms uniques, non vides, non manquants, sans autre
+    attribut que ses noms (\code{liste\_nommee()}), sans nom d'encodage
+    \code{bytes}, et dont les noms s'écrivent dans la fiche
+    (\code{octets\_chaines()}, section~\ref{sec:empreinte})~; une liste vide
+    vaut \code{NULL}. Puis chaque élément, dans l'ordre des clés converties
+    en UTF-8 et triées par octets, doit (a)~avoir exactement la classe
+    \code{table\_reference} et les colonnes du constructeur~; (b)~être
+    reconstruit sans refus par \code{table\_reference()} à partir du
+    \code{data.frame} nu de ses colonnes et de ses métadonnées~; (c)~être
+    \code{identical()} à cette reconstruction (classe, attributs, ordre
+    canonique des lignes, valeurs contrôlées)~; (d)~avoir un élément de fiche
+    (\code{element\_table\_fiche()}) qui s'écrit dans le texte de la fiche,
+    sous sa clé, et se relit \code{identical()}. La lettre de l'ADR
+    n'exigeait que la classe~: la reconstruction garantit qu'une table
+    retouchée après le constructeur (lignes permutées, valeur de $q_x$ portée
+    hors de $[0, 1]$, attribut modifié) n'entre pas sous l'identité d'une table
+    contrôlée, et l'écriture d'essai qu'aucune métadonnée ne fera échouer
+    l'écriture de la fiche après tous les calculs (décision M249)~;
+  \item \textbf{clé citée et non reçue}, refus
+    \code{table\_reference\_absente}~: une clé citée par un paramètre du
+    plan (\code{cles\_citees()}, dans l'ordre de
+    \code{PARAMETRES\_CLE\_TABLE}, pour les étapes présentes au plan) n'est
+    pas un nom de la liste reçue~; le premier paramètre en défaut est cité~;
+  \item \textbf{table reçue et non citée}, refus
+    \code{table\_reference\_inattendue}~: une clé reçue n'est citée par
+    aucun paramètre du plan~; toutes sont citées. Rien n'entre dans la
+    construction sans y être employé, comme pour la graine~; un plan dont
+    aucune étape ne lit de table refuse donc toute liste non vide. Deux
+    paramètres peuvent citer la même clé~;
+  \item \textbf{tables de statut \code{embarquee}}~: le statut est une
+    affirmation que le moteur vérifie, non une étiquette libre. Le
+    \code{nom} de la table doit être celui d'une table du catalogue
+    \code{TABLES\_EMBARQUEES}, sinon refus
+    \code{table\_embarquee\_absente}~; puis son empreinte de table doit être
+    celle de la table du catalogue de même nom, sinon refus
+    \code{table\_embarquee\_discordante}. Le catalogue étant vide dans cette
+    version, toute table de statut \code{embarquee} citée par le plan est
+    refusée \code{table\_embarquee\_absente}.
+\end{enumerate}
+Le contrôle rend la valeur de \code{fiche\$tables\_reference}~: \code{NULL}
+sans table, sinon l'élément de fiche de chaque table, par clé triée.
+\code{PARAMETRES\_CLE\_TABLE} et \code{TABLES\_EMBARQUEES} sont ses
+arguments par défaut, ce qui permet de tester les quatre contrôles par
+injection d'un paramètre et d'un catalogue fabriqués (décision M247).
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{5.2cm}p{6.0cm}p{3.4cm}@{}}
+\caption{Refus du contrôle des tables reçues (module \code{construire\_table}~; textes de la construction).}
+\label{tab:refus-tables-reference}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Motif}} &
+\textcolor{financeblue}{\textbf{Message}} &
+\textcolor{financeblue}{\textbf{\code{details}}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Motif}} &
+\textcolor{financeblue}{\textbf{Message}} &
+\textcolor{financeblue}{\textbf{\code{details}}} \\
+\endhead
+\code{tables\_reference\_mal\_formees} (argument) & «~L'argument «~tables\_reference~» doit être NULL (aucune table de référence) ou une liste nommée aux noms uniques, non vides, sans autre attribut que ses noms, d'objets rendus par table\_reference() (ADR 0015, point 1.1)~; reçu~: objet de classe [classes] (type [type], longueur [n]).~» & \code{cle}, \code{lu}, \code{attendu}, \code{motif\_constructeur}, \code{chemin}, \code{motif\_ecriture}~: clé, chemin \code{tables\_reference/}\allowbreak\code{@noms} et motif de l'écrivain si un nom ne s'écrit pas \\
+\code{tables\_reference\_mal\_formees} (élément) & «~Table de clé «~[clé]~»~: [raison]. Chaque élément de «~tables\_reference~» doit être l'objet rendu par table\_reference(), sans modification (classe, attributs, ordre canonique des lignes, valeurs contrôlées), et ses métadonnées doivent s'écrire dans la fiche.~» Raisons~: «~objet de classe [classes] au lieu de table\_reference~», «~refusé par table\_reference() (motif [motif])~», «~objet modifié après table\_reference()~», «~métadonnée sans écriture exacte dans la fiche ([refus et chemin], ou relecture différente)~» & \code{cle}, \code{lu}, \code{attendu}, \code{motif\_constructeur}, \code{chemin} \\
+\code{table\_reference\_absente} & «~Le plan cite la table de clé «~[clé]~» (paramètre [chemin])~; «~tables\_reference~» [ne porte pas cette clé (clés reçues~: [clés]), ou ne porte aucune table (NULL)]. Passer la table, rendue par table\_reference(), sous cette clé~: le moteur ne lit aucun fichier et ne cherche aucune table par son nom.~» & \code{cle}, \code{parametre}, \code{lu}, \code{attendu} \\
+\code{table\_reference\_inattendue} & «~Table(s) de clé [clés] reçue(s) dans «~tables\_reference~» et citée(s) par aucun paramètre du plan (clés citées~: [clés, ou «~aucune~»])~: une table de référence n'entre dans la construction que si une étape la lit.~» & \code{cle}, \code{lu}, \code{attendu} \\
+\code{table\_embarquee\_absente} & «~Table de clé «~[clé]~», de statut «~embarquee~» et de nom «~[nom]~»~: ce package n'embarque aucune table de ce nom (tables embarquées~: [noms, ou «~aucune~»]). Le statut «~embarquee~» est vérifié contre le package~; une table importée se déclare de statut «~importee~».~» & \code{cle}, \code{nom}, \code{lu}, \code{attendu} \\
+\code{table\_embarquee\_discordante} & «~Table de clé «~[clé]~», de statut «~embarquee~» et de nom «~[nom]~»~: empreinte [lue], différente de celle de la table de ce nom embarquée dans le package installé ([empreinte du catalogue]). Obtenir la table par table\_embarquee(), ou la déclarer de statut «~importee~».~» & \code{cle}, \code{nom}, \code{lu}, \code{attendu} \\
+\end{longtable}
+}
+
+\noindent
+Les valeurs reçues (clés, noms, classes) sont citées selon la règle unique
+des refus (section~\ref{sec:refus}, «~Citation d'une valeur dans un
+message~»), et les messages formés par \code{formuler()}. \textbf{Statut}
+(E2.20)~: contrôles exacts (\code{identical()}, égalité de chaînes),
+sans approximation~; l'égalité de deux empreintes de table est sans rôle de
+sécurité, comme toute empreinte du projet (section~\ref{sec:empreinte}).
+\textbf{Limite}~: le coût de la reconstruction d'une table prospective
+entière par le contrôle n'est pas mesuré.\par
+\endgroup
+
 \subsection{Objet résultat}
 \label{sec:objet-resultat}
 
@@ -2772,7 +2930,10 @@ lecteurs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{table}~: la table finale~; \code{NULL} dans cette branche, dont
-    les plans s'arrêtent aux taux bruts~;
+    les plans s'arrêtent aux taux bruts. Une table de référence n'y est
+    jamais rangée, et l'objet n'en garde aucune copie~: son identité est
+    dans \code{fiche\$tables\_reference} (ADR 0015, point~5~;
+    section~\ref{sec:tables-reference-recues})~;
   \item \code{etapes}~: une entrée par étape exécutée, dans l'ordre, avec
     \code{parametres} (paramètres effectifs, après résolution par le moteur),
     \code{resultat} et \code{diagnostics}~;
@@ -2800,8 +2961,10 @@ question~Q2~; issue~\#42).
 \begingroup\sloppy
 
 Le \emph{rejeu} est l'exécution de
-\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
-sur les données qu'une fiche de construction identifie, pour retrouver la
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance, tables\_reference)}
+sur les données et les tables de référence qu'une fiche de construction
+identifie (\code{tables\_reference} valant \code{NULL} si elle n'en porte
+aucune), pour retrouver la
 construction qu'elle décrit (E3.7). La note de lecture d'E3.7 du 19/10/2026
 (décision M64~; ADR 0011, point~12) en fait un critère en quatre temps~: le
 relecteur (1)~vérifie \code{version\_fiche}, la représentation canonique et
@@ -2809,8 +2972,15 @@ l'empreinte des données de la fiche~; (2)~exécute la construction sur le plan
 relu du texte de la fiche~; (3)~compare les grandeurs à tolérance par classes
 (section~\ref{sec:non-regression}) sur une autre machine, au bit près sur la
 même (E4.6)~; (4)~n'emploie l'empreinte du résultat que comme témoin sur la
-même machine (section~\ref{sec:empreinte-resultat}). Le \emph{rejeu outillé},
-fonction exportée \code{rejouer\_fiche(donnees, fiche)} de
+même machine (section~\ref{sec:empreinte-resultat}). La note de lecture
+d'E3.7 du 06/11/2026 (décisions M239 et M251~; ADR 0015) le complète quand
+la fiche porte des tables de référence (\code{fiche\$tables\_reference})~:
+le relecteur dispose aussi de chaque table importée ou synthétique, comme
+des données~; il en vérifie l'empreinte de table (reçue, ou relue dans le
+package pour une table embarquée), puis exécute
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance, tables\_reference)}.
+Le \emph{rejeu outillé},
+fonction exportée \code{rejouer\_fiche(donnees, fiche, tables\_reference = NULL)} de
 \code{R/construire\_table.R} (issue~\#86~; ADR 0012, point~3, précisé par sa
 seconde annotation du 24/10/2026), outille les temps (1), (2) et~(4) ---
 pour le temps~(2), la relecture du texte de la fiche reste à l'appelant,
@@ -2826,8 +2996,18 @@ points 3.2 et 3.3). \code{rejouer\_fiche()} n'exécute aucune étape et
 n'appelle aucune fonction d'étape~: elle contrôle la fiche et les données,
 puis appelle \code{construire\_table()} \textbf{exactement une fois}, avec
 les rôles, le plan et la provenance \textbf{lus dans la fiche}, sans en
-recevoir d'autres~; \code{construire\_table()} reste la seule fonction qui
-exécute un plan, et sa signature est inchangée. Elle vit dans
+recevoir d'autres, et les tables de référence que la fiche identifie~;
+\code{construire\_table()} reste la seule fonction qui exécute un plan, et
+le rejeu n'ajoute aucun argument à sa signature. Le troisième argument de
+\code{rejouer\_fiche()}, \code{tables\_reference}, facultatif, porte les
+tables de statut \code{importee} ou \code{synthetique} que la construction
+a lues~: recevoir une table importée n'est pas recevoir un autre plan ou
+d'autres rôles, c'est recevoir une \emph{entrée}, au même titre que
+\code{donnees}, que la fiche identifie par son empreinte et que le rejeu
+contrôle avant de construire (étape~7~bis)~; une table de statut
+\code{embarquee} n'est jamais reçue, elle est \emph{relue} par son nom dans
+le package installé (ADR 0015, point~1.4, qui annote l'ADR 0012, points~3.1
+et~3.10). Elle vit dans
 \code{R/construire\_table.R} parce que le module \code{rapport}, qui porte la
 fiche et ses empreintes, ne peut pas appeler \code{construire\_table()}
 (section~\ref{sec:graphe})~; un troisième fichier transversal, écarté,
@@ -2863,7 +3043,17 @@ appeler \code{construire\_table()}~:
     chaîne unique, non vide, non \code{NA}, sans attribut
     (\code{chaine\_unique()})~; noms \code{roles}, \code{plan} et
     \code{provenance} présents (\code{provenance} peut valoir
-    \code{NULL}). Une classe d'encodage \code{bytes} sur l'un de ces champs
+    \code{NULL})~; si \code{version\_fiche} est de la forme attendue et
+    admise (étape~3), \code{tables\_reference} présent et égal à
+    \code{NULL}, ou liste nommée \textbf{non vide} aux noms uniques, sans nom
+    d'encodage \code{bytes}, en UTF-8 valide et \textbf{triés par octets},
+    dont chaque élément est une liste aux sept champs de
+    \code{CHAMPS\_TABLE\_FICHE}, dans leur ordre, avec \code{nom},
+    \code{representation} et \code{empreinte} chaînes uniques et
+    \code{statut} pris dans \code{STATUTS\_TABLE}~; seul le premier élément
+    en défaut est cité. Une fiche de version~4, qui n'a pas ce champ, est
+    ainsi refusée à l'étape~3 (\code{version\_fiche\_non\_admise}) et non ici.
+    Une classe d'encodage \code{bytes} sur l'un de ces champs
     est un attribut en défaut comme un autre, et un nom de cet encodage dans
     \code{empreintes} un défaut de forme de ce champ~: ils sont refusés ici,
     avec les autres défauts, et non par une erreur R (ADR 0012, point~3.4~;
@@ -2900,7 +3090,9 @@ appeler \code{construire\_table()}~:
     (module \code{rapport}) et une date en \code{character} une empreinte
     discordante, au lieu de \code{colonne\_absente} et de
     \code{type\_incompatible} (ADR 0012, «~Contexte~», mesures
-    d'\code{actuary})~;
+    d'\code{actuary}). Le contrôle des tables reçues
+    (\code{controler\_tables\_reference()}) n'y figure pas~: il porte sur
+    la liste que le rejeu assemble à l'étape~7~bis, et s'exécute là~;
   \item \textbf{empreinte des données}~: recalculée par
     \code{empreinte\_donnees(donnees, fiche\$roles)} et comparée à
     \code{fiche\$empreintes\$donnees}, sinon
@@ -2908,10 +3100,41 @@ appeler \code{construire\_table()}~:
     par rejeu, ici et dans \code{construire\_table()}, qui ne reçoit pas
     d'empreinte~: la lui transmettre aurait changé la signature du point
     d'entrée~;
+  \item[7~bis.] \textbf{tables de référence} (\code{controler\_tables\_rejeu()}~;
+    ADR 0015, point~4.2)~: (0)~forme de l'argument
+    \code{tables\_reference}, par le contrôle de la construction
+    (\code{controler\_forme\_tables()}, refus
+    \code{tables\_reference\_mal\_formees})~; (1)~une clé reçue absente de
+    \code{fiche\$tables\_reference}, ou de statut \code{embarquee} dans la
+    fiche, est refusée sous \code{table\_reference\_inattendue}, toutes
+    citées~; (2)~puis, pour chaque clé de la fiche, dans son ordre~:
+    (a)~\code{representation} égale à \code{REPRESENTATION\_TABLE}, sinon
+    \code{representation\_table\_non\_admise}, par le raisonnement de
+    l'étape~5~; (b)~origine~: une table de statut \code{embarquee} est
+    relue dans \code{TABLES\_EMBARQUEES} par son \code{nom}, sinon
+    \code{table\_embarquee\_absente}~; une autre est la table reçue sous la
+    même clé, sinon \code{table\_reference\_absente}~; (c)~empreinte de table
+    recalculée par \code{empreinte\_table()} et comparée à celle de la
+    fiche, sinon \code{empreinte\_table\_discordante}~; (3)~enfin, le
+    contrôle des tables reçues de la construction
+    (section~\ref{sec:tables-reference-recues}) sur la liste assemblée
+    (tables reçues et relues) et le plan de la fiche. Les métadonnées
+    (\code{nom}, \code{source}, \code{forme\_origine}, \code{parametres},
+    et \code{statut} hors \code{embarquee}) ne sont \textbf{pas} un motif de
+    refus~: la table reçue les porte, \code{construire\_table()} les écrit
+    dans la fiche rendue, et un écart apparaît au témoin de la fiche. C'est
+    le partage voulu entre ce qui identifie l'entrée (l'empreinte, refus) et
+    ce qui la décrit (témoin)~: un refus sur un libellé reformulé
+    interdirait le rejeu légitime d'une table réimportée sous un autre nom
+    de fichier (ADR 0015, point~4.2, et «~Options écartées~»~; décision
+    M248 pour \code{source})~;
   \item \textbf{construction}~:
-    \code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)},
-    une fois. Si l'empreinte des données de l'objet rendu diffère de celle
-    de l'étape~7, le rejeu s'arrête sur une erreur de programmation
+    \code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance, tables\_reference)},
+    une fois, \code{tables\_reference} étant la liste assemblée à
+    l'étape~7~bis (\code{NULL} sans table). Si l'empreinte des données de
+    l'objet rendu diffère de celle de l'étape~7, ou si les empreintes de
+    table de la fiche rendue diffèrent, clé par clé, de celles de
+    l'étape~7~bis, le rejeu s'arrête sur une erreur de programmation
     (garde-fou, non un refus)~;
   \item \textbf{témoins}, consignés dans le bilan, jamais motifs de refus
     (ci-dessous).
@@ -2938,9 +3161,15 @@ structure et le même sens. Une fiche de version~3, relue sans refus par
 
 \medskip
 \noindent
-\textbf{Textes des refus.} Les cinq motifs propres au rejeu sont levés sous
+\textbf{Textes des refus.} Les sept motifs propres au rejeu sont levés sous
 le module \code{construire\_table}, comme les refus de \code{valider\_plan()}
-(tableau~\ref{tab:refus-rejeu})~; les refus délégués (étape~1 pour les
+(tableau~\ref{tab:refus-rejeu})~; à l'étape~7~bis s'y ajoutent trois
+motifs partagés avec le contrôle des tables reçues de la construction
+(\code{table\_reference\_inattendue}, \code{table\_reference\_absente},
+\code{table\_embarquee\_absente}), sous un texte propre au rejeu, tandis
+que \code{tables\_reference\_mal\_formees} (point~0) et les refus du
+point~3 gardent le texte de la construction
+(tableau~\ref{tab:refus-tables-reference})~; les refus délégués (étape~1 pour les
 données, étape~6) gardent leur module. Chaque message cite la valeur lue et
 la valeur attendue. La version de \code{tablexp} et les empreintes du
 code y sont écrites par \code{texte\_lu()}~: «~absente~» si la valeur
@@ -3001,11 +3230,16 @@ Dans le tableau, un crochet désigne une valeur insérée.
 \code{fiche\_non\_conforme}, étape~1 (objet \code{rejeu}) & «~Rejeu~: objet \code{`rejeu`} reçu à la place d'une fiche~; passer \code{r\$construction\$fiche}.~» & idem, \code{lu} «~rejeu~» \\
 \code{fiche\_non\_conforme}, étape~1 (nom d'encodage \code{bytes}) & «~Rejeu~: la fiche porte un nom de champ d'encodage «~bytes~» (champ n\textsuperscript{o} [position du premier] : [nom cité]), non convertible en UTF-8 sans deviner~; aucun champ du premier niveau n'est lu par nom. Une fiche produite par le moteur ou relue par \code{lire\_fiche()} n'en porte pas.~» & \code{champ} «~(fiche)~», \code{lu} les noms \code{bytes} bruts, \code{attendu} «~noms de champ sans encodage bytes~» \\
 \code{fiche\_non\_conforme}, étape~1 (autre objet) & «~Rejeu~: la fiche doit être une liste nommée aux noms uniques, sans autre attribut que ses noms~; reçu~: objet de classe [classes] (type [type]). Le rejeu ne lit aucun fichier~: relire la fiche de ses octets par \code{lire\_fiche(readBin(fichier, "raw", file.size(fichier)))}, ou passer \code{x\$fiche}.~» & idem, \code{lu} les classes \\
-\code{fiche\_non\_conforme}, étape~2 & «~Fiche non conforme au rejeu~: «~[champ]~»~: [forme lue] au lieu de [forme attendue]~; \ldots{} Le rejeu ne lit que ces champs avant \code{construire\_table()}~; aucun n'est complété ni converti.~» Formes attendues~: «~integer de longueur 1, non NA, sans attribut~» (\code{version\_fiche})~; «~liste nommée aux noms uniques, sans autre attribut que ses noms~» (\code{empreintes})~; «~chaîne unique, non vide, non NA, sans attribut~» (ses trois éléments)~; «~champ présent~» (\code{roles}, \code{plan})~; «~champ présent (NULL admis)~» (\code{provenance}) & \code{champ}, \code{lu}, \code{attendu}~: un élément par champ en défaut, dans l'ordre de l'étape \\
+\code{fiche\_non\_conforme}, étape~2 & «~Fiche non conforme au rejeu~: «~[champ]~»~: [forme lue] au lieu de [forme attendue]~; \ldots{} Le rejeu ne lit que ces champs avant \code{construire\_table()}~; aucun n'est complété ni converti.~» Formes attendues~: «~integer de longueur 1, non NA, sans attribut~» (\code{version\_fiche})~; «~liste nommée aux noms uniques, sans autre attribut que ses noms~» (\code{empreintes})~; «~chaîne unique, non vide, non NA, sans attribut~» (ses trois éléments)~; «~champ présent~» (\code{roles}, \code{plan})~; «~champ présent (NULL admis)~» (\code{provenance})~; «~NULL, ou liste nommée non vide aux noms uniques, par clé triée par octets, d'éléments aux sept champs nom, statut, source, forme\_origine, parametres, representation, empreinte (dans cet ordre)~; nom, representation, empreinte~: chaînes uniques~; statut~: synthetique, embarquee ou importee~» (\code{tables\_reference})~; pour ce champ, la forme lue est «~champ absent~», la forme de la liste, «~clés [clés] hors de l'ordre par octets [clés triées]~», ou celle du premier élément en défaut («~élément «~[clé]~»~: [forme], champs [noms]~», «~élément «~[clé]~», champ «~[champ]~»~: [forme]~») & \code{champ}, \code{lu}, \code{attendu}~: un élément par champ en défaut, dans l'ordre de l'étape \\
 \code{version\_fiche\_non\_admise}, étape~3 & «~Version de fiche non admise au rejeu~: version\_fiche [version lue] lue, version(s) admise(s) par ce code~: [\code{VERSIONS\_FICHE\_REJEU}]. Fiche produite par tablexp [version de la fiche], empreinte du code [empreinte du code de la fiche]~; code installé~: tablexp [version installée], empreinte du code [\code{EMPREINTE\_CODE}]. Aucune conversion de fiche n'est faite~: rejouer cette fiche avec le code dont l'empreinte est celle de la fiche.~» La version de la fiche est «~absente~» si \code{versions} manque ou est une liste sans élément \code{tablexp} & \code{lu}, \code{admises}, \code{tablexp}, \code{code}, \code{code\_installe} \\
 \code{algorithme\_empreinte\_inconnu}, étape~4 & «~Algorithme d'empreinte «~[lu]~» lu dans la fiche, «~[\code{ALGORITHME\_EMPREINTE}]~» attendu~: ce code ne calcule l'empreinte des données que par cet algorithme~; aucune comparaison n'est possible.~» & \code{lu}, \code{attendu} \\
 \code{representation\_non\_admise}, étape~5 & «~Représentation canonique «~[lue]~» lue dans la fiche, «~[\code{ENTETE\_CANONIQUE}]~» attendue~: ce code calcule l'empreinte des données sous cette seule définition, et une empreinte d'une autre définition ne lui est jamais égale~; aucune conversion n'est faite.~» & \code{lu}, \code{attendu} \\
 \code{empreinte\_donnees\_discordante}, étape~7 & «~Empreinte des données discordante~: [empreinte de la fiche] lue dans la fiche, [empreinte recalculée] recalculée sur les données reçues ([nombre] lignes). L'empreinte porte sur la représentation «~[\code{ENTETE\_CANONIQUE}]~» des colonnes des rôles de la fiche ([colonnes, entre guillemets]), lignes dans l'ordre reçu~: un autre ordre des lignes, une valeur ou un type de colonne différents suffisent à la changer~; les colonnes hors rôles n'y entrent pas.~» & \code{lu}, \code{attendu}, \code{lignes}, \code{colonnes} \\
+\code{table\_reference\_inattendue}, étape 7~bis, point~1 & «~Rejeu~: clé(s) [clés] reçue(s) dans «~tables\_reference~», absente(s) de fiche/tables\_reference ou de statut «~embarquee~» (clés attendues~: [clés, ou «~aucune~»]). Une table embarquée est relue par son nom dans le package, jamais reçue.~» & \code{cle}, \code{lu}, \code{attendu} \\
+\code{representation\_table\_}\allowbreak\code{non\_admise}, étape 7~bis, point 2~(a) & «~Table de clé «~[clé]~» (nom «~[nom]~»)~: représentation «~[lue]~» lue dans la fiche, «~[\code{REPRESENTATION\_TABLE}]~» attendue. Ce code calcule l'empreinte d'une table sous cette seule définition, et une empreinte d'une autre définition ne lui est jamais égale~; aucune conversion n'est faite.~» & \code{cle}, \code{nom}, \code{lu}, \code{attendu} \\
+\code{table\_embarquee\_absente}, étape 7~bis, point 2~(b) & «~Table de clé «~[clé]~», de statut «~embarquee~» et de nom «~[nom]~»~: ce package n'embarque aucune table de ce nom (tables embarquées~: [noms, ou «~aucune~»])~; rejouer cette fiche avec le package qui l'embarquait (empreinte du code de la fiche~: [empreinte]).~» & \code{cle}, \code{nom}, \code{lu}, \code{attendu} \\
+\code{table\_reference\_absente}, étape 7~bis, point 2~(b) & «~Rejeu~: la fiche porte la table de clé «~[clé]~» (nom «~[nom]~», statut «~[statut]~», empreinte [empreinte]), absente de l'argument «~tables\_reference~» ([clés reçues~: [clés], ou aucune table reçue]). Une table importée ou synthétique est une entrée du rejeu, comme les données~: la passer sous cette clé.~» & \code{cle}, \code{nom}, \code{statut}, \code{lu}, \code{attendu} \\
+\code{empreinte\_table\_discordante}, étape 7~bis, point 2~(c) & «~Empreinte de la table de clé «~[clé]~» discordante~: [empreinte de la fiche] lue dans fiche/tables\_reference (nom «~[nom]~», statut «~[statut]~»), [empreinte recalculée] recalculée sur la table [reçue, ou relue dans le package]. L'empreinte porte sur la représentation «~[\code{REPRESENTATION\_TABLE}]~» du contenu de la table (âge, sexe, année si présente, q\_x~; lignes dans l'ordre canonique)~: une seule valeur de q\_x différente au dernier bit suffit à la changer. La table est une entrée de la construction~: l'effet d'une autre table se mesure par construire\_table(), non par le rejeu.~», suivi, pour une table embarquée, de «~Le package installé a pu corriger cette table depuis la construction (tableau avant~/ après et visa, ADR 0006)~; rejouer avec le package de la fiche (empreinte du code [empreinte]).~», pour une table synthétique, de «~Une table synthétique calculée sur une autre plateforme peut différer au dernier bit (fonctions de la libm)~; ses paramètres sont dans fiche/tables\_reference/[clé]/parametres.~» & \code{cle}, \code{nom}, \code{statut}, \code{lu}, \code{attendu}, \code{origine} \\
 \end{longtable}
 }
 
@@ -3115,18 +3349,23 @@ exécuté que si git est présent~: il est sauté, avec un saut
 éléments~: \code{construction}, l'objet rendu par \code{construire\_table()},
 \textbf{sans modification ni attribut} --- il reste \code{identical()} hors
 \code{execution} à un original, et le périmètre de l'empreinte du résultat
-n'est pas touché ---, et \code{bilan}, un \code{data.frame} de treize lignes
+n'est pas touché ---, et \code{bilan}, un \code{data.frame} de quatorze lignes
 et cinq colonnes \code{character}, sans \code{NA} (\code{controle},
-\code{attendu}, \code{lu}, \code{verdict}, \code{statut})~: sept contrôles,
-puis six témoins (tableau~\ref{tab:bilan-rejeu}). La colonne \code{lu}
+\code{attendu}, \code{lu}, \code{verdict}, \code{statut})~: huit contrôles,
+puis six témoins (tableau~\ref{tab:bilan-rejeu}~; la ligne
+\code{tables\_reference}, huitième, vient de l'issue~\#73). La colonne \code{lu}
 porte ce que reçoit le rejeu (la fiche, et les données pour la première
-ligne), la colonne \code{attendu} ce que le code installé exige ou obtient.
+ligne), la colonne \code{attendu} ce que le code installé exige ou obtient~;
+la ligne \code{tables\_reference} fait exception (ADR 0015, point~4.3)~: les
+tables y sont l'entrée reçue ou relue, si bien que \code{lu} porte
+l'empreinte recalculée sur chacune et \code{attendu} celle que la fiche
+exige.
 Le bilan \textbf{n'entre pas dans l'objet}~: un champ ou un attribut de plus
 ferait que l'objet rejoué ne serait plus \code{identical()} à un original,
 changerait le périmètre de l'empreinte du résultat, et
 \code{empreinte\_resultat()} s'arrête sur une erreur de programmation devant
 tout attribut inconnu. Un bilan n'existe
-que pour un rejeu abouti~: ses sept lignes de contrôle valent donc toujours
+que pour un rejeu abouti~: ses huit lignes de contrôle valent donc toujours
 «~conforme~»~; elles disent ce qui a été contrôlé, sur quelles valeurs. Un
 refus est une condition R (section~\ref{sec:refus}) et ne rend aucun bilan.
 
@@ -3154,6 +3393,7 @@ refus est une condition R (section~\ref{sec:refus}) et ne rend aucun bilan.
 \code{representation} & \code{ENTETE\_CANONIQUE} / \code{empreintes\$representation} & conforme & comparaison exacte \\
 \code{entrees\_construction} & «~valider\_plan(), controler\_roles(), recette et convention, controler\_provenance()~: aucun refus~» / «~étapes~: [étapes du plan]~; rôles~: [rôles de la fiche]~; recette~: [recette déduite]~; provenance~: [fichier, ou NULL]~» & conforme & contrôles délégués aux modules \\
 \code{empreinte\_donnees} & empreinte recalculée / \code{empreintes\$donnees} & conforme & exacte~; sans rôle de sécurité \\
+\code{tables\_reference} & «~[clé] : [empreinte de la fiche]~», joints par «~;~», ou «~aucune table de référence (fiche/tables\_reference~: NULL)~» / «~[clé] : [empreinte recalculée] (reçue)~» ou «~(relue dans le package)~», joints par «~;~», ou «~aucune table reçue ni relue~» & conforme & exacte~; sans rôle de sécurité \\
 \code{temoin\_code} & \code{EMPREINTE\_CODE} / \code{empreintes\$code} & V1 & exacte~; sans rôle de sécurité \\
 \code{temoin\_versions} & \code{versions} de la fiche rendue / de la fiche reçue, en paires «~nom=valeur~» jointes par «~;~» & V2 & comparaison exacte \\
 \code{temoin\_plateforme} & idem pour \code{plateforme} & V2 & comparaison exacte \\
@@ -3219,7 +3459,15 @@ n'ont rien refusé, sans rien ajouter à ce qu'ils vérifient~; la ligne~7 est
 l'égalité exacte de deux MD5~: l'empreinte des données est portable (exacte
 sous glibc, non mesurée ailleurs~; section~\ref{sec:empreinte}) et, comme
 toute empreinte du projet, sans rôle de sécurité~: elle identifie un
-contenu, elle ne le protège pas contre une modification délibérée. Les
+contenu, elle ne le protège pas contre une modification délibérée~; la
+ligne~8 est, pour chaque table de la fiche, la même égalité exacte de deux
+empreintes de table, dont l'origine (reçue, ou relue dans le package) est
+dite dans la colonne \code{lu}. Une empreinte de table porte sur des doubles
+écrits en octets~: une table synthétique recalculée sur une autre plateforme
+peut en différer au dernier bit, par les fonctions de la \code{libm}, et son
+rejeu y être refusé (\emph{possibilité} déduite de l'écriture, non
+mesurée~; ADR 0015, point~2.3)~; ses paramètres, dans la fiche, permettent
+alors au tiers de la recalculer et de mesurer l'écart. Les
 témoins \textbf{signalent et ne refusent jamais}~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{code}~: égalité exacte de l'empreinte du code de la fiche et
@@ -3234,7 +3482,11 @@ témoins \textbf{signalent et ne refusent jamais}~:
     effet~;
   \item \textbf{fiche}~: un écart révèle un code au comportement différent
     sur ce que la fiche consigne (recette, convention, fin effective,
-    hypothèses, décomptes d'exclusion, avertissements)~; la fiche ne portant
+    hypothèses, décomptes d'exclusion, avertissements), ou, sous
+    \code{tables\_reference}, une table reçue dont les métadonnées
+    (\code{nom}, \code{source}, \code{forme\_origine}, \code{parametres},
+    \code{statut} hors \code{embarquee}) diffèrent de celles de la fiche, à
+    empreinte de table égale (étape~7~bis)~; la fiche ne portant
     ni exposition ni taux, un écart de dernier bit des grandeurs calculées
     n'y apparaît que par l'empreinte du résultat. La stabilité de ce témoin
     d'une machine à l'autre n'est pas mesurée directement~; elle a un
@@ -3340,9 +3592,40 @@ identiques sont \code{identical()} hors \code{execution}, dans le même
 processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\par}
 
 \medskip
+{\sloppy \textbf{Tables de référence reçues} (section~\ref{sec:tables-reference-recues}~;
+issue~\#73). \code{tests/unitaires/test\_tables\_reference.R} vérifie, avec
+des attendus calculés à la main, deux témoins d'empreinte de table calculés
+hors de R et des identités exactes~: l'ordre canonique rendu par
+\code{table\_reference()} et ses refus après le tri
+(section~\ref{sec:table-reference})~; le texte empreinté et l'empreinte de
+table (un ulp sur une valeur de $q_x$ la change, les métadonnées non)~; le
+champ \code{fiche\$tables\_reference} (présent et \code{NULL} sans table,
+éléments aux sept champs par clé triée, aller-retour du texte de la fiche,
+effet sur l'empreinte du résultat)~; les signatures de
+\code{construire\_table()}, \code{rejouer\_fiche()} et
+\code{table\_embarquee()}~; l'identité de l'objet sous \code{NULL} et
+\code{list()}~; chaque refus du contrôle des tables reçues, avec son module,
+son motif, ses \code{details} et un extrait de son message, et l'ordre des
+quatre contrôles, ceux qu'aucune étape de la branche ne peut atteindre étant
+testés par injection d'un paramètre qui cite une clé et d'un catalogue de
+tables embarquées (décision M247)~; l'absence d'appel de
+\code{preparer\_donnees()} sur un refus, comptée par \code{trace()}~; au
+rejeu, chaque refus de l'étape~7~bis, les textes de la ligne
+\code{tables\_reference} du bilan (table reçue, table relue), l'absence
+d'appel de \code{construire\_table()} sur \code{empreinte\_table\_discordante},
+le refus d'une fiche de version~4 sous \code{version\_fiche\_non\_admise}
+et le témoin de la fiche sur un \code{nom} de table changé~; enfin, que
+chaque chemin de \code{PARAMETRES\_CLE\_TABLE} désigne un paramètre
+\code{character} de \code{PARAMETRES\_ETAPES} et que le module
+\code{donnees} n'appelle pas le module \code{rapport}. Le chemin de bout en
+bout avec une table lue par une étape (construction puis rejeu) est vérifié
+avec l'étape qui la lit.\par}
+
+\medskip
 {\sloppy \textbf{Rejeu outillé} (section~\ref{sec:rejeu}~; issue~\#86).
 \code{tests/unitaires/test\_rejeu.R} vérifie le contrat (fonction
-exportée, arguments \code{donnees} et \code{fiche},
+exportée, arguments \code{donnees}, \code{fiche} et
+\code{tables\_reference}, ce dernier \code{NULL} par défaut,
 \code{VERSIONS\_FICHE\_REJEU} \code{identical()} à \code{VERSION\_FICHE})~;
 la structure d'un rejeu réussi (classe, colonnes, lignes, libellés et
 valeurs du bilan~; objet rendu \code{identical()} hors \code{execution} à
@@ -3404,11 +3687,17 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{graine}) \\
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa \\
 \catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine \\
+\catalogue{fonctions-construire-table}{PARAMETRES\_CLE\_TABLE} & constante & --- & chemins \code{etapes/}\allowbreak\code{<étape>/}\allowbreak\code{<paramètre>} des paramètres du plan qui citent une table de référence par sa clé, chacun un paramètre \code{character} de \code{PARAMETRES\_ETAPES} (section~\ref{sec:tables-reference-recues}) \\
+\catalogue{fonctions-construire-table}{CHAMPS\_TABLE\_FICHE} & constante & --- & les sept champs d'un élément de \code{fiche\$tables\_reference}, dans l'ordre~: \code{nom}, \code{statut}, \code{source}, \code{forme\_origine}, \code{parametres}, \code{representation}, \code{empreinte}~; contrôle de forme de l'étape~2 du rejeu \\
 \catalogue{fonctions-construire-table}{liste\_noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms, par \code{forme\_exacte()}) aux noms complets au sens de \code{noms\_complets()} (module \code{outils}~: présents, non vides et non manquants), ou vide (sans noms admis)~; doublons non contrôlés~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#22, \#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{liste\_noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
-\catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
+\catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
+\catalogue{fonctions-construire-table}{cles\_citees()} & interne & plan, chemins des paramètres qui citent une clé & \code{data.frame} (\code{cle}, \code{parametre}) des clés citées par les étapes présentes au plan, dans l'ordre des chemins~; une clé citée deux fois y figure deux fois \\
+\catalogue{fonctions-construire-table}{controler\_tables\_reference()} & interne & tables reçues, plan~; chemins des paramètres et catalogue (par défaut, les deux constantes de ce rôle) & valeur de \code{fiche\$tables\_reference}~; les quatre contrôles des tables reçues, dans l'ordre (section~\ref{sec:tables-reference-recues}), appelé une fois par \code{construire\_table()} \\
+\catalogue{fonctions-construire-table}{controler\_tables\_rejeu()} & interne & champ de la fiche, tables reçues, plan, empreinte du code de la fiche~; chemins et catalogue & étape~7~bis du rejeu (section~\ref{sec:rejeu})~: liste assemblée (tables reçues et relues), empreintes recalculées par clé, textes de la ligne \code{tables\_reference} du bilan \\
+\catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance, tables de référence & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», longueur lue sans la classe si celle-ci est d'encodage \code{bytes} (issue~\#128), pour un message ou le bilan du rejeu \\
 \catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu seulement \\
 \catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets, nom(s) d'encodage \code{bytes}~; valeur de classe \code{bytes} décrite sans sa classe (section~\ref{sec:rejeu}~; issue~\#128) \\
@@ -3418,7 +3707,7 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{verdict\_chaines()} & interne & attendu, lu & verdict~V1~: «~non déterminable~» si l'un n'est pas une chaîne unique, sinon «~identique~» ou «~différente~» \\
 \catalogue{fonctions-construire-table}{verdict\_liste()} & interne & liste rendue, liste reçue, racine & verdict~V2~: «~non déterminable~» si la liste reçue n'est pas une liste sans classe aux noms complets ou porte un nom d'encodage \code{bytes}, sinon \code{verdict\_chemins()} \\
 \catalogue{fonctions-construire-table}{perimetre\_temoin\_fiche()} & interne & fiche & fiche privée de \code{versions}, \code{plateforme} et des trois dernières empreintes, périmètre du témoin de la fiche \\
-\catalogue{fonctions-construire-table}{rejouer\_fiche()} & exportée & données, fiche & objet de classe \code{rejeu} (\code{construction}, \code{bilan})~; contrôles, puis \code{construire\_table()} une fois~; refus nommés du module \code{construire\_table} (section~\ref{sec:rejeu}) \\
+\catalogue{fonctions-construire-table}{rejouer\_fiche()} & exportée & données, fiche, tables de référence importées ou synthétiques & objet de classe \code{rejeu} (\code{construction}, \code{bilan})~; contrôles, puis \code{construire\_table()} une fois~; refus nommés du module \code{construire\_table} (section~\ref{sec:rejeu}) \\
 \end{longtable}
 }
 
@@ -3439,7 +3728,9 @@ jamais les données~: une ligne invalide arrête la construction, sauf règle
 d'exclusion déclarée, et rien n'est corrigé (E2.7). Sa fonction d'étape est
 \code{preparer\_donnees()}~; il porte aussi le catalogue des rôles
 (\code{catalogue\_roles()}) et la représentation commune d'une table de
-référence (\code{table\_reference()}), toutes deux exportées. Le contenu de fond
+référence (\code{table\_reference()}), toutes deux exportées, ainsi que le
+catalogue des tables embarquées et son accesseur exporté
+(\code{table\_embarquee()}). Le contenu de fond
 (catalogue, motifs, règles de fusion) vient de la spécification d'\code{actuary}
 du 16/10/2026, versée dans l'issue~\#11 (parties A.0 et A.1).
 
@@ -3933,8 +4224,8 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
     coexiste jamais avec \code{H} ou \code{F}, dans la table ou au sein d'une
     même année), \code{qx} (double fini dans $[0, 1]$) et, facultative,
     \code{annee} (entier), pour les tables prospectives de la v2~;
-  \item âges sans doublon, croissants dans l'ordre reçu et contigus, au sein de
-    chaque sexe (et de chaque année)~;
+  \item âges sans doublon et contigus au sein de chaque sexe (et de chaque
+    année), quel que soit l'ordre reçu des lignes~;
   \item attributs \code{nom}, \code{statut} (\code{synthetique},
     \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
     de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
@@ -3956,8 +4247,68 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
 \code{table\_colonne\_inconnue}, \code{table\_vide},
 \code{table\_colonne\_mal\_typee}, \code{table\_sexe\_hors\_modalites},
 \code{table\_sexes\_melanges}, \code{table\_qx\_non\_fini},
-\code{table\_qx\_hors\_bornes}, \code{table\_age\_double},
-\code{table\_ages\_non\_croissants} et \code{table\_ages\_non\_contigus}.\par}
+\code{table\_qx\_hors\_bornes}, \code{table\_age\_double} et
+\code{table\_ages\_non\_contigus}.\par}
+
+\medskip
+\noindent
+\textbf{Ordre canonique} (ADR 0015, point~2.1~; décision M235~; issue~\#73).
+Le constructeur rend les lignes triées par rang du sexe dans
+\code{SEXES\_TABLE} (\code{H}, \code{F}, \code{ensemble}), obtenu par
+\code{match()} et jamais par un tri de chaînes, puis par \code{annee} si
+la colonne est présente, puis par \code{age}~; le tri est
+\code{order(\ldots, method = "radix")}, stable et indépendant de la
+locale, et les noms de lignes de l'objet rendu sont automatiques (colonnes
+construites par sous-indiçage, jamais par \code{x[o, ]}). Un facteur
+\code{sexe} est ainsi rangé selon \code{SEXES\_TABLE} et non selon ses
+niveaux. L'objet rendu, et donc son empreinte de table
+(section~\ref{sec:empreinte-resultat}, «~Empreinte d'une table de
+référence~»), ne dépendent plus de l'ordre reçu~: deux tables de même
+contenu reçues dans deux ordres donnent le même objet. Le refus
+\code{table\_ages\_non\_croissants}, qui exigeait des âges croissants
+dans l'ordre reçu, est \textbf{retiré}~: l'ordre reçu n'est pas une
+propriété du contenu. Les contrôles ligne à ligne, jusqu'à
+\code{table\_qx\_hors\_bornes}, précèdent le tri et citent les lignes
+dans la numérotation reçue~; les doublons et les trous s'évaluent sur
+l'ordre canonique et sont cités eux aussi dans la numérotation
+reçue~: \code{table\_age\_double} cite, pour chaque doublon, la ligne
+reçue la plus tardive, dans l'ordre croissant~; \code{table\_ages\_non\_contigus}
+cite chaque trou par la paire des lignes qui l'encadrent dans l'ordre
+canonique («~entre les lignes $a$ et $b$~»), \code{details\$lignes} donnant
+la ligne qui suit le trou. La contiguïté reste exigée~: un trou est un
+défaut de contenu, dont dépendent la conversion d'une table transcrite en
+$l_x$, la plage d'âges et la fermeture. Option écartée~: trier pour l'empreinte
+seulement et garder l'objet dans l'ordre reçu, si bien que deux objets de
+même empreinte donneraient des constructions différentes dès qu'une étape
+lirait l'ordre. Les deux tables synthétiques de l'entrée de référence
+(section~\ref{sec:non-regression}) ont la seule modalité \code{ensemble} et
+des âges croissants~: le tri y est l'identité, et l'entrée de référence est
+inchangée (\emph{constat} de la batterie unitaire).
+
+\medskip
+\noindent
+\textbf{Tables embarquées} (ADR 0015, point~6~; décision M250). Une table
+embarquée est une constante du package, lue à l'installation, jamais un
+fichier ouvert à l'exécution (note de lecture d'E4.4 du 06/11/2026). Le
+catalogue \code{TABLES\_EMBARQUEES} est une liste nommée par \code{nom}
+d'objets \code{table\_reference} de statut \code{embarquee}~; il est
+\textbf{vide dans cette version}~: aucune table n'est embarquée, et la
+branche de transcription des tables homologuées, qui en fixera le format et
+le mode de lecture, n'est pas faite. L'accesseur exporté
+\code{table\_embarquee(nom)} rend la table de ce nom telle qu'elle est au
+catalogue, ou refuse, sous le module \code{donnees}, un nom absent ou qui
+n'est pas une chaîne unique (\code{table\_embarquee\_absente}~:
+«~Table embarquée «~[nom, ou nom illisible]~»~: ce package n'embarque
+aucune table de ce nom (tables embarquées~: [noms, ou «~aucune~»]).~»~;
+\code{details}~: \code{lu}, \code{attendu}). Il est appelé par
+l'application et par le tiers qui rejoue une fiche hors de
+\code{rejouer\_fiche()}~; le moteur, lui, relit une table embarquée dans le
+catalogue au rejeu (section~\ref{sec:rejeu}, étape~7~bis). L'accesseur du
+catalogue entier, \code{tables\_embarquees}, prévu par l'ADR 0015, est
+reporté à la branche de transcription (décision M250)~: il rendrait
+l'empreinte de chaque table, que le module \code{donnees} ne peut pas
+calculer, \code{empreinte\_table()} étant du module \code{rapport}
+(section~\ref{sec:graphe}).
 
 \subsection{Vérifications}
 \label{sec:verifications-donnees}
@@ -3966,7 +4317,10 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
 rôle et de paramètre, chaque motif et les règles d'évaluation, les exclusions
 (lignes conservées identiques à l'entrée), la lecture~B de E2.4 au jour près
 de la borne $B$ (délais 0 et 30~jours) et le relevé après décès hors période
-(lignes conservées, deux unités), la table de référence et ses refus. Les cas
+(lignes conservées, deux unités), la table de référence et ses refus~;
+l'ordre canonique, les refus évalués après le tri et l'accesseur des tables
+embarquées le sont par \code{tests/unitaires/test\_tables\_reference.R}
+(section~\ref{sec:verifications-construction}). Les cas
 de fusion F1 à F7 de la spécification (chevauchement, contiguïté, écart d'un
 jour, décès sur deux contrats, observation après décès, deux décès,
 naissances discordantes) ont des attendus calculés à la main~; la fusion est
@@ -4032,7 +4386,9 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé (section~\ref{sec:table-reference}) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques (section~\ref{sec:table-reference}) \\
+\catalogue{fonctions-donnees}{TABLES\_EMBARQUEES} & constante & --- & catalogue des tables embarquées, liste nommée par \code{nom} d'objets \code{table\_reference} de statut \code{embarquee}~; vide dans cette version \\
+\catalogue{fonctions-donnees}{table\_embarquee()} & exportée & nom & table embarquée de ce nom, telle qu'au catalogue~; refus \code{table\_embarquee\_absente} (module \code{donnees}) d'un nom absent ou qui n'est pas une chaîne unique \\
 \end{longtable}
 }
 
@@ -5899,7 +6255,7 @@ identiques. Ses champs, dans cet ordre, en huit blocs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{identification}~: \code{version\_fiche}
-    (\code{VERSION\_FICHE}, 4)~; \code{versions}
+    (\code{VERSION\_FICHE}, 5)~; \code{versions}
     (\code{tablexp}, lue dans la description du package installé, et
     \code{R.version.string})~; \code{plateforme}, dans l'ordre
     \code{sysname}, \code{release} et \code{machine} (système, version,
@@ -5916,7 +6272,9 @@ identiques. Ses champs, dans cet ordre, en huit blocs~:
     \code{fichier}, \code{algorithme\_fichier},
     \code{representation\_resultat}, \code{resultat}, \code{code},
     \code{statut\_resultat\_code} (sections~\ref{sec:empreinte}
-    et~\ref{sec:empreinte-resultat})~;
+    et~\ref{sec:empreinte-resultat})~; \code{tables\_reference}, identité des
+    tables de référence lues, \code{NULL} sans table (ci-dessous, «~Tables
+    de référence~»)~;
   \item \textbf{plan}~: \code{plan}, le \textbf{plan canonique}
     (ci-dessous)~;
   \item \sloppy\hbadness=10000 \textbf{paramètres retenus}, dans l'ordre du
@@ -6182,13 +6540,60 @@ section~\ref{sec:non-regression}). Aucune table, aucun taux ni aucun
 verdict ne change.\par
 \endgroup
 
+\medskip
+\begingroup\sloppy
+\noindent
+\textbf{Tables de référence} (issue~\#73~; ADR 0015, point~3~; décision
+M239). \code{fiche\$tables\_reference} identifie les tables de référence
+reçues par la construction (section~\ref{sec:tables-reference-recues}).
+Il vaut \code{NULL} quand le plan ne cite aucune clé~: le champ est alors
+présent, de valeur \code{NULL}, comme \code{provenance}, sans champ de
+mention. Sinon c'est une liste nommée par clé de table, les clés converties
+en UTF-8 et triées par octets (forme canonique, sans dépendance à la
+locale), dont chaque élément est la liste, dans cet ordre
+(\code{CHAMPS\_TABLE\_FICHE}), de \code{nom}, \code{statut},
+\code{source} (chaîne déclarée, texte libre~; décision M248),
+\code{forme\_origine}, \code{parametres} (\code{NULL} hors du statut
+\code{synthetique}), \code{representation} (\code{REPRESENTATION\_TABLE})
+et \code{empreinte}, l'empreinte de table
+(section~\ref{sec:empreinte-resultat}, «~Empreinte d'une table de
+référence~»)~; l'élément est formé par la seule fonction
+\code{element\_table\_fiche()}. La fiche \textbf{identifie} la table, elle
+ne la porte pas~: ses valeurs n'y sont pas écrites, et le tiers qui rejoue
+dispose de chaque table importée ou synthétique comme des données (note de
+lecture d'E3.7 du 06/11/2026). Le champ suit \code{empreintes} dans le
+bloc «~données~», parce qu'une table de référence est une entrée, à côté
+des rôles, de la provenance et de l'empreinte des données~; il appartient au
+bloc de lecture «~rejeu~» (ci-dessous) et à la section
+\code{donnees\_recues} du rapport figé (section~\ref{sec:rapport-fige}). Il
+est dans le \textbf{périmètre de l'empreinte du résultat}
+(\code{CHEMINS\_HORS\_RESULTAT} inchangé), qui identifie ainsi aussi les
+tables lues et leurs métadonnées. Son ajout change l'ensemble des champs et
+fait passer \code{version\_fiche} de~4 à~5 (ADR 0011, point~10~(c)~; ADR
+0015, point~3.3), seul incrément de la branche
+\code{claude/validation-smr-reference}, porté par le premier commit qui
+change la définition de la fiche, celui de l'issue~\#73~; une fiche de
+version~4 est refusée au rejeu (\code{version\_fiche\_non\_admise}), sans
+migration. Pour les six plans de référence, qui ne lisent aucune table, le
+tableau avant~/ après de ce commit (visa d'\code{actuary}~; sa condition, le
+relevé des empreintes du résultat de R4 et R5 sur la plateforme de
+référence, a été levée par la régénération des références, commit
+\code{9579d71}) ne relève que
+\code{fiche/version\_fiche}, le nom ajouté à \code{fiche/@noms}, la ligne
+nouvelle \code{fiche/tables\_reference} (\code{NULL}), et, par voie de
+conséquence, l'empreinte du résultat et celle du code~; aucune table, aucun
+taux ni aucun verdict ne change.\par
+\endgroup
+
 \noindent
 Les champs qui n'ont pas d'objet (convention et unité d'exposition d'un plan
 sans étape \code{exposition}) valent \code{NULL} ou \code{NA}. \textbf{Rejeu}~:
-\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
-redonne un objet \code{identical()} hors \code{execution}~; c'est un test de
-la batterie de reproductibilité, aussi à partir du texte de la fiche. Le
-rejeu outillé, \code{rejouer\_fiche(donnees, fiche)}, fait cet appel après
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance, tables\_reference)}
+redonne un objet \code{identical()} hors \code{execution}, \code{tables\_reference}
+portant les tables que la fiche identifie (\code{NULL} sans table)~; c'est un test de
+la batterie de reproductibilité, aussi à partir du texte de la fiche, pour
+les six plans de référence, qui ne lisent aucune table. Le
+rejeu outillé, \code{rejouer\_fiche(donnees, fiche, tables\_reference)}, fait cet appel après
 avoir contrôlé la fiche et les données, et refuse en particulier une fiche
 dont \code{version\_fiche} n'est pas une version admise, la version
 courante seule (\code{VERSIONS\_FICHE\_REJEU}~; section~\ref{sec:rejeu}). La
@@ -7003,6 +7408,68 @@ Dans les références de non-régression, les deux empreintes sont comparées
 par leur forme, et leurs valeurs écrites dans l'en-tête
 (section~\ref{sec:non-regression}).
 
+\subsubsection*{Empreinte d'une table de référence}
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Objet}~: identifier le contenu numérique d'une table de
+    référence lue par la construction, quel que soit son statut
+    (\code{embarquee}, \code{importee}, \code{synthetique}), par la même
+    règle pour les trois (ADR 0011, annotation du 05/11/2026, (b) à~(g),
+    décision M210~; ADR 0015, point~2~; issue~\#73). Ni l'empreinte des
+    données, qui porte sur l'entrée reçue par \code{donnees}, ni celle du
+    code, qui porte sur les seuls fichiers \code{R/*.R}, ne couvrent une
+    table de référence.
+  \item \textbf{Texte empreinté}~: le \code{data.frame} nu de la table~---
+    colonnes \code{age}, \code{sexe}, \code{annee} si présente et
+    \code{qx}, dans cet ordre, seuls attributs \code{names}, \code{class}
+    (\code{data.frame}) et \code{row.names} automatiques~---, rangé sous la
+    racine \code{table\_reference} d'une liste et écrit par
+    \code{texte\_objet()} en forme «~empreinte~» (doubles en octets
+    IEEE~754, section~\ref{sec:empreinte}), précédé de la première ligne
+    \code{tablexp table 1} (\code{REPRESENTATION\_TABLE}) et sans ligne
+    d'en-tête \code{\#}. Le texte a donc, après cette première ligne, les
+    lignes \code{@noms} (la racine), \code{table\_reference/@colonnes},
+    \code{table\_reference/@lignes}, puis une ligne par colonne
+    (\code{table\_reference/age}, \code{table\_reference/sexe},
+    \code{table\_reference/annee} s'il y a lieu, \code{table\_reference/qx}).
+    La racine s'appelle \code{table\_reference} et non \code{table}, nom
+    réservé à la table finale de l'objet (ADR 0007, point~6.1). Les lignes
+    sont celles de l'objet rendu par \code{table\_reference()}, dans
+    l'\textbf{ordre canonique} (section~\ref{sec:table-reference})~: aucun
+    tri n'est fait à l'empreinte, et l'empreinte ne dépend pas de l'ordre
+    dans lequel la table a été reçue. Les métadonnées (\code{nom},
+    \code{statut}, \code{source}, \code{forme\_origine},
+    \code{parametres}) \textbf{n'y entrent pas}~: elles sont écrites en clair
+    dans la fiche, à côté de l'empreinte (section~\ref{sec:fiche}, «~Tables
+    de référence~»).
+  \item \textbf{Version}~: la première ligne numérote la définition du texte
+    (colonnes, ordre des lignes, forme des valeurs) et est consignée dans
+    chaque élément de \code{fiche\$tables\_reference}, sous
+    \code{representation}~; au rejeu, une autre valeur est refusée
+    (\code{representation\_table\_non\_admise}, section~\ref{sec:rejeu}),
+    par le raisonnement de la représentation canonique des données~: une
+    empreinte calculée sous une autre définition n'est jamais égale, et un
+    refus pour discordance aurait un motif trompeur.
+  \item \textbf{Calcul}~: \code{empreinte\_table()}, seule fonction qui
+    calcule cette empreinte, MD5 des octets par \code{md5\_octets()}~;
+    appelée par \code{element\_table\_fiche()} pour la fiche, par le
+    contrôle des tables reçues pour comparer une table de statut
+    \code{embarquee} à celle du catalogue, et par l'étape~7~bis du rejeu
+    (sections~\ref{sec:tables-reference-recues} et~\ref{sec:rejeu}).
+  \item \textbf{Statut}~: écriture exacte (octets fixés, MD5 d'octets),
+    sans rôle de sécurité. Une valeur de $q_x$ différente au dernier bit
+    change l'empreinte (vérifié par la batterie unitaire). Pour une table
+    importée ou embarquée, les valeurs sont reçues ou lues telles quelles~;
+    pour une table synthétique, calculée hors de la construction par des
+    fonctions de la \code{libm} (section~\ref{sec:loi-vraie}), les valeurs,
+    et donc l'empreinte, peuvent différer d'une plateforme à l'autre
+    (\emph{possibilité} non mesurée~; ADR 0015, point~2.3). Deux témoins
+    calculés hors de R (texte écrit à la main, octets IEEE~754 des doubles,
+    MD5 par \code{md5sum}) sont égaux à \code{empreinte\_table()}
+    (\emph{constat} de la batterie unitaire, valeurs écrites en dur dans
+    \code{tests/unitaires/test\_tables\_reference.R}).
+\end{itemize}
+
 \subsection{Texte du plan et de la fiche}
 \label{sec:serialisation}
 
@@ -7224,10 +7691,14 @@ ADR 0012, point~3.5).
 
 \medskip
 \textbf{Rejeu par un tiers} (E3.7 et sa note de lecture du 19/10/2026~; ADR
-0011, point~12), rappelé par la ligne \code{\# rejeu} de la fiche écrite~: le
+0011, point~12~; note de lecture d'E3.7 du 06/11/2026~; ADR 0015), rappelé
+par la ligne \code{\# rejeu} de la fiche écrite~: le
 relecteur vérifie \code{version\_fiche}, la représentation canonique et
-l'empreinte des données de la fiche~; il exécute
-\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance)}
+l'empreinte des données de la fiche, et l'empreinte de chaque table de
+\code{fiche\$tables\_reference} (table importée ou synthétique, dont il
+dispose comme des données~; table embarquée, relue dans le package)~; il
+exécute
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance, tables\_reference)}
 sur le plan relu du texte~; il compare les grandeurs à tolérance par classes
 (section~\ref{sec:non-regression}) sur une autre machine, au bit près sur la
 même (E4.6). L'empreinte du résultat ne sert de témoin que sur la même
@@ -7260,11 +7731,16 @@ de la fiche (\code{ORDRE\_CHAMPS\_FICHE}, issue~\#64)~:
 \code{hypotheses\_brut}, \code{avertissements}~; \emph{rejeu}~:
 \code{version\_fiche}, \code{versions}, \code{plateforme}, \code{roles},
 \code{provenance}, \code{provenance\_mention}, \code{empreintes},
-\code{graine}, \code{graine\_mention}, \code{generateur}. Le champ
+\code{tables\_reference}, \code{graine}, \code{graine\_mention},
+\code{generateur}. Le champ
 \code{empreintes} est rangé en «~rejeu~» à cause de l'empreinte des données,
 préalable du rejeu~; il porte aussi l'empreinte du résultat, simple témoin
 d'identité sur la même machine (\code{statut\_resultat\_code},
-section~\ref{sec:empreinte-resultat}), et celle du code. Un champ absent de la fiche (\code{hypotheses\_brut}
+section~\ref{sec:empreinte-resultat}), et celle du code. Le champ
+\code{tables\_reference} l'est pour la même raison~: les empreintes de
+table qu'il porte sont contrôlées avant toute exécution du rejeu
+(section~\ref{sec:rejeu}, étape~7~bis~; placement validé par
+\code{actuary}, spécification de l'issue~\#73). Un champ absent de la fiche (\code{hypotheses\_brut}
 sans étape \code{brut}) est omis de la ligne.\par}
 
 \subsection{Rapport figé}
@@ -7511,7 +7987,7 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{lecture} & Lecture du rapport & texte & textes de lecture (ci-dessous)~; conventions d'écriture de \code{CONVENTIONS\_TEXTE}, dans leur ordre~; empreinte du code qui écrit le rapport \\
 \code{identification} & Identification~: empreintes, versions et plateforme & objet & \code{fiche/version\_fiche}, \code{fiche/empreintes}, \code{fiche/versions}, \code{fiche/plateforme}~; puis mentions des empreintes, phrase de plateforme et phrase du contrôle d'intégrité \\
 \code{alea} & Graine et générateur & objet & \code{fiche/graine}, \code{fiche/graine\_mention}, \code{fiche/generateur} \\
-\code{donnees\_recues} & Rôles, provenance, recette et unité d'observation & objet & \code{fiche/roles}, \code{fiche/provenance}, \code{fiche/provenance\_mention}, \code{fiche/recette}, \code{fiche/unite\_observation}, \code{fiche/avertissement\_unite} \\
+\code{donnees\_recues} & Rôles, provenance, recette et unité d'observation & objet & \code{fiche/roles}, \code{fiche/provenance}, \code{fiche/provenance\_mention}, \code{fiche/tables\_reference}, \code{fiche/recette}, \code{fiche/unite\_observation}, \code{fiche/avertissement\_unite} \\
 \code{plan} & Plan de construction (plan canonique), transition et fin effective de la période & objet & \code{fiche/plan}, \code{fiche/transition\_code}, \code{fiche/fin\_effective} \\
 \code{fiche\_hypotheses} & Paramètres retenus et hypothèses consignés dans la fiche & objet & \code{fiche/convention}, \code{fiche/unite\_exposition}, \code{fiche/par\_annee}, \code{fiche/exclusions}, \code{fiche/nombre\_lignes\_exclues}, \code{fiche/hypothese\_censure}, \code{fiche/hypotheses\_brut}, \code{fiche/avertissements} \\
 \code{etape\_donnees} & Étape donnees~: exclusions, unité d'observation et relevés & etape & étape \code{donnees}~: \code{etapes/donnees}, sous-arbre entier \\
@@ -7620,12 +8096,22 @@ renvoie aux chemins qui portent exposition, événements et bornes, sans en
 calculer aucun, et dit «~Largeur des intervalles~: non produite par cette
 version.~»~: une largeur serait une quantité nouvelle, à calculer dans le
 package comme grandeur du résultat. La section \emph{rejeu} reprend la
-ligne \code{\# rejeu} de la fiche écrite, puis décrit le rejeu outillé et
+ligne \code{\# rejeu} de la fiche écrite, puis décrit le rejeu outillé
+(\code{rejouer\_fiche(donnees, fiche, tables\_reference)}, qui reçoit, si
+la fiche porte des tables de référence importées ou synthétiques, ces
+tables, une table embarquée étant relue dans le package, et contrôle aussi
+l'empreinte de chaque table) et
 précise que le bilan d'un rejeu n'entre pas dans l'objet. La ligne
 \code{\# rejeu} vient d'une seule constante, \code{TEXTE\_REJEU\_FICHE},
 extraite du littéral d'\code{ecrire\_fiche()} sans changer un octet de la
 fiche (MD5 des fiches des six plans de référence identiques avant et après,
-cités dans le message du commit \code{5135667}).
+cités dans le message du commit \code{5135667}). Cette ligne et le texte
+du rejeu outillé ont été alignés sur la note de lecture d'E3.7 du
+06/11/2026 par l'issue~\#73 (décision M251)~: ils nomment l'empreinte de
+chaque table de \code{tables\_reference} et l'appel
+\code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance, tables\_reference)}~;
+la ligne \code{\# rejeu} est un en-tête, hors aller-retour, si bien que la
+fiche relue n'en dépend pas.
 
 \medskip
 \noindent
@@ -7955,11 +8441,12 @@ les deux locales.\par}
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (4) \\
+\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (5) \\
 \catalogue{fonctions-rapport}{VERSIONS\_FICHE\_REJEU} & constante & --- & versions de fiche admises au rejeu outillé~: \code{VERSION\_FICHE}, la version courante seule (section~\ref{sec:rejeu}) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
 \catalogue{fonctions-rapport}{REPRESENTATION\_RESULTAT} & constante & --- & \code{"tablexp resultat 1"}, première ligne du texte empreinté du résultat et \code{fiche\$empreintes\$}\allowbreak\code{representation\_resultat} \\
+\catalogue{fonctions-rapport}{REPRESENTATION\_TABLE} & constante & --- & \code{"tablexp table 1"}, première ligne du texte empreinté d'une table de référence, consignée sous \code{representation} dans chaque élément de \code{fiche\$tables\_reference} (section~\ref{sec:empreinte-resultat}) \\
 \catalogue{fonctions-rapport}{STATUT\_EMPREINTE\_RESULTAT} & constante & --- & libellé du statut de l'empreinte du résultat (témoin d'identité sur la même machine seulement)~; littéral non ASCII lu par la sonde UTF-8 des batteries \\
 \catalogue{fonctions-rapport}{STATUT\_EMPREINTE\_CODE} & constante & --- & libellé du statut de l'empreinte du code calculée (relevé des MD5 de \code{R/*.R}, commande de recalcul) \\
 \catalogue{fonctions-rapport}{STATUT\_CODE\_INTROUVABLE} & constante & --- & libellé du statut de l'empreinte du code \code{NA} (sources introuvables à l'installation) \\
@@ -7986,6 +8473,8 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche, dans l'ordre de la section~\ref{sec:fiche}~; \code{resultat} à \code{NA}, posé ensuite par \code{construire\_table()}~; \code{code} égal à \code{EMPREINTE\_CODE}~; contrôle d'abord, par \code{octets\_chaines()}, le codage des valeurs des rôles et des champs de la provenance (refus de codage, issue~\#106) \\
 \catalogue{fonctions-rapport}{statut\_empreintes()} & interne & empreinte du code & \code{statut\_resultat\_code}~: libellé du résultat, \code{" ; "}, libellé du code calculé ou, si l'empreinte du code est \code{NA}, des sources introuvables~; marqué UTF-8 \\
 \catalogue{fonctions-rapport}{md5\_octets()} & interne & octets & MD5 des octets, écrits en binaire dans un fichier temporaire supprimé à la sortie \\
+\catalogue{fonctions-rapport}{empreinte\_table()} & interne & table de référence (objet rendu par le constructeur) & empreinte de table~: MD5 du texte, en forme \code{"empreinte"}, du \code{data.frame} nu (\code{age}, \code{sexe}, \code{annee} si présente, \code{qx}) sous la racine \code{table\_reference}, première ligne \code{REPRESENTATION\_TABLE}~; aucun tri, métadonnées exclues~; seule fonction qui la calcule (section~\ref{sec:empreinte-resultat}) \\
+\catalogue{fonctions-rapport}{element\_table\_fiche()} & interne & table de référence (objet rendu par le constructeur) & élément de \code{fiche\$tables\_reference}~: \code{nom}, \code{statut}, \code{source}, \code{forme\_origine}, \code{parametres}, \code{representation}, \code{empreinte}, dans cet ordre~; seul constructeur de l'élément (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{CHEMINS\_HORS\_RESULTAT} & constante & --- & liste fermée des sept chemins hors du périmètre de l'empreinte du résultat (section~\ref{sec:empreinte-resultat}) \\
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
@@ -7993,7 +8482,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
 \catalogue{fonctions-rapport}{MENTION\_BIBLIOTHEQUE\_C\_NON\_RELEVEE} & constante & --- & mention «~non relevée~» de \code{fiche\$plateforme\$}\allowbreak\code{bibliotheque\_c}, quand la valeur lue est absente, \code{NA}, vide ou faite de blancs, ou n'est pas un texte (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{bibliotheque\_c()} & interne & versions des bibliothèques (par défaut celles de R~; paramètre pour les tests) & élément \code{iconv}, tel quel («~unknown~» compris), sinon la mention «~non relevée~» (constante ci-dessus)~; n'identifie la glibc que si la valeur commence par «~glibc~» (section~\ref{sec:fiche}) \\
-\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme})~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée~; champs réordonnés par \code{ordonner\_fiche()} selon \code{ORDRE\_CHAMPS\_FICHE} \\
+\catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance, tables de référence (défaut \code{NULL}) & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme}), \code{tables\_reference} reçu du contrôle des tables (\code{NULL} gardé comme élément)~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée~; champs réordonnés par \code{ordonner\_fiche()} selon \code{ORDRE\_CHAMPS\_FICHE} \\
 \catalogue{fonctions-rapport}{ordonner\_fiche()} & interne & fiche, ordre & fiche réordonnée selon l'ordre, réduit aux champs présents (\code{hypotheses\_brut} absent sans étape \code{brut})~; erreur de programmation sur un champ présent hors de l'ordre, jamais retiré en silence \\
 \catalogue{fonctions-rapport}{ORDRE\_CHAMPS\_FICHE} & constante & --- & ordre des champs de la fiche en huit blocs (identification, données, plan, paramètres retenus, exclusions, hypothèses, aléa, avertissements)~; source unique de l'ordre du corps de la fiche écrite \\
 \catalogue{fonctions-rapport}{informations\_execution()} & interne & instant de début & champ \code{execution}, hors comparaison \\
@@ -8012,7 +8501,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{lire\_plan()} & exportée & octets & plan relu, \textbf{non validé}~: à passer à \code{valider\_plan()} ou à \code{construire\_table()} \\
 \catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier~; \code{chaine\_codage\_bytes} pour un nom de premier niveau d'encodage \code{bytes}, et, par l'écrivain, pour un nom de cet encodage plus bas~; \code{serialisation\_impossible} pour une classe de cet encodage~; issues~\#114 et~\#128)~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}, \code{TEXTE\_REJEU\_FICHE}) \\
 \catalogue{fonctions-rapport}{TEXTE\_REJEU\_FICHE} & constante & --- & ligne \code{\# rejeu} de la fiche écrite (note de lecture d'E3.7 en une ligne), reprise par la section «~Rejeu~» du rapport figé~; texte du moteur marqué UTF-8 \\
-\catalogue{fonctions-rapport}{lire\_fiche()} & exportée & octets & fiche relue, dont le rejeu est \code{construire\_table(donnees, f\$roles, f\$plan, f\$provenance)}, outillé par \code{rejouer\_fiche()}~; ne contrôle pas \code{version\_fiche} \\
+\catalogue{fonctions-rapport}{lire\_fiche()} & exportée & octets & fiche relue, dont le rejeu est \code{construire\_table(donnees, f\$roles, f\$plan, f\$provenance, tables\_reference)}, outillé par \code{rejouer\_fiche()}~; ne contrôle pas \code{version\_fiche} \\
 \catalogue{fonctions-rapport}{SECTIONS\_RAPPORT} & constante & --- & les quatorze sections du rapport figé, dans l'ordre~: identifiant, titre, nature, étape, racines, renvois (tableau~\ref{tab:sections-rapport}) \\
 \catalogue{fonctions-rapport}{CHEMINS\_STRUCTURE\_SEULE} & constante & --- & tables dont le volume croît avec la base, citées par chemin, type et dimension, sans leurs valeurs \\
 \catalogue{fonctions-rapport}{MENTIONS\_RAPPORT} & constante & --- & textes fixes du rapport figé, aux noms ASCII, marqués UTF-8 (section~\ref{sec:rapport-fige}) \\
@@ -9360,6 +9849,7 @@ fonctions de leur module.
 \endhead
 \catalogue{exports}{catalogue\_roles()} & \code{donnees} & catalogue fermé des rôles, lu par l'application pour la déclaration des rôles & \ref{sec:catalogue-roles} \\
 \catalogue{exports}{table\_reference()} & \code{donnees} & constructeur contrôlé d'une table de référence, appelé par l'application pour l'import de tables & \ref{sec:table-reference} \\
+\catalogue{exports}{table\_embarquee()} & \code{donnees} & accesseur d'une table embarquée par son nom, appelé par l'application et par le tiers qui rejoue (ADR 0015, point~6.2)~; catalogue vide dans cette version & \ref{sec:table-reference} \\
 \catalogue{exports}{simuler\_portefeuille()} & \code{simulation} & point d'entrée du simulateur~: jeu simulé sous une loi vraie et une graine & \ref{sec:simulation} \\
 \catalogue{exports}{valider\_plan()} & \code{construire\_table} & validateur du plan, contrôle de saisie que l'application appellera (E4.3) & \ref{sec:plan} \\
 \catalogue{exports}{construire\_table()} & \code{construire\_table} & point d'entrée unique~: exécute un plan de construction et retourne l'objet \code{construction} & \ref{sec:construction} \\
@@ -9420,11 +9910,11 @@ E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-ba
 E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
 E3.5 & rapport figé HTML autonome et fiche de construction (en partie~: les tables CSV et xlsx à en-tête viendront avec la première table finale) & \ref{sec:fiche}, \ref{sec:rapport-fige} \\
 E3.6 & restitution sans recalcul par le rapport figé~; empreintes des données reçues, du fichier, du résultat et du code~; dépendance de l'empreinte du résultat à la plateforme (en partie~: validations, table finale et largeur des intervalles «~non produites par cette version~») & \ref{sec:empreinte}, \ref{sec:empreinte-resultat}, \ref{sec:rapport-fige} \\
-E3.7 & relecture sans le code, rejeu à partir de la fiche, rejeu outillé & \ref{sec:fiche}, \ref{sec:serialisation}, \ref{sec:rejeu} \\
+E3.7 & relecture sans le code, rejeu à partir de la fiche, rejeu outillé, empreinte de chaque table de référence (note de lecture du 06/11/2026) & \ref{sec:fiche}, \ref{sec:serialisation}, \ref{sec:rejeu} \\
 E4.1 & R 4.3.3, package \code{tablexp}, point d'entrée unique, modules~; rapport figé écrit par le module \code{rapport} (note de lecture du 24/10/2026) & \ref{sec:fichiers-package}, \ref{sec:construction}, \ref{sec:rapport-fige} \\
 E4.2 & packages de priorité \code{base}~; aucune dépendance à Java & \ref{sec:scripts-controle}, \ref{sec:absence-java} \\
 E4.3 & frontière calcul / affichage~; contrôles de saisie dans le package & \ref{sec:separation}, \ref{sec:plan} \\
-E4.4 & le moteur reçoit un \code{data.frame} et des rôles, refuse un type incompatible & \ref{sec:separation}, \ref{sec:catalogue-roles} \\
+E4.4 & le moteur reçoit un \code{data.frame} et des rôles, refuse un type incompatible~; une table de référence entre en objet \code{table\_reference}, une table embarquée est une constante du package (note de lecture du 06/11/2026) & \ref{sec:separation}, \ref{sec:catalogue-roles}, \ref{sec:tables-reference-recues}, \ref{sec:table-reference} \\
 E4.5 & plan exécuté d'un bloc, objet complet, contenu de la fiche & \ref{sec:construction}, \ref{sec:fiche} \\
 E4.6 & reproductibilité, graine locale, générateur fixé, aucun horodatage comparé & \ref{sec:reproductibilite}, \ref{sec:objet-resultat} \\
 E4.7 & références de non-régression sur la plateforme de référence & \ref{sec:plateforme}, \ref{sec:non-regression} \\
