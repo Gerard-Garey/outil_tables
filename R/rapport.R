@@ -19,6 +19,9 @@
 #    tools::md5sum() sur un fichier temporaire écrit en binaire ; algorithme
 #    nommé ; jamais serialize(), dont l'en-tête porte la version de R
 #    (point 9.4) ;
+#  - empreinte_table(), element_table_fiche() : empreinte d'une table de
+#    référence (première ligne « tablexp table 1 ») et élément de
+#    fiche$tables_reference qui l'identifie (ADR 0015, points 2.2 et 3 ; #73) ;
 #  - empreinte_resultat() : empreinte du résultat, MD5 du texte de l'objet en
 #    forme « empreinte », première ligne « tablexp resultat 1 » (ADR 0011,
 #    point 11 ; cinquième et sixième annotations du 20/10/2026 ; septième,
@@ -69,7 +72,10 @@
 # (point 10 (c)). Le champ est hors empreinte du résultat (fiche/plateforme est
 # dans CHEMINS_HORS_RESULTAT), l'incrément la change (fiche/version_fiche
 # n'y est pas).
-VERSION_FICHE <- 4L
+# Fiche 5 : champ tables_reference, identité des tables de référence lues
+# (ADR 0015, point 3 ; #73), NULL sans table ; premier commit de B13 qui
+# change la définition de la fiche (point 10 (a)).
+VERSION_FICHE <- 5L
 # Versions de fiche admises au rejeu outillé (rejouer_fiche(), ADR 0012,
 # point 3.5 ; #86) : la version courante seule ; ici, et non dans
 # R/construire_table.R, évalué avant ce fichier. Élargir demande, version par
@@ -82,6 +88,10 @@ ALGORITHME_EMPREINTE <- "md5"
 # fiche$empreintes$representation_resultat : cinquième version du point 10
 # (ADR 0011, cinquième annotation du 20/10/2026, (a) ; #67).
 REPRESENTATION_RESULTAT <- "tablexp resultat 1"
+# Première ligne du texte empreinté d'une table de référence, consignée dans
+# fiche$tables_reference/<clé>/representation (ADR 0011, annotation du
+# 05/11/2026, (b) ; ADR 0015, point 2.2 ; #73).
+REPRESENTATION_TABLE <- "tablexp table 1"
 # Statut des empreintes du résultat et du code (cinquième annotation du
 # 20/10/2026, (d)), réunis dans fiche$empreintes$statut_resultat_code par
 # « ; ». Littéraux laissés tels quels, marqués UTF-8 à l'emploi (#50) ;
@@ -729,6 +739,32 @@ md5_octets <- function(octets) {
   unname(tools::md5sum(f))
 }
 
+# Empreinte d'une table de référence (ADR 0011, annotation du 05/11/2026, (b) ;
+# ADR 0015, point 2.2 ; #73) : MD5 du texte, en forme « empreinte », du
+# data.frame nu (age, sexe, annee si présente, qx ; seuls attributs names,
+# class et row.names automatiques) sous la racine `table_reference`, première
+# ligne REPRESENTATION_TABLE. Aucun tri : `t` est l'objet rendu par
+# table_reference(), dont les lignes sont dans l'ordre canonique. Les
+# métadonnées (nom, statut, source, forme_origine, parametres) n'y entrent pas.
+# Seule fonction qui calcule cette empreinte.
+empreinte_table <- function(t) {
+  d <- data.frame(age = t$age, sexe = t$sexe, stringsAsFactors = FALSE)
+  if ("annee" %in% names(t)) d$annee <- t$annee
+  d$qx <- t$qx
+  md5_octets(texte_objet(list(table_reference = d), REPRESENTATION_TABLE, character(0), "empreinte"))
+}
+
+# Élément de fiche$tables_reference d'une table `t` rendue par
+# table_reference() (ADR 0015, point 3.1) : nom, statut, source,
+# forme_origine, parametres (NULL hors du statut synthetique),
+# representation, empreinte, dans cet ordre. Seul constructeur de l'élément.
+element_table_fiche <- function(t) {
+  list(nom = attr(t, "nom", exact = TRUE), statut = attr(t, "statut", exact = TRUE),
+       source = attr(t, "source", exact = TRUE), forme_origine = attr(t, "forme_origine", exact = TRUE),
+       parametres = attr(t, "parametres", exact = TRUE), representation = REPRESENTATION_TABLE,
+       empreinte = empreinte_table(t))
+}
+
 # Périmètre de l'empreinte du résultat (ADR 0011, point 11.1 ; #67) : l'objet
 # `construction` entier moins ces chemins, liste fermée. execution,
 # fiche$versions, fiche$plateforme et les trois derniers champs de
@@ -914,10 +950,13 @@ bibliotheque_c <- function(versions = extSoftVersion()) {
 # niveau (point 5.4 ; #22, point 6). Rôles dans l'ordre du catalogue
 # (CATALOGUE_ROLES$role), provenance dans l'ordre (fichier, empreinte,
 # algorithme) (point 5.3). Rejeu : construire_table(donnees, fiche$roles,
-# fiche$plan, fiche$provenance). Le champ hypotheses_brut n'existe que si
-# l'étape `brut` est exécutée : un plan sans cette étape garde les autres
-# champs.
-assembler_fiche <- function(roles, plan, recette, etapes, avertissements, empreintes, provenance) {
+# fiche$plan, fiche$provenance, tables_reference). Le champ hypotheses_brut
+# n'existe que si l'étape `brut` est exécutée : un plan sans cette étape garde
+# les autres champs. `tables_reference` : valeur du champ de même nom, NULL ou
+# liste par clé triée d'éléments formés par element_table_fiche(), rendue par
+# controler_tables_reference() (ADR 0015, point 3.1).
+assembler_fiche <- function(roles, plan, recette, etapes, avertissements, empreintes, provenance,
+                            tables_reference = NULL) {
   pd <- etapes[["donnees"]][["parametres"]]
   pe <- etapes[["exposition"]][["parametres"]]
   unite <- pd$unite_observation
@@ -950,6 +989,8 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     provenance_mention = texte_moteur(if (is.null(provenance)) "aucun fichier (données construites en mémoire)"
                                       else "fichier lu par la couche de lecture"),
     empreintes = empreintes,
+    # NULL gardé comme élément de la liste (champ présent, ADR 0015, point 3.1).
+    tables_reference = tables_reference,
     avertissements = avertissements
   )
   pb <- etapes[["brut"]][["parametres"]]
@@ -982,7 +1023,7 @@ ordonner_fiche <- function(fiche, ordre) {
 # écrite (ecrire_fiche()) ; BLOCS_LECTURE_FICHE en est une partition.
 ORDRE_CHAMPS_FICHE <- c(
   "version_fiche", "versions", "plateforme",
-  "roles", "provenance", "provenance_mention", "empreintes",
+  "roles", "provenance", "provenance_mention", "empreintes", "tables_reference",
   "plan",
   "transition_code", "fin_effective", "unite_observation", "recette", "convention", "unite_exposition", "par_annee",
   "exclusions", "nombre_lignes_exclues",
@@ -1087,7 +1128,7 @@ BLOCS_LECTURE_FICHE <- texte_moteur(list(
   "hypothèses" = c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure",
                   "hypotheses_brut", "avertissements"),
   rejeu = c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention", "empreintes",
-            "graine", "graine_mention", "generateur")))
+            "tables_reference", "graine", "graine_mention", "generateur")))
 
 joindre_chemin <- function(chemin, segment) if (nzchar(chemin)) paste0(chemin, "/", segment) else segment
 
@@ -1518,12 +1559,15 @@ ecrire_fiche <- function(fiche) {
 # de l'en-tête de la fiche écrite (ecrire_fiche()), reprise telle quelle par la
 # section « Rejeu » du rapport figé (ADR 0012, seconde annotation du 24/10/2026,
 # (b) 7 ; #87) ; texte du moteur marqué UTF-8 (#50). Extraite du littéral
-# d'ecrire_fiche() sans changer un octet de la fiche.
+# d'ecrire_fiche() sans changer un octet de la fiche ; alignée sur la note de
+# lecture d'E3.7 du 06/11/2026 (tables de référence, ADR 0015 ; décision Q3
+# du mainteneur, #73).
 TEXTE_REJEU_FICHE <- texte_moteur(paste(
-  "vérifier version_fiche, empreintes/representation et empreintes/donnees ; exécuter",
-  "construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) sur le plan relu",
-  "de ce texte ; comparer à tolérance par classes (ADR 0009) sur une autre machine, au bit",
-  "près sur la même (E4.6)"))
+  "vérifier version_fiche, empreintes/representation et empreintes/donnees, et l'empreinte de",
+  "chaque table de tables_reference (table importée ou synthétique reçue comme les données, table",
+  "embarquée relue dans le package) ; exécuter construire_table(donnees, fiche$roles, fiche$plan,",
+  "fiche$provenance, tables_reference) sur le plan relu de ce texte ; comparer à tolérance par",
+  "classes (ADR 0009) sur une autre machine, au bit près sur la même (E4.6)"))
 
 # Fiche relue des octets `octets` (raw). Ne contrôle pas version_fiche :
 # c'est l'affaire du rejeu (troisième annotation, (i) ; point 12 (1)). Rejeu
@@ -1594,8 +1638,8 @@ SECTIONS_RAPPORT <- data.frame(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
     c("fiche/graine", "fiche/graine_mention", "fiche/generateur"),
-    c("fiche/roles", "fiche/provenance", "fiche/provenance_mention", "fiche/recette", "fiche/unite_observation",
-      "fiche/avertissement_unite"),
+    c("fiche/roles", "fiche/provenance", "fiche/provenance_mention", "fiche/tables_reference", "fiche/recette",
+      "fiche/unite_observation", "fiche/avertissement_unite"),
     c("fiche/plan", "fiche/transition_code", "fiche/fin_effective"),
     c("fiche/convention", "fiche/unite_exposition", "fiche/par_annee", "fiche/exclusions",
       "fiche/nombre_lignes_exclues", "fiche/hypothese_censure", "fiche/hypotheses_brut", "fiche/avertissements"),
@@ -1709,9 +1753,11 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   suffisance_brut_absente = "Événements, exposition et bornes d'intervalle par estimateur : non demandée par le plan.",
   rejeu_1 = "Ligne de rejeu de la fiche de construction (en-tête de la fiche écrite par ecrire_fiche()) : ",
   rejeu_2 = paste(
-    "Rejeu outillé : rejouer_fiche(donnees, fiche) reçoit le data.frame des données et la fiche relue de son",
-    "texte par lire_fiche() ; elle contrôle la fiche et les données (version de fiche, algorithme et",
-    "représentation des empreintes, contrôles d'entrée, empreinte des données), refuse à la première",
+    "Rejeu outillé : rejouer_fiche(donnees, fiche, tables_reference) reçoit le data.frame des données, la",
+    "fiche relue de son texte par lire_fiche() et, si la fiche porte des tables de référence importées ou",
+    "synthétiques, ces tables (une table embarquée est relue dans le package) ; elle contrôle la fiche, les",
+    "données et les tables de référence (version de fiche, algorithme et représentation des empreintes,",
+    "contrôles d'entrée, empreinte des données, empreinte de chaque table), refuse à la première",
     "discordance, puis appelle construire_table() une seule fois ; elle rend la construction et un bilan de",
     "rejeu. Le rapport de la construction rejouée s'écrit par ecrire_rapport() appliquée à l'élément",
     "construction de ce résultat."),

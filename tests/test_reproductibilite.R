@@ -370,8 +370,19 @@ SANS_REFERENCE_17 <- character(0)
 # Transitions #35 et #42 closes par la régénération unique de B4 (run CI
 # 39315172327, d18c269) ; transitions #57, #64 et #67 closes ensemble par la
 # régénération unique de B5 (run CI 39435673257, 5757c30 ; ADR 0009, point
-# 9.5). Liste vide.
-TRANSITIONS_EN_COURS <- list()
+# 9.5). Transition #73 (commit (1) de B13, ADR 0015, point 3.4) : fiche 5,
+# champ tables_reference (NULL sans table) après empreintes ; close par la
+# régénération unique (R) de B13.
+TRANSITIONS_EN_COURS <- list(
+  list(issue = "#73", plans = c("R1", "R2", "R3", "R4", "R5", "R6"), changements = list(
+    list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 5L),
+    list(chemin = "fiche/tables_reference", nature = "ajout", type = "NULL", longueur = 0L),
+    list(chemin = "fiche/@noms", nature = "valeur de chaîne",
+         valeurs = c("version_fiche", "roles", "provenance", "provenance_mention", "empreintes", "tables_reference",
+                     "plan", "transition_code", "fin_effective", "unite_observation", "recette", "convention",
+                     "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues", "avertissement_unite",
+                     "hypothese_censure", "hypotheses_brut", "graine", "graine_mention", "generateur",
+                     "avertissements")))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -737,10 +748,10 @@ for (p in plans_reference()) {
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
   # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
   # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
-  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 8 à 12 « identique », 13 « non vérifiée »", id), {
+  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 « identique », 14 « non vérifiée »", id), {
     r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)))
     identical(sans_execution(r$construction), sans_execution(x_ref)) &&
-      identical(r$bilan$verdict[8:13], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
+      identical(r$bilan$verdict[9:14], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
   })
   # Rapport figé (#87, U24, U25) : contrôles du document ; taille (octets) et
   # durée du rendu imprimées (constat, sans seuil ; critère 7 de #87).

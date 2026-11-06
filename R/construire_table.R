@@ -11,14 +11,20 @@
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
 #    controler_parametres_exposition(), controler_parametres_brut()) ;
 #    exporté (contrôle de saisie à sens métier, E4.3) ;
-#  - construire_table() : valide le plan, les rôles et la provenance, calcule
+#  - PARAMETRES_CLE_TABLE, controler_forme_tables(), cles_citees(),
+#    controler_tables_reference(), controler_tables_rejeu() : tables de
+#    référence reçues par l'argument tables_reference, contrôles 1.3 (entrée
+#    de construire_table()) et 7 bis (rejeu) de l'ADR 0015 (#73) ;
+#  - construire_table() : valide le plan, les rôles, la provenance et les
+#    tables de référence, calcule
 #    l'empreinte des données, exécute les étapes dans l'ordre du plan en
 #    transmettant les champs du plan en arguments nommés (une fonction
 #    d'étape ne reçoit jamais le plan entier), assemble l'objet
 #    `construction` et la fiche (module `rapport`) ;
 #  - rejouer_fiche() : rejeu outillé d'une fiche (E3.7 ; ADR 0012, point 3 ;
 #    #86) : contrôles de la fiche et des données, puis un seul appel de
-#    construire_table() sur les rôles, le plan et la provenance de la fiche ;
+#    construire_table() sur les rôles, le plan et la provenance de la fiche,
+#    et les tables de référence reçues ou relues ;
 #    bilan des contrôles et des témoins, hors de l'objet ; exporté.
 #
 #  Aucun calcul. Peut appeler tous les modules sauf `simulation` (ADR 0007,
@@ -72,6 +78,18 @@ PARAMETRES_ETAPES <- list(
                 "nombre double unique, fini, 0 < niveau < 1"),
     stringsAsFactors = FALSE)
 )
+
+# Paramètres du plan qui citent une table de référence par sa clé (ADR 0015,
+# points 1.2 et 1.3 ; #73) : chemins « etapes/<étape>/<paramètre> », chacun
+# un paramètre `character` de PARAMETRES_ETAPES. Vide tant qu'aucune étape ne
+# lit de table ; vaudra « etapes/validation/table_reference » (#4). Les
+# contrôles des tables reçues la prennent en argument (défaut), pour être
+# testés par injection (M247).
+PARAMETRES_CLE_TABLE <- character(0)
+
+# Champs d'un élément de fiche$tables_reference, dans l'ordre (ADR 0015,
+# point 3.1 ; element_table_fiche(), module rapport).
+CHAMPS_TABLE_FICHE <- c("nom", "statut", "source", "forme_origine", "parametres", "representation", "empreinte")
 
 # Liste aux noms complets (noms_complets() de R/outils.R ; liste vide admise
 # sans noms), sans autre attribut que names (ni data.frame, ni dim, ni
@@ -203,18 +221,316 @@ ordres_canoniques <- function()
        "etapes/donnees/exclusions" = c(MOTIFS_LIGNES, MOTIFS_TETE),
        "etapes/brut/estimateurs" = ESTIMATEURS_BRUT)
 
+# --- tables de référence reçues (ADR 0015, points 1.3 et 4 ; #73) --------------
+
+# Forme de l'argument `tables_reference` (contrôle 1.3, point 1 ; même contrôle
+# au rejeu, 7 bis, point 0) : NULL, ou liste nommée (liste_nommee()) aux noms
+# sans encodage « bytes » et écrivables dans la fiche (octets_chaines(),
+# module rapport) ; list() équivaut à NULL. Puis, pour chaque élément, dans
+# l'ordre des clés converties en UTF-8 et triées par octets : (a) classe
+# table_reference exacte et colonnes du constructeur ; (b) reconstruction par
+# table_reference() sur le data.frame nu de ses colonnes et ses métadonnées,
+# sans refus ; (c) objet identical() à sa reconstruction (ordre canonique,
+# valeurs contrôlées, attributs) ; (d) élément de fiche (element_table_fiche(),
+# module rapport) écrit en forme « texte » sous sa clé, puis relu identical()
+# (décision Q1 du mainteneur, 06/11/2026). Premier défaut : refus
+# tables_reference_mal_formees (module construire_table). Rend NULL sans
+# table, sinon list(tables = objets, champ = éléments de fiche), tous deux
+# nommés par clé, dans l'ordre des clés.
+controler_forme_tables <- function(tables) {
+  if (is.null(tables)) return(NULL)
+  # Clés écrivables dans la fiche : refus d'octets_chaines() (module rapport)
+  # rattrapé ; la clé en cause et le motif de l'écrivain vont dans les details
+  # (audit de #73, m2), le message reste celui de l'argument.
+  ecriture <- if (liste_nommee(tables) && !length(noms_bytes(tables)) && length(tables))
+    tryCatch({ octets_chaines(attr(tables, "names", exact = TRUE), "tables_reference/@noms"); NULL },
+             refus_tablexp = function(e) e)
+  if (!liste_nommee(tables) || length(noms_bytes(tables)) || !is.null(ecriture))
+    refuser("construire_table", "tables_reference_mal_formees",
+            formuler(paste("L'argument « tables_reference » doit être NULL (aucune table de référence) ou une liste",
+                           "nommée aux noms uniques, non vides, sans autre attribut que ses noms, d'objets rendus par",
+                           "table_reference() (ADR 0015, point 1.1) ; reçu : objet de classe %s (type %s, longueur %d)."),
+                     paste(citer(class(tables)), collapse = "/"), citer(typeof(tables)),
+                     length(if (classe_bytes(tables)) unclass(tables) else tables)),
+            list(cle = if (is.null(ecriture)) NA_character_
+                       else attr(tables, "names", exact = TRUE)[ecriture$details$lignes],
+                 lu = decrire_forme(list(tables_reference = tables), "tables_reference"),
+                 attendu = texte_moteur("NULL ou liste nommée d'objets table_reference"), motif_constructeur = NA_character_,
+                 chemin = if (is.null(ecriture)) NA_character_ else "tables_reference/@noms",
+                 motif_ecriture = if (is.null(ecriture)) NA_character_ else ecriture$motif))
+  if (!length(tables)) return(NULL)
+  cles <- enc2utf8(attr(tables, "names", exact = TRUE))
+  o <- order(cles, method = "radix")
+  objets <- champ <- stats::setNames(vector("list", length(o)), cles[o])
+  classe_attendue <- c("table_reference", "data.frame")
+  for (i in o) {
+    k <- cles[i]
+    x <- .subset2(tables, i)
+    mal_formee <- function(texte, lu, attendu, motif = NA_character_, chemin = NA_character_)
+      refuser("construire_table", "tables_reference_mal_formees",
+              formuler(paste("Table de clé « %s » : %s. Chaque élément de « tables_reference » doit être l'objet rendu",
+                             "par table_reference(), sans modification (classe, attributs, ordre canonique des lignes,",
+                             "valeurs contrôlées), et ses métadonnées doivent s'écrire dans la fiche."),
+                       citer(k), texte),
+              list(cle = k, lu = lu, attendu = attendu, motif_constructeur = motif, chemin = chemin))
+    modifie <- formuler("objet modifié après table_reference()")
+    # (a) Classe exacte, lue par attr() (une classe « bytes » ne lève pas).
+    cl <- attr(x, "class", exact = TRUE)
+    if (!identical(cl, classe_attendue))
+      mal_formee(formuler("objet de classe %s au lieu de table_reference", paste(citer(class(x)), collapse = "/")),
+                 class(x), classe_attendue)
+    colonnes <- attr(x, "names", exact = TRUE)
+    if (!identical(colonnes, c("age", "sexe", "qx")) && !identical(colonnes, c("age", "sexe", "qx", "annee")))
+      mal_formee(modifie, colonnes, "age, sexe, qx [, annee] (colonnes de table_reference())")
+    # (b) Reconstruction : data.frame nu des colonnes, métadonnées lues dans
+    # les attributs (un attribut absent est passé NULL, que le constructeur
+    # refuse) ; une erreur R du data.frame nu vaut objet modifié.
+    r <- tryCatch({
+      nu <- data.frame(lapply(stats::setNames(colonnes, colonnes), function(n) .subset2(x, n)),
+                       stringsAsFactors = FALSE)
+      table_reference(nu, attr(x, "nom", exact = TRUE), attr(x, "statut", exact = TRUE),
+                      attr(x, "source", exact = TRUE), attr(x, "parametres", exact = TRUE),
+                      attr(x, "forme_origine", exact = TRUE))
+    }, refus_tablexp = function(e) e, error = function(e) NULL)
+    if (is.null(r)) mal_formee(modifie, "data.frame nu non reconstructible", "colonnes de table_reference()")
+    if (inherits(r, "refus_tablexp"))
+      mal_formee(formuler("refusé par table_reference() (motif %s)", citer(r$motif)), r$motif, "aucun refus",
+                 motif = r$motif)
+    # (c) Identité avec la reconstruction.
+    if (!identical(x, r)) mal_formee(modifie, texte_moteur("objet reçu"), "objet reconstruit par table_reference()")
+    # (d) Écriture et relecture de l'élément de fiche, sous sa clé.
+    el <- element_table_fiche(x)
+    ecrit <- stats::setNames(list(el), k)
+    octets <- tryCatch(texte_objet(ecrit, PREMIERE_LIGNE_FICHE, character(0)), refus_tablexp = function(e) e)
+    if (inherits(octets, "refus_tablexp")) {
+      ch <- octets$details$chemin
+      if (is.null(ch)) ch <- octets$details$role
+      if (!is.character(ch) || length(ch) != 1L) ch <- NA_character_
+      mal_formee(formuler("métadonnée sans écriture exacte dans la fiche (%s)",
+                          formuler("refus %s, %s", citer(octets$motif), citer(ch))),
+                 octets$motif, texte_moteur("écriture du texte de fiche sans refus"), chemin = ch)
+    }
+    relu <- tryCatch(lire_texte(octets, PREMIERE_LIGNE_FICHE, "fiche"), refus_tablexp = function(e) e)
+    if (!identical(relu, ecrit))
+      mal_formee(formuler("métadonnée sans écriture exacte dans la fiche (%s)", formuler("relecture différente")),
+                 texte_moteur("élément relu différent"), texte_moteur("élément relu identical() à l'élément écrit"))
+    objets[[k]] <- x
+    champ[k] <- list(el)
+  }
+  list(tables = objets, champ = champ)
+}
+
+# Clés citées par le plan (ADR 0015, point 1.2) : pour chaque chemin
+# « etapes/<étape>/<paramètre> » de `parametres_cle` dont l'étape est au plan,
+# la valeur du paramètre si c'est une chaîne unique (sa forme est contrôlée
+# par le module de l'étape). Rend un data.frame (cle, parametre), dans l'ordre
+# de `parametres_cle` ; une clé citée par deux paramètres y figure deux fois.
+cles_citees <- function(plan, parametres_cle) {
+  cle <- parametre <- character(0)
+  for (chemin in parametres_cle) {
+    s <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
+    v <- plan
+    for (n in s) v <- if (is.list(v)) lire_champ(v, n)
+    if (chaine_unique(v)) {
+      cle <- c(cle, v); parametre <- c(parametre, chemin)
+    }
+  }
+  data.frame(cle = cle, parametre = parametre, stringsAsFactors = FALSE)
+}
+
+# Contrôle 1.3 (ADR 0015, point 1.3 ; spécification de #73, § 3), à l'entrée
+# de construire_table(), après controler_provenance() et avant toute étape ;
+# refus de module construire_table, dans cet ordre : forme
+# (controler_forme_tables()) ; clé citée par le plan et non reçue
+# (table_reference_absente, premier paramètre dans l'ordre de
+# `parametres_cle`) ; clé reçue citée par aucun paramètre
+# (table_reference_inattendue, toutes citées) ; table de statut embarquee
+# dont le nom est absent du catalogue `embarquees` (table_embarquee_absente),
+# puis dont l'empreinte diffère de celle de la table du catalogue
+# (table_embarquee_discordante). `parametres_cle` et `embarquees` :
+# PARAMETRES_CLE_TABLE et TABLES_EMBARQUEES par défaut, injectés par les
+# tests (M247). Rend la valeur de fiche$tables_reference : NULL, ou liste des
+# éléments par clé.
+controler_tables_reference <- function(tables_reference, plan, parametres_cle = PARAMETRES_CLE_TABLE,
+                                       embarquees = TABLES_EMBARQUEES) {
+  f <- controler_forme_tables(tables_reference)
+  champ <- f$champ
+  recues <- if (is.null(champ)) character(0) else names(champ)
+  citees <- cles_citees(plan, parametres_cle)
+  absentes <- which(!citees$cle %in% recues)
+  if (length(absentes)) {
+    a <- absentes[1L]
+    refuser("construire_table", "table_reference_absente",
+            formuler(paste("Le plan cite la table de clé « %s » (paramètre %s) ; « tables_reference » %s. Passer la",
+                           "table, rendue par table_reference(), sous cette clé : le moteur ne lit aucun fichier et ne",
+                           "cherche aucune table par son nom."),
+                     citer(citees$cle[a]), citer(citees$parametre[a]),
+                     if (length(recues)) formuler("ne porte pas cette clé (clés reçues : %s)", liste_guillemets(recues))
+                     else formuler("ne porte aucune table (NULL)")),
+            list(cle = citees$cle[a], parametre = citees$parametre[a], lu = recues, attendu = citees$cle[a]))
+  }
+  inattendues <- recues[!recues %in% citees$cle]
+  if (length(inattendues)) {
+    attendues <- unique(citees$cle)
+    refuser("construire_table", "table_reference_inattendue",
+            formuler(paste("Table(s) de clé %s reçue(s) dans « tables_reference » et citée(s) par aucun paramètre du",
+                           "plan (clés citées : %s) : une table de référence n'entre dans la construction que si une",
+                           "étape la lit."),
+                     liste_guillemets(inattendues),
+                     if (length(attendues)) liste_guillemets(attendues) else formuler("aucune")),
+            list(cle = inattendues, lu = inattendues, attendu = attendues))
+  }
+  catalogue <- attr(embarquees, "names", exact = TRUE)
+  if (is.null(catalogue)) catalogue <- character(0)
+  embarquees_recues <- recues[vapply(champ, function(e) identical(e$statut, "embarquee"), NA)]
+  for (k in embarquees_recues) {
+    nom <- champ[[k]]$nom
+    if (!nom %in% catalogue)
+      refuser("construire_table", "table_embarquee_absente",
+              formuler(paste("Table de clé « %s », de statut « embarquee » et de nom « %s » : ce package n'embarque",
+                             "aucune table de ce nom (tables embarquées : %s). Le statut « embarquee » est vérifié",
+                             "contre le package ; une table importée se déclare de statut « importee »."),
+                       citer(k), citer(nom), if (length(catalogue)) liste_guillemets(catalogue) else formuler("aucune")),
+              list(cle = k, nom = nom, lu = nom, attendu = catalogue))
+  }
+  for (k in embarquees_recues) {
+    nom <- champ[[k]]$nom
+    attendue <- empreinte_table(embarquees[[nom]])
+    if (!identical(champ[[k]]$empreinte, attendue))
+      refuser("construire_table", "table_embarquee_discordante",
+              formuler(paste("Table de clé « %s », de statut « embarquee » et de nom « %s » : empreinte %s, différente",
+                             "de celle de la table de ce nom embarquée dans le package installé (%s). Obtenir la table",
+                             "par table_embarquee(), ou la déclarer de statut « importee »."),
+                       citer(k), citer(nom), citer(champ[[k]]$empreinte), citer(attendue)),
+              list(cle = k, nom = nom, lu = champ[[k]]$empreinte, attendu = attendue))
+  }
+  champ
+}
+
+# Contrôle 7 bis du rejeu (ADR 0015, point 4.2 ; spécification de #73, § 3),
+# après le contrôle de l'empreinte des données et avant construire_table() :
+# 0. forme de l'argument (controler_forme_tables()) ; 1. clés reçues absentes
+# de fiche$tables_reference ou de statut embarquee dans la fiche
+# (table_reference_inattendue, toutes citées) ; 2. pour chaque clé de la
+# fiche, dans son ordre : (a) représentation (representation_table_non_admise),
+# (b) origine, table relue dans `embarquees` par son nom (sinon
+# table_embarquee_absente) ou table reçue sous la clé (sinon
+# table_reference_absente), (c) empreinte recalculée par empreinte_table()
+# égale à celle de la fiche (empreinte_table_discordante) ; 3. contrôle 1.3
+# sur la liste assemblée et le plan de la fiche. `fiche_tables` : champ
+# fiche$tables_reference, de forme contrôlée (contrôle 2) ; `code_fiche` :
+# empreinte du code lue dans la fiche, citée. Rend la liste assemblée (NULL
+# sans table), les empreintes recalculées et les textes de la ligne
+# « tables_reference » du bilan.
+controler_tables_rejeu <- function(fiche_tables, tables_reference, plan, code_fiche,
+                                   parametres_cle = PARAMETRES_CLE_TABLE, embarquees = TABLES_EMBARQUEES) {
+  f <- controler_forme_tables(tables_reference)
+  recues <- if (is.null(f)) character(0) else names(f$tables)
+  cles <- if (is.null(fiche_tables)) character(0) else names(fiche_tables)
+  statuts <- vapply(fiche_tables, function(e) e$statut, "")
+  attendues <- cles[statuts != "embarquee"]
+  trop <- recues[!recues %in% attendues]
+  if (length(trop))
+    refuser("construire_table", "table_reference_inattendue",
+            formuler(paste("Rejeu : clé(s) %s reçue(s) dans « tables_reference », absente(s) de fiche/tables_reference",
+                           "ou de statut « embarquee » (clés attendues : %s). Une table embarquée est relue par son nom",
+                           "dans le package, jamais reçue."),
+                     liste_guillemets(trop), if (length(attendues)) liste_guillemets(attendues) else formuler("aucune")),
+            list(cle = trop, lu = trop, attendu = attendues))
+  catalogue <- attr(embarquees, "names", exact = TRUE)
+  if (is.null(catalogue)) catalogue <- character(0)
+  assemblee <- list()
+  empreintes <- origines <- character(0)
+  for (k in cles) {
+    e <- fiche_tables[[k]]
+    # (a) Représentation de l'empreinte de table.
+    if (!identical(e$representation, REPRESENTATION_TABLE))
+      refuser("construire_table", "representation_table_non_admise",
+              formuler(paste("Table de clé « %s » (nom « %s ») : représentation « %s » lue dans la fiche, « %s »",
+                             "attendue. Ce code calcule l'empreinte d'une table sous cette seule définition, et une",
+                             "empreinte d'une autre définition ne lui est jamais égale ; aucune conversion n'est faite."),
+                       citer(k), citer(e$nom), citer(e$representation), texte_moteur(REPRESENTATION_TABLE)),
+              list(cle = k, nom = e$nom, lu = e$representation, attendu = REPRESENTATION_TABLE))
+    # (b) Origine : relue dans le package, ou reçue.
+    if (identical(e$statut, "embarquee")) {
+      if (!e$nom %in% catalogue)
+        refuser("construire_table", "table_embarquee_absente",
+                formuler(paste("Table de clé « %s », de statut « embarquee » et de nom « %s » : ce package n'embarque",
+                               "aucune table de ce nom (tables embarquées : %s) ; rejouer cette fiche avec le package",
+                               "qui l'embarquait (empreinte du code de la fiche : %s)."),
+                         citer(k), citer(e$nom), if (length(catalogue)) liste_guillemets(catalogue) else formuler("aucune"),
+                         citer(code_fiche)),
+                list(cle = k, nom = e$nom, lu = e$nom, attendu = catalogue))
+      t <- embarquees[[e$nom]]
+      origine <- texte_moteur("relue dans le package")
+    } else {
+      if (!k %in% recues)
+        refuser("construire_table", "table_reference_absente",
+                formuler(paste("Rejeu : la fiche porte la table de clé « %s » (nom « %s », statut « %s », empreinte %s),",
+                               "absente de l'argument « tables_reference » (%s). Une table importée ou synthétique est",
+                               "une entrée du rejeu, comme les données : la passer sous cette clé."),
+                         citer(k), citer(e$nom), citer(e$statut), citer(e$empreinte),
+                         if (length(recues)) formuler("clés reçues : %s", liste_guillemets(recues))
+                         else formuler("aucune table reçue")),
+                list(cle = k, nom = e$nom, statut = e$statut, lu = recues, attendu = k))
+      t <- f$tables[[k]]
+      origine <- texte_moteur("reçue")
+    }
+    # (c) Empreinte recalculée.
+    calculee <- empreinte_table(t)
+    if (!identical(calculee, e$empreinte)) {
+      complement <- if (identical(e$statut, "embarquee"))
+        formuler(paste(" Le package installé a pu corriger cette table depuis la construction (tableau avant / après",
+                       "et visa, ADR 0006) ; rejouer avec le package de la fiche (empreinte du code %s)."),
+                 citer(code_fiche))
+      else if (identical(e$statut, "synthetique"))
+        formuler(paste(" Une table synthétique calculée sur une autre plateforme peut différer au dernier bit",
+                       "(fonctions de la libm) ; ses paramètres sont dans fiche/tables_reference/%s/parametres."),
+                 citer(k))
+      else ""
+      refuser("construire_table", "empreinte_table_discordante",
+              formuler(paste("Empreinte de la table de clé « %s » discordante : %s lue dans fiche/tables_reference",
+                             "(nom « %s », statut « %s »), %s recalculée sur la table %s. L'empreinte porte sur la",
+                             "représentation « %s » du contenu de la table (âge, sexe, année si présente, q_x ; lignes",
+                             "dans l'ordre canonique) : une seule valeur de q_x différente au dernier bit suffit à la",
+                             "changer. La table est une entrée de la construction : l'effet d'une autre table se mesure",
+                             "par construire_table(), non par le rejeu.%s"),
+                       citer(k), citer(e$empreinte), citer(e$nom), citer(e$statut), citer(calculee), origine,
+                       texte_moteur(REPRESENTATION_TABLE), complement),
+              list(cle = k, nom = e$nom, statut = e$statut, lu = e$empreinte, attendu = calculee, origine = origine))
+    }
+    assemblee[k] <- list(t)
+    empreintes <- c(empreintes, calculee)
+    origines <- c(origines, origine)
+  }
+  names(empreintes) <- cles
+  tables <- if (length(assemblee)) assemblee
+  # 3. Contrôle 1.3 sur la liste assemblée, avec le plan de la fiche.
+  controler_tables_reference(tables, plan, parametres_cle, embarquees)
+  list(tables = tables, empreintes = empreintes,
+       attendu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
+                              else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
+                                          collapse = " ; ")),
+       lu = texte_moteur(if (!length(cles)) "aucune table reçue ni relue"
+                         else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")))
+}
+
 # Point d'entrée unique (ADR 0007, point 3.1).
 #   donnees    : data.frame (le moteur ne lit pas de fichier) ;
 #   roles      : vecteur de chaînes nommé rôle -> colonne ;
 #   plan       : liste nommée (valider_plan()) ;
 #   provenance : NULL (données construites en mémoire) ou list(fichier,
-#                empreinte, algorithme) transmise par la couche de lecture.
+#                empreinte, algorithme) transmise par la couche de lecture ;
+#   tables_reference : NULL, ou liste nommée par clé d'objets rendus par
+#                table_reference(), chaque clé citée par un paramètre du plan
+#                (ADR 0015, point 1 ; #73) ; identité de chaque table dans
+#                fiche$tables_reference, aucune copie dans l'objet.
 # Rend un objet de classe `construction` : table, etapes, avertissements,
 # fiche, execution (seul champ qui change entre deux exécutions identiques).
-construire_table <- function(donnees, roles, plan, provenance = NULL) {
+construire_table <- function(donnees, roles, plan, provenance = NULL, tables_reference = NULL) {
   debut <- Sys.time()
   # Validation entière avant toute exécution : plan, rôles, recette et
-  # convention, provenance. Chaque contrôle s'exécute ici une seule fois : les
+  # convention, provenance, tables de référence. Chaque contrôle s'exécute ici une seule fois : les
   # fonctions d'étape, appelées avec controler = FALSE, n'en refont aucun (#22).
   plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
   controler_roles(donnees, roles, plan[["segmentation"]])
@@ -223,6 +539,7 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
   if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
   controler_provenance(provenance)
+  tables_fiche <- controler_tables_reference(tables_reference, plan)
   empreintes <- empreintes_construction(donnees, roles, provenance)
 
   etapes <- list()
@@ -272,7 +589,8 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
 
   x <- structure(
     list(table = NULL, etapes = etapes, avertissements = avertissements,
-         fiche = assembler_fiche(roles, plan, recette, etapes, avertissements, empreintes, provenance)),
+         fiche = assembler_fiche(roles, plan, recette, etapes, avertissements, empreintes, provenance,
+                                 tables_fiche)),
     class = "construction")
   # Empreinte du résultat sur l'objet assemblé, avant execution, hors de son
   # périmètre (ADR 0011, point 11.1 ; #67).
@@ -411,17 +729,22 @@ perimetre_temoin_fiche <- function(f) {
 # Rejeu outillé d'une fiche (E3.7 ; ADR 0012, point 3 ; #86).
 #   donnees : data.frame (le moteur ne lit pas de fichier) ;
 #   fiche   : liste de la fiche, relue de son texte par lire_fiche() ou prise
-#             dans x$fiche ; rôles, plan et provenance en sont lus.
+#             dans x$fiche ; rôles, plan et provenance en sont lus ;
+#   tables_reference : NULL, ou liste nommée par clé des tables de statut
+#             importee ou synthetique de fiche$tables_reference, reçues
+#             comme les données ; une table embarquée est relue par son nom
+#             dans le package, jamais reçue (ADR 0015, point 1.4 ; #73).
 # Contrôle, dans l'ordre, la nature des arguments, la forme des champs lus,
 # version_fiche (VERSIONS_FICHE_REJEU), l'algorithme et la représentation de
 # l'empreinte des données, les entrées de construire_table() (mêmes contrôles,
-# mêmes refus), puis l'empreinte des données ; s'arrête au premier refus, sans
+# mêmes refus), l'empreinte des données, puis les tables de référence
+# (contrôle 7 bis, controler_tables_rejeu()) ; s'arrête au premier refus, sans
 # appeler construire_table(). Appelle ensuite construire_table() une seule
 # fois. Rend un objet de classe `rejeu` : construction, l'objet rendu par
-# construire_table() sans retouche ; bilan, data.frame de 13 lignes
-# (controle, attendu, lu, verdict, statut) : 7 contrôles, tous « conforme »
+# construire_table() sans retouche ; bilan, data.frame de 14 lignes
+# (controle, attendu, lu, verdict, statut) : 8 contrôles, tous « conforme »
 # dans un bilan rendu, puis 6 témoins, jamais motifs de refus.
-rejouer_fiche <- function(donnees, fiche) {
+rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # Message marqué UTF-8 sous toute locale (#94) : chaque message est formé
   # par formuler(), qui marque le gabarit avant sprintf() (#127).
   refus_rejeu <- function(motif, message, details = list())
@@ -472,7 +795,12 @@ rejouer_fiche <- function(donnees, fiche) {
                              "empreintes/algorithme" = "chaîne unique, non vide, non NA, sans attribut",
                              "empreintes/representation" = "chaîne unique, non vide, non NA, sans attribut",
                              "empreintes/donnees" = "chaîne unique, non vide, non NA, sans attribut",
-                             roles = "champ présent", plan = "champ présent", provenance = "champ présent (NULL admis)"))
+                             roles = "champ présent", plan = "champ présent", provenance = "champ présent (NULL admis)",
+                             tables_reference = paste(
+                               "NULL, ou liste nommée non vide aux noms uniques, par clé triée par octets, d'éléments aux sept champs",
+                               "nom, statut, source, forme_origine, parametres, representation, empreinte (dans cet",
+                               "ordre) ; nom, representation, empreinte : chaînes uniques ; statut : synthetique,",
+                               "embarquee ou importee")))
   champ <- lu <- character(0)
   v <- fiche[["version_fiche"]]
   if (!(forme_exacte(v, "integer") && length(v) == 1L && !is.na(v))) {
@@ -491,6 +819,45 @@ rejouer_fiche <- function(donnees, fiche) {
   }
   for (n in c("roles", "plan", "provenance")) if (!(n %in% names(fiche))) {
     champ <- c(champ, n); lu <- c(lu, "champ absent")
+  }
+  # `tables_reference` (ADR 0015, point 4.1) : contrôlé seulement si
+  # version_fiche est bien formée et admise ; sinon le contrôle 3 refuse la
+  # version (une fiche 4, sans ce champ, est refusée version_fiche_non_admise).
+  if (forme_exacte(v, "integer") && length(v) == 1L && !is.na(v) && v %in% VERSIONS_FICHE_REJEU) {
+    ft <- fiche[["tables_reference"]]
+    if (!("tables_reference" %in% names(fiche))) {
+      champ <- c(champ, "tables_reference"); lu <- c(lu, "champ absent")
+    } else if (!is.null(ft)) {
+      if (!liste_nommee(ft) || !length(ft) || length(noms_bytes(ft)) || !all(validUTF8(names(ft)))) {
+        champ <- c(champ, "tables_reference"); lu <- c(lu, decrire_forme(fiche, "tables_reference"))
+      } else if (!identical(enc2utf8(names(ft)), sort(enc2utf8(names(ft)), method = "radix"))) {
+        # Clés dans l'ordre de la fiche écrite par le moteur (tri par octets,
+        # ADR 0015, point 3.1 ; audit de #73, m1).
+        champ <- c(champ, "tables_reference")
+        lu <- c(lu, formuler("clés %s hors de l'ordre par octets %s", liste_guillemets(names(ft)),
+                             liste_guillemets(sort(enc2utf8(names(ft)), method = "radix"))))
+      } else for (k in names(ft)) {
+        el <- ft[[k]]
+        if (!forme_exacte(el, "list", "names") || !identical(attr(el, "names", exact = TRUE), CHAMPS_TABLE_FICHE)) {
+          champ <- c(champ, "tables_reference")
+          lu <- c(lu, formuler("élément « %s » : %s, champs %s", sans_controle(k), decrire_forme(ft, k),
+                               if (is.null(attr(el, "names", exact = TRUE))) formuler("sans noms")
+                               else liste_guillemets(attr(el, "names", exact = TRUE))))
+          break
+        }
+        mal <- c(nom = !chaine_unique(el[["nom"]]),
+                 statut = !chaine_unique(el[["statut"]]) || !(el[["statut"]] %in% STATUTS_TABLE),
+                 representation = !chaine_unique(el[["representation"]]),
+                 empreinte = !chaine_unique(el[["empreinte"]]))
+        if (any(mal)) {
+          m <- names(mal)[mal][1L]
+          champ <- c(champ, "tables_reference")
+          lu <- c(lu, formuler("élément « %s », champ « %s » : %s", sans_controle(k), sans_controle(m),
+                               decrire_forme(el, m)))
+          break
+        }
+      }
+    }
   }
   if (length(champ))
     refus_rejeu("fiche_non_conforme",
@@ -558,15 +925,27 @@ rejouer_fiche <- function(donnees, fiche) {
                          liste_guillemets(unname(roles))),
                 list(lu = e[["donnees"]], attendu = empreinte, lignes = nrow(donnees), colonnes = unname(roles)))
 
+  # 7 bis. Tables de référence (ADR 0015, point 4.2) : reçues ou relues dans
+  #    le package, empreinte de chacune contre la fiche, puis contrôle 1.3
+  #    sur la liste assemblée.
+  tr <- controler_tables_rejeu(fiche[["tables_reference"]], tables_reference, plan, texte_lu(e[["code"]]))
+
   # 8. Construction, une seule fois, sur les rôles, le plan et la provenance
-  #    de la fiche.
-  x <- construire_table(donnees, roles, fiche[["plan"]], fiche[["provenance"]])
+  #    de la fiche, et les tables assemblées.
+  x <- construire_table(donnees, roles, fiche[["plan"]], fiche[["provenance"]], tr$tables)
   r <- x$fiche
   if (!identical(r$empreintes$donnees, empreinte))
     stop("rejouer_fiche() : empreinte des données de la construction différente de celle du rejeu (erreur de programmation).",
          call. = FALSE)
+  # Comparaison par clé (audit de #73, m1) : la fiche rendue range les clés
+  # triées, tr$empreintes suit la fiche reçue.
+  emp_rendues <- vapply(r$tables_reference, function(t) t$empreinte, "")
+  if (!setequal(names(emp_rendues), names(tr$empreintes)) ||
+      !identical(unname(emp_rendues[names(tr$empreintes)]), unname(tr$empreintes)))
+    stop("rejouer_fiche() : empreintes des tables de la construction différentes de celles du rejeu (erreur de programmation).",
+         call. = FALSE)
 
-  # Bilan : 7 contrôles (passés), puis 6 témoins. texte_moteur() s'applique
+  # Bilan : 8 contrôles (passés), puis 6 témoins. texte_moteur() s'applique
   # aussi au texte composé (lignes 1 et 6, verdicts « différente : … ») :
   # sprintf() d'un gabarit marqué UTF-8 avec un argument non ASCII non marqué
   # écrit « <c3><a9> » sous la locale C (mesuré, #86). Les comparaisons sont
@@ -581,16 +960,17 @@ rejouer_fiche <- function(donnees, fiche) {
   securite <- texte_moteur("exacte ; sans rôle de sécurité")
   bilan <- data.frame(
     controle = c("nature_arguments", "forme_fiche", "version_fiche", "algorithme_empreinte", "representation",
-                 "entrees_construction", "empreinte_donnees", "temoin_code", "temoin_versions",
+                 "entrees_construction", "empreinte_donnees", "tables_reference", "temoin_code", "temoin_versions",
                  "temoin_plateforme", "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier"),
     attendu = c(texte_moteur("fiche : liste nommée ; donnees : data.frame"),
                 texte_moteur(paste("version_fiche : integer de longueur 1, non NA, sans attribut ;",
                                    "empreintes/algorithme, empreintes/representation, empreintes/donnees :",
-                                   "chaînes uniques ; roles, plan, provenance : présents")),
+                                   "chaînes uniques ; roles, plan, provenance : présents ; tables_reference : NULL ou",
+                                   "liste nommée par clé (sept champs)")),
                 paste(sprintf("%d", VERSIONS_FICHE_REJEU), collapse = ", "), ALGORITHME_EMPREINTE, ENTETE_CANONIQUE,
                 texte_moteur(paste("valider_plan(), controler_roles(), recette et convention, controler_provenance() :",
                                    "aucun refus")),
-                empreinte, texte_lu(EMPREINTE_CODE), paires_lues(r$versions), paires_lues(r$plateforme),
+                empreinte, tr$attendu, texte_lu(EMPREINTE_CODE), paires_lues(r$versions), paires_lues(r$plateforme),
                 texte_moteur(paste("fiche rendue par construire_table(), hors versions, plateforme,",
                                    "empreintes/resultat, empreintes/code, empreintes/statut_resultat_code")),
                 texte_lu(r$empreintes$resultat),
@@ -603,10 +983,10 @@ rejouer_fiche <- function(donnees, fiche) {
                                 paste(names(plan[["etapes"]]), collapse = ", "), paste(names(roles), collapse = ", "),
                                 recette$recette,
                                 if (is.null(fiche[["provenance"]])) "NULL" else fiche[["provenance"]][["fichier"]])),
-           e[["donnees"]], texte_lu(e[["code"]]), paires_lues(fiche[["versions"]]),
+           e[["donnees"]], tr$lu, texte_lu(e[["code"]]), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
            texte_lu(e[["resultat"]]), texte_lu(e[["fichier"]])),
-    verdict = c(rep(conforme, 7L),
+    verdict = c(rep(conforme, 8L),
                 verdict_chaines(EMPREINTE_CODE, e[["code"]]),
                 verdict_liste(r$versions, fiche[["versions"]], "versions"),
                 verdict_liste(r$plateforme, fiche[["plateforme"]], "plateforme"),
@@ -614,7 +994,7 @@ rejouer_fiche <- function(donnees, fiche) {
                 verdict_chaines(r$empreintes$resultat, e[["resultat"]]),
                 texte_moteur("non vérifiée")),
     statut = c(forme, forme, exacte, exacte, exacte, texte_moteur("contrôles délégués aux modules"), securite,
-               securite, exacte, exacte, exacte, texte_moteur("témoin, même machine seulement"),
+               securite, securite, exacte, exacte, exacte, texte_moteur("témoin, même machine seulement"),
                texte_moteur("reprise de la fiche, non vérifiée par le moteur")),
     stringsAsFactors = FALSE)
   structure(list(construction = x, bilan = bilan), class = "rejeu")

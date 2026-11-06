@@ -40,14 +40,15 @@ refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function
 # --- exports et signature -------------------------------------------------------
 
 verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, ecrire_rapport,",
-               "lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_reference, valider_plan (ADR 0007,",
-               "point 3.4 ; #9, #10, #11, #50, #86, #87)"),
+               "lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_embarquee, table_reference,",
+               "valider_plan (ADR 0007, point 3.4 ; ADR 0015, point 6.2 ; #9, #10, #11, #50, #73, #86, #87)"),
          identical(sort(getNamespaceExports("tablexp")),
                    c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "ecrire_rapport", "lire_fiche",
-                     "lire_plan", "rejouer_fiche", "simuler_portefeuille", "table_reference", "valider_plan")))
-verifier("construire_table : signature (donnees, roles, plan, provenance = NULL)",
-         identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance")) &&
-           is.null(formals(construire_table)$provenance))
+                     "lire_plan", "rejouer_fiche", "simuler_portefeuille", "table_embarquee", "table_reference",
+                     "valider_plan")))
+verifier("construire_table : signature (donnees, roles, plan, provenance = NULL, tables_reference = NULL) (ADR 0015, point 1.1 ; #73)",
+         identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance", "tables_reference")) &&
+           is.null(formals(construire_table)$provenance) && is.null(formals(construire_table)$tables_reference))
 verifier("valider_plan : signature (plan) ; plan valide rendu inchangé",
          identical(names(formals(valider_plan)), "plan") && identical(valider_plan(plan_type()), plan_type()))
 
@@ -421,10 +422,10 @@ verifier("objet : exposition par (sexe, âge), colonnes de la spécification (A.
                    c("sexe", "age", "exposition_jours", "exposition_centrale", "complement_initial_cellule",
                      "complement_initial_fenetre", "evenements", "sorties_concurrentes")))
 CHAMPS_FICHE <- c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention",
-                  "empreintes", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
-                  "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
+                  "empreintes", "tables_reference", "plan", "transition_code", "fin_effective", "unite_observation",
+                  "recette", "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
                   "avertissement_unite", "hypothese_censure", "graine", "graine_mention", "generateur",
-                  "avertissements")  # ordre de lecture (#64)
+                  "avertissements")  # ordre de lecture (#64) ; tables_reference : fiche 5 (#73)
 f <- x$fiche
 verifier("fiche : champs de l'ADR 0007 (point 6.2) et de la spécification (A.3)", identical(names(f), CHAMPS_FICHE))
 verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôles, recette, convention retenue non forcée, unité tête",
@@ -434,9 +435,9 @@ verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôl
                                         retenue = "dernier_anniversaire", forcee = FALSE)) &&
            identical(f$unite_observation, "tete") && is.na(f$avertissement_unite) &&
            identical(f$transition_code, "vivant_decede") && identical(f$fin_effective, D("2024-12-31")))
-verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 4 (#57, #77)",
+verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 5 (#57, #77, #73)",
          identical(f$graine, NA_integer_) && identical(f$graine_mention, "aucune étape aléatoire") &&
-           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 4L))
+           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 5L))
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
@@ -658,7 +659,7 @@ verifier("empreinte du résultat : fiche$plateforme$bibliotheque_c ajouté, chan
   identical(names(p), c("sysname", "release", "machine", "blas", "lapack", "bibliotheque_c")) &&
     identical(empreinte_resultat(sans), x$fiche$empreintes$resultat) &&
     identical(empreinte_resultat(autre), x$fiche$empreintes$resultat) &&
-    identical(x$fiche$version_fiche, tablexp:::VERSION_FICHE) && identical(tablexp:::VERSION_FICHE, 4L) &&
+    identical(x$fiche$version_fiche, tablexp:::VERSION_FICHE) && identical(tablexp:::VERSION_FICHE, 5L) &&
     !identical(empreinte_resultat(v3), x$fiche$empreintes$resultat)
 })
 verifier("empreinte du résultat (témoin) : changée par un ulp d'un double du périmètre (exposition_jours[1]), et par la représentation", {
@@ -1610,8 +1611,8 @@ local({
   verifier("construire_table : rejeu de la fiche (rôles, plan canonique, provenance) identical() hors execution",
            identical(sans_execution(construire_table(BASE, y$fiche$roles, y$fiche$plan, y$fiche$provenance)), x0) &&
              identical(y$fiche$plan, pb))
-  verifier("fiche : version 4, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
-           identical(x0$fiche$version_fiche, 4L) &&
+  verifier("fiche : version 5, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
+           identical(x0$fiche$version_fiche, 5L) &&
              !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
 
   # Ordre canonique des valeurs de segmentation, exclusions et estimateurs (#63 ;

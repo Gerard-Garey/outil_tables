@@ -494,9 +494,10 @@ verifier("objet : etapes$brut (parametres, resultat, diagnostics), table NULL", 
   identical(names(XC$etapes), c("donnees", "exposition", "brut")) &&
     identical(names(XC$etapes$brut), c("parametres", "resultat", "diagnostics")) && is.null(XC$table)
 })
-# Ordre des champs de la fiche (#64 ; avis d'actuary du 20/10/2026, étape (1)), sans l'étape brut.
+# Ordre des champs de la fiche (#64 ; avis d'actuary du 20/10/2026, étape (1)), sans l'étape brut ;
+# tables_reference après empreintes (fiche 5, ADR 0015, point 3.2 ; #73).
 CHAMPS_FICHE_SANS_BRUT <- c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention",
-                     "empreintes", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
+                     "empreintes", "tables_reference", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
                      "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
                      "avertissement_unite", "hypothese_censure", "graine", "graine_mention", "generateur",
                      "avertissements")

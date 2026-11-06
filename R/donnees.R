@@ -13,7 +13,10 @@
 #    unité d'observation et fusion par tête, relevés non bloquants,
 #    avertissements inscrits dans le résultat ;
 #  - table_reference() : représentation commune d'une table de référence et
-#    son contrôle (exportée).
+#    son contrôle, lignes dans l'ordre canonique (exportée ; ADR 0015,
+#    point 2.1) ;
+#  - TABLES_EMBARQUEES, table_embarquee() : catalogue des tables embarquées
+#    (vide) et son accesseur (exporté ; ADR 0015, point 6).
 #
 #  Conventions de temps (A.0) : une date est un jour ; un intervalle
 #  d'observation est [entrée, sortie) ; une ligne `en_cours` est ouverte à
@@ -801,7 +804,8 @@ FORMES_ORIGINE <- c("qx", "lx")
 
 # Construit une table de référence (classe S3 `table_reference` sur un
 # data.frame long : age entier, sexe, qx, et annee entier si fournie) et la
-# contrôle ; refuse (module donnees) au lieu de corriger.
+# contrôle ; refuse (module donnees) au lieu de corriger. Lignes rendues dans
+# l'ordre canonique (sexe, annee, age), row.names automatiques.
 #   x            : data.frame (age, sexe, qx [, annee]) ;
 #   nom, source  : chaînes non vides (source : arrêté, URL, fichier de
 #                  provenance) ;
@@ -886,33 +890,65 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             list(lignes = hors_bornes))
   age <- as.integer(x$age)
   annee <- if ("annee" %in% names(x)) as.integer(x$annee) else NULL
-  cle <- if (is.null(annee)) sexe else paste(sexe, annee, sep = "\r")
-  doublons <- which(duplicated(paste(cle, age, sep = "\r")))
+  # Ordre canonique (ADR 0015, point 2.1 ; M235) : rang du sexe dans
+  # SEXES_TABLE (par match(), jamais par un tri de chaînes), puis annee si
+  # présente, puis age ; tri radix stable, indépendant de la locale. L'objet
+  # rendu et son empreinte ne dépendent plus de l'ordre reçu (aucun refus
+  # d'âges non croissants). Doublons et trous s'évaluent sur l'ordre trié ;
+  # les lignes sont citées dans la numérotation reçue (o[k]).
+  rang <- match(sexe, SEXES_TABLE)
+  o <- if (is.null(annee)) order(rang, age, method = "radix") else order(rang, annee, age, method = "radix")
+  n <- length(o)
+  # Même groupe (sexe, annee) que la ligne triée précédente ; comparaison et
+  # non diff() : une différence d'années extrêmes déborderait les integer.
+  meme <- c(FALSE, rang[o][-1L] == rang[o][-n])
+  if (!is.null(annee)) meme <- meme & c(FALSE, annee[o][-1L] == annee[o][-n])
+  pas <- c(NA_integer_, diff(age[o]))  # âges >= 0 : aucun débordement
+  # Ligne reçue la plus tardive de chaque doublon (tri stable), en
+  # numérotation reçue croissante.
+  doublons <- sort(o[which(meme & pas == 0L)])
   if (length(doublons))
     refuser("donnees", "table_age_double",
             formuler("Table « %s » : âge en double au sein d'un même sexe%s, lignes %s.", nom_cite,
                      if (is.null(annee)) "" else formuler(" et d'une même année"),
                      paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = doublons))
-  # Âges croissants et contigus par (sexe, annee), dans l'ordre reçu.
-  g <- match(cle, unique(cle))
-  o <- order(g, method = "radix")  # tri stable : ordre reçu au sein du groupe
-  pas <- diff(age[o]); meme <- diff(g[o]) == 0L
-  decroit <- which(meme & pas < 0L)
-  if (length(decroit))
-    refuser("donnees", "table_ages_non_croissants",
-            formuler("Table « %s » : âges non croissants au sein d'un même sexe, lignes %s.", nom_cite,
-                     paste(utils::head(o[decroit + 1L], NB_LIGNES_CITEES), collapse = ", ")),
-            list(lignes = o[decroit + 1L]))
+  # Âges contigus par (sexe, annee) : un pas supérieur à 1 est un trou, cité
+  # par la paire des lignes qui l'encadrent dans l'ordre canonique ;
+  # details$lignes : ligne qui suit le trou.
   trous <- which(meme & pas > 1L)
   if (length(trous))
     refuser("donnees", "table_ages_non_contigus",
             formuler("Table « %s » : âges non contigus (âge manquant) au sein d'un même sexe, entre les lignes %s.",
-                     nom_cite, paste(sprintf("%d et %d", o[trous], o[trous + 1L])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
+                     nom_cite, paste(sprintf("%d et %d", o[trous - 1L], o[trous])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
                                 collapse = ", ")),
-            list(lignes = o[trous + 1L]))
-  t <- data.frame(age = age, sexe = sexe, qx = as.numeric(x$qx), stringsAsFactors = FALSE)
-  if (!is.null(annee)) t$annee <- annee
+            list(lignes = o[trous]))
+  # Colonnes construites par sous-indiçage [o], jamais x[o, ] : row.names
+  # automatiques, aucun attribut de colonne reçu.
+  t <- data.frame(age = age[o], sexe = sexe[o], qx = as.numeric(x$qx)[o], stringsAsFactors = FALSE)
+  if (!is.null(annee)) t$annee <- annee[o]
   structure(t, class = c("table_reference", "data.frame"), nom = nom, statut = statut,
             source = source, forme_origine = forme_origine, parametres = parametres)
+}
+
+# Catalogue des tables embarquées (ADR 0015, point 6 ; décision Q2 du
+# 06/11/2026) : liste nommée par `nom` d'objets table_reference de statut
+# embarquee, lue à l'installation. Vide tant que la branche de transcription
+# n'embarque aucune table : toute table de statut embarquee est refusée
+# (table_embarquee_absente).
+TABLES_EMBARQUEES <- structure(list(), names = character(0))
+
+# Table embarquée de nom `nom` (ADR 0015, point 6.2), objet table_reference
+# rendu tel qu'il est au catalogue ; refuse (module donnees) un nom absent du
+# catalogue, ou qui n'est pas une chaîne unique. Exportée (appelants :
+# application, tiers qui rejoue).
+table_embarquee <- function(nom) {
+  noms <- attr(TABLES_EMBARQUEES, "names", exact = TRUE)
+  if (!chaine_unique(nom) || !(nom %in% noms))
+    refuser("donnees", "table_embarquee_absente",
+            formuler("Table embarquée « %s » : ce package n'embarque aucune table de ce nom (tables embarquées : %s).",
+                     if (chaine_unique(nom)) citer(nom) else formuler("nom illisible"),
+                     if (length(noms)) liste_guillemets(noms) else formuler("aucune")),
+            list(lu = nom, attendu = noms))
+  TABLES_EMBARQUEES[[nom]]
 }
