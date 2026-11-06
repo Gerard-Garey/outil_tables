@@ -1007,7 +1007,8 @@ noms relèvent de l'appelant~; seul endroit où s'écrit la règle, partagée pa
 entière et de valeur absolue au plus \code{.Machine\$integer.max},
 \code{FALSE} sinon, jamais \code{NA}~; ne refuse pas~; règle de
 \code{sous\_graine()}, partagée avec le contrôle de la graine des défauts
-du simulateur (section~\ref{sec:sous-graine}~; issues~\#43 et~\#113) \\
+du simulateur, avec celui de la graine du plan et avec la canonisation du
+plan (section~\ref{sec:sous-graine}~; issues~\#43, \#113 et~\#61) \\
 \catalogue{fonctions-outils}{date\_unique()} & interne & \code{x} &
 \code{TRUE} si \code{x} est une date unique entière et finie, de forme
 exacte (classe \code{Date} seule, stockage \code{double} ou
@@ -1165,8 +1166,12 @@ tire un aléa (ADR 0007, point 8.1). Elle procède ainsi~:
     entier et de valeur absolue au plus \code{.Machine\$integer.max},
     règle écrite une seule fois, \code{forme\_graine()}, et partagée avec le
     contrôle de la graine des défauts du simulateur
-    (section~\ref{sec:defauts-parametres}~; issue~\#113)~; sinon,
-    et aussi quand la graine est omise, refus \code{graine\_invalide} du module
+    (section~\ref{sec:defauts-parametres}~; issue~\#113), avec celui de la
+    graine du plan, refus \code{graine\_invalide} du module
+    \code{construire\_table} (section~\ref{sec:plan}~; issue~\#61), et avec
+    la canonisation du plan (section~\ref{sec:fiche})~; si la graine reçue
+    par \code{sous\_graine()} ne la satisfait pas, et aussi quand elle est
+    omise, refus \code{graine\_invalide} du module
     \code{outils}. Il n'y a jamais de graine par défaut~: une graine par défaut
     serait une graine non déclarée~;
   \item \textbf{sauvegarde de l'état de l'appelant}~: \code{.Random.seed} de
@@ -2574,7 +2579,12 @@ un refus, jamais une valeur supposée. Il porte six champs de premier niveau
     \code{tete\_segment\_incoherent})~: une étape antérieure ne doit pas
     dépendre d'un paramètre d'une étape postérieure, et un plan réduit à
     l'étape \code{donnees} doit rester défini sans défaut (décision M49)~;
-  \item \code{graine}~: entier, requis dès qu'une étape du plan tire un aléa,
+  \item \code{graine}~: nombre entier unique, de la forme qu'exige
+    \code{forme\_graine()} (\code{integer} ou \code{double} à valeur
+    entière, de longueur~1, non manquant, fini, sans aucun attribut, de
+    valeur absolue au plus \code{.Machine\$integer.max}~: même règle que
+    pour la graine de \code{sous\_graine()}, section~\ref{sec:sous-graine}~;
+    issue~\#61), requis dès qu'une étape du plan tire un aléa,
     interdit sinon. Aucune étape de cette branche ne tire d'aléa~: la graine y
     est donc refusée, et la fiche écrit «~aucune étape aléatoire~»~;
   \item \code{etapes}~: liste nommée ordonnée~; chaque nom est une étape, au
@@ -2643,13 +2653,17 @@ des noms, exactement autant d'éléments que de noms attendus (un
 d'autre attribut que la classe \code{Date}, stockées en \code{double} ou en
 \code{integer}~; \code{delai\_declaration} est un \code{integer} ou un
 \code{double} sans attribut~; \code{segmentation} un vecteur
-\code{character} sans attribut, vide compris. La forme est contrôlée par
-\code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()} et
-\code{chaine\_unique()} (section~\ref{sec:fonctions-outils}), sous le motif
+\code{character} sans attribut, vide compris~; la graine, quand le champ
+est présent (valeur \code{NULL} comprise), satisfait \code{forme\_graine()},
+sinon refus \code{graine\_invalide} du module \code{construire\_table}
+(ci-dessous~; issue~\#61). La forme est contrôlée par
+\code{forme\_exacte()}, directement ou par \code{liste\_aux\_noms()},
+\code{chaine\_unique()} et \code{forme\_graine()}
+(section~\ref{sec:fonctions-outils}), sous le motif
 existant de chaque paramètre~: aucun motif n'est propre à la forme. Hors du
 plan, la même règle s'applique notamment à la graine reçue par
-\code{sous\_graine()} (refus \code{graine\_invalide},
-section~\ref{sec:sous-graine}), aux rôles reçus par \code{controler\_roles()}
+\code{sous\_graine()} (refus \code{graine\_invalide} du module
+\code{outils}, section~\ref{sec:sous-graine}), aux rôles reçus par \code{controler\_roles()}
 (seul attribut admis~: les noms~; refus \code{roles\_mal\_formes},
 section~\ref{sec:controles-donnees}~; issue~\#62), au mode du portefeuille
 simulé (refus \code{portefeuille\_invalide},
@@ -2677,8 +2691,9 @@ les codes \emph{structurels} du plan, module \code{construire\_table}~:
 \code{plan\_mal\_forme}, \code{champ\_inconnu}, \code{champ\_manquant},
 \code{etapes\_mal\_formees}, \code{aucune\_etape}, \code{etape\_en\_double},
 \code{etape\_inconnue}, \code{etapes\_hors\_ordre},
-\code{etape\_prealable\_manquante}, \code{graine\_inattendue},
-\code{graine\_manquante}, \code{parametres\_mal\_formes},
+\code{etape\_prealable\_manquante}, \code{graine\_invalide},
+\code{graine\_inattendue}, \code{graine\_manquante},
+\code{parametres\_mal\_formes},
 \code{parametre\_inconnu} et \code{parametre\_manquant}. Les préalables
 d'une étape forment une liste (colonne \code{prealable} de \code{ETAPES})~;
 chacun est contrôlé, et le refus \code{etape\_prealable\_manquante} ne cite
@@ -2689,6 +2704,28 @@ absents d'autre part~; le champ \code{prealables\_par\_etape}, liste nommée
 par étape fautive dans l'ordre du plan, donne pour chacune ses propres
 préalables absents, dans l'ordre de \code{ETAPES}, si bien que le refus dit
 quel préalable manque à quelle étape (issue~\#27).
+Les trois refus de la graine viennent ensuite, portés par
+\code{controler\_graine\_plan()}, dans cet ordre (issue~\#61~; décision
+M243)~: \code{graine\_invalide} si le champ \code{graine} est présent,
+valeur \code{NULL} comprise, et que \code{forme\_graine()} est faux, qu'une
+étape du plan tire un aléa ou non~; puis \code{graine\_inattendue} si le
+champ est présent et qu'aucune étape du plan ne tire d'aléa~; puis
+\code{graine\_manquante} si une étape du plan tire un aléa et que le champ
+est absent. Le champ \code{graine} de \code{details} de chacun des deux
+premiers refus est la valeur reçue, telle quelle. Une graine mal formée est
+ainsi refusée sous son propre motif, avant la question de sa présence et
+avant le contrôle de la structure des paramètres d'étape
+(\code{parametres\_mal\_formes} et suivants) et celui des valeurs des
+champs et des paramètres, porté par les modules. \code{integer} et \code{double} à valeur
+entière sont tous deux admis, comme pour \code{sous\_graine()} (issue~\#43)
+et pour la graine des défauts du simulateur (issue~\#113)~:
+\code{set.seed()} convertit son argument en entier, si bien que
+\code{sous\_graine(7, expr)} et \code{sous\_graine(7L, expr)} tirent les
+mêmes valeurs (identité vérifiée par
+\code{tests/unitaires/test\_graine\_plan.R})~; c'est l'option~1 de l'ADR
+0011, annotation du 20/10/2026 du point~5.1~(g), (d). Le domaine admis est
+aussi celui de \code{canoniser\_plan()} (section~\ref{sec:fiche})~: toute
+graine qui passe \code{valider\_plan()} est canonisable.
 Le plan, son champ \code{etapes} et la liste des paramètres de chaque étape
 sont des listes nommées \textbf{nues}, dont le seul attribut admis est
 celui des noms~: un \code{data.frame}, un objet de classe ou une liste
@@ -3587,6 +3624,21 @@ avec contrôle, et chaque valeur dérivée sans contrôle est égale à celle qu
 rend le contrôle correspondant~; une segmentation dupliquée passée à
 \code{taux\_kaplan\_meier()} arrête le calcul par une erreur de
 programmation, non par un refus.
+\code{tests/unitaires/test\_graine\_plan.R} vérifie le contrôle de la
+graine du plan (issue~\#61), par des attendus calculés à la main et des
+identités exactes~: sur une grille de dix-sept graines mal formées (hors
+étendue, non entières, manquantes, infinies, de longueur autre que~1, d'un
+autre type, \code{NULL}, munies d'un attribut) et de sept graines admises
+(dont \code{-0} et $\pm 2\,147\,483\,647$, en \code{integer} comme en
+\code{double}), le motif, le module et les \code{details} du refus, par
+injection de l'indicateur d'aléa dans \code{controler\_graine\_plan()}
+puis par \code{valider\_plan()}~; le refus \code{graine\_manquante}~;
+l'ordre des refus en amont (\code{etape\_prealable\_manquante}) et en aval
+(\code{parametres\_mal\_formes}, valeurs du module \code{donnees})~;
+l'égalité du domaine de \code{forme\_graine()} et de celui de
+\code{canoniser\_plan()}, la graine canonique rendue et l'idempotence~;
+l'identité des tirages de \code{sous\_graine()} sous les graines
+\code{7} et \code{7L}.
 \code{tests/test\_reproductibilite.R} vérifie que deux constructions
 identiques sont \code{identical()} hors \code{execution}, dans le même
 processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\par}
@@ -3691,6 +3743,7 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{CHAMPS\_TABLE\_FICHE} & constante & --- & les sept champs d'un élément de \code{fiche\$tables\_reference}, dans l'ordre~: \code{nom}, \code{statut}, \code{source}, \code{forme\_origine}, \code{parametres}, \code{representation}, \code{empreinte}~; contrôle de forme de l'étape~2 du rejeu \\
 \catalogue{fonctions-construire-table}{liste\_noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms, par \code{forme\_exacte()}) aux noms complets au sens de \code{noms\_complets()} (module \code{outils}~: présents, non vides et non manquants), ou vide (sans noms admis)~; doublons non contrôlés~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#22, \#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{liste\_noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
+\catalogue{fonctions-construire-table}{controler\_graine\_plan()} & interne & plan, indicateur \code{aleatoire} (une étape du plan tire un aléa) & \code{NULL} invisible, ou, dans l'ordre, refus \code{graine\_invalide} (champ présent, \code{NULL} compris, et \code{forme\_graine()} faux), \code{graine\_inattendue}, \code{graine\_manquante}, module \code{construire\_table}~; appelée par \code{valider\_plan()} après le contrôle des préalables~; l'indicateur en argument permet de tester les trois refus par injection (section~\ref{sec:plan}~; issue~\#61) \\
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
@@ -6336,18 +6389,24 @@ applique donc \code{canoniser\_plan()} une seule fois, juste après
 \code{CHAMPS\_PLAN}~; \code{transition} dans l'ordre \code{depart},
 \code{arrivee}~; \code{periode} dans l'ordre \code{debut}, \code{fin},
 chaque borne de classe \code{Date} à stockage \code{double}~;
-\code{delai\_declaration} en \code{double}~; \code{graine}~: un
-\code{integer} sans \code{NA} est rendu tel quel, quelle que soit sa
-longueur, et un \code{double} unique, fini, à valeur entière et de valeur
-absolue au plus \code{.Machine\$integer.max} est converti en
-\code{integer}, parce que \code{set.seed()} convertit son argument en entier
-et que deux graines de même valeur doivent donner la même fiche~; toute autre
-graine est une erreur de programmation (ADR 0011, annotation du 20/10/2026 du
-point~5.1~(g)). Cette conversion est \textbf{sans effet dans cette branche}~:
-aucune étape ne tire d'aléa, si bien que \code{valider\_plan()} refuse toute
-graine (\code{graine\_inattendue}) avant la canonisation~; le contrat de
-validation de la graine sera fixé avec la première étape aléatoire
-(issue~\#61)~; paramètres de chaque étape dans l'ordre de
+\code{delai\_declaration} en \code{double}~; \code{graine} rendue en
+\code{integer} par \code{as.integer()} si elle satisfait
+\code{forme\_graine()} (\code{integer} ou \code{double} à valeur entière,
+de longueur~1, non manquant, fini, sans attribut, de valeur absolue au plus
+\code{.Machine\$integer.max}), parce que \code{set.seed()} convertit son
+argument en entier et que deux graines de même valeur doivent donner la même
+fiche, toute autre graine étant une erreur de programmation. Ce domaine est
+exactement celui des graines que \code{valider\_plan()} ne refuse pas
+sous \code{graine\_invalide} (section~\ref{sec:plan}~; issue~\#61)~: l'erreur de
+programmation n'est atteinte que sur un plan non validé, et la conversion
+d'un \code{double} que si une étape du plan tire un aléa,
+\code{valider\_plan()} refusant sinon toute graine
+(\code{graine\_inattendue}) avant la canonisation. Avant l'issue~\#61, la
+canonisation rendait tel quel un \code{integer} sans \code{NA} de toute
+longueur (ADR 0011, annotation du 20/10/2026 du point~5.1~(g), (a)) et
+convertissait un \code{double} unique muni d'un attribut (noms, dimension,
+classe) en retirant celui-ci sans le signaler~; aucun de ces cas n'était atteignable par
+\code{construire\_table()}, faute d'étape aléatoire~; paramètres de chaque étape dans l'ordre de
 \code{PARAMETRES\_ETAPES}~; valeurs des trois champs qui forment un
 ensemble dans l'ordre de leur catalogue (ci-dessous, issue~\#63)~:
 \code{segmentation} dans l'ordre de \code{ROLES\_SEGMENTATION},
@@ -8479,7 +8538,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
-\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine en integer, paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()} \\
+\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, délai en double, graine admise par \code{forme\_graine()} rendue en integer (issue~\#61), paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()}, et une fois par \code{rejouer\_fiche()} sur le plan de la fiche, à l'étape~6 du rejeu, avant son appel de \code{construire\_table()} (section~\ref{sec:rejeu}) \\
 \catalogue{fonctions-rapport}{MENTION\_BIBLIOTHEQUE\_C\_NON\_RELEVEE} & constante & --- & mention «~non relevée~» de \code{fiche\$plateforme\$}\allowbreak\code{bibliotheque\_c}, quand la valeur lue est absente, \code{NA}, vide ou faite de blancs, ou n'est pas un texte (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{bibliotheque\_c()} & interne & versions des bibliothèques (par défaut celles de R~; paramètre pour les tests) & élément \code{iconv}, tel quel («~unknown~» compris), sinon la mention «~non relevée~» (constante ci-dessus)~; n'identifie la glibc que si la valeur commence par «~glibc~» (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance, tables de référence (défaut \code{NULL}) & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme}), \code{tables\_reference} reçu du contrôle des tables (\code{NULL} gardé comme élément)~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée~; champs réordonnés par \code{ordonner\_fiche()} selon \code{ORDRE\_CHAMPS\_FICHE} \\
