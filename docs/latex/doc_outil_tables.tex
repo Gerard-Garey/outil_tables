@@ -2448,7 +2448,14 @@ du Store ou d'un Python installé depuis le Store (décision du mainteneur du
 «~Décisions et termes proposés~»). Le nom est cherché dans le chemin tel
 que rendu par la recherche et dans sa forme longue~: sous Windows,
 \code{Sys.which()} rend des chemins courts au format 8.3, où
-\code{WindowsApps} n'apparaît pas. Tout
+\code{WindowsApps} n'apparaît pas. Il l'est aussi dans la forme longue
+du dossier qui contient le fichier. Cette troisième forme repose sur une
+hypothèse de construction~: le fichier d'un alias du Store serait un
+point d'analyse (\code{IO\_REPARSE\_TAG\_APPEXECLINK}) dont la
+résolution pourrait échouer, auquel cas la forme courte serait rendue
+telle quelle, alors que son dossier, ordinaire, se résoudrait. Ni ce
+mécanisme ni cette forme n'ont été mesurés sur un vrai alias~: c'est une
+précaution. Tout
 autre candidat est exécuté (option \code{-I}) et n'est retenu que si sa
 version est au moins 3.8, une exécution en échec ou qui dépasse
 30~secondes l'écartant. Si aucun ne convient, le contrôle sort avec le
@@ -2466,10 +2473,18 @@ Python~3.14.7, 06/11/2026)~: pour \code{py -3}, le délai, réduit à
 processus Python orphelin~; la sortie capturée du juge garde ses
 accents. La recherche elle-même (ordre, chemin \code{WindowsApps} écarté,
 version, délai, absence de candidat) est testée avec de faux interpréteurs
-hors Windows~; le filtre \code{WindowsApps} l'est aussi sous Windows, par
-un faux interpréteur placé sous un dossier \code{WindowsApps} et désigné
-par son chemin court, qui n'est pas lancé, et par le même placé ailleurs,
-qui l'est (\code{test\_controles\_portables.R}).
+hors Windows~; la recherche dans la forme longue du dossier l'est hors
+Windows seulement, par liens symboliques~: un lien vers un dossier
+\code{WindowsApps} y donne accès à un lien vers un interpréteur situé
+ailleurs, si bien que ni le chemin donné ni la forme longue du fichier ne
+contiennent \code{WindowsApps}~; ce candidat n'est pas lancé, le même
+montage vers un dossier ordinaire l'est. Ce test exerce la condition,
+non l'échec de résolution d'un point d'analyse. Le filtre \code{WindowsApps}
+l'est aussi sous Windows, quand le volume fournit des noms courts 8.3
+(sinon le test est sauté, et le saut est annoncé), par un faux
+interpréteur placé sous un dossier \code{WindowsApps} et désigné par son
+chemin court, qui n'est pas lancé, et par le même placé ailleurs, qui
+l'est (\code{test\_controles\_portables.R}).
 
 \begin{center}
 \small
