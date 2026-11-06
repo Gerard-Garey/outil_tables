@@ -12,10 +12,10 @@ charger_ <- function(script, env) {
   for (e in suppressWarnings(parse(file.path(CONTROLES_, script), encoding = "UTF-8", keep.source = FALSE))) eval(e, env)
   env
 }
-orch <- charger_("orchestration_locale.R", new.env())
+orch_ <- charger_("orchestration_locale.R", new.env())
 
 verifier("orchestration : l'utilitaire ne définit que les huit fonctions communes",
-         identical(sort(ls(orch)), c("appeler_python", "avec_environnement", "duree", "ecart_octets", "executer",
+         identical(sort(ls(orch_)), c("appeler_python", "avec_environnement", "duree", "ecart_octets", "executer",
                                      "installer", "message_python_absent", "trouver_python")))
 
 # --- avec_environnement ---------------------------------------------------------
@@ -23,14 +23,14 @@ verifier("orchestration : l'utilitaire ne définit que les huit fonctions commun
 noms_ <- c("TABLEXP_ORCH_ABSENTE", "TABLEXP_ORCH_PRESENTE")
 Sys.unsetenv(noms_[1L])
 Sys.setenv(TABLEXP_ORCH_PRESENTE = "avant")
-vu_ <- orch$avec_environnement(c(TABLEXP_ORCH_ABSENTE = "x", TABLEXP_ORCH_PRESENTE = "y"),
+vu_ <- orch_$avec_environnement(c(TABLEXP_ORCH_ABSENTE = "x", TABLEXP_ORCH_PRESENTE = "y"),
                                c(Sys.getenv(noms_[1L]), Sys.getenv(noms_[2L])))
 verifier("avec_environnement : variables posées pendant l'appel, valeur de l'expression rendue",
          identical(vu_, c("x", "y")))
 verifier("avec_environnement : variable absente supprimée, variable présente restaurée",
          identical(Sys.getenv(noms_[1L], unset = NA), NA_character_) &&
            identical(Sys.getenv(noms_[2L], unset = NA), "avant"))
-r_ <- tryCatch(orch$avec_environnement(c(TABLEXP_ORCH_ABSENTE = "x", TABLEXP_ORCH_PRESENTE = "y"), stop("boum")),
+r_ <- tryCatch(orch_$avec_environnement(c(TABLEXP_ORCH_ABSENTE = "x", TABLEXP_ORCH_PRESENTE = "y"), stop("boum")),
                error = function(e) conditionMessage(e))
 verifier("avec_environnement : restauration aussi après une erreur de l'expression",
          identical(r_, "boum") && identical(Sys.getenv(noms_[1L], unset = NA), NA_character_) &&
@@ -40,12 +40,14 @@ Sys.unsetenv(noms_)
 # --- ecart_octets, duree ----------------------------------------------------------
 
 verifier("ecart_octets : premier octet différent et ligne ; préfixe commun",
-         identical(orch$ecart_octets(charToRaw("ab\ncd\n"), charToRaw("ab\nXd\n")),
+         identical(orch_$ecart_octets(charToRaw("ab\ncd\n"), charToRaw("ab\nXd\n")),
                    "longueurs 6 et 6 octets ; premier octet différent : 4 (ligne 2)") &&
-           identical(orch$ecart_octets(charToRaw("ab\ncd"), charToRaw("ab\ncd\nef")),
+           identical(orch_$ecart_octets(charToRaw("ab\ncd"), charToRaw("ab\ncd\nef")),
                      "longueurs 5 et 8 octets ; premier octet différent : 6 (ligne 2)"))
 t0_ <- Sys.time() - 2.5
-verifier("duree : texte « n.n s » (2,5 s écoulées au moins)", grepl("^2\\.[5-9] s$", orch$duree(t0_)))
+d_txt_ <- orch_$duree(t0_)
+verifier("duree : texte « n.n s » (2,5 s écoulées au moins)",
+         grepl("^[0-9]+\\.[0-9] s$", d_txt_) && as.numeric(sub(" s$", "", d_txt_)) >= 2.5)
 
 # --- executer, installer : statut de sortie et environnement transmis -------------
 
@@ -53,18 +55,18 @@ script_ <- tempfile("orch_", fileext = ".R")
 writeLines(c("a <- commandArgs(trailingOnly = TRUE)",
              "cat('TABLEXP_ORCH=', Sys.getenv('TABLEXP_ORCH'), ' args=', length(a), '\\n', sep = '')",
              "if (identical(a[3L], 'echec')) quit(save = 'no', status = 3L)"), script_)
-ex_ok <- orch$executer(script_, "racine", "lib", c(TABLEXP_ORCH = "oui"), "attendu", "sortie")
-ex_ko <- orch$executer(script_, "racine", "lib", c(TABLEXP_ORCH = "oui"), "echec", "sortie")
+ex_ok_ <- orch_$executer(script_, "racine", "lib", c(TABLEXP_ORCH = "oui"), "attendu", "sortie")
+ex_ko_ <- orch_$executer(script_, "racine", "lib", c(TABLEXP_ORCH = "oui"), "echec", "sortie")
 verifier("executer : sous-processus lancé sous l'environnement donné (--travailleur et 5 arguments), ok = TRUE",
-         isTRUE(ex_ok$ok) && identical(as.vector(ex_ok$sortie), "TABLEXP_ORCH=oui args=5") &&
-           grepl("^[0-9]+\\.[0-9] s$", ex_ok$duree))
+         isTRUE(ex_ok_$ok) && identical(as.vector(ex_ok_$sortie), "TABLEXP_ORCH=oui args=5") &&
+           grepl("^[0-9]+\\.[0-9] s$", ex_ok_$duree))
 verifier("executer : statut de sortie non nul -> ok = FALSE",
-         identical(ex_ko$ok, FALSE) && identical(attr(ex_ko$sortie, "status"), 3L))
+         identical(ex_ko_$ok, FALSE) && identical(attr(ex_ko_$sortie, "status"), 3L))
 unlink(script_)
 
 sans_package_ <- tempfile("orch_racine_"); dir.create(sans_package_)
 lib_ <- tempfile("orch_lib_"); dir.create(lib_)
-ins_ <- orch$installer(sans_package_, lib_, c(LC_ALL = "C"))
+ins_ <- orch_$installer(sans_package_, lib_, c(LC_ALL = "C"))
 verifier("installer : racine sans package -> ok = FALSE, sortie et durée rendues",
          identical(ins_$ok, FALSE) && length(ins_$sortie) > 0L && grepl("^[0-9]+\\.[0-9] s$", ins_$duree))
 unlink(c(sans_package_, lib_), recursive = TRUE)
@@ -79,8 +81,8 @@ unlink(c(sans_package_, lib_), recursive = TRUE)
 for (script_ in c("locale_c.R", "locale_latin1.R")) {
   e_ <- charger_(script_, new.env())
   verifier(sprintf("%s : orchestration chargée depuis l'utilitaire (mêmes fonctions, signatures à env)", script_),
-           all(vapply(names(orch), function(n) identical(body(e_[[n]]), body(orch[[n]])) &&
-                        identical(formals(e_[[n]]), formals(orch[[n]])), TRUE)) &&
+           all(vapply(names(orch_), function(n) identical(body(e_[[n]]), body(orch_[[n]])) &&
+                        identical(formals(e_[[n]]), formals(orch_[[n]])), TRUE)) &&
              identical(names(formals(e_$installer)), c("racine", "lib", "env")) &&
              identical(names(formals(e_$executer)), c("script", "racine", "lib", "env", "attendu", "sortie")))
   l_ <- readLines(file.path(CONTROLES_, script_), encoding = "UTF-8")
@@ -132,7 +134,7 @@ if (.Platform$OS.type != "windows") {
     Sys.chmod(chemin, "755")
     chemin
   }
-  vue_ <- function(...) { unlink(journal_); orch$trouver_python(...) }
+  vue_ <- function(...) { unlink(journal_); orch_$trouver_python(...) }
   chemins_ <- c(python3 = file.path(d_py_, "bin", "python3"), python = file.path(d_py_, "bin", "python"),
                 py = file.path(d_py_, "bin", "py"))
   cherche_ <- function(m) function(nom) if (nom %in% names(m)) m[[nom]] else ""
@@ -169,6 +171,31 @@ if (.Platform$OS.type != "windows") {
   r_ <- vue_(chercher = cherche_(c(python3 = sub("WindowsApps", "windowsapps", alias_), python = chemins_[["python"]])))
   verifier("trouver_python : WindowsApps reconnu sans égard à la casse",
            identical(r_$commande, chemins_[["python"]]) && identical(appels_(), "python"))
+  # Dossier du chemin résolu en WindowsApps : le fichier est un lien vers un vrai
+  # interpréteur (sa forme longue, comme celle d'un alias dont la résolution
+  # aboutit ailleurs, ne contient pas WindowsApps) et le chemin donné n'a pas le
+  # mot, car il passe par un lien symbolique « lien » vers WindowsApps. Seule la
+  # forme longue du dossier le révèle. Témoin : même montage vers un dossier
+  # ordinaire, exécuté.
+  file.symlink(chemins_[["python3"]], file.path(d_py_, "WindowsApps", "relais"))
+  file.symlink(file.path(d_py_, "WindowsApps"), file.path(d_py_, "lien"))
+  dir.create(file.path(d_py_, "ordinaire"))
+  file.symlink(chemins_[["python3"]], file.path(d_py_, "ordinaire", "relais"))
+  file.symlink(file.path(d_py_, "ordinaire"), file.path(d_py_, "lien_ordinaire"))
+  via_ <- file.path(d_py_, "lien", "relais"); via_ok_ <- file.path(d_py_, "lien_ordinaire", "relais")
+  verifier("trouver_python : montage du dossier WindowsApps (ni le chemin donné, ni la forme longue du fichier ne portent le mot)",
+           !grepl("WindowsApps", via_, ignore.case = TRUE) &&
+             !grepl("WindowsApps", normalizePath(via_, winslash = "/"), ignore.case = TRUE) &&
+             grepl("WindowsApps", normalizePath(dirname(via_), winslash = "/"), ignore.case = TRUE) &&
+             file.exists(via_))
+  cand_py3_ <- list(list(nom = "python3", prefixe = character(0)))
+  r_ <- vue_(candidats = cand_py3_, chercher = function(nom) via_)
+  verifier("trouver_python : dossier résolu en WindowsApps (lien symbolique), fichier résolu ailleurs : écarté sans être exécuté",
+           is.null(r_) && identical(appels_(), character(0)))
+  r_ <- vue_(candidats = cand_py3_, chercher = function(nom) via_ok_)
+  verifier("trouver_python : même montage vers un dossier ordinaire, exécuté et retenu : le témoin passe bien par le lien",
+           identical(r_$commande, via_ok_) && identical(appels_(), "python3"))
+  file.remove(file.path(d_py_, c("lien", "lien_ordinaire")))
 
   # Lanceur py : -3 placé avant les arguments de la vérification.
   faux_(chemins_[["python3"]], "python3", 1L); faux_(chemins_[["python"]], "python", 3L)
@@ -190,7 +217,7 @@ if (.Platform$OS.type != "windows") {
 
   # Aucun candidat : introuvables, ou tous en échec, ou tous écartés -> NULL.
   verifier("trouver_python : aucun candidat trouvé par la recherche -> NULL",
-           is.null(orch$trouver_python(chercher = function(nom) "")))
+           is.null(orch_$trouver_python(chercher = function(nom) "")))
   faux_(chemins_[["py"]], "py", 1L)
   r_ <- vue_(chercher = cherche_(chemins_))
   verifier("trouver_python : tous les candidats en échec -> NULL, les trois ont été exécutés",
@@ -200,13 +227,13 @@ if (.Platform$OS.type != "windows") {
            is.null(r_) && identical(appels_(), character(0)))
   r_ <- vue_(candidats = list(list(nom = "x", prefixe = character(0))), chercher = cherche_(c(x = file.path(d_py_, "absent"))))
   verifier("trouver_python : chemin inexistant -> NULL, sans erreur ni avertissement", is.null(r_))
-  verifier("trouver_python : liste de candidats vide -> NULL", is.null(orch$trouver_python(candidats = list())))
+  verifier("trouver_python : liste de candidats vide -> NULL", is.null(orch_$trouver_python(candidats = list())))
 
   # appeler_python : statut, sortie capturée (standard et erreur), UTF-8, CRLF ramenées à LF.
   faux_(chemins_[["python"]], "python", 2L,
         c("printf 'ligne \\303\\251\\r\\n'", "printf 'erreur\\n' >&2"), nargs = TRUE)
   p_ <- list(commande = chemins_[["python"]], prefixe = "-3")
-  c_ <- orch$appeler_python(p_, c("-I", shQuote("x y")), capturer = TRUE)
+  c_ <- orch_$appeler_python(p_, c("-I", shQuote("x y")), capturer = TRUE)
   verifier("appeler_python : statut rendu, sortie standard et d'erreur capturées, CRLF ramenées à LF",
            identical(c_$statut, 2L) && length(c_$sortie) == 2L &&
              identical(charToRaw(c_$sortie[1L]), as.raw(c(0x6c, 0x69, 0x67, 0x6e, 0x65, 0x20, 0xc3, 0xa9))) &&
@@ -218,9 +245,9 @@ if (.Platform$OS.type != "windows") {
              (!identical(Encoding(c_$sortie[1L]), "UTF-8") || identical(enc2utf8(c_$sortie[1L]), "ligne \u00e9")))
   faux_(chemins_[["python"]], "python", 0L)
   verifier("appeler_python : sans capture, statut 0 rendu et sortie vide",
-           identical(orch$appeler_python(p_, "--version"), list(statut = 0L, sortie = character(0))))
+           identical(orch_$appeler_python(p_, "--version"), list(statut = 0L, sortie = character(0))))
   verifier("message_python_absent : ligne ECHEC nommant les trois candidats, terminée par un saut de ligne",
-           grepl("^ECHEC : .*python3.*python.*py -3.*\n$", orch$message_python_absent()))
+           grepl("^ECHEC : .*python3.*python.*py -3.*\n$", orch_$message_python_absent()))
   unlink(d_py_, recursive = TRUE)
 } else {
   cat("  [sauté] trouver_python (hors alias du Store), appeler_python, message_python_absent : faux interpréteurs en scripts sh, plateforme Windows : non exercés\n")
@@ -244,10 +271,10 @@ if (.Platform$OS.type != "windows") {
   cand_ <- list(list(nom = "python3", prefixe = character(0)))
   # Sans forme courte qui cache le nom du dossier, le test ne prouverait rien.
   if (!grepl("WindowsApps", court_, ignore.case = TRUE)) {
-    r_ <- orch$trouver_python(cand_, function(nom) court_)
+    r_ <- orch_$trouver_python(cand_, function(nom) court_)
     verifier("trouver_python : alias WindowsApps rendu en chemin court 8.3 (sans « WindowsApps »), écarté sans être exécuté (aucune trace)",
              is.null(r_) && !file.exists(trace_))
-    r_ <- orch$trouver_python(cand_, function(nom) cmd_ok_)
+    r_ <- orch_$trouver_python(cand_, function(nom) cmd_ok_)
     verifier("trouver_python : même témoin hors de WindowsApps, exécuté (trace écrite) et retenu : le témoin laisse bien sa trace",
              identical(r_$commande, cmd_ok_) && file.exists(trace_))
   } else cat("  [sauté] trouver_python : alias WindowsApps en chemin court 8.3 : ce volume ne fournit pas de forme courte distincte (noms 8.3 inactifs) : filtre sur forme longue non exercé\n")
@@ -257,10 +284,10 @@ if (.Platform$OS.type != "windows") {
 # Vrai interpréteur, quand il y en a un. La CI actuelle n'en a pas au moment de
 # la batterie unitaire (python3 n'y est installé que pour les étapes des
 # contrôles, après elle) : le saut est alors annoncé, jamais silencieux.
-p_reel_ <- orch$trouver_python()
+p_reel_ <- orch_$trouver_python()
 if (!is.null(p_reel_)) {  # sauté sans interpréteur utilisable (Windows avec le seul alias du Store)
   verifier("trouver_python : vrai interpréteur >= 3.8 trouvé, version trop haute (99.0) refusée",
-           is.null(orch$trouver_python(version_min = c(99L, 0L))))
+           is.null(orch_$trouver_python(version_min = c(99L, 0L))))
 } else cat("  [sauté] trouver_python : vrai interpréteur >= 3.8 : aucun interpréteur Python >= 3.8 trouvé, version trop haute (99.0) non exercée\n")
 
 # --- sourçage par les deux contrôles à juge Python -------------------------------

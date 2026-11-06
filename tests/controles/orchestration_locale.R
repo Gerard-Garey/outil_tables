@@ -96,7 +96,11 @@ ecart_octets <- function(a, b) {
 # Store est écarté de même) est écarté sans être exécuté. Le test porte aussi
 # sur la forme longue du chemin (normalizePath) : Sys.which() rend sous Windows
 # des chemins courts 8.3 (…\MICROS~1\WINDOW~1\python3.exe) où « WindowsApps »
-# n'apparaît pas. Tout autre candidat est exécuté (-I) et n'est retenu que si
+# n'apparaît pas. Il porte aussi sur la forme longue du dossier du chemin : le
+# fichier d'un alias est un point d'analyse (IO_REPARSE_TAG_APPEXECLINK) dont la
+# résolution peut échouer, auquel cas normalizePath(mustWork = FALSE) rend la
+# forme courte inchangée ; le dossier, ordinaire, se résout toujours. Tout
+# autre candidat est exécuté (-I) et n'est retenu que si
 # sys.version_info >= version_min, un échec d'exécution l'écartant sans erreur ;
 # l'exécution est bornée à `delai` secondes (30 par défaut, arrondies à
 # l'entier supérieur : system2 ignore une fraction de seconde) ; un candidat qui
@@ -112,9 +116,11 @@ trouver_python <- function(candidats = list(list(nom = "python3", prefixe = char
   for (cand in candidats) {
     chemin <- unname(chercher(cand$nom))[1L]
     if (is.na(chemin) || !nzchar(chemin)) next
-    # Forme donnée, puis forme longue (chemin inexistant : rendu tel quel, sans avertissement).
+    # Forme donnée, forme longue du fichier, puis forme longue de son dossier
+    # (chemin inexistant : rendu tel quel, sans avertissement).
     if (grepl("WindowsApps", chemin, ignore.case = TRUE) ||
-        grepl("WindowsApps", normalizePath(chemin, winslash = "/", mustWork = FALSE), ignore.case = TRUE)) next
+        grepl("WindowsApps", normalizePath(chemin, winslash = "/", mustWork = FALSE), ignore.case = TRUE) ||
+        grepl("WindowsApps", normalizePath(dirname(chemin), winslash = "/", mustWork = FALSE), ignore.case = TRUE)) next
     statut <- tryCatch(suppressWarnings(system2(chemin, c(cand$prefixe, "-I", "-c", shQuote(code)),
                                                 stdout = FALSE, stderr = FALSE, timeout = ceiling(delai))),
                        error = function(e) 1L)
