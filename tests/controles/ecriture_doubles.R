@@ -106,7 +106,7 @@ writeLines(c("import struct, sys",
              "        l = l.rstrip('\\n')",
              "        s.write((l if l in jetons else struct.pack('<d', float(l) + 0.0).hex()) + '\\n')"),
            script)
-t_juge <- system.time(statut <- appeler_python(python, c("-I", script, entree, sortie))$statut)[["elapsed"]]
+t_juge <- system.time(statut <- appeler_python(python, c("-I", shQuote(c(script, entree, sortie))))$statut)[["elapsed"]]
 if (statut != 0L) { cat("ECHEC : le juge Python a échoué.\n"); sortir(1L) }
 attendu <- readLines(sortie)
 

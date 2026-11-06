@@ -222,14 +222,16 @@ if (.Platform$OS.type != "windows") {
   verifier("message_python_absent : ligne ECHEC nommant les trois candidats, terminée par un saut de ligne",
            grepl("^ECHEC : .*python3.*python.*py -3.*\n$", orch$message_python_absent()))
   unlink(d_py_, recursive = TRUE)
-}
+} else cat("  [sauté] trouver_python, appeler_python, message_python_absent : faux interpréteurs en scripts sh, plateforme Windows : non exercés\n")
 
-# Vrai interpréteur, quand il y en a un (la CI en a un : le juge Python en dépend).
+# Vrai interpréteur, quand il y en a un. La CI actuelle n'en a pas au moment de
+# la batterie unitaire (python3 n'y est installé que pour les étapes des
+# contrôles, après elle) : le saut est alors annoncé, jamais silencieux.
 p_reel_ <- orch$trouver_python()
 if (!is.null(p_reel_)) {  # sauté sans interpréteur utilisable (Windows avec le seul alias du Store)
   verifier("trouver_python : vrai interpréteur >= 3.8 trouvé, version trop haute (99.0) refusée",
            is.null(orch$trouver_python(version_min = c(99L, 0L))))
-}
+} else cat("  [sauté] trouver_python : vrai interpréteur >= 3.8 : aucun interpréteur Python >= 3.8 trouvé, version trop haute (99.0) non exercée\n")
 
 # --- sourçage par les deux contrôles à juge Python -------------------------------
 # Les contrôles ne se chargent pas comme ceux de locale (ils s'exécutent en
@@ -262,3 +264,117 @@ for (script_ in c("ecriture_doubles.R", "ecriture_doubles_texte.R")) {
              any(grepl(script_, r_$sortie, fixed = TRUE)))
   unlink(d_, recursive = TRUE)
 }
+
+# --- témoins d'échec des contrôles à juge Python (issue #119) -----------------------
+# La règle de tests/unitaires/test_controles.R (un cas fautif par script) vaut
+# aussi pour ecriture_doubles_texte.R et ecriture_doubles.R, dont l'exécution
+# complète (10^6 doubles et plus, 15 à 25 s) reste hors batterie. Les témoins
+# bon marché ci-dessous exécutent le script du dépôt (ou une copie mutée, dans
+# une arborescence temporaire R/, tests/controles/, tests/unitaires/ : le
+# contrôle retrouve sa racine d'après son propre emplacement) :
+#  - juge absent (hors Windows) : PATH réduit à quelques outils système, sans
+#    Python ; le script sort en 1 et nomme l'absence, avant toute construction ;
+#  - vrai défaut (copie mutée, Python requis) : MD5 de T2 de la batterie
+#    altérée, juge Python faussé (.16g au lieu de .17g), N_EGALITES réduit et
+#    n = 1000 pour la durée ; le contrôle doit relever les deux écarts, et eux
+#    seuls (glibc et MD5 de T3 inchangés) ;
+#  - ecriture_doubles.R sous un dossier temporaire dont le nom contient une
+#    espace (R refuse une telle valeur de TMPDIR hors Windows : c'est la copie
+#    qui redéfinit tempfile()) ; la même copie sans shQuote() échoue.
+# Nature des attendus : valeurs exactes (codes de sortie, lignes relevées).
+
+lignes_ <- function(f) readLines(f, encoding = "UTF-8", warn = FALSE)
+# Remplace `ancien` par `nouveau` (texte littéral, octets) dans l'unique ligne de
+# `l` qui le contient ; rend NULL si zéro ou plusieurs lignes le contiennent.
+muter_ <- function(l, ancien, nouveau) {
+  k <- grep(ancien, l, fixed = TRUE, useBytes = TRUE)
+  if (length(k) != 1L) return(NULL)
+  l[k] <- sub(ancien, nouveau, l[k], fixed = TRUE, useBytes = TRUE)
+  l
+}
+# Arborescence temporaire portant le contrôle `script` (lignes `l`, précédées de
+# `avant`) et ce qu'il lit à côté ; rend le chemin du contrôle copié.
+copie_controle_ <- function(script, l, avant = character(0)) {
+  racine_ <- tempfile("controle_copie_")
+  for (d in c("R", file.path("tests", "controles"), file.path("tests", "unitaires")))
+    dir.create(file.path(racine_, d), recursive = TRUE)
+  file.copy(file.path(RACINE, "R", c("outils.R", "rapport.R")), file.path(racine_, "R"))
+  file.copy(file.path(CONTROLES_, "orchestration_locale.R"), file.path(racine_, "tests", "controles"))
+  file.copy(file.path(RACINE, "tests", "unitaires", "test_construire_table.R"), file.path(racine_, "tests", "unitaires"))
+  f <- file.path(racine_, "tests", "controles", script)
+  writeLines(c(avant, l), f, useBytes = TRUE)
+  f
+}
+# Motifs sur octets (la sortie suit la locale : é en UTF-8, en latin-1 ou brut).
+a_ <- function(r, motif) any(grepl(motif, r$sortie, useBytes = TRUE))
+
+# Juge absent : outils minimaux de l'enveloppe de R dans un dossier sans Python.
+if (.Platform$OS.type != "windows") {
+  d_path_ <- tempfile("sans_python_"); dir.create(d_path_)
+  for (o_ in c("uname", "sed", "rm", "dirname", "basename", "cat", "mkdir")) {
+    w_ <- unname(Sys.which(o_))
+    if (nzchar(w_)) file.symlink(w_, file.path(d_path_, o_))
+  }
+  r_ <- executer_rscript(file.path(CONTROLES_, "ecriture_doubles_texte.R"), env = paste0("PATH=", d_path_))
+  verifier("ecriture_doubles_texte.R : sans Python dans le PATH, code 1 et absence nommée, avant toute construction",
+           identical(r_$statut, 1L) && a_(r_, "^ECHEC : aucun interpr[^ ]* Python >= 3\\.8") &&
+             !a_(r_, "doubles :") && !any(r_$sortie == "OK"))
+  r_ <- executer_rscript(file.path(CONTROLES_, "ecriture_doubles.R"), env = paste0("PATH=", d_path_))
+  verifier("ecriture_doubles.R : sans Python dans le PATH, code 1 et absence nommée",
+           identical(r_$statut, 1L) && a_(r_, "^ECHEC : aucun interpr[^ ]* Python >= 3\\.8") && !any(r_$sortie == "OK"))
+  unlink(d_path_, recursive = TRUE)
+} else cat("  [sauté] ecriture_doubles_texte.R, ecriture_doubles.R : Python absent du PATH : plateforme Windows (effet d'un PATH vide non vérifié)\n")
+
+# Vrai défaut : le contrôle sait voir un écart (copie mutée, Python requis).
+if (!is.null(p_reel_)) {
+  l_ <- lignes_(file.path(CONTROLES_, "ecriture_doubles_texte.R"))
+  md5_t2_ <- sub("^MD5_T2 <- \"([0-9a-f]{32})\".*$", "\\1", grep("^MD5_T2 <- ", l_, value = TRUE))
+  md5_faux_ <- paste0(substr(md5_t2_, 1L, 31L), if (substring(md5_t2_, 32L) == "0") "1" else "0")
+  m_ <- muter_(l_, "N_EGALITES <- 2e5L", "N_EGALITES <- 1000L")
+  if (!is.null(m_)) m_ <- muter_(m_, paste0("MD5_T2 <- \"", md5_t2_, "\""), paste0("MD5_T2 <- \"", md5_faux_, "\""))
+  if (!is.null(m_)) m_ <- muter_(m_, "return format(x + 0.0, '.17g')", "return format(x + 0.0, '.16g')")
+  verifier("ecriture_doubles_texte.R : trois mutations de la copie chacune appliquée à une seule ligne",
+           if (is.null(m_)) "une mutation ne touche pas exactement une ligne" else
+             identical(sum(m_ != l_), 3L) && nchar(md5_t2_) == 32L)
+  if (!is.null(m_)) {
+    f_ <- copie_controle_("ecriture_doubles_texte.R", m_)
+    r_ <- executer_rscript(f_, "1000")
+    verifier("ecriture_doubles_texte.R : MD5 de T2 altéré relevé (MD5 recalculé = celui de la batterie, constante fausse), code 1",
+             identical(r_$statut, 1L) &&
+               a_(r_, sprintf("^MD5 du texte de T2 : %s ; constante de la batterie %s ; DIFF", md5_t2_, md5_faux_)))
+    verifier("ecriture_doubles_texte.R : MD5 de T3, tranches d'égalités exactes et table des puissances inchangés",
+             a_(r_, "^MD5 du texte de T3 : ([0-9a-f]{32}) ; constante de la batterie \\1 ; [^;]*gal ;") &&
+               !a_(r_, "ECART") && a_(r_, "^Table des puissances : 2098 ligne\\(s\\), 0 "))
+    verifier("ecriture_doubles_texte.R : juge Python faussé relevé (écarts non nuls, code du juge 1), juge glibc sans écart",
+             a_(r_, "^Juge Python [0-9.]+ : [0-9]+ ligne\\(s\\), [1-9][0-9]* ") && a_(r_, ", code 1$") &&
+               (.Platform$OS.type == "windows" || a_(r_, "^Juge glibc .* : [0-9]+ ligne\\(s\\), 0 ")))
+    verifier("ecriture_doubles_texte.R : deux contrôles en écart nommés, pas de « OK »",
+             a_(r_, "^ECHEC : 2 contr") && !any(r_$sortie == "OK"))
+    unlink(dirname(dirname(dirname(f_))), recursive = TRUE)
+  }
+} else cat("  [sauté] ecriture_doubles_texte.R : vrai défaut (copie mutée : MD5 de T2, juge Python faussé) : aucun interpréteur Python >= 3.8\n")
+
+# ecriture_doubles.R : dossier temporaire dont le nom contient une espace. Hors
+# Windows (le script y refuse de s'exécuter) et avec Python.
+if (.Platform$OS.type != "windows" && !is.null(p_reel_)) {
+  l_ <- lignes_(file.path(CONTROLES_, "ecriture_doubles.R"))
+  espace_ <- tempfile("dossier_espace_"); dir.create(file.path(espace_, "a b"), recursive = TRUE)
+  # tempfile() du contrôle redéfini en tête de copie : fichiers dans « a b ».
+  avant_ <- sprintf("tempfile <- function(pattern = \"file\", tmpdir = %s, fileext = \"\") base::tempfile(pattern, tmpdir, fileext)",
+                    deparse(file.path(espace_, "a b")))
+  f_ <- copie_controle_("ecriture_doubles.R", l_, avant_)
+  r_ <- executer_rscript(f_, "1000")
+  verifier("ecriture_doubles.R : chemins du juge protégés par shQuote(), contrôle passé avec un dossier temporaire à espace",
+           identical(r_$statut, 0L) && any(r_$sortie == "OK") && a_(r_, "^Lignes : [0-9]+ \\(R\\) contre [0-9]+ \\(Python\\) ; [^ ]*cart[^ ]* : 0$"))
+  m_ <- muter_(l_, "shQuote(c(script, entree, sortie))", "script, entree, sortie")
+  verifier("ecriture_doubles.R : sans shQuote(), la copie échoue sous ce même dossier (le témoin voit le défaut)",
+           if (is.null(m_)) "la mutation ne touche pas exactement une ligne" else {
+             f_m_ <- copie_controle_("ecriture_doubles.R", m_, avant_)
+             r_m_ <- executer_rscript(f_m_, "1000")
+             unlink(dirname(dirname(dirname(f_m_))), recursive = TRUE)
+             identical(r_m_$statut, 1L) && a_(r_m_, "^ECHEC : le juge Python a [^ ]*chou") && !any(r_m_$sortie == "OK")
+           })
+  unlink(c(espace_, dirname(dirname(dirname(f_)))), recursive = TRUE)
+} else cat(sprintf("  [sauté] ecriture_doubles.R : dossier temporaire à espace, avec et sans shQuote() : %s\n",
+                   if (.Platform$OS.type == "windows") "plateforme Windows (le contrôle ne s'y exécute pas)" else
+                     "aucun interpréteur Python >= 3.8"))
