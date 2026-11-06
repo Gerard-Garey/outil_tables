@@ -95,23 +95,23 @@ deduire_recette <- function(roles) {
 controler_parametres_exposition <- function(convention, par_annee) {
   if (!forme_exacte(convention, "character") || length(convention) != 1L || is.na(convention))
     refuser("exposition", "convention_invalide",
-            sprintf("La convention d'âge doit être une chaîne unique, sans attribut, prise dans %s.",
-                    liste_guillemets(VALEURS_CONVENTION)),
+            formuler("La convention d'âge doit être une chaîne unique, sans attribut, prise dans %s.",
+                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (convention %in% setdiff(ORDRE_CONVENTIONS, CONVENTIONS_MISES_EN_OEUVRE))
     refuser("exposition", "convention_non_mise_en_oeuvre",
-            sprintf(paste("Convention d'âge « %s » non mise en oeuvre (rôles d'âge fourni non pris",
-                          "en charge) : la construction est refusée (valeurs admises : %s)."),
-                    convention, liste_guillemets(VALEURS_CONVENTION)),
+            formuler(paste("Convention d'âge « %s » non mise en oeuvre (rôles d'âge fourni non pris",
+                           "en charge) : la construction est refusée (valeurs admises : %s)."),
+                     citer(convention), liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (!(convention %in% VALEURS_CONVENTION))
     refuser("exposition", "convention_invalide",
-            sprintf("Convention d'âge inconnue %s (valeurs admises : %s).", liste_guillemets(convention),
-                    liste_guillemets(VALEURS_CONVENTION)),
+            formuler("Convention d'âge inconnue %s (valeurs admises : %s).", liste_guillemets(convention),
+                     liste_guillemets(VALEURS_CONVENTION)),
             list(convention = convention))
   if (!forme_exacte(par_annee, "logical") || length(par_annee) != 1L || is.na(par_annee))
     refuser("exposition", "par_annee_invalide",
-            "Le découpage par année (par_annee) doit valoir TRUE ou FALSE, sans attribut.",
+            formuler("Le découpage par année (par_annee) doit valoir TRUE ou FALSE, sans attribut."),
             list(par_annee = par_annee))
   invisible(TRUE)
 }
@@ -134,9 +134,9 @@ resoudre_convention <- function(convention, native) {
   conv <- convention_retenue(convention, native)
   if (match(conv$retenue, ORDRE_CONVENTIONS) < match(native, ORDRE_CONVENTIONS))
     refuser("exposition", "convention_plus_fine",
-            sprintf(paste("Convention d'âge « %s » plus fine que celle que la recette permet",
-                          "(« %s ») : le forçage vers une convention plus fine est refusé."),
-                    conv$retenue, native),
+            formuler(paste("Convention d'âge « %s » plus fine que celle que la recette permet",
+                           "(« %s ») : le forçage vers une convention plus fine est refusé."),
+                     citer(conv$retenue), native),
             list(convention = conv$retenue, convention_native = native))
   conv
 }
@@ -274,7 +274,7 @@ nombre_cellules <- function(n_age, n_an,
   n <- sum(as.double(n_age) * n_an)
   if (n > .Machine$integer.max)
     refuser("exposition", "trop_de_cellules",
-            sprintf(libelle, format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
+            formuler(libelle, format(n, scientific = FALSE, trim = TRUE), .Machine$integer.max),
             stats::setNames(list(n), diagnostic))
   as.integer(n)
 }
@@ -322,8 +322,9 @@ segments_observations <- function(observations, segmentation) {
   # encoding must be UTF-8, Latin-1 or bytes » sur une chaîne non ASCII
   # d'encodage `unknown`, forme que donne read.csv() d'un CSV UTF-8 (#106) :
   # le tri porte sur une copie marquée `bytes`, comparée octet à octet sans
-  # traduction, sous C comme sous une locale UTF-8. Avant le tri, même critère
-  # `locale_connue` qu'octets_chaines() : dans une session UTF-8 ou latin-1,
+  # traduction, sous C comme sous une locale UTF-8. Avant le tri, la conversion
+  # de la règle unique qu'appelle aussi octets_chaines(), vers_utf8_locale()
+  # (outils ; #113) : dans une session UTF-8 ou latin-1,
   # toutes les chaînes passent par enc2utf8() ; sinon (locale C) seules les
   # chaînes marquées latin-1 sont converties, les `unknown` gardent leurs
   # octets (enc2utf8 les échapperait en <c3><a9>). Ce n'est pas l'ordre de
@@ -336,11 +337,7 @@ segments_observations <- function(observations, segmentation) {
     u <- unique(v)
     u <- u[!is.na(u)]
     if (!is.character(u)) return(u[order(u, method = "radix")])
-    l <- l10n_info()
-    connue <- isTRUE(l[["UTF-8"]]) || isTRUE(l[["Latin-1"]])
-    latin1 <- Encoding(u) == "latin1"
-    w <- u
-    if (connue) w <- enc2utf8(w) else if (any(latin1)) w[latin1] <- enc2utf8(w[latin1])
+    w <- vers_utf8_locale(u)
     Encoding(w) <- "bytes"
     u[order(w, method = "radix")]
   }

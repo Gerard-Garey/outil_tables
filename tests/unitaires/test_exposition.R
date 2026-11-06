@@ -689,6 +689,40 @@ for (loc in c("C", LOCALE_UTF8)) {
              else TRUE
            }))
 }
+# Égalité des deux ordres de #106 (#113) : l'ordre des segments
+# (segments_observations()) est celui des octets que l'empreinte des données
+# hache (octets_chaines(), module rapport), les deux passant par la même
+# conversion, vers_utf8_locale() (outils). Oracle : corps de la ligne écrite
+# par octets_chaines() pour chaque valeur (guillemet ouvrant, guillemet
+# fermant et LF retirés ; valeurs sans caractère échappé), rangés par octets
+# (hexadécimal, tri radix), hors du code de l'ordre des segments. Valeurs
+# admises par l'empreinte dans la locale : ASCII, marquées UTF-8 et latin-1
+# mêlées (ÿ latin-1 avant € UTF-8 en octets UTF-8, c3 bf < e2 82 ac, l'inverse
+# en octets natifs) ; sous UTF-8, en plus, une valeur native non marquée.
+# Chaque corps est aussi comparé aux octets de vers_utf8_locale().
+corps_empreinte <- function(v) {
+  o <- tablexp:::octets_chaines(v, "segment")
+  o[2L:(length(o) - 2L)]
+}
+for (loc in c("C", LOCALE_UTF8)) {
+  verifier(sprintf("#113 : locale %s, ordre des segments = ordre des octets hachés par l'empreinte des données (octets_chaines()), même conversion vers_utf8_locale()", loc),
+           sous_ctype(loc, {
+             sg <- c("a", natif_l1(0xff), SEG_UTF8[5L], "Z", SEG_UTF8[1L], natif_l1(0xe0), "10",
+                     if (!identical(loc, "C")) SEG_NATIFS[3L])
+             sg <- rep(sg, 2L)[c(seq_along(sg), rev(seq_along(sg)))]
+             u <- unique(sg)
+             corps <- lapply(u, corps_empreinte)
+             cle <- vapply(corps, function(o) paste(sprintf("%02x", as.integer(o)), collapse = ""), "")
+             attendu <- u[order(cle, method = "radix")]
+             r <- tablexp:::segments_observations(data.frame(segment = sg, stringsAsFactors = FALSE), "segment")
+             forme <- function(x) paste(Encoding(x), octets_hex(x))
+             if (!all(mapply(function(v, o) identical(charToRaw(tablexp:::vers_utf8_locale(v)), o), u, corps)))
+               "corps de l'empreinte différent de vers_utf8_locale()"
+             else if (!identical(forme(r$segments$segment), forme(attendu))) "ordre des segments"
+             else if (!identical(forme(r$segments$segment[r$g]), forme(sg))) "indices g"
+             else TRUE
+           }))
+}
 verifier("#106 : octets invalides en UTF-8 (0xc9) : nom de colonne déclaré en rôle refusé chaine_non_utf8 sous UTF-8, chaine_codage_indetermine sous C ; segment : mêmes refus",
          {
            colonne <- paste0("s", natif(0xc9))

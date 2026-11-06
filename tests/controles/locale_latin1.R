@@ -3,12 +3,14 @@
 #  locale latin-1 (issue #115 ; ADR 0007, point 9.3 ; suite de #106 et de #66)
 #
 #  octets_chaines() (R/rapport.R) et ordre_octets(), fonction locale de
-#  segments_observations() (R/exposition.R), traitent une session latin-1
-#  comme une session UTF-8 (`locale_connue`) : toutes les chaînes passent par
-#  enc2utf8(). Aucune batterie ne s'exécute sous une locale latin-1 et
-#  locale_c.R ne compare que C et UTF-8 : sans ce contrôle, une régression de
-#  cette branche, qui toucherait l'empreinte des données, l'ordre des
-#  segments, la fiche ou le rapport figé, passerait la CI.
+#  segments_observations() (R/exposition.R), convertissent par la règle
+#  unique vers_utf8_locale() (R/outils.R) : une session latin-1 est traitée
+#  comme une session UTF-8, toutes les chaînes passent par enc2utf8() ; le
+#  refus de `rapport` garde le critère `locale_connue`. Aucune batterie ne
+#  s'exécute sous une locale latin-1 et locale_c.R ne compare que C et UTF-8 :
+#  sans ce contrôle, une régression de cette branche, qui toucherait
+#  l'empreinte des données, l'ordre des segments, la fiche ou le rapport
+#  figé, passerait la CI.
 #
 #  Déroulement :
 #    1. la locale latin-1 est générée par `localedef -i fr_FR -f ISO-8859-1`

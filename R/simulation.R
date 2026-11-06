@@ -160,12 +160,12 @@ table_gompertz_makeham <- function(A, B, c, ages) {
   reel <- function(v) is.numeric(v) && length(v) == 1L && is.finite(v)
   if (!reel(A) || !reel(B) || !reel(c) || A < 0 || B < 0 || c <= 1)
     refuser("simulation", "loi_invalide",
-            "Gompertz-Makeham : A >= 0, B >= 0 et c > 1, réels finis, à déclarer.",
+            formuler("Gompertz-Makeham : A >= 0, B >= 0 et c > 1, réels finis, à déclarer."),
             list(A = A, B = B, c = c))
   if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
       any(ages < 0))
     refuser("simulation", "loi_invalide",
-            "Gompertz-Makeham : les âges sont des entiers >= 0.", list(ages = ages))
+            formuler("Gompertz-Makeham : les âges sont des entiers >= 0."), list(ages = ages))
   ages <- as.integer(ages)
   qx <- 1 - exp(-A - B * c^ages * (c - 1) / log(c))
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = qx, stringsAsFactors = FALSE),
@@ -182,10 +182,10 @@ table_gompertz_makeham <- function(A, B, c, ages) {
 # rachat de la branche, A.2 ; q = 0 pour une transition absente).
 table_constante <- function(q, ages, nom) {
   if (!is.numeric(q) || length(q) != 1L || !is.finite(q) || q < 0 || q > 1)
-    refuser("simulation", "loi_invalide", "Table constante : q réel fini dans [0, 1].", list(q = q))
+    refuser("simulation", "loi_invalide", formuler("Table constante : q réel fini dans [0, 1]."), list(q = q))
   if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
       any(ages < 0))
-    refuser("simulation", "loi_invalide", "Table constante : les âges sont des entiers >= 0.",
+    refuser("simulation", "loi_invalide", formuler("Table constante : les âges sont des entiers >= 0."),
             list(ages = ages))
   ages <- as.integer(ages)
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = rep(as.numeric(q), length(ages)),
@@ -206,15 +206,15 @@ table_constante <- function(q, ages, nom) {
 loi_effective <- function(loi_t, cause, sexes) {
   if (!liste_aux_noms(loi_t, c("facteurs", "table")))
     refuser("simulation", "loi_invalide",
-            sprintf("Loi « %s » : liste (table, facteurs) attendue.", cause), list(cause = cause))
+            formuler("Loi « %s » : liste (table, facteurs) attendue.", cause), list(cause = cause))
   tab <- loi_t$table; f <- loi_t$facteurs
   if (!inherits(tab, "table_reference"))
     refuser("simulation", "loi_invalide",
-            sprintf("Loi « %s » : la table doit être de classe table_reference (ADR 0007, point 7).", cause),
+            formuler("Loi « %s » : la table doit être de classe table_reference (ADR 0007, point 7).", cause),
             list(cause = cause))
   if ("annee" %in% names(tab))
     refuser("simulation", "loi_invalide",
-            sprintf("Loi « %s » : table prospective (colonne annee) non prise en charge par le simulateur minimal.", cause),
+            formuler("Loi « %s » : table prospective (colonne annee) non prise en charge par le simulateur minimal.", cause),
             list(cause = cause))
   # Facteurs : forme exacte (#58, forme_exacte()) : double ou integer, seul
   # attribut names (ni classe, ni dim), de noms exactement H et F, sans tri :
@@ -225,14 +225,14 @@ loi_effective <- function(loi_t, cause, sexes) {
       anyNA(names(f)) || anyDuplicated(names(f)) || !setequal(names(f), c("H", "F")) ||
       any(!is.finite(f)) || any(f < 0))
     refuser("simulation", "loi_invalide",
-            sprintf(paste("Loi « %s » : facteurs = c(H = , F = ), réels finis >= 0, de type double ou integer,",
-                          "sans autre attribut que les noms."), cause),
+            formuler(paste("Loi « %s » : facteurs = c(H = , F = ), réels finis >= 0, de type double ou integer,",
+                           "sans autre attribut que les noms."), cause),
             list(cause = cause, facteurs = f))
   morceaux <- lapply(sexes, function(s) {
     t <- if (s %in% tab$sexe) tab[tab$sexe == s, , drop = FALSE] else tab[tab$sexe == "ensemble", , drop = FALSE]
     if (!nrow(t))
       refuser("simulation", "loi_invalide",
-              sprintf("Loi « %s » : aucune ligne pour le sexe %s ni pour « ensemble ».", cause, s),
+              formuler("Loi « %s » : aucune ligne pour le sexe %s ni pour « ensemble ».", cause, s),
               list(cause = cause, sexe = s))
     t <- t[order(t$age), , drop = FALSE]
     q <- pmin(f[[s]] * t$qx, 1)
@@ -293,25 +293,45 @@ age_anniversaire <- function(cn, an_t, t) {
   x - (jour_anniversaire(cn, x) > t)
 }
 
+# Jours (numériques) rendus en Date, stockage double : colonnes de dates du
+# jeu simulé et du jeu à défauts (#113 : une seule définition).
+en_date <- function(j) structure(as.numeric(j), class = "Date")
+
 # --- contrôle des entrées ------------------------------------------------------
 
-# Date unique : la forme de date1() de controler_transition_periode() (donnees ;
-# #58) : stockage double ou integer, seul attribut la classe "Date" exacte (ni
-# noms, ni autre attribut), longueur 1, finie, en jours entiers.
-date_unique <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
-  identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
-  is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
+# Dates uniques (bornes de la période, origine, date_entree) : date_unique()
+# (outils ; #58, #113), même règle que les bornes de la période des données.
+
+# Noms reçus d'une liste comparés aux noms admis, sans tri (setdiff,
+# anyDuplicated, anyNA ; #100) : règle unique des noms des arguments du
+# simulateur (portefeuille, defauts et chaque déclaration ; #113). Rend ""
+# si les noms sont complets et admis ; sinon la chaîne d'écart, noms
+# requis absents et noms non admis cités par liste_guillemets() (règle
+# neutraliser_citation(), R/outils.R ; #111, #94 ; un nom marqué « bytes »
+# est cité sous un repère). Une liste sans noms a des noms vides.
+ecart_noms <- function(x, requis, admis) {
+  n <- names(x)
+  if (is.null(n)) n <- rep("", length(x))
+  n <- as.character(n)
+  if (anyNA(n) || anyDuplicated(n)) return("noms manquants ou en double")
+  manquants <- setdiff(requis, n); inconnus <- setdiff(n, admis)
+  if (!length(manquants) && !length(inconnus)) return("")
+  formuler("champs attendus %s ; manquants : %s ; inconnus : %s", liste_guillemets(admis),
+           if (length(manquants)) liste_guillemets(manquants) else "aucun",
+           if (length(inconnus)) liste_guillemets(inconnus) else "aucun")
+}
 
 controler_portefeuille <- function(portefeuille, periode) {
   if (!liste_aux_noms(periode, c("debut", "fin")) ||
       !date_unique(periode[["debut"]]) || !date_unique(periode[["fin"]]))
     refuser("simulation", "periode_invalide",
-            paste("La période d'observation doit être une liste (debut, fin) de deux dates (classe Date,",
-                  "sans autre attribut)."),
+            formuler(paste("La période d'observation doit être une liste (debut, fin) de deux dates (classe Date,",
+                           "sans autre attribut).")),
             list(periode = periode))
   if (periode[["debut"]] > periode[["fin"]])
     refuser("simulation", "periode_invalide",
-            sprintf("Période vide : début %s postérieur à la fin %s.", format(periode[["debut"]]), format(periode[["fin"]])),
+            formuler("Période vide : début %s postérieur à la fin %s.", citer(format(periode[["debut"]])),
+                     citer(format(periode[["fin"]]))),
             list(periode = periode))
   # Forme exacte du portefeuille (#78, forme_exacte()) : liste nue, seul
   # attribut names (ni data.frame, ni classe, ni attribut quelconque). Noms
@@ -322,8 +342,8 @@ controler_portefeuille <- function(portefeuille, periode) {
   # (ASCII).
   if (!forme_exacte(portefeuille, "list", "names"))
     refuser("simulation", "portefeuille_invalide",
-            paste("Portefeuille : liste nue attendue (ni data.frame, ni classe, aucun attribut",
-                  "autre que les noms)."),
+            formuler(paste("Portefeuille : liste nue attendue (ni data.frame, ni classe, aucun attribut",
+                           "autre que les noms).")),
             list(classe = class(portefeuille)))
   # Champs lus par [[ ]] (jamais $, qui apparie les noms partiels) ; ici, le
   # mode : chaîne unique de forme exacte (chaine_unique(), #60).
@@ -334,35 +354,33 @@ controler_portefeuille <- function(portefeuille, periode) {
   mode <- if (is.na(i_mode)) NULL else portefeuille[[i_mode]]
   if (!chaine_unique(mode) || !(mode %in% names(CHAMPS_PORTEFEUILLE)))
     refuser("simulation", "portefeuille_invalide",
-            sprintf("Portefeuille : liste avec un champ mode pris dans %s.",
-                    liste_guillemets(names(CHAMPS_PORTEFEUILLE))),
+            formuler("Portefeuille : liste avec un champ mode pris dans %s.",
+                     liste_guillemets(names(CHAMPS_PORTEFEUILLE))),
             list(mode = mode))
+  # Noms comparés par ecart_noms() (#113), règle partagée avec defauts.
   attendus <- CHAMPS_PORTEFEUILLE[[mode]]
-  manquants <- setdiff(attendus, names(portefeuille)); inconnus <- setdiff(names(portefeuille), attendus)
-  if (length(manquants) || length(inconnus) || anyDuplicated(names(portefeuille)))
+  e <- ecart_noms(portefeuille, attendus, attendus)
+  if (nzchar(e))
     refuser("simulation", "portefeuille_invalide",
-            sprintf("Portefeuille (mode %s) : champs attendus %s ; manquants : %s ; inconnus : %s.", mode,
-                    liste_guillemets(attendus),
-                    if (length(manquants)) liste_guillemets(manquants) else "aucun",
-                    if (length(inconnus)) liste_guillemets(inconnus) else "aucun"),
-            list(manquants = manquants, inconnus = inconnus))
+            formuler("Portefeuille (mode %s) : %s.", citer(mode), e),
+            list(mode = mode, attendus = attendus, noms = names(portefeuille)))
   p <- portefeuille
   # Champs numériques : forme exacte (#78), double ou integer sans aucun
   # attribut (ni names, ni dim, ni classe), longueur 1, fini.
   reel <- function(v) forme_exacte(v, c("double", "integer")) && length(v) == 1L && is.finite(v)
   entier <- function(v) reel(v) && v == trunc(v)
-  invalide <- function(msg) refuser("simulation", "portefeuille_invalide", paste("Portefeuille :", msg))
-  if (!entier(p[["n"]]) || p[["n"]] < 1 || p[["n"]] > .Machine$integer.max) invalide("n entier >= 1, de type double ou integer, sans attribut.")
+  invalide <- function(msg) refuser("simulation", "portefeuille_invalide", formuler("Portefeuille : %s", msg))
+  if (!entier(p[["n"]]) || p[["n"]] < 1 || p[["n"]] > .Machine$integer.max) invalide(formuler("n entier >= 1, de type double ou integer, sans attribut."))
   if (!reel(p[["proportion_hommes"]]) || p[["proportion_hommes"]] < 0 || p[["proportion_hommes"]] > 1)
-    invalide("proportion_hommes réel dans [0, 1], de type double ou integer, sans attribut.")
+    invalide(formuler("proportion_hommes réel dans [0, 1], de type double ou integer, sans attribut."))
   fin <- as.numeric(periode[["fin"]])
   if (MODE_BASE[[mode]] == "uniforme") {
     if (!reel(p[["age_min"]]) || !reel(p[["age_max"]]) || p[["age_min"]] * 365.25 < 1 || p[["age_min"]] >= p[["age_max"]])
-      invalide(paste("âges réels finis, de type double ou integer, sans attribut ;",
-                     "age_min d'au moins un jour (1/365,25) et age_min < age_max."))
+      invalide(formuler(paste("âges réels finis, de type double ou integer, sans attribut ;",
+                              "age_min d'au moins un jour (1/365,25) et age_min < age_max.")))
     if (!date_unique(p[["origine"]]) || p[["origine"]] > periode[["debut"]])
-      invalide(paste("origine : date (classe Date, sans autre attribut) antérieure ou égale",
-                     "au début de la période."))
+      invalide(formuler(paste("origine : date (classe Date, sans autre attribut) antérieure ou égale",
+                              "au début de la période.")))
     age_bas <- age_revolu_minimal(round(p[["age_min"]] * 365.25))
     # Borne haute (erratum d'actuary du 17/10/2026, point 4). Soit span(y)
     # le nombre de jours de la naissance à l'anniversaire y (T2) : pour
@@ -380,14 +398,14 @@ controler_portefeuille <- function(portefeuille, periode) {
     # encore inférieure au « + 1 » d'age_haut.
     age_haut <- p[["age_max"]] + (fin + 1 - as.numeric(p[["origine"]])) / 365.25 + 1
   } else {
-    if (!entier(p[["age"]]) || p[["age"]] < 1) invalide("âge exact entier >= 1, de type double ou integer, sans attribut.")
+    if (!entier(p[["age"]]) || p[["age"]] < 1) invalide(formuler("âge exact entier >= 1, de type double ou integer, sans attribut."))
     if (!date_unique(p[["date_entree"]]) || p[["date_entree"]] > periode[["fin"]])
-      invalide(paste("date_entree : date (classe Date, sans autre attribut) antérieure ou égale",
-                     "à la fin de la période."))
+      invalide(formuler(paste("date_entree : date (classe Date, sans autre attribut) antérieure ou égale",
+                              "à la fin de la période.")))
     ce <- composantes_date(as.numeric(p[["date_entree"]]))
     if (ce$mois == 1L && ce$jour == 29L)
       refuser("simulation", "entree_29_fevrier",
-              "Mode âge exact : une entrée le 29/02 est refusée (la naissance « x années avant » serait ambiguë).",
+              formuler("Mode âge exact : une entrée le 29/02 est refusée (la naissance « x années avant » serait ambiguë)."),
               list(date_entree = p[["date_entree"]]))
     age_bas <- p[["age"]]
     # Borne haute : même preuve qu'en mode uniforme, avec B - n =
@@ -411,14 +429,14 @@ controler_portefeuille <- function(portefeuille, periode) {
     lc <- p[["loi_contrats"]]
     if (!forme_exacte(lc, c("double", "integer")) || !length(lc) || any(!is.finite(lc)) || any(lc < 0) ||
         lc[length(lc)] <= 0 || abs(sum(lc) - 1) > 1e-12)
-      invalide(paste("loi_contrats : probabilités p_1, ..., p_m (m >= 1) du nombre de contrats par tête,",
-                     "réels finis >= 0, de type double ou integer, sans attribut, p_m > 0, de somme 1",
-                     "à 1e-12 près."))
+      invalide(formuler(paste("loi_contrats : probabilités p_1, ..., p_m (m >= 1) du nombre de contrats par tête,",
+                              "réels finis >= 0, de type double ou integer, sans attribut, p_m > 0, de somme 1",
+                              "à 1e-12 près.")))
     # Garde de débordement : le nombre de contrats tirés, au plus n x m,
     # est un entier R.
     if (as.numeric(p[["n"]]) * length(lc) > .Machine$integer.max)
-      invalide(sprintf("n x length(loi_contrats) (%.0f) dépasse .Machine$integer.max (%d).",
-                       as.numeric(p[["n"]]) * length(lc), .Machine$integer.max))
+      invalide(formuler("n x length(loi_contrats) (%.0f) dépasse .Machine$integer.max (%d).",
+                        as.numeric(p[["n"]]) * length(lc), .Machine$integer.max))
   }
   list(mode = mode, age_bas = age_bas, age_haut = age_haut)
 }
@@ -442,17 +460,17 @@ controler_couverture <- function(loi, age_bas, age_haut, sexes) {
     l <- loi[loi$cause == cause & loi$sexe == s, , drop = FALSE]
     if (floor(age_bas) < min(l$age) || floor(age_haut) > max(l$age))
       refuser("simulation", "table_trop_courte",
-              sprintf(paste("Loi « %s », sexe %s : la table couvre les âges %d à %d ; âges atteignables",
-                            "%d à %d (A.2 : aucune extrapolation)."),
-                      cause, s, min(l$age), max(l$age), as.integer(floor(age_bas)),
-                      as.integer(floor(age_haut))),
+              formuler(paste("Loi « %s », sexe %s : la table couvre les âges %d à %d ; âges atteignables",
+                             "%d à %d (A.2 : aucune extrapolation)."),
+                       cause, s, min(l$age), max(l$age), as.integer(floor(age_bas)),
+                       as.integer(floor(age_haut))),
               list(cause = cause, sexe = s, ages_table = range(l$age),
                    ages_atteignables = c(age_bas, age_haut)))
     un <- l$age[l$age >= floor(age_bas) & l$age <= floor(age_haut) & l$qx >= 1]
     if (length(un))
       refuser("simulation", "qx_egal_a_un",
-              sprintf("Loi « %s », sexe %s : q_x = 1 à l'âge atteignable %d (force constante non définie).",
-                      cause, s, un[1L]),
+              formuler("Loi « %s », sexe %s : q_x = 1 à l'âge atteignable %d (force constante non définie).",
+                       cause, s, un[1L]),
               list(cause = cause, sexe = s, ages = un))
   }
   invisible(TRUE)
@@ -503,107 +521,152 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 # catalogue, ou une combinaison admise (COMBINAISONS_DEFAUTS). Noms comparés
 # sans tri (setdiff, anyDuplicated, anyNA ; #100). `graine` : la graine du
 # jeu, telle que reçue ; NULL si l'argument manque (le refus graine_invalide
-# vient alors de sous_graine()). Rend list(graine, declarations) : graine
-# entière ; pour chaque déclaration, list(type, unite, cible, taux, nombre),
-# cible = causes du catalogue si absente, taux ou nombre NULL.
-controler_defauts <- function(defauts, graine) {
+# vient alors de sous_graine()). `vides` : vecteur nommé de
+# conditions_vides() (noms : conditions du catalogue structurellement vides
+# pour le portefeuille ; valeurs : raison citée au refus) ; par défaut,
+# aucune condition vide. Une déclaration dont un type porte l'une d'elles est
+# refusée (ADR 0007, annotation du 05/11/2026, seconde, (c) et (d) ; #112,
+# #135).
+# Rend list(graine,
+# declarations) : graine entière ; pour chaque déclaration, list(type,
+# unite, cible, taux, nombre), cible = causes du catalogue si absente, taux
+# ou nombre NULL.
+controler_defauts <- function(defauts, graine, vides = stats::setNames(character(0), character(0))) {
   invalide <- function(msg, details = list())
-    refuser("simulation", "defauts_invalides", paste("Défauts :", msg), details)
+    refuser("simulation", "defauts_invalides", formuler("Défauts : %s", msg), details)
   # Chaînes de l'utilisateur citées par liste_guillemets() : règle
-  # neutraliser_citation() (R/outils.R ; #111, #94).
-  # Noms reçus comparés aux noms admis, sans tri ; rend la chaîne d'écart, ou "".
-  ecart_noms <- function(x, requis, admis) {
-    n <- names(x)
-    if (is.null(n)) n <- rep("", length(x))
-    n <- as.character(n)
-    if (anyNA(n) || anyDuplicated(n)) return("noms manquants ou en double")
-    manquants <- setdiff(requis, n); inconnus <- setdiff(n, admis)
-    if (!length(manquants) && !length(inconnus)) return("")
-    sprintf("champs attendus %s ; manquants : %s ; inconnus : %s", liste_guillemets(admis),
-            if (length(manquants)) liste_guillemets(manquants) else "aucun",
-            if (length(inconnus)) liste_guillemets(inconnus) else "aucun")
-  }
-  forme_graine <- function(g) forme_exacte(g, c("double", "integer")) && length(g) == 1L && !is.na(g) &&
-    is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max
+  # neutraliser_citation() (R/outils.R ; #111, #94). Noms : ecart_noms() ;
+  # graine : forme_graine() (outils), règle de sous_graine() (#113).
   if (!forme_exacte(defauts, "list", "names"))
-    invalide("liste nue attendue, list(graine, declarations) (ni data.frame, ni classe, aucun attribut autre que les noms).",
+    invalide(formuler("liste nue attendue, list(graine, declarations) (ni data.frame, ni classe, aucun attribut autre que les noms)."),
              list(parametre = "defauts"))
   e <- ecart_noms(defauts, c("graine", "declarations"), c("graine", "declarations"))
-  if (nzchar(e)) invalide(paste0(e, "."), list(parametre = "defauts"))
+  if (nzchar(e)) invalide(formuler("%s.", e), list(parametre = "defauts"))
   dg <- defauts[["graine"]]
   if (!forme_graine(dg))
-    invalide("la graine des défauts doit être un nombre entier unique, explicite et fini, sans attribut.",
+    invalide(formuler("la graine des défauts doit être un nombre entier unique, explicite et fini, sans attribut."),
              list(parametre = "defauts$graine", graine_defauts = dg))
   if (!is.null(graine) && forme_graine(graine) && as.integer(dg) == as.integer(graine))
     refuser("simulation", "defauts_invalides",
-            paste("La graine des défauts doit différer de la graine du jeu : avec la même graine, les défauts",
-                  "seraient tirés sur le même flux pseudo-aléatoire que le jeu et corrélés à ses colonnes",
-                  "(par exemple le sexe)."),
+            formuler(paste("La graine des défauts doit différer de la graine du jeu : avec la même graine, les défauts",
+                           "seraient tirés sur le même flux pseudo-aléatoire que le jeu et corrélés à ses colonnes",
+                           "(par exemple le sexe).")),
             list(parametre = "defauts$graine", graine = graine, graine_defauts = dg))
   decl <- defauts[["declarations"]]
   if (!forme_exacte(decl, "list"))
-    invalide("declarations : liste sans attribut (ni noms, ni classe) de déclarations.",
+    invalide(formuler("declarations : liste sans attribut (ni noms, ni classe) de déclarations."),
              list(parametre = "defauts$declarations"))
   causes <- c("deces", "rachat", "en_cours")
   declarations <- lapply(seq_along(decl), function(k) {
     d <- decl[[k]]
-    inv <- function(msg) invalide(sprintf("déclaration %d : %s", k, msg), list(parametre = "defauts$declarations",
+    inv <- function(msg) invalide(formuler("déclaration %d : %s", k, msg), list(parametre = "defauts$declarations",
                                                                               declaration = k))
     if (!forme_exacte(d, "list", "names"))
-      inv("liste nue attendue, list(type, cible, taux) ou list(type, cible, nombre).")
+      inv(formuler("liste nue attendue, list(type, cible, taux) ou list(type, cible, nombre)."))
     e <- ecart_noms(d, "type", c("type", "cible", "taux", "nombre"))
-    if (nzchar(e)) inv(paste0(e, "."))
+    if (nzchar(e)) inv(formuler("%s.", e))
     type <- d[["type"]]
     if (!forme_exacte(type, "character") || !length(type) || anyNA(type) || anyDuplicated(type))
-      inv("type : chaîne (ou vecteur de chaînes d'une combinaison admise) sans attribut, sans NA ni doublon.")
+      inv(formuler("type : chaîne (ou vecteur de chaînes d'une combinaison admise) sans attribut, sans NA ni doublon."))
     if (length(type) == 1L) {
       if (!(type %in% CATALOGUE_DEFAUTS$defaut))
-        inv(sprintf("type %s inconnu ; types admis : %s.", liste_guillemets(type),
-                    liste_guillemets(CATALOGUE_DEFAUTS$defaut)))
+        inv(formuler("type %s inconnu ; types admis : %s.", liste_guillemets(type),
+                     liste_guillemets(CATALOGUE_DEFAUTS$defaut)))
     } else if (!any(vapply(COMBINAISONS_DEFAUTS, function(cmb)
       length(cmb) == length(type) && all(type %in% cmb), logical(1L)))) {
-      inv(sprintf("combinaison %s non admise ; combinaisons admises : %s.", liste_guillemets(type),
-                  paste(vapply(COMBINAISONS_DEFAUTS, liste_guillemets, character(1L)), collapse = " ; ")))
+      inv(formuler("combinaison %s non admise ; combinaisons admises : %s.", liste_guillemets(type),
+                   paste(vapply(COMBINAISONS_DEFAUTS, liste_guillemets, character(1L)), collapse = " ; ")))
     }
     unite <- CATALOGUE_DEFAUTS$unite[match(type[1L], CATALOGUE_DEFAUTS$defaut)]
     a_cible <- "cible" %in% names(d)
     if (unite == "tete" && a_cible)
-      inv(sprintf("type de tête « %s » : champ cible interdit.", type))
+      inv(formuler("type de tête « %s » : champ cible interdit.", citer(type)))
     if (unite == "ligne" && !a_cible)
-      inv("type de ligne : champ cible requis (sous-ensemble de « deces », « rachat », « en_cours »).")
+      inv(formuler("type de ligne : champ cible requis (sous-ensemble de « deces », « rachat », « en_cours »)."))
     cible <- if (a_cible) d[["cible"]] else causes
     if (!forme_exacte(cible, "character") || !length(cible) || anyNA(cible) || anyDuplicated(cible) ||
         !all(cible %in% causes))
-      inv(sprintf("cible : vecteur de chaînes sans attribut, non vide, sans NA ni doublon, pris dans %s.",
-                  liste_guillemets(causes)))
+      inv(formuler("cible : vecteur de chaînes sans attribut, non vide, sans NA ni doublon, pris dans %s.",
+                   liste_guillemets(causes)))
     # Types d'une combinaison rangés dans l'ordre du catalogue : l'attribut
     # ne dépend pas de l'ordre de saisie (parametre garde la saisie brute).
     type <- CATALOGUE_DEFAUTS$defaut[CATALOGUE_DEFAUTS$defaut %in% type]
     # Cible disjointe, par construction, des causes que le catalogue admet
     # pour le type (pour une combinaison, pour tous ses types) : refus
-    # (complément de spécification d'actuary, 25/10/2026). Un vide qui
-    # dépend du jeu (condition entree < fin, conditions de tête, cause
-    # absente du jeu propre) n'est pas refusé ici.
+    # (complément de spécification d'actuary, 25/10/2026). Puis condition du
+    # catalogue structurellement vide (`vides`) : refus. Un vide qui dépend
+    # du tirage (cause absente du jeu propre, aucune tête à deux lignes en
+    # mode multi, aucune entrée tirée avant la fin quand origine < fin) n'est
+    # pas refusé ici (defauts_ineligibles ou eligibles = 0,
+    # injecter_defauts()).
+    i_cat <- match(type, CATALOGUE_DEFAUTS$defaut)
     if (unite == "ligne") {
-      i_cat <- match(type, CATALOGUE_DEFAUTS$defaut)
       admises <- causes[vapply(causes, function(cs) all(CATALOGUE_DEFAUTS[[cs]][i_cat]), logical(1L))]
       if (!any(cible %in% admises))
-        inv(sprintf("cible %s disjointe des causes admises pour %s (%s) : aucune ligne éligible par construction.",
-                    liste_guillemets(cible), paste(type, collapse = " + "),
-                    if (length(admises)) liste_guillemets(admises) else "aucune"))
+        inv(formuler("cible %s disjointe des causes admises pour %s (%s) : aucune ligne éligible par construction.",
+                     liste_guillemets(cible), paste(citer(type), collapse = " + "),
+                     if (length(admises)) liste_guillemets(admises) else "aucune"))
     }
+    # Noms vides ("") jamais retenus : une chaîne vide ne fait pas refuser un
+    # type sans condition.
+    vide <- CATALOGUE_DEFAUTS$condition[i_cat]
+    vide <- vide[nzchar(vide) & vide %in% names(vides)[nzchar(names(vides))]]
+    if (length(vide))
+      inv(formuler("type %s : aucune unité éligible par construction (%s), quel que soit le tirage.",
+                   paste(citer(type), collapse = " + "), paste(unique(vides[vide]), collapse = " ; ")))
     a_taux <- "taux" %in% names(d); a_nombre <- "nombre" %in% names(d)
-    if (a_taux == a_nombre) inv("exactement un des champs taux et nombre est requis.")
+    if (a_taux == a_nombre) inv(formuler("exactement un des champs taux et nombre est requis."))
     v <- if (a_taux) d[["taux"]] else d[["nombre"]]
     reel <- forme_exacte(v, c("double", "integer")) && length(v) == 1L && is.finite(v)
     if (a_taux && !(reel && v >= 0 && v <= 1))
-      inv("taux : réel de [0, 1], de type double ou integer, sans attribut.")
+      inv(formuler("taux : réel de [0, 1], de type double ou integer, sans attribut."))
     if (a_nombre && !(reel && v == trunc(v) && v >= 0 && v <= .Machine$integer.max))
-      inv("nombre : entier >= 0, de type double ou integer, sans attribut.")
+      inv(formuler("nombre : entier >= 0, de type double ou integer, sans attribut."))
     list(type = type, unite = unite, cible = cible,
          taux = if (a_taux) as.numeric(v), nombre = if (a_nombre) as.integer(v))
   })
   list(graine = as.integer(dg), declarations = declarations)
+}
+
+# Conditions du catalogue (colonne condition de CATALOGUE_DEFAUTS)
+# structurellement vides pour un portefeuille déjà validé
+# (controler_portefeuille(), mode `mode`) et la période : vide connu avant
+# tout tirage, quelle que soit la graine (ADR 0007, annotation du
+# 05/11/2026, seconde, (c) et (d)). Un seul contrat par tête (modes
+# uniforme et age_exact ; modes multi dont loi_contrats n'a qu'une
+# probabilité, K = 1, p_m > 0) : les conditions des types de tête, qui
+# exigent une tête d'au moins deux lignes (injecter_defauts()), sont vides
+# (#112). Aucune entrée avant la fin de la période (#135) : la condition
+# entree_avant_fin (entrée < fin) est vide quand date_entree == fin (modes
+# age_exact et age_exact_multi : toute entrée vaut date_entree) ou origine
+# == fin (modes uniforme et uniforme_multi : entrées tirées dans [origine,
+# fin]) ; controler_portefeuille() impose date_entree <= fin et origine <=
+# debut <= fin, ce sont donc exactement les cas vides. Rend un vecteur
+# nommé : noms, conditions vides (jamais "") ; valeurs, raison formée à
+# partir des valeurs reçues (mode, longueur de loi_contrats ; date_entree ou
+# origine, et fin), citée par controler_defauts() ; vecteur vide si aucune.
+conditions_vides <- function(mode, portefeuille, periode) {
+  vides <- stats::setNames(character(0), character(0))
+  raison <- if (mode == MODE_BASE[[mode]])
+    formuler("un seul contrat par tête : mode « %s »", citer(mode))
+  else if (length(portefeuille[["loi_contrats"]]) == 1L)
+    formuler("un seul contrat par tête : mode « %s », loi_contrats de longueur 1", citer(mode))
+  if (!is.null(raison)) {
+    cond <- unique(CATALOGUE_DEFAUTS$condition[CATALOGUE_DEFAUTS$unite == "tete"])
+    cond <- cond[nzchar(cond)]
+    vides <- c(vides, stats::setNames(rep(raison, length(cond)), cond))
+  }
+  fin <- periode[["fin"]]
+  raison <- if (MODE_BASE[[mode]] == "uniforme") {
+    if (as.numeric(portefeuille[["origine"]]) == as.numeric(fin))
+      formuler("aucune entrée avant la fin de la période : origine « %s » égale à la fin « %s »",
+               citer(format(portefeuille[["origine"]])), citer(format(fin)))
+  } else if (as.numeric(portefeuille[["date_entree"]]) == as.numeric(fin)) {
+    formuler("aucune entrée avant la fin de la période : date_entree « %s » égale à la fin « %s »",
+             citer(format(portefeuille[["date_entree"]])), citer(format(fin)))
+  }
+  if (!is.null(raison)) vides <- c(vides, entree_avant_fin = raison)
+  vides
 }
 
 # Injecte les défauts dans le jeu propre `jeu` (data.frame de
@@ -665,9 +728,9 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
     } else {
       if (d$nombre > length(el))
         refuser("simulation", "defauts_ineligibles",
-                sprintf(paste("Défauts : déclaration %d (%s) : nombre = %d dépasse le nombre d'unités éligibles",
-                              "(%d) du jeu propre."),
-                        k, paste(d$type, collapse = " + "), d$nombre, length(el)),
+                formuler(paste("Défauts : déclaration %d (%s) : nombre = %d dépasse le nombre d'unités éligibles",
+                               "(%d) du jeu propre."),
+                         k, paste(citer(d$type), collapse = " + "), d$nombre, length(el)),
                 list(declaration = k, type = d$type, nombre = d$nombre, eligibles = length(el)))
       r <- sort(el[sample.int(length(el), d$nombre)])
     }
@@ -749,7 +812,6 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
   lignes <- do.call(rbind, c(list(ligne_df(integer(0), 0L, character(0), character(0), character(0))), morceaux))
   row.names(lignes) <- NULL
 
-  en_date <- function(j) structure(as.numeric(j), class = "Date")
   # Copies : valeurs du jeu propre (une ligne dupliquée n'est pas altérée autrement).
   resultat <- data.frame(id_contrat = c(id_c, jeu$id_contrat[copies]), id_tete = c(id_t, jeu$id_tete[copies]),
                          sexe = c(sexe, jeu$sexe[copies]),
@@ -827,7 +889,7 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
 simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = NULL) {
   if (!liste_aux_noms(loi, names(CAUSES_SIMULEES)))
     refuser("simulation", "loi_invalide",
-            sprintf("La loi vraie doit être une liste nommée %s.", liste_guillemets(names(CAUSES_SIMULEES))),
+            formuler("La loi vraie doit être une liste nommée %s.", liste_guillemets(names(CAUSES_SIMULEES))),
             list(noms = names(loi)))
   ctl <- controler_portefeuille(portefeuille, periode)
   p <- portefeuille
@@ -841,7 +903,7 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
   # Défauts : contrôlés avant tout tirage (refus defauts_invalides).
   if (!is.null(defauts)) {
     graine_jeu <- if (missing(graine)) NULL else graine
-    ctl_defauts <- controler_defauts(defauts, graine_jeu)
+    ctl_defauts <- controler_defauts(defauts, graine_jeu, conditions_vides(ctl$mode, p, periode))
   }
 
   # Tirages, dans l'ordre fixé (ORDRE_TIRAGES ; modes multi-contrats :
@@ -953,7 +1015,6 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
     stop("simuler_portefeuille() : décès antérieur à l'entrée d'un contrat écrit (erreur de programmation).",
          call. = FALSE)
 
-  en_date <- function(j) structure(as.numeric(j), class = "Date")
   # id_tete : seq_len(n) dans les modes existants (même objet qu'avant #92).
   resultat <- data.frame(id_contrat = seq_len(length(sel)), id_tete = if (multi) tete[sel] else seq_len(n),
                          sexe = sexe[tete][sel],

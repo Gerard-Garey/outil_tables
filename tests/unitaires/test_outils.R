@@ -367,3 +367,51 @@ verifier("noms_bytes : positions des noms bytes (début, milieu, fin), integer(0
     identical(noms_bytes(structure(list(a = 1), class = b)), integer(0)) &&
     identical(noms_bytes(structure(setNames(list(1, 2), c("a", b)), class = b)), 2L)
 })
+
+# a_classe(), classe_bytes() et lire_champ() (#128) : lectures de la classe et
+# d'un champ par nom qui ne lèvent pas sur une classe ou un nom d'encodage
+# bytes, là où inherits(), names(), length() et x[["champ"]] lèvent « translating
+# strings with "bytes" encoding is not allowed ». Contre-épreuve incluse : les
+# lectures usuelles lèvent bien sur les mêmes objets (sinon le test ne prouve rien).
+verifier("a_classe : classe lue par attr(), sans erreur sur une classe bytes ; équivaut à inherits() sinon", {
+  b <- octets_de(0xe9); Encoding(b) <- "bytes"
+  a_classe <- tablexp:::a_classe
+  x <- structure(list(a = 1), class = b)
+  y <- structure(1L, levels = "a", class = c("factor", b))
+  inherits(tryCatch(inherits(x, "construction"), error = function(e) e), "error") &&
+    identical(a_classe(x, "construction"), FALSE) && identical(a_classe(x, "factor"), FALSE) &&
+    identical(a_classe(y, "factor"), TRUE) && identical(a_classe(y, b), TRUE) &&
+    identical(a_classe(structure(1, class = "construction"), "construction"), TRUE) &&
+    identical(a_classe(structure(list(), class = c("a", "data.frame")), "data.frame"), TRUE) &&
+    identical(a_classe(list(a = 1), "construction"), FALSE) && identical(a_classe(NULL, "construction"), FALSE) &&
+    identical(a_classe(data.frame(a = 1), "data.frame"), is.data.frame(data.frame(a = 1)))
+})
+verifier("classe_bytes : TRUE si un élément de la classe est bytes (toute position), FALSE sinon ; sans erreur", {
+  b <- octets_de(0xe9); Encoding(b) <- "bytes"
+  classe_bytes <- tablexp:::classe_bytes
+  identical(classe_bytes(structure(1, class = b)), TRUE) &&
+    identical(classe_bytes(structure(1, class = c("a", b))), TRUE) &&
+    identical(classe_bytes(structure(1, class = c(b, "a"))), TRUE) &&
+    identical(classe_bytes(structure(1, class = "a")), FALSE) &&
+    identical(classe_bytes(structure(1, class = u(0xe9))), FALSE) &&
+    identical(classe_bytes(1), FALSE) && identical(classe_bytes(NULL), FALSE) &&
+    identical(classe_bytes(setNames(list(1), b)), FALSE) &&
+    identical(classe_bytes(data.frame(a = 1)), FALSE)
+})
+verifier("lire_champ : champ lu par nom sans erreur sur un nom ou une classe bytes (toute position) ; NULL si absent ; premier de ce nom", {
+  b <- octets_de(0xe9); Encoding(b) <- "bytes"
+  lire_champ <- tablexp:::lire_champ
+  l <- setNames(list(1, 2, 3), c("a", b, "c"))
+  l0 <- setNames(list(1, 2, 3), c(b, "a", "c"))
+  lc <- structure(list(a = 1, c = 3), class = b)
+  inherits(tryCatch(l[["c"]], error = function(e) e), "error") &&
+    inherits(tryCatch(l0[["a"]], error = function(e) e), "error") &&
+    inherits(tryCatch(lc[["a"]], error = function(e) e), "error") &&
+    identical(lire_champ(l, "c"), 3) && identical(lire_champ(l, "a"), 1) && identical(lire_champ(l, b), 2) &&
+    identical(lire_champ(l0, "a"), 2) && identical(lire_champ(l0, "c"), 3) &&
+    identical(lire_champ(lc, "c"), 3) && is.null(lire_champ(lc, "z")) &&
+    is.null(lire_champ(l, "z")) && is.null(lire_champ(list(1), "a")) && is.null(lire_champ(NULL, "a")) &&
+    identical(lire_champ(list(a = 1, a = 2), "a"), 1) &&
+    identical(lire_champ(list(abc = 1), "a"), NULL) &&
+    identical(lire_champ(data.frame(x = 1:2, y = 3:4), "y"), 3:4)
+})

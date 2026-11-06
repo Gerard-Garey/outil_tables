@@ -93,44 +93,44 @@ valider_plan <- function(plan) {
     refuser("construire_table", motif, message, details)
   if (!liste_nommee(plan) || !length(plan))
     refus_plan("plan_mal_forme",
-               paste("Le plan doit être une liste nommée non vide, aux noms uniques, sans autre attribut",
-                     "que ses noms (ADR 0007, point 5.1)."))
+               formuler(paste("Le plan doit être une liste nommée non vide, aux noms uniques, sans autre attribut",
+                              "que ses noms (ADR 0007, point 5.1).")))
   inconnus <- setdiff(names(plan), CHAMPS_PLAN)
   if (length(inconnus))
     refus_plan("champ_inconnu",
-               sprintf("Champ(s) inconnu(s) du plan : %s (champs admis : %s).",
-                       liste_guillemets(inconnus), liste_guillemets(CHAMPS_PLAN)),
+               formuler("Champ(s) inconnu(s) du plan : %s (champs admis : %s).",
+                        liste_guillemets(inconnus), liste_guillemets(CHAMPS_PLAN)),
                list(champ = inconnus))
   manquants <- setdiff(CHAMPS_PLAN_REQUIS, names(plan))
   if (length(manquants))
     refus_plan("champ_manquant",
-               sprintf("Champ(s) requis absent(s) du plan : %s (aucun défaut implicite).",
-                       liste_guillemets(manquants)),
+               formuler("Champ(s) requis absent(s) du plan : %s (aucun défaut implicite).",
+                        liste_guillemets(manquants)),
                list(champ = manquants))
   etapes <- plan[["etapes"]]
   if (!liste_noms_complets(etapes))
     refus_plan("etapes_mal_formees",
-               paste("Le champ « etapes » doit être une liste nommée (nom d'étape -> liste de ses paramètres),",
-                     "sans autre attribut que ses noms."))
+               formuler(paste("Le champ « etapes » doit être une liste nommée (nom d'étape -> liste de ses paramètres),",
+                              "sans autre attribut que ses noms.")))
   if (!length(etapes))
-    refus_plan("aucune_etape", "Le plan ne déclare aucune étape.")
+    refus_plan("aucune_etape", formuler("Le plan ne déclare aucune étape."))
   noms <- names(etapes)
   doubles <- unique(noms[duplicated(noms)])
   if (length(doubles))
     refus_plan("etape_en_double",
-               sprintf("Étape(s) déclarée(s) plusieurs fois : %s.", liste_guillemets(doubles)),
+               formuler("Étape(s) déclarée(s) plusieurs fois : %s.", liste_guillemets(doubles)),
                list(etape = doubles))
   inconnues <- setdiff(noms, ETAPES$etape)
   if (length(inconnues))
     refus_plan("etape_inconnue",
-               sprintf("Étape(s) inconnue(s) : %s (étapes disponibles : %s).",
-                       liste_guillemets(inconnues), liste_guillemets(ETAPES$etape)),
+               formuler("Étape(s) inconnue(s) : %s (étapes disponibles : %s).",
+                        liste_guillemets(inconnues), liste_guillemets(ETAPES$etape)),
                list(etape = inconnues))
   rang <- match(noms, ETAPES$etape)
   if (is.unsorted(rang, strictly = TRUE))
     refus_plan("etapes_hors_ordre",
-               sprintf("Étapes hors de l'ordre des modules : %s reçu, ordre attendu %s.",
-                       liste_guillemets(noms), liste_guillemets(ETAPES$etape[sort(rang)])),
+               formuler("Étapes hors de l'ordre des modules : %s reçu, ordre attendu %s.",
+                        liste_guillemets(noms), liste_guillemets(ETAPES$etape[sort(rang)])),
                list(etape = noms))
   # Chaque préalable de chaque étape est contrôlé ; seuls les préalables
   # absents sont cités. `etape` et `prealable` sont les vecteurs aplatis ;
@@ -141,38 +141,38 @@ valider_plan <- function(plan) {
   if (any(sans_prealable)) {
     manquants <- unique(unlist(absents))
     refus_plan("etape_prealable_manquante",
-               sprintf("Étape(s) %s sans %s %s.", liste_guillemets(noms[sans_prealable]),
-                       if (length(manquants) == 1L) "son étape préalable" else "ses étapes préalables",
-                       liste_guillemets(manquants)),
+               formuler("Étape(s) %s sans %s %s.", liste_guillemets(noms[sans_prealable]),
+                        if (length(manquants) == 1L) formuler("son étape préalable") else formuler("ses étapes préalables"),
+                        liste_guillemets(manquants)),
                list(etape = noms[sans_prealable], prealable = manquants,
                     prealables_par_etape = absents[sans_prealable]))
   }
   aleatoire <- any(ETAPES$aleatoire[rang])
   if (!aleatoire && "graine" %in% names(plan))
     refus_plan("graine_inattendue",
-               "Le plan déclare une graine alors qu'aucune de ses étapes ne tire d'aléa.",
+               formuler("Le plan déclare une graine alors qu'aucune de ses étapes ne tire d'aléa."),
                list(graine = plan[["graine"]]))
   if (aleatoire && !("graine" %in% names(plan)))
-    refus_plan("graine_manquante", "Une étape du plan tire un aléa : la graine est requise.")
+    refus_plan("graine_manquante", formuler("Une étape du plan tire un aléa : la graine est requise."))
   for (nom in noms) {
     pe <- etapes[[nom]]
     attendus <- PARAMETRES_ETAPES[[nom]]$parametre
     if (!liste_nommee(pe))
       refus_plan("parametres_mal_formes",
-                 sprintf("Étape « %s » : ses paramètres doivent être une liste nommée, sans autre attribut que ses noms.",
-                         nom),
+                 formuler("Étape « %s » : ses paramètres doivent être une liste nommée, sans autre attribut que ses noms.",
+                          citer(nom)),
                  list(etape = nom))
     inconnus <- setdiff(names(pe), attendus)
     if (length(inconnus))
       refus_plan("parametre_inconnu",
-                 sprintf("Étape « %s » : paramètre(s) inconnu(s) %s (paramètres admis : %s).",
-                         nom, liste_guillemets(inconnus), liste_guillemets(attendus)),
+                 formuler("Étape « %s » : paramètre(s) inconnu(s) %s (paramètres admis : %s).",
+                          citer(nom), liste_guillemets(inconnus), liste_guillemets(attendus)),
                  list(etape = nom, parametre = inconnus))
     manquants <- setdiff(attendus, names(pe))
     if (length(manquants))
       refus_plan("parametre_manquant",
-                 sprintf("Étape « %s » : paramètre(s) requis absent(s) %s (aucun défaut implicite).",
-                         nom, liste_guillemets(manquants)),
+                 formuler("Étape « %s » : paramètre(s) requis absent(s) %s (aucun défaut implicite).",
+                          citer(nom), liste_guillemets(manquants)),
                  list(etape = nom, parametre = manquants))
   }
   # Valeurs : contrôlées par les modules (codes identiques par construction,
@@ -289,8 +289,11 @@ construire_table <- function(donnees, roles, plan, provenance = NULL) {
 # quelle (sans_controle() pour un message).
 texte_lu <- function(v) {
   if (is.null(v)) return("absente")
-  if (is.character(v) && length(v) == 1L && is.null(attributes(v))) return(if (is.na(v)) "NA" else v)
-  sprintf("illisible (%s de longueur %d)", typeof(v), length(v))
+  if (is.character(v) && is.null(attributes(v)) && length(v) == 1L) return(if (is.na(v)) "NA" else v)
+  # length() dispatche sur la classe et lève sur une classe d'encodage
+  # « bytes » (#128) : les attributs sont contrôlés avant length(), qui lit
+  # la valeur sans sa classe.
+  sprintf("illisible (%s de longueur %d)", typeof(v), length(if (classe_bytes(v)) unclass(v) else v))
 }
 
 # Valeur lue dans la fiche, citée dans un message de refus du rejeu : règle
@@ -304,44 +307,62 @@ sans_controle <- function(s) neutraliser_citation(s)
 # une liste), sinon « <type> de longueur <n> », complété au besoin par « , NA »,
 # « , vide », « , attribut(s) <noms> » (names non cité pour une liste, dont
 # les noms sont admis), « , noms en double : <noms> » et « , noms incomplets »
-# (nom vide ou NA ; décision Q-A d'actuary, reprise de #86).
+# (nom vide ou NA ; décision Q-A d'actuary, reprise de #86). Une valeur de
+# classe d'encodage « bytes » est décrite sans sa classe (unclass()) pour
+# length(), is.na() et names(), qui dispatchent et lèveraient une erreur R
+# (#128) ; ses attributs, `class` compris, sont lus avant. Les noms en double
+# sont cités un à un par sans_controle() : un nom « bytes » n'efface pas les
+# autres (#128), et le premier nom « bytes » est cité par sa position, sous un
+# repère (« nom(s) d'encodage bytes (n° k : <repère>) »).
 decrire_forme <- function(conteneur, nom) {
-  if (!is.list(conteneur) || !(nom %in% names(conteneur))) return("champ absent")
-  v <- conteneur[[nom]]
-  s <- sprintf("%s de longueur %d", typeof(v), length(v))
+  if (!is.list(conteneur) || !(nom %in% attr(conteneur, "names", exact = TRUE))) return("champ absent")
+  v <- lire_champ(conteneur, nom)
+  a <- names(attributes(v))
+  if (classe_bytes(v)) v <- unclass(v)
+  s <- formuler("%s de longueur %d", typeof(v), length(v))
   if (is.atomic(v) && length(v) == 1L && is.na(v)) s <- paste0(s, ", NA")
   else if (is.character(v) && length(v) == 1L && !nzchar(v)) s <- paste0(s, ", vide")
-  a <- names(attributes(v))
   if (is.list(v)) a <- setdiff(a, "names")
   if (length(a)) s <- paste0(s, ", attribut(s) ", paste(sans_controle(a), collapse = ", "))
   n <- names(v)
   if (!is.null(n)) {
     complets <- n[!is.na(n) & nzchar(n)]
     doubles <- unique(complets[duplicated(complets)])
-    if (length(doubles)) s <- paste0(s, ", noms en double : ", sans_controle(paste(doubles, collapse = ", ")))
+    if (length(doubles)) s <- paste0(s, ", noms en double : ", paste(sans_controle(doubles), collapse = ", "))
     if (anyNA(n) || !all(nzchar(n[!is.na(n)]))) s <- paste0(s, ", noms incomplets")
+    b <- noms_bytes(v)
+    if (length(b)) s <- formuler("%s, nom(s) d'encodage bytes (n° %d : %s)", s, b[1L], sans_controle(n[b[1L]]))
   }
   s
 }
 
 # Paires « nom=valeur » d'une liste nommée de la fiche (versions,
-# plateforme), jointes par « ; » ; texte_lu() d'une autre valeur.
+# plateforme), jointes par « ; » ; texte_lu() d'une autre valeur, dont une
+# liste de classe « bytes » (names() lèverait une erreur R, #128). Les noms
+# sont cités par neutraliser_citation() : un nom « bytes » l'est sous un
+# repère, au lieu de l'erreur R de sprintf() ; ces champs sont des témoins,
+# jamais motifs de refus (ADR 0012, point 3.6).
 paires_lues <- function(l) {
-  if (!is.list(l) || is.null(names(l))) return(texte_lu(l))
-  paste(sprintf("%s=%s", names(l), vapply(l, texte_lu, "")), collapse = " ; ")
+  n <- attr(l, "names", exact = TRUE)
+  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(texte_lu(l))
+  paste(sprintf("%s=%s", neutraliser_citation(n), vapply(l, texte_lu, "")), collapse = " ; ")
 }
 
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
 # fiche reçue (`recu`) (descente D de la spécification de #86) : deux listes
 # nommées sans classe, aux noms complets et uniques, sont parcourues sur
 # l'union de leurs noms (ordre de la fiche rendue, puis noms propres à la fiche
-# reçue) ; toute autre valeur est une feuille. Un nœud qui diffère sans
+# reçue) ; toute autre valeur est une feuille, dont une liste à nom
+# d'encodage « bytes » (#128) : `[[` et %in% sur ses noms lèveraient une erreur
+# R (mesuré) ; la liste est citée « différente » à son chemin. (Une classe
+# « bytes » est déjà une feuille par is.object().) Un nœud qui diffère sans
 # qu'aucun enfant ne diffère est cité « (ordre des champs ou attributs) » ;
 # `racine` nomme le nœud de départ. Rend character(0) si identical().
 champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   if (identical(rendu, recu)) return(character(0))
   ici <- if (length(chemin)) paste(chemin, collapse = "/") else racine
-  descend <- function(v) is.list(v) && !is.object(v) && noms_complets(names(v)) && !anyDuplicated(names(v))
+  descend <- function(v) is.list(v) && !is.object(v) && !length(noms_bytes(v)) &&
+    noms_complets(names(v)) && !anyDuplicated(names(v))
   if (!descend(rendu) || !descend(recu)) return(ici)
   d <- character(0)
   for (n in union(names(rendu), names(recu))) {
@@ -371,9 +392,10 @@ verdict_chaines <- function(attendu, lu) {
 
 # Verdict d'un témoin de liste nommée de la fiche (V2 : versions,
 # plateforme) : « non déterminable » si le côté de la fiche reçue n'est pas une
-# liste sans classe aux noms complets, sinon verdict_chemins().
+# liste sans classe aux noms complets, ou porte un nom d'encodage « bytes »
+# (#128 ; une classe « bytes » est déjà un objet), sinon verdict_chemins().
 verdict_liste <- function(rendu, recu, racine) {
-  if (!is.list(recu) || is.object(recu) || !noms_complets(names(recu)))
+  if (!is.list(recu) || is.object(recu) || length(noms_bytes(recu)) || !noms_complets(names(recu)))
     return(texte_moteur("non déterminable"))
   verdict_chemins(rendu, recu, racine)
 }
@@ -400,13 +422,10 @@ perimetre_temoin_fiche <- function(f) {
 # (controle, attendu, lu, verdict, statut) : 7 contrôles, tous « conforme »
 # dans un bilan rendu, puis 6 témoins, jamais motifs de refus.
 rejouer_fiche <- function(donnees, fiche) {
-  # Message marqué UTF-8 sous toute locale (#94) ; les gabarits sont marqués
-  # par texte_moteur() avant sprintf() : sous la locale C, un gabarit non
-  # marqué (paquet installé sous C) mêlé à une citation marquée UTF-8 verrait
-  # ses octets non ASCII échappés (« <c2><ab> »).
+  # Message marqué UTF-8 sous toute locale (#94) : chaque message est formé
+  # par formuler(), qui marque le gabarit avant sprintf() (#127).
   refus_rejeu <- function(motif, message, details = list())
-    refuser("construire_table", motif, texte_moteur(message), details)
-  gabarit <- function(...) texte_moteur(paste(...))
+    refuser("construire_table", motif, message, details)
 
   # 1. Nature des arguments : la fiche d'abord, puis les données (refus
   #    délégué à controler_roles(), motif donnees_mal_formees). Classe lue
@@ -415,12 +434,12 @@ rejouer_fiche <- function(donnees, fiche) {
   #    not allowed », mesuré sous C et C.UTF-8 ; #94).
   if ("construction" %in% class(fiche))
     refus_rejeu("fiche_non_conforme",
-                paste("Rejeu : objet `construction` reçu à la place de sa fiche ; passer x$fiche, ou la fiche",
-                      "relue de son texte par lire_fiche()."),
+                formuler(paste("Rejeu : objet `construction` reçu à la place de sa fiche ; passer x$fiche, ou la fiche",
+                               "relue de son texte par lire_fiche().")),
                 list(champ = "(fiche)", lu = "construction", attendu = "liste nommée"))
   if ("rejeu" %in% class(fiche))
     refus_rejeu("fiche_non_conforme",
-                "Rejeu : objet `rejeu` reçu à la place d'une fiche ; passer r$construction$fiche.",
+                formuler("Rejeu : objet `rejeu` reçu à la place d'une fiche ; passer r$construction$fiche."),
                 list(champ = "(fiche)", lu = "rejeu", attendu = "liste nommée"))
   # Un nom du premier niveau d'encodage « bytes » : toute lecture par nom
   # (fiche[["version_fiche"]]...) lèverait une erreur R (#114), position
@@ -431,18 +450,18 @@ rejouer_fiche <- function(donnees, fiche) {
   b <- if (is.list(fiche)) noms_bytes(fiche)
   if (length(b))
     refus_rejeu("fiche_non_conforme",
-                sprintf(gabarit("Rejeu : la fiche porte un nom de champ d'encodage « bytes » (champ n° %d : %s),",
-                                "non convertible en UTF-8 sans deviner ; aucun champ du premier niveau n'est lu par nom. Une fiche",
-                                "produite par le moteur ou relue par lire_fiche() n'en porte pas."),
-                        b[1L], neutraliser_citation(nf[b[1L]])),
+                formuler(paste("Rejeu : la fiche porte un nom de champ d'encodage « bytes » (champ n° %d : %s),",
+                                 "non convertible en UTF-8 sans deviner ; aucun champ du premier niveau n'est lu par nom. Une fiche",
+                                 "produite par le moteur ou relue par lire_fiche() n'en porte pas."),
+                         b[1L], neutraliser_citation(nf[b[1L]])),
                 list(champ = "(fiche)", lu = nf[b], attendu = "noms de champ sans encodage bytes"))
   if (!liste_nommee(fiche))
     refus_rejeu("fiche_non_conforme",
-                sprintf(gabarit("Rejeu : la fiche doit être une liste nommée aux noms uniques, sans autre attribut",
-                                "que ses noms ; reçu : objet de classe %s (type %s). Le rejeu ne lit aucun fichier :",
-                                "relire la fiche de ses octets par lire_fiche(readBin(fichier, \"raw\",",
-                                "file.size(fichier))), ou passer x$fiche."),
-                        paste(neutraliser_citation(class(fiche)), collapse = "/"), typeof(fiche)),
+                formuler(paste("Rejeu : la fiche doit être une liste nommée aux noms uniques, sans autre attribut",
+                                 "que ses noms ; reçu : objet de classe %s (type %s). Le rejeu ne lit aucun fichier :",
+                                 "relire la fiche de ses octets par lire_fiche(readBin(fichier, \"raw\",",
+                                 "file.size(fichier))), ou passer x$fiche."),
+                         paste(neutraliser_citation(class(fiche)), collapse = "/"), typeof(fiche)),
                 list(champ = "(fiche)", lu = class(fiche), attendu = "liste nommée"))
   if (!is.data.frame(donnees)) controler_roles(donnees, character(0), character(0))
 
@@ -459,10 +478,15 @@ rejouer_fiche <- function(donnees, fiche) {
   if (!(forme_exacte(v, "integer") && length(v) == 1L && !is.na(v))) {
     champ <- c(champ, "version_fiche"); lu <- c(lu, decrire_forme(fiche, "version_fiche"))
   }
+  # `empreintes` : liste_nommee() et anyDuplicated(names()) ne lèvent pas sur un
+  # nom « bytes » (mesuré), qui est signalé sous le champ `empreintes` avec les
+  # autres défauts (#128) ; ses trois champs se lisent par lire_champ(), qui ne
+  # traduit pas les noms (`[[` lèverait).
   e <- fiche[["empreintes"]]
-  if (!liste_nommee(e)) {
+  if (!liste_nommee(e) || length(noms_bytes(e))) {
     champ <- c(champ, "empreintes"); lu <- c(lu, decrire_forme(fiche, "empreintes"))
-  } else for (n in c("algorithme", "representation", "donnees")) if (!chaine_unique(e[[n]])) {
+  }
+  if (liste_nommee(e)) for (n in c("algorithme", "representation", "donnees")) if (!chaine_unique(lire_champ(e, n))) {
     champ <- c(champ, paste0("empreintes/", n)); lu <- c(lu, decrire_forme(e, n))
   }
   for (n in c("roles", "plan", "provenance")) if (!(n %in% names(fiche))) {
@@ -470,9 +494,9 @@ rejouer_fiche <- function(donnees, fiche) {
   }
   if (length(champ))
     refus_rejeu("fiche_non_conforme",
-                sprintf(gabarit("Fiche non conforme au rejeu : %s. Le rejeu ne lit que ces champs avant",
-                                "construire_table() ; aucun n'est complété ni converti."),
-                        paste(sprintf(gabarit("« %s » : %s au lieu de %s"), champ, lu, attendus[champ]), collapse = " ; ")),
+                formuler(paste("Fiche non conforme au rejeu : %s. Le rejeu ne lit que ces champs avant",
+                                 "construire_table() ; aucun n'est complété ni converti."),
+                         paste(formuler("« %s » : %s au lieu de %s", champ, lu, attendus[champ]), collapse = " ; ")),
                 list(champ = champ, lu = lu, attendu = unname(attendus[champ])))
 
   # 3. version_fiche admise : la version donne le sens des autres champs.
@@ -481,34 +505,33 @@ rejouer_fiche <- function(donnees, fiche) {
     # #86) : « absente » si versions manque ou est une liste sans tablexp ;
     # versions[["tablexp"]] d'une liste qui l'a ; versions entier sinon.
     versions <- fiche[["versions"]]
-    lus <- list(tablexp = texte_lu(if (is.list(versions)) { if ("tablexp" %in% names(versions)) versions[["tablexp"]] }
-                                   else versions),
+    lus <- list(tablexp = texte_lu(if (is.list(versions)) lire_champ(versions, "tablexp") else versions),
                 code = texte_lu(e[["code"]]),
                 code_installe = texte_lu(EMPREINTE_CODE))
     refus_rejeu("version_fiche_non_admise",
-                sprintf(gabarit("Version de fiche non admise au rejeu : version_fiche %d lue, version(s) admise(s)",
-                                "par ce code : %s. Fiche produite par tablexp %s, empreinte du code %s ; code installé :",
-                                "tablexp %s, empreinte du code %s. Aucune conversion de fiche n'est faite : rejouer",
-                                "cette fiche avec le code dont l'empreinte est celle de la fiche."),
-                        v, paste(sprintf("%d", VERSIONS_FICHE_REJEU), collapse = ", "),
-                        sans_controle(lus$tablexp), sans_controle(lus$code),
-                        as.character(utils::packageVersion("tablexp")), sans_controle(lus$code_installe)),
+                formuler(paste("Version de fiche non admise au rejeu : version_fiche %d lue, version(s) admise(s)",
+                                 "par ce code : %s. Fiche produite par tablexp %s, empreinte du code %s ; code installé :",
+                                 "tablexp %s, empreinte du code %s. Aucune conversion de fiche n'est faite : rejouer",
+                                 "cette fiche avec le code dont l'empreinte est celle de la fiche."),
+                         v, paste(sprintf("%d", VERSIONS_FICHE_REJEU), collapse = ", "),
+                         sans_controle(lus$tablexp), sans_controle(lus$code),
+                         as.character(utils::packageVersion("tablexp")), sans_controle(lus$code_installe)),
                 c(list(lu = v, admises = VERSIONS_FICHE_REJEU), lus))
   }
 
   # 4. et 5. Algorithme et représentation de l'empreinte des données.
   if (!identical(e[["algorithme"]], ALGORITHME_EMPREINTE))
     refus_rejeu("algorithme_empreinte_inconnu",
-                sprintf(gabarit("Algorithme d'empreinte « %s » lu dans la fiche, « %s » attendu : ce code ne calcule",
-                                "l'empreinte des données que par cet algorithme ; aucune comparaison n'est possible."),
-                        sans_controle(e[["algorithme"]]), ALGORITHME_EMPREINTE),
+                formuler(paste("Algorithme d'empreinte « %s » lu dans la fiche, « %s » attendu : ce code ne calcule",
+                                 "l'empreinte des données que par cet algorithme ; aucune comparaison n'est possible."),
+                         sans_controle(e[["algorithme"]]), ALGORITHME_EMPREINTE),
                 list(lu = e[["algorithme"]], attendu = ALGORITHME_EMPREINTE))
   if (!identical(e[["representation"]], ENTETE_CANONIQUE))
     refus_rejeu("representation_non_admise",
-                sprintf(gabarit("Représentation canonique « %s » lue dans la fiche, « %s » attendue : ce code calcule",
-                                "l'empreinte des données sous cette seule définition, et une empreinte d'une autre",
-                                "définition ne lui est jamais égale ; aucune conversion n'est faite."),
-                        sans_controle(e[["representation"]]), ENTETE_CANONIQUE),
+                formuler(paste("Représentation canonique « %s » lue dans la fiche, « %s » attendue : ce code calcule",
+                                 "l'empreinte des données sous cette seule définition, et une empreinte d'une autre",
+                                 "définition ne lui est jamais égale ; aucune conversion n'est faite."),
+                         sans_controle(e[["representation"]]), ENTETE_CANONIQUE),
                 list(lu = e[["representation"]], attendu = ENTETE_CANONIQUE))
 
   # 6. Entrées de construire_table() : la séquence de contrôles de
@@ -526,13 +549,13 @@ rejouer_fiche <- function(donnees, fiche) {
   empreinte <- empreinte_donnees(donnees, roles)
   if (!identical(empreinte, e[["donnees"]]))
     refus_rejeu("empreinte_donnees_discordante",
-                sprintf(gabarit("Empreinte des données discordante : %s lue dans la fiche, %s recalculée sur les",
-                                "données reçues (%d lignes). L'empreinte porte sur la représentation « %s » des",
-                                "colonnes des rôles de la fiche (%s), lignes dans l'ordre reçu : un autre ordre des",
-                                "lignes, une valeur ou un type de colonne différents suffisent à la changer ; les",
-                                "colonnes hors rôles n'y entrent pas."),
-                        sans_controle(e[["donnees"]]), empreinte, nrow(donnees), ENTETE_CANONIQUE,
-                        sans_controle(liste_guillemets(unname(roles)))),
+                formuler(paste("Empreinte des données discordante : %s lue dans la fiche, %s recalculée sur les",
+                                 "données reçues (%d lignes). L'empreinte porte sur la représentation « %s » des",
+                                 "colonnes des rôles de la fiche (%s), lignes dans l'ordre reçu : un autre ordre des",
+                                 "lignes, une valeur ou un type de colonne différents suffisent à la changer ; les",
+                                 "colonnes hors rôles n'y entrent pas."),
+                         sans_controle(e[["donnees"]]), empreinte, nrow(donnees), ENTETE_CANONIQUE,
+                         liste_guillemets(unname(roles))),
                 list(lu = e[["donnees"]], attendu = empreinte, lignes = nrow(donnees), colonnes = unname(roles)))
 
   # 8. Construction, une seule fois, sur les rôles, le plan et la provenance

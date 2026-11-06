@@ -14,11 +14,21 @@
 #  - noms_complets() : la règle des noms complets, écrite une seule fois et
 #    partagée par les modules et l'orchestration (#22, notes de B6) ;
 #  - noms_bytes() : positions des noms d'encodage « bytes » d'un objet (#114) ;
+#  - a_classe(), classe_bytes() et lire_champ() : lectures de la classe et d'un
+#    champ par nom sans dispatch ni traduction, sûres sur une classe ou un nom
+#    d'encodage « bytes » (#128) ;
 #  - texte_moteur() : texte produit par le moteur marqué UTF-8, quelle que
 #    soit la locale d'installation ou d'exécution (#50) ;
+#  - formuler() : seul point de passage des messages de refus, gabarit
+#    marqué avant sprintf() (ADR 0007, annotation du 05/11/2026, (c) ; #127) ;
 #  - neutraliser_citation() et citation_a_neutraliser() : règle unique de
 #    neutralisation d'une valeur citée dans un message de refus (caractères
-#    de contrôle et séparateurs de ligne, encodage ; #94).
+#    de contrôle et séparateurs de ligne, encodage ; #94) ;
+#  - forme_graine() et date_unique() : prédicats de forme d'une graine et
+#    d'une date unique, écrits une seule fois (#113) ;
+#  - vers_utf8_locale() : conversion des chaînes en UTF-8 selon la locale de
+#    la session, partagée par l'empreinte des données et l'ordre des segments
+#    (ADR 0007, point 9.3, annotation du 05/11/2026, (g) ; #113, #106).
 #
 #  Ce fichier n'appelle aucun module (graphe d'appels, ADR 0007, point 2.1 ;
 #  contrôlé par tests/controles/graphe_modules.R).
@@ -104,6 +114,37 @@ chaine_unique <- function(v) {
 # FALSE, jamais NA.
 noms_complets <- function(noms) !is.null(noms) && !anyNA(noms) && all(nzchar(noms))
 
+# Forme d'une graine (#43, #113) : forme_exacte() integer ou double (ni names,
+# ni dim, ni classe), longueur 1, ni NA, finie, entière, de valeur absolue au
+# plus .Machine$integer.max. Règle de sous_graine(), partagée avec le contrôle
+# de la graine des défauts du simulateur. Rend TRUE ou FALSE, jamais NA.
+forme_graine <- function(g) forme_exacte(g, c("double", "integer")) && length(g) == 1L && !is.na(g) &&
+  is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max
+
+# Date unique (#58, #113) : stockage double ou integer, seul attribut la classe
+# "Date" exacte (ni noms, ni autre attribut), longueur 1, finie, en jours
+# entiers. Partagée par les bornes de la période d'observation (donnees,
+# simulation) et les dates du portefeuille simulé. Rend TRUE ou FALSE, jamais NA.
+date_unique <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
+  identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
+  is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
+
+# Chaînes x (character) converties en UTF-8 selon la locale de la session
+# (ADR 0007, point 9.3 ; annotation du 05/11/2026, (g) ; #113) : sous une
+# locale UTF-8 ou latin-1 (l10n_info()), enc2utf8() sur tout ; sinon (locale
+# C), sur les seules chaînes marquées latin-1, les autres gardant leurs octets
+# (enc2utf8() échapperait une chaîne non ASCII `unknown` en « <c3><a9> »).
+# Aucun refus : octets_chaines() (rapport) refuse avant l'appel ce que
+# l'empreinte n'admet pas ; l'ordre des segments (exposition) range sans
+# refuser. Rend un character de même longueur, NA conservés.
+vers_utf8_locale <- function(x) {
+  l <- l10n_info()
+  if (isTRUE(l[["UTF-8"]]) || isTRUE(l[["Latin-1"]])) return(enc2utf8(x))
+  latin1 <- Encoding(x) == "latin1"
+  if (any(latin1)) x[latin1] <- enc2utf8(x[latin1])
+  x
+}
+
 # Positions des noms d'encodage « bytes » de x (#114) : integer(0) si x n'a pas
 # de noms ou aucun de ce codage. Une lecture par nom, x[["champ"]] ou
 # x$champ, lève « translating strings with "bytes" encoding is not allowed »
@@ -119,6 +160,35 @@ noms_complets <- function(noms) !is.null(noms) && !anyNA(noms) && all(nzchar(nom
 noms_bytes <- function(x) {
   n <- attr(x, "names", exact = TRUE)
   if (is.null(n)) integer(0) else which(Encoding(n) == "bytes")
+}
+
+# Lectures sûres sur un objet reçu dont la classe ou un nom est d'encodage
+# « bytes » (#128). inherits(), is.factor(), is.data.frame(), names(), length(),
+# is.na() et x[["champ"]] dispatchent sur la classe, ou traduisent les noms,
+# et lèvent « translating strings with "bytes" encoding is not allowed »
+# (mesuré sous C et C.UTF-8, R 4.3.3) ; attr(), match(), %in%, Encoding(),
+# unclass() et .subset2() ne le font pas.
+#  - a_classe(x, classe) : TRUE si `classe` figure dans la classe de x, lue par
+#    attr() ; équivaut à inherits(x, classe) pour une classe posée en attribut
+#    (la classe implicite n'est jamais celle d'une classe nommée par les
+#    appelants), sans lever sur une classe « bytes ». Rend TRUE ou FALSE ;
+#  - classe_bytes(x) : TRUE si un élément de l'attribut `class` de x est
+#    d'encodage « bytes » ; l'appelant retire alors la classe par unclass()
+#    avant length(), names() ou is.na() ;
+#  - lire_champ(x, nom) : élément `nom` de la liste x, trouvé par match() sur
+#    les noms lus par attr() puis lu par position (.subset2()), donc sans
+#    erreur R sur un nom ou une classe « bytes », quelle que soit sa position ;
+#    premier élément de ce nom, NULL s'il est absent (comme x[[nom]]).
+a_classe <- function(x, classe) classe %in% attr(x, "class", exact = TRUE)
+
+classe_bytes <- function(x) {
+  cl <- attr(x, "class", exact = TRUE)
+  is.character(cl) && any(Encoding(cl) == "bytes")
+}
+
+lire_champ <- function(x, nom) {
+  k <- match(nom, attr(x, "names", exact = TRUE))
+  if (is.na(k)) NULL else .subset2(x, k)
 }
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
@@ -175,6 +245,22 @@ texte_moteur <- function(x) {
   if (!is.null(names(x))) names(x) <- texte_moteur(names(x))
   x
 }
+
+# Message de refus (ADR 0007, point 6.4, annotation du 05/11/2026, (c) ;
+# #127) : seul point de passage de tout message de refus, avec ou sans
+# valeur insérée (un message sans valeur s'écrit formuler("…"), un % littéral
+# %%). Le gabarit, littéral du moteur, est marqué par texte_moteur() AVANT
+# sprintf() : sous la locale C, sprintf() traduit un gabarit non marqué
+# (paquet installé sous C) dès qu'un argument est marqué UTF-8, et en écrit
+# les octets non ASCII « <c3><a9> » ; marquer après viendrait trop tard
+# (mesuré, ADR 0007, annotation du 05/11/2026, (b)). Règle des arguments
+# insérés par %s : valeur reçue citée par neutraliser_citation() (ou ses
+# alias citer(), sans_controle()), texte déjà formé (formuler(),
+# liste_guillemets()), constante ASCII, ou texte_moteur() d'une chaîne
+# constante ou d'une constante du moteur (une constante non ASCII non
+# marquée n'est insérée que par texte_moteur()) ; un nombre inséré par %d, %g
+# ou %f n'est pas cité. Règle contrôlée par tests/controles/messages_refus.R.
+formuler <- function(gabarit, ...) sprintf(texte_moteur(gabarit), ...)
 
 # Valeur citée dans un message de refus (#94) : règle unique de
 # neutralisation, appliquée à chaque élément d'un vecteur (texte des refus,
@@ -270,14 +356,12 @@ citation_a_neutraliser <- function(x) {
 # appelant n'est pas dans .Random.seed et n'est pas restaurable ; sans effet
 # sur le moteur, qui tire sous Inversion.
 sous_graine <- function(graine, expr) {
-  # Forme exacte (#43, forme_exacte()) : integer ou double, aucun attribut (ni
+  # Forme exacte (#43, forme_graine()) : integer ou double, aucun attribut (ni
   # names, ni dim, ni classe) ; une graine non canonique ne doit pas être
   # consignée.
-  if (missing(graine) || !forme_exacte(graine, c("double", "integer")) || length(graine) != 1L ||
-      is.na(graine) || !is.finite(graine) || graine != trunc(graine) ||
-      abs(graine) > .Machine$integer.max)
+  if (missing(graine) || !forme_graine(graine))
     refuser("outils", "graine_invalide",
-            "La graine doit être un nombre entier unique, explicite et fini, sans attribut.",
+            formuler("La graine doit être un nombre entier unique, explicite et fini, sans attribut."),
             list(graine = if (missing(graine)) NULL else graine))
   env <- globalenv()
   avait_graine <- exists(".Random.seed", envir = env, inherits = FALSE)

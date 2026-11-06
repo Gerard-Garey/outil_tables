@@ -23,9 +23,14 @@
 #       ecrire_rapport(x) (#87, C1) ; pour R1, rejouer_fiche() sur la fiche
 #       relue : chaînes non ASCII du bilan marquées UTF-8 (#86) ; messages
 #       de refus du rejeu et de objet_modifie (et citation d'une chaîne
-#       latin-1) marqués UTF-8 et sur une ligne (#94) ;
+#       latin-1) marqués UTF-8 et sur une ligne (#94) ; puis un refus par
+#       module citant une valeur non ASCII native, latin-1 et UTF-8, et
+#       trois refus de lire_texte() et deux type_incompatible sur un rôle
+#       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
+#       octet « <xx> » (#127) ;
 #    3. les textes (fiche, plan et rapport figé de R1 à R6, bilan du rejeu et
-#       messages de refus de R1) écrits sous C et sous UTF-8 sont comparés
+#       messages de refus de R1, messages de refus par module) écrits sous C
+#       et sous UTF-8 sont comparés
 #       octet à octet. Aucune
 #       différence n'est admise : à entrées, rôles, plan et graine identiques
 #       sur la même machine, la locale ne change aucun octet de la fiche, du
@@ -141,6 +146,84 @@ travailleur <- function(args) {
     if (inherits(r, "error")) d(sprintf("erreur [%s] : %s", paste(class(r)[1L], collapse = "/"), conditionMessage(r)))
     cat(sprintf("  %s : %s\n", id, if (length(defauts) && any(startsWith(defauts, paste0(id, " :")))) "ECHEC" else "ok"))
   }
+  # Messages de refus par module (#127, critère 2 ; ADR 0007, annotation du
+  # 05/11/2026, (c) et (f)) : un refus par module qui cite une valeur reçue
+  # non ASCII (« âge ») de codage natif non marqué, latin-1 et UTF-8 ; puis
+  # les trois refus de lire_texte() de tests/unitaires/test_serialisation.R
+  # (première ligne inconnue, type inconnu, valeur illisible ; entrées en
+  # octets bruts). Chaque message : marqué UTF-8, sur une ligne, sans octet
+  # écrit « <xx> » (gabarit échappé par sprintf() sous C, régression de #94),
+  # la citation gardée en octets UTF-8 (c3 a2 67 65, ou c3 a9). Octets
+  # comparés ensuite entre les deux installations.
+  d <- function(m) defauts <<- c(defauts, sprintf("refus par module : %s", octets_bruts(m)))
+  r <- tryCatch({
+    refus_msg <- function(expr) tryCatch({ force(expr); NA_character_ },
+                                         refus_tablexp = function(r) conditionMessage(r))
+    brut_age <- as.raw(c(0xc3, 0xa2, 0x67, 0x65))
+    natif <- rawToChar(brut_age)
+    latin1 <- rawToChar(as.raw(c(0xe2, 0x67, 0x65))); Encoding(latin1) <- "latin1"
+    utf8_ <- rawToChar(brut_age); Encoding(utf8_) <- "UTF-8"
+    valeurs <- list(natif = natif, latin1 = latin1, utf8 = utf8_)
+    modules <- list(
+      donnees = function(v) tablexp:::controler_roles(data.frame(x = 1), c(sexe = v), character(0)),
+      exposition = function(v) tablexp:::controler_parametres_exposition(v, FALSE),
+      brut = function(v) tablexp:::controler_parametres_brut(v, 0.95, FALSE),
+      simulation = function(v) tablexp:::controler_defauts(
+        list(graine = 1L, declarations = list(list(type = v, cible = "deces", taux = 0.1))), 2L),
+      rapport = function(v) tablexp:::ecrire_valeurs(structure(1, class = v), "texte", "r"),
+      construire_table = function(v) valider_plan(stats::setNames(list(1), v)))
+    msgs <- character(0); noms <- character(0)
+    for (mo in names(modules)) for (en in names(valeurs)) {
+      m <- refus_msg(modules[[mo]](valeurs[[en]]))
+      nom <- sprintf("%s (%s)", mo, en)
+      if (is.na(m)) { d(sprintf("%s : refus attendu non levé", nom)); next }
+      if (!grepl(rawToChar(brut_age), octets_bruts(m), fixed = TRUE, useBytes = TRUE))
+        d(sprintf("%s : citation absente ou altérée : %s", nom, m))
+      msgs <- c(msgs, m); noms <- c(noms, nom)
+    }
+    # type_incompatible sur un rôle date (M1 de la revue finale de #127) : le
+    # libellé TYPES_ADMIS["date"] (« valeurs entières finies »), constante du
+    # moteur non ASCII, est inséré par %s ; sans texte_moteur(), sprintf()
+    # l'écrit « enti<c3><a8>res » sous C. Colonne de type character, puis de
+    # classe (chaîne d'encodage bytes, Date) ; octets « è » (c3 a8) du
+    # libellé exigés dans chaque message.
+    classe_bytes <- rawToChar(as.raw(c(0x63, 0x61, 0x66, 0xe9))); Encoding(classe_bytes) <- "bytes"
+    col_date <- structure(18262, class = c(classe_bytes, "Date"))
+    dates <- list("type_incompatible, rôle date, colonne character" = data.frame(d = "2020-01-01"),
+                  "type_incompatible, rôle date, classe bytes" = structure(list(d = col_date), class = "data.frame",
+                                                                          row.names = 1L))
+    for (nom in names(dates)) {
+      m <- refus_msg(tablexp:::controler_roles(dates[[nom]], c(date_entree = "d"), character(0)))
+      if (is.na(m)) { d(sprintf("%s : refus attendu non levé", nom)); next }
+      if (!grepl(rawToChar(as.raw(c(0x65, 0x6e, 0x74, 0x69, 0xc3, 0xa8, 0x72, 0x65, 0x73))), octets_bruts(m),
+                 fixed = TRUE, useBytes = TRUE))
+        d(sprintf("%s : libellé « entières » absent ou altéré : %s", nom, m))
+      msgs <- c(msgs, m); noms <- c(noms, nom)
+    }
+    u8 <- function(...) { x <- rawToChar(as.raw(c(...))); Encoding(x) <- "UTF-8"; x }
+    e_acute <- c(0xc3, 0xa9)
+    tete_ <- charToRaw("tablexp plan 1\n@noms\tcharacter\t1\t\"a\"\n")
+    lectures <- list(
+      "première ligne inconnue" = c(charToRaw("tablexp plan 1"), as.raw(e_acute), as.raw(c(0x0b, 0x0a)), tete_[-(1:15)]),
+      "type inconnu" = c(tete_, charToRaw("a\ttyp"), as.raw(e_acute), charToRaw("\t1\t1\n")),
+      "valeur illisible" = c(tete_, charToRaw("a\tinteger\t1\t1"), as.raw(e_acute), charToRaw("\n")))
+    for (nom in names(lectures)) {
+      m <- refus_msg(lire_plan(lectures[[nom]]))
+      if (is.na(m)) { d(sprintf("lire_plan, %s : refus attendu non levé", nom)); next }
+      if (!grepl(u8(e_acute), m, fixed = TRUE)) d(sprintf("lire_plan, %s : citation absente ou altérée : %s", nom, m))
+      msgs <- c(msgs, m); noms <- c(noms, paste("lire_plan,", nom))
+    }
+    for (i in seq_along(msgs)) {
+      if (!identical(Encoding(msgs[i]), "UTF-8")) d(sprintf("%s : message non marqué UTF-8", noms[i]))
+      if (grepl("<[0-9a-f]{2}>", msgs[i], useBytes = TRUE)) d(sprintf("%s : octets écrits <xx> : %s", noms[i], msgs[i]))
+      if (grepl("[\n\v\f]", msgs[i], useBytes = TRUE)) d(sprintf("%s : message sur plusieurs lignes", noms[i]))
+    }
+    writeBin(unlist(lapply(msgs, function(s) c(charToRaw(s), as.raw(10L)))), file.path(sortie, "modules.refus.txt"))
+    cat(sprintf("  refus par module (#127) : %d messages, %s\n", length(msgs),
+                if (any(startsWith(defauts, "refus par module"))) "ECHEC" else "ok"))
+    NULL
+  }, error = function(e) e)
+  if (inherits(r, "error")) d(sprintf("erreur [%s] : %s", class(r)[1L], conditionMessage(r)))
   if (length(defauts)) { cat(paste0("  DEFAUT ", defauts, "\n"), sep = ""); quit(save = "no", status = 1L) }
   invisible(TRUE)
 }
@@ -247,9 +330,18 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
     if (!length(a) || !identical(a, b))
       defauts <- c(defauts, sprintf("R1.refus.txt : messages de refus sous C différents de ceux sous %s (%s)", utf8, ecart_octets(a, b)))
   }
-  if (n_comparees != 3L * length(IDENTIFIANTS) + 2L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
+  # Messages de refus par module et de lire_texte() (#127, critère 2).
+  f <- file.path(vapply(cas, `[[`, "", "sortie"), "modules.refus.txt")
+  if (!all(file.exists(f))) defauts <- c(defauts, "modules.refus.txt : messages de refus par module absents") else {
+    a <- readBin(f[1L], "raw", file.size(f[1L])); b <- readBin(f[2L], "raw", file.size(f[2L]))
+    n_comparees <- n_comparees + 1L
+    if (!length(a) || !identical(a, b))
+      defauts <- c(defauts, sprintf("modules.refus.txt : messages de refus par module sous C différents de ceux sous %s (%s)",
+                                    utf8, ecart_octets(a, b)))
+  }
+  if (n_comparees != 3L * length(IDENTIFIANTS) + 3L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
-  cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu et messages de refus de R1) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
+  cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu et messages de refus de R1, messages de refus par module) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
               n_comparees, paste(range(IDENTIFIANTS), collapse = " à "), utf8, duree(t_debut)))
   invisible(TRUE)
 }

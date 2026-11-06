@@ -244,6 +244,121 @@ verifier("ordre des modules : passe sur un graphe conforme (simulation -> donnee
          passe(controle("graphe_modules.R", shQuote(d))))
 unlink(d, recursive = TRUE)
 
+# --- messages de refus (ADR 0007, annotation du 05/11/2026, (c) et (f) ; #127) --
+# Le script lit R/ sans charger tablexp ; sur un témoin, la liste
+# d'exceptions est remplacée par un fichier CSV (vide, sauf cas contraire).
+# Chaque règle du script a un témoin qui la fait échouer.
+
+verifier("messages de refus : passe sur R/ du dépôt", passe(controle("messages_refus.R")))
+exceptions_temoin <- function(lignes = character(0)) {
+  f <- tempfile("exceptions_", fileext = ".csv")
+  writeLines(c("fichier,fonction,expression,raison", lignes), f, useBytes = TRUE)
+  f
+}
+sans_exception <- exceptions_temoin()
+for (cas in list(
+  list(nom = "message par sprintf()",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", sprintf(\"x %s\", citer(x)))"),
+       motif = "message de refuser() non formé par formuler()"),
+  list(nom = "message par paste0() de texte_moteur()",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", paste0(texte_moteur(\"x \"), citer(x)))"),
+       motif = "message de refuser() non formé par formuler()"),
+  list(nom = "message littéral sans formuler()",
+       fichiers = list(outils = "f <- function() refus_tablexp(\"m\", \"a\", \"x\")"),
+       motif = "message de refus_tablexp() non formé par formuler()"),
+  list(nom = "message suivi jusqu'à un sprintf()",
+       fichiers = list(outils = c("f <- function(x) {", "  m <- sprintf(\"x %s\", citer(x))",
+                                  "  refuser(\"m\", \"a\", m)", "}")),
+       motif = "message de refuser() non formé par formuler() : m"),
+  list(nom = "message paramètre hors relais",
+       fichiers = list(outils = "f <- function(m) refuser(\"m\", \"a\", m)"),
+       motif = "message de refuser() non formé par formuler() : m"),
+  list(nom = "valeur %s non citée",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", x))"),
+       motif = "valeur insérée par %s sans citation ni forme admise : x"),
+  list(nom = "constante non ASCII sous %s",
+       fichiers = list(outils = "f <- function() refuser(\"m\", \"a\", formuler(\"x %s\", \"\\u00e9\"))"),
+       motif = "valeur insérée par %s sans citation ni forme admise"),
+  # Constante du moteur non ASCII non marquée (M1 de la revue finale de #127) :
+  # insérée par %s sans texte_moteur(), sprintf() la traduirait sous la locale C.
+  list(nom = "constante non ASCII du moteur sous %s sans texte_moteur()",
+       fichiers = list(outils = c("TYPES <- c(date = \"enti\\u00e8res\")",
+                                  "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", TYPES[x]))")),
+       motif = "valeur insérée par %s sans citation ni forme admise : TYPES[x]"),
+  list(nom = "texte_moteur() d'une valeur reçue sous %s",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", texte_moteur(x)))"),
+       motif = "valeur insérée par %s sans citation ni forme admise : texte_moteur(x)"),
+  list(nom = "paste() d'une valeur non citée sous %s",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", paste(x, collapse = \", \")))"),
+       motif = "valeur insérée par %s sans citation ni forme admise : paste(x"),
+  list(nom = "gabarit non constant",
+       fichiers = list(outils = "f <- function(g, x) refuser(\"m\", \"a\", formuler(g, citer(x)))"),
+       motif = "gabarit de formuler() non constant : g"),
+  list(nom = "conversions et valeurs en nombres différents",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s %d\", citer(x)))"),
+       motif = "formuler() : 2 conversion(s) pour 1 valeur(s)"),
+  list(nom = "aide de message qui rend un sprintf()",
+       fichiers = list(donnees = "message_aucune_recette <- function(x) sprintf(\"x %s\", x)"),
+       motif = "aide de message : expression rendue non formée"),
+  # Paramètre formel réaffecté sur un seul chemin : la valeur reçue atteint
+  # le message quand y est FALSE (mineur 1 de l'audit de #127).
+  list(nom = "paramètre formel à affectation locale conditionnelle",
+       fichiers = list(outils = "f <- function(x, y) { if (y) x <- \"a\"; refuser(\"m\", \"a\", formuler(\"v %s\", x)) }"),
+       motif = "valeur insérée par %s sans citation ni forme admise : x"),
+  # Relais local de RELAIS (refus_plan dans valider_plan) : son message est
+  # contrôlé comme celui de refuser() (mineur 2 de l'audit de #127).
+  list(nom = "message d'un relais local par paste()",
+       fichiers = list(construire_table = c(
+         "valider_plan <- function(x) {",
+         "  refus_plan <- function(motif, message, details = NULL) refuser(\"plan\", motif, message, details)",
+         "  refus_plan(\"a\", paste(\"R\\u00f4le\", x))",
+         "}")),
+       motif = "message de refus_plan() non formé par formuler() : paste(")
+)) {
+  d <- modules_temoins(cas$fichiers)
+  verifier(sprintf("messages de refus : échoue sur le témoin « %s »", cas$nom),
+           echoue(controle("messages_refus.R", shQuote(d), shQuote(sans_exception)), cas$motif))
+  unlink(d, recursive = TRUE)
+}
+d <- modules_temoins(list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", citer(x)))"))
+e <- exceptions_temoin("outils.R,f,typeof(x),type R")
+verifier("messages de refus : échoue sur une exception périmée (aucun site)",
+         echoue(controle("messages_refus.R", shQuote(d), shQuote(e)), "exception périmée (aucun site) : outils.R, f, typeof(x)"))
+unlink(c(d, e), recursive = TRUE)
+# Liste d'exceptions mal formée (ligne en double) : refusée avant l'analyse.
+d <- modules_temoins(list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", citer(x)))"))
+e <- exceptions_temoin(c("outils.R,f,typeof(x),type R", "outils.R,f,typeof(x),type R"))
+verifier("messages de refus : échoue sur une liste d'exceptions mal formée (ligne en double)",
+         echoue(controle("messages_refus.R", shQuote(d), shQuote(e)),
+                "liste d'exceptions : ligne en double, sans raison ou expression non ASCII"))
+unlink(c(d, e), recursive = TRUE)
+# Exception sur une constante non ASCII non marquée : refusée ; la même
+# constante marquée par texte_moteur() à l'insertion passe sans exception.
+constante_non_ascii <- c("TYPES <- c(date = \"enti\\u00e8res\")",
+                         "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", @@))")
+d <- modules_temoins(list(outils = c(constante_non_ascii[1L], sub("@@", "TYPES[x]", constante_non_ascii[2L], fixed = TRUE))))
+e <- exceptions_temoin("outils.R,f,TYPES[x],libelles du catalogue")
+verifier("messages de refus : échoue sur une exception couvrant une constante non ASCII non marquée",
+         echoue(controle("messages_refus.R", shQuote(d), shQuote(e)),
+                "exception sur la constante non ASCII non marquée TYPES (texte_moteur() requis)"))
+unlink(c(d, e), recursive = TRUE)
+d <- modules_temoins(list(outils = c(constante_non_ascii[1L], sub("@@", "texte_moteur(TYPES[x])", constante_non_ascii[2L], fixed = TRUE))))
+verifier("messages de refus : passe sur une constante non ASCII du moteur marquée par texte_moteur(), sans exception",
+         passe(controle("messages_refus.R", shQuote(d), shQuote(sans_exception))))
+unlink(d, recursive = TRUE)
+d <- modules_temoins(list(outils = c(
+  "f <- function(x, n) {",
+  "  if (n) refuser(\"m\", \"a\", formuler(\"x %s, %d, %s, %s\", citer(x), n, liste_guillemets(x), \"ascii\"))",
+  "  m <- formuler(\"y %s (%s)\", if (n) neutraliser_citation(x) else \"aucun\", paste(sans_controle(x), collapse = \", \"))",
+  "  if (n) refuser(\"m\", \"b\", m)",
+  "  cite <- citer(x)",
+  "  refuser(\"m\", \"c\", formuler(\"z %s %s %s\", cite, typeof(x), formuler(\"\\u00e9\")))",
+  "}")))
+e <- exceptions_temoin("outils.R,f,typeof(x),type R")
+verifier("messages de refus : passe sur un témoin conforme (citations, liste_guillemets(), if, paste(collapse), symbole suivi, exception employée)",
+         passe(controle("messages_refus.R", shQuote(d), shQuote(e))))
+unlink(c(d, e, sans_exception), recursive = TRUE)
+
 # --- tablexp sous la locale C (issue #66) -------------------------------------
 # Le contrôle complet (deux installations, R1 à R6 sous C et sous UTF-8) dure
 # une trentaine de secondes : il est une étape de la CI, non rejouée ici. Seul

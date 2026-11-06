@@ -155,17 +155,20 @@ entiers_finis <- function(v) {
 
 # TRUE si la colonne x est du type `type` du catalogue. Une colonne-liste,
 # une matrice ou une classe autre que celles admises (POSIXct, difftime...)
-# est refusée.
+# est refusée. Dimension lue par attr() et facteur par a_classe() (R/outils.R,
+# #128) : dim() et is.factor() dispatchent sur la classe et lèvent une erreur R
+# sur une classe d'encodage « bytes » (mesuré) ; la colonne est alors refusée
+# comme toute classe non admise.
 type_conforme <- function(x, type) {
-  if (!is.atomic(x) || !is.null(dim(x))) return(FALSE)
+  if (!is.atomic(x) || !is.null(attr(x, "dim", exact = TRUE))) return(FALSE)
   nu <- !is.object(x)
   chaine <- nu && is.character(x)
   entier <- nu && is.integer(x)
   double_entier <- nu && is.double(x) && entiers_finis(x)
   switch(type,
     identifiant = chaine || entier || double_entier,
-    categorie = chaine || is.factor(x),
-    categorie_ou_entier = chaine || is.factor(x) || entier,
+    categorie = chaine || a_classe(x, "factor"),
+    categorie_ou_entier = chaine || a_classe(x, "factor") || entier,
     date = identical(class(x), "Date") && is.numeric(unclass(x)) &&
       entiers_finis(unclass(x)),
     entier = entier || double_entier,
@@ -187,14 +190,21 @@ type_conforme <- function(x, type) {
 # <xx>, marque UTF-8. Rend le vecteur neutralisé, sans paste ; NA reste NA.
 citer <- function(x) neutraliser_citation(x)
 
-liste_guillemets <- function(x) paste0("« ", citer(x), " »", collapse = ", ")
+# Valeurs citées entre guillemets, jointes par « , » : texte formé, argument
+# admis de formuler() sans nouvelle citation (ADR 0007, annotation du
+# 05/11/2026, (c) 3 ; #127). Les guillemets sont marqués par texte_moteur()
+# avant le collage : sous la locale C, paste0() traduirait des guillemets non
+# marqués (paquet installé sous C) mêlés à une citation marquée UTF-8 et en
+# écrirait les octets « <c2><ab> » (mesuré, même annotation, (b)).
+liste_guillemets <- function(x)
+  paste0(texte_moteur("« "), citer(x), texte_moteur(" »"), collapse = ", ")
 
 # Message du refus `aucune_recette` (texte unique, repris par le module
 # `exposition`, deduire_recette()).
 message_aucune_recette <- function(requis, manquants)
-  sprintf(paste("Aucune recette d'exposition ne s'applique : la recette « %s »",
-                "(seule disponible) exige les rôles %s ; absents : %s."),
-          RECETTE_BRANCHE, liste_guillemets(requis), liste_guillemets(manquants))
+  formuler(paste("Aucune recette d'exposition ne s'applique : la recette « %s »",
+                 "(seule disponible) exige les rôles %s ; absents : %s."),
+           RECETTE_BRANCHE, liste_guillemets(requis), liste_guillemets(manquants))
 
 # Contrôle `roles` (vecteur de chaînes nommé rôle -> colonne, ADR 0007,
 # point 4.1) contre le catalogue et `donnees`. Forme exacte (#62,
@@ -208,81 +218,89 @@ message_aucune_recette <- function(requis, manquants)
 controler_roles <- function(donnees, roles, segmentation) {
   if (!is.data.frame(donnees))
     refuser("donnees", "donnees_mal_formees",
-            "Les données doivent être un data.frame (le moteur ne lit pas de fichier).",
+            formuler("Les données doivent être un data.frame (le moteur ne lit pas de fichier)."),
             list(classe = class(donnees)))
   if (!forme_exacte(roles, "character", "names") || !noms_complets(names(roles)) || anyNA(roles))
     refuser("donnees", "roles_mal_formes",
-            paste("Les rôles doivent être un vecteur de chaînes nommé (nom du rôle -> nom",
-                  "de colonne), sans autre attribut que ses noms, sans valeur",
-                  "ni nom manquant (ADR 0007, point 4.1)."),
+            formuler(paste("Les rôles doivent être un vecteur de chaînes nommé (nom du rôle -> nom",
+                           "de colonne), sans autre attribut que ses noms, sans valeur",
+                           "ni nom manquant (ADR 0007, point 4.1).")),
             list(classe = class(roles), attributs = names(attributes(roles))))
   r <- names(roles)
   inconnus <- setdiff(r, CATALOGUE_ROLES$role)
   if (length(inconnus))
     refuser("donnees", "role_inconnu",
-            sprintf("Rôle inconnu du catalogue fermé : %s (colonne %s).",
-                    liste_guillemets(inconnus), liste_guillemets(roles[r %in% inconnus])),
+            formuler("Rôle inconnu du catalogue fermé : %s (colonne %s).",
+                     liste_guillemets(inconnus), liste_guillemets(roles[r %in% inconnus])),
             list(role = inconnus, colonne = unname(roles[r %in% inconnus])))
   doubles <- unique(r[duplicated(r)])
   if (length(doubles))
     refuser("donnees", "role_declare_deux_fois",
-            sprintf("Rôle déclaré plusieurs fois : %s (colonnes %s).",
-                    liste_guillemets(doubles), liste_guillemets(roles[r %in% doubles])),
+            formuler("Rôle déclaré plusieurs fois : %s (colonnes %s).",
+                     liste_guillemets(doubles), liste_guillemets(roles[r %in% doubles])),
             list(role = doubles, colonne = unname(roles[r %in% doubles])))
   non_pris <- r[CATALOGUE_ROLES$usage[match(r, CATALOGUE_ROLES$role)] == "non_pris_en_charge"]
   if (length(non_pris))
     refuser("donnees", "role_non_pris_en_charge",
-            sprintf(paste("Rôle déclaré qu'aucune recette disponible n'emploie : %s (colonne %s) ;",
-                          "l'ignorer changerait le sens du résultat, la construction est refusée."),
-                    liste_guillemets(non_pris), liste_guillemets(roles[non_pris])),
+            formuler(paste("Rôle déclaré qu'aucune recette disponible n'emploie : %s (colonne %s) ;",
+                           "l'ignorer changerait le sens du résultat, la construction est refusée."),
+                     liste_guillemets(non_pris), liste_guillemets(roles[non_pris])),
             list(role = non_pris, colonne = unname(roles[non_pris])))
   absentes <- r[!(roles %in% names(donnees))]
   if (length(absentes))
     refuser("donnees", "colonne_absente",
-            sprintf("Colonne absente des données : %s (rôle %s).",
-                    liste_guillemets(roles[absentes]), liste_guillemets(absentes)),
+            formuler("Colonne absente des données : %s (rôle %s).",
+                     liste_guillemets(roles[absentes]), liste_guillemets(absentes)),
             list(role = absentes, colonne = unname(roles[absentes])))
   ambigues <- r[vapply(roles, function(cl) sum(names(donnees) == cl) > 1L, logical(1L))]
   if (length(ambigues))
     refuser("donnees", "colonne_ambigue",
-            sprintf("Colonne présente plusieurs fois sous le même nom dans les données : %s (rôle %s).",
-                    liste_guillemets(roles[ambigues]), liste_guillemets(ambigues)),
+            formuler("Colonne présente plusieurs fois sous le même nom dans les données : %s (rôle %s).",
+                     liste_guillemets(roles[ambigues]), liste_guillemets(ambigues)),
             list(role = ambigues, colonne = unname(roles[ambigues])))
   col_doubles <- unique(roles[duplicated(roles)])
   if (length(col_doubles))
     refuser("donnees", "colonne_declaree_deux_fois",
-            sprintf("Colonne déclarée pour plusieurs rôles : %s (rôles %s).",
-                    liste_guillemets(col_doubles), liste_guillemets(r[roles %in% col_doubles])),
+            formuler("Colonne déclarée pour plusieurs rôles : %s (rôles %s).",
+                     liste_guillemets(col_doubles), liste_guillemets(r[roles %in% col_doubles])),
             list(role = r[roles %in% col_doubles], colonne = col_doubles))
   types <- CATALOGUE_ROLES$type[match(r, CATALOGUE_ROLES$role)]
-  ko <- !vapply(seq_along(r), function(i) type_conforme(donnees[[roles[[i]]]], types[i]),
+  # Colonnes lues par lire_champ() (R/outils.R, #128) : donnees[[nom]] lève une
+  # erreur R sur un nom de colonne d'encodage « bytes » (mesuré) ; la colonne,
+  # présente (colonne_absente a refusé sinon), est jugée sur son type.
+  colonne <- function(i) lire_champ(donnees, roles[[i]])
+  ko <- !vapply(seq_along(r), function(i) type_conforme(colonne(i), types[i]),
                 logical(1L))
+  # TYPES_ADMIS (« entières », non ASCII) est une constante du moteur non
+  # marquée : texte_moteur() la marque UTF-8 avant l'insertion par %s (sous
+  # la locale C, sprintf() en écrirait les octets « <c3><a8> » ; #127).
   if (any(ko))
     refuser("donnees", "type_incompatible",
-            sprintf("Type incompatible : %s.",
-                    paste(sprintf("rôle « %s », colonne « %s » : %s attendu, %s reçu",
-                                  r[ko], roles[ko], TYPES_ADMIS[types[ko]],
-                                  vapply(r[ko], function(x)
-                                    paste(class(donnees[[roles[[x]]]]), collapse = "/"),
-                                    character(1L))),
-                          collapse = " ; ")),
+            formuler("Type incompatible : %s.",
+                     paste(formuler("rôle « %s », colonne « %s » : %s attendu, %s reçu",
+                                    citer(r[ko]), citer(roles[ko]),
+                                    texte_moteur(TYPES_ADMIS[types[ko]]),
+                                    vapply(which(ko), function(i)
+                                      paste(citer(class(colonne(i))), collapse = "/"),
+                                      character(1L))),
+                           collapse = " ; ")),
             list(role = r[ko], colonne = unname(roles[ko]), type_attendu = unname(TYPES_ADMIS[types[ko]])))
   # Dates hors du domaine [0001-01-01, 9999-12-31] : type conforme, mais aucune
   # écriture canonique ; refus nommé, tous les rôles en cause et leurs lignes
   # sont cités (ADR 0011, point 4) ; details$lignes : liste nommée rôle ->
   # lignes, comme ligne_invalide.
   hors <- lapply(stats::setNames(which(types == "date"), r[types == "date"]),
-                 function(i) which(dates_hors_domaine(unclass(donnees[[roles[[i]]]]))))
+                 function(i) which(dates_hors_domaine(unclass(colonne(i)))))
   hors <- hors[lengths(hors) > 0L]
   if (length(hors))
     refuser("donnees", "date_hors_domaine",
-            sprintf(paste("Dates hors du domaine [0001-01-01, 9999-12-31] : %s ; aucune écriture canonique à",
-                          "quatre chiffres n'existe."),
-                    paste(sprintf("rôle « %s », colonne « %s » : %d date(s) (premières lignes %s)",
-                                  names(hors), roles[names(hors)], lengths(hors),
-                                  vapply(hors, function(h) paste(utils::head(h, NB_LIGNES_CITEES), collapse = ", "),
-                                         character(1L))),
-                          collapse = " ; ")),
+            formuler(paste("Dates hors du domaine [0001-01-01, 9999-12-31] : %s ; aucune écriture canonique à",
+                           "quatre chiffres n'existe."),
+                     paste(formuler("rôle « %s », colonne « %s » : %d date(s) (premières lignes %s)",
+                                    citer(names(hors)), citer(roles[names(hors)]), lengths(hors),
+                                    vapply(hors, function(h) paste(utils::head(h, NB_LIGNES_CITEES), collapse = ", "),
+                                           character(1L))),
+                           collapse = " ; ")),
             list(role = names(hors), colonne = unname(roles[names(hors)]), lignes = hors))
   requis <- CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"]
   manquants <- setdiff(requis, r)
@@ -292,9 +310,9 @@ controler_roles <- function(donnees, roles, segmentation) {
   seg_manquants <- setdiff(segmentation, r)
   if (length(seg_manquants))
     refuser("donnees", "role_requis_manquant",
-            sprintf(paste("Rôle requis manquant : %s, employé par la segmentation du plan",
-                          "(recette « %s »)."),
-                    liste_guillemets(seg_manquants), RECETTE_BRANCHE),
+            formuler(paste("Rôle requis manquant : %s, employé par la segmentation du plan",
+                           "(recette « %s »)."),
+                     liste_guillemets(seg_manquants), RECETTE_BRANCHE),
             list(role = seg_manquants, recette = RECETTE_BRANCHE))
   roles
 }
@@ -311,9 +329,9 @@ controler_segmentation <- function(segmentation, etape) {
   if (!forme_exacte(segmentation, "character") || anyNA(segmentation) || anyDuplicated(segmentation) ||
       !all(segmentation %in% ROLES_SEGMENTATION))
     refuser(etape, "segmentation_invalide",
-            sprintf(paste("La segmentation doit être un vecteur de chaînes sans attribut, sans doublon,",
-                          "pris dans %s (vide explicite admis)."),
-                    liste_guillemets(ROLES_SEGMENTATION)),
+            formuler(paste("La segmentation doit être un vecteur de chaînes sans attribut, sans doublon,",
+                           "pris dans %s (vide explicite admis)."),
+                     liste_guillemets(ROLES_SEGMENTATION)),
             list(segmentation = segmentation))
   invisible(NULL)
 }
@@ -348,47 +366,46 @@ controler_transition_periode <- function(transition, periode, delai_declaration)
   if (!liste_aux_noms(transition, c("depart", "arrivee")) || !chaine_unique(transition[["depart"]]) ||
       !chaine_unique(transition[["arrivee"]]))
     refuser("donnees", "transition_inconnue",
-            paste("La transition doit être une liste de deux noms d'états (chaînes non vides, sans attribut),",
-                  "de champs exactement depart et arrivee, sans autre attribut (ADR 0007, point 5.1)."),
+            formuler(paste("La transition doit être une liste de deux noms d'états (chaînes non vides, sans attribut),",
+                           "de champs exactement depart et arrivee, sans autre attribut (ADR 0007, point 5.1).")),
             list(transition = transition))
   depart <- transition[["depart"]]; arrivee <- transition[["arrivee"]]
   if (!nrow(ligne_transition(transition))) {
     # États cités par citer() : règle neutraliser_citation() (R/outils.R ; #111, #94).
     refuser("donnees", "transition_inconnue",
-            sprintf("Transition non prise en charge : %s -> %s (prises en charge : %s).",
-                    citer(depart), citer(arrivee),
-                    paste(TRANSITIONS$depart, "->", TRANSITIONS$arrivee, collapse = ", ")),
+            formuler("Transition non prise en charge : %s -> %s (prises en charge : %s).",
+                     citer(depart), citer(arrivee),
+                     paste(TRANSITIONS$depart, "->", TRANSITIONS$arrivee, collapse = ", ")),
             list(transition = transition))
   }
-  # Stockage double ou integer admis (inchangé), seul attribut : la classe.
-  date1 <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
-    identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
-    is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
-  if (!liste_aux_noms(periode, c("debut", "fin")) || !date1(periode[["debut"]]) || !date1(periode[["fin"]]))
+  # Stockage double ou integer admis (inchangé), seul attribut : la classe
+  # (date_unique(), outils ; #113).
+  if (!liste_aux_noms(periode, c("debut", "fin")) || !date_unique(periode[["debut"]]) ||
+      !date_unique(periode[["fin"]]))
     refuser("donnees", "periode_invalide",
-            paste("La période d'observation doit être une liste de champs exactement debut et fin,",
-                  "sans autre attribut, deux dates (classe Date, sans autre attribut) non manquantes."),
+            formuler(paste("La période d'observation doit être une liste de champs exactement debut et fin,",
+                           "sans autre attribut, deux dates (classe Date, sans autre attribut) non manquantes.")),
             list(periode = periode))
   # Bornes hors du domaine des dates (ADR 0011, point 4), même domaine que les données.
   hors_p <- c(debut = dates_hors_domaine(periode[["debut"]]), fin = dates_hors_domaine(periode[["fin"]]))
   if (any(hors_p))
     refuser("donnees", "date_hors_domaine",
-            sprintf("Période d'observation : borne(s) %s hors du domaine des dates [0001-01-01, 9999-12-31].",
-                    paste(names(hors_p)[hors_p], collapse = " et ")),
+            formuler("Période d'observation : borne(s) %s hors du domaine des dates [0001-01-01, 9999-12-31].",
+                     paste(names(hors_p)[hors_p], collapse = " et ")),
             list(bornes = names(hors_p)[hors_p]))
   if (!forme_exacte(delai_declaration, c("integer", "double")) || length(delai_declaration) != 1L ||
       is.na(delai_declaration) || !is.finite(delai_declaration) ||
       delai_declaration != trunc(delai_declaration) || delai_declaration < 0)
     refuser("donnees", "delai_invalide",
-            "Le délai de déclaration doit être un nombre entier unique de jours >= 0, sans attribut (A.0, T4).",
+            formuler("Le délai de déclaration doit être un nombre entier unique de jours >= 0, sans attribut (A.0, T4)."),
             list(delai_declaration = delai_declaration))
   debut <- as.numeric(periode[["debut"]]); fin <- as.numeric(periode[["fin"]])
   fin_effective <- fin - delai_declaration
   if (debut > fin_effective)
     refuser("donnees", "periode_vide",
-            sprintf("Période d'observation vide : début %s postérieur à la fin effective %s (fin %s, délai %s jour(s)).",
-                    format(periode[["debut"]]), format(structure(fin_effective, class = "Date")),
-                    format(periode[["fin"]]), format(delai_declaration)),
+            formuler("Période d'observation vide : début %s postérieur à la fin effective %s (fin %s, délai %s jour(s)).",
+                     citer(format(periode[["debut"]])), citer(format(structure(fin_effective, class = "Date"))),
+                     citer(format(periode[["fin"]])), citer(format(delai_declaration))),
             list(debut = periode[["debut"]], fin_effective = structure(fin_effective, class = "Date")))
   valeurs_parametres_donnees(transition, periode, delai_declaration)
 }
@@ -403,13 +420,13 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
   controler_segmentation(segmentation, "donnees")
   if (!forme_exacte(exclusions, "character") || anyNA(exclusions) || anyDuplicated(exclusions))
     refuser("donnees", "exclusions_invalides",
-            paste("Les règles d'exclusion doivent être un vecteur de codes de motif sans attribut, sans doublon",
-                  "(vide explicite admis)."),
+            formuler(paste("Les règles d'exclusion doivent être un vecteur de codes de motif sans attribut, sans doublon",
+                           "(vide explicite admis).")),
             list(exclusions = exclusions))
   inconnus <- setdiff(exclusions, c(MOTIFS_LIGNES, MOTIFS_TETE))
   if (length(inconnus))
     refuser("donnees", "exclusion_inconnue",
-            sprintf("Code d'exclusion inconnu : %s (liste fermée des motifs).", liste_guillemets(inconnus)),
+            formuler("Code d'exclusion inconnu : %s (liste fermée des motifs).", liste_guillemets(inconnus)),
             list(exclusions = inconnus))
   p
 }
@@ -548,10 +565,10 @@ fusionner_intervalles <- function(g, entree, fin) {
   # directement.
   if (max(gs) * largeur >= 2^52)
     refuser("donnees", "dates_hors_plage",
-            sprintf(paste("Étendue des dates d'entrée et de sortie de %.0f jours pour %d têtes : leur produit",
-                          "dépasse 2^52, hors de la plage que la fusion par tête calcule exactement ;",
-                          "vérifier les dates et le nombre de têtes."),
-                    largeur, max(gs)),
+            formuler(paste("Étendue des dates d'entrée et de sortie de %.0f jours pour %d têtes : leur produit",
+                           "dépasse 2^52, hors de la plage que la fusion par tête calcule exactement ;",
+                           "vérifier les dates et le nombre de têtes."),
+                     largeur, max(gs)),
             list(etendue_jours = largeur, tetes = max(gs)))
   fc <- fs; fc[!is.finite(fc)] <- haut
   decalage <- (gs - 1) * largeur
@@ -600,7 +617,7 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
     controler_roles(donnees, roles, segmentation)
   }
   n <- nrow(donnees)
-  if (!n) refuser("donnees", "base_vide", "La base d'observation ne contient aucune ligne.")
+  if (!n) refuser("donnees", "base_vide", formuler("La base d'observation ne contient aucune ligne."))
   ev <- evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation)
   motifs <- ev$motifs
   nombre <- lengths(motifs)
@@ -613,14 +630,14 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
     premieres <- lapply(lignes, utils::head, NB_LIGNES_CITEES)
     total <- length(unique(unlist(lignes, use.names = FALSE)))
     refuser("donnees", "ligne_invalide",
-            sprintf(paste("Lignes invalides, sans règle d'exclusion déclarée pour leur motif",
-                          "(E2.7) : %s. Total : %d ligne(s) distincte(s)."),
-                    paste(sprintf("« %s » : %d ligne(s), premières lignes %s%s", non_declares,
-                                  lengths(lignes),
-                                  vapply(premieres, paste, character(1L), collapse = ", "),
-                                  ifelse(lengths(lignes) > NB_LIGNES_CITEES, " et suivantes", "")),
-                          collapse = " ; "),
-                    total),
+            formuler(paste("Lignes invalides, sans règle d'exclusion déclarée pour leur motif",
+                           "(E2.7) : %s. Total : %d ligne(s) distincte(s)."),
+                     paste(formuler("« %s » : %d ligne(s), premières lignes %s%s", non_declares,
+                                    lengths(lignes),
+                                    vapply(premieres, paste, character(1L), collapse = ", "),
+                                    ifelse(lengths(lignes) > NB_LIGNES_CITEES, " et suivantes", "")),
+                           collapse = " ; "),
+                     total),
             list(decompte = lengths(lignes), premieres_lignes = premieres, lignes = lignes,
                  total_lignes = total))
   }
@@ -631,8 +648,8 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
   numeros <- setdiff(seq_len(n), exclues)
   if (!length(numeros))
     refuser("donnees", "aucune_ligne_conservee",
-            sprintf("Toutes les lignes (%d) sont écartées par les règles d'exclusion déclarées (%s).",
-                    n, liste_guillemets(exclusions[lengths(motifs[exclusions]) > 0L])),
+            formuler("Toutes les lignes (%d) sont écartées par les règles d'exclusion déclarées (%s).",
+                     n, liste_guillemets(exclusions[lengths(motifs[exclusions]) > 0L])),
             list(lignes_exclues = length(exclues)))
 
   # Unité d'observation (E2.4, M46) et observations.
@@ -794,41 +811,41 @@ FORMES_ORIGINE <- c("qx", "lx")
 #   forme_origine: qx ou lx (forme de la transcription).
 table_reference <- function(x, nom, statut, source, parametres = NULL, forme_origine = "qx") {
   if (!chaine_unique(nom))
-    refuser("donnees", "table_nom_manquant", "La table de référence doit avoir un nom (chaîne non vide, sans attribut).")
+    refuser("donnees", "table_nom_manquant", formuler("La table de référence doit avoir un nom (chaîne non vide, sans attribut)."))
   # Nom cité dans les messages : règle neutraliser_citation() (R/outils.R ;
   # #111, #94) ; `nom` lui-même reste celui de l'objet.
   nom_cite <- citer(nom)
   if (!chaine_unique(statut) || !(statut %in% STATUTS_TABLE))
     refuser("donnees", "table_statut_inconnu",
-            sprintf("Table « %s » : statut (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(STATUTS_TABLE)),
+            formuler("Table « %s » : statut (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(STATUTS_TABLE)),
             list(statut = statut))
   if (!chaine_unique(source))
     refuser("donnees", "table_source_manquante",
-            sprintf("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom_cite))
+            formuler("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom_cite))
   if (statut == "synthetique" && (!is.list(parametres) || !length(parametres)))
     refuser("donnees", "table_parametres_manquants",
-            sprintf("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom_cite))
+            formuler("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom_cite))
   if (statut != "synthetique" && !is.null(parametres))
     refuser("donnees", "table_parametres_inattendus",
-            sprintf("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, statut))
+            formuler("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, citer(statut)))
   if (!chaine_unique(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
     refuser("donnees", "table_forme_inconnue",
-            sprintf("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(FORMES_ORIGINE)))
+            formuler("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(FORMES_ORIGINE)))
   if (!is.data.frame(x))
-    refuser("donnees", "table_mal_formee", sprintf("Table « %s » : un data.frame est attendu.", nom_cite))
+    refuser("donnees", "table_mal_formee", formuler("Table « %s » : un data.frame est attendu.", nom_cite))
   colonnes <- c("age", "sexe", "qx", if ("annee" %in% names(x)) "annee")
   manquantes <- setdiff(c("age", "sexe", "qx"), names(x))
   if (length(manquantes))
     refuser("donnees", "table_colonne_manquante",
-            sprintf("Table « %s » : colonne(s) manquante(s) %s.", nom_cite, liste_guillemets(manquantes)),
+            formuler("Table « %s » : colonne(s) manquante(s) %s.", nom_cite, liste_guillemets(manquantes)),
             list(colonne = manquantes))
   en_trop <- setdiff(names(x), colonnes)
   if (length(en_trop))
     refuser("donnees", "table_colonne_inconnue",
-            sprintf("Table « %s » : colonne(s) inconnue(s) %s (admises : age, sexe, qx, annee).",
-                    nom_cite, liste_guillemets(en_trop)),
+            formuler("Table « %s » : colonne(s) inconnue(s) %s (admises : age, sexe, qx, annee).",
+                     nom_cite, liste_guillemets(en_trop)),
             list(colonne = en_trop))
-  if (!nrow(x)) refuser("donnees", "table_vide", sprintf("Table « %s » : aucune ligne.", nom_cite))
+  if (!nrow(x)) refuser("donnees", "table_vide", formuler("Table « %s » : aucune ligne.", nom_cite))
   mal_typees <- c(
     age = !type_conforme(x$age, "entier_positif") || anyNA(x$age),
     sexe = !type_conforme(x$sexe, "categorie") || anyNA(x$sexe),
@@ -836,15 +853,15 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     annee = "annee" %in% names(x) && (!type_conforme(x$annee, "entier") || anyNA(x$annee)))
   if (any(mal_typees))
     refuser("donnees", "table_colonne_mal_typee",
-            sprintf("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; sexe : chaîne ; qx : double).",
-                    nom_cite, liste_guillemets(names(mal_typees)[mal_typees])),
+            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; sexe : chaîne ; qx : double).",
+                     nom_cite, liste_guillemets(names(mal_typees)[mal_typees])),
             list(colonne = names(mal_typees)[mal_typees]))
   sexe <- as.character(x$sexe)
   hors <- which(!(sexe %in% SEXES_TABLE))
   if (length(hors))
     refuser("donnees", "table_sexe_hors_modalites",
-            sprintf("Table « %s » : sexe hors de %s aux lignes %s.", nom_cite, liste_guillemets(SEXES_TABLE),
-                    paste(utils::head(hors, NB_LIGNES_CITEES), collapse = ", ")),
+            formuler("Table « %s » : sexe hors de %s aux lignes %s.", nom_cite, liste_guillemets(SEXES_TABLE),
+                     paste(utils::head(hors, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = hors))
   # « ensemble » (table sans distinction de sexe) ne coexiste pas avec H ou
   # F, dans toute la table ou, si elle a des années, au sein d'une année.
@@ -852,20 +869,20 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   melange <- unique(annee0[annee0 %in% annee0[sexe == "ensemble"] & annee0 %in% annee0[sexe != "ensemble"]])
   if (length(melange))
     refuser("donnees", "table_sexes_melanges",
-            sprintf("Table « %s » : la modalité « ensemble » coexiste avec H ou F%s.", nom_cite,
-                    if ("annee" %in% names(x)) sprintf(" (années %s)", paste(utils::head(melange, NB_LIGNES_CITEES), collapse = ", ")) else ""),
+            formuler("Table « %s » : la modalité « ensemble » coexiste avec H ou F%s.", nom_cite,
+                     if ("annee" %in% names(x)) formuler(" (années %s)", paste(utils::head(melange, NB_LIGNES_CITEES), collapse = ", ")) else ""),
             list(annees = if ("annee" %in% names(x)) melange else NULL))
   non_fini <- which(!is.finite(x$qx))
   if (length(non_fini))
     refuser("donnees", "table_qx_non_fini",
-            sprintf("Table « %s » : q_x manquant ou non fini aux lignes %s.", nom_cite,
-                    paste(utils::head(non_fini, NB_LIGNES_CITEES), collapse = ", ")),
+            formuler("Table « %s » : q_x manquant ou non fini aux lignes %s.", nom_cite,
+                     paste(utils::head(non_fini, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = non_fini))
   hors_bornes <- which(x$qx < 0 | x$qx > 1)
   if (length(hors_bornes))
     refuser("donnees", "table_qx_hors_bornes",
-            sprintf("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom_cite,
-                    paste(utils::head(hors_bornes, NB_LIGNES_CITEES), collapse = ", ")),
+            formuler("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom_cite,
+                     paste(utils::head(hors_bornes, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = hors_bornes))
   age <- as.integer(x$age)
   annee <- if ("annee" %in% names(x)) as.integer(x$annee) else NULL
@@ -873,9 +890,9 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   doublons <- which(duplicated(paste(cle, age, sep = "\r")))
   if (length(doublons))
     refuser("donnees", "table_age_double",
-            sprintf("Table « %s » : âge en double au sein d'un même sexe%s, lignes %s.", nom_cite,
-                    if (is.null(annee)) "" else " et d'une même année",
-                    paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = ", ")),
+            formuler("Table « %s » : âge en double au sein d'un même sexe%s, lignes %s.", nom_cite,
+                     if (is.null(annee)) "" else formuler(" et d'une même année"),
+                     paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = doublons))
   # Âges croissants et contigus par (sexe, annee), dans l'ordre reçu.
   g <- match(cle, unique(cle))
@@ -884,15 +901,15 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   decroit <- which(meme & pas < 0L)
   if (length(decroit))
     refuser("donnees", "table_ages_non_croissants",
-            sprintf("Table « %s » : âges non croissants au sein d'un même sexe, lignes %s.", nom_cite,
-                    paste(utils::head(o[decroit + 1L], NB_LIGNES_CITEES), collapse = ", ")),
+            formuler("Table « %s » : âges non croissants au sein d'un même sexe, lignes %s.", nom_cite,
+                     paste(utils::head(o[decroit + 1L], NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = o[decroit + 1L]))
   trous <- which(meme & pas > 1L)
   if (length(trous))
     refuser("donnees", "table_ages_non_contigus",
-            sprintf("Table « %s » : âges non contigus (âge manquant) au sein d'un même sexe, entre les lignes %s.",
-                    nom_cite, paste(sprintf("%d et %d", o[trous], o[trous + 1L])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
-                               collapse = ", ")),
+            formuler("Table « %s » : âges non contigus (âge manquant) au sein d'un même sexe, entre les lignes %s.",
+                     nom_cite, paste(sprintf("%d et %d", o[trous], o[trous + 1L])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
+                                collapse = ", ")),
             list(lignes = o[trous + 1L]))
   t <- data.frame(age = age, sexe = sexe, qx = as.numeric(x$qx), stringsAsFactors = FALSE)
   if (!is.null(annee)) t$annee <- annee
