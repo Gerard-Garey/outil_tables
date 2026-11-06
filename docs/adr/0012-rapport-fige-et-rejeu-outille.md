@@ -341,3 +341,15 @@ La mention ne contient aucune phrase sur l'entreprise ni sur le certificateur, e
 **Effet sur les résultats.** Aucun au-delà de l'annotation précédente : texte d'une mention du rapport, non encore écrit dans le code (commit (4b)).
 
 Issue : #69. Décision M259 ; M69, M242.
+
+## Annotation du 6 novembre 2026 (quatrième) — annotation du même jour, seconde, (c) : liste des refus d'appariement complétée (#4)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `713b323`, sur l'écart relevé par `docwriter` au passage unique (6). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Mesures refaites par `architect` sous R 4.3.3, `tablexp` installé depuis l'arbre de travail à `713b323` dans une bibliothèque temporaire (environnement cloud, hors plateforme de référence).
+
+**Correction.** Le point (c) de l'annotation du même jour, seconde, énumère quatre refus d'appariement (`convention_validation_non_admise`, `table_annee_non_admise`, `table_sexe_incompatible`, `plage_ages_hors_table`). `controler_entrees_validation()` (`R/validation.R:296`, livrée par `e9cbf53`, #4) en lève **cinq**, dans cet ordre : `convention_validation_non_admise`, `table_annee_non_admise`, **`table_sexes_ambigus`** (table qui mêle la modalité `ensemble` et H ou F), `table_sexe_incompatible`, `plage_ages_hors_table` (*vérifié* par lecture de `R/validation.R:296-330`). Le rejeu l'appelle au contrôle **7 ter**, après le contrôle 7 bis et avant l'unique appel de `construire_table()` (`R/construire_table.R:1018-1024`, *vérifié* par lecture). Le point (c) se lit donc avec les cinq motifs.
+
+**Portée du cinquième motif.** `table_sexes_ambigus` est une **garde de défense** : une table qui mêle `ensemble` et H ou F est refusée plus tôt par `table_reference()` (`table_sexes_melanges`, module `donnees`, `R/donnees.R:926-934`). Elle ne peut donc pas atteindre `controler_entrees_validation()` sous forme d'objet `table_reference`, ni par `construire_table()` ni par le rejeu. *Vérifié* : `table_reference()` sur une table H + `ensemble` rend le refus `table_sexes_melanges` ; l'appel direct de `tablexp:::controler_entrees_validation()` sur le même `data.frame` rend `table_sexes_ambigus`. Ce dernier cas est le test `tests/unitaires/test_validation.R:515` (« appel direct, défense »). Le point 3.2 est inchangé.
+
+**Effet sur les résultats : aucun.** Le texte de l'ADR est mis en accord avec le code livré ; rien n'est modifié dans le code.
+
+Issues : #4, #73. Décisions M242, M253. Branche `claude/validation-smr-reference`, PR #155.
