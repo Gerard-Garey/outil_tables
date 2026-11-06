@@ -386,7 +386,9 @@ for (expr_ in parse(file.path(CONTROLES, "locale_c.R"), encoding = "UTF-8")) eva
 verifier("locale C : sourcé, locale_c.R ne définit que des fonctions et constantes ; LOCALES_UTF8 identique à celle du harnais",
          identical(env_locale_c$LOCALES_UTF8, LOCALES_UTF8) && is.function(env_locale_c$ecart_octets) &&
            is.function(env_locale_c$locale_utf8_disponible) &&
-           identical(env_locale_c$locale_utf8_disponible(), locale_utf8_disponible()))
+           identical(env_locale_c$locale_utf8_disponible(), locale_utf8_disponible()) &&
+           identical(env_locale_c$LOCALE_INVENTEE, LOCALE_INVENTEE) &&
+           identical(deparse(env_locale_c$locale_utf8_disponible), deparse(locale_utf8_disponible)))
 octets_ <- function(t) charToRaw(t)
 verifier("locale C : ecart_octets() — textes identiques (le premier octet « différent » est celui qui suit la fin)",
          identical(env_locale_c$ecart_octets(octets_("ab\ncd\n"), octets_("ab\ncd\n")),
@@ -452,7 +454,9 @@ unlink(chemin_reduit, recursive = TRUE)
 # l'est que sous une session UTF-8 (sous C, les octets natifs sont du latin-1).
 verifier("locale latin-1 : sourcé, locale_latin1.R ne définit que des fonctions et constantes ; LOCALES_UTF8 identique à celle du harnais",
          identical(env_latin1$LOCALES_UTF8, LOCALES_UTF8) && is.function(env_latin1$valeurs_segment) &&
-           identical(env_latin1$locale_utf8_disponible(), locale_utf8_disponible()))
+           identical(env_latin1$locale_utf8_disponible(), locale_utf8_disponible()) &&
+           identical(env_latin1$LOCALE_INVENTEE, LOCALE_INVENTEE) &&
+           identical(deparse(env_latin1$locale_utf8_disponible), deparse(locale_utf8_disponible)))
 verifier("locale latin-1 : jeux de segments — marquages (latin-1, UTF-8) et octets UTF-8 de référence, ordre des octets",
          {
            l1 <- env_latin1$valeurs_segment("latin1"); u8 <- env_latin1$valeurs_segment("utf8")

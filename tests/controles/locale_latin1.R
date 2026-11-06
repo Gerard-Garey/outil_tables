@@ -47,6 +47,7 @@
 # -----------------------------------------------------------------------------
 
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
+LOCALE_INVENTEE <- "xx_XX.UTF-8"  # comme tests/harnais.R (critère de #109)
 LOCALE_LATIN1 <- "fr_FR.ISO-8859-1"
 IDENTIFIANTS <- paste0("R", 1:6)
 JEUX_NON_ASCII <- c("natif", "latin1", "utf8", "mixte")
@@ -75,11 +76,21 @@ rm(e_)
 # sous latin-1 par le sous-processus.
 ascii <- function(x) iconv(enc2utf8(x), "UTF-8", "ASCII", sub = "byte")
 
-# Première locale UTF-8 que Sys.setlocale accepte, "" si aucune.
-locale_utf8_disponible <- function() {
-  ancienne <- Sys.getlocale("LC_CTYPE")
-  on.exit(Sys.setlocale("LC_CTYPE", ancienne))
-  for (l in LOCALES_UTF8) if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) return(l)
+# Première locale UTF-8 que Sys.setlocale accepte, "" si aucune. Copie à
+# l'identique de locale_utf8_disponible() de tests/harnais.R (critère de #109 :
+# un nom inventé que l'UCRT accepte est refusé ; voir le commentaire de cette
+# fonction).
+locale_utf8_disponible <- function(candidats = LOCALES_UTF8) {
+  ancienne <- vapply(c("LC_CTYPE", "LC_MONETARY"), Sys.getlocale, "")
+  on.exit(for (n in names(ancienne)) Sys.setlocale(n, ancienne[[n]]))
+  devise <- function(l) if (nzchar(suppressWarnings(Sys.setlocale("LC_MONETARY", l))))
+    Sys.localeconv()[["int_curr_symbol"]]
+  inventee <- devise(LOCALE_INVENTEE)
+  for (l in candidats) {
+    if (!nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) next
+    if (!is.null(inventee) && identical(devise(l), inventee)) next
+    return(l)
+  }
   ""
 }
 

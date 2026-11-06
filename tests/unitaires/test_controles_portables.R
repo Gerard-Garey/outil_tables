@@ -378,3 +378,44 @@ if (.Platform$OS.type != "windows" && !is.null(p_reel_)) {
 } else cat(sprintf("  [sauté] ecriture_doubles.R : dossier temporaire à espace, avec et sans shQuote() : %s\n",
                    if (.Platform$OS.type == "windows") "plateforme Windows (le contrôle ne s'y exécute pas)" else
                      "aucun interpréteur Python >= 3.8"))
+
+# --- locale_utf8_disponible() : refus d'un nom inventé (issue #109) -------------------
+# Sous l'UCRT de Windows, Sys.setlocale accepte tout nom inventé (« xx_XX.UTF-8 »)
+# et lui donne la culture invariante, que seul Sys.localeconv() sous LC_MONETARY
+# distingue d'une locale réelle (devise XDR contre USD pour en_US.UTF-8). Sous
+# glibc le nom inventé est refusé : le résultat est le même ("") sans le critère.
+# Limite résiduelle, non testée : « xx_US.UTF-8 » (langue inventée, pays réel,
+# devise USD) échappe au critère. Nature des attendus : valeurs exactes.
+
+monnaie_avant_ <- Sys.getlocale("LC_MONETARY"); ctype_avant_ <- Sys.getlocale("LC_CTYPE")
+verifier("locale_utf8_disponible() : un nom inventé seul n'est pas disponible (UCRT : refusé par le critère ; glibc : refusé par setlocale)",
+         identical(locale_utf8_disponible(c("xx_XX.UTF-8")), ""))
+reference_ <- locale_utf8_disponible()
+verifier("locale_utf8_disponible() : un nom inventé placé avant les candidates ne change pas le résultat",
+         identical(locale_utf8_disponible(c("xx_XX.UTF-8", LOCALES_UTF8)), reference_))
+verifier("locale_utf8_disponible() : LC_CTYPE et LC_MONETARY restaurées (appels refusés et acceptés)",
+         identical(Sys.getlocale("LC_CTYPE"), ctype_avant_) && identical(Sys.getlocale("LC_MONETARY"), monnaie_avant_))
+if (.Platform$OS.type == "windows") {
+  verifier("locale_utf8_disponible() : en_US.UTF-8 derrière un nom inventé -> en_US.UTF-8 (locale réelle de l'UCRT)",
+           identical(locale_utf8_disponible(c("xx_XX.UTF-8", "en_US.UTF-8")), "en_US.UTF-8"))
+  verifier("locale_utf8_disponible() : yy_YY.utf8 et en_XX.UTF-8 (devise XDR) refusés, en_US.UTF-8 retenu",
+           identical(locale_utf8_disponible(c("yy_YY.utf8", "en_XX.UTF-8", "en_US.UTF-8")), "en_US.UTF-8"))
+  # Session en page de code 1252 (cas de locale_installation()) : currency_symbol
+  # y est rendu en 1252 (a4), sous UTF-8 en c2 a4 ; seul int_curr_symbol (ASCII)
+  # permet de comparer la session et un candidat.
+  if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", "English_United States.1252")))) {
+    en_1252_ <- tryCatch(suppressWarnings(locale_utf8_disponible(c("yy_YY.utf8", "en_XX.UTF-8", "en_US.UTF-8"))),
+                         finally = Sys.setlocale("LC_CTYPE", ctype_avant_))
+    verifier("locale_utf8_disponible() : session English_United States.1252, noms inventés refusés, en_US.UTF-8 retenu",
+             identical(en_1252_, "en_US.UTF-8") && identical(Sys.getlocale("LC_CTYPE"), ctype_avant_))
+  } else verifier("locale_utf8_disponible() : English_United States.1252 non posable sous cette installation de Windows", FALSE)
+  # Critère inactif quand LOCALE_INVENTEE est refusée (cas de glibc) : le nom
+  # inventé redevient accepté, comme avant #109.
+  inventee_ <- LOCALE_INVENTEE
+  LOCALE_INVENTEE <<- "xx_XX.UTF-8@tablexp"
+  inactif_ <- tryCatch(locale_utf8_disponible(c("xx_XX.UTF-8")), finally = LOCALE_INVENTEE <<- inventee_)
+  verifier("locale_utf8_disponible() : LOCALE_INVENTEE refusée -> critère inactif, le nom inventé est accepté (glibc : rien ne change)",
+           identical(inactif_, "xx_XX.UTF-8") && identical(LOCALE_INVENTEE, "xx_XX.UTF-8"))
+  verifier("locale_utf8_disponible() : LC_CTYPE et LC_MONETARY restaurées après les cas Windows",
+           identical(Sys.getlocale("LC_CTYPE"), ctype_avant_) && identical(Sys.getlocale("LC_MONETARY"), monnaie_avant_))
+} else cat("  [sauté] locale_utf8_disponible() : en_US.UTF-8 retenue derrière un nom inventé, critère inactif : l'acceptation d'un nom inventé est propre à l'UCRT, plateforme hors Windows\n")
