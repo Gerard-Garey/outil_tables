@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{05/11/2026}
+\newcommand{\datedoc}{06/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -2288,9 +2288,12 @@ batterie unitaire garde les témoins T1 à T3 et que la CI exécute en entier
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
 sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
-(\code{sys.source()}), vérifie que \code{LOCALES\_UTF8}, dupliquée de \code{tests/harnais.R}, y
+(lu par \code{parse()} en UTF-8, puis évalué dans un environnement
+propre~; issue~\#81), vérifie que \code{LOCALES\_UTF8}, dupliquée de \code{tests/harnais.R}, y
 est identique à celle du harnais et que \code{locale\_utf8\_disponible()}
-y rend la même locale que celle du harnais, et teste la fonction \code{ecart\_octets} du script,
+y rend la même locale que celle du harnais, et teste la fonction
+\code{ecart\_octets}, que le script charge de l'utilitaire commun
+(ci-dessous),
 qui rédige le message d'un écart de la comparaison octet à octet et
 que le chemin d'échec bon marché n'atteint pas, sur des attendus écrits à
 la main (textes identiques, premier octet différent à la deuxième ligne,
@@ -2313,6 +2316,33 @@ batterie exécute le mode \code{arbre} et les refus, et ne parcourt
 l'historique, sur des dépôts synthétiques, que si git est présent, avec un
 saut annoncé sinon (section~\ref{sec:rejeu}, «~Retrouver le code d'une
 fiche~»).
+
+\textbf{Utilitaire commun des contrôles de locale} (issue~\#117).
+L'orchestration «~installer, puis exécuter sous un environnement
+donné~», que \code{locale\_c.R} et \code{locale\_latin1.R} recopiaient avec
+de légères variantes, est écrite une seule fois dans
+\code{tests/controles/orchestration\_locale.R}~: pose des variables
+d'environnement le temps d'un appel et restauration ensuite, même après une
+erreur~; durée écoulée~; \code{R CMD INSTALL} de l'arbre de travail dans une
+bibliothèque temporaire et exécution du contrôle en sous-processus, chacun
+sous un vecteur d'environnement complet que fournit le contrôle~; message
+d'écart de la comparaison octet à octet (premier octet différent et sa
+ligne). Deux copies d'une même logique devaient rester synchronisées sans
+que rien ne le signale~; une correction de la restauration de
+l'environnement ou de la lecture du statut de sortie vaut désormais pour
+les deux contrôles. L'utilitaire ne lance rien et ne fait que définir des
+fonctions~; ce qui est propre à un contrôle (environnement de locale, jeux,
+comparaisons) reste dans le contrôle. Chaque contrôle le lit par
+\code{parse()} en UTF-8, quelle que soit la locale de la session
+(latin-1 comprise), et l'évalue dans son propre environnement~; il ne
+retient que le dossier qui contient aussi le contrôle, jamais un fichier
+homonyme placé à côté du script qui le lance, et s'arrête en nommant le
+contrôle si l'utilitaire y manque. Les fonctions de l'utilitaire, leur
+chargement par les deux contrôles (dont le texte ne doit redéfinir aucune
+d'elles) et le refus de l'homonyme sont testés dans
+\code{tests/unitaires/test\_controles\_portables.R}, et non dans
+\code{test\_controles.R}~: les tests nouveaux d'une branche ouverte en
+parallèle d'une autre vont dans un fichier propre (ADR 0013, point~3).
 
 \begin{center}
 \small
@@ -2391,6 +2421,12 @@ ordre des segments écrit et comparé à un ordre par octets UTF-8, puis
 (section~\ref{sec:harnais})~; étape «~Locale latin-1 (installation et
 exécution)~» du job «~Tests (R 4.3.3)~», hors liste des batteries &
 ADR 0007, point 9.3~; issues~\#106 et~\#115 \\
+\code{orchestration\_}\newline\code{locale.R} & aucune règle~:
+utilitaire commun, chargé par \code{locale\_c.R} et
+\code{locale\_latin1.R}, qui ne fait que définir des fonctions
+(environnement posé le temps d'un appel, installation et exécution sous un
+environnement donné, durée, premier octet différent)~; testé dans
+\code{test\_controles\_portables.R} & issue~\#117 \\
 \code{ecriture\_doubles.R} & écriture des doubles de l'empreinte en octets
 IEEE~754 identique, ligne à ligne, à celle d'un juge indépendant (Python,
 \code{struct.pack}) sur $10^6$ doubles tirés sous graine et des cas limites~;
