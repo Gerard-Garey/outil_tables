@@ -302,13 +302,20 @@ VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalide
                     validation.plage_ages = list(c(20, 90), "plage_ages_invalide"),
                     validation.tranches_age = list(c(20, 50), "tranches_age_invalides"),
                     validation.niveau = list(0.95, "niveau_invalide"),
-                    validation.replications = list(99, "replications_invalides"))
+                    validation.replications = list(99, "replications_invalides"),
+                    importance_exclusions.niveau = list(0.95, "niveau_invalide"))
 # Plan complet muni de l'étape validation (aléatoire : graine requise, #4),
 # pour les témoins de type de ses paramètres.
 plan_validation <- function() modifier(plan_complet(), graine = 1L, etapes = c(plan_complet()$etapes, list(
   validation = list(table_reference = "t", relation_table = "independante", plage_ages = c(20, 90),
                     tranches_age = c(20, 50), niveau = 0.95, replications = 99))))
-plan_de <- function(cle) if (startsWith(cle, "validation.")) plan_validation() else plan_complet()
+# Plan complet muni de l'étape importance_exclusions (#69, non aléatoire).
+plan_importance <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
+  importance_exclusions = list(niveau = 0.95))))
+plan_de <- function(cle) {
+  if (startsWith(cle, "validation.")) plan_validation()
+  else if (startsWith(cle, "importance_exclusions.")) plan_importance() else plan_complet()
+}
 AUTRES_TYPES <- list(logical = TRUE, integer = 1L, double = 0.5, complex = 0.5 + 0i, character = "poisson",
                      list = list("poisson"), raw = as.raw(1L))
 pe_cat <- tablexp:::PARAMETRES_ETAPES

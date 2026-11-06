@@ -48,12 +48,13 @@ verifier("A constantes : RELATIONS_TABLE, CONVENTIONS_VALIDATION, N_MAX_WILCOXON
            identical(tablexp:::N_MAX_WILCOXON_EXACT, 1000) && identical(tablexp:::N_MAX_RUNS_EXACT, 10000) &&
            identical(tablexp:::TOLERANCE_RESIDU_NUL, 1e-10) &&
            identical(tablexp:::PARAMETRES_CLE_TABLE, "etapes/validation/table_reference"))
-verifier("A ETAPES : validation après brut, module validation, préalables donnees et exposition, seule étape aléatoire", {
+verifier("A ETAPES : validation après brut, module validation, préalables donnees et exposition, seule étape aléatoire (importance_exclusions après elle, #69)", {
   e <- tablexp:::ETAPES
   k <- match("validation", e$etape)
-  identical(e$etape, c("donnees", "exposition", "brut", "validation")) && identical(e$module[k], "validation") &&
+  identical(e$etape, c("donnees", "exposition", "brut", "validation", "importance_exclusions")) &&
+    identical(e$module[k], "validation") &&
     identical(e$fonction[k], "calculer_validation") && identical(e$prealable[[k]], c("donnees", "exposition")) &&
-    identical(e$aleatoire, c(FALSE, FALSE, FALSE, TRUE))
+    identical(e$aleatoire, c(FALSE, FALSE, FALSE, TRUE, FALSE))
 })
 verifier("A PARAMETRES_ETAPES$validation : six paramètres dans l'ordre, types character et double", {
   p <- tablexp:::PARAMETRES_ETAPES$validation

@@ -10,7 +10,8 @@
 #    structurels du plan ; valeurs contrôlées par les modules qui les
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
 #    controler_parametres_exposition(), controler_parametres_brut(),
-#    controler_parametres_validation()) ;
+#    controler_parametres_validation(),
+#    controler_parametres_importance_exclusions()) ;
 #    exporté (contrôle de saisie à sens métier, E4.3) ;
 #  - PARAMETRES_CLE_TABLE, controler_forme_tables(), cles_citees(),
 #    controler_tables_reference(), controler_tables_rejeu() : tables de
@@ -50,13 +51,18 @@ CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentat
 # de tests/unitaires/test_brut_kaplan_meier.R, #27), tirage d'un aléa.
 # `validation` (#4 ; M242) : préalables `donnees` et `exposition` (`brut`
 # n'en est pas un : mu^ s'obtient par taux_poisson()), aléatoire (Monte-Carlo,
-# graine requise ; ADR 0015, point 7.2).
+# graine requise ; ADR 0015, point 7.2). `importance_exclusions` (#69 ;
+# M242) : module `validation`, préalables `donnees` et `exposition`, non
+# aléatoire ; après `validation`, dont elle lit le résultat (comparateur 2)
+# si et seulement si `validation` est au plan.
 ETAPES <- data.frame(
-  etape = c("donnees", "exposition", "brut", "validation"),
-  module = c("donnees", "exposition", "brut", "validation"),
-  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_validation"),
-  prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition"))),
-  aleatoire = c(FALSE, FALSE, FALSE, TRUE),
+  etape = c("donnees", "exposition", "brut", "validation", "importance_exclusions"),
+  module = c("donnees", "exposition", "brut", "validation", "validation"),
+  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_validation",
+               "calculer_importance_exclusions"),
+  prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition"),
+                     c("donnees", "exposition"))),
+  aleatoire = c(FALSE, FALSE, FALSE, TRUE, FALSE),
   stringsAsFactors = FALSE
 )
 
@@ -95,6 +101,11 @@ PARAMETRES_ETAPES <- list(
                 "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
                 "nombre double unique, fini, 0 < niveau < 1",
                 "nombre entier unique, au moins 1 (réplications de Monte-Carlo)"),
+    stringsAsFactors = FALSE),
+  importance_exclusions = data.frame(
+    parametre = "niveau",
+    type = "double",
+    domaine = "nombre double unique, fini, 0 < niveau < 1",
     stringsAsFactors = FALSE)
 )
 
@@ -243,6 +254,8 @@ valider_plan <- function(plan) {
     controler_parametres_validation(pv[["table_reference"]], pv[["relation_table"]], pv[["plage_ages"]],
                                     pv[["tranches_age"]], pv[["niveau"]], pv[["replications"]])
   }
+  if ("importance_exclusions" %in% noms)
+    controler_parametres_importance_exclusions(etapes[["importance_exclusions"]][["niveau"]])
   invisible(plan)
 }
 
@@ -632,6 +645,14 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                        tranches_age = pe[["tranches_age"]], niveau = pe[["niveau"]],
                                        replications = pe[["replications"]], graine = plan[["graine"]],
                                        controler = FALSE),
+      importance_exclusions = calculer_importance_exclusions(donnees, roles, etapes[["donnees"]],
+                                                             etapes[["exposition"]], etapes[["validation"]],
+                                                             table = table_validation,
+                                                             transition = plan[["transition"]],
+                                                             periode = plan[["periode"]],
+                                                             delai_declaration = plan[["delai_declaration"]],
+                                                             segmentation = plan[["segmentation"]],
+                                                             niveau = pe[["niveau"]], controler = FALSE),
       stop(sprintf("construire_table() : étape « %s » sans fonction d'étape (erreur de programmation).", nom),
            call. = FALSE))
     etapes[[nom]] <- r[c("parametres", "resultat", "diagnostics")]

@@ -24,7 +24,16 @@
 #  - replications_poisson() (sous sous_graine()) et pvaleur_monte_carlo() ;
 #  - statistiques_validation() : S1 à S12 sur les cellules (cœur partagé avec
 #    #69 et le futur suivre_experience(), ADR 0015, point 7.5) ;
-#  - calculer_validation() : fonction d'étape `validation`.
+#  - calculer_validation() : fonction d'étape `validation` ;
+#  - classe_motifs(), classer_lignes_exclues() : classes des motifs et des
+#    lignes exclues (mesurable, non calculable faute de clé, non mesurable),
+#    seule source des ensembles S (#69) ;
+#  - retrait_contrefactuel() : événements et exposition retirés par
+#    différence contrefactuelle (construire_observations(),
+#    evaluer_motifs(lignes_tete), calculer_exposition()) ;
+#  - smr_comparateur_1(), smr_comparateur_2() : SMR des lignes exclues ;
+#  - calculer_importance_exclusions() : fonction d'étape
+#    `importance_exclusions` (#69).
 #
 #  Notations (M217) : D = evenements ; E^c = exposition_centrale ; q~ = q_x
 #  de la table ; mu~ = -log1p(-q~) ; A = E^c mu~ (A = 0 si E^c = 0, même pour
@@ -35,7 +44,10 @@
 #  sous H0 produite, aucun tirage (M254). Aucun verdict, aucun seuil (M217,
 #  Q4). Formules sans attribution d'auteur (M200).
 #  Ce module n'appelle que `outils`, `donnees` (citer(), liste_guillemets(),
-#  controler_segmentation(), SEXES_TABLE) et `brut` (taux_poisson()) ; le
+#  controler_segmentation(), SEXES_TABLE ; pour #69 : construire_observations(),
+#  evaluer_motifs(), valeurs_parametres_donnees(), MOTIFS_TETE,
+#  MODALITES_CAUSE), `exposition` (calculer_exposition(), #69) et `brut`
+#  (taux_poisson()) ; le
 #  niveau est contrôlé ici sous le code niveau_invalide de `brut` (M253)
 #  (ADR 0007, point 2.1 et seconde annotation du 06/11/2026, (d)). Les
 #  arêtes vers donnees::table_reference relevées par graphe_modules.R sont
@@ -330,10 +342,12 @@ controler_entrees_validation <- function(table, cle, convention, segmentation, p
 # n'est créé. Appariement sur la clé exacte (sexe, âge), sans déduction : la
 # modalité ensemble s'applique à chaque cellule ; sinon le sexe de la cellule.
 # Refus en cours d'étape : cellule_sans_valeur_table (sexe absent de la
-# table). Rend list(cellules (clés, age [, annee], exposition_centrale,
-# evenements, qx_table), segment (indice), hors_plage (cellules, evenements,
+# table) ; avec refuser_sans_valeur = FALSE (comparateur 2 de l'étape
+# importance_exclusions, #69, sans refus), q~ NA pour ces cellules. Rend
+# list(cellules (clés, age [, annee], exposition_centrale, evenements,
+# qx_table), segment (indice), hors_plage (cellules, evenements,
 # exposition), appariement_sexe).
-apparier_table <- function(exposition, segmentation, par_annee, table, plage_ages, cle) {
+apparier_table <- function(exposition, segmentation, par_annee, table, plage_ages, cle, refuser_sans_valeur = TRUE) {
   cles_seg <- if (length(segmentation))
     do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r"))) else rep("", nrow(exposition))
   premiers <- !duplicated(cles_seg)
@@ -363,7 +377,7 @@ apparier_table <- function(exposition, segmentation, par_annee, table, plage_age
   ensemble <- identical(sexes, "ensemble")
   sexe_cle <- if (ensemble || !("sexe" %in% segmentation)) rep("ensemble", n) else as.character(cellules$sexe)
   k <- match(paste(sexe_cle, cellules$age, sep = "\r"), paste(table$sexe, table$age, sep = "\r"))
-  if (anyNA(k)) {
+  if (anyNA(k) && refuser_sans_valeur) {
     manquants <- unique(sexe_cle[is.na(k)])
     refuser("validation", "cellule_sans_valeur_table",
             formuler(paste("Validation : %d cellule(s) de la plage sans valeur dans la table de clé « %s » (sexe(s) %s",
@@ -897,4 +911,596 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
                           evenements_hors_plage = ap$hors_plage$evenements,
                           exposition_hors_plage = ap$hors_plage$exposition, evenements_total = total),
        avertissements = avert)
+}
+
+# --- étape `importance_exclusions` (#69) ----------------------------------------
+#
+# Spécification d'actuary-approfondi décidée (#69, commentaire 6663938080 ;
+# M215 : Q1 (b), Q2 à Q5 (a)) ; avis de forme (0'') (M242) ; décisions du
+# 06/11/2026 (#69, commentaire 6686457325 ; M255, M259). Notations : R lignes
+# conservées, S ensemble de lignes exclues mesurables ; D_e,c = D_c(R u S) -
+# D_c(R), E_e,c = E_c(R u S) - E_c(R) dans l'unité d'observation de la
+# construction (unité contrat : E(S) par additivité ; unité tête : sur les
+# seules têtes touchées) ; niveau A : cellules âge (x année si par_annee),
+# population regroupée ; niveau B : cellules de la construction. Aucun
+# verdict, aucun seuil ; des agrégats seulement, aucun vecteur par ligne.
+
+# Classes des motifs (§ 2) : toujours mesurables ; clé de cellule rendue
+# manquante (mesurable si la clé n'est pas une clé des cellules, non
+# calculable `cle_segmentation_manquante` sinon) ; id_tete_manquant mesurable
+# en unité contrat seulement ; contrat_duplique mesurable en unité tête
+# seulement (décision du mainteneur du 06/11/2026, option (b) : non mesurable
+# en unité contrat, raison contrat_duplique_unite_contrat) ; tout autre motif
+# (motifs de tête compris) non mesurable (Q5 (a) pour age_aberrant et
+# annee_naissance_incoherente).
+MOTIFS_MESURABLES_IMPORTANCE <- c("id_contrat_manquant", "contrat_duplique")
+CLES_MOTIFS_IMPORTANCE <- c(sexe_manquant = "sexe", sexe_hors_modalites = "sexe", segment_manquant = "segment")
+# États des événements déclarés d'une ligne exclue (§ 1.2), unité la ligne.
+ETATS_EVENEMENTS_EXCLUS <- c("evenement_dans_fenetre", "sans_evenement_dans_fenetre", "evenement_date_inconnue",
+                             "cause_inconnue_sortie_dans_fenetre", "cause_et_sortie_inconnues")
+# États des grandeurs de l'étape et leur libellé (trois familles : non
+# demandée par le plan, non produite par cette version, non calculable).
+ETATS_IMPORTANCE <- texte_moteur(data.frame(
+  etat = c("produite", "non_demandee_par_le_plan", "non_produite_par_cette_version", "aucune_ligne_mesurable",
+           "cle_segmentation_manquante", "tete_indeterminee_apres_reintegration", "aucun_attendu",
+           "observe_sans_attendu", "sans_exposition_retenue", "cellule_sans_valeur_table", "taux_table_egal_un",
+           "contrat_duplique_unite_contrat", "ddl_non_etabli"),
+  libelle = c("produite", "non demandée par le plan", "non produite par cette version",
+              "non calculable : aucune_ligne_mesurable", "non calculable : cle_segmentation_manquante",
+              "non calculable : tete_indeterminee_apres_reintegration", "non calculable : aucun_attendu",
+              "non calculable : observe_sans_attendu", "non calculable : sans_exposition_retenue",
+              "non calculable : cellule_sans_valeur_table", "non calculable : taux_table_egal_un",
+              "non calculable : contrat_duplique_unite_contrat", "non calculable : ddl_non_etabli"),
+  stringsAsFactors = FALSE))
+# Statuts (E2.20) des grandeurs de l'étape, par table du résultat.
+STATUTS_IMPORTANCE <- local({
+  l <- list(
+    c("volumes", "lignes", paste("décompte exact ; identité lignes_recues = lignes_conservees + lignes_exclues",
+                                 "vérifiée")),
+    c("motifs", "lignes", paste("décompte exact ; une ligne compte sous chacun de ses motifs, seule la ligne total",
+                                "est distincte ; mesurable : tous les motifs de la ligne sont mesurables au niveau",
+                                "(parametres/classes_motifs) ; non calculable au niveau B : une clé de segmentation",
+                                "employée manque ; non mesurable : événements déclarés comptés, exposition et SMR non",
+                                "calculés")),
+    c("evenements_declares", "lignes",
+      paste("décompte exact des lignes exclues par état de leurs déclarations (unité : la ligne), événement dans la",
+            "fenêtre si cause = état d'arrivée et début <= sortie < borne ; cause_inconnue_sortie_dans_fenetre est",
+            "une borne, pas un nombre d'événements")),
+    c("evenements_declares", "tetes",
+      paste("décompte exact des têtes distinctes (id_tete non manquant) des lignes evenement_dans_fenetre, dont les",
+            "têtes déjà porteuses d'un événement compté par la construction ; NA si id_tete n'est pas déclaré")),
+    c("retraits", "evenements_exposition",
+      paste("différence contrefactuelle D_c(R u S) - D_c(R), E_c(R u S) - E_c(R), même recette, convention et",
+            "fenêtre que la construction, dans son unité d'observation (unité contrat : E(S) par additivité ;",
+            "unité tête : têtes touchées seules) ; décomptes et jours exacts, E^c en arithmétique flottante (nulle",
+            "si aucun jour retiré) ; par motif, les différences ne s'additionnent pas")),
+    c("retraits", "tetes_indeterminees",
+      paste("unité tête, garde de réintégration : têtes où un motif de tête apparaît sur R_t u S (segmentation de",
+            "la construction), retirées entièrement des retraits ; une valeur manquante (naissance, sexe, sexe",
+            "hors modalités, segment) ne rend pas une tête indéterminée : il faut deux valeurs valides distinctes ;",
+            "lignes_indeterminees : lignes de S de ces têtes ; NA en unité contrat")),
+    c("retraits", "niveaux",
+      paste("niveau A : population regroupée, cellules âge (x année si par_annee) ; niveau B : cellules de la",
+            "construction (segment, âge [, année])")),
+    c("smr_comparateur_1", "smr",
+      paste("D_e / A, A = somme sur les cellules à exposition retenue positive de E^c_e mu^_r, mu^_r = D_r / E^c_r",
+            "(taux de Poisson des lignes conservées, comparateur estimé) ; niveau A : standardisé sur l'âge (et",
+            "l'année si par_annee), pas sur le segment")),
+    c("smr_comparateur_1", "bornes_exactes",
+      paste("exact sous D_e ~ Poisson(theta A), A tenu pour fixe ; le comparateur est estimé : la couverture n'est",
+            "pas garantie ; qgamma, approximation numérique")),
+    c("smr_comparateur_1", "bornes_asymptotiques",
+      "asymptotique : Wald sur log(SMR), variance 1 / D_e ; non défini à D_e = 0"),
+    c("smr_comparateur_1", "rapport_variance",
+      paste("somme E^c_e^2 mu^_r / E^c_r / A : estimation par substitution de Var(A^) / E(D_e) ; Var(A^) exacte sous",
+            "Poisson à mu connu, E^c fixe")),
+    c("smr_comparateur_1", "sans_exposition_retenue",
+      "cellules retirées sans exposition retenue (E^c_r = 0) : D_e et E^c_e restitués à part, hors du SMR"),
+    c("smr_comparateur_2", "smr",
+      paste("D_e / A, A = somme E^c_e mu~, mu~ = -ln(1 - q~) de la table de l'étape validation, sur sa plage_ages,",
+            "appariement de l'étape validation, cellules à A > 0 ; O et A excluent les cellules hors plage",
+            "(événements et E^c comptés à part) ; non calculable dès qu'une cellule retirée est sans valeur de table",
+            "(cellule_sans_valeur_table, prioritaire) ou à q~ = 1 avec E^c > 0 (taux_table_egal_un) : aucun agrégat",
+            "partiel, ces cellules et leurs événements restitués à part ; table par sexe au niveau A : contrefactuel",
+            "propre sans les lignes sexe_manquant et sexe_hors_modalites (non calculables)")),
+    c("smr_comparateur_2", "bornes",
+      paste("relation independante : exact sous D_e ~ Poisson(theta A), A connu (table, E^c tenue pour fixe) ;",
+            "qgamma, approximation numérique (bornes exactes ; Wald asymptotique) ;",
+            "relation ajustee_hors_outil : valeurs ponctuelles seules, bornes non produites (ddl_non_etabli)")),
+    c("smr_comparateur_2", "conserves",
+      paste("SMR des lignes conservées de l'étape validation (etapes/validation/resultat/statistiques, smr),",
+            "côte à côte, sans rapport entre eux")))
+  texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
+                          statut = vapply(l, `[`, "", 3L), stringsAsFactors = FALSE))
+})
+
+# Contrôle le paramètre de l'étape (valeur ; le nom est contrôlé par
+# valider_plan()) : niveau, double nu, 0 < niveau < 1, même code que `brut`.
+controler_parametres_importance_exclusions <- function(niveau) {
+  if (!forme_exacte(niveau, "double") || length(niveau) != 1L || !is.finite(niveau) || niveau <= 0 || niveau >= 1)
+    refuser("importance_exclusions", "niveau_invalide",
+            formuler(paste("Le niveau de confiance doit être un nombre (double) unique, sans attribut, fini,",
+                           "strictement compris entre 0 et 1.")),
+            list(niveau = niveau))
+  invisible(TRUE)
+}
+
+# Classe de chaque motif (§ 2) dans la configuration : unité d'observation et
+# clés des cellules du niveau (`cles` : character(0) au niveau A, segmentation
+# de la construction au niveau B, "sexe" pour le comparateur 2 au niveau A
+# avec une table par sexe). Rend "M" (mesurable), "cle" (non calculable,
+# clé manquante) ou "N" (non mesurable), un par motif.
+classe_motifs <- function(motifs, unite, cles) {
+  cl <- rep("N", length(motifs))
+  cl[motifs %in% MOTIFS_MESURABLES_IMPORTANCE] <- "M"
+  if (identical(unite, "contrat")) cl[motifs == "id_tete_manquant"] <- "M"
+  if (identical(unite, "contrat")) cl[motifs == "contrat_duplique"] <- "N"
+  k <- motifs %in% names(CLES_MOTIFS_IMPORTANCE)
+  cl[k] <- ifelse(CLES_MOTIFS_IMPORTANCE[motifs[k]] %in% cles, "cle", "M")
+  cl
+}
+
+# Seule fonction de classement des lignes exclues (condition 1 du visa
+# d'actuary) : une ligne est M si tous ses motifs sont M, sinon N si l'un
+# d'eux est N, sinon cle. `lignes_exclues` : liste nommée motif -> numéros de
+# ligne (resultat$lignes_exclues de `donnees`). Rend list(lignes (croissantes,
+# distinctes), classe).
+classer_lignes_exclues <- function(lignes_exclues, unite, cles) {
+  rang <- match(classe_motifs(names(lignes_exclues), unite, cles), c("M", "cle", "N"))
+  l <- unlist(lignes_exclues, use.names = FALSE)
+  if (is.null(l)) l <- integer(0)
+  r <- rep.int(rang, lengths(lignes_exclues))
+  o <- order(l, -r, method = "radix")
+  prem <- !duplicated(l[o])
+  list(lignes = l[o][prem], classe = c("M", "cle", "N")[r[o][prem]])
+}
+
+# Clé de cellule (clés de segmentation, âge [, année]) de chaque ligne d'une
+# table de cellules.
+cle_cellules <- function(t, cles, par_annee)
+  do.call(paste, c(unname(as.list(t[c(cles, "age", if (isTRUE(par_annee)) "annee")])), list(sep = "\r")))
+
+# Table d'exposition des lignes `lignes` de l'entrée (numéros croissants),
+# segmentée par `cles` : construire_observations() puis calculer_exposition(),
+# une seule implémentation de la fusion et de l'exposition (M242). NULL sans
+# ligne.
+exposition_lignes <- function(lignes, cles, ctx) {
+  if (!length(lignes)) return(NULL)
+  ob <- construire_observations(ctx$donnees[lignes, , drop = FALSE], lignes, ctx$roles, cles, ctx$p)
+  if (!identical(ob$unite, ctx$unite))
+    stop("exposition_lignes() : unité d'observation différente de la construction (erreur de programmation).",
+         call. = FALSE)
+  calculer_exposition(ob$observations, ctx$roles, ctx$transition, ctx$periode, ctx$delai_declaration, cles,
+                      ctx$convention, ctx$par_annee, controler = FALSE)$resultat$exposition
+}
+
+# Événements et exposition retirés par l'ensemble S (numéros de lignes
+# exclues mesurables), cellules segmentées par `cles` (niveau). Unité
+# contrat : exposition de S seule (additivité), sans garde. Unité tête :
+# têtes touchées T (id_tete des lignes de S), lignes conservées R_t de ces
+# têtes ; garde de réintégration : evaluer_motifs() sur le sous-tableau R_t
+# u S, lignes_tete = toutes ses lignes (indices relatifs), segmentation de
+# la construction, seuls ses motifs de tête lus (ses motifs de ligne, dont
+# contrat_duplique, dépendent du jeu entier) ; une tête qui porte un motif de
+# tête est indéterminée et sort entièrement ; puis deux passages, R_t u S et
+# R_t, sur les têtes restantes. Invariants (erreur de programmation) : S n'a
+# que des lignes M (classer_lignes_exclues()) ; D_e,c >= 0, jours >= 0 ;
+# E^c_e,c = 0 si aucun jour retiré, > 0 sinon. Rend list(cellules (clés,
+# age [, annee], evenements_retires, exposition_jours_retiree,
+# exposition_centrale_retiree ; cellules à jours ou événements retirés
+# non nuls), tetes_touchees, tetes_indeterminees, lignes_indeterminees).
+retrait_contrefactuel <- function(S, cles, ctx) {
+  cl <- classer_lignes_exclues(ctx$lignes_exclues, ctx$unite, cles)
+  mesurables <- cl$lignes[cl$classe == "M"]
+  if (!length(S) || !all(S %in% mesurables) || is.unsorted(S, strictly = TRUE))
+    stop("retrait_contrefactuel() : S vide, non trié ou hors des lignes mesurables (erreur de programmation).",
+         call. = FALSE)
+  pa <- ctx$par_annee
+  colonnes <- c(cles, "age", if (isTRUE(pa)) "annee")
+  if (identical(ctx$unite, "contrat")) {
+    t_rs <- exposition_lignes(S, cles, ctx); t_r <- NULL
+    touchees <- indeterminees <- lignes_ind <- NA_integer_
+  } else {
+    idt <- ctx$id_tete
+    tt <- unique(idt[S])
+    r_t <- ctx$R[idt[ctx$R] %in% tt]
+    L <- sort(c(r_t, S))
+    # Aucune ligne N (ni cle) n'entre dans lignes_tete (condition 1 du visa).
+    if (any(L %in% cl$lignes[cl$classe != "M"]))
+      stop("retrait_contrefactuel() : ligne non mesurable dans lignes_tete (erreur de programmation).", call. = FALSE)
+    ev <- evaluer_motifs(ctx$donnees[L, , drop = FALSE], ctx$roles, ctx$p$debut, ctx$p$fin, ctx$p$borne,
+                         ctx$segmentation, lignes_tete = seq_along(L))
+    ti <- unique(idt[L[unique(unlist(ev$motifs[MOTIFS_TETE], use.names = FALSE))]])
+    garde <- !(idt[L] %in% ti)
+    t_rs <- exposition_lignes(L[garde], cles, ctx)
+    t_r <- exposition_lignes(L[garde & L %in% ctx$R], cles, ctx)
+    touchees <- length(tt); indeterminees <- length(ti); lignes_ind <- sum(idt[S] %in% ti)
+  }
+  if (is.null(t_rs))
+    return(list(cellules = retrait_vide(ctx, cles), tetes_touchees = touchees, tetes_indeterminees = indeterminees,
+                lignes_indeterminees = lignes_ind))
+  De <- t_rs$evenements; Je <- t_rs$exposition_jours; Ee <- t_rs$exposition_centrale
+  if (!is.null(t_r)) {
+    k_rs <- cle_cellules(t_rs, cles, pa); k_r <- cle_cellules(t_r, cles, pa)
+    k <- match(k_rs, k_r)
+    absentes <- !(k_r %in% k_rs) & (t_r$evenements > 0L | t_r$exposition_jours > 0)
+    if (any(absentes))
+      stop("retrait_contrefactuel() : cellule de R absente de R u S (erreur de programmation).", call. = FALSE)
+    a <- !is.na(k)
+    De[a] <- De[a] - t_r$evenements[k[a]]
+    Je[a] <- Je[a] - t_r$exposition_jours[k[a]]
+    Ee[a] <- Ee[a] - t_r$exposition_centrale[k[a]]
+  }
+  if (any(De < 0L) || any(Je < 0))
+    stop("retrait_contrefactuel() : événements ou jours retirés négatifs (erreur de programmation).", call. = FALSE)
+  Ee[Je == 0] <- 0
+  if (any(Je > 0 & !(Ee > 0)))
+    stop("retrait_contrefactuel() : exposition centrale retirée non positive avec des jours retirés (erreur de programmation).",
+         call. = FALSE)
+  garder <- De > 0L | Je > 0
+  cel <- t_rs[garder, colonnes, drop = FALSE]
+  rownames(cel) <- NULL
+  cel$evenements_retires <- De[garder]
+  cel$exposition_jours_retiree <- Je[garder]
+  cel$exposition_centrale_retiree <- Ee[garder]
+  list(cellules = cel, tetes_touchees = touchees, tetes_indeterminees = indeterminees,
+       lignes_indeterminees = lignes_ind)
+}
+
+# Cellules des lignes conservées au niveau A : table d'exposition de la
+# construction sommée sur les segments, par âge (et année), dans l'ordre
+# (âge [, année]).
+cellules_regroupees <- function(exposition, par_annee) {
+  k <- cle_cellules(exposition, character(0), par_annee)
+  u <- unique(k)
+  g <- match(k, u)
+  prem <- exposition[!duplicated(g), c("age", if (isTRUE(par_annee)) "annee"), drop = FALSE]
+  s <- rowsum(cbind(as.numeric(exposition$evenements), exposition$exposition_jours, exposition$exposition_centrale),
+              g, reorder = TRUE)
+  t <- prem
+  t$evenements <- as.integer(s[, 1L]); t$exposition_jours <- s[, 2L]; t$exposition_centrale <- s[, 3L]
+  o <- if (isTRUE(par_annee)) order(t$age, t$annee, method = "radix") else order(t$age, method = "radix")
+  t <- t[o, , drop = FALSE]
+  rownames(t) <- NULL
+  t
+}
+
+# Comparateur 1 (§ 1.4) : taux bruts de Poisson des lignes conservées,
+# mu^_r,c = D_r,c / E^c_r,c (taux_poisson(), module brut), cellule par
+# cellule. `ret` : cellules retirées ; `conservees` : cellules des lignes
+# conservées au même niveau. Rend list(cellules (ret complétée :
+# evenements_conserves, exposition_centrale_conservee, taux_conserves,
+# attendus_comparateur_1, etat_cellule), ligne (valeurs du SMR ; état
+# sans_exposition_retenue si aucune cellule retirée n'a d'exposition
+# retenue)).
+smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
+  k <- match(cle_cellules(ret, cles, par_annee), cle_cellules(conservees, cles, par_annee))
+  mu_r <- taux_poisson(conservees$evenements, conservees$exposition_centrale, niveau)$taux
+  Er <- numeric(nrow(ret)); Dr <- integer(nrow(ret)); mu <- rep(NA_real_, nrow(ret))
+  a <- !is.na(k)
+  Er[a] <- conservees$exposition_centrale[k[a]]; Dr[a] <- conservees$evenements[k[a]]
+  ok <- Er > 0
+  mu[ok] <- mu_r[k[ok]]
+  att <- rep(NA_real_, nrow(ret)); att[ok] <- ret$exposition_centrale_retiree[ok] * mu[ok]
+  ret$evenements_conserves <- Dr
+  ret$exposition_centrale_conservee <- Er
+  ret$taux_conserves <- mu
+  ret$attendus_comparateur_1 <- att
+  ret$etat_cellule <- ifelse(ok, "produite", "sans_exposition_retenue")
+  O <- sum(as.numeric(ret$evenements_retires[ok])); A <- sum(att[ok])
+  tp <- taux_poisson(O, A, niveau)
+  list(cellules = ret,
+       ligne = list(observes = O, attendus = A, smr = tp$taux, borne_inf_exacte = tp$borne_inf_exacte,
+                    borne_sup_exacte = tp$borne_sup_exacte, borne_inf_asymptotique = tp$borne_inf_asymptotique,
+                    borne_sup_asymptotique = tp$borne_sup_asymptotique,
+                    rapport_variance = if (A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A
+                                       else NA_real_,
+                    cellules_sans_exposition_retenue = sum(!ok),
+                    evenements_sans_exposition_retenue = sum(as.numeric(ret$evenements_retires[!ok])),
+                    exposition_centrale_sans_exposition_retenue = sum(ret$exposition_centrale_retiree[!ok]),
+                    etat = if (nrow(ret) && !any(ok)) "sans_exposition_retenue"
+                           else switch(tp$etat, defini = "produite", exposition_nulle = "aucun_attendu",
+                                       evenement_sans_exposition = "observe_sans_attendu")))
+}
+
+# Comparateur 2 (§ 1.4 ; M242, M255) : table de l'étape validation sur sa
+# plage_ages, même appariement (apparier_table(), sans refus des cellules
+# sans valeur) et mêmes attendus (attendus_cellules()) ; O et A sur les
+# cellules à A > 0 ; cellules hors plage exclues de O et A, restituées à
+# part ; relation ajustee_hors_outil : bornes non produites. Tout ou rien
+# (avis d'actuary, C2) : une cellule retirée sans valeur de table (sexe
+# absent) ou à q~ = 1 avec E^c > 0 rend l'étape non calculable (O, A, SMR
+# et bornes NA, aucun agrégat partiel) ; les cellules à q~ = 1 sont écartées
+# avant attendus_cellules() (aucun refus taux_table_egal_un ici). Ordre des
+# états : cellule_sans_valeur_table l'emporte sur taux_table_egal_un, qui
+# l'emporte sur les états de taux_poisson(). Les décomptes des deux cas sont
+# toujours restitués.
+smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table, relation_table, niveau) {
+  sans_valeur <- un <- 0L; ev_sans_valeur <- ev_un <- ev_sans_attendu <- ev_hors <- e_hors <- 0
+  O <- 0; A <- 0
+  if (nrow(ret)) {
+    ex <- ret[c(cles, "age", if (isTRUE(par_annee)) "annee")]
+    ex$exposition_centrale <- ret$exposition_centrale_retiree
+    ex$evenements <- ret$evenements_retires
+    ap <- apparier_table(ex, cles, par_annee, table, plage_ages, cle_table, refuser_sans_valeur = FALSE)
+    c_ <- ap$cellules
+    sv <- is.na(c_$qx_table)
+    rempli <- c_$exposition_centrale > 0 | c_$evenements > 0L
+    sans_valeur <- sum(sv & rempli); ev_sans_valeur <- sum(as.numeric(c_$evenements[sv]))
+    q1 <- !sv & c_$qx_table == 1 & c_$exposition_centrale > 0
+    un <- sum(q1); ev_un <- sum(as.numeric(c_$evenements[q1]))
+    g <- !sv & !q1
+    at <- attendus_cellules(c_$exposition_centrale[g], c_$evenements[g], c_$qx_table[g], cle_table)
+    r <- at$etat == "retenue"
+    O <- sum(as.numeric(c_$evenements[g][r])); A <- sum(at$attendus[r])
+    ev_sans_attendu <- sum(as.numeric(c_$evenements[g][at$etat %in% c("evenement_sans_exposition",
+                                                                    "evenement_sous_taux_nul")]))
+    ev_hors <- ap$hors_plage$evenements; e_hors <- ap$hors_plage$exposition
+  }
+  tp <- taux_poisson(O, A, niveau)
+  ind <- identical(relation_table, "independante")
+  etat <- if (sans_valeur > 0L) "cellule_sans_valeur_table"
+          else if (un > 0L) "taux_table_egal_un"
+          else switch(tp$etat, defini = "produite", exposition_nulle = "aucun_attendu",
+                      evenement_sans_exposition = "observe_sans_attendu")
+  nc <- etat %in% c("cellule_sans_valeur_table", "taux_table_egal_un")
+  b <- function(v) if (ind && !nc) v else NA_real_
+  list(observes = if (nc) NA_real_ else O, attendus = if (nc) NA_real_ else A, smr = if (nc) NA_real_ else tp$taux,
+       borne_inf_exacte = b(tp$borne_inf_exacte), borne_sup_exacte = b(tp$borne_sup_exacte),
+       borne_inf_asymptotique = b(tp$borne_inf_asymptotique), borne_sup_asymptotique = b(tp$borne_sup_asymptotique),
+       cellules_sans_valeur_table = sans_valeur, evenements_sans_valeur_table = ev_sans_valeur,
+       cellules_taux_table_egal_un = un, evenements_taux_table_egal_un = ev_un,
+       evenements_sans_attendu = ev_sans_attendu, evenements_hors_plage = ev_hors,
+       exposition_centrale_hors_plage = e_hors, etat = etat,
+       etat_intervalle = if (!identical(etat, "produite")) etat else if (ind) "produite" else "ddl_non_etabli")
+}
+
+# État des déclarations de chaque ligne `lignes` (§ 1.2) : cause connue (dans
+# MODALITES_CAUSE) ou non, sortie datée ou non, dans la fenêtre [début,
+# borne) ou non ; `cible` : état d'arrivée de la transition.
+etats_evenements_exclus <- function(donnees, roles, lignes, debut, borne, cible) {
+  cause <- as.character(donnees[[roles[["cause_sortie"]]]][lignes])
+  sor <- as.numeric(unclass(donnees[[roles[["date_sortie"]]]][lignes]))
+  connue <- !is.na(cause) & cause %in% MODALITES_CAUSE
+  datee <- !is.na(sor)
+  dans <- datee & sor >= debut & sor < borne
+  etat <- rep("sans_evenement_dans_fenetre", length(lignes))
+  etat[connue & cause == cible & dans] <- "evenement_dans_fenetre"
+  etat[connue & cause == cible & !datee] <- "evenement_date_inconnue"
+  etat[!connue & dans] <- "cause_inconnue_sortie_dans_fenetre"
+  etat[!connue & !datee] <- "cause_et_sortie_inconnues"
+  etat
+}
+
+# Ligne d'une table de résultat : data.frame d'une ligne (ensemble, niveau,
+# valeurs de la liste v).
+ligne_resultat <- function(ensemble, niveau, v)
+  data.frame(c(list(ensemble = ensemble, niveau = niveau), v), stringsAsFactors = FALSE)
+
+# Étape `importance_exclusions` du plan (#69).
+#   donnees, roles     : entrée de construire_table() (data.frame reçu) ;
+#   etape_donnees      : etapes$donnees (parametres, resultat) ;
+#   etape_exposition   : etapes$exposition (parametres, resultat) ;
+#   etape_validation   : etapes$validation, ou NULL si `validation` n'est pas
+#                        au plan (comparateur 2 non demandé) ;
+#   table              : objet table_reference de l'étape validation, ou NULL ;
+#   transition, periode, delai_declaration, segmentation : champs du plan ;
+#   niveau             : paramètre de l'étape ;
+#   controler          : TRUE (appel direct) contrôle la segmentation et le
+#                        niveau ; FALSE, réservé à construire_table() (#22).
+# Rend list(parametres, resultat (volumes, motifs, evenements_declares,
+# retraits, cellules_niveau_a, cellules_niveau_b, smr_comparateur_1,
+# smr_comparateur_2), diagnostics, avertissements). Aucun vecteur par ligne.
+calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_exposition, etape_validation, table,
+                                           transition, periode, delai_declaration, segmentation, niveau,
+                                           controler = TRUE) {
+  if (!isFALSE(controler)) {
+    controler_segmentation(segmentation, "importance_exclusions")
+    controler_parametres_importance_exclusions(niveau)
+  }
+  if (is.null(etape_validation) != is.null(table))
+    stop("calculer_importance_exclusions() : étape validation et table incohérentes (erreur de programmation).",
+         call. = FALSE)
+  p <- valeurs_parametres_donnees(transition, periode, delai_declaration)
+  rd <- etape_donnees$resultat
+  pe <- etape_exposition$parametres
+  unite <- rd$unite_observation
+  le <- rd$lignes_exclues
+  n <- nrow(donnees)
+  if (!identical(as.numeric(n), as.numeric(length(rd$numeros_conserves) + rd$nombre_lignes_exclues)))
+    stop("calculer_importance_exclusions() : lignes reçues différentes de conservées + exclues (erreur de programmation).",
+         call. = FALSE)
+  par_annee <- pe$par_annee
+  expo <- etape_exposition$resultat$exposition
+  ctx <- list(donnees = donnees, roles = roles, p = p, transition = transition, periode = periode,
+              delai_declaration = delai_declaration, convention = pe$convention$demandee, par_annee = par_annee,
+              unite = unite, segmentation = segmentation, lignes_exclues = le, R = rd$numeros_conserves,
+              id_tete = if ("id_tete" %in% names(roles)) donnees[[roles[["id_tete"]]]],
+              prototype = expo[0L, c(segmentation, "age", if (isTRUE(par_annee)) "annee"), drop = FALSE])
+  # Ensembles : chaque motif déclaré (S_k), puis le total (lignes distinctes).
+  ens <- c(names(le), "total")
+  lignes_ens <- c(le, list(total = sort(unique(c(integer(0), unlist(le, use.names = FALSE))))))
+  niveaux <- list(A = character(0), B = segmentation)
+  classes <- lapply(niveaux, function(cl) classer_lignes_exclues(le, unite, cl))
+  de_classe <- function(lig, cl, k) lig[lig %in% cl$lignes[cl$classe == k]]
+  cache <- list()
+  # Motif déclaré sans ligne (ou aucune exclusion : total vide ; avis
+  # d'actuary, C1) : retrait nul, sans calcul contrefactuel (têtes 0 en unité
+  # tête, NA en unité contrat).
+  zero <- if (identical(unite, "tete")) 0L else NA_integer_
+  retrait <- function(S, cles) {
+    if (!length(S))
+      return(list(cellules = retrait_vide(ctx, cles), tetes_touchees = zero, tetes_indeterminees = zero,
+                  lignes_indeterminees = zero))
+    for (e in cache) if (identical(e$cles, cles) && identical(e$S, S)) return(e$r)
+    r <- retrait_contrefactuel(S, cles, ctx)
+    cache[[length(cache) + 1L]] <<- list(cles = cles, S = S, r = r)
+    r
+  }
+
+  # État initial d'un ensemble de lignes `lig` (S : ses lignes M) : produite
+  # si S est non vide ou si l'ensemble n'a aucune ligne (retrait nul) ;
+  # sinon cle_segmentation_manquante si une ligne est cle,
+  # contrat_duplique_unite_contrat pour ce motif en unité contrat, sinon
+  # aucune_ligne_mesurable (lignes toutes non mesurables).
+  etat_ensemble <- function(ensemble, lig, S, n_cle)
+    if (length(S) || !length(lig)) "produite" else if (n_cle) "cle_segmentation_manquante"
+    else if (identical(unite, "contrat") && identical(ensemble, "contrat_duplique")) "contrat_duplique_unite_contrat"
+    else "aucune_ligne_mesurable"
+  indeterminee <- function(r) identical(unite, "tete") && r$tetes_touchees > 0L &&
+    r$tetes_indeterminees == r$tetes_touchees
+
+  # 1.1 Volumes et lignes par classe.
+  volumes <- data.frame(lignes_recues = n, lignes_conservees = length(rd$numeros_conserves),
+                        lignes_exclues = rd$nombre_lignes_exclues)
+  motifs <- do.call(rbind, lapply(seq_along(ens), function(i) {
+    lig <- lignes_ens[[i]]
+    data.frame(ensemble = ens[i], lignes = length(lig),
+               lignes_mesurables_niveau_a = length(de_classe(lig, classes$A, "M")),
+               lignes_mesurables_niveau_b = length(de_classe(lig, classes$B, "M")),
+               lignes_non_calculables_niveau_b = length(de_classe(lig, classes$B, "cle")),
+               lignes_non_mesurables = length(de_classe(lig, classes$A, "N")), stringsAsFactors = FALSE)
+  }))
+
+  # 1.2 Événements déclarés sur les lignes exclues.
+  tout <- lignes_ens$total
+  etat_l <- etats_evenements_exclus(donnees, roles, tout, p$debut, p$borne, p$transition$arrivee)
+  obs <- rd$observations
+  ofin <- as.numeric(obs$fin)
+  compte <- obs$cause == p$transition$arrivee & !is.na(ofin) & ofin >= p$debut & ofin < p$borne
+  id_obs <- if (identical(unite, "tete")) obs$unite else obs$id_tete
+  tetes_comptees <- unique(id_obs[compte])
+  evenements <- do.call(rbind, lapply(seq_along(ens), function(i) {
+    m <- match(lignes_ens[[i]], tout)
+    e <- etat_l[m]
+    d <- data.frame(ensemble = ens[i], lignes = length(m), stringsAsFactors = FALSE)
+    for (s in ETATS_EVENEMENTS_EXCLUS) d[[s]] <- sum(e == s)
+    ids <- if (is.null(ctx$id_tete)) NULL else ctx$id_tete[lignes_ens[[i]][e == "evenement_dans_fenetre"]]
+    u <- unique(ids[!is.na(ids)])
+    d$tetes_evenement_dans_fenetre <- if (is.null(ids)) NA_integer_ else length(u)
+    d$tetes_deja_porteuses <- if (is.null(ids)) NA_integer_ else sum(u %in% tetes_comptees)
+    d$lignes_evenement_sans_identifiant_tete <- if (is.null(ids)) NA_integer_ else sum(is.na(ids))
+    d
+  }))
+
+  # 1.3 et 1.4 Retraits (niveaux A et B) et comparateur 1.
+  conservees <- list(A = cellules_regroupees(expo, par_annee), B = expo)
+  retraits <- list(); cellules <- list(A = list(), B = list()); smr1 <- list()
+  for (nv in names(niveaux)) for (i in seq_along(ens)) {
+    lig <- lignes_ens[[i]]
+    S <- de_classe(lig, classes[[nv]], "M")
+    n_cle <- length(de_classe(lig, classes[[nv]], "cle"))
+    v <- list(lignes_mesurables = length(S), lignes_non_calculables = n_cle, tetes_touchees = NA_integer_,
+              tetes_indeterminees = NA_integer_, lignes_indeterminees = NA_integer_, evenements_retires = NA_real_,
+              exposition_jours_retiree = NA_real_, exposition_centrale_retiree = NA_real_)
+    etat <- etat_ensemble(ens[i], lig, S, n_cle)
+    if (identical(etat, "produite")) {
+      r <- retrait(S, niveaux[[nv]])
+      v$tetes_touchees <- r$tetes_touchees; v$tetes_indeterminees <- r$tetes_indeterminees
+      v$lignes_indeterminees <- r$lignes_indeterminees
+      if (indeterminee(r)) {
+        etat <- "tete_indeterminee_apres_reintegration"
+      } else {
+        v$evenements_retires <- sum(as.numeric(r$cellules$evenements_retires))
+        v$exposition_jours_retiree <- sum(r$cellules$exposition_jours_retiree)
+        v$exposition_centrale_retiree <- sum(r$cellules$exposition_centrale_retiree)
+        s1 <- smr_comparateur_1(r$cellules, conservees[[nv]], niveaux[[nv]], par_annee, niveau)
+        cel <- s1$cellules
+        if (nrow(cel)) cellules[[nv]][[length(cellules[[nv]]) + 1L]] <- cbind(ensemble = rep(ens[i], nrow(cel)), cel,
+                                                                               stringsAsFactors = FALSE)
+        smr1[[length(smr1) + 1L]] <- ligne_resultat(ens[i], nv, s1$ligne)
+      }
+    }
+    v$etat <- etat
+    retraits[[length(retraits) + 1L]] <- ligne_resultat(ens[i], nv, v)
+    if (!identical(etat, "produite"))
+      smr1[[length(smr1) + 1L]] <- ligne_resultat(ens[i], nv, list(
+        observes = NA_real_, attendus = NA_real_, smr = NA_real_, borne_inf_exacte = NA_real_,
+        borne_sup_exacte = NA_real_, borne_inf_asymptotique = NA_real_, borne_sup_asymptotique = NA_real_,
+        rapport_variance = NA_real_, cellules_sans_exposition_retenue = NA_integer_,
+        evenements_sans_exposition_retenue = NA_real_, exposition_centrale_sans_exposition_retenue = NA_real_,
+        etat = etat))
+  }
+  retraits <- do.call(rbind, retraits)
+  smr1 <- do.call(rbind, smr1)
+  # Ordre des lignes de smr_comparateur_1 : celui de retraits.
+  smr1 <- smr1[match(paste(retraits$niveau, retraits$ensemble), paste(smr1$niveau, smr1$ensemble)), , drop = FALSE]
+  rownames(smr1) <- NULL
+  modele <- function(nv) {
+    cel <- smr_comparateur_1(retrait_vide(ctx, niveaux[[nv]]), conservees[[nv]], niveaux[[nv]], par_annee,
+                             niveau)$cellules
+    cbind(ensemble = character(0), cel, stringsAsFactors = FALSE)
+  }
+  cellules <- lapply(stats::setNames(names(niveaux), names(niveaux)), function(nv) {
+    t <- if (length(cellules[[nv]])) do.call(rbind, cellules[[nv]]) else modele(nv)
+    rownames(t) <- NULL
+    t
+  })
+
+  # Comparateur 2 : si et seulement si `validation` est au plan (M242).
+  smr2 <- NULL
+  if (!is.null(etape_validation)) {
+    pv <- etape_validation$parametres
+    st <- etape_validation$resultat$statistiques
+    val <- function(g) st$valeur[match(paste("smr", g, sep = "/"), paste(st$statistique, st$grandeur, sep = "/"))]
+    # Clés des cellules du comparateur 2 : niveau A sans clé (table ensemble)
+    # ou par sexe (table par sexe : contrefactuel propre S(2), M255) ;
+    # niveau B, segmentation de la construction.
+    cles2 <- list(A = if (identical(unique(table$sexe), "ensemble")) character(0) else "sexe", B = segmentation)
+    smr2 <- do.call(rbind, lapply(names(cles2), function(nv) do.call(rbind, lapply(seq_along(ens), function(i) {
+      cl2 <- classer_lignes_exclues(le, unite, cles2[[nv]])
+      S <- de_classe(lignes_ens[[i]], cl2, "M")
+      n_cle <- length(de_classe(lignes_ens[[i]], cl2, "cle"))
+      etat <- etat_ensemble(ens[i], lignes_ens[[i]], S, n_cle)
+      v <- NULL
+      if (identical(etat, "produite")) {
+        r <- retrait(S, cles2[[nv]])
+        if (indeterminee(r))
+          etat <- "tete_indeterminee_apres_reintegration"
+        else v <- smr_comparateur_2(r$cellules, cles2[[nv]], par_annee, table, pv$plage_ages, pv$table_reference,
+                                    pv$relation_table, niveau)
+      }
+      if (is.null(v))
+        v <- list(observes = NA_real_, attendus = NA_real_, smr = NA_real_, borne_inf_exacte = NA_real_,
+                  borne_sup_exacte = NA_real_, borne_inf_asymptotique = NA_real_, borne_sup_asymptotique = NA_real_,
+                  cellules_sans_valeur_table = NA_integer_, evenements_sans_valeur_table = NA_real_,
+                  cellules_taux_table_egal_un = NA_integer_, evenements_taux_table_egal_un = NA_real_,
+                  evenements_sans_attendu = NA_real_, evenements_hors_plage = NA_real_,
+                  exposition_centrale_hors_plage = NA_real_, etat = etat, etat_intervalle = etat)
+      ligne_resultat(ens[i], nv, c(list(lignes_mesurables = length(S), lignes_non_calculables = n_cle), v,
+                                   list(observes_conserves = val("observes"), attendus_conserves = val("attendus"),
+                                        smr_conserves = val("smr"))))
+    }))))
+    rownames(smr2) <- NULL
+  }
+
+  comparateurs <- texte_moteur(data.frame(
+    comparateur = 1:3,
+    definition = c("taux bruts de Poisson des lignes conservées, mu^_r = D_r / E^c_r, cellule par cellule",
+                   "table de référence de l'étape validation (etapes/validation/parametres : table_reference, plage_ages, relation_table)",
+                   "table construite"),
+    etat = c("produite", if (is.null(etape_validation)) "non_demandee_par_le_plan" else "produite",
+             "non_produite_par_cette_version"),
+    stringsAsFactors = FALSE))
+  comparateurs$libelle <- ETATS_IMPORTANCE$libelle[match(comparateurs$etat, ETATS_IMPORTANCE$etat)]
+  classes_motifs <- data.frame(motif = names(le), classe_niveau_a = classe_motifs(names(le), unite, character(0)),
+                               classe_niveau_b = classe_motifs(names(le), unite, segmentation),
+                               stringsAsFactors = FALSE)
+  list(parametres = list(niveau = niveau, unite_observation = unite, segmentation = segmentation,
+                         par_annee = par_annee, classes_motifs = classes_motifs, comparateurs = comparateurs,
+                         etats = ETATS_IMPORTANCE, statuts = STATUTS_IMPORTANCE),
+       resultat = list(volumes = volumes, motifs = motifs, evenements_declares = evenements, retraits = retraits,
+                       cellules_niveau_a = cellules$A, cellules_niveau_b = cellules$B, smr_comparateur_1 = smr1,
+                       smr_comparateur_2 = smr2),
+       diagnostics = list(calculs_contrefactuels = length(cache)),
+       avertissements = avertissements_vides())
+}
+
+# Cellules retirées vides (gabarit des colonnes d'une table de cellules).
+retrait_vide <- function(ctx, cles) {
+  cel <- ctx$prototype[0L, c(cles, "age", if (isTRUE(ctx$par_annee)) "annee"), drop = FALSE]
+  rownames(cel) <- NULL
+  cel$evenements_retires <- integer(0); cel$exposition_jours_retiree <- numeric(0)
+  cel$exposition_centrale_retiree <- numeric(0)
+  cel
 }
