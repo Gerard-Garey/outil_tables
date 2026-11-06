@@ -2344,6 +2344,35 @@ d'elles) et le refus de l'homonyme sont testés dans
 \code{test\_controles.R}~: les tests nouveaux d'une branche ouverte en
 parallèle d'une autre vont dans un fichier propre (ADR 0013, point~3).
 
+\textbf{Interpréteur Python des juges} (issue~\#123). Le même utilitaire,
+chargé de la même façon, porte la recherche et l'appel de l'interpréteur
+Python des deux contrôles à juge indépendant, \code{ecriture\_doubles.R}
+et \code{ecriture\_doubles\_texte.R}, qui cherchaient auparavant
+\code{python3} seul~: l'installeur de Python pour Windows ne fournit que
+\code{python.exe} et le lanceur \code{py}, et le \code{python3} que le
+contrôle trouvait sur le poste du mainteneur était l'alias du Microsoft
+Store, qui n'est pas un interpréteur (constat rapporté par
+l'issue~\#123). Les candidats sont essayés dans l'ordre \code{python3},
+\code{python}, puis \code{py -3}~; un chemin qui contient
+\code{WindowsApps} (l'alias du Store) est écarté sans être exécuté~; tout
+autre candidat est exécuté (option \code{-I}) et n'est retenu que si sa
+version est au moins 3.8, une exécution en échec ou qui dépasse
+30~secondes l'écartant. Si aucun ne convient, le contrôle sort avec le
+code~1 et un message qui nomme les trois candidats essayés~: l'absence de
+juge est un échec, jamais un saut. Le script du juge impose l'UTF-8 à ses
+sorties standard et d'erreur (l'option \code{-I} écarte la variable
+\code{PYTHONIOENCODING}, et Python écrirait sinon dans la page de code
+ANSI de Windows, accents abîmés)~; \code{ecriture\_doubles\_texte.R}
+capture cette sortie, la lit en UTF-8 et l'imprime lui-même. Seul
+l'affichage était en cause~: les comptes et le verdict ne dépendent pas de
+ce codage. \textbf{Statut}~: \emph{constat de mesure} sur le poste du
+mainteneur (Windows~11, R~4.3.3 ucrt, Python~3.14.7, 06/11/2026)~: le délai
+est respecté pour \code{py -3}, dont l'arrêt ne laisse aucun processus
+Python orphelin, et la sortie capturée du juge garde ses accents~; la
+recherche elle-même (ordre, alias écarté, version, délai, absence de
+candidat) est testée avec de faux interpréteurs, hors Windows
+(\code{test\_controles\_portables.R}).
+
 \begin{center}
 \small
 \rowcolors{2}{tablerow}{white}
@@ -2423,15 +2452,19 @@ exécution)~» du job «~Tests (R 4.3.3)~», hors liste des batteries &
 ADR 0007, point 9.3~; issues~\#106 et~\#115 \\
 \code{orchestration\_}\newline\code{locale.R} & aucune règle~:
 utilitaire commun, chargé par \code{locale\_c.R} et
-\code{locale\_latin1.R}, qui ne fait que définir des fonctions
-(environnement posé le temps d'un appel, installation et exécution sous un
-environnement donné, durée, premier octet différent)~; testé dans
-\code{test\_controles\_portables.R} & issue~\#117 \\
+\code{locale\_latin1.R} (environnement posé le temps d'un appel,
+installation et exécution sous un environnement donné, durée, premier
+octet différent) et par les deux contrôles à juge Python (recherche de
+l'interpréteur, appel, message d'absence), qui ne fait que définir des
+fonctions~; testé dans \code{test\_controles\_portables.R} & issues~\#117
+et~\#123 \\
 \code{ecriture\_doubles.R} & écriture des doubles de l'empreinte en octets
 IEEE~754 identique, ligne à ligne, à celle d'un juge indépendant (Python,
 \code{struct.pack}) sur $10^6$ doubles tirés sous graine et des cas limites~;
-\textbf{hors CI} (Python requis), non exécuté sous Windows
-(section~\ref{sec:empreinte}) & ADR 0011, points 2.1 et 2.4~; issue~\#35 \\
+\textbf{hors CI} (Python~3.8 ou plus requis, cherché parmi \code{python3},
+\code{python} et \code{py -3}~; code~1 s'il n'est pas trouvé), non exécuté
+sous Windows (section~\ref{sec:empreinte}) & ADR 0011, points 2.1 et 2.4~;
+issues~\#35 et~\#123 \\
 \code{ecriture\_doubles\_}\newline\code{texte.R} & écriture des doubles en
 forme «~texte~» (\code{\%.17g} calculé par \code{tablexp}) identique, ligne
 à ligne, à celle de deux juges, la glibc (\code{sprintf}, sauté sous
@@ -2441,11 +2474,13 @@ décimal (T1, T2, T3, un échantillon de $10^{6}$ doubles, des égalités
 exactes tirées, leurs voisins et leurs opposés, des non-finis à charge
 utile)~; nombre d'égalités exactes exigé dans chaque partie~; MD5 des textes
 de T2 et de T3 égaux aux constantes de la batterie unitaire~; table des
-puissances égale aux entiers exacts de Python~; code~1 si Python est absent.
+puissances égale aux entiers exacts de Python~; code~1 si aucun
+interpréteur Python~3.8 ou plus n'est trouvé (\code{python3},
+\code{python}, \code{py -3})~; sortie du juge lue en UTF-8.
 \textbf{Hors batterie}~; étape «~Écriture \%.17g des doubles (juges glibc
 et Python)~» du job «~Tests (R 4.3.3)~», hors liste des batteries
 (section~\ref{sec:empreinte}) & ADR 0011, annotation du 26/10/2026~; M161~;
-issue~\#104 \\
+issues~\#104 et~\#123 \\
 \code{commits\_empreinte\_}\newline\code{code.R} & commits dont les
 \code{R/*.R} ont une empreinte du code donnée, recalculée sur les blobs de
 l'historique git sans charger \code{tablexp} (mode \code{historique})~;
@@ -7712,7 +7747,8 @@ tirés sous graine, dont le MD5 du texte doit être celui que produit le juge
 Python, hors de R. Le contrôle \code{tests/controles/ecriture\_doubles.R},
 \textbf{hors batterie et hors CI} (durée, dépendance à Python), étend ce
 recoupement à $10^6$ doubles et aux cas limites, ligne à ligne, et sort avec
-un code non nul sur un écart ou si Python est absent~; il ne s'exécute pas
+un code non nul sur un écart ou si aucun interpréteur Python~3.8 ou plus
+n'est trouvé (section~\ref{sec:scripts-controle})~; il ne s'exécute pas
 sous Windows, où le texte \code{\%.17g} qu'il transmet au juge n'est pas
 toujours correctement arrondi.
 
