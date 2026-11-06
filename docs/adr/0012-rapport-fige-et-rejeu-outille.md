@@ -313,3 +313,17 @@ Rédigée par `architect` sur la branche porteuse `claude/validation-smr-referen
 **Effet sur les résultats : aucun** (fonction de contrôle ; R1 à R6 ne lisent aucune table et se rejouent sans `tables_reference`).
 
 Issues : #73, #86 (critère 3 étendu). Décision M239. ADR 0015 (points 1.4, 4, 6.2) ; ADR 0011 et ADR 0007 (annotations du même jour). Branche `claude/validation-smr-reference`, PR #155.
+
+## Annotation du 6 novembre 2026 (seconde) — point 2.6 : sections `etape_validation` et `etape_importance_exclusions` ; contrôle d'entrée de la validation au rejeu (M242 ; #4, #69)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `78b6052`, d'après l'avis de forme (0'') et les décisions du mainteneur du 06/11/2026, versés en commentaire de #4 (https://github.com/Gerard-Garey/outil_tables/issues/4#issuecomment-6679524403). Le texte ci-dessus, annotations comprises, n'est pas réécrit ; noms indicatifs, le nom de l'objet fait foi (M77, (b)). Mise en œuvre : commits (3) et (4b) de B13.
+
+**(a) Point 2.6 : la section `validations` « non produite par cette version » est remplacée** par deux sections de nature `etape`, `etape_validation` et `etape_importance_exclusions`, liées aux deux étapes du catalogue (ADR 0007, annotation du même jour) ; absentes du plan, elles portent « non demandée par le plan ». Le test de concordance de `SECTIONS_RAPPORT` avec `ETAPES` reste le contrôle : il échoue tant que l'une des deux étapes n'a pas sa section. Le rendu lit les grandeurs dans l'objet, sans calcul (point 2), y compris `etapes$validation$parametres$reference_methode` (M244).
+
+**(b) Mentions fixes.** Section `etape_validation` : « aucune table positionnée n'est produite » et p = 0 sous `independante`, **sans verdict ni seuil** (M217, Q4). Section `etape_importance_exclusions` : « ces grandeurs décrivent l'importance des exclusions et ne disent pas si une exclusion est justifiée », texte **lu par `regulatory`** avant le commit (4b). Libellés exacts : spécification d'`actuary-approfondi`.
+
+**(c) Point 3.4 : contrôle d'entrée de la validation au rejeu.** `rejouer_fiche()` appelle aussi `controler_entrees_validation()` avant `construire_table()` (après le contrôle 7 bis de l'annotation précédente du même jour) : un refus d'appariement (`convention_validation_non_admise`, `table_annee_non_admise`, `table_sexe_incompatible`, `plage_ages_hors_table`) arrête le rejeu sans construire. Le point 3.2 est inchangé (un seul appel de `construire_table()`, aucune étape exécutée par le rejeu).
+
+**Effet sur les résultats.** Le HTML du rapport de R1 à R6 change (section remplacée) ; ce n'est pas une grandeur de référence. Les objets de R1 à R6 sont identiques hors jeton de l'empreinte du code (et lignes de fiche de l'ADR 0015, point 3.4). Aucune table finale, aucun verdict.
+
+Issues : #4, #69, #73. Décisions M242, M244 ; M217. ADR 0015 et ADR 0007 (annotations du même jour, secondes). Branche `claude/validation-smr-reference`, PR #155.

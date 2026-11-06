@@ -866,3 +866,19 @@ Rédigée par `architect` sur la branche porteuse `claude/validation-smr-referen
 **Effet sur les résultats : aucun** par la présente annotation. Le tri est l'identité sur les deux tables de `jeu_reference()` (*vérifié* par `architect`, ADR 0015, « Contexte ») ; l'effet de B13 sur R1 à R6 est celui de l'ADR 0015, point 3.4.
 
 Issues : #73, #61 (Q7). Décisions M235, M236, M239. ADR 0015 ; ADR 0011 et ADR 0012 (annotations du même jour) ; ADR 0014 (point 9). Branche `claude/validation-smr-reference`, PR #155.
+
+## Annotation du 6 novembre 2026 (seconde) — points 2.1, 5.1 et 5.2 : étapes `validation` et `importance_exclusions`, paramètres `double` à valeur entière, transmission par l'orchestration (M242, M246 ; #4, #69)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `78b6052`, d'après l'avis de forme (0'') et les décisions du mainteneur du 06/11/2026, versés en commentaire de #4 (https://github.com/Gerard-Garey/outil_tables/issues/4#issuecomment-6679524403). Le texte ci-dessus, annotations comprises, n'est pas réécrit ; noms indicatifs, le nom de l'objet fait foi (M77, (b)). Mise en œuvre : commits (3) (#4) et (4b) (#69) de B13.
+
+**(a) Point 5.1 : deux noms d'étapes nouveaux (M242).** `ETAPES` reçoit `validation` (préalables `donnees` et `exposition`, `aleatoire = TRUE`) puis `importance_exclusions` (mêmes préalables, `aleatoire = FALSE`), toutes deux du module `validation`. `brut` n'est **pas** un préalable de l'une ni de l'autre. `ETAPES$aleatoire` reste une constante par étape (ADR 0015, point 7.2) ; la forme de la graine est contrôlée dans `valider_plan()` avant `graine_inattendue` et `graine_manquante` (#61, M243). La liste indicative des noms d'étapes du point 5.1 se lit avec `importance_exclusions` en plus.
+
+**(b) Point 5.2 : paramètres, tous requis et sans défaut.** `validation` : `table_reference` (clé de table), `relation_table`, `plage_ages`, `tranches_age`, `niveau`, `replications` (B ≥ 1) ; `importance_exclusions` : `niveau`. Les paramètres à valeur entière (`replications`, `plage_ages`, `tranches_age`) sont des **`double` à valeur entière** (M246) ; la canonisation ne change pas (ADR 0011). Le sort d'un `integer` reçu (refus, comme pour `niveau`, ou admission, comme pour `delai_declaration` ; annotation du 19/10/2026) relève de la spécification d'`actuary-approfondi` et de `coder`. Règle « présent ou refusé » inchangée.
+
+**(c) Transmission (point 6 ; seconde annotation du 19/10/2026).** Rien hors objet : l'orchestration passe à `validation` les cellules d'`etapes$exposition`, et à `importance_exclusions` l'**entrée `donnees`**, `lignes_exclues` et `etapes$validation` (comparateur 2, produit si et seulement si `validation` est au plan). Aucune structure sur le modèle de `fenetres`. L'identité de la note II1291-14 entre dans `etapes$validation$parametres$reference_methode` (M244) ; `etapes$importance_exclusions` ne porte que des agrégats, aucun vecteur par ligne. Ajout compatible au sens du point 6.3.
+
+**(d) Point 2.1 : arêtes effectives du module `validation`.** Le tableau autorise « `fermeture` et amont » ; le module `validation` de B13 n'appelle que `outils`, `donnees`, `exposition` et `brut` (`exposition_retiree()` appelle `calculer_exposition()`, `taux_poisson()` et deux fonctions de `donnees`, factorisées à résultats identiques au commit (4a)). Aucune arête vers `rapport`, `construire_table` ni `simulation`. *Vérifié* (avis de forme) : `graphe_modules.R` OK à `78b6052`, avant tout code du module ; le script reste le contrôle.
+
+**Effet sur les résultats : aucun** par la présente annotation ; pour R1 à R6, aucune étape nouvelle au plan.
+
+Issues : #4, #69, #61. Décisions M242, M243, M244, M246 ; M215, M217. ADR 0015 et ADR 0012 (annotations du même jour, secondes) ; ADR 0011. Branche `claude/validation-smr-reference`, PR #155.
