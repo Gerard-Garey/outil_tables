@@ -222,7 +222,37 @@ if (.Platform$OS.type != "windows") {
   verifier("message_python_absent : ligne ECHEC nommant les trois candidats, terminée par un saut de ligne",
            grepl("^ECHEC : .*python3.*python.*py -3.*\n$", orch$message_python_absent()))
   unlink(d_py_, recursive = TRUE)
-} else cat("  [sauté] trouver_python, appeler_python, message_python_absent : faux interpréteurs en scripts sh, plateforme Windows : non exercés\n")
+} else {
+  cat("  [sauté] trouver_python (hors alias du Store), appeler_python, message_python_absent : faux interpréteurs en scripts sh, plateforme Windows : non exercés\n")
+
+  # Alias du Store sous Windows : Sys.which() rend des chemins courts 8.3
+  # (…\MICROS~1\WINDOW~1\python3.exe) où « WindowsApps » n'apparaît pas ; le
+  # filtre porte donc sur la forme longue. Témoin : python3.cmd, dans un dossier
+  # nommé WindowsApps, qui écrit un fichier trace s'il est lancé ; `chercher`
+  # rend sa forme courte (shortPathName). Un témoin identique hors de ce dossier
+  # prouve qu'il laisse bien sa trace quand il est exécuté.
+  d_wa_ <- tempfile("faux_store_"); dir.create(file.path(d_wa_, "WindowsApps"), recursive = TRUE)
+  dir.create(file.path(d_wa_, "bin"))
+  trace_ <- file.path(d_wa_, "trace.txt")
+  temoin_ <- function(chemin) {
+    writeLines(c("@echo off", sprintf("echo lance> \"%s\"", gsub("/", "\\", trace_, fixed = TRUE)), "exit /b 0"), chemin)
+    chemin
+  }
+  cmd_wa_ <- temoin_(file.path(d_wa_, "WindowsApps", "python3.cmd"))
+  cmd_ok_ <- temoin_(file.path(d_wa_, "bin", "python3.cmd"))
+  court_ <- utils::shortPathName(cmd_wa_)
+  cand_ <- list(list(nom = "python3", prefixe = character(0)))
+  # Sans forme courte qui cache le nom du dossier, le test ne prouverait rien.
+  if (!grepl("WindowsApps", court_, ignore.case = TRUE)) {
+    r_ <- orch$trouver_python(cand_, function(nom) court_)
+    verifier("trouver_python : alias WindowsApps rendu en chemin court 8.3 (sans « WindowsApps »), écarté sans être exécuté (aucune trace)",
+             is.null(r_) && !file.exists(trace_))
+    r_ <- orch$trouver_python(cand_, function(nom) cmd_ok_)
+    verifier("trouver_python : même témoin hors de WindowsApps, exécuté (trace écrite) et retenu : le témoin laisse bien sa trace",
+             identical(r_$commande, cmd_ok_) && file.exists(trace_))
+  } else cat("  [sauté] trouver_python : alias WindowsApps en chemin court 8.3 : ce volume ne fournit pas de forme courte distincte (noms 8.3 inactifs) : filtre sur forme longue non exercé\n")
+  unlink(d_wa_, recursive = TRUE)
+}
 
 # Vrai interpréteur, quand il y en a un. La CI actuelle n'en a pas au moment de
 # la batterie unitaire (python3 n'y est installé que pour les étapes des
@@ -344,13 +374,27 @@ if (!is.null(p_reel_)) {
                a_(r_, sprintf("^MD5 du texte de T2 : %s ; constante de la batterie %s ; DIFF", md5_t2_, md5_faux_)))
     verifier("ecriture_doubles_texte.R : MD5 de T3, tranches d'égalités exactes et table des puissances inchangés",
              a_(r_, "^MD5 du texte de T3 : ([0-9a-f]{32}) ; constante de la batterie \\1 ; [^;]*gal ;") &&
-               !a_(r_, "ECART") && a_(r_, "^Table des puissances : 2098 ligne\\(s\\), 0 "))
+               a_(r_, "^  T1 \\(lignes [0-9]+ [^ ]+ [0-9]+\\) : 3 [^ ]*galit[^ ]*, attendu 3$") &&
+               !a_(r_, "CART$") && a_(r_, "^Table des puissances : 2098 ligne\\(s\\), 0 "))
     verifier("ecriture_doubles_texte.R : juge Python faussé relevé (écarts non nuls, code du juge 1), juge glibc sans écart",
              a_(r_, "^Juge Python [0-9.]+ : [0-9]+ ligne\\(s\\), [1-9][0-9]* ") && a_(r_, ", code 1$") &&
                (.Platform$OS.type == "windows" || a_(r_, "^Juge glibc .* : [0-9]+ ligne\\(s\\), 0 ")))
     verifier("ecriture_doubles_texte.R : deux contrôles en écart nommés, pas de « OK »",
              a_(r_, "^ECHEC : 2 contr") && !any(r_$sortie == "OK"))
     unlink(dirname(dirname(dirname(f_))), recursive = TRUE)
+    # Preuve par mutation du motif « CART$ » : un décompte d'égalités de T1 faussé
+    # (attendu 4 au lieu de 3) est relevé par le juge sur la ligne de la tranche,
+    # qui finit par « ÉCART » ; avec lui, les trois assertions sur T3 et T1 qui
+    # précèdent échoueraient.
+    m4_ <- muter_(m_, "fin = fin[[\"T1\"]], attendu = 3L)", "fin = fin[[\"T1\"]], attendu = 4L)")
+    verifier("ecriture_doubles_texte.R : quatrième défaut (décompte d'égalités de T1 attendu 4 au lieu de 3) relevé sur la ligne de tranche, qui finit par ÉCART",
+             if (is.null(m4_)) "la mutation ne touche pas exactement une ligne" else {
+               f4_ <- copie_controle_("ecriture_doubles_texte.R", m4_)
+               r4_ <- executer_rscript(f4_, "1000")
+               unlink(dirname(dirname(dirname(f4_))), recursive = TRUE)
+               identical(r4_$statut, 1L) && a_(r4_, "^  T1 \\(lignes [0-9]+ [^ ]+ [0-9]+\\) : 3 [^ ]*galit[^ ]*, attendu 4 : [^ ]*CART$") &&
+                 a_(r4_, "CART$")
+             })
   }
 } else cat("  [sauté] ecriture_doubles_texte.R : vrai défaut (copie mutée : MD5 de T2, juge Python faussé) : aucun interpréteur Python >= 3.8\n")
 

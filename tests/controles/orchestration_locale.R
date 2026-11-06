@@ -23,7 +23,7 @@
 #                                   (--travailleur) sous `env` ; list(ok,
 #                                   sortie, duree) ;
 #    ecart_octets(a, b)             premier octet différent, avec sa ligne ;
-#    trouver_python(candidats, chercher, version_min)
+#    trouver_python(candidats, chercher, version_min, delai)
 #                                   premier interpréteur Python >= 3.8 parmi
 #                                   python3, python, « py -3 » (alias du
 #                                   Microsoft Store, chemin contenant
@@ -92,8 +92,11 @@ ecart_octets <- function(a, b) {
 # Interpréteur Python du juge indépendant (#123). Candidats essayés dans
 # l'ordre : python3, python (l'installeur python.org pour Windows ne fournit
 # que python.exe), puis le lanceur « py -3 ». Un chemin qui contient WindowsApps
-# (alias du Microsoft Store, qui n'est pas un interpréteur) est écarté sans être
-# exécuté ; tout autre candidat est exécuté (-I) et n'est retenu que si
+# (alias du Microsoft Store, qui n'est pas un interpréteur ; un vrai Python du
+# Store est écarté de même) est écarté sans être exécuté. Le test porte aussi
+# sur la forme longue du chemin (normalizePath) : Sys.which() rend sous Windows
+# des chemins courts 8.3 (…\MICROS~1\WINDOW~1\python3.exe) où « WindowsApps »
+# n'apparaît pas. Tout autre candidat est exécuté (-I) et n'est retenu que si
 # sys.version_info >= version_min, un échec d'exécution l'écartant sans erreur ;
 # l'exécution est bornée à `delai` secondes (30 par défaut, arrondies à
 # l'entier supérieur : system2 ignore une fraction de seconde) ; un candidat qui
@@ -108,7 +111,10 @@ trouver_python <- function(candidats = list(list(nom = "python3", prefixe = char
   code <- sprintf("import sys; sys.exit(0 if sys.version_info >= (%d, %d) else 1)", version_min[1L], version_min[2L])
   for (cand in candidats) {
     chemin <- unname(chercher(cand$nom))[1L]
-    if (is.na(chemin) || !nzchar(chemin) || grepl("WindowsApps", chemin, ignore.case = TRUE)) next
+    if (is.na(chemin) || !nzchar(chemin)) next
+    # Forme donnée, puis forme longue (chemin inexistant : rendu tel quel, sans avertissement).
+    if (grepl("WindowsApps", chemin, ignore.case = TRUE) ||
+        grepl("WindowsApps", normalizePath(chemin, winslash = "/", mustWork = FALSE), ignore.case = TRUE)) next
     statut <- tryCatch(suppressWarnings(system2(chemin, c(cand$prefixe, "-I", "-c", shQuote(code)),
                                                 stdout = FALSE, stderr = FALSE, timeout = ceiling(delai))),
                        error = function(e) 1L)
