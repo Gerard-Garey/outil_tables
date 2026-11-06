@@ -2617,7 +2617,7 @@ plan n'est connu que du point d'entrée et du validateur.
 \begin{center}
 \small
 \rowcolors{2}{tablerow}{white}
-\begin{tabular}{@{}p{2.1cm}p{4.3cm}p{1.9cm}p{6.1cm}@{}}
+\begin{tabular}{@{}p{2.1cm}p{5.95cm}p{1.9cm}p{4.45cm}@{}}
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Étape}} &
 \textcolor{financeblue}{\textbf{Fonction d'étape}} &
@@ -2645,6 +2645,11 @@ $0 < \text{niveau} < 1$ (section~\ref{sec:brut-etape}) \\
 \code{plage\_ages}, \code{tranches\_age}~: âges entiers~;
 \code{niveau}~; \code{replications}~: entier $\ge 1$
 (section~\ref{sec:validation-etape}) \\
+\code{importance\_}\allowbreak\code{exclusions} & \code{calculer\_importance\_exclusions()} & \code{donnees},
+\code{exposition} &
+\code{niveau}~: niveau de confiance, comme pour \code{brut}~; après
+\code{validation}, dont le résultat est lu si elle est au plan
+(section~\ref{sec:importance-exclusions}) \\
 \end{tabular}
 \end{center}
 
@@ -2702,7 +2707,9 @@ contrôle que dans le plan, \code{controler\_segmentation()} (refus
 \code{segmentation\_invalide} du module \code{brut},
 section~\ref{sec:brut-etape}~; issues~\#43 et~\#59)~; de même à l'appel
 direct de \code{calculer\_validation()}, sous le module \code{validation}
-(section~\ref{sec:validation-etape}). Pour
+(section~\ref{sec:validation-etape}), et de
+\code{calculer\_importance\_exclusions()}, sous le module
+\code{importance\_exclusions} (section~\ref{sec:importance-exclusions}). Pour
 chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
@@ -2764,7 +2771,8 @@ un nom en double est refusé sous \code{plan\_mal\_forme} ou
 non sous \code{etapes\_mal\_formees} (issue~\#60).
 Elle ne réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
 (\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
-\code{controler\_parametres\_brut()}, \code{controler\_parametres\_validation()}), dont les codes et le module sont ainsi identiques, quelle que soit la
+\code{controler\_parametres\_brut()}, \code{controler\_parametres\_validation()},
+\code{controler\_parametres\_importance\_exclusions()}), dont les codes et le module sont ainsi identiques, quelle que soit la
 fonction qui détecte la condition (ADR 0007, annotation du 17/10/2026,
 point~d). Dans une construction, ces contrôles ne sont faits que là~: les
 fonctions d'étape ne les refont pas (section~\ref{sec:execution}).\par}
@@ -2823,7 +2831,9 @@ des données reçues (section~\ref{sec:empreinte}). Tout refus possible avant
 le calcul a donc lieu avant la première étape~; seuls les refus de l'étape
 \code{validation} qui portent sur ses cellules
 (\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un})
-sont levés pendant l'étape, après celles qui la précèdent~; un nom de colonne ou un
+sont levés pendant l'étape, après celles qui la précèdent (l'étape
+\code{importance\_exclusions} ne lève aucun refus sur ses cellules,
+section~\ref{sec:importance-exclusions})~; un nom de colonne ou un
 chemin non ASCII de codage indéterminé, sous la locale C, n'est plus refusé
 après tous les calculs, à l'écriture de la fiche, en erreur de
 programmation. Chaque contrôle n'y est exécuté qu'une fois
@@ -2846,7 +2856,17 @@ observations calculées par l'étape \code{exposition}, avec la transition, la
 période et le délai du plan~; l'étape \code{validation} lit la table
 d'exposition et les paramètres effectifs de l'étape \code{exposition}
 (découpage par année, convention retenue), la table de la clé citée et la
-graine du plan (section~\ref{sec:validation-etape}). Ces fenêtres sont la seule donnée qu'une étape
+graine du plan (section~\ref{sec:validation-etape})~; l'étape
+\code{importance\_exclusions} lit les données reçues et les rôles, le
+résultat des étapes \code{donnees} (unité d'observation, lignes conservées,
+lignes exclues par motif, observations) et \code{exposition} (table
+d'exposition, paramètres effectifs), et, si l'étape \code{validation} est au
+plan, ses paramètres, ses statistiques et la table de la clé qu'elle cite,
+avec la transition, la période, le délai et la segmentation du plan~; elle
+recalcule l'exposition des lignes qu'elle réintègre par les fonctions des
+étapes \code{donnees} et \code{exposition}
+(section~\ref{sec:importance-exclusions}). Les fenêtres de l'estimateur
+\code{kaplan\_meier} sont la seule donnée qu'une étape
 transmet à une autre hors de l'objet résultat (issue~\#38~; ADR 0007, seconde
 annotation du 19/10/2026)~: \code{calculer\_exposition()} les rend dans un
 élément \code{fenetres} à côté de son résultat
@@ -3017,7 +3037,8 @@ lecteurs~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{table}~: la table finale~; \code{NULL} dans cette version,
     dont aucune étape ne produit de table finale (taux bruts, statistiques
-    de validation d'une table de référence prise telle quelle). Une table de référence n'y est
+    de validation d'une table de référence prise telle quelle, importance
+    des exclusions). Une table de référence n'y est
     jamais rangée, et l'objet n'en garde aucune copie~: son identité est
     dans \code{fiche\$tables\_reference} (ADR 0015, point~5~;
     section~\ref{sec:tables-reference-recues})~;
@@ -4101,7 +4122,27 @@ Les motifs forment une liste fermée (E2.7), évaluée par
     porte \code{annee\_naissance\_incoherente} et dont les naissances
     diffèrent donne \code{tete\_naissance\_incoherente} sur les lignes 2 et 3
     seulement, et le refus annonce deux lignes pour ce motif)~; le rapport
-    est ainsi complet en un seul passage~;
+    est ainsi complet en un seul passage. Une \textbf{valeur manquante} n'y
+    rend pas une tête incohérente~: une tête n'est incohérente que si elle
+    porte au moins deux valeurs valides distinctes (sexes H et manquant~:
+    tête cohérente~; H, F et manquant~: tête incohérente), un sexe
+    hors modalités comptant comme manquant (décision d'\code{actuary} du
+    06/11/2026, issue~\#69). Sur les lignes propres, la règle est sans
+    effet, aucune ne portant de valeur manquante ou hors modalités (motifs
+    de ligne)~; elle sert à l'évaluation sur des lignes désignées
+    (ci-dessous)~;
+  \item \textbf{lignes désignées} (argument facultatif \code{lignes\_tete}
+    d'\code{evaluer\_motifs()}, issue~\#69)~: \code{NULL} par défaut
+    (lignes propres)~; sinon, numéros (\code{integer} sans attribut, sans
+    \code{NA} ni doublon, entre~1 et le nombre de lignes) des lignes sur
+    lesquelles les motifs de tête sont évalués et auxquelles ils
+    s'appliquent, quels que soient leurs motifs de ligne, qui n'en dépendent
+    pas. C'est la garde de réintégration de l'étape
+    \code{importance\_exclusions} (section~\ref{sec:importance-exclusions}).
+    Une forme non admise, ou une ligne désignée sans identifiant de tête,
+    sans cause de sortie ou sans date de sortie hors \code{en\_cours}
+    (motifs non mesurables), est une erreur de programmation, non un
+    refus~;
   \item \textbf{décompte}~: une ligne peut porter plusieurs motifs~; le décompte
     par motif compte les lignes porteuses, et le nombre de lignes distinctes
     est donné à part.
@@ -4140,9 +4181,9 @@ admis comme règles d'exclusion.}
 \code{age\_aberrant} & âge au dernier anniversaire au moins égal à \code{AGE\_ABERRANT} (130) à la plus petite des dates de sortie et de fin de période (à la fin si la sortie manque)~; constante de catalogue, \emph{choix de conception}~: la borne laisse passer toute durée de vie humaine connue, elle n'est pas un paramètre du plan \\
 \code{contrat\_duplique} & \code{id\_contrat} déclaré et présent sur plusieurs lignes (toutes les lignes du groupe sont listées) \\
 \multicolumn{2}{@{}l@{}}{\textit{\textcolor{financeblue}{Motifs de tête (si \code{id\_tete} est déclaré)}}} \\
-\code{tete\_naissance\_incoherente} & dates de naissance différentes entre lignes d'une même tête \\
-\code{tete\_sexe\_incoherent} & sexes différents au sein d'une tête (\code{sexe} déclaré) \\
-\code{tete\_segment\_incoherent} & segments différents au sein d'une tête, si la segmentation emploie \code{segment} \\
+\code{tete\_naissance\_incoherente} & au moins deux dates de naissance renseignées et différentes entre lignes d'une même tête \\
+\code{tete\_sexe\_incoherent} & au moins deux sexes valides (\code{H}, \code{F}) différents au sein d'une tête (\code{sexe} déclaré~; valeur manquante ou hors modalités ignorée) \\
+\code{tete\_segment\_incoherent} & au moins deux segments renseignés et différents au sein d'une tête, si la segmentation emploie \code{segment} \\
 \code{tete\_observee\_apres\_deces} & le premier décès $s_d$ de la tête est antérieur à $B$ et une ligne de la tête a une fin d'observation postérieure à $s_d$ (lecture~B de E2.4, ci-dessous) \\
 \end{longtable}
 }
@@ -4209,7 +4250,12 @@ contradiction avec eux~: une tête déclarée «~contrat~» alors que
 \code{id\_tete} est présent compterait plusieurs fois un même décès. Pour le
 rachat, l'unité est le contrat~; l'identifiant de tête sert alors aux contrôles
 de cohérence et au futur rééchantillonnage par têtes (E2.4, E2.14)~: il est
-gardé dans la table des observations.
+gardé dans la table des observations. L'unité, les observations et la fusion
+décrite ci-dessous sont calculées par \code{construire\_observations()}, que
+\code{preparer\_donnees()} appelle sur les lignes conservées et que l'étape
+\code{importance\_exclusions} rappelle sur les lignes qu'elle réintègre
+(section~\ref{sec:importance-exclusions}~; issue~\#69)~: la fusion n'a
+qu'une implémentation.
 
 \subsubsection*{Fusion des intervalles d'une tête}
 
@@ -4490,17 +4536,18 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
-\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees}, \code{brut} ou \code{validation})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, en appel direct (\code{controler = TRUE}), par les fonctions d'étape \code{brut} et \code{validation} (issues~\#22, \#59 et~\#4) \\
+\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees}, \code{brut}, \code{validation} ou \code{importance\_exclusions})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, en appel direct (\code{controler = TRUE}), par les fonctions d'étape \code{brut}, \code{validation} et \code{importance\_exclusions} (issues~\#22, \#59, \#4 et~\#69) \\
 \catalogue{fonctions-donnees}{ligne\_transition()} & interne & transition (\code{list(depart, arrivee)}, de forme déjà contrôlée) & ligne de \code{TRANSITIONS} de la transition, zéro ligne si elle n'est pas prise en charge~; seul endroit où s'écrit la recherche (issue~\#22) \\
 \catalogue{fonctions-donnees}{valeurs\_parametres\_donnees()} & interne & transition, période, délai, déjà contrôlés & transition retenue (\code{ligne\_transition()}), début, fin, borne $B$ (jours depuis 1970-01-01)~; ne contrôle rien~; employée par les fonctions d'étape appelées avec \code{controler = FALSE} et par \code{taux\_kaplan\_meier()} (issue~\#22) \\
 \catalogue{fonctions-donnees}{controler\_transition\_periode()} & interne & transition, période, délai & refus de la transition, de la période (dont \code{date\_hors\_domaine} pour ses bornes), du délai et de la période vide, dans cet ordre~; rend la transition retenue, le début, la fin et la borne $B$, calculés par la fonction sans contrôle de la ligne précédente~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, pour \code{kaplan\_meier} en appel direct, par la fonction d'étape \code{brut} (issue~\#22) \\
 \catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus de la transition, de la période et du délai par le contrôle de la ligne précédente, puis de la segmentation et des exclusions~; transition retenue, début, fin, borne $B$ \\
-\catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes où la valeur n'est pas constante \\
+\catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes qui portent au moins deux valeurs valides distinctes, une valeur manquante étant ignorée (issue~\#69) \\
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
 \catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
-\catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation & numéros des lignes porteuses de chaque motif \\
+\catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation, \code{lignes\_tete} (\code{NULL} par défaut) & numéros des lignes porteuses de chaque motif~; \code{lignes\_tete} désigne les lignes où les motifs de tête sont évalués (section~\ref{sec:controles-donnees}~; issue~\#69) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
 \catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, transition, période, délai, segmentation, exclusions, \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni les paramètres ni les rôles ne sont recontrôlés (issue~\#22) \\
+\catalogue{fonctions-donnees}{construire\_observations()} & interne & lignes retenues, leurs numéros dans l'entrée, rôles, segmentation, valeurs des paramètres & unité d'observation, observations (fusion par tête en unité tête), correspondance des lignes aux observations, relevés~; extraite de \code{preparer\_donnees()} à résultats identiques, seule implémentation de la fusion, rappelée par l'étape \code{importance\_exclusions} (section~\ref{sec:unite-observation}~; issue~\#69) \\
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
@@ -6328,12 +6375,16 @@ et l'étape \code{importance\_exclusions} (issue~\#69,
 section~\ref{sec:importance-exclusions}). Leurs fonctions d'étape,
 \code{calculer\_validation()} et \code{calculer\_importance\_exclusions()},
 reçoivent les résultats des étapes préalables et les champs du plan qui les
-concernent, jamais le plan entier. Le module n'appelle que des modules
+concernent (et, pour la seconde, les données reçues, les rôles et la table
+de l'étape \code{validation}), jamais le plan entier. Le module n'appelle que des modules
 situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
 (\code{controler\_segmentation()}, \code{citer()},
 \code{liste\_guillemets()}, \code{SEXES\_TABLE}, et, pour
-\code{importance\_exclusions}, d'autres fonctions de ce module),
-\code{exposition} (pour \code{importance\_exclusions} seulement) et
+\code{importance\_exclusions}, \code{construire\_observations()},
+\code{evaluer\_motifs()}, \code{valeurs\_parametres\_donnees()},
+\code{MOTIFS\_TETE} et \code{MODALITES\_CAUSE}),
+\code{exposition} (\code{calculer\_exposition()}, pour
+\code{importance\_exclusions} seulement) et
 \code{brut} (\code{taux\_poisson()})~; le contrôle de
 \code{tests/controles/graphe\_modules.R} relève aussi des arêtes vers
 \code{table\_reference()}, qui sont des homonymies de l'argument
@@ -6962,7 +7013,487 @@ segments (E2.12, issue~\#124).
 \subsection{Étape \code{importance\_exclusions}}
 \label{sec:importance-exclusions}
 
-\emph{À rédiger (issue~\#69).}
+{\sloppy\hbadness=10000
+L'étape \code{importance\_exclusions} restitue les grandeurs qui permettent
+d'apprécier l'importance des exclusions déclarées par le plan (règles
+d'exclusion de l'étape \code{donnees}, section~\ref{sec:controles-donnees})~:
+volumes, événements déclarés sur les lignes exclues, événements et exposition
+retirés, SMR des lignes exclues. Jusqu'à elle, l'importance d'une exclusion
+n'était mesurée qu'en lignes (\code{nombre\_lignes\_exclues},
+section~\ref{sec:fiche})~; or une exclusion peu nombreuse en lignes peut
+porter une part bien plus grande des événements, et c'est l'écart entre la
+part des événements retirés et celle de l'exposition retirée qui déplace un
+taux brut~: un taux global $D/E$ devient $D(1 - D_e/D) / (E(1 - E_e/E))$
+quand on retire $D_e$ événements et une exposition $E_e$ (identité exacte).
+Par décision du mainteneur (M69, point~1~: lecture restreinte aux
+grandeurs), l'outil restitue des grandeurs objectives et ne juge ni de la
+pertinence des données exclues ni de la justification de leur exclusion,
+qui restent à l'entreprise et au certificateur~; \textbf{aucun verdict,
+aucun seuil, aucun avertissement} n'est produit, et aucune justification
+n'entre dans le plan. Le fond vient de la spécification
+d'\code{actuary-approfondi} du 05/11/2026 (issue~\#69, commentaire
+6663938080), décidée par le mainteneur (M215~: Q1~(b), Q2 à Q5~(a)), de
+l'avis de forme du 06/11/2026 (M242), de la décision M255, de la mention
+fixe arrêtée par le mainteneur (M259), des avis d'\code{actuary} et des
+décisions du mainteneur du 06/11/2026 (issue~\#69, commentaires 6686457325
+et 6689493026~; M263 à M266).
+
+\medskip
+\textbf{Paramètre, place dans le plan et contrôles} (constantes
+\code{ETAPES} et \code{PARAMETRES\_ETAPES}, section~\ref{sec:plan}). L'étape
+appartient au module \code{validation}~; sa fonction d'étape est
+\code{calculer\_importance\_exclusions()}. Elle a pour préalables
+\code{donnees} et \code{exposition}, ne tire aucun aléa et vient, dans
+l'ordre des étapes, après \code{validation}, dont elle lit le résultat
+quand cette étape est au plan (comparateur~2, ci-dessous). Son seul
+paramètre, requis, sans défaut, est \code{niveau}~: niveau de confiance des
+intervalles, nombre \code{double} unique, sans attribut, fini, $0 <
+\text{niveau} < 1$, refusé sinon sous \code{niveau\_invalide} (même motif
+que dans les modules \code{brut} et \code{validation}), levé sous le module
+\code{importance\_exclusions} par
+\code{controler\_parametres\_importance\_exclusions()}, que
+\code{valider\_plan()} appelle avant toute étape. En appel direct
+(\code{controler = TRUE}), la fonction d'étape contrôle d'abord la
+segmentation par \code{controler\_segmentation()} (refus
+\code{segmentation\_invalide}, même module), puis le niveau. L'étape ne
+définit aucun autre refus~: tout ce qui ne peut être calculé est rendu dans
+un état nommé (ci-dessous), sans refus~; seules les gardes des fonctions
+d'exposition qu'elle rappelle (par exemple \code{trop\_de\_cellules})
+restent en vigueur. Les incohérences internes (lignes reçues
+différentes de conservées plus exclues, invariants des retraits, ligne non
+mesurable dans un ensemble mesuré) sont des \emph{erreurs de programmation},
+non des refus. La fiche de construction ne change pas~: les grandeurs sont
+rangées dans l'objet (\code{etapes\$importance\_exclusions}) et restituées
+par le rapport figé, jamais dans la fiche (décision M215, Q4~(a))~; les
+plans de référence R1 à R6 ne comprennent pas l'étape, que couvrent les
+tests unitaires (décision M263).
+
+\medskip
+\textbf{Notations.} $R$ est l'ensemble des lignes conservées~; un
+\emph{ensemble} est soit l'ensemble des lignes exclues sous un motif déclaré
+(une ligne exclue sous deux motifs appartient aux deux), soit le
+\emph{total}, union des lignes exclues (lignes distinctes)~; $S$ est
+l'ensemble des lignes \emph{mesurables} (ci-dessous) d'un ensemble. Pour un
+ensemble de lignes $L$ et une cellule $c$, $D_c(L)$ et $E^c_c(L)$ sont le
+nombre d'événements et l'exposition centrale de la cellule, calculés sur les
+seules lignes de $L$ par la recette, la convention, la fenêtre et l'unité
+d'observation de la construction. Dans cette section, $D_{r,c}$ et
+$E^c_{r,c}$ désignent ces quantités pour les lignes conservées, $D_{e,c}$
+et $E^c_{e,c}$ les événements et l'exposition \emph{retirés}, $O$ et $A$
+les observés et les attendus du SMR des lignes exclues, $z = \Phi^{-1}(1 -
+\alpha/2)$ et $\alpha = 1 - \text{niveau}$. Deux \emph{niveaux} de cellules
+sont produits~: le \textbf{niveau~A}, population regroupée, cellules âge (et
+année sous \code{par\_annee = TRUE})~; le \textbf{niveau~B}, cellules de la
+construction (clés de la segmentation, âge, et année sous
+\code{par\_annee = TRUE}). Aucune tranche d'âge n'est formée.
+
+\medskip
+\textbf{Classes des motifs} (\code{classe\_motifs()},
+\code{MOTIFS\_MESURABLES\_IMPORTANCE}, \code{CLES\_MOTIFS\_IMPORTANCE}~;
+spécification, §~2, modifiée par la décision M266). Une ligne exclue est
+\emph{mesurable} si ses événements et son exposition retirés se calculent
+sans rien supposer de ce qui manque ou se contredit sur la ligne~; sinon,
+ses événements déclarés sont comptés, mais son exposition et son SMR ne
+sont pas calculés, avec une raison codée. La classe d'un motif dépend de la
+configuration~: unité d'observation et clés des cellules du niveau (aucune
+au niveau~A, la segmentation de la construction au niveau~B, et \code{sexe}
+pour le comparateur~2 au niveau~A face à une table par sexe).
+
+\begin{center}
+\small
+\rowcolors{2}{tablerow}{white}
+\begin{tabular}{@{}p{5.6cm}p{9.0cm}@{}}
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Motif}} &
+\textcolor{financeblue}{\textbf{Classe}} \\
+\code{id\_contrat\_manquant} & mesurable \\
+\code{contrat\_duplique} & mesurable en unité tête, où la fusion par tête absorbe les copies~; non mesurable en unité contrat, raison \code{contrat\_duplique\_unite\_contrat} (décision M266) \\
+\code{id\_tete\_manquant} & mesurable en unité contrat~; non mesurable en unité tête, la ligne ne pouvant être rattachée à aucune tête \\
+\code{sexe\_manquant}, \code{sexe\_hors\_modalites} (clé \code{sexe}), \code{segment\_manquant} (clé \code{segment}) & mesurable si la clé n'est pas une clé des cellules du niveau~; sinon \emph{non calculable}, raison \code{cle\_segmentation\_manquante} \\
+les autres motifs de ligne et les quatre motifs de tête & non mesurable (pour \code{annee\_naissance\_incoherente} et \code{age\_aberrant}~: décision M215, Q5~(a)) \\
+\end{tabular}
+\end{center}
+
+\noindent
+Les autres motifs de ligne (\code{naissance\_manquante},
+\code{entree\_manquante}, \code{sortie\_manquante}, \code{cause\_manquante},
+\code{cause\_hors\_modalites}, \code{naissance\_apres\_entree},
+\code{sortie\_avant\_entree}, \code{en\_cours\_avant\_fin}) portent sur une
+date ou une cause manquante ou contradictoire~: les mesurer obligerait à la
+deviner. \code{annee\_naissance\_incoherente} et \code{age\_aberrant} mettent
+en doute la date de naissance déclarée~; les mesurer sur cette date était
+l'option~(b) de la question Q5, écartée. En unité contrat, le contrefactuel
+d'un contrat dupliqué réintégrerait toutes ses copies~: un contrat présent
+$k$ fois y compterait $k$ fois ses événements et son exposition, ce qui
+laisse le SMR ponctuel peu changé mais rend l'intervalle anti-conservateur~;
+dédupliquer obligerait à choisir une copie, donc à deviner (option
+écartée, décision M266). Une ligne est \emph{mesurable} si tous ses motifs le
+sont, \emph{non mesurable} si l'un d'eux ne l'est pas, \emph{non calculable}
+sinon (\code{classer\_lignes\_exclues()}, seule source des ensembles $S$).
+Le tableau \code{resultat\$motifs} donne, par ensemble, le nombre de lignes,
+de lignes mesurables aux niveaux~A et~B, de lignes non calculables au
+niveau~B et de lignes non mesurables~; \code{parametres\$classes\_motifs},
+la classe de chaque motif déclaré aux niveaux~A (sans clé) et~B.
+
+\medskip
+\textbf{Volumes et événements déclarés} (\code{resultat\$volumes},
+\code{resultat\$evenements\_declares}~; spécification, §~1.1 et~1.2).
+\code{volumes} donne les lignes reçues, conservées et exclues (lignes
+distinctes)~; l'identité reçues = conservées + exclues est vérifiée à chaque
+exécution, un écart étant une erreur de programmation. Les événements
+déclarés portent sur \emph{toutes} les lignes exclues, mesurables ou non,
+dans l'unité de la ligne~: chaque ligne prend un état
+(\code{ETATS\_EVENEMENTS\_EXCLUS}, \code{etats\_evenements\_exclus()}), la
+cause étant \emph{connue} si elle est renseignée et prise dans
+\code{MODALITES\_CAUSE}, et la fenêtre allant du début de la période à la fin
+effective incluse (section~\ref{sec:conventions-temps})~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{evenement\_dans\_fenetre}~: cause connue égale à l'état
+    d'arrivée de la transition, sortie datée dans la fenêtre~;
+  \item \code{evenement\_date\_inconnue}~: cause connue égale à l'état
+    d'arrivée, sortie non datée~;
+  \item \code{cause\_inconnue\_sortie\_dans\_fenetre}~: cause inconnue, sortie
+    datée dans la fenêtre~: le décompte est une \textbf{borne}, non un nombre
+    d'événements~;
+  \item \code{cause\_et\_sortie\_inconnues}~: cause inconnue, sortie non
+    datée~;
+  \item \code{sans\_evenement\_dans\_fenetre}~: tous les autres cas (autre
+    cause connue, ou sortie hors de la fenêtre).
+\end{itemize}
+Par ensemble, la table donne le nombre de lignes par état et, si le rôle
+\code{id\_tete} est déclaré, le nombre de têtes distinctes des lignes
+\code{evenement\_dans\_fenetre}, dont les têtes déjà porteuses d'un
+événement compté par la construction, et le nombre de ces lignes sans
+identifiant de tête~; ces trois colonnes valent \code{NA} si \code{id\_tete}
+n'est pas déclaré. Tous ces nombres sont des décomptes exacts.
+
+\medskip
+\textbf{Événements et exposition retirés~: différence contrefactuelle}
+(\code{retrait\_contrefactuel()}~; spécification, §~1.3, décision Q3~(a)).
+Pour chaque ensemble et chaque niveau, sur les lignes mesurables $S$ de
+l'ensemble à ce niveau~:
+\[
+  D_{e,c} = D_c(R \cup S) - D_c(R), \qquad
+  E^c_{e,c} = E^c_c(R \cup S) - E^c_c(R),
+\]
+de même pour l'exposition en jours, avec la même recette, la même
+convention, la même fenêtre et la même unité d'observation que la
+construction (E2.4). Ce n'est pas l'exposition des lignes de $S$ prises
+seules~: en unité tête, une ligne exclue réintégrée fusionne avec les
+lignes conservées de sa tête. Sur le jeu~T1 des tests (valeur calculée à la
+main), les trois lignes exclues mesurables, prises seules, portent 330~jours
+et 3~décès, mais leur réintégration ne retire que 182~jours et 2~décès~:
+l'une est un second contrat d'une tête conservée, contenu dans le premier,
+et son décès est celui de la tête, déjà compté. Le calcul est local~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item en \textbf{unité contrat}, chaque ligne est une observation, et la
+    différence est l'exposition de $S$ seule (additivité)~;
+  \item en \textbf{unité tête}, seules comptent les \emph{têtes touchées}
+    (identifiants de tête des lignes de $S$) et leurs lignes conservées
+    $R_t$~: la différence est calculée par deux passages,
+    \code{construire\_observations()} puis \code{calculer\_exposition()},
+    sur $R_t \cup S$ et sur $R_t$ (\code{exposition\_lignes()}), les
+    autres têtes contribuant identiquement aux deux termes~; l'égalité du
+    calcul local au calcul sur la base entière est vérifiée par un test
+    (T4~: événements et jours identiques, exposition centrale à
+    $10^{-12}$ près du total de la cellule). La fusion et l'exposition n'ont ainsi qu'une
+    implémentation, celle des étapes \code{donnees} et \code{exposition}.
+\end{itemize}
+\textbf{Garde de réintégration} (unité tête). Réintégrer $S$ peut faire
+apparaître sur une tête un motif de tête que les exclusions masquaient
+(par exemple une observation après décès). Les motifs de tête sont donc
+évalués sur $R_t \cup S$ (\code{evaluer\_motifs()} avec l'argument
+\code{lignes\_tete}, section~\ref{sec:controles-donnees}, segmentation de la
+construction)~; une tête qui en porte un est \emph{indéterminée} et sort
+entièrement des deux passages. Une valeur manquante n'y rend pas une tête
+incohérente~: il faut deux valeurs valides distinctes, un sexe hors
+modalités comptant comme manquant (décision d'\code{actuary} du 06/11/2026).
+Les nombres de têtes touchées, de têtes indéterminées et de lignes de $S$ de
+ces têtes sont restitués (\code{tetes\_touchees},
+\code{tetes\_indeterminees}, \code{lignes\_indeterminees}, \code{NA} en
+unité contrat)~; si toutes les têtes touchées sont indéterminées, l'ensemble
+est dans l'état \code{tete\_indeterminee\_apres\_reintegration}.
+\textbf{Invariants}, en erreur de programmation~: $D_{e,c} \ge 0$ et jours
+retirés $\ge 0$ dans chaque cellule~; $E^c_{e,c}$ est posée à $0$ dans une
+cellule sans jour retiré, et doit être $> 0$ dans une cellule qui en a~;
+une cellule des lignes conservées ne peut manquer à $R \cup S$. Seules les
+cellules à événements ou à jours retirés non nuls sont gardées.
+
+\noindent
+Le tableau \code{resultat\$retraits} donne, par ensemble et par niveau, les
+lignes mesurables, les lignes non calculables, les décomptes de têtes, les
+événements, jours et exposition centrale retirés (sommes des cellules) et
+l'état~; les cellules elles-mêmes sont dans
+\code{resultat\$cellules\_niveau\_a} et \code{resultat\$cellules\_niveau\_b}.
+Un motif déclaré qui ne porte sur aucune ligne, ou un total vide, est dans
+l'état \code{produite}, à retraits nuls (têtes à 0 en unité tête), son
+SMR dans l'état \code{aucun\_attendu}. \textbf{Les
+retraits par motif ne s'additionnent pas}~: une ligne exclue sous deux motifs
+compte sous chacun, et la différence contrefactuelle n'est pas additive en
+unité tête~; seul le total porte l'union.
+
+\medskip
+\textbf{SMR des lignes exclues} (spécification, §~1.4~; décisions M215, Q1~(b)
+et Q2~(a), et M242). Le SMR des lignes exclues est $O/A$, où $A$ vient d'un
+\emph{comparateur}, référence des attendus
+(\code{parametres\$comparateurs})~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Comparateur~1, taux bruts de Poisson des lignes conservées}
+    (\code{smr\_comparateur\_1()}, \code{resultat\$smr\_comparateur\_1}),
+    produit dès qu'un ensemble a des lignes mesurables~: au même niveau,
+    $\hat\mu_{r,c} = D_{r,c} / E^c_{r,c}$ par \code{taux\_poisson()} (module
+    \code{brut}, section~\ref{sec:brut-poisson}), sur la table d'exposition
+    de la construction au niveau~B, sommée sur les segments au niveau~A
+    (\code{cellules\_regroupees()})~; sur les cellules retirées à exposition
+    retenue positive ($E^c_{r,c} > 0$),
+    \[
+      O = \sum_c D_{e,c}, \qquad A = \sum_c E^c_{e,c}\,\hat\mu_{r,c}.
+    \]
+    Un test vérifie que $\hat\mu_{r,c}$ est identique, cellule par cellule,
+    au taux de Poisson de l'étape \code{brut} quand celle-ci est au plan
+    (niveau~B). Les
+    cellules retirées sans exposition retenue sont hors du SMR, leurs
+    événements et leur exposition restitués à part (état de cellule
+    \code{sans\_exposition\_retenue}). Au niveau~A, le SMR est standardisé
+    sur l'âge (et l'année sous \code{par\_annee}), non sur le segment.
+  \item \textbf{Comparateur~2, table de référence de l'étape
+    \code{validation}} (\code{smr\_comparateur\_2()},
+    \code{resultat\$smr\_comparateur\_2}), produit \textbf{si et seulement
+    si} \code{validation} est au plan (décision M242), sans quoi
+    \code{smr\_comparateur\_2} vaut \code{NULL} et le comparateur est
+    «~non demandé par le plan~»~:
+    même table, même \code{plage\_ages}, même appariement par clé exacte
+    (\code{apparier\_table()}, sans refus d'une cellule sans valeur) et même
+    attendu $A = \sum E^c_{e,c}\tilde\mu_c$, $\tilde\mu_c = -\ln(1 - \tilde
+    q_c)$, sur les cellules à attendu positif, que l'étape \code{validation}
+    (section~\ref{sec:validation-etape})~; au niveau~B, cellules de la
+    construction~; au niveau~A, cellules par âge (et année sous
+    \code{par\_annee}) face à une table \code{ensemble}, par sexe et âge
+    face à une table par sexe~: les lignes \code{sexe\_manquant} et \code{sexe\_hors\_modalites}
+    y sont alors non calculables, et le contrefactuel est propre à ce
+    comparateur, sans aucune déduction du sexe par la tête (avis
+    d'\code{actuary} du 06/11/2026, issue~\#69, commentaire 6686457325,
+    point~4).
+    Les cellules hors de la plage sont exclues de $O$ et de $A$, leurs
+    événements et leur exposition restitués à part, de même que les
+    événements des cellules sans attendu. Le comparateur est \textbf{en tout
+    ou rien}~: si une cellule retirée (exposition ou événements non nuls)
+    n'a pas de valeur dans la table (sexe absent), l'état est
+    \code{cellule\_sans\_valeur\_table}~; sinon, si une cellule retirée
+    d'exposition $E^c > 0$ a $\tilde q = 1$ (attendu infini),
+    \code{taux\_table\_egal\_un}~; dans les deux cas, $O$, $A$, le SMR et
+    ses bornes valent \code{NA}, sans refus et sans agrégat partiel, et les
+    décomptes de cellules et d'événements des deux cas sont toujours
+    restitués. L'étape \code{validation} refuse dans ces deux cas~; un SMR
+    partiel porterait sur un autre domaine que le sien. Les cellules à
+    $\tilde q = 1$ sont écartées avant le calcul des attendus, si bien
+    qu'aucun refus \code{taux\_table\_egal\_un} ne vient de cette étape. Le SMR
+    des lignes conservées, lu dans
+    \code{etapes/}\allowbreak\code{validation/}\allowbreak\code{resultat/}\allowbreak\code{statistiques}
+    (statistique \code{smr}), est placé à côté (\code{observes\_conserves},
+    \code{attendus\_conserves}, \code{smr\_conserves}), sans rapport calculé
+    entre les deux.
+  \item \textbf{Comparateur~3, table construite}~: «~non produite par cette
+    version~», aucune table finale n'étant produite.
+\end{itemize}
+
+\noindent
+\textbf{Intervalles.} Pour les deux comparateurs, \code{taux\_poisson()}
+appliquée à $(O, A)$ donne le SMR, l'intervalle exact à queues égales
+$[G_O^{-1}(\alpha/2),\ G_{O+1}^{-1}(1 - \alpha/2)] / A$ ($G_k$ fonction de
+répartition de la loi gamma de forme $k$, borne inférieure $0$ si $O = 0$~;
+\code{qgamma()}) et l'intervalle asymptotique normal sur l'échelle de
+$\log(\mathrm{SMR})$, $\mathrm{SMR}\,\exp(\mp z/\sqrt{O})$, non défini à $O
+= 0$~; $A = 0$ donne l'état \code{aucun\_attendu} si $O = 0$,
+\code{observe\_sans\_attendu} sinon. Sous la relation
+\code{ajustee\_hors\_outil}, le comparateur~2 ne donne que des valeurs
+ponctuelles ($O$, $A$, SMR)~: ses bornes valent \code{NA}, état
+d'intervalle \code{ddl\_non\_etabli}, aucune grandeur définie par une
+hypothèse nulle n'étant produite sous cette relation
+(section~\ref{sec:validation-etape}~; décision M255).
+
+\medskip
+\textbf{Le comparateur~1 est estimé}~: l'intervalle exact traite $A$ comme
+connu, alors que $A$ dépend des décès des lignes conservées. Le
+\emph{rapport de variance} restitué (\code{rapport\_variance})
+\[
+  f = \frac{1}{A}\sum_c \frac{(E^c_{e,c})^2\,\hat\mu_{r,c}}{E^c_{r,c}}
+\]
+situe cet effet. Sous l'hypothèse nulle d'une exclusion \emph{non
+informative} (même force $\mu_c$ pour les lignes conservées et exclues),
+avec les expositions tenues pour fixes et des décès de Poisson
+indépendants, $\hat A = \sum_c E^c_{e,c} D_{r,c}/E^c_{r,c}$ a pour variance
+exacte $\sum_c (E^c_{e,c})^2 \mu_c / E^c_{r,c}$ et $E[D_e] = \sum_c
+E^c_{e,c}\mu_c$~: $f$ est l'estimation par substitution ($\mu_c$ remplacé
+par $\hat\mu_{r,c}$) du rapport $\operatorname{Var}(\hat A)/E[D_e]$. Par la
+méthode delta, $\operatorname{Var}(\log \mathrm{SMR}) \approx (1 +
+f)/E[D_e]$, alors que les deux intervalles ont, pour $O$ grand, la
+largeur que donnerait une variance $1/O$~; si les décès retirés sont indépendants des décès conservés
+(hypothèse), la couverture des intervalles tend, quand $E[D_e] \to \infty$
+à $f$ fixé, vers $2\,\Phi\bigl(z/\sqrt{1 + f}\bigr) - 1$, inférieure au
+niveau (résultat asymptotique)~; par exemple, pour un niveau de 0,95 et $f
+= 0{,}1$, $2\,\Phi\bigl(1{,}959964/\sqrt{1{,}1}\bigr) - 1 = 0{,}9383$. La
+couverture de l'intervalle exact du comparateur~1 n'est donc pas
+garantie~; $f$ petit (exposition retirée faible devant l'exposition
+conservée des mêmes cellules) la rapproche de celle d'un attendu connu. Pour
+le comparateur~2, l'attendu vient de la table et des expositions~: il est
+connu, $E^c$ étant tenue pour fixe.
+
+\medskip
+\noindent
+\textbf{États} (\code{ETATS\_IMPORTANCE}, qui en donne le libellé, et
+\code{parametres\$etats})~: \code{produite}~; «~non demandée par le plan~»
+(\code{non\_demandee\_par\_le\_plan}, comparateur~2 sans \code{validation})~;
+«~non produite par cette version~»
+(\code{non\_produite\_par\_cette\_version}, comparateur~3)~; et, sous le
+libellé «~non calculable~: \emph{raison}~», \code{aucune\_ligne\_mesurable}
+(toutes les lignes de l'ensemble sont non mesurables~; un total dont toutes
+les lignes sont \code{contrat\_duplique} en unité contrat reste dans cet
+état, la raison propre étant portée par la ligne du motif),
+\code{cle\_segmentation\_manquante} (aucune ligne mesurable et au moins une
+non calculable), \code{contrat\_duplique\_unite\_contrat},
+\code{tete\_indeterminee\_apres\_reintegration}, \code{aucun\_attendu},
+\code{observe\_sans\_attendu}, \code{sans\_exposition\_retenue} (aucune
+cellule retirée n'a d'exposition retenue), \code{cellule\_sans\_valeur\_table},
+\code{taux\_table\_egal\_un} et \code{ddl\_non\_etabli}. Une grandeur non
+produite reste une ligne de sa table, de valeur \code{NA}, avec son état.
+
+\medskip
+\textbf{Statuts} (E2.20~; constante \code{STATUTS\_IMPORTANCE}, rangée dans
+\code{parametres\$statuts}, une ligne par table et grandeur)~: volumes,
+lignes par motif et événements déclarés~: \textbf{décomptes exacts}~;
+événements et jours retirés~: décomptes exacts, exposition centrale
+retirée calculée en arithmétique flottante~; SMR~: quotient des grandeurs
+précédentes~; bornes exactes du comparateur~1~: exactes sous $D_e \sim
+\mathcal{P}(\theta A)$, $A$ tenu pour fixe, \textbf{couverture non
+garantie}, le comparateur étant estimé, \code{qgamma()} en approximation
+numérique~; bornes exactes du comparateur~2 sous \code{independante}~:
+exactes sous $D_e \sim \mathcal{P}(\theta A)$, $A$ connu (table, $E^c$
+tenue pour fixe), \code{qgamma()} en approximation numérique~; bornes
+asymptotiques des deux comparateurs~: \textbf{asymptotiques} (normal sur
+l'échelle de $\log(\mathrm{SMR})$, variance $1/D_e$, non défini à $D_e =
+0$)~; rapport de variance~: estimation par substitution de
+$\operatorname{Var}(\hat A)/E[D_e]$, $\operatorname{Var}(\hat A)$ exacte
+sous Poisson à $\mu$ connu, $E^c$ fixe~; couverture limite~: résultat
+asymptotique~; couverture observée~: \textbf{constat de simulation}
+(ci-dessous). Les textes de \code{STATUTS\_IMPORTANCE} désignent les
+intervalles par leur formule, sans attribution d'auteur (issue~\#31~;
+décision M267).
+
+\medskip
+\textbf{Résultat} (\code{etapes\$importance\_exclusions}).
+\code{parametres}~: \code{niveau}, \code{unite\_observation},
+\code{segmentation}, \code{par\_annee}, \code{classes\_motifs},
+\code{comparateurs} (définition et état de chacun des trois), \code{etats},
+\code{statuts}. \code{resultat}~: \code{volumes}, \code{motifs},
+\code{evenements\_declares}, \code{retraits}, \code{cellules\_niveau\_a},
+\code{cellules\_niveau\_b} (cellules retirées de chaque ensemble produit,
+avec les grandeurs du comparateur~1 par cellule), \code{smr\_comparateur\_1},
+\code{smr\_comparateur\_2} (\code{NULL} sans \code{validation}).
+\code{diagnostics}~: \code{calculs\_contrefactuels}, nombre de calculs
+contrefactuels distincts (un même ensemble $S$ aux mêmes clés n'est calculé
+qu'une fois). \textbf{Des agrégats seulement~: aucun vecteur par ligne}
+n'entre dans l'objet (M242). Le rapport figé restitue l'étape dans sa section
+\code{etape\_importance\_}\allowbreak\code{exclusions}, précédée d'une
+mention fixe (section~\ref{sec:rapport-fige}). La durée de l'étape a été
+mesurée à la taille du plan R6 (décision M185~;
+\code{tests/mesures/importance\_exclusions.R}, mesure \code{duree}, hors
+batterie)~; les durées sont consignées dans le message du commit
+\code{fe14b6d} et ne sont pas reproduites ici (E3.4).
+
+\begin{encadre}
+\small
+\textbf{Portée.} L'étape mesure~; elle ne juge pas. Elle ne dit ni si les
+données exclues sont pertinentes, ni si leur exclusion est justifiée, et ne
+compare aucune grandeur à un seuil. Elle ne calcule ni l'exposition ni le
+SMR des lignes non mesurables (seuls leurs événements déclarés sont
+comptés), ne forme aucune tranche d'âge, ne produit pas le comparateur~3
+(table construite) et ne modifie aucune donnée~: le contrefactuel est
+calculé sur les lignes reçues telles quelles. Un SMR des lignes exclues
+proche de~1 ne dit pas que ces données sont étrangères au risque
+modélisé~: l'exposition exclue est souvent mince, et un agrégat peut
+masquer des écarts de sens contraires (avis d'\code{actuary} sur la mention
+fixe, M259).
+\end{encadre}
+
+\medskip
+\noindent
+\textbf{Vérifications} (\code{tests/unitaires/test\_importance\_exclusions.R},
+chaque test nommant la nature de son attendu)~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{valeurs calculées à la main}~: \code{construire\_observations()}
+    (unités tête et contrat, relevés, numéros des lignes reçues)~;
+    \code{evaluer\_motifs()} avec \code{lignes\_tete} (valeurs manquantes,
+    sexe hors modalités, forme admise)~; jeux T1 (unité tête) et T2 (même
+    jeu en unité contrat)~: volumes, événements déclarés, retraits, SMR,
+    bornes exactes et asymptotiques, rapport de variance~; classement des
+    motifs et des lignes~; T5, garde de réintégration~; T6, niveaux~A et~B
+    sous la segmentation \code{sexe}, et sous \code{par\_annee}~; T7, états
+    du SMR~; T8, comparateur~2 sous \code{independante}, sous
+    \code{ajustee\_hors\_outil} et sans \code{validation}, table par sexe,
+    tout ou rien et priorité des états~; motif sans ligne, total vide,
+    \code{contrat\_duplique} dans les deux unités~; refus du plan et de
+    l'appel direct~; section du rapport figé, mention fixe mot pour mot,
+    mention d'unité contrat~;
+  \item \textbf{identités exactes}~: \code{construire\_observations()}
+    identique à la partie correspondante de \code{preparer\_donnees()} sur
+    des jeux simulés à exclusions~; T3, retraits égaux à la construction du
+    jeu propre moins celle du jeu altéré du constat de simulation des
+    exclusions informatives (section~\ref{sec:constats-simulation}~:
+    événements et jours identiques, exposition centrale à $10^{-12}$ près en
+    relatif)~; T4, calcul local égal au calcul global en unité tête~; taux du
+    comparateur~1 égaux au taux de Poisson de l'étape \code{brut}~; appel
+    direct égal à \code{construire\_table()}~; reproductibilité et rejeu
+    \code{identical()} hors \code{execution}~;
+  \item \textbf{constats d'exécution}~: les invariants et les contrôles
+    internes lèvent une erreur de programmation, non un refus.
+\end{itemize}
+
+\medskip
+\noindent
+\textbf{Constat de simulation~: couverture de l'intervalle exact du SMR des
+lignes exclues, comparateur~1} (fiche de vérification~; décision M264,
+script hors CI \code{tests/mesures/importance\_exclusions.R}, mesure
+\code{couverture}).
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \emph{Jeu}~: 20\,000 contrats simulés en mode \code{uniforme} sous
+    la graine 20261016, période du 01/01/2015 au 31/12/2019, transition
+    vivant $\to$ décédé, unité tête, niveau~A~; exclusion non informative
+    \code{sexe\_manquant} tirée sur 2~\% puis sur 10~\% de toutes les lignes
+    (graine des défauts 20261025). Les cellules $(E^c_{r,c}, E^c_{e,c})$ de
+    chaque construction sont gardées, et $\mu_c$ est fixé au taux brut de
+    Poisson du jeu sans défaut.
+  \item \emph{Hypothèse}~: exclusion non informative et expositions tenues
+    pour fixes~; à chaque réplication, $D_{r,c} \sim
+    \mathcal{P}(E^c_{r,c}\mu_c)$ et $D_{e,c} \sim
+    \mathcal{P}(E^c_{e,c}\mu_c)$, indépendants, puis
+    \code{smr\_comparateur\_1()} du moteur~; $B = 20\,000$ réplications sous
+    la graine 20261105, niveau 0,95.
+  \item \emph{Statistique}~: proportion des réplications où l'intervalle
+    exact contient $\theta = 1$, avec son erreur de Monte-Carlo
+    $\sqrt{p(1 - p)/B}$, au plus $0{,}0036$ pour $B = 20\,000$~; le script
+    imprime aussi le rapport de variance moyen, le rapport au $\mu_c$ vrai
+    et $E[D_e]$.
+  \item \emph{Lecture}~: aucune région ni verdict~; ce constat ne garantit
+    pas la couverture. Les valeurs observées, consignées dans le message du
+    commit \code{fe14b6d} et sous la décision M264, ne sont pas reproduites
+    ici (E3.4)~: dans les deux configurations, la couverture observée n'est
+    pas significativement inférieure au niveau (à l'erreur de Monte-Carlo
+    près)~; elle baisse significativement de la première à la seconde,
+    où $f$ et $E[D_e]$ sont plus grands, l'intervalle exact devenant moins
+    conservateur quand $E[D_e]$ croît et l'estimation de l'attendu coûtant
+    davantage quand $f$ croît (lecture d'\code{actuary}, même message).
+  \item \emph{Conditions et sources d'erreur}~: $E^c$ tenue pour fixe
+    (aucune variabilité de l'exposition n'est simulée)~; l'erreur de
+    Monte-Carlo dépend de $B$, l'écart de couverture dû à l'estimation du
+    comparateur dépend de l'exposition des cellules (par $f$ et
+    $E[D_e]$)~: ce sont deux erreurs distinctes (E2.20).
+\end{itemize}
+
+\noindent
+\textbf{Références}~: celles de l'intervalle de Poisson
+(section~\ref{sec:brut-poisson})~; le rapport de variance et la couverture
+limite sont dérivés ci-dessus, sans source extérieure.\par}
 
 \subsection{Vérifications}
 \label{sec:validation-verifications}
@@ -7098,7 +7629,7 @@ même nature (mesure de \code{docwriter} sur ce jeu, non reproduite).
 \catalogue{fonctions-validation}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé & grille des cellules et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table}, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
 \catalogue{fonctions-validation}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} \\
 \catalogue{fonctions-validation}{probabilite\_hors()} & interne & $A$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{P}(A)$, par cellule \\
-\catalogue{fonctions-validation}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé~; partagée avec l'étape \code{importance\_exclusions} \\
+\catalogue{fonctions-validation}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé \\
 \catalogue{fonctions-validation}{loi\_runs()} & interne & $n_{+}$, $n_{-}$ par séquence & loi exacte du nombre total de suites, par convolution \\
 \catalogue{fonctions-validation}{wilcoxon\_rangs()} & interne & différences & effectif, nuls, groupes d'ex aequo, $w_{+}$, variance corrigée, $z$ \\
 \catalogue{fonctions-validation}{signe\_residu()} & interne & résidus, attendus & signe à la tolérance~; seul ensemble de zéros \\
@@ -7108,24 +7639,24 @@ même nature (mesure de \code{docwriter} sur ce jeu, non reproduite).
 \catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, $p$, $B$, graine & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
 \catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes \\
 \catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine, \code{controler} & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements \\
-\catalogue{fonctions-validation}{MOTIFS\_MESURABLES\_IMPORTANCE} & constante & --- & étape \code{importance\_exclusions} (section~\ref{sec:importance-exclusions}) \\
-\catalogue{fonctions-validation}{CLES\_MOTIFS\_IMPORTANCE} & constante & --- & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{ETATS\_EVENEMENTS\_EXCLUS} & constante & --- & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{ETATS\_IMPORTANCE} & constante & --- & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{STATUTS\_IMPORTANCE} & constante & --- & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{controler\_parametres\_importance\_exclusions()} & interne & niveau & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{classe\_motifs()} & interne & motifs, unité, clés & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{classer\_lignes\_exclues()} & interne & lignes exclues, unité, clés & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{cle\_cellules()} & interne & table, clés, découpage & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{exposition\_lignes()} & interne & lignes, clés, contexte & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes, clés, contexte & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{cellules\_regroupees()} & interne & table d'exposition, découpage & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{smr\_comparateur\_1()} & interne & cellules, niveau & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules, table, plage, relation, niveau & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & entrée, étapes préalables, table, champs du plan, niveau & fonction d'étape \code{importance\_exclusions} \\
-\catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & étape \code{importance\_exclusions} \\
+\catalogue{fonctions-validation}{MOTIFS\_MESURABLES\_IMPORTANCE} & constante & --- & motifs mesurables~: \code{id\_contrat\_manquant}, \code{contrat\_duplique} (ce dernier en unité tête seulement~; section~\ref{sec:importance-exclusions}) \\
+\catalogue{fonctions-validation}{CLES\_MOTIFS\_IMPORTANCE} & constante & --- & motif $\to$ clé de cellule qu'il rend manquante~: \code{sexe} pour \code{sexe\_manquant} et \code{sexe\_hors\_modalites}, \code{segment} pour \code{segment\_manquant} \\
+\catalogue{fonctions-validation}{ETATS\_EVENEMENTS\_EXCLUS} & constante & --- & les cinq états des déclarations d'une ligne exclue \\
+\catalogue{fonctions-validation}{ETATS\_IMPORTANCE} & constante & --- & \code{data.frame} (\code{etat}, \code{libelle})~: états des grandeurs de l'étape et leur libellé \\
+\catalogue{fonctions-validation}{STATUTS\_IMPORTANCE} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque grandeur de l'étape (E2.20) \\
+\catalogue{fonctions-validation}{controler\_parametres\_importance\_exclusions()} & interne & niveau & \code{TRUE} invisible, ou refus \code{niveau\_invalide} (module \code{importance\_exclusions})~; appelée par \code{valider\_plan()} et en appel direct par la fonction d'étape \\
+\catalogue{fonctions-validation}{classe\_motifs()} & interne & motifs, unité, clés & classe de chaque motif~: mesurable, non calculable faute de clé, non mesurable \\
+\catalogue{fonctions-validation}{classer\_lignes\_exclues()} & interne & lignes exclues par motif, unité, clés & lignes distinctes et leur classe~; seule source des ensembles $S$ \\
+\catalogue{fonctions-validation}{cle\_cellules()} & interne & cellules, clés, découpage & clé de chaque cellule (segmentation, âge, année) \\
+\catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}~; même unité que la construction, sinon erreur de programmation \\
+\catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes $S$, clés, contexte & cellules retirées (événements, jours, $E^c$), têtes touchées et indéterminées~; garde de réintégration et invariants \\
+\catalogue{fonctions-validation}{cellules\_regroupees()} & interne & table d'exposition, découpage & cellules des lignes conservées au niveau~A, sommées sur les segments \\
+\catalogue{fonctions-validation}{smr\_comparateur\_1()} & interne & cellules retirées et conservées, clés, découpage, niveau & taux conservés et attendus par cellule~; $O$, $A$, SMR, bornes, rapport de variance, état \\
+\catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
+\catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne \\
+\catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, champs du plan, niveau, \code{controler} & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun) \\
+\catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
 }
 
@@ -7390,7 +7921,10 @@ restant à l'entreprise et au certificateur, et aucune justification déclarée
 n'entre dans le plan. La même décision renvoie à l'issue~\#69 la question
 réglementaire des exclusions et les grandeurs qui mesureraient leur
 importance (décès et exposition retirés par les exclusions, SMR des lignes
-exclues). L'ajout du champ change l'ensemble
+exclues)~; ces grandeurs sont produites par l'étape
+\code{importance\_exclusions}, dans l'objet et le rapport figé, hors de la
+fiche (section~\ref{sec:importance-exclusions}~; décision M215, Q4~(a)).
+L'ajout du champ change l'ensemble
 des champs et fait passer \code{version\_fiche} de~2 à~3 (ADR 0011,
 point~10~(c))~; l'incrément est porté par le premier commit de la branche
 \code{claude/fiche-rapport} qui change la définition de la fiche, celui de
@@ -8912,7 +9446,7 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{suffisance} & Indicateurs de suffisance & renvoi & aucune racine~; renvois à \code{etapes/exposition/}\allowbreak\code{resultat/exposition} et à \code{etapes/brut/resultat}, ou «~non demandée par le plan~»~; mention de la largeur des intervalles \\
 \code{avertissements} & Avertissements & objet & \code{avertissements} \\
 \code{etape\_validation} & Étape validation~: statistiques de validation de la table de référence prise telle quelle & etape & étape \code{validation}~: \code{etapes/validation}, précédée de mentions fixes (ci-dessous) \\
-\code{etape\_importance\_}\allowbreak\code{exclusions} & Étape importance\_exclusions~: importance des exclusions (volumes, événements, exposition et SMR des lignes exclues) & etape & étape \code{importance\_exclusions}~: \code{etapes/}\allowbreak\code{importance\_exclusions}, précédée d'une mention fixe (section~\ref{sec:importance-exclusions}) \\
+\code{etape\_importance\_}\allowbreak\code{exclusions} & Étape importance\_exclusions~: importance des exclusions (volumes, événements, exposition et SMR des lignes exclues) & etape & étape \code{importance\_exclusions}~: \code{etapes/}\allowbreak\code{importance\_exclusions}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:importance-exclusions}) \\
 \code{table\_finale} & Table finale et comparaisons & non\_produite & \code{table}~: \code{NULL}, «~non produites par cette version~»~; autre valeur, refus (contrôle~4) \\
 \code{rejeu} & Rejeu & texte & ligne \code{\# rejeu} de la fiche (\code{TEXTE\_REJEU\_FICHE}) et textes du rejeu outillé (ci-dessous) \\
 \end{longtable}
@@ -9034,7 +9568,27 @@ sexe~; l'absence de correction de multiplicité~; la formule des p-valeurs
 de Monte-Carlo, le chemin du nombre de tirages et l'erreur de Monte-Carlo~;
 la référence de méthode, avec renvoi à la colonne \code{statut} des
 statistiques (section~\ref{sec:validation}). Ces textes ont été acceptés
-sans lecture de \code{regulatory} (décision M258). La section \emph{suffisance} (E2.15)
+sans lecture de \code{regulatory} (décision M258). La section \emph{étape
+importance\_exclusions}, quand l'étape est au plan, s'ouvre sur la mention
+fixe arrêtée par le mainteneur (décision M259~; ADR 0012, troisième
+annotation du 06/11/2026)~: «~Ces grandeurs mesurent le
+poids des lignes exclues par les règles d'exclusion déclarées (volumes,
+événements, exposition, SMR) et permettent d'apprécier l'importance des
+exclusions. Elles ne disent ni si les données exclues sont pertinentes, ni
+si leur exclusion est justifiée.~»~; puis, si
+\code{fiche/avertissement\_unite} est présent, sur la même mention de
+sur-dispersion que la section \emph{étape validation} (décision M265)~;
+puis viennent les tables de l'étape. La mention ne cite aucun texte~; elle
+nomme les deux notions, pertinence et justification, que la décision M69
+laisse à l'entreprise et au certificateur, et dit «~mesurent~» et
+«~permettent d'apprécier~», non «~décrivent~», parce que l'appréciation
+de l'importance relative revient à l'entreprise, non à l'outil (lecture de
+\code{regulatory})~; elle remplace le
+texte du plan, «~ces grandeurs décrivent l'importance des exclusions et ne
+disent pas si une exclusion est justifiée~», après lecture de
+\code{regulatory} et avis d'\code{actuary} (issue~\#69, commentaire
+6682488525), et son rendu est à contrôler par \code{regulatory} à la revue
+finale de la branche. La section \emph{suffisance} (E2.15)
 renvoie aux chemins qui portent exposition, événements et bornes, sans en
 calculer aucun, et dit «~Largeur des intervalles~: non produite par cette
 version.~»~: une largeur serait une quantité nouvelle, à calculer dans le
@@ -10571,7 +11125,9 @@ identiques au jeu propre~; lignes modifiées, établies par comparaison au
 jeu propre, égales aux lignes de rôle \code{alteree}~; tirages rejoués sous
 la graine des défauts~; lignes exclues par le module \code{donnees} égales
 à l'attribut, motif par motif) et par un constat de simulation sur un jeu à
-\emph{exclusion informative}, préparé pour l'issue~\#69~: mode
+\emph{exclusion informative}, préparé pour l'issue~\#69 et repris par le
+test~T3 de l'étape \code{importance\_exclusions}
+(section~\ref{sec:importance-exclusions})~: mode
 \code{uniforme}, $10^{5}$ contrats, loi vraie et portefeuille de l'entrée de
 référence, graine 20261016, période du 2015-01-01 au 2019-12-31~; défauts
 sous la graine 20261025, \code{sexe\_manquant} sur les lignes à décès au
@@ -10839,7 +11395,7 @@ E2.3 & recette la plus fine, nommée, refus si aucune~; convention d'âge, forç
 E2.4 & unité d'observation, fusion par tête, incohérences entre contrats & \ref{sec:unite-observation} \\
 E2.5 & période déclarée, délai de déclaration & \ref{sec:conventions-temps}, \ref{sec:troncature-censure} \\
 E2.6 & troncature à gauche, censure à droite, censure non informative nommée & \ref{sec:troncature-censure} \\
-E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, données inchangées & \ref{sec:controles-donnees} \\
+E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, données inchangées~; importance des exclusions (grandeurs, sans verdict) & \ref{sec:controles-donnees}, \ref{sec:importance-exclusions} \\
 E2.8 & pondération par les montants~: rôle refusé tant que ses intervalles ne sont pas spécifiés & \ref{sec:catalogue-roles} \\
 E2.9 & segmentation déclarée, vide explicite admis (le test d'homogénéité viendra avec la validation) & \ref{sec:plan}, \ref{sec:troncature-censure} \\
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
@@ -10847,9 +11403,9 @@ E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec tro
 E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-groupes, SMR, signes, suites, intervalles (en partie~: statistiques écrites une fois et appliquées par l'étape \code{validation} aux observations de la construction~; la fonction de suivi sur de nouvelles observations viendra avec sa branche) & \ref{sec:validation-statistiques} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut} \\
-E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:validation-statistiques} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
-E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:validation-statistiques}, \ref{sec:validation-verifications} \\
+E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
 E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
 E3.5 & rapport figé HTML autonome et fiche de construction (en partie~: les tables CSV et xlsx à en-tête viendront avec la première table finale) & \ref{sec:fiche}, \ref{sec:rapport-fige} \\
