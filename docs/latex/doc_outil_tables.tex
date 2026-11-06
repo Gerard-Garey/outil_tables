@@ -2277,13 +2277,48 @@ sur \code{tests/reference/}.
 Tout contrôle mécanique est un script, jamais une relecture (\code{CLAUDE.md},
 «~Workflows~», principe~7). Les scripts sont en R de base, sous
 \code{tests/controles/}, et sortent avec un code non nul en cas d'écart. Chacun
-est testé sur des témoins dans \code{tests/unitaires/test\_controles.R}~: il
-doit échouer sur un cas fautif et passer sur le dépôt. Font exception
-\code{ecriture\_doubles.R}, recoupement hors CI dont la batterie unitaire
-garde un échantillon (section~\ref{sec:verifications-rapport}), et
-\code{ecriture\_doubles\_texte.R}, recoupement par deux juges dont la
-batterie unitaire garde les témoins T1 à T3 et que la CI exécute en entier
-(même section)~; pour
+est testé sur des témoins dans \code{tests/unitaires/test\_controles.R}, ou,
+pour les deux contrôles à juge Python, dans
+\code{tests/unitaires/test\_controles\_portables.R} (ci-dessous)~: il
+doit échouer sur un cas fautif et passer sur le dépôt. Pour
+\code{ecriture\_doubles.R} et \code{ecriture\_doubles\_texte.R}, dont
+l'exécution complète ($10^{6}$ doubles et plus) reste hors batterie, la
+batterie exerce des chemins d'échec bon marché (issue~\#119)~:
+\begin{itemize}[leftmargin=*, itemsep=1pt]
+  \item \emph{juge absent}~: chacun des deux contrôles, lancé sous un
+    \code{PATH} réduit à quelques outils système, sans Python, sort avec le
+    code~1 et nomme l'absence, avant toute construction de doubles~;
+  \item \emph{vrai défaut}~: une copie d'\code{ecriture\_doubles\_texte.R},
+    placée dans une arborescence temporaire, porte trois mutations
+    (constante MD5 de T2 altérée, juge Python faussé, qui écrit
+    \code{\%.16g} au lieu de \code{\%.17g}, nombre d'égalités exactes
+    réduit pour la durée) et s'exécute sur $n = 1\,000$ doubles~; elle doit
+    sortir avec le code~1 en relevant exactement les deux écarts attendus
+    (MD5 de T2, juge Python), le MD5 de T3, les égalités exactes, la table
+    des puissances et, hors Windows, le juge glibc restant sans écart~; une
+    mutation qui ne
+    toucherait pas exactement une ligne du script fait échouer le témoin~;
+  \item \emph{chemin à espace}~: une copie d'\code{ecriture\_doubles.R}
+    dont les fichiers temporaires sont placés sous un dossier dont le nom
+    contient une espace passe, et la même copie privée de la protection
+    des chemins (\code{shQuote()}) passée au juge échoue~; le témoin voit
+    ainsi le défaut que l'issue~\#119 a corrigé dans ce script.
+\end{itemize}
+Ces témoins dépendent de l'environnement et se sautent avec un saut
+\textbf{annoncé}~: le juge absent hors POSIX (Windows), le vrai défaut sans
+interpréteur Python~3.8 ou plus, le chemin à espace sous Windows, où le
+contrôle refuse de s'exécuter, ou sans interpréteur. Sur la CI, la batterie
+unitaire s'exécute avant l'installation de \code{python3}, réservée à
+l'étape du contrôle \code{ecriture\_doubles\_texte.R}~: seuls les témoins
+du juge absent y sont exercés (décision du mainteneur du 06/11/2026, le
+workflow restant inchangé). Le vrai défaut est exercé sur un poste muni
+d'un interpréteur, Windows compris (constat sur le poste du mainteneur,
+R~4.3.3 ucrt, Python~3.14.7, 06/11/2026)~; le chemin à espace ne l'est que
+sur un poste POSIX muni d'un interpréteur, donc ni sur la CI ni sous
+Windows. La batterie unitaire garde en outre un échantillon de l'écriture
+recoupée par \code{ecriture\_doubles.R} et les témoins T1 à T3 de
+\code{ecriture\_doubles\_texte.R}, que la CI exécute en entier
+(section~\ref{sec:verifications-rapport}). Pour
 \code{locale\_c.R}, dont l'exécution complète (deux installations, six plans)
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
@@ -2463,8 +2498,9 @@ IEEE~754 identique, ligne à ligne, à celle d'un juge indépendant (Python,
 \code{struct.pack}) sur $10^6$ doubles tirés sous graine et des cas limites~;
 \textbf{hors CI} (Python~3.8 ou plus requis, cherché parmi \code{python3},
 \code{python} et \code{py -3}~; code~1 s'il n'est pas trouvé), non exécuté
-sous Windows (section~\ref{sec:empreinte}) & ADR 0011, points 2.1 et 2.4~;
-issues~\#35 et~\#123 \\
+sous Windows (section~\ref{sec:empreinte})~; témoins d'échec (juge absent,
+chemin à espace) dans la batterie unitaire & ADR 0011, points 2.1 et 2.4~;
+issues~\#35, \#119 et~\#123 \\
 \code{ecriture\_doubles\_}\newline\code{texte.R} & écriture des doubles en
 forme «~texte~» (\code{\%.17g} calculé par \code{tablexp}) identique, ligne
 à ligne, à celle de deux juges, la glibc (\code{sprintf}, sauté sous
@@ -2477,10 +2513,11 @@ de T2 et de T3 égaux aux constantes de la batterie unitaire~; table des
 puissances égale aux entiers exacts de Python~; code~1 si aucun
 interpréteur Python~3.8 ou plus n'est trouvé (\code{python3},
 \code{python}, \code{py -3})~; sortie du juge lue en UTF-8.
-\textbf{Hors batterie}~; étape «~Écriture \%.17g des doubles (juges glibc
+Exécution complète \textbf{hors batterie}, témoins d'échec (juge absent,
+vrai défaut) dans la batterie unitaire~; étape «~Écriture \%.17g des doubles (juges glibc
 et Python)~» du job «~Tests (R 4.3.3)~», hors liste des batteries
 (section~\ref{sec:empreinte}) & ADR 0011, annotation du 26/10/2026~; M161~;
-issues~\#104 et~\#123 \\
+issues~\#104, \#119 et~\#123 \\
 \code{commits\_empreinte\_}\newline\code{code.R} & commits dont les
 \code{R/*.R} ont une empreinte du code donnée, recalculée sur les blobs de
 l'historique git sans charger \code{tablexp} (mode \code{historique})~;
@@ -7748,7 +7785,8 @@ Python, hors de R. Le contrôle \code{tests/controles/ecriture\_doubles.R},
 \textbf{hors batterie et hors CI} (durée, dépendance à Python), étend ce
 recoupement à $10^6$ doubles et aux cas limites, ligne à ligne, et sort avec
 un code non nul sur un écart ou si aucun interpréteur Python~3.8 ou plus
-n'est trouvé (section~\ref{sec:scripts-controle})~; il ne s'exécute pas
+n'est trouvé~; la batterie unitaire n'en exerce que des chemins bon marché,
+juge absent et chemin à espace (section~\ref{sec:scripts-controle})~; il ne s'exécute pas
 sous Windows, où le texte \code{\%.17g} qu'il transmet au juge n'est pas
 toujours correctement arrondi.
 
@@ -7781,7 +7819,10 @@ condition de plateforme l'écriture d'un niveau construit par ses octets
 double (constat de mesure). Le contrôle
 \code{tests/controles/ecriture\_doubles\_texte.R}
 (tableau~\ref{tab:scripts-controle}), \textbf{hors batterie} (durée,
-dépendance à Python) et exécuté par une étape de la CI, recoupe l'écriture
+dépendance à Python) et exécuté par une étape de la CI, la batterie
+unitaire n'en exerçant que des chemins d'échec bon marché, juge absent et
+vrai défaut sur une copie mutée (section~\ref{sec:scripts-controle}),
+recoupe l'écriture
 du moteur sur plus de $10^{6}$ doubles, compare chaque ligne aux deux
 juges, exige le nombre d'égalités exactes de chaque partie et recalcule les
 MD5 de T2 et de T3. \textbf{Statut}~: les attendus sont des \emph{constats}
