@@ -46,8 +46,9 @@
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/controles/ecriture_doubles_texte.R [n]   (n = 1e6 par défaut)
-#  Code de sortie 1 si un écart, si Python est absent ou si un MD5 diffère de
-#  la batterie.
+#  Code de sortie 1 si un écart, si aucun Python >= 3.8 n'est trouvé (python3,
+#  python, py -3 : trouver_python(), orchestration_locale.R) ou si un MD5 diffère
+#  de la batterie.
 # -----------------------------------------------------------------------------
 
 ARGS <- commandArgs(trailingOnly = TRUE)
@@ -65,9 +66,27 @@ RACINE <- if (length(f)) normalizePath(file.path(dirname(f[1L]), "..", "..")) el
 moteur <- new.env()
 for (m in c("outils.R", "rapport.R")) sys.source(file.path(RACINE, "R", m), moteur)
 
-python <- Sys.which("python3")
-if (!nzchar(python)) {
-  cat("ECHEC : python3 absent, le juge indépendant n'est pas disponible.\n")
+# Orchestration commune (trouver_python, appeler_python, message_python_absent :
+# tests/controles/orchestration_locale.R, #117 et #123), chargée dans
+# l'environnement courant. Dossiers cherchés : celui du script lancé (Rscript,
+# --file=), son sous-dossier controles/, puis tests/controles/ sous le
+# répertoire courant ; n'est retenu que celui qui contient aussi ce contrôle :
+# on charge son voisin, jamais un homonyme placé à côté du script lanceur. Lue en
+# UTF-8 quelle que soit la locale.
+for (e_ in parse(encoding = "UTF-8", keep.source = FALSE, file = local({
+  controle_ <- "ecriture_doubles_texte.R"
+  f <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))[1L]
+  d <- c(if (!is.na(f)) c(dirname(f), file.path(dirname(f), "controles")), file.path("tests", "controles"))
+  d <- d[file.exists(file.path(d, controle_))]
+  if (!length(d) || !file.exists(file.path(d[1L], "orchestration_locale.R")))
+    stop("orchestration_locale.R introuvable à côté de ", controle_)
+  file.path(d[1L], "orchestration_locale.R")
+}))) eval(e_, environment())
+rm(e_)
+
+python <- trouver_python()
+if (is.null(python)) {
+  cat(message_python_absent())
   quit(status = 1L)
 }
 GLIBC <- .Platform$OS.type != "windows"
@@ -262,6 +281,7 @@ writeLines(enc2utf8(sprintf("%s\t%d\t%d\t%d", TRANCHES$nom, TRANCHES$debut, TRAN
            useBytes = TRUE)
 writeLines(c(
   "import struct, sys, hashlib",
+  "sys.stdout.reconfigure(encoding='utf-8', line_buffering=True); sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)",
   "from decimal import Decimal",
   "f_x, f_r, f_tp, f_lg, largeur, f_tr = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6]",
   "b = open(f_x, 'rb').read()",
@@ -308,7 +328,12 @@ writeLines(c(
   "print('Table des puissances : %d ligne(s), %d écart(s) aux entiers exacts' % (len(lg), faux))",
   "sys.exit(1 if ecarts or len(r) != len(lignes) or faux or faux_eg or len(lg) != 2098 else 0)"),
   script, useBytes = TRUE)
-t_juge <- system.time(statut <- system2(python, c("-I", shQuote(c(script, f_x, f_r, f_tp, f_lg)), ncol(tp$tranches), shQuote(f_tr))))[["elapsed"]]
+# Sortie du juge capturée (standard et erreur) et lue en UTF-8, puis écrite par R :
+# les accents ne dépendent ni de la page de code ANSI de Windows ni de la console.
+t_juge <- system.time(juge <- appeler_python(python, c("-I", shQuote(c(script, f_x, f_r, f_tp, f_lg)), ncol(tp$tranches), shQuote(f_tr)),
+                                               capturer = TRUE))[["elapsed"]]
+statut <- juge$statut
+cat(paste0(juge$sortie, "\n"), sep = "")
 cat(sprintf("Juge Python : %.2f s, code %d\n", t_juge, statut))
 if (statut != 0L) ecarts <- ecarts + 1L
 

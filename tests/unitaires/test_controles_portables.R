@@ -1,6 +1,8 @@
 # -----------------------------------------------------------------------------
 #  tests/unitaires/test_controles_portables.R : utilitaire commun des scripts
 #  de tests/controles/ (tests/controles/orchestration_locale.R, issue #117).
+#  Interpréteur Python du juge indépendant (issue #123) : recherche testée avec
+#  de faux interpréteurs (scripts sh), donc hors Windows.
 #  Cas bon marché (moins de deux secondes) : le contrôle complet de chaque
 #  locale est une étape de la CI. Nature des attendus : valeurs exactes.
 # -----------------------------------------------------------------------------
@@ -12,8 +14,9 @@ charger_ <- function(script, env) {
 }
 orch <- charger_("orchestration_locale.R", new.env())
 
-verifier("orchestration : l'utilitaire ne définit que les cinq fonctions communes",
-         identical(sort(ls(orch)), c("avec_environnement", "duree", "ecart_octets", "executer", "installer")))
+verifier("orchestration : l'utilitaire ne définit que les huit fonctions communes",
+         identical(sort(ls(orch)), c("appeler_python", "avec_environnement", "duree", "ecart_octets", "executer",
+                                     "installer", "message_python_absent", "trouver_python")))
 
 # --- avec_environnement ---------------------------------------------------------
 
@@ -104,6 +107,154 @@ for (script_ in c("locale_c.R", "locale_latin1.R")) {
   r_ <- executer_rscript(lanceur_)
   verifier(sprintf("%s : homonyme à côté du script lanceur non chargé (installer à env, pas « FAUX »)", script_),
            identical(r_$statut, 0L) && any(r_$sortie == "installer: racine lib env "))
+  file.remove(file.path(d_, "controles", "orchestration_locale.R"))
+  r_ <- executer_rscript(lanceur_)
+  verifier(sprintf("%s : sans utilitaire à côté du contrôle, refus nommé (pas de repli sur l'homonyme)", script_),
+           r_$statut != 0L && any(grepl("orchestration_locale.R introuvable", r_$sortie, fixed = TRUE)) &&
+             any(grepl(script_, r_$sortie, fixed = TRUE)))
+  unlink(d_, recursive = TRUE)
+}
+
+# --- trouver_python, appeler_python (issue #123) ------------------------------------
+# Faux interpréteurs : scripts sh qui consignent leur nom et leurs arguments dans
+# un journal, impriment éventuellement un texte, puis sortent avec le code
+# demandé ; la recherche est injectée (`chercher`), de sorte qu'aucun vrai
+# Python ni aucune variable d'environnement n'entre en jeu. Hors Windows (sh).
+
+if (.Platform$OS.type != "windows") {
+  d_py_ <- tempfile("faux_python_")
+  dir.create(file.path(d_py_, "bin"), recursive = TRUE); dir.create(file.path(d_py_, "WindowsApps"))
+  journal_ <- file.path(d_py_, "journal.txt")
+  # `nargs` : le journal porte aussi le nombre d'arguments reçus ($#).
+  faux_ <- function(chemin, nom, code, sortie = "", nargs = FALSE) {
+    writeLines(c("#!/bin/sh", sprintf("echo '%s' %s\"$@\" >> '%s'", nom, if (nargs) "\"$#\" " else "", journal_),
+                 sortie, sprintf("exit %d", code)), chemin)
+    Sys.chmod(chemin, "755")
+    chemin
+  }
+  vue_ <- function(...) { unlink(journal_); orch$trouver_python(...) }
+  chemins_ <- c(python3 = file.path(d_py_, "bin", "python3"), python = file.path(d_py_, "bin", "python"),
+                py = file.path(d_py_, "bin", "py"))
+  cherche_ <- function(m) function(nom) if (nom %in% names(m)) m[[nom]] else ""
+  appels_ <- function() if (file.exists(journal_)) sub(" .*", "", readLines(journal_)) else character(0)
+
+  # Ordre de priorité : python3 d'abord, une fois exécuté (-I -c, sys.version_info >= (3, 8)).
+  for (n_ in names(chemins_)) faux_(chemins_[[n_]], n_, 0L)
+  r_ <- vue_(chercher = cherche_(chemins_))
+  verifier("trouver_python : python3 retenu en premier, seul exécuté, sans préfixe",
+           identical(r_, list(commande = chemins_[["python3"]], prefixe = character(0))) &&
+             identical(appels_(), "python3"))
+  verifier("trouver_python : le candidat est vérifié par -I -c sys.version_info >= (3, 8)",
+           grepl("^python3 -I -c import sys; sys.exit\\(0 if sys.version_info >= \\(3, 8\\) else 1\\)$", readLines(journal_)))
+  vue_(chercher = cherche_(chemins_), version_min = c(3L, 11L))
+  verifier("trouver_python : version minimale paramétrable (3, 11)", grepl("\\(3, 11\\)", readLines(journal_)))
+
+  # Un candidat dont l'exécution échoue (code non nul, ou fichier non exécutable) est écarté.
+  faux_(chemins_[["python3"]], "python3", 1L)
+  r_ <- vue_(chercher = cherche_(chemins_))
+  verifier("trouver_python : python3 en échec écarté, python retenu (python3 puis python exécutés)",
+           identical(r_, list(commande = chemins_[["python"]], prefixe = character(0))) &&
+             identical(appels_(), c("python3", "python")))
+  writeLines("pas un programme", chemins_[["python3"]]); Sys.chmod(chemins_[["python3"]], "644")
+  r_ <- vue_(chercher = cherche_(chemins_))
+  verifier("trouver_python : candidat non exécutable écarté sans erreur",
+           identical(r_$commande, chemins_[["python"]]) && identical(appels_(), "python"))
+  faux_(chemins_[["python3"]], "python3", 0L)
+
+  # Alias du Store : chemin contenant WindowsApps, écarté sans être exécuté.
+  alias_ <- faux_(file.path(d_py_, "WindowsApps", "python3"), "alias", 0L)
+  r_ <- vue_(chercher = cherche_(c(python3 = alias_, python = chemins_[["python"]], py = chemins_[["py"]])))
+  verifier("trouver_python : chemin WindowsApps écarté sans être exécuté, python retenu",
+           identical(r_$commande, chemins_[["python"]]) && identical(appels_(), "python"))
+  r_ <- vue_(chercher = cherche_(c(python3 = sub("WindowsApps", "windowsapps", alias_), python = chemins_[["python"]])))
+  verifier("trouver_python : WindowsApps reconnu sans égard à la casse",
+           identical(r_$commande, chemins_[["python"]]) && identical(appels_(), "python"))
+
+  # Lanceur py : -3 placé avant les arguments de la vérification.
+  faux_(chemins_[["python3"]], "python3", 1L); faux_(chemins_[["python"]], "python", 3L)
+  r_ <- vue_(chercher = cherche_(chemins_))
+  verifier("trouver_python : py retenu avec le préfixe -3, appelé « py -3 -I -c … »",
+           identical(r_, list(commande = chemins_[["py"]], prefixe = "-3")) &&
+             identical(appels_(), c("python3", "python", "py")) &&
+             grepl("^py -3 -I -c ", tail(readLines(journal_), 1L)))
+
+  # Un candidat qui ne rend pas la main dans le délai est écarté (délai court injecté).
+  writeLines(c("#!/bin/sh", sprintf("echo 'python3' >> '%s'", journal_), "exec sleep 5"), chemins_[["python3"]])
+  faux_(chemins_[["python"]], "python", 0L)
+  t0_ <- Sys.time()
+  r_ <- vue_(chercher = cherche_(chemins_), delai = 1)
+  verifier("trouver_python : candidat qui dépasse le délai écarté (python3 dort 5 s, délai 1 s), python retenu",
+           identical(r_$commande, chemins_[["python"]]) && identical(appels_(), c("python3", "python")) &&
+             as.numeric(difftime(Sys.time(), t0_, units = "secs")) < 3)
+  faux_(chemins_[["python3"]], "python3", 1L); faux_(chemins_[["python"]], "python", 3L)
+
+  # Aucun candidat : introuvables, ou tous en échec, ou tous écartés -> NULL.
+  verifier("trouver_python : aucun candidat trouvé par la recherche -> NULL",
+           is.null(orch$trouver_python(chercher = function(nom) "")))
+  faux_(chemins_[["py"]], "py", 1L)
+  r_ <- vue_(chercher = cherche_(chemins_))
+  verifier("trouver_python : tous les candidats en échec -> NULL, les trois ont été exécutés",
+           is.null(r_) && identical(appels_(), c("python3", "python", "py")))
+  r_ <- vue_(chercher = cherche_(c(python3 = alias_, python = alias_)))
+  verifier("trouver_python : tous les chemins WindowsApps -> NULL, aucun exécuté",
+           is.null(r_) && identical(appels_(), character(0)))
+  r_ <- vue_(candidats = list(list(nom = "x", prefixe = character(0))), chercher = cherche_(c(x = file.path(d_py_, "absent"))))
+  verifier("trouver_python : chemin inexistant -> NULL, sans erreur ni avertissement", is.null(r_))
+  verifier("trouver_python : liste de candidats vide -> NULL", is.null(orch$trouver_python(candidats = list())))
+
+  # appeler_python : statut, sortie capturée (standard et erreur), UTF-8, CRLF ramenées à LF.
+  faux_(chemins_[["python"]], "python", 2L,
+        c("printf 'ligne \\303\\251\\r\\n'", "printf 'erreur\\n' >&2"), nargs = TRUE)
+  p_ <- list(commande = chemins_[["python"]], prefixe = "-3")
+  c_ <- orch$appeler_python(p_, c("-I", shQuote("x y")), capturer = TRUE)
+  verifier("appeler_python : statut rendu, sortie standard et d'erreur capturées, CRLF ramenées à LF",
+           identical(c_$statut, 2L) && length(c_$sortie) == 2L &&
+             identical(charToRaw(c_$sortie[1L]), as.raw(c(0x6c, 0x69, 0x67, 0x6e, 0x65, 0x20, 0xc3, 0xa9))) &&
+             identical(c_$sortie[2L], "erreur"))
+  verifier("appeler_python : préfixe puis arguments transmis, « x y » protégé par shQuote en un seul argument ($# = 3)",
+           identical(tail(readLines(journal_), 1L), "python 3 -3 -I x y"))
+  verifier("appeler_python : accents lus en UTF-8 (marque UTF-8, sauf locale C hors Windows où les octets sont gardés)",
+           identical(Encoding(c_$sortie[1L]), if (Sys.getlocale("LC_CTYPE") %in% c("C", "POSIX")) "unknown" else "UTF-8") &&
+             (!identical(Encoding(c_$sortie[1L]), "UTF-8") || identical(enc2utf8(c_$sortie[1L]), "ligne \u00e9")))
+  faux_(chemins_[["python"]], "python", 0L)
+  verifier("appeler_python : sans capture, statut 0 rendu et sortie vide",
+           identical(orch$appeler_python(p_, "--version"), list(statut = 0L, sortie = character(0))))
+  verifier("message_python_absent : ligne ECHEC nommant les trois candidats, terminée par un saut de ligne",
+           grepl("^ECHEC : .*python3.*python.*py -3.*\n$", orch$message_python_absent()))
+  unlink(d_py_, recursive = TRUE)
+}
+
+# Vrai interpréteur, quand il y en a un (la CI en a un : le juge Python en dépend).
+p_reel_ <- orch$trouver_python()
+if (!is.null(p_reel_)) {  # sauté sans interpréteur utilisable (Windows avec le seul alias du Store)
+  verifier("trouver_python : vrai interpréteur >= 3.8 trouvé, version trop haute (99.0) refusée",
+           is.null(orch$trouver_python(version_min = c(99L, 0L))))
+}
+
+# --- sourçage par les deux contrôles à juge Python -------------------------------
+# Les contrôles ne se chargent pas comme ceux de locale (ils s'exécutent en
+# entier) : on vérifie leur texte (aucune redéfinition de l'utilitaire, plus de
+# Sys.which("python3")) et on exécute leur bloc de chargement, extrait tel quel,
+# comme plus haut (homonyme à côté du lanceur non chargé ; refus nommé).
+
+for (script_ in c("ecriture_doubles.R", "ecriture_doubles_texte.R")) {
+  l_ <- readLines(file.path(CONTROLES_, script_), encoding = "UTF-8")
+  redefinies_ <- grep("^(trouver_python|appeler_python|message_python_absent|avec_environnement|installer|executer) *<- *function", l_, value = TRUE)
+  verifier(sprintf("%s : aucune fonction de l'utilitaire redéfinie ; python trouvé par trouver_python(), plus de Sys.which(\"python3\")", script_),
+           if (length(redefinies_)) paste("redéfinies :", paste(redefinies_, collapse = " | ")) else
+             any(grepl("^python <- trouver_python\\(\\)", l_)) && !any(grepl("Sys.which(\"python3\")", l_, fixed = TRUE)))
+  debut_ <- grep("^for \\(e_ in parse\\(", l_); fin_ <- grep("^rm\\(e_\\)", l_)
+  d_ <- tempfile("homonyme_py_"); dir.create(file.path(d_, "controles"), recursive = TRUE)
+  file.copy(file.path(CONTROLES_, "orchestration_locale.R"), file.path(d_, "controles"))
+  writeLines("# contrôle factice", file.path(d_, "controles", script_))
+  writeLines('trouver_python <- function(...) "FAUX"', file.path(d_, "orchestration_locale.R"))
+  lanceur_ <- file.path(d_, "lanceur.R")
+  writeLines(c("setwd(tempdir())", l_[debut_:fin_], 'cat("trouver_python:", names(formals(trouver_python)), "\n")'), lanceur_)
+  verifier(sprintf("%s : bloc de chargement unique (une seule fois dans le fichier)", script_),
+           length(debut_) == 1L && length(fin_) == 1L && fin_ > debut_)
+  r_ <- executer_rscript(lanceur_)
+  verifier(sprintf("%s : homonyme à côté du script lanceur non chargé (trouver_python à candidats, pas « FAUX »)", script_),
+           identical(r_$statut, 0L) && any(r_$sortie == "trouver_python: candidats chercher version_min delai "))
   file.remove(file.path(d_, "controles", "orchestration_locale.R"))
   r_ <- executer_rscript(lanceur_)
   verifier(sprintf("%s : sans utilitaire à côté du contrôle, refus nommé (pas de repli sur l'homonyme)", script_),
