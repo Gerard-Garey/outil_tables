@@ -289,3 +289,27 @@ Rédigée par `architect-approfondi` à l'étape (5) de la branche `claude/rappo
 - pour les deux : l'empreinte du code (M70) ; aucun `.tsv`, ni l'empreinte du résultat, ni `version_fiche`.
 
 Issues : #120, #94, #89. ADR 0011 (annotation du 27/10/2026). Décisions M126, M162, M165, M166, M167. Branche `claude/rapport-suites`, PR #125.
+
+## Annotation du 6 novembre 2026 — points 3.1, 3.4 (contrôle 7 bis), 3.6, 3.10 ; « Options écartées », l. 159-160 : rejeu d'une construction qui lit une table de référence (ADR 0015, M239 ; #73)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `b146631`, après l'acceptation de l'ADR 0015 par le mainteneur le 06/11/2026 (M239). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Les numéros de ligne cités sont ceux du présent fichier à `b146631` ; le nom de l'objet fait foi (M77, (b)). Aucun code n'est encore écrit : la mise en œuvre est le commit (1) de B13 (#73).
+
+**(a) Point 3.1 : signature.** `rejouer_fiche(donnees, fiche, tables_reference = NULL)`. Le troisième argument, facultatif et nommé, de même forme que celui de `construire_table()`, porte les tables de statut `importee` ou `synthetique` lues par la construction ; les tables de statut `embarquee` ne sont pas reçues, elles sont relues par leur `nom` dans le package (ADR 0015, point 1.4). Les rôles, le plan et la provenance **viennent toujours de la fiche** : la phrase « la fonction n'en reçoit pas d'autres » reste vraie pour eux. Une table reçue est une **entrée**, comme `donnees`, identifiée par son empreinte dans `fiche$tables_reference` et contrôlée avant la construction. Le point 3.2 est inchangé : `rejouer_fiche()` assemble la liste complète (reçues plus relues) et appelle `construire_table()` une seule fois, sans exécuter d'étape.
+
+**(b) Point 3.4 : ordre des contrôles.**
+- Contrôle 2 : la forme de `fiche$tables_reference` y entre (`NULL`, ou liste nommée d'éléments aux sept champs ; `representation` et `empreinte` chaînes uniques ; `statut` dans `STATUTS_TABLE`), motif `fiche_non_conforme` (ADR 0015, point 4.1).
+- **Contrôle 7 bis**, après le contrôle 7 et avant le contrôle 8, pour chaque élément de `fiche$tables_reference`, dans l'ordre des clés, arrêt au premier refus (module `construire_table` ; noms indicatifs) : (1) `representation` égale à `REPRESENTATION_TABLE`, sinon `representation_table_non_admise` ; (2) origine : table relue par `nom` si `embarquee` (sinon `table_embarquee_absente`), table reçue de même clé sinon (`table_reference_absente`, `table_reference_inattendue`, `tables_reference_mal_formees`) ; (3) empreinte recalculée par `empreinte_table()`, sinon `empreinte_table_discordante` (ADR 0015, point 4.2 ; ADR 0011, annotation du 05/11/2026, (f)).
+- Contrôle 8 : `construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance, tables_reference = <liste assemblée>)`.
+- Le bilan porte une ligne de contrôle `tables_reference`, avant les témoins (ADR 0015, point 4.3). Le point 3.8 s'étend aux motifs nouveaux, de module `construire_table`. Un test montre que, sur `empreinte_table_discordante`, `construire_table()` n'est pas appelée (critère 3 de #86 étendu).
+
+**(c) Point 3.6 : témoin « fiche ».** Les métadonnées d'une table (`nom`, `source`, `forme_origine`, `parametres`, et `statut` hors `embarquee`) ne sont pas des motifs de refus : un écart apparaît au témoin « fiche » (« différente : fiche/tables_reference/<clé>/<champ> »). L'empreinte de table identifie l'entrée (refus) ; les métadonnées la décrivent (témoin) (ADR 0015, point 4.2, dernier alinéa).
+
+**(d) Point 3.10 : contrat partagé.** La signature de `rejouer_fiche()` change (troisième argument facultatif ; appels existants inchangés). La phrase « la signature de `construire_table()` est inchangée » se lit avec l'ADR 0007, point 3.1 (annotation du même jour) : un cinquième argument nommé facultatif, `construire_table(donnees, roles, plan)` inchangée. Deux exports nouveaux, `table_embarquee()` et `tables_embarquees()` (ADR 0015, point 6.2).
+
+**(e) « Options écartées », l. 159 et 160.**
+- L. 159 (rejeu avec `roles`, `plan`, `provenance` de l'appelant) : maintenue. Recevoir une table importée n'est pas recevoir un autre plan ni d'autres rôles : c'est recevoir une entrée, que la fiche identifie par son empreinte. Le tiers qui veut mesurer l'effet d'une autre table construit par `construire_table()`.
+- L. 160 (écart d'empreinte du code en refus) : maintenue. L'écart d'empreinte d'une table est un refus, et non un témoin, parce que la table est une entrée et le code ne l'est pas (ADR 0011, annotation du 05/11/2026, (f)).
+
+**Effet sur les résultats : aucun** (fonction de contrôle ; R1 à R6 ne lisent aucune table et se rejouent sans `tables_reference`).
+
+Issues : #73, #86 (critère 3 étendu). Décision M239. ADR 0015 (points 1.4, 4, 6.2) ; ADR 0011 et ADR 0007 (annotations du même jour). Branche `claude/validation-smr-reference`, PR #155.
