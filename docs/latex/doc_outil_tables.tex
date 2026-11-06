@@ -1380,10 +1380,13 @@ l'UCRT de Windows, cette acceptation ne prouve pas que la locale existe~:
 \code{Sys.setlocale()} accepte un nom inventé (\code{xx\_XX.UTF-8},
 \code{yy\_YY.utf8}, \code{en\_XX.UTF-8}) et lui donne la culture
 invariante, que ni \code{l10n\_info()}, ni les noms des mois, ni la casse,
-ni le tri ne distinguent d'une locale réelle~; un nom erroné de la liste des
-candidates passerait donc inaperçu. Seul le symbole monétaire
-international, champ \code{int\_curr\_symbol} de \code{Sys.localeconv()}
-lu sous \code{LC\_MONETARY}, les distingue~: «~XDR~» pour la culture
+ni le tri ne distinguent de \code{en\_US.UTF-8}, la candidate réelle de la
+liste sous Windows (\code{fr\_FR.UTF-8}, par exemple, s'en distingue par ses
+mois, «~janvier~»)~; un nom erroné de la liste des candidates passerait
+donc inaperçu. Parmi les grandeurs mesurées, seules celles de
+\code{LC\_MONETARY} (\code{Sys.localeconv()}) les distinguent~; le critère
+en retient le symbole monétaire international, champ
+\code{int\_curr\_symbol}~: «~XDR~» pour la culture
 invariante, «~USD~» pour \code{en\_US.UTF-8}, «~EUR~» pour
 \code{fr\_FR.UTF-8}. La sonde refuse donc une candidate acceptée dont ce
 symbole égale celui d'un nom sûrement inventé (\code{LOCALE\_INVENTEE},
@@ -1401,11 +1404,21 @@ sont refusés, y compris depuis une session en page de code~1252, et le
 critère devient inactif quand le nom de référence est refusé.
 \textbf{Limite}~: un nom
 à langue inventée et pays réel (\code{xx\_US.UTF-8}, symbole «~USD~»)
-échappe au critère et serait tenu pour disponible. \textbf{Statut}~: le
-comportement de l'UCRT est un \emph{constat de mesure} (Windows~11,
-R~4.3.3 ucrt, 06/11/2026), non tiré de sa documentation, qui n'a pas été
-consultée~; le critère et sa limite ont été retenus par le mainteneur le
-06/11/2026 (issue~\#109). Après le chargement, une sonde
+échappe au critère et serait tenu pour disponible. Sa portée est
+restreinte~: \code{LOCALES\_UTF8} ne contient que des noms fixés dans le
+code, dont aucun n'a cette forme~; sous l'UCRT, \code{C.UTF-8} et
+\code{C.utf8} sont refusés et \code{en\_US.UTF-8} est réelle (constat de
+mesure)~; la limite ne jouerait que si un nom erroné de cette forme y était
+ajouté, et même alors un tel nom reçoit la page de code~65001, celle de
+l'UTF-8 (mesuré pour \code{xx\_US.UTF-8}), tandis que \code{sonde\_utf8()},
+après le chargement (ci-dessous), reste le contrôle de ce qui compte.
+\textbf{Statut}~: le comportement de l'UCRT est un \emph{constat de mesure}
+sur un seul poste (Windows~11 Home, version 10.0.26300, R~4.3.3 ucrt,
+06/11/2026)~; l'UCRT étant un composant du système, il peut changer avec la
+version de Windows~; il n'est pas tiré de la documentation de l'UCRT, qui
+n'a pas été consultée. Le critère et sa limite ont été retenus par le
+mainteneur le 06/11/2026 (issue~\#109~; décision consignée dans le corps de
+la pull request~\#157, section «~Décisions et termes proposés~»). Après le chargement, une sonde
 (\code{sonde\_utf8()}) vérifie qu'un littéral non ASCII du moteur, la
 constante \code{STATUT\_EMPREINTE\_RESULTAT}, est de l'UTF-8 valide et
 inchangé par la conversion~; sinon la batterie échoue. Limite admise~: une
@@ -2326,9 +2339,13 @@ batterie exerce des chemins d'échec bon marché (issue~\#119)~:
     \code{\%.16g} au lieu de \code{\%.17g}, nombre d'égalités exactes
     réduit pour la durée) et s'exécute sur $n = 1\,000$ doubles~; elle doit
     sortir avec le code~1 en relevant exactement les deux écarts attendus
-    (MD5 de T2, juge Python), le MD5 de T3, les égalités exactes, la table
-    des puissances et, hors Windows, le juge glibc restant sans écart~; une
-    mutation qui ne
+    (MD5 de T2, juge Python), le MD5 de T3, les égalités exactes (dont la
+    tranche de T1, trois égalités attendues et trouvées), la table
+    des puissances et, hors Windows, le juge glibc restant sans écart~; un
+    quatrième défaut, ajouté à la même copie (nombre d'égalités exactes
+    attendu dans T1 porté de 3 à~4), doit être relevé sur la ligne de cette
+    tranche, que le contrôle termine par «~ÉCART~», ce qui prouve que le
+    témoin sait voir une tranche fausse~; une mutation qui ne
     toucherait pas exactement une ligne du script fait échouer le témoin~;
   \item \emph{chemin à espace}~: une copie d'\code{ecriture\_doubles.R}
     dont les fichiers temporaires sont placés sous un dossier dont le nom
@@ -2343,7 +2360,8 @@ contrôle refuse de s'exécuter, ou sans interpréteur. Sur la CI, la batterie
 unitaire s'exécute avant l'installation de \code{python3}, réservée à
 l'étape du contrôle \code{ecriture\_doubles\_texte.R}~: seuls les témoins
 du juge absent y sont exercés (décision du mainteneur du 06/11/2026, le
-workflow restant inchangé). Le vrai défaut est exercé sur un poste muni
+workflow restant inchangé, consignée dans le corps de la pull
+request~\#157, section «~Décisions et termes proposés~»). Le vrai défaut est exercé sur un poste muni
 d'un interpréteur, Windows compris (constat sur le poste du mainteneur,
 R~4.3.3 ucrt, Python~3.14.7, 06/11/2026)~; le chemin à espace ne l'est que
 sur un poste POSIX muni d'un interpréteur, donc ni sur la CI ni sous
@@ -2358,9 +2376,9 @@ sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
 (lu par \code{parse()} en UTF-8, puis évalué dans un environnement
 propre~; issue~\#81), vérifie que \code{LOCALES\_UTF8}, dupliquée de \code{tests/harnais.R}, y
 est identique à celle du harnais et que \code{locale\_utf8\_disponible()}
-y rend la même locale que celle du harnais, cette sonde et la constante
-\code{LOCALE\_INVENTEE} y étant des copies au texte identique à celui du
-harnais (issue~\#109~; section~\ref{sec:harnais}), et teste la fonction
+y rend la même locale que celle du harnais, cette sonde y étant une copie
+au code identique à celui du harnais (comparé par \code{deparse()}) et la
+constante \code{LOCALE\_INVENTEE} égale à celle du harnais (issue~\#109~; section~\ref{sec:harnais}), et teste la fonction
 \code{ecart\_octets}, que le script charge de l'utilitaire commun
 (ci-dessous),
 qui rédige le message d'un écart de la comparaison octet à octet et
@@ -2423,8 +2441,14 @@ et \code{ecriture\_doubles\_texte.R}, qui cherchaient auparavant
 contrôle trouvait sur le poste du mainteneur était l'alias du Microsoft
 Store, qui n'est pas un interpréteur (constat rapporté par
 l'issue~\#123). Les candidats sont essayés dans l'ordre \code{python3},
-\code{python}, puis \code{py -3}~; un chemin qui contient
-\code{WindowsApps} (l'alias du Store) est écarté sans être exécuté~; tout
+\code{python}, puis \code{py -3}~; tout chemin situé sous un dossier
+\code{WindowsApps} est écarté sans être exécuté, qu'il s'agisse de l'alias
+du Store ou d'un Python installé depuis le Store (décision du mainteneur du
+06/11/2026, consignée dans le corps de la pull request~\#157, section
+«~Décisions et termes proposés~»). Le nom est cherché dans le chemin tel
+que rendu par la recherche et dans sa forme longue~: sous Windows,
+\code{Sys.which()} rend des chemins courts au format 8.3, où
+\code{WindowsApps} n'apparaît pas. Tout
 autre candidat est exécuté (option \code{-I}) et n'est retenu que si sa
 version est au moins 3.8, une exécution en échec ou qui dépasse
 30~secondes l'écartant. Si aucun ne convient, le contrôle sort avec le
@@ -2436,12 +2460,16 @@ ANSI de Windows, accents abîmés)~; \code{ecriture\_doubles\_texte.R}
 capture cette sortie, la lit en UTF-8 et l'imprime lui-même. Seul
 l'affichage était en cause~: les comptes et le verdict ne dépendent pas de
 ce codage. \textbf{Statut}~: \emph{constat de mesure} sur le poste du
-mainteneur (Windows~11, R~4.3.3 ucrt, Python~3.14.7, 06/11/2026)~: le délai
-est respecté pour \code{py -3}, dont l'arrêt ne laisse aucun processus
-Python orphelin, et la sortie capturée du juge garde ses accents~; la
-recherche elle-même (ordre, alias écarté, version, délai, absence de
-candidat) est testée avec de faux interpréteurs, hors Windows
-(\code{test\_controles\_portables.R}).
+mainteneur (Windows~11 Home, version 10.0.26300, R~4.3.3 ucrt,
+Python~3.14.7, 06/11/2026)~: pour \code{py -3}, le délai, réduit à
+3~secondes pour la mesure, est respecté, et l'arrêt ne laisse aucun
+processus Python orphelin~; la sortie capturée du juge garde ses
+accents. La recherche elle-même (ordre, chemin \code{WindowsApps} écarté,
+version, délai, absence de candidat) est testée avec de faux interpréteurs
+hors Windows~; le filtre \code{WindowsApps} l'est aussi sous Windows, par
+un faux interpréteur placé sous un dossier \code{WindowsApps} et désigné
+par son chemin court, qui n'est pas lancé, et par le même placé ailleurs,
+qui l'est (\code{test\_controles\_portables.R}).
 
 \begin{center}
 \small
@@ -7820,8 +7848,8 @@ Python, hors de R. Le contrôle \code{tests/controles/ecriture\_doubles.R},
 \textbf{hors batterie et hors CI} (durée, dépendance à Python), étend ce
 recoupement à $10^6$ doubles et aux cas limites, ligne à ligne, et sort avec
 un code non nul sur un écart ou si aucun interpréteur Python~3.8 ou plus
-n'est trouvé~; la batterie unitaire n'en exerce que des chemins bon marché,
-juge absent et chemin à espace (section~\ref{sec:scripts-controle})~; il ne s'exécute pas
+n'est trouvé~; la batterie unitaire n'exerce du script lui-même que des
+chemins bon marché, juge absent et chemin à espace (section~\ref{sec:scripts-controle})~; il ne s'exécute pas
 sous Windows, où le texte \code{\%.17g} qu'il transmet au juge n'est pas
 toujours correctement arrondi.
 
@@ -7855,14 +7883,20 @@ double (constat de mesure). Le contrôle
 \code{tests/controles/ecriture\_doubles\_texte.R}
 (tableau~\ref{tab:scripts-controle}), \textbf{hors batterie} (durée,
 dépendance à Python) et exécuté par une étape de la CI, la batterie
-unitaire n'en exerçant que des chemins d'échec bon marché, juge absent et
-vrai défaut sur une copie mutée (section~\ref{sec:scripts-controle}),
+unitaire n'exerçant du script lui-même que des chemins d'échec bon marché,
+juge absent et vrai défaut sur une copie mutée (section~\ref{sec:scripts-controle}),
 recoupe l'écriture
 du moteur sur plus de $10^{6}$ doubles, compare chaque ligne aux deux
 juges, exige le nombre d'égalités exactes de chaque partie et recalcule les
 MD5 de T2 et de T3. \textbf{Statut}~: les attendus sont des \emph{constats}
 de deux juges, non des valeurs démontrées~; l'arrondi correct relève de
-la preuve.
+la preuve. Sous Windows, \emph{constat de mesure} sur le poste du
+mainteneur (Windows~11 Home, version 10.0.26300, R~4.3.3 ucrt,
+Python~3.14.7, 06/11/2026)~: le contrôle complet passe, le juge glibc étant
+sauté~; le juge Python relève 0~écart sur 2\,423\,344 doubles, les MD5 des
+textes de T2 et de T3 sont égaux aux constantes de la batterie unitaire et
+la table des puissances est sans écart. Ce constat ne garantit pas la
+portabilité~: un seul poste, un seul juge, hors CI.
 
 \medskip
 Les dates sont vérifiées sur quatre chiffres
