@@ -1,5 +1,4 @@
 type,nom,issue,motif
-entree,fonctions-construire-table:controler_graine_plan,#61,"docwriter en fin de branche (règle 9) ; contrôle de la graine du plan, refus graine_invalide"
 catalogue,fonctions-validation,#4,"module validation (R/validation.R), nouveau ; docwriter en fin de branche (règle 9)"
 entree,fonctions-construire-table:table_citee,#4,"docwriter en fin de branche (règle 9) ; table de la clé citée par l'étape validation"
 entree,fonctions-donnees:construire_observations,#69,"docwriter en fin de branche (règle 9) ; observations de l'unité d'observation, extraites de preparer_donnees() (factorisation, commit (4a))"
