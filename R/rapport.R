@@ -870,14 +870,15 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # programmation, jamais une valeur retirée en silence ; toute autre valeur
 # inchangée. Stockages admis, liste fermée, conversions sans perte : borne de
 # période Date à stockage double ou integer -> Date double ; délai integer ou
-# double -> double ; graine integer, ou double entier dans l'étendue des
-# integer -> integer (graine NA refusée). Un autre stockage, une étape absente
-# de `parametres` ou en double, ou aux noms de paramètres en double ou autres
-# que ceux du catalogue, sont une erreur de programmation (le plan n'a pas été
-# validé ; un nom en double serait sinon réduit en silence à sa première
-# occurrence, #42). Idempotente : un plan canonique est rendu
-# identical(). Ce n'est pas un plan résolu (point 5.2 : convention demandée
-# inchangée).
+# double -> double ; graine admise par forme_graine() (integer ou double
+# entier, unique, fini, sans attribut, de valeur absolue au plus
+# .Machine$integer.max ; domaine de graine_invalide, #61) -> integer. Un
+# autre stockage, une étape absente de `parametres` ou en double, ou aux noms
+# de paramètres en double ou autres que ceux du catalogue, sont une erreur de
+# programmation (le plan n'a pas été validé ; un nom en double serait sinon
+# réduit en silence à sa première occurrence, #42). Idempotente : un plan
+# canonique est rendu identical(). Ce n'est pas un plan résolu (point 5.2 :
+# convention demandée inchangée).
 canoniser_plan <- function(plan, champs, parametres, ordres) {
   non_canonique <- function(champ)
     stop(sprintf("canoniser_plan() : valeur ou stockage non canonisable pour « %s » (erreur de programmation : plan non validé).",
@@ -895,10 +896,8 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   p[["delai_declaration"]] <- as.double(delai)
   if ("graine" %in% names(p)) {
     g <- p[["graine"]]
-    if (is.double(g) && length(g) == 1L && is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max)
-      g <- as.integer(g)
-    if (!is.integer(g) || anyNA(g)) non_canonique("graine")
-    p[["graine"]] <- g
+    if (!forme_graine(g)) non_canonique("graine")
+    p[["graine"]] <- as.integer(g)
   }
   e <- p[["etapes"]]
   if (anyDuplicated(names(e))) non_canonique("etapes")

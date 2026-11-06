@@ -16,3 +16,4 @@ fiche,VERSION_FICHE,#73,"version_fiche 4 -> 5 ; docwriter en fin de branche (rè
 fiche,REPRESENTATION_TABLE,#73,"première ligne « tablexp table 1 » de l'empreinte de table ; docwriter en fin de branche (règle 9) ; ADR 0015"
 fiche,champs_fiche,#73,"champ tables_reference après empreintes ; docwriter en fin de branche (règle 9) ; ADR 0015"
 fiche,blocs_lecture,#73,"tables_reference dans le bloc rejeu, après empreintes ; docwriter en fin de branche (règle 9) ; ADR 0015"
+entree,fonctions-construire-table:controler_graine_plan,#61,"docwriter en fin de branche (règle 9) ; contrôle de la graine du plan, refus graine_invalide"

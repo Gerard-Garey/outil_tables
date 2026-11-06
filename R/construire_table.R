@@ -103,6 +103,27 @@ liste_noms_complets <- function(x) forme_exacte(x, "list", "names") &&
 # attribut que names (#23) : liste_noms_complets() sans doublon.
 liste_nommee <- function(x) liste_noms_complets(x) && !anyDuplicated(names(x))
 
+# Graine du plan (#61 ; M243), appelée par valider_plan() après le contrôle
+# des étapes préalables : `aleatoire` dit si une étape du plan tire un aléa
+# (paramètre, pour tester les trois refus par injection tant qu'aucune étape
+# n'est aléatoire). Ordre : graine_invalide (champ présent, NULL compris, et
+# forme_graine() faux : même domaine que canoniser_plan()), puis
+# graine_inattendue, puis graine_manquante. Rend NULL, invisible.
+controler_graine_plan <- function(plan, aleatoire) {
+  presente <- "graine" %in% names(plan)
+  if (presente && !forme_graine(plan[["graine"]]))
+    refuser("construire_table", "graine_invalide",
+            formuler("La graine du plan doit être un nombre entier unique, fini, sans attribut, de valeur absolue au plus 2147483647."),
+            list(graine = plan[["graine"]]))
+  if (!aleatoire && presente)
+    refuser("construire_table", "graine_inattendue",
+            formuler("Le plan déclare une graine alors qu'aucune de ses étapes ne tire d'aléa."),
+            list(graine = plan[["graine"]]))
+  if (aleatoire && !presente)
+    refuser("construire_table", "graine_manquante", formuler("Une étape du plan tire un aléa : la graine est requise."))
+  invisible(NULL)
+}
+
 # Valide le plan entier, sans rien exécuter (ADR 0007, point 5.4). Rend le
 # plan, inchangé et invisible ; refuse (module construire_table pour les
 # codes structurels ; module donnees, exposition ou brut pour les valeurs).
@@ -165,13 +186,7 @@ valider_plan <- function(plan) {
                list(etape = noms[sans_prealable], prealable = manquants,
                     prealables_par_etape = absents[sans_prealable]))
   }
-  aleatoire <- any(ETAPES$aleatoire[rang])
-  if (!aleatoire && "graine" %in% names(plan))
-    refus_plan("graine_inattendue",
-               formuler("Le plan déclare une graine alors qu'aucune de ses étapes ne tire d'aléa."),
-               list(graine = plan[["graine"]]))
-  if (aleatoire && !("graine" %in% names(plan)))
-    refus_plan("graine_manquante", formuler("Une étape du plan tire un aléa : la graine est requise."))
+  controler_graine_plan(plan, any(ETAPES$aleatoire[rang]))
   for (nom in noms) {
     pe <- etapes[[nom]]
     attendus <- PARAMETRES_ETAPES[[nom]]$parametre
