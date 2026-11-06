@@ -2785,9 +2785,10 @@ avant le contrôle de la structure des paramètres d'étape
 champs et des paramètres, porté par les modules. \code{integer} et \code{double} à valeur
 entière sont tous deux admis, comme pour \code{sous\_graine()} (issue~\#43)
 et pour la graine des défauts du simulateur (issue~\#113)~:
-\code{set.seed()} convertit son argument en entier, si bien que
-\code{sous\_graine(7, expr)} et \code{sous\_graine(7L, expr)} tirent les
-mêmes valeurs (identité vérifiée par
+\code{sous\_graine()} passe \code{as.integer(graine)} à \code{set.seed()}
+(\code{R/outils.R}), si bien que \code{sous\_graine(7, expr)} et
+\code{sous\_graine(7L, expr)} reçoivent le même entier et tirent les mêmes
+valeurs (identité exacte par construction, constatée par
 \code{tests/unitaires/test\_graine\_plan.R})~; c'est l'option~1 de l'ADR
 0011, annotation du 20/10/2026 du point~5.1~(g), (d). Le domaine admis est
 aussi celui de \code{canoniser\_plan()} (section~\ref{sec:fiche})~: toute
@@ -3515,7 +3516,9 @@ ligne), la colonne \code{attendu} ce que le code installé exige ou obtient~;
 la ligne \code{tables\_reference} fait exception (ADR 0015, point~4.3)~: les
 tables y sont l'entrée reçue ou relue, si bien que \code{lu} porte
 l'empreinte recalculée sur chacune et \code{attendu} celle que la fiche
-exige.
+exige. Les \code{details} du refus \code{empreinte\_table\_discordante}
+suivent, eux, la règle générale (\code{lu}~: empreinte de la fiche~;
+\code{attendu}~: empreinte recalculée).
 Le bilan \textbf{n'entre pas dans l'objet}~: un champ ou un attribut de plus
 ferait que l'objet rejoué ne serait plus \code{identical()} à un original,
 changerait le périmètre de l'empreinte du résultat, et
@@ -6740,8 +6743,9 @@ tenue pour fixe, \emph{asymptotique} sous le modèle de survie, où $E^c$ est
 aléatoire (section~\ref{sec:brut-poisson}). Elle suppose des unités
 d'observation indépendantes~: en unité contrat, sans identifiant de tête,
 une tête qui porte $k$ contrats compte $k$ décès, et la variance des décès
-est sur-dispersée d'un facteur $\varphi = \sum k^2 E / \sum k E \ge 1$
-(exact sous le modèle de Poisson par tête), ce qui rend les tests
+est sur-dispersée d'un facteur $\varphi = \sum k^2 E / \sum k E \ge 1$,
+$E$ étant l'exposition d'une tête dont les $k$ contrats couvrent la même
+période (exact sous le modèle de Poisson par tête dans ce cas), ce qui rend les tests
 \textbf{anti-conservateurs} (p-valeurs trop petites, intervalles trop
 étroits)~; $\varphi$ n'est pas mesurable sans identifiant de tête, et le
 rapport figé le mentionne (section~\ref{sec:rapport-fige}). Les
@@ -6829,7 +6833,8 @@ dans la colonne \code{statut} du résultat.
     donc sensible au déséquilibre des signes comme à leur regroupement. Le
     sens inférieur répond à l'écart visé~: une table qui s'écarte des
     observations sur une plage d'âges y regroupe les résidus d'un même
-    signe et réduit le nombre de suites.
+    signe et réduit le nombre de suites~; la note associe d'ailleurs un bon
+    ajustement à «~un grand nombre de \emph{runs}~» (p.~3/29).
   \item \textbf{S8, Wilcoxon} (\code{wilcoxon})~: rangs signés des
     différences $d_c = D_c/E^c_c - \tilde\mu_c$ $(= \hat\mu_c - \tilde\mu_c
     = r_c / E^c_c)$, calculées sous la forme $D_c/E^c_c - \tilde\mu_c$, qui
@@ -6884,10 +6889,13 @@ suffit pas~: $A_c$ est calculé en arithmétique flottante, et un attendu
 entier par construction peut ne pas l'être en \code{double} (constat sous
 R~4.3.3~: \code{49 * (1 / 49)} n'est pas égal à 1)~;
 la tolérance relative fait de ce résidu un zéro. Elle ne change pas la
-définition sous $H_0$, $D$ étant entier et un résidu non nul étant au moins
-de l'ordre de la partie fractionnaire de $A_c$, sauf pour un $A_c$ à moins
-de $10^{-10} A_c$ d'un entier sans l'être (statut~: approximation
-numérique).
+définition sous $H_0$~: $D_c$ étant entier, un résidu non nul vaut au
+moins, en valeur absolue, la distance de $A_c$ à l'entier le plus
+proche~; seule exception, pour un $A_c$ non entier à moins de
+$10^{-10}A_c$ d'un entier $k$, l'événement $D_c = k$ est compté nul au
+lieu d'être signé (statut~: approximation numérique). La règle étant la
+même pour l'observé et pour les répliques, le niveau des p-valeurs de
+Monte-Carlo n'en dépend pas.
 
 \medskip
 \noindent
@@ -6936,7 +6944,7 @@ la queue inférieure ($R$)~; centrale, $\min(1, 2\min(p_{\inf}, p_{\sup}))$,
 chaque queue de cette forme (signes, Wilcoxon). Sous $H_0$~(i), $E^c$
 tenue pour fixe, l'observé et les $B$ répliques sont indépendants et de
 même loi~; le rang de l'observé parmi les $B + 1$ valeurs est donc
-uniforme, et les égalités, comptées dans $K$, rendent la
+uniforme en l'absence d'égalité, et les égalités, comptées dans $K$, rendent la
 p-valeur conservatrice~; d'où, pour la
 queue supérieure, $P_{H_0}(p_{MC} \le \alpha) = \lfloor \alpha(B+1)
 \rfloor / (B+1) \le \alpha$ pour une statistique continue et $\le \alpha$
@@ -6946,7 +6954,8 @@ en présence d'égalités, et, pour la p-valeur centrale, $P(p_{MC} \le
 \alpha$, sous $H_0$~(i) avec $E^c$ tenue pour fixe~; asymptotique sous le
 modèle de survie (décision M260). Ce niveau vaut pour tout $B \ge 1$~; $B$
 règle la précision de $p_{MC}$ et la puissance, non le niveau.
-\textbf{Erreur de Monte-Carlo}~: $e = \sqrt{B\,p_{MC}(1 - p_{MC})}/(B +
+\textbf{Erreur de Monte-Carlo}~: écart-type de $p_{MC}$ conditionnel aux
+observations, estimé par substitution, $e = \sqrt{B\,p_{MC}(1 - p_{MC})}/(B +
 1)$, restituée avec chaque p-valeur de Monte-Carlo~; elle est due au nombre
 fini de réplications et \textbf{distincte de l'erreur d'estimation}, qui
 tient à l'exposition (E2.20). Pour les signes, les suites et Wilcoxon, sans
@@ -7377,7 +7386,11 @@ par $\hat\mu_{r,c}$) du rapport $\operatorname{Var}(\hat A)/E[D_e]$. Par la
 méthode delta, $\operatorname{Var}(\log \mathrm{SMR}) \approx (1 +
 f)/E[D_e]$, alors que les deux intervalles ont, pour $O$ grand, la
 largeur que donnerait une variance $1/O$~; si les décès retirés sont indépendants des décès conservés
-(hypothèse), la couverture des intervalles tend, quand $E[D_e] \to \infty$
+(hypothèse~: vraie sous le modèle de Poisson à expositions fixes, $D_e$
+étant compté --- même en unité tête, où il est une différence
+contrefactuelle --- sur des expositions disjointes de celles des lignes
+conservées~; en défaut en unité contrat quand une tête porte un contrat
+conservé et un contrat exclu, son décès comptant des deux côtés), la couverture des intervalles tend, quand $E[D_e] \to \infty$
 à $f$ fixé, vers $2\,\Phi\bigl(z/\sqrt{1 + f}\bigr) - 1$, inférieure au
 niveau (résultat asymptotique)~; par exemple, pour un niveau de 0,95 et $f
 = 0{,}1$, $2\,\Phi\bigl(1{,}959964/\sqrt{1{,}1}\bigr) - 1 = 0{,}9383$. La
@@ -7638,7 +7651,8 @@ asymptotique proche de sa taille exacte~: \emph{constat de simulation}, qui
 illustre que seules les p-valeurs de Monte-Carlo ont un niveau garanti sous
 $H_0$~(i) sur une petite base. Le décentrage de $z$ de Wilcoxon sous
 $H_0$~(i) quand de nombreuses cellules ont $A_c < \ln 2$ est un constat de
-même nature (mesure de \code{docwriter} sur ce jeu, non reproduite).
+même nature (mesures consignées dans le message du commit \code{e9cbf53}, non
+reproduites ici, E3.4).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-validation}
