@@ -1311,6 +1311,11 @@ if (nzchar(Sys.which("git"))) {
   }
   cites <- tempfile("depot_commits_"); dir.create(cites)
   git_t(cites, "init", "-q")
+  # Git for Windows (core.protectNTFS, vrai par défaut) refuse ces noms dans
+  # l'index (« Invalid path 'R/a"b.R' ») ; ils n'existent ici que dans l'index
+  # et les objets, jamais sur le disque : protection levée pour ce seul dépôt
+  # synthétique (la CI sous Linux admettait déjà ces noms).
+  git_t(cites, "config", "core.protectNTFS", "false")
   pose <- function(chemin, texte) {
     f <- tempfile(); on.exit(unlink(f)); writeBin(charToRaw(texte), f)
     oid <- git_t(cites, "hash-object", "-w", shQuote(f))
