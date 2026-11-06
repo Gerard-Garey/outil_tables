@@ -1,2 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-donnees:construire_observations,#69,"docwriter en fin de branche (règle 9) ; observations de l'unité d'observation, extraites de preparer_donnees() (factorisation, commit (4a))"
