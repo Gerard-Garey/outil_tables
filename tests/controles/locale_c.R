@@ -51,6 +51,25 @@
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
 IDENTIFIANTS <- paste0("R", 1:6)
 
+# Orchestration commune (installer, executer, avec_environnement, duree,
+# ecart_octets : tests/controles/orchestration_locale.R, #117), chargée dans
+# l'environnement courant. Dossiers cherchés : celui du script lancé (Rscript,
+# --file=), son sous-dossier controles/ (contrôle sourcé depuis
+# tests/test_unitaires.R), puis tests/controles/ sous le répertoire courant ;
+# n'est retenu que celui qui contient aussi ce contrôle : on charge son voisin,
+# jamais un homonyme placé à côté du script lanceur. Lue en UTF-8 quelle que
+# soit la locale.
+for (e_ in parse(encoding = "UTF-8", keep.source = FALSE, file = local({
+  controle_ <- "locale_c.R"
+  f <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))[1L]
+  d <- c(if (!is.na(f)) c(dirname(f), file.path(dirname(f), "controles")), file.path("tests", "controles"))
+  d <- d[file.exists(file.path(d, controle_))]
+  if (!length(d) || !file.exists(file.path(d[1L], "orchestration_locale.R")))
+    stop("orchestration_locale.R introuvable à côté de ", controle_)
+  file.path(d[1L], "orchestration_locale.R")
+}))) eval(e_, environment())
+rm(e_)
+
 # Octets tels quels (marque d'encodage retirée) pour cat() : sous la locale C,
 # cat() écrit « <U+00E9> » pour une chaîne marquée UTF-8.
 octets_bruts <- function(x) { Encoding(x) <- "unknown"; x }
@@ -61,17 +80,6 @@ locale_utf8_disponible <- function() {
   on.exit(Sys.setlocale("LC_CTYPE", ancienne))
   for (l in LOCALES_UTF8) if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) return(l)
   ""
-}
-
-# Variables « NOM=valeur » posées dans ce processus le temps de l'appel (le
-# sous-processus en hérite) ; restaurées ensuite.
-avec_environnement <- function(env, expr) {
-  noms <- names(env)
-  anciens <- Sys.getenv(noms, unset = NA, names = TRUE)
-  do.call(Sys.setenv, as.list(env))
-  on.exit(for (n in noms) if (is.na(anciens[[n]])) Sys.unsetenv(n) else
-    do.call(Sys.setenv, stats::setNames(list(anciens[[n]]), n)))
-  force(expr)
 }
 
 environnement_locale <- function(locale) c(LC_ALL = locale, LANG = locale, LC_CTYPE = locale)
@@ -228,40 +236,7 @@ travailleur <- function(args) {
   invisible(TRUE)
 }
 
-# --- orchestration ------------------------------------------------------------
-
-duree <- function(depuis) sprintf("%.1f s", as.numeric(difftime(Sys.time(), depuis, units = "secs")))
-
-installer <- function(racine, lib, locale) {
-  t0 <- Sys.time()
-  r <- avec_environnement(environnement_locale(locale),
-    suppressWarnings(system2(file.path(R.home("bin"), "R"),
-                             c("CMD", "INSTALL", "--no-docs", "-l", shQuote(lib), shQuote(racine)),
-                             stdout = TRUE, stderr = TRUE)))
-  statut <- attr(r, "status")
-  if (!is.null(statut) && statut != 0L)
-    return(list(ok = FALSE, sortie = r, duree = duree(t0)))
-  list(ok = TRUE, sortie = r, duree = duree(t0))
-}
-
-executer <- function(script, racine, lib, locale, attendu, sortie) {
-  t0 <- Sys.time()
-  r <- avec_environnement(environnement_locale(locale),
-    suppressWarnings(system2(file.path(R.home("bin"), "Rscript"),
-                             c(shQuote(script), "--travailleur", shQuote(lib), attendu, shQuote(sortie), shQuote(racine)),
-                             stdout = TRUE, stderr = TRUE)))
-  statut <- attr(r, "status")
-  list(ok = is.null(statut) || statut == 0L, sortie = r, duree = duree(t0))
-}
-
-# Premier octet différent, avec le numéro de ligne (LF) : message d'écart.
-ecart_octets <- function(a, b) {
-  n <- min(length(a), length(b))
-  k <- which(a[seq_len(n)] != b[seq_len(n)])[1L]
-  if (is.na(k)) k <- n + 1L
-  ligne <- 1L + sum(a[seq_len(k - 1L)] == as.raw(10L))
-  sprintf("longueurs %d et %d octets ; premier octet différent : %d (ligne %d)", length(a), length(b), k, ligne)
-}
+# --- orchestration (installer(), executer() : orchestration_locale.R) ----------
 
 principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   script <- normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1L]))
@@ -290,14 +265,14 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
     dir.create(cas[[k]]$lib); dir.create(cas[[k]]$sortie)
   }
   for (c_ in cas) {
-    i <- installer(racine, c_$lib, c_$locale)
+    i <- installer(racine, c_$lib, environnement_locale(c_$locale))
     cat(sprintf("  R CMD INSTALL sous LC_ALL=%s : %s (%s)\n", c_$locale, if (i$ok) "ok" else "ECHEC", i$duree))
     if (!i$ok) { cat(i$sortie, sep = "\n"); defauts <- c(defauts, sprintf("installation sous LC_ALL=%s en échec", c_$locale)) }
   }
   if (length(defauts)) echec()
   for (c_ in cas) {
     cat(sprintf("  R1 à R6, fiche, plan et rapport figé, sous LC_ALL=%s :\n", c_$locale))
-    e <- executer(script, racine, c_$lib, c_$locale, c_$attendu, c_$sortie)
+    e <- executer(script, racine, c_$lib, environnement_locale(c_$locale), c_$attendu, c_$sortie)
     cat(paste0("  ", e$sortie), sep = "\n")
     cat(sprintf("  durée : %s\n", e$duree))
     if (!e$ok) defauts <- c(defauts, sprintf("sous-processus sous LC_ALL=%s en échec (voir ci-dessus)", c_$locale))

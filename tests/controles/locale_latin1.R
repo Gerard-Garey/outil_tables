@@ -51,6 +51,25 @@ LOCALE_LATIN1 <- "fr_FR.ISO-8859-1"
 IDENTIFIANTS <- paste0("R", 1:6)
 JEUX_NON_ASCII <- c("natif", "latin1", "utf8", "mixte")
 
+# Orchestration commune (installer, executer, avec_environnement, duree,
+# ecart_octets : tests/controles/orchestration_locale.R, #117), chargée dans
+# l'environnement courant. Dossiers cherchés : celui du script lancé (Rscript,
+# --file=), son sous-dossier controles/ (contrôle sourcé depuis
+# tests/test_unitaires.R), puis tests/controles/ sous le répertoire courant ;
+# n'est retenu que celui qui contient aussi ce contrôle : on charge son voisin,
+# jamais un homonyme placé à côté du script lanceur. Lue en UTF-8 quelle que
+# soit la locale.
+for (e_ in parse(encoding = "UTF-8", keep.source = FALSE, file = local({
+  controle_ <- "locale_latin1.R"
+  f <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))[1L]
+  d <- c(if (!is.na(f)) c(dirname(f), file.path(dirname(f), "controles")), file.path("tests", "controles"))
+  d <- d[file.exists(file.path(d, controle_))]
+  if (!length(d) || !file.exists(file.path(d[1L], "orchestration_locale.R")))
+    stop("orchestration_locale.R introuvable à côté de ", controle_)
+  file.path(d[1L], "orchestration_locale.R")
+}))) eval(e_, environment())
+rm(e_)
+
 # Messages du sous-processus rendus en ASCII (octets non ASCII en <xx>) : la
 # sortie d'une session latin-1 n'est pas de l'UTF-8, et ce fichier est lu
 # sous latin-1 par le sous-processus.
@@ -62,17 +81,6 @@ locale_utf8_disponible <- function() {
   on.exit(Sys.setlocale("LC_CTYPE", ancienne))
   for (l in LOCALES_UTF8) if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) return(l)
   ""
-}
-
-# Variables « NOM=valeur » posées dans ce processus le temps de l'appel (le
-# sous-processus en hérite) ; restaurées ensuite.
-avec_environnement <- function(env, expr) {
-  noms <- names(env)
-  anciens <- Sys.getenv(noms, unset = NA, names = TRUE)
-  do.call(Sys.setenv, as.list(env))
-  on.exit(for (n in noms) if (is.na(anciens[[n]])) Sys.unsetenv(n) else
-    do.call(Sys.setenv, stats::setNames(list(anciens[[n]]), n)))
-  force(expr)
 }
 
 environnement_locale <- function(locale, locpath = NULL)
@@ -204,38 +212,7 @@ travailleur <- function(args) {
   invisible(TRUE)
 }
 
-# --- orchestration ------------------------------------------------------------
-
-duree <- function(depuis) sprintf("%.1f s", as.numeric(difftime(Sys.time(), depuis, units = "secs")))
-
-installer <- function(racine, lib, env) {
-  t0 <- Sys.time()
-  r <- avec_environnement(env,
-    suppressWarnings(system2(file.path(R.home("bin"), "R"),
-                             c("CMD", "INSTALL", "--no-docs", "-l", shQuote(lib), shQuote(racine)),
-                             stdout = TRUE, stderr = TRUE)))
-  statut <- attr(r, "status")
-  list(ok = is.null(statut) || statut == 0L, sortie = r, duree = duree(t0))
-}
-
-executer <- function(script, racine, lib, env, attendu, sortie) {
-  t0 <- Sys.time()
-  r <- avec_environnement(env,
-    suppressWarnings(system2(file.path(R.home("bin"), "Rscript"),
-                             c(shQuote(script), "--travailleur", shQuote(lib), attendu, shQuote(sortie), shQuote(racine)),
-                             stdout = TRUE, stderr = TRUE)))
-  statut <- attr(r, "status")
-  list(ok = is.null(statut) || statut == 0L, sortie = r, duree = duree(t0))
-}
-
-# Premier octet différent, avec le numéro de ligne (LF) : message d'écart.
-ecart_octets <- function(a, b) {
-  n <- min(length(a), length(b))
-  k <- which(a[seq_len(n)] != b[seq_len(n)])[1L]
-  if (is.na(k)) k <- n + 1L
-  ligne <- 1L + sum(a[seq_len(k - 1L)] == as.raw(10L))
-  sprintf("longueurs %d et %d octets ; premier octet différent : %d (ligne %d)", length(a), length(b), k, ligne)
-}
+# --- orchestration (installer(), executer() : orchestration_locale.R) ----------
 
 principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   script <- normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1L]))
