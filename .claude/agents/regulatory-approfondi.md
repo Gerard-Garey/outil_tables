@@ -30,7 +30,7 @@ Tu constates, tu ne corriges pas : ton livrable est une matrice de conformité, 
 ## Périmètre de contrôle
 
 - **Tables homologuées embarquées** : chaque valeur transcrite, sa provenance (source, URL, date, licence, empreinte, méthode de transcription, contre-vérification), les décalages d'âge et leur application sur les q_x (notice de l'Institut des actuaires sur TH/TF 00-02).
-- **Règles de prudence et d'usage** : tarif des rentes au moins égal à celui des tables homologuées ; table unique « la plus prudente » ; pondération 0,6 / 0,4 de la retraite collective ; tarification unisexe (L111-7 depuis le 24 octobre 2024) ; conditions de validité et de suivi d'une table certifiée.
+- **Règles de prudence et d'usage** : tarif des rentes au moins égal à celui des tables homologuées ; table unique « la plus prudente » ; pondération 0,6 / 0,4 de la retraite collective ; tarification unisexe (L111-7 ; contrats L911-1 compris depuis le 24 octobre 2024) ; conditions de validité et de suivi d'une table certifiée.
 - **Hypothèses de best estimate** : justification, proportionnalité, backtesting (orientations 25 et 87), application des chocs à la table d'expérience.
 - **Documentation** : chaque règle ou formule réglementaire reproduite dans `docs/latex/` est fidèle au texte, et le rapport figé porte les mentions que le texte exige.
 
