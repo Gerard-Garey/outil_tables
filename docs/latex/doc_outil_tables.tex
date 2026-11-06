@@ -1373,7 +1373,39 @@ session n'est pas en UTF-8, \code{installer\_tablexp()} lance donc
 \code{R CMD INSTALL} sous la première locale UTF-8 disponible parmi
 \code{C.UTF-8}, \code{C.utf8} et \code{en\_US.UTF-8}
 (\code{locale\_installation()}), et échoue s'il n'y en a aucune~; la locale
-d'exécution des batteries reste libre. Après le chargement, une sonde
+d'exécution des batteries reste libre. La disponibilité se sonde, elle ne
+se suppose pas (\code{locale\_utf8\_disponible()})~: une candidate est
+disponible si \code{Sys.setlocale()} l'accepte pour \code{LC\_CTYPE}. Sous
+l'UCRT de Windows, cette acceptation ne prouve pas que la locale existe~:
+\code{Sys.setlocale()} accepte un nom inventé (\code{xx\_XX.UTF-8},
+\code{yy\_YY.utf8}, \code{en\_XX.UTF-8}) et lui donne la culture
+invariante, que ni \code{l10n\_info()}, ni les noms des mois, ni la casse,
+ni le tri ne distinguent d'une locale réelle~; un nom erroné de la liste des
+candidates passerait donc inaperçu. Seul le symbole monétaire
+international, champ \code{int\_curr\_symbol} de \code{Sys.localeconv()}
+lu sous \code{LC\_MONETARY}, les distingue~: «~XDR~» pour la culture
+invariante, «~USD~» pour \code{en\_US.UTF-8}, «~EUR~» pour
+\code{fr\_FR.UTF-8}. La sonde refuse donc une candidate acceptée dont ce
+symbole égale celui d'un nom sûrement inventé (\code{LOCALE\_INVENTEE},
+\code{xx\_XX.UTF-8}). Le critère n'est actif que si ce nom est lui-même
+accepté~: la glibc le refuse, et le critère n'y joue pas, la sonde y étant
+déjà fiable (une locale non installée est refusée). Ce seul champ est
+comparé parce qu'il est en ASCII~: le symbole local de la devise est rendu
+dans la page de code de \code{LC\_CTYPE}, et différerait entre la session,
+sous sa page de code, et la candidate. \code{LC\_CTYPE} et
+\code{LC\_MONETARY} sont restaurées après la sonde. Ces propriétés sont
+testées dans \code{tests/unitaires/test\_controles\_portables.R}~: sur toute
+plateforme, un nom inventé seul n'est pas disponible, et placé devant les
+candidates il ne change pas le résultat~; sous Windows, les noms inventés
+sont refusés, y compris depuis une session en page de code~1252, et le
+critère devient inactif quand le nom de référence est refusé.
+\textbf{Limite}~: un nom
+à langue inventée et pays réel (\code{xx\_US.UTF-8}, symbole «~USD~»)
+échappe au critère et serait tenu pour disponible. \textbf{Statut}~: le
+comportement de l'UCRT est un \emph{constat de mesure} (Windows~11,
+R~4.3.3 ucrt, 06/11/2026), non tiré de sa documentation, qui n'a pas été
+consultée~; le critère et sa limite ont été retenus par le mainteneur le
+06/11/2026 (issue~\#109). Après le chargement, une sonde
 (\code{sonde\_utf8()}) vérifie qu'un littéral non ASCII du moteur, la
 constante \code{STATUT\_EMPREINTE\_RESULTAT}, est de l'UTF-8 valide et
 inchangé par la conversion~; sinon la batterie échoue. Limite admise~: une
@@ -2326,7 +2358,9 @@ sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
 (lu par \code{parse()} en UTF-8, puis évalué dans un environnement
 propre~; issue~\#81), vérifie que \code{LOCALES\_UTF8}, dupliquée de \code{tests/harnais.R}, y
 est identique à celle du harnais et que \code{locale\_utf8\_disponible()}
-y rend la même locale que celle du harnais, et teste la fonction
+y rend la même locale que celle du harnais, cette sonde et la constante
+\code{LOCALE\_INVENTEE} y étant des copies au texte identique à celui du
+harnais (issue~\#109~; section~\ref{sec:harnais}), et teste la fonction
 \code{ecart\_octets}, que le script charge de l'utilitaire commun
 (ci-dessous),
 qui rédige le message d'un écart de la comparaison octet à octet et
@@ -2338,7 +2372,8 @@ la batterie rejoue deux chemins d'échec bon marché (racine sans package~:
 l'installation sous \code{fr\_FR.ISO-8859-1} est nommée en échec~;
 \code{localedef} introuvable~: échec nommé, jamais un saut), vérifie que
 le script sourcé ne fait que définir ses fonctions et constantes, avec
-\code{LOCALES\_UTF8} identique à celle du harnais, et teste le marquage de
+\code{LOCALES\_UTF8}, la sonde et \code{LOCALE\_INVENTEE} identiques à
+celles du harnais, et teste le marquage de
 ses jeux de segments et son ordre de référence. Les deux chemins d'échec
 dépendent de l'environnement~: ils se sautent, avec un saut
 \textbf{annoncé} («~[sauté]~» et sa raison), hors POSIX (Windows), si la
