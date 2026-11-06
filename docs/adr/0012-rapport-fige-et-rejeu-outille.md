@@ -327,3 +327,17 @@ Rédigée par `architect` sur la branche porteuse `claude/validation-smr-referen
 **Effet sur les résultats.** Le HTML du rapport de R1 à R6 change (section remplacée) ; ce n'est pas une grandeur de référence. Les objets de R1 à R6 sont identiques hors jeton de l'empreinte du code (et lignes de fiche de l'ADR 0015, point 3.4). Aucune table finale, aucun verdict.
 
 Issues : #4, #69, #73. Décisions M242, M244 ; M217. ADR 0015 et ADR 0007 (annotations du même jour, secondes). Branche `claude/validation-smr-reference`, PR #155.
+
+## Annotation du 6 novembre 2026 (troisième) — annotation du même jour, seconde, (b) : texte retenu de la mention fixe de la section `etape_importance_exclusions` (M259 ; #69)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `bd9d467`, d'après la lecture de `regulatory`, l'avis d'`actuary` et la décision du mainteneur du 06/11/2026, versés en commentaire de #69 (https://github.com/Gerard-Garey/outil_tables/issues/69#issuecomment-6682488525). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**Mention fixe retenue.** Le texte cité au point (b) de l'annotation précédente (« ces grandeurs décrivent l'importance des exclusions et ne disent pas si une exclusion est justifiée ») était provisoire, sous réserve de la lecture de `regulatory`. Il est remplacé, pour la section `etape_importance_exclusions`, par :
+
+> « Ces grandeurs mesurent le poids des lignes exclues par les règles d'exclusion déclarées (volumes, événements, exposition, SMR) et permettent d'apprécier l'importance des exclusions. Elles ne disent ni si les données exclues sont pertinentes, ni si leur exclusion est justifiée. »
+
+La mention ne contient aucune phrase sur l'entreprise ni sur le certificateur, et ne cite aucun texte tant que #13 est ouverte. Motif : RD (UE) 2015/35, art. 19, § 1, b, pose deux notions, la pertinence et la justification ; voir aussi M69 et la notice ACPR du 17/12/2015, orientation 14, § 56 b (détail et statuts de lecture : M259). Le rendu reste sans verdict ni seuil. `regulatory` le contrôle à la revue finale.
+
+**Effet sur les résultats.** Aucun au-delà de l'annotation précédente : texte d'une mention du rapport, non encore écrit dans le code (commit (4b)).
+
+Issue : #69. Décision M259 ; M69, M242.
