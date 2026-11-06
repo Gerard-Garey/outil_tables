@@ -22,26 +22,51 @@
 #  posterieur ou egal a <date>, pour borner le bilan a la periode d'une
 #  branche ou d'une session (le journal local est cumulatif). <date> s'ecrit
 #  AAAA-MM-JJ ou AAAA-MM-JJTHH:MM[:SS][Z], en UTC ; tout autre format est
-#  refuse. Les lignes sans date sont alors exclues et comptees en pied.
+#  refuse, de meme qu'une date inexistante (#153). Les lignes sans date sont
+#  alors exclues et comptees en pied. Options et journal en toute position ;
+#  option inconnue ou argument en trop : code 2 (#153).
 #
 #  Usage : bash .claude/outils/bilan_journal.sh [--depuis <date>] [journal]
 ###############################################################################
 set -euo pipefail
 racine="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-depuis=""
-if [ "${1:-}" = "--depuis" ]; then
-  [ $# -ge 2 ] || { echo "Option --depuis : date manquante (AAAA-MM-JJ ou AAAA-MM-JJTHH:MM[:SS][Z], UTC)." >&2; exit 2; }
-  depuis="$2"; shift 2
-  if ! printf '%s' "$depuis" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?)?$'; then
-    echo "Option --depuis : date non admise « $depuis » (AAAA-MM-JJ ou AAAA-MM-JJTHH:MM[:SS][Z], UTC)." >&2; exit 2
-  fi
-fi
-journal="${1:-$racine/.claude/journal-agents.jsonl}"
-[ -s "$journal" ] || { echo "Journal vide ou absent : $journal"; exit 0; }
+usage="Usage : bash .claude/outils/bilan_journal.sh [--depuis <date>] [journal]"
+format="AAAA-MM-JJ ou AAAA-MM-JJTHH:MM[:SS][Z], UTC"
+# Options en toute position (#153) : --depuis au plus une fois, un seul
+# journal ; tout autre argument commencant par « - » est refuse (code 2).
+depuis=""; vu_depuis=0; journal=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --depuis)
+      [ "$vu_depuis" -eq 0 ] || { echo "Option --depuis donnee deux fois. $usage" >&2; exit 2; }
+      [ $# -ge 2 ] || { echo "Option --depuis : date manquante ($format)." >&2; exit 2; }
+      depuis="$2"; vu_depuis=1; shift 2 ;;
+    -*)
+      echo "Option non reconnue « $1 ». $usage" >&2; exit 2 ;;
+    *)
+      [ -z "$journal" ] || { echo "Argument en trop « $1 ». $usage" >&2; exit 2; }
+      journal="$1"; shift ;;
+  esac
+done
 py=""
 for c in python3 python; do
   if command -v "$c" >/dev/null 2>&1 && "$c" -c "import json" >/dev/null 2>&1; then py="$c"; break; fi
 done
+if [ "$vu_depuis" -eq 1 ]; then
+  if ! printf '%s' "$depuis" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?)?$'; then
+    echo "Option --depuis : date non admise « $depuis » ($format)." >&2; exit 2
+  fi
+  # Controle calendaire (#153) : la forme seule admettait 2026-13-45.
+  if [ -n "$py" ] && ! "$py" -c '
+import sys, datetime
+s = sys.argv[1].rstrip("Z")
+f = {10: "%Y-%m-%d", 16: "%Y-%m-%dT%H:%M", 19: "%Y-%m-%dT%H:%M:%S"}[len(s)]
+datetime.datetime.strptime(s, f)' "$depuis" >/dev/null 2>&1; then
+    echo "Option --depuis : date inexistante « $depuis » ($format)." >&2; exit 2
+  fi
+fi
+journal="${journal:-$racine/.claude/journal-agents.jsonl}"
+[ -s "$journal" ] || { echo "Journal vide ou absent : $journal"; exit 0; }
 [ -n "$py" ] || { echo "Python introuvable : bilan impossible."; exit 1; }
 "$py" - "$journal" "$depuis" <<'PY'
 import json, sys
