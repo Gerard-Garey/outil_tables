@@ -8,10 +8,11 @@
 #    des contrôles, graine canonique rendue ;
 #  - identité exacte : concordance forme_graine() <=> canoniser_plan(),
 #    idempotence, tirages identical() de sous_graine() pour 7 et 7L.
-#  Tant qu'aucune étape n'est aléatoire (ETAPES$aleatoire tout FALSE), les
-#  trois refus de la graine sont testés par injection de `aleatoire` dans
-#  controler_graine_plan() (M247) ; valider_plan() garde sa signature (plan).
-#  Le bout en bout avec une étape aléatoire vient au commit (3) de B13.
+#  Les trois refus de la graine sont testés par injection de `aleatoire`
+#  dans controler_graine_plan() (M247) ; valider_plan() garde sa signature
+#  (plan). Les plans de ce fichier n'ont pas d'étape aléatoire ; le bout en
+#  bout avec l'étape aléatoire `validation` (commit (3) de B13, #4) est dans
+#  tests/unitaires/test_validation.R.
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -87,8 +88,9 @@ for (n in names(INVALIDES)) {
 for (a in ADMISES)
   verifier(sprintf("valider_plan : graine %s admise -> graine_inattendue (aucune étape aléatoire)", a[[1L]]),
            controle(refus_de(valider_plan(avec_graine(a[[2L]]))), "graine_inattendue", a[[2L]]))
-verifier("valider_plan : signature (plan) inchangée ; aucune étape aléatoire au catalogue",
-         identical(names(formals(valider_plan)), "plan") && !any(tablexp:::ETAPES$aleatoire))
+verifier("valider_plan : signature (plan) inchangée ; seule l'étape validation est aléatoire au catalogue (#4)",
+         identical(names(formals(valider_plan)), "plan") &&
+           identical(tablexp:::ETAPES$etape[tablexp:::ETAPES$aleatoire], "validation"))
 verifier("ordre amont : etape_prealable_manquante avant graine_invalide", {
   p <- avec_graine(1.5); p$etapes <- p$etapes["exposition"]
   controle(refus_de(valider_plan(p)), "etape_prealable_manquante")

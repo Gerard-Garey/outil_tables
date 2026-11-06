@@ -278,7 +278,7 @@ verifier("U8 : refus 3, empreinte consignée autre MD5 : objet_modifie, message 
                  c(x1$fiche$empreintes$resultat, "0123456789abcdef0123456789abcdef"))
 })
 
-for (cas in list(list("etapes$validation <- list()", function(x) { x$etapes$validation <- list(); x }, "etapes/validation"),
+for (cas in list(list("etapes$inconnue <- list()", function(x) { x$etapes$inconnue <- list(); x }, "etapes/inconnue"),
                  list("table <- data.frame(a = 1)", function(x) { x$table <- data.frame(a = 1); x }, "table"),
                  list("fiche$nouveau <- 1", function(x) { x$fiche$nouveau <- 1; x }, "fiche/nouveau"),
                  list("autre <- 1", function(x) { x$autre <- 1; x }, "autre")))
@@ -641,7 +641,7 @@ verifier("U21 : phrase de plateforme une fois ; « pas de date » ; conventions 
         !grepl(paste0("Hors du périmètre de cette empreinte, et donc de ce contrôle : ", paste(html(hors), collapse = ", "),
                       " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.</p>"), integ, fixed = TRUE))
       e <- c(e, paste(id, ": phrase du contrôle d'intégrité"))
-    if (!"<p>Validations : non produites par cette version (chemin etapes/validation absent de l'objet).</p>" %in% l ||
+    if (!"<p>Étape « validation » : non demandée par le plan (chemin etapes/validation absent de l'objet).</p>" %in% l ||
         !"<p>Table finale et comparaisons : non produites par cette version (chemin table : NULL).</p>" %in% l)
       e <- c(e, paste(id, ": sections 12 et 13"))
   }

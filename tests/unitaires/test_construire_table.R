@@ -296,7 +296,19 @@ VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalide
                     exposition.convention = list("plus_fine", "convention_invalide"),
                     exposition.par_annee = list(FALSE, "par_annee_invalide"),
                     brut.estimateurs = list("poisson", "estimateurs_invalides"),
-                    brut.niveau = list(0.95, "niveau_invalide"))
+                    brut.niveau = list(0.95, "niveau_invalide"),
+                    validation.table_reference = list("t", "cle_table_invalide"),
+                    validation.relation_table = list("independante", "relation_table_invalide"),
+                    validation.plage_ages = list(c(20, 90), "plage_ages_invalide"),
+                    validation.tranches_age = list(c(20, 50), "tranches_age_invalides"),
+                    validation.niveau = list(0.95, "niveau_invalide"),
+                    validation.replications = list(99, "replications_invalides"))
+# Plan complet muni de l'étape validation (aléatoire : graine requise, #4),
+# pour les témoins de type de ses paramètres.
+plan_validation <- function() modifier(plan_complet(), graine = 1L, etapes = c(plan_complet()$etapes, list(
+  validation = list(table_reference = "t", relation_table = "independante", plage_ages = c(20, 90),
+                    tranches_age = c(20, 50), niveau = 0.95, replications = 99))))
+plan_de <- function(cle) if (startsWith(cle, "validation.")) plan_validation() else plan_complet()
 AUTRES_TYPES <- list(logical = TRUE, integer = 1L, double = 0.5, complex = 0.5 + 0i, character = "poisson",
                      list = list("poisson"), raw = as.raw(1L))
 pe_cat <- tablexp:::PARAMETRES_ETAPES
@@ -312,11 +324,11 @@ for (i in seq_along(cles_cat)) {
   chemin <- c("etapes", strsplit(cle, ".", fixed = TRUE)[[1L]])
   verifier(sprintf("PARAMETRES_ETAPES : %s de type %s, valeur nue du type déclaré admise", cle, ty),
            identical(typeof(k[[1]]), ty) &&
-             isTRUE(tryCatch({ valider_plan(poser(plan_complet(), chemin, k[[1]])); TRUE },
+             isTRUE(tryCatch({ valider_plan(poser(plan_de(cle), chemin, k[[1]])); TRUE },
                              refus_tablexp = function(r) FALSE)))
   for (t in setdiff(names(AUTRES_TYPES), ty))
     verifier(sprintf("PARAMETRES_ETAPES : %s de type %s, valeur de type %s -> refus %s", cle, ty, t, k[[2]]),
-             leve_refus(valider_plan(poser(plan_complet(), chemin, AUTRES_TYPES[[t]])), k[[2]]))
+             leve_refus(valider_plan(poser(plan_de(cle), chemin, AUTRES_TYPES[[t]])), k[[2]]))
 }
 
 # --- construire_table : refus et validation avant exécution ------------------

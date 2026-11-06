@@ -15,9 +15,11 @@
 #    execution, aller-retour de la fiche).
 #  Les contrôles 1.3 et 7 bis sont testés par injection de
 #  `parametres_cle` et `embarquees` (M247) : au commit (1), aucune étape ne
-#  cite de clé (PARAMETRES_CLE_TABLE vide) et aucune table n'est embarquée
+#  citait de clé ; depuis le commit (3) (#4), PARAMETRES_CLE_TABLE vaut
+#  « etapes/validation/table_reference », et les plans de ce fichier, sans
+#  étape validation, ne citent aucune clé ; aucune table n'est embarquée
 #  (TABLES_EMBARQUEES vide). Le chemin de bout en bout avec une table
-#  (construction puis rejeu) vient au commit (3).
+#  (construction puis rejeu) est dans tests/unitaires/test_validation.R.
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -170,10 +172,10 @@ PLAN <- list(
                 brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95)))
 X <- construire_table(BASE, ROLES, PLAN)
 
-verifier("C constantes : VERSION_FICHE 5L, VERSIONS_FICHE_REJEU 5L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE vide, TABLES_EMBARQUEES liste nommée vide",
+verifier("C constantes : VERSION_FICHE 5L, VERSIONS_FICHE_REJEU 5L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
          identical(tablexp:::VERSION_FICHE, 5L) && identical(tablexp:::VERSIONS_FICHE_REJEU, 5L) &&
            identical(tablexp:::REPRESENTATION_TABLE, "tablexp table 1") &&
-           identical(tablexp:::PARAMETRES_CLE_TABLE, character(0)) &&
+           identical(tablexp:::PARAMETRES_CLE_TABLE, "etapes/validation/table_reference") &&
            identical(tablexp:::TABLES_EMBARQUEES, structure(list(), names = character(0))))
 verifier("C constantes : tables_reference après empreintes dans ORDRE_CHAMPS_FICHE et dans BLOCS_LECTURE_FICHE$rejeu ; fiche/tables_reference après fiche/provenance_mention dans la section donnees_recues", {
   o <- tablexp:::ORDRE_CHAMPS_FICHE; b <- tablexp:::BLOCS_LECTURE_FICHE$rejeu; s <- tablexp:::SECTIONS_RAPPORT
@@ -292,7 +294,7 @@ verifier("D tables_reference_mal_formees : éléments contrôlés dans l'ordre d
   r <- refus_de(controler_forme_tables(list(a = 1, B = 2)))
   identical(r$details$cle, "B")
 })
-verifier("D table_reference_inattendue de bout en bout (PARAMETRES_CLE_TABLE vide : toute table reçue est inattendue), préparation non appelée", {
+verifier("D table_reference_inattendue de bout en bout (plan sans étape validation : toute table reçue est inattendue), préparation non appelée", {
   n <- compter_appels(construire_table(BASE, ROLES, PLAN, tables_reference = list(t1 = T1)))
   ok <- controle_refus(refus_de(construire_table(BASE, ROLES, PLAN, tables_reference = list(t1 = T1))),
                        "construire_table", "table_reference_inattendue", "t1", character(0),
@@ -410,7 +412,7 @@ for (cas in CAS_FORME)
   })
 
 # Fiche de version 5 construite à la main, qui porte la table t1 (importée) ;
-# le plan ne cite aucune clé (PARAMETRES_CLE_TABLE vide) : le contrôle 7 bis.3
+# le plan ne cite aucune clé (pas d'étape validation) : le contrôle 7 bis.3
 # refuse ensuite par table_reference_inattendue.
 fiche_t1 <- function(el = EL) champ_fiche(list(t1 = el))
 F_T1 <- fiche_t1()
@@ -489,7 +491,7 @@ local({
 })
 ns_cle <- ns$PARAMETRES_CLE_TABLE
 verifier("E injection de bout en bout : PARAMETRES_CLE_TABLE restauré et verrouillé",
-         identical(ns_cle, character(0)) && bindingIsLocked("PARAMETRES_CLE_TABLE", ns))
+         identical(ns_cle, "etapes/validation/table_reference") && bindingIsLocked("PARAMETRES_CLE_TABLE", ns))
 verifier("E injection : origine « relue dans le package » d'une table embarquée, liste assemblée et textes de la ligne 8", {
   el <- element_table_fiche(T_EMB)
   r <- controler_tables_rejeu(list(t1 = el), NULL, PLAN_T1, "code", CLE_ESSAI, list(TABLE_E = T_EMB))
@@ -503,7 +505,8 @@ verifier("E injection : origine « reçue », deux tables dans l'ordre de la fic
 })
 # Le verdict cite le chemin sous la fiche, sans préfixe « fiche/ » (comme
 # « différente : convention », tests/unitaires/test_rejeu.R, T11) ; le rejeu
-# de bout en bout avec une table vient au commit (3) (M247).
+# de bout en bout avec une table est dans tests/unitaires/test_validation.R
+# (M247).
 verifier("E témoin « fiche » : nom de table changé -> « différente : tables_reference/t1/nom » (verdict du témoin, sans refus)", {
   f2 <- fiche_t1(replace(EL, "nom", list("autre nom")))
   identical(tablexp:::verdict_chemins(tablexp:::perimetre_temoin_fiche(F_T1), tablexp:::perimetre_temoin_fiche(f2), "fiche"),

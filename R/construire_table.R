@@ -9,14 +9,17 @@
 #  - valider_plan() : plan validé entièrement avant toute exécution (codes
 #    structurels du plan ; valeurs contrôlées par les modules qui les
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
-#    controler_parametres_exposition(), controler_parametres_brut()) ;
+#    controler_parametres_exposition(), controler_parametres_brut(),
+#    controler_parametres_validation()) ;
 #    exporté (contrôle de saisie à sens métier, E4.3) ;
 #  - PARAMETRES_CLE_TABLE, controler_forme_tables(), cles_citees(),
 #    controler_tables_reference(), controler_tables_rejeu() : tables de
 #    référence reçues par l'argument tables_reference, contrôles 1.3 (entrée
 #    de construire_table()) et 7 bis (rejeu) de l'ADR 0015 (#73) ;
+#    table_citee() : table de la clé citée par l'étape `validation` (#4) ;
 #  - construire_table() : valide le plan, les rôles, la provenance et les
-#    tables de référence, calcule
+#    tables de référence, contrôle les entrées de la validation
+#    (controler_entrees_validation(), module validation), calcule
 #    l'empreinte des données, exécute les étapes dans l'ordre du plan en
 #    transmettant les champs du plan en arguments nommés (une fonction
 #    d'étape ne reçoit jamais le plan entier), assemble l'objet
@@ -24,7 +27,8 @@
 #  - rejouer_fiche() : rejeu outillé d'une fiche (E3.7 ; ADR 0012, point 3 ;
 #    #86) : contrôles de la fiche et des données, puis un seul appel de
 #    construire_table() sur les rôles, le plan et la provenance de la fiche,
-#    et les tables de référence reçues ou relues ;
+#    et les tables de référence reçues ou relues, après les contrôles
+#    d'entrée de la validation ;
 #    bilan des contrôles et des témoins, hors de l'objet ; exporté.
 #
 #  Aucun calcul. Peut appeler tous les modules sauf `simulation` (ADR 0007,
@@ -44,12 +48,15 @@ CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentat
 # reste dans les préalables de `brut`, préalable transitif par `exposition` :
 # les détails du refus etape_prealable_manquante sont figés par les témoins
 # de tests/unitaires/test_brut_kaplan_meier.R, #27), tirage d'un aléa.
+# `validation` (#4 ; M242) : préalables `donnees` et `exposition` (`brut`
+# n'en est pas un : mu^ s'obtient par taux_poisson()), aléatoire (Monte-Carlo,
+# graine requise ; ADR 0015, point 7.2).
 ETAPES <- data.frame(
-  etape = c("donnees", "exposition", "brut"),
-  module = c("donnees", "exposition", "brut"),
-  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts"),
-  prealable = I(list(character(0), "donnees", c("donnees", "exposition"))),
-  aleatoire = c(FALSE, FALSE, FALSE),
+  etape = c("donnees", "exposition", "brut", "validation"),
+  module = c("donnees", "exposition", "brut", "validation"),
+  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_validation"),
+  prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition"))),
+  aleatoire = c(FALSE, FALSE, FALSE, TRUE),
   stringsAsFactors = FALSE
 )
 
@@ -76,16 +83,27 @@ PARAMETRES_ETAPES <- list(
                       "binomial et kaplan_meier refusés sous par_annee = TRUE ; résultats dans l'ordre",
                       "canonique"),
                 "nombre double unique, fini, 0 < niveau < 1"),
+    stringsAsFactors = FALSE),
+  # Paramètres à valeur entière en double (M246) ; un integer est refusé
+  # (M257).
+  validation = data.frame(
+    parametre = c("table_reference", "relation_table", "plage_ages", "tranches_age", "niveau", "replications"),
+    type = c("character", "character", "double", "double", "double", "double"),
+    domaine = c("clé de la table dans l'argument tables_reference, chaîne unique non vide",
+                "independante ou ajustee_hors_outil",
+                "deux valeurs entières, 0 <= min <= max, couvertes par la table",
+                "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
+                "nombre double unique, fini, 0 < niveau < 1",
+                "nombre entier unique, au moins 1 (réplications de Monte-Carlo)"),
     stringsAsFactors = FALSE)
 )
 
 # Paramètres du plan qui citent une table de référence par sa clé (ADR 0015,
 # points 1.2 et 1.3 ; #73) : chemins « etapes/<étape>/<paramètre> », chacun
-# un paramètre `character` de PARAMETRES_ETAPES. Vide tant qu'aucune étape ne
-# lit de table ; vaudra « etapes/validation/table_reference » (#4). Les
-# contrôles des tables reçues la prennent en argument (défaut), pour être
-# testés par injection (M247).
-PARAMETRES_CLE_TABLE <- character(0)
+# un paramètre `character` de PARAMETRES_ETAPES : la clé de la table de
+# l'étape `validation` (#4). Les contrôles des tables reçues la prennent en
+# argument (défaut), pour être testés par injection (M247).
+PARAMETRES_CLE_TABLE <- "etapes/validation/table_reference"
 
 # Champs d'un élément de fiche$tables_reference, dans l'ordre (ADR 0015,
 # point 3.1 ; element_table_fiche(), module rapport).
@@ -220,6 +238,11 @@ valider_plan <- function(plan) {
   if ("brut" %in% noms)
     controler_parametres_brut(etapes[["brut"]][["estimateurs"]], etapes[["brut"]][["niveau"]],
                               etapes[["exposition"]][["par_annee"]])
+  if ("validation" %in% noms) {
+    pv <- etapes[["validation"]]
+    controler_parametres_validation(pv[["table_reference"]], pv[["relation_table"]], pv[["plage_ages"]],
+                                    pv[["tranches_age"]], pv[["niveau"]], pv[["replications"]])
+  }
   invisible(plan)
 }
 
@@ -530,6 +553,15 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, plan, code_fi
                          else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")))
 }
 
+# Table de clé `cle` dans la liste `tables` (contrôlée par
+# controler_forme_tables() : noms uniques, sans encodage « bytes ») ; clés
+# comparées en UTF-8, comme le contrôle 1.3. Rend l'objet table_reference.
+table_citee <- function(tables, cle) {
+  k <- match(enc2utf8(cle), enc2utf8(attr(tables, "names", exact = TRUE)))
+  if (is.na(k)) stop("table_citee() : clé citée absente des tables reçues (erreur de programmation).", call. = FALSE)
+  .subset2(tables, k)
+}
+
 # Point d'entrée unique (ADR 0007, point 3.1).
 #   donnees    : data.frame (le moteur ne lit pas de fichier) ;
 #   roles      : vecteur de chaînes nommé rôle -> colonne ;
@@ -551,10 +583,17 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
   controler_roles(donnees, roles, plan[["segmentation"]])
   recette <- deduire_recette(roles)
   etapes_plan <- plan[["etapes"]]
-  if ("exposition" %in% names(etapes_plan))
+  conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
   controler_provenance(provenance)
   tables_fiche <- controler_tables_reference(tables_reference, plan)
+  # Table de l'étape `validation` (clé citée, reçue : contrôle 1.3) et
+  # contrôles d'entrée avant exécution (ADR 0015, point 7.3 ; M253).
+  table_validation <- if ("validation" %in% names(etapes_plan))
+    table_citee(tables_reference, etapes_plan[["validation"]][["table_reference"]])
+  if (!is.null(table_validation))
+    controler_entrees_validation(table_validation, etapes_plan[["validation"]][["table_reference"]], conv$retenue,
+                                 plan[["segmentation"]], etapes_plan[["validation"]][["plage_ages"]])
   empreintes <- empreintes_construction(donnees, roles, provenance)
 
   etapes <- list()
@@ -584,6 +623,15 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                  delai_declaration = plan[["delai_declaration"]],
                                  parametres_exposition = etapes[["exposition"]][["parametres"]],
                                  controler = FALSE),
+      validation = calculer_validation(etapes[["exposition"]][["resultat"]][["exposition"]],
+                                       segmentation = plan[["segmentation"]],
+                                       par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
+                                       convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
+                                       table = table_validation, table_reference = pe[["table_reference"]],
+                                       relation_table = pe[["relation_table"]], plage_ages = pe[["plage_ages"]],
+                                       tranches_age = pe[["tranches_age"]], niveau = pe[["niveau"]],
+                                       replications = pe[["replications"]], graine = plan[["graine"]],
+                                       controler = FALSE),
       stop(sprintf("construire_table() : étape « %s » sans fonction d'étape (erreur de programmation).", nom),
            call. = FALSE))
     etapes[[nom]] <- r[c("parametres", "resultat", "diagnostics")]
@@ -753,7 +801,9 @@ perimetre_temoin_fiche <- function(f) {
 # version_fiche (VERSIONS_FICHE_REJEU), l'algorithme et la représentation de
 # l'empreinte des données, les entrées de construire_table() (mêmes contrôles,
 # mêmes refus), l'empreinte des données, puis les tables de référence
-# (contrôle 7 bis, controler_tables_rejeu()) ; s'arrête au premier refus, sans
+# (contrôle 7 bis, controler_tables_rejeu()) et les entrées de la validation
+# (7 ter, controler_entrees_validation(), module validation, si l'étape est au
+# plan ; aucune ligne de bilan nouvelle) ; s'arrête au premier refus, sans
 # appeler construire_table(). Appelle ensuite construire_table() une seule
 # fois. Rend un objet de classe `rejeu` : construction, l'objet rendu par
 # construire_table() sans retouche ; bilan, data.frame de 14 lignes
@@ -923,7 +973,7 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   plan <- canoniser_plan(valider_plan(fiche[["plan"]]), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
   controler_roles(donnees, roles, plan[["segmentation"]])
   recette <- deduire_recette(roles)
-  if ("exposition" %in% names(plan[["etapes"]]))
+  conv <- if ("exposition" %in% names(plan[["etapes"]]))
     resoudre_convention(plan[["etapes"]][["exposition"]][["convention"]], recette$convention_native)
   controler_provenance(fiche[["provenance"]])
 
@@ -944,6 +994,13 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   #    le package, empreinte de chacune contre la fiche, puis contrôle 1.3
   #    sur la liste assemblée.
   tr <- controler_tables_rejeu(fiche[["tables_reference"]], tables_reference, plan, texte_lu(e[["code"]]))
+  # 7 ter. Contrôles d'entrée de la validation (ADR 0012, seconde annotation
+  #    du 06/11/2026, (c)) : un refus d'appariement arrête le rejeu sans
+  #    construire.
+  pv <- plan[["etapes"]][["validation"]]
+  if (!is.null(pv))
+    controler_entrees_validation(table_citee(tr$tables, pv[["table_reference"]]), pv[["table_reference"]],
+                                 conv$retenue, plan[["segmentation"]], pv[["plage_ages"]])
 
   # 8. Construction, une seule fois, sur les rôles, le plan et la provenance
   #    de la fiche, et les tables assemblées.

@@ -724,7 +724,7 @@ controler_rapport_fige <- function(x, l, id) {
   rj <- section_de("rejeu")
   if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))
     e <- c(e, "U21 : rejeu")
-  if (!any(grepl("<p>Validations : non produites par cette version", l, fixed = TRUE)) ||
+  if (!any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) ||
       !any(grepl("<p>Table finale et comparaisons : non produites par cette version", l, fixed = TRUE))) e <- c(e, "U21 : sections 12 et 13")
   # U22 : section brut.
   b <- section_de("etape_brut")

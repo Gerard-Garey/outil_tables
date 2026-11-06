@@ -1614,7 +1614,7 @@ lire_fiche <- function(octets) {
 SECTIONS_RAPPORT <- data.frame(
   section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
               "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements",
-              "validations", "table_finale", "rejeu"),
+              "etape_validation", "table_finale", "rejeu"),
   titre = texte_moteur(c(
     "Lecture du rapport",
     "Identification : empreintes, versions et plateforme",
@@ -1627,12 +1627,12 @@ SECTIONS_RAPPORT <- data.frame(
     "Étape brut : taux bruts et intervalles",
     "Indicateurs de suffisance",
     "Avertissements",
-    "Validations",
+    "Étape validation : statistiques de validation de la table de référence prise telle quelle",
     "Table finale et comparaisons",
     "Rejeu")),
   nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
-             "objet", "non_produite", "non_produite", "texte"),
-  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, NA, NA, NA),
+             "objet", "etape", "non_produite", "texte"),
+  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "validation", NA, NA),
   racines = I(list(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
@@ -1721,7 +1721,51 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   etape_absente_1 = "Étape « ",
   etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
   etape_absente_3 = " absent de l'objet).",
-  validations = "Validations : non produites par cette version (chemin etapes/validation absent de l'objet).",
+  # Section etape_validation (#4 ; M258 : textes acceptés ; ADR 0012, seconde
+  # annotation du 06/11/2026, (b)).
+  validation_sans_verdict = paste(
+    "Aucune table positionnée n'est produite : la table de référence est prise telle quelle. Aucun verdict ni",
+    "seuil : aucune p-valeur n'est comparée à un niveau, et le moteur ne conclut pas sur l'adéquation de la table."),
+  validation_independante = paste(
+    "Relation « independante » (etapes/validation/parametres/relation_table) : la table est déclarée indépendante",
+    "des observations, aucun paramètre n'est estimé sur ces données (p = 0, ddl = n, nombre de cellules",
+    "retenues)."),
+  validation_ajustee = paste(
+    "Relation « ajustee_hors_outil » (etapes/validation/parametres/relation_table) : la table a été ajustée hors",
+    "de l'outil, sur des données qui peuvent recouper celles-ci ; le nombre de paramètres estimés n'est pas établi",
+    "(état ddl_non_etabli). Aucune p-valeur (asymptotique, exacte ou de Monte-Carlo), aucun intervalle, aucune",
+    "espérance ni variance sous H0, aucune statistique standardisée n'est produite, et aucun tirage de",
+    "Monte-Carlo n'est effectué ; seules les grandeurs descriptives le sont."),
+  validation_h0 = paste(
+    "Hypothèse nulle : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec",
+    "l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c aléatoire)."),
+  validation_hypotheses_tests = paste(
+    "Les p-valeurs asymptotiques et exactes des signes, des suites et de Wilcoxon reposent sur une hypothèse",
+    "qui n'est pas H0 (i) (colonne statut) ; seules les p-valeurs de Monte-Carlo ont un niveau garanti sous",
+    "H0 (i)."),
+  validation_multiplicite = paste(
+    "Aucune correction de multiplicité : chaque p-valeur (statistiques et sous-groupes) est marginale ; sous H0,",
+    "la probabilité qu'au moins une de ces p-valeurs soit petite croît avec leur nombre."),
+  validation_monte_carlo = paste(
+    "p-valeurs de Monte-Carlo : p_MC = (1 + K) / (B + 1), K nombre de réplications D*_c ~ Poisson(A_c) dont la",
+    "statistique est au moins aussi extrême que l'observée (queue supérieure pour X² et G², inférieure pour les",
+    "suites ; pour les signes et Wilcoxon, p = min(1, 2 min(p_inf, p_sup)), chaque queue de la forme",
+    "(1 + K) / (B + 1)), B = etapes/validation/parametres/replications ;",
+    "nombre de tirages effectués : etapes/validation/resultat/monte_carlo/tirages_effectues. Niveau exact :",
+    "P_H0(p_MC <= alpha) <= alpha. Erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre",
+    "fini de réplications, distincte de l'erreur d'estimation."),
+  validation_reference = paste(
+    "Référence de méthode : etapes/validation/parametres/reference_methode (référence de place) ; statistiques",
+    "sous leur forme usuelle, écarts à la note documentés ; le statut de chaque grandeur est dans la colonne",
+    "statut de etapes/validation/resultat/statistiques."),
+  validation_unite_contrat = paste(
+    "Unité d'observation contrat, sans identifiant de tête (fiche/avertissement_unite) : la variance des décès",
+    "est sur-dispersée d'un facteur phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête), ce qui",
+    "rend les tests anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
+    "mesurable sans identifiant de tête."),
+  validation_ensemble = paste(
+    "Table de modalité « ensemble » appliquée à chaque sexe de la segmentation",
+    "(etapes/validation/parametres/appariement_sexe : ensemble_par_sexe)."),
   table_finale = "Table finale et comparaisons : non produites par cette version (chemin table : NULL).",
   largeur = "Largeur des intervalles : non produite par cette version.",
   racine_absente = "absent de l'objet",
@@ -2072,6 +2116,22 @@ corps_section <- function(x, k) {
     e <- SECTIONS_RAPPORT$etape[k]
     if (!(e %in% etapes))
       return(paragraphe(m[["etape_absente_1"]], e, m[["etape_absente_2"]], e, m[["etape_absente_3"]]))
+    if (identical(e, "validation")) {
+      # Étape validation : mentions fixes, lues dans l'objet (relation, unité,
+      # appariement), avant ses tables (M258).
+      pv <- x[["etapes"]][["validation"]][["parametres"]]
+      au <- x[["fiche"]][["avertissement_unite"]]
+      return(c(paragraphe(m[["validation_sans_verdict"]]),
+               paragraphe(m[[if (identical(pv[["relation_table"]], "independante")) "validation_independante"
+                             else "validation_ajustee"]]),
+               paragraphe(m[["validation_h0"]]),
+               if (identical(pv[["relation_table"]], "independante")) paragraphe(m[["validation_hypotheses_tests"]]),
+               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
+               paragraphe(m[["validation_multiplicite"]]), paragraphe(m[["validation_monte_carlo"]]),
+               paragraphe(m[["validation_reference"]]),
+               lignes_racines(x, racines)))
+    }
     if (!identical(e, "brut")) return(lignes_racines(x, racines))
     # Étape brut : note sur la colonne taux en tête ; légendes immédiatement
     # après le tableau des statuts (spécification d'actuary, § 2.4).
@@ -2086,7 +2146,6 @@ corps_section <- function(x, k) {
              element_liste(m[[if ("exposition" %in% etapes) "suffisance_exposition" else "suffisance_exposition_absente"]]),
              element_liste(m[[if ("brut" %in% etapes) "suffisance_brut" else "suffisance_brut_absente"]]),
              element_liste(m[["largeur"]]), "</ul>"))
-  if (identical(id, "validations")) return(paragraphe(m[["validations"]]))
   if (identical(id, "table_finale")) return(paragraphe(m[["table_finale"]]))
   if (identical(id, "rejeu"))
     return(c(paragraphe(m[["rejeu_1"]], TEXTE_REJEU_FICHE), paragraphe(m[["rejeu_2"]]), paragraphe(m[["rejeu_3"]])))
