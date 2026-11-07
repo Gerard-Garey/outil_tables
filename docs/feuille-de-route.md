@@ -116,7 +116,7 @@ PR #155 `[B13]`, fusionnée le 07/11/2026 par commit de fusion `2247794` (parent
 
 ### 1.15 Quatorzième branche : `claude/positionnement-smr` (B14, A2, ouverte)
 
-PR #? `[B14]`, brouillon. **Plan accepté par le mainteneur le 07/11/2026 (M273)**, sur le point d'étape d'`architect-approfondi` du même jour. C'est **A2**, seconde partie de la branche (A) scindée (M225), sans la recette « agrégats » (M274). Objet : protéger par des références les étapes livrées par B13, poser le seam des étapes (#82), puis livrer le positionnement par SMR et le test d'homogénéité entre segments.
+PR #173 `[B14]`, brouillon. **Plan accepté par le mainteneur le 07/11/2026 (M273)**, sur le point d'étape d'`architect-approfondi` du même jour. C'est **A2**, seconde partie de la branche (A) scindée (M225), sans la recette « agrégats » (M274). Objet : protéger par des références les étapes livrées par B13, poser le seam des étapes (#82), puis livrer le positionnement par SMR et le test d'homogénéité entre segments.
 
 - **Branche** : partie de `main` (`2247794`) ; PR `[B14]` ouverte en brouillon au commit (0). Pas de vague (M277) : règle ordinaire de `CLAUDE.md`.
 - **Périmètre** (fermé, cinq issues, M273) :
