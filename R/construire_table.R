@@ -117,7 +117,7 @@ PARAMETRES_ETAPES <- list(
     parametre = c("table_reference", "relation_table", "plage_ages", "tranches_age", "niveau", "replications"),
     type = c("character", "character", "double", "double", "double", "double"),
     domaine = c("clé de la table dans l'argument tables_reference, chaîne unique non vide",
-                "independante ou ajustee_hors_outil",
+                "independante, ajustee_hors_outil ou positionnee (étape positionnement au plan, même clé, même plage)",
                 "deux valeurs entières, 0 <= min <= max, couvertes par la table",
                 "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
                 "nombre double unique, fini, 0 < niveau < 1",
@@ -278,7 +278,8 @@ valider_plan <- function(plan) {
   if ("validation" %in% noms) {
     pv <- etapes[["validation"]]
     controler_parametres_validation(pv[["table_reference"]], pv[["relation_table"]], pv[["plage_ages"]],
-                                    pv[["tranches_age"]], pv[["niveau"]], pv[["replications"]])
+                                    pv[["tranches_age"]], pv[["niveau"]], pv[["replications"]],
+                                    positionnement = etapes[["positionnement"]])
   }
   if ("importance_exclusions" %in% noms)
     controler_parametres_importance_exclusions(etapes[["importance_exclusions"]][["niveau"]])
@@ -716,7 +717,8 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                        table = table_validation, table_reference = pe[["table_reference"]],
                                        relation_table = pe[["relation_table"]], plage_ages = pe[["plage_ages"]],
                                        tranches_age = pe[["tranches_age"]], niveau = pe[["niveau"]],
-                                       replications = pe[["replications"]], graine = plan[["graine"]]),
+                                       replications = pe[["replications"]], graine = plan[["graine"]],
+                                       positionnement = etapes[["positionnement"]]),
       importance_exclusions = calculer_importance_exclusions(donnees, roles, etapes[["donnees"]],
                                                              etapes[["exposition"]], etapes[["validation"]],
                                                              table = table_validation, p = p,

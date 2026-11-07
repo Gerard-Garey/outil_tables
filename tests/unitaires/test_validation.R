@@ -42,8 +42,8 @@ tous <- function(...) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A constantes : RELATIONS_TABLE, CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement puis validation, #167)",
-         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_)) &&
+verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement puis validation, #167)",
+         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L)) &&
            identical(tablexp:::CONVENTIONS_VALIDATION, "dernier_anniversaire") &&
            identical(tablexp:::N_MAX_WILCOXON_EXACT, 1000) && identical(tablexp:::N_MAX_RUNS_EXACT, 10000) &&
            identical(tablexp:::TOLERANCE_RESIDU_NUL, 1e-10) &&
@@ -81,7 +81,7 @@ verifier("A erreur de Monte-Carlo (M253) : B = 999, K = 49 -> p = 0,05, e = 0,00
 # --- B. J1, J2, J3 (d) : statistiques sur des cellules (valeur calculée à la main) --
 
 J1 <- list(E = c(128, 256, 512, 64), mu = c(1 / 256, 1 / 128, 1 / 128, 7 / 128), D = c(0L, 3L, 5L, 4L))
-stat_j <- function(E, mu, D, pe = 0L, B = 99, graine = 1L)
+stat_j <- function(E, mu, D, pe = "independante", B = 99, graine = 1L)
   sv(D, E, -expm1(-mu), mu, E * mu, rep("retenue", length(D)), rep(1L, length(D)), seq_along(D), 0.95, pe, B, graine)
 S1 <- stat_j(J1$E, J1$mu, J1$D)
 s1 <- S1$statistiques
@@ -155,7 +155,7 @@ verifier("J3 (d), D = 0 partout, somme A = 2 : SMR 0, IC [0 ; 1,84443972705697],
                 all(is.na(valeur(s, c("mape/valeur", "r2/valeur"))))) TRUE else "états MAPE / R2")
 })
 verifier("J1 sous ajustee_hors_outil : grandeurs sous H0 NA (ddl_non_etabli), descriptives produites, aucun tirage", {
-  S <- stat_j(J1$E, J1$mu, J1$D, pe = NA_integer_)
+  S <- stat_j(J1$E, J1$mu, J1$D, pe = "ajustee_hors_outil")
   s <- S$statistiques
   h0 <- tablexp:::STATUTS_VALIDATION$sous_h0[tablexp:::STATUTS_VALIDATION$statistique != "sous_groupes"]
   if (!all(s$etat[h0] == "ddl_non_etabli") || !all(is.na(s$valeur[h0]))) "grandeurs sous H0"
@@ -164,7 +164,7 @@ verifier("J1 sous ajustee_hors_outil : grandeurs sous H0 NA (ddl_non_etabli), de
   else TRUE
 })
 verifier("aucune cellule retenue : toutes les grandeurs NA, état aucune_cellule_retenue, aucun tirage", {
-  S <- sv(0L, 0, 0.1, -log1p(-0.1), 0, "sans_exposition", 1L, 1L, 0.95, 0L, 9, 1L)
+  S <- sv(0L, 0, 0.1, -log1p(-0.1), 0, "sans_exposition", 1L, 1L, 0.95, "independante", 9, 1L)
   all(S$statistiques$etat == "aucune_cellule_retenue") && all(is.na(S$statistiques$valeur)) && S$tirages_effectues == 0
 })
 
@@ -189,7 +189,7 @@ verifier("résidu |D - A| = 1e-6 non nul (E = 2, mu~ = (1 - 1e-6) / 2, D = 1) : 
 verifier("statistiques_test() et le chemin observé : mêmes signes, suites et z de Wilcoxon (identical), zéros à la tolérance, deux séquences", {
   E <- c(128, 49, 256, 2, 512, 64, 49, 8); mu <- c(1 / 256, 1 / 49, 1 / 128, (1 - 1e-6) / 2, 1 / 128, 7 / 128, 1 / 49, 1 / 4)
   Dd <- c(0L, 1L, 3L, 1L, 5L, 4L, 1L, 2L); sq <- c(1L, 1L, 1L, 1L, 2L, 2L, 2L, 2L); A <- E * mu
-  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 8L), sq, seq_along(Dd), 0.95, 0L, 19, 1L)$statistiques
+  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 8L), sq, seq_along(Dd), 0.95, "independante", 19, 1L)$statistiques
   t <- tablexp:::statistiques_test(matrix(as.numeric(Dd), ncol = 1L), A, E, mu, match(sq, sq))
   np <- valeur(s, "signes/positifs"); nm <- valeur(s, "signes/negatifs")
   identical(t$signes, (np - nm) / sqrt(np + nm)) && identical(as.numeric(t$runs), valeur(s, "runs/runs")) &&
@@ -197,7 +197,7 @@ verifier("statistiques_test() et le chemin observé : mêmes signes, suites et z
 })
 verifier("Wilcoxon sur d = D / E^c - mu~ : deux cellules D = 0 de même mu~ = 0,1, E = 3 et 7, en un seul groupe d'ex aequo ; T* = T (identical)", {
   E <- c(3, 7, 10, 20); mu <- rep(0.1, 4L); Dd <- c(0L, 0L, 3L, 1L); A <- E * mu
-  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 4L), rep(1L, 4L), seq_along(Dd), 0.95, 0L, 19, 1L)$statistiques
+  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 4L), rep(1L, 4L), seq_along(Dd), 0.95, "independante", 19, 1L)$statistiques
   t <- tablexp:::statistiques_test(matrix(as.numeric(Dd), ncol = 1L), A, E, mu, rep(1L, 4L))
   tous(construit = if ((0 - A[1L]) / E[1L] != (0 - A[2L]) / E[2L]) TRUE else "(D - A) / E^c égaux : cas non construit",
        groupes = proche(valeur(s, c("wilcoxon/effectif", "wilcoxon/groupes_ex_aequo")), c(4, 1), 0, 0),
@@ -282,7 +282,7 @@ local({
   cles <- c("khi2_pearson/p_monte_carlo", "deviance/p_monte_carlo", "signes/p_monte_carlo", "runs/p_monte_carlo",
             "wilcoxon/p_monte_carlo", "signes/p_asymptotique")
   P <- t(vapply(seq_len(400L), function(i)
-    valeur(sv(Dall[, i], E, -expm1(-mu), mu, A, rep("retenue", length(A)), rep(1L, length(A)), ages, 0.95, 0L, 199,
+    valeur(sv(Dall[, i], E, -expm1(-mu), mu, A, rep("retenue", length(A)), rep(1L, length(A)), ages, 0.95, "independante", 199,
               1000L + i)$statistiques, cles), numeric(length(cles))))
   taille <- colMeans(P <= 0.05)
   names(taille) <- cles
@@ -436,7 +436,7 @@ T_ET <- table_reference(data.frame(age = 40:70, sexe = "ensemble", qx = ifelse(4
 validation_directe <- function(expo = EXPO, table = T_ET, plage = c(50, 57), segmentation = character(0), ...) {
   a <- list(exposition = expo, segmentation = segmentation, par_annee = FALSE, convention = "dernier_anniversaire",
             table = table, table_reference = "t", relation_table = "independante", plage_ages = plage,
-            tranches_age = plage[1L], niveau = 0.95, replications = 19, graine = 5L)
+            tranches_age = plage[1L], niveau = 0.95, replications = 19, graine = 5L, positionnement = NULL)
   m <- list(...)
   a[names(m)] <- m
   do.call(tablexp:::calculer_validation, a)

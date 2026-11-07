@@ -181,6 +181,8 @@ TOLERANCES <- c(
   "importance_exclusions/resultat/smr_comparateur_2/exposition_centrale_hors_plage" = 1e-14,
   # 1e-12 : log1p, exp, racines, qpois, qgamma, ppois, pnorm, pchisq, Monte-Carlo
   "validation/resultat/cellules/taux_table" = 1e-12,
+  "validation/resultat/cellules/smr_positionnement" = 1e-12,
+  "validation/resultat/cellules/taux_positionne" = 1e-12,
   "validation/resultat/cellules/attendus" = 1e-12,
   "validation/resultat/cellules/probabilite_brute" = 1e-12,
   "validation/resultat/cellules/residu_reponse" = 1e-12,

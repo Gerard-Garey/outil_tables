@@ -1747,10 +1747,15 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "l'outil multiplie la force de mortalité et prend les attendus sur l'exposition centrale, comme l'étape",
     "validation. Les deux tables diffèrent d'autant plus que q~_x est grand."),
   # Section etape_validation (#4 ; M258 : textes acceptés ; ADR 0012, seconde
-  # annotation du 06/11/2026, (b)).
+  # annotation du 06/11/2026, (b)). Première phrase de validation_sans_verdict
+  # (validation_sans_verdict_table) conditionnelle à la relation (#167,
+  # spécification, § 8 ; F9) : rendue dans le même paragraphe, hors relation
+  # positionnee.
+  validation_sans_verdict_table = paste(
+    "Aucune table positionnée n'est produite : la table de référence est prise telle quelle."),
   validation_sans_verdict = paste(
-    "Aucune table positionnée n'est produite : la table de référence est prise telle quelle. Aucun verdict ni",
-    "seuil : aucune p-valeur n'est comparée à un niveau, et le moteur ne conclut pas sur l'adéquation de la table."),
+    "Aucun verdict ni seuil : aucune p-valeur n'est comparée à un niveau, et le moteur ne conclut pas sur",
+    "l'adéquation de la table."),
   validation_independante = paste(
     "Relation « independante » (etapes/validation/parametres/relation_table) : la table est déclarée indépendante",
     "des observations, aucun paramètre n'est estimé sur ces données (p = 0, ddl = n, nombre de cellules",
@@ -1761,9 +1766,26 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "(état ddl_non_etabli). Aucune p-valeur (asymptotique, exacte ou de Monte-Carlo), aucun intervalle, aucune",
     "espérance ni variance sous H0, aucune statistique standardisée n'est produite, et aucun tirage de",
     "Monte-Carlo n'est effectué ; seules les grandeurs descriptives le sont."),
+  # Relation positionnee (#167, spécification, § 8, texte proposé ; F9).
+  validation_positionnee = paste(
+    "Relation « positionnee » : la table validée est la table positionnée de cette construction",
+    "(etapes/positionnement), dont le facteur theta a été estimé sur ces mêmes cellules (un paramètre par",
+    "segment, ddl = n - S). Le SMR de la table positionnée vaut 1 par construction : ni intervalle ni p-valeur ne",
+    "sont produits pour lui. Les lois sous H0 sont prises conditionnellement aux décès observés de chaque segment",
+    "(binomiale par cellule ou sous-groupe, multinomiale pour les réplications de Monte-Carlo), qui ne dépendent",
+    "pas de theta."),
   validation_h0 = paste(
     "Hypothèse nulle : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec",
     "l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c aléatoire)."),
+  # Hypothèse nulle sous la relation positionnee (#167 ; C2 d'actuary du
+  # 07/11/2026, texte arrêté).
+  validation_h0_positionnee = paste(
+    "Hypothèse nulle : D_c ~ Poisson(theta_s A~_c) indépendants, A~_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c), theta_s",
+    "inconnu, un par segment ; attendus de la table positionnée A_c = theta^_s A~_c",
+    "(etapes/positionnement/resultat/smr). Conditionnellement aux décès observés O_s de chaque segment, les décès",
+    "des cellules retenues du segment suivent la loi multinomiale (O_s ; pi_c), pi_c = A_c / A_s, libre de",
+    "theta_s : exacte avec l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c",
+    "aléatoire)."),
   validation_hypotheses_tests = paste(
     "Les p-valeurs asymptotiques et exactes des signes, des suites et de Wilcoxon reposent sur une hypothèse",
     "qui n'est pas H0 (i) (colonne statut) ; seules les p-valeurs de Monte-Carlo ont un niveau garanti sous",
@@ -1779,6 +1801,18 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "nombre de tirages effectués : etapes/validation/resultat/monte_carlo/tirages_effectues. Niveau exact :",
     "P_H0(p_MC <= alpha) <= alpha. Erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre",
     "fini de réplications, distincte de l'erreur d'estimation."),
+  # Déclinaison de validation_monte_carlo sous la relation positionnee
+  # (#167, spécification, § 8 ; F9).
+  validation_monte_carlo_positionnee = paste(
+    "p-valeurs de Monte-Carlo : p_MC = (1 + K) / (B + 1), K nombre de réplications dont la statistique est au",
+    "moins aussi extrême que l'observée (queue supérieure pour X² et G², inférieure pour les suites ; pour les",
+    "signes et Wilcoxon, p = min(1, 2 min(p_inf, p_sup)), chaque queue de la forme (1 + K) / (B + 1)),",
+    "B = etapes/validation/parametres/replications ; chaque réplication tire, pour chaque segment s, les décès",
+    "D*_c des cellules retenues selon la loi multinomiale (O_s ; pi_c), pi_c = A_c / A_s, conditionnellement aux",
+    "décès observés O_s du segment ; nombre de tirages effectués :",
+    "etapes/validation/resultat/monte_carlo/tirages_effectues. Niveau exact conditionnellement aux O_s, quel que",
+    "soit theta : P_H0(p_MC <= alpha) <= alpha. Erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1),",
+    "due au nombre fini de réplications, distincte de l'erreur d'estimation."),
   validation_reference = paste(
     "Référence de méthode : etapes/validation/parametres/reference_methode (référence de place) ; statistiques",
     "sous leur forme usuelle, écarts à la note documentés ; le statut de chaque grandeur est dans la colonne",
@@ -1791,6 +1825,13 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   validation_ensemble = paste(
     "Table de modalité « ensemble » appliquée à chaque sexe de la segmentation",
     "(etapes/validation/parametres/appariement_sexe : ensemble_par_sexe)."),
+  # Titres de la section etape_validation selon la relation (#167 ; critère
+  # d'actuary du 07/11/2026) : independante, titre de SECTIONS_RAPPORT ;
+  # ajustee_hors_outil et positionnee, ci-dessous (titre_section()).
+  titre_validation_ajustee = paste(
+    "Étape validation : statistiques de validation de la table de référence ajustée hors de l'outil"),
+  titre_validation_positionnee = paste(
+    "Étape validation : statistiques de validation de la table positionnée de cette construction"),
   # Section etape_importance_exclusions (#69) : texte arrêté par le mainteneur
   # le 06/11/2026 (M259), sans citation de texte réglementaire ; la mention
   # validation_unite_contrat y est reprise sous la même condition (décision
@@ -2153,18 +2194,29 @@ corps_section <- function(x, k) {
       return(paragraphe(m[["etape_absente_1"]], e, m[["etape_absente_2"]], e, m[["etape_absente_3"]]))
     if (identical(e, "validation")) {
       # Étape validation : mentions fixes, lues dans l'objet (relation, unité,
-      # appariement), avant ses tables (M258).
+      # appariement), avant ses tables (M258) ; relation à trois valeurs
+      # (switch explicite, erreur de programmation par défaut ; #167, F5,
+      # F9) : sous positionnee, première phrase de validation_sans_verdict
+      # omise, mentions validation_positionnee et validation_h0_positionnee
+      # (C2), multiplicité, hypothèses des tests et Monte-Carlo multinomial.
       pv <- x[["etapes"]][["validation"]][["parametres"]]
       au <- x[["fiche"]][["avertissement_unite"]]
-      return(c(paragraphe(m[["validation_sans_verdict"]]),
-               paragraphe(m[[if (identical(pv[["relation_table"]], "independante")) "validation_independante"
-                             else "validation_ajustee"]]),
-               paragraphe(m[["validation_h0"]]),
-               if (identical(pv[["relation_table"]], "independante")) paragraphe(m[["validation_hypotheses_tests"]]),
+      sans_verdict <- paragraphe(m[["validation_sans_verdict_table"]], " ", m[["validation_sans_verdict"]])
+      r <- switch(relation_lue(pv[["relation_table"]]),
+        independante = list(verdict = sans_verdict, relation = "validation_independante", h0 = "validation_h0",
+                            tests = TRUE, mc = "validation_monte_carlo"),
+        ajustee_hors_outil = list(verdict = sans_verdict, relation = "validation_ajustee", h0 = "validation_h0",
+                                  tests = FALSE, mc = NULL),
+        positionnee = list(verdict = paragraphe(m[["validation_sans_verdict"]]), relation = "validation_positionnee",
+                           h0 = "validation_h0_positionnee", tests = TRUE, mc = "validation_monte_carlo_positionnee"),
+        stop("corps_section() : relation de l'étape validation sans mentions (erreur de programmation).", call. = FALSE))
+      return(c(r$verdict,
+               paragraphe(m[[r$relation]]),
+               paragraphe(m[[r$h0]]),
+               if (r$tests) paragraphe(m[["validation_hypotheses_tests"]]),
                if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
                if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
-               if (identical(pv[["relation_table"]], "independante"))
-                 c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[["validation_monte_carlo"]])),
+               if (r$tests) c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[[r$mc]])),
                paragraphe(m[["validation_reference"]]),
                lignes_racines(x, racines)))
     }
@@ -2211,6 +2263,25 @@ corps_section <- function(x, k) {
   stop(paste0("corps_section() : section ", id, " sans rendu (erreur de programmation)."), call. = FALSE)
 }
 
+# Relation de l'étape validation lue dans l'objet : la chaîne si elle est
+# unique et non manquante, "" sinon (valeur sans mentions : erreur de
+# programmation des switch qui la lisent).
+relation_lue <- function(r) if (is.character(r) && length(r) == 1L && !is.na(r)) r else ""
+
+# Titre de la section k pour l'objet x : celui de SECTIONS_RAPPORT, sauf la
+# section etape_validation d'un objet qui porte l'étape, dont le titre suit
+# la relation (#167 ; critère d'actuary du 07/11/2026 : trois valeurs,
+# erreur de programmation par défaut).
+titre_section <- function(x, k) {
+  t <- SECTIONS_RAPPORT$titre[k]
+  if (!identical(SECTIONS_RAPPORT$section[k], "etape_validation") || !("validation" %in% names(x[["etapes"]])))
+    return(t)
+  switch(relation_lue(x[["etapes"]][["validation"]][["parametres"]][["relation_table"]]),
+         independante = t, ajustee_hors_outil = MENTIONS_RAPPORT[["titre_validation_ajustee"]],
+         positionnee = MENTIONS_RAPPORT[["titre_validation_positionnee"]],
+         stop("titre_section() : relation de l'étape validation sans titre (erreur de programmation).", call. = FALSE))
+}
+
 # Rapport figé de l'objet `construction` x (ADR 0012, point 2) : contrôles
 # (controler_rapport()), puis octets UTF-8 du document HTML, LF seul, LF final,
 # sans BOM. Aucune option : le rapport a une forme. L'appelant écrit le fichier
@@ -2219,7 +2290,7 @@ ecrire_rapport <- function(x) {
   controler_rapport(x)
   titre <- echapper_html(MENTIONS_RAPPORT[["titre_document"]])
   ids <- SECTIONS_RAPPORT$section
-  titres <- echapper_html(SECTIONS_RAPPORT$titre)
+  titres <- echapper_html(vapply(seq_along(ids), function(k) titre_section(x, k), ""))
   sections <- lapply(seq_along(ids), function(k)
     c(paste0("<section id=\"", ids[k], "\">"), paste0("<h2>", titres[k], "</h2>"), corps_section(x, k), "</section>"))
   lignes <- c("<!DOCTYPE html>", "<html lang=\"fr\">", "<head>", "<meta charset=\"utf-8\">",
