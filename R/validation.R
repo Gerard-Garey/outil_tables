@@ -6,8 +6,13 @@
 #  seconde annotation du 06/11/2026 ; ADR 0007 et ADR 0012, secondes
 #  annotations du 06/11/2026) ou de la table positionnée de la construction
 #  (p = 1 par segment, relation `positionnee` ; #167, spécification
-#  d'actuary-approfondi, § 8, M289 ; avis de forme (0''), F3, F5, F9, M292)
+#  d'actuary-approfondi, § 8, M289 ; avis de forme (0''), F3, F5, F9, M292) ;
+#  étape `homogeneite`, test d'homogénéité entre segments (#168 ; avis de
+#  forme (0''), F10, F11)
 #
+#  - controler_tranches_age(), controler_replications() : forme des tranches
+#    d'âge et du nombre de réplications, sous le module de l'étape appelante
+#    (`validation` ou `homogeneite`) ;
 #  - controler_parametres_validation() : paramètres de l'étape (clé de table,
 #    relation table / observations, plage d'âges, tranches, niveau,
 #    réplications) ; appelée par valider_plan() seule (#82) ;
@@ -27,6 +32,12 @@
 #  - sous_groupes_validation(), sous_groupes_positionnee() : S5 par
 #    regroupement ;
 #  - calculer_validation() : fonction d'étape `validation` ;
+#  - controler_parametres_homogeneite() : paramètres de l'étape
+#    `homogeneite` ; appelée par valider_plan() seule ;
+#  - somme_par(), score_homogeneite(), p_exacte_homogeneite() : tests du
+#    score conditionnels aux décès de chaque strate (U, V, ddl, statistique
+#    des répliques), p-valeur exacte à deux groupes ;
+#  - calculer_homogeneite() : fonction d'étape `homogeneite` (#168) ;
 #  - classe_motifs(), classer_lignes_exclues() : classes des motifs et des
 #    lignes exclues (mesurable, non calculable faute de clé, non mesurable),
 #    seule source des ensembles S (#69) ;
@@ -54,8 +65,9 @@
 #  CONVENTIONS_VALIDATION, valeurs_entieres_double(),
 #  controler_entrees_validation(), apparier_table(), attendus_cellules() et
 #  smr_poisson() sont dans R/positionnement.R (#167, F1).
-#  Ce module n'appelle que `outils`, `donnees` (liste_guillemets() ;
-#  pour #69 : construire_observations(), evaluer_motifs(),
+#  Ce module n'appelle que `outils` (dont sous_graine(), par
+#  replications_poisson() et replications_multinomiales()), `donnees`
+#  (liste_guillemets() ; pour #69 : construire_observations(), evaluer_motifs(),
 #  MOTIFS_TETE, MODALITES_CAUSE), `exposition` (calculer_exposition(), #69), `brut`
 #  (taux_poisson()) et `positionnement` (valeurs_entieres_double(),
 #  controler_cle_table(), controler_plage_ages(), apparier_table(),
@@ -374,6 +386,37 @@ statuts_validation <- function(relation_table)
          positionnee = STATUTS_VALIDATION_POSITIONNEE,
          stop("statuts_validation() : relation inconnue (erreur de programmation).", call. = FALSE))
 
+# Forme des tranches d'âge (tranches_age_invalides) et du nombre de
+# réplications (replications_invalides), sous le module de l'étape `etape`
+# (`validation` ou `homogeneite`, #168 ; extraites de
+# controler_parametres_validation(), messages inchangés). plage_ages est déjà
+# contrôlée (controler_plage_ages()). Rendent TRUE, invisible.
+ETAPES_TRANCHES_REPLICATIONS <- c("validation", "homogeneite")
+controler_tranches_age <- function(tranches_age, plage_ages, etape) {
+  if (!(etape %in% ETAPES_TRANCHES_REPLICATIONS))
+    stop("controler_tranches_age() : étape inconnue (erreur de programmation).", call. = FALSE)
+  if (!valeurs_entieres_double(tranches_age) || !length(tranches_age) || is.unsorted(tranches_age, strictly = TRUE) ||
+      tranches_age[1L] != plage_ages[1L] || tranches_age[length(tranches_age)] > plage_ages[2L])
+    refuser(etape, "tranches_age_invalides",
+            formuler(paste("Les tranches d'âge (tranches_age) doivent être les bornes inférieures, vecteur double sans",
+                           "attribut de valeurs entières strictement croissantes, la première égale au minimum de",
+                           "plage_ages, la dernière au plus égale à son maximum (un integer est refusé).")),
+            list(tranches_age = tranches_age))
+  invisible(TRUE)
+}
+controler_replications <- function(replications, etape) {
+  if (!(etape %in% ETAPES_TRANCHES_REPLICATIONS))
+    stop("controler_replications() : étape inconnue (erreur de programmation).", call. = FALSE)
+  if (!valeurs_entieres_double(replications) || length(replications) != 1L || replications < 1 ||
+      replications > .Machine$integer.max)
+    refuser(etape, "replications_invalides",
+            formuler(paste("Le nombre de réplications de Monte-Carlo (replications) doit être un nombre double unique,",
+                           "sans attribut, entier, au moins 1 et au plus 2147483647, sans défaut (un integer est",
+                           "refusé).")),
+            list(replications = replications))
+  invisible(TRUE)
+}
+
 # Contrôle les paramètres propres à l'étape `validation` (valeurs ; les noms
 # sont contrôlés par valider_plan()), dans l'ordre du catalogue. Forme exacte
 # (#23) : type de base exact, aucun attribut, sinon refus sous le motif du
@@ -399,25 +442,13 @@ controler_parametres_validation <- function(table_reference, relation_table, pla
                      liste_guillemets(names(RELATIONS_TABLE))),
             list(relation_table = relation_table))
   controler_plage_ages(plage_ages, "validation")
-  if (!valeurs_entieres_double(tranches_age) || !length(tranches_age) || is.unsorted(tranches_age, strictly = TRUE) ||
-      tranches_age[1L] != plage_ages[1L] || tranches_age[length(tranches_age)] > plage_ages[2L])
-    refuser("validation", "tranches_age_invalides",
-            formuler(paste("Les tranches d'âge (tranches_age) doivent être les bornes inférieures, vecteur double sans",
-                           "attribut de valeurs entières strictement croissantes, la première égale au minimum de",
-                           "plage_ages, la dernière au plus égale à son maximum (un integer est refusé).")),
-            list(tranches_age = tranches_age))
+  controler_tranches_age(tranches_age, plage_ages, "validation")
   if (!forme_exacte(niveau, "double") || length(niveau) != 1L || !is.finite(niveau) || niveau <= 0 || niveau >= 1)
     refuser("validation", "niveau_invalide",
             formuler(paste("Le niveau de confiance doit être un nombre (double) unique, sans attribut, fini,",
                            "strictement compris entre 0 et 1.")),
             list(niveau = niveau))
-  if (!valeurs_entieres_double(replications) || length(replications) != 1L || replications < 1 ||
-      replications > .Machine$integer.max)
-    refuser("validation", "replications_invalides",
-            formuler(paste("Le nombre de réplications de Monte-Carlo (replications) doit être un nombre double unique,",
-                           "sans attribut, entier, au moins 1 et au plus 2147483647, sans défaut (un integer est",
-                           "refusé).")),
-            list(replications = replications))
+  controler_replications(replications, "validation")
   if (identical(relation_table, "positionnee")) {
     if (is.null(positionnement))
       refuser("validation", "positionnement_absent",
@@ -1181,6 +1212,457 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
                           evenements_sans_attendu = ev_sans, cellules_hors_plage = ap$hors_plage$cellules,
                           evenements_hors_plage = ap$hors_plage$evenements,
                           exposition_hors_plage = ap$hors_plage$exposition, evenements_total = total),
+       avertissements = avert)
+}
+
+# --- étape `homogeneite` (#168) ------------------------------------------------
+#
+# Test d'homogénéité entre segments (E2.9, E2.12 ; forme décidée par le
+# mainteneur, M209 ; périmètre complet, M290 ; spécification
+# d'actuary-approfondi, #168, commentaire 6705873492 ; avis de forme (0''),
+# F10, F11, M292 ; F11 confirmé, M294). Notations : cellule c (âge, et année
+# civile si par_annee) de plage_ages ; segment s ; D_sc décès, E_sc exposition
+# centrale (étape exposition) ; D_.c et E_.c sommes sur les segments ;
+# pi_sc = E_sc / E_.c. Strate : la cellule (test global, tranches), ou
+# cellule x modalité de l'autre variable (test par variable) ; groupe : le
+# segment, ou la modalité de la variable testée. H0 : taux communs aux
+# groupes de chaque strate ; conditionnellement à D_.c, loi multinomiale
+# (D_.c ; pi_c), libre du taux commun. T = U' V^- U, U = O - A, A = somme de
+# D_. pi, V = somme de D_. (diag pi - pi pi'), sur les strates informatives
+# (D_. > 0, au moins deux groupes exposés) ; ddl = rang de V. Aucun verdict,
+# aucun seuil ; formules sans attribution (M200). Étape aléatoire : chaque
+# jeu de réplications tire sous sous_graine(graine du plan), flux propre à
+# l'étape (F11, M294).
+
+# États d'un test (resultat$tests$etat) : produite ;
+# evenement_sans_exposition (une cellule du test porte un événement sans
+# exposition, E_sc = 0 et D_sc > 0 : test non produit, sans refus, décision
+# 7 de #124, granularité Q4 de M290) ; moins_de_deux_segments_informatifs
+# (ddl = 0 : tests non produits, sans refus).
+ETATS_TESTS_HOMOGENEITE <- c("produite", "evenement_sans_exposition", "moins_de_deux_segments_informatifs")
+# États de la p-valeur exacte (resultat$tests$etat_p_exacte) : ceux du test
+# quand il n'est pas produit ; sinon produite (deux groupes comparés),
+# plus_de_deux_groupes, convolution_au_dela_n_max (coût de la convolution
+# au-delà de N_MAX_PRODUITS_CONVOLUTION, brique de #167, F3), ou
+# non_produite_par_cette_version (somme des tranches : la loi exacte d'une
+# somme de statistiques de tranche n'est pas mise en oeuvre).
+ETATS_P_EXACTE_HOMOGENEITE <- c("produite", "plus_de_deux_groupes", "convolution_au_dela_n_max",
+                                "non_produite_par_cette_version", "evenement_sans_exposition",
+                                "moins_de_deux_segments_informatifs")
+# États d'une ligne de resultat$segments, par priorité :
+# evenement_sans_exposition pour un segment d'exposition nulle sur la portée
+# qui y porte des décès (reprise de l'audit, m1) ; segment_sans_exposition
+# (E_s = 0 sur la portée, sans décès : hors du test, hors de ddl, O = A = 0) ;
+# evenement_sans_exposition (portée dont une cellule porte un événement sans
+# exposition : z non produit) ; variance_nulle (V_ss = 0, segment absent des
+# strates informatives : z non défini) ; produite.
+ETATS_SEGMENTS_HOMOGENEITE <- c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle")
+# Mention d'indépendance des unités (M278, #159), en fin de chaque statut
+# d'une loi.
+INDEPENDANCE_HOMOGENEITE <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+                                  "sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)")
+# Hypothèse nulle (spécification de #168, § 1), dans les paramètres de l'étape.
+HYPOTHESE_HOMOGENEITE <- texte_moteur(paste(
+  "H0 : D_sc ~ Poisson(E_sc mu_c) indépendants, mu_c commun à tous les segments s dans chaque cellule c de la",
+  "plage (âge, et année civile si par_annee), force constante sur la cellule, exposition centrale E tenue pour",
+  "fixe ; conditionnellement à D_.c, (D_1c, ..., D_Sc) suit la loi multinomiale (D_.c ; pi_c), pi_sc =",
+  "E_sc / E_.c, libre de mu_c ; test par variable : mêmes lois, strates cellule x modalité de l'autre variable,",
+  "groupes modalités de la variable testée ;", INDEPENDANCE_HOMOGENEITE))
+# Référence de méthode : emplacement à compléter après la relecture de la
+# source sur l'image (M290, décision du mainteneur du 07/11/2026) ; aucune
+# donnée de la source (URL, SHA-256, pages) n'est consignée tant qu'elle n'a
+# pas été lue (test en échec attendu renvoyant à #168).
+REFERENCE_METHODE_HOMOGENEITE <- texte_moteur(paste(
+  "à compléter après lecture de la source (M290) : forme décidée par le mainteneur (M209, E2.12) ; source non",
+  "relue dans cette version, aucune donnée de source consignée"))
+
+# Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
+# segments) ; spécification de #168, § 4.
+STATUTS_HOMOGENEITE <- local({
+  ind <- INDEPENDANCE_HOMOGENEITE
+  l <- list(
+    c("tests", "strates_informatives",
+      paste("décompte exact : strates (cellules ; cellule x modalité de l'autre variable pour un test par",
+            "variable) où D_. > 0 et où au moins deux groupes sont exposés ; les autres strates apportent 0 à U",
+            "et V (exact) ; somme_tranches : somme sur les tranches à ddl > 0")),
+    c("tests", "groupes",
+      paste("décompte exact : groupes (segments ; modalités de la variable testée) exposés dans une strate",
+            "informative ; somme_tranches : NA (un décompte par tranche)")),
+    c("tests", "statistique",
+      paste("T = U' V^- U, U = O - A, V = somme sur les strates informatives de D_. (diag pi - pi pi') ; somme des T",
+            "des tranches (ddl > 0) pour somme_tranches ; arithmétique flottante, système linéaire résolu sur V",
+            "réduite (un groupe de référence par composante connexe du graphe groupes-strates) : approximation",
+            "numérique")),
+    c("tests", "ddl",
+      paste("exact (combinatoire) : rang de V, nombre de groupes exposés dans les strates informatives moins nombre",
+            "de composantes connexes du graphe groupes-strates ; somme des ddl des tranches pour somme_tranches")),
+    c("tests", "p_asymptotique",
+      paste("asymptotique : loi du khi-deux à ddl degrés de liberté (D_. -> infini), sous H0 avec E tenue pour",
+            "fixe ; asymptotique aussi sous le modèle de survie ; queue supérieure ;", ind)),
+    c("tests", "p_exacte",
+      paste("exacte conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe, quand deux groupes",
+            "seulement sont comparés : O_1 somme de binomiales indépendantes Bin(D_., pi_1), p = P(|O_1 - A_1| >=",
+            "|o_1 - A_1|), égalité à 1e-10 A_1 près ; convolution des dbinom, approximation numérique ; produite si",
+            "le nombre de produits de la convolution est au plus N_MAX_PRODUITS_CONVOLUTION (état",
+            "convolution_au_dela_n_max sinon) ; plus de deux groupes : état plus_de_deux_groupes ; somme_tranches :",
+            "état non_produite_par_cette_version ;", ind)),
+    c("tests", "p_monte_carlo",
+      paste("niveau exact conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe : P_H0(p_MC <=",
+            "alpha) <= alpha, p_MC = (1 + K) / (B + 1), queue supérieure ; réplications multinomiales (D_. ; pi)",
+            "par strate sous la graine du plan, un seul jeu pour les tests global, tranche et somme_tranches, un",
+            "jeu par test par variable ; e est l'erreur due au nombre fini de réplications, distincte de l'erreur",
+            "d'estimation ;", ind)),
+    c("tests", "erreur_monte_carlo",
+      paste("erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre fini de réplications,",
+            "distincte de l'erreur d'estimation")),
+    c("segments", "exposition_centrale",
+      paste("descriptif : somme de E^c du segment sur les cellules de la portée (plage, ou tranche), hors cellules",
+            "qui portent un événement sans exposition (restituées aux diagnostics)")),
+    c("segments", "observes", "descriptif : O_s, somme des décès du segment sur les mêmes cellules"),
+    c("segments", "attendus",
+      paste("descriptif : A_s = somme sur les mêmes cellules de D_.c pi_sc, décès attendus si les taux étaient",
+            "communs aux segments de chaque cellule (standardisation interne)")),
+    c("segments", "rapport_observes_attendus",
+      paste("descriptif : O_s / A_s, rapport interne au regroupé (standardisation interne) ; ce n'est pas un SMR",
+            "rapporté à une table")),
+    c("segments", "z",
+      paste("z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous",
+            "H0 (D_. -> infini), E tenue pour fixe ; aucune p-valeur produite ; calcul en arithmétique flottante,",
+            "approximation numérique ; aucune correction de multiplicité ;", ind)))
+  texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
+                          statut = vapply(l, `[`, "", 3L), stringsAsFactors = FALSE))
+})
+
+# Contrôle les paramètres de l'étape `homogeneite` (valeurs ; les noms sont
+# contrôlés par valider_plan()), dans l'ordre du catalogue, sous le module
+# homogeneite : plage_ages (controler_plage_ages(), module positionnement),
+# tranches_age et replications (formes de `validation`), puis le refus
+# inter-champs homogeneite_sans_segmentation (avis (0''), F10) :
+# `segmentation` est le champ du plan, déjà contrôlé par
+# controler_parametres_donnees(). Appelée par valider_plan() seule. Rend
+# TRUE, invisible.
+controler_parametres_homogeneite <- function(plage_ages, tranches_age, replications, segmentation) {
+  controler_plage_ages(plage_ages, "homogeneite")
+  controler_tranches_age(tranches_age, plage_ages, "homogeneite")
+  controler_replications(replications, "homogeneite")
+  if (!length(segmentation))
+    refuser("homogeneite", "homogeneite_sans_segmentation",
+            formuler(paste("Le test d'homogénéité compare les segments de la construction : le plan doit déclarer une",
+                           "segmentation (champ segmentation non vide ; E2.9).")),
+            list(segmentation = segmentation))
+  invisible(TRUE)
+}
+
+# Somme de x par indice i (1..n), dans l'ordre des lignes ; 0 pour un
+# indice sans ligne.
+somme_par <- function(x, i, n) {
+  s <- numeric(n)
+  if (length(x)) {
+    r <- rowsum(as.numeric(x), i, reorder = TRUE)
+    s[as.integer(rownames(r))] <- r[, 1L]
+  }
+  s
+}
+
+# Cœur des tests du score conditionnels (spécification de #168, § 1), sur
+# des lignes (groupe, strate) d'une portée : D décès, E exposition centrale,
+# strate (1..K) et groupe (1..G) entiers ; aucune ligne d'une cellule qui
+# porte un événement sans exposition (écartées par l'appelant). Strate
+# informative : D_. > 0 et au moins deux groupes à E > 0 ; ligne utilisée :
+# strate informative et E > 0. Composantes connexes du graphe groupes-strates
+# par union au plus petit indice ; système réduit : un groupe de référence
+# (le plus petit indice) retiré par composante (V réduite définie positive,
+# U de somme nulle par composante : forme quadratique indépendante du choix).
+# Rend list(O, A (par groupe, toutes les lignes), U, v (diagonale de V),
+# utilisee (logique par ligne), presents, garde, ddl, strates_informatives,
+# statistique (fonction d'une matrice de décès des lignes utilisées, une
+# colonne par jeu ; observé et répliques passent par elle), t (observée),
+# poids, strate_tirage, effectifs (pour les réplications), exacte (list(n,
+# p, o, a) quand deux groupes seulement sont comparés, NULL sinon)).
+score_homogeneite <- function(D, E, strate, groupe, K, G) {
+  D <- as.numeric(D)
+  Ds <- somme_par(D, strate, K)
+  Es <- somme_par(E, strate, K)
+  ne <- somme_par(E > 0, strate, K)
+  inf <- Ds > 0 & ne >= 2
+  pi <- numeric(length(D))
+  pos <- Es[strate] > 0
+  pi[pos] <- E[pos] / Es[strate][pos]
+  Ar <- Ds[strate] * pi
+  u <- inf[strate] & E > 0
+  gu <- as.integer(groupe[u]); Du <- D[u]; Au <- Ar[u]
+  si <- which(inf)
+  ru <- match(strate[u], si)
+  presents <- sort(unique(gu))
+  comp <- seq_len(G)
+  racine <- function(g) { while (comp[g] != g) g <- comp[g]; g }
+  for (gs in split(gu, ru)) {
+    r <- unique(vapply(gs, racine, 0L))
+    comp[r] <- min(r)
+  }
+  garde <- presents[vapply(presents, racine, 0L) != presents]
+  P <- matrix(0, length(si), G)
+  P[cbind(ru, gu)] <- pi[u]
+  V <- diag(somme_par(Au, gu, G), G) - crossprod(P, P * Ds[si])
+  Vg <- V[garde, garde, drop = FALSE]
+  # U = O - A par groupe : O somme d'entiers (exacte en double), A calculée
+  # une fois ; deux jeux de mêmes O par groupe ont ainsi le même T au bit
+  # près (ex aequo du Monte-Carlo préservés ; reprise de l'audit, C1).
+  Ag <- rowsum(Au, gu, reorder = TRUE)[, 1L]
+  statistique <- function(Dm) {
+    Um <- rowsum(Dm, gu, reorder = TRUE) - Ag
+    Uk <- Um[match(garde, as.integer(rownames(Um))), , drop = FALSE]
+    colSums(Uk * solve(Vg, Uk))
+  }
+  ddl <- length(garde)
+  exacte <- if (length(presents) == 2L && ddl == 1L)
+    list(n = Ds[si], p = P[, garde], o = sum(Du[gu == garde]), a = sum(Au[gu == garde]))
+  list(O = somme_par(D, groupe, G), A = somme_par(Ar, groupe, G), U = somme_par(Du - Au, gu, G), v = diag(V),
+       utilisee = u, presents = presents, garde = garde, ddl = ddl, strates_informatives = length(si),
+       statistique = statistique, t = if (ddl) statistique(matrix(Du, ncol = 1L)) else NA_real_,
+       poids = E[u], strate_tirage = ru, effectifs = Ds[si], exacte = exacte)
+}
+
+# p-valeur exacte d'un test produit (score_homogeneite()) : deux groupes
+# comparés, O_1 somme de binomiales indépendantes Bin(D_., pi_1) sur les
+# strates informatives (loi_somme_binomiales(), brique de #167, F3), p =
+# P(|O_1 - A_1| >= |o_1 - A_1|), égalité à TOLERANCE_RESIDU_NUL x A_1 près ;
+# coût au-delà de N_MAX_PRODUITS_CONVOLUTION : état
+# convolution_au_dela_n_max. Rend list(p, etat).
+p_exacte_homogeneite <- function(sc) {
+  e <- sc$exacte
+  if (is.null(e)) return(list(p = NA_real_, etat = "plus_de_deux_groupes"))
+  if (cout_convolution_binomiales(e$n, e$p) > N_MAX_PRODUITS_CONVOLUTION)
+    return(list(p = NA_real_, etat = "convolution_au_dela_n_max"))
+  loi <- loi_somme_binomiales(e$n, e$p)
+  k <- seq_along(loi) - 1
+  ext <- abs(k - e$a) >= abs(e$o - e$a) - TOLERANCE_RESIDU_NUL * e$a
+  list(p = min(1, sum(loi[ext])), etat = "produite")
+}
+
+# Étape `homogeneite` du plan (#168).
+#   exposition    : table de l'étape `exposition`
+#                   (etapes$exposition$resultat$exposition) ;
+#   segmentation  : clés de segmentation (champ du plan, non vide : contrôlé
+#                   par valider_plan()) ;
+#   par_annee, convention : de l'étape `exposition` (toutes conventions
+#                   admises : comparaison interne, aucune table appariée) ;
+#   plage_ages, tranches_age, replications : paramètres de l'étape ;
+#   graine        : graine du plan (étape aléatoire ; F11 : chaque jeu de
+#                   réplications sous sous_graine(graine), flux propre).
+# Segments : combinaisons des clés présentes dans la table d'exposition, dans
+# son ordre ; cellules : (âge[, année]) de la plage présentes dans la table,
+# par âge puis année. Tests (une ligne chacun, resultat$tests) : global ;
+# chaque tranche d'âge ; somme des tranches (T = somme des T de tranche, ddl
+# = somme des ddl) ; si la segmentation a deux variables, chaque variable
+# conditionnellement à l'autre. Un jeu de réplications pour global, tranches
+# et somme ; un par test par variable ; aucun tirage sans test produit.
+# Aucun contrôle (#82) : valider_plan() a contrôlé les paramètres. Rend
+# list(parametres, resultat (tests, segments, monte_carlo), diagnostics,
+# avertissements).
+calculer_homogeneite <- function(exposition, segmentation, par_annee, convention, plage_ages, tranches_age,
+                                 replications, graine) {
+  manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
+                        names(exposition))
+  if (length(manquantes))
+    stop(sprintf("calculer_homogeneite() : colonne(s) %s absente(s) de la table d'exposition (erreur de programmation).",
+                 paste(manquantes, collapse = ", ")), call. = FALSE)
+  if (!length(segmentation))
+    stop("calculer_homogeneite() : segmentation requise (erreur de programmation).", call. = FALSE)
+  # Segments, dans l'ordre de la table d'exposition.
+  cles_seg <- do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r")))
+  premiers <- !duplicated(cles_seg)
+  segments <- exposition[premiers, segmentation, drop = FALSE]
+  rownames(segments) <- NULL
+  S <- nrow(segments)
+  dans <- exposition$age >= plage_ages[1L] & exposition$age <= plage_ages[2L]
+  ex <- exposition[dans, , drop = FALSE]
+  sg <- match(cles_seg[dans], cles_seg[premiers])
+  D <- as.numeric(ex$evenements)
+  E <- ex$exposition_centrale
+  # Cellules de la plage, par âge puis année.
+  cle_cel <- if (isTRUE(par_annee)) paste(ex$age, ex$annee, sep = "\r") else as.character(ex$age)
+  o <- if (isTRUE(par_annee)) order(ex$age, ex$annee, method = "radix") else order(ex$age, method = "radix")
+  ucel <- unique(cle_cel[o])
+  cel <- match(cle_cel, ucel)
+  K <- length(ucel)
+  nb <- length(tranches_age)
+  fin_tranche <- as.integer(c(tranches_age[-1L] - 1, plage_ages[2L]))
+  tranche <- findInterval(ex$age, tranches_age)
+  tranche_cel <- tranche[match(seq_len(K), cel)]
+  # Cellules qui portent un événement sans exposition (E_sc = 0, D_sc > 0) :
+  # écartées des sommes, tests qui les contiennent non produits (Q4).
+  fautive <- tabulate(cel[E == 0 & D > 0], K) > 0
+  saine <- !fautive[cel]
+  tranche_fautive <- tabulate(tranche_cel[fautive], nb) > 0
+  toute_faute <- any(fautive)
+
+  sc_g <- score_homogeneite(D[saine], E[saine], cel[saine], sg[saine], K, S)
+  lignes_g <- which(saine)[sc_g$utilisee]
+  sc_b <- lapply(seq_len(nb), function(b) {
+    l <- saine & tranche == b
+    s <- score_homogeneite(D[l], E[l], cel[l], sg[l], K, S)
+    s$position <- match(which(l)[s$utilisee], lignes_g)
+    s
+  })
+  prod_g <- !toute_faute && sc_g$ddl > 0
+  prod_b <- vapply(seq_len(nb), function(b) !tranche_fautive[b] && sc_b[[b]]$ddl > 0, NA)
+  ddl_b <- vapply(sc_b, function(s) s$ddl, 0L)
+  prod_somme <- !toute_faute && sum(ddl_b) > 0
+
+  # Réplications du jeu « cellules » : global, tranches, somme.
+  jeux <- list()
+  t_rep <- NULL
+  t_obs <- NULL
+  if (prod_g || any(prod_b)) {
+    f_stat <- function(Dm) {
+      r <- list(global = if (prod_g) sc_g$statistique(Dm) else rep(NA_real_, ncol(Dm)))
+      somme <- numeric(ncol(Dm))
+      for (b in which(prod_b)) {
+        r[[paste0("tranche_", b)]] <- sc_b[[b]]$statistique(Dm[sc_b[[b]]$position, , drop = FALSE])
+        somme <- somme + r[[paste0("tranche_", b)]]
+      }
+      r$somme_tranches <- somme
+      r
+    }
+    t_rep <- replications_multinomiales(sc_g$poids, sc_g$strate_tirage, sc_g$effectifs, replications, graine, f_stat)
+    # Valeurs observées du jeu par la même fonction que les répliques (global,
+    # tranches, somme accumulée de la même façon ; reprise de l'audit, C2).
+    t_obs <- f_stat(matrix(D[lignes_g], ncol = 1L))
+    jeux$cellules <- replications
+  } else jeux$cellules <- 0
+
+  na_i <- NA_integer_
+  ligne <- function(test, variable, conditionnellement_a, debut, fin, sc, t, ddl, etat, pe, mc) {
+    data.frame(test = test, variable = variable, conditionnellement_a = conditionnellement_a,
+               tranche_debut = as.integer(debut), tranche_fin = as.integer(fin),
+               strates_informatives = if (is.null(sc)) na_i else as.integer(sc$strates_informatives),
+               groupes = if (is.null(sc$presents)) na_i else length(sc$presents), statistique = t,
+               ddl = as.integer(ddl),
+               p_asymptotique = if (identical(etat, "produite")) stats::pchisq(t, ddl, lower.tail = FALSE)
+                                else NA_real_,
+               p_exacte = pe$p, etat_p_exacte = pe$etat, p_monte_carlo = mc[["p"]], erreur_monte_carlo = mc[["e"]],
+               etat = etat, stringsAsFactors = FALSE)
+  }
+  non_produit <- function(etat) list(p = NA_real_, etat = etat)
+  mc_na <- c(p = NA_real_, e = NA_real_)
+  etat_de <- function(faute, ddl) if (faute) "evenement_sans_exposition"
+                                   else if (ddl == 0L) "moins_de_deux_segments_informatifs" else "produite"
+  tests <- list()
+  e_g <- etat_de(toute_faute, sc_g$ddl)
+  tests[[1L]] <- ligne("global", NA_character_, NA_character_, na_i, na_i, sc_g,
+                       if (prod_g) t_obs$global else NA_real_, if (toute_faute) na_i else sc_g$ddl, e_g,
+                       if (prod_g) p_exacte_homogeneite(sc_g) else non_produit(e_g),
+                       if (prod_g) pvaleur_monte_carlo(t_obs$global, t_rep$global, "superieure") else mc_na)
+  for (b in seq_len(nb)) {
+    e_b <- etat_de(tranche_fautive[b], ddl_b[b])
+    tests[[length(tests) + 1L]] <-
+      ligne("tranche", NA_character_, NA_character_, tranches_age[b], fin_tranche[b], sc_b[[b]],
+            if (prod_b[b]) t_obs[[paste0("tranche_", b)]] else NA_real_, if (tranche_fautive[b]) na_i else ddl_b[b],
+            e_b, if (prod_b[b]) p_exacte_homogeneite(sc_b[[b]]) else non_produit(e_b),
+            if (prod_b[b]) pvaleur_monte_carlo(t_obs[[paste0("tranche_", b)]], t_rep[[paste0("tranche_", b)]],
+                                               "superieure") else mc_na)
+  }
+  e_s <- etat_de(toute_faute, sum(ddl_b))
+  t_somme <- if (prod_somme) t_obs$somme_tranches else NA_real_
+  # Somme des tranches : strates informatives des tranches à ddl > 0 ; groupes
+  # NA (un décompte par tranche, non sommable ; reprise de l'audit, m2).
+  sc_somme <- list(strates_informatives = sum(vapply(sc_b[ddl_b > 0], function(s) s$strates_informatives, 0L)))
+  tests[[length(tests) + 1L]] <-
+    ligne("somme_tranches", NA_character_, NA_character_, na_i, na_i, sc_somme, t_somme,
+          if (toute_faute) na_i else sum(ddl_b), e_s,
+          if (prod_somme) non_produit("non_produite_par_cette_version") else non_produit(e_s),
+          if (prod_somme) pvaleur_monte_carlo(t_somme, t_rep$somme_tranches, "superieure") else mc_na)
+  # Tests par variable, conditionnellement à l'autre (segmentation à deux
+  # variables ; décision 6 de #124) : strates cellule x modalité de l'autre
+  # variable, groupes modalités de la variable testée ; un jeu de
+  # réplications par test.
+  if (length(segmentation) == 2L) for (k in 1:2) {
+    v <- segmentation[k]; w <- segmentation[3L - k]
+    mv <- unique(segments[[v]]); mw <- unique(segments[[w]])
+    gv <- match(ex[[v]], mv); gw <- match(ex[[w]], mw)
+    st <- (cel - 1L) * length(mw) + gw
+    sc_v <- score_homogeneite(D[saine], E[saine], st[saine], gv[saine], K * length(mw), length(mv))
+    prod_v <- !toute_faute && sc_v$ddl > 0
+    nom_jeu <- paste0("variable_", v)
+    mc <- mc_na
+    if (prod_v) {
+      r <- replications_multinomiales(sc_v$poids, sc_v$strate_tirage, sc_v$effectifs, replications, graine,
+                                      function(Dm) list(t = sc_v$statistique(Dm)))
+      mc <- pvaleur_monte_carlo(sc_v$t, r$t, "superieure")
+      jeux[[nom_jeu]] <- replications
+    } else jeux[[nom_jeu]] <- 0
+    e_v <- etat_de(toute_faute, sc_v$ddl)
+    tests[[length(tests) + 1L]] <-
+      ligne("variable", v, w, na_i, na_i, sc_v, if (prod_v) sc_v$t else NA_real_,
+            if (toute_faute) na_i else sc_v$ddl, e_v,
+            if (prod_v) p_exacte_homogeneite(sc_v) else non_produit(e_v), mc)
+  }
+  tests <- do.call(rbind, tests)
+  rownames(tests) <- NULL
+
+  # Observés et attendus par segment (portée globale, puis par tranche).
+  portee <- function(nom, debut, fin, sc, l_toutes, faute) {
+    l_saines <- l_toutes & saine
+    e_tout <- somme_par(E[l_toutes], sg[l_toutes], S)
+    d_tout <- somme_par(D[l_toutes], sg[l_toutes], S)
+    d <- data.frame(portee = rep(nom, S), stringsAsFactors = FALSE)
+    for (k in segmentation) d[[k]] <- segments[[k]]
+    d$tranche_debut <- rep(as.integer(debut), S)
+    d$tranche_fin <- rep(as.integer(fin), S)
+    d$exposition_centrale <- somme_par(E[l_saines], sg[l_saines], S)
+    d$observes <- sc$O
+    d$attendus <- sc$A
+    d$rapport_observes_attendus <- ifelse(sc$A > 0, sc$O / sc$A, NA_real_)
+    etat <- ifelse(e_tout == 0 & d_tout > 0, "evenement_sans_exposition",
+                   ifelse(e_tout == 0, "segment_sans_exposition", if (faute) "evenement_sans_exposition" else
+                     ifelse(sc$v > 0, "produite", "variance_nulle")))
+    z <- rep(NA_real_, S)
+    ok <- etat == "produite"
+    z[ok] <- sc$U[ok] / sqrt(sc$v[ok])
+    d$z <- z
+    d$etat <- etat
+    d
+  }
+  seg <- c(list(portee("global", na_i, na_i, sc_g, rep(TRUE, nrow(ex)), toute_faute)),
+           lapply(seq_len(nb), function(b) portee("tranche", tranches_age[b], fin_tranche[b], sc_b[[b]], tranche == b,
+                                                  tranche_fautive[b])))
+  seg <- do.call(rbind, seg)
+  rownames(seg) <- NULL
+
+  # Décomptes et identité des événements.
+  Dc <- somme_par(D, cel, K)
+  nexp <- somme_par(E > 0, cel, K)
+  O <- sum(sc_g$O)
+  ev_fautives <- sum(D[!saine])
+  total <- sum(as.numeric(exposition$evenements))
+  ev_hors <- sum(as.numeric(exposition$evenements[!dans]))
+  if (!identical(O + ev_fautives + ev_hors, total))
+    stop("calculer_homogeneite() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
+  avert <- avertissements_vides()
+  if (toute_faute)
+    avert <- avertir(avert, "homogeneite", "evenements_sans_exposition",
+                     sprintf(paste("Homogénéité : %d cellule(s) de la plage où un segment compte des événements sans",
+                                   "exposition (%d événement(s) dans ces cellules) : cellules écartées des sommes, tests",
+                                   "qui les contiennent non produits (état evenement_sans_exposition)."),
+                             sum(fautive), as.integer(ev_fautives)),
+                     sum(fautive))
+  list(parametres = list(plage_ages = plage_ages, tranches_age = tranches_age, replications = replications,
+                         convention = convention, hypothese_nulle = HYPOTHESE_HOMOGENEITE,
+                         statuts = STATUTS_HOMOGENEITE, reference_methode = REFERENCE_METHODE_HOMOGENEITE),
+       resultat = list(tests = tests, segments = seg,
+                       monte_carlo = list(replications = replications, graine = graine,
+                                          jeux = data.frame(jeu = names(jeux),
+                                                            tirages_effectues = unlist(jeux, use.names = FALSE),
+                                                            stringsAsFactors = FALSE))),
+       diagnostics = list(cellules = K, cellules_informatives = sc_g$strates_informatives,
+                          cellules_sans_deces = sum(!fautive & Dc == 0),
+                          cellules_non_informatives = sum(!fautive & Dc > 0 & nexp < 2),
+                          cellules_evenement_sans_exposition = sum(fautive),
+                          evenements_cellules_evenement_sans_exposition = ev_fautives,
+                          lignes_exposition_hors_plage = sum(!dans), evenements_hors_plage = ev_hors,
+                          exposition_hors_plage = sum(exposition$exposition_centrale[!dans]),
+                          evenements_total = total),
        avertissements = avert)
 }
 

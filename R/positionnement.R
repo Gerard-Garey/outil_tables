@@ -66,7 +66,10 @@ controler_cle_table <- function(table_reference, etape) {
   invisible(TRUE)
 }
 controler_plage_ages <- function(plage_ages, etape) {
-  if (!(etape %in% ETAPES_TABLE)) stop("controler_plage_ages() : étape inconnue (erreur de programmation).", call. = FALSE)
+  # Admise aussi pour l'étape `homogeneite` (#168, module validation), qui ne
+  # lit aucune table : même forme de plage_ages que `validation`.
+  if (!(etape %in% c(ETAPES_TABLE, "homogeneite")))
+    stop("controler_plage_ages() : étape inconnue (erreur de programmation).", call. = FALSE)
   if (!valeurs_entieres_double(plage_ages) || length(plage_ages) != 2L || plage_ages[1L] < 0 ||
       plage_ages[1L] > plage_ages[2L] || plage_ages[2L] > .Machine$integer.max)
     refuser(etape, "plage_ages_invalide",

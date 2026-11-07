@@ -91,9 +91,12 @@ for (n in names(INVALIDES)) {
 for (a in ADMISES)
   verifier(sprintf("valider_plan : graine %s admise -> graine_inattendue (aucune étape aléatoire)", a[[1L]]),
            controle(refus_de(valider_plan(avec_graine(a[[2L]]))), "graine_inattendue", a[[2L]]))
-verifier("valider_plan : signature (plan) inchangée ; seule l'étape validation est aléatoire au catalogue (#4)",
+# Deux étapes aléatoires depuis #168 (F10, F11) : homogeneite et validation,
+# chacune sous la graine du plan, flux propre (test de localité :
+# tests/unitaires/test_homogeneite.R).
+verifier("valider_plan : signature (plan) inchangée ; étapes aléatoires au catalogue : homogeneite (#168) et validation (#4)",
          identical(names(formals(valider_plan)), "plan") &&
-           identical(tablexp:::ETAPES$etape[tablexp:::ETAPES$aleatoire], "validation"))
+           identical(tablexp:::ETAPES$etape[tablexp:::ETAPES$aleatoire], c("homogeneite", "validation")))
 verifier("ordre amont : etape_prealable_manquante avant graine_invalide", {
   p <- avec_graine(1.5); p$etapes <- p$etapes["exposition"]
   controle(refus_de(valider_plan(p)), "etape_prealable_manquante")

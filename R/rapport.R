@@ -1614,7 +1614,8 @@ lire_fiche <- function(octets) {
 SECTIONS_RAPPORT <- data.frame(
   section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
               "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements",
-              "etape_positionnement", "etape_validation", "etape_importance_exclusions", "table_finale", "rejeu"),
+              "etape_positionnement", "etape_homogeneite", "etape_validation", "etape_importance_exclusions",
+              "table_finale", "rejeu"),
   titre = texte_moteur(c(
     "Lecture du rapport",
     "Identification : empreintes, versions et plateforme",
@@ -1628,14 +1629,15 @@ SECTIONS_RAPPORT <- data.frame(
     "Indicateurs de suffisance",
     "Avertissements",
     "Étape positionnement : positionnement par SMR sur une table de référence et table positionnée",
+    "Étape homogeneite : test d'homogénéité entre segments (tests du score conditionnels aux décès de chaque strate)",
     "Étape validation : statistiques de validation de la table de référence prise telle quelle",
     "Étape importance_exclusions : importance des exclusions (volumes, événements, exposition et SMR des lignes exclues)",
     "Table finale et comparaisons",
     "Rejeu")),
   nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
-             "objet", "etape", "etape", "etape", "non_produite", "texte"),
-  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "positionnement", "validation",
-            "importance_exclusions", NA, NA),
+             "objet", "etape", "etape", "etape", "etape", "non_produite", "texte"),
+  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "positionnement", "homogeneite",
+            "validation", "importance_exclusions", NA, NA),
   racines = I(list(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
@@ -1651,6 +1653,7 @@ SECTIONS_RAPPORT <- data.frame(
     character(0),
     "avertissements",
     "etapes/positionnement",
+    "etapes/homogeneite",
     "etapes/validation",
     "etapes/importance_exclusions",
     "table",
@@ -1658,7 +1661,7 @@ SECTIONS_RAPPORT <- data.frame(
   renvois = I(list(
     character(0), character(0), character(0), character(0), character(0), character(0), character(0),
     character(0), character(0), c("etapes/exposition/resultat/exposition", "etapes/brut/resultat"),
-    character(0), character(0), character(0), character(0), character(0), character(0))),
+    character(0), character(0), character(0), character(0), character(0), character(0), character(0))),
   stringsAsFactors = FALSE)
 
 # Tables dont le volume croît avec la base : chemin, type et dimension (lus
@@ -1746,6 +1749,16 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "note multiplie les probabilités de décès (q_x = SMR q~_x) et prend pour attendus la somme des E q~ ;",
     "l'outil multiplie la force de mortalité et prend les attendus sur l'exposition centrale, comme l'étape",
     "validation. Les deux tables diffèrent d'autant plus que q~_x est grand."),
+  # Section etape_homogeneite (#168 ; spécification d'actuary-approfondi, § 6,
+  # texte proposé) ; la mention validation_unite_contrat y est reprise sous
+  # la même condition (avis de forme (0''), F10).
+  homogeneite_portee = paste(
+    "Test d'homogénéité entre segments : hypothèse nulle, dans chaque cellule de la plage (âge, et année civile si",
+    "par_annee), un taux commun à tous les segments, sur l'exposition centrale ; tests du score conditionnels aux",
+    "décès de chaque strate : la cellule (global, par tranche d'âge déclarée) ou la cellule croisée avec la modalité",
+    "de l'autre variable (par variable de segmentation conditionnellement à l'autre). Diagnostic sans verdict ni seuil : un test non significatif n'établit pas l'homogénéité, surtout",
+    "sur une base modeste ; la décision de regrouper reste à l'utilisateur et se déclare par la segmentation du",
+    "plan. Aucune correction de multiplicité."),
   # Section etape_validation (#4 ; M258 : textes acceptés ; ADR 0012, seconde
   # annotation du 06/11/2026, (b)). Première phrase de validation_sans_verdict
   # (validation_sans_verdict_table) conditionnelle à la relation (#167,
@@ -2232,6 +2245,14 @@ corps_section <- function(x, k) {
                 paragraphe(m[["positionnement_ecart_note"]])),
         stop("corps_section() : méthode de positionnement sans mentions (erreur de programmation).", call. = FALSE))
       return(c(mentions,
+               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               lignes_racines(x, racines)))
+    }
+    if (identical(e, "homogeneite")) {
+      # Étape homogeneite : mention fixe (#168, spécification, § 6), puis
+      # mention d'unité contrat sous la même condition que l'étape validation.
+      au <- x[["fiche"]][["avertissement_unite"]]
+      return(c(paragraphe(m[["homogeneite_portee"]]),
                if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
                lignes_racines(x, racines)))
     }

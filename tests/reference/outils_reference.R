@@ -89,7 +89,7 @@ CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12)
 # retour à doubles_sans_tolerance().
 TOLERANCES <- c(
   # Aucune clé nue (#175) : toute clé commence par le nom de l'étape
-  # (`exposition`, `brut`, `positionnement`, `validation`,
+  # (`exposition`, `brut`, `positionnement`, `homogeneite`, `validation`,
   # `importance_exclusions`) ou par
   # `fiche/` (écho du plan et des hypothèses : fiche/plan/…,
   # fiche/hypotheses_<étape>/…). Une colonne de même nom d'une étape ultérieure
@@ -247,7 +247,31 @@ TOLERANCES <- c(
   "positionnement/resultat/table_positionnee/borne_inf_exacte" = 1e-12,
   "positionnement/resultat/table_positionnee/borne_sup_exacte" = 1e-12,
   "positionnement/resultat/table_positionnee/borne_inf_asymptotique" = 1e-12,
-  "positionnement/resultat/table_positionnee/borne_sup_asymptotique" = 1e-12)
+  "positionnement/resultat/table_positionnee/borne_sup_asymptotique" = 1e-12,
+  # Homogénéité entre segments (#168), préparées pour le plan de méthode de
+  # (R), sur le modèle de `validation` : paramètres déclarés, dénombrements
+  # et sommes d'entiers exacts ; sommes, produits et quotients IEEE à 1e-14 ;
+  # système linéaire, racines, pchisq, dbinom et Monte-Carlo à 1e-12. Toute
+  # clé commence par `homogeneite/` (#175).
+  # exacte
+  "homogeneite/parametres/plage_ages" = 0, "homogeneite/parametres/tranches_age" = 0,
+  "homogeneite/parametres/replications" = 0,
+  "homogeneite/resultat/segments/observes" = 0,
+  "homogeneite/resultat/monte_carlo/replications" = 0,
+  "homogeneite/resultat/monte_carlo/jeux/tirages_effectues" = 0,
+  "homogeneite/diagnostics/evenements_cellules_evenement_sans_exposition" = 0,
+  "homogeneite/diagnostics/evenements_hors_plage" = 0, "homogeneite/diagnostics/evenements_total" = 0,
+  "homogeneite/plage_ages" = 0, "homogeneite/tranches_age" = 0, "homogeneite/replications" = 0,
+  # 1e-14
+  "homogeneite/resultat/segments/exposition_centrale" = 1e-14,
+  "homogeneite/resultat/segments/attendus" = 1e-14,
+  "homogeneite/resultat/segments/rapport_observes_attendus" = 1e-14,
+  "homogeneite/diagnostics/exposition_hors_plage" = 1e-14,
+  # 1e-12
+  "homogeneite/resultat/tests/statistique" = 1e-12, "homogeneite/resultat/tests/p_asymptotique" = 1e-12,
+  "homogeneite/resultat/tests/p_exacte" = 1e-12, "homogeneite/resultat/tests/p_monte_carlo" = 1e-12,
+  "homogeneite/resultat/tests/erreur_monte_carlo" = 1e-12,
+  "homogeneite/resultat/segments/z" = 1e-12)
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 

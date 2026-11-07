@@ -10,7 +10,8 @@
 #    structurels du plan ; valeurs contrôlées par les modules qui les
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
 #    controler_parametres_exposition(), controler_parametres_brut(),
-#    controler_parametres_positionnement(), controler_parametres_validation(),
+#    controler_parametres_positionnement(), controler_parametres_homogeneite(),
+#    controler_parametres_validation(),
 #    controler_parametres_importance_exclusions()) ;
 #    exporté (contrôle de saisie à sens métier, E4.3) ;
 #  - PARAMETRES_CLE_TABLE, controler_forme_tables(), cles_citees(),
@@ -65,15 +66,19 @@ CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentat
 # aléatoire ; après `validation`, dont elle lit le résultat (comparateur 2)
 # si et seulement si `validation` est au plan. `positionnement` (#167 ; F4) :
 # module `positionnement`, après `brut`, préalables `donnees` et
-# `exposition`, non aléatoire.
+# `exposition`, non aléatoire. `homogeneite` (#168 ; F10) : module
+# `validation`, après `positionnement` et avant `validation` (premier rang que
+# permet l'ordre des modules), préalables `donnees` et `exposition`,
+# aléatoire (Monte-Carlo conditionnel ; chaque étape aléatoire tire sous la
+# graine du plan, flux propre, F11).
 ETAPES <- data.frame(
-  etape = c("donnees", "exposition", "brut", "positionnement", "validation", "importance_exclusions"),
-  module = c("donnees", "exposition", "brut", "positionnement", "validation", "validation"),
+  etape = c("donnees", "exposition", "brut", "positionnement", "homogeneite", "validation", "importance_exclusions"),
+  module = c("donnees", "exposition", "brut", "positionnement", "validation", "validation", "validation"),
   fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_positionnement",
-               "calculer_validation", "calculer_importance_exclusions"),
+               "calculer_homogeneite", "calculer_validation", "calculer_importance_exclusions"),
   prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition"),
-                     c("donnees", "exposition"), c("donnees", "exposition"))),
-  aleatoire = c(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE),
+                     c("donnees", "exposition"), c("donnees", "exposition"), c("donnees", "exposition"))),
+  aleatoire = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE),
   stringsAsFactors = FALSE
 )
 
@@ -110,6 +115,16 @@ PARAMETRES_ETAPES <- list(
                 "clé de la table dans l'argument tables_reference, chaîne unique non vide",
                 "deux valeurs entières, 0 <= min <= max, couvertes par la table",
                 "nombre double unique, fini, 0 < niveau < 1"),
+    stringsAsFactors = FALSE),
+  # Test d'homogénéité entre segments (#168 ; F10) : paramètres à valeur
+  # entière en double (M246), un integer est refusé (M257) ; segmentation du
+  # plan non vide (refus homogeneite_sans_segmentation).
+  homogeneite = data.frame(
+    parametre = c("plage_ages", "tranches_age", "replications"),
+    type = c("double", "double", "double"),
+    domaine = c("deux valeurs entières, 0 <= min <= max",
+                "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
+                "nombre entier unique, au moins 1 (réplications de Monte-Carlo)"),
     stringsAsFactors = FALSE),
   # Paramètres à valeur entière en double (M246) ; un integer est refusé
   # (M257).
@@ -274,6 +289,11 @@ valider_plan <- function(plan) {
   if ("positionnement" %in% noms) {
     pp <- etapes[["positionnement"]]
     controler_parametres_positionnement(pp[["methode"]], pp[["table_reference"]], pp[["plage_ages"]], pp[["niveau"]])
+  }
+  if ("homogeneite" %in% noms) {
+    ph <- etapes[["homogeneite"]]
+    controler_parametres_homogeneite(ph[["plage_ages"]], ph[["tranches_age"]], ph[["replications"]],
+                                     plan[["segmentation"]])
   }
   if ("validation" %in% noms) {
     pv <- etapes[["validation"]]
@@ -710,6 +730,12 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                                table = entrees$tables[["positionnement"]],
                                                table_reference = pe[["table_reference"]], methode = pe[["methode"]],
                                                plage_ages = pe[["plage_ages"]], niveau = pe[["niveau"]]),
+      homogeneite = calculer_homogeneite(etapes[["exposition"]][["resultat"]][["exposition"]],
+                                         segmentation = plan[["segmentation"]],
+                                         par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
+                                         convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
+                                         plage_ages = pe[["plage_ages"]], tranches_age = pe[["tranches_age"]],
+                                         replications = pe[["replications"]], graine = plan[["graine"]]),
       validation = calculer_validation(etapes[["exposition"]][["resultat"]][["exposition"]],
                                        segmentation = plan[["segmentation"]],
                                        par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],

@@ -1304,9 +1304,10 @@ for (chemin_ie in c("etapes/validation/diagnostics/cellules_retenues",
 }
 # Une table de même nom sous une autre étape n'hérite d'aucune classe (#166,
 # point 3.4) : cellules, statistiques, retraits de R8 recopiés sous
-# `etapes/etape_non_listee` et `etapes/homogeneite` (étapes simulées en
-# mémoire ; #168 ; `positionnement` a ses clés depuis #167, d'où une étape
-# fictive) sont relevés par doubles_sans_tolerance(), que des clés
+# `etapes/etape_non_listee` et `etapes/homogeneite` (copies en mémoire ;
+# `positionnement` a ses clés depuis #167, d'où une étape fictive ;
+# `homogeneite` a les siennes depuis #168, qui ne classent aucune de ces
+# tables) sont relevés par doubles_sans_tolerance(), que des clés
 # `<table>/<colonne>` auraient masqués.
 for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
                        "etapes/validation/resultat/cellules/taux_table",
@@ -1325,6 +1326,30 @@ for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
     })
   }
 }
+# Étape homogeneite (#168) : aucun plan de référence ne la porte encore (plan
+# de méthode à l'étape (R)) ; ses clés `homogeneite/…` de TOLERANCES sont
+# contrôlées ici sur une construction témoin (plan de R1 et étape homogeneite,
+# segmentation sexe, entrée `reference`), en mémoire, sans écriture sous
+# tests/reference/ : complétude (point 3.4), invariants (b) et (d) de #175,
+# et chaque clé `homogeneite/…` classe au moins un chemin (aucune clé morte).
+local({
+  p <- plan_reference(graine = GRAINE_MONTE_CARLO_R8)
+  p$etapes$homogeneite <- list(plage_ages = c(20, 90), tranches_age = c(20, 50, 70), replications = 99)
+  g <- aplatir_construction(construire_table(jeu_ref$donnees, jeu_ref$roles, p))
+  d <- names(g$types)[g$types == "double"]
+  dh <- d[grepl("(^|/)etapes/homogeneite/", d)]
+  cles_h <- names(TOLERANCES)[startsWith(names(TOLERANCES), "homogeneite/")]
+  utilisees <- unique(unlist(lapply(dh, cles_de)))
+  verifier("homogeneite (#168), construction témoin : tout double classé, par des clés homogeneite/ seules, une clé par chemin, aucune clé morte (point 3.4, #175)", {
+    sans <- doubles_sans_tolerance(g)
+    if (!length(dh)) "aucun double de l'étape homogeneite"
+    else if (length(sans)) paste("sans tolérance :", paste(utils::head(sans, 5L), collapse = ", "))
+    else if (length(mal <- doubles_etape_mal_classes(dh))) paste("mal classés :", paste(utils::head(mal, 5L), collapse = ", "))
+    else if (length(m2 <- doubles_multi_cles(dh))) paste("plusieurs clés :", paste(utils::head(m2, 5L), collapse = ", "))
+    else if (length(morte <- setdiff(cles_h, utilisees))) paste("clés mortes :", paste(morte, collapse = ", "))
+    else TRUE
+  })
+})
 # Colonnes qu'une clé nue classait avant #175 : pour chacune des 36 clés qui les
 # remplacent, un chemin double qu'elle classe dans R6 est recopié en mémoire
 # sous une étape non listée (etape_non_listee, fictive : `positionnement` a ses
