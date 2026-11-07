@@ -20,7 +20,8 @@
 #  jeu_reference_defauts() pour R9), aplatis, aller-retour exact du format,
 #  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
 #  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE : R7, #32 ; R8 et R9, #166), aucune référence orpheline ;
+#  SANS_REFERENCE, vide depuis la création de R7 à R9), aucune référence
+#  orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
 #  exclusions, table importée passée par tables_reference (#166) ; R9 : le
@@ -331,7 +332,7 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-SANS_REFERENCE <- c(R7 = "#32", R8 = "#166", R9 = "#166")
+SANS_REFERENCE <- character(0)
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -897,11 +898,18 @@ for (p in plans_reference()) {
     ligne9 <- function(tab, ens, niveau) tab[tab$ensemble == ens & tab$niveau == niveau, , drop = FALSE]
     verifier("R9 : une classe de mesurabilité par motif (id_contrat_manquant : retrait aux niveaux A et B, sexe_manquant : A seulement, clé manquante en B, entree_manquante : aucune ligne mesurable)", {
       r <- ie9$retraits
-      retire <- function(ens, niveau) { l <- ligne9(r, ens, niveau); l$etat == "produite" && l$evenements_retires > 0 && l$exposition_jours_retiree > 0 && l$exposition_centrale_retiree > 0 }
-      retire("id_contrat_manquant", "A") && retire("id_contrat_manquant", "B") && retire("sexe_manquant", "A") &&
-        identical(ligne9(r, "sexe_manquant", "B")$etat, "cle_segmentation_manquante") &&
-        identical(ligne9(r, "entree_manquante", "A")$etat, "aucune_ligne_mesurable") &&
-        identical(ligne9(r, "entree_manquante", "B")$etat, "aucune_ligne_mesurable")
+      retire <- function(ens, niveau) { l <- ligne9(r, ens, niveau)
+        nrow(l) == 1L && identical(l$etat, "produite") && isTRUE(l$evenements_retires > 0) &&
+          isTRUE(l$exposition_jours_retiree > 0) && isTRUE(l$exposition_centrale_retiree > 0) }
+      etat <- function(ens, niveau) { e <- ligne9(r, ens, niveau)$etat; if (length(e) == 1L) e else sprintf("(%d ligne(s))", length(e)) }
+      ecarts <- c(
+        if (!retire("id_contrat_manquant", "A")) "id_contrat_manquant, niveau A : pas de retrait produit non nul",
+        if (!retire("id_contrat_manquant", "B")) "id_contrat_manquant, niveau B : pas de retrait produit non nul",
+        if (!retire("sexe_manquant", "A")) "sexe_manquant, niveau A : pas de retrait produit non nul",
+        if (!identical(etat("sexe_manquant", "B"), "cle_segmentation_manquante")) paste("sexe_manquant, niveau B : état", etat("sexe_manquant", "B")),
+        if (!identical(etat("entree_manquante", "A"), "aucune_ligne_mesurable")) paste("entree_manquante, niveau A : état", etat("entree_manquante", "A")),
+        if (!identical(etat("entree_manquante", "B"), "aucune_ligne_mesurable")) paste("entree_manquante, niveau B : état", etat("entree_manquante", "B")))
+      if (length(ecarts)) ecarts else TRUE
     })
     verifier("R9 : retraits non nuls (total des niveaux A et B) et SMR du comparateur 1 défini, fini et positif, intervalle exact non dégénéré", {
       r <- ie9$retraits; sm <- ie9$smr_comparateur_1
@@ -909,8 +917,13 @@ for (p in plans_reference()) {
         nrow(l) == 1L && l$etat == "produite" && l$observes > 0 && is.finite(l$attendus) && l$attendus > 0 &&
           is.finite(l$smr) && l$smr > 0 && is.finite(l$borne_inf_exacte) && is.finite(l$borne_sup_exacte) &&
           l$borne_inf_exacte < l$smr && l$smr < l$borne_sup_exacte }
-      ligne9(r, "total", "A")$evenements_retires > 0 && ligne9(r, "total", "B")$evenements_retires > 0 &&
-        ligne9(r, "total", "A")$exposition_centrale_retiree > 0 && def("A") && def("B")
+      ecarts <- c(
+        if (!isTRUE(ligne9(r, "total", "A")$evenements_retires > 0)) "total, niveau A : aucun événement retiré",
+        if (!isTRUE(ligne9(r, "total", "B")$evenements_retires > 0)) "total, niveau B : aucun événement retiré",
+        if (!isTRUE(ligne9(r, "total", "A")$exposition_centrale_retiree > 0)) "total, niveau A : aucune exposition centrale retirée",
+        if (!isTRUE(def("A"))) "SMR du comparateur 1, total, niveau A : non défini, non fini, non positif ou intervalle exact dégénéré",
+        if (!isTRUE(def("B"))) "SMR du comparateur 1, total, niveau B : non défini, non fini, non positif ou intervalle exact dégénéré")
+      if (length(ecarts)) ecarts else TRUE
     })
   }
   f <- tempfile(fileext = ".tsv")
