@@ -88,34 +88,50 @@ CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12)
 # une clé la classerait aussi si elle redevenait double, et masquerait ce
 # retour à doubles_sans_tolerance().
 TOLERANCES <- c(
+  # Aucune clé nue (#175) : toute clé commence par le nom de l'étape
+  # (`exposition`, `brut`, `validation`, `importance_exclusions`) ou par
+  # `fiche/` (écho du plan et des hypothèses : fiche/plan/…,
+  # fiche/hypotheses_<étape>/…). Une colonne de même nom d'une étape ultérieure
+  # (#167, #168) ne reçoit ainsi aucune classe sans contrôle de complétude
+  # (point 3.4) ; les invariants de test_reproductibilite.R le contrôlent.
+  # Étapes exposition et brut (R1 à R9). Classes par nature de calcul.
   # exacte : doubles à valeur entière ou déclarée (point 3.4)
-  exposition_jours = 0, niveau = 0, delai_declaration = 0,
-  tolerance_effectif = 0,
+  "exposition/resultat/exposition/exposition_jours" = 0,
+  "exposition/diagnostics/exposition_jours" = 0,
+  "exposition/parametres/delai_declaration" = 0, "fiche/plan/delai_declaration" = 0,
+  "brut/parametres/niveau" = 0, "brut/niveau" = 0, "fiche/hypotheses_brut/niveau" = 0,
+  "brut/parametres/tolerance_effectif" = 0, "fiche/hypotheses_brut/tolerance_effectif" = 0,
   # 1e-14 : arithmétique IEEE de base (point 3.4)
-  exposition_centrale = 1e-14, complement_initial_cellule = 1e-14,
-  complement_initial_fenetre = 1e-14, exposition_initiale = 1e-14, taux = 1e-14,
+  "exposition/resultat/exposition/exposition_centrale" = 1e-14,
+  "exposition/resultat/exposition/complement_initial_cellule" = 1e-14,
+  "exposition/resultat/exposition/complement_initial_fenetre" = 1e-14,
+  "brut/resultat/poisson/exposition_centrale" = 1e-14, "brut/resultat/poisson/taux" = 1e-14,
+  "brut/resultat/binomial/exposition_initiale" = 1e-14, "brut/resultat/binomial/taux" = 1e-14,
+  "brut/resultat/kaplan_meier_sauts/age_exact" = 1e-14,
+  "brut/resultat/kaplan_meier_sauts/variance_log_survie_cellule" = 1e-14,
   # 1e-12 : fonctions spéciales et libm (point 3.4)
-  borne_inf_exacte = 1e-12, borne_sup_exacte = 1e-12,
-  borne_inf_asymptotique = 1e-12, borne_sup_asymptotique = 1e-12,
-  probabilite = 1e-12, probabilite_borne_inf_exacte = 1e-12,
-  probabilite_borne_sup_exacte = 1e-12, probabilite_borne_inf_asymptotique = 1e-12,
-  probabilite_borne_sup_asymptotique = 1e-12,
-  # Kaplan-Meier, clés qualifiées (seconde annotation, (b))
-  "kaplan_meier/taux" = 1e-12, "kaplan_meier/variance" = 1e-12,
-  "kaplan_meier_sauts/survie_cellule" = 1e-12,
-  "kaplan_meier_sauts/age_exact" = 1e-14,
-  "kaplan_meier_sauts/variance_log_survie_cellule" = 1e-14,
+  "brut/resultat/poisson/borne_inf_exacte" = 1e-12, "brut/resultat/poisson/borne_sup_exacte" = 1e-12,
+  "brut/resultat/poisson/borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/poisson/borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/poisson/probabilite" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_inf_exacte" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_sup_exacte" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/binomial/borne_inf_exacte" = 1e-12, "brut/resultat/binomial/borne_sup_exacte" = 1e-12,
+  "brut/resultat/binomial/borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/binomial/borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/kaplan_meier/borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/kaplan_meier/borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/kaplan_meier/taux" = 1e-12, "brut/resultat/kaplan_meier/variance" = 1e-12,
+  "brut/resultat/kaplan_meier_sauts/survie_cellule" = 1e-12,
   # Validation et importance des exclusions (R8, #166). Toute clé de ces deux
   # étapes commence par le nom de l'étape : `<étape>/resultat/<table>/<colonne>`
   # pour les tables du résultat, `<étape>/parametres/<paramètre>` et
   # `<étape>/diagnostics/…`, et `<étape>/<paramètre>` pour l'écho du plan dans
   # la fiche (fiche/plan/etapes/<étape>/…). Les tables génériques (`cellules`,
   # `statistiques`…) d'une étape ultérieure (#167, #168) ne reçoivent ainsi
-  # aucune classe sans contrôle de complétude (point 3.4). Quinze de ces clés
-  # (`niveau` : 4, `exposition_centrale` : 1, `borne_*` : 10) ont une homonyme
-  # nue préexistante, de même classe ; les clés nues, conservées, servent R1 à
-  # R7 et classeraient encore, sans contrôle, une colonne de même nom d'une
-  # autre étape. Classes par nature de calcul.
+  # aucune classe sans contrôle de complétude (point 3.4).
   # exacte : paramètres déclarés, dénombrements (doubles à valeur entière),
   # recopie de la table reçue (qx_table, aucune opération)
   "validation/parametres/plage_ages" = 0, "validation/parametres/tranches_age" = 0,
