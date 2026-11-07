@@ -551,12 +551,64 @@ verifier("bout en bout : rejeu sans la table -> table_reference_absente ; avec u
   tous(a = controle(refus_de(rejouer_fiche(JEU, f)), "construire_table", "table_reference_absente"),
        b = controle(refus_de(rejouer_fiche(JEU, f, list(tv = t2))), "construire_table", "empreinte_table_discordante"))
 })
-verifier("bout en bout : rejeu d'une fiche dont la plage dépasse la table -> plage_ages_hors_table avant construire_table()", {
+verifier("bout en bout : rejeu d'une fiche dont la plage dépasse la table -> plage_ages_hors_table, levé par l'unique appel de construire_table() avant toute étape (#82 : contrôle d'entrée fait une fois)", {
   f <- X$fiche
   f$plan$etapes$validation$plage_ages <- c(20, 130)
   a <- compter_appels(rejouer_fiche(JEU, f, list(tv = T_HF)))
   r <- controle(a$refus, "validation", "plage_ages_hors_table")
-  if (isTRUE(r) && a$n[["construire_table"]]) "construire_table() appelée" else r
+  if (isTRUE(r) && !identical(a$n, c(construire_table = 1L, preparer_donnees = 0L))) "appels" else r
+})
+# Refus du contrôle 1.3 et des contrôles d'entrée de la validation au rejeu
+# (#82 ; avis (P) rafraîchi, critère 4) : même module, motif, message et
+# details que construire_table() sur le plan, la provenance et les tables de
+# la fiche (identité exacte).
+for (cas in list(
+  list("clé citée par le plan absente de fiche/tables_reference (1.3)", "construire_table", "table_reference_absente",
+       function(f) { f$plan$etapes$validation$table_reference <- "autre"; f }),
+  list("plage d'âges hors de la table (contrôle d'entrée de la validation)", "validation", "plage_ages_hors_table",
+       function(f) { f$plan$etapes$validation$plage_ages <- c(20, 130); f }),
+  list("segmentation sans sexe, table par sexe (contrôle d'entrée de la validation)", "validation",
+       "table_sexe_incompatible", function(f) { f$plan$segmentation <- character(0); f }))) {
+  f <- cas[[4L]](X$fiche)
+  r <- refus_de(rejouer_fiche(JEU, f, list(tv = T_HF)))
+  r_ct <- refus_de(construire_table(JEU, f$roles, f$plan, f$provenance, list(tv = T_HF)))
+  verifier(sprintf("rejeu (#82), %s : %s/%s, refus identical() à celui de construire_table()", cas[[1L]], cas[[2L]],
+                   cas[[3L]]),
+           if (is.null(r) || is.null(r_ct)) "aucun refus" else
+             if (!identical(unclass(r), unclass(r_ct))) "refus différent de celui de construire_table()" else
+               controle(r, cas[[2L]], cas[[3L]]))
+}
+# Comptes d'exécution (#82 ; #164, point 2, M281 ; valeur calculée à la main,
+# mesurée par trace() sur l'espace de noms installé) : construire_table()
+# exécute chaque contrôle une fois ; rejouer_fiche() exécute la couche
+# plan-rôles deux fois (contrôle 6 du rejeu, puis construire_table()), le
+# contrôle 1.3 et les contrôles d'entrée de la validation une fois.
+CONTROLES_82 <- c("valider_plan", "controler_roles", "deduire_recette", "resoudre_convention", "controler_provenance",
+                  "controler_plan_roles", "controler_entrees", "controler_tables_reference",
+                  "controler_entrees_validation", "construire_table")
+compter_82 <- function(expr) {
+  n <- new.env()
+  for (f in CONTROLES_82) assign(f, 0L, envir = n)
+  for (f in CONTROLES_82)
+    suppressMessages(trace(f, where = ns, print = FALSE,
+                           tracer = bquote(assign(.(f), get(.(f), envir = .(n)) + 1L, envir = .(n)))))
+  on.exit(for (f in CONTROLES_82) suppressMessages(untrace(f, where = ns)))
+  force(expr)
+  vapply(CONTROLES_82, function(f) get(f, envir = n), 0L)
+}
+verifier("comptes (#82 ; #164, point 2) : construire_table() sur un plan à validation, chaque contrôle une fois", {
+  # Par l'espace de noms : la copie de construire_table() de l'environnement
+  # du package attaché n'est pas tracée par trace(where = ns).
+  a <- compter_82(tablexp:::construire_table(JEU, ROLES, P0, tables_reference = list(tv = T_HF)))
+  if (all(a == 1L)) TRUE else paste(names(a), a, sep = "=", collapse = " ")
+})
+verifier("comptes (#82 ; #164, point 2) : rejouer_fiche() sur un plan à validation : couche plan-rôles 2, controler_tables_reference() 1, controler_entrees_validation() 1, construire_table() 1", {
+  f <- lire_fiche(ecrire_fiche(X$fiche))
+  a <- compter_82(rejouer_fiche(JEU, f, list(tv = T_HF)))
+  attendu <- c(valider_plan = 2L, controler_roles = 2L, deduire_recette = 2L, resoudre_convention = 2L,
+               controler_provenance = 2L, controler_plan_roles = 2L, controler_entrees = 1L,
+               controler_tables_reference = 1L, controler_entrees_validation = 1L, construire_table = 1L)
+  if (identical(a, attendu)) TRUE else paste(names(a), a, sep = "=", collapse = " ")
 })
 verifier("rapport : section etape_validation avec ses mentions fixes (sans verdict, independante, H0, multiplicité, Monte-Carlo, référence) et ses tables", {
   h <- rawToChar(ecrire_rapport(X)); Encoding(h) <- "UTF-8"

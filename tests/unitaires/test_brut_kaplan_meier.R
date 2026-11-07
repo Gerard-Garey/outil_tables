@@ -381,9 +381,6 @@ for (cfg in list(list(n = 1e5, age = 60L, graine = 20261016L, D = 878L, k = 2L),
 
 verifier("par_annee : kaplan_meier -> refus kaplan_meier_par_annee depuis valider_plan(), avant toute étape",
          leve_refus(valider_plan(plan_km(par_annee = TRUE)), "kaplan_meier_par_annee"))
-verifier("par_annee : kaplan_meier -> refus kaplan_meier_par_annee depuis l'appel direct de la fonction d'étape",
-         leve_refus(calculer_taux_bruts(EC, character(0), TRUE, "dernier_anniversaire", "u", "kaplan_meier", 0.95),
-                    "kaplan_meier_par_annee"))
 verifier("par_annee : le refus nomme par_annee et q_x, module brut", {
   r <- tryCatch(valider_plan(plan_km(par_annee = TRUE)), refus_tablexp = function(r) r)
   identical(r$module, "brut") && grepl("par_annee", conditionMessage(r), fixed = TRUE) &&
@@ -554,11 +551,16 @@ verifier("contre-vérification par survival::survfit() (valeurs hors CI, poste d
 # Base commune du jeu fixé (trois segments) ; fenêtres rendues par
 # calculer_exposition() et transmises à l'étape brut par construire_table().
 OJ <- XJ$etapes$donnees$resultat$observations
-RJ <- tablexp:::calculer_exposition(OJ, c(ROLES, segment = "g"), VD, PER, 0, "segment", "plus_fine", FALSE)
+# Valeurs validées (#82) : p, recette et convention transmises par
+# construire_table().
+PJ <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
+RECJ <- tablexp:::deduire_recette(c(ROLES, segment = "g"))
+RJ <- tablexp:::calculer_exposition(OJ, PJ, PER, 0, "segment", RECJ,
+                                    tablexp:::resoudre_convention("plus_fine", RECJ$convention_native), FALSE)
 EJ <- XJ$etapes$exposition$resultat$exposition
 brut_j <- function(e, o, convention = "dernier_anniversaire")
   calculer_taux_bruts(e, "segment", FALSE, convention, XJ$etapes$exposition$parametres$unite_exposition,
-                      "kaplan_meier", 0.95, o, VD, PER, 0, XJ$etapes$exposition$parametres)
+                      "kaplan_meier", 0.95, o, PJ, XJ$etapes$exposition$parametres)
 verifier("fenêtres transmises (identité exacte) : calculer_exposition() rend un objet fenetres_exposition à côté de ses quatre éléments ; étape brut identical() avec les fenêtres transmises et avec les observations (appel direct, fenêtres recalculées) ; objet résultat sans fenêtres", {
   cherche <- function(x) inherits(x, "fenetres_exposition") || (is.list(x) && any(vapply(x, cherche, logical(1L))))
   identical(names(RJ), c("parametres", "resultat", "diagnostics", "avertissements", "fenetres")) &&

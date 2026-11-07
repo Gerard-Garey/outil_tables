@@ -34,9 +34,16 @@ BASE <- data.frame(
 ROLES <- c(id_contrat = "contrat", id_tete = "tete", sexe = "sexe", date_naissance = "naissance",
            date_entree = "entree", date_sortie = "sortie", cause_sortie = "cause")
 
+# Contrôles du module donnees dans l'ordre de construire_table() (paramètres
+# par controler_parametres_donnees(), que valider_plan() appelle, puis rôles
+# par controler_roles()), puis l'étape sur les valeurs validées : la fonction
+# d'étape ne contrôle plus rien (#82).
 prep <- function(d = BASE, roles = ROLES, exclusions = character(0), transition = VD,
-                 segmentation = "sexe", periode = PER, delai = 0)
-  preparer_donnees(d, roles, transition, periode, delai, segmentation, exclusions)
+                 segmentation = "sexe", periode = PER, delai = 0) {
+  p <- tablexp:::controler_parametres_donnees(transition, periode, delai, segmentation, exclusions)
+  tablexp:::controler_roles(d, roles, segmentation)
+  preparer_donnees(d, roles, p, segmentation, exclusions)
+}
 # Condition de refus levée par expr (NULL si aucune).
 refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r)
 contient <- function(r, ...) {
@@ -94,8 +101,8 @@ verifier("rôles en liste : refus roles_mal_formes",
 # Forme exacte des rôles (#62, forme_exacte()) : vecteur character dont le
 # seul attribut est names. Chaque témoin porte un attribut de plus, ou un dim,
 # sur des rôles valides par ailleurs : refus roles_mal_formes, par
-# controler_roles() appelée directement et par preparer_donnees() ; ROLES nu
-# est admis.
+# controler_roles() appelée directement et par prep() (controler_roles()
+# avant preparer_donnees(), comme construire_table()) ; ROLES nu est admis.
 cr <- tablexp:::controler_roles
 ROLES_REFUSES <- list(
   "attribut quelconque (foo)" = structure(ROLES, foo = 1),
@@ -109,7 +116,7 @@ ROLES_REFUSES <- list(
   "matrice a une colonne (dim, dimnames)" =
     matrix(unname(ROLES), ncol = 1L, dimnames = list(names(ROLES), NULL)))
 for (k in names(ROLES_REFUSES))
-  verifier(sprintf("rôles, forme exacte : %s -> refus roles_mal_formes (controler_roles et preparer_donnees)", k),
+  verifier(sprintf("rôles, forme exacte : %s -> refus roles_mal_formes (controler_roles et prep)", k),
            leve_refus(cr(BASE, ROLES_REFUSES[[k]], "sexe"), "roles_mal_formes") &&
              leve_refus(prep(roles = ROLES_REFUSES[[k]]), "roles_mal_formes"))
 x <- refus(cr(BASE, structure(ROLES, foo = 1), "sexe"))

@@ -8,11 +8,11 @@
 #
 #  - controler_parametres_validation() : paramètres de l'étape (clé de table,
 #    relation table / observations, plage d'âges, tranches, niveau,
-#    réplications) ; appelée par valider_plan() et, en appel direct, par la
-#    fonction d'étape ;
+#    réplications) ; appelée par valider_plan() seule (#82) ;
 #  - controler_entrees_validation() : convention d'âge retenue, table sans
 #    année, appariement par sexe, couverture de la plage ; appelée avant
-#    exécution par construire_table() et par rejouer_fiche() ;
+#    exécution par controler_entrees() (construire_table(), #82), une fois,
+#    rejeu compris ;
 #  - apparier_table(), attendus_cellules() : grille des cellules de la plage,
 #    q~ apparié par clé exacte (sexe, âge), A = E^c mu~, mu~ = -log1p(-q~),
 #    état de chaque cellule ;
@@ -44,9 +44,8 @@
 #  sous H0 produite, aucun tirage (M254). Aucun verdict, aucun seuil (M217,
 #  Q4). Formules sans attribution d'auteur (M200).
 #  Ce module n'appelle que `outils`, `donnees` (citer(), liste_guillemets(),
-#  controler_segmentation(), SEXES_TABLE ; pour #69 : construire_observations(),
-#  evaluer_motifs(), valeurs_parametres_donnees(), MOTIFS_TETE,
-#  MODALITES_CAUSE), `exposition` (calculer_exposition(), #69) et `brut`
+#  SEXES_TABLE ; pour #69 : construire_observations(), evaluer_motifs(),
+#  MOTIFS_TETE, MODALITES_CAUSE), `exposition` (calculer_exposition(), #69) et `brut`
 #  (taux_poisson()) ; le
 #  niveau est contrôlé ici sous le code niveau_invalide de `brut` (M253)
 #  (ADR 0007, point 2.1 et seconde annotation du 06/11/2026, (d)). Les
@@ -824,24 +823,16 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
 #                      tables_reference de construire_table()) ;
 #   table_reference, relation_table, plage_ages, tranches_age, niveau,
 #   replications     : paramètres de l'étape ;
-#   graine           : graine du plan (étape aléatoire, ADR 0015, point 7.2) ;
-#   controler        : TRUE (appel direct) contrôle la segmentation, les
-#                      paramètres, la classe de la table et les entrées ;
-#                      FALSE, réservé à construire_table() qui les a
-#                      contrôlés, n'en refait aucun (#22).
+#   graine           : graine du plan (étape aléatoire, ADR 0015, point 7.2).
+# Aucun contrôle (#82 ; ADR 0007, annotation du 17/10/2026, (c) et (d)) :
+# construire_table() a validé la segmentation et les paramètres
+# (valider_plan()), la table (contrôle 1.3) et les entrées
+# (controler_entrees_validation()) une fois, dans controler_entrees().
 # Rend list(parametres, resultat (cellules, statistiques, sous_groupes,
 # sequences_runs, monte_carlo), diagnostics, avertissements). Aucune copie de
 # la table (ADR 0015, point 5).
 calculer_validation <- function(exposition, segmentation, par_annee, convention, table, table_reference,
-                                relation_table, plage_ages, tranches_age, niveau, replications, graine,
-                                controler = TRUE) {
-  if (!isFALSE(controler)) {
-    controler_segmentation(segmentation, "validation")
-    controler_parametres_validation(table_reference, relation_table, plage_ages, tranches_age, niveau, replications)
-    if (!identical(attr(table, "class", exact = TRUE), c("table_reference", "data.frame")))
-      stop("calculer_validation() : `table` doit être un objet table_reference (erreur de programmation).", call. = FALSE)
-    controler_entrees_validation(table, table_reference, convention, segmentation, plage_ages)
-  }
+                                relation_table, plage_ages, tranches_age, niveau, replications, graine) {
   manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
                         names(exposition))
   if (length(manquantes))
@@ -1063,16 +1054,17 @@ cle_cellules <- function(t, cles, par_annee)
 
 # Table d'exposition des lignes `lignes` de l'entrée (numéros croissants),
 # segmentée par `cles` : construire_observations() puis calculer_exposition(),
-# une seule implémentation de la fusion et de l'exposition (M242). NULL sans
-# ligne.
+# une seule implémentation de la fusion et de l'exposition (M242), sous la
+# recette et la convention validées de la construction (ctx$recette,
+# ctx$conv : une seule source, #82). NULL sans ligne.
 exposition_lignes <- function(lignes, cles, ctx) {
   if (!length(lignes)) return(NULL)
   ob <- construire_observations(ctx$donnees[lignes, , drop = FALSE], lignes, ctx$roles, cles, ctx$p)
   if (!identical(ob$unite, ctx$unite))
     stop("exposition_lignes() : unité d'observation différente de la construction (erreur de programmation).",
          call. = FALSE)
-  calculer_exposition(ob$observations, ctx$roles, ctx$transition, ctx$periode, ctx$delai_declaration, cles,
-                      ctx$convention, ctx$par_annee, controler = FALSE)$resultat$exposition
+  calculer_exposition(ob$observations, ctx$p, ctx$periode, ctx$delai_declaration, cles, ctx$recette, ctx$conv,
+                      ctx$par_annee)$resultat$exposition
 }
 
 # Événements et exposition retirés par l'ensemble S (numéros de lignes
@@ -1285,24 +1277,24 @@ ligne_resultat <- function(ensemble, niveau, v)
 #   etape_validation   : etapes$validation, ou NULL si `validation` n'est pas
 #                        au plan (comparateur 2 non demandé) ;
 #   table              : objet table_reference de l'étape validation, ou NULL ;
-#   transition, periode, delai_declaration, segmentation : champs du plan ;
-#   niveau             : paramètre de l'étape ;
-#   controler          : TRUE (appel direct) contrôle la segmentation et le
-#                        niveau ; FALSE, réservé à construire_table() (#22).
+#   p                  : valeurs validées de la transition, de la période et
+#                        du délai (valeurs_parametres_donnees()) ;
+#   periode, delai_declaration, segmentation : champs du plan ;
+#   recette, conv      : recette et convention validées (deduire_recette(),
+#                        resoudre_convention()), celles de l'étape exposition
+#                        et de la fiche : les expositions contrefactuelles
+#                        (exposition_lignes()) les emploient telles quelles ;
+#   niveau             : paramètre de l'étape.
+# Aucun contrôle (#82) : construire_table() a validé la segmentation et le
+# niveau (valider_plan()) avant toute étape.
 # Rend list(parametres, resultat (volumes, motifs, evenements_declares,
 # retraits, cellules_niveau_a, cellules_niveau_b, smr_comparateur_1,
 # smr_comparateur_2), diagnostics, avertissements). Aucun vecteur par ligne.
 calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_exposition, etape_validation, table,
-                                           transition, periode, delai_declaration, segmentation, niveau,
-                                           controler = TRUE) {
-  if (!isFALSE(controler)) {
-    controler_segmentation(segmentation, "importance_exclusions")
-    controler_parametres_importance_exclusions(niveau)
-  }
+                                           p, periode, delai_declaration, recette, conv, segmentation, niveau) {
   if (is.null(etape_validation) != is.null(table))
     stop("calculer_importance_exclusions() : étape validation et table incohérentes (erreur de programmation).",
          call. = FALSE)
-  p <- valeurs_parametres_donnees(transition, periode, delai_declaration)
   rd <- etape_donnees$resultat
   pe <- etape_exposition$parametres
   unite <- rd$unite_observation
@@ -1313,8 +1305,8 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
          call. = FALSE)
   par_annee <- pe$par_annee
   expo <- etape_exposition$resultat$exposition
-  ctx <- list(donnees = donnees, roles = roles, p = p, transition = transition, periode = periode,
-              delai_declaration = delai_declaration, convention = pe$convention$demandee, par_annee = par_annee,
+  ctx <- list(donnees = donnees, roles = roles, p = p, periode = periode, delai_declaration = delai_declaration,
+              recette = recette, conv = conv, par_annee = par_annee,
               unite = unite, segmentation = segmentation, lignes_exclues = le, R = rd$numeros_conserves,
               id_tete = if ("id_tete" %in% names(roles)) donnees[[roles[["id_tete"]]]],
               prototype = expo[0L, c(segmentation, "age", if (isTRUE(par_annee)) "annee"), drop = FALSE])

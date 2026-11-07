@@ -325,16 +325,17 @@ controler_roles <- function(donnees, roles, segmentation) {
 
 # --- paramètres de l'étape ----------------------------------------------------
 
-# Contrôle de la segmentation d'une fonction d'étape (#59), seul endroit où
-# s'écrivent sa forme et son catalogue : vecteur character sans attribut (ni
-# names, ni dim, ni classe), sans NA ni doublon, dont chaque clé est prise dans
+# Contrôle de la segmentation du plan (#59), seul endroit où s'écrivent sa
+# forme et son catalogue : vecteur character sans attribut (ni names, ni dim,
+# ni classe), sans NA ni doublon, dont chaque clé est prise dans
 # ROLES_SEGMENTATION (vide explicite admis ; la chaîne vide n'en fait pas
-# partie). Sinon refus sous le motif segmentation_invalide, au nom de l'étape
-# appelante `etape` ("donnees", "brut"). Rend NULL sans rien modifier.
-controler_segmentation <- function(segmentation, etape) {
+# partie). Sinon refus sous le motif segmentation_invalide, module donnees
+# (seul appelant depuis #82 : controler_parametres_donnees(), appelée par
+# valider_plan()). Rend NULL sans rien modifier.
+controler_segmentation <- function(segmentation) {
   if (!forme_exacte(segmentation, "character") || anyNA(segmentation) || anyDuplicated(segmentation) ||
       !all(segmentation %in% ROLES_SEGMENTATION))
-    refuser(etape, "segmentation_invalide",
+    refuser("donnees", "segmentation_invalide",
             formuler(paste("La segmentation doit être un vecteur de chaînes sans attribut, sans doublon,",
                            "pris dans %s (vide explicite admis)."),
                      liste_guillemets(ROLES_SEGMENTATION)),
@@ -353,8 +354,8 @@ ligne_transition <- function(transition)
 # contrôlés donnent (#22) : list(transition, debut, fin, borne), la ligne de
 # TRANSITIONS, les bornes de la période et la borne B = fin - délai + 1 (jours
 # depuis 1970-01-01). Ne contrôle rien : rendue par controler_transition_periode()
-# et employée telle quelle par les fonctions d'étape que construire_table()
-# appelle après valider_plan() (argument `controler = FALSE`).
+# et par controler_plan_roles() (orchestration), qui la transmet aux
+# fonctions d'étape après valider_plan() (#82).
 valeurs_parametres_donnees <- function(transition, periode, delai_declaration) {
   fin <- as.numeric(periode[["fin"]])
   list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]), fin = fin,
@@ -362,7 +363,7 @@ valeurs_parametres_donnees <- function(transition, periode, delai_declaration) {
 }
 
 # Contrôle la transition, la période d'observation et le délai de déclaration
-# d'une fonction d'étape ; rend valeurs_parametres_donnees().
+# du plan (controler_parametres_donnees()) ; rend valeurs_parametres_donnees().
 # Forme exacte (#23, forme_exacte()) : chaque valeur a son type de base exact
 # et ne porte aucun attribut (ni names, ni dim, ni classe), hormis les noms
 # des listes `transition` et `periode` et la classe Date des bornes de la
@@ -423,7 +424,7 @@ controler_transition_periode <- function(transition, periode, delai_declaration)
 controler_parametres_donnees <- function(transition, periode, delai_declaration,
                                          segmentation, exclusions) {
   p <- controler_transition_periode(transition, periode, delai_declaration)
-  controler_segmentation(segmentation, "donnees")
+  controler_segmentation(segmentation)
   if (!forme_exacte(exclusions, "character") || anyNA(exclusions) || anyDuplicated(exclusions))
     refuser("donnees", "exclusions_invalides",
             formuler(paste("Les règles d'exclusion doivent être un vecteur de codes de motif sans attribut, sans doublon",
@@ -626,29 +627,20 @@ fusionner_intervalles <- function(g, entree, fin) {
 # défaut (motif `ligne_invalide`), exclusions déclarées, unité
 # d'observation, fusion par tête, relevés et avertissements.
 #   donnees, roles     : data.frame et vecteur nommé rôle -> colonne ;
-#   transition         : list(depart, arrivee) (ADR 0007, point 5.1) ;
-#   periode            : list(debut, fin), dates ; fin incluse (A.0, T4) ;
-#   delai_declaration  : entier de jours >= 0 ;
+#   p                  : valeurs validées de la transition, de la période
+#                        (fin incluse, A.0, T4) et du délai
+#                        (valeurs_parametres_donnees()) ;
 #   segmentation       : sous-ensemble de c("sexe", "segment"), vide admis ;
-#   exclusions         : codes de motif exclus, vide admis ;
-#   controler          : TRUE (appel direct) contrôle les paramètres puis les
-#                        rôles ; FALSE, réservé à construire_table() qui les a
-#                        contrôlés (valider_plan(), controler_roles()), n'en
-#                        refait aucun (#22 ; seule la valeur FALSE les omet).
+#   exclusions         : codes de motif exclus, vide admis.
+# Aucun contrôle des paramètres ni des rôles (#82 ; ADR 0007, annotation du
+# 17/10/2026, (c) et (d)) : construire_table() les a validés
+# (controler_entrees() : valider_plan(), controler_roles()) avant toute étape.
 # Rend list(parametres, resultat, diagnostics, avertissements) ; les lignes
 # conservées (resultat$lignes_conservees) sont celles de l'entrée, inchangées
 # (`donnees` lui-même s'il n'y a aucune exclusion) ;
 # resultat$observation_des_lignes donne, pour chaque ligne conservée, le
 # numéro de son observation (composante fusionnée ou contrat).
-preparer_donnees <- function(donnees, roles, transition, periode, delai_declaration,
-                             segmentation, exclusions, controler = TRUE) {
-  if (isFALSE(controler)) {
-    p <- valeurs_parametres_donnees(transition, periode, delai_declaration)
-  } else {
-    p <- controler_parametres_donnees(transition, periode, delai_declaration,
-                                      segmentation, exclusions)
-    controler_roles(donnees, roles, segmentation)
-  }
+preparer_donnees <- function(donnees, roles, p, segmentation, exclusions) {
   n <- nrow(donnees)
   if (!n) refuser("donnees", "base_vide", formuler("La base d'observation ne contient aucune ligne."))
   ev <- evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation)

@@ -82,8 +82,8 @@ verifier("construire_observations, sans id_tete (valeur calculée à la main) : 
 B_NA <- BASE; B_NA$sexe[3L] <- NA
 verifier("construire_observations, contrefactuel (identité exacte) : lignes reçues = toutes, mêmes observations que le jeu sans défaut hors colonne sexe", {
   o <- construire_observations(B_NA, 1:4, ROLES, character(0), P_VD)
-  r <- preparer_donnees(BASE, ROLES, VD, PER, 0, character(0), character(0))$resultat
-  ex <- preparer_donnees(B_NA, ROLES, VD, PER, 0, character(0), "sexe_manquant")$resultat
+  r <- preparer_donnees(BASE, ROLES, P_VD, character(0), character(0))$resultat
+  ex <- preparer_donnees(B_NA, ROLES, P_VD, character(0), "sexe_manquant")$resultat
   garde <- setdiff(names(o$observations), "sexe")
   identical(o$observations[garde], r$observations[garde]) && identical(o$observation_des_lignes, c(1L, 2L, 3L, 3L)) &&
     identical(ex$numeros_conserves, c(1L, 2L, 4L)) && identical(ex$observations$ligne, c(1L, 2L, 4L)) &&
@@ -112,7 +112,7 @@ for (cas in list(list("vivant -> deces, unité tête, délai 30", VD, ROLES_SIM,
                       tablexp:::MOTIFS_LIGNES))) {
   d <- if (identical(cas[[3]], ROLES_SIM)) SC else SC[!(seq_len(nrow(SC)) %in% attr(SC, "defauts")$lignes$ligne[
     attr(SC, "defauts")$lignes$unite == "tete"]), ]
-  r <- preparer_donnees(d, cas[[3]], cas[[2]], PER, cas[[4]], "sexe", cas[[5]])
+  r <- preparer_donnees(d, cas[[3]], valeurs(cas[[2]], PER, cas[[4]]), "sexe", cas[[5]])
   o <- construire_observations(r$resultat$lignes_conservees, r$resultat$numeros_conserves, cas[[3]], "sexe",
                                valeurs(cas[[2]], PER, cas[[4]]))
   verifier(sprintf("construire_observations = champs de preparer_donnees() (identité exacte), jeu simulé à %d lignes exclues : %s",
@@ -735,7 +735,10 @@ global <- function(x, cles, niveau) {
   cl <- tablexp:::classer_lignes_exclues(rd$lignes_exclues, "tete", cles)
   L <- sort(c(rd$numeros_conserves, cl$lignes[cl$classe == "M"]))
   ob <- construire_observations(S4[L, ], L, ROLES_SIM, cles, P)
-  t_rs <- tablexp:::calculer_exposition(ob$observations, ROLES_SIM, VD, PER, 0, cles, "plus_fine", FALSE)$resultat$exposition
+  rec <- tablexp:::deduire_recette(ROLES_SIM)
+  t_rs <- tablexp:::calculer_exposition(ob$observations, P, PER, 0, cles, rec,
+                                        tablexp:::resoudre_convention("plus_fine", rec$convention_native),
+                                        FALSE)$resultat$exposition
   t_r <- if (length(cles)) x$etapes$exposition$resultat$exposition
          else tablexp:::cellules_regroupees(x$etapes$exposition$resultat$exposition, FALSE)
   k <- match(tablexp:::cle_cellules(t_rs, cles, FALSE), tablexp:::cle_cellules(t_r, cles, FALSE))
@@ -767,6 +770,38 @@ verifier(sprintf("T4 (identité exacte) : local = global en unité tête, niveau
 verifier(sprintf("T4 (identité exacte) : local = global en unité tête, niveau B (sexe), %d lignes mesurables",
                  de(x4b$etapes$importance_exclusions$resultat$retraits, "total", "B")$lignes_mesurables),
          global(x4b, "sexe", "B"))
+# Deuxième recette fictive (#82 ; avis (P) rafraîchi, critère 2) :
+# deduire_recette() remplacée dans l'espace de noms par une recette
+# « recette_fictive » de convention native age_atteint_annee, puis restaurée ;
+# chaque appel de calculer_exposition() (étape exposition et expositions
+# contrefactuelles de exposition_lignes()) est relevé par trace() : recette
+# et convention retenue reçues. Toutes égalent celles de la fiche (une seule
+# source ; avant #82, les contrefactuelles relisaient la recette de la
+# branche et résolvaient la convention demandée).
+verifier("deuxième recette fictive (#82) : étape exposition et expositions contrefactuelles de importance_exclusions sous la recette et la convention de la fiche (recette_fictive, age_atteint_annee) ; au moins un calcul contrefactuel ; deduire_recette() restaurée", {
+  ns <- asNamespace("tablexp")
+  ancienne <- get("deduire_recette", envir = ns)
+  fictive <- function(roles) {
+    r <- ancienne(roles)
+    r$recette <- "recette_fictive"; r$convention_native <- "age_atteint_annee"
+    r
+  }
+  releve <- new.env(); releve$l <- character(0)
+  unlockBinding("deduire_recette", ns)
+  assign("deduire_recette", fictive, envir = ns)
+  suppressMessages(trace("calculer_exposition", where = ns, print = FALSE,
+                         tracer = bquote(assign("l", c(get("l", envir = .(releve)), paste(recette$recette, conv$retenue)),
+                                                envir = .(releve)))))
+  x <- tryCatch(construire_table(S4, ROLES_SIM, plan_ie(EXC4, periode = PER)), finally = {
+    suppressMessages(untrace("calculer_exposition", where = ns))
+    assign("deduire_recette", ancienne, envir = ns); lockBinding("deduire_recette", ns)
+  })
+  fiche <- paste(x$fiche$recette, x$fiche$convention$retenue)
+  identical(fiche, "recette_fictive age_atteint_annee") && length(releve$l) >= 2L && all(releve$l == fiche) &&
+    x$etapes$importance_exclusions$diagnostics$calculs_contrefactuels >= 1L &&
+    identical(tablexp:::deduire_recette(ROLES_SIM)$recette, "lignes_dates_completes") &&
+    bindingIsLocked("deduire_recette", ns)
+})
 verifier("comparateur 1 (identité exacte) : taux_conserves = taux de Poisson de l'étape brut, cellule par cellule (niveau B)", {
   c_ <- x4b$etapes$importance_exclusions$resultat$cellules_niveau_b
   b <- x4b$etapes$brut$resultat$poisson
@@ -786,19 +821,23 @@ verifier("plan (valeur calculée à la main) : niveau invalide -> refus niveau_i
     identical(b$motif, "etape_prealable_manquante") && identical(g$motif, "graine_inattendue") &&
     isTRUE(tryCatch({ valider_plan(p); TRUE }, refus_tablexp = function(r) FALSE))
 })
-verifier("appel direct (valeur calculée à la main) : niveau = 1 -> refus niveau_invalide ; validation sans table -> erreur de programmation", {
+# Valeurs validées de X1 (#82) : p, recette et convention transmises par
+# construire_table().
+P_X1 <- valeurs(VD, P15, 0)
+REC_X1 <- tablexp:::deduire_recette(ROLES_SIM)
+CONV_X1 <- tablexp:::resoudre_convention("plus_fine", REC_X1$convention_native)
+verifier("appel direct (valeur calculée à la main) : validation sans table -> erreur de programmation ; la fonction d'étape ne contrôle plus le niveau (#82 : refus niveau_invalide levé par valider_plan(), ci-dessus)", {
   e <- X1$etapes
-  a <- refus_de(tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, NULL, NULL, VD, P15, 0,
-                                                         character(0), 1))
-  b <- tryCatch({ tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, list(), NULL, VD,
-                                                           P15, 0, character(0), 0.95); NULL }, error = function(e) e)
-  identical(a$motif, "niveau_invalide") && !inherits(b, "refus_tablexp") &&
-    grepl("erreur de programmation", conditionMessage(b), fixed = TRUE)
+  b <- tryCatch({ tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, list(), NULL, P_X1, P15,
+                                                           0, REC_X1, CONV_X1, character(0), 0.95); NULL },
+                error = function(e) e)
+  !inherits(b, "refus_tablexp") && grepl("erreur de programmation", conditionMessage(b), fixed = TRUE) &&
+    !("controler" %in% names(formals(tablexp:::calculer_importance_exclusions)))
 })
 verifier("appel direct = construire_table() (identité exacte) : même résultat, aucun avertissement", {
   e <- X1$etapes
-  r <- tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, NULL, NULL, VD, P15, 0,
-                                                character(0), 0.95)
+  r <- tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, NULL, NULL, P_X1, P15, 0, REC_X1,
+                                                CONV_X1, character(0), 0.95)
   identical(r[c("parametres", "resultat", "diagnostics")], e$importance_exclusions) && !nrow(r$avertissements)
 })
 verifier("reproductibilité (identité exacte) : deux constructions identical() hors execution ; fiche sans champ nouveau",

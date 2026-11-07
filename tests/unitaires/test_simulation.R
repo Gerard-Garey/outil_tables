@@ -172,7 +172,7 @@ ROLES_SIM <- c(id_contrat = "id_contrat", id_tete = "id_tete", sexe = "sexe",
                date_naissance = "date_naissance", date_entree = "date_entree",
                date_sortie = "date_sortie", cause_sortie = "cause_sortie")
 for (tr in list(list(depart = "vivant", arrivee = "deces"), list(depart = "en_cours", arrivee = "rachat"))) {
-  r <- preparer_donnees(s, ROLES_SIM, tr, PER, 0, "sexe", character(0))
+  r <- preparer_donnees(s, ROLES_SIM, tablexp:::valeurs_parametres_donnees(tr, PER, 0), "sexe", character(0))
   verifier(sprintf("module donnees (%s -> %s) : aucun motif, aucune exclusion, lignes conservées identical()",
                    tr$depart, tr$arrivee),
            all(r$diagnostics$motifs$nombre == 0L) && r$resultat$nombre_lignes_exclues == 0L &&
@@ -1275,7 +1275,8 @@ cat(sprintf("  jeu catalogue (uniforme_multi, 5 000 têtes, graine %d, graine de
 VD <- list(depart = "vivant", arrivee = "deces")
 attendus_par_motif <- lapply(stats::setNames(TOUS_MOTIFS, TOUS_MOTIFS), function(m)
   sort(unique(lg$ligne[lg$motif_attendu %in% m])))
-rp <- preparer_donnees(sc, ROLES_SIM, VD, PER, 0, "sexe", TOUS_MOTIFS)
+P_VD <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
+rp <- preparer_donnees(sc, ROLES_SIM, P_VD, "sexe", TOUS_MOTIFS)
 verifier("défauts (critère 3) : toutes exclusions déclarées -> lignes_exclues de preparer_donnees() = lignes de l'attribut, motif par motif (20 motifs)",
          identical(names(rp$resultat$lignes_exclues), TOUS_MOTIFS) &&
            all(vapply(TOUS_MOTIFS, function(m) identical(rp$resultat$lignes_exclues[[m]], attendus_par_motif[[m]]),
@@ -1286,7 +1287,7 @@ verifier("défauts (critère 3) : chaque motif du catalogue exercé (17 motifs n
                    TOUS_MOTIFS[TOUS_MOTIFS %in% CATALOGUE_DEFAUTS$motif_attendu]) &&
            sum(lengths(attendus_par_motif) > 0L) == 17L)
 verifier("défauts (critère 3) : aucune exclusion -> refus ligne_invalide, details$lignes = lignes de l'attribut, motif par motif", {
-  e <- tryCatch(preparer_donnees(sc, ROLES_SIM, VD, PER, 0, "sexe", character(0)), refus_tablexp = function(e) e)
+  e <- tryCatch(preparer_donnees(sc, ROLES_SIM, P_VD, "sexe", character(0)), refus_tablexp = function(e) e)
   inherits(e, "refus_tablexp") && identical(e$motif, "ligne_invalide") &&
     identical(e$details$lignes, attendus_par_motif[lengths(attendus_par_motif) > 0L])
 })
@@ -1301,7 +1302,9 @@ verifier("défauts (critère 3) : jeu à part, date_hors_domaine -> naissance 00
                 defauts = list(graine = GRAINE_DEF, declarations = list(list(type = "date_hors_domaine", cible = TOUTES,
                                                                               nombre = 5))))
   l <- attr(sh, "defauts")$lignes
-  e <- tryCatch(preparer_donnees(sh, ROLES_SIM, VD, PER, 0, "sexe", TOUS_MOTIFS), refus_tablexp = function(e) e)
+  # Refus du contrôle des rôles (controler_roles(), que construire_table()
+  # appelle avant toute étape ; la fonction d'étape ne contrôle plus, #82).
+  e <- tryCatch(tablexp:::controler_roles(sh, ROLES_SIM, "sexe"), refus_tablexp = function(e) e)
   nrow(l) == 5L && all(is.na(l$motif_attendu)) && all(l$refus_attendu == "date_hors_domaine") &&
     all(unclass(sh$date_naissance[l$ligne]) == -719163) &&
     with(as.POSIXlt(as.Date(-719163)), year + 1900L == 0L && mon == 11L && mday == 31L) &&
