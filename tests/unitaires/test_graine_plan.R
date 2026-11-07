@@ -10,9 +10,12 @@
 #    idempotence, tirages identical() de sous_graine() pour 7 et 7L.
 #  Les trois refus de la graine sont testés par injection de `aleatoire`
 #  dans controler_graine_plan() (M247) ; valider_plan() garde sa signature
-#  (plan). Les plans de ce fichier n'ont pas d'étape aléatoire ; le bout en
-#  bout avec l'étape aléatoire `validation` (commit (3) de B13, #4) est dans
-#  tests/unitaires/test_validation.R.
+#  (plan). Les plans de ce fichier n'ont pas d'étape aléatoire, sauf le dernier
+#  groupe ; le bout en bout avec l'étape aléatoire `validation` (commit (3) de
+#  B13, #4) est dans tests/unitaires/test_validation.R. Le dernier groupe
+#  vérifie que la graine `double` entière traverse construire_table(),
+#  ecrire_fiche() et rejouer_fiche() sans effet (ADR 0011, annotation du
+#  06/11/2026, (c)).
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -126,3 +129,51 @@ verifier("canoniser_plan : plan sans graine rendu sans graine",
 
 verifier("sous_graine : tirages identical() pour la graine 7 et 7L (identité exacte)",
          identical(tablexp:::sous_graine(7, stats::runif(5L)), tablexp:::sous_graine(7L, stats::runif(5L))))
+
+# --- graine double entière de bout en bout : construire_table(), fiche, rejeu ----------
+# Un même plan muni des étapes validation (aléatoire) et importance_exclusions,
+# graine 20261106 (double) puis 20261106L, sur un petit jeu simulé et une petite
+# table de référence (replications faibles). Identité exacte attendue. Témoin
+# (mesuré, hors dépôt) : si canoniser_plan() ne convertit pas la graine
+# (`as.integer(g)` ôté), les trois tests de construction, de fiche et de rejeu
+# échouent.
+
+GRAINE_D <- 20261106
+GRAINE_I <- 20261106L
+PERIODE_G <- list(debut = D("2015-01-01"), fin = D("2024-12-31"))
+GM_G <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
+JEU_G <- simuler_portefeuille(
+  list(deces = list(table = GM_G, facteurs = c(H = 1, F = 0.6)),
+       rachat = list(table = tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %"), facteurs = c(H = 1, F = 1))),
+  list(mode = "uniforme", n = 1500, proportion_hommes = 0.5, age_min = 20, age_max = 75, origine = D("2005-01-01")),
+  PERIODE_G, 20261106L)
+ROLES_G <- c(id_contrat = "id_contrat", id_tete = "id_tete", sexe = "sexe", date_naissance = "date_naissance",
+             date_entree = "date_entree", date_sortie = "date_sortie", cause_sortie = "cause_sortie")
+TABLES_G <- list(tv = table_reference(rbind(data.frame(age = GM_G$age, sexe = "H", qx = GM_G$qx),
+                                            data.frame(age = GM_G$age, sexe = "F", qx = 0.6 * GM_G$qx)),
+                                      "GM vraie par sexe", "importee", "loi vraie du jeu simulé (test)"))
+plan_graine <- function(g) list(
+  transition = list(depart = "vivant", arrivee = "deces"), periode = PERIODE_G, delai_declaration = 0,
+  segmentation = "sexe", graine = g,
+  etapes = list(donnees = list(exclusions = character(0)),
+                exposition = list(convention = "plus_fine", par_annee = FALSE),
+                validation = list(table_reference = "tv", relation_table = "independante", plage_ages = c(20, 90),
+                                  tranches_age = c(20, 50, 70), niveau = 0.95, replications = 39),
+                importance_exclusions = list(niveau = 0.95)))
+XD <- construire_table(JEU_G, ROLES_G, plan_graine(GRAINE_D), tables_reference = TABLES_G)
+XI <- construire_table(JEU_G, ROLES_G, plan_graine(GRAINE_I), tables_reference = TABLES_G)
+
+verifier("graine double 20261106 et entière 20261106L : construction identical() hors execution (identité exacte)",
+         is.double(GRAINE_D) && is.integer(GRAINE_I) && identical(sans_execution(XD), sans_execution(XI)))
+verifier("graine double : fiche identical(), octets de ecrire_fiche() égaux, fiche$plan$graine et graine de Monte-Carlo integer (identité exacte)",
+         identical(XD$fiche, XI$fiche) && identical(ecrire_fiche(XD$fiche), ecrire_fiche(XI$fiche)) &&
+           identical(XD$fiche$plan$graine, GRAINE_I) &&
+           identical(XD$etapes$validation$resultat$monte_carlo$graine, GRAINE_I))
+verifier("graine double : le chemin est bien exercé (39 tirages de Monte-Carlo effectués, étape importance_exclusions présente)",
+         identical(XD$etapes$validation$resultat$monte_carlo$tirages_effectues, 39) &&
+           !is.null(XD$etapes$importance_exclusions$resultat))
+verifier("graine double : rejouer_fiche() sur la fiche aboutit, construction identical() hors execution à l'originale, ligne de graine entière dans la fiche écrite", {
+  f <- lire_fiche(ecrire_fiche(XD$fiche))
+  r <- rejouer_fiche(JEU_G, f, tables_reference = TABLES_G)
+  identical(sans_execution(r$construction), sans_execution(XD)) && identical(f$plan$graine, GRAINE_I)
+})
