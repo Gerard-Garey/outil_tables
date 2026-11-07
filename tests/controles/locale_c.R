@@ -179,8 +179,8 @@ travailleur <- function(args) {
   # Messages de refus par module (#127, critère 2 ; ADR 0007, annotation du
   # 05/11/2026, (c) et (f)) : un refus par module qui cite une valeur reçue
   # non ASCII (« âge ») de codage natif non marqué, latin-1 et UTF-8, le refus
-  # portant le module et le motif attendus de l'entrée (sept modules, dont
-  # validation : #127, B13) ; puis
+  # portant le module et le motif attendus de l'entrée (huit modules, dont
+  # validation : #127, B13 ; positionnement : #167) ; puis
   # les trois refus de lire_texte() de tests/unitaires/test_serialisation.R
   # (première ligne inconnue, type inconnu, valeur illisible ; entrées en
   # octets bruts). Chaque message : marqué UTF-8, sur une ligne, sans octet
@@ -204,13 +204,16 @@ travailleur <- function(args) {
         list(graine = 1L, declarations = list(list(type = v, cible = "deces", taux = 0.1))), 2L),
       rapport = function(v) tablexp:::ecrire_valeurs(structure(1, class = v), "texte", "r"),
       construire_table = function(v) valider_plan(stats::setNames(list(1), v)),
+      positionnement = function(v) tablexp:::controler_entrees_validation(
+        list(annee = 1), v, tablexp:::CONVENTIONS_VALIDATION[1L], character(0), c(0, 1), "positionnement"),
       validation = function(v) tablexp:::controler_entrees_validation(
-        list(annee = 1), v, tablexp:::CONVENTIONS_VALIDATION[1L], character(0), c(0, 1)))
+        list(annee = 1), v, tablexp:::CONVENTIONS_VALIDATION[1L], character(0), c(0, 1), "validation"))
     # Motif attendu de chaque refus : sans lui, un refus voisin du même module
     # (autre garde, même citation) passerait.
     motifs_attendus <- c(donnees = "colonne_absente", exposition = "convention_invalide", brut = "estimateur_inconnu",
                          simulation = "defauts_invalides", rapport = "type_non_canonique",
-                         construire_table = "champ_inconnu", validation = "table_annee_non_admise")
+                         construire_table = "champ_inconnu", positionnement = "table_annee_non_admise",
+                         validation = "table_annee_non_admise")
     msgs <- character(0); noms <- character(0)
     for (mo in names(modules)) for (en in names(valeurs)) {
       cond <- tryCatch({ force(modules[[mo]](valeurs[[en]])); NULL }, refus_tablexp = function(r) r)

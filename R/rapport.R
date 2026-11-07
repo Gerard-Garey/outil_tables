@@ -1614,7 +1614,7 @@ lire_fiche <- function(octets) {
 SECTIONS_RAPPORT <- data.frame(
   section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
               "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements",
-              "etape_validation", "etape_importance_exclusions", "table_finale", "rejeu"),
+              "etape_positionnement", "etape_validation", "etape_importance_exclusions", "table_finale", "rejeu"),
   titre = texte_moteur(c(
     "Lecture du rapport",
     "Identification : empreintes, versions et plateforme",
@@ -1627,14 +1627,15 @@ SECTIONS_RAPPORT <- data.frame(
     "Étape brut : taux bruts et intervalles",
     "Indicateurs de suffisance",
     "Avertissements",
+    "Étape positionnement : positionnement par SMR sur une table de référence et table positionnée",
     "Étape validation : statistiques de validation de la table de référence prise telle quelle",
     "Étape importance_exclusions : importance des exclusions (volumes, événements, exposition et SMR des lignes exclues)",
     "Table finale et comparaisons",
     "Rejeu")),
   nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
-             "objet", "etape", "etape", "non_produite", "texte"),
-  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "validation", "importance_exclusions", NA,
-            NA),
+             "objet", "etape", "etape", "etape", "non_produite", "texte"),
+  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "positionnement", "validation",
+            "importance_exclusions", NA, NA),
   racines = I(list(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
@@ -1649,6 +1650,7 @@ SECTIONS_RAPPORT <- data.frame(
     "etapes/brut",
     character(0),
     "avertissements",
+    "etapes/positionnement",
     "etapes/validation",
     "etapes/importance_exclusions",
     "table",
@@ -1656,7 +1658,7 @@ SECTIONS_RAPPORT <- data.frame(
   renvois = I(list(
     character(0), character(0), character(0), character(0), character(0), character(0), character(0),
     character(0), character(0), c("etapes/exposition/resultat/exposition", "etapes/brut/resultat"),
-    character(0), character(0), character(0), character(0), character(0))),
+    character(0), character(0), character(0), character(0), character(0), character(0))),
   stringsAsFactors = FALSE)
 
 # Tables dont le volume croît avec la base : chemin, type et dimension (lus
@@ -1724,6 +1726,26 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   etape_absente_1 = "Étape « ",
   etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
   etape_absente_3 = " absent de l'objet).",
+  # Section etape_positionnement (#167 ; spécification d'actuary-approfondi,
+  # § 7, textes acceptés sans lecture de regulatory, M289, Q7 ; notation de la
+  # section validation : theta, q~, somme) ; la mention
+  # validation_unite_contrat y est reprise sous la même condition.
+  positionnement_methode = paste(
+    "Positionnement par SMR (etapes/positionnement/parametres/methode) : pour chaque segment, theta = O / A, où O est le nombre de décès observés et",
+    "A = somme des E^c_x (-ln(1 - q~_x)) le nombre de décès attendus sous la table de référence, sur l'exposition",
+    "centrale des cellules de la plage d'âges déclarée (etapes/positionnement/parametres/plage_ages). La table",
+    "positionnée vaut q_x = 1 - (1 - q~_x)^theta aux seuls âges de cette plage : elle multiplie par theta la force",
+    "de mortalité de la référence, supposée constante sur chaque année d'âge. Hors de la plage, rien n'est",
+    "produit."),
+  positionnement_forme = paste(
+    "La méthode suppose que la mortalité du segment a, sur la plage, la forme de la table de référence à un",
+    "facteur près. Les intervalles de theta et de la table positionnée ne couvrent que l'incertitude sur ce",
+    "facteur, non l'écart de forme, que mesure l'étape validation. Aucun verdict ni seuil."),
+  positionnement_ecart_note = paste(
+    "Écart à la note de méthode (etapes/positionnement/parametres/reference_methode, référence de place) : la",
+    "note multiplie les probabilités de décès (q_x = SMR q~_x) et prend pour attendus la somme des E q~ ;",
+    "l'outil multiplie la force de mortalité et prend les attendus sur l'exposition centrale, comme l'étape",
+    "validation. Les deux tables diffèrent d'autant plus que q~_x est grand."),
   # Section etape_validation (#4 ; M258 : textes acceptés ; ADR 0012, seconde
   # annotation du 06/11/2026, (b)).
   validation_sans_verdict = paste(
@@ -2144,6 +2166,21 @@ corps_section <- function(x, k) {
                if (identical(pv[["relation_table"]], "independante"))
                  c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[["validation_monte_carlo"]])),
                paragraphe(m[["validation_reference"]]),
+               lignes_racines(x, racines)))
+    }
+    if (identical(e, "positionnement")) {
+      # Étape positionnement : mentions fixes (#167, M289, Q7), puis mention
+      # d'unité contrat sous la même condition que l'étape validation.
+      # Mentions de la méthode SMR, seule mise en oeuvre (M293) ; une autre
+      # valeur est une erreur de programmation (avis d'actuary du 07/11/2026).
+      au <- x[["fiche"]][["avertissement_unite"]]
+      methode <- x[["etapes"]][["positionnement"]][["parametres"]][["methode"]]
+      mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
+        smr = c(paragraphe(m[["positionnement_methode"]]), paragraphe(m[["positionnement_forme"]]),
+                paragraphe(m[["positionnement_ecart_note"]])),
+        stop("corps_section() : méthode de positionnement sans mentions (erreur de programmation).", call. = FALSE))
+      return(c(mentions,
+               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
                lignes_racines(x, racines)))
     }
     if (identical(e, "importance_exclusions")) {

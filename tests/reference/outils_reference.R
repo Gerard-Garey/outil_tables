@@ -89,7 +89,8 @@ CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12)
 # retour à doubles_sans_tolerance().
 TOLERANCES <- c(
   # Aucune clé nue (#175) : toute clé commence par le nom de l'étape
-  # (`exposition`, `brut`, `validation`, `importance_exclusions`) ou par
+  # (`exposition`, `brut`, `positionnement`, `validation`,
+  # `importance_exclusions`) ou par
   # `fiche/` (écho du plan et des hypothèses : fiche/plan/…,
   # fiche/hypotheses_<étape>/…). Une colonne de même nom d'une étape ultérieure
   # (#167, #168) ne reçoit ainsi aucune classe sans contrôle de complétude
@@ -210,7 +211,41 @@ TOLERANCES <- c(
   "importance_exclusions/resultat/smr_comparateur_2/borne_inf_asymptotique" = 1e-12,
   "importance_exclusions/resultat/smr_comparateur_2/borne_sup_asymptotique" = 1e-12,
   "importance_exclusions/resultat/smr_comparateur_2/attendus_conserves" = 1e-12,
-  "importance_exclusions/resultat/smr_comparateur_2/smr_conserves" = 1e-12)
+  "importance_exclusions/resultat/smr_comparateur_2/smr_conserves" = 1e-12,
+  # Positionnement (#167), préparées pour le plan de méthode de (R) ; classes
+  # de la spécification d'actuary-approfondi (§ 5 : observes exacte ;
+  # bornes, qx et ses bornes 1e-12), complétées sur
+  # le modèle de `validation` pour les cellules, les paramètres et les
+  # diagnostics. Toute clé commence par `positionnement/` (#175).
+  # exacte : paramètres déclarés, dénombrements, recopie de la table reçue
+  "positionnement/parametres/plage_ages" = 0, "positionnement/parametres/niveau" = 0,
+  "positionnement/resultat/cellules/qx_table" = 0,
+  "positionnement/resultat/smr/observes" = 0,
+  "positionnement/resultat/table_positionnee/qx_reference" = 0,
+  "positionnement/diagnostics/etats/evenements" = 0,
+  "positionnement/diagnostics/evenements_sans_attendu" = 0,
+  "positionnement/diagnostics/evenements_hors_plage" = 0,
+  "positionnement/diagnostics/evenements_total" = 0,
+  "positionnement/plage_ages" = 0, "positionnement/niveau" = 0,
+  # 1e-14 : sommes et quotients IEEE
+  "positionnement/resultat/cellules/exposition_centrale" = 1e-14,
+  "positionnement/diagnostics/exposition_hors_plage" = 1e-14,
+  # 1e-12 : log1p, expm1, exp, qnorm, qgamma ; attendus et smr (somme de
+  # E^c mu~, mu~ par log1p) : spécification corrigée par l'avis d'actuary du
+  # 07/11/2026
+  "positionnement/resultat/smr/attendus" = 1e-12,
+  "positionnement/resultat/smr/smr" = 1e-12,
+  "positionnement/resultat/cellules/taux_table" = 1e-12,
+  "positionnement/resultat/cellules/attendus" = 1e-12,
+  "positionnement/resultat/smr/borne_inf_exacte" = 1e-12,
+  "positionnement/resultat/smr/borne_sup_exacte" = 1e-12,
+  "positionnement/resultat/smr/borne_inf_asymptotique" = 1e-12,
+  "positionnement/resultat/smr/borne_sup_asymptotique" = 1e-12,
+  "positionnement/resultat/table_positionnee/qx" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_inf_exacte" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_sup_exacte" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_inf_asymptotique" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_sup_asymptotique" = 1e-12)
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 

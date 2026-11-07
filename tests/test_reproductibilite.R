@@ -1304,15 +1304,16 @@ for (chemin_ie in c("etapes/validation/diagnostics/cellules_retenues",
 }
 # Une table de même nom sous une autre étape n'hérite d'aucune classe (#166,
 # point 3.4) : cellules, statistiques, retraits de R8 recopiés sous
-# `etapes/positionnement` et `etapes/homogeneite` (étapes simulées en mémoire,
-# #167 et #168) sont relevés par doubles_sans_tolerance(), que des clés
+# `etapes/etape_non_listee` et `etapes/homogeneite` (étapes simulées en
+# mémoire ; #168 ; `positionnement` a ses clés depuis #167, d'où une étape
+# fictive) sont relevés par doubles_sans_tolerance(), que des clés
 # `<table>/<colonne>` auraient masqués.
 for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
                        "etapes/validation/resultat/cellules/taux_table",
                        "etapes/validation/resultat/statistiques/valeur",
                        "etapes/validation/resultat/sous_groupes/smr",
                        "etapes/importance_exclusions/resultat/retraits/exposition_centrale_retiree")) {
-  for (autre in c("positionnement", "homogeneite")) {
+  for (autre in c("etape_non_listee", "homogeneite")) {
     chemin_autre <- sub("^etapes/[a-z_]+/", paste0("etapes/", autre, "/"), chemin_etape)
     verifier(sprintf("témoin : %s simulé sous une autre étape -> relevé par doubles_sans_tolerance()", chemin_autre), {
       g <- aplatis[["R8"]]
@@ -1326,8 +1327,9 @@ for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
 }
 # Colonnes qu'une clé nue classait avant #175 : pour chacune des 36 clés qui les
 # remplacent, un chemin double qu'elle classe dans R6 est recopié en mémoire
-# sous une étape non listée (positionnement ; fiche/plan/etapes/positionnement/
-# ou fiche/hypotheses_positionnement/ pour la fiche). Le chemin recopié est
+# sous une étape non listée (etape_non_listee, fictive : `positionnement` a ses
+# clés depuis #167 ; fiche/plan/etapes/etape_non_listee/ ou
+# fiche/hypotheses_etape_non_listee/ pour la fiche). Le chemin recopié est
 # relevé par doubles_sans_tolerance(), l'original ne l'est pas, et avec
 # l'ancienne clé ajoutée en mémoire (sa classe est sans objet ici) le chemin
 # recopié ne l'est plus : ce que la clé nue masquait. Rien n'est écrit sous
@@ -1363,10 +1365,10 @@ ANCIENNES_CLES_NUES <- c(
   "etapes/brut/resultat/kaplan_meier/variance" = "kaplan_meier/variance",
   "etapes/brut/resultat/kaplan_meier_sauts/survie_cellule" = "kaplan_meier_sauts/survie_cellule")
 chemin_autre_etape <- function(chemin) {
-  if (startsWith(chemin, "fiche/plan/etapes/")) return(sub("^fiche/plan/etapes/[^/]+/", "fiche/plan/etapes/positionnement/", chemin))
-  if (identical(chemin, "fiche/plan/delai_declaration")) return("fiche/plan/etapes/positionnement/delai_declaration")
-  if (startsWith(chemin, "fiche/hypotheses_")) return(sub("^fiche/hypotheses_[^/]+/", "fiche/hypotheses_positionnement/", chemin))
-  sub("^etapes/[^/]+/", "etapes/positionnement/", chemin)
+  if (startsWith(chemin, "fiche/plan/etapes/")) return(sub("^fiche/plan/etapes/[^/]+/", "fiche/plan/etapes/etape_non_listee/", chemin))
+  if (identical(chemin, "fiche/plan/delai_declaration")) return("fiche/plan/etapes/etape_non_listee/delai_declaration")
+  if (startsWith(chemin, "fiche/hypotheses_")) return(sub("^fiche/hypotheses_[^/]+/", "fiche/hypotheses_etape_non_listee/", chemin))
+  sub("^etapes/[^/]+/", "etapes/etape_non_listee/", chemin)
 }
 verifier("témoins des clés nues retirées : 36 chemins (un par clé qualifiée) de R6, 23 anciennes clés", {
   length(ANCIENNES_CLES_NUES) == 36L && length(unique(ANCIENNES_CLES_NUES)) == 23L && !anyDuplicated(names(ANCIENNES_CLES_NUES)) &&

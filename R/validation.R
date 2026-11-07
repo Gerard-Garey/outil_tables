@@ -43,7 +43,8 @@
 #  pour #69 : construire_observations(), evaluer_motifs(),
 #  MOTIFS_TETE, MODALITES_CAUSE), `exposition` (calculer_exposition(), #69), `brut`
 #  (taux_poisson()) et `positionnement` (valeurs_entieres_double(),
-#  apparier_table(), attendus_cellules(), smr_poisson()) ; le
+#  controler_cle_table(), controler_plage_ages(), apparier_table(),
+#  attendus_cellules(), smr_poisson()) ; le
 #  niveau est contrôlé ici sous le code niveau_invalide de `brut` (M253)
 #  (ADR 0007, point 2.1 et seconde annotation du 06/11/2026, (d)). Les
 #  arêtes vers donnees::table_reference relevées par graphe_modules.R sont
@@ -232,26 +233,19 @@ STATUTS_VALIDATION <- local({
 # sont contrôlés par valider_plan()), dans l'ordre du catalogue. Forme exacte
 # (#23) : type de base exact, aucun attribut, sinon refus sous le motif du
 # paramètre ; un integer reçu pour plage_ages, tranches_age ou replications
-# est refusé (M257). Rend TRUE, invisible.
+# est refusé (M257). Clé et plage : controler_cle_table() et
+# controler_plage_ages() (module positionnement, sous le module validation ;
+# #167, F2). Rend TRUE, invisible.
 controler_parametres_validation <- function(table_reference, relation_table, plage_ages, tranches_age, niveau,
                                             replications) {
-  if (!chaine_unique(table_reference))
-    refuser("validation", "cle_table_invalide",
-            formuler(paste("La clé de la table de référence (table_reference) doit être une chaîne unique, non vide,",
-                           "sans attribut : le nom, dans l'argument « tables_reference », de la table à valider.")),
-            list(table_reference = table_reference))
+  controler_cle_table(table_reference, "validation")
   if (!chaine_unique(relation_table) || !(relation_table %in% names(RELATIONS_TABLE)))
     refuser("validation", "relation_table_invalide",
             formuler(paste("La relation entre la table et les observations (relation_table) doit être une chaîne",
                            "unique, sans attribut, prise dans %s, sans défaut (ADR 0015, point 7.1)."),
                      liste_guillemets(names(RELATIONS_TABLE))),
             list(relation_table = relation_table))
-  if (!valeurs_entieres_double(plage_ages) || length(plage_ages) != 2L || plage_ages[1L] < 0 ||
-      plage_ages[1L] > plage_ages[2L] || plage_ages[2L] > .Machine$integer.max)
-    refuser("validation", "plage_ages_invalide",
-            formuler(paste("La plage d'âges (plage_ages) doit être un vecteur double sans attribut de deux valeurs",
-                           "entières finies, 0 <= min <= max (un integer est refusé).")),
-            list(plage_ages = plage_ages))
+  controler_plage_ages(plage_ages, "validation")
   if (!valeurs_entieres_double(tranches_age) || !length(tranches_age) || is.unsorted(tranches_age, strictly = TRUE) ||
       tranches_age[1L] != plage_ages[1L] || tranches_age[length(tranches_age)] > plage_ages[2L])
     refuser("validation", "tranches_age_invalides",
@@ -676,9 +670,9 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
     stop(sprintf("calculer_validation() : colonne(s) %s absente(s) de la table d'exposition (erreur de programmation).",
                  paste(manquantes, collapse = ", ")), call. = FALSE)
   pe <- RELATIONS_TABLE[[relation_table]]
-  ap <- apparier_table(exposition, segmentation, par_annee, table, plage_ages, table_reference)
+  ap <- apparier_table(exposition, segmentation, par_annee, table, plage_ages, table_reference, "validation")
   cel <- ap$cellules
-  at <- attendus_cellules(cel$exposition_centrale, cel$evenements, cel$qx_table, table_reference)
+  at <- attendus_cellules(cel$exposition_centrale, cel$evenements, cel$qx_table, table_reference, "validation")
   ret <- at$etat == "retenue"
   # Séquence des suites : segment x année.
   sequence <- if (isTRUE(par_annee)) (ap$segment - 1L) * length(unique(cel$annee)) + match(cel$annee, sort(unique(cel$annee)))
@@ -1052,7 +1046,7 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
     ex <- ret[c(cles, "age", if (isTRUE(par_annee)) "annee")]
     ex$exposition_centrale <- ret$exposition_centrale_retiree
     ex$evenements <- ret$evenements_retires
-    ap <- apparier_table(ex, cles, par_annee, table, plage_ages, cle_table, refuser_sans_valeur = FALSE)
+    ap <- apparier_table(ex, cles, par_annee, table, plage_ages, cle_table, "validation", refuser_sans_valeur = FALSE)
     c_ <- ap$cellules
     sv <- is.na(c_$qx_table)
     rempli <- c_$exposition_centrale > 0 | c_$evenements > 0L
@@ -1060,7 +1054,7 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
     q1 <- !sv & c_$qx_table == 1 & c_$exposition_centrale > 0
     un <- sum(q1); ev_un <- sum(as.numeric(c_$evenements[q1]))
     g <- !sv & !q1
-    at <- attendus_cellules(c_$exposition_centrale[g], c_$evenements[g], c_$qx_table[g], cle_table)
+    at <- attendus_cellules(c_$exposition_centrale[g], c_$evenements[g], c_$qx_table[g], cle_table, "validation")
     r <- at$etat == "retenue"
     O <- sum(as.numeric(c_$evenements[g][r])); A <- sum(at$attendus[r])
     ev_sans_attendu <- sum(as.numeric(c_$evenements[g][at$etat %in% c("evenement_sans_exposition",

@@ -297,6 +297,10 @@ VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalide
                     exposition.par_annee = list(FALSE, "par_annee_invalide"),
                     brut.estimateurs = list("poisson", "estimateurs_invalides"),
                     brut.niveau = list(0.95, "niveau_invalide"),
+                    positionnement.methode = list("smr", "methode_invalide"),
+                    positionnement.table_reference = list("t", "cle_table_invalide"),
+                    positionnement.plage_ages = list(c(20, 90), "plage_ages_invalide"),
+                    positionnement.niveau = list(0.95, "niveau_invalide"),
                     validation.table_reference = list("t", "cle_table_invalide"),
                     validation.relation_table = list("independante", "relation_table_invalide"),
                     validation.plage_ages = list(c(20, 90), "plage_ages_invalide"),
@@ -309,11 +313,15 @@ VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalide
 plan_validation <- function() modifier(plan_complet(), graine = 1L, etapes = c(plan_complet()$etapes, list(
   validation = list(table_reference = "t", relation_table = "independante", plage_ages = c(20, 90),
                     tranches_age = c(20, 50), niveau = 0.95, replications = 99))))
+# Plan complet muni de l'étape positionnement (#167, non aléatoire).
+plan_positionnement <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
+  positionnement = list(methode = "smr", table_reference = "t", plage_ages = c(20, 90), niveau = 0.95))))
 # Plan complet muni de l'étape importance_exclusions (#69, non aléatoire).
 plan_importance <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
   importance_exclusions = list(niveau = 0.95))))
 plan_de <- function(cle) {
   if (startsWith(cle, "validation.")) plan_validation()
+  else if (startsWith(cle, "positionnement.")) plan_positionnement()
   else if (startsWith(cle, "importance_exclusions.")) plan_importance() else plan_complet()
 }
 AUTRES_TYPES <- list(logical = TRUE, integer = 1L, double = 0.5, complex = 0.5 + 0i, character = "poisson",
