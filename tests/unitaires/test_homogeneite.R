@@ -8,6 +8,9 @@
 #  - valeur calculée à la main : petit jeu de cellules (T = 529/53, tranches
 #    121/21 et 9/2), deux composantes connexes, constantes, catalogue, motifs
 #    et ordre des refus, états, loi exacte par énumération directe ;
+#  - valeur imprimée dans la source : exemple de Breslow et Day (1987), vol.
+#    II, § 3.6 (g), p. 114-115 (T, attendus, variance, Pearson interne), à la
+#    précision imprimée ;
 #  - recoupement indépendant par `stats` (priorité base, en CI ; M290) : test
 #    du score (Rao) d'un GLM de Poisson à offset, anova(..., test = "Rao"),
 #    sous les quatre conditions de la spécification, § 7 (ajustement nul à
@@ -73,15 +76,18 @@ verifier("A STATUTS_HOMOGENEITE : (table, grandeur) uniques ; mention d'indépen
     !any(grepl("Breslow|Day|Rao|Mantel|Haenszel|Cochran|Pearson", s$statut)) &&
     identical(Encoding(s$statut[1L]), "UTF-8")
 })
-verifier("A REFERENCE_METHODE_HOMOGENEITE : emplacement marqué « à compléter après lecture de la source (M290) », aucune donnée de source", {
-  r <- tablexp:::REFERENCE_METHODE_HOMOGENEITE
-  startsWith(r, "à compléter après lecture de la source (M290)") && !grepl("[0-9a-f]{64}", r) &&
-    !grepl("http", r, fixed = TRUE)
+verifier("A STATUTS_HOMOGENEITE : p exacte et p de Monte-Carlo asymptotiques sous le modèle de survie (Breslow et Day, § 4.2), après « E tenue pour fixe » ; statut terminé par la mention d'indépendance", {
+  s <- tablexp:::STATUTS_HOMOGENEITE
+  st <- s$statut[s$table == "tests" & s$grandeur %in% c("p_exacte", "p_monte_carlo")]
+  pos <- function(motif, x) regexpr(motif, x, fixed = TRUE)
+  f <- pos("E tenue pour fixe", st); a <- pos("asymptotique sous le modèle de survie", st)
+  length(st) == 2L && all(f > 0L) && all(a > f) &&
+    all(endsWith(st, paste(";", tablexp:::INDEPENDANCE_HOMOGENEITE)))
 })
-echec_attendu("A REFERENCE_METHODE_HOMOGENEITE : données consignées de la source (URL, SHA-256, pages ; E2.25), après relecture sur l'image (M290)",
-              "#168", {
+verifier("A REFERENCE_METHODE_HOMOGENEITE : données consignées de la source (URL, SHA-256, pages ; E2.25), après relecture sur l'image (M290)", {
   r <- tablexp:::REFERENCE_METHODE_HOMOGENEITE
-  grepl("[0-9a-f]{64}", r) && grepl("https://", r, fixed = TRUE) && !grepl("à compléter", r, fixed = TRUE)
+  grepl("[0-9a-f]{64}", r) && grepl("https://", r, fixed = TRUE) && !grepl("à compléter", r, fixed = TRUE) &&
+    identical(Encoding(r), "UTF-8")
 })
 
 # --- B. Refus (valeur calculée à la main : module, motif, ordre) -------------------
@@ -244,6 +250,38 @@ verifier("C : statistique de Monte-Carlo : la statistique d'une réplique égale
                                     match(EXPO_C$sexe, c("F", "H")), 5L, 2L)
   Du <- EXPO_C$evenements[sc$utilisee]
   identical(unname(sc$statistique(cbind(Du, Du))), rep(sc$t, 2L)) && isTRUE(proche(sc$t, 529 / 53, 1e-14, 0))
+})
+
+# Ancre sur la source (valeur imprimée) : Breslow et Day (1987), vol. II,
+# chap. 3, § 3.6 (g), p. 114-115, lu sur l'image. Deux strates (cellules 1
+# et 2), deux groupes (segments 1 non exposés, 2 exposés) : strate I, d =
+# (25, 5), n = (10 000, 1 000) ; strate II, d = (5, 25), n = (4 000,
+# 10 000). Imprimé : attendus 35.844 (non exposés) et 24.156 (exposés),
+# Var = 8.602, chi2_1 = (30 - 24.156)^2 / 8.602 = 3.97 (p. 115), Pearson
+# interne 2.37 ; comparés à la précision imprimée (2 décimales pour les
+# statistiques, 3 pour A et V). Le Pearson interne, Somme (O - A)^2 / A,
+# n'est pas produit par le moteur : il est calculé ici à partir de O et A.
+# Étiquetage : les lignes « E2 » et « E1 » de la p. 114 portent, par le
+# calcul, les attendus des non-exposés et des exposés, à l'inverse de la
+# convention du § 3.6 (a), p. 108 (O_2 aux exposés), et de la formule
+# (O_2 E_1) / (O_1 E_2) = 1.48 de la p. 115 : incohérence d'étiquetage
+# interne à la source ; le test suit les colonnes, et à deux groupes la
+# variance ne dépend pas de l'indice. La p. 115 imprime p = 0.13 et p =
+# 0.047 ; la queue supérieure du khi-deux à 1 ddl des statistiques imprimées
+# elles-mêmes (2.37 ; 3.97) vaut 0.1237 et 0.0463, et ni la correction de
+# continuité ni la queue normale unilatérale ne redonnent les valeurs
+# imprimées : écart interne à la source, p-valeurs imprimées non retenues
+# comme ancre.
+verifier("C ancre (Breslow et Day, § 3.6 (g)) : A = (35.844, 24.156), V = 8.602, T = 3.97, Pearson interne 2.37, ddl 1, à la précision imprimée", {
+  sc <- tablexp:::score_homogeneite(c(25, 5, 5, 25), c(10000, 1000, 4000, 10000), c(1L, 1L, 2L, 2L), c(1L, 2L, 1L, 2L),
+                                    2L, 2L)
+  pearson <- sum((sc$O - sc$A)^2 / sc$A)
+  tous(o = if (identical(sc$O, c(30, 30))) TRUE else "O",
+       a = if (identical(round(sc$A, 3), c(35.844, 24.156))) TRUE else paste(format(sc$A, digits = 10), collapse = " "),
+       v = if (identical(round(sc$v, 3), c(8.602, 8.602))) TRUE else paste(format(sc$v, digits = 10), collapse = " "),
+       t = if (identical(round(sc$t, 2), 3.97)) TRUE else format(sc$t, digits = 10),
+       pearson = if (identical(round(pearson, 2), 2.37)) TRUE else format(pearson, digits = 10),
+       ddl = if (identical(sc$ddl, 1L) && identical(sc$strates_informatives, 2L)) TRUE else "ddl ou strates")
 })
 
 # Jeu de cellules sexe x segment (3 modalités), âges 40 à 69, tiré sous une

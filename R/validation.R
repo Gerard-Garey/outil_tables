@@ -1268,13 +1268,19 @@ HYPOTHESE_HOMOGENEITE <- texte_moteur(paste(
   "fixe ; conditionnellement à D_.c, (D_1c, ..., D_Sc) suit la loi multinomiale (D_.c ; pi_c), pi_sc =",
   "E_sc / E_.c, libre de mu_c ; test par variable : mêmes lois, strates cellule x modalité de l'autre variable,",
   "groupes modalités de la variable testée ;", INDEPENDANCE_HOMOGENEITE))
-# Référence de méthode : emplacement à compléter après la relecture de la
-# source sur l'image (M290, décision du mainteneur du 07/11/2026) ; aucune
-# donnée de la source (URL, SHA-256, pages) n'est consignée tant qu'elle n'a
-# pas été lue (test en échec attendu renvoyant à #168).
+# Référence de méthode (forme M209, E2.12) : source relue sur l'image le
+# 07/11/2026 (M290, M305) ; URL, SHA-256 des fichiers lus et pages
+# consignés, écarts de l'outil à la source nommés.
 REFERENCE_METHODE_HOMOGENEITE <- texte_moteur(paste(
-  "à compléter après lecture de la source (M290) : forme décidée par le mainteneur (M209, E2.12) ; source non",
-  "relue dans cette version, aucune donnée de source consignée"))
+  "Breslow N. E., Day N. E. (1987), Statistical Methods in Cancer Research, vol. II, IARC Scientific Publications",
+  "n° 82 ; chap. 3, https://publications.iarc.who.int/download/SP82_vol2-3.pdf, SHA-256",
+  "8c20ae8827229febf2f21aca19abf695ad436542ab5875ed2568d7232e6d0dba : § 3.5, éq. (3.13), p. 104 ; § 3.6, p. 107-108 ;",
+  "§ 3.6 (f), éq. (3.23)-(3.24), p. 113-114 ; § 3.6 (g), p. 114-115 (exemple) ; chap. 4,",
+  "https://publications.iarc.who.int/download/SP82_vol2-4.pdf,",
+  "SHA-256 a270d917a68b30985b27c37f3d1cf7b1dbd92aed6bee1c7318c23f8863e0cac9 : § 4.2, p. 131-135 ; consultés le",
+  "07/11/2026, lus sur l'image ; source de méthode, qui ne prescrit rien pour l'actuariat ; écarts documentés :",
+  "degrés de liberté pris au rang de V (K - 1 dans la source), tests par tranche d'âge et leur somme, p-valeur",
+  "exacte bilatérale à deux groupes et p-valeur de Monte-Carlo conditionnelle, absents de la source"))
 
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
 # segments) ; spécification de #168, § 4.
@@ -1301,17 +1307,17 @@ STATUTS_HOMOGENEITE <- local({
             "fixe ; asymptotique aussi sous le modèle de survie ; queue supérieure ;", ind)),
     c("tests", "p_exacte",
       paste("exacte conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe, quand deux groupes",
-            "seulement sont comparés : O_1 somme de binomiales indépendantes Bin(D_., pi_1), p = P(|O_1 - A_1| >=",
-            "|o_1 - A_1|), égalité à 1e-10 A_1 près ; convolution des dbinom, approximation numérique ; produite si",
-            "le nombre de produits de la convolution est au plus N_MAX_PRODUITS_CONVOLUTION (état",
-            "convolution_au_dela_n_max sinon) ; plus de deux groupes : état plus_de_deux_groupes ; somme_tranches :",
-            "état non_produite_par_cette_version ;", ind)),
+            "seulement sont comparés ; asymptotique sous le modèle de survie ; O_1 somme de binomiales indépendantes",
+            "Bin(D_., pi_1), p = P(|O_1 - A_1| >= |o_1 - A_1|), égalité à 1e-10 A_1 près ; convolution des dbinom,",
+            "approximation numérique ; produite si le nombre de produits de la convolution est au plus",
+            "N_MAX_PRODUITS_CONVOLUTION (état convolution_au_dela_n_max sinon) ; plus de deux groupes : état",
+            "plus_de_deux_groupes ; somme_tranches : état non_produite_par_cette_version ;", ind)),
     c("tests", "p_monte_carlo",
       paste("niveau exact conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe : P_H0(p_MC <=",
-            "alpha) <= alpha, p_MC = (1 + K) / (B + 1), queue supérieure ; réplications multinomiales (D_. ; pi)",
-            "par strate sous la graine du plan, un seul jeu pour les tests global, tranche et somme_tranches, un",
-            "jeu par test par variable ; e est l'erreur due au nombre fini de réplications, distincte de l'erreur",
-            "d'estimation ;", ind)),
+            "alpha) <= alpha, p_MC = (1 + K) / (B + 1), queue supérieure ; asymptotique sous le modèle de survie ;",
+            "réplications multinomiales (D_. ; pi) par strate sous la graine du plan, un seul jeu pour les tests",
+            "global, tranche et somme_tranches, un jeu par test par variable ; e est l'erreur due au nombre fini de",
+            "réplications, distincte de l'erreur d'estimation ;", ind)),
     c("tests", "erreur_monte_carlo",
       paste("erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre fini de réplications,",
             "distincte de l'erreur d'estimation")),
