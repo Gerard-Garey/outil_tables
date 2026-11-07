@@ -3190,9 +3190,17 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     sous sa clé, et se relit \code{identical()}. La lettre de l'ADR
     n'exigeait que la classe~: la reconstruction garantit qu'une table
     retouchée après le constructeur (lignes permutées, valeur de $q_x$ portée
-    hors de $[0, 1]$, attribut modifié) n'entre pas sous l'identité d'une table
-    contrôlée, et l'écriture d'essai qu'aucune métadonnée ne fera échouer
-    l'écriture de la fiche après tous les calculs (décision M249)~;
+    hors de $[0, 1]$, attribut ajouté, ou modifié vers une valeur que le
+    constructeur refuse) n'entre pas sous l'identité d'une table contrôlée,
+    et l'écriture d'essai qu'aucune métadonnée ne fera échouer l'écriture de
+    la fiche après tous les calculs (décision M249). Un objet égal à ce que
+    \code{table\_reference()} rendrait pour ses colonnes et ses
+    métadonnées (nom, source ou paramètres d'une table synthétique changés,
+    statut changé vers une valeur admise, $q_x$ modifié dans $[0, 1]$) passe
+    en revanche ce contrôle~: c'est lui, table réellement employée, que
+    portent l'empreinte et l'élément de fiche (une table passée au statut
+    \code{embarquee} est ensuite refusée, \code{table\_embarquee\_absente}
+    ou \code{table\_embarquee\_discordante})~;
   \item \textbf{clé citée et non reçue}, refus
     \code{table\_reference\_absente}~: une clé citée par un paramètre du
     plan (\code{cles\_citees()}, dans l'ordre de
@@ -3951,7 +3959,16 @@ l'ordre des refus en amont (\code{etape\_prealable\_manquante}) et en aval
 l'égalité du domaine de \code{forme\_graine()} et de celui de
 \code{canoniser\_plan()}, la graine canonique rendue et l'idempotence~;
 l'identité des tirages de \code{sous\_graine()} sous les graines
-\code{7} et \code{7L}.
+\code{7} et \code{7L}~; de bout en bout, un même plan muni des étapes
+\code{validation} (39~tirages de Monte-Carlo) et
+\code{importance\_exclusions}, sur un jeu simulé de 1\,500~têtes et une
+table de référence par sexe, construit sous la graine \code{20261106}
+(\code{double}) puis \code{20261106L}~: constructions \code{identical()}
+hors \code{execution}, fiches \code{identical()} et octets de
+\code{ecrire\_fiche()} égaux, graine du plan dans la fiche et graine de
+Monte-Carlo de type \code{integer}, et \code{rejouer\_fiche()} qui aboutit
+sur la fiche écrite puis relue, à une construction \code{identical()} hors
+\code{execution} à l'originale.
 \code{tests/test\_reproductibilite.R} vérifie que deux constructions
 identiques sont \code{identical()} hors \code{execution}, dans le même
 processus et dans un autre, et que le rejeu de la fiche redonne le même objet.\par}
@@ -9822,9 +9839,12 @@ niveau garanti sous H0 (i).~»~; si \code{fiche/avertissement\_unite} est
 présent (unité contrat sans identifiant de tête), la sur-dispersion
 $\varphi \ge 1$ qui rend les tests anti-conservateurs~; si l'appariement est
 \code{ensemble\_par\_sexe}, la table \code{ensemble} appliquée à chaque
-sexe~; l'absence de correction de multiplicité~; la formule des p-valeurs
-de Monte-Carlo, le chemin du nombre de tirages et l'erreur de Monte-Carlo~;
-la référence de méthode, avec renvoi à la colonne \code{statut} des
+sexe~; sous \code{independante} seulement, l'absence de correction de
+multiplicité, puis la formule des p-valeurs de Monte-Carlo, le chemin du
+nombre de tirages et l'erreur de Monte-Carlo (sous
+\code{ajustee\_hors\_outil}, aucune p-valeur n'est produite et aucun
+tirage n'est fait, décision M254)~; la référence de méthode, avec renvoi
+à la colonne \code{statut} des
 statistiques (section~\ref{sec:validation}). Ces textes ont été acceptés
 sans lecture de \code{regulatory} (décision M258). La section \emph{étape
 importance\_exclusions}, quand l'étape est au plan, s'ouvre sur la mention
@@ -9840,8 +9860,9 @@ puis viennent les tables de l'étape. La mention ne cite aucun texte~; elle
 nomme les deux notions, pertinence et justification, que la décision M69
 laisse à l'entreprise et au certificateur, et dit «~mesurent~» et
 «~permettent d'apprécier~», non «~décrivent~», parce que l'appréciation
-de l'importance relative revient à l'entreprise, non à l'outil (lecture de
-\code{regulatory})~; elle remplace le
+de l'importance relative revient à l'entreprise (fonction actuarielle,
+notice ACPR du 17/12/2015, orientation~14, §~56~b), non à l'outil (lecture
+de \code{regulatory})~; elle remplace le
 texte du plan, «~ces grandeurs décrivent l'importance des exclusions et ne
 disent pas si une exclusion est justifiée~», après lecture de
 \code{regulatory} et avis d'\code{actuary} (issue~\#69, commentaire
