@@ -293,13 +293,40 @@ empreinte_source <- function(racine) {
 # disponibilité sur la plateforme (issue #34).
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")
 
-# Première locale UTF-8 de LOCALES_UTF8 que Sys.setlocale accepte (LC_CTYPE,
+# Nom sûrement inventé, pour le critère de locale_utf8_disponible() (#109).
+LOCALE_INVENTEE <- "xx_XX.UTF-8"
+
+# Première locale de `candidats` que Sys.setlocale accepte (LC_CTYPE,
 # restaurée ensuite), "" si aucune : la disponibilité se sonde, ne se suppose
 # pas (C.UTF-8 n'existe pas sous Windows).
-locale_utf8_disponible <- function() {
-  ancienne <- Sys.getlocale("LC_CTYPE")
-  on.exit(Sys.setlocale("LC_CTYPE", ancienne))
-  for (l in LOCALES_UTF8) if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) return(l)
+# Sous l'UCRT de Windows, Sys.setlocale accepte pourtant tout nom inventé
+# (« xx_XX.UTF-8 », « yy_YY.utf8 », « en_XX.UTF-8 »…) et lui donne la culture
+# invariante (mesuré, R 4.3.3 ucrt : l10n_info(), mois, casse et tri ne
+# distinguent pas un nom inventé d'une locale réelle). Seul Sys.localeconv()
+# sous LC_MONETARY les distingue : int_curr_symbol « XDR » pour une culture
+# invariante, « USD » pour en_US.UTF-8, « EUR » pour fr_FR.UTF-8. Critère : un
+# candidat accepté est refusé si, posé sous LC_MONETARY, son int_curr_symbol
+# égale celui de LOCALE_INVENTEE ; actif seulement si LOCALE_INVENTEE est
+# elle-même acceptée (UCRT) : glibc la refuse, le critère n'y joue pas et rien
+# ne change. Un seul champ, int_curr_symbol : il est ASCII, donc indépendant de
+# la page de code. currency_symbol (« ¤ » pour une culture invariante) est rendu
+# dans la page de code de LC_CTYPE (a4 sous 1252, c2 a4 sous UTF-8) : comparé
+# entre la session (LC_CTYPE d'origine) et un candidat (LC_CTYPE posée), il
+# différerait. positive_sign diffère pour une langue réelle à pays inventé
+# (« en_XX.UTF-8 »), non pour une langue inventée. Limite résiduelle : un nom à
+# langue inventée et pays réel (« xx_US.UTF-8 », USD) échappe au critère.
+# LC_CTYPE et LC_MONETARY sont restaurées.
+locale_utf8_disponible <- function(candidats = LOCALES_UTF8) {
+  ancienne <- vapply(c("LC_CTYPE", "LC_MONETARY"), Sys.getlocale, "")
+  on.exit(for (n in names(ancienne)) Sys.setlocale(n, ancienne[[n]]))
+  devise <- function(l) if (nzchar(suppressWarnings(Sys.setlocale("LC_MONETARY", l))))
+    Sys.localeconv()[["int_curr_symbol"]]
+  inventee <- devise(LOCALE_INVENTEE)
+  for (l in candidats) {
+    if (!nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", l)))) next
+    if (!is.null(inventee) && identical(devise(l), inventee)) next
+    return(l)
+  }
   ""
 }
 
