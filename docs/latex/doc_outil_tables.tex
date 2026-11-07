@@ -3065,15 +3065,11 @@ section~\ref{sec:importance-exclusions})~; un nom de colonne ou un
 chemin non ASCII de codage indéterminé, sous la locale C, n'est plus refusé
 après tous les calculs, à l'écriture de la fiche, en erreur de
 programmation. Chaque contrôle n'y est exécuté qu'une fois
-(issue~\#22)~: \code{construire\_table()} appelle chaque fonction d'étape
-avec son argument interne \code{controler = FALSE}, sous lequel elle ne
-refait aucun de ces contrôles (ses paramètres et, selon l'étape, les rôles,
-la recette, la convention et la segmentation), et reprend les valeurs qui en dérivent par des fonctions
-qui ne contrôlent rien (\code{valeurs\_parametres\_donnees()},
-\code{recette\_branche()}, \code{convention\_retenue()}). Appelée
-directement, avec la valeur par défaut \code{controler = TRUE}, une fonction
-d'étape fait elle-même ses contrôles, chacun une fois, et en lève les
-refus~; seule la valeur \code{FALSE} les omet. Les étapes s'exécutent ensuite dans l'ordre du plan,
+(issues~\#22 et~\#82)~: \code{construire\_table()} transmet à chaque
+fonction d'étape les valeurs validées qui en dérivent (transition, période
+et délai par \code{valeurs\_parametres\_donnees()}, recette par
+\code{deduire\_recette()}, convention par \code{resoudre\_convention()}),
+et la fonction d'étape ne refait aucun de ces contrôles. Les étapes s'exécutent ensuite dans l'ordre du plan,
 chacune par sa fonction d'étape, qui rend ses paramètres effectifs, son
 résultat, ses diagnostics et ses avertissements~; l'étape \code{exposition}
 lit la table des observations de l'étape \code{donnees}~; l'étape \code{brut}
@@ -4852,12 +4848,10 @@ requis sont déclarés, ou refuse (\code{aucune\_recette}, le message nommant la
 recette et les rôles absents)~; dans \code{construire\_table()}, le même
 manque est détecté plus tôt par le contrôle des rôles, avec le même code et le
 module \code{donnees}. \code{construire\_table()} appelle
-\code{deduire\_recette()} une fois, avant toute étape~; la fonction d'étape,
-appelée avec \code{controler = FALSE} (section~\ref{sec:execution}), ne la
-rappelle pas et lit la recette de la branche, sa convention native et ses
-rôles requis par \code{recette\_branche()}, qui ne contrôle rien~; appelée
-directement, elle appelle \code{deduire\_recette()}. Cette lecture sans
-contrôle vaut tant que la branche n'a qu'une recette.
+\code{deduire\_recette()} une fois, avant toute étape, et transmet à la
+fonction d'étape la recette, sa convention native et ses rôles requis
+qu'elle rend~; la fonction d'étape ne la rappelle pas
+(section~\ref{sec:execution}).
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -5323,11 +5317,9 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{CONVENTION\_NATIVE} & constante & --- & convention native de chaque recette \\
 \catalogue{fonctions-exposition}{UNITES\_EXPOSITION} & constante & --- & unité de l'exposition par convention \\
 \catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE} & constante & --- & hypothèse de censure non informative, inscrite dans la fiche \\
-\catalogue{fonctions-exposition}{recette\_branche()} & interne & --- & recette de la branche, convention native, rôles requis, sans contrôle des rôles~; employée par \code{deduire\_recette()} et par \code{calculer\_exposition()} appelée avec \code{controler = FALSE} (issue~\#22) \\
-\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis (\code{recette\_branche()})~; refus \code{aucune\_recette} \\
+\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis~; refus \code{aucune\_recette} \\
 \catalogue{fonctions-exposition}{controler\_parametres\_exposition()} & interne & convention, \code{par\_annee} & refus des valeurs \\
-\catalogue{fonctions-exposition}{convention\_retenue()} & interne & convention demandée, native & convention demandée, native, retenue (la native pour \code{plus\_fine}, la demandée sinon) et forçage, sans contrôle~; employée par \code{resoudre\_convention()} et par \code{calculer\_exposition()} appelée avec \code{controler = FALSE} (issue~\#22) \\
-\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & convention retenue et forçage (\code{convention\_retenue()})~; refus \code{convention\_plus\_fine} \\
+\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & convention retenue (la native pour \code{plus\_fine}, la demandée sinon) et forçage~; refus \code{convention\_plus\_fine} \\
 \catalogue{fonctions-exposition}{an\_bissextile()} & interne & années & bissextilité grégorienne \\
 \catalogue{fonctions-exposition}{bissextiles\_anterieures()} & interne & années & nombre d'années bissextiles antérieures \\
 \catalogue{fonctions-exposition}{premier\_janvier()} & interne & années & jour du 1\textsuperscript{er}~janvier \\
