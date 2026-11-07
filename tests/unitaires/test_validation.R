@@ -418,7 +418,9 @@ verifier("étape : relation ajustee_hors_outil -> aucun tirage, sous-groupes san
   identical(v$resultat$monte_carlo$tirages_effectues, 0) && identical(v$parametres$parametres_estimes, NA_integer_) &&
     all(g$etat == "ddl_non_etabli") && all(is.na(g$p_centrale)) && !anyNA(g$smr) &&
     grepl("Relation « ajustee_hors_outil »", h, fixed = TRUE) &&
-    !grepl("seules les p-valeurs de Monte-Carlo ont un niveau garanti", h, fixed = TRUE)
+    !grepl("seules les p-valeurs de Monte-Carlo ont un niveau garanti", h, fixed = TRUE) &&
+    !grepl("Aucune correction de multiplicité", h, fixed = TRUE) &&
+    !grepl("p-valeurs de Monte-Carlo : p_MC = (1 + K) / (B + 1)", h, fixed = TRUE)
 })
 
 # États de cellule et décomptes (calculer_validation() en appel direct ; valeur

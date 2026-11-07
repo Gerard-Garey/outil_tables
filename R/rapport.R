@@ -2141,7 +2141,8 @@ corps_section <- function(x, k) {
                if (identical(pv[["relation_table"]], "independante")) paragraphe(m[["validation_hypotheses_tests"]]),
                if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
                if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
-               paragraphe(m[["validation_multiplicite"]]), paragraphe(m[["validation_monte_carlo"]]),
+               if (identical(pv[["relation_table"]], "independante"))
+                 c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[["validation_monte_carlo"]])),
                paragraphe(m[["validation_reference"]]),
                lignes_racines(x, racines)))
     }

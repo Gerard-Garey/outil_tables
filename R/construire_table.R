@@ -1015,9 +1015,12 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   #    le package, empreinte de chacune contre la fiche, puis contrôle 1.3
   #    sur la liste assemblée.
   tr <- controler_tables_rejeu(fiche[["tables_reference"]], tables_reference, plan, texte_lu(e[["code"]]))
-  # 7 ter. Contrôles d'entrée de la validation (ADR 0012, seconde annotation
-  #    du 06/11/2026, (c)) : un refus d'appariement arrête le rejeu sans
-  #    construire.
+  # 7 ter. Contrôles d'entrée de la validation (ADR 0012, annotations du
+  #    06/11/2026, seconde, (c), et quatrième) : un des cinq refus de
+  #    controler_entrees_validation() arrête le rejeu sans construire ; les
+  #    deux refus qui portent sur les cellules (cellule_sans_valeur_table,
+  #    taux_table_egal_un) ne peuvent être levés qu'en cours d'étape, par
+  #    construire_table().
   pv <- plan[["etapes"]][["validation"]]
   if (!is.null(pv))
     controler_entrees_validation(table_citee(tr$tables, pv[["table_reference"]]), pv[["table_reference"]],
