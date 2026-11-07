@@ -16,12 +16,14 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R7 sur l'entrée de référence (jeu_reference()),
+#  3.8) : plans R1 à R8 sur l'entrée de référence (jeu_reference()),
 #  aplatis, aller-retour exact du format, comparés à leur fichier de
 #  tests/reference/ (échec attendu renvoyant à l'issue de création tant que
-#  le fichier n'existe pas, liste SANS_REFERENCE : R7, #32), aucune
+#  le fichier n'existe pas, liste SANS_REFERENCE : R7, #32 ; R8, #166), aucune
 #  référence orpheline ; R7 : aucun double sans classe de tolérance, Σd par
-#  cellule égale aux evenements de l'exposition (#32) ; témoins sur des
+#  cellule égale aux evenements de l'exposition (#32) ; R8 : validation et
+#  importance des exclusions, table importée passée par tables_reference
+#  (#166) ; témoins sur des
 #  copies temporaires (jamais sur tests/reference/) ; règles des modes du
 #  workflow et lignes de commande produire_references.R (refus d'appel) et
 #  comparer_references.R ; permutation des lignes de l'entrée de référence
@@ -31,7 +33,7 @@
 #  transitions de changement de résultat annoncé (ADR 0009, point 9.5, #47) :
 #  liste unique TRANSITIONS_EN_COURS (vide hors transition), utilitaire
 #  générique et témoins de chaque nature, de l'union et du succès inattendu.
-#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R7 (sections et
+#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R8 (sections et
 #  leur ordre, cellules décimales en %.17g, textes fixes, section brut ; taille
 #  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
 #
@@ -315,7 +317,7 @@ unlink(c(script, sortie))
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
 # référence sur l'entrée de référence, aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R7, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R8, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
@@ -327,7 +329,7 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-SANS_REFERENCE <- c(R7 = "#32")
+SANS_REFERENCE <- c(R7 = "#32", R8 = "#166")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -653,7 +655,7 @@ issue_des_restes <- function(transitions) {
 # 5a95f9c : octets_lignes(sprintf("%d", x)) et octets_lignes(txt[match(j,
 # u)])). Les références ne comparent que le jeton de l'empreinte (ADR 0009,
 # seconde annotation du 20/10/2026) : l'égalité à l'oracle en garde la valeur,
-# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R7 ne
+# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R8 ne
 # portent aucun entier négatif (les dates s'écrivent en ISO, sans signe) : le
 # signe des entiers est gardé par les tests unitaires des écrivains, non par
 # cet oracle.
@@ -670,7 +672,7 @@ oracle_empreinte_resultat <- local({
   e$empreinte_resultat
 })
 
-# Rapport figé (#87, U24) : contrôles du document de R1 à R7 à 10^5 lignes
+# Rapport figé (#87, U24) : contrôles du document de R1 à R8 à 10^5 lignes
 # (spécification d'actuary du 24/10/2026, U14, U18, U21, U22, repris de
 # tests/unitaires/test_rapport.R) ; rend TRUE ou la liste des écarts.
 controler_rapport_fige <- function(x, l, id) {
@@ -720,8 +722,17 @@ controler_rapport_fige <- function(x, l, id) {
   rj <- section_de("rejeu")
   if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))
     e <- c(e, "U21 : rejeu")
-  if (!any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) ||
+  # Étape validation demandée (R8, #166) : le paragraphe « non demandée par le
+  # plan » est absent, la section porte la légende des cellules et des
+  # statistiques, et l'étape importance_exclusions a sa section.
+  valid <- !is.null(x$etapes$validation)
+  if (any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) == valid ||
       !any(grepl("<p>Table finale et comparaisons : non produites par cette version", l, fixed = TRUE))) e <- c(e, "U21 : sections 12 et 13")
+  legende <- function(sec, chemin) any(startsWith(section_de(sec), paste0("<caption><code>", chemin, "</code>")))
+  if (valid && !(legende("etape_validation", "etapes/validation/resultat/cellules") &&
+                 legende("etape_validation", "etapes/validation/resultat/statistiques") &&
+                 legende("etape_importance_exclusions", "etapes/importance_exclusions/resultat/retraits")))
+    e <- c(e, "U21 : sections validation et importance_exclusions")
   # U22 : section brut.
   b <- section_de("etape_brut")
   st <- grep("<caption><code>etapes/brut/parametres/statuts</code>", b, fixed = TRUE)
@@ -738,14 +749,14 @@ jeu_ref <- jeu_reference()
 aplatis <- list()
 for (p in plans_reference()) {
   id <- p$identifiant
-  x_ref <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan)
+  x_ref <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan, tables_reference = tables_du_plan(p))
   verifier(sprintf("%s : empreinte du résultat égale à celle de l'oracle d'avant #71 (écrivains des entiers et des dates par une chaîne par ligne)", id),
            grepl("^[0-9a-f]{32}$", x_ref$fiche$empreintes$resultat) &&
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
   # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
   # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
   verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 « identique », 14 « non vérifiée »", id), {
-    r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)))
+    r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)), tables_reference = tables_du_plan(p))
     identical(sans_execution(r$construction), sans_execution(x_ref)) &&
       identical(r$bilan$verdict[9:14], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
   })
@@ -774,6 +785,30 @@ for (p in plans_reference()) {
     sans <- doubles_sans_tolerance(g)
     if (length(sans)) paste("sans tolérance :", paste(utils::head(sans, 5L), collapse = ", ")) else TRUE
   })
+  # R8 (#166) : les clés de TOLERANCES des étapes validation et
+  # importance_exclusions commencent par le nom de l'étape (point 3.4, seconde
+  # annotation, (a)), pour les chemins de l'étape et pour l'écho du plan dans
+  # la fiche : une table de même nom d'une étape ultérieure (#167, #168) n'en
+  # hérite aucune classe. Deux clés concurrentes classent un même chemin sans
+  # désaccord de classe (les clés nues préexistantes sont de même classe).
+  if (id == "R8") {
+    verifier("R8 : tout double des étapes validation et importance_exclusions est classé par une clé qui commence par l'étape (point 3.4)", {
+      d <- names(g$types)[g$types == "double"]
+      d <- d[grepl("(^|/)etapes/(validation|importance_exclusions)/", d)]
+      etape <- sub("^.*etapes/(validation|importance_exclusions)/.*$", "\\1", d)
+      cle <- vapply(d, function(c_) tolerance_de(c_)$cle, "")
+      mal <- d[is.na(cle) | !startsWith(cle, paste0(etape, "/"))]
+      if (!length(d)) "aucun double d'étape trouvé"
+      else if (length(mal)) paste("clé non qualifiée par l'étape :", paste(utils::head(mal, 5L), collapse = ", "))
+      else TRUE
+    })
+    verifier("R8 : aucun chemin classé par deux clés de classes de tolérance différentes", {
+      d <- names(g$types)[g$types == "double"]
+      conflit <- d[vapply(d, function(c_) {
+        k <- cles_de(c_); length(unique(unname(TOLERANCES[k]))) > 1L }, NA)]
+      if (length(conflit)) paste("clés de classes différentes :", paste(utils::head(conflit, 5L), collapse = ", ")) else TRUE
+    })
+  }
   # R7 (#32) : Kaplan-Meier sous age_atteint_annee. Σd par cellule des sauts =
   # evenements de la cellule Kaplan-Meier = evenements de l'exposition (même
   # cellules, mêmes effectifs d'événements).
@@ -1115,6 +1150,45 @@ for (chemin_cellules in c("etapes/exposition/diagnostics/cellules", "etapes/brut
     g$types[[chemin_cellules]] <- "double"; g$valeurs[[chemin_cellules]] <- as.double(g$valeurs[[chemin_cellules]])
     chemin_cellules %in% doubles_sans_tolerance(g) && !chemin_cellules %in% doubles_sans_tolerance(g, masque)
   })
+}
+# Mêmes témoins pour R8 (#166, audit m1) : les trois chemins integer que les
+# clés nues cellules_retenues et evenements_retires auraient classés ; les clés
+# de R8 sont qualifiées (`<table>/<colonne>`) et n'atteignent que des doubles.
+for (chemin_ie in c("etapes/validation/diagnostics/cellules_retenues",
+                    "etapes/importance_exclusions/resultat/cellules_niveau_a/evenements_retires",
+                    "etapes/importance_exclusions/resultat/cellules_niveau_b/evenements_retires")) {
+  verifier(sprintf("témoin : %s remis en double -> relevé par doubles_sans_tolerance(), que la clé nue %s aurait masqué", chemin_ie, basename(chemin_ie)), {
+    g <- aplatis[["R8"]]
+    if (!identical(unname(g$types[chemin_ie]), "integer"))
+      return(sprintf("%s de R8 : un chemin integer attendu, type %s", chemin_ie, unname(g$types[chemin_ie])))
+    masque <- c(TOLERANCES, stats::setNames(0, basename(chemin_ie)))
+    g$types[[chemin_ie]] <- "double"; g$valeurs[[chemin_ie]] <- as.double(g$valeurs[[chemin_ie]])
+    chemin_ie %in% doubles_sans_tolerance(g) && !chemin_ie %in% doubles_sans_tolerance(g, masque)
+  })
+}
+# Une table de même nom sous une autre étape n'hérite d'aucune classe (#166,
+# point 3.4) : cellules, statistiques, retraits de R8 recopiés sous
+# `etapes/positionnement` et `etapes/homogeneite` (étapes simulées en mémoire,
+# #167 et #168) sont relevés par doubles_sans_tolerance(), que des clés
+# `<table>/<colonne>` auraient masqués. Les colonnes qu'une clé nue classe
+# (exposition_centrale, borne_*, niveau) restent classées sous toute étape :
+# limite des clés nues préexistantes, non testée.
+for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
+                       "etapes/validation/resultat/cellules/taux_table",
+                       "etapes/validation/resultat/statistiques/valeur",
+                       "etapes/validation/resultat/sous_groupes/smr",
+                       "etapes/importance_exclusions/resultat/retraits/exposition_centrale_retiree")) {
+  for (autre in c("positionnement", "homogeneite")) {
+    chemin_autre <- sub("^etapes/[a-z_]+/", paste0("etapes/", autre, "/"), chemin_etape)
+    verifier(sprintf("témoin : %s simulé sous une autre étape -> relevé par doubles_sans_tolerance()", chemin_autre), {
+      g <- aplatis[["R8"]]
+      if (!identical(unname(g$types[chemin_etape]), "double"))
+        return(sprintf("%s de R8 : un chemin double attendu", chemin_etape))
+      g$types[[chemin_autre]] <- g$types[[chemin_etape]]; g$valeurs[[chemin_autre]] <- g$valeurs[[chemin_etape]]
+      !chemin_etape %in% doubles_sans_tolerance(aplatis[["R8"]]) && chemin_autre %in% doubles_sans_tolerance(g) &&
+        !chemin_etape %in% doubles_sans_tolerance(g)
+    })
+  }
 }
 # Un plan listé dans SANS_REFERENCE et sans fichier n'a pas de référence
 # commitée à lire : son objet aplati est contrôlé par la boucle des plans
@@ -2097,27 +2171,28 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R7 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R8 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R7, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R8, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant
-    x <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan)
+    x <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan, tables_reference = tables_du_plan(p))
     verifier(sprintf("%s : lire_plan(ecrire_plan(plan)) identical() au plan", id),
              identical(lire_plan(ecrire_plan(p$plan)), p$plan))
     f <- lire_fiche(ecrire_fiche(x$fiche))
     verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
     # #57 : lignes reçues = lignes conservées + lignes distinctes exclues ;
-    # aucune exclusion déclarée dans R1 à R7, donc 0L et aucune ligne écartée.
+    # aucune exclusion déclarée dans R1 à R7, et R8 en déclare deux dont aucune règle ne
+    # touche l'entrée de référence : 0L et aucune ligne écartée.
     verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (0L, integer) (#57)", id),
              identical(x$fiche$nombre_lignes_exclues, 0L) &&
                nrow(jeu_ref$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
-    y <- construire_table(jeu_ref$donnees, f$roles, valider_plan(f$plan), f$provenance)
+    y <- construire_table(jeu_ref$donnees, f$roles, valider_plan(f$plan), f$provenance, tables_reference = tables_du_plan(p))
     verifier(sprintf("%s : rejeu sur le plan relu de la fiche écrite identical() hors execution", id),
              identical(sans_execution(y), sans_execution(x)))
     if (id != "R1") next
