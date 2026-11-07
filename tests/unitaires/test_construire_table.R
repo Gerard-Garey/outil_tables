@@ -1182,7 +1182,7 @@ local({
   # NA ; les autres motifs sont des NaN. Ce classement est celui de R (R_IsNA,
   # « True for R's NA only », R_ext/Arith.h), non une règle de l'ADR 0011 : le
   # test est le témoin d'un changement de R (avis d'actuary du 05/11/2026).
-  verifier("jetons des non finis : formes « empreinte » et « texte » identiques sur NA, NaN, Inf, -Inf et 7 motifs de NaN à charge utile, seuls ou mêlés à des finis", {
+  verifier("jetons des non finis : formes « empreinte » et « texte » identiques sur NA, NaN, Inf, -Inf et 8 motifs de NaN à charge utile, seuls ou mêlés à des finis", {
     motifs <- c("7ff8000000000000" = "NaN", "fff8000000000000" = "NaN", "7ff8000000000001" = "NaN",
                 "7ff80000000007a2" = "NA", "fff80000000007a2" = "NA", "7ff00000000007a2" = "NA",
                 "7ff0000000000001" = "NaN", "fff0000000000001" = "NaN")
