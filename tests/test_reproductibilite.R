@@ -370,7 +370,10 @@ SANS_REFERENCE_17 <- character(0)
 # Transitions #35 et #42 closes par la régénération unique de B4 (run CI
 # 39315172327, d18c269) ; transitions #57, #64 et #67 closes ensemble par la
 # régénération unique de B5 (run CI 39435673257, 5757c30 ; ADR 0009, point
-# 9.5). Liste vide.
+# 9.5). Transitions #73 (commit (1) de B13, ADR 0015, point 3.4 : fiche 5,
+# champ tables_reference) et #31 (commit (5) de B13 : textes des lignes 3,
+# 8, 9 et 12 de STATUTS_BRUT) closes par la régénération unique (R) de B13
+# (run CI 42257221627).
 TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
@@ -713,14 +716,14 @@ controler_rapport_fige <- function(x, l, id) {
   rj <- section_de("rejeu")
   if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))
     e <- c(e, "U21 : rejeu")
-  if (!any(grepl("<p>Validations : non produites par cette version", l, fixed = TRUE)) ||
+  if (!any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) ||
       !any(grepl("<p>Table finale et comparaisons : non produites par cette version", l, fixed = TRUE))) e <- c(e, "U21 : sections 12 et 13")
   # U22 : section brut.
   b <- section_de("etape_brut")
   st <- grep("<caption><code>etapes/brut/parametres/statuts</code>", b, fixed = TRUE)
   re <- grep("<caption><code>etapes/brut/resultat/", b, fixed = TRUE)
   if (length(st) != 1L || !length(re) || st > re[1L]) e <- c(e, "U22 : ordre des légendes")
-  if (any(startsWith(b, "<p>Intervalle binomial \u00ab exact \u00bb")) != ("binomial" %in% x$etapes$brut$parametres$estimateurs))
+  if (any(startsWith(b, "<p>Intervalles binomiaux (colonnes borne_inf_exacte")) != ("binomial" %in% x$etapes$brut$parametres$estimateurs))
     e <- c(e, "U22 : légende binomiale")
   if (id == "R6" && !any(grepl("^<tr><td>etapes/brut/resultat/kaplan_meier_sauts</td><td>data.frame</td><td>[0-9]+</td><td>non reproduites", b)))
     e <- c(e, "U22 : kaplan_meier_sauts")
@@ -737,10 +740,10 @@ for (p in plans_reference()) {
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
   # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
   # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
-  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 8 à 12 « identique », 13 « non vérifiée »", id), {
+  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 « identique », 14 « non vérifiée »", id), {
     r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)))
     identical(sans_execution(r$construction), sans_execution(x_ref)) &&
-      identical(r$bilan$verdict[8:13], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
+      identical(r$bilan$verdict[9:14], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
   })
   # Rapport figé (#87, U24, U25) : contrôles du document ; taille (octets) et
   # durée du rendu imprimées (constat, sans seuil ; critère 7 de #87).

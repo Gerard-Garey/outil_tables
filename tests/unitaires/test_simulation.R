@@ -305,9 +305,9 @@ for (cas in list(list(age_min = 21, age_max = 75, ages = 21:120),
 # par la période. Décompte D des événements datés avant anniv(x+1) =
 # 2017-03-15. Sous le modèle simulé, D ~ Binomiale(n, p), p exact.
 # Région d'acceptation bilatérale exacte [qbinom(a_k/2), qbinom(1 - a_k/2)] ;
-# Bonferroni, alpha global 10^-3, K = 5, a_k = 2.10^-4. Fausse alarme exacte
+# inégalité de l'union, alpha global 10^-3, K = 5, a_k = 2.10^-4. Fausse alarme exacte
 # de chaque test FA_k = P(D < lo) + P(D > hi). Fausse alarme familiale :
-# borne de Bonferroni sum(FA_k) <= alpha, vérifiée, qui ne suppose aucune
+# borne par l'inégalité de l'union sum(FA_k) <= alpha, vérifiée, qui ne suppose aucune
 # indépendance ; la valeur 1 - prod(1 - FA_k) est donnée pour information,
 # valable sous indépendance des cohortes (hypothèse usuelle sur le
 # générateur, graines distinctes), non démontrée. La graine est fixe : le
@@ -357,7 +357,7 @@ for (k in seq_len(K)) {
   verifier(ligne, d >= lo && d <= hi)
 }
 ligne <- sprintf(paste("constat : fausse alarme familiale <= sum(FA_k) = %.4g <= alpha global %g",
-                       "(borne de Bonferroni, K = %d, sans hypothèse d'indépendance) ;",
+                       "(inégalité de l'union, K = %d, sans hypothèse d'indépendance) ;",
                        "1 - prod(1 - FA_k) = %.4g sous indépendance des cohortes (hypothèse usuelle",
                        "sur le générateur)"), sum(fa), ALPHA, K, 1 - prod(1 - fa))
 cat("  ", ligne, "\n", sep = "")
@@ -869,7 +869,7 @@ cat(sprintf(paste("  famille B, informatif (sans verdict) : décès unité contr
 # + j) rho) (1 - e^{-(mu + (c + j) rho)}) (forme close ; recoupement par
 # stats::integrate). Têtes à k lignes ~ Bin(n, p_k) (aucun contrat non
 # souscrit : toutes les entrées valent e_(1)). Sept tests binomiaux,
-# Bonferroni, alpha = 10^-3, a_k = alpha / 7 ; régions bilatérales exactes
+# inégalité de l'union, alpha = 10^-3, a_k = alpha / 7 ; régions bilatérales exactes
 # [qbinom(a_k/2), qbinom(1 - a_k/2)] et fausses alarmes exactes FA_k,
 # recalculées ici et comparées à celles de la spécification.
 N_A <- 3e5; ALPHA_A <- 1e-3; K_A <- 7L; A_K <- ALPHA_A / K_A; GRAINE_A <- 20261025L
@@ -938,7 +938,7 @@ for (k in seq_len(K_A)) {
   cat("  ", ligne, "\n", sep = "")
   verifier(ligne, OBSERVE_A[k] >= lo && OBSERVE_A[k] <= hi)
 }
-ligne <- sprintf(paste("famille A : fausse alarme familiale <= sum(FA_k) = %.4g <= alpha = %g (Bonferroni, K = %d,",
+ligne <- sprintf(paste("famille A : fausse alarme familiale <= sum(FA_k) = %.4g <= alpha = %g (inégalité de l'union, K = %d,",
                        "sans hypothèse d'indépendance ; spécification : 9,566e-4)"), sum(fa_a), ALPHA_A, K_A)
 cat("  ", ligne, "\n", sep = "")
 verifier(ligne, sum(fa_a) <= ALPHA_A && isTRUE(proche(signif(sum(fa_a), 4), 9.566e-4, rel = 1e-12, abs = 0)))

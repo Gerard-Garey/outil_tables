@@ -8,12 +8,18 @@
 #  - controler_roles() : refus au niveau des rôles (liste fermée) ;
 #  - evaluer_motifs() : motifs de ligne et motifs de tête (liste fermée
 #    MOTIFS_LIGNES, MOTIFS_TETE), évaluation exhaustive, sans court-circuit ;
+#    lignes d'évaluation des motifs de tête désignables (#69) ;
+#  - construire_observations() : unité d'observation, observations et
+#    fusion par tête sur des lignes retenues (#69) ;
 #  - preparer_donnees() : fonction d'étape `donnees` — refus par défaut,
 #    exclusions déclarées (comptées, listées, lignes conservées inchangées),
 #    unité d'observation et fusion par tête, relevés non bloquants,
 #    avertissements inscrits dans le résultat ;
 #  - table_reference() : représentation commune d'une table de référence et
-#    son contrôle (exportée).
+#    son contrôle, lignes dans l'ordre canonique (exportée ; ADR 0015,
+#    point 2.1) ;
+#  - TABLES_EMBARQUEES, table_embarquee() : catalogue des tables embarquées
+#    (vide) et son accesseur (exporté ; ADR 0015, point 6).
 #
 #  Conventions de temps (A.0) : une date est un jour ; un intervalle
 #  d'observation est [entrée, sortie) ; une ligne `en_cours` est ouverte à
@@ -433,8 +439,12 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
 
 # --- motifs de ligne et de tête (A.1) -----------------------------------------
 
-# Groupes (entiers) dont la valeur v n'est pas constante.
+# Groupes (entiers) qui portent au moins deux valeurs valides distinctes de
+# v : une valeur manquante est ignorée ((H, F, NA) hétérogène, (H, NA) non ;
+# #69, décision d'actuary).
 groupes_heterogenes <- function(g, v) {
+  ok <- !is.na(v)
+  g <- g[ok]; v <- v[ok]
   o <- order(g, v, method = "radix")
   gs <- g[o]; vs <- v[o]
   prem <- !duplicated(gs); dern <- !duplicated(gs, fromLast = TRUE)
@@ -466,11 +476,28 @@ deces_par_tete <- function(g, sor, cause) {
 # Évalue tous les motifs sur toutes les lignes (aucun court-circuit ; un
 # motif de comparaison n'est pas levé si l'une de ses valeurs est NA). Les
 # motifs de tête sont évalués sur les lignes exemptes de motif de ligne et
-# s'appliquent aux lignes propres de la tête. Rend list(motifs) : liste
-# nommée code -> numéros de ligne (1-based, croissants), dans l'ordre
-# MOTIFS_LIGNES puis MOTIFS_TETE (integer(0) pour un motif sans objet).
-evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation) {
+# s'appliquent aux lignes propres de la tête ; une valeur manquante (sexe
+# hors modalités compris) n'y rend pas une tête incohérente (#69). Rend
+# list(motifs) : liste nommée code -> numéros de ligne (1-based, croissants),
+# dans l'ordre MOTIFS_LIGNES puis MOTIFS_TETE (integer(0) pour un motif sans
+# objet).
+#   lignes_tete : facultatif (#69) ; NULL (défaut) : motifs de tête évalués
+#                 sur les lignes exemptes de motif de ligne ; sinon, numéros
+#                 (integer sans attribut, sans NA ni doublon, dans
+#                 1..nrow(donnees)) des lignes sur lesquelles ils sont
+#                 évalués et auxquelles ils s'appliquent, quels que soient
+#                 leurs motifs de ligne (contrefactuel sans exclusions).
+#                 Les motifs de ligne n'en dépendent pas. Une ligne désignée
+#                 sans identifiant de tête, sans cause de sortie ou sans
+#                 date de sortie hors « en_cours » (motifs non mesurables,
+#                 #69, § 2) est une erreur de programmation.
+evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lignes_tete = NULL) {
   n <- nrow(donnees)
+  if (!is.null(lignes_tete) && (!is.integer(lignes_tete) || !is.null(attributes(lignes_tete)) ||
+                                anyNA(lignes_tete) || anyDuplicated(lignes_tete) ||
+                                any(lignes_tete < 1L | lignes_tete > n)))
+    stop(paste("evaluer_motifs() : lignes_tete hors de la forme admise (integer sans attribut, sans NA ni",
+               "doublon, dans 1..nrow(donnees)) (erreur de programmation)."), call. = FALSE)
   col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
   jours <- function(role) as.numeric(unclass(col(role)))
   nai <- jours("date_naissance"); ent <- jours("date_entree"); sor <- jours("date_sortie")
@@ -510,7 +537,11 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation) {
 
   t <- stats::setNames(rep(list(logical(n)), length(MOTIFS_TETE)), MOTIFS_TETE)
   if (!is.null(id_t)) {
-    propres <- which(!Reduce(`|`, m))
+    if (!is.null(lignes_tete) &&
+        any(m$id_tete_manquant[lignes_tete] | m$cause_manquante[lignes_tete] | m$sortie_manquante[lignes_tete]))
+      stop(paste("evaluer_motifs() : lignes_tete désigne une ligne sans identifiant de tête, sans cause de sortie",
+                 "ou sans date de sortie hors « en_cours » (erreur de programmation)."), call. = FALSE)
+    propres <- if (is.null(lignes_tete)) which(!Reduce(`|`, m)) else lignes_tete
     g <- match(id_t[propres], unique(id_t[propres]))
     marquer <- function(groupes) {
       x <- logical(n)
@@ -518,8 +549,10 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation) {
       x
     }
     t$tete_naissance_incoherente <- marquer(groupes_heterogenes(g, nai[propres]))
-    if (!is.null(sexe))
-      t$tete_sexe_incoherent <- marquer(groupes_heterogenes(g, sexe[propres]))
+    if (!is.null(sexe)) {
+      sexe_t <- sexe[propres]; sexe_t[!(sexe_t %in% MODALITES_SEXE)] <- NA
+      t$tete_sexe_incoherent <- marquer(groupes_heterogenes(g, sexe_t))
+    }
     if (!is.null(segment) && "segment" %in% segmentation)
       t$tete_segment_incoherent <- marquer(groupes_heterogenes(g, as.character(segment[propres])))
     # Lecture B d'E2.4 (décision du mainteneur du 16/10/2026) : motif si le
@@ -653,13 +686,92 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
             list(lignes_exclues = length(exclues)))
 
   # Unité d'observation (E2.4, M46) et observations.
-  col <- function(role) if (role %in% names(roles)) conservees[[roles[[role]]]] else NULL
+  ob <- construire_observations(conservees, numeros, roles, segmentation, p)
+  unite <- ob$unite; observations <- ob$observations; releves <- ob$releves
+
+  # Avertissements (ADR 0007, point 6.5).
+  avert <- avertissements_vides()
+  # Unité contrat sous une transition qui porte sur la tête : aucun id_tete
+  # déclaré (construire_observations()).
+  if (p$transition$etat_de == "tete" && unite == "contrat")
+    avert <- avertir(avert, "donnees", "unite_contrat",
+                     paste("Unité d'observation : contrat (aucun identifiant de tête déclaré) ;",
+                           "une tête titulaire de plusieurs contrats est comptée plusieurs fois,",
+                           "ce qui surestime l'exposition et peut compter plusieurs fois un même décès."),
+                     nrow(observations))
+  for (s in setdiff(intersect(ROLES_SEGMENTATION, names(roles)), segmentation))
+    avert <- avertir(avert, "donnees", "role_non_employe",
+                     sprintf("Rôle « %s » déclaré, non employé par la segmentation du plan (contrôlé seulement).", s),
+                     1)
+  for (x in exclusions[lengths(motifs[exclusions]) > 0L])
+    avert <- avertir(avert, "donnees", "exclusion",
+                     sprintf("Exclusion déclarée « %s » : %d ligne(s) écartée(s).", x, length(motifs[[x]])),
+                     length(motifs[[x]]))
+  libelles <- c(chevauchements = "contrat(s) chevauchant le précédent d'une même tête",
+                disjoints = "intervalle(s) disjoint(s) du précédent d'une même tête (trou non exposé)",
+                ecarts_un_jour = paste("écart(s) d'un jour entre contrats d'une même tête (date de fin",
+                                       "inclusive probable ; non comblé)"),
+                fenetres_vides = "observation(s) sans intersection avec la période d'observation",
+                observations_apres_deces_hors_periode = paste(
+                  "tête(s) dont un contrat est observé après le premier décès de la tête, survenu",
+                  "à partir de la fin effective de la période (contrôle par identifiant de tête ;",
+                  "non refusé, E2.4, lecture B)"))
+  # Relevés de fusion : avertis quand l'unité est la tête (ils décrivent la
+  # fusion) ; pour l'unité contrat, restitués dans les diagnostics seulement.
+  # Fenêtres vides et observations après décès hors période : avertis dans
+  # toutes les unités.
+  for (r in names(libelles))
+    if (!is.na(releves[[r]]) && releves[[r]] > 0L &&
+        (unite == "tete" || r %in% c("fenetres_vides", "observations_apres_deces_hors_periode")))
+      avert <- avertir(avert, "donnees", r, sprintf("Relevé : %d %s.", releves[[r]], libelles[[r]]),
+                       releves[[r]])
+
+  list(
+    parametres = list(transition = p$transition$code, unite_observation = unite,
+                      segmentation = segmentation, exclusions = exclusions,
+                      fin_effective = structure(p$borne - 1, class = "Date")),
+    resultat = list(lignes_conservees = conservees, numeros_conserves = numeros,
+                    exclusions = data.frame(motif = exclusions,
+                                            nombre = unname(lengths(motifs[exclusions])),
+                                            stringsAsFactors = FALSE),
+                    lignes_exclues = motifs[exclusions],
+                    nombre_lignes_exclues = length(exclues),
+                    unite_observation = unite, observations = observations,
+                    observation_des_lignes = ob$observation_des_lignes),
+    diagnostics = list(motifs = data.frame(motif = names(motifs),
+                                           nature = rep(c("ligne", "tete"),
+                                                        c(length(MOTIFS_LIGNES), length(MOTIFS_TETE))),
+                                           nombre = unname(nombre),
+                                           exclu = names(motifs) %in% exclusions,
+                                           stringsAsFactors = FALSE),
+                       lignes_porteuses = length(unique(unlist(motifs, use.names = FALSE))),
+                       releves = releves),
+    avertissements = avert
+  )
+}
+
+# --- observations de l'unité d'observation (E2.4, M46) ------------------------
+
+# Observations de l'unité d'observation sur des lignes déjà retenues : unité
+# (tête si la transition porte sur la tête et que id_tete est déclaré, sinon
+# contrat), fusion par tête, relevés. Extraite de preparer_donnees() à
+# résultats identiques (#69) ; l'étape importance_exclusions la rappelle sur
+# le contrefactuel sans exclusions (une seule implémentation de la fusion).
+#   lignes        : data.frame des lignes retenues (colonnes de l'entrée) ;
+#   numeros       : numéros de ces lignes dans l'entrée (1-based, croissants) ;
+#   roles         : vecteur nommé rôle -> colonne ;
+#   segmentation  : sous-ensemble de c("sexe", "segment"), vide admis ;
+#   p             : valeurs_parametres_donnees() (transition, debut, borne).
+# Rend list(unite, observations, observation_des_lignes, releves) : champs
+# unite_observation, observations et observation_des_lignes du résultat de
+# preparer_donnees() ; releves, ses diagnostics$releves.
+construire_observations <- function(lignes, numeros, roles, segmentation, p) {
+  col <- function(role) if (role %in% names(roles)) lignes[[roles[[role]]]] else NULL
   ent <- as.numeric(unclass(col("date_entree"))); sor <- as.numeric(unclass(col("date_sortie")))
   cause <- as.character(col("cause_sortie"))
   fin <- sor; fin[cause == "en_cours"] <- Inf
   id_t <- col("id_tete")
   unite <- if (p$transition$etat_de == "tete" && !is.null(id_t)) "tete" else "contrat"
-  avert <- avertissements_vides()
   releves <- list(tetes = NA_integer_, tetes_multi_contrats = NA_integer_,
                   chevauchements = NA_integer_, contiguites = NA_integer_,
                   disjoints = NA_integer_, ecarts_un_jour = NA_integer_)
@@ -672,9 +784,10 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
     releves <- c(list(tetes = length(tab), tetes_multi_contrats = sum(tab > 1L)),
                  lapply(fusion$releves, as.integer))
     # Têtes observées après un premier décès s_d >= borne (lecture B d'E2.4),
-    # quelle que soit l'unité (M48), sur les seules lignes conservées : une
-    # tête écartée par une exclusion déclarée n'est pas comptée ; une tête
-    # dont une ligne seulement est exclue l'est sur ses lignes conservées.
+    # quelle que soit l'unité (M48), sur les seules lignes reçues (dans
+    # preparer_donnees(), les lignes conservées) : une tête écartée par une
+    # exclusion déclarée n'est pas comptée ; une tête dont une ligne
+    # seulement est exclue l'est sur ses lignes conservées.
     dt <- deces_par_tete(g, sor, cause)
     hors_periode <- sum(dt$apres & dt$premier_deces >= p$borne)
   }
@@ -735,62 +848,8 @@ preparer_donnees <- function(donnees, roles, transition, periode, delai_declarat
   releves$observations <- nrow(observations)
   releves$observations_apres_deces_hors_periode <- hors_periode
 
-  # Avertissements (ADR 0007, point 6.5).
-  if (p$transition$etat_de == "tete" && is.null(id_t))
-    avert <- avertir(avert, "donnees", "unite_contrat",
-                     paste("Unité d'observation : contrat (aucun identifiant de tête déclaré) ;",
-                           "une tête titulaire de plusieurs contrats est comptée plusieurs fois,",
-                           "ce qui surestime l'exposition et peut compter plusieurs fois un même décès."),
-                     nrow(observations))
-  for (s in setdiff(intersect(ROLES_SEGMENTATION, names(roles)), segmentation))
-    avert <- avertir(avert, "donnees", "role_non_employe",
-                     sprintf("Rôle « %s » déclaré, non employé par la segmentation du plan (contrôlé seulement).", s),
-                     1)
-  for (x in exclusions[lengths(motifs[exclusions]) > 0L])
-    avert <- avertir(avert, "donnees", "exclusion",
-                     sprintf("Exclusion déclarée « %s » : %d ligne(s) écartée(s).", x, length(motifs[[x]])),
-                     length(motifs[[x]]))
-  libelles <- c(chevauchements = "contrat(s) chevauchant le précédent d'une même tête",
-                disjoints = "intervalle(s) disjoint(s) du précédent d'une même tête (trou non exposé)",
-                ecarts_un_jour = paste("écart(s) d'un jour entre contrats d'une même tête (date de fin",
-                                       "inclusive probable ; non comblé)"),
-                fenetres_vides = "observation(s) sans intersection avec la période d'observation",
-                observations_apres_deces_hors_periode = paste(
-                  "tête(s) dont un contrat est observé après le premier décès de la tête, survenu",
-                  "à partir de la fin effective de la période (contrôle par identifiant de tête ;",
-                  "non refusé, E2.4, lecture B)"))
-  # Relevés de fusion : avertis quand l'unité est la tête (ils décrivent la
-  # fusion) ; pour l'unité contrat, restitués dans les diagnostics seulement.
-  # Fenêtres vides et observations après décès hors période : avertis dans
-  # toutes les unités.
-  for (r in names(libelles))
-    if (!is.na(releves[[r]]) && releves[[r]] > 0L &&
-        (unite == "tete" || r %in% c("fenetres_vides", "observations_apres_deces_hors_periode")))
-      avert <- avertir(avert, "donnees", r, sprintf("Relevé : %d %s.", releves[[r]], libelles[[r]]),
-                       releves[[r]])
-
-  list(
-    parametres = list(transition = p$transition$code, unite_observation = unite,
-                      segmentation = segmentation, exclusions = exclusions,
-                      fin_effective = structure(p$borne - 1, class = "Date")),
-    resultat = list(lignes_conservees = conservees, numeros_conserves = numeros,
-                    exclusions = data.frame(motif = exclusions,
-                                            nombre = unname(lengths(motifs[exclusions])),
-                                            stringsAsFactors = FALSE),
-                    lignes_exclues = motifs[exclusions],
-                    nombre_lignes_exclues = length(exclues),
-                    unite_observation = unite, observations = observations,
-                    observation_des_lignes = composante_ligne),
-    diagnostics = list(motifs = data.frame(motif = names(motifs),
-                                           nature = rep(c("ligne", "tete"),
-                                                        c(length(MOTIFS_LIGNES), length(MOTIFS_TETE))),
-                                           nombre = unname(nombre),
-                                           exclu = names(motifs) %in% exclusions,
-                                           stringsAsFactors = FALSE),
-                       lignes_porteuses = length(unique(unlist(motifs, use.names = FALSE))),
-                       releves = releves),
-    avertissements = avert
-  )
+  list(unite = unite, observations = observations, observation_des_lignes = composante_ligne,
+       releves = releves)
 }
 
 # --- table de référence (A.1 ; ADR 0007, point 7) ------------------------------
@@ -801,7 +860,8 @@ FORMES_ORIGINE <- c("qx", "lx")
 
 # Construit une table de référence (classe S3 `table_reference` sur un
 # data.frame long : age entier, sexe, qx, et annee entier si fournie) et la
-# contrôle ; refuse (module donnees) au lieu de corriger.
+# contrôle ; refuse (module donnees) au lieu de corriger. Lignes rendues dans
+# l'ordre canonique (sexe, annee, age), row.names automatiques.
 #   x            : data.frame (age, sexe, qx [, annee]) ;
 #   nom, source  : chaînes non vides (source : arrêté, URL, fichier de
 #                  provenance) ;
@@ -886,33 +946,65 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             list(lignes = hors_bornes))
   age <- as.integer(x$age)
   annee <- if ("annee" %in% names(x)) as.integer(x$annee) else NULL
-  cle <- if (is.null(annee)) sexe else paste(sexe, annee, sep = "\r")
-  doublons <- which(duplicated(paste(cle, age, sep = "\r")))
+  # Ordre canonique (ADR 0015, point 2.1 ; M235) : rang du sexe dans
+  # SEXES_TABLE (par match(), jamais par un tri de chaînes), puis annee si
+  # présente, puis age ; tri radix stable, indépendant de la locale. L'objet
+  # rendu et son empreinte ne dépendent plus de l'ordre reçu (aucun refus
+  # d'âges non croissants). Doublons et trous s'évaluent sur l'ordre trié ;
+  # les lignes sont citées dans la numérotation reçue (o[k]).
+  rang <- match(sexe, SEXES_TABLE)
+  o <- if (is.null(annee)) order(rang, age, method = "radix") else order(rang, annee, age, method = "radix")
+  n <- length(o)
+  # Même groupe (sexe, annee) que la ligne triée précédente ; comparaison et
+  # non diff() : une différence d'années extrêmes déborderait les integer.
+  meme <- c(FALSE, rang[o][-1L] == rang[o][-n])
+  if (!is.null(annee)) meme <- meme & c(FALSE, annee[o][-1L] == annee[o][-n])
+  pas <- c(NA_integer_, diff(age[o]))  # âges >= 0 : aucun débordement
+  # Ligne reçue la plus tardive de chaque doublon (tri stable), en
+  # numérotation reçue croissante.
+  doublons <- sort(o[which(meme & pas == 0L)])
   if (length(doublons))
     refuser("donnees", "table_age_double",
             formuler("Table « %s » : âge en double au sein d'un même sexe%s, lignes %s.", nom_cite,
                      if (is.null(annee)) "" else formuler(" et d'une même année"),
                      paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = doublons))
-  # Âges croissants et contigus par (sexe, annee), dans l'ordre reçu.
-  g <- match(cle, unique(cle))
-  o <- order(g, method = "radix")  # tri stable : ordre reçu au sein du groupe
-  pas <- diff(age[o]); meme <- diff(g[o]) == 0L
-  decroit <- which(meme & pas < 0L)
-  if (length(decroit))
-    refuser("donnees", "table_ages_non_croissants",
-            formuler("Table « %s » : âges non croissants au sein d'un même sexe, lignes %s.", nom_cite,
-                     paste(utils::head(o[decroit + 1L], NB_LIGNES_CITEES), collapse = ", ")),
-            list(lignes = o[decroit + 1L]))
+  # Âges contigus par (sexe, annee) : un pas supérieur à 1 est un trou, cité
+  # par la paire des lignes qui l'encadrent dans l'ordre canonique ;
+  # details$lignes : ligne qui suit le trou.
   trous <- which(meme & pas > 1L)
   if (length(trous))
     refuser("donnees", "table_ages_non_contigus",
             formuler("Table « %s » : âges non contigus (âge manquant) au sein d'un même sexe, entre les lignes %s.",
-                     nom_cite, paste(sprintf("%d et %d", o[trous], o[trous + 1L])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
+                     nom_cite, paste(sprintf("%d et %d", o[trous - 1L], o[trous])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
                                 collapse = ", ")),
-            list(lignes = o[trous + 1L]))
-  t <- data.frame(age = age, sexe = sexe, qx = as.numeric(x$qx), stringsAsFactors = FALSE)
-  if (!is.null(annee)) t$annee <- annee
+            list(lignes = o[trous]))
+  # Colonnes construites par sous-indiçage [o], jamais x[o, ] : row.names
+  # automatiques, aucun attribut de colonne reçu.
+  t <- data.frame(age = age[o], sexe = sexe[o], qx = as.numeric(x$qx)[o], stringsAsFactors = FALSE)
+  if (!is.null(annee)) t$annee <- annee[o]
   structure(t, class = c("table_reference", "data.frame"), nom = nom, statut = statut,
             source = source, forme_origine = forme_origine, parametres = parametres)
+}
+
+# Catalogue des tables embarquées (ADR 0015, point 6 ; décision Q2 du
+# 06/11/2026) : liste nommée par `nom` d'objets table_reference de statut
+# embarquee, lue à l'installation. Vide tant que la branche de transcription
+# n'embarque aucune table : toute table de statut embarquee est refusée
+# (table_embarquee_absente).
+TABLES_EMBARQUEES <- structure(list(), names = character(0))
+
+# Table embarquée de nom `nom` (ADR 0015, point 6.2), objet table_reference
+# rendu tel qu'il est au catalogue ; refuse (module donnees) un nom absent du
+# catalogue, ou qui n'est pas une chaîne unique. Exportée (appelants :
+# application, tiers qui rejoue).
+table_embarquee <- function(nom) {
+  noms <- attr(TABLES_EMBARQUEES, "names", exact = TRUE)
+  if (!chaine_unique(nom) || !(nom %in% noms))
+    refuser("donnees", "table_embarquee_absente",
+            formuler("Table embarquée « %s » : ce package n'embarque aucune table de ce nom (tables embarquées : %s).",
+                     if (chaine_unique(nom)) citer(nom) else formuler("nom illisible"),
+                     if (length(noms)) liste_guillemets(noms) else formuler("aucune")),
+            list(lu = nom, attendu = noms))
+  TABLES_EMBARQUEES[[nom]]
 }

@@ -11,29 +11,29 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 9V74 80-Core Processor
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
+# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 1e7565ea0a96a9eb93b861f21cd2ca94f2ae6117
+# plateforme consignée : GITHUB_SHA                    : 3620ec347986a1e2ba743d66c157b5e391c229ec
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
-# fiche$plateforme/release : 6.17.0-1022-azure
+# fiche$plateforme/release : 7.0.0-1017-azure
 # fiche$plateforme/machine : x86_64
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
-# fiche$empreintes/resultat : ba93834c033ef325ba5b19b0906a4c9a
-# fiche$empreintes/code : 369798534cf73b02f9aa20f1bc72e2ba
-# commit : 1e7565ea0a96a9eb93b861f21cd2ca94f2ae6117
-# execution : 40311393253
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/40311393253
+# fiche$empreintes/resultat : 9cdd4718dad40a00bd44933d62030d4e
+# fiche$empreintes/code : b6ce4419ed7b1f50543fe860bca4e48e
+# commit : 3620ec347986a1e2ba743d66c157b5e391c229ec
+# execution : 42257221627
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42257221627
 # mode : regeneration
-# date : 2026-10-26 10:58:00 UTC
+# date : 2026-11-06 16:58:23 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -135,9 +135,9 @@ etapes/brut/parametres/statuts/@lignes	integer	1	9
 etapes/brut/parametres/statuts/estimateur	character	9	"poisson"	"poisson"	"poisson"	"poisson"	"poisson"	"poisson"	"binomial"	"binomial"	"binomial"
 etapes/brut/parametres/statuts/grandeur	character	9	"taux"	"taux"	"taux"	"probabilite"	"probabilite"	"probabilite"	"taux"	"taux"	"taux"
 etapes/brut/parametres/statuts/intervalle	character	9	"sans objet (estimation ponctuelle)"	"exact"	"asymptotique"	"sans objet (estimation ponctuelle)"	"exact"	"asymptotique"	"sans objet (estimation ponctuelle)"	"exact"	"asymptotique"
-etapes/brut/parametres/statuts/statut	character	9	"résultat exact : maximum de vraisemblance du modèle à force constante dans la cellule"	"exact sous la loi supposée : couverture >= niveau pour tout mu, E^c tenue pour fixe ; sous le modèle de survie (E^c aléatoire), couverture seulement asymptotique"	"asymptotique (mu E^c -> infini) ; non défini à D = 0"	"résultat exact : image du maximum de vraisemblance par q = 1 - exp(-mu) (invariance du maximum de vraisemblance), force constante sur la cellule entière"	"exact sous la loi supposée (transformation croissante des bornes exactes du taux : couverture identique)"	"asymptotique (transformation croissante des bornes asymptotiques du taux : même régime) ; non défini à D = 0"	"estimateur des moments : E[D] = q E[E^i] exactement sous l'hypothèse de répartition ; convergent ; non sans biais à effectif fini"	"exact sous la loi supposée si E^i est entier ; si E^i n'est pas entier, prolongement continu de la formule exacte : couverture non établie"	"asymptotique (E^i q(1-q) -> infini) ; non défini à D = 0 et à D = E^i"
+etapes/brut/parametres/statuts/statut	character	9	"résultat exact : maximum de vraisemblance du modèle à force constante dans la cellule"	"exact sous la loi supposée : couverture >= niveau pour tout mu, E^c tenue pour fixe ; sous le modèle de survie (E^c aléatoire), couverture seulement asymptotique"	"asymptotique (mu E^c -> infini) ; non défini à D = 0"	"résultat exact : image du maximum de vraisemblance par q = 1 - exp(-mu) (invariance du maximum de vraisemblance), force constante sur la cellule entière"	"exact sous la loi supposée (transformation croissante des bornes exactes du taux : couverture identique)"	"asymptotique (transformation croissante des bornes asymptotiques du taux : même régime) ; non défini à D = 0"	"estimateur des moments : E[D] = q E[E^i] exactement sous l'hypothèse de répartition ; convergent ; non sans biais à effectif fini"	"exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, E^i entier) ; avec une entrée ou une censure dans la cellule, couverture non établie, même si E^i est entier (prolongement continu de la formule exacte si E^i n'est pas entier)"	"asymptotique (E^i q(1-q) -> infini) pour une cellule observée entière ; avec une entrée ou une censure dans la cellule, couverture non établie ; non défini à D = 0 et à D = E^i"
 etapes/brut/parametres/statuts/loi_supposee	character	9	"force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)"	"D ~ Poisson(mu E^c), E^c fixe"	"D ~ Poisson(mu E^c)"	"force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)"	"D ~ Poisson(mu E^c), E^c fixe"	"D ~ Poisson(mu E^c)"	"répartition _(1-t)q_(x+t) = (1 - t) q_x dans la cellule, censure indépendante"	"D ~ Bin(E^i, q), E^i fixe"	"D ~ Bin(E^i, q)"
-etapes/brut/parametres/statuts/calcul	character	9	"D / E^c"	"[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et d'échelle 1 ; borne inférieure 0 si D = 0 ; approximation numérique (qgamma)"	"taux exp(-+ z / sqrt(D)) : Wald sur log mu ; z = qnorm(alpha/2, lower.tail = FALSE)"	"-expm1(-taux)"	"1 - exp(-borne), par -expm1(-borne)"	"1 - exp(-borne), par -expm1(-borne)"	"D / E^i"	"[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ; 0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"	"plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : Wald sur logit q ; z = qnorm(alpha/2, lower.tail = FALSE)"
+etapes/brut/parametres/statuts/calcul	character	9	"D / E^c"	"[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et d'échelle 1 ; borne inférieure 0 si D = 0 ; approximation numérique (qgamma)"	"taux exp(-+ z / sqrt(D)) : normal sur l'échelle de log mu ; z = qnorm(alpha/2, lower.tail = FALSE)"	"-expm1(-taux)"	"1 - exp(-borne), par -expm1(-borne)"	"1 - exp(-borne), par -expm1(-borne)"	"D / E^i"	"[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ; 0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"	"plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : normal sur l'échelle de logit q ; z = qnorm(alpha/2, lower.tail = FALSE)"
 etapes/brut/resultat/@noms	character	2	"poisson"	"binomial"
 etapes/brut/resultat/poisson/@colonnes	character	15	"sexe"	"age"	"evenements"	"exposition_centrale"	"taux"	"borne_inf_exacte"	"borne_sup_exacte"	"borne_inf_asymptotique"	"borne_sup_asymptotique"	"probabilite"	"probabilite_borne_inf_exacte"	"probabilite_borne_sup_exacte"	"probabilite_borne_inf_asymptotique"	"probabilite_borne_sup_asymptotique"	"etat"
 etapes/brut/resultat/poisson/@lignes	integer	1	149
@@ -184,8 +184,8 @@ avertissements/etape	character	1	"donnees"
 avertissements/code	character	1	"fenetres_vides"
 avertissements/message	character	1	"Relevé : 12079 observation(s) sans intersection avec la période d'observation."
 avertissements/nombre	integer	1	12079
-fiche/@noms	character	22	"version_fiche"	"roles"	"provenance"	"provenance_mention"	"empreintes"	"plan"	"transition_code"	"fin_effective"	"unite_observation"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"nombre_lignes_exclues"	"avertissement_unite"	"hypothese_censure"	"hypotheses_brut"	"graine"	"graine_mention"	"generateur"	"avertissements"
-fiche/version_fiche	integer	1	4
+fiche/@noms	character	23	"version_fiche"	"roles"	"provenance"	"provenance_mention"	"empreintes"	"tables_reference"	"plan"	"transition_code"	"fin_effective"	"unite_observation"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"nombre_lignes_exclues"	"avertissement_unite"	"hypothese_censure"	"hypotheses_brut"	"graine"	"graine_mention"	"generateur"	"avertissements"
+fiche/version_fiche	integer	1	5
 fiche/roles/@noms	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/roles	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/provenance	NULL	0
@@ -200,6 +200,7 @@ fiche/empreintes/representation_resultat	character	1	"tablexp resultat 1"
 fiche/empreintes/resultat	character	1	"<md5>"
 fiche/empreintes/code	character	1	"<md5>"
 fiche/empreintes/statut_resultat_code	character	1	"résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6), jamais critère de rejeu chez un tiers ; code : MD5 du relevé des MD5 des fichiers R/*.R, fait à l'installation (recalcul depuis la racine des sources, avec le md5sum de GNU coreutils : LC_ALL=C md5sum -t R/*.R | md5sum) ; identifie le texte source, non le comportement numérique, qui dépend aussi de R, du BLAS et de la libm"
+fiche/tables_reference	NULL	0
 fiche/plan/@noms	character	5	"transition"	"periode"	"delai_declaration"	"segmentation"	"etapes"
 fiche/plan/transition/@noms	character	2	"depart"	"arrivee"
 fiche/plan/transition/depart	character	1	"vivant"
@@ -250,9 +251,9 @@ fiche/hypotheses_brut/statuts/@lignes	integer	1	9
 fiche/hypotheses_brut/statuts/estimateur	character	9	"poisson"	"poisson"	"poisson"	"poisson"	"poisson"	"poisson"	"binomial"	"binomial"	"binomial"
 fiche/hypotheses_brut/statuts/grandeur	character	9	"taux"	"taux"	"taux"	"probabilite"	"probabilite"	"probabilite"	"taux"	"taux"	"taux"
 fiche/hypotheses_brut/statuts/intervalle	character	9	"sans objet (estimation ponctuelle)"	"exact"	"asymptotique"	"sans objet (estimation ponctuelle)"	"exact"	"asymptotique"	"sans objet (estimation ponctuelle)"	"exact"	"asymptotique"
-fiche/hypotheses_brut/statuts/statut	character	9	"résultat exact : maximum de vraisemblance du modèle à force constante dans la cellule"	"exact sous la loi supposée : couverture >= niveau pour tout mu, E^c tenue pour fixe ; sous le modèle de survie (E^c aléatoire), couverture seulement asymptotique"	"asymptotique (mu E^c -> infini) ; non défini à D = 0"	"résultat exact : image du maximum de vraisemblance par q = 1 - exp(-mu) (invariance du maximum de vraisemblance), force constante sur la cellule entière"	"exact sous la loi supposée (transformation croissante des bornes exactes du taux : couverture identique)"	"asymptotique (transformation croissante des bornes asymptotiques du taux : même régime) ; non défini à D = 0"	"estimateur des moments : E[D] = q E[E^i] exactement sous l'hypothèse de répartition ; convergent ; non sans biais à effectif fini"	"exact sous la loi supposée si E^i est entier ; si E^i n'est pas entier, prolongement continu de la formule exacte : couverture non établie"	"asymptotique (E^i q(1-q) -> infini) ; non défini à D = 0 et à D = E^i"
+fiche/hypotheses_brut/statuts/statut	character	9	"résultat exact : maximum de vraisemblance du modèle à force constante dans la cellule"	"exact sous la loi supposée : couverture >= niveau pour tout mu, E^c tenue pour fixe ; sous le modèle de survie (E^c aléatoire), couverture seulement asymptotique"	"asymptotique (mu E^c -> infini) ; non défini à D = 0"	"résultat exact : image du maximum de vraisemblance par q = 1 - exp(-mu) (invariance du maximum de vraisemblance), force constante sur la cellule entière"	"exact sous la loi supposée (transformation croissante des bornes exactes du taux : couverture identique)"	"asymptotique (transformation croissante des bornes asymptotiques du taux : même régime) ; non défini à D = 0"	"estimateur des moments : E[D] = q E[E^i] exactement sous l'hypothèse de répartition ; convergent ; non sans biais à effectif fini"	"exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, E^i entier) ; avec une entrée ou une censure dans la cellule, couverture non établie, même si E^i est entier (prolongement continu de la formule exacte si E^i n'est pas entier)"	"asymptotique (E^i q(1-q) -> infini) pour une cellule observée entière ; avec une entrée ou une censure dans la cellule, couverture non établie ; non défini à D = 0 et à D = E^i"
 fiche/hypotheses_brut/statuts/loi_supposee	character	9	"force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)"	"D ~ Poisson(mu E^c), E^c fixe"	"D ~ Poisson(mu E^c)"	"force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)"	"D ~ Poisson(mu E^c), E^c fixe"	"D ~ Poisson(mu E^c)"	"répartition _(1-t)q_(x+t) = (1 - t) q_x dans la cellule, censure indépendante"	"D ~ Bin(E^i, q), E^i fixe"	"D ~ Bin(E^i, q)"
-fiche/hypotheses_brut/statuts/calcul	character	9	"D / E^c"	"[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et d'échelle 1 ; borne inférieure 0 si D = 0 ; approximation numérique (qgamma)"	"taux exp(-+ z / sqrt(D)) : Wald sur log mu ; z = qnorm(alpha/2, lower.tail = FALSE)"	"-expm1(-taux)"	"1 - exp(-borne), par -expm1(-borne)"	"1 - exp(-borne), par -expm1(-borne)"	"D / E^i"	"[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ; 0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"	"plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : Wald sur logit q ; z = qnorm(alpha/2, lower.tail = FALSE)"
+fiche/hypotheses_brut/statuts/calcul	character	9	"D / E^c"	"[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et d'échelle 1 ; borne inférieure 0 si D = 0 ; approximation numérique (qgamma)"	"taux exp(-+ z / sqrt(D)) : normal sur l'échelle de log mu ; z = qnorm(alpha/2, lower.tail = FALSE)"	"-expm1(-taux)"	"1 - exp(-borne), par -expm1(-borne)"	"1 - exp(-borne), par -expm1(-borne)"	"D / E^i"	"[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ; 0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"	"plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : normal sur l'échelle de logit q ; z = qnorm(alpha/2, lower.tail = FALSE)"
 fiche/graine	integer	1	NA
 fiche/graine_mention	character	1	"aucune étape aléatoire"
 fiche/generateur/@noms	character	3	"kind"	"normal.kind"	"sample.kind"

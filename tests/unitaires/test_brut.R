@@ -449,11 +449,16 @@ verifier("estimateurs déclarés c(\"binomial\", \"poisson\") : résultats dans 
     identical(names(pa$hypotheses), c("poisson", "binomial", "probabilite")) &&
     identical(names(pa$statuts), c("estimateur", "grandeur", "intervalle", "statut", "loi_supposee", "calcul"))
 })
-verifier("statuts : binomial exact « couverture non établie » si E^i n'est pas entier ; Poisson exact sous E^c fixe ; asymptotiques non définis à D = 0", {
+verifier("statuts : binomiaux exact et asymptotique « exact » ou « asymptotique » pour une cellule observée entière seule, « couverture non établie » avec une entrée ou une censure, même si E^i est entier (#31) ; Poisson exact sous E^c fixe ; asymptotiques non définis à D = 0", {
   s <- XC$etapes$brut$parametres$statuts
   be <- s$statut[s$estimateur == "binomial" & s$intervalle == "exact"]
+  ba <- s$statut[s$estimateur == "binomial" & s$intervalle == "asymptotique"]
   pa <- s$statut[s$estimateur == "poisson" & s$grandeur == "taux" & s$intervalle == "asymptotique"]
-  length(be) == 1L && grepl("couverture non établie", be, fixed = TRUE) &&
+  cond <- function(x) length(x) == 1L && grepl("pour une cellule observée entière", x, fixed = TRUE) &&
+    grepl("avec une entrée ou une censure dans la cellule, couverture non établie", x, fixed = TRUE)
+  cond(be) && startsWith(be, "exact sous la loi supposée pour une cellule observée entière") &&
+    grepl("même si E^i est entier", be, fixed = TRUE) &&
+    cond(ba) && startsWith(ba, "asymptotique (E^i q(1-q) -> infini) pour une cellule observée entière") &&
     any(grepl("E^c fixe", s$loi_supposee, fixed = TRUE)) && grepl("D = 0", pa, fixed = TRUE)
 })
 verifier("statuts (valeur calculée à la main) : 9 lignes, une par (estimateur, grandeur, intervalle) ; « fixe » dans la loi supposée des seuls intervalles exacts ; statuts commençant par un terme canonique", {
@@ -494,9 +499,10 @@ verifier("objet : etapes$brut (parametres, resultat, diagnostics), table NULL", 
   identical(names(XC$etapes), c("donnees", "exposition", "brut")) &&
     identical(names(XC$etapes$brut), c("parametres", "resultat", "diagnostics")) && is.null(XC$table)
 })
-# Ordre des champs de la fiche (#64 ; avis d'actuary du 20/10/2026, étape (1)), sans l'étape brut.
+# Ordre des champs de la fiche (#64 ; avis d'actuary du 20/10/2026, étape (1)), sans l'étape brut ;
+# tables_reference après empreintes (fiche 5, ADR 0015, point 3.2 ; #73).
 CHAMPS_FICHE_SANS_BRUT <- c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention",
-                     "empreintes", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
+                     "empreintes", "tables_reference", "plan", "transition_code", "fin_effective", "unite_observation", "recette",
                      "convention", "unite_exposition", "par_annee", "exclusions", "nombre_lignes_exclues",
                      "avertissement_unite", "hypothese_censure", "graine", "graine_mention", "generateur",
                      "avertissements")

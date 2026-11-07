@@ -623,8 +623,6 @@ CAS_TABLE <- list(
        motif = "table_age_double", lignes = 3L),
   list(nom = "âges non contigus", x = transform(TR, age = c(60L, 61L, 63L, 60L, 61L, 62L)),
        motif = "table_ages_non_contigus", lignes = 3L),
-  list(nom = "âges non croissants", x = transform(TR, age = c(60L, 62L, 61L, 60L, 61L, 62L)),
-       motif = "table_ages_non_croissants", lignes = 3L),
   list(nom = "sexe hors modalités", x = transform(TR, sexe = c("H", "H", "H", "M", "M", "M")),
        motif = "table_sexe_hors_modalites", lignes = 4:6),
   list(nom = "âge non entier", x = transform(TR, age = c(60, 61.5, 62, 60, 61, 62)),
@@ -646,6 +644,14 @@ for (cas in CAS_TABLE) {
            else if (!is.null(cas$lignes) && !identical(x$details$lignes, cas$lignes)) "numéros de ligne"
            else TRUE)
 }
+# Âges non croissants (refus table_ages_non_croissants retiré, M235 ; ADR 0015,
+# point 2.1 ; #73) : l'objet est rendu dans l'ordre canonique, chaque q_x
+# suivant son âge (valeur calculée à la main).
+verifier("table_reference : âges H reçus 60, 62, 61, rendus 60, 61, 62 avec leurs q_x ; F inchangé (ordre canonique, #73)", {
+  t <- tr(transform(TR, age = c(60L, 62L, 61L, 60L, 61L, 62L)))
+  identical(t$sexe, c("H", "H", "H", "F", "F", "F")) && identical(t$age, c(60L, 61L, 62L, 60L, 61L, 62L)) &&
+    identical(t$qx, c(0.01, 0.012, 0.011, 0.006, 0.0066, 0.0072))
+})
 verifier("table_reference : âges non contigus au sein d'une même année",
          leve_refus(tr(data.frame(age = c(60L, 61L, 60L, 62L), sexe = "H", qx = 0.01, annee = c(2020L, 2020L, 2021L, 2021L))),
                     "table_ages_non_contigus"))

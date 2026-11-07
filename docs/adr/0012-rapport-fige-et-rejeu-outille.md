@@ -289,3 +289,67 @@ Rédigée par `architect-approfondi` à l'étape (5) de la branche `claude/rappo
 - pour les deux : l'empreinte du code (M70) ; aucun `.tsv`, ni l'empreinte du résultat, ni `version_fiche`.
 
 Issues : #120, #94, #89. ADR 0011 (annotation du 27/10/2026). Décisions M126, M162, M165, M166, M167. Branche `claude/rapport-suites`, PR #125.
+
+## Annotation du 6 novembre 2026 — points 3.1, 3.4 (contrôle 7 bis), 3.6, 3.10 ; « Options écartées », l. 159-160 : rejeu d'une construction qui lit une table de référence (ADR 0015, M239 ; #73)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `b146631`, après l'acceptation de l'ADR 0015 par le mainteneur le 06/11/2026 (M239). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Les numéros de ligne cités sont ceux du présent fichier à `b146631` ; le nom de l'objet fait foi (M77, (b)). Aucun code n'est encore écrit : la mise en œuvre est le commit (1) de B13 (#73).
+
+**(a) Point 3.1 : signature.** `rejouer_fiche(donnees, fiche, tables_reference = NULL)`. Le troisième argument, facultatif et nommé, de même forme que celui de `construire_table()`, porte les tables de statut `importee` ou `synthetique` lues par la construction ; les tables de statut `embarquee` ne sont pas reçues, elles sont relues par leur `nom` dans le package (ADR 0015, point 1.4). Les rôles, le plan et la provenance **viennent toujours de la fiche** : la phrase « la fonction n'en reçoit pas d'autres » reste vraie pour eux. Une table reçue est une **entrée**, comme `donnees`, identifiée par son empreinte dans `fiche$tables_reference` et contrôlée avant la construction. Le point 3.2 est inchangé : `rejouer_fiche()` assemble la liste complète (reçues plus relues) et appelle `construire_table()` une seule fois, sans exécuter d'étape.
+
+**(b) Point 3.4 : ordre des contrôles.**
+- Contrôle 2 : la forme de `fiche$tables_reference` y entre (`NULL`, ou liste nommée d'éléments aux sept champs ; `representation` et `empreinte` chaînes uniques ; `statut` dans `STATUTS_TABLE`), motif `fiche_non_conforme` (ADR 0015, point 4.1).
+- **Contrôle 7 bis**, après le contrôle 7 et avant le contrôle 8, pour chaque élément de `fiche$tables_reference`, dans l'ordre des clés, arrêt au premier refus (module `construire_table` ; noms indicatifs) : (1) `representation` égale à `REPRESENTATION_TABLE`, sinon `representation_table_non_admise` ; (2) origine : table relue par `nom` si `embarquee` (sinon `table_embarquee_absente`), table reçue de même clé sinon (`table_reference_absente`, `table_reference_inattendue`, `tables_reference_mal_formees`) ; (3) empreinte recalculée par `empreinte_table()`, sinon `empreinte_table_discordante` (ADR 0015, point 4.2 ; ADR 0011, annotation du 05/11/2026, (f)).
+- Contrôle 8 : `construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance, tables_reference = <liste assemblée>)`.
+- Le bilan porte une ligne de contrôle `tables_reference`, avant les témoins (ADR 0015, point 4.3). Le point 3.8 s'étend aux motifs nouveaux, de module `construire_table`. Un test montre que, sur `empreinte_table_discordante`, `construire_table()` n'est pas appelée (critère 3 de #86 étendu).
+
+**(c) Point 3.6 : témoin « fiche ».** Les métadonnées d'une table (`nom`, `source`, `forme_origine`, `parametres`, et `statut` hors `embarquee`) ne sont pas des motifs de refus : un écart apparaît au témoin « fiche » (« différente : fiche/tables_reference/<clé>/<champ> »). L'empreinte de table identifie l'entrée (refus) ; les métadonnées la décrivent (témoin) (ADR 0015, point 4.2, dernier alinéa).
+
+**(d) Point 3.10 : contrat partagé.** La signature de `rejouer_fiche()` change (troisième argument facultatif ; appels existants inchangés). La phrase « la signature de `construire_table()` est inchangée » se lit avec l'ADR 0007, point 3.1 (annotation du même jour) : un cinquième argument nommé facultatif, `construire_table(donnees, roles, plan)` inchangée. Deux exports nouveaux, `table_embarquee()` et `tables_embarquees()` (ADR 0015, point 6.2).
+
+**(e) « Options écartées », l. 159 et 160.**
+- L. 159 (rejeu avec `roles`, `plan`, `provenance` de l'appelant) : maintenue. Recevoir une table importée n'est pas recevoir un autre plan ni d'autres rôles : c'est recevoir une entrée, que la fiche identifie par son empreinte. Le tiers qui veut mesurer l'effet d'une autre table construit par `construire_table()`.
+- L. 160 (écart d'empreinte du code en refus) : maintenue. L'écart d'empreinte d'une table est un refus, et non un témoin, parce que la table est une entrée et le code ne l'est pas (ADR 0011, annotation du 05/11/2026, (f)).
+
+**Effet sur les résultats : aucun** (fonction de contrôle ; R1 à R6 ne lisent aucune table et se rejouent sans `tables_reference`).
+
+Issues : #73, #86 (critère 3 étendu). Décision M239. ADR 0015 (points 1.4, 4, 6.2) ; ADR 0011 et ADR 0007 (annotations du même jour). Branche `claude/validation-smr-reference`, PR #155.
+
+## Annotation du 6 novembre 2026 (seconde) — point 2.6 : sections `etape_validation` et `etape_importance_exclusions` ; contrôle d'entrée de la validation au rejeu (M242 ; #4, #69)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `78b6052`, d'après l'avis de forme (0'') et les décisions du mainteneur du 06/11/2026, versés en commentaire de #4 (https://github.com/Gerard-Garey/outil_tables/issues/4#issuecomment-6679524403). Le texte ci-dessus, annotations comprises, n'est pas réécrit ; noms indicatifs, le nom de l'objet fait foi (M77, (b)). Mise en œuvre : commits (3) et (4b) de B13.
+
+**(a) Point 2.6 : la section `validations` « non produite par cette version » est remplacée** par deux sections de nature `etape`, `etape_validation` et `etape_importance_exclusions`, liées aux deux étapes du catalogue (ADR 0007, annotation du même jour) ; absentes du plan, elles portent « non demandée par le plan ». Le test de concordance de `SECTIONS_RAPPORT` avec `ETAPES` reste le contrôle : il échoue tant que l'une des deux étapes n'a pas sa section. Le rendu lit les grandeurs dans l'objet, sans calcul (point 2), y compris `etapes$validation$parametres$reference_methode` (M244).
+
+**(b) Mentions fixes.** Section `etape_validation` : « aucune table positionnée n'est produite » et p = 0 sous `independante`, **sans verdict ni seuil** (M217, Q4). Section `etape_importance_exclusions` : « ces grandeurs décrivent l'importance des exclusions et ne disent pas si une exclusion est justifiée », texte **lu par `regulatory`** avant le commit (4b). Libellés exacts : spécification d'`actuary-approfondi`.
+
+**(c) Point 3.4 : contrôle d'entrée de la validation au rejeu.** `rejouer_fiche()` appelle aussi `controler_entrees_validation()` avant `construire_table()` (après le contrôle 7 bis de l'annotation précédente du même jour) : un refus d'appariement (`convention_validation_non_admise`, `table_annee_non_admise`, `table_sexe_incompatible`, `plage_ages_hors_table`) arrête le rejeu sans construire. Le point 3.2 est inchangé (un seul appel de `construire_table()`, aucune étape exécutée par le rejeu).
+
+**Effet sur les résultats.** Le HTML du rapport de R1 à R6 change (section remplacée) ; ce n'est pas une grandeur de référence. Les objets de R1 à R6 sont identiques hors jeton de l'empreinte du code (et lignes de fiche de l'ADR 0015, point 3.4). Aucune table finale, aucun verdict.
+
+Issues : #4, #69, #73. Décisions M242, M244 ; M217. ADR 0015 et ADR 0007 (annotations du même jour, secondes). Branche `claude/validation-smr-reference`, PR #155.
+
+## Annotation du 6 novembre 2026 (troisième) — annotation du même jour, seconde, (b) : texte retenu de la mention fixe de la section `etape_importance_exclusions` (M259 ; #69)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `bd9d467`, d'après la lecture de `regulatory`, l'avis d'`actuary` et la décision du mainteneur du 06/11/2026, versés en commentaire de #69 (https://github.com/Gerard-Garey/outil_tables/issues/69#issuecomment-6682488525). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**Mention fixe retenue.** Le texte cité au point (b) de l'annotation précédente (« ces grandeurs décrivent l'importance des exclusions et ne disent pas si une exclusion est justifiée ») était provisoire, sous réserve de la lecture de `regulatory`. Il est remplacé, pour la section `etape_importance_exclusions`, par :
+
+> « Ces grandeurs mesurent le poids des lignes exclues par les règles d'exclusion déclarées (volumes, événements, exposition, SMR) et permettent d'apprécier l'importance des exclusions. Elles ne disent ni si les données exclues sont pertinentes, ni si leur exclusion est justifiée. »
+
+La mention ne contient aucune phrase sur l'entreprise ni sur le certificateur, et ne cite aucun texte tant que #13 est ouverte. Motif : RD (UE) 2015/35, art. 19, § 1, b, pose deux notions, la pertinence et la justification ; voir aussi M69 et la notice ACPR du 17/12/2015, orientation 14, § 56 b (détail et statuts de lecture : M259). Le rendu reste sans verdict ni seuil. `regulatory` le contrôle à la revue finale.
+
+**Effet sur les résultats.** Aucun au-delà de l'annotation précédente : texte d'une mention du rapport, non encore écrit dans le code (commit (4b)).
+
+Issue : #69. Décision M259 ; M69, M242.
+
+## Annotation du 6 novembre 2026 (quatrième) — annotation du même jour, seconde, (c) : liste des refus d'appariement complétée (#4)
+
+Rédigée par `architect` sur la branche porteuse `claude/validation-smr-reference` (B13, PR #155), à `713b323`, sur l'écart relevé par `docwriter` au passage unique (6). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Mesures refaites par `architect` sous R 4.3.3, `tablexp` installé depuis l'arbre de travail à `713b323` dans une bibliothèque temporaire (environnement cloud, hors plateforme de référence).
+
+**Correction.** Le point (c) de l'annotation du même jour, seconde, énumère quatre refus d'appariement (`convention_validation_non_admise`, `table_annee_non_admise`, `table_sexe_incompatible`, `plage_ages_hors_table`). `controler_entrees_validation()` (`R/validation.R:296`, livrée par `e9cbf53`, #4) en lève **cinq**, dans cet ordre : `convention_validation_non_admise`, `table_annee_non_admise`, **`table_sexes_ambigus`** (table qui mêle la modalité `ensemble` et H ou F), `table_sexe_incompatible`, `plage_ages_hors_table` (*vérifié* par lecture de `R/validation.R:296-330`). Le rejeu l'appelle au contrôle **7 ter**, après le contrôle 7 bis et avant l'unique appel de `construire_table()` (`R/construire_table.R:1018-1024`, *vérifié* par lecture). Le point (c) se lit donc avec les cinq motifs.
+
+**Portée du cinquième motif.** `table_sexes_ambigus` est une **garde de défense** : une table qui mêle `ensemble` et H ou F est refusée plus tôt par `table_reference()` (`table_sexes_melanges`, module `donnees`, `R/donnees.R:926-934`). Elle ne peut donc pas atteindre `controler_entrees_validation()` sous forme d'objet `table_reference`, ni par `construire_table()` ni par le rejeu. *Vérifié* : `table_reference()` sur une table H + `ensemble` rend le refus `table_sexes_melanges` ; l'appel direct de `tablexp:::controler_entrees_validation()` sur le même `data.frame` rend `table_sexes_ambigus`. Ce dernier cas est le test `tests/unitaires/test_validation.R:515` (« appel direct, défense »). Le point 3.2 est inchangé.
+
+**Effet sur les résultats : aucun.** Le texte de l'ADR est mis en accord avec le code livré ; rien n'est modifié dans le code.
+
+Issues : #4, #73. Décisions M242, M253. Branche `claude/validation-smr-reference`, PR #155.

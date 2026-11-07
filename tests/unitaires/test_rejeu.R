@@ -43,14 +43,17 @@ FICHE <- lire_fiche(octets(TEXTE))
 R0 <- rejouer_fiche(BASE, FICHE)
 EMPREINTE_CODE <- tablexp:::EMPREINTE_CODE
 
+# Ligne 8 « tables_reference » (contrôle 7 bis, ADR 0015, point 4.3 ; #73) :
+# témoins aux lignes 9 à 14.
 CONTROLES <- c("nature_arguments", "forme_fiche", "version_fiche", "algorithme_empreinte", "representation",
-               "entrees_construction", "empreinte_donnees", "temoin_code", "temoin_versions", "temoin_plateforme",
-               "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier")
+               "entrees_construction", "empreinte_donnees", "tables_reference", "temoin_code", "temoin_versions",
+               "temoin_plateforme", "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier")
 STATUTS <- c("contrôle de forme", "contrôle de forme", "comparaison exacte", "comparaison exacte",
              "comparaison exacte", "contrôles délégués aux modules", "exacte ; sans rôle de sécurité",
-             "exacte ; sans rôle de sécurité", "comparaison exacte", "comparaison exacte", "comparaison exacte",
-             "témoin, même machine seulement", "reprise de la fiche, non vérifiée par le moteur")
-VERDICTS_SUCCES <- c(rep("conforme", 7L), rep("identique", 5L), "non vérifiée")
+             "exacte ; sans rôle de sécurité", "exacte ; sans rôle de sécurité", "comparaison exacte",
+             "comparaison exacte", "comparaison exacte", "témoin, même machine seulement",
+             "reprise de la fiche, non vérifiée par le moteur")
+VERDICTS_SUCCES <- c(rep("conforme", 8L), rep("identique", 5L), "non vérifiée")
 
 # Fiche FICHE modifiée : chaque argument nommé est un chemin « a/b/c » de la
 # fiche, posé à sa valeur (NULL retire le champ).
@@ -101,42 +104,45 @@ compter_appels <- function(expr) {
 
 # --- T1 : contrat (valeur calculée à la main) -----------------------------------
 
-verifier("T1 rejouer_fiche : exportée, arguments (donnees, fiche)",
+verifier("T1 rejouer_fiche : exportée, arguments (donnees, fiche, tables_reference = NULL) (ADR 0015, point 1.4 ; #73)",
          "rejouer_fiche" %in% getNamespaceExports("tablexp") &&
-           identical(names(formals(rejouer_fiche)), c("donnees", "fiche")))
-verifier("T1 VERSIONS_FICHE_REJEU : integer sans attribut ni NA, identical() à VERSION_FICHE (4L)", {
+           identical(names(formals(rejouer_fiche)), c("donnees", "fiche", "tables_reference")) &&
+           is.null(formals(rejouer_fiche)$tables_reference))
+verifier("T1 VERSIONS_FICHE_REJEU : integer sans attribut ni NA, identical() à VERSION_FICHE (5L, #73)", {
   v <- tablexp:::VERSIONS_FICHE_REJEU
-  is.integer(v) && is.null(attributes(v)) && !anyNA(v) && identical(v, tablexp:::VERSION_FICHE) && identical(v, 4L)
+  is.integer(v) && is.null(attributes(v)) && !anyNA(v) && identical(v, tablexp:::VERSION_FICHE) && identical(v, 5L)
 })
 
 # --- T2 : structure d'un rejeu réussi (valeur calculée à la main ; identité exacte)
 
 verifier("T2 rejeu réussi : classe rejeu, éléments construction et bilan",
          identical(class(R0), "rejeu") && identical(names(R0), c("construction", "bilan")))
-verifier("T2 bilan : data.frame de 13 lignes, 5 colonnes character dans l'ordre, sans NA, noms de lignes automatiques", {
+verifier("T2 bilan : data.frame de 14 lignes, 5 colonnes character dans l'ordre, sans NA, noms de lignes automatiques", {
   b <- R0$bilan
   is.data.frame(b) && identical(names(b), c("controle", "attendu", "lu", "verdict", "statut")) &&
-    all(vapply(b, is.character, NA)) && nrow(b) == 13L && !anyNA(b) &&
-    identical(attr(b, "row.names"), 1:13) && identical(b$controle, CONTROLES)
+    all(vapply(b, is.character, NA)) && nrow(b) == 14L && !anyNA(b) &&
+    identical(attr(b, "row.names"), 1:14) && identical(b$controle, CONTROLES)
 })
-verifier("T2 bilan : verdicts (1 à 7 « conforme », 8 à 12 « identique », 13 « non vérifiée ») et statuts exacts",
+verifier("T2 bilan : verdicts (1 à 8 « conforme », 9 à 13 « identique », 14 « non vérifiée ») et statuts exacts",
          identical(R0$bilan$verdict, VERDICTS_SUCCES) && identical(R0$bilan$statut, STATUTS))
-verifier("T2 bilan : attendu et lu des lignes 3, 4, 5, 7, 8 et 12 égaux aux constantes et aux valeurs de la fiche", {
+verifier("T2 bilan : attendu et lu des lignes 3, 4, 5, 7, 9 et 13 égaux aux constantes et aux valeurs de la fiche", {
   b <- R0$bilan; e <- FICHE$empreintes
-  identical(b$attendu[c(3, 4, 5, 7, 8, 12)],
-            c("4", "md5", "tablexp canonique 2", tablexp:::empreinte_donnees(BASE, ROLES), EMPREINTE_CODE,
+  identical(b$attendu[c(3, 4, 5, 7, 9, 13)],
+            c("5", "md5", "tablexp canonique 2", tablexp:::empreinte_donnees(BASE, ROLES), EMPREINTE_CODE,
               R0$construction$fiche$empreintes$resultat)) &&
-    identical(b$lu[c(3, 4, 5, 7, 8, 12)], c("4", e$algorithme, e$representation, e$donnees, e$code, e$resultat))
+    identical(b$lu[c(3, 4, 5, 7, 9, 13)], c("5", e$algorithme, e$representation, e$donnees, e$code, e$resultat))
 })
-verifier("T2 bilan : lignes 1, 2, 6, 11 et 13 (textes fixes et composés)", {
+verifier("T2 bilan : lignes 1, 2, 6, 8, 12 et 14 (textes fixes et composés)", {
   b <- R0$bilan
   identical(b$attendu[1L], "fiche : liste nommée ; donnees : data.frame") &&
-    identical(b$lu[1L], "fiche : liste nommée de 24 champs ; donnees : classe data.frame, 4 lignes, 7 colonnes") &&
+    identical(b$lu[1L], "fiche : liste nommée de 25 champs ; donnees : classe data.frame, 4 lignes, 7 colonnes") &&
     identical(b$lu[2L], "champs lus de la forme attendue") &&
     identical(b$lu[6L], paste("étapes : donnees, exposition, brut ; rôles : id_contrat, id_tete, sexe, date_naissance,",
                               "date_entree, date_sortie, cause_sortie ; recette : lignes_dates_completes ; provenance : NULL")) &&
-    identical(b$lu[11L], "fiche reçue, même périmètre") && identical(b$lu[13L], "NA") &&
-    identical(b$attendu[13L], "non recalculée par le moteur (couche de lecture, E4.4)")
+    identical(b$attendu[8L], "aucune table de référence (fiche/tables_reference : NULL)") &&
+    identical(b$lu[8L], "aucune table reçue ni relue") &&
+    identical(b$lu[12L], "fiche reçue, même périmètre") && identical(b$lu[14L], "NA") &&
+    identical(b$attendu[14L], "non recalculée par le moteur (couche de lecture, E4.4)")
 })
 verifier("T2 construction : identical() hors execution à l'objet original (identité exacte)",
          identical(sans_execution(R0$construction), sans_execution(X)))
@@ -169,7 +175,7 @@ CAS_REFUS <- list(
   list(nom = "étape 1 : données « donnees.csv »", d = "donnees.csv", module = "donnees", motif = "donnees_mal_formees",
        details = list(classe = "character")),
   list(nom = "étape 2 : version_fiche double 3 (texte édité puis relu)",
-       f = fiche_texte("version_fiche\tinteger\t1\t4", "version_fiche\tdouble\t1\t3"),
+       f = fiche_texte("version_fiche\tinteger\t1\t5", "version_fiche\tdouble\t1\t3"),
        module = "construire_table", motif = "fiche_non_conforme",
        details = list(champ = "version_fiche", lu = "double de longueur 1",
                       attendu = "integer de longueur 1, non NA, sans attribut"),
@@ -213,9 +219,9 @@ CAS_REFUS <- list(
        details = list(champ = "provenance", lu = "champ absent", attendu = "champ présent (NULL admis)")),
   list(nom = "étape 3 : version_fiche 99", f = fiche_modifiee(version_fiche = 99L),
        module = "construire_table", motif = "version_fiche_non_admise",
-       details = list(lu = 99L, admises = 4L, tablexp = FICHE$versions$tablexp, code = FICHE$empreintes$code,
+       details = list(lu = 99L, admises = 5L, tablexp = FICHE$versions$tablexp, code = FICHE$empreintes$code,
                       code_installe = EMPREINTE_CODE),
-       contient = c("version_fiche 99 lue", "admise(s) par ce code : 4.",
+       contient = c("version_fiche 99 lue", "admise(s) par ce code : 5.",
                     sprintf("Fiche produite par tablexp %s, empreinte du code %s", FICHE$versions$tablexp,
                             FICHE$empreintes$code),
                     sprintf("empreinte du code %s. Aucune", EMPREINTE_CODE), "Aucune conversion de fiche n'est faite")),
@@ -312,28 +318,28 @@ ecart_verdicts <- function(obtenu, attendu) if (identical(obtenu, attendu)) TRUE
   sprintf("ligne %d : « %s » au lieu de « %s »", which(obtenu != attendu), obtenu[obtenu != attendu], attendu[obtenu != attendu])
 FAUX_MD5 <- strrep("0", 32L)
 for (cas in list(
-  list("empreinte du résultat altérée : pas de refus, ligne 12 « différente »",
-       fiche_modifiee("empreintes/resultat" = FAUX_MD5), list("12" = "différente")),
+  list("empreinte du résultat altérée : pas de refus, ligne 13 « différente »",
+       fiche_modifiee("empreintes/resultat" = FAUX_MD5), list("13" = "différente")),
   list("empreintes du résultat et du code NA : « non déterminable »",
        fiche_modifiee("empreintes/resultat" = NA_character_, "empreintes/code" = NA_character_),
-       list("8" = "non déterminable", "12" = "non déterminable")),
-  list("empreinte du code altérée", fiche_modifiee("empreintes/code" = FAUX_MD5), list("8" = "différente")),
-  list("versions$R modifiée", fiche_modifiee("versions/R" = "R version 0"), list("9" = "différente : R")),
-  list("plateforme$blas modifiée", fiche_modifiee("plateforme/blas" = "autre"), list("10" = "différente : blas")),
-  list("versions retiré", fiche_modifiee(versions = NULL), list("9" = "non déterminable")),
+       list("9" = "non déterminable", "13" = "non déterminable")),
+  list("empreinte du code altérée", fiche_modifiee("empreintes/code" = FAUX_MD5), list("9" = "différente")),
+  list("versions$R modifiée", fiche_modifiee("versions/R" = "R version 0"), list("10" = "différente : R")),
+  list("plateforme$blas modifiée", fiche_modifiee("plateforme/blas" = "autre"), list("11" = "différente : blas")),
+  list("versions retiré", fiche_modifiee(versions = NULL), list("10" = "non déterminable")),
   list("champ x ajouté à plateforme", fiche_modifiee("plateforme/x" = "y"),
-       list("10" = "différente : x (absent de la fiche rendue)")),
+       list("11" = "différente : x (absent de la fiche rendue)")),
   list("transition_code modifié", fiche_modifiee(transition_code = "autre"),
-       list("11" = "différente : transition_code")),
+       list("12" = "différente : transition_code")),
   list("estimateurs inversés dans le plan : résultat identique",
        fiche_modifiee("plan/etapes/brut/estimateurs" = rev(FICHE$plan$etapes$brut$estimateurs)),
-       list("11" = "différente : plan/etapes/brut/estimateurs")),
+       list("12" = "différente : plan/etapes/brut/estimateurs")),
   list("niveau 0,99 : résultat différent", fiche_modifiee("plan/etapes/brut/niveau" = 0.99),
-       list("11" = "différente : hypotheses_brut/niveau", "12" = "différente")),
+       list("12" = "différente : hypotheses_brut/niveau", "13" = "différente")),
   list("deux champs de premier niveau permutés",
        FICHE[replace(names(FICHE), match(c("transition_code", "fin_effective"), names(FICHE)),
                      c("fin_effective", "transition_code"))],
-       list("11" = "différente : fiche (ordre des champs ou attributs)"))))
+       list("12" = "différente : fiche (ordre des champs ou attributs)"))))
   verifier(sprintf("T7 témoins, %s", cas[[1L]]), ecart_verdicts(verdicts(cas[[2L]]), do.call(attendus_temoins, cas[[3L]])))
 
 # --- T8 : cas adverses de l'ADR 0012, point 3.9 (constat de mesure) -------------
@@ -342,7 +348,7 @@ sans_lignes_conservees <- function(x) { x <- sans_execution(x); x$etapes$donnees
 BASE_EXTRA <- cbind(BASE, extra = 1:4)
 verifier("T8 lignes permutées : refus empreinte_donnees_discordante",
          controle_refus(refus_de(rejouer_fiche(BASE_PERMUTEE, FICHE)), "construire_table", "empreinte_donnees_discordante"))
-verifier("T8 colonne hors rôles ajoutée : pas de refus, témoins 8 à 12 « identique », objet identical() hors lignes_conservees seulement", {
+verifier("T8 colonne hors rôles ajoutée : pas de refus, témoins 9 à 13 « identique », objet identical() hors lignes_conservees seulement", {
   r <- rejouer_fiche(BASE_EXTRA, FICHE)
   identical(r$bilan$verdict, VERDICTS_SUCCES) && !identical(sans_execution(r$construction), sans_execution(X)) &&
     identical(sans_lignes_conservees(r$construction), sans_lignes_conservees(X))
@@ -354,27 +360,27 @@ verifier("T8 colonne hors rôles retirée : même constat", {
     identical(sans_lignes_conservees(r$construction), sans_lignes_conservees(x2))
 })
 BASE_GENRE <- BASE; names(BASE_GENRE)[names(BASE_GENRE) == "sexe"] <- "genre"
-verifier("T8 colonne de rôle renommée, rôles de la fiche adaptés : passe, témoin fiche « identique », ligne 12 « différente »",
-         ecart_verdicts(verdicts(fiche_modifiee("roles/sexe" = "genre"), BASE_GENRE), attendus_temoins("12" = "différente")))
+verifier("T8 colonne de rôle renommée, rôles de la fiche adaptés : passe, témoin fiche « identique », ligne 13 « différente »",
+         ecart_verdicts(verdicts(fiche_modifiee("roles/sexe" = "genre"), BASE_GENRE), attendus_temoins("13" = "différente")))
 verifier("T8 colonne de rôle renommée sans adaptation : refus colonne_absente",
          controle_refus(refus_de(rejouer_fiche(BASE_GENRE, FICHE)), "donnees", "colonne_absente"))
-verifier("T8 fiche sans puis avec provenance : rejouées, identical() hors execution, empreintes du résultat distinctes, ligne 13", {
+verifier("T8 fiche sans puis avec provenance : rejouées, identical() hors execution, empreintes du résultat distinctes, ligne 14", {
   prov <- list(fichier = "base.csv", empreinte = "0123456789abcdef0123456789abcdef", algorithme = "md5")
   xp <- construire_table(BASE, ROLES, plan_complet(), prov)
   rp <- rejouer_fiche(BASE, lire_fiche(ecrire_fiche(xp$fiche)))
   identical(sans_execution(rp$construction), sans_execution(xp)) &&
     identical(sans_execution(R0$construction), sans_execution(X)) &&
     !identical(xp$fiche$empreintes$resultat, X$fiche$empreintes$resultat) &&
-    identical(R0$bilan$lu[13L], "NA") && identical(rp$bilan$lu[13L], prov$empreinte) &&
-    identical(c(R0$bilan$verdict[13L], rp$bilan$verdict[13L]), rep("non vérifiée", 2L)) &&
+    identical(R0$bilan$lu[14L], "NA") && identical(rp$bilan$lu[14L], prov$empreinte) &&
+    identical(c(R0$bilan$verdict[14L], rp$bilan$verdict[14L]), rep("non vérifiée", 2L)) &&
     identical(rp$bilan$verdict, VERDICTS_SUCCES) && endsWith(rp$bilan$lu[6L], "; provenance : base.csv") &&
     endsWith(R0$bilan$lu[6L], "; provenance : NULL")
 })
-verifier("T8 fiche de version 3 fabriquée d'une fiche 4 écrite : lue sans refus, rejeu refusé, construire_table() directe passe", {
+verifier("T8 fiche de version 3 fabriquée d'une fiche 5 écrite : lue sans refus, rejeu refusé, construire_table() directe passe", {
   noms6 <- TEXTE[startsWith(TEXTE, "plateforme/@noms\t")]
   noms5 <- sub("\t\"bibliotheque_c\"$", "", sub("^plateforme/@noms\tcharacter\t6\t", "plateforme/@noms\tcharacter\t5\t", noms6))
   l <- TEXTE[!startsWith(TEXTE, "plateforme/bibliotheque_c\t")]
-  l[l == "version_fiche\tinteger\t1\t4"] <- "version_fiche\tinteger\t1\t3"
+  l[l == "version_fiche\tinteger\t1\t5"] <- "version_fiche\tinteger\t1\t3"
   l[l == noms6] <- noms5
   f3 <- tryCatch(lire_fiche(octets(l)), error = function(e) e)
   !inherits(f3, "error") && identical(f3$version_fiche, 3L) && !("bibliotheque_c" %in% names(f3$plateforme)) &&
@@ -517,7 +523,7 @@ local({
   # (classe), sur une ligne, marquée UTF-8 si non ASCII ; les autres lignes du bilan sont
   # celles du rejeu d'une fiche saine.
   for (ch in c("versions", "plateforme")) {
-    ligne <- if (ch == "versions") 9L else 10L
+    ligne <- if (ch == "versions") 10L else 11L
     ok_temoin <- function(r, lu_attendu) {
       if (inherits(r, "error")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
       lu <- r$bilan$lu[ligne]
@@ -579,13 +585,13 @@ local({
            {
              r <- attrape(rejouer_fiche(BASE, fiche_modifiee("empreintes/code" = structure("abc", class = b))))
              if (inherits(r, "error")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
-             else identical(r$bilan$lu[8L], "illisible (character de longueur 1)") && identical(r$bilan$verdict[8L], "non déterminable")
+             else identical(r$bilan$lu[9L], "illisible (character de longueur 1)") && identical(r$bilan$verdict[9L], "non déterminable")
            })
   verifier("T11 versions/tablexp de classe bytes : rejeu sans refus, témoin des versions « tablexp=illisible (character de longueur 1) »",
            {
              r <- attrape(rejouer_fiche(BASE, fiche_modifiee("versions/tablexp" = structure("abc", class = b))))
              if (inherits(r, "error")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
-             else startsWith(r$bilan$lu[9L], "tablexp=illisible (character de longueur 1) ; ")
+             else startsWith(r$bilan$lu[10L], "tablexp=illisible (character de longueur 1) ; ")
            })
   verifier("T11 version_fiche 3 et empreintes/code de classe bytes : refus version_fiche_non_admise, code « illisible (character de longueur 2) »",
            {
@@ -618,7 +624,7 @@ local({
   # lèveraient l'erreur R ; la liste est une feuille, citée « différente » à
   # son chemin de premier niveau (ou de niveau inférieur si les parents se
   # descendent). Position 1 de convention, position 1 de hypotheses_brut, et
-  # troisième niveau (hypotheses_brut/hypotheses) : rejeu rendu, ligne 11 du
+  # troisième niveau (hypotheses_brut/hypotheses) : rejeu rendu, ligne 12 du
   # bilan « différente : <chemin> », sur une ligne, marquée UTF-8.
   nom_bytes_en <- function(f, chemin, k) {
     n <- names(f[[chemin]]); n[k] <- b
@@ -627,16 +633,16 @@ local({
   }
   for (cas in list(list("convention", "convention", 1L), list("hypotheses_brut", "hypotheses_brut", 1L),
                    list(c("hypotheses_brut", "hypotheses"), "hypotheses_brut/hypotheses", 3L))) {
-    verifier(sprintf("T11 nom d'encodage bytes en position %d de fiche$%s : rejeu rendu (pas une erreur R), ligne 11 « différente : %s », une ligne, UTF-8",
+    verifier(sprintf("T11 nom d'encodage bytes en position %d de fiche$%s : rejeu rendu (pas une erreur R), ligne 12 « différente : %s », une ligne, UTF-8",
                      cas[[3L]], paste(cas[[1L]], collapse = "$"), cas[[2L]]),
              {
                fb <- nom_bytes_en(FICHE, cas[[1L]], cas[[3L]])
                r <- attrape(rejouer_fiche(BASE, fb))
                if (inherits(r, "error")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
                else if (!inherits(r, "rejeu")) "objet non rejeu"
-               else if (!identical(r$bilan$controle[11L], "temoin_fiche")) "ligne 11 : autre témoin"
-               else if (!identical(r$bilan$verdict[11L], paste("différente :", cas[[2L]]))) sprintf("ligne 11 : « %s »", r$bilan$verdict[11L])
-               else if (!identical(Encoding(r$bilan$verdict[11L]), "UTF-8")) "verdict non marqué UTF-8"
+               else if (!identical(r$bilan$controle[12L], "temoin_fiche")) "ligne 12 : autre témoin"
+               else if (!identical(r$bilan$verdict[12L], paste("différente :", cas[[2L]]))) sprintf("ligne 12 : « %s »", r$bilan$verdict[12L])
+               else if (!identical(Encoding(r$bilan$verdict[12L]), "UTF-8")) "verdict non marqué UTF-8"
                else TRUE
              })
   }

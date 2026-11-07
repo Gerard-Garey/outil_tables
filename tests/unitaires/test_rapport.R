@@ -187,20 +187,20 @@ for (k in list(list("a<VT>b", "a\u000bb", "a<U+000B>b"), list("d'encodage bytes"
   })
 }
 
-verifier("U7 : refus 2, version_fiche 3L : version_fiche_non_admise (pas objet_modifie), message « 3 (integer) » et « 4 (integer) »", {
+verifier("U7 : refus 2, version_fiche 3L : version_fiche_non_admise (pas objet_modifie), message « 3 (integer) » et « 5 (integer) »", {
   y <- x1; y$fiche$version_fiche <- 3L
-  controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(lu = 3L, attendu = 4L),
-                 c("3 (integer)", "4 (integer)", tablexp:::EMPREINTE_CODE))
+  controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(lu = 3L, attendu = 5L),
+                 c("3 (integer)", "5 (integer)", tablexp:::EMPREINTE_CODE))
 })
-verifier("U7 : refus 2, version_fiche 4 (double) : version_fiche_non_admise, message « 4 (double) »", {
-  y <- x1; y$fiche$version_fiche <- 4
-  controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(lu = 4, attendu = 4L),
-                 c("4 (double)", "4 (integer)"))
+verifier("U7 : refus 2, version_fiche 5 (double) : version_fiche_non_admise, message « 5 (double) »", {
+  y <- x1; y$fiche$version_fiche <- 5
+  controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(lu = 5, attendu = 5L),
+                 c("5 (double)", "5 (integer)"))
 })
 verifier("U7 : refus 2, versions$tablexp « a<LF>b » : valeur décrite par l'écrivain, message sur une seule ligne", {
   y <- x1; y$fiche$version_fiche <- 3L; y$fiche$versions$tablexp <- "a\nb"
   r <- refus_de(ecrire_rapport(y))
-  ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L, attendu = 4L), "\"a\\nb\" (character)")
+  ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L, attendu = 5L), "\"a\\nb\" (character)")
   if (isTRUE(ok) && grepl("\n", conditionMessage(r), fixed = TRUE)) "message sur plusieurs lignes" else ok
 })
 # NEL et U+2028 : décrits par l'écrivain, puis neutralisés <U+XXXX> (règle
@@ -208,7 +208,7 @@ verifier("U7 : refus 2, versions$tablexp « a<LF>b » : valeur décrite par l'é
 verifier("U7 : refus 2, versions$tablexp « a<U+0085>b » (NEL) : décrite par l'écrivain, NEL cité <U+0085>, pas en clair", {
   y <- x1; y$fiche$version_fiche <- 3L; y$fiche$versions$tablexp <- "a\u0085b"
   r <- refus_de(ecrire_rapport(y))
-  ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L, attendu = 4L), "\"a<U+0085>b\" (character)")
+  ok <- controle_refus(r, "version_fiche_non_admise", list(lu = 3L, attendu = 5L), "\"a<U+0085>b\" (character)")
   if (isTRUE(ok) && grepl("\u0085", conditionMessage(r), fixed = TRUE)) "NEL écrit en clair" else ok
 })
 verifier("U7 : refus 2, versions$tablexp « a<U+2028>b » : décrite par l'écrivain, U+2028 cité <U+2028>, pas en clair", {
@@ -247,7 +247,7 @@ verifier("U7 : refus 2, versions$tablexp « é » : écrite en clair (caractère
 })
 verifier("U7 : refus 2, version_fiche retirée : version_fiche_non_admise", {
   y <- x1; y$fiche$version_fiche <- NULL
-  controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(attendu = 4L), "4 (integer)")
+  controle_refus(refus_de(ecrire_rapport(y)), "version_fiche_non_admise", list(attendu = 5L), "5 (integer)")
 })
 
 verifier("U8 : refus 3, taux altéré d'un ulp (octet de poids faible) : objet_modifie, message avec les deux empreintes", {
@@ -278,7 +278,7 @@ verifier("U8 : refus 3, empreinte consignée autre MD5 : objet_modifie, message 
                  c(x1$fiche$empreintes$resultat, "0123456789abcdef0123456789abcdef"))
 })
 
-for (cas in list(list("etapes$validation <- list()", function(x) { x$etapes$validation <- list(); x }, "etapes/validation"),
+for (cas in list(list("etapes$inconnue <- list()", function(x) { x$etapes$inconnue <- list(); x }, "etapes/inconnue"),
                  list("table <- data.frame(a = 1)", function(x) { x$table <- data.frame(a = 1); x }, "table"),
                  list("fiche$nouveau <- 1", function(x) { x$fiche$nouveau <- 1; x }, "fiche/nouveau"),
                  list("autre <- 1", function(x) { x$autre <- 1; x }, "autre")))
@@ -641,7 +641,7 @@ verifier("U21 : phrase de plateforme une fois ; « pas de date » ; conventions 
         !grepl(paste0("Hors du périmètre de cette empreinte, et donc de ce contrôle : ", paste(html(hors), collapse = ", "),
                       " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.</p>"), integ, fixed = TRUE))
       e <- c(e, paste(id, ": phrase du contrôle d'intégrité"))
-    if (!"<p>Validations : non produites par cette version (chemin etapes/validation absent de l'objet).</p>" %in% l ||
+    if (!"<p>Étape « validation » : non demandée par le plan (chemin etapes/validation absent de l'objet).</p>" %in% l ||
         !"<p>Table finale et comparaisons : non produites par cette version (chemin table : NULL).</p>" %in% l)
       e <- c(e, paste(id, ": sections 12 et 13"))
   }
@@ -659,7 +659,7 @@ verifier("U22 : etape_brut : légende de etapes/brut/parametres/statuts avant la
     fin <- st - 1L + match("</table>", b[st:length(b)])
     if (is.na(fin) || !startsWith(b[fin + 1L], "<p>Les mots « exact » et « asymptotique »"))
       e <- c(e, paste(id, ": légende hors de sa place"))
-    bin <- any(startsWith(b, "<p>Intervalle binomial « exact »"))
+    bin <- any(startsWith(b, "<p>Intervalles binomiaux (colonnes borne_inf_exacte"))
     if (bin != (id != "R4")) e <- c(e, paste(id, ": légende binomiale"))
   }
   b <- section_de(L$R6, "etape_brut")

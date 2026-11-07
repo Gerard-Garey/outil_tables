@@ -19,6 +19,9 @@
 #    tools::md5sum() sur un fichier temporaire écrit en binaire ; algorithme
 #    nommé ; jamais serialize(), dont l'en-tête porte la version de R
 #    (point 9.4) ;
+#  - empreinte_table(), element_table_fiche() : empreinte d'une table de
+#    référence (première ligne « tablexp table 1 ») et élément de
+#    fiche$tables_reference qui l'identifie (ADR 0015, points 2.2 et 3 ; #73) ;
 #  - empreinte_resultat() : empreinte du résultat, MD5 du texte de l'objet en
 #    forme « empreinte », première ligne « tablexp resultat 1 » (ADR 0011,
 #    point 11 ; cinquième et sixième annotations du 20/10/2026 ; septième,
@@ -69,7 +72,10 @@
 # (point 10 (c)). Le champ est hors empreinte du résultat (fiche/plateforme est
 # dans CHEMINS_HORS_RESULTAT), l'incrément la change (fiche/version_fiche
 # n'y est pas).
-VERSION_FICHE <- 4L
+# Fiche 5 : champ tables_reference, identité des tables de référence lues
+# (ADR 0015, point 3 ; #73), NULL sans table ; premier commit de B13 qui
+# change la définition de la fiche (point 10 (a)).
+VERSION_FICHE <- 5L
 # Versions de fiche admises au rejeu outillé (rejouer_fiche(), ADR 0012,
 # point 3.5 ; #86) : la version courante seule ; ici, et non dans
 # R/construire_table.R, évalué avant ce fichier. Élargir demande, version par
@@ -82,6 +88,10 @@ ALGORITHME_EMPREINTE <- "md5"
 # fiche$empreintes$representation_resultat : cinquième version du point 10
 # (ADR 0011, cinquième annotation du 20/10/2026, (a) ; #67).
 REPRESENTATION_RESULTAT <- "tablexp resultat 1"
+# Première ligne du texte empreinté d'une table de référence, consignée dans
+# fiche$tables_reference/<clé>/representation (ADR 0011, annotation du
+# 05/11/2026, (b) ; ADR 0015, point 2.2 ; #73).
+REPRESENTATION_TABLE <- "tablexp table 1"
 # Statut des empreintes du résultat et du code (cinquième annotation du
 # 20/10/2026, (d)), réunis dans fiche$empreintes$statut_resultat_code par
 # « ; ». Littéraux laissés tels quels, marqués UTF-8 à l'emploi (#50) ;
@@ -729,6 +739,32 @@ md5_octets <- function(octets) {
   unname(tools::md5sum(f))
 }
 
+# Empreinte d'une table de référence (ADR 0011, annotation du 05/11/2026, (b) ;
+# ADR 0015, point 2.2 ; #73) : MD5 du texte, en forme « empreinte », du
+# data.frame nu (age, sexe, annee si présente, qx ; seuls attributs names,
+# class et row.names automatiques) sous la racine `table_reference`, première
+# ligne REPRESENTATION_TABLE. Aucun tri : `t` est l'objet rendu par
+# table_reference(), dont les lignes sont dans l'ordre canonique. Les
+# métadonnées (nom, statut, source, forme_origine, parametres) n'y entrent pas.
+# Seule fonction qui calcule cette empreinte.
+empreinte_table <- function(t) {
+  d <- data.frame(age = t$age, sexe = t$sexe, stringsAsFactors = FALSE)
+  if ("annee" %in% names(t)) d$annee <- t$annee
+  d$qx <- t$qx
+  md5_octets(texte_objet(list(table_reference = d), REPRESENTATION_TABLE, character(0), "empreinte"))
+}
+
+# Élément de fiche$tables_reference d'une table `t` rendue par
+# table_reference() (ADR 0015, point 3.1) : nom, statut, source,
+# forme_origine, parametres (NULL hors du statut synthetique),
+# representation, empreinte, dans cet ordre. Seul constructeur de l'élément.
+element_table_fiche <- function(t) {
+  list(nom = attr(t, "nom", exact = TRUE), statut = attr(t, "statut", exact = TRUE),
+       source = attr(t, "source", exact = TRUE), forme_origine = attr(t, "forme_origine", exact = TRUE),
+       parametres = attr(t, "parametres", exact = TRUE), representation = REPRESENTATION_TABLE,
+       empreinte = empreinte_table(t))
+}
+
 # Périmètre de l'empreinte du résultat (ADR 0011, point 11.1 ; #67) : l'objet
 # `construction` entier moins ces chemins, liste fermée. execution,
 # fiche$versions, fiche$plateforme et les trois derniers champs de
@@ -834,14 +870,15 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # programmation, jamais une valeur retirée en silence ; toute autre valeur
 # inchangée. Stockages admis, liste fermée, conversions sans perte : borne de
 # période Date à stockage double ou integer -> Date double ; délai integer ou
-# double -> double ; graine integer, ou double entier dans l'étendue des
-# integer -> integer (graine NA refusée). Un autre stockage, une étape absente
-# de `parametres` ou en double, ou aux noms de paramètres en double ou autres
-# que ceux du catalogue, sont une erreur de programmation (le plan n'a pas été
-# validé ; un nom en double serait sinon réduit en silence à sa première
-# occurrence, #42). Idempotente : un plan canonique est rendu
-# identical(). Ce n'est pas un plan résolu (point 5.2 : convention demandée
-# inchangée).
+# double -> double ; graine admise par forme_graine() (integer ou double
+# entier, unique, fini, sans attribut, de valeur absolue au plus
+# .Machine$integer.max ; domaine de graine_invalide, #61) -> integer. Un
+# autre stockage, une étape absente de `parametres` ou en double, ou aux noms
+# de paramètres en double ou autres que ceux du catalogue, sont une erreur de
+# programmation (le plan n'a pas été validé ; un nom en double serait sinon
+# réduit en silence à sa première occurrence, #42). Idempotente : un plan
+# canonique est rendu identical(). Ce n'est pas un plan résolu (point 5.2 :
+# convention demandée inchangée).
 canoniser_plan <- function(plan, champs, parametres, ordres) {
   non_canonique <- function(champ)
     stop(sprintf("canoniser_plan() : valeur ou stockage non canonisable pour « %s » (erreur de programmation : plan non validé).",
@@ -859,10 +896,8 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   p[["delai_declaration"]] <- as.double(delai)
   if ("graine" %in% names(p)) {
     g <- p[["graine"]]
-    if (is.double(g) && length(g) == 1L && is.finite(g) && g == trunc(g) && abs(g) <= .Machine$integer.max)
-      g <- as.integer(g)
-    if (!is.integer(g) || anyNA(g)) non_canonique("graine")
-    p[["graine"]] <- g
+    if (!forme_graine(g)) non_canonique("graine")
+    p[["graine"]] <- as.integer(g)
   }
   e <- p[["etapes"]]
   if (anyDuplicated(names(e))) non_canonique("etapes")
@@ -914,10 +949,13 @@ bibliotheque_c <- function(versions = extSoftVersion()) {
 # niveau (point 5.4 ; #22, point 6). Rôles dans l'ordre du catalogue
 # (CATALOGUE_ROLES$role), provenance dans l'ordre (fichier, empreinte,
 # algorithme) (point 5.3). Rejeu : construire_table(donnees, fiche$roles,
-# fiche$plan, fiche$provenance). Le champ hypotheses_brut n'existe que si
-# l'étape `brut` est exécutée : un plan sans cette étape garde les autres
-# champs.
-assembler_fiche <- function(roles, plan, recette, etapes, avertissements, empreintes, provenance) {
+# fiche$plan, fiche$provenance, tables_reference). Le champ hypotheses_brut
+# n'existe que si l'étape `brut` est exécutée : un plan sans cette étape garde
+# les autres champs. `tables_reference` : valeur du champ de même nom, NULL ou
+# liste par clé triée d'éléments formés par element_table_fiche(), rendue par
+# controler_tables_reference() (ADR 0015, point 3.1).
+assembler_fiche <- function(roles, plan, recette, etapes, avertissements, empreintes, provenance,
+                            tables_reference = NULL) {
   pd <- etapes[["donnees"]][["parametres"]]
   pe <- etapes[["exposition"]][["parametres"]]
   unite <- pd$unite_observation
@@ -950,6 +988,8 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     provenance_mention = texte_moteur(if (is.null(provenance)) "aucun fichier (données construites en mémoire)"
                                       else "fichier lu par la couche de lecture"),
     empreintes = empreintes,
+    # NULL gardé comme élément de la liste (champ présent, ADR 0015, point 3.1).
+    tables_reference = tables_reference,
     avertissements = avertissements
   )
   pb <- etapes[["brut"]][["parametres"]]
@@ -982,7 +1022,7 @@ ordonner_fiche <- function(fiche, ordre) {
 # écrite (ecrire_fiche()) ; BLOCS_LECTURE_FICHE en est une partition.
 ORDRE_CHAMPS_FICHE <- c(
   "version_fiche", "versions", "plateforme",
-  "roles", "provenance", "provenance_mention", "empreintes",
+  "roles", "provenance", "provenance_mention", "empreintes", "tables_reference",
   "plan",
   "transition_code", "fin_effective", "unite_observation", "recette", "convention", "unite_exposition", "par_annee",
   "exclusions", "nombre_lignes_exclues",
@@ -1087,7 +1127,7 @@ BLOCS_LECTURE_FICHE <- texte_moteur(list(
   "hypothèses" = c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure",
                   "hypotheses_brut", "avertissements"),
   rejeu = c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention", "empreintes",
-            "graine", "graine_mention", "generateur")))
+            "tables_reference", "graine", "graine_mention", "generateur")))
 
 joindre_chemin <- function(chemin, segment) if (nzchar(chemin)) paste0(chemin, "/", segment) else segment
 
@@ -1518,12 +1558,15 @@ ecrire_fiche <- function(fiche) {
 # de l'en-tête de la fiche écrite (ecrire_fiche()), reprise telle quelle par la
 # section « Rejeu » du rapport figé (ADR 0012, seconde annotation du 24/10/2026,
 # (b) 7 ; #87) ; texte du moteur marqué UTF-8 (#50). Extraite du littéral
-# d'ecrire_fiche() sans changer un octet de la fiche.
+# d'ecrire_fiche() sans changer un octet de la fiche ; alignée sur la note de
+# lecture d'E3.7 du 06/11/2026 (tables de référence, ADR 0015 ; décision Q3
+# du mainteneur, #73).
 TEXTE_REJEU_FICHE <- texte_moteur(paste(
-  "vérifier version_fiche, empreintes/representation et empreintes/donnees ; exécuter",
-  "construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance) sur le plan relu",
-  "de ce texte ; comparer à tolérance par classes (ADR 0009) sur une autre machine, au bit",
-  "près sur la même (E4.6)"))
+  "vérifier version_fiche, empreintes/representation et empreintes/donnees, et l'empreinte de",
+  "chaque table de tables_reference (table importée ou synthétique reçue comme les données, table",
+  "embarquée relue dans le package) ; exécuter construire_table(donnees, fiche$roles, fiche$plan,",
+  "fiche$provenance, tables_reference) sur le plan relu de ce texte ; comparer à tolérance par",
+  "classes (ADR 0009) sur une autre machine, au bit près sur la même (E4.6)"))
 
 # Fiche relue des octets `octets` (raw). Ne contrôle pas version_fiche :
 # c'est l'affaire du rejeu (troisième annotation, (i) ; point 12 (1)). Rejeu
@@ -1571,7 +1614,7 @@ lire_fiche <- function(octets) {
 SECTIONS_RAPPORT <- data.frame(
   section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
               "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements",
-              "validations", "table_finale", "rejeu"),
+              "etape_validation", "etape_importance_exclusions", "table_finale", "rejeu"),
   titre = texte_moteur(c(
     "Lecture du rapport",
     "Identification : empreintes, versions et plateforme",
@@ -1584,18 +1627,20 @@ SECTIONS_RAPPORT <- data.frame(
     "Étape brut : taux bruts et intervalles",
     "Indicateurs de suffisance",
     "Avertissements",
-    "Validations",
+    "Étape validation : statistiques de validation de la table de référence prise telle quelle",
+    "Étape importance_exclusions : importance des exclusions (volumes, événements, exposition et SMR des lignes exclues)",
     "Table finale et comparaisons",
     "Rejeu")),
   nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
-             "objet", "non_produite", "non_produite", "texte"),
-  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, NA, NA, NA),
+             "objet", "etape", "etape", "non_produite", "texte"),
+  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "validation", "importance_exclusions", NA,
+            NA),
   racines = I(list(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
     c("fiche/graine", "fiche/graine_mention", "fiche/generateur"),
-    c("fiche/roles", "fiche/provenance", "fiche/provenance_mention", "fiche/recette", "fiche/unite_observation",
-      "fiche/avertissement_unite"),
+    c("fiche/roles", "fiche/provenance", "fiche/provenance_mention", "fiche/tables_reference", "fiche/recette",
+      "fiche/unite_observation", "fiche/avertissement_unite"),
     c("fiche/plan", "fiche/transition_code", "fiche/fin_effective"),
     c("fiche/convention", "fiche/unite_exposition", "fiche/par_annee", "fiche/exclusions",
       "fiche/nombre_lignes_exclues", "fiche/hypothese_censure", "fiche/hypotheses_brut", "fiche/avertissements"),
@@ -1605,12 +1650,13 @@ SECTIONS_RAPPORT <- data.frame(
     character(0),
     "avertissements",
     "etapes/validation",
+    "etapes/importance_exclusions",
     "table",
     character(0))),
   renvois = I(list(
     character(0), character(0), character(0), character(0), character(0), character(0), character(0),
     character(0), character(0), c("etapes/exposition/resultat/exposition", "etapes/brut/resultat"),
-    character(0), character(0), character(0), character(0))),
+    character(0), character(0), character(0), character(0), character(0))),
   stringsAsFactors = FALSE)
 
 # Tables dont le volume croît avec la base : chemin, type et dimension (lus
@@ -1678,7 +1724,59 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   etape_absente_1 = "Étape « ",
   etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
   etape_absente_3 = " absent de l'objet).",
-  validations = "Validations : non produites par cette version (chemin etapes/validation absent de l'objet).",
+  # Section etape_validation (#4 ; M258 : textes acceptés ; ADR 0012, seconde
+  # annotation du 06/11/2026, (b)).
+  validation_sans_verdict = paste(
+    "Aucune table positionnée n'est produite : la table de référence est prise telle quelle. Aucun verdict ni",
+    "seuil : aucune p-valeur n'est comparée à un niveau, et le moteur ne conclut pas sur l'adéquation de la table."),
+  validation_independante = paste(
+    "Relation « independante » (etapes/validation/parametres/relation_table) : la table est déclarée indépendante",
+    "des observations, aucun paramètre n'est estimé sur ces données (p = 0, ddl = n, nombre de cellules",
+    "retenues)."),
+  validation_ajustee = paste(
+    "Relation « ajustee_hors_outil » (etapes/validation/parametres/relation_table) : la table a été ajustée hors",
+    "de l'outil, sur des données qui peuvent recouper celles-ci ; le nombre de paramètres estimés n'est pas établi",
+    "(état ddl_non_etabli). Aucune p-valeur (asymptotique, exacte ou de Monte-Carlo), aucun intervalle, aucune",
+    "espérance ni variance sous H0, aucune statistique standardisée n'est produite, et aucun tirage de",
+    "Monte-Carlo n'est effectué ; seules les grandeurs descriptives le sont."),
+  validation_h0 = paste(
+    "Hypothèse nulle : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec",
+    "l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c aléatoire)."),
+  validation_hypotheses_tests = paste(
+    "Les p-valeurs asymptotiques et exactes des signes, des suites et de Wilcoxon reposent sur une hypothèse",
+    "qui n'est pas H0 (i) (colonne statut) ; seules les p-valeurs de Monte-Carlo ont un niveau garanti sous",
+    "H0 (i)."),
+  validation_multiplicite = paste(
+    "Aucune correction de multiplicité : chaque p-valeur (statistiques et sous-groupes) est marginale ; sous H0,",
+    "la probabilité qu'au moins une de ces p-valeurs soit petite croît avec leur nombre."),
+  validation_monte_carlo = paste(
+    "p-valeurs de Monte-Carlo : p_MC = (1 + K) / (B + 1), K nombre de réplications D*_c ~ Poisson(A_c) dont la",
+    "statistique est au moins aussi extrême que l'observée (queue supérieure pour X² et G², inférieure pour les",
+    "suites ; pour les signes et Wilcoxon, p = min(1, 2 min(p_inf, p_sup)), chaque queue de la forme",
+    "(1 + K) / (B + 1)), B = etapes/validation/parametres/replications ;",
+    "nombre de tirages effectués : etapes/validation/resultat/monte_carlo/tirages_effectues. Niveau exact :",
+    "P_H0(p_MC <= alpha) <= alpha. Erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre",
+    "fini de réplications, distincte de l'erreur d'estimation."),
+  validation_reference = paste(
+    "Référence de méthode : etapes/validation/parametres/reference_methode (référence de place) ; statistiques",
+    "sous leur forme usuelle, écarts à la note documentés ; le statut de chaque grandeur est dans la colonne",
+    "statut de etapes/validation/resultat/statistiques."),
+  validation_unite_contrat = paste(
+    "Unité d'observation contrat, sans identifiant de tête (fiche/avertissement_unite) : la variance des décès",
+    "est sur-dispersée d'un facteur phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête), ce qui",
+    "rend les tests anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
+    "mesurable sans identifiant de tête."),
+  validation_ensemble = paste(
+    "Table de modalité « ensemble » appliquée à chaque sexe de la segmentation",
+    "(etapes/validation/parametres/appariement_sexe : ensemble_par_sexe)."),
+  # Section etape_importance_exclusions (#69) : texte arrêté par le mainteneur
+  # le 06/11/2026 (M259), sans citation de texte réglementaire ; la mention
+  # validation_unite_contrat y est reprise sous la même condition (décision
+  # Q-c du 06/11/2026).
+  importance_exclusions_portee = paste(
+    "Ces grandeurs mesurent le poids des lignes exclues par les règles d'exclusion déclarées (volumes,",
+    "événements, exposition, SMR) et permettent d'apprécier l'importance des exclusions. Elles ne disent ni si",
+    "les données exclues sont pertinentes, ni si leur exclusion est justifiée."),
   table_finale = "Table finale et comparaisons : non produites par cette version (chemin table : NULL).",
   largeur = "Largeur des intervalles : non produite par cette version.",
   racine_absente = "absent de l'objet",
@@ -1693,10 +1791,12 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "couverture garantie : le statut de chaque grandeur et de chaque intervalle est celui du tableau ci-dessus",
     "(colonnes statut, loi_supposee et calcul), qui fait foi."),
   brut_binomial = paste(
-    "Intervalle binomial « exact » (colonnes borne_inf_exacte et borne_sup_exacte de",
-    "etapes/brut/resultat/binomial) : la formule par quantiles de lois bêta suppose D ~ Bin(E^i, q) avec E^i",
-    "entier ; sous troncature à gauche et censure, l'exposition initiale E^i n'est en général pas entière, et la",
-    "formule en est alors le prolongement continu, de couverture non établie."),
+    "Intervalles binomiaux (colonnes borne_inf_exacte, borne_sup_exacte, borne_inf_asymptotique et",
+    "borne_sup_asymptotique de etapes/brut/resultat/binomial) : les deux formules supposent D ~ Bin(E^i, q), ce",
+    "qui ne vaut que pour une cellule observée entière, sans entrée ni censure dans la cellule (E^i est alors le",
+    "nombre d'unités d'observation, entier). Avec une entrée ou une censure dans la cellule, D ne suit pas",
+    "Bin(E^i, q), même si E^i est entier : la couverture des deux intervalles n'est pas établie ; si E^i n'est",
+    "pas entier, la formule par quantiles de lois bêta en est en outre le prolongement continu."),
   suffisance_intro = paste(
     "Indicateurs de suffisance (E2.15 : exposition et événements par âge et par segment, largeur des",
     "intervalles) : ils signalent ce que les données portent, sans rien interdire. Le rapport n'en calcule",
@@ -1709,9 +1809,11 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   suffisance_brut_absente = "Événements, exposition et bornes d'intervalle par estimateur : non demandée par le plan.",
   rejeu_1 = "Ligne de rejeu de la fiche de construction (en-tête de la fiche écrite par ecrire_fiche()) : ",
   rejeu_2 = paste(
-    "Rejeu outillé : rejouer_fiche(donnees, fiche) reçoit le data.frame des données et la fiche relue de son",
-    "texte par lire_fiche() ; elle contrôle la fiche et les données (version de fiche, algorithme et",
-    "représentation des empreintes, contrôles d'entrée, empreinte des données), refuse à la première",
+    "Rejeu outillé : rejouer_fiche(donnees, fiche, tables_reference) reçoit le data.frame des données, la",
+    "fiche relue de son texte par lire_fiche() et, si la fiche porte des tables de référence importées ou",
+    "synthétiques, ces tables (une table embarquée est relue dans le package) ; elle contrôle la fiche, les",
+    "données et les tables de référence (version de fiche, algorithme et représentation des empreintes,",
+    "contrôles d'entrée, empreinte des données, empreinte de chaque table), refuse à la première",
     "discordance, puis appelle construire_table() une seule fois ; elle rend la construction et un bilan de",
     "rejeu. Le rapport de la construction rejouée s'écrit par ecrire_rapport() appliquée à l'élément",
     "construction de ce résultat."),
@@ -2027,6 +2129,31 @@ corps_section <- function(x, k) {
     e <- SECTIONS_RAPPORT$etape[k]
     if (!(e %in% etapes))
       return(paragraphe(m[["etape_absente_1"]], e, m[["etape_absente_2"]], e, m[["etape_absente_3"]]))
+    if (identical(e, "validation")) {
+      # Étape validation : mentions fixes, lues dans l'objet (relation, unité,
+      # appariement), avant ses tables (M258).
+      pv <- x[["etapes"]][["validation"]][["parametres"]]
+      au <- x[["fiche"]][["avertissement_unite"]]
+      return(c(paragraphe(m[["validation_sans_verdict"]]),
+               paragraphe(m[[if (identical(pv[["relation_table"]], "independante")) "validation_independante"
+                             else "validation_ajustee"]]),
+               paragraphe(m[["validation_h0"]]),
+               if (identical(pv[["relation_table"]], "independante")) paragraphe(m[["validation_hypotheses_tests"]]),
+               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
+               if (identical(pv[["relation_table"]], "independante"))
+                 c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[["validation_monte_carlo"]])),
+               paragraphe(m[["validation_reference"]]),
+               lignes_racines(x, racines)))
+    }
+    if (identical(e, "importance_exclusions")) {
+      # Étape importance_exclusions : mention fixe (M259), puis mention d'unité
+      # contrat sous la même condition que l'étape validation (Q-c).
+      au <- x[["fiche"]][["avertissement_unite"]]
+      return(c(paragraphe(m[["importance_exclusions_portee"]]),
+               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               lignes_racines(x, racines)))
+    }
     if (!identical(e, "brut")) return(lignes_racines(x, racines))
     # Étape brut : note sur la colonne taux en tête ; légendes immédiatement
     # après le tableau des statuts (spécification d'actuary, § 2.4).
@@ -2041,7 +2168,6 @@ corps_section <- function(x, k) {
              element_liste(m[[if ("exposition" %in% etapes) "suffisance_exposition" else "suffisance_exposition_absente"]]),
              element_liste(m[[if ("brut" %in% etapes) "suffisance_brut" else "suffisance_brut_absente"]]),
              element_liste(m[["largeur"]]), "</ul>"))
-  if (identical(id, "validations")) return(paragraphe(m[["validations"]]))
   if (identical(id, "table_finale")) return(paragraphe(m[["table_finale"]]))
   if (identical(id, "rejeu"))
     return(c(paragraphe(m[["rejeu_1"]], TEXTE_REJEU_FICHE), paragraphe(m[["rejeu_2"]]), paragraphe(m[["rejeu_3"]])))

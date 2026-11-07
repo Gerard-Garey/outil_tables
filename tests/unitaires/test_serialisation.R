@@ -509,7 +509,8 @@ local({
                    grepl("17 chiffres significatifs (forme %.17g de la norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par tablexp sans la bibliothèque C ; relecture au bit près constatée sous glibc et sous Windows (R 4.3.3 ucrt), non garantie ailleurs",
                          l, fixed = TRUE)) &&
              !any(grepl("aller-retour exact", l, fixed = TRUE)) &&
-             any(startsWith(l, "# rejeu") & grepl("construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance)", l, fixed = TRUE)))
+             any(startsWith(l, "# rejeu") & grepl("construire_table(donnees, fiche$roles, fiche$plan, fiche$provenance, tables_reference)",
+                                                  l, fixed = TRUE)))
   b <- tablexp:::BLOCS_LECTURE_FICHE
   verifier("BLOCS_LECTURE_FICHE : trois blocs (calculé, hypothèses, rejeu), aucun champ en double",
            identical(names(b), c("calculé", "hypothèses", "rejeu")) && !anyDuplicated(unlist(b)))
@@ -520,11 +521,11 @@ local({
              c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure", "hypotheses_brut",
                "avertissements"),
              c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention", "empreintes",
-               "graine", "graine_mention", "generateur"))))
+               "tables_reference", "graine", "graine_mention", "generateur"))))  # tables_reference : #73
   o_fiche <- tablexp:::ORDRE_CHAMPS_FICHE
   verifier("#64 : ORDRE_CHAMPS_FICHE, huit blocs dans l'ordre de l'avis d'actuary du 20/10/2026 (étape (1)), sans doublon",
            identical(o_fiche, c("version_fiche", "versions", "plateforme",
-                                "roles", "provenance", "provenance_mention", "empreintes",
+                                "roles", "provenance", "provenance_mention", "empreintes", "tables_reference",
                                 "plan",
                                 "transition_code", "fin_effective", "unite_observation", "recette", "convention",
                                 "unite_exposition", "par_annee",
@@ -551,7 +552,7 @@ local({
   verifier("#64 : ordonner_fiche() applique l'ordre donné (élément NULL conservé) et ignore un champ de l'ordre absent de la fiche",
            identical(tablexp:::ordonner_fiche(f_test, c("z", "d", "a", "b", "c", "y")), list(d = "x", a = 1L, b = NULL, c = 3L)) &&
              identical(tablexp:::ordonner_fiche(list(), c("a", "b")), list()))
-  verifier("#64 : names(fiche) suit ORDRE_CHAMPS_FICHE, sans brut (hypotheses_brut absent, 23 champs) et avec brut (24 champs)",
+  verifier("#64 : names(fiche) suit ORDRE_CHAMPS_FICHE, sans brut (hypotheses_brut absent, 24 champs) et avec brut (25 champs)",
            identical(names(x$fiche), setdiff(o_fiche, "hypotheses_brut")) && identical(names(xb$fiche), o_fiche))
   verifier("#64 : aller-retour de la fiche écrite : même objet, mêmes champs dans l'ordre de ORDRE_CHAMPS_FICHE",
            identical(lire_fiche(ecrire_fiche(xb$fiche)), xb$fiche) &&
