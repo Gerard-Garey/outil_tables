@@ -1485,15 +1485,18 @@ pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
 outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
 citent des valeurs à caractères de contrôle ou non ASCII, et la citation
 d'une chaîne latin-1~; issue~\#94), qui doivent être marqués UTF-8 et tenir sur une
-ligne, et dix-huit refus par module, six modules (\code{donnees},
+ligne, et vingt et un refus par module, sept modules (\code{donnees},
 \code{exposition}, \code{brut}, \code{simulation}, \code{rapport},
-\code{construire\_table}) citant chacun une valeur reçue non ASCII de
-codage natif non marqué, latin-1 et UTF-8, avec trois refus de la
+\code{construire\_table}, \code{validation}~: refus
+\code{table\_annee\_non\_admise}) citant chacun une valeur reçue non ASCII de
+codage natif non marqué, latin-1 et UTF-8, chacun levé par le module et
+sous le motif attendus de son entrée (un refus voisin du même module,
+autre garde et même citation, est signalé), avec trois refus de la
 lecture du texte du plan (première ligne inconnue, type inconnu, valeur
 illisible) et deux refus \code{type\_incompatible} sur un rôle date
 (colonne \code{character}, et classe formée d'une chaîne d'encodage
 \code{bytes} et de \code{Date}~; le libellé «~entières~» de
-\code{TYPES\_ADMIS} y est exigé en octets UTF-8), soit vingt-trois
+\code{TYPES\_ADMIS} y est exigé en octets UTF-8), soit vingt-six
 messages, qui doivent en outre ne contenir aucun octet écrit
 «~<xx>~» et garder la valeur citée en octets UTF-8 (issue~\#127~;
 section~\ref{sec:refus}, «~Règle de rédaction des messages~»), puis
@@ -2585,9 +2588,11 @@ installation, qui vérifie d'abord la locale effective~; pour R1 à R6,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
 marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
-issue~\#94)~; messages de refus par module, de la lecture du texte du
+issue~\#94)~; messages de refus par module (sept modules, dont
+\code{validation}, chacun contrôlé sur son module et son motif attendus),
+de la lecture du texte du
 plan et de deux refus \code{type\_incompatible} sur un rôle date,
-vingt-trois en tout (marqués UTF-8, sur une ligne, sans octet écrit
+vingt-six en tout (marqués UTF-8, sur une ligne, sans octet écrit
 «~<xx>~»~; issue~\#127)~; puis ces textes, trois par plan, le bilan, les messages
 de R1 et les messages par module, soit vingt et un, comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
