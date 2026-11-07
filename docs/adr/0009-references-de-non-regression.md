@@ -740,3 +740,24 @@ Trois précisions :
 **Effet sur les résultats : aucun.** Aucun fichier de `R/` n'est modifié par `074f769`, `ddc67ba` ni `486547b` (`git diff --stat 2247794 486547b -- R/` vide, *vérifié*). Aucune référence n'existe encore pour R7, R8 ni R9. La présente annotation ne modifie aucun code.
 
 Issues : #32, #166 ; limite (a) 5 : issue proposée ; #167, #168 (règle (a) 3). Décisions du mainteneur M295 à M298 (07/11/2026). Branche `claude/positionnement-smr`, PR #173.
+
+**(e) Complément du 07/11/2026 : paramètres finals de R9 (commit (1b'), `9c5e4da`).** Rédigé par `architect` à `9c5e4da`, d'après le message de ce commit (`git log -1 9c5e4da`) et le code de `tests/reference/outils_reference.R` à cette tête (lu, l. 205 à 266). Il clôt les points laissés « à fixer au commit (1b') » par (d) 2 et vérifie l'hypothèse de (d) 3. Le texte de (a) à (d) n'est pas réécrit.
+
+1. **Entrée.** Le champ `entree` de R9 vaut `reference_defauts` : `jeu_reference()` (même loi, même portefeuille, graine du jeu 20261016), altéré après son tirage complet par `simuler_portefeuille(defauts =)` (`jeu_reference_defauts()`). La forme attendue de (d) 2 est confirmée.
+2. **Défauts.** Graine 20261108 (`GRAINE_DEFAUTS_R9`), **décision du mainteneur du 07/11/2026** (M300) : elle est distincte de 20261025, déjà employée par les tests unitaires (`test_importance_exclusions.R`, `test_simulation.R`) et par `tests/mesures/`. Trois motifs, 500 lignes chacun, en nombre fixe : `id_contrat_manquant`, `sexe_manquant` et `entree_manquante`. Cela fait 1 500 lignes, en ensembles disjoints, de cibles `deces`, `rachat` et `en_cours`.
+3. **Exclusions du plan de R9** : `id_contrat_manquant`, `entree_manquante`, `sexe_manquant`. La liste diffère de celle de R8 par `id_contrat_manquant` : sans cette exclusion, les lignes porteuses du défaut seraient refusées (`ligne_invalide`).
+4. **Reste du plan** : celui de R8 (point (b)), graine de Monte-Carlo 20261107 (`GRAINE_MONTE_CARLO_R8`) comprise.
+5. **Forme du champ `entree`.** C'est un **nom**, résolu par `tirer_entree()` (`reference` pour R1 à R8, `reference_defauts` pour R9). Ce n'est pas une fonction comme `tables_reference` (point (b)). Le nom permet de tirer chaque entrée distincte une seule fois : `entrees_des_plans()` le fait, et refuse un plan dont le champ `entree` est absent ou n'est pas une chaîne. La remarque R1 de l'audit le demandait. L'amendement du point 4.1 ((d) 1) se lit donc « un champ du plan, nom d'entrée » et non « sur le modèle de `tables_reference` » quant à la forme.
+6. **Empreinte des données de R9** (`fiche/empreintes/donnees`) : `f21fed51a5f95db1c2774709df000ba2`, relevée par `coder` puis `audit` (message de `9c5e4da`). Elle diffère de celle de R1 à R8, comme prévu en (d) 3.
+7. **Hypothèse de (d) 3, « sans effet sur R1 à R8 » : désormais *vérifiée*.** `TOLERANCES`, `jeu_reference()`, les plans et les aplatis de R1 à R8 sont `identical()` à leur état à `3861528`, mesuré par `coder` puis par `audit` (message de `9c5e4da`).
+8. **Limite.** R9 n'exerce pas la soustraction E(R ∪ S) − E(R) : les têtes porteuses sont mono-contrat. Cette soustraction est couverte par le test T4 de `tests/unitaires/test_importance_exclusions.R` (avis d'`actuary`).
+9. **`SANS_REFERENCE`** (point (c)) vaut `c(R7 = "#32", R8 = "#166", R9 = "#166")` à `9c5e4da` (`tests/test_reproductibilite.R:334`, *vérifié* par lecture).
+10. **Point 4.3, ligne R9** (`plans_reference()`, à `9c5e4da`) :
+
+| Id | Description | Segmentation | Délai | Convention | `par_annee` | `estimateurs` | `niveau` | Étapes et champs ajoutés |
+|---|---|---|---|---|---|---|---|---|
+| R9 | validation et importance des exclusions sur une entrée à défauts injectés (R8 sur `reference_defauts`), #166, `9c5e4da` | `sexe` | 0 | `plus_fine` | `FALSE` | `poisson`, `binomial` | 0,95 | `entree = "reference_defauts"` (graine des défauts 20261108, 500 lignes par motif `id_contrat_manquant`, `sexe_manquant`, `entree_manquante`) ; `exclusions = c("id_contrat_manquant", "entree_manquante", "sexe_manquant")` ; `validation`, `importance_exclusions`, `graine = 20261107` et `tables_reference` : ceux de R8 |
+
+Le champ `entree` vaut `reference` pour R1 à R8. L'étape (1c) de (d) 4 (création de R7, R8 et R9 sur la CI) est la suivante.
+
+**Effet sur les résultats de (e)** : aucun. `9c5e4da` ne modifie aucun fichier de `R/` (`git show 9c5e4da --stat`, *vérifié* : six fichiers, tous sous `tests/`) ; aucune référence n'est créée. Décision M300.
