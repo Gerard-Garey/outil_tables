@@ -14,8 +14,8 @@
 #  chaîne au codage « bytes », non UTF-8 valide, ou non ASCII non marquée
 #  dans une session ni UTF-8 ni latin-1 est refusée, jamais convertie).
 #
-#  - plans_reference(), jeu_reference() : plans R1 à R6 et entrée de
-#    référence (points 4.1 et 4.3 ; R6 : première annotation, (b)) ;
+#  - plans_reference(), jeu_reference() : plans R1 à R7 et entrée de
+#    référence (points 4.1 et 4.3 ; R6 : première annotation, (b) ; R7 : #32) ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
 #    type, valeurs), moins `execution`, `fiche$versions`, `fiche$plateforme`
 #    (point 1.1) ; valeurs de fiche/empreintes/resultat et /code remplacées
@@ -143,7 +143,10 @@ plans_reference <- function() {
     R4 = p("R4", "par année (surface), Poisson seul", plan_reference(par_annee = TRUE, estimateurs = "poisson")),
     R5 = p("R5", "en cours -> racheté, unité contrat", plan_reference(transition = c("en_cours", "rachat"))),
     R6 = p("R6", "Kaplan-Meier (R1 avec kaplan_meier)",
-           plan_reference(estimateurs = c("poisson", "binomial", "kaplan_meier"))))
+           plan_reference(estimateurs = c("poisson", "binomial", "kaplan_meier"))),
+    R7 = p("R7", "Kaplan-Meier sous age_atteint_annee (R3 avec kaplan_meier)",
+           plan_reference(convention = "age_atteint_annee",
+                          estimateurs = c("poisson", "binomial", "kaplan_meier"))))
 }
 
 # --- aplatissement (points 1 et 2.3) ------------------------------------------

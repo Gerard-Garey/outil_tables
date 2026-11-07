@@ -16,10 +16,12 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R6 sur l'entrée de référence (jeu_reference()),
+#  3.8) : plans R1 à R7 sur l'entrée de référence (jeu_reference()),
 #  aplatis, aller-retour exact du format, comparés à leur fichier de
-#  tests/reference/ (échec attendu #17 tant que le fichier n'existe pas,
-#  liste SANS_REFERENCE_17), aucune référence orpheline ; témoins sur des
+#  tests/reference/ (échec attendu renvoyant à l'issue de création tant que
+#  le fichier n'existe pas, liste SANS_REFERENCE : R7, #32), aucune
+#  référence orpheline ; R7 : aucun double sans classe de tolérance, Σd par
+#  cellule égale aux evenements de l'exposition (#32) ; témoins sur des
 #  copies temporaires (jamais sur tests/reference/) ; règles des modes du
 #  workflow et lignes de commande produire_references.R (refus d'appel) et
 #  comparer_references.R ; permutation des lignes de l'entrée de référence
@@ -29,7 +31,7 @@
 #  transitions de changement de résultat annoncé (ADR 0009, point 9.5, #47) :
 #  liste unique TRANSITIONS_EN_COURS (vide hors transition), utilitaire
 #  générique et témoins de chaque nature, de l'union et du succès inattendu.
-#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R6 (sections et
+#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R7 (sections et
 #  leur ordre, cellules décimales en %.17g, textes fixes, section brut ; taille
 #  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
 #
@@ -313,17 +315,19 @@ unlink(c(script, sortie))
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
 # référence sur l'entrée de référence, aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R6, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R7, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
 local(for (e in parse(file.path(RACINE, "tests", "reference", "outils_reference.R"), encoding = "UTF-8",
                       keep.source = FALSE)) eval(e, globalenv()))
 DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
-# Plans sans fichier de référence (point 3.7) : échec attendu #17. Le commit
-# de référence de la session principale retire de cette liste les plans
-# qu'il crée (succès inattendu sinon).
-SANS_REFERENCE_17 <- character(0)
+# Plans sans fichier de référence (point 3.7) : échec attendu renvoyant à
+# l'issue de création du plan (#17 pour R1 à R6, créés en `1019d8e`). Vecteur
+# nommé : identifiant du plan -> issue de création. Le commit de référence de
+# la session principale retire de cette liste les plans qu'il crée (succès
+# inattendu sinon).
+SANS_REFERENCE <- c(R7 = "#32")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -649,7 +653,7 @@ issue_des_restes <- function(transitions) {
 # 5a95f9c : octets_lignes(sprintf("%d", x)) et octets_lignes(txt[match(j,
 # u)])). Les références ne comparent que le jeton de l'empreinte (ADR 0009,
 # seconde annotation du 20/10/2026) : l'égalité à l'oracle en garde la valeur,
-# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R6 ne
+# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R7 ne
 # portent aucun entier négatif (les dates s'écrivent en ISO, sans signe) : le
 # signe des entiers est gardé par les tests unitaires des écrivains, non par
 # cet oracle.
@@ -666,7 +670,7 @@ oracle_empreinte_resultat <- local({
   e$empreinte_resultat
 })
 
-# Rapport figé (#87, U24) : contrôles du document de R1 à R6 à 10^5 lignes
+# Rapport figé (#87, U24) : contrôles du document de R1 à R7 à 10^5 lignes
 # (spécification d'actuary du 24/10/2026, U14, U18, U21, U22, repris de
 # tests/unitaires/test_rapport.R) ; rend TRUE ou la liste des écarts.
 controler_rapport_fige <- function(x, l, id) {
@@ -725,7 +729,7 @@ controler_rapport_fige <- function(x, l, id) {
   if (length(st) != 1L || !length(re) || st > re[1L]) e <- c(e, "U22 : ordre des légendes")
   if (any(startsWith(b, "<p>Intervalles binomiaux (colonnes borne_inf_exacte")) != ("binomial" %in% x$etapes$brut$parametres$estimateurs))
     e <- c(e, "U22 : légende binomiale")
-  if (id == "R6" && !any(grepl("^<tr><td>etapes/brut/resultat/kaplan_meier_sauts</td><td>data.frame</td><td>[0-9]+</td><td>non reproduites", b)))
+  if (id %in% c("R6", "R7") && !any(grepl("^<tr><td>etapes/brut/resultat/kaplan_meier_sauts</td><td>data.frame</td><td>[0-9]+</td><td>non reproduites", b)))
     e <- c(e, "U22 : kaplan_meier_sauts")
   if (length(e)) e else TRUE
 }
@@ -764,6 +768,27 @@ for (p in plans_reference()) {
            if (inherits(g, "refus_reference")) conditionMessage(g) else TRUE)
   if (inherits(g, "refus_reference")) next
   aplatis[[id]] <- g
+  # Règle de complétude (point 3.4), avant toute création : un double sans
+  # classe ferait échouer le workflow de création (critère de #32).
+  verifier(sprintf("%s : aucun double sans classe de tolérance dans l'objet aplati (point 3.4)", id), {
+    sans <- doubles_sans_tolerance(g)
+    if (length(sans)) paste("sans tolérance :", paste(utils::head(sans, 5L), collapse = ", ")) else TRUE
+  })
+  # R7 (#32) : Kaplan-Meier sous age_atteint_annee. Σd par cellule des sauts =
+  # evenements de la cellule Kaplan-Meier = evenements de l'exposition (même
+  # cellules, mêmes effectifs d'événements).
+  if (id == "R7") verifier("R7 : Σ des evenements des sauts par cellule = evenements de Kaplan-Meier = evenements de l'exposition (#32)", {
+    ex <- x_ref$etapes$exposition$resultat$exposition
+    km <- x_ref$etapes$brut$resultat$kaplan_meier
+    sa <- x_ref$etapes$brut$resultat$kaplan_meier_sauts
+    cle <- function(d) paste(d$sexe, d$age)
+    som <- tapply(sa$evenements, cle(sa), sum)
+    d_sauts <- unname(ifelse(is.na(som[cle(km)]), 0L, som[cle(km)]))
+    if (!identical(cle(km), cle(ex))) "cellules de Kaplan-Meier et de l'exposition différentes"
+    else if (!identical(as.integer(d_sauts), km$evenements)) "Σ des sauts différente des evenements de Kaplan-Meier"
+    else if (!identical(km$evenements, ex$evenements)) "evenements de Kaplan-Meier différents de ceux de l'exposition"
+    else if (sum(sa$evenements) != sum(ex$evenements)) "totaux différents" else TRUE
+  })
   f <- tempfile(fileext = ".tsv")
   ecrire_reference(g, f, c(identifiant = id))
   verifier(sprintf("%s : aller-retour lire(ecrire(aplatir(x))) identical() (types et valeurs)", id), {
@@ -785,9 +810,9 @@ for (p in plans_reference()) {
   # Échec attendu seulement si le fichier est absent : un plan encore listé
   # dont le fichier existe échoue (marque à retirer ; la comparaison devient
   # alors un test ordinaire).
-  if (id %in% SANS_REFERENCE_17 && !present) echec_attendu(nom, "#17", comparer_au_fichier(id, g))
-  else if (id %in% SANS_REFERENCE_17)
-    verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE_17", id, id))
+  if (id %in% names(SANS_REFERENCE) && !present) echec_attendu(nom, SANS_REFERENCE[[id]], comparer_au_fichier(id, g))
+  else if (id %in% names(SANS_REFERENCE))
+    verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE", id, id))
   else controler_plan(id, nom, lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv"))), g,
                       comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, jeu_ref$donnees, jeu_ref$roles)
 }
@@ -1091,14 +1116,18 @@ for (chemin_cellules in c("etapes/exposition/diagnostics/cellules", "etapes/brut
     chemin_cellules %in% doubles_sans_tolerance(g) && !chemin_cellules %in% doubles_sans_tolerance(g, masque)
   })
 }
-restes_commites <- function() lapply(plans_reference(), function(p) {
+# Un plan listé dans SANS_REFERENCE et sans fichier n'a pas de référence
+# commitée à lire : son objet aplati est contrôlé par la boucle des plans
+# (aucun double sans classe de tolérance).
+restes_commites <- function() lapply(Filter(function(p) file.exists(file.path(DOSSIER_REFERENCES, paste0(p$identifiant, ".tsv"))) ||
+                                                    !p$identifiant %in% names(SANS_REFERENCE), plans_reference()), function(p) {
   f <- file.path(DOSSIER_REFERENCES, paste0(p$identifiant, ".tsv"))
   if (!file.exists(f)) return(paste("absent :", f))
   doubles_sans_tolerance(lire_reference(f))
 })
 restes_vides <- function(restes)
   if (all(lengths(restes) == 0L)) TRUE else paste(names(restes)[lengths(restes) > 0L], collapse = ", ")
-nom_restes <- "tolérances : aucun double sans tolérance déclarée dans les six références commitées (table sans clé integer)"
+nom_restes <- "tolérances : aucun double sans tolérance déclarée dans les références commitées (table sans clé integer)"
 # Plans en transition (#47) : tant que la référence commitée porte un double
 # que les transitions admettent (type converti depuis double, ou retrait), ce
 # reste est admis par un test ordinaire et le test strict est un échec
@@ -1322,11 +1351,11 @@ verifier("lecture des doubles : aller-retour exact d'un fichier, branche de l'h�
   ecrire_reference(g, f, c(identifiant = "doubles"))
   meme_double(lire_reference(f)$valeurs$x, v)
 })
-verifier("témoin : référence orpheline détectée (R7.tsv dans un dossier temporaire)", {
+verifier("témoin : référence orpheline détectée (R99.tsv dans un dossier temporaire)", {
   d <- tempfile("references_"); dir.create(d)
-  file.copy(F_BASE, file.path(d, "R6.tsv")); file.copy(F_BASE, file.path(d, "R7.tsv"))
+  file.copy(F_BASE, file.path(d, "R6.tsv")); file.copy(F_BASE, file.path(d, "R99.tsv"))
   o <- references_orphelines(d); unlink(d, recursive = TRUE)
-  identical(o, "R7.tsv")
+  identical(o, "R99.tsv")
 })
 # Règles des modes du workflow (point 5.2), table de vérité.
 verifier("règles des modes : creation, regeneration, bascule, releve (table de vérité)", {
@@ -2068,13 +2097,13 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R6 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R7 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R6, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R7, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant
@@ -2084,7 +2113,7 @@ local({
     f <- lire_fiche(ecrire_fiche(x$fiche))
     verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
     # #57 : lignes reçues = lignes conservées + lignes distinctes exclues ;
-    # aucune exclusion déclarée dans R1 à R6, donc 0L et aucune ligne écartée.
+    # aucune exclusion déclarée dans R1 à R7, donc 0L et aucune ligne écartée.
     verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (0L, integer) (#57)", id),
              identical(x$fiche$nombre_lignes_exclues, 0L) &&
                nrow(jeu_ref$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
