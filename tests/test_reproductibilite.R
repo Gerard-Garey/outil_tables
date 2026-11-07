@@ -16,17 +16,19 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R9 sur l'entrée de chaque plan (jeu_reference(), ou
+#  3.8) : plans R1 à R12 sur l'entrée de chaque plan (jeu_reference(), ou
 #  jeu_reference_defauts() pour R9), aplatis, aller-retour exact du format,
 #  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
 #  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE, vide depuis la création de R7 à R9), aucune référence
-#  orpheline ;
+#  SANS_REFERENCE : R10 à R12), aucune référence orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
 #  exclusions, table importée passée par tables_reference (#166) ; R9 : le
 #  même plan sur une entrée à défauts injectés, lignes exclues par motif et
-#  retraits non nuls (#166) ; témoins sur des copies temporaires (jamais sur
+#  retraits non nuls (#166) ; R10 : positionnement par SMR et validation de
+#  la table positionnée (#167) ; R11 : test d'homogénéité entre segments
+#  (#168) ; R12 : le même test sous H0 vraie, transition en_cours -> rachat
+#  (#168, M307) ; témoins sur des copies temporaires (jamais sur
 #  tests/reference/) ; règles des modes du workflow et lignes de commande
 #  produire_references.R (refus d'appel) et comparer_references.R ;
 #  permutation des lignes de l'entrée de référence
@@ -36,7 +38,7 @@
 #  transitions de changement de résultat annoncé (ADR 0009, point 9.5, #47) :
 #  liste unique TRANSITIONS_EN_COURS (vide hors transition), utilitaire
 #  générique et témoins de chaque nature, de l'union et du succès inattendu.
-#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R9 (sections et
+#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R12 (sections et
 #  leur ordre, cellules décimales en %.17g, textes fixes, section brut ; taille
 #  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
 #
@@ -320,7 +322,7 @@ unlink(c(script, sortie))
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
 # référence sur son entrée (champ `entree`, point 4.1), aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R9, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R12, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
@@ -332,7 +334,7 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-SANS_REFERENCE <- character(0)
+SANS_REFERENCE <- c(R10 = "#167", R11 = "#168", R12 = "#168")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -658,7 +660,7 @@ issue_des_restes <- function(transitions) {
 # 5a95f9c : octets_lignes(sprintf("%d", x)) et octets_lignes(txt[match(j,
 # u)])). Les références ne comparent que le jeton de l'empreinte (ADR 0009,
 # seconde annotation du 20/10/2026) : l'égalité à l'oracle en garde la valeur,
-# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R9 ne
+# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R12 ne
 # portent aucun entier négatif (les dates s'écrivent en ISO, sans signe) : le
 # signe des entiers est gardé par les tests unitaires des écrivains, non par
 # cet oracle.
@@ -675,7 +677,7 @@ oracle_empreinte_resultat <- local({
   e$empreinte_resultat
 })
 
-# Rapport figé (#87, U24) : contrôles du document de R1 à R9 à 10^5 lignes
+# Rapport figé (#87, U24) : contrôles du document de R1 à R12 à 10^5 lignes
 # (spécification d'actuary du 24/10/2026, U14, U18, U21, U22, repris de
 # tests/unitaires/test_rapport.R) ; rend TRUE ou la liste des écarts.
 controler_rapport_fige <- function(x, l, id) {
@@ -749,13 +751,14 @@ controler_rapport_fige <- function(x, l, id) {
 }
 
 # Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
-# distincte tirée une seule fois ; jeu_ref est l'entrée `reference` (R1 à R8),
+# distincte tirée une seule fois ; jeu_ref est l'entrée `reference` (R1 à R8,
+# R10 à R12),
 # que les contrôles propres à un plan de cette entrée (permutation, R6) lisent.
 entrees_ref <- entrees_des_plans(plans_reference())
 jeu_ref <- entrees_ref[["reference"]]
-verifier("entrées des plans : R1 à R8 sur `reference`, R9 sur `reference_defauts` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
+verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
   e <- unname(vapply(plans_reference(), function(p) p$entree, ""))
-  attendu <- c(rep("reference", 8L), "reference_defauts")
+  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L))
   if (!identical(e, attendu))
     paste0("entrées des plans obtenues (", paste(e, collapse = ", "), ") contre attendues (", paste(attendu, collapse = ", "), ")")
   else if (!identical(names(entrees_ref), c("reference", "reference_defauts")))
@@ -874,7 +877,7 @@ for (p in plans_reference()) {
   # niveau hors etapes/ et fiche/ (avertissements/, table/ à venir) n'est
   # couvert par aucun invariant ; il hériterait en silence d'une clé d'étape si
   # un segment intermédiaire portait le nom de l'étape. Aucun tel double dans
-  # R1 à R9 (mesuré : 0) ; à couvrir quand un premier apparaîtra.
+  # R1 à R12 (mesuré : 0) ; à couvrir quand un premier apparaîtra.
   verifier(sprintf("%s : tout double d'une étape est classé par des clés qui commencent par l'étape (point 3.4)", id), {
     d <- names(g$types)[g$types == "double"]
     mal <- doubles_etape_mal_classes(d)
@@ -1326,8 +1329,8 @@ for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
     })
   }
 }
-# Étape homogeneite (#168) : aucun plan de référence ne la porte encore (plan
-# de méthode à l'étape (R)) ; ses clés `homogeneite/…` de TOLERANCES sont
+# Étape homogeneite (#168) : R11 et R12 la portent (plans de méthode ; sans fichier
+# de référence tant que la CI ne les a pas créés) ; ses clés `homogeneite/…` de TOLERANCES sont
 # contrôlées ici sur une construction témoin (plan de R1 et étape homogeneite,
 # segmentation sexe, entrée `reference`), en mémoire, sans écriture sous
 # tests/reference/ : complétude (point 3.4), invariants (b) et (d) de #175,
@@ -2429,13 +2432,13 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R9 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R12 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R9, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R12, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant
@@ -2446,7 +2449,7 @@ local({
     f <- lire_fiche(ecrire_fiche(x$fiche))
     verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
     # #57 : lignes reçues = lignes conservées + lignes distinctes exclues ;
-    # aucune exclusion déclarée dans R1 à R7, et R8 en déclare deux dont aucune règle ne
+    # aucune exclusion déclarée dans R1 à R7, et R8 et R10 en déclarent deux dont aucune règle ne
     # touche l'entrée de référence : 0L et aucune ligne écartée. R9 déclare trois
     # exclusions sur une entrée qui porte NOMBRE_PAR_MOTIF_R9 lignes de chacun des
     # motifs correspondants : MOTIFS_DEFAUTS_R9 x NOMBRE_PAR_MOTIF_R9 lignes exclues.

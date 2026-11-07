@@ -15,10 +15,13 @@
 #  dans une session ni UTF-8 ni latin-1 est refusée, jamais convertie).
 #
 #  - plans_reference(), jeu_reference(), jeu_reference_defauts() : plans R1 à
-#    R9 et entrées de référence (points 4.1 et 4.3 ; R6 : première annotation,
+#    R12 et entrées de référence (points 4.1 et 4.3 ; R6 : première annotation,
 #    (b) ; R7 : #32 ; R8 : #166, avec `tables_reference`, table importée en
 #    valeurs littérales ; R9 : #166, avec `entree`, une entrée par plan,
-#    annotation du 07/11/2026, (d)) ;
+#    annotation du 07/11/2026, (d) ; R10 : #167, positionnement par SMR et
+#    validation de la table positionnée ; R11 : #168, test d'homogénéité entre
+#    segments ; R12 : #168, le même test sous H0 vraie ; plans de méthode,
+#    point 5.2) ;
 #  - tirer_entree(nom), entrees_des_plans(plans) : tirage de l'entrée d'un
 #    plan, chaque entrée distincte une seule fois ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
@@ -280,6 +283,21 @@ nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANC
 PERIODE_REFERENCE <- list(debut = as.Date("2015-01-01"), fin = as.Date("2024-12-31"))
 GRAINE_REFERENCE <- 20261016L
 GRAINE_MONTE_CARLO_R8 <- 20261107L  # Monte-Carlo de la validation de R8 et de R9 (distincte de celle du jeu)
+# Monte-Carlo de la validation de R10 (réplications multinomiales conditionnelles
+# aux décès de chaque segment, relation positionnee) et du test d'homogénéité de
+# R11 (réplications conditionnelles aux décès de chaque cellule) : une graine
+# propre à chaque plan, distinctes entre elles, de celle du jeu
+# (GRAINE_REFERENCE), de GRAINE_MONTE_CARLO_R8, de celle des défauts de R9
+# (GRAINE_DEFAUTS_R9) et de toute graine d'un test ou d'une mesure du dépôt
+# (recherche de 2026xxxx dans le dépôt entier au 07/11/2026 : 20261113 et
+# 20261114 n'y figurent pas).
+# R12 (#168, M307) : test d'homogénéité sous H0 exactement vraie (transition
+# en_cours -> rachat, facteurs de rachat H = F = 1 dans simuler_reference()),
+# où les p de Monte-Carlo ne sont pas au plancher et épinglent le flux des
+# réplications ; graine propre, absente du dépôt au 07/11/2026 (20261115).
+GRAINE_MONTE_CARLO_R10 <- 20261113L
+GRAINE_MONTE_CARLO_R11 <- 20261114L
+GRAINE_MONTE_CARLO_R12 <- 20261115L
 ROLES_REFERENCE <- c(id_contrat = "id_contrat", id_tete = "id_tete", sexe = "sexe",
                      date_naissance = "date_naissance", date_entree = "date_entree",
                      date_sortie = "date_sortie", cause_sortie = "cause_sortie")
@@ -322,7 +340,7 @@ jeu_reference_defauts <- function() {
 }
 
 # Entrée d'un plan (champ `entree` de plans_reference() : le nom de l'entrée) :
-# `reference` (jeu_reference(), R1 à R8) ou `reference_defauts`
+# `reference` (jeu_reference(), R1 à R8, R10 à R12) ou `reference_defauts`
 # (jeu_reference_defauts(), R9). Un nom plutôt qu'une fonction, pour que
 # l'outillage tire chaque entrée distincte une seule fois (entrees_des_plans()).
 tirer_entree <- function(nom)
@@ -388,16 +406,20 @@ tables_reference_r8 <- function() {
     source = "valeurs littérales de tests/reference/outils_reference.R (QX_TABLE_R8), arrondies à 5 chiffres significatifs"))
 }
 
-# `exclusions`, `validation`, `importance` et `graine` : étapes et graine
-# facultatives (R8) ; absents, le plan est celui de R1 à R7 (champs et ordre
-# inchangés).
+# `exclusions`, `positionnement`, `homogeneite`, `validation`, `importance` et
+# `graine` : étapes et graine facultatives (R8 ; R10 à R12 : #167, #168) ;
+# absents, le plan est celui de R1 à R7 (champs et ordre inchangés). Les
+# étapes sont écrites dans l'ordre d'ETAPES (R/construire_table.R).
 plan_reference <- function(transition = c("vivant", "deces"), segmentation = "sexe", delai = 0,
                            convention = "plus_fine", par_annee = FALSE,
                            estimateurs = c("poisson", "binomial"), niveau = 0.95,
-                           exclusions = character(0), validation = NULL, importance = NULL, graine = NULL) {
+                           exclusions = character(0), positionnement = NULL, homogeneite = NULL,
+                           validation = NULL, importance = NULL, graine = NULL) {
   etapes <- list(donnees = list(exclusions = exclusions),
                  exposition = list(convention = convention, par_annee = par_annee),
                  brut = list(estimateurs = estimateurs, niveau = niveau))
+  if (!is.null(positionnement)) etapes$positionnement <- positionnement
+  if (!is.null(homogeneite)) etapes$homogeneite <- homogeneite
   if (!is.null(validation)) etapes$validation <- validation
   if (!is.null(importance)) etapes$importance_exclusions <- importance
   plan <- list(transition = list(depart = transition[1L], arrivee = transition[2L]),
@@ -416,7 +438,7 @@ plan_reference <- function(transition = c("vivant", "deces"), segmentation = "se
 tables_du_plan <- function(p) if (is.null(p$tables_reference)) NULL else p$tables_reference()
 
 # Un identifiant n'est jamais réemployé (point 4.3). `entree` : nom de
-# l'entrée du plan (tirer_entree()), `reference` pour R1 à R8.
+# l'entrée du plan (tirer_entree()), `reference` pour R1 à R8, R10 à R12.
 plans_reference <- function() {
   p <- function(id, description, plan, tables_reference = NULL, entree = "reference")
     list(identifiant = id, description = description, plan = plan, tables_reference = tables_reference,
@@ -426,6 +448,14 @@ plans_reference <- function() {
                      plage_ages = c(20, 90), tranches_age = c(20, 50, 70),
                      niveau = 0.95, replications = 999)
   importance <- list(niveau = 0.95)
+  # R10 (#167) : positionnement par SMR sur la table de R8, puis validation de
+  # la table positionnée (relation positionnee : même clé de table et même
+  # plage d'âges que le positionnement, tranches libres).
+  positionnement <- list(methode = "smr", table_reference = "tv", plage_ages = c(20, 90), niveau = 0.95)
+  validation_positionnee <- validation
+  validation_positionnee$relation_table <- "positionnee"
+  # R11 (#168) et R12 (#168, M307) : test d'homogénéité entre segments (sexe), sous H0 fausse (R1) et vraie (R5).
+  homogeneite <- list(plage_ages = c(20, 90), tranches_age = c(20, 50, 70), replications = 999)
   list(
     R1 = p("R1", "décès, référence principale", plan_reference()),
     R2 = p("R2", "sans segmentation, délai 90, niveau 0,99",
@@ -446,7 +476,17 @@ plans_reference <- function() {
                          paste(MOTIFS_DEFAUTS_R9, collapse = ", "), NOMBRE_PAR_MOTIF_R9, GRAINE_DEFAUTS_R9),
            plan_reference(exclusions = c("id_contrat_manquant", "entree_manquante", "sexe_manquant"),
                           validation = validation, importance = importance, graine = GRAINE_MONTE_CARLO_R8),
-           tables_reference = tables_reference_r8, entree = "reference_defauts"))
+           tables_reference = tables_reference_r8, entree = "reference_defauts"),
+    R10 = p("R10", "positionnement par SMR sur la table de R8 et validation de la table positionnée (plan de R8 avec les étapes positionnement et validation en relation positionnee ; exclusions déclarées, sans ligne touchée par l'entrée de référence)",
+            plan_reference(exclusions = c("entree_manquante", "sexe_manquant"), positionnement = positionnement,
+                           validation = validation_positionnee, importance = importance,
+                           graine = GRAINE_MONTE_CARLO_R10),
+            tables_reference = tables_reference_r8),
+    R11 = p("R11", "test d'homogénéité entre segments (R1 avec l'étape homogeneite)",
+            plan_reference(homogeneite = homogeneite, graine = GRAINE_MONTE_CARLO_R11)),
+    R12 = p("R12", "test d'homogénéité entre segments sous H0 (R5 avec l'étape homogeneite ; le sexe est sans effet sur la loi vraie du rachat) : épingle le flux des réplications",
+            plan_reference(transition = c("en_cours", "rachat"), homogeneite = homogeneite,
+                           graine = GRAINE_MONTE_CARLO_R12)))
 }
 
 # --- aplatissement (points 1 et 2.3) ------------------------------------------

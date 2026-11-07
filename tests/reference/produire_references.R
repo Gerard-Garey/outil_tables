@@ -139,7 +139,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
     # Un refus ou une erreur de construction consigne le plan comme non
     # produit (comme les échecs d'aplatissement, d'écriture et de lecture) :
     # les autres plans sont produits et comparés, le bilan est écrit.
-    # `tables_reference` : tables lues par le plan (NULL hors R8 et R9, #166).
+    # `tables_reference` : tables lues par le plan (NULL hors R8 à R10, #166, #167).
     x <- tryCatch(construire_table(jeu$donnees, jeu$roles, p$plan, tables_reference = tables_du_plan(p)),
                   error = function(e) e)
     if (inherits(x, "error")) { non_produit(x, "construction en échec"); next }

@@ -360,7 +360,7 @@ verifier("messages de refus : passe sur un témoin conforme (citations, liste_gu
 unlink(c(d, e, sans_exception), recursive = TRUE)
 
 # --- tablexp sous la locale C (issue #66) -------------------------------------
-# Le contrôle complet (deux installations, R1 à R9 sous C et sous UTF-8) dure
+# Le contrôle complet (deux installations, R1 à R12 sous C et sous UTF-8) dure
 # une trentaine de secondes : il est une étape de la CI, non rejouée ici. Seul
 # le chemin d'échec bon marché l'est : une racine sans package sort en code 1
 # et nomme l'installation en échec.
@@ -403,7 +403,7 @@ verifier("locale C : ecart_octets() — longueurs inégales à préfixe commun (
                      "longueurs 8 et 5 octets ; premier octet différent : 6 (ligne 2)"))
 
 # --- tablexp sous une locale latin-1 (issue #115) -------------------------------
-# Comme pour la locale C : le contrôle complet (deux installations, R1 à R9 et
+# Comme pour la locale C : le contrôle complet (deux installations, R1 à R12 et
 # quatre jeux de segments sous latin-1 et sous UTF-8) est une étape de la CI,
 # non rejouée ici. Chemins d'échec bon marché : racine sans package (la locale
 # est générée par localedef, l'installation sous latin-1 échoue et est nommée) ;

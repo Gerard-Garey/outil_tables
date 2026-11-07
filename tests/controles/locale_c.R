@@ -15,7 +15,7 @@
 #       en_US.UTF-8 : sondée comme le harnais) ;
 #    2. dans un sous-processus par bibliothèque, sous la locale de son
 #       installation, qui vérifie d'abord que la session est bien en C (resp.
-#       en UTF-8) : pour R1 à R9 (plans_reference() de
+#       en UTF-8) : pour R1 à R12 (plans_reference() de
 #       tests/reference/outils_reference.R, sur l'entrée de chaque plan :
 #       jeu_reference(), ou jeu_reference_defauts() pour R9), construire_table(), puis
 #       ecrire_fiche(x$fiche) et ecrire_plan(x$fiche$plan), relus par
@@ -29,7 +29,7 @@
 #       trois refus de lire_texte() et deux type_incompatible sur un rôle
 #       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
 #       octet « <xx> » (#127) ;
-#    3. les textes (fiche, plan et rapport figé de R1 à R9, bilan du rejeu et
+#    3. les textes (fiche, plan et rapport figé de R1 à R12, bilan du rejeu et
 #       messages de refus de R1, messages de refus par module) écrits sous C
 #       et sous UTF-8 sont comparés
 #       octet à octet. Aucune
@@ -51,7 +51,7 @@
 
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
 LOCALE_INVENTEE <- "xx_XX.UTF-8"  # comme tests/harnais.R (critère de #109)
-IDENTIFIANTS <- paste0("R", 1:9)
+IDENTIFIANTS <- paste0("R", 1:12)
 
 # Orchestration commune (installer, executer, avec_environnement, duree,
 # ecart_octets : tests/controles/orchestration_locale.R, #117), chargée dans
@@ -96,7 +96,7 @@ locale_utf8_disponible <- function(candidats = LOCALES_UTF8) {
 
 environnement_locale <- function(locale) c(LC_ALL = locale, LANG = locale, LC_CTYPE = locale)
 
-# --- sous-processus : R1 à R9, fiche et plan --------------------------------
+# --- sous-processus : R1 à R12, fiche et plan --------------------------------
 
 travailleur <- function(args) {
   lib <- args[1L]; attendu <- args[2L]; sortie <- args[3L]; racine <- args[4L]
@@ -313,7 +313,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
   if (length(defauts)) echec()
   for (c_ in cas) {
-    cat(sprintf("  R1 à R9, fiche, plan et rapport figé, sous LC_ALL=%s :\n", c_$locale))
+    cat(sprintf("  %s, fiche, plan et rapport figé, sous LC_ALL=%s :\n", paste(IDENTIFIANTS, collapse = ", "), c_$locale))
     e <- executer(script, racine, c_$lib, environnement_locale(c_$locale), c_$attendu, c_$sortie)
     cat(paste0("  ", e$sortie), sep = "\n")
     cat(sprintf("  durée : %s\n", e$duree))
@@ -359,7 +359,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   if (n_comparees != 3L * length(IDENTIFIANTS) + 3L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
   cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu et messages de refus de R1, messages de refus par module) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
-              n_comparees, paste(range(IDENTIFIANTS), collapse = " à "), utf8, duree(t_debut)))
+              n_comparees, paste(IDENTIFIANTS, collapse = ", "), utf8, duree(t_debut)))
   invisible(TRUE)
 }
 

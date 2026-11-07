@@ -22,7 +22,7 @@
 #       locale_c.R et le harnais) ;
 #    3. dans un sous-processus par bibliothèque, sous la locale de son
 #       installation, qui vérifie d'abord que la session est bien latin-1
-#       (resp. UTF-8) : R1 à R9 (plans_reference() de
+#       (resp. UTF-8) : R1 à R12 (plans_reference() de
 #       tests/reference/outils_reference.R, sur l'entrée de chaque plan :
 #       jeu_reference(), ou jeu_reference_defauts() pour R9) puis, pour quatre jeux dont les
 #       valeurs de segment non ASCII sont natives non marquées, marquées
@@ -50,7 +50,7 @@
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
 LOCALE_INVENTEE <- "xx_XX.UTF-8"  # comme tests/harnais.R (critère de #109)
 LOCALE_LATIN1 <- "fr_FR.ISO-8859-1"
-IDENTIFIANTS <- paste0("R", 1:9)
+IDENTIFIANTS <- paste0("R", 1:12)
 JEUX_NON_ASCII <- c("natif", "latin1", "utf8", "mixte")
 
 # Orchestration commune (installer, executer, avec_environnement, duree,
@@ -156,7 +156,7 @@ hex_octets <- function(x) vapply(x, function(s) paste(sprintf("%02x", as.integer
 # classés comme des chaînes hexadécimales de même longueur de paire (radix).
 ordre_reference <- function(v) { h <- unique(hex_octets(enc2utf8(v))); h[order(h, method = "radix")] }
 
-# --- sous-processus : R1 à R9 et jeux non ASCII --------------------------------
+# --- sous-processus : R1 à R12 et jeux non ASCII --------------------------------
 
 travailleur <- function(args) {
   lib <- args[1L]; attendu <- args[2L]; sortie <- args[3L]; racine <- args[4L]
@@ -278,7 +278,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
   if (length(defauts)) echec()
   for (c_ in cas) {
-    cat(sprintf("  R1 à R9 et jeux de segments non ASCII (%s), sous LC_ALL=%s :\n", paste(JEUX_NON_ASCII, collapse = ", "), c_$nom))
+    cat(sprintf("  %s et jeux de segments non ASCII (%s), sous LC_ALL=%s :\n", paste(IDENTIFIANTS, collapse = ", "), paste(JEUX_NON_ASCII, collapse = ", "), c_$nom))
     e <- executer(script, racine, c_$lib, c_$env, c_$attendu, c_$sortie)
     cat(paste0("  ", e$sortie), sep = "\n")
     cat(sprintf("  durée : %s\n", e$duree))
@@ -300,7 +300,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   if (n_comparees != length(noms) && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
   cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s et de %d jeux de segments non ASCII, ordre des segments) identiques octet à octet sous %s et sous %s ; aller-retour identical() ; durée totale %s.\n",
-              n_comparees, paste(range(IDENTIFIANTS), collapse = " à "), length(JEUX_NON_ASCII), LOCALE_LATIN1, utf8, duree(t_debut)))
+              n_comparees, paste(IDENTIFIANTS, collapse = ", "), length(JEUX_NON_ASCII), LOCALE_LATIN1, utf8, duree(t_debut)))
   invisible(TRUE)
 }
 
