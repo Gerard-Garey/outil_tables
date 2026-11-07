@@ -353,3 +353,20 @@ Rédigée par `architect` sur la branche porteuse `claude/validation-smr-referen
 **Effet sur les résultats : aucun.** Le texte de l'ADR est mis en accord avec le code livré ; rien n'est modifié dans le code.
 
 Issues : #4, #73. Décisions M242, M253. Branche `claude/validation-smr-reference`, PR #155.
+
+## Annotation du 7 novembre 2026 — seconde annotation du 24/10/2026, (a) 1 ; annotations du 06/11/2026 (première, (b) ; seconde, (c) ; quatrième) : séquence du rejeu factorisée, contrôles 1.3 et 7 ter hors du rejeu (#82, M291) ; point 2.6 : sections `etape_positionnement` et `etape_homogeneite`, titre de `etape_validation` à trois valeurs (#167, #168)
+
+Rédigée par `architect` à l'étape (A) de la branche `claude/positionnement-smr` (B14, PR #173), à `0d3e45f`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne à `0d3e45f` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Rejeu (`4ef26bd`, #82).**
+1. **Seconde annotation du 24/10/2026, (a) 1** : la séquence de l'étape 6 n'est plus dupliquée. `rejouer_fiche()` appelle `controler_plan_roles()`, partagée avec `construire_table()` (`R/construire_table.R:636` ; ADR 0007, annotation du même jour, (a) 1). Le test « même motif par les deux chemins » reste, étendu aux refus 1.3 et 7 ter.
+2. **Annotations du 06/11/2026, première (b), seconde (c) et quatrième** : le contrôle 1.3 sur la liste assemblée (ancienne étape 3 de `controler_tables_rejeu()`) et le contrôle **7 ter** (`controler_entrees_validation()`) **ne sont plus exécutés par le rejeu** : ils le sont une seule fois, par l'unique appel de `construire_table()` (contrôle 8), dans `controler_entrees()`, avant toute étape. Les refus gardent motif, module, `details` et message (32 scénarios `identical()`, audit de `4ef26bd`) ; seul le lieu de levée change. Le point 3.2 est inchangé ; le test « sur `empreinte_table_discordante`, `construire_table()` n'est pas appelée » reste vrai (7 bis précède). Comptes au rejeu : `tests/unitaires/test_validation.R:583-612` (M281).
+
+**(b) Point 2.6 : sections (`7389e8e`, `5efa338`, `35da74b` ; F9, F10).**
+1. `SECTIONS_RAPPORT` compte **17** sections (*vérifié*) ; deux sections de nature `etape` nouvelles, à leur rang d'`ETAPES` : `etape_positionnement` (mentions `positionnement_methode`, `positionnement_forme`, `positionnement_ecart_note`, par un `switch` sur la méthode) et `etape_homogeneite` (mention `homogeneite_portee`). Absentes du plan, elles portent « non demandée par le plan » : le HTML de **toute** construction a changé deux fois (visa d'`actuary`, tableaux des messages de `7389e8e` et `35da74b`).
+2. **Titre de `etape_validation` à trois valeurs**, lu dans l'objet par `titre_section()` (`R/rapport.R:2296`), erreur de programmation par défaut : `independante` → « … de la table de référence prise telle quelle » (titre de `SECTIONS_RAPPORT`) ; `ajustee_hors_outil` → « … de la table de référence ajustée hors de l'outil » ; `positionnee` → « … de la table positionnée de cette construction » (*vérifié* par appel de `titre_section()` sur trois constructions). Changement du titre sous `ajustee_hors_outil`, visé par `actuary` (`5efa338`) ; aucune construction de R1 à R9 n'est concernée.
+3. Mentions conditionnelles de la section `etape_validation` sous `positionnee` : `validation_positionnee`, `validation_h0_positionnee`, `validation_monte_carlo_positionnee` ; première phrase de `validation_sans_verdict` omise. Aucune mention « les p-valeurs ne se combinent pas » (M302).
+
+**Effet sur les résultats : aucun** par la présente annotation ; effets des commits cités : HTML seulement, visé par `actuary` ; aucun `.tsv`, aucune table finale, aucun verdict.
+
+Issues : #82, #164, #167, #168. Décisions M281, M291, M292, M302. ADR 0007 et 0015 (annotations du même jour). Branche `claude/positionnement-smr`, PR #173.

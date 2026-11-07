@@ -122,3 +122,12 @@ Le mainteneur accepte l'ADR le 05/11/2026 et répond aux six questions fermées 
 6. **Fiche** : la branche peut faire entrer les hypothèses de la recette dans la fiche par un champ nouveau ; un seul incrément de `version_fiche` dans la branche, régénération de R1 à R6 limitée à `fiche/version_fiche` et `fiche/empreintes/resultat`, avec tableau avant / après et visa.
 
 Suites : annotations des ADR 0003, 0007 et 0011 proposées à la porteuse (PR #139) ; spécification de la recette par `actuary-approfondi` (circuit 1) avant tout code ; ouverture de `claude/recette-stocks-successifs` soumise à l'autorisation du mainteneur (vague 2, M198).
+
+## Annotation du 7 novembre 2026 — « Contexte » et points 5 et 6 : état après la forme (P) de #82 (`4ef26bd`)
+
+Rédigée par `architect` à l'étape (A) de la branche `claude/positionnement-smr` (B14, PR #173), à `0d3e45f` (surface d'impact de `4ef26bd`, « ADR 0014 (constat) »). Le texte ci-dessus n'est pas réécrit ; le nom de l'objet fait foi (M77, (b)).
+
+- **Constat changé** : `recette_branche()` n'existe plus, intégrée à `deduire_recette()` (`R/exposition.R:75`) ; `convention_retenue()` est intégrée à `resoudre_convention()`. `RECETTE_BRANCHE` (`R/donnees.R:76`) et `CONVENTION_NATIVE` (`R/exposition.R:61`) restent (*vérifié* par `grep`). Le point 5 se lit : `CATALOGUE_RECETTES` remplacera `RECETTE_BRANCHE`, `CONVENTION_NATIVE`, la colonne `usage`, et la lecture de la recette unique dans `deduire_recette()`.
+- **Point 6** : à `0d3e45f`, `preparer_donnees(donnees, roles, p, segmentation, exclusions)` **ne reçoit pas** la recette : l'avis (P), point P4, ne la passe pas tant que l'étape ne l'emploie pas. La branche `claude/recette-stocks-successifs` l'ajoutera, avec l'emploi qu'en fait le point 6. La prémisse (P) est désormais en place (ADR 0007, annotation du même jour).
+
+Effet sur les résultats : aucun. Issues : #82, #169. Décisions M216, M274.

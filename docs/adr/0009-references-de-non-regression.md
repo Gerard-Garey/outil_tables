@@ -761,3 +761,37 @@ Issues : #32, #166 ; limite (a) 5 : issue proposée ; #167, #168 (règle (a) 3).
 Le champ `entree` vaut `reference` pour R1 à R8. L'étape (1c) de (d) 4 (création de R7, R8 et R9 sur la CI) est la suivante.
 
 **Effet sur les résultats de (e)** : aucun. `9c5e4da` ne modifie aucun fichier de `R/` (`git show 9c5e4da --stat`, *vérifié* : six fichiers, tous sous `tests/`) ; aucune référence n'est créée. Décision M300.
+
+## Annotation du 7 novembre 2026 (seconde) — points 3.4 et 9.3 : clés de `TOLERANCES` toutes qualifiées par l'étape (#175, M301), invariants de structure, clés de `positionnement`, `validation` sous `positionnee` et `homogeneite` (#167, #168) ; R7, R8 et R9 créés
+
+Rédigée par `architect` à l'étape (A) de la branche `claude/positionnement-smr` (B14, PR #173), à `0d3e45f`, d'après les messages de `a68e5aa`, `9cda1cc`, `7389e8e`, `5efa338` et `35da74b`, l'avis d'`actuary` sur #175 et la décision M301 du mainteneur. Le texte ci-dessus, annotations comprises, n'est pas réécrit. C'est l'annotation datée que les points 3.4 et 9.3 exigent pour toute modification de `TOLERANCES`. Numéros de ligne à `0d3e45f` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Point 3.4 : plus aucune clé nue (#175, `9cda1cc`, M301).**
+1. **Règle.** Toute clé de `TOLERANCES` commence par le nom d'une étape (`exposition`, `brut`, `positionnement`, `homogeneite`, `validation`, `importance_exclusions`) ou par `fiche/` (écho du plan et des hypothèses hors `fiche/plan/etapes/`). La colonne « Grandeurs » du tableau du point 3.4 (noms nus) ne vaut plus comme clé : elle se lit désormais comme la liste des noms de colonnes dont chaque occurrence est classée par une clé qualifiée de même classe. Le mécanisme de recherche (`cles_de()`, `tolerance_de()`, `tests/reference/outils_reference.R:822` et `:827`) est inchangé.
+2. **Opération de `9cda1cc`.** 23 clés retirées (les 18 noms nus et les 5 clés `kaplan_meier*/…`), 36 ajoutées (27 `brut/…`, 6 `exposition/…`, 3 `fiche/…`), de même classe ; **aucun reclassement** : 433 doubles de R1 à R9 comparés à l'état de `a68e5aa`, 0 reclassé, 0 sans classe (message de `9cda1cc`, mesure de `coder` et d'`audit`, *non remesuré ici*). Extension de #175 aux 23 clés non ancrées sur l'étape : avis d'`actuary`, validée par le mainteneur (M301).
+3. **Invariants**, dans `tests/test_reproductibilite.R` (l. 804-895), pour chaque plan de référence : (a) aucune clé nue ; (b) tout double d'une étape (`etapes/<e>/` ou `fiche/plan/etapes/<e>/`) n'est classé que par des clés qui commencent par `<e>/` ; (c) tout double de la fiche hors `fiche/plan/etapes/` n'est classé que par des clés `fiche/…` ; (d) aucun chemin n'est classé par deux clés. Témoins sur copies en mémoire.
+4. **Limite connue** (constat mineur de l'audit de #175, commentaire l. 873-877) : un double de premier niveau hors `etapes/` et `fiche/` (par exemple sous `avertissements/` ou la future `table/`) n'est couvert par aucun invariant. Aucun dans R1 à R9 ; aucun non plus sur une construction à `positionnement`, `homogeneite`, `validation` (`positionnee`) et `importance_exclusions` (mesure ci-dessous). À couvrir quand un premier apparaîtra.
+5. **Annotation du 07/11/2026, (a) 4 et 5 : périmées.** Les « clés nues conservées, qui servent R1 à R7 » de (a) 4 n'existent plus depuis `9cda1cc`, et la limite de (a) 5 (classement silencieux d'une colonne homonyme) est levée par (1) et par l'invariant (b). Ces deux points ne sont pas réécrits ; ils se lisent avec le présent point. Les points (a) 1 à 3 restent vrais (le décompte de (a) 1 vaut à `ddc67ba`).
+
+**(b) Clés des étapes nouvelles, déclarées dans le commit qui crée les grandeurs (règle (a) 3 de l'annotation précédente).**
+- `7389e8e` (#167, (3b)) : **26** clés `positionnement/…` (11 exactes, 2 à 1e-14, 13 à 1e-12). Correction d'`actuary` sur la spécification : `positionnement/resultat/smr/attendus` et `positionnement/resultat/smr/smr` à **1e-12** au lieu de 1e-14.
+- `5efa338` (#167, (3c)) : **2** clés `validation/resultat/cellules/smr_positionnement` et `validation/resultat/cellules/taux_positionne`, à 1e-12 (colonnes présentes sous la seule relation `positionnee`, ADR 0015, annotation du même jour).
+- `35da74b` (#168, (4)) : **22** clés `homogeneite/…` (12 exactes, 4 à 1e-14, 6 à 1e-12). Le message de `35da74b` et le handoff de la session annoncent 25 : le décompte mesuré est 22 (*vérifié*, deux méthodes ci-dessous) ; l'écart est de rédaction, aucun double n'est sans classe.
+
+**Décompte** (*vérifié* par `architect`, 07/11/2026 : bloc `TOLERANCES` de `tests/reference/outils_reference.R` extrait par `git show <sha>` et évalué sous R 4.3.3 ; recoupé par `grep -o '"homogeneite/[^"]*"' | sort -u | wc -l` = 22 et `"positionnement/…"` = 26) :
+
+| SHA | Clés | exactes | 1e-14 | 1e-12 | nues |
+|---|---|---|---|---|---|
+| `ddc67ba`, `a68e5aa` | 106 | 40 | 22 | 44 | 18 |
+| `9cda1cc` | 119 | 45 | 24 | 50 | 0 |
+| `7389e8e` | 145 | 56 | 26 | 63 | 0 |
+| `5efa338` | 147 | 56 | 26 | 65 | 0 |
+| `35da74b`, `0d3e45f` | 169 | 68 | 30 | 71 | 0 |
+
+**Mesure de complétude** (*vérifiée* par `architect`, R 4.3.3, `tablexp` installé depuis `git archive 0d3e45f` dans une bibliothèque temporaire, hors plateforme de référence) : sur `jeu_reference()` avec le plan de R1 plus `positionnement` (`smr`, `tv`, 20-90, 0,95), `homogeneite` (20-90, tranches 20/50/70, B = 199), `validation` (`positionnee`) et `importance_exclusions`, `aplatir_construction()` rend 147 doubles : 0 sans tolérance (`doubles_sans_tolerance()`), 0 mal classé au sens de (b), 0 classé par deux clés, 0 de premier niveau hors `etapes/` et `fiche/`.
+
+**(c) Points 3.7 et 4.3 : R7, R8 et R9 créés (étape (1c), `a68e5aa`).** Mode `creation`, exécution 42389267990 ; MD5 de `tests/reference/R7.tsv`, `R8.tsv`, `R9.tsv` égaux à ceux du message (*vérifié* par `md5sum`) ; `SANS_REFERENCE` vide (`tests/test_reproductibilite.R:335`, *vérifié*) ; visa d'`actuary`. R1 à R6 inchangés depuis `2247794` (*vérifié*). Les clés de (b) ne touchent aucun de R1 à R9 (aucune de ces étapes n'est dans leurs plans) : elles serviront les plans de méthode de l'étape (R), créés selon le point 5.2 (visa du mainteneur pour la table positionnée, M287).
+
+**Effet sur les résultats : aucun** par la présente annotation ni par `9cda1cc` (aucun `.tsv` modifié).
+
+Issues : #175, #167, #168, #32, #166 ; #174 et #177 (types de colonnes de R8 et R9, hors périmètre). Décisions M296, M301, M287. Branche `claude/positionnement-smr`, PR #173.
