@@ -16,24 +16,26 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R8 sur l'entrée de référence (jeu_reference()),
-#  aplatis, aller-retour exact du format, comparés à leur fichier de
-#  tests/reference/ (échec attendu renvoyant à l'issue de création tant que
-#  le fichier n'existe pas, liste SANS_REFERENCE : R7, #32 ; R8, #166), aucune
-#  référence orpheline ; R7 : aucun double sans classe de tolérance, Σd par
-#  cellule égale aux evenements de l'exposition (#32) ; R8 : validation et
-#  importance des exclusions, table importée passée par tables_reference
-#  (#166) ; témoins sur des
-#  copies temporaires (jamais sur tests/reference/) ; règles des modes du
-#  workflow et lignes de commande produire_references.R (refus d'appel) et
-#  comparer_references.R ; permutation des lignes de l'entrée de référence
+#  3.8) : plans R1 à R9 sur l'entrée de chaque plan (jeu_reference(), ou
+#  jeu_reference_defauts() pour R9), aplatis, aller-retour exact du format,
+#  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
+#  l'issue de création tant que le fichier n'existe pas, liste
+#  SANS_REFERENCE : R7, #32 ; R8 et R9, #166), aucune référence orpheline ;
+#  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
+#  evenements de l'exposition (#32) ; R8 : validation et importance des
+#  exclusions, table importée passée par tables_reference (#166) ; R9 : le
+#  même plan sur une entrée à défauts injectés, lignes exclues par motif et
+#  retraits non nuls (#166) ; témoins sur des copies temporaires (jamais sur
+#  tests/reference/) ; règles des modes du workflow et lignes de commande
+#  produire_references.R (refus d'appel) et comparer_references.R ;
+#  permutation des lignes de l'entrée de référence
 #  (#39) : plans R6, R4, R5, R3 et R2, deux permutations, identical() hors
 #  sommes par cellule, celles-ci à la tolérance TOLERANCE_PERMUTATION, bilan
 #  des écarts et témoins ; chaînes non ASCII et locale (T1 à T4, M54) ;
 #  transitions de changement de résultat annoncé (ADR 0009, point 9.5, #47) :
 #  liste unique TRANSITIONS_EN_COURS (vide hors transition), utilitaire
 #  générique et témoins de chaque nature, de l'union et du succès inattendu.
-#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R8 (sections et
+#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R9 (sections et
 #  leur ordre, cellules décimales en %.17g, textes fixes, section brut ; taille
 #  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
 #
@@ -315,9 +317,9 @@ verifier("R6, autre processus : objet identical() hors execution (Kaplan-Meier c
 unlink(c(script, sortie))
 
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
-# référence sur l'entrée de référence, aplati et comparé à son fichier ;
+# référence sur son entrée (champ `entree`, point 4.1), aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R8, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R9, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
@@ -329,7 +331,7 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-SANS_REFERENCE <- c(R7 = "#32", R8 = "#166")
+SANS_REFERENCE <- c(R7 = "#32", R8 = "#166", R9 = "#166")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -655,7 +657,7 @@ issue_des_restes <- function(transitions) {
 # 5a95f9c : octets_lignes(sprintf("%d", x)) et octets_lignes(txt[match(j,
 # u)])). Les références ne comparent que le jeton de l'empreinte (ADR 0009,
 # seconde annotation du 20/10/2026) : l'égalité à l'oracle en garde la valeur,
-# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R8 ne
+# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R9 ne
 # portent aucun entier négatif (les dates s'écrivent en ISO, sans signe) : le
 # signe des entiers est gardé par les tests unitaires des écrivains, non par
 # cet oracle.
@@ -672,7 +674,7 @@ oracle_empreinte_resultat <- local({
   e$empreinte_resultat
 })
 
-# Rapport figé (#87, U24) : contrôles du document de R1 à R8 à 10^5 lignes
+# Rapport figé (#87, U24) : contrôles du document de R1 à R9 à 10^5 lignes
 # (spécification d'actuary du 24/10/2026, U14, U18, U21, U22, repris de
 # tests/unitaires/test_rapport.R) ; rend TRUE ou la liste des écarts.
 controler_rapport_fige <- function(x, l, id) {
@@ -745,18 +747,71 @@ controler_rapport_fige <- function(x, l, id) {
   if (length(e)) e else TRUE
 }
 
-jeu_ref <- jeu_reference()
+# Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
+# distincte tirée une seule fois ; jeu_ref est l'entrée `reference` (R1 à R8),
+# que les contrôles propres à un plan de cette entrée (permutation, R6) lisent.
+entrees_ref <- entrees_des_plans(plans_reference())
+jeu_ref <- entrees_ref[["reference"]]
+verifier("entrées des plans : R1 à R8 sur `reference`, R9 sur `reference_defauts` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
+  e <- unname(vapply(plans_reference(), function(p) p$entree, ""))
+  attendu <- c(rep("reference", 8L), "reference_defauts")
+  if (!identical(e, attendu))
+    paste0("entrées des plans obtenues (", paste(e, collapse = ", "), ") contre attendues (", paste(attendu, collapse = ", "), ")")
+  else if (!identical(names(entrees_ref), c("reference", "reference_defauts")))
+    paste0("entrées tirées obtenues (", paste(names(entrees_ref), collapse = ", "), ") contre attendues (reference, reference_defauts)")
+  else if (!identical(jeu_ref, jeu_reference())) "entrée `reference` différente de jeu_reference()"
+  else TRUE
+})
+verifier("entrées des plans : tirer_entree() d'un nom inconnu -> erreur",
+         inherits(tryCatch(tirer_entree("inconnue"), error = function(e) e), "error"))
+# Refus nommé d'un plan sans champ `entree` exploitable (pas de valeur par
+# défaut). Le message se compare sur sa partie ASCII : sous une locale non UTF-8,
+# stop() rend « î » en « <U+00EE> ».
+verifier("entrées des plans : entrees_des_plans() d'un plan sans champ entree, ou d'un champ non chaîne -> refus nommant le plan", {
+  msg <- function(plans) tryCatch({ entrees_des_plans(plans); "aucune erreur" }, error = function(e) conditionMessage(e))
+  debut <- "plan X : champ entree absent ou non cha"
+  obt <- c(sans = msg(list(list(identifiant = "X"))),
+           nul = msg(list(list(identifiant = "X", entree = NULL))),
+           numerique = msg(list(list(identifiant = "X", entree = 1))),
+           vecteur = msg(list(list(identifiant = "X", entree = c("reference", "reference")))),
+           na = msg(list(list(identifiant = "X", entree = NA_character_))),
+           sans_identifiant = msg(list(list(entree = NULL))))
+  attendu_debut <- ifelse(names(obt) == "sans_identifiant", "plan (sans identifiant) : champ entree absent ou non cha", debut)
+  mal <- !startsWith(obt, attendu_debut)
+  if (!any(mal)) TRUE
+  else paste0("messages obtenus (", paste(names(obt)[mal], ": ", obt[mal], collapse = " ; "), ") contre attendus (", paste(unique(attendu_debut), collapse = " ; "), "...)")
+})
+# Entrée de R9 : le jeu de jeu_reference() altéré après son tirage complet. Les
+# lignes que les défauts n'altèrent pas sont celles de jeu_reference() (même
+# loi, même portefeuille, même graine du jeu) ; les défauts sont ceux déclarés
+# (graine des défauts, nombre fixe par motif, un seul motif par ligne).
+verifier("R9, entrée : défauts de graine GRAINE_DEFAUTS_R9, NOMBRE_PAR_MOTIF_R9 lignes par motif de MOTIFS_DEFAUTS_R9, lignes non altérées identical() à jeu_reference()", {
+  d9 <- entrees_ref[["reference_defauts"]]$donnees
+  da <- attr(d9, "defauts")
+  l <- da$lignes
+  nus <- function(d) { attributes(d) <- attributes(d)[c("names", "class", "row.names")]; d }
+  alt <- unique(l$ligne)
+  if (is.null(da)) "attribut defauts absent"
+  else if (!identical(da$graine, GRAINE_DEFAUTS_R9)) "graine des défauts différente de GRAINE_DEFAUTS_R9"
+  else if (!identical(sort(unique(l$defaut)), sort(MOTIFS_DEFAUTS_R9)) ||
+           !all(table(l$defaut) == NOMBRE_PAR_MOTIF_R9)) "motifs ou effectifs par motif différents des déclarés"
+  else if (length(alt) != length(MOTIFS_DEFAUTS_R9) * NOMBRE_PAR_MOTIF_R9) "une ligne porte plusieurs motifs"
+  else if (nrow(d9) != nrow(jeu_ref$donnees)) "nombre de lignes différent de jeu_reference()"
+  else if (!identical(nus(d9)[-alt, ], nus(jeu_ref$donnees)[-alt, ])) "lignes non altérées différentes de jeu_reference()"
+  else TRUE
+})
 aplatis <- list()
 for (p in plans_reference()) {
   id <- p$identifiant
-  x_ref <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan, tables_reference = tables_du_plan(p))
+  entree_p <- entrees_ref[[p$entree]]
+  x_ref <- construire_table(entree_p$donnees, entree_p$roles, p$plan, tables_reference = tables_du_plan(p))
   verifier(sprintf("%s : empreinte du résultat égale à celle de l'oracle d'avant #71 (écrivains des entiers et des dates par une chaîne par ligne)", id),
            grepl("^[0-9a-f]{32}$", x_ref$fiche$empreintes$resultat) &&
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
   # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
   # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
   verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 « identique », 14 « non vérifiée »", id), {
-    r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)), tables_reference = tables_du_plan(p))
+    r <- rejouer_fiche(entree_p$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)), tables_reference = tables_du_plan(p))
     identical(sans_execution(r$construction), sans_execution(x_ref)) &&
       identical(r$bilan$verdict[9:14], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
   })
@@ -785,14 +840,14 @@ for (p in plans_reference()) {
     sans <- doubles_sans_tolerance(g)
     if (length(sans)) paste("sans tolérance :", paste(utils::head(sans, 5L), collapse = ", ")) else TRUE
   })
-  # R8 (#166) : les clés de TOLERANCES des étapes validation et
+  # R8 et R9 (#166) : les clés de TOLERANCES des étapes validation et
   # importance_exclusions commencent par le nom de l'étape (point 3.4, seconde
   # annotation, (a)), pour les chemins de l'étape et pour l'écho du plan dans
   # la fiche : une table de même nom d'une étape ultérieure (#167, #168) n'en
   # hérite aucune classe. Deux clés concurrentes classent un même chemin sans
   # désaccord de classe (les clés nues préexistantes sont de même classe).
-  if (id == "R8") {
-    verifier("R8 : tout double des étapes validation et importance_exclusions est classé par une clé qui commence par l'étape (point 3.4)", {
+  if (id %in% c("R8", "R9")) {
+    verifier(sprintf("%s : tout double des étapes validation et importance_exclusions est classé par une clé qui commence par l'étape (point 3.4)", id), {
       d <- names(g$types)[g$types == "double"]
       d <- d[grepl("(^|/)etapes/(validation|importance_exclusions)/", d)]
       etape <- sub("^.*etapes/(validation|importance_exclusions)/.*$", "\\1", d)
@@ -802,7 +857,7 @@ for (p in plans_reference()) {
       else if (length(mal)) paste("clé non qualifiée par l'étape :", paste(utils::head(mal, 5L), collapse = ", "))
       else TRUE
     })
-    verifier("R8 : aucun chemin classé par deux clés de classes de tolérance différentes", {
+    verifier(sprintf("%s : aucun chemin classé par deux clés de classes de tolérance différentes", id), {
       d <- names(g$types)[g$types == "double"]
       conflit <- d[vapply(d, function(c_) {
         k <- cles_de(c_); length(unique(unname(TOLERANCES[k]))) > 1L }, NA)]
@@ -824,6 +879,40 @@ for (p in plans_reference()) {
     else if (!identical(km$evenements, ex$evenements)) "evenements de Kaplan-Meier différents de ceux de l'exposition"
     else if (sum(sa$evenements) != sum(ex$evenements)) "totaux différents" else TRUE
   })
+  # R9 (#166), non-vacuité : le retrait contrefactuel porte sur des lignes
+  # réellement exclues, une classe de mesurabilité par motif (id_contrat_manquant :
+  # mesurable aux niveaux A et B ; sexe_manquant : mesurable en A, non calculable
+  # en B faute de clé sous la segmentation `sexe` ; entree_manquante : non
+  # mesurable), des retraits non nuls et un SMR du comparateur 1 défini. Sans
+  # défauts dans l'entrée, ces contrôles échouent (R8 les passerait à vide).
+  if (id == "R9") {
+    ex9 <- x_ref$etapes$donnees$resultat
+    ie9 <- x_ref$etapes$importance_exclusions$resultat
+    verifier("R9 : lignes exclues pour chacun des motifs de MOTIFS_DEFAUTS_R9 (NOMBRE_PAR_MOTIF_R9), nombre_lignes_exclues = leur somme", {
+      n <- vapply(ex9$lignes_exclues[MOTIFS_DEFAUTS_R9], length, 1L)
+      if (!identical(unname(n), rep(NOMBRE_PAR_MOTIF_R9, length(MOTIFS_DEFAUTS_R9)))) paste("effectifs par motif :", paste(names(n), n, collapse = ", "))
+      else if (!identical(ex9$nombre_lignes_exclues, sum(n))) "nombre_lignes_exclues différent de la somme"
+      else TRUE
+    })
+    ligne9 <- function(tab, ens, niveau) tab[tab$ensemble == ens & tab$niveau == niveau, , drop = FALSE]
+    verifier("R9 : une classe de mesurabilité par motif (id_contrat_manquant : retrait aux niveaux A et B, sexe_manquant : A seulement, clé manquante en B, entree_manquante : aucune ligne mesurable)", {
+      r <- ie9$retraits
+      retire <- function(ens, niveau) { l <- ligne9(r, ens, niveau); l$etat == "produite" && l$evenements_retires > 0 && l$exposition_jours_retiree > 0 && l$exposition_centrale_retiree > 0 }
+      retire("id_contrat_manquant", "A") && retire("id_contrat_manquant", "B") && retire("sexe_manquant", "A") &&
+        identical(ligne9(r, "sexe_manquant", "B")$etat, "cle_segmentation_manquante") &&
+        identical(ligne9(r, "entree_manquante", "A")$etat, "aucune_ligne_mesurable") &&
+        identical(ligne9(r, "entree_manquante", "B")$etat, "aucune_ligne_mesurable")
+    })
+    verifier("R9 : retraits non nuls (total des niveaux A et B) et SMR du comparateur 1 défini, fini et positif, intervalle exact non dégénéré", {
+      r <- ie9$retraits; sm <- ie9$smr_comparateur_1
+      def <- function(niveau) { l <- ligne9(sm, "total", niveau)
+        nrow(l) == 1L && l$etat == "produite" && l$observes > 0 && is.finite(l$attendus) && l$attendus > 0 &&
+          is.finite(l$smr) && l$smr > 0 && is.finite(l$borne_inf_exacte) && is.finite(l$borne_sup_exacte) &&
+          l$borne_inf_exacte < l$smr && l$smr < l$borne_sup_exacte }
+      ligne9(r, "total", "A")$evenements_retires > 0 && ligne9(r, "total", "B")$evenements_retires > 0 &&
+        ligne9(r, "total", "A")$exposition_centrale_retiree > 0 && def("A") && def("B")
+    })
+  }
   f <- tempfile(fileext = ".tsv")
   ecrire_reference(g, f, c(identifiant = id))
   verifier(sprintf("%s : aller-retour lire(ecrire(aplatir(x))) identical() (types et valeurs)", id), {
@@ -849,7 +938,7 @@ for (p in plans_reference()) {
   else if (id %in% names(SANS_REFERENCE))
     verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE", id, id))
   else controler_plan(id, nom, lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv"))), g,
-                      comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, jeu_ref$donnees, jeu_ref$roles)
+                      comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, entree_p$donnees, entree_p$roles)
 }
 verifier("aucune référence orpheline sous tests/reference/ (point 3.7)", {
   o <- if (dir.exists(DOSSIER_REFERENCES)) references_orphelines(DOSSIER_REFERENCES) else character(0)
@@ -1536,8 +1625,8 @@ for (cas in list(
   list(args = c("--mode", "creation", "--plans", "tous", "--sortie", tempfile()), motif = "--motif exigé", env = EN_CI),
   list(args = c("--mode", "bascule", "--plans", "R1", "--sortie", tempfile(), "--motif", "x"), motif = "--plans tous obligatoire",
        env = EN_CI),
-  list(args = c("--mode", "creation", "--plans", "R9", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
-  list(args = c("--mode", "regeneration", "--plans", "R9", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
+  list(args = c("--mode", "creation", "--plans", "R99", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
+  list(args = c("--mode", "regeneration", "--plans", "R99", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
   list(args = c("--mode", "creation", "--plans", "tous", "--sortie", shQuote(file.path(DOSSIER_REFERENCES, "essai")), "--motif", "x"),
        motif = "ne peut être tests/reference/", env = EN_CI),
   list(args = c("--mode", "releve", "--plans", "tous", "--sortie", tempfile()), motif = "mode releve refusé sur la CI",
@@ -1598,8 +1687,8 @@ verifier("producteur : plan dont la construction échoue -> non produit, autres 
   file.copy(file.path(DOSSIER_REFERENCES, c("produire_references.R", "outils_reference.R")),
             file.path(d, "tests", "reference"))
   cat("plans_reference <- function() list(",
-      "R1 = list(identifiant = 'R1', description = 'temoin valide', plan = plan_reference()),",
-      "R2 = list(identifiant = 'R2', description = 'temoin invalide', plan = plan_reference(niveau = 2)))",
+      "R1 = list(identifiant = 'R1', description = 'temoin valide', plan = plan_reference(), entree = 'reference'),",
+      "R2 = list(identifiant = 'R2', description = 'temoin invalide', plan = plan_reference(niveau = 2), entree = 'reference'))",
       sep = "\n", file = file.path(d, "tests", "reference", "outils_reference.R"), append = TRUE)
   sortie_t <- file.path(d, "sortie")
   resume_t <- file.path(d, "resume_job.md")
@@ -1637,7 +1726,7 @@ verifier("producteur, sous-processus LC_ALL=C : libellés non ASCII d'ecarts.txt
   file.copy(file.path(DOSSIER_REFERENCES, c("produire_references.R", "outils_reference.R")),
             file.path(d, "tests", "reference"))
   cat("plans_reference <- function() list(",
-      "R1 = list(identifiant = 'R1', description = 'd\\u00e9c\\u00e8s', plan = plan_reference()))",
+      "R1 = list(identifiant = 'R1', description = 'd\\u00e9c\\u00e8s', plan = plan_reference(), entree = 'reference'))",
       sep = "\n", file = file.path(d, "tests", "reference", "outils_reference.R"), append = TRUE)
   sortie_t <- file.path(d, "sortie")
   r <- executer_rscript(file.path(d, "tests", "reference", "produire_references.R"),
@@ -1919,7 +2008,7 @@ local({
     list("issue sans #", list(tr("37", "R1", ch$ajout))),
     list("élément non liste (list(\"#35\"), au lieu d'une erreur R brute)", list("#35")),
     list("issue en double sur un plan commun", list(tr("#901", c("R1", "R2"), ch$ajout), tr("#901", "R2", ch$retrait))),
-    list("plan de référence inconnu", list(tr("#901", "R9", ch$ajout))),
+    list("plan de référence inconnu", list(tr("#901", "R99", ch$ajout))),
     list("aucun changement", list(tr("#901", "R1"))),
     list("champ hors de la nature (valeurs sur un type)", list(tr("#901", "R1", modifyList(ch$type, list(valeurs = 1))))),
     list("conversion de type hors double / integer", list(tr("#901", "R1", modifyList(ch$type, list(vers = "character"))))),
@@ -2171,28 +2260,32 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R8 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R9 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R8, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R9, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant
-    x <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan, tables_reference = tables_du_plan(p))
+    entree_p <- entrees_ref[[p$entree]]
+    x <- construire_table(entree_p$donnees, entree_p$roles, p$plan, tables_reference = tables_du_plan(p))
     verifier(sprintf("%s : lire_plan(ecrire_plan(plan)) identical() au plan", id),
              identical(lire_plan(ecrire_plan(p$plan)), p$plan))
     f <- lire_fiche(ecrire_fiche(x$fiche))
     verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
     # #57 : lignes reçues = lignes conservées + lignes distinctes exclues ;
     # aucune exclusion déclarée dans R1 à R7, et R8 en déclare deux dont aucune règle ne
-    # touche l'entrée de référence : 0L et aucune ligne écartée.
-    verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (0L, integer) (#57)", id),
-             identical(x$fiche$nombre_lignes_exclues, 0L) &&
-               nrow(jeu_ref$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
-    y <- construire_table(jeu_ref$donnees, f$roles, valider_plan(f$plan), f$provenance, tables_reference = tables_du_plan(p))
+    # touche l'entrée de référence : 0L et aucune ligne écartée. R9 déclare trois
+    # exclusions sur une entrée qui porte NOMBRE_PAR_MOTIF_R9 lignes de chacun des
+    # motifs correspondants : MOTIFS_DEFAUTS_R9 x NOMBRE_PAR_MOTIF_R9 lignes exclues.
+    exclues_attendues <- if (id == "R9") length(MOTIFS_DEFAUTS_R9) * NOMBRE_PAR_MOTIF_R9 else 0L
+    verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (%dL, integer) (#57)", id, exclues_attendues),
+             identical(x$fiche$nombre_lignes_exclues, as.integer(exclues_attendues)) &&
+               nrow(entree_p$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
+    y <- construire_table(entree_p$donnees, f$roles, valider_plan(f$plan), f$provenance, tables_reference = tables_du_plan(p))
     verifier(sprintf("%s : rejeu sur le plan relu de la fiche écrite identical() hors execution", id),
              identical(sans_execution(y), sans_execution(x)))
     if (id != "R1") next

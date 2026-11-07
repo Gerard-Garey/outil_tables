@@ -14,9 +14,13 @@
 #  chaîne au codage « bytes », non UTF-8 valide, ou non ASCII non marquée
 #  dans une session ni UTF-8 ni latin-1 est refusée, jamais convertie).
 #
-#  - plans_reference(), jeu_reference() : plans R1 à R8 et entrée de
-#    référence (points 4.1 et 4.3 ; R6 : première annotation, (b) ; R7 : #32 ;
-#    R8 : #166, avec `tables_reference`, table importée en valeurs littérales) ;
+#  - plans_reference(), jeu_reference(), jeu_reference_defauts() : plans R1 à
+#    R9 et entrées de référence (points 4.1 et 4.3 ; R6 : première annotation,
+#    (b) ; R7 : #32 ; R8 : #166, avec `tables_reference`, table importée en
+#    valeurs littérales ; R9 : #166, avec `entree`, une entrée par plan,
+#    annotation du 07/11/2026, (d)) ;
+#  - tirer_entree(nom), entrees_des_plans(plans) : tirage de l'entrée d'un
+#    plan, chaque entrée distincte une seule fois ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
 #    type, valeurs), moins `execution`, `fiche$versions`, `fiche$plateforme`
 #    (point 1.1) ; valeurs de fiche/empreintes/resultat et /code remplacées
@@ -198,20 +202,66 @@ nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANC
 
 PERIODE_REFERENCE <- list(debut = as.Date("2015-01-01"), fin = as.Date("2024-12-31"))
 GRAINE_REFERENCE <- 20261016L
-GRAINE_MONTE_CARLO_R8 <- 20261107L  # Monte-Carlo de la validation de R8 (distincte de celle du jeu)
+GRAINE_MONTE_CARLO_R8 <- 20261107L  # Monte-Carlo de la validation de R8 et de R9 (distincte de celle du jeu)
 ROLES_REFERENCE <- c(id_contrat = "id_contrat", id_tete = "id_tete", sexe = "sexe",
                      date_naissance = "date_naissance", date_entree = "date_entree",
                      date_sortie = "date_sortie", cause_sortie = "cause_sortie")
 
-jeu_reference <- function() {
+# Entrée de R9 (#166 ; annotation du 07/11/2026, (d)) : le jeu de
+# jeu_reference() (même loi, même portefeuille, même graine du jeu), altéré
+# après son tirage complet par simuler_portefeuille(defauts =), sous une graine
+# propre aux défauts, distincte de celle du jeu (GRAINE_REFERENCE) et de celle
+# du Monte-Carlo (GRAINE_MONTE_CARLO_R8). Un motif par classe de mesurabilité
+# de l'étape importance_exclusions : id_contrat_manquant (mesurable aux niveaux
+# A et B), sexe_manquant (mesurable au niveau A, non calculable au niveau B
+# sous la segmentation `sexe`), entree_manquante (non mesurable). Nombre fixe
+# de lignes par motif, toutes causes de sortie admises. La graine des défauts
+# diffère de 20261025, déjà employée par les tests unitaires
+# (test_importance_exclusions.R, test_simulation.R) et tests/mesures/ (décision
+# du mainteneur du 07/11/2026).
+GRAINE_DEFAUTS_R9 <- 20261108L
+MOTIFS_DEFAUTS_R9 <- c("id_contrat_manquant", "sexe_manquant", "entree_manquante")
+NOMBRE_PAR_MOTIF_R9 <- 500L
+
+# Jeu de l'entrée de référence : `defauts` NULL pour jeu_reference() (aucun
+# défaut), sinon la liste (graine, declarations) de simuler_portefeuille().
+simuler_reference <- function(defauts = NULL) {
   gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
   ra <- tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %")
   loi <- list(deces = list(table = gm, facteurs = c(H = 1, F = 0.6)),
               rachat = list(table = ra, facteurs = c(H = 1, F = 1)))
   pf <- list(mode = "uniforme", n = 1e5, proportion_hommes = 0.5, age_min = 20, age_max = 75,
              origine = as.Date("2005-01-01"))
-  list(donnees = tablexp::simuler_portefeuille(loi, pf, PERIODE_REFERENCE, GRAINE_REFERENCE),
+  tablexp::simuler_portefeuille(loi, pf, PERIODE_REFERENCE, GRAINE_REFERENCE, defauts = defauts)
+}
+
+jeu_reference <- function() list(donnees = simuler_reference(), roles = ROLES_REFERENCE)
+
+jeu_reference_defauts <- function() {
+  declarations <- lapply(MOTIFS_DEFAUTS_R9, function(m)
+    list(type = m, cible = c("deces", "rachat", "en_cours"), nombre = NOMBRE_PAR_MOTIF_R9))
+  list(donnees = simuler_reference(list(graine = GRAINE_DEFAUTS_R9, declarations = declarations)),
        roles = ROLES_REFERENCE)
+}
+
+# Entrée d'un plan (champ `entree` de plans_reference() : le nom de l'entrée) :
+# `reference` (jeu_reference(), R1 à R8) ou `reference_defauts`
+# (jeu_reference_defauts(), R9). Un nom plutôt qu'une fonction, pour que
+# l'outillage tire chaque entrée distincte une seule fois (entrees_des_plans()).
+tirer_entree <- function(nom)
+  switch(nom, reference = jeu_reference(), reference_defauts = jeu_reference_defauts(),
+         stop("entrée de référence inconnue : ", nom, call. = FALSE))
+
+# Entrées des plans `plans` : liste nommée (nom de l'entrée -> list(donnees,
+# roles)), chaque entrée tirée une fois ; l'entrée d'un plan p est
+# `entrees[[p$entree]]`.
+entrees_des_plans <- function(plans) {
+  noms <- unique(vapply(plans, function(p) {
+    if (!is.character(p$entree) || length(p$entree) != 1L || is.na(p$entree))
+      stop("plan ", if (is.null(p$identifiant)) "(sans identifiant)" else p$identifiant, " : champ entree absent ou non chaîne", call. = FALSE)
+    p$entree
+  }, ""))
+  stats::setNames(lapply(noms, tirer_entree), noms)
 }
 
 # Table de référence de R8 (#166) : statut `importee`, en valeurs littérales
@@ -288,10 +338,17 @@ plan_reference <- function(transition = c("vivant", "deces"), segmentation = "se
 # tablexp::table_reference() n'est alors pas disponible.
 tables_du_plan <- function(p) if (is.null(p$tables_reference)) NULL else p$tables_reference()
 
-# Un identifiant n'est jamais réemployé (point 4.3).
+# Un identifiant n'est jamais réemployé (point 4.3). `entree` : nom de
+# l'entrée du plan (tirer_entree()), `reference` pour R1 à R8.
 plans_reference <- function() {
-  p <- function(id, description, plan, tables_reference = NULL)
-    list(identifiant = id, description = description, plan = plan, tables_reference = tables_reference)
+  p <- function(id, description, plan, tables_reference = NULL, entree = "reference")
+    list(identifiant = id, description = description, plan = plan, tables_reference = tables_reference,
+         entree = entree)
+  # Étapes validation et importance_exclusions de R8 et de R9 : un seul texte.
+  validation <- list(table_reference = "tv", relation_table = "independante",
+                     plage_ages = c(20, 90), tranches_age = c(20, 50, 70),
+                     niveau = 0.95, replications = 999)
+  importance <- list(niveau = 0.95)
   list(
     R1 = p("R1", "décès, référence principale", plan_reference()),
     R2 = p("R2", "sans segmentation, délai 90, niveau 0,99",
@@ -306,11 +363,13 @@ plans_reference <- function() {
                           estimateurs = c("poisson", "binomial", "kaplan_meier"))),
     R8 = p("R8", "validation et importance des exclusions (R1 avec table importée ; exclusions déclarées, sans ligne touchée par l'entrée de référence)",
            plan_reference(exclusions = c("entree_manquante", "sexe_manquant"),
-                          validation = list(table_reference = "tv", relation_table = "independante",
-                                            plage_ages = c(20, 90), tranches_age = c(20, 50, 70),
-                                            niveau = 0.95, replications = 999),
-                          importance = list(niveau = 0.95), graine = GRAINE_MONTE_CARLO_R8),
-           tables_reference = tables_reference_r8))
+                          validation = validation, importance = importance, graine = GRAINE_MONTE_CARLO_R8),
+           tables_reference = tables_reference_r8),
+    R9 = p("R9", sprintf("validation et importance des exclusions sur une entrée à défauts injectés (plan de R8, exclusions id_contrat_manquant en plus ; %s, %d lignes chacun, graine des défauts %d)",
+                         paste(MOTIFS_DEFAUTS_R9, collapse = ", "), NOMBRE_PAR_MOTIF_R9, GRAINE_DEFAUTS_R9),
+           plan_reference(exclusions = c("id_contrat_manquant", "entree_manquante", "sexe_manquant"),
+                          validation = validation, importance = importance, graine = GRAINE_MONTE_CARLO_R8),
+           tables_reference = tables_reference_r8, entree = "reference_defauts"))
 }
 
 # --- aplatissement (points 1 et 2.3) ------------------------------------------

@@ -15,8 +15,9 @@
 #       en_US.UTF-8 : sondée comme le harnais) ;
 #    2. dans un sous-processus par bibliothèque, sous la locale de son
 #       installation, qui vérifie d'abord que la session est bien en C (resp.
-#       en UTF-8) : jeu_reference() puis, pour R1 à R8 (plans_reference() de
-#       tests/reference/outils_reference.R), construire_table(), puis
+#       en UTF-8) : pour R1 à R9 (plans_reference() de
+#       tests/reference/outils_reference.R, sur l'entrée de chaque plan :
+#       jeu_reference(), ou jeu_reference_defauts() pour R9), construire_table(), puis
 #       ecrire_fiche(x$fiche) et ecrire_plan(x$fiche$plan), relus par
 #       lire_fiche() et lire_plan() : aller-retour identical(), et réécriture
 #       de l'objet relu identique octet à octet au texte écrit ; rapport figé
@@ -28,7 +29,7 @@
 #       trois refus de lire_texte() et deux type_incompatible sur un rôle
 #       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
 #       octet « <xx> » (#127) ;
-#    3. les textes (fiche, plan et rapport figé de R1 à R8, bilan du rejeu et
+#    3. les textes (fiche, plan et rapport figé de R1 à R9, bilan du rejeu et
 #       messages de refus de R1, messages de refus par module) écrits sous C
 #       et sous UTF-8 sont comparés
 #       octet à octet. Aucune
@@ -50,7 +51,7 @@
 
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
 LOCALE_INVENTEE <- "xx_XX.UTF-8"  # comme tests/harnais.R (critère de #109)
-IDENTIFIANTS <- paste0("R", 1:8)
+IDENTIFIANTS <- paste0("R", 1:9)
 
 # Orchestration commune (installer, executer, avec_environnement, duree,
 # ecart_octets : tests/controles/orchestration_locale.R, #117), chargée dans
@@ -95,7 +96,7 @@ locale_utf8_disponible <- function(candidats = LOCALES_UTF8) {
 
 environnement_locale <- function(locale) c(LC_ALL = locale, LANG = locale, LC_CTYPE = locale)
 
-# --- sous-processus : R1 à R8, fiche et plan --------------------------------
+# --- sous-processus : R1 à R9, fiche et plan --------------------------------
 
 travailleur <- function(args) {
   lib <- args[1L]; attendu <- args[2L]; sortie <- args[3L]; racine <- args[4L]
@@ -110,7 +111,9 @@ travailleur <- function(args) {
     quit(save = "no", status = 1L)
   }
   defauts <- character(0)
-  jeu <- jeu_reference()
+  # Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
+  # distincte tirée une seule fois.
+  entrees <- entrees_des_plans(plans_reference())
   # IDENTIFIANTS (comparaison octet à octet du processus principal) couvre
   # tous les plans de plans_reference() : un plan ajouté sans mise à jour de
   # IDENTIFIANTS serait construit ici et jamais comparé.
@@ -120,6 +123,7 @@ travailleur <- function(args) {
                                   paste(ids_plans, collapse = ", "), paste(IDENTIFIANTS, collapse = ", ")))
   for (p in plans_reference()) {
     id <- p$identifiant
+    jeu <- entrees[[p$entree]]
     d <- function(m) defauts <<- c(defauts, sprintf("%s : %s", id, octets_bruts(m)))
     r <- tryCatch({
       x <- construire_table(jeu$donnees, jeu$roles, p$plan, tables_reference = tables_du_plan(p))
@@ -302,7 +306,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
   if (length(defauts)) echec()
   for (c_ in cas) {
-    cat(sprintf("  R1 à R8, fiche, plan et rapport figé, sous LC_ALL=%s :\n", c_$locale))
+    cat(sprintf("  R1 à R9, fiche, plan et rapport figé, sous LC_ALL=%s :\n", c_$locale))
     e <- executer(script, racine, c_$lib, environnement_locale(c_$locale), c_$attendu, c_$sortie)
     cat(paste0("  ", e$sortie), sep = "\n")
     cat(sprintf("  durée : %s\n", e$duree))
