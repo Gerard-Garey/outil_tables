@@ -384,8 +384,9 @@ d'observation, table de référence (section~\ref{sec:donnees}) & présent \\
 et censure (section~\ref{sec:exposition}) & présent \\
 \code{R/brut.R} & taux bruts, intervalles et statuts (section~\ref{sec:brut}) & présent \\
 \code{R/lissage.R} & lissages (section~\ref{sec:lissage}) & à créer \\
-\code{R/positionnement.R} & positionnement sur une table de référence
-(section~\ref{sec:positionnement}) & à créer \\
+\code{R/positionnement.R} & positionnement sur une table de référence~; pour
+l'instant, briques d'appariement et de SMR partagées avec la validation
+(section~\ref{sec:positionnement}) & présent \\
 \code{R/prospective.R} & tables prospectives (section~\ref{sec:prospective}) & à créer \\
 \code{R/fermeture.R} & fermeture aux âges extrêmes (section~\ref{sec:fermeture}) & à créer \\
 \code{R/validation.R} & statistiques de validation d'une table de référence
@@ -452,7 +453,7 @@ jamais \code{positionnement}.
 \node[fonc, below=3.5mm of rap] (val) {\code{validation}};
 \node[prevu, below=3.5mm of val] (fer) {\code{fermeture}};
 \node[prevu, below=3.5mm of fer] (pro) {\code{prospective}};
-\node[prevu, below=3.5mm of pro] (pos) {\code{positionnement}};
+\node[fonc, below=3.5mm of pro] (pos) {\code{positionnement}};
 \node[prevu, below=3.5mm of pos] (lis) {\code{lissage}};
 \node[fonc, below=3.5mm of lis] (bru) {\code{brut}};
 \node[fonc, below=3.5mm of bru] (exp) {\code{exposition}};
@@ -3048,7 +3049,7 @@ contrôle de la provenance~; contrôle des tables de référence reçues
 section~\ref{sec:tables-reference-recues})~; si le plan comprend l'étape
 \code{validation}, lecture de la table de la clé qu'elle cite
 (\code{table\_citee()}) et contrôles d'entrée de cette étape
-(\code{controler\_entrees\_validation()}, module \code{validation}~:
+(\code{controler\_entrees\_validation()}, module \code{positionnement}~:
 convention d'âge retenue, table sans année, modalités de sexe, couverture
 de la plage, section~\ref{sec:validation-etape})~; contrôle du codage des chaînes que la fiche
 écrira hors des données, valeurs des rôles (noms de colonnes) et champs de
@@ -6531,9 +6532,15 @@ ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
 \section{Positionnement sur une table de référence~: \code{R/positionnement.R}}
 \label{sec:positionnement}
 
-Module prévu (E2.12, E2.15)~: positionnement d'une table d'expérience sur une
-table de référence. Il sera créé par une branche ultérieure
-(\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
+Module du positionnement d'une table d'expérience sur une table de
+référence (E2.12, E2.15). Le fichier \code{R/positionnement.R} est créé
+(issue~\#167)~; il ne contient pour l'instant que les briques partagées
+avec l'étape \code{validation} (section~\ref{sec:validation}), déplacées
+sans changement depuis \code{R/validation.R}~: conventions d'âge admises,
+forme des paramètres à valeur entière, contrôles d'entrée avant exécution,
+appariement à la table de référence, attendus par cellule, SMR et son
+inférence de Poisson. Leurs refus gardent le module \code{validation} et
+leurs motifs. L'étape de positionnement n'est pas encore implémentée.
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-positionnement}
@@ -6548,7 +6555,19 @@ table de référence. Il sera créé par une branche ultérieure
 \textcolor{financeblue}{\textbf{Statut}} &
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
-\multicolumn{4}{@{}l@{}}{aucune fonction~: fichier \code{R/positionnement.R} absent} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Nom}} &
+\textcolor{financeblue}{\textbf{Statut}} &
+\textcolor{financeblue}{\textbf{Entrées}} &
+\textcolor{financeblue}{\textbf{Sortie et rôle}} \\
+\endhead
+\catalogue{fonctions-positionnement}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} \\
+\catalogue{fonctions-positionnement}{valeurs\_entieres\_double()} & interne & valeur & \code{TRUE} pour un \code{double} sans attribut, sans \code{NA}, fini, à valeurs entières \\
+\catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre~; appelée par \code{construire\_table()} et par \code{rejouer\_fiche()} (étape~7~ter) \\
+\catalogue{fonctions-positionnement}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé & grille des cellules et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table}, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
+\catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} \\
+\catalogue{fonctions-positionnement}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé \\
 \end{longtable}
 }
 
@@ -6636,7 +6655,9 @@ situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
 \code{MOTIFS\_TETE} et \code{MODALITES\_CAUSE}),
 \code{exposition} (\code{calculer\_exposition()}, pour
 \code{importance\_exclusions} seulement) et
-\code{brut} (\code{taux\_poisson()})~; le contrôle de
+\code{brut} (\code{taux\_poisson()}) et, depuis l'issue~\#167,
+\code{positionnement} (\code{apparier\_table()}, \code{attendus\_cellules()},
+\code{smr\_poisson()} et \code{valeurs\_entieres\_double()})~; le contrôle de
 \code{tests/controles/graphe\_modules.R} relève aussi des arêtes vers
 \code{table\_reference()}, qui sont des homonymies de l'argument
 \code{table\_reference} (la clé de la table), arêtes autorisées de toute
@@ -7875,7 +7896,6 @@ reproduites ici, E3.4).
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
 \catalogue{fonctions-validation}{RELATIONS\_TABLE} & constante & --- & \code{independante} $\to$ \code{0L}, \code{ajustee\_hors\_outil} $\to$ \code{NA} (nombre de paramètres estimés) \\
-\catalogue{fonctions-validation}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} \\
 \catalogue{fonctions-validation}{N\_MAX\_WILCOXON\_EXACT} & constante & --- & 1000~: effectif maximal de la p-valeur exacte de Wilcoxon (décision M256) \\
 \catalogue{fonctions-validation}{N\_MAX\_RUNS\_EXACT} & constante & --- & 10000~: somme maximale des effectifs de la loi exacte des suites \\
 \catalogue{fonctions-validation}{TOLERANCE\_RESIDU\_NUL} & constante & --- & $10^{-10}$~: tolérance relative d'un résidu nul \\
@@ -7885,13 +7905,8 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{ETATS\_CELLULE\_VALIDATION} & constante & --- & les cinq états d'une cellule (section~\ref{sec:validation-etape}) \\
 \catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les neuf états d'une grandeur (section~\ref{sec:validation-statistiques}) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION} & constante & --- & \code{data.frame} (\code{statistique}, \code{grandeur}, \code{sous\_h0}, \code{statut})~: une ligne par grandeur, dans l'ordre du résultat~; \code{sous\_h0} désigne les grandeurs non produites sous \code{ajustee\_hors\_outil} (tableau~\ref{tab:statistiques-validation}) \\
-\catalogue{fonctions-validation}{valeurs\_entieres\_double()} & interne & valeur & \code{TRUE} pour un \code{double} sans attribut, sans \code{NA}, fini, à valeurs entières \\
 \catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & les six paramètres & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue~; appelée par \code{valider\_plan()} et en appel direct par la fonction d'étape \\
-\catalogue{fonctions-validation}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre~; appelée par \code{construire\_table()} et par \code{rejouer\_fiche()} (étape~7~ter) \\
-\catalogue{fonctions-validation}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé & grille des cellules et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table}, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
-\catalogue{fonctions-validation}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} \\
 \catalogue{fonctions-validation}{probabilite\_hors()} & interne & $A$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{P}(A)$, par cellule \\
-\catalogue{fonctions-validation}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé \\
 \catalogue{fonctions-validation}{loi\_runs()} & interne & $n_{+}$, $n_{-}$ par séquence & loi exacte du nombre total de suites, par convolution \\
 \catalogue{fonctions-validation}{wilcoxon\_rangs()} & interne & différences & effectif, nuls, groupes d'ex aequo, $w_{+}$, variance corrigée, $z$ \\
 \catalogue{fonctions-validation}{signe\_residu()} & interne & résidus, attendus & signe à la tolérance~; seul ensemble de zéros \\
