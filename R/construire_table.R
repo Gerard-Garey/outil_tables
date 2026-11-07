@@ -23,7 +23,7 @@
 #    provenance) est partagée par construire_table() et rejouer_fiche() ; la
 #    seconde y ajoute le contrôle 1.3 et les contrôles d'entrée des étapes
 #    qui lisent une table (controler_entrees_validation(), module
-#    validation), et n'est appelée que par construire_table() ; toutes deux
+#    positionnement), et n'est appelée que par construire_table() ; toutes deux
 #    rendent les valeurs validées transmises aux étapes ;
 #  - construire_table() : contrôle les entrées une fois (controler_entrees()),
 #    calcule l'empreinte des données, exécute les étapes dans l'ordre du plan
@@ -609,7 +609,7 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
 # étape : controler_plan_roles(), puis le contrôle 1.3 des tables de
 # référence (controler_tables_reference(), ADR 0015, point 1.3), puis le
 # contrôle d'entrée de chaque étape qui lit une table (ADR 0015, point 7.3 ;
-# M253) : controler_entrees_validation() (module validation) sur la table
+# M253) : controler_entrees_validation() (module positionnement) sur la table
 # citée par l'étape `validation`. Rend les valeurs de controler_plan_roles(),
 # plus tables_fiche (valeur de fiche$tables_reference) et tables (table citée
 # par étape, liste nommée par étape ; vide sans table citée). Au rejeu, ces
