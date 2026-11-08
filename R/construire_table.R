@@ -38,8 +38,8 @@
 #    #86) : contrôles de la fiche et des données, puis un seul appel de
 #    construire_table() sur les rôles, le plan et la provenance de la fiche,
 #    et les tables de référence reçues ou relues ; le contrôle 1.3 et les
-#    contrôles d'entrée de la validation sont faits une fois, par
-#    construire_table() (#82) ;
+#    contrôles d'entrée des étapes qui lisent une table (positionnement,
+#    validation) sont faits une fois, par construire_table() (#82) ;
 #    bilan des contrôles et des témoins, hors de l'objet ; exporté.
 #
 #  Aucun calcul. Peut appeler tous les modules sauf `simulation` (ADR 0007,
@@ -667,6 +667,10 @@ controler_entrees <- function(donnees, roles, plan, provenance, tables_reference
     controler_entrees_validation(tables$positionnement, pp[["table_reference"]], e$conv$retenue,
                                  e$plan[["segmentation"]], pp[["plage_ages"]], "positionnement")
   }
+  # Sous la relation positionnee, valider_plan() impose à la validation la
+  # clé de table et la plage d'âges du positionnement : ce second contrôle
+  # refait alors le premier, à l'identique. Il est gardé pour l'uniformité
+  # (un contrôle par étape qui lit une table).
   if ("validation" %in% names(etapes_plan)) {
     pv <- etapes_plan[["validation"]]
     tables$validation <- table_citee(tables_reference, pv[["table_reference"]])
@@ -926,12 +930,13 @@ perimetre_temoin_fiche <- function(f) {
 # controler_tables_rejeu() : forme, clés, représentation, origine, empreinte) ;
 # s'arrête au premier refus, sans appeler construire_table(). Appelle ensuite
 # construire_table() une seule fois : le contrôle 1.3 sur la liste assemblée
-# et les contrôles d'entrée de la validation y sont faits une fois, avant
-# toute étape (mêmes motifs, mêmes messages ; #82 ; #164, point 2). Rend un
-# objet de classe `rejeu` : construction, l'objet rendu par
-# construire_table() sans retouche ; bilan, data.frame de 14 lignes
-# (controle, attendu, lu, verdict, statut) : 8 contrôles, tous « conforme »
-# dans un bilan rendu, puis 6 témoins, jamais motifs de refus.
+# et les contrôles d'entrée des étapes qui lisent une table (positionnement,
+# validation) y sont faits une fois, avant toute étape (mêmes motifs, mêmes
+# messages ; #82 ; #164, point 2). Rend un objet de classe `rejeu` :
+# construction, l'objet rendu par construire_table() sans retouche ; bilan,
+# data.frame de 14 lignes (controle, attendu, lu, verdict, statut) :
+# 8 contrôles, tous « conforme » dans un bilan rendu, puis 6 témoins, jamais
+# motifs de refus.
 rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # Message marqué UTF-8 sous toute locale (#94) : chaque message est formé
   # par formuler(), qui marque le gabarit avant sprintf() (#127).
@@ -1113,9 +1118,9 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
 
   # 7 bis. Tables de référence (ADR 0015, point 4.2) : reçues ou relues dans
   #    le package, empreinte de chacune contre la fiche. Le contrôle 1.3 sur
-  #    la liste assemblée et les contrôles d'entrée de la validation (ancien
-  #    7 ter) sont faits une fois, par construire_table() (8), avant toute
-  #    étape (#82 ; #164, point 2).
+  #    la liste assemblée et les contrôles d'entrée des étapes qui lisent une
+  #    table (positionnement, validation ; ancien 7 ter) sont faits une fois,
+  #    par construire_table() (8), avant toute étape (#82 ; #164, point 2).
   tr <- controler_tables_rejeu(fiche[["tables_reference"]], tables_reference, texte_lu(e[["code"]]))
 
   # 8. Construction, une seule fois, sur les rôles, le plan et la provenance

@@ -1763,9 +1763,16 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   # annotation du 06/11/2026, (b)). Première phrase de validation_sans_verdict
   # (validation_sans_verdict_table) conditionnelle à la relation (#167,
   # spécification, § 8 ; F9) : rendue dans le même paragraphe, hors relation
-  # positionnee.
+  # positionnee. Sous independante et ajustee_hors_outil, la phrase suit la
+  # présence de l'étape positionnement (décision du mainteneur du 08/11/2026,
+  # sur avis d'actuary) : validation_sans_verdict_table_positionnement si elle
+  # est au plan, validation_sans_verdict_table sinon.
   validation_sans_verdict_table = paste(
     "Aucune table positionnée n'est produite : la table de référence est prise telle quelle."),
+  validation_sans_verdict_table_positionnement = paste(
+    "La validation porte sur la table de référence citée par l'étape validation, prise telle quelle",
+    "(etapes/validation/parametres/table_reference) ; la table positionnée produite par l'étape positionnement de",
+    "cette construction n'est pas validée par cette étape (relation « positionnee » pour la valider)."),
   validation_sans_verdict = paste(
     "Aucun verdict ni seuil : aucune p-valeur n'est comparée à un niveau, et le moteur ne conclut pas sur",
     "l'adéquation de la table."),
@@ -2211,10 +2218,14 @@ corps_section <- function(x, k) {
       # (switch explicite, erreur de programmation par défaut ; #167, F5,
       # F9) : sous positionnee, première phrase de validation_sans_verdict
       # omise, mentions validation_positionnee et validation_h0_positionnee
-      # (C2), multiplicité, hypothèses des tests et Monte-Carlo multinomial.
+      # (C2), multiplicité, hypothèses des tests et Monte-Carlo multinomial ;
+      # sous les deux autres, première phrase selon la présence de l'étape
+      # positionnement (décision du mainteneur du 08/11/2026).
       pv <- x[["etapes"]][["validation"]][["parametres"]]
       au <- x[["fiche"]][["avertissement_unite"]]
-      sans_verdict <- paragraphe(m[["validation_sans_verdict_table"]], " ", m[["validation_sans_verdict"]])
+      table_prise <- if ("positionnement" %in% etapes) "validation_sans_verdict_table_positionnement"
+                     else "validation_sans_verdict_table"
+      sans_verdict <- paragraphe(m[[table_prise]], " ", m[["validation_sans_verdict"]])
       r <- switch(relation_lue(pv[["relation_table"]]),
         independante = list(verdict = sans_verdict, relation = "validation_independante", h0 = "validation_h0",
                             tests = TRUE, mc = "validation_monte_carlo"),

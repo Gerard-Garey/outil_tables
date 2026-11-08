@@ -559,6 +559,28 @@ verifier("rapport independante : titre inchangé ; première phrase et suite de 
     grepl("<h2>Étape validation : statistiques de validation de la table de référence prise telle quelle</h2>", r$sec,
           fixed = TRUE)
 })
+verifier("rapport independante et ajustee_hors_outil avec l'étape positionnement au plan (décision du mainteneur du 08/11/2026) : mention de la table de référence prise telle quelle, une fois, dans le paragraphe de validation_sans_verdict ; « Aucune table positionnée n'est produite » absente ; titre sans table positionnée", {
+  nouvelle <- paste("<p>La validation porte sur la table de référence citée par l'étape validation, prise telle quelle",
+                    "(etapes/validation/parametres/table_reference) ; la table positionnée produite par l'étape",
+                    "positionnement de cette construction n'est pas validée par cette étape (relation « positionnee »",
+                    "pour la valider). Aucun verdict ni seuil : aucune p-valeur n'est comparée à un niveau, et le moteur",
+                    "ne conclut pas sur l'adéquation de la table.</p>")
+  une <- function(rel, titre) {
+    x <- construire_table(JEU, ROLES, plan_vp(val = modifyList(VAL, list(relation_table = rel))),
+                          tables_reference = list(tv = T_HF))
+    r <- section_validation(x)
+    n <- lengths(regmatches(r$h, gregexpr(nouvelle, r$h, fixed = TRUE)))
+    if (!("positionnement" %in% names(x$etapes))) "étape positionnement absente"
+    else if (n != 1L) sprintf("nouvelle mention présente %d fois", n)
+    else if (grepl("Aucune table positionnée n'est produite", r$h, fixed = TRUE)) "ancienne mention présente"
+    else if (!grepl(paste0("<h2>", titre, "</h2>"), r$sec, fixed = TRUE)) "titre"
+    else TRUE
+  }
+  tous(independante = une("independante",
+                          "Étape validation : statistiques de validation de la table de référence prise telle quelle"),
+       ajustee_hors_outil = une("ajustee_hors_outil",
+                                "Étape validation : statistiques de validation de la table de référence ajustée hors de l'outil"))
+})
 verifier("rapport ajustee_hors_outil : titre propre à la relation ; plan sans validation : titre de SECTIONS_RAPPORT", {
   x <- construire_table(JEU, ROLES, plan_vp(pos = NULL, val = modifyList(VAL, list(relation_table = "ajustee_hors_outil"))),
                         tables_reference = list(tv = T_HF))

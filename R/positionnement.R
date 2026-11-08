@@ -30,7 +30,7 @@
 #  (F2). Aucun verdict, aucun seuil ; formules sans attribution d'auteur
 #  (M200).
 #  Ce module n'appelle que `outils` (refuser(), formuler(), forme_exacte(),
-#  chaine_unique(), avertir(), texte_moteur()) et `donnees` (citer(),
+#  chaine_unique(), avertissements_vides(), avertir(), texte_moteur()) et `donnees` (citer(),
 #  liste_guillemets(), SEXES_TABLE) (ADR 0007, point 2.1). Les arêtes vers
 #  donnees::table_reference éventuellement relevées par graphe_modules.R sont
 #  des homonymies de l'argument `table_reference` (clé de la table).
@@ -411,8 +411,16 @@ calculer_positionnement <- function(exposition, segmentation, par_annee, convent
   rownames(segs) <- NULL
   sans_a <- which(!(A > 0))
   sans_o <- which(O == 0)
-  # Segments cités dans un refus : clés et attendus (texte formé, une
-  # expression par refus : règle 2 de tests/controles/messages_refus.R).
+  # Segments cités dans un refus : clés et attendus, « ; » entre segments
+  # (texte formé : aide de message, règles 2 et 4 de
+  # tests/controles/messages_refus.R), commun aux deux refus qui suivent.
+  segments_cites <- function(idx)
+    paste(vapply(idx, function(i)
+      formuler("%s (A = %.17g)",
+               if (length(segmentation)) paste(vapply(segmentation, function(v)
+                 formuler("%s = « %s »", citer(v), citer(as.character(segs[[v]][i]))), ""),
+                 collapse = ", ")
+               else formuler("sans segmentation"), A[i]), ""), collapse = " ; ")
   # Aucune cellule dans la table d'exposition (période sans observation) :
   # aucun segment (avis d'actuary du 07/11/2026).
   if (!n_seg)
@@ -428,12 +436,7 @@ calculer_positionnement <- function(exposition, segmentation, par_annee, convent
                            "cellule exposée où la table de clé « %s » donne q_x > 0 : attendus A = 0) : %s. Le facteur",
                            "theta = O / A n'est pas défini : aucune table positionnée n'est produite."),
                      length(sans_a), as.integer(plage_ages[1L]), as.integer(plage_ages[2L]), citer(table_reference),
-                     paste(vapply(sans_a, function(i)
-                       formuler("%s (A = %.17g)",
-                                if (length(segmentation)) paste(vapply(segmentation, function(v)
-                                  formuler("%s = « %s »", citer(v), citer(as.character(segs[[v]][i]))), ""),
-                                  collapse = ", ")
-                                else formuler("sans segmentation"), A[i]), ""), collapse = " ; ")),
+                     segments_cites(sans_a)),
             list(cle = table_reference, plage_ages = plage_ages, segments = segs[sans_a, , drop = FALSE],
                  attendus = A[sans_a]))
   if (length(sans_o))
@@ -443,12 +446,7 @@ calculer_positionnement <- function(exposition, segmentation, par_annee, convent
                            "positionnement est refusé. L'étape validation (relation independante) donne, sur ces",
                            "données, le SMR et sa borne supérieure exacte -ln(alpha/2) / A."),
                      length(sans_o), as.integer(plage_ages[1L]), as.integer(plage_ages[2L]),
-                     paste(vapply(sans_o, function(i)
-                       formuler("%s (A = %.17g)",
-                                if (length(segmentation)) paste(vapply(segmentation, function(v)
-                                  formuler("%s = « %s »", citer(v), citer(as.character(segs[[v]][i]))), ""),
-                                  collapse = ", ")
-                                else formuler("sans segmentation"), A[i]), ""), collapse = " ; ")),
+                     segments_cites(sans_o)),
             list(cle = table_reference, plage_ages = plage_ages, segments = segs[sans_o, , drop = FALSE],
                  attendus = A[sans_o]))
 
