@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-08
 ---
 
@@ -8,6 +8,8 @@ date: 2026-11-08
 *Proposé par `architect-approfondi` sur Fable le 08/11/2026, à l'étape (0''') de la branche `claude/recette-stocks-successifs` (B15, PR #188, tête `41e38cd`) ; rédaction d'office au titre de `docs/agents/routage.md`, § 4.1, cas 3 (ADR d'architecture), consultation Fable 1/3 de B15 (décision D1 du mainteneur, 08/11/2026, M329). La décision revient au mainteneur : les points à trancher à l'acceptation sont en fin d'ADR ; aucun code de #169, #180 ni #181 n'est écrit avant l'acceptation (D1 ; `docs/feuille-de-route.md`, § 1.16, P2). Les commits (1) de #176 et (2) de #182 ne dépendent pas du présent ADR et peuvent le précéder.*
 
 *Sources : l'avis de forme (0'') d'`architect-approfondi` accepté par le mainteneur le 08/11/2026 (https://github.com/Gerard-Garey/outil_tables/issues/169#issuecomment-6723637706 ; points G1 à G15, décisions D1 à D6), dont le présent ADR est la consignation d'architecture ; les spécifications de fond (0') d'`actuary-approfondi` acceptées le même jour : #169 (questions Q1 à Q6) et #176 (Q7), numérotées **M327** ; #180 (questions QS1 à QS6), numérotée **M328** ; les décisions D1 à D6 de l'avis (0''), numérotées **M329** (D1) à **M334** (D6) ; l'ADR 0014 (accepté le 05/11/2026, M218) et ses annotations ; les ADR 0003, 0005, 0007, 0011 et 0015. Numéros de ligne relevés à `41e38cd` ; le nom de l'objet fait foi (M77, (b)). Mesures d'`architect` sous R 4.3.3, `tablexp` installé depuis l'arbre de `41e38cd` dans une bibliothèque temporaire hors dépôt, hôte cloud Linux, hors plateforme de référence ; marquées *vérifié*. Les noms d'objets que l'avis (0'') ne fixe pas sont dits « indicatifs » : `coder` les fixe, `actuary` vise les motifs de refus.*
+
+*Accepté par le mainteneur le 08/11/2026 (décision M335), points A à E selon la recommandation : A catalogue et sélection (points 1 à 3) ; B deux seams et invariant (point 4) ; C matrice (point 5) ; D plan conditionnel (point 7) ; E fiche (point 8). F accordé : les annotations datées de la section « Conséquences » et les entrées de `CONTEXT.md` sont écrites par `architect` avant le code (M320), le même jour. Issue proposée (« Conséquences », script de contrôle de l'invariant 4.4) créée en #194, hors périmètre de B15 ; `grep` à l'audit en attendant. Le corps ci-dessous n'est pas réécrit : « proposé », « à arrêter par le mainteneur » et « création sur accord du mainteneur » s'y lisent à la date de la proposition. Annotations datées du 08/11/2026 portées par `architect` à l'étape (0''') : ADR 0003 (points 2, 3 et 9), ADR 0007 (points 3.1, 3.2, 4.1, 5.1 à 5.4 ; annotation du 25/10/2026, (c) 4 et (c) 11), ADR 0011 (points 5 et 10), ADR 0014 (points 3 à 6, point 11 et question 5, réponse 6) ; ADR 0015 non annoté. Transcrit par `architect`.*
 
 ## Contexte
 
