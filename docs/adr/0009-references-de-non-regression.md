@@ -795,3 +795,31 @@ Rédigée par `architect` à l'étape (A) de la branche `claude/positionnement-s
 **Effet sur les résultats : aucun** par la présente annotation ni par `9cda1cc` (aucun `.tsv` modifié).
 
 Issues : #175, #167, #168, #32, #166 ; #174 et #177 (types de colonnes de R8 et R9, hors périmètre). Décisions M296, M301, M287. Branche `claude/positionnement-smr`, PR #173.
+
+## Annotation du 8 novembre 2026 — plans de méthode R10, R11 et R12 (#167, #168) ; R12 sous H0 vraie (M307) ; créations sur la CI ; point 5.2 précisé
+
+Rédigée par `architect` sur la branche `claude/positionnement-smr` (B14, PR #173), à `fc08589`, d'après les messages des commits `b46aa0b`, `3e2af4f`, `bad9a70`, `6675952` et `fc08589` (`git log 6b173bf..fc08589`) et les décisions du mainteneur M307 à M309 (`docs/feuille-de-route.md`, § 4). Elle complète l'étape (R) du plan de la branche (§ 1.15).
+
+**(a) Point 4.3 : lignes R10, R11 et R12** (`plans_reference()`, `tests/reference/outils_reference.R`, à `3e2af4f`, inchangées à `fc08589`). Les trois plans prennent l'entrée `reference` (`jeu_reference()`) ; graines de Monte-Carlo 20261113 à 20261115 (`GRAINE_MONTE_CARLO_R10` à `_R12`), absentes du reste du dépôt à `3e2af4f` (message du commit, `grep`).
+
+| Id | Description | Segmentation | Délai | Convention | `par_annee` | `estimateurs` | `niveau` | Étapes et champs ajoutés |
+|---|---|---|---|---|---|---|---|---|
+| R10 | positionnement par SMR sur la table de R8 et validation de la table positionnée (plan de R8 avec les étapes `positionnement` et `validation` en relation `positionnee`), #167, `3e2af4f` | `sexe` | 0 | `plus_fine` | `FALSE` | `poisson`, `binomial` | 0,95 | `exclusions` et `importance_exclusions` de R8 ; `positionnement` : `methode = "smr"`, `table_reference = "tv"`, `plage_ages = c(20, 90)`, `niveau = 0.95` ; `validation` de R8 avec `relation_table = "positionnee"` ; `graine = 20261113` ; `tables_reference` de R8 |
+| R11 | test d'homogénéité entre segments (R1 avec l'étape `homogeneite`), #168, `3e2af4f` | `sexe` | 0 | `plus_fine` | `FALSE` | `poisson`, `binomial` | 0,95 | `homogeneite` : `plage_ages = c(20, 90)`, `tranches_age = c(20, 50, 70)`, `replications = 999` ; `graine = 20261114` ; H0 fausse (facteur 0,6 sur F), témoin de puissance : p de Monte-Carlo au plancher |
+| R12 | test d'homogénéité entre segments sous H0 (R5 avec l'étape `homogeneite`), #168, M307, `3e2af4f` | `sexe` | 0 | `plus_fine` | `FALSE` | `poisson`, `binomial` | 0,95 | `transition = c("en_cours", "rachat")` ; `homogeneite` de R11 ; `graine = 20261115` ; H0 exactement vraie (facteurs de rachat H = F = 1) : épingle le flux des réplications de l'homogénéité |
+
+Le champ `entree` vaut `reference` pour R1 à R8 et R10 à R12, `reference_defauts` pour R9.
+
+**(b) Points 3.7 et 5.5 : créations sur la CI.**
+
+1. **R11 et R12** : mode `creation`, exécution 42465708495 (sur `3e2af4f`, 08/11/2026, 09:06 UTC, motif « #167, #168, M307 ») ; MD5 de l'artefact, vérifiés par `md5sum -c` : `R11.tsv` `af8a972f7fc64e9a2f4409f2ccca670b`, `R12.tsv` `bebe4468c518ebc8ac8126d0d9b321cc` (332 lignes chacun) ; R1 à R9 identiques au bit près aux fichiers commités, en-têtes exceptés ; visa d'`actuary` (création seule, aucune table finale) ; commit `6675952`.
+2. **R10** : non commité à `6675952`, bien que visé par le mainteneur (M287, M308 : θ_F = 0,978472 [0,932059 ; 1,026597], θ_H = 0,966962 [0,929727 ; 1,005306], 142 lignes), parce que trois statuts textuels de la validation sous `positionnee` devaient d'abord être corrigés (M309, `fc08589` ; aucune valeur ni aucun état ne change, empreinte `fiche/empreintes/resultat` de R10 `17ed0402…` → `48e2a464…`). R10 est recréé sur la CI après cette correction : exécution 42469308812, MD5 `76feaa42a6e37c419121cc01a45001dd` (*vérifié* par `architect` par `md5sum tests/reference/R10.tsv` sur l'arbre de travail, fichier non suivi à `fc08589`, 550 lignes), commité par la session principale en `8a4fd09`.
+3. **`SANS_REFERENCE`** vaut `c(R10 = "#167")` à `6675952` et à `fc08589` ; il est **vide après le commit de R10**.
+
+**(c) Point 5.2 précisé : un plan par méthode, et un second plan pour l'homogénéité sous H0 vraie (M307).** La règle « un plan par méthode » (point 4.3, alinéa qui suit le tableau ; ADR 0005, point 8) reste la règle. Pour une méthode dont les réplications de Monte-Carlo ne sont épinglées que si la statistique observée tombe dans le corps de la loi, un second plan est admis : sous H0 fausse (R11), toutes les p de Monte-Carlo sont au plancher, et un changement du flux des réplications n'y change aucune valeur figée ; sous H0 exactement vraie (R12 : p de Monte-Carlo 0,615, 0,466 / 0,339 / 0,429, 0,557), il en change. Ce second plan est décidé par le mainteneur, sur avis d'`actuary`, comme tout plan ajouté.
+
+**(d) Constat de simulation `bad9a70`, hors références.** `tests/mesures/constat_positionnement.R` est hors batteries et hors références (aucun seuil) ; il ne crée aucun plan. Son constat sur X² et G² aux cellules à attendus faibles donne l'issue #179 (M310) ; ses graines sont gardées (M311).
+
+**Effet sur les résultats : aucun** par la présente annotation. Les références R1 à R9 sont inchangées ; R10, R11 et R12 sont des créations.
+
+Issues : #167, #168, #179. Décisions M287, M307, M308, M309, M310, M311. Branche `claude/positionnement-smr`, PR #173.
