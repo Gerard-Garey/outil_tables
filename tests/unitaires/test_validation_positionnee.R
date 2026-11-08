@@ -69,7 +69,42 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE : mêmes (statistique, grandeur, sous
               c(k("residus", "esperance_au_dela_2"), k("khi2_pearson", "p_asymptotique"), k("deviance", "p_monte_carlo"),
                 k("sous_groupes", "bornes_exactes"), k("sous_groupes", "p_valeurs")), fixed = TRUE)) &&
     grepl("couverture >= niveau (intervalle exact conservatif)", k("sous_groupes", "bornes_exactes"), fixed = TRUE) &&
-    grepl("ddl = n - S = 0 (une cellule retenue par segment)", k("khi2_pearson", "ddl"), fixed = TRUE)
+    grepl("si n - S = 0 (une cellule retenue par segment)", k("khi2_pearson", "ddl"), fixed = TRUE)
+})
+verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nomment la table positionnée (mu_pos, q_pos), jamais mu^ - mu~ ni q~ ; ddl conditionnel (si n - S = 0) ; espace avant chaque point-virgule ; STATUTS_VALIDATION inchangé octet pour octet (empreinte MD5 figée)", {
+  a <- tablexp:::STATUTS_VALIDATION; b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
+  k <- function(s, g) b$statut[b$statistique == s & b$grandeur == g]
+  pos <- c(k("wilcoxon", "effectif"), k("wilcoxon", "groupes_ex_aequo"), k("wilcoxon", "w_plus"), k("r2", "valeur"))
+  # Empreinte des statuts de la relation independante (et ajustee_hors_outil)
+  # avant M309, valeur écrite en dur (identité exacte) : octets bruts des
+  # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
+  # lignes par un saut de ligne ; indépendante de la locale d'installation
+  # et de session.
+  champs <- function(i) lapply(list(a$statistique[i], a$grandeur[i], if (a$sous_h0[i]) "TRUE" else "FALSE",
+                                    a$statut[i]), charToRaw)
+  ligne <- function(i) unlist(Map(c, champs(i), list(as.raw(9L), as.raw(9L), as.raw(9L), raw(0))))
+  octets <- unlist(Map(c, lapply(seq_len(nrow(a)), ligne), c(rep(list(as.raw(10L)), nrow(a) - 1L), list(raw(0)))))
+  f <- tempfile(); on.exit(unlink(f))
+  writeBin(octets, f)
+  tous(
+    wilcoxon_r2 = if (all(grepl("mu^ - mu_pos", pos, fixed = TRUE)) &&
+                      !any(grepl("mu~)", pos, fixed = TRUE) | grepl("mu^ - mu~", pos, fixed = TRUE)) &&
+                      all(grepl("mu_pos = theta^_s mu~", pos[c(1L, 4L)], fixed = TRUE))) TRUE else "mu_pos absent",
+    distance = if (grepl("|q^ - q_pos|, q^ = 1 - exp(-mu^), q_pos = 1 - exp(-theta^_s mu~)",
+                         k("distance_probabilites", "valeur"), fixed = TRUE) &&
+                   !grepl("q~", k("distance_probabilites", "valeur"), fixed = TRUE)) TRUE else "q_pos absent",
+    ddl = if (all(vapply(c("khi2_pearson", "deviance"), function(s)
+                grepl("S segments ; si n - S = 0 (une cellule retenue par segment) : loi conditionnelle dégénérée",
+                      k(s, "ddl"), fixed = TRUE, useBytes = TRUE) && !grepl("ddl = n - S = 0", k(s, "ddl"), fixed = TRUE) &&
+                grepl("de Monte-Carlo, erreurs de Monte-Carlo : état contraint_par_positionnement)", k(s, "ddl"),
+                      fixed = TRUE, useBytes = TRUE), NA)))
+            TRUE else "ddl non conditionnel",
+    point_virgule = if (!any(grepl("[^ ];", b$statut, useBytes = TRUE)) &&
+                        grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
+                              useBytes = TRUE))
+                      TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
+    independante = if (identical(unname(tools::md5sum(f)), "3e1b88019ff1d3a567acbd3c37aed3ec")) TRUE
+                   else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(
   i = if (identical(tablexp:::statuts_validation("independante"), tablexp:::STATUTS_VALIDATION)) TRUE else "independante",

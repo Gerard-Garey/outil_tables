@@ -311,11 +311,13 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
               "P_H0(p_MC <= alpha | O_s) <= alpha ; réplications multinomiales (O_s ; pi_c) par segment ; e est",
               "l'erreur due au nombre fini de réplications, distincte de l'erreur d'estimation", indep)
   ddl <- paste("n - S : n cellules retenues, p = 1 paramètre (theta) estimé sur ces données par segment positionné,",
-               "S segments ; ddl = n - S = 0 (une cellule retenue par segment) : loi conditionnelle dégénérée,",
-               "D_c = O_s ; aucun test défini (état contraint_par_positionnement)")
+               "S segments ; si n - S = 0 (une cellule retenue par segment) : loi conditionnelle dégénérée,",
+               "D_c = O_s ; aucun test défini, aucun tirage (statistiques standardisées, moments des suites et",
+               "variance de Wilcoxon, p-valeurs asymptotiques, exactes et de Monte-Carlo, erreurs de Monte-Carlo :",
+               "état contraint_par_positionnement)")
   non <- paste("non produit : le SMR de la table positionnée vaut 1 par construction (theta estimé sur ces",
                "cellules) ; état contraint_par_positionnement")
-  nc <- "; table positionnée sur ces données : loi non corrigée de l'estimation de theta"
+  nc <- " ; table positionnée sur ces données : loi non corrigée de l'estimation de theta"
   remplacer <- function(stat, gr, texte) {
     k <- which(s$statistique == stat & s$grandeur == gr)
     if (length(k) != 1L) stop("STATUTS_VALIDATION_POSITIONNEE : ligne inconnue (erreur de programmation).", call. = FALSE)
@@ -351,6 +353,20 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
   for (g in c("variance", "statistique", "p_asymptotique", "p_exacte")) completer("wilcoxon", g)
   remplacer("wilcoxon", "p_monte_carlo",
             paste(mc, "; p centrale sur z, z = 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé"))
+  # Différences, R2 et distance sur la table positionnée (mu_pos = theta^_s
+  # mu~, q_pos = 1 - exp(-mu_pos) ; M309), non sur la référence.
+  zero <- "; zéro : |D - A| <= 1e-10 A"
+  remplacer("wilcoxon", "effectif",
+            paste("descriptif : n = nombre de cellules retenues où la différence d = D / E^c - mu_pos (= mu^ - mu_pos),",
+                  "mu_pos = theta^_s mu~ (force de la table positionnée), est non nulle", zero))
+  remplacer("wilcoxon", "groupes_ex_aequo", "descriptif : nombre de groupes de |mu^ - mu_pos| égaux (taille >= 2)")
+  remplacer("wilcoxon", "w_plus", "descriptif : somme des rangs moyens de |mu^ - mu_pos| des différences positives")
+  remplacer("r2", "valeur",
+            paste("descriptif, fragile : 1 - somme (mu^ - mu_pos)^2 / somme (mu^ - moyenne de mu^)^2 sur C+,",
+                  "mu_pos = theta^_s mu~ (force de la table positionnée) ; peut être négatif"))
+  remplacer("distance_probabilites", "valeur",
+            paste("descriptif : somme sur C+ de |q^ - q_pos|, q^ = 1 - exp(-mu^), q_pos = 1 - exp(-theta^_s mu~)",
+                  "(table positionnée ; échelle des probabilités)"))
   remplacer("fluctuation", "hors_intervalle_exact",
             "nombre de cellules retenues où D est hors de [qbinom(alpha/2, O_s, pi_c), qbinom(1 - alpha/2, O_s, pi_c)]")
   remplacer("fluctuation", "esperance_hors_intervalle_exact", paste(cond, ": somme sur C+ de P(D_c hors intervalle)"))
@@ -852,8 +868,9 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
       else pose("runs", "p_exacte", min(1, sum(loi_runs(n1, n2)[seq_len(R + 1)])))
     }
     # S8 : Wilcoxon sur d = D / E^c - mu~ (= (D - A) / E^c, forme qui garde les
-    # ex aequo exacts des cellules D = 0), nul hors des résidus non nuls (même
-    # différence que statistiques_test()).
+    # ex aequo exacts des cellules D = 0 ; mu~ est mu_pos = theta^_s mu~ sous
+    # positionnee), nul hors des résidus non nuls (même différence que
+    # statistiques_test()).
     dw <- Dr / Er - mur
     dw[sgn == 0] <- 0
     wr <- wilcoxon_rangs(dw)
