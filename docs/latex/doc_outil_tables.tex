@@ -1934,7 +1934,14 @@ qu'aucune fonction mathématique de la bibliothèque du système n'intervient
 l'outillage, par la loi de Gompertz-Makeham de l'entrée de référence pour
 les hommes et 0,6~fois ce taux non arrondi pour les femmes, puis arrondies
 à cinq chiffres significatifs~; elles ne se recalculent pas et ne dépendent
-pas des observations. Sur l'entrée de référence, les deux exclusions de R8
+pas des observations. Elles sont la loi vraie de l'entrée de référence à
+l'arrondi près~: sous R8, l'hypothèse nulle $H_0$~(i) de la validation est
+approximativement vraie (asymptotiquement sous le modèle de survie), ses
+p-valeurs, de Monte-Carlo comprises, tombent dans le corps de leur loi, et
+R8 épingle le flux des réplications de Poisson de la validation~; de même,
+R10 épingle le flux multinomial de la relation \code{positionnee}. Ni R8 ni
+R10 ne mesurent la taille ou la puissance des tests (un seul jeu~; constats
+de simulation hors CI, section~\ref{sec:positionnement-verifications}). Sur l'entrée de référence, les deux exclusions de R8
 ne touchent aucune ligne (le libellé du plan le dit)~: R8 fige la forme des
 sorties des deux étapes, sans retrait effectif. Le retrait effectif est l'objet de
 R9~: même plan, exclusion \code{id\_contrat\_manquant} en plus (une ligne
@@ -11585,7 +11592,7 @@ décimaux, les textes fixes et les légendes (pour un plan qui demande l'étape
 plan~», légendes des tables \code{cellules} et \code{statistiques} de la
 validation et \code{retraits} de l'importance des exclusions), et vérifie que la ligne
 \code{\# rejeu} de la fiche écrite est \code{TEXTE\_REJEU\_FICHE}.
-\code{tests/controles/locale\_c.R} compare les octets des six rapports sous
+\code{tests/controles/locale\_c.R} compare les octets du rapport de chacun des plans de référence sous
 les deux locales.\par}
 
 \subsection{Fonctions du module}
