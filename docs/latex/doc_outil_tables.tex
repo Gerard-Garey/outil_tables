@@ -384,13 +384,15 @@ d'observation, table de référence (section~\ref{sec:donnees}) & présent \\
 et censure (section~\ref{sec:exposition}) & présent \\
 \code{R/brut.R} & taux bruts, intervalles et statuts (section~\ref{sec:brut}) & présent \\
 \code{R/lissage.R} & lissages (section~\ref{sec:lissage}) & à créer \\
-\code{R/positionnement.R} & positionnement sur une table de référence~; pour
-l'instant, briques d'appariement et de SMR partagées avec la validation
+\code{R/positionnement.R} & positionnement sur une table de référence~:
+étape \code{positionnement}, méthode~1 (SMR) et table positionnée~; briques
+d'appariement et de SMR partagées avec la validation
 (section~\ref{sec:positionnement}) & présent \\
 \code{R/prospective.R} & tables prospectives (section~\ref{sec:prospective}) & à créer \\
 \code{R/fermeture.R} & fermeture aux âges extrêmes (section~\ref{sec:fermeture}) & à créer \\
 \code{R/validation.R} & statistiques de validation d'une table de référence
-prise telle quelle et importance des exclusions~; suivi d'expérience à venir
+prise telle quelle ou de la table positionnée, et importance des
+exclusions~; suivi d'expérience à venir
 (section~\ref{sec:validation}) & présent \\
 \code{R/rapport.R} & quantités des rapports, fiche de construction, empreintes,
 texte du plan et de la fiche, rapport figé en octets HTML, sans calcul
@@ -1905,6 +1907,7 @@ R6 & R1 avec l'estimateur produit-limite & \code{sexe} & 0 & \code{plus\_fine} &
 R7 & R3 avec l'estimateur produit-limite (issue~\#32) & \code{sexe} & 0 & \code{age\_atteint\_annee} & non & Poisson, binomial, \code{kaplan\_meier}~; 0,95 \\
 R8 & R1 avec validation et importance des exclusions (issue~\#166) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 R9 & R8 sur l'entrée à défauts injectés (issue~\#166) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
+R10 & R8 avec positionnement par SMR et validation de la table positionnée (issue~\#167) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 \end{longtable}
 }
 
@@ -1946,6 +1949,25 @@ exclues est leur somme, la classe de mesurabilité de chaque motif, des retraits
 non nuls aux deux niveaux et un SMR du comparateur~1 défini, fini et
 positif, d'intervalle exact non dégénéré, aux deux niveaux~: ces contrôles
 échoueraient sur une entrée sans défaut, que R8 passerait à vide.
+
+\medskip
+\noindent
+\textbf{Plan R10} (issue~\#167~; ADR 0009, annotation du 08/11/2026,
+point~(a)~; plan de méthode du point~5.2). R10 est le plan de R8 (mêmes
+exclusions déclarées, sans ligne touchée par l'entrée de référence, même
+table \code{tv}, même étape \code{importance\_exclusions}) augmenté de
+l'étape \code{positionnement} (\code{methode = "smr"}, table \code{tv},
+âges 20 à 90, niveau 0,95), l'étape \code{validation} passant à la
+relation \code{positionnee} (même clé, même plage, mêmes tranches, niveau
+et nombre de réplications que R8), sous la graine de Monte-Carlo
+20261113 (constante \code{GRAINE\_MONTE\_CARLO\_R10},
+\code{tests/reference/outils\_reference.R}, l.~298), distincte de celle du
+jeu, de celle de R8 et des défauts de R9. C'est la première référence qui
+contient une table positionnée~: sa création a demandé le visa du
+mainteneur (décisions M287 et M308), trois statuts textuels ayant été
+corrigés avant elle (décision M309). Il fige aussi l'état
+\code{non\_produite\_par\_cette\_version} du comparateur~2 de l'étape
+\code{importance\_exclusions} sous \code{positionnee}.
 
 \subsubsection*{Format des fichiers}
 
@@ -2115,7 +2137,7 @@ point~(a)~4).
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
 point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
-07/11/2026, point~(a), et seconde annotation du 07/11/2026, point~(a)).
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)).
 Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
 groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
@@ -2133,9 +2155,9 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
-$10^{-14}$ & \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3) \\
+exacte & \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
+$10^{-14}$ & \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
+$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3) \\
 \end{longtable}
 }
 
@@ -2307,7 +2329,19 @@ plateforme de référence (image \code{rocker/r-ver:4.3.3}, R~4.3.3, BLAS et
 LAPACK de référence 3.10.0 monothread, Ubuntu 22.04.5 LTS, glibc 2.35,
 processeur AMD EPYC 9V74)~: création seule, R1 à R6 restés identiques au
 bit près aux fichiers commités (ADR 0009, seconde annotation du 07/11/2026,
-point~(c)).
+point~(c)). La référence R10 a été \textbf{créée} le 08/11/2026 en mode
+\code{creation} (exécution 42469308812 du workflow, calcul sur
+\code{fc08589}, commit \code{8a4fd09}~; issue~\#167, décisions M287, M308 et
+M309~; visa du mainteneur pour la table positionnée, puis d'\code{actuary}),
+sur la plateforme de référence (image \code{rocker/r-ver:4.3.3}, R~4.3.3,
+BLAS et LAPACK de référence 3.10.0 monothread, Ubuntu 22.04.5 LTS, glibc
+2.35, processeur AMD EPYC 9V45)~: création seule, les autres références
+en comparaison réussie face aux fichiers commités~; une première
+création, sur \code{3e2af4f} (processeur AMD EPYC 7763), n'a pas été
+commitée, les statuts de M309 restant à corriger~; la seconde n'en diffère
+que par la ligne des statuts de la validation, les valeurs étant
+identiques au bit près sur l'autre processeur (ADR 0009, annotation du
+08/11/2026, point~(b)~2).
 
 \begin{encadre}
 \small
@@ -2329,7 +2363,11 @@ point~(c)).
     $\to$ décédé, l'unité d'observation tête et la segmentation
     \code{sexe}~; R8 les exerce sans ligne exclue, R9 sur trois motifs de
     500~lignes chacun (section~\ref{sec:non-regression}, «~Plans R8 et
-    R9~»).
+    R9~»). R10 ajoute la relation \code{positionnee} et l'étape
+    \code{positionnement}, sous les mêmes conditions et sans ligne exclue~:
+    la relation \code{ajustee\_hors\_outil}, une table \code{ensemble} et
+    le positionnement d'une construction non segmentée ou sous
+    \code{par\_annee} ne sont couverts que par les tests unitaires.
   \item L'entrée n'exerce pas la fusion des contrats par tête~: elle est
     tirée en mode \code{uniforme}, une tête par contrat
     (section~\ref{sec:simulation}). La fusion n'est couverte que par les
@@ -2977,7 +3015,7 @@ plan n'est connu que du point d'entrée et du validateur.
 \begin{center}
 \small
 \rowcolors{2}{tablerow}{white}
-\begin{tabular}{@{}p{2.1cm}p{5.95cm}p{1.9cm}p{4.45cm}@{}}
+\begin{tabular}{@{}p{2.6cm}p{5.95cm}p{1.9cm}p{3.95cm}@{}}
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Étape}} &
 \textcolor{financeblue}{\textbf{Fonction d'étape}} &
@@ -2998,10 +3036,16 @@ ordre~; \code{binomial} et \code{kaplan\_meier} refusés sous
 \code{par\_annee = TRUE}~; \code{niveau}~:
 niveau de confiance, nombre \code{double} unique, fini,
 $0 < \text{niveau} < 1$ (section~\ref{sec:brut-etape}) \\
+\code{positionnement} & \code{calculer\_positionnement()} & \code{donnees},
+\code{exposition} &
+\code{methode}~: \code{smr}~; \code{table\_reference}~: clé de la
+table~; \code{plage\_ages}~: âges entiers~; \code{niveau}
+(section~\ref{sec:positionnement-etape}) \\
 \code{validation} & \code{calculer\_validation()} & \code{donnees},
 \code{exposition} &
 \code{table\_reference}~: clé de la table~; \code{relation\_table}~:
-\code{independante} ou \code{ajustee\_hors\_outil}~;
+\code{independante}, \code{ajustee\_hors\_outil} ou \code{positionnee}
+(étape \code{positionnement} au plan, même clé, même plage)~;
 \code{plage\_ages}, \code{tranches\_age}~: âges entiers~;
 \code{niveau}~; \code{replications}~: entier $\ge 1$
 (section~\ref{sec:validation-etape}) \\
@@ -3013,13 +3057,15 @@ $0 < \text{niveau} < 1$ (section~\ref{sec:brut-etape}) \\
 \end{tabular}
 \end{center}
 
-\noindent
+{\sloppy\noindent
 Seule l'étape \code{validation} tire un aléa (colonne \code{aleatoire} de
-\code{ETAPES}), et seule elle cite une table de référence, par sa clé
-(section~\ref{sec:tables-reference-recues}). La recette d'exposition et l'unité
+\code{ETAPES})~; les étapes \code{positionnement} et \code{validation}
+citent chacune une table de référence, par sa clé
+(section~\ref{sec:tables-reference-recues}~; constante
+\code{PARAMETRES\_CLE\_TABLE}). La recette d'exposition et l'unité
 d'observation ne sont pas des paramètres~: le moteur les déduit des rôles
 (sections~\ref{sec:recettes} et~\ref{sec:unite-observation})~; seule une
-convention d'âge plus grossière peut être forcée.
+convention d'âge plus grossière peut être forcée.\par}
 
 \noindent
 \textbf{Règle commune de forme} (issue~\#23)~: chaque paramètre d'étape a
@@ -3129,7 +3175,8 @@ un nom en double est refusé sous \code{plan\_mal\_forme} ou
 non sous \code{etapes\_mal\_formees} (issue~\#60).
 Elle ne réimplémente pas les contrôles de valeur~: elle appelle ceux des modules
 (\code{controler\_parametres\_donnees()}, \code{controler\_parametres\_exposition()},
-\code{controler\_parametres\_brut()}, \code{controler\_parametres\_validation()},
+\code{controler\_parametres\_brut()}, \code{controler\_parametres\_positionnement()},
+\code{controler\_parametres\_validation()},
 \code{controler\_parametres\_importance\_exclusions()}), dont les codes et le module sont ainsi identiques, quelle que soit la
 fonction qui détecte la condition (ADR 0007, annotation du 17/10/2026,
 point~d). Dans une construction, ces contrôles ne sont faits que là~: les
@@ -3175,12 +3222,13 @@ canonique~; contrôle des rôles (\code{controler\_roles()})~; déduction de la 
 si le plan comprend l'étape \code{exposition}, de la convention retenue~;
 contrôle de la provenance~; contrôle des tables de référence reçues
 (\code{controler\_tables\_reference()},
-section~\ref{sec:tables-reference-recues})~; si le plan comprend l'étape
-\code{validation}, lecture de la table de la clé qu'elle cite
-(\code{table\_citee()}) et contrôles d'entrée de cette étape
-(\code{controler\_entrees\_validation()}, module \code{positionnement}~:
-convention d'âge retenue, table sans année, modalités de sexe, couverture
-de la plage, section~\ref{sec:validation-etape})~; contrôle du codage des chaînes que la fiche
+section~\ref{sec:tables-reference-recues})~; pour chaque étape du plan
+qui lit une table, \code{positionnement} puis \code{validation}, lecture de
+la table de la clé qu'elle cite (\code{table\_citee()}) et contrôles
+d'entrée de cette étape (\code{controler\_entrees\_validation()}, module
+\code{positionnement}, refus sous le module de l'étape~: convention d'âge
+retenue, table sans année, modalités de sexe, couverture de la plage,
+sections~\ref{sec:positionnement-etape} et~\ref{sec:validation-etape})~; contrôle du codage des chaînes que la fiche
 écrira hors des données, valeurs des rôles (noms de colonnes) et champs de
 la provenance, par l'écrivain de l'empreinte (\code{octets\_chaines()},
 refus \code{chaine\_codage\_bytes}, \code{chaine\_non\_utf8} et
@@ -3188,8 +3236,11 @@ refus \code{chaine\_codage\_bytes}, \code{chaine\_non\_utf8} et
 des données reçues (section~\ref{sec:empreinte}). Tout refus possible avant
 le calcul a donc lieu avant la première étape~; seuls les refus de l'étape
 \code{validation} qui portent sur ses cellules
-(\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un})
-sont levés pendant l'étape, après celles qui la précèdent (l'étape
+(\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un}),
+et ceux de l'étape \code{positionnement} sur ses cellules et ses segments
+(les mêmes, plus \code{positionnement\_sans\_attendu} et
+\code{positionnement\_sans\_deces}), sont levés pendant l'étape, après
+celles qui la précèdent (l'étape
 \code{importance\_exclusions} ne lève aucun refus sur ses cellules,
 section~\ref{sec:importance-exclusions})~; un nom de colonne ou un
 chemin non ASCII de codage indéterminé, sous la locale C, n'est plus refusé
@@ -3224,10 +3275,17 @@ lit la table d'exposition et les paramètres effectifs de l'étape
 \code{exposition} (découpage par année, convention retenue, unité de
 l'exposition) et, pour l'estimateur \code{kaplan\_meier}, les fenêtres des
 observations calculées par l'étape \code{exposition}, avec les valeurs
-validées de la transition, de la période et du délai~; l'étape \code{validation} lit la table
+validées de la transition, de la période et du délai~; l'étape
+\code{positionnement} lit la table d'exposition et les paramètres effectifs
+de l'étape \code{exposition} (découpage par année, convention retenue) et
+la table de la clé citée (section~\ref{sec:positionnement-etape})~; l'étape
+\code{validation} lit la table
 d'exposition et les paramètres effectifs de l'étape \code{exposition}
-(découpage par année, convention retenue), la table de la clé citée et la
-graine du plan (section~\ref{sec:validation-etape})~; l'étape
+(découpage par année, convention retenue), la table de la clé citée, la
+graine du plan et, sous la relation \code{positionnee}, le résultat de
+l'étape \code{positionnement} (\code{etapes\$positionnement}, \code{NULL}
+en son absence~; rien ne passe hors de l'objet~;
+section~\ref{sec:validation-etape})~; l'étape
 \code{importance\_exclusions} lit les données reçues et les rôles, le
 résultat des étapes \code{donnees} (unité d'observation, lignes conservées,
 lignes exclues par motif, observations) et \code{exposition} (table
@@ -4189,9 +4247,11 @@ chaque chemin de \code{PARAMETRES\_CLE\_TABLE} désigne un paramètre
 \code{character} de \code{PARAMETRES\_ETAPES} et que le module
 \code{donnees} n'appelle pas le module \code{rapport}. Le chemin de bout en
 bout avec une table lue par une étape (construction puis rejeu) est vérifié
-avec l'étape qui la lit, \code{validation}, par
+avec les étapes qui la lisent, \code{validation}, par
 \code{tests/unitaires/test\_validation.R}
-(section~\ref{sec:validation-verifications}~; décision M247).\par}
+(section~\ref{sec:validation-verifications}~; décision M247), et
+\code{positionnement}, par \code{tests/unitaires/test\_positionnement.R}
+(section~\ref{sec:positionnement-verifications}).\par}
 
 \medskip
 {\sloppy \textbf{Rejeu outillé} (section~\ref{sec:rejeu}~; issue~\#86).
@@ -6726,14 +6786,447 @@ ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2).
 \label{sec:positionnement}
 
 Module du positionnement d'une table d'expérience sur une table de
-référence (E2.12, E2.15). Le fichier \code{R/positionnement.R} est créé
-(issue~\#167)~; il ne contient pour l'instant que les briques partagées
-avec l'étape \code{validation} (section~\ref{sec:validation}), déplacées
-sans changement depuis \code{R/validation.R}~: conventions d'âge admises,
-forme des paramètres à valeur entière, contrôles d'entrée avant exécution,
-appariement à la table de référence, attendus par cellule, SMR et son
-inférence de Poisson. Leurs refus gardent le module \code{validation} et
-leurs motifs. L'étape de positionnement n'est pas encore implémentée.
+référence (E2.12, E2.15~; issue~\#167). Il porte deux choses. D'une part,
+les briques d'appariement à une table de référence et de SMR, partagées
+avec l'étape \code{validation} (section~\ref{sec:validation})~: conventions
+d'âge admises, forme des paramètres à valeur entière, de la clé de table et
+de la plage d'âges, contrôles d'entrée avant exécution, appariement,
+attendus par cellule, SMR et son inférence de Poisson. Elles ont été
+déplacées sans changement depuis \code{R/validation.R} (avis de forme
+d'\code{architect-approfondi}, F1~; décision M292), puis généralisées à
+l'étape appelante, dont leurs refus prennent le module et le préfixe du
+message (F2), les refus de l'étape \code{validation} restant identiques en
+motif, module, \code{details} et message. D'autre part, l'étape
+\code{positionnement} du plan, méthode~1 (SMR), seule méthode mise en
+œuvre (décision M293)~: en v1, la crédibilité se limite à ce positionnement
+par SMR avec son intervalle de confiance (E2.15). Le module n'appelle que
+\code{outils} et \code{donnees} (\code{citer()},
+\code{liste\_guillemets()}, \code{SEXES\_TABLE})~; \code{validation} et
+\code{construire\_table} l'appellent, \code{rapport} ne l'appelle pas
+(section~\ref{sec:graphe}~; ADR 0007, annotation du 07/11/2026, (b)).
+
+\medskip
+\noindent
+Le fond vient de la spécification d'\code{actuary-approfondi} du
+07/11/2026 (issue~\#167, commentaire 6705863583), décidée par le
+mainteneur (décision M288 pour l'échelle de la force, M289 pour les
+questions Q2 à Q7), de l'avis de forme d'\code{architect-approfondi}
+(même issue, commentaire 6706003047, accepté tel quel~: décision M292) et
+de la décision M293 (paramètre \code{methode}). L'ADR 0015 (annotation du
+07/11/2026, points~(a) à~(d)) et l'ADR 0007 (annotation du même jour,
+(a)~6, (b) et~(c)) consignent la forme.
+
+\subsection{Étape \code{positionnement} du plan}
+\label{sec:positionnement-etape}
+
+{\sloppy \textbf{Paramètres}, tous requis, sans défaut (constante
+\code{PARAMETRES\_ETAPES}), soumis à la règle commune de forme
+(section~\ref{sec:plan})~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{methode}~: \code{smr}, seule valeur de
+    \code{METHODES\_POSITIONNEMENT}. Le paramètre est requis bien qu'il
+    n'ait qu'une valeur (décision M293)~: ajouter plus tard un paramètre
+    requis rendrait invalides, au rejeu, tous les plans et toutes les fiches
+    qui ne le portent pas (refus \code{parametre\_manquant},
+    section~\ref{sec:plan}), alors qu'une méthode nouvelle de mêmes
+    paramètres (E2.12) entrera comme une valeur nouvelle~;
+  \item \code{table\_reference}~: clé de la table dans l'argument
+    \code{tables\_reference} de \code{construire\_table()}, chaîne unique
+    non vide~; le chemin \code{etapes/}\allowbreak\code{positionnement/}\allowbreak\code{table\_reference}
+    figure dans \code{PARAMETRES\_CLE\_TABLE}, si bien que le contrôle des
+    tables reçues couvre la clé (section~\ref{sec:tables-reference-recues})~;
+  \item \code{plage\_ages}~: deux valeurs entières, $0 \le \min \le \max$,
+    en \code{double} (un \code{integer} est refusé, décisions M246 et
+    M257)~; le SMR est estimé sur ces âges, et la table positionnée n'est
+    produite que sur eux (décision M289, Q3)~;
+  \item \code{niveau}~: niveau de confiance des intervalles, nombre
+    \code{double} unique, fini, $0 < \text{niveau} < 1$.
+\end{itemize}\par}
+Refus du module \code{positionnement}, levés par
+\code{controler\_parametres\_positionnement()}, que seule
+\code{valider\_plan()} appelle, avant toute étape, dans cet ordre~:
+\code{methode\_invalide}, \code{cle\_table\_invalide} et
+\code{plage\_ages\_invalide} (par \code{controler\_cle\_table()} et
+\code{controler\_plage\_ages()}, partagées avec l'étape \code{validation}),
+\code{niveau\_invalide} (même motif que dans le module \code{brut}). Il n'y
+a pas de paramètre de réplications~: l'étape est \textbf{non aléatoire}
+(constante \code{ETAPES}), et un plan dont aucune étape ne tire d'aléa
+refuse la graine (\code{graine\_inattendue}, section~\ref{sec:plan})~; le
+bootstrap par têtes d'E2.14 est hors périmètre. L'étape a pour préalables
+\code{donnees} et \code{exposition}~; elle vient après \code{brut} dans
+l'ordre des étapes, qui n'en est pas un préalable.
+
+\medskip
+\textbf{Contrôles d'entrée avant exécution}. Ce sont ceux de l'étape
+\code{validation} (section~\ref{sec:validation-etape}), faits par la même
+fonction, \code{controler\_entrees\_validation()}, appelée pour l'étape
+\code{positionnement} par \code{controler\_entrees()} sur la table de la clé
+citée, avant l'empreinte des données et toute étape
+(section~\ref{sec:execution}), dans cet ordre, sous le module
+\code{positionnement} et le préfixe «~Positionnement~»~:
+\code{convention\_positionnement\_non\_admise} (convention retenue autre
+que \code{dernier\_anniversaire}~: sous \code{age\_atteint\_annee},
+l'appariement d'une cellule d'année civile à $\tilde q_x$ n'est pas
+spécifié, même motif que la décision Q7~(a) de l'issue~\#4),
+\code{table\_annee\_non\_admise} (le positionnement d'une table
+prospective, $q_x(t)$, est hors de la v1~; ADR 0015, point~7.4),
+\code{table\_sexes\_ambigus}, \code{table\_sexe\_incompatible},
+\code{plage\_ages\_hors\_table}. Quand les étapes \code{positionnement} et
+\code{validation} sont toutes deux au plan, celles du positionnement
+passent les premières.
+
+\medskip
+{\sloppy\textbf{Méthode~1~: positionnement par SMR} (spécification, §~1 à~5).
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Objet}~: par segment $s$ de la construction, le facteur
+    $\theta_s$ par lequel multiplier la force de la table de référence pour
+    décrire la mortalité du segment sur la plage d'âges, puis la
+    \emph{table positionnée} qui en résulte~; méthode \code{smr}. Notations
+    de la section~\ref{sec:validation-etape}~: cellules (segment, âge, et
+    année civile sous \code{par\_annee}) de la plage, $D_c$, $E^c_c$,
+    $\tilde q_c$ apparié par clé exacte (sexe, âge) sans déduction,
+    $\tilde\mu_c = -\ln(1 - \tilde q_c)$, $A_c = E^c_c \tilde\mu_c$
+    (\code{attendus\_cellules()}, la même fonction que pour l'étape
+    \code{validation}, décision M217)~; $C^{+}_s$ les cellules retenues
+    ($A_c > 0$) du segment, $O_s = \sum_{C^{+}_s} D_c$, $A_s =
+    \sum_{C^{+}_s} A_c$.
+  \item \textbf{Hypothèses}~: par segment, $D_c \sim \mathcal{P}(\theta_s
+    A_c)$ indépendants sur $C^{+}_s$~; force constante sur chaque cellule,
+    égale à $\theta_s \tilde\mu_c$~; unités d'observation indépendantes
+    (issue~\#159, décision M278)~; convention \code{dernier\_anniversaire}
+    (cellule $[x, x+1)$). La méthode suppose que la mortalité du segment a,
+    sur la plage, la \emph{forme} de la référence à un facteur près~:
+    l'incertitude qu'elle restitue est celle du facteur seul, jamais
+    l'écart de forme, que mesure l'étape \code{validation} sous la relation
+    \code{positionnee} (section~\ref{sec:validation-etape}).
+  \item \textbf{Estimateur}~:
+    \[
+      \hat\theta_s = O_s / A_s .
+    \]
+  \item \textbf{Justification} (résultat exact). La log-vraisemblance de
+    $\theta_s$ sous le modèle de Poisson vaut, à une constante près,
+    $\sum_{C^{+}_s} (D_c \ln \theta_s - \theta_s A_c) = O_s \ln\theta_s -
+    \theta_s A_s$, de maximum $O_s / A_s$. Sous le modèle de survie à force
+    constante par cellule, troncature et censure comprises, la
+    vraisemblance de la force $\mu_c = \theta_s \tilde\mu_c$ est
+    $\prod_c \mu_c^{D_c} e^{-\mu_c E^c_c}$~: elle a la même forme en
+    $\theta_s$, dont $\hat\theta_s$ reste le maximum~; seule la loi de $O_s$
+    cesse d'être exactement de Poisson.
+  \item \textbf{Intervalle exact}~:
+    $\bigl[G_{O_s}^{-1}(\alpha/2),\ G_{O_s+1}^{-1}(1 - \alpha/2)\bigr] /
+    A_s$, $G_k$ fonction de répartition de la loi gamma de forme $k$ et
+    d'échelle~1 (\code{smr\_poisson()}, \code{qgamma()})~: l'intervalle
+    exact de Poisson de la section~\ref{sec:brut-poisson} appliqué à $O_s
+    \sim \mathcal{P}(\theta_s A_s)$, $A_s$ tenu pour fixe.
+  \item \textbf{Intervalle asymptotique}~: normal sur l'échelle de
+    $\ln\theta$, de variance $1/O_s$ (inverse de l'information de Fisher de
+    $\ln\theta$, évaluée en $\hat\theta_s$), soit $\hat\theta_s\,
+    e^{\mp z/\sqrt{O_s}}$, $z = \Phi^{-1}(1 - \alpha/2)$~; même forme que
+    l'intervalle asymptotique de Poisson de l'étape \code{brut}.
+  \item \textbf{Table positionnée} (échelle de la force, décision M288)~:
+    \[
+      q_{\mathrm{pos},x} = 1 - (1 - \tilde q_x)^{\hat\theta_s}
+      = 1 - e^{-\hat\theta_s \tilde\mu_x},
+    \]
+    calculée par \code{-expm1(theta * log1p(-q))}, aux seuls âges de la
+    plage, une ligne par segment et par âge, même sous \code{par\_annee}
+    ($\hat\theta_s \tilde\mu_x$ ne dépend pas de l'année). Ses bornes sont
+    les images des bornes de $\theta_s$ par la même formule. Trois motifs
+    (spécification, §~2~(a))~: c'est exactement le modèle ajusté, dont
+    $\hat\theta_s$ est le maximum de vraisemblance~; les attendus de la
+    table positionnée sur la plage, $\sum_{C^{+}_s} E^c_c \hat\theta_s
+    \tilde\mu_c$, valent $O_s$ (identité exacte, à l'arrondi près), ce
+    qu'emploie l'étape \code{validation} sous la relation
+    \code{positionnee}~; enfin, pour $0 \le \tilde q_x < 1$ et
+    $\hat\theta_s$ fini, $(1 - \tilde q_x)^{\hat\theta_s} > 0$, donc
+    $q_{\mathrm{pos},x} < 1$ \textbf{en arithmétique exacte}~: la
+    question d'un $q$ positionné supérieur ou égal à 1 ne se pose pas
+    hors de l'arrondi (ci-dessous). Hors de la plage, rien n'est produit~:
+    une extrapolation aux âges élevés relève de la fermeture, étape
+    distincte et déclarée.
+  \item \textbf{Arrondi en double précision} (avis d'\code{actuary} du
+    07/11/2026, sur un constat de l'audit). La survie $e^{-\hat\theta_s
+    \tilde\mu_x}$, inférieure à $2^{-54}$ dès que $\hat\theta_s \tilde\mu_x
+    \ge 54 \ln 2$ (environ 37,43), donne $q_{\mathrm{pos},x}$ égal à 1 par
+    arrondi~: la ligne prend l'état \code{qx\_arrondi\_un} (si $0 <
+    \tilde q_x < 1$ et si $q_{\mathrm{pos},x}$ ou l'une de ses quatre
+    bornes vaut 1), et l'avertissement \code{qx\_arrondi\_un} (module
+    \code{positionnement}) en cite le segment, l'âge et $\hat\theta_s$~;
+    ni refus ni plafonnement. Les attendus de la validation sous
+    \code{positionnee} sont calculés sur la force, $\hat\theta_s
+    \tilde\mu_c$, jamais relus dans la table positionnée~: ils restent
+    finis dans ce cas.
+  \item \textbf{Calcul}~: \code{calculer\_positionnement()}, par
+    \code{apparier\_table()}, \code{attendus\_cellules()} et
+    \code{smr\_poisson()}~; \code{qgamma()}, \code{qnorm()}, \code{exp()},
+    \code{log1p()}, \code{expm1()}.
+  \item \textbf{Statut} (E2.20~; constante \code{STATUTS\_POSITIONNEMENT},
+    rendue dans \code{etapes\$positionnement\$parametres\$statuts}, une
+    ligne par colonne double de \code{resultat\$smr} et de
+    \code{resultat\$table\_positionnee}, qui fait foi)~: $O_s$ et $A_s$,
+    descriptifs (arithmétique flottante)~; $\hat\theta_s$, résultat exact
+    (maximum de vraisemblance, ci-dessus)~; bornes exactes, exactes sous la
+    loi supposée ($O_s \sim \mathcal{P}(\theta_s A_s)$, $A_s$ fixe), de
+    couverture au moins égale au niveau (intervalle conservatif),
+    asymptotiques sous le modèle de survie, \code{qgamma()} en
+    approximation numérique~; bornes asymptotiques, résultat asymptotique
+    ($O_s \to \infty$)~; $q_{\mathrm{pos}}$, estimation, \code{log1p()} et
+    \code{expm1()} en approximation numérique~; bornes de $q_{\mathrm{pos}}$,
+    images des bornes de $\theta_s$ par une fonction croissante de
+    $\theta$ (transformation exacte), de même statut que l'intervalle dont
+    elles sont l'image~: comme un seul $\theta_s$ détermine toute la table
+    du segment, l'événement «~$\theta_s$ dans son intervalle~» entraîne
+    que la table positionnée vraie (force $\theta_s \tilde\mu$) est
+    encadrée \emph{simultanément} à tous les âges de la plage, sous
+    l'hypothèse de forme, sans que l'écart de forme soit couvert. Chaque
+    statut qui porte sur une loi se termine par la mention
+    d'indépendance (décision M278)~: «~unités d'observation
+    indépendantes~; sous l'unité contrat, les décès sont sur-dispersés et
+    l'intervalle est trop étroit~». Aucune p-valeur n'est produite~: le
+    test de $\theta = 1$ est celui de l'étape \code{validation} sous la
+    relation \code{independante} (S4, section~\ref{sec:validation-statistiques}).
+    \textbf{Aucun verdict, aucun seuil.} Les formules sont données sans
+    attribution d'auteur (décision M200~: la note attribue le SMR à une
+    source qui n'est pas lue).
+  \item \textbf{Références}~: note de travail II1291-12 v1.7, §~3.1,
+    p.~3/13 (ci-dessous), \emph{référence de place} (décision M80)~; son
+    identité est rangée dans
+    \code{etapes\$positionnement\$parametres\$}\allowbreak\code{reference\_methode}
+    (constante \code{REFERENCE\_METHODE\_POSITIONNEMENT}), non dans la
+    fiche (précédent de la décision M244).
+\end{itemize}\par}
+
+{\sloppy\refl{Institut des actuaires, \emph{Méthodes de positionnement~:
+aspects méthodologiques}, note de travail II1291-12 v1.7, fichier
+\code{II1291-12\_v1.7.pdf} de la page du groupe de travail mortalité de
+l'ISFA (jeu retenu par la décision M191), §~2.3 et §~3.1, p.~3/13, et
+p.~4/13~; \url{https://www.ressources-actuarielles.net/gtmortalite},
+consulté le 07/11/2026~; SHA-256
+\code{93537ddb13bf3c989f186b3d7676976e}\allowbreak\code{8759d5b6ca106910c8ab66cd0e4e6dce}
+(\code{docs/recherche/}\allowbreak\code{2026-11-05-sources-v1.md}, §~2.1~;
+auteurs non relevés dans ce fichier). Passages lus sur l'image par
+\code{actuary-approfondi} (spécification, en-tête), non relus par la
+rédaction de ce document.}\par}
+
+\medskip
+\textbf{Écart à la note II1291-12} (décisions M288, M80 et M192). La note
+pose $\tilde q_x^{\mathrm{pos}} = \mathrm{SMR} \times q_x^{\mathrm{réf}}$,
+avec $\mathrm{SMR} = \sum D / \sum E\, q^{\mathrm{réf}}$ sur «~la plage
+d'âges et période d'observation communes avec la référence~», $E$ étant le
+temps d'observation des individus (§~2.3 et §~3.1, p.~3/13), donc une
+exposition centrale. L'outil
+multiplie la \emph{force} et prend les attendus sur l'exposition
+centrale, comme l'étape \code{validation}. Deux conséquences, exactes~:
+(i)~pour $0 < \tilde q < 1$, $\tilde\mu = -\ln(1 - \tilde q) > \tilde q$,
+si bien que $\sum E^c \tilde q < \sum E^c \tilde\mu$ dès qu'une cellule
+retenue a $\tilde q > 0$~: à décès égaux, le SMR de la note dépasse
+$\hat\theta$, et, sous le modèle d'exposition du moteur ($E[D] =
+\sum E^c \mu$), il est biaisé vers le haut~; (ii)~par l'inégalité de
+Bernoulli, $1 - (1 - \tilde q)^{\theta} \le \theta \tilde q$ pour
+$\theta \ge 1$ et $\ge \theta \tilde q$ pour $0 < \theta \le 1$, l'écart
+étant d'ordre $\tilde q^2$ pour $\tilde q$ petit et croissant avec
+$\tilde q$~; la règle de la note peut enfin donner $\theta \tilde q \ge 1$,
+ce que la formule de l'outil exclut en arithmétique exacte. La note avertit
+elle-même que, si la mortalité de l'organisme s'éloigne trop de la
+référence, «~les probabilités de décès aux âges élevés n'auront pas de
+sens~» (p.~4/13), et que la table construite «~ne sera valide que sur la
+plage d'âges retenue~» (p.~3/13)~: d'où la table limitée à la plage. Le
+rapport figé restitue cet écart (mention \code{positionnement\_ecart\_note},
+section~\ref{sec:rapport-fige}).
+
+\medskip
+\textbf{Refus en cours d'étape}, dans cet ordre~:
+\code{cellule\_sans\_valeur\_table} (un sexe de la construction absent
+d'une table par sexe) et \code{taux\_table\_egal\_un} ($\tilde q = 1$ dans
+une cellule d'exposition $E^c > 0$), par les briques partagées, sous le
+module \code{positionnement}~; puis \code{positionnement\_sans\_attendu}
+($A_s = 0$~: aucune cellule retenue dans un segment, ou aucune cellule dans
+la table d'exposition, période sans observation~; $\hat\theta_s$ n'est pas
+défini) et \code{positionnement\_sans\_deces} ($O_s = 0$~:
+$\hat\theta_s = 0$ donnerait une table à mortalité nulle), chacun citant
+tous les segments en défaut avec leur $A_s$ (décision M289, Q2~: refus
+plutôt qu'un segment sans table). Le message de
+\code{positionnement\_sans\_deces} renvoie à l'étape \code{validation}
+sous la relation \code{independante}, qui donne sur ces données le SMR et
+sa borne supérieure exacte $-\ln(\alpha/2)/A$.
+
+\medskip
+\noindent
+\textbf{États.} Les cellules prennent les états de l'étape
+\code{validation} (\code{ETATS\_CELLULE\_POSITIONNEMENT}, mêmes valeurs dans
+le même ordre que \code{ETATS\_CELLULE\_VALIDATION}, que ce module ne peut
+lire~: graphe des modules)~; les décès d'une cellule
+\code{evenement\_sans\_exposition} ou \code{evenement\_sous\_taux\_nul}
+sont hors de $O_s$, restitués à part, et signalés par l'avertissement
+\code{evenements\_sans\_attendu} (module \code{positionnement})~; l'identité
+$\sum_s O_s + \text{\code{evenements\_sans\_attendu}} +
+\text{\code{evenements\_hors\_plage}} = \sum \text{\code{evenements}}$ est
+contrôlée à chaque exécution (erreur de programmation sinon). Une ligne de
+la table positionnée est dans l'un des états de
+\code{ETATS\_TABLE\_POSITIONNEE}~: \code{produite}~;
+\code{taux\_table\_nul} ($\tilde q_x = 0$, image exacte $q = 0$)~;
+\code{taux\_table\_egal\_un} ($\tilde q_x = 1$ sur une cellule sans
+exposition, image exacte $q = 1$~; avec exposition, l'étape refuse)~;
+\code{qx\_arrondi\_un} (ci-dessus)~; les deux états de la table de
+référence l'emportent. La table \code{smr} n'a que l'état
+\code{produite}, les segments sans attendu ou sans décès étant refusés.
+
+\medskip
+\textbf{Résultat} (\code{etapes\$positionnement}). \code{parametres}~: les
+quatre paramètres, le \code{nom} de la table (\code{table\_nom}), la
+convention retenue, \code{appariement\_sexe}, \code{parametres\_estimes}
+(1 par segment, \code{PARAMETRES\_ESTIMES\_POSITIONNEMENT}), les statuts et
+la référence de méthode. \code{resultat}~: \code{cellules} (clés de
+segmentation, \code{age}, \code{annee} sous \code{par\_annee}, $E^c$, $D$,
+\code{qx\_table}, \code{taux\_table} pour $\tilde\mu$, \code{attendus},
+\code{etat})~; \code{smr}, une ligne par segment (clés,
+\code{cellules\_retenues}, \code{observes}, \code{attendus}, \code{smr},
+les quatre bornes, \code{etat})~; \code{table\_positionnee}, un
+\code{data.frame} nu en format long, une ligne par segment et par âge de
+la plage (clés de segmentation de la construction dans l'ordre du plan,
+\code{age}, \code{qx\_reference}, \code{qx}, les quatre bornes,
+\code{etat}). Cette table est \emph{la table positionnée}, non la table
+finale~: \code{x\$table} reste \code{NULL} (ADR 0015, point~5.1)~; ses
+colonnes s'écartent de la lettre de l'ADR 0015, point~5.2 («~colonnes de
+2.2~»), un segment n'étant pas un sexe, la règle durable étant tenue
+(\code{data.frame} nu, sans métadonnée, identité de la référence dans la
+fiche~; annotation du 07/11/2026, (c)). Elle est tenue pour une table
+finale au sens du visa (décision M287). \code{diagnostics}~: nombre de
+cellules et de cellules retenues, tableau des états, décès sans attendu,
+cellules, décès et exposition hors plage, total des décès de la table
+d'exposition. La fiche ne change pas (\code{VERSION\_FICHE} reste~5)~: les
+paramètres de l'étape sont dans \code{fiche\$plan}, et l'identité de la
+table dans \code{fiche\$tables\_reference}, une seule entrée quand les
+étapes \code{positionnement} et \code{validation} citent la même clé.
+
+\subsection{Vérifications}
+\label{sec:positionnement-verifications}
+
+{\sloppy \code{tests/unitaires/test\_positionnement.R} vérifie, par des
+attendus calculés à la main et des identités exactes~: la ligne de
+\code{ETAPES}, les paramètres et les constantes du module, la référence de
+méthode et l'unicité des statuts, chacun d'eux portant la mention
+d'indépendance et aucune attribution d'auteur~; sur un cas d'un segment à
+trois cellules retenues, $\hat\theta$, ses bornes exactes
+(\code{qgamma()}) et asymptotiques, la table positionnée et ses bornes,
+l'identité $\sum E^c \hat\theta \tilde\mu = O$, les paramètres et les
+statuts~; les états des cellules et de la table positionnée, dont
+\code{qx\_arrondi\_un} et sa frontière $\hat\theta\tilde\mu = 54 \ln 2$,
+vérifiée de part et d'autre, l'avertissement correspondant et l'ordre
+strict des bornes sur toute ligne \code{produite}~; chaque refus du module,
+par \code{valider\_plan()}, avant exécution et en cours d'étape, avec son
+module~; l'invariance des refus de l'étape \code{validation} après la
+généralisation des briques (F2)~; sous \code{par\_annee}, une table
+positionnée sans année et un $\hat\theta$ égal au cas sans année à
+$10^{-12}$ près~; sans segmentation, une ligne par âge~; une seule table
+dans la fiche quand positionnement et validation citent la même clé, et
+une validation \code{independante} \code{identical()} à celle d'un plan
+sans positionnement~; le rejeu~; la section du rapport figé. Les
+\textbf{recoupements} (au sens de \code{CONTEXT.md}~: appel direct, dans
+le test, d'une fonction de \code{stats}) portent sur la part SMR de
+l'issue~\#5~: $\hat\theta_s$ et les bornes asymptotiques par un
+\code{glm()} de Poisson à offset ($D \sim 0 + \text{segment}$,
+\code{offset(log(A))}, \code{confint.default()}), les bornes exactes par
+\code{poisson.test()}, dont la portée est limitée (même \code{qgamma()}~:
+le test vérifie la formule et son branchement), et $q_{\mathrm{pos}}$ par
+la puissance $1 - (1 - \tilde q)^{\hat\theta}$ à $10^{-12}$ près.
+\code{tests/controles/locale\_c.R} couvre un refus du module. La
+couverture des intervalles de $\theta$ fait l'objet d'un constat de
+simulation hors CI (ci-dessous). Le plan de référence R10 fige l'étape sur
+l'entrée de référence (section~\ref{sec:non-regression}, «~Plan R10~»).\par}
+
+\medskip
+\noindent
+\textbf{Constat de simulation hors CI~: positionnement par SMR et
+validation de la table positionnée} (fiche de vérification~; spécification
+d'\code{actuary-approfondi}, §~10~; issues~\#167 et~\#168~; décision M311).
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \emph{Script et exécution}~: \code{tests/mesures/constat\_positionnement.R},
+    hors des batteries et sans seuil (le script ne vérifie que son
+    exécution), lancé depuis la racine du dépôt par
+    \code{LC\_ALL=C.UTF-8 Rscript tests/mesures/constat\_positionnement.R}
+    (une locale UTF-8 est requise, sinon le script refuse)~; sortie,
+    plateforme et durée consignées dans le message du commit
+    \code{bad9a70}, hors de la plateforme de référence.
+  \item \emph{Jeux}~: pour chacune de trois lois vraies, $R$ jeux (3\,000
+    par défaut, clé \code{jeux}) de $n$ têtes ($2 \cdot 10^4$ par défaut,
+    clé \code{tetes}), simulés par \code{simuler\_portefeuille()} sur la
+    période 2015--2024, puis construits par \code{construire\_table()}~;
+    table de référence $\tilde q$~: la loi de Gompertz-Makeham du jeu de
+    référence (paramètres $2 \cdot 10^{-4}$, $2{,}5 \cdot 10^{-5}$ et
+    $1{,}1$), H et F, âges 20 à 90 (plage de l'étape)~; niveau 0,95~;
+    $B = 199$ réplications de Monte-Carlo (clé \code{replications}), si bien
+    que $(B + 1)\,\alpha$ est entier pour $\alpha = 5~\%$. Le nombre de têtes
+    donne une base modeste, dont plusieurs cellules ne comptent que
+    quelques décès.
+  \item \emph{Graines}~: jeu $r$ de la loi $k$ sous \code{GRAINES\_JEU[k]}
+    $+ r$ (20261200, 20271200 et 20281200 pour les lois A, B et C), et
+    Monte-Carlo du même jeu sous \code{GRAINES\_JEU[k]} $+ 500\,000 + r$
+    (\code{DECALAGE\_MC}), distincte de celle du jeu~; $R$ est borné à
+    moins de 10\,000 pour que les graines de deux lois ne se rejoignent
+    pas. Neuf graines de jeux de la loi~A coïncident avec des graines de
+    \code{tests/unitaires/test\_constats\_brut.R}~: coïncidence sans effet
+    statistique, deux expériences sans lien entre leurs conclusions, et
+    graines gardées pour que la sortie consignée reste rejouable
+    (décision M311).
+  \item \emph{Loi A} (E2.19~: le simulateur multiplie les $q$, $q_F =
+    0{,}6\,\tilde q$, $q_H = \tilde q$)~: étape \code{positionnement}~;
+    couverture de $\theta_s$ par les intervalles exact et asymptotique. Pour
+    H, la cible est~1. Pour F, la loi vraie n'est pas dans la famille du
+    modèle (la force vraie $-\ln(1 - 0{,}6\,\tilde q)$ n'est pas
+    proportionnelle à $\tilde\mu$)~: la cible est la valeur
+    \emph{pseudo-vraie} $\sum E^c \mu_F / \sum E^c \tilde\mu$, calculée sur
+    l'exposition centrale des cellules retenues de chaque jeu.
+  \item \emph{Loi B} (table du simulateur à force proportionnelle, $\mu_F =
+    0{,}6\,\tilde\mu$ exactement)~: étapes \code{positionnement} et
+    \code{validation} sous la relation \code{positionnee}~; $H_0$ de la
+    validation exactement vraie~; taux de rejet à 5~\% de $X^2$ et $G^2$
+    (p-valeurs asymptotiques sur $n - S$ degrés de liberté et p-valeurs de
+    Monte-Carlo multinomiales conditionnelles), et couverture de $\theta_H
+    = 1$ et $\theta_F = 0{,}6$.
+  \item \emph{Loi C} (taux communs aux deux sexes)~: étape
+    \code{homogeneite}, décrite avec cette étape (issue~\#168).
+  \item \emph{Lecture et statut}~: chaque taux est un \emph{constat de
+    simulation}, lu par rapport à sa cible $\pm 3$ erreurs types
+    $\sqrt{p(1 - p)/R}$, sans seuil ni verdict~: ce n'est pas un test, et
+    aucune fausse alarme n'est contrôlée sur l'ensemble des taux. Cette
+    erreur de Monte-Carlo, due au nombre $R$ de jeux, est distincte de
+    l'erreur d'estimation de chaque jeu (exposition, décès par segment)
+    et de l'erreur de Monte-Carlo de chaque $p_{MC}$ (due à $B$).
+\end{itemize}
+Les taux observés ne sont pas reproduits ici (E3.4)~; ils sont dans le
+message du commit \code{bad9a70}. Conclusions qualitatives, sous ce
+protocole~: sous la loi~A, les couvertures des intervalles exact et
+asymptotique de $\theta_s$, pour H comme pour F (cible pseudo-vraie),
+sont toutes dans la région $\pm 3$ erreurs types autour de 0,95~; sous la
+loi~B, les taux de rejet des p-valeurs de Monte-Carlo de $X^2$ et de $G^2$
+sont dans la région autour de 5~\%, conformément au niveau exact, tandis
+que la p-valeur asymptotique de $X^2$ rejette \emph{trop} (au-dessus de la
+région~: anti-conservatrice) et celle de $G^2$ \emph{trop peu}
+(au-dessous~: conservatrice)~; sous la loi~B, la couverture asymptotique
+de $\theta_F$ reste dans la région, mais la cible tombe sous la borne
+inférieure un peu plus souvent que ne l'admet la région $\pm 3$ erreurs
+types autour de 2,5~\%, ce qu'\code{actuary-approfondi} lit comme une
+fluctuation.
+\textbf{Mécanisme} (avis d'\code{actuary-approfondi} sur \code{bad9a70},
+par des mesures à attendus fixés, hors du moteur)~: ces écarts des
+p-valeurs asymptotiques viennent des cellules à attendus faibles (aux
+premiers âges de la plage). Sous $H_0$, conditionnellement aux $O_s$,
+$E[(D_c - A_c)^2 / A_c] = 1 - \pi_c$, donc $E[X^2] = n - S$
+\textbf{exactement} (résultat exact~: $D_c \mid O_s \sim
+\mathcal{B}(O_s, \pi_c)$, $A_c = O_s \pi_c$)~: la moyenne est celle de la
+loi du khi-deux~; mais la variance de la contribution d'une cellule vaut,
+sous la loi de Poisson, $2 + 1/A_c$ (résultat exact~: quatrième moment
+centré $A_c + 3A_c^2$), et en est la limite sous la loi binomiale quand
+$\pi_c \to 0$ à $A_c$ fixé, contre~2 par degré de liberté pour la loi du
+khi-deux~: la queue de $X^2$ est plus lourde que celle de la loi de
+référence quand des $A_c$ sont petits. Pour $G^2$, le sens de l'écart
+dépend des $A_c$. Ces statuts sont à compléter par l'issue~\#179
+(décision M310), hors du périmètre de la branche. \textbf{Réserve}~: le
+constat ne couvre que la relation \code{positionnee}~; la relation
+\code{independante} n'y est pas simulée, et l'effet y est le même d'après
+l'avis d'\code{actuary-approfondi} (mêmes mesures à attendus fixés), sans
+constat de simulation du moteur.
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-positionnement}
@@ -6755,12 +7248,23 @@ leurs motifs. L'étape de positionnement n'est pas encore implémentée.
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-positionnement}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} \\
+\catalogue{fonctions-positionnement}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} (étapes \code{positionnement} et \code{validation}) \\
 \catalogue{fonctions-positionnement}{valeurs\_entieres\_double()} & interne & valeur & \code{TRUE} pour un \code{double} sans attribut, sans \code{NA}, fini, à valeurs entières \\
-\catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre~; appelée par \code{controler\_entrees()} seule, une fois par construction (au rejeu, par l'unique appel de \code{construire\_table()}~; issue~\#82) \\
-\catalogue{fonctions-positionnement}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé & grille des cellules et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table}, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
-\catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} \\
+\catalogue{fonctions-positionnement}{ETAPES\_TABLE} & constante & --- & étapes qui lisent une table par les briques du module~: \code{positionnement}, \code{validation}~; chacune donne aux refus son module et le préfixe de leur message (F2) \\
+\catalogue{fonctions-positionnement}{controler\_cle\_table()} & interne & clé, étape appelante & \code{TRUE} invisible, ou refus \code{cle\_table\_invalide} sous le module de l'étape~; message propre à l'étape \\
+\catalogue{fonctions-positionnement}{controler\_plage\_ages()} & interne & plage, étape appelante & \code{TRUE} invisible, ou refus \code{plage\_ages\_invalide} sous le module de l'étape (\code{positionnement}, \code{validation} ou \code{homogeneite}) \\
+\catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage, étape appelante & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre, sous le module et le préfixe de l'étape (motif de convention propre à l'étape)~; appelée par \code{controler\_entrees()} seule, pour chaque étape qui lit une table, une fois par construction (au rejeu, par l'unique appel de \code{construire\_table()}~; issue~\#82) \\
+\catalogue{fonctions-positionnement}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé, étape appelante & grille des cellules et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table} sous le module de l'étape, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
+\catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé, étape appelante & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} sous le module de l'étape \\
 \catalogue{fonctions-positionnement}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé \\
+\catalogue{fonctions-positionnement}{METHODES\_POSITIONNEMENT} & constante & --- & méthodes admises~: \code{smr} seule (décision M293) \\
+\catalogue{fonctions-positionnement}{PARAMETRES\_ESTIMES\_POSITIONNEMENT} & constante & --- & 1~: paramètre estimé par segment positionné, égal à la valeur de la relation \code{positionnee} de l'étape \code{validation} \\
+\catalogue{fonctions-positionnement}{ETATS\_TABLE\_POSITIONNEE} & constante & --- & états d'une ligne de la table positionnée~: \code{produite}, \code{taux\_table\_nul}, \code{taux\_table\_egal\_un}, \code{qx\_arrondi\_un} (section~\ref{sec:positionnement-etape}) \\
+\catalogue{fonctions-positionnement}{ETATS\_CELLULE\_POSITIONNEMENT} & constante & --- & états d'une cellule, mêmes valeurs dans le même ordre que ceux de l'étape \code{validation} \\
+\catalogue{fonctions-positionnement}{REFERENCE\_METHODE\_POSITIONNEMENT} & constante & --- & identité de la note II1291-12 v1.7 (titre, fichier, SHA-256 complet, §~3.1, statut de référence de place) \\
+\catalogue{fonctions-positionnement}{STATUTS\_POSITIONNEMENT} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque colonne double de \code{smr} et de \code{table\_positionnee} (E2.20), mention d'indépendance comprise \\
+\catalogue{fonctions-positionnement}{controler\_parametres\_positionnement()} & interne & méthode, clé, plage, niveau & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue (module \code{positionnement})~; appelée par \code{valider\_plan()} seule \\
+\catalogue{fonctions-positionnement}{calculer\_positionnement()} & interne & table d'exposition, segmentation, découpage, convention, table, clé, méthode, plage, niveau & fonction d'étape \code{positionnement}~: paramètres, résultat (\code{cellules}, \code{smr}, \code{table\_positionnee}), diagnostics, avertissements~; ne contrôle aucun paramètre (issue~\#82) \\
 \end{longtable}
 }
 
@@ -6832,7 +7336,8 @@ par une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, 
 \code{R/validation.R} (décision M242~; avis de forme du 06/11/2026,
 issue~\#4)~: l'étape \code{validation} (issue~\#4), qui calcule les
 statistiques de validation d'une table de référence \emph{prise telle
-quelle} face aux observations de la construction
+quelle}, ou de la table positionnée de la même construction (relation
+\code{positionnee}, issue~\#167), face aux observations de la construction
 (sections~\ref{sec:validation-etape} à~\ref{sec:validation-verifications}),
 et l'étape \code{importance\_exclusions} (issue~\#69,
 section~\ref{sec:importance-exclusions}). Leurs fonctions d'étape,
@@ -6840,20 +7345,22 @@ section~\ref{sec:importance-exclusions}). Leurs fonctions d'étape,
 reçoivent les résultats des étapes préalables et les champs du plan qui les
 concernent (et, pour la seconde, les données reçues, les rôles, la table
 de l'étape \code{validation} et les valeurs validées de la transition, de
-la période, du délai, de la recette et de la convention~; issue~\#82),
-jamais le plan entier. Le module n'appelle que des modules
+la période, du délai, de la recette et de la convention~; issue~\#82~;
+pour la première, sous la relation \code{positionnee}, le résultat de
+l'étape \code{positionnement}), jamais le plan entier. Le module n'appelle que des modules
 situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
-(\code{citer()},
-\code{liste\_guillemets()}, \code{SEXES\_TABLE}, et, pour
+(\code{citer()}, \code{liste\_guillemets()}, et, pour
 \code{importance\_exclusions}, \code{construire\_observations()},
 \code{evaluer\_motifs()}, \code{MOTIFS\_TETE} et \code{MODALITES\_CAUSE}~; ni
 \code{controler\_segmentation()} ni \code{valeurs\_parametres\_donnees()},
-qu'il appelait avant l'issue~\#82),
+qu'il appelait avant l'issue~\#82, ni \code{SEXES\_TABLE}, qu'emploient
+les briques déplacées vers \code{positionnement}),
 \code{exposition} (\code{calculer\_exposition()}, pour
 \code{importance\_exclusions} seulement) et
 \code{brut} (\code{taux\_poisson()}) et, depuis l'issue~\#167,
 \code{positionnement} (\code{apparier\_table()}, \code{attendus\_cellules()},
-\code{smr\_poisson()} et \code{valeurs\_entieres\_double()})~; le contrôle de
+\code{smr\_poisson()}, \code{valeurs\_entieres\_double()},
+\code{controler\_cle\_table()} et \code{controler\_plage\_ages()})~; le contrôle de
 \code{tests/controles/graphe\_modules.R} relève aussi des arêtes vers
 \code{table\_reference()}, qui sont des homonymies de l'argument
 \code{table\_reference} (la clé de la table), arêtes autorisées de toute
@@ -6870,7 +7377,10 @@ telle quelle seule dans cette version, relation déclarée sans défaut), de
 l'avis de forme du 06/11/2026 (M242 à M248), des six points
 d'\code{actuary-approfondi} du 06/11/2026 (issue~\#4, commentaire
 6682191067, ci-après «~spécification du 06/11/2026~»~; décisions D1 à D6,
-M253 à M258) et des décisions M260 à M262.
+M253 à M258) et des décisions M260 à M262~; la relation
+\code{positionnee}, du §~8 de la spécification d'\code{actuary-approfondi}
+sur l'issue~\#167 (décision M289), de l'avis de forme de la même issue (F3,
+F5 et F9, décision M292) et de la décision M309 (statuts).
 Le \emph{suivi d'expérience} (E2.18), qui comparera une table à de nouvelles
 observations, n'est pas encore produit~: les statistiques sont écrites une
 seule fois, par des fonctions qui reçoivent des cellules (décès, exposition
@@ -6950,8 +7460,8 @@ pour $\tilde q$ petit.
     (section~\ref{sec:tables-reference-recues}~; constante
     \code{PARAMETRES\_CLE\_TABLE})~;
   \item \code{relation\_table}~: \emph{relation table~/ observations},
-    \code{independante} ou \code{ajustee\_hors\_outil} (constante
-    \code{RELATIONS\_TABLE}~; ci-dessous)~;
+    \code{independante}, \code{ajustee\_hors\_outil} ou
+    \code{positionnee} (constante \code{RELATIONS\_TABLE}~; ci-dessous)~;
   \item \code{plage\_ages}~: deux valeurs entières, $0 \le \min \le \max$~;
   \item \code{tranches\_age}~: bornes inférieures des tranches d'âge des
     sous-groupes, valeurs entières strictement croissantes, la première égale
@@ -6977,7 +7487,18 @@ cet ordre~:
 \code{plage\_ages\_invalide}, \code{tranches\_age\_invalides},
 \code{niveau\_invalide} (même motif que dans le module \code{brut},
 spécification du 06/11/2026, §~1~; levé ici sous le module \code{validation}),
-\code{replications\_invalides}. La fonction d'étape ne refait aucun
+\code{replications\_invalides}~; puis, sous la relation \code{positionnee}
+seulement, les refus inter-étapes \code{positionnement\_absent} (étape
+\code{positionnement} absente du plan), \code{plage\_ages\_differente\_}\allowbreak\code{positionnement}
+(plage d'âges différente de celle du positionnement~; les tranches d'âge
+restent libres) et \code{table\_reference\_differente\_}\allowbreak\code{positionnement}
+(clé différente de celle du positionnement), dans cet ordre~:
+$\hat\theta$ est estimé sur les cellules de cette plage et de cette table,
+et la contrainte $\sum A = O$ comme les lois conditionnelles des tests n'en
+tiennent qu'à ce prix. Sous \code{positionnee}, \code{table\_reference}
+reste requise et désigne la référence de la table positionnée~: la clé est
+citée deux fois, et \code{fiche\$tables\_reference} n'en porte qu'une
+entrée. La fonction d'étape ne refait aucun
 contrôle~: ni la segmentation, dont la variante
 \code{segmentation\_invalide} du module \code{validation} est retirée, ni
 les paramètres, la classe de la table et ses entrées (ci-dessous), qu'elle
@@ -7019,11 +7540,36 @@ paramètres estimés sur ces données~:
     statistique standardisée, ni degrés de liberté~: valeur \code{NA}, état
     \code{ddl\_non\_etabli} ---, \textbf{aucun tirage} n'est fait
     (\code{tirages\_effectues} vaut 0, \code{replications} et la graine
-    restant requis), et seules les grandeurs descriptives sont produites.
+    restant requis), et seules les grandeurs descriptives sont produites~;
+  \item \code{positionnee} (table positionnée par l'étape
+    \code{positionnement} de la même construction, section~\ref{sec:positionnement-etape}~;
+    issue~\#167, décision M289)~: $p = 1$ \emph{par segment positionné}
+    (\code{parametres\_estimes} vaut~1, comme
+    \code{PARAMETRES\_ESTIMES\_POSITIONNEMENT}), d'où
+    \textbf{ddl $= n - S$}, $S$ étant le nombre de segments positionnés
+    (lignes de \code{etapes\$positionnement\$resultat\$smr}, chacune
+    d'attendus positifs, le positionnement refusant sinon). La décision
+    M237 («~$p = 1$~») est ainsi précisée~: elle n'est exacte que pour une
+    construction non segmentée. La table validée a pour attendus $A_c =
+    \hat\theta_s E^c_c \tilde\mu_c$, calculés sur la force à partir de
+    $\hat\theta_s$ (\code{resultat\$smr}), \textbf{jamais relus} dans
+    \code{table\_positionnee\$qx}~: ils restent finis quand la table
+    positionnée vaut~1 par arrondi (état \code{qx\_arrondi\_un})~; la
+    probabilité correspondante est $1 - e^{-\hat\theta_s \tilde\mu_c}$. La
+    grille (clés, âges, $E^c$, $D$, $\tilde q$, états) est celle du
+    positionnement, contrôlée à l'égalité exacte (erreur de programmation
+    sinon). Valider la référence brute ($p = 0$) et la table positionnée
+    ($p = 1$) demande donc deux plans (avis de forme, F6~: une étape
+    n'apparaît qu'une fois par plan). L'étape \code{positionnement}, qui
+    précède \code{validation} dans l'ordre des étapes, n'en est pas un
+    préalable au sens de \code{ETAPES}~: c'est le refus
+    \code{positionnement\_absent} qui l'exige sous cette seule relation.
 \end{itemize}
-Le cas $p = 1$ (table positionnée par SMR dans l'outil) est réservé à la
-méthode de positionnement~A2 (section~\ref{sec:positionnement})~: aucune
-table positionnée n'est produite par cette version.
+Chaque branchement sur la relation est écrit à trois valeurs, avec une
+erreur de programmation pour toute autre valeur (avis de forme, F5).
+Sous \code{positionnee}, les lois sous $H_0$ sont prises conditionnellement
+aux décès de chaque segment (section~\ref{sec:validation-statistiques},
+«~Sous la relation \code{positionnee}~»).
 
 \medskip
 \textbf{Contrôles d'entrée avant exécution} (\code{controler\_entrees\_validation()}~;
@@ -7124,20 +7670,29 @@ la table d'exposition est contrôlée à chaque exécution, un écart étant une
 erreur de programmation.
 
 \medskip
-\textbf{Résultat} (\code{etapes\$validation}). \code{parametres}~: les six
+{\sloppy\textbf{Résultat} (\code{etapes\$validation}). \code{parametres}~: les six
 paramètres, le \code{nom} de la table (\code{table\_nom}),
 \code{parametres\_estimes} ($p$), la convention retenue,
 \code{appariement\_sexe}, les plafonds \code{n\_max\_wilcoxon\_exact} et
 \code{n\_max\_runs\_exact}, l'hypothèse nulle
-(\code{HYPOTHESE\_VALIDATION}), la référence de méthode et les statuts des
-sous-groupes (\code{statuts\_sous\_groupes}). \code{resultat}~:
+(\code{HYPOTHESE\_VALIDATION}, ou \code{HYPOTHESE\_VALIDATION\_POSITIONNEE}
+sous \code{positionnee}), la référence de méthode et les statuts des
+sous-groupes (\code{statuts\_sous\_groupes}, selon la relation). \code{resultat}~:
 \code{cellules} (clés de segmentation, \code{age}, \code{annee} sous
 \code{par\_annee}, $E^c$, $D$, \code{qx\_table}, \code{taux\_table} pour
 $\tilde\mu$, \code{attendus}, \code{taux\_brut} pour $\hat\mu$,
 \code{probabilite\_brute} pour $\hat q$, résidus de réponse, de Pearson et
 de déviance, bornes de fluctuation exactes et asymptotiques, tranche d'âge,
 état~; résidus et bornes de fluctuation valent \code{NA} hors de $C^{+}$,
-et les bornes aussi sous \code{ajustee\_hors\_outil})~;
+et les bornes aussi sous \code{ajustee\_hors\_outil}~; sous
+\code{positionnee} seulement, deux colonnes de plus,
+\code{smr\_positionnement} ($\hat\theta_s$ du segment de la cellule) et
+\code{taux\_positionne} ($\hat\theta_s \tilde\mu_c$), la colonne
+\code{attendus} portant alors les attendus de la table positionnée,
+$\hat\theta_s E^c_c \tilde\mu_c$, et \code{qx\_table} et
+\code{taux\_table} gardant $\tilde q_c$ et $\tilde\mu_c$ de la
+référence~; ajout compatible, ADR 0007,
+point~6.3)~;
 \code{statistiques}, au format long, une ligne par grandeur
 (\code{statistique}, \code{grandeur}, \code{valeur}, \code{etat},
 \code{statut})~: une grandeur non produite reste une ligne, de valeur
@@ -7151,7 +7706,7 @@ et exposition hors plage, total des décès de la table d'exposition.
 niveau, et le moteur ne conclut pas sur l'adéquation de la table (décision
 M217, Q4). La note II1291-14 ne fixe aucun $\alpha$ et sa règle de lecture
 («~la p-valeur la plus proche de 1~», p.~4/29) compare des ajustements~;
-elle ne fonde pas un verdict sur une seule table.
+elle ne fonde pas un verdict sur une seule table.\par}
 
 \subsection{Statistiques S1 à S12}
 \label{sec:validation-statistiques}
@@ -7336,6 +7891,90 @@ diagnostic $E_{H_0}[n_{+}]$ du test des signes mesure cet écart. Seules les
 \textbf{p-valeurs de Monte-Carlo} ont un niveau garanti sous $H_0$~(i)~;
 le rapport figé le dit (section~\ref{sec:rapport-fige}).
 
+\medskip
+\noindent
+\textbf{Sous la relation \code{positionnee}} (spécification
+d'\code{actuary-approfondi} sur l'issue~\#167, §~8~; décision M289~;
+constantes \code{HYPOTHESE\_VALIDATION\_POSITIONNEE} et
+\code{STATUTS\_VALIDATION\_POSITIONNEE}). L'hypothèse nulle devient~: les
+$D_c$ sont indépendants et $D_c \sim \mathcal{P}(\theta_s \tilde A_c)$,
+$\tilde A_c = E^c_c \tilde\mu_c$, $\theta_s$ inconnu, un par segment,
+estimé par $\hat\theta_s = O_s / \tilde A_s$ (étape \code{positionnement})~;
+les attendus de la table positionnée sont $A_c = \hat\theta_s \tilde A_c$.
+\textbf{Fait exact sur lequel tout repose}~: conditionnellement à $O_s$,
+statistique exhaustive de $\theta_s$, les décès $(D_c)_{c \in C^{+}_s}$
+suivent la loi multinomiale $(O_s~; \pi_c)$, $\pi_c = \tilde A_c / \tilde
+A_s = A_c / A_s$, qui ne dépend pas de $\theta_s$~; chaque $D_c$ suit
+alors $\mathcal{B}(O_s, \pi_c)$. Les lois sous $H_0$ sont donc prises
+conditionnellement aux $O_s$, exactes avec $E^c$ tenue pour fixe quel que
+soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{S2 et S3}~: degrés de liberté $n - S$~; p-valeurs
+    asymptotiques sur $\chi^2_{n-S}$, $\theta$ étant estimé par maximum de
+    vraisemblance sur ces cellules (résultat asymptotique, $A_c \to
+    \infty$)~; $G^2$ et $X^2$ sont la déviance et la statistique de Pearson
+    du modèle de Poisson à un niveau par segment et offset $\ln \tilde A_c$
+    (recoupement par \code{glm()}, ci-dessous)~; sur une base modeste, à
+    attendus faibles, les p-valeurs asymptotiques de $X^2$ et de $G^2$
+    s'écartent de leur niveau nominal ($X^2$ anti-conservatrice, $G^2$
+    dans un sens qui dépend des $A_c$~; constat de
+    simulation, section~\ref{sec:positionnement-verifications}~; statuts à
+    compléter par l'issue~\#179). Si $n - S = 0$ (une seule
+    cellule retenue par segment), la loi conditionnelle est dégénérée
+    ($D_c = O_s$)~: aucun test n'est défini et aucun tirage n'est fait~;
+    les statistiques standardisées, les moments des suites, la variance de
+    Wilcoxon, les p-valeurs asymptotiques, exactes et de Monte-Carlo et
+    leurs erreurs prennent l'état \code{contraint\_par\_positionnement}
+    (décision M309 pour la forme conditionnelle du statut).
+  \item \textbf{S4, SMR global}~: $O$, $A$, SMR et $O - A$ restent
+    produits, descriptifs~: le SMR vaut~1 et $O - A$ vaut~0 par
+    construction, à l'arrondi près~; bornes, p-valeurs, $z$ et p de la
+    racine cubique ne sont pas produits (état
+    \code{contraint\_par\_positionnement}).
+  \item \textbf{S1, S6 et S12}~: espérances sous $H_0$ (résidus au-delà de
+    $k\sqrt{A_c}$, signes positifs, nombres hors des intervalles de
+    fluctuation) et intervalles de fluctuation par cellule sous la loi
+    $\mathcal{B}(O_s, \pi_c)$ (\code{pbinom()}, \code{qbinom()},
+    \code{probabilite\_hors\_binomiale()}) au lieu de $\mathcal{P}(A_c)$~;
+    intervalle asymptotique $A_c \pm z\sqrt{A_c(1 - \pi_c)}$.
+  \item \textbf{S5, sous-groupes}~: pour un sous-groupe d'un seul segment,
+    p-valeurs exactes conditionnelles, $O_b \mid O_s \sim \mathcal{B}(O_s,
+    \pi_b)$, $\pi_b = A_b / A_s$, et bornes exactes du SMR du sous-groupe,
+    l'intervalle exact binomial de $\pi_b$ (\code{qbeta()}) divisé par
+    $\pi_b$ (exactes conditionnellement, couverture au moins égale au
+    niveau)~; pour un sous-groupe de plusieurs segments, p-valeurs exactes
+    sous la loi d'une somme de binomiales indépendantes
+    $\mathcal{B}(O_s, \pi_{b,s})$, calculée par convolution
+    (\code{loi\_somme\_binomiales()}), bornes non produites (état
+    \code{bornes\_non\_definies})~; la convolution n'est faite que si son
+    nombre de produits, calculé avant elle
+    (\code{cout\_convolution\_binomiales()}), est au plus
+    \code{N\_MAX\_PRODUITS\_CONVOLUTION} ($10^8$, \code{R/validation.R},
+    l.~115), sinon p-valeurs et bornes valent \code{NA}, état
+    \code{convolution\_au\_dela\_n\_max} (l'issue~\#178 propose une
+    p-valeur asymptotique au-delà)~; le regroupement \code{segment}, et
+    tout sous-groupe qui contient, pour chaque segment qu'il touche, toutes
+    les cellules retenues de ce segment, ont un $O_b$ déterminé par les
+    $O_s$~: SMR descriptif, bornes et p-valeurs non produites, état
+    \code{contraint\_par\_positionnement}. Les états d'une ligne de
+    sous-groupe forment \code{ETATS\_SOUS\_GROUPES\_VALIDATION}~:
+    \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_retenue}
+    et, sous \code{positionnee} seulement, les trois états ci-dessus.
+  \item \textbf{S6, S7 et S8} (signes, suites, Wilcoxon), exactes et
+    asymptotiques~: produites, avec le statut de la relation
+    \code{independante} complété par «~table positionnée sur ces données~:
+    loi non corrigée de l'estimation de $\theta$~»~; seules les p-valeurs
+    de Monte-Carlo y ont un niveau garanti. Les différences de Wilcoxon, le
+    $R^2$ et la distance (S8, S10, S11) portent sur la table positionnée,
+    $\mu_{\mathrm{pos}} = \hat\theta_s \tilde\mu$ et $q_{\mathrm{pos}} = 1 -
+    e^{-\hat\theta_s \tilde\mu}$, non sur la référence (décision M309).
+  \item \textbf{Monte-Carlo}~: réplications multinomiales
+    $(O_s~; \pi_c)$ par segment (ci-dessous).
+\end{itemize}
+Aucune p-valeur n'est produite pour le SMR de la table positionnée, et
+aucun verdict~: le test du facteur seul ($\theta = 1$) est celui de la
+relation \code{independante}, sur un autre plan (avis de forme, F6).
+
 \subsubsection*{P-valeurs de Monte-Carlo}
 \label{sec:validation-monte-carlo}
 
@@ -7354,7 +7993,18 @@ par un test). L'observé et chaque réplique passent par la \textbf{même}
 fonction, \code{statistiques\_test()}, avec le même ensemble de zéros.
 Aucun tirage n'est fait sous \code{ajustee\_hors\_outil} ni sans cellule
 retenue~; le nombre de tirages effectués est rendu
-(\code{resultat\$monte\_carlo\$tirages\_effectues}).
+(\code{resultat\$monte\_carlo\$tirages\_effectues}). Sous \code{positionnee},
+les réplications sont \textbf{multinomiales}
+(\code{replications\_multinomiales()}~; avis de forme, F3)~: chaque réplique
+tire, pour chaque segment $s$, les décès des cellules retenues selon la loi
+$(O_s~; \pi_c)$, si bien que chaque réplique reproduit exactement les $O_s$
+observés (vérifié par un test sur des entiers)~; l'ordre de tirage est
+fixé --- réplique par réplique, puis segment par segment dans l'ordre des
+indices, un tirage de \code{rmultinom()} chacun, sous
+\code{sous\_graine()} avec la graine du plan ---, ce qui rend les tirages
+indépendants du découpage par blocs~; les réplications de Poisson des deux
+autres relations sont inchangées. La boucle de tirage n'est pas vectorisée
+(décision M304). Aucun tirage n'est fait quand $n - S = 0$.
 
 \medskip
 \textbf{P-valeur} (\code{pvaleur\_monte\_carlo()})~: $p_{MC} = (1 + K)/(B +
@@ -7372,7 +8022,11 @@ en présence d'égalités, et, pour la p-valeur centrale, $P(p_{MC} \le
 \alpha) \le P(p_{\inf} \le \alpha/2) + P(p_{\sup} \le \alpha/2) \le \alpha$.
 \textbf{Statut}~: niveau exact au sens $P_{H_0}(p_{MC} \le \alpha) \le
 \alpha$, sous $H_0$~(i) avec $E^c$ tenue pour fixe~; asymptotique sous le
-modèle de survie (décision M260). Ce niveau vaut pour tout $B \ge 1$~; $B$
+modèle de survie (décision M260). Sous \code{positionnee}, le même
+argument vaut conditionnellement aux $O_s$~: l'observé et les répliques
+sont, sachant les $O_s$, indépendants et de même loi multinomiale, libre
+de $\theta$~; le niveau est exact conditionnellement, donc aussi sans
+condition, quel que soit $\theta$. Ce niveau vaut pour tout $B \ge 1$~; $B$
 règle la précision de $p_{MC}$ et la puissance, non le niveau.
 \textbf{Erreur de Monte-Carlo}~: écart-type de $p_{MC}$ conditionnel aux
 observations, estimé par substitution, $e = \sqrt{B\,p_{MC}(1 - p_{MC})}/(B +
@@ -7391,12 +8045,15 @@ aucun résidu non nul observé, la p-valeur de Monte-Carlo et son erreur sont
 vide~: toutes les grandeurs)~; \code{aucun\_residu\_non\_nul} (signes,
 suites, Wilcoxon)~; \code{variance\_nulle} (suites)~; \code{ex\_aequo} et
 \code{effectif\_au\_dela\_n\_max} (p-valeurs exactes)~;
-\code{aucun\_deces} (MAPE)~; \code{variance\_observee\_nulle} ($R^2$).\par}
+\code{aucun\_deces} (MAPE)~; \code{variance\_observee\_nulle} ($R^2$)~;
+\code{contraint\_par\_positionnement} (sous \code{positionnee}~: grandeurs
+sous $H_0$ du SMR global, et toutes les grandeurs de test quand $n - S =
+0$).\par}
 
 {\footnotesize
 \rowcolors{2}{tablerow}{white}
 \begin{longtable}{@{}p{2.6cm}p{5.0cm}p{2.0cm}p{5.0cm}@{}}
-\caption{Statistiques de l'étape \code{validation} et statut de leurs grandeurs (\code{STATUTS\_VALIDATION}, qui fait foi grandeur par grandeur~; sous \code{ajustee\_hors\_outil}, les grandeurs définies par $H_0$ ne sont pas produites).}
+\caption{Statistiques de l'étape \code{validation} et statut de leurs grandeurs (\code{STATUTS\_VALIDATION}, qui fait foi grandeur par grandeur~; sous \code{ajustee\_hors\_outil}, les grandeurs définies par $H_0$ ne sont pas produites~; sous \code{positionnee}, \code{STATUTS\_VALIDATION\_POSITIONNEE}, mêmes lignes, statuts remplacés comme le dit le paragraphe «~Sous la relation \code{positionnee}~»).}
 \label{tab:statistiques-validation}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Statistique}} &
@@ -7545,11 +8202,13 @@ mesurable dans un ensemble mesuré) sont des \emph{erreurs de programmation},
 non des refus. La fiche de construction ne change pas~: les grandeurs sont
 rangées dans l'objet (\code{etapes\$importance\_exclusions}) et restituées
 par le rapport figé, jamais dans la fiche (décision M215, Q4~(a))~; les
-plans de référence R1 à R6 ne comprennent pas l'étape, que couvrent les
-tests unitaires (décision M263)~; R8 et R9 la comprennent
-(issue~\#166~; section~\ref{sec:non-regression}, «~Plans R8 et R9~»)~: R8
-sans ligne exclue, R9 sur une entrée à défauts injectés où chacune des
-trois classes de mesurabilité est représentée. Les têtes de cette entrée
+seuls les plans de référence R8, R9 et R10 comprennent l'étape (pour R1
+à R6, que couvrent les tests unitaires, décision M263~; R8 et R9~:
+issue~\#166~; section~\ref{sec:non-regression}, «~Plans R8 et R9~» et
+«~Plan R10~»)~: R8 sans ligne exclue, R9 sur une entrée à défauts injectés
+où chacune des trois classes de mesurabilité est représentée, R10 sans
+ligne exclue sous la relation \code{positionnee}, où il fige l'état
+\code{non\_produite\_par\_cette\_version} du comparateur~2. Les têtes de cette entrée
 n'ayant qu'un contrat, une tête touchée n'y a aucune ligne conservée
 ($R_t$ vide)~: le calcul par deux passages sur des têtes multi-contrats
 relève des tests unitaires, dont T4 (ci-dessous).
@@ -7745,9 +8404,11 @@ et Q2~(a), et M242). Le SMR des lignes exclues est $O/A$, où $A$ vient d'un
   \item \textbf{Comparateur~2, table de référence de l'étape
     \code{validation}} (\code{smr\_comparateur\_2()},
     \code{resultat\$smr\_comparateur\_2}), produit \textbf{si et seulement
-    si} \code{validation} est au plan (décision M242), sans quoi
+    si} \code{validation} est au plan (décision M242) sous la relation
+    \code{independante} ou \code{ajustee\_hors\_outil}, sans quoi
     \code{smr\_comparateur\_2} vaut \code{NULL} et le comparateur est
-    «~non demandé par le plan~»~:
+    «~non demandé par le plan~», ou, sous \code{positionnee}, «~non produit
+    par cette version~» (décision M289, Q6~; ci-dessous)~:
     même table, même \code{plage\_ages}, même appariement par clé exacte
     (\code{apparier\_table()}, sans refus d'une cellule sans valeur) et même
     attendu $A = \sum E^c_{e,c}\tilde\mu_c$, $\tilde\mu_c = -\ln(1 - \tilde
@@ -7835,7 +8496,10 @@ connu, $E^c$ étant tenue pour fixe.
 \code{parametres\$etats})~: \code{produite}~; «~non demandée par le plan~»
 (\code{non\_demandee\_par\_le\_plan}, comparateur~2 sans \code{validation})~;
 «~non produite par cette version~»
-(\code{non\_produite\_par\_cette\_version}, comparateur~3)~; et, sous le
+(\code{non\_produite\_par\_cette\_version}, comparateur~3, et comparateur~2
+sous la relation \code{positionnee}~: la table de l'étape \code{validation}
+y est estimée sur les lignes conservées, et le comparateur~2 n'est pas
+produit en attendant le comparateur~3~; décision M289, Q6)~; et, sous le
 libellé «~non calculable~: \emph{raison}~», \code{aucune\_ligne\_mesurable}
 (toutes les lignes de l'ensemble sont non mesurables~; un total dont toutes
 les lignes sont \code{contrat\_duplique} en unité contrat reste dans cet
@@ -8038,6 +8702,41 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{preparer\_donnees()} (issue~\#82)~; section \code{etape\_validation} du
     rapport figé avec ses mentions fixes, mention «~non demandée par le
     plan~» sans l'étape, mention d'unité contrat sans identifiant de tête.
+  \item \textbf{relation \code{positionnee}}
+    (\code{tests/unitaires/test\_validation\_positionnee.R}, issue~\#167),
+    par des attendus calculés à la main et des identités exactes~:
+    constantes (\code{RELATIONS\_TABLE}, plafond de convolution), lignes de
+    \code{STATUTS\_VALIDATION\_POSITIONNEE} identiques à celles de
+    \code{STATUTS\_VALIDATION} en statistique, grandeur et \code{sous\_h0},
+    statuts de Wilcoxon, du $R^2$ et de la distance qui nomment la table
+    positionnée, statut conditionnel de ddl (décision M309), empreinte des
+    statuts stable sous les locales C et UTF-8~; \code{statuts\_validation()}
+    et chaque branchement à trois valeurs, erreur de programmation par
+    défaut~; sur un jeu d'un segment, $X^2$, $G^2$, ddl $= n - S$, SMR
+    global égal à 1 et grandeurs sous $H_0$ non produites, fluctuation
+    exacte et asymptotique et espérances binomiales par sommes directes~;
+    réplications multinomiales (somme des décès de chaque réplique égale à
+    $O_s$, découpage par blocs sans effet, ordre de tirage, état du
+    générateur restauré, reproductibilité à graine égale)~;
+    \code{loi\_somme\_binomiales()} égale à la somme directe et
+    \code{cout\_convolution\_binomiales()} égal au nombre de produits
+    effectués, de part et d'autre du plafond~; dans
+    \code{construire\_table()}, grille identique à celle du positionnement,
+    $A_c = \hat\theta_s \tilde A_c$ et $\sum A_c = O_s$ par segment,
+    attendus indépendants de \code{table\_positionnee\$qx} (remplacée par
+    \code{NA}, validation \code{identical()}), cas \code{qx\_arrondi\_un},
+    ddl $= n - S$ sous \code{par\_annee} et sans segmentation, cas $n - S =
+    0$ (aucun test, aucun tirage) et son témoin~; sous-groupes~: binomiaux
+    d'un segment et sommes de deux binomiales recoupés, états
+    \code{contraint\_par\_positionnement} (dont un sous-groupe qui contient
+    tous les segments touchés en entier) et \code{bornes\_non\_definies}~;
+    les trois refus inter-étapes et \code{relation\_table\_invalide}~;
+    comparateur~2 non produit~; rejeu \code{identical()} hors
+    \code{execution}~; titre et mentions du rapport figé sous les trois
+    relations. Recoupements~: $G^2$ par \code{deviance()}, $X^2$ par les
+    résidus de Pearson et ddl par \code{df.residual} d'un \code{glm()} de
+    Poisson à un niveau par segment et offset~; p-valeurs et bornes des
+    sous-groupes d'un segment par \code{binom.test()}.
 \end{itemize}\par}
 
 \medskip
@@ -8108,27 +8807,38 @@ reproduites ici, E3.4).
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-validation}{RELATIONS\_TABLE} & constante & --- & \code{independante} $\to$ \code{0L}, \code{ajustee\_hors\_outil} $\to$ \code{NA} (nombre de paramètres estimés) \\
+\catalogue{fonctions-validation}{RELATIONS\_TABLE} & constante & --- & \code{independante} $\to$ \code{0L}, \code{ajustee\_hors\_outil} $\to$ \code{NA}, \code{positionnee} $\to$ \code{1L} par segment positionné (nombre de paramètres estimés~; ddl $= n - S$ sous \code{positionnee}) \\
 \catalogue{fonctions-validation}{N\_MAX\_WILCOXON\_EXACT} & constante & --- & 1000~: effectif maximal de la p-valeur exacte de Wilcoxon (décision M256) \\
 \catalogue{fonctions-validation}{N\_MAX\_RUNS\_EXACT} & constante & --- & 10000~: somme maximale des effectifs de la loi exacte des suites \\
 \catalogue{fonctions-validation}{TOLERANCE\_RESIDU\_NUL} & constante & --- & $10^{-10}$~: tolérance relative d'un résidu nul \\
 \catalogue{fonctions-validation}{ELEMENTS\_BLOC\_REPLICATIONS} & constante & --- & $2^{22}$~: éléments au plus d'un bloc de réplications \\
+\catalogue{fonctions-validation}{N\_MAX\_PRODUITS\_CONVOLUTION} & constante & --- & $10^8$~: nombre maximal de produits de la convolution d'une somme de binomiales (sous-groupes de plusieurs segments sous \code{positionnee}~; au-delà, état \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}) \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_VALIDATION} & constante & --- & identité de la note II1291-14 v1.4 (titre, fichier, SHA-256 complet, statut de référence de place~; décision M244) \\
 \catalogue{fonctions-validation}{HYPOTHESE\_VALIDATION} & constante & --- & texte de l'hypothèse nulle $H_0$~(i) et de ses conditions \\
+\catalogue{fonctions-validation}{HYPOTHESE\_VALIDATION\_POSITIONNEE} & constante & --- & texte de l'hypothèse nulle sous \code{positionnee}~: $\theta_s$ inconnu par segment, loi multinomiale conditionnelle aux $O_s$ \\
 \catalogue{fonctions-validation}{ETATS\_CELLULE\_VALIDATION} & constante & --- & les cinq états d'une cellule (section~\ref{sec:validation-etape}) \\
-\catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les neuf états d'une grandeur (section~\ref{sec:validation-statistiques}) \\
+\catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les états d'une grandeur, dont \code{contraint\_par\_}\allowbreak\code{positionnement} (section~\ref{sec:validation-statistiques}) \\
+\catalogue{fonctions-validation}{ETATS\_SOUS\_GROUPES\_VALIDATION} & constante & --- & les états d'une ligne des sous-groupes~: \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_}\allowbreak\code{retenue}, et, sous \code{positionnee}, \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{bornes\_non\_}\allowbreak\code{definies}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max} \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION} & constante & --- & \code{data.frame} (\code{statistique}, \code{grandeur}, \code{sous\_h0}, \code{statut})~: une ligne par grandeur, dans l'ordre du résultat~; \code{sous\_h0} désigne les grandeurs non produites sous \code{ajustee\_hors\_outil} (tableau~\ref{tab:statistiques-validation}) \\
-\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & les six paramètres & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
+\catalogue{fonctions-validation}{STATUTS\_VALIDATION\_POSITIONNEE} & constante & --- & mêmes lignes que \code{STATUTS\_VALIDATION}, statuts remplacés sous \code{positionnee} (lois conditionnelles, ddl $n - S$, table positionnée~; décision M309) \\
+\catalogue{fonctions-validation}{statuts\_validation()} & interne & relation & statuts de la relation (\code{switch} à trois valeurs, erreur de programmation par défaut) \\
+\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & les six paramètres, paramètres de l'étape \code{positionnement} du plan (\code{NULL} en son absence) & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue, puis, sous \code{positionnee}, les trois refus inter-étapes~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
 \catalogue{fonctions-validation}{probabilite\_hors()} & interne & $A$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{P}(A)$, par cellule \\
+\catalogue{fonctions-validation}{probabilite\_hors\_binomiale()} & interne & $n$, $p$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{B}(n, p)$, par cellule (loi conditionnelle sous \code{positionnee}) \\
 \catalogue{fonctions-validation}{loi\_runs()} & interne & $n_{+}$, $n_{-}$ par séquence & loi exacte du nombre total de suites, par convolution \\
 \catalogue{fonctions-validation}{wilcoxon\_rangs()} & interne & différences & effectif, nuls, groupes d'ex aequo, $w_{+}$, variance corrigée, $z$ \\
 \catalogue{fonctions-validation}{signe\_residu()} & interne & résidus, attendus & signe à la tolérance~; seul ensemble de zéros \\
 \catalogue{fonctions-validation}{statistiques\_test()} & interne & matrice de décès (une colonne par jeu), attendus, début des séquences & $X^2$, $G^2$, signes, $R$, $z$ de Wilcoxon par colonne~; observé et répliques \\
 \catalogue{fonctions-validation}{replications\_poisson()} & interne & $A$, $B$, graine, fonction de réduction & statistiques des $B$ réplications, tirées par blocs sous \code{sous\_graine()} \\
+\catalogue{fonctions-validation}{replications\_multinomiales()} & interne & poids, groupe de chaque cellule, effectifs des groupes, $B$, graine, fonction de réduction & statistiques des $B$ réplications multinomiales par groupe, tirées réplique par réplique puis groupe par groupe sous \code{sous\_graine()}, par blocs \\
+\catalogue{fonctions-validation}{binomiale\_elaguee()} & interne & $n$, $p$ & \code{dbinom(0:n, n, p)} réduite à l'intervalle de ses valeurs non nulles, et sa première valeur \\
+\catalogue{fonctions-validation}{cout\_convolution\_binomiales()} & interne & effectifs, probabilités & nombre de produits de la convolution, calculé avant elle \\
+\catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe~; attribut \code{produits}~; brique partagée avec l'étape \code{homogeneite} \\
 \catalogue{fonctions-validation}{pvaleur\_monte\_carlo()} & interne & observé, répliques, sens & $p_{MC}$ et erreur de Monte-Carlo \\
-\catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, $p$, $B$, graine & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
-\catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes \\
-\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
+\catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, relation, $B$, graine, segment (sous \code{positionnee} seulement) & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
+\catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante \\
+\catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, bornes d'un segment, états \\
+\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine, étape \code{positionnement} & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{MOTIFS\_MESURABLES\_IMPORTANCE} & constante & --- & motifs mesurables~: \code{id\_contrat\_manquant}, \code{contrat\_duplique} (ce dernier en unité tête seulement~; section~\ref{sec:importance-exclusions}) \\
 \catalogue{fonctions-validation}{CLES\_MOTIFS\_IMPORTANCE} & constante & --- & motif $\to$ clé de cellule qu'il rend manquante~: \code{sexe} pour \code{sexe\_manquant} et \code{sexe\_hors\_modalites}, \code{segment} pour \code{segment\_manquant} \\
 \catalogue{fonctions-validation}{ETATS\_EVENEMENTS\_EXCLUS} & constante & --- & les cinq états des déclarations d'une ligne exclue \\
@@ -9897,7 +10607,7 @@ contrôle que les cinq autres chemins (issue~\#94).
 \medskip
 \noindent
 \textbf{Sections} (\code{SECTIONS\_RAPPORT}, tableau~\ref{tab:sections-rapport}).
-Le document a quinze sections, dans un ordre fixe, chacune avec un
+Le document a les sections du tableau~\ref{tab:sections-rapport}, dans un ordre fixe, chacune avec un
 identifiant (ancre HTML), un titre, une nature (\code{texte}, \code{objet},
 \code{etape}, \code{renvoi}, \code{non\_produite}), l'étape du catalogue pour
 la nature \code{etape}, et ses \emph{racines}, chemins de l'objet qu'elle
@@ -9935,7 +10645,8 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{etape\_brut} & Étape brut~: taux bruts et intervalles & etape & étape \code{brut}~: \code{etapes/brut}~; note sur la colonne \code{taux} en tête, légendes après le tableau des statuts (ci-dessous) \\
 \code{suffisance} & Indicateurs de suffisance & renvoi & aucune racine~; renvois à \code{etapes/exposition/}\allowbreak\code{resultat/exposition} et à \code{etapes/brut/resultat}, ou «~non demandée par le plan~»~; mention de la largeur des intervalles \\
 \code{avertissements} & Avertissements & objet & \code{avertissements} \\
-\code{etape\_validation} & Étape validation~: statistiques de validation de la table de référence prise telle quelle & etape & étape \code{validation}~: \code{etapes/validation}, précédée de mentions fixes (ci-dessous) \\
+\code{etape\_}\allowbreak\code{positionnement} & Étape positionnement~: positionnement par SMR sur une table de référence et table positionnée & etape & étape \code{positionnement}~: \code{etapes/}\allowbreak\code{positionnement}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:positionnement-etape}) \\
+\code{etape\_validation} & Étape validation~: statistiques de validation de la table de référence prise telle quelle (titre propre à la relation sous \code{ajustee\_hors\_outil} et \code{positionnee}, ci-dessous) & etape & étape \code{validation}~: \code{etapes/validation}, précédée de mentions fixes (ci-dessous) \\
 \code{etape\_importance\_}\allowbreak\code{exclusions} & Étape importance\_exclusions~: importance des exclusions (volumes, événements, exposition et SMR des lignes exclues) & etape & étape \code{importance\_exclusions}~: \code{etapes/}\allowbreak\code{importance\_exclusions}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:importance-exclusions}) \\
 \code{table\_finale} & Table finale et comparaisons & non\_produite & \code{table}~: \code{NULL}, «~non produites par cette version~»~; autre valeur, refus (contrôle~4) \\
 \code{rejeu} & Rejeu & texte & ligne \code{\# rejeu} de la fiche (\code{TEXTE\_REJEU\_FICHE}) et textes du rejeu outillé (ci-dessous) \\
@@ -10040,28 +10751,78 @@ entrée ou une censure dans la cellule, D ne suit pas Bin(E\^{}i, q), même si
 E\^{}i est entier~: la couverture des deux intervalles n'est pas établie~;
 si E\^{}i n'est pas entier, la formule par quantiles de lois bêta en est en
 outre le prolongement continu.~» (section~\ref{sec:brut-binomial}~;
-issue~\#31, constat C2 de la décision M55). La section \emph{étape validation},
-quand l'étape est au plan, fait précéder ses tables de mentions fixes, dont
+issue~\#31, constat C2 de la décision M55). La section \emph{étape
+positionnement}, quand l'étape est au plan, fait précéder ses tables de
+trois mentions fixes, choisies par la méthode lue dans l'objet
+(\code{etapes/positionnement/parametres/methode}~; une autre valeur que
+\code{smr} est une erreur de programmation~; issue~\#167, décision M289,
+Q7~: textes acceptés sans lecture de \code{regulatory}, précédent de la
+décision M258)~: «~Positionnement par SMR
+(etapes/positionnement/parametres/methode)~: pour chaque segment, theta =
+O~/ A, où O est le nombre de décès observés et A = somme des E\^{}c\_x
+(-ln(1 - q\textasciitilde{}\_x)) le nombre de décès attendus sous la table de
+référence, sur l'exposition centrale des cellules de la plage d'âges
+déclarée (etapes/positionnement/parametres/plage\_ages). La table
+positionnée vaut q\_x = 1 - (1 - q\textasciitilde{}\_x)\^{}theta aux seuls
+âges de cette plage~: elle multiplie par theta la force de mortalité de la
+référence, supposée constante sur chaque année d'âge. Hors de la plage,
+rien n'est produit.~»~; «~La méthode suppose que la mortalité du segment
+a, sur la plage, la forme de la table de référence à un facteur près. Les
+intervalles de theta et de la table positionnée ne couvrent que
+l'incertitude sur ce facteur, non l'écart de forme, que mesure l'étape
+validation. Aucun verdict ni seuil.~»~; «~Écart à la note de méthode
+(etapes/positionnement/parametres/reference\_methode, référence de
+place)~: la note multiplie les probabilités de décès (q\_x = SMR
+q\textasciitilde{}\_x) et prend pour attendus la somme des E
+q\textasciitilde{}~; l'outil multiplie la force de mortalité et prend les
+attendus sur l'exposition centrale, comme l'étape validation. Les deux
+tables diffèrent d'autant plus que q\textasciitilde{}\_x est grand.~»~;
+puis, sous la même condition que pour l'étape validation, la mention
+d'unité contrat. La section \emph{étape validation},
+quand l'étape est au plan, porte un titre qui suit la relation déclarée
+(\code{titre\_section()}, lu dans l'objet, erreur de programmation pour
+une autre valeur~; ADR 0012, annotation du 07/11/2026, (b)~2)~: celui du
+tableau~\ref{tab:sections-rapport} sous \code{independante}, «~Étape
+validation~: statistiques de validation de la table de référence ajustée
+hors de l'outil~» sous \code{ajustee\_hors\_outil}, «~Étape validation~:
+statistiques de validation de la table positionnée de cette
+construction~» sous \code{positionnee}~; la table des matières suit. Elle
+fait précéder ses tables de mentions fixes, dont
 le choix est lu dans l'objet (décisions M258 et M262~; ADR 0012, seconde
-annotation du 06/11/2026, (b)), dans cet ordre~: «~Aucune table
-positionnée n'est produite~: la table de référence est prise telle quelle.
-Aucun verdict ni seuil~: aucune p-valeur n'est comparée à un niveau, et le
+annotation du 06/11/2026, (b)~; relation à trois valeurs, issue~\#167), dans
+cet ordre~: hors de \code{positionnee}, «~Aucune table
+positionnée n'est produite~: la table de référence est prise telle quelle.~»,
+puis, sous toute relation, «~Aucun verdict ni seuil~: aucune p-valeur
+n'est comparée à un niveau, et le
 moteur ne conclut pas sur l'adéquation de la table.~»~; la relation
 déclarée (\code{etapes/validation/parametres/relation\_table})~: sous
 \code{independante}, $p = 0$ et ddl $= n$~; sous
 \code{ajustee\_hors\_outil}, la liste des grandeurs non produites et
-l'absence de tirage~; l'hypothèse nulle de Poisson, exacte avec $E^c$
-tenue pour fixe, asymptotique sous le modèle de survie~; sous
-\code{independante} seulement, «~Les p-valeurs asymptotiques et exactes
+l'absence de tirage~; sous \code{positionnee}, «~Relation
+«~positionnee~»~: la table validée est la table positionnée de cette
+construction (etapes/positionnement), dont le facteur theta a été estimé
+sur ces mêmes cellules (un paramètre par segment, ddl = n - S). Le SMR de
+la table positionnée vaut 1 par construction~: ni intervalle ni p-valeur
+ne sont produits pour lui. Les lois sous H0 sont prises conditionnellement
+aux décès observés de chaque segment (binomiale par cellule ou sous-groupe,
+multinomiale pour les réplications de Monte-Carlo), qui ne dépendent pas de
+theta.~»~; l'hypothèse nulle de Poisson, exacte avec $E^c$
+tenue pour fixe, asymptotique sous le modèle de survie, et, sous
+\code{positionnee}, sa forme à $\theta_s$ inconnu, conditionnelle aux décès
+de chaque segment (mention \code{validation\_h0\_positionnee})~; sous
+\code{independante} et \code{positionnee}, «~Les p-valeurs asymptotiques et exactes
 des signes, des suites et de Wilcoxon reposent sur une hypothèse qui n'est
 pas H0 (i) (colonne statut)~; seules les p-valeurs de Monte-Carlo ont un
 niveau garanti sous H0 (i).~»~; si \code{fiche/avertissement\_unite} est
 présent (unité contrat sans identifiant de tête), la sur-dispersion
 $\varphi \ge 1$ qui rend les tests anti-conservateurs~; si l'appariement est
 \code{ensemble\_par\_sexe}, la table \code{ensemble} appliquée à chaque
-sexe~; sous \code{independante} seulement, l'absence de correction de
+sexe~; sous \code{independante} et \code{positionnee}, l'absence de correction de
 multiplicité, puis la formule des p-valeurs de Monte-Carlo, le chemin du
-nombre de tirages et l'erreur de Monte-Carlo (sous
+nombre de tirages et l'erreur de Monte-Carlo, la mention précisant sous
+\code{positionnee} le tirage multinomial par segment et le niveau exact
+conditionnellement aux $O_s$ (mention
+\code{validation\_monte\_carlo\_positionnee}~; sous
 \code{ajustee\_hors\_outil}, aucune p-valeur n'est produite et aucun
 tirage n'est fait, décision M254)~; la référence de méthode, avec renvoi
 à la colonne \code{statut} des
@@ -10512,7 +11273,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier~; \code{chaine\_codage\_bytes} pour un nom de premier niveau d'encodage \code{bytes}, et, par l'écrivain, pour un nom de cet encodage plus bas~; \code{serialisation\_impossible} pour une classe de cet encodage~; issues~\#114 et~\#128)~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}, \code{TEXTE\_REJEU\_FICHE}) \\
 \catalogue{fonctions-rapport}{TEXTE\_REJEU\_FICHE} & constante & --- & ligne \code{\# rejeu} de la fiche écrite (note de lecture d'E3.7 en une ligne), reprise par la section «~Rejeu~» du rapport figé~; texte du moteur marqué UTF-8 \\
 \catalogue{fonctions-rapport}{lire\_fiche()} & exportée & octets & fiche relue, dont le rejeu est \code{construire\_table(donnees, f\$roles, f\$plan, f\$provenance, tables\_reference)}, outillé par \code{rejouer\_fiche()}~; ne contrôle pas \code{version\_fiche} \\
-\catalogue{fonctions-rapport}{SECTIONS\_RAPPORT} & constante & --- & les quinze sections du rapport figé, dans l'ordre~: identifiant, titre, nature, étape, racines, renvois (tableau~\ref{tab:sections-rapport}) \\
+\catalogue{fonctions-rapport}{SECTIONS\_RAPPORT} & constante & --- & les sections du rapport figé, dans l'ordre~: identifiant, titre, nature, étape, racines, renvois (tableau~\ref{tab:sections-rapport}) \\
 \catalogue{fonctions-rapport}{CHEMINS\_STRUCTURE\_SEULE} & constante & --- & tables dont le volume croît avec la base, citées par chemin, type et dimension, sans leurs valeurs \\
 \catalogue{fonctions-rapport}{MENTIONS\_RAPPORT} & constante & --- & textes fixes du rapport figé, aux noms ASCII, marqués UTF-8 (section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{STYLE\_RAPPORT} & constante & --- & feuille de style en ligne de l'en-tête du document \\
@@ -10527,7 +11288,9 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{lignes\_racines()} & interne & objet, racines, insertions & tables de lignes et de colonnes des racines, dans l'ordre de l'objet~; structure seule pour \code{CHEMINS\_STRUCTURE\_SEULE}~; «~absent de l'objet~»~; valeur de classe d'encodage \code{bytes} passée à l'écrivain, qui la refuse (\code{type\_non\_canonique}~; issue~\#128) \\
 \catalogue{fonctions-rapport}{paragraphe()} & interne & textes & paragraphe HTML, texte échappé \\
 \catalogue{fonctions-rapport}{element\_liste()} & interne & textes & élément de liste HTML, texte échappé \\
-\catalogue{fonctions-rapport}{corps\_section()} & interne & objet, rang de la section & corps HTML d'une section de \code{SECTIONS\_RAPPORT}~; erreur de programmation pour une section sans rendu \\
+\catalogue{fonctions-rapport}{corps\_section()} & interne & objet, rang de la section & corps HTML d'une section de \code{SECTIONS\_RAPPORT}~; erreur de programmation pour une section sans rendu, une relation de l'étape \code{validation} ou une méthode de positionnement sans mentions \\
+\catalogue{fonctions-rapport}{relation\_lue()} & interne & valeur lue & la relation de l'étape \code{validation} si c'est une chaîne unique non manquante, \code{""} sinon (valeur sans mentions, erreur de programmation des \code{switch} qui la lisent) \\
+\catalogue{fonctions-rapport}{titre\_section()} & interne & objet, rang de la section & titre de la section~: celui de \code{SECTIONS\_RAPPORT}, sauf \code{etape\_validation} d'un objet qui porte l'étape, dont le titre suit la relation (trois valeurs, erreur de programmation par défaut~; issue~\#167) \\
 \catalogue{fonctions-rapport}{ecrire\_rapport()} & exportée & objet \code{construction} & octets UTF-8 du rapport figé HTML, après \code{controler\_rapport()}~; aucun calcul, aucune date (section~\ref{sec:rapport-fige}) \\
 \end{longtable}
 }
@@ -11912,11 +12675,11 @@ E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, donn�
 E2.8 & pondération par les montants~: rôle refusé tant que ses intervalles ne sont pas spécifiés & \ref{sec:catalogue-roles} \\
 E2.9 & segmentation déclarée, vide explicite admis (le test d'homogénéité viendra avec la validation) & \ref{sec:plan}, \ref{sec:troncature-censure} \\
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
-E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; statistiques de validation d'une table de référence prise telle quelle, d'après II1291-14 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:validation} \\
+E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; positionnement par SMR sur une table de référence (méthode~1), d'après II1291-12~; statistiques de validation d'une table de référence prise telle quelle ou de la table positionnée, d'après II1291-14 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:positionnement}, \ref{sec:validation} \\
 E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-groupes, SMR, signes, suites, intervalles (en partie~: statistiques écrites une fois et appliquées par l'étape \code{validation} aux observations de la construction~; la fonction de suivi sur de nouvelles observations viendra avec sa branche) & \ref{sec:validation-statistiques} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
-E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut} \\
-E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
+E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
