@@ -1854,14 +1854,26 @@ origine 2005-01-01, période 2015-01-01 au 2024-12-31, graine 20261016
 \code{id\_tete}, \code{sexe}, \code{date\_naissance}, \code{date\_entree},
 \code{date\_sortie}, \code{cause\_sortie}. Le simulateur est ainsi figé pour
 cette graine~: une modification qui change le jeu tiré change l'empreinte et
-met toutes les références en «~entrée différente~».
+met toutes les références en «~entrée différente~». Chaque plan nomme son
+entrée (champ \code{entree}~; ADR 0009, point 4.1 amendé, annotation du
+07/11/2026, points~(d) et~(e))~: \code{reference}, le jeu ci-dessus, pour
+tous les plans sauf R9~; \code{reference\_defauts} pour R9, le même jeu
+altéré après son tirage complet par \code{simuler\_portefeuille(defauts =)}
+(section~\ref{sec:defauts-parametres}) sous la graine des défauts 20261108,
+distincte de celle du jeu et des graines de Monte-Carlo~: 500~lignes pour
+chacun des motifs \code{id\_contrat\_manquant}, \code{sexe\_manquant} et
+\code{entree\_manquante}, ensembles disjoints, toutes causes de sortie
+admises (empreinte des données \code{f21fed51\ldots}). Les lignes que les
+défauts n'altèrent pas sont celles de \code{reference}~; un test le
+vérifie, avec la graine, les motifs et leurs effectifs.
 
 {\small
 \rowcolors{2}{tablerow}{white}
 \begin{longtable}{@{}p{0.6cm}p{2.8cm}p{1.4cm}p{0.9cm}p{3.2cm}p{1.2cm}p{2.6cm}@{}}
 \caption{Plans de référence (\code{plans\_reference} de
-\code{tests/reference/outils\_reference.R}~; tous sur la période de l'entrée,
-sans exclusion~; un identifiant n'est jamais réemployé).}
+\code{tests/reference/outils\_reference.R}~; tous sur la période de l'entrée~;
+exclusions déclarées et étapes postérieures à \code{brut} dites dans le
+texte qui suit~; un identifiant n'est jamais réemployé).}
 \label{tab:plans-reference}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Id}} &
@@ -1888,8 +1900,50 @@ R4 & par année (surface) & \code{sexe} & 0 & \code{plus\_fine} & oui & Poisson~
 R5 & en cours $\to$ racheté, unité contrat & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 R6 & R1 avec l'estimateur produit-limite & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial, \code{kaplan\_meier}~; 0,95 \\
 R7 & R3 avec l'estimateur produit-limite (issue~\#32) & \code{sexe} & 0 & \code{age\_atteint\_annee} & non & Poisson, binomial, \code{kaplan\_meier}~; 0,95 \\
+R8 & R1 avec validation et importance des exclusions (issue~\#166) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
+R9 & R8 sur l'entrée à défauts injectés (issue~\#166) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 \end{longtable}
 }
+
+\noindent
+\textbf{Plans R8 et R9} (issue~\#166~; ADR 0009, annotation du
+07/11/2026, points~(b), (d) et~(e)). R8 est le plan de R1 augmenté de deux
+exclusions déclarées (\code{entree\_manquante}, \code{sexe\_manquant}), de
+l'étape \code{validation} (table de clé \code{tv}, relation
+\code{independante}, âges 20 à 90, tranches d'âge de bornes 20, 50 et 70,
+niveau 0,95, 999~réplications de Monte-Carlo sous la graine 20261107,
+distincte de celle du jeu) et de l'étape \code{importance\_exclusions}
+(niveau 0,95). La table \code{tv} lui est passée par l'argument
+\code{tables\_reference}~: c'est une table de statut \code{importee}, âges
+20 à 90 pour chaque sexe, écrite en valeurs littérales dans
+\code{outils\_reference.R} (constante \code{QX\_TABLE\_R8}), si bien
+qu'aucune fonction mathématique de la bibliothèque du système n'intervient
+à l'exécution~; ces valeurs ont été produites une seule fois, hors de
+l'outillage, par la loi de Gompertz-Makeham de l'entrée de référence pour
+les hommes et 0,6~fois ce taux non arrondi pour les femmes, puis arrondies
+à cinq chiffres significatifs~; elles ne se recalculent pas et ne dépendent
+pas des observations. Sur l'entrée de référence, les deux exclusions de R8
+ne touchent aucune ligne (0~ligne exclue, 100\,000~lignes conservées,
+\emph{mesuré})~: ses retraits sont nuls et le SMR de ses deux comparateurs
+est dans l'état \code{aucun\_attendu}. Le retrait effectif est l'objet de
+R9~: même plan, exclusion \code{id\_contrat\_manquant} en plus (une ligne
+sans identifiant de contrat serait sinon refusée, \code{ligne\_invalide}),
+sur l'entrée \code{reference\_defauts} décrite ci-dessus. Les trois motifs y
+représentent chacun une classe de mesurabilité de l'étape
+\code{importance\_exclusions} (section~\ref{sec:importance-exclusions})~:
+\code{id\_contrat\_manquant}, mesurable aux niveaux A et B~;
+\code{sexe\_manquant}, mesurable au niveau A et à l'état
+\code{cle\_segmentation\_manquante} au niveau B sous la segmentation
+\code{sexe}~; \code{entree\_manquante}, à l'état
+\code{aucune\_ligne\_mesurable}. \emph{Mesuré} sur R9~: 500~lignes exclues
+par motif, 1\,500 au total, 98\,500~conservées~; 21~événements retirés par
+\code{id\_contrat\_manquant} (niveaux A et B) et 21 par
+\code{sexe\_manquant} (niveau A), soit 42 au niveau A et 21 au niveau B.
+\code{tests/test\_reproductibilite.R} vérifie sur l'objet de R9 ces
+effectifs par motif, la classe de mesurabilité de chaque motif, des retraits
+non nuls aux deux niveaux et un SMR du comparateur~1 défini, fini et
+positif, d'intervalle exact non dégénéré, aux deux niveaux~: ces contrôles
+échoueraient sur une entrée sans défaut, que R8 passerait à vide.
 
 \subsubsection*{Format des fichiers}
 
@@ -2053,8 +2107,12 @@ fichiers.
 \subsubsection*{Batterie, production et commit}
 
 \textbf{Dans la batterie} (\code{tests/test\_reproductibilite.R}, job «~Tests
-(R 4.3.3)~», donc sur la plateforme de référence)~: le jeu est tiré une fois,
-chaque plan de référence est exécuté, aplati, écrit puis relu
+(R 4.3.3)~», donc sur la plateforme de référence)~: chaque entrée distincte
+est tirée une fois (\code{entrees\_des\_plans}, qui refuse un plan dont le
+champ \code{entree} est absent ou n'est pas une chaîne), chaque plan de
+référence est exécuté sur son entrée, avec les tables de référence que lit
+son plan (\code{tables\_du\_plan}, \code{NULL} pour un plan sans table),
+aplati, écrit puis relu
 (aller-retour \code{identical()}), et comparé à son fichier~; un plan sans
 fichier est un échec attendu renvoyant à l'issue de création tant qu'il
 figure dans la liste \code{SANS\_REFERENCE}, vecteur nommé dont chaque nom
@@ -2193,7 +2251,15 @@ grandeurs sont restées identiques au bit près, sur la plateforme de
 référence (image \code{rocker/r-ver:4.3.3}, R~4.3.3, BLAS et LAPACK de
 référence 3.10.0 monothread, Ubuntu 22.04.5 LTS, glibc 2.35, processeur
 AMD EPYC 7763). Ni la cinquième ni la sixième n'ont changé de table
-finale, de verdict ni de valeur de table homologuée.
+finale, de verdict ni de valeur de table homologuée. Les références R7, R8
+et R9 ont été \textbf{créées} le 07/11/2026 en mode \code{creation}
+(exécution 42389267990 du workflow, calcul sur \code{1ce59fe}, commit
+\code{a68e5aa}, visa d'\code{actuary}~; issues~\#32 et~\#166), sur la
+plateforme de référence (image \code{rocker/r-ver:4.3.3}, R~4.3.3, BLAS et
+LAPACK de référence 3.10.0 monothread, Ubuntu 22.04.5 LTS, glibc 2.35,
+processeur AMD EPYC 9V74)~: création seule, R1 à R6 restés identiques au
+bit près aux fichiers commités (ADR 0009, seconde annotation du 07/11/2026,
+point~(c)).
 
 \begin{encadre}
 \small
@@ -2209,6 +2275,13 @@ finale, de verdict ni de valeur de table homologuée.
     déclaration nul et le niveau 0,95~: aucun plan ne le retient avec un
     délai (pas de variante de R7 à 90~jours, décision M297), sans
     segmentation ni sous l'unité d'observation contrat.
+  \item Les étapes \code{validation} et \code{importance\_exclusions} ne
+    sont figées que par R8 et R9 (issue~\#166)~: une table importée
+    (\code{tv}), la relation \code{independante}, la transition vivant
+    $\to$ décédé, l'unité d'observation tête et la segmentation
+    \code{sexe}~; R8 les exerce sans ligne exclue, R9 sur trois motifs de
+    500~lignes chacun (section~\ref{sec:non-regression}, «~Plans R8 et
+    R9~»).
   \item L'entrée n'exerce pas la fusion des contrats par tête~: elle est
     tirée en mode \code{uniforme}, une tête par contrat
     (section~\ref{sec:simulation}). La fusion n'est couverte que par les
@@ -7367,7 +7440,13 @@ non des refus. La fiche de construction ne change pas~: les grandeurs sont
 rangées dans l'objet (\code{etapes\$importance\_exclusions}) et restituées
 par le rapport figé, jamais dans la fiche (décision M215, Q4~(a))~; les
 plans de référence R1 à R6 ne comprennent pas l'étape, que couvrent les
-tests unitaires (décision M263).
+tests unitaires (décision M263)~; R8 et R9 la comprennent
+(issue~\#166~; section~\ref{sec:non-regression}, «~Plans R8 et R9~»)~: R8
+sans ligne exclue, R9 sur une entrée à défauts injectés où chacune des
+trois classes de mesurabilité est représentée. Les têtes de cette entrée
+n'ayant qu'un contrat, une tête touchée n'y a aucune ligne conservée
+($R_t$ vide)~: le calcul par deux passages sur des têtes multi-contrats
+relève des tests unitaires, dont T4 (ci-dessous).
 
 \medskip
 \textbf{Notations.} $R$ est l'ensemble des lignes conservées~; un
@@ -8342,7 +8421,7 @@ sans étape \code{exposition}) valent \code{NULL} ou \code{NA}. \textbf{Rejeu}~:
 redonne un objet \code{identical()} hors \code{execution}, \code{tables\_reference}
 portant les tables que la fiche identifie (\code{NULL} sans table)~; c'est un test de
 la batterie de reproductibilité, aussi à partir du texte de la fiche, pour
-les six plans de référence, qui ne lisent aucune table. Le
+les six plans de référence, chacun avec les tables que lit son plan (\code{NULL} pour un plan qui n'en lit aucune). Le
 rejeu outillé, \code{rejouer\_fiche(donnees, fiche, tables\_reference)}, fait cet appel après
 avoir contrôlé la fiche et les données, et refuse en particulier une fiche
 dont \code{version\_fiche} n'est pas une version admise, la version
@@ -10233,7 +10312,10 @@ statuts, légende binomiale selon les estimateurs retenus). Les tables de
 colonnes y sont comparées, cellule par cellule et en-têtes compris, à
 l'écriture échappée des colonnes de l'objet. \code{tests/test\_reproductibilite.R}
 refait sur les six plans de référence l'ordre des sections, l'écriture des
-décimaux, les textes fixes et les légendes, et vérifie que la ligne
+décimaux, les textes fixes et les légendes (pour un plan qui demande l'étape
+\code{validation}, comme R8~: absence du paragraphe «~non demandée par le
+plan~», légendes des tables \code{cellules} et \code{statistiques} de la
+validation et \code{retraits} de l'importance des exclusions), et vérifie que la ligne
 \code{\# rejeu} de la fiche écrite est \code{TEXTE\_REJEU\_FICHE}.
 \code{tests/controles/locale\_c.R} compare les octets des six rapports sous
 les deux locales.\par}
