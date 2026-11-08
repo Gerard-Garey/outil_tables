@@ -3138,7 +3138,8 @@ citent chacune une table de référence, par sa clé
 \code{PARAMETRES\_CLE\_TABLE}). La recette d'exposition et l'unité
 d'observation ne sont pas des paramètres~: le moteur les déduit des rôles
 (sections~\ref{sec:recettes} et~\ref{sec:unite-observation})~; seule une
-convention d'âge plus grossière peut être forcée.\par}
+convention d'âge plus grossière peut être forcée, ou, sous une recette sans
+convention native, déclarée.\par}
 
 \noindent
 \textbf{Règle commune de forme} (issue~\#23)~: chaque paramètre d'étape a
@@ -4052,7 +4053,7 @@ refus est une condition R (section~\ref{sec:refus}) et ne rend aucun bilan.
 \code{version\_fiche} & \code{VERSIONS\_FICHE\_REJEU} / \code{version\_fiche} de la fiche & conforme & comparaison exacte \\
 \code{algorithme\_empreinte} & \code{ALGORITHME\_EMPREINTE} / \code{empreintes\$algorithme} & conforme & comparaison exacte \\
 \code{representation} & \code{ENTETE\_CANONIQUE} / \code{empreintes\$representation} & conforme & comparaison exacte \\
-\code{entrees\_construction} & «~valider\_plan(), controler\_roles(), recette et convention, controler\_provenance()~: aucun refus~» / «~étapes~: [étapes du plan]~; rôles~: [rôles de la fiche]~; recette~: [recette déduite]~; provenance~: [fichier, ou NULL]~» & conforme & contrôles délégués aux modules \\
+\code{entrees\_construction} & «~valider\_plan(), controler\_roles(), recette et convention, controler\_matrice\_recette(), controler\_provenance()~: aucun refus~» / «~étapes~: [étapes du plan]~; rôles~: [rôles de la fiche]~; recette~: [recette déduite]~; provenance~: [fichier, ou NULL]~» & conforme & contrôles délégués aux modules \\
 \code{empreinte\_donnees} & empreinte recalculée / \code{empreintes\$donnees} & conforme & exacte~; sans rôle de sécurité \\
 \code{tables\_reference} & «~[clé] : [empreinte de la fiche]~», joints par «~;~», ou «~aucune table de référence (fiche/tables\_reference~: NULL)~» / «~[clé] : [empreinte recalculée] (reçue)~» ou «~(relue dans le package)~», joints par «~;~», ou «~aucune table reçue ni relue~» & conforme & exacte~; sans rôle de sécurité \\
 \code{temoin\_code} & \code{EMPREINTE\_CODE} / \code{empreintes\$code} & V1 & exacte~; sans rôle de sécurité \\
@@ -4520,22 +4521,25 @@ comme rôle requis, rôle d'un groupe dont l'un au moins est requis, ou rôle
 facultatif, jointes par «~,~»~; elle est vide pour un rôle qu'aucune recette
 n'emploie. Elle est dérivée de ce catalogue, seul endroit où s'écrit l'emploi
 d'un rôle par une recette~: un emploi n'a de sens que relatif à une recette
-(ADR 0016, point 3.1). Sous la seule recette du catalogue,
-\code{lignes\_dates\_completes}, l'emploi des rôles est le suivant~:\par}
+(ADR 0016, point 3.1). L'emploi d'un rôle par une recette est l'un des
+suivants~:\par}
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \emph{requis}~: rôle sans lequel la recette ne s'applique (refus
-    \code{aucune\_recette})~;
+    \code{aucune\_recette})~; \emph{un parmi}~: rôle d'un groupe dont l'un
+    au moins est requis (sous \code{agregats}, \code{exposition\_centrale}
+    et \code{exposition\_initiale})~;
   \item \emph{facultatif}~: rôle lu pour des contrôles (unicité du contrat,
     cohérence de l'année de naissance) ou, pour \code{id\_tete}, pour l'unité
-    d'observation~; les rôles \code{sexe} et \code{segment} sont aussi requis
+    d'observation, ou, pour \code{annee} sous \code{agregats}, comme clé
+    des cellules~; les rôles \code{sexe} et \code{segment} sont aussi requis
     si la segmentation du plan les emploie (règle commune à toutes les
     recettes, constante \code{ROLES\_SEGMENTATION}~; refus
     \code{role\_requis\_manquant}), contrôlés s'ils sont seulement déclarés,
     avec l'avertissement \code{role\_non\_employe}~;
   \item \emph{non employé}~: rôle qu'aucune recette du catalogue
     n'emploie et dont l'omission changerait le sens du résultat (pondération,
-    agrégats, états, date de survenance distincte de la sortie, date
+    états, date de survenance distincte de la sortie, date
     d'inventaire, âge fourni)~; sa déclaration est \textbf{refusée}
     (\code{role\_non\_pris\_en\_charge}) plutôt qu'ignorée en silence. Le rôle
     \code{montant} est de ceux-là~: la pondération par les montants attend la
@@ -4591,7 +4595,7 @@ rôle par la recette.}
 \endhead
 \catalogue{roles}{id\_contrat} & identification & \code{character}, \code{integer}, \code{double} entier fini & \code{lignes\_dates\_completes} (facultatif) \\
 \catalogue{roles}{id\_tete} & identification & \code{character}, \code{integer}, \code{double} entier fini & \code{lignes\_dates\_completes} (facultatif) \\
-\catalogue{roles}{sexe} & état civil & \code{character}, \code{factor} & \code{lignes\_dates\_completes} (facultatif~; segmentation) \\
+\catalogue{roles}{sexe} & état civil & \code{character}, \code{factor} & \code{lignes\_dates\_completes}, \code{agregats} (facultatif~; segmentation) \\
 \catalogue{roles}{date\_naissance} & état civil & \code{Date} (valeurs entières finies) & \code{lignes\_dates\_completes} (requis) \\
 \catalogue{roles}{annee\_naissance} & état civil & \code{integer}, \code{double} entier fini & \code{lignes\_dates\_completes} (facultatif) \\
 \catalogue{roles}{age\_fourni} & état civil & \code{integer}, \code{double} entier fini $\ge 0$ & aucune \\
@@ -4601,13 +4605,13 @@ rôle par la recette.}
 \catalogue{roles}{cause\_sortie} & observation & \code{character}, \code{factor} & \code{lignes\_dates\_completes} (requis) \\
 \catalogue{roles}{date\_evenement} & observation & \code{Date} (valeurs entières finies) & aucune \\
 \catalogue{roles}{date\_inventaire} & observation & \code{Date} (valeurs entières finies) & aucune \\
-\catalogue{roles}{age} & agrégats & \code{integer}, \code{double} & aucune \\
-\catalogue{roles}{annee} & agrégats & \code{integer}, \code{double} & aucune \\
-\catalogue{roles}{exposition\_centrale} & agrégats & \code{integer}, \code{double} & aucune \\
-\catalogue{roles}{exposition\_initiale} & agrégats & \code{integer}, \code{double} & aucune \\
-\catalogue{roles}{evenements} & agrégats & \code{integer}, \code{double} & aucune \\
+\catalogue{roles}{age} & agrégats & \code{integer}, \code{double} & \code{agregats} (requis) \\
+\catalogue{roles}{annee} & agrégats & \code{integer}, \code{double} & \code{agregats} (facultatif) \\
+\catalogue{roles}{exposition\_centrale} & agrégats & \code{integer}, \code{double} & \code{agregats} (un parmi) \\
+\catalogue{roles}{exposition\_initiale} & agrégats & \code{integer}, \code{double} & \code{agregats} (un parmi) \\
+\catalogue{roles}{evenements} & agrégats & \code{integer}, \code{double} & \code{agregats} (requis) \\
 \catalogue{roles}{montant} & pondération & \code{double} fini $> 0$ & aucune \\
-\catalogue{roles}{segment} & segmentation & \code{character}, \code{factor}, \code{integer} & \code{lignes\_dates\_completes} (facultatif~; segmentation) \\
+\catalogue{roles}{segment} & segmentation & \code{character}, \code{factor}, \code{integer} & \code{lignes\_dates\_completes}, \code{agregats} (facultatif~; segmentation) \\
 \catalogue{roles}{etat\_depart} & multi-états & \code{character}, \code{factor} & aucune \\
 \catalogue{roles}{etat\_arrivee} & multi-états & \code{character}, \code{factor} & aucune \\
 \catalogue{roles}{date\_changement} & multi-états & \code{Date} (valeurs entières finies) & aucune \\
@@ -4653,10 +4657,14 @@ recette par recette, les rôles requis absents)~;
 \code{role\_non\_pris\_en\_charge} (rôle que la recette retenue n'emploie
 pas~; le message nomme la recette)~; \code{role\_requis\_manquant}
 (un rôle employé par la segmentation n'est pas déclaré).
-\code{controler\_roles()} rend la recette retenue. Tant que le catalogue
-ne compte qu'une recette, \code{recettes\_concurrentes} et le second
-\code{role\_non\_pris\_en\_charge} ne peuvent pas survenir~: tout rôle
-employé l'est par cette recette, seule à avoir des rôles propres.
+\code{controler\_roles()} rend la recette retenue. Avec deux recettes au
+catalogue, les deux refus sont atteignables~: \code{recettes\_concurrentes}
+pour des rôles propres aux deux recettes déclarés ensemble (par exemple
+\code{date\_entree} avec \code{age}, \code{evenements} et
+\code{exposition\_centrale}), le second \code{role\_non\_pris\_en\_charge}
+pour un rôle de \code{lignes\_dates\_completes} qui ne lui est pas propre,
+déclaré avec les rôles de \code{agregats} (par exemple
+\code{date\_naissance}).
 
 \medskip
 {\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
@@ -5122,9 +5130,11 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{TRANSITIONS} & constante & --- & transitions prises en charge~: départ, arrivée, code interne, porteur de l'état de départ (tête ou contrat) \\
 \catalogue{fonctions-donnees}{MOTIFS\_LIGNES} & constante & --- & motifs de ligne (tableau~\ref{tab:motifs}) \\
 \catalogue{fonctions-donnees}{MOTIFS\_TETE} & constante & --- & motifs de tête (tableau~\ref{tab:motifs}) \\
+\catalogue{fonctions-donnees}{MOTIFS\_LIGNES\_AGREGATS} & constante & --- & motifs de ligne de la recette \code{agregats} (une ligne est une cellule), dans l'ordre de restitution~; aucun motif d'unité \\
+\catalogue{fonctions-donnees}{LIBELLES\_MOTIFS} & constante & --- & libellé de chaque code de motif de l'union des recettes, un seul par code quelle que soit la recette qui le lève \\
 \catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus \\
-\catalogue{fonctions-donnees}{CATALOGUE\_RECETTES} & constante & --- & catalogue des recettes d'exposition, une ligne par recette~: rôles requis, groupes de rôles dont un au moins est requis, rôles facultatifs, rôles propres (discriminants), convention native (\code{NA} si elle ne se déduit pas des rôles), forme rendue au noyau (\code{fenetres} ou \code{cellules}), motifs de ligne et d'unité~; seule ligne~: \code{lignes\_dates\_completes} (tableau~\ref{tab:recettes}) \\
-\catalogue{fonctions-donnees}{MATRICE\_RECETTES} & constante & --- & matrice recette $\times$ étape $\times$ estimateur, complète, une ligne par étape et par estimateur de \code{brut}~: admis (\code{oui}, \code{non}, \code{si\_role}), rôle qui conditionne \code{si\_role}, motif du refus~; tout est admis sous \code{lignes\_dates\_completes} \\
+\catalogue{fonctions-donnees}{CATALOGUE\_RECETTES} & constante & --- & catalogue des recettes d'exposition, une ligne par recette~: rôles requis, groupes de rôles dont un au moins est requis, rôles facultatifs, rôles propres (discriminants), convention native (\code{NA} si elle ne se déduit pas des rôles), forme rendue au noyau (\code{fenetres} ou \code{cellules}), motifs de ligne et d'unité~; lignes \code{lignes\_dates\_completes} et \code{agregats} (tableau~\ref{tab:recettes}) \\
+\catalogue{fonctions-donnees}{MATRICE\_RECETTES} & constante & --- & matrice recette $\times$ étape $\times$ estimateur, complète, une ligne par étape et par estimateur de \code{brut}~: admis (\code{oui}, \code{non}, \code{si\_role}), rôle qui conditionne \code{si\_role}, motif du refus~; tout est admis sous \code{lignes\_dates\_completes}~; sous \code{agregats}, lignes \code{si\_role} et \code{non} (section~\ref{sec:recettes}) \\
 \catalogue{fonctions-donnees}{roles\_recette()} & interne & catalogue, rang & rôles employés par la recette~: requis, d'un groupe, facultatifs, sans doublon \\
 \catalogue{fonctions-donnees}{recettes\_du\_role()} & interne & rôles, catalogue & pour chaque rôle, recettes qui l'emploient, dans l'ordre du catalogue \\
 \catalogue{fonctions-donnees}{motifs\_recettes()} & interne & --- & union des motifs de toutes les recettes, ligne puis unité~: référence du refus \code{exclusion\_inconnue} et ordre canonique des exclusions \\
@@ -5139,7 +5149,8 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue (par défaut, celui du module) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de matrice~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
-\catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
+\catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique, convention validée (\code{NULL} sans étape \code{exposition}), valeurs validées \code{p} & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis règles qui ne tiennent pas dans une ligne (fonction de la ligne suivante), puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
+\catalogue{fonctions-donnees}{regles\_conditionnelles\_recette()} & interne & recette, rôles, étapes du plan, convention & règles de la matrice qui ne tiennent pas dans une ligne~; sous \code{agregats}, dans cet ordre, refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle \code{annee}) et \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire} (binomial avec le rôle \code{annee} sous la convention retenue \code{dernier\_anniversaire})~; aucune sous \code{lignes\_dates\_completes}~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide}, module \code{donnees}~; rend \code{NULL}~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22, \#59 et~\#82~; variantes des modules \code{brut}, \code{validation} et \code{importance\_exclusions} retirées par l'issue~\#82) \\
 \catalogue{fonctions-donnees}{ligne\_transition()} & interne & transition (\code{list(depart, arrivee)}, de forme déjà contrôlée) & ligne de \code{TRANSITIONS} de la transition, zéro ligne si elle n'est pas prise en charge~; seul endroit où s'écrit la recherche (issue~\#22) \\
 \catalogue{fonctions-donnees}{valeurs\_parametres\_donnees()} & interne & transition, période, délai, déjà contrôlés & transition retenue (\code{ligne\_transition()}), début, fin, borne $B$ (jours depuis 1970-01-01)~; ne contrôle rien~; appelée par \code{controler\_plan\_roles()}, qui en transmet la valeur \code{p} aux fonctions d'étape, et par le contrôle de la transition, de la période et du délai (ligne suivante~; issues~\#22 et~\#82) \\
@@ -5149,8 +5160,13 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
 \catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
 \catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation, \code{lignes\_tete} (\code{NULL} par défaut) & numéros des lignes porteuses de chaque motif~; \code{lignes\_tete} désigne les lignes où les motifs de tête sont évalués (section~\ref{sec:controles-donnees}~; issue~\#69) \\
+\catalogue{fonctions-donnees}{evaluer\_motifs\_agregats()} & interne & données, rôles, valeurs validées \code{p} & numéros des lignes porteuses de chaque motif de \code{MOTIFS\_LIGNES\_AGREGATS}, évaluation exhaustive sans court-circuit \\
+\catalogue{fonctions-donnees}{observations\_agregats()} & interne & lignes retenues, leurs numéros, rôles, segmentation, motifs, exclusions, nombre de lignes reçues, données & une observation par cellule conservée, sans complétion, unité d'observation \code{non\_determinee}~; relevés (cellules conservées, cohérence des deux expositions déclarées ensemble, poids des cellules exclues par motif déclaré) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
-\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}), squelette commun~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
+\catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat) \\
+\catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements})~; jamais un refus \\
+\catalogue{fonctions-donnees}{avertir\_releves\_lignes()} & interne & avertissements, relevés, unité d'observation & avertissements des relevés de la recette \code{lignes\_dates\_completes} (fusion par tête, fenêtres vides, observations après décès hors période)~; extraite de \code{preparer\_donnees()} à résultats identiques \\
 \catalogue{fonctions-donnees}{construire\_observations()} & interne & lignes retenues, leurs numéros dans l'entrée, rôles, segmentation, valeurs des paramètres & unité d'observation, observations (fusion par tête en unité tête), correspondance des lignes aux observations, relevés~; extraite de \code{preparer\_donnees()} à résultats identiques, seule implémentation de la fusion, rappelée par l'étape \code{importance\_exclusions} (section~\ref{sec:unite-observation}~; issue~\#69) \\
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
@@ -5175,8 +5191,12 @@ et, sur demande, année civile), en traitant explicitement la troncature à
 gauche et la censure à droite (E2.3, E2.5, E2.6~; ADR 0003, points 3, 6 et 8).
 Sa fonction d'étape est \code{calculer\_exposition()}~; elle reçoit la table
 des observations de l'étape \code{donnees} (composantes fusionnées ou
-contrats, section~\ref{sec:unite-observation}), les rôles, les champs du plan
-et ses deux paramètres. Le contenu de fond vient de la spécification
+contrats, section~\ref{sec:unite-observation}~; cellules sous la recette
+\code{agregats}), la recette, les champs du plan
+et ses deux paramètres, et aiguille sur la forme que la recette rend au
+noyau (section~\ref{sec:recettes})~: \code{exposition\_fenetres()} pour
+\code{fenetres}, objet du reste de cette section, \code{exposition\_cellules()}
+pour \code{cellules}. Le contenu de fond vient de la spécification
 d'\code{actuary} (issue~\#11, parties A.0 et A.3) et de son erratum du
 17/10/2026. Les fenêtres et les événements, les segments des observations et
 la position d'un jour dans sa cellule sont calculés par trois fonctions
@@ -5201,10 +5221,10 @@ avant et après l'extraction, sur les cas de test et sur des plans sans
 La \emph{recette d'exposition} n'est pas un paramètre du plan~: le moteur
 retient la plus fine que les rôles permettent, la nomme dans les paramètres
 effectifs et dans la fiche, et \textbf{refuse si aucune ne s'applique}, sans
-jamais deviner (E2.3~; ADR 0003, point 3~; ADR 0007, point 5.3). Une seule
-recette existe dans cette branche (tableau~\ref{tab:recettes})~; les recettes
-«~agrégats~» et «~stocks successifs~» (E2.1) viendront avec les branches qui
-les créent. Les recettes sont décrites par une seule constante du module
+jamais deviner (E2.3~; ADR 0003, point 3~; ADR 0007, point 5.3). Deux
+recettes existent (tableau~\ref{tab:recettes})~: \code{lignes\_dates\_completes}
+et \code{agregats}~; la recette «~stocks successifs~» (E2.1) n'est pas
+encore mise en œuvre. Les recettes sont décrites par une seule constante du module
 \code{donnees}, \code{CATALOGUE\_RECETTES} (une ligne par recette~: rôles
 requis, facultatifs et propres, convention native, motifs~; ADR 0016,
 point~1), et la sélection par une seule fonction du même module,
@@ -5217,7 +5237,8 @@ absents)~; des rôles propres à deux recettes déclarés ensemble sont refusés
 \code{deduire\_recette()} une fois, avant toute étape, par
 \code{controler\_roles()}, qui rend la recette à
 \code{controler\_plan\_roles()}, et transmet aux fonctions d'étape qui
-l'emploient (\code{exposition}, \code{importance\_exclusions}) la recette,
+l'emploient (\code{donnees}, \code{exposition}, \code{brut},
+\code{importance\_exclusions}) la recette,
 sa convention native et ses rôles requis qu'elle rend, avec la convention
 que rend \code{resoudre\_convention()}~; aucune fonction d'étape ne les
 recalcule, et la fiche porte la même recette (une seule source~; issue~\#82,
@@ -5226,9 +5247,30 @@ section~\ref{sec:execution}). Après la convention,
 chaque estimateur de l'étape \code{brut}, est admis sous la recette retenue
 (matrice \code{MATRICE\_RECETTES}~; refus sous le motif de la ligne de
 matrice), et qu'aucune exclusion du plan n'est hors des motifs de la recette
-(\code{exclusion\_hors\_recette})~; sous \code{lignes\_dates\_completes},
-toutes les lignes de la matrice admettent, et ses motifs sont tous les
-motifs du catalogue, si bien qu'aucun de ces refus ne peut survenir.
+(\code{exclusion\_hors\_recette}), après les règles qui ne tiennent pas
+dans une ligne de matrice (\code{regles\_conditionnelles\_recette()})~; sous
+\code{lignes\_dates\_completes}, toutes les lignes de la matrice admettent
+et aucune règle conditionnelle ne s'applique, si bien que seul le refus
+\code{exclusion\_hors\_recette} peut survenir, pour une exclusion propre à
+une autre recette. Sous \code{agregats}, l'estimateur \code{poisson} exige
+le rôle \code{exposition\_centrale} (refus
+\code{poisson\_sans\_exposition\_centrale}), l'estimateur \code{binomial} le
+rôle \code{exposition\_initiale} (\code{binomial\_sans\_exposition\_initiale}),
+les étapes \code{positionnement}, \code{homogeneite} et \code{validation} le
+rôle \code{exposition\_centrale} (\code{etape\_exige\_exposition\_centrale})~;
+l'estimateur \code{kaplan\_meier} (\code{kaplan\_meier\_agregats}) et
+l'étape \code{importance\_exclusions}
+(\code{importance\_exclusions\_agregats}) sont refusés~; s'y ajoutent les
+refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle
+\code{annee}) et \code{binomial\_annee\_dernier\_anniversaire} (binomial
+avec le rôle \code{annee} sous la convention retenue
+\code{dernier\_anniversaire}). La recette \code{agregats} n'a pas de
+convention native~: la convention d'âge des cellules se déclare
+(\code{plus\_fine} est refusé, \code{convention\_non\_declaree}~; fonction
+\code{resoudre\_convention()}). Sa forme rendue au noyau est
+\code{cellules}~: l'étape \code{exposition} somme les cellules reçues par
+clé, sans en créer ni les tronquer (\code{exposition\_cellules()}), au lieu
+de former des fenêtres d'observation.
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -5250,6 +5292,10 @@ module \code{donnees}).}
 \code{date\_entree}, \code{date\_sortie}, \code{cause\_sortie} (lignes
 individuelles, dates complètes) & âge au dernier anniversaire
 (\code{dernier\_anniversaire}) \\
+\catalogue{recettes}{agregats} & \code{age}, \code{evenements}, et l'un au
+moins de \code{exposition\_centrale} et \code{exposition\_initiale}
+(cellules agrégées~; facultatifs~: \code{annee}, \code{sexe},
+\code{segment}) & aucune (\code{NA})~: convention déclarée \\
 \end{longtable}
 }
 
@@ -5716,7 +5762,13 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur ni du marquage d'encodage (ordre des octets UTF-8 de l'empreinte des données) \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
-\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, valeurs validées \code{p}, période, délai, segmentation, recette et convention validées, \code{par\_annee} & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; ne contrôle ni les paramètres, ni la recette, ni la convention, et ne les recalcule pas (issues~\#22 et~\#82) \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, valeurs validées \code{p}, segmentation, recette et convention validées, \code{par\_annee} & fonction d'étape \code{exposition}, aiguillage sur la forme rendue au noyau par la recette (\code{seam})~: \code{exposition\_fenetres()} (\code{fenetres}) ou \code{exposition\_cellules()} (\code{cellules}), dont elle rend la valeur~; ne contrôle ni les paramètres, ni la recette, ni la convention, et ne les recalcule pas (issues~\#22 et~\#82) \\
+\catalogue{fonctions-exposition}{exposition\_fenetres()} & interne & mêmes arguments & forme \code{fenetres} (recette \code{lignes\_dates\_completes})~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; corps de \code{calculer\_exposition()} extrait à l'identique (issue~\#169) \\
+\catalogue{fonctions-exposition}{UNITE\_EXPOSITION\_DECLAREE} & constante & --- & unité de l'exposition reçue sous la forme \code{cellules}, inscrite à la place de \code{UNITES\_EXPOSITION} \\
+\catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE\_DECLAREE} & constante & --- & hypothèse sur les sorties concurrentes sous la forme \code{cellules} (traitement fait par le producteur, non vérifiable), inscrite à la place de \code{HYPOTHESE\_CENSURE} \\
+\catalogue{fonctions-exposition}{STATUT\_HYPOTHESE\_DECLAREE} & constante & --- & statut commun des hypothèses de la recette \code{agregats}~: hypothèse déclarée, non vérifiable par le moteur \\
+\catalogue{fonctions-exposition}{hypotheses\_agregats()} & interne & rôles d'exposition déclarés, présence du rôle \code{annee}, convention retenue & hypothèses de la recette \code{agregats} (\code{data.frame}~: code, énoncé, nature, statut), celles des expositions pour les seules expositions déclarées~; champ \code{hypotheses\_recette} des paramètres et de la fiche \\
+\catalogue{fonctions-exposition}{exposition\_cellules()} & interne & mêmes arguments & forme \code{cellules} (recette \code{agregats})~: somme des cellules reçues par clé (segmentation, âge, année sous \code{par\_annee}), sans en créer~; relevés \code{annees\_sommees}, \code{ages\_manquants}, \code{evenement\_sans\_exposition}, avertissement \code{convention\_declaree}~; refus \code{evenements\_hors\_plage}~; aucun objet \code{fenetres\_exposition} \\
 \end{longtable}
 }
 
@@ -6851,19 +6903,25 @@ $q$, spécification, A.4)~: sa garantie est le cas K
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
 \catalogue{fonctions-brut}{ESTIMATEURS\_BRUT} & constante & --- & estimateurs disponibles, dans l'ordre canonique des résultats \\
-\catalogue{fonctions-brut}{EXPOSITION\_INITIALE\_BRUT} & constante & --- & \code{"cellule"}~: définition de l'exposition initiale du binomial, sans paramètre (section~\ref{sec:brut-binomial}) \\
+\catalogue{fonctions-brut}{EXPOSITION\_INITIALE\_BRUT} & constante & --- & \code{"cellule"}~: définition de l'exposition initiale du binomial, sans paramètre, sous la forme \code{fenetres} (section~\ref{sec:brut-binomial}) \\
+\catalogue{fonctions-brut}{EXPOSITION\_INITIALE\_DECLAREE} & constante & --- & \code{"declaree"}~: exposition initiale reçue, sous la forme \code{cellules} (recette \code{agregats}) \\
 \catalogue{fonctions-brut}{TOLERANCE\_EFFECTIF} & constante & --- & $10^{-9}$~: tolérance absolue sur $|E^i - D|$ \\
 \catalogue{fonctions-brut}{ETATS\_BRUT} & constante & --- & états possibles d'une cellule, par estimateur (section~\ref{sec:brut-etats}) \\
 \catalogue{fonctions-brut}{DENOMINATEUR\_INSTANTS} & constante & --- & 133\,590 ($365 \times 366$), entier~: dénominateur commun des instants de \code{kaplan\_meier} \\
 \catalogue{fonctions-brut}{ENSEMBLE\_A\_RISQUE\_KM} & constante & --- & \code{"ferme"}~: convention d'ensemble à risque (section~\ref{sec:brut-kaplan-meier}) \\
 \catalogue{fonctions-brut}{HYPOTHESES\_BRUT} & constante & --- & textes des hypothèses, par estimateur et pour la probabilité, inscrits dans les paramètres et dans la fiche \\
+\catalogue{fonctions-brut}{CLAUSE\_TRONCATURE\_FENETRES} & constante & --- & clause de l'hypothèse de Poisson sur la troncature à gauche, traitée par la fenêtre d'observation \\
+\catalogue{fonctions-brut}{CLAUSE\_TRONCATURE\_CELLULES} & constante & --- & clause qui la remplace sous la forme \code{cellules}~: $E^c$ et $D$ reçus, troncature, censure et sorties concurrentes traitées par le producteur de l'agrégat \\
+\catalogue{fonctions-brut}{AJOUT\_BINOMIAL\_CELLULES} & constante & --- & phrase ajoutée à l'hypothèse du binomial sous la forme \code{cellules}~: $E^i$ reçue, déclarée de définition «~cellule~», non vérifiée par le moteur \\
+\catalogue{fonctions-brut}{hypothese\_brut()} & interne & estimateur, forme rendue au noyau & texte de l'hypothèse de l'estimateur~: celui de \code{HYPOTHESES\_BRUT} sous \code{fenetres}~; sous \code{cellules}, clause de troncature remplacée (Poisson) ou phrase ajoutée (binomial) \\
 \catalogue{fonctions-brut}{PORTEE\_PROBABILITE} & constante & --- & portée de la probabilité de Poisson selon la cellule (année d'âge, année civile, âge $\times$ année) \\
 \catalogue{fonctions-brut}{STATUTS\_BRUT} & constante & --- & statut, loi supposée et calcul de chaque grandeur (tableau~\ref{tab:statuts-brut}) \\
 \catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} seule (issues~\#22 et~\#82) \\
 \catalogue{fonctions-brut}{taux\_poisson()} & interne & $D$, $E^c$, niveau & taux, bornes exactes et asymptotiques, état (section~\ref{sec:brut-poisson}) \\
 \catalogue{fonctions-brut}{taux\_binomial()} & interne & $D$, $E^i$, niveau, tolérance & taux, bornes, état, cellules où $D = E^i > 0$ (section~\ref{sec:brut-binomial}) \\
 \catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & fenêtres transmises par l'étape \code{exposition} ou observations (appel direct), table d'exposition, segmentation, valeurs validées \code{p} (transition, période, délai), convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
-\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), valeurs validées \code{p} (transition, période, délai), paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat})~; ne contrôle ni la segmentation, ni les paramètres de l'étape, ni (pour \code{kaplan\_meier}) la transition, la période et le délai, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
+\catalogue{fonctions-brut}{exposition\_initiale\_brut()} & interne & table d'exposition (ou \code{NULL}), forme rendue au noyau & seule source de $E^i$ du binomial et de sa définition~: sous \code{fenetres}, $E^c$ plus \code{complement\_initial\_}\allowbreak\code{cellule} (\code{EXPOSITION\_INITIALE\_}\allowbreak\code{BRUT})~; sous \code{cellules}, colonne \code{exposition\_initiale} lue telle quelle (\code{EXPOSITION\_INITIALE\_}\allowbreak\code{DECLAREE}) \\
+\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau, recette validée (sa forme rendue au noyau fixe la source de $E^i$, les hypothèses et les colonnes requises)~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), valeurs validées \code{p} (transition, période, délai), paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat})~; ne contrôle ni la segmentation, ni les paramètres de l'étape, ni (pour \code{kaplan\_meier}) la transition, la période et le délai, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \end{longtable}
 }
 
@@ -7215,7 +7273,7 @@ fiche~; annotation du 07/11/2026, (c)). Elle est tenue pour une table
 finale au sens du visa (décision M287). \code{diagnostics}~: nombre de
 cellules et de cellules retenues, tableau des états, décès sans attendu,
 cellules, décès et exposition hors plage, total des décès de la table
-d'exposition. La fiche ne change pas (\code{VERSION\_FICHE} reste~5)~: les
+d'exposition. L'étape ne change pas la définition de la fiche~: les
 paramètres de l'étape sont dans \code{fiche\$plan}, et l'identité de la
 table dans \code{fiche\$tables\_reference}, une seule entrée quand les
 étapes \code{positionnement} et \code{validation} citent la même clé.
@@ -8462,7 +8520,7 @@ exacte avec son état, de Monte-Carlo avec son erreur, état)~;
 \code{diagnostics}~: cellules, cellules informatives, sans décès, non
 informatives et à événement sans exposition, décès de ces dernières,
 lignes, décès et exposition hors plage, total des décès. La fiche ne
-change pas (\code{VERSION\_FICHE} reste~5).\par}
+change pas la définition de la fiche.\par}
 
 \medskip
 \noindent
@@ -9309,7 +9367,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
 \catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p}, période, délai, recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82) \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p}, période, délai, recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes}) \\
 \catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
 }
@@ -9348,7 +9406,7 @@ identiques. Ses champs, dans cet ordre, en huit blocs~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{identification}~: \code{version\_fiche}
-    (\code{VERSION\_FICHE}, 5)~; \code{versions}
+    (\code{VERSION\_FICHE}, 6)~; \code{versions}
     (\code{tablexp}, lue dans la description du package installé, et
     \code{R.version.string})~; \code{plateforme}, dans l'ordre
     \code{sysname}, \code{release} et \code{machine} (système, version,
@@ -9380,8 +9438,16 @@ identiques. Ses champs, dans cet ordre, en huit blocs~:
     chacun)~; \code{nombre\_lignes\_exclues} (\code{integer}, nombre de
     lignes distinctes exclues, \code{0L} sans exclusion~; ci-dessous)~;
   \item \textbf{hypothèses}~: \code{avertissement\_unite}, s'il y a lieu
-    (message de l'avertissement \code{unite\_contrat})~;
-    \code{hypothese\_censure}~; \code{hypotheses\_brut}, \textbf{seulement
+    (message de l'avertissement \code{unite\_contrat}, ou, sous la recette
+    des agrégats, de l'avertissement d'unité non déterminée, texte
+    \code{UNITE\_AGREGAT})~;
+    \code{hypothese\_censure} (\code{HYPOTHESE\_CENSURE}, ou
+    \code{HYPOTHESE\_CENSURE\_DECLAREE} sous la recette des agrégats)~;
+    \code{hypotheses\_recette}, \textbf{seulement si l'étape
+    \code{exposition} en porte}, soit sous la recette des agrégats~:
+    hypothèses de la recette (\code{code}, \code{enonce}, \code{nature},
+    \code{statut}), formées par \code{hypotheses\_agregats()}~;
+    \code{hypotheses\_brut}, \textbf{seulement
     si l'étape \code{brut} est exécutée}~: copie des paramètres effectifs de
     l'étape \code{estimateurs}, \code{niveau}, \code{exposition\_initiale},
     \code{tolerance\_effectif}, \code{hypotheses} et \code{statuts}, plus
@@ -10832,7 +10898,8 @@ de la fiche (\code{ORDRE\_CHAMPS\_FICHE}, issue~\#64)~:
 \code{convention}, \code{unite\_exposition}, \code{par\_annee}~;
 \emph{hypothèses}~: \code{exclusions}, \code{nombre\_lignes\_exclues},
 \code{avertissement\_unite}, \code{hypothese\_censure},
-\code{hypotheses\_brut}, \code{avertissements}~; \emph{rejeu}~:
+\code{hypotheses\_recette}, \code{hypotheses\_brut},
+\code{avertissements}~; \emph{rejeu}~:
 \code{version\_fiche}, \code{versions}, \code{plateforme}, \code{roles},
 \code{provenance}, \code{provenance\_mention}, \code{empreintes},
 \code{tables\_reference}, \code{graine}, \code{graine\_mention},
@@ -11093,7 +11160,7 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{alea} & Graine et générateur & objet & \code{fiche/graine}, \code{fiche/graine\_mention}, \code{fiche/generateur} \\
 \code{donnees\_recues} & Rôles, provenance, recette et unité d'observation & objet & \code{fiche/roles}, \code{fiche/provenance}, \code{fiche/provenance\_mention}, \code{fiche/tables\_reference}, \code{fiche/recette}, \code{fiche/unite\_observation}, \code{fiche/avertissement\_unite} \\
 \code{plan} & Plan de construction (plan canonique), transition et fin effective de la période & objet & \code{fiche/plan}, \code{fiche/transition\_code}, \code{fiche/fin\_effective} \\
-\code{fiche\_hypotheses} & Paramètres retenus et hypothèses consignés dans la fiche & objet & \code{fiche/convention}, \code{fiche/unite\_exposition}, \code{fiche/par\_annee}, \code{fiche/exclusions}, \code{fiche/nombre\_lignes\_exclues}, \code{fiche/hypothese\_censure}, \code{fiche/hypotheses\_brut}, \code{fiche/avertissements} \\
+\code{fiche\_hypotheses} & Paramètres retenus et hypothèses consignés dans la fiche & objet & \code{fiche/convention}, \code{fiche/unite\_exposition}, \code{fiche/par\_annee}, \code{fiche/exclusions}, \code{fiche/nombre\_lignes\_exclues}, \code{fiche/hypothese\_censure}, \code{fiche/hypotheses\_recette}, \code{fiche/hypotheses\_brut}, \code{fiche/avertissements} \\
 \code{etape\_donnees} & Étape donnees~: exclusions, unité d'observation et relevés & etape & étape \code{donnees}~: \code{etapes/donnees}, sous-arbre entier \\
 \code{etape\_exposition} & Étape exposition~: convention d'âge, exposition et événements par cellule & etape & étape \code{exposition}~: \code{etapes/exposition} \\
 \code{etape\_brut} & Étape brut~: taux bruts et intervalles & etape & étape \code{brut}~: \code{etapes/brut}~; note sur la colonne \code{taux} en tête, légendes après le tableau des statuts (ci-dessous) \\
@@ -11233,7 +11300,7 @@ q\textasciitilde{}~; l'outil multiplie la force de mortalité et prend les
 attendus sur l'exposition centrale, comme l'étape validation. Les deux
 tables diffèrent d'autant plus que q\textasciitilde{}\_x est grand.~»~;
 puis, sous la même condition que pour l'étape validation, la mention
-d'unité contrat. La section \emph{étape homogeneite}, quand l'étape est au
+d'unité. La section \emph{étape homogeneite}, quand l'étape est au
 plan, fait précéder ses tables de la mention fixe «~Test d'homogénéité
 entre segments~: hypothèse nulle, dans chaque cellule de la plage (âge, et
 année civile si par\_annee), un taux commun à tous les segments, sur
@@ -11244,7 +11311,7 @@ conditionnellement à l'autre). Diagnostic sans verdict ni seuil~: un test
 non significatif n'établit pas l'homogénéité, surtout sur une base
 modeste~; la décision de regrouper reste à l'utilisateur et se déclare par
 la segmentation du plan. Aucune correction de multiplicité.~», puis de la
-mention d'unité contrat sous la même condition (issue~\#168~; texte de la
+mention d'unité sous la même condition (issue~\#168~; texte de la
 spécification, §~6, visé par \code{actuary}~; aucune mention «~les
 p-valeurs ne se combinent pas~», décision M302). La section \emph{étape validation},
 quand l'étape est au plan, porte un titre qui suit la relation déclarée
@@ -11290,8 +11357,13 @@ de chaque segment (mention \code{validation\_h0\_positionnee})~; sous
 des signes, des suites et de Wilcoxon reposent sur une hypothèse qui n'est
 pas H0 (i) (colonne statut)~; seules les p-valeurs de Monte-Carlo ont un
 niveau garanti sous H0 (i).~»~; si \code{fiche/avertissement\_unite} est
-présent (unité contrat sans identifiant de tête), la sur-dispersion
-$\varphi \ge 1$ qui rend les tests anti-conservateurs~; si l'appariement est
+présent, la mention d'unité (\code{mention\_unite()})~: sous l'unité
+contrat sans identifiant de tête, la sur-dispersion
+$\varphi \ge 1$ qui rend les tests anti-conservateurs (mention
+\code{validation\_unite\_contrat})~; sous l'unité non déterminée des
+agrégats, la même sur-dispersion, d'un facteur au plus $\varphi$, si les
+effectifs comptent des contrats (mention
+\code{validation\_unite\_non\_determinee})~; si l'appariement est
 \code{ensemble\_par\_sexe}, la table \code{ensemble} appliquée à chaque
 sexe~; sous \code{independante} et \code{positionnee}, l'absence de correction de
 multiplicité, puis la formule des p-valeurs de Monte-Carlo, le chemin du
@@ -11311,8 +11383,8 @@ poids des lignes exclues par les règles d'exclusion déclarées (volumes,
 événements, exposition, SMR) et permettent d'apprécier l'importance des
 exclusions. Elles ne disent ni si les données exclues sont pertinentes, ni
 si leur exclusion est justifiée.~»~; puis, si
-\code{fiche/avertissement\_unite} est présent, sur la même mention de
-sur-dispersion que la section \emph{étape validation} (décision M265)~;
+\code{fiche/avertissement\_unite} est présent, sur la même mention
+d'unité que la section \emph{étape validation} (décision M265)~;
 puis viennent les tables de l'étape. La mention ne cite aucun texte~; elle
 nomme les deux notions, pertinence et justification, que la décision M69
 laisse à l'entreprise et au certificateur, et dit «~mesurent~» et
@@ -11688,7 +11760,7 @@ les deux locales.\par}
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (5) \\
+\catalogue{fonctions-rapport}{VERSION\_FICHE} & constante & --- & version de la fiche (6) \\
 \catalogue{fonctions-rapport}{VERSIONS\_FICHE\_REJEU} & constante & --- & versions de fiche admises au rejeu outillé~: \code{VERSION\_FICHE}, la version courante seule (section~\ref{sec:rejeu}) \\
 \catalogue{fonctions-rapport}{ENTETE\_CANONIQUE} & constante & --- & \code{"tablexp canonique 2"}, première ligne du texte empreinté et \code{fiche\$empreintes\$}\allowbreak\code{representation} (version de la représentation canonique) \\
 \catalogue{fonctions-rapport}{ALGORITHME\_EMPREINTE} & constante & --- & \code{"md5"} \\
@@ -11762,6 +11834,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{controler\_rapport()} & interne & objet & les quatre contrôles avant l'écriture et leurs refus nommés (tableau~\ref{tab:refus-rapport})~; champs de la fiche lus par \code{lire\_champ()}, si bien qu'une classe ou un nom d'encodage \code{bytes} donne \code{objet\_modifie} au lieu d'une erreur R (issue~\#128) \\
 \catalogue{fonctions-rapport}{table\_colonnes()} & interne & \code{data.frame}, chemin & table de colonnes HTML~: légende, en-tête (nom, type), une ligne par ligne de l'objet \\
 \catalogue{fonctions-rapport}{lignes\_racines()} & interne & objet, racines, insertions & tables de lignes et de colonnes des racines, dans l'ordre de l'objet~; structure seule pour \code{CHEMINS\_STRUCTURE\_SEULE}~; «~absent de l'objet~»~; valeur de classe d'encodage \code{bytes} passée à l'écrivain, qui la refuse (\code{type\_non\_canonique}~; issue~\#128) \\
+\catalogue{fonctions-rapport}{mention\_unite()} & interne & objet & mention d'unité des sections des étapes \code{positionnement}, \code{homogeneite}, \code{validation} et \code{importance\_exclusions}, si \code{fiche/avertissement\_unite} est une chaîne unique non manquante~: \code{validation\_unite\_contrat} sous l'unité d'observation \code{contrat}, \code{validation\_unite\_}\allowbreak\code{non\_determinee} sous \code{non\_determinee}~; rien sinon \\
 \catalogue{fonctions-rapport}{paragraphe()} & interne & textes & paragraphe HTML, texte échappé \\
 \catalogue{fonctions-rapport}{element\_liste()} & interne & textes & élément de liste HTML, texte échappé \\
 \catalogue{fonctions-rapport}{corps\_section()} & interne & objet, rang de la section & corps HTML d'une section de \code{SECTIONS\_RAPPORT}~; erreur de programmation pour une section sans rendu, une relation de l'étape \code{validation} ou une méthode de positionnement sans mentions \\
