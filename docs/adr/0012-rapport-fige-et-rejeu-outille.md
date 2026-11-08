@@ -370,3 +370,20 @@ Rédigée par `architect` à l'étape (A) de la branche `claude/positionnement-s
 **Effet sur les résultats : aucun** par la présente annotation ; effets des commits cités : HTML seulement, visé par `actuary` ; aucun `.tsv`, aucune table finale, aucun verdict.
 
 Issues : #82, #164, #167, #168. Décisions M281, M291, M292, M302. ADR 0007 et 0015 (annotations du même jour). Branche `claude/positionnement-smr`, PR #173.
+
+## Annotation du 8 novembre 2026 — point 2.6 et annotation du 07/11/2026, (b) 3 : première phrase de `validation_sans_verdict` sous `independante` et `ajustee_hors_outil` quand l'étape `positionnement` est au plan (#167, M312)
+
+Rédigée par `architect` à l'étape (6) de la branche `claude/positionnement-smr` (B14, PR #173), à `2b7dccf`, d'après le message de `4c52459` et la décision M312 du mainteneur (`docs/feuille-de-route.md`, § 4), texte d'`actuary`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne à `2b7dccf` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Constat.** L'annotation du 07/11/2026, (b) 3, rend la première phrase de `validation_sans_verdict` (« Aucune table positionnée n'est produite : la table de référence est prise telle quelle. ») hors de la relation `positionnee`. Le plan admet l'étape `positionnement` avec une validation sous `independante` ou `ajustee_hors_outil` : la phrase y était **fausse**, puisqu'une table positionnée est produite, mais pas validée par l'étape (constat de `/code-review` à la revue finale, confirmé par `actuary`).
+
+**(b) Règle (`4c52459`).** La première phrase de la section `etape_validation` se choisit par la relation, puis, hors `positionnee`, par la présence de l'étape `positionnement` dans `names(etapes)` de l'objet (`R/rapport.R:2226-2227`) :
+- `positionnee` : phrase omise (inchangé) ;
+- `independante` ou `ajustee_hors_outil`, `positionnement` au plan : mention **`validation_sans_verdict_table_positionnement`** (`R/rapport.R:1772-1775`), texte d'`actuary` acté par le mainteneur : la validation porte sur la table de référence citée par l'étape `validation`, prise telle quelle, et la table positionnée de la construction n'est pas validée par cette étape (relation `positionnee` pour la valider) ;
+- `independante` ou `ajustee_hors_outil`, sans `positionnement` : `validation_sans_verdict_table`, texte inchangé.
+
+La règle reste celle du point 2.6 : la mention est lue dans l'objet, aucune liste figée du rendu seul, aucun calcul. **La combinaison reste admise** : aucun refus nouveau dans `valider_plan()` (M312). Test : `tests/unitaires/test_validation_positionnee.R`, section H (l. 548 et suivantes).
+
+**(c) Effet sur les résultats.** HTML du rapport figé des seules constructions qui combinent `positionnement` et une validation hors `positionnee` ; **aucun des plans R1 à R12** (R10, seul plan à `positionnement`, est sous `positionnee` : annotation du 08/11/2026 de l'ADR 0009, (a)). Rapports R1 à R12 : empreinte du code seule changée (message de `4c52459`, octets comparés par `coder` et `audit`, *non remesuré ici*). Aucun `.tsv`, aucune table finale, aucun verdict ; visa d'`actuary` sur le texte.
+
+Issues : #167. Décision M312. Branche `claude/positionnement-smr`, PR #173.
