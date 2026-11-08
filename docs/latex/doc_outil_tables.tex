@@ -1859,13 +1859,16 @@ entrée (champ \code{entree}~; ADR 0009, point 4.1 amendé, annotation du
 07/11/2026, points~(d) et~(e))~: \code{reference}, le jeu ci-dessus, pour
 tous les plans sauf R9~; \code{reference\_defauts} pour R9, le même jeu
 altéré après son tirage complet par \code{simuler\_portefeuille(defauts =)}
-(section~\ref{sec:defauts-parametres}) sous la graine des défauts 20261108,
-distincte de celle du jeu et des graines de Monte-Carlo~: 500~lignes pour
-chacun des motifs \code{id\_contrat\_manquant}, \code{sexe\_manquant} et
-\code{entree\_manquante}, ensembles disjoints, toutes causes de sortie
-admises (empreinte des données \code{f21fed51\ldots}). Les lignes que les
-défauts n'altèrent pas sont celles de \code{reference}~; un test le
-vérifie, avec la graine, les motifs et leurs effectifs.
+(section~\ref{sec:defauts-parametres}) sous la graine des défauts 20261108
+(constante \code{GRAINE\_DEFAUTS\_R9}), distincte de celle du jeu et des
+graines de Monte-Carlo~: 500~lignes (constante \code{NOMBRE\_PAR\_MOTIF\_R9})
+pour chacun des motifs \code{id\_contrat\_manquant}, \code{sexe\_manquant}
+et \code{entree\_manquante} (constante \code{MOTIFS\_DEFAUTS\_R9}), toutes
+causes de sortie admises (\code{tests/reference/outils\_reference.R},
+constantes l.~317 à~319, déclarations des défauts l.~336 et~337). Les lignes
+que les défauts n'altèrent pas sont celles de \code{reference}~; un test le
+vérifie, avec la graine, les motifs, leurs effectifs et l'absence de ligne
+portant deux motifs.
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -1923,9 +1926,8 @@ l'outillage, par la loi de Gompertz-Makeham de l'entrée de référence pour
 les hommes et 0,6~fois ce taux non arrondi pour les femmes, puis arrondies
 à cinq chiffres significatifs~; elles ne se recalculent pas et ne dépendent
 pas des observations. Sur l'entrée de référence, les deux exclusions de R8
-ne touchent aucune ligne (0~ligne exclue, 100\,000~lignes conservées,
-\emph{mesuré})~: ses retraits sont nuls et le SMR de ses deux comparateurs
-est dans l'état \code{aucun\_attendu}. Le retrait effectif est l'objet de
+ne touchent aucune ligne (le libellé du plan le dit)~: R8 fige la forme des
+sorties des deux étapes, sans retrait effectif. Le retrait effectif est l'objet de
 R9~: même plan, exclusion \code{id\_contrat\_manquant} en plus (une ligne
 sans identifiant de contrat serait sinon refusée, \code{ligne\_invalide}),
 sur l'entrée \code{reference\_defauts} décrite ci-dessus. Les trois motifs y
@@ -1935,12 +1937,12 @@ représentent chacun une classe de mesurabilité de l'étape
 \code{sexe\_manquant}, mesurable au niveau A et à l'état
 \code{cle\_segmentation\_manquante} au niveau B sous la segmentation
 \code{sexe}~; \code{entree\_manquante}, à l'état
-\code{aucune\_ligne\_mesurable}. \emph{Mesuré} sur R9~: 500~lignes exclues
-par motif, 1\,500 au total, 98\,500~conservées~; 21~événements retirés par
-\code{id\_contrat\_manquant} (niveaux A et B) et 21 par
-\code{sexe\_manquant} (niveau A), soit 42 au niveau A et 21 au niveau B.
-\code{tests/test\_reproductibilite.R} vérifie sur l'objet de R9 ces
-effectifs par motif, la classe de mesurabilité de chaque motif, des retraits
+\code{aucune\_ligne\_mesurable}. R9 retire donc des événements et de
+l'exposition aux niveaux A et B pour \code{id\_contrat\_manquant}, au
+niveau A seulement pour \code{sexe\_manquant}.
+\code{tests/test\_reproductibilite.R} vérifie sur l'objet de R9 que chaque
+motif exclut \code{NOMBRE\_PAR\_MOTIF\_R9} lignes et que le nombre de lignes
+exclues est leur somme, la classe de mesurabilité de chaque motif, des retraits
 non nuls aux deux niveaux et un SMR du comparateur~1 défini, fini et
 positif, d'intervalle exact non dégénéré, aux deux niveaux~: ces contrôles
 échoueraient sur une entrée sans défaut, que R8 passerait à vide.
@@ -2336,12 +2338,7 @@ point~(c)).
   \item R6 comprend une cellule définie à $\hat q_x = 1$ avec un seul exposé
     à risque~: la référence fige ce cas d'instabilité de l'estimateur
     produit-limite sous troncature (section~\ref{sec:brut-kaplan-meier}),
-    qui n'est pas une anomalie. R7 n'a aucune cellule à $\hat q_x = 1$~;
-    ses deux cellules de 20~ans (une par sexe), exposées mais sans
-    événement, sont dans l'état \code{ensemble\_a\_risque\_vide} (taux,
-    variance et bornes \code{NA}, sans avertissement, puisqu'elles ne
-    portent aucun événement~; section~\ref{sec:brut-etats}), et la
-    référence les fige telles quelles.
+    qui n'est pas une anomalie.
   \item Absence de bruit numérique sur la plateforme de référence~:
     \emph{constat} sur cinq exécutions de la CI sur la plateforme de
     référence, sur trois modèles de processeur (AMD EPYC 7763, 9V74 et 9V45,
