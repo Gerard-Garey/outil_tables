@@ -112,7 +112,9 @@ RELAIS <- list(
   list(fichier = "simulation.R", haut = "controler_defauts", nom = "invalide", parametre = "msg",
        modele = function(msg, details) NULL),
   list(fichier = "simulation.R", haut = "controler_defauts", nom = "inv", parametre = "msg",
-       modele = function(msg) NULL)
+       modele = function(msg) NULL),
+  list(fichier = "simulation.R", haut = "controler_forme", nom = "invalide", parametre = "msg",
+       modele = function(msg, details) NULL)
 )
 
 # Aides de message : (fichier, nom) d'une fonction, de premier niveau ou

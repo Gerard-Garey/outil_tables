@@ -17,7 +17,13 @@
 #    cours -> racheté), troncature à gauche (entrée après la naissance,
 #    éventuellement avant le début de la période), censure par la fin de la
 #    période ; loi vraie, paramètres, graine et générateur consignés dans
-#    l'attribut `simulation`.
+#    l'attribut `simulation` ;
+#  - controler_forme(), projeter_agregats() : forme « agrégats » (#169 ; ADR
+#    0003, point 9, et ADR 0007, point 3.2, annotations du 08/11/2026 ;
+#    spécification (0') de #169, § 11) : argument `forme`, contrôlé avant tout
+#    tirage, puis projection du jeu propre en cellules (sexe, âge au dernier
+#    anniversaire [, année]), sans tirage supplémentaire ni appel à
+#    `exposition`.
 #
 #  Hypothèse de répartition dans l'année (A.2) : force constante par âge
 #  entier, dans l'échelle des années d'âge (A.0, T3 : une année d'âge de
@@ -847,6 +853,156 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
   resultat
 }
 
+# --- formes du simulateur (#169, commit (3c)) -------------------------------------
+
+# Formes admises de l'argument `forme` (ADR 0007, annotation du 08/11/2026,
+# (b) ; avis (0''), G11) : nom -> champs, tous requis, aucun défaut implicite.
+# Conventions d'âge des agrégats mises en œuvre (spécification (0') de #169,
+# § 11) : `dernier_anniversaire` seule ; `age_atteint_annee` est un refus
+# nommé (renvoyé à I-1), toute autre valeur une forme invalide.
+CHAMPS_FORMES <- list(agregats = c("nom", "transition", "convention", "par_annee"))
+CONVENTIONS_FORMES <- list(agregats = "dernier_anniversaire")
+
+# Contrôle de l'argument `forme` (non NULL), avant tout tirage ; refus
+# forme_invalide, module simulation. `mode` : mode validé du portefeuille ;
+# `avec_defauts` : TRUE si l'argument `defauts` est déclaré. Refus nommés
+# (spécification (0') de #169, § 11) : forme avec défauts (défauts propres aux
+# formes renvoyés à #189 et #191) ; modes multi-contrats (unité d'un agrégat
+# ambiguë : têtes ou contrats) ; convention `age_atteint_annee`. Rend
+# list(nom, transition = list(depart, arrivee), cause, convention, par_annee),
+# cause : cause de sortie du jeu propre comptée comme événement (nom de
+# CAUSES_SIMULEES), les autres sorties étant des censures.
+controler_forme <- function(forme, mode, avec_defauts) {
+  invalide <- function(msg, details = list())
+    refuser("simulation", "forme_invalide", formuler("Forme du jeu simulé : %s", msg), details)
+  if (!forme_exacte(forme, "list", "names"))
+    invalide(formuler(paste("liste nue attendue, list(nom = \"agregats\", transition, convention, par_annee)",
+                            "(ni data.frame, ni classe, aucun attribut autre que les noms).")),
+             list(parametre = "forme"))
+  nom <- forme[["nom"]]
+  if (!chaine_unique(nom) || !(nom %in% names(CHAMPS_FORMES)))
+    invalide(formuler("champ nom : une chaîne prise dans %s.", liste_guillemets(names(CHAMPS_FORMES))),
+             list(parametre = "forme$nom"))
+  e <- ecart_noms(forme, CHAMPS_FORMES[[nom]], CHAMPS_FORMES[[nom]])
+  if (nzchar(e)) invalide(formuler("forme « %s » : %s.", citer(nom), e), list(parametre = "forme"))
+  if (avec_defauts)
+    invalide(formuler(paste("forme « %s » avec l'argument defauts : les défauts paramétrés ne sont injectés que",
+                            "dans les lignes individuelles (forme = NULL)."), citer(nom)),
+             list(parametre = "forme", forme = nom))
+  if (mode != MODE_BASE[[mode]])
+    invalide(formuler(paste("forme « %s » sous le mode multi-contrats « %s » : l'unité d'un agrégat (têtes ou",
+                            "contrats) serait ambiguë ; modes admis : %s."),
+                      citer(nom), citer(mode), liste_guillemets(unique(MODE_BASE))),
+             list(parametre = "forme", forme = nom, mode = mode))
+  tr <- forme[["transition"]]
+  code <- if (liste_aux_noms(tr, c("depart", "arrivee")) && chaine_unique(tr[["depart"]]) &&
+              chaine_unique(tr[["arrivee"]])) paste(tr[["depart"]], "->", tr[["arrivee"]]) else NA_character_
+  if (is.na(code) || !(code %in% CAUSES_SIMULEES))
+    invalide(formuler("transition : liste nue (depart, arrivee) de deux chaînes, transition prise dans %s.",
+                      liste_guillemets(unname(CAUSES_SIMULEES))),
+             list(parametre = "forme$transition"))
+  cv <- forme[["convention"]]
+  if (identical(cv, "age_atteint_annee"))
+    invalide(formuler(paste("convention « age_atteint_annee » non mise en œuvre pour la forme « %s » ;",
+                            "convention admise : %s."), citer(nom), liste_guillemets(CONVENTIONS_FORMES[[nom]])),
+             list(parametre = "forme$convention", convention = cv))
+  if (!chaine_unique(cv) || !(cv %in% CONVENTIONS_FORMES[[nom]]))
+    invalide(formuler("convention : une chaîne prise dans %s.", liste_guillemets(CONVENTIONS_FORMES[[nom]])),
+             list(parametre = "forme$convention"))
+  pa <- forme[["par_annee"]]
+  if (!forme_exacte(pa, "logical") || length(pa) != 1L || is.na(pa))
+    invalide(formuler("par_annee : TRUE ou FALSE (logique unique, sans attribut)."),
+             list(parametre = "forme$par_annee"))
+  list(nom = nom, transition = list(depart = tr[["depart"]], arrivee = tr[["arrivee"]]),
+       cause = names(CAUSES_SIMULEES)[match(code, CAUSES_SIMULEES)], convention = cv, par_annee = pa)
+}
+
+# Projection du jeu propre `jeu` (lignes individuelles d'un mode à une tête
+# par contrat) en agrégats par cellule (sexe, âge au dernier anniversaire
+# [, année civile]) ; spécification (0') de #169, § 11. Par l'arithmétique de
+# dates du simulateur (jours_civils(), jour_anniversaire(),
+# age_anniversaire()), sans appel au module `exposition` (ADR 0003, point 9 ;
+# ADR 0007, options écartées ; graphe_modules.R) ; aucun tirage. Fenêtre de
+# chaque ligne [a, b), a = max(entrée, D), b = min(sortie, B), B = fin + 1
+# (sortie = Inf en cours) ; une année d'âge [anniv(x), anniv(x + 1)) de L_x
+# jours vaut 1 (A.0, T3). Événement : sortie de cause `cause` avec D <= sortie
+# < B, compté dans la cellule du jour de sortie ; les autres sorties sont des
+# censures. exposition_centrale : somme, sur les morceaux de fenêtre de la
+# cellule, de (fin - début) / L_x ; exposition_initiale (sans par_annee) :
+# exposition_centrale plus, pour chaque événement, (anniv(x + 1) - sortie) /
+# L_x, complément jusqu'à la fin de la cellule, aucun pour une censure. Sous
+# par_annee, les morceaux sont coupés au 1er janvier, l'événement va à l'année
+# civile de sa sortie. Lignes : par sexe (ordre des octets), plage contiguë
+# des âges des cellules qui portent un morceau de fenêtre, un événement ou une
+# autre sortie dans [D, B) ; sous par_annee, toutes les années civiles de
+# [D, B - 1] pour chaque âge ; zéros explicites. Rend le data.frame (sexe,
+# age, [annee], exposition_centrale, [exposition_initiale], evenements),
+# colonnes aux noms des rôles, age, annee et evenements en integer.
+projeter_agregats <- function(jeu, cause, par_annee, debut, borne) {
+  an_de <- function(j) composantes_distinctes(j)$an
+  nai <- as.numeric(jeu$date_naissance)
+  entree <- as.numeric(jeu$date_entree)
+  sortie <- as.numeric(jeu$date_sortie); sortie[is.na(sortie)] <- Inf
+  cn <- composantes_distinctes(nai)
+  sous <- function(i) lapply(cn, `[`, i)
+  a <- pmax(entree, debut); b <- pmin(sortie, borne)
+  # Morceaux de fenêtre, un par âge parcouru.
+  ex <- which(a < b)
+  x_a <- age_anniversaire(sous(ex), an_de(a[ex]), a[ex])
+  x_b <- age_anniversaire(sous(ex), an_de(b[ex] - 1), b[ex] - 1)
+  k <- x_b - x_a + 1L
+  rang <- rep.int(seq_along(ex), k)
+  obs <- ex[rang]
+  x <- x_a[rang] + (seq_along(rang) - rep.int(cumsum(k) - k, k)) - 1L
+  cm <- sous(obs)
+  bas <- jour_anniversaire(cm, x); haut <- jour_anniversaire(cm, x + 1L)
+  m_deb <- pmax(a[obs], bas); m_fin <- pmin(b[obs], haut); longueur <- haut - bas
+  if (par_annee) {
+    y0 <- an_de(m_deb); k2 <- an_de(m_fin - 1) - y0 + 1L
+    r2 <- rep.int(seq_along(m_deb), k2)
+    y <- y0[r2] + (seq_along(r2) - rep.int(cumsum(k2) - k2, k2)) - 1L
+    obs <- obs[r2]; x <- x[r2]; longueur <- longueur[r2]
+    m_deb <- pmax(m_deb[r2], jours_civils(y, 1L, 1L)); m_fin <- pmin(m_fin[r2], jours_civils(y + 1L, 1L, 1L))
+  }
+  # Sorties dans [D, B) : événements (cause comptée) et censures.
+  dans <- is.finite(sortie) & sortie >= debut & sortie < borne
+  ev <- which(dans & jeu$cause_sortie == cause)
+  au <- which(dans & jeu$cause_sortie != cause)
+  ce <- sous(ev)
+  x_e <- age_anniversaire(ce, an_de(sortie[ev]), sortie[ev])
+  bas_e <- jour_anniversaire(ce, x_e); haut_e <- jour_anniversaire(ce, x_e + 1L)
+  x_c <- age_anniversaire(sous(au), an_de(sortie[au]), sortie[au])
+
+  # Cellules : par sexe, plage contiguë des âges présents ; années de [D, B - 1].
+  sexes <- sort(unique(jeu$sexe), method = "radix")
+  s_m <- jeu$sexe[obs]; s_e <- jeu$sexe[ev]; s_c <- jeu$sexe[au]
+  annees <- if (par_annee) seq.int(an_de(debut), an_de(borne - 1)) else NA_integer_
+  plages <- lapply(sexes, function(s) {
+    xs <- c(x[s_m == s], x_e[s_e == s], x_c[s_c == s])
+    if (length(xs)) seq.int(min(xs), max(xs)) else integer(0)
+  })
+  n_age <- lengths(plages); n_an <- length(annees)
+  cellules <- data.frame(sexe = rep(sexes, n_age * n_an),
+                         age = as.integer(rep(unlist(plages), each = n_an)), stringsAsFactors = FALSE)
+  if (par_annee) cellules$annee <- as.integer(rep(annees, length.out = nrow(cellules)))
+  cle <- function(s, xx, yy) if (par_annee) paste(s, xx, yy) else paste(s, xx)
+  cles <- if (par_annee) cle(cellules$sexe, cellules$age, cellules$annee) else cle(cellules$sexe, cellules$age)
+  somme <- function(i, v) {
+    r <- numeric(nrow(cellules))
+    if (length(i)) { s <- rowsum(as.numeric(v), i, reorder = TRUE); r[sort(unique(i))] <- s[, 1L] }
+    r
+  }
+  i_m <- match(if (par_annee) cle(s_m, x, y) else cle(s_m, x), cles)
+  i_e <- match(if (par_annee) cle(s_e, x_e, an_de(sortie[ev])) else cle(s_e, x_e), cles)
+  if (anyNA(i_m) || anyNA(i_e))
+    stop("projeter_agregats() : morceau ou événement hors des cellules (erreur de programmation).", call. = FALSE)
+  cellules$exposition_centrale <- somme(i_m, (m_fin - m_deb) / longueur)
+  if (!par_annee)
+    cellules$exposition_initiale <- cellules$exposition_centrale + somme(i_e, (haut_e - sortie[ev]) / (haut_e - bas_e))
+  cellules$evenements <- tabulate(i_e, nbins = nrow(cellules))
+  cellules
+}
+
 # --- point d'entrée ---------------------------------------------------------------
 
 # Simule un portefeuille de n têtes : une tête par contrat (modes `uniforme`
@@ -880,13 +1036,23 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
 #                  ADR 0007, annotation du 25/10/2026, (b)) ; ou list(graine,
 #                  declarations) (controler_defauts()) : défauts paramétrés
 #                  injectés après le tirage complet du jeu propre
-#                  (injecter_defauts()).
+#                  (injecter_defauts()) ;
+#   forme        : NULL (défaut de l'argument) : lignes individuelles (ce
+#                  n'est pas une valeur choisie à la place de l'appelant ;
+#                  ADR 0007, annotation du 08/11/2026, (b)) ; ou list(nom =
+#                  "agregats", transition = list(depart, arrivee), convention
+#                  = "dernier_anniversaire", par_annee) (controler_forme(),
+#                  avant tout tirage) : projection du jeu propre en agrégats
+#                  (projeter_agregats()), même loi, même portefeuille, même
+#                  graine, aucun tirage supplémentaire (#169).
 # Rend un data.frame (id_contrat, id_tete, sexe, date_naissance, date_entree,
 # date_sortie, cause_sortie) avec l'attribut `simulation` (et `defauts` si des
 # défauts sont déclarés). Toutes les lignes sont gardées, y compris celles
 # sorties avant le début de la période ; seuls manquent les contrats non
-# souscrits (modes multi-contrats), décomptés dans l'attribut.
-simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = NULL) {
+# souscrits (modes multi-contrats), décomptés dans l'attribut. Avec `forme`,
+# le data.frame de la forme (projeter_agregats()), d'attribut `simulation`
+# celui du jeu propre plus un champ `forme` ajouté en fin (forme validée).
+simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = NULL, forme = NULL) {
   if (!liste_aux_noms(loi, names(CAUSES_SIMULEES)))
     refuser("simulation", "loi_invalide",
             formuler("La loi vraie doit être une liste nommée %s.", liste_guillemets(names(CAUSES_SIMULEES))),
@@ -900,6 +1066,9 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
     loi_effective(loi[[cause]], cause, sexes)))
   controler_couverture(effective, ctl$age_bas, ctl$age_haut, sexes)
   debut <- as.numeric(periode$debut); fin <- as.numeric(periode$fin); borne <- fin + 1
+  # Forme : contrôlée avant tout tirage et avant les défauts (refus
+  # forme_invalide ; une forme avec défauts est refusée quels qu'ils soient).
+  if (!is.null(forme)) ctl_forme <- controler_forme(forme, ctl$mode, !is.null(defauts))
   # Défauts : contrôlés avant tout tirage (refus defauts_invalides).
   if (!is.null(defauts)) {
     graine_jeu <- if (missing(graine)) NULL else graine
@@ -1051,5 +1220,13 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
   # Défauts paramétrés (#93) : après le tirage complet du jeu propre, sous
   # leur propre graine ; jeu propre inchangé si defauts = NULL.
   if (!is.null(defauts)) resultat <- injecter_defauts(resultat, ctl_defauts, defauts, periode)
+  # Forme (#169) : projection du jeu propre, attribut `simulation` du jeu
+  # propre plus le champ `forme` en fin (ajout compatible).
+  if (!is.null(forme)) {
+    sim <- attr(resultat, "simulation")
+    resultat <- projeter_agregats(resultat, ctl_forme$cause, ctl_forme$par_annee, debut, borne)
+    sim$forme <- ctl_forme[c("nom", "transition", "convention", "par_annee")]
+    attr(resultat, "simulation") <- sim
+  }
   resultat
 }

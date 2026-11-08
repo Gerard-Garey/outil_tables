@@ -1,8 +1,8 @@
 # -----------------------------------------------------------------------------
 #  tests/unitaires/test_agregats.R : recette d'exposition « agrégats » (issue
-#  #169, commit (3b) ; spécification d'actuary-approfondi acceptée, M327 ;
-#  ADR 0016, points 4.3, 4.5, 5, 6 et 8 ; messages visés par actuary, avis du
-#  08/11/2026 sur #169)
+#  #169, commits (3b) et (3c), forme « agrégats » du simulateur ; spécification
+#  d'actuary-approfondi acceptée, M327 ; ADR 0016, points 4.3, 4.5, 5, 6 et
+#  8 ; messages visés par actuary, avis du 08/11/2026 sur #169)
 #
 #  Natures des attendus (ADR 0007, point 11.4), nommées dans chaque test :
 #  - identité exacte : agrégats formés depuis la table d'exposition d'une
@@ -11,9 +11,12 @@
 #  - valeur écrite à la main : motifs levés seuls (C3), relevés (C4), refus,
 #    motifs et messages (C2, C7, C8), champs de la fiche (C9) ;
 #  - contre-exemple écrit à la main : deux jeux de lignes aux mêmes agrégats,
-#    Kaplan-Meier 0,5 et 1 (C8, spécification, § 4.3).
-#  Graine du jeu simulé inférieure à 1000 (exemptée, tests/controles/graines.R,
-#  règle A5) ; aucune graine nouvelle.
+#    Kaplan-Meier 0,5 et 1 (C8, spécification, § 4.3) ;
+#  - simulateur (C10, C11) : identité exacte du jeu propre et des appels
+#    répétés, refus écrits à la main ; recoupement simulateur <-> exposition,
+#    approximation numérique à tolérance relative 1e-10.
+#  Graines inférieures à 1000 (exemptées, tests/controles/graines.R, règle
+#  A5) ; aucune graine de 1000 ou plus.
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -55,7 +58,10 @@ T_HF <- table_reference(rbind(data.frame(age = GM$age, sexe = "H", qx = GM$qx),
 POS <- list(positionnement = list(methode = "smr", table_reference = "tv", plage_ages = c(20, 90), niveau = 0.95))
 VAL <- list(validation = list(table_reference = "tv", relation_table = "independante", plage_ages = c(20, 90),
                               tranches_age = c(20, 50, 70), niveau = 0.95, replications = 199))
-PLAN_C1 <- plan_ag(c(BRUT, POS, VAL), graine = 169L)
+# Étape homogeneite ajoutée à C1 (recommandation d'actuary, commit (3c)) : la
+# matrice l'admet sous exposition_centrale (#169, § 4 et § 7).
+HOM <- list(homogeneite = list(plage_ages = c(20, 90), tranches_age = c(20, 50, 70), replications = 199))
+PLAN_C1 <- plan_ag(c(BRUT, POS, HOM, VAL), graine = 169L)
 XL <- construire_table(JEU, ROLES, PLAN_C1, tables_reference = list(tv = T_HF))
 EL <- XL$etapes$exposition$resultat$exposition
 AGG <- data.frame(sexe = EL$sexe, age = EL$age, ec = EL$exposition_centrale,
@@ -64,9 +70,11 @@ AGG <- data.frame(sexe = EL$sexe, age = EL$age, ec = EL$exposition_centrale,
 R_AG <- c(sexe = "sexe", age = "age", exposition_centrale = "ec", exposition_initiale = "ei", evenements = "d")
 XA <- construire_table(AGG, R_AG, PLAN_C1, tables_reference = list(tv = T_HF))
 
-verifier("C1 (identité exacte) : agrégats formés depuis la table d'exposition des lignes (E^c, E^c + complément, D, zéros compris) -> tables poisson et binomial, positionnement et validation identical() à la construction en lignes", {
+verifier("C1 (identité exacte) : agrégats formés depuis la table d'exposition des lignes (E^c, E^c + complément, D, zéros compris) -> tables poisson et binomial, positionnement, homogeneite et validation identical() à la construction en lignes", {
   ok <- c(brut = identical(XA$etapes$brut$resultat, XL$etapes$brut$resultat),
           positionnement = identical(XA$etapes$positionnement$resultat, XL$etapes$positionnement$resultat),
+          homogeneite = !is.null(XA$etapes$homogeneite) &&
+            identical(XA$etapes$homogeneite$resultat, XL$etapes$homogeneite$resultat),
           validation = identical(XA$etapes$validation$resultat, XL$etapes$validation$resultat),
           cellules = nrow(EL) > 100L && sum(EL$evenements) > 50L)
   if (all(ok)) TRUE else paste("écart :", paste(names(ok)[!ok], collapse = ", "))
@@ -76,6 +84,20 @@ verifier("C1 : table d'exposition des agrégats = clés, age, expositions décla
   identical(names(ea), c("sexe", "age", "exposition_centrale", "exposition_initiale", "evenements")) &&
     identical(ea[c("sexe", "age", "exposition_centrale", "evenements")], EL[c("sexe", "age", "exposition_centrale", "evenements")]) &&
     identical(ea$exposition_initiale, AGG$ei) && is.integer(ea$evenements) && is.integer(ea$age)
+})
+# C1 sous par_annee (recommandation d'actuary, commit (3c)) : agrégats formés
+# depuis les cellules de Lexis (sexe, âge, année) des lignes, E^c et D seuls
+# (binomial refusé sous par_annee et dernier_anniversaire) ; Poisson seul.
+verifier("C1 sous par_annee = TRUE (identité exacte) : agrégats formés depuis les cellules de Lexis des lignes (sexe, age, annee, E^c, D) -> table poisson identical() à la construction en lignes", {
+  pl <- plan_ag(list(brut = list(estimateurs = "poisson", niveau = 0.95)), par_annee = TRUE)
+  xl <- construire_table(JEU, ROLES, pl)
+  el <- xl$etapes$exposition$resultat$exposition
+  ag <- data.frame(sexe = el$sexe, age = el$age, annee = el$annee, ec = el$exposition_centrale, d = el$evenements,
+                   stringsAsFactors = FALSE)
+  xa <- construire_table(ag, c(sexe = "sexe", age = "age", annee = "annee", exposition_centrale = "ec", evenements = "d"), pl)
+  ok <- c(poisson = identical(xa$etapes$brut$resultat$poisson, xl$etapes$brut$resultat$poisson),
+          annees = length(unique(el$annee)) == 10L, evenements = sum(el$evenements) > 50L)
+  if (all(ok)) TRUE else paste("écart :", paste(names(ok)[!ok], collapse = ", "))
 })
 verifier("hypothèses de brut sous le seam cellules (textes visés par actuary) : Poisson, clause de troncature remplacée ; binomial, phrase ajoutée ; seam fenetres : HYPOTHESES_BRUT inchangées", {
   h <- XA$etapes$brut$parametres$hypotheses; hl <- XL$etapes$brut$parametres$hypotheses
@@ -158,12 +180,12 @@ verifier("C9 rejeu : rejouer_fiche() sur une construction en agrégats -> constr
   identical(sx(r$construction), sx(XA)) && all(r$bilan$verdict[1:8] == "conforme") &&
     all(r$bilan$verdict[9:13] == "identique")
 })
-verifier("rapport figé sous les agrégats : mention d'unité non déterminée (positionnement, validation), jamais la mention d'unité contrat (avis d'actuary, point 3) ; hypotheses_recette restituée", {
+verifier("rapport figé sous les agrégats : mention d'unité non déterminée (positionnement, homogeneite, validation), jamais la mention d'unité contrat (avis d'actuary, point 3) ; hypotheses_recette restituée", {
   h <- rawToChar(ecrire_rapport(XA)); Encoding(h) <- "UTF-8"
   m <- tablexp:::MENTIONS_RAPPORT
   esc <- tablexp:::echapper_html
   n_nd <- lengths(regmatches(h, gregexpr(esc(m[["validation_unite_non_determinee"]]), h, fixed = TRUE)))
-  n_nd == 2L && !grepl(esc(m[["validation_unite_contrat"]]), h, fixed = TRUE) &&
+  n_nd == 3L && !grepl(esc(m[["validation_unite_contrat"]]), h, fixed = TRUE) &&
     grepl("fiche/hypotheses_recette", h, fixed = TRUE)
 })
 verifier("rapport figé : texte de validation_unite_non_determinee visé par actuary (événements, et non décès, sous toute transition)",
@@ -473,6 +495,116 @@ verifier("C8 contre-exemple (deux jeux de lignes, mêmes agrégats de la cellule
     isTRUE(all.equal(ca(xa, "poisson", "taux"), ca(xb, "poisson", "taux"), tolerance = 1e-14)) &&
     isTRUE(all.equal(ca(xa, "binomial", "taux"), ca(xb, "binomial", "taux"), tolerance = 1e-14)) &&
     isTRUE(controle(r, "donnees", "kaplan_meier_agregats"))
+})
+
+# --- C10, C11 : forme « agrégats » du simulateur (commit (3c)) ----------------------
+#
+# Natures : C10, identité exacte (jeu propre, appels répétés) et refus écrits à
+# la main ; C11, recoupement simulateur <-> exposition, approximation numérique
+# (deux arithmétiques de dates indépendantes), tolérance relative de classe
+# 1e-10 (spécification (0') de #169, § 13). Écart maximal mesuré le 08/11/2026
+# sur le jeu de ce fichier (graine 169, 4000 têtes), les deux transitions, avec
+# et sans année : 0 (expositions identical()) ; un dépassement est un constat
+# à remonter, jamais une tolérance à élargir.
+
+LOI_SIM <- local({
+  ra <- tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %")
+  list(deces = list(table = GM, facteurs = c(H = 1, F = 0.6)), rachat = list(table = ra, facteurs = c(H = 1, F = 1)))
+})
+PF_SIM <- list(mode = "uniforme", n = 4000, proportion_hommes = 0.5, age_min = 20, age_max = 75, origine = D("2005-01-01"))
+forme_ag <- function(transition = VD, convention = "dernier_anniversaire", par_annee = FALSE)
+  list(nom = "agregats", transition = transition, convention = convention, par_annee = par_annee)
+sim_ag <- function(forme, portefeuille = PF_SIM, defauts = NULL)
+  simuler_portefeuille(LOI_SIM, portefeuille, PER, 169L, defauts = defauts, forme = forme)
+AG_SIM <- sim_ag(forme_ag())
+
+verifier("C10 (identité exacte) : forme = NULL explicite identical() à l'appel sans forme ; deux appels identiques en agrégats identical()", {
+  identical(simuler_portefeuille(LOI_SIM, PF_SIM, PER, 169L, forme = NULL), JEU) && identical(sim_ag(forme_ag()), AG_SIM)
+})
+verifier("C10 : attribut simulation des agrégats = celui du jeu propre (forme lignes, même graine), plus le champ forme en fin (forme validée) ; colonnes aux noms des rôles (sans annee : exposition_initiale ; avec annee : sans exposition_initiale)", {
+  s0 <- attr(JEU, "simulation"); s1 <- attr(AG_SIM, "simulation")
+  a2 <- sim_ag(forme_ag(RA, par_annee = TRUE))
+  identical(names(s1), c(names(s0), "forme")) && identical(s1[names(s0)], s0) && identical(s1$forme, forme_ag()) &&
+    identical(names(AG_SIM), c("sexe", "age", "exposition_centrale", "exposition_initiale", "evenements")) &&
+    identical(names(a2), c("sexe", "age", "annee", "exposition_centrale", "evenements")) &&
+    is.integer(AG_SIM$age) && is.integer(AG_SIM$evenements) && is.integer(a2$annee) && is.character(AG_SIM$sexe) &&
+    identical(attr(a2, "simulation")[names(s0)], s0)
+})
+verifier("C10 : événements des agrégats = sorties de la cause comptée dans [D, B) du jeu propre (décès ; rachats), sans année et par année", {
+  dans <- function(cause) sum(JEU$cause_sortie == cause & !is.na(JEU$date_sortie) & JEU$date_sortie >= PER$debut &
+                                JEU$date_sortie <= PER$fin)
+  sum(AG_SIM$evenements) == dans("deces") && sum(sim_ag(forme_ag(RA))$evenements) == dans("rachat") &&
+    sum(sim_ag(forme_ag(par_annee = TRUE))$evenements) == dans("deces")
+})
+verifier("C10 (refus écrits à la main) : forme avec defauts, mode multi-contrats, convention age_atteint_annee, forme mal formée -> forme_invalide, module simulation, avant tout tirage (aucun appel de sous_graine(), état .Random.seed de l'appelant inchangé)", {
+  dft <- list(graine = 170L, declarations = list(list(type = "sexe_manquant", cible = "deces", nombre = 1L)))
+  pf_multi <- c(PF_SIM, list(loi_contrats = c(0.5, 0.5))); pf_multi$mode <- "uniforme_multi"
+  # « Avant tout tirage » : tous les tirages du simulateur passent par
+  # sous_graine() (outils), qui rétablit l'état de l'appelant même après un
+  # tirage ; .Random.seed seul ne le prouve donc pas. Les appels de
+  # sous_graine() sont comptés par trace() pendant les refus, retiré ensuite.
+  # Témoin : un appel sans forme compte un appel.
+  ns <- asNamespace("tablexp"); cpt <- new.env(); cpt$n <- 0L
+  suppressMessages(trace("sous_graine", tracer = bquote(assign("n", get("n", envir = .(cpt)) + 1L, envir = .(cpt))),
+                         where = ns, print = FALSE))
+  set.seed(5L); graine_avant <- .Random.seed
+  cas <- tryCatch({
+    invisible(simuler_portefeuille(LOI_SIM, PF_SIM, PER, 169L))
+    temoin <- cpt$n
+    cpt$n <- 0L; graine_temoin <- .Random.seed
+    list(
+      defauts = rf(sim_ag(forme_ag(), defauts = dft)),
+      multi = rf(sim_ag(forme_ag(), portefeuille = pf_multi)),
+      age_atteint_annee = rf(sim_ag(forme_ag(convention = "age_atteint_annee"))),
+      convention = rf(sim_ag(forme_ag(convention = "plus_fine"))),
+      nom = rf(sim_ag(list(nom = "stocks", transition = VD, convention = "dernier_anniversaire", par_annee = FALSE))),
+      champ_manquant = rf(sim_ag(forme_ag()[c("nom", "transition", "convention")])),
+      champ_inconnu = rf(sim_ag(c(forme_ag(), list(segment = "x")))),
+      transition = rf(sim_ag(forme_ag(transition = list(depart = "vivant", arrivee = "rachat")))),
+      par_annee = rf(sim_ag(forme_ag(par_annee = NA))),
+      classe = rf(sim_ag(structure(forme_ag(), class = "forme"))),
+      data_frame = rf(sim_ag(data.frame(nom = "agregats"))))
+  }, finally = suppressMessages(untrace("sous_graine", where = ns)))
+  tirages_refus <- cpt$n
+  graine_inchangee <- identical(.Random.seed, graine_temoin) && identical(graine_temoin, graine_avant)
+  ko <- names(cas)[!vapply(cas, function(r) isTRUE(controle(r, "simulation", "forme_invalide")), NA)]
+  msg <- function(k) cas[[k]]$message
+  if (!identical(temoin, 1L)) sprintf("témoin : %d appel(s) de sous_graine() sans forme au lieu de 1", temoin)
+  else if (!identical(tirages_refus, 0L)) sprintf("%d appel(s) de sous_graine() pendant les refus", tirages_refus)
+  else if (!graine_inchangee) ".Random.seed de l'appelant modifié"
+  else if (length(ko)) paste("sans le refus attendu :", paste(ko, collapse = ", "))
+  else if (!grepl("defauts", msg("defauts"), fixed = TRUE) || !grepl("multi-contrats", msg("multi"), fixed = TRUE) ||
+           !grepl("age_atteint_annee", msg("age_atteint_annee"), fixed = TRUE)) "message sans la raison nommée"
+  else TRUE
+})
+# C11 : la table d'exposition des lignes (recette lignes_dates_completes,
+# segmentation sexe, convention dernier_anniversaire, délai nul, période du
+# jeu) et la projection du simulateur ont les mêmes cellules.
+verifier("C11 (approximation numérique, tolérance relative 1e-10) : simulateur <-> exposition sur le jeu simulé, deux transitions, sans et avec année : mêmes cellules, D identical(), E^c et E^i à 1e-10 (écart maximal mesuré : 0)", {
+  ecarts <- character(0)
+  rel <- function(u, v) if (!length(u)) 0 else max(abs(u - v) / pmax(abs(v), .Machine$double.xmin))
+  for (tr in list(VD, RA)) for (pa in c(FALSE, TRUE)) {
+    a <- sim_ag(forme_ag(tr, par_annee = pa))
+    pl <- plan_ag(list(brut = list(estimateurs = "poisson", niveau = 0.95)), transition = tr, par_annee = pa)
+    el <- construire_table(JEU, ROLES, pl)$etapes$exposition$resultat$exposition
+    cles <- c("sexe", "age", if (pa) "annee")
+    lab <- sprintf("%s -> %s, par_annee = %s", tr$depart, tr$arrivee, pa)
+    if (!identical(a[cles], el[cles])) { ecarts <- c(ecarts, paste(lab, ": cellules différentes")); next }
+    if (!identical(a$evenements, el$evenements)) ecarts <- c(ecarts, paste(lab, ": D différents"))
+    if (rel(a$exposition_centrale, el$exposition_centrale) > 1e-10) ecarts <- c(ecarts, paste(lab, ": E^c au-delà de 1e-10"))
+    if (!pa && rel(a$exposition_initiale, el$exposition_centrale + el$complement_initial_cellule) > 1e-10)
+      ecarts <- c(ecarts, paste(lab, ": E^i au-delà de 1e-10"))
+    if (sum(a$evenements) < 50L) ecarts <- c(ecarts, paste(lab, ": moins de 50 événements (cas vide)"))
+  }
+  if (length(ecarts)) ecarts else TRUE
+})
+verifier("C10 : construction en agrégats sur la forme du simulateur = construction en lignes sur le jeu propre (poisson, binomial, positionnement, homogeneite, validation identical() ; rôles aux noms des colonnes)", {
+  rs <- stats::setNames(names(AG_SIM), names(AG_SIM))
+  x <- construire_table(AG_SIM, rs, PLAN_C1, tables_reference = list(tv = T_HF))
+  identical(x$etapes$brut$resultat, XL$etapes$brut$resultat) &&
+    identical(x$etapes$positionnement$resultat, XL$etapes$positionnement$resultat) &&
+    !is.null(x$etapes$homogeneite) && identical(x$etapes$homogeneite$resultat, XL$etapes$homogeneite$resultat) &&
+    !is.null(x$etapes$validation) && identical(x$etapes$validation$resultat, XL$etapes$validation$resultat)
 })
 
 # --- garde-fous internes ------------------------------------------------------------

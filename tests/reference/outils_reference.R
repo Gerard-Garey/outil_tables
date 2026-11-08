@@ -14,14 +14,14 @@
 #  chaîne au codage « bytes », non UTF-8 valide, ou non ASCII non marquée
 #  dans une session ni UTF-8 ni latin-1 est refusée, jamais convertie).
 #
-#  - plans_reference(), jeu_reference(), jeu_reference_defauts() : plans R1 à
-#    R12 et entrées de référence (points 4.1 et 4.3 ; R6 : première annotation,
-#    (b) ; R7 : #32 ; R8 : #166, avec `tables_reference`, table importée en
+#  - plans_reference(), jeu_reference(), jeu_reference_defauts(),
+#    agregats_reference() : plans R1 à R13 et entrées de référence (points
+#    4.1 et 4.3 ; R6 : première annotation, (b) ; R7 : #32 ; R8 : #166, avec `tables_reference`, table importée en
 #    valeurs littérales ; R9 : #166, avec `entree`, une entrée par plan,
 #    annotation du 07/11/2026, (d) ; R10 : #167, positionnement par SMR et
 #    validation de la table positionnée ; R11 : #168, test d'homogénéité entre
-#    segments ; R12 : #168, le même test sous H0 vraie ; plans de méthode,
-#    point 5.2) ;
+#    segments ; R12 : #168, le même test sous H0 vraie ; R13 : #169, recette
+#    agrégats, entrée agregats_reference() ; plans de méthode, point 5.2) ;
 #  - tirer_entree(nom), entrees_des_plans(plans) : tirage de l'entrée d'un
 #    plan, chaque entrée distincte une seule fois ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
@@ -92,7 +92,7 @@ CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12, "1e-10" = 1
 # retour à doubles_sans_tolerance().
 TOLERANCES <- c(
   # Aucune clé nue (#175) : toute clé commence par le nom de l'étape
-  # (`exposition`, `brut`, `positionnement`, `homogeneite`, `validation`,
+  # (`donnees`, `exposition`, `brut`, `positionnement`, `homogeneite`, `validation`,
   # `importance_exclusions`) ou par
   # `fiche/` (écho du plan et des hypothèses : fiche/plan/…,
   # fiche/hypotheses_<étape>/…). Une colonne de même nom d'une étape ultérieure
@@ -109,6 +109,16 @@ TOLERANCES <- c(
   "exposition/resultat/exposition/exposition_centrale" = 1e-14,
   "exposition/resultat/exposition/complement_initial_cellule" = 1e-14,
   "exposition/resultat/exposition/complement_initial_fenetre" = 1e-14,
+  # R13 (#169, recette agrégats ; avis d'actuary) : exposition initiale
+  # déclarée, sommée par cellule (seam cellules), 1e-14 ; poids des exclusions
+  # de l'étape donnees (diagnostic Q6 ; table vide dans R13, sans exclusion) :
+  # evenements, sommes d'entiers sur les cellules sans motif de valeur
+  # (R/donnees.R, observations_agregats()), exacte ; expositions, sommes de
+  # valeurs reçues, 1e-14.
+  "exposition/resultat/exposition/exposition_initiale" = 1e-14,
+  "donnees/diagnostics/releves/poids_exclusions/evenements" = 0,
+  "donnees/diagnostics/releves/poids_exclusions/exposition_centrale" = 1e-14,
+  "donnees/diagnostics/releves/poids_exclusions/exposition_initiale" = 1e-14,
   "brut/resultat/poisson/exposition_centrale" = 1e-14, "brut/resultat/poisson/taux" = 1e-14,
   "brut/resultat/binomial/exposition_initiale" = 1e-14, "brut/resultat/binomial/taux" = 1e-14,
   "brut/resultat/kaplan_meier_sauts/age_exact" = 1e-14,
@@ -334,15 +344,17 @@ MOTIFS_DEFAUTS_R9 <- c("id_contrat_manquant", "sexe_manquant", "entree_manquante
 NOMBRE_PAR_MOTIF_R9 <- 500L
 
 # Jeu de l'entrée de référence : `defauts` NULL pour jeu_reference() (aucun
-# défaut), sinon la liste (graine, declarations) de simuler_portefeuille().
-simuler_reference <- function(defauts = NULL) {
+# défaut), sinon la liste (graine, declarations) de simuler_portefeuille() ;
+# `forme` NULL pour les lignes individuelles, sinon la forme de
+# simuler_portefeuille() (agregats_reference(), R13 ; #169).
+simuler_reference <- function(defauts = NULL, forme = NULL) {
   gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
   ra <- tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %")
   loi <- list(deces = list(table = gm, facteurs = c(H = 1, F = 0.6)),
               rachat = list(table = ra, facteurs = c(H = 1, F = 1)))
   pf <- list(mode = "uniforme", n = 1e5, proportion_hommes = 0.5, age_min = 20, age_max = 75,
              origine = as.Date("2005-01-01"))
-  tablexp::simuler_portefeuille(loi, pf, PERIODE_REFERENCE, GRAINE_REFERENCE, defauts = defauts)
+  tablexp::simuler_portefeuille(loi, pf, PERIODE_REFERENCE, GRAINE_REFERENCE, defauts = defauts, forme = forme)
 }
 
 jeu_reference <- function() list(donnees = simuler_reference(), roles = ROLES_REFERENCE)
@@ -354,12 +366,26 @@ jeu_reference_defauts <- function() {
        roles = ROLES_REFERENCE)
 }
 
+# Entrée de R13 (#169 ; spécification (0') de #169, § 12 ; avis (0''), G12) :
+# forme « agrégats » de simuler_reference(), donc même loi, même portefeuille et
+# GRAINE_REFERENCE (réemploi admis A1 de #176 ; aucun tirage supplémentaire) ;
+# transition décès, convention dernier_anniversaire, sans année. Colonnes et
+# rôles : sexe, age, exposition_centrale, exposition_initiale, evenements.
+FORME_AGREGATS_R13 <- list(nom = "agregats", transition = list(depart = "vivant", arrivee = "deces"),
+                           convention = "dernier_anniversaire", par_annee = FALSE)
+ROLES_AGREGATS_R13 <- c(sexe = "sexe", age = "age", exposition_centrale = "exposition_centrale",
+                        exposition_initiale = "exposition_initiale", evenements = "evenements")
+agregats_reference <- function()
+  list(donnees = simuler_reference(forme = FORME_AGREGATS_R13), roles = ROLES_AGREGATS_R13)
+
 # Entrée d'un plan (champ `entree` de plans_reference() : le nom de l'entrée) :
-# `reference` (jeu_reference(), R1 à R8, R10 à R12) ou `reference_defauts`
-# (jeu_reference_defauts(), R9). Un nom plutôt qu'une fonction, pour que
-# l'outillage tire chaque entrée distincte une seule fois (entrees_des_plans()).
+# `reference` (jeu_reference(), R1 à R8, R10 à R12), `reference_defauts`
+# (jeu_reference_defauts(), R9) ou `agregats_reference` (agregats_reference(),
+# R13). Un nom plutôt qu'une fonction, pour que l'outillage tire chaque entrée
+# distincte une seule fois (entrees_des_plans()).
 tirer_entree <- function(nom)
   switch(nom, reference = jeu_reference(), reference_defauts = jeu_reference_defauts(),
+         agregats_reference = agregats_reference(),
          stop("entrée de référence inconnue : ", nom, call. = FALSE))
 
 # Entrées des plans `plans` : liste nommée (nom de l'entrée -> list(donnees,
@@ -454,6 +480,7 @@ tables_du_plan <- function(p) if (is.null(p$tables_reference)) NULL else p$table
 
 # Un identifiant n'est jamais réemployé (point 4.3). `entree` : nom de
 # l'entrée du plan (tirer_entree()), `reference` pour R1 à R8, R10 à R12.
+# R13 (#169) : entrée `agregats_reference`.
 plans_reference <- function() {
   p <- function(id, description, plan, tables_reference = NULL, entree = "reference")
     list(identifiant = id, description = description, plan = plan, tables_reference = tables_reference,
@@ -501,7 +528,14 @@ plans_reference <- function() {
             plan_reference(homogeneite = homogeneite, graine = GRAINE_MONTE_CARLO_R11)),
     R12 = p("R12", "test d'homogénéité entre segments sous H0 (R5 avec l'étape homogeneite ; le sexe est sans effet sur la loi vraie du rachat) : épingle le flux des réplications",
             plan_reference(transition = c("en_cours", "rachat"), homogeneite = homogeneite,
-                           graine = GRAINE_MONTE_CARLO_R12)))
+                           graine = GRAINE_MONTE_CARLO_R12)),
+    # R13 (#169 ; spécification (0') de #169, § 12) : recette « agrégats » sur la
+    # forme agrégats de l'entrée de référence ; convention déclarée
+    # dernier_anniversaire, sans année ; Poisson et binomial ; positionnement
+    # par SMR sur la table de R8. Aucune étape aléatoire, aucune graine.
+    R13 = p("R13", "recette agrégats (forme agrégats de l'entrée de référence, transition décès, dernier_anniversaire sans année ; Poisson, binomial, positionnement par SMR sur la table de R8)",
+            plan_reference(convention = "dernier_anniversaire", positionnement = positionnement),
+            tables_reference = tables_reference_r8, entree = "agregats_reference"))
 }
 
 # --- aplatissement (points 1 et 2.3) ------------------------------------------

@@ -1,1 +1,5 @@
 type,nom,issue,motif
+entree,fonctions-simulation:CHAMPS_FORMES,#169,"forme « agrégats » du simulateur, commit (3c) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+entree,fonctions-simulation:CONVENTIONS_FORMES,#169,"forme « agrégats » du simulateur, commit (3c) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+entree,fonctions-simulation:controler_forme,#169,"forme « agrégats » du simulateur, commit (3c) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+entree,fonctions-simulation:projeter_agregats,#169,"forme « agrégats » du simulateur, commit (3c) ; catalogue à compléter par docwriter en fin de branche (règle 9)"

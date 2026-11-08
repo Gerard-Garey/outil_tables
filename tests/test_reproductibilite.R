@@ -16,11 +16,11 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R12 sur l'entrée de chaque plan (jeu_reference(), ou
-#  jeu_reference_defauts() pour R9), aplatis, aller-retour exact du format,
-#  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
-#  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE, vide depuis la création de R10 à R12), aucune référence
+#  3.8) : plans R1 à R13 sur l'entrée de chaque plan (jeu_reference(),
+#  jeu_reference_defauts() pour R9, agregats_reference() pour R13), aplatis,
+#  aller-retour exact du format, comparés à leur fichier de tests/reference/
+#  (échec attendu renvoyant à l'issue de création tant que le fichier
+#  n'existe pas, liste SANS_REFERENCE : R13, #169), aucune référence
 #  orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
@@ -29,7 +29,8 @@
 #  retraits non nuls (#166) ; R10 : positionnement par SMR et validation de
 #  la table positionnée (#167) ; R11 : test d'homogénéité entre segments
 #  (#168) ; R12 : le même test sous H0 vraie, transition en_cours -> rachat
-#  (#168, M307) ; témoins sur des copies temporaires (jamais sur
+#  (#168, M307) ; R13 : recette agrégats sur la forme agrégats de l'entrée de
+#  référence (#169) ; témoins sur des copies temporaires (jamais sur
 #  tests/reference/) ; règles des modes du workflow et lignes de commande
 #  produire_references.R (refus d'appel) et comparer_references.R ;
 #  permutation des lignes de l'entrée de référence
@@ -323,7 +324,7 @@ unlink(c(script, sortie))
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
 # référence sur son entrée (champ `entree`, point 4.1), aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R12, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R13, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
@@ -335,7 +336,9 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-SANS_REFERENCE <- character(0)
+# R13 (#169, commit (3c) de B15 ; ADR 0016, point 8.4) : recette agrégats,
+# créé par le commit de référence (R), après visa d'actuary (M319).
+SANS_REFERENCE <- c(R13 = "#169")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -763,14 +766,28 @@ controler_rapport_fige <- function(x, l, id) {
 # (permutation, R6) lisent.
 entrees_ref <- entrees_des_plans(plans_reference())
 jeu_ref <- entrees_ref[["reference"]]
-verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
+verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts`, R13 sur `agregats_reference` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
   e <- unname(vapply(plans_reference(), function(p) p$entree, ""))
-  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L))
+  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L), "agregats_reference")
   if (!identical(e, attendu))
     paste0("entrées des plans obtenues (", paste(e, collapse = ", "), ") contre attendues (", paste(attendu, collapse = ", "), ")")
-  else if (!identical(names(entrees_ref), c("reference", "reference_defauts")))
-    paste0("entrées tirées obtenues (", paste(names(entrees_ref), collapse = ", "), ") contre attendues (reference, reference_defauts)")
+  else if (!identical(names(entrees_ref), c("reference", "reference_defauts", "agregats_reference")))
+    paste0("entrées tirées obtenues (", paste(names(entrees_ref), collapse = ", "), ") contre attendues (reference, reference_defauts, agregats_reference)")
   else if (!identical(jeu_ref, jeu_reference())) "entrée `reference` différente de jeu_reference()"
+  else TRUE
+})
+# Entrée de R13 (#169 ; spécification (0') de #169, § 12) : forme agrégats de
+# simuler_reference(), même graine que jeu_reference() ; attribut `simulation`
+# celui du jeu propre plus le champ `forme` en fin ; colonnes aux noms des rôles.
+verifier("R13, entrée : forme agrégats de l'entrée de référence (colonnes sexe, age, exposition_centrale, exposition_initiale, evenements ; attribut simulation de jeu_reference() plus forme en fin ; événements = décès de jeu_reference() dans la période)", {
+  a13 <- entrees_ref[["agregats_reference"]]$donnees
+  s13 <- attr(a13, "simulation"); s0 <- attr(jeu_ref$donnees, "simulation")
+  dc <- jeu_ref$donnees$cause_sortie == "deces" & jeu_ref$donnees$date_sortie >= PERIODE_REFERENCE$debut &
+    jeu_ref$donnees$date_sortie <= PERIODE_REFERENCE$fin
+  if (!identical(names(a13), unname(ROLES_AGREGATS_R13))) paste("colonnes :", paste(names(a13), collapse = ", "))
+  else if (!identical(names(s13), c(names(s0), "forme")) || !identical(s13[names(s0)], s0)) "attribut simulation différent de celui du jeu propre plus forme"
+  else if (!identical(s13$forme, FORME_AGREGATS_R13)) "champ forme différent de FORME_AGREGATS_R13"
+  else if (sum(a13$evenements) != sum(dc, na.rm = TRUE)) "total des événements différent des décès de la période"
   else TRUE
 })
 verifier("entrées des plans : tirer_entree() d'un nom inconnu -> erreur",
@@ -2446,13 +2463,13 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R12 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R13 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R12, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R13, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant
