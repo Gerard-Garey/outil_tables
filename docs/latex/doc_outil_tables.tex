@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{06/11/2026}
+\newcommand{\datedoc}{08/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -3291,9 +3291,12 @@ requise~:\\[2pt]
 {\sloppy\hbadness=10000 \code{construire\_table()} procède dans cet ordre~: validation du plan,
 puis sa mise sous forme canonique, une seule fois (\code{canoniser\_plan()},
 section~\ref{sec:fiche})~; les étapes et la fiche ne voient que le plan
-canonique~; contrôle des rôles (\code{controler\_roles()})~; déduction de la recette et,
-si le plan comprend l'étape \code{exposition}, de la convention retenue~;
-contrôle de la provenance~; contrôle des tables de référence reçues
+canonique~; contrôle des rôles et déduction de la recette
+(\code{controler\_roles()}, qui appelle \code{deduire\_recette()} et rend la
+recette retenue)~; si le plan comprend l'étape \code{exposition}, résolution
+de la convention retenue~; contrôle des étapes et des estimateurs du plan
+sous la recette retenue (\code{controler\_matrice\_recette()},
+section~\ref{sec:recettes})~; contrôle de la provenance~; contrôle des tables de référence reçues
 (\code{controler\_tables\_reference()},
 section~\ref{sec:tables-reference-recues})~; pour chaque étape du plan
 qui lit une table, \code{positionnement} puis \code{validation}, lecture de
@@ -3328,7 +3331,8 @@ convention n'ont ainsi qu'une source, pour les étapes comme pour la fiche.
 Les contrôles qui précèdent le contrôle du codage des chaînes forment deux
 couches, dans \code{R/construire\_table.R} (issue~\#82~; ADR 0007,
 annotation du 07/11/2026, (a)~1)~: \code{controler\_plan\_roles()} (plan
-validé puis canonique, rôles, recette, convention, provenance), partagée
+validé puis canonique, rôles et recette, convention, étapes et estimateurs
+admis sous la recette, provenance), partagée
 avec \code{rejouer\_fiche()} (section~\ref{sec:rejeu}, étape~6), qui rend le
 plan canonique et les valeurs validées~; puis \code{controler\_entrees()},
 qui l'appelle, puis fait le contrôle des tables reçues et les contrôles
@@ -3702,9 +3706,10 @@ qu'elle n'exécute aucune étape du plan (issue~\#82, décision M291)~:
     contrôles de \code{construire\_table()} (section~\ref{sec:execution}),
     \code{controler\_plan\_roles()}, sur les champs de la fiche~:
     \code{valider\_plan()}, \code{canoniser\_plan()},
-    \code{controler\_roles()} sur la segmentation canonique,
+    \code{controler\_roles()} sur la segmentation canonique, qui appelle
     \code{deduire\_recette()}, \code{resoudre\_convention()} si l'étape
-    \code{exposition} est au plan, \code{controler\_provenance()}. Ces
+    \code{exposition} est au plan, \code{controler\_matrice\_recette()},
+    \code{controler\_provenance()}. Ces
     refus gardent leur module, leur motif et leur message
     (\code{colonne\_absente}, \code{type\_incompatible},
     \code{plan\_mal\_forme}, \code{convention\_invalide},
@@ -4407,7 +4412,7 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{controler\_tables\_reference()} & interne & tables reçues, plan~; chemins des paramètres et catalogue (par défaut, les deux constantes de ce rôle) & valeur de \code{fiche\$tables\_reference}~; les quatre contrôles des tables reçues, dans l'ordre (section~\ref{sec:tables-reference-recues}), appelé une fois par \code{construire\_table()} \\
 \catalogue{fonctions-construire-table}{controler\_tables\_rejeu()} & interne & champ de la fiche, tables reçues, empreinte du code de la fiche~; catalogue des tables embarquées & étape~7~bis du rejeu (section~\ref{sec:rejeu})~: liste assemblée (tables reçues et relues), empreintes recalculées par clé, textes de la ligne \code{tables\_reference} du bilan~; ne reçoit plus le plan, le contrôle des tables reçues étant fait par \code{construire\_table()} (issue~\#82) \\
 \catalogue{fonctions-construire-table}{table\_citee()} & interne & tables reçues, clé & objet \code{table\_reference} de la clé, comparée en UTF-8 comme au contrôle des tables reçues~; erreur de programmation si la clé est absente (le contrôle des tables reçues l'a exclu)~; table citée par chaque étape qui lit une table, lue par \code{controler\_entrees()} \\
-\catalogue{fonctions-construire-table}{controler\_plan\_roles()} & interne & données, rôles, plan, provenance & première couche du contrôle des entrées, dans cet ordre~: \code{valider\_plan()} puis \code{canoniser\_plan()}, \code{controler\_roles()} sur la segmentation canonique, \code{deduire\_recette()}, \code{resoudre\_convention()} si l'étape \code{exposition} est au plan, \code{controler\_provenance()}~; rend le plan canonique et les valeurs validées \code{p} (transition retenue, début, fin, borne $B$, par la fonction sans contrôle du module \code{donnees}), \code{recette} et \code{conv} (\code{NULL} sans \code{exposition})~; appelée par \code{controler\_entrees()} et par \code{rejouer\_fiche()} (étape~6) (section~\ref{sec:execution}~; issue~\#82) \\
+\catalogue{fonctions-construire-table}{controler\_plan\_roles()} & interne & données, rôles, plan, provenance & première couche du contrôle des entrées, dans cet ordre~: \code{valider\_plan()} puis \code{canoniser\_plan()}, \code{controler\_roles()} sur la segmentation canonique, qui appelle \code{deduire\_recette()} et rend la recette, \code{resoudre\_convention()} si l'étape \code{exposition} est au plan, contrôle des étapes et des estimateurs admis sous la recette (module \code{donnees}, section~\ref{sec:recettes}), \code{controler\_provenance()}~; rend le plan canonique et les valeurs validées \code{p} (transition retenue, début, fin, borne $B$, par la fonction sans contrôle du module \code{donnees}), \code{recette} et \code{conv} (\code{NULL} sans \code{exposition})~; appelée par \code{controler\_entrees()} et par \code{rejouer\_fiche()} (étape~6) (section~\ref{sec:execution}~; issue~\#82) \\
 \catalogue{fonctions-construire-table}{controler\_entrees()} & interne & données, rôles, plan, provenance, tables de référence & seconde couche~: \code{controler\_plan\_roles()}, puis le contrôle des tables reçues (section~\ref{sec:tables-reference-recues}) et, pour chaque étape du plan qui lit une table, la lecture de sa table (\code{table\_citee()}) et ses contrôles d'entrée (section~\ref{sec:validation-etape})~; rend les valeurs de la première couche, la valeur de \code{fiche\$tables\_reference} et la table citée par étape~; appelée une fois par \code{construire\_table()}, seule (section~\ref{sec:execution}~; issue~\#82) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance, tables de référence & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», longueur lue sans la classe si celle-ci est d'encodage \code{bytes} (issue~\#128), pour un message ou le bilan du rejeu \\
@@ -4504,24 +4509,31 @@ chaînes nommé~: noms = rôles du catalogue, valeurs = noms de colonnes de la
 base (ADR 0007, point 4.1). Les colonnes sans rôle sont ignorées.
 \code{catalogue\_roles()}, exportée pour que l'application propose la
 déclaration des rôles, rend le catalogue sous la forme d'un \code{data.frame}
-de colonnes \code{role}, \code{famille}, \code{type\_admis}, \code{usage} et
+de colonnes \code{role}, \code{famille}, \code{type\_admis} et
 \code{recettes} (tableau~\ref{tab:catalogue-roles}).
 
 \medskip
-{\sloppy\hbadness=10000 La colonne \emph{usage} décrit l'emploi du rôle par la seule recette
-d'exposition disponible, \code{lignes\_dates\_completes}
-(section~\ref{sec:recettes})~:\par}
+{\sloppy\hbadness=10000 La colonne \emph{recettes} nomme, dans l'ordre du
+catalogue des recettes (constante \code{CATALOGUE\_RECETTES},
+section~\ref{sec:recettes}), les recettes d'exposition qui emploient le rôle,
+comme rôle requis, rôle d'un groupe dont l'un au moins est requis, ou rôle
+facultatif, jointes par «~,~»~; elle est vide pour un rôle qu'aucune recette
+n'emploie. Elle est dérivée de ce catalogue, seul endroit où s'écrit l'emploi
+d'un rôle par une recette~: un emploi n'a de sens que relatif à une recette
+(ADR 0016, point 3.1). Sous la seule recette du catalogue,
+\code{lignes\_dates\_completes}, l'emploi des rôles est le suivant~:\par}
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \code{requis}~: rôle sans lequel aucune recette ne s'applique (refus
+  \item \emph{requis}~: rôle sans lequel la recette ne s'applique (refus
     \code{aucune\_recette})~;
-  \item \code{facultatif}~: rôle lu pour des contrôles (unicité du contrat,
+  \item \emph{facultatif}~: rôle lu pour des contrôles (unicité du contrat,
     cohérence de l'année de naissance) ou, pour \code{id\_tete}, pour l'unité
-    d'observation~;
-  \item \code{segmentation}~: rôle requis si la segmentation du plan l'emploie
-    (refus \code{role\_requis\_manquant}), contrôlé s'il est seulement
-    déclaré, avec l'avertissement \code{role\_non\_employe}~;
-  \item \code{non\_pris\_en\_charge}~: rôle qu'aucune recette disponible
+    d'observation~; les rôles \code{sexe} et \code{segment} sont aussi requis
+    si la segmentation du plan les emploie (règle commune à toutes les
+    recettes, constante \code{ROLES\_SEGMENTATION}~; refus
+    \code{role\_requis\_manquant}), contrôlés s'ils sont seulement déclarés,
+    avec l'avertissement \code{role\_non\_employe}~;
+  \item \emph{non employé}~: rôle qu'aucune recette du catalogue
     n'emploie et dont l'omission changerait le sens du résultat (pondération,
     agrégats, états, date de survenance distincte de la sortie, date
     d'inventaire, âge fourni)~; sa déclaration est \textbf{refusée}
@@ -4558,45 +4570,47 @@ pour \code{cause\_sortie} (constantes \code{MODALITES\_SEXE} et
 
 {\small
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{3.3cm}p{2.5cm}p{5.4cm}p{3.4cm}@{}}
+\begin{longtable}{@{}p{3.6cm}p{2.3cm}p{4.4cm}p{4.3cm}@{}}
 \caption{Catalogue fermé des rôles (\code{catalogue\_roles()}~; constantes
-\code{CATALOGUE\_ROLES} et \code{TYPES\_ADMIS}). La colonne \code{recettes}
-du catalogue vaut \code{lignes\_dates\_completes} pour tout rôle pris en
-charge, vide sinon.}
+\code{CATALOGUE\_ROLES}, \code{TYPES\_ADMIS} et \code{CATALOGUE\_RECETTES}).
+La colonne «~Recettes~» donne la colonne \code{recettes} du catalogue
+(«~aucune~» quand elle est vide), suivie, entre parenthèses, de l'emploi du
+rôle par la recette.}
 \label{tab:catalogue-roles}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Rôle}} &
 \textcolor{financeblue}{\textbf{Famille}} &
 \textcolor{financeblue}{\textbf{Types R admis}} &
-\textcolor{financeblue}{\textbf{Usage}} \\
+\textcolor{financeblue}{\textbf{Recettes}} \\
 \endfirsthead
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Rôle}} &
 \textcolor{financeblue}{\textbf{Famille}} &
 \textcolor{financeblue}{\textbf{Types R admis}} &
-\textcolor{financeblue}{\textbf{Usage}} \\
+\textcolor{financeblue}{\textbf{Recettes}} \\
 \endhead
-\catalogue{roles}{id\_contrat} & identification & \code{character}, \code{integer}, \code{double} entier fini & facultatif \\
-\catalogue{roles}{id\_tete} & identification & \code{character}, \code{integer}, \code{double} entier fini & facultatif \\
-\catalogue{roles}{sexe} & état civil & \code{character}, \code{factor} & segmentation \\
-\catalogue{roles}{date\_naissance} & état civil & \code{Date} (valeurs entières finies) & requis \\
-\catalogue{roles}{annee\_naissance} & état civil & \code{integer}, \code{double} entier fini & facultatif \\
-\catalogue{roles}{age\_fourni} & état civil & \code{integer}, \code{double} entier fini $\ge 0$ & non pris en charge \\
-\catalogue{roles}{date\_age\_fourni} & état civil & \code{Date} (valeurs entières finies) & non pris en charge \\
-\catalogue{roles}{date\_entree} & observation & \code{Date} (valeurs entières finies) & requis \\
-\catalogue{roles}{date\_sortie} & observation & \code{Date} (valeurs entières finies~; manquante admise pour une ligne \code{en\_cours}) & requis \\
-\catalogue{roles}{cause\_sortie} & observation & \code{character}, \code{factor} & requis \\
-\catalogue{roles}{date\_evenement} & observation & \code{Date} (valeurs entières finies) & non pris en charge \\
-\catalogue{roles}{date\_inventaire} & observation & \code{Date} (valeurs entières finies) & non pris en charge \\
-\catalogue{roles}{age} & agrégats & \code{integer}, \code{double} entier fini & non pris en charge \\
-\catalogue{roles}{annee} & agrégats & \code{integer}, \code{double} entier fini & non pris en charge \\
-\catalogue{roles}{exposition} & agrégats & \code{double} fini $\ge 0$ & non pris en charge \\
-\catalogue{roles}{evenements} & agrégats & \code{double} fini $\ge 0$ & non pris en charge \\
-\catalogue{roles}{montant} & pondération & \code{double} fini $> 0$ & non pris en charge \\
-\catalogue{roles}{segment} & segmentation & \code{character}, \code{factor}, \code{integer} & segmentation \\
-\catalogue{roles}{etat\_depart} & multi-états & \code{character}, \code{factor} & non pris en charge \\
-\catalogue{roles}{etat\_arrivee} & multi-états & \code{character}, \code{factor} & non pris en charge \\
-\catalogue{roles}{date\_changement} & multi-états & \code{Date} (valeurs entières finies) & non pris en charge \\
+\catalogue{roles}{id\_contrat} & identification & \code{character}, \code{integer}, \code{double} entier fini & \code{lignes\_dates\_completes} (facultatif) \\
+\catalogue{roles}{id\_tete} & identification & \code{character}, \code{integer}, \code{double} entier fini & \code{lignes\_dates\_completes} (facultatif) \\
+\catalogue{roles}{sexe} & état civil & \code{character}, \code{factor} & \code{lignes\_dates\_completes} (facultatif~; segmentation) \\
+\catalogue{roles}{date\_naissance} & état civil & \code{Date} (valeurs entières finies) & \code{lignes\_dates\_completes} (requis) \\
+\catalogue{roles}{annee\_naissance} & état civil & \code{integer}, \code{double} entier fini & \code{lignes\_dates\_completes} (facultatif) \\
+\catalogue{roles}{age\_fourni} & état civil & \code{integer}, \code{double} entier fini $\ge 0$ & aucune \\
+\catalogue{roles}{date\_age\_fourni} & état civil & \code{Date} (valeurs entières finies) & aucune \\
+\catalogue{roles}{date\_entree} & observation & \code{Date} (valeurs entières finies) & \code{lignes\_dates\_completes} (requis) \\
+\catalogue{roles}{date\_sortie} & observation & \code{Date} (valeurs entières finies~; manquante admise pour une ligne \code{en\_cours}) & \code{lignes\_dates\_completes} (requis) \\
+\catalogue{roles}{cause\_sortie} & observation & \code{character}, \code{factor} & \code{lignes\_dates\_completes} (requis) \\
+\catalogue{roles}{date\_evenement} & observation & \code{Date} (valeurs entières finies) & aucune \\
+\catalogue{roles}{date\_inventaire} & observation & \code{Date} (valeurs entières finies) & aucune \\
+\catalogue{roles}{age} & agrégats & \code{integer}, \code{double} & aucune \\
+\catalogue{roles}{annee} & agrégats & \code{integer}, \code{double} & aucune \\
+\catalogue{roles}{exposition\_centrale} & agrégats & \code{integer}, \code{double} & aucune \\
+\catalogue{roles}{exposition\_initiale} & agrégats & \code{integer}, \code{double} & aucune \\
+\catalogue{roles}{evenements} & agrégats & \code{integer}, \code{double} & aucune \\
+\catalogue{roles}{montant} & pondération & \code{double} fini $> 0$ & aucune \\
+\catalogue{roles}{segment} & segmentation & \code{character}, \code{factor}, \code{integer} & \code{lignes\_dates\_completes} (facultatif~; segmentation) \\
+\catalogue{roles}{etat\_depart} & multi-états & \code{character}, \code{factor} & aucune \\
+\catalogue{roles}{etat\_arrivee} & multi-états & \code{character}, \code{factor} & aucune \\
+\catalogue{roles}{date\_changement} & multi-états & \code{Date} (valeurs entières finies) & aucune \\
 \end{longtable}
 }
 
@@ -4617,8 +4631,11 @@ valeur ni nom manquant ni nom vide~; \code{details\$classe} et
 qui désignent la cause quand elle tient à une classe, une dimension ou un
 attribut, mais non quand elle tient à une valeur ou à un nom manquant ou
 vide~; issue~\#62)~; \code{role\_inconnu}~;
-\code{role\_declare\_deux\_fois}~; \code{role\_non\_pris\_en\_charge}~;
-\code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
+\code{role\_declare\_deux\_fois}~; \code{role\_non\_pris\_en\_charge} (rôle
+qu'aucune recette du catalogue n'emploie)~; \code{recettes\_concurrentes}
+(rôles propres à plusieurs recettes déclarés ensemble~: la recette n'est pas
+choisie à la place de l'utilisateur)~; ces deux refus ne lisent que les noms
+des rôles~; \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
 \code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
 \code{type\_incompatible} (une colonne de classe d'encodage
@@ -4630,9 +4647,16 @@ issue~\#128)~; \code{date\_hors\_domaine} (une ou plusieurs
 colonnes de date portent une date hors de [0001-01-01, 9999-12-31]~; le refus
 nomme tous les rôles et colonnes en cause et, dans \code{details\$lignes},
 les lignes de chacun, comme \code{ligne\_invalide})~;
-\code{aucune\_recette} (un rôle requis manque~; le
-message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
+\code{aucune\_recette} (aucune recette n'a tous ses rôles requis
+déclarés, refus levé par \code{deduire\_recette()}~; le message nomme,
+recette par recette, les rôles requis absents)~;
+\code{role\_non\_pris\_en\_charge} (rôle que la recette retenue n'emploie
+pas~; le message nomme la recette)~; \code{role\_requis\_manquant}
 (un rôle employé par la segmentation n'est pas déclaré).
+\code{controler\_roles()} rend la recette retenue. Tant que le catalogue
+ne compte qu'une recette, \code{recettes\_concurrentes} et le second
+\code{role\_non\_pris\_en\_charge} ne peuvent pas survenir~: tout rôle
+employé l'est par cette recette, seule à avoir des rôles propres.
 
 \medskip
 {\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
@@ -5088,9 +5112,8 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-donnees}{CATALOGUE\_ROLES} & constante & --- & catalogue fermé des rôles (rôle, famille, code de type, usage) \\
+\catalogue{fonctions-donnees}{CATALOGUE\_ROLES} & constante & --- & catalogue fermé des rôles (rôle, famille, code de type) \\
 \catalogue{fonctions-donnees}{TYPES\_ADMIS} & constante & --- & libellé des types R admis par code de type \\
-\catalogue{fonctions-donnees}{RECETTE\_BRANCHE} & constante & --- & seule recette d'exposition disponible~: \code{lignes\_dates\_completes} \\
 \catalogue{fonctions-donnees}{MODALITES\_SEXE} & constante & --- & \code{H}, \code{F} \\
 \catalogue{fonctions-donnees}{MODALITES\_CAUSE} & constante & --- & \code{deces}, \code{rachat}, \code{terme}, \code{autre}, \code{en\_cours} \\
 \catalogue{fonctions-donnees}{ROLES\_SEGMENTATION} & constante & --- & \code{sexe}, \code{segment} \\
@@ -5100,6 +5123,11 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{MOTIFS\_LIGNES} & constante & --- & motifs de ligne (tableau~\ref{tab:motifs}) \\
 \catalogue{fonctions-donnees}{MOTIFS\_TETE} & constante & --- & motifs de tête (tableau~\ref{tab:motifs}) \\
 \catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus \\
+\catalogue{fonctions-donnees}{CATALOGUE\_RECETTES} & constante & --- & catalogue des recettes d'exposition, une ligne par recette~: rôles requis, groupes de rôles dont un au moins est requis, rôles facultatifs, rôles propres (discriminants), convention native (\code{NA} si elle ne se déduit pas des rôles), forme rendue au noyau (\code{fenetres} ou \code{cellules}), motifs de ligne et d'unité~; seule ligne~: \code{lignes\_dates\_completes} (tableau~\ref{tab:recettes}) \\
+\catalogue{fonctions-donnees}{MATRICE\_RECETTES} & constante & --- & matrice recette $\times$ étape $\times$ estimateur, complète, une ligne par étape et par estimateur de \code{brut}~: admis (\code{oui}, \code{non}, \code{si\_role}), rôle qui conditionne \code{si\_role}, motif du refus~; tout est admis sous \code{lignes\_dates\_completes} \\
+\catalogue{fonctions-donnees}{roles\_recette()} & interne & catalogue, rang & rôles employés par la recette~: requis, d'un groupe, facultatifs, sans doublon \\
+\catalogue{fonctions-donnees}{recettes\_du\_role()} & interne & rôles, catalogue & pour chaque rôle, recettes qui l'emploient, dans l'ordre du catalogue \\
+\catalogue{fonctions-donnees}{motifs\_recettes()} & interne & --- & union des motifs de toutes les recettes, ligne puis unité~: référence du refus \code{exclusion\_inconnue} et ordre canonique des exclusions \\
 \catalogue{fonctions-donnees}{catalogue\_roles()} & exportée & --- & catalogue des rôles (tableau~\ref{tab:catalogue-roles}) \\
 \catalogue{fonctions-donnees}{composantes\_date()} & interne & jours depuis 1970-01-01 & année, mois, jour \\
 \catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
@@ -5107,8 +5135,11 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne de classe d'encodage \code{bytes} étant non conforme sans erreur R (issue~\#128) \\
 \catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
-\catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
+\catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & recettes, rôles requis absents, groupes non couverts & message du refus \code{aucune\_recette}, recette par recette \\
+\catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
+\catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue (par défaut, celui du module) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de matrice~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
+\catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide}, module \code{donnees}~; rend \code{NULL}~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22, \#59 et~\#82~; variantes des modules \code{brut}, \code{validation} et \code{importance\_exclusions} retirées par l'issue~\#82) \\
 \catalogue{fonctions-donnees}{ligne\_transition()} & interne & transition (\code{list(depart, arrivee)}, de forme déjà contrôlée) & ligne de \code{TRANSITIONS} de la transition, zéro ligne si elle n'est pas prise en charge~; seul endroit où s'écrit la recherche (issue~\#22) \\
 \catalogue{fonctions-donnees}{valeurs\_parametres\_donnees()} & interne & transition, période, délai, déjà contrôlés & transition retenue (\code{ligne\_transition()}), début, fin, borne $B$ (jours depuis 1970-01-01)~; ne contrôle rien~; appelée par \code{controler\_plan\_roles()}, qui en transmet la valeur \code{p} aux fonctions d'étape, et par le contrôle de la transition, de la période et du délai (ligne suivante~; issues~\#22 et~\#82) \\
@@ -5173,24 +5204,37 @@ effectifs et dans la fiche, et \textbf{refuse si aucune ne s'applique}, sans
 jamais deviner (E2.3~; ADR 0003, point 3~; ADR 0007, point 5.3). Une seule
 recette existe dans cette branche (tableau~\ref{tab:recettes})~; les recettes
 «~agrégats~» et «~stocks successifs~» (E2.1) viendront avec les branches qui
-les créent. \code{deduire\_recette()} retient la recette dont tous les rôles
-requis sont déclarés, ou refuse (\code{aucune\_recette}, le message nommant la
-recette et les rôles absents)~; dans \code{construire\_table()}, le même
-manque est détecté plus tôt par le contrôle des rôles, avec le même code et le
-module \code{donnees}. \code{construire\_table()} appelle
+les créent. Les recettes sont décrites par une seule constante du module
+\code{donnees}, \code{CATALOGUE\_RECETTES} (une ligne par recette~: rôles
+requis, facultatifs et propres, convention native, motifs~; ADR 0016,
+point~1), et la sélection par une seule fonction du même module,
+\code{deduire\_recette()}~: elle retient la recette dont tous les rôles
+requis sont déclarés, ou refuse (\code{aucune\_recette}, module
+\code{donnees}, le message nommant, recette par recette, les rôles requis
+absents)~; des rôles propres à deux recettes déclarés ensemble sont refusés
+(\code{recettes\_concurrentes}), jamais arbitrés
+(section~\ref{sec:controles-donnees}). \code{construire\_table()} appelle
 \code{deduire\_recette()} une fois, avant toute étape, par
+\code{controler\_roles()}, qui rend la recette à
 \code{controler\_plan\_roles()}, et transmet aux fonctions d'étape qui
 l'emploient (\code{exposition}, \code{importance\_exclusions}) la recette,
 sa convention native et ses rôles requis qu'elle rend, avec la convention
 que rend \code{resoudre\_convention()}~; aucune fonction d'étape ne les
 recalcule, et la fiche porte la même recette (une seule source~; issue~\#82,
-section~\ref{sec:execution}).
+section~\ref{sec:execution}). Après la convention,
+\code{controler\_matrice\_recette()} vérifie que chaque étape du plan, et
+chaque estimateur de l'étape \code{brut}, est admis sous la recette retenue
+(matrice \code{MATRICE\_RECETTES}~; refus sous le motif de la ligne de
+matrice), et qu'aucune exclusion du plan n'est hors des motifs de la recette
+(\code{exclusion\_hors\_recette})~; sous \code{lignes\_dates\_completes},
+toutes les lignes de la matrice admettent, et ses motifs sont tous les
+motifs du catalogue, si bien qu'aucun de ces refus ne peut survenir.
 
 {\small
 \rowcolors{2}{tablerow}{white}
 \begin{longtable}{@{}p{4.4cm}p{5.6cm}p{4.6cm}@{}}
-\caption{Recettes d'exposition (constantes \code{RECETTE\_BRANCHE} et
-\code{CONVENTION\_NATIVE}).}
+\caption{Recettes d'exposition (constante \code{CATALOGUE\_RECETTES},
+module \code{donnees}).}
 \label{tab:recettes}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Recette}} &
@@ -5647,12 +5691,10 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{ORDRE\_CONVENTIONS} & constante & --- & conventions d'âge, de la plus fine à la plus grossière \\
 \catalogue{fonctions-exposition}{CONVENTIONS\_MISES\_EN\_OEUVRE} & constante & --- & \code{dernier\_anniversaire}, \code{age\_atteint\_annee} \\
 \catalogue{fonctions-exposition}{VALEURS\_CONVENTION} & constante & --- & valeurs admises du paramètre \code{convention} \\
-\catalogue{fonctions-exposition}{CONVENTION\_NATIVE} & constante & --- & convention native de chaque recette \\
 \catalogue{fonctions-exposition}{UNITES\_EXPOSITION} & constante & --- & unité de l'exposition par convention \\
 \catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE} & constante & --- & hypothèse de censure non informative, inscrite dans la fiche \\
-\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis~; refus \code{aucune\_recette}~; appelée par \code{controler\_plan\_roles()} seule, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-exposition}{controler\_parametres\_exposition()} & interne & convention, \code{par\_annee} & refus des valeurs \\
-\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & conventions demandée, native et retenue (la native pour \code{plus\_fine}, la demandée sinon) et forçage~; refus \code{convention\_plus\_fine}~; appelée par \code{controler\_plan\_roles()} seule, si l'étape \code{exposition} est au plan, valeur validée transmise aux étapes (issue~\#82) \\
+\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & conventions demandée, native et retenue (la native pour \code{plus\_fine}, la demandée sinon) et forçage~; refus \code{convention\_plus\_fine}~; sans convention native (\code{NA}), \code{plus\_fine} refusé (\code{convention\_non\_declaree}), toute autre valeur retenue, non forcée~; appelée par \code{controler\_plan\_roles()} seule, si l'étape \code{exposition} est au plan, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-exposition}{an\_bissextile()} & interne & années & bissextilité grégorienne \\
 \catalogue{fonctions-exposition}{bissextiles\_anterieures()} & interne & années & nombre d'années bissextiles antérieures \\
 \catalogue{fonctions-exposition}{premier\_janvier()} & interne & années & jour du 1\textsuperscript{er}~janvier \\
