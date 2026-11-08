@@ -13,11 +13,13 @@
 #    § 2) ;
 #  - identité exacte : objets identical() (permutations, rejeu hors
 #    execution, aller-retour de la fiche).
-#  Les contrôles 1.3 et 7 bis sont testés par injection de
-#  `parametres_cle` et `embarquees` (M247) : au commit (1), aucune étape ne
+#  Le contrôle 1.3 est testé par injection de `parametres_cle` et
+#  `embarquees`, le contrôle 7 bis par injection de `embarquees` (M247 ; le
+#  1.3 n'est plus fait par le 7 bis, #82) : au commit (1), aucune étape ne
 #  citait de clé ; depuis le commit (3) (#4), PARAMETRES_CLE_TABLE vaut
-#  « etapes/validation/table_reference », et les plans de ce fichier, sans
-#  étape validation, ne citent aucune clé ; aucune table n'est embarquée
+#  « etapes/validation/table_reference », et, depuis #167, aussi
+#  « etapes/positionnement/table_reference » ; les plans de ce fichier, sans
+#  étape positionnement ni validation, ne citent aucune clé ; aucune table n'est embarquée
 #  (TABLES_EMBARQUEES vide). Le chemin de bout en bout avec une table
 #  (construction puis rejeu) est dans tests/unitaires/test_validation.R.
 # -----------------------------------------------------------------------------
@@ -172,10 +174,11 @@ PLAN <- list(
                 brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95)))
 X <- construire_table(BASE, ROLES, PLAN)
 
-verifier("C constantes : VERSION_FICHE 5L, VERSIONS_FICHE_REJEU 5L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
+verifier("C constantes : VERSION_FICHE 5L, VERSIONS_FICHE_REJEU 5L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/positionnement/table_reference » (#167), « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
          identical(tablexp:::VERSION_FICHE, 5L) && identical(tablexp:::VERSIONS_FICHE_REJEU, 5L) &&
            identical(tablexp:::REPRESENTATION_TABLE, "tablexp table 1") &&
-           identical(tablexp:::PARAMETRES_CLE_TABLE, "etapes/validation/table_reference") &&
+           identical(tablexp:::PARAMETRES_CLE_TABLE,
+                     c("etapes/positionnement/table_reference", "etapes/validation/table_reference")) &&
            identical(tablexp:::TABLES_EMBARQUEES, structure(list(), names = character(0))))
 verifier("C constantes : tables_reference après empreintes dans ORDRE_CHAMPS_FICHE et dans BLOCS_LECTURE_FICHE$rejeu ; fiche/tables_reference après fiche/provenance_mention dans la section donnees_recues", {
   o <- tablexp:::ORDRE_CHAMPS_FICHE; b <- tablexp:::BLOCS_LECTURE_FICHE$rejeu; s <- tablexp:::SECTIONS_RAPPORT
@@ -412,8 +415,9 @@ for (cas in CAS_FORME)
   })
 
 # Fiche de version 5 construite à la main, qui porte la table t1 (importée) ;
-# le plan ne cite aucune clé (pas d'étape validation) : le contrôle 7 bis.3
-# refuse ensuite par table_reference_inattendue.
+# le plan ne cite aucune clé (pas d'étape validation) : le contrôle 1.3,
+# fait par construire_table() que le rejeu appelle après le contrôle 7 bis
+# (#82 ; #164, point 2), refuse ensuite par table_reference_inattendue.
 fiche_t1 <- function(el = EL) champ_fiche(list(t1 = el))
 F_T1 <- fiche_t1()
 verifier("E fiche t1 : représentation fausse -> representation_table_non_admise",
@@ -452,10 +456,12 @@ verifier("E fiche t1 synthétique discordante : complément libm et chemin des p
                  "empreinte_table_discordante", "0", empreinte_table(T_SYNTH),
                  "ses paramètres sont dans fiche/tables_reference/t1/parametres.")
 })
-verifier("E fiche t1 : table permutée reçue, admise jusqu'au point 7 bis.3, puis table_reference_inattendue (texte de la construction)", {
+verifier("E fiche t1 : table permutée reçue, admise par le contrôle 7 bis, puis table_reference_inattendue (texte de la construction), levé par construire_table() (contrôle 1.3, une fois, #82) avant toute étape", {
   x <- TR[6:1, ]; rownames(x) <- NULL
-  controle_refus(refus_de(rejouer_fiche(BASE, F_T1, list(t1 = importee(x)))), "construire_table",
-                 "table_reference_inattendue", "t1", character(0), "citée(s) par aucun paramètre du plan")
+  n <- compter_appels(rejouer_fiche(BASE, F_T1, list(t1 = importee(x))))
+  ok <- controle_refus(refus_de(rejouer_fiche(BASE, F_T1, list(t1 = importee(x)))), "construire_table",
+                       "table_reference_inattendue", "t1", character(0), "citée(s) par aucun paramètre du plan")
+  if (isTRUE(ok) && !identical(n, c(construire_table = 1L, preparer_donnees = 0L))) "appels" else ok
 })
 # Bout en bout par injection dans l'espace de noms (audit de #73, m1) :
 # PARAMETRES_CLE_TABLE posé à deux paramètres character du catalogue
@@ -491,15 +497,16 @@ local({
 })
 ns_cle <- ns$PARAMETRES_CLE_TABLE
 verifier("E injection de bout en bout : PARAMETRES_CLE_TABLE restauré et verrouillé",
-         identical(ns_cle, "etapes/validation/table_reference") && bindingIsLocked("PARAMETRES_CLE_TABLE", ns))
+         identical(ns_cle, c("etapes/positionnement/table_reference", "etapes/validation/table_reference")) &&
+           bindingIsLocked("PARAMETRES_CLE_TABLE", ns))
 verifier("E injection : origine « relue dans le package » d'une table embarquée, liste assemblée et textes de la ligne 8", {
   el <- element_table_fiche(T_EMB)
-  r <- controler_tables_rejeu(list(t1 = el), NULL, PLAN_T1, "code", CLE_ESSAI, list(TABLE_E = T_EMB))
+  r <- controler_tables_rejeu(list(t1 = el), NULL, "code", list(TABLE_E = T_EMB))
   identical(r$tables, list(t1 = T_EMB)) && identical(unname(r$empreintes), el$empreinte) &&
     identical(r$attendu, paste0("t1 : ", el$empreinte)) && identical(r$lu, paste0("t1 : ", el$empreinte, " (relue dans le package)"))
 })
 verifier("E injection : origine « reçue », deux tables dans l'ordre de la fiche, textes joints par « ; »", {
-  r <- controler_tables_rejeu(CHAMP_AB, list(b = T1, a = T_SYNTH), PLAN_AB, "code", CLES_AB)
+  r <- controler_tables_rejeu(CHAMP_AB, list(b = T1, a = T_SYNTH), "code")
   identical(names(r$tables), c("a", "b")) &&
     identical(r$lu, sprintf("a : %s (reçue) ; b : %s (reçue)", CHAMP_AB$a$empreinte, CHAMP_AB$b$empreinte))
 })

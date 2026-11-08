@@ -67,25 +67,18 @@ UNITES_EXPOSITION <- c(
 HYPOTHESE_CENSURE <- paste("censure non informative : les sorties concurrentes sont des censures",
                            "à droite à leur instant (risques indépendants)")
 
-# Recette de la branche, sans contrôle des rôles (#22) : list(recette,
-# convention_native, roles_requis), rendue par deduire_recette() et employée
-# telle quelle par calculer_exposition(controler = FALSE).
-recette_branche <- function()
-  list(recette = RECETTE_BRANCHE, convention_native = CONVENTION_NATIVE[[RECETTE_BRANCHE]],
-       roles_requis = CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"])
-
 # Recette déduite des rôles (ADR 0007, point 5.3) : la recette dont tous les
 # rôles requis sont déclarés. Seule recette de la branche :
 # `lignes_dates_completes`, rôles requis du catalogue (CATALOGUE_ROLES,
-# usage `requis`). Rend list(recette, convention_native, roles_requis)
-# (recette_branche()).
+# usage `requis`). Rend list(recette, convention_native, roles_requis),
+# valeur validée que construire_table() transmet aux étapes (#82).
 deduire_recette <- function(roles) {
-  rec <- recette_branche()
-  manquants <- setdiff(rec$roles_requis, names(roles))
+  requis <- CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"]
+  manquants <- setdiff(requis, names(roles))
   if (length(manquants))
-    refuser("exposition", "aucune_recette", message_aucune_recette(rec$roles_requis, manquants),
+    refuser("exposition", "aucune_recette", message_aucune_recette(requis, manquants),
             list(recette = RECETTE_BRANCHE, role = manquants))
-  rec
+  list(recette = RECETTE_BRANCHE, convention_native = CONVENTION_NATIVE[[RECETTE_BRANCHE]], roles_requis = requis)
 }
 
 # Contrôle les paramètres propres à l'étape `exposition` (valeurs ; les noms
@@ -117,28 +110,20 @@ controler_parametres_exposition <- function(convention, par_annee) {
 }
 
 # Convention retenue à partir de la convention demandée et de la convention
-# native de la recette, sans contrôle (#22) : `plus_fine` retient la native ;
-# toute autre valeur est retenue telle quelle. Rend list(demandee, native,
-# retenue, forcee), rendue par resoudre_convention() et employée telle quelle
-# par calculer_exposition(controler = FALSE).
-convention_retenue <- function(convention, native) {
-  retenue <- if (identical(convention, "plus_fine")) native else convention
-  list(demandee = convention, native = native, retenue = retenue,
-       forcee = !identical(retenue, native))
-}
-
-# Convention retenue (convention_retenue()), après contrôle : une convention
-# plus grossière que la native est un forçage, admis ; une convention plus fine
-# est refusée (les rôles ne la permettent pas).
+# native de la recette : `plus_fine` retient la native ; toute autre valeur
+# est retenue telle quelle. Une convention plus grossière que la native est un
+# forçage, admis ; une convention plus fine est refusée (les rôles ne la
+# permettent pas). Rend list(demandee, native, retenue, forcee), valeur
+# validée que construire_table() transmet aux étapes (#82).
 resoudre_convention <- function(convention, native) {
-  conv <- convention_retenue(convention, native)
-  if (match(conv$retenue, ORDRE_CONVENTIONS) < match(native, ORDRE_CONVENTIONS))
+  retenue <- if (identical(convention, "plus_fine")) native else convention
+  if (match(retenue, ORDRE_CONVENTIONS) < match(native, ORDRE_CONVENTIONS))
     refuser("exposition", "convention_plus_fine",
             formuler(paste("Convention d'âge « %s » plus fine que celle que la recette permet",
                            "(« %s ») : le forçage vers une convention plus fine est refusé."),
-                     citer(conv$retenue), native),
-            list(convention = conv$retenue, convention_native = native))
-  conv
+                     citer(retenue), native),
+            list(convention = retenue, convention_native = native))
+  list(demandee = convention, native = native, retenue = retenue, forcee = !identical(retenue, native))
 }
 
 # --- arithmétique de dates (jours depuis 1970-01-01) -------------------------
@@ -375,20 +360,19 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #   observations      : data.frame des observations de l'étape `donnees`
 #                       (resultat$observations : date_naissance, debut, fin
 #                       [NA = en cours], cause, et les rôles de segmentation) ;
-#   roles             : vecteur nommé rôle -> colonne (déduction de la recette) ;
-#   transition        : list(depart, arrivee) ;
+#   p                 : valeurs validées de la transition, de la période et du
+#                       délai (valeurs_parametres_donnees()) ;
 #   periode           : list(debut, fin), dates ; fin incluse ;
-#   delai_declaration : entier de jours >= 0 ;
+#   delai_declaration : entier de jours >= 0 (periode et delai_declaration
+#                       sont inscrits tels quels dans parametres) ;
 #   segmentation      : sous-ensemble de c("sexe", "segment"), vide admis ;
-#   convention        : plus_fine, dernier_anniversaire ou age_atteint_annee ;
-#   par_annee         : TRUE pour découper aussi par année civile ;
-#   controler         : TRUE (appel direct) contrôle les paramètres, la recette
-#                       et la convention ; FALSE, réservé à construire_table()
-#                       qui les a contrôlés (valider_plan(), controler_roles(),
-#                       deduire_recette(), resoudre_convention()), n'en refait
-#                       aucun (#22 ; seule la valeur FALSE les omet) : avec
-#                       FALSE, aucune entrée n'est gardée ici, l'appelant,
-#                       construire_table(), a tout contrôlé.
+#   recette           : recette validée (deduire_recette()) ;
+#   conv              : convention validée (resoudre_convention()) ;
+#   par_annee         : TRUE pour découper aussi par année civile.
+# Aucun contrôle (#82 ; ADR 0007, annotation du 17/10/2026, (c) et (d)) : les
+# valeurs sont celles que construire_table() a validées (controler_entrees())
+# et inscrites dans la fiche ; une seule source pour la recette et la
+# convention.
 # Rend list(parametres, resultat, diagnostics, avertissements, fenetres) ;
 # fenetres (#38) : objet de classe `fenetres_exposition`, fenêtres des
 # observations (composantes, calendrier, a, b, evenement :
@@ -411,19 +395,8 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 # parametres$unite_exposition), complement_initial_cellule et
 # complement_initial_fenetre (sans par_annee seulement), evenements,
 # sorties_concurrentes.
-calculer_exposition <- function(observations, roles, transition, periode, delai_declaration,
-                                segmentation, convention, par_annee, controler = TRUE) {
-  if (isFALSE(controler)) {
-    p <- valeurs_parametres_donnees(transition, periode, delai_declaration)
-    rec <- recette_branche()
-    conv <- convention_retenue(convention, rec$convention_native)
-  } else {
-    p <- controler_parametres_donnees(transition, periode, delai_declaration, segmentation,
-                                      character(0))
-    controler_parametres_exposition(convention, par_annee)
-    rec <- deduire_recette(roles)
-    conv <- resoudre_convention(convention, rec$convention_native)
-  }
+calculer_exposition <- function(observations, p, periode, delai_declaration, segmentation, recette, conv,
+                                par_annee) {
   cv <- conv$retenue
   manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
   if (length(manquantes))
@@ -529,7 +502,7 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
   if (conv$forcee)
     avert <- avertir(avert, "exposition", "convention_forcee",
                      sprintf("Convention d'âge forcée : « %s » au lieu de « %s » (convention native de la recette « %s »).",
-                             cv, conv$native, rec$recette), 1)
+                             cv, conv$native, recette$recette), 1)
   if (sans_exposition > 0L)
     avert <- avertir(avert, "exposition", "evenement_sans_exposition",
                      sprintf("Relevé : %d cellule(s) à exposition nulle qui comptent au moins un événement.",
@@ -539,7 +512,7 @@ calculer_exposition <- function(observations, roles, transition, periode, delai_
                      "Aucune exposition ni aucun événement dans la période d'observation.", 0)
 
   list(
-    parametres = list(recette = rec$recette, convention = conv,
+    parametres = list(recette = recette$recette, convention = conv,
                       # Texte du moteur marqué UTF-8 en toute locale (#50).
                       unite_exposition = texte_moteur(UNITES_EXPOSITION[[cv]]), par_annee = par_annee,
                       transition = p$transition$code, segmentation = segmentation,

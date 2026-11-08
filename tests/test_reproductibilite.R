@@ -16,20 +16,30 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R6 sur l'entrée de référence (jeu_reference()),
-#  aplatis, aller-retour exact du format, comparés à leur fichier de
-#  tests/reference/ (échec attendu #17 tant que le fichier n'existe pas,
-#  liste SANS_REFERENCE_17), aucune référence orpheline ; témoins sur des
-#  copies temporaires (jamais sur tests/reference/) ; règles des modes du
-#  workflow et lignes de commande produire_references.R (refus d'appel) et
-#  comparer_references.R ; permutation des lignes de l'entrée de référence
+#  3.8) : plans R1 à R12 sur l'entrée de chaque plan (jeu_reference(), ou
+#  jeu_reference_defauts() pour R9), aplatis, aller-retour exact du format,
+#  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
+#  l'issue de création tant que le fichier n'existe pas, liste
+#  SANS_REFERENCE, vide depuis la création de R10 à R12), aucune référence
+#  orpheline ;
+#  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
+#  evenements de l'exposition (#32) ; R8 : validation et importance des
+#  exclusions, table importée passée par tables_reference (#166) ; R9 : le
+#  même plan sur une entrée à défauts injectés, lignes exclues par motif et
+#  retraits non nuls (#166) ; R10 : positionnement par SMR et validation de
+#  la table positionnée (#167) ; R11 : test d'homogénéité entre segments
+#  (#168) ; R12 : le même test sous H0 vraie, transition en_cours -> rachat
+#  (#168, M307) ; témoins sur des copies temporaires (jamais sur
+#  tests/reference/) ; règles des modes du workflow et lignes de commande
+#  produire_references.R (refus d'appel) et comparer_references.R ;
+#  permutation des lignes de l'entrée de référence
 #  (#39) : plans R6, R4, R5, R3 et R2, deux permutations, identical() hors
 #  sommes par cellule, celles-ci à la tolérance TOLERANCE_PERMUTATION, bilan
 #  des écarts et témoins ; chaînes non ASCII et locale (T1 à T4, M54) ;
 #  transitions de changement de résultat annoncé (ADR 0009, point 9.5, #47) :
 #  liste unique TRANSITIONS_EN_COURS (vide hors transition), utilitaire
 #  générique et témoins de chaque nature, de l'union et du succès inattendu.
-#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R6 (sections et
+#  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R12 (sections et
 #  leur ordre, cellules décimales en %.17g, textes fixes, section brut ; taille
 #  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
 #
@@ -311,19 +321,21 @@ verifier("R6, autre processus : objet identical() hors execution (Kaplan-Meier c
 unlink(c(script, sortie))
 
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
-# référence sur l'entrée de référence, aplati et comparé à son fichier ;
+# référence sur son entrée (champ `entree`, point 4.1), aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R6, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R12, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
 local(for (e in parse(file.path(RACINE, "tests", "reference", "outils_reference.R"), encoding = "UTF-8",
                       keep.source = FALSE)) eval(e, globalenv()))
 DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
-# Plans sans fichier de référence (point 3.7) : échec attendu #17. Le commit
-# de référence de la session principale retire de cette liste les plans
-# qu'il crée (succès inattendu sinon).
-SANS_REFERENCE_17 <- character(0)
+# Plans sans fichier de référence (point 3.7) : échec attendu renvoyant à
+# l'issue de création du plan (#17 pour R1 à R6, créés en `1019d8e`). Vecteur
+# nommé : identifiant du plan -> issue de création. Le commit de référence de
+# la session principale retire de cette liste les plans qu'il crée (succès
+# inattendu sinon).
+SANS_REFERENCE <- character(0)
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -649,7 +661,7 @@ issue_des_restes <- function(transitions) {
 # 5a95f9c : octets_lignes(sprintf("%d", x)) et octets_lignes(txt[match(j,
 # u)])). Les références ne comparent que le jeton de l'empreinte (ADR 0009,
 # seconde annotation du 20/10/2026) : l'égalité à l'oracle en garde la valeur,
-# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R6 ne
+# sans valeur figée propre à une machine (ADR 0011, point 11.2). R1 à R12 ne
 # portent aucun entier négatif (les dates s'écrivent en ISO, sans signe) : le
 # signe des entiers est gardé par les tests unitaires des écrivains, non par
 # cet oracle.
@@ -666,7 +678,7 @@ oracle_empreinte_resultat <- local({
   e$empreinte_resultat
 })
 
-# Rapport figé (#87, U24) : contrôles du document de R1 à R6 à 10^5 lignes
+# Rapport figé (#87, U24) : contrôles du document de R1 à R12 à 10^5 lignes
 # (spécification d'actuary du 24/10/2026, U14, U18, U21, U22, repris de
 # tests/unitaires/test_rapport.R) ; rend TRUE ou la liste des écarts.
 controler_rapport_fige <- function(x, l, id) {
@@ -716,8 +728,17 @@ controler_rapport_fige <- function(x, l, id) {
   rj <- section_de("rejeu")
   if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))
     e <- c(e, "U21 : rejeu")
-  if (!any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) ||
+  # Étape validation demandée (R8, #166) : le paragraphe « non demandée par le
+  # plan » est absent, la section porte la légende des cellules et des
+  # statistiques, et l'étape importance_exclusions a sa section.
+  valid <- !is.null(x$etapes$validation)
+  if (any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) == valid ||
       !any(grepl("<p>Table finale et comparaisons : non produites par cette version", l, fixed = TRUE))) e <- c(e, "U21 : sections 12 et 13")
+  legende <- function(sec, chemin) any(startsWith(section_de(sec), paste0("<caption><code>", chemin, "</code>")))
+  if (valid && !(legende("etape_validation", "etapes/validation/resultat/cellules") &&
+                 legende("etape_validation", "etapes/validation/resultat/statistiques") &&
+                 legende("etape_importance_exclusions", "etapes/importance_exclusions/resultat/retraits")))
+    e <- c(e, "U21 : sections validation et importance_exclusions")
   # U22 : section brut.
   b <- section_de("etape_brut")
   st <- grep("<caption><code>etapes/brut/parametres/statuts</code>", b, fixed = TRUE)
@@ -725,23 +746,103 @@ controler_rapport_fige <- function(x, l, id) {
   if (length(st) != 1L || !length(re) || st > re[1L]) e <- c(e, "U22 : ordre des légendes")
   if (any(startsWith(b, "<p>Intervalles binomiaux (colonnes borne_inf_exacte")) != ("binomial" %in% x$etapes$brut$parametres$estimateurs))
     e <- c(e, "U22 : légende binomiale")
-  if (id == "R6" && !any(grepl("^<tr><td>etapes/brut/resultat/kaplan_meier_sauts</td><td>data.frame</td><td>[0-9]+</td><td>non reproduites", b)))
+  if (id %in% c("R6", "R7") && !any(grepl("^<tr><td>etapes/brut/resultat/kaplan_meier_sauts</td><td>data.frame</td><td>[0-9]+</td><td>non reproduites", b)))
     e <- c(e, "U22 : kaplan_meier_sauts")
   if (length(e)) e else TRUE
 }
 
-jeu_ref <- jeu_reference()
+# Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
+# distincte tirée une seule fois ; jeu_ref est l'entrée `reference` (R1 à R8,
+# R10 à R12), que les contrôles propres à un plan de cette entrée
+# (permutation, R6) lisent.
+entrees_ref <- entrees_des_plans(plans_reference())
+jeu_ref <- entrees_ref[["reference"]]
+verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
+  e <- unname(vapply(plans_reference(), function(p) p$entree, ""))
+  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L))
+  if (!identical(e, attendu))
+    paste0("entrées des plans obtenues (", paste(e, collapse = ", "), ") contre attendues (", paste(attendu, collapse = ", "), ")")
+  else if (!identical(names(entrees_ref), c("reference", "reference_defauts")))
+    paste0("entrées tirées obtenues (", paste(names(entrees_ref), collapse = ", "), ") contre attendues (reference, reference_defauts)")
+  else if (!identical(jeu_ref, jeu_reference())) "entrée `reference` différente de jeu_reference()"
+  else TRUE
+})
+verifier("entrées des plans : tirer_entree() d'un nom inconnu -> erreur",
+         inherits(tryCatch(tirer_entree("inconnue"), error = function(e) e), "error"))
+# Refus nommé d'un plan sans champ `entree` exploitable (pas de valeur par
+# défaut). Le message se compare sur sa partie ASCII : sous une locale non UTF-8,
+# stop() rend « î » en « <U+00EE> ».
+verifier("entrées des plans : entrees_des_plans() d'un plan sans champ entree, ou d'un champ non chaîne -> refus nommant le plan", {
+  msg <- function(plans) tryCatch({ entrees_des_plans(plans); "aucune erreur" }, error = function(e) conditionMessage(e))
+  debut <- "plan X : champ entree absent ou non cha"
+  obt <- c(sans = msg(list(list(identifiant = "X"))),
+           nul = msg(list(list(identifiant = "X", entree = NULL))),
+           numerique = msg(list(list(identifiant = "X", entree = 1))),
+           vecteur = msg(list(list(identifiant = "X", entree = c("reference", "reference")))),
+           na = msg(list(list(identifiant = "X", entree = NA_character_))),
+           sans_identifiant = msg(list(list(entree = NULL))))
+  attendu_debut <- ifelse(names(obt) == "sans_identifiant", "plan (sans identifiant) : champ entree absent ou non cha", debut)
+  mal <- !startsWith(obt, attendu_debut)
+  if (!any(mal)) TRUE
+  else paste0("messages obtenus (", paste(names(obt)[mal], ": ", obt[mal], collapse = " ; "), ") contre attendus (", paste(unique(attendu_debut), collapse = " ; "), "...)")
+})
+# Entrée de R9 : le jeu de jeu_reference() altéré après son tirage complet. Les
+# lignes que les défauts n'altèrent pas sont celles de jeu_reference() (même
+# loi, même portefeuille, même graine du jeu) ; les défauts sont ceux déclarés
+# (graine des défauts, nombre fixe par motif, un seul motif par ligne).
+verifier("R9, entrée : défauts de graine GRAINE_DEFAUTS_R9, NOMBRE_PAR_MOTIF_R9 lignes par motif de MOTIFS_DEFAUTS_R9, lignes non altérées identical() à jeu_reference()", {
+  d9 <- entrees_ref[["reference_defauts"]]$donnees
+  da <- attr(d9, "defauts")
+  l <- da$lignes
+  nus <- function(d) { attributes(d) <- attributes(d)[c("names", "class", "row.names")]; d }
+  alt <- unique(l$ligne)
+  if (is.null(da)) "attribut defauts absent"
+  else if (!identical(da$graine, GRAINE_DEFAUTS_R9)) "graine des défauts différente de GRAINE_DEFAUTS_R9"
+  else if (!identical(sort(unique(l$defaut)), sort(MOTIFS_DEFAUTS_R9)) ||
+           !all(table(l$defaut) == NOMBRE_PAR_MOTIF_R9)) "motifs ou effectifs par motif différents des déclarés"
+  else if (length(alt) != length(MOTIFS_DEFAUTS_R9) * NOMBRE_PAR_MOTIF_R9) "une ligne porte plusieurs motifs"
+  else if (nrow(d9) != nrow(jeu_ref$donnees)) "nombre de lignes différent de jeu_reference()"
+  else if (!identical(nus(d9)[-alt, ], nus(jeu_ref$donnees)[-alt, ])) "lignes non altérées différentes de jeu_reference()"
+  else TRUE
+})
+# Invariants de structure de TOLERANCES (#175), fonctions des chemins doubles
+# et d'une table de clés (témoins plus bas) ; chacune rend les chemins en défaut.
+# Les clés qui classent un chemin sont toutes celles de cles_de() : une clé plus
+# courte que la clé qualifiée est relevée, même si elle ne l'emporte pas.
+REGEX_CHEMIN_ETAPE <- "^(fiche/plan/)?etapes/[^/]+/"
+cles_nues <- function(tolerances = TOLERANCES) names(tolerances)[!grepl("/", names(tolerances), fixed = TRUE)]
+doubles_etape_mal_classes <- function(doubles, tolerances = TOLERANCES) {
+  d <- doubles[grepl(REGEX_CHEMIN_ETAPE, doubles)]
+  etape <- sub("/.*$", "", sub("^(fiche/plan/)?etapes/", "", d))
+  d[vapply(seq_along(d), function(i) {
+    k <- cles_de(d[i], tolerances); !length(k) || !all(startsWith(k, paste0(etape[i], "/"))) }, NA)]
+}
+doubles_fiche_mal_classes <- function(doubles, tolerances = TOLERANCES) {
+  d <- doubles[startsWith(doubles, "fiche/") & !grepl(REGEX_CHEMIN_ETAPE, doubles)]
+  d[vapply(d, function(c_) { k <- cles_de(c_, tolerances); !length(k) || !all(startsWith(k, "fiche/")) }, NA)]
+}
+doubles_multi_cles <- function(doubles, tolerances = TOLERANCES)
+  doubles[vapply(doubles, function(c_) length(cles_de(c_, tolerances)) > 1L, NA)]
+verifier("TOLERANCES : toute tolérance est une classe de CLASSES_TOLERANCE (#168)", {
+  hors <- names(TOLERANCES)[!(TOLERANCES %in% CLASSES_TOLERANCE)]
+  if (length(hors)) paste("tolérances hors classe :", paste(hors, collapse = ", ")) else TRUE
+})
+verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
+  nues <- cles_nues()
+  if (length(nues)) paste("clés nues :", paste(nues, collapse = ", ")) else TRUE
+})
 aplatis <- list()
 for (p in plans_reference()) {
   id <- p$identifiant
-  x_ref <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan)
+  entree_p <- entrees_ref[[p$entree]]
+  x_ref <- construire_table(entree_p$donnees, entree_p$roles, p$plan, tables_reference = tables_du_plan(p))
   verifier(sprintf("%s : empreinte du résultat égale à celle de l'oracle d'avant #71 (écrivains des entiers et des dates par une chaîne par ligne)", id),
            grepl("^[0-9a-f]{32}$", x_ref$fiche$empreintes$resultat) &&
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
   # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
   # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
   verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 « identique », 14 « non vérifiée »", id), {
-    r <- rejouer_fiche(jeu_ref$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)))
+    r <- rejouer_fiche(entree_p$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)), tables_reference = tables_du_plan(p))
     identical(sans_execution(r$construction), sans_execution(x_ref)) &&
       identical(r$bilan$verdict[9:14], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
   })
@@ -764,6 +865,103 @@ for (p in plans_reference()) {
            if (inherits(g, "refus_reference")) conditionMessage(g) else TRUE)
   if (inherits(g, "refus_reference")) next
   aplatis[[id]] <- g
+  # Règle de complétude (point 3.4), avant toute création : un double sans
+  # classe ferait échouer le workflow de création (critère de #32).
+  verifier(sprintf("%s : aucun double sans classe de tolérance dans l'objet aplati (point 3.4)", id), {
+    sans <- doubles_sans_tolerance(g)
+    if (length(sans)) paste("sans tolérance :", paste(utils::head(sans, 5L), collapse = ", ")) else TRUE
+  })
+  # Invariants de structure de TOLERANCES (#175 ; point 3.4, seconde annotation,
+  # (a)), pour tous les plans : (b) tout double d'une étape (etapes/<e>/ ou
+  # fiche/plan/etapes/<e>/) n'est classé que par des clés qui commencent par
+  # <e>/ ; (c) tout double de la fiche hors fiche/plan/etapes/ n'est classé que
+  # par des clés qui commencent par fiche/ ; (d) aucun chemin n'est classé par
+  # deux clés. Une étape nouvelle (#167, #168) ne peut ainsi hériter la classe
+  # d'une colonne homonyme d'une autre étape, ni d'une clé nue.
+  # Limite connue (audit de #175, constat mineur) : un double de premier
+  # niveau hors etapes/ et fiche/ (avertissements/, table/ à venir) n'est
+  # couvert par aucun invariant ; il hériterait en silence d'une clé d'étape si
+  # un segment intermédiaire portait le nom de l'étape. Aucun tel double dans
+  # R1 à R12 (mesuré : 0) ; à couvrir quand un premier apparaîtra.
+  verifier(sprintf("%s : tout double d'une étape est classé par des clés qui commencent par l'étape (point 3.4)", id), {
+    d <- names(g$types)[g$types == "double"]
+    mal <- doubles_etape_mal_classes(d)
+    if (!any(grepl(REGEX_CHEMIN_ETAPE, d))) "aucun double d'étape trouvé"
+    else if (length(mal)) paste("clé non qualifiée par l'étape :", paste(utils::head(mal, 5L), collapse = ", "))
+    else TRUE
+  })
+  verifier(sprintf("%s : tout double de la fiche hors fiche/plan/etapes/ est classé par des clés qui commencent par fiche/ (point 3.4)", id), {
+    d <- names(g$types)[g$types == "double"]
+    mal <- doubles_fiche_mal_classes(d)
+    if (!any(startsWith(d, "fiche/") & !grepl(REGEX_CHEMIN_ETAPE, d))) "aucun double de fiche trouvé"
+    else if (length(mal)) paste("clé non qualifiée par fiche/ :", paste(utils::head(mal, 5L), collapse = ", "))
+    else TRUE
+  })
+  verifier(sprintf("%s : aucun chemin classé par deux clés", id), {
+    conflit <- doubles_multi_cles(names(g$types)[g$types == "double"])
+    if (length(conflit)) paste("classé par plusieurs clés :", paste(utils::head(conflit, 5L), collapse = ", ")) else TRUE
+  })
+  # R7 (#32) : Kaplan-Meier sous age_atteint_annee. Σd par cellule des sauts =
+  # evenements de la cellule Kaplan-Meier = evenements de l'exposition (même
+  # cellules, mêmes effectifs d'événements).
+  if (id == "R7") verifier("R7 : Σ des evenements des sauts par cellule = evenements de Kaplan-Meier = evenements de l'exposition (#32)", {
+    ex <- x_ref$etapes$exposition$resultat$exposition
+    km <- x_ref$etapes$brut$resultat$kaplan_meier
+    sa <- x_ref$etapes$brut$resultat$kaplan_meier_sauts
+    cle <- function(d) paste(d$sexe, d$age)
+    som <- tapply(sa$evenements, cle(sa), sum)
+    d_sauts <- unname(ifelse(is.na(som[cle(km)]), 0L, som[cle(km)]))
+    if (!identical(cle(km), cle(ex))) "cellules de Kaplan-Meier et de l'exposition différentes"
+    else if (!identical(as.integer(d_sauts), km$evenements)) "Σ des sauts différente des evenements de Kaplan-Meier"
+    else if (!identical(km$evenements, ex$evenements)) "evenements de Kaplan-Meier différents de ceux de l'exposition"
+    else if (sum(sa$evenements) != sum(ex$evenements)) "totaux différents" else TRUE
+  })
+  # R9 (#166), non-vacuité : le retrait contrefactuel porte sur des lignes
+  # réellement exclues, une classe de mesurabilité par motif (id_contrat_manquant :
+  # mesurable aux niveaux A et B ; sexe_manquant : mesurable en A, non calculable
+  # en B faute de clé sous la segmentation `sexe` ; entree_manquante : non
+  # mesurable), des retraits non nuls et un SMR du comparateur 1 défini. Sans
+  # défauts dans l'entrée, ces contrôles échouent (R8 les passerait à vide).
+  if (id == "R9") {
+    ex9 <- x_ref$etapes$donnees$resultat
+    ie9 <- x_ref$etapes$importance_exclusions$resultat
+    verifier("R9 : lignes exclues pour chacun des motifs de MOTIFS_DEFAUTS_R9 (NOMBRE_PAR_MOTIF_R9), nombre_lignes_exclues = leur somme", {
+      n <- vapply(ex9$lignes_exclues[MOTIFS_DEFAUTS_R9], length, 1L)
+      if (!identical(unname(n), rep(NOMBRE_PAR_MOTIF_R9, length(MOTIFS_DEFAUTS_R9)))) paste("effectifs par motif :", paste(names(n), n, collapse = ", "))
+      else if (!identical(ex9$nombre_lignes_exclues, sum(n))) "nombre_lignes_exclues différent de la somme"
+      else TRUE
+    })
+    ligne9 <- function(tab, ens, niveau) tab[tab$ensemble == ens & tab$niveau == niveau, , drop = FALSE]
+    verifier("R9 : une classe de mesurabilité par motif (id_contrat_manquant : retrait aux niveaux A et B, sexe_manquant : A seulement, clé manquante en B, entree_manquante : aucune ligne mesurable)", {
+      r <- ie9$retraits
+      retire <- function(ens, niveau) { l <- ligne9(r, ens, niveau)
+        nrow(l) == 1L && identical(l$etat, "produite") && isTRUE(l$evenements_retires > 0) &&
+          isTRUE(l$exposition_jours_retiree > 0) && isTRUE(l$exposition_centrale_retiree > 0) }
+      etat <- function(ens, niveau) { e <- ligne9(r, ens, niveau)$etat; if (length(e) == 1L) e else sprintf("(%d ligne(s))", length(e)) }
+      ecarts <- c(
+        if (!retire("id_contrat_manquant", "A")) "id_contrat_manquant, niveau A : pas de retrait produit non nul",
+        if (!retire("id_contrat_manquant", "B")) "id_contrat_manquant, niveau B : pas de retrait produit non nul",
+        if (!retire("sexe_manquant", "A")) "sexe_manquant, niveau A : pas de retrait produit non nul",
+        if (!identical(etat("sexe_manquant", "B"), "cle_segmentation_manquante")) paste("sexe_manquant, niveau B : état", etat("sexe_manquant", "B")),
+        if (!identical(etat("entree_manquante", "A"), "aucune_ligne_mesurable")) paste("entree_manquante, niveau A : état", etat("entree_manquante", "A")),
+        if (!identical(etat("entree_manquante", "B"), "aucune_ligne_mesurable")) paste("entree_manquante, niveau B : état", etat("entree_manquante", "B")))
+      if (length(ecarts)) ecarts else TRUE
+    })
+    verifier("R9 : retraits non nuls (total des niveaux A et B) et SMR du comparateur 1 défini, fini et positif, intervalle exact non dégénéré", {
+      r <- ie9$retraits; sm <- ie9$smr_comparateur_1
+      def <- function(niveau) { l <- ligne9(sm, "total", niveau)
+        nrow(l) == 1L && l$etat == "produite" && l$observes > 0 && is.finite(l$attendus) && l$attendus > 0 &&
+          is.finite(l$smr) && l$smr > 0 && is.finite(l$borne_inf_exacte) && is.finite(l$borne_sup_exacte) &&
+          l$borne_inf_exacte < l$smr && l$smr < l$borne_sup_exacte }
+      ecarts <- c(
+        if (!isTRUE(ligne9(r, "total", "A")$evenements_retires > 0)) "total, niveau A : aucun événement retiré",
+        if (!isTRUE(ligne9(r, "total", "B")$evenements_retires > 0)) "total, niveau B : aucun événement retiré",
+        if (!isTRUE(ligne9(r, "total", "A")$exposition_centrale_retiree > 0)) "total, niveau A : aucune exposition centrale retirée",
+        if (!isTRUE(def("A"))) "SMR du comparateur 1, total, niveau A : non défini, non fini, non positif ou intervalle exact dégénéré",
+        if (!isTRUE(def("B"))) "SMR du comparateur 1, total, niveau B : non défini, non fini, non positif ou intervalle exact dégénéré")
+      if (length(ecarts)) ecarts else TRUE
+    })
+  }
   f <- tempfile(fileext = ".tsv")
   ecrire_reference(g, f, c(identifiant = id))
   verifier(sprintf("%s : aller-retour lire(ecrire(aplatir(x))) identical() (types et valeurs)", id), {
@@ -785,11 +983,11 @@ for (p in plans_reference()) {
   # Échec attendu seulement si le fichier est absent : un plan encore listé
   # dont le fichier existe échoue (marque à retirer ; la comparaison devient
   # alors un test ordinaire).
-  if (id %in% SANS_REFERENCE_17 && !present) echec_attendu(nom, "#17", comparer_au_fichier(id, g))
-  else if (id %in% SANS_REFERENCE_17)
-    verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE_17", id, id))
+  if (id %in% names(SANS_REFERENCE) && !present) echec_attendu(nom, SANS_REFERENCE[[id]], comparer_au_fichier(id, g))
+  else if (id %in% names(SANS_REFERENCE))
+    verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE", id, id))
   else controler_plan(id, nom, lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv"))), g,
-                      comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, jeu_ref$donnees, jeu_ref$roles)
+                      comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, entree_p$donnees, entree_p$roles)
 }
 verifier("aucune référence orpheline sous tests/reference/ (point 3.7)", {
   o <- if (dir.exists(DOSSIER_REFERENCES)) references_orphelines(DOSSIER_REFERENCES) else character(0)
@@ -818,7 +1016,9 @@ GRAINE_PERMUTATION <- 20261019L
 # Un écart dépendant de l'ordre inférieur à 1e-12 n'y est pas détecté (témoin
 # « taux altéré de 1e-13 »). R1 est couvert par R6, qui en contient tous les
 # chemins aux mêmes valeurs, hors paramètres et diagnostics du brut liés à
-# kaplan_meier ; R3 est le seul plan sous age_atteint_annee.
+# kaplan_meier ; R3 et R7 sont les plans sous age_atteint_annee : R3 est
+# permuté, R7 (R3 avec kaplan_meier) ne l'est pas, son chemin Kaplan-Meier
+# l'étant par R6, sous la convention plus_fine.
 TOLERANCE_PERMUTATION <- CLASSES_TOLERANCE[["1e-12"]]
 EMPREINTES_PERMUTATION <- c(CHEMIN_EMPREINTE_DONNEES, "etapes/donnees/resultat/lignes_conservees/@empreinte",
                             "etapes/donnees/resultat/observations/@empreinte")
@@ -1001,27 +1201,34 @@ for (cas in list(
   list(chemin = P_BORNE, facteur = 1 + 2e-12, ok = FALSE, v = "écart", classe = "1e-12, au-delà"),
   list(chemin = P_BORNE, facteur = 1 + 0.5e-12, ok = TRUE, v = "sous tolérance", classe = "1e-12, juste en dessous"),
   list(chemin = P_JOURS, facteur = 1 + .Machine$double.eps, ok = FALSE, v = "écart", classe = "exacte, un ulp"),
-  # Clé qualifiée prioritaire : kaplan_meier/taux (1e-12) l'emporte sur taux
-  # (1e-14) ; la même altération sur poisson/taux est un écart.
-  list(chemin = P_KM, facteur = 1 + 0.5e-12, ok = TRUE, v = "sous tolérance", classe = "clé qualifiée kaplan_meier/taux (1e-12)"),
+  # Deux colonnes `taux` de classes différentes : brut/resultat/kaplan_meier/taux
+  # (1e-12) et brut/resultat/poisson/taux (1e-14) ; la même altération sur
+  # poisson/taux est un écart.
+  list(chemin = P_KM, facteur = 1 + 0.5e-12, ok = TRUE, v = "sous tolérance", classe = "clé qualifiée brut/resultat/kaplan_meier/taux (1e-12)"),
   list(chemin = P_TAUX, facteur = 1 + 0.5e-12, ok = FALSE, v = "écart", classe = "même altération sur poisson/taux (1e-14)")
 )) {
   verifier(sprintf("témoin : %s altéré, classe %s -> %s", cas$chemin, cas$classe, if (cas$ok) "succès" else "échec"),
            attendu(comparer_references(alterer(cas$chemin, cas$facteur), base), cas$ok, cas$chemin, cas$v))
 }
-verifier("témoin : clé retenue pour kaplan_meier/taux = kaplan_meier/taux (aussi : taux), imprimée", {
-  t <- tolerance_de(P_KM)
-  r <- comparer_references(ref0, base)
-  identical(t$cle, "kaplan_meier/taux") && identical(t$tol, 1e-12) && identical(t$autres, "taux") &&
-    any(grepl("clé retenue : etapes/brut/resultat/kaplan_meier/taux -> kaplan_meier/taux (classe 1e-12 ; aussi : taux)",
+# Clé la plus longue retenue, les autres clés qui classent le chemin imprimées :
+# la table TOLERANCES n'en a plus (invariant (d), #175), une clé plus courte est
+# ajoutée en mémoire.
+verifier("témoin : clé retenue pour kaplan_meier/taux = brut/resultat/kaplan_meier/taux (aussi : kaplan_meier/taux), imprimée", {
+  masque <- c(TOLERANCES, "kaplan_meier/taux" = 1e-14)
+  t <- tolerance_de(P_KM, masque)
+  r <- comparer_references(ref0, base, masque)
+  identical(tolerance_de(P_KM)$autres, character(0)) &&
+    identical(t$cle, "brut/resultat/kaplan_meier/taux") && identical(t$tol, 1e-12) && identical(t$autres, "kaplan_meier/taux") &&
+    any(grepl("clé retenue : etapes/brut/resultat/kaplan_meier/taux -> brut/resultat/kaplan_meier/taux (classe 1e-12 ; aussi : kaplan_meier/taux)",
               imprimer_comparaison(r), fixed = TRUE, useBytes = TRUE))
 })
-verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, tolérance, verdict) et des trois classes", {
+verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, tolérance, verdict) et de chaque classe de CLASSES_TOLERANCE", {
   avant <- alterer(P_TAUX, 1 + 2e-14)
   r <- comparer_references(avant, base)
   l <- imprimer_comparaison(r)
   e <- r$grandeurs[r$grandeurs$chemin == P_TAUX, ]
-  sum(grepl("Écart relatif maximal, classe", l, fixed = TRUE, useBytes = TRUE)) == 3L &&
+  sum(grepl("Écart relatif maximal, classe", l, fixed = TRUE, useBytes = TRUE)) == length(CLASSES_TOLERANCE) &&
+    length(CLASSES_TOLERANCE) == 4L &&
     any(grepl(sprintf("%s | 149 | 1 | ", P_TAUX), l, fixed = TRUE, useBytes = TRUE)) &&
     any(grepl(sprintf("| %s | %s | 1e-14 | écart", e$avant, e$apres), l, fixed = TRUE, useBytes = TRUE)) &&
     identical(e$avant, sprintf("%.17g", avant$valeurs[[P_TAUX]][e$position])) &&
@@ -1091,14 +1298,179 @@ for (chemin_cellules in c("etapes/exposition/diagnostics/cellules", "etapes/brut
     chemin_cellules %in% doubles_sans_tolerance(g) && !chemin_cellules %in% doubles_sans_tolerance(g, masque)
   })
 }
-restes_commites <- function() lapply(plans_reference(), function(p) {
+# Mêmes témoins pour R8 (#166, audit m1) : les trois chemins integer que les
+# clés nues cellules_retenues et evenements_retires auraient classés ; les clés
+# de R8 sont qualifiées (`<table>/<colonne>`) et n'atteignent que des doubles.
+for (chemin_ie in c("etapes/validation/diagnostics/cellules_retenues",
+                    "etapes/importance_exclusions/resultat/cellules_niveau_a/evenements_retires",
+                    "etapes/importance_exclusions/resultat/cellules_niveau_b/evenements_retires")) {
+  verifier(sprintf("témoin : %s remis en double -> relevé par doubles_sans_tolerance(), que la clé nue %s aurait masqué", chemin_ie, basename(chemin_ie)), {
+    g <- aplatis[["R8"]]
+    if (!identical(unname(g$types[chemin_ie]), "integer"))
+      return(sprintf("%s de R8 : un chemin integer attendu, type %s", chemin_ie, unname(g$types[chemin_ie])))
+    masque <- c(TOLERANCES, stats::setNames(0, basename(chemin_ie)))
+    g$types[[chemin_ie]] <- "double"; g$valeurs[[chemin_ie]] <- as.double(g$valeurs[[chemin_ie]])
+    chemin_ie %in% doubles_sans_tolerance(g) && !chemin_ie %in% doubles_sans_tolerance(g, masque)
+  })
+}
+# Une table de même nom sous une autre étape n'hérite d'aucune classe (#166,
+# point 3.4) : cellules, statistiques, retraits de R8 recopiés sous
+# `etapes/etape_non_listee` et `etapes/homogeneite` (copies en mémoire ;
+# `positionnement` a ses clés depuis #167, d'où une étape fictive ;
+# `homogeneite` a les siennes depuis #168, qui ne classent aucune de ces
+# tables) sont relevés par doubles_sans_tolerance(), que des clés
+# `<table>/<colonne>` auraient masqués.
+for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
+                       "etapes/validation/resultat/cellules/taux_table",
+                       "etapes/validation/resultat/statistiques/valeur",
+                       "etapes/validation/resultat/sous_groupes/smr",
+                       "etapes/importance_exclusions/resultat/retraits/exposition_centrale_retiree")) {
+  for (autre in c("etape_non_listee", "homogeneite")) {
+    chemin_autre <- sub("^etapes/[a-z_]+/", paste0("etapes/", autre, "/"), chemin_etape)
+    verifier(sprintf("témoin : %s simulé sous une autre étape -> relevé par doubles_sans_tolerance()", chemin_autre), {
+      g <- aplatis[["R8"]]
+      if (!identical(unname(g$types[chemin_etape]), "double"))
+        return(sprintf("%s de R8 : un chemin double attendu", chemin_etape))
+      g$types[[chemin_autre]] <- g$types[[chemin_etape]]; g$valeurs[[chemin_autre]] <- g$valeurs[[chemin_etape]]
+      !chemin_etape %in% doubles_sans_tolerance(aplatis[["R8"]]) && chemin_autre %in% doubles_sans_tolerance(g) &&
+        !chemin_etape %in% doubles_sans_tolerance(g)
+    })
+  }
+}
+# Étape homogeneite (#168) : R11 et R12 la portent (plans de méthode ; références
+# créées sur la CI, exécution 42465708495) ; ses clés `homogeneite/…` de TOLERANCES sont
+# contrôlées ici sur une construction témoin (plan de R1 et étape homogeneite,
+# segmentation sexe, entrée `reference`), en mémoire, sans écriture sous
+# tests/reference/ : complétude (point 3.4), invariants (b) et (d) de #175,
+# et chaque clé `homogeneite/…` classe au moins un chemin (aucune clé morte).
+local({
+  p <- plan_reference(graine = GRAINE_MONTE_CARLO_R8)
+  p$etapes$homogeneite <- list(plage_ages = c(20, 90), tranches_age = c(20, 50, 70), replications = 99)
+  g <- aplatir_construction(construire_table(jeu_ref$donnees, jeu_ref$roles, p))
+  d <- names(g$types)[g$types == "double"]
+  dh <- d[grepl("(^|/)etapes/homogeneite/", d)]
+  cles_h <- names(TOLERANCES)[startsWith(names(TOLERANCES), "homogeneite/")]
+  utilisees <- unique(unlist(lapply(dh, cles_de)))
+  verifier("homogeneite (#168), construction témoin : tout double classé, par des clés homogeneite/ seules, une clé par chemin, aucune clé morte (point 3.4, #175)", {
+    sans <- doubles_sans_tolerance(g)
+    if (!length(dh)) "aucun double de l'étape homogeneite"
+    else if (length(sans)) paste("sans tolérance :", paste(utils::head(sans, 5L), collapse = ", "))
+    else if (length(mal <- doubles_etape_mal_classes(dh))) paste("mal classés :", paste(utils::head(mal, 5L), collapse = ", "))
+    else if (length(m2 <- doubles_multi_cles(dh))) paste("plusieurs clés :", paste(utils::head(m2, 5L), collapse = ", "))
+    else if (length(morte <- setdiff(cles_h, utilisees))) paste("clés mortes :", paste(morte, collapse = ", "))
+    else TRUE
+  })
+})
+# Colonnes qu'une clé nue classait avant #175 : pour chacune des 36 clés qui les
+# remplacent, un chemin double qu'elle classe dans R6 est recopié en mémoire
+# sous une étape non listée (etape_non_listee, fictive : `positionnement` a ses
+# clés depuis #167 ; fiche/plan/etapes/etape_non_listee/ ou
+# fiche/hypotheses_etape_non_listee/ pour la fiche). Le chemin recopié est
+# relevé par doubles_sans_tolerance(), l'original ne l'est pas, et avec
+# l'ancienne clé ajoutée en mémoire (sa classe est sans objet ici) le chemin
+# recopié ne l'est plus : ce que la clé nue masquait. Rien n'est écrit sous
+# tests/reference/.
+ANCIENNES_CLES_NUES <- c(
+  "etapes/exposition/resultat/exposition/exposition_jours" = "exposition_jours",
+  "etapes/exposition/diagnostics/exposition_jours" = "exposition_jours",
+  "etapes/exposition/parametres/delai_declaration" = "delai_declaration",
+  "fiche/plan/delai_declaration" = "delai_declaration",
+  "etapes/brut/parametres/niveau" = "niveau",
+  "fiche/plan/etapes/brut/niveau" = "niveau",
+  "fiche/hypotheses_brut/niveau" = "niveau",
+  "etapes/brut/parametres/tolerance_effectif" = "tolerance_effectif",
+  "fiche/hypotheses_brut/tolerance_effectif" = "tolerance_effectif",
+  "etapes/exposition/resultat/exposition/exposition_centrale" = "exposition_centrale",
+  "etapes/exposition/resultat/exposition/complement_initial_cellule" = "complement_initial_cellule",
+  "etapes/exposition/resultat/exposition/complement_initial_fenetre" = "complement_initial_fenetre",
+  "etapes/brut/resultat/poisson/exposition_centrale" = "exposition_centrale",
+  "etapes/brut/resultat/poisson/taux" = "taux",
+  "etapes/brut/resultat/binomial/exposition_initiale" = "exposition_initiale",
+  "etapes/brut/resultat/binomial/taux" = "taux",
+  "etapes/brut/resultat/kaplan_meier_sauts/age_exact" = "kaplan_meier_sauts/age_exact",
+  "etapes/brut/resultat/kaplan_meier_sauts/variance_log_survie_cellule" = "kaplan_meier_sauts/variance_log_survie_cellule",
+  stats::setNames(paste0("borne_", c("inf_exacte", "sup_exacte", "inf_asymptotique", "sup_asymptotique")),
+                  paste0("etapes/brut/resultat/poisson/borne_", c("inf_exacte", "sup_exacte", "inf_asymptotique", "sup_asymptotique"))),
+  stats::setNames(c("probabilite", paste0("probabilite_borne_", c("inf_exacte", "sup_exacte", "inf_asymptotique", "sup_asymptotique"))),
+                  paste0("etapes/brut/resultat/poisson/", c("probabilite", paste0("probabilite_borne_", c("inf_exacte", "sup_exacte", "inf_asymptotique", "sup_asymptotique"))))),
+  stats::setNames(paste0("borne_", c("inf_exacte", "sup_exacte", "inf_asymptotique", "sup_asymptotique")),
+                  paste0("etapes/brut/resultat/binomial/borne_", c("inf_exacte", "sup_exacte", "inf_asymptotique", "sup_asymptotique"))),
+  "etapes/brut/resultat/kaplan_meier/borne_inf_asymptotique" = "borne_inf_asymptotique",
+  "etapes/brut/resultat/kaplan_meier/borne_sup_asymptotique" = "borne_sup_asymptotique",
+  "etapes/brut/resultat/kaplan_meier/taux" = "kaplan_meier/taux",
+  "etapes/brut/resultat/kaplan_meier/variance" = "kaplan_meier/variance",
+  "etapes/brut/resultat/kaplan_meier_sauts/survie_cellule" = "kaplan_meier_sauts/survie_cellule")
+chemin_autre_etape <- function(chemin) {
+  if (startsWith(chemin, "fiche/plan/etapes/")) return(sub("^fiche/plan/etapes/[^/]+/", "fiche/plan/etapes/etape_non_listee/", chemin))
+  if (identical(chemin, "fiche/plan/delai_declaration")) return("fiche/plan/etapes/etape_non_listee/delai_declaration")
+  if (startsWith(chemin, "fiche/hypotheses_")) return(sub("^fiche/hypotheses_[^/]+/", "fiche/hypotheses_etape_non_listee/", chemin))
+  sub("^etapes/[^/]+/", "etapes/etape_non_listee/", chemin)
+}
+verifier("témoins des clés nues retirées : 36 chemins (un par clé qualifiée) de R6, 23 anciennes clés", {
+  length(ANCIENNES_CLES_NUES) == 36L && length(unique(ANCIENNES_CLES_NUES)) == 23L && !anyDuplicated(names(ANCIENNES_CLES_NUES)) &&
+    !any(ANCIENNES_CLES_NUES %in% names(TOLERANCES)[!grepl("/", names(TOLERANCES), fixed = TRUE)])
+})
+for (chemin_ancien in names(ANCIENNES_CLES_NUES)) {
+  ancienne <- ANCIENNES_CLES_NUES[[chemin_ancien]]
+  chemin_autre <- chemin_autre_etape(chemin_ancien)
+  verifier(sprintf("témoin : %s simulé sous une étape non listée (%s) -> relevé par doubles_sans_tolerance(), que la clé %s aurait masqué", chemin_ancien, chemin_autre, ancienne), {
+    g <- aplatis[["R6"]]
+    if (!identical(unname(g$types[chemin_ancien]), "double")) return(sprintf("%s de R6 : un chemin double attendu", chemin_ancien))
+    if (chemin_autre %in% names(g$types)) return(sprintf("%s déjà présent dans R6", chemin_autre))
+    g$types[[chemin_autre]] <- g$types[[chemin_ancien]]; g$valeurs[[chemin_autre]] <- g$valeurs[[chemin_ancien]]
+    masque <- c(TOLERANCES, stats::setNames(0, ancienne))
+    !chemin_ancien %in% doubles_sans_tolerance(g) && chemin_autre %in% doubles_sans_tolerance(g) &&
+      !chemin_autre %in% doubles_sans_tolerance(g, masque)
+  })
+}
+# Témoins des invariants de structure (#175), sur des copies en mémoire : une
+# clé nue fait échouer (a) ; une clé non qualifiée par l'étape ou une clé d'une
+# autre étape classant un chemin d'une étape fait échouer (b) ; une clé non
+# qualifiée par fiche/ classant un chemin de la fiche, (c) ; deux clés pour un
+# même chemin, (d). Les invariants sont d'abord vrais sur TOLERANCES.
+verifier("témoin : une clé nue ajoutée en mémoire à TOLERANCES -> (a) l'identifie", {
+  identical(cles_nues(), character(0)) && identical(cles_nues(c(TOLERANCES, taux = 1e-14)), "taux")
+})
+verifier("témoin : une clé non qualifiée par l'étape, ou d'une autre étape, classant un chemin de brut -> (b) le relève", {
+  d <- names(aplatis[["R6"]]$types)[aplatis[["R6"]]$types == "double"]
+  c1 <- "etapes/brut/resultat/poisson/taux"
+  c2 <- "etapes/brut/positionnement/resultat/cellules/exposition_centrale"
+  if (!c1 %in% d) return(sprintf("%s absent de R6", c1))
+  # chemin seul classé par la clé d'une autre étape (positionnement/…), sans clé de brut
+  c2_cle <- c(TOLERANCES, "positionnement/resultat/cellules/exposition_centrale" = 1e-14)
+  # clé nue et clé non qualifiée qui s'ajoutent à la clé qualifiée du chemin
+  identical(doubles_etape_mal_classes(d), character(0)) &&
+    identical(doubles_etape_mal_classes(c1, c(TOLERANCES, taux = 1e-14)), c1) &&
+    identical(doubles_etape_mal_classes(c1, c(TOLERANCES, "poisson/taux" = 1e-14)), c1) &&
+    identical(doubles_etape_mal_classes(c2, TOLERANCES), c2) &&
+    identical(doubles_etape_mal_classes(c2, c2_cle), c2)
+})
+verifier("témoin : une clé non qualifiée par fiche/ classant un chemin de la fiche -> (c) le relève", {
+  d <- names(aplatis[["R6"]]$types)[aplatis[["R6"]]$types == "double"]
+  c1 <- "fiche/hypotheses_brut/niveau"
+  if (!c1 %in% d) return(sprintf("%s absent de R6", c1))
+  identical(doubles_fiche_mal_classes(d), character(0)) &&
+    identical(doubles_fiche_mal_classes(c1, c(TOLERANCES, "hypotheses_brut/niveau" = 0)), c1) &&
+    identical(doubles_fiche_mal_classes(c1, c(TOLERANCES, niveau = 0)), c1)
+})
+verifier("témoin : un chemin classé par deux clés -> (d) le relève", {
+  d <- names(aplatis[["R6"]]$types)[aplatis[["R6"]]$types == "double"]
+  c1 <- "etapes/brut/resultat/poisson/taux"
+  identical(doubles_multi_cles(d), character(0)) &&
+    identical(doubles_multi_cles(c1, c(TOLERANCES, taux = 1e-14)), c1)
+})
+# Un plan listé dans SANS_REFERENCE et sans fichier n'a pas de référence
+# commitée à lire : son objet aplati est contrôlé par la boucle des plans
+# (aucun double sans classe de tolérance).
+restes_commites <- function() lapply(Filter(function(p) file.exists(file.path(DOSSIER_REFERENCES, paste0(p$identifiant, ".tsv"))) ||
+                                                    !p$identifiant %in% names(SANS_REFERENCE), plans_reference()), function(p) {
   f <- file.path(DOSSIER_REFERENCES, paste0(p$identifiant, ".tsv"))
   if (!file.exists(f)) return(paste("absent :", f))
   doubles_sans_tolerance(lire_reference(f))
 })
 restes_vides <- function(restes)
   if (all(lengths(restes) == 0L)) TRUE else paste(names(restes)[lengths(restes) > 0L], collapse = ", ")
-nom_restes <- "tolérances : aucun double sans tolérance déclarée dans les six références commitées (table sans clé integer)"
+nom_restes <- "tolérances : aucun double sans tolérance déclarée dans les références commitées (table sans clé integer)"
 # Plans en transition (#47) : tant que la référence commitée porte un double
 # que les transitions admettent (type converti depuis double, ou retrait), ce
 # reste est admis par un test ordinaire et le test strict est un échec
@@ -1322,11 +1694,11 @@ verifier("lecture des doubles : aller-retour exact d'un fichier, branche de l'h�
   ecrire_reference(g, f, c(identifiant = "doubles"))
   meme_double(lire_reference(f)$valeurs$x, v)
 })
-verifier("témoin : référence orpheline détectée (R7.tsv dans un dossier temporaire)", {
+verifier("témoin : référence orpheline détectée (R99.tsv dans un dossier temporaire)", {
   d <- tempfile("references_"); dir.create(d)
-  file.copy(F_BASE, file.path(d, "R6.tsv")); file.copy(F_BASE, file.path(d, "R7.tsv"))
+  file.copy(F_BASE, file.path(d, "R6.tsv")); file.copy(F_BASE, file.path(d, "R99.tsv"))
   o <- references_orphelines(d); unlink(d, recursive = TRUE)
-  identical(o, "R7.tsv")
+  identical(o, "R99.tsv")
 })
 # Règles des modes du workflow (point 5.2), table de vérité.
 verifier("règles des modes : creation, regeneration, bascule, releve (table de vérité)", {
@@ -1433,8 +1805,8 @@ for (cas in list(
   list(args = c("--mode", "creation", "--plans", "tous", "--sortie", tempfile()), motif = "--motif exigé", env = EN_CI),
   list(args = c("--mode", "bascule", "--plans", "R1", "--sortie", tempfile(), "--motif", "x"), motif = "--plans tous obligatoire",
        env = EN_CI),
-  list(args = c("--mode", "creation", "--plans", "R9", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
-  list(args = c("--mode", "regeneration", "--plans", "R9", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
+  list(args = c("--mode", "creation", "--plans", "R99", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
+  list(args = c("--mode", "regeneration", "--plans", "R99", "--sortie", tempfile(), "--motif", "x"), motif = "--plans : ", env = EN_CI),
   list(args = c("--mode", "creation", "--plans", "tous", "--sortie", shQuote(file.path(DOSSIER_REFERENCES, "essai")), "--motif", "x"),
        motif = "ne peut être tests/reference/", env = EN_CI),
   list(args = c("--mode", "releve", "--plans", "tous", "--sortie", tempfile()), motif = "mode releve refusé sur la CI",
@@ -1495,8 +1867,8 @@ verifier("producteur : plan dont la construction échoue -> non produit, autres 
   file.copy(file.path(DOSSIER_REFERENCES, c("produire_references.R", "outils_reference.R")),
             file.path(d, "tests", "reference"))
   cat("plans_reference <- function() list(",
-      "R1 = list(identifiant = 'R1', description = 'temoin valide', plan = plan_reference()),",
-      "R2 = list(identifiant = 'R2', description = 'temoin invalide', plan = plan_reference(niveau = 2)))",
+      "R1 = list(identifiant = 'R1', description = 'temoin valide', plan = plan_reference(), entree = 'reference'),",
+      "R2 = list(identifiant = 'R2', description = 'temoin invalide', plan = plan_reference(niveau = 2), entree = 'reference'))",
       sep = "\n", file = file.path(d, "tests", "reference", "outils_reference.R"), append = TRUE)
   sortie_t <- file.path(d, "sortie")
   resume_t <- file.path(d, "resume_job.md")
@@ -1534,7 +1906,7 @@ verifier("producteur, sous-processus LC_ALL=C : libellés non ASCII d'ecarts.txt
   file.copy(file.path(DOSSIER_REFERENCES, c("produire_references.R", "outils_reference.R")),
             file.path(d, "tests", "reference"))
   cat("plans_reference <- function() list(",
-      "R1 = list(identifiant = 'R1', description = 'd\\u00e9c\\u00e8s', plan = plan_reference()))",
+      "R1 = list(identifiant = 'R1', description = 'd\\u00e9c\\u00e8s', plan = plan_reference(), entree = 'reference'))",
       sep = "\n", file = file.path(d, "tests", "reference", "outils_reference.R"), append = TRUE)
   sortie_t <- file.path(d, "sortie")
   r <- executer_rscript(file.path(d, "tests", "reference", "produire_references.R"),
@@ -1687,20 +2059,20 @@ verifier("transitions en cours : liste bien formée (champs, issues, plans de r�
 
 local({
   nouveau <- list(
-    types = c("fiche/empreintes/donnees" = "character", "fiche/version" = "character", "s/taux" = "double",
+    types = c("fiche/empreintes/donnees" = "character", "fiche/version" = "character", "brut/resultat/poisson/taux" = "double",
               "s/cellules" = "integer", "s/n" = "integer", "s/nouveau" = "integer"),
-    valeurs = list("fiche/empreintes/donnees" = strrep("a", 32L), "fiche/version" = "v2", "s/taux" = c(0.1, 0.2, 0.3),
+    valeurs = list("fiche/empreintes/donnees" = strrep("a", 32L), "fiche/version" = "v2", "brut/resultat/poisson/taux" = c(0.1, 0.2, 0.3),
                    "s/cellules" = c(149L, 75L), "s/n" = c(1L, 2L, 3L), "s/nouveau" = 7L))
   # États d'avant, un par nature.
   def_type <- function(r) { r$types[["s/cellules"]] <- "double"; r$valeurs[["s/cellules"]] <- c(149, 75); r }
-  def_valeur <- function(r) { r$valeurs[["s/taux"]][3L] <- 0.35; r }
+  def_valeur <- function(r) { r$valeurs[["brut/resultat/poisson/taux"]][3L] <- 0.35; r }
   def_chaine <- function(r) { r$valeurs[["fiche/version"]] <- "v1"; r }
   def_ajout <- function(r) { r$types <- r$types[names(r$types) != "s/nouveau"]; r$valeurs <- r$valeurs[names(r$valeurs) != "s/nouveau"]; r }
   def_retrait <- function(r) { r$types[["s/ancien"]] <- "integer"; r$valeurs[["s/ancien"]] <- 5L; r }
   derive <- function(r) { r$valeurs[["s/n"]][2L] <- 9L; r }  # dérive non déclarée
   ch <- list(
     type = list(chemin = "s/cellules", nature = "type", de = "double", vers = "integer"),
-    valeur = list(chemin = "s/taux", nature = "valeur", valeurs = 0.3, positions = 3L),
+    valeur = list(chemin = "brut/resultat/poisson/taux", nature = "valeur", valeurs = 0.3, positions = 3L),
     "valeur de chaîne" = list(chemin = "fiche/version", nature = "valeur de chaîne", valeurs = "v2"),
     ajout = list(chemin = "s/nouveau", nature = "ajout", type = "integer", longueur = 1L),
     retrait = list(chemin = "s/ancien", nature = "retrait", type = "integer", longueur = 1L))
@@ -1764,10 +2136,10 @@ local({
   })
   # Même chemin : positions disjointes (deux issues), natures différentes
   # (type puis valeur) dans l'un ou l'autre ordre, conflit, idempotence.
-  n2 <- nouveau; n2$valeurs[["s/cellules"]] <- c(149L, 80L); n2$valeurs[["s/taux"]] <- c(0.15, 0.2, 0.3)
-  old2 <- def_type(n2); old2$valeurs[["s/taux"]][1L] <- 0.1; old2$valeurs[["s/taux"]][3L] <- 0.35
-  v1 <- list(chemin = "s/taux", nature = "valeur", valeurs = 0.15, positions = 1L)
-  v3 <- list(chemin = "s/taux", nature = "valeur", valeurs = 0.3, positions = 3L)
+  n2 <- nouveau; n2$valeurs[["s/cellules"]] <- c(149L, 80L); n2$valeurs[["brut/resultat/poisson/taux"]] <- c(0.15, 0.2, 0.3)
+  old2 <- def_type(n2); old2$valeurs[["brut/resultat/poisson/taux"]][1L] <- 0.1; old2$valeurs[["brut/resultat/poisson/taux"]][3L] <- 0.35
+  v1 <- list(chemin = "brut/resultat/poisson/taux", nature = "valeur", valeurs = 0.15, positions = 1L)
+  v3 <- list(chemin = "brut/resultat/poisson/taux", nature = "valeur", valeurs = 0.3, positions = 3L)
   vc <- list(chemin = "s/cellules", nature = "valeur", valeurs = 80L, positions = 2L)
   old2$valeurs[["s/cellules"]] <- c(149, 75)
   verifier("témoin 9.5, union sur un même chemin : positions disjointes de deux issues -> seul écart", {
@@ -1816,7 +2188,7 @@ local({
     list("issue sans #", list(tr("37", "R1", ch$ajout))),
     list("élément non liste (list(\"#35\"), au lieu d'une erreur R brute)", list("#35")),
     list("issue en double sur un plan commun", list(tr("#901", c("R1", "R2"), ch$ajout), tr("#901", "R2", ch$retrait))),
-    list("plan de référence inconnu", list(tr("#901", "R9", ch$ajout))),
+    list("plan de référence inconnu", list(tr("#901", "R99", ch$ajout))),
     list("aucun changement", list(tr("#901", "R1"))),
     list("champ hors de la nature (valeurs sur un type)", list(tr("#901", "R1", modifyList(ch$type, list(valeurs = 1))))),
     list("conversion de type hors double / integer", list(tr("#901", "R1", modifyList(ch$type, list(vers = "character"))))),
@@ -1827,10 +2199,10 @@ local({
 
   # Doubles sans tolérance déclarée des références à régénérer.
   verifier("témoin 9.5, restes : type converti depuis double et retrait de type double admis ; retrait d'un autre type, valeur, ajout et autre plan non admis", {
-    restes <- list(R1 = c("s/cellules", "s/vieux", "s/ancien", "s/taux"), R2 = "s/cellules")
+    restes <- list(R1 = c("s/cellules", "s/vieux", "s/ancien", "brut/resultat/poisson/taux"), R2 = "s/cellules")
     vieux <- list(chemin = "s/vieux", nature = "retrait", type = "double", longueur = 1L)
     r <- restes_hors_transitions(restes, list(tr("#901", "R1", ch$type, vieux, ch$retrait, ch$valeur, ch$ajout)))
-    identical(r$R1, c("s/ancien", "s/taux")) && identical(r$R2, "s/cellules") &&
+    identical(r$R1, c("s/ancien", "brut/resultat/poisson/taux")) && identical(r$R2, "s/cellules") &&
       identical(issue_des_restes(list(tr("#902", "R1", ch$valeur), tr("#901", "R1", ch$type))), "#901")
   })
 
@@ -2068,27 +2440,32 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R6 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R12 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R6, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R12, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant
-    x <- construire_table(jeu_ref$donnees, jeu_ref$roles, p$plan)
+    entree_p <- entrees_ref[[p$entree]]
+    x <- construire_table(entree_p$donnees, entree_p$roles, p$plan, tables_reference = tables_du_plan(p))
     verifier(sprintf("%s : lire_plan(ecrire_plan(plan)) identical() au plan", id),
              identical(lire_plan(ecrire_plan(p$plan)), p$plan))
     f <- lire_fiche(ecrire_fiche(x$fiche))
     verifier(sprintf("%s : lire_fiche(ecrire_fiche(fiche)) identical() à la fiche", id), identical(f, x$fiche))
     # #57 : lignes reçues = lignes conservées + lignes distinctes exclues ;
-    # aucune exclusion déclarée dans R1 à R6, donc 0L et aucune ligne écartée.
-    verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (0L, integer) (#57)", id),
-             identical(x$fiche$nombre_lignes_exclues, 0L) &&
-               nrow(jeu_ref$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
-    y <- construire_table(jeu_ref$donnees, f$roles, valider_plan(f$plan), f$provenance)
+    # aucune exclusion déclarée dans R1 à R7, et R8 et R10 en déclarent deux dont aucune règle ne
+    # touche l'entrée de référence : 0L et aucune ligne écartée. R9 déclare trois
+    # exclusions sur une entrée qui porte NOMBRE_PAR_MOTIF_R9 lignes de chacun des
+    # motifs correspondants : MOTIFS_DEFAUTS_R9 x NOMBRE_PAR_MOTIF_R9 lignes exclues.
+    exclues_attendues <- if (id == "R9") length(MOTIFS_DEFAUTS_R9) * NOMBRE_PAR_MOTIF_R9 else 0L
+    verifier(sprintf("%s : lignes reçues = lignes conservées + nombre_lignes_exclues (%dL, integer) (#57)", id, exclues_attendues),
+             identical(x$fiche$nombre_lignes_exclues, as.integer(exclues_attendues)) &&
+               nrow(entree_p$donnees) == nrow(x$etapes$donnees$resultat$lignes_conservees) + x$fiche$nombre_lignes_exclues)
+    y <- construire_table(entree_p$donnees, f$roles, valider_plan(f$plan), f$provenance, tables_reference = tables_du_plan(p))
     verifier(sprintf("%s : rejeu sur le plan relu de la fiche écrite identical() hors execution", id),
              identical(sans_execution(y), sans_execution(x)))
     if (id != "R1") next

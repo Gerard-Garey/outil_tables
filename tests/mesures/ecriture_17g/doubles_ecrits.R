@@ -14,7 +14,9 @@ trace("ecrire_valeurs", where = ns, print = FALSE,
 compter <- function(expr) { releve$n <- 0; releve$appels <- 0L; force(expr); c(releve$n, releve$appels) }
 j <- jeu_reference()
 constructions <- list(); tab <- list()
-for (id in names(plans_reference())) {
+# Figé sur R1 à R6 : le relevé reproduit la mesure consignée à abda2d8, qui ne
+# contenait ni R7 ni R8 ; plans_reference() en compte désormais davantage.
+for (id in c("R1", "R2", "R3", "R4", "R5", "R6")) {
   p <- plans_reference()[[id]]$plan
   ct <- compter(x <- construire_table(j$donnees, j$roles, p))
   pl <- compter(ecrire_plan(x$fiche$plan)); fi <- compter(ecrire_fiche(x$fiche)); ra <- compter(ecrire_rapport(x))

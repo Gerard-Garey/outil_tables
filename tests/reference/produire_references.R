@@ -125,9 +125,12 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   for (o in orphelines) defauts <- c(defauts, sprintf("référence orpheline : tests/reference/%s", o))
   plateformes_commises <- list()
 
-  jeu <- jeu_reference()
+  # Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
+  # distincte tirée une seule fois.
+  entrees <- entrees_des_plans(plans)
   for (p in plans) {
     id <- p$identifiant
+    jeu <- entrees[[p$entree]]
     non_produit <- function(e, etape = NULL) {
       defauts <<- c(defauts, sprintf("%s : %s%s", id, if (is.null(etape)) "" else paste0(etape, " : "), conditionMessage(e)))
       resume[nrow(resume) + 1L, ] <<- list(id, if (file.exists(file.path(commis, paste0(id, ".tsv")))) "oui" else "non",
@@ -136,7 +139,9 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
     # Un refus ou une erreur de construction consigne le plan comme non
     # produit (comme les échecs d'aplatissement, d'écriture et de lecture) :
     # les autres plans sont produits et comparés, le bilan est écrit.
-    x <- tryCatch(construire_table(jeu$donnees, jeu$roles, p$plan), error = function(e) e)
+    # `tables_reference` : tables lues par le plan (NULL hors R8 à R10, #166, #167).
+    x <- tryCatch(construire_table(jeu$donnees, jeu$roles, p$plan, tables_reference = tables_du_plan(p)),
+                  error = function(e) e)
     if (inherits(x, "error")) { non_produit(x, "construction en échec"); next }
     g <- tryCatch(aplatir_construction(x), refus_reference = function(e) e)
     if (inherits(g, "refus_reference")) { non_produit(g); next }

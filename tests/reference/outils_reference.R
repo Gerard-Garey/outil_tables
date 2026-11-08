@@ -14,8 +14,16 @@
 #  chaîne au codage « bytes », non UTF-8 valide, ou non ASCII non marquée
 #  dans une session ni UTF-8 ni latin-1 est refusée, jamais convertie).
 #
-#  - plans_reference(), jeu_reference() : plans R1 à R6 et entrée de
-#    référence (points 4.1 et 4.3 ; R6 : première annotation, (b)) ;
+#  - plans_reference(), jeu_reference(), jeu_reference_defauts() : plans R1 à
+#    R12 et entrées de référence (points 4.1 et 4.3 ; R6 : première annotation,
+#    (b) ; R7 : #32 ; R8 : #166, avec `tables_reference`, table importée en
+#    valeurs littérales ; R9 : #166, avec `entree`, une entrée par plan,
+#    annotation du 07/11/2026, (d) ; R10 : #167, positionnement par SMR et
+#    validation de la table positionnée ; R11 : #168, test d'homogénéité entre
+#    segments ; R12 : #168, le même test sous H0 vraie ; plans de méthode,
+#    point 5.2) ;
+#  - tirer_entree(nom), entrees_des_plans(plans) : tirage de l'entrée d'un
+#    plan, chaque entrée distincte une seule fois ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
 #    type, valeurs), moins `execution`, `fiche$versions`, `fiche$plateforme`
 #    (point 1.1) ; valeurs de fiche/empreintes/resultat et /code remplacées
@@ -78,28 +86,210 @@ TYPES_REFERENCE <- c("double", "integer", "logical", "character", "Date", "facto
 # les grandeurs de type double consultent cette table ; les autres types et
 # les lignes @ sont exacts par leur type. Toute modification est annotée
 # dans l'ADR 0009, datée, avec l'avis d'actuary (point 9.3).
-CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12)
+CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12, "1e-10" = 1e-10)
 # Aucune clé pour une grandeur de type integer (quatrième annotation, (b)) :
 # une clé la classerait aussi si elle redevenait double, et masquerait ce
 # retour à doubles_sans_tolerance().
 TOLERANCES <- c(
+  # Aucune clé nue (#175) : toute clé commence par le nom de l'étape
+  # (`exposition`, `brut`, `positionnement`, `homogeneite`, `validation`,
+  # `importance_exclusions`) ou par
+  # `fiche/` (écho du plan et des hypothèses : fiche/plan/…,
+  # fiche/hypotheses_<étape>/…). Une colonne de même nom d'une étape ultérieure
+  # (#167, #168) ne reçoit ainsi aucune classe sans contrôle de complétude
+  # (point 3.4) ; les invariants de test_reproductibilite.R le contrôlent.
+  # Étapes exposition et brut (R1 à R9). Classes par nature de calcul.
   # exacte : doubles à valeur entière ou déclarée (point 3.4)
-  exposition_jours = 0, niveau = 0, delai_declaration = 0,
-  tolerance_effectif = 0,
+  "exposition/resultat/exposition/exposition_jours" = 0,
+  "exposition/diagnostics/exposition_jours" = 0,
+  "exposition/parametres/delai_declaration" = 0, "fiche/plan/delai_declaration" = 0,
+  "brut/parametres/niveau" = 0, "brut/niveau" = 0, "fiche/hypotheses_brut/niveau" = 0,
+  "brut/parametres/tolerance_effectif" = 0, "fiche/hypotheses_brut/tolerance_effectif" = 0,
   # 1e-14 : arithmétique IEEE de base (point 3.4)
-  exposition_centrale = 1e-14, complement_initial_cellule = 1e-14,
-  complement_initial_fenetre = 1e-14, exposition_initiale = 1e-14, taux = 1e-14,
+  "exposition/resultat/exposition/exposition_centrale" = 1e-14,
+  "exposition/resultat/exposition/complement_initial_cellule" = 1e-14,
+  "exposition/resultat/exposition/complement_initial_fenetre" = 1e-14,
+  "brut/resultat/poisson/exposition_centrale" = 1e-14, "brut/resultat/poisson/taux" = 1e-14,
+  "brut/resultat/binomial/exposition_initiale" = 1e-14, "brut/resultat/binomial/taux" = 1e-14,
+  "brut/resultat/kaplan_meier_sauts/age_exact" = 1e-14,
+  "brut/resultat/kaplan_meier_sauts/variance_log_survie_cellule" = 1e-14,
   # 1e-12 : fonctions spéciales et libm (point 3.4)
-  borne_inf_exacte = 1e-12, borne_sup_exacte = 1e-12,
-  borne_inf_asymptotique = 1e-12, borne_sup_asymptotique = 1e-12,
-  probabilite = 1e-12, probabilite_borne_inf_exacte = 1e-12,
-  probabilite_borne_sup_exacte = 1e-12, probabilite_borne_inf_asymptotique = 1e-12,
-  probabilite_borne_sup_asymptotique = 1e-12,
-  # Kaplan-Meier, clés qualifiées (seconde annotation, (b))
-  "kaplan_meier/taux" = 1e-12, "kaplan_meier/variance" = 1e-12,
-  "kaplan_meier_sauts/survie_cellule" = 1e-12,
-  "kaplan_meier_sauts/age_exact" = 1e-14,
-  "kaplan_meier_sauts/variance_log_survie_cellule" = 1e-14)
+  "brut/resultat/poisson/borne_inf_exacte" = 1e-12, "brut/resultat/poisson/borne_sup_exacte" = 1e-12,
+  "brut/resultat/poisson/borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/poisson/borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/poisson/probabilite" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_inf_exacte" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_sup_exacte" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/poisson/probabilite_borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/binomial/borne_inf_exacte" = 1e-12, "brut/resultat/binomial/borne_sup_exacte" = 1e-12,
+  "brut/resultat/binomial/borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/binomial/borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/kaplan_meier/borne_inf_asymptotique" = 1e-12,
+  "brut/resultat/kaplan_meier/borne_sup_asymptotique" = 1e-12,
+  "brut/resultat/kaplan_meier/taux" = 1e-12, "brut/resultat/kaplan_meier/variance" = 1e-12,
+  "brut/resultat/kaplan_meier_sauts/survie_cellule" = 1e-12,
+  # Validation et importance des exclusions (R8, #166). Toute clé de ces deux
+  # étapes commence par le nom de l'étape : `<étape>/resultat/<table>/<colonne>`
+  # pour les tables du résultat, `<étape>/parametres/<paramètre>` et
+  # `<étape>/diagnostics/…`, et `<étape>/<paramètre>` pour l'écho du plan dans
+  # la fiche (fiche/plan/etapes/<étape>/…). Les tables génériques (`cellules`,
+  # `statistiques`…) d'une étape ultérieure (#167, #168) ne reçoivent ainsi
+  # aucune classe sans contrôle de complétude (point 3.4).
+  # exacte : paramètres déclarés, dénombrements (doubles à valeur entière),
+  # recopie de la table reçue (qx_table, aucune opération)
+  "validation/parametres/plage_ages" = 0, "validation/parametres/tranches_age" = 0,
+  "validation/parametres/niveau" = 0, "validation/parametres/replications" = 0,
+  "validation/parametres/n_max_wilcoxon_exact" = 0, "validation/parametres/n_max_runs_exact" = 0,
+  "validation/resultat/cellules/qx_table" = 0,
+  "validation/resultat/sous_groupes/cellules_retenues" = 0,
+  "validation/resultat/sous_groupes/observes" = 0,
+  "validation/resultat/sequences_runs/positifs" = 0,
+  "validation/resultat/sequences_runs/negatifs" = 0, "validation/resultat/sequences_runs/runs" = 0,
+  "validation/resultat/monte_carlo/replications" = 0,
+  "validation/resultat/monte_carlo/tirages_effectues" = 0,
+  "validation/diagnostics/etats/evenements" = 0,
+  "validation/diagnostics/evenements_sans_attendu" = 0,
+  "validation/diagnostics/evenements_hors_plage" = 0,
+  "validation/diagnostics/evenements_total" = 0, "importance_exclusions/parametres/niveau" = 0,
+  "importance_exclusions/resultat/retraits/evenements_retires" = 0,
+  "importance_exclusions/resultat/retraits/exposition_jours_retiree" = 0,
+  "importance_exclusions/resultat/cellules_niveau_a/exposition_jours_retiree" = 0,
+  "importance_exclusions/resultat/cellules_niveau_b/exposition_jours_retiree" = 0,
+  "importance_exclusions/resultat/smr_comparateur_1/observes" = 0,
+  "importance_exclusions/resultat/smr_comparateur_1/evenements_sans_exposition_retenue" = 0,
+  "importance_exclusions/resultat/smr_comparateur_2/observes" = 0,
+  "importance_exclusions/resultat/smr_comparateur_2/evenements_sans_valeur_table" = 0,
+  "importance_exclusions/resultat/smr_comparateur_2/evenements_taux_table_egal_un" = 0,
+  "importance_exclusions/resultat/smr_comparateur_2/evenements_sans_attendu" = 0,
+  "importance_exclusions/resultat/smr_comparateur_2/evenements_hors_plage" = 0,
+  "importance_exclusions/resultat/smr_comparateur_2/observes_conserves" = 0,
+  "validation/plage_ages" = 0, "validation/tranches_age" = 0, "validation/niveau" = 0,
+  "validation/replications" = 0, "importance_exclusions/niveau" = 0,
+  # 1e-14 : sommes, produits et quotients IEEE sans libm
+  "validation/resultat/cellules/exposition_centrale" = 1e-14,
+  "validation/resultat/cellules/taux_brut" = 1e-14,
+  "validation/diagnostics/exposition_hors_plage" = 1e-14,
+  "importance_exclusions/resultat/retraits/exposition_centrale_retiree" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_a/exposition_centrale_retiree" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_a/exposition_centrale_conservee" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_a/taux_conserves" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_a/attendus_comparateur_1" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_b/exposition_centrale_retiree" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_b/exposition_centrale_conservee" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_b/taux_conserves" = 1e-14,
+  "importance_exclusions/resultat/cellules_niveau_b/attendus_comparateur_1" = 1e-14,
+  "importance_exclusions/resultat/smr_comparateur_1/rapport_variance" = 1e-14,
+  "importance_exclusions/resultat/smr_comparateur_1/exposition_centrale_sans_exposition_retenue" = 1e-14,
+  "importance_exclusions/resultat/smr_comparateur_2/exposition_centrale_hors_plage" = 1e-14,
+  # 1e-12 : log1p, exp, racines, qpois, qgamma, ppois, pnorm, pchisq, Monte-Carlo
+  "validation/resultat/cellules/taux_table" = 1e-12,
+  "validation/resultat/cellules/smr_positionnement" = 1e-12,
+  "validation/resultat/cellules/taux_positionne" = 1e-12,
+  "validation/resultat/cellules/attendus" = 1e-12,
+  "validation/resultat/cellules/probabilite_brute" = 1e-12,
+  "validation/resultat/cellules/residu_reponse" = 1e-12,
+  "validation/resultat/cellules/residu_pearson" = 1e-12,
+  "validation/resultat/cellules/residu_deviance" = 1e-12,
+  "validation/resultat/cellules/fluctuation_inf_exacte" = 1e-12,
+  "validation/resultat/cellules/fluctuation_sup_exacte" = 1e-12,
+  "validation/resultat/cellules/fluctuation_inf_asymptotique" = 1e-12,
+  "validation/resultat/cellules/fluctuation_sup_asymptotique" = 1e-12,
+  "validation/resultat/statistiques/valeur" = 1e-12,
+  "validation/resultat/sous_groupes/attendus" = 1e-12,
+  "validation/resultat/sous_groupes/smr" = 1e-12,
+  "validation/resultat/sous_groupes/borne_inf_exacte" = 1e-12,
+  "validation/resultat/sous_groupes/borne_sup_exacte" = 1e-12,
+  "validation/resultat/sous_groupes/p_inferieure" = 1e-12,
+  "validation/resultat/sous_groupes/p_superieure" = 1e-12,
+  "validation/resultat/sous_groupes/p_centrale" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_1/attendus" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_1/smr" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_1/borne_inf_exacte" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_1/borne_sup_exacte" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_1/borne_inf_asymptotique" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_1/borne_sup_asymptotique" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/attendus" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/smr" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/borne_inf_exacte" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/borne_sup_exacte" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/borne_inf_asymptotique" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/borne_sup_asymptotique" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/attendus_conserves" = 1e-12,
+  "importance_exclusions/resultat/smr_comparateur_2/smr_conserves" = 1e-12,
+  # Positionnement (#167), préparées pour le plan de méthode de (R) ; classes
+  # de la spécification d'actuary-approfondi (§ 5 : observes exacte ;
+  # bornes, qx et ses bornes 1e-12), complétées sur
+  # le modèle de `validation` pour les cellules, les paramètres et les
+  # diagnostics. Toute clé commence par `positionnement/` (#175).
+  # exacte : paramètres déclarés, dénombrements, recopie de la table reçue
+  "positionnement/parametres/plage_ages" = 0, "positionnement/parametres/niveau" = 0,
+  "positionnement/resultat/cellules/qx_table" = 0,
+  "positionnement/resultat/smr/observes" = 0,
+  "positionnement/resultat/table_positionnee/qx_reference" = 0,
+  "positionnement/diagnostics/etats/evenements" = 0,
+  "positionnement/diagnostics/evenements_sans_attendu" = 0,
+  "positionnement/diagnostics/evenements_hors_plage" = 0,
+  "positionnement/diagnostics/evenements_total" = 0,
+  "positionnement/plage_ages" = 0, "positionnement/niveau" = 0,
+  # 1e-14 : sommes et quotients IEEE
+  "positionnement/resultat/cellules/exposition_centrale" = 1e-14,
+  "positionnement/diagnostics/exposition_hors_plage" = 1e-14,
+  # 1e-12 : log1p, expm1, exp, qnorm, qgamma ; attendus et smr (somme de
+  # E^c mu~, mu~ par log1p) : spécification corrigée par l'avis d'actuary du
+  # 07/11/2026
+  "positionnement/resultat/smr/attendus" = 1e-12,
+  "positionnement/resultat/smr/smr" = 1e-12,
+  "positionnement/resultat/cellules/taux_table" = 1e-12,
+  "positionnement/resultat/cellules/attendus" = 1e-12,
+  "positionnement/resultat/smr/borne_inf_exacte" = 1e-12,
+  "positionnement/resultat/smr/borne_sup_exacte" = 1e-12,
+  "positionnement/resultat/smr/borne_inf_asymptotique" = 1e-12,
+  "positionnement/resultat/smr/borne_sup_asymptotique" = 1e-12,
+  "positionnement/resultat/table_positionnee/qx" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_inf_exacte" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_sup_exacte" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_inf_asymptotique" = 1e-12,
+  "positionnement/resultat/table_positionnee/borne_sup_asymptotique" = 1e-12,
+  # Homogénéité entre segments (#168), préparées pour le plan de méthode de
+  # (R), sur le modèle de `validation` : paramètres déclarés, dénombrements
+  # et sommes d'entiers exacts ; sommes, produits et quotients IEEE à 1e-14 ;
+  # dbinom (p exacte) et Monte-Carlo à 1e-12 ; grandeurs dérivées de
+  # U = O - A (statistique du score, z, p asymptotique) à 1e-10 (décision du
+  # mainteneur du 08/11/2026, sur avis d'actuary). Toute clé commence par
+  # `homogeneite/` (#175).
+  # exacte
+  "homogeneite/parametres/plage_ages" = 0, "homogeneite/parametres/tranches_age" = 0,
+  "homogeneite/parametres/replications" = 0,
+  "homogeneite/resultat/segments/observes" = 0,
+  "homogeneite/resultat/monte_carlo/replications" = 0,
+  "homogeneite/resultat/monte_carlo/jeux/tirages_effectues" = 0,
+  "homogeneite/diagnostics/evenements_cellules_evenement_sans_exposition" = 0,
+  "homogeneite/diagnostics/evenements_hors_plage" = 0, "homogeneite/diagnostics/evenements_total" = 0,
+  "homogeneite/plage_ages" = 0, "homogeneite/tranches_age" = 0, "homogeneite/replications" = 0,
+  # 1e-14
+  "homogeneite/resultat/segments/exposition_centrale" = 1e-14,
+  "homogeneite/resultat/segments/attendus" = 1e-14,
+  "homogeneite/resultat/segments/rapport_observes_attendus" = 1e-14,
+  "homogeneite/diagnostics/exposition_hors_plage" = 1e-14,
+  # 1e-12 : p exacte (avis d'actuary du 08/11/2026) : elle dépend des
+  # attendus par pi = E_g / E_strate (score_homogeneite()) et par la
+  # frontière |k - A_1| >= |o_1 - A_1|, tenue à TOLERANCE_RESIDU_NUL x A_1
+  # près ; elle ne contient pas la différence O - A, donc pas d'annulation.
+  # L'erreur relative de pi entre dans dbinom avec un facteur borné, d'ordre
+  # z sqrt(Var(O_1)) / (1 - pi) sur la queue (mesuré par actuary : <= 9e-15
+  # pour +-4 ulp sur pi, jusqu'à 16 000 décès, z = 4) ; marge qui décroît
+  # comme z sqrt(n) : passer à 1e-10 si un futur jeu de référence atteint
+  # ~1e6 décès par strate en queue lointaine (motif : conditionnement en
+  # pi). p de Monte-Carlo (1 + K) / (B + 1) et son erreur : comptage de
+  # répliques.
+  "homogeneite/resultat/tests/p_exacte" = 1e-12, "homogeneite/resultat/tests/p_monte_carlo" = 1e-12,
+  "homogeneite/resultat/tests/erreur_monte_carlo" = 1e-12,
+  # 1e-10 : U = O - A, différence de deux grandeurs proches (annulation :
+  # écart relatif de U de l'ordre de eps A / |U|), puis T = U' V^- U,
+  # z = U / sqrt(v) et pchisq(T, ddl)
+  "homogeneite/resultat/tests/statistique" = 1e-10, "homogeneite/resultat/tests/p_asymptotique" = 1e-10,
+  "homogeneite/resultat/segments/z" = 1e-10)
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 
@@ -107,34 +297,180 @@ nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANC
 
 PERIODE_REFERENCE <- list(debut = as.Date("2015-01-01"), fin = as.Date("2024-12-31"))
 GRAINE_REFERENCE <- 20261016L
+GRAINE_MONTE_CARLO_R8 <- 20261107L  # Monte-Carlo de la validation de R8 et de R9 (distincte de celle du jeu)
+# Monte-Carlo de la validation de R10 (réplications multinomiales conditionnelles
+# aux décès de chaque segment, relation positionnee) et du test d'homogénéité de
+# R11 (réplications conditionnelles aux décès de chaque cellule) : une graine
+# propre à chaque plan, distinctes entre elles, de celle du jeu
+# (GRAINE_REFERENCE), de GRAINE_MONTE_CARLO_R8, de celle des défauts de R9
+# (GRAINE_DEFAUTS_R9) et de toute graine d'un test ou d'une mesure du dépôt
+# (recherche de 2026xxxx dans le dépôt entier au 07/11/2026 : 20261113 et
+# 20261114 n'y figurent pas).
+# R12 (#168, M307) : test d'homogénéité sous H0 exactement vraie (transition
+# en_cours -> rachat, facteurs de rachat H = F = 1 dans simuler_reference()),
+# où les p de Monte-Carlo ne sont pas au plancher et épinglent le flux des
+# réplications ; graine propre, absente du dépôt au 07/11/2026 (20261115).
+GRAINE_MONTE_CARLO_R10 <- 20261113L
+GRAINE_MONTE_CARLO_R11 <- 20261114L
+GRAINE_MONTE_CARLO_R12 <- 20261115L
 ROLES_REFERENCE <- c(id_contrat = "id_contrat", id_tete = "id_tete", sexe = "sexe",
                      date_naissance = "date_naissance", date_entree = "date_entree",
                      date_sortie = "date_sortie", cause_sortie = "cause_sortie")
 
-jeu_reference <- function() {
+# Entrée de R9 (#166 ; annotation du 07/11/2026, (d)) : le jeu de
+# jeu_reference() (même loi, même portefeuille, même graine du jeu), altéré
+# après son tirage complet par simuler_portefeuille(defauts =), sous une graine
+# propre aux défauts, distincte de celle du jeu (GRAINE_REFERENCE) et de celle
+# du Monte-Carlo (GRAINE_MONTE_CARLO_R8). Un motif par classe de mesurabilité
+# de l'étape importance_exclusions : id_contrat_manquant (mesurable aux niveaux
+# A et B), sexe_manquant (mesurable au niveau A, non calculable au niveau B
+# sous la segmentation `sexe`), entree_manquante (non mesurable). Nombre fixe
+# de lignes par motif, toutes causes de sortie admises. La graine des défauts
+# diffère de 20261025, déjà employée par les tests unitaires
+# (test_importance_exclusions.R, test_simulation.R) et tests/mesures/ (décision
+# du mainteneur du 07/11/2026).
+GRAINE_DEFAUTS_R9 <- 20261108L
+MOTIFS_DEFAUTS_R9 <- c("id_contrat_manquant", "sexe_manquant", "entree_manquante")
+NOMBRE_PAR_MOTIF_R9 <- 500L
+
+# Jeu de l'entrée de référence : `defauts` NULL pour jeu_reference() (aucun
+# défaut), sinon la liste (graine, declarations) de simuler_portefeuille().
+simuler_reference <- function(defauts = NULL) {
   gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
   ra <- tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %")
   loi <- list(deces = list(table = gm, facteurs = c(H = 1, F = 0.6)),
               rachat = list(table = ra, facteurs = c(H = 1, F = 1)))
   pf <- list(mode = "uniforme", n = 1e5, proportion_hommes = 0.5, age_min = 20, age_max = 75,
              origine = as.Date("2005-01-01"))
-  list(donnees = tablexp::simuler_portefeuille(loi, pf, PERIODE_REFERENCE, GRAINE_REFERENCE),
+  tablexp::simuler_portefeuille(loi, pf, PERIODE_REFERENCE, GRAINE_REFERENCE, defauts = defauts)
+}
+
+jeu_reference <- function() list(donnees = simuler_reference(), roles = ROLES_REFERENCE)
+
+jeu_reference_defauts <- function() {
+  declarations <- lapply(MOTIFS_DEFAUTS_R9, function(m)
+    list(type = m, cible = c("deces", "rachat", "en_cours"), nombre = NOMBRE_PAR_MOTIF_R9))
+  list(donnees = simuler_reference(list(graine = GRAINE_DEFAUTS_R9, declarations = declarations)),
        roles = ROLES_REFERENCE)
 }
 
-plan_reference <- function(transition = c("vivant", "deces"), segmentation = "sexe", delai = 0,
-                           convention = "plus_fine", par_annee = FALSE,
-                           estimateurs = c("poisson", "binomial"), niveau = 0.95) {
-  list(transition = list(depart = transition[1L], arrivee = transition[2L]),
-       periode = PERIODE_REFERENCE, delai_declaration = delai, segmentation = segmentation,
-       etapes = list(donnees = list(exclusions = character(0)),
-                     exposition = list(convention = convention, par_annee = par_annee),
-                     brut = list(estimateurs = estimateurs, niveau = niveau)))
+# Entrée d'un plan (champ `entree` de plans_reference() : le nom de l'entrée) :
+# `reference` (jeu_reference(), R1 à R8, R10 à R12) ou `reference_defauts`
+# (jeu_reference_defauts(), R9). Un nom plutôt qu'une fonction, pour que
+# l'outillage tire chaque entrée distincte une seule fois (entrees_des_plans()).
+tirer_entree <- function(nom)
+  switch(nom, reference = jeu_reference(), reference_defauts = jeu_reference_defauts(),
+         stop("entrée de référence inconnue : ", nom, call. = FALSE))
+
+# Entrées des plans `plans` : liste nommée (nom de l'entrée -> list(donnees,
+# roles)), chaque entrée tirée une fois ; l'entrée d'un plan p est
+# `entrees[[p$entree]]`.
+entrees_des_plans <- function(plans) {
+  noms <- unique(vapply(plans, function(p) {
+    if (!is.character(p$entree) || length(p$entree) != 1L || is.na(p$entree))
+      stop("plan ", if (is.null(p$identifiant)) "(sans identifiant)" else p$identifiant, " : champ entree absent ou non chaîne", call. = FALSE)
+    p$entree
+  }, ""))
+  stats::setNames(lapply(noms, tirer_entree), noms)
 }
 
-# Un identifiant n'est jamais réemployé (point 4.3).
+# Table de référence de R8 (#166) : statut `importee`, en valeurs littérales
+# (aucun calcul de la libm à l'exécution : la référence ne dépend ni d'une
+# table synthétique, ADR 0015, point 2.3, ni de #163). Âges 20 à 90, sexes H
+# et F. Les valeurs ont été produites une seule fois, hors de l'outillage, par
+#   H : q_x = 1 - exp(-A - B c^x (c - 1) / ln c), A = 2e-4, B = 2,5e-5, c = 1,1
+#       (loi de Gompertz-Makeham de jeu_reference()) ;
+#   F : 0,6 fois q_H non arrondi ;
+# chaque valeur est ensuite arrondie à 5 chiffres significatifs, puis recopiée
+# ici : elles ne se recalculent pas. La table est indépendante des observations
+# (aucun ajustement sur le jeu tiré).
+AGES_TABLE_R8 <- 20:90
+QX_TABLE_R8 <- list(
+  H = c(
+    0.00037639, 0.00039403, 0.00041344, 0.00043478, 0.00045825, 0.00048408,
+    0.00051248, 0.00054373, 0.0005781, 0.0006159, 0.00065748, 0.00070322,
+    0.00075353, 0.00080887, 0.00086974, 0.00093669, 0.0010103, 0.0010913,
+    0.0011804, 0.0012784, 0.0013862, 0.0015047, 0.0016351, 0.0017785,
+    0.0019362, 0.0021097, 0.0023005, 0.0025103, 0.002741, 0.0029948,
+    0.0032738, 0.0035807, 0.0039181, 0.0042892, 0.0046972, 0.0051458,
+    0.005639, 0.0061813, 0.0067774, 0.0074328, 0.0081532, 0.008945,
+    0.0098153, 0.010772, 0.011823, 0.012978, 0.014246, 0.01564,
+    0.017171, 0.018852, 0.020698, 0.022725, 0.024949, 0.02739,
+    0.030068, 0.033005, 0.036226, 0.039756, 0.043625, 0.047862,
+    0.052501, 0.057579, 0.063132, 0.069203, 0.075836, 0.083078,
+    0.090978, 0.099589, 0.10897, 0.11917, 0.13026),
+  F = c(
+    0.00022584, 0.00023642, 0.00024806, 0.00026087, 0.00027495, 0.00029045,
+    0.00030749, 0.00032624, 0.00034686, 0.00036954, 0.00039449, 0.00042193,
+    0.00045212, 0.00048532, 0.00052184, 0.00056202, 0.0006062, 0.0006548,
+    0.00070825, 0.00076705, 0.00083172, 0.00090284, 0.00098107, 0.0010671,
+    0.0011617, 0.0012658, 0.0013803, 0.0015062, 0.0016446, 0.0017969,
+    0.0019643, 0.0021484, 0.0023509, 0.0025735, 0.0028183, 0.0030875,
+    0.0033834, 0.0037088, 0.0040665, 0.0044597, 0.0048919, 0.005367,
+    0.0058892, 0.006463, 0.0070936, 0.0077865, 0.0085478, 0.009384,
+    0.010303, 0.011311, 0.012419, 0.013635, 0.014969, 0.016434,
+    0.018041, 0.019803, 0.021735, 0.023854, 0.026175, 0.028717,
+    0.031501, 0.034547, 0.037879, 0.041522, 0.045502, 0.049847,
+    0.054587, 0.059754, 0.065381, 0.071503, 0.078156))
+
+tables_reference_r8 <- function() {
+  list(tv = tablexp::table_reference(
+    data.frame(age = rep(AGES_TABLE_R8, 2L), sexe = rep(c("H", "F"), each = length(AGES_TABLE_R8)),
+               qx = c(QX_TABLE_R8$H, QX_TABLE_R8$F), stringsAsFactors = FALSE),
+    nom = "table de référence de R8 (loi vraie arrondie, valeurs littérales)", statut = "importee",
+    source = "valeurs littérales de tests/reference/outils_reference.R (QX_TABLE_R8), arrondies à 5 chiffres significatifs"))
+}
+
+# `exclusions`, `positionnement`, `homogeneite`, `validation`, `importance` et
+# `graine` : étapes et graine facultatives (R8 ; R10 à R12 : #167, #168) ;
+# absents, le plan est celui de R1 à R7 (champs et ordre inchangés). Les
+# étapes sont écrites dans l'ordre d'ETAPES (R/construire_table.R).
+plan_reference <- function(transition = c("vivant", "deces"), segmentation = "sexe", delai = 0,
+                           convention = "plus_fine", par_annee = FALSE,
+                           estimateurs = c("poisson", "binomial"), niveau = 0.95,
+                           exclusions = character(0), positionnement = NULL, homogeneite = NULL,
+                           validation = NULL, importance = NULL, graine = NULL) {
+  etapes <- list(donnees = list(exclusions = exclusions),
+                 exposition = list(convention = convention, par_annee = par_annee),
+                 brut = list(estimateurs = estimateurs, niveau = niveau))
+  if (!is.null(positionnement)) etapes$positionnement <- positionnement
+  if (!is.null(homogeneite)) etapes$homogeneite <- homogeneite
+  if (!is.null(validation)) etapes$validation <- validation
+  if (!is.null(importance)) etapes$importance_exclusions <- importance
+  plan <- list(transition = list(depart = transition[1L], arrivee = transition[2L]),
+               periode = PERIODE_REFERENCE, delai_declaration = delai, segmentation = segmentation)
+  if (!is.null(graine)) plan$graine <- graine
+  plan$etapes <- etapes
+  plan
+}
+
+# Tables lues par un plan : NULL, ou une fonction sans argument qui rend la
+# liste nommée des objets `table_reference` (argument `tables_reference` de
+# construire_table() et de rejouer_fiche(), ADR 0015). Fonction et non liste :
+# plans_reference() est appelée avant le chargement de tablexp (par exemple par
+# produire_references.R, qui lit les plans avant d'installer le package), et
+# tablexp::table_reference() n'est alors pas disponible.
+tables_du_plan <- function(p) if (is.null(p$tables_reference)) NULL else p$tables_reference()
+
+# Un identifiant n'est jamais réemployé (point 4.3). `entree` : nom de
+# l'entrée du plan (tirer_entree()), `reference` pour R1 à R8, R10 à R12.
 plans_reference <- function() {
-  p <- function(id, description, plan) list(identifiant = id, description = description, plan = plan)
+  p <- function(id, description, plan, tables_reference = NULL, entree = "reference")
+    list(identifiant = id, description = description, plan = plan, tables_reference = tables_reference,
+         entree = entree)
+  # Étapes validation et importance_exclusions de R8 et de R9 : un seul texte.
+  validation <- list(table_reference = "tv", relation_table = "independante",
+                     plage_ages = c(20, 90), tranches_age = c(20, 50, 70),
+                     niveau = 0.95, replications = 999)
+  importance <- list(niveau = 0.95)
+  # R10 (#167) : positionnement par SMR sur la table de R8, puis validation de
+  # la table positionnée (relation positionnee : même clé de table et même
+  # plage d'âges que le positionnement, tranches libres).
+  positionnement <- list(methode = "smr", table_reference = "tv", plage_ages = c(20, 90), niveau = 0.95)
+  validation_positionnee <- validation
+  validation_positionnee$relation_table <- "positionnee"
+  # R11 (#168) et R12 (#168, M307) : test d'homogénéité entre segments (sexe), sous H0 fausse (R1) et vraie (R5).
+  homogeneite <- list(plage_ages = c(20, 90), tranches_age = c(20, 50, 70), replications = 999)
   list(
     R1 = p("R1", "décès, référence principale", plan_reference()),
     R2 = p("R2", "sans segmentation, délai 90, niveau 0,99",
@@ -143,7 +479,29 @@ plans_reference <- function() {
     R4 = p("R4", "par année (surface), Poisson seul", plan_reference(par_annee = TRUE, estimateurs = "poisson")),
     R5 = p("R5", "en cours -> racheté, unité contrat", plan_reference(transition = c("en_cours", "rachat"))),
     R6 = p("R6", "Kaplan-Meier (R1 avec kaplan_meier)",
-           plan_reference(estimateurs = c("poisson", "binomial", "kaplan_meier"))))
+           plan_reference(estimateurs = c("poisson", "binomial", "kaplan_meier"))),
+    R7 = p("R7", "Kaplan-Meier sous age_atteint_annee (R3 avec kaplan_meier)",
+           plan_reference(convention = "age_atteint_annee",
+                          estimateurs = c("poisson", "binomial", "kaplan_meier"))),
+    R8 = p("R8", "validation et importance des exclusions (R1 avec table importée ; exclusions déclarées, sans ligne touchée par l'entrée de référence)",
+           plan_reference(exclusions = c("entree_manquante", "sexe_manquant"),
+                          validation = validation, importance = importance, graine = GRAINE_MONTE_CARLO_R8),
+           tables_reference = tables_reference_r8),
+    R9 = p("R9", sprintf("validation et importance des exclusions sur une entrée à défauts injectés (plan de R8, exclusions id_contrat_manquant en plus ; %s, %d lignes chacun, graine des défauts %d)",
+                         paste(MOTIFS_DEFAUTS_R9, collapse = ", "), NOMBRE_PAR_MOTIF_R9, GRAINE_DEFAUTS_R9),
+           plan_reference(exclusions = c("id_contrat_manquant", "entree_manquante", "sexe_manquant"),
+                          validation = validation, importance = importance, graine = GRAINE_MONTE_CARLO_R8),
+           tables_reference = tables_reference_r8, entree = "reference_defauts"),
+    R10 = p("R10", "positionnement par SMR sur la table de R8 et validation de la table positionnée (plan de R8 avec les étapes positionnement et validation en relation positionnee ; exclusions déclarées, sans ligne touchée par l'entrée de référence)",
+            plan_reference(exclusions = c("entree_manquante", "sexe_manquant"), positionnement = positionnement,
+                           validation = validation_positionnee, importance = importance,
+                           graine = GRAINE_MONTE_CARLO_R10),
+            tables_reference = tables_reference_r8),
+    R11 = p("R11", "test d'homogénéité entre segments (R1 avec l'étape homogeneite)",
+            plan_reference(homogeneite = homogeneite, graine = GRAINE_MONTE_CARLO_R11)),
+    R12 = p("R12", "test d'homogénéité entre segments sous H0 (R5 avec l'étape homogeneite ; le sexe est sans effet sur la loi vraie du rachat) : épingle le flux des réplications",
+            plan_reference(transition = c("en_cours", "rachat"), homogeneite = homogeneite,
+                           graine = GRAINE_MONTE_CARLO_R12)))
 }
 
 # --- aplatissement (points 1 et 2.3) ------------------------------------------

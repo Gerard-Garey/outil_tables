@@ -15,8 +15,9 @@
 #       en_US.UTF-8 : sondée comme le harnais) ;
 #    2. dans un sous-processus par bibliothèque, sous la locale de son
 #       installation, qui vérifie d'abord que la session est bien en C (resp.
-#       en UTF-8) : jeu_reference() puis, pour R1 à R6 (plans_reference() de
-#       tests/reference/outils_reference.R), construire_table(), puis
+#       en UTF-8) : pour R1 à R12 (plans_reference() de
+#       tests/reference/outils_reference.R, sur l'entrée de chaque plan :
+#       jeu_reference(), ou jeu_reference_defauts() pour R9), construire_table(), puis
 #       ecrire_fiche(x$fiche) et ecrire_plan(x$fiche$plan), relus par
 #       lire_fiche() et lire_plan() : aller-retour identical(), et réécriture
 #       de l'objet relu identique octet à octet au texte écrit ; rapport figé
@@ -28,7 +29,7 @@
 #       trois refus de lire_texte() et deux type_incompatible sur un rôle
 #       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
 #       octet « <xx> » (#127) ;
-#    3. les textes (fiche, plan et rapport figé de R1 à R6, bilan du rejeu et
+#    3. les textes (fiche, plan et rapport figé de R1 à R12, bilan du rejeu et
 #       messages de refus de R1, messages de refus par module) écrits sous C
 #       et sous UTF-8 sont comparés
 #       octet à octet. Aucune
@@ -50,7 +51,7 @@
 
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
 LOCALE_INVENTEE <- "xx_XX.UTF-8"  # comme tests/harnais.R (critère de #109)
-IDENTIFIANTS <- paste0("R", 1:6)
+IDENTIFIANTS <- paste0("R", 1:12)
 
 # Orchestration commune (installer, executer, avec_environnement, duree,
 # ecart_octets : tests/controles/orchestration_locale.R, #117), chargée dans
@@ -95,7 +96,7 @@ locale_utf8_disponible <- function(candidats = LOCALES_UTF8) {
 
 environnement_locale <- function(locale) c(LC_ALL = locale, LANG = locale, LC_CTYPE = locale)
 
-# --- sous-processus : R1 à R6, fiche et plan --------------------------------
+# --- sous-processus : R1 à R12, fiche et plan --------------------------------
 
 travailleur <- function(args) {
   lib <- args[1L]; attendu <- args[2L]; sortie <- args[3L]; racine <- args[4L]
@@ -110,12 +111,22 @@ travailleur <- function(args) {
     quit(save = "no", status = 1L)
   }
   defauts <- character(0)
-  jeu <- jeu_reference()
+  # Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
+  # distincte tirée une seule fois.
+  entrees <- entrees_des_plans(plans_reference())
+  # IDENTIFIANTS (comparaison octet à octet du processus principal) couvre
+  # tous les plans de plans_reference() : un plan ajouté sans mise à jour de
+  # IDENTIFIANTS serait construit ici et jamais comparé.
+  ids_plans <- vapply(plans_reference(), function(p) p$identifiant, "")
+  if (!identical(unname(ids_plans), IDENTIFIANTS))
+    defauts <- c(defauts, sprintf("plans_reference() (%s) different de IDENTIFIANTS (%s)",
+                                  paste(ids_plans, collapse = ", "), paste(IDENTIFIANTS, collapse = ", ")))
   for (p in plans_reference()) {
     id <- p$identifiant
+    jeu <- entrees[[p$entree]]
     d <- function(m) defauts <<- c(defauts, sprintf("%s : %s", id, octets_bruts(m)))
     r <- tryCatch({
-      x <- construire_table(jeu$donnees, jeu$roles, p$plan)
+      x <- construire_table(jeu$donnees, jeu$roles, p$plan, tables_reference = tables_du_plan(p))
       f <- x$fiche
       tf <- ecrire_fiche(f); tp <- ecrire_plan(f$plan)
       if (!is.raw(tf) || !is.raw(tp)) stop("texte non écrit en octets (raw)")
@@ -168,8 +179,11 @@ travailleur <- function(args) {
   # Messages de refus par module (#127, critère 2 ; ADR 0007, annotation du
   # 05/11/2026, (c) et (f)) : un refus par module qui cite une valeur reçue
   # non ASCII (« âge ») de codage natif non marqué, latin-1 et UTF-8, le refus
-  # portant le module et le motif attendus de l'entrée (sept modules, dont
-  # validation : #127, B13) ; puis
+  # portant le module et le motif attendus de l'entrée (neuf modules, dont
+  # validation : #127, B13 ; positionnement : #167 ; homogeneite : #168, dont
+  # aucun refus ne cite de valeur reçue : la valeur non ASCII y est passée en
+  # tranches_age, refusée par sa forme, et le texte « âge » contrôlé est celui
+  # du gabarit, marqué UTF-8 par formuler()) ; puis
   # les trois refus de lire_texte() de tests/unitaires/test_serialisation.R
   # (première ligne inconnue, type inconnu, valeur illisible ; entrées en
   # octets bruts). Chaque message : marqué UTF-8, sur une ligne, sans octet
@@ -193,13 +207,17 @@ travailleur <- function(args) {
         list(graine = 1L, declarations = list(list(type = v, cible = "deces", taux = 0.1))), 2L),
       rapport = function(v) tablexp:::ecrire_valeurs(structure(1, class = v), "texte", "r"),
       construire_table = function(v) valider_plan(stats::setNames(list(1), v)),
+      positionnement = function(v) tablexp:::controler_entrees_validation(
+        list(annee = 1), v, tablexp:::CONVENTIONS_VALIDATION[1L], character(0), c(0, 1), "positionnement"),
       validation = function(v) tablexp:::controler_entrees_validation(
-        list(annee = 1), v, tablexp:::CONVENTIONS_VALIDATION[1L], character(0), c(0, 1)))
+        list(annee = 1), v, tablexp:::CONVENTIONS_VALIDATION[1L], character(0), c(0, 1), "validation"),
+      homogeneite = function(v) tablexp:::controler_parametres_homogeneite(c(0, 1), v, 1, "sexe"))
     # Motif attendu de chaque refus : sans lui, un refus voisin du même module
     # (autre garde, même citation) passerait.
     motifs_attendus <- c(donnees = "colonne_absente", exposition = "convention_invalide", brut = "estimateur_inconnu",
                          simulation = "defauts_invalides", rapport = "type_non_canonique",
-                         construire_table = "champ_inconnu", validation = "table_annee_non_admise")
+                         construire_table = "champ_inconnu", positionnement = "table_annee_non_admise",
+                         validation = "table_annee_non_admise", homogeneite = "tranches_age_invalides")
     msgs <- character(0); noms <- character(0)
     for (mo in names(modules)) for (en in names(valeurs)) {
       cond <- tryCatch({ force(modules[[mo]](valeurs[[en]])); NULL }, refus_tablexp = function(r) r)
@@ -295,7 +313,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
   if (length(defauts)) echec()
   for (c_ in cas) {
-    cat(sprintf("  R1 à R6, fiche, plan et rapport figé, sous LC_ALL=%s :\n", c_$locale))
+    cat(sprintf("  %s, fiche, plan et rapport figé, sous LC_ALL=%s :\n", paste(IDENTIFIANTS, collapse = ", "), c_$locale))
     e <- executer(script, racine, c_$lib, environnement_locale(c_$locale), c_$attendu, c_$sortie)
     cat(paste0("  ", e$sortie), sep = "\n")
     cat(sprintf("  durée : %s\n", e$duree))
@@ -341,7 +359,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   if (n_comparees != 3L * length(IDENTIFIANTS) + 3L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
   cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu et messages de refus de R1, messages de refus par module) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
-              n_comparees, paste(range(IDENTIFIANTS), collapse = " à "), utf8, duree(t_debut)))
+              n_comparees, paste(IDENTIFIANTS, collapse = ", "), utf8, duree(t_debut)))
   invisible(TRUE)
 }
 

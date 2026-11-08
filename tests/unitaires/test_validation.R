@@ -42,19 +42,21 @@ tous <- function(...) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A constantes : RELATIONS_TABLE, CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE",
-         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_)) &&
+verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement puis validation, #167)",
+         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L)) &&
            identical(tablexp:::CONVENTIONS_VALIDATION, "dernier_anniversaire") &&
            identical(tablexp:::N_MAX_WILCOXON_EXACT, 1000) && identical(tablexp:::N_MAX_RUNS_EXACT, 10000) &&
            identical(tablexp:::TOLERANCE_RESIDU_NUL, 1e-10) &&
-           identical(tablexp:::PARAMETRES_CLE_TABLE, "etapes/validation/table_reference"))
-verifier("A ETAPES : validation après brut, module validation, préalables donnees et exposition, seule étape aléatoire (importance_exclusions après elle, #69)", {
+           identical(tablexp:::PARAMETRES_CLE_TABLE,
+                     c("etapes/positionnement/table_reference", "etapes/validation/table_reference")))
+verifier("A ETAPES : validation après brut, positionnement (#167) et homogeneite (#168), module validation, préalables donnees et exposition, aléatoire comme homogeneite (importance_exclusions après elle, #69)", {
   e <- tablexp:::ETAPES
   k <- match("validation", e$etape)
-  identical(e$etape, c("donnees", "exposition", "brut", "validation", "importance_exclusions")) &&
+  identical(e$etape, c("donnees", "exposition", "brut", "positionnement", "homogeneite", "validation",
+                       "importance_exclusions")) &&
     identical(e$module[k], "validation") &&
     identical(e$fonction[k], "calculer_validation") && identical(e$prealable[[k]], c("donnees", "exposition")) &&
-    identical(e$aleatoire, c(FALSE, FALSE, FALSE, TRUE, FALSE))
+    identical(e$aleatoire, c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE))
 })
 verifier("A PARAMETRES_ETAPES$validation : six paramètres dans l'ordre, types character et double", {
   p <- tablexp:::PARAMETRES_ETAPES$validation
@@ -80,7 +82,7 @@ verifier("A erreur de Monte-Carlo (M253) : B = 999, K = 49 -> p = 0,05, e = 0,00
 # --- B. J1, J2, J3 (d) : statistiques sur des cellules (valeur calculée à la main) --
 
 J1 <- list(E = c(128, 256, 512, 64), mu = c(1 / 256, 1 / 128, 1 / 128, 7 / 128), D = c(0L, 3L, 5L, 4L))
-stat_j <- function(E, mu, D, pe = 0L, B = 99, graine = 1L)
+stat_j <- function(E, mu, D, pe = "independante", B = 99, graine = 1L)
   sv(D, E, -expm1(-mu), mu, E * mu, rep("retenue", length(D)), rep(1L, length(D)), seq_along(D), 0.95, pe, B, graine)
 S1 <- stat_j(J1$E, J1$mu, J1$D)
 s1 <- S1$statistiques
@@ -154,7 +156,7 @@ verifier("J3 (d), D = 0 partout, somme A = 2 : SMR 0, IC [0 ; 1,84443972705697],
                 all(is.na(valeur(s, c("mape/valeur", "r2/valeur"))))) TRUE else "états MAPE / R2")
 })
 verifier("J1 sous ajustee_hors_outil : grandeurs sous H0 NA (ddl_non_etabli), descriptives produites, aucun tirage", {
-  S <- stat_j(J1$E, J1$mu, J1$D, pe = NA_integer_)
+  S <- stat_j(J1$E, J1$mu, J1$D, pe = "ajustee_hors_outil")
   s <- S$statistiques
   h0 <- tablexp:::STATUTS_VALIDATION$sous_h0[tablexp:::STATUTS_VALIDATION$statistique != "sous_groupes"]
   if (!all(s$etat[h0] == "ddl_non_etabli") || !all(is.na(s$valeur[h0]))) "grandeurs sous H0"
@@ -163,7 +165,7 @@ verifier("J1 sous ajustee_hors_outil : grandeurs sous H0 NA (ddl_non_etabli), de
   else TRUE
 })
 verifier("aucune cellule retenue : toutes les grandeurs NA, état aucune_cellule_retenue, aucun tirage", {
-  S <- sv(0L, 0, 0.1, -log1p(-0.1), 0, "sans_exposition", 1L, 1L, 0.95, 0L, 9, 1L)
+  S <- sv(0L, 0, 0.1, -log1p(-0.1), 0, "sans_exposition", 1L, 1L, 0.95, "independante", 9, 1L)
   all(S$statistiques$etat == "aucune_cellule_retenue") && all(is.na(S$statistiques$valeur)) && S$tirages_effectues == 0
 })
 
@@ -188,7 +190,7 @@ verifier("résidu |D - A| = 1e-6 non nul (E = 2, mu~ = (1 - 1e-6) / 2, D = 1) : 
 verifier("statistiques_test() et le chemin observé : mêmes signes, suites et z de Wilcoxon (identical), zéros à la tolérance, deux séquences", {
   E <- c(128, 49, 256, 2, 512, 64, 49, 8); mu <- c(1 / 256, 1 / 49, 1 / 128, (1 - 1e-6) / 2, 1 / 128, 7 / 128, 1 / 49, 1 / 4)
   Dd <- c(0L, 1L, 3L, 1L, 5L, 4L, 1L, 2L); sq <- c(1L, 1L, 1L, 1L, 2L, 2L, 2L, 2L); A <- E * mu
-  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 8L), sq, seq_along(Dd), 0.95, 0L, 19, 1L)$statistiques
+  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 8L), sq, seq_along(Dd), 0.95, "independante", 19, 1L)$statistiques
   t <- tablexp:::statistiques_test(matrix(as.numeric(Dd), ncol = 1L), A, E, mu, match(sq, sq))
   np <- valeur(s, "signes/positifs"); nm <- valeur(s, "signes/negatifs")
   identical(t$signes, (np - nm) / sqrt(np + nm)) && identical(as.numeric(t$runs), valeur(s, "runs/runs")) &&
@@ -196,7 +198,7 @@ verifier("statistiques_test() et le chemin observé : mêmes signes, suites et z
 })
 verifier("Wilcoxon sur d = D / E^c - mu~ : deux cellules D = 0 de même mu~ = 0,1, E = 3 et 7, en un seul groupe d'ex aequo ; T* = T (identical)", {
   E <- c(3, 7, 10, 20); mu <- rep(0.1, 4L); Dd <- c(0L, 0L, 3L, 1L); A <- E * mu
-  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 4L), rep(1L, 4L), seq_along(Dd), 0.95, 0L, 19, 1L)$statistiques
+  s <- sv(Dd, E, -expm1(-mu), mu, A, rep("retenue", 4L), rep(1L, 4L), seq_along(Dd), 0.95, "independante", 19, 1L)$statistiques
   t <- tablexp:::statistiques_test(matrix(as.numeric(Dd), ncol = 1L), A, E, mu, rep(1L, 4L))
   tous(construit = if ((0 - A[1L]) / E[1L] != (0 - A[2L]) / E[2L]) TRUE else "(D - A) / E^c égaux : cas non construit",
        groupes = proche(valeur(s, c("wilcoxon/effectif", "wilcoxon/groupes_ex_aequo")), c(4, 1), 0, 0),
@@ -281,7 +283,7 @@ local({
   cles <- c("khi2_pearson/p_monte_carlo", "deviance/p_monte_carlo", "signes/p_monte_carlo", "runs/p_monte_carlo",
             "wilcoxon/p_monte_carlo", "signes/p_asymptotique")
   P <- t(vapply(seq_len(400L), function(i)
-    valeur(sv(Dall[, i], E, -expm1(-mu), mu, A, rep("retenue", length(A)), rep(1L, length(A)), ages, 0.95, 0L, 199,
+    valeur(sv(Dall[, i], E, -expm1(-mu), mu, A, rep("retenue", length(A)), rep(1L, length(A)), ages, 0.95, "independante", 199,
               1000L + i)$statistiques, cles), numeric(length(cles))))
   taille <- colMeans(P <= 0.05)
   names(taille) <- cles
@@ -435,7 +437,7 @@ T_ET <- table_reference(data.frame(age = 40:70, sexe = "ensemble", qx = ifelse(4
 validation_directe <- function(expo = EXPO, table = T_ET, plage = c(50, 57), segmentation = character(0), ...) {
   a <- list(exposition = expo, segmentation = segmentation, par_annee = FALSE, convention = "dernier_anniversaire",
             table = table, table_reference = "t", relation_table = "independante", plage_ages = plage,
-            tranches_age = plage[1L], niveau = 0.95, replications = 19, graine = 5L)
+            tranches_age = plage[1L], niveau = 0.95, replications = 19, graine = 5L, positionnement = NULL)
   m <- list(...)
   a[names(m)] <- m
   do.call(tablexp:::calculer_validation, a)
@@ -516,7 +518,7 @@ verifier("refus avant exécution : plage d'âges non couverte -> plage_ages_hors
                                                        "importee", "test")), "plage_ages_hors_table"))
 verifier("refus (appel direct, défense) : table mêlant ensemble et H -> table_sexes_ambigus", {
   t <- data.frame(age = c(20:90, 20:90), sexe = rep(c("H", "ensemble"), each = 71), qx = 0.01, stringsAsFactors = FALSE)
-  controle(refus_de(tablexp:::controler_entrees_validation(t, "t", "dernier_anniversaire", "sexe", c(20, 90))),
+  controle(refus_de(tablexp:::controler_entrees_validation(t, "t", "dernier_anniversaire", "sexe", c(20, 90), "validation")),
            "validation", "table_sexes_ambigus")
 })
 verifier("refus en cours d'étape : table H seule face à H et F -> cellule_sans_valeur_table", {
@@ -551,12 +553,64 @@ verifier("bout en bout : rejeu sans la table -> table_reference_absente ; avec u
   tous(a = controle(refus_de(rejouer_fiche(JEU, f)), "construire_table", "table_reference_absente"),
        b = controle(refus_de(rejouer_fiche(JEU, f, list(tv = t2))), "construire_table", "empreinte_table_discordante"))
 })
-verifier("bout en bout : rejeu d'une fiche dont la plage dépasse la table -> plage_ages_hors_table avant construire_table()", {
+verifier("bout en bout : rejeu d'une fiche dont la plage dépasse la table -> plage_ages_hors_table, levé par l'unique appel de construire_table() avant toute étape (#82 : contrôle d'entrée fait une fois)", {
   f <- X$fiche
   f$plan$etapes$validation$plage_ages <- c(20, 130)
   a <- compter_appels(rejouer_fiche(JEU, f, list(tv = T_HF)))
   r <- controle(a$refus, "validation", "plage_ages_hors_table")
-  if (isTRUE(r) && a$n[["construire_table"]]) "construire_table() appelée" else r
+  if (isTRUE(r) && !identical(a$n, c(construire_table = 1L, preparer_donnees = 0L))) "appels" else r
+})
+# Refus du contrôle 1.3 et des contrôles d'entrée de la validation au rejeu
+# (#82 ; avis (P) rafraîchi, critère 4) : même module, motif, message et
+# details que construire_table() sur le plan, la provenance et les tables de
+# la fiche (identité exacte).
+for (cas in list(
+  list("clé citée par le plan absente de fiche/tables_reference (1.3)", "construire_table", "table_reference_absente",
+       function(f) { f$plan$etapes$validation$table_reference <- "autre"; f }),
+  list("plage d'âges hors de la table (contrôle d'entrée de la validation)", "validation", "plage_ages_hors_table",
+       function(f) { f$plan$etapes$validation$plage_ages <- c(20, 130); f }),
+  list("segmentation sans sexe, table par sexe (contrôle d'entrée de la validation)", "validation",
+       "table_sexe_incompatible", function(f) { f$plan$segmentation <- character(0); f }))) {
+  f <- cas[[4L]](X$fiche)
+  r <- refus_de(rejouer_fiche(JEU, f, list(tv = T_HF)))
+  r_ct <- refus_de(construire_table(JEU, f$roles, f$plan, f$provenance, list(tv = T_HF)))
+  verifier(sprintf("rejeu (#82), %s : %s/%s, refus identical() à celui de construire_table()", cas[[1L]], cas[[2L]],
+                   cas[[3L]]),
+           if (is.null(r) || is.null(r_ct)) "aucun refus" else
+             if (!identical(unclass(r), unclass(r_ct))) "refus différent de celui de construire_table()" else
+               controle(r, cas[[2L]], cas[[3L]]))
+}
+# Comptes d'exécution (#82 ; #164, point 2, M281 ; valeur calculée à la main,
+# mesurée par trace() sur l'espace de noms installé) : construire_table()
+# exécute chaque contrôle une fois ; rejouer_fiche() exécute la couche
+# plan-rôles deux fois (contrôle 6 du rejeu, puis construire_table()), le
+# contrôle 1.3 et les contrôles d'entrée de la validation une fois.
+CONTROLES_82 <- c("valider_plan", "controler_roles", "deduire_recette", "resoudre_convention", "controler_provenance",
+                  "controler_plan_roles", "controler_entrees", "controler_tables_reference",
+                  "controler_entrees_validation", "construire_table")
+compter_82 <- function(expr) {
+  n <- new.env()
+  for (f in CONTROLES_82) assign(f, 0L, envir = n)
+  for (f in CONTROLES_82)
+    suppressMessages(trace(f, where = ns, print = FALSE,
+                           tracer = bquote(assign(.(f), get(.(f), envir = .(n)) + 1L, envir = .(n)))))
+  on.exit(for (f in CONTROLES_82) suppressMessages(untrace(f, where = ns)))
+  force(expr)
+  vapply(CONTROLES_82, function(f) get(f, envir = n), 0L)
+}
+verifier("comptes (#82 ; #164, point 2) : construire_table() sur un plan à validation, chaque contrôle une fois", {
+  # Par l'espace de noms : la copie de construire_table() de l'environnement
+  # du package attaché n'est pas tracée par trace(where = ns).
+  a <- compter_82(tablexp:::construire_table(JEU, ROLES, P0, tables_reference = list(tv = T_HF)))
+  if (all(a == 1L)) TRUE else paste(names(a), a, sep = "=", collapse = " ")
+})
+verifier("comptes (#82 ; #164, point 2) : rejouer_fiche() sur un plan à validation : couche plan-rôles 2, controler_tables_reference() 1, controler_entrees_validation() 1, construire_table() 1", {
+  f <- lire_fiche(ecrire_fiche(X$fiche))
+  a <- compter_82(rejouer_fiche(JEU, f, list(tv = T_HF)))
+  attendu <- c(valider_plan = 2L, controler_roles = 2L, deduire_recette = 2L, resoudre_convention = 2L,
+               controler_provenance = 2L, controler_plan_roles = 2L, controler_entrees = 1L,
+               controler_tables_reference = 1L, controler_entrees_validation = 1L, construire_table = 1L)
+  if (identical(a, attendu)) TRUE else paste(names(a), a, sep = "=", collapse = " ")
 })
 verifier("rapport : section etape_validation avec ses mentions fixes (sans verdict, independante, H0, multiplicité, Monte-Carlo, référence) et ses tables", {
   h <- rawToChar(ecrire_rapport(X)); Encoding(h) <- "UTF-8"

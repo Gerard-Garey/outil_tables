@@ -289,9 +289,6 @@ verifier("H13 par_annee, Poisson seul (valeur calculée à la main) : 60 lignes,
            identical(names(H13$objet$etapes$brut$resultat), "poisson"))
 verifier("H13 : binomial sous par_annee -> refus binomial_par_annee depuis valider_plan(), avant toute étape",
          leve_refus(valider_plan(plan_brut(par_annee = TRUE)), "binomial_par_annee"))
-verifier("H13 : binomial sous par_annee -> refus binomial_par_annee depuis l'appel direct de la fonction d'étape",
-         leve_refus(calculer_taux_bruts(H13$e, character(0), TRUE, "dernier_anniversaire", "u",
-                                        c("poisson", "binomial"), 0.95), "binomial_par_annee"))
 verifier("H13 : le refus nomme par_annee et q_x", {
   r <- tryCatch(valider_plan(plan_brut(par_annee = TRUE)), refus_tablexp = function(r) r)
   identical(r$module, "brut") && grepl("par_annee", conditionMessage(r), fixed = TRUE) &&
@@ -399,10 +396,9 @@ for (est in list(c(a = "poisson"), c(a = "poisson", b = "binomial"), matrix(c("p
          plan_brut(estimateurs = est))
 for (k in cas_refus)
   verifier(sprintf("valider_plan : %s -> refus %s", k[[1]], k[[2]]), leve_refus(valider_plan(k[[3]]), k[[2]]))
-verifier("refus de valeur portés par le module brut (codes identiques depuis valider_plan() et la fonction d'étape)", {
+verifier("refus de valeur portés par le module brut (codes identiques depuis valider_plan() et controler_parametres_brut() ; la fonction d'étape ne contrôle plus rien, #82)", {
   r1 <- tryCatch(valider_plan(plan_brut(niveau = 2)), refus_tablexp = function(r) r)
-  r2 <- tryCatch(calculer_taux_bruts(EC, character(0), FALSE, "dernier_anniversaire", "u", "poisson", 2),
-                 refus_tablexp = function(r) r)
+  r2 <- tryCatch(controler_parametres_brut(c("poisson", "binomial"), 2, FALSE), refus_tablexp = function(r) r)
   r3 <- tryCatch(controler_parametres_brut("estimateur_fictif", 0.95, FALSE), refus_tablexp = function(r) r)
   identical(c(r1$module, r2$module, r3$module), rep("brut", 3L)) &&
     identical(c(r1$motif, r2$motif, r3$motif), c("niveau_invalide", "niveau_invalide", "estimateur_inconnu")) &&
@@ -535,10 +531,11 @@ verifier("invariance du plan sans brut (cas C, par_annee = TRUE, poisson seul) :
          invariance_sans_brut(construire_table(DC, ROLES_C, plan_brut(estimateurs = "poisson", par_annee = TRUE)),
                               DC, ROLES_C))
 
-# Forme exacte et catalogue de la segmentation à l'appel direct de
-# calculer_taux_bruts() (#43, #59) : hors du chemin Kaplan-Meier, ils n'étaient
-# pas contrôlés. Table d'exposition munie des colonnes `sexe` et `region` (et
-# d'une colonne `age` déjà présente), pour que seule la segmentation échoue.
+# Forme exacte et catalogue de la segmentation (#43, #59) : contrôlés par
+# valider_plan() (module donnees), avant toute étape ; la fonction d'étape
+# brut ne les contrôle plus en appel direct (#82, M216). Table d'exposition
+# munie des colonnes `sexe` et `region` (et d'une colonne `age` déjà
+# présente), pour l'appel direct admis ci-dessous.
 EC_SEXE <- cbind(EC, sexe = "H", region = "R")
 cas_segmentation <- list(
   list("age (clé réservée, dupliquerait la colonne)", "age"),
@@ -555,27 +552,25 @@ cas_segmentation <- list(
   list("logique", NA),
   list("NULL", NULL))
 for (k in cas_segmentation)
-  verifier(sprintf("calculer_taux_bruts(segmentation %s) : refus segmentation_invalide, module brut", k[[1]]), {
-    r <- tryCatch(calculer_taux_bruts(EC_SEXE, k[[2]], FALSE, "dernier_anniversaire", "u", "poisson", 0.95),
-                  error = function(e) e)
-    inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "brut")
+  verifier(sprintf("valider_plan(segmentation %s, plan avec brut) : refus segmentation_invalide, module donnees (#82)", k[[1]]), {
+    p <- plan_brut(); p["segmentation"] <- list(k[[2]])
+    r <- tryCatch(valider_plan(p), error = function(e) e)
+    inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "donnees")
   })
 # Chemin Kaplan-Meier (#59, sec:brut-etape) : le catalogue est contrôlé avant le
-# calcul de l'estimateur, sans observations ni transition à fournir.
-verifier("calculer_taux_bruts(estimateurs = kaplan_meier, segmentation region hors catalogue) : refus segmentation_invalide, module brut", {
-  r <- tryCatch(calculer_taux_bruts(EC_SEXE, "region", FALSE, "dernier_anniversaire", "u", "kaplan_meier", 0.95),
-                error = function(e) e)
-  inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "brut")
+# calcul de l'estimateur, par valider_plan() (#82).
+verifier("valider_plan(estimateurs = kaplan_meier, segmentation region hors catalogue) : refus segmentation_invalide, module donnees (#82)", {
+  r <- tryCatch(valider_plan(plan_brut(estimateurs = "kaplan_meier", segmentation = "region")), error = function(e) e)
+  inherits(r, "refus_tablexp") && identical(r$motif, "segmentation_invalide") && identical(r$module, "donnees")
 })
-verifier("controler_segmentation : mêmes message et détails aux deux étapes, module de l'étape appelante (#59)", {
+verifier("controler_segmentation : un seul module (donnees, #82), message et détails du refus ; segmentations valides admises (#59)", {
   cs <- tablexp:::controler_segmentation
-  e <- function(etape) tryCatch(cs("region", etape), error = function(e) e)
-  d <- e("donnees"); b <- e("brut")
-  inherits(d, "refus_tablexp") && inherits(b, "refus_tablexp") &&
-    identical(d$module, "donnees") && identical(b$module, "brut") &&
-    identical(d$motif, "segmentation_invalide") && identical(b$motif, "segmentation_invalide") &&
-    identical(conditionMessage(d), conditionMessage(b)) && identical(d$details, b$details) &&
-    is.null(cs(character(0), "brut")) && is.null(cs(c("sexe", "segment"), "donnees"))
+  d <- tryCatch(cs("region"), error = function(e) e)
+  inherits(d, "refus_tablexp") && identical(d$module, "donnees") && identical(d$motif, "segmentation_invalide") &&
+    identical(d$details, list(segmentation = "region")) &&
+    grepl("La segmentation doit être un vecteur de chaînes sans attribut", conditionMessage(d), fixed = TRUE) &&
+    identical(names(formals(cs)), "segmentation") &&
+    is.null(cs(character(0))) && is.null(cs(c("sexe", "segment")))
 })
 verifier("calculer_taux_bruts : segmentation valide (character(0) et \"sexe\") admise, colonnes de segmentation en tête", {
   r0 <- calculer_taux_bruts(EC_SEXE, character(0), FALSE, "dernier_anniversaire", "u", "poisson", 0.95)

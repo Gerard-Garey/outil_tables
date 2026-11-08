@@ -10,6 +10,7 @@
 #    structurels du plan ; valeurs contrôlées par les modules qui les
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
 #    controler_parametres_exposition(), controler_parametres_brut(),
+#    controler_parametres_positionnement(), controler_parametres_homogeneite(),
 #    controler_parametres_validation(),
 #    controler_parametres_importance_exclusions()) ;
 #    exporté (contrôle de saisie à sens métier, E4.3) ;
@@ -17,19 +18,28 @@
 #    controler_tables_reference(), controler_tables_rejeu() : tables de
 #    référence reçues par l'argument tables_reference, contrôles 1.3 (entrée
 #    de construire_table()) et 7 bis (rejeu) de l'ADR 0015 (#73) ;
-#    table_citee() : table de la clé citée par l'étape `validation` (#4) ;
-#  - construire_table() : valide le plan, les rôles, la provenance et les
-#    tables de référence, contrôle les entrées de la validation
-#    (controler_entrees_validation(), module validation), calcule
-#    l'empreinte des données, exécute les étapes dans l'ordre du plan en
-#    transmettant les champs du plan en arguments nommés (une fonction
-#    d'étape ne reçoit jamais le plan entier), assemble l'objet
-#    `construction` et la fiche (module `rapport`) ;
+#    table_citee() : table de la clé citée par une étape (`positionnement`,
+#    #167 ; `validation`, #4) ;
+#  - controler_plan_roles(), controler_entrees() : contrôle des entrées en
+#    deux couches (#82) ; la première (plan, rôles, recette, convention,
+#    provenance) est partagée par construire_table() et rejouer_fiche() ; la
+#    seconde y ajoute le contrôle 1.3 et les contrôles d'entrée des étapes
+#    qui lisent une table (controler_entrees_validation(), module
+#    positionnement, pour `positionnement` puis `validation`), et n'est
+#    appelée que par construire_table() ; toutes deux
+#    rendent les valeurs validées transmises aux étapes ;
+#  - construire_table() : contrôle les entrées une fois (controler_entrees()),
+#    calcule l'empreinte des données, exécute les étapes dans l'ordre du plan
+#    en transmettant les champs du plan et les valeurs validées (p, recette,
+#    convention) en arguments nommés (une fonction d'étape ne reçoit jamais
+#    le plan entier et ne contrôle rien), assemble l'objet `construction` et
+#    la fiche (module `rapport`) ;
 #  - rejouer_fiche() : rejeu outillé d'une fiche (E3.7 ; ADR 0012, point 3 ;
 #    #86) : contrôles de la fiche et des données, puis un seul appel de
 #    construire_table() sur les rôles, le plan et la provenance de la fiche,
-#    et les tables de référence reçues ou relues, après les contrôles
-#    d'entrée de la validation ;
+#    et les tables de référence reçues ou relues ; le contrôle 1.3 et les
+#    contrôles d'entrée des étapes qui lisent une table (positionnement,
+#    validation) sont faits une fois, par construire_table() (#82) ;
 #    bilan des contrôles et des témoins, hors de l'objet ; exporté.
 #
 #  Aucun calcul. Peut appeler tous les modules sauf `simulation` (ADR 0007,
@@ -54,15 +64,21 @@ CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentat
 # graine requise ; ADR 0015, point 7.2). `importance_exclusions` (#69 ;
 # M242) : module `validation`, préalables `donnees` et `exposition`, non
 # aléatoire ; après `validation`, dont elle lit le résultat (comparateur 2)
-# si et seulement si `validation` est au plan.
+# si et seulement si `validation` est au plan. `positionnement` (#167 ; F4) :
+# module `positionnement`, après `brut`, préalables `donnees` et
+# `exposition`, non aléatoire. `homogeneite` (#168 ; F10) : module
+# `validation`, après `positionnement` et avant `validation` (premier rang que
+# permet l'ordre des modules), préalables `donnees` et `exposition`,
+# aléatoire (Monte-Carlo conditionnel ; chaque étape aléatoire tire sous la
+# graine du plan, flux propre, F11).
 ETAPES <- data.frame(
-  etape = c("donnees", "exposition", "brut", "validation", "importance_exclusions"),
-  module = c("donnees", "exposition", "brut", "validation", "validation"),
-  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_validation",
-               "calculer_importance_exclusions"),
+  etape = c("donnees", "exposition", "brut", "positionnement", "homogeneite", "validation", "importance_exclusions"),
+  module = c("donnees", "exposition", "brut", "positionnement", "validation", "validation", "validation"),
+  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_positionnement",
+               "calculer_homogeneite", "calculer_validation", "calculer_importance_exclusions"),
   prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition"),
-                     c("donnees", "exposition"))),
-  aleatoire = c(FALSE, FALSE, FALSE, TRUE, FALSE),
+                     c("donnees", "exposition"), c("donnees", "exposition"), c("donnees", "exposition"))),
+  aleatoire = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE),
   stringsAsFactors = FALSE
 )
 
@@ -90,13 +106,33 @@ PARAMETRES_ETAPES <- list(
                       "canonique"),
                 "nombre double unique, fini, 0 < niveau < 1"),
     stringsAsFactors = FALSE),
+  # Méthode requise, sans défaut (M293) ; plage_ages à valeur entière en
+  # double (M246, M257).
+  positionnement = data.frame(
+    parametre = c("methode", "table_reference", "plage_ages", "niveau"),
+    type = c("character", "character", "double", "double"),
+    domaine = c("smr (méthode 1, seule mise en oeuvre)",
+                "clé de la table dans l'argument tables_reference, chaîne unique non vide",
+                "deux valeurs entières, 0 <= min <= max, couvertes par la table",
+                "nombre double unique, fini, 0 < niveau < 1"),
+    stringsAsFactors = FALSE),
+  # Test d'homogénéité entre segments (#168 ; F10) : paramètres à valeur
+  # entière en double (M246), un integer est refusé (M257) ; segmentation du
+  # plan non vide (refus homogeneite_sans_segmentation).
+  homogeneite = data.frame(
+    parametre = c("plage_ages", "tranches_age", "replications"),
+    type = c("double", "double", "double"),
+    domaine = c("deux valeurs entières, 0 <= min <= max",
+                "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
+                "nombre entier unique, au moins 1 (réplications de Monte-Carlo)"),
+    stringsAsFactors = FALSE),
   # Paramètres à valeur entière en double (M246) ; un integer est refusé
   # (M257).
   validation = data.frame(
     parametre = c("table_reference", "relation_table", "plage_ages", "tranches_age", "niveau", "replications"),
     type = c("character", "character", "double", "double", "double", "double"),
     domaine = c("clé de la table dans l'argument tables_reference, chaîne unique non vide",
-                "independante ou ajustee_hors_outil",
+                "independante, ajustee_hors_outil ou positionnee (étape positionnement au plan, même clé, même plage)",
                 "deux valeurs entières, 0 <= min <= max, couvertes par la table",
                 "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
                 "nombre double unique, fini, 0 < niveau < 1",
@@ -111,10 +147,11 @@ PARAMETRES_ETAPES <- list(
 
 # Paramètres du plan qui citent une table de référence par sa clé (ADR 0015,
 # points 1.2 et 1.3 ; #73) : chemins « etapes/<étape>/<paramètre> », chacun
-# un paramètre `character` de PARAMETRES_ETAPES : la clé de la table de
-# l'étape `validation` (#4). Les contrôles des tables reçues la prennent en
-# argument (défaut), pour être testés par injection (M247).
-PARAMETRES_CLE_TABLE <- "etapes/validation/table_reference"
+# un paramètre `character` de PARAMETRES_ETAPES, dans l'ordre des étapes : la
+# clé de la table de l'étape `positionnement` (#167 ; F4) et celle de l'étape
+# `validation` (#4). Les contrôles des tables reçues la prennent en argument
+# (défaut), pour être testés par injection (M247).
+PARAMETRES_CLE_TABLE <- c("etapes/positionnement/table_reference", "etapes/validation/table_reference")
 
 # Champs d'un élément de fiche$tables_reference, dans l'ordre (ADR 0015,
 # point 3.1 ; element_table_fiche(), module rapport).
@@ -249,10 +286,20 @@ valider_plan <- function(plan) {
   if ("brut" %in% noms)
     controler_parametres_brut(etapes[["brut"]][["estimateurs"]], etapes[["brut"]][["niveau"]],
                               etapes[["exposition"]][["par_annee"]])
+  if ("positionnement" %in% noms) {
+    pp <- etapes[["positionnement"]]
+    controler_parametres_positionnement(pp[["methode"]], pp[["table_reference"]], pp[["plage_ages"]], pp[["niveau"]])
+  }
+  if ("homogeneite" %in% noms) {
+    ph <- etapes[["homogeneite"]]
+    controler_parametres_homogeneite(ph[["plage_ages"]], ph[["tranches_age"]], ph[["replications"]],
+                                     plan[["segmentation"]])
+  }
   if ("validation" %in% noms) {
     pv <- etapes[["validation"]]
     controler_parametres_validation(pv[["table_reference"]], pv[["relation_table"]], pv[["plage_ages"]],
-                                    pv[["tranches_age"]], pv[["niveau"]], pv[["replications"]])
+                                    pv[["tranches_age"]], pv[["niveau"]], pv[["replications"]],
+                                    positionnement = etapes[["positionnement"]])
   }
   if ("importance_exclusions" %in% noms)
     controler_parametres_importance_exclusions(etapes[["importance_exclusions"]][["niveau"]])
@@ -467,14 +514,15 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
 # (b) origine, table relue dans `embarquees` par son nom (sinon
 # table_embarquee_absente) ou table reçue sous la clé (sinon
 # table_reference_absente), (c) empreinte recalculée par empreinte_table()
-# égale à celle de la fiche (empreinte_table_discordante) ; 3. contrôle 1.3
-# sur la liste assemblée et le plan de la fiche. `fiche_tables` : champ
+# égale à celle de la fiche (empreinte_table_discordante). Le contrôle 1.3
+# sur la liste assemblée et le plan de la fiche n'est pas fait ici : il l'est
+# une fois, par construire_table(), que rejouer_fiche() appelle ensuite avec
+# cette liste (#82 ; #164, point 2). `fiche_tables` : champ
 # fiche$tables_reference, de forme contrôlée (contrôle 2) ; `code_fiche` :
 # empreinte du code lue dans la fiche, citée. Rend la liste assemblée (NULL
 # sans table), les empreintes recalculées et les textes de la ligne
 # « tables_reference » du bilan.
-controler_tables_rejeu <- function(fiche_tables, tables_reference, plan, code_fiche,
-                                   parametres_cle = PARAMETRES_CLE_TABLE, embarquees = TABLES_EMBARQUEES) {
+controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, embarquees = TABLES_EMBARQUEES) {
   f <- controler_forme_tables(tables_reference)
   recues <- if (is.null(f)) character(0) else names(f$tables)
   cles <- if (is.null(fiche_tables)) character(0) else names(fiche_tables)
@@ -556,8 +604,6 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, plan, code_fi
   }
   names(empreintes) <- cles
   tables <- if (length(assemblee)) assemblee
-  # 3. Contrôle 1.3 sur la liste assemblée, avec le plan de la fiche.
-  controler_tables_reference(tables, plan, parametres_cle, embarquees)
   list(tables = tables, empreintes = empreintes,
        attendu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
                               else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
@@ -575,6 +621,71 @@ table_citee <- function(tables, cle) {
   .subset2(tables, k)
 }
 
+# --- contrôle des entrées (#82 ; ADR 0007, point 3.1 ; ADR 0012, point 3) ------
+
+# Première couche, partagée par construire_table() (par controler_entrees())
+# et rejouer_fiche() (contrôle 6), dans cet ordre : plan (valider_plan(),
+# puis canoniser_plan()), rôles (controler_roles(), module donnees), recette
+# (deduire_recette()) et convention (resoudre_convention(), si `exposition`
+# est au plan ; module exposition), provenance (controler_provenance()).
+# Rend les valeurs validées : list(plan (canonique), p (transition, période
+# et délai : valeurs_parametres_donnees(), module donnees, la valeur que rend
+# controler_parametres_donnees() appelée par valider_plan()), recette, conv
+# (NULL sans exposition)). Une seule source de la recette et de la convention
+# pour les étapes et la fiche.
+controler_plan_roles <- function(donnees, roles, plan, provenance) {
+  plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
+  controler_roles(donnees, roles, plan[["segmentation"]])
+  recette <- deduire_recette(roles)
+  etapes_plan <- plan[["etapes"]]
+  conv <- if ("exposition" %in% names(etapes_plan))
+    resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
+  controler_provenance(provenance)
+  # p recalculé par la fonction qui forme la valeur de
+  # controler_parametres_donnees() dans valider_plan(), ici sur le plan
+  # canonique : valeurs identical() mesurées sur R1 à R12 (revue finale de
+  # B14). Un chemin unique demanderait de changer le contrat de valider_plan()
+  # (exportée) ou les comptes de contrôles du test « contrôles non répétés »
+  # (#22, #82 ; tests/unitaires/test_construire_table.R) : renvoyé à une issue.
+  list(plan = plan, p = valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]]),
+       recette = recette, conv = conv)
+}
+
+# Seconde couche, appelée par construire_table() seule, une fois, avant toute
+# étape : controler_plan_roles(), puis le contrôle 1.3 des tables de
+# référence (controler_tables_reference(), ADR 0015, point 1.3), puis le
+# contrôle d'entrée de chaque étape qui lit une table (ADR 0015, point 7.3 ;
+# M253) : controler_entrees_validation() (module positionnement) sur la table
+# citée par l'étape `positionnement` (#167), puis sur celle citée par l'étape
+# `validation`. Rend les valeurs de controler_plan_roles(),
+# plus tables_fiche (valeur de fiche$tables_reference) et tables (table citée
+# par étape, liste nommée par étape ; vide sans table citée). Au rejeu, ces
+# contrôles ne sont faits qu'ici, par l'unique appel de construire_table()
+# (#82 ; #164, point 2).
+controler_entrees <- function(donnees, roles, plan, provenance, tables_reference) {
+  e <- controler_plan_roles(donnees, roles, plan, provenance)
+  etapes_plan <- e$plan[["etapes"]]
+  tables_fiche <- controler_tables_reference(tables_reference, e$plan)
+  tables <- list()
+  if ("positionnement" %in% names(etapes_plan)) {
+    pp <- etapes_plan[["positionnement"]]
+    tables$positionnement <- table_citee(tables_reference, pp[["table_reference"]])
+    controler_entrees_validation(tables$positionnement, pp[["table_reference"]], e$conv$retenue,
+                                 e$plan[["segmentation"]], pp[["plage_ages"]], "positionnement")
+  }
+  # Sous la relation positionnee, valider_plan() impose à la validation la
+  # clé de table et la plage d'âges du positionnement : ce second contrôle
+  # refait alors le premier, à l'identique. Il est gardé pour l'uniformité
+  # (un contrôle par étape qui lit une table).
+  if ("validation" %in% names(etapes_plan)) {
+    pv <- etapes_plan[["validation"]]
+    tables$validation <- table_citee(tables_reference, pv[["table_reference"]])
+    controler_entrees_validation(tables$validation, pv[["table_reference"]], e$conv$retenue,
+                                 e$plan[["segmentation"]], pv[["plage_ages"]], "validation")
+  }
+  c(e, list(tables_fiche = tables_fiche, tables = tables))
+}
+
 # Point d'entrée unique (ADR 0007, point 3.1).
 #   donnees    : data.frame (le moteur ne lit pas de fichier) ;
 #   roles      : vecteur de chaînes nommé rôle -> colonne ;
@@ -589,24 +700,18 @@ table_citee <- function(tables, cle) {
 # fiche, execution (seul champ qui change entre deux exécutions identiques).
 construire_table <- function(donnees, roles, plan, provenance = NULL, tables_reference = NULL) {
   debut <- Sys.time()
-  # Validation entière avant toute exécution : plan, rôles, recette et
-  # convention, provenance, tables de référence. Chaque contrôle s'exécute ici une seule fois : les
-  # fonctions d'étape, appelées avec controler = FALSE, n'en refont aucun (#22).
-  plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
-  controler_roles(donnees, roles, plan[["segmentation"]])
-  recette <- deduire_recette(roles)
+  # Validation entière avant toute exécution (controler_entrees()) : plan,
+  # rôles, recette et convention, provenance, tables de référence (1.3),
+  # entrées des étapes qui lisent une table (7.3). Chaque contrôle s'exécute
+  # ici une seule fois ; les fonctions d'étape reçoivent les valeurs validées
+  # et n'en refont aucun (#22, #82).
+  entrees <- controler_entrees(donnees, roles, plan, provenance, tables_reference)
+  plan <- entrees$plan
+  p <- entrees$p
+  recette <- entrees$recette
+  conv <- entrees$conv
   etapes_plan <- plan[["etapes"]]
-  conv <- if ("exposition" %in% names(etapes_plan))
-    resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
-  controler_provenance(provenance)
-  tables_fiche <- controler_tables_reference(tables_reference, plan)
-  # Table de l'étape `validation` (clé citée, reçue : contrôle 1.3) et
-  # contrôles d'entrée avant exécution (ADR 0015, point 7.3 ; M253).
-  table_validation <- if ("validation" %in% names(etapes_plan))
-    table_citee(tables_reference, etapes_plan[["validation"]][["table_reference"]])
-  if (!is.null(table_validation))
-    controler_entrees_validation(table_validation, etapes_plan[["validation"]][["table_reference"]], conv$retenue,
-                                 plan[["segmentation"]], etapes_plan[["validation"]][["plage_ages"]])
+  table_validation <- entrees$tables[["validation"]]
   empreintes <- empreintes_construction(donnees, roles, provenance)
 
   etapes <- list()
@@ -614,28 +719,33 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
   for (nom in names(etapes_plan)) {
     pe <- etapes_plan[[nom]]
     r <- switch(nom,
-      donnees = preparer_donnees(donnees, roles,
-                                 transition = plan[["transition"]], periode = plan[["periode"]],
-                                 delai_declaration = plan[["delai_declaration"]],
-                                 segmentation = plan[["segmentation"]],
-                                 exclusions = pe[["exclusions"]], controler = FALSE),
-      exposition = calculer_exposition(etapes[["donnees"]][["resultat"]][["observations"]], roles,
-                                       transition = plan[["transition"]], periode = plan[["periode"]],
-                                       delai_declaration = plan[["delai_declaration"]],
-                                       segmentation = plan[["segmentation"]],
-                                       convention = pe[["convention"]], par_annee = pe[["par_annee"]],
-                                       controler = FALSE),
+      donnees = preparer_donnees(donnees, roles, p = p, segmentation = plan[["segmentation"]],
+                                 exclusions = pe[["exclusions"]]),
+      exposition = calculer_exposition(etapes[["donnees"]][["resultat"]][["observations"]], p = p,
+                                       periode = plan[["periode"]], delai_declaration = plan[["delai_declaration"]],
+                                       segmentation = plan[["segmentation"]], recette = recette, conv = conv,
+                                       par_annee = pe[["par_annee"]]),
       brut = calculer_taux_bruts(etapes[["exposition"]][["resultat"]][["exposition"]],
                                  segmentation = plan[["segmentation"]],
                                  par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
                                  convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
                                  unite_exposition = etapes[["exposition"]][["parametres"]][["unite_exposition"]],
                                  estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]],
-                                 observations = fenetres,
-                                 transition = plan[["transition"]], periode = plan[["periode"]],
-                                 delai_declaration = plan[["delai_declaration"]],
-                                 parametres_exposition = etapes[["exposition"]][["parametres"]],
-                                 controler = FALSE),
+                                 observations = fenetres, p = p,
+                                 parametres_exposition = etapes[["exposition"]][["parametres"]]),
+      positionnement = calculer_positionnement(etapes[["exposition"]][["resultat"]][["exposition"]],
+                                               segmentation = plan[["segmentation"]],
+                                               par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
+                                               convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
+                                               table = entrees$tables[["positionnement"]],
+                                               table_reference = pe[["table_reference"]], methode = pe[["methode"]],
+                                               plage_ages = pe[["plage_ages"]], niveau = pe[["niveau"]]),
+      homogeneite = calculer_homogeneite(etapes[["exposition"]][["resultat"]][["exposition"]],
+                                         segmentation = plan[["segmentation"]],
+                                         par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
+                                         convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
+                                         plage_ages = pe[["plage_ages"]], tranches_age = pe[["tranches_age"]],
+                                         replications = pe[["replications"]], graine = plan[["graine"]]),
       validation = calculer_validation(etapes[["exposition"]][["resultat"]][["exposition"]],
                                        segmentation = plan[["segmentation"]],
                                        par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
@@ -644,15 +754,15 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                        relation_table = pe[["relation_table"]], plage_ages = pe[["plage_ages"]],
                                        tranches_age = pe[["tranches_age"]], niveau = pe[["niveau"]],
                                        replications = pe[["replications"]], graine = plan[["graine"]],
-                                       controler = FALSE),
+                                       positionnement = etapes[["positionnement"]]),
       importance_exclusions = calculer_importance_exclusions(donnees, roles, etapes[["donnees"]],
                                                              etapes[["exposition"]], etapes[["validation"]],
-                                                             table = table_validation,
-                                                             transition = plan[["transition"]],
+                                                             table = table_validation, p = p,
                                                              periode = plan[["periode"]],
                                                              delai_declaration = plan[["delai_declaration"]],
+                                                             recette = recette, conv = conv,
                                                              segmentation = plan[["segmentation"]],
-                                                             niveau = pe[["niveau"]], controler = FALSE),
+                                                             niveau = pe[["niveau"]]),
       stop(sprintf("construire_table() : étape « %s » sans fonction d'étape (erreur de programmation).", nom),
            call. = FALSE))
     etapes[[nom]] <- r[c("parametres", "resultat", "diagnostics")]
@@ -674,7 +784,7 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
   x <- structure(
     list(table = NULL, etapes = etapes, avertissements = avertissements,
          fiche = assembler_fiche(roles, plan, recette, etapes, avertissements, empreintes, provenance,
-                                 tables_fiche)),
+                                 entrees$tables_fiche)),
     class = "construction")
   # Empreinte du résultat sur l'objet assemblé, avant execution, hors de son
   # périmètre (ADR 0011, point 11.1 ; #67).
@@ -820,16 +930,19 @@ perimetre_temoin_fiche <- function(f) {
 #             dans le package, jamais reçue (ADR 0015, point 1.4 ; #73).
 # Contrôle, dans l'ordre, la nature des arguments, la forme des champs lus,
 # version_fiche (VERSIONS_FICHE_REJEU), l'algorithme et la représentation de
-# l'empreinte des données, les entrées de construire_table() (mêmes contrôles,
-# mêmes refus), l'empreinte des données, puis les tables de référence
-# (contrôle 7 bis, controler_tables_rejeu()) et les entrées de la validation
-# (7 ter, controler_entrees_validation(), module validation, si l'étape est au
-# plan ; aucune ligne de bilan nouvelle) ; s'arrête au premier refus, sans
-# appeler construire_table(). Appelle ensuite construire_table() une seule
-# fois. Rend un objet de classe `rejeu` : construction, l'objet rendu par
-# construire_table() sans retouche ; bilan, data.frame de 14 lignes
-# (controle, attendu, lu, verdict, statut) : 8 contrôles, tous « conforme »
-# dans un bilan rendu, puis 6 témoins, jamais motifs de refus.
+# l'empreinte des données, les entrées de construire_table() de la première
+# couche (controler_plan_roles() : mêmes contrôles, mêmes refus), l'empreinte
+# des données, puis les tables de référence (contrôle 7 bis,
+# controler_tables_rejeu() : forme, clés, représentation, origine, empreinte) ;
+# s'arrête au premier refus, sans appeler construire_table(). Appelle ensuite
+# construire_table() une seule fois : le contrôle 1.3 sur la liste assemblée
+# et les contrôles d'entrée des étapes qui lisent une table (positionnement,
+# validation) y sont faits une fois, avant toute étape (mêmes motifs, mêmes
+# messages ; #82 ; #164, point 2). Rend un objet de classe `rejeu` :
+# construction, l'objet rendu par construire_table() sans retouche ; bilan,
+# data.frame de 14 lignes (controle, attendu, lu, verdict, statut) :
+# 8 contrôles, tous « conforme » dans un bilan rendu, puis 6 témoins, jamais
+# motifs de refus.
 rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # Message marqué UTF-8 sous toute locale (#94) : chaque message est formé
   # par formuler(), qui marque le gabarit avant sprintf() (#127).
@@ -987,16 +1100,14 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                          sans_controle(e[["representation"]]), ENTETE_CANONIQUE),
                 list(lu = e[["representation"]], attendu = ENTETE_CANONIQUE))
 
-  # 6. Entrées de construire_table() : la séquence de contrôles de
-  #    construire_table(), dupliquée ici pour ne pas la modifier ; les refus
-  #    gardent leur module et leur message.
+  # 6. Entrées de construire_table() : première couche de ses contrôles
+  #    (controler_plan_roles(), partagée, #82) ; les refus gardent leur
+  #    module et leur message. Requise avant l'empreinte des données (7) et
+  #    les tables de la fiche (7 bis).
   roles <- fiche[["roles"]]
-  plan <- canoniser_plan(valider_plan(fiche[["plan"]]), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
-  controler_roles(donnees, roles, plan[["segmentation"]])
-  recette <- deduire_recette(roles)
-  conv <- if ("exposition" %in% names(plan[["etapes"]]))
-    resoudre_convention(plan[["etapes"]][["exposition"]][["convention"]], recette$convention_native)
-  controler_provenance(fiche[["provenance"]])
+  entrees <- controler_plan_roles(donnees, roles, fiche[["plan"]], fiche[["provenance"]])
+  plan <- entrees$plan
+  recette <- entrees$recette
 
   # 7. Empreinte des données reçues contre celle de la fiche.
   empreinte <- empreinte_donnees(donnees, roles)
@@ -1012,19 +1123,11 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                 list(lu = e[["donnees"]], attendu = empreinte, lignes = nrow(donnees), colonnes = unname(roles)))
 
   # 7 bis. Tables de référence (ADR 0015, point 4.2) : reçues ou relues dans
-  #    le package, empreinte de chacune contre la fiche, puis contrôle 1.3
-  #    sur la liste assemblée.
-  tr <- controler_tables_rejeu(fiche[["tables_reference"]], tables_reference, plan, texte_lu(e[["code"]]))
-  # 7 ter. Contrôles d'entrée de la validation (ADR 0012, annotations du
-  #    06/11/2026, seconde, (c), et quatrième) : un des cinq refus de
-  #    controler_entrees_validation() arrête le rejeu sans construire ; les
-  #    deux refus qui portent sur les cellules (cellule_sans_valeur_table,
-  #    taux_table_egal_un) ne peuvent être levés qu'en cours d'étape, par
-  #    construire_table().
-  pv <- plan[["etapes"]][["validation"]]
-  if (!is.null(pv))
-    controler_entrees_validation(table_citee(tr$tables, pv[["table_reference"]]), pv[["table_reference"]],
-                                 conv$retenue, plan[["segmentation"]], pv[["plage_ages"]])
+  #    le package, empreinte de chacune contre la fiche. Le contrôle 1.3 sur
+  #    la liste assemblée et les contrôles d'entrée des étapes qui lisent une
+  #    table (positionnement, validation ; ancien 7 ter) sont faits une fois,
+  #    par construire_table() (8), avant toute étape (#82 ; #164, point 2).
+  tr <- controler_tables_rejeu(fiche[["tables_reference"]], tables_reference, texte_lu(e[["code"]]))
 
   # 8. Construction, une seule fois, sur les rôles, le plan et la provenance
   #    de la fiche, et les tables assemblées.
