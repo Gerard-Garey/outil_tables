@@ -3059,18 +3059,15 @@ issue~\#78), aux bornes de la
 période du simulateur (même forme que celles du plan~; refus
 \code{periode\_invalide}) et aux facteurs de la loi vraie (\code{double} ou
 \code{integer}, seul attribut les noms~; refus \code{loi\_invalide},
-section~\ref{sec:loi-vraie}~; issue~\#58) et, à
-l'appel direct de la fonction d'étape \code{calculer\_taux\_bruts()} (argument
-\code{controler} à sa valeur par défaut, \code{TRUE}~;
-section~\ref{sec:execution}), à la segmentation, contrôlée dans sa forme et dans son catalogue par le même
-contrôle que dans le plan, \code{controler\_segmentation()} (refus
-\code{segmentation\_invalide} du module \code{brut},
-section~\ref{sec:brut-etape}~; issues~\#43 et~\#59)~; de même à l'appel
-direct de \code{calculer\_validation()}, sous le module \code{validation}
-(section~\ref{sec:validation-etape}), et de
-\code{calculer\_importance\_exclusions()}, sous le module
-\code{importance\_exclusions} (section~\ref{sec:importance-exclusions}). Pour
-chaque paramètre, elle l'est avant sa valeur, si bien qu'un vecteur nommé de codes inconnus est
+section~\ref{sec:loi-vraie}~; issue~\#58). La forme et le catalogue de
+la segmentation du plan sont contrôlés par \code{controler\_segmentation()},
+sous le seul module \code{donnees} (refus \code{segmentation\_invalide},
+section~\ref{sec:controles-donnees}~; issues~\#43 et~\#59)~; les variantes
+de ce refus sous les modules \code{brut}, \code{validation} et
+\code{importance\_exclusions}, que levait l'appel direct de leur fonction
+d'étape, sont retirées avec la fin des refus en appel direct (issue~\#82,
+décisions M216 et M291~; section~\ref{sec:execution}). Pour
+chaque paramètre, la forme est contrôlée avant la valeur, si bien qu'un vecteur nommé de codes inconnus est
 refusé sous \code{exclusions\_invalides} ou \code{estimateurs\_invalides},
 et non sous \code{exclusion\_inconnue} ou \code{estimateur\_inconnu}.
 
@@ -3202,15 +3199,32 @@ programmation. Chaque contrôle n'y est exécuté qu'une fois
 fonction d'étape les valeurs validées qui en dérivent (transition, période
 et délai par \code{valeurs\_parametres\_donnees()}, recette par
 \code{deduire\_recette()}, convention par \code{resoudre\_convention()}),
-et la fonction d'étape ne refait aucun de ces contrôles. Les étapes s'exécutent ensuite dans l'ordre du plan,
+et la fonction d'étape ne refait aucun de ces contrôles~; la recette et la
+convention n'ont ainsi qu'une source, pour les étapes comme pour la fiche.
+Les contrôles qui précèdent le contrôle du codage des chaînes forment deux
+couches, dans \code{R/construire\_table.R} (issue~\#82~; ADR 0007,
+annotation du 07/11/2026, (a)~1)~: \code{controler\_plan\_roles()} (plan
+validé puis canonique, rôles, recette, convention, provenance), partagée
+avec \code{rejouer\_fiche()} (section~\ref{sec:rejeu}, étape~6), qui rend le
+plan canonique et les valeurs validées~; puis \code{controler\_entrees()},
+qui l'appelle, puis fait le contrôle des tables reçues et les contrôles
+d'entrée des étapes qui lisent une table, et que \code{construire\_table()}
+appelle une seule fois. Une fonction d'étape appelée directement, hors de
+\code{construire\_table()}, ne refait donc aucun de ces contrôles et n'en
+lève aucun refus~: ses entrées sont supposées validées, et elle n'est pas
+une interface (fin des refus en appel direct, décisions M216 et M291~; ADR
+0007, même annotation, (a)~3)~; seuls restent les refus propres à son
+calcul, levés en cours d'étape (par exemple \code{base\_vide} de l'étape
+\code{donnees}, \code{cellule\_sans\_valeur\_table} de l'étape
+\code{validation}). Les étapes s'exécutent ensuite dans l'ordre du plan,
 chacune par sa fonction d'étape, qui rend ses paramètres effectifs, son
 résultat, ses diagnostics et ses avertissements~; l'étape \code{exposition}
 lit la table des observations de l'étape \code{donnees}~; l'étape \code{brut}
 lit la table d'exposition et les paramètres effectifs de l'étape
 \code{exposition} (découpage par année, convention retenue, unité de
 l'exposition) et, pour l'estimateur \code{kaplan\_meier}, les fenêtres des
-observations calculées par l'étape \code{exposition}, avec la transition, la
-période et le délai du plan~; l'étape \code{validation} lit la table
+observations calculées par l'étape \code{exposition}, avec les valeurs
+validées de la transition, de la période et du délai~; l'étape \code{validation} lit la table
 d'exposition et les paramètres effectifs de l'étape \code{exposition}
 (découpage par année, convention retenue), la table de la clé citée et la
 graine du plan (section~\ref{sec:validation-etape})~; l'étape
@@ -3219,7 +3233,8 @@ résultat des étapes \code{donnees} (unité d'observation, lignes conservées,
 lignes exclues par motif, observations) et \code{exposition} (table
 d'exposition, paramètres effectifs), et, si l'étape \code{validation} est au
 plan, ses paramètres, ses statistiques et la table de la clé qu'elle cite,
-avec la transition, la période, le délai et la segmentation du plan~; elle
+avec les valeurs validées (transition, période, délai, recette, convention)
+et la segmentation du plan~; elle
 recalcule l'exposition des lignes qu'elle réintègre par les fonctions des
 étapes \code{donnees} et \code{exposition}
 (section~\ref{sec:importance-exclusions}). Les fenêtres de l'estimateur
@@ -3491,8 +3506,12 @@ octets par \code{lire\_fiche()} chez l'appelant, ou prise dans
 
 \medskip
 \noindent
-\textbf{Étapes}, dans cet ordre~; le rejeu s'arrête au premier refus, sans
-appeler \code{construire\_table()}~:
+\textbf{Étapes}, dans cet ordre~; le rejeu s'arrête au premier refus. Les
+refus des étapes~1 à~7~bis sont levés sans appeler
+\code{construire\_table()}~; ceux du contrôle des tables reçues
+(section~\ref{sec:tables-reference-recues}~; ADR 0015, point~1.3) et des contrôles d'entrée des étapes qui lisent une table
+le sont par l'appel de \code{construire\_table()} de l'étape~8, avant
+qu'elle n'exécute aucune étape du plan (issue~\#82, décision M291)~:
 \begin{enumerate}[leftmargin=*, itemsep=2pt]
   \item \textbf{nature des arguments}, la fiche d'abord~: un objet
     \code{construction} ou \code{rejeu} reçu à la place de la fiche, une
@@ -3545,9 +3564,9 @@ appeler \code{construire\_table()}~:
     égale à \code{ENTETE\_CANONIQUE}, sinon \code{representation\_non\_admise}~:
     un recalcul sous une autre définition échouerait toujours, sous un motif
     trompeur~;
-  \item \textbf{entrées de la construction}~: la séquence de contrôles de
-    \code{construire\_table()} (section~\ref{sec:execution}), refaite en
-    entier, dans son ordre, sur les champs de la fiche~:
+  \item \textbf{entrées de la construction}~: la première couche des
+    contrôles de \code{construire\_table()} (section~\ref{sec:execution}),
+    \code{controler\_plan\_roles()}, sur les champs de la fiche~:
     \code{valider\_plan()}, \code{canoniser\_plan()},
     \code{controler\_roles()} sur la segmentation canonique,
     \code{deduire\_recette()}, \code{resoudre\_convention()} si l'étape
@@ -3555,19 +3574,22 @@ appeler \code{construire\_table()}~:
     refus gardent leur module, leur motif et leur message
     (\code{colonne\_absente}, \code{type\_incompatible},
     \code{plan\_mal\_forme}, \code{convention\_invalide},
-    \code{provenance\_invalide}\ldots). La séquence est dupliquée, non
-    factorisée, pour ne pas modifier \code{construire\_table()}~; un test
-    vérifie qu'elle donne le même refus par les deux chemins. Elle précède
+    \code{provenance\_invalide}\ldots). La séquence n'est pas recopiée~:
+    c'est la fonction même de la construction (issue~\#82~; ADR 0012,
+    annotation du 07/11/2026, (a)~1), et un test vérifie qu'elle donne le
+    même refus par les deux chemins. Elle est donc exécutée deux fois par
+    rejeu réussi, ici et dans \code{construire\_table()} (étape~8). Elle précède
     l'empreinte des données, qui, calculée la première, nommerait mal la
     cause~: une colonne de rôle absente donnerait \code{type\_non\_canonique}
     (module \code{rapport}) et une date en \code{character} une empreinte
     discordante, au lieu de \code{colonne\_absente} et de
     \code{type\_incompatible} (ADR 0012, «~Contexte~», mesures
     d'\code{actuary}). Le contrôle des tables reçues
-    (\code{controler\_tables\_reference()}) n'y figure pas~: il porte sur
-    la liste que le rejeu assemble à l'étape~7~bis, et s'exécute là~; de
-    même, les contrôles d'entrée de l'étape \code{validation}, qui lisent
-    une table de cette liste, s'exécutent à l'étape~7~ter~;
+    (\code{controler\_tables\_reference()}) n'y figure pas, ni
+    les contrôles d'entrée des étapes qui lisent une table~: ils portent sur
+    la liste que le rejeu assemble à l'étape~7~bis, et ne sont faits
+    qu'une fois, par \code{construire\_table()} à l'étape~8
+    (ci-dessous)~;
   \item \textbf{empreinte des données}~: recalculée par
     \code{empreinte\_donnees(donnees, fiche\$roles)} et comparée à
     \code{fiche\$empreintes\$donnees}, sinon
@@ -3590,10 +3612,13 @@ appeler \code{construire\_table()}~:
     \code{table\_embarquee\_absente}~; une autre est la table reçue sous la
     même clé, sinon \code{table\_reference\_absente}~; (c)~empreinte de table
     recalculée par \code{empreinte\_table()} et comparée à celle de la
-    fiche, sinon \code{empreinte\_table\_discordante}~; (3)~enfin, le
-    contrôle des tables reçues de la construction
-    (section~\ref{sec:tables-reference-recues}) sur la liste assemblée
-    (tables reçues et relues) et le plan de la fiche. Les métadonnées
+    fiche, sinon \code{empreinte\_table\_discordante}. Le contrôle des tables
+    reçues de la construction (section~\ref{sec:tables-reference-recues}),
+    sur la liste assemblée (tables reçues et relues) et le plan de la fiche,
+    n'est plus un point de cette étape~: il est fait une fois, par
+    \code{construire\_table()} à l'étape~8 (issue~\#82, décision M291~; ADR
+    0012, annotation du 07/11/2026, (a)~2)~; \code{controler\_tables\_rejeu()}
+    ne reçoit plus le plan. Les métadonnées
     (\code{nom}, \code{source}, \code{forme\_origine}, \code{parametres},
     et \code{statut} hors \code{embarquee}) ne sont \textbf{pas} un motif de
     refus~: la table reçue les porte, \code{construire\_table()} les écrit
@@ -3603,20 +3628,28 @@ appeler \code{construire\_table()}~:
     interdirait le rejeu légitime d'une table réimportée sous un autre nom
     de fichier (ADR 0015, point~4.2, et «~Options écartées~»~; décision
     M248 pour \code{source})~;
-  \item[7~ter.] \textbf{entrées de l'étape \code{validation}}, si elle est au
-    plan de la fiche (ADR 0012, seconde annotation du 06/11/2026, (c))~:
-    \code{controler\_entrees\_validation()} sur la table de la clé citée,
-    prise dans la liste assemblée à l'étape~7~bis, avec la convention
-    retenue, la segmentation et la plage d'âges du plan de la fiche~; ses
-    refus gardent leur module (\code{validation}) et leur motif
-    (section~\ref{sec:validation-etape}), et un refus arrête le rejeu sans
-    construire. Ce contrôle n'a pas de ligne propre dans le bilan~; les
-    deux refus de cette étape qui portent sur les cellules sont levés, s'il
-    y a lieu, par \code{construire\_table()}~;
+  \item[7~ter.] \textbf{entrées des étapes qui lisent une table}~: étape
+    retirée du rejeu par l'issue~\#82 (décision M291~; ADR 0012, annotation
+    du 07/11/2026, (a)~2, sur sa seconde annotation du 06/11/2026, (c))~;
+    le numéro est gardé pour les renvois. Le rejeu n'appelle plus
+    \code{controler\_entrees\_validation()}~: ces contrôles (table de la clé
+    citée, convention retenue, segmentation et plage d'âges du plan de la
+    fiche) sont faits une fois, par \code{construire\_table()} à l'étape~8,
+    sur la liste assemblée à l'étape~7~bis, avant toute étape du plan. Leurs
+    refus gardent leur motif, leur module, leurs \code{details} et leur
+    message (section~\ref{sec:validation-etape}) et arrêtent le rejeu sans
+    bilan~; ils n'ont pas de ligne propre dans le bilan. Les deux refus de
+    l'étape \code{validation} qui portent sur les cellules sont levés, s'il y
+    a lieu, en cours d'étape~;
   \item \textbf{construction}~:
     \code{construire\_table(donnees, fiche\$roles, fiche\$plan, fiche\$provenance, tables\_reference)},
     une fois, \code{tables\_reference} étant la liste assemblée à
-    l'étape~7~bis (\code{NULL} sans table). Si l'empreinte des données de
+    l'étape~7~bis (\code{NULL} sans table)~; ses contrôles d'entrée
+    (\code{controler\_entrees()}, section~\ref{sec:execution}) y refont la
+    première couche et font, pour la seule fois du rejeu, le contrôle des tables
+    reçues et ceux des entrées des étapes qui lisent une table (comptes
+    d'appels vérifiés par un test~: issue~\#164, point~2, décision M281,
+    section~\ref{sec:verifications-construction}). Si l'empreinte des données de
     l'objet rendu diffère de celle de l'étape~7, ou si les empreintes de
     table de la fiche rendue diffèrent, clé par clé, de celles de
     l'étape~7~bis, le rejeu s'arrête sur une erreur de programmation
@@ -3653,9 +3686,11 @@ motifs partagés avec le contrôle des tables reçues de la construction
 (\code{table\_reference\_inattendue}, \code{table\_reference\_absente},
 \code{table\_embarquee\_absente}), sous un texte propre au rejeu, tandis
 que \code{tables\_reference\_mal\_formees} (point~0) et les refus du
-point~3 gardent le texte de la construction
+contrôle des tables reçues, levés à l'étape~8 par \code{construire\_table()},
+gardent le texte de la construction
 (tableau~\ref{tab:refus-tables-reference})~; les refus délégués (étape~1 pour les
-données, étape~6) gardent leur module. Chaque message cite la valeur lue et
+données, étape~6, et, à l'étape~8, contrôles d'entrée des étapes qui lisent
+une table) gardent leur module. Chaque message cite la valeur lue et
 la valeur attendue. La version de \code{tablexp} et les empreintes du
 code y sont écrites par \code{texte\_lu()}~: «~absente~» si la valeur
 manque, elle-même si c'est une chaîne unique sans attribut (\code{NA} écrit
@@ -4064,16 +4099,37 @@ Il vérifie aussi que les contrôles ne sont pas répétés (issue~\#22)~: le
 nombre d'exécutions de chaque contrôle, compté par \code{trace()} sur
 l'espace de noms installé, vaut un par construction (plan avec ou sans
 \code{kaplan\_meier}, plan réduit à l'étape \code{donnees}~; aucun contrôle
-n'est exécuté au-delà d'un refus de \code{valider\_plan()}), et un par contrôle que fait chaque
-fonction d'étape appelée directement, \code{taux\_kaplan\_meier()} n'en
-faisant aucun~; les refus de l'appel direct gardent leur module et leur
-motif~; seule la valeur \code{FALSE} de \code{controler} omet les
-contrôles~; sur des entrées valides, chaque fonction d'étape rend sous
-\code{controler = FALSE} un objet \code{identical()} à celui de l'appel
-avec contrôle, et chaque valeur dérivée sans contrôle est égale à celle que
-rend le contrôle correspondant~; une segmentation dupliquée passée à
-\code{taux\_kaplan\_meier()} arrête le calcul par une erreur de
-programmation, non par un refus.
+n'est exécuté au-delà d'un refus de \code{valider\_plan()}), et zéro par
+fonction d'étape appelée directement (\code{preparer\_donnees()},
+\code{calculer\_exposition()}, \code{calculer\_taux\_bruts()} avec et sans
+\code{kaplan\_meier}, \code{taux\_kaplan\_meier()})~; aucune fonction
+d'étape de \code{ETAPES} ni \code{taux\_kaplan\_meier()} ne porte
+d'argument \code{controler} (issue~\#82)~; appelées avec les valeurs
+validées, calculées comme dans \code{controler\_plan\_roles()}, ces
+fonctions rendent des objets \code{identical()} aux étapes de
+\code{construire\_table()}, et \code{calculer\_exposition()} le fait sous
+la convention native comme forcée, sans et avec découpage par année~;
+\code{valeurs\_parametres\_donnees()}, qui ne contrôle rien, rend la
+valeur que rend \code{controler\_parametres\_donnees()}, pour chaque
+transition prise en charge et plusieurs délais~; les fonctions
+\code{recette\_branche} et \code{convention\_retenue} n'existent plus, intégrées à
+\code{deduire\_recette()} et \code{resoudre\_convention()}~; une recette
+fictive de convention native \code{age\_atteint\_annee}, substituée à
+\code{deduire\_recette()} le temps du test, donne à l'étape
+\code{exposition} la recette et la convention de la fiche, ce qui montre
+qu'aucune seconde source de la recette ne subsiste (même contrôle, pour
+les expositions contrefactuelles, section~\ref{sec:importance-exclusions})~;
+une segmentation dupliquée passée à \code{taux\_kaplan\_meier()} arrête
+le calcul par une erreur de programmation, non par un refus. Au rejeu d'un
+plan à étape \code{validation}, \code{tests/unitaires/test\_validation.R}
+compte deux exécutions de la première couche
+(\code{controler\_plan\_roles()} et chacun de ses contrôles) et une de
+\code{controler\_entrees()}, du contrôle des tables reçues, de
+\code{controler\_entrees\_validation()} et de \code{construire\_table()}
+(issue~\#164, point~2, décision M281)~; des refus du contrôle des tables
+reçues et des contrôles d'entrée de la validation, levés au rejeu, y sont
+\code{identical()} à ceux de \code{construire\_table()} sur les champs de
+la fiche.
 \code{tests/unitaires/test\_graine\_plan.R} vérifie le contrôle de la
 graine du plan (issue~\#61), par des attendus calculés à la main et des
 identités exactes~: sur une grille de dix-sept graines mal formées (hors
@@ -4124,7 +4180,10 @@ tables embarquées (décision M247)~; l'absence d'appel de
 rejeu, chaque refus de l'étape~7~bis, les textes de la ligne
 \code{tables\_reference} du bilan (table reçue, table relue), l'absence
 d'appel de \code{construire\_table()} sur \code{empreinte\_table\_discordante},
-le refus d'une fiche de version~4 sous \code{version\_fiche\_non\_admise}
+une table reçue qu'aucun paramètre du plan ne cite, admise par l'étape~7~bis
+puis refusée sous \code{table\_reference\_inattendue}, texte de la
+construction, par l'unique appel de \code{construire\_table()}, sans appel
+de \code{preparer\_donnees()} (issue~\#82), le refus d'une fiche de version~4 sous \code{version\_fiche\_non\_admise}
 et le témoin de la fiche sur un \code{nom} de table changé~; enfin, que
 chaque chemin de \code{PARAMETRES\_CLE\_TABLE} désigne un paramètre
 \code{character} de \code{PARAMETRES\_ETAPES} et que le module
@@ -4150,7 +4209,7 @@ chaque refus délégué, l'égalité du module, du motif, du message et des
 \code{details} avec ceux de \code{construire\_table()} appelée directement
 sur les champs de la fiche~; le nombre d'appels de
 \code{construire\_table()}, compté par \code{trace()} sur l'espace de noms
-installé~: aucun sur un refus, un sur un rejeu réussi~; les verdicts des
+installé~: aucun sur un refus des étapes~1 à~7, un sur un rejeu réussi~; les verdicts des
 témoins sur des fiches modifiées~; les cas adverses de la section
 \ref{sec:rejeu}, «~Limites~», testés tels que constatés~; la citation
 des valeurs lues dans les messages (VT, FF, NEL et U+2028 écrits
@@ -4210,8 +4269,10 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
 \catalogue{fonctions-construire-table}{cles\_citees()} & interne & plan, chemins des paramètres qui citent une clé & \code{data.frame} (\code{cle}, \code{parametre}) des clés citées par les étapes présentes au plan, dans l'ordre des chemins~; une clé citée deux fois y figure deux fois \\
 \catalogue{fonctions-construire-table}{controler\_tables\_reference()} & interne & tables reçues, plan~; chemins des paramètres et catalogue (par défaut, les deux constantes de ce rôle) & valeur de \code{fiche\$tables\_reference}~; les quatre contrôles des tables reçues, dans l'ordre (section~\ref{sec:tables-reference-recues}), appelé une fois par \code{construire\_table()} \\
-\catalogue{fonctions-construire-table}{controler\_tables\_rejeu()} & interne & champ de la fiche, tables reçues, plan, empreinte du code de la fiche~; chemins et catalogue & étape~7~bis du rejeu (section~\ref{sec:rejeu})~: liste assemblée (tables reçues et relues), empreintes recalculées par clé, textes de la ligne \code{tables\_reference} du bilan \\
-\catalogue{fonctions-construire-table}{table\_citee()} & interne & tables reçues, clé & objet \code{table\_reference} de la clé, comparée en UTF-8 comme au contrôle des tables reçues~; erreur de programmation si la clé est absente (le contrôle des tables reçues l'a exclu)~; table de l'étape \code{validation}, pour la construction et pour l'étape~7~ter du rejeu \\
+\catalogue{fonctions-construire-table}{controler\_tables\_rejeu()} & interne & champ de la fiche, tables reçues, empreinte du code de la fiche~; catalogue des tables embarquées & étape~7~bis du rejeu (section~\ref{sec:rejeu})~: liste assemblée (tables reçues et relues), empreintes recalculées par clé, textes de la ligne \code{tables\_reference} du bilan~; ne reçoit plus le plan, le contrôle des tables reçues étant fait par \code{construire\_table()} (issue~\#82) \\
+\catalogue{fonctions-construire-table}{table\_citee()} & interne & tables reçues, clé & objet \code{table\_reference} de la clé, comparée en UTF-8 comme au contrôle des tables reçues~; erreur de programmation si la clé est absente (le contrôle des tables reçues l'a exclu)~; table citée par chaque étape qui lit une table, lue par \code{controler\_entrees()} \\
+\catalogue{fonctions-construire-table}{controler\_plan\_roles()} & interne & données, rôles, plan, provenance & première couche du contrôle des entrées, dans cet ordre~: \code{valider\_plan()} puis \code{canoniser\_plan()}, \code{controler\_roles()} sur la segmentation canonique, \code{deduire\_recette()}, \code{resoudre\_convention()} si l'étape \code{exposition} est au plan, \code{controler\_provenance()}~; rend le plan canonique et les valeurs validées \code{p} (transition retenue, début, fin, borne $B$, par la fonction sans contrôle du module \code{donnees}), \code{recette} et \code{conv} (\code{NULL} sans \code{exposition})~; appelée par \code{controler\_entrees()} et par \code{rejouer\_fiche()} (étape~6) (section~\ref{sec:execution}~; issue~\#82) \\
+\catalogue{fonctions-construire-table}{controler\_entrees()} & interne & données, rôles, plan, provenance, tables de référence & seconde couche~: \code{controler\_plan\_roles()}, puis le contrôle des tables reçues (section~\ref{sec:tables-reference-recues}) et, pour chaque étape du plan qui lit une table, la lecture de sa table (\code{table\_citee()}) et ses contrôles d'entrée (section~\ref{sec:validation-etape})~; rend les valeurs de la première couche, la valeur de \code{fiche\$tables\_reference} et la table citée par étape~; appelée une fois par \code{construire\_table()}, seule (section~\ref{sec:execution}~; issue~\#82) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance, tables de référence & objet \code{construction} (section~\ref{sec:objet-resultat})~; empreinte du résultat posée avant \code{execution} \\
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», longueur lue sans la classe si celle-ci est d'encodage \code{bytes} (issue~\#128), pour un message ou le bilan du rejeu \\
 \catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu seulement \\
@@ -4441,9 +4502,7 @@ message nomme la recette et les rôles absents)~; \code{role\_requis\_manquant}
 {\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
 reçoit, les cinq premiers motifs ci-dessous par
 \code{controler\_transition\_periode()}, qui contrôle la transition, la
-période et le délai et que la fonction d'étape \code{brut} appelle aussi
-pour \code{kaplan\_meier} en appel direct (section~\ref{sec:brut-etape}),
-les suivants par elle-même~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
+période et le délai, les suivants par elle-même~: \code{transition\_inconnue} (liste qui n'est pas nue~--- un
 \code{data.frame} ou une liste munie d'un autre attribut que ses noms~---, de
 champs autres qu'exactement \code{depart} et \code{arrivee}, ou d'un élément
 de plus, même nommé \code{NA}~; état qui n'est pas une chaîne unique sans
@@ -4459,8 +4518,8 @@ n'est pas un nombre unique, \code{integer} ou \code{double}, sans attribut,
 entier et $\ge 0$)~; \code{periode\_vide}~; \code{segmentation\_invalide}
 (autre chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
 doublon, pris dans \code{sexe} et \code{segment}, vide explicite admis~;
-contrôle \code{controler\_segmentation()}, partagé avec la fonction d'étape
-\code{calculer\_taux\_bruts()} en appel direct, section~\ref{sec:brut-etape})~;
+contrôle \code{controler\_segmentation()}, que seul ce contrôle appelle
+depuis l'issue~\#82)~;
 \code{exclusions\_invalides} (autre chose qu'un vecteur \code{character} sans
 attribut, sans \code{NA} ni doublon, vide explicite admis)~;
 \code{exclusion\_inconnue} (code absent de la liste fermée des motifs). Les
@@ -4470,13 +4529,15 @@ refusé sous ce motif et non sous \code{exclusion\_inconnue}. Les noms de champs
 appariement partiel. Le même contrôle est appelé par \code{valider\_plan()},
 avant toute étape~: un code désigne une condition, quelle que soit la fonction
 qui la détecte, et le refus porte le module \code{donnees} (ADR 0007,
-annotation du 17/10/2026, point~d). Dans une construction, il n'est appelé
-que là, une fois~: \code{preparer\_donnees()}, appelée avec
-\code{controler = FALSE}, ne contrôle ni ces paramètres ni les rôles, déjà
-contrôlés, et reprend la transition retenue, les bornes de la période et la
-borne $B$ par \code{valeurs\_parametres\_donnees()}~; appelée directement,
-elle appelle ce contrôle, puis \code{controler\_roles()}
-(section~\ref{sec:execution}).\par}
+annotation du 17/10/2026, point~d). Il n'est appelé que là, une fois par
+construction (deux fois par rejeu, section~\ref{sec:rejeu}, étape~6)~:
+\code{preparer\_donnees()} ne contrôle ni ces paramètres ni les rôles, et
+reçoit de \code{construire\_table()} les valeurs validées \code{p}
+(transition retenue, bornes de la période, borne $B$), que
+\code{controler\_plan\_roles()} calcule par
+\code{valeurs\_parametres\_donnees()}~; appelée directement, elle ne
+refait pas davantage ces contrôles (issue~\#82~;
+section~\ref{sec:execution}).\par}
 
 \subsubsection*{Motifs d'invalidité des lignes}
 
@@ -4912,17 +4973,17 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & rôles requis, manquants & message du refus \code{aucune\_recette}, partagé avec \code{exposition} \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}~; rend les rôles inchangés \\
-\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation, étape appelante & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide} au nom de l'étape appelante (\code{donnees}, \code{brut}, \code{validation} ou \code{importance\_exclusions})~; rend \code{NULL}~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, en appel direct (\code{controler = TRUE}), par les fonctions d'étape \code{brut}, \code{validation} et \code{importance\_exclusions} (issues~\#22, \#59, \#4 et~\#69) \\
+\catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide}, module \code{donnees}~; rend \code{NULL}~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22, \#59 et~\#82~; variantes des modules \code{brut}, \code{validation} et \code{importance\_exclusions} retirées par l'issue~\#82) \\
 \catalogue{fonctions-donnees}{ligne\_transition()} & interne & transition (\code{list(depart, arrivee)}, de forme déjà contrôlée) & ligne de \code{TRANSITIONS} de la transition, zéro ligne si elle n'est pas prise en charge~; seul endroit où s'écrit la recherche (issue~\#22) \\
-\catalogue{fonctions-donnees}{valeurs\_parametres\_donnees()} & interne & transition, période, délai, déjà contrôlés & transition retenue (\code{ligne\_transition()}), début, fin, borne $B$ (jours depuis 1970-01-01)~; ne contrôle rien~; employée par les fonctions d'étape appelées avec \code{controler = FALSE} et par \code{taux\_kaplan\_meier()} (issue~\#22) \\
-\catalogue{fonctions-donnees}{controler\_transition\_periode()} & interne & transition, période, délai & refus de la transition, de la période (dont \code{date\_hors\_domaine} pour ses bornes), du délai et de la période vide, dans cet ordre~; rend la transition retenue, le début, la fin et la borne $B$, calculés par la fonction sans contrôle de la ligne précédente~; appelée par le contrôle des paramètres de l'étape \code{donnees} et, pour \code{kaplan\_meier} en appel direct, par la fonction d'étape \code{brut} (issue~\#22) \\
+\catalogue{fonctions-donnees}{valeurs\_parametres\_donnees()} & interne & transition, période, délai, déjà contrôlés & transition retenue (\code{ligne\_transition()}), début, fin, borne $B$ (jours depuis 1970-01-01)~; ne contrôle rien~; appelée par \code{controler\_plan\_roles()}, qui en transmet la valeur \code{p} aux fonctions d'étape, et par le contrôle de la transition, de la période et du délai (ligne suivante~; issues~\#22 et~\#82) \\
+\catalogue{fonctions-donnees}{controler\_transition\_periode()} & interne & transition, période, délai & refus de la transition, de la période (dont \code{date\_hors\_domaine} pour ses bornes), du délai et de la période vide, dans cet ordre~; rend la transition retenue, le début, la fin et la borne $B$, calculés par la fonction sans contrôle de la ligne précédente~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{controler\_parametres\_donnees()} & interne & transition, période, délai, segmentation, exclusions & refus de la transition, de la période et du délai par le contrôle de la ligne précédente, puis de la segmentation et des exclusions~; transition retenue, début, fin, borne $B$ \\
 \catalogue{fonctions-donnees}{groupes\_heterogenes()} & interne & groupes, valeurs & groupes qui portent au moins deux valeurs valides distinctes, une valeur manquante étant ignorée (issue~\#69) \\
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
 \catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
 \catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation, \code{lignes\_tete} (\code{NULL} par défaut) & numéros des lignes porteuses de chaque motif~; \code{lignes\_tete} désigne les lignes où les motifs de tête sont évalués (section~\ref{sec:controles-donnees}~; issue~\#69) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
-\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, transition, période, délai, segmentation, exclusions, \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni les paramètres ni les rôles ne sont recontrôlés (issue~\#22) \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{construire\_observations()} & interne & lignes retenues, leurs numéros dans l'entrée, rôles, segmentation, valeurs des paramètres & unité d'observation, observations (fusion par tête en unité tête), correspondance des lignes aux observations, relevés~; extraite de \code{preparer\_donnees()} à résultats identiques, seule implémentation de la fusion, rappelée par l'étape \code{importance\_exclusions} (section~\ref{sec:unite-observation}~; issue~\#69) \\
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
@@ -4981,10 +5042,13 @@ requis sont déclarés, ou refuse (\code{aucune\_recette}, le message nommant la
 recette et les rôles absents)~; dans \code{construire\_table()}, le même
 manque est détecté plus tôt par le contrôle des rôles, avec le même code et le
 module \code{donnees}. \code{construire\_table()} appelle
-\code{deduire\_recette()} une fois, avant toute étape, et transmet à la
-fonction d'étape la recette, sa convention native et ses rôles requis
-qu'elle rend~; la fonction d'étape ne la rappelle pas
-(section~\ref{sec:execution}).
+\code{deduire\_recette()} une fois, avant toute étape, par
+\code{controler\_plan\_roles()}, et transmet aux fonctions d'étape qui
+l'emploient (\code{exposition}, \code{importance\_exclusions}) la recette,
+sa convention native et ses rôles requis qu'elle rend, avec la convention
+que rend \code{resoudre\_convention()}~; aucune fonction d'étape ne les
+recalcule, et la fiche porte la même recette (une seule source~; issue~\#82,
+section~\ref{sec:execution}).
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -5450,9 +5514,9 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{CONVENTION\_NATIVE} & constante & --- & convention native de chaque recette \\
 \catalogue{fonctions-exposition}{UNITES\_EXPOSITION} & constante & --- & unité de l'exposition par convention \\
 \catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE} & constante & --- & hypothèse de censure non informative, inscrite dans la fiche \\
-\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis~; refus \code{aucune\_recette} \\
+\catalogue{fonctions-exposition}{deduire\_recette()} & interne & rôles & recette, convention native, rôles requis~; refus \code{aucune\_recette}~; appelée par \code{controler\_plan\_roles()} seule, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-exposition}{controler\_parametres\_exposition()} & interne & convention, \code{par\_annee} & refus des valeurs \\
-\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & convention retenue (la native pour \code{plus\_fine}, la demandée sinon) et forçage~; refus \code{convention\_plus\_fine} \\
+\catalogue{fonctions-exposition}{resoudre\_convention()} & interne & convention demandée, native & conventions demandée, native et retenue (la native pour \code{plus\_fine}, la demandée sinon) et forçage~; refus \code{convention\_plus\_fine}~; appelée par \code{controler\_plan\_roles()} seule, si l'étape \code{exposition} est au plan, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-exposition}{an\_bissextile()} & interne & années & bissextilité grégorienne \\
 \catalogue{fonctions-exposition}{bissextiles\_anterieures()} & interne & années & nombre d'années bissextiles antérieures \\
 \catalogue{fonctions-exposition}{premier\_janvier()} & interne & années & jour du 1\textsuperscript{er}~janvier \\
@@ -5474,7 +5538,7 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur ni du marquage d'encodage (ordre des octets UTF-8 de l'empreinte des données) \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
-\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, rôles, transition, période, délai, segmentation, convention, \code{par\_annee}, \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni les paramètres, ni la recette, ni la convention ne sont recontrôlés (issue~\#22) \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, valeurs validées \code{p}, période, délai, segmentation, recette et convention validées, \code{par\_annee} & fonction d'étape \code{exposition}~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; ne contrôle ni les paramètres, ni la recette, ni la convention, et ne les recalcule pas (issues~\#22 et~\#82) \\
 \end{longtable}
 }
 
@@ -5556,10 +5620,9 @@ tous les estimateurs la table de la seconde.
 
 \medskip
 \textbf{Refus du module \code{brut}}, levés par
-\code{controler\_parametres\_brut()}, que \code{valider\_plan()} appelle avant
-toute étape et que la fonction d'étape appelle en appel direct seulement
-(\code{controler = TRUE}, valeur par défaut~; \code{construire\_table()}
-l'appelle avec \code{controler = FALSE}, section~\ref{sec:execution})~:
+\code{controler\_parametres\_brut()}, que seule \code{valider\_plan()}
+appelle, avant toute étape (la fonction d'étape ne l'appelle pas~;
+section~\ref{sec:execution})~:
 \code{estimateurs\_invalides}
 (pas un vecteur \code{character}, attribut~--- noms, dimension ou classe~---,
 vide, \code{NA} ou doublon)~; \code{estimateur\_inconnu}, contrôlé
@@ -5574,39 +5637,26 @@ même raison de couverture (un estimateur de période sur une cellule âge
 $\times$ année relèverait d'une autre spécification). Si le binomial et
 \code{kaplan\_meier} sont tous deux déclarés sous \code{par\_annee},
 \code{binomial\_par\_annee} est levé en premier.
-En appel direct, la fonction d'étape contrôle en outre, en tête et avant
-\code{controler\_parametres\_brut()}, la forme et le catalogue de la
-segmentation qu'elle reçoit, par \code{controler\_segmentation()} du module
-\code{donnees}~: \code{segmentation\_invalide}, module \code{brut} (autre
-chose qu'un vecteur \code{character} sans attribut, sans \code{NA} ni
-doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, soit
-\code{sexe} et \code{segment}~; vide explicite admis~; issues~\#43
-et~\#59). Une clé hors de ce catalogue est donc refusée à l'appel direct,
-qu'elle désigne une colonne de la table d'exposition (\code{"age"},
-\code{"evenements"}) ou non (\code{"region"}), de même que la chaîne vide,
-qui n'en fait pas partie~: sans ce contrôle, une clé hors du catalogue
-présente dans la table serait employée comme clé de segmentation sans
-avoir été déclarée comme rôle (\code{"age"} dupliquerait la clé d'âge dans
-la table résultat), et une clé absente de la table ne serait signalée que
-par une erreur de programmation sur les colonnes manquantes. Sur le
-chemin Kaplan-Meier, la fonction d'étape contrôle ensuite, en appel direct,
-la transition, la période et le délai par
-\code{controler\_transition\_periode()} du module \code{donnees} (refus de ce
-module, section~\ref{sec:controles-donnees}), sans recontrôler la
-segmentation ni contrôler d'exclusions~; l'estimateur
-\code{taux\_kaplan\_meier()} ne contrôle rien lui-même
-(section~\ref{sec:brut-kaplan-meier}). Une segmentation invalide y est donc
-refusée sous le module \code{brut}, une transition inconnue sous le module
-\code{donnees}. Le même code est porté par le
-module qui détecte la condition (ADR 0007, annotation du 17/10/2026,
-point~d)~: dans le plan, la segmentation est déjà refusée sous ce code par
-\code{controler\_parametres\_donnees()}, module \code{donnees}, que
-\code{valider\_plan()} appelle et qui emploie le même contrôle
-(section~\ref{sec:controles-donnees})~; la forme et le catalogue de la
-segmentation ne sont écrits qu'à un endroit, et le message du refus est le
-même dans les deux modules. Ce contrôle-ci ne sert qu'à l'appel direct de
-la fonction d'étape, et une segmentation invalide y est signalée avant un
-estimateur inconnu.
+La fonction d'étape ne refait aucun contrôle (issue~\#82, décisions M216
+et M291)~: ni celui de ses paramètres, ni celui de la segmentation, dont la
+variante \code{segmentation\_invalide} du module \code{brut} est retirée,
+ni, sur le chemin Kaplan-Meier, celui de la transition, de la période et du
+délai, dont elle reçoit les valeurs validées \code{p}~; l'estimateur
+\code{taux\_kaplan\_meier()} ne contrôle rien non plus
+(section~\ref{sec:brut-kaplan-meier}). Une segmentation invalide est
+refusée sous \code{segmentation\_invalide}, module \code{donnees}, par
+\code{controler\_parametres\_donnees()}, que \code{valider\_plan()}
+appelle (section~\ref{sec:controles-donnees}). Une fonction d'étape
+appelée directement n'est pas une interface~: ses entrées sont supposées
+validées. \emph{Constaté} sur un appel direct de
+\code{calculer\_taux\_bruts()} (mesure de relecture, comportement qu'aucun
+test ne fixe)~: une clé de segmentation absente de la table d'exposition
+(\code{"region"}, ou la chaîne vide) arrête le calcul par une erreur de
+programmation sur les colonnes manquantes, et une clé présente dans la
+table sans être un rôle de segmentation (\code{"age"}), comme une clé en
+double, est employée sans refus et duplique une colonne de la table
+résultat~; c'est la protection qu'apportait le contrôle retiré à l'appel
+direct, et que \code{valider\_plan()} garde dans toute construction.
 
 \medskip
 \textbf{Quantiles supérieurs.} Ils sont calculés par la queue supérieure
@@ -5847,11 +5897,12 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     vérifie la cohérence avec la convention de l'étape \code{exposition}~; un
     écart est une erreur de programmation. \code{taux\_kaplan\_meier()} ne
     lève aucun refus~: la transition, la période, le délai et la
-    segmentation qu'il reçoit ont été contrôlés par \code{valider\_plan()}
-    dans une construction, par la fonction d'étape en appel direct
-    (section~\ref{sec:brut-etape}), et il en reprend les valeurs par
+    segmentation qu'il reçoit ont été contrôlés par \code{valider\_plan()},
+    et il reçoit les valeurs validées \code{p}, calculées par
     \code{valeurs\_parametres\_donnees()}, qui ne contrôle rien
-    (issue~\#22). Les observations elles-mêmes ne
+    (issues~\#22 et~\#82~; en appel direct, aucun contrôle n'est fait,
+    section~\ref{sec:brut-etape}, hors la garde d'une segmentation en
+    double, erreur de programmation). Les observations elles-mêmes ne
     sont pas contrôlées~: seul \code{construire\_table()} transmet cet objet,
     produit par \code{calculer\_exposition()} à partir des observations de
     l'étape \code{donnees} de la même exécution. En appel
@@ -6180,8 +6231,11 @@ en dur~:
   \item les cas d'une ligne et de fusion de l'étape \code{exposition} (H, F)
     et un cas composite à onze têtes (C), aux attendus calculés à la main~:
     taux, bornes, états, avertissements, diagnostics~;
-  \item chaque refus, depuis \code{valider\_plan()} et depuis la fonction
-    d'étape, avec le même code~; le niveau $1 - 2^{-53}$, admis, à bornes
+  \item chaque refus, depuis \code{valider\_plan()} et depuis
+    \code{controler\_parametres\_brut()}, avec le même code (la fonction
+    d'étape ne contrôle plus rien, issue~\#82)~; la forme et le catalogue de
+    la segmentation, refusés par \code{valider\_plan()} sous le module
+    \code{donnees}, y compris sur le chemin Kaplan-Meier~; le niveau $1 - 2^{-53}$, admis, à bornes
     finies~;
   \item des identités exactes~: \code{evenements} et
     \code{exposition\_centrale} \code{identical()} aux colonnes de
@@ -6627,11 +6681,11 @@ $q$, spécification, A.4)~: sa garantie est le cas K
 \catalogue{fonctions-brut}{HYPOTHESES\_BRUT} & constante & --- & textes des hypothèses, par estimateur et pour la probabilité, inscrits dans les paramètres et dans la fiche \\
 \catalogue{fonctions-brut}{PORTEE\_PROBABILITE} & constante & --- & portée de la probabilité de Poisson selon la cellule (année d'âge, année civile, âge $\times$ année) \\
 \catalogue{fonctions-brut}{STATUTS\_BRUT} & constante & --- & statut, loi supposée et calcul de chaque grandeur (tableau~\ref{tab:statuts-brut}) \\
-\catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} et, en appel direct (\code{controler = TRUE}), par la fonction d'étape (issue~\#22) \\
+\catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} seule (issues~\#22 et~\#82) \\
 \catalogue{fonctions-brut}{taux\_poisson()} & interne & $D$, $E^c$, niveau & taux, bornes exactes et asymptotiques, état (section~\ref{sec:brut-poisson}) \\
 \catalogue{fonctions-brut}{taux\_binomial()} & interne & $D$, $E^i$, niveau, tolérance & taux, bornes, état, cellules où $D = E^i > 0$ (section~\ref{sec:brut-binomial}) \\
-\catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & fenêtres transmises par l'étape \code{exposition} ou observations (appel direct), table d'exposition, segmentation, transition, période, délai, convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
-\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), transition, période, délai, paramètres de l'étape \code{exposition}~; \code{controler} (\code{TRUE} par défaut) & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat})~; avec \code{controler = FALSE}, réservé à \code{construire\_table()}, ni la segmentation, ni les paramètres de l'étape, ni (pour \code{kaplan\_meier}) la transition, la période et le délai ne sont recontrôlés (issue~\#22) \\
+\catalogue{fonctions-brut}{taux\_kaplan\_meier()} & interne & fenêtres transmises par l'étape \code{exposition} ou observations (appel direct), table d'exposition, segmentation, valeurs validées \code{p} (transition, période, délai), convention, niveau, paramètres de l'étape \code{exposition} & tables \code{kaplan\_meier} et \code{kaplan\_meier\_sauts}, diagnostics (section~\ref{sec:brut-kaplan-meier}) \\
+\catalogue{fonctions-brut}{calculer\_taux\_bruts()} & interne & table d'exposition, segmentation, \code{par\_annee}, convention, unité d'exposition, estimateurs, niveau~; pour \code{kaplan\_meier}~: \code{observations} (fenêtres transmises par l'étape \code{exposition} dans une construction, table des observations de l'étape \code{donnees} en appel direct~; issue~\#38), valeurs validées \code{p} (transition, période, délai), paramètres de l'étape \code{exposition} & fonction d'étape \code{brut}~: paramètres effectifs, résultat, diagnostics, avertissements (section~\ref{sec:brut-resultat})~; ne contrôle ni la segmentation, ni les paramètres de l'étape, ni (pour \code{kaplan\_meier}) la transition, la période et le délai, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \end{longtable}
 }
 
@@ -6703,7 +6757,7 @@ leurs motifs. L'étape de positionnement n'est pas encore implémentée.
 \endhead
 \catalogue{fonctions-positionnement}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} \\
 \catalogue{fonctions-positionnement}{valeurs\_entieres\_double()} & interne & valeur & \code{TRUE} pour un \code{double} sans attribut, sans \code{NA}, fini, à valeurs entières \\
-\catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre~; appelée par \code{construire\_table()} et par \code{rejouer\_fiche()} (étape~7~ter) \\
+\catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre~; appelée par \code{controler\_entrees()} seule, une fois par construction (au rejeu, par l'unique appel de \code{construire\_table()}~; issue~\#82) \\
 \catalogue{fonctions-positionnement}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé & grille des cellules et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table}, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
 \catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} \\
 \catalogue{fonctions-positionnement}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé \\
@@ -6774,7 +6828,7 @@ par une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, 
 \section{Validation et suivi d'expérience~: \code{R/validation.R}}
 \label{sec:validation}
 
-Le module \code{validation} porte deux étapes du plan, toutes deux dans
+{\sloppy Le module \code{validation} porte deux étapes du plan, toutes deux dans
 \code{R/validation.R} (décision M242~; avis de forme du 06/11/2026,
 issue~\#4)~: l'étape \code{validation} (issue~\#4), qui calcule les
 statistiques de validation d'une table de référence \emph{prise telle
@@ -6784,14 +6838,17 @@ et l'étape \code{importance\_exclusions} (issue~\#69,
 section~\ref{sec:importance-exclusions}). Leurs fonctions d'étape,
 \code{calculer\_validation()} et \code{calculer\_importance\_exclusions()},
 reçoivent les résultats des étapes préalables et les champs du plan qui les
-concernent (et, pour la seconde, les données reçues, les rôles et la table
-de l'étape \code{validation}), jamais le plan entier. Le module n'appelle que des modules
+concernent (et, pour la seconde, les données reçues, les rôles, la table
+de l'étape \code{validation} et les valeurs validées de la transition, de
+la période, du délai, de la recette et de la convention~; issue~\#82),
+jamais le plan entier. Le module n'appelle que des modules
 situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
-(\code{controler\_segmentation()}, \code{citer()},
+(\code{citer()},
 \code{liste\_guillemets()}, \code{SEXES\_TABLE}, et, pour
 \code{importance\_exclusions}, \code{construire\_observations()},
-\code{evaluer\_motifs()}, \code{valeurs\_parametres\_donnees()},
-\code{MOTIFS\_TETE} et \code{MODALITES\_CAUSE}),
+\code{evaluer\_motifs()}, \code{MOTIFS\_TETE} et \code{MODALITES\_CAUSE}~; ni
+\code{controler\_segmentation()} ni \code{valeurs\_parametres\_donnees()},
+qu'il appelait avant l'issue~\#82),
 \code{exposition} (\code{calculer\_exposition()}, pour
 \code{importance\_exclusions} seulement) et
 \code{brut} (\code{taux\_poisson()}) et, depuis l'issue~\#167,
@@ -6802,7 +6859,7 @@ situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
 \code{table\_reference} (la clé de la table), arêtes autorisées de toute
 façon (section~\ref{sec:graphe}~; ADR 0007, seconde
 annotation du 06/11/2026, (d)). L'étape \code{validation} est la seule
-étape du plan qui tire un aléa (Monte-Carlo, section~\ref{sec:validation-monte-carlo}).
+étape du plan qui tire un aléa (Monte-Carlo, section~\ref{sec:validation-monte-carlo}).\par}
 
 \medskip
 \noindent
@@ -6913,17 +6970,19 @@ exemple \code{999L}) y est \textbf{refusé} sous le motif du paramètre
 d'étape, si bien qu'admettre les deux types donnerait deux fiches pour deux
 plans de même sens, défaut que la canonisation corrige pour les champs du
 plan (section~\ref{sec:fiche}). Refus du module \code{validation}, levés par
-\code{controler\_parametres\_validation()}, que \code{valider\_plan()}
-appelle avant toute étape (après les contrôles des étapes amont) et que la
-fonction d'étape appelle en appel direct seulement, dans cet ordre~:
+\code{controler\_parametres\_validation()}, que seule \code{valider\_plan()}
+appelle, avant toute étape (après les contrôles des étapes amont), dans
+cet ordre~:
 \code{cle\_table\_invalide}, \code{relation\_table\_invalide},
 \code{plage\_ages\_invalide}, \code{tranches\_age\_invalides},
 \code{niveau\_invalide} (même motif que dans le module \code{brut},
 spécification du 06/11/2026, §~1~; levé ici sous le module \code{validation}),
-\code{replications\_invalides}. En appel direct, la fonction d'étape
-contrôle d'abord la segmentation par \code{controler\_segmentation()}
-(refus \code{segmentation\_invalide}, module \code{validation}), puis les
-paramètres, la classe de la table et ses entrées (ci-dessous).
+\code{replications\_invalides}. La fonction d'étape ne refait aucun
+contrôle~: ni la segmentation, dont la variante
+\code{segmentation\_invalide} du module \code{validation} est retirée, ni
+les paramètres, la classe de la table et ses entrées (ci-dessous), qu'elle
+contrôlait en appel direct avant l'issue~\#82 (décisions M216 et M291~;
+section~\ref{sec:execution}).
 
 \medskip
 \textbf{Préalables et aléa} (constante \code{ETAPES}~; ADR 0015,
@@ -6996,9 +7055,10 @@ sous le module \code{validation}~:
     ne contiennent pas la plage (les âges d'un sexe sont contigus, contrôle
     de \code{table\_reference()}, section~\ref{sec:table-reference}).
 \end{enumerate}
-Le rejeu outillé refait ces contrôles, sur la table reçue ou relue, avant
-d'appeler \code{construire\_table()} (section~\ref{sec:rejeu},
-étape~7~ter). Deux refus ne peuvent être levés qu'en cours d'étape, sur les
+Au rejeu outillé, ces contrôles ne précèdent pas l'appel de
+\code{construire\_table()}~: ils sont faits une fois, par cet appel, sur la
+table reçue ou relue (section~\ref{sec:rejeu}, étape~8~; issue~\#82,
+décision M291). Deux refus ne peuvent être levés qu'en cours d'étape, sur les
 cellules~: \code{cellule\_sans\_valeur\_table} (un sexe de la construction
 absent d'une table par sexe) et \code{taux\_table\_egal\_un} ($\tilde q =
 1$ dans une cellule d'exposition $E^c > 0$~: l'attendu serait infini, le
@@ -7469,10 +7529,13 @@ intervalles, nombre \code{double} unique, sans attribut, fini, $0 <
 que dans les modules \code{brut} et \code{validation}), levé sous le module
 \code{importance\_exclusions} par
 \code{controler\_parametres\_importance\_exclusions()}, que
-\code{valider\_plan()} appelle avant toute étape. En appel direct
-(\code{controler = TRUE}), la fonction d'étape contrôle d'abord la
-segmentation par \code{controler\_segmentation()} (refus
-\code{segmentation\_invalide}, même module), puis le niveau. L'étape ne
+\code{valider\_plan()} appelle, seule, avant toute étape. La fonction
+d'étape ne refait aucun contrôle~: ni la segmentation, dont la variante
+\code{segmentation\_invalide} de ce module est retirée, ni le niveau,
+qu'elle contrôlait en appel direct avant l'issue~\#82 (décisions M216 et
+M291~; section~\ref{sec:execution})~; elle reçoit les valeurs validées
+\code{p}, la recette et la convention, qu'elle transmet aux expositions
+contrefactuelles. L'étape ne
 définit aucun autre refus~: tout ce qui ne peut être calculé est rendu dans
 un état nommé (ci-dessous), sans refus~; seules les gardes des fonctions
 d'exposition qu'elle rappelle (par exemple \code{trop\_de\_cellules})
@@ -7859,8 +7922,12 @@ chaque test nommant la nature de son attendu)~:
     du SMR~; T8, comparateur~2 sous \code{independante}, sous
     \code{ajustee\_hors\_outil} et sans \code{validation}, table par sexe,
     tout ou rien et priorité des états~; motif sans ligne, total vide,
-    \code{contrat\_duplique} dans les deux unités~; refus du plan et de
-    l'appel direct~; section du rapport figé, mention fixe mot pour mot,
+    \code{contrat\_duplique} dans les deux unités~; refus du plan, et, en
+    appel direct, erreur de programmation sur une étape
+    \code{validation} transmise sans sa table~; recette fictive de convention native
+    \code{age\_atteint\_annee}~: l'étape \code{exposition} et les
+    expositions contrefactuelles emploient la recette et la convention de
+    la fiche (issue~\#82)~; section du rapport figé, mention fixe mot pour mot,
     mention d'unité contrat~;
   \item \textbf{identités exactes}~: \code{construire\_observations()}
     identique à la partie correspondante de \code{preparer\_donnees()} sur
@@ -7966,8 +8033,9 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{identical()} hors \code{execution}~; refus
     \code{table\_reference\_absente} sans la table et
     \code{empreinte\_table\_discordante} pour une table altérée d'un ulp~;
-    refus \code{plage\_ages\_hors\_table} au rejeu (étape~7~ter) sans appel
-    de \code{construire\_table()}~; section \code{etape\_validation} du
+    refus \code{plage\_ages\_hors\_table} au rejeu, levé par l'unique
+    appel de \code{construire\_table()} avant toute étape, sans appel de
+    \code{preparer\_donnees()} (issue~\#82)~; section \code{etape\_validation} du
     rapport figé avec ses mentions fixes, mention «~non demandée par le
     plan~» sans l'étape, mention d'unité contrat sans identifiant de tête.
 \end{itemize}\par}
@@ -8050,7 +8118,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{ETATS\_CELLULE\_VALIDATION} & constante & --- & les cinq états d'une cellule (section~\ref{sec:validation-etape}) \\
 \catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les neuf états d'une grandeur (section~\ref{sec:validation-statistiques}) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION} & constante & --- & \code{data.frame} (\code{statistique}, \code{grandeur}, \code{sous\_h0}, \code{statut})~: une ligne par grandeur, dans l'ordre du résultat~; \code{sous\_h0} désigne les grandeurs non produites sous \code{ajustee\_hors\_outil} (tableau~\ref{tab:statistiques-validation}) \\
-\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & les six paramètres & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue~; appelée par \code{valider\_plan()} et en appel direct par la fonction d'étape \\
+\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & les six paramètres & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
 \catalogue{fonctions-validation}{probabilite\_hors()} & interne & $A$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{P}(A)$, par cellule \\
 \catalogue{fonctions-validation}{loi\_runs()} & interne & $n_{+}$, $n_{-}$ par séquence & loi exacte du nombre total de suites, par convolution \\
 \catalogue{fonctions-validation}{wilcoxon\_rangs()} & interne & différences & effectif, nuls, groupes d'ex aequo, $w_{+}$, variance corrigée, $z$ \\
@@ -8060,13 +8128,13 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{pvaleur\_monte\_carlo()} & interne & observé, répliques, sens & $p_{MC}$ et erreur de Monte-Carlo \\
 \catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, $p$, $B$, graine & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
 \catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes \\
-\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine, \code{controler} & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements \\
+\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{MOTIFS\_MESURABLES\_IMPORTANCE} & constante & --- & motifs mesurables~: \code{id\_contrat\_manquant}, \code{contrat\_duplique} (ce dernier en unité tête seulement~; section~\ref{sec:importance-exclusions}) \\
 \catalogue{fonctions-validation}{CLES\_MOTIFS\_IMPORTANCE} & constante & --- & motif $\to$ clé de cellule qu'il rend manquante~: \code{sexe} pour \code{sexe\_manquant} et \code{sexe\_hors\_modalites}, \code{segment} pour \code{segment\_manquant} \\
 \catalogue{fonctions-validation}{ETATS\_EVENEMENTS\_EXCLUS} & constante & --- & les cinq états des déclarations d'une ligne exclue \\
 \catalogue{fonctions-validation}{ETATS\_IMPORTANCE} & constante & --- & \code{data.frame} (\code{etat}, \code{libelle})~: états des grandeurs de l'étape et leur libellé \\
 \catalogue{fonctions-validation}{STATUTS\_IMPORTANCE} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque grandeur de l'étape (E2.20) \\
-\catalogue{fonctions-validation}{controler\_parametres\_importance\_exclusions()} & interne & niveau & \code{TRUE} invisible, ou refus \code{niveau\_invalide} (module \code{importance\_exclusions})~; appelée par \code{valider\_plan()} et en appel direct par la fonction d'étape \\
+\catalogue{fonctions-validation}{controler\_parametres\_importance\_exclusions()} & interne & niveau & \code{TRUE} invisible, ou refus \code{niveau\_invalide} (module \code{importance\_exclusions})~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
 \catalogue{fonctions-validation}{classe\_motifs()} & interne & motifs, unité, clés & classe de chaque motif~: mesurable, non calculable faute de clé, non mesurable \\
 \catalogue{fonctions-validation}{classer\_lignes\_exclues()} & interne & lignes exclues par motif, unité, clés & lignes distinctes et leur classe~; seule source des ensembles $S$ \\
 \catalogue{fonctions-validation}{cle\_cellules()} & interne & cellules, clés, découpage & clé de chaque cellule (segmentation, âge, année) \\
@@ -8077,7 +8145,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
 \catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, champs du plan, niveau, \code{controler} & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun) \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p}, période, délai, recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
 }
