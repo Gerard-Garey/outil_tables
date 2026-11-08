@@ -136,8 +136,12 @@ invariant_libelles <- function(libelles, motifs) {
   if (anyDuplicated(unname(libelles))) e <- c(e, "deux codes au même libellé")
   if (length(e)) e else TRUE
 }
-verifier("libellés des motifs : un libellé et un seul par code de l'union des motifs des recettes, libellés distincts (invariant)",
-         invariant_libelles(tablexp:::LIBELLES_MOTIFS, tablexp:::motifs_recettes()))
+# Commit (4a) de #180 : les motifs des stocks (MOTIFS_LIGNES_STOCKS,
+# MOTIFS_UNITE_STOCKS) sont libellés avant la ligne `stocks_successifs` du
+# catalogue, ajoutée au commit (4b), qui réduit cet ensemble à motifs_recettes().
+MOTIFS_LIBELLES <- unique(c(tablexp:::motifs_recettes(), tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS))
+verifier("libellés des motifs : un libellé et un seul par code de l'union des motifs des recettes et des motifs des stocks (commit (4a) de #180), libellés distincts (invariant)",
+         invariant_libelles(tablexp:::LIBELLES_MOTIFS, MOTIFS_LIBELLES))
 verifier("libellés des motifs : codes communs aux listes de motifs de plusieurs recettes recensés (sexe_manquant, sexe_hors_modalites, segment_manquant, age_aberrant), chacun avec un seul libellé (valeur écrite à la main)", {
   tous <- unlist(lapply(seq_len(nrow(CAT)), function(k) unique(c(CAT$motifs_ligne[[k]], CAT$motifs_unite[[k]]))),
                  use.names = FALSE)
@@ -150,7 +154,7 @@ verifier("libellés des motifs : l'invariant rejette un code en double, un code 
   doublon <- c(l, age_aberrant = "autre sens")
   sans <- l[names(l) != "cellule_dupliquee"]
   meme <- l; meme[["age_manquant"]] <- meme[["annee_manquante"]]
-  m <- tablexp:::motifs_recettes()
+  m <- MOTIFS_LIBELLES
   is.character(invariant_libelles(doublon, m)) && is.character(invariant_libelles(sans, m)) &&
     any(grepl("cellule_dupliquee", invariant_libelles(sans, m), fixed = TRUE)) &&
     identical(invariant_libelles(meme, m), "deux codes au même libellé")
@@ -210,8 +214,8 @@ verifier("matrice, (3b) : lignes agregats (#169, § 4 et § 7 ; ADR 0016, point 
 CR <- catalogue_roles()
 verifier("catalogue_roles() : colonnes role, famille, type_admis, recettes, sans usage (valeur écrite à la main)",
          identical(names(CR), c("role", "famille", "type_admis", "recettes")))
-verifier("catalogue_roles() : 22 rôles ; exposition remplacé par exposition_centrale et exposition_initiale (famille agregats) ; type numerique pour age, annee, exposition_centrale, exposition_initiale, evenements (valeur écrite à la main)",
-         nrow(CR) == 22L && !("exposition" %in% CR$role) &&
+verifier("catalogue_roles() : 23 rôles (type_ligne, famille observation, ajouté par le commit (4a) de #180) ; exposition remplacé par exposition_centrale et exposition_initiale (famille agregats) ; type numerique pour age, annee, exposition_centrale, exposition_initiale, evenements (valeur écrite à la main)",
+         nrow(CR) == 23L && !("exposition" %in% CR$role) &&
            identical(CR$famille[match(c("exposition_centrale", "exposition_initiale"), CR$role)], c("agregats", "agregats")) &&
            all(CR$type_admis[match(c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements"), CR$role)] ==
                  "integer, double"))
@@ -221,8 +225,9 @@ verifier("catalogue_roles() : recettes dérivée du catalogue des recettes : lig
   agr <- c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements")
   all(v[emp] == "lignes_dates_completes") && all(v[agr] == "agregats") &&
     all(v[c("sexe", "segment")] == "lignes_dates_completes, agregats") &&
-    identical(CR$role[CR$recettes == ""], c("age_fourni", "date_age_fourni", "date_evenement", "date_inventaire", "montant",
-                                            "etat_depart", "etat_arrivee", "date_changement"))
+    identical(CR$role[CR$recettes == ""], c("age_fourni", "date_age_fourni", "date_evenement", "type_ligne",
+                                            "date_inventaire", "montant", "etat_depart", "etat_arrivee",
+                                            "date_changement"))
 })
 verifier("catalogue_roles() : sous un catalogue de deux recettes (injection), recettes jointes par « , » dans l'ordre du catalogue (sexe, segment), recette seule (montant, age) ou vide (date_inventaire)", {
   cr <- avec_constante("CATALOGUE_RECETTES", CAT2, catalogue_roles())

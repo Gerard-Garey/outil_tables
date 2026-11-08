@@ -51,17 +51,17 @@
 CATALOGUE_ROLES <- data.frame(
   role = c("id_contrat", "id_tete", "sexe", "date_naissance", "annee_naissance",
            "age_fourni", "date_age_fourni", "date_entree", "date_sortie",
-           "cause_sortie", "date_evenement", "date_inventaire", "age", "annee",
+           "cause_sortie", "date_evenement", "type_ligne", "date_inventaire", "age", "annee",
            "exposition_centrale", "exposition_initiale", "evenements", "montant",
            "segment", "etat_depart", "etat_arrivee", "date_changement"),
   famille = c("identification", "identification", "etat_civil", "etat_civil",
               "etat_civil", "etat_civil", "etat_civil", "observation",
-              "observation", "observation", "observation", "observation",
+              "observation", "observation", "observation", "observation", "observation",
               "agregats", "agregats", "agregats", "agregats", "agregats",
               "ponderation", "segmentation", "multi_etats", "multi_etats",
               "multi_etats"),
   type = c("identifiant", "identifiant", "categorie", "date", "entier",
-           "entier_positif", "date", "date", "date", "categorie", "date", "date",
+           "entier_positif", "date", "date", "date", "categorie", "date", "categorie", "date",
            "numerique", "numerique", "numerique", "numerique", "numerique",
            "reel_strictement_positif", "categorie_ou_entier", "categorie",
            "categorie", "date"),
@@ -86,6 +86,10 @@ TYPES_ADMIS <- c(
 # sensibles à la casse.
 MODALITES_SEXE <- c("H", "F")
 MODALITES_CAUSE <- c("deces", "rachat", "terme", "autre", "en_cours")
+# Modalités du rôle type_ligne de la recette `stocks_successifs` (spécification
+# d'actuary-approfondi de #180, § 3, M328) : ligne d'inventaire (présence de
+# l'unité à la date d'inventaire) ou ligne d'événement (sortie de l'unité).
+MODALITES_TYPE_LIGNE <- c("inventaire", "evenement")
 ROLES_SEGMENTATION <- c("sexe", "segment")
 
 # Âge (au dernier anniversaire) à partir duquel une ligne est aberrante
@@ -141,10 +145,30 @@ MOTIFS_LIGNES_AGREGATS <- c("age_manquant", "age_non_entier", "age_negatif", "ag
                             "exposition_manquante", "exposition_non_finie", "exposition_negative",
                             "evenements_manquants", "evenements_non_entiers", "evenements_negatifs",
                             "evenements_sans_exposition", "cellule_dupliquee")
-# Libellé de chaque code de motif de l'union des recettes (motifs_recettes()) :
-# un code a un seul sens, quelle que soit la recette qui le lève (invariant
-# « un libellé unique par code », avis d'actuary du 08/11/2026 sur #169,
-# point 2 ; contrôlé par tests/unitaires/test_catalogue_recettes.R).
+# Motifs de ligne et motifs d'unité de la recette `stocks_successifs`
+# (spécification d'actuary-approfondi de #180, § 7.2 et § 7.3, M328), dans
+# l'ordre de restitution : motifs de toute ligne, puis de la ligne
+# d'inventaire, puis de la ligne d'événement ; motifs d'unité évalués sur les
+# lignes exemptes de motif de ligne (evaluer_motifs_stocks()). Les codes
+# communs avec MOTIFS_LIGNES ont le même sens (LIBELLES_MOTIFS). Constantes
+# sans recette au catalogue jusqu'au commit (4b) de #180, qui ajoute la ligne
+# `stocks_successifs` de CATALOGUE_RECETTES.
+MOTIFS_LIGNES_STOCKS <- c("type_ligne_manquant", "type_ligne_hors_modalites", "id_contrat_manquant",
+                          "id_tete_manquant", "naissance_manquante", "sexe_manquant", "sexe_hors_modalites",
+                          "segment_manquant", "annee_naissance_incoherente", "age_aberrant",
+                          "inventaire_sans_date", "inventaire_hors_grille", "inventaire_avec_sortie",
+                          "naissance_apres_inventaire", "inventaire_duplique",
+                          "sortie_manquante", "cause_manquante", "cause_hors_modalites", "cause_en_cours",
+                          "evenement_avec_date_inventaire", "naissance_apres_sortie")
+MOTIFS_UNITE_STOCKS <- c("unite_naissance_incoherente", "unite_sexe_incoherent", "unite_segment_incoherent",
+                         "evenements_multiples", "presence_apres_evenement", "presence_interrompue",
+                         "sortie_non_renseignee", "evenement_apres_absence")
+# Libellé de chaque code de motif de l'union des recettes (motifs_recettes()),
+# plus ceux des motifs des stocks (MOTIFS_LIGNES_STOCKS, MOTIFS_UNITE_STOCKS)
+# jusqu'au commit (4b) de #180 : un code a un seul sens, quelle que soit la
+# recette qui le lève (invariant « un libellé unique par code », avis
+# d'actuary du 08/11/2026 sur #169, point 2 ; contrôlé par
+# tests/unitaires/test_catalogue_recettes.R).
 LIBELLES_MOTIFS <- c(
   id_contrat_manquant = "identifiant de contrat manquant",
   id_tete_manquant = "identifiant de tête manquant",
@@ -179,7 +203,27 @@ LIBELLES_MOTIFS <- c(
   evenements_non_entiers = "nombre d'événements non entier ou non fini",
   evenements_negatifs = "nombre d'événements négatif",
   evenements_sans_exposition = "événements sans aucune exposition déclarée strictement positive",
-  cellule_dupliquee = "clé de cellule (sexe, segment, âge, année déclarés) présente sur plusieurs lignes")
+  cellule_dupliquee = "clé de cellule (sexe, segment, âge, année déclarés) présente sur plusieurs lignes",
+  type_ligne_manquant = "type de ligne manquant",
+  type_ligne_hors_modalites = "type de ligne hors des modalités inventaire, evenement",
+  inventaire_sans_date = "ligne d'inventaire sans date d'inventaire",
+  inventaire_hors_grille = "date d'inventaire hors de la grille des inventaires du plan",
+  inventaire_avec_sortie = "ligne d'inventaire qui porte une date ou une cause de sortie",
+  naissance_apres_inventaire = "date de naissance postérieure à la date d'inventaire",
+  inventaire_duplique = "même unité inventoriée sur plusieurs lignes à la même date",
+  cause_en_cours = "ligne d'événement de cause « en_cours »",
+  evenement_avec_date_inventaire = "ligne d'événement qui porte une date d'inventaire",
+  naissance_apres_sortie = "date de naissance postérieure à la date de sortie",
+  unite_naissance_incoherente = "dates de naissance différentes au sein d'une même unité",
+  unite_sexe_incoherent = "sexes différents au sein d'une même unité",
+  unite_segment_incoherent = "segments différents au sein d'une même unité (segment employé par la segmentation)",
+  evenements_multiples = "unité qui porte plusieurs lignes d'événement",
+  presence_apres_evenement = "unité inventoriée à une date égale ou postérieure à une de ses dates de sortie",
+  presence_interrompue = "unité absente d'un inventaire situé entre deux inventaires où elle est présente",
+  sortie_non_renseignee = paste("unité absente de l'inventaire qui suit sa dernière présence, sans ligne",
+                                "d'événement"),
+  evenement_apres_absence = paste("date de sortie postérieure à l'inventaire qui suit la dernière présence de",
+                                  "l'unité"))
 
 # Nombre de numéros de ligne cités dans un message de refus (A.1) ; l'objet
 # de refus porte la liste complète.
@@ -688,17 +732,22 @@ ligne_transition <- function(transition)
 
 # Valeurs que les paramètres de transition, de période et de délai déjà
 # contrôlés donnent (#22) : list(transition, debut, fin, borne, periode,
-# delai_declaration), la ligne de TRANSITIONS, les bornes de la période et la
-# borne B = fin - délai + 1 (jours depuis 1970-01-01), puis la période et le
-# délai tels que le plan les porte (#182 : seule source des champs validés ;
-# periode et delai_declaration sont inscrits tels quels dans les paramètres de
-# l'étape exposition). Ne contrôle rien : rendue par controler_transition_periode()
-# et par controler_plan_roles() (orchestration), qui la transmet aux
-# fonctions d'étape après valider_plan() (#82).
-valeurs_parametres_donnees <- function(transition, periode, delai_declaration) {
+# delai_declaration[, inventaires]), la ligne de TRANSITIONS, les bornes de la
+# période et la borne B = fin - délai + 1 (jours depuis 1970-01-01), puis la
+# période et le délai tels que le plan les porte (#182 : seule source des
+# champs validés ; periode et delai_declaration sont inscrits tels quels dans
+# les paramètres de l'étape exposition), puis la grille des inventaires telle
+# que le plan la porte (champ conditionnel `inventaires`, ADR 0016, point
+# 7.1 ; #180) : l'élément n'existe que si `inventaires` n'est pas NULL (champ
+# absent du plan). Ne contrôle rien : rendue par controler_transition_periode()
+# (sans grille) et par controler_plan_roles() (orchestration, grille du plan
+# canonique), qui la transmet aux fonctions d'étape après valider_plan() (#82).
+valeurs_parametres_donnees <- function(transition, periode, delai_declaration, inventaires = NULL) {
   fin <- as.numeric(periode[["fin"]])
-  list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]), fin = fin,
-       borne = (fin - delai_declaration) + 1, periode = periode, delai_declaration = delai_declaration)
+  v <- list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]), fin = fin,
+            borne = (fin - delai_declaration) + 1, periode = periode, delai_declaration = delai_declaration)
+  if (!is.null(inventaires)) v$inventaires <- inventaires
+  v
 }
 
 # Contrôle la transition, la période d'observation et le délai de déclaration
@@ -1035,6 +1084,312 @@ observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, 
                                                         else NA_integer_,
                   poids_exclusions = poids)
   list(unite = "non_determinee", observations = observations, observation_des_lignes = i, releves = releves)
+}
+
+# --- motifs et observations de la recette `stocks_successifs` (#180, § 4 et § 7) --
+
+# Les fonctions de cette section n'ont pas encore de recette au catalogue :
+# la ligne `stocks_successifs` de CATALOGUE_RECETTES, les aiguillages de
+# preparer_donnees() et les avertissements des relevés arrivent au commit
+# (4b) de #180 ; elles sont testées en appel direct
+# (tests/unitaires/test_stocks_successifs.R).
+# Conventions (spécification d'actuary-approfondi de #180, § 2.1 et § 4,
+# M328) : une ligne d'inventaire datée d atteste la présence de l'unité à
+# l'instant d au sens d'A.0 (e <= d < s : état en fin de journée) ; la grille
+# t_1 < ... < t_M (p$inventaires, jours depuis 1970-01-01) est celle du plan
+# canonique, alignée par valider_plan() (t_1 = début - 1, t_M = fin effective) ;
+# l'unité est l'identifiant déclaré, id_tete ou id_contrat (exactement un :
+# le refus identifiants_concurrents relève de la matrice, ADR 0016, point 5.2).
+
+# Identifiant d'unité déclaré des stocks : "id_tete" ou "id_contrat". Deux
+# identifiants, ou aucun, sont une erreur de programmation (refus en amont :
+# identifiants_concurrents, aucune_recette).
+identifiant_stocks <- function(roles) {
+  id <- intersect(c("id_tete", "id_contrat"), names(roles))
+  if (length(id) != 1L)
+    stop(sprintf("identifiant_stocks() : %d identifiant(s) déclaré(s), un seul attendu (erreur de programmation).",
+                 length(id)), call. = FALSE)
+  id
+}
+
+# Faits par unité des stocks, sur des lignes de type valide : g, entier
+# d'unité de chaque ligne (rang de première apparition) ; inv, evt : lignes
+# d'inventaire et d'événement (logical) ; k : indice dans la grille de la date
+# d'inventaire de chaque ligne (NA hors grille et pour un événement) ; s,
+# cause : date de sortie (jours) et cause de chaque ligne ; G : nombre
+# d'unités. Rend list(f, l, n_inventaires, n_evenements, s_min, s_max,
+# cause) par unité : indices du premier et du dernier inventaire où l'unité
+# est présente (NA sans inventaire), nombres de lignes d'inventaire et
+# d'événement, plus petite et plus grande date de sortie de ses événements
+# (NA sans événement), cause de l'événement de plus petite date (le premier
+# dans l'ordre des lignes à date égale ; NA sans événement).
+faits_unites_stocks <- function(g, inv, evt, k, s, cause, G) {
+  f <- l <- rep(NA_integer_, G)
+  ki <- k[inv]
+  if (any(inv)) {
+    e <- extremes_par_groupe(g[inv][!is.na(ki)], ki[!is.na(ki)])
+    f[e$groupe] <- e$min; l[e$groupe] <- e$max
+  }
+  s_min <- s_max <- rep(NA_real_, G)
+  cause_u <- rep(NA_character_, G)
+  if (any(evt)) {
+    ge <- g[evt]; se <- s[evt]; ce <- cause[evt]
+    ok <- !is.na(se)
+    e <- extremes_par_groupe(ge[ok], se[ok])
+    s_min[e$groupe] <- e$min; s_max[e$groupe] <- e$max
+    o <- order(ge[ok], se[ok], method = "radix")
+    prem <- o[!duplicated(ge[ok][o])]
+    cause_u[ge[ok][prem]] <- ce[ok][prem]
+  }
+  list(f = f, l = l, n_inventaires = tabulate(g[inv], nbins = G), n_evenements = tabulate(g[evt], nbins = G),
+       s_min = s_min, s_max = s_max, cause = cause_u)
+}
+
+# Évalue tous les motifs de la recette `stocks_successifs` (spécification de
+# #180, § 7.2 et § 7.3) sur toutes les lignes, sans court-circuit ; un motif
+# de comparaison n'est pas levé sur une valeur manquante. Motifs de ligne
+# (MOTIFS_LIGNES_STOCKS) :
+#   - toute ligne : type_ligne manquant ou hors de MODALITES_TYPE_LIGNE ;
+#     identifiant déclaré manquant ; naissance manquante ; sexe et segment
+#     (rôles déclarés) ; annee_naissance_incoherente (rôle déclaré) ;
+#     age_aberrant, âge au dernier anniversaire >= AGE_ABERRANT à la date de
+#     la ligne (date d'inventaire d'une ligne d'inventaire, date de sortie
+#     d'une ligne d'événement ; non levé sans type valide ou sans date) ;
+#   - ligne d'inventaire : sans date ; date hors de la grille ; date ou cause
+#     de sortie renseignée (« en_cours » compris) ; naissance postérieure à la
+#     date d'inventaire ; inventaire_duplique (même identifiant, même date,
+#     valeurs non manquantes : toutes les lignes en cause) ;
+#   - ligne d'événement : sortie_manquante (date de sortie manquante, cause
+#     renseignée autre que « en_cours », même sens que sous les lignes) ;
+#     cause manquante, hors de MODALITES_CAUSE, ou « en_cours » ; date
+#     d'inventaire renseignée ; naissance postérieure à la sortie.
+# Motifs d'unité (MOTIFS_UNITE_STOCKS), évalués sur les lignes exemptes de
+# motif de ligne et marqués sur ces lignes (comme les motifs de tête,
+# evaluer_motifs()), avec f, l les indices du premier et du dernier inventaire
+# où l'unité est présente, M le nombre d'inventaires :
+#   - dates de naissance, sexes (modalités H, F) ou segments (segment employé
+#     par la segmentation) différents au sein de l'unité ;
+#   - evenements_multiples : au moins deux lignes d'événement ;
+#   - presence_apres_evenement : une date d'inventaire de l'unité >= une de
+#     ses dates de sortie (inventaire après le décès, remise en vigueur) ;
+#   - presence_interrompue : l'unité manque à un inventaire entre f et l ;
+#   - sortie_non_renseignee : l < M sans ligne d'événement ;
+#   - evenement_apres_absence : l < M et une date de sortie > t_{l+1}.
+#   donnees, roles : data.frame et vecteur nommé rôle -> colonne ;
+#   p              : valeurs validées (valeurs_parametres_donnees()), dont
+#                    p$inventaires (grille du plan canonique, requise) ;
+#   segmentation   : sous-ensemble de c("sexe", "segment"), vide admis.
+# Rend list(motifs) : liste nommée code -> numéros de ligne (1-based,
+# croissants), dans l'ordre MOTIFS_LIGNES_STOCKS puis MOTIFS_UNITE_STOCKS
+# (integer(0) pour un motif sans objet).
+evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
+  if (is.null(p$inventaires))
+    stop("evaluer_motifs_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
+  grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
+  n <- nrow(donnees)
+  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  jours <- function(role) as.numeric(unclass(col(role)))
+  vrai <- function(x) !is.na(x) & x
+  role_id <- identifiant_stocks(roles)
+  id <- col(role_id)
+  tl <- as.character(col("type_ligne"))
+  inv <- vrai(tl == "inventaire"); evt <- vrai(tl == "evenement")
+  nai <- jours("date_naissance"); dinv <- jours("date_inventaire"); sor <- jours("date_sortie")
+  cause <- as.character(col("cause_sortie"))
+  m <- stats::setNames(rep(list(logical(n)), length(MOTIFS_LIGNES_STOCKS)), MOTIFS_LIGNES_STOCKS)
+  m$type_ligne_manquant <- is.na(tl)
+  m$type_ligne_hors_modalites <- !is.na(tl) & !(tl %in% MODALITES_TYPE_LIGNE)
+  m[[paste0(role_id, "_manquant")]] <- is.na(id)
+  m$naissance_manquante <- is.na(nai)
+  sexe <- col("sexe")
+  if (!is.null(sexe)) {
+    sexe <- as.character(sexe)
+    m$sexe_manquant <- is.na(sexe)
+    m$sexe_hors_modalites <- !is.na(sexe) & !(sexe %in% MODALITES_SEXE)
+  }
+  segment <- col("segment")
+  if (!is.null(segment)) m$segment_manquant <- is.na(segment)
+  an_nai <- col("annee_naissance")
+  if (!is.null(an_nai))
+    m$annee_naissance_incoherente <- vrai(an_nai != composantes_date(nai)$an)
+  d_ligne <- rep(NA_real_, n); d_ligne[inv] <- dinv[inv]; d_ligne[evt] <- sor[evt]
+  m$age_aberrant <- vrai(age_revolu(nai, d_ligne) >= AGE_ABERRANT)
+  m$inventaire_sans_date <- inv & is.na(dinv)
+  m$inventaire_hors_grille <- inv & !is.na(dinv) & !(dinv %in% grille)
+  m$inventaire_avec_sortie <- inv & (!is.na(sor) | !is.na(cause))
+  m$naissance_apres_inventaire <- inv & vrai(nai > dinv)
+  # Clé exacte (identifiant, date) : rangs des valeurs distinctes (match(),
+  # égalité exacte), comme cellule_dupliquee.
+  cle <- inv & !is.na(id) & !is.na(dinv)
+  rangs <- paste(match(id, unique(id)), match(dinv, unique(dinv)), sep = "\r")
+  rangs[!cle] <- NA
+  m$inventaire_duplique <- cle & (duplicated(rangs, incomparables = NA) |
+                                  duplicated(rangs, fromLast = TRUE, incomparables = NA))
+  m$sortie_manquante <- evt & is.na(sor) & !is.na(cause) & cause != "en_cours"
+  m$cause_manquante <- evt & is.na(cause)
+  m$cause_hors_modalites <- evt & !is.na(cause) & !(cause %in% MODALITES_CAUSE)
+  m$cause_en_cours <- evt & vrai(cause == "en_cours")
+  m$evenement_avec_date_inventaire <- evt & !is.na(dinv)
+  m$naissance_apres_sortie <- evt & vrai(nai > sor)
+
+  u <- stats::setNames(rep(list(logical(n)), length(MOTIFS_UNITE_STOCKS)), MOTIFS_UNITE_STOCKS)
+  propres <- which(!Reduce(`|`, m))
+  g <- match(id[propres], unique(id[propres]))
+  G <- max(0L, g)
+  marquer <- function(groupes) {
+    x <- logical(n)
+    x[propres[g %in% groupes]] <- TRUE
+    x
+  }
+  u$unite_naissance_incoherente <- marquer(groupes_heterogenes(g, nai[propres]))
+  if (!is.null(sexe)) {
+    # Lignes propres : sexe dans MODALITES_SEXE (sexe_manquant et
+    # sexe_hors_modalites sont des motifs de ligne).
+    u$unite_sexe_incoherent <- marquer(groupes_heterogenes(g, sexe[propres]))
+  }
+  if (!is.null(segment) && "segment" %in% segmentation)
+    u$unite_segment_incoherent <- marquer(groupes_heterogenes(g, as.character(segment[propres])))
+  fu <- faits_unites_stocks(g, inv[propres], evt[propres], match(dinv[propres], grille), sor[propres],
+                            cause[propres], G)
+  a_inv <- fu$n_inventaires > 0L
+  a_evt <- fu$n_evenements > 0L
+  avant_fin <- a_inv & fu$l < M
+  suivant <- rep(NA_real_, G); suivant[avant_fin] <- grille[fu$l[avant_fin] + 1L]
+  u$evenements_multiples <- marquer(which(fu$n_evenements >= 2L))
+  u$presence_apres_evenement <- marquer(which(a_inv & a_evt & grille[fu$l] >= fu$s_min))
+  u$presence_interrompue <- marquer(which(a_inv & (fu$l - fu$f + 1L) != fu$n_inventaires))
+  u$sortie_non_renseignee <- marquer(which(avant_fin & !a_evt))
+  u$evenement_apres_absence <- marquer(which(avant_fin & a_evt & fu$s_max > suivant))
+  list(motifs = lapply(c(m, u), which))
+}
+
+# Observations de la recette `stocks_successifs` sur les lignes retenues
+# (spécification de #180, § 4) : une observation par unité, faits établis
+# sans aucune hypothèse (l'instant d'entrée d'une unité absente de
+# l'inventaire précédent reste inconnu ; l'hypothèse qui le fixe relève de
+# l'étape exposition, ADR 0016, point 4.2). Unité d'observation `tete` si
+# l'identifiant déclaré est id_tete, `contrat` s'il est id_contrat. Unités
+# rangées par identifiant (order(method = "radix") : ordre des octets pour
+# une chaîne, ordre numérique pour un nombre), indépendamment de l'ordre des
+# lignes reçues. Colonnes : unite (identifiant), ligne (premier numéro de
+# ligne de l'unité), nb_lignes, date_naissance, sexe (déclaré), segment
+# (employé par la segmentation), premier_inventaire et dernier_inventaire
+# (indices f <= l dans la grille, NA sans inventaire), date_sortie et cause
+# (événement, NA sans événement), intervalle (i tel que t_i < s <= t_{i+1},
+# NA sans événement ou hors de ]t_1, t_M]), classe et fin :
+#   - classe P0 : présente à t_1 (f = 1) ; E : vue pour la première fois à
+#     t_f, f >= 2 ; ES : événement sans inventaire, t_1 < s <= t_M ; HF :
+#     événement sans inventaire, s <= t_1 ou s > t_M ;
+#   - fin S : événement avec t_l < s <= t_{l+1} ; C : présente à t_M, sans
+#     événement ou avec un événement postérieur à t_M ; NA pour ES et HF.
+# Les lignes reçues ici ne portent aucun motif (refus par défaut ou
+# exclusion) : une unité incohérente (plusieurs événements, présence
+# interrompue, fin introuvable) est une erreur de programmation.
+# Refus inventaire_sans_ligne (§ 7.4 ; module donnees, non excluable) : une
+# date de la grille sans aucune unité présente sur les lignes retenues ; le
+# message distingue la date sans aucune ligne reçue (lignes dont
+# date_inventaire vaut cette date, quel que soit leur type_ligne) de la date
+# dont toutes les lignes reçues sont exclues.
+#   lignes, numeros, roles, segmentation : comme construire_observations() ;
+#   p       : valeurs validées, dont p$inventaires ;
+#   donnees : lignes reçues (avant exclusions), pour le message du refus.
+# Rend list(unite, observations, observation_des_lignes, releves) : releves
+# porte le nombre d'unités, le décompte de chaque classe (p0, entrees,
+# entres_sortis, hors_fenetre, fin_sortie, fin_censure), les unités ES par
+# cause (entres_sortis_par_cause, causes de MODALITES_CAUSE hors « en_cours »),
+# les unités présentes par inventaire (inventaires : date_inventaire,
+# presents) et, par intervalle ]t_i, t_{i+1}] (intervalles : debut, fin,
+# entrants, entres_sortis, sorties_<cause> des unités de fin S).
+observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees) {
+  if (is.null(p$inventaires))
+    stop("observations_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
+  grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
+  role_id <- identifiant_stocks(roles)
+  col <- function(role, d = lignes) if (role %in% names(roles)) d[[roles[[role]]]] else NULL
+  id <- col(role_id)
+  tl <- as.character(col("type_ligne"))
+  inv <- !is.na(tl) & tl == "inventaire"; evt <- !is.na(tl) & tl == "evenement"
+  s <- as.numeric(unclass(col("date_sortie"))); cause <- as.character(col("cause_sortie"))
+  k <- match(as.numeric(unclass(col("date_inventaire"))), grille)
+  uid <- unique(id)
+  g <- match(id, uid)
+  G <- length(uid)
+  fu <- faits_unites_stocks(g, inv, evt, k, s, cause, G)
+  a_inv <- fu$n_inventaires > 0L
+  a_evt <- fu$n_evenements > 0L
+  # Unité incohérente : erreur de programmation (motifs d'unité non appliqués).
+  suivant <- rep(NA_real_, G); avant_fin <- a_inv & fu$l < M
+  suivant[avant_fin] <- grille[fu$l[avant_fin] + 1L]
+  incoherente <- fu$n_evenements > 1L | !(a_inv | a_evt) | (!a_inv & is.na(fu$s_min)) |
+    (a_inv & (fu$l - fu$f + 1L) != fu$n_inventaires) |
+    (avant_fin & !(a_evt & !is.na(fu$s_min) & fu$s_min > grille[pmax(fu$l, 1L)] & fu$s_min <= suivant)) |
+    (a_inv & !avant_fin & a_evt & !(fu$s_min > grille[M]))
+  if (any(incoherente, na.rm = TRUE) || anyNA(incoherente))
+    stop(sprintf("observations_stocks() : %d unité(s) incohérente(s) (erreur de programmation : motifs non appliqués).",
+                 sum(incoherente | is.na(incoherente))), call. = FALSE)
+
+  # Présentes par inventaire : +1 à f, -1 à l + 1.
+  presents <- cumsum(tabulate(fu$f[a_inv], nbins = M + 1L) - tabulate(fu$l[a_inv] + 1L, nbins = M + 1L))[seq_len(M)]
+  vides <- which(presents == 0L)
+  if (length(vides)) {
+    d_r <- as.numeric(unclass(col("date_inventaire", donnees)))
+    recues <- vapply(grille[vides], function(t) sum(!is.na(d_r) & d_r == t),
+                     integer(1L))
+    dates <- citer(format(structure(grille[vides], class = "Date")))
+    refuser("donnees", "inventaire_sans_ligne",
+            formuler(paste("Inventaire(s) sans aucune unité présente sur les lignes retenues : %s ; la grille du plan",
+                           "suppose un inventaire exhaustif à chacune de ses dates (un portefeuille vide à une date",
+                           "d'inventaire n'est pas pris en charge), la construction est refusée."),
+                     paste(ifelse(recues == 0L,
+                                  formuler("%s (aucune ligne reçue à cette date d'inventaire)", dates),
+                                  formuler("%s (%d ligne(s) reçue(s) à cette date d'inventaire, toutes exclues)", dates, recues)),
+                           collapse = " ; ")),
+            list(dates = structure(grille[vides], class = "Date"), lignes_recues = recues))
+  }
+
+  t1 <- grille[1L]; tM <- grille[M]
+  classe <- ifelse(a_inv, ifelse(fu$f == 1L, "P0", "E"), ifelse(fu$s_min > t1 & fu$s_min <= tM, "ES", "HF"))
+  fin <- rep(NA_character_, G); fin[a_inv] <- ifelse(fu$l[a_inv] == M, "C", "S")
+  intervalle <- findInterval(fu$s_min, grille, left.open = TRUE)
+  intervalle[is.na(fu$s_min) | intervalle == 0L | intervalle == M] <- NA_integer_
+
+  o <- order(uid, method = "radix")
+  rang <- integer(G); rang[o] <- seq_len(G)
+  premiere <- match(seq_len(G), g)
+  i <- premiere[o]
+  as_date <- function(j) structure(as.numeric(j), class = "Date")
+  categorie <- function(x)
+    if (is.factor(x)) structure(unclass(x)[i], levels = levels(x),
+                                class = if (is.ordered(x)) c("ordered", "factor") else "factor")
+    else x[i]
+  observations <- data.frame(unite = id[i], ligne = numeros[i], nb_lignes = tabulate(g, nbins = G)[o],
+                             stringsAsFactors = FALSE, row.names = NULL)
+  observations$date_naissance <- col("date_naissance")[i]
+  if ("sexe" %in% names(roles)) observations$sexe <- categorie(col("sexe"))
+  if ("segment" %in% segmentation) observations$segment <- categorie(col("segment"))
+  observations$premier_inventaire <- fu$f[o]
+  observations$dernier_inventaire <- fu$l[o]
+  observations$date_sortie <- as_date(fu$s_min[o])
+  observations$cause <- fu$cause[o]
+  observations$intervalle <- intervalle[o]
+  observations$classe <- classe[o]
+  observations$fin <- fin[o]
+
+  causes <- setdiff(MODALITES_CAUSE, "en_cours")
+  es <- classe == "ES"; sortie <- !is.na(fin) & fin == "S"
+  intervalles <- data.frame(debut = as_date(grille[-M]), fin = as_date(grille[-1L]),
+                            entrants = tabulate(fu$f[classe == "E"] - 1L, nbins = M - 1L),
+                            entres_sortis = tabulate(intervalle[es], nbins = M - 1L),
+                            stringsAsFactors = FALSE)
+  for (x in causes)
+    intervalles[[paste0("sorties_", x)]] <- tabulate(intervalle[sortie & fu$cause == x], nbins = M - 1L)
+  releves <- list(unites = G, p0 = sum(classe == "P0"), entrees = sum(classe == "E"), entres_sortis = sum(es),
+                  hors_fenetre = sum(classe == "HF"), fin_sortie = sum(sortie), fin_censure = sum(fin %in% "C"),
+                  entres_sortis_par_cause = vapply(causes, function(x) sum(es & fu$cause == x), integer(1L)),
+                  inventaires = data.frame(date_inventaire = as_date(grille), presents = presents),
+                  intervalles = intervalles)
+  list(unite = if (role_id == "id_tete") "tete" else "contrat", observations = observations,
+       observation_des_lignes = rang[g], releves = releves)
 }
 
 # --- fusion par tête (A.1, « Unité d'observation et fusion par tête ») --------

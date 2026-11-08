@@ -57,13 +57,13 @@ contient <- function(r, ...) {
 # --- catalogue fermé des rôles ------------------------------------------------
 
 cat_r <- catalogue_roles()
-verifier("catalogue_roles() : 22 rôles, colonnes role, famille, type_admis, recettes (sans usage ; ADR 0016, point 3)",
-         nrow(cat_r) == 22L && identical(names(cat_r), c("role", "famille", "type_admis", "recettes")))
+verifier("catalogue_roles() : 23 rôles (type_ligne ajouté, #180, commit (4a)), colonnes role, famille, type_admis, recettes (sans usage ; ADR 0016, point 3)",
+         nrow(cat_r) == 23L && identical(names(cat_r), c("role", "famille", "type_admis", "recettes")))
 verifier("catalogue_roles() : rôles requis de la recette = date_naissance, date_entree, date_sortie, cause_sortie (CATALOGUE_RECETTES)",
          identical(tablexp:::CATALOGUE_RECETTES$requis[[1L]],
                    c("date_naissance", "date_entree", "date_sortie", "cause_sortie")))
-NON_PRIS <- c("age_fourni", "date_age_fourni", "date_evenement", "date_inventaire", "montant", "etat_depart",
-              "etat_arrivee", "date_changement")
+NON_PRIS <- c("age_fourni", "date_age_fourni", "date_evenement", "type_ligne", "date_inventaire", "montant",
+              "etat_depart", "etat_arrivee", "date_changement")
 AGREGATS <- c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements")
 verifier("catalogue_roles() : rôles qu'aucune recette n'emploie signalés (recettes vide), agregats pour ses rôles propres, « lignes_dates_completes, agregats » pour sexe et segment, lignes_dates_completes pour les autres (#169)", {
   v <- stats::setNames(cat_r$recettes, cat_r$role)

@@ -875,7 +875,10 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # hors du vecteur d'ordre, un doublon ou un attribut sont une erreur de
 # programmation, jamais une valeur retirée en silence ; toute autre valeur
 # inchangée. Stockages admis, liste fermée, conversions sans perte : borne de
-# période Date à stockage double ou integer -> Date double ; délai integer ou
+# période Date à stockage double ou integer -> Date double ; grille des
+# inventaires (champ conditionnel `inventaires`, ADR 0016, point 7.1 ; #180),
+# Date à stockage double ou integer -> Date double, dates dans l'ordre reçu
+# (strictement croissant, imposé par valider_plan()) ; délai integer ou
 # double -> double ; graine admise par forme_graine() (integer ou double
 # entier, unique, fini, sans attribut, de valeur absolue au plus
 # .Machine$integer.max ; domaine de graine_invalide, #61) -> integer. Un
@@ -900,6 +903,7 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   delai <- p[["delai_declaration"]]
   if (!typeof(delai) %in% c("double", "integer")) non_canonique("delai_declaration")
   p[["delai_declaration"]] <- as.double(delai)
+  if ("inventaires" %in% names(p)) p[["inventaires"]] <- borne(p[["inventaires"]], "inventaires")
   if ("graine" %in% names(p)) {
     g <- p[["graine"]]
     if (!forme_graine(g)) non_canonique("graine")

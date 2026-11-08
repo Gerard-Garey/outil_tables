@@ -49,7 +49,12 @@
 
 # Champs de premier niveau du plan (ADR 0007, point 5.1 ; M48, M49). `graine`
 # est requise dès qu'une étape du plan tire un aléa, interdite sinon.
-CHAMPS_PLAN <- c("transition", "periode", "delai_declaration", "segmentation", "graine", "etapes")
+# `inventaires` (grille des inventaires ; ADR 0014, point 4 ; ADR 0016,
+# point 7.1 ; #180) est requis si la recette retenue emploie le rôle
+# date_inventaire, interdit sinon (controler_inventaires_recette()) ; sa forme
+# et son alignement sur la période sont contrôlés par valider_plan()
+# (controler_inventaires_plan()).
+CHAMPS_PLAN <- c("transition", "periode", "delai_declaration", "inventaires", "segmentation", "graine", "etapes")
 CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentation", "etapes")
 
 # Étapes de la branche, dans l'ordre des modules : fonction d'étape (module),
@@ -191,6 +196,93 @@ controler_graine_plan <- function(plan, aleatoire) {
   invisible(NULL)
 }
 
+# Grille des inventaires du plan (champ `inventaires` ; ADR 0016, point 7.1 ;
+# spécification d'actuary-approfondi de #180, § 2, M328), appelée par
+# valider_plan() si le champ est présent, après controler_parametres_donnees()
+# dont elle reçoit les valeurs validées `p` (debut, borne). Dans cet ordre :
+#   - inventaires_invalides : classe Date exacte, stockage double ou integer,
+#     sans autre attribut ; puis au moins deux dates, sans valeur manquante,
+#     en jours entiers finis, dans le domaine des dates (dates_hors_domaine(),
+#     module donnees, sur les valeurs finies), strictement croissantes (sur
+#     les valeurs finies) ; tous les défauts constatés
+#     sont cités (seul le premier groupe si la classe est en défaut) ;
+#   - inventaires_periode : première date différente de la veille du début de
+#     la période (t_1 = début - 1) ou dernière date différente de la fin
+#     effective (t_M = fin - délai = borne - 1) ; une date d'inventaire désigne
+#     l'état en fin de journée (A.0 : présence à l'instant d).
+# Module construire_table. Rend NULL, invisible.
+controler_inventaires_plan <- function(inventaires, p) {
+  x <- inventaires
+  defauts <- character(0)
+  if (!forme_exacte(x, c("double", "integer"), "class") || !identical(class(x), "Date")) {
+    defauts <- formuler("classe autre que Date exacte, stockage autre que double ou integer, ou autre attribut")
+  } else {
+    j <- as.numeric(unclass(x))
+    if (length(j) < 2L) defauts <- c(defauts, formuler("moins de deux dates"))
+    if (anyNA(j)) defauts <- c(defauts, formuler("valeur manquante"))
+    k <- j[!is.na(j)]
+    if (!all(is.finite(k) & k == trunc(k))) defauts <- c(defauts, formuler("date non entière ou non finie"))
+    if (any(dates_hors_domaine(k[is.finite(k)]))) defauts <- c(defauts, formuler("date hors du domaine [0001-01-01, 9999-12-31]"))
+    # Croissance jugée sur les valeurs finies seules (Inf - Inf = NaN).
+    kf <- k[is.finite(k)]
+    if (length(kf) > 1L && any(diff(kf) <= 0)) defauts <- c(defauts, formuler("dates non strictement croissantes"))
+  }
+  if (length(defauts))
+    refuser("construire_table", "inventaires_invalides",
+            formuler(paste("La grille des inventaires (champ « inventaires » du plan) doit être un vecteur de dates",
+                           "(classe Date, sans autre attribut) d'au moins deux dates en jours entiers, sans valeur",
+                           "manquante, dans le domaine [0001-01-01, 9999-12-31], strictement croissantes ; défaut(s) :",
+                           "%s."),
+                     paste(defauts, collapse = " ; ")),
+            list(inventaires = inventaires))
+  j <- as.numeric(unclass(x)); M <- length(j)
+  attendu <- c(p$debut - 1, p$borne - 1)
+  ecart <- c(j[1L] != attendu[1L], j[M] != attendu[2L])
+  if (any(ecart)) {
+    premier <- citer(format(structure(j[1L], class = "Date")))
+    dernier <- citer(format(structure(j[M], class = "Date")))
+    veille <- citer(format(structure(attendu[1L], class = "Date")))
+    fin_effective <- citer(format(structure(attendu[2L], class = "Date")))
+    ecarts <- character(0)
+    if (ecart[1L]) ecarts <- c(ecarts, formuler("premier inventaire %s au lieu de %s", premier, veille))
+    if (ecart[2L]) ecarts <- c(ecarts, formuler("dernier inventaire %s au lieu de %s", dernier, fin_effective))
+    refuser("construire_table", "inventaires_periode",
+            formuler(paste("Grille des inventaires non alignée sur la période d'observation : %s ; la première date",
+                           "doit être la veille du début (%s) et la dernière la fin effective (%s : fin moins le",
+                           "délai de déclaration), une date d'inventaire désignant l'état en fin de journée."),
+                     paste(ecarts, collapse = " ; "), veille, fin_effective),
+            list(inventaires = inventaires, attendu = structure(attendu, class = "Date"),
+                 bornes = c("premier", "dernier")[ecart]))
+  }
+  invisible(NULL)
+}
+
+# Présence du champ `inventaires` selon la recette retenue (ADR 0016,
+# point 7.1), appelée par controler_plan_roles() après controler_roles() :
+# requis si la recette emploie le rôle date_inventaire parmi ses rôles requis
+# (propriété de la recette, ADR 0016, point 4.4 ; recette `stocks_successifs`,
+# #180), refus inventaires_manquants s'il est absent (aucun défaut
+# implicite) ; interdit sous toute autre recette, refus inventaires_inattendus
+# s'il est présent. Module construire_table. Rend NULL, invisible.
+controler_inventaires_recette <- function(plan, recette) {
+  requis <- "date_inventaire" %in% recette$roles_requis
+  present <- "inventaires" %in% names(plan)
+  if (requis && !present)
+    refuser("construire_table", "inventaires_manquants",
+            formuler(paste("La recette « %s » exige la grille des inventaires (champ « inventaires » du plan : dates",
+                           "des inventaires, la première la veille du début de la période, la dernière la fin",
+                           "effective) ; aucun défaut implicite, la construction est refusée."),
+                     citer(recette$recette)),
+            list(recette = recette$recette))
+  if (!requis && present)
+    refuser("construire_table", "inventaires_inattendus",
+            formuler(paste("Le plan déclare une grille des inventaires (champ « inventaires ») alors que la recette",
+                           "« %s » n'emploie pas de date d'inventaire ; la construction est refusée."),
+                     citer(recette$recette)),
+            list(recette = recette$recette, inventaires = plan[["inventaires"]]))
+  invisible(NULL)
+}
+
 # Valide le plan entier, sans rien exécuter (ADR 0007, point 5.4). Rend le
 # plan, inchangé et invisible ; refuse (module construire_table pour les
 # codes structurels ; module donnees, exposition ou brut pour les valeurs).
@@ -277,8 +369,11 @@ valider_plan <- function(plan) {
   }
   # Valeurs : contrôlées par les modules (codes identiques par construction,
   # ADR 0007, annotation du 17/10/2026, point d).
-  controler_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
-                               plan[["segmentation"]], etapes[["donnees"]][["exclusions"]])
+  p <- controler_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
+                                    plan[["segmentation"]], etapes[["donnees"]][["exclusions"]])
+  # Grille des inventaires, si le champ est présent (sa présence selon la
+  # recette est contrôlée par controler_plan_roles(), qui connaît les rôles).
+  if ("inventaires" %in% names(plan)) controler_inventaires_plan(plan[["inventaires"]], p)
   if ("exposition" %in% noms)
     controler_parametres_exposition(etapes[["exposition"]][["convention"]],
                                     etapes[["exposition"]][["par_annee"]])
@@ -629,18 +724,21 @@ table_citee <- function(tables, cle) {
 # Première couche, partagée par construire_table() (par controler_entrees())
 # et rejouer_fiche() (contrôle 6), dans cet ordre : plan (valider_plan(),
 # puis canoniser_plan()), rôles et recette (controler_roles(), qui rend la
-# recette de deduire_recette() ; module donnees), convention
+# recette de deduire_recette() ; module donnees), présence de la grille des
+# inventaires selon la recette (controler_inventaires_recette()), convention
 # (resoudre_convention(), si `exposition` est au plan ; module exposition),
 # matrice recette x étape x estimateur (controler_matrice_recette(), module
 # donnees ; ADR 0016, point 5.3), provenance (controler_provenance()).
 # Rend les valeurs validées : list(plan (canonique), p (transition, période
 # et délai : valeurs_parametres_donnees(), module donnees, la valeur que rend
-# controler_parametres_donnees() appelée par valider_plan()), recette, conv
+# controler_parametres_donnees() appelée par valider_plan(), plus la grille
+# canonique p$inventaires si le plan la porte), recette, conv
 # (NULL sans exposition)). Une seule source de la recette et de la convention
 # pour les étapes et la fiche.
 controler_plan_roles <- function(donnees, roles, plan, provenance) {
   plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
   recette <- controler_roles(donnees, roles, plan[["segmentation"]])
+  controler_inventaires_recette(plan, recette)
   etapes_plan <- plan[["etapes"]]
   conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
@@ -650,7 +748,8 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
   # B14). Un chemin unique demanderait de changer le contrat de valider_plan()
   # (exportée) ou les comptes de contrôles du test « contrôles non répétés »
   # (#22, #82 ; tests/unitaires/test_construire_table.R) : renvoyé à une issue.
-  p <- valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]])
+  p <- valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
+                                  plan[["inventaires"]])
   controler_matrice_recette(recette, roles, plan, conv, p)
   controler_provenance(provenance)
   list(plan = plan, p = p, recette = recette, conv = conv)

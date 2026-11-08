@@ -1597,7 +1597,8 @@ local({
            identical(cn(pb)$delai_declaration, 0) && identical(cn(modifier(pb, delai_declaration = 90L))$delai_declaration, 90))
   verifier("canoniser_plan : graine integer inchangée, graine double entière convertie en integer",
            identical(cn(modifier(pb, graine = 7L))$graine, 7L) && identical(cn(modifier(pb, graine = 7))$graine, 7L) &&
-             identical(names(cn(modifier(pb, graine = 7L))), tablexp:::CHAMPS_PLAN))
+             # Champ conditionnel inventaires absent du plan (#180, commit (4a)).
+             identical(names(cn(modifier(pb, graine = 7L))), setdiff(tablexp:::CHAMPS_PLAN, "inventaires")))
   verifier("canoniser_plan : stockage hors de la liste fermée -> erreur (délai character, borne non Date, graine 1,5 ou hors étendue des integer)",
            erreur(cn(modifier(pb, delai_declaration = "0"))) &&
              erreur(cn(modifier(pb, periode = list(debut = 16436, fin = PER$fin)))) &&
