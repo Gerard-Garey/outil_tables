@@ -753,8 +753,8 @@ controler_rapport_fige <- function(x, l, id) {
 
 # Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
 # distincte tirée une seule fois ; jeu_ref est l'entrée `reference` (R1 à R8,
-# R10 à R12),
-# que les contrôles propres à un plan de cette entrée (permutation, R6) lisent.
+# R10 à R12), que les contrôles propres à un plan de cette entrée
+# (permutation, R6) lisent.
 entrees_ref <- entrees_des_plans(plans_reference())
 jeu_ref <- entrees_ref[["reference"]]
 verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
@@ -1016,7 +1016,9 @@ GRAINE_PERMUTATION <- 20261019L
 # Un écart dépendant de l'ordre inférieur à 1e-12 n'y est pas détecté (témoin
 # « taux altéré de 1e-13 »). R1 est couvert par R6, qui en contient tous les
 # chemins aux mêmes valeurs, hors paramètres et diagnostics du brut liés à
-# kaplan_meier ; R3 est le seul plan sous age_atteint_annee.
+# kaplan_meier ; R3 et R7 sont les plans sous age_atteint_annee : R3 est
+# permuté, R7 (R3 avec kaplan_meier) ne l'est pas, son chemin Kaplan-Meier
+# l'étant par R6, sous la convention plus_fine.
 TOLERANCE_PERMUTATION <- CLASSES_TOLERANCE[["1e-12"]]
 EMPREINTES_PERMUTATION <- c(CHEMIN_EMPREINTE_DONNEES, "etapes/donnees/resultat/lignes_conservees/@empreinte",
                             "etapes/donnees/resultat/observations/@empreinte")

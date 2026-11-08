@@ -227,23 +227,40 @@ t_debut <- proc.time()[["elapsed"]]
 for (k in LOIS) {
   cat(sprintf("\n=== Loi %s : %s ===\n", k, LIBELLE[[k]]))
   t0 <- proc.time()[["elapsed"]]
-  jeux <- vector("list", R_JEUX); erreurs <- character(0)
+  jeux <- vector("list", R_JEUX); erreurs <- character(0); refus <- character(0)
+  # Refus du moteur (refus_tablexp, réponse documentée à un jeu sans issue,
+  # par exemple un segment sans décès) comptés à part des erreurs R
+  # (défaut du script ou du moteur) ; la classe refus_tablexp hérite
+  # d'error (R/outils.R) : son gestionnaire est placé avant celui de error.
   for (r in seq_len(R_JEUX)) {
-    jeux[[r]] <- tryCatch(un_jeu(k, r), error = function(e) { erreurs <<- c(erreurs, sprintf("jeu %d : %s", r, conditionMessage(e))); NULL })
+    jeux[[r]] <- tryCatch(un_jeu(k, r),
+                          refus_tablexp = function(e) {
+                            refus <<- c(refus, sprintf("jeu %d : %s (%s)", r, conditionMessage(e), e$motif)); NULL },
+                          error = function(e) { erreurs <<- c(erreurs, sprintf("jeu %d : %s", r, conditionMessage(e))); NULL })
     if (r == 1L) cat(sprintf("Premier jeu : %.2f s ; durée extrapolée pour %d jeux : %.1f min\n",
                              proc.time()[["elapsed"]] - t0, R_JEUX, (proc.time()[["elapsed"]] - t0) * R_JEUX / 60))
   }
   duree <- proc.time()[["elapsed"]] - t0
   ok <- !vapply(jeux, is.null, NA)
-  cat(sprintf("Durée : %.1f min (%.2f s par jeu) ; jeux en erreur : %d\n", duree / 60, duree / R_JEUX, sum(!ok)))
-  if (length(erreurs)) cat(paste(" ", utils::head(erreurs, 5L)), sep = "\n")
+  cat(sprintf("Durée : %.1f min (%.2f s par jeu) ; jeux refusés par le moteur : %d ; jeux en erreur : %d\n",
+              duree / 60, duree / R_JEUX, length(refus), length(erreurs)))
+  if (length(refus)) cat(paste("  refus :", utils::head(refus, 5L)), sep = "\n")
+  if (length(erreurs)) cat(paste("  erreur :", utils::head(erreurs, 5L)), sep = "\n")
   if (sum(ok) == 0L) {
     verifier(sprintf("loi %s : aucun jeu exécuté", k), FALSE)
     bilan()
   }
-  # colonnes alignées par nom sur celles du premier jeu exécuté
-  noms <- names(unlist(jeux[ok][[1L]]))
-  m <- do.call(rbind, lapply(jeux[ok], function(o) unlist(o)[noms]))
+  # colonnes : union des noms de tous les jeux exécutés, dans l'ordre de
+  # première apparition ; une grandeur absente d'un jeu y vaut NA (non
+  # produite dans les taux) et son absence est imprimée (contrôle de
+  # présence), jamais ignorée en silence.
+  noms_jeux <- lapply(jeux[ok], function(o) names(unlist(o)))
+  noms <- unique(unlist(noms_jeux))
+  absents <- vapply(noms, function(nm) sum(!vapply(noms_jeux, function(n) nm %in% n, NA)), 0L)
+  if (any(absents > 0L))
+    cat(sprintf("Grandeurs absentes d'une partie des jeux exécutés (NA) : %s\n",
+                paste(sprintf("%s (%d jeu(x))", noms[absents > 0L], absents[absents > 0L]), collapse = " ; ")))
+  m <- do.call(rbind, lapply(jeux[ok], function(o) { v <- unlist(o)[noms]; names(v) <- noms; v }))
   col <- function(nm) m[, nm]
 
   cat("\nErreur d'estimation (par jeu, sur les jeux exécutés) :\n")
@@ -294,7 +311,7 @@ for (k in LOIS) {
                                                     ALPHA, rejet(col(paste(t, g, sep = "|"))))
     }
   }
-  cat("\nTaux (constats de simulation ; e.t. nominale = sqrt(cible (1 - cible) / R), intervalle = cible ± 3 e.t.) :\n")
+  cat("\nTaux (constats de simulation ; R = jeux exécutés où la grandeur est produite, jeux refusés exclus (voir le décompte ci-dessus) ; e.t. nominale = sqrt(cible (1 - cible) / R), intervalle = cible ± 3 e.t.) :\n")
   imprimer(do.call(rbind, lignes))
   verifier(sprintf("loi %s : %d jeux exécutés", k, sum(ok)), sum(ok) > 0L)
 }
