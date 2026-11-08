@@ -230,7 +230,7 @@ if ("wilcoxon" %in% MESURES) {
                 100 * part(pr, "wilcoxon_rangs") / max(part(pr, "calculer_validation"), 1e-9)))
     if (B <= 9999) {
       # Appel direct sur des matrices de la taille réelle (n x colonnes du bloc).
-      set.seed(20261108L)
+      set.seed(20261117L)
       t_tirage <- t_stat <- t_wil <- 0
       fait <- 0
       while (fait < B) {
