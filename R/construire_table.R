@@ -641,6 +641,12 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
   conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
   controler_provenance(provenance)
+  # p recalculé par la fonction qui forme la valeur de
+  # controler_parametres_donnees() dans valider_plan(), ici sur le plan
+  # canonique : valeurs identical() mesurées sur R1 à R12 (revue finale de
+  # B14). Un chemin unique demanderait de changer le contrat de valider_plan()
+  # (exportée) ou les comptes de contrôles du test « contrôles non répétés »
+  # (#22, #82 ; tests/unitaires/test_construire_table.R) : renvoyé à une issue.
   list(plan = plan, p = valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]]),
        recette = recette, conv = conv)
 }
