@@ -2057,23 +2057,69 @@ sur avis d'\code{actuary}, parce qu'elle classait aussi
 \code{etapes/brut/diagnostics/etats/cellules}, déjà \code{integer}, et
 aurait masqué leur retour au double (ADR 0009, seconde annotation du
 19/10/2026, point~(a)). Un double reçoit sa tolérance de la
-table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), cherchée par le
-\textbf{suffixe le plus long} du chemin~: une clé qualifiée
-\code{<table>/<colonne>} l'emporte sur le nom nu, ce qui donne au \code{taux}
-de \code{kaplan\_meier} une autre classe qu'au \code{taux} de Poisson ou du
-binomial sans changer le nom commun de la colonne. \textbf{Un double sans
-classe déclarée fait échouer la comparaison}~: une grandeur nouvelle reçoit
-sa classe d'\code{actuary} avant d'entrer dans une référence, et toute
-modification de la table est annotée dans l'ADR 0009, datée, avec l'avis
-d'\code{actuary}.
+table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont les clés sont
+cherchées parmi les suffixes du chemin, segment par segment, le
+\textbf{suffixe le plus long} l'emportant (\code{cles\_de},
+\code{tolerance\_de}, \code{tests/reference/outils\_reference.R}).
+\textbf{Toute clé est qualifiée par l'étape}, ou par \code{fiche/}
+(issue~\#175, décision M301~; ADR 0009, seconde annotation du 07/11/2026,
+point~(a))~: \code{<étape>/resultat/<table>/<colonne>},
+\code{<étape>/parametres/<nom>}, \code{<étape>/diagnostics/\ldots},
+\code{<étape>/<paramètre>} pour l'écho du plan dans
+\code{fiche/plan/etapes/<étape>/}, et \code{fiche/\ldots} pour les autres
+doubles de la fiche (écho du plan hors des étapes, hypothèses du brut).
+Aucune clé n'est un nom nu~: deux colonnes de même nom dans deux tables ou
+deux étapes (le \code{taux} de Poisson et celui de \code{kaplan\_meier},
+l'\code{exposition\_centrale} de l'exposition et celle de la validation)
+reçoivent chacune la classe de leur propre clé, et une étape nouvelle
+n'hérite d'aucune classe d'une colonne homonyme~: ses doubles restent sans
+classe tant que leurs clés ne sont pas déclarées. Ce passage aux clés
+qualifiées a retiré 23~clés (18~noms nus et 5~clés
+\code{kaplan\_meier\ldots/\ldots}) et en a ajouté 36 de même classe, sans
+reclasser aucun double de R1 à R9 (commit \code{9cda1cc}, \emph{constat}
+consigné dans son message). \textbf{Un double sans classe déclarée fait échouer la
+comparaison}~: une grandeur nouvelle reçoit sa classe d'\code{actuary} avant
+d'entrer dans une référence, et toute modification de la table est annotée
+dans l'ADR 0009, datée, avec l'avis d'\code{actuary}.
+
+\medskip
+\noindent
+\textbf{Invariants de structure de la table} (\code{tests/test\_reproductibilite.R},
+pour chaque plan de référence)~: (a)~aucune clé nue, sans «~\code{/}~»~;
+(b)~tout double d'une étape (chemin sous \code{etapes/<e>/} ou
+\code{fiche/plan/etapes/<e>/}) n'est classé que par des clés qui commencent
+par \code{<e>/}~; (c)~tout double de la fiche hors de
+\code{fiche/plan/etapes/} n'est classé que par des clés qui commencent par
+\code{fiche/}~; (d)~aucun chemin n'est classé par deux clés, si bien que
+chaque double a exactement une clé et que la règle du suffixe le plus long
+ne départage plus aucun cas. Pour (b) et~(c), toutes les clés qui classent
+un chemin sont examinées, même celles que la plus longue écarte. Des
+témoins sur des copies en mémoire font échouer chaque invariant~; d'autres
+recopient 36~chemins doubles de R6 (un par clé ajoutée) sous une étape
+absente de la table et vérifient qu'ils sont relevés sans classe, ce que
+l'ancienne clé nue correspondante aurait masqué. \textbf{Limite connue}~: un double
+de premier niveau hors de \code{etapes/} et de \code{fiche/} (par exemple
+sous \code{avertissements/}) n'est couvert par aucun invariant et
+hériterait en silence d'une clé d'étape si un segment intermédiaire de son
+chemin portait le nom de l'étape~; les plans de référence n'en
+produisent aucun (\emph{constat}), et le cas sera couvert
+quand un premier apparaîtra (ADR 0009, seconde annotation du 07/11/2026,
+point~(a)~4).
 
 {\small
 \rowcolors{2}{tablerow}{white}
-\begin{longtable}{@{}p{1.4cm}p{7.6cm}p{5.6cm}@{}}
+\begin{longtable}{@{}p{1.4cm}>{\raggedright\arraybackslash}p{9.4cm}p{3.8cm}@{}}
 \caption{Classes de tolérance des doubles (\code{TOLERANCES},
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
-point~(f), et seconde annotation du 19/10/2026, point~(a)).}
+point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, point~(a)).
+Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
+groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
+\code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
+\code{borne\_sup\_asymptotique}, «~\code{cellules\_niveau\_a} et
+\code{\_b}~» les deux tables \code{cellules\_niveau\_a} et
+\code{cellules\_niveau\_b}.}
 \label{tab:tolerances}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Classe}} &
@@ -2085,9 +2131,9 @@ point~(f), et seconde annotation du 19/10/2026, point~(a)).}
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{exposition\_jours}, \code{niveau}, \code{delai\_declaration}, \code{tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
-$10^{-14}$ & \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}, \code{exposition\_initiale}, \code{taux}~; \code{kaplan\_meier\_sauts/}\allowbreak\code{age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & les bornes exactes et asymptotiques, \code{probabilite} et ses quatre bornes~; \code{kaplan\_meier/taux}, \code{kaplan\_meier/variance}, \code{kaplan\_meier\_sauts/}\allowbreak\code{survie\_cellule} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3) \\
+exacte & \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée~: aucun bruit possible \\
+$10^{-14}$ & \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
+$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3) \\
 \end{longtable}
 }
 
