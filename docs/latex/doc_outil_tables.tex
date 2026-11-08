@@ -9120,7 +9120,10 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     tous les segments touchés en entier) et \code{bornes\_non\_definies}~;
     les trois refus inter-étapes et \code{relation\_table\_invalide}~;
     comparateur~2 non produit~; rejeu \code{identical()} hors
-    \code{execution}~; titre et mentions du rapport figé sous les trois
+    \code{execution}~; mention de la table de référence prise telle quelle
+sous \code{independante} et \code{ajustee\_hors\_outil} quand l'étape
+\code{positionnement} est au plan, une fois, dans le paragraphe du
+verdict~; titre et mentions du rapport figé sous les trois
     relations. Recoupements~: $G^2$ par \code{deviance()}, $X^2$ par les
     résidus de Pearson et ddl par \code{df.residual} d'un \code{glm()} de
     Poisson à un niveau par segment et offset~; p-valeurs et bornes des
@@ -11207,8 +11210,16 @@ construction~» sous \code{positionnee}~; la table des matières suit. Elle
 fait précéder ses tables de mentions fixes, dont
 le choix est lu dans l'objet (décisions M258 et M262~; ADR 0012, seconde
 annotation du 06/11/2026, (b)~; relation à trois valeurs, issue~\#167), dans
-cet ordre~: hors de \code{positionnee}, «~Aucune table
-positionnée n'est produite~: la table de référence est prise telle quelle.~»,
+cet ordre~: hors de \code{positionnee}, si l'étape \code{positionnement}
+n'est pas au plan, «~Aucune table positionnée n'est produite~: la table de
+référence est prise telle quelle.~», et, si elle est au plan (combinaison
+admise, sans refus~; décision du mainteneur du 08/11/2026, texte
+d'\code{actuary}), «~La validation porte sur la table de référence citée
+par l'étape validation, prise telle quelle
+(etapes/validation/parametres/table\_reference)~; la table positionnée
+produite par l'étape positionnement de cette construction n'est pas
+validée par cette étape (relation «~positionnee~» pour la valider).~»
+(mention \code{validation\_sans\_verdict\_table\_positionnement})~;
 puis, sous toute relation, «~Aucun verdict ni seuil~: aucune p-valeur
 n'est comparée à un niveau, et le
 moteur ne conclut pas sur l'adéquation de la table.~»~; la relation
