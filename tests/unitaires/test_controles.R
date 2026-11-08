@@ -980,7 +980,7 @@ SOURCES <- local({
   f <- lapply(fichiers, function(m) defs$symbole[defs$module == m])
   names(f) <- paste0("fonctions-", gsub("_", "-", fichiers, fixed = TRUE, useBytes = TRUE))
   c(list(exports = EXPORTS), f,
-    list(roles = catalogue_roles()$role, recettes = tablexp:::RECETTE_BRANCHE))
+    list(roles = catalogue_roles()$role, recettes = tablexp:::CATALOGUE_RECETTES$recette))
 })
 echapper <- function(n) gsub("_", "\\_", n, fixed = TRUE, useBytes = TRUE)
 code_latex <- function(n) sprintf("\\code{%s()}", echapper(n))

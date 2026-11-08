@@ -57,17 +57,17 @@ contient <- function(r, ...) {
 # --- catalogue fermé des rôles ------------------------------------------------
 
 cat_r <- catalogue_roles()
-verifier("catalogue_roles() : 21 rôles, colonnes role, famille, type_admis, usage, recettes",
-         nrow(cat_r) == 21L && identical(names(cat_r), c("role", "famille", "type_admis", "usage", "recettes")))
-verifier("catalogue_roles() : rôles requis de la recette = date_naissance, date_entree, date_sortie, cause_sortie",
-         identical(cat_r$role[cat_r$usage == "requis"],
+verifier("catalogue_roles() : 22 rôles, colonnes role, famille, type_admis, recettes (sans usage ; ADR 0016, point 3)",
+         nrow(cat_r) == 22L && identical(names(cat_r), c("role", "famille", "type_admis", "recettes")))
+verifier("catalogue_roles() : rôles requis de la recette = date_naissance, date_entree, date_sortie, cause_sortie (CATALOGUE_RECETTES)",
+         identical(tablexp:::CATALOGUE_RECETTES$requis[[1L]],
                    c("date_naissance", "date_entree", "date_sortie", "cause_sortie")))
 NON_PRIS <- c("age_fourni", "date_age_fourni", "date_evenement", "date_inventaire", "age", "annee",
-              "exposition", "evenements", "montant", "etat_depart", "etat_arrivee", "date_changement")
-verifier("catalogue_roles() : rôles non employés par la recette de la branche signalés (usage non_pris_en_charge, recettes vide)",
-         identical(cat_r$role[cat_r$usage == "non_pris_en_charge"], NON_PRIS) &&
-           all(cat_r$recettes[cat_r$usage == "non_pris_en_charge"] == "") &&
-           all(cat_r$recettes[cat_r$usage != "non_pris_en_charge"] == "lignes_dates_completes"))
+              "exposition_centrale", "exposition_initiale", "evenements", "montant", "etat_depart", "etat_arrivee",
+              "date_changement")
+verifier("catalogue_roles() : rôles qu'aucune recette n'emploie signalés (recettes vide), lignes_dates_completes pour les autres",
+         identical(cat_r$role[cat_r$recettes == ""], NON_PRIS) &&
+           all(cat_r$recettes[cat_r$recettes != ""] == "lignes_dates_completes"))
 verifier("catalogue_roles() : noms sans accents, uniques",
          !anyDuplicated(cat_r$role) && all(grepl("^[a-z_]+$", cat_r$role)))
 verifier("catalogue_roles() : type admis de date_naissance = Date",
@@ -123,8 +123,9 @@ x <- refus(cr(BASE, structure(ROLES, foo = 1), "sexe"))
 verifier("rôles, forme exacte : message et détails du refus nomment l'attribut en cause",
          identical(x$motif, "roles_mal_formes") && isTRUE(contient(x, "sans autre attribut que ses noms")) &&
            identical(x$details, list(classe = "character", attributs = c("names", "foo"))))
-verifier("rôles, forme exacte : vecteur nommé sans autre attribut admis (controler_roles rend les rôles inchangés)",
-         identical(cr(BASE, ROLES, "sexe"), ROLES) && identical(attributes(ROLES), list(names = names(ROLES))))
+verifier("rôles, forme exacte : vecteur nommé sans autre attribut admis (controler_roles rend la recette retenue, rôles inchangés)",
+         identical(cr(BASE, ROLES, "sexe"), tablexp:::deduire_recette(ROLES)) &&
+           identical(attributes(ROLES), list(names = names(ROLES))))
 x <- refus(prep(roles = c(ROLES, age_exact = "autre_colonne")))
 verifier("rôle inconnu : refus role_inconnu, message nomme rôle et colonne",
          identical(x$motif, "role_inconnu") && isTRUE(contient(x, "age_exact", "autre_colonne")) &&
@@ -240,10 +241,10 @@ local({
   })
   # Colonne conforme sous un nom bytes : le type est jugé, non le nom (le refus
   # chaine_codage_bytes de la fiche vient plus tard, module rapport).
-  verifier("nom de colonne d'encodage bytes, type conforme : controler_roles() ne lève rien et rend les rôles",
+  verifier("nom de colonne d'encodage bytes, type conforme : controler_roles() ne lève rien et rend la recette",
            identical(tryCatch(tablexp:::controler_roles(avec_sexe(OCTETS, BASE$sexe), replace(ROLES, "sexe", OCTETS), "sexe"),
                               error = function(e) conditionMessage(e)),
-                     replace(ROLES, "sexe", OCTETS)))
+                     tablexp:::deduire_recette(ROLES)))
 })
 d <- BASE; d$an <- c(1950.5, 1960, 1945, 1945)
 verifier("type incompatible : annee_naissance non entière",
@@ -256,7 +257,7 @@ x <- refus(prep(roles = ROLES[names(ROLES) != "date_naissance"]))
 verifier("rôle requis de la recette absent : refus aucune_recette, message nomme la recette et le rôle absent",
          identical(x$motif, "aucune_recette") &&
            isTRUE(contient(x, "lignes_dates_completes", "date_naissance")) &&
-           identical(x$details$role, "date_naissance"))
+           identical(x$details$role, list(lignes_dates_completes = "date_naissance")))
 x <- refus(prep(segmentation = c("sexe", "segment")))
 verifier("rôle employé par la segmentation absent : refus role_requis_manquant, message nomme rôle et recette",
          identical(x$motif, "role_requis_manquant") && isTRUE(contient(x, "segment", "lignes_dates_completes")))
@@ -1045,7 +1046,7 @@ verifier("date hors domaine dans une colonne non déclarée : sans effet",
 verifier("dates aux bornes du domaine (0001-01-01, 9999-12-31) : acceptées par le contrôle des rôles",
          identical(tablexp:::controler_roles(
            avec(naissance = J(c(-719162, 2932896, -719162, 2932896)), entree = J(rep(-719162, 4L))),
-           ROLES, "sexe"), ROLES))
+           ROLES, "sexe"), tablexp:::deduire_recette(ROLES)))
 verifier("période : borne début à 0000-12-31 (-719163) ou borne fin à 10000-01-01 (2932897) : refus date_hors_domaine",
          leve_refus(prep(periode = list(debut = J(-719163), fin = PER$fin)), "date_hors_domaine") &&
            leve_refus(prep(periode = list(debut = PER$debut, fin = J(2932897))), "date_hors_domaine") &&

@@ -22,7 +22,8 @@
 #    #167 ; `validation`, #4) ;
 #  - controler_plan_roles(), controler_entrees() : contrôle des entrées en
 #    deux couches (#82) ; la première (plan, rôles, recette, convention,
-#    provenance) est partagée par construire_table() et rejouer_fiche() ; la
+#    matrice recette x étape x estimateur, provenance) est partagée par
+#    construire_table() et rejouer_fiche() ; la
 #    seconde y ajoute le contrôle 1.3 et les contrôles d'entrée des étapes
 #    qui lisent une table (controler_entrees_validation(), module
 #    positionnement, pour `positionnement` puis `validation`), et n'est
@@ -313,10 +314,12 @@ valider_plan <- function(plan) {
 # alphabétique à l'installation, `construire_table.R` avant `donnees.R`,
 # dont les constantes (ROLES_SEGMENTATION, MOTIFS_*) ne sont pas encore
 # définies ; `brut.R` (ESTIMATEURS_BRUT) l'est déjà, mais la fonction les
-# lit toutes trois au même endroit.
+# lit toutes trois au même endroit. Exclusions : union des motifs des
+# recettes, motifs des lignes en tête (motifs_recettes(), ADR 0016,
+# point 6.4).
 ordres_canoniques <- function()
   list(segmentation = ROLES_SEGMENTATION,
-       "etapes/donnees/exclusions" = c(MOTIFS_LIGNES, MOTIFS_TETE),
+       "etapes/donnees/exclusions" = motifs_recettes(),
        "etapes/brut/estimateurs" = ESTIMATEURS_BRUT)
 
 # --- tables de référence reçues (ADR 0015, points 1.3 et 4 ; #73) --------------
@@ -625,9 +628,11 @@ table_citee <- function(tables, cle) {
 
 # Première couche, partagée par construire_table() (par controler_entrees())
 # et rejouer_fiche() (contrôle 6), dans cet ordre : plan (valider_plan(),
-# puis canoniser_plan()), rôles (controler_roles(), module donnees), recette
-# (deduire_recette()) et convention (resoudre_convention(), si `exposition`
-# est au plan ; module exposition), provenance (controler_provenance()).
+# puis canoniser_plan()), rôles et recette (controler_roles(), qui rend la
+# recette de deduire_recette() ; module donnees), convention
+# (resoudre_convention(), si `exposition` est au plan ; module exposition),
+# matrice recette x étape x estimateur (controler_matrice_recette(), module
+# donnees ; ADR 0016, point 5.3), provenance (controler_provenance()).
 # Rend les valeurs validées : list(plan (canonique), p (transition, période
 # et délai : valeurs_parametres_donnees(), module donnees, la valeur que rend
 # controler_parametres_donnees() appelée par valider_plan()), recette, conv
@@ -635,11 +640,11 @@ table_citee <- function(tables, cle) {
 # pour les étapes et la fiche.
 controler_plan_roles <- function(donnees, roles, plan, provenance) {
   plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
-  controler_roles(donnees, roles, plan[["segmentation"]])
-  recette <- deduire_recette(roles)
+  recette <- controler_roles(donnees, roles, plan[["segmentation"]])
   etapes_plan <- plan[["etapes"]]
   conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
+  controler_matrice_recette(recette, roles, plan)
   controler_provenance(provenance)
   # p recalculé par la fonction qui forme la valeur de
   # controler_parametres_donnees() dans valider_plan(), ici sur le plan

@@ -5,6 +5,12 @@
 #
 #  - CATALOGUE_ROLES et catalogue_roles() : catalogue fermé des rôles de la v1
 #    (exporté : l'application le lit pour la déclaration des rôles) ;
+#  - CATALOGUE_RECETTES, MATRICE_RECETTES : catalogue des recettes
+#    d'exposition et matrice recette x étape x estimateur (ADR 0016, points 1
+#    et 5), seul endroit où s'écrit la connaissance « recette » ;
+#  - deduire_recette() : recette déduite des rôles (ADR 0007, point 5.3 ;
+#    ADR 0016, point 2) ; controler_matrice_recette() : étapes et estimateurs
+#    du plan admis sous la recette retenue (ADR 0016, point 5) ;
 #  - controler_roles() : refus au niveau des rôles (liste fermée) ;
 #  - evaluer_motifs() : motifs de ligne et motifs de tête (liste fermée
 #    MOTIFS_LIGNES, MOTIFS_TETE), évaluation exhaustive, sans court-circuit ;
@@ -31,36 +37,33 @@
 
 # --- catalogue fermé des rôles (A.1) ------------------------------------------
 
-# type : code contrôlé par type_conforme() ; usage, pour la seule recette de
-# la branche (`lignes_dates_completes`) : requis, facultatif (contrôle),
-# segmentation (requis si la segmentation l'emploie), non_pris_en_charge
-# (refus nommé : son omission changerait le sens du résultat).
+# type : code contrôlé par type_conforme(). L'emploi d'un rôle par chaque
+# recette (requis, un parmi, facultatif) est porté par CATALOGUE_RECETTES ;
+# un rôle qu'aucune recette n'emploie est refusé (role_non_pris_en_charge :
+# son omission changerait le sens du résultat ; ADR 0016, point 3).
 CATALOGUE_ROLES <- data.frame(
   role = c("id_contrat", "id_tete", "sexe", "date_naissance", "annee_naissance",
            "age_fourni", "date_age_fourni", "date_entree", "date_sortie",
            "cause_sortie", "date_evenement", "date_inventaire", "age", "annee",
-           "exposition", "evenements", "montant", "segment", "etat_depart",
-           "etat_arrivee", "date_changement"),
+           "exposition_centrale", "exposition_initiale", "evenements", "montant",
+           "segment", "etat_depart", "etat_arrivee", "date_changement"),
   famille = c("identification", "identification", "etat_civil", "etat_civil",
               "etat_civil", "etat_civil", "etat_civil", "observation",
               "observation", "observation", "observation", "observation",
-              "agregats", "agregats", "agregats", "agregats", "ponderation",
-              "segmentation", "multi_etats", "multi_etats", "multi_etats"),
+              "agregats", "agregats", "agregats", "agregats", "agregats",
+              "ponderation", "segmentation", "multi_etats", "multi_etats",
+              "multi_etats"),
   type = c("identifiant", "identifiant", "categorie", "date", "entier",
            "entier_positif", "date", "date", "date", "categorie", "date", "date",
-           "entier", "entier", "reel_positif", "reel_positif",
+           "numerique", "numerique", "numerique", "numerique", "numerique",
            "reel_strictement_positif", "categorie_ou_entier", "categorie",
            "categorie", "date"),
-  usage = c("facultatif", "facultatif", "segmentation", "requis", "facultatif",
-            "non_pris_en_charge", "non_pris_en_charge", "requis", "requis",
-            "requis", "non_pris_en_charge", "non_pris_en_charge",
-            "non_pris_en_charge", "non_pris_en_charge", "non_pris_en_charge",
-            "non_pris_en_charge", "non_pris_en_charge", "segmentation",
-            "non_pris_en_charge", "non_pris_en_charge", "non_pris_en_charge"),
   stringsAsFactors = FALSE
 )
 
 # Libellé des types R admis, par code de type (restitué par catalogue_roles()).
+# `numerique` : classe seule (ADR 0016, point 6.5 ; #169, Q5) ; les défauts de
+# domaine (manquant, non entier, négatif, non fini) sont des motifs de ligne.
 TYPES_ADMIS <- c(
   identifiant = "character, integer, double entier fini",
   categorie = "character, factor",
@@ -68,12 +71,9 @@ TYPES_ADMIS <- c(
   date = "Date (valeurs entières finies)",
   entier = "integer, double entier fini",
   entier_positif = "integer, double entier fini >= 0",
-  reel_positif = "double fini >= 0",
-  reel_strictement_positif = "double fini > 0"
+  reel_strictement_positif = "double fini > 0",
+  numerique = "integer, double"
 )
-
-# Seule recette d'exposition de la branche (A.3) et ses rôles requis.
-RECETTE_BRANCHE <- "lignes_dates_completes"
 
 # Modalités des rôles catégoriels (A.1), comparées après as.character,
 # sensibles à la casse.
@@ -125,12 +125,96 @@ MOTIFS_TETE <- c("tete_naissance_incoherente", "tete_sexe_incoherent",
 # de refus porte la liste complète.
 NB_LIGNES_CITEES <- 10L
 
+# --- catalogue des recettes (ADR 0016, point 1 ; ADR 0014, point 5) -----------
+
+# Une ligne par recette d'exposition, colonnes-listes (précédent :
+# ETAPES$prealable) :
+#   recette           : nom de la recette ;
+#   requis            : rôles requis ;
+#   un_parmi          : groupes de rôles dont au moins un est requis (liste de
+#                       vecteurs ; vide si aucun) ;
+#   facultatifs       : rôles employés sans être requis (dont ceux de la
+#                       segmentation, requis par la règle commune
+#                       ROLES_SEGMENTATION si le plan les emploie) ;
+#   discriminants     : rôles propres à la recette ; ceux de deux recettes
+#                       déclarés ensemble sont un refus (recettes_concurrentes),
+#                       jamais un arbitrage ;
+#   convention_native : convention d'âge la plus fine que les rôles
+#                       permettent (ORDRE_CONVENTIONS, module exposition), ou
+#                       NA si la convention ne se déduit pas des rôles ;
+#   seam              : forme rendue au noyau, "fenetres" ou "cellules"
+#                       (ADR 0016, point 4) ;
+#   motifs_ligne, motifs_unite : motifs de ligne et d'unité de la recette
+#                       (constantes MOTIFS_*), codes des règles d'exclusion.
+# Ligne de la seule recette `lignes_dates_completes` (A.3) ; ajouter une
+# recette ajoute une ligne ici et ses lignes dans MATRICE_RECETTES.
+CATALOGUE_RECETTES <- data.frame(
+  recette = "lignes_dates_completes",
+  requis = I(list(c("date_naissance", "date_entree", "date_sortie", "cause_sortie"))),
+  un_parmi = I(list(list())),
+  facultatifs = I(list(c("id_contrat", "id_tete", "sexe", "annee_naissance", "segment"))),
+  discriminants = I(list("date_entree")),
+  convention_native = "dernier_anniversaire",
+  seam = "fenetres",
+  motifs_ligne = I(list(MOTIFS_LIGNES)),
+  motifs_unite = I(list(MOTIFS_TETE)),
+  stringsAsFactors = FALSE
+)
+
+# Matrice recette x étape x estimateur (ADR 0016, point 5), format long et
+# complet : une ligne par couple (recette, étape de ETAPES, estimateur NA) et
+# par triplet (recette, "brut", estimateur de ESTIMATEURS_BRUT) ; complétude
+# contrôlée par tests/unitaires/test_catalogue_recettes.R (ETAPES et
+# ESTIMATEURS_BRUT ne sont pas lisibles depuis ce module, ADR 0007, point 2.2).
+#   admis       : "oui", "non" ou "si_role" (admis si `role_requis` est
+#                 déclaré) ;
+#   role_requis : rôle qui conditionne "si_role" (NA sinon) ;
+#   motif       : motif du refus quand la ligne n'admet pas (NA sinon).
+# Sous `lignes_dates_completes`, tout est admis : les refus de Kaplan-Meier et
+# du binomial sous par_annee ne dépendent pas de la recette et restent dans
+# controler_parametres_brut() (ADR 0016, point 5.7).
+MATRICE_RECETTES <- data.frame(
+  recette = "lignes_dates_completes",
+  etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite",
+            "validation", "importance_exclusions"),
+  estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
+  admis = "oui",
+  role_requis = NA_character_,
+  motif = NA_character_,
+  stringsAsFactors = FALSE
+)
+
+# Rôles employés par la recette de rang k du catalogue `catalogue` : requis,
+# un parmi, facultatifs, dans cet ordre, sans doublon.
+roles_recette <- function(catalogue, k)
+  unique(c(catalogue$requis[[k]], unlist(catalogue$un_parmi[[k]], use.names = FALSE),
+           catalogue$facultatifs[[k]]))
+
+# Recettes du catalogue `catalogue` qui emploient chaque rôle de `r` : liste
+# parallèle à `r` de noms de recettes, dans l'ordre du catalogue.
+recettes_du_role <- function(r, catalogue) {
+  employes <- lapply(seq_len(nrow(catalogue)), function(k) roles_recette(catalogue, k))
+  lapply(r, function(x) catalogue$recette[vapply(employes, function(e) x %in% e, logical(1L))])
+}
+
+# Codes de motif de toutes les recettes (union), motifs de chaque recette dans
+# l'ordre du catalogue, ligne puis unité : référence de exclusion_inconnue
+# (valider_plan(), qui ne connaît pas les rôles) et ordre canonique des
+# exclusions (ordres_canoniques(), module construire_table ; ADR 0016,
+# point 6.4). Sous la seule recette des lignes : c(MOTIFS_LIGNES, MOTIFS_TETE).
+motifs_recettes <- function()
+  unique(unlist(lapply(seq_len(nrow(CATALOGUE_RECETTES)), function(k)
+    c(CATALOGUE_RECETTES$motifs_ligne[[k]], CATALOGUE_RECETTES$motifs_unite[[k]])), use.names = FALSE))
+
+# Catalogue des rôles restitué (exporté) : role, famille, type_admis et
+# recettes (recettes qui emploient le rôle, requis, un parmi ou facultatif,
+# dans l'ordre de CATALOGUE_RECETTES, jointes par « , » ; "" si aucune ;
+# ADR 0016, point 3.1, M330).
 catalogue_roles <- function() {
   data.frame(role = CATALOGUE_ROLES$role, famille = CATALOGUE_ROLES$famille,
              type_admis = unname(TYPES_ADMIS[CATALOGUE_ROLES$type]),
-             usage = CATALOGUE_ROLES$usage,
-             recettes = ifelse(CATALOGUE_ROLES$usage == "non_pris_en_charge", "",
-                               RECETTE_BRANCHE),
+             recettes = vapply(recettes_du_role(CATALOGUE_ROLES$role, CATALOGUE_RECETTES), paste,
+                               character(1L), collapse = ", "),
              stringsAsFactors = FALSE)
 }
 
@@ -179,10 +263,9 @@ type_conforme <- function(x, type) {
       entiers_finis(unclass(x)),
     entier = entier || double_entier,
     entier_positif = (entier || double_entier) && all(x[!is.na(x)] >= 0),
-    reel_positif = nu && is.double(x) && all(is.finite(x[!is.na(x)])) &&
-      all(x[!is.na(x)] >= 0),
     reel_strictement_positif = nu && is.double(x) && all(is.finite(x[!is.na(x)])) &&
       all(x[!is.na(x)] > 0),
+    numerique = nu && (is.integer(x) || is.double(x)),
     stop(sprintf("type_conforme() : type de catalogue inconnu « %s »", type), call. = FALSE))
 }
 
@@ -205,22 +288,97 @@ citer <- function(x) neutraliser_citation(x)
 liste_guillemets <- function(x)
   paste0(texte_moteur("« "), citer(x), texte_moteur(" »"), collapse = ", ")
 
-# Message du refus `aucune_recette` (texte unique, repris par le module
-# `exposition`, deduire_recette()).
-message_aucune_recette <- function(requis, manquants)
-  formuler(paste("Aucune recette d'exposition ne s'applique : la recette « %s »",
-                 "(seule disponible) exige les rôles %s ; absents : %s."),
-           RECETTE_BRANCHE, liste_guillemets(requis), liste_guillemets(manquants))
+# Message du refus `aucune_recette` (texte visé par actuary, #169, avis du
+# 08/11/2026) : pour chaque recette listée, ses rôles requis absents puis,
+# pour chaque groupe `un_parmi` non couvert, « un rôle parmi ... ».
+#   recettes : noms des recettes listées ;
+#   requis   : liste parallèle des rôles requis absents ;
+#   groupes  : liste parallèle des groupes un_parmi non couverts.
+message_aucune_recette <- function(recettes, requis, groupes) {
+  manquants <- vapply(seq_along(recettes), function(k)
+    paste(c(if (length(requis[[k]])) liste_guillemets(requis[[k]]) else character(0),
+            vapply(groupes[[k]], function(g) formuler("un rôle parmi %s", liste_guillemets(g)), character(1L))),
+          collapse = ", "), character(1L))
+  formuler("Aucune recette d'exposition ne s'applique ; rôles requis absents, recette par recette : %s.",
+           paste(formuler("recette « %s » : %s", citer(recettes), manquants), collapse = " ; "))
+}
+
+# Refus `recettes_concurrentes` (ADR 0016, point 2.2, refus 5) : des rôles
+# discriminants de plusieurs recettes du catalogue `catalogue` sont déclarés
+# ensemble ; la recette n'est pas choisie à la place de l'utilisateur. Ne lit
+# que les noms des rôles. Rend NULL, invisible.
+controler_recettes_concurrentes <- function(roles, catalogue) {
+  r <- names(roles)
+  propres <- lapply(catalogue$discriminants, function(d) r[r %in% d])
+  k <- which(lengths(propres) > 0L)
+  if (length(k) > 1L)
+    refuser("donnees", "recettes_concurrentes",
+            formuler(paste("Les rôles déclarés relèvent de plusieurs recettes d'exposition (rôles propres à chacune : %s) ;",
+                           "la recette n'est pas choisie à la place de l'utilisateur : retirer les rôles de la recette qui ne",
+                           "s'applique pas, la construction est refusée."),
+                     paste(formuler("recette « %s » : %s (colonnes %s)", citer(catalogue$recette[k]),
+                                    vapply(propres[k], liste_guillemets, character(1L)),
+                                    vapply(propres[k], function(x) liste_guillemets(roles[x]), character(1L))),
+                           collapse = " ; ")),
+            list(recette = catalogue$recette[k], role = unlist(propres[k], use.names = FALSE),
+                 colonne = unname(roles[unlist(propres[k], use.names = FALSE)])))
+  invisible(NULL)
+}
+
+# Recette déduite des rôles (ADR 0007, point 5.3 ; ADR 0016, point 2.1),
+# seul endroit où s'écrit la sélection : la recette du catalogue `catalogue`
+# dont tous les rôles requis sont déclarés et dont chaque groupe `un_parmi` a
+# au moins un rôle déclaré ; des discriminants de deux recettes déclarés
+# ensemble sont un refus (recettes_concurrentes) ; aucune recette complète :
+# refus aucune_recette, qui liste la recette dont des rôles propres sont
+# déclarés, sinon toutes, dans l'ordre du catalogue. Argument `catalogue` par
+# défaut : injection en test (M247). Rend la valeur validée que
+# construire_table() transmet aux étapes (#82) : list(recette,
+# convention_native, roles_requis, roles_employes, seam, motifs (ligne puis
+# unité), matrice (lignes de MATRICE_RECETTES de la recette, sans la colonne
+# recette)) ; les étapes lisent ses propriétés, non son nom (ADR 0016,
+# point 4.4).
+deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES) {
+  controler_recettes_concurrentes(roles, catalogue)
+  r <- names(roles)
+  requis <- lapply(catalogue$requis, function(q) setdiff(q, r))
+  groupes <- lapply(catalogue$un_parmi, function(u) Filter(function(g) !any(g %in% r), u))
+  complete <- which(lengths(requis) == 0L & lengths(groupes) == 0L)
+  if (!length(complete)) {
+    propres <- which(vapply(catalogue$discriminants, function(d) any(d %in% r), logical(1L)))
+    k <- if (length(propres) == 1L) propres else seq_len(nrow(catalogue))
+    refuser("donnees", "aucune_recette", message_aucune_recette(catalogue$recette[k], requis[k], groupes[k]),
+            list(recette = catalogue$recette[k], role = stats::setNames(requis[k], catalogue$recette[k]),
+                 un_parmi = stats::setNames(groupes[k], catalogue$recette[k])))
+  }
+  if (length(complete) > 1L)
+    stop(sprintf("deduire_recette() : recettes %s complètes sans discriminant concurrent (catalogue mal formé).",
+                 paste(catalogue$recette[complete], collapse = ", ")), call. = FALSE)
+  k <- complete
+  m <- MATRICE_RECETTES[MATRICE_RECETTES$recette == catalogue$recette[k],
+                        c("etape", "estimateur", "admis", "role_requis", "motif"), drop = FALSE]
+  rownames(m) <- NULL
+  list(recette = catalogue$recette[k], convention_native = catalogue$convention_native[k],
+       roles_requis = catalogue$requis[[k]], roles_employes = roles_recette(catalogue, k),
+       seam = catalogue$seam[k], motifs = c(catalogue$motifs_ligne[[k]], catalogue$motifs_unite[[k]]),
+       matrice = m)
+}
 
 # Contrôle `roles` (vecteur de chaînes nommé rôle -> colonne, ADR 0007,
 # point 4.1) contre le catalogue et `donnees`. Forme exacte (#62,
 # forme_exacte()) : type character, seul attribut names (ni classe, ni dim,
-# ni attribut quelconque), sans nom ni valeur manquants. Ordre des contrôles :
-# forme, rôle inconnu, rôle déclaré deux fois, rôle non pris en charge,
-# colonne absente, colonne ambiguë (nom présent plusieurs fois dans
-# `donnees`), colonne déclarée deux fois, type incompatible, date hors du
-# domaine (date_hors_domaine), recette impossible (aucune_recette), rôle requis par la segmentation manquant.
-# Chaque refus nomme tous les rôles en cause. Rend `roles`, inchangé.
+# ni attribut quelconque), sans nom ni valeur manquants. Ordre des contrôles
+# (ADR 0016, point 2.2) : (1) forme ; (2) rôle inconnu ; (3) rôle déclaré
+# deux fois ; (4) rôle qu'aucune recette du catalogue n'emploie
+# (role_non_pris_en_charge) ; (5) discriminants de plusieurs recettes
+# (recettes_concurrentes) ; (6) colonne absente, colonne ambiguë (nom présent
+# plusieurs fois dans `donnees`), colonne déclarée deux fois, type
+# incompatible, date hors du domaine (date_hors_domaine) ; (7) recette
+# impossible (aucune_recette, deduire_recette()) ; (8) rôle que la recette
+# retenue n'emploie pas (role_non_pris_en_charge) ; (9) rôle requis par la
+# segmentation manquant. Les refus 4 et 5 ne lisent que les noms de rôles ;
+# le refus 8 suppose la sélection. Chaque refus nomme tous les rôles en
+# cause. Rend la recette retenue (deduire_recette()).
 controler_roles <- function(donnees, roles, segmentation) {
   if (!is.data.frame(donnees))
     refuser("donnees", "donnees_mal_formees",
@@ -245,13 +403,15 @@ controler_roles <- function(donnees, roles, segmentation) {
             formuler("Rôle déclaré plusieurs fois : %s (colonnes %s).",
                      liste_guillemets(doubles), liste_guillemets(roles[r %in% doubles])),
             list(role = doubles, colonne = unname(roles[r %in% doubles])))
-  non_pris <- r[CATALOGUE_ROLES$usage[match(r, CATALOGUE_ROLES$role)] == "non_pris_en_charge"]
+  employeurs <- recettes_du_role(r, CATALOGUE_RECETTES)
+  non_pris <- r[lengths(employeurs) == 0L]
   if (length(non_pris))
     refuser("donnees", "role_non_pris_en_charge",
-            formuler(paste("Rôle déclaré qu'aucune recette disponible n'emploie : %s (colonne %s) ;",
+            formuler(paste("Rôle déclaré qu'aucune recette d'exposition du catalogue n'emploie : %s (colonne %s) ;",
                            "l'ignorer changerait le sens du résultat, la construction est refusée."),
                      liste_guillemets(non_pris), liste_guillemets(roles[non_pris])),
             list(role = non_pris, colonne = unname(roles[non_pris])))
+  controler_recettes_concurrentes(roles, CATALOGUE_RECETTES)
   absentes <- r[!(roles %in% names(donnees))]
   if (length(absentes))
     refuser("donnees", "colonne_absente",
@@ -308,19 +468,74 @@ controler_roles <- function(donnees, roles, segmentation) {
                                            character(1L))),
                            collapse = " ; ")),
             list(role = names(hors), colonne = unname(roles[names(hors)]), lignes = hors))
-  requis <- CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"]
-  manquants <- setdiff(requis, r)
-  if (length(manquants))
-    refuser("donnees", "aucune_recette", message_aucune_recette(requis, manquants),
-            list(recette = RECETTE_BRANCHE, role = manquants))
+  recette <- deduire_recette(roles)
+  hors <- r[!(r %in% recette$roles_employes)]
+  if (length(hors)) {
+    autres <- unique(unlist(recettes_du_role(hors, CATALOGUE_RECETTES), use.names = FALSE))
+    refuser("donnees", "role_non_pris_en_charge",
+            formuler(paste("Rôle déclaré que la recette « %s » n'emploie pas : %s (colonne %s, employé par la recette %s) ;",
+                           "l'ignorer changerait le sens du résultat, la construction est refusée."),
+                     citer(recette$recette), liste_guillemets(hors), liste_guillemets(roles[hors]),
+                     liste_guillemets(autres)),
+            list(role = hors, colonne = unname(roles[hors]), recette = recette$recette))
+  }
   seg_manquants <- setdiff(segmentation, r)
   if (length(seg_manquants))
     refuser("donnees", "role_requis_manquant",
             formuler(paste("Rôle requis manquant : %s, employé par la segmentation du plan",
                            "(recette « %s »)."),
-                     liste_guillemets(seg_manquants), RECETTE_BRANCHE),
-            list(role = seg_manquants, recette = RECETTE_BRANCHE))
-  roles
+                     liste_guillemets(seg_manquants), citer(recette$recette)),
+            list(role = seg_manquants, recette = recette$recette))
+  recette
+}
+
+# Étapes et estimateurs du plan admis sous la recette retenue (ADR 0016,
+# point 5.2), seul endroit où s'applique la matrice : pour chaque étape du
+# plan, dans l'ordre du plan, la ligne (étape, estimateur NA), puis, pour
+# l'étape `brut`, la ligne de chaque estimateur, dans l'ordre du plan ; une
+# ligne `non`, ou `si_role` sans son rôle déclaré, est un refus sous le motif
+# de la ligne (module donnees). Puis les règles qui ne tiennent pas dans une
+# ligne : une exclusion du plan hors des motifs de la recette retenue
+# (exclusion_hors_recette ; valider_plan() a contrôlé l'union, point 6.4).
+#   recette : valeur validée (deduire_recette()), dont matrice et motifs ;
+#   roles   : rôles contrôlés ; plan : plan canonique.
+# Une étape ou un estimateur sans exactement une ligne est une erreur de
+# programmation (matrice incomplète), jamais une admission. Appelée par
+# controler_plan_roles() après resoudre_convention() (couche partagée par
+# construire_table() et rejouer_fiche(), point 5.3). Rend NULL, invisible.
+controler_matrice_recette <- function(recette, roles, plan) {
+  m <- recette$matrice
+  etapes <- plan[["etapes"]]
+  cles <- do.call(rbind, lapply(names(etapes), function(e)
+    data.frame(etape = e, estimateur = c(NA_character_, if (identical(e, "brut")) etapes[[e]][["estimateurs"]]),
+               stringsAsFactors = FALSE)))
+  for (i in seq_len(nrow(cles))) {
+    e <- cles$etape[i]; est <- cles$estimateur[i]
+    k <- which(m$etape == e & (if (is.na(est)) is.na(m$estimateur) else (!is.na(m$estimateur) & m$estimateur == est)))
+    if (length(k) != 1L)
+      stop(sprintf("controler_matrice_recette() : %d ligne(s) de matrice pour (%s, %s, %s) (erreur de programmation).",
+                   length(k), recette$recette, e, est), call. = FALSE)
+    admis <- m$admis[k]
+    if (identical(admis, "oui") || (identical(admis, "si_role") && m$role_requis[k] %in% names(roles))) next
+    quoi <- if (is.na(est)) formuler("l'étape « %s » n'est pas admise", citer(e))
+            else formuler("l'estimateur « %s » de l'étape « brut » n'est pas admis", citer(est))
+    if (identical(admis, "si_role"))
+      refuser("donnees", m$motif[k],
+              formuler("Sous la recette « %s », %s sans le rôle %s ; la construction est refusée.",
+                       citer(recette$recette), quoi, liste_guillemets(m$role_requis[k])),
+              list(recette = recette$recette, etape = e, estimateur = est, role = m$role_requis[k]))
+    refuser("donnees", m$motif[k],
+            formuler("Sous la recette « %s », %s ; la construction est refusée.",
+                     citer(recette$recette), quoi),
+            list(recette = recette$recette, etape = e, estimateur = est))
+  }
+  hors <- setdiff(etapes[["donnees"]][["exclusions"]], recette$motifs)
+  if (length(hors))
+    refuser("donnees", "exclusion_hors_recette",
+            formuler("Code d'exclusion sans objet pour la recette « %s » : %s (motifs de cette recette : %s).",
+                     citer(recette$recette), liste_guillemets(hors), liste_guillemets(recette$motifs)),
+            list(recette = recette$recette, exclusions = hors))
+  invisible(NULL)
 }
 
 # --- paramètres de l'étape ----------------------------------------------------
@@ -433,7 +648,7 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
             formuler(paste("Les règles d'exclusion doivent être un vecteur de codes de motif sans attribut, sans doublon",
                            "(vide explicite admis).")),
             list(exclusions = exclusions))
-  inconnus <- setdiff(exclusions, c(MOTIFS_LIGNES, MOTIFS_TETE))
+  inconnus <- setdiff(exclusions, motifs_recettes())
   if (length(inconnus))
     refuser("donnees", "exclusion_inconnue",
             formuler("Code d'exclusion inconnu : %s (liste fermée des motifs).", liste_guillemets(inconnus)),

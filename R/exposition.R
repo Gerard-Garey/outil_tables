@@ -3,12 +3,13 @@
 #  ADR 0003, points 1, 3, 6 et 8 ; ADR 0007, points 5.2, 5.3 et 10 ;
 #  spécification d'actuary, A.0 et A.3)
 #
-#  - deduire_recette() : recette d'exposition déduite des rôles (ADR 0007,
-#    point 5.3) ; aucune recette applicable : refus, jamais de devinette ;
 #  - controler_parametres_exposition(), resoudre_convention() : paramètres
 #    de l'étape (convention d'âge, découpage par année) ; forçage vers une
 #    convention plus grossière admis et inscrit, vers une convention plus
-#    fine ou non mise en oeuvre refusé ;
+#    fine ou non mise en oeuvre refusé ; sans convention native, convention
+#    déclarée, `plus_fine` refusé (ADR 0016, point 5.5). La recette est
+#    déduite des rôles dans le module `donnees` (deduire_recette(), ADR 0016,
+#    point 2.1) ;
 #  - fenetres_observations(), segments_observations(),
 #    position_dans_cellule() : fenêtres et événements (T5), segments des
 #    observations, position d'un instant dans sa cellule ; employées par
@@ -57,8 +58,6 @@ CONVENTIONS_MISES_EN_OEUVRE <- c("dernier_anniversaire", "age_atteint_annee")
 # Valeurs admises du paramètre `convention` du plan (ADR 0007, annotation du
 # 17/10/2026, M49) : `plus_fine` retient la convention native de la recette.
 VALEURS_CONVENTION <- c("plus_fine", "dernier_anniversaire", "age_atteint_annee")
-# Convention native (la plus fine que les rôles permettent) de chaque recette.
-CONVENTION_NATIVE <- c(lignes_dates_completes = "dernier_anniversaire")
 # Unité de l'exposition centrale par convention (T3), inscrite dans la fiche.
 UNITES_EXPOSITION <- c(
   dernier_anniversaire = "annee_d_age : jours / L_x, L_x = anniv(x+1) - anniv(x) (365 ou 366 jours)",
@@ -66,20 +65,6 @@ UNITES_EXPOSITION <- c(
 # Hypothèse sur les sorties concurrentes, inscrite dans la fiche (A.3).
 HYPOTHESE_CENSURE <- paste("censure non informative : les sorties concurrentes sont des censures",
                            "à droite à leur instant (risques indépendants)")
-
-# Recette déduite des rôles (ADR 0007, point 5.3) : la recette dont tous les
-# rôles requis sont déclarés. Seule recette de la branche :
-# `lignes_dates_completes`, rôles requis du catalogue (CATALOGUE_ROLES,
-# usage `requis`). Rend list(recette, convention_native, roles_requis),
-# valeur validée que construire_table() transmet aux étapes (#82).
-deduire_recette <- function(roles) {
-  requis <- CATALOGUE_ROLES$role[CATALOGUE_ROLES$usage == "requis"]
-  manquants <- setdiff(requis, names(roles))
-  if (length(manquants))
-    refuser("exposition", "aucune_recette", message_aucune_recette(requis, manquants),
-            list(recette = RECETTE_BRANCHE, role = manquants))
-  list(recette = RECETTE_BRANCHE, convention_native = CONVENTION_NATIVE[[RECETTE_BRANCHE]], roles_requis = requis)
-}
 
 # Contrôle les paramètres propres à l'étape `exposition` (valeurs ; les noms
 # sont contrôlés par valider_plan()). Forme exacte (#23, forme_exacte()) :
@@ -110,12 +95,26 @@ controler_parametres_exposition <- function(convention, par_annee) {
 }
 
 # Convention retenue à partir de la convention demandée et de la convention
-# native de la recette : `plus_fine` retient la native ; toute autre valeur
-# est retenue telle quelle. Une convention plus grossière que la native est un
-# forçage, admis ; une convention plus fine est refusée (les rôles ne la
-# permettent pas). Rend list(demandee, native, retenue, forcee), valeur
-# validée que construire_table() transmet aux étapes (#82).
+# native de la recette (CATALOGUE_RECETTES$convention_native, module
+# donnees) : `plus_fine` retient la native ; toute autre valeur est retenue
+# telle quelle. Une convention plus grossière que la native est un forçage,
+# admis ; une convention plus fine est refusée (les rôles ne la permettent
+# pas). Sans convention native (native = NA : la convention ne se déduit pas
+# des rôles ; ADR 0016, point 5.5) : `plus_fine` est refusé
+# (convention_non_declaree), toute autre valeur est retenue telle quelle,
+# non forcée. Rend list(demandee, native, retenue, forcee), valeur validée
+# que construire_table() transmet aux étapes (#82).
 resoudre_convention <- function(convention, native) {
+  if (is.na(native)) {
+    if (identical(convention, "plus_fine"))
+      refuser("exposition", "convention_non_declaree",
+              formuler(paste("Convention d'âge « plus_fine » sans objet : la recette retenue n'a pas de convention native",
+                             "(la convention d'âge ne se déduit pas des rôles) ; déclarer la convention des données,",
+                             "prise dans %s."),
+                       liste_guillemets(CONVENTIONS_MISES_EN_OEUVRE)),
+              list(convention = convention, convention_native = native))
+    return(list(demandee = convention, native = native, retenue = convention, forcee = FALSE))
+  }
   retenue <- if (identical(convention, "plus_fine")) native else convention
   if (match(retenue, ORDRE_CONVENTIONS) < match(native, ORDRE_CONVENTIONS))
     refuser("exposition", "convention_plus_fine",
@@ -366,7 +365,7 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #                       p$delai_declaration, entier de jours >= 0, sont
 #                       inscrits tels quels dans parametres (#182) ;
 #   segmentation      : sous-ensemble de c("sexe", "segment"), vide admis ;
-#   recette           : recette validée (deduire_recette()) ;
+#   recette           : recette validée (deduire_recette(), module donnees) ;
 #   conv              : convention validée (resoudre_convention()) ;
 #   par_annee         : TRUE pour découper aussi par année civile.
 # Aucun contrôle (#82 ; ADR 0007, annotation du 17/10/2026, (c) et (d)) : les

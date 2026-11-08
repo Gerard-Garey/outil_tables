@@ -226,11 +226,11 @@ verifier("deduire_recette : rôles requis présents -> lignes_dates_completes, c
          identical(deduire_recette(c(date_naissance = "a", date_entree = "b", date_sortie = "c",
                                      cause_sortie = "d"))[c("recette", "convention_native")],
                    list(recette = "lignes_dates_completes", convention_native = "dernier_anniversaire")))
-verifier("deduire_recette : rôle requis absent -> refus aucune_recette, message qui nomme le rôle et la recette", {
+verifier("deduire_recette (module donnees) : rôle requis absent -> refus aucune_recette, module donnees, message qui nomme le rôle et la recette", {
   r <- tryCatch(deduire_recette(c(date_naissance = "a", date_entree = "b", cause_sortie = "d")),
                 refus_tablexp = function(r) r)
-  inherits(r, "refus_tablexp") && identical(r$motif, "aucune_recette") &&
-    identical(r$details$role, "date_sortie") &&
+  inherits(r, "refus_tablexp") && identical(r$motif, "aucune_recette") && identical(r$module, "donnees") &&
+    identical(r$details$role, list(lignes_dates_completes = "date_sortie")) &&
     grepl("date_sortie", conditionMessage(r), fixed = TRUE) &&
     grepl("lignes_dates_completes", conditionMessage(r), fixed = TRUE)
 })

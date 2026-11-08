@@ -48,9 +48,8 @@
 #                              par analyser_modules() de
 #                              tests/controles/graphe_modules.R ;
 #         roles                catalogue_roles()$role ;
-#         recettes             RECETTE_BRANCHE (R/donnees.R), source unique ;
-#                              les clés de CONVENTION_NATIVE (R/exposition.R)
-#                              lui sont égales (contrôle 4).
+#         recettes             CATALOGUE_RECETTES$recette (R/donnees.R), source
+#                              unique (ADR 0016, point 1.5).
 #    5. constantes de version et fiche de construction (#70) ; seule la
 #       valeur est comparée, la rédaction du document reste libre :
 #       - toute valeur citée des constantes de version est égale à sa valeur
@@ -306,7 +305,7 @@ SOURCES_CATALOGUES <- octets_utf8(local({
   c(list(exports = getNamespaceExports("tablexp")),
     fonctions,
     list(roles = tablexp::catalogue_roles()$role,
-         recettes = NS[["RECETTE_BRANCHE"]]))
+         recettes = NS[["CATALOGUE_RECETTES"]]$recette))
 }))
 # Catalogues où `()` marque une fonction ; ailleurs, aucun nom n'en porte.
 avec_fonctions <- function(catalogue) catalogue == "exports" || startsWith(catalogue, "fonctions-")
@@ -409,12 +408,6 @@ for (k in inconnus)
   verifier(sprintf("catalogue %s : catalogue requis", k),
            sprintf("catalogue inconnu (%d entrée(s)) ; requis : %s", sum(entrees$catalogue == k),
                    paste(names(SOURCES_CATALOGUES), collapse = ", ")))
-verifier("recettes : clés de CONVENTION_NATIVE égales à RECETTE_BRANCHE (source unique)", {
-  cles <- names(NS[["CONVENTION_NATIVE"]])
-  if (setequal(cles, SOURCES_CATALOGUES$recettes)) TRUE
-  else sprintf("CONVENTION_NATIVE : %s ; RECETTE_BRANCHE : %s", paste(cles, collapse = ", "),
-               paste(SOURCES_CATALOGUES$recettes, collapse = ", "))
-})
 for (k in names(SOURCES_CATALOGUES)) {
   lus <- entrees[entrees$catalogue == k, , drop = FALSE]
   source_k <- SOURCES_CATALOGUES[[k]]

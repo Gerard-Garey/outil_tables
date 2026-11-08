@@ -362,7 +362,8 @@ verifier("construire_table : plan validé avant toute exécution (données inval
 })
 verifier("construire_table : rôle requis absent (date_sortie) -> refus aucune_recette, message qui nomme le rôle et la recette", {
   r <- refus(construire_table(BASE, ROLES[names(ROLES) != "date_sortie"], plan_type()))
-  !is.null(r) && identical(r$motif, "aucune_recette") && identical(r$details$role, "date_sortie") &&
+  !is.null(r) && identical(r$motif, "aucune_recette") &&
+    identical(r$details$role, list(lignes_dates_completes = "date_sortie")) &&
     grepl("date_sortie", conditionMessage(r), fixed = TRUE) &&
     grepl("lignes_dates_completes", conditionMessage(r), fixed = TRUE)
 })
@@ -1853,8 +1854,9 @@ verifier("contrôles (#82) : recette_branche() et convention_retenue() n'existen
   ns <- asNamespace("tablexp")
   rc <- tablexp:::resoudre_convention
   !exists("recette_branche", envir = ns, inherits = FALSE) && !exists("convention_retenue", envir = ns, inherits = FALSE) &&
-    identical(REC_22, list(recette = "lignes_dates_completes", convention_native = "dernier_anniversaire",
-                           roles_requis = c("date_naissance", "date_entree", "date_sortie", "cause_sortie"))) &&
+    identical(REC_22[c("recette", "convention_native", "roles_requis")],
+              list(recette = "lignes_dates_completes", convention_native = "dernier_anniversaire",
+                   roles_requis = c("date_naissance", "date_entree", "date_sortie", "cause_sortie"))) &&
     identical(rc("plus_fine", "dernier_anniversaire"),
               list(demandee = "plus_fine", native = "dernier_anniversaire", retenue = "dernier_anniversaire", forcee = FALSE)) &&
     identical(rc("dernier_anniversaire", "dernier_anniversaire")$forcee, FALSE) &&

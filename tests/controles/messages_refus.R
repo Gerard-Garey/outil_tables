@@ -142,8 +142,6 @@ EXCEPTIONS <- exception_lignes(
   c("construire_table.R", "rejouer_fiche", "ALGORITHME_EMPREINTE", "constante du moteur"),
   c("construire_table.R", "rejouer_fiche", "ENTETE_CANONIQUE", "constante du moteur"),
   c("construire_table.R", "rejouer_fiche", "empreinte", "empreinte recalculée par le moteur (hexadécimal)"),
-  c("donnees.R", "message_aucune_recette", "RECETTE_BRANCHE", "constante du moteur"),
-  c("donnees.R", "controler_roles", "RECETTE_BRANCHE", "constante du moteur"),
   c("donnees.R", "controler_roles", "vapply(hors, function(h) paste(utils::head(h, NB_LIGNES_CITEES), collapse = \", \"), character(1L))", "numéros de ligne (which())"),
   c("donnees.R", "controler_transition_periode", "paste(TRANSITIONS$depart, \"->\", TRANSITIONS$arrivee, collapse = \", \")", "catalogue des transitions"),
   c("donnees.R", "controler_transition_periode", "paste(names(hors_p)[hors_p], collapse = \" et \")", "noms des bornes (debut, fin), texte du moteur"),
