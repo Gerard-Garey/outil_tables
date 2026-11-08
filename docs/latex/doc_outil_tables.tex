@@ -1887,6 +1887,7 @@ R3 & convention forcée & \code{sexe} & 0 & \code{age\_atteint\_annee} & non & P
 R4 & par année (surface) & \code{sexe} & 0 & \code{plus\_fine} & oui & Poisson~; 0,95 \\
 R5 & en cours $\to$ racheté, unité contrat & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 R6 & R1 avec l'estimateur produit-limite & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial, \code{kaplan\_meier}~; 0,95 \\
+R7 & R3 avec l'estimateur produit-limite (issue~\#32) & \code{sexe} & 0 & \code{age\_atteint\_annee} & non & Poisson, binomial, \code{kaplan\_meier}~; 0,95 \\
 \end{longtable}
 }
 
@@ -2056,8 +2057,13 @@ fichiers.
 chaque plan de référence est exécuté, aplati, écrit puis relu
 (aller-retour \code{identical()}), et comparé à son fichier~; un plan sans
 fichier est un échec attendu renvoyant à l'issue de création tant qu'il
-figure dans la liste \code{SANS\_REFERENCE\_17}, vide depuis la création
-des six fichiers~; hors de cette liste, un fichier manquant est un échec, de
+figure dans la liste \code{SANS\_REFERENCE}, vecteur nommé dont chaque nom
+est un plan et chaque valeur l'issue de création à laquelle renvoie l'échec
+attendu (ADR 0009, annotation du 07/11/2026, point~(c))~; un plan quitte la
+liste dans le commit qui crée son fichier, et un plan listé dont le fichier
+existe fait échouer la batterie (succès inattendu). La liste est vide,
+chaque plan du tableau~\ref{tab:plans-reference} ayant son fichier~; hors
+de cette liste, un fichier manquant est un échec, de
 même qu'un fichier sans plan (référence orpheline). Des témoins, sur des
 copies temporaires et jamais sur \code{tests/reference/}, vérifient que la
 comparaison échoue quand elle le doit (valeur altérée au-delà de sa
@@ -2195,9 +2201,14 @@ finale, de verdict ni de valeur de table homologuée.
 \begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
   \item La couverture est celle des plans~: une recette ou une convention
     absente des plans n'est protégée qu'à partir du plan qui l'introduira.
-    En particulier, l'estimateur \code{kaplan\_meier} n'est figé que sous
-    \code{dernier\_anniversaire} (R6)~; sa branche \code{age\_atteint\_annee}
-    n'a pas de référence (avis d'\code{actuary} au visa).
+    En particulier, l'estimateur \code{kaplan\_meier} est figé sous les deux
+    conventions mises en œuvre, \code{dernier\_anniversaire} (R6, retenue
+    par \code{plus\_fine}) et \code{age\_atteint\_annee} (R7, forcée~;
+    issue~\#32), mais seulement pour la transition vivant $\to$ décédé,
+    l'unité d'observation tête, la segmentation \code{sexe}, un délai de
+    déclaration nul et le niveau 0,95~: aucun plan ne le retient avec un
+    délai (pas de variante de R7 à 90~jours, décision M297), sans
+    segmentation ni sous l'unité d'observation contrat.
   \item L'entrée n'exerce pas la fusion des contrats par tête~: elle est
     tirée en mode \code{uniforme}, une tête par contrat
     (section~\ref{sec:simulation}). La fusion n'est couverte que par les
@@ -2206,7 +2217,12 @@ finale, de verdict ni de valeur de table homologuée.
   \item R6 comprend une cellule définie à $\hat q_x = 1$ avec un seul exposé
     à risque~: la référence fige ce cas d'instabilité de l'estimateur
     produit-limite sous troncature (section~\ref{sec:brut-kaplan-meier}),
-    qui n'est pas une anomalie.
+    qui n'est pas une anomalie. R7 n'a aucune cellule à $\hat q_x = 1$~;
+    ses deux cellules de 20~ans (une par sexe), exposées mais sans
+    événement, sont dans l'état \code{ensemble\_a\_risque\_vide} (taux,
+    variance et bornes \code{NA}, sans avertissement, puisqu'elles ne
+    portent aucun événement~; section~\ref{sec:brut-etats}), et la
+    référence les fige telles quelles.
   \item Absence de bruit numérique sur la plateforme de référence~:
     \emph{constat} sur cinq exécutions de la CI sur la plateforme de
     référence, sur trois modèles de processeur (AMD EPYC 7763, 9V74 et 9V45,
@@ -6162,7 +6178,14 @@ l'étape \code{brut} est \code{identical()} hors \code{execution} dans le même
 processus et dans un autre, que le rejeu de la fiche redonne l'objet, et
 l'invariance du plan sans \code{brut} sur deux plans de référence (R1 et
 R4, section~\ref{sec:non-regression})~; et de même pour le plan R6, qui retient \code{kaplan\_meier}, avec
-l'invariance du plan sans \code{kaplan\_meier}.
+l'invariance du plan sans \code{kaplan\_meier}. Pour le plan R7, qui retient
+\code{kaplan\_meier} sous \code{age\_atteint\_annee} (issue~\#32), elle
+vérifie en outre, sur l'objet comparé à sa référence, que les cellules de
+la table \code{kaplan\_meier} sont celles de l'exposition, dans le même
+ordre, que la somme par cellule des événements de
+\code{kaplan\_meier\_sauts} est égale aux événements de
+\code{kaplan\_meier}, et que ceux-ci sont égaux aux événements de
+l'exposition.
 
 \subsection{Constats de simulation~: retrouver la loi vraie}
 \label{sec:constats-brut}
