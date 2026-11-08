@@ -2393,7 +2393,14 @@ mainteneur.
     l'unité d'observation tête, la segmentation \code{sexe}, un délai de
     déclaration nul et le niveau 0,95~: aucun plan ne le retient avec un
     délai (pas de variante de R7 à 90~jours, décision M297), sans
-    segmentation ni sous l'unité d'observation contrat.
+    segmentation ni sous l'unité d'observation contrat~; le délai
+    n'entre dans l'estimateur que par la borne $B$ des fenêtres
+    d'observation, calculées par la même fonction que l'exposition
+    (\code{fenetres\_observations()}), que R2 fige sous un délai de
+    90~jours~; ces cas ne sont couverts que par les tests unitaires
+    (\code{tests/unitaires/test\_brut\_kaplan\_meier.R}~: segmentation vide,
+    unité contrat et transition en cours $\to$ racheté, valeurs calculées à
+    la main).
   \item Les étapes \code{validation} et \code{importance\_exclusions} ne
     sont figées que par R8 et R9 (issue~\#166)~: une table importée
     (\code{tv}), la relation \code{independante}, la transition vivant
