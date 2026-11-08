@@ -357,7 +357,7 @@ verifier("étape : positionnement et validation sur la même clé -> une seule t
   x0 <- construire_table(JEU, ROLES, plan_p(pos = NULL, val = VAL), tables_reference = list(tv = T_HF))
   identical(names(x1$fiche$tables_reference), "tv") && identical(x1$etapes$validation, x0$etapes$validation) &&
     identical(names(x1$etapes), c("donnees", "exposition", "positionnement", "validation")) &&
-    identical(x1$fiche$version_fiche, 5L)
+    identical(x1$fiche$version_fiche, 6L)
 })
 verifier("étape : clés distinctes pour positionnement et validation -> deux tables dans la fiche", {
   x <- construire_table(JEU, ROLES, plan_p(val = modifyList(VAL, list(table_reference = "autre"))),

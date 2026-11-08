@@ -386,7 +386,13 @@ SANS_REFERENCE <- character(0)
 # champ tables_reference) et #31 (commit (5) de B13 : textes des lignes 3,
 # 8, 9 et 12 de STATUTS_BRUT) closes par la régénération unique (R) de B13
 # (run CI 42257221627).
-TRANSITIONS_EN_COURS <- list()
+# Transition #169 (commit (3b) de B15, ADR 0016, point 8.2 ; M333) : fiche 6,
+# champ conditionnel hypotheses_recette, absent de R1 à R12 ; seule
+# fiche/version_fiche change dans le corps (fiche/empreintes/resultat est
+# épinglé au jeton "<md5>", M334) ; retirée par le commit de référence (R).
+TRANSITIONS_EN_COURS <- list(
+  list(issue = "#169", plans = paste0("R", 1:12), changements = list(
+    list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 6L))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -2482,8 +2488,11 @@ local({
     verifier(sprintf("R1 : chacun des %d préfixes stricts du corps de la fiche écrite refusé par lire_fiche()", length(corps)),
              !length(acceptes) || sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
     b <- unlist(tablexp:::BLOCS_LECTURE_FICHE)
-    verifier("R1 : BLOCS_LECTURE_FICHE partitionne names(fiche) (aucun champ manquant, en double ni étranger)",
-             setequal(b, names(x$fiche)) && length(b) == length(x$fiche) && !anyDuplicated(b))
+    # hypotheses_recette : champ conditionnel, absent sous la recette des
+    # lignes (ADR 0016, point 8.1 ; #169).
+    verifier("R1 : BLOCS_LECTURE_FICHE partitionne names(fiche) (aucun champ manquant, en double ni étranger ; seul hypotheses_recette, conditionnel, absent)",
+             setequal(setdiff(b, "hypotheses_recette"), names(x$fiche)) && length(b) == length(x$fiche) + 1L &&
+               !anyDuplicated(b))
   }
 })
 

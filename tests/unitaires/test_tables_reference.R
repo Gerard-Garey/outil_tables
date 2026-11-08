@@ -174,8 +174,8 @@ PLAN <- list(
                 brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95)))
 X <- construire_table(BASE, ROLES, PLAN)
 
-verifier("C constantes : VERSION_FICHE 5L, VERSIONS_FICHE_REJEU 5L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/positionnement/table_reference » (#167), « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
-         identical(tablexp:::VERSION_FICHE, 5L) && identical(tablexp:::VERSIONS_FICHE_REJEU, 5L) &&
+verifier("C constantes : VERSION_FICHE 6L, VERSIONS_FICHE_REJEU 6L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/positionnement/table_reference » (#167), « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
+         identical(tablexp:::VERSION_FICHE, 6L) && identical(tablexp:::VERSIONS_FICHE_REJEU, 6L) &&
            identical(tablexp:::REPRESENTATION_TABLE, "tablexp table 1") &&
            identical(tablexp:::PARAMETRES_CLE_TABLE,
                      c("etapes/positionnement/table_reference", "etapes/validation/table_reference")) &&
@@ -187,10 +187,10 @@ verifier("C constantes : tables_reference après empreintes dans ORDRE_CHAMPS_FI
     identical(match("tables_reference", b), match("empreintes", b) + 1L) &&
     identical(match("fiche/tables_reference", r), match("fiche/provenance_mention", r) + 1L)
 })
-verifier("C fiche sans table : champ tables_reference présent, NULL, après empreintes ; version_fiche 5L", {
+verifier("C fiche sans table : champ tables_reference présent, NULL, après empreintes ; version_fiche 6L", {
   n <- names(X$fiche)
   "tables_reference" %in% n && is.null(X$fiche$tables_reference) &&
-    identical(match("tables_reference", n), match("empreintes", n) + 1L) && identical(X$fiche$version_fiche, 5L)
+    identical(match("tables_reference", n), match("empreintes", n) + 1L) && identical(X$fiche$version_fiche, 6L)
 })
 T_SYNTH <- table_reference(transform(TR, qx = TR$qx * 2), "gm", "synthetique", "loi de test",
                            parametres = list(A = 2e-4, ages = c(0L, 120L)))
@@ -382,11 +382,11 @@ verifier("E fiche sans table, liste non vide reçue : table_reference_inattendue
                        c("Rejeu : clé(s) « t1 » reçue(s)", "(clés attendues : aucune)", "jamais reçue"))
   if (isTRUE(ok) && n[["construire_table"]] != 0L) "construire_table() appelée" else ok
 })
-verifier("E fiche de version 4 (sans tables_reference) : version_fiche_non_admise (lu 4L, admises 5L), pas fiche_non_conforme", {
+verifier("E fiche de version 4 (sans tables_reference) : version_fiche_non_admise (lu 4L, admises 6L), pas fiche_non_conforme", {
   f4 <- FICHE; f4$version_fiche <- 4L; f4$tables_reference <- NULL
   r <- refus_de(rejouer_fiche(BASE, f4))
   if (is.null(r)) "aucun refus" else identical(r$motif, "version_fiche_non_admise") && identical(r$details$lu, 4L) &&
-    identical(r$details$admises, 5L)
+    identical(r$details$admises, 6L)
 })
 FICHE_SANS <- FICHE; FICHE_SANS$tables_reference <- NULL
 FORME_ATTENDUE <- paste("NULL, ou liste nommée non vide aux noms uniques, par clé triée par octets, d'éléments aux sept",

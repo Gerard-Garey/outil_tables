@@ -561,7 +561,7 @@ RJ <- tablexp:::calculer_exposition(OJ, PJ, "segment", RECJ,
 EJ <- XJ$etapes$exposition$resultat$exposition
 brut_j <- function(e, o, convention = "dernier_anniversaire")
   calculer_taux_bruts(e, "segment", FALSE, convention, XJ$etapes$exposition$parametres$unite_exposition,
-                      "kaplan_meier", 0.95, o, PJ, XJ$etapes$exposition$parametres)
+                      "kaplan_meier", 0.95, RECJ, o, PJ, XJ$etapes$exposition$parametres)
 verifier("fenêtres transmises (identité exacte) : calculer_exposition() rend un objet fenetres_exposition à côté de ses quatre éléments ; étape brut identical() avec les fenêtres transmises et avec les observations (appel direct, fenêtres recalculées) ; objet résultat sans fenêtres", {
   cherche <- function(x) inherits(x, "fenetres_exposition") || (is.list(x) && any(vapply(x, cherche, logical(1L))))
   identical(names(RJ), c("parametres", "resultat", "diagnostics", "avertissements", "fenetres")) &&

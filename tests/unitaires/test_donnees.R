@@ -41,8 +41,8 @@ ROLES <- c(id_contrat = "contrat", id_tete = "tete", sexe = "sexe", date_naissan
 prep <- function(d = BASE, roles = ROLES, exclusions = character(0), transition = VD,
                  segmentation = "sexe", periode = PER, delai = 0) {
   p <- tablexp:::controler_parametres_donnees(transition, periode, delai, segmentation, exclusions)
-  tablexp:::controler_roles(d, roles, segmentation)
-  preparer_donnees(d, roles, p, segmentation, exclusions)
+  recette <- tablexp:::controler_roles(d, roles, segmentation)
+  preparer_donnees(d, roles, p, segmentation, exclusions, recette)
 }
 # Condition de refus levée par expr (NULL si aucune).
 refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r)
@@ -62,12 +62,15 @@ verifier("catalogue_roles() : 22 rôles, colonnes role, famille, type_admis, rec
 verifier("catalogue_roles() : rôles requis de la recette = date_naissance, date_entree, date_sortie, cause_sortie (CATALOGUE_RECETTES)",
          identical(tablexp:::CATALOGUE_RECETTES$requis[[1L]],
                    c("date_naissance", "date_entree", "date_sortie", "cause_sortie")))
-NON_PRIS <- c("age_fourni", "date_age_fourni", "date_evenement", "date_inventaire", "age", "annee",
-              "exposition_centrale", "exposition_initiale", "evenements", "montant", "etat_depart", "etat_arrivee",
-              "date_changement")
-verifier("catalogue_roles() : rôles qu'aucune recette n'emploie signalés (recettes vide), lignes_dates_completes pour les autres",
-         identical(cat_r$role[cat_r$recettes == ""], NON_PRIS) &&
-           all(cat_r$recettes[cat_r$recettes != ""] == "lignes_dates_completes"))
+NON_PRIS <- c("age_fourni", "date_age_fourni", "date_evenement", "date_inventaire", "montant", "etat_depart",
+              "etat_arrivee", "date_changement")
+AGREGATS <- c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements")
+verifier("catalogue_roles() : rôles qu'aucune recette n'emploie signalés (recettes vide), agregats pour ses rôles propres, « lignes_dates_completes, agregats » pour sexe et segment, lignes_dates_completes pour les autres (#169)", {
+  v <- stats::setNames(cat_r$recettes, cat_r$role)
+  identical(cat_r$role[cat_r$recettes == ""], NON_PRIS) && all(v[AGREGATS] == "agregats") &&
+    all(v[c("sexe", "segment")] == "lignes_dates_completes, agregats") &&
+    all(v[setdiff(cat_r$role, c(NON_PRIS, AGREGATS, "sexe", "segment"))] == "lignes_dates_completes")
+})
 verifier("catalogue_roles() : noms sans accents, uniques",
          !anyDuplicated(cat_r$role) && all(grepl("^[a-z_]+$", cat_r$role)))
 verifier("catalogue_roles() : type admis de date_naissance = Date",

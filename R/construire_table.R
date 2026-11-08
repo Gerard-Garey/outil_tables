@@ -644,16 +644,16 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
   etapes_plan <- plan[["etapes"]]
   conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
-  controler_matrice_recette(recette, roles, plan)
-  controler_provenance(provenance)
   # p recalculé par la fonction qui forme la valeur de
   # controler_parametres_donnees() dans valider_plan(), ici sur le plan
   # canonique : valeurs identical() mesurées sur R1 à R12 (revue finale de
   # B14). Un chemin unique demanderait de changer le contrat de valider_plan()
   # (exportée) ou les comptes de contrôles du test « contrôles non répétés »
   # (#22, #82 ; tests/unitaires/test_construire_table.R) : renvoyé à une issue.
-  list(plan = plan, p = valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]]),
-       recette = recette, conv = conv)
+  p <- valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]])
+  controler_matrice_recette(recette, roles, plan, conv, p)
+  controler_provenance(provenance)
+  list(plan = plan, p = p, recette = recette, conv = conv)
 }
 
 # Seconde couche, appelée par construire_table() seule, une fois, avant toute
@@ -725,7 +725,7 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
     pe <- etapes_plan[[nom]]
     r <- switch(nom,
       donnees = preparer_donnees(donnees, roles, p = p, segmentation = plan[["segmentation"]],
-                                 exclusions = pe[["exclusions"]]),
+                                 exclusions = pe[["exclusions"]], recette = recette),
       exposition = calculer_exposition(etapes[["donnees"]][["resultat"]][["observations"]], p = p,
                                        segmentation = plan[["segmentation"]], recette = recette, conv = conv,
                                        par_annee = pe[["par_annee"]]),
@@ -734,7 +734,7 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                  par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],
                                  convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
                                  unite_exposition = etapes[["exposition"]][["parametres"]][["unite_exposition"]],
-                                 estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]],
+                                 estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]], recette = recette,
                                  observations = fenetres, p = p,
                                  parametres_exposition = etapes[["exposition"]][["parametres"]]),
       positionnement = calculer_positionnement(etapes[["exposition"]][["resultat"]][["exposition"]],
@@ -1169,8 +1169,8 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                                    "chaînes uniques ; roles, plan, provenance : présents ; tables_reference : NULL ou",
                                    "liste nommée par clé (sept champs)")),
                 paste(sprintf("%d", VERSIONS_FICHE_REJEU), collapse = ", "), ALGORITHME_EMPREINTE, ENTETE_CANONIQUE,
-                texte_moteur(paste("valider_plan(), controler_roles(), recette et convention, controler_provenance() :",
-                                   "aucun refus")),
+                texte_moteur(paste("valider_plan(), controler_roles(), recette et convention,",
+                                   "controler_matrice_recette(), controler_provenance() : aucun refus")),
                 empreinte, tr$attendu, texte_lu(EMPREINTE_CODE), paires_lues(r$versions), paires_lues(r$plateforme),
                 texte_moteur(paste("fiche rendue par construire_table(), hors versions, plateforme,",
                                    "empreintes/resultat, empreintes/code, empreintes/statut_resultat_code")),

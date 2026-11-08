@@ -805,7 +805,9 @@ verifier("calculer_exposition : garde de présence avant le tabulate() de prése
   rec <- tablexp:::deduire_recette(roles)
   appeler <- function(f) f(obs, p = tablexp:::valeurs_parametres_donnees(vd, per, 0), segmentation = character(0), recette = rec,
                            conv = tablexp:::resoudre_convention("plus_fine", rec$convention_native), par_annee = FALSE)
-  original <- get("calculer_exposition", ns)
+  # Corps du seam « fenêtres » (ADR 0016, point 4.2), où vivent la garde et
+  # le tabulate() de présence ; calculer_exposition() n'est que l'aiguillage.
+  original <- get("exposition_fenetres", ns)
   journal <- character(0)
   instrumentee <- function(garde) {
     env <- new.env(parent = ns)
@@ -847,7 +849,8 @@ EC <- function(sortie, cause = "en_cours")
 EC_ROLES <- c(id_contrat = "c", id_tete = "t", date_naissance = "n", date_entree = "e",
               date_sortie = "s", cause_sortie = "k")
 EC_ARGS <- function(d, transition)
-  list(d, EC_ROLES, tablexp:::valeurs_parametres_donnees(transition, PER, 0), character(0), character(0))
+  list(d, EC_ROLES, tablexp:::valeurs_parametres_donnees(transition, PER, 0), character(0), character(0),
+       tablexp:::deduire_recette(EC_ROLES))
 for (u in list(list(nom = "contrat", tr = RA), list(nom = "tête", tr = VD))) {
   for (s in c("2023-05-01", "2024-12-30")) {
     x <- tryCatch({ do.call(tablexp:::preparer_donnees, EC_ARGS(EC(s), u$tr)); NULL },
@@ -875,7 +878,7 @@ verifier("tête de deux contrats dont un en cours (sortie postérieure à la fin
                            s = D(c("2019-12-31", NA, "2020-12-31", "2026-06-01")),
                            k = c("rachat", "en_cours", "rachat", "en_cours"), stringsAsFactors = FALSE)
            obs <- tablexp:::preparer_donnees(d, EC_ROLES, tablexp:::valeurs_parametres_donnees(VD, PER, 0), character(0),
-                                             character(0))$resultat$observations
+                                             character(0), tablexp:::deduire_recette(EC_ROLES))$resultat$observations
            f <- tablexp:::fenetres_observations(obs, as.numeric(PER$debut), as.numeric(PER$fin) + 1, "deces")
            if (!identical(obs$unite, c("T1", "T2", "T2"))) "observations"
            else if (!identical(obs$cause, c("en_cours", "censure", "en_cours"))) "causes"

@@ -12,11 +12,18 @@
 #    ADR 0016, point 2) ; controler_matrice_recette() : étapes et estimateurs
 #    du plan admis sous la recette retenue (ADR 0016, point 5) ;
 #  - controler_roles() : refus au niveau des rôles (liste fermée) ;
+#  - regles_conditionnelles_recette() : règles de la matrice qui ne tiennent
+#    pas dans une ligne (agrégats : par_annee_sans_annee,
+#    binomial_annee_dernier_anniversaire ; ADR 0016, point 5.2) ;
 #  - evaluer_motifs() : motifs de ligne et motifs de tête (liste fermée
 #    MOTIFS_LIGNES, MOTIFS_TETE), évaluation exhaustive, sans court-circuit ;
 #    lignes d'évaluation des motifs de tête désignables (#69) ;
 #  - construire_observations() : unité d'observation, observations et
 #    fusion par tête sur des lignes retenues (#69) ;
+#  - evaluer_motifs_agregats(), observations_agregats() : motifs de ligne
+#    (MOTIFS_LIGNES_AGREGATS) et observations de la recette `agregats`, une
+#    observation par cellule reçue, unité non déterminée (#169) ; libellé de
+#    chaque code de motif : LIBELLES_MOTIFS ;
 #  - preparer_donnees() : fonction d'étape `donnees` — refus par défaut,
 #    exclusions déclarées (comptées, listées, lignes conservées inchangées),
 #    unité d'observation et fusion par tête, relevés non bloquants,
@@ -120,6 +127,59 @@ MOTIFS_LIGNES <- c("id_contrat_manquant", "id_tete_manquant", "naissance_manquan
                    "annee_naissance_incoherente", "age_aberrant", "contrat_duplique")
 MOTIFS_TETE <- c("tete_naissance_incoherente", "tete_sexe_incoherent",
                  "tete_segment_incoherent", "tete_observee_apres_deces")
+# Motifs de ligne de la recette `agregats` (une ligne est une cellule ;
+# spécification d'actuary de #169, § 6.2, M327, Q5), dans l'ordre de
+# restitution : défauts de valeur (manquant, non entier ou non fini, négatif)
+# des rôles d'âge, d'année, d'exposition (chaque rôle d'exposition déclaré)
+# et d'événements, année hors de la période, segmentation, événements sans
+# exposition, cellule dupliquée. Aucun motif d'unité. Les codes communs avec
+# MOTIFS_LIGNES (sexe_manquant, sexe_hors_modalites, segment_manquant,
+# age_aberrant) ont le même sens (LIBELLES_MOTIFS).
+MOTIFS_LIGNES_AGREGATS <- c("age_manquant", "age_non_entier", "age_negatif", "age_aberrant",
+                            "annee_manquante", "annee_non_entiere", "annee_hors_periode",
+                            "sexe_manquant", "sexe_hors_modalites", "segment_manquant",
+                            "exposition_manquante", "exposition_non_finie", "exposition_negative",
+                            "evenements_manquants", "evenements_non_entiers", "evenements_negatifs",
+                            "evenements_sans_exposition", "cellule_dupliquee")
+# Libellé de chaque code de motif de l'union des recettes (motifs_recettes()) :
+# un code a un seul sens, quelle que soit la recette qui le lève (invariant
+# « un libellé unique par code », avis d'actuary du 08/11/2026 sur #169,
+# point 2 ; contrôlé par tests/unitaires/test_catalogue_recettes.R).
+LIBELLES_MOTIFS <- c(
+  id_contrat_manquant = "identifiant de contrat manquant",
+  id_tete_manquant = "identifiant de tête manquant",
+  naissance_manquante = "date de naissance manquante",
+  entree_manquante = "date d'entrée manquante",
+  sortie_manquante = "date de sortie manquante, cause de sortie renseignée autre que « en_cours »",
+  cause_manquante = "cause de sortie manquante",
+  cause_hors_modalites = "cause de sortie hors des modalités",
+  sexe_manquant = "sexe manquant (rôle sexe déclaré)",
+  sexe_hors_modalites = "sexe hors des modalités H, F (rôle sexe déclaré)",
+  segment_manquant = "segment manquant (rôle segment déclaré)",
+  naissance_apres_entree = "date de naissance postérieure à la date d'entrée",
+  sortie_avant_entree = "date de sortie antérieure à la date d'entrée",
+  en_cours_avant_fin = "ligne « en_cours » dont la date de sortie précède la fin de la période",
+  annee_naissance_incoherente = "année de naissance différente de l'année de la date de naissance",
+  age_aberrant = sprintf("âge d'au moins %d ans", AGE_ABERRANT),
+  contrat_duplique = "identifiant de contrat présent sur plusieurs lignes",
+  tete_naissance_incoherente = "dates de naissance différentes au sein d'une même tête",
+  tete_sexe_incoherent = "sexes différents au sein d'une même tête",
+  tete_segment_incoherent = "segments différents au sein d'une même tête (segment employé par la segmentation)",
+  tete_observee_apres_deces = "tête observée après son premier décès, survenu avant la fin effective de la période",
+  age_manquant = "âge manquant",
+  age_non_entier = "âge non entier ou non fini",
+  age_negatif = "âge négatif",
+  annee_manquante = "année manquante",
+  annee_non_entiere = "année non entière ou non finie",
+  annee_hors_periode = "année hors des années civiles de la période, du début à la fin effective",
+  exposition_manquante = "exposition déclarée manquante",
+  exposition_non_finie = "exposition déclarée infinie",
+  exposition_negative = "exposition déclarée négative",
+  evenements_manquants = "nombre d'événements manquant",
+  evenements_non_entiers = "nombre d'événements non entier ou non fini",
+  evenements_negatifs = "nombre d'événements négatif",
+  evenements_sans_exposition = "événements sans aucune exposition déclarée strictement positive",
+  cellule_dupliquee = "clé de cellule (sexe, segment, âge, année déclarés) présente sur plusieurs lignes")
 
 # Nombre de numéros de ligne cités dans un message de refus (A.1) ; l'objet
 # de refus porte la liste complète.
@@ -146,18 +206,22 @@ NB_LIGNES_CITEES <- 10L
 #                       (ADR 0016, point 4) ;
 #   motifs_ligne, motifs_unite : motifs de ligne et d'unité de la recette
 #                       (constantes MOTIFS_*), codes des règles d'exclusion.
-# Ligne de la seule recette `lignes_dates_completes` (A.3) ; ajouter une
+# Lignes `lignes_dates_completes` (A.3) et `agregats` (#169, § 1 : âge,
+# événements et au moins une des deux expositions requis ; année, sexe et
+# segment facultatifs ; convention déclarée, sans native, Q2) ; ajouter une
 # recette ajoute une ligne ici et ses lignes dans MATRICE_RECETTES.
 CATALOGUE_RECETTES <- data.frame(
-  recette = "lignes_dates_completes",
-  requis = I(list(c("date_naissance", "date_entree", "date_sortie", "cause_sortie"))),
-  un_parmi = I(list(list())),
-  facultatifs = I(list(c("id_contrat", "id_tete", "sexe", "annee_naissance", "segment"))),
-  discriminants = I(list("date_entree")),
-  convention_native = "dernier_anniversaire",
-  seam = "fenetres",
-  motifs_ligne = I(list(MOTIFS_LIGNES)),
-  motifs_unite = I(list(MOTIFS_TETE)),
+  recette = c("lignes_dates_completes", "agregats"),
+  requis = I(list(c("date_naissance", "date_entree", "date_sortie", "cause_sortie"), c("age", "evenements"))),
+  un_parmi = I(list(list(), list(c("exposition_centrale", "exposition_initiale")))),
+  facultatifs = I(list(c("id_contrat", "id_tete", "sexe", "annee_naissance", "segment"),
+                       c("annee", "sexe", "segment"))),
+  discriminants = I(list("date_entree",
+                         c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements"))),
+  convention_native = c("dernier_anniversaire", NA_character_),
+  seam = c("fenetres", "cellules"),
+  motifs_ligne = I(list(MOTIFS_LIGNES, MOTIFS_LIGNES_AGREGATS)),
+  motifs_unite = I(list(MOTIFS_TETE, character(0))),
   stringsAsFactors = FALSE
 )
 
@@ -172,15 +236,25 @@ CATALOGUE_RECETTES <- data.frame(
 #   motif       : motif du refus quand la ligne n'admet pas (NA sinon).
 # Sous `lignes_dates_completes`, tout est admis : les refus de Kaplan-Meier et
 # du binomial sous par_annee ne dépendent pas de la recette et restent dans
-# controler_parametres_brut() (ADR 0016, point 5.7).
+# controler_parametres_brut() (ADR 0016, point 5.7). Sous `agregats` (#169,
+# § 4 et § 7) : poisson avec exposition_centrale, binomial avec
+# exposition_initiale, Kaplan-Meier refusé (non identifiable sur des
+# agrégats, § 4.3) ; positionnement, homogeneite et validation avec
+# exposition_centrale (elles lisent E^c) ; importance_exclusions refusée (Q6).
 MATRICE_RECETTES <- data.frame(
-  recette = "lignes_dates_completes",
+  recette = rep(c("lignes_dates_completes", "agregats"), each = 10L),
   etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite",
             "validation", "importance_exclusions"),
   estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
-  admis = "oui",
-  role_requis = NA_character_,
-  motif = NA_character_,
+  admis = c(rep("oui", 10L),
+            "oui", "oui", "oui", "si_role", "si_role", "non", "si_role", "si_role", "si_role", "non"),
+  role_requis = c(rep(NA_character_, 10L),
+                  NA, NA, NA, "exposition_centrale", "exposition_initiale", NA, "exposition_centrale",
+                  "exposition_centrale", "exposition_centrale", NA),
+  motif = c(rep(NA_character_, 10L),
+            NA, NA, NA, "poisson_sans_exposition_centrale", "binomial_sans_exposition_initiale",
+            "kaplan_meier_agregats", "etape_exige_exposition_centrale", "etape_exige_exposition_centrale",
+            "etape_exige_exposition_centrale", "importance_exclusions_agregats"),
   stringsAsFactors = FALSE
 )
 
@@ -495,15 +569,21 @@ controler_roles <- function(donnees, roles, segmentation) {
 # l'étape `brut`, la ligne de chaque estimateur, dans l'ordre du plan ; une
 # ligne `non`, ou `si_role` sans son rôle déclaré, est un refus sous le motif
 # de la ligne (module donnees). Puis les règles qui ne tiennent pas dans une
-# ligne : une exclusion du plan hors des motifs de la recette retenue
-# (exclusion_hors_recette ; valider_plan() a contrôlé l'union, point 6.4).
+# ligne (regles_conditionnelles_recette()), puis une exclusion du plan hors
+# des motifs de la recette retenue (exclusion_hors_recette ; valider_plan() a
+# contrôlé l'union, point 6.4).
 #   recette : valeur validée (deduire_recette()), dont matrice et motifs ;
-#   roles   : rôles contrôlés ; plan : plan canonique.
+#   roles   : rôles contrôlés ; plan : plan canonique ;
+#   conv    : convention validée (resoudre_convention()), NULL sans étape
+#             exposition ;
+#   p       : valeurs validées de la transition, de la période et du délai
+#             (valeurs_parametres_donnees()) ; aucune règle des agrégats ne
+#             les lit (forme de l'ADR 0016, point 5.2, commune aux recettes).
 # Une étape ou un estimateur sans exactement une ligne est une erreur de
 # programmation (matrice incomplète), jamais une admission. Appelée par
 # controler_plan_roles() après resoudre_convention() (couche partagée par
 # construire_table() et rejouer_fiche(), point 5.3). Rend NULL, invisible.
-controler_matrice_recette <- function(recette, roles, plan) {
+controler_matrice_recette <- function(recette, roles, plan, conv, p) {
   m <- recette$matrice
   etapes <- plan[["etapes"]]
   cles <- do.call(rbind, lapply(names(etapes), function(e)
@@ -529,12 +609,53 @@ controler_matrice_recette <- function(recette, roles, plan) {
                      citer(recette$recette), quoi),
             list(recette = recette$recette, etape = e, estimateur = est))
   }
+  regles_conditionnelles_recette(recette, roles, etapes, conv)
   hors <- setdiff(etapes[["donnees"]][["exclusions"]], recette$motifs)
   if (length(hors))
     refuser("donnees", "exclusion_hors_recette",
             formuler("Code d'exclusion sans objet pour la recette « %s » : %s (motifs de cette recette : %s).",
                      citer(recette$recette), liste_guillemets(hors), liste_guillemets(recette$motifs)),
             list(recette = recette$recette, exclusions = hors))
+  invisible(NULL)
+}
+
+# Règles de la matrice qui ne tiennent pas dans une ligne (recette, étape,
+# estimateur) (ADR 0016, point 5.2), par recette (aiguillage sur le nom,
+# admis dans ce module, point 4.4). Sous `agregats` (#169, § 3 et § 4), dans
+# cet ordre :
+#   - par_annee_sans_annee : étape exposition avec par_annee = TRUE sans le
+#     rôle annee (une cellule agrégée ne se redécoupe pas par année) ;
+#   - binomial_annee_dernier_anniversaire : binomial avec le rôle annee sous
+#     la convention retenue dernier_anniversaire (E^i n'est pas additive sur
+#     la partition de Lexis d'une année d'âge ; binomial sous par_annee =
+#     TRUE déjà refusé par controler_parametres_brut()).
+# Aucune règle sous `lignes_dates_completes`. Rend NULL, invisible.
+regles_conditionnelles_recette <- function(recette, roles, etapes, conv) {
+  switch(recette$recette,
+    agregats = {
+      if ("exposition" %in% names(etapes) && isTRUE(etapes[["exposition"]][["par_annee"]]) &&
+          !("annee" %in% names(roles)))
+        refuser("donnees", "par_annee_sans_annee",
+                formuler(paste("Sous la recette « %s », le découpage par année (par_annee = TRUE) exige le rôle",
+                               "« annee » : une cellule agrégée ne se redécoupe pas par année civile ; la",
+                               "construction est refusée."),
+                         citer(recette$recette)),
+                list(recette = recette$recette, etape = "exposition", role = "annee"))
+      if ("binomial" %in% etapes[["brut"]][["estimateurs"]] && "annee" %in% names(roles) &&
+          identical(conv$retenue, "dernier_anniversaire"))
+        refuser("donnees", "binomial_annee_dernier_anniversaire",
+                formuler(paste("Sous la recette « %s », l'estimateur « binomial » n'est pas admis avec le rôle",
+                               "« annee » sous la convention « dernier_anniversaire » : l'exposition initiale",
+                               "d'une année d'âge n'est pas la somme de celles des carrés de Lexis (le complément",
+                               "d'un événement court jusqu'à l'anniversaire suivant, à travers la fin de l'année",
+                               "civile) ; retenir l'estimateur « poisson », ou fournir des cellules par âge seul",
+                               "dont l'exposition initiale a été formée par le producteur sur l'année d'âge ; la",
+                               "construction est refusée."),
+                         citer(recette$recette)),
+                list(recette = recette$recette, etape = "brut", estimateur = "binomial", role = "annee",
+                     convention = conv$retenue))
+    },
+    NULL)
   invisible(NULL)
 }
 
@@ -785,6 +906,137 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lign
   list(motifs = lapply(c(m, t), which))
 }
 
+# --- motifs et observations de la recette `agregats` (#169, § 5 à § 7) -------
+
+# Évalue tous les motifs de ligne de la recette `agregats` (MOTIFS_LIGNES_AGREGATS)
+# sur toutes les lignes (une ligne est une cellule), sans court-circuit ; un
+# motif de comparaison n'est pas levé sur une valeur manquante, comme dans
+# evaluer_motifs(). Défauts de valeur (Q5) : manquant (NA ou NaN), non entier
+# (une valeur infinie est non entière : evenements_non_entiers, « non finis
+# compris », § 6.2 ; de même pour l'âge et l'année), négatif ; une exposition
+# est manquante (NA ou NaN), infinie (exposition_non_finie) ou négative, pour
+# chaque rôle d'exposition déclaré. annee_hors_periode : année antérieure à
+# l'année du début ou postérieure à celle de la fin effective (borne - 1 ; le
+# délai est reçu comme appliqué par le producteur, Q3, et ne sert qu'à ce
+# contrôle). evenements_sans_exposition : D > 0 alors qu'aucune exposition
+# déclarée n'est > 0, toutes renseignées. cellule_dupliquee : toutes les
+# lignes d'une même clé (rôles de clé déclarés : sexe, segment, age, annee,
+# employés ou non par la segmentation, § 5), clés non manquantes, valeurs
+# comparées exactement. Rend list(motifs) : liste nommée code -> numéros de
+# ligne (1-based, croissants), dans l'ordre MOTIFS_LIGNES_AGREGATS.
+evaluer_motifs_agregats <- function(donnees, roles, p) {
+  n <- nrow(donnees)
+  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  vrai <- function(x) !is.na(x) & x
+  non_entier <- function(x) !is.na(x) & (!is.finite(x) | x != trunc(x))
+  m <- stats::setNames(rep(list(logical(n)), length(MOTIFS_LIGNES_AGREGATS)), MOTIFS_LIGNES_AGREGATS)
+  age <- as.numeric(col("age"))
+  m$age_manquant <- is.na(age)
+  m$age_non_entier <- non_entier(age)
+  m$age_negatif <- vrai(age < 0)
+  m$age_aberrant <- vrai(age >= AGE_ABERRANT)
+  annee <- col("annee")
+  if (!is.null(annee)) {
+    annee <- as.numeric(annee)
+    m$annee_manquante <- is.na(annee)
+    m$annee_non_entiere <- non_entier(annee)
+    m$annee_hors_periode <- vrai(annee < composantes_date(p$debut)$an | annee > composantes_date(p$borne - 1)$an)
+  }
+  sexe <- col("sexe")
+  if (!is.null(sexe)) {
+    sexe <- as.character(sexe)
+    m$sexe_manquant <- is.na(sexe)
+    m$sexe_hors_modalites <- !is.na(sexe) & !(sexe %in% MODALITES_SEXE)
+  }
+  segment <- col("segment")
+  if (!is.null(segment)) m$segment_manquant <- is.na(segment)
+  expositions <- lapply(intersect(c("exposition_centrale", "exposition_initiale"), names(roles)),
+                        function(r) as.numeric(col(r)))
+  m$exposition_manquante <- Reduce(`|`, lapply(expositions, is.na))
+  m$exposition_non_finie <- Reduce(`|`, lapply(expositions, function(e) !is.na(e) & !is.finite(e)))
+  m$exposition_negative <- Reduce(`|`, lapply(expositions, function(e) vrai(e < 0)))
+  ev <- as.numeric(col("evenements"))
+  m$evenements_manquants <- is.na(ev)
+  m$evenements_non_entiers <- non_entier(ev)
+  m$evenements_negatifs <- vrai(ev < 0)
+  m$evenements_sans_exposition <- vrai(ev > 0) & !m$exposition_manquante &
+    !Reduce(`|`, lapply(expositions, function(e) vrai(e > 0)))
+  # Clé exacte : rang de chaque valeur parmi les valeurs distinctes de sa
+  # colonne (match(), égalité exacte, sans écriture décimale), puis doublons
+  # sur les rangs.
+  cles <- Filter(Negate(is.null), lapply(c("sexe", "segment", "age", "annee"), function(r) {
+    v <- col(r)
+    if (is.null(v)) NULL else if (is.factor(v)) as.character(v) else v
+  }))
+  complete <- !Reduce(`|`, lapply(cles, is.na))
+  rangs <- do.call(paste, c(lapply(cles, function(v) match(v, unique(v))), list(sep = "\r")))
+  rangs[!complete] <- NA
+  m$cellule_dupliquee <- complete & (duplicated(rangs, incomparables = NA) |
+                                     duplicated(rangs, fromLast = TRUE, incomparables = NA))
+  list(motifs = lapply(m, which))
+}
+
+# Observations de la recette `agregats` sur les lignes retenues : une
+# observation par cellule reçue et conservée, sans aucune complétion (§ 5).
+# Unité d'observation `non_determinee` (Q4). Colonnes : sexe s'il est
+# déclaré, segment s'il est employé par la segmentation (même règle et même
+# recopie que construire_observations()), age et annee (s'il est déclaré) en
+# double, les expositions déclarées (exposition_centrale, exposition_initiale)
+# en double, evenements en double ; les valeurs, contrôlées par les motifs,
+# ne sont pas modifiées (la somme et la conversion en entier des événements
+# relèvent de l'étape exposition).
+#   lignes, numeros, roles, segmentation : comme construire_observations() ;
+#   motifs     : motifs évalués sur toutes les lignes (evaluer_motifs_agregats()) ;
+#   exclusions : codes exclus du plan ;
+#   n          : nombre de lignes reçues.
+# Rend list(unite, observations, observation_des_lignes, releves) : releves
+# porte le nombre de cellules conservées, les relevés de cohérence des deux
+# expositions quand elles sont déclarées ensemble (§ 2 ; NA sinon) et le
+# poids des cellules exclues, par motif déclaré (§ 7, Q6) : cellules exclues
+# sous le motif, puis, sur celles dont D et les expositions déclarées ne
+# portent aucun motif de valeur, leur nombre, Σ D et Σ E par exposition
+# déclarée (NA pour une exposition non déclarée).
+observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, exclusions, n, donnees) {
+  col <- function(role, d = lignes) if (role %in% names(roles)) d[[roles[[role]]]] else NULL
+  i <- seq_along(numeros)
+  categorie <- function(x)
+    if (is.factor(x)) structure(unclass(x)[i], levels = levels(x),
+                                class = if (is.ordered(x)) c("ordered", "factor") else "factor")
+    else x[i]
+  observations <- data.frame(row.names = seq_along(i))
+  if ("sexe" %in% names(roles)) observations$sexe <- categorie(col("sexe"))
+  if ("segment" %in% segmentation) observations$segment <- categorie(col("segment"))
+  observations$age <- as.numeric(col("age"))
+  if ("annee" %in% names(roles)) observations$annee <- as.numeric(col("annee"))
+  declarees <- intersect(c("exposition_centrale", "exposition_initiale"), names(roles))
+  for (r in declarees) observations[[r]] <- as.numeric(col(r))
+  observations$evenements <- as.numeric(col("evenements"))
+  rownames(observations) <- NULL
+  deux <- length(declarees) == 2L
+  ec <- observations$exposition_centrale; ei <- observations$exposition_initiale
+  valeur <- c("exposition_manquante", "exposition_non_finie", "exposition_negative", "evenements_manquants",
+              "evenements_non_entiers", "evenements_negatifs")
+  sans_defaut <- !(seq_len(n) %in% unlist(motifs[valeur], use.names = FALSE))
+  somme <- function(r, k) if (r %in% declarees) sum(as.numeric(col(r, donnees))[k]) else NA_real_
+  poids <- do.call(rbind, lapply(exclusions, function(x) {
+    k <- motifs[[x]][sans_defaut[motifs[[x]]]]
+    data.frame(motif = x, cellules = length(motifs[[x]]), cellules_sommees = length(k),
+               evenements = sum(as.numeric(col("evenements", donnees))[k]),
+               exposition_centrale = somme("exposition_centrale", k),
+               exposition_initiale = somme("exposition_initiale", k), stringsAsFactors = FALSE)
+  }))
+  if (is.null(poids))
+    poids <- data.frame(motif = character(0), cellules = integer(0), cellules_sommees = integer(0),
+                        evenements = numeric(0), exposition_centrale = numeric(0),
+                        exposition_initiale = numeric(0), stringsAsFactors = FALSE)
+  releves <- list(cellules = length(i),
+                  exposition_initiale_inferieure_centrale = if (deux) sum(ei < ec) else NA_integer_,
+                  complement_superieur_aux_evenements = if (deux) sum(ei - ec > observations$evenements)
+                                                        else NA_integer_,
+                  poids_exclusions = poids)
+  list(unite = "non_determinee", observations = observations, observation_des_lignes = i, releves = releves)
+}
+
 # --- fusion par tête (A.1, « Unité d'observation et fusion par tête ») --------
 
 # Fusionne les intervalles [entree, fin) des lignes d'une même tête (g :
@@ -849,19 +1101,33 @@ fusionner_intervalles <- function(g, entree, fin) {
 #                        (fin incluse, A.0, T4) et du délai
 #                        (valeurs_parametres_donnees()) ;
 #   segmentation       : sous-ensemble de c("sexe", "segment"), vide admis ;
-#   exclusions         : codes de motif exclus, vide admis.
+#   exclusions         : codes de motif exclus, vide admis ;
+#   recette            : recette validée (deduire_recette()) ; deux
+#                        aiguillages sur son nom (ADR 0016, point 6.2) :
+#                        évaluation des motifs (evaluer_motifs(),
+#                        evaluer_motifs_agregats()) et construction des
+#                        observations (construire_observations(),
+#                        observations_agregats()), plus les avertissements
+#                        propres à la recette ; squelette commun (refus par
+#                        défaut, exclusions déclarées, aucune_ligne_conservee).
 # Aucun contrôle des paramètres ni des rôles (#82 ; ADR 0007, annotation du
 # 17/10/2026, (c) et (d)) : construire_table() les a validés
 # (controler_entrees() : valider_plan(), controler_roles()) avant toute étape.
-# Rend list(parametres, resultat, diagnostics, avertissements) ; les lignes
+# Rend list(parametres, resultat, diagnostics, avertissements), noms communs
+# aux recettes, contenu propre à chacune ; les lignes
 # conservées (resultat$lignes_conservees) sont celles de l'entrée, inchangées
 # (`donnees` lui-même s'il n'y a aucune exclusion) ;
 # resultat$observation_des_lignes donne, pour chaque ligne conservée, le
-# numéro de son observation (composante fusionnée ou contrat).
-preparer_donnees <- function(donnees, roles, p, segmentation, exclusions) {
+# numéro de son observation (composante fusionnée ou contrat ; la cellule
+# elle-même sous `agregats`).
+preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recette) {
   n <- nrow(donnees)
   if (!n) refuser("donnees", "base_vide", formuler("La base d'observation ne contient aucune ligne."))
-  ev <- evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation)
+  ev <- switch(recette$recette,
+    lignes_dates_completes = evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation),
+    agregats = evaluer_motifs_agregats(donnees, roles, p),
+    stop(sprintf("preparer_donnees() : recette « %s » sans évaluation des motifs (erreur de programmation).",
+                 recette$recette), call. = FALSE))
   motifs <- ev$motifs
   nombre <- lengths(motifs)
 
@@ -896,7 +1162,11 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions) {
             list(lignes_exclues = length(exclues)))
 
   # Unité d'observation (E2.4, M46) et observations.
-  ob <- construire_observations(conservees, numeros, roles, segmentation, p)
+  ob <- switch(recette$recette,
+    lignes_dates_completes = construire_observations(conservees, numeros, roles, segmentation, p),
+    agregats = observations_agregats(conservees, numeros, roles, segmentation, motifs, exclusions, n, donnees),
+    stop(sprintf("preparer_donnees() : recette « %s » sans observations (erreur de programmation).",
+                 recette$recette), call. = FALSE))
   unite <- ob$unite; observations <- ob$observations; releves <- ob$releves
 
   # Avertissements (ADR 0007, point 6.5).
@@ -909,14 +1179,94 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions) {
                            "une tête titulaire de plusieurs contrats est comptée plusieurs fois,",
                            "ce qui surestime l'exposition et peut compter plusieurs fois un même décès."),
                      nrow(observations))
+  # Unité non déterminée (agrégats, Q4) : texte selon le porteur de la
+  # transition (avis d'actuary du 08/11/2026 sur #169, point 3).
+  if (unite == "non_determinee")
+    avert <- avertir(avert, "donnees", "unite_agregat",
+                     UNITE_AGREGAT[[p$transition$etat_de]], nrow(observations))
+  # Texte selon la recette (aiguillage admis dans ce module, ADR 0016,
+  # point 4.4) : sous `agregats`, les cellules de même clé sont sommées sur
+  # les modalités du rôle (texte visé par actuary).
   for (s in setdiff(intersect(ROLES_SEGMENTATION, names(roles)), segmentation))
     avert <- avertir(avert, "donnees", "role_non_employe",
-                     sprintf("Rôle « %s » déclaré, non employé par la segmentation du plan (contrôlé seulement).", s),
+                     switch(recette$recette,
+                       agregats = sprintf(paste("Rôle « %s » déclaré, non employé par la segmentation du plan :",
+                                                "contrôlé (motifs, clé des cellules), puis cellules de même clé",
+                                                "sommées sur ses modalités à l'étape exposition."), s),
+                       sprintf("Rôle « %s » déclaré, non employé par la segmentation du plan (contrôlé seulement).", s)),
                      1)
   for (x in exclusions[lengths(motifs[exclusions]) > 0L])
     avert <- avertir(avert, "donnees", "exclusion",
                      sprintf("Exclusion déclarée « %s » : %d ligne(s) écartée(s).", x, length(motifs[[x]])),
                      length(motifs[[x]]))
+  avert <- switch(recette$recette,
+    lignes_dates_completes = avertir_releves_lignes(avert, releves, unite),
+    agregats = avertir_releves_agregats(avert, releves))
+
+  nature <- switch(recette$recette,
+    lignes_dates_completes = rep(c("ligne", "tete"), c(length(MOTIFS_LIGNES), length(MOTIFS_TETE))),
+    agregats = rep("ligne", length(motifs)))
+  list(
+    parametres = list(transition = p$transition$code, unite_observation = unite,
+                      segmentation = segmentation, exclusions = exclusions,
+                      fin_effective = structure(p$borne - 1, class = "Date")),
+    resultat = list(lignes_conservees = conservees, numeros_conserves = numeros,
+                    exclusions = data.frame(motif = exclusions,
+                                            nombre = unname(lengths(motifs[exclusions])),
+                                            stringsAsFactors = FALSE),
+                    lignes_exclues = motifs[exclusions],
+                    nombre_lignes_exclues = length(exclues),
+                    unite_observation = unite, observations = observations,
+                    observation_des_lignes = ob$observation_des_lignes),
+    diagnostics = list(motifs = data.frame(motif = names(motifs),
+                                           nature = nature,
+                                           nombre = unname(nombre),
+                                           exclu = names(motifs) %in% exclusions,
+                                           stringsAsFactors = FALSE),
+                       lignes_porteuses = length(unique(unlist(motifs, use.names = FALSE))),
+                       releves = releves),
+    avertissements = avert
+  )
+}
+
+# Textes de l'avertissement unite_agregat (agrégats, Q4), par porteur de la
+# transition (TRANSITIONS$etat_de) ; textes visés par actuary (avis du
+# 08/11/2026 sur #169, point 3).
+UNITE_AGREGAT <- c(
+  tete = paste("Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des",
+               "têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs",
+               "contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois",
+               "un même décès ; les intervalles et les tests supposent des unités indépendantes et sont trop",
+               "étroits en cas de dépendance positive."),
+  contrat = paste("Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des",
+                  "contrats ou des têtes) ; la transition porte sur le contrat, des effectifs comptés en têtes ne",
+                  "lui conviennent pas ; les intervalles et les tests supposent des unités indépendantes et sont",
+                  "trop étroits en cas de dépendance positive entre contrats d'une même tête."))
+
+# Avertissements des relevés de la recette `agregats` (§ 2 et § 6.3), sur les
+# cellules conservées, quand les deux expositions sont déclarées : E^i < E^c,
+# E^i - E^c > D. Relevés non bloquants, jamais un refus. Rend `avert` augmenté.
+avertir_releves_agregats <- function(avert, releves) {
+  k <- releves$exposition_initiale_inferieure_centrale
+  if (!is.na(k) && k > 0L)
+    avert <- avertir(avert, "donnees", "exposition_initiale_inferieure_centrale",
+                     sprintf(paste("Relevé : %d cellule(s) dont l'exposition initiale déclarée est inférieure à",
+                                   "l'exposition centrale déclarée (définition « cellule » : 0 <= E^i - E^c <= D)."), k),
+                     k)
+  k <- releves$complement_superieur_aux_evenements
+  if (!is.na(k) && k > 0L)
+    avert <- avertir(avert, "donnees", "complement_superieur_aux_evenements",
+                     sprintf(paste("Relevé : %d cellule(s) dont l'écart entre exposition initiale et exposition",
+                                   "centrale déclarées dépasse le nombre d'événements (définition « cellule » :",
+                                   "0 <= E^i - E^c <= D)."), k),
+                     k)
+  avert
+}
+
+# Avertissements des relevés de la recette `lignes_dates_completes` (fusion
+# par tête, fenêtres vides, observations après décès hors période),
+# extraits de preparer_donnees() à résultats identiques. Rend `avert` augmenté.
+avertir_releves_lignes <- function(avert, releves, unite) {
   libelles <- c(chevauchements = "contrat(s) chevauchant le précédent d'une même tête",
                 disjoints = "intervalle(s) disjoint(s) du précédent d'une même tête (trou non exposé)",
                 ecarts_un_jour = paste("écart(s) d'un jour entre contrats d'une même tête (date de fin",
@@ -935,29 +1285,7 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions) {
         (unite == "tete" || r %in% c("fenetres_vides", "observations_apres_deces_hors_periode")))
       avert <- avertir(avert, "donnees", r, sprintf("Relevé : %d %s.", releves[[r]], libelles[[r]]),
                        releves[[r]])
-
-  list(
-    parametres = list(transition = p$transition$code, unite_observation = unite,
-                      segmentation = segmentation, exclusions = exclusions,
-                      fin_effective = structure(p$borne - 1, class = "Date")),
-    resultat = list(lignes_conservees = conservees, numeros_conserves = numeros,
-                    exclusions = data.frame(motif = exclusions,
-                                            nombre = unname(lengths(motifs[exclusions])),
-                                            stringsAsFactors = FALSE),
-                    lignes_exclues = motifs[exclusions],
-                    nombre_lignes_exclues = length(exclues),
-                    unite_observation = unite, observations = observations,
-                    observation_des_lignes = ob$observation_des_lignes),
-    diagnostics = list(motifs = data.frame(motif = names(motifs),
-                                           nature = rep(c("ligne", "tete"),
-                                                        c(length(MOTIFS_LIGNES), length(MOTIFS_TETE))),
-                                           nombre = unname(nombre),
-                                           exclu = names(motifs) %in% exclusions,
-                                           stringsAsFactors = FALSE),
-                       lignes_porteuses = length(unique(unlist(motifs, use.names = FALSE))),
-                       releves = releves),
-    avertissements = avert
-  )
+  avert
 }
 
 # --- observations de l'unité d'observation (E2.4, M46) ------------------------

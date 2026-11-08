@@ -108,9 +108,9 @@ verifier("T1 rejouer_fiche : exportée, arguments (donnees, fiche, tables_refere
          "rejouer_fiche" %in% getNamespaceExports("tablexp") &&
            identical(names(formals(rejouer_fiche)), c("donnees", "fiche", "tables_reference")) &&
            is.null(formals(rejouer_fiche)$tables_reference))
-verifier("T1 VERSIONS_FICHE_REJEU : integer sans attribut ni NA, identical() à VERSION_FICHE (5L, #73)", {
+verifier("T1 VERSIONS_FICHE_REJEU : integer sans attribut ni NA, identical() à VERSION_FICHE (6L, #73, #169)", {
   v <- tablexp:::VERSIONS_FICHE_REJEU
-  is.integer(v) && is.null(attributes(v)) && !anyNA(v) && identical(v, tablexp:::VERSION_FICHE) && identical(v, 5L)
+  is.integer(v) && is.null(attributes(v)) && !anyNA(v) && identical(v, tablexp:::VERSION_FICHE) && identical(v, 6L)
 })
 
 # --- T2 : structure d'un rejeu réussi (valeur calculée à la main ; identité exacte)
@@ -128,13 +128,15 @@ verifier("T2 bilan : verdicts (1 à 8 « conforme », 9 à 13 « identique », 1
 verifier("T2 bilan : attendu et lu des lignes 3, 4, 5, 7, 9 et 13 égaux aux constantes et aux valeurs de la fiche", {
   b <- R0$bilan; e <- FICHE$empreintes
   identical(b$attendu[c(3, 4, 5, 7, 9, 13)],
-            c("5", "md5", "tablexp canonique 2", tablexp:::empreinte_donnees(BASE, ROLES), EMPREINTE_CODE,
+            c("6", "md5", "tablexp canonique 2", tablexp:::empreinte_donnees(BASE, ROLES), EMPREINTE_CODE,
               R0$construction$fiche$empreintes$resultat)) &&
-    identical(b$lu[c(3, 4, 5, 7, 9, 13)], c("5", e$algorithme, e$representation, e$donnees, e$code, e$resultat))
+    identical(b$lu[c(3, 4, 5, 7, 9, 13)], c("6", e$algorithme, e$representation, e$donnees, e$code, e$resultat))
 })
-verifier("T2 bilan : lignes 1, 2, 6, 8, 12 et 14 (textes fixes et composés)", {
+verifier("T2 bilan : lignes 1, 2, 6, 8, 12 et 14 (textes fixes et composés ; ligne 6 : controler_matrice_recette() citée, #169)", {
   b <- R0$bilan
   identical(b$attendu[1L], "fiche : liste nommée ; donnees : data.frame") &&
+    identical(b$attendu[6L], paste("valider_plan(), controler_roles(), recette et convention,",
+                                   "controler_matrice_recette(), controler_provenance() : aucun refus")) &&
     identical(b$lu[1L], "fiche : liste nommée de 25 champs ; donnees : classe data.frame, 4 lignes, 7 colonnes") &&
     identical(b$lu[2L], "champs lus de la forme attendue") &&
     identical(b$lu[6L], paste("étapes : donnees, exposition, brut ; rôles : id_contrat, id_tete, sexe, date_naissance,",
@@ -175,7 +177,7 @@ CAS_REFUS <- list(
   list(nom = "étape 1 : données « donnees.csv »", d = "donnees.csv", module = "donnees", motif = "donnees_mal_formees",
        details = list(classe = "character")),
   list(nom = "étape 2 : version_fiche double 3 (texte édité puis relu)",
-       f = fiche_texte("version_fiche\tinteger\t1\t5", "version_fiche\tdouble\t1\t3"),
+       f = fiche_texte("version_fiche\tinteger\t1\t6", "version_fiche\tdouble\t1\t3"),
        module = "construire_table", motif = "fiche_non_conforme",
        details = list(champ = "version_fiche", lu = "double de longueur 1",
                       attendu = "integer de longueur 1, non NA, sans attribut"),
@@ -219,9 +221,9 @@ CAS_REFUS <- list(
        details = list(champ = "provenance", lu = "champ absent", attendu = "champ présent (NULL admis)")),
   list(nom = "étape 3 : version_fiche 99", f = fiche_modifiee(version_fiche = 99L),
        module = "construire_table", motif = "version_fiche_non_admise",
-       details = list(lu = 99L, admises = 5L, tablexp = FICHE$versions$tablexp, code = FICHE$empreintes$code,
+       details = list(lu = 99L, admises = 6L, tablexp = FICHE$versions$tablexp, code = FICHE$empreintes$code,
                       code_installe = EMPREINTE_CODE),
-       contient = c("version_fiche 99 lue", "admise(s) par ce code : 5.",
+       contient = c("version_fiche 99 lue", "admise(s) par ce code : 6.",
                     sprintf("Fiche produite par tablexp %s, empreinte du code %s", FICHE$versions$tablexp,
                             FICHE$empreintes$code),
                     sprintf("empreinte du code %s. Aucune", EMPREINTE_CODE), "Aucune conversion de fiche n'est faite")),
@@ -376,11 +378,11 @@ verifier("T8 fiche sans puis avec provenance : rejouées, identical() hors execu
     identical(rp$bilan$verdict, VERDICTS_SUCCES) && endsWith(rp$bilan$lu[6L], "; provenance : base.csv") &&
     endsWith(R0$bilan$lu[6L], "; provenance : NULL")
 })
-verifier("T8 fiche de version 3 fabriquée d'une fiche 5 écrite : lue sans refus, rejeu refusé, construire_table() directe passe", {
+verifier("T8 fiche de version 3 fabriquée d'une fiche 6 écrite : lue sans refus, rejeu refusé, construire_table() directe passe", {
   noms6 <- TEXTE[startsWith(TEXTE, "plateforme/@noms\t")]
   noms5 <- sub("\t\"bibliotheque_c\"$", "", sub("^plateforme/@noms\tcharacter\t6\t", "plateforme/@noms\tcharacter\t5\t", noms6))
   l <- TEXTE[!startsWith(TEXTE, "plateforme/bibliotheque_c\t")]
-  l[l == "version_fiche\tinteger\t1\t5"] <- "version_fiche\tinteger\t1\t3"
+  l[l == "version_fiche\tinteger\t1\t6"] <- "version_fiche\tinteger\t1\t3"
   l[l == noms6] <- noms5
   f3 <- tryCatch(lire_fiche(octets(l)), error = function(e) e)
   !inherits(f3, "error") && identical(f3$version_fiche, 3L) && !("bibliotheque_c" %in% names(f3$plateforme)) &&

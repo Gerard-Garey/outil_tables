@@ -38,6 +38,8 @@
 #  - assembler_fiche() : fiche en mémoire (point 6.2), sans horodatage ;
 #    plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre
 #    (fichier, empreinte, algorithme) (ADR 0011, points 5.2 à 5.4) ;
+#    champ hypotheses_recette, présent seulement si l'étape `exposition` en
+#    porte (recette autre que `lignes_dates_completes` ; ADR 0016, point 8.1) ;
 #    champ hypotheses_brut, présent seulement si l'étape `brut` est exécutée,
 #    à sa place dans ORDRE_CHAMPS_FICHE (#64 ; #14, spécification d'actuary,
 #    A.5), avec la convention d'ensemble à risque et le dénominateur des
@@ -75,7 +77,11 @@
 # Fiche 5 : champ tables_reference, identité des tables de référence lues
 # (ADR 0015, point 3 ; #73), NULL sans table ; premier commit de B13 qui
 # change la définition de la fiche (point 10 (a)).
-VERSION_FICHE <- 5L
+# Fiche 6 : champ conditionnel hypotheses_recette (ADR 0016, point 8 ; #169),
+# absent sous `lignes_dates_completes` ; ADR 0011, point 10 (c), lu « ensemble
+# des champs possibles » : l'incrément est porté par le commit qui rend le
+# champ atteignable (M333).
+VERSION_FICHE <- 6L
 # Versions de fiche admises au rejeu outillé (rejouer_fiche(), ADR 0012,
 # point 3.5 ; #86) : la version courante seule ; ici, et non dans
 # R/construire_table.R, évalué avant ce fichier. Élargir demande, version par
@@ -970,8 +976,11 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     transition_code = pd$transition,
     fin_effective = pd$fin_effective,
     unite_observation = unite,
-    avertissement_unite = if (any(avertissements$code == "unite_contrat"))
-      avertissements$message[avertissements$code == "unite_contrat"][1L] else NA_character_,
+    # Avertissement d'unité : unite_contrat (lignes sans identifiant de tête)
+    # ou unite_agregat (agrégats, unité non déterminée ; avis d'actuary du
+    # 08/11/2026 sur #169, point 3).
+    avertissement_unite = if (any(avertissements$code %in% c("unite_contrat", "unite_agregat")))
+      avertissements$message[avertissements$code %in% c("unite_contrat", "unite_agregat")][1L] else NA_character_,
     recette = recette$recette,
     convention = if (is.null(pe)) NULL else pe$convention,
     unite_exposition = if (is.null(pe)) NA_character_ else pe$unite_exposition,
@@ -992,6 +1001,9 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     tables_reference = tables_reference,
     avertissements = avertissements
   )
+  # Hypothèses de la recette (ADR 0016, point 8.1) : recopiées si l'étape
+  # exposition en porte, absentes sinon (champ conditionnel).
+  if (!is.null(pe[["hypotheses_recette"]])) fiche$hypotheses_recette <- pe[["hypotheses_recette"]]
   pb <- etapes[["brut"]][["parametres"]]
   if (!is.null(pb))
     fiche$hypotheses_brut <- pb[c("estimateurs", "niveau", "exposition_initiale", "tolerance_effectif",
@@ -1026,7 +1038,7 @@ ORDRE_CHAMPS_FICHE <- c(
   "plan",
   "transition_code", "fin_effective", "unite_observation", "recette", "convention", "unite_exposition", "par_annee",
   "exclusions", "nombre_lignes_exclues",
-  "avertissement_unite", "hypothese_censure", "hypotheses_brut",
+  "avertissement_unite", "hypothese_censure", "hypotheses_recette", "hypotheses_brut",
   "graine", "graine_mention", "generateur",
   "avertissements")
 
@@ -1125,7 +1137,7 @@ BLOCS_LECTURE_FICHE <- texte_moteur(list(
   "calculé" = c("plan", "transition_code", "fin_effective", "unite_observation", "recette", "convention",
                "unite_exposition", "par_annee"),
   "hypothèses" = c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure",
-                  "hypotheses_brut", "avertissements"),
+                  "hypotheses_recette", "hypotheses_brut", "avertissements"),
   rejeu = c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention", "empreintes",
             "tables_reference", "graine", "graine_mention", "generateur")))
 
@@ -1646,7 +1658,8 @@ SECTIONS_RAPPORT <- data.frame(
       "fiche/unite_observation", "fiche/avertissement_unite"),
     c("fiche/plan", "fiche/transition_code", "fiche/fin_effective"),
     c("fiche/convention", "fiche/unite_exposition", "fiche/par_annee", "fiche/exclusions",
-      "fiche/nombre_lignes_exclues", "fiche/hypothese_censure", "fiche/hypotheses_brut", "fiche/avertissements"),
+      "fiche/nombre_lignes_exclues", "fiche/hypothese_censure", "fiche/hypotheses_recette", "fiche/hypotheses_brut",
+      "fiche/avertissements"),
     "etapes/donnees",
     "etapes/exposition",
     "etapes/brut",
@@ -1842,6 +1855,16 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "est sur-dispersée d'un facteur phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête), ce qui",
     "rend les tests anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
     "mesurable sans identifiant de tête."),
+  # Mention d'unité non déterminée (agrégats ; avis d'actuary du 08/11/2026
+  # sur #169, point 3), reprise sous la même condition que
+  # validation_unite_contrat, l'unité d'observation valant non_determinee.
+  validation_unite_non_determinee = paste(
+    "Unité d'observation non déterminée (agrégats ; fiche/avertissement_unite) : si les effectifs comptent des",
+    "contrats, les événements des contrats d'une même tête ne sont pas indépendants ; la variance des événements",
+    "est sur-dispersée d'un facteur au plus phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête),",
+    "atteint quand les événements d'une tête sont simultanés, comme un décès compté sur chacun de ses contrats ;",
+    "les tests sont alors anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
+    "mesurable sur des agrégats."),
   validation_ensemble = paste(
     "Table de modalité « ensemble » appliquée à chaque sexe de la segmentation",
     "(etapes/validation/parametres/appariement_sexe : ensemble_par_sexe)."),
@@ -2180,6 +2203,21 @@ lignes_racines <- function(x, racines, apres = list()) {
   sortie
 }
 
+# Mention d'unité des étapes positionnement, homogeneite, validation et
+# importance_exclusions : si fiche/avertissement_unite est une chaîne unique
+# non manquante, validation_unite_contrat sous l'unité d'observation contrat,
+# validation_unite_non_determinee sous l'unité non_determinee (agrégats) ;
+# rien sinon (avis d'actuary du 08/11/2026 sur #169, point 3 : la mention
+# d'unité contrat serait fausse sous les agrégats).
+mention_unite <- function(x) {
+  au <- x[["fiche"]][["avertissement_unite"]]
+  if (!(is.character(au) && length(au) == 1L && !is.na(au))) return(NULL)
+  unite <- x[["fiche"]][["unite_observation"]]
+  if (identical(unite, "contrat")) return(paragraphe(MENTIONS_RAPPORT[["validation_unite_contrat"]]))
+  if (identical(unite, "non_determinee")) return(paragraphe(MENTIONS_RAPPORT[["validation_unite_non_determinee"]]))
+  NULL
+}
+
 # Un paragraphe, un élément de liste : texte échappé.
 paragraphe <- function(...) paste0("<p>", echapper_html(paste0(...)), "</p>")
 element_liste <- function(...) paste0("<li>", echapper_html(paste0(...)), "</li>")
@@ -2222,7 +2260,6 @@ corps_section <- function(x, k) {
       # sous les deux autres, première phrase selon la présence de l'étape
       # positionnement (décision du mainteneur du 08/11/2026).
       pv <- x[["etapes"]][["validation"]][["parametres"]]
-      au <- x[["fiche"]][["avertissement_unite"]]
       table_prise <- if ("positionnement" %in% etapes) "validation_sans_verdict_table_positionnement"
                      else "validation_sans_verdict_table"
       sans_verdict <- paragraphe(m[[table_prise]], " ", m[["validation_sans_verdict"]])
@@ -2238,7 +2275,7 @@ corps_section <- function(x, k) {
                paragraphe(m[[r$relation]]),
                paragraphe(m[[r$h0]]),
                if (r$tests) paragraphe(m[["validation_hypotheses_tests"]]),
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
                if (r$tests) c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[[r$mc]])),
                paragraphe(m[["validation_reference"]]),
@@ -2249,30 +2286,27 @@ corps_section <- function(x, k) {
       # d'unité contrat sous la même condition que l'étape validation.
       # Mentions de la méthode SMR, seule mise en oeuvre (M293) ; une autre
       # valeur est une erreur de programmation (avis d'actuary du 07/11/2026).
-      au <- x[["fiche"]][["avertissement_unite"]]
       methode <- x[["etapes"]][["positionnement"]][["parametres"]][["methode"]]
       mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
         smr = c(paragraphe(m[["positionnement_methode"]]), paragraphe(m[["positionnement_forme"]]),
                 paragraphe(m[["positionnement_ecart_note"]])),
         stop("corps_section() : méthode de positionnement sans mentions (erreur de programmation).", call. = FALSE))
       return(c(mentions,
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                lignes_racines(x, racines)))
     }
     if (identical(e, "homogeneite")) {
       # Étape homogeneite : mention fixe (#168, spécification, § 6), puis
       # mention d'unité contrat sous la même condition que l'étape validation.
-      au <- x[["fiche"]][["avertissement_unite"]]
       return(c(paragraphe(m[["homogeneite_portee"]]),
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                lignes_racines(x, racines)))
     }
     if (identical(e, "importance_exclusions")) {
       # Étape importance_exclusions : mention fixe (M259), puis mention d'unité
       # contrat sous la même condition que l'étape validation (Q-c).
-      au <- x[["fiche"]][["avertissement_unite"]]
       return(c(paragraphe(m[["importance_exclusions_portee"]]),
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                lignes_racines(x, racines)))
     }
     if (!identical(e, "brut")) return(lignes_racines(x, racines))

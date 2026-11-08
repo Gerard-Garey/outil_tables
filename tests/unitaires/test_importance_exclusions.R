@@ -82,8 +82,8 @@ verifier("construire_observations, sans id_tete (valeur calculée à la main) : 
 B_NA <- BASE; B_NA$sexe[3L] <- NA
 verifier("construire_observations, contrefactuel (identité exacte) : lignes reçues = toutes, mêmes observations que le jeu sans défaut hors colonne sexe", {
   o <- construire_observations(B_NA, 1:4, ROLES, character(0), P_VD)
-  r <- preparer_donnees(BASE, ROLES, P_VD, character(0), character(0))$resultat
-  ex <- preparer_donnees(B_NA, ROLES, P_VD, character(0), "sexe_manquant")$resultat
+  r <- preparer_donnees(BASE, ROLES, P_VD, character(0), character(0), tablexp:::deduire_recette(ROLES))$resultat
+  ex <- preparer_donnees(B_NA, ROLES, P_VD, character(0), "sexe_manquant", tablexp:::deduire_recette(ROLES))$resultat
   garde <- setdiff(names(o$observations), "sexe")
   identical(o$observations[garde], r$observations[garde]) && identical(o$observation_des_lignes, c(1L, 2L, 3L, 3L)) &&
     identical(ex$numeros_conserves, c(1L, 2L, 4L)) && identical(ex$observations$ligne, c(1L, 2L, 4L)) &&
@@ -112,7 +112,7 @@ for (cas in list(list("vivant -> deces, unité tête, délai 30", VD, ROLES_SIM,
                       tablexp:::MOTIFS_LIGNES))) {
   d <- if (identical(cas[[3]], ROLES_SIM)) SC else SC[!(seq_len(nrow(SC)) %in% attr(SC, "defauts")$lignes$ligne[
     attr(SC, "defauts")$lignes$unite == "tete"]), ]
-  r <- preparer_donnees(d, cas[[3]], valeurs(cas[[2]], PER, cas[[4]]), "sexe", cas[[5]])
+  r <- preparer_donnees(d, cas[[3]], valeurs(cas[[2]], PER, cas[[4]]), "sexe", cas[[5]], tablexp:::deduire_recette(cas[[3]]))
   o <- construire_observations(r$resultat$lignes_conservees, r$resultat$numeros_conserves, cas[[3]], "sexe",
                                valeurs(cas[[2]], PER, cas[[4]]))
   verifier(sprintf("construire_observations = champs de preparer_donnees() (identité exacte), jeu simulé à %d lignes exclues : %s",
@@ -771,33 +771,35 @@ verifier(sprintf("T4 (identité exacte) : local = global en unité tête, niveau
                  de(x4b$etapes$importance_exclusions$resultat$retraits, "total", "B")$lignes_mesurables),
          global(x4b, "sexe", "B"))
 # Deuxième recette fictive (#82 ; avis (P) rafraîchi, critère 2) :
-# deduire_recette() remplacée dans l'espace de noms par une recette
-# « recette_fictive » de convention native age_atteint_annee, puis restaurée ;
+# deduire_recette() remplacée dans l'espace de noms par une recette de
+# convention native age_atteint_annee, puis restaurée (nom gardé :
+# lignes_dates_completes ; un nom hors du catalogue est une erreur de
+# programmation depuis l'aiguillage sur le nom, ADR 0016, points 4.1 et 6.2) ;
 # chaque appel de calculer_exposition() (étape exposition et expositions
 # contrefactuelles de exposition_lignes()) est relevé par trace() : recette
 # et convention retenue reçues. Toutes égalent celles de la fiche (une seule
 # source ; avant #82, les contrefactuelles relisaient la recette de la
 # branche et résolvaient la convention demandée).
-verifier("deuxième recette fictive (#82) : étape exposition et expositions contrefactuelles de importance_exclusions sous la recette et la convention de la fiche (recette_fictive, age_atteint_annee) ; au moins un calcul contrefactuel ; deduire_recette() restaurée", {
+verifier("deuxième recette fictive (#82) : étape exposition et expositions contrefactuelles de importance_exclusions sous la recette et la convention de la fiche (convention native age_atteint_annee, retenue age_atteint_annee) ; au moins un calcul contrefactuel ; deduire_recette() restaurée", {
   ns <- asNamespace("tablexp")
   ancienne <- get("deduire_recette", envir = ns)
   fictive <- function(roles) {
     r <- ancienne(roles)
-    r$recette <- "recette_fictive"; r$convention_native <- "age_atteint_annee"
+    r$convention_native <- "age_atteint_annee"
     r
   }
   releve <- new.env(); releve$l <- character(0)
   unlockBinding("deduire_recette", ns)
   assign("deduire_recette", fictive, envir = ns)
   suppressMessages(trace("calculer_exposition", where = ns, print = FALSE,
-                         tracer = bquote(assign("l", c(get("l", envir = .(releve)), paste(recette$recette, conv$retenue)),
+                         tracer = bquote(assign("l", c(get("l", envir = .(releve)), paste(recette$convention_native, conv$retenue)),
                                                 envir = .(releve)))))
   x <- tryCatch(construire_table(S4, ROLES_SIM, plan_ie(EXC4, periode = PER)), finally = {
     suppressMessages(untrace("calculer_exposition", where = ns))
     assign("deduire_recette", ancienne, envir = ns); lockBinding("deduire_recette", ns)
   })
-  fiche <- paste(x$fiche$recette, x$fiche$convention$retenue)
-  identical(fiche, "recette_fictive age_atteint_annee") && length(releve$l) >= 2L && all(releve$l == fiche) &&
+  fiche <- paste(x$fiche$convention$native, x$fiche$convention$retenue)
+  identical(fiche, "age_atteint_annee age_atteint_annee") && length(releve$l) >= 2L && all(releve$l == fiche) &&
     x$etapes$importance_exclusions$diagnostics$calculs_contrefactuels >= 1L &&
     identical(tablexp:::deduire_recette(ROLES_SIM)$recette, "lignes_dates_completes") &&
     bindingIsLocked("deduire_recette", ns)

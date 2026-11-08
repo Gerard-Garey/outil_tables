@@ -2098,6 +2098,18 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
   if (is.null(etape_validation) != is.null(table))
     stop("calculer_importance_exclusions() : étape validation et table incohérentes (erreur de programmation).",
          call. = FALSE)
+  # Contrefactuel par lignes et fusion par tête : étape admise sans condition
+  # par la ligne de matrice de la recette, et seam « fenêtres » ; le refus
+  # utilisateur est levé en amont par controler_matrice_recette()
+  # (importance_exclusions_agregats). Propriétés de la recette, jamais son
+  # nom (ADR 0016, points 4.4 et 4.6).
+  m <- recette$matrice
+  ligne <- m[m$etape == "importance_exclusions" & is.na(m$estimateur), , drop = FALSE]
+  if (nrow(ligne) != 1L || !identical(ligne$admis, "oui"))
+    stop("calculer_importance_exclusions() : étape non admise par la matrice de la recette (erreur de programmation).",
+         call. = FALSE)
+  if (!identical(recette$seam, "fenetres"))
+    stop("calculer_importance_exclusions() : recette sans fenêtres (erreur de programmation).", call. = FALSE)
   rd <- etape_donnees$resultat
   pe <- etape_exposition$parametres
   unite <- rd$unite_observation

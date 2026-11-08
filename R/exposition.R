@@ -16,12 +16,17 @@
 #    calculer_exposition() et par l'estimateur de Kaplan-Meier du module
 #    `brut` (#15, spécification d'actuary, A.9 : factorisation à résultats
 #    identiques) ;
-#  - calculer_exposition() : fonction d'étape `exposition` — fenêtre de
-#    chaque observation (troncature au début de la période, censure à
+#  - calculer_exposition() : fonction d'étape `exposition`, aiguillage sur le
+#    seam de la recette (ADR 0016, point 4.1) ;
+#  - exposition_fenetres() : seam « fenêtres » — fenêtre de chaque
+#    observation (troncature au début de la période, censure à
 #    B = fin - délai + 1), exposition centrale par cellule (segment, âge
 #    [, année civile]) en jours et en unité d'exposition, événements de la
 #    transition étudiée, compléments de l'exposition initiale, sorties
-#    concurrentes (censures à droite à leur instant).
+#    concurrentes (censures à droite à leur instant) ;
+#  - exposition_cellules(), hypotheses_agregats() : seam « cellules »
+#    (agrégats, #169) — somme des cellules reçues par clé, sans en créer,
+#    relevés, hypothèses de la recette (champ hypotheses_recette).
 #
 #  Conventions de temps (A.0) : une date est un jour ; une observation est
 #  l'intervalle [debut, fin) (fin = +Inf pour une observation en cours) ; un
@@ -394,7 +399,25 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 # parametres$unite_exposition), complement_initial_cellule et
 # complement_initial_fenetre (sans par_annee seulement), evenements,
 # sorties_concurrentes.
+# Aiguillage à deux points (ADR 0016, point 4.1), seuls branchements sur la
+# recette hors du module donnees : sur la propriété `seam` de la recette
+# (exposition_fenetres() ou exposition_cellules()), puis, dans le seam
+# « fenêtres », sur le nom de la recette pour former les fenêtres.
 calculer_exposition <- function(observations, p, segmentation, recette, conv, par_annee) {
+  switch(recette$seam,
+    fenetres = exposition_fenetres(observations, p, segmentation, recette, conv, par_annee),
+    cellules = exposition_cellules(observations, p, segmentation, recette, conv, par_annee),
+    stop(sprintf("calculer_exposition() : seam « %s » inconnu (erreur de programmation).", recette$seam),
+         call. = FALSE))
+}
+
+# Seam « fenêtres » (ADR 0016, point 4.2 ; ADR 0014, point 6) : corps de
+# calculer_exposition() extrait à l'identique (#169, commit (3b)) ; mêmes
+# arguments, même valeur rendue (ci-dessus). Les fenêtres sont formées par la
+# fonction de la recette (fenetres_observations() pour
+# `lignes_dates_completes`), le découpage en cellules, les segments, les
+# sommes et l'objet `fenetres_exposition` sont communs.
+exposition_fenetres <- function(observations, p, segmentation, recette, conv, par_annee) {
   cv <- conv$retenue
   manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
   if (length(manquantes))
@@ -406,7 +429,10 @@ calculer_exposition <- function(observations, p, segmentation, recette, conv, pa
 
   # Fenêtre (T5) : troncature au début de la période, censure à B ;
   # composantes des naissances et table calendaire.
-  f <- fenetres_observations(observations, debut_p, borne, cible)
+  f <- switch(recette$recette,
+    lignes_dates_completes = fenetres_observations(observations, debut_p, borne, cible),
+    stop(sprintf("exposition_fenetres() : recette « %s » sans fenêtres (erreur de programmation).", recette$recette),
+         call. = FALSE))
   cn <- f$composantes; cal <- f$calendrier; sortie <- f$sortie
   a <- f$a; b <- f$b
   exposees <- which(a < b)
@@ -527,5 +553,178 @@ calculer_exposition <- function(observations, p, segmentation, recette, conv, pa
                            list(debut = debut_p, borne = borne, transition = p$transition$code, convention = cv,
                                 segmentation = segmentation)),
                          class = "fenetres_exposition")
+  )
+}
+
+# --- seam « cellules » (ADR 0016, point 4.3 ; #169, § 5) ------------------------
+
+# Unité de l'exposition reçue et hypothèse sur les sorties concurrentes sous
+# le seam « cellules » (#169, § 10), inscrites dans les paramètres de l'étape
+# et dans la fiche à la place de UNITES_EXPOSITION et de HYPOTHESE_CENSURE.
+UNITE_EXPOSITION_DECLAREE <- "déclarée : années de la convention déclarée, définition des jours non vérifiable"
+HYPOTHESE_CENSURE_DECLAREE <- "traitement des sorties concurrentes fait par le producteur, non vérifiable"
+# Statut commun des hypothèses de la recette `agregats` (#169, § 10).
+STATUT_HYPOTHESE_DECLAREE <- "hypothèse déclarée, non vérifiable par le moteur"
+
+# Hypothèses de la recette `agregats` (#169, § 10 ; champ conditionnel
+# hypotheses_recette, ADR 0016, point 8.1) : data.frame (code, enonce, nature,
+# statut), une ligne par hypothèse, celles des expositions pour les seules
+# expositions déclarées. Textes du moteur marqués UTF-8 (#50).
+#   declarees : rôles d'exposition déclarés ; annee : rôle annee déclaré ;
+#   convention : convention retenue (déclarée).
+hypotheses_agregats <- function(declarees, annee, convention) {
+  h <- data.frame(
+    code = c("exposition_centrale_declaree", "exposition_initiale_declaree", "unite_exposition",
+             "convention_declaree", "une_annee_d_age", "periode_delai_producteur", "evenements_transition",
+             "unite_observation"),
+    enonce = c(
+      paste("exposition centrale E^c reçue : somme des durées de présence dans la cellule, en années de la",
+            "convention déclarée ; ni recalculée ni vérifiée par le moteur"),
+      paste("exposition initiale E^i reçue, de définition « cellule » : E^c plus, pour chaque événement de la",
+            "transition, le complément jusqu'à la fin de la cellule, aucun complément pour une sortie",
+            "concurrente ; aucune exposition n'est déduite de l'autre"),
+      paste("exposition reçue en années de la convention déclarée (jours / L, L nombre de jours de l'année d'âge",
+            "sous dernier_anniversaire, de l'année civile sous age_atteint_annee : 365 ou 366), sans conversion ;",
+            "un décompte en jours / 365 ou jours / 365,25 l'écarte d'au plus 1/365 en relatif (borne exacte)"),
+      sprintf(paste("âge des cellules (et année, si le rôle annee est déclaré) formés par le producteur sous la",
+                    "convention déclarée « %s », retenue telle quelle ; aucune convention n'est déduite des",
+                    "données ni forcée"), convention),
+      paste("une valeur de age désigne une seule année d'âge (ni classe ouverte, ni classe quinquennale) ;",
+            "une convention hors catalogue n'est pas déclarée sous l'une des deux conventions"),
+      paste("période d'observation et délai de déclaration appliqués par le producteur de l'agrégat",
+            "(le moteur ne tronque pas une cellule agrégée)"),
+      paste("événements reçus : ceux de la transition du plan, en nombres d'unités non pondérés (E2.8)"),
+      paste("unité d'observation non déterminée : rien n'indique si les effectifs comptent des têtes ou des",
+            "contrats")),
+    nature = c("hypothèse de données", "hypothèse de données", "hypothèse de données", "convention",
+               "hypothèse de données", "hypothèse de données", "hypothèse de données", "hypothèse de données"),
+    statut = c(STATUT_HYPOTHESE_DECLAREE, STATUT_HYPOTHESE_DECLAREE, STATUT_HYPOTHESE_DECLAREE,
+               STATUT_HYPOTHESE_DECLAREE, paste0(STATUT_HYPOTHESE_DECLAREE, " ; relevé ages_manquants"),
+               if (annee) paste("hypothèse déclarée, vérifiable en partie par le moteur : motif annee_hors_periode",
+                                "(années civiles hors de la période ; troncature et délai à l'intérieur d'une année",
+                                "non vérifiables)")
+               else STATUT_HYPOTHESE_DECLAREE,
+               STATUT_HYPOTHESE_DECLAREE, paste0(STATUT_HYPOTHESE_DECLAREE, " ; avertissement unite_agregat")),
+    stringsAsFactors = FALSE)
+  garder <- c("exposition_centrale" %in% declarees, "exposition_initiale" %in% declarees, rep(TRUE, 6L))
+  h <- h[garder, , drop = FALSE]
+  rownames(h) <- NULL
+  texte_moteur(h)
+}
+
+# Seam « cellules » (ADR 0016, point 4.3) : somme des cellules reçues par clé
+# (segmentation, age, annee si par_annee), sans en créer aucune (#169, § 5).
+#   observations : cellules conservées par l'étape donnees
+#                  (observations_agregats() : clés de segmentation, age,
+#                  [annee], expositions déclarées, evenements) ;
+#   p, segmentation, recette, conv, par_annee : comme calculer_exposition().
+# Sommes : D décompte exact (somme de doubles entiers, rendue en integer) ;
+# E en arithmétique flottante, somme dans l'ordre des lignes (rowsum(), comme
+# somme_par_cellule()) : une permutation des lignes reçues peut changer les
+# derniers bits d'une somme (même règle que #39) ; une cellule sans somme
+# garde sa valeur exacte. Ordre des segments : segments_observations() ;
+# dans un segment, âge puis année croissants (ordre de la recette des lignes).
+# resultat$exposition : clés, age, [annee], expositions déclarées
+# (exposition_centrale puis exposition_initiale, double), evenements
+# (integer) ; aucune colonne propre aux lignes (exposition_jours,
+# sorties_concurrentes, complement_initial_*), ni en 0 ni en NA. Aucun objet
+# `fenetres_exposition` (Kaplan-Meier est refusé par la matrice). Relevés :
+# annees_sommees (annee déclarée, par_annee = FALSE), ages_manquants (trous
+# de la plage d'âges de chaque segment, de chaque (segment, année) sous
+# par_annee), evenement_sans_exposition
+# (événements d'une cellule d'exposition centrale nulle, ou d'exposition
+# initiale nulle sans exposition centrale déclarée) ; convention_declaree
+# (convention sans native : déclarée, non vérifiable).
+exposition_cellules <- function(observations, p, segmentation, recette, conv, par_annee) {
+  cv <- conv$retenue
+  declarees <- intersect(c("exposition_centrale", "exposition_initiale"), names(observations))
+  manquantes <- setdiff(c("age", "evenements", segmentation, if (par_annee) "annee"), names(observations))
+  if (length(manquantes) || !length(declarees))
+    stop(sprintf("calculer_exposition() : colonne(s) %s absente(s) des observations (erreur de programmation).",
+                 paste(c(manquantes, if (!length(declarees)) "exposition"), collapse = ", ")), call. = FALSE)
+  n_obs <- nrow(observations)
+  sg <- segments_observations(observations, segmentation)
+  g <- sg$g; segments <- sg$segments
+  age <- observations$age
+  annee <- if (par_annee) observations$annee else rep(0, n_obs)
+  o <- order(g, age, annee, method = "radix")
+  # Nouvelle cellule à chaque changement de clé dans l'ordre trié (égalité
+  # exacte, sans écriture décimale).
+  gs <- g[o]; as_ <- age[o]; ys <- annee[o]
+  nouvelle <- if (n_obs) c(TRUE, gs[-1L] != gs[-n_obs] | as_[-1L] != as_[-n_obs] | ys[-1L] != ys[-n_obs])
+              else logical(0)
+  cellule <- integer(n_obs); cellule[o] <- cumsum(nouvelle)
+  n_cel <- sum(nouvelle)
+  premiere <- o[nouvelle]
+  table_exp <- segments[g[premiere], , drop = FALSE]
+  rownames(table_exp) <- NULL
+  table_exp$age <- as.integer(age[premiere])
+  if (par_annee) table_exp$annee <- as.integer(annee[premiere])
+  for (r in declarees) table_exp[[r]] <- somme_par_cellule(cellule, observations[[r]], n_cel)
+  d <- somme_par_cellule(cellule, observations$evenements, n_cel)
+  if (any(d > .Machine$integer.max))
+    refuser("exposition", "evenements_hors_plage",
+            formuler(paste("Somme des événements hors de la plage des entiers du moteur (au plus %d) dans %d",
+                           "cellule(s) ; vérifier la colonne du rôle « evenements » ; la construction est refusée."),
+                     .Machine$integer.max, sum(d > .Machine$integer.max)),
+            list(cellules = sum(d > .Machine$integer.max)))
+  table_exp$evenements <- as.integer(d)
+
+  # Relevés.
+  sommees <- !par_annee && "annee" %in% names(observations)
+  sans_exposition <- sum(table_exp$evenements > 0L & table_exp[[declarees[1L]]] == 0)
+  # Trous dans la plage d'âges de chaque (segment, année) sous par_annee, de
+  # chaque segment sinon (spécification de #169, § 6.3, révisée par actuary) :
+  # cellules (âge entier) absentes entre l'âge minimal et l'âge maximal reçus.
+  trous <- 0
+  if (n_cel) {
+    groupe <- if (par_annee) paste(g[premiere], annee[premiere], sep = "\r") else g[premiere]
+    plage <- vapply(split(table_exp$age, groupe), function(a) max(a) - min(a) + 1, numeric(1L))
+    trous <- sum(plage) - n_cel
+  }
+  avert <- avertissements_vides()
+  if (is.na(conv$native))
+    avert <- avertir(avert, "exposition", "convention_declaree",
+                     sprintf("Convention d'âge déclarée « %s », non vérifiable sur des agrégats.", cv), 1)
+  # Sous dernier_anniversaire avec exposition_initiale déclarée, le texte
+  # précise que la somme des E^i des carrés de Lexis n'est pas l'E^i de
+  # l'année d'âge (texte visé par actuary ; binomial refusé par
+  # regles_conditionnelles_recette()).
+  if (sommees)
+    avert <- avertir(avert, "exposition", "annees_sommees",
+                     if ("exposition_initiale" %in% declarees && identical(cv, "dernier_anniversaire"))
+                       paste("Rôle « annee » déclaré sous par_annee = FALSE : exposition et événements sommés sur",
+                             "les années de chaque cellule (somme exacte pour l'exposition centrale et les",
+                             "événements ; sous « dernier_anniversaire », la somme des expositions initiales des",
+                             "carrés de Lexis n'est pas l'exposition initiale de l'année d'âge : la colonne",
+                             "exposition_initiale est la somme des valeurs reçues, l'estimateur « binomial » est",
+                             "refusé).")
+                     else
+                       paste("Rôle « annee » déclaré sous par_annee = FALSE : exposition et événements sommés sur",
+                             "les années de chaque cellule (somme exacte pour l'exposition centrale et les",
+                             "événements)."), 1)
+  if (trous > 0)
+    avert <- avertir(avert, "exposition", "ages_manquants",
+                     sprintf(paste("Relevé : %.0f cellule(s) absente(s) de la plage d'âges de leur segment%s",
+                                   "(classes d'âge groupées possibles ; aucune cellule n'est créée)."),
+                             trous, if (par_annee) " et de leur année civile" else ""), trous)
+  if (sans_exposition > 0L)
+    avert <- avertir(avert, "exposition", "evenement_sans_exposition",
+                     sprintf("Relevé : %d cellule(s) à exposition nulle qui comptent au moins un événement.",
+                             sans_exposition), sans_exposition)
+
+  list(
+    parametres = list(recette = recette$recette, convention = conv,
+                      unite_exposition = texte_moteur(UNITE_EXPOSITION_DECLAREE), par_annee = par_annee,
+                      transition = p$transition$code, segmentation = segmentation,
+                      periode = p$periode, delai_declaration = p$delai_declaration,
+                      fin_effective = structure(p$borne - 1, class = "Date"),
+                      hypothese_censure = texte_moteur(HYPOTHESE_CENSURE_DECLAREE),
+                      hypotheses_recette = hypotheses_agregats(declarees, "annee" %in% names(observations), cv)),
+    resultat = list(exposition = table_exp),
+    diagnostics = list(observations = n_obs, evenements = sum(table_exp$evenements), cellules = n_cel,
+                       cellules_evenement_sans_exposition = sans_exposition,
+                       cellules_absentes_de_la_plage = as.integer(trous)),
+    avertissements = avert
   )
 }
