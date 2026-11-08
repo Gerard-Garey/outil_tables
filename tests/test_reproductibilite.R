@@ -20,7 +20,7 @@
 #  jeu_reference_defauts() pour R9), aplatis, aller-retour exact du format,
 #  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
 #  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE : R10 à R12), aucune référence orpheline ;
+#  SANS_REFERENCE : R10), aucune référence orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
 #  exclusions, table importée passée par tables_reference (#166) ; R9 : le
@@ -334,7 +334,7 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-SANS_REFERENCE <- c(R10 = "#167", R11 = "#168", R12 = "#168")
+SANS_REFERENCE <- c(R10 = "#167")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -1329,8 +1329,8 @@ for (chemin_etape in c("etapes/validation/resultat/cellules/attendus",
     })
   }
 }
-# Étape homogeneite (#168) : R11 et R12 la portent (plans de méthode ; sans fichier
-# de référence tant que la CI ne les a pas créés) ; ses clés `homogeneite/…` de TOLERANCES sont
+# Étape homogeneite (#168) : R11 et R12 la portent (plans de méthode ; références
+# créées sur la CI, exécution 42465708495) ; ses clés `homogeneite/…` de TOLERANCES sont
 # contrôlées ici sur une construction témoin (plan de R1 et étape homogeneite,
 # segmentation sexe, entrée `reference`), en mémoire, sans écriture sous
 # tests/reference/ : complétude (point 3.4), invariants (b) et (d) de #175,
