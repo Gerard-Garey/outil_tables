@@ -1990,10 +1990,11 @@ augmenté de l'étape \code{homogeneite} (âges 20 à 90, tranches de bornes
 20, 50 et 70, 999~réplications), sous la graine de Monte-Carlo 20261114
 (\code{GRAINE\_MONTE\_CARLO\_R11}, \code{tests/reference/outils\_reference.R},
 l.~299)~; l'entrée de référence portant un facteur 0,6 sur les femmes
-(section~\ref{sec:simulation}), l'hypothèse nulle y est fausse~: R11 est un
-témoin de puissance, non un verdict, et ses p-valeurs de Monte-Carlo sont
-au plancher $1/(B + 1)$, si bien qu'un changement du flux des réplications
-n'y changerait aucune valeur figée. R12 est le plan de R5 (en cours $\to$
+(section~\ref{sec:simulation}), l'hypothèse nulle y est fausse~: R11 fige
+l'étape sous une alternative~; ce n'est ni un verdict ni une mesure de
+puissance (un seul jeu). Ses p-valeurs de Monte-Carlo sont au plancher
+$1/(B + 1)$, sauf celle de la tranche 20-49~: un changement du flux des
+réplications n'y changerait que cette p-valeur et son erreur. R12 est le plan de R5 (en cours $\to$
 racheté, unité contrat) augmenté de la même étape, sous la graine 20261115
 (\code{GRAINE\_MONTE\_CARLO\_R12}, l.~300)~: les facteurs de rachat de
 l'entrée étant égaux pour les deux sexes, l'hypothèse nulle y est
@@ -2192,7 +2193,7 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \endhead
 exacte & \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
 $10^{-14}$ & \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/}~: \code{tests/} \code{statistique}, \code{p\_asymptotique}, \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}, \code{segments/z}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3) \\
+$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/}~: \code{tests/} \code{statistique}, \code{p\_asymptotique}, \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}, \code{segments/z}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme~; \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{statistique}) \\
 \end{longtable}
 }
 
@@ -2822,8 +2823,8 @@ contrôlé sur son module et son motif attendus),
 de la lecture du texte du
 plan et de deux refus \code{type\_incompatible} sur un rôle date
 (marqués UTF-8, sur une ligne, sans octet écrit
-«~<xx>~»~; issue~\#127)~; puis ces textes, trois par plan, le bilan, les messages
-de R1 et les messages par module, soit vingt et un, comparés
+«~<xx>~»~; issue~\#127)~; puis ces textes (trois par plan, le bilan, les messages
+de R1 et les messages par module~; leur nombre est écrit par la sortie du contrôle), comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11 et annotation du 05/11/2026, (f)~; M54~;
@@ -8444,20 +8445,19 @@ suit Breslow et Day (1987), relus sur l'image le 07/11/2026 par
 (§~3.6, p.~107~; §~3.6~(f), éq.~(3.23), p.~113)~; statistique (3.24), à
 $K - 1$ degrés de liberté (p.~113--114), dont la forme du code est
 conforme~; la statistique de Pearson à attendus internes, (3.11), «~always
-yields smaller values than (3.24)~» (p.~114)~; deux groupes~: convolution
+yields smaller values than (3.24)~» (p.~114~; au sens large)~; deux groupes~: convolution
 des binomiales «~in principle~» (p.~108)~; exemple chiffré du §~3.6~(g),
 p.~114--115, reproduit par le moteur à la précision imprimée (test
 d'ancrage)~; §~4.2, p.~131--135~: mêmes lois asymptotiques à exposition
 fixe ou aléatoire (p.~133--134). La loi par cellule se cite au §~3.6,
 p.~107, et au §~3.6~(f), p.~113~: la citation «~§~3.4~(c)~» d'un avis
 antérieur (issue~\#124) est \textbf{inexacte} pour cette loi, ce passage
-conditionnant au seul total avec un étalon externe. Le $z_s$ restitué par
-segment n'est pas le test (3.14) de la source (relecture
-d'\code{actuary-approfondi}, consignée au compte rendu de la PR~\#173).
+conditionnant au seul total avec un étalon externe.
 \textbf{Écarts de l'outil à la source}, nommés dans
 \code{REFERENCE\_METHODE\_HOMOGENEITE}~: degrés de liberté pris au rang de
-$V$ ($K - 1$ dans la source, ce qui n'est vrai que si le graphe
-groupes--strates est connexe)~; tests par tranche d'âge et leur somme~;
+$V$ ($K - 1$ dans la source, ce qui suppose que les $K$ groupes soient
+exposés dans des strates informatives et que le graphe groupes--strates
+soit connexe)~; tests par tranche d'âge et leur somme~;
 p-valeur exacte bilatérale à deux groupes~; p-valeur de Monte-Carlo
 conditionnelle~: ces quatre éléments sont absents de la source. C'est une
 source de méthode, qui ne prescrit rien pour l'actuariat~; ses fichiers ne
@@ -8522,8 +8522,12 @@ seuil ni verdict. Statut~: \emph{constat de simulation}~; l'erreur de
 Monte-Carlo due à $R$ est distincte de l'erreur d'estimation de chaque jeu.
 Les taux observés ne sont pas reproduits ici (E3.4)~; ils sont dans le
 message du commit \code{bad9a70}. Conclusion qualitative~: tous les taux
-sont dans la région, tous au-dessous de 5~\%~: la taille est
-\textbf{légèrement conservatrice}. La discrétude des lois conditionnelles,
+sont dans la région~; tous sont au-dessous de 5~\%, ce qui indique une
+taille \textbf{légèrement conservatrice}, sans qu'aucun taux ne s'en
+distingue seul (taux calculés sur les mêmes jeux, non indépendants). Pour
+les p-valeurs exactes et de Monte-Carlo, $P_{H_0}(p \le \alpha) \le \alpha$
+est un résultat exact (lois conditionnelles discrètes, ex aequo comptés).
+La discrétude des lois conditionnelles,
 vérifiée par \code{actuary-approfondi}, l'explique en partie~; un écart
 résiduel n'est pas expliqué. \textbf{Réserve}~: le constat ne porte que sur
 deux segments, et la puissance n'y est pas mesurée.
