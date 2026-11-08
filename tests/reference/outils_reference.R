@@ -86,7 +86,7 @@ TYPES_REFERENCE <- c("double", "integer", "logical", "character", "Date", "facto
 # les grandeurs de type double consultent cette table ; les autres types et
 # les lignes @ sont exacts par leur type. Toute modification est annotée
 # dans l'ADR 0009, datée, avec l'avis d'actuary (point 9.3).
-CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12)
+CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12, "1e-10" = 1e-10)
 # Aucune clé pour une grandeur de type integer (quatrième annotation, (b)) :
 # une clé la classerait aussi si elle redevenait double, et masquerait ce
 # retour à doubles_sans_tolerance().
@@ -254,8 +254,10 @@ TOLERANCES <- c(
   # Homogénéité entre segments (#168), préparées pour le plan de méthode de
   # (R), sur le modèle de `validation` : paramètres déclarés, dénombrements
   # et sommes d'entiers exacts ; sommes, produits et quotients IEEE à 1e-14 ;
-  # système linéaire, racines, pchisq, dbinom et Monte-Carlo à 1e-12. Toute
-  # clé commence par `homogeneite/` (#175).
+  # dbinom (p exacte) et Monte-Carlo à 1e-12 ; grandeurs dérivées de
+  # U = O - A (statistique du score, z, p asymptotique) à 1e-10 (décision du
+  # mainteneur du 08/11/2026, sur avis d'actuary). Toute clé commence par
+  # `homogeneite/` (#175).
   # exacte
   "homogeneite/parametres/plage_ages" = 0, "homogeneite/parametres/tranches_age" = 0,
   "homogeneite/parametres/replications" = 0,
@@ -270,11 +272,24 @@ TOLERANCES <- c(
   "homogeneite/resultat/segments/attendus" = 1e-14,
   "homogeneite/resultat/segments/rapport_observes_attendus" = 1e-14,
   "homogeneite/diagnostics/exposition_hors_plage" = 1e-14,
-  # 1e-12
-  "homogeneite/resultat/tests/statistique" = 1e-12, "homogeneite/resultat/tests/p_asymptotique" = 1e-12,
+  # 1e-12 : p exacte (avis d'actuary du 08/11/2026) : elle dépend des
+  # attendus par pi = E_g / E_strate (score_homogeneite()) et par la
+  # frontière |k - A_1| >= |o_1 - A_1|, tenue à TOLERANCE_RESIDU_NUL x A_1
+  # près ; elle ne contient pas la différence O - A, donc pas d'annulation.
+  # L'erreur relative de pi entre dans dbinom avec un facteur borné, d'ordre
+  # z sqrt(Var(O_1)) / (1 - pi) sur la queue (mesuré par actuary : <= 9e-15
+  # pour +-4 ulp sur pi, jusqu'à 16 000 décès, z = 4) ; marge qui décroît
+  # comme z sqrt(n) : passer à 1e-10 si un futur jeu de référence atteint
+  # ~1e6 décès par strate en queue lointaine (motif : conditionnement en
+  # pi). p de Monte-Carlo (1 + K) / (B + 1) et son erreur : comptage de
+  # répliques.
   "homogeneite/resultat/tests/p_exacte" = 1e-12, "homogeneite/resultat/tests/p_monte_carlo" = 1e-12,
   "homogeneite/resultat/tests/erreur_monte_carlo" = 1e-12,
-  "homogeneite/resultat/segments/z" = 1e-12)
+  # 1e-10 : U = O - A, différence de deux grandeurs proches (annulation :
+  # écart relatif de U de l'ordre de eps A / |U|), puis T = U' V^- U,
+  # z = U / sqrt(v) et pchisq(T, ddl)
+  "homogeneite/resultat/tests/statistique" = 1e-10, "homogeneite/resultat/tests/p_asymptotique" = 1e-10,
+  "homogeneite/resultat/segments/z" = 1e-10)
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 

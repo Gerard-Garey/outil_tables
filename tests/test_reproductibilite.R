@@ -823,6 +823,10 @@ doubles_fiche_mal_classes <- function(doubles, tolerances = TOLERANCES) {
 }
 doubles_multi_cles <- function(doubles, tolerances = TOLERANCES)
   doubles[vapply(doubles, function(c_) length(cles_de(c_, tolerances)) > 1L, NA)]
+verifier("TOLERANCES : toute tolérance est une classe de CLASSES_TOLERANCE (#168)", {
+  hors <- names(TOLERANCES)[!(TOLERANCES %in% CLASSES_TOLERANCE)]
+  if (length(hors)) paste("tolérances hors classe :", paste(hors, collapse = ", ")) else TRUE
+})
 verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
   nues <- cles_nues()
   if (length(nues)) paste("clés nues :", paste(nues, collapse = ", ")) else TRUE
@@ -1216,12 +1220,13 @@ verifier("témoin : clé retenue pour kaplan_meier/taux = brut/resultat/kaplan_m
     any(grepl("clé retenue : etapes/brut/resultat/kaplan_meier/taux -> brut/resultat/kaplan_meier/taux (classe 1e-12 ; aussi : kaplan_meier/taux)",
               imprimer_comparaison(r), fixed = TRUE, useBytes = TRUE))
 })
-verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, tolérance, verdict) et des trois classes", {
+verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, tolérance, verdict) et de chaque classe de CLASSES_TOLERANCE", {
   avant <- alterer(P_TAUX, 1 + 2e-14)
   r <- comparer_references(avant, base)
   l <- imprimer_comparaison(r)
   e <- r$grandeurs[r$grandeurs$chemin == P_TAUX, ]
-  sum(grepl("Écart relatif maximal, classe", l, fixed = TRUE, useBytes = TRUE)) == 3L &&
+  sum(grepl("Écart relatif maximal, classe", l, fixed = TRUE, useBytes = TRUE)) == length(CLASSES_TOLERANCE) &&
+    length(CLASSES_TOLERANCE) == 4L &&
     any(grepl(sprintf("%s | 149 | 1 | ", P_TAUX), l, fixed = TRUE, useBytes = TRUE)) &&
     any(grepl(sprintf("| %s | %s | 1e-14 | écart", e$avant, e$apres), l, fixed = TRUE, useBytes = TRUE)) &&
     identical(e$avant, sprintf("%.17g", avant$valeurs[[P_TAUX]][e$position])) &&

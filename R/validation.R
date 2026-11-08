@@ -167,6 +167,7 @@ ETATS_SOUS_GROUPES_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule
 # définie par H0 (p-valeur, intervalle, espérance ou variance sous H0,
 # statistique standardisée, ddl), non produite sous `ajustee_hors_outil`
 # (M254) ; les lignes `sous_groupes` décrivent resultat$sous_groupes.
+# Textes marqués UTF-8 (texte_moteur(), comme STATUTS_POSITIONNEMENT).
 STATUTS_VALIDATION <- local({
   desc <- "descriptif : calcul direct sur les cellules retenues (C+), valeur en arithmétique flottante"
   exact_h0 <- paste("exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ;",
@@ -288,16 +289,17 @@ STATUTS_VALIDATION <- local({
       "exact sous la loi supposée (O ~ Poisson, A fixe) ; qgamma, approximation numérique"),
     c("sous_groupes", "p_valeurs", "TRUE",
       paste(exact_h0, "; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité")))
-  data.frame(statistique = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
-             sous_h0 = vapply(l, `[`, "", 3L) == "TRUE", statut = vapply(l, `[`, "", 4L),
-             stringsAsFactors = FALSE)
+  texte_moteur(data.frame(statistique = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
+                          sous_h0 = vapply(l, `[`, "", 3L) == "TRUE", statut = vapply(l, `[`, "", 4L),
+                          stringsAsFactors = FALSE))
 })
 
 # Statuts sous la relation positionnee (#167, spécification, § 8 ; F5 : les
 # statuts « (0) » dépendent de la relation) : mêmes lignes (statistique,
 # grandeur, sous_h0) que STATUTS_VALIDATION, statut remplacé là où la loi,
 # les degrés de liberté ou la production changent ; A_c désigne les attendus
-# de la table positionnée, A_c = theta^_s E^c mu~_c.
+# de la table positionnée, A_c = theta^_s E^c mu~_c. Textes marqués UTF-8
+# (texte_moteur()).
 STATUTS_VALIDATION_POSITIONNEE <- local({
   s <- STATUTS_VALIDATION
   indep <- paste("; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et les",
@@ -317,7 +319,10 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
                "état contraint_par_positionnement)")
   non <- paste("non produit : le SMR de la table positionnée vaut 1 par construction (theta estimé sur ces",
                "cellules) ; état contraint_par_positionnement")
-  nc <- " ; table positionnée sur ces données : loi non corrigée de l'estimation de theta"
+  # nc est collé à un statut de STATUTS_VALIDATION, marqué UTF-8 : marqué
+  # aussi, sinon paste0() le traduirait depuis le codage natif (installation
+  # sous la locale C).
+  nc <- texte_moteur(" ; table positionnée sur ces données : loi non corrigée de l'estimation de theta")
   remplacer <- function(stat, gr, texte) {
     k <- which(s$statistique == stat & s$grandeur == gr)
     if (length(k) != 1L) stop("STATUTS_VALIDATION_POSITIONNEE : ligne inconnue (erreur de programmation).", call. = FALSE)
@@ -393,7 +398,7 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
                   "plusieurs segments (convolution des dbinom, approximation numérique ; produites si le nombre de",
                   "produits de la convolution est au plus N_MAX_PRODUITS_CONVOLUTION, état",
                   "convolution_au_dela_n_max sinon) ;", deg, "; aucune correction de multiplicité", indep))
-  s
+  texte_moteur(s)
 })
 
 # Statuts des grandeurs selon la relation (switch explicite, F5).
@@ -623,14 +628,22 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # (ELEMENTS_BLOC_REPLICATIONS) par `statistiques`, comme
 # replications_poisson() ; l'ordre réplique par réplique rend les tirages
 # indépendants du découpage en blocs. Rend la liste des vecteurs concaténés
-# (longueur B).
+# (longueur B). Un groupe sans cellule n'est admis que d'effectif nul (il
+# est sauté, sans tirage) : d'effectif positif, ses décès n'auraient aucune
+# cellule où se répartir (erreur de programmation, contrôlée avant tout
+# tirage).
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
   G <- length(effectifs)
-  if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || any(!(poids > 0)))
-    stop("replications_multinomiales() : groupes ou poids invalides (erreur de programmation).", call. = FALSE)
+  if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || any(!(poids > 0)) ||
+      anyNA(effectifs) || any(effectifs < 0))
+    stop("replications_multinomiales() : groupes, poids ou effectifs invalides (erreur de programmation).",
+         call. = FALSE)
   idx <- lapply(seq_len(G), function(g) which(groupe == g))
+  if (any(!lengths(idx) & effectifs > 0))
+    stop("replications_multinomiales() : groupe d'effectif positif sans cellule (erreur de programmation).",
+         call. = FALSE)
   pi_g <- lapply(idx, function(i) poids[i] / sum(poids[i]))
   taille <- max(1, floor(elements_bloc / max(1, n)))
   sous_graine(graine, {

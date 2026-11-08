@@ -71,6 +71,12 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE : mêmes (statistique, grandeur, sous
     grepl("couverture >= niveau (intervalle exact conservatif)", k("sous_groupes", "bornes_exactes"), fixed = TRUE) &&
     grepl("si n - S = 0 (une cellule retenue par segment)", k("khi2_pearson", "ddl"), fixed = TRUE)
 })
+verifier("A STATUTS_VALIDATION et STATUTS_VALIDATION_POSITIONNEE (#168, m8) : tout statut non ASCII marqué UTF-8 (texte_moteur()), quelle que soit la locale d'installation", {
+  nm <- function(d) { s <- d$statut[grepl("[^\001-\177]", d$statut, useBytes = TRUE)]
+                      length(s) > 0L && all(Encoding(s) == "UTF-8") && all(validUTF8(s)) }
+  tous(v = if (nm(tablexp:::STATUTS_VALIDATION)) TRUE else "STATUTS_VALIDATION",
+       p = if (nm(tablexp:::STATUTS_VALIDATION_POSITIONNEE)) TRUE else "STATUTS_VALIDATION_POSITIONNEE")
+})
 verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nomment la table positionnée (mu_pos, q_pos), jamais mu^ - mu~ ni q~ ; ddl conditionnel (si n - S = 0) ; espace avant chaque point-virgule ; STATUTS_VALIDATION inchangé octet pour octet (empreinte MD5 figée)", {
   a <- tablexp:::STATUTS_VALIDATION; b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
   k <- function(s, g) b$statut[b$statistique == s & b$grandeur == g]
@@ -203,6 +209,21 @@ verifier("multinomiales : état de l'aléa de l'appelant restauré ; poids nul o
   isTRUE(identical(.Random.seed, avant)) &&
     isTRUE(programmation(erreur_de(tablexp:::replications_multinomiales(c(0, PO[-1]), GR, EF, 9, 3L, f_somme)))) &&
     isTRUE(programmation(erreur_de(tablexp:::replications_multinomiales(PO, c(GR[-5], 3L), EF, 9, 3L, f_somme))))
+})
+verifier("multinomiales (#168) : effectif manquant ou négatif -> erreur de programmation (et non l'erreur de rmultinom())", tous(
+  na = programmation(erreur_de(tablexp:::replications_multinomiales(PO, GR, c(10, NA), 9, 3L, f_somme))),
+  negatif = programmation(erreur_de(tablexp:::replications_multinomiales(PO, GR, c(10, -1), 9, 3L, f_somme)))))
+verifier("multinomiales (#168) : groupe sans cellule d'effectif positif -> erreur de programmation ; d'effectif nul, sauté sans tirage (tirages identiques à ceux sans le groupe)", {
+  # Groupe 2 sans cellule : GR ne prend que 1 et 3 (G = 3).
+  g3 <- c(1L, 1L, 1L, 3L, 3L)
+  f3 <- function(Dm) list(m = Dm[1L, ], g3 = colSums(Dm[4:5, , drop = FALSE]))
+  e <- erreur_de(tablexp:::replications_multinomiales(PO, g3, c(10, 2, 7), 9, 11L, f3))
+  a <- tablexp:::replications_multinomiales(PO, g3, c(10, 0, 7), 97, 11L, f3)
+  b <- tablexp:::replications_multinomiales(PO, GR, EF, 97, 11L, f_somme)
+  tous(e = programmation(e),
+       m = if (grepl("groupe d'effectif positif sans cellule", conditionMessage(e), fixed = TRUE)) TRUE
+           else conditionMessage(e),
+       nul = if (identical(a$m, b$m) && identical(a$g3, rep(7, 97))) TRUE else "groupe vide d'effectif nul")
 })
 verifier("J1 positionné : reproductible au bit près à graine égale ; Monte-Carlo par réplications multinomiales (p-valeurs dans ]0, 1])", {
   a <- pos_j(B = 199, graine = 7L); b <- pos_j(B = 199, graine = 7L)
