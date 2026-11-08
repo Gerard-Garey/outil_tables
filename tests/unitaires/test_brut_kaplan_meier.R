@@ -556,7 +556,7 @@ OJ <- XJ$etapes$donnees$resultat$observations
 # construire_table().
 PJ <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
 RECJ <- tablexp:::deduire_recette(c(ROLES, segment = "g"))
-RJ <- tablexp:::calculer_exposition(OJ, PJ, PER, 0, "segment", RECJ,
+RJ <- tablexp:::calculer_exposition(OJ, PJ, "segment", RECJ,
                                     tablexp:::resoudre_convention("plus_fine", RECJ$convention_native), FALSE)
 EJ <- XJ$etapes$exposition$resultat$exposition
 brut_j <- function(e, o, convention = "dernier_anniversaire")

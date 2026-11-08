@@ -1787,7 +1787,7 @@ REC_22 <- tablexp:::deduire_recette(ROLES)
 CONV_22 <- tablexp:::resoudre_convention("plus_fine", REC_22$convention_native)
 X_22 <- construire_table(BASE, ROLES, plan_km_22)
 OBS_22 <- tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0))$resultat$observations
-EXPO_22 <- tablexp:::calculer_exposition(OBS_22, P_22, PER, 0, "sexe", REC_22, CONV_22, FALSE)
+EXPO_22 <- tablexp:::calculer_exposition(OBS_22, P_22, "sexe", REC_22, CONV_22, FALSE)
 appel_brut_22 <- function(estimateurs, observations = EXPO_22$fenetres)
   tablexp:::calculer_taux_bruts(EXPO_22$resultat$exposition, "sexe", FALSE, EXPO_22$parametres$convention$retenue,
                                 EXPO_22$parametres$unite_exposition, estimateurs, 0.95, observations = observations,
@@ -1796,7 +1796,7 @@ verifier("contrôles (#82) : fonctions d'étape en appel direct, aucun contrôle
   ok <- list(
     donnees = ecart_22(compter_controles(tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0))),
                        attendu_22()),
-    exposition = ecart_22(compter_controles(tablexp:::calculer_exposition(OBS_22, P_22, PER, 0, "sexe", REC_22, CONV_22,
+    exposition = ecart_22(compter_controles(tablexp:::calculer_exposition(OBS_22, P_22, "sexe", REC_22, CONV_22,
                                                                           FALSE)), attendu_22()),
     brut_km = ecart_22(compter_controles(appel_brut_22(c("poisson", "kaplan_meier"))), attendu_22()),
     brut = ecart_22(compter_controles(appel_brut_22(c("poisson", "binomial"))), attendu_22()),
@@ -1832,7 +1832,7 @@ verifier("contrôles (#82) : calculer_exposition() avec les valeurs validées, c
     pl <- modifier(plan_type(), etapes = list(donnees = list(exclusions = character(0)),
                                               exposition = list(convention = a[1L], par_annee = as.logical(a[2L]))))
     cv <- tablexp:::resoudre_convention(a[1L], REC_22$convention_native)
-    identical(tablexp:::calculer_exposition(OBS_22, P_22, PER, 0, "sexe", REC_22, cv,
+    identical(tablexp:::calculer_exposition(OBS_22, P_22, "sexe", REC_22, cv,
                                             as.logical(a[2L]))[c("parametres", "resultat", "diagnostics")],
               construire_table(BASE, ROLES, pl)$etapes$exposition)
   }, logical(1L))

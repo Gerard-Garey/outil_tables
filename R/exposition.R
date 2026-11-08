@@ -361,10 +361,10 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #                       (resultat$observations : date_naissance, debut, fin
 #                       [NA = en cours], cause, et les rôles de segmentation) ;
 #   p                 : valeurs validées de la transition, de la période et du
-#                       délai (valeurs_parametres_donnees()) ;
-#   periode           : list(debut, fin), dates ; fin incluse ;
-#   delai_declaration : entier de jours >= 0 (periode et delai_declaration
-#                       sont inscrits tels quels dans parametres) ;
+#                       délai (valeurs_parametres_donnees()) : p$periode,
+#                       list(debut, fin), dates, fin incluse, et
+#                       p$delai_declaration, entier de jours >= 0, sont
+#                       inscrits tels quels dans parametres (#182) ;
 #   segmentation      : sous-ensemble de c("sexe", "segment"), vide admis ;
 #   recette           : recette validée (deduire_recette()) ;
 #   conv              : convention validée (resoudre_convention()) ;
@@ -395,8 +395,7 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 # parametres$unite_exposition), complement_initial_cellule et
 # complement_initial_fenetre (sans par_annee seulement), evenements,
 # sorties_concurrentes.
-calculer_exposition <- function(observations, p, periode, delai_declaration, segmentation, recette, conv,
-                                par_annee) {
+calculer_exposition <- function(observations, p, segmentation, recette, conv, par_annee) {
   cv <- conv$retenue
   manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
   if (length(manquantes))
@@ -516,7 +515,7 @@ calculer_exposition <- function(observations, p, periode, delai_declaration, seg
                       # Texte du moteur marqué UTF-8 en toute locale (#50).
                       unite_exposition = texte_moteur(UNITES_EXPOSITION[[cv]]), par_annee = par_annee,
                       transition = p$transition$code, segmentation = segmentation,
-                      periode = periode, delai_declaration = delai_declaration,
+                      periode = p$periode, delai_declaration = p$delai_declaration,
                       fin_effective = structure(borne - 1, class = "Date"),
                       hypothese_censure = texte_moteur(HYPOTHESE_CENSURE)),
     resultat = list(exposition = table_exp),

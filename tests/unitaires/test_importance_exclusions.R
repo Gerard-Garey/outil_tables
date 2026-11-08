@@ -736,7 +736,7 @@ global <- function(x, cles, niveau) {
   L <- sort(c(rd$numeros_conserves, cl$lignes[cl$classe == "M"]))
   ob <- construire_observations(S4[L, ], L, ROLES_SIM, cles, P)
   rec <- tablexp:::deduire_recette(ROLES_SIM)
-  t_rs <- tablexp:::calculer_exposition(ob$observations, P, PER, 0, cles, rec,
+  t_rs <- tablexp:::calculer_exposition(ob$observations, P, cles, rec,
                                         tablexp:::resoudre_convention("plus_fine", rec$convention_native),
                                         FALSE)$resultat$exposition
   t_r <- if (length(cles)) x$etapes$exposition$resultat$exposition
@@ -828,15 +828,15 @@ REC_X1 <- tablexp:::deduire_recette(ROLES_SIM)
 CONV_X1 <- tablexp:::resoudre_convention("plus_fine", REC_X1$convention_native)
 verifier("appel direct (valeur calculée à la main) : validation sans table -> erreur de programmation ; la fonction d'étape ne contrôle plus le niveau (#82 : refus niveau_invalide levé par valider_plan(), ci-dessus)", {
   e <- X1$etapes
-  b <- tryCatch({ tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, list(), NULL, P_X1, P15,
-                                                           0, REC_X1, CONV_X1, character(0), 0.95); NULL },
+  b <- tryCatch({ tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, list(), NULL, P_X1,
+                                                           REC_X1, CONV_X1, character(0), 0.95); NULL },
                 error = function(e) e)
   !inherits(b, "refus_tablexp") && grepl("erreur de programmation", conditionMessage(b), fixed = TRUE) &&
     !("controler" %in% names(formals(tablexp:::calculer_importance_exclusions)))
 })
 verifier("appel direct = construire_table() (identité exacte) : même résultat, aucun avertissement", {
   e <- X1$etapes
-  r <- tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, NULL, NULL, P_X1, P15, 0, REC_X1,
+  r <- tablexp:::calculer_importance_exclusions(T1, ROLES_SIM, e$donnees, e$exposition, NULL, NULL, P_X1, REC_X1,
                                                 CONV_X1, character(0), 0.95)
   identical(r[c("parametres", "resultat", "diagnostics")], e$importance_exclusions) && !nrow(r$avertissements)
 })

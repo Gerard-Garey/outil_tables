@@ -803,8 +803,7 @@ verifier("calculer_exposition : garde de présence avant le tabulate() de prése
                              exposition = list(convention = "plus_fine", par_annee = FALSE)))
   obs <- construire_table(d, roles, plan)$etapes$donnees$resultat$observations
   rec <- tablexp:::deduire_recette(roles)
-  appeler <- function(f) f(obs, p = tablexp:::valeurs_parametres_donnees(vd, per, 0), periode = per,
-                           delai_declaration = 0, segmentation = character(0), recette = rec,
+  appeler <- function(f) f(obs, p = tablexp:::valeurs_parametres_donnees(vd, per, 0), segmentation = character(0), recette = rec,
                            conv = tablexp:::resoudre_convention("plus_fine", rec$convention_native), par_annee = FALSE)
   original <- get("calculer_exposition", ns)
   journal <- character(0)

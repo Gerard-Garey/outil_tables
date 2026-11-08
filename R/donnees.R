@@ -351,15 +351,18 @@ ligne_transition <- function(transition)
               drop = FALSE]
 
 # Valeurs que les paramètres de transition, de période et de délai déjà
-# contrôlés donnent (#22) : list(transition, debut, fin, borne), la ligne de
-# TRANSITIONS, les bornes de la période et la borne B = fin - délai + 1 (jours
-# depuis 1970-01-01). Ne contrôle rien : rendue par controler_transition_periode()
+# contrôlés donnent (#22) : list(transition, debut, fin, borne, periode,
+# delai_declaration), la ligne de TRANSITIONS, les bornes de la période et la
+# borne B = fin - délai + 1 (jours depuis 1970-01-01), puis la période et le
+# délai tels que le plan les porte (#182 : seule source des champs validés ;
+# periode et delai_declaration sont inscrits tels quels dans les paramètres de
+# l'étape exposition). Ne contrôle rien : rendue par controler_transition_periode()
 # et par controler_plan_roles() (orchestration), qui la transmet aux
 # fonctions d'étape après valider_plan() (#82).
 valeurs_parametres_donnees <- function(transition, periode, delai_declaration) {
   fin <- as.numeric(periode[["fin"]])
   list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]), fin = fin,
-       borne = (fin - delai_declaration) + 1)
+       borne = (fin - delai_declaration) + 1, periode = periode, delai_declaration = delai_declaration)
 }
 
 # Contrôle la transition, la période d'observation et le délai de déclaration
