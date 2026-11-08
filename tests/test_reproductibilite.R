@@ -20,7 +20,8 @@
 #  jeu_reference_defauts() pour R9), aplatis, aller-retour exact du format,
 #  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
 #  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE : R10), aucune référence orpheline ;
+#  SANS_REFERENCE, vide depuis la création de R10 à R12), aucune référence
+#  orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
 #  exclusions, table importée passée par tables_reference (#166) ; R9 : le
@@ -334,7 +335,7 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-SANS_REFERENCE <- c(R10 = "#167")
+SANS_REFERENCE <- character(0)
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
