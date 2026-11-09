@@ -172,7 +172,18 @@ STATUTS_VALIDATION <- local({
   desc <- "descriptif : calcul direct sur les cellules retenues (C+), valeur en arithmétique flottante"
   exact_h0 <- paste("exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ;",
                     "fonctions de répartition de Poisson (ppois), approximation numérique")
-  chi2 <- "asymptotique : loi du khi-deux à n - p degrés de liberté (A_c -> infini), p = 0"
+  chi2 <- "asymptotique : loi du khi-deux à n - p degrés de liberté (A_c -> infini dans chaque cellule retenue), p = 0"
+  # Attendus faibles (#179 ; spécification (0'), M359, M360) : avertissement
+  # sans seuil, chiffré par khi2_pearson/variance_h0 ; petits, fin_x2 et g2
+  # sont recopiés à l'identique dans STATUTS_VALIDATION_POSITIONNEE (portée
+  # locale ; identité contrôlée par le test T179.1).
+  petits <- "approximation non garantie quand des attendus A_c sont petits"
+  fin_x2 <- paste("le niveau réel du test fondé sur cette p n'est pas établi en général et dépasse le niveau nominal",
+                  "dans les constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0 (i)")
+  g2 <- paste("l'espérance de la contribution d'une cellule est inférieure à 1 pour A_c inférieur à 0,49 environ et",
+              "supérieure à 1 au-delà (maximum voisin de 1,16), par sommation des probabilités (approximation",
+              "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
+              "p_monte_carlo a un niveau garanti sous H0 (i)")
   mc <- paste("niveau exact sous H0 (i), E^c tenue pour fixe : P_H0(p_MC <= alpha) <= alpha ; e est l'erreur due",
               "au nombre fini de réplications, distincte de l'erreur d'estimation")
   e_mc <- paste("erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre fini de",
@@ -191,13 +202,21 @@ STATUTS_VALIDATION <- local({
     c("residus", "esperance_au_dela_3", "TRUE", paste(exact_h0, "; somme sur C+ de P(|D_c - A_c| > 3 sqrt(A_c))")),
     c("khi2_pearson", "statistique", "FALSE", "descriptif : X2 = somme sur C+ de (D - A)^2 / A"),
     c("khi2_pearson", "ddl", "TRUE", "n - p : n cellules retenues, p paramètres estimés sur ces données (0)"),
-    c("khi2_pearson", "p_asymptotique", "TRUE", paste(chi2, "; queue supérieure")),
+    c("khi2_pearson", "variance_h0", "TRUE",
+      paste("exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie : Var(X2) = somme sur C+",
+            "de (2 + 1/A_c) (moments de Poisson d'ordre 4), à comparer à 2 (n - p), variance de la loi de référence",
+            "de khi2_pearson/p_asymptotique (les espérances sont égales) ; arithmétique flottante")),
+    c("khi2_pearson", "p_asymptotique", "TRUE",
+      paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe, E[X2] = n - p exactement mais",
+            "Var(X2) = somme sur C+ de (2 + 1/A_c) > 2 (n - p) (moments de Poisson, résultat exact ;",
+            "khi2_pearson/variance_h0) ;", fin_x2)),
     c("khi2_pearson", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure")),
     c("khi2_pearson", "erreur_monte_carlo", "TRUE", e_mc),
     c("deviance", "statistique", "FALSE",
       "descriptif : G2 = 2 somme sur C+ de [D ln(D / A) - (D - A)] (0 ln 0 = 0), rapport de vraisemblance"),
     c("deviance", "ddl", "TRUE", "n - p : n cellules retenues, p paramètres estimés sur ces données (0)"),
-    c("deviance", "p_asymptotique", "TRUE", paste(chi2, "; queue supérieure")),
+    c("deviance", "p_asymptotique", "TRUE",
+      paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe,", g2)),
     c("deviance", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure")),
     c("deviance", "erreur_monte_carlo", "TRUE", e_mc),
     c("smr", "observes", "FALSE", "descriptif : O = somme de D sur C+"),
@@ -307,8 +326,21 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
   cond <- paste("exact sous H0 (i) conditionnellement aux décès observés O_s de chaque segment, E^c tenue pour fixe,",
                 "quel que soit theta : D_c | O_s ~ Bin(O_s, pi_c), pi_c = A_c / A_s ; asymptotique sous le modèle de",
                 "survie ; fonctions de répartition binomiales (pbinom), approximation numérique", indep)
-  chi2 <- paste("asymptotique : loi du khi-deux à n - S degrés de liberté (A_c -> infini), theta estimé par maximum",
-                "de vraisemblance sur ces cellules, un par segment positionné (S segments)", indep)
+  # Corps de la loi de référence (#179, spécification (0') et visa
+  # d'actuary) : X2 et G2 ont le même corps, « (A_c -> infini dans chaque
+  # cellule retenue) » ; seul G2 précise que ses seuils sont calculés sous
+  # Poisson, sans conditionner par les O_s ; les deux finissent par `indep`.
+  loi_s <- "asymptotique : loi du khi-deux à n - S degrés de liberté"
+  theta_s <- "theta estimé par maximum de vraisemblance sur ces cellules, un par segment positionné (S segments)"
+  petits <- "approximation non garantie quand des attendus A_c sont petits"
+  fin_x2 <- paste("le niveau réel du test fondé sur cette p n'est pas établi en général et dépasse le niveau nominal",
+                  "dans les constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0 (i)")
+  g2 <- paste("l'espérance de la contribution d'une cellule est inférieure à 1 pour A_c inférieur à 0,49 environ et",
+              "supérieure à 1 au-delà (maximum voisin de 1,16), par sommation des probabilités (approximation",
+              "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
+              "p_monte_carlo a un niveau garanti sous H0 (i)")
+  var_s <- paste("Var(X2) = somme sur les segments de [2 (n_s - 1) + somme sur C+_s de 1/A_c - (n_s^2 + 2 n_s - 2) /",
+                 "O_s]")
   mc <- paste("niveau exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta :",
               "P_H0(p_MC <= alpha | O_s) <= alpha ; réplications multinomiales (O_s ; pi_c) par segment ; e est",
               "l'erreur due au nombre fini de réplications, distincte de l'erreur d'estimation", indep)
@@ -334,9 +366,24 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
               paste0(cond, " ; somme sur C+ de P(|D_c - A_c| > ", k, " sqrt(A_c))"))
   for (st in c("khi2_pearson", "deviance")) {
     remplacer(st, "ddl", ddl)
-    remplacer(st, "p_asymptotique", paste(chi2, "; queue supérieure"))
     remplacer(st, "p_monte_carlo", paste(mc, "; queue supérieure"))
   }
+  remplacer("khi2_pearson", "variance_h0",
+            paste("exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta ;",
+                  "asymptotique sous le modèle de survie : Var(X2 | O_s) = somme sur les segments de [2 (n_s - 1) +",
+                  "somme sur C+_s de 1/A_c - (n_s^2 + 2 n_s - 2) / O_s], A_c = O_s pi_c (moments multinomiaux",
+                  "d'ordre 4), à comparer à 2 (n - S) ; arithmétique flottante", indep))
+  remplacer("khi2_pearson", "p_asymptotique",
+            paste0(loi_s, " (A_c -> infini dans chaque cellule retenue), ", theta_s, " ; queue supérieure ; ", petits,
+                   " : sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, E[X2] = n - S exactement et ",
+                   var_s, " (moments multinomiaux, résultat exact ; khi2_pearson/variance_h0), supérieure à 2 (n - S)",
+                   " quand des A_c sont petits devant ceux de leur segment, inférieure quand les A_c d'un segment",
+                   " sont égaux ; ", fin_x2, " ", indep))
+  remplacer("deviance", "p_asymptotique",
+            paste0(loi_s, " (A_c -> infini dans chaque cellule retenue), ", theta_s, " ; queue supérieure ; ", petits,
+                   " : sous H0 (i), E^c tenue pour fixe, pour des cellules de loi de Poisson d'espérance A_c, sans",
+                   " conditionner par les O_s (conditionnellement aux O_s, D_c suit une loi binomiale et les valeurs",
+                   " ci-après ne valent qu'approximativement, quand pi_c est petit), ", g2, " ", indep))
   remplacer("smr", "attendus",
             "descriptif : A = somme de A_c sur C+, A_c = theta^_s E^c mu~_c ; égal à O par construction, à l'arrondi près")
   remplacer("smr", "smr", "descriptif : O / A, égal à 1 par construction, à l'arrondi près")
@@ -817,6 +864,22 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
     degenere <- positionnee && ddl == 0
     pose("khi2_pearson", "statistique", t_obs$khi2)
     pose("khi2_pearson", "ddl", ddl)
+    # Variance exacte de X2 sous H0 (i), E^c tenue pour fixe (#179 ;
+    # spécification (0'), M359) : moments de Poisson, somme sur C+ de
+    # (2 + 1/A_c) ; moments multinomiaux conditionnels aux O_s, par segment
+    # 2 (n_s - 1) + somme de 1/A_c - (n_s^2 + 2 n_s - 2) / O_s avec A_c =
+    # O_s pi_c (loi des réplications ; O_s >= 1 par le refus
+    # positionnement_sans_deces) ; NA sous ajustee_hors_outil (remplacé plus
+    # bas par ddl_non_etabli).
+    pose("khi2_pearson", "variance_h0", switch(relation_table,
+      independante = sum(2 + 1 / Ar),
+      ajustee_hors_outil = NA_real_,
+      positionnee = {
+        n_s <- tabulate(gr, nbins = length(Os))
+        inv_s <- as.numeric(rowsum(1 / (nr * pic), gr, reorder = TRUE))
+        sum(2 * (n_s - 1) + inv_s - (n_s^2 + 2 * n_s - 2) / Os)
+      },
+      stop("statistiques_validation() : relation inconnue (erreur de programmation).", call. = FALSE)))
     pose("khi2_pearson", "p_asymptotique", stats::pchisq(t_obs$khi2, ddl, lower.tail = FALSE))
     pose("deviance", "statistique", t_obs$deviance)
     pose("deviance", "ddl", ddl)
@@ -955,7 +1018,7 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
     }
     if (degenere) {
       mc_ <- c("p_monte_carlo", "erreur_monte_carlo")
-      tests <- list(khi2_pearson = c("p_asymptotique", mc_), deviance = c("p_asymptotique", mc_),
+      tests <- list(khi2_pearson = c("variance_h0", "p_asymptotique", mc_), deviance = c("p_asymptotique", mc_),
                     signes = c("statistique", "p_asymptotique", "p_exacte", mc_),
                     runs = c("esperance", "variance", "statistique", "p_asymptotique", "p_exacte", mc_),
                     wilcoxon = c("variance", "statistique", "p_asymptotique", "p_exacte", mc_))
