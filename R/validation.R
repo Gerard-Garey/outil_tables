@@ -27,6 +27,8 @@
 #    sous_graine()), pvaleur_monte_carlo() ;
 #  - loi_somme_binomiales() : loi d'une somme de binomiales indépendantes
 #    (convolution, brique partagée avec #168, F3) ;
+#  - p_somme_binomiales_normale() : p-valeurs asymptotiques de cette somme
+#    (approximation normale, correction de continuité ; #178) ;
 #  - statistiques_validation() : S1 à S12 sur les cellules (cœur partagé avec
 #    #69 et le futur suivre_experience(), ADR 0015, point 7.5) ;
 #  - sous_groupes_validation(), sous_groupes_positionnee() : S5 par
@@ -103,8 +105,9 @@ ELEMENTS_BLOC_REPLICATIONS <- 2^22
 # Nombre maximal de produits de la convolution directe de
 # loi_somme_binomiales() (relation positionnee, sous-groupes de plusieurs
 # segments ; F3, M185 ; audit A2) : coût calculé avant la convolution par
-# cout_convolution_binomiales() ; au-delà, p-valeurs NA
-# (convolution_au_dela_n_max). Mesures (hôte cloud Linux, R 4.3.3,
+# cout_convolution_binomiales() ; au-delà, p-valeurs exactes NA, p-valeurs
+# asymptotiques par p_somme_binomiales_normale() (convolution_au_dela_n_max ;
+# #178). Mesures (hôte cloud Linux, R 4.3.3,
 # 07/11/2026 ; débit d'environ 1,1 à 1,4e8 produits/s) :
 #   segments x n_s, pi                        produits        durée
 #   2 x 50 000, 0,5                           73 599 241      0,61 s
@@ -157,8 +160,10 @@ ETATS_GRANDEUR_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule_ret
 # cellules retenues de ce segment : O_b déterministe sachant les O_s ; SMR
 # descriptif, bornes et p-valeurs NA ; C1), bornes_non_definies (sous-groupe
 # de plusieurs segments : p-valeurs produites, bornes NA),
-# convolution_au_dela_n_max (coût de la convolution au-delà de
-# N_MAX_PRODUITS_CONVOLUTION : p-valeurs et bornes NA).
+# convolution_au_dela_n_max (sous-groupe de plusieurs segments, coût de la
+# convolution au-delà de N_MAX_PRODUITS_CONVOLUTION : p-valeurs exactes et
+# bornes NA, p-valeurs asymptotiques produites à la place des exactes ;
+# #178). Les colonnes p_*_asymptotique sont NA dans tout autre état.
 ETATS_SOUS_GROUPES_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule_retenue",
                                    "contraint_par_positionnement", "bornes_non_definies", "convolution_au_dela_n_max")
 
@@ -307,7 +312,11 @@ STATUTS_VALIDATION <- local({
     c("sous_groupes", "bornes_exactes", "TRUE",
       "exact sous la loi supposée (O ~ Poisson, A fixe) ; qgamma, approximation numérique"),
     c("sous_groupes", "p_valeurs", "TRUE",
-      paste(exact_h0, "; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité")))
+      paste(exact_h0, "; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité")),
+    c("sous_groupes", "p_valeurs_asymptotiques", "TRUE",
+      paste("relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours",
+            "calculée ; relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe",
+            "(ddl_non_etabli) ; colonnes NA")))
   texte_moteur(data.frame(statistique = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
                           sous_h0 = vapply(l, `[`, "", 3L) == "TRUE", statut = vapply(l, `[`, "", 4L),
                           stringsAsFactors = FALSE))
@@ -444,7 +453,18 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
                   "segment (pbinom) ; somme de binomiales indépendantes Bin(O_s, pi_b,s) pour un sous-groupe de",
                   "plusieurs segments (convolution des dbinom, approximation numérique ; produites si le nombre de",
                   "produits de la convolution est au plus N_MAX_PRODUITS_CONVOLUTION, état",
-                  "convolution_au_dela_n_max sinon) ;", deg, "; aucune correction de multiplicité", indep))
+                  "convolution_au_dela_n_max sinon, p-valeurs asymptotiques produites à leur place) ;", deg,
+                  "; aucune correction de multiplicité", indep))
+  # p asymptotiques au-delà du plafond (#178 ; spécification (0'), M361).
+  remplacer("sous_groupes", "p_valeurs_asymptotiques",
+            paste("asymptotiques (sigma^2 -> infini) conditionnellement aux O_s : approximation normale de la somme",
+                  "de binomiales indépendantes Bin(O_s, pi_b,s) d'un sous-groupe de plusieurs segments, moyenne somme",
+                  "de O_s pi_b,s, variance sigma^2 = somme de O_s pi_b,s (1 - pi_b,s), correction de continuité",
+                  "(P(O_b <= o) par Phi((o + 1/2 - moyenne) / sigma), P(O_b >= o) par 1 - Phi((o - 1/2 - moyenne) /",
+                  "sigma)), p centrale min(1, 2 min) ; produites seulement si le nombre de produits de la convolution",
+                  "dépasse N_MAX_PRODUITS_CONVOLUTION (état convolution_au_dela_n_max), les p-valeurs exactes étant",
+                  "alors NA ; jamais produites à côté d'une p-valeur exacte ; erreur relative croissante dans les",
+                  "queues (asymétrie de la somme, d'ordre 1/sigma) ; aucune correction de multiplicité", indep))
   texte_moteur(s)
 })
 
@@ -758,6 +778,24 @@ loi_somme_binomiales <- function(n, p) {
   r[debut + seq_along(loi)] <- loi
   attr(r, "produits") <- produits
   r
+}
+
+# p-valeurs asymptotiques d'une somme X de binomiales indépendantes Bin(n_s,
+# p_s) en o (#178 ; spécification (0'), M361) : approximation normale de
+# moyenne mu = somme de n_s p_s et de variance sigma^2 = somme de n_s p_s (1 -
+# p_s), avec correction de continuité : P(X <= o) par Phi((o + 1/2 - mu) /
+# sigma), P(X >= o) par 1 - Phi((o - 1/2 - mu) / sigma) (pnorm(lower.tail =
+# FALSE)), p centrale min(1, 2 min). sigma = 0 (toutes les p_s dans {0, 1})
+# est inatteignable au-delà de N_MAX_PRODUITS_CONVOLUTION : erreur de
+# programmation. Rend c(inferieure, superieure, centrale).
+p_somme_binomiales_normale <- function(n, p, o) {
+  mu <- sum(n * p)
+  sigma <- sqrt(sum(n * p * (1 - p)))
+  if (!isTRUE(sigma > 0))
+    stop("p_somme_binomiales_normale() : variance nulle (erreur de programmation).", call. = FALSE)
+  inf <- stats::pnorm((o + 0.5 - mu) / sigma)
+  sup <- stats::pnorm((o - 0.5 - mu) / sigma, lower.tail = FALSE)
+  c(inferieure = inf, superieure = sup, centrale = min(1, 2 * min(inf, sup)))
 }
 
 # p-valeur de Monte-Carlo (M253, point 1) : p = (1 + K) / (B + 1), K nombre
@@ -1085,6 +1123,10 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
       if (ajustee && c_ != "smr") v[] <- NA_real_
       d[[switch(c_, borne_inf = "borne_inf_exacte", borne_sup = "borne_sup_exacte", c_)]] <- v
     }
+    # p asymptotiques (#178 ; M361) : colonnes présentes sous les trois
+    # relations, produites sous positionnee seule (NA ici).
+    for (c_ in c("p_inferieure_asymptotique", "p_superieure_asymptotique", "p_centrale_asymptotique"))
+      d[[c_]] <- rep(NA_real_, n_g)
     d$etat <- ifelse(!ok, "aucune_cellule_retenue", if (ajustee) "ddl_non_etabli" else "produite")
     d
   }
@@ -1112,8 +1154,10 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
 # pour chaque groupe k du regroupement `nom` (indices `cle` des cellules,
 # n_g groupes ; O et At : décès et attendus de la table positionnée du
 # groupe), colonnes smr, borne_inf_exacte, borne_sup_exacte, p_inferieure,
-# p_superieure, p_centrale, etat. Lois conditionnelles aux décès O_s de
-# chaque segment s : O_b,s | O_s ~ Bin(O_s, pi_b,s), pi_b,s = A_b,s / A_s.
+# p_superieure, p_centrale, p_inferieure_asymptotique,
+# p_superieure_asymptotique, p_centrale_asymptotique, etat. Lois
+# conditionnelles aux décès O_s de chaque segment s : O_b,s | O_s ~ Bin(O_s,
+# pi_b,s), pi_b,s = A_b,s / A_s.
 #   - regroupement segment, et tout groupe qui contient, pour chaque segment
 #     qu'il touche, toutes les cellules retenues de ce segment (C1 : O_b
 #     déterministe sachant les O_s ; détecté par les décomptes de cellules
@@ -1126,14 +1170,19 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
 #     des binomiales (loi_somme_binomiales() ; un segment complet y entre
 #     avec pi = 1 exactement, loi dégénérée en O_s), bornes NA, état
 #     bornes_non_definies ; coût (cout_convolution_binomiales()) au-delà
-#     de N_MAX_PRODUITS_CONVOLUTION : p-valeurs NA, état
-#     convolution_au_dela_n_max ;
+#     de n_max (N_MAX_PRODUITS_CONVOLUTION ; autre valeur pour les seuls
+#     tests) : p-valeurs exactes et bornes NA, p-valeurs asymptotiques
+#     (p_somme_binomiales_normale() ; #178), état convolution_au_dela_n_max ;
+#     une ligne ne porte jamais à la fois une p exacte et une p asymptotique ;
 #   - groupe sans cellule retenue : NA, état aucune_cellule_retenue.
-sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At, niveau) {
+# Colonnes p_*_asymptotique NA hors de l'état convolution_au_dela_n_max.
+sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At, niveau,
+                                     n_max = N_MAX_PRODUITS_CONVOLUTION) {
   alpha <- 1 - niveau
   na <- rep(NA_real_, n_g)
   r <- list(smr = ifelse(At > 0, O / At, NA_real_), borne_inf_exacte = na, borne_sup_exacte = na, p_inferieure = na,
-            p_superieure = na, p_centrale = na, etat = ifelse(At > 0, "produite", "aucune_cellule_retenue"))
+            p_superieure = na, p_centrale = na, p_inferieure_asymptotique = na, p_superieure_asymptotique = na,
+            p_centrale_asymptotique = na, etat = ifelse(At > 0, "produite", "aucune_cellule_retenue"))
   if (identical(nom, "segment")) {
     r$etat[At > 0] <- "contraint_par_positionnement"
     return(r)
@@ -1160,7 +1209,11 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
       psup <- stats::pbinom(ob - 1, n, pib, lower.tail = FALSE)
       r$borne_inf_exacte[k] <- if (ob > 0) stats::qbeta(alpha / 2, ob, n - ob + 1) / pib else 0
       r$borne_sup_exacte[k] <- if (ob < n) stats::qbeta(1 - alpha / 2, ob + 1, n - ob) / pib else 1 / pib
-    } else if (cout_convolution_binomiales(Os[j], pib) > N_MAX_PRODUITS_CONVOLUTION) {
+    } else if (cout_convolution_binomiales(Os[j], pib) > n_max) {
+      pa <- p_somme_binomiales_normale(Os[j], pib, ob)
+      r$p_inferieure_asymptotique[k] <- pa[["inferieure"]]
+      r$p_superieure_asymptotique[k] <- pa[["superieure"]]
+      r$p_centrale_asymptotique[k] <- pa[["centrale"]]
       r$etat[k] <- "convolution_au_dela_n_max"
       next
     } else {
