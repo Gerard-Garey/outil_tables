@@ -505,6 +505,30 @@ verifier("T7 (valeur calculée à la main) : aucune cellule retirée avec exposi
   s <- s1(1L, 0.3, 2L, 1, ages_e = 66L)
   identical(s$etat, "sans_exposition_retenue") && is.na(s$smr) && identical(s$cellules_sans_exposition_retenue, 1L)
 })
+# Type de etat_cellule (#177) : character que la table de cellules soit vide,
+# mêle des cellules produites et sans exposition retenue, ou n'en ait aucune
+# de produite ; ifelse() sur un vecteur vide rendait logical(0).
+verifier("T7 (#177) : etat_cellule en character, cellules retirées vides (0 ligne), mêlées (produite, sans_exposition_retenue) ou toutes sans exposition retenue ; tables de cellules A et B de la construction vides ou non, character", {
+  c1 <- function(De, Ee, Dr, Er, ages_r = 65L, ages_e = 65L)
+    tablexp:::smr_comparateur_1(data.frame(age = ages_e, evenements_retires = De, exposition_jours_retiree = Ee * 365,
+                                           exposition_centrale_retiree = Ee),
+                                data.frame(age = ages_r, evenements = Dr, exposition_jours = Er * 365,
+                                           exposition_centrale = Er), character(0), FALSE, 0.95)$cellules
+  vide <- c1(integer(0), numeric(0), 2L, 1, ages_e = integer(0))
+  melee <- c1(c(1L, 1L), c(0.5, 0.3), 2L, 1, ages_e = 65:66)
+  sans <- c1(1L, 0.3, 2L, 1, ages_e = 66L)
+  v0 <- construire_table(T1[1:4, ], ROLES_SANS_TETE, plan_ie("id_contrat_manquant"))$etapes$importance_exclusions$resultat
+  tous(vide = if (nrow(vide) == 0L && identical(vide$etat_cellule, character(0))) TRUE else paste(typeof(vide$etat_cellule), nrow(vide)),
+       melee = if (identical(melee$etat_cellule, c("produite", "sans_exposition_retenue"))) TRUE else paste(melee$etat_cellule, collapse = " "),
+       sans = if (identical(sans$etat_cellule, "sans_exposition_retenue")) TRUE else paste(sans$etat_cellule, collapse = " "),
+       table_vide = if (nrow(v0$cellules_niveau_a) == 0L && nrow(v0$cellules_niveau_b) == 0L &&
+                        identical(typeof(v0$cellules_niveau_a$etat_cellule), "character") &&
+                        identical(typeof(v0$cellules_niveau_b$etat_cellule), "character")) TRUE
+                    else "tables de cellules vides attendues, etat_cellule character",
+       table_remplie = if (identical(typeof(I6$cellules_niveau_a$etat_cellule), "character") &&
+                           identical(typeof(I6$cellules_niveau_b$etat_cellule), "character") &&
+                           nrow(I6$cellules_niveau_a) > 0L && nrow(I6$cellules_niveau_b) > 0L) TRUE else "tables remplies attendues, character")
+})
 
 # --- T8 : comparateur 2 (valeur calculée à la main) --------------------------------
 
