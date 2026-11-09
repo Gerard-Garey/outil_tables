@@ -1,4 +1,1 @@
 type,nom,issue,motif
-export,empiler_stocks,#181,"empiler_stocks() exportée (couche de lecture, application), commit (5) ; à citer par docwriter en fin de branche (règle 9)"
-entree,fonctions-donnees:empiler_stocks,#181,"empiler_stocks(), commit (5) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
-entree,exports:empiler_stocks,#181,"empiler_stocks() exportée, commit (5) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
