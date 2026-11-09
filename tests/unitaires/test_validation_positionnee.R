@@ -67,6 +67,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE : mêmes (statistique, grandeur, sous
     !any(grepl("Liddell|Garwood|Byar|Wilson|Hilferty|Clopper|Pearson \\(", b$statut)) &&
     all(grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs",
               c(k("residus", "esperance_au_dela_2"), k("khi2_pearson", "p_asymptotique"), k("deviance", "p_monte_carlo"),
+                k("deviance", "p_asymptotique"),
                 k("sous_groupes", "bornes_exactes"), k("sous_groupes", "p_valeurs")), fixed = TRUE)) &&
     grepl("couverture >= niveau (intervalle exact conservatif)", k("sous_groupes", "bornes_exactes"), fixed = TRUE) &&
     grepl("si n - S = 0 (une cellule retenue par segment)", k("khi2_pearson", "ddl"), fixed = TRUE)
@@ -82,7 +83,9 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
   k <- function(s, g) b$statut[b$statistique == s & b$grandeur == g]
   pos <- c(k("wilcoxon", "effectif"), k("wilcoxon", "groupes_ex_aequo"), k("wilcoxon", "w_plus"), k("r2", "valeur"))
   # Empreinte des statuts de la relation independante (et ajustee_hors_outil)
-  # avant M309, valeur écrite en dur (identité exacte) : octets bruts des
+  # avant M309, mise à jour par #179 (ligne khi2_pearson/variance_h0 et
+  # textes des deux p asymptotiques ; avant #179 : 3e1b88019ff1d3a567acbd3c37aed3ec),
+  # valeur écrite en dur (identité exacte) : octets bruts des
   # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
   # lignes par un saut de ligne ; indépendante de la locale d'installation
   # et de session.
@@ -109,7 +112,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
                         grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
                               useBytes = TRUE))
                       TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
-    independante = if (identical(unname(tools::md5sum(f)), "3e1b88019ff1d3a567acbd3c37aed3ec")) TRUE
+    independante = if (identical(unname(tools::md5sum(f)), "937ad009c51822ad825fff9a3c560527")) TRUE
                    else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(
@@ -462,7 +465,8 @@ local({
 # ddl = n - S = 0 (audit A1) : une cellule retenue par segment, A = theta^ A~
 # avec theta^ = D / A~ (S = 1 et S = 2 ; E^c = 7 et 13,7) ; témoin ddl = 1
 # (un segment de deux cellules).
-TESTS_A1 <- c(paste0(rep(c("khi2_pearson", "deviance"), each = 3L), "/",
+TESTS_A1 <- c("khi2_pearson/variance_h0",  # #179
+              paste0(rep(c("khi2_pearson", "deviance"), each = 3L), "/",
                      c("p_asymptotique", "p_monte_carlo", "erreur_monte_carlo")),
               paste0("signes/", c("statistique", "p_asymptotique", "p_exacte", "p_monte_carlo", "erreur_monte_carlo")),
               paste0("runs/", c("esperance", "variance", "statistique", "p_asymptotique", "p_exacte", "p_monte_carlo",
@@ -625,4 +629,123 @@ verifier("rapport : relation sans mentions (objet altéré, appel direct) -> err
   k <- match("etape_validation", tablexp:::SECTIONS_RAPPORT$section)
   isTRUE(programmation(erreur_de(tablexp:::titre_section(x, k)))) &&
     isTRUE(programmation(erreur_de(tablexp:::corps_section(x, k))))
+})
+
+# --- I. Attendus faibles : statuts des p asymptotiques et variance_h0 (#179) -------
+# Spécification (0') de #179 (commentaire 6747033179 ; M359, M360), tests
+# T179.1 à T179.3. Natures : valeur calculée à la main (textes, états) ;
+# énumération exacte (loi conjointe de Poisson tronquée, compositions
+# multinomiales), indépendante de la formule du moteur.
+
+verifier("T179.1 statuts : p asymptotique de X2 avec 2 + 1/A_c (independante) et (n_s^2 + 2 n_s - 2) / O_s (positionnee) ; p asymptotique de G2 « selon la répartition des A_c », sans « conservat » ; variance_h0 sous H0 entre ddl et p_asymptotique", {
+  a <- tablexp:::STATUTS_VALIDATION; b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
+  k <- function(s, st, g) s$statut[s$statistique == st & s$grandeur == g]
+  g2 <- c(k(a, "deviance", "p_asymptotique"), k(b, "deviance", "p_asymptotique"))
+  ordre <- function(s) s$grandeur[s$statistique == "khi2_pearson"]
+  tous(
+    x2_i = if (grepl("2 + 1/A_c", k(a, "khi2_pearson", "p_asymptotique"), fixed = TRUE)) TRUE else "independante",
+    x2_p = if (grepl("(n_s^2 + 2 n_s - 2) / O_s", k(b, "khi2_pearson", "p_asymptotique"), fixed = TRUE)) TRUE
+           else "positionnee",
+    # Absence de « conservat » hors de la mention `indep` (unité contrat),
+    # que le statut de G2 sous positionnee porte comme les autres (visa
+    # d'actuary, Q2).
+    g2 = if (all(grepl("selon la répartition des A_c", g2, fixed = TRUE)) &&
+             !any(grepl("conservat", sub(" ; unités d'observation indépendantes.*", "", g2), fixed = TRUE)) &&
+             grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs", g2[2L],
+                   fixed = TRUE))
+           TRUE else "deviance",
+    # Phrases recopiées entre les deux tables (portée locale) : identiques.
+    copies = local({
+      phrase_g2 <- regmatches(g2, regexpr("l'espérance de la contribution.*garanti sous H0 \\(i\\)", g2))
+      fin_x2 <- sub(".*khi2_pearson/variance_h0\\) ; ", "", k(a, "khi2_pearson", "p_asymptotique"))
+      if (length(phrase_g2) == 2L && identical(phrase_g2[1L], phrase_g2[2L]) &&
+          startsWith(fin_x2, "le niveau réel") &&
+          grepl(paste0("sont égaux ; ", fin_x2, " ; unités d'observation"), k(b, "khi2_pearson", "p_asymptotique"),
+                fixed = TRUE)) TRUE else "phrases recopiées différentes"
+    }),
+    ligne = if (all(vapply(list(a, b), function(s)
+                  identical(ordre(s), c("statistique", "ddl", "variance_h0", "p_asymptotique", "p_monte_carlo",
+                                        "erreur_monte_carlo")) &&
+                    isTRUE(s$sous_h0[s$statistique == "khi2_pearson" & s$grandeur == "variance_h0"]), NA)))
+              TRUE else "ligne variance_h0")
+})
+
+verifier("T179.2 Poisson : variance_h0 égale à la variance de X2 par énumération conjointe (3 cellules, A = 0,05 ; 0,7 ; 3,2 ; troncature A + 40 sqrt(A) + 60), écart relatif <= 1e-12 ; identique à sum(2 + 1/A)", {
+  A <- c(0.05, 0.7, 3.2)
+  s <- sv(c(0L, 1L, 3L), rep(1, 3), -expm1(-A), A, A, rep("retenue", 3), rep(1L, 3), 1:3, 0.95, "independante", 19, 7L)
+  v <- valeur(s$statistiques, "khi2_pearson/variance_h0")
+  # Loi conjointe des trois cellules indépendantes, X2 = somme des
+  # contributions, sur la grille tronquée (masse retirée < 1e-300).
+  d <- lapply(A, function(a) 0:ceiling(a + 40 * sqrt(a) + 60))
+  p <- lapply(seq_along(A), function(c) stats::dpois(d[[c]], A[c]))
+  x <- lapply(seq_along(A), function(c) (d[[c]] - A[c])^2 / A[c])
+  P <- outer(outer(p[[1L]], p[[2L]]), p[[3L]])
+  X <- outer(outer(x[[1L]], x[[2L]], `+`), x[[3L]], `+`)
+  m <- sum(P * X)
+  tous(var = proche(v, sum(P * (X - m)^2), 1e-12, 0), esp = proche(m, 3, 1e-12, 0),
+       somme = if (identical(v, sum(2 + 1 / A))) TRUE else "différent de sum(2 + 1/A)",
+       etat = if (identical(etat_de(s$statistiques, "khi2_pearson/variance_h0"), "produite")) TRUE else "état")
+})
+
+verifier("T179.2 multinomiale : variance_h0 égale à la variance de X2 par énumération de toutes les compositions (segment 1 : 3 cellules, O = 7 ; segment 2 : 2 cellules, O = 4), écart relatif <= 1e-12 ; E[X2] = n - S = 3", {
+  pi1 <- c(0.1, 1, 3) / 4.1; pi2 <- c(0.2, 0.8)
+  A <- c(7 * pi1, 4 * pi2); seg <- c(1L, 1L, 1L, 2L, 2L)
+  s <- sv(c(1L, 2L, 4L, 1L, 3L), rep(1, 5), -expm1(-A), A, A, rep("retenue", 5), seg, 1:5, 0.95, "positionnee", 19, 7L, seg)
+  v <- valeur(s$statistiques, "khi2_pearson/variance_h0")
+  # Compositions de O en k parts, probabilités multinomiales par factorielles.
+  compositions <- function(O, k) if (k == 1L) matrix(O, 1L) else
+    do.call(rbind, lapply(0:O, function(j) cbind(j, compositions(O - j, k - 1L))))
+  loi <- function(O, p) {
+    m <- compositions(O, length(p))
+    list(p = apply(m, 1L, function(r) factorial(O) / prod(factorial(r)) * prod(p^r)),
+         x = apply(m, 1L, function(r) sum((r - O * p)^2 / (O * p))))
+  }
+  l1 <- loi(7, pi1); l2 <- loi(4, pi2)
+  P <- outer(l1$p, l2$p); X <- outer(l1$x, l2$x, `+`)
+  m <- sum(P * X)
+  tous(masse = proche(sum(P), 1, 1e-13, 0), esp = proche(m, 3, 1e-12, 0), var = proche(v, sum(P * (X - m)^2), 1e-12, 0),
+       etat = if (identical(etat_de(s$statistiques, "khi2_pearson/variance_h0"), "produite")) TRUE else "état")
+})
+
+verifier("T179.2 multinomiale, segments non contigus et non ordonnés (5, 2, 5, 9, 2, 5, 9, 7), cellule sans_exposition intercalée, segment 7 à une seule cellule retenue (ddl > 0) : variance_h0 égale à la somme des variances par segment énumérées, écart relatif <= 1e-12 (constat mineur 1 de l'audit)", {
+  seg <- c(5L, 2L, 5L, 9L, 2L, 5L, 9L, 7L)
+  etat <- c("retenue", "retenue", "retenue", "sans_exposition", "retenue", "retenue", "retenue", "retenue")
+  At <- c(0.03, 1.2, 0.5, 1, 2.5, 4, 0.7, 2)
+  D <- c(0L, 2L, 1L, 0L, 1L, 3L, 2L, 1L)
+  ret <- etat == "retenue"
+  O <- tapply(D[ret], seg[ret], sum); As <- tapply(At[ret], seg[ret], sum)
+  A <- At; A[ret] <- At[ret] * (O / As)[as.character(seg[ret])]
+  # Séquence constante : avec sequence = seg, le tri par séquence puis âge
+  # (R/validation.R, statistiques_validation()) rendrait les segments contigus
+  # et rangés avant le calcul de n_s et O_s (audit de la reprise de #179).
+  s <- sv(D, rep(1, 8), -expm1(-A), A, A, etat, rep(1L, 8), seq_along(D), 0.95, "positionnee", 19, 7L, seg)
+  compositions <- function(O, k) if (k == 1L) matrix(O, 1L) else
+    do.call(rbind, lapply(0:O, function(j) cbind(j, compositions(O - j, k - 1L))))
+  # Segments indépendants : somme des variances ; un segment d'une seule
+  # cellule retenue a X2 = 0 (D_c = O_s), variance nulle.
+  v_enum <- 0
+  for (g in sort(unique(seg[ret]))) {
+    i <- which(ret & seg == g)
+    if (length(i) < 2L) next
+    p <- At[i] / sum(At[i]); m <- compositions(sum(D[i]), length(i))
+    pr <- apply(m, 1L, function(r) factorial(sum(D[i])) / prod(factorial(r)) * prod(p^r))
+    x <- apply(m, 1L, function(r) sum((r - sum(D[i]) * p)^2 / (sum(D[i]) * p)))
+    v_enum <- v_enum + sum(pr * (x - sum(pr * x))^2)
+  }
+  tous(var = proche(valeur(s$statistiques, "khi2_pearson/variance_h0"), v_enum, 1e-12, 0),
+       ddl = proche(valeur(s$statistiques, "khi2_pearson/ddl"), 3, 0, 0),
+       etat = if (identical(etat_de(s$statistiques, "khi2_pearson/variance_h0"), "produite")) TRUE else "état")
+})
+
+verifier("T179.3 états de variance_h0 : une cellule retenue par segment (ddl = n - S = 0) -> contraint_par_positionnement, NA ; ajustee_hors_outil -> ddl_non_etabli, NA ; aucune cellule retenue -> aucune_cellule_retenue, NA", {
+  cle <- "khi2_pearson/variance_h0"
+  d <- une_cellule(c(7, 7), c(3L, 1L), c(1L, 2L))$statistiques
+  A <- c(0.5, 2, 4)
+  h <- sv(c(0L, 3L, 5L), rep(1, 3), -expm1(-A), A, A, rep("retenue", 3), rep(1L, 3), 1:3, 0.95, "ajustee_hors_outil", 19, 7L)$statistiques
+  z <- sv(c(0L, 3L, 5L), rep(1, 3), -expm1(-A), A, A, rep("sans_exposition", 3), rep(1L, 3), 1:3, 0.95, "independante", 19,
+          7L)$statistiques
+  tous(degenere = if (identical(etat_de(d, cle), "contraint_par_positionnement") && is.na(valeur(d, cle))) TRUE
+                  else etat_de(d, cle),
+       ajustee = if (identical(etat_de(h, cle), "ddl_non_etabli") && is.na(valeur(h, cle))) TRUE else etat_de(h, cle),
+       vide = if (identical(etat_de(z, cle), "aucune_cellule_retenue") && is.na(valeur(z, cle))) TRUE else etat_de(z, cle))
 })

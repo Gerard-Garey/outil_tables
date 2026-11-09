@@ -406,6 +406,85 @@ SANS_REFERENCE <- character(0)
 # des exclusions, vide dans R8 et R10, passe de logical à character ; R9, dont
 # les tables ne sont pas vides, le porte déjà en character ; retirée par le
 # commit de référence (R).
+# Transition #179 (B16 ; spécification (0') de #179, M359) : ligne nouvelle
+# khi2_pearson/variance_h0 de etapes/validation/resultat/statistiques
+# (position 7, entre ddl et p_asymptotique ; 61 -> 62 lignes) et textes de
+# statut de khi2_pearson/p_asymptotique (position 8 après insertion) et de
+# deviance/p_asymptotique (position 13) dans R8, R9 et R10. La longueur
+# change : chaque colonne est déclarée en vecteur entier, formé de la colonne
+# de la référence commitée (lue dans tests/reference/, jamais dans le
+# package), ligne nouvelle insérée et deux textes remplacés ; valeurs
+# nouvelles en littéral (variance_h0 : valeur du moteur mesurée, comparée à la
+# tolérance de la colonne valeur ; textes en échappements \u, chaînes UTF-8 en
+# toute locale) ; une transition par plan (valeurs propres), plans deux à deux
+# disjoints ; retirée par le commit de référence (R), avec transition_179() et
+# les constantes *_179.
+VARIANCE_I_179 <- paste(
+  "exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le mod\u00e8le de survie : Var(X2) = somme sur C+",
+  "de (2 + 1/A_c) (moments de Poisson d'ordre 4), \u00e0 comparer \u00e0 2 (n - p), variance de la loi de",
+  "r\u00e9f\u00e9rence de khi2_pearson/p_asymptotique (les esp\u00e9rances sont \u00e9gales) ;",
+  "arithm\u00e9tique flottante")
+KHI2_I_179 <- paste(
+  "asymptotique : loi du khi-deux \u00e0 n - p degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
+  "retenue), p = 0 ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits :",
+  "sous H0 (i), E^c tenue pour fixe, E[X2] = n - p exactement mais Var(X2) = somme sur C+ de (2 + 1/A_c) > 2 (n",
+  "- p) (moments de Poisson, r\u00e9sultat exact ; khi2_pearson/variance_h0) ; le niveau r\u00e9el du test",
+  "fond\u00e9 sur cette p n'est pas \u00e9tabli en g\u00e9n\u00e9ral et d\u00e9passe le niveau nominal dans les",
+  "constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0 (i)")
+DEVIANCE_I_179 <- paste(
+  "asymptotique : loi du khi-deux \u00e0 n - p degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
+  "retenue), p = 0 ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits :",
+  "sous H0 (i), E^c tenue pour fixe, l'esp\u00e9rance de la contribution d'une cellule est inf\u00e9rieure",
+  "\u00e0 1 pour A_c inf\u00e9rieur \u00e0 0,49 environ et sup\u00e9rieure \u00e0 1 au-del\u00e0 (maximum",
+  "voisin de 1,16), par sommation des probabilit\u00e9s (approximation num\u00e9rique) : la p asymptotique est",
+  "trop grande ou trop petite selon la r\u00e9partition des A_c ; seule p_monte_carlo a un niveau garanti sous",
+  "H0 (i)")
+VARIANCE_P_179 <- paste(
+  "exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta ; asymptotique sous",
+  "le mod\u00e8le de survie : Var(X2 | O_s) = somme sur les segments de [2 (n_s - 1) + somme sur C+_s de 1/A_c",
+  "- (n_s^2 + 2 n_s - 2) / O_s], A_c = O_s pi_c (moments multinomiaux d'ordre 4), \u00e0 comparer \u00e0 2 (n -",
+  "S) ; arithm\u00e9tique flottante ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat,",
+  "les d\u00e9c\u00e8s sont sur-dispers\u00e9s et les tests sont anti-conservateurs")
+KHI2_P_179 <- paste(
+  "asymptotique : loi du khi-deux \u00e0 n - S degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
+  "retenue), theta estim\u00e9 par maximum de vraisemblance sur ces cellules, un par segment positionn\u00e9 (S",
+  "segments) ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits : sous H0",
+  "(i) conditionnellement aux O_s, E^c tenue pour fixe, E[X2] = n - S exactement et Var(X2) = somme sur les",
+  "segments de [2 (n_s - 1) + somme sur C+_s de 1/A_c - (n_s^2 + 2 n_s - 2) / O_s] (moments multinomiaux,",
+  "r\u00e9sultat exact ; khi2_pearson/variance_h0), sup\u00e9rieure \u00e0 2 (n - S) quand des A_c sont petits",
+  "devant ceux de leur segment, inf\u00e9rieure quand les A_c d'un segment sont \u00e9gaux ; le niveau",
+  "r\u00e9el du test fond\u00e9 sur cette p n'est pas \u00e9tabli en g\u00e9n\u00e9ral et d\u00e9passe le",
+  "niveau nominal dans les constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0",
+  "(i) ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
+  "sur-dispers\u00e9s et les tests sont anti-conservateurs")
+DEVIANCE_P_179 <- paste(
+  "asymptotique : loi du khi-deux \u00e0 n - S degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
+  "retenue), theta estim\u00e9 par maximum de vraisemblance sur ces cellules, un par segment positionn\u00e9 (S",
+  "segments) ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits : sous H0",
+  "(i), E^c tenue pour fixe, pour des cellules de loi de Poisson d'esp\u00e9rance A_c, sans conditionner par",
+  "les O_s (conditionnellement aux O_s, D_c suit une loi binomiale et les valeurs ci-apr\u00e8s ne valent",
+  "qu'approximativement, quand pi_c est petit), l'esp\u00e9rance de la contribution d'une cellule est",
+  "inf\u00e9rieure \u00e0 1 pour A_c inf\u00e9rieur \u00e0 0,49 environ et sup\u00e9rieure \u00e0 1",
+  "au-del\u00e0 (maximum voisin de 1,16), par sommation des probabilit\u00e9s (approximation num\u00e9rique) :",
+  "la p asymptotique est trop grande ou trop petite selon la r\u00e9partition des A_c ; seule p_monte_carlo a",
+  "un niveau garanti sous H0 (i) ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat,",
+  "les d\u00e9c\u00e8s sont sur-dispers\u00e9s et les tests sont anti-conservateurs")
+transition_179 <- function(id, variance, statuts) {
+  ch <- "etapes/validation/resultat/statistiques/"
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  inserer <- function(colonne, v) append(ref[[paste0(ch, colonne)]], v, after = 6L)
+  statut <- inserer("statut", statuts[[1L]])
+  statut[c(8L, 13L)] <- unlist(statuts[2:3])
+  list(issue = "#179", plans = id, changements = list(
+    list(chemin = paste0(ch, "@lignes"), nature = "valeur", valeurs = 62),
+    list(chemin = paste0(ch, "statistique"), nature = "valeur de chaîne", valeurs = inserer("statistique", "khi2_pearson")),
+    list(chemin = paste0(ch, "grandeur"), nature = "valeur de chaîne", valeurs = inserer("grandeur", "variance_h0")),
+    list(chemin = paste0(ch, "valeur"), nature = "valeur", valeurs = inserer("valeur", variance)),
+    list(chemin = paste0(ch, "etat"), nature = "valeur de chaîne", valeurs = inserer("etat", "produite")),
+    list(chemin = paste0(ch, "statut"), nature = "valeur de chaîne", valeurs = statut)))
+}
+STATUTS_I_179 <- list(VARIANCE_I_179, KHI2_I_179, DEVIANCE_I_179)
+STATUTS_P_179 <- list(VARIANCE_P_179, KHI2_P_179, DEVIANCE_P_179)
 TRANSITIONS_EN_COURS <- list(
   list(issue = "#174", plans = c("R8", "R9", "R10"), changements = list(
     list(chemin = "etapes/validation/resultat/sous_groupes/cellules_retenues", nature = "type",
@@ -416,7 +495,10 @@ TRANSITIONS_EN_COURS <- list(
     list(chemin = "etapes/importance_exclusions/resultat/cellules_niveau_a/etat_cellule", nature = "type",
          de = "logical", vers = "character"),
     list(chemin = "etapes/importance_exclusions/resultat/cellules_niveau_b/etat_cellule", nature = "type",
-         de = "logical", vers = "character"))))
+         de = "logical", vers = "character"))),
+  transition_179("R8", 360.38810430872218, STATUTS_I_179),
+  transition_179("R9", 361.34969667340141, STATUTS_I_179),
+  transition_179("R10", 353.26471567362739, STATUTS_P_179))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
