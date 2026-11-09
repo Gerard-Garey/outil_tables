@@ -1318,8 +1318,8 @@ références de non-régression (section~\ref{sec:non-regression}) et contrôle
 l'effet d'une permutation des lignes de l'entrée de référence
 (section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39), puis
 l'aller-retour du texte du plan et de la fiche et le rejeu à partir de ce
-texte pour chacun des plans de référence (douze~: fonction \code{plans\_reference} de
-\code{tests/reference/outils\_reference.R}, l.~457~; section~\ref{sec:serialisation}).
+texte pour chacun des plans de référence (treize~: fonction \code{plans\_reference} de
+\code{tests/reference/outils\_reference.R}, l.~515~; section~\ref{sec:serialisation}).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -1483,7 +1483,7 @@ d'\code{ecrire\_fiche()}, ci-dessus). Le contrôle
 \code{tests/controles/locale\_c.R} (tableau~\ref{tab:scripts-controle})
 installe donc l'arbre de travail sous \code{LC\_ALL=C} et sous la première
 locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
-l'installation, les plans de référence R1 à R12 sur leur entrée de référence,
+l'installation, les plans de référence R1 à R13 sur leur entrée de référence,
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
 pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
 outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
@@ -1511,7 +1511,7 @@ obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
 l'identité des textes est un \emph{constat} sur la machine qui exécute le
-contrôle (la plateforme de référence en CI) et sur ces douze plans, non une
+contrôle (la plateforme de référence en CI) et sur ces treize plans, non une
 propriété démontrée~; il ne couvre ni une locale latin-1 (contrôle
 suivant), ni Windows (issue~\#49), ni des données de l'utilisateur à chaînes
 non ASCII.
@@ -1537,7 +1537,7 @@ dossier temporaire, sans droits particuliers, et \textbf{échoue}, sans
 jamais sauter, s'il ne peut pas la générer~; il installe l'arbre de travail
 sous cette locale et sous la première locale UTF-8 disponible, puis
 exécute dans chaque cas, sous la locale de l'installation et après avoir
-vérifié la locale effective, les plans de référence R1 à R12 et quatre jeux
+vérifié la locale effective, les plans de référence R1 à R13 et quatre jeux
 de segments non ASCII (valeurs natives non marquées, marquées latin-1,
 marquées UTF-8, et mêlées~: «~ÿ~» natif et «~€~» UTF-8), construits à
 partir de leurs octets avec un marquage explicite~; il écrit la fiche, le
@@ -1863,7 +1863,15 @@ cette graine~: une modification qui change le jeu tiré change l'empreinte et
 met toutes les références en «~entrée différente~». Chaque plan nomme son
 entrée (champ \code{entree}~; ADR 0009, point 4.1 amendé, annotation du
 07/11/2026, points~(d) et~(e))~: \code{reference}, le jeu ci-dessus, pour
-tous les plans sauf R9~; \code{reference\_defauts} pour R9, le même jeu
+tous les plans sauf R9 et R13~; \code{agregats\_reference} pour R13, le
+même jeu propre rendu sous la forme «~agrégats~»
+(\code{simuler\_portefeuille(forme =)}, section~\ref{sec:portefeuille-simule},
+«~Sortie~»~; même loi, même portefeuille, même graine, aucun tirage
+supplémentaire~; transition vivant $\to$ décédé, convention
+\code{dernier\_anniversaire}, sans année~; constante
+\code{FORME\_AGREGATS\_R13}), de rôles \code{sexe}, \code{age},
+\code{exposition\_centrale}, \code{exposition\_initiale} et
+\code{evenements} (\code{ROLES\_AGREGATS\_R13})~; \code{reference\_defauts} pour R9, le même jeu
 altéré après son tirage complet par \code{simuler\_portefeuille(defauts =)}
 (section~\ref{sec:defauts-parametres}) sous la graine des défauts 20261108
 (constante \code{GRAINE\_DEFAUTS\_R9}), distincte de celle du jeu et des
@@ -1871,7 +1879,7 @@ graines de Monte-Carlo~: 500~lignes (constante \code{NOMBRE\_PAR\_MOTIF\_R9})
 pour chacun des motifs \code{id\_contrat\_manquant}, \code{sexe\_manquant}
 et \code{entree\_manquante} (constante \code{MOTIFS\_DEFAUTS\_R9}), toutes
 causes de sortie admises (\code{tests/reference/outils\_reference.R},
-constantes l.~332 à~334, déclarations des défauts l.~351 et~352). Les lignes
+constantes l.~349 à~351, déclarations des défauts l.~371 et~372). Les lignes
 que les défauts n'altèrent pas sont celles de \code{reference}~; un test le
 vérifie, avec la graine, les motifs, leurs effectifs et l'absence de ligne
 portant deux motifs.
@@ -1914,6 +1922,7 @@ R9 & R8 sur l'entrée à défauts injectés (issue~\#166) & \code{sexe} & 0 & \c
 R10 & R8 avec positionnement par SMR et validation de la table positionnée (issue~\#167) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 R11 & R1 avec le test d'homogénéité entre segments (issue~\#168) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 R12 & R5 avec le test d'homogénéité, sous $H_0$ vraie (issue~\#168, décision M307) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
+R13 & recette \code{agregats} sur la forme agrégats de l'entrée, avec positionnement par SMR sur la table de R8 (issue~\#169) & \code{sexe} & 0 & \code{dernier\_}\allowbreak\code{anniversaire} (déclarée) & non & Poisson, binomial~; 0,95 \\
 \end{longtable}
 }
 
@@ -1974,7 +1983,7 @@ l'étape \code{positionnement} (\code{methode = "smr"}, table \code{tv},
 relation \code{positionnee} (même clé, même plage, mêmes tranches, niveau
 et nombre de réplications que R8), sous la graine de Monte-Carlo
 20261113 (constante \code{GRAINE\_MONTE\_CARLO\_R10},
-\code{tests/reference/outils\_reference.R}, l.~313), distincte de celle du
+\code{tests/reference/outils\_reference.R}, l.~330), distincte de celle du
 jeu, de celle de R8 et des défauts de R9. C'est la première référence qui
 contient une table positionnée~: sa création a demandé le visa du
 mainteneur (décisions M287 et M308), trois statuts textuels ayant été
@@ -1989,14 +1998,14 @@ corrigés avant elle (décision M309). Il fige aussi l'état
 augmenté de l'étape \code{homogeneite} (âges 20 à 90, tranches de bornes
 20, 50 et 70, 999~réplications), sous la graine de Monte-Carlo 20261114
 (\code{GRAINE\_MONTE\_CARLO\_R11}, \code{tests/reference/outils\_reference.R},
-l.~314)~; l'entrée de référence portant un facteur 0,6 sur les femmes
+l.~331)~; l'entrée de référence portant un facteur 0,6 sur les femmes
 (section~\ref{sec:simulation}), l'hypothèse nulle y est fausse~: R11 fige
 l'étape sous une alternative~; ce n'est ni un verdict ni une mesure de
 puissance (un seul jeu). Ses p-valeurs de Monte-Carlo sont au plancher
 $1/(B + 1)$, sauf celle de la tranche 20-49~: un changement du flux des
 réplications n'y changerait que cette p-valeur et son erreur. R12 est le plan de R5 (en cours $\to$
 racheté, unité contrat) augmenté de la même étape, sous la graine 20261115
-(\code{GRAINE\_MONTE\_CARLO\_R12}, l.~315)~: les facteurs de rachat de
+(\code{GRAINE\_MONTE\_CARLO\_R12}, l.~332)~: les facteurs de rachat de
 l'entrée étant égaux pour les deux sexes, l'hypothèse nulle y est
 exactement vraie, les p-valeurs de Monte-Carlo tombent dans le corps de la
 loi, et R12 épingle le flux des réplications de l'homogénéité. Ce second
@@ -2004,6 +2013,37 @@ plan d'une même méthode précise la règle «~un plan par méthode~» (ADR 000
 annotation du 08/11/2026, (c)). Les graines 20261113 à 20261115 sont
 distinctes entre elles, de celle du jeu, de celles de R8 et des défauts de
 R9, et absentes du reste du dépôt à leur création.
+
+\medskip
+\noindent
+\textbf{Plan R13} (issue~\#169~; ADR 0016, point~8.4~; spécification
+d'\code{actuary} M327, § 12~; création de la référence soumise au visa
+d'\code{actuary}, décision M319). R13 exécute
+la recette \code{agregats} sur l'entrée \code{agregats\_reference}
+décrite ci-dessus~: segmentation \code{sexe}, délai nul, convention
+déclarée \code{dernier\_anniversaire} (la recette n'a pas de convention
+native, \code{plus\_fine} y est refusé), sans découpage par année,
+estimateurs \code{poisson} et \code{binomial} au niveau 0,95, aucune
+exclusion, puis l'étape \code{positionnement} de R10 (\code{methode =
+"smr"}, table \code{tv} de R8, âges 20 à 90, niveau 0,95). Il n'a aucune
+étape aléatoire, donc aucune graine. Il fige le chemin de la forme
+\code{cellules} (section~\ref{sec:exposition-cellules}), l'exposition
+initiale déclarée du binomial, le champ \code{hypotheses\_recette} de la
+fiche et le relevé \code{poids\_exclusions}, vide faute d'exclusion.
+Sur l'entrée de référence, sa table d'exposition a les 149~cellules de
+celle de R1, aux mêmes clés, avec les mêmes $D$ ($\sum D = 4\,228$) et des
+$E^c$ et $E^i$ égaux au bit près à $E^c$ et à $E^c$ plus
+\code{complement\_initial\_cellule} de R1 ($\sum E^c = 492\,422{,}728760$)
+(\emph{constat}, R~4.3.3, \code{construire\_table()} sur les deux
+entrées). R13 ne contrôle pas pour autant que la recette des agrégats
+redonne la table d'exposition de R1~: ce recoupement (mêmes cellules, $D$
+identiques, $E^c$ et $E^i$ à $10^{-10}$ près en relatif, écart maximal
+mesuré nul) est fait par la batterie unitaire, sur un jeu simulé propre au
+test (\code{tests/unitaires/test\_agregats.R}, C11~; approximation
+numérique), de même que l'identité exacte des étapes \code{brut},
+\code{positionnement}, \code{homogeneite} et \code{validation}
+construites sur la forme agrégats et sur les lignes du même jeu propre
+(C10).
 
 \subsubsection*{Format des fichiers}
 
@@ -2120,7 +2160,7 @@ aurait masqué leur retour au double (ADR 0009, seconde annotation du
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont chaque valeur
 est l'une des quatre classes de \code{CLASSES\_TOLERANCE} (exacte,
 $10^{-14}$, $10^{-12}$, $10^{-10}$~; \code{tests/reference/outils\_reference.R},
-l.~89), et dont les clés sont
+l.~91), et dont les clés sont
 cherchées parmi les suffixes du chemin, segment par segment, le
 \textbf{suffixe le plus long} l'emportant (\code{cles\_de},
 \code{tolerance\_de}, \code{tests/reference/outils\_reference.R}).
@@ -2178,7 +2218,7 @@ point~(a)~4).
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
 point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
-07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)).
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026).
 Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
 groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
@@ -2196,8 +2236,8 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
-$10^{-14}$ & \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
+exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
+$10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
 $10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
 $10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z} & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a)) \\
 \end{longtable}
@@ -2389,10 +2429,28 @@ identiques au bit près sur l'autre processeur (ADR 0009, annotation du
 visa d'\code{actuary}~; issue~\#168, décision M307), sur la plateforme de
 référence (processeur AMD EPYC 7763)~: création seule, R1 à R9 restant
 identiques au bit près aux fichiers commités, en-têtes exceptés (ADR 0009,
-annotation du 08/11/2026, point~(b)~1). Aucune de ces créations ne
+annotation du 08/11/2026, point~(b)~1). La référence R13 a été
+\textbf{créée} le 09/11/2026 en mode \code{creation} (exécution
+42637989632 du workflow, calcul sur \code{756fbfe}, commit
+\code{5e2231f}, visa d'\code{actuary}, décision M319~; issue~\#169), sur
+la plateforme de référence (processeur AMD EPYC 7763)~: R1 à R12 en
+comparaison réussie face aux fichiers commités~; son corps est identique au
+bit près à celui d'une première exécution sur \code{bd63b73} (processeur
+AMD EPYC 9V45), sur laquelle porte le visa. Aucune de ces créations ne
 change de table finale, de verdict ni de valeur de table homologuée~;
 celle de R10 porte la première table positionnée, visée par le
-mainteneur.
+mainteneur. Les références R1 à R12 ont été régénérées \textbf{une
+septième fois}, le 09/11/2026, en mode \code{regeneration} (exécution
+42635335347 du workflow, calcul sur \code{bd63b73}, commit
+\code{d14a757}, visa d'\code{actuary}, décision M319~; issue~\#169,
+décisions M333 et M334), pour le seul passage de \code{version\_fiche}
+de~5 à~6 (champ conditionnel \code{hypotheses\_recette},
+section~\ref{sec:fiche})~: \code{fiche/version\_fiche} est la seule
+grandeur du corps en écart, l'empreinte du résultat change en
+conséquence, celle du code aussi, \code{R/} ayant changé, et toutes les
+autres grandeurs sont restées identiques au bit près, sur la plateforme de
+référence (processeur AMD EPYC 9V45), sans table finale, verdict ni valeur
+de table homologuée changés.
 
 \begin{encadre}
 \small
@@ -2432,6 +2490,17 @@ mainteneur.
     tests par variable conditionnellement à l'autre, la p-valeur exacte au
     delà du plafond de convolution et les cas aux limites ne sont couverts
     que par les tests unitaires.
+  \item La recette \code{agregats} n'est figée que par R13~: transition
+    vivant $\to$ décédé, segmentation \code{sexe}, les deux expositions
+    déclarées, convention \code{dernier\_anniversaire} sans rôle
+    \code{annee} ni \code{par\_annee}, aucune exclusion, cellules à zéros
+    explicites et plage d'âges contiguë (forme du simulateur), donc sans
+    relevé \code{ages\_manquants}, \code{annees\_sommees} ni de cohérence
+    des expositions. Les motifs, les exclusions et leur relevé
+    \code{poids\_exclusions}, le rôle \code{annee}, une seule exposition
+    déclarée et les refus de la matrice ne sont couverts que par les tests
+    unitaires (\code{tests/unitaires/test\_agregats.R},
+    \code{tests/unitaires/test\_catalogue\_recettes.R}).
   \item L'entrée n'exerce pas la fusion des contrats par tête~: elle est
     tirée en mode \code{uniforme}, une tête par contrat
     (section~\ref{sec:simulation}). La fusion n'est couverte que par les
@@ -2662,7 +2731,7 @@ Windows. La batterie unitaire garde en outre un échantillon de l'écriture
 recoupée par \code{ecriture\_doubles.R} et les témoins T1 à T3 de
 \code{ecriture\_doubles\_texte.R}, que la CI exécute en entier
 (section~\ref{sec:verifications-rapport}). Pour
-\code{locale\_c.R}, dont l'exécution complète (deux installations, douze plans)
+\code{locale\_c.R}, dont l'exécution complète (deux installations, treize plans)
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
 sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
@@ -2864,7 +2933,7 @@ ADR 0008, points 3 à 5 \\
 \code{locale\_c.R} & \code{tablexp} installé dans deux bibliothèques
 temporaires, l'une sous \code{LC\_ALL=C}, l'autre sous la première locale
 UTF-8 disponible, et exécuté dans un sous-processus sous la locale de son
-installation, qui vérifie d'abord la locale effective~; pour R1 à R12,
+installation, qui vérifie d'abord la locale effective~; pour R1 à R13,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
 marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
@@ -2897,7 +2966,7 @@ du 05/11/2026, (c) et~(f)~; M182~; issue~\#127 \\
 temporaires, l'une sous \code{fr\_FR.ISO-8859-1}, générée par
 \code{localedef} (échec, jamais de saut, si elle ne peut pas l'être), l'autre
 sous la première locale UTF-8 disponible, et exécuté sous la locale de son
-installation, vérifiée d'abord~; pour R1 à R12 et quatre jeux de segments non
+installation, vérifiée d'abord~; pour R1 à R13 et quatre jeux de segments non
 ASCII (natifs, latin-1, UTF-8, mêlés), fiche, plan et rapport figé écrits,
 ordre des segments écrit et comparé à un ordre par octets UTF-8, puis
 textes (trois par plan, quatre par jeu) comparés octet à octet entre latin-1 et UTF-8, sans écart admis
@@ -4755,8 +4824,12 @@ section~\ref{sec:execution}).\par}
 
 \subsubsection*{Motifs d'invalidité des lignes}
 
-Les motifs forment une liste fermée (E2.7), évaluée par
-\code{evaluer\_motifs()} (tableau~\ref{tab:motifs}).
+{\sloppy\hbadness=10000 Les motifs forment une liste fermée (E2.7), propre à chaque recette
+(colonne des motifs de \code{CATALOGUE\_RECETTES}, section~\ref{sec:recettes})~:
+sous \code{lignes\_dates\_completes}, ils sont évalués par
+\code{evaluer\_motifs()} (tableau~\ref{tab:motifs})~; sous
+\code{agregats}, par \code{evaluer\_motifs\_agregats()}
+(tableau~\ref{tab:motifs-agregats}, ci-dessous).\par}
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{Exhaustivité}~: tous les motifs de ligne sont évalués sur toutes
@@ -4802,9 +4875,10 @@ Les motifs forment une liste fermée (E2.7), évaluée par
 {\small
 \rowcolors{2}{tablerow}{white}
 \begin{longtable}{@{}p{4.9cm}p{9.7cm}@{}}
-\caption{Motifs d'invalidité, dans l'ordre de restitution (constantes
+\caption{Motifs d'invalidité de la recette \code{lignes\_dates\_completes},
+dans l'ordre de restitution (constantes
 \code{MOTIFS\_LIGNES} et \code{MOTIFS\_TETE}). Ce sont aussi les codes
-admis comme règles d'exclusion.}
+admis comme règles d'exclusion sous cette recette.}
 \label{tab:motifs}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Code}} &
@@ -4836,6 +4910,83 @@ admis comme règles d'exclusion.}
 \code{tete\_sexe\_incoherent} & au moins deux sexes valides (\code{H}, \code{F}) différents au sein d'une tête (\code{sexe} déclaré~; valeur manquante ou hors modalités ignorée) \\
 \code{tete\_segment\_incoherent} & au moins deux segments renseignés et différents au sein d'une tête, si la segmentation emploie \code{segment} \\
 \code{tete\_observee\_apres\_deces} & le premier décès $s_d$ de la tête est antérieur à $B$ et une ligne de la tête a une fin d'observation postérieure à $s_d$ (lecture~B de E2.4, ci-dessous) \\
+\end{longtable}
+}
+
+\medskip
+{\sloppy\hbadness=10000\noindent
+\textbf{Motifs de la recette \code{agregats}} (issue~\#169~; spécification
+d'\code{actuary} M327, Q5). Une ligne est une cellule agrégée. Les dix-huit
+motifs de \code{MOTIFS\_LIGNES\_AGREGATS} (tableau~\ref{tab:motifs-agregats})
+sont tous des motifs de ligne~: aucun motif de tête ni d'unité, l'unité
+d'observation d'un agrégat n'étant pas déterminée
+(section~\ref{sec:unite-observation}). Ils sont évalués sur toutes les
+lignes, sans court-circuit~; un motif de comparaison n'est pas levé sur une
+valeur manquante. Un code commun à deux recettes a un seul libellé
+(\code{LIBELLES\_MOTIFS}, un libellé par code de l'union des motifs des
+recettes~; invariant contrôlé par
+\code{tests/unitaires/test\_catalogue\_recettes.R}), mais sa mesure suit les
+colonnes de la recette~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{age\_aberrant} a pour libellé «~âge d'au moins 130 ans~»
+    (\code{AGE\_ABERRANT})~; sous \code{lignes\_dates\_completes}, l'âge est
+    l'âge au dernier anniversaire calculé à partir de la date de naissance, à
+    la plus petite des dates de sortie et de fin de période
+    (tableau~\ref{tab:motifs})~; sous \code{agregats}, c'est la valeur du
+    rôle \code{age} reçue, comparée telle quelle, sans date ni convention~;
+  \item les trois défauts d'exposition (\code{exposition\_manquante},
+    \code{exposition\_non\_finie}, \code{exposition\_negative}) portent sur
+    chaque rôle d'exposition déclaré, \code{exposition\_centrale} ou
+    \code{exposition\_initiale}~: une cellule est porteuse si l'une au moins
+    de ses expositions déclarées a le défaut. Le libellé («~exposition
+    déclarée manquante~», etc.) et le décompte, qui compte des cellules, ne
+    disent pas laquelle~;
+  \item une valeur infinie d'âge, d'année ou d'événements est «~non entière
+    ou non finie~»~; un âge $+\infty$ porte aussi \code{age\_aberrant}, un âge
+    $-\infty$ aussi \code{age\_negatif}, et \code{NaN} est une valeur
+    manquante (\emph{constat} sur \code{evaluer\_motifs\_agregats()},
+    R~4.3.3).
+\end{itemize}
+Les codes \code{sexe\_manquant}, \code{sexe\_hors\_modalites} et
+\code{segment\_manquant} ont la même condition que sous
+\code{lignes\_dates\_completes}. Une exclusion déclarée hors des motifs de
+la recette retenue est refusée (\code{exclusion\_hors\_recette},
+section~\ref{sec:recettes}).\par}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.9cm}p{9.7cm}@{}}
+\caption{Motifs d'invalidité de la recette \code{agregats}, dans l'ordre de
+restitution (constante \code{MOTIFS\_LIGNES\_AGREGATS}~; fonction
+\code{evaluer\_motifs\_agregats()}). Ce sont aussi les codes admis comme
+règles d'exclusion sous cette recette.}
+\label{tab:motifs-agregats}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Code}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Code}} &
+\textcolor{financeblue}{\textbf{Condition}} \\
+\endhead
+\code{age\_manquant} & âge manquant (\code{NA} ou \code{NaN}) \\
+\code{age\_non\_entier} & âge non entier ou non fini \\
+\code{age\_negatif} & âge strictement négatif \\
+\code{age\_aberrant} & âge reçu au moins égal à \code{AGE\_ABERRANT} (130) \\
+\code{annee\_manquante} & \code{annee} déclarée et manquante \\
+\code{annee\_non\_entiere} & \code{annee} déclarée, non entière ou non finie \\
+\code{annee\_hors\_periode} & \code{annee} déclarée, antérieure à l'année civile du début de la période ou postérieure à celle de la fin effective $B - 1$ (le délai de déclaration, reçu comme appliqué par le producteur, ne sert qu'à ce contrôle~; Q3) \\
+\code{sexe\_manquant} & \code{sexe} déclaré et manquant \\
+\code{sexe\_hors\_modalites} & \code{sexe} déclaré, hors de \code{H} et \code{F} \\
+\code{segment\_manquant} & \code{segment} déclaré et manquant \\
+\code{exposition\_manquante} & l'une au moins des expositions déclarées manquante (\code{NA} ou \code{NaN}) \\
+\code{exposition\_non\_finie} & l'une au moins des expositions déclarées infinie \\
+\code{exposition\_negative} & l'une au moins des expositions déclarées strictement négative \\
+\code{evenements\_manquants} & nombre d'événements manquant \\
+\code{evenements\_non\_entiers} & nombre d'événements non entier ou non fini \\
+\code{evenements\_negatifs} & nombre d'événements strictement négatif \\
+\code{evenements\_sans\_exposition} & au moins un événement, aucune exposition déclarée manquante et aucune strictement positive \\
+\code{cellule\_dupliquee} & clé de cellule (rôles \code{sexe}, \code{segment}, \code{age}, \code{annee} déclarés, employés ou non par la segmentation), sans valeur manquante, présente sur plusieurs lignes, valeurs comparées exactement~; toutes les lignes du groupe sont listées \\
 \end{longtable}
 }
 
@@ -4892,7 +5043,28 @@ de l'étape et dans la fiche~:
     est inscrit dans l'objet et repris dans la fiche~: «~une tête titulaire de
     plusieurs contrats est comptée plusieurs fois, ce qui surestime
     l'exposition et peut compter plusieurs fois un même décès~» (cas F4 des
-    tests~: deux décès comptés au lieu d'un).
+    tests~: deux décès comptés au lieu d'un)~;
+  \item \textbf{non déterminée} (\code{non\_determinee}) sous la recette
+    \code{agregats}, quelle que soit la transition~: rien n'indique si les
+    effectifs d'une cellule comptent des têtes ou des contrats (spécification
+    M327, Q4). L'avertissement \code{unite\_agregat} le dit, avec un texte
+    propre au porteur de la transition (constante \code{UNITE\_AGREGAT}~:
+    sous une transition de tête, une tête titulaire de plusieurs contrats
+    serait comptée plusieurs fois si l'agrégat compte des contrats~; sous une
+    transition de contrat, des effectifs comptés en têtes ne lui conviennent
+    pas~; dans les deux cas, les intervalles et les tests supposent des unités
+    indépendantes et sont trop étroits en cas de dépendance positive). Son
+    décompte est le nombre de cellules reçues et conservées par l'étape
+    \code{donnees}, avant la somme par clé de l'étape \code{exposition}~: il
+    n'est pas le nombre de cellules de la table d'exposition (\emph{constat} sur
+    un exemple construit~: six cellules reçues, trois exclues, deux des
+    trois conservées de même âge, sommées sur le sexe que la segmentation
+    n'emploie pas~: décompte~3, table d'exposition de deux cellules).
+    L'hypothèse \code{unite\_observation} de la fiche
+    (section~\ref{sec:exposition-cellules}) le reprend, et le rapport figé
+    porte alors la mention \code{validation\_unite\_non\_determinee} au
+    lieu de \code{validation\_unite\_contrat} (\code{mention\_unite()},
+    tableau~\ref{tab:sections-rapport}).
 \end{itemize}
 
 \noindent
@@ -4978,12 +5150,61 @@ contiguïtés sont décomptées sans avertissement~: une contiguïté exacte est
 fusionnée sans perte.
 
 \medskip
+{\sloppy\hbadness=10000 \textbf{Sous la recette \code{agregats}} (issue~\#169), les relevés sont
+calculés par \code{observations\_agregats()} sur les cellules conservées,
+sans aucune complétion ni modification de valeur~: le nombre de cellules
+conservées (\code{cellules}) et, quand les deux expositions sont déclarées,
+deux relevés de cohérence avec la définition «~cellule~» de l'exposition
+initiale, $0 \le E^i - E^c \le D$ (section~\ref{sec:exposition-cellules})~:
+\code{exposition\_initiale\_inferieure\_centrale} (cellules où
+$E^i < E^c$) et \code{complement\_superieur\_aux\_evenements} (cellules
+où $E^i - E^c > D$)~; ils valent \code{NA} si une seule exposition est
+déclarée. Chacun donne, s'il est positif, un avertissement de même code
+(\code{avertir\_releves\_agregats()}), jamais un refus. Les deux
+comparaisons sont faites en arithmétique flottante, \textbf{sans
+tolérance}~: une cellule dont les valeurs décimales vérifient exactement
+$E^i - E^c = D$ peut être relevée, la différence calculée en double
+dépassant $D$ d'un arrondi (\emph{constat}, R~4.3.3~: $E^c = 1{,}14$,
+$E^i = 2{,}14$, $D = 1$ donnent une différence écrite
+\code{1.0000000000000002} en \code{\%.17g}, et la cellule est relevée
+par \code{construire\_table()}). Le relevé signale une incohérence
+possible, à vérifier dans la base~; il n'en prouve aucune.
+Le relevé \code{poids\_exclusions} (spécification M327, Q6) restitue,
+pour chaque motif déclaré en exclusion, dans l'ordre du plan~: le nombre de
+cellules exclues sous le motif (\code{cellules}), puis, parmi elles, le
+nombre de celles dont les événements et les expositions déclarées ne portent
+aucun défaut de valeur (\code{cellules\_sommees}) et leurs sommes
+$\sum D$, $\sum E^c$ et $\sum E^i$ (\code{NA} pour une exposition non
+déclarée)~; c'est le diagnostic que la spécification retient sous les
+agrégats, où l'étape \code{importance\_exclusions} est refusée
+(\code{importance\_exclusions\_agregats})~; il ne mesure aucun effet sur
+un taux.
+Une cellule exclue sous plusieurs motifs est comptée, et ses valeurs
+sommées, \textbf{sous chacun}~: les lignes du relevé ne s'additionnent pas,
+et leur somme peut dépasser le poids des cellules exclues
+(\emph{constat} sur un exemple construit~: deux cellules d'âge 130 de même
+clé, portant \code{age\_aberrant} et \code{cellule\_dupliquee},
+comptées deux fois chacune, trois cellules distinctes exclues au total,
+\code{resultat\$nombre\_lignes\_exclues}). Les avertissements de
+l'étape sous cette recette sont \code{unite\_agregat}~;
+\code{role\_non\_employe}, dont le texte dit que le rôle déclaré mais non
+employé par la segmentation est contrôlé (motifs, clé des cellules), puis
+que les cellules de même clé sont sommées sur ses modalités à l'étape
+\code{exposition}~; \code{exclusion}~; et les deux relevés de cohérence
+ci-dessus.\par}
+
+\medskip
 Le résultat de l'étape (\code{resultat}) contient les lignes conservées et
 leurs numéros, les exclusions, l'unité retenue, la table des observations
 (une ligne par composante fusionnée ou par contrat~: identifiant, numéro de la
 première ligne, nombre de lignes, date de naissance, sexe s'il est déclaré,
 segment s'il est employé, début, fin, cause) et, pour chaque ligne conservée,
-le numéro de son observation. Les paramètres effectifs
+le numéro de son observation~; sous \code{agregats}, la table des
+observations a une ligne par cellule conservée (sexe s'il est déclaré,
+segment s'il est employé par la segmentation, \code{age}, \code{annee}
+s'il est déclaré, expositions déclarées et \code{evenements}~; âge, année,
+expositions et événements en \code{double}, valeurs inchangées), et l'observation d'une ligne est
+la ligne elle-même. Les paramètres effectifs
 (\code{parametres}) sont le code interne de la transition
 (\code{vivant\_decede} ou \code{en\_cours\_rachete}), l'unité d'observation, la
 segmentation, les exclusions et la fin effective.
@@ -5242,7 +5463,7 @@ contrats, section~\ref{sec:unite-observation}~; cellules sous la recette
 et ses deux paramètres, et aiguille sur la forme que la recette rend au
 noyau (section~\ref{sec:recettes})~: \code{exposition\_fenetres()} pour
 \code{fenetres}, objet du reste de cette section, \code{exposition\_cellules()}
-pour \code{cellules}. Le contenu de fond vient de la spécification
+pour \code{cellules} (section~\ref{sec:exposition-cellules}). Le contenu de fond vient de la spécification
 d'\code{actuary} (issue~\#11, parties A.0 et A.3) et de son erratum du
 17/10/2026. Les fenêtres et les événements, les segments des observations et
 la position d'un jour dans sa cellule sont calculés par trois fonctions
@@ -5315,7 +5536,8 @@ convention native~: la convention d'âge des cellules se déclare
 (\code{plus\_fine} est refusé, \code{convention\_non\_declaree}~; fonction
 \code{resoudre\_convention()}). Sa forme rendue au noyau est
 \code{cellules}~: l'étape \code{exposition} somme les cellules reçues par
-clé, sans en créer ni les tronquer (\code{exposition\_cellules()}), au lieu
+clé, sans en créer ni les tronquer (\code{exposition\_cellules()},
+section~\ref{sec:exposition-cellules}), au lieu
 de former des fenêtres d'observation.
 
 {\small
@@ -5657,6 +5879,91 @@ coûterait à toute construction, y compris sans cet estimateur, et ferait
 dépendre le module \code{exposition} des besoins d'un estimateur du module
 \code{brut}.
 
+\subsection{Table d'exposition des agrégats (forme \code{cellules})}
+\label{sec:exposition-cellules}
+
+Sous la recette \code{agregats}, la forme rendue au noyau est
+\code{cellules}~: \code{calculer\_exposition()} appelle
+\code{exposition\_cellules()} (ADR 0016, point 4.3~; spécification
+d'\code{actuary} M327, § 5). Les cellules conservées par l'étape
+\code{donnees} sont \textbf{sommées par clé} (segments de la segmentation,
+\code{age}, et \code{annee} sous \code{par\_annee})~; aucune cellule n'est
+créée, aucune n'est tronquée ni complétée, et la plage d'âges n'est pas
+rendue contiguë. Un rôle \code{sexe}, \code{segment} ou \code{annee}
+déclaré mais absent de la clé est ainsi sommé sur ses modalités
+(avertissements \code{role\_non\_employe}, à l'étape \code{donnees}, et
+\code{annees\_sommees}, ci-dessous). Les événements sont sommés exactement
+et rendus en \code{integer}~; une somme qui dépasse le plus grand entier du
+moteur ($2^{31} - 1$, \code{.Machine\$integer.max}) est refusée
+(\code{evenements\_hors\_plage}, module \code{exposition}). Les expositions
+sont sommées en arithmétique flottante, dans l'ordre des lignes, comme sous
+la recette des lignes~: une permutation des lignes reçues peut changer les
+derniers bits d'une somme, et une cellule sans somme garde sa valeur
+exacte. Les segments suivent l'ordre de \code{segments\_observations()}~;
+dans un segment, les âges puis les années sont croissants.
+
+\medskip
+La table d'exposition (\code{resultat\$exposition}) porte les clés,
+\code{age}, \code{annee} sous \code{par\_annee}, les expositions
+déclarées (\code{exposition\_centrale} puis \code{exposition\_initiale},
+en \code{double}) et \code{evenements}~; elle ne porte aucune colonne
+propre aux fenêtres (\code{exposition\_jours},
+\code{sorties\_concurrentes}, compléments de l'exposition initiale), ni en
+zéro ni en \code{NA}, et l'étape ne rend pas d'objet
+\code{fenetres\_exposition}, l'estimateur \code{kaplan\_meier} étant refusé
+sous cette recette. L'exposition initiale reçue est présumée de définition
+«~cellule~»~: $E^i = E^c$ plus, pour chaque événement de la transition, le
+complément jusqu'à la fin de la cellule, aucun complément pour une sortie
+concurrente, soit $0 \le E^i - E^c \le D$ (relevés de cohérence de
+l'étape \code{donnees}, section~\ref{sec:unite-observation}, «~Relevés et
+avertissements~»)~; aucune exposition n'est déduite de l'autre.
+
+\medskip
+Les paramètres effectifs remplacent l'unité de l'exposition et l'hypothèse
+sur les sorties concurrentes par des textes déclarés
+(\code{UNITE\_EXPOSITION\_DECLAREE}~: années de la convention déclarée,
+définition des jours non vérifiable~; \code{HYPOTHESE\_CENSURE\_DECLAREE}~:
+traitement des sorties concurrentes fait par le producteur, non vérifiable)
+et ajoutent \code{hypotheses\_recette}, table des hypothèses nommées de la
+recette (\code{hypotheses\_agregats()}~: code, énoncé, nature, statut),
+reprise dans la fiche (champ conditionnel \code{hypotheses\_recette},
+section~\ref{sec:fiche}). Elle compte six hypothèses, plus une par
+exposition déclarée (sept ou huit), dans cet ordre~: exposition centrale
+déclarée, exposition initiale déclarée (définition «~cellule~»), unité
+de l'exposition (années de la convention déclarée, sans conversion~; un
+décompte en jours$/365$ ou jours$/365{,}25$ s'en écarte d'au plus $1/365$ en
+relatif, borne exacte), convention déclarée, une valeur d'\code{age}
+désignant une seule année d'âge, période et délai appliqués par le
+producteur, événements de la transition du plan non pondérés (E2.8), unité
+d'observation non déterminée. Toutes ont le statut «~hypothèse déclarée,
+non vérifiable par le moteur~» (\code{STATUT\_HYPOTHESE\_DECLAREE}),
+complété par le relevé \code{ages\_manquants} pour l'année d'âge, par
+l'avertissement \code{unite\_agregat} pour l'unité, et, si \code{annee}
+est déclaré, remplacé pour la période par «~vérifiable en partie~» (motif
+\code{annee\_hors\_periode}~; troncature et délai à l'intérieur d'une
+année non vérifiables). Les diagnostics sont le nombre de cellules reçues
+(\code{observations}), le total des événements, le nombre de cellules de
+la table, celui des cellules à événement sans exposition et celui des
+cellules absentes de la plage d'âges.
+
+\medskip
+Avertissements~: \code{convention\_declaree} (la recette n'ayant pas de
+convention native, la convention retenue est la convention déclarée, non
+vérifiable sur des agrégats)~; \code{annees\_sommees} (\code{annee}
+déclaré sous \code{par\_annee = FALSE}~: exposition et événements sommés
+sur les années de chaque cellule, somme exacte pour l'exposition centrale
+et les événements~; sous \code{dernier\_anniversaire} avec l'exposition
+initiale déclarée, le texte ajoute que la somme des expositions initiales
+des carrés de Lexis n'est pas l'exposition initiale de l'année d'âge, la
+colonne \code{exposition\_initiale} étant la somme des valeurs reçues, et
+que l'estimateur \code{binomial} est refusé, \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire})~;
+\code{ages\_manquants} (cellules d'âge entier absentes entre l'âge minimal
+et l'âge maximal reçus de chaque segment, et de chaque couple segment,
+année sous \code{par\_annee}~; aucune cellule n'est créée, des classes
+d'âge groupées étant possibles)~; \code{evenement\_sans\_exposition}
+(cellules qui comptent au moins un événement et dont l'exposition centrale,
+ou, sans exposition centrale déclarée, l'exposition initiale, est nulle).
+
 \subsection{Découpage par année}
 \label{sec:decoupage-annee}
 
@@ -5675,7 +5982,20 @@ compléments de l'exposition initiale ne sont pas produits dans ce découpage.
 Les cas construits à la main de la spécification (H1 à H13 pour une ligne,
 F1 à F4 pour la fusion) sont vérifiés par
 \code{tests/unitaires/test\_exposition.R}, en jours exactement et en unité
-d'exposition à $10^{-12}$ près. Quelques-uns illustrent les règles
+d'exposition à $10^{-12}$ près. La recette \code{agregats} (forme
+\code{cellules}) l'est par \code{tests/unitaires/test\_agregats.R}, chaque
+attendu de nature nommée~: identité exacte des résultats des étapes
+\code{brut}, \code{positionnement}, \code{homogeneite} et
+\code{validation} calculés sur des agrégats formés depuis la table
+d'exposition d'une construction en lignes et de ceux de cette construction
+(C1), d'une permutation des lignes sans somme (C6) et de sommes dyadiques
+(C5)~; valeurs écrites à la main pour les motifs (C3), les relevés (C4), les
+refus et leurs messages (C2, C7, C8) et les champs de la fiche (C9)~;
+contre-exemple écrit à la main de deux jeux de lignes aux mêmes agrégats et
+aux estimations de Kaplan-Meier 0,5 et~1, qui motive le refus de cet
+estimateur sous la recette (C8)~; forme agrégats du simulateur (C10,
+identité exacte~; C11, approximation numérique, section~\ref{sec:non-regression},
+«~Plan R13~»). Quelques-uns illustrent les règles
 ci-dessus (période du 2015-01-01 au 2024-12-31, délai nul, vivant $\to$
 décédé)~:
 
@@ -5954,7 +6274,13 @@ l'arrondi (approximation numérique).
   \item \textbf{Hypothèses}~: force de la transition constante dans la
     cellule~; sorties concurrentes non informatives
     (\code{HYPOTHESE\_CENSURE}, section~\ref{sec:troncature-censure})~;
-    troncature à gauche traitée par la fenêtre d'observation.
+    troncature à gauche traitée par la fenêtre d'observation. Sous la forme
+    \code{cellules} (recette \code{agregats}), $E^c$ et $D$ sont reçus du
+    producteur de l'agrégat, qui a traité la troncature à gauche, la censure
+    et les sorties concurrentes~: la dernière clause est remplacée par ce
+    texte dans l'hypothèse inscrite (\code{hypothese\_brut()},
+    \code{CLAUSE\_TRONCATURE\_CELLULES}~; section~\ref{sec:exposition-cellules}),
+    hypothèse déclarée que le moteur ne vérifie pas.
   \item \textbf{Estimateur}~: sous ces hypothèses, la log-vraisemblance de
     $\mu$ vaut exactement $D \log \mu - \mu E^c$~; son maximum est
     \[
@@ -6029,7 +6355,19 @@ l'arrondi (approximation numérique).
     l'instant de l'événement.
   \item \textbf{Estimateur}~: $\hat q^{B} = D / E^i$, avec l'exposition
     initiale «~cellule~» (\code{EXPOSITION\_INITIALE\_BRUT}), fixée sans
-    paramètre (décision M51, question~1).
+    paramètre (décision M51, question~1). Sous la forme \code{cellules}
+    (recette \code{agregats}), $E^i$ est la colonne
+    \code{exposition\_initiale} reçue, lue telle quelle~; le paramètre
+    \code{exposition\_initiale} de l'étape vaut alors \code{"declaree"}
+    (\code{EXPOSITION\_INITIALE\_DECLAREE}), et l'hypothèse inscrite ajoute
+    que $E^i$ est déclarée de définition «~cellule~», non vérifiée par le
+    moteur (\code{AJOUT\_BINOMIAL\_CELLULES}). La propriété ci-dessous
+    ne vaut donc que si le producteur a bien formé $E^i$ selon cette
+    définition~; les relevés de cohérence de l'étape \code{donnees}
+    (section~\ref{sec:unite-observation}, «~Relevés et avertissements~»)
+    n'en vérifient que les bornes $0 \le E^i - E^c \le D$. Une seule
+    fonction donne $E^i$ et sa définition selon la forme
+    (\code{exposition\_initiale\_brut()}~; ADR 0016, point 4.5).
   \item \textbf{Pourquoi la définition «~cellule~»} (spécification, A.2~;
     preuve écrite). Soit une tête présente dans la cellule à la fraction
     $u$ et censurée en $c$ ($u < c \le 1$, $c$ fixe ou indépendant de
@@ -11913,11 +12251,12 @@ gauche et censure par la période~; elle reste celle des modes
 portant un nombre aléatoire de contrats, de loi déclarée (issue~\#92~;
 section~\ref{sec:portefeuille-simule}). Des \emph{défauts paramétrés}
 peuvent être injectés dans le jeu propre (issue~\#93~;
-section~\ref{sec:defauts-parametres}). Les autres formes de données
-(agrégats, stocks successifs) viendront avec une branche ultérieure
-(\code{docs/}\allowbreak\code{feuille-de-route.md}, §~2). Son point
+section~\ref{sec:defauts-parametres}). Le jeu propre peut être rendu sous
+la forme «~agrégats~» de E2.1 (issue~\#169~;
+section~\ref{sec:portefeuille-simule}, «~Sortie~»)~; la forme «~stocks
+successifs~» n'est pas encore mise en œuvre. Son point
 d'entrée est \code{simuler\_portefeuille(loi, portefeuille, periode,
-graine, defauts = NULL)}, exporté (ADR 0007, point 3.2, et annotation du
+graine, defauts = NULL, forme = NULL)}, exporté (ADR 0007, point 3.2, et annotation du
 25/10/2026, point~(b)). Le contenu de fond vient de la
 spécification d'\code{actuary} (issue~\#11, partie A.2) et de son erratum du
 17/10/2026, et, pour les têtes multi-contrats et les défauts paramétrés,
@@ -12342,13 +12681,65 @@ lignes et sur \code{tires\_par\_tete}, sauf
 lignes~: les tests n'en vérifient que la positivité.
 
 \medskip
+\textbf{Forme «~agrégats~»} (issue~\#169~; ADR 0003, point~9~; ADR 0007,
+annotation du 08/11/2026, (b)~; spécification d'\code{actuary} M327,
+§ 11). L'argument facultatif \code{forme} de \code{simuler\_portefeuille()}
+(\code{NULL} par défaut~: lignes individuelles, sortie ci-dessus) demande le
+même jeu sous une autre forme de données de E2.1. La forme agrégats
+s'écrit \code{list(nom = "agregats", transition, convention, par\_annee)},
+tous les champs requis, sans défaut implicite (\code{CHAMPS\_FORMES})~:
+\code{transition} est l'une des deux transitions simulées, dont la cause
+est comptée comme événement, les autres sorties étant des censures~;
+\code{convention} ne peut valoir que \code{dernier\_anniversaire}
+(\code{CONVENTIONS\_FORMES})~; \code{par\_annee} est \code{TRUE} ou
+\code{FALSE}. Le jeu propre est tiré exactement comme sans forme (aucune
+graine nouvelle, aucun tirage supplémentaire), puis projeté en cellules par
+\code{projeter\_agregats()}, par l'arithmétique de dates du simulateur,
+sans appel au module \code{exposition}, ce qui garde la projection
+indépendante du code qu'elle sert à vérifier (ADR 0003, point~9~; graphe
+contrôlé par \code{graphe\_modules.R}). La fenêtre de chaque ligne est
+$[a, b)$, $a = \max(\text{entrée}, D)$, $b = \min(\text{sortie}, B)$~; une
+année d'âge $[\text{anniv}(x), \text{anniv}(x + 1))$ de $L_x$ jours vaut~1.
+L'événement est la sortie de la cause comptée, de jour $s$ avec
+$D \le s < B$, rangée dans la cellule de ce jour.
+\code{exposition\_centrale} est la somme, sur les morceaux de fenêtre de la
+cellule, de leur longueur divisée par $L_x$~; sans \code{par\_annee},
+\code{exposition\_initiale} lui ajoute, pour chaque événement,
+$(\text{anniv}(x + 1) - s) / L_x$, complément jusqu'à la fin de la cellule,
+aucun pour une censure (définition «~cellule~», section~\ref{sec:exposition-cellules})~;
+sous \code{par\_annee}, les morceaux sont coupés au 1\textsuperscript{er}
+janvier, l'événement va à l'année civile de sa sortie, et la colonne
+\code{exposition\_initiale} n'est pas produite. Les lignes sont formées par
+sexe (ordre des octets), sur la plage contiguë des âges des cellules qui
+portent un morceau de fenêtre, un événement ou une autre sortie dans
+$[D, B)$, et, sous \code{par\_annee}, pour chaque âge, toutes les années
+civiles de $D$ à $B - 1$~; les cellules vides sont écrites avec des
+\textbf{zéros explicites}. Le résultat est un \code{data.frame} de colonnes
+aux noms des rôles (\code{sexe}, \code{age}, \code{annee} sous
+\code{par\_annee}, \code{exposition\_centrale}, \code{exposition\_initiale}
+sans \code{par\_annee}, \code{evenements}~; âge, année et événements en
+\code{integer}). Son attribut \code{simulation} est celui du jeu propre,
+suivi en fin d'un champ \code{forme} (nom, transition, convention,
+\code{par\_annee}). La forme est contrôlée par \code{controler\_forme()},
+avant tout tirage et avant les défauts~; tout écart est refusé sous
+\code{forme\_invalide} (module \code{simulation}), avec trois cas nommés~:
+une forme avec l'argument \code{defauts} (les défauts paramétrés ne sont
+injectés que dans les lignes individuelles~; défauts propres aux formes~:
+issue~\#189), une forme sous un mode multi-contrats (l'unité d'un agrégat,
+têtes ou contrats, serait ambiguë~; modes admis lus dans \code{MODE\_BASE}),
+et la convention \code{age\_atteint\_annee}, non mise en œuvre pour cette
+forme (issue~\#189). Le jeu propre sous forme agrégats est l'entrée du plan
+de référence R13 (section~\ref{sec:non-regression}).
+
+\medskip
 {\sloppy\hbadness=10000 Refus du simulateur~: \code{loi\_invalide}, \code{portefeuille\_invalide},
 \code{periode\_invalide}, \code{entree\_29\_fevrier}, \code{table\_trop\_courte}
 et \code{qx\_egal\_a\_un}~; et, par \code{sous\_graine()}, \code{graine\_invalide}.
 Les modes multi-contrats n'ajoutent aucun code~: \code{loi\_contrats} et la
 garde de débordement sont refusés sous \code{portefeuille\_invalide}. Les
 défauts paramétrés en ajoutent deux, \code{defauts\_invalides} et
-\code{defauts\_ineligibles} (section~\ref{sec:defauts-parametres}).\par}
+\code{defauts\_ineligibles} (section~\ref{sec:defauts-parametres}), et
+l'argument \code{forme} un, \code{forme\_invalide} (ci-dessus).\par}
 
 \subsection{Défauts paramétrés}
 \label{sec:defauts-parametres}
@@ -12364,7 +12755,8 @@ code de refus que ce module doit produire.
 \subsubsection*{Argument \code{defauts}}
 
 {\sloppy\hbadness=10000 La signature est
-\code{simuler\_portefeuille(loi, portefeuille, periode, graine, defauts = NULL)}.
+\code{simuler\_portefeuille(loi, portefeuille, periode, graine, defauts = NULL, forme = NULL)}
+(argument \code{forme}~: section~\ref{sec:portefeuille-simule}, «~Sortie~»).
 La valeur \code{NULL} signifie «~aucun défaut injecté~»~: le jeu rendu est
 le jeu propre, sans attribut \code{defauts}, identique à celui de l'appel à
 quatre arguments. Ce n'est pas une graine par défaut~: \code{graine} reste
@@ -13179,7 +13571,11 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issue~\#112)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; déclarations normalisées (types rangés dans l'ordre du catalogue, cible, taux ou nombre) \\
 \catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête (issue~\#112), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres}) \\
 \catalogue{fonctions-simulation}{injecter\_defauts()} & interne & jeu propre, défauts contrôlés, défauts reçus, période & sélection sous la graine des défauts, refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de jeu~; jeu altéré et attribut \code{defauts} \\
-\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine, défauts (\code{NULL} par défaut) & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation}~; jeu altéré et attribut \code{defauts} si des défauts sont déclarés \\
+\catalogue{fonctions-simulation}{CHAMPS\_FORMES} & constante & --- & champs requis de l'argument \code{forme}, par forme~: \code{agregats} (\code{nom}, \code{transition}, \code{convention}, \code{par\_annee}) \\
+\catalogue{fonctions-simulation}{CONVENTIONS\_FORMES} & constante & --- & conventions d'âge mises en œuvre par forme~: \code{dernier\_anniversaire} seule pour \code{agregats} \\
+\catalogue{fonctions-simulation}{controler\_forme()} & interne & forme, mode validé, présence de défauts, bornes de la période & forme validée (pour \code{agregats}~: nom, transition, cause comptée, convention, \code{par\_annee})~; refus \code{forme\_invalide}, avant tout tirage \\
+\catalogue{fonctions-simulation}{projeter\_agregats()} & interne & jeu propre, cause comptée, \code{par\_annee}, début et borne de la période & cellules agrégées (sexe, âge au dernier anniversaire, année sous \code{par\_annee}), zéros explicites, par l'arithmétique de dates du simulateur~; aucun tirage, aucun appel au module \code{exposition} \\
+\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine, défauts et forme (\code{NULL} par défaut) & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation}~; jeu altéré et attribut \code{defauts} si des défauts sont déclarés~; sous une forme, table de la forme demandée, attribut \code{simulation} suivi du champ \code{forme} \\
 \end{longtable}
 }
 
