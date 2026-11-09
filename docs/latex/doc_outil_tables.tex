@@ -2779,6 +2779,45 @@ interpréteur placé sous un dossier \code{WindowsApps} et désigné par son
 chemin court, qui n'est pas lancé, et par le même placé ailleurs, qui
 l'est (\code{test\_controles\_portables.R}).
 
+\textbf{Unicité des graines} (issue~\#176). Deux sources d'aléa tirées
+sous une même graine donnent des flux identiques~: les données et la
+statistique d'un test deviennent dépendantes, et la probabilité de fausse
+alarme écrite par un constat de simulation ne vaut plus (E2.19, E2.20).
+\code{tests/controles/graines.R} lit chaque fichier \code{*.R} de
+\code{tests/}, \code{R/} et \code{inst/} par \code{parse()} et
+\code{utils::getParseData()}, sans charger \code{tablexp}, et relève les
+littéraux entiers de graine~: argument de \code{set.seed()}, premier
+argument de \code{sous\_graine()}, valeur d'un argument, d'un paramètre par
+défaut ou d'un élément nommé \code{graine}, valeur affectée à
+\code{x\$graine} ou à \code{x[["graine"]]}, membre droit d'une affectation à une constante
+\code{GRAINE}, \code{GRAINE\_*} ou \code{GRAINES\_*}, et littéral
+positionnel que la correspondance des arguments de R
+(\code{match.call()}) apparie à un paramètre formel \code{graine} d'une
+fonction définie dans l'un des fichiers lus (extension décidée par le
+mainteneur, M337). Une valeur inférieure à $1\,000$ est une graine de
+garde, exemptée, sauf sous une constante \code{GRAINE*}. Une valeur d'au
+moins $1\,000$ relevée dans plusieurs fichiers, ou sous deux contextes d'un
+même fichier, doit figurer, avec pour fichiers exactement l'ensemble
+observé, soit dans la liste blanche
+\code{tests/controles/graines\_admises.csv} (réemplois admis, classes A1
+à~A4 de la spécification d'\code{actuary} versée sur l'issue~\#176, et
+plages de graines réservées à un script de constat, qu'aucun autre fichier
+ne peut employer, sauf entrée de l'héritage figé qui le nomme), soit dans l'héritage figé \code{HERITAGE\_176} du script
+(réemplois antérieurs à la décision M300, conservés par décision du
+mainteneur, M327, Q7~: aucune valeur ni aucun fichier nouveau, retrait
+d'une entrée devenue sans occurrence autorisé d'avance, M338). Un fichier
+nouveau ou disparu, une entrée sans occurrence (hors entrée d'héritage
+marquée «~pour mémoire~») et deux plages qui se recouvrent sont des écarts.
+\textbf{Limites}, écrites dans l'en-tête du script~: seuls les littéraux
+directs sont lus (ni l'arithmétique, comme \code{GRAINE + 1L}, ni une
+variable, ni le réemploi d'une constante par son nom, ni un appel à une
+fonction qui n'est définie dans aucun fichier lu)~; deux occurrences d'un
+même contexte dans un même fichier ne sont pas distinguées~; deux constats
+présentés comme indépendants qui partageraient la graine de leur jeu ne
+sont pas détectables mécaniquement, ce qui reste une règle de rédaction des
+constats~; le contrôle teste l'égalité des valeurs, non l'indépendance des
+flux.
+
 \begin{center}
 \small
 \rowcolors{2}{tablerow}{white}
@@ -2804,6 +2843,12 @@ méthode qui l'introduit, dans la constante \code{ADMIS}, vide à cette date &
 ADR 0002, point 3 et A8~; M44 \\
 \code{graphe\_modules.R} & graphe d'appels autorisés et appels dynamiques
 interdits (section~\ref{sec:graphe}) & ADR 0007, points 2.1 à 2.3 \\
+\code{graines.R} & aucune graine littérale d'au moins $1\,000$ réemployée
+hors de la liste blanche \code{graines\_admises.csv} et de l'héritage figé
+\code{HERITAGE\_176}, ensembles de fichiers exacts~; aucune constante
+\code{GRAINE*} inférieure à $1\,000$~; plages réservées à leurs fichiers
+(ci-dessus)~; étape «~Unicité des graines~» du job «~Tests (R 4.3.3)~», hors
+liste des batteries & E2.19~; M327 (Q7), M336 à M338~; issue~\#176 \\
 \code{identite\_batteries.R} & mêmes batteries, dans le même ordre, dans
 \code{CLAUDE.md}, dans \code{circuit-technique.js} et dans les étapes
 «~Batterie~:~» du job «~Tests (R 4.3.3)~»~; ce job ne porte ni
