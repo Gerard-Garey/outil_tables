@@ -1977,7 +1977,9 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
   ret$exposition_centrale_conservee <- Er
   ret$taux_conserves <- mu
   ret$attendus_comparateur_1 <- att
-  ret$etat_cellule <- ifelse(ok, "produite", "sans_exposition_retenue")
+  # character même sans cellule (#177) : ifelse() rend logical(0) sur ok vide.
+  etat_cel <- rep("sans_exposition_retenue", nrow(ret)); etat_cel[ok] <- "produite"
+  ret$etat_cellule <- etat_cel
   O <- sum(as.numeric(ret$evenements_retires[ok])); A <- sum(att[ok])
   tp <- taux_poisson(O, A, niveau)
   list(cellules = ret,
