@@ -62,14 +62,18 @@ verifier("catalogue_roles() : 23 rôles (type_ligne ajouté, #180, commit (4a)),
 verifier("catalogue_roles() : rôles requis de la recette = date_naissance, date_entree, date_sortie, cause_sortie (CATALOGUE_RECETTES)",
          identical(tablexp:::CATALOGUE_RECETTES$requis[[1L]],
                    c("date_naissance", "date_entree", "date_sortie", "cause_sortie")))
-NON_PRIS <- c("age_fourni", "date_age_fourni", "date_evenement", "type_ligne", "date_inventaire", "montant",
-              "etat_depart", "etat_arrivee", "date_changement")
+NON_PRIS <- c("age_fourni", "date_age_fourni", "date_evenement", "montant", "etat_depart", "etat_arrivee",
+              "date_changement")
 AGREGATS <- c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements")
-verifier("catalogue_roles() : rôles qu'aucune recette n'emploie signalés (recettes vide), agregats pour ses rôles propres, « lignes_dates_completes, agregats » pour sexe et segment, lignes_dates_completes pour les autres (#169)", {
+STOCKS <- c("type_ligne", "date_inventaire")
+verifier("catalogue_roles() : rôles qu'aucune recette n'emploie signalés (recettes vide), agregats et stocks_successifs pour leurs rôles propres, les trois recettes pour sexe et segment, lignes_dates_completes pour date_entree, « lignes_dates_completes, stocks_successifs » pour les autres (#169, #180 commit (4b))", {
   v <- stats::setNames(cat_r$recettes, cat_r$role)
   identical(cat_r$role[cat_r$recettes == ""], NON_PRIS) && all(v[AGREGATS] == "agregats") &&
-    all(v[c("sexe", "segment")] == "lignes_dates_completes, agregats") &&
-    all(v[setdiff(cat_r$role, c(NON_PRIS, AGREGATS, "sexe", "segment"))] == "lignes_dates_completes")
+    all(v[STOCKS] == "stocks_successifs") &&
+    all(v[c("sexe", "segment")] == "lignes_dates_completes, agregats, stocks_successifs") &&
+    identical(unname(v["date_entree"]), "lignes_dates_completes") &&
+    all(v[setdiff(cat_r$role, c(NON_PRIS, AGREGATS, STOCKS, "sexe", "segment", "date_entree"))] ==
+          "lignes_dates_completes, stocks_successifs")
 })
 verifier("catalogue_roles() : noms sans accents, uniques",
          !anyDuplicated(cat_r$role) && all(grepl("^[a-z_]+$", cat_r$role)))
@@ -140,6 +144,14 @@ for (role in NON_PRIS) {
   x <- refus(prep(roles = c(ROLES, stats::setNames("autre_colonne", role))))
   verifier(sprintf("rôle %s : refus role_non_pris_en_charge, message nomme rôle et colonne", role),
            if (is.null(x)) "aucun refus" else if (!identical(x$motif, "role_non_pris_en_charge"))
+             x$motif else contient(x, role, "autre_colonne"))
+}
+# Rôles discriminants de la recette stocks_successifs (#180, commit (4b)) sur
+# une base en lignes : recettes_concurrentes (auparavant role_non_pris_en_charge).
+for (role in STOCKS) {
+  x <- refus(prep(roles = c(ROLES, stats::setNames("autre_colonne", role))))
+  verifier(sprintf("rôle %s (discriminant des stocks successifs) : refus recettes_concurrentes, message nomme rôle et colonne", role),
+           if (is.null(x)) "aucun refus" else if (!identical(x$motif, "recettes_concurrentes"))
              x$motif else contient(x, role, "autre_colonne"))
 }
 x <- refus(prep(roles = replace(ROLES, "sexe", "genre")))

@@ -5,7 +5,9 @@
 #
 #  - ETAPES, PARAMETRES_ETAPES : catalogue des étapes (ordre, fonction
 #    d'étape, étapes préalables, aléa) et de leurs paramètres (nom, type,
-#    domaine), recensé par la documentation ;
+#    domaine, recette d'un paramètre conditionnel), recensé par la
+#    documentation ; controler_parametres_recette() : présence des
+#    paramètres conditionnels selon la recette retenue (ADR 0016, point 7.2) ;
 #  - valider_plan() : plan validé entièrement avant toute exécution (codes
 #    structurels du plan ; valeurs contrôlées par les modules qui les
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
@@ -89,20 +91,28 @@ ETAPES <- data.frame(
 )
 
 # Catalogue des paramètres par étape (ADR 0007, point 5.2 et annotation du
-# 17/10/2026) : tous requis, aucun défaut. Les valeurs sont contrôlées par le
-# module de l'étape. Règle commune (#23) : chaque paramètre a exactement le
-# type de base de la colonne `type` et ne porte aucun attribut (ni names, ni
-# dim, ni classe), sinon refus sous le motif propre au paramètre.
+# 17/10/2026) : aucun défaut. Les valeurs sont contrôlées par le module de
+# l'étape. Règle commune (#23) : chaque paramètre a exactement le type de base
+# de la colonne `type` et ne porte aucun attribut (ni names, ni dim, ni
+# classe), sinon refus sous le motif propre au paramètre. Colonne `recette`
+# (ADR 0016, points 7.2 et 7.3 ; M331) : NA pour un paramètre requis sous
+# toute recette (parametre_manquant, valider_plan()) ; le nom d'une recette
+# du catalogue pour un paramètre conditionnel, requis sous cette recette et
+# interdit sous les autres (parametre_manquant, parametre_inattendu,
+# controler_parametres_recette(), après la sélection de la recette).
 PARAMETRES_ETAPES <- list(
   donnees = data.frame(
     parametre = "exclusions",
     type = "character",
     domaine = "codes de motif de ligne ou de tête, sans doublon ; vide explicite admis",
+    recette = NA_character_,
     stringsAsFactors = FALSE),
   exposition = data.frame(
-    parametre = c("convention", "par_annee"),
-    type = c("character", "logical"),
-    domaine = c("plus_fine, dernier_anniversaire ou age_atteint_annee", "TRUE ou FALSE"),
+    parametre = c("convention", "par_annee", "entree_entre_inventaires"),
+    type = c("character", "logical", "character"),
+    domaine = c("plus_fine, dernier_anniversaire ou age_atteint_annee", "TRUE ou FALSE",
+                "premier_inventaire ou milieu (hypothèse d'entrée entre inventaires)"),
+    recette = c(NA_character_, NA_character_, "stocks_successifs"),
     stringsAsFactors = FALSE),
   brut = data.frame(
     parametre = c("estimateurs", "niveau"),
@@ -111,6 +121,7 @@ PARAMETRES_ETAPES <- list(
                       "binomial et kaplan_meier refusés sous par_annee = TRUE ; résultats dans l'ordre",
                       "canonique"),
                 "nombre double unique, fini, 0 < niveau < 1"),
+    recette = NA_character_,
     stringsAsFactors = FALSE),
   # Méthode requise, sans défaut (M293) ; plage_ages à valeur entière en
   # double (M246, M257).
@@ -121,6 +132,7 @@ PARAMETRES_ETAPES <- list(
                 "clé de la table dans l'argument tables_reference, chaîne unique non vide",
                 "deux valeurs entières, 0 <= min <= max, couvertes par la table",
                 "nombre double unique, fini, 0 < niveau < 1"),
+    recette = NA_character_,
     stringsAsFactors = FALSE),
   # Test d'homogénéité entre segments (#168 ; F10) : paramètres à valeur
   # entière en double (M246), un integer est refusé (M257) ; segmentation du
@@ -131,6 +143,7 @@ PARAMETRES_ETAPES <- list(
     domaine = c("deux valeurs entières, 0 <= min <= max",
                 "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
                 "nombre entier unique, au moins 1 (réplications de Monte-Carlo)"),
+    recette = NA_character_,
     stringsAsFactors = FALSE),
   # Paramètres à valeur entière en double (M246) ; un integer est refusé
   # (M257).
@@ -143,11 +156,13 @@ PARAMETRES_ETAPES <- list(
                 "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
                 "nombre double unique, fini, 0 < niveau < 1",
                 "nombre entier unique, au moins 1 (réplications de Monte-Carlo)"),
+    recette = NA_character_,
     stringsAsFactors = FALSE),
   importance_exclusions = data.frame(
     parametre = "niveau",
     type = "double",
     domaine = "nombre double unique, fini, 0 < niveau < 1",
+    recette = NA_character_,
     stringsAsFactors = FALSE)
 )
 
@@ -283,9 +298,49 @@ controler_inventaires_recette <- function(plan, recette) {
   invisible(NULL)
 }
 
+# Paramètres conditionnels à la recette (colonne `recette` de
+# PARAMETRES_ETAPES ; ADR 0016, points 7.2 et 7.3 ; M331), appelée par
+# controler_plan_roles() après la sélection de la recette (valider_plan(),
+# qui ne connaît pas les rôles, n'exige que les paramètres sans recette et
+# contrôle la forme d'un paramètre conditionnel présent). Pour chaque étape
+# du plan, dans l'ordre du plan : paramètre attribué à la recette retenue et
+# absent, refus parametre_manquant (aucun défaut implicite) ; paramètre
+# attribué à une autre recette et présent, refus parametre_inattendu (un
+# paramètre sans effet n'est pas admis). Module construire_table. Rend NULL,
+# invisible.
+controler_parametres_recette <- function(plan, recette) {
+  etapes <- plan[["etapes"]]
+  for (nom in names(etapes)) {
+    cat_e <- PARAMETRES_ETAPES[[nom]]
+    conditionnel <- !is.na(cat_e$recette)
+    presents <- names(etapes[[nom]])
+    sous <- conditionnel & cat_e$recette %in% recette$recette
+    absents <- setdiff(cat_e$parametre[sous], presents)
+    if (length(absents))
+      refuser("construire_table", "parametre_manquant",
+              formuler("Étape « %s » : paramètre(s) requis absent(s) %s sous la recette « %s » (aucun défaut implicite).",
+                       citer(nom), liste_guillemets(absents), citer(recette$recette)),
+              list(etape = nom, parametre = absents, recette = recette$recette))
+    autres <- conditionnel & !sous
+    inattendus <- intersect(cat_e$parametre[autres], presents)
+    if (length(inattendus))
+      refuser("construire_table", "parametre_inattendu",
+              formuler(paste("Étape « %s » : paramètre(s) %s sans objet pour la recette « %s » (employé(s) par la",
+                             "recette %s) ; un paramètre sans effet n'est pas admis dans le plan."),
+                       citer(nom), liste_guillemets(inattendus), citer(recette$recette),
+                       liste_guillemets(unique(cat_e$recette[autres & cat_e$parametre %in% inattendus]))),
+              list(etape = nom, parametre = inattendus, recette = recette$recette))
+  }
+  invisible(NULL)
+}
+
 # Valide le plan entier, sans rien exécuter (ADR 0007, point 5.4). Rend le
 # plan, inchangé et invisible ; refuse (module construire_table pour les
 # codes structurels ; module donnees, exposition ou brut pour les valeurs).
+# Un paramètre conditionnel à la recette (colonne `recette` de
+# PARAMETRES_ETAPES) n'est pas exigé ici (la recette n'est pas connue) : sa
+# présence est contrôlée par controler_parametres_recette() ; sa forme l'est
+# ici s'il est présent.
 valider_plan <- function(plan) {
   refus_plan <- function(motif, message, details = list())
     refuser("construire_table", motif, message, details)
@@ -360,7 +415,7 @@ valider_plan <- function(plan) {
                  formuler("Étape « %s » : paramètre(s) inconnu(s) %s (paramètres admis : %s).",
                           citer(nom), liste_guillemets(inconnus), liste_guillemets(attendus)),
                  list(etape = nom, parametre = inconnus))
-    manquants <- setdiff(attendus, names(pe))
+    manquants <- setdiff(attendus[is.na(PARAMETRES_ETAPES[[nom]]$recette)], names(pe))
     if (length(manquants))
       refus_plan("parametre_manquant",
                  formuler("Étape « %s » : paramètre(s) requis absent(s) %s (aucun défaut implicite).",
@@ -374,9 +429,12 @@ valider_plan <- function(plan) {
   # Grille des inventaires, si le champ est présent (sa présence selon la
   # recette est contrôlée par controler_plan_roles(), qui connaît les rôles).
   if ("inventaires" %in% names(plan)) controler_inventaires_plan(plan[["inventaires"]], p)
-  if ("exposition" %in% noms)
-    controler_parametres_exposition(etapes[["exposition"]][["convention"]],
-                                    etapes[["exposition"]][["par_annee"]])
+  if ("exposition" %in% noms) {
+    pe <- etapes[["exposition"]]
+    if ("entree_entre_inventaires" %in% names(pe))
+      controler_parametres_exposition(pe[["convention"]], pe[["par_annee"]], pe[["entree_entre_inventaires"]])
+    else controler_parametres_exposition(pe[["convention"]], pe[["par_annee"]])
+  }
   # `brut` a pour préalables `donnees` et `exposition` (contrôlés ci-dessus) :
   # par_annee est déjà validé.
   if ("brut" %in% noms)
@@ -725,7 +783,8 @@ table_citee <- function(tables, cle) {
 # et rejouer_fiche() (contrôle 6), dans cet ordre : plan (valider_plan(),
 # puis canoniser_plan()), rôles et recette (controler_roles(), qui rend la
 # recette de deduire_recette() ; module donnees), présence de la grille des
-# inventaires selon la recette (controler_inventaires_recette()), convention
+# inventaires selon la recette (controler_inventaires_recette()), paramètres
+# conditionnels à la recette (controler_parametres_recette()), convention
 # (resoudre_convention(), si `exposition` est au plan ; module exposition),
 # matrice recette x étape x estimateur (controler_matrice_recette(), module
 # donnees ; ADR 0016, point 5.3), provenance (controler_provenance()).
@@ -739,6 +798,7 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
   plan <- canoniser_plan(valider_plan(plan), CHAMPS_PLAN, PARAMETRES_ETAPES, ordres_canoniques())
   recette <- controler_roles(donnees, roles, plan[["segmentation"]])
   controler_inventaires_recette(plan, recette)
+  controler_parametres_recette(plan, recette)
   etapes_plan <- plan[["etapes"]]
   conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
@@ -827,7 +887,8 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                  exclusions = pe[["exclusions"]], recette = recette),
       exposition = calculer_exposition(etapes[["donnees"]][["resultat"]][["observations"]], p = p,
                                        segmentation = plan[["segmentation"]], recette = recette, conv = conv,
-                                       par_annee = pe[["par_annee"]]),
+                                       par_annee = pe[["par_annee"]],
+                                       entree_entre_inventaires = pe[["entree_entre_inventaires"]]),
       brut = calculer_taux_bruts(etapes[["exposition"]][["resultat"]][["exposition"]],
                                  segmentation = plan[["segmentation"]],
                                  par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],

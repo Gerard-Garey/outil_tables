@@ -6,15 +6,22 @@
 #  Commit (4a) : champ conditionnel `inventaires` du plan (validation,
 #  canonisation, présence selon la recette), p$inventaires, rôle type_ligne,
 #  motifs (§ 7.2, § 7.3) et observations (§ 4) des stocks, refus
-#  inventaire_sans_ligne (§ 7.4). La recette n'est pas encore au catalogue
-#  (ligne `stocks_successifs` au commit (4b)) : motifs et observations sont
-#  testés en appel direct, la présence du champ par une recette fabriquée.
+#  inventaire_sans_ligne (§ 7.4), testés en appel direct.
+#  Commit (4b) : ligne `stocks_successifs` du catalogue et de la matrice,
+#  paramètre conditionnel entree_entre_inventaires (ADR 0016, point 7.2),
+#  preparer_donnees() sous les stocks avec l'exclusion par unité (amendement
+#  A1 de la spécification, M339 : C5 amendé, C16 et son oracle), fenêtres et
+#  hypothèses de la recette (§ 5, § 6), refus du § 7.1, relevés du § 7.5,
+#  fiche (§ 10), oracle C1 (lignes reconstituées dans le test), C3, C6, C8,
+#  C9, C14.
 #
 #  Natures des attendus (ADR 0007, point 11.4), nommées dans chaque test :
 #  valeurs écrites à la main (motifs levés seuls sur une base construite à la
 #  main, faits par unité et décomptes, refus, motifs et messages) ; identité
-#  exacte (permutation des lignes reçues, aller-retour du plan). Aucune
-#  graine.
+#  exacte (permutation des lignes reçues, aller-retour du plan, oracle des
+#  lignes reconstituées, oracle de la base privée des unités exclues) ;
+#  inégalité exacte (C3). Graines des jeux simulés de l'oracle C1 : 180L et
+#  181L (< 1000, exemptées du contrôle de #176, règle A5).
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -161,20 +168,24 @@ verifier("champ_inconnu : la liste des champs admis cite inventaires (valeur éc
 
 # --- rôle type_ligne (§ 3) -----------------------------------------------------
 
-verifier("type_ligne : rôle du catalogue, famille observation, type categorie, modalités inventaire et evenement ; aucune recette ne l'emploie avant le commit (4b) (valeur écrite à la main)", {
+verifier("type_ligne : rôle du catalogue, famille observation, type categorie, modalités inventaire et evenement ; employé par la recette stocks_successifs depuis le commit (4b) (valeur écrite à la main)", {
   cr <- catalogue_roles()
   k <- which(cr$role == "type_ligne")
   length(k) == 1L && identical(cr$famille[k], "observation") && identical(cr$type_admis[k], "character, factor") &&
-    identical(cr$recettes[k], "") && identical(tablexp:::MODALITES_TYPE_LIGNE, c("inventaire", "evenement")) &&
+    identical(cr$recettes[k], "stocks_successifs") && identical(tablexp:::MODALITES_TYPE_LIGNE, c("inventaire", "evenement")) &&
     identical(cr$role[k + 1L], "date_inventaire")
 })
-verifier("type_ligne déclaré sur une base en lignes : role_non_pris_en_charge (refus 4, aucune recette ne l'emploie) ; message exact", {
+verifier("type_ligne déclaré sur une base en lignes : recettes_concurrentes depuis le commit (4b) (refus 5, discriminants des lignes et des stocks ; auparavant role_non_pris_en_charge) ; message exact", {
   b <- BL; b$t <- "inventaire"
   r <- rf(construire_table(b, c(RL, type_ligne = "t"), plan_s()))
-  isTRUE(controle(r, "donnees", "role_non_pris_en_charge")) &&
+  isTRUE(controle(r, "donnees", "recettes_concurrentes")) &&
     identical(conditionMessage(r), paste(
-      "Rôle déclaré qu'aucune recette d'exposition du catalogue n'emploie : « type_ligne » (colonne « t ») ;",
-      "l'ignorer changerait le sens du résultat, la construction est refusée."))
+      "Les rôles déclarés relèvent de plusieurs recettes d'exposition (rôles propres à chacune :",
+      "recette « lignes_dates_completes » : « date_entree » (colonnes « e ») ; recette « stocks_successifs » :",
+      "« type_ligne » (colonnes « t »)) ; la recette n'est pas choisie à la place de l'utilisateur : retirer les",
+      "rôles de la recette qui ne s'applique pas, la construction est refusée.")) &&
+    identical(r$details, list(recette = c("lignes_dates_completes", "stocks_successifs"),
+                              role = c("date_entree", "type_ligne"), colonne = c("e", "t")))
 })
 
 # --- motifs des stocks (§ 7.2, § 7.3) -----------------------------------------------
@@ -191,12 +202,12 @@ verifier("MOTIFS_LIGNES_STOCKS et MOTIFS_UNITE_STOCKS : listes fermées de la sp
                      c("unite_naissance_incoherente", "unite_sexe_incoherent", "unite_segment_incoherent",
                        "evenements_multiples", "presence_apres_evenement", "presence_interrompue",
                        "sortie_non_renseignee", "evenement_apres_absence")))
-verifier("motifs des stocks : hors du catalogue avant le commit (4b) (exclusion d'un code des stocks : exclusion_inconnue)", {
-  r <- rf(valider_plan(plan_s(etapes = list(donnees = list(exclusions = "presence_interrompue")))))
+verifier("motifs des stocks : au catalogue depuis le commit (4b) (union des motifs des recettes : valider_plan() admet un code des stocks ; sous les lignes, construire_table() le refuse : exclusion_hors_recette)", {
+  pl <- plan_s(etapes = list(donnees = list(exclusions = "presence_interrompue")))
   propres <- setdiff(c(tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS),
                      c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE, tablexp:::MOTIFS_LIGNES_AGREGATS))
-  isTRUE(controle(r, "donnees", "exclusion_inconnue")) && length(propres) == 18L &&
-    !any(propres %in% tablexp:::motifs_recettes())
+  is.null(rf(valider_plan(pl))) && length(propres) == 18L && all(propres %in% tablexp:::motifs_recettes()) &&
+    isTRUE(controle(rf(construire_table(BL, RL, pl)), "donnees", "exclusion_hors_recette"))
 })
 
 # Base valide, six unités sur la grille G3 (une ligne par unité et par
@@ -284,8 +295,16 @@ verifier("motifs des stocks : chaque motif de la spécification (§ 7.2, § 7.3)
 })
 verifier("motifs des stocks : unite_segment_incoherent seulement si le segment est employé par la segmentation",
          !length(motifs_s(CAS_S$unite_segment_incoherent[[1L]], segmentation = character(0))))
-verifier("motifs des stocks : le retrait d'une ligne par un motif de ligne se répercute sur les motifs d'unité (ligne de C à t_3 hors modalités : C, vue à t_2 seulement, sans événement -> sortie_non_renseignee sur sa ligne propre)",
-         identical(motifs_s(modif("sx", "X", 8L)), list(sexe_hors_modalites = 8L, sortie_non_renseignee = 7L)))
+verifier("motifs des stocks (C5 amendé, amendement A1) : une unité porteuse d'un motif de ligne n'est soumise à aucun motif d'unité ; ses lignes propres sont des lignes de propagation (ligne de C à t_3 hors modalités ; valeur écrite à la main)", {
+  ev <- tablexp:::evaluer_motifs_stocks(modif("sx", "X", 8L), RS, P3, "segment")
+  identical(motifs_s(modif("sx", "X", 8L)), list(sexe_hors_modalites = 8L)) &&
+    identical(ev$lignes_propagation, 7L) && identical(ev$unites_propagation, 1L)
+})
+verifier("motifs des stocks (amendement A1) : lignes de propagation vides sans motif de ligne, ou si le motif est porté par une ligne sans identifiant valide ou par l'unique ligne de l'unité (valeur écrite à la main)", {
+  vide <- function(d) { ev <- tablexp:::evaluer_motifs_stocks(d, RS, P3, "segment")
+                        identical(ev$lignes_propagation, integer(0)) && identical(ev$unites_propagation, 0L) }
+  vide(BS) && vide(modif("id", NA, 1L)) && vide(modif("c", "Deces", 9L)) && vide(BS[-6L, ])
+})
 verifier("motifs des stocks : aucun motif de comparaison levé sur une valeur manquante (naissance manquante : ni age_aberrant, ni naissance_apres_inventaire ; sortie manquante : ni naissance_apres_sortie)", {
   identical(names(motifs_s(modif("n", NA_D, 7L))), "naissance_manquante") &&
     identical(names(motifs_s({ d <- modif("s", NA_D, 9L); d$n[9L] <- D("2016-01-01"); d$an[9L] <- 2016L; d })),
@@ -384,4 +403,578 @@ verifier("inventaire_sans_ligne : ligne reçue datée de la date de grille, à t
   isTRUE(controle(r, "donnees", "inventaire_sans_ligne")) &&
     grepl("2014-12-31 (1 ligne(s) reçue(s) à cette date d'inventaire, toutes exclues)", conditionMessage(r), fixed = TRUE) &&
     identical(r$details$lignes_recues, 1L) && identical(r$details$dates, G3[1L])
+})
+
+# =============================================================================
+# Commit (4b) : recette au catalogue, paramètre conditionnel, preparer_donnees(),
+# fenêtres, hypothèses, oracles.
+# =============================================================================
+
+# Plan des stocks sur la grille G3 (période 2015-2016, délai 0). `mode` NULL :
+# paramètre entree_entre_inventaires absent ; `exposition` FALSE : plan réduit
+# à l'étape donnees.
+plan_st <- function(mode = "milieu", exclusions = character(0), sup = NULL, segmentation = "segment",
+                    convention = "plus_fine", par_annee = FALSE, transition = VD, inventaires = G3,
+                    exposition = TRUE, graine = NULL) {
+  p <- list(transition = transition, periode = PER, delai_declaration = 0)
+  if (!is.null(inventaires)) p$inventaires <- inventaires
+  p$segmentation <- segmentation
+  if (!is.null(graine)) p$graine <- graine
+  ex <- list(convention = convention, par_annee = par_annee)
+  if (!is.null(mode)) ex$entree_entre_inventaires <- mode
+  p$etapes <- c(list(donnees = list(exclusions = exclusions)), if (exposition) list(exposition = ex), sup)
+  p
+}
+BRUT3 <- list(brut = list(estimateurs = c("poisson", "binomial", "kaplan_meier"), niveau = 0.95))
+# Avertissements hors role_non_employe (rôle sexe déclaré, segmentation
+# « segment » des plans de la base BS).
+avert_s <- function(x) {
+  a <- x$avertissements
+  a <- a[a$code != "role_non_employe", , drop = FALSE]
+  rownames(a) <- NULL
+  a
+}
+codes <- function(x, etape = NULL) {
+  a <- avert_s(x)
+  if (!is.null(etape)) a <- a[a$etape == etape, , drop = FALSE]
+  a$code
+}
+
+# --- catalogue des recettes et matrice (ADR 0016, points 1 et 5 ; § 3, § 8) -------
+
+CAT <- tablexp:::CATALOGUE_RECETTES
+MAT <- tablexp:::MATRICE_RECETTES
+verifier("catalogue des recettes, (4b) : ligne stocks_successifs (§ 3 : type_ligne, date_inventaire, naissance, date et cause de sortie requises ; un identifiant parmi id_tete, id_contrat ; annee_naissance, sexe, segment facultatifs ; discriminants type_ligne et date_inventaire ; native dernier_anniversaire, § 9 ; seam fenetres ; motifs des stocks ; valeur écrite à la main)", {
+  k <- match("stocks_successifs", CAT$recette)
+  identical(CAT$recette, c("lignes_dates_completes", "agregats", "stocks_successifs")) &&
+    identical(CAT$requis[[k]], c("type_ligne", "date_inventaire", "date_naissance", "date_sortie", "cause_sortie")) &&
+    identical(CAT$un_parmi[[k]], list(c("id_tete", "id_contrat"))) &&
+    identical(CAT$facultatifs[[k]], c("annee_naissance", "sexe", "segment")) &&
+    identical(CAT$discriminants[[k]], c("type_ligne", "date_inventaire")) &&
+    identical(CAT$convention_native[k], "dernier_anniversaire") && identical(CAT$seam[k], "fenetres") &&
+    identical(CAT$motifs_ligne[[k]], tablexp:::MOTIFS_LIGNES_STOCKS) &&
+    identical(CAT$motifs_unite[[k]], tablexp:::MOTIFS_UNITE_STOCKS)
+})
+verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, sauf importance_exclusions, motif importance_exclusions_stocks ; valeur écrite à la main)", {
+  m <- MAT[MAT$recette == "stocks_successifs", -1L]; rownames(m) <- NULL
+  identical(m, data.frame(
+    etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite", "validation",
+              "importance_exclusions"),
+    estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
+    admis = c(rep("oui", 9L), "non"), role_requis = NA_character_,
+    motif = c(rep(NA_character_, 9L), "importance_exclusions_stocks"), stringsAsFactors = FALSE))
+})
+verifier("deduire_recette(), (4b) : rôles des stocks -> recette stocks_successifs, convention native dernier_anniversaire, rôles employés, seam fenetres, motifs ligne puis unité (valeur écrite à la main)", {
+  r <- tablexp:::deduire_recette(RS)
+  identical(r$recette, "stocks_successifs") && identical(r$convention_native, "dernier_anniversaire") &&
+    identical(r$roles_employes, c("type_ligne", "date_inventaire", "date_naissance", "date_sortie", "cause_sortie",
+                                  "id_tete", "id_contrat", "annee_naissance", "sexe", "segment")) &&
+    identical(r$seam, "fenetres") &&
+    identical(r$motifs, c(tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS))
+})
+verifier("deduire_recette(), (4b) : rôles des stocks sans identifiant -> aucune_recette, seule la recette des stocks listée, « un rôle parmi » (message écrit à la main)", {
+  r <- rf(tablexp:::deduire_recette(RS[names(RS) != "id_tete"]))
+  isTRUE(controle(r, "donnees", "aucune_recette")) &&
+    identical(conditionMessage(r), paste("Aucune recette d'exposition ne s'applique ; rôles requis absents, recette par recette :",
+                                         "recette « stocks_successifs » : un rôle parmi « id_tete », « id_contrat ».")) &&
+    identical(r$details$recette, "stocks_successifs")
+})
+verifier("catalogue_roles(), (4b) : colonne recettes des rôles des stocks (valeur écrite à la main)", {
+  v <- stats::setNames(catalogue_roles()$recettes, catalogue_roles()$role)
+  identical(unname(v[c("type_ligne", "date_inventaire", "id_tete", "id_contrat", "date_naissance", "annee_naissance",
+                       "date_sortie", "cause_sortie", "sexe", "segment", "date_entree")]),
+            c("stocks_successifs", "stocks_successifs", rep("lignes_dates_completes, stocks_successifs", 6L),
+              rep("lignes_dates_completes, agregats, stocks_successifs", 2L), "lignes_dates_completes"))
+})
+
+# --- paramètre conditionnel entree_entre_inventaires (ADR 0016, point 7.2) ------
+
+verifier("PARAMETRES_ETAPES, (4b) : colonne recette (NA pour tout paramètre existant) ; exposition : entree_entre_inventaires, character, conditionnel à stocks_successifs (valeur écrite à la main)", {
+  pe <- tablexp:::PARAMETRES_ETAPES
+  all(vapply(pe, function(t) identical(names(t), c("parametre", "type", "domaine", "recette")), NA)) &&
+    identical(pe$exposition$parametre, c("convention", "par_annee", "entree_entre_inventaires")) &&
+    identical(pe$exposition$type, c("character", "logical", "character")) &&
+    identical(pe$exposition$recette, c(NA, NA, "stocks_successifs")) &&
+    all(is.na(unlist(lapply(pe[names(pe) != "exposition"], function(t) t$recette)))) &&
+    identical(tablexp:::VALEURS_ENTREE_ENTRE_INVENTAIRES, c("premier_inventaire", "milieu"))
+})
+verifier("parametre_manquant (stocks, paramètre absent ; module construire_table, contrôlé après la recette) : message exact, details ; valider_plan() admet le plan", {
+  pl <- plan_st(mode = NULL)
+  r <- rf(construire_table(BS, RS, pl))
+  is.null(rf(valider_plan(pl))) && isTRUE(controle(r, "construire_table", "parametre_manquant")) &&
+    identical(conditionMessage(r), paste("Étape « exposition » : paramètre(s) requis absent(s) « entree_entre_inventaires »",
+                                         "sous la recette « stocks_successifs » (aucun défaut implicite).")) &&
+    identical(r$details, list(etape = "exposition", parametre = "entree_entre_inventaires", recette = "stocks_successifs"))
+})
+verifier("parametre_inattendu (lignes, paramètre présent ; module construire_table) : message visé par actuary, details ; valider_plan() admet le plan", {
+  pl <- plan_s(etapes = list(donnees = list(exclusions = character(0)),
+                             exposition = list(convention = "plus_fine", par_annee = FALSE,
+                                               entree_entre_inventaires = "milieu")))
+  r <- rf(construire_table(BL, RL, pl))
+  is.null(rf(valider_plan(pl))) && isTRUE(controle(r, "construire_table", "parametre_inattendu")) &&
+    identical(conditionMessage(r), paste("Étape « exposition » : paramètre(s) « entree_entre_inventaires » sans objet pour la",
+                                         "recette « lignes_dates_completes » (employé(s) par la recette « stocks_successifs ») ;",
+                                         "un paramètre sans effet n'est pas admis dans le plan.")) &&
+    identical(r$details, list(etape = "exposition", parametre = "entree_entre_inventaires",
+                              recette = "lignes_dates_completes"))
+})
+verifier("entree_entre_inventaires_invalide (valider_plan(), module exposition) : valeur hors des deux modes, NA, longueur 2, attribut, autre type ; message exact", {
+  ko <- list("trapeze", NA_character_, c("milieu", "milieu"), c(a = "milieu"), 1, TRUE, factor("milieu"))
+  rs <- lapply(ko, function(x) rf(valider_plan(plan_st(mode = x))))
+  all(vapply(rs, function(r) isTRUE(controle(r, "exposition", "entree_entre_inventaires_invalide")), NA)) &&
+    identical(conditionMessage(rs[[1L]]), paste("L'hypothèse d'entrée entre inventaires (entree_entre_inventaires) doit être une",
+                                                "chaîne unique, sans attribut, prise dans « premier_inventaire », « milieu » (aucun",
+                                                "défaut).")) &&
+    is.null(rf(valider_plan(plan_st(mode = "premier_inventaire")))) && is.null(rf(valider_plan(plan_st(mode = "milieu"))))
+})
+verifier("canoniser_plan(), (4b) : paramètres d'étape dans l'ordre du catalogue restreint aux présents ; idempotente avec et sans paramètre conditionnel ; paramètre sans recette absent -> erreur de programmation ; aller-retour ecrire_plan() / lire_plan() (identité exacte)", {
+  p <- plan_st()
+  p$etapes$exposition <- p$etapes$exposition[c("entree_entre_inventaires", "par_annee", "convention")]
+  c1 <- CN(p); c0 <- CN(plan_st(mode = NULL))
+  manque <- plan_st(); manque$etapes$exposition$par_annee <- NULL
+  e <- tryCatch(CN(manque), error = function(e) e)
+  identical(names(c1$etapes$exposition), c("convention", "par_annee", "entree_entre_inventaires")) &&
+    identical(CN(c1), c1) && identical(CN(c0), c0) && identical(names(c0$etapes$exposition), c("convention", "par_annee")) &&
+    inherits(e, "error") && !inherits(e, "refus_tablexp") && identical(lire_plan(ecrire_plan(c1)), c1)
+})
+
+# --- refus du § 7.1 propres aux stocks (C4, C12) ----------------------------------
+
+verifier("recettes_concurrentes (C12) : rôles des stocks avec date_entree -> refus 5, module donnees", {
+  b <- BS; b$e <- b$n
+  isTRUE(controle(rf(construire_table(b, c(RS, date_entree = "e"), plan_st())), "donnees", "recettes_concurrentes"))
+})
+verifier("identifiants_concurrents (C12, QS3) : id_tete et id_contrat déclarés -> refus, module donnees, message exact, details", {
+  b <- BS; b$ct <- b$id
+  r <- rf(construire_table(b, c(RS, id_contrat = "ct"), plan_st()))
+  isTRUE(controle(r, "donnees", "identifiants_concurrents")) &&
+    identical(conditionMessage(r), paste("Sous la recette « stocks_successifs », les rôles « id_tete », « id_contrat » sont déclarés",
+                                         "ensemble : l'unité d'observation des stocks successifs est un seul identifiant (la fusion",
+                                         "par tête de contrats inventoriés n'est pas prise en charge) ; déclarer un seul des deux",
+                                         "(« id_tete » pour une transition sur la tête, « id_contrat » pour une transition sur le",
+                                         "contrat), la construction est refusée.")) &&
+    identical(r$details, list(recette = "stocks_successifs", role = c("id_tete", "id_contrat"), colonne = c("id", "ct")))
+})
+RA <- list(depart = "en_cours", arrivee = "rachat")
+verifier("identifiant_inadapte (C12) : rachat (transition portée par le contrat) avec id_tete seul -> refus, message exact ; avec id_contrat seul : admis, unité contrat, sans avertissement unite_contrat", {
+  r <- rf(construire_table(BS, RS, plan_st(transition = RA)))
+  x <- construire_table(BS, RS_C, plan_st(transition = RA))
+  isTRUE(controle(r, "donnees", "identifiant_inadapte")) &&
+    identical(conditionMessage(r), paste("Sous la recette « stocks_successifs », la transition « en_cours_rachete » porte sur le",
+                                         "contrat : le rôle « id_tete » seul ne désigne pas l'unité de la transition (les contrats",
+                                         "d'une même tête ne se distinguent pas) ; déclarer le rôle « id_contrat », la construction",
+                                         "est refusée.")) &&
+    identical(r$details, list(recette = "stocks_successifs", transition = "en_cours_rachete", role = "id_tete")) &&
+    identical(x$fiche$unite_observation, "contrat") && !("unite_contrat" %in% codes(x))
+})
+verifier("unite_contrat (§ 3) : décès avec id_contrat seul -> admis, unité contrat, avertissement unite_contrat (même texte que sous les lignes), repris par fiche$avertissement_unite", {
+  x <- construire_table(BS, RS_C, plan_st())
+  a <- x$avertissements
+  identical(x$fiche$unite_observation, "contrat") && identical(sum(a$code == "unite_contrat"), 1L) &&
+    identical(a$message[a$code == "unite_contrat"], paste("Unité d'observation : contrat (aucun identifiant de tête déclaré) ;",
+                                                          "une tête titulaire de plusieurs contrats est comptée plusieurs fois,",
+                                                          "ce qui surestime l'exposition et peut compter plusieurs fois un même décès.")) &&
+    identical(x$fiche$avertissement_unite, a$message[a$code == "unite_contrat"])
+})
+verifier("importance_exclusions_stocks (C12, QS4) : étape refusée par la matrice, module donnees, message exact", {
+  r <- rf(construire_table(BS, RS, plan_st(sup = list(importance_exclusions = list(niveau = 0.95)))))
+  isTRUE(controle(r, "donnees", "importance_exclusions_stocks")) &&
+    identical(conditionMessage(r), paste("Sous la recette « stocks_successifs », l'étape « importance_exclusions » n'est pas",
+                                         "admise ; la construction est refusée."))
+})
+verifier("inventaires_manquants (C9) : rôles des stocks, plan sans grille -> refus par construire_table() (module construire_table)",
+         isTRUE(controle(rf(construire_table(BS, RS, plan_st(inventaires = NULL))), "construire_table", "inventaires_manquants")))
+verifier("exclusion_hors_recette : code des lignes (contrat_duplique) exclu sous les stocks -> refus, module donnees",
+         isTRUE(controle(rf(construire_table(BS, RS, plan_st(exclusions = "contrat_duplique"))), "donnees",
+                         "exclusion_hors_recette")))
+verifier("rôles non employés par les stocks : date_evenement refusé (role_non_pris_en_charge, refus 4)", {
+  b <- BS; b$de <- b$s
+  isTRUE(controle(rf(construire_table(b, c(RS, date_evenement = "de"), plan_st())), "donnees", "role_non_pris_en_charge"))
+})
+
+# --- preparer_donnees() sous les stocks (C5 amendé ; amendement A1) -------------
+
+PROP <- list(inventaire_sans_date = 8L, inventaire_hors_grille = 8L, inventaire_avec_sortie = 8L,
+             naissance_apres_inventaire = 8L, inventaire_duplique = 8L)
+verifier("C5 : chaque motif des § 7.2 et 7.3, levé seul, est refusé par défaut (ligne_invalide qui le nomme, décompte et premières lignes) et excluable (lignes portant le motif, lignes de propagation exclues avec elles) ; aucun autre motif levé (valeur écrite à la main)", {
+  e <- character(0)
+  for (m in names(CAS_S)) {
+    cas <- CAS_S[[m]]
+    roles <- if (length(cas) > 2L) cas[[3L]] else RS
+    att <- as.integer(cas[[2L]])
+    r <- rf(construire_table(cas[[1L]], roles, plan_st(exposition = FALSE)))
+    ok_refus <- isTRUE(controle(r, "donnees", "ligne_invalide")) && identical(names(r$details$lignes), m) &&
+      identical(r$details$lignes[[m]], att) && identical(unname(r$details$decompte), length(att)) &&
+      grepl(sprintf("« %s » : %d ligne(s), premières lignes %s", m, length(att), paste(att, collapse = ", ")),
+            conditionMessage(r), fixed = TRUE)
+    x <- tryCatch(construire_table(cas[[1L]], roles, plan_st(exposition = FALSE, exclusions = m)), error = function(e) NULL)
+    prop <- if (is.null(PROP[[m]])) integer(0) else PROP[[m]]
+    rd <- x$etapes$donnees
+    ok_excl <- !is.null(x) && identical(rd$resultat$lignes_exclues, stats::setNames(list(att), m)) &&
+      identical(rd$resultat$numeros_conserves, setdiff(seq_len(nrow(cas[[1L]])), c(att, prop))) &&
+      identical(rd$resultat$nombre_lignes_exclues, length(c(att, prop))) &&
+      identical(rd$diagnostics$releves$lignes_exclues_par_propagation, length(prop)) &&
+      identical(rd$diagnostics$motifs$motif[rd$diagnostics$motifs$nombre > 0L], m)
+    if (!ok_refus || !ok_excl) e <- c(e, m)
+  }
+  if (length(e)) paste("écart :", paste(e, collapse = ", ")) else TRUE
+})
+verifier("diagnostics des motifs sous les stocks : un code par motif des stocks, nature ligne ou unite, dans l'ordre MOTIFS_LIGNES_STOCKS puis MOTIFS_UNITE_STOCKS (valeur écrite à la main)", {
+  d <- construire_table(BS, RS, plan_st(exposition = FALSE))$etapes$donnees$diagnostics$motifs
+  identical(d$motif, c(tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS)) &&
+    identical(d$nature, rep(c("ligne", "unite"), c(21L, 8L))) && all(d$nombre == 0L) && !any(d$exclu)
+})
+dn <- function(d, exclusions, roles = RS) construire_table(d, roles, plan_st(exposition = FALSE, exclusions = exclusions))
+B_P1 <- modif("t", NA, 1L)
+X_P1 <- dn(B_P1, "type_ligne_manquant")
+verifier("C16, P1 : inventaire t_1 de A à type_ligne manquant, exclu -> lignes 1 à 3 exclues, A absente des observations ; relevé 1 unité, 2 lignes ; avertissements exclusion puis unites_exclues_par_propagation (texte exact) ; aucune entrée ajoutée par rapport à la base privée de A (valeur écrite à la main)", {
+  rd <- X_P1$etapes$donnees
+  pr <- dn(BS[-(1:3), ], character(0))$etapes$donnees
+  a <- avert_s(X_P1)
+  identical(rd$resultat$numeros_conserves, 4:12) && !("A" %in% rd$resultat$observations$unite) &&
+    identical(rd$diagnostics$releves$unites_exclues_par_propagation, 1L) &&
+    identical(rd$diagnostics$releves$lignes_exclues_par_propagation, 2L) &&
+    identical(a$code[1:2], c("exclusion", "unites_exclues_par_propagation")) && identical(a$nombre[1:2], c(1L, 1L)) &&
+    identical(a$message[2L], paste("Relevé : 1 unité(s) écartée(s) par propagation d'une exclusion de ligne (2 ligne(s) sans",
+                                   "motif, écartée(s) avec la ligne exclue de leur unité, pour ne pas tronquer son histoire).")) &&
+    identical(rd$diagnostics$releves$entrees, pr$diagnostics$releves$entrees) &&
+    identical(rd$resultat$observations[names(rd$resultat$observations) != "ligne"],
+              pr$resultat$observations[names(pr$resultat$observations) != "ligne"])
+})
+verifier("C16, P2 et P3 : inventaire t_2, puis t_3, de A à type_ligne manquant ; le plan qui ne déclare que type_ligne_manquant n'est pas refusé (ni presence_interrompue, ni sortie_non_renseignee) ; A exclue", {
+  ok <- function(l) {
+    x <- tryCatch(dn(modif("t", NA, l), "type_ligne_manquant"), refus_tablexp = function(e) NULL)
+    !is.null(x) && identical(x$etapes$donnees$resultat$numeros_conserves, 4:12) &&
+      all(x$etapes$donnees$diagnostics$motifs$nombre[x$etapes$donnees$diagnostics$motifs$nature == "unite"] == 0L)
+  }
+  ok(2L) && ok(3L)
+})
+verifier("C16, P4 : événement de B à cause « Deces », exclu -> pas de sortie_non_renseignee ; lignes 4 à 6 exclues ; relevé 1 unité, 2 lignes", {
+  rd <- dn(modif("c", "Deces", 6L), "cause_hors_modalites")$etapes$donnees
+  identical(rd$resultat$numeros_conserves, c(1:3, 7:12)) &&
+    identical(rd$diagnostics$releves$unites_exclues_par_propagation, 1L) &&
+    identical(rd$diagnostics$releves$lignes_exclues_par_propagation, 2L) &&
+    identical(rd$diagnostics$motifs$nombre[rd$diagnostics$motifs$motif == "sortie_non_renseignee"], 0L)
+})
+verifier("C16, P5 : événement de D (unité ES, ligne unique) à cause « Deces », exclu -> ligne 9 seule exclue ; relevé 0, sans avertissement de propagation", {
+  x <- dn(modif("c", "Deces", 9L), "cause_hors_modalites")
+  rd <- x$etapes$donnees
+  identical(rd$resultat$numeros_conserves, c(1:8, 10:12)) &&
+    identical(rd$diagnostics$releves$unites_exclues_par_propagation, 0L) &&
+    identical(rd$diagnostics$releves$lignes_exclues_par_propagation, 0L) &&
+    !("unites_exclues_par_propagation" %in% codes(x))
+})
+verifier("C16, P6 : id_tete manquant sur l'inventaire t_1 de A, exclu -> ligne 1 seule exclue ; A de classe E ; relevé 0 (limite A1.7.1 encodée, pas un défaut)", {
+  rd <- dn(modif("id", NA, 1L), "id_tete_manquant")$etapes$donnees
+  o <- rd$resultat$observations
+  identical(rd$resultat$numeros_conserves, 2:12) && identical(o$classe[o$unite == "A"], "E") &&
+    identical(rd$diagnostics$releves$unites_exclues_par_propagation, 0L)
+})
+verifier("C16, P7 : t_1 de A à type_ligne manquant (déclaré) et t_2 de A à sexe « X » (non déclaré) -> ligne_invalide qui nomme sexe_hors_modalites seul", {
+  d <- modif("t", NA, 1L); d$sx[2L] <- "X"
+  r <- rf(dn(d, "type_ligne_manquant"))
+  isTRUE(controle(r, "donnees", "ligne_invalide")) && identical(names(r$details$lignes), "sexe_hors_modalites") &&
+    identical(r$details$lignes$sexe_hors_modalites, 2L)
+})
+verifier("C16, P8 : n = lignes conservées + nombre_lignes_exclues ; lignes de propagation = setdiff(1:n, conservées et lignes listées par motif) ; resultat$exclusions compte les lignes qui portent le motif", {
+  rd <- X_P1$etapes$donnees$resultat
+  identical(nrow(B_P1), length(rd$numeros_conserves) + rd$nombre_lignes_exclues) &&
+    identical(setdiff(seq_len(nrow(B_P1)), c(rd$numeros_conserves, unlist(rd$lignes_exclues))), 2:3) &&
+    identical(rd$exclusions, data.frame(motif = "type_ligne_manquant", nombre = 1L, stringsAsFactors = FALSE)) &&
+    identical(rd$lignes_exclues, list(type_ligne_manquant = 1L))
+})
+verifier("C16, P9 : une propagation qui vide une date de grille lève inventaire_sans_ligne, variante « toutes exclues »", {
+  d <- BS[-(7:8), ]; d$t[1L] <- NA
+  r <- rf(dn(d, "type_ligne_manquant"))
+  isTRUE(controle(r, "donnees", "inventaire_sans_ligne")) &&
+    grepl("2016-12-31 (1 ligne(s) reçue(s) à cette date d'inventaire, toutes exclues)", conditionMessage(r), fixed = TRUE)
+})
+verifier("C14 étendu : une permutation des lignes d'une base avec propagation donne les mêmes tables, les mêmes relevés et les mêmes lignes exclues (en ensemble) (identité exacte)", {
+  perm <- c(12L, 3L, 9L, 1L, 6L, 10L, 2L, 8L, 5L, 11L, 4L, 7L)
+  pl <- plan_st(exclusions = "type_ligne_manquant", sup = BRUT3)
+  x1 <- construire_table(B_P1, RS, pl); x2 <- construire_table(B_P1[perm, ], RS, pl)
+  ex <- function(x) setdiff(seq_len(12L), x$etapes$donnees$resultat$numeros_conserves)
+  identical(x1$etapes$exposition$resultat, x2$etapes$exposition$resultat) &&
+    identical(x1$etapes$brut$resultat, x2$etapes$brut$resultat) &&
+    identical(x1$etapes$donnees$diagnostics$releves, x2$etapes$donnees$diagnostics$releves) &&
+    identical(sort(perm[ex(x2)]), ex(x1)) && identical(x1$avertissements, x2$avertissements)
+})
+
+# --- relevés (§ 7.5 ; C6 sur la base construite à la main) ------------------------
+
+verifier("relevés des stocks, base BS : entrees_entre_inventaires et evenements_hors_fenetre (donnees), entres_sortis_entre_inventaires (exposition), décomptes et textes selon le mode ; aucun relevé de propagation (valeur écrite à la main)", {
+  x1 <- construire_table(BS, RS, plan_st("premier_inventaire"))
+  x2 <- construire_table(BS, RS, plan_st("milieu"))
+  a1 <- avert_s(x1); a2 <- avert_s(x2)
+  identical(a1$code, c("entrees_entre_inventaires", "evenements_hors_fenetre", "entres_sortis_entre_inventaires")) &&
+    identical(a1$etape, c("donnees", "donnees", "exposition")) && identical(a1$nombre, c(1L, 1L, 1L)) &&
+    identical(a1$message[3L], paste("Relevé : 1 unité(s) entrée(s) et sortie(s) entre deux inventaires, sans ligne",
+                                    "d'inventaire : sans fenêtre sous l'hypothèse d'entrée « premier_inventaire », sorties",
+                                    "écartées, non comptées (deces : 1, rachat : 0, terme : 0, autre : 0).")) &&
+    identical(a2$message[3L], paste("Relevé : 1 unité(s) entrée(s) et sortie(s) entre deux inventaires, sans ligne",
+                                    "d'inventaire : fenêtre imputée sous l'hypothèse d'entrée « milieu » (entrée au",
+                                    "milieu de l'intervalle des instants compatibles), sorties prises en compte,",
+                                    "événement de la transition ou sortie concurrente (deces : 1, rachat : 0, terme : 0,",
+                                    "autre : 0).")) &&
+    identical(a1$message[1L], paste("Relevé : 1 unité(s) vue(s) pour la première fois à un inventaire postérieur au premier",
+                                    "(entrée entre deux inventaires, instant d'entrée inconnu : fixé par l'hypothèse",
+                                    "d'entrée de l'étape exposition).")) &&
+    identical(a1$message[2L], paste("Relevé : 1 unité(s) sans ligne d'inventaire dont l'événement est daté au plus tard du",
+                                    "premier inventaire ou après le dernier (hors de la période d'observation, sans",
+                                    "exposition ni événement compté).")) &&
+    identical(x1$etapes$donnees$diagnostics$releves[c("unites_exclues_par_propagation", "lignes_exclues_par_propagation")],
+              list(unites_exclues_par_propagation = 0L, lignes_exclues_par_propagation = 0L))
+})
+verifier("intervalle_inventaires_long : sous « milieu » seulement, un intervalle de plus de 366 jours (grille de deux dates sur deux ans) ; texte exact", {
+  g2 <- G3[c(1L, 3L)]
+  d <- BS[!(BS$di %in% G3[2L]) | is.na(BS$di), ]
+  d <- d[d$id %in% c("A", "D", "E"), ]
+  x2 <- construire_table(d, RS, plan_st("milieu", inventaires = g2))
+  x1 <- construire_table(d, RS, plan_st("premier_inventaire", inventaires = g2))
+  a <- avert_s(x2)
+  identical(a$nombre[a$code == "intervalle_inventaires_long"], 1L) && !("intervalle_inventaires_long" %in% codes(x1)) &&
+    identical(a$message[a$code == "intervalle_inventaires_long"],
+              paste("Relevé : 1 intervalle(s) entre inventaires de plus de 366 jours sous l'hypothèse d'entrée « milieu »",
+                    "(l'écart à l'instant d'entrée inconnu, borné par la moitié de l'intervalle, croît avec sa longueur)."))
+})
+
+# --- fenêtres (§ 5 ; C8) et hypothèses (§ 6), fiche (§ 10 ; C9, C10) ------------
+
+verifier("C8 : milieu, t_1 = 2014-12-31, t_2 = 2015-12-31 -> début imputé 2015-07-02 pour l'unité C (vue à t_2) ; premier_inventaire -> 2015-12-31 ; exposition imputée (jours de [â, t_f) et de [â, s)) : 182 + 76 (valeur écrite à la main)", {
+  x2 <- construire_table(BS, RS, plan_st("milieu", segmentation = "sexe"))
+  x1 <- construire_table(BS, RS, plan_st("premier_inventaire", segmentation = "sexe"))
+  e2 <- x2$etapes$exposition$resultat$exposition; e1 <- x1$etapes$exposition$resultat$exposition
+  # C, né le 1970-01-01, homme : âge 45 du 2015-07-02 (ou du 2015-12-31) au 2016-01-01.
+  identical(e2$exposition_jours[e2$sexe == "H" & e2$age == 45L], 183) &&
+    identical(e1$exposition_jours[e1$sexe == "H" & e1$age == 45L], 1) &&
+    identical(x2$etapes$exposition$diagnostics$exposition_imputee_jours, 258) &&
+    identical(x1$etapes$exposition$diagnostics$exposition_imputee_jours, 0) &&
+    identical(x1$etapes$exposition$diagnostics$unites_sans_fenetre, 2L) &&
+    identical(x2$etapes$exposition$diagnostics$unites_sans_fenetre, 1L)
+})
+verifier("C8 : unité ES de sortie s = t_1 + 1 sous « milieu » -> début imputé s, fenêtre vide, décès compté, avertissement evenement_sans_exposition", {
+  k <- data.frame(id = "K", t = "evenement", di = NA_D, sx = "H", seg = "a", n = D("1900-06-01"), an = 1900L,
+                  s = D("2015-01-01"), c = "deces", stringsAsFactors = FALSE)
+  x <- construire_table(rbind(BS, k), RS, plan_st("milieu", segmentation = "sexe"))
+  e <- x$etapes$exposition$resultat$exposition
+  j <- e$sexe == "H" & e$age == 114L
+  identical(e$exposition_jours[j], 0) && identical(e$evenements[j], 1L) && "evenement_sans_exposition" %in% codes(x, "exposition")
+})
+# Ligne d'une unité ajoutée à une base de test (segment « a »).
+lig <- function(id, t, di, sx, n, s = NA_D, c = NA_character_)
+  data.frame(id = id, t = t, di = di, sx = sx, seg = "a", n = D(n), an = as.integer(substr(n, 1L, 4L)), s = s, c = c,
+             stringsAsFactors = FALSE)
+verifier("fenetres_vides (diagnostic de l'étape exposition, sans avertissement ; reprise de (4b), C-5) : P0 sortie le jour D et ES de sortie t_1 + 1 sous « milieu » -> 2 ; sous « premier_inventaire » (ES écartée) -> 1 ; base BS -> 0 (valeur écrite à la main)", {
+  z <- rbind(lig("P", "inventaire", G3[1L], "H", "1950-01-01"), lig("P", "evenement", NA_D, "H", "1950-01-01", PER$debut, "rachat"),
+             lig("Q", "evenement", NA_D, "F", "1960-01-01", G3[1L] + 1, "deces"))
+  b <- rbind(BS, z)
+  x2 <- construire_table(b, RS, plan_st("milieu"))
+  x1 <- construire_table(b, RS, plan_st("premier_inventaire"))
+  identical(x2$etapes$exposition$diagnostics$fenetres_vides, 2L) &&
+    identical(x1$etapes$exposition$diagnostics$fenetres_vides, 1L) &&
+    identical(construire_table(BS, RS, plan_st("milieu"))$etapes$exposition$diagnostics$fenetres_vides, 0L) &&
+    !any(grepl("fenetres_vides", c(codes(x1), codes(x2))))
+})
+verifier("hypothèses de la recette (§ 6 et A1.6) : neuf lignes, codes dans l'ordre, colonnes code, enonce, nature, statut ; énoncé de l'hypothèse d'entrée selon le mode ; inscrites dans les paramètres de l'étape exposition et dans la fiche (valeur écrite à la main)", {
+  x1 <- construire_table(BS, RS, plan_st("premier_inventaire"))
+  x2 <- construire_table(BS, RS, plan_st("milieu"))
+  h1 <- x1$fiche$hypotheses_recette; h2 <- x2$fiche$hypotheses_recette
+  identical(names(h1), c("code", "enonce", "nature", "statut")) &&
+    identical(h1$code, c("instant_inventaire", "grille_periode", "inventaires_exhaustifs", "evenements_exhaustifs",
+                         "presence_continue", "entree_entre_inventaires", "entres_sortis", "fin_au_dernier_inventaire",
+                         "exclusion_par_unite")) &&
+    identical(h1$nature, c("convention", "convention", "hypothèse de données", "hypothèse de données",
+                           "hypothèse de données", "hypothèse de modèle", "conséquence du mode",
+                           "exact sous hypothèses", "convention")) &&
+    grepl("« premier_inventaire »", h1$enonce[6L], fixed = TRUE) && grepl("« milieu »", h2$enonce[6L], fixed = TRUE) &&
+    identical(h1$statut[9L], "convention ; relevé unites_exclues_par_propagation") &&
+    identical(x2$etapes$exposition$parametres$hypotheses_recette, h2) &&
+    identical(x2$etapes$exposition$parametres$entree_entre_inventaires, "milieu") &&
+    identical(h1[-c(6L, 7L), ], h2[-c(6L, 7L), ]) &&
+    identical(h1$statut[5L], paste("hypothèse de données, non vérifiable : une remise en vigueur visible est relevée par les",
+                                   "motifs presence_apres_evenement et presence_interrompue (refus par défaut) ; une remise",
+                                   "en vigueur entre deux inventaires ne laisse aucune trace")) &&
+    identical(h1$enonce[6L], paste("entree_entre_inventaires = « premier_inventaire » : une unité vue pour la première fois à",
+                                   "l'inventaire t_f (f >= 2) entre à t_f (troncature à gauche) ; une unité présente à t_1",
+                                   "entre à t_1")) &&
+    identical(h1$statut[6L], paste("hypothèse de modèle : troncature à gauche non informative à t_f, la même que la",
+                                   "troncature au début de la période sous la recette des lignes ; exposition exacte, en",
+                                   "jours entiers, pour ce schéma d'observation ; contrôle : constat de simulation")) &&
+    identical(h2$statut[6L], paste("approximation de modélisation : écart à l'instant d'entrée inconnu au plus égal à la",
+                                   "partie entière de L / 2 jours par unité (L : longueur de l'intervalle des instants",
+                                   "compatibles ; majoration certaine, atteinte pour une unité vue pour la première fois",
+                                   "à un inventaire) ; contrôle : constat de simulation (effet moyen sur les taux)")) &&
+    identical(h2$enonce[7L], paste("unités entrées et sorties entre deux inventaires (sans ligne d'inventaire) : fenêtre",
+                                   "imputée sous l'hypothèse « milieu », sorties prises en compte (événement de la",
+                                   "transition ou sortie concurrente)"))
+})
+verifier("C10 : fiche sous les stocks : recette, convention native dernier_anniversaire, unité tete, grille et hypothèse d'entrée dans le plan ; hypotheses_recette absent sous les lignes", {
+  x <- construire_table(BS, RS, plan_st("milieu"))
+  xl <- construire_table(BL, RL, plan_s(etapes = list(donnees = list(exclusions = character(0)),
+                                                      exposition = list(convention = "plus_fine", par_annee = FALSE))))
+  f <- x$fiche
+  identical(f$recette, "stocks_successifs") && identical(f$convention$native, "dernier_anniversaire") &&
+    identical(f$convention$retenue, "dernier_anniversaire") && identical(f$unite_observation, "tete") &&
+    identical(f$plan$inventaires, G3 + 0) && identical(f$plan$etapes$exposition$entree_entre_inventaires, "milieu") &&
+    !("hypotheses_recette" %in% names(xl$fiche))
+})
+verifier("C9 : rejouer_fiche() sur une construction en stocks (deux modes, Kaplan-Meier compris) : bilan sans écart", {
+  ok <- function(mode) {
+    x <- construire_table(BS, RS, plan_st(mode, sup = BRUT3))
+    sx <- function(y) { y$execution <- NULL; y }
+    r <- rejouer_fiche(BS, lire_fiche(ecrire_fiche(x$fiche)))
+    identical(sx(r$construction), sx(x)) && all(r$bilan$verdict[1:8] == "conforme") &&
+      all(r$bilan$verdict[9:13] == "identique")
+  }
+  ok("premier_inventaire") && ok("milieu")
+})
+verifier("convention forcée age_atteint_annee admise sous les stocks (forçage vers une convention plus grossière, avertissement convention_forcee) ; par_annee admis", {
+  x <- construire_table(BS, RS, plan_st("milieu", convention = "age_atteint_annee", par_annee = TRUE,
+                                        sup = list(brut = list(estimateurs = "poisson", niveau = 0.95))))
+  isTRUE(x$fiche$convention$forcee) && "convention_forcee" %in% codes(x, "exposition") &&
+    "annee" %in% names(x$etapes$exposition$resultat$exposition)
+})
+
+# --- C16-oracle : base privée des unités exclues (base construite à la main) -----
+
+# Base BO : BS augmentée de cinq unités (G : P0 en cours ; H : vue à t_3 ; I : P0,
+# décès entre t_2 et t_3 ; J : vue à t_2, en cours ; K : ES, rachat entre t_2
+# et t_3). Défauts injectés sur U = {A, B, G, I} : inventaire initial (A),
+# intermédiaire (B), terminal (G), événement (I) ; aucune date de grille
+# vidée (t_1 : F ; t_2 : C, J ; t_3 : C, H, J).
+BO <- rbind(BS,
+            lig("G", "inventaire", G3, "F", "1948-04-04"),
+            lig("H", "inventaire", G3[3L], "H", "1975-11-30"),
+            lig("I", "inventaire", G3[1:2], "H", "1940-08-08"), lig("I", "evenement", NA_D, "H", "1940-08-08", D("2016-09-09"), "deces"),
+            lig("J", "inventaire", G3[2:3], "F", "1965-02-28"),
+            lig("K", "evenement", NA_D, "F", "1958-12-12", D("2016-04-04"), "rachat"))
+BO_D <- BO
+BO_D$t[BO_D$id == "A" & BO_D$di %in% G3[1L]] <- NA                                     # inventaire initial
+BO_D$sx[which(BO_D$id == "B" & BO_D$di %in% G3[2L])] <- "X"                              # intermédiaire
+BO_D$di[which(BO_D$id == "G" & BO_D$di %in% G3[3L])] <- D("2016-06-30")                  # terminal (hors grille)
+BO_D$c[BO_D$id == "I" & BO_D$t %in% "evenement"] <- "Deces"                                # événement
+EXC_O <- c("type_ligne_manquant", "sexe_hors_modalites", "inventaire_hors_grille", "cause_hors_modalites")
+PRIVEE <- BO[!(BO$id %in% c("A", "B", "G", "I")), ]
+verifier("C16-oracle : défauts de ligne injectés sur U = {A, B, G, I} et exclus -> tables d'exposition et de brut identical() à celles de la base privée des lignes de U, sans exclusion ; deux modes, deux conventions, par_annee TRUE et FALSE ; relevé 4 unités (identité exacte)", {
+  e <- character(0)
+  for (mode in c("premier_inventaire", "milieu")) for (cv in c("plus_fine", "age_atteint_annee")) for (pa in c(FALSE, TRUE)) {
+    sup <- list(brut = list(estimateurs = if (pa) "poisson" else c("poisson", "binomial", "kaplan_meier"), niveau = 0.95))
+    xa <- construire_table(BO_D, RS, plan_st(mode, EXC_O, sup, convention = cv, par_annee = pa))
+    xb <- construire_table(PRIVEE, RS, plan_st(mode, character(0), sup, convention = cv, par_annee = pa))
+    if (!identical(xa$etapes$exposition$resultat, xb$etapes$exposition$resultat) ||
+        !identical(xa$etapes$brut$resultat, xb$etapes$brut$resultat) ||
+        !identical(xa$etapes$donnees$diagnostics$releves$unites_exclues_par_propagation, 4L))
+      e <- c(e, paste(mode, cv, pa))
+  }
+  if (length(e)) paste("écart :", paste(e, collapse = " | ")) else TRUE
+})
+
+# --- oracle C1 (lignes reconstituées dans le test), C3, C6 : jeux simulés ---------
+
+# Projection en stocks d'un jeu simulé en lignes (dans le test, indépendante du
+# moteur ; § 11) : une ligne d'inventaire par (unité, t_i) avec e <= t_i < s
+# (s = +Inf en cours), une ligne d'événement par sortie finie t_1 < s <= t_M.
+PER_C1 <- list(debut = D("2015-01-01"), fin = D("2017-12-31"))
+G_C1 <- D(c("2014-12-31", "2015-12-31", "2016-12-31", "2017-12-31"))
+LOI_C1 <- local({
+  gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
+  ra <- tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %")
+  list(deces = list(table = gm, facteurs = c(H = 1, F = 0.6)), rachat = list(table = ra, facteurs = c(H = 1, F = 1)))
+})
+PF_C1 <- list(mode = "uniforme", n = 3000, proportion_hommes = 0.5, age_min = 30, age_max = 80, origine = D("2010-01-01"))
+projeter <- function(j, g) {
+  e <- as.numeric(j$date_entree); s <- as.numeric(j$date_sortie); s[j$cause_sortie == "en_cours"] <- Inf
+  gi <- as.numeric(g); M <- length(gi)
+  inv <- do.call(rbind, lapply(seq_len(M), function(k) {
+    i <- which(e <= gi[k] & gi[k] < s)
+    data.frame(id = j$id_tete[i], t = "inventaire", di = g[k], sx = j$sexe[i], n = j$date_naissance[i], s = NA_D,
+               c = NA_character_, stringsAsFactors = FALSE)
+  }))
+  i <- which(is.finite(s) & s > gi[1L] & s <= gi[M])
+  evt <- data.frame(id = j$id_tete[i], t = "evenement", di = NA_D, sx = j$sexe[i], n = j$date_naissance[i],
+                    s = j$date_sortie[i], c = j$cause_sortie[i], stringsAsFactors = FALSE)
+  d <- rbind(inv, evt)
+  d[order(d$id, d$t == "evenement", d$di, method = "radix"), , drop = FALSE]
+}
+RS_C1 <- c(id_tete = "id", sexe = "sx", date_naissance = "n", type_ligne = "t", date_inventaire = "di",
+           date_sortie = "s", cause_sortie = "c")
+RL_C1 <- c(id_tete = "id", sexe = "sx", date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c")
+# Reconstitution des lignes depuis la forme stocks (dans le test, ADR 0014,
+# option (I) écartée pour le moteur) : entrée = â selon le mode (§ 5), unités
+# ES écartées (premier_inventaire) ou gardées (milieu), unités HF écartées,
+# unités présentes au dernier inventaire en cours ; lignes rangées par
+# identifiant (ordre des unités de la recette).
+reconstituer <- function(st, g, mode) {
+  gi <- as.numeric(g); M <- length(gi)
+  ids <- unique(st$id); ids <- ids[order(ids, method = "radix")]
+  res <- lapply(ids, function(u) {
+    l <- st[st$id == u, ]
+    di <- sort(as.numeric(l$di[l$t == "inventaire"]))
+    ev <- l[l$t == "evenement", ]
+    s <- if (nrow(ev)) as.numeric(ev$s) else NA_real_
+    if (length(di)) {
+      f <- match(di[1L], gi)
+      a <- if (f == 1L) gi[1L] else if (mode == "milieu") gi[f - 1L] + ceiling((gi[f] - gi[f - 1L]) / 2) else gi[f]
+    } else {
+      if (!(s > gi[1L] && s <= gi[M]) || mode != "milieu") return(NULL)
+      ii <- max(which(gi < s)); a <- gi[ii] + ceiling((s - gi[ii]) / 2)
+    }
+    data.frame(id = u, sx = l$sx[1L], n = l$n[1L], e = structure(a, class = "Date"),
+               s = if (nrow(ev)) ev$s else NA_D, c = if (nrow(ev)) ev$c else "en_cours", stringsAsFactors = FALSE)
+  })
+  do.call(rbind, res)
+}
+plan_c1 <- function(roles_stocks, mode, cv, pa, inventaires) {
+  sup <- list(brut = list(estimateurs = if (pa) "poisson" else c("poisson", "binomial", "kaplan_meier"), niveau = 0.95))
+  p <- list(transition = VD, periode = PER_C1, delai_declaration = 0)
+  if (roles_stocks) p$inventaires <- inventaires
+  ex <- list(convention = cv, par_annee = pa)
+  if (roles_stocks) ex$entree_entre_inventaires <- mode
+  c(p, list(segmentation = "sexe", etapes = c(list(donnees = list(exclusions = character(0)), exposition = ex), sup)))
+}
+JEUX_C1 <- lapply(c(180L, 181L), function(gr) simuler_portefeuille(LOI_C1, PF_C1, PER_C1, gr))
+ST_C1 <- lapply(JEUX_C1, projeter, g = G_C1)
+verifier("oracle C1 : tables d'exposition et de brut d'une construction en stocks identical() à celles d'une construction en lignes reconstituées dans le test (deux jeux simulés, graines 180L et 181L ; deux modes ; deux conventions ; par_annee TRUE et FALSE)", {
+  e <- character(0)
+  for (k in seq_along(ST_C1)) for (mode in c("premier_inventaire", "milieu"))
+    for (cv in c("plus_fine", "age_atteint_annee")) for (pa in c(FALSE, TRUE)) {
+      xs <- construire_table(ST_C1[[k]], RS_C1, plan_c1(TRUE, mode, cv, pa, G_C1))
+      xl <- construire_table(reconstituer(ST_C1[[k]], G_C1, mode), RL_C1, plan_c1(FALSE, mode, cv, pa, G_C1))
+      if (!identical(xs$etapes$exposition$resultat, xl$etapes$exposition$resultat) ||
+          !identical(xs$etapes$brut$resultat, xl$etapes$brut$resultat))
+        e <- c(e, paste(k, mode, cv, pa))
+    }
+  if (length(e)) paste("écart :", paste(e, collapse = " | ")) else TRUE
+})
+verifier("C3 : sous premier_inventaire, dans chaque cellule, E^c et D de la construction en stocks au plus ceux de la construction en lignes du jeu propre (inégalité exacte, cellules appariées par clé)", {
+  ok <- vapply(seq_along(JEUX_C1), function(k) {
+    xs <- construire_table(ST_C1[[k]], RS_C1, plan_c1(TRUE, "premier_inventaire", "plus_fine", FALSE, G_C1))
+    xl <- construire_table(transform(JEUX_C1[[k]], id = id_tete, sx = sexe, n = date_naissance, e = date_entree,
+                                     s = date_sortie, c = cause_sortie), RL_C1,
+                           plan_c1(FALSE, "premier_inventaire", "plus_fine", FALSE, G_C1))
+    ts <- xs$etapes$exposition$resultat$exposition; tl <- xl$etapes$exposition$resultat$exposition
+    k_l <- match(paste(ts$sexe, ts$age), paste(tl$sexe, tl$age))
+    !anyNA(k_l) && all(ts$exposition_centrale <= tl$exposition_centrale[k_l]) && all(ts$evenements <= tl$evenements[k_l]) &&
+      sum(ts$exposition_centrale) < sum(tl$exposition_centrale)
+  }, NA)
+  all(ok)
+})
+verifier("C6 : relevés de la recette sur la forme stocks propre égaux aux décomptes tirés du jeu en lignes (P0, E, ES par cause, présents au dernier inventaire) ; propagation 0 unité et 0 ligne, sans avertissement (valeur calculée dans le test, indépendamment du moteur)", {
+  ok <- vapply(seq_along(JEUX_C1), function(k) {
+    j <- JEUX_C1[[k]]; gi <- as.numeric(G_C1); M <- length(gi)
+    e <- as.numeric(j$date_entree); s <- as.numeric(j$date_sortie); s[j$cause_sortie == "en_cours"] <- Inf
+    present <- sapply(gi, function(t) e <= t & t < s)
+    p0 <- present[, 1L]; vu <- rowSums(present) > 0
+    es <- !vu & is.finite(s) & s > gi[1L] & s <= gi[M]
+    x <- construire_table(ST_C1[[k]], RS_C1, plan_c1(TRUE, "milieu", "plus_fine", FALSE, G_C1))
+    r <- x$etapes$donnees$diagnostics$releves
+    causes <- c("deces", "rachat", "terme", "autre")
+    identical(r$p0, sum(p0)) && identical(r$entrees, sum(vu & !p0)) && identical(r$entres_sortis, sum(es)) &&
+      identical(unname(r$entres_sortis_par_cause), vapply(causes, function(cz) sum(es & j$cause_sortie == cz), integer(1L),
+                                                          USE.NAMES = FALSE)) &&
+      identical(r$inventaires$presents[M], sum(present[, M])) && identical(r$inventaires$presents, as.integer(colSums(present))) &&
+      identical(r$unites_exclues_par_propagation, 0L) && identical(r$lignes_exclues_par_propagation, 0L) &&
+      !("unites_exclues_par_propagation" %in% codes(x)) && r$entres_sortis > 0L && r$entrees > 0L
+  }, NA)
+  all(ok)
 })

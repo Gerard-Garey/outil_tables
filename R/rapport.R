@@ -868,7 +868,10 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # le module ne lit pas les constantes des autres modules). Champs dans l'ordre
 # de `champs` ; transition (depart, arrivee) ; periode (debut, fin) ; étapes
 # dans l'ordre reçu (imposé par valider_plan()), paramètres de chaque étape
-# dans l'ordre de parametres[[étape]]$parametre ; valeurs des champs ensembles
+# dans l'ordre de parametres[[étape]]$parametre restreint aux paramètres
+# présents (un paramètre conditionnel à la recette, colonne `recette` non
+# NA, peut manquer : sa présence selon la recette est contrôlée après la
+# canonisation ; ADR 0011, annotation du 08/11/2026, (b) 3) ; valeurs des champs ensembles
 # dans l'ordre de `ordres`, liste nommée par le chemin du champ dans le plan
 # (« segmentation », « etapes/donnees/exclusions », « etapes/brut/estimateurs ») ;
 # un chemin dont l'étape est absente du plan n'a rien à canoniser ; une valeur
@@ -882,8 +885,9 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # double -> double ; graine admise par forme_graine() (integer ou double
 # entier, unique, fini, sans attribut, de valeur absolue au plus
 # .Machine$integer.max ; domaine de graine_invalide, #61) -> integer. Un
-# autre stockage, une étape absente de `parametres` ou en double, ou aux noms
-# de paramètres en double ou autres que ceux du catalogue, sont une erreur de
+# autre stockage, une étape absente de `parametres` ou en double, aux noms
+# de paramètres en double, hors du catalogue de l'étape ou sans l'un de ses
+# paramètres sans recette, sont une erreur de
 # programmation (le plan n'a pas été validé ; un nom en double serait sinon
 # réduit en silence à sa première occurrence, #42). Idempotente : un plan
 # canonique est rendu identical(). Ce n'est pas un plan résolu (point 5.2 :
@@ -912,9 +916,12 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   e <- p[["etapes"]]
   if (anyDuplicated(names(e))) non_canonique("etapes")
   for (n in names(e))
-    if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) || !setequal(names(e[[n]]), parametres[[n]]$parametre))
+    if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) ||
+        !all(names(e[[n]]) %in% parametres[[n]]$parametre) ||
+        !all(parametres[[n]]$parametre[is.na(parametres[[n]]$recette)] %in% names(e[[n]])))
       non_canonique(sprintf("etapes$%s", n))
-  p[["etapes"]] <- stats::setNames(lapply(names(e), function(n) e[[n]][parametres[[n]]$parametre]), names(e))
+  p[["etapes"]] <- stats::setNames(lapply(names(e), function(n)
+    e[[n]][parametres[[n]]$parametre[parametres[[n]]$parametre %in% names(e[[n]])]]), names(e))
   # Champs ensembles : valeurs dans l'ordre du vecteur d'ordre (contrôle avant
   # de réordonner : o[o %in% x] seul perdrait une valeur inconnue sans le dire).
   ordonner <- function(q, cle, o, chemin) {

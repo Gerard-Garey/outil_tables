@@ -149,10 +149,9 @@ MOTIFS_LIGNES_AGREGATS <- c("age_manquant", "age_non_entier", "age_negatif", "ag
 # (spécification d'actuary-approfondi de #180, § 7.2 et § 7.3, M328), dans
 # l'ordre de restitution : motifs de toute ligne, puis de la ligne
 # d'inventaire, puis de la ligne d'événement ; motifs d'unité évalués sur les
-# lignes exemptes de motif de ligne (evaluer_motifs_stocks()). Les codes
-# communs avec MOTIFS_LIGNES ont le même sens (LIBELLES_MOTIFS). Constantes
-# sans recette au catalogue jusqu'au commit (4b) de #180, qui ajoute la ligne
-# `stocks_successifs` de CATALOGUE_RECETTES.
+# unités exemptes de motif de ligne (evaluer_motifs_stocks() ; amendement A1
+# de la spécification, M339). Les codes communs avec MOTIFS_LIGNES ont le
+# même sens (LIBELLES_MOTIFS).
 MOTIFS_LIGNES_STOCKS <- c("type_ligne_manquant", "type_ligne_hors_modalites", "id_contrat_manquant",
                           "id_tete_manquant", "naissance_manquante", "sexe_manquant", "sexe_hors_modalites",
                           "segment_manquant", "annee_naissance_incoherente", "age_aberrant",
@@ -163,12 +162,10 @@ MOTIFS_LIGNES_STOCKS <- c("type_ligne_manquant", "type_ligne_hors_modalites", "i
 MOTIFS_UNITE_STOCKS <- c("unite_naissance_incoherente", "unite_sexe_incoherent", "unite_segment_incoherent",
                          "evenements_multiples", "presence_apres_evenement", "presence_interrompue",
                          "sortie_non_renseignee", "evenement_apres_absence")
-# Libellé de chaque code de motif de l'union des recettes (motifs_recettes()),
-# plus ceux des motifs des stocks (MOTIFS_LIGNES_STOCKS, MOTIFS_UNITE_STOCKS)
-# jusqu'au commit (4b) de #180 : un code a un seul sens, quelle que soit la
-# recette qui le lève (invariant « un libellé unique par code », avis
-# d'actuary du 08/11/2026 sur #169, point 2 ; contrôlé par
-# tests/unitaires/test_catalogue_recettes.R).
+# Libellé de chaque code de motif de l'union des recettes (motifs_recettes()) :
+# un code a un seul sens, quelle que soit la recette qui le lève (invariant
+# « un libellé unique par code », avis d'actuary du 08/11/2026 sur #169,
+# point 2 ; contrôlé par tests/unitaires/test_catalogue_recettes.R).
 LIBELLES_MOTIFS <- c(
   id_contrat_manquant = "identifiant de contrat manquant",
   id_tete_manquant = "identifiant de tête manquant",
@@ -250,22 +247,30 @@ NB_LIGNES_CITEES <- 10L
 #                       (ADR 0016, point 4) ;
 #   motifs_ligne, motifs_unite : motifs de ligne et d'unité de la recette
 #                       (constantes MOTIFS_*), codes des règles d'exclusion.
-# Lignes `lignes_dates_completes` (A.3) et `agregats` (#169, § 1 : âge,
+# Lignes `lignes_dates_completes` (A.3), `agregats` (#169, § 1 : âge,
 # événements et au moins une des deux expositions requis ; année, sexe et
-# segment facultatifs ; convention déclarée, sans native, Q2) ; ajouter une
-# recette ajoute une ligne ici et ses lignes dans MATRICE_RECETTES.
+# segment facultatifs ; convention déclarée, sans native, Q2) et
+# `stocks_successifs` (#180, § 3 : type de ligne, date d'inventaire,
+# naissance, date et cause de sortie requises, un identifiant parmi id_tete
+# et id_contrat — exactement un : identifiants_concurrents,
+# regles_conditionnelles_recette() — ; année de naissance, sexe et segment
+# facultatifs ; convention native dernier_anniversaire, § 9 ; seam
+# « fenêtres », ADR 0016, point 4.2) ; ajouter une recette ajoute une ligne
+# ici et ses lignes dans MATRICE_RECETTES.
 CATALOGUE_RECETTES <- data.frame(
-  recette = c("lignes_dates_completes", "agregats"),
-  requis = I(list(c("date_naissance", "date_entree", "date_sortie", "cause_sortie"), c("age", "evenements"))),
-  un_parmi = I(list(list(), list(c("exposition_centrale", "exposition_initiale")))),
+  recette = c("lignes_dates_completes", "agregats", "stocks_successifs"),
+  requis = I(list(c("date_naissance", "date_entree", "date_sortie", "cause_sortie"), c("age", "evenements"),
+                  c("type_ligne", "date_inventaire", "date_naissance", "date_sortie", "cause_sortie"))),
+  un_parmi = I(list(list(), list(c("exposition_centrale", "exposition_initiale")), list(c("id_tete", "id_contrat")))),
   facultatifs = I(list(c("id_contrat", "id_tete", "sexe", "annee_naissance", "segment"),
-                       c("annee", "sexe", "segment"))),
+                       c("annee", "sexe", "segment"), c("annee_naissance", "sexe", "segment"))),
   discriminants = I(list("date_entree",
-                         c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements"))),
-  convention_native = c("dernier_anniversaire", NA_character_),
-  seam = c("fenetres", "cellules"),
-  motifs_ligne = I(list(MOTIFS_LIGNES, MOTIFS_LIGNES_AGREGATS)),
-  motifs_unite = I(list(MOTIFS_TETE, character(0))),
+                         c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements"),
+                         c("type_ligne", "date_inventaire"))),
+  convention_native = c("dernier_anniversaire", NA_character_, "dernier_anniversaire"),
+  seam = c("fenetres", "cellules", "fenetres"),
+  motifs_ligne = I(list(MOTIFS_LIGNES, MOTIFS_LIGNES_AGREGATS, MOTIFS_LIGNES_STOCKS)),
+  motifs_unite = I(list(MOTIFS_TETE, character(0), MOTIFS_UNITE_STOCKS)),
   stringsAsFactors = FALSE
 )
 
@@ -285,20 +290,27 @@ CATALOGUE_RECETTES <- data.frame(
 # exposition_initiale, Kaplan-Meier refusé (non identifiable sur des
 # agrégats, § 4.3) ; positionnement, homogeneite et validation avec
 # exposition_centrale (elles lisent E^c) ; importance_exclusions refusée (Q6).
+# Sous `stocks_successifs` (#180, § 8) : tout est admis (les trois
+# estimateurs reçoivent les mêmes fenêtres), sauf importance_exclusions,
+# dont le contrefactuel fusionne des lignes par tête et n'existe pas pour les
+# stocks (QS4, #192).
 MATRICE_RECETTES <- data.frame(
-  recette = rep(c("lignes_dates_completes", "agregats"), each = 10L),
+  recette = rep(c("lignes_dates_completes", "agregats", "stocks_successifs"), each = 10L),
   etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite",
             "validation", "importance_exclusions"),
   estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
   admis = c(rep("oui", 10L),
-            "oui", "oui", "oui", "si_role", "si_role", "non", "si_role", "si_role", "si_role", "non"),
+            "oui", "oui", "oui", "si_role", "si_role", "non", "si_role", "si_role", "si_role", "non",
+            rep("oui", 9L), "non"),
   role_requis = c(rep(NA_character_, 10L),
                   NA, NA, NA, "exposition_centrale", "exposition_initiale", NA, "exposition_centrale",
-                  "exposition_centrale", "exposition_centrale", NA),
+                  "exposition_centrale", "exposition_centrale", NA,
+                  rep(NA_character_, 10L)),
   motif = c(rep(NA_character_, 10L),
             NA, NA, NA, "poisson_sans_exposition_centrale", "binomial_sans_exposition_initiale",
             "kaplan_meier_agregats", "etape_exige_exposition_centrale", "etape_exige_exposition_centrale",
-            "etape_exige_exposition_centrale", "importance_exclusions_agregats"),
+            "etape_exige_exposition_centrale", "importance_exclusions_agregats",
+            rep(NA_character_, 9L), "importance_exclusions_stocks"),
   stringsAsFactors = FALSE
 )
 
@@ -591,10 +603,10 @@ controler_roles <- function(donnees, roles, segmentation) {
   if (length(hors)) {
     autres <- unique(unlist(recettes_du_role(hors, CATALOGUE_RECETTES), use.names = FALSE))
     refuser("donnees", "role_non_pris_en_charge",
-            formuler(paste("Rôle déclaré que la recette « %s » n'emploie pas : %s (colonne %s, employé par la recette %s) ;",
+            formuler(paste("Rôle déclaré que la recette « %s » n'emploie pas : %s (colonne %s, employé par %s %s) ;",
                            "l'ignorer changerait le sens du résultat, la construction est refusée."),
                      citer(recette$recette), liste_guillemets(hors), liste_guillemets(roles[hors]),
-                     liste_guillemets(autres)),
+                     if (length(autres) > 1L) "les recettes" else "la recette", liste_guillemets(autres)),
             list(role = hors, colonne = unname(roles[hors]), recette = recette$recette))
   }
   seg_manquants <- setdiff(segmentation, r)
@@ -621,8 +633,8 @@ controler_roles <- function(donnees, roles, segmentation) {
 #   conv    : convention validée (resoudre_convention()), NULL sans étape
 #             exposition ;
 #   p       : valeurs validées de la transition, de la période et du délai
-#             (valeurs_parametres_donnees()) ; aucune règle des agrégats ne
-#             les lit (forme de l'ADR 0016, point 5.2, commune aux recettes).
+#             (valeurs_parametres_donnees()) ; la règle identifiant_inadapte
+#             des stocks lit le porteur de la transition (p$transition).
 # Une étape ou un estimateur sans exactement une ligne est une erreur de
 # programmation (matrice incomplète), jamais une admission. Appelée par
 # controler_plan_roles() après resoudre_convention() (couche partagée par
@@ -653,7 +665,7 @@ controler_matrice_recette <- function(recette, roles, plan, conv, p) {
                      citer(recette$recette), quoi),
             list(recette = recette$recette, etape = e, estimateur = est))
   }
-  regles_conditionnelles_recette(recette, roles, etapes, conv)
+  regles_conditionnelles_recette(recette, roles, etapes, conv, p)
   hors <- setdiff(etapes[["donnees"]][["exclusions"]], recette$motifs)
   if (length(hors))
     refuser("donnees", "exclusion_hors_recette",
@@ -673,8 +685,14 @@ controler_matrice_recette <- function(recette, roles, plan, conv, p) {
 #     la convention retenue dernier_anniversaire (E^i n'est pas additive sur
 #     la partition de Lexis d'une année d'âge ; binomial sous par_annee =
 #     TRUE déjà refusé par controler_parametres_brut()).
+# Sous `stocks_successifs` (#180, § 3, QS3), dans cet ordre :
+#   - identifiants_concurrents : id_tete et id_contrat déclarés ensemble
+#     (l'unité des stocks est un seul identifiant ; la fusion par tête de
+#     contrats inventoriés n'est pas prise en charge, #190) ;
+#   - identifiant_inadapte : transition portée par le contrat
+#     (p$transition$etat_de) avec id_tete seul.
 # Aucune règle sous `lignes_dates_completes`. Rend NULL, invisible.
-regles_conditionnelles_recette <- function(recette, roles, etapes, conv) {
+regles_conditionnelles_recette <- function(recette, roles, etapes, conv, p) {
   switch(recette$recette,
     agregats = {
       if ("exposition" %in% names(etapes) && isTRUE(etapes[["exposition"]][["par_annee"]]) &&
@@ -698,6 +716,25 @@ regles_conditionnelles_recette <- function(recette, roles, etapes, conv) {
                          citer(recette$recette)),
                 list(recette = recette$recette, etape = "brut", estimateur = "binomial", role = "annee",
                      convention = conv$retenue))
+    },
+    stocks_successifs = {
+      ids <- intersect(c("id_tete", "id_contrat"), names(roles))
+      if (length(ids) > 1L)
+        refuser("donnees", "identifiants_concurrents",
+                formuler(paste("Sous la recette « %s », les rôles %s sont déclarés ensemble : l'unité d'observation",
+                               "des stocks successifs est un seul identifiant (la fusion par tête de contrats",
+                               "inventoriés n'est pas prise en charge) ; déclarer un seul des deux (« id_tete » pour",
+                               "une transition sur la tête, « id_contrat » pour une transition sur le contrat), la",
+                               "construction est refusée."),
+                         citer(recette$recette), liste_guillemets(ids)),
+                list(recette = recette$recette, role = ids, colonne = unname(roles[ids])))
+      if (identical(p$transition$etat_de, "contrat") && identical(ids, "id_tete"))
+        refuser("donnees", "identifiant_inadapte",
+                formuler(paste("Sous la recette « %s », la transition « %s » porte sur le contrat : le rôle « id_tete »",
+                               "seul ne désigne pas l'unité de la transition (les contrats d'une même tête ne se",
+                               "distinguent pas) ; déclarer le rôle « id_contrat », la construction est refusée."),
+                         citer(recette$recette), citer(p$transition$code)),
+                list(recette = recette$recette, transition = p$transition$code, role = "id_tete"))
     },
     NULL)
   invisible(NULL)
@@ -1088,11 +1125,9 @@ observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, 
 
 # --- motifs et observations de la recette `stocks_successifs` (#180, § 4 et § 7) --
 
-# Les fonctions de cette section n'ont pas encore de recette au catalogue :
-# la ligne `stocks_successifs` de CATALOGUE_RECETTES, les aiguillages de
-# preparer_donnees() et les avertissements des relevés arrivent au commit
-# (4b) de #180 ; elles sont testées en appel direct
-# (tests/unitaires/test_stocks_successifs.R).
+# Fonctions de la recette `stocks_successifs` (ligne de CATALOGUE_RECETTES),
+# appelées par les aiguillages de preparer_donnees() ; avertissements des
+# relevés : avertir_releves_stocks().
 # Conventions (spécification d'actuary-approfondi de #180, § 2.1 et § 4,
 # M328) : une ligne d'inventaire datée d atteste la présence de l'unité à
 # l'instant d au sens d'A.0 (e <= d < s : état en fin de journée) ; la grille
@@ -1163,10 +1198,13 @@ faits_unites_stocks <- function(g, inv, evt, k, s, cause, G) {
 #     renseignée autre que « en_cours », même sens que sous les lignes) ;
 #     cause manquante, hors de MODALITES_CAUSE, ou « en_cours » ; date
 #     d'inventaire renseignée ; naissance postérieure à la sortie.
-# Motifs d'unité (MOTIFS_UNITE_STOCKS), évalués sur les lignes exemptes de
-# motif de ligne et marqués sur ces lignes (comme les motifs de tête,
-# evaluer_motifs()), avec f, l les indices du premier et du dernier inventaire
-# où l'unité est présente, M le nombre d'inventaires :
+# Motifs d'unité (MOTIFS_UNITE_STOCKS), évalués sur les unités exemptes de
+# motif de ligne — identifiants valides dont aucune ligne reçue ne porte de
+# motif de ligne — et marqués sur toutes les lignes de l'unité (amendement A1
+# de la spécification, § 7.3, M339) : une unité porteuse d'un motif de ligne
+# n'est soumise à aucun motif d'unité, son sort est fixé par ses motifs de
+# ligne ; avec f, l les indices du premier et du dernier inventaire où
+# l'unité est présente, M le nombre d'inventaires :
 #   - dates de naissance, sexes (modalités H, F) ou segments (segment employé
 #     par la segmentation) différents au sein de l'unité ;
 #   - evenements_multiples : au moins deux lignes d'événement ;
@@ -1179,9 +1217,14 @@ faits_unites_stocks <- function(g, inv, evt, k, s, cause, G) {
 #   p              : valeurs validées (valeurs_parametres_donnees()), dont
 #                    p$inventaires (grille du plan canonique, requise) ;
 #   segmentation   : sous-ensemble de c("sexe", "segment"), vide admis.
-# Rend list(motifs) : liste nommée code -> numéros de ligne (1-based,
-# croissants), dans l'ordre MOTIFS_LIGNES_STOCKS puis MOTIFS_UNITE_STOCKS
-# (integer(0) pour un motif sans objet).
+# Rend list(motifs, lignes_propagation, unites_propagation) : motifs, liste
+# nommée code -> numéros de ligne (1-based, croissants), dans l'ordre
+# MOTIFS_LIGNES_STOCKS puis MOTIFS_UNITE_STOCKS (integer(0) pour un motif
+# sans objet) ; lignes_propagation, numéros (1-based, croissants) des lignes
+# sans motif de ligne d'une unité porteuse (amendement A1, § 7.6, étape 4 :
+# calculées sans le plan ; preparer_donnees() les exclut avec les lignes des
+# motifs exclus, tout motif de ligne présent étant alors déclaré) ;
+# unites_propagation, nombre d'identifiants distincts parmi ces lignes.
 evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
   if (is.null(p$inventaires))
     stop("evaluer_motifs_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
@@ -1233,7 +1276,17 @@ evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
   m$naissance_apres_sortie <- evt & vrai(nai > sor)
 
   u <- stats::setNames(rep(list(logical(n)), length(MOTIFS_UNITE_STOCKS)), MOTIFS_UNITE_STOCKS)
-  propres <- which(!Reduce(`|`, m))
+  # Amendement A1 (§ 7.6, étapes 2 à 4) : unités porteuses (identifiants
+  # valides d'au moins une ligne à motif de ligne ; même identifiant :
+  # égalité exacte, par match()) ; lignes propres, celles des unités non
+  # porteuses ; lignes de propagation, lignes sans motif de ligne d'une unité
+  # porteuse. Une ligne sans identifiant valide porte <id>_manquant : elle
+  # n'est dans aucun des deux ensembles et n'écarte qu'elle-même.
+  a_motif <- Reduce(`|`, m)
+  porteurs <- unique(id[a_motif & !is.na(id)])
+  de_porteuse <- !a_motif & id %in% porteurs
+  propres <- which(!a_motif & !de_porteuse)
+  propagation <- which(de_porteuse)
   g <- match(id[propres], unique(id[propres]))
   G <- max(0L, g)
   marquer <- function(groupes) {
@@ -1260,7 +1313,8 @@ evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
   u$presence_interrompue <- marquer(which(a_inv & (fu$l - fu$f + 1L) != fu$n_inventaires))
   u$sortie_non_renseignee <- marquer(which(avant_fin & !a_evt))
   u$evenement_apres_absence <- marquer(which(avant_fin & a_evt & fu$s_max > suivant))
-  list(motifs = lapply(c(m, u), which))
+  list(motifs = lapply(c(m, u), which), lignes_propagation = propagation,
+       unites_propagation = length(unique(id[propagation])))
 }
 
 # Observations de la recette `stocks_successifs` sur les lignes retenues
@@ -1460,11 +1514,22 @@ fusionner_intervalles <- function(g, entree, fin) {
 #   recette            : recette validée (deduire_recette()) ; deux
 #                        aiguillages sur son nom (ADR 0016, point 6.2) :
 #                        évaluation des motifs (evaluer_motifs(),
-#                        evaluer_motifs_agregats()) et construction des
-#                        observations (construire_observations(),
-#                        observations_agregats()), plus les avertissements
+#                        evaluer_motifs_agregats(), evaluer_motifs_stocks())
+#                        et construction des observations
+#                        (construire_observations(), observations_agregats(),
+#                        observations_stocks()), plus les avertissements
 #                        propres à la recette ; squelette commun (refus par
 #                        défaut, exclusions déclarées, aucune_ligne_conservee).
+# Lignes de propagation (stocks successifs, amendement A1 de la
+# spécification de #180, M339) : l'évaluation des motifs peut rendre
+# lignes_propagation (NULL sous les autres recettes, qui restent identiques
+# au bit près) ; ces lignes, sans motif, sont exclues avec les lignes des
+# motifs exclus (une exclusion de ligne ne tronque jamais l'histoire d'une
+# unité identifiée), n'entrent pas dans le refus par défaut et ne sont pas
+# listées par motif (resultat$exclusions et resultat$lignes_exclues comptent
+# les lignes qui portent le motif ; nombre_lignes_exclues les compte) ;
+# relevés unites_exclues_par_propagation (avertissement si > 0) et
+# lignes_exclues_par_propagation, en fin de diagnostics$releves.
 # Aucun contrôle des paramètres ni des rôles (#82 ; ADR 0007, annotation du
 # 17/10/2026, (c) et (d)) : construire_table() les a validés
 # (controler_entrees() : valider_plan(), controler_roles()) avant toute étape.
@@ -1481,6 +1546,7 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
   ev <- switch(recette$recette,
     lignes_dates_completes = evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation),
     agregats = evaluer_motifs_agregats(donnees, roles, p),
+    stocks_successifs = evaluer_motifs_stocks(donnees, roles, p, segmentation),
     stop(sprintf("preparer_donnees() : recette « %s » sans évaluation des motifs (erreur de programmation).",
                  recette$recette), call. = FALSE))
   motifs <- ev$motifs
@@ -1506,7 +1572,10 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
                  total_lignes = total))
   }
 
-  exclues <- sort(unique(unlist(motifs[exclusions], use.names = FALSE)))
+  # Lignes exclues : lignes des motifs exclus et lignes de propagation (tout
+  # motif de ligne présent est ici déclaré : le refus par défaut a refusé
+  # sinon).
+  exclues <- sort(unique(c(unlist(motifs[exclusions], use.names = FALSE), ev$lignes_propagation)))
   if (is.null(exclues)) exclues <- integer(0)
   conservees <- if (length(exclues)) donnees[-exclues, , drop = FALSE] else donnees
   numeros <- setdiff(seq_len(n), exclues)
@@ -1520,9 +1589,13 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
   ob <- switch(recette$recette,
     lignes_dates_completes = construire_observations(conservees, numeros, roles, segmentation, p),
     agregats = observations_agregats(conservees, numeros, roles, segmentation, motifs, exclusions, n, donnees),
+    stocks_successifs = observations_stocks(conservees, numeros, roles, segmentation, p, donnees),
     stop(sprintf("preparer_donnees() : recette « %s » sans observations (erreur de programmation).",
                  recette$recette), call. = FALSE))
   unite <- ob$unite; observations <- ob$observations; releves <- ob$releves
+  if (!is.null(ev$lignes_propagation))
+    releves <- c(releves, list(unites_exclues_par_propagation = as.integer(ev$unites_propagation),
+                               lignes_exclues_par_propagation = length(ev$lignes_propagation)))
 
   # Avertissements (ADR 0007, point 6.5).
   avert <- avertissements_vides()
@@ -1554,13 +1627,23 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
     avert <- avertir(avert, "donnees", "exclusion",
                      sprintf("Exclusion déclarée « %s » : %d ligne(s) écartée(s).", x, length(motifs[[x]])),
                      length(motifs[[x]]))
+  # Propagation d'une exclusion de ligne (amendement A1, § 7.5), juste après
+  # les avertissements `exclusion` (texte du mainteneur et d'actuary).
+  if (!is.null(ev$lignes_propagation) && releves$unites_exclues_par_propagation > 0L)
+    avert <- avertir(avert, "donnees", "unites_exclues_par_propagation",
+                     sprintf(paste("Relevé : %d unité(s) écartée(s) par propagation d'une exclusion de ligne (%d ligne(s) sans motif,",
+                                   "écartée(s) avec la ligne exclue de leur unité, pour ne pas tronquer son histoire)."),
+                             releves$unites_exclues_par_propagation, releves$lignes_exclues_par_propagation),
+                     releves$unites_exclues_par_propagation)
   avert <- switch(recette$recette,
     lignes_dates_completes = avertir_releves_lignes(avert, releves, unite),
-    agregats = avertir_releves_agregats(avert, releves))
+    agregats = avertir_releves_agregats(avert, releves),
+    stocks_successifs = avertir_releves_stocks(avert, releves))
 
   nature <- switch(recette$recette,
     lignes_dates_completes = rep(c("ligne", "tete"), c(length(MOTIFS_LIGNES), length(MOTIFS_TETE))),
-    agregats = rep("ligne", length(motifs)))
+    agregats = rep("ligne", length(motifs)),
+    stocks_successifs = rep(c("ligne", "unite"), c(length(MOTIFS_LIGNES_STOCKS), length(MOTIFS_UNITE_STOCKS))))
   list(
     parametres = list(transition = p$transition$code, unite_observation = unite,
                       segmentation = segmentation, exclusions = exclusions,
@@ -1615,6 +1698,29 @@ avertir_releves_agregats <- function(avert, releves) {
                                    "centrale déclarées dépasse le nombre d'événements (définition « cellule » :",
                                    "0 <= E^i - E^c <= D)."), k),
                      k)
+  avert
+}
+
+# Avertissements des relevés de la recette `stocks_successifs` (#180, § 7.5),
+# après celui de la propagation : unités vues pour la première fois à un
+# inventaire postérieur au premier (classe E) ; unités dont la seule ligne
+# est un événement hors de ]t_1, t_M] (classe HF). Le relevé des unités
+# entrées et sorties entre deux inventaires (classe ES), dont le traitement
+# dépend de l'hypothèse d'entrée, est averti par l'étape exposition
+# (fenetres_stocks_successifs()). Relevés non bloquants. Rend `avert` augmenté.
+avertir_releves_stocks <- function(avert, releves) {
+  if (releves$entrees > 0L)
+    avert <- avertir(avert, "donnees", "entrees_entre_inventaires",
+                     sprintf(paste("Relevé : %d unité(s) vue(s) pour la première fois à un inventaire postérieur au",
+                                   "premier (entrée entre deux inventaires, instant d'entrée inconnu : fixé par",
+                                   "l'hypothèse d'entrée de l'étape exposition)."), releves$entrees),
+                     releves$entrees)
+  if (releves$hors_fenetre > 0L)
+    avert <- avertir(avert, "donnees", "evenements_hors_fenetre",
+                     sprintf(paste("Relevé : %d unité(s) sans ligne d'inventaire dont l'événement est daté au plus",
+                                   "tard du premier inventaire ou après le dernier (hors de la période",
+                                   "d'observation, sans exposition ni événement compté)."), releves$hors_fenetre),
+                     releves$hors_fenetre)
   avert
 }
 

@@ -26,7 +26,12 @@
 #    concurrentes (censures à droite à leur instant) ;
 #  - exposition_cellules(), hypotheses_agregats() : seam « cellules »
 #    (agrégats, #169) — somme des cellules reçues par clé, sans en créer,
-#    relevés, hypothèses de la recette (champ hypotheses_recette).
+#    relevés, hypothèses de la recette (champ hypotheses_recette) ;
+#  - fenetres_stocks_successifs(), hypotheses_stocks() : fenêtres des unités
+#    de la recette `stocks_successifs` (#180, § 5) au seam « fenêtres » —
+#    début selon l'hypothèse d'entrée entre inventaires déclarée
+#    (entree_entre_inventaires), fin à la sortie ou censure à B —, relevés,
+#    hypothèses de la recette.
 #
 #  Conventions de temps (A.0) : une date est un jour ; une observation est
 #  l'intervalle [debut, fin) (fin = +Inf pour une observation en cours) ; un
@@ -67,6 +72,12 @@ VALEURS_CONVENTION <- c("plus_fine", "dernier_anniversaire", "age_atteint_annee"
 UNITES_EXPOSITION <- c(
   dernier_anniversaire = "annee_d_age : jours / L_x, L_x = anniv(x+1) - anniv(x) (365 ou 366 jours)",
   age_atteint_annee = "annee_civile : jours / nombre de jours de l'année civile (365 ou 366)")
+# Valeurs admises du paramètre conditionnel `entree_entre_inventaires` de
+# l'étape (recette `stocks_successifs` ; spécification de #180, § 5, QS1,
+# M328 ; ADR 0016, point 7.2) : entrée retardée au premier inventaire où
+# l'unité est présente, ou entrée au milieu de l'intervalle des instants
+# d'entrée compatibles avec les données. Sans défaut.
+VALEURS_ENTREE_ENTRE_INVENTAIRES <- c("premier_inventaire", "milieu")
 # Hypothèse sur les sorties concurrentes, inscrite dans la fiche (A.3).
 HYPOTHESE_CENSURE <- paste("censure non informative : les sorties concurrentes sont des censures",
                            "à droite à leur instant (risques indépendants)")
@@ -74,8 +85,13 @@ HYPOTHESE_CENSURE <- paste("censure non informative : les sorties concurrentes s
 # Contrôle les paramètres propres à l'étape `exposition` (valeurs ; les noms
 # sont contrôlés par valider_plan()). Forme exacte (#23, forme_exacte()) :
 # type de base exact, aucun attribut (ni names, ni dim, ni classe), sinon
-# refus sous le motif du paramètre. Rend TRUE, invisible.
-controler_parametres_exposition <- function(convention, par_annee) {
+# refus sous le motif du paramètre. `entree_entre_inventaires`, paramètre
+# conditionnel à la recette (ADR 0016, point 7.2), n'est contrôlé que s'il
+# est passé (paramètre présent dans le plan ; sa présence selon la recette
+# est contrôlée après la sélection de la recette, controler_plan_roles()) :
+# chaîne unique prise dans VALEURS_ENTREE_ENTRE_INVENTAIRES, sinon refus
+# entree_entre_inventaires_invalide. Rend TRUE, invisible.
+controler_parametres_exposition <- function(convention, par_annee, entree_entre_inventaires) {
   if (!forme_exacte(convention, "character") || length(convention) != 1L || is.na(convention))
     refuser("exposition", "convention_invalide",
             formuler("La convention d'âge doit être une chaîne unique, sans attribut, prise dans %s.",
@@ -96,6 +112,14 @@ controler_parametres_exposition <- function(convention, par_annee) {
     refuser("exposition", "par_annee_invalide",
             formuler("Le découpage par année (par_annee) doit valoir TRUE ou FALSE, sans attribut."),
             list(par_annee = par_annee))
+  if (!missing(entree_entre_inventaires) &&
+      (!forme_exacte(entree_entre_inventaires, "character") || length(entree_entre_inventaires) != 1L ||
+       is.na(entree_entre_inventaires) || !(entree_entre_inventaires %in% VALEURS_ENTREE_ENTRE_INVENTAIRES)))
+    refuser("exposition", "entree_entre_inventaires_invalide",
+            formuler(paste("L'hypothèse d'entrée entre inventaires (entree_entre_inventaires) doit être une chaîne",
+                           "unique, sans attribut, prise dans %s (aucun défaut)."),
+                     liste_guillemets(VALEURS_ENTREE_ENTRE_INVENTAIRES)),
+            list(entree_entre_inventaires = entree_entre_inventaires))
   invisible(TRUE)
 }
 
@@ -372,7 +396,11 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #   segmentation      : sous-ensemble de c("sexe", "segment"), vide admis ;
 #   recette           : recette validée (deduire_recette(), module donnees) ;
 #   conv              : convention validée (resoudre_convention()) ;
-#   par_annee         : TRUE pour découper aussi par année civile.
+#   par_annee         : TRUE pour découper aussi par année civile ;
+#   entree_entre_inventaires : hypothèse d'entrée entre inventaires validée,
+#                       paramètre conditionnel de la recette
+#                       `stocks_successifs` (lu sous cette recette seulement ;
+#                       NULL, paramètre absent du plan, sous les autres).
 # Aucun contrôle (#82 ; ADR 0007, annotation du 17/10/2026, (c) et (d)) : les
 # valeurs sont celles que construire_table() a validées (controler_entrees())
 # et inscrites dans la fiche ; une seule source pour la recette et la
@@ -403,9 +431,9 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 # recette hors du module donnees : sur la propriété `seam` de la recette
 # (exposition_fenetres() ou exposition_cellules()), puis, dans le seam
 # « fenêtres », sur le nom de la recette pour former les fenêtres.
-calculer_exposition <- function(observations, p, segmentation, recette, conv, par_annee) {
+calculer_exposition <- function(observations, p, segmentation, recette, conv, par_annee, entree_entre_inventaires) {
   switch(recette$seam,
-    fenetres = exposition_fenetres(observations, p, segmentation, recette, conv, par_annee),
+    fenetres = exposition_fenetres(observations, p, segmentation, recette, conv, par_annee, entree_entre_inventaires),
     cellules = exposition_cellules(observations, p, segmentation, recette, conv, par_annee),
     stop(sprintf("calculer_exposition() : seam « %s » inconnu (erreur de programmation).", recette$seam),
          call. = FALSE))
@@ -413,26 +441,34 @@ calculer_exposition <- function(observations, p, segmentation, recette, conv, pa
 
 # Seam « fenêtres » (ADR 0016, point 4.2 ; ADR 0014, point 6) : corps de
 # calculer_exposition() extrait à l'identique (#169, commit (3b)) ; mêmes
-# arguments, même valeur rendue (ci-dessus). Les fenêtres sont formées par la
-# fonction de la recette (fenetres_observations() pour
-# `lignes_dates_completes`), le découpage en cellules, les segments, les
-# sommes et l'objet `fenetres_exposition` sont communs.
-exposition_fenetres <- function(observations, p, segmentation, recette, conv, par_annee) {
+# arguments, même valeur rendue (ci-dessus). Les observations à fenêtres
+# (date_naissance, debut, fin, cause et clés de segmentation) sont formées
+# par la recette — celles de l'étape donnees telles quelles pour
+# `lignes_dates_completes` ; une par unité exposable, de début et de fin
+# fixés par fenetres_stocks_successifs() pour `stocks_successifs` (qui rend
+# aussi ses paramètres retenus, diagnostics et avertissements propres,
+# ajoutés en fin des listes communes) — ; fenetres_observations(), le
+# découpage en cellules, les segments, les sommes et l'objet
+# `fenetres_exposition` sont communs.
+exposition_fenetres <- function(observations, p, segmentation, recette, conv, par_annee, entree_entre_inventaires) {
   cv <- conv$retenue
+  cible <- p$transition$arrivee
+  debut_p <- p$debut; borne <- p$borne
+  fs <- switch(recette$recette,
+    lignes_dates_completes = list(observations = observations, avertissements = avertissements_vides()),
+    stocks_successifs = fenetres_stocks_successifs(observations, p, segmentation, entree_entre_inventaires),
+    stop(sprintf("exposition_fenetres() : recette « %s » sans fenêtres (erreur de programmation).", recette$recette),
+         call. = FALSE))
+  observations <- fs$observations
   manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
   if (length(manquantes))
     stop(sprintf("calculer_exposition() : colonne(s) %s absente(s) des observations (erreur de programmation).",
                  paste(manquantes, collapse = ", ")), call. = FALSE)
-  cible <- p$transition$arrivee
-  debut_p <- p$debut; borne <- p$borne
   n_obs <- nrow(observations)
 
   # Fenêtre (T5) : troncature au début de la période, censure à B ;
   # composantes des naissances et table calendaire.
-  f <- switch(recette$recette,
-    lignes_dates_completes = fenetres_observations(observations, debut_p, borne, cible),
-    stop(sprintf("exposition_fenetres() : recette « %s » sans fenêtres (erreur de programmation).", recette$recette),
-         call. = FALSE))
+  f <- fenetres_observations(observations, debut_p, borne, cible)
   cn <- f$composantes; cal <- f$calendrier; sortie <- f$sortie
   a <- f$a; b <- f$b
   exposees <- which(a < b)
@@ -534,20 +570,26 @@ exposition_fenetres <- function(observations, p, segmentation, recette, conv, pa
   if (!n_cel)
     avert <- avertir(avert, "exposition", "aucune_exposition",
                      "Aucune exposition ni aucun événement dans la période d'observation.", 0)
+  # Avertissements propres à la recette (aucun sous `lignes_dates_completes`).
+  for (k in seq_len(nrow(fs$avertissements)))
+    avert <- avertir(avert, "exposition", fs$avertissements$code[k], fs$avertissements$message[k],
+                     fs$avertissements$nombre[k])
 
   list(
-    parametres = list(recette = recette$recette, convention = conv,
-                      # Texte du moteur marqué UTF-8 en toute locale (#50).
-                      unite_exposition = texte_moteur(UNITES_EXPOSITION[[cv]]), par_annee = par_annee,
-                      transition = p$transition$code, segmentation = segmentation,
-                      periode = p$periode, delai_declaration = p$delai_declaration,
-                      fin_effective = structure(borne - 1, class = "Date"),
-                      hypothese_censure = texte_moteur(HYPOTHESE_CENSURE)),
+    parametres = c(list(recette = recette$recette, convention = conv,
+                        # Texte du moteur marqué UTF-8 en toute locale (#50).
+                        unite_exposition = texte_moteur(UNITES_EXPOSITION[[cv]]), par_annee = par_annee,
+                        transition = p$transition$code, segmentation = segmentation,
+                        periode = p$periode, delai_declaration = p$delai_declaration,
+                        fin_effective = structure(borne - 1, class = "Date"),
+                        hypothese_censure = texte_moteur(HYPOTHESE_CENSURE)),
+                   fs$parametres),
     resultat = list(exposition = table_exp),
-    diagnostics = list(observations = n_obs, observations_exposees = length(exposees),
-                       exposition_jours = sum(m$jours), evenements = length(ev),
-                       sorties_concurrentes = length(sc), cellules = n_cel,
-                       cellules_evenement_sans_exposition = sans_exposition),
+    diagnostics = c(list(observations = n_obs, observations_exposees = length(exposees),
+                         exposition_jours = sum(m$jours), evenements = length(ev),
+                         sorties_concurrentes = length(sc), cellules = n_cel,
+                         cellules_evenement_sans_exposition = sans_exposition),
+                    fs$diagnostics),
     avertissements = avert,
     fenetres = structure(c(f[c("composantes", "calendrier", "a", "b", "evenement")], sg,
                            list(debut = debut_p, borne = borne, transition = p$transition$code, convention = cv,
@@ -727,4 +769,172 @@ exposition_cellules <- function(observations, p, segmentation, recette, conv, pa
                        cellules_absentes_de_la_plage = as.integer(trous)),
     avertissements = avert
   )
+}
+
+# --- recette `stocks_successifs` au seam « fenêtres » (#180, § 5 et § 6) --------
+
+# Hypothèses nommées de la recette `stocks_successifs` (spécification
+# d'actuary-approfondi de #180, § 6, M328, et amendement A1, § A1.6, M339 ;
+# champ conditionnel hypotheses_recette, ADR 0016, point 8.1) : data.frame
+# (code, enonce, nature, statut), neuf lignes dans l'ordre de la
+# spécification, `exclusion_par_unite` en dernier ; énoncé et statut des
+# lignes entree_entre_inventaires et entres_sortis selon l'hypothèse
+# d'entrée déclarée. Le statut porte le contrôle de la spécification. Textes
+# du moteur marqués UTF-8 (#50).
+#   entree : hypothèse d'entrée entre inventaires validée
+#            (VALEURS_ENTREE_ENTRE_INVENTAIRES).
+hypotheses_stocks <- function(entree) {
+  milieu <- identical(entree, "milieu")
+  h <- data.frame(
+    code = c("instant_inventaire", "grille_periode", "inventaires_exhaustifs", "evenements_exhaustifs",
+             "presence_continue", "entree_entre_inventaires", "entres_sortis", "fin_au_dernier_inventaire",
+             "exclusion_par_unite"),
+    enonce = c(
+      paste("une ligne d'inventaire datée d atteste la présence de l'unité à l'instant d au sens d'A.0",
+            "(entrée e <= d < sortie s : état arrêté en fin de journée)"),
+      paste("premier inventaire t_1 = veille du début de la période, dernier inventaire t_M = fin effective",
+            "(fin moins le délai de déclaration)"),
+      "chaque inventaire recense toutes les unités en vigueur à sa date",
+      "toute sortie survenue jusqu'à la fin effective figure au fichier des événements",
+      "aucune sortie suivie d'une remise en vigueur entre deux présences d'une même unité",
+      if (milieu)
+        paste("entree_entre_inventaires = « milieu » : une unité vue pour la première fois à l'inventaire t_f",
+              "(f >= 2) entre au jour t_{f-1} + plafond((t_f - t_{f-1}) / 2) ; une unité entrée et sortie entre",
+              "t_i et t_{i+1} (sortie s) entre au jour t_i + plafond((s - t_i) / 2) ; une unité présente à t_1",
+              "entre à t_1")
+      else
+        paste("entree_entre_inventaires = « premier_inventaire » : une unité vue pour la première fois à",
+              "l'inventaire t_f (f >= 2) entre à t_f (troncature à gauche) ; une unité présente à t_1 entre à t_1"),
+      if (milieu)
+        paste("unités entrées et sorties entre deux inventaires (sans ligne d'inventaire) : fenêtre imputée",
+              "sous l'hypothèse « milieu », sorties prises en compte (événement de la transition ou sortie",
+              "concurrente)")
+      else
+        paste("unités entrées et sorties entre deux inventaires (sans ligne d'inventaire) : sans fenêtre sous",
+              "l'hypothèse « premier_inventaire », sorties écartées et décomptées par cause"),
+      paste("unité présente au dernier inventaire t_M : censurée à B = fin effective + 1 jour, sans événement",
+            "compté après la fin effective"),
+      paste("l'exclusion déclarée d'un motif de ligne écarte toutes les lignes de l'unité (même identifiant) ;",
+            "une ligne sans identifiant valide n'écarte qu'elle-même ; aucune histoire d'unité identifiée n'est",
+            "tronquée par une exclusion")),
+    nature = c("convention", "convention", "hypothèse de données", "hypothèse de données", "hypothèse de données",
+               "hypothèse de modèle", "conséquence du mode", "exact sous hypothèses", "convention"),
+    statut = c(
+      "convention (A.0), sans contrôle propre",
+      "convention ; contrôle : refus inventaires_periode",
+      paste("hypothèse de données, vérifiée en partie : motifs sortie_non_renseignee, presence_interrompue ;",
+            "refus inventaire_sans_ligne"),
+      "hypothèse de données, vérifiée en partie : motif sortie_non_renseignee",
+      paste("hypothèse de données, non vérifiable : une remise en vigueur visible est relevée par les motifs",
+            "presence_apres_evenement et presence_interrompue (refus par défaut) ; une remise en vigueur entre",
+            "deux inventaires ne laisse aucune trace"),
+      if (milieu)
+        paste("approximation de modélisation : écart à l'instant d'entrée inconnu au plus égal à la partie",
+              "entière de L / 2 jours par unité (L : longueur de l'intervalle des instants compatibles ;",
+              "majoration certaine, atteinte pour une unité vue pour la première fois à un inventaire) ;",
+              "contrôle : constat de simulation (effet moyen sur les taux)")
+      else
+        paste("hypothèse de modèle : troncature à gauche non informative à t_f, la même que la troncature au",
+              "début de la période sous la recette des lignes ; exposition exacte, en jours entiers, pour ce",
+              "schéma d'observation ; contrôle : constat de simulation"),
+      "conséquence du mode ; relevé entres_sortis_entre_inventaires (décompte par cause)",
+      paste("exact sous les hypothèses inventaires_exhaustifs, evenements_exhaustifs et presence_continue"),
+      "convention ; relevé unites_exclues_par_propagation"),
+    stringsAsFactors = FALSE)
+  texte_moteur(h)
+}
+
+# Observations à fenêtres de la recette `stocks_successifs` (spécification de
+# #180, § 5 ; ADR 0016, point 4.2) : une par unité exposable, dans l'ordre des
+# unités de l'étape donnees (observations_stocks()), colonnes date_naissance,
+# clés de segmentation, debut (â), fin (ŝ ; NA pour une unité censurée) et
+# cause (« en_cours » pour une unité censurée), que exposition_fenetres()
+# passe à fenetres_observations() (a = max(â, D), b = min(ŝ, B)) :
+#   - début â : unité présente à t_1 (P0), â = t_1 ; unité vue pour la
+#     première fois à t_f, f >= 2 (E), â = t_f sous « premier_inventaire »,
+#     â = t_{f-1} + plafond((t_f - t_{f-1}) / 2) sous « milieu » ; unité
+#     entrée et sortie entre t_i et t_{i+1} (ES, sortie s), sans fenêtre sous
+#     « premier_inventaire » (unité écartée, sorties non comptées),
+#     â = t_i + plafond((s - t_i) / 2) sous « milieu » ; unité à événement
+#     hors de ]t_1, t_M] sans inventaire (HF) : sans fenêtre ;
+#   - fin ŝ : sortie s (fin S), +Inf (fin C : présente à t_M, censurée à B).
+# Jours entiers ; t_i < â <= t_{i+1} (ou s) : le début imputé reste dans la
+# période. Un instant d'événement d'une unité exposable est sa date de
+# sortie exacte (aucune hypothèse sur les sorties ni sur les âges).
+#   observations : observations de l'étape donnees (observations_stocks()) ;
+#   p            : valeurs validées, dont p$inventaires (grille canonique) ;
+#   segmentation : clés de segmentation du plan ;
+#   entree       : hypothèse d'entrée validée.
+# Rend list(observations, parametres (entree_entre_inventaires,
+# hypotheses_recette), diagnostics (unites_sans_fenetre : ES écartées et HF ;
+# fenetres_vides : unités gardées de fenêtre vide, max(â, D) >= min(ŝ, B),
+# sans avertissement (amendement mineur du § 7.5 par actuary) ;
+# exposition_imputee_jours : jours de [â, t_f) des unités E et de [â, s)
+# des unités ES sous « milieu », 0 sous « premier_inventaire » : part de
+# l'exposition qui repose sur l'hypothèse), avertissements (relevés
+# entres_sortis_entre_inventaires, par cause, et, sous « milieu »,
+# intervalle_inventaires_long : intervalle de plus de 366 jours)).
+fenetres_stocks_successifs <- function(observations, p, segmentation, entree) {
+  if (is.null(p$inventaires) || !chaine_unique(entree) || !(entree %in% VALEURS_ENTREE_ENTRE_INVENTAIRES))
+    stop(paste("fenetres_stocks_successifs() : grille des inventaires absente de p ou hypothèse d'entrée hors des",
+               "valeurs admises (erreur de programmation)."), call. = FALSE)
+  grille <- as.numeric(unclass(p$inventaires))
+  milieu <- identical(entree, "milieu")
+  classe <- observations$classe
+  f <- observations$premier_inventaire; i <- observations$intervalle
+  s <- as.numeric(unclass(observations$date_sortie))
+  cause_u <- observations$cause
+  censure <- !is.na(observations$fin) & observations$fin == "C"
+  p0 <- classe == "P0"; e <- classe == "E"; es <- classe == "ES"
+  garder <- p0 | e | (milieu & es)
+  debut <- rep(NA_real_, length(classe))
+  debut[p0] <- grille[1L]
+  if (milieu) {
+    debut[e] <- grille[f[e] - 1L] + ceiling((grille[f[e]] - grille[f[e] - 1L]) / 2)
+    debut[es] <- grille[i[es]] + ceiling((s[es] - grille[i[es]]) / 2)
+  } else {
+    debut[e] <- grille[f[e]]
+  }
+  fin <- s; fin[censure] <- NA_real_
+  fin_inf <- fin; fin_inf[is.na(fin_inf)] <- Inf
+  cause <- cause_u; cause[censure] <- "en_cours"
+  imputee <- if (milieu) sum(grille[f[e]] - debut[e]) + sum(s[es] - debut[es]) else 0
+  o <- observations[garder, c("date_naissance", segmentation), drop = FALSE]
+  rownames(o) <- NULL
+  o$debut <- structure(debut[garder], class = "Date")
+  o$fin <- structure(fin[garder], class = "Date")
+  o$cause <- cause[garder]
+
+  avert <- avertissements_vides()
+  causes <- setdiff(MODALITES_CAUSE, "en_cours")
+  n_es <- sum(es)
+  if (n_es > 0L) {
+    detail <- paste(sprintf("%s : %d", causes,
+                            vapply(causes, function(x) sum(es & !is.na(cause_u) & cause_u == x), integer(1L))),
+                    collapse = ", ")
+    avert <- avertir(avert, "exposition", "entres_sortis_entre_inventaires",
+                     if (milieu)
+                       sprintf(paste("Relevé : %d unité(s) entrée(s) et sortie(s) entre deux inventaires, sans ligne",
+                                     "d'inventaire : fenêtre imputée sous l'hypothèse d'entrée « milieu » (entrée au",
+                                     "milieu de l'intervalle des instants compatibles), sorties prises en compte,",
+                                     "événement de la transition ou sortie concurrente (%s)."),
+                               n_es, detail)
+                     else
+                       sprintf(paste("Relevé : %d unité(s) entrée(s) et sortie(s) entre deux inventaires, sans ligne",
+                                     "d'inventaire : sans fenêtre sous l'hypothèse d'entrée « premier_inventaire »,",
+                                     "sorties écartées, non comptées (%s)."), n_es, detail),
+                     n_es)
+  }
+  longs <- if (milieu) sum(diff(grille) > 366) else 0L
+  if (longs > 0L)
+    avert <- avertir(avert, "exposition", "intervalle_inventaires_long",
+                     sprintf(paste("Relevé : %d intervalle(s) entre inventaires de plus de 366 jours sous l'hypothèse",
+                                   "d'entrée « milieu » (l'écart à l'instant d'entrée inconnu, borné par la moitié de",
+                                   "l'intervalle, croît avec sa longueur)."), longs),
+                     longs)
+  list(observations = o,
+       parametres = list(entree_entre_inventaires = entree, hypotheses_recette = hypotheses_stocks(entree)),
+       diagnostics = list(unites_sans_fenetre = sum(!garder), exposition_imputee_jours = imputee,
+                          fenetres_vides = sum(pmax(debut[garder], p$debut) >= pmin(fin_inf[garder], p$borne))),
+       avertissements = avert)
 }

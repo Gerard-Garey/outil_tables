@@ -60,8 +60,8 @@ CAT2 <- rbind(CAT[1L, ], data.frame(
 verifier("catalogue des recettes : colonnes recette, requis, un_parmi, facultatifs, discriminants, convention_native, seam, motifs_ligne, motifs_unite (valeur écrite à la main)",
          identical(names(CAT), c("recette", "requis", "un_parmi", "facultatifs", "discriminants", "convention_native",
                                  "seam", "motifs_ligne", "motifs_unite")))
-verifier("catalogue des recettes, (3b) : deux lignes, lignes_dates_completes puis agregats ; ligne des lignes : rôles, convention native, seam et motifs (valeur écrite à la main)",
-         identical(CAT$recette, c("lignes_dates_completes", "agregats")) &&
+verifier("catalogue des recettes, (4b) de #180 : trois lignes, lignes_dates_completes, agregats puis stocks_successifs (ligne des stocks : test_stocks_successifs.R) ; ligne des lignes : rôles, convention native, seam et motifs (valeur écrite à la main)",
+         identical(CAT$recette, c("lignes_dates_completes", "agregats", "stocks_successifs")) &&
            identical(CAT$requis[[1L]], c("date_naissance", "date_entree", "date_sortie", "cause_sortie")) &&
            identical(CAT$un_parmi[[1L]], list()) &&
            identical(CAT$facultatifs[[1L]], c("id_contrat", "id_tete", "sexe", "annee_naissance", "segment")) &&
@@ -136,17 +136,18 @@ invariant_libelles <- function(libelles, motifs) {
   if (anyDuplicated(unname(libelles))) e <- c(e, "deux codes au même libellé")
   if (length(e)) e else TRUE
 }
-# Commit (4a) de #180 : les motifs des stocks (MOTIFS_LIGNES_STOCKS,
-# MOTIFS_UNITE_STOCKS) sont libellés avant la ligne `stocks_successifs` du
-# catalogue, ajoutée au commit (4b), qui réduit cet ensemble à motifs_recettes().
-MOTIFS_LIBELLES <- unique(c(tablexp:::motifs_recettes(), tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS))
-verifier("libellés des motifs : un libellé et un seul par code de l'union des motifs des recettes et des motifs des stocks (commit (4a) de #180), libellés distincts (invariant)",
+# Depuis le commit (4b) de #180, les motifs des stocks (MOTIFS_LIGNES_STOCKS,
+# MOTIFS_UNITE_STOCKS) sont dans l'union des motifs des recettes.
+MOTIFS_LIBELLES <- tablexp:::motifs_recettes()
+verifier("libellés des motifs : un libellé et un seul par code de l'union des motifs des recettes (stocks compris depuis le commit (4b) de #180), libellés distincts (invariant)",
          invariant_libelles(tablexp:::LIBELLES_MOTIFS, MOTIFS_LIBELLES))
-verifier("libellés des motifs : codes communs aux listes de motifs de plusieurs recettes recensés (sexe_manquant, sexe_hors_modalites, segment_manquant, age_aberrant), chacun avec un seul libellé (valeur écrite à la main)", {
+verifier("libellés des motifs : codes communs aux listes de motifs de plusieurs recettes recensés (sexe_manquant, sexe_hors_modalites, segment_manquant, age_aberrant ; depuis le commit (4b) de #180, en plus, ceux communs aux lignes et aux stocks), chacun avec un seul libellé (valeur écrite à la main)", {
   tous <- unlist(lapply(seq_len(nrow(CAT)), function(k) unique(c(CAT$motifs_ligne[[k]], CAT$motifs_unite[[k]]))),
                  use.names = FALSE)
   communs <- sort(unique(tous[duplicated(tous)]))
-  identical(communs, sort(c("sexe_manquant", "sexe_hors_modalites", "segment_manquant", "age_aberrant"))) &&
+  identical(communs, sort(c("sexe_manquant", "sexe_hors_modalites", "segment_manquant", "age_aberrant",
+                            "id_contrat_manquant", "id_tete_manquant", "naissance_manquante", "sortie_manquante",
+                            "cause_manquante", "cause_hors_modalites", "annee_naissance_incoherente"))) &&
     all(lengths(lapply(communs, function(x) which(names(tablexp:::LIBELLES_MOTIFS) == x))) == 1L)
 })
 verifier("libellés des motifs : l'invariant rejette un code en double, un code sans libellé et deux codes au même libellé (témoin du contrôle)", {
@@ -219,15 +220,15 @@ verifier("catalogue_roles() : 23 rôles (type_ligne, famille observation, ajout�
            identical(CR$famille[match(c("exposition_centrale", "exposition_initiale"), CR$role)], c("agregats", "agregats")) &&
            all(CR$type_admis[match(c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements"), CR$role)] ==
                  "integer, double"))
-verifier("catalogue_roles() : recettes dérivée du catalogue des recettes : lignes_dates_completes pour ses rôles propres, agregats pour les siens, les deux pour sexe et segment, vide sinon (valeur écrite à la main)", {
+verifier("catalogue_roles() : recettes dérivée du catalogue des recettes : lignes_dates_completes pour date_entree, lignes et stocks pour les rôles qu'elles partagent, agregats et stocks_successifs pour leurs rôles propres, les trois pour sexe et segment, vide sinon (valeur écrite à la main ; stocks depuis le commit (4b) de #180)", {
   v <- stats::setNames(CR$recettes, CR$role)
-  emp <- c("id_contrat", "id_tete", "date_naissance", "annee_naissance", "date_entree", "date_sortie", "cause_sortie")
+  emp <- c("id_contrat", "id_tete", "date_naissance", "annee_naissance", "date_sortie", "cause_sortie")
   agr <- c("age", "annee", "exposition_centrale", "exposition_initiale", "evenements")
-  all(v[emp] == "lignes_dates_completes") && all(v[agr] == "agregats") &&
-    all(v[c("sexe", "segment")] == "lignes_dates_completes, agregats") &&
-    identical(CR$role[CR$recettes == ""], c("age_fourni", "date_age_fourni", "date_evenement", "type_ligne",
-                                            "date_inventaire", "montant", "etat_depart", "etat_arrivee",
-                                            "date_changement"))
+  all(v[emp] == "lignes_dates_completes, stocks_successifs") && identical(unname(v["date_entree"]), "lignes_dates_completes") &&
+    all(v[agr] == "agregats") && all(v[c("type_ligne", "date_inventaire")] == "stocks_successifs") &&
+    all(v[c("sexe", "segment")] == "lignes_dates_completes, agregats, stocks_successifs") &&
+    identical(CR$role[CR$recettes == ""], c("age_fourni", "date_age_fourni", "date_evenement", "montant", "etat_depart",
+                                            "etat_arrivee", "date_changement"))
 })
 verifier("catalogue_roles() : sous un catalogue de deux recettes (injection), recettes jointes par « , » dans l'ordre du catalogue (sexe, segment), recette seule (montant, age) ou vide (date_inventaire)", {
   cr <- avec_constante("CATALOGUE_RECETTES", CAT2, catalogue_roles())
@@ -360,9 +361,20 @@ verifier("role_non_pris_en_charge, refus 8, catalogue du package : rôle des lig
                                     character(0)))
   !is.null(r) && identical(r$module, "donnees") && identical(r$motif, "role_non_pris_en_charge") &&
     identical(conditionMessage(r), paste("Rôle déclaré que la recette « agregats » n'emploie pas :",
-                                         "« id_contrat » (colonne « ct », employé par la recette « lignes_dates_completes ») ;",
+                                         "« id_contrat » (colonne « ct », employé par les recettes « lignes_dates_completes »,",
+                                         "« stocks_successifs ») ;",
                                          "l'ignorer changerait le sens du résultat, la construction est refusée.")) &&
     identical(r$details, list(role = "id_contrat", colonne = "ct", recette = "agregats"))
+})
+verifier("role_non_pris_en_charge, refus 8, rôle employé par deux autres recettes (agregats avec id_tete) : « employé par les recettes » au pluriel (reprise de (4b) de #180, C-4 ; message écrit à la main)", {
+  ag <- data.frame(a = 60, ev = 1, x = 2, tt = "T1", stringsAsFactors = FALSE)
+  r <- rf(tablexp:::controler_roles(ag, c(age = "a", evenements = "ev", exposition_centrale = "x", id_tete = "tt"),
+                                    character(0)))
+  !is.null(r) && identical(r$motif, "role_non_pris_en_charge") &&
+    identical(conditionMessage(r), paste("Rôle déclaré que la recette « agregats » n'emploie pas :",
+                                         "« id_tete » (colonne « tt », employé par les recettes « lignes_dates_completes »,",
+                                         "« stocks_successifs ») ; l'ignorer changerait le sens du résultat, la construction",
+                                         "est refusée."))
 })
 verifier("deduire_recette(), catalogue du package : age seul -> aucune_recette, seule la recette agregats listée (rôles propres déclarés), « un rôle parmi » (message écrit à la main)", {
   r <- rf(tablexp:::deduire_recette(c(age = "a")))
@@ -473,10 +485,11 @@ verifier("resoudre_convention(), native NA : convention déclarée retenue telle
 
 # --- union des exclusions (ADR 0016, point 6.4) ------------------------------
 
-verifier("union des motifs des recettes : motifs des lignes (ligne puis tête), puis motifs des agrégats absents des précédents, sous le catalogue du package ; ordre canonique des exclusions des lignes inchangé (#169)", {
+verifier("union des motifs des recettes : motifs des lignes (ligne puis tête), puis motifs des agrégats, puis motifs des stocks (ligne puis unité) absents des précédents, sous le catalogue du package ; ordre canonique des exclusions des lignes inchangé (#169 ; stocks depuis le commit (4b) de #180)", {
   u <- tablexp:::motifs_recettes()
-  identical(u, unique(c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE, tablexp:::MOTIFS_LIGNES_AGREGATS))) &&
-    identical(u[seq_len(20L)], c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE)) && length(u) == 34L &&
+  identical(u, unique(c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE, tablexp:::MOTIFS_LIGNES_AGREGATS,
+                        tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS))) &&
+    identical(u[seq_len(20L)], c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE)) && length(u) == 52L &&
     identical(tablexp:::ordres_canoniques()[["etapes/donnees/exclusions"]], u)
 })
 verifier("exclusion propre aux agrégats dans un plan des lignes : admise par valider_plan() (union), refusée exclusion_hors_recette avant toute étape (auparavant exclusion_inconnue ; #169)", {

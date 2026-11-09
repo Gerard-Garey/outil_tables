@@ -295,6 +295,7 @@ for (k in PRIORITE_FORME)
 VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalides"),
                     exposition.convention = list("plus_fine", "convention_invalide"),
                     exposition.par_annee = list(FALSE, "par_annee_invalide"),
+                    exposition.entree_entre_inventaires = list("milieu", "entree_entre_inventaires_invalide"),
                     brut.estimateurs = list("poisson", "estimateurs_invalides"),
                     brut.niveau = list(0.95, "niveau_invalide"),
                     positionnement.methode = list("smr", "methode_invalide"),
@@ -1658,12 +1659,13 @@ local({
   # fiche comprise, sur un portefeuille simulé (n = 5 000, graine 7) auquel est
   # ajouté un rôle segment constant par tête (trois segments).
   ord <- tablexp:::ordres_canoniques()
-  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête, puis motifs propres aux agrégats (union des recettes, #169) ; estimateurs = poisson, binomial, kaplan_meier",
+  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête, puis motifs propres aux agrégats, puis aux stocks successifs (union des recettes, #169, #180) ; estimateurs = poisson, binomial, kaplan_meier",
            identical(names(ord), c("segmentation", "etapes/donnees/exclusions", "etapes/brut/estimateurs")) &&
              identical(ord$segmentation, c("sexe", "segment")) &&
              identical(ord[["etapes/brut/estimateurs"]], c("poisson", "binomial", "kaplan_meier")) &&
              identical(ord[["etapes/donnees/exclusions"]],
-                       unique(c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE, tablexp:::MOTIFS_LIGNES_AGREGATS))))
+                       unique(c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE, tablexp:::MOTIFS_LIGNES_AGREGATS,
+                                tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS))))
   SIM63 <- simuler_portefeuille(LOI, modifier(PF, n = 5000), PER, 7L)
   SIM63$segment <- paste0("s", SIM63$id_tete %% 3L)
   ROLES63 <- c(ROLES_SIM, segment = "segment")
