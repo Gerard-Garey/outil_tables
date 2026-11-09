@@ -21,7 +21,7 @@
 #  stocks_reference() pour R14), aplatis, aller-retour exact du format,
 #  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
 #  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE : R13, #169 ; R14, #180), aucune référence
+#  SANS_REFERENCE, vide depuis la création de R13 et R14 par B15), aucune référence
 #  orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
@@ -338,11 +338,11 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # nommé : identifiant du plan -> issue de création. Le commit de référence de
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
-# R13 (#169, commit (3c) de B15 ; ADR 0016, point 8.4) : recette agrégats,
-# créé par le commit de référence (R), après visa d'actuary (M319). R14
-# (#180, commit (4c) de B15 ; spécification de #180, § 13) : recette stocks
-# successifs, de même.
-SANS_REFERENCE <- c(R13 = "#169", R14 = "#180")
+# R13 (#169, commit (3c) de B15 ; ADR 0016, point 8.4) : recette agrégats ;
+# R14 (#180, commit (4c) de B15 ; spécification de #180, § 13) : recette
+# stocks successifs ; créés par le commit de référence (R) de B15, après visa
+# d'actuary (M319), run CI 42637989632 (756fbfe).
+SANS_REFERENCE <- character(0)
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
