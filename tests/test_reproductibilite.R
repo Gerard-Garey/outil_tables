@@ -393,13 +393,11 @@ SANS_REFERENCE <- c(R13 = "#169", R14 = "#180")
 # champ tables_reference) et #31 (commit (5) de B13 : textes des lignes 3,
 # 8, 9 et 12 de STATUTS_BRUT) closes par la régénération unique (R) de B13
 # (run CI 42257221627).
-# Transition #169 (commit (3b) de B15, ADR 0016, point 8.2 ; M333) : fiche 6,
+# Transition #169 (commit (3b) de B15, ADR 0016, point 8.2 ; M333 : fiche 6,
 # champ conditionnel hypotheses_recette, absent de R1 à R12 ; seule
-# fiche/version_fiche change dans le corps (fiche/empreintes/resultat est
-# épinglé au jeton "<md5>", M334) ; retirée par le commit de référence (R).
-TRANSITIONS_EN_COURS <- list(
-  list(issue = "#169", plans = paste0("R", 1:12), changements = list(
-    list(chemin = "fiche/version_fiche", nature = "valeur", valeurs = 6L))))
+# fiche/version_fiche changeait dans le corps, M334) close par la
+# régénération (R) de B15 (run CI 42635335347, bd63b73).
+TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

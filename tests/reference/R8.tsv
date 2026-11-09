@@ -11,14 +11,14 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 9V74 80-Core Processor
+# plateforme consignée : Processeur                    : AMD EPYC 9V45 96-Core Processor
 # plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 1ce59fec73cf7ed005cd560f409df1fde25b1233
+# plateforme consignée : GITHUB_SHA                    : bd63b73d8f9250fc8468be48104bdf613315e043
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -27,13 +27,13 @@
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
-# fiche$empreintes/resultat : d924fca49165b88c792e1e75accf332c
-# fiche$empreintes/code : 10086fa0dceb7d2c044869aab0522876
-# commit : 1ce59fec73cf7ed005cd560f409df1fde25b1233
-# execution : 42389267990
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42389267990
-# mode : creation
-# date : 2026-11-07 16:02:54 UTC
+# fiche$empreintes/resultat : 407dd5a9318adb19e477f5e9b512a446
+# fiche$empreintes/code : a01830b440d02de3641ad16b8a789885
+# commit : bd63b73d8f9250fc8468be48104bdf613315e043
+# execution : 42635335347
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42635335347
+# mode : regeneration
+# date : 2026-11-09 14:30:49 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -405,7 +405,7 @@ avertissements/code	character	1	"fenetres_vides"
 avertissements/message	character	1	"Relevé : 12079 observation(s) sans intersection avec la période d'observation."
 avertissements/nombre	integer	1	12079
 fiche/@noms	character	23	"version_fiche"	"roles"	"provenance"	"provenance_mention"	"empreintes"	"tables_reference"	"plan"	"transition_code"	"fin_effective"	"unite_observation"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"nombre_lignes_exclues"	"avertissement_unite"	"hypothese_censure"	"hypotheses_brut"	"graine"	"graine_mention"	"generateur"	"avertissements"
-fiche/version_fiche	integer	1	5
+fiche/version_fiche	integer	1	6
 fiche/roles/@noms	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/roles	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/provenance	NULL	0
