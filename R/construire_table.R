@@ -855,7 +855,9 @@ controler_entrees <- function(donnees, roles, plan, provenance, tables_reference
 #   roles      : vecteur de chaînes nommé rôle -> colonne ;
 #   plan       : liste nommée (valider_plan()) ;
 #   provenance : NULL (données construites en mémoire) ou list(fichier,
-#                empreinte, algorithme) transmise par la couche de lecture ;
+#                empreinte, algorithme) transmise par la couche de lecture :
+#                trois vecteurs parallèles de longueur k >= 1, un élément
+#                par fichier lu, dans l'ordre de la lecture (#181) ;
 #   tables_reference : NULL, ou liste nommée par clé d'objets rendus par
 #                table_reference(), chaque clé citée par un paramètre du plan
 #                (ADR 0015, point 1 ; #73) ; identité de chaque table dans
@@ -1315,6 +1317,17 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # l'effet est mesuré identique sous C et C.UTF-8 (tests/controles/
   # locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune comparaison ni à
   # aucune écriture de valeur lue.
+  # Empreinte(s) de fichier de la fiche, témoin 14 : k >= 2 empreintes
+  # (provenance de k fichiers, #181 ; M332) citées une à une par
+  # liste_guillemets() (règle neutraliser_citation(), NA écrit « NA »), dans
+  # l'ordre de la fiche ; toute autre valeur par texte_lu(), dont k = 1
+  # (texte inchangé). Ligne 6 : noms des fichiers de la provenance (qui a
+  # passé controler_provenance()), de même pour k >= 2, tels quels pour k = 1.
+  ef <- e[["fichier"]]
+  fichiers_lus <- if (is.character(ef) && is.null(attributes(ef)) && length(ef) > 1L)
+    liste_guillemets(ef) else texte_lu(ef)
+  pf <- fiche[["provenance"]][["fichier"]]
+  provenance_lue <- if (is.null(fiche[["provenance"]])) "NULL" else if (length(pf) > 1L) liste_guillemets(pf) else pf
   conforme <- texte_moteur("conforme")
   forme <- texte_moteur("contrôle de forme")
   exacte <- texte_moteur("comparaison exacte")
@@ -1343,10 +1356,10 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
            texte_moteur(sprintf("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
                                 paste(names(plan[["etapes"]]), collapse = ", "), paste(names(roles), collapse = ", "),
                                 recette$recette,
-                                if (is.null(fiche[["provenance"]])) "NULL" else fiche[["provenance"]][["fichier"]])),
+                                provenance_lue)),
            e[["donnees"]], tr$lu, texte_lu(e[["code"]]), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
-           texte_lu(e[["resultat"]]), texte_lu(e[["fichier"]])),
+           texte_lu(e[["resultat"]]), fichiers_lus),
     verdict = c(rep(conforme, 8L),
                 verdict_chaines(EMPREINTE_CODE, e[["code"]]),
                 verdict_liste(r$versions, fiche[["versions"]], "versions"),

@@ -688,17 +688,25 @@ empreinte_donnees <- function(donnees, roles) {
 }
 
 # Contrôle l'argument `provenance` : NULL, ou list(fichier, empreinte,
-# algorithme) de trois chaînes non vides. Forme exacte (#21, forme_exacte()) :
-# liste nue (seul l'attribut names ; ni data.frame, ni classe), exactement ces
-# trois noms, chaque valeur une chaîne de longueur 1 sans attribut.
+# algorithme) de k >= 1 fichiers en trois vecteurs parallèles (#181 ; M332 ;
+# ADR 0016, point 8.5 ; ADR 0007, annotation du 08/11/2026, (a)). Forme exacte
+# (#21, forme_exacte()) : liste nue (seul l'attribut names ; ni data.frame, ni
+# classe), exactement ces trois noms ; chaque valeur un vecteur character sans
+# attribut (ni noms), de longueur k >= 1, sans NA ni chaîne vide ; les trois
+# de même longueur k, dans l'ordre de la couche de lecture (inventaires puis
+# événements pour les stocks successifs), qui n'est ni trié ni contrôlé ici.
+# k = 1 : la forme « trois chaînes uniques » de #21, inchangée.
 controler_provenance <- function(provenance) {
   if (is.null(provenance)) return(invisible(TRUE))
   if (!liste_aux_noms(provenance, c("fichier", "empreinte", "algorithme")) ||
-      !all(vapply(provenance, chaine_unique, logical(1L))))
+      !all(vapply(provenance, function(v) forme_exacte(v, "character") && length(v) >= 1L && !anyNA(v) &&
+                                            all(nzchar(v)), logical(1L))) ||
+      length(unique(lengths(provenance))) != 1L)
     refuser("rapport", "provenance_invalide",
             formuler(paste("La provenance doit être NULL (données construites en mémoire) ou une liste nue",
-                           "(fichier, empreinte, algorithme) de trois chaînes non vides, sans attribut",
-                           "(ni data.frame, ni classe ; ADR 0007, point 3.1).")),
+                           "(ni data.frame, ni classe) aux trois éléments fichier, empreinte et algorithme :",
+                           "trois vecteurs de chaînes non vides, sans NA ni attribut (ni noms), de même longueur",
+                           "k >= 1, un élément par fichier lu (ADR 0007, point 3.1 ; ADR 0016, point 8.5).")),
             list(provenance = provenance))
   invisible(TRUE)
 }
@@ -712,7 +720,10 @@ controler_provenance <- function(provenance) {
 # refusée qu'à l'écriture de la fiche, par empreinte_resultat(), en erreur de
 # programmation après tous les calculs (#106). Elles sont contrôlées ici, avant
 # tout calcul, par octets_chaines(), mêmes refus et mêmes chemins
-# (« fiche/roles », « fiche/provenance/<champ> »).
+# (« fiche/roles », « fiche/provenance/<champ> »). `fichier` et
+# `algorithme_fichier` recopient les vecteurs `empreinte` et `algorithme` de
+# la provenance, de longueur k (un élément par fichier, #181), NA sans
+# provenance.
 empreintes_construction <- function(donnees, roles, provenance) {
   octets_chaines(unname(roles), "fiche/roles")
   for (champ in names(provenance))
@@ -1005,8 +1016,13 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     graine_mention = texte_moteur(if ("graine" %in% names(plan)) "graine du plan" else "aucune étape aléatoire"),
     generateur = GENERATEUR,
     provenance = if (is.null(provenance)) NULL else provenance[c("fichier", "empreinte", "algorithme")],
-    provenance_mention = texte_moteur(if (is.null(provenance)) "aucun fichier (données construites en mémoire)"
-                                      else "fichier lu par la couche de lecture"),
+    # k = 1 : mention inchangée ; k >= 2 fichiers (#181, M332) : leur nombre
+    # et l'ordre de la couche de lecture, celui des vecteurs de la provenance.
+    provenance_mention = if (is.null(provenance)) texte_moteur("aucun fichier (données construites en mémoire)")
+                         else if (length(provenance[["fichier"]]) == 1L) texte_moteur("fichier lu par la couche de lecture")
+                         else formuler(paste("%d fichiers lus par la couche de lecture, un élément par fichier",
+                                             "dans fiche/provenance, dans l'ordre de la lecture"),
+                                       length(provenance[["fichier"]])),
     empreintes = empreintes,
     # NULL gardé comme élément de la liste (champ présent, ADR 0015, point 3.1).
     tables_reference = tables_reference,

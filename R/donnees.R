@@ -24,6 +24,10 @@
 #    (MOTIFS_LIGNES_AGREGATS) et observations de la recette `agregats`, une
 #    observation par cellule reçue, unité non déterminée (#169) ; libellé de
 #    chaque code de motif : LIBELLES_MOTIFS ;
+#  - empiler_stocks() : table des inventaires et table des événements
+#    empilées en une table de la recette `stocks_successifs`, structure seule
+#    (exportée : couche de lecture et application ; ADR 0014, point 11 ;
+#    #181) ;
 #  - preparer_donnees() : fonction d'étape `donnees` — refus par défaut,
 #    exclusions déclarées (comptées, listées, lignes conservées inchangées),
 #    unité d'observation et fusion par tête, relevés non bloquants,
@@ -1444,6 +1448,153 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
                   intervalles = intervalles)
   list(unite = if (role_id == "id_tete") "tete" else "contrat", observations = observations,
        observation_des_lignes = rang[g], releves = releves)
+}
+
+# --- empilement des tables des stocks successifs (#181 ; ADR 0014, point 11) ---
+
+# Empile la table des inventaires et celle des événements en une seule table,
+# la forme que consomme la recette `stocks_successifs` (adapter de structure,
+# sans calcul ; avis de forme (0'') de B15, G10 ; ADR 0014, point 11, et son
+# annotation du 08/11/2026, (d)). Exportée : appelée par la couche de lecture
+# et par l'application avant construire_table(), pour que la règle
+# d'empilement ne soit pas réécrite par chaque appelant.
+#   inventaires  : data.frame des lignes d'inventaire ;
+#   evenements   : data.frame des lignes d'événement ;
+#   colonne_type : nom de la colonne écrite (chaîne unique, non vide, sans
+#                  attribut, d'encodage autre que « bytes »), à déclarer au
+#                  rôle type_ligne : « inventaire » pour une ligne de
+#                  `inventaires`, « evenement » pour une ligne de `evenements`
+#                  (MODALITES_TYPE_LIGNE ; déclaration par la table d'origine,
+#                  jamais déduction), en character.
+# Rend un data.frame nu (classe data.frame seule, row.names automatiques) :
+# lignes de `inventaires` puis de `evenements`, chacune dans l'ordre reçu ;
+# colonnes de `inventaires` dans leur ordre, puis celles des seuls
+# `evenements` dans le leur, puis `colonne_type`. Une colonne commune (même
+# nom) garde ses valeurs ; une colonne absente d'une table y est complétée par
+# des NA de la classe de la colonne présente (sous-indiçage [NA] de cette
+# colonne : complétion de structure, aucune ligne créée). Aucune conversion :
+# une colonne commune doit avoir même type de stockage (typeof) et mêmes
+# attributs conservés par le sous-indiçage (attributes(x[0L]), names
+# retiré : classe, niveaux d'un facteur, fuseau d'un POSIXct, unité d'un
+# difftime) ; ses valeurs sont posées par [<- sur la colonne des inventaires
+# complétée. Les attributs de colonne que le sous-indiçage ne conserve pas
+# (dont « label ») et la classe de table (tibble…) ne sont pas recopiés.
+# Seules les colonnes atomiques sans dimension, hors raw, sont admises (une
+# colonne raw n'a pas de NA : la complétion écrirait 00). Refus (module
+# donnees), dans l'ordre :
+#   empilement_table_invalide        : `inventaires` ou `evenements` n'est pas
+#                                      un data.frame (le moteur ne lit pas de
+#                                      fichier) ;
+#   empilement_colonne_type_invalide : `colonne_type` hors de la forme
+#                                      ci-dessus ;
+#   empilement_noms_invalides        : nom de colonne NA, vide, en double ou
+#                                      d'encodage « bytes » dans une table
+#                                      (les colonnes communes s'apparient par
+#                                      leur nom) ; première table en défaut ;
+#   empilement_colonne_non_atomique  : colonne non atomique, munie d'une
+#                                      dimension ou de type raw (liste,
+#                                      matrice, tableau, data.frame, raw) ;
+#                                      première table en défaut ;
+#   empilement_colonne_type_presente : `colonne_type` est déjà le nom d'une
+#                                      colonne (elle serait écrasée) ;
+#   empilement_colonnes_discordantes : colonne(s) commune(s) de type de
+#                                      stockage ou d'attributs conservés
+#                                      différents, toutes citées.
+empiler_stocks <- function(inventaires, evenements, colonne_type) {
+  tables <- list(inventaires = inventaires, evenements = evenements)
+  non_df <- names(tables)[!vapply(tables, is.data.frame, logical(1L))]
+  if (length(non_df))
+    refuser("donnees", "empilement_table_invalide",
+            formuler(paste("Empilement des stocks successifs : un data.frame est attendu pour %s (classe(s) reçue(s) : %s) ;",
+                           "le moteur ne lit pas de fichier."),
+                     liste_guillemets(non_df),
+                     paste(vapply(tables[non_df], function(x) paste(citer(class(x)), collapse = "/"), character(1L)),
+                           collapse = " ; ")),
+            list(table = non_df, classe = lapply(tables[non_df], class)))
+  if (!chaine_unique(colonne_type) || Encoding(colonne_type) == "bytes")
+    refuser("donnees", "empilement_colonne_type_invalide",
+            formuler(paste("Empilement des stocks successifs : colonne_type, nom de la colonne du type de ligne",
+                           "(rôle type_ligne), doit être une chaîne unique, non vide, sans attribut, d'encodage",
+                           "autre que « bytes ».")),
+            list(colonne_type = colonne_type))
+  for (nom_table in names(tables)) {
+    n <- attr(tables[[nom_table]], "names", exact = TRUE)
+    mal <- is.na(n) | !nzchar(n) | Encoding(n) == "bytes"
+    mal <- mal | n %in% n[!mal][duplicated(n[!mal])]
+    if (any(mal))
+      refuser("donnees", "empilement_noms_invalides",
+              formuler(paste("Empilement des stocks successifs : table « %s », nom(s) de colonne NA, vide(s), en double",
+                             "ou d'encodage « bytes » : %s ; les colonnes communes s'apparient par leur nom, sans",
+                             "deviner."),
+                       citer(nom_table), liste_guillemets(unique(n[mal]))),
+              list(table = nom_table, colonne = unique(n[mal])))
+  }
+  for (nom_table in names(tables)) {
+    tab <- tables[[nom_table]]
+    n <- attr(tab, "names", exact = TRUE)
+    mal <- n[!vapply(seq_along(n), function(j) {
+      x <- .subset2(tab, j)
+      is.atomic(x) && is.null(attr(x, "dim", exact = TRUE)) && !identical(typeof(x), "raw")
+    }, logical(1L))]
+    if (length(mal))
+      refuser("donnees", "empilement_colonne_non_atomique",
+              formuler(paste("Empilement des stocks successifs : table « %s », colonne(s) non atomique(s), munie(s)",
+                             "d'une dimension ou de type raw (liste, matrice, tableau, data.frame, raw) : %s ;",
+                             "l'empilement ne complète que des colonnes atomiques sans dimension, hors raw."),
+                       citer(nom_table), liste_guillemets(mal)),
+              list(table = nom_table, colonne = mal))
+  }
+  ni <- attr(inventaires, "names", exact = TRUE)
+  ne <- attr(evenements, "names", exact = TRUE)
+  avec_type <- names(tables)[c(colonne_type %in% ni, colonne_type %in% ne)]
+  if (length(avec_type))
+    refuser("donnees", "empilement_colonne_type_presente",
+            formuler(paste("Empilement des stocks successifs : la colonne « %s » (colonne_type) existe déjà dans %s ;",
+                           "elle serait écrasée : choisir un autre nom ou retirer cette colonne."),
+                     citer(colonne_type), liste_guillemets(avec_type)),
+            list(colonne = colonne_type, table = avec_type))
+  communes <- ni[ni %in% ne]
+  # Noms des attributs conservés par le sous-indiçage (attributes(x[0L]),
+  # names retiré) qui diffèrent entre les deux colonnes de nom k.
+  attributs_differents <- function(k) {
+    aa <- attributes(.subset2(inventaires, match(k, ni))[0L]); aa$names <- NULL
+    ab <- attributes(.subset2(evenements, match(k, ne))[0L]); ab$names <- NULL
+    u <- union(names(aa), names(ab))
+    u[!vapply(u, function(m) identical(aa[[m]], ab[[m]]), logical(1L))]
+  }
+  discordantes <- communes[vapply(communes, function(k)
+    !identical(typeof(.subset2(inventaires, match(k, ni))), typeof(.subset2(evenements, match(k, ne)))) ||
+      length(attributs_differents(k)) > 0L, logical(1L))]
+  if (length(discordantes)) {
+    desc <- vapply(discordantes, function(k) {
+      a <- .subset2(inventaires, match(k, ni)); b <- .subset2(evenements, match(k, ne))
+      d <- attributs_differents(k)
+      formuler("« %s » (inventaires : classe %s, stockage %s ; événements : classe %s, stockage %s%s)", citer(k),
+               paste(citer(class(a)), collapse = "/"), citer(typeof(a)), paste(citer(class(b)), collapse = "/"),
+               citer(typeof(b)),
+               if (length(d)) formuler(" ; attribut(s) différent(s) : %s", liste_guillemets(d)) else "")
+    }, character(1L), USE.NAMES = FALSE)
+    refuser("donnees", "empilement_colonnes_discordantes",
+            formuler(paste("Empilement des stocks successifs : colonne(s) commune(s) discordante(s) : %s ; une colonne",
+                           "commune doit avoir même classe, même type de stockage et mêmes attributs conservés par le",
+                           "sous-indiçage (niveaux d'un facteur, fuseau d'un POSIXct, unité d'un difftime) ; aucune",
+                           "conversion n'est faite."),
+                     paste(desc, collapse = " ; ")),
+            list(colonne = discordantes))
+  }
+  n_i <- nrow(inventaires); n_e <- nrow(evenements)
+  noms <- c(ni, ne[!(ne %in% ni)])
+  colonnes <- lapply(noms, function(k) {
+    ja <- match(k, ni); jb <- match(k, ne)
+    if (is.na(jb)) return(.subset2(inventaires, ja)[c(seq_len(n_i), rep(NA_integer_, n_e))])
+    b <- .subset2(evenements, jb)
+    if (is.na(ja)) return(b[c(rep(NA_integer_, n_i), seq_len(n_e))])
+    v <- .subset2(inventaires, ja)[c(seq_len(n_i), rep(NA_integer_, n_e))]
+    v[n_i + seq_len(n_e)] <- b
+    v
+  })
+  structure(c(colonnes, list(rep(MODALITES_TYPE_LIGNE, c(n_i, n_e)))), names = c(noms, colonne_type),
+            row.names = .set_row_names(n_i + n_e), class = "data.frame")
 }
 
 # --- fusion par tête (A.1, « Unité d'observation et fusion par tête ») --------

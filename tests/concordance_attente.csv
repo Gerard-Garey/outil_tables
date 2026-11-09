@@ -20,3 +20,6 @@ entree,fonctions-exposition:fenetres_stocks_successifs,#180,"stocks successifs, 
 entree,fonctions-exposition:hypotheses_stocks,#180,"stocks successifs, commit (4b) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
 entree,recettes:stocks_successifs,#180,"stocks successifs, commit (4b) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
 entree,fonctions-simulation:projeter_stocks,#180,"forme « stocks successifs » du simulateur, commit (4c) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+export,empiler_stocks,#181,"empiler_stocks() exportée (couche de lecture, application), commit (5) ; à citer par docwriter en fin de branche (règle 9)"
+entree,fonctions-donnees:empiler_stocks,#181,"empiler_stocks(), commit (5) ; catalogue à compléter par docwriter en fin de branche (règle 9)"
+entree,exports:empiler_stocks,#181,"empiler_stocks() exportée, commit (5) ; catalogue à compléter par docwriter en fin de branche (règle 9)"

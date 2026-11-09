@@ -40,12 +40,13 @@ refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function
 # --- exports et signature -------------------------------------------------------
 
 verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, ecrire_rapport,",
-               "lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_embarquee, table_reference,",
-               "valider_plan (ADR 0007, point 3.4 ; ADR 0015, point 6.2 ; #9, #10, #11, #50, #73, #86, #87)"),
-         identical(sort(getNamespaceExports("tablexp")),
-                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "ecrire_rapport", "lire_fiche",
-                     "lire_plan", "rejouer_fiche", "simuler_portefeuille", "table_embarquee", "table_reference",
-                     "valider_plan")))
+               "empiler_stocks, lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_embarquee,",
+               "table_reference, valider_plan (ADR 0007, point 3.4 ; ADR 0015, point 6.2 ; #9, #10, #11, #50, #73,",
+               "#86, #87, #181)"),
+         identical(sort(getNamespaceExports("tablexp"), method = "radix"),
+                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "ecrire_rapport",
+                     "empiler_stocks", "lire_fiche", "lire_plan", "rejouer_fiche", "simuler_portefeuille",
+                     "table_embarquee", "table_reference", "valider_plan")))
 verifier("construire_table : signature (donnees, roles, plan, provenance = NULL, tables_reference = NULL) (ADR 0015, point 1.1 ; #73)",
          identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance", "tables_reference")) &&
            is.null(formals(construire_table)$provenance) && is.null(formals(construire_table)$tables_reference))
@@ -401,7 +402,7 @@ PROV_REFUSEES <- list(
   "nom inconnu a la place d'un nom attendu" = setNames(PROV, c("fichier", "empreinte", "hash")),
   "nom NA en plus des trois noms" = setNames(c(PROV, "x"), c(names(PROV), NA)),
   "liste sans noms" = unname(PROV),
-  "chaine de longueur 2" = modifyList(PROV, list(fichier = c("a.csv", "b.csv"))),
+  "longueurs inegales (fichier de longueur 2, empreinte et algorithme de longueur 1)" = modifyList(PROV, list(fichier = c("a.csv", "b.csv"))),
   "chaine de longueur 0" = modifyList(PROV, list(fichier = character(0))),
   "chaine a attribut names" = modifyList(PROV, list(fichier = c(a = "base.csv"))),
   "chaine a attribut class" = modifyList(PROV, list(algorithme = structure("md5", class = "algo"))),
