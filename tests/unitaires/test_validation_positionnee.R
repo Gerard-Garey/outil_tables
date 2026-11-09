@@ -333,6 +333,13 @@ local({
     p = proche(valeur(ST, "deviance/p_asymptotique"),
                stats::pchisq(valeur(ST, "deviance/statistique"), sum(RV) - 2, lower.tail = FALSE), 1e-12, 0)))
 })
+verifier("dénombrements (#174) : sous_groupes$cellules_retenues en integer sous positionnee, somme par regroupement égale à celle des cellules retenues", {
+  g <- V$resultat$sous_groupes
+  tous(type = if (identical(typeof(g$cellules_retenues), "integer")) TRUE else typeof(g$cellules_retenues),
+       diag = if (identical(typeof(V$diagnostics$cellules_retenues), "integer")) TRUE else typeof(V$diagnostics$cellules_retenues),
+       somme = proche(tapply(g$cellules_retenues, g$regroupement, sum)[c("segment", "tranche", "segment_tranche")],
+                      rep(sum(RV), 3L), 0, 0))
+})
 verifier("étape : SMR global = 1 (1e-12), bornes et p-valeurs NA (contraint_par_positionnement) ; B tirages, graine du plan", tous(
   smr = proche(valeur(ST, "smr/smr"), 1, 1e-12, 0),
   na = if (all(etat_de(ST, c("smr/borne_inf_exacte", "smr/p_centrale", "smr/z_racine_cubique")) ==

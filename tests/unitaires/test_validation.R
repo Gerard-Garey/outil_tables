@@ -454,6 +454,26 @@ verifier("états : retenue, sans_exposition (âges 50 et 57), taux_table_nul, ev
     identical(r$avertissements$code, "evenements_sans_attendu") && identical(r$avertissements$nombre, 2L) &&
     identical(valeur(r$resultat$statistiques, "smr/observes"), 4) && all(is.na(c_$residu_pearson[c_$etat != "retenue"]))
 })
+# Type des dénombrements (#174) : cellules_retenues des sous-groupes en integer,
+# comme celui du diagnostic, quel que soit le nombre de segments ou de cellules.
+verifier("dénombrements (#174) : sous_groupes$cellules_retenues et diagnostics$cellules_retenues en integer, un seul segment (segmentation vide), table vide, par_annee sans cellule, relation ajustee_hors_outil, segmentation par sexe", {
+  expo_a <- EXPO; expo_a$annee <- 2020L
+  cas <- list(un_segment = validation_directe(), vide = validation_directe(expo = EXPO[0L, ]),
+              ajustee = validation_directe(relation_table = "ajustee_hors_outil"),
+              annee_vide = validation_directe(expo = expo_a[0L, ], par_annee = TRUE),
+              par_sexe = X$etapes$validation)
+  types <- vapply(cas, function(r) paste(typeof(r$resultat$sous_groupes$cellules_retenues),
+                                         typeof(r$diagnostics$cellules_retenues)), "")
+  g <- cas$un_segment$resultat$sous_groupes
+  tous(types = if (all(types == "integer integer")) TRUE else paste(names(types), types, collapse = "; "),
+       valeurs = if (identical(g$cellules_retenues, 3L) && identical(cas$un_segment$diagnostics$cellules_retenues, 3L) &&
+                     identical(cas$vide$resultat$sous_groupes$cellules_retenues, 0L)) TRUE else "décomptes",
+       sexe = {
+         sg <- cas$par_sexe$resultat$sous_groupes
+         som <- vapply(c("segment", "tranche"), function(r) sum(sg$cellules_retenues[sg$regroupement == r]), 0)
+         if (identical(as.integer(som), rep(cas$par_sexe$diagnostics$cellules_retenues, 2L))) TRUE else "somme par regroupement"
+       })
+})
 verifier("états : E^c = 0 et q~ = 1 -> A = 0, état sans_exposition, pas de refus ni de NaN", {
   t1 <- table_reference(data.frame(age = 40:70, sexe = "ensemble", qx = ifelse(40:70 == 50, 1, 0.01)), "u", "importee", "test")
   r <- validation_directe(table = t1)

@@ -397,7 +397,16 @@ SANS_REFERENCE <- character(0)
 # champ conditionnel hypotheses_recette, absent de R1 à R12 ; seule
 # fiche/version_fiche changeait dans le corps, M334) close par la
 # régénération (R) de B15 (run CI 42635335347, bd63b73).
-TRANSITIONS_EN_COURS <- list()
+# Transition #174 (B16) : cellules_retenues des sous-groupes de la validation
+# et evenements_retires de la table retraits de l'importance des exclusions
+# passent de double à integer (dénombrements) dans R8, R9 et R10, valeurs
+# inchangées ; retirée par le commit de référence (R).
+TRANSITIONS_EN_COURS <- list(
+  list(issue = "#174", plans = c("R8", "R9", "R10"), changements = list(
+    list(chemin = "etapes/validation/resultat/sous_groupes/cellules_retenues", nature = "type",
+         de = "double", vers = "integer"),
+    list(chemin = "etapes/importance_exclusions/resultat/retraits/evenements_retires", nature = "type",
+         de = "double", vers = "integer"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
