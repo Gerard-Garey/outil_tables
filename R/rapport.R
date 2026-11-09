@@ -1749,8 +1749,9 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "colonnes des rôles telles que reçues par le moteur, toutes les lignes dans l'ordre reçu ; les colonnes hors",
     "rôles n'y entrent pas ; portable : exacte sous glibc, non mesurée ailleurs."),
   empreinte_fichier = paste(
-    "fichier (fiche/empreintes/fichier, fiche/empreintes/algorithme_fichier) : calculée par la couche de lecture",
-    "sur les octets du fichier lu et recopiée de la provenance ; non vérifiée par le moteur."),
+    "fichier (fiche/empreintes/fichier, fiche/empreintes/algorithme_fichier) : une empreinte par fichier lu,",
+    "calculée par la couche de lecture sur les octets de ce fichier, dans l'ordre de fiche/provenance, et",
+    "recopiée de la provenance ; non vérifiée par le moteur."),
   empreinte_resultat_code = paste(
     "résultat et code : statut consigné dans fiche/empreintes/statut_resultat_code (tableau ci-dessus)."),
   plateforme = paste(

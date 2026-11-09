@@ -59,7 +59,7 @@
 #  antérieurs à M300 (07/11/2026) ; aucun membre nouveau, toute modification
 #  est visible au diff et soumise au mainteneur (décision du 08/11/2026,
 #  point P1, Q7). Retirer d'HERITAGE_176 un fichier ou une entrée devenus sans
-#  occurrence est autorisé d'avance (décision du 08/11/2026, M3) ; la
+#  occurrence est autorisé d'avance (décision du 08/11/2026, M338) ; la
 #  mention est notée dans la PR.
 #
 #  Limites : (i) seuls les littéraux directs sont lus. Ne sont pas vus :
@@ -100,7 +100,7 @@ OPERATEURS_AFFECTATION <- c("LEFT_ASSIGN", "EQ_ASSIGN", "RIGHT_ASSIGN")
 # du mainteneur du 08/11/2026 (point P1, Q7) : aucune valeur nouvelle, aucun
 # fichier nouveau. Les ensembles de fichiers sont exacts ; un fichier ou une
 # entrée devenus sans occurrence se retirent ici, au diff : retrait autorisé
-# d'avance et noté dans la PR (décision du 08/11/2026, M3) ; seul un ajout est
+# d'avance et noté dans la PR (décision du 08/11/2026, M338) ; seul un ajout est
 # soumis au mainteneur.
 HERITAGE_176 <- data.frame(
   valeur = c(20261016, 20261019, 20261025, 20261026, 20261106,
@@ -119,10 +119,10 @@ HERITAGE_176 <- data.frame(
           "tests/unitaires/test_validation_positionnee.R", sep = "|"),
     rep("tests/unitaires/test_constats_brut.R", 9L)),
   motif = c(
-    "GRAINE_REFERENCE (jeu propre de R1 à R12, de l'entrée de R9 et de celle de R13 : A1) ; même valeur reprise comme jeu de tests distincts (test_simulation.R, test_brut_kaplan_meier.R, test_construire_table.R, test_importance_exclusions.R, test_rapport.R, mesure temps_construire_table.R) ou comme tirage d'essai de sous_graine (test_reproductibilite.R) : X2 antérieurs à M300 ; corriger obligerait à recalculer des attentes écrites en dur (D = 878)",
+    "GRAINE_REFERENCE (jeu propre de R1 à R12, de l'entrée de R9 et de celles de R13 et R14 : A1) ; même valeur reprise comme jeu de tests distincts (test_simulation.R, test_brut_kaplan_meier.R, test_construire_table.R, test_importance_exclusions.R, test_rapport.R, mesure temps_construire_table.R) ou comme tirage d'essai de sous_graine (test_reproductibilite.R) : X2 antérieurs à M300 ; corriger obligerait à recalculer des attentes écrites en dur (D = 878)",
     "échantillon de doubles de la forme empreinte : même recette (corps identiques, vérifié) dans ecriture_doubles.R, ecriture_doubles_texte.R et test_construire_table.R (A2 : même objet à n = 1e5) ; réemployée aussi comme GRAINE_PERMUTATION (ordre de permutation des lignes de test_reproductibilite.R), autre objet, antérieur à M300",
     "jeu altéré de test_importance_exclusions.R et test_simulation.R (GRAINE_A, GRAINE_DEF), défauts des mesures importance_exclusions.R et calculs_repetes.R : mêmes valeurs pour des objets distincts, antérieures à M300",
-    "deux contrôles d'écriture exacte des doubles sans lien entre eux, antérieurs à M300 : ecriture_doubles_texte.R:57 (GRAINE_EGALITES, égalités tirées) et tests/mesures/ecriture_17g/echantillon.R:7 (oracle de #104) ; aucune probabilité de fausse alarme n'en dépend (décision du mainteneur du 08/11/2026, M1)",
+    "deux contrôles d'écriture exacte des doubles sans lien entre eux, antérieurs à M300 : ecriture_doubles_texte.R:57 (GRAINE_EGALITES, égalités tirées) et tests/mesures/ecriture_17g/echantillon.R:7 (oracle de #104) ; aucune probabilité de fausse alarme n'en dépend (décision du mainteneur du 08/11/2026, M336)",
     "jeu simulé, graine du plan (Monte-Carlo) et échantillon d'essai sous la même valeur dans des tests déterministes (X1) ; assertions structurelles ou de recoupement, hormis le constat J5 de test_validation.R (taille des tests, données sous set.seed(20261106), Monte-Carlo sous 1001 à 1400, sans partage de flux) ; le jeu de test_validation_positionnee.R:279 est le même objet que le jeu de test_positionnement.R:255-261 (même appel : loi, portefeuille, période, graine ; vérifié par actuary) ; antérieures à M300",
     rep("graines de test_constats_brut.R comprises dans la plage des jeux de la loi A du constat de positionnement (r = 411 à 416, 421, 431, 441) : coïncidence connue, sans effet statistique, gardée pour que la sortie consignée reste rejouable (décision du mainteneur du 08/11/2026, commentaire de constat_positionnement.R) ; pour mémoire : graine en arithmétique (20261610L + co$id) ou en variable (G_C2), hors du relevé (limite (i))", 9L)),
   pour_memoire = c(rep(FALSE, 5L), rep(TRUE, 9L)),
@@ -488,7 +488,7 @@ analyser_graines <- function(occ, entrees, fichiers_arbre = NULL, racine = NULL)
     }
   }
   # Entrées sans aucune occurrence : écart, sauf entrée d'héritage pour mémoire
-  # (décision du 08/11/2026, M3).
+  # (décision du 08/11/2026, M338).
   sans <- Filter(function(e) !(e$valeur %in% occ$valeur), ponctuelles)
   for (e in Filter(function(e) !e$pour_memoire, sans))
     defauts <- c(defauts, sprintf(

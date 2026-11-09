@@ -383,7 +383,7 @@ d <- arbre_graines(list("tests/a.R" = "x <- 1")); writeLines("a,b", file.path(d,
 verifier("graines : échoue sur une liste blanche aux colonnes inattendues",
          echoue(controle("graines.R", shQuote(d)), "colonnes attendues valeur,etendue,classe,fichiers,motif,decision"))
 unlink(d, recursive = TRUE)
-# Entrées sans aucune occurrence (M3) et note d'une entrée sans réemploi.
+# Entrées sans aucune occurrence (M338) et note d'une entrée sans réemploi.
 verifier("graines : échoue sur une entrée de liste blanche dont la valeur n'a aucune occurrence",
          echoue(graines(list("tests/a.R" = "x <- 1"), A_ADMISE(20261301, "A2", "tests/a.R")),
                 "20261301 : entrée A2 (liste blanche) sans aucune occurrence"))
@@ -394,7 +394,7 @@ verifier("graines : une entrée dont la valeur n'apparaît plus que dans un cont
              if (any(grepl("20261301 : entrée A4 (liste blanche) sans réemploi observé", r$sortie, fixed = TRUE, useBytes = TRUE))) TRUE else
                "note « sans réemploi observé » absente"
          })
-# Littéraux positionnels qui tombent sur un formel `graine` (M2).
+# Littéraux positionnels qui tombent sur un formel `graine` (M337).
 DEF_SIM <- c("simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = NULL) NULL",
              "avec_points <- function(..., graine) NULL",
              "defaut <- function(a, graine = 1L) NULL")
@@ -481,7 +481,7 @@ verifier("graines : héritage : une valeur nouvelle échoue (réemploi non admis
          any(grepl("20261302 : réemploi non admis",
                    defauts_graines(c(FICH_H, list("tests/c.R" = "set.seed(20261302L)", "tests/d.R" = "set.seed(20261302L)")),
                                    heritage = heritage_temoin()), fixed = TRUE, useBytes = TRUE)))
-verifier("graines : héritage : une entrée sans aucune occurrence échoue (M3)",
+verifier("graines : héritage : une entrée sans aucune occurrence échoue (M338)",
          any(grepl("20261301 : entrée heritage (HERITAGE_176) sans aucune occurrence",
                    defauts_graines(list("tests/a.R" = "x <- 1"), heritage = heritage_temoin()), fixed = TRUE, useBytes = TRUE)))
 verifier("graines : héritage : une entrée sans occurrence marquée pour mémoire passe",
