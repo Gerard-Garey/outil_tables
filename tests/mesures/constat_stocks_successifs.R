@@ -660,7 +660,10 @@ for (k in names(GROUPES)) {
     verifier(sprintf("%s : mêmes grandeurs (noms, ordre) dans chaque jeu", sc),
              all(vapply(v, function(x) identical(names(x), noms), NA)))
     m <- do.call(rbind, lapply(v, function(x) x[noms]))
-    rapport(sc, m, if (k == "S3") N_TETES_S3 else N_TETES, AGES_COUV[[k]])
+    # n de n* = n / beta^2 : têtes dont les décès entrent dans E[D_L] ; sous S4,
+    # fond et bloc (réserve R2 du visa d'actuary du passage consigné, 09/11/2026 ;
+    # le passage à fbf47af, calculé avec le bloc seul, se lit x (n + n_fond) / n).
+    rapport(sc, m, switch(k, S3 = N_TETES_S3, S4 = N_TETES + PF$S4_fond$n, N_TETES), AGES_COUV[[k]])
   }
 }
 
