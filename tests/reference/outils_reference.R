@@ -15,13 +15,15 @@
 #  dans une session ni UTF-8 ni latin-1 est refusée, jamais convertie).
 #
 #  - plans_reference(), jeu_reference(), jeu_reference_defauts(),
-#    agregats_reference() : plans R1 à R13 et entrées de référence (points
+#    agregats_reference(), stocks_reference() : plans R1 à R14 et entrées de
+#    référence (points
 #    4.1 et 4.3 ; R6 : première annotation, (b) ; R7 : #32 ; R8 : #166, avec `tables_reference`, table importée en
 #    valeurs littérales ; R9 : #166, avec `entree`, une entrée par plan,
 #    annotation du 07/11/2026, (d) ; R10 : #167, positionnement par SMR et
 #    validation de la table positionnée ; R11 : #168, test d'homogénéité entre
 #    segments ; R12 : #168, le même test sous H0 vraie ; R13 : #169, recette
-#    agrégats, entrée agregats_reference() ; plans de méthode, point 5.2) ;
+#    agrégats, entrée agregats_reference() ; R14 : #180, recette stocks
+#    successifs, entrée stocks_reference() ; plans de méthode, point 5.2) ;
 #  - tirer_entree(nom), entrees_des_plans(plans) : tirage de l'entrée d'un
 #    plan, chaque entrée distincte une seule fois ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
@@ -102,6 +104,11 @@ TOLERANCES <- c(
   # exacte : doubles à valeur entière ou déclarée (point 3.4)
   "exposition/resultat/exposition/exposition_jours" = 0,
   "exposition/diagnostics/exposition_jours" = 0,
+  # R14 (#180, recette stocks successifs) : jours de l'exposition imputée sous
+  # l'hypothèse d'entrée « milieu », somme de différences de jours entiers
+  # (R/exposition.R, fenetres_stocks_successifs()), exacte comme
+  # exposition_jours.
+  "exposition/diagnostics/exposition_imputee_jours" = 0,
   "exposition/parametres/delai_declaration" = 0, "fiche/plan/delai_declaration" = 0,
   "brut/parametres/niveau" = 0, "brut/niveau" = 0, "fiche/hypotheses_brut/niveau" = 0,
   "brut/parametres/tolerance_effectif" = 0, "fiche/hypotheses_brut/tolerance_effectif" = 0,
@@ -346,7 +353,8 @@ NOMBRE_PAR_MOTIF_R9 <- 500L
 # Jeu de l'entrée de référence : `defauts` NULL pour jeu_reference() (aucun
 # défaut), sinon la liste (graine, declarations) de simuler_portefeuille() ;
 # `forme` NULL pour les lignes individuelles, sinon la forme de
-# simuler_portefeuille() (agregats_reference(), R13 ; #169).
+# simuler_portefeuille() (agregats_reference(), R13 ; #169 ;
+# stocks_reference(), R14 ; #180).
 simuler_reference <- function(defauts = NULL, forme = NULL) {
   gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
   ra <- tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %")
@@ -378,14 +386,30 @@ ROLES_AGREGATS_R13 <- c(sexe = "sexe", age = "age", exposition_centrale = "expos
 agregats_reference <- function()
   list(donnees = simuler_reference(forme = FORME_AGREGATS_R13), roles = ROLES_AGREGATS_R13)
 
+# Entrée de R14 (#180 ; spécification de #180, § 13, QS6 ; avis (0''), G12) :
+# forme « stocks successifs » de simuler_reference(), donc même loi, même
+# portefeuille et GRAINE_REFERENCE (réemploi admis A1 de #176 ; aucun tirage
+# supplémentaire), sur la grille annuelle du 31/12/2014 au 31/12/2024 (t_1 =
+# veille du début de PERIODE_REFERENCE, t_M = sa fin, délai nul). Rôles :
+# id_tete, type_ligne, date_inventaire, sexe, date_naissance, date_sortie,
+# cause_sortie (id_contrat, égal à id_tete, non déclaré : un seul identifiant
+# sous les stocks).
+INVENTAIRES_R14 <- seq(as.Date("2014-12-31"), as.Date("2024-12-31"), by = "year")
+FORME_STOCKS_R14 <- list(nom = "stocks_successifs", inventaires = INVENTAIRES_R14)
+ROLES_STOCKS_R14 <- c(id_tete = "id_tete", type_ligne = "type_ligne", date_inventaire = "date_inventaire",
+                      sexe = "sexe", date_naissance = "date_naissance", date_sortie = "date_sortie",
+                      cause_sortie = "cause_sortie")
+stocks_reference <- function()
+  list(donnees = simuler_reference(forme = FORME_STOCKS_R14), roles = ROLES_STOCKS_R14)
+
 # Entrée d'un plan (champ `entree` de plans_reference() : le nom de l'entrée) :
 # `reference` (jeu_reference(), R1 à R8, R10 à R12), `reference_defauts`
-# (jeu_reference_defauts(), R9) ou `agregats_reference` (agregats_reference(),
-# R13). Un nom plutôt qu'une fonction, pour que l'outillage tire chaque entrée
+# (jeu_reference_defauts(), R9), `agregats_reference` (agregats_reference(),
+# R13) ou `stocks_reference` (stocks_reference(), R14). Un nom plutôt qu'une fonction, pour que l'outillage tire chaque entrée
 # distincte une seule fois (entrees_des_plans()).
 tirer_entree <- function(nom)
   switch(nom, reference = jeu_reference(), reference_defauts = jeu_reference_defauts(),
-         agregats_reference = agregats_reference(),
+         agregats_reference = agregats_reference(), stocks_reference = stocks_reference(),
          stop("entrée de référence inconnue : ", nom, call. = FALSE))
 
 # Entrées des plans `plans` : liste nommée (nom de l'entrée -> list(donnees,
@@ -451,20 +475,27 @@ tables_reference_r8 <- function() {
 # `graine` : étapes et graine facultatives (R8 ; R10 à R12 : #167, #168) ;
 # absents, le plan est celui de R1 à R7 (champs et ordre inchangés). Les
 # étapes sont écrites dans l'ordre d'ETAPES (R/construire_table.R).
+# `inventaires` et `entree_entre_inventaires` (R14, #180) : NULL (champ et
+# paramètre absents, plans R1 à R13 inchangés) ou la grille et l'hypothèse
+# d'entrée de la recette des stocks successifs.
 plan_reference <- function(transition = c("vivant", "deces"), segmentation = "sexe", delai = 0,
                            convention = "plus_fine", par_annee = FALSE,
                            estimateurs = c("poisson", "binomial"), niveau = 0.95,
                            exclusions = character(0), positionnement = NULL, homogeneite = NULL,
-                           validation = NULL, importance = NULL, graine = NULL) {
-  etapes <- list(donnees = list(exclusions = exclusions),
-                 exposition = list(convention = convention, par_annee = par_annee),
+                           validation = NULL, importance = NULL, graine = NULL,
+                           inventaires = NULL, entree_entre_inventaires = NULL) {
+  exposition <- list(convention = convention, par_annee = par_annee)
+  if (!is.null(entree_entre_inventaires)) exposition$entree_entre_inventaires <- entree_entre_inventaires
+  etapes <- list(donnees = list(exclusions = exclusions), exposition = exposition,
                  brut = list(estimateurs = estimateurs, niveau = niveau))
   if (!is.null(positionnement)) etapes$positionnement <- positionnement
   if (!is.null(homogeneite)) etapes$homogeneite <- homogeneite
   if (!is.null(validation)) etapes$validation <- validation
   if (!is.null(importance)) etapes$importance_exclusions <- importance
   plan <- list(transition = list(depart = transition[1L], arrivee = transition[2L]),
-               periode = PERIODE_REFERENCE, delai_declaration = delai, segmentation = segmentation)
+               periode = PERIODE_REFERENCE, delai_declaration = delai)
+  if (!is.null(inventaires)) plan$inventaires <- inventaires
+  plan$segmentation <- segmentation
   if (!is.null(graine)) plan$graine <- graine
   plan$etapes <- etapes
   plan
@@ -480,7 +511,7 @@ tables_du_plan <- function(p) if (is.null(p$tables_reference)) NULL else p$table
 
 # Un identifiant n'est jamais réemployé (point 4.3). `entree` : nom de
 # l'entrée du plan (tirer_entree()), `reference` pour R1 à R8, R10 à R12.
-# R13 (#169) : entrée `agregats_reference`.
+# R13 (#169) : entrée `agregats_reference` ; R14 (#180) : `stocks_reference`.
 plans_reference <- function() {
   p <- function(id, description, plan, tables_reference = NULL, entree = "reference")
     list(identifiant = id, description = description, plan = plan, tables_reference = tables_reference,
@@ -535,7 +566,16 @@ plans_reference <- function() {
     # par SMR sur la table de R8. Aucune étape aléatoire, aucune graine.
     R13 = p("R13", "recette agrégats (forme agrégats de l'entrée de référence, transition décès, dernier_anniversaire sans année ; Poisson, binomial, positionnement par SMR sur la table de R8)",
             plan_reference(convention = "dernier_anniversaire", positionnement = positionnement),
-            tables_reference = tables_reference_r8, entree = "agregats_reference"))
+            tables_reference = tables_reference_r8, entree = "agregats_reference"),
+    # R14 (#180 ; spécification de #180, § 13, QS6) : recette « stocks
+    # successifs » sur la forme stocks de l'entrée de référence, grille
+    # annuelle ; hypothèse d'entrée « milieu », convention plus_fine (native
+    # dernier_anniversaire), sans année, aucune exclusion ; Poisson, binomial,
+    # Kaplan-Meier au niveau 0,95. Aucune étape aléatoire, aucune graine.
+    R14 = p("R14", "recette stocks successifs (forme stocks de l'entrée de référence, grille annuelle du 31/12/2014 au 31/12/2024, hypothèse d'entrée milieu ; Poisson, binomial, Kaplan-Meier)",
+            plan_reference(estimateurs = c("poisson", "binomial", "kaplan_meier"), inventaires = INVENTAIRES_R14,
+                           entree_entre_inventaires = "milieu"),
+            entree = "stocks_reference"))
 }
 
 # --- aplatissement (points 1 et 2.3) ------------------------------------------

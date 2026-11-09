@@ -14,6 +14,11 @@
 #  hypothèses de la recette (§ 5, § 6), refus du § 7.1, relevés du § 7.5,
 #  fiche (§ 10), oracle C1 (lignes reconstituées dans le test), C3, C6, C8,
 #  C9, C14.
+#  Commit (4c) : forme « stocks successifs » du simulateur (§ 11 ; C11) et
+#  compléments de couverture demandés par actuary au visa de (4b) : fenêtres
+#  sur une grille irrégulière avec délai, écrites à la main ; C2 en test
+#  direct ; C6 contre les décomptes de l'attribut `simulation` ; C16-oracle
+#  sur des jeux simulés, plusieurs graines (A1.8).
 #
 #  Natures des attendus (ADR 0007, point 11.4), nommées dans chaque test :
 #  valeurs écrites à la main (motifs levés seuls sur une base construite à la
@@ -21,7 +26,9 @@
 #  exacte (permutation des lignes reçues, aller-retour du plan, oracle des
 #  lignes reconstituées, oracle de la base privée des unités exclues) ;
 #  inégalité exacte (C3). Graines des jeux simulés de l'oracle C1 : 180L et
-#  181L (< 1000, exemptées du contrôle de #176, règle A5).
+#  181L ; du C16-oracle sur jeux simulés : 180L, 181L et 182L ; du test
+#  d'instant de la forme du simulateur : 183L (< 1000, exemptées du contrôle
+#  de #176, règle A5).
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -977,4 +984,316 @@ verifier("C6 : relevés de la recette sur la forme stocks propre égaux aux déc
       !("unites_exclues_par_propagation" %in% codes(x)) && r$entres_sortis > 0L && r$entrees > 0L
   }, NA)
   all(ok)
+})
+
+# =============================================================================
+# Commit (4c) : forme « stocks successifs » du simulateur ; compléments de
+# couverture (visa d'actuary de (4b)).
+# =============================================================================
+
+# --- forme « stocks successifs » du simulateur (§ 11 ; C11) ---------------------
+
+FORME_C1 <- list(nom = "stocks_successifs", inventaires = G_C1)
+RS_C1_SIM <- c(id_tete = "id_tete", type_ligne = "type_ligne", date_inventaire = "date_inventaire", sexe = "sexe",
+               date_naissance = "date_naissance", date_sortie = "date_sortie", cause_sortie = "cause_sortie")
+sim_st <- function(forme = FORME_C1, graine = 180L, portefeuille = PF_C1, periode = PER_C1, defauts = NULL)
+  simuler_portefeuille(LOI_C1, portefeuille, periode, graine, defauts = defauts, forme = forme)
+SIM_C1 <- lapply(c(180L, 181L), function(gr) sim_st(graine = gr))
+COLS_SIM <- c("id_contrat", "id_tete", "type_ligne", "date_inventaire", "sexe", "date_naissance", "date_sortie",
+              "cause_sortie")
+verifier("C11 (identité exacte) : deux appels en forme stocks identical() ; attribut simulation = celui du jeu propre (forme lignes, même graine) plus le champ forme en fin (nom, grille en Date à stockage double, décomptes)", {
+  s0 <- attr(JEUX_C1[[1L]], "simulation"); s1 <- attr(SIM_C1[[1L]], "simulation")
+  gi <- structure(as.integer(unclass(G_C1)), class = "Date")
+  identical(sim_st(), SIM_C1[[1L]]) &&
+    identical(names(s1), c(names(s0), "forme")) && identical(s1[names(s0)], s0) &&
+    identical(names(s1$forme), c("nom", "inventaires", "decomptes")) && identical(s1$forme$nom, "stocks_successifs") &&
+    identical(s1$forme$inventaires, G_C1 + 0) &&
+    identical(sim_st(list(nom = "stocks_successifs", inventaires = gi)), SIM_C1[[1L]])
+})
+verifier("C11 : colonnes, types et ordre de la spécification, § 11 (id_contrat, id_tete égaux ; type_ligne ; dates manquantes en NA de classe Date à stockage double, causes manquantes en NA caractère ; ordre par id_contrat puis date de ligne ; lignes numérotées 1..n)", {
+  st <- SIM_C1[[1L]]
+  inv <- st$type_ligne == "inventaire"
+  date_ligne <- ifelse(inv, as.numeric(st$date_inventaire), as.numeric(st$date_sortie))
+  identical(names(st), COLS_SIM) && is.integer(st$id_contrat) && identical(st$id_contrat, st$id_tete) &&
+    is.character(st$type_ligne) && all(st$type_ligne %in% c("inventaire", "evenement")) &&
+    identical(class(st$date_inventaire), "Date") && is.double(unclass(st$date_inventaire)) &&
+    identical(class(st$date_sortie), "Date") && is.double(unclass(st$date_sortie)) &&
+    identical(class(st$date_naissance), "Date") && is.character(st$sexe) && is.character(st$cause_sortie) &&
+    all(is.na(st$date_sortie[inv])) && all(is.na(st$cause_sortie[inv])) && !anyNA(st$date_inventaire[inv]) &&
+    all(is.na(st$date_inventaire[!inv])) && !anyNA(st$date_sortie[!inv]) && !anyNA(st$cause_sortie[!inv]) &&
+    identical(order(st$id_contrat, date_ligne, method = "radix"), seq_len(nrow(st))) &&
+    identical(attr(st, "row.names"), seq_len(nrow(st)))
+})
+verifier("C11 (identité exacte) : forme stocks du simulateur identical() à la projection du jeu propre écrite dans le test (projeter(), comparaisons de dates e <= t_i < s et t_1 < s <= t_M), deux graines", {
+  ok <- vapply(seq_along(SIM_C1), function(k) {
+    st <- SIM_C1[[k]]
+    a <- data.frame(id = st$id_tete, t = st$type_ligne, di = st$date_inventaire, sx = st$sexe, n = st$date_naissance,
+                    s = st$date_sortie, c = st$cause_sortie, stringsAsFactors = FALSE)
+    b <- ST_C1[[k]]; rownames(b) <- NULL
+    identical(a, b)
+  }, NA)
+  all(ok)
+})
+verifier("C11 : décomptes de l'attribut simulation (lignes de chaque type, P0, E, ES par cause, présents au dernier inventaire) égaux à ceux recomptés dans le test sur le jeu propre (valeur calculée dans le test) ; aucune unité HF écrite (sortie au plus tard t_1 : non écrite)", {
+  ok <- vapply(seq_along(SIM_C1), function(k) {
+    j <- JEUX_C1[[k]]; st <- SIM_C1[[k]]; dc <- attr(st, "simulation")$forme$decomptes
+    gi <- as.numeric(G_C1); M <- length(gi)
+    e <- as.numeric(j$date_entree); s <- as.numeric(j$date_sortie); s[is.na(s)] <- Inf
+    present <- sapply(gi, function(t) e <= t & t < s)
+    vu <- rowSums(present) > 0
+    es <- !vu & is.finite(s) & s > gi[1L] & s <= gi[M]
+    ecrits <- unique(st$id_contrat)
+    identical(names(dc), c("lignes", "p0", "entrees", "entres_sortis", "presents_dernier")) &&
+      identical(dc$lignes, c(inventaire = sum(present), evenement = sum(st$type_ligne == "evenement"))) &&
+      identical(dc$p0, sum(present[, 1L])) && identical(dc$entrees, sum(vu & !present[, 1L])) &&
+      identical(dc$entres_sortis, c(deces = sum(es & j$cause_sortie == "deces"), rachat = sum(es & j$cause_sortie == "rachat"))) &&
+      identical(dc$presents_dernier, sum(present[, M])) &&
+      identical(sort(ecrits), j$id_contrat[vu | (is.finite(s) & s > gi[1L])]) && sum(es) > 0L
+  }, NA)
+  all(ok)
+})
+verifier("C11 : instant d'une date d'inventaire dans la forme du simulateur (§ 2.1) : unités entrées le jour t_2 présentes à t_2 si en vigueur ce soir-là, aucune présente à t_1 (mode age_exact, date_entree = t_2) ; la sortie le jour t_i est couverte par le test direct de projeter_stocks()", {
+  pf <- list(mode = "age_exact", n = 400, proportion_hommes = 0.5, age = 60, date_entree = G_C1[2L])
+  st <- sim_st(portefeuille = pf, graine = 183L)
+  j <- simuler_portefeuille(LOI_C1, pf, PER_C1, 183L)
+  inv <- st[st$type_ligne == "inventaire", ]
+  # Toute unité entrée le 2015-12-31 et en vigueur ce soir-là est présente à
+  # t_2 ; aucune n'est présente à t_1.
+  vig <- j$id_contrat[is.na(j$date_sortie) | j$date_sortie > G_C1[2L]]
+  length(vig) > 0L && identical(sort(inv$id_contrat[inv$date_inventaire == G_C1[2L]]), vig) &&
+    !any(inv$date_inventaire == G_C1[1L])
+})
+# Jeu propre écrit à la main, grille G_C1 (t_1 = 2014-12-31 ... t_4 =
+# 2017-12-31) : 1, sortie le jour t_1 (aucune ligne) ; 2, sortie le jour t_M
+# (inventaires t_1 à t_3, puis l'événement) ; 3, sortie le jour t_2
+# (inventaire t_1, puis l'événement) ; 4, entrée le jour t_2, en cours
+# (inventaires t_2 à t_4) ; 5, entrée et sortie entre t_2 et t_3 (événement
+# seul) ; 6, entrée entre t_1 et t_2, en cours (inventaires t_2 à t_4).
+verifier("projeter_stocks() en appel direct (valeurs écrites à la main) : s = t_1 sans ligne, s = t_i intermédiaire, s = t_M, e = t_i présent à t_i, entrée-sortie entre deux inventaires (événement seul), unité en cours ; lignes, ordre et décomptes", {
+  j <- data.frame(id_contrat = 1:6, id_tete = 1:6, sexe = "H", date_naissance = D("1960-01-01"),
+                  date_entree = D(c("2010-01-01", "2010-01-01", "2010-01-01", "2015-12-31", "2016-01-01", "2015-03-03")),
+                  date_sortie = D(c("2014-12-31", "2017-12-31", "2015-12-31", NA, "2016-06-01", NA)),
+                  cause_sortie = c("deces", "rachat", "deces", "en_cours", "deces", "en_cours"), stringsAsFactors = FALSE)
+  r <- tablexp:::projeter_stocks(j, G_C1)
+  l <- r$lignes
+  identical(l$id_contrat, c(2L, 2L, 2L, 2L, 3L, 3L, 4L, 4L, 4L, 5L, 6L, 6L, 6L)) &&
+    identical(l$type_ligne, c("inventaire", "inventaire", "inventaire", "evenement", "inventaire", "evenement",
+                              "inventaire", "inventaire", "inventaire", "evenement", "inventaire", "inventaire", "inventaire")) &&
+    identical(l$date_inventaire, D(c("2014-12-31", "2015-12-31", "2016-12-31", NA, "2014-12-31", NA,
+                                     "2015-12-31", "2016-12-31", "2017-12-31", NA, "2015-12-31", "2016-12-31", "2017-12-31"))) &&
+    identical(l$date_sortie, D(c(NA, NA, NA, "2017-12-31", NA, "2015-12-31", NA, NA, NA, "2016-06-01", NA, NA, NA))) &&
+    identical(l$cause_sortie, c(NA, NA, NA, "rachat", NA, "deces", NA, NA, NA, "deces", NA, NA, NA)) &&
+    identical(r$decomptes, list(lignes = c(inventaire = 10L, evenement = 3L), p0 = 2L, entrees = 2L,
+                                entres_sortis = c(deces = 1L, rachat = 0L), presents_dernier = 2L))
+})
+verifier("C11 (refus écrits à la main) : forme stocks avec defauts, mode multi-contrats, grille non alignée (premier, dernier), grille mal formée (classe, une date, NA, non croissante, non entière, attribut), champ manquant ou inconnu -> forme_invalide, module simulation, avant tout tirage (aucun appel de sous_graine())", {
+  dft <- list(graine = 170L, declarations = list(list(type = "sexe_manquant", cible = "deces", nombre = 1L)))
+  pf_multi <- c(PF_C1, list(loi_contrats = c(0.5, 0.5))); pf_multi$mode <- "uniforme_multi"
+  fg <- function(g) list(nom = "stocks_successifs", inventaires = g)
+  ns <- asNamespace("tablexp"); cpt <- new.env(); cpt$n <- 0L
+  suppressMessages(trace("sous_graine", tracer = bquote(assign("n", get("n", envir = .(cpt)) + 1L, envir = .(cpt))),
+                         where = ns, print = FALSE))
+  cas <- tryCatch(list(
+    defauts = rf(sim_st(defauts = dft)),
+    multi = rf(sim_st(portefeuille = pf_multi)),
+    premier = rf(sim_st(fg(G_C1[-1L]))),
+    dernier = rf(sim_st(fg(G_C1[-4L]))),
+    classe = rf(sim_st(fg(as.numeric(G_C1)))),
+    posixct = rf(sim_st(fg(as.POSIXct(G_C1)))),
+    une_date = rf(sim_st(fg(G_C1[1L]))),
+    na = rf(sim_st(fg(c(G_C1[1:2], NA, G_C1[4L])))),
+    croissance = rf(sim_st(fg(G_C1[c(1L, 3L, 2L, 4L)]))),
+    entiere = rf(sim_st(fg(structure(c(unclass(G_C1)[1:2], unclass(G_C1)[3L] + 0.5, unclass(G_C1)[4L]), class = "Date")))),
+    attribut = rf(sim_st(fg(structure(G_C1, names = letters[1:4])))),
+    champ_manquant = rf(sim_st(list(nom = "stocks_successifs"))),
+    champ_inconnu = rf(sim_st(c(FORME_C1, list(par_annee = FALSE))))),
+    finally = suppressMessages(untrace("sous_graine", where = ns)))
+  ko <- names(cas)[!vapply(cas, function(r) isTRUE(controle(r, "simulation", "forme_invalide")), NA)]
+  msg <- function(k) conditionMessage(cas[[k]])
+  if (!identical(cpt$n, 0L)) sprintf("%d appel(s) de sous_graine() pendant les refus", cpt$n)
+  else if (length(ko)) paste("sans le refus attendu :", paste(ko, collapse = ", "))
+  else if (!grepl("defauts", msg("defauts"), fixed = TRUE) ||
+           !grepl("(tête ou contrat) serait ambiguë ; la fusion par tête des contrats inventoriés", msg("multi"), fixed = TRUE) ||
+           !identical(msg("premier"), paste("Forme du jeu simulé : inventaires : grille non alignée sur la période (premier",
+                                            "inventaire 2015-12-31, dernier 2017-12-31) ; la première date doit être la veille",
+                                            "du début (2014-12-31) et la dernière la fin de la période (2017-12-31), le simulateur",
+                                            "n'ayant pas de délai de déclaration.")) ||
+           !identical(cas$dernier$details$attendu, D(c("2014-12-31", "2017-12-31"))) ||
+           !grepl("strictement croissantes", msg("croissance"), fixed = TRUE)) "message ou details sans la raison nommée"
+  else TRUE
+})
+
+# --- fenêtres sur une grille irrégulière, délai de 31 jours (valeurs écrites à la main)
+
+# Grille 2014-12-31, 2015-12-31, 2016-12-31, 2018-11-30 (intervalles de 365,
+# 366 et 699 jours) ; période 2015-01-01 à 2018-12-31, délai 31 jours : fin
+# effective 2018-11-30 = t_4, D = 2015-01-01, B = 2018-12-01. Unités :
+#   P0a : t_1 à t_4, en cours ; P0b : t_1, t_2, décès 2016-03-15 ;
+#   P0c : t_1 à t_4, décès 2018-12-10 (après t_M : fin C, non compté) ;
+#   P0d : t_1, décès 2015-01-01 (sortie le jour D : fenêtre vide, compté) ;
+#   E1 : t_2 à t_4, en cours ; E2 : t_3, décès 2017-05-05 ; E3 : t_4 ;
+#   ES1 : décès 2016-01-01 = t_2 + 1 ; ES2 : rachat 2017-02-10 ;
+#   ES3 : décès 2015-06-01 ; ES4 : rachat 2018-11-30 = t_M ;
+#   HF1 : décès 2014-12-31 = t_1 ; HF2 : décès 2018-12-05 > t_M.
+G_IR <- D(c("2014-12-31", "2015-12-31", "2016-12-31", "2018-11-30"))
+PER_IR <- list(debut = D("2015-01-01"), fin = D("2018-12-31"))
+inv_ir <- function(id, k, n) data.frame(id = id, t = "inventaire", di = G_IR[k], sx = "H", n = D(n), s = NA_D,
+                                        c = NA_character_, stringsAsFactors = FALSE)
+evt_ir <- function(id, s, c, n) data.frame(id = id, t = "evenement", di = NA_D, sx = "H", n = D(n), s = D(s), c = c,
+                                           stringsAsFactors = FALSE)
+B_IR <- rbind(inv_ir("P0a", 1:4, "1950-01-01"),
+              inv_ir("P0b", 1:2, "1951-02-02"), evt_ir("P0b", "2016-03-15", "deces", "1951-02-02"),
+              inv_ir("P0c", 1:4, "1952-03-03"), evt_ir("P0c", "2018-12-10", "deces", "1952-03-03"),
+              inv_ir("P0d", 1L, "1953-04-04"), evt_ir("P0d", "2015-01-01", "deces", "1953-04-04"),
+              inv_ir("E1", 2:4, "1960-01-01"),
+              inv_ir("E2", 3L, "1961-01-01"), evt_ir("E2", "2017-05-05", "deces", "1961-01-01"),
+              inv_ir("E3", 4L, "1962-01-01"),
+              evt_ir("ES1", "2016-01-01", "deces", "1970-01-01"), evt_ir("ES2", "2017-02-10", "rachat", "1971-01-01"),
+              evt_ir("ES3", "2015-06-01", "deces", "1972-01-01"), evt_ir("ES4", "2018-11-30", "rachat", "1973-01-01"),
+              evt_ir("HF1", "2014-12-31", "deces", "1980-01-01"), evt_ir("HF2", "2018-12-05", "deces", "1981-01-01"))
+plan_ir <- function(mode) list(transition = VD, periode = PER_IR, delai_declaration = 31, inventaires = G_IR,
+                               segmentation = "sexe",
+                               etapes = c(list(donnees = list(exclusions = character(0)),
+                                               exposition = list(convention = "plus_fine", par_annee = FALSE,
+                                                                 entree_entre_inventaires = mode)), BRUT3))
+# Fenêtres (a, b) et indicateur d'événement des observations gardées, par
+# l'aiguillage de l'étape exposition (objet fenetres_exposition).
+fenetres_st <- function(x, roles, plan) {
+  ob <- x$etapes$donnees$resultat$observations
+  pp <- tablexp:::valeurs_parametres_donnees(plan$transition, plan$periode, plan$delai_declaration, plan$inventaires)
+  rc <- tablexp:::deduire_recette(roles)
+  f <- tablexp:::calculer_exposition(ob, pp, plan$segmentation, rc, x$etapes$exposition$parametres$convention,
+                                     plan$etapes$exposition$par_annee, plan$etapes$exposition$entree_entre_inventaires)$fenetres
+  list(observations = ob, a = f$a, b = f$b, evenement = f$evenement)
+}
+verifier("grille irrégulière, délai 31 jours (valeurs écrites à la main) : fenêtres a = max(â, D), b = min(ŝ, B) des unités gardées, événements comptés, dans les deux modes ; E sous milieu : 2015-07-02, 2016-07-01, 2017-12-16 ; ES à s = t_M ; P0 sortie le jour D ; P0 à événement après t_M", {
+  x2 <- construire_table(B_IR, RS_C1, plan_ir("milieu")); x1 <- construire_table(B_IR, RS_C1, plan_ir("premier_inventaire"))
+  f2 <- fenetres_st(x2, RS_C1, plan_ir("milieu")); f1 <- fenetres_st(x1, RS_C1, plan_ir("premier_inventaire"))
+  dd <- function(...) as.numeric(D(c(...)))
+  # milieu : E1, E2, E3, ES1, ES2, ES3, ES4, P0a, P0b, P0c, P0d.
+  a2 <- dd("2015-07-02", "2016-07-01", "2017-12-16", "2016-01-01", "2017-01-21", "2015-03-17", "2017-12-16",
+           "2015-01-01", "2015-01-01", "2015-01-01", "2015-01-01")
+  b2 <- dd("2018-12-01", "2017-05-05", "2018-12-01", "2016-01-01", "2017-02-10", "2015-06-01", "2018-11-30",
+           "2018-12-01", "2016-03-15", "2018-12-01", "2015-01-01")
+  e2 <- c(FALSE, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, TRUE)
+  # premier_inventaire : E1, E2, E3, P0a, P0b, P0c, P0d (ES écartées).
+  a1 <- dd("2015-12-31", "2016-12-31", "2018-11-30", "2015-01-01", "2015-01-01", "2015-01-01", "2015-01-01")
+  b1 <- dd("2018-12-01", "2017-05-05", "2018-12-01", "2018-12-01", "2016-03-15", "2018-12-01", "2015-01-01")
+  e1 <- c(FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, TRUE)
+  ob <- f2$observations
+  identical(ob$unite, c("E1", "E2", "E3", "ES1", "ES2", "ES3", "ES4", "HF1", "HF2", "P0a", "P0b", "P0c", "P0d")) &&
+    identical(ob$classe, c("E", "E", "E", "ES", "ES", "ES", "ES", "HF", "HF", "P0", "P0", "P0", "P0")) &&
+    identical(ob$fin, c("C", "S", "C", NA, NA, NA, NA, NA, NA, "C", "S", "C", "S")) &&
+    identical(f2$a, a2) && identical(f2$b, b2) && identical(f2$evenement, e2) &&
+    identical(f1$a, a1) && identical(f1$b, b1) && identical(f1$evenement, e1)
+})
+verifier("grille irrégulière, délai 31 jours (valeurs écrites à la main) : diagnostics de l'étape exposition (exposition imputée 182 + 183 + 349 + 0 + 20 + 76 + 349 = 1159 jours sous milieu ; unités sans fenêtre ; fenêtres vides ; événements) et relevés de l'étape donnees ; un intervalle de plus de 366 jours relevé sous milieu", {
+  x2 <- construire_table(B_IR, RS_C1, plan_ir("milieu")); x1 <- construire_table(B_IR, RS_C1, plan_ir("premier_inventaire"))
+  d2 <- x2$etapes$exposition$diagnostics; d1 <- x1$etapes$exposition$diagnostics
+  r <- x2$etapes$donnees$diagnostics$releves
+  identical(d2$exposition_imputee_jours, 1159) && identical(d1$exposition_imputee_jours, 0) &&
+    identical(d2$unites_sans_fenetre, 2L) && identical(d1$unites_sans_fenetre, 6L) &&
+    identical(d2$fenetres_vides, 2L) && identical(d1$fenetres_vides, 1L) &&
+    identical(d2$evenements, 5L) && identical(d1$evenements, 3L) &&
+    identical(r[c("unites", "p0", "entrees", "entres_sortis", "hors_fenetre", "fin_sortie", "fin_censure")],
+              list(unites = 13L, p0 = 4L, entrees = 3L, entres_sortis = 4L, hors_fenetre = 2L, fin_sortie = 3L,
+                   fin_censure = 4L)) &&
+    identical(r$entres_sortis_par_cause, c(deces = 2L, rachat = 2L, terme = 0L, autre = 0L)) &&
+    identical(r$inventaires$presents, c(4L, 4L, 4L, 4L)) &&
+    identical(r$intervalles$entrants, c(1L, 1L, 1L)) && identical(r$intervalles$entres_sortis, c(1L, 1L, 2L)) &&
+    identical(x2$avertissements$nombre[x2$avertissements$code == "intervalle_inventaires_long"], 1L) &&
+    !("intervalle_inventaires_long" %in% x1$avertissements$code)
+})
+
+# --- C2 en test direct (simulateur, deux modes) ----------------------------------
+
+verifier("C2 (identité exacte) : fenêtres (a, b) et événements des unités P0 de la forme stocks du simulateur identical() à ceux des mêmes unités dans la forme en lignes du même jeu propre, deux graines, deux modes", {
+  e <- character(0)
+  for (k in seq_along(SIM_C1)) {
+    j <- JEUX_C1[[k]]
+    dl <- data.frame(id = j$id_tete, sx = j$sexe, n = j$date_naissance, e = j$date_entree, s = j$date_sortie,
+                     c = j$cause_sortie, stringsAsFactors = FALSE)
+    pl_l <- plan_c1(FALSE, "milieu", "plus_fine", FALSE, G_C1)
+    fl <- fenetres_st(construire_table(dl, RL_C1, pl_l), RL_C1, pl_l)
+    for (mode in c("premier_inventaire", "milieu")) {
+      pl_s <- plan_c1(TRUE, mode, "plus_fine", FALSE, G_C1)
+      fs <- fenetres_st(construire_table(SIM_C1[[k]], RS_C1_SIM, pl_s), RS_C1_SIM, pl_s)
+      ob <- fs$observations
+      garde <- ob$classe %in% c("P0", "E", if (mode == "milieu") "ES")
+      u_g <- ob$unite[garde]; p0 <- ob$classe[garde] == "P0"
+      i_l <- match(u_g[p0], fl$observations$unite)
+      if (anyNA(i_l) || sum(p0) < 100L || !identical(fs$a[p0], fl$a[i_l]) || !identical(fs$b[p0], fl$b[i_l]) ||
+          !identical(fs$evenement[p0], fl$evenement[i_l]))
+        e <- c(e, paste(k, mode))
+    }
+  }
+  if (length(e)) paste("écart :", paste(e, collapse = " | ")) else TRUE
+})
+
+# --- C6 contre les décomptes de l'attribut simulation -----------------------------
+
+verifier("C6 : relevés de la recette sur la forme stocks du simulateur égaux aux décomptes de son attribut simulation (P0, E, ES par cause, présents au dernier inventaire, lignes de chaque type) ; causes non simulées à 0 ; propagation 0 unité et 0 ligne, sans avertissement ; deux graines", {
+  ok <- vapply(SIM_C1, function(st) {
+    dc <- attr(st, "simulation")$forme$decomptes
+    x <- construire_table(st, RS_C1_SIM, plan_c1(TRUE, "milieu", "plus_fine", FALSE, G_C1))
+    r <- x$etapes$donnees$diagnostics$releves
+    M <- length(G_C1)
+    identical(r$p0, dc$p0) && identical(r$entrees, dc$entrees) && identical(r$entres_sortis, sum(dc$entres_sortis)) &&
+      identical(r$entres_sortis_par_cause[names(dc$entres_sortis)], dc$entres_sortis) &&
+      identical(unname(r$entres_sortis_par_cause[c("terme", "autre")]), c(0L, 0L)) &&
+      identical(r$inventaires$presents[M], dc$presents_dernier) &&
+      identical(sum(r$inventaires$presents), dc$lignes[["inventaire"]]) &&
+      identical(r$fin_sortie + r$entres_sortis + r$hors_fenetre, dc$lignes[["evenement"]]) && identical(r$hors_fenetre, 0L) &&
+      identical(r$unites_exclues_par_propagation, 0L) && identical(r$lignes_exclues_par_propagation, 0L) &&
+      !("unites_exclues_par_propagation" %in% x$avertissements$code)
+  }, NA)
+  all(ok)
+})
+
+# --- C16-oracle sur jeux simulés (A1.8), trois graines -----------------------------
+
+# Défauts de ligne injectés sur la forme stocks du simulateur, deux unités par
+# type : inventaire initial (type_ligne manquant sur la ligne t_1 d'une unité
+# P0 présente à t_1 et t_2), intermédiaire (sexe « X » sur la ligne t_2 d'une
+# unité présente de t_1 à t_3), terminal (date d'inventaire hors grille sur la
+# ligne t_M d'une unité présente à t_{M-1} et t_M), événement (cause « Deces »
+# sur la ligne d'événement d'une unité P0 décédée). Unités distinctes, choisies
+# dans l'ordre des identifiants ; aucune date de grille vidée (plusieurs
+# centaines d'unités présentes à chaque inventaire).
+injecter_c16 <- function(st, g) {
+  u_inv <- function(k) unique(st$id_tete[st$type_ligne == "inventaire" & st$date_inventaire %in% g[k]])
+  M <- length(g)
+  pris <- integer(0)
+  choisir <- function(cands) { c2 <- setdiff(cands, pris)[1:2]; pris <<- c(pris, c2); c2 }
+  u1 <- choisir(intersect(u_inv(1L), u_inv(2L)))
+  u2 <- choisir(intersect(intersect(u_inv(1L), u_inv(2L)), u_inv(3L)))
+  u3 <- choisir(intersect(u_inv(M - 1L), u_inv(M)))
+  u4 <- choisir(intersect(u_inv(1L), st$id_tete[st$type_ligne == "evenement" & st$cause_sortie == "deces"]))
+  d <- st
+  l_inv <- function(u, k) which(d$id_tete %in% u & d$type_ligne == "inventaire" & d$date_inventaire %in% g[k])
+  d$type_ligne[l_inv(u1, 1L)] <- NA
+  d$sexe[l_inv(u2, 2L)] <- "X"
+  d$date_inventaire[l_inv(u3, M)] <- g[M] - 100
+  d$cause_sortie[which(d$id_tete %in% u4 & d$type_ligne %in% "evenement")] <- "Deces"
+  list(donnees = d, unites = c(u1, u2, u3, u4))
+}
+EXC_C16 <- c("type_ligne_manquant", "sexe_hors_modalites", "inventaire_hors_grille", "cause_hors_modalites")
+verifier("C16-oracle sur jeux simulés (A1.8 ; identité exacte) : défauts de ligne injectés sur U (inventaire initial, intermédiaire, terminal, événement ; 8 unités) et exclus -> tables d'exposition et de brut identical() à celles de la base privée de toutes les lignes de U, sans exclusion ; trois graines, deux modes, deux conventions, par_annee TRUE et FALSE ; relevé de propagation 8 unités", {
+  e <- character(0)
+  for (gr in c(180L, 181L, 182L)) {
+    st <- if (gr == 182L) sim_st(graine = gr) else SIM_C1[[gr - 179L]]
+    inj <- injecter_c16(st, G_C1)
+    privee <- st[!(st$id_tete %in% inj$unites), ]
+    if (length(unique(inj$unites)) != 8L) { e <- c(e, paste(gr, ": U incomplet")); next }
+    for (mode in c("premier_inventaire", "milieu")) for (cv in c("plus_fine", "age_atteint_annee")) for (pa in c(FALSE, TRUE)) {
+      pl_a <- plan_c1(TRUE, mode, cv, pa, G_C1); pl_a$etapes$donnees$exclusions <- EXC_C16
+      xa <- construire_table(inj$donnees, RS_C1_SIM, pl_a)
+      xb <- construire_table(privee, RS_C1_SIM, plan_c1(TRUE, mode, cv, pa, G_C1))
+      if (!identical(xa$etapes$exposition$resultat, xb$etapes$exposition$resultat) ||
+          !identical(xa$etapes$brut$resultat, xb$etapes$brut$resultat) ||
+          !identical(xa$etapes$donnees$diagnostics$releves$unites_exclues_par_propagation, 8L))
+        e <- c(e, paste(gr, mode, cv, pa))
+    }
+  }
+  if (length(e)) paste("écart :", paste(e, collapse = " | ")) else TRUE
 })

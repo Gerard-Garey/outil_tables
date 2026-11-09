@@ -16,11 +16,12 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R13 sur l'entrée de chaque plan (jeu_reference(),
-#  jeu_reference_defauts() pour R9, agregats_reference() pour R13), aplatis,
-#  aller-retour exact du format, comparés à leur fichier de tests/reference/
-#  (échec attendu renvoyant à l'issue de création tant que le fichier
-#  n'existe pas, liste SANS_REFERENCE : R13, #169), aucune référence
+#  3.8) : plans R1 à R14 sur l'entrée de chaque plan (jeu_reference(),
+#  jeu_reference_defauts() pour R9, agregats_reference() pour R13,
+#  stocks_reference() pour R14), aplatis, aller-retour exact du format,
+#  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
+#  l'issue de création tant que le fichier n'existe pas, liste
+#  SANS_REFERENCE : R13, #169 ; R14, #180), aucune référence
 #  orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
@@ -30,7 +31,8 @@
 #  la table positionnée (#167) ; R11 : test d'homogénéité entre segments
 #  (#168) ; R12 : le même test sous H0 vraie, transition en_cours -> rachat
 #  (#168, M307) ; R13 : recette agrégats sur la forme agrégats de l'entrée de
-#  référence (#169) ; témoins sur des copies temporaires (jamais sur
+#  référence (#169) ; R14 : recette stocks successifs sur la forme stocks de
+#  l'entrée de référence (#180) ; témoins sur des copies temporaires (jamais sur
 #  tests/reference/) ; règles des modes du workflow et lignes de commande
 #  produire_references.R (refus d'appel) et comparer_references.R ;
 #  permutation des lignes de l'entrée de référence
@@ -324,7 +326,7 @@ unlink(c(script, sortie))
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
 # référence sur son entrée (champ `entree`, point 4.1), aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R13, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R14, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
@@ -337,8 +339,10 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # la session principale retire de cette liste les plans qu'il crée (succès
 # inattendu sinon).
 # R13 (#169, commit (3c) de B15 ; ADR 0016, point 8.4) : recette agrégats,
-# créé par le commit de référence (R), après visa d'actuary (M319).
-SANS_REFERENCE <- c(R13 = "#169")
+# créé par le commit de référence (R), après visa d'actuary (M319). R14
+# (#180, commit (4c) de B15 ; spécification de #180, § 13) : recette stocks
+# successifs, de même.
+SANS_REFERENCE <- c(R13 = "#169", R14 = "#180")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -766,13 +770,13 @@ controler_rapport_fige <- function(x, l, id) {
 # (permutation, R6) lisent.
 entrees_ref <- entrees_des_plans(plans_reference())
 jeu_ref <- entrees_ref[["reference"]]
-verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts`, R13 sur `agregats_reference` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
+verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts`, R13 sur `agregats_reference`, R14 sur `stocks_reference` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
   e <- unname(vapply(plans_reference(), function(p) p$entree, ""))
-  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L), "agregats_reference")
+  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L), "agregats_reference", "stocks_reference")
   if (!identical(e, attendu))
     paste0("entrées des plans obtenues (", paste(e, collapse = ", "), ") contre attendues (", paste(attendu, collapse = ", "), ")")
-  else if (!identical(names(entrees_ref), c("reference", "reference_defauts", "agregats_reference")))
-    paste0("entrées tirées obtenues (", paste(names(entrees_ref), collapse = ", "), ") contre attendues (reference, reference_defauts, agregats_reference)")
+  else if (!identical(names(entrees_ref), c("reference", "reference_defauts", "agregats_reference", "stocks_reference")))
+    paste0("entrées tirées obtenues (", paste(names(entrees_ref), collapse = ", "), ") contre attendues (reference, reference_defauts, agregats_reference, stocks_reference)")
   else if (!identical(jeu_ref, jeu_reference())) "entrée `reference` différente de jeu_reference()"
   else TRUE
 })
@@ -788,6 +792,26 @@ verifier("R13, entrée : forme agrégats de l'entrée de référence (colonnes s
   else if (!identical(names(s13), c(names(s0), "forme")) || !identical(s13[names(s0)], s0)) "attribut simulation différent de celui du jeu propre plus forme"
   else if (!identical(s13$forme, FORME_AGREGATS_R13)) "champ forme différent de FORME_AGREGATS_R13"
   else if (sum(a13$evenements) != sum(dc, na.rm = TRUE)) "total des événements différent des décès de la période"
+  else TRUE
+})
+# Entrée de R14 (#180 ; spécification de #180, § 13) : forme stocks de
+# simuler_reference(), même graine que jeu_reference() ; attribut
+# `simulation` celui du jeu propre plus le champ `forme` en fin (nom, grille,
+# décomptes) ; colonnes de la spécification, § 11 ; décomptes de lignes
+# remesurés sur la table ; lignes d'événement = sorties du jeu propre dans
+# ]t_1, t_M].
+verifier("R14, entrée : forme stocks de l'entrée de référence (colonnes id_contrat, id_tete, type_ligne, date_inventaire, sexe, date_naissance, date_sortie, cause_sortie ; attribut simulation de jeu_reference() plus forme en fin ; lignes d'événement = sorties de jeu_reference() dans la période)", {
+  a14 <- entrees_ref[["stocks_reference"]]$donnees
+  s14 <- attr(a14, "simulation"); s0 <- attr(jeu_ref$donnees, "simulation")
+  j0 <- jeu_ref$donnees
+  dans <- !is.na(j0$date_sortie) & j0$date_sortie >= PERIODE_REFERENCE$debut & j0$date_sortie <= PERIODE_REFERENCE$fin
+  if (!identical(names(a14), c("id_contrat", "id_tete", "type_ligne", "date_inventaire", "sexe", "date_naissance",
+                               "date_sortie", "cause_sortie"))) paste("colonnes :", paste(names(a14), collapse = ", "))
+  else if (!identical(names(s14), c(names(s0), "forme")) || !identical(s14[names(s0)], s0)) "attribut simulation différent de celui du jeu propre plus forme"
+  else if (!identical(s14$forme[c("nom", "inventaires")], FORME_STOCKS_R14)) "champ forme (nom, inventaires) différent de FORME_STOCKS_R14"
+  else if (!identical(unname(s14$forme$decomptes$lignes), c(sum(a14$type_ligne == "inventaire"), sum(a14$type_ligne == "evenement"))))
+    "décomptes de lignes différents de la table"
+  else if (sum(a14$type_ligne == "evenement") != sum(dans)) "lignes d'événement différentes des sorties de la période"
   else TRUE
 })
 verifier("entrées des plans : tirer_entree() d'un nom inconnu -> erreur",
@@ -923,6 +947,20 @@ for (p in plans_reference()) {
   verifier(sprintf("%s : aucun chemin classé par deux clés", id), {
     conflit <- doubles_multi_cles(names(g$types)[g$types == "double"])
     if (length(conflit)) paste("classé par plusieurs clés :", paste(utils::head(conflit, 5L), collapse = ", ")) else TRUE
+  })
+  # R14 (#180, C6 à l'échelle de l'entrée de référence) : relevés de la
+  # construction de référence égaux aux décomptes de l'attribut simulation
+  # de son entrée (P0, E, ES par cause, présents au dernier inventaire) ;
+  # aucune construction supplémentaire.
+  if (id == "R14") verifier("R14 : relevés de l'étape donnees égaux aux décomptes de l'attribut simulation de l'entrée (P0, E, ES par cause, présents au dernier inventaire) (C6)", {
+    r <- x_ref$etapes$donnees$diagnostics$releves
+    dc <- attr(entree_p$donnees, "simulation")$forme$decomptes
+    if (!identical(r$p0, dc$p0)) "P0 différent"
+    else if (!identical(r$entrees, dc$entrees)) "E différent"
+    else if (!identical(r$entres_sortis_par_cause[names(dc$entres_sortis)], dc$entres_sortis) ||
+             !identical(r$entres_sortis, sum(dc$entres_sortis))) "ES par cause différents"
+    else if (!identical(r$inventaires$presents[nrow(r$inventaires)], dc$presents_dernier)) "présents au dernier inventaire différents"
+    else TRUE
   })
   # R7 (#32) : Kaplan-Meier sous age_atteint_annee. Σd par cellule des sauts =
   # evenements de la cellule Kaplan-Meier = evenements de l'exposition (même
@@ -2463,13 +2501,13 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R13 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R14 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R13, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R14, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant

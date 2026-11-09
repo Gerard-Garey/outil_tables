@@ -23,7 +23,12 @@
 #    spécification (0') de #169, § 11) : argument `forme`, contrôlé avant tout
 #    tirage, puis projection du jeu propre en cellules (sexe, âge au dernier
 #    anniversaire [, année]), sans tirage supplémentaire ni appel à
-#    `exposition`.
+#    `exposition` ;
+#  - projeter_stocks() : forme « stocks successifs » (#180 ; spécification
+#    d'actuary-approfondi de #180, § 11, M328) : projection du jeu propre en
+#    lignes d'inventaire et d'événement sur une grille alignée sur la période,
+#    décomptes de la projection dans l'attribut `simulation`, sans tirage
+#    supplémentaire ni appel à `exposition`.
 #
 #  Hypothèse de répartition dans l'année (A.2) : force constante par âge
 #  entier, dans l'échelle des années d'âge (A.0, T3 : une année d'âge de
@@ -853,31 +858,40 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
   resultat
 }
 
-# --- formes du simulateur (#169, commit (3c)) -------------------------------------
+# --- formes du simulateur (#169, commit (3c) ; #180, commit (4c)) ------------------
 
 # Formes admises de l'argument `forme` (ADR 0007, annotation du 08/11/2026,
 # (b) ; avis (0''), G11) : nom -> champs, tous requis, aucun défaut implicite.
 # Conventions d'âge des agrégats mises en œuvre (spécification (0') de #169,
 # § 11) : `dernier_anniversaire` seule ; `age_atteint_annee` est un refus
-# nommé (renvoyé à I-1), toute autre valeur une forme invalide.
-CHAMPS_FORMES <- list(agregats = c("nom", "transition", "convention", "par_annee"))
+# nommé (renvoyé à I-1), toute autre valeur une forme invalide. Forme
+# « stocks successifs » (spécification de #180, § 11) : la grille des
+# inventaires seule (le simulateur n'a pas de délai de déclaration).
+CHAMPS_FORMES <- list(agregats = c("nom", "transition", "convention", "par_annee"),
+                      stocks_successifs = c("nom", "inventaires"))
 CONVENTIONS_FORMES <- list(agregats = "dernier_anniversaire")
 
 # Contrôle de l'argument `forme` (non NULL), avant tout tirage ; refus
 # forme_invalide, module simulation. `mode` : mode validé du portefeuille ;
-# `avec_defauts` : TRUE si l'argument `defauts` est déclaré. Refus nommés
-# (spécification (0') de #169, § 11) : forme avec défauts (défauts propres aux
-# formes renvoyés à #189 et #191) ; modes multi-contrats (unité d'un agrégat
-# ambiguë : têtes ou contrats) ; convention `age_atteint_annee`. Rend
-# list(nom, transition = list(depart, arrivee), cause, convention, par_annee),
-# cause : cause de sortie du jeu propre comptée comme événement (nom de
-# CAUSES_SIMULEES), les autres sorties étant des censures.
-controler_forme <- function(forme, mode, avec_defauts) {
+# `avec_defauts` : TRUE si l'argument `defauts` est déclaré ; `debut`, `fin` :
+# bornes de la période validée (jours). Refus nommés (spécification (0') de
+# #169, § 11 ; spécification de #180, § 11) : forme avec défauts (défauts
+# propres aux formes renvoyés à #189 et #191) ; modes multi-contrats (unité
+# d'un agrégat ambiguë : têtes ou contrats ; fusion par tête des stocks non
+# prise en charge, #190) ; convention `age_atteint_annee` (agrégats) ; grille
+# mal formée ou non alignée (stocks : t_1 = début - 1, t_M = fin, délai nul).
+# Rend, pour les agrégats, list(nom, transition = list(depart, arrivee),
+# cause, convention, par_annee), cause : cause de sortie du jeu propre comptée
+# comme événement (nom de CAUSES_SIMULEES), les autres sorties étant des
+# censures ; pour les stocks, list(nom, inventaires), grille en Date à
+# stockage double.
+controler_forme <- function(forme, mode, avec_defauts, debut, fin) {
   invalide <- function(msg, details = list())
     refuser("simulation", "forme_invalide", formuler("Forme du jeu simulé : %s", msg), details)
   if (!forme_exacte(forme, "list", "names"))
     invalide(formuler(paste("liste nue attendue, list(nom = \"agregats\", transition, convention, par_annee)",
-                            "(ni data.frame, ni classe, aucun attribut autre que les noms).")),
+                            "ou list(nom = \"stocks_successifs\", inventaires) (ni data.frame, ni classe, aucun",
+                            "attribut autre que les noms).")),
              list(parametre = "forme"))
   nom <- forme[["nom"]]
   if (!chaine_unique(nom) || !(nom %in% names(CHAMPS_FORMES)))
@@ -890,10 +904,35 @@ controler_forme <- function(forme, mode, avec_defauts) {
                             "dans les lignes individuelles (forme = NULL)."), citer(nom)),
              list(parametre = "forme", forme = nom))
   if (mode != MODE_BASE[[mode]])
-    invalide(formuler(paste("forme « %s » sous le mode multi-contrats « %s » : l'unité d'un agrégat (têtes ou",
-                            "contrats) serait ambiguë ; modes admis : %s."),
-                      citer(nom), citer(mode), liste_guillemets(unique(MODE_BASE))),
+    invalide(if (nom == "agregats")
+               formuler(paste("forme « %s » sous le mode multi-contrats « %s » : l'unité d'un agrégat (têtes ou",
+                              "contrats) serait ambiguë ; modes admis : %s."),
+                        citer(nom), citer(mode), liste_guillemets(unique(MODE_BASE)))
+             else
+               formuler(paste("forme « %s » sous le mode multi-contrats « %s » : l'unité inventoriée (tête ou",
+                              "contrat) serait ambiguë ; la fusion par tête des contrats inventoriés n'est pas prise",
+                              "en charge ; modes admis : %s."),
+                        citer(nom), citer(mode), liste_guillemets(unique(MODE_BASE))),
              list(parametre = "forme", forme = nom, mode = mode))
+  if (nom == "stocks_successifs") {
+    g <- forme[["inventaires"]]
+    j <- if (forme_exacte(g, c("double", "integer"), "class") && identical(class(g), "Date")) as.numeric(unclass(g))
+         else NA_real_
+    if (length(j) < 2L || anyNA(j) || !all(is.finite(j) & j == trunc(j)) || any(diff(j) <= 0))
+      invalide(formuler(paste("inventaires : vecteur de dates (classe Date seule, stockage double ou integer, sans",
+                              "autre attribut) d'au moins deux dates en jours entiers, sans valeur manquante,",
+                              "strictement croissantes.")),
+               list(parametre = "forme$inventaires"))
+    M <- length(j)
+    if (j[1L] != debut - 1 || j[M] != fin)
+      invalide(formuler(paste("inventaires : grille non alignée sur la période (premier inventaire %s, dernier %s) ;",
+                              "la première date doit être la veille du début (%s) et la dernière la fin de la période",
+                              "(%s), le simulateur n'ayant pas de délai de déclaration."),
+                        citer(format(en_date(j[1L]))), citer(format(en_date(j[M]))), citer(format(en_date(debut - 1))),
+                        citer(format(en_date(fin)))),
+               list(parametre = "forme$inventaires", attendu = en_date(c(debut - 1, fin))))
+    return(list(nom = nom, inventaires = en_date(j)))
+  }
   tr <- forme[["transition"]]
   code <- if (liste_aux_noms(tr, c("depart", "arrivee")) && chaine_unique(tr[["depart"]]) &&
               chaine_unique(tr[["arrivee"]])) paste(tr[["depart"]], "->", tr[["arrivee"]]) else NA_character_
@@ -1003,6 +1042,60 @@ projeter_agregats <- function(jeu, cause, par_annee, debut, borne) {
   cellules
 }
 
+# Projection du jeu propre `jeu` (lignes individuelles d'un mode à une tête
+# par contrat) en stocks successifs sur la grille `grille` (Date, validée par
+# controler_forme()) ; spécification de #180, § 11. Comparaisons de dates du
+# simulateur seules, sans appel au module `exposition` (ADR 0003, point 9 ;
+# graphe_modules.R) ; aucun tirage. Pour chaque ligne d'entrée e et de
+# sortie s (s = +Inf en cours) :
+#   - une ligne d'inventaire par date t_i de la grille avec e <= t_i < s (une
+#     date d'inventaire désigne l'état en fin de journée : unité entrée le
+#     jour t_i présente, unité sortie le jour t_i absente ; § 2.1) ;
+#   - une ligne d'événement si la sortie est finie et t_1 < s <= t_M ;
+#   - aucune ligne sinon (sortie au plus tard le jour t_1).
+# Colonnes aux noms des rôles : id_contrat, id_tete, type_ligne
+# (« inventaire » ou « evenement »), date_inventaire, sexe, date_naissance,
+# date_sortie, cause_sortie ; dates manquantes en NA de classe Date, causes
+# manquantes en NA de type caractère. Ordre : par id_contrat, puis par date
+# de la ligne (inventaires avant l'événement, toujours postérieur). Rend
+# list(lignes, decomptes) ; decomptes, calculés sur le jeu propre : lignes
+# (inventaire, evenement), p0 (présentes à t_1), entrees (vues pour la
+# première fois à t_f, f >= 2), entres_sortis (sans ligne d'inventaire,
+# sortie dans ]t_1, t_M], par cause de CAUSES_SIMULEES), presents_dernier
+# (présentes à t_M) ; entiers.
+projeter_stocks <- function(jeu, grille) {
+  g <- as.numeric(unclass(grille)); M <- length(g)
+  e <- as.numeric(jeu$date_entree)
+  s <- as.numeric(jeu$date_sortie); s[is.na(s)] <- Inf
+  # Inventaires de présence : de kp (premier t_i >= e) à kd (dernier t_i < s).
+  kp <- findInterval(e, g, left.open = TRUE) + 1L
+  kd <- findInterval(s, g, left.open = TRUE)
+  nb <- pmax(kd - kp + 1L, 0L)
+  rang <- rep.int(seq_along(nb), nb)
+  k <- kp[rang] + sequence(nb) - 1L
+  ev <- which(is.finite(s) & s > g[1L] & s <= g[M])
+  u <- c(rang, ev)
+  o <- order(jeu$id_contrat[u], c(g[k], s[ev]), method = "radix")
+  u <- u[o]
+  ni <- length(rang); ne <- length(ev)
+  lignes <- data.frame(id_contrat = jeu$id_contrat[u], id_tete = jeu$id_tete[u],
+                       type_ligne = rep(c("inventaire", "evenement"), c(ni, ne))[o],
+                       date_inventaire = en_date(c(g[k], rep(NA_real_, ne))[o]),
+                       sexe = jeu$sexe[u], date_naissance = jeu$date_naissance[u],
+                       date_sortie = en_date(c(rep(NA_real_, ni), s[ev])[o]),
+                       cause_sortie = c(rep(NA_character_, ni), jeu$cause_sortie[ev])[o],
+                       stringsAsFactors = FALSE)
+  p0 <- e <= g[1L] & g[1L] < s
+  vu <- nb > 0L
+  es <- !vu & is.finite(s) & s > g[1L] & s <= g[M]
+  causes <- names(CAUSES_SIMULEES)
+  decomptes <- list(lignes = c(inventaire = ni, evenement = ne),
+                    p0 = sum(p0), entrees = sum(vu & !p0),
+                    entres_sortis = vapply(causes, function(x) sum(es & jeu$cause_sortie == x), integer(1L)),
+                    presents_dernier = sum(e <= g[M] & g[M] < s))
+  list(lignes = lignes, decomptes = decomptes)
+}
+
 # --- point d'entrée ---------------------------------------------------------------
 
 # Simule un portefeuille de n têtes : une tête par contrat (modes `uniforme`
@@ -1044,14 +1137,20 @@ projeter_agregats <- function(jeu, cause, par_annee, debut, borne) {
 #                  = "dernier_anniversaire", par_annee) (controler_forme(),
 #                  avant tout tirage) : projection du jeu propre en agrégats
 #                  (projeter_agregats()), même loi, même portefeuille, même
-#                  graine, aucun tirage supplémentaire (#169).
+#                  graine, aucun tirage supplémentaire (#169) ; ou list(nom =
+#                  "stocks_successifs", inventaires) (grille alignée : t_1 =
+#                  début - 1, t_M = fin) : projection du jeu propre en lignes
+#                  d'inventaire et d'événement (projeter_stocks()), de même
+#                  (#180).
 # Rend un data.frame (id_contrat, id_tete, sexe, date_naissance, date_entree,
 # date_sortie, cause_sortie) avec l'attribut `simulation` (et `defauts` si des
 # défauts sont déclarés). Toutes les lignes sont gardées, y compris celles
 # sorties avant le début de la période ; seuls manquent les contrats non
 # souscrits (modes multi-contrats), décomptés dans l'attribut. Avec `forme`,
-# le data.frame de la forme (projeter_agregats()), d'attribut `simulation`
-# celui du jeu propre plus un champ `forme` ajouté en fin (forme validée).
+# le data.frame de la forme (projeter_agregats(), projeter_stocks()),
+# d'attribut `simulation` celui du jeu propre plus un champ `forme` ajouté en
+# fin : forme validée (agrégats) ; nom, grille (Date à stockage double) et
+# décomptes de la projection (stocks).
 simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = NULL, forme = NULL) {
   if (!liste_aux_noms(loi, names(CAUSES_SIMULEES)))
     refuser("simulation", "loi_invalide",
@@ -1068,7 +1167,7 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
   debut <- as.numeric(periode$debut); fin <- as.numeric(periode$fin); borne <- fin + 1
   # Forme : contrôlée avant tout tirage et avant les défauts (refus
   # forme_invalide ; une forme avec défauts est refusée quels qu'ils soient).
-  if (!is.null(forme)) ctl_forme <- controler_forme(forme, ctl$mode, !is.null(defauts))
+  if (!is.null(forme)) ctl_forme <- controler_forme(forme, ctl$mode, !is.null(defauts), debut, fin)
   # Défauts : contrôlés avant tout tirage (refus defauts_invalides).
   if (!is.null(defauts)) {
     graine_jeu <- if (missing(graine)) NULL else graine
@@ -1220,12 +1319,18 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
   # Défauts paramétrés (#93) : après le tirage complet du jeu propre, sous
   # leur propre graine ; jeu propre inchangé si defauts = NULL.
   if (!is.null(defauts)) resultat <- injecter_defauts(resultat, ctl_defauts, defauts, periode)
-  # Forme (#169) : projection du jeu propre, attribut `simulation` du jeu
-  # propre plus le champ `forme` en fin (ajout compatible).
+  # Forme (#169, #180) : projection du jeu propre, attribut `simulation` du
+  # jeu propre plus le champ `forme` en fin (ajout compatible).
   if (!is.null(forme)) {
     sim <- attr(resultat, "simulation")
-    resultat <- projeter_agregats(resultat, ctl_forme$cause, ctl_forme$par_annee, debut, borne)
-    sim$forme <- ctl_forme[c("nom", "transition", "convention", "par_annee")]
+    if (ctl_forme$nom == "agregats") {
+      resultat <- projeter_agregats(resultat, ctl_forme$cause, ctl_forme$par_annee, debut, borne)
+      sim$forme <- ctl_forme[c("nom", "transition", "convention", "par_annee")]
+    } else {
+      pr <- projeter_stocks(resultat, ctl_forme$inventaires)
+      resultat <- pr$lignes
+      sim$forme <- list(nom = ctl_forme$nom, inventaires = ctl_forme$inventaires, decomptes = pr$decomptes)
+    }
     attr(resultat, "simulation") <- sim
   }
   resultat
