@@ -485,6 +485,61 @@ transition_179 <- function(id, variance, statuts) {
 }
 STATUTS_I_179 <- list(VARIANCE_I_179, KHI2_I_179, DEVIANCE_I_179)
 STATUTS_P_179 <- list(VARIANCE_P_179, KHI2_P_179, DEVIANCE_P_179)
+# Transition #178 (B16 ; spécification (0') de #178, M361) : trois colonnes
+# nouvelles p_inferieure_asymptotique, p_superieure_asymptotique,
+# p_centrale_asymptotique de etapes/validation/resultat/sous_groupes, entre
+# p_centrale et etat (14 -> 17 colonnes ; ajouts de type double, longueur
+# @lignes de la référence ; valeurs NA contrôlées par le test T178.3 de ce
+# fichier) ; ligne nouvelle p_valeurs_asymptotiques de
+# etapes/validation/parametres/statuts_sous_groupes (3 -> 4 lignes) dans R8,
+# R9 et R10, plus, dans R10 (relation positionnee), le texte de p_valeurs
+# complété. Colonnes de la référence commitée (lues dans tests/reference/,
+# jamais dans le package), complétées par les littéraux ci-dessous
+# (échappements \u) ; une transition par plan, plans deux à deux disjoints ;
+# retirée par le commit de référence (R), avec transition_178() et les
+# constantes *_178.
+ASYMPTOTIQUES_I_178 <- paste(
+  "relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours",
+  "calcul\u00e9e ; relation ajustee_hors_outil : non produites, p non \u00e9tabli, aucune p-valeur du",
+  "sous-groupe (ddl_non_etabli) ; colonnes NA")
+ASYMPTOTIQUES_P_178 <- paste(
+  "asymptotiques (sigma^2 -> infini) conditionnellement aux O_s : approximation normale de la somme de binomiales",
+  "ind\u00e9pendantes Bin(O_s, pi_b,s) d'un sous-groupe de plusieurs segments, moyenne somme de O_s pi_b,s,",
+  "variance sigma^2 = somme de O_s pi_b,s (1 - pi_b,s), correction de continuit\u00e9 (P(O_b <= o) par Phi((o +",
+  "1/2 - moyenne) / sigma), P(O_b >= o) par 1 - Phi((o - 1/2 - moyenne) / sigma)), p centrale min(1, 2 min) ;",
+  "produites seulement si le nombre de produits de la convolution d\u00e9passe N_MAX_PRODUITS_CONVOLUTION",
+  "(\u00e9tat convolution_au_dela_n_max), les p-valeurs exactes \u00e9tant alors NA ; jamais produites \u00e0",
+  "c\u00f4t\u00e9 d'une p-valeur exacte ; erreur relative croissante dans les queues (asym\u00e9trie de la",
+  "somme, d'ordre 1/sigma) ; aucune correction de multiplicit\u00e9 ; unit\u00e9s d'observation",
+  "ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s et les tests",
+  "sont anti-conservateurs")
+# Fragment de p_valeurs (positionnee) remplacé, avant et après.
+P_VALEURS_AVANT_178 <- "convolution_au_dela_n_max sinon) ;"
+P_VALEURS_APRES_178 <- "convolution_au_dela_n_max sinon, p-valeurs asymptotiques produites \u00e0 leur place) ;"
+transition_178 <- function(id, positionnee) {
+  sg <- "etapes/validation/resultat/sous_groupes/"
+  st <- "etapes/validation/parametres/statuts_sous_groupes/"
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  colonnes <- ref[[paste0(sg, "@colonnes")]]
+  nouvelles <- c("p_inferieure_asymptotique", "p_superieure_asymptotique", "p_centrale_asymptotique")
+  statut <- ref[[paste0(st, "statut")]]
+  if (positionnee) {
+    k <- which(ref[[paste0(st, "grandeur")]] == "p_valeurs")
+    if (length(k) != 1L || !grepl(P_VALEURS_AVANT_178, statut[k], fixed = TRUE))
+      stop(sprintf("transition_178(%s) : texte de p_valeurs de la référence inattendu", id))
+    statut[k] <- sub(P_VALEURS_AVANT_178, P_VALEURS_APRES_178, statut[k], fixed = TRUE)
+  }
+  list(issue = "#178", plans = id, changements = c(
+    list(list(chemin = paste0(sg, "@colonnes"), nature = "valeur de chaîne",
+              valeurs = append(colonnes, nouvelles, after = match("p_centrale", colonnes)))),
+    lapply(nouvelles, function(n) list(chemin = paste0(sg, n), nature = "ajout", type = "double",
+                                       longueur = ref[[paste0(sg, "@lignes")]])),
+    list(list(chemin = paste0(st, "@lignes"), nature = "valeur", valeurs = 4),
+         list(chemin = paste0(st, "grandeur"), nature = "valeur de chaîne",
+              valeurs = c(ref[[paste0(st, "grandeur")]], "p_valeurs_asymptotiques")),
+         list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
+              valeurs = c(statut, if (positionnee) ASYMPTOTIQUES_P_178 else ASYMPTOTIQUES_I_178)))))
+}
 TRANSITIONS_EN_COURS <- list(
   list(issue = "#174", plans = c("R8", "R9", "R10"), changements = list(
     list(chemin = "etapes/validation/resultat/sous_groupes/cellules_retenues", nature = "type",
@@ -498,7 +553,10 @@ TRANSITIONS_EN_COURS <- list(
          de = "logical", vers = "character"))),
   transition_179("R8", 360.38810430872218, STATUTS_I_179),
   transition_179("R9", 361.34969667340141, STATUTS_I_179),
-  transition_179("R10", 353.26471567362739, STATUTS_P_179))
+  transition_179("R10", 353.26471567362739, STATUTS_P_179),
+  transition_178("R8", FALSE),
+  transition_178("R9", FALSE),
+  transition_178("R10", TRUE))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -1052,6 +1110,18 @@ for (p in plans_reference()) {
   verifier(sprintf("%s : aucun chemin classé par deux clés", id), {
     conflit <- doubles_multi_cles(names(g$types)[g$types == "double"])
     if (length(conflit)) paste("classé par plusieurs clés :", paste(utils::head(conflit, 5L), collapse = ", ")) else TRUE
+  })
+  # T178.3 (#178 ; spécification (0'), M361) : aucun sous-groupe de R8, R9,
+  # R10 ne dépasse N_MAX_PRODUITS_CONVOLUTION ; les trois colonnes des p
+  # asymptotiques sont entièrement NA (valeurs des ajouts de la transition
+  # #178, que l'alignement ne contrôle pas).
+  if (id %in% c("R8", "R9", "R10")) verifier(sprintf("%s : T178.3 colonnes p_*_asymptotique des sous-groupes de la validation entièrement NA, aucun état convolution_au_dela_n_max (#178)", id), {
+    sg <- x_ref$etapes$validation$resultat$sous_groupes
+    a <- c("p_inferieure_asymptotique", "p_superieure_asymptotique", "p_centrale_asymptotique")
+    if (!all(a %in% names(sg))) "colonnes absentes"
+    else if (!all(vapply(sg[a], function(v) is.double(v) && all(is.na(v)), NA))) "valeurs non NA"
+    else if (any(sg$etat == "convolution_au_dela_n_max")) "état convolution_au_dela_n_max"
+    else TRUE
   })
   # R14 (#180, C6 à l'échelle de l'entrée de référence) : relevés de la
   # construction de référence égaux aux décomptes de l'attribut simulation
