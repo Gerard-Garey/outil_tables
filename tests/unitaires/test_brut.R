@@ -573,7 +573,8 @@ verifier("controler_segmentation : un seul module (donnees, #82), message et dé
     is.null(cs(character(0))) && is.null(cs(c("sexe", "segment")))
 })
 verifier("calculer_taux_bruts : segmentation valide (character(0) et \"sexe\") admise, colonnes de segmentation en tête", {
-  r0 <- calculer_taux_bruts(EC_SEXE, character(0), FALSE, "dernier_anniversaire", "u", "poisson", 0.95)
-  r1 <- calculer_taux_bruts(EC_SEXE, "sexe", FALSE, "dernier_anniversaire", "u", "poisson", 0.95)
+  rec <- tablexp:::deduire_recette(c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c"))
+  r0 <- calculer_taux_bruts(EC_SEXE, character(0), FALSE, "dernier_anniversaire", "u", "poisson", 0.95, rec)
+  r1 <- calculer_taux_bruts(EC_SEXE, "sexe", FALSE, "dernier_anniversaire", "u", "poisson", 0.95, rec)
   identical(names(r0$resultat$poisson)[1L], "age") && identical(names(r1$resultat$poisson)[1:2], c("sexe", "age"))
 })

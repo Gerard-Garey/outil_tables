@@ -151,6 +151,7 @@ unlink(depot, recursive = TRUE)
 # --- ordre des modules (ADR 0007, points 2.1 à 2.3) --------------------------
 
 verifier("ordre des modules : passe sur R/ du dépôt", passe(controle("graphe_modules.R")))
+verifier("graines : passe sur l'arbre du dépôt (réemplois admis, héritage figé ; #176)", passe(controle("graines.R")))
 modules_temoins <- function(fichiers) {
   d <- tempfile("R_temoin_")
   dir.create(d)
@@ -243,6 +244,268 @@ d <- modules_temoins(list(
 verifier("ordre des modules : passe sur un graphe conforme (simulation -> donnees, positionnement -> lissage, do.call(f), do.call(function), eval(e))",
          passe(controle("graphe_modules.R", shQuote(d))))
 unlink(d, recursive = TRUE)
+
+# --- unicité des graines (issue #176 ; B15, avis de forme G13) -----------------
+# Arbres fabriqués (tests/, R/ et la liste blanche tests/controles/
+# graines_admises.csv du témoin), jamais l'arbre du dépôt (hors la copie des
+# *.R du dépôt, pour les témoins d'injection) ; la liste d'héritage
+# est celle du script, écartée (--sans-heritage) sauf aux témoins d'héritage,
+# qui appellent les fonctions du script. Chaque règle a un témoin qui la fait
+# échouer.
+
+arbre_graines <- function(fichiers, admises = character(0), csv = TRUE) {
+  d <- tempfile("arbre_graines_")
+  dir.create(file.path(d, "tests", "controles"), recursive = TRUE)
+  for (n in names(fichiers)) {
+    p <- file.path(d, n)
+    dir.create(dirname(p), recursive = TRUE, showWarnings = FALSE)
+    writeLines(fichiers[[n]], p)
+  }
+  if (csv) writeLines(c("valeur,etendue,classe,fichiers,motif,decision", admises),
+                      file.path(d, "tests", "controles", "graines_admises.csv"))
+  d
+}
+graines <- function(fichiers, admises = character(0), csv = TRUE) {
+  d <- arbre_graines(fichiers, admises, csv)
+  on.exit(unlink(d, recursive = TRUE))
+  controle("graines.R", shQuote(d), "--sans-heritage")
+}
+A_ADMISE <- function(valeur, classe, fichiers, etendue = 1)
+  sprintf("%s,%s,%s,\"%s\",motif du témoin,décision du témoin", valeur, etendue, classe, paste(fichiers, collapse = "|"))
+
+verifier("graines : sortie 1 si la liste blanche est introuvable",
+         echoue(graines(list("tests/a.R" = "x <- 1"), csv = FALSE), "liste blanche introuvable"))
+verifier("graines : passe sur des graines toutes distinctes, tous contextes relevés",
+         passe(graines(list(
+           "tests/a.R" = c("set.seed(20261201L)", "sous_graine(20261202L, runif(1))"),
+           "tests/b.R" = c("simuler(graine = 20261203)", "p <- list(graine = 20261204L)", "p$graine <- 20261205L",
+                           "p[[\"graine\"]] <- 20261206L", "GRAINE_X <- 20261207L", "GRAINES_Y <- c(A = 20261208L, 20261209L)",
+                           "GRAINE <- 20261210L", "f <- function(graine = 20261211L) graine"),
+           "R/c.R" = "g <- function() sous_graine(graine = 20261212L, 1)"))))
+# Chaque forme relevée, rapprochée d'un set.seed() de la même valeur dans un autre fichier.
+for (cas in list(
+  list(nom = "sous_graine() premier argument", code = "x <- sous_graine(20261301L, runif(1))"),
+  list(nom = "sous_graine(graine = )", code = "x <- sous_graine(graine = 20261301L, runif(1))"),
+  list(nom = "argument nommé graine", code = "x <- simuler(a, b, graine = 20261301)"),
+  list(nom = "élément nommé graine", code = "p <- list(transition = 1, graine = 20261301L)"),
+  list(nom = "paramètre par défaut graine", code = "f <- function(n, graine = 20261301L) n"),
+  list(nom = "affectation à x$graine", code = "p$graine <- 20261301L"),
+  list(nom = "affectation à x[[\"graine\"]]", code = "p[[\"graine\"]] <- 20261301L"),
+  list(nom = "constante GRAINE_*", code = "GRAINE_JEU <- 20261301L"),
+  list(nom = "constante GRAINE", code = "GRAINE <- 20261301"),
+  list(nom = "constante GRAINES_* en vecteur c()", code = "GRAINES_JEU <- c(A = 1L, B = 20261301L)"),
+  list(nom = "constante GRAINE_* affectée par =", code = "GRAINE_JEU = 20261301L"),
+  list(nom = "set.seed() avec arguments de générateur", code = "set.seed(20261301L, kind = \"Mersenne-Twister\")")
+)) verifier(sprintf("graines : réemploi non admis relevé sous la forme « %s »", cas$nom),
+            echoue(graines(list("tests/a.R" = "set.seed(20261301L)", "tests/b.R" = cas$code)),
+                   "20261301 : réemploi non admis"))
+# Non relevé : variables, expressions, autres positions, commentaires, chaînes.
+verifier("graines : passe si la valeur n'est ni littérale ni en position de graine (variable, expression, 2e argument, commentaire, chaîne)",
+         passe(graines(list(
+           "tests/a.R" = "set.seed(20261301L)",
+           "tests/b.R" = c("g <- 20261301L", "set.seed(g)", "sous_graine(g, 1)", "sous_graine(1, 20261301L)",
+                           "simuler(a, 20261301L)", "p <- list(seed = 20261301L)", "graine = GRAINE + 20261301L",
+                           "# set.seed(20261301L)", "x <- \"sous_graine(20261301L, 1)\"",
+                           "GRAINE_Z <- as.integer(20261301)", "x <- f(graine_mc = 20261301L)")))))
+verifier("graines : échoue sur deux contextes d'un même fichier (X1 : set.seed et graine = pour deux sources d'aléa)",
+         echoue(graines(list("tests/a.R" = c("jeu <- sous_graine(20261301L, runif(1))", "p <- list(graine = 20261301L)"))),
+                "20261301 : réemploi non admis"))
+verifier("graines : passe sur plusieurs occurrences d'un même contexte d'un même fichier (même usage supposé)",
+         passe(graines(list("tests/a.R" = c("a <- sous_graine(20261301L, runif(1))", "b <- sous_graine(20261301L, runif(1))")))))
+verifier("graines : un réemploi non admis nomme chaque fichier, ligne et contexte",
+         echoue(graines(list("tests/a.R" = c("x <- 1", "set.seed(20261301L)"), "tests/b.R" = "p <- list(graine = 20261301L)")),
+                "tests/a.R:2 [set.seed] ; tests/b.R:1 [graine= (list)]"))
+# Réemplois admis : ensemble de fichiers exact.
+ADM2 <- A_ADMISE(20261301, "A2", c("tests/a.R", "tests/b.R"))
+verifier("graines : passe sur un réemploi admis, ensemble de fichiers exact",
+         passe(graines(list("tests/a.R" = "set.seed(20261301L)", "tests/b.R" = "p <- list(graine = 20261301L)"), ADM2)))
+verifier("graines : échoue si l'ensemble de fichiers d'une entrée croît (X3)",
+         echoue(graines(list("tests/a.R" = "set.seed(20261301L)", "tests/b.R" = "p <- list(graine = 20261301L)",
+                             "tests/c.R" = "GRAINE_C <- 20261301L"), ADM2),
+                "croissance, fichier(s) nouveau(x) : tests/c.R"))
+verifier("graines : échoue si un fichier d'une entrée n'a plus l'occurrence (la mention se retire)",
+         echoue(graines(list("tests/a.R" = c("set.seed(20261301L)", "p <- list(graine = 20261301L)"),
+                             "tests/b.R" = "x <- 1"), ADM2),
+                "fichier(s) sans occurrence, à retirer de l'entrée : tests/b.R"))
+verifier("graines : passe sur une entrée admise en un seul fichier, deux contextes",
+         passe(graines(list("tests/a.R" = c("set.seed(20261301L)", "p <- list(graine = 20261301L)")),
+                       A_ADMISE(20261301, "A1", "tests/a.R"))))
+verifier("graines : échoue si une valeur admise ne l'est que pour d'autres fichiers (admission non transférable)",
+         echoue(graines(list("tests/a.R" = "set.seed(20261301L)", "tests/b.R" = "set.seed(20261301L)"),
+                        A_ADMISE(20261301, "A2", c("tests/a.R", "tests/z.R"))),
+                "ensemble de fichiers différent"))
+# Graines de garde (A5).
+verifier("graines : passe sur des graines < 1000 réemployées partout (A5)",
+         passe(graines(list("tests/a.R" = c("set.seed(42)", "x <- f(graine = 1L)", "set.seed(1L)", "p$graine <- 7L"),
+                            "tests/b.R" = c("set.seed(42)", "x <- f(graine = 1L)", "sous_graine(7L, 1)"),
+                            "R/c.R" = "p <- list(graine = 7L)"))))
+verifier("graines : échoue sur une constante GRAINE_* < 1000 (A5 : pas de garde sous une constante)",
+         echoue(graines(list("tests/a.R" = "GRAINE_JEU <- 42L")), "tests/a.R:1 : constante GRAINE_JEU = 42"))
+verifier("graines : échoue sur un élément d'une constante GRAINES_* en vecteur < 1000",
+         echoue(graines(list("tests/a.R" = "GRAINES_JEU <- c(A = 20261301L, B = 5L)")), "constante GRAINES_JEU = 5"))
+verifier("graines : échoue sur la constante nue GRAINE < 1000",
+         echoue(graines(list("tests/a.R" = "GRAINE <- 999L")), "constante GRAINE = 999"))
+verifier("graines : la valeur 1000 n'est plus une garde (réemploi non admis)",
+         echoue(graines(list("tests/a.R" = "set.seed(1000L)", "tests/b.R" = "set.seed(1000L)")), "1000 : réemploi non admis"))
+# Plages.
+PLAGE <- A_ADMISE(20300000, "plage", "tests/m.R", etendue = 100)
+verifier("graines : passe si seule la plage de son fichier déclarant contient des valeurs",
+         passe(graines(list("tests/m.R" = c("GRAINES_JEU <- c(A = 20300000L, B = 20300099L)")), PLAGE)))
+verifier("graines : échoue sur une valeur dans la plage déclarée par un autre fichier",
+         echoue(graines(list("tests/m.R" = "x <- 1", "tests/a.R" = "set.seed(20300050L)"), PLAGE),
+                "20300050 : valeur dans la plage 20300000..20300099 déclarée par tests/m.R"))
+verifier("graines : la plage est de largeur etendue (valeur + etendue exclue)",
+         passe(graines(list("tests/m.R" = "x <- 1", "tests/a.R" = c("set.seed(20299999L)", "set.seed(20300100L)")), PLAGE)))
+verifier("graines : échoue sur deux plages qui se recouvrent",
+         echoue(graines(list("tests/m.R" = "x <- 1", "tests/n.R" = "x <- 1"),
+                        c(PLAGE, A_ADMISE(20300099, "plage", "tests/n.R", etendue = 10))), "plages qui se recouvrent"))
+verifier("graines : échoue si le fichier déclarant d'une plage n'existe pas",
+         echoue(graines(list("tests/a.R" = "x <- 1"), PLAGE), "fichier déclaré introuvable : tests/m.R"))
+# Liste blanche mal formée.
+for (cas in list(
+  list(nom = "classe inconnue", ligne = A_ADMISE(20261301, "A9", "tests/a.R"), motif = "classe A9 inconnue"),
+  list(nom = "classe A5 (la garde n'a pas d'entrée)", ligne = A_ADMISE(20261301, "A5", "tests/a.R"), motif = "classe A5 inconnue"),
+  list(nom = "valeur < 1000", ligne = A_ADMISE(999, "A2", "tests/a.R"), motif = "valeur entière >= 1000"),
+  list(nom = "valeur isolée d'étendue 3", ligne = A_ADMISE(20261301, "A2", "tests/a.R", etendue = 3), motif = "valeur isolée"),
+  list(nom = "plage d'étendue 1", ligne = A_ADMISE(20261301, "plage", "tests/a.R"), motif = "etendue >= 2"),
+  list(nom = "sans fichier", ligne = "20261301,1,A2,,m,d", motif = "aucun fichier"),
+  list(nom = "sans motif", ligne = "20261301,1,A2,tests/a.R,,d", motif = "motif et decision requis"),
+  list(nom = "sans décision", ligne = "20261301,1,A2,tests/a.R,m,", motif = "motif et decision requis")
+)) verifier(sprintf("graines : échoue sur une liste blanche mal formée (%s)", cas$nom),
+            echoue(graines(list("tests/a.R" = "x <- 1"), cas$ligne), cas$motif))
+verifier("graines : échoue sur deux entrées pour la même valeur",
+         echoue(graines(list("tests/a.R" = "set.seed(20261301L)", "tests/b.R" = "set.seed(20261301L)"),
+                        c(ADM2, A_ADMISE(20261301, "A4", c("tests/a.R", "tests/b.R")))),
+                "plusieurs entrées"))
+verifier("graines : échoue sur un fichier R illisible",
+         echoue(graines(list("tests/a.R" = "x <- (")), "tests/a.R : illisible"))
+d <- arbre_graines(list("tests/a.R" = "x <- 1")); writeLines("a,b", file.path(d, "tests", "controles", "graines_admises.csv"))
+verifier("graines : échoue sur une liste blanche aux colonnes inattendues",
+         echoue(controle("graines.R", shQuote(d)), "colonnes attendues valeur,etendue,classe,fichiers,motif,decision"))
+unlink(d, recursive = TRUE)
+# Entrées sans aucune occurrence (M338) et note d'une entrée sans réemploi.
+verifier("graines : échoue sur une entrée de liste blanche dont la valeur n'a aucune occurrence",
+         echoue(graines(list("tests/a.R" = "x <- 1"), A_ADMISE(20261301, "A2", "tests/a.R")),
+                "20261301 : entrée A2 (liste blanche) sans aucune occurrence"))
+verifier("graines : une entrée dont la valeur n'apparaît plus que dans un contexte passe, avec une note",
+         {
+           r <- graines(list("tests/a.R" = "set.seed(20261301L)"), A_ADMISE(20261301, "A4", "tests/a.R"))
+           if (!isTRUE(passe(r))) passe(r) else
+             if (any(grepl("20261301 : entrée A4 (liste blanche) sans réemploi observé", r$sortie, fixed = TRUE, useBytes = TRUE))) TRUE else
+               "note « sans réemploi observé » absente"
+         })
+# Littéraux positionnels qui tombent sur un formel `graine` (M337).
+DEF_SIM <- c("simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = NULL) NULL",
+             "avec_points <- function(..., graine) NULL",
+             "defaut <- function(a, graine = 1L) NULL")
+for (cas in list(
+  list(nom = "4e argument positionnel", code = "x <- simuler_portefeuille(loi, pf, per, 20261401L)"),
+  list(nom = "4e argument, forme qualifiée", code = "x <- tablexp::simuler_portefeuille(loi, pf, per, 20261401L)"),
+  list(nom = "nom partiel gra =", code = "x <- simuler_portefeuille(loi, pf, per, gra = 20261401L)"),
+  list(nom = "positionnel avant defauts nommé", code = "x <- simuler_portefeuille(loi, pf, per, 20261401L, defauts = d)"),
+  list(nom = "arguments nommés dans le désordre, graine restant positionnelle", code = "x <- simuler_portefeuille(defauts = d, loi, pf, per, 20261401L)"),
+  list(nom = "formel à valeur par défaut, 2e argument", code = "x <- defaut(1, 20261401L)")
+)) verifier(sprintf("graines : littéral positionnel relevé (%s)", cas$nom),
+            echoue(graines(list("R/sim.R" = DEF_SIM, "tests/a.R" = "set.seed(20261401L)", "tests/b.R" = cas$code)),
+                   "20261401 : réemploi non admis"))
+verifier("graines : passe si le littéral positionnel ne tombe pas sur `graine` (autre formel, après `...`, argument omis, fonction inconnue, formel nommé par ailleurs)",
+         passe(graines(list("R/sim.R" = DEF_SIM, "tests/a.R" = "set.seed(20261401L)",
+                            "tests/b.R" = c("x <- simuler_portefeuille(loi, 20261401L, per, 1L)",
+                                            "x <- simuler_portefeuille(loi, pf, 20261401L, graine = 7L)",
+                                            "x <- avec_points(1, 20261401L)",
+                                            "x <- avec_points(20261401L, graine = 7L)",
+                                            "x <- simuler_portefeuille(loi, , per, 20261401L)",
+                                            "x <- inconnue(1, 2, 20261401L)",
+                                            "x <- defaut(20261401L, graine = 7L)")))))
+verifier("graines : sans définition de la fonction dans les fichiers relevés, le positionnel n'est pas vu (limite documentée)",
+         passe(graines(list("tests/a.R" = "set.seed(20261401L)", "tests/b.R" = "x <- simuler_portefeuille(loi, pf, per, 20261401L)"))))
+# Copie des *.R du dépôt (R/, tests/) et de sa liste blanche : l'arbre réel ne
+# change pas ; les formels sont ceux de R/ (simuler_portefeuille).
+copie_depot <- function() {
+  d <- tempfile("copie_depot_")
+  fichiers <- c(paste0("R/", list.files(file.path(RACINE, "R"), pattern = "\\.[Rr]$")),
+                paste0("tests/", list.files(file.path(RACINE, "tests"), pattern = "\\.[Rr]$", recursive = TRUE)),
+                "tests/controles/graines_admises.csv")
+  for (x in fichiers) {
+    dir.create(dirname(file.path(d, x)), recursive = TRUE, showWarnings = FALSE)
+    file.copy(file.path(RACINE, x), file.path(d, x))
+  }
+  d
+}
+d <- copie_depot()
+verifier("graines : la copie des *.R du dépôt passe (héritage du script)", passe(controle("graines.R", shQuote(d))))
+writeLines("x <- simuler_portefeuille(loi, pf, per, 20261016L)", file.path(d, "tests", "unitaires", "test_injection.R"))
+verifier("graines : injection d'un positionnel simuler_portefeuille(loi, pf, per, 20261016L) dans un fichier nouveau : échec (héritage figé, X3)",
+         echoue(controle("graines.R", shQuote(d)),
+                "20261016 : entrée heritage (HERITAGE_176) : ensemble de fichiers différent de l'ensemble observé (X2 ou X3) ; croissance, fichier(s) nouveau(x) : tests/unitaires/test_injection.R"))
+writeLines("x <- simuler_portefeuille(loi, pf, per, 20261150L)", file.path(d, "tests", "unitaires", "test_injection.R"))
+verifier("graines : injection d'un positionnel à valeur propre (20261150) : passe",
+         passe(controle("graines.R", shQuote(d))))
+writeLines("x <- simuler_portefeuille(loi, pf, per, 20261201L)", file.path(d, "tests", "unitaires", "test_injection.R"))
+verifier("graines : injection d'un positionnel dans la plage de constat_positionnement.R : échec",
+         echoue(controle("graines.R", shQuote(d)),
+                "20261201 : valeur dans la plage 20261200..20271199 déclarée par tests/mesures/constat_positionnement.R"))
+unlink(d, recursive = TRUE)
+# Plages : l'exemption vaut pour l'héritage seul, jamais pour une entrée A1 à A4.
+verifier("graines : échoue sur une plage plus deux fichiers couverts par une entrée A2 (l'exemption est réservée à l'héritage)",
+         echoue(graines(list("tests/m.R" = "x <- 1", "tests/a.R" = "set.seed(20300050L)",
+                             "tests/b.R" = "p <- list(graine = 20300050L)"),
+                        c(PLAGE, A_ADMISE(20300050, "A2", c("tests/a.R", "tests/b.R")))),
+                "20300050 : valeur dans la plage 20300000..20300099 déclarée par tests/m.R"))
+# Héritage figé : appels directs des fonctions du script, sur un héritage témoin
+# (le script le lit dans HERITAGE_176 ; --sans-heritage l'écarte pour les
+# témoins ci-dessus).
+GR <- local({
+  g <- new.env()
+  sys.source(file.path(CONTROLES, "graines.R"), envir = g)
+  g
+})
+defauts_graines <- function(fichiers, admises = character(0), heritage = NULL) {
+  d <- arbre_graines(fichiers, admises)
+  on.exit(unlink(d, recursive = TRUE))
+  rel <- GR$relever_graines(d)
+  lb <- GR$lire_admises(file.path(d, "tests", "controles", "graines_admises.csv"))
+  r <- GR$analyser_graines(rel$occurrences, c(lb$entrees, if (!is.null(heritage)) GR$entrees_heritage(heritage)), rel$fichiers, d)
+  c(rel$defauts, lb$defauts, r$defauts)
+}
+heritage_temoin <- function(valeur = 20261301, fichiers = "tests/a.R|tests/b.R", pour_memoire = FALSE)
+  data.frame(valeur = valeur, fichiers = fichiers, motif = "motif du témoin", pour_memoire = pour_memoire,
+             stringsAsFactors = FALSE)
+FICH_H <- list("tests/a.R" = "set.seed(20261301L)", "tests/b.R" = "p <- list(graine = 20261301L)")
+verifier("graines : héritage : une valeur dans l'ensemble exact de ses fichiers passe",
+         length(defauts_graines(FICH_H, heritage = heritage_temoin())) == 0L)
+verifier("graines : héritage : un fichier de plus échoue (héritage figé, aucun membre nouveau)",
+         any(grepl("croissance, fichier(s) nouveau(x) : tests/c.R",
+                   defauts_graines(c(FICH_H, list("tests/c.R" = "GRAINE_C <- 20261301L")), heritage = heritage_temoin()), fixed = TRUE, useBytes = TRUE)))
+verifier("graines : héritage : une valeur nouvelle échoue (réemploi non admis)",
+         any(grepl("20261302 : réemploi non admis",
+                   defauts_graines(c(FICH_H, list("tests/c.R" = "set.seed(20261302L)", "tests/d.R" = "set.seed(20261302L)")),
+                                   heritage = heritage_temoin()), fixed = TRUE, useBytes = TRUE)))
+verifier("graines : héritage : une entrée sans aucune occurrence échoue (M338)",
+         any(grepl("20261301 : entrée heritage (HERITAGE_176) sans aucune occurrence",
+                   defauts_graines(list("tests/a.R" = "x <- 1"), heritage = heritage_temoin()), fixed = TRUE, useBytes = TRUE)))
+verifier("graines : héritage : une entrée sans occurrence marquée pour mémoire passe",
+         length(defauts_graines(list("tests/a.R" = "x <- 1"), heritage = heritage_temoin(pour_memoire = TRUE))) == 0L)
+verifier("graines : héritage : un fichier sans occurrence se retire de l'entrée (écart, retrait autorisé d'avance)",
+         any(grepl("fichier(s) sans occurrence, à retirer de l'entrée : tests/b.R",
+                   defauts_graines(list("tests/a.R" = c("set.seed(20261301L)", "p <- list(graine = 20261301L)")),
+                                   heritage = heritage_temoin()), fixed = TRUE, useBytes = TRUE)))
+verifier("graines : héritage : une entrée d'héritage dispense de la règle des plages pour ses fichiers",
+         length(defauts_graines(list("tests/m.R" = "x <- 1", "tests/a.R" = "set.seed(20300050L)",
+                                     "tests/b.R" = "p <- list(graine = 20300050L)"),
+                                PLAGE, heritage_temoin(valeur = 20300050))) == 0L)
+verifier("graines : héritage : l'entrée d'héritage ne dispense pas un fichier qu'elle ne nomme pas",
+         any(grepl("20300050 : valeur dans la plage",
+                   defauts_graines(list("tests/m.R" = "x <- 1", "tests/a.R" = "set.seed(20300050L)",
+                                        "tests/b.R" = "p <- list(graine = 20300050L)",
+                                        "tests/c.R" = "p <- list(graine = 20300050L)"),
+                                   PLAGE, heritage_temoin(valeur = 20300050)), fixed = TRUE, useBytes = TRUE)))
+HER <- GR$HERITAGE_176
+verifier("graines : HERITAGE_176 : motif non vide, fichiers listés et marque pour_memoire logique pour chaque entrée, valeurs distinctes, toutes >= 1000",
+         nrow(HER) > 0L && all(nzchar(HER$motif)) && all(nzchar(HER$fichiers)) && !anyDuplicated(HER$valeur) &&
+           all(HER$valeur >= 1000) && is.logical(HER$pour_memoire) && !anyNA(HER$pour_memoire))
+verifier("graines : HERITAGE_176 : chaque entrée pour mémoire dit pourquoi elle est hors du relevé",
+         all(grepl("pour mémoire", HER$motif[HER$pour_memoire], fixed = TRUE, useBytes = TRUE)))
 
 # --- messages de refus (ADR 0007, annotation du 05/11/2026, (c) et (f) ; #127) --
 # Le script lit R/ sans charger tablexp ; sur un témoin, la liste
@@ -717,7 +980,7 @@ SOURCES <- local({
   f <- lapply(fichiers, function(m) defs$symbole[defs$module == m])
   names(f) <- paste0("fonctions-", gsub("_", "-", fichiers, fixed = TRUE, useBytes = TRUE))
   c(list(exports = EXPORTS), f,
-    list(roles = catalogue_roles()$role, recettes = tablexp:::RECETTE_BRANCHE))
+    list(roles = catalogue_roles()$role, recettes = tablexp:::CATALOGUE_RECETTES$recette))
 })
 echapper <- function(n) gsub("_", "\\_", n, fixed = TRUE, useBytes = TRUE)
 code_latex <- function(n) sprintf("\\code{%s()}", echapper(n))

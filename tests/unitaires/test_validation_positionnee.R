@@ -288,7 +288,7 @@ VAL <- list(table_reference = "tv", relation_table = "positionnee", plage_ages =
             tranches_age = c(20, 50, 70), niveau = 0.95, replications = 99)
 plan_vp <- function(segmentation = "sexe", par_annee = FALSE, pos = POS, val = VAL, ie = FALSE) {
   p <- list(transition = list(depart = "vivant", arrivee = "deces"), periode = PERIODE, delai_declaration = 0,
-            segmentation = segmentation, graine = 20261107L,
+            segmentation = segmentation, graine = 20261116L,
             etapes = list(donnees = list(exclusions = character(0)),
                           exposition = list(convention = "plus_fine", par_annee = par_annee)))
   if (!is.null(pos)) p$etapes$positionnement <- pos
@@ -338,7 +338,7 @@ verifier("étape : SMR global = 1 (1e-12), bornes et p-valeurs NA (contraint_par
   na = if (all(etat_de(ST, c("smr/borne_inf_exacte", "smr/p_centrale", "smr/z_racine_cubique")) ==
                "contraint_par_positionnement")) TRUE else "états",
   mc = if (identical(V$resultat$monte_carlo$tirages_effectues, 99) &&
-           identical(V$resultat$monte_carlo$graine, 20261107L)) TRUE else "Monte-Carlo"))
+           identical(V$resultat$monte_carlo$graine, 20261116L)) TRUE else "Monte-Carlo"))
 verifier("étape : paramètres (relation positionnee, p = 1 par segment, hypothèse nulle et statuts de la relation) ; statut des statistiques", {
   p <- V$parametres
   s <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
@@ -391,7 +391,7 @@ verifier("critère d'actuary : les attendus positionnés ne lisent pas table_pos
   e <- X$etapes
   appel <- function(pos) tablexp:::calculer_validation(e$exposition$resultat$exposition, "sexe", FALSE,
                                                        "dernier_anniversaire", T_HF, "tv", "positionnee", c(20, 90),
-                                                       c(20, 50, 70), 0.95, 99, 20261107L, pos)
+                                                       c(20, 50, 70), 0.95, 99, e$validation$resultat$monte_carlo$graine, pos)
   p2 <- e$positionnement
   p2$resultat$table_positionnee$qx[] <- NA_real_
   p2$resultat$table_positionnee$borne_sup_exacte[] <- NA_real_

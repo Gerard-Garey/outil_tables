@@ -1861,7 +1861,7 @@ exposition_lignes <- function(lignes, cles, ctx) {
   if (!identical(ob$unite, ctx$unite))
     stop("exposition_lignes() : unité d'observation différente de la construction (erreur de programmation).",
          call. = FALSE)
-  calculer_exposition(ob$observations, ctx$p, ctx$periode, ctx$delai_declaration, cles, ctx$recette, ctx$conv,
+  calculer_exposition(ob$observations, ctx$p, cles, ctx$recette, ctx$conv,
                       ctx$par_annee)$resultat$exposition
 }
 
@@ -2080,8 +2080,9 @@ ligne_resultat <- function(ensemble, niveau, v)
 #                        relation positionnee, comparateur 2 non produit ;
 #   table              : objet table_reference de l'étape validation, ou NULL ;
 #   p                  : valeurs validées de la transition, de la période et
-#                        du délai (valeurs_parametres_donnees()) ;
-#   periode, delai_declaration, segmentation : champs du plan ;
+#                        du délai (valeurs_parametres_donnees()), dont
+#                        p$periode et p$delai_declaration (#182) ;
+#   segmentation       : champ du plan ;
 #   recette, conv      : recette et convention validées (deduire_recette(),
 #                        resoudre_convention()), celles de l'étape exposition
 #                        et de la fiche : les expositions contrefactuelles
@@ -2093,10 +2094,22 @@ ligne_resultat <- function(ensemble, niveau, v)
 # retraits, cellules_niveau_a, cellules_niveau_b, smr_comparateur_1,
 # smr_comparateur_2), diagnostics, avertissements). Aucun vecteur par ligne.
 calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_exposition, etape_validation, table,
-                                           p, periode, delai_declaration, recette, conv, segmentation, niveau) {
+                                           p, recette, conv, segmentation, niveau) {
   if (is.null(etape_validation) != is.null(table))
     stop("calculer_importance_exclusions() : étape validation et table incohérentes (erreur de programmation).",
          call. = FALSE)
+  # Contrefactuel par lignes et fusion par tête : étape admise sans condition
+  # par la ligne de matrice de la recette, et seam « fenêtres » ; le refus
+  # utilisateur est levé en amont par controler_matrice_recette()
+  # (importance_exclusions_agregats). Propriétés de la recette, jamais son
+  # nom (ADR 0016, points 4.4 et 4.6).
+  m <- recette$matrice
+  ligne <- m[m$etape == "importance_exclusions" & is.na(m$estimateur), , drop = FALSE]
+  if (nrow(ligne) != 1L || !identical(ligne$admis, "oui"))
+    stop("calculer_importance_exclusions() : étape non admise par la matrice de la recette (erreur de programmation).",
+         call. = FALSE)
+  if (!identical(recette$seam, "fenetres"))
+    stop("calculer_importance_exclusions() : recette sans fenêtres (erreur de programmation).", call. = FALSE)
   rd <- etape_donnees$resultat
   pe <- etape_exposition$parametres
   unite <- rd$unite_observation
@@ -2107,7 +2120,7 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
          call. = FALSE)
   par_annee <- pe$par_annee
   expo <- etape_exposition$resultat$exposition
-  ctx <- list(donnees = donnees, roles = roles, p = p, periode = periode, delai_declaration = delai_declaration,
+  ctx <- list(donnees = donnees, roles = roles, p = p,
               recette = recette, conv = conv, par_annee = par_annee,
               unite = unite, segmentation = segmentation, lignes_exclues = le, R = rd$numeros_conserves,
               id_tete = if ("id_tete" %in% names(roles)) donnees[[roles[["id_tete"]]]],

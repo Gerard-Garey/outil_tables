@@ -38,6 +38,8 @@
 #  - assembler_fiche() : fiche en mémoire (point 6.2), sans horodatage ;
 #    plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre
 #    (fichier, empreinte, algorithme) (ADR 0011, points 5.2 à 5.4) ;
+#    champ hypotheses_recette, présent seulement si l'étape `exposition` en
+#    porte (recette autre que `lignes_dates_completes` ; ADR 0016, point 8.1) ;
 #    champ hypotheses_brut, présent seulement si l'étape `brut` est exécutée,
 #    à sa place dans ORDRE_CHAMPS_FICHE (#64 ; #14, spécification d'actuary,
 #    A.5), avec la convention d'ensemble à risque et le dénominateur des
@@ -75,7 +77,11 @@
 # Fiche 5 : champ tables_reference, identité des tables de référence lues
 # (ADR 0015, point 3 ; #73), NULL sans table ; premier commit de B13 qui
 # change la définition de la fiche (point 10 (a)).
-VERSION_FICHE <- 5L
+# Fiche 6 : champ conditionnel hypotheses_recette (ADR 0016, point 8 ; #169),
+# absent sous `lignes_dates_completes` ; ADR 0011, point 10 (c), lu « ensemble
+# des champs possibles » : l'incrément est porté par le commit qui rend le
+# champ atteignable (M333).
+VERSION_FICHE <- 6L
 # Versions de fiche admises au rejeu outillé (rejouer_fiche(), ADR 0012,
 # point 3.5 ; #86) : la version courante seule ; ici, et non dans
 # R/construire_table.R, évalué avant ce fichier. Élargir demande, version par
@@ -682,17 +688,25 @@ empreinte_donnees <- function(donnees, roles) {
 }
 
 # Contrôle l'argument `provenance` : NULL, ou list(fichier, empreinte,
-# algorithme) de trois chaînes non vides. Forme exacte (#21, forme_exacte()) :
-# liste nue (seul l'attribut names ; ni data.frame, ni classe), exactement ces
-# trois noms, chaque valeur une chaîne de longueur 1 sans attribut.
+# algorithme) de k >= 1 fichiers en trois vecteurs parallèles (#181 ; M332 ;
+# ADR 0016, point 8.5 ; ADR 0007, annotation du 08/11/2026, (a)). Forme exacte
+# (#21, forme_exacte()) : liste nue (seul l'attribut names ; ni data.frame, ni
+# classe), exactement ces trois noms ; chaque valeur un vecteur character sans
+# attribut (ni noms), de longueur k >= 1, sans NA ni chaîne vide ; les trois
+# de même longueur k, dans l'ordre de la couche de lecture (inventaires puis
+# événements pour les stocks successifs), qui n'est ni trié ni contrôlé ici.
+# k = 1 : la forme « trois chaînes uniques » de #21, inchangée.
 controler_provenance <- function(provenance) {
   if (is.null(provenance)) return(invisible(TRUE))
   if (!liste_aux_noms(provenance, c("fichier", "empreinte", "algorithme")) ||
-      !all(vapply(provenance, chaine_unique, logical(1L))))
+      !all(vapply(provenance, function(v) forme_exacte(v, "character") && length(v) >= 1L && !anyNA(v) &&
+                                            all(nzchar(v)), logical(1L))) ||
+      length(unique(lengths(provenance))) != 1L)
     refuser("rapport", "provenance_invalide",
             formuler(paste("La provenance doit être NULL (données construites en mémoire) ou une liste nue",
-                           "(fichier, empreinte, algorithme) de trois chaînes non vides, sans attribut",
-                           "(ni data.frame, ni classe ; ADR 0007, point 3.1).")),
+                           "(ni data.frame, ni classe) aux trois éléments fichier, empreinte et algorithme :",
+                           "trois vecteurs de chaînes non vides, sans NA ni attribut (ni noms), de même longueur",
+                           "k >= 1, un élément par fichier lu (ADR 0007, point 3.1 ; ADR 0016, point 8.5).")),
             list(provenance = provenance))
   invisible(TRUE)
 }
@@ -706,7 +720,10 @@ controler_provenance <- function(provenance) {
 # refusée qu'à l'écriture de la fiche, par empreinte_resultat(), en erreur de
 # programmation après tous les calculs (#106). Elles sont contrôlées ici, avant
 # tout calcul, par octets_chaines(), mêmes refus et mêmes chemins
-# (« fiche/roles », « fiche/provenance/<champ> »).
+# (« fiche/roles », « fiche/provenance/<champ> »). `fichier` et
+# `algorithme_fichier` recopient les vecteurs `empreinte` et `algorithme` de
+# la provenance, de longueur k (un élément par fichier, #181), NA sans
+# provenance.
 empreintes_construction <- function(donnees, roles, provenance) {
   octets_chaines(unname(roles), "fiche/roles")
   for (champ in names(provenance))
@@ -862,19 +879,26 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # le module ne lit pas les constantes des autres modules). Champs dans l'ordre
 # de `champs` ; transition (depart, arrivee) ; periode (debut, fin) ; étapes
 # dans l'ordre reçu (imposé par valider_plan()), paramètres de chaque étape
-# dans l'ordre de parametres[[étape]]$parametre ; valeurs des champs ensembles
+# dans l'ordre de parametres[[étape]]$parametre restreint aux paramètres
+# présents (un paramètre conditionnel à la recette, colonne `recette` non
+# NA, peut manquer : sa présence selon la recette est contrôlée après la
+# canonisation ; ADR 0011, annotation du 08/11/2026, (b) 3) ; valeurs des champs ensembles
 # dans l'ordre de `ordres`, liste nommée par le chemin du champ dans le plan
 # (« segmentation », « etapes/donnees/exclusions », « etapes/brut/estimateurs ») ;
 # un chemin dont l'étape est absente du plan n'a rien à canoniser ; une valeur
 # hors du vecteur d'ordre, un doublon ou un attribut sont une erreur de
 # programmation, jamais une valeur retirée en silence ; toute autre valeur
 # inchangée. Stockages admis, liste fermée, conversions sans perte : borne de
-# période Date à stockage double ou integer -> Date double ; délai integer ou
+# période Date à stockage double ou integer -> Date double ; grille des
+# inventaires (champ conditionnel `inventaires`, ADR 0016, point 7.1 ; #180),
+# Date à stockage double ou integer -> Date double, dates dans l'ordre reçu
+# (strictement croissant, imposé par valider_plan()) ; délai integer ou
 # double -> double ; graine admise par forme_graine() (integer ou double
 # entier, unique, fini, sans attribut, de valeur absolue au plus
 # .Machine$integer.max ; domaine de graine_invalide, #61) -> integer. Un
-# autre stockage, une étape absente de `parametres` ou en double, ou aux noms
-# de paramètres en double ou autres que ceux du catalogue, sont une erreur de
+# autre stockage, une étape absente de `parametres` ou en double, aux noms
+# de paramètres en double, hors du catalogue de l'étape ou sans l'un de ses
+# paramètres sans recette, sont une erreur de
 # programmation (le plan n'a pas été validé ; un nom en double serait sinon
 # réduit en silence à sa première occurrence, #42). Idempotente : un plan
 # canonique est rendu identical(). Ce n'est pas un plan résolu (point 5.2 :
@@ -894,6 +918,7 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   delai <- p[["delai_declaration"]]
   if (!typeof(delai) %in% c("double", "integer")) non_canonique("delai_declaration")
   p[["delai_declaration"]] <- as.double(delai)
+  if ("inventaires" %in% names(p)) p[["inventaires"]] <- borne(p[["inventaires"]], "inventaires")
   if ("graine" %in% names(p)) {
     g <- p[["graine"]]
     if (!forme_graine(g)) non_canonique("graine")
@@ -902,9 +927,12 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   e <- p[["etapes"]]
   if (anyDuplicated(names(e))) non_canonique("etapes")
   for (n in names(e))
-    if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) || !setequal(names(e[[n]]), parametres[[n]]$parametre))
+    if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) ||
+        !all(names(e[[n]]) %in% parametres[[n]]$parametre) ||
+        !all(parametres[[n]]$parametre[is.na(parametres[[n]]$recette)] %in% names(e[[n]])))
       non_canonique(sprintf("etapes$%s", n))
-  p[["etapes"]] <- stats::setNames(lapply(names(e), function(n) e[[n]][parametres[[n]]$parametre]), names(e))
+  p[["etapes"]] <- stats::setNames(lapply(names(e), function(n)
+    e[[n]][parametres[[n]]$parametre[parametres[[n]]$parametre %in% names(e[[n]])]]), names(e))
   # Champs ensembles : valeurs dans l'ordre du vecteur d'ordre (contrôle avant
   # de réordonner : o[o %in% x] seul perdrait une valeur inconnue sans le dire).
   ordonner <- function(q, cle, o, chemin) {
@@ -970,8 +998,11 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     transition_code = pd$transition,
     fin_effective = pd$fin_effective,
     unite_observation = unite,
-    avertissement_unite = if (any(avertissements$code == "unite_contrat"))
-      avertissements$message[avertissements$code == "unite_contrat"][1L] else NA_character_,
+    # Avertissement d'unité : unite_contrat (lignes sans identifiant de tête)
+    # ou unite_agregat (agrégats, unité non déterminée ; avis d'actuary du
+    # 08/11/2026 sur #169, point 3).
+    avertissement_unite = if (any(avertissements$code %in% c("unite_contrat", "unite_agregat")))
+      avertissements$message[avertissements$code %in% c("unite_contrat", "unite_agregat")][1L] else NA_character_,
     recette = recette$recette,
     convention = if (is.null(pe)) NULL else pe$convention,
     unite_exposition = if (is.null(pe)) NA_character_ else pe$unite_exposition,
@@ -985,13 +1016,21 @@ assembler_fiche <- function(roles, plan, recette, etapes, avertissements, emprei
     graine_mention = texte_moteur(if ("graine" %in% names(plan)) "graine du plan" else "aucune étape aléatoire"),
     generateur = GENERATEUR,
     provenance = if (is.null(provenance)) NULL else provenance[c("fichier", "empreinte", "algorithme")],
-    provenance_mention = texte_moteur(if (is.null(provenance)) "aucun fichier (données construites en mémoire)"
-                                      else "fichier lu par la couche de lecture"),
+    # k = 1 : mention inchangée ; k >= 2 fichiers (#181, M332) : leur nombre
+    # et l'ordre de la couche de lecture, celui des vecteurs de la provenance.
+    provenance_mention = if (is.null(provenance)) texte_moteur("aucun fichier (données construites en mémoire)")
+                         else if (length(provenance[["fichier"]]) == 1L) texte_moteur("fichier lu par la couche de lecture")
+                         else formuler(paste("%d fichiers lus par la couche de lecture, un élément par fichier",
+                                             "dans fiche/provenance, dans l'ordre de la lecture"),
+                                       length(provenance[["fichier"]])),
     empreintes = empreintes,
     # NULL gardé comme élément de la liste (champ présent, ADR 0015, point 3.1).
     tables_reference = tables_reference,
     avertissements = avertissements
   )
+  # Hypothèses de la recette (ADR 0016, point 8.1) : recopiées si l'étape
+  # exposition en porte, absentes sinon (champ conditionnel).
+  if (!is.null(pe[["hypotheses_recette"]])) fiche$hypotheses_recette <- pe[["hypotheses_recette"]]
   pb <- etapes[["brut"]][["parametres"]]
   if (!is.null(pb))
     fiche$hypotheses_brut <- pb[c("estimateurs", "niveau", "exposition_initiale", "tolerance_effectif",
@@ -1026,7 +1065,7 @@ ORDRE_CHAMPS_FICHE <- c(
   "plan",
   "transition_code", "fin_effective", "unite_observation", "recette", "convention", "unite_exposition", "par_annee",
   "exclusions", "nombre_lignes_exclues",
-  "avertissement_unite", "hypothese_censure", "hypotheses_brut",
+  "avertissement_unite", "hypothese_censure", "hypotheses_recette", "hypotheses_brut",
   "graine", "graine_mention", "generateur",
   "avertissements")
 
@@ -1125,7 +1164,7 @@ BLOCS_LECTURE_FICHE <- texte_moteur(list(
   "calculé" = c("plan", "transition_code", "fin_effective", "unite_observation", "recette", "convention",
                "unite_exposition", "par_annee"),
   "hypothèses" = c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure",
-                  "hypotheses_brut", "avertissements"),
+                  "hypotheses_recette", "hypotheses_brut", "avertissements"),
   rejeu = c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention", "empreintes",
             "tables_reference", "graine", "graine_mention", "generateur")))
 
@@ -1646,7 +1685,8 @@ SECTIONS_RAPPORT <- data.frame(
       "fiche/unite_observation", "fiche/avertissement_unite"),
     c("fiche/plan", "fiche/transition_code", "fiche/fin_effective"),
     c("fiche/convention", "fiche/unite_exposition", "fiche/par_annee", "fiche/exclusions",
-      "fiche/nombre_lignes_exclues", "fiche/hypothese_censure", "fiche/hypotheses_brut", "fiche/avertissements"),
+      "fiche/nombre_lignes_exclues", "fiche/hypothese_censure", "fiche/hypotheses_recette", "fiche/hypotheses_brut",
+      "fiche/avertissements"),
     "etapes/donnees",
     "etapes/exposition",
     "etapes/brut",
@@ -1709,8 +1749,9 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "colonnes des rôles telles que reçues par le moteur, toutes les lignes dans l'ordre reçu ; les colonnes hors",
     "rôles n'y entrent pas ; portable : exacte sous glibc, non mesurée ailleurs."),
   empreinte_fichier = paste(
-    "fichier (fiche/empreintes/fichier, fiche/empreintes/algorithme_fichier) : calculée par la couche de lecture",
-    "sur les octets du fichier lu et recopiée de la provenance ; non vérifiée par le moteur."),
+    "fichier (fiche/empreintes/fichier, fiche/empreintes/algorithme_fichier) : une empreinte par fichier lu,",
+    "calculée par la couche de lecture sur les octets de ce fichier, dans l'ordre de fiche/provenance, et",
+    "recopiée de la provenance ; non vérifiée par le moteur."),
   empreinte_resultat_code = paste(
     "résultat et code : statut consigné dans fiche/empreintes/statut_resultat_code (tableau ci-dessus)."),
   plateforme = paste(
@@ -1842,6 +1883,16 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "est sur-dispersée d'un facteur phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête), ce qui",
     "rend les tests anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
     "mesurable sans identifiant de tête."),
+  # Mention d'unité non déterminée (agrégats ; avis d'actuary du 08/11/2026
+  # sur #169, point 3), reprise sous la même condition que
+  # validation_unite_contrat, l'unité d'observation valant non_determinee.
+  validation_unite_non_determinee = paste(
+    "Unité d'observation non déterminée (agrégats ; fiche/avertissement_unite) : si les effectifs comptent des",
+    "contrats, les événements des contrats d'une même tête ne sont pas indépendants ; la variance des événements",
+    "est sur-dispersée d'un facteur au plus phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête),",
+    "atteint quand les événements d'une tête sont simultanés, comme un décès compté sur chacun de ses contrats ;",
+    "les tests sont alors anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
+    "mesurable sur des agrégats."),
   validation_ensemble = paste(
     "Table de modalité « ensemble » appliquée à chaque sexe de la segmentation",
     "(etapes/validation/parametres/appariement_sexe : ensemble_par_sexe)."),
@@ -2180,6 +2231,21 @@ lignes_racines <- function(x, racines, apres = list()) {
   sortie
 }
 
+# Mention d'unité des étapes positionnement, homogeneite, validation et
+# importance_exclusions : si fiche/avertissement_unite est une chaîne unique
+# non manquante, validation_unite_contrat sous l'unité d'observation contrat,
+# validation_unite_non_determinee sous l'unité non_determinee (agrégats) ;
+# rien sinon (avis d'actuary du 08/11/2026 sur #169, point 3 : la mention
+# d'unité contrat serait fausse sous les agrégats).
+mention_unite <- function(x) {
+  au <- x[["fiche"]][["avertissement_unite"]]
+  if (!(is.character(au) && length(au) == 1L && !is.na(au))) return(NULL)
+  unite <- x[["fiche"]][["unite_observation"]]
+  if (identical(unite, "contrat")) return(paragraphe(MENTIONS_RAPPORT[["validation_unite_contrat"]]))
+  if (identical(unite, "non_determinee")) return(paragraphe(MENTIONS_RAPPORT[["validation_unite_non_determinee"]]))
+  NULL
+}
+
 # Un paragraphe, un élément de liste : texte échappé.
 paragraphe <- function(...) paste0("<p>", echapper_html(paste0(...)), "</p>")
 element_liste <- function(...) paste0("<li>", echapper_html(paste0(...)), "</li>")
@@ -2222,7 +2288,6 @@ corps_section <- function(x, k) {
       # sous les deux autres, première phrase selon la présence de l'étape
       # positionnement (décision du mainteneur du 08/11/2026).
       pv <- x[["etapes"]][["validation"]][["parametres"]]
-      au <- x[["fiche"]][["avertissement_unite"]]
       table_prise <- if ("positionnement" %in% etapes) "validation_sans_verdict_table_positionnement"
                      else "validation_sans_verdict_table"
       sans_verdict <- paragraphe(m[[table_prise]], " ", m[["validation_sans_verdict"]])
@@ -2238,7 +2303,7 @@ corps_section <- function(x, k) {
                paragraphe(m[[r$relation]]),
                paragraphe(m[[r$h0]]),
                if (r$tests) paragraphe(m[["validation_hypotheses_tests"]]),
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
                if (r$tests) c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[[r$mc]])),
                paragraphe(m[["validation_reference"]]),
@@ -2249,30 +2314,27 @@ corps_section <- function(x, k) {
       # d'unité contrat sous la même condition que l'étape validation.
       # Mentions de la méthode SMR, seule mise en oeuvre (M293) ; une autre
       # valeur est une erreur de programmation (avis d'actuary du 07/11/2026).
-      au <- x[["fiche"]][["avertissement_unite"]]
       methode <- x[["etapes"]][["positionnement"]][["parametres"]][["methode"]]
       mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
         smr = c(paragraphe(m[["positionnement_methode"]]), paragraphe(m[["positionnement_forme"]]),
                 paragraphe(m[["positionnement_ecart_note"]])),
         stop("corps_section() : méthode de positionnement sans mentions (erreur de programmation).", call. = FALSE))
       return(c(mentions,
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                lignes_racines(x, racines)))
     }
     if (identical(e, "homogeneite")) {
       # Étape homogeneite : mention fixe (#168, spécification, § 6), puis
       # mention d'unité contrat sous la même condition que l'étape validation.
-      au <- x[["fiche"]][["avertissement_unite"]]
       return(c(paragraphe(m[["homogeneite_portee"]]),
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                lignes_racines(x, racines)))
     }
     if (identical(e, "importance_exclusions")) {
       # Étape importance_exclusions : mention fixe (M259), puis mention d'unité
       # contrat sous la même condition que l'étape validation (Q-c).
-      au <- x[["fiche"]][["avertissement_unite"]]
       return(c(paragraphe(m[["importance_exclusions_portee"]]),
-               if (is.character(au) && length(au) == 1L && !is.na(au)) paragraphe(m[["validation_unite_contrat"]]),
+               mention_unite(x),
                lignes_racines(x, racines)))
     }
     if (!identical(e, "brut")) return(lignes_racines(x, racines))

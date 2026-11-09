@@ -48,9 +48,8 @@
 #                              par analyser_modules() de
 #                              tests/controles/graphe_modules.R ;
 #         roles                catalogue_roles()$role ;
-#         recettes             RECETTE_BRANCHE (R/donnees.R), source unique ;
-#                              les clés de CONVENTION_NATIVE (R/exposition.R)
-#                              lui sont égales (contrôle 4).
+#         recettes             CATALOGUE_RECETTES$recette (R/donnees.R), source
+#                              unique (ADR 0016, point 1.5).
 #    5. constantes de version et fiche de construction (#70) ; seule la
 #       valeur est comparée, la rédaction du document reste libre :
 #       - toute valeur citée des constantes de version est égale à sa valeur
@@ -68,12 +67,14 @@
 #       - liste des champs de la fiche du document (le bloc d'items qui
 #         commence à \textbf{identification}) : ordre des champs de premier
 #         niveau, lus par leur première occurrence \code{nom}, égal à celui de
-#         names(fiche) rendue par construire_table() sur un plan avec étape
-#         brut, la fiche sans étape brut en étant un sous-ensemble ; en outre,
+#         names(fiche) rendue par construire_table() sur des agrégats avec
+#         étape brut (fiche qui porte tous les champs, dont le champ
+#         conditionnel hypotheses_recette, #169), les fiches en lignes avec et
+#         sans étape brut en étant des sous-ensembles ; en outre,
 #         chaque \code{} du bloc est classé dans l'une de ces sources, sinon
 #         c'est un écart : (1) noms de la fiche à tous les niveaux (names()
-#         récursif) de fiches témoins avec une provenance fournie et
-#         l'estimateur kaplan_meier retenu ; (2) objets de l'espace de noms de
+#         récursif) de fiches témoins avec une provenance fournie,
+#         l'estimateur kaplan_meier retenu, et sous la recette agrégats ; (2) objets de l'espace de noms de
 #         tablexp (constantes citées : VERSION_FICHE, CATALOGUE_ROLES,
 #         GENERATEUR) ; (3) valeurs de ESTIMATEURS_BRUT (kaplan_meier) ;
 #         (4) liste blanche minimale WHITELIST_FICHE (aucun catalogue source
@@ -306,7 +307,7 @@ SOURCES_CATALOGUES <- octets_utf8(local({
   c(list(exports = getNamespaceExports("tablexp")),
     fonctions,
     list(roles = tablexp::catalogue_roles()$role,
-         recettes = NS[["RECETTE_BRANCHE"]]))
+         recettes = NS[["CATALOGUE_RECETTES"]]$recette))
 }))
 # Catalogues où `()` marque une fonction ; ailleurs, aucun nom n'en porte.
 avec_fonctions <- function(catalogue) catalogue == "exports" || startsWith(catalogue, "fonctions-")
@@ -409,12 +410,6 @@ for (k in inconnus)
   verifier(sprintf("catalogue %s : catalogue requis", k),
            sprintf("catalogue inconnu (%d entrée(s)) ; requis : %s", sum(entrees$catalogue == k),
                    paste(names(SOURCES_CATALOGUES), collapse = ", ")))
-verifier("recettes : clés de CONVENTION_NATIVE égales à RECETTE_BRANCHE (source unique)", {
-  cles <- names(NS[["CONVENTION_NATIVE"]])
-  if (setequal(cles, SOURCES_CATALOGUES$recettes)) TRUE
-  else sprintf("CONVENTION_NATIVE : %s ; RECETTE_BRANCHE : %s", paste(cles, collapse = ", "),
-               paste(SOURCES_CATALOGUES$recettes, collapse = ", "))
-})
 for (k in names(SOURCES_CATALOGUES)) {
   lus <- entrees[entrees$catalogue == k, , drop = FALSE]
   source_k <- SOURCES_CATALOGUES[[k]]
@@ -533,16 +528,26 @@ fiches_temoins <- local({
   plan_brut <- plan
   plan_brut$etapes$brut <- list(estimateurs = c("poisson", "binomial", "kaplan_meier"), niveau = 0.95)
   provenance <- list(fichier = "base.csv", empreinte = "0123456789abcdef0123456789abcdef", algorithme = "md5")
+  # Agrégats (#169) : champ conditionnel hypotheses_recette, absent sous les
+  # lignes.
+  agregats <- data.frame(sexe = c("H", "F"), age = c(60, 61), ec = c(10, 12), ei = c(10.5, 12), d = c(1, 0),
+                         stringsAsFactors = FALSE)
+  plan_agregats <- plan
+  plan_agregats$etapes$exposition$convention <- "dernier_anniversaire"
+  plan_agregats$etapes$brut <- list(estimateurs = c("poisson", "binomial"), niveau = 0.95)
   list(sans_brut = tablexp::construire_table(base, roles, plan)$fiche,
-       avec_brut = tablexp::construire_table(base, roles, plan_brut, provenance)$fiche)
+       avec_brut = tablexp::construire_table(base, roles, plan_brut, provenance)$fiche,
+       agregats = tablexp::construire_table(agregats, c(sexe = "sexe", age = "age", exposition_centrale = "ec",
+                                                        exposition_initiale = "ei", evenements = "d"),
+                                            plan_agregats, provenance)$fiche)
 })
-champs_avec <- octets_utf8(names(fiches_temoins$avec_brut))
+champs_avec <- octets_utf8(names(fiches_temoins$agregats))
 champs_sans <- octets_utf8(names(fiches_temoins$sans_brut))
 # Noms à tous les niveaux (listes et data.frames).
 noms_recursifs <- function(x) if (is.list(x)) c(names(x), unlist(lapply(x, noms_recursifs), use.names = FALSE)) else names(x)
 noms_fiche <- octets_utf8(unique(unlist(lapply(fiches_temoins, noms_recursifs), use.names = FALSE)))
 noms_tablexp <- octets_utf8(ls(NS, all.names = TRUE))
-cat(sprintf("Champs de la fiche : %d avec étape brut, %d sans (conditionnels : %s)\n",
+cat(sprintf("Champs de la fiche : %d (agrégats, étape brut), %d en lignes sans étape brut (conditionnels : %s)\n",
             length(champs_avec), length(champs_sans), paste(setdiff(champs_avec, champs_sans), collapse = ", ")))
 
 i_liste <- grep("\\\\textbf\\{identification\\}", texte)
@@ -562,7 +567,9 @@ controle_fiche("champs_fiche", "liste des champs de la fiche du document égale 
   nommes <- unique(tous[!grepl("\\(.*\\)$", tous)])
   inconnus <- c(nommes[!(nommes %in% c(noms_fiche, noms_tablexp, octets_utf8(NS[["ESTIMATEURS_BRUT"]]), WHITELIST_FICHE))],
                 fonctions[!vapply(fonctions, function(f) isTRUE(fonction_existe(f)), logical(1L))])
-  ecarts <- c(if (!all(champs_sans %in% champs_avec)) "fiche sans étape brut : champs absents de la fiche avec étape brut",
+  ecarts <- c(if (!all(octets_utf8(names(fiches_temoins$avec_brut)) %in% champs_avec) ||
+                  !all(octets_utf8(names(fiches_temoins$sans_brut)) %in% champs_avec))
+                "fiche en lignes (avec ou sans étape brut) : champs absents de la fiche des agrégats avec étape brut",
               if (length(manquants)) paste("champs de la fiche absents du document :", paste(manquants, collapse = ", ")),
               if (length(inconnus)) paste("noms du document absents de la fiche, du package et de la liste blanche :",
                                           paste(inconnus, collapse = ", ")),

@@ -518,10 +518,10 @@ local({
            identical(unname(b), list(
              c("plan", "transition_code", "fin_effective", "unite_observation", "recette", "convention",
                "unite_exposition", "par_annee"),
-             c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure", "hypotheses_brut",
-               "avertissements"),
+             c("exclusions", "nombre_lignes_exclues", "avertissement_unite", "hypothese_censure", "hypotheses_recette",
+               "hypotheses_brut", "avertissements"),
              c("version_fiche", "versions", "plateforme", "roles", "provenance", "provenance_mention", "empreintes",
-               "tables_reference", "graine", "graine_mention", "generateur"))))  # tables_reference : #73
+               "tables_reference", "graine", "graine_mention", "generateur"))))  # tables_reference : #73 ; hypotheses_recette : #169
   o_fiche <- tablexp:::ORDRE_CHAMPS_FICHE
   verifier("#64 : ORDRE_CHAMPS_FICHE, huit blocs dans l'ordre de l'avis d'actuary du 20/10/2026 (étape (1)), sans doublon",
            identical(o_fiche, c("version_fiche", "versions", "plateforme",
@@ -530,18 +530,18 @@ local({
                                 "transition_code", "fin_effective", "unite_observation", "recette", "convention",
                                 "unite_exposition", "par_annee",
                                 "exclusions", "nombre_lignes_exclues",
-                                "avertissement_unite", "hypothese_censure", "hypotheses_brut",
+                                "avertissement_unite", "hypothese_censure", "hypotheses_recette", "hypotheses_brut",
                                 "graine", "graine_mention", "generateur",
                                 "avertissements")) && !anyDuplicated(o_fiche))
   verifier("#64 : ORDRE_CHAMPS_FICHE et BLOCS_LECTURE_FICHE portent exactement les mêmes champs",
            setequal(o_fiche, unlist(b)) && length(o_fiche) == length(unlist(b)))
   presents <- intersect(unlist(b), names(x$fiche))
-  verifier("BLOCS_LECTURE_FICHE : partition de names(fiche) sans étape brut (aucun manquant ; seul hypotheses_brut hors fiche)",
+  verifier("BLOCS_LECTURE_FICHE : partition de names(fiche) sans étape brut (aucun manquant ; seuls hypotheses_recette, conditionnel à la recette, et hypotheses_brut hors fiche)",
            setequal(presents, names(x$fiche)) && length(presents) == length(x$fiche) &&
-             identical(setdiff(unlist(b), names(x$fiche)), "hypotheses_brut"))
+             identical(setdiff(unlist(b), names(x$fiche)), c("hypotheses_recette", "hypotheses_brut")))
   xb <- construire_table(BASE, ROLES, plan_complet())
-  verifier("BLOCS_LECTURE_FICHE : partition exacte de names(fiche) avec étape brut (aucun manquant, doublon ni étranger)",
-           setequal(unlist(b), names(xb$fiche)) && length(unlist(b)) == length(xb$fiche))
+  verifier("BLOCS_LECTURE_FICHE : partition exacte de names(fiche) avec étape brut, sous la recette des lignes (aucun manquant, doublon ni étranger ; hypotheses_recette seul absent, #169)",
+           setequal(setdiff(unlist(b), "hypotheses_recette"), names(xb$fiche)) && length(unlist(b)) == length(xb$fiche) + 1L)
   # ordonner_fiche() avec un ordre fabriqué (précédent de #63, canoniser_plan(..., ordres)).
   f_test <- list(c = 3L, a = 1L, b = NULL, d = "x")
   r_arret <- tryCatch(tablexp:::ordonner_fiche(f_test, c("a", "c", "b")), error = function(e) e)
@@ -552,11 +552,12 @@ local({
   verifier("#64 : ordonner_fiche() applique l'ordre donné (élément NULL conservé) et ignore un champ de l'ordre absent de la fiche",
            identical(tablexp:::ordonner_fiche(f_test, c("z", "d", "a", "b", "c", "y")), list(d = "x", a = 1L, b = NULL, c = 3L)) &&
              identical(tablexp:::ordonner_fiche(list(), c("a", "b")), list()))
-  verifier("#64 : names(fiche) suit ORDRE_CHAMPS_FICHE, sans brut (hypotheses_brut absent, 24 champs) et avec brut (25 champs)",
-           identical(names(x$fiche), setdiff(o_fiche, "hypotheses_brut")) && identical(names(xb$fiche), o_fiche))
+  verifier("#64 : names(fiche) suit ORDRE_CHAMPS_FICHE, sans brut (hypotheses_brut absent, 24 champs) et avec brut (25 champs), hypotheses_recette absent sous la recette des lignes (#169)",
+           identical(names(x$fiche), setdiff(o_fiche, c("hypotheses_recette", "hypotheses_brut"))) &&
+             identical(names(xb$fiche), setdiff(o_fiche, "hypotheses_recette")))
   verifier("#64 : aller-retour de la fiche écrite : même objet, mêmes champs dans l'ordre de ORDRE_CHAMPS_FICHE",
            identical(lire_fiche(ecrire_fiche(xb$fiche)), xb$fiche) &&
-             identical(names(lire_fiche(ecrire_fiche(xb$fiche))), o_fiche))
+             identical(names(lire_fiche(ecrire_fiche(xb$fiche))), setdiff(o_fiche, "hypotheses_recette")))
   verifier("en-tête : ligne lecture sans hypotheses_brut pour la fiche sans brut, avec pour la fiche avec brut",
            !grepl("hypotheses_brut", l[startsWith(l, "# lecture")], fixed = TRUE) &&
              grepl("hypotheses_brut", grep("^# lecture", lignes_de(ecrire_fiche(xb$fiche)), value = TRUE), fixed = TRUE))

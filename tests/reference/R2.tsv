@@ -11,14 +11,14 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
+# plateforme consignée : Processeur                    : AMD EPYC 9V45 96-Core Processor
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 3620ec347986a1e2ba743d66c157b5e391c229ec
+# plateforme consignée : GITHUB_SHA                    : bd63b73d8f9250fc8468be48104bdf613315e043
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -27,13 +27,13 @@
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
-# fiche$empreintes/resultat : 97a523ef5eb6ae608fd58045b7219fbf
-# fiche$empreintes/code : b6ce4419ed7b1f50543fe860bca4e48e
-# commit : 3620ec347986a1e2ba743d66c157b5e391c229ec
-# execution : 42257221627
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42257221627
+# fiche$empreintes/resultat : 1bc9a0db8104aa41ed7e7b16adcc8bfa
+# fiche$empreintes/code : a01830b440d02de3641ad16b8a789885
+# commit : bd63b73d8f9250fc8468be48104bdf613315e043
+# execution : 42635335347
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42635335347
 # mode : regeneration
-# date : 2026-11-06 16:58:23 UTC
+# date : 2026-11-09 14:30:49 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -182,7 +182,7 @@ avertissements/code	character	2	"role_non_employe"	"fenetres_vides"
 avertissements/message	character	2	"Rôle « sexe » déclaré, non employé par la segmentation du plan (contrôlé seulement)."	"Relevé : 13346 observation(s) sans intersection avec la période d'observation."
 avertissements/nombre	integer	2	1	13346
 fiche/@noms	character	23	"version_fiche"	"roles"	"provenance"	"provenance_mention"	"empreintes"	"tables_reference"	"plan"	"transition_code"	"fin_effective"	"unite_observation"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"nombre_lignes_exclues"	"avertissement_unite"	"hypothese_censure"	"hypotheses_brut"	"graine"	"graine_mention"	"generateur"	"avertissements"
-fiche/version_fiche	integer	1	5
+fiche/version_fiche	integer	1	6
 fiche/roles/@noms	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/roles	character	7	"id_contrat"	"id_tete"	"sexe"	"date_naissance"	"date_entree"	"date_sortie"	"cause_sortie"
 fiche/provenance	NULL	0

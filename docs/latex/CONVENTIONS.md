@@ -50,7 +50,7 @@ Règles **obligatoires** pour toute modification de `doc_outil_tables.tex`, par 
   | `exports` | `getNamespaceExports("tablexp")` | tableau `tab:index-exports` (dernière partie) |
   | `fonctions-<fichier>` | définitions de premier niveau de `R/<fichier>.R` (`nom <- …` ou `nom = …`, lues par `parse()` comme dans `tests/controles/graphe_modules.R`) | tableau `tab:fonctions-<fichier>` de la partie du module |
   | `roles` | `catalogue_roles()$role` | tableau `tab:catalogue-roles` (partie `donnees`) |
-  | `recettes` | constante `RECETTE_BRANCHE` de `R/donnees.R`, source unique ; les clés de `CONVENTION_NATIVE` de `R/exposition.R` lui sont égales (contrôlé) | tableau `tab:recettes` (partie `exposition`) |
+  | `recettes` | colonne `recette` de la constante `CATALOGUE_RECETTES` de `R/donnees.R`, source unique (ADR 0016, point 1.5) | tableau `tab:recettes` (partie `exposition`) |
 
 - **Catalogues proposés**, non instrumentés (les codes correspondants sont cités par `\code{}` dans le texte ; un catalogue non requis employé par `\catalogue` serait un écart) : `conventions` (`ORDRE_CONVENTIONS`), `champs-plan` (`CHAMPS_PLAN`), `parametres-<etape>` (colonne `parametre` de `PARAMETRES_ETAPES[[etape]]`), `motifs` (`MOTIFS_LIGNES` et `MOTIFS_TETE`), `refus` (codes de refus passés à `refuser()`), `avertissements` (codes passés à `avertir()`).
 - **Catalogue en attente** : un catalogue requis sans aucune entrée dans le document est un échec, sauf s'il figure dans `tests/concordance_attente.csv` (colonne `type` = `catalogue`, avec renvoi à l'issue qui le documente), où il compte en échec attendu ; présent et encore en attente, c'est un succès inattendu, qui fait échouer la batterie.

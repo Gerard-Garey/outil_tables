@@ -172,7 +172,8 @@ ROLES_SIM <- c(id_contrat = "id_contrat", id_tete = "id_tete", sexe = "sexe",
                date_naissance = "date_naissance", date_entree = "date_entree",
                date_sortie = "date_sortie", cause_sortie = "cause_sortie")
 for (tr in list(list(depart = "vivant", arrivee = "deces"), list(depart = "en_cours", arrivee = "rachat"))) {
-  r <- preparer_donnees(s, ROLES_SIM, tablexp:::valeurs_parametres_donnees(tr, PER, 0), "sexe", character(0))
+  r <- preparer_donnees(s, ROLES_SIM, tablexp:::valeurs_parametres_donnees(tr, PER, 0), "sexe", character(0),
+                        tablexp:::deduire_recette(ROLES_SIM))
   verifier(sprintf("module donnees (%s -> %s) : aucun motif, aucune exclusion, lignes conservées identical()",
                    tr$depart, tr$arrivee),
            all(r$diagnostics$motifs$nombre == 0L) && r$resultat$nombre_lignes_exclues == 0L &&
@@ -1276,7 +1277,7 @@ VD <- list(depart = "vivant", arrivee = "deces")
 attendus_par_motif <- lapply(stats::setNames(TOUS_MOTIFS, TOUS_MOTIFS), function(m)
   sort(unique(lg$ligne[lg$motif_attendu %in% m])))
 P_VD <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
-rp <- preparer_donnees(sc, ROLES_SIM, P_VD, "sexe", TOUS_MOTIFS)
+rp <- preparer_donnees(sc, ROLES_SIM, P_VD, "sexe", TOUS_MOTIFS, tablexp:::deduire_recette(ROLES_SIM))
 verifier("défauts (critère 3) : toutes exclusions déclarées -> lignes_exclues de preparer_donnees() = lignes de l'attribut, motif par motif (20 motifs)",
          identical(names(rp$resultat$lignes_exclues), TOUS_MOTIFS) &&
            all(vapply(TOUS_MOTIFS, function(m) identical(rp$resultat$lignes_exclues[[m]], attendus_par_motif[[m]]),
@@ -1287,7 +1288,7 @@ verifier("défauts (critère 3) : chaque motif du catalogue exercé (17 motifs n
                    TOUS_MOTIFS[TOUS_MOTIFS %in% CATALOGUE_DEFAUTS$motif_attendu]) &&
            sum(lengths(attendus_par_motif) > 0L) == 17L)
 verifier("défauts (critère 3) : aucune exclusion -> refus ligne_invalide, details$lignes = lignes de l'attribut, motif par motif", {
-  e <- tryCatch(preparer_donnees(sc, ROLES_SIM, P_VD, "sexe", character(0)), refus_tablexp = function(e) e)
+  e <- tryCatch(preparer_donnees(sc, ROLES_SIM, P_VD, "sexe", character(0), tablexp:::deduire_recette(ROLES_SIM)), refus_tablexp = function(e) e)
   inherits(e, "refus_tablexp") && identical(e$motif, "ligne_invalide") &&
     identical(e$details$lignes, attendus_par_motif[lengths(attendus_par_motif) > 0L])
 })

@@ -42,8 +42,12 @@
 
 # Estimateurs disponibles, dans l'ordre canonique des résultats (A.4).
 ESTIMATEURS_BRUT <- c("poisson", "binomial", "kaplan_meier")
-# Définition de l'exposition initiale du binomial, fixée sans paramètre (A.2).
+# Définition de l'exposition initiale du binomial, fixée sans paramètre (A.2),
+# sous le seam « fenêtres » ; sous le seam « cellules », l'exposition initiale
+# est reçue (déclarée de définition « cellule », #169, § 2 ; ADR 0016,
+# point 4.5).
 EXPOSITION_INITIALE_BRUT <- "cellule"
+EXPOSITION_INITIALE_DECLAREE <- "declaree"
 # Tolérance absolue sur |E^i - D| (A.3), approximation numérique : en deçà,
 # le calcul prend E^i := D (la colonne exposition_initiale garde la somme
 # calculée). Plus petit écart rationnel non nul entre E^i et un entier, avec
@@ -90,6 +94,29 @@ HYPOTHESES_BRUT <- list(
   probabilite = paste("probabilite = 1 - exp(-taux), bornes transformées par la même fonction",
                       "croissante (couverture conservée exactement) : force constante sur la",
                       "cellule entière, égale au taux de la cellule."))
+# Hypothèses de Poisson et du binomial sous le seam « cellules » (agrégats,
+# #169 ; textes visés par actuary) : dans celle de Poisson, la clause sur la
+# troncature à gauche est remplacée ; à celle du binomial, une phrase est
+# ajoutée. Lues sur recette$seam (ADR 0016, point 4.4) ; sans effet sous le
+# seam « fenêtres ».
+CLAUSE_TRONCATURE_FENETRES <- "troncature à gauche traitée par la fenêtre d'observation"
+CLAUSE_TRONCATURE_CELLULES <- paste("E^c et D reçus du producteur de l'agrégat ; troncature à gauche, censure et",
+                                    "sorties concurrentes traitées par lui (hypothese_censure, hypotheses_recette)")
+AJOUT_BINOMIAL_CELLULES <- paste("E^i reçue, déclarée de cette définition (exposition_initiale = « declaree »,",
+                                 "hypotheses_recette), non vérifiée par le moteur.")
+hypothese_brut <- function(estimateur, seam) {
+  h <- HYPOTHESES_BRUT[[estimateur]]
+  if (!identical(seam, "cellules")) return(h)
+  switch(estimateur,
+    poisson = {
+      if (!grepl(CLAUSE_TRONCATURE_FENETRES, h, fixed = TRUE))
+        stop("hypothese_brut() : clause de troncature absente (erreur de programmation).", call. = FALSE)
+      sub(CLAUSE_TRONCATURE_FENETRES, CLAUSE_TRONCATURE_CELLULES, h, fixed = TRUE)
+    },
+    binomial = paste(h, AJOUT_BINOMIAL_CELLULES),
+    h)
+}
+
 # Portée de la probabilité selon le découpage (A.1), ajoutée à son hypothèse.
 PORTEE_PROBABILITE <- c(
   dernier_anniversaire = "Unité l'année d'âge : q_x exact sous force constante par âge entier.",
@@ -479,6 +506,22 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, p, convent
                           ensemble_a_risque_maximal = if (length(r)) max(r) else 0L))
 }
 
+# Exposition initiale E^i du binomial, seule source (ADR 0016, point 4.5),
+# selon la propriété `seam` de la recette (jamais son nom, point 4.4) :
+# seam « fenêtres », E^c + complement_initial_cellule (définition
+# EXPOSITION_INITIALE_BRUT) ; seam « cellules », colonne exposition_initiale
+# lue telle quelle (EXPOSITION_INITIALE_DECLAREE). Rend list(valeurs,
+# definition) ; valeurs NULL si `exposition` est NULL (définition seule).
+exposition_initiale_brut <- function(exposition, seam) {
+  switch(seam,
+    fenetres = list(valeurs = if (!is.null(exposition))
+                      exposition$exposition_centrale + exposition$complement_initial_cellule,
+                    definition = EXPOSITION_INITIALE_BRUT),
+    cellules = list(valeurs = exposition$exposition_initiale, definition = EXPOSITION_INITIALE_DECLAREE),
+    stop(sprintf("exposition_initiale_brut() : seam « %s » inconnu (erreur de programmation).", seam),
+         call. = FALSE))
+}
+
 # Étape `brut` du plan.
 #   exposition       : table de l'étape `exposition`
 #                      (etapes$exposition$resultat$exposition) ;
@@ -488,6 +531,11 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, p, convent
 #   unite_exposition : unité de l'exposition centrale (étape `exposition`) ;
 #   estimateurs      : sous-ensemble de ESTIMATEURS_BRUT ;
 #   niveau           : niveau de confiance des intervalles ;
+#   recette          : recette validée (deduire_recette(), module donnees) ;
+#                      sa propriété `seam` fixe la source de E^i
+#                      (exposition_initiale_brut()) et les colonnes requises
+#                      (seam « cellules » : exposition_centrale seulement si
+#                      poisson est retenu, exposition_initiale si binomial) ;
 #   observations     : fenêtres transmises par l'étape `exposition`
 #                      (construire_table(), #38) ou observations de l'étape
 #                      `donnees` (appel direct), et p : valeurs validées de
@@ -507,11 +555,13 @@ taux_kaplan_meier <- function(observations, exposition, segmentation, p, convent
 # si elle n'en a aucune) ; Kaplan-Meier ajoute la table kaplan_meier_sauts
 # (une ligne par instant d'événement).
 calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention, unite_exposition,
-                                estimateurs, niveau, observations = NULL, p = NULL, parametres_exposition = NULL) {
+                                estimateurs, niveau, recette, observations = NULL, p = NULL,
+                                parametres_exposition = NULL) {
   retenus <- ESTIMATEURS_BRUT[ESTIMATEURS_BRUT %in% estimateurs]
   cles <- c(segmentation, "age", if (isTRUE(par_annee)) "annee")
-  requises <- c(cles, "evenements", "exposition_centrale",
-                if ("binomial" %in% retenus) "complement_initial_cellule")
+  fenetres <- identical(recette$seam, "fenetres")
+  requises <- c(cles, "evenements", if (fenetres || "poisson" %in% retenus) "exposition_centrale",
+                if ("binomial" %in% retenus) (if (fenetres) "complement_initial_cellule" else "exposition_initiale"))
   manquantes <- setdiff(requises, names(exposition))
   if (length(manquantes))
     stop(sprintf("calculer_taux_bruts() : colonne(s) %s absente(s) de la table d'exposition (erreur de programmation).",
@@ -539,7 +589,7 @@ calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention,
                            probabilite_borne_sup_asymptotique = -expm1(-po$borne_sup_asymptotique),
                            etat = po$etat))
     resultat$poisson <- tp
-    hypotheses$poisson <- HYPOTHESES_BRUT$poisson
+    hypotheses$poisson <- hypothese_brut("poisson", recette$seam)
     sans_expo <- po$etat == "evenement_sans_exposition"
     if (any(sans_expo))
       avert <- avertir(avert, "brut", "poisson_evenement_sans_exposition",
@@ -550,14 +600,14 @@ calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention,
                        sum(sans_expo))
   }
   if ("binomial" %in% retenus) {
-    Ei <- Ec + exposition$complement_initial_cellule
+    Ei <- exposition_initiale_brut(exposition, recette$seam)$valeurs
     b <- taux_binomial(D, Ei, niveau, TOLERANCE_EFFECTIF)
     tb <- ajouter(exposition[cles], list(evenements = D, exposition_initiale = Ei))
     tb <- ajouter(tb, b[c("taux", "borne_inf_exacte", "borne_sup_exacte",
                           "borne_inf_asymptotique", "borne_sup_asymptotique", "etat")])
     resultat$binomial <- tb
     effectif_egal <- sum(b$effectif_egal)
-    hypotheses$binomial <- HYPOTHESES_BRUT$binomial
+    hypotheses$binomial <- hypothese_brut("binomial", recette$seam)
     inferieur <- b$etat == "effectif_inferieur_aux_evenements"
     if (any(inferieur))
       avert <- avertir(avert, "brut", "binomial_effectif_inferieur_aux_evenements",
@@ -607,7 +657,7 @@ calculer_taux_bruts <- function(exposition, segmentation, par_annee, convention,
   rownames(etats) <- NULL
 
   parametres <- list(estimateurs = retenus, niveau = niveau,
-                     exposition_initiale = EXPOSITION_INITIALE_BRUT,
+                     exposition_initiale = exposition_initiale_brut(NULL, recette$seam)$definition,
                      tolerance_effectif = TOLERANCE_EFFECTIF, convention = convention,
                      unite_exposition = unite_exposition,
                      # Texte du moteur marqué UTF-8 en toute locale (#50).

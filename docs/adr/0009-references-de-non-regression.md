@@ -849,3 +849,27 @@ Rédigée par `architect` à l'étape (6) de la branche `claude/positionnement-s
 4. **Effet sur les résultats : aucun** (correction de rédaction ; R11 et R12 inchangés).
 
 Issues : #168. Décisions M307, M313. ADR 0009, annotation du 08/11/2026. Branche `claude/positionnement-smr`, PR #173.
+
+## Annotation du 9 novembre 2026 — point 3.4 : cinq clés de `TOLERANCES` ajoutées par B15 (R13, R14 ; #169, #180)
+
+Rédigée par `architect` à l'étape (A) de la branche `claude/recette-stocks-successifs` (B15, PR #188), tête `fbf47af`. Annotation de **constat**, exigée par les points 3.4 et 9.3 pour toute modification de `TOLERANCES` ; le texte ci-dessus n'est pas réécrit. Numéros de ligne à `fbf47af` (`git grep -n … HEAD -- tests/reference/outils_reference.R`).
+
+**(a) Clés ajoutées.**
+
+| Clé | Classe | Ligne | Commit | Justification (commentaire du code) |
+|---|---|---|---|---|
+| `exposition/resultat/exposition/exposition_initiale` | 1e-14 | 125 | `317d9db` (R13, #169) | exposition initiale déclarée, sommée par cellule (seam « cellules ») ; avis d'`actuary` |
+| `donnees/diagnostics/releves/poids_exclusions/evenements` | exacte | 126 | `317d9db` | sommes d'entiers (cellules sans motif de valeur) ; avis d'`actuary` |
+| `donnees/diagnostics/releves/poids_exclusions/exposition_centrale` | 1e-14 | 127 | `317d9db` | sommes de valeurs reçues ; avis d'`actuary` |
+| `donnees/diagnostics/releves/poids_exclusions/exposition_initiale` | 1e-14 | 128 | `317d9db` | idem |
+| `exposition/diagnostics/exposition_imputee_jours` | exacte | 111 | `5bce17e` (R14, #180) | somme de différences de jours entiers, comme `exposition_jours` |
+
+Le préfixe d'étape `donnees` entre dans la liste des préfixes admis (commentaire de `TOLERANCES`, point 3.4 ; seconde annotation du 07/11/2026).
+
+**(b) Décompte** (*vérifié* par `architect`, 09/11/2026 : blocs `TOLERANCES` et `CLASSES_TOLERANCE` extraits par `git show <rév>:tests/reference/outils_reference.R`, évalués sous R 4.3.3, `table()` des classes) : à `302fc8e`, 169 clés (68 exactes, 30 à 1e-14, 68 à 1e-12, 3 à 1e-10) ; à `fbf47af`, **174** (70, 33, 68, 3). `CLASSES_TOLERANCE` inchangée (`tests/reference/outils_reference.R:91`). Aucune clé retirée ni reclassée.
+
+**(c) Plans R13 et R14** : créés dans `plans_reference()` (`317d9db`, `5bce17e`), sans référence (`SANS_REFERENCE <- c(R13 = "#169", R14 = "#180")`, `tests/test_reproductibilite.R:345`) ; leurs lignes du tableau du point 4.3 et leur création sur la CI sont à consigner à l'étape (R).
+
+**Effet sur les résultats : aucun** (R1 à R12 n'ont pas ces chemins ; R13 et R14 n'ont pas encore de référence).
+
+Issues : #169, #180. Branche `claude/recette-stocks-successifs`, PR #188.

@@ -40,12 +40,13 @@ refus <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function
 # --- exports et signature -------------------------------------------------------
 
 verifier(paste("NAMESPACE : exports = catalogue_roles, construire_table, ecrire_fiche, ecrire_plan, ecrire_rapport,",
-               "lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_embarquee, table_reference,",
-               "valider_plan (ADR 0007, point 3.4 ; ADR 0015, point 6.2 ; #9, #10, #11, #50, #73, #86, #87)"),
-         identical(sort(getNamespaceExports("tablexp")),
-                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "ecrire_rapport", "lire_fiche",
-                     "lire_plan", "rejouer_fiche", "simuler_portefeuille", "table_embarquee", "table_reference",
-                     "valider_plan")))
+               "empiler_stocks, lire_fiche, lire_plan, rejouer_fiche, simuler_portefeuille, table_embarquee,",
+               "table_reference, valider_plan (ADR 0007, point 3.4 ; ADR 0015, point 6.2 ; #9, #10, #11, #50, #73,",
+               "#86, #87, #181)"),
+         identical(sort(getNamespaceExports("tablexp"), method = "radix"),
+                   c("catalogue_roles", "construire_table", "ecrire_fiche", "ecrire_plan", "ecrire_rapport",
+                     "empiler_stocks", "lire_fiche", "lire_plan", "rejouer_fiche", "simuler_portefeuille",
+                     "table_embarquee", "table_reference", "valider_plan")))
 verifier("construire_table : signature (donnees, roles, plan, provenance = NULL, tables_reference = NULL) (ADR 0015, point 1.1 ; #73)",
          identical(names(formals(construire_table)), c("donnees", "roles", "plan", "provenance", "tables_reference")) &&
            is.null(formals(construire_table)$provenance) && is.null(formals(construire_table)$tables_reference))
@@ -295,6 +296,7 @@ for (k in PRIORITE_FORME)
 VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalides"),
                     exposition.convention = list("plus_fine", "convention_invalide"),
                     exposition.par_annee = list(FALSE, "par_annee_invalide"),
+                    exposition.entree_entre_inventaires = list("milieu", "entree_entre_inventaires_invalide"),
                     brut.estimateurs = list("poisson", "estimateurs_invalides"),
                     brut.niveau = list(0.95, "niveau_invalide"),
                     positionnement.methode = list("smr", "methode_invalide"),
@@ -362,7 +364,8 @@ verifier("construire_table : plan validé avant toute exécution (données inval
 })
 verifier("construire_table : rôle requis absent (date_sortie) -> refus aucune_recette, message qui nomme le rôle et la recette", {
   r <- refus(construire_table(BASE, ROLES[names(ROLES) != "date_sortie"], plan_type()))
-  !is.null(r) && identical(r$motif, "aucune_recette") && identical(r$details$role, "date_sortie") &&
+  !is.null(r) && identical(r$motif, "aucune_recette") &&
+    identical(r$details$role, list(lignes_dates_completes = "date_sortie")) &&
     grepl("date_sortie", conditionMessage(r), fixed = TRUE) &&
     grepl("lignes_dates_completes", conditionMessage(r), fixed = TRUE)
 })
@@ -399,7 +402,7 @@ PROV_REFUSEES <- list(
   "nom inconnu a la place d'un nom attendu" = setNames(PROV, c("fichier", "empreinte", "hash")),
   "nom NA en plus des trois noms" = setNames(c(PROV, "x"), c(names(PROV), NA)),
   "liste sans noms" = unname(PROV),
-  "chaine de longueur 2" = modifyList(PROV, list(fichier = c("a.csv", "b.csv"))),
+  "longueurs inegales (fichier de longueur 2, empreinte et algorithme de longueur 1)" = modifyList(PROV, list(fichier = c("a.csv", "b.csv"))),
   "chaine de longueur 0" = modifyList(PROV, list(fichier = character(0))),
   "chaine a attribut names" = modifyList(PROV, list(fichier = c(a = "base.csv"))),
   "chaine a attribut class" = modifyList(PROV, list(algorithme = structure("md5", class = "algo"))),
@@ -470,9 +473,9 @@ verifier("fiche : plan canonique (plan reçu, déjà canonique, inchangé), rôl
                                         retenue = "dernier_anniversaire", forcee = FALSE)) &&
            identical(f$unite_observation, "tete") && is.na(f$avertissement_unite) &&
            identical(f$transition_code, "vivant_decede") && identical(f$fin_effective, D("2024-12-31")))
-verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 5 (#57, #77, #73)",
+verifier("fiche : graine absente (NA, « aucune étape aléatoire »), générateur consigné, version 6 (#57, #77, #73, #169)",
          identical(f$graine, NA_integer_) && identical(f$graine_mention, "aucune étape aléatoire") &&
-           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 5L))
+           identical(f$generateur, tablexp:::GENERATEUR) && identical(f$version_fiche, 6L))
 verifier("fiche : provenance NULL, mention « aucun fichier », empreinte du fichier NA",
          "provenance" %in% names(f) && is.null(f$provenance) && startsWith(f$provenance_mention, "aucun fichier") &&
            is.na(f$empreintes$fichier))
@@ -694,7 +697,7 @@ verifier("empreinte du résultat : fiche$plateforme$bibliotheque_c ajouté, chan
   identical(names(p), c("sysname", "release", "machine", "blas", "lapack", "bibliotheque_c")) &&
     identical(empreinte_resultat(sans), x$fiche$empreintes$resultat) &&
     identical(empreinte_resultat(autre), x$fiche$empreintes$resultat) &&
-    identical(x$fiche$version_fiche, tablexp:::VERSION_FICHE) && identical(tablexp:::VERSION_FICHE, 5L) &&
+    identical(x$fiche$version_fiche, tablexp:::VERSION_FICHE) && identical(tablexp:::VERSION_FICHE, 6L) &&
     !identical(empreinte_resultat(v3), x$fiche$empreintes$resultat)
 })
 verifier("empreinte du résultat (témoin) : changée par un ulp d'un double du périmètre (exposition_jours[1]), et par la représentation", {
@@ -1596,7 +1599,8 @@ local({
            identical(cn(pb)$delai_declaration, 0) && identical(cn(modifier(pb, delai_declaration = 90L))$delai_declaration, 90))
   verifier("canoniser_plan : graine integer inchangée, graine double entière convertie en integer",
            identical(cn(modifier(pb, graine = 7L))$graine, 7L) && identical(cn(modifier(pb, graine = 7))$graine, 7L) &&
-             identical(names(cn(modifier(pb, graine = 7L))), tablexp:::CHAMPS_PLAN))
+             # Champ conditionnel inventaires absent du plan (#180, commit (4a)).
+             identical(names(cn(modifier(pb, graine = 7L))), setdiff(tablexp:::CHAMPS_PLAN, "inventaires")))
   verifier("canoniser_plan : stockage hors de la liste fermée -> erreur (délai character, borne non Date, graine 1,5 ou hors étendue des integer)",
            erreur(cn(modifier(pb, delai_declaration = "0"))) &&
              erreur(cn(modifier(pb, periode = list(debut = 16436, fin = PER$fin)))) &&
@@ -1646,8 +1650,8 @@ local({
   verifier("construire_table : rejeu de la fiche (rôles, plan canonique, provenance) identical() hors execution",
            identical(sans_execution(construire_table(BASE, y$fiche$roles, y$fiche$plan, y$fiche$provenance)), x0) &&
              identical(y$fiche$plan, pb))
-  verifier("fiche : version 5, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
-           identical(x0$fiche$version_fiche, 5L) &&
+  verifier("fiche : version 6, aucune copie du plan au premier niveau (transition, periode, delai_declaration, segmentation)",
+           identical(x0$fiche$version_fiche, 6L) &&
              !any(c("transition", "periode", "delai_declaration", "segmentation") %in% names(x0$fiche)))
 
   # Ordre canonique des valeurs de segmentation, exclusions et estimateurs (#63 ;
@@ -1656,11 +1660,13 @@ local({
   # fiche comprise, sur un portefeuille simulé (n = 5 000, graine 7) auquel est
   # ajouté un rôle segment constant par tête (trois segments).
   ord <- tablexp:::ordres_canoniques()
-  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête ; estimateurs = poisson, binomial, kaplan_meier",
+  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête, puis motifs propres aux agrégats, puis aux stocks successifs (union des recettes, #169, #180) ; estimateurs = poisson, binomial, kaplan_meier",
            identical(names(ord), c("segmentation", "etapes/donnees/exclusions", "etapes/brut/estimateurs")) &&
              identical(ord$segmentation, c("sexe", "segment")) &&
              identical(ord[["etapes/brut/estimateurs"]], c("poisson", "binomial", "kaplan_meier")) &&
-             identical(ord[["etapes/donnees/exclusions"]], c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE)))
+             identical(ord[["etapes/donnees/exclusions"]],
+                       unique(c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE, tablexp:::MOTIFS_LIGNES_AGREGATS,
+                                tablexp:::MOTIFS_LIGNES_STOCKS, tablexp:::MOTIFS_UNITE_STOCKS))))
   SIM63 <- simuler_portefeuille(LOI, modifier(PF, n = 5000), PER, 7L)
   SIM63$segment <- paste0("s", SIM63$id_tete %% 3L)
   ROLES63 <- c(ROLES_SIM, segment = "segment")
@@ -1786,17 +1792,17 @@ P_22 <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
 REC_22 <- tablexp:::deduire_recette(ROLES)
 CONV_22 <- tablexp:::resoudre_convention("plus_fine", REC_22$convention_native)
 X_22 <- construire_table(BASE, ROLES, plan_km_22)
-OBS_22 <- tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0))$resultat$observations
-EXPO_22 <- tablexp:::calculer_exposition(OBS_22, P_22, PER, 0, "sexe", REC_22, CONV_22, FALSE)
+OBS_22 <- tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0), REC_22)$resultat$observations
+EXPO_22 <- tablexp:::calculer_exposition(OBS_22, P_22, "sexe", REC_22, CONV_22, FALSE)
 appel_brut_22 <- function(estimateurs, observations = EXPO_22$fenetres)
   tablexp:::calculer_taux_bruts(EXPO_22$resultat$exposition, "sexe", FALSE, EXPO_22$parametres$convention$retenue,
-                                EXPO_22$parametres$unite_exposition, estimateurs, 0.95, observations = observations,
+                                EXPO_22$parametres$unite_exposition, estimateurs, 0.95, REC_22, observations = observations,
                                 p = P_22, parametres_exposition = EXPO_22$parametres)
 verifier("contrôles (#82) : fonctions d'étape en appel direct, aucun contrôle exécuté (preparer_donnees(), calculer_exposition(), calculer_taux_bruts() avec et sans Kaplan-Meier, taux_kaplan_meier())", {
   ok <- list(
-    donnees = ecart_22(compter_controles(tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0))),
+    donnees = ecart_22(compter_controles(tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0), REC_22)),
                        attendu_22()),
-    exposition = ecart_22(compter_controles(tablexp:::calculer_exposition(OBS_22, P_22, PER, 0, "sexe", REC_22, CONV_22,
+    exposition = ecart_22(compter_controles(tablexp:::calculer_exposition(OBS_22, P_22, "sexe", REC_22, CONV_22,
                                                                           FALSE)), attendu_22()),
     brut_km = ecart_22(compter_controles(appel_brut_22(c("poisson", "kaplan_meier"))), attendu_22()),
     brut = ecart_22(compter_controles(appel_brut_22(c("poisson", "binomial"))), attendu_22()),
@@ -1820,7 +1826,7 @@ verifier("contrôles : taux_kaplan_meier() en appel direct sur un data.frame ave
 
 # Appel direct avec les valeurs validées : mêmes objets que construire_table().
 verifier("contrôles (#82) : preparer_donnees(), calculer_exposition() et calculer_taux_bruts() (Kaplan-Meier compris) appelées avec les valeurs validées rendent les étapes de construire_table() (identité exacte)", {
-  d <- tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0))
+  d <- tablexp:::preparer_donnees(BASE, ROLES, P_22, "sexe", character(0), REC_22)
   identical(d[c("parametres", "resultat", "diagnostics")], X_22$etapes$donnees) &&
     identical(EXPO_22[c("parametres", "resultat", "diagnostics")], X_22$etapes$exposition) &&
     identical(appel_brut_22(c("poisson", "binomial", "kaplan_meier"))[c("parametres", "resultat", "diagnostics")],
@@ -1832,7 +1838,7 @@ verifier("contrôles (#82) : calculer_exposition() avec les valeurs validées, c
     pl <- modifier(plan_type(), etapes = list(donnees = list(exclusions = character(0)),
                                               exposition = list(convention = a[1L], par_annee = as.logical(a[2L]))))
     cv <- tablexp:::resoudre_convention(a[1L], REC_22$convention_native)
-    identical(tablexp:::calculer_exposition(OBS_22, P_22, PER, 0, "sexe", REC_22, cv,
+    identical(tablexp:::calculer_exposition(OBS_22, P_22, "sexe", REC_22, cv,
                                             as.logical(a[2L]))[c("parametres", "resultat", "diagnostics")],
               construire_table(BASE, ROLES, pl)$etapes$exposition)
   }, logical(1L))
@@ -1853,8 +1859,9 @@ verifier("contrôles (#82) : recette_branche() et convention_retenue() n'existen
   ns <- asNamespace("tablexp")
   rc <- tablexp:::resoudre_convention
   !exists("recette_branche", envir = ns, inherits = FALSE) && !exists("convention_retenue", envir = ns, inherits = FALSE) &&
-    identical(REC_22, list(recette = "lignes_dates_completes", convention_native = "dernier_anniversaire",
-                           roles_requis = c("date_naissance", "date_entree", "date_sortie", "cause_sortie"))) &&
+    identical(REC_22[c("recette", "convention_native", "roles_requis")],
+              list(recette = "lignes_dates_completes", convention_native = "dernier_anniversaire",
+                   roles_requis = c("date_naissance", "date_entree", "date_sortie", "cause_sortie"))) &&
     identical(rc("plus_fine", "dernier_anniversaire"),
               list(demandee = "plus_fine", native = "dernier_anniversaire", retenue = "dernier_anniversaire", forcee = FALSE)) &&
     identical(rc("dernier_anniversaire", "dernier_anniversaire")$forcee, FALSE) &&
@@ -1865,8 +1872,12 @@ verifier("contrôles (#82) : recette_branche() et convention_retenue() n'existen
 
 # Deuxième recette fictive (#82, critère du corps ; avis (P) rafraîchi,
 # critère 2) : deduire_recette() remplacée dans l'espace de noms par une
-# recette « recette_fictive » de convention native age_atteint_annee (les
-# rôles requis inchangés), puis restaurée. Sous plus_fine, l'étape exposition
+# recette de convention native age_atteint_annee (les rôles requis
+# inchangés), puis restaurée. Depuis l'aiguillage sur le nom de la recette
+# (ADR 0016, points 4.1 et 6.2 ; #169), un nom hors du catalogue est une
+# erreur de programmation : la recette fictive garde le nom
+# lignes_dates_completes et ne diffère que par sa convention native, que le
+# catalogue ne lui donne pas. Sous plus_fine, l'étape exposition
 # retient la convention native de la recette transmise (age_atteint_annee),
 # et non celle de la recette de la branche (dernier_anniversaire) : la
 # recette et la convention de l'étape égalent celles de la fiche.
@@ -1875,7 +1886,7 @@ recette_fictive_22 <- function(expr) {
   ancienne <- get("deduire_recette", envir = ns)
   fictive <- function(roles) {
     r <- ancienne(roles)
-    r$recette <- "recette_fictive"; r$convention_native <- "age_atteint_annee"
+    r$convention_native <- "age_atteint_annee"
     r
   }
   unlockBinding("deduire_recette", ns)
@@ -1886,7 +1897,7 @@ recette_fictive_22 <- function(expr) {
 verifier("contrôles (#82) : deuxième recette fictive (convention native age_atteint_annee) : recette et convention de l'étape exposition égales à celles de la fiche, convention retenue age_atteint_annee non forcée ; deduire_recette() restaurée", {
   x <- recette_fictive_22(construire_table(BASE, ROLES, plan_type()))
   pe <- x$etapes$exposition$parametres
-  ok <- identical(x$fiche$recette, "recette_fictive") && identical(pe$recette, x$fiche$recette) &&
+  ok <- identical(x$fiche$recette, "lignes_dates_completes") && identical(pe$recette, x$fiche$recette) &&
     identical(pe$convention, x$fiche$convention) &&
     identical(pe$convention, list(demandee = "plus_fine", native = "age_atteint_annee", retenue = "age_atteint_annee",
                                   forcee = FALSE)) &&
