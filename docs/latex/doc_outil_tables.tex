@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{08/11/2026}
+\newcommand{\datedoc}{09/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -2069,9 +2069,7 @@ classes et relevés de l'étape \code{donnees}, les neuf hypothèses
 nommées et la clé \code{exposition/diagnostics/exposition\_imputee\_jours}.
 Sur l'entrée de référence (\emph{constat}, R~4.3.3~; valeurs non
 reproduites ici, E3.4), les classes P0, E et ES sont représentées et
-aucune unité n'est hors de la période~; $D$ est celui de R1, et
-$\sum E^c$ le dépasse légèrement, de l'exposition imputée sous
-\code{milieu}. Les
+aucune unité n'est hors de la période~; $D$ est celui de R1, et $\sum E^c$ le dépasse légèrement~: sous \code{milieu}, l'exposition imputée remplace, pour les unités E et ES, l'exposition vraie qui précède leur premier inventaire, et $\sum E^c$ n'est accru que de l'écart net entre les deux (section~\ref{sec:stocks-fenetres}, «~Biais de \code{milieu}~»). Les
 décomptes de classes de la construction sont égaux à ceux de l'attribut
 \code{simulation} de l'entrée (test de \code{tests/test\_reproductibilite.R}).
 
@@ -5189,9 +5187,7 @@ ligne sans identifiant valide ne comptent pas comme propagation.\par}
 
 \medskip
 {\sloppy\hbadness=10000\noindent
-\textbf{Limites, non corrigées} (amendement A1, § A1.7~; questions Q1 et
-Q2 de l'amendement, non tranchées, documentées selon la décision du
-mainteneur du 09/11/2026)~:
+\textbf{Limites, non corrigées} (amendement A1, § A1.7~; questions Q1 et Q2 de l'amendement tranchées par le mainteneur le 09/11/2026, décision M339~: limites documentées, sans refus nouveau ni hypothèse nommée)~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \emph{ligne sans identifiant valide}~: exclure
     \code{id\_tete\_manquant} (ou \code{id\_contrat\_manquant}) sur
@@ -6429,14 +6425,14 @@ le 09/11/2026, décision M340). Du second ordre en $L$~:\par}
     intervalle de longueur $L$, sous une force de sortie toutes causes
     $\lambda$ constante, l'exposition imputée dépasse en moyenne
     l'exposition vraie d'environ $\lambda L^2/12$ (conditionnement par la
-    survie jusqu'au premier inventaire de l'unité), à l'arrondi de
+    survie jusqu'au premier inventaire $t_f$ où l'unité est présente), à l'arrondi de
     $\hat a$ près (un demi-jour pour un intervalle de 366~jours)~; pour une
     unité ES, l'écart est nul au premier ordre~;
   \item \emph{décès attendus}~: l'exposition imputée $[\hat a, e)$ tombe à
     des âges inférieurs à l'âge à l'entrée~; au second ordre,
     $E[A_M - A_L] \approx (L^2/12) \sum_{E} (\mu_x \lambda - \mu'_x/2)$,
     où $A_M$ et $A_L$ sont les décès attendus sous \code{milieu} et sur les
-    lignes complètes du même jeu, et la somme porte sur les unités E. Le
+    lignes complètes du même jeu, la somme porte sur les unités E, $\mu_x$ et $\mu'_x$ sont la force de la transition et sa dérivée à l'âge $x$ de l'unité à son entrée et $\lambda$ sa force de sortie toutes causes, l'âge à l'entrée étant supposé indépendant de l'instant d'entrée dans l'intervalle (cas du simulateur~; si c'est la date de naissance qui est fixée, le terme en $\mu'_x$ change de signe). Le
     signe et la taille du biais sur les taux dépendent donc de la loi~; ils
     ne se déduisent pas du seul terme $\lambda L^2/12$~;
   \item \emph{cellule sous l'âge minimal d'entrée}~: l'exposition imputée
@@ -6475,8 +6471,7 @@ lecture~:\par}
     entrants survivants est celui que prédit le développement, à l'erreur
     de Monte-Carlo près. Le biais propre à l'hypothèse d'entrée,
     $\delta = E[A_L - A_M]/E[A_M]$ (écart apparié), est négatif~: taux
-    légèrement sous-estimés~; la prédiction qui garde le terme en $\mu'_x$
-    le retrouve à moins de deux erreurs types de Monte-Carlo, celle qui
+    légèrement sous-estimés~; la prédiction qui garde le terme en $\mu'_x$ et ajoute la part réalisée des unités ES le retrouve à moins de deux erreurs types de Monte-Carlo, celle qui
     l'omet est rejetée. Il reste inférieur à l'erreur d'estimation du
     rapport des observés aux attendus global par sexe, d'ordre
     $1/\sqrt{D}$, jusqu'à des portefeuilles de même structure très
@@ -6485,8 +6480,7 @@ lecture~:\par}
     complètes~;
   \item \emph{deux inventaires distants de dix ans} (S2), hors du domaine
     du développement ($\lambda L$ de l'ordre de 0,5)~: l'excès d'exposition
-    imputée dépasse significativement la prédiction du second ordre, ce
-    qu'expliquent les termes négligés, au premier chef la hausse de la
+    imputée dépasse significativement la prédiction du second ordre, ce que n'explique pas la prédiction exacte à force de sortie constante et qu'expliqueraient les termes négligés, au premier chef la hausse de la
     force de mortalité avec l'âge pendant l'intervalle (terme d'ordre
     $\mu'_x L^3$~; hypothèse, non mesurée par le script)~; le biais propre
     sous-estime les taux et domine l'erreur d'estimation dès des
