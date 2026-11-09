@@ -5191,7 +5191,7 @@ ligne sans identifiant valide ne comptent pas comme propagation.\par}
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \emph{ligne sans identifiant valide}~: exclure
     \code{id\_tete\_manquant} (ou \code{id\_contrat\_manquant}) sur
-    l'inventaire $t_1$ d'une unité laisse cette unité, non rattachable, en
+    le premier inventaire $t_f$ où une unité est présente laisse cette unité, non rattachable, en
     fausse entrée entre deux inventaires~; sous l'hypothèse d'entrée
     \code{milieu} (section~\ref{sec:stocks-fenetres}), son exposition sur
     l'intervalle est en partie perdue sans qu'aucun décès n'y soit perdu
@@ -6490,8 +6490,10 @@ lecture~:\par}
     $\hat a - e = 181$~jours et ne garde que 184 de ses 365~jours
     d'exposition à l'âge d'entrée, sans qu'aucun décès soit déplacé~: le
     taux brut de cet âge est presque doublé (facteur $365/184 \approx
-    1{,}98$ pour un tel entrant), les autres âges étant inchangés (identité
-    exacte des décès attendus vérifiée sur chaque jeu)~; la couverture du
+    1{,}98$ pour un tel entrant), les autres âges étant inchangés, à une
+    exception près~: une unité entrée et sortie le jour même reçoit un jour
+    d'exposition à l'âge précédent (identité exacte des décès attendus, qui
+    en tient compte, vérifiée sur chaque jeu)~; la couverture du
     $q_x$ vrai à l'âge d'entrée s'effondre. Dans ce cas, préférer
     \code{premier\_inventaire}, sans biais détecté, au prix de l'exposition
     de l'âge d'entrée, presque entièrement perdue.
