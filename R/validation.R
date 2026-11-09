@@ -995,11 +995,11 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
                                     par_annee, niveau, relation_table) {
   fin_tranche <- c(tranches[-1L] - 1, plage_ages[2L])
   n_seg <- nrow(segments_cles)
-  Dr <- ifelse(ret, as.numeric(D), 0); Ar <- ifelse(ret, A, 0); nr <- as.numeric(ret)
+  Dr <- ifelse(ret, as.numeric(D), 0); Ar <- ifelse(ret, A, 0); nr <- as.integer(ret)
   groupe <- function(nom, cle, n_g, seg_g, tr_g, an_g) {
     O <- vapply(seq_len(n_g), function(k) sum(Dr[cle == k]), 0)
     At <- vapply(seq_len(n_g), function(k) sum(Ar[cle == k]), 0)
-    nb <- vapply(seq_len(n_g), function(k) sum(nr[cle == k]), 0)
+    nb <- vapply(seq_len(n_g), function(k) sum(nr[cle == k]), 0L)  # dénombrement : integer (#174)
     d <- data.frame(regroupement = rep(nom, n_g), stringsAsFactors = FALSE)
     for (k in names(segments_cles)) d[[k]] <- segments_cles[[k]][seg_g]
     d$tranche_debut <- as.integer(tranches[tr_g])
@@ -2199,7 +2199,7 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
     S <- de_classe(lig, classes[[nv]], "M")
     n_cle <- length(de_classe(lig, classes[[nv]], "cle"))
     v <- list(lignes_mesurables = length(S), lignes_non_calculables = n_cle, tetes_touchees = NA_integer_,
-              tetes_indeterminees = NA_integer_, lignes_indeterminees = NA_integer_, evenements_retires = NA_real_,
+              tetes_indeterminees = NA_integer_, lignes_indeterminees = NA_integer_, evenements_retires = NA_integer_,
               exposition_jours_retiree = NA_real_, exposition_centrale_retiree = NA_real_)
     etat <- etat_ensemble(ens[i], lig, S, n_cle)
     if (identical(etat, "produite")) {
@@ -2209,7 +2209,7 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
       if (indeterminee(r)) {
         etat <- "tete_indeterminee_apres_reintegration"
       } else {
-        v$evenements_retires <- sum(as.numeric(r$cellules$evenements_retires))
+        v$evenements_retires <- total_evenements_retires(r$cellules$evenements_retires, ens[i], nv)  # integer (#174)
         v$exposition_jours_retiree <- sum(r$cellules$exposition_jours_retiree)
         v$exposition_centrale_retiree <- sum(r$cellules$exposition_centrale_retiree)
         s1 <- smr_comparateur_1(r$cellules, conservees[[nv]], niveaux[[nv]], par_annee, niveau)
@@ -2309,6 +2309,23 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
                        smr_comparateur_2 = smr2),
        diagnostics = list(calculs_contrefactuels = length(cache)),
        avertissements = avertissements_vides())
+}
+
+# Total des événements retirés d'un ensemble, en integer (#174). La somme est
+# formée en double, où elle ne déborde pas ; au-delà de .Machine$integer.max
+# (sans qu'aucune cellule n'ait dépassé la borne : l'étape exposition refuse
+# déjà ce cas par cellule, motif evenements_hors_plage) l'étape refuse, plutôt
+# que de laisser as.integer() rendre NA avec un simple avertissement.
+total_evenements_retires <- function(evenements, ensemble, niveau) {
+  n <- sum(as.numeric(evenements))
+  if (n > .Machine$integer.max)
+    refuser("importance_exclusions", "evenements_retires_hors_plage",
+            formuler(paste("Le total des événements retirés (%.0f) pour l'ensemble « %s », niveau %s, est hors de la",
+                           "plage des entiers du moteur (au plus %d) : la construction est refusée."),
+                     n, citer(ensemble), citer(niveau),
+                     .Machine$integer.max),
+            list(ensemble = ensemble, niveau = niveau, evenements_retires = n))
+  as.integer(n)
 }
 
 # Cellules retirées vides (gabarit des colonnes d'une table de cellules).
