@@ -1,3 +1,4 @@
 type,nom,issue,motif
 entree,fonctions-donnees:lignes_cle_dupliquee,#196,assistant de module ajouté par #196 (point 4) ; entrée du catalogue à écrire par docwriter en fin de branche (règle 9)
 entree,fonctions-donnees:sous_indicer_categorie,#196,assistant de module ajouté par #196 (point 5) ; entrée du catalogue à écrire par docwriter en fin de branche (règle 9)
+entree,fonctions-donnees:TOLERANCE_RELEVES_AGREGATS,#195,constante ajoutée par #195 (tolérance relative des relevés de cohérence des agrégats) ; entrée du catalogue à écrire par docwriter en fin de branche (règle 9)

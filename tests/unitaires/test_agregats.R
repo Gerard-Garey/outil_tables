@@ -372,6 +372,86 @@ verifier("C4 une seule exposition déclarée : relevés de cohérence NA, aucun 
   is.na(rl$exposition_initiale_inferieure_centrale) && is.na(rl$complement_superieur_aux_evenements) &&
     !any(c("exposition_initiale_inferieure_centrale", "complement_superieur_aux_evenements") %in% x$avertissements$code)
 })
+# --- C4 : tolérance d'arrondi des relevés de cohérence (#195, M381) --------------------
+# Approximation numérique : écart relevé au-delà de 1e-10 * max(|E^i|, |E^c|)
+# (TOLERANCE_RELEVES_AGREGATS). Attendus écrits à la main ; la dérive d'arrondi
+# est vérifiée présente avant de conclure à son absorption par la tolérance.
+R_REL <- c(age = "age", exposition_centrale = "ec", exposition_initiale = "ei", evenements = "d")
+CODES_REL <- c("exposition_initiale_inferieure_centrale", "complement_superieur_aux_evenements")
+releves_de <- function(ec, ei, d, age = seq_along(ec) + 19, roles = R_REL, plan = plan_ag(segmentation = character(0))) {
+  x <- construire_table(data.frame(age = age, ec = ec, ei = ei, d = d), roles, plan)
+  list(rl = unlist(x$etapes$donnees$diagnostics$releves[CODES_REL]),
+       codes = x$avertissements$code[x$avertissements$code %in% CODES_REL],
+       textes = x$avertissements$message[x$avertissements$code %in% CODES_REL])
+}
+verifier("C4 #195 (CA1) : 2,14 - 1,14 = 1 + 2,2e-16 > D = 1 en double, mais cellule 1,14 / 2,14 / 1 non relevée (relevés 0 et 0, aucun avertissement de relevé)", {
+  r <- releves_de(1.14, 2.14, 1)
+  derive <- 2.14 - 1.14 > 1
+  if (!derive) "témoin : la dérive d'arrondi 2,14 - 1,14 > 1 n'existe plus" else
+    if (identical(unname(r$rl), c(0L, 0L)) && !length(r$codes)) TRUE else
+      sprintf("relevés %s, avertissements %s", paste(r$rl, collapse = " et "), paste(r$codes, collapse = ", "))
+})
+verifier("C4 #195 (CA1) : grille de 500 cellules distinctes (âge 20 à 69 x année 2015 à 2024 ; E^c = k/100, E^i = E^c + 1, D = 1) sous par_annee : relevés 0 et 0, aucun avertissement de relevé ; la comparaison exacte en relèverait 48", {
+  k <- 1:500; ec <- k / 100; ei <- ec + 1
+  exacts <- sum(ei - ec > 1) + sum(ei < ec)
+  g <- expand.grid(age = 20:69, annee = 2015:2024)
+  x <- construire_table(data.frame(age = g$age, annee = g$annee, ec = ec, ei = ei, d = 1),
+                        c(R_REL, annee = "annee"), plan_ag(segmentation = character(0), par_annee = TRUE))
+  rl <- unlist(x$etapes$donnees$diagnostics$releves[CODES_REL])
+  if (!identical(exacts, 48L)) sprintf("témoin : %d relevé(s) exact(s) au lieu de 48", exacts) else
+    if (identical(unname(rl), c(0L, 0L)) && !any(CODES_REL %in% x$avertissements$code) &&
+        identical(x$etapes$donnees$diagnostics$releves$cellules, 500L)) TRUE else
+      sprintf("relevés %s", paste(rl, collapse = " et "))
+})
+verifier("C4 #195 (CA1, sens E^i < E^c) : E^c = 0,1 + 0,2 et E^i = 0,3 (E^i < E^c en double, égaux en décimal) : non relevée", {
+  r <- releves_de(0.1 + 0.2, 0.3, 1)
+  if (!(0.3 < 0.1 + 0.2)) "témoin : la dérive 0,3 < 0,1 + 0,2 n'existe plus" else
+    if (identical(unname(r$rl), c(0L, 0L)) && !length(r$codes)) TRUE else paste("relevés", paste(r$rl, collapse = " et "))
+})
+verifier("C4 #195 (CA2) : écarts réels (E^i = 9,5 < E^c = 10 ; E^i - E^c = 2 > D = 1) toujours relevés, 1 et 1, avec les deux avertissements et leurs textes complétés de la tolérance", {
+  r <- releves_de(c(10, 12), c(9.5, 14), c(1, 1))
+  mention <- "au-delà d'une tolérance d'arrondi de 1e-10 fois la plus grande des deux expositions déclarées de la cellule"
+  if (identical(unname(r$rl), c(1L, 1L)) && identical(r$codes, CODES_REL) && length(r$textes) == 2L &&
+      all(grepl(mention, r$textes, fixed = TRUE))) TRUE else
+    sprintf("relevés %s, codes %s", paste(r$rl, collapse = " et "), paste(r$codes, collapse = ", "))
+})
+verifier("C4 #195 (CA3) : un jour (1/366 an) relevé dans les deux sens à E = 1e5 ans : E^i = E^c + D + 1/366 (supérieur aux événements) et E^i = E^c - 1/366, D = 0 (inférieure)", {
+  sup <- releves_de(1e5, 1e5 + 1 + 1 / 366, 1)
+  inf <- releves_de(1e5, 1e5 - 1 / 366, 0)
+  if (identical(unname(sup$rl), c(0L, 1L)) && identical(unname(inf$rl), c(1L, 0L))) TRUE else
+    sprintf("supérieur : %s ; inférieure : %s", paste(sup$rl, collapse = " et "), paste(inf$rl, collapse = " et "))
+})
+verifier("C4 #195 (CA4) : deux chemins de sommation d'une cellule sans événement (1e4 fractions j/366, sous sous_graine(195L)) : E^c = sum(x), E^i = Reduce(+, rev(x)), E^i != E^c, écart relatif < 1e-10 : non relevée (0 et 0)", {
+  x <- tablexp:::sous_graine(195L, sample(366L, 1e4, replace = TRUE)) / 366
+  ec <- sum(x); ei <- Reduce(`+`, rev(x))
+  r <- releves_de(ec, ei, 0)
+  if (identical(ei, ec)) "témoin : les deux sommes sont identiques" else
+    if (!(abs(ei - ec) / ec < 1e-10)) "témoin : écart relatif des deux sommes >= 1e-10" else
+      if (identical(unname(r$rl), c(0L, 0L)) && !length(r$codes)) TRUE else paste("relevés", paste(r$rl, collapse = " et "))
+})
+verifier("C4 #195 (relative, non absolue) : E^c = 8388607,14, E^i = 8388608,14, D = 1 : E^i - E^c - D = 9,3e-10 (> 1e-10 absolu, < 1e-10 * E^i = 8,4e-4) : non relevée", {
+  ec <- 8388607.14; ei <- 8388608.14
+  ecart <- ei - ec - 1
+  r <- releves_de(ec, ei, 1)
+  if (!(ecart > 1e-10 && ecart < 1e-10 * ei)) sprintf("témoin : écart %g hors de (1e-10, 1e-10 * E^i)", ecart) else
+    if (identical(unname(r$rl), c(0L, 0L)) && !length(r$codes)) TRUE else paste("relevés", paste(r$rl, collapse = " et "))
+})
+verifier("C4 #195 (pmax, non pmin) : E^c = 0, E^i = 1e6 + 1e-5, D = 1e6 : E^i - E^c - D = 1e-5 < 1e-10 * E^i = 1e-4 (pmax) mais > 0 (pmin donnerait tau = 0) : non relevée", {
+  ei <- 1e6 + 1e-5
+  ecart <- ei - 0 - 1e6
+  r <- releves_de(0, ei, 1e6)
+  if (!(ecart > 9.9e-6 && ecart < 1.01e-5)) sprintf("témoin : écart %g au lieu de 1e-5 environ", ecart) else
+    if (identical(unname(r$rl), c(0L, 0L)) && !length(r$codes)) TRUE else paste("relevés", paste(r$rl, collapse = " et "))
+})
+verifier("C4 #195 (CA6) : une exposition manquante laisse les deux relevés NA (pas de na.rm), comme avant la tolérance ; E^i = E^c = 0 : tolérance nulle, rien relevé", {
+  ro <- R_REL
+  l <- data.frame(age = 60:62, ec = c(1, NA, 3), ei = c(2, 2, 3), d = c(0, 0, 0))
+  rl <- tablexp:::observations_agregats(l, 1:3, ro, character(0), list(), character(0), 3L, l)$releves
+  r0 <- releves_de(0, 0, 0)
+  if (!(is.na(rl$exposition_initiale_inferieure_centrale) && is.na(rl$complement_superieur_aux_evenements)))
+    "relevés non NA avec une exposition manquante" else
+    if (identical(unname(r0$rl), c(0L, 0L))) TRUE else paste("E^i = E^c = 0 :", paste(r0$rl, collapse = " et "))
+})
 verifier("C4 avertissements des agrégats, dans l'ordre (valeur écrite à la main) : unite_agregat (transition sur la tête), role_non_employe, convention_declaree, annees_sommees, ages_manquants", {
   d <- BV; d$age[4L] <- 63
   x <- construire_table(d, R_BV, plan_ag(segmentation = "sexe"))
