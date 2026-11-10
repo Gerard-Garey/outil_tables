@@ -434,6 +434,38 @@ verifier("T6 (valeur calculée à la main) : niveau A, 5 lignes mesurables, 578 
        etat = if (identical(de(I6$retraits, "sexe_manquant", "B")$etat, "cle_segmentation_manquante") &&
                   identical(de(I6$retraits, "sexe_manquant", "A")$etat, "produite")) TRUE else "états")
 })
+# Type des dénombrements (#174) : evenements_retires de la table retraits en
+# integer, comme celui des tables de cellules, que des lignes soient produites,
+# non produites (NA) ou absentes (total vide).
+verifier("T6 (#174) : retraits$evenements_retires en integer, lignes produites et non produites mêlées (valeur calculée à la main : 3, 1, NA aux états de clé manquante) ; total vide (aucune exclusion) de même ; tables de cellules A et B integer", {
+  r6 <- I6$retraits
+  v0 <- construire_table(T1[1:4, ], ROLES_SANS_TETE, plan_ie("id_contrat_manquant"))$etapes$importance_exclusions$resultat
+  tous(type = if (identical(typeof(r6$evenements_retires), "integer") &&
+                  identical(typeof(v0$retraits$evenements_retires), "integer")) TRUE
+              else paste(typeof(r6$evenements_retires), typeof(v0$retraits$evenements_retires)),
+       na = if (anyNA(r6$evenements_retires) && any(r6$etat == "produite")) TRUE else "lignes non produites et produites attendues",
+       valeurs = proche(c(de(r6, "total", "A")$evenements_retires, de(r6, "total", "B")$evenements_retires), c(3, 1), 0, 0),
+       vide = if (nrow(v0$retraits) > 0L && all(v0$retraits$evenements_retires == 0L)) TRUE else "total vide : zéros attendus",
+       cellules = if (identical(typeof(I6$cellules_niveau_a$evenements_retires), "integer") &&
+                      identical(typeof(I6$cellules_niveau_b$evenements_retires), "integer")) TRUE else "cellules")
+})
+# Garde du total (#174, reprise) : aucune cellule ne dépasse .Machine$integer.max,
+# mais leur somme oui. Garde défensive : sous la forme fenêtres, le total est
+# majoré par le nombre de lignes des observations (décompte par tabulate()) ;
+# inatteignable par construire_table(), d'où l'appel direct.
+verifier("total_evenements_retires (#174) : total > .Machine$integer.max sans cellule au-delà de la borne -> refus importance_exclusions / evenements_retires_hors_plage (message cite le total, l'ensemble, le niveau) ; total égal à la borne et vide -> integer", {
+  f <- tablexp:::total_evenements_retires
+  imax <- .Machine$integer.max
+  r <- tryCatch({ f(c(imax, 1L, 5L), "sexe_manquant", "B"); NULL }, refus_tablexp = function(r) r)
+  tous(refus = if (is.null(r)) "aucun refus levé" else if (identical(c(r$module, r$motif),
+                    c("importance_exclusions", "evenements_retires_hors_plage"))) TRUE else paste(r$module, r$motif),
+       message = if (!is.null(r) && grepl("2147483653", r$message, fixed = TRUE) && grepl("« sexe_manquant »", r$message, fixed = TRUE) &&
+                     grepl("niveau B", r$message, fixed = TRUE) &&
+                     grepl(as.character(imax), r$message, fixed = TRUE)) TRUE else "message",
+       details = if (!is.null(r) && identical(r$details$evenements_retires, as.numeric(imax) + 6)) TRUE else "détails",
+       borne = if (identical(f(c(imax - 1L, 1L), "total", "A"), imax)) TRUE else "total égal à la borne",
+       vide = if (identical(f(integer(0), "total", "A"), 0L)) TRUE else "total vide")
+})
 verifier("T6 (valeur calculée à la main) : classes_motifs du plan, niveau B (sexe employé)", {
   cm <- X6$etapes$importance_exclusions$parametres$classes_motifs
   identical(cm$motif, EXC6) && identical(cm$classe_niveau_a, c("M", "N", "M", "M")) &&
@@ -474,6 +506,30 @@ verifier("T7 (valeur calculée à la main) : cellule sans exposition retenue res
 verifier("T7 (valeur calculée à la main) : aucune cellule retirée avec exposition retenue -> sans_exposition_retenue, SMR NA", {
   s <- s1(1L, 0.3, 2L, 1, ages_e = 66L)
   identical(s$etat, "sans_exposition_retenue") && is.na(s$smr) && identical(s$cellules_sans_exposition_retenue, 1L)
+})
+# Type de etat_cellule (#177) : character que la table de cellules soit vide,
+# mêle des cellules produites et sans exposition retenue, ou n'en ait aucune
+# de produite ; ifelse() sur un vecteur vide rendait logical(0).
+verifier("T7 (#177) : etat_cellule en character, cellules retirées vides (0 ligne), mêlées (produite, sans_exposition_retenue) ou toutes sans exposition retenue ; tables de cellules A et B de la construction vides ou non, character", {
+  c1 <- function(De, Ee, Dr, Er, ages_r = 65L, ages_e = 65L)
+    tablexp:::smr_comparateur_1(data.frame(age = ages_e, evenements_retires = De, exposition_jours_retiree = Ee * 365,
+                                           exposition_centrale_retiree = Ee),
+                                data.frame(age = ages_r, evenements = Dr, exposition_jours = Er * 365,
+                                           exposition_centrale = Er), character(0), FALSE, 0.95)$cellules
+  vide <- c1(integer(0), numeric(0), 2L, 1, ages_e = integer(0))
+  melee <- c1(c(1L, 1L), c(0.5, 0.3), 2L, 1, ages_e = 65:66)
+  sans <- c1(1L, 0.3, 2L, 1, ages_e = 66L)
+  v0 <- construire_table(T1[1:4, ], ROLES_SANS_TETE, plan_ie("id_contrat_manquant"))$etapes$importance_exclusions$resultat
+  tous(vide = if (nrow(vide) == 0L && identical(vide$etat_cellule, character(0))) TRUE else paste(typeof(vide$etat_cellule), nrow(vide)),
+       melee = if (identical(melee$etat_cellule, c("produite", "sans_exposition_retenue"))) TRUE else paste(melee$etat_cellule, collapse = " "),
+       sans = if (identical(sans$etat_cellule, "sans_exposition_retenue")) TRUE else paste(sans$etat_cellule, collapse = " "),
+       table_vide = if (nrow(v0$cellules_niveau_a) == 0L && nrow(v0$cellules_niveau_b) == 0L &&
+                        identical(typeof(v0$cellules_niveau_a$etat_cellule), "character") &&
+                        identical(typeof(v0$cellules_niveau_b$etat_cellule), "character")) TRUE
+                    else "tables de cellules vides attendues, etat_cellule character",
+       table_remplie = if (identical(typeof(I6$cellules_niveau_a$etat_cellule), "character") &&
+                           identical(typeof(I6$cellules_niveau_b$etat_cellule), "character") &&
+                           nrow(I6$cellules_niveau_a) > 0L && nrow(I6$cellules_niveau_b) > 0L) TRUE else "tables remplies attendues, character")
 })
 
 # --- T8 : comparateur 2 (valeur calculée à la main) --------------------------------

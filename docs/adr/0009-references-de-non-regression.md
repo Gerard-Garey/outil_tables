@@ -873,3 +873,42 @@ Le préfixe d'étape `donnees` entre dans la liste des préfixes admis (commenta
 **Effet sur les résultats : aucun** (R1 à R12 n'ont pas ces chemins ; R13 et R14 n'ont pas encore de référence).
 
 Issues : #169, #180. Branche `claude/recette-stocks-successifs`, PR #188.
+
+## Annotation du 10 novembre 2026 — point 3.4 : deux clés de `TOLERANCES` retirées (#174, dénombrements en `integer`), trois ajoutées en classe 1e-12 (#178) ; régénération unique de R8 à R13 (B16), première régénération de R13
+
+Rédigée par `architect` à l'étape (A) de la branche `claude/validation-suites` (B16, PR #198), tête `cc7d849`. Annotation de **constat**, exigée par les points 3.4 et 9.3 pour toute modification de `TOLERANCES` ; le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne à `cc7d849` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Clés retirées (#174).** `904f5ad` (`moteur:`) rend toujours `integer` les dénombrements `validation/resultat/sous_groupes/cellules_retenues` et `importance_exclusions/resultat/retraits/evenements_retires` ; `371e4f6` (`tests:`) retire leurs deux clés de la classe exacte. C'est la règle de la quatrième annotation du 17/10/2026, (b), rappelée par le commentaire de `TOLERANCES` (`tests/reference/outils_reference.R:92-94`) : une grandeur `integer` est exacte par son type et n'a pas de clé, qui la classerait encore si elle redevenait double et masquerait ce retour à `doubles_sans_tolerance()`. Les témoins de classe de R8 couvrent les deux chemins `integer` (message de `cc7d849`).
+
+**(b) Clés ajoutées (#178, M361).** Déclarées dans l'étape (4) de la branche, au commit de tests `526c9bd`, qui suit le commit `moteur:` `4da33ae` créant les colonnes ; classe fixée par l'avis de forme (0'') accepté (M363) :
+
+| Clé | Classe | Ligne | Justification |
+|---|---|---|---|
+| `validation/resultat/sous_groupes/p_inferieure_asymptotique` | 1e-12 | 221 | approximation normale de la loi de convolution, avec correction de continuité (`stats::pnorm`, `4da33ae`), même classe que `p_inferieure` |
+| `validation/resultat/sous_groupes/p_superieure_asymptotique` | 1e-12 | 222 | idem, `p_superieure` |
+| `validation/resultat/sous_groupes/p_centrale_asymptotique` | 1e-12 | 223 | idem, `p_centrale` |
+
+Dans R8, R9 et R10, ces trois colonnes valent `NA` sur toutes les lignes (aucun sous-groupe au-delà de `N_MAX_PRODUITS_CONVOLUTION` ; tableau du message de `cc7d849`) : leur classe n'est donc encore exercée par aucune valeur figée, seulement par les tests T178.1 à T178.3.
+
+**(c) Décompte** (*vérifié* par `architect`, 10/11/2026 : blocs `CLASSES_TOLERANCE` et `TOLERANCES` extraits par `git show <rév>:tests/reference/outils_reference.R`, évalués sous R 4.3.3, `table()` des classes ; même mesure faite par `docwriter`, concordante) :
+
+| Révision | Clés | exactes | 1e-14 | 1e-12 | 1e-10 |
+|---|---|---|---|---|---|
+| `904f5ad~1` (= `fbf47af` pour ce fichier) | 174 | 70 | 33 | 68 | 3 |
+| `371e4f6` (#174) | 172 | 68 | 33 | 68 | 3 |
+| `526c9bd` (#178) = `cc7d849` | **175** | **68** | **33** | **71** | **3** |
+
+Retirées : les deux clés de (a) ; ajoutées : les trois clés de (b) ; aucune clé reclassée ; aucun nom en double. `CLASSES_TOLERANCE` inchangée (`tests/reference/outils_reference.R:91`).
+
+**(d) Annotation du 07/11/2026, (a) 1, tableau, ligne « exacte (36) » : décompte daté.** Ce relevé vaut à `ddc67ba`, qu'il cite, et n'est pas réécrit. Deux des 36 clés qu'il énumère n'existent plus depuis `371e4f6` : `validation/resultat/sous_groupes/cellules_retenues` et `importance_exclusions/resultat/retraits/evenements_retires` ; leur justification « dénombrements (doubles à valeur entière) » est dépassée pour elles, qui sont `integer`. Lu à `cc7d849`, ce groupe de clés compterait 34 exactes ; les décomptes globaux qui font foi sont ceux de (c).
+
+**(e) Régénération unique de B16** (étape (R), M362) : plans **R8 à R13**, workflow « Références de non-régression », exécution 42771679323, mode `regeneration`, sur `ecaead0` ; commit `cc7d849` par la session principale, après visa d'`actuary` du 10/11/2026 (aucune table finale, aucun verdict). Constats, d'après le message de `cc7d849` (*vérifié* par lecture du message ; valeurs non remesurées ici) :
+
+1. **R13** (créé en B15 sur la CI : exécution 42637989632 sur `756fbfe`, commit de référence `5e2231f`) est **régénéré pour la première fois** : 2 textes de `etapes/positionnement/parametres/statuts/statut` (#185), jeton du code, en-tête.
+2. **Processeur consigné** : AMD EPYC 7763 (fma, avx2, sans avx512f) au lieu d'EPYC 9V45 avec avx512f pour R8 à R12 (R13 l'était déjà sur 7763) ; **aucun effet mesuré** : R1 à R7 et R14 « comparaison réussie », identiques au bit près, et valeurs inchangées de R8 à R13 identiques au bit près. Constat qui s'ajoute à ceux de l'annotation du 19/10/2026 sur la réserve de la `libm` ; il ne la lève pas.
+3. **Empreinte du résultat de R12** : la valeur commitée est celle de la CI ; un relevé sur poste en diffère, par un ulp sur un double du brut (`probabilite_borne_sup_asymptotique[116]`, écart 1,27e-16), écart antérieur à B16. Conforme au statut **même machine seulement** de `fiche$empreintes$resultat` (ADR 0011, point 11.2) et à sa comparaison par jeton (seconde annotation du 20/10/2026) ; aucun constat de régression.
+4. `TRANSITIONS_EN_COURS` est vide après `cc7d849` ; `version_fiche` inchangée (6).
+
+**Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code. Les changements de R8 à R13 sont ceux du tableau avant / après de `cc7d849`.
+
+Issues : #174, #177, #178, #179, #185. Décisions M359 à M363. Branche `claude/validation-suites`, PR #198.

@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{09/11/2026}
+\newcommand{\datedoc}{10/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1319,7 +1319,7 @@ l'effet d'une permutation des lignes de l'entrée de référence
 (section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39), puis
 l'aller-retour du texte du plan et de la fiche et le rejeu à partir de ce
 texte pour chacun des plans de référence (quatorze~: fonction \code{plans\_reference} de
-\code{tests/reference/outils\_reference.R}, l.~515~; section~\ref{sec:serialisation}).
+\code{tests/reference/outils\_reference.R}, l.~516~; section~\ref{sec:serialisation}).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -1887,7 +1887,7 @@ graines de Monte-Carlo~: 500~lignes (constante \code{NOMBRE\_PAR\_MOTIF\_R9})
 pour chacun des motifs \code{id\_contrat\_manquant}, \code{sexe\_manquant}
 et \code{entree\_manquante} (constante \code{MOTIFS\_DEFAUTS\_R9}), toutes
 causes de sortie admises (\code{tests/reference/outils\_reference.R},
-constantes l.~349 à~351, déclarations des défauts l.~371 et~372). Les lignes
+constantes l.~350 à~352, déclarations des défauts l.~372 et~373). Les lignes
 que les défauts n'altèrent pas sont celles de \code{reference}~; un test le
 vérifie, avec la graine, les motifs, leurs effectifs et l'absence de ligne
 portant deux motifs.
@@ -1992,7 +1992,7 @@ l'étape \code{positionnement} (\code{methode = "smr"}, table \code{tv},
 relation \code{positionnee} (même clé, même plage, mêmes tranches, niveau
 et nombre de réplications que R8), sous la graine de Monte-Carlo
 20261113 (constante \code{GRAINE\_MONTE\_CARLO\_R10},
-\code{tests/reference/outils\_reference.R}, l.~330), distincte de celle du
+\code{tests/reference/outils\_reference.R}, l.~331), distincte de celle du
 jeu, de celle de R8 et des défauts de R9. C'est la première référence qui
 contient une table positionnée~: sa création a demandé le visa du
 mainteneur (décisions M287 et M308), trois statuts textuels ayant été
@@ -2007,14 +2007,14 @@ corrigés avant elle (décision M309). Il fige aussi l'état
 augmenté de l'étape \code{homogeneite} (âges 20 à 90, tranches de bornes
 20, 50 et 70, 999~réplications), sous la graine de Monte-Carlo 20261114
 (\code{GRAINE\_MONTE\_CARLO\_R11}, \code{tests/reference/outils\_reference.R},
-l.~331)~; l'entrée de référence portant un facteur 0,6 sur les femmes
+l.~332)~; l'entrée de référence portant un facteur 0,6 sur les femmes
 (section~\ref{sec:simulation}), l'hypothèse nulle y est fausse~: R11 fige
 l'étape sous une alternative~; ce n'est ni un verdict ni une mesure de
 puissance (un seul jeu). Ses p-valeurs de Monte-Carlo sont au plancher
 $1/(B + 1)$, sauf celle de la tranche 20-49~: un changement du flux des
 réplications n'y changerait que cette p-valeur et son erreur. R12 est le plan de R5 (en cours $\to$
 racheté, unité contrat) augmenté de la même étape, sous la graine 20261115
-(\code{GRAINE\_MONTE\_CARLO\_R12}, l.~332)~: les facteurs de rachat de
+(\code{GRAINE\_MONTE\_CARLO\_R12}, l.~333)~: les facteurs de rachat de
 l'entrée étant égaux pour les deux sexes, l'hypothèse nulle y est
 exactement vraie, les p-valeurs de Monte-Carlo tombent dans le corps de la
 loi, et R12 épingle le flux des réplications de l'homogénéité. Ce second
@@ -2184,7 +2184,19 @@ sur avis d'\code{actuary}, parce qu'elle classait aussi
 \code{etapes/brut/diagnostics/cellules} et
 \code{etapes/brut/diagnostics/etats/cellules}, déjà \code{integer}, et
 aurait masqué leur retour au double (ADR 0009, seconde annotation du
-19/10/2026, point~(a)). Un double reçoit sa tolérance de la
+19/10/2026, point~(a)). Depuis l'issue~\#174, deux dénombrements du
+module \code{validation} sont de même stockés en \code{integer} dans tous
+les cas~: le nombre de cellules retenues d'un sous-groupe
+(\code{etapes/validation/resultat/}\allowbreak\code{sous\_groupes/cellules\_retenues}), quels
+que soient la relation, le nombre de segments et le nombre de cellules, et
+le nombre d'événements retirés d'un ensemble
+(\code{etapes/importance\_exclusions/}\allowbreak\code{resultat/retraits/}\allowbreak\code{evenements\_retires}),
+\code{NA} compris pour une ligne non produite~; les deux clés exactes qui
+les classaient tant qu'ils étaient stockés en \code{double},
+\code{validation/resultat/}\allowbreak\code{sous\_groupes/cellules\_retenues} et
+\code{importance\_exclusions/}\allowbreak\code{resultat/retraits/}\allowbreak\code{evenements\_retires}, sont
+retirées de \code{TOLERANCES} pour la même raison, sans changement d'aucune
+valeur (visa d'\code{actuary} du 09/11/2026). Un double reçoit sa tolérance de la
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont chaque valeur
 est l'une des quatre classes de \code{CLASSES\_TOLERANCE} (exacte,
 $10^{-14}$, $10^{-12}$, $10^{-10}$~; \code{tests/reference/outils\_reference.R},
@@ -2246,7 +2258,7 @@ point~(a)~4).
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
 point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
-07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026).
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)).
 Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
 groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
@@ -2264,9 +2276,9 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
+exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
 $10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
+$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires)~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
 $10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z} & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a)) \\
 \end{longtable}
 }
@@ -2478,7 +2490,37 @@ grandeur du corps en écart, l'empreinte du résultat change en
 conséquence, celle du code aussi, \code{R/} ayant changé, et toutes les
 autres grandeurs sont restées identiques au bit près, sur la plateforme de
 référence (processeur AMD EPYC 9V45), sans table finale, verdict ni valeur
-de table homologuée changés.
+de table homologuée changés. Les références R8 à R13 ont été régénérées
+\textbf{une huitième fois}, le 10/11/2026, en mode \code{regeneration}
+sur ces six plans seulement (exécution 42771679323 du workflow, calcul sur
+\code{ecaead0}, commit \code{cc7d849}, visa d'\code{actuary} du
+10/11/2026, décisions M359 à M362~; issues~\#174, \#177, \#179, \#178
+et~\#185), régénération unique de la branche
+\code{claude/validation-suites}, pour les seuls changements annoncés en
+transition par ces issues~: type \code{integer} au lieu de \code{double}
+de deux dénombrements, à valeurs identiques (\#174~; R8 à R10)~; type
+\code{character} au lieu de \code{logical} de la colonne
+\code{etat\_cellule} des tables de cellules vides de l'étape
+\code{importance\_exclusions} (\#177~; R8 et R10)~; ligne
+\code{khi2\_pearson}/\code{variance\_h0} et textes des statuts des
+p-valeurs asymptotiques de $X^2$ et de $G^2$ (\#179~; R8 à R10)~; trois
+colonnes \code{p\_\ldots\_asymptotique} des sous-groupes, toutes à
+\code{NA}, et ligne de statut \code{p\_valeurs\_asymptotiques} (\#178~;
+R8 à R10)~; textes des statuts de $\hat\theta_s$ et de
+$q_{\mathrm{pos}}$ (\#185~; R10 et R13) et du test d'homogénéité
+(\#185~; R11 et R12). L'empreinte du résultat change en conséquence,
+celle du code aussi, \code{R/} ayant changé~; \code{version\_fiche} est
+inchangée~; R13, créée le 09/11/2026, est régénérée pour la première
+fois~; toutes les autres grandeurs de R8 à R13 sont restées identiques au
+bit près, de même que R1 à R7 et R14, non visées, en comparaison réussie,
+sur la plateforme de référence (processeur AMD EPYC 7763, au lieu de l'EPYC
+9V45 consigné pour R8 à R12, sans effet mesuré~; ADR 0009, annotation du
+10/11/2026, (e)), sans table finale, verdict ni valeur de table homologuée
+changés. L'empreinte du résultat de R12 commitée est celle de la
+plateforme de référence~; un relevé sur un poste en diffère, par un écart
+d'une unité au dernier rang sur un double de l'étape \code{brut}, antérieur
+à la branche, conformément au statut «~même machine seulement~» de cette
+empreinte (section~\ref{sec:empreinte-resultat}).
 
 \begin{encadre}
 \small
@@ -2509,9 +2551,11 @@ de table homologuée changés.
     500~lignes chacun (section~\ref{sec:non-regression}, «~Plans R8 et
     R9~»). R10 ajoute la relation \code{positionnee} et l'étape
     \code{positionnement}, sous les mêmes conditions et sans ligne exclue~:
-    la relation \code{ajustee\_hors\_outil}, une table \code{ensemble} et
+    la relation \code{ajustee\_hors\_outil}, une table \code{ensemble},
     le positionnement d'une construction non segmentée ou sous
-    \code{par\_annee} ne sont couverts que par les tests unitaires.
+    \code{par\_annee} et les p-valeurs asymptotiques des sous-groupes
+    au-delà du plafond de convolution (aucun sous-groupe de R8 à R10 ne
+    l'atteint~; issue~\#178) ne sont couverts que par les tests unitaires.
   \item L'étape \code{homogeneite} n'est figée que par R11 et R12~: deux
     segments (\code{sexe}), une seule variable de segmentation, la
     convention \code{dernier\_anniversaire} sans \code{par\_annee}~; les
@@ -2591,8 +2635,15 @@ fermée de cinq et déclarée exactement~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{type}~: conversion sans perte de \code{double} vers
-    \code{integer}, ou l'inverse~; la référence est du type de départ
-    déclaré~;
+    \code{integer}, ou l'inverse, et, depuis l'issue~\#177, de
+    \code{logical} vers \code{character} pour un vecteur vide seulement
+    (colonne \code{etat\_cellule} d'une table de cellules vide de l'étape
+    \code{importance\_exclusions}, que \code{ifelse()} rendait en
+    \code{logical} sur un vecteur vide, et qui est désormais en
+    \code{character} dans tous les cas)~: un vecteur \code{logical} non
+    vide est refusé, faute de conversion qui ne change aucune valeur, et
+    aucune autre paire de types n'est admise~; la référence est du type de
+    départ déclaré~;
   \item \textbf{valeur}~: valeurs numériques nouvelles d'une grandeur
     \code{double} ou \code{integer}, avec ou sans positions. Avec positions,
     la longueur est conservée et chaque position déclarée change~; sans
@@ -2703,9 +2754,12 @@ propre à cette issue (\code{A\_REGENERER\_37}, vidée par le commit des
 références, puis remplacée par la liste unique), puis pour les issues~\#35
 et~\#42, dont les transitions ont été closes par la seconde régénération,
 puis pour les issues~\#57, \#64 et~\#67, dont les transitions ont été
-closes ensemble par la troisième, et pour les issues~\#73 et~\#31, dont
-les transitions ont été closes ensemble par la sixième («~Références
-existantes~», ci-dessus)~: la liste est de nouveau vide. Chaque
+closes ensemble par la troisième, pour les issues~\#73 et~\#31, dont
+les transitions ont été closes ensemble par la sixième, pour
+l'issue~\#169, dont la transition a été close par la septième, et pour
+les issues~\#174, \#177, \#179, \#178 et~\#185, dont les transitions
+ont été closes ensemble par la huitième («~Références existantes~»,
+ci-dessus)~: la liste est de nouveau vide. Chaque
 nature, l'union et ses conflits, l'observation, la forme de la liste, le
 rattachement de l'échec attendu, les doubles restants et la garde sont
 exercés par des témoins de la batterie, sur des objets en mémoire et jamais
@@ -8117,13 +8171,24 @@ passent les premières.
     ligne par colonne double de \code{resultat\$smr} et de
     \code{resultat\$table\_positionnee}, qui fait foi)~: $O_s$ et $A_s$,
     descriptifs (arithmétique flottante)~; $\hat\theta_s$, résultat exact
-    (maximum de vraisemblance, ci-dessus)~; bornes exactes, exactes sous la
+    (maximum de vraisemblance, ci-dessus), en forme close, $O_s / A_s$,
+    sans optimisation numérique~: le statut porte sur la formule de
+    l'estimateur, et l'erreur d'estimation de $\theta_s$ est décrite par
+    les bornes, non par ce statut (issue~\#185)~; bornes exactes, exactes sous la
     loi supposée ($O_s \sim \mathcal{P}(\theta_s A_s)$, $A_s$ fixe), de
     couverture au moins égale au niveau (intervalle conservatif),
     asymptotiques sous le modèle de survie, \code{qgamma()} en
     approximation numérique~; bornes asymptotiques, résultat asymptotique
-    ($O_s \to \infty$)~; $q_{\mathrm{pos}}$, estimation, \code{log1p()} et
-    \code{expm1()} en approximation numérique~; bornes de $q_{\mathrm{pos}}$,
+    ($O_s \to \infty$)~; $q_{\mathrm{pos}}$, résultat exact~: image de
+    $\hat\theta_s$ par $\theta \mapsto 1 - (1 - \tilde q_x)^{\theta}$,
+    fonction croissante de $\theta$, il est, par invariance du maximum de
+    vraisemblance, le maximum de vraisemblance de $q_x$ dans le modèle de
+    forme imposée (force $\theta_s \tilde\mu_x$ constante sur $[x, x+1)$),
+    comme la probabilité de l'estimateur de Poisson de l'étape \code{brut}
+    (section~\ref{sec:brut-poisson})~; il reste une estimation de $q_x$,
+    dont l'erreur d'estimation est décrite par les bornes, «~estimation~»
+    n'étant pas un statut au sens d'E2.20 (issue~\#185)~;
+    \code{log1p()} et \code{expm1()} en approximation numérique~; bornes de $q_{\mathrm{pos}}$,
     images des bornes de $\theta_s$ par une fonction croissante de
     $\theta$ (transformation exacte), de même statut que l'intervalle dont
     elles sont l'image~: comme un seul $\theta_s$ détermine toute la table
@@ -8261,7 +8326,10 @@ table dans \code{fiche\$tables\_reference}, une seule entrée quand les
 attendus calculés à la main et des identités exactes~: la ligne de
 \code{ETAPES}, les paramètres et les constantes du module, la référence de
 méthode et l'unicité des statuts, chacun d'eux portant la mention
-d'indépendance et aucune attribution d'auteur~; sur un cas d'un segment à
+d'indépendance et aucune attribution d'auteur~; les textes des statuts de
+$\hat\theta$ (forme close, erreur d'estimation décrite par les bornes) et
+de $q_{\mathrm{pos}}$ (résultat exact par invariance), aucun statut ne
+commençant par «~estimation~» (T185.2, issue~\#185)~; sur un cas d'un segment à
 trois cellules retenues, $\hat\theta$, ses bornes exactes
 (\code{qgamma()}) et asymptotiques, la table positionnée et ses bornes,
 l'identité $\sum E^c \hat\theta \tilde\mu = O$, les paramètres et les
@@ -8381,15 +8449,35 @@ loi du khi-deux~; mais la variance de la contribution d'une cellule vaut,
 sous la loi de Poisson, $2 + 1/A_c$ (résultat exact~: quatrième moment
 centré $A_c + 3A_c^2$), et en est la limite sous la loi binomiale quand
 $\pi_c \to 0$ à $A_c$ fixé, contre~2 par degré de liberté pour la loi du
-khi-deux~: la variance de $X^2$ dépasse alors celle de la loi de
-référence, ce qui, avec les mesures à attendus fixés, explique une queue
-plus lourde quand des $A_c$ sont petits (explication, non démonstration). Pour $G^2$, le sens de l'écart
-dépend des $A_c$. Ces statuts sont à compléter par l'issue~\#179
-(décision M310), hors du périmètre de la branche. \textbf{Réserve}~: le
+khi-deux. Conditionnellement aux $O_s$, la variance exacte de $X^2$
+(moments multinomiaux, résultat exact~; issue~\#179) dépasse $2(n - S)$
+si et seulement si $\sum_s \sum_{c \in C^{+}_s} 1/A_c > \sum_s (n_s^2 +
+2n_s - 2)/O_s$~; il suffit que, dans chaque segment qui compte au moins
+deux cellules retenues, une cellule retenue ait $A_c < O_s/(n_s^2 + 2n_s
+- 2)$ (un segment d'une seule cellule apporte un excès nul)~; quand les
+$A_c$ de chaque segment
+sont égaux, elle lui est inférieure dès qu'un segment compte au moins deux
+cellules retenues (section~\ref{sec:validation-statistiques}, «~Sous la
+relation \code{positionnee}~»). Aux premiers âges de la plage, quand
+leurs $A_c$ sont assez petits pour remplir ce critère, la variance de
+$X^2$ dépasse donc celle de la loi de référence, ce qui, avec les mesures
+à attendus fixés, explique une queue plus lourde (explication, non
+démonstration). Pour $G^2$, le sens de l'écart dépend
+de la répartition des $A_c$~: sous la loi de Poisson, l'espérance de la
+contribution d'une cellule est inférieure à~1 pour $A_c$ inférieur à
+$0{,}49$ environ et supérieure à~1 au-delà (approximation numérique).
+Depuis l'issue~\#179 (décisions M310 et M359), les statuts des p-valeurs
+asymptotiques de $X^2$ et de $G^2$ le disent, sous les relations
+\code{independante} et \code{positionnee}, et la grandeur
+\code{khi2\_pearson}/\code{variance\_h0} restitue la variance exacte de
+$X^2$ sous $H_0$ (section~\ref{sec:validation-statistiques}). \textbf{Réserve}~: le
 constat ne couvre que la relation \code{positionnee}~; la relation
 \code{independante} n'y est pas simulée, et l'effet y est le même d'après
-l'avis d'\code{actuary-approfondi} (mêmes mesures à attendus fixés), sans
-constat de simulation du moteur.
+l'avis d'\code{actuary-approfondi} (mêmes mesures à attendus fixés)~; sous
+cette relation, la mesure hors batterie du constat J5, sur un autre jeu
+(commit \code{e9cbf53}~; section~\ref{sec:validation-verifications}),
+donne des écarts de même sens (p-valeur asymptotique de $X^2$ au-dessus
+de 5~\%, de $G^2$ au-dessous).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-positionnement}
@@ -8906,9 +8994,11 @@ dans la colonne \code{statut} du résultat.
     P(|D_c - A_c| > k\sqrt{A_c})$, calculée par la fonction de répartition
     de Poisson.
   \item \textbf{S2, khi-deux de Pearson} (\code{khi2\_pearson})~: $X^2 =
-    \sum_{C^{+}} r_c^2 / A_c$~; degrés de liberté $n - p$~; p-valeur
-    asymptotique $P(\chi^2_{n-p} \ge X^2)$ et p-valeur de Monte-Carlo, queue
-    supérieure.
+    \sum_{C^{+}} r_c^2 / A_c$~; degrés de liberté $n - p$~; variance exacte
+    de $X^2$ sous $H_0$~(i), $\sum_{C^{+}} (2 + 1/A_c)$ (grandeur
+    \code{variance\_h0}, issue~\#179~; paragraphe «~Attendus faibles~»
+    ci-dessous)~; p-valeur asymptotique $P(\chi^2_{n-p} \ge X^2)$ et
+    p-valeur de Monte-Carlo, queue supérieure.
   \item \textbf{S3, déviance} (\code{deviance})~: $G^2 = 2\sum_{C^{+}} [D_c
     \ln(D_c/A_c) - (D_c - A_c)]$, statistique du rapport de vraisemblance
     de $H_0$~(i) contre le modèle saturé (une seule statistique, la note
@@ -8940,7 +9030,9 @@ dans la colonne \code{statut} du résultat.
     $X \sim \mathcal{P}(A)$) par regroupement \code{segment\_tranche}
     (segment $\times$ tranche d'âge) et \code{segment} si la segmentation
     n'est pas vide, \code{tranche} toujours, \code{annee} sous
-    \code{par\_annee}, sur les cellules retenues~; un groupe sans cellule
+    \code{par\_annee}, sur les cellules retenues, dont le nombre est
+    restitué par groupe (\code{cellules\_retenues}, en \code{integer},
+    issue~\#174)~; un groupe sans cellule
     retenue est dans l'état \code{aucune\_cellule\_retenue}. Aucune
     correction de multiplicité (décision M217).
   \item \textbf{S6, signes} (\code{signes})~: $n_{+}$, $n_{-}$ et
@@ -9059,6 +9151,45 @@ diagnostic $E_{H_0}[n_{+}]$ du test des signes mesure cet écart. Seules les
 le rapport figé le dit (section~\ref{sec:rapport-fige}).
 
 \medskip
+{\sloppy\noindent
+\textbf{Attendus faibles~: p-valeurs asymptotiques de $X^2$ et de $G^2$}
+(issue~\#179~; spécification d'\code{actuary-approfondi} du 09/11/2026~;
+décisions M359 et M360). La loi de référence $\chi^2_{n-p}$ est
+asymptotique quand $A_c \to \infty$ dans \emph{chaque} cellule retenue~;
+une base modeste compte des cellules à attendus faibles (premiers âges de
+la plage), où rien ne garantit l'approximation. Pour $X^2$, sous $H_0$~(i),
+$E^c$ tenue pour fixe, $E[(D_c - A_c)^2 / A_c] = 1$, donc $E[X^2] = n - p$
+\textbf{exactement}, mais $\operatorname{Var}[(D_c - A_c)^2 / A_c] = 2 +
+1/A_c$ (quatrième moment centré de la loi de Poisson, $A_c + 3A_c^2$) et,
+les cellules étant indépendantes, $\operatorname{Var}(X^2) = \sum_{C^{+}}
+(2 + 1/A_c) > 2(n - p)$, variance de la loi de référence (résultat
+exact). Cette variance est restituée par la ligne
+\code{khi2\_pearson}/\code{variance\_h0}, placée entre \code{ddl} et
+\code{p\_asymptotique}~; définie par $H_0$, elle est dans l'état
+\code{ddl\_non\_etabli} sous \code{ajustee\_hors\_outil}. Une variance
+plus grande à espérance égale ne fixe pas, à elle seule, le sens de
+l'erreur de niveau~: le niveau réel du test fondé sur la p-valeur
+asymptotique de $X^2$ n'est pas établi en général~; il dépasse le niveau
+nominal dans les constats de simulation du projet, sous
+\code{independante} (mesure hors batterie du constat J5,
+section~\ref{sec:validation-verifications}) comme sous
+\code{positionnee} (constat \code{bad9a70},
+section~\ref{sec:positionnement-verifications}). Pour $G^2$, sous la loi
+de Poisson, l'espérance de la contribution
+$2[D_c \ln(D_c/A_c) - (D_c - A_c)]$ d'une cellule est inférieure à~1 pour
+$A_c$ inférieur à $0{,}49$ environ et supérieure à~1 au-delà (maximum
+voisin de $1{,}16$), valeurs obtenues par sommation des probabilités
+(approximation numérique)~: la p-valeur asymptotique de $G^2$ est trop
+grande ou trop petite selon la répartition des $A_c$. Les statuts des deux
+p-valeurs asymptotiques (\code{STATUTS\_VALIDATION}) le disent, et
+rappellent que seule la p-valeur de Monte-Carlo a un niveau garanti sous
+$H_0$~(i). \textbf{Aucun seuil} sur les attendus n'est appliqué ni
+affiché~: la règle usuelle d'un attendu minimal par cellule n'a pas été
+lue à sa source dans le projet et n'est donc pas citée (décision M360)~;
+la variance exacte chiffre l'avertissement à sa place, à comparer à
+$2(n - p)$.\par}
+
+\medskip
 \noindent
 \textbf{Sous la relation \code{positionnee}} (spécification
 d'\code{actuary-approfondi} sur l'issue~\#167, §~8~; décision M289~;
@@ -9079,17 +9210,45 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
   \item \textbf{S2 et S3}~: degrés de liberté $n - S$~; p-valeurs
     asymptotiques sur $\chi^2_{n-S}$, $\theta$ étant estimé par maximum de
     vraisemblance sur ces cellules (résultat asymptotique, $A_c \to
-    \infty$)~; $G^2$ et $X^2$ sont la déviance et la statistique de Pearson
-    du modèle de Poisson à un niveau par segment et offset $\ln \tilde A_c$
-    (recoupement par \code{glm()}, ci-dessous)~; sur une base modeste, à
-    attendus faibles, les p-valeurs asymptotiques de $X^2$ et de $G^2$
-    s'écartent de leur niveau nominal ($X^2$ anti-conservatrice, $G^2$
-    dans un sens qui dépend des $A_c$~; constat de
-    simulation, section~\ref{sec:positionnement-verifications}~; statuts à
-    compléter par l'issue~\#179). Si $n - S = 0$ (une seule
+    \infty$ dans chaque cellule retenue)~; $G^2$ et $X^2$ sont la déviance
+    et la statistique de Pearson du modèle de Poisson à un niveau par
+    segment et offset $\ln \tilde A_c$ (recoupement par \code{glm()},
+    ci-dessous). Attendus faibles (issue~\#179~; paragraphe «~Attendus
+    faibles~» ci-dessus)~: conditionnellement aux $O_s$, $E[X^2] = n - S$
+    exactement, et la variance exacte de $X^2$, restituée par
+    \code{variance\_h0}, est
+    \[
+      \operatorname{Var}(X^2 \mid O_s) = \sum_s \Bigl[2(n_s - 1) +
+      \sum_{c \in C^{+}_s} \frac{1}{A_c} - \frac{n_s^2 + 2n_s - 2}{O_s}\Bigr],
+      \qquad A_c = O_s \pi_c,
+    \]
+    $n_s$ nombre de cellules retenues du segment $s$ (moments
+    multinomiaux d'ordre~4, résultat exact), à comparer à $2(n - S)$~;
+    elle lui est supérieure si et seulement si $\sum_s \sum_{c \in
+    C^{+}_s} 1/A_c > \sum_s (n_s^2 + 2n_s - 2)/O_s$~; il suffit que, dans
+    chaque segment qui compte au moins deux cellules retenues, une cellule
+    retenue ait $A_c < O_s/(n_s^2 + 2n_s - 2)$ (un segment d'une seule
+    cellule apporte un excès nul), les autres termes $1/A_c$ étant
+    positifs (condition suffisante,
+    non nécessaire)~; elle lui est inférieure quand les $A_c$ de chaque
+    segment sont égaux, dès qu'un segment compte au moins deux cellules
+    retenues (trois cellules, $O_s = 40$, $\pi_c = 1/3$~: $3{,}9$
+    contre~4, calcul exact).
+    Sur une base modeste, à attendus faibles, les p-valeurs asymptotiques
+    de $X^2$ et de $G^2$ s'écartent de leur niveau nominal (rejet trop
+    fréquent pour $X^2$, trop rare pour $G^2$, sous la loi~B du constat de
+    simulation \code{bad9a70}, section~\ref{sec:positionnement-verifications}~;
+    pour $G^2$, le sens de l'écart dépend en général de la répartition des
+    $A_c$). Le statut de
+    \code{deviance}/\code{p\_asymptotique} donne les valeurs de
+    l'espérance de la contribution d'une cellule sous la loi de Poisson,
+    sans conditionner par les $O_s$~: conditionnellement, $D_c$ suit une loi
+    binomiale, et ces valeurs ne valent qu'approximativement, quand $\pi_c$
+    est petit. Si $n - S = 0$ (une seule
     cellule retenue par segment), la loi conditionnelle est dégénérée
     ($D_c = O_s$)~: aucun test n'est défini et aucun tirage n'est fait~;
-    les statistiques standardisées, les moments des suites, la variance de
+    les statistiques standardisées, la variance exacte de $X^2$, les
+    moments des suites, la variance de
     Wilcoxon, les p-valeurs asymptotiques, exactes et de Monte-Carlo et
     leurs erreurs prennent l'état \code{contraint\_par\_positionnement}
     (décision M309 pour la forme conditionnelle du statut).
@@ -9117,9 +9276,10 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     nombre de produits, calculé avant elle
     (\code{cout\_convolution\_binomiales()}), est au plus
     \code{N\_MAX\_PRODUITS\_CONVOLUTION} ($10^8$, \code{R/validation.R},
-    l.~115), sinon p-valeurs et bornes valent \code{NA}, état
-    \code{convolution\_au\_dela\_n\_max} (l'issue~\#178 propose une
-    p-valeur asymptotique au-delà)~; le regroupement \code{segment}, et
+    l.~118)~; au-delà, les p-valeurs exactes et les bornes valent
+    \code{NA}, état \code{convolution\_au\_dela\_n\_max}, et des p-valeurs
+    asymptotiques sont produites à la place des exactes (paragraphe
+    suivant)~; le regroupement \code{segment}, et
     tout sous-groupe qui contient, pour chaque segment qu'il touche, toutes
     les cellules retenues de ce segment, ont un $O_b$ déterminé par les
     $O_s$~: SMR descriptif, bornes et p-valeurs non produites, état
@@ -9127,6 +9287,67 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     sous-groupe forment \code{ETATS\_SOUS\_GROUPES\_VALIDATION}~:
     \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_retenue}
     et, sous \code{positionnee} seulement, les trois états ci-dessus.
+  \item \textbf{S5, p-valeurs asymptotiques au-delà du plafond de
+    convolution} (issue~\#178~; spécification d'\code{actuary-approfondi}
+    du 09/11/2026, commentaire 6747040204~; décision M361). Dans l'état
+    \code{convolution\_au\_dela\_n\_max}, et dans celui-là seulement, trois
+    colonnes de \code{resultat\$sous\_groupes}, placées entre
+    \code{p\_centrale} et \code{etat}, \code{p\_inferieure\_asymptotique},
+    \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique},
+    portent les p-valeurs de l'approximation normale de la loi de $O_b$
+    sachant les $O_s$ (\code{p\_somme\_binomiales\_normale()})~:
+    $O_b$ est la somme de $\sum_s O_s$ variables de Bernoulli
+    indépendantes, de moyenne $m_b = \sum_s O_s \pi_{b,s}$ et de variance
+    $\sigma_b^2 = \sum_s O_s \pi_{b,s}(1 - \pi_{b,s})$~; avec correction de
+    continuité, $P(O_b \le o) \approx \Phi\bigl((o + 1/2 - m_b)/\sigma_b\bigr)$,
+    $P(O_b \ge o) \approx 1 - \Phi\bigl((o - 1/2 - m_b)/\sigma_b\bigr)$
+    (\code{pnorm()}), et p centrale $\min(1, 2\min(\cdot,\cdot))$, comme
+    pour les autres p-valeurs centrales du module. \emph{Statut}~:
+    \textbf{résultat asymptotique}, conditionnellement aux $O_s$, quand
+    $\sigma_b^2 \to \infty$ (théorème central limite pour une somme de
+    variables de Bernoulli indépendantes dont la variance totale tend vers
+    l'infini), \code{pnorm()} en approximation numérique~; l'erreur
+    relative croît dans les queues, l'asymétrie de la somme étant d'ordre
+    $1/\sigma_b$. Une ligne ne porte jamais à la fois une p-valeur exacte
+    et une p-valeur asymptotique~; la règle de bascule est inchangée (un
+    seul segment~: loi binomiale exacte~; plusieurs segments et coût au
+    plus égal au plafond~: convolution exacte~; coût au-delà~: p-valeurs
+    asymptotiques). \code{p\_somme\_binomiales\_normale()} s'arrête sur une
+    erreur de programmation si $\sigma_b = 0$ (toutes les $\pi_{b,s}$ dans
+    $\{0, 1\}$), cas inatteignable au-delà du plafond. Les trois colonnes
+    sont présentes sous les trois relations et valent \code{NA} dans tout
+    autre état~: sous \code{independante}, la loi de Poisson exacte du
+    sous-groupe est toujours calculée (aucun paramètre estimé sur ces
+    données, $p = 0$)~; sous \code{ajustee\_hors\_outil}, aucune
+    p-valeur du sous-groupe n'est produite (nombre $p$ de paramètres
+    estimés non établi). La ligne de statut
+    \code{sous\_groupes}/\code{p\_valeurs\_asymptotiques}, quatrième des
+    statuts des sous-groupes (\code{statuts\_sous\_groupes}), le dit pour
+    chaque relation, et le statut \code{sous\_groupes}/\code{p\_valeurs}
+    sous \code{positionnee} renvoie aux p-valeurs asymptotiques produites à
+    la place des exactes. \emph{Écart mesuré} (calcul exact, hors simulation)
+    sur le cas du test T178.2, $O_s = (2000, 3000, 1000)$, $\pi_{b,s} =
+    (0{,}2~; 0{,}7~; 0{,}4)$, en deçà du plafond (5\,085\,864 produits,
+    $\sigma_b \approx 34{,}50$), les p-valeurs asymptotiques étant forcées
+    par l'argument \code{n\_max = 0} de \code{sous\_groupes\_positionnee()},
+    réservé aux tests~: pour $o = 2830$, $2970$ et $3000$, sur les trois
+    p-valeurs, l'écart absolu à la p-valeur exacte est au plus $2{,}47
+    \times 10^{-5}$ (p centrale, $o = 2970$) et l'écart relatif au plus
+    $1{,}82 \times 10^{-3}$ (p supérieure et p centrale, $o = 3000$, où la
+    p centrale exacte vaut $0{,}0039$)~; le test exige au plus $5 \times
+    10^{-5}$ et $3 \times 10^{-3}$. Au-delà du plafond, où la loi exacte
+    n'est pas calculée, l'écart n'est mesuré par aucune batterie. La
+    spécification (commentaire 6747040204 de l'issue~\#178) donne une
+    mesure hors batterie au-delà du plafond, par calcul de la loi exacte
+    hors CI (comparaison à une loi calculée, non un constat de simulation,
+    non rejouée par le dépôt), sur le pire cas mesuré, de 40~segments (coût $2{,}1
+    \times 10^{8}$, $\sigma_b \approx 48$), en notant $z = (o - m_b)/\sigma_b$
+    (notation de la présente documentation~; la spécification ne précise
+    pas si $z$ inclut la correction de continuité, écart de
+    $1/(2\sigma_b) \approx 0{,}01$ sans effet à la précision donnée)~:
+    écart absolu au plus $1{,}2 \times 10^{-3}$ et relatif au plus
+    $2{,}3$~\% pour $|z| \le 2$, de $7{,}7$ à $8{,}9$~\% à $|z| = 3$,
+    jusqu'à 23~\% à $|z| = 4$.
   \item \textbf{S6, S7 et S8} (signes, suites, Wilcoxon), exactes et
     asymptotiques~: produites, avec le statut de la relation
     \code{independante} complété par «~table positionnée sur ces données~:
@@ -9214,8 +9435,8 @@ suites, Wilcoxon)~; \code{variance\_nulle} (suites)~; \code{ex\_aequo} et
 \code{effectif\_au\_dela\_n\_max} (p-valeurs exactes)~;
 \code{aucun\_deces} (MAPE)~; \code{variance\_observee\_nulle} ($R^2$)~;
 \code{contraint\_par\_positionnement} (sous \code{positionnee}~: grandeurs
-sous $H_0$ du SMR global, et toutes les grandeurs de test quand $n - S =
-0$).\par}
+sous $H_0$ du SMR global, et toutes les grandeurs de test, variance exacte
+de $X^2$ comprise, quand $n - S = 0$).\par}
 
 {\footnotesize
 \rowcolors{2}{tablerow}{white}
@@ -9235,10 +9456,10 @@ sous $H_0$ du SMR global, et toutes les grandeurs de test quand $n - S =
 \textcolor{financeblue}{\textbf{Statut}} \\
 \endhead
 S1 \code{residus} & décomptes au-delà de 2 et 3~; leurs espérances & --- & décomptes descriptifs~; espérances exactes sous $H_0$~(i), $E^c$ fixe (asymptotiques sous le modèle de survie), \code{ppois()} en approximation numérique \\
-S2 \code{khi2\_pearson} & $X^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & $X^2$ descriptif~; p asymptotique ($\chi^2_{n-p}$, $A_c \to \infty$)~; Monte-Carlo de niveau exact \\
-S3 \code{deviance} & $G^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & comme S2 \\
+S2 \code{khi2\_pearson} & $X^2$, ddl, variance exacte sous $H_0$, p asymptotique, p et erreur de Monte-Carlo & supérieure & $X^2$ descriptif~; variance exacte sous $H_0$~(i), $E^c$ fixe (moments de Poisson)~; p asymptotique ($\chi^2_{n-p}$, $A_c \to \infty$ dans chaque cellule retenue), non garantie aux attendus faibles~; Monte-Carlo de niveau exact \\
+S3 \code{deviance} & $G^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & comme S2, sans variance~; aux attendus faibles, erreur de la p asymptotique de sens variable selon les $A_c$ \\
 S4 \code{smr} & $O$, $A$, SMR, $O - A$, bornes exactes, p inférieure, supérieure, centrale, $z$ et p de la racine cubique & centrale (et unilatérales) & SMR~: résultat exact (maximum de vraisemblance)~; bornes exactes sous la loi supposée, couverture $\ge$ niveau, \code{qgamma()} en approximation numérique~; p exactes sous $H_0$~(i)~; racine cubique asymptotique \\
-S5 sous-groupes & $O$, $A$, SMR, bornes exactes, p-valeurs & centrale (et unilatérales) & comme S4, sans correction de multiplicité (statuts dans les paramètres de l'étape) \\
+S5 sous-groupes & $O$, $A$, SMR, bornes exactes, p-valeurs~; p-valeurs asymptotiques (sous \code{positionnee}, au-delà du plafond de convolution seulement) & centrale (et unilatérales) & comme S4, sans correction de multiplicité~; p-valeurs asymptotiques~: approximation normale, résultat asymptotique (statuts dans les paramètres de l'étape) \\
 S6 \code{signes} & $n_{+}$, $n_{-}$, nuls, $n$, statistique, p asymptotique, p exacte, $E_{H_0}[n_{+}]$, p et erreur de Monte-Carlo & centrale & décomptes descriptifs~; p asymptotique et exacte sous $P(r_c > 0) = 1/2$, \textbf{qui n'est pas} $H_0$~(i)~; $E_{H_0}[n_{+}]$ exact sous $H_0$~(i)~; Monte-Carlo de niveau exact \\
 S7 \code{runs} & séquences, $R$, espérance, variance, statistique, p asymptotique, p exacte, p et erreur de Monte-Carlo & inférieure & moments, p asymptotique et exacte conditionnelles à $(n_{+}, n_{-})$ sous l'équiprobabilité des ordres, \textbf{qui n'est pas} $H_0$~(i)~; p exacte par \code{lchoose()} en approximation numérique~; Monte-Carlo de niveau exact \\
 S8 \code{wilcoxon} & $n$, nuls, groupes d'ex aequo, $w_{+}$, variance, $z$, p asymptotique, p exacte, p et erreur de Monte-Carlo & centrale & sous la symétrie des différences autour de 0, \textbf{qui n'est pas} $H_0$~(i)~; p exacte par \code{psignrank()} en approximation numérique~; Monte-Carlo de niveau exact \\
@@ -9436,7 +9657,9 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     par tranche)~: $E^c$, $O_s$, $A_s$, $O_s / A_s$ --- rapport interne au
     regroupé, qui \textbf{n'est pas un SMR} rapporté à une table --- et
     l'écart réduit $z_s = (O_s - A_s)/\sqrt{V_{ss}}$, de loi asymptotique
-    $\mathcal{N}(0, 1)$ sous $H_0$~; aucune p-valeur n'en est tirée, et
+    $\mathcal{N}(0, 1)$ sous $H_0$ quand $V_{ss} \to \infty$ (même
+    régime que la p-valeur asymptotique,
+    ci-dessous~; issue~\#185)~; aucune p-valeur n'en est tirée, et
     aucune correction de multiplicité. Le rapport $(O_s - A_s)^2/A_s$,
     conservateur, n'est pas produit.
   \item \textbf{Calcul}~: \code{calculer\_homogeneite()}, par
@@ -9447,8 +9670,32 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     rendue dans \code{etapes\$homogeneite\$parametres\$statuts}, qui fait
     foi)~: décomptes de strates et de groupes et ddl, exacts~; $T$ et
     $z_s$, approximation numérique~; p-valeur asymptotique, résultat
-    asymptotique ($D_{\cdot c} \to \infty$), sous $H_0$ avec $E$ tenue pour
-    fixe et aussi sous le modèle de survie~; p-valeur exacte, exacte
+    asymptotique dans le régime d'information croissante (issue~\#185)~:
+    plus petite valeur propre de $V$ réduite (de façon équivalente, à
+    nombre de groupes fixé, plus petite valeur propre non nulle de $V$)
+    tendant vers l'infini, le nombre de strates étant fixe ou croissant~;
+    $D_{\cdot c}$ peut rester petit dans chaque strate~: sachant les
+    $D_{\cdot c}$, $U$ est la somme de $\sum_c D_{\cdot c}$ vecteurs
+    indépendants, un par décès (vecteur indicateur du groupe du décès
+    moins $\pi_c$), centrés sous $H_0$ et bornés, dont les matrices de
+    variance somment à $V$~; le théorème central limite de Lindeberg, sous
+    sa forme multivariée, s'applique dès que cette valeur propre tend vers
+    l'infini, et le régime $D_{\cdot c} \to \infty$ dans chaque strate
+    n'est donc pas requis. La condition, reprise du statut, qu'aucune
+    strate ne porte à elle seule une part non négligeable de $V$ est
+    suffisante sans être nécessaire, et ne peut être remplie quand le
+    nombre de strates est fixe (issue~\#202, décision du mainteneur du
+    10/11/2026~: correction du statut du code renvoyée hors de B16).
+    Illustration~: constat de simulation m8 de la spécification
+    (commentaire 6747045250 de l'issue~\#185), hors batterie, $10^4$
+    réplications par cas, erreur de Monte-Carlo $0{,}0022$ sur un taux de
+    5~\%~: niveau réel au seuil de 5~\% de $0{,}0490$ (71~strates,
+    2~groupes, $0{,}3$~décès attendu par strate), $0{,}0468$ ($0{,}1$~décès
+    attendu par strate), $0{,}0463$ (3~groupes), $0{,}0415$ (10~strates,
+    5~décès en tout)~: voisin du niveau nominal, ou un peu inférieur, avec
+    moins d'un décès attendu par strate. La loi limite $\chi^2_{\mathrm{ddl}}$ de la p-valeur
+    asymptotique vaut sous $H_0$ avec $E$ tenue pour fixe et aussi sous le
+    modèle de survie~; $z_s$, même régime, $V_{ss} \to \infty$~; p-valeur exacte, exacte
     conditionnellement aux $D_{\cdot c}$ sous $H_0$, $E$ tenue pour fixe, et
     asymptotique sous le modèle de survie (convolution~: approximation
     numérique)~; p-valeur de Monte-Carlo, de niveau exact au sens
@@ -9563,7 +9810,9 @@ p.~114--115~; chap.~4,
 des attendus calculés à la main, des identités exactes et des
 recoupements~: la ligne de \code{ETAPES}, les paramètres, les états et les
 statuts (mention d'indépendance, place de la qualification «~asymptotique
-sous le modèle de survie~», $O/A$ non nommé SMR, aucune attribution)~;
+sous le modèle de survie~», $O/A$ non nommé SMR, aucune attribution~;
+régime d'information croissante de la p-valeur asymptotique et de $z_s$,
+T185.1, issue~\#185)~;
 chaque refus de \code{valider\_plan()} et leur ordre, et l'invariance des
 refus de l'étape \code{validation} après l'extraction des briques de
 forme~; sur un petit jeu, $T$, ddl et p asymptotiques des tests global,
@@ -9657,13 +9906,24 @@ que dans les modules \code{brut} et \code{validation}), levé sous le module
 \code{importance\_exclusions} par
 \code{controler\_parametres\_importance\_exclusions()}, que
 \code{valider\_plan()} appelle, seule, avant toute étape. La fonction
-d'étape ne refait aucun contrôle~: ni la segmentation, dont la variante
+d'étape ne refait aucun contrôle des entrées ni des paramètres~: ni la segmentation, dont la variante
 \code{segmentation\_invalide} de ce module est retirée, ni le niveau,
 qu'elle contrôlait en appel direct avant l'issue~\#82 (décisions M216 et
 M291~; section~\ref{sec:execution})~; elle reçoit les valeurs validées
 \code{p}, la recette et la convention, qu'elle transmet aux expositions
 contrefactuelles. L'étape ne
-définit aucun autre refus~: tout ce qui ne peut être calculé est rendu dans
+définit qu'un autre refus, de capacité (issue~\#174)~:
+\code{evenements\_retires\_hors\_plage}, levé sous le module
+\code{importance\_exclusions} par \code{total\_evenements\_retires()} quand le
+total des événements retirés d'un ensemble à un niveau, somme formée en
+\code{double} des événements retirés de ses cellules (chacun stocké en
+\code{integer}), dépasse le plus grand entier du moteur ($2^{31} - 1$,
+\code{.Machine\$integer.max})~; le message cite ce total, l'ensemble et le
+niveau, repris dans \code{details} (\code{ensemble}, \code{niveau},
+\code{evenements\_retires}). Ce refus tient la place de la conversion en
+\code{integer} qui, au-delà de la borne, rendrait \code{NA} avec un simple
+avertissement~; en deçà, le total est rendu en \code{integer}. Hors ce
+refus, tout ce qui ne peut être calculé est rendu dans
 un état nommé (ci-dessous), sans refus~; seules les gardes des fonctions
 d'exposition qu'elle rappelle (par exemple \code{trop\_de\_cellules})
 restent en vigueur. Les incohérences internes (lignes reçues
@@ -9837,8 +10097,9 @@ cellules à événements ou à jours retirés non nuls sont gardées.
 \noindent
 Le tableau \code{resultat\$retraits} donne, par ensemble et par niveau, les
 lignes mesurables, les lignes non calculables, les décomptes de têtes, les
-événements, jours et exposition centrale retirés (sommes des cellules) et
-l'état~; les cellules elles-mêmes sont dans
+événements, jours et exposition centrale retirés (sommes des cellules~;
+\code{evenements\_retires} est stocké en \code{integer}, \code{NA} pour une
+ligne non produite, issue~\#174) et l'état~; les cellules elles-mêmes sont dans
 \code{resultat\$cellules\_niveau\_a} et \code{resultat\$cellules\_niveau\_b}.
 Un motif déclaré qui ne porte sur aucune ligne, ou un total vide, est dans
 l'état \code{produite}, à retraits nuls (têtes à 0 en unité tête), son
@@ -9869,8 +10130,11 @@ et Q2~(a), et M242). Le SMR des lignes exclues est $O/A$, où $A$ vient d'un
     (niveau~B). Les
     cellules retirées sans exposition retenue sont hors du SMR, leurs
     événements et leur exposition restitués à part (état de cellule
-    \code{sans\_exposition\_retenue}). Au niveau~A, le SMR est standardisé
-    sur l'âge (et l'année sous \code{par\_annee}), non sur le segment.
+    \code{sans\_exposition\_retenue}, \code{produite} sinon, dans la
+    colonne \code{etat\_cellule} des tables de cellules, stockée en
+    \code{character} même quand la table est vide, issue~\#177). Au
+    niveau~A, le SMR est standardisé sur l'âge (et l'année sous
+    \code{par\_annee}), non sur le segment.
   \item \textbf{Comparateur~2, table de référence de l'étape
     \code{validation}} (\code{smr\_comparateur\_2()},
     \code{resultat\$smr\_comparateur\_2}), produit \textbf{si et seulement
@@ -10053,10 +10317,20 @@ chaque test nommant la nature de son attendu)~:
     bornes exactes et asymptotiques, rapport de variance~; classement des
     motifs et des lignes~; T5, garde de réintégration~; T6, niveaux~A et~B
     sous la segmentation \code{sexe}, et sous \code{par\_annee}~; T7, états
-    du SMR~; T8, comparateur~2 sous \code{independante}, sous
+    du SMR, et type \code{character} de \code{etat\_cellule} sur une table
+    de cellules vide, mêlée ou toute sans exposition retenue, et dans les
+    tables de cellules des niveaux~A et~B d'une construction, vides ou non
+    (issue~\#177)~; T8, comparateur~2 sous \code{independante}, sous
     \code{ajustee\_hors\_outil} et sans \code{validation}, table par sexe,
     tout ou rien et priorité des états~; motif sans ligne, total vide,
-    \code{contrat\_duplique} dans les deux unités~; refus du plan, et, en
+    \code{contrat\_duplique} dans les deux unités~; type \code{integer} de
+    \code{evenements\_retires} dans \code{retraits} (lignes produites et non
+    produites, total vide) et dans les tables de cellules des niveaux~A
+    et~B~; refus \code{evenements\_retires\_hors\_plage} de
+    \code{total\_evenements\_retires()} en appel direct, sur un total qui
+    dépasse la borne sans qu'aucun terme ne la dépasse (module, motif,
+    message, \code{details}), total égal à la borne et total vide rendus en
+    \code{integer} (issue~\#174)~; refus du plan, et, en
     appel direct, erreur de programmation sur une étape
     \code{validation} transmise sans sa table~; recette fictive de convention native
     \code{age\_atteint\_annee}~: l'étape \code{exposition} et les
@@ -10158,7 +10432,11 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     l'appelant restauré~; $\hat\mu$ identique au taux de Poisson de l'étape
     \code{brut}~; grille, identité des décomptes, paramètres et
     \code{monte\_carlo} de l'étape dans \code{construire\_table()}~;
-    sous-groupes dont les $O$ somment au $O$ global~; appariement
+    sous-groupes dont les $O$ somment au $O$ global~; nombre de cellules
+    retenues des sous-groupes et du diagnostic stocké en \code{integer} (un
+    segment, table vide, \code{par\_annee} sans cellule,
+    \code{ajustee\_hors\_outil}, segmentation par sexe), les nombres d'un
+    regroupement sommant à celui du diagnostic (issue~\#174)~; appariement
     \code{ensemble\_par\_sexe}~; \code{par\_annee = TRUE} (séquences sexe
     $\times$ année, SMR égal au cas sans année)~;
     \code{ajustee\_hors\_outil} dans \code{construire\_table()}~;
@@ -10180,7 +10458,22 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{STATUTS\_VALIDATION} en statistique, grandeur et \code{sous\_h0},
     statuts de Wilcoxon, du $R^2$ et de la distance qui nomment la table
     positionnée, statut conditionnel de ddl (décision M309), empreinte des
-    statuts stable sous les locales C et UTF-8~; \code{statuts\_validation()}
+    statuts stable sous les locales C et UTF-8~; ligne
+    \code{khi2\_pearson}/\code{variance\_h0} définie par $H_0$, entre
+    \code{ddl} et \code{p\_asymptotique}, sous les deux relations, et
+    textes des p-valeurs asymptotiques de $X^2$ et de $G^2$ (formule de
+    variance de chaque relation, répartition des $A_c$, phrases communes
+    identiques sous les deux relations, absence de «~conservat~» hors de la
+    mention de l'unité d'observation~; issue~\#179)~; variance exacte de
+    $X^2$ égale, à $10^{-12}$ près en relatif, à celle obtenue par
+    énumération exacte --- loi de Poisson conjointe de trois cellules,
+    tronquée, avec $E[X^2] = n$, sous \code{independante}~; toutes les compositions
+    multinomiales de deux segments, avec $E[X^2] = n - S$, puis d'un cas à
+    segments non contigus et non ordonnés, cellule exclue intercalée et
+    segment d'une seule cellule retenue, sous \code{positionnee} ---, et
+    ses états \code{contraint\_par\_positionnement} ($n - S = 0$),
+    \code{ddl\_non\_etabli} et \code{aucune\_cellule\_retenue}
+    (issue~\#179)~; \code{statuts\_validation()}
     et chaque branchement à trois valeurs, erreur de programmation par
     défaut~; sur un jeu d'un segment, $X^2$, $G^2$, ddl $= n - S$, SMR
     global égal à 1 et grandeurs sous $H_0$ non produites, fluctuation
@@ -10199,7 +10492,18 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     0$ (aucun test, aucun tirage) et son témoin~; sous-groupes~: binomiaux
     d'un segment et sommes de deux binomiales recoupés, états
     \code{contraint\_par\_positionnement} (dont un sous-groupe qui contient
-    tous les segments touchés en entier) et \code{bornes\_non\_definies}~;
+    tous les segments touchés en entier) et \code{bornes\_non\_definies},
+    nombre de cellules retenues en \code{integer}, sommant par regroupement
+    au nombre des cellules retenues (issue~\#174)~; p-valeurs asymptotiques
+    au-delà du plafond (issue~\#178~: T178.1, deux segments de deux
+    cellules au-delà de $10^8$ produits, p-valeurs exactes et bornes
+    \code{NA}, p-valeurs asymptotiques égales à la formule à $10^{-15}$
+    près en relatif, et erreur de programmation à variance nulle~; T178.2,
+    écart à la p-valeur exacte borné sur un cas en deçà du plafond, bascule
+    stricte au coût égal au plafond~; T178.3, ordre des colonnes, valeurs
+    \code{NA} sous les trois relations hors de l'état
+    \code{convolution\_au\_dela\_n\_max}, aucune ligne portant une
+    p-valeur exacte et une p-valeur asymptotique, textes des statuts)~;
     les trois refus inter-étapes et \code{relation\_table\_invalide}~;
     comparateur~2 non produit~; rejeu \code{identical()} hors
     \code{execution}~; mention de la table de référence prise telle quelle
@@ -10285,7 +10589,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{N\_MAX\_RUNS\_EXACT} & constante & --- & 10000~: somme maximale des effectifs de la loi exacte des suites \\
 \catalogue{fonctions-validation}{TOLERANCE\_RESIDU\_NUL} & constante & --- & $10^{-10}$~: tolérance relative d'un résidu nul \\
 \catalogue{fonctions-validation}{ELEMENTS\_BLOC\_REPLICATIONS} & constante & --- & $2^{22}$~: éléments au plus d'un bloc de réplications \\
-\catalogue{fonctions-validation}{N\_MAX\_PRODUITS\_CONVOLUTION} & constante & --- & $10^8$~: nombre maximal de produits de la convolution d'une somme de binomiales (sous-groupes de plusieurs segments sous \code{positionnee}~; au-delà, état \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}) \\
+\catalogue{fonctions-validation}{N\_MAX\_PRODUITS\_CONVOLUTION} & constante & --- & $10^8$~: nombre maximal de produits de la convolution d'une somme de binomiales (sous-groupes de plusieurs segments sous \code{positionnee}~; au-delà, état \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}~: p-valeurs exactes \code{NA}, p-valeurs asymptotiques produites à leur place, issue~\#178) \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_VALIDATION} & constante & --- & identité de la note II1291-14 v1.4 (titre, fichier, SHA-256 complet, statut de référence de place~; décision M244) \\
 \catalogue{fonctions-validation}{HYPOTHESE\_VALIDATION} & constante & --- & texte de l'hypothèse nulle $H_0$~(i) et de ses conditions \\
 \catalogue{fonctions-validation}{HYPOTHESE\_VALIDATION\_POSITIONNEE} & constante & --- & texte de l'hypothèse nulle sous \code{positionnee}~: $\theta_s$ inconnu par segment, loi multinomiale conditionnelle aux $O_s$ \\
@@ -10310,10 +10614,11 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{binomiale\_elaguee()} & interne & $n$, $p$ & \code{dbinom(0:n, n, p)} réduite à l'intervalle de ses valeurs non nulles, et sa première valeur \\
 \catalogue{fonctions-validation}{cout\_convolution\_binomiales()} & interne & effectifs, probabilités & nombre de produits de la convolution, calculé avant elle \\
 \catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe~; attribut \code{produits}~; brique partagée avec l'étape \code{homogeneite} \\
+\catalogue{fonctions-validation}{p\_somme\_binomiales\_normale()} & interne & effectifs, probabilités, valeur observée $o$ & p-valeurs inférieure, supérieure et centrale de l'approximation normale d'une somme de binomiales indépendantes, avec correction de continuité (\code{pnorm()})~; erreur de programmation si la variance est nulle (issue~\#178) \\
 \catalogue{fonctions-validation}{pvaleur\_monte\_carlo()} & interne & observé, répliques, sens & $p_{MC}$ et erreur de Monte-Carlo \\
 \catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, relation, $B$, graine, segment (sous \code{positionnee} seulement) & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
 \catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante \\
-\catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, bornes d'un segment, états \\
+\catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau, plafond de convolution (\code{n\_max}, par défaut \code{N\_MAX\_}\allowbreak\code{PRODUITS\_}\allowbreak\code{CONVOLUTION}~; autre valeur pour les seuls tests) & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, exactes ou, au-delà du plafond, asymptotiques, bornes d'un segment, états \\
 \catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine, étape \code{positionnement} & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs} \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version} \\
@@ -10343,7 +10648,8 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
 \catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes}) \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174) \\
+\catalogue{fonctions-validation}{total\_evenements\_retires()} & interne & événements retirés des cellules, ensemble, niveau & total en \code{integer}, formé en \code{double}~; refus \code{evenements\_retires\_}\allowbreak\code{hors\_plage} (module \code{importance\_exclusions}) au-delà de \code{.Machine\$integer.max}, le message citant le total, l'ensemble et le niveau (issue~\#174) \\
 \catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
 }

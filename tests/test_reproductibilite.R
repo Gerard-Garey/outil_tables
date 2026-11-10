@@ -355,7 +355,8 @@ SANS_REFERENCE <- character(0)
 # tout alignement (sinon : « changement déclaré non observé ») :
 #   list(chemin = , nature = "type", de = "double", vers = "integer")
 #       conversion de type sans perte (double <-> integer) ; la référence est
-#       du type `de` ;
+#       du type `de` ; seconde conversion admise, logical -> character
+#       (#177), d'un vecteur vide seulement (logical(0) -> character(0)) ;
 #   list(chemin = , nature = "valeur", valeurs = , positions = )
 #       valeurs numériques nouvelles. Sans `positions`, `valeurs` remplace
 #       tout le vecteur, de n'importe quelle longueur (changement de
@@ -397,6 +398,10 @@ SANS_REFERENCE <- character(0)
 # champ conditionnel hypotheses_recette, absent de R1 à R12 ; seule
 # fiche/version_fiche changeait dans le corps, M334) close par la
 # régénération (R) de B15 (run CI 42635335347, bd63b73).
+# Transitions #174, #177, #179, #178 et #185 (B16 ; types des dénombrements,
+# etat_cellule, ligne khi2_pearson/variance_h0, colonnes p_*_asymptotique des
+# sous-groupes, statuts du positionnement et de l'homogénéité) closes par la
+# régénération unique (R) de B16 (run CI 42771679323, ecaead0).
 TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
@@ -449,8 +454,8 @@ valider_transitions <- function(transitions, plans = names(plans_reference())) {
       if (identical(ch$chemin, CHEMIN_EMPREINTE_DONNEES) && !(ch$nature == "valeur de chaîne" && is.null(ch$positions)))
         p <- c(p, paste0(e2, CHEMIN_EMPREINTE_DONNEES, " : seule la nature « valeur de chaîne » sans positions est admise (garde 3.2)"))
       if (ch$nature == "type" && !(is.character(ch$de) && is.character(ch$vers) && length(ch$de) == 1L && length(ch$vers) == 1L &&
-                                   paste(ch$de, ch$vers) %in% c("double integer", "integer double")))
-        p <- c(p, paste0(e2, "type : de et vers parmi double -> integer ou integer -> double"))
+                                   paste(ch$de, ch$vers) %in% c("double integer", "integer double", "logical character")))
+        p <- c(p, paste0(e2, "type : de et vers parmi double -> integer, integer -> double ou logical -> character"))
       if (ch$nature %in% c("ajout", "retrait")) {
         if (!(is.character(ch$type) && length(ch$type) == 1L && ch$type %in% TYPES_REFERENCE))
           p <- c(p, paste0(e2, "type : un type du format des références exigé"))
@@ -526,9 +531,15 @@ aligner_reference <- function(ref, g, changements) {
       if (identical(t, ch$vers)) stop(sprintf("%s : type déjà %s ; %s", c_, t, NON_OBSERVE))
       if (!identical(t, ch$de)) stop(sprintf("%s : type %s de la référence, %s déclaré", c_, t, ch$de))
       v <- ref$valeurs[[c_]]
-      w <- if (ch$vers == "integer") suppressWarnings(as.integer(v)) else as.double(v)
-      if (!identical(if (ch$de == "double") as.double(w) else as.integer(w), v))
-        stop(sprintf("%s : conversion %s -> %s avec perte", c_, ch$de, ch$vers))
+      if (identical(ch$de, "logical")) {
+        # logical -> character : seul le vecteur vide est sans valeur à convertir.
+        if (length(v)) stop(sprintf("%s : conversion logical -> character d'un vecteur non vide refusée (%d valeur(s))", c_, length(v)))
+        w <- character(0)
+      } else {
+        w <- if (ch$vers == "integer") suppressWarnings(as.integer(v)) else as.double(v)
+        if (!identical(if (ch$de == "double") as.double(w) else as.integer(w), v))
+          stop(sprintf("%s : conversion %s -> %s avec perte", c_, ch$de, ch$vers))
+      }
       ref$types[[c_]] <- ch$vers; ref$valeurs[[c_]] <- w
     } else if (ch$nature %in% c("valeur", "valeur de chaîne")) {
       t <- ref$types[[c_]]; v0 <- ref_t$valeurs[[c_]]
@@ -946,6 +957,18 @@ for (p in plans_reference()) {
     conflit <- doubles_multi_cles(names(g$types)[g$types == "double"])
     if (length(conflit)) paste("classé par plusieurs clés :", paste(utils::head(conflit, 5L), collapse = ", ")) else TRUE
   })
+  # T178.3 (#178 ; spécification (0'), M361) : aucun sous-groupe de R8, R9,
+  # R10 ne dépasse N_MAX_PRODUITS_CONVOLUTION ; les trois colonnes des p
+  # asymptotiques sont entièrement NA (valeurs des ajouts de la transition
+  # #178, que l'alignement ne contrôle pas).
+  if (id %in% c("R8", "R9", "R10")) verifier(sprintf("%s : T178.3 colonnes p_*_asymptotique des sous-groupes de la validation entièrement NA, aucun état convolution_au_dela_n_max (#178)", id), {
+    sg <- x_ref$etapes$validation$resultat$sous_groupes
+    a <- c("p_inferieure_asymptotique", "p_superieure_asymptotique", "p_centrale_asymptotique")
+    if (!all(a %in% names(sg))) "colonnes absentes"
+    else if (!all(vapply(sg[a], function(v) is.double(v) && all(is.na(v)), NA))) "valeurs non NA"
+    else if (any(sg$etat == "convolution_au_dela_n_max")) "état convolution_au_dela_n_max"
+    else TRUE
+  })
   # R14 (#180, C6 à l'échelle de l'entrée de référence) : relevés de la
   # construction de référence égaux aux décomptes de l'attribut simulation
   # de son entrée (P0, E, ES par cause, présents au dernier inventaire) ;
@@ -1357,12 +1380,15 @@ for (chemin_cellules in c("etapes/exposition/diagnostics/cellules", "etapes/brut
     chemin_cellules %in% doubles_sans_tolerance(g) && !chemin_cellules %in% doubles_sans_tolerance(g, masque)
   })
 }
-# Mêmes témoins pour R8 (#166, audit m1) : les trois chemins integer que les
-# clés nues cellules_retenues et evenements_retires auraient classés ; les clés
-# de R8 sont qualifiées (`<table>/<colonne>`) et n'atteignent que des doubles.
+# Mêmes témoins pour R8 (#166, audit m1) : les chemins integer que les clés
+# nues cellules_retenues et evenements_retires auraient classés ; les clés de R8
+# sont qualifiées (`<table>/<colonne>`) et n'atteignent que des doubles. Les
+# deux derniers sont integer depuis #174 (B16).
 for (chemin_ie in c("etapes/validation/diagnostics/cellules_retenues",
                     "etapes/importance_exclusions/resultat/cellules_niveau_a/evenements_retires",
-                    "etapes/importance_exclusions/resultat/cellules_niveau_b/evenements_retires")) {
+                    "etapes/importance_exclusions/resultat/cellules_niveau_b/evenements_retires",
+                    "etapes/validation/resultat/sous_groupes/cellules_retenues",
+                    "etapes/importance_exclusions/resultat/retraits/evenements_retires")) {
   verifier(sprintf("témoin : %s remis en double -> relevé par doubles_sans_tolerance(), que la clé nue %s aurait masqué", chemin_ie, basename(chemin_ie)), {
     g <- aplatis[["R8"]]
     if (!identical(unname(g$types[chemin_ie]), "integer"))
@@ -2166,6 +2192,26 @@ local({
            is.character(seul_ecart(def_chaine(nouveau), nouveau, fixe(modifyList(ch[["valeur de chaîne"]], list(valeurs = "v3"))))))
   verifier("témoin 9.5, type : conversion avec perte (valeurs non entières) refusée",
            mauvais({ o <- def_type(nouveau); o$valeurs[["s/cellules"]][1L] <- 149.5; o }, ch$type, "avec perte"))
+  # logical -> character (#177) : vecteur vide seulement.
+  vide_logique <- function(r) { r$types[["s/etat"]] <- "logical"; r$valeurs[["s/etat"]] <- logical(0); r }
+  nouveau_etat <- nouveau
+  nouveau_etat$types[["s/etat"]] <- "character"; nouveau_etat$valeurs[["s/etat"]] <- character(0)
+  ch_etat <- list(chemin = "s/etat", nature = "type", de = "logical", vers = "character")
+  verifier("témoin 9.5, type logical -> character (#177) : vecteur vide, la comparaison stricte échoue, le seul écart déclaré passe, un écart non déclaré en plus échoue",
+           !comparer_references(vide_logique(nouveau_etat), nouveau_etat)$ok &&
+             isTRUE(seul_ecart(vide_logique(nouveau_etat), nouveau_etat, fixe(ch_etat))) &&
+             is.character(seul_ecart(derive(vide_logique(nouveau_etat)), nouveau_etat, fixe(ch_etat))))
+  verifier("témoin 9.5, type logical -> character (#177) : vecteur non vide refusé ; type déjà character non observé ; type logical -> integer refusé par valider_transitions()", {
+    plein <- vide_logique(nouveau_etat); plein$valeurs[["s/etat"]] <- c(TRUE, NA)
+    r1 <- seul_ecart(plein, nouveau_etat, fixe(ch_etat))
+    r2 <- seul_ecart(nouveau_etat, nouveau_etat, fixe(ch_etat))
+    if (!(is.character(r1) && grepl("non vide", r1, fixed = TRUE, useBytes = TRUE))) paste("vecteur non vide :", paste(r1, collapse = " "))
+    else if (!(is.character(r2) && grepl("type déjà character", r2, fixed = TRUE, useBytes = TRUE))) paste("type déjà character :", paste(r2, collapse = " "))
+    else if (length(valider_transitions(list(tr("#901", "R1", ch_etat))))) "logical -> character refusé par valider_transitions()"
+    else if (!length(valider_transitions(list(tr("#901", "R1", modifyList(ch_etat, list(vers = "integer"))))))) "logical -> integer accepté"
+    else if (!length(valider_transitions(list(tr("#901", "R1", modifyList(ch_etat, list(de = "character", vers = "logical"))))))) "character -> logical accepté"
+    else TRUE
+  })
   verifier("témoin 9.5, type : type de la référence autre que le type déclaré refusé",
            mauvais(def_type(nouveau), modifyList(ch$type, list(chemin = "fiche/version")), "type character de la référence"))
   verifier("témoin 9.5, type : chemin absent de la référence refusé",
