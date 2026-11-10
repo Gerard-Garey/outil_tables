@@ -2603,8 +2603,15 @@ fermée de cinq et déclarée exactement~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{type}~: conversion sans perte de \code{double} vers
-    \code{integer}, ou l'inverse~; la référence est du type de départ
-    déclaré~;
+    \code{integer}, ou l'inverse, et, depuis l'issue~\#177, de
+    \code{logical} vers \code{character} pour un vecteur vide seulement
+    (colonne \code{etat\_cellule} d'une table de cellules vide de l'étape
+    \code{importance\_exclusions}, que \code{ifelse()} rendait en
+    \code{logical} sur un vecteur vide, et qui est désormais en
+    \code{character} dans tous les cas)~: un vecteur \code{logical} non
+    vide est refusé, faute de conversion qui ne change aucune valeur, et
+    aucune autre paire de types n'est admise~; la référence est du type de
+    départ déclaré~;
   \item \textbf{valeur}~: valeurs numériques nouvelles d'une grandeur
     \code{double} ou \code{integer}, avec ou sans positions. Avec positions,
     la longueur est conservée et chaque position déclarée change~; sans
@@ -9895,8 +9902,11 @@ et Q2~(a), et M242). Le SMR des lignes exclues est $O/A$, où $A$ vient d'un
     (niveau~B). Les
     cellules retirées sans exposition retenue sont hors du SMR, leurs
     événements et leur exposition restitués à part (état de cellule
-    \code{sans\_exposition\_retenue}). Au niveau~A, le SMR est standardisé
-    sur l'âge (et l'année sous \code{par\_annee}), non sur le segment.
+    \code{sans\_exposition\_retenue}, \code{produite} sinon, dans la
+    colonne \code{etat\_cellule} des tables de cellules, stockée en
+    \code{character} même quand la table est vide, issue~\#177). Au
+    niveau~A, le SMR est standardisé sur l'âge (et l'année sous
+    \code{par\_annee}), non sur le segment.
   \item \textbf{Comparateur~2, table de référence de l'étape
     \code{validation}} (\code{smr\_comparateur\_2()},
     \code{resultat\$smr\_comparateur\_2}), produit \textbf{si et seulement
@@ -10079,7 +10089,10 @@ chaque test nommant la nature de son attendu)~:
     bornes exactes et asymptotiques, rapport de variance~; classement des
     motifs et des lignes~; T5, garde de réintégration~; T6, niveaux~A et~B
     sous la segmentation \code{sexe}, et sous \code{par\_annee}~; T7, états
-    du SMR~; T8, comparateur~2 sous \code{independante}, sous
+    du SMR, et type \code{character} de \code{etat\_cellule} sur une table
+    de cellules vide, mêlée ou toute sans exposition retenue, et dans les
+    tables de cellules des niveaux~A et~B d'une construction, vides ou non
+    (issue~\#177)~; T8, comparateur~2 sous \code{independante}, sous
     \code{ajustee\_hors\_outil} et sans \code{validation}, table par sexe,
     tout ou rien et priorité des états~; motif sans ligne, total vide,
     \code{contrat\_duplique} dans les deux unités~; type \code{integer} de
