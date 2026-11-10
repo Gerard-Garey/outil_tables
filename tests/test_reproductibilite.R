@@ -398,219 +398,11 @@ SANS_REFERENCE <- character(0)
 # champ conditionnel hypotheses_recette, absent de R1 à R12 ; seule
 # fiche/version_fiche changeait dans le corps, M334) close par la
 # régénération (R) de B15 (run CI 42635335347, bd63b73).
-# Transition #174 (B16) : cellules_retenues des sous-groupes de la validation
-# et evenements_retires de la table retraits de l'importance des exclusions
-# passent de double à integer (dénombrements) dans R8, R9 et R10, valeurs
-# inchangées ; retirée par le commit de référence (R).
-# Transition #177 (B16) : etat_cellule des tables de cellules de l'importance
-# des exclusions, vide dans R8 et R10, passe de logical à character ; R9, dont
-# les tables ne sont pas vides, le porte déjà en character ; retirée par le
-# commit de référence (R).
-# Transition #179 (B16 ; spécification (0') de #179, M359) : ligne nouvelle
-# khi2_pearson/variance_h0 de etapes/validation/resultat/statistiques
-# (position 7, entre ddl et p_asymptotique ; 61 -> 62 lignes) et textes de
-# statut de khi2_pearson/p_asymptotique (position 8 après insertion) et de
-# deviance/p_asymptotique (position 13) dans R8, R9 et R10. La longueur
-# change : chaque colonne est déclarée en vecteur entier, formé de la colonne
-# de la référence commitée (lue dans tests/reference/, jamais dans le
-# package), ligne nouvelle insérée et deux textes remplacés ; valeurs
-# nouvelles en littéral (variance_h0 : valeur du moteur mesurée, comparée à la
-# tolérance de la colonne valeur ; textes en échappements \u, chaînes UTF-8 en
-# toute locale) ; une transition par plan (valeurs propres), plans deux à deux
-# disjoints ; retirée par le commit de référence (R), avec transition_179() et
-# les constantes *_179.
-VARIANCE_I_179 <- paste(
-  "exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le mod\u00e8le de survie : Var(X2) = somme sur C+",
-  "de (2 + 1/A_c) (moments de Poisson d'ordre 4), \u00e0 comparer \u00e0 2 (n - p), variance de la loi de",
-  "r\u00e9f\u00e9rence de khi2_pearson/p_asymptotique (les esp\u00e9rances sont \u00e9gales) ;",
-  "arithm\u00e9tique flottante")
-KHI2_I_179 <- paste(
-  "asymptotique : loi du khi-deux \u00e0 n - p degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
-  "retenue), p = 0 ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits :",
-  "sous H0 (i), E^c tenue pour fixe, E[X2] = n - p exactement mais Var(X2) = somme sur C+ de (2 + 1/A_c) > 2 (n",
-  "- p) (moments de Poisson, r\u00e9sultat exact ; khi2_pearson/variance_h0) ; le niveau r\u00e9el du test",
-  "fond\u00e9 sur cette p n'est pas \u00e9tabli en g\u00e9n\u00e9ral et d\u00e9passe le niveau nominal dans les",
-  "constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0 (i)")
-DEVIANCE_I_179 <- paste(
-  "asymptotique : loi du khi-deux \u00e0 n - p degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
-  "retenue), p = 0 ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits :",
-  "sous H0 (i), E^c tenue pour fixe, l'esp\u00e9rance de la contribution d'une cellule est inf\u00e9rieure",
-  "\u00e0 1 pour A_c inf\u00e9rieur \u00e0 0,49 environ et sup\u00e9rieure \u00e0 1 au-del\u00e0 (maximum",
-  "voisin de 1,16), par sommation des probabilit\u00e9s (approximation num\u00e9rique) : la p asymptotique est",
-  "trop grande ou trop petite selon la r\u00e9partition des A_c ; seule p_monte_carlo a un niveau garanti sous",
-  "H0 (i)")
-VARIANCE_P_179 <- paste(
-  "exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta ; asymptotique sous",
-  "le mod\u00e8le de survie : Var(X2 | O_s) = somme sur les segments de [2 (n_s - 1) + somme sur C+_s de 1/A_c",
-  "- (n_s^2 + 2 n_s - 2) / O_s], A_c = O_s pi_c (moments multinomiaux d'ordre 4), \u00e0 comparer \u00e0 2 (n -",
-  "S) ; arithm\u00e9tique flottante ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat,",
-  "les d\u00e9c\u00e8s sont sur-dispers\u00e9s et les tests sont anti-conservateurs")
-KHI2_P_179 <- paste(
-  "asymptotique : loi du khi-deux \u00e0 n - S degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
-  "retenue), theta estim\u00e9 par maximum de vraisemblance sur ces cellules, un par segment positionn\u00e9 (S",
-  "segments) ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits : sous H0",
-  "(i) conditionnellement aux O_s, E^c tenue pour fixe, E[X2] = n - S exactement et Var(X2) = somme sur les",
-  "segments de [2 (n_s - 1) + somme sur C+_s de 1/A_c - (n_s^2 + 2 n_s - 2) / O_s] (moments multinomiaux,",
-  "r\u00e9sultat exact ; khi2_pearson/variance_h0), sup\u00e9rieure \u00e0 2 (n - S) quand des A_c sont petits",
-  "devant ceux de leur segment, inf\u00e9rieure quand les A_c d'un segment sont \u00e9gaux ; le niveau",
-  "r\u00e9el du test fond\u00e9 sur cette p n'est pas \u00e9tabli en g\u00e9n\u00e9ral et d\u00e9passe le",
-  "niveau nominal dans les constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0",
-  "(i) ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
-  "sur-dispers\u00e9s et les tests sont anti-conservateurs")
-DEVIANCE_P_179 <- paste(
-  "asymptotique : loi du khi-deux \u00e0 n - S degr\u00e9s de libert\u00e9 (A_c -> infini dans chaque cellule",
-  "retenue), theta estim\u00e9 par maximum de vraisemblance sur ces cellules, un par segment positionn\u00e9 (S",
-  "segments) ; queue sup\u00e9rieure ; approximation non garantie quand des attendus A_c sont petits : sous H0",
-  "(i), E^c tenue pour fixe, pour des cellules de loi de Poisson d'esp\u00e9rance A_c, sans conditionner par",
-  "les O_s (conditionnellement aux O_s, D_c suit une loi binomiale et les valeurs ci-apr\u00e8s ne valent",
-  "qu'approximativement, quand pi_c est petit), l'esp\u00e9rance de la contribution d'une cellule est",
-  "inf\u00e9rieure \u00e0 1 pour A_c inf\u00e9rieur \u00e0 0,49 environ et sup\u00e9rieure \u00e0 1",
-  "au-del\u00e0 (maximum voisin de 1,16), par sommation des probabilit\u00e9s (approximation num\u00e9rique) :",
-  "la p asymptotique est trop grande ou trop petite selon la r\u00e9partition des A_c ; seule p_monte_carlo a",
-  "un niveau garanti sous H0 (i) ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat,",
-  "les d\u00e9c\u00e8s sont sur-dispers\u00e9s et les tests sont anti-conservateurs")
-transition_179 <- function(id, variance, statuts) {
-  ch <- "etapes/validation/resultat/statistiques/"
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  inserer <- function(colonne, v) append(ref[[paste0(ch, colonne)]], v, after = 6L)
-  statut <- inserer("statut", statuts[[1L]])
-  statut[c(8L, 13L)] <- unlist(statuts[2:3])
-  list(issue = "#179", plans = id, changements = list(
-    list(chemin = paste0(ch, "@lignes"), nature = "valeur", valeurs = 62),
-    list(chemin = paste0(ch, "statistique"), nature = "valeur de chaîne", valeurs = inserer("statistique", "khi2_pearson")),
-    list(chemin = paste0(ch, "grandeur"), nature = "valeur de chaîne", valeurs = inserer("grandeur", "variance_h0")),
-    list(chemin = paste0(ch, "valeur"), nature = "valeur", valeurs = inserer("valeur", variance)),
-    list(chemin = paste0(ch, "etat"), nature = "valeur de chaîne", valeurs = inserer("etat", "produite")),
-    list(chemin = paste0(ch, "statut"), nature = "valeur de chaîne", valeurs = statut)))
-}
-STATUTS_I_179 <- list(VARIANCE_I_179, KHI2_I_179, DEVIANCE_I_179)
-STATUTS_P_179 <- list(VARIANCE_P_179, KHI2_P_179, DEVIANCE_P_179)
-# Transition #178 (B16 ; spécification (0') de #178, M361) : trois colonnes
-# nouvelles p_inferieure_asymptotique, p_superieure_asymptotique,
-# p_centrale_asymptotique de etapes/validation/resultat/sous_groupes, entre
-# p_centrale et etat (14 -> 17 colonnes ; ajouts de type double, longueur
-# @lignes de la référence ; valeurs NA contrôlées par le test T178.3 de ce
-# fichier) ; ligne nouvelle p_valeurs_asymptotiques de
-# etapes/validation/parametres/statuts_sous_groupes (3 -> 4 lignes) dans R8,
-# R9 et R10, plus, dans R10 (relation positionnee), le texte de p_valeurs
-# complété. Colonnes de la référence commitée (lues dans tests/reference/,
-# jamais dans le package), complétées par les littéraux ci-dessous
-# (échappements \u) ; une transition par plan, plans deux à deux disjoints ;
-# retirée par le commit de référence (R), avec transition_178() et les
-# constantes *_178.
-ASYMPTOTIQUES_I_178 <- paste(
-  "relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours",
-  "calcul\u00e9e ; relation ajustee_hors_outil : non produites, p non \u00e9tabli, aucune p-valeur du",
-  "sous-groupe (ddl_non_etabli) ; colonnes NA")
-ASYMPTOTIQUES_P_178 <- paste(
-  "asymptotiques (sigma^2 -> infini) conditionnellement aux O_s : approximation normale de la somme de binomiales",
-  "ind\u00e9pendantes Bin(O_s, pi_b,s) d'un sous-groupe de plusieurs segments, moyenne somme de O_s pi_b,s,",
-  "variance sigma^2 = somme de O_s pi_b,s (1 - pi_b,s), correction de continuit\u00e9 (P(O_b <= o) par Phi((o +",
-  "1/2 - moyenne) / sigma), P(O_b >= o) par 1 - Phi((o - 1/2 - moyenne) / sigma)), p centrale min(1, 2 min) ;",
-  "produites seulement si le nombre de produits de la convolution d\u00e9passe N_MAX_PRODUITS_CONVOLUTION",
-  "(\u00e9tat convolution_au_dela_n_max), les p-valeurs exactes \u00e9tant alors NA ; jamais produites \u00e0",
-  "c\u00f4t\u00e9 d'une p-valeur exacte ; erreur relative croissante dans les queues (asym\u00e9trie de la",
-  "somme, d'ordre 1/sigma) ; aucune correction de multiplicit\u00e9 ; unit\u00e9s d'observation",
-  "ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s et les tests",
-  "sont anti-conservateurs")
-# Fragment de p_valeurs (positionnee) remplacé, avant et après.
-P_VALEURS_AVANT_178 <- "convolution_au_dela_n_max sinon) ;"
-P_VALEURS_APRES_178 <- "convolution_au_dela_n_max sinon, p-valeurs asymptotiques produites \u00e0 leur place) ;"
-transition_178 <- function(id, positionnee) {
-  sg <- "etapes/validation/resultat/sous_groupes/"
-  st <- "etapes/validation/parametres/statuts_sous_groupes/"
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  colonnes <- ref[[paste0(sg, "@colonnes")]]
-  nouvelles <- c("p_inferieure_asymptotique", "p_superieure_asymptotique", "p_centrale_asymptotique")
-  statut <- ref[[paste0(st, "statut")]]
-  if (positionnee) {
-    k <- which(ref[[paste0(st, "grandeur")]] == "p_valeurs")
-    if (length(k) != 1L || !grepl(P_VALEURS_AVANT_178, statut[k], fixed = TRUE))
-      stop(sprintf("transition_178(%s) : texte de p_valeurs de la référence inattendu", id))
-    statut[k] <- sub(P_VALEURS_AVANT_178, P_VALEURS_APRES_178, statut[k], fixed = TRUE)
-  }
-  list(issue = "#178", plans = id, changements = c(
-    list(list(chemin = paste0(sg, "@colonnes"), nature = "valeur de chaîne",
-              valeurs = append(colonnes, nouvelles, after = match("p_centrale", colonnes)))),
-    lapply(nouvelles, function(n) list(chemin = paste0(sg, n), nature = "ajout", type = "double",
-                                       longueur = ref[[paste0(sg, "@lignes")]])),
-    list(list(chemin = paste0(st, "@lignes"), nature = "valeur", valeurs = 4),
-         list(chemin = paste0(st, "grandeur"), nature = "valeur de chaîne",
-              valeurs = c(ref[[paste0(st, "grandeur")]], "p_valeurs_asymptotiques")),
-         list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
-              valeurs = c(statut, if (positionnee) ASYMPTOTIQUES_P_178 else ASYMPTOTIQUES_I_178)))))
-}
-# Transition #185 (B16 ; spécification (0') de #185, M362, option 1a) : textes
-# de statut de smr/smr et de table_positionnee/qx dans
-# etapes/positionnement/parametres/statuts/statut (R10, R13), de
-# tests/p_asymptotique et de segments/z dans
-# etapes/homogeneite/parametres/statuts/statut (R11, R12) ; longueurs
-# inchangées (13 lignes), deux valeurs de chaîne à leur position, repérée par
-# (table, grandeur) dans la référence commitée (lue dans tests/reference/,
-# jamais dans le package). Textes nouveaux en littéral (échappements \u) ;
-# celui de z, fragment remplacé dans le texte de la référence. Une transition
-# par plan, plans deux à deux disjoints ; retirée par le commit de référence
-# (R), avec transition_185() et les constantes *_185.
-SMR_185 <- paste(
-  "r\u00e9sultat exact : theta^ = O / A en forme close (aucune optimisation num\u00e9rique), maximum de",
-  "vraisemblance de theta dans le mod\u00e8le D_c ~ Poisson(theta A_c) ind\u00e9pendants ; vraisemblance de",
-  "m\u00eame forme sous le mod\u00e8le de survie \u00e0 force constante par cellule ; estimation de theta :",
-  "son erreur d'estimation est d\u00e9crite par les bornes, non par ce statut")
-QX_185 <- paste(
-  "r\u00e9sultat exact : image de theta^ par q = 1 - (1 - q~)^theta, fonction croissante de theta",
-  "(invariance du maximum de vraisemblance : maximum de vraisemblance de q dans le mod\u00e8le de forme",
-  "impos\u00e9e, force theta mu~ constante sur [x, x+1)) ; estimation de q_x, erreur d'estimation",
-  "d\u00e9crite par les bornes ; -expm1(theta^ log1p(-q~)), approximation num\u00e9rique ; vaut 1 par",
-  "arrondi si theta^ mu~ >= 54 ln 2 (\u00e9tat qx_arrondi_un)")
-P_ASYMPTOTIQUE_185 <- paste(
-  "asymptotique : loi du khi-deux \u00e0 ddl degr\u00e9s de libert\u00e9 quand l'information du test",
-  "cro\u00eet (plus petite valeur propre de V r\u00e9duite -> infini, aucune strate ne portant \u00e0 elle",
-  "seule une part non n\u00e9gligeable de V), le nombre de strates \u00e9tant fixe ou croissant : D_. peut",
-  "rester petit dans chaque strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le",
-  "mod\u00e8le de survie ; queue sup\u00e9rieure ; unit\u00e9s d'observation ind\u00e9pendantes ; sous",
-  "l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s et le test est anti-conservateur",
-  "(p-valeurs trop petites)")
-# Fragment du statut de segments/z remplacé, avant et après.
-Z_AVANT_185 <- "H0 (D_. -> infini), E tenue pour fixe"
-Z_APRES_185 <- "H0 (V_ss -> infini, m\u00eame r\u00e9gime que p_asymptotique), E tenue pour fixe"
-transition_185 <- function(id, etape) {
-  st <- paste0("etapes/", etape, "/parametres/statuts/")
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  cle <- paste(ref[[paste0(st, "table")]], ref[[paste0(st, "grandeur")]])
-  cibles <- if (etape == "positionnement") c("smr smr", "table_positionnee qx") else c("tests p_asymptotique", "segments z")
-  k <- match(cibles, cle)
-  statut <- ref[[paste0(st, "statut")]]
-  if (anyNA(k) || anyDuplicated(cle))
-    stop(sprintf("transition_185(%s) : lignes %s de la référence introuvables", id, paste(cibles, collapse = ", ")))
-  valeurs <- if (etape == "positionnement") c(SMR_185, QX_185) else {
-    if (!grepl(Z_AVANT_185, statut[k[2L]], fixed = TRUE))
-      stop(sprintf("transition_185(%s) : texte de segments/z de la référence inattendu", id))
-    c(P_ASYMPTOTIQUE_185, sub(Z_AVANT_185, Z_APRES_185, statut[k[2L]], fixed = TRUE))
-  }
-  list(issue = "#185", plans = id, changements = list(
-    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = valeurs, positions = k)))
-}
-TRANSITIONS_EN_COURS <- list(
-  list(issue = "#174", plans = c("R8", "R9", "R10"), changements = list(
-    list(chemin = "etapes/validation/resultat/sous_groupes/cellules_retenues", nature = "type",
-         de = "double", vers = "integer"),
-    list(chemin = "etapes/importance_exclusions/resultat/retraits/evenements_retires", nature = "type",
-         de = "double", vers = "integer"))),
-  list(issue = "#177", plans = c("R8", "R10"), changements = list(
-    list(chemin = "etapes/importance_exclusions/resultat/cellules_niveau_a/etat_cellule", nature = "type",
-         de = "logical", vers = "character"),
-    list(chemin = "etapes/importance_exclusions/resultat/cellules_niveau_b/etat_cellule", nature = "type",
-         de = "logical", vers = "character"))),
-  transition_179("R8", 360.38810430872218, STATUTS_I_179),
-  transition_179("R9", 361.34969667340141, STATUTS_I_179),
-  transition_179("R10", 353.26471567362739, STATUTS_P_179),
-  transition_178("R8", FALSE),
-  transition_178("R9", FALSE),
-  transition_178("R10", TRUE),
-  transition_185("R10", "positionnement"),
-  transition_185("R11", "homogeneite"),
-  transition_185("R12", "homogeneite"),
-  transition_185("R13", "positionnement"))
+# Transitions #174, #177, #179, #178 et #185 (B16 ; types des dénombrements,
+# etat_cellule, ligne khi2_pearson/variance_h0, colonnes p_*_asymptotique des
+# sous-groupes, statuts du positionnement et de l'homogénéité) closes par la
+# régénération unique (R) de B16 (run CI 42771679323, ecaead0).
+TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -1588,12 +1380,15 @@ for (chemin_cellules in c("etapes/exposition/diagnostics/cellules", "etapes/brut
     chemin_cellules %in% doubles_sans_tolerance(g) && !chemin_cellules %in% doubles_sans_tolerance(g, masque)
   })
 }
-# Mêmes témoins pour R8 (#166, audit m1) : les trois chemins integer que les
-# clés nues cellules_retenues et evenements_retires auraient classés ; les clés
-# de R8 sont qualifiées (`<table>/<colonne>`) et n'atteignent que des doubles.
+# Mêmes témoins pour R8 (#166, audit m1) : les chemins integer que les clés
+# nues cellules_retenues et evenements_retires auraient classés ; les clés de R8
+# sont qualifiées (`<table>/<colonne>`) et n'atteignent que des doubles. Les
+# deux derniers sont integer depuis #174 (B16).
 for (chemin_ie in c("etapes/validation/diagnostics/cellules_retenues",
                     "etapes/importance_exclusions/resultat/cellules_niveau_a/evenements_retires",
-                    "etapes/importance_exclusions/resultat/cellules_niveau_b/evenements_retires")) {
+                    "etapes/importance_exclusions/resultat/cellules_niveau_b/evenements_retires",
+                    "etapes/validation/resultat/sous_groupes/cellules_retenues",
+                    "etapes/importance_exclusions/resultat/retraits/evenements_retires")) {
   verifier(sprintf("témoin : %s remis en double -> relevé par doubles_sans_tolerance(), que la clé nue %s aurait masqué", chemin_ie, basename(chemin_ie)), {
     g <- aplatis[["R8"]]
     if (!identical(unname(g$types[chemin_ie]), "integer"))
