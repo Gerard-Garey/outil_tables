@@ -462,7 +462,7 @@ exposition_fenetres <- function(observations, p, segmentation, recette, conv, pa
   observations <- fs$observations
   manquantes <- setdiff(c("date_naissance", "debut", "fin", "cause", segmentation), names(observations))
   if (length(manquantes))
-    stop(sprintf("calculer_exposition() : colonne(s) %s absente(s) des observations (erreur de programmation).",
+    stop(sprintf("exposition_fenetres() : colonne(s) %s absente(s) des observations (erreur de programmation).",
                  paste(manquantes, collapse = ", ")), call. = FALSE)
   n_obs <- nrow(observations)
 
@@ -682,7 +682,7 @@ exposition_cellules <- function(observations, p, segmentation, recette, conv, pa
   declarees <- intersect(c("exposition_centrale", "exposition_initiale"), names(observations))
   manquantes <- setdiff(c("age", "evenements", segmentation, if (par_annee) "annee"), names(observations))
   if (length(manquantes) || !length(declarees))
-    stop(sprintf("calculer_exposition() : colonne(s) %s absente(s) des observations (erreur de programmation).",
+    stop(sprintf("exposition_cellules() : colonne(s) %s absente(s) des observations (erreur de programmation).",
                  paste(c(manquantes, if (!length(declarees)) "exposition"), collapse = ", ")), call. = FALSE)
   n_obs <- nrow(observations)
   sg <- segments_observations(observations, segmentation)

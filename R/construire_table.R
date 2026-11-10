@@ -431,9 +431,16 @@ valider_plan <- function(plan) {
   if ("inventaires" %in% names(plan)) controler_inventaires_plan(plan[["inventaires"]], p)
   if ("exposition" %in% noms) {
     pe <- etapes[["exposition"]]
-    if ("entree_entre_inventaires" %in% names(pe))
-      controler_parametres_exposition(pe[["convention"]], pe[["par_annee"]], pe[["entree_entre_inventaires"]])
-    else controler_parametres_exposition(pe[["convention"]], pe[["par_annee"]])
+    # Paramètres conditionnels à la recette : passés, par leur nom, quand le
+    # plan les porte (un paramètre présent à NULL est passé et refusé par
+    # controler_parametres_exposition(), qui lit son absence par missing()) ;
+    # un paramètre conditionnel de plus n'ajoute aucune branche. quote = TRUE :
+    # une valeur du plan qui est un objet de langage n'est pas évaluée, elle
+    # est refusée comme toute valeur de mauvais type.
+    ce <- PARAMETRES_ETAPES[["exposition"]]
+    do.call(controler_parametres_exposition,
+            c(list(pe[["convention"]], pe[["par_annee"]]), pe[intersect(ce$parametre[!is.na(ce$recette)], names(pe))]),
+            quote = TRUE)
   }
   # `brut` a pour préalables `donnees` et `exposition` (contrôlés ci-dessus) :
   # par_annee est déjà validé.
