@@ -662,14 +662,20 @@ verifier("T179.1 statuts : p asymptotique de X2 avec 2 + 1/A_c (independante) et
              grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs", g2[2L],
                    fixed = TRUE))
            TRUE else "deviance",
-    # Phrases recopiées entre les deux tables (portée locale) : identiques.
+    # Phrases partagées entre les deux tables (PHRASES_ATTENDUS_FAIBLES, #200) :
+    # identiques ; `petits` précède « : sous H0 (i) » dans les quatre p
+    # asymptotiques.
     copies = local({
+      p4 <- c(k(a, "khi2_pearson", "p_asymptotique"), k(a, "deviance", "p_asymptotique"),
+              k(b, "khi2_pearson", "p_asymptotique"), k(b, "deviance", "p_asymptotique"))
+      if (!all(grepl("approximation non garantie quand des attendus A_c sont petits : sous H0 (i)", p4, fixed = TRUE)))
+        return("phrase petits absente d'une p asymptotique")
       phrase_g2 <- regmatches(g2, regexpr("l'espérance de la contribution.*garanti sous H0 \\(i\\)", g2))
       fin_x2 <- sub(".*khi2_pearson/variance_h0\\) ; ", "", k(a, "khi2_pearson", "p_asymptotique"))
       if (length(phrase_g2) == 2L && identical(phrase_g2[1L], phrase_g2[2L]) &&
           startsWith(fin_x2, "le niveau réel") &&
           grepl(paste0("sont égaux ; ", fin_x2, " ; unités d'observation"), k(b, "khi2_pearson", "p_asymptotique"),
-                fixed = TRUE)) TRUE else "phrases recopiées différentes"
+                fixed = TRUE)) TRUE else "phrases partagées différentes entre les tables"
     }),
     ligne = if (all(vapply(list(a, b), function(s)
                   identical(ordre(s), c("statistique", "ddl", "variance_h0", "p_asymptotique", "p_monte_carlo",

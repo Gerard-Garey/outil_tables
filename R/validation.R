@@ -167,6 +167,21 @@ ETATS_GRANDEUR_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule_ret
 ETATS_SOUS_GROUPES_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule_retenue",
                                    "contraint_par_positionnement", "bornes_non_definies", "convolution_au_dela_n_max")
 
+# Phrases des statuts des p asymptotiques sur attendus faibles (#179, #200),
+# posées une fois pour STATUTS_VALIDATION et STATUTS_VALIDATION_POSITIONNEE :
+# petits (réserve sur les attendus A_c petits), fin_x2 (niveau réel de la p
+# de X2), g2 (espérance de la contribution d'une cellule à G2). Chaînes non
+# marquées, comme leurs copies d'origine : le texte_moteur() de chaque table
+# les marque après le paste (même parcours d'octets sous la locale C, #50).
+PHRASES_ATTENDUS_FAIBLES <- list(
+  petits = "approximation non garantie quand des attendus A_c sont petits",
+  fin_x2 = paste("le niveau réel du test fondé sur cette p n'est pas établi en général et dépasse le niveau nominal",
+                 "dans les constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0 (i)"),
+  g2 = paste("l'espérance de la contribution d'une cellule est inférieure à 1 pour A_c inférieur à 0,49 environ et",
+             "supérieure à 1 au-delà (maximum voisin de 1,16), par sommation des probabilités (approximation",
+             "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
+             "p_monte_carlo a un niveau garanti sous H0 (i)"))
+
 # Statuts (E2.20) des grandeurs de resultat$statistiques, une ligne par
 # (statistique, grandeur), dans l'ordre du tableau ; sous_h0 : grandeur
 # définie par H0 (p-valeur, intervalle, espérance ou variance sous H0,
@@ -179,16 +194,11 @@ STATUTS_VALIDATION <- local({
                     "fonctions de répartition de Poisson (ppois), approximation numérique")
   chi2 <- "asymptotique : loi du khi-deux à n - p degrés de liberté (A_c -> infini dans chaque cellule retenue), p = 0"
   # Attendus faibles (#179 ; spécification (0'), M359, M360) : avertissement
-  # sans seuil, chiffré par khi2_pearson/variance_h0 ; petits, fin_x2 et g2
-  # sont recopiés à l'identique dans STATUTS_VALIDATION_POSITIONNEE (portée
-  # locale ; identité contrôlée par le test T179.1).
-  petits <- "approximation non garantie quand des attendus A_c sont petits"
-  fin_x2 <- paste("le niveau réel du test fondé sur cette p n'est pas établi en général et dépasse le niveau nominal",
-                  "dans les constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0 (i)")
-  g2 <- paste("l'espérance de la contribution d'une cellule est inférieure à 1 pour A_c inférieur à 0,49 environ et",
-              "supérieure à 1 au-delà (maximum voisin de 1,16), par sommation des probabilités (approximation",
-              "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
-              "p_monte_carlo a un niveau garanti sous H0 (i)")
+  # sans seuil, chiffré par khi2_pearson/variance_h0 ; phrases posées une
+  # fois (PHRASES_ATTENDUS_FAIBLES), communes aux deux tables de statuts.
+  petits <- PHRASES_ATTENDUS_FAIBLES$petits
+  fin_x2 <- PHRASES_ATTENDUS_FAIBLES$fin_x2
+  g2 <- PHRASES_ATTENDUS_FAIBLES$g2
   mc <- paste("niveau exact sous H0 (i), E^c tenue pour fixe : P_H0(p_MC <= alpha) <= alpha ; e est l'erreur due",
               "au nombre fini de réplications, distincte de l'erreur d'estimation")
   e_mc <- paste("erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre fini de",
@@ -341,13 +351,9 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
   # Poisson, sans conditionner par les O_s ; les deux finissent par `indep`.
   loi_s <- "asymptotique : loi du khi-deux à n - S degrés de liberté"
   theta_s <- "theta estimé par maximum de vraisemblance sur ces cellules, un par segment positionné (S segments)"
-  petits <- "approximation non garantie quand des attendus A_c sont petits"
-  fin_x2 <- paste("le niveau réel du test fondé sur cette p n'est pas établi en général et dépasse le niveau nominal",
-                  "dans les constats de simulation du projet ; seule p_monte_carlo a un niveau garanti sous H0 (i)")
-  g2 <- paste("l'espérance de la contribution d'une cellule est inférieure à 1 pour A_c inférieur à 0,49 environ et",
-              "supérieure à 1 au-delà (maximum voisin de 1,16), par sommation des probabilités (approximation",
-              "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
-              "p_monte_carlo a un niveau garanti sous H0 (i)")
+  petits <- PHRASES_ATTENDUS_FAIBLES$petits
+  fin_x2 <- PHRASES_ATTENDUS_FAIBLES$fin_x2
+  g2 <- PHRASES_ATTENDUS_FAIBLES$g2
   var_s <- paste("Var(X2) = somme sur les segments de [2 (n_s - 1) + somme sur C+_s de 1/A_c - (n_s^2 + 2 n_s - 2) /",
                  "O_s]")
   mc <- paste("niveau exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta :",
@@ -918,6 +924,9 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
       ajustee_hors_outil = NA_real_,
       positionnee = {
         n_s <- tabulate(gr, nbins = length(Os))
+        # nr * pic = O_s pi_c, l'espérance conditionnelle A_c = O_s pi_c que
+        # nomment le statut et la documentation ; non remplacé par Ar =
+        # theta^_s E^c mu~_c, qui ne lui est égal qu'à l'arrondi près (#200).
         inv_s <- as.numeric(rowsum(1 / (nr * pic), gr, reorder = TRUE))
         sum(2 * (n_s - 1) + inv_s - (n_s^2 + 2 * n_s - 2) / Os)
       },
