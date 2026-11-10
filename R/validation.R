@@ -1449,8 +1449,11 @@ STATUTS_HOMOGENEITE <- local({
       paste("exact (combinatoire) : rang de V, nombre de groupes exposés dans les strates informatives moins nombre",
             "de composantes connexes du graphe groupes-strates ; somme des ddl des tranches pour somme_tranches")),
     c("tests", "p_asymptotique",
-      paste("asymptotique : loi du khi-deux à ddl degrés de liberté (D_. -> infini), sous H0 avec E tenue pour",
-            "fixe ; asymptotique aussi sous le modèle de survie ; queue supérieure ;", ind)),
+      paste("asymptotique : loi du khi-deux à ddl degrés de liberté quand l'information du test croît (plus",
+            "petite valeur propre de V réduite -> infini, aucune strate ne portant à elle seule une part non",
+            "négligeable de V), le nombre de strates étant fixe ou croissant : D_. peut rester petit dans chaque",
+            "strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le modèle de survie ; queue",
+            "supérieure ;", ind)),
     c("tests", "p_exacte",
       paste("exacte conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe, quand deux groupes",
             "seulement sont comparés ; asymptotique sous le modèle de survie ; O_1 somme de binomiales indépendantes",
@@ -1479,8 +1482,8 @@ STATUTS_HOMOGENEITE <- local({
             "rapporté à une table")),
     c("segments", "z",
       paste("z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous",
-            "H0 (D_. -> infini), E tenue pour fixe ; aucune p-valeur produite ; calcul en arithmétique flottante,",
-            "approximation numérique ; aucune correction de multiplicité ;", ind)))
+            "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ;",
+            "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;", ind)))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
                           statut = vapply(l, `[`, "", 3L), stringsAsFactors = FALSE))
 })
