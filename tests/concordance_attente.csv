@@ -1,2 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-donnees:TOLERANCE_RELEVES_AGREGATS,#195,constante ajoutée par #195 (tolérance relative des relevés de cohérence des agrégats) ; entrée du catalogue à écrire par docwriter en fin de branche (règle 9)
