@@ -888,3 +888,19 @@ verifier("tête de deux contrats dont un en cours (sortie postérieure à la fin
            else if (!identical(f$evenement, c(FALSE, FALSE, FALSE))) "événements"
            else TRUE
          })
+
+# --- préfixe des erreurs de programmation des deux seams (#196, point 6) -------
+
+verifier("exposition_fenetres() et exposition_cellules() : colonne absente des observations -> erreur de programmation préfixée par la fonction qui la lève, non par calculer_exposition() (message écrit à la main)", {
+  err <- function(expr) tryCatch({ expr; NULL }, error = function(e) e)
+  obs <- data.frame(x = 1)
+  p <- list(transition = list(depart = "vivant", arrivee = "deces"), debut = 0, borne = 1)
+  cv <- list(retenue = "dernier_anniversaire")
+  e1 <- err(tablexp:::exposition_fenetres(obs, p, character(0), tablexp:::deduire_recette(c(date_naissance = "a", date_entree = "b",
+                                            date_sortie = "c", cause_sortie = "d")), cv, FALSE, NULL))
+  e2 <- err(tablexp:::exposition_cellules(obs, p, character(0), tablexp:::deduire_recette(c(age = "a", evenements = "b",
+                                            exposition_centrale = "c")), cv, FALSE))
+  !inherits(e1, "refus_tablexp") && !inherits(e2, "refus_tablexp") &&
+    identical(conditionMessage(e1), "exposition_fenetres() : colonne(s) date_naissance, debut, fin, cause absente(s) des observations (erreur de programmation).") &&
+    identical(conditionMessage(e2), "exposition_cellules() : colonne(s) age, evenements, exposition absente(s) des observations (erreur de programmation).")
+})

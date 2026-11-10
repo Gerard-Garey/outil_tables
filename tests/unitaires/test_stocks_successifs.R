@@ -534,6 +534,20 @@ verifier("entree_entre_inventaires_invalide (valider_plan(), module exposition) 
                                                 "défaut).")) &&
     is.null(rf(valider_plan(plan_st(mode = "premier_inventaire")))) && is.null(rf(valider_plan(plan_st(mode = "milieu"))))
 })
+verifier("entree_entre_inventaires_invalide (valider_plan()) : paramètre présent à NULL -> refus (le plan le porte), alors que l'absence du paramètre est admise (#196, point 3 ; cohérence avec les autres paramètres)", {
+  p <- plan_st(); p$etapes$exposition["entree_entre_inventaires"] <- list(NULL)
+  r <- rf(valider_plan(p))
+  "entree_entre_inventaires" %in% names(p$etapes$exposition) && isTRUE(controle(r, "exposition", "entree_entre_inventaires_invalide")) &&
+    is.null(rf(valider_plan(plan_st(mode = NULL))))
+})
+verifier("valider_plan() n'évalue aucune valeur du plan (#196, point 3) : objet de langage sous entree_entre_inventaires -> refus entree_entre_inventaires_invalide ; sous convention -> refus convention_invalide, sans que l'expression soit évaluée", {
+  p1 <- plan_st(); p1$etapes$exposition$entree_entre_inventaires <- quote(paste0("mil", "ieu"))
+  p2 <- plan_st(); p2$etapes$exposition$convention <- quote(stop("évalué"))
+  r1 <- rf(valider_plan(p1))
+  r2 <- tryCatch(valider_plan(p2), refus_tablexp = function(e) e, error = function(e) e)
+  isTRUE(controle(r1, "exposition", "entree_entre_inventaires_invalide")) &&
+    inherits(r2, "refus_tablexp") && identical(r2$motif, "convention_invalide")
+})
 verifier("canoniser_plan(), (4b) : paramètres d'étape dans l'ordre du catalogue restreint aux présents ; idempotente avec et sans paramètre conditionnel ; paramètre sans recette absent -> erreur de programmation ; aller-retour ecrire_plan() / lire_plan() (identité exacte)", {
   p <- plan_st()
   p$etapes$exposition <- p$etapes$exposition[c("entree_entre_inventaires", "par_annee", "convention")]
