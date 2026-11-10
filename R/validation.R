@@ -1127,7 +1127,9 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
     # relations, produites sous positionnee seule (NA ici).
     for (c_ in c("p_inferieure_asymptotique", "p_superieure_asymptotique", "p_centrale_asymptotique"))
       d[[c_]] <- rep(NA_real_, n_g)
-    d$etat <- ifelse(!ok, "aucune_cellule_retenue", if (ajustee) "ddl_non_etabli" else "produite")
+    # character même sans groupe (#201) : ifelse() rend logical(0) sur ok vide.
+    etat <- rep(if (ajustee) "ddl_non_etabli" else "produite", n_g); etat[!ok] <- "aucune_cellule_retenue"
+    d$etat <- etat
     d
   }
   n_tr <- length(tranches)
@@ -1180,9 +1182,13 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
                                      n_max = N_MAX_PRODUITS_CONVOLUTION) {
   alpha <- 1 - niveau
   na <- rep(NA_real_, n_g)
-  r <- list(smr = ifelse(At > 0, O / At, NA_real_), borne_inf_exacte = na, borne_sup_exacte = na, p_inferieure = na,
+  # smr (double) et etat (character) même sans groupe (#201) : ifelse() rend
+  # logical(0) sur At vide.
+  smr <- na; smr[At > 0] <- (O / At)[At > 0]
+  etat <- rep("aucune_cellule_retenue", n_g); etat[At > 0] <- "produite"
+  r <- list(smr = smr, borne_inf_exacte = na, borne_sup_exacte = na, p_inferieure = na,
             p_superieure = na, p_centrale = na, p_inferieure_asymptotique = na, p_superieure_asymptotique = na,
-            p_centrale_asymptotique = na, etat = ifelse(At > 0, "produite", "aucune_cellule_retenue"))
+            p_centrale_asymptotique = na, etat = etat)
   if (identical(nom, "segment")) {
     r$etat[At > 0] <- "contraint_par_positionnement"
     return(r)
@@ -1768,10 +1774,14 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
     d$exposition_centrale <- somme_par(E[l_saines], sg[l_saines], S)
     d$observes <- sc$O
     d$attendus <- sc$A
-    d$rapport_observes_attendus <- ifelse(sc$A > 0, sc$O / sc$A, NA_real_)
-    etat <- ifelse(e_tout == 0 & d_tout > 0, "evenement_sans_exposition",
-                   ifelse(e_tout == 0, "segment_sans_exposition", if (faute) "evenement_sans_exposition" else
-                     ifelse(sc$v > 0, "produite", "variance_nulle")))
+    # double et character même sans segment (#201) : ifelse() rend logical(0) sur S = 0.
+    rap <- rep(NA_real_, S); pos <- which(sc$A > 0)
+    rap[pos] <- sc$O[pos] / sc$A[pos]
+    d$rapport_observes_attendus <- rap
+    etat <- rep(if (faute) "evenement_sans_exposition" else "produite", S)
+    if (!faute) etat[!(sc$v > 0)] <- "variance_nulle"
+    etat[e_tout == 0] <- "segment_sans_exposition"
+    etat[e_tout == 0 & d_tout > 0] <- "evenement_sans_exposition"
     z <- rep(NA_real_, S)
     ok <- etat == "produite"
     z[ok] <- sc$U[ok] / sqrt(sc$v[ok])
