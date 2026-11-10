@@ -874,3 +874,28 @@ verifier("T178.3 statuts : ligne sous_groupes/p_valeurs_asymptotiques (sous_h0) 
                           k(b, "p_valeurs"), fixed = TRUE)) TRUE else "p_valeurs (positionnee)",
     etape = if (identical(nrow(V$parametres$statuts_sous_groupes), 4L)) TRUE else "statuts_sous_groupes")
 })
+
+# --- K. Type des colonnes etat et smr sur entrée vide (#201) ------------------------
+# ifelse() sur un vecteur vide rendait logical(0) : etat (character) et smr
+# (double) sortaient en logical quand le regroupement n'avait aucun groupe.
+
+verifier("K (#201) : sous_groupes_positionnee() sans groupe (n_g = 0) -> smr double et etat character de longueur 0 ; avec groupes, inchangés", {
+  r <- tablexp:::sous_groupes_positionnee("tranche", integer(0), 0L, integer(0), logical(0), numeric(0), numeric(0),
+                                          numeric(0), numeric(0), 0.95)
+  p <- tablexp:::sous_groupes_positionnee("tranche", c(1L, 2L), 2L, c(1L, 1L), c(TRUE, TRUE), c(1, 0), c(2, 3),
+                                          c(1, 0), c(2, 0), 0.95)
+  tous(vide = if (identical(r$smr, numeric(0)) && identical(r$etat, character(0))) TRUE
+              else paste(typeof(r$smr), typeof(r$etat)),
+       pleine = if (identical(p$smr, c(0.5, NA)) && identical(p$etat[2L], "aucune_cellule_retenue") &&
+                    identical(typeof(p$etat), "character")) TRUE else "groupes non vides")
+})
+verifier("K (#201) : sous_groupes_validation() sans groupe (tranches vides), sous les trois relations -> 0 ligne, smr double et etat character", {
+  v <- function(rel) tablexp:::sous_groupes_validation(data.frame(age = integer(0)), integer(0), data.frame(), integer(0),
+                                                       numeric(0), c(20, 90), numeric(0), numeric(0), logical(0), FALSE,
+                                                       0.95, rel)
+  rels <- c("independante", "ajustee_hors_outil", "positionnee")
+  r <- lapply(stats::setNames(rels, rels), v)
+  do.call(tous, lapply(r, function(x)
+    if (nrow(x) == 0L && identical(typeof(x$etat), "character") && identical(typeof(x$smr), "double")) TRUE
+    else paste(nrow(x), typeof(x$etat), typeof(x$smr))))
+})

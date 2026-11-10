@@ -522,6 +522,17 @@ verifier("F variable à une seule modalité présente : test par variable moins_
     isTRUE(proche(ligne_test(r, "variable", "sexe")$statistique, 529 / 53, 1e-14, 0))
 })
 
+# Types des colonnes de segments (#201) : character (etat) et double
+# (rapport_observes_attendus) même sans segment ; ifelse() sur un vecteur vide
+# rendait logical(0).
+verifier("F (#201) : exposition à 0 ligne -> segments à 0 ligne, colonnes etat (character) et rapport_observes_attendus, z (double)", {
+  e0 <- data.frame(sexe = character(0), age = integer(0), exposition_centrale = numeric(0), evenements = integer(0))
+  s <- homog(e0, "sexe", c(50, 54), c(50, 52))$resultat$segments
+  if (nrow(s) == 0L && identical(s$etat, character(0)) && identical(s$rapport_observes_attendus, numeric(0)) &&
+      identical(s$z, numeric(0))) TRUE else
+    paste(nrow(s), typeof(s$etat), typeof(s$rapport_observes_attendus), typeof(s$z))
+})
+
 # --- G. Étape dans construire_table() (identité exacte ; recoupement) --------------
 
 GM <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
@@ -548,6 +559,14 @@ verifier("G objet : parametres, resultat (tests, segments, monte_carlo), diagnos
     identical(names(H$resultat$tests), c("test", "variable", "conditionnellement_a", "tranche_debut", "tranche_fin",
                                          "strates_informatives", "groupes", "statistique", "ddl", "p_asymptotique",
                                          "p_exacte", "etat_p_exacte", "p_monte_carlo", "erreur_monte_carlo", "etat"))
+})
+verifier("G (#201) : période sans exposition (jeu hors période) -> étape produite, segments à 0 ligne, mêmes types de colonnes que sur une période exposée", {
+  p0 <- plan_h(); p0$periode <- list(debut = D("1990-01-01"), fin = D("1990-12-31"))
+  s0 <- construire_table(JEU, ROLES, p0)$etapes$homogeneite$resultat$segments
+  s1 <- H$resultat$segments
+  if (nrow(s0) == 0L && nrow(s1) > 0L && identical(vapply(s0, typeof, ""), vapply(s1, typeof, "")) &&
+      identical(s0$etat, character(0)) && identical(s0$rapport_observes_attendus, numeric(0))) TRUE else
+    paste(nrow(s0), paste(vapply(s0, typeof, ""), collapse = "/"))
 })
 verifier("G recoupement sur le jeu simulé : T global et somme_tranches = Rao de glm à 1e-7 ; forme close S = 2 recalculée à la main à 1e-12", {
   ex <- X$etapes$exposition$resultat$exposition
