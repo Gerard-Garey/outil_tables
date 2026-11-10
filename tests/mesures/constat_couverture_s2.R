@@ -659,13 +659,28 @@ lecture_calibree <- function(ix, titre) {
   invisible(NULL)
 }
 cat("\n=== Lecture calibrée (ajoutée le 10/11/2026 après un pilote à R = 1 000 sur les jeux 1 à 1 000 ; décision du mainteneur, M383) : risque global de 5 % partagé en trois parts de 5 %/3 ===\n")
-lecture_calibree(seq_len(R), sprintf("jeux 1 à %d", R_JEUX))
-rangs <- which(ok)
-if (R_JEUX <= R_RATTACHEMENT) {
-  cat(sprintf("\n--- Lecture calibrée, partie confirmatoire (jeux %d à R, non vus au choix de la règle) : non applicable (R = %d <= %d) ---\n",
-              R_RATTACHEMENT + 1L, R_JEUX, R_RATTACHEMENT))
-} else lecture_calibree(which(rangs > R_RATTACHEMENT),
-                        sprintf("partie confirmatoire, jeux %d à %d (non vus au choix de la règle)", R_RATTACHEMENT + 1L, R_JEUX))
+# Titres sur les jeux effectivement lus (rangs, nombre), non sur les jeux demandés
+# (R_JEUX) : si un jeu est refusé ou en erreur, la lecture compte moins de jeux
+# que la demande, et le titre le dit (#207). `lus` : rangs des jeux réussis ;
+# `demandes` : rangs demandés pour cette lecture.
+titre_jeux <- function(lus, demandes) {
+  manq <- length(demandes) - length(lus)
+  s <- sprintf("jeux %d à %d", min(lus), max(lus))
+  if (manq > 0L) s <- sprintf("%s ; %d jeu(x) manquant(s) sur %d demandés", s, manq, length(demandes))
+  s
+}
+rangs <- which(ok)  # rang du jeu de la ligne i de m : rangs[i]
+lecture_calibree(seq_len(R), titre_jeux(rangs, seq_len(R_JEUX)))
+# Partie confirmatoire : jeux réussis de rang > R_RATTACHEMENT (lignes de m).
+conf <- which(rangs > R_RATTACHEMENT)
+if (!length(conf)) {
+  cat(sprintf("\n--- Lecture calibrée, partie confirmatoire (jeux de rang > %d, non vus au choix de la règle) : non applicable (%s) ---\n",
+              R_RATTACHEMENT,
+              if (R_JEUX <= R_RATTACHEMENT) sprintf("aucun jeu demandé à ces rangs : %d jeux demandés <= %d", R_JEUX, R_RATTACHEMENT)
+              else sprintf("%d jeux demandés à ces rangs, aucun réussi ; %d jeux lus sur %d demandés",
+                           R_JEUX - R_RATTACHEMENT, R, R_JEUX)))
+} else lecture_calibree(conf, sprintf("partie confirmatoire, %s (non vus au choix de la règle)",
+                                      titre_jeux(rangs[conf], seq_len(max(R_JEUX - R_RATTACHEMENT, 0L)) + R_RATTACHEMENT)))
 cat(paste("\nStatuts : couvertures, McNemar, phi, biais de cellule = constats de simulation (erreur de Monte-Carlo, fonction de R) ;",
           "pi = calcul exact sous approximation (D ~ Poisson conditionnellement aux expositions réalisées, validée par L) ;",
           "erreur d'estimation (1 / sqrt(D) par cellule) résumée à part.\n"))
