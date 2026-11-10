@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{09/11/2026}
+\newcommand{\datedoc}{10/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -2184,7 +2184,19 @@ sur avis d'\code{actuary}, parce qu'elle classait aussi
 \code{etapes/brut/diagnostics/cellules} et
 \code{etapes/brut/diagnostics/etats/cellules}, déjà \code{integer}, et
 aurait masqué leur retour au double (ADR 0009, seconde annotation du
-19/10/2026, point~(a)). Un double reçoit sa tolérance de la
+19/10/2026, point~(a)). Depuis l'issue~\#174, deux dénombrements du
+module \code{validation} sont de même stockés en \code{integer} dans tous
+les cas~: le nombre de cellules retenues d'un sous-groupe
+(\code{etapes/validation/resultat/}\allowbreak\code{sous\_groupes/cellules\_retenues}), quels
+que soient la relation, le nombre de segments et le nombre de cellules, et
+le nombre d'événements retirés d'un ensemble
+(\code{etapes/importance\_exclusions/}\allowbreak\code{resultat/retraits/}\allowbreak\code{evenements\_retires}),
+\code{NA} compris pour une ligne non produite~; les deux clés exactes qui
+les classaient tant qu'ils étaient stockés en \code{double},
+\code{validation/resultat/}\allowbreak\code{sous\_groupes/cellules\_retenues} et
+\code{importance\_exclusions/}\allowbreak\code{resultat/retraits/}\allowbreak\code{evenements\_retires}, sont
+retirées de \code{TOLERANCES} pour la même raison, sans changement d'aucune
+valeur (visa d'\code{actuary} du 09/11/2026). Un double reçoit sa tolérance de la
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont chaque valeur
 est l'une des quatre classes de \code{CLASSES\_TOLERANCE} (exacte,
 $10^{-14}$, $10^{-12}$, $10^{-10}$~; \code{tests/reference/outils\_reference.R},
@@ -2264,7 +2276,7 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/} \code{cellules\_retenues} et \code{observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/} \code{evenements\_retires} et \code{exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
+exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
 $10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
 $10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure} et \code{p\_centrale}~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
 $10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z} & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a)) \\
@@ -8940,7 +8952,9 @@ dans la colonne \code{statut} du résultat.
     $X \sim \mathcal{P}(A)$) par regroupement \code{segment\_tranche}
     (segment $\times$ tranche d'âge) et \code{segment} si la segmentation
     n'est pas vide, \code{tranche} toujours, \code{annee} sous
-    \code{par\_annee}, sur les cellules retenues~; un groupe sans cellule
+    \code{par\_annee}, sur les cellules retenues, dont le nombre est
+    restitué par groupe (\code{cellules\_retenues}, en \code{integer},
+    issue~\#174)~; un groupe sans cellule
     retenue est dans l'état \code{aucune\_cellule\_retenue}. Aucune
     correction de multiplicité (décision M217).
   \item \textbf{S6, signes} (\code{signes})~: $n_{+}$, $n_{-}$ et
@@ -9657,13 +9671,24 @@ que dans les modules \code{brut} et \code{validation}), levé sous le module
 \code{importance\_exclusions} par
 \code{controler\_parametres\_importance\_exclusions()}, que
 \code{valider\_plan()} appelle, seule, avant toute étape. La fonction
-d'étape ne refait aucun contrôle~: ni la segmentation, dont la variante
+d'étape ne refait aucun contrôle des entrées ni des paramètres~: ni la segmentation, dont la variante
 \code{segmentation\_invalide} de ce module est retirée, ni le niveau,
 qu'elle contrôlait en appel direct avant l'issue~\#82 (décisions M216 et
 M291~; section~\ref{sec:execution})~; elle reçoit les valeurs validées
 \code{p}, la recette et la convention, qu'elle transmet aux expositions
 contrefactuelles. L'étape ne
-définit aucun autre refus~: tout ce qui ne peut être calculé est rendu dans
+définit qu'un autre refus, de capacité (issue~\#174)~:
+\code{evenements\_retires\_hors\_plage}, levé sous le module
+\code{importance\_exclusions} par \code{total\_evenements\_retires()} quand le
+total des événements retirés d'un ensemble à un niveau, somme formée en
+\code{double} des événements retirés de ses cellules (chacun stocké en
+\code{integer}), dépasse le plus grand entier du moteur ($2^{31} - 1$,
+\code{.Machine\$integer.max})~; le message cite ce total, l'ensemble et le
+niveau, repris dans \code{details} (\code{ensemble}, \code{niveau},
+\code{evenements\_retires}). Ce refus tient la place de la conversion en
+\code{integer} qui, au-delà de la borne, rendrait \code{NA} avec un simple
+avertissement~; en deçà, le total est rendu en \code{integer}. Hors ce
+refus, tout ce qui ne peut être calculé est rendu dans
 un état nommé (ci-dessous), sans refus~; seules les gardes des fonctions
 d'exposition qu'elle rappelle (par exemple \code{trop\_de\_cellules})
 restent en vigueur. Les incohérences internes (lignes reçues
@@ -9837,8 +9862,9 @@ cellules à événements ou à jours retirés non nuls sont gardées.
 \noindent
 Le tableau \code{resultat\$retraits} donne, par ensemble et par niveau, les
 lignes mesurables, les lignes non calculables, les décomptes de têtes, les
-événements, jours et exposition centrale retirés (sommes des cellules) et
-l'état~; les cellules elles-mêmes sont dans
+événements, jours et exposition centrale retirés (sommes des cellules~;
+\code{evenements\_retires} est stocké en \code{integer}, \code{NA} pour une
+ligne non produite, issue~\#174) et l'état~; les cellules elles-mêmes sont dans
 \code{resultat\$cellules\_niveau\_a} et \code{resultat\$cellules\_niveau\_b}.
 Un motif déclaré qui ne porte sur aucune ligne, ou un total vide, est dans
 l'état \code{produite}, à retraits nuls (têtes à 0 en unité tête), son
@@ -10056,7 +10082,14 @@ chaque test nommant la nature de son attendu)~:
     du SMR~; T8, comparateur~2 sous \code{independante}, sous
     \code{ajustee\_hors\_outil} et sans \code{validation}, table par sexe,
     tout ou rien et priorité des états~; motif sans ligne, total vide,
-    \code{contrat\_duplique} dans les deux unités~; refus du plan, et, en
+    \code{contrat\_duplique} dans les deux unités~; type \code{integer} de
+    \code{evenements\_retires} dans \code{retraits} (lignes produites et non
+    produites, total vide) et dans les tables de cellules des niveaux~A
+    et~B~; refus \code{evenements\_retires\_hors\_plage} de
+    \code{total\_evenements\_retires()} en appel direct, sur un total qui
+    dépasse la borne sans qu'aucun terme ne la dépasse (module, motif,
+    message, \code{details}), total égal à la borne et total vide rendus en
+    \code{integer} (issue~\#174)~; refus du plan, et, en
     appel direct, erreur de programmation sur une étape
     \code{validation} transmise sans sa table~; recette fictive de convention native
     \code{age\_atteint\_annee}~: l'étape \code{exposition} et les
@@ -10158,7 +10191,11 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     l'appelant restauré~; $\hat\mu$ identique au taux de Poisson de l'étape
     \code{brut}~; grille, identité des décomptes, paramètres et
     \code{monte\_carlo} de l'étape dans \code{construire\_table()}~;
-    sous-groupes dont les $O$ somment au $O$ global~; appariement
+    sous-groupes dont les $O$ somment au $O$ global~; nombre de cellules
+    retenues des sous-groupes et du diagnostic stocké en \code{integer} (un
+    segment, table vide, \code{par\_annee} sans cellule,
+    \code{ajustee\_hors\_outil}, segmentation par sexe), les nombres d'un
+    regroupement sommant à celui du diagnostic (issue~\#174)~; appariement
     \code{ensemble\_par\_sexe}~; \code{par\_annee = TRUE} (séquences sexe
     $\times$ année, SMR égal au cas sans année)~;
     \code{ajustee\_hors\_outil} dans \code{construire\_table()}~;
@@ -10199,7 +10236,9 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     0$ (aucun test, aucun tirage) et son témoin~; sous-groupes~: binomiaux
     d'un segment et sommes de deux binomiales recoupés, états
     \code{contraint\_par\_positionnement} (dont un sous-groupe qui contient
-    tous les segments touchés en entier) et \code{bornes\_non\_definies}~;
+    tous les segments touchés en entier) et \code{bornes\_non\_definies},
+    nombre de cellules retenues en \code{integer}, sommant par regroupement
+    au nombre des cellules retenues (issue~\#174)~;
     les trois refus inter-étapes et \code{relation\_table\_invalide}~;
     comparateur~2 non produit~; rejeu \code{identical()} hors
     \code{execution}~; mention de la table de référence prise telle quelle
@@ -10343,7 +10382,8 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
 \catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes}) \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174) \\
+\catalogue{fonctions-validation}{total\_evenements\_retires()} & interne & événements retirés des cellules, ensemble, niveau & total en \code{integer}, formé en \code{double}~; refus \code{evenements\_retires\_}\allowbreak\code{hors\_plage} (module \code{importance\_exclusions}) au-delà de \code{.Machine\$integer.max}, le message citant le total, l'ensemble et le niveau (issue~\#174) \\
 \catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
 }
