@@ -415,6 +415,18 @@ verifier("C4 #195 (CA2) : écarts réels (E^i = 9,5 < E^c = 10 ; E^i - E^c = 2 >
       all(grepl(mention, r$textes, fixed = TRUE))) TRUE else
     sprintf("relevés %s, codes %s", paste(r$rl, collapse = " et "), paste(r$codes, collapse = ", "))
 })
+verifier("C4 #195 (m1) : le nombre de la tolérance dans les deux textes d'avertissement est lu dans TOLERANCE_RELEVES_AGREGATS (constante remplacée par 1e-3 dans l'espace de noms le temps d'un appel, puis restaurée), mention complète « 0.001 » attendue à la main, aucune trace de « 1e-10 » ; valeur d'origine « 1e-10 » rendue à l'identique", {
+  ns <- asNamespace("tablexp"); nom <- "TOLERANCE_RELEVES_AGREGATS"
+  ancienne <- get(nom, envir = ns)
+  unlockBinding(nom, ns); assign(nom, 1e-3, envir = ns)
+  r <- tryCatch(releves_de(c(10, 12), c(9.5, 14), c(1, 1)), finally = { assign(nom, ancienne, envir = ns); lockBinding(nom, ns) })
+  mention <- "au-delà d'une tolérance d'arrondi de 0.001 fois la plus grande des deux expositions déclarées de la cellule"
+  if (!identical(ancienne, 1e-10) || !bindingIsLocked(nom, ns) || !identical(get(nom, envir = ns), 1e-10))
+    "constante non restaurée ou valeur d'origine différente de 1e-10" else
+    if (identical(r$codes, CODES_REL) && length(r$textes) == 2L && all(grepl(mention, r$textes, fixed = TRUE)) &&
+        !any(grepl("1e-10", r$textes, fixed = TRUE))) TRUE else
+      sprintf("codes %s ; textes : %s", paste(r$codes, collapse = ", "), paste(substr(r$textes, 1L, 200L), collapse = " | "))
+})
 verifier("C4 #195 (CA3) : un jour (1/366 an) relevé dans les deux sens à E = 1e5 ans : E^i = E^c + D + 1/366 (supérieur aux événements) et E^i = E^c - 1/366, D = 0 (inférieure)", {
   sup <- releves_de(1e5, 1e5 + 1 + 1 / 366, 1)
   inf <- releves_de(1e5, 1e5 - 1 / 366, 0)

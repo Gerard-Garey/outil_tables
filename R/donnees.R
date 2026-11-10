@@ -1872,21 +1872,22 @@ UNITE_AGREGAT <- c(
 # E^i - E^c > D, au-delà de la tolérance relative TOLERANCE_RELEVES_AGREGATS
 # (#195). Relevés non bloquants, jamais un refus. Rend `avert` augmenté.
 avertir_releves_agregats <- function(avert, releves) {
+  tol <- sprintf("%g", TOLERANCE_RELEVES_AGREGATS)  # le texte suit la constante
   k <- releves$exposition_initiale_inferieure_centrale
   if (!is.na(k) && k > 0L)
     avert <- avertir(avert, "donnees", "exposition_initiale_inferieure_centrale",
                      sprintf(paste("Relevé : %d cellule(s) dont l'exposition initiale déclarée est inférieure à",
-                                   "l'exposition centrale déclarée, au-delà d'une tolérance d'arrondi de 1e-10 fois la plus",
+                                   "l'exposition centrale déclarée, au-delà d'une tolérance d'arrondi de %s fois la plus",
                                    "grande des deux expositions déclarées de la cellule (définition « cellule » :",
-                                   "0 <= E^i - E^c <= D)."), k),
+                                   "0 <= E^i - E^c <= D)."), k, tol),
                      k)
   k <- releves$complement_superieur_aux_evenements
   if (!is.na(k) && k > 0L)
     avert <- avertir(avert, "donnees", "complement_superieur_aux_evenements",
                      sprintf(paste("Relevé : %d cellule(s) dont l'écart entre exposition initiale et exposition",
                                    "centrale déclarées dépasse le nombre d'événements, au-delà d'une tolérance d'arrondi de",
-                                   "1e-10 fois la plus grande des deux expositions déclarées de la cellule (définition",
-                                   "« cellule » : 0 <= E^i - E^c <= D)."), k),
+                                   "%s fois la plus grande des deux expositions déclarées de la cellule (définition",
+                                   "« cellule » : 0 <= E^i - E^c <= D)."), k, tol),
                      k)
   avert
 }
