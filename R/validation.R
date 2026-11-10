@@ -870,8 +870,12 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
              residu_pearson = rep_na(), residu_deviance = rep_na(), fluctuation_inf_exacte = rep_na(),
              fluctuation_sup_exacte = rep_na(), fluctuation_inf_asymptotique = rep_na(),
              fluctuation_sup_asymptotique = rep_na())
-  seqs <- data.frame(sequence = integer(0), positifs = numeric(0), negatifs = numeric(0), runs = numeric(0))
-  tirages <- 0
+  # Décomptes rangés en integer (#199 ; ADR 0009, point 9.6, (ii)) : n+, n- et
+  # R d'une séquence sont bornés par le nombre de cellules retenues, les
+  # tirages par replications (au plus .Machine$integer.max, contrôlé) ;
+  # calculs en double.
+  seqs <- data.frame(sequence = integer(0), positifs = integer(0), negatifs = integer(0), runs = integer(0))
+  tirages <- 0L
   if (n) {
     rr <- Dr - Ar
     dev <- Dr * log(Dr / Ar); dev[Dr == 0] <- 0
@@ -960,11 +964,11 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
     # quand le signe change entre deux cellules non nulles consécutives.
     s_nz <- sr[sgn != 0]; g_nz <- sgn[sgn != 0]; k_nz <- length(s_nz)
     ouvre <- if (k_nz) c(TRUE, s_nz[-1L] != s_nz[-k_nz] | g_nz[-1L] != g_nz[-k_nz]) else logical(0)
-    seqs <- data.frame(sequence = us, positifs = n1, negatifs = n2,
-                       runs = as.numeric(tabulate(match(s_nz[ouvre], us), nbins = length(us))))
-    if (!identical(sum(seqs$runs), as.numeric(t_obs$runs)))
+    runs_s <- as.numeric(tabulate(match(s_nz[ouvre], us), nbins = length(us)))
+    if (!identical(sum(runs_s), as.numeric(t_obs$runs)))
       stop("statistiques_validation() : décompte des suites par séquence incohérent (erreur de programmation).",
            call. = FALSE)
+    seqs <- data.frame(sequence = us, positifs = as.integer(n1), negatifs = as.integer(n2), runs = as.integer(runs_s))
     m <- n1 + n2
     mu_r <- ifelse(m > 0, 1 + ifelse(n1 * n2 > 0, 2 * n1 * n2 / m, 0), 0)
     v_r <- ifelse(n1 * n2 > 0, 2 * n1 * n2 * (2 * n1 * n2 - m) / (m^2 * (m - 1)), 0)
@@ -1036,7 +1040,7 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
                       positionnee = replications_multinomiales(Ar, gr, Os, replications, graine, f_stat),
                       stop("statistiques_validation() : relation sans réplications (erreur de programmation).",
                            call. = FALSE))
-      tirages <- replications
+      tirages <- as.integer(replications)
       # Signes, suites, Wilcoxon : aucun résidu non nul observé (ns = 0) ->
       # p de Monte-Carlo et erreur NA, état aucun_residu_non_nul.
       mc <- function(s, t, tr, sens) {
@@ -1107,7 +1111,7 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
     d$tranche_fin <- as.integer(fin_tranche[tr_g])
     if (par_annee) d$annee <- as.integer(an_g)
     d$cellules_retenues <- nb
-    d$observes <- O
+    d$observes <- denombrement_entier(O, "validation", "sous_groupes/observes")  # integer (#199) ; O reste double
     d$attendus <- At
     ok <- At > 0
     if (identical(relation_table, "positionnee")) {
@@ -1331,6 +1335,12 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
   total <- sum(as.numeric(exposition$evenements))
   if (!identical(O + ev_sans + ap$hors_plage$evenements, total))
     stop("calculer_validation() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
+  # Rangement en integer après l'identité, vérifiée en double (#199 ; ADR 0009,
+  # point 9.6, (iii)) : garde défensive, le total de l'étape exposition étant
+  # déjà gardé (M397) ; l'avertissement qui suit cite la valeur rangée.
+  ev_sans <- denombrement_entier(ev_sans, "validation", "evenements_sans_attendu")
+  ev_hors <- denombrement_entier(ap$hors_plage$evenements, "validation", "evenements_hors_plage")
+  total <- denombrement_entier(total, "validation", "evenements_total")
   avert <- avertissements_vides()
   if (any(sans_attendu))
     avert <- avertir(avert, "validation", "evenements_sans_attendu",
@@ -1338,12 +1348,13 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
                                    "nulle, ou q_x de la table nul) : statistiques non définies dans ces cellules (états",
                                    "evenement_sans_exposition, evenement_sous_taux_nul) ; événements restitués à part,",
                                    "non comptés dans O."),
-                             sum(sans_attendu), as.integer(ev_sans)),
+                             sum(sans_attendu), ev_sans),
                      sum(sans_attendu))
   etats <- data.frame(etat = ETATS_CELLULE_VALIDATION,
                       cellules = vapply(ETATS_CELLULE_VALIDATION, function(e) sum(at$etat == e), 0L, USE.NAMES = FALSE),
-                      evenements = vapply(ETATS_CELLULE_VALIDATION, function(e)
+                      evenements = denombrement_entier(vapply(ETATS_CELLULE_VALIDATION, function(e)
                         sum(as.numeric(cel$evenements[at$etat == e])), 0, USE.NAMES = FALSE),
+                        "validation", "etats/evenements"),
                       stringsAsFactors = FALSE)
   parametres <- list(table_reference = table_reference, table_nom = attr(table, "nom", exact = TRUE),
                      relation_table = relation_table, parametres_estimes = pe, plage_ages = plage_ages,
@@ -1362,7 +1373,7 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
                                           graine = graine)),
        diagnostics = list(cellules = nrow(cel), cellules_retenues = sum(ret), etats = etats,
                           evenements_sans_attendu = ev_sans, cellules_hors_plage = ap$hors_plage$cellules,
-                          evenements_hors_plage = ap$hors_plage$evenements,
+                          evenements_hors_plage = ev_hors,
                           exposition_hors_plage = ap$hors_plage$exposition, evenements_total = total),
        avertissements = avert)
 }
@@ -1772,7 +1783,7 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
     d$tranche_debut <- rep(as.integer(debut), S)
     d$tranche_fin <- rep(as.integer(fin), S)
     d$exposition_centrale <- somme_par(E[l_saines], sg[l_saines], S)
-    d$observes <- sc$O
+    d$observes <- denombrement_entier(sc$O, "homogeneite", "segments/observes")  # integer (#199)
     d$attendus <- sc$A
     # double et character même sans segment (#201) : ifelse() rend logical(0) sur S = 0.
     rap <- rep(NA_real_, S); pos <- which(sc$A > 0)
@@ -1804,21 +1815,30 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   ev_hors <- sum(as.numeric(exposition$evenements[!dans]))
   if (!identical(O + ev_fautives + ev_hors, total))
     stop("calculer_homogeneite() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
+  # Rangement en integer après l'identité, vérifiée en double (#199 ; ADR 0009,
+  # point 9.6, (iii)) : garde défensive (total de l'étape exposition gardé,
+  # M397) ; l'avertissement qui suit cite la valeur rangée.
+  ev_fautives <- denombrement_entier(ev_fautives, "homogeneite", "evenements_cellules_evenement_sans_exposition")
+  ev_hors <- denombrement_entier(ev_hors, "homogeneite", "evenements_hors_plage")
+  total <- denombrement_entier(total, "homogeneite", "evenements_total")
   avert <- avertissements_vides()
   if (toute_faute)
     avert <- avertir(avert, "homogeneite", "evenements_sans_exposition",
                      sprintf(paste("Homogénéité : %d cellule(s) de la plage où un segment compte des événements sans",
                                    "exposition (%d événement(s) dans ces cellules) : cellules écartées des sommes, tests",
                                    "qui les contiennent non produits (état evenement_sans_exposition)."),
-                             sum(fautive), as.integer(ev_fautives)),
+                             sum(fautive), ev_fautives),
                      sum(fautive))
   list(parametres = list(plage_ages = plage_ages, tranches_age = tranches_age, replications = replications,
                          convention = convention, hypothese_nulle = HYPOTHESE_HOMOGENEITE,
                          statuts = STATUTS_HOMOGENEITE, reference_methode = REFERENCE_METHODE_HOMOGENEITE),
+       # Tirages effectués par jeu en integer (#199), bornés par replications
+       # (au plus .Machine$integer.max, contrôlé par controler_replications()).
        resultat = list(tests = tests, segments = seg,
                        monte_carlo = list(replications = replications, graine = graine,
                                           jeux = data.frame(jeu = names(jeux),
-                                                            tirages_effectues = unlist(jeux, use.names = FALSE),
+                                                            tirages_effectues = as.integer(unlist(jeux,
+                                                                                                  use.names = FALSE)),
                                                             stringsAsFactors = FALSE))),
        diagnostics = list(cellules = K, cellules_informatives = sc_g$strates_informatives,
                           cellules_sans_deces = sum(!fautive & Dc == 0),
@@ -2111,14 +2131,20 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
   ret$etat_cellule <- etat_cel
   O <- sum(as.numeric(ret$evenements_retires[ok])); A <- sum(att[ok])
   tp <- taux_poisson(O, A, niveau)
+  # Sommes d'événements rangées en integer (#199) : gardes défensives ; sous la
+  # forme fenêtres, seule admise ici, le total est majoré par le nombre de lignes
+  # (voir total_evenements_retires()).
   list(cellules = ret,
-       ligne = list(observes = O, attendus = A, smr = tp$taux, borne_inf_exacte = tp$borne_inf_exacte,
+       ligne = list(observes = denombrement_entier(O, "importance_exclusions", "smr_comparateur_1/observes"),
+                    attendus = A, smr = tp$taux, borne_inf_exacte = tp$borne_inf_exacte,
                     borne_sup_exacte = tp$borne_sup_exacte, borne_inf_asymptotique = tp$borne_inf_asymptotique,
                     borne_sup_asymptotique = tp$borne_sup_asymptotique,
                     rapport_variance = if (A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A
                                        else NA_real_,
                     cellules_sans_exposition_retenue = sum(!ok),
-                    evenements_sans_exposition_retenue = sum(as.numeric(ret$evenements_retires[!ok])),
+                    evenements_sans_exposition_retenue = denombrement_entier(
+                      sum(as.numeric(ret$evenements_retires[!ok])), "importance_exclusions",
+                      "smr_comparateur_1/evenements_sans_exposition_retenue"),
                     exposition_centrale_sans_exposition_retenue = sum(ret$exposition_centrale_retiree[!ok]),
                     etat = if (nrow(ret) && !any(ok)) "sans_exposition_retenue"
                            else switch(tp$etat, defini = "produite", exposition_nulle = "aucun_attendu",
@@ -2170,12 +2196,19 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
                       evenement_sans_exposition = "observe_sans_attendu")
   nc <- etat %in% c("cellule_sans_valeur_table", "taux_table_egal_un")
   b <- function(v) if (ind && !nc) v else NA_real_
-  list(observes = if (nc) NA_real_ else O, attendus = if (nc) NA_real_ else A, smr = if (nc) NA_real_ else tp$taux,
+  # Sommes d'événements rangées en integer (#199) : gardes défensives ; sous la
+  # forme fenêtres, seule admise ici, le total est majoré par le nombre de lignes
+  # (voir total_evenements_retires()) ; calculs et états en double ci-dessus.
+  ent <- function(v, g) denombrement_entier(v, "importance_exclusions", paste0("smr_comparateur_2/", g))
+  list(observes = ent(if (nc) NA_real_ else O, "observes"), attendus = if (nc) NA_real_ else A,
+       smr = if (nc) NA_real_ else tp$taux,
        borne_inf_exacte = b(tp$borne_inf_exacte), borne_sup_exacte = b(tp$borne_sup_exacte),
        borne_inf_asymptotique = b(tp$borne_inf_asymptotique), borne_sup_asymptotique = b(tp$borne_sup_asymptotique),
-       cellules_sans_valeur_table = sans_valeur, evenements_sans_valeur_table = ev_sans_valeur,
-       cellules_taux_table_egal_un = un, evenements_taux_table_egal_un = ev_un,
-       evenements_sans_attendu = ev_sans_attendu, evenements_hors_plage = ev_hors,
+       cellules_sans_valeur_table = sans_valeur,
+       evenements_sans_valeur_table = ent(ev_sans_valeur, "evenements_sans_valeur_table"),
+       cellules_taux_table_egal_un = un, evenements_taux_table_egal_un = ent(ev_un, "evenements_taux_table_egal_un"),
+       evenements_sans_attendu = ent(ev_sans_attendu, "evenements_sans_attendu"),
+       evenements_hors_plage = ent(ev_hors, "evenements_hors_plage"),
        exposition_centrale_hors_plage = e_hors, etat = etat,
        etat_intervalle = if (!identical(etat, "produite")) etat else if (ind) "produite" else "ddl_non_etabli")
 }
@@ -2354,10 +2387,10 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
     retraits[[length(retraits) + 1L]] <- ligne_resultat(ens[i], nv, v)
     if (!identical(etat, "produite"))
       smr1[[length(smr1) + 1L]] <- ligne_resultat(ens[i], nv, list(
-        observes = NA_real_, attendus = NA_real_, smr = NA_real_, borne_inf_exacte = NA_real_,
+        observes = NA_integer_, attendus = NA_real_, smr = NA_real_, borne_inf_exacte = NA_real_,
         borne_sup_exacte = NA_real_, borne_inf_asymptotique = NA_real_, borne_sup_asymptotique = NA_real_,
         rapport_variance = NA_real_, cellules_sans_exposition_retenue = NA_integer_,
-        evenements_sans_exposition_retenue = NA_real_, exposition_centrale_sans_exposition_retenue = NA_real_,
+        evenements_sans_exposition_retenue = NA_integer_, exposition_centrale_sans_exposition_retenue = NA_real_,
         etat = etat))
   }
   retraits <- do.call(rbind, retraits)
@@ -2408,14 +2441,17 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
                                     pv$relation_table, niveau)
       }
       if (is.null(v))
-        v <- list(observes = NA_real_, attendus = NA_real_, smr = NA_real_, borne_inf_exacte = NA_real_,
+        v <- list(observes = NA_integer_, attendus = NA_real_, smr = NA_real_, borne_inf_exacte = NA_real_,
                   borne_sup_exacte = NA_real_, borne_inf_asymptotique = NA_real_, borne_sup_asymptotique = NA_real_,
-                  cellules_sans_valeur_table = NA_integer_, evenements_sans_valeur_table = NA_real_,
-                  cellules_taux_table_egal_un = NA_integer_, evenements_taux_table_egal_un = NA_real_,
-                  evenements_sans_attendu = NA_real_, evenements_hors_plage = NA_real_,
+                  cellules_sans_valeur_table = NA_integer_, evenements_sans_valeur_table = NA_integer_,
+                  cellules_taux_table_egal_un = NA_integer_, evenements_taux_table_egal_un = NA_integer_,
+                  evenements_sans_attendu = NA_integer_, evenements_hors_plage = NA_integer_,
                   exposition_centrale_hors_plage = NA_real_, etat = etat, etat_intervalle = etat)
       ligne_resultat(ens[i], nv, c(list(lignes_mesurables = length(S), lignes_non_calculables = n_cle), v,
-                                   list(observes_conserves = val("observes"), attendus_conserves = val("attendus"),
+                                   list(observes_conserves = denombrement_entier(
+                                          val("observes"), "importance_exclusions",
+                                          "smr_comparateur_2/observes_conserves"),
+                                        attendus_conserves = val("attendus"),
                                         smr_conserves = val("smr"))))
     }))))
     rownames(smr2) <- NULL

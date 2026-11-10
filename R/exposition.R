@@ -711,6 +711,12 @@ exposition_cellules <- function(observations, p, segmentation, recette, conv, pa
                      .Machine$integer.max, sum(d > .Machine$integer.max)),
             list(cellules = sum(d > .Machine$integer.max)))
   table_exp$evenements <- as.integer(d)
+  # Total des événements (#199, M397 ; ADR 0009, point 9.6, (d) 3) : formé en
+  # double, rangé en integer par denombrement_entier(), qui refuse au-delà de
+  # .Machine$integer.max (sum() d'un integer rendrait sinon un double, sans
+  # avertissement). Après la garde par cellule ; les sommes des étapes en aval
+  # portent sur des sous-ensembles de ces cellules.
+  evenements_total <- denombrement_entier(sum(d), "exposition", "evenements")
 
   # Relevés.
   sommees <- !par_annee && "annee" %in% names(observations)
@@ -764,7 +770,7 @@ exposition_cellules <- function(observations, p, segmentation, recette, conv, pa
                       hypothese_censure = texte_moteur(HYPOTHESE_CENSURE_DECLAREE),
                       hypotheses_recette = hypotheses_agregats(declarees, "annee" %in% names(observations), cv)),
     resultat = list(exposition = table_exp),
-    diagnostics = list(observations = n_obs, evenements = sum(table_exp$evenements), cellules = n_cel,
+    diagnostics = list(observations = n_obs, evenements = evenements_total, cellules = n_cel,
                        cellules_evenement_sans_exposition = sans_exposition,
                        cellules_absentes_de_la_plage = as.integer(trous)),
     avertissements = avert
