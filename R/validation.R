@@ -2434,9 +2434,13 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
 
 # Total des événements retirés d'un ensemble, en integer (#174). La somme est
 # formée en double, où elle ne déborde pas ; au-delà de .Machine$integer.max
-# (sans qu'aucune cellule n'ait dépassé la borne : l'étape exposition refuse
-# déjà ce cas par cellule, motif evenements_hors_plage) l'étape refuse, plutôt
-# que de laisser as.integer() rendre NA avec un simple avertissement.
+# l'étape refuse, plutôt que de laisser as.integer() rendre NA avec un simple
+# avertissement. Garde défensive : sous la forme fenêtres, seule admise ici, le
+# décompte par cellule vient de tabulate() (exposition_fenetres()) et le total
+# est majoré par le nombre de lignes des observations ; le cas est donc
+# inatteignable par construire_table(), et testé en appel direct. Le refus
+# evenements_hors_plage de l'étape exposition ne vaut que pour la forme cellules
+# (exposition_cellules()), que cette étape n'admet pas.
 total_evenements_retires <- function(evenements, ensemble, niveau) {
   n <- sum(as.numeric(evenements))
   if (n > .Machine$integer.max)
