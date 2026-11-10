@@ -1062,3 +1062,31 @@ Plus aucune clé n'y relève de la justification « dénombrements ». De même,
 **Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code.
 
 Issues : #199. Décisions du mainteneur M396 et M397 (10/11/2026). Branche `claude/validation-types-statuts`, PR #208.
+
+## Annotation du 10 novembre 2026 (troisième) — seconde annotation du 10/11/2026, (d) 4 : sommes de l'étape `importance_exclusions` bornées par le seam « fenêtres », non par l'exposition (#199)
+
+Rédigée par `architect` (fiche de routine) à l'étape « consignation » de la branche `claude/validation-types-statuts` (B18, PR #208), tête `062a0ad`, à la demande de l'audit de #199 (handoff https://github.com/Gerard-Garey/outil_tables/pull/208#issuecomment-6778541396, § 3, point 2). Annotation de **précision** : elle corrige la justification de (d) 4 pour une étape, sans changer la décision. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne à `062a0ad` (`git show HEAD:<fichier>`) ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Ce que dit (d) 4.** « Les sommes des étapes `positionnement`, `validation`, `homogeneite` et `importance_exclusions` portent sur des sous-ensembles des cellules de l'exposition. Leurs gardes deviennent défensives. » Pour `importance_exclusions`, la prémisse est inexacte ; la conclusion (gardes défensives) tient, pour une autre raison.
+
+**(b) Pourquoi la prémisse ne vaut pas pour `importance_exclusions`.** Les événements retirés ne sont pas lus dans la table d'exposition de la construction. Ils viennent d'une exposition **contrefactuelle**, recalculée sur des lignes exclues :
+- `retrait_contrefactuel()` (`R/validation.R:2032`) appelle `exposition_lignes()` (`R/validation.R:2007-2015`), qui forme les observations des lignes passées (`construire_observations()`) puis rappelle `calculer_exposition()` sur elles. En unité contrat, ce sont les lignes de S ; en unité tête, les lignes des têtes touchées (conservées et exclues), puis les seules conservées, et la différence donne les retraits ;
+- ces lignes exclues ne figurent pas dans l'exposition de la construction : leurs cellules ne sont pas un sous-ensemble des siennes.
+
+**(c) Ce qui borne réellement ces sommes : le seam « fenêtres ».**
+1. L'étape n'existe que sous ce seam : arrêt en erreur de programmation sinon (`R/validation.R:2275`) ; la matrice des recettes la refuse sous `agregats` et `stocks_successifs` (`R/donnees.R:301-317`, motifs `importance_exclusions_agregats` et `importance_exclusions_stocks`).
+2. Sous ce seam, le drapeau d'événement est porté par observation (`R/exposition.R:319`, `evenement = dans_fenetre & cause == cible`) ; les événements sont `ev <- which(f$evenement)` (`R/exposition.R:489`) et leur total vaut `length(ev)` (`R/exposition.R:589`) : **au plus un événement par observation**.
+3. Une observation provient d'une ligne au plus (une par ligne en unité contrat, fusion par tête en unité tête). Le total des événements retirés d'un ensemble est donc majoré par le nombre de lignes passées à `exposition_lignes()`, lui-même majoré par `nrow(donnees)`, donc par `.Machine$integer.max`.
+4. Les autres sommes de l'étape portent sur une partie des cellules retirées : comparateur 1, cellules à exposition retenue ou non (`R/validation.R:2132`, `:2145-2146`) ; comparateur 2, cellules de la grille appariée, où chaque cellule retirée tombe une fois au plus, le reste allant à `hors_plage` (`apparier_table()`, `R/positionnement.R:185-190` et `:209`). Chacune est donc majorée par le total de (c) 3.
+
+Le code le dit déjà : commentaires « sous la forme fenêtres, seule admise ici, le total est majoré par le nombre de lignes » (`R/validation.R:2134-2136` et `:2199-2201`).
+
+**(d) Lecture corrigée de (d) 4.** Les gardes de `smr_comparateur_1/…` et `smr_comparateur_2/…` (`R/validation.R:2138`, `:2144-2146`, `:2202`), comme le code `evenements_retires_hors_plage` de `total_evenements_retires()` (`R/validation.R:2490-2500`, inchangé, (d) 5), sont **défensives parce que le seam « fenêtres » borne les totaux par le nombre de lignes**, et non parce qu'elles porteraient sur des cellules de l'exposition. Pour `positionnement`, `validation` et `homogeneite`, (d) 4 n'est pas réexaminé par la présente annotation.
+
+**Preuves.**
+- *Vérifiés* par lecture à `062a0ad` (`git show HEAD:<fichier> | grep -n`, puis lecture des fonctions) : toutes les lignes citées en (b), (c) et (d).
+- *Non mesuré* : aucun appel exécuté ; la borne de (c) 3 est un raisonnement sur le code, qu'aucun test ne met en défaut. Les tests en appel direct au-delà de `.Machine$integer.max` (critère 5 de la spécification) restent ceux du commit de #199.
+
+**Effet sur les résultats : aucun.** Rien ne change dans le code ni dans les valeurs ; aucun `.tsv` modifié.
+
+Issues : #199. Décisions du mainteneur M396 et M397 (10/11/2026). Branche `claude/validation-types-statuts`, PR #208.
