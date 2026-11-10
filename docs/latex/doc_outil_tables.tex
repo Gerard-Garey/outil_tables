@@ -5551,19 +5551,21 @@ de $n$ termes est bornée, au premier ordre en $u$, par
 $(n-1)\,u \sum_k |x_k|$ (N.\,J.~Higham, \emph{Accuracy and Stability of
 Numerical Algorithms}, 2\textsuperscript{e}~éd., SIAM, 2002, chap.~4,
 «~Summation~»)~; les contributions à une exposition étant positives,
-$\sum_k |x_k|$ est l'exposition elle-même, et l'écart entre les deux sommes
-reste au plus $2(n-1)\,u \max(E^i, E^c)$, inférieur à $\tau$ jusqu'à
-environ $4{,}5 \cdot 10^5$~termes par somme
+$\sum_k |x_k|$ est l'exposition elle-même, et l'erreur qui en résulte sur
+la différence $E^i - E^c$ reste au plus $2(n-1)\,u \max(E^i, E^c)$,
+inférieur à $\tau$ jusqu'à environ $4{,}5 \cdot 10^5$~termes par somme
 ($n - 1 \le 10^{-10}/(2u)$). Au-delà, cette borne du pire cas ne garantit
-plus qu'un écart d'arrondi soit absorbé. C'est la raison du choix d'une
-tolérance relative à l'exposition plutôt que de deux fois l'epsilon
-machine, qui ne couvrirait que la conversion (i)~; une tolérance absolue
+plus qu'un écart d'arrondi soit absorbé. C'est la raison du choix de
+$\rho = 10^{-10}$ plutôt que de deux fois l'epsilon machine
+($\rho = 2^{-51}$, proposé par l'issue~\#195), qui ne couvrirait que la
+conversion (i) et l'arrondi de la soustraction~; une tolérance absolue
 ne suivrait pas la taille de la cellule. Un écart réel d'un jour, soit au
 moins $1/366$~d'année quelle que soit la convention de décompte, reste
 relevé tant que la plus grande des deux expositions de la cellule est
 inférieure à $(1/366)/\rho$, soit environ $2{,}7 \cdot 10^7$~années. Les
 comptages ne peuvent que baisser par rapport à la comparaison sans
-tolérance (\emph{résultat exact}~: $\tau \ge 0$, et une différence
+tolérance (\emph{résultat exact}~: $\tau \ge 0$, la différence intérieure
+$E^i - E^c$ du second relevé est la même double qu'avant, et une différence
 calculée en double a le signe de la différence exacte de ses deux
 opérandes, l'arrondi au plus proche avec dénormalisés ne rendant zéro que
 pour deux opérandes égaux). Exemple~: $E^c = 1{,}14$, $E^i = 2{,}14$,
@@ -6630,7 +6632,9 @@ lecture~:\par}
     réduit le manque dominant de l'intervalle asymptotique (constat de
     simulation, lecture calibrée sur des jeux non vus au choix de la
     règle, \code{tests/mesures/constat\_couverture\_s2.R}, hors CI, âges de
-    50 à 70~ans~; Kaplan-Meier non couvert)~;
+    50 à 70~ans, 2\,000~jeux dont les 1\,000 de la PR~\#188~; passage
+    consigné au commentaire de la PR~\#204 du 10/11/2026, valeurs non
+    reproduites ici, E3.4~; Kaplan-Meier non couvert)~;
   \item \emph{entrées concentrées au lendemain d'un inventaire} (S4)~: par
     construction, un entrant qui survit à son premier inventaire reçoit
     $\hat a - e = 181$~jours et ne garde que 184 de ses 365~jours
