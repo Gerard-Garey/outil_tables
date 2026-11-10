@@ -449,8 +449,10 @@ verifier("T6 (#174) : retraits$evenements_retires en integer, lignes produites e
        cellules = if (identical(typeof(I6$cellules_niveau_a$evenements_retires), "integer") &&
                       identical(typeof(I6$cellules_niveau_b$evenements_retires), "integer")) TRUE else "cellules")
 })
-# Garde du total (#174, reprise) : aucune cellule ne dépasse .Machine$integer.max
-# (borne par cellule déjà refusée par l'étape exposition), mais leur somme oui.
+# Garde du total (#174, reprise) : aucune cellule ne dépasse .Machine$integer.max,
+# mais leur somme oui. Garde défensive : sous la forme fenêtres, le total est
+# majoré par le nombre de lignes des observations (décompte par tabulate()) ;
+# inatteignable par construire_table(), d'où l'appel direct.
 verifier("total_evenements_retires (#174) : total > .Machine$integer.max sans cellule au-delà de la borne -> refus importance_exclusions / evenements_retires_hors_plage (message cite le total, l'ensemble, le niveau) ; total égal à la borne et vide -> integer", {
   f <- tablexp:::total_evenements_retires
   imax <- .Machine$integer.max
