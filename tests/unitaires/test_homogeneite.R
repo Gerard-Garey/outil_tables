@@ -84,6 +84,23 @@ verifier("A STATUTS_HOMOGENEITE : p exacte et p de Monte-Carlo asymptotiques sou
   length(st) == 2L && all(f > 0L) && all(a > f) &&
     all(endsWith(st, paste(";", tablexp:::INDEPENDANCE_HOMOGENEITE)))
 })
+# T185 (spécification (0') de #185, M362, option 1a) : régime asymptotique de
+# p_asymptotique et de z, information du test croissante (plus petite valeur
+# propre de V réduite -> infini), et non plus D_. -> infini dans chaque strate.
+verifier("T185.1 STATUTS_HOMOGENEITE : p_asymptotique sous le régime de la plus petite valeur propre de V (texte de la spécification) ; z au même régime ; plus aucun « (D_. -> infini) »", {
+  s <- tablexp:::STATUTS_HOMOGENEITE
+  st <- function(t, g) s$statut[s$table == t & s$grandeur == g]
+  p <- paste("asymptotique : loi du khi-deux à ddl degrés de liberté quand l'information du test croît (plus",
+             "petite valeur propre de V réduite -> infini, aucune strate ne portant à elle seule une part non",
+             "négligeable de V), le nombre de strates étant fixe ou croissant : D_. peut rester petit dans chaque",
+             "strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le modèle de survie ; queue",
+             "supérieure ;", tablexp:::INDEPENDANCE_HOMOGENEITE)
+  identical(st("tests", "p_asymptotique"), p) &&
+    grepl("de loi asymptotique N(0, 1) sous H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ;",
+          st("segments", "z"), fixed = TRUE) &&
+    sum(grepl("plus petite valeur propre de V", s$statut, fixed = TRUE)) == 1L &&
+    !any(grepl("(D_. -> infini)", s$statut, fixed = TRUE))
+})
 verifier("A REFERENCE_METHODE_HOMOGENEITE : données consignées de la source (URL, SHA-256, pages ; E2.25), après relecture sur l'image (M290)", {
   r <- tablexp:::REFERENCE_METHODE_HOMOGENEITE
   grepl("[0-9a-f]{64}", r) && grepl("https://", r, fixed = TRUE) && !grepl("à compléter", r, fixed = TRUE) &&

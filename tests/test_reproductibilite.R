@@ -540,6 +540,56 @@ transition_178 <- function(id, positionnee) {
          list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
               valeurs = c(statut, if (positionnee) ASYMPTOTIQUES_P_178 else ASYMPTOTIQUES_I_178)))))
 }
+# Transition #185 (B16 ; spécification (0') de #185, M362, option 1a) : textes
+# de statut de smr/smr et de table_positionnee/qx dans
+# etapes/positionnement/parametres/statuts/statut (R10, R13), de
+# tests/p_asymptotique et de segments/z dans
+# etapes/homogeneite/parametres/statuts/statut (R11, R12) ; longueurs
+# inchangées (13 lignes), deux valeurs de chaîne à leur position, repérée par
+# (table, grandeur) dans la référence commitée (lue dans tests/reference/,
+# jamais dans le package). Textes nouveaux en littéral (échappements \u) ;
+# celui de z, fragment remplacé dans le texte de la référence. Une transition
+# par plan, plans deux à deux disjoints ; retirée par le commit de référence
+# (R), avec transition_185() et les constantes *_185.
+SMR_185 <- paste(
+  "r\u00e9sultat exact : theta^ = O / A en forme close (aucune optimisation num\u00e9rique), maximum de",
+  "vraisemblance de theta dans le mod\u00e8le D_c ~ Poisson(theta A_c) ind\u00e9pendants ; vraisemblance de",
+  "m\u00eame forme sous le mod\u00e8le de survie \u00e0 force constante par cellule ; estimation de theta :",
+  "son erreur d'estimation est d\u00e9crite par les bornes, non par ce statut")
+QX_185 <- paste(
+  "r\u00e9sultat exact : image de theta^ par q = 1 - (1 - q~)^theta, fonction croissante de theta",
+  "(invariance du maximum de vraisemblance : maximum de vraisemblance de q dans le mod\u00e8le de forme",
+  "impos\u00e9e, force theta mu~ constante sur [x, x+1)) ; estimation de q_x, erreur d'estimation",
+  "d\u00e9crite par les bornes ; -expm1(theta^ log1p(-q~)), approximation num\u00e9rique ; vaut 1 par",
+  "arrondi si theta^ mu~ >= 54 ln 2 (\u00e9tat qx_arrondi_un)")
+P_ASYMPTOTIQUE_185 <- paste(
+  "asymptotique : loi du khi-deux \u00e0 ddl degr\u00e9s de libert\u00e9 quand l'information du test",
+  "cro\u00eet (plus petite valeur propre de V r\u00e9duite -> infini, aucune strate ne portant \u00e0 elle",
+  "seule une part non n\u00e9gligeable de V), le nombre de strates \u00e9tant fixe ou croissant : D_. peut",
+  "rester petit dans chaque strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le",
+  "mod\u00e8le de survie ; queue sup\u00e9rieure ; unit\u00e9s d'observation ind\u00e9pendantes ; sous",
+  "l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s et le test est anti-conservateur",
+  "(p-valeurs trop petites)")
+# Fragment du statut de segments/z remplacé, avant et après.
+Z_AVANT_185 <- "H0 (D_. -> infini), E tenue pour fixe"
+Z_APRES_185 <- "H0 (V_ss -> infini, m\u00eame r\u00e9gime que p_asymptotique), E tenue pour fixe"
+transition_185 <- function(id, etape) {
+  st <- paste0("etapes/", etape, "/parametres/statuts/")
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  cle <- paste(ref[[paste0(st, "table")]], ref[[paste0(st, "grandeur")]])
+  cibles <- if (etape == "positionnement") c("smr smr", "table_positionnee qx") else c("tests p_asymptotique", "segments z")
+  k <- match(cibles, cle)
+  statut <- ref[[paste0(st, "statut")]]
+  if (anyNA(k) || anyDuplicated(cle))
+    stop(sprintf("transition_185(%s) : lignes %s de la référence introuvables", id, paste(cibles, collapse = ", ")))
+  valeurs <- if (etape == "positionnement") c(SMR_185, QX_185) else {
+    if (!grepl(Z_AVANT_185, statut[k[2L]], fixed = TRUE))
+      stop(sprintf("transition_185(%s) : texte de segments/z de la référence inattendu", id))
+    c(P_ASYMPTOTIQUE_185, sub(Z_AVANT_185, Z_APRES_185, statut[k[2L]], fixed = TRUE))
+  }
+  list(issue = "#185", plans = id, changements = list(
+    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = valeurs, positions = k)))
+}
 TRANSITIONS_EN_COURS <- list(
   list(issue = "#174", plans = c("R8", "R9", "R10"), changements = list(
     list(chemin = "etapes/validation/resultat/sous_groupes/cellules_retenues", nature = "type",
@@ -556,7 +606,11 @@ TRANSITIONS_EN_COURS <- list(
   transition_179("R10", 353.26471567362739, STATUTS_P_179),
   transition_178("R8", FALSE),
   transition_178("R9", FALSE),
-  transition_178("R10", TRUE))
+  transition_178("R10", TRUE),
+  transition_185("R10", "positionnement"),
+  transition_185("R11", "homogeneite"),
+  transition_185("R12", "homogeneite"),
+  transition_185("R13", "positionnement"))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

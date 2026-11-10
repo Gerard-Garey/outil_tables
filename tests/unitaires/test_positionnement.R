@@ -67,6 +67,25 @@ verifier("A STATUTS_POSITIONNEMENT : (table, grandeur) uniques ; mention d'indé
               fixed = TRUE)) &&
     !any(grepl("Liddell|Garwood|Byar|Wilson|Hilferty", s$statut))
 })
+# T185 (spécification (0') de #185, M362, option 1a) : statut de qx aligné sur
+# la convention du module brut (résultat exact par invariance du maximum de
+# vraisemblance), « estimation » n'étant pas l'un des quatre statuts (E2.20) ;
+# theta^ en forme close, son erreur d'estimation portée par les bornes.
+verifier("T185.2 STATUTS_POSITIONNEMENT : qx « résultat exact » par invariance (texte de la spécification) ; theta^ en forme close, erreur d'estimation décrite par les bornes", {
+  s <- tablexp:::STATUTS_POSITIONNEMENT
+  st <- function(t, g) s$statut[s$table == t & s$grandeur == g]
+  q <- paste("résultat exact : image de theta^ par q = 1 - (1 - q~)^theta, fonction croissante de theta",
+             "(invariance du maximum de vraisemblance : maximum de vraisemblance de q dans le modèle de forme",
+             "imposée, force theta mu~ constante sur [x, x+1)) ; estimation de q_x, erreur d'estimation décrite",
+             "par les bornes ; -expm1(theta^ log1p(-q~)), approximation numérique ; vaut 1 par arrondi si theta^",
+             "mu~ >= 54 ln 2 (état qx_arrondi_un)")
+  t <- st("smr", "smr")
+  identical(st("table_positionnee", "qx"), q) && startsWith(st("table_positionnee", "qx"), "résultat exact") &&
+    grepl("invariance", st("table_positionnee", "qx"), fixed = TRUE) &&
+    startsWith(t, "résultat exact : theta^ = O / A en forme close (aucune optimisation numérique), maximum de") &&
+    endsWith(t, "; estimation de theta : son erreur d'estimation est décrite par les bornes, non par ce statut") &&
+    !any(startsWith(s$statut, "estimation"))
+})
 
 # --- B. Petit jeu de cellules (valeur calculée à la main) --------------------------
 # Une seule séquence sans segmentation, âges 50 à 52 : E^c = (128, 256, 512),
