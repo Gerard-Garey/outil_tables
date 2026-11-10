@@ -4,7 +4,8 @@
 #  (priorité recommended, exclu par l'ADR 0002)
 #
 #  Méthode (ADR 0007, point 2.2) :
-#    1. chaque fichier R/<module>.R est lu par parse(keep.source = FALSE) ;
+#    1. chaque fichier R/<module>.R est lu par parse(keep.source = FALSE), en
+#       UTF-8 quelle que soit la locale (analyser_fichier(), #206) ;
 #       un fichier dont le nom n'est pas un module connu (MODULES) est un
 #       écart ;
 #    2. les affectations de premier niveau (`nom <- ...`, `nom = ...`,
@@ -135,6 +136,84 @@ appels_interdits <- function(e) {
   unique(c(trouves, sprintf("%s() (appel, ou fonction passée comme objet)", dyn)))
 }
 
+# Analyse syntaxique d'un fichier de R/ (UTF-8), indépendante de la locale
+# native (#206). En locale UTF-8 : parse(fichier, encoding = "UTF-8"). Sinon
+# (mesuré sous LC_ALL=C), parse() ne peut pas traduire vers l'encodage natif
+# les littéraux non ASCII : il avertit et les altère (« <U+00E9> »), sans
+# refus. Le fichier est alors lu en octets UTF-8 (validUTF8() : sinon erreur),
+# chaque caractère non ASCII est réécrit en échappement \U{...} (le parseur
+# l'interprète sans traduction : chaîne ordinaire lue comme en UTF-8 ; sans
+# effet dans un commentaire), puis analysé en texte ASCII ; les numéros de
+# ligne sont conservés. La réécriture lit autrement qu'en UTF-8 deux
+# constructions, refusées (écart « illisible », controler_non_ascii()) : un
+# caractère non ASCII dans une chaîne brute (r"(...)"), et un caractère non
+# ASCII précédé d'une barre oblique inverse dans une chaîne (échappement
+# invalide en UTF-8). Limites : un nom (symbole, ou chaîne en position de nom
+# d'argument : "délais" = ...) ne peut pas être natif hors UTF-8 ; parse() le
+# traduit en « <U+00E9> » et avertit, avertissement écarté ici (seul son
+# marqueur « <U+ » est écarté, tout autre avertissement passe). Un symbole
+# non ASCII hors chaîne (nom de définition, d'appel) est refusé par le
+# parseur : écart « illisible ». Divergence résiduelle : un symbole non ASCII
+# entre accents graves est accepté en UTF-8 et refusé hors UTF-8 (parse() :
+# « \Uxxxxxxxx sequences not supported inside backticks »), jamais accepté à
+# tort hors UTF-8.
+# Un appel d'opérateur non ASCII (a %é% b) est lu hors UTF-8 sous le nom
+# littéral « %\U{e9}% » ; aucun tel opérateur ne peut être défini hors UTF-8
+# (forme entre accents graves refusée par parse()) et R/ n'en contient aucun.
+# Aucune lecture de ce script ne dépend d'un nom non ASCII en position de nom
+# d'argument.
+session_utf8 <- function() isTRUE(l10n_info()[["UTF-8"]])
+# Remplace chaque caractère non ASCII d'un vecteur de lignes UTF-8 par
+# `par(points de code)`.
+remplacer_non_ascii <- function(l, par) {
+  na <- grepl("[^\\001-\\177]", l, perl = TRUE, useBytes = TRUE)
+  l[na] <- vapply(l[na], function(s) {
+    cp <- utf8ToInt(s)
+    paste(ifelse(cp > 127L, par(cp), intToUtf8(cp, multiple = TRUE)), collapse = "")
+  }, "", USE.NAMES = FALSE)
+  l
+}
+# Refus des deux constructions que la réécriture en \U{...} lirait autrement
+# qu'en UTF-8 (#206) : un caractère non ASCII dans une chaîne brute
+# (r"(...)", R'[...]', avec ou sans tirets), où \U{e9} resterait le texte
+# « \U{e9} » ; un caractère non ASCII précédé d'une barre oblique inverse dans
+# une chaîne (échappement invalide en UTF-8, valide une fois réécrit). Les
+# lignes sont analysées une fois avec un marqueur ASCII à la place de chaque
+# caractère non ASCII : une barre oblique inverse devant le marqueur est un
+# échappement invalide (erreur du parseur) ; un jeton chaîne commençant par r
+# ou R qui contient le marqueur est une chaîne brute non ASCII.
+MARQUEUR_NON_ASCII <- "QNONASCIIQ"
+controler_non_ascii <- function(l) {
+  if (any(grepl(MARQUEUR_NON_ASCII, l, fixed = TRUE)))
+    stop("le texte contient le marqueur interne ", MARQUEUR_NON_ASCII, " : lecture impossible", call. = FALSE)
+  e <- tryCatch(parse(text = remplacer_non_ascii(l, function(cp) MARQUEUR_NON_ASCII), keep.source = TRUE),
+                error = function(e)
+                  stop("échappement invalide devant un caractère non ASCII, ou syntaxe (non ASCII remplacé par ",
+                       MARQUEUR_NON_ASCII, " pour l'analyse) : ", conditionMessage(e), call. = FALSE))
+  pd <- utils::getParseData(e, includeText = NA)
+  if (is.null(pd)) return(invisible(NULL))
+  s <- pd[pd$token == "STR_CONST", , drop = FALSE]
+  if (!nrow(s)) return(invisible(NULL))
+  texte <- utils::getParseText(pd, s$id)
+  brute <- grepl("^[rR]", texte) & grepl(MARQUEUR_NON_ASCII, texte, fixed = TRUE)
+  if (any(brute))
+    stop(sprintf("caractère non ASCII dans une chaîne brute (ligne %s) : lue hors UTF-8 comme du texte échappé, refusée",
+                 paste(s$line1[brute], collapse = ", ")), call. = FALSE)
+  invisible(NULL)
+}
+source_ascii <- function(fichier) {
+  l <- readLines(fichier, encoding = "UTF-8", warn = FALSE)
+  if (!all(validUTF8(l))) stop("octets non UTF-8 dans ", basename(fichier), call. = FALSE)
+  if (any(grepl("[^\\001-\\177]", l, perl = TRUE, useBytes = TRUE))) controler_non_ascii(l)
+  remplacer_non_ascii(l, function(cp) sprintf("\\U{%x}", cp))
+}
+analyser_fichier <- function(fichier, keep.source) {
+  if (session_utf8()) return(parse(fichier, keep.source = keep.source, encoding = "UTF-8"))
+  withCallingHandlers(parse(text = source_ascii(fichier), keep.source = keep.source),
+                      warning = function(w)
+                        if (grepl("<U+", conditionMessage(w), fixed = TRUE)) invokeRestart("muffleWarning"))
+}
+
 # Analyse le dossier R/ ; rend list(defauts, aretes, symboles).
 analyser_modules <- function(dossier) {
   defauts <- character(0)
@@ -151,7 +230,7 @@ analyser_modules <- function(dossier) {
                                     basename(f)))
       next
     }
-    exprs <- tryCatch(parse(f, keep.source = FALSE, encoding = "UTF-8"),
+    exprs <- tryCatch(analyser_fichier(f, keep.source = FALSE),
                       error = function(e) e)
     if (inherits(exprs, "error")) {
       defauts <- c(defauts, sprintf("%s : illisible (%s)", basename(f), conditionMessage(exprs)))
