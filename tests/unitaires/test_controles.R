@@ -245,6 +245,218 @@ verifier("ordre des modules : passe sur un graphe conforme (simulation -> donnee
          passe(controle("graphe_modules.R", shQuote(d))))
 unlink(d, recursive = TRUE)
 
+# --- invariant des recettes (ADR 0016, point 4.4 ; #194, M380) ----------------
+# Le script lit l'arbre d'analyse de R/ ; les témoins d'injection travaillent
+# sur une copie de R/ dans tempfile() (R/ n'est jamais modifié) et les cas de
+# règles sur un arbre fabriqué, sans lieu admis, par appel des fonctions du
+# script.
+
+verifier("invariant des recettes : passe sur R/ du dépôt", passe(controle("recettes_invariant.R")))
+copie_R <- function() {
+  d <- tempfile("R_copie_")
+  dir.create(d)
+  file.copy(list.files(file.path(RACINE, "R"), pattern = "\\.[Rr]$", full.names = TRUE), d)
+  d
+}
+# Ajoute `lignes` à la fin du fichier de la copie ; rend le numéro de la première ligne ajoutée.
+injecter <- function(d, fichier, lignes) {
+  f <- file.path(d, fichier)
+  n <- length(readLines(f, encoding = "UTF-8"))
+  cat(c("", lignes), file = f, sep = "\n", append = TRUE)
+  n + 2L
+}
+# Remplace `ancien` (fixe) par `nouveau` dans le fichier de la copie ; refuse si rien ne change.
+remplacer <- function(d, fichier, ancien, nouveau) {
+  f <- file.path(d, fichier)
+  l <- readLines(f, encoding = "UTF-8")
+  m <- gsub(ancien, nouveau, l, fixed = TRUE, useBytes = TRUE)
+  stopifnot(!identical(l, m))
+  writeLines(m, f, useBytes = TRUE)
+}
+recettes <- function(d) controle("recettes_invariant.R", shQuote(d))
+
+d <- copie_R()
+n <- injecter(d, "brut.R", c("fonction_injectee <- function(recette) {",
+                             "  if (recette$recette == \"agregats\") 1 else 2", "}"))
+r <- recettes(d)
+verifier("invariant des recettes : échoue sur un `if (recette$recette == \"agregats\")` injecté dans brut.R (R3, fichier:ligne et fonction)",
+         echoue(r, sprintf("brut.R:%d : fonction fonction_injectee : règle R3 : jeton recette$recette", n + 1L)))
+verifier("invariant des recettes : le littéral de la comparaison injectée est relevé de même",
+         echoue(r, sprintf("brut.R:%d : fonction fonction_injectee : règle R3 : jeton \"agregats\"", n + 1L)))
+unlink(d, recursive = TRUE)
+
+d <- copie_R()
+n <- injecter(d, "brut.R", c("fonction_injectee <- function(recette) {",
+                             "  switch(recette$recette, agregats = 1, stocks_successifs = 2, 3)", "}"))
+r <- recettes(d)
+verifier("invariant des recettes : échoue sur un `switch(recette$recette, ...)` injecté (R1, sujet)",
+         echoue(r, sprintf("brut.R:%d : fonction fonction_injectee : règle R1 : jeton recette$recette", n + 1L)))
+verifier("invariant des recettes : le même `switch` est relevé en R2 (étiquette de cas)",
+         echoue(r, sprintf("brut.R:%d : fonction fonction_injectee : règle R2 : jeton stocks_successifs", n + 1L)))
+unlink(d, recursive = TRUE)
+
+# Règle non admise dans un lieu admis : R3 dans exposition_fenetres (admise en R1 et R2 seulement).
+d <- copie_R()
+remplacer(d, "exposition.R", "fs <- switch(recette$recette,",
+          "if (recette$recette == \"agregats\") NULL\n  fs <- switch(recette$recette,")
+verifier("invariant des recettes : échoue sur une règle non admise dans un lieu admis (R3 dans exposition_fenetres)",
+         echoue(recettes(d), "fonction exposition_fenetres : règle R3 : jeton recette$recette"))
+unlink(d, recursive = TRUE)
+# Fonction voisine d'un lieu admis : l'admission est par nom de fonction exact.
+d <- copie_R()
+n <- injecter(d, "exposition.R", "exposition_fenetres_bis <- function(recette) switch(recette$recette, a = 1)")
+verifier("invariant des recettes : échoue sur une fonction voisine d'un lieu admis (admission par nom de fonction exact)",
+         echoue(recettes(d), sprintf("exposition.R:%d : fonction exposition_fenetres_bis : règle R1", n)))
+unlink(d, recursive = TRUE)
+
+# Admission devenue inutile : l'occurrence de controler_parametres_recette disparaît.
+d <- copie_R()
+remplacer(d, "construire_table.R", "cat_e$recette %in% recette$recette", "TRUE")
+verifier("invariant des recettes : échoue sur une admission devenue inutile (retrait de l'occurrence de controler_parametres_recette)",
+         echoue(recettes(d), "admission inutile : construire_table.R, fonction controler_parametres_recette"))
+unlink(d, recursive = TRUE)
+# Fonction renommée : occurrence hors lieu admis et admission inutile.
+d <- copie_R()
+remplacer(d, "construire_table.R", "controler_parametres_recette <- function(", "controler_parametres_recettes <- function(")
+r <- recettes(d)
+verifier("invariant des recettes : fonction admise renommée -> occurrence hors lieu admis",
+         echoue(r, "fonction controler_parametres_recettes : règle R3 : jeton cat_e$recette"))
+verifier("invariant des recettes : fonction admise renommée -> admission inutile",
+         echoue(r, "admission inutile : construire_table.R, fonction controler_parametres_recette (règles R3)"))
+unlink(d, recursive = TRUE)
+
+# Catalogue : absent, mal placé, non littéral.
+d <- copie_R()
+remplacer(d, "donnees.R", "CATALOGUE_RECETTES <- data.frame(", "CATALOGUE_AUTRE <- data.frame(")
+verifier("invariant des recettes : échoue si donnees.R n'a plus CATALOGUE_RECETTES",
+         echoue(recettes(d), "CATALOGUE_RECETTES : affectation de premier niveau absente"))
+unlink(d, recursive = TRUE)
+d <- copie_R()
+remplacer(d, "donnees.R", "recette = c(\"lignes_dates_completes\", \"agregats\", \"stocks_successifs\"),",
+          "recette = c(\"lignes_dates_completes\", paste0(\"agre\", \"gats\"), \"stocks_successifs\"),")
+verifier("invariant des recettes : échoue si l'argument recette du catalogue n'est pas un vecteur littéral",
+         echoue(recettes(d), "pas un vecteur littéral de chaînes"))
+unlink(d, recursive = TRUE)
+d <- tempfile("R_vide_")
+dir.create(d)
+verifier("invariant des recettes : échoue si donnees.R est introuvable",
+         echoue(recettes(d), "donnees.R introuvable"))
+unlink(d, recursive = TRUE)
+
+# Les noms sont lus dans le catalogue de la copie, jamais recopiés dans le script :
+# une 4e recette du catalogue est relevée, un nom retiré ne l'est plus.
+CATALOGUE_COPIE <- "recette = c(\"lignes_dates_completes\", \"agregats\", \"stocks_successifs\"),"
+d <- copie_R()
+remplacer(d, "donnees.R", CATALOGUE_COPIE,
+          "recette = c(\"lignes_dates_completes\", \"agregats\", \"stocks_successifs\", \"recette_temoin\"),")
+n <- injecter(d, "brut.R", "fonction_injectee <- function(x) x == \"recette_temoin\"")
+verifier("invariant des recettes : une 4e recette ajoutée au catalogue est relevée en R3 (noms lus dans le catalogue)",
+         echoue(recettes(d), sprintf("brut.R:%d : fonction fonction_injectee : règle R3 : jeton \"recette_temoin\"", n)))
+unlink(d, recursive = TRUE)
+d <- copie_R()
+remplacer(d, "donnees.R", CATALOGUE_COPIE,
+          "recette = c(\"lignes_dates_completes\", \"stocks_successifs\"),")
+n <- injecter(d, "brut.R", "fonction_injectee <- function(x) x == \"agregats\"")
+r <- recettes(d)
+verifier("invariant des recettes : un nom retiré du catalogue n'est plus relevé (aucun écart en brut.R)",
+         !any(grepl("brut.R:", r$sortie, fixed = TRUE, useBytes = TRUE)))
+verifier("invariant des recettes : un nom retiré du catalogue retire aussi les occurrences admises qui le portaient (simuler_portefeuille : admission inutile)",
+         echoue(r, "admission inutile : simulation.R, fonction simuler_portefeuille"))
+unlink(d, recursive = TRUE)
+
+# Littéraux isolés, lecture pour inscription et comparaisons voisines : aucun écart.
+d <- copie_R()
+injecter(d, "brut.R", c("fonction_isolee <- function(recette, forme) {",
+                        "  famille <- \"agregats\"",
+                        "  cles <- c(\"stocks_successifs\", \"autre\")",
+                        "  list(recette = recette$recette, seam = recette$seam, f = forme$nom)",
+                        "  if (recette$seam == \"fenetres\" && forme$nom == \"autre\") sprintf(\"%s\", recette$recette)",
+                        "}"))
+verifier("invariant des recettes : un littéral isolé, une inscription de recette$recette et une comparaison sur une propriété ne sont pas relevés",
+         passe(recettes(d)))
+unlink(d, recursive = TRUE)
+
+# Règles sur un arbre fabriqué, sans lieu admis (appel direct des fonctions du script).
+env_recettes <- new.env()
+sys.source(file.path(CONTROLES, "recettes_invariant.R"), envir = env_recettes)
+CAT_TEMOIN <- "CATALOGUE_RECETTES <- data.frame(recette = c(\"lignes_dates_completes\", \"agregats\", \"stocks_successifs\"), x = 1)"
+arbre_recettes <- function(...) {
+  d <- tempfile("arbre_recettes_")
+  dir.create(d)
+  writeLines(CAT_TEMOIN, file.path(d, "donnees.R"))
+  writeLines(c(...), file.path(d, "autre.R"))
+  d
+}
+releve <- function(...) {
+  d <- arbre_recettes(...)
+  on.exit(unlink(d, recursive = TRUE))
+  o <- env_recettes$analyser_recettes(d, env_recettes$LIEUX_ADMIS[0L, ])$occurrences
+  o <- o[o$fichier == "autre.R", ]
+  sort(sprintf("%s %s", o$regle, o$jeton))
+}
+for (cas in list(
+  list(code = "f <- function(x) x == \"agregats\"", attendu = "R3 \"agregats\""),
+  list(code = "f <- function(x) \"agregats\" != x", attendu = "R3 \"agregats\""),
+  list(code = "f <- function(x) x %in% c(\"lignes_dates_completes\", \"autre\")", attendu = "R3 \"lignes_dates_completes\""),
+  list(code = "f <- function(x) identical(x, \"agregats\")", attendu = "R3 \"agregats\""),
+  list(code = "f <- function(x) match(x, c(\"agregats\", \"stocks_successifs\"))",
+       attendu = c("R3 \"agregats\"", "R3 \"stocks_successifs\"")),
+  list(code = "f <- function(x) is.element(\"stocks_successifs\", x)", attendu = "R3 \"stocks_successifs\""),
+  list(code = "f <- function(r, y) r$recette == y", attendu = "R3 r$recette"),
+  list(code = "f <- function(r, y) y != r[[\"recette\"]]", attendu = "R3 r[[\"recette\"]]"),
+  list(code = "f <- function(r, y) identical(r$recette, y)", attendu = "R3 r$recette"),
+  list(code = "f <- function(r, y) (r$recette) == y", attendu = "R3 r$recette"),
+  list(code = "f <- function(r, y) g(r)$recette %in% y", attendu = "R3 g(r)$recette"),
+  list(code = "f <- function(r, y) base::match(r$recette, y)", attendu = "R3 r$recette"),
+  list(code = "f <- function(r) switch(r$recette, a = 1)", attendu = "R1 r$recette"),
+  list(code = "f <- function(r) switch(EXPR = r[[\"recette\"]], a = 1)", attendu = "R1 r[[\"recette\"]]"),
+  list(code = "f <- function(r) base::switch(r$recette, 1)", attendu = "R1 r$recette"),
+  list(code = "f <- function(r, y) r$`recette` == y", attendu = "R3 r$`recette`"),
+  list(code = "f <- function(r) switch(r$recette, `agregats` = 1, 2)",
+       attendu = c("R1 r$recette", "R2 agregats")),
+  list(code = "f <- function(x) switch(x, agregats = 1, \"stocks_successifs\" = , 2)",
+       attendu = c("R2 agregats", "R2 stocks_successifs")),
+  list(code = "f <- function(x, r) switch(x, a = r$recette == \"agregats\")",
+       attendu = c("R3 \"agregats\"", "R3 r$recette"))
+)) verifier(sprintf("invariant des recettes : règle relevée sur « %s »", cas$code),
+            if (identical(releve(cas$code), sort(cas$attendu))) TRUE
+            else paste("relevé :", paste(releve(cas$code), collapse = " | ")))
+for (code in c("f <- function(x) x <- \"agregats\"",
+               "f <- function(x) list(famille = \"agregats\", cle = c(\"stocks_successifs\", \"autre\"))",
+               "f <- function(r) r$recette",
+               "f <- function(r) paste(r$recette, r$seam)",
+               "f <- function(r) list(recette = r$recette)",
+               "f <- function(x) switch(x, a = 1, 2)",
+               "f <- function(x) switch(x, 1, 2)",
+               "f <- function(x) x == \"autre\"",
+               "f <- function(x, y) x == y",
+               "f <- function(x) x$nom == y$nom",
+               "f <- function(r) r$seam == \"fenetres\"",
+               "f <- function(r) r$recettes == 1",
+               "f <- function(r) r$recette[1L]",
+               "f <- function(x) x %in% c(\"autre\", \"x\")",
+               "f <- function(x) paste0(x, \"agregats\") == \"y\"",
+               "f <- function(x) switch(x, a = \"agregats\")",
+               "# if (x == \"agregats\") 1",
+               "f <- function(x) \"if (x == 'agregats') 1\""))
+  verifier(sprintf("invariant des recettes : non relevé sur « %s »", code),
+           if (identical(releve(code), character(0))) TRUE
+           else paste("relevé :", paste(releve(code), collapse = " | ")))
+# Fonction englobante : définition de premier niveau, fonction locale comprise.
+englobante <- function(...) {
+  d <- arbre_recettes(...)
+  on.exit(unlink(d, recursive = TRUE))
+  o <- env_recettes$analyser_recettes(d, env_recettes$LIEUX_ADMIS[0L, ])$occurrences
+  o <- o[o$fichier == "autre.R", ]
+  sprintf("%d:%s", o$ligne, o$fonction)
+}
+verifier("invariant des recettes : fonction englobante = définition de premier niveau (fonction locale, `=`, constante, hors affectation)",
+         identical(englobante("f <- function() {", "  h <- function(x) x == \"agregats\"", "  h(1)", "}",
+                              "g = function(x) x == \"agregats\"",
+                              "K <- list(a = (1 == \"agregats\"))",
+                              "if (TRUE == \"agregats\") 1"),
+                   c("2:f", "5:g", "6:K", "7:<premier niveau>")))
+
 # --- unicité des graines (issue #176 ; B15, avis de forme G13) -----------------
 # Arbres fabriqués (tests/, R/ et la liste blanche tests/controles/
 # graines_admises.csv du témoin), jamais l'arbre du dépôt (hors la copie des
