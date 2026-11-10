@@ -247,7 +247,7 @@ verifier("C : diagnostics : 5 cellules, 3 informatives, 1 sans décès, 1 non in
   d <- RC$diagnostics
   identical(d$cellules, 5L) && identical(d$cellules_informatives, 3L) && identical(d$cellules_sans_deces, 1L) &&
     identical(d$cellules_non_informatives, 1L) && identical(d$cellules_evenement_sans_exposition, 0L) &&
-    identical(d$evenements_total, 16) && identical(d$evenements_hors_plage, 0)
+    identical(d$evenements_total, 16L) && identical(d$evenements_hors_plage, 0L)
 })
 verifier("C : apport nul (exact) des cellules sans décès et non informatives : T identical() sans elles", {
   r <- homog(EXPO_C[EXPO_C$age <= 52, ], "sexe", c(50, 52), c(50, 52))
@@ -260,7 +260,7 @@ verifier("C : Monte-Carlo : p dans [1/(B+1), 1], e = sqrt(B p (1 - p)) / (B + 1)
   all(t$p_monte_carlo >= 1 / (B + 1) & t$p_monte_carlo <= 1) &&
     isTRUE(proche(t$erreur_monte_carlo, sqrt(B * t$p_monte_carlo * (1 - t$p_monte_carlo)) / (B + 1), 1e-14, 0)) &&
     identical(r2, RC) &&
-    identical(RC$resultat$monte_carlo$jeux, data.frame(jeu = "cellules", tirages_effectues = 99, stringsAsFactors = FALSE))
+    identical(RC$resultat$monte_carlo$jeux, data.frame(jeu = "cellules", tirages_effectues = 99L, stringsAsFactors = FALSE))
 })
 verifier("C : statistique de Monte-Carlo : la statistique d'une réplique égale aux décès observés vaut T observé (même fonction)", {
   sc <- tablexp:::score_homogeneite(EXPO_C$evenements, EXPO_C$exposition_centrale, EXPO_C$age - 49L,
@@ -432,7 +432,7 @@ verifier("D variable segment | sexe : T = Rao de glm (strates cellule x sexe, al
 })
 verifier("D Monte-Carlo : trois jeux (cellules, variable_sexe, variable_segment), B tirages chacun ; p de Monte-Carlo de chaque test produit", {
   j <- RD$resultat$monte_carlo$jeux
-  identical(j$jeu, c("cellules", "variable_sexe", "variable_segment")) && identical(j$tirages_effectues, rep(99, 3L)) &&
+  identical(j$jeu, c("cellules", "variable_sexe", "variable_segment")) && identical(j$tirages_effectues, rep(99L, 3L)) &&
     !anyNA(RD$resultat$tests$p_monte_carlo)
 })
 verifier("D sous H0 (facteurs égaux) : T global = Rao à 1e-7 (spécification : pire écart mesuré sous H0)", {
@@ -471,7 +471,7 @@ verifier("F segment sans exposition sur la plage : hors du test, ligne O = A = 0
        seg = if (identical(g$sexe, c("F", "H", "X")) && identical(g$etat[3L], "segment_sans_exposition") &&
                  g$observes[3L] == 0 && g$attendus[3L] == 0 && is.na(g$z[3L]) && is.na(g$rapport_observes_attendus[3L]))
                TRUE else "ligne X",
-       hors = if (identical(r$diagnostics$evenements_hors_plage, 3) && identical(r$diagnostics$lignes_exposition_hors_plage, 1L))
+       hors = if (identical(r$diagnostics$evenements_hors_plage, 3L) && identical(r$diagnostics$lignes_exposition_hors_plage, 1L))
                 TRUE else "hors plage",
        groupes = if (identical(r$resultat$tests$groupes[1L], 2L)) TRUE else "groupes")
 })
@@ -482,7 +482,7 @@ verifier("F moins de deux segments informatifs : tests NA, état moins_de_deux_s
   t <- r$resultat$tests
   all(t$etat == "moins_de_deux_segments_informatifs") && all(is.na(t$statistique)) && all(is.na(t$p_monte_carlo)) &&
     identical(t$ddl, c(0L, 0L, 0L, 0L)) && identical(t$etat_p_exacte, t$etat) &&
-    identical(r$resultat$monte_carlo$jeux$tirages_effectues, 0) &&
+    identical(r$resultat$monte_carlo$jeux$tirages_effectues, 0L) &&
     all(r$resultat$segments$etat[r$resultat$segments$sexe == "F"] == "variance_nulle")
 })
 verifier("F événement sans exposition (âge 52, tranche 52-54) : global, tranche 52-54 et somme non produits ; tranche 50-51 produite et identique ; avertissement ; identité des décomptes", {
@@ -505,7 +505,7 @@ verifier("F événement sans exposition (âge 52, tranche 52-54) : global, tranc
                            c("produite", "produite", "segment_sans_exposition")))
                TRUE else paste(s$etat, collapse = ", "),
        diag = if (identical(d$cellules_evenement_sans_exposition, 1L) &&
-                  identical(d$evenements_cellules_evenement_sans_exposition, 10) &&
+                  identical(d$evenements_cellules_evenement_sans_exposition, 10L) &&
                   sum(s$observes[s$portee == "global"]) + 10 == d$evenements_total) TRUE else "diagnostics",
        avert = if (identical(r$avertissements$code, "evenements_sans_exposition") &&
                    identical(r$avertissements$etape, "homogeneite") && identical(r$avertissements$nombre, 1L))
@@ -518,7 +518,7 @@ verifier("F variable à une seule modalité présente : test par variable moins_
   r <- homog(e, c("sexe", "segment"), c(50, 54), c(50, 52))
   v <- ligne_test(r, "variable", "segment")
   identical(v$etat, "moins_de_deux_segments_informatifs") &&
-    identical(r$resultat$monte_carlo$jeux$tirages_effectues[r$resultat$monte_carlo$jeux$jeu == "variable_segment"], 0) &&
+    identical(r$resultat$monte_carlo$jeux$tirages_effectues[r$resultat$monte_carlo$jeux$jeu == "variable_segment"], 0L) &&
     isTRUE(proche(ligne_test(r, "variable", "sexe")$statistique, 529 / 53, 1e-14, 0))
 })
 
@@ -531,6 +531,28 @@ verifier("F (#201) : exposition à 0 ligne -> segments à 0 ligne, colonnes etat
   if (nrow(s) == 0L && identical(s$etat, character(0)) && identical(s$rapport_observes_attendus, numeric(0)) &&
       identical(s$z, numeric(0))) TRUE else
     paste(nrow(s), typeof(s$etat), typeof(s$rapport_observes_attendus), typeof(s$z))
+})
+
+# Type des dénombrements (#199 ; ADR 0009, point 9.6) : segments$observes,
+# jeux$tirages_effectues et les trois diagnostics d'événements en integer,
+# avec tirages (C), avec événement sans exposition (F), sans aucun test
+# produit (jeu à 0 tirage) et sur une exposition à 0 ligne.
+verifier("F (#199) : segments$observes, monte_carlo$jeux$tirages_effectues, evenements_cellules_evenement_sans_exposition, evenements_hors_plage, evenements_total en integer (tirages, événement sans exposition, aucun test produit, 0 ligne)", {
+  ty <- function(r) vapply(list(r$resultat$segments$observes, r$resultat$monte_carlo$jeux$tirages_effectues,
+                                r$diagnostics$evenements_cellules_evenement_sans_exposition,
+                                r$diagnostics$evenements_hors_plage, r$diagnostics$evenements_total), typeof, "")
+  fe <- homog(rbind(EXPO_C, data.frame(sexe = "X", age = 52L, exposition_centrale = 0, evenements = 2L)), "sexe",
+              c(50, 54), c(50, 52))
+  e1 <- EXPO_C[EXPO_C$sexe == "F", ]
+  sans_test <- homog(rbind(e1, data.frame(sexe = "H", age = 53L, exposition_centrale = 100, evenements = 0L)), "sexe",
+                     c(50, 54), c(50, 52))
+  e0 <- homog(data.frame(sexe = character(0), age = integer(0), exposition_centrale = numeric(0), evenements = integer(0)),
+              "sexe", c(50, 54), c(50, 52))
+  cas <- list(tirages = RC, sans_exposition = fe, sans_test = sans_test, vide = e0)
+  r <- vapply(cas, function(x) all(ty(x) == "integer"), NA)
+  tous(types = if (all(r)) TRUE else paste("non integer :", paste(names(r)[!r], collapse = ", ")),
+       sans_test = if (identical(sans_test$resultat$monte_carlo$jeux$tirages_effectues, 0L)) TRUE else "tirages",
+       vide = if (nrow(e0$resultat$segments) == 0L && identical(e0$diagnostics$evenements_total, 0L)) TRUE else "vide")
 })
 
 # --- G. Étape dans construire_table() (identité exacte ; recoupement) --------------

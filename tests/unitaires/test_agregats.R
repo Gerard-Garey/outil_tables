@@ -530,6 +530,40 @@ verifier("evenements_hors_plage (appel direct du seam cellules) : somme au-delà
                               .Machine$integer.max)) && identical(r$details, list(cellules = 1L))
 })
 
+# Garde du total des événements (#199, M397 ; ADR 0009, point 9.6, (d) 3) :
+# agrégats du jeu simulé (forme de l'entrée de R13), deux cellules (âges 40
+# et 60, sexe H) portées à 1,5e9 événements, chacune sous la borne de la
+# garde par cellule : construire_table() refuse à l'étape exposition, avant
+# toute étape en aval ; un total exactement égal à .Machine$integer.max
+# n'est pas refusé et reste integer dans les diagnostics des étapes.
+P_TOTAL <- plan_ag(c(BRUT, POS))
+tous <- function(...) {
+  l <- list(...)
+  for (n in names(l)) if (!isTRUE(l[[n]])) return(paste(n, ":", l[[n]]))
+  TRUE
+}
+verifier("garde du total (#199, M397) : deux cellules à 1,5e9 événements (sous la garde par cellule) -> refus exposition / denombrement_hors_plage, message et détails (grandeur evenements, valeur, limite) ; total égal à .Machine$integer.max -> construction aboutie, totaux integer", {
+  k <- which(AGG$sexe == "H" & AGG$age %in% c(40, 60))
+  g <- AGG; g$d[k] <- 1500000000L
+  total <- sum(as.numeric(g$d))
+  r <- rf(construire_table(g, R_AG, P_TOTAL, tables_reference = list(tv = T_HF)))
+  b <- AGG; b$d[k[1L]] <- as.integer(b$d[k[1L]] + (.Machine$integer.max - sum(as.numeric(AGG$d))))
+  x <- tryCatch(construire_table(b, R_AG, P_TOTAL, tables_reference = list(tv = T_HF)), refus_tablexp = function(e) e)
+  ok <- controle(r, "exposition", "denombrement_hors_plage")
+  tous(cellules = if (length(k) == 2L) TRUE else "deux cellules attendues",
+       refus = ok,
+       message = if (isTRUE(ok) && identical(msg(r), sprintf(paste(
+         "Le dénombrement « evenements » (%.0f) est hors de la plage des entiers du moteur (au plus %d) : la",
+         "construction est refusée."), total, .Machine$integer.max))) TRUE else "message",
+       details = if (isTRUE(ok) && identical(r$details, list(grandeur = "evenements", valeur = total,
+                                                             limite = .Machine$integer.max))) TRUE else "détails",
+       borne = if (!inherits(x, "refus_tablexp") &&
+                   identical(x$etapes$exposition$diagnostics$evenements, .Machine$integer.max) &&
+                   identical(x$etapes$brut$diagnostics$evenements, .Machine$integer.max) &&
+                   identical(x$etapes$positionnement$diagnostics$evenements_total, .Machine$integer.max)) TRUE
+               else if (inherits(x, "refus_tablexp")) paste("refus inattendu :", x$motif) else "total à la borne")
+})
+
 # --- C5 et C6 : sommes et ordre ------------------------------------------------------
 
 verifier("C5 sommes sur un segment non employé et sur les années (par_annee = FALSE), valeurs dyadiques : D et E égaux aux sommes, identical()", {

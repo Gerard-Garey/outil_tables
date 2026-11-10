@@ -161,7 +161,7 @@ verifier("J1 sous ajustee_hors_outil : grandeurs sous H0 NA (ddl_non_etabli), de
   h0 <- tablexp:::STATUTS_VALIDATION$sous_h0[tablexp:::STATUTS_VALIDATION$statistique != "sous_groupes"]
   if (!all(s$etat[h0] == "ddl_non_etabli") || !all(is.na(s$valeur[h0]))) "grandeurs sous H0"
   else if (!all(s$etat[!h0] == "produite") || !identical(s$valeur[!h0], s1$valeur[!h0])) "grandeurs descriptives"
-  else if (!identical(S$tirages_effectues, 0) || !all(is.na(S$cellules$fluctuation_inf_exacte))) "tirages ou intervalles"
+  else if (!identical(S$tirages_effectues, 0L) || !all(is.na(S$cellules$fluctuation_inf_exacte))) "tirages ou intervalles"
   else TRUE
 })
 verifier("aucune cellule retenue : toutes les grandeurs NA, état aucune_cellule_retenue, aucun tirage", {
@@ -387,7 +387,7 @@ verifier("étape : paramètres (référence de méthode M244, p = 0, appariement
   p <- V$parametres
   identical(p$reference_methode, tablexp:::REFERENCE_METHODE_VALIDATION) && identical(p$parametres_estimes, 0L) &&
     identical(p$appariement_sexe, "par_sexe") && identical(p$table_reference, "tv") &&
-    identical(p$table_nom, "GM vraie par sexe") && identical(V$resultat$monte_carlo$tirages_effectues, 199) &&
+    identical(p$table_nom, "GM vraie par sexe") && identical(V$resultat$monte_carlo$tirages_effectues, 199L) &&
     identical(V$resultat$monte_carlo$graine, 20261106L) && identical(X$fiche$graine_mention, "graine du plan")
 })
 verifier("étape : sous-groupes segment x tranche, tranche, segment ; somme des O par regroupement = O global", {
@@ -417,7 +417,7 @@ verifier("étape : relation ajustee_hors_outil -> aucun tirage, sous-groupes san
   v <- x$etapes$validation
   g <- v$resultat$sous_groupes
   h <- rawToChar(ecrire_rapport(x)); Encoding(h) <- "UTF-8"
-  identical(v$resultat$monte_carlo$tirages_effectues, 0) && identical(v$parametres$parametres_estimes, NA_integer_) &&
+  identical(v$resultat$monte_carlo$tirages_effectues, 0L) && identical(v$parametres$parametres_estimes, NA_integer_) &&
     all(g$etat == "ddl_non_etabli") && all(is.na(g$p_centrale)) && !anyNA(g$smr) &&
     grepl("Relation « ajustee_hors_outil »", h, fixed = TRUE) &&
     !grepl("seules les p-valeurs de Monte-Carlo ont un niveau garanti", h, fixed = TRUE) &&
@@ -449,8 +449,8 @@ verifier("états : retenue, sans_exposition (âges 50 et 57), taux_table_nul, ev
   identical(c_$age, 50:57) &&
     identical(c_$etat, c("sans_exposition", "evenement_sans_exposition", "taux_table_nul", "evenement_sous_taux_nul",
                          "retenue", "retenue", "retenue", "sans_exposition")) &&
-    identical(d$etats$cellules, c(3L, 2L, 1L, 1L, 1L)) && identical(d$evenements_sans_attendu, 3) &&
-    identical(d$evenements_hors_plage, 4) && identical(d$exposition_hors_plage, 50) && identical(d$cellules_hors_plage, 1L) &&
+    identical(d$etats$cellules, c(3L, 2L, 1L, 1L, 1L)) && identical(d$evenements_sans_attendu, 3L) &&
+    identical(d$evenements_hors_plage, 4L) && identical(d$exposition_hors_plage, 50) && identical(d$cellules_hors_plage, 1L) &&
     identical(r$avertissements$code, "evenements_sans_attendu") && identical(r$avertissements$nombre, 2L) &&
     identical(valeur(r$resultat$statistiques, "smr/observes"), 4) && all(is.na(c_$residu_pearson[c_$etat != "retenue"]))
 })
@@ -473,6 +473,36 @@ verifier("dénombrements (#174) : sous_groupes$cellules_retenues et diagnostics$
          som <- vapply(c("segment", "tranche"), function(r) sum(sg$cellules_retenues[sg$regroupement == r]), 0)
          if (identical(as.integer(som), rep(cas$par_sexe$diagnostics$cellules_retenues, 2L))) TRUE else "somme par regroupement"
        })
+})
+# Type des dénombrements (#199 ; ADR 0009, point 9.6) : les neuf chemins de
+# l'étape validation en integer dans toutes les branches (cellules retenues,
+# aucune cellule retenue avec sequences_runs vide, ajustee_hors_outil sans
+# tirage, par_annee sans cellule, construction par sexe) ; valeurs écrites à
+# la main sur un_segment.
+types_validation_199 <- function(r) {
+  t <- c(sous_groupes_observes = typeof(r$resultat$sous_groupes$observes),
+         positifs = typeof(r$resultat$sequences_runs$positifs), negatifs = typeof(r$resultat$sequences_runs$negatifs),
+         runs = typeof(r$resultat$sequences_runs$runs),
+         tirages_effectues = typeof(r$resultat$monte_carlo$tirages_effectues),
+         etats_evenements = typeof(r$diagnostics$etats$evenements),
+         evenements_sans_attendu = typeof(r$diagnostics$evenements_sans_attendu),
+         evenements_hors_plage = typeof(r$diagnostics$evenements_hors_plage),
+         evenements_total = typeof(r$diagnostics$evenements_total))
+  if (all(t == "integer")) TRUE else paste(names(t)[t != "integer"], t[t != "integer"], collapse = ", ")
+}
+verifier("dénombrements (#199) : sous_groupes$observes, sequences_runs (positifs, negatifs, runs), tirages_effectues, diagnostics (etats$evenements, evenements_sans_attendu, evenements_hors_plage, evenements_total) en integer, cinq branches ; valeurs inchangées", {
+  expo_a <- EXPO; expo_a$annee <- 2020L
+  un <- validation_directe()
+  vide <- validation_directe(expo = EXPO[0L, ])
+  cas <- list(un_segment = un, vide = vide, ajustee = validation_directe(relation_table = "ajustee_hors_outil"),
+              annee_vide = validation_directe(expo = expo_a[0L, ], par_annee = TRUE), par_sexe = X$etapes$validation)
+  d <- un$diagnostics
+  do.call(tous, c(lapply(cas, types_validation_199), list(
+    vide_seq = if (nrow(vide$resultat$sequences_runs) == 0L && identical(vide$resultat$monte_carlo$tirages_effectues, 0L))
+                 TRUE else "aucune cellule retenue : sequences_runs vide et aucun tirage attendus",
+    valeurs = if (identical(d$etats$evenements, c(4L, 0L, 0L, 1L, 2L)) && identical(d$evenements_total, 11L) &&
+                  identical(un$resultat$sous_groupes$observes, 4L) &&
+                  identical(un$resultat$monte_carlo$tirages_effectues, 19L)) TRUE else "valeurs")))
 })
 verifier("états : E^c = 0 et q~ = 1 -> A = 0, état sans_exposition, pas de refus ni de NaN", {
   t1 <- table_reference(data.frame(age = 40:70, sexe = "ensemble", qx = ifelse(40:70 == 50, 1, 0.01)), "u", "importee", "test")

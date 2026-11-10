@@ -153,32 +153,19 @@ TOLERANCES <- c(
   # la fiche (fiche/plan/etapes/<étape>/…). Les tables génériques (`cellules`,
   # `statistiques`…) d'une étape ultérieure (#167, #168) ne reçoivent ainsi
   # aucune classe sans contrôle de complétude (point 3.4).
-  # exacte : paramètres déclarés, dénombrements (doubles à valeur entière),
-  # recopie de la table reçue (qx_table, aucune opération)
+  # exacte : paramètres déclarés et leurs échos, exposition en jours,
+  # recopie de la table reçue (qx_table, aucune opération). Les dénombrements
+  # sont des integer, sans clé (ADR 0009, point 9.6 ; 27 clés retirées par
+  # #199).
   "validation/parametres/plage_ages" = 0, "validation/parametres/tranches_age" = 0,
   "validation/parametres/niveau" = 0, "validation/parametres/replications" = 0,
   "validation/parametres/n_max_wilcoxon_exact" = 0, "validation/parametres/n_max_runs_exact" = 0,
   "validation/resultat/cellules/qx_table" = 0,
-  "validation/resultat/sous_groupes/observes" = 0,
-  "validation/resultat/sequences_runs/positifs" = 0,
-  "validation/resultat/sequences_runs/negatifs" = 0, "validation/resultat/sequences_runs/runs" = 0,
   "validation/resultat/monte_carlo/replications" = 0,
-  "validation/resultat/monte_carlo/tirages_effectues" = 0,
-  "validation/diagnostics/etats/evenements" = 0,
-  "validation/diagnostics/evenements_sans_attendu" = 0,
-  "validation/diagnostics/evenements_hors_plage" = 0,
-  "validation/diagnostics/evenements_total" = 0, "importance_exclusions/parametres/niveau" = 0,
+  "importance_exclusions/parametres/niveau" = 0,
   "importance_exclusions/resultat/retraits/exposition_jours_retiree" = 0,
   "importance_exclusions/resultat/cellules_niveau_a/exposition_jours_retiree" = 0,
   "importance_exclusions/resultat/cellules_niveau_b/exposition_jours_retiree" = 0,
-  "importance_exclusions/resultat/smr_comparateur_1/observes" = 0,
-  "importance_exclusions/resultat/smr_comparateur_1/evenements_sans_exposition_retenue" = 0,
-  "importance_exclusions/resultat/smr_comparateur_2/observes" = 0,
-  "importance_exclusions/resultat/smr_comparateur_2/evenements_sans_valeur_table" = 0,
-  "importance_exclusions/resultat/smr_comparateur_2/evenements_taux_table_egal_un" = 0,
-  "importance_exclusions/resultat/smr_comparateur_2/evenements_sans_attendu" = 0,
-  "importance_exclusions/resultat/smr_comparateur_2/evenements_hors_plage" = 0,
-  "importance_exclusions/resultat/smr_comparateur_2/observes_conserves" = 0,
   "validation/plage_ages" = 0, "validation/tranches_age" = 0, "validation/niveau" = 0,
   "validation/replications" = 0, "importance_exclusions/niveau" = 0,
   # 1e-14 : sommes, produits et quotients IEEE sans libm
@@ -240,15 +227,11 @@ TOLERANCES <- c(
   # bornes, qx et ses bornes 1e-12), complétées sur
   # le modèle de `validation` pour les cellules, les paramètres et les
   # diagnostics. Toute clé commence par `positionnement/` (#175).
-  # exacte : paramètres déclarés, dénombrements, recopie de la table reçue
+  # exacte : paramètres déclarés, recopie de la table reçue (dénombrements en
+  # integer, sans clé : #199)
   "positionnement/parametres/plage_ages" = 0, "positionnement/parametres/niveau" = 0,
   "positionnement/resultat/cellules/qx_table" = 0,
-  "positionnement/resultat/smr/observes" = 0,
   "positionnement/resultat/table_positionnee/qx_reference" = 0,
-  "positionnement/diagnostics/etats/evenements" = 0,
-  "positionnement/diagnostics/evenements_sans_attendu" = 0,
-  "positionnement/diagnostics/evenements_hors_plage" = 0,
-  "positionnement/diagnostics/evenements_total" = 0,
   "positionnement/plage_ages" = 0, "positionnement/niveau" = 0,
   # 1e-14 : sommes et quotients IEEE
   "positionnement/resultat/cellules/exposition_centrale" = 1e-14,
@@ -276,14 +259,10 @@ TOLERANCES <- c(
   # U = O - A (statistique du score, z, p asymptotique) à 1e-10 (décision du
   # mainteneur du 08/11/2026, sur avis d'actuary). Toute clé commence par
   # `homogeneite/` (#175).
-  # exacte
+  # exacte (dénombrements en integer, sans clé : #199)
   "homogeneite/parametres/plage_ages" = 0, "homogeneite/parametres/tranches_age" = 0,
   "homogeneite/parametres/replications" = 0,
-  "homogeneite/resultat/segments/observes" = 0,
   "homogeneite/resultat/monte_carlo/replications" = 0,
-  "homogeneite/resultat/monte_carlo/jeux/tirages_effectues" = 0,
-  "homogeneite/diagnostics/evenements_cellules_evenement_sans_exposition" = 0,
-  "homogeneite/diagnostics/evenements_hors_plage" = 0, "homogeneite/diagnostics/evenements_total" = 0,
   "homogeneite/plage_ages" = 0, "homogeneite/tranches_age" = 0, "homogeneite/replications" = 0,
   # 1e-14
   "homogeneite/resultat/segments/exposition_centrale" = 1e-14,

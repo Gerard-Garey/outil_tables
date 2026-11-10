@@ -1,1 +1,2 @@
 type,nom,issue,motif
+entree,fonctions-outils:denombrement_entier,#199,assistant de rangement des dénombrements en integer ajouté par #199 (ADR 0009 point 9.6 (d)) ; entrée du catalogue à écrire par docwriter en fin de branche (règle 9)

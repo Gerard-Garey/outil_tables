@@ -182,7 +182,7 @@ verifier("J1 positionné : statuts de la colonne statut = STATUTS_VALIDATION_POS
   b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
   b <- b[b$statistique != "sous_groupes", ]
   identical(sp$statut, b$statut) && all(sp$etat %in% tablexp:::ETATS_GRANDEUR_VALIDATION) &&
-    identical(SP$tirages_effectues, 99)
+    identical(SP$tirages_effectues, 99L)
 })
 verifier("statistiques_validation() : relation inconnue -> erreur de programmation ; segment absent sous positionnee, ou présent sous independante -> erreur de programmation", tous(
   r = programmation(erreur_de(pos_j(relation = "autre", segment = NULL))),
@@ -355,7 +355,7 @@ verifier("étape : SMR global = 1 (1e-12), bornes et p-valeurs NA (contraint_par
   smr = proche(valeur(ST, "smr/smr"), 1, 1e-12, 0),
   na = if (all(etat_de(ST, c("smr/borne_inf_exacte", "smr/p_centrale", "smr/z_racine_cubique")) ==
                "contraint_par_positionnement")) TRUE else "états",
-  mc = if (identical(V$resultat$monte_carlo$tirages_effectues, 99) &&
+  mc = if (identical(V$resultat$monte_carlo$tirages_effectues, 99L) &&
            identical(V$resultat$monte_carlo$graine, 20261116L)) TRUE else "Monte-Carlo"))
 verifier("étape : paramètres (relation positionnee, p = 1 par segment, hypothèse nulle et statuts de la relation) ; statut des statistiques", {
   p <- V$parametres
@@ -502,11 +502,11 @@ verifier("A1 : ddl = n - S = 0 (une cellule par segment ; S = 1 et S = 2 ; E^c =
               une_cellule(c(13.7, 13.7), c(3L, 1L), c(1L, 2L)))
   e <- lapply(cas, etats_a1)
   all(vapply(e, function(a) identical(a$ddl, 0) && identical(a$contraints, attendu) && a$na_tests &&
-               identical(a$tirages, 0) && a$produits, NA))
+               identical(a$tirages, 0L) && a$produits, NA))
 })
 verifier("A1 témoin : ddl = 1 (un segment de deux cellules) -> tests produits, B tirages", {
   a <- etats_a1(une_cellule(c(7, 13.7), c(3L, 1L), c(1L, 1L)))
-  identical(a$ddl, 1) && identical(a$tirages, 99) &&
+  identical(a$ddl, 1) && identical(a$tirages, 99L) &&
     !any(c("khi2_pearson/p_asymptotique", "khi2_pearson/p_monte_carlo") %in% a$contraints)
 })
 
@@ -898,4 +898,54 @@ verifier("K (#201) : sous_groupes_validation() sans groupe (tranches vides), sou
   do.call(tous, lapply(r, function(x)
     if (nrow(x) == 0L && identical(typeof(x$etat), "character") && identical(typeof(x$smr), "double")) TRUE
     else paste(nrow(x), typeof(x$etat), typeof(x$smr))))
+})
+
+# --- L. Type des dénombrements (#199 ; ADR 0009, point 9.6) ------------------------
+# Les chemins de dénombrement des étapes positionnement et validation sont
+# integer sous la relation positionnee, y compris dans le cas dégénéré
+# ddl = n - S = 0 (aucun tirage) et sans cellule retenue (séquences vides) ;
+# la garde de sous_groupes_validation() refuse au-delà de
+# .Machine$integer.max (garde défensive, appel direct).
+
+verifier("L (#199) : statistiques_validation() sous positionnee, cas dégénéré (ddl = 0), témoin ddl = 1 et aucune cellule retenue -> tirages_effectues et colonnes positifs, negatifs, runs en integer", {
+  deg <- une_cellule(7, 3L, 1L)
+  tem <- une_cellule(c(7, 13.7), c(3L, 1L), c(1L, 1L))
+  vide <- sv(0L, 0, 0.1, -log1p(-0.1), 0, "sans_exposition", 1L, 1L, 0.95, "positionnee", 9, 1L, 1L)
+  ty <- function(S) paste(c(typeof(S$tirages_effectues), vapply(S$sequences[c("positifs", "negatifs", "runs")], typeof, "")),
+                          collapse = " ")
+  attendu <- "integer integer integer integer"
+  tous(degenere = if (identical(ty(deg), attendu) && identical(deg$tirages_effectues, 0L)) TRUE else ty(deg),
+       temoin = if (identical(ty(tem), attendu) && identical(tem$tirages_effectues, 99L)) TRUE else ty(tem),
+       vide = if (identical(ty(vide), attendu) && nrow(vide$sequences) == 0L) TRUE else ty(vide))
+})
+verifier("L (#199) : construction positionnee -> dénombrements de positionnement (smr$observes, etats$evenements, evenements_sans_attendu, evenements_hors_plage, evenements_total) et de validation (sous_groupes$observes, sequences_runs, tirages_effectues, diagnostics) en integer ; identité O + sans attendu + hors plage = total", {
+  # Construction refaite : P, V et X sont réaffectés plus haut dans le fichier.
+  xp <- construire_table(JEU, ROLES, plan_vp(), tables_reference = list(tv = T_HF))
+  P <- xp$etapes$positionnement; V <- xp$etapes$validation
+  t <- c(p_observes = typeof(P$resultat$smr$observes), p_etats = typeof(P$diagnostics$etats$evenements),
+         p_sans = typeof(P$diagnostics$evenements_sans_attendu), p_hors = typeof(P$diagnostics$evenements_hors_plage),
+         p_total = typeof(P$diagnostics$evenements_total), v_sg = typeof(V$resultat$sous_groupes$observes),
+         v_seq = unique(vapply(V$resultat$sequences_runs[c("positifs", "negatifs", "runs")], typeof, "")),
+         v_tirages = typeof(V$resultat$monte_carlo$tirages_effectues), v_etats = typeof(V$diagnostics$etats$evenements),
+         v_sans = typeof(V$diagnostics$evenements_sans_attendu), v_hors = typeof(V$diagnostics$evenements_hors_plage),
+         v_total = typeof(V$diagnostics$evenements_total))
+  d <- P$diagnostics
+  tous(types = if (all(t == "integer")) TRUE else paste(names(t)[t != "integer"], collapse = ", "),
+       identite = if (identical(sum(P$resultat$smr$observes) + d$evenements_sans_attendu + d$evenements_hors_plage,
+                                d$evenements_total)) TRUE else "identité")
+})
+verifier("L (#199) : sous_groupes_validation() sans groupe -> observes integer(0) sous les trois relations ; somme des observés au-delà de .Machine$integer.max -> refus validation / denombrement_hors_plage (grandeur sous_groupes/observes), sous les trois relations", {
+  rels <- c("independante", "ajustee_hors_outil", "positionnee")
+  vide <- vapply(rels, function(rel) typeof(tablexp:::sous_groupes_validation(
+    data.frame(age = integer(0)), integer(0), data.frame(), integer(0), numeric(0), c(20, 90), numeric(0), numeric(0),
+    logical(0), FALSE, 0.95, rel)$observes), "")
+  # Deux cellules retenues d'une tranche, 1,5e9 décès chacune (integer valides).
+  gros <- lapply(rels, function(rel) tryCatch({
+    tablexp:::sous_groupes_validation(data.frame(age = c(50L, 51L)), c(1L, 1L), data.frame(row.names = 1L), c(1L, 1L),
+                                      20, c(20, 90), c(1500000000L, 1500000000L), c(1, 1), c(TRUE, TRUE), FALSE, 0.95, rel)
+    NULL }, refus_tablexp = function(r) r))
+  ok <- vapply(gros, function(r) !is.null(r) && identical(c(r$module, r$motif), c("validation", "denombrement_hors_plage")) &&
+                 identical(r$details$grandeur, "sous_groupes/observes") && identical(r$details$valeur, 3e9), NA)
+  tous(vide = if (all(vide == "integer")) TRUE else paste(vide, collapse = " "),
+       refus = if (all(ok)) TRUE else paste("relation(s) sans le refus attendu :", paste(rels[!ok], collapse = ", ")))
 })
