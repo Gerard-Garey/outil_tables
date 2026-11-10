@@ -14,6 +14,12 @@ echoue <- function(r, motif = NULL) {
     return(paste("écart attendu non signalé :", motif, "| sortie :", paste(r$sortie, collapse = " | ")))
   TRUE
 }
+# Vrai si le code de sortie est non nul et que la sortie contient chaque motif.
+echoue_tous <- function(r, motifs) {
+  v <- vapply(motifs, function(m) isTRUE(echoue(r, m)), logical(1L))
+  if (all(v)) TRUE else paste("motifs non signalés :", paste(motifs[!v], collapse = " | "), "| sortie :",
+                              paste(r$sortie, collapse = " | "))
+}
 passe <- function(r) if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | ")
 
 # --- liste blanche de DESCRIPTION (ADR 0002, point 3, A8, M44) ---------------
@@ -147,6 +153,141 @@ r <- controle("absence_java.R", "--depot", shQuote(url_depot(tempfile("depot_abs
 verifier("absence de Java : métadonnées illisibles -> code de sortie 2, sans verdict",
          r$statut == 2L && any(grepl("métadonnées illisibles", r$sortie, fixed = TRUE, useBytes = TRUE)))
 unlink(depot, recursive = TRUE)
+
+# --- lecture de R/ indépendante de la locale native (#206) --------------------
+# graphe_modules.R et recettes_invariant.R lisent R/ en UTF-8 quelle que soit
+# la locale : sous LC_ALL=C, aucun avertissement « unable to translate » (avant
+# #206 : un par littéral non ASCII de rapport.R), les littéraux non ASCII sont
+# lus sans altération ; ce que la réécriture en \U{...} lirait autrement qu'en
+# UTF-8 (caractère non ASCII dans une chaîne brute, échappement invalide devant
+# un caractère non ASCII) et un nom lisible seulement en UTF-8 sont refusés.
+# Limite non testée : un symbole non ASCII entre accents graves est accepté en
+# UTF-8 et refusé hors UTF-8 par parse() (refus, jamais acceptation à tort).
+# Les sous-processus posent LC_ALL=C eux-mêmes : le cas vaut dans toute
+# session, y compris celle de la CI en UTF-8.
+
+sous_C <- function(script, ...) executer_rscript(file.path(CONTROLES, script), c(...), env = "LC_ALL=C")
+verifier("lecture hors UTF-8 : le sous-processus sous LC_ALL=C n'est pas en UTF-8 (prémisse des cas suivants)", {
+  f <- tempfile(fileext = ".R")
+  writeLines('cat("UTF-8:", l10n_info()[["UTF-8"]], "\n")', f)
+  r <- executer_rscript(f, env = "LC_ALL=C")
+  unlink(f)
+  identical(r$sortie, "UTF-8: FALSE ")
+})
+for (script in c("graphe_modules.R", "recettes_invariant.R")) {
+  r <- sous_C(script)
+  verifier(sprintf("lecture hors UTF-8 : %s passe sous LC_ALL=C", script), passe(r))
+  verifier(sprintf("lecture hors UTF-8 : %s n'émet aucun avertissement sous LC_ALL=C", script),
+           if (any(grepl("unable to translate|Warning|Avertissement", r$sortie, useBytes = TRUE)))
+             paste(r$sortie, collapse = " | ") else TRUE)
+}
+
+# Fonctions de lecture, appelées dans la session courante : littéraux non ASCII
+# (accent, idéogramme, plan supplémentaire) et commentaire non ASCII.
+OCTETS_TEMOIN <- list(c("c3", "a9"), c("e6", "97", "a5", "e6", "9c", "ac"), c("f0", "9f", "98", "80"))
+fichier_temoin_utf8 <- function() {
+  f <- tempfile(fileext = ".R")
+  l <- c("x <- \"\u00e9\"", "y <- c(\"\u65e5\u672c\", \"\U0001F600\")", "# commentaire \u00fc", "z <- 1")
+  writeLines(enc2utf8(l), f, useBytes = TRUE)
+  f
+}
+for (script in c("graphe_modules.R", "recettes_invariant.R")) {
+  g <- new.env()
+  sys.source(file.path(CONTROLES, script), envir = g)
+  f <- fichier_temoin_utf8()
+  verifier(sprintf("lecture hors UTF-8 : %s, le fichier témoin contient bien des octets non ASCII", script),
+           any(grepl("[^ -~]", readLines(f, warn = FALSE), useBytes = TRUE)))
+  lignes <- g$source_ascii(f)
+  verifier(sprintf("lecture hors UTF-8 : %s, source_ascii() rend du texte ASCII, même nombre de lignes", script),
+           length(lignes) == 4L && !any(grepl("[^ -~]", lignes, useBytes = TRUE)))
+  for (lecture in list(list("source_ascii + parse(text)", function(k) parse(text = g$source_ascii(f), keep.source = k)),
+                       list("analyser_fichier", function(k) g$analyser_fichier(f, keep.source = k)))) {
+    for (k in c(FALSE, TRUE)) {
+      e <- lecture[[2L]](k)
+      octets <- function(x) as.character(charToRaw(enc2utf8(x)))
+      verifier(sprintf("lecture hors UTF-8 : %s, %s (keep.source = %s) lit les littéraux non ASCII sans altération",
+                       script, lecture[[1L]], k),
+               identical(octets(e[[1L]][[3L]]), OCTETS_TEMOIN[[1L]]) &&
+                 identical(lapply(as.list(e[[2L]][[3L]])[-1L], octets), OCTETS_TEMOIN[2:3]))
+    }
+  }
+  unlink(f)
+  f <- tempfile(fileext = ".R")
+  writeBin(as.raw(c(0x78, 0x20, 0x3c, 0x2d, 0x20, 0x22, 0xe9, 0x22, 0x0a)), f)  # x <- "é" en latin-1
+  verifier(sprintf("lecture hors UTF-8 : %s, source_ascii() refuse un fichier qui n'est pas en UTF-8", script),
+           inherits(tryCatch(g$source_ascii(f), error = function(e) e), "error"))
+  unlink(f)
+  # Chaînes brutes et échappements invalides devant un caractère non ASCII : refus
+  # (la réécriture en \U{...} les lirait autrement qu'en UTF-8) ; chaînes
+  # ordinaires et commentaires voisins : aucun faux refus.
+  e_ <- "\u00e9"
+  refus <- list(
+    "chaîne brute r\"(...)\"" = sprintf("a <- r\"(%s)\"", e_),
+    "chaîne brute R'[...]'" = sprintf("a <- R'[x%sy]'", e_),
+    "chaîne brute avec tirets et accolades" = sprintf("a <- r\"--{%s}--\"", e_),
+    "chaîne brute à plan supplémentaire" = "a <- r\"(\U0001F600)\"",
+    "chaîne brute sur plusieurs lignes" = c("a <- r\"(x", sprintf("%s", e_), ")\"; b <- 1"),
+    "chaîne brute précédée d'une ligne non ASCII" = c(sprintf("z <- \"%s\"", e_), sprintf("\tw <- r\"{%s}\"", e_)),
+    "échappement invalide \\é" = sprintf("x <- \"\\%s\"", e_),
+    "échappement invalide après barres paires \\\\\\é" = sprintf("x <- \"\\\\\\%s\"", e_))
+  for (n in names(refus)) {
+    f <- tempfile(fileext = ".R")
+    writeLines(refus[[n]], f, useBytes = TRUE)
+    verifier(sprintf("lecture hors UTF-8 : %s, source_ascii() refuse %s", script, n),
+             inherits(tryCatch(g$source_ascii(f), error = function(e) e), "error"))
+    unlink(f)
+  }
+  admis <- list(
+    "chaîne ordinaire non ASCII" = sprintf("x <- \"%s\"", e_),
+    "barres obliques paires devant un caractère non ASCII" = sprintf("x <- \"\\\\%s\"", e_),
+    "barre oblique dans un commentaire" = sprintf("x <- 1 # C:\\%s", e_),
+    "chaîne brute ASCII à côté d'une chaîne non ASCII" = sprintf("a <- \"%s\"; b <- r\"(abc)\"; d <- \"%s\"", e_, e_),
+    "fichier vide" = character(0))
+  for (n in names(admis)) {
+    f <- tempfile(fileext = ".R")
+    writeLines(admis[[n]], f, useBytes = TRUE)
+    verifier(sprintf("lecture hors UTF-8 : %s, source_ascii() accepte %s", script, n),
+             if (inherits(r_ <- tryCatch(g$source_ascii(f), error = function(e) e), "error")) conditionMessage(r_) else TRUE)
+    unlink(f)
+  }
+}
+
+# Refus sous LC_ALL=C, en sous-processus, sur un dossier R/ témoin. Le symbole non
+# ASCII est refusé par le parseur déjà avant #206 (même motif sur le script
+# d'origine) : cas de non-régression. Chaîne brute et échappement invalide
+# (#206, reprise) : refus propres à la réécriture ; le nom de recette non ASCII :
+# refus de prudence de recettes_invariant.R.
+dossier_R_temoin <- function(fichier, lignes) {
+  d <- tempfile("R_non_ascii_")
+  dir.create(d)
+  writeLines(lignes, file.path(d, fichier), useBytes = TRUE)
+  d
+}
+d <- dossier_R_temoin("outils.R", "\u00e9 <- 1")
+verifier("lecture hors UTF-8 (non-régression) : graphe_modules.R refuse sous LC_ALL=C un symbole non ASCII (écart « illisible »)",
+         echoue(sous_C("graphe_modules.R", shQuote(d)), "outils.R : illisible"))
+unlink(d, recursive = TRUE)
+d <- dossier_R_temoin("outils.R", "a <- r\"(\u00e9)\"")
+verifier("lecture hors UTF-8 : graphe_modules.R refuse sous LC_ALL=C un caractère non ASCII dans une chaîne brute (écart « illisible »)",
+         echoue_tous(sous_C("graphe_modules.R", shQuote(d)), c("outils.R : illisible", "chaîne brute")))
+unlink(d, recursive = TRUE)
+d <- dossier_R_temoin("outils.R", "x <- \"\\\u00e9\"")
+verifier("lecture hors UTF-8 : graphe_modules.R refuse sous LC_ALL=C un échappement invalide devant un caractère non ASCII (écart « illisible »)",
+         echoue_tous(sous_C("graphe_modules.R", shQuote(d)), c("outils.R : illisible", "échappement invalide")))
+unlink(d, recursive = TRUE)
+cat_temoin <- 'CATALOGUE_RECETTES <- data.frame(recette = c("a", "b"), x = 1)'
+d <- dossier_R_temoin("donnees.R", c(cat_temoin, "a <- r\"(\u00e9)\""))
+verifier("lecture hors UTF-8 : recettes_invariant.R refuse sous LC_ALL=C un caractère non ASCII dans une chaîne brute",
+         echoue_tous(sous_C("recettes_invariant.R", shQuote(d)), c("illisible", "chaîne brute")))
+unlink(d, recursive = TRUE)
+d <- dossier_R_temoin("donnees.R", c(cat_temoin, "x <- \"\\\u00e9\""))
+verifier("lecture hors UTF-8 : recettes_invariant.R refuse sous LC_ALL=C un échappement invalide devant un caractère non ASCII",
+         echoue_tous(sous_C("recettes_invariant.R", shQuote(d)), c("illisible", "échappement invalide")))
+unlink(d, recursive = TRUE)
+d <- dossier_R_temoin("donnees.R", 'CATALOGUE_RECETTES <- data.frame(recette = c("agr\u00e9gats", "b"), x = 1)')
+verifier("lecture hors UTF-8 : recettes_invariant.R refuse sous LC_ALL=C un nom de recette non ASCII (refus de prudence)",
+         echoue(sous_C("recettes_invariant.R", shQuote(d)), "nom de recette non ASCII"))
+unlink(d, recursive = TRUE)
 
 # --- ordre des modules (ADR 0007, points 2.1 à 2.3) --------------------------
 
@@ -1437,12 +1578,6 @@ fiche_temoin <- function(version = V_FICHE, version_catalogue = V_FICHE, champs 
     sprintf("\\code{tablexp resultat %s} (\\code{REPRESENTATION\\_RESULTAT})", resultat),
     sprintf("\\code{tablexp plan %s} (\\code{PREMIERE\\_LIGNE\\_PLAN}) et \\code{tablexp fiche %s}", plan, fiche),
     paste0(paste(sprintf("\\emph{%s}~: %s", names(blocs), vapply(blocs, code_champs, "", sep = ", ")), collapse = "~; "), "."))
-}
-# Vrai si le code de sortie est non nul et que la sortie contient chaque motif.
-echoue_tous <- function(r, motifs) {
-  v <- vapply(motifs, function(m) isTRUE(echoue(r, m)), logical(1L))
-  if (all(v)) TRUE else paste("motifs non signalés :", paste(motifs[!v], collapse = " | "), "| sortie :",
-                              paste(r$sortie, collapse = " | "))
 }
 # Témoins à écarts, chacun avec les motifs que la sortie doit tous contenir.
 ecarts_fiche <- list(
