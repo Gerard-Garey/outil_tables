@@ -3004,6 +3004,31 @@ méthode qui l'introduit, dans la constante \code{ADMIS}, vide à cette date &
 ADR 0002, point 3 et A8~; M44 \\
 \code{graphe\_modules.R} & graphe d'appels autorisés et appels dynamiques
 interdits (section~\ref{sec:graphe}) & ADR 0007, points 2.1 à 2.3 \\
+\code{recettes\_invariant.R} & aucun module ne teste un nom de recette
+(section~\ref{sec:recettes})~: fichiers de \code{R/} lus par \code{parse()}
+et \code{utils::getParseData()}, sans charger \code{tablexp}~; noms des
+recettes lus dans l'arbre de \code{R/donnees.R}, à la colonne
+\code{recette} de \code{CATALOGUE\_RECETTES}, jamais recopiés (absents ou
+non littéraux~: écart)~; trois règles~: sujet d'un \code{switch()} terminé
+par \code{\$recette} ou \code{[["recette"]]} (R1), étiquette de cas d'un
+\code{switch()} égale à un nom de recette (R2), opérande de \code{==},
+\code{!=} ou \code{\%in\%}, ou argument d'\code{identical()}, de
+\code{match()} ou d'\code{is.element()}, égal à un nom de recette ou
+terminé par \code{\$recette} ou \code{[["recette"]]} (R3)~; occurrences
+admises par fonction englobante dans cinq lieux, liste fermée~:
+\code{R/donnees.R} entier (R1 à R3), l'aiguillage
+\code{exposition\_fenetres()} (R1, R2), la recherche par clé de
+\code{controler\_parametres\_recette()} (R3), les comparaisons sur le nom
+de forme du simulateur de \code{controler\_forme()} et de
+\code{simuler\_portefeuille()} (R3)~; une admission devenue inutile est un
+écart. \textbf{Limites}, écrites dans l'en-tête du script~: le contrôle est
+syntaxique, et une indirection par variable, le pipe natif, un opérateur
+écrit en appel, un argument nommé dans \code{[[} et les fonctions hors de
+la liste de R3 (\code{grepl()}, \code{startsWith()}, \code{all.equal()}…)
+lui échappent~; l'audit reste en appui. Témoins dans
+\code{test\_controles.R}~; étape «~Invariant des recettes (ADR 0016,
+point 4.4)~» du job «~Tests (R 4.3.3)~», hors liste des batteries &
+ADR 0016, point 4.4 et annotation du 10/11/2026~; M380~; issue~\#194 \\
 \code{graines.R} & aucune graine littérale d'au moins $1\,000$ réemployée
 hors de la liste blanche \code{graines\_admises.csv} et de l'héritage figé
 \code{HERITAGE\_176}, ensembles de fichiers exacts~; aucune constante
@@ -5908,7 +5933,19 @@ l'emploient (\code{donnees}, \code{exposition}, \code{brut},
 sa convention native et ses rôles requis qu'elle rend, avec la convention
 que rend \code{resoudre\_convention()}~; aucune fonction d'étape ne les
 recalcule, et la fiche porte la même recette (une seule source~; issue~\#82,
-section~\ref{sec:execution}). Après la convention,
+section~\ref{sec:execution}). Hors du module \code{donnees} et de
+l'aiguillage d'\code{exposition\_fenetres()}, aucun module ne teste le nom
+de la recette~: il lit une propriété de la recette (forme rendue au noyau,
+ligne de la matrice, colonnes présentes de la table d'exposition), et ne
+lit ce nom que pour l'inscrire (paramètres retenus, fiche, messages~; ADR
+0016, point~4.4). Deux formes, qui ne sont pas des branches propres à une
+recette, sont admises en outre~: la recherche par clé de
+\code{controler\_parametres\_recette()} dans la colonne \code{recette} du
+catalogue des paramètres, et les comparaisons du simulateur sur le nom de
+sa forme, dont les valeurs coïncident avec des noms de recettes (ADR 0016,
+annotations du 09/11/2026 et du 10/11/2026). L'invariant est contrôlé
+mécaniquement par \code{tests/controles/recettes\_invariant.R}
+(tableau~\ref{tab:scripts-controle}). Après la convention,
 \code{controler\_matrice\_recette()} vérifie que chaque étape du plan, et
 chaque estimateur de l'étape \code{brut}, est admis sous la recette retenue
 (matrice \code{MATRICE\_RECETTES}~; refus sous le motif de la ligne de
