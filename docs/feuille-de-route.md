@@ -42,6 +42,26 @@ Mise à jour du 10/11/2026, commit (0) de la dix-huitième branche (`architect-a
 - **PR ouverte** : aucune au commit (0) (*vérifié*, API `pulls?state=open` : liste vide) ; PR brouillon de B18 ouverte par la session après ce commit, **PR #208** ; PR du correctif rapide de #206 et #207 à venir ; aucune vague autorisée.
 - **Écarts de consignation** relevés par le point d'étape : E1, le journal des agents de la nouvelle session était vide au point d'étape, et le dernier bilan du journal collé dans la PR #204 (handoff https://github.com/Gerard-Garey/outil_tables/pull/204#issuecomment-6771889212, § 6) précède les étapes (5) à (7) de B17 : le bilan des consultations de ces étapes manque à la PR, la table « Escalades, relances et arrêts » de son corps en tenant lieu ; correction de pratique par M395 (bilan collé juste avant la sortie du brouillon), sans rattrapage ; E2, le verdict du job « Tests (R 4.3.3) » de `5c9998a` n'était pas rendu au point d'étape (job en cours à 17:32 UTC) : relevé par `architect` à la rédaction (ci-dessus), écart levé.
 
+Mise à jour du 10/11/2026, étape (0')(b) de la dix-huitième branche.
+
+Rédaction : `architect`, fiche de routine (Opus, effort `medium`), lue dans l'en-tête de la consigne de l'agent ; à confirmer par le journal. Écrite dans le worktree de B18 à `937d268` (*vérifié* par `git rev-parse HEAD`), à commiter par la session après relecture.
+
+Objet :
+- consignation des décisions M396 à M398 du mainteneur, prises le 10/11/2026 sur les avis (0')(a) et (0')(f) d'`actuary-approfondi` ;
+- seconde annotation du 10/11/2026 de l'ADR 0009 (point 9.6, nouveau, « Type des dénombrements ») ;
+- entrée « Dénombrement » de `CONTEXT.md` ;
+- mise à jour du § 1.19, avec les hypothèses corrigées par les avis (0').
+
+- **État du dépôt** (*vérifié*, `git fetch` puis `git log`, 10/11/2026) :
+  - `main` est à `5c9998a`. Le correctif rapide `claude/correctif-controles-locale` (#206, #207, M390) n'est pas encore fusionné.
+  - `claude/validation-types-statuts` est à `937d268`, égal à `origin`. Aucun commit de code depuis le commit (0) ; `tests/reference/` est inchangé.
+- **Avis (0') versés en commentaire des issues** par la session, le 10/11/2026 :
+  - (a) #199 : https://github.com/Gerard-Garey/outil_tables/issues/199#issuecomment-6775937356 ;
+  - (c) et (d) #202 : https://github.com/Gerard-Garey/outil_tables/issues/202#issuecomment-6775943400 ;
+  - (e) #200 : https://github.com/Gerard-Garey/outil_tables/issues/200#issuecomment-6775950806 ;
+  - (f) #184 : https://github.com/Gerard-Garey/outil_tables/issues/184#issuecomment-6775962003.
+- **Escalades** : aucune consultation Fable. La relecture (0')(c) lève le désaccord sur #202 : la session retient la lecture (B), sans désaccord persistant au sens du § 4.1, cas 2, de `docs/agents/routage.md`. Une branche est ouverte : les lignes d'escalade, de relance et d'arrêt vont au corps de la PR #208 (M177), et la session s'en charge. Le § 5 est sans objet pour cette consultation.
+
 ## 1. Branche de travail en cours
 
 Les dix-sept premières branches sont closes (§ 1.1 à § 1.18), ainsi que la branche documentaire D1 (§ 1.13). **La vague 2 est close** : autorisée le 06/11/2026 (M233), elle a expiré à la fusion de B13, sa dernière branche (`2247794`, 07/11/2026 ; ADR 0013, point 7), après celle de `[P3]` (`16af9cf`). La règle ordinaire de `CLAUDE.md` (une seule branche de travail) s'applique ; **aucune vague n'est autorisée**. Tableau des branches ouvertes et état de la vague 2 : texte intégral à `2247794` (M270). La quinzième branche `claude/recette-stocks-successifs` (B15, § 1.16) est **close** (`acf5ec6`, 09/11/2026). La seizième branche `claude/validation-suites` (B16, § 1.17) est **close** (`419f6a9`, 10/11/2026). La dix-septième branche `claude/recettes-suites` (B17, § 1.18) est **close** (`5c9998a`, 10/11/2026). La dix-huitième branche `claude/validation-types-statuts` (B18, § 1.19) est **ouverte**, hors vague ; un correctif rapide (`claude/correctif-controles-locale`, #206 et #207, M390) est en cours à son ouverture, `main` fusionnée ensuite dans B18.
@@ -150,28 +170,49 @@ PR #204 `[B17]`, fusionnée le 10/11/2026 par commit de fusion `5c9998a` (parent
   - [ ] #199 — convention de type des dénombrements (sommes d'événements, décomptes de cellules).
     - Circuit 3, après (0')(a) et (0')(b) ; **`coder-approfondi`** (Opus, effort `medium`), hors circuit 1 (trois modules, structure des références, nouvelle garde de refus ; M387), ligne dans la PR.
     - Critères : ceux du corps et de la convention (0')(a) acceptée ; transitions `TRANSITIONS_EN_COURS` (`tests/test_reproductibilite.R`) par plan jusqu'à (R) ; garde de débordement testée au-delà de `.Machine$integer.max` ; clés inertes retirées de `TOLERANCES` (`tests/reference/outils_reference.R`) ; graphe des modules inchangé (`graphe_modules.R`).
+    - *Mis à jour le 10/11/2026, (0')(b).* Convention C1 à C7 adoptée (M396) ; critères 1 à 10 de la spécification (0')(a). Points de forme :
+      - assistant unique de `R/outils.R`, code de refus générique `denombrement_hors_plage` (avis de forme d'`architect`, M396, Q4) ;
+      - garde du total à l'étape `exposition` (`R/exposition.R:767`, M397) ;
+      - 27 clés exactes retirées de `TOLERANCES` : 175 → 148 clés, 68 → 41 exactes (*vérifié* par `architect`) ;
+      - contrôle de type des références inclus (M396, Q6).
+
+      Le tout est consigné à l'ADR 0009, seconde annotation du 10/11/2026 (point 9.6).
   - [ ] #200 — textes de statut `sous_groupes/p_valeurs` et `bornes_exactes` muets sur la relation `ajustee_hors_outil`, avec les deux points de `/code-review` de B16 (M375).
     - Circuit 3 ; texte d'`actuary-approfondi` en amont ((0')(e)) et visa d'`actuary`.
     - Ordre interne : déduplication des textes `petits`, `fin_x2` et `g2` entre `STATUTS_VALIDATION` (`R/validation.R:176`) et `STATUTS_VALIDATION_POSITIONNEE` (`R/validation.R:331`, à `5c9998a`, *vérifié*), contrôle de `petits` par T179.1 ; puis `1 / (nr * pic)` selon l'avis (0')(e) ; puis textes par relation.
     - Critères : ceux du corps ; textes propres à `ajustee_hors_outil`, peut-être aucun plan touché (*hypothèse*).
+    - *Mis à jour le 10/11/2026, (0')(b), d'après l'avis (0')(e).* L'hypothèse ci-dessus est **fausse** : R8 et R9 sont touchés. Les deux lignes visées sont communes aux relations `independante` et `ajustee_hors_outil`. Changent les chaînes 2 et 3 de `etapes/validation/parametres/statuts_sous_groupes/statut` (`tests/reference/R8.tsv:200`, `R9.tsv:200`, *vérifié* : chemin à quatre chaînes), et l'empreinte du résultat (*hypothèse*). R10 est inchangé.
+      - `1 / (nr * pic)` est gardé, avec un commentaire ou un nom posé une fois ; contrôle par `identical()` de `khi2_pearson/variance_h0`.
+      - Deux commits : (A)+(B) sans changement de résultat, puis (C) avec son tableau avant / après.
+      - Visa d'`actuary` (textes de statut seuls).
   - [ ] #202 — statut de la p-valeur asymptotique d'homogénéité (condition « aucune strate dominante »).
     - Circuit 3, après la relecture (0')(c) ; visa d'`actuary`.
     - Critères : ceux du corps et de la relecture (0')(c) ; aucun numéro de théorème ni de paragraphe cité sans lecture à la page, et aucun dans le texte de statut du code (M388).
+    - *Mis à jour le 10/11/2026, (0')(b).* La relecture (0')(c) va dans le sens de #202 ; la session retient le texte de statut (B), mot pour mot dans le commentaire de l'issue. Il n'y a pas de désaccord persistant, donc pas de consultation Fable.
+      - Seul `tests/p_asymptotique` de `STATUTS_HOMOGENEITE` change ; `segments/z` est inchangé.
+      - Dans R11 et R12, une seule valeur change : la 5ᵉ des 13 chaînes de `etapes/homogeneite/parametres/statuts/statut` (`tests/reference/R11.tsv:192`, `R12.tsv:192`, *vérifié* : chemin à 13 chaînes). Les deux empreintes changent aussi.
+      - (0')(d) : Billingsley n'a pas été lu à la page, donc aucun numéro n'est cité (M388).
   - [ ] #184 — constat de simulation hors CI : puissance du test d'homogénéité entre segments sur bases modestes (E2.15).
     - Circuit 1 : `actuary-approfondi` spécifie ((0')(f)) → `coder-approfondi` d'office (`medium`) → `audit` léger → `actuary` valide.
     - Critères : ceux du corps et de la spécification ; script sous `tests/mesures/`, hors CI ; plage de graines nouvelle dans `tests/controles/graines_admises.csv`, acceptée par le mainteneur (P3) ; erreur Monte-Carlo (nombre de réplications) distinguée de l'erreur d'estimation (exposition) ; statut « constat de simulation ».
+    - *Mis à jour le 10/11/2026, (0')(b).* Spécification (0')(f) acceptée, avec ses critères C1 à C10 (M398) :
+      - script unique `tests/mesures/constat_puissance_homogeneite.R` ;
+      - plage de graines [20 841 200 ; 21 991 199] (`GRAINE_BASE`) ;
+      - 54 cellules, R = 1 000 avec nombres aléatoires communs, B = 199 ;
+      - règle de lecture L1 à L3 fixée le 10/11/2026, avant tout jeu ;
+      - passage consigné en commentaire de la PR #208.
   - [ ] #203 — docs : ambiguïté « (p = 0 : X ~ P(A)) » des sous-groupes S5 et avertissement LaTeX `\mathrm{réf}` ; **étendue par M394** à la mention du verdict de référence « non expliqué » de M383 dans la phrase S2 de `sec:stocks-fenetres` (`docs/latex/doc_outil_tables.tex:6626-6637` à `5c9998a`, *vérifié* ; le point d'étape citait l. 6629-6637), commentaire de l'issue versé par la session.
     - Au seul passage de `docwriter` (étape (6)) ; validée par `actuary-approfondi` à l'étape (7) (M394).
     - Critères : ceux du corps ; cause de l'avertissement confirmée sur le journal de compilation.
 - **Ordre des commits** :
   - (0) — `docs:` la présente mise à jour (M384 à M395), dont l'allègement de B17 (M384) ; puis le numéro de la PR, en commit séparé ;
   - (0') — préalables hors code, chacun avant le code de son issue, avis versés en commentaire de l'issue :
-    - (a) #199 : `actuary-approfondi` (spécification) fixe la convention de type (décomptes de cellules, de lignes, de têtes ; sommes d'événements en `integer` avec garde, ou `double` voulu ; sort de `poids_exclusions/evenements` ; clés inertes de `TOLERANCES`), à partir d'un relevé mécanique hors CI de R1 à R14 (`tests/reference/produire_references.R --mode releve`) lancé par la session (principe 7) ;
-    - (b) annotation de l'ADR 0009 par `architect` avant le code de #199, une fois la convention acceptée (P1) ; entrée « Dénombrement » de `CONTEXT.md` si besoin ; avis de forme : la garde de débordement est un seul assistant technique de `R/outils.R` (étape et code de refus en arguments), graphe des modules inchangé ;
-    - (c) #202 : relecture par `actuary-approfondi`, consultation neuve (M362, M364, corps de #202, condition C3 de B16, `c891621`) ; désaccord persistant → Fable d'office (`docs/agents/routage.md`, § 4.1, cas 2), puis mainteneur (P2) ;
-    - (d) citations : règle M388 (Billingsley pour #202) ;
-    - (e) #200 : `actuary-approfondi` rédige les textes par relation (modèle `smr_comparateur_2/bornes`) et donne son avis sur `1 / (nr * pic)` ;
-    - (f) #184 : spécification d'`actuary-approfondi` (effectif × écart relatif × nombre de segments, réplications, erreur Monte-Carlo distinguée de l'erreur d'estimation, statut « constat de simulation ») ; plage de graines nouvelle acceptée par le mainteneur (P3) ;
+    - (a) #199 : `actuary-approfondi` (spécification) fixe la convention de type (décomptes de cellules, de lignes, de têtes ; sommes d'événements en `integer` avec garde, ou `double` voulu ; sort de `poids_exclusions/evenements` ; clés inertes de `TOLERANCES`), à partir d'un relevé mécanique hors CI de R1 à R14 (`tests/reference/produire_references.R --mode releve`) lancé par la session (principe 7) ; **fait** (spécification du 10/11/2026, https://github.com/Gerard-Garey/outil_tables/issues/199#issuecomment-6775937356 ; M396, M397) ;
+    - (b) annotation de l'ADR 0009 par `architect` avant le code de #199, une fois la convention acceptée (P1) ; entrée « Dénombrement » de `CONTEXT.md` si besoin ; avis de forme : la garde de débordement est un seul assistant technique de `R/outils.R` (étape et code de refus en arguments), graphe des modules inchangé ; **en cours** (10/11/2026 : ADR 0009, seconde annotation du 10/11/2026, point 9.6 ; entrée « Dénombrement » ; avis de forme sur le code de refus et la garde de M397, à commiter par la session après relecture) ;
+    - (c) #202 : relecture par `actuary-approfondi`, consultation neuve (M362, M364, corps de #202, condition C3 de B16, `c891621`) ; désaccord persistant → Fable d'office (`docs/agents/routage.md`, § 4.1, cas 2), puis mainteneur (P2) ; **fait** (https://github.com/Gerard-Garey/outil_tables/issues/202#issuecomment-6775943400 ; lecture (B) retenue par la session, désaccord levé, pas de Fable) ;
+    - (d) citations : règle M388 (Billingsley pour #202) ; **fait** (même commentaire : non lu à la page, aucun numéro cité, la mention « cités de mémoire » ne migre nulle part) ;
+    - (e) #200 : `actuary-approfondi` rédige les textes par relation (modèle `smr_comparateur_2/bornes`) et donne son avis sur `1 / (nr * pic)` ; **fait** (https://github.com/Gerard-Garey/outil_tables/issues/200#issuecomment-6775950806) ;
+    - (f) #184 : spécification d'`actuary-approfondi` (effectif × écart relatif × nombre de segments, réplications, erreur Monte-Carlo distinguée de l'erreur d'estimation, statut « constat de simulation ») ; plage de graines nouvelle acceptée par le mainteneur (P3) ; **fait** (https://github.com/Gerard-Garey/outil_tables/issues/184#issuecomment-6775962003 ; M398) ;
     - (g) hors code, pendant la branche : avis d'`actuary` sur les seuils d'E2.15 (M373) après le passage de #184 (`R/rapport.R:1787` et `:1818` à `5c9998a`, *vérifié* : « Aucun verdict ni seuil ») ; avis d'options d'`actuary-approfondi` sur la décision (4) du 25/10 (M369) ;
   - (1) — #201 ; (2) — #199, après (0')(a) et (0')(b) ; (3) — #200 ; (4) — #202, après (0')(c) ; (5) — #184 ; chacun laisse les trois batteries vertes ;
   - (A) — annotation de constat de l'ADR 0009 par `architect` ;
@@ -180,19 +221,24 @@ PR #204 `[B17]`, fusionnée le 10/11/2026 par commit de fusion `5c9998a` (parent
   - (7) — validation du diff de la documentation par `actuary-approfondi` (règle 9), dont la phrase S2 (M394) ;
   - (8) — revue finale complète (règle 10) : `audit` en effort `high` sur `git diff origin/main...HEAD`, et `/code-review` ; `regulatory` et `app-review` sans objet ; bilan du journal collé dans la PR juste avant la sortie du brouillon (M395).
 - **Effet attendu sur les résultats** (*hypothèses* à mesurer) : #202 → R11, R12 ; #199 → R8 à R13 (`sequences_runs` R8 à R10 ; `evenements_sans_attendu` R8 à R10 et R13 ; `observes_conserves` R8, R9 ; `smr/observes` R10, R13 ; `segments/observes` R11, R12 ; `poids_exclusions` R13) ; #200 → textes propres à `ajustee_hors_outil`, peut-être aucun plan ; #201 et #184 → aucun. Régénération attendue de R8 à R13, R1 à R7 et R14 identiques ; empreinte du résultat probablement changée dans les plans dont un type change ; `VERSION_FICHE` inchangée (6) ; aucune table finale ni verdict : visa d'`actuary`, non du mainteneur.
-- **Partition des fichiers admis** : `R/validation.R`, `R/positionnement.R`, `R/donnees.R` (diagnostic `poids_exclusions` seulement), `R/outils.R` (assistant de garde), `tests/unitaires/` concernés, `tests/reference/outils_reference.R`, `tests/test_reproductibilite.R`, `tests/mesures/` (script du constat de puissance), `tests/controles/graines_admises.csv`, `docs/latex/`, `docs/adr/0009-references-de-non-regression.md`, `CONTEXT.md`, la présente feuille ; références de `tests/reference/` par (R) seulement. Hors partition : `R/rapport.R` (sauf mesure), `R/construire_table.R`, `R/exposition.R`, `app/`.
+  - *Hypothèses corrigées le 10/11/2026, (0')(b), d'après les avis (0')* :
+    - #200 touche **R8 et R9** (deux chaînes de `statuts_sous_groupes/statut` et l'empreinte du résultat) ; R10 est inchangé ;
+    - #199 touche R8 à R13 par 27 chemins et 65 lignes, en type seul (17, 17, 16, 5, 5, 5 ; *vérifié* par `grep` sur les références) ; **`poids_exclusions` (R13) est retiré de l'effet de #199**, car il reste `double` (M396, Q3 (b)) ;
+    - #202 touche R11 et R12, une chaîne chacun (texte (B)), plus les empreintes ;
+    - la régénération attendue reste celle de R8 à R13.
+- **Partition des fichiers admis** : `R/validation.R`, `R/positionnement.R`, `R/donnees.R` (diagnostic `poids_exclusions` seulement), `R/outils.R` (assistant de garde), `R/exposition.R` (garde du total `sum(table_exp$evenements)`, l. 767, seulement ; **ajouté par M397**), `tests/unitaires/` concernés, `tests/reference/outils_reference.R`, `tests/test_reproductibilite.R`, `tests/mesures/` (script du constat de puissance), `tests/controles/graines_admises.csv`, `docs/latex/`, `docs/adr/0009-references-de-non-regression.md`, `CONTEXT.md`, la présente feuille ; références de `tests/reference/` par (R) seulement. Hors partition : `R/rapport.R` (sauf mesure), `R/construire_table.R`, `R/brut.R`, `app/`. Depuis M396, Q3 (b), `R/donnees.R` n'est plus admis que pour un commentaire de l'exception `poids_exclusions/evenements`.
 - **Critères d'acceptation** :
   - ceux du corps de chaque issue et des avis (0') acceptés ;
   - trois batteries vertes sur la CI ; `graphe_modules.R`, `messages_refus.R`, `graines.R`, `identite_batteries.R` et `recettes_invariant.R` OK ;
   - `git diff 5c9998a -- tests/reference/` limité à R8 à R13 ;
   - durée du job « Tests (R 4.3.3) » relevée selon M185.
 - **Points de décision du mainteneur** :
-  - P1 — convention de #199 et annotation de l'ADR 0009 ;
-  - P2 — #202 si le désaccord persiste après Fable ;
-  - P3 — plage de graines de #184 ;
+  - P1 — convention de #199 et annotation de l'ADR 0009 ; **tranché le 10/11/2026** (M396, M397) ; annotation rédigée à (0')(b), à relire ;
+  - P2 — #202 si le désaccord persiste après Fable ; **sans objet** (désaccord levé par (0')(c)) ;
+  - P3 — plage de graines de #184 ; **tranché le 10/11/2026** (M398) ;
   - P4 — tout emploi de `coder-approfondi` hors #184 et #199, ou à l'effort `high`.
 - **Agents** : `coder` pour #201, #200 et #202 ; `coder-approfondi` (effort `medium`) pour #199 (M387, hors circuit 1) et d'office pour #184 (circuit 1) ; `actuary-approfondi` pour (0')(a), (c), (e), (f), l'avis d'options M369 et (7) ; `actuary` pour les visas et l'avis E2.15 ; `architect` pour (0')(b) et (A) ; `audit` ; `docwriter`.
-- **Consultations Fable** : 0/3 à l'ouverture ; seuil « macro » non atteint, Fable non proposé ; Fable d'office seulement au cas 2 du § 4.1 (désaccord persistant sur #202).
+- **Consultations Fable** : 0/3 à l'ouverture ; seuil « macro » non atteint, Fable non proposé ; Fable d'office seulement au cas 2 du § 4.1 (désaccord persistant sur #202). Au 10/11/2026, (0')(b) : 0/3, cas 2 non réalisé.
 - **Dépendances** : #199 après #201 ; avis E2.15 après #184 ; #205 avec #186 dans `claude/rejeu-suites` ; `claude/lissage-whittaker` (rang 6) suit B18.
 - **Hors périmètre** :
   - #144 : `claude/lissage-whittaker` (rang 6, M374) ;
@@ -714,6 +760,9 @@ Décisions de l'entretien de cadrage du 14/10/2026 (`docs/cadrage/2026-10-14-ent
 | M393 | 10/11/2026 | **Aucune issue de suivi Kaplan-Meier (#197)** ; la réserve est consignée au commentaire de clôture de #197 (https://github.com/Gerard-Garey/outil_tables/issues/197#issuecomment-6774392857) | § 1.18 |
 | M394 | 10/11/2026 | **Mention du verdict de référence « non expliqué » de M383 dans la phrase S2 de `sec:stocks-fenetres`** (`docs/latex/doc_outil_tables.tex:6626-6637` à `5c9998a`, *vérifié* par `architect` ; le point d'étape citait l. 6629-6637), au passage de `docwriter` de B18, **par extension de #203** (commentaire de l'issue), validée par `actuary-approfondi` à l'étape (7) | § 1.19, § 3 (#203) |
 | M395 | 10/11/2026 | **Calibration du routage** (point d'étape après B17) : aucun seuil ni effort modifié ; la session colle le bilan du journal des agents dans la PR **juste avant la sortie du brouillon** (et non seulement au handoff ; écart E1 du commit (0) de B18) ; taux de reprises de `coder` en circuit 3 à surveiller sur #201 | § 1.19 |
+| M396 | 10/11/2026 | **#199 : convention de type des dénombrements C1 à C7 adoptée** (point P1 du § 1.19), sur la spécification (0')(a) d'`actuary-approfondi` (https://github.com/Gerard-Garey/outil_tables/issues/199#issuecomment-6775937356). 27 chemins passent en `integer`, sur 65 lignes de R8 à R13. Assistant unique de `R/outils.R` ; sommes en `double`, conversion avec garde au rangement. 27 clés exactes retirées de `TOLERANCES` (175 → 148, 68 → 41 exactes). **Q3 (b)** : `donnees/diagnostics/releves/poids_exclusions/evenements` reste `double` (exception motivée, clé exacte conservée). **Q4** : code de refus générique porté par l'assistant, forme laissée à `architect` et fixée par lui au (0')(b) : `denombrement_hors_plage` (nom de travail `denombrement_hors_entiers` écarté : ADR 0009, seconde annotation du 10/11/2026, (d) 2). **Q5** : `monte_carlo/replications` reste `double` (écho du paramètre). **Q6** : un contrôle des références exige `integer` pour les chemins nommés comme des dénombrements, sauf une liste d'exceptions fermée, dans #199 (`tests/test_reproductibilite.R`). Aucune table finale ni verdict : visa d'`actuary`. | § 1.19 ; ADR 0009, seconde annotation du 10/11/2026 (point 9.6) ; `CONTEXT.md` (« Dénombrement ») |
+| M397 | 10/11/2026 | **#199, Q2 (a) : partition de B18 étendue à `R/exposition.R`**. Le total `sum(table_exp$evenements)` (`R/exposition.R:767`, seam « cellules ») est gardé par l'assistant, à l'étape `exposition`, avec son test. Code de refus : `denombrement_hors_plage`, `grandeur = "evenements"` (avis de forme d'`architect`). La garde par cellule `evenements_hors_plage` (l. 707) est inchangée et reste la première. Les gardes des sommes en aval deviennent défensives. `R/brut.R` n'est pas touché ; aucune référence ne change. | § 1.19 ; ADR 0009, seconde annotation du 10/11/2026, (d) 3 |
+| M398 | 10/11/2026 | **#184 : spécification (0')(f) d'`actuary-approfondi` acceptée** (point P3 du § 1.19 ; https://github.com/Gerard-Garey/outil_tables/issues/184#issuecomment-6775962003). Plage de graines [20 841 200 ; 21 991 199], par pas de 10 000, r ≤ 9 999. R = 1 000 avec nombres aléatoires communs ; passage par familles si la durée extrapolée dépasse 100 min, chaque passage sous 90 min ; en deçà, un passage unique entre 90 et 100 min est admis, en dépassement du plafond de 90 min de M382. Marge du biais groupé : ±0,02. Grille de 54 cellules. Passage consigné en commentaire de la PR #208. Règle de lecture (L1 à L3) fixée le 10/11/2026, avant tout jeu de la plage ; tout changement après essai se déclare et revient au mainteneur (M383). | § 1.19 |
 
 **Note du 08/11/2026 (correction d'`architect`, sans décision nouvelle, sans numéro M).** M307 écrit que R11 (H0 fausse) a ses « p de Monte-Carlo au plancher » et n'épingle pas le flux des réplications de l'homogénéité. C'est inexact : `tests/reference/R11.tsv:209` donne p_MC = 0,001, 0,002, 0,001, 0,001, 0,001 (*vérifié*), la tranche 20-49 étant à 0,002 (K = 1, B = 999). R11 épingle donc aussi le flux, par cette seule tranche ; R12 reste justifié (cinq p dans le corps de la loi). M307 et la ligne « R12 ajouté sous #168 » du § 1.15 ne sont pas réécrites ; elles se lisent avec la présente note et avec l'ADR 0009, seconde annotation du 08/11/2026, (c).
 

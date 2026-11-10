@@ -912,3 +912,153 @@ Retirées : les deux clés de (a) ; ajoutées : les trois clés de (b) ; aucune 
 **Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code. Les changements de R8 à R13 sont ceux du tableau avant / après de `cc7d849`.
 
 Issues : #174, #177, #178, #179, #185. Décisions M359 à M363. Branche `claude/validation-suites`, PR #198.
+
+## Annotation du 10 novembre 2026 (seconde) — point 9.6 (nouveau) : type des dénombrements (#199, M396, M397) ; 27 clés de `TOLERANCES` à retirer au commit de #199 ; annotation du 07/11/2026, (a) 1, dépassée pour ces clés
+
+Rédigée par `architect` (fiche de routine) à l'étape (0')(b) de la branche `claude/validation-types-statuts` (B18, PR #208), tête `937d268`. Sources : la spécification (0')(a) d'`actuary-approfondi`, versée en commentaire de #199 (https://github.com/Gerard-Garey/outil_tables/issues/199#issuecomment-6775937356), et les décisions du mainteneur du 10/11/2026 **M396** et **M397** (`docs/feuille-de-route.md`, § 4). C'est une annotation de **décision** : elle précède le code de #199 (point P1 du § 1.19 de la feuille de route). Le constat des clés effectivement retirées et des références régénérées viendra à l'étape (A) de B18. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne à `937d268` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Contexte.**
+1. **Une règle au cas par cas.** Le point 2.3 compare le type de chaque grandeur à part de sa valeur. Trois dénombrements sont passés de `double` à `integer`, chacun par une décision propre, avec le retrait de leur clé : `avertissements/nombre` (quatrième annotation du 17/10/2026), puis `validation/resultat/sous_groupes/cellules_retenues` et `importance_exclusions/resultat/retraits/evenements_retires` (annotation du 10/11/2026, (a)). Aucune règle générale ne fixait le type d'un dénombrement.
+2. **État des références.** Le relevé mécanique des 14 références, fait par la session pour la spécification (non remesuré ici), compte 60 chemins `double` à valeurs toutes entières. Le présent point en classe 27 en `integer` ; ils occupent 65 lignes, toutes de type `double` aujourd'hui : 17 dans R8, 17 dans R9, 16 dans R10, 5 dans R11, 5 dans R12, 5 dans R13, aucune dans R1 à R7 ni R14. Les 33 autres restent `double` : 13 par choix (C6) et 20 hors de la règle (C7).
+3. **Le type d'une somme dépend des données (mesure M1).** `sum()` d'un vecteur `integer` rend un `integer` tant que le total tient dans la plage des entiers, et un `double` au-delà, **sans avertissement**. À l'inverse, `y + y` rend `NA` avec un avertissement.
+4. **Conséquence observée (mesure M2 de la spécification, non remesurée ici).** On gonfle l'entrée de R13 : deux cellules portées à 1,5e9 événements chacune. `construire_table()` réussit. `exposition/diagnostics/evenements` et `brut/diagnostics/evenements`, `integer` dans les références, deviennent `double` (3000004223). Le type d'un chemin dépend donc des données. Le contrôle de structure du point 2.3 relèverait un écart de type qui ne vient d'aucune modification du code.
+
+**(b) Point 9.6, nouveau.** Il s'ajoute aux règles durables du point 9 ; les références C1 à C7 renvoient à la spécification.
+
+> **9.6. Type des dénombrements.**
+> (i) **Sont rangés en `integer`** (C1) :
+> - les décomptes d'objets : cellules, lignes, têtes, segments, séquences, suites, signes n+ et n−, tirages effectués ;
+> - les sommes d'événements non pondérés (E2.8) que le moteur forme sur des données admises.
+>
+> (ii) **Conversion** (C2) :
+> - un décompte borné par une longueur ou par un paramètre contrôlé se convertit sans garde, et sa borne est citée en commentaire ;
+> - une somme d'événements se convertit par l'assistant unique de `R/outils.R` décrit en (d).
+>
+> (iii) **`integer` est un type de stockage** (C3). Les sommes et les calculs se font en `double`. Les identités du type « O + sans attendu + hors plage = total » se vérifient en `double`, avant toute conversion. La conversion n'a lieu qu'au rangement dans l'objet résultat. Un avertissement qui cite le décompte suit la garde.
+>
+> (iv) **Conversion exacte** (C4). Une somme d'entiers non négatifs est exacte en `double` sous 2^53. L'assistant refuse toute valeur au-delà de 2^31 − 1. L'arrondi est monotone : aucun dépassement n'échappe au refus.
+>
+> (v) **Invariant** (C5) : le type d'un chemin de l'objet résultat ne dépend ni du plan ni des données.
+>
+> (vi) **Restent `double`, par choix** (C6) :
+> - l'exposition (`exposition_jours`, `*_retiree`, `exposition_centrale_*`) ;
+> - les attendus et leurs bornes ;
+> - les bornes de fluctuation exactes (des quantiles) ;
+> - les futurs événements pondérés, grandeurs distinctes des événements non pondérés ;
+> - les ddl effectifs du futur module `lissage`.
+>
+> (vii) **Hors de la règle** (C7) :
+> - les échos de paramètres du plan (`plage_ages`, `tranches_age`, `delai_declaration`, `replications`) ;
+> - les constantes de seuil ;
+> - `monte_carlo/replications` ;
+> - la colonne hétérogène `validation/resultat/statistiques/valeur`.
+>
+> (viii) **Application.** Une grandeur `integer` n'a pas de clé dans `TOLERANCES` (quatrième annotation du 17/10/2026, (b)). Une grandeur nouvelle suit la présente règle dès le commit qui la crée (point 9.1), y compris dans le module `lissage` (M367). Une exception à (i) est motivée par une annotation du présent ADR et inscrite dans la liste fermée du contrôle de (f).
+
+**(c) Exceptions motivées.**
+1. **`donnees/diagnostics/releves/poids_exclusions/evenements` reste `double`** (M396, Q3, option (b)). Il somme les événements de cellules **exclues**. Ces cellules ne sont pas passées par la garde par cellule (`R/exposition.R:707-712`). Une garde `integer` refuserait donc une construction à cause de données justement écartées. Sa clé exacte reste (`tests/reference/outils_reference.R:126`). C'est la seule exception que nomme le contrôle de (f) à l'ouverture. Dans R13, le chemin est `double` et vaut 0 (`tests/reference/R13.tsv:83`).
+2. **`validation/resultat/statistiques/valeur`** : la colonne réunit des statistiques, des p-valeurs et des décomptes. Elle reste `double`, classe 1e-12 (l. 213).
+3. **`validation/resultat/cellules/fluctuation_inf_exacte` et `fluctuation_sup_exacte`** : leurs valeurs sont entières par construction, mais ce sont des quantiles, donc des bornes et non des dénombrements. Elles restent `double`, classe 1e-12 (l. 209-210).
+4. **Échos de paramètres.** `monte_carlo/replications` reste `double` (M396, Q5) : c'est l'écho du paramètre `replications`. Les clés exactes `validation/resultat/monte_carlo/replications` (l. 165) et `homogeneite/resultat/monte_carlo/replications` (l. 283) restent, comme celles des échos du plan.
+
+**(d) Assistant de conversion et codes de refus** (avis de forme d'`architect`, M396 Q4 et M397).
+1. **Un seul assistant technique, dans `R/outils.R`.** Il ne porte aucun contenu métier et n'appelle aucun module, puisque `refuser()` est dans le même fichier. Le graphe des modules ne change pas (`tests/controles/graphe_modules.R`). Son interface est `(x, etape, grandeur)` ; nom indicatif : `denombrement_entier()`. Comportement :
+   - il reçoit un vecteur `double` à valeurs entières, ou `NA` ;
+   - il rend un `integer` de même longueur, `NA` devenant `NA_integer_` ;
+   - au-delà de `.Machine$integer.max`, il appelle `refuser(etape, "denombrement_hors_plage", …)`, avec les détails `grandeur`, `valeur` (le plus grand élément) et `limite` ;
+   - pour une valeur non finie, négative ou non entière, il appelle `stop()` : c'est une erreur de programmation, puisque les données sont admises en amont. `NaN` est une valeur non finie, et non une valeur absente ;
+   - il n'émet aucun `warning()`.
+
+   Le gabarit du message est constant. L'insertion de `grandeur` doit passer `tests/controles/messages_refus.R` : la forme est laissée à `coder-approfondi`, et le script la contrôle.
+2. **Code générique : `denombrement_hors_plage`.** La spécification avait pris `denombrement_hors_entiers` comme nom de travail ; il est écarté pour deux raisons :
+   - **Cohérence.** Les deux codes existants qui refusent la même condition, `evenements_hors_plage` (`R/exposition.R:708`) et `evenements_retires_hors_plage` (`R/validation.R:2447`), disent « hors de la plage des entiers du moteur ».
+   - **Ambiguïté.** « hors entiers » se lit comme « non entier ». Or ce cas relève de `stop()`, pas d'un refus : le code nommerait la mauvaise condition.
+
+   Le couple (module, motif), avec `details$grandeur`, situe le refus sans qu'il faille un code par grandeur. Ce code respecte `MOTIF_CODE_REFUS` (`R/outils.R:43`).
+3. **Garde à la source** (M397, Q2 (a)).
+   - **Lieu.** Le total `sum(table_exp$evenements)` du seam « cellules » (`exposition_cellules()`, `R/exposition.R:767`) passe par l'assistant, à l'étape `exposition`, sous le code de (2), avec `grandeur = "evenements"`.
+   - **Ordre.** La garde par cellule (l. 707, code `evenements_hors_plage`, inchangé) reste la première ; le total vient ensuite.
+   - **Seam « fenêtres ».** Le total vaut `length(ev)` (`R/exposition.R:589`), `integer` par construction : il n'y faut aucune garde.
+   - **Portée.** `R/brut.R` n'est pas touché. Aucune référence ne change.
+   - **Options écartées :**
+     - un code propre au total (`evenements_total_hors_plage`) : ce serait un second code pour la même règle, alors que l'étape et la grandeur la situent déjà ;
+     - le réemploi de `evenements_hors_plage` : son message et son détail `cellules` décrivent un dépassement par cellule, et un même code désignerait deux conditions aux détails de formes différentes ;
+     - le modèle `trop_de_cellules` (`R/exposition.R:289`) : il garde un décompte d'objets avant une allocation (`tabulate()`). C'est une autre nature que la somme d'événements visée ici.
+4. **Sommes en aval.** Les sommes des étapes `positionnement`, `validation`, `homogeneite` et `importance_exclusions` portent sur des sous-ensembles des cellules de l'exposition. Leurs gardes deviennent défensives. Elles sont testées en appel direct au-delà de `.Machine$integer.max` (critère 5 de la spécification).
+5. **Codes existants inchangés** : `exposition/evenements_hors_plage` et `importance_exclusions/evenements_retires_hors_plage`.
+
+**(e) Points 3.4 et 9.3 : 27 clés exactes à retirer de `TOLERANCES`** dans le commit `tests:` de #199. On applique la règle de la quatrième annotation du 17/10/2026, (b) : une grandeur `integer` n'a pas de clé.
+
+| Lignes | Clés retirées |
+|---|---|
+| 162-170 (9) | `validation/resultat/sous_groupes/observes` ; `validation/resultat/sequences_runs/{positifs, negatifs, runs}` ; `validation/resultat/monte_carlo/tirages_effectues` ; `validation/diagnostics/etats/evenements` ; `validation/diagnostics/{evenements_sans_attendu, evenements_hors_plage, evenements_total}` |
+| 174-181 (8) | `importance_exclusions/resultat/smr_comparateur_1/{observes, evenements_sans_exposition_retenue}` ; `importance_exclusions/resultat/smr_comparateur_2/{observes, evenements_sans_valeur_table, evenements_taux_table_egal_un, evenements_sans_attendu, evenements_hors_plage, observes_conserves}` |
+| 246, 248-251 (5) | `positionnement/resultat/smr/observes` ; `positionnement/diagnostics/etats/evenements` ; `positionnement/diagnostics/{evenements_sans_attendu, evenements_hors_plage, evenements_total}` |
+| 282, 284-286 (5) | `homogeneite/resultat/segments/observes` ; `homogeneite/resultat/monte_carlo/jeux/tirages_effectues` ; `homogeneite/diagnostics/{evenements_cellules_evenement_sans_exposition, evenements_hors_plage, evenements_total}` |
+
+**Lignes partagées.** Deux lignes de ces plages portent aussi une clé qui **reste** :
+- l. 165, `validation/resultat/monte_carlo/replications`, écho (c) 4 ;
+- l. 170, `importance_exclusions/parametres/niveau`, écrite à la suite de `validation/diagnostics/evenements_total`.
+
+C'est la clé qui se retire, non la ligne.
+
+**Décompte.** `TOLERANCES` passe de 175 clés (68 exactes, 33 à 1e-14, 71 à 1e-12, 3 à 1e-10) à **148** (**41**, 33, 71, 3). Les 27 clés sont toutes présentes, distinctes et de classe exacte. Aucune clé n'est reclassée. `CLASSES_TOLERANCE` ne change pas (l. 91).
+
+**Témoins.** Un témoin par famille montre qu'un retour au `double` est relevé (critère 8 de la spécification).
+
+**(f) Contrôle des références** (M396, Q6, inclus dans #199). Un test de `tests/test_reproductibilite.R` exige le type `integer`, dans chaque plan de référence, pour tout chemin nommé comme un dénombrement :
+- `observes`, `evenements*`, `cellules*`, `lignes*`, `tetes*`, `tirages_effectues`, `runs`, `positifs` ou `negatifs` ;
+- sauf une liste fermée d'exceptions, qui contient `donnees/diagnostics/releves/poids_exclusions/evenements` (c) 1.
+
+Le motif s'applique au **dernier segment du chemin**, c'est-à-dire au nom de la colonne ou du diagnostic. Il ne s'applique pas aux noms de tables (`cellules`, `cellules_niveau_a`, `cellules_niveau_b` sont des tables de l'objet). Cette précision de forme est d'`architect`. Toute exception ajoutée à la liste est annotée ici. Ce test rend l'invariant (v) contrôlable par script, selon le principe 7 de `CLAUDE.md`.
+
+**(g) Transition (point 9.5).** `TRANSITIONS_EN_COURS` (`tests/test_reproductibilite.R:405`) reçoit l'issue `#199`, sur des plans disjoints (quatrième annotation du 19/10/2026) :
+
+| Plans | Chemins déclarés |
+|---|---|
+| R8, R9 | 17 |
+| R10 | 16 |
+| R11, R12 | 5 |
+| R13 | 5 |
+
+La nature est `type`, de `double` vers `integer`, chemins déclarés exactement. La régénération unique de B18, étape (R), close la transition.
+
+Effets attendus (*hypothèses* de la spécification, à mesurer au commit et à (R)) :
+- valeurs identiques au bit près ;
+- `fiche/empreintes/resultat` changée pour R8 à R13, et `fiche/empreintes/code` pour tous les plans (comparaison par jeton, seconde annotation du 20/10/2026) ;
+- `VERSION_FICHE` inchangée (6) ;
+- aucune table finale, aucun verdict : visa d'`actuary`.
+
+**(h) Annotation du 07/11/2026, (a) 1, tableau, ligne « exacte (36) » : justification dépassée.** Ce relevé vaut à `ddc67ba` et n'est pas réécrit. La justification « dénombrements (doubles à valeur entière) » est **dépassée** :
+- pour les 17 clés de la ligne que retire (e) : 9 `validation/…` et 8 `importance_exclusions/…` ;
+- pour les deux clés déjà retirées par `371e4f6` (annotation du 10/11/2026, (d)).
+
+Après #199, la ligne garde **17** des 36 clés, dont aucun dénombrement :
+- les six paramètres `validation/parametres/…` ;
+- `qx_table` ;
+- `validation/resultat/monte_carlo/replications` ;
+- `importance_exclusions/parametres/niveau` ;
+- les trois `exposition_jours_retiree` (exposition, C6) ;
+- les cinq échos du plan dans la fiche.
+
+Plus aucune clé n'y relève de la justification « dénombrements ». De même, les clés `positionnement/…` (5) et `homogeneite/…` (5) de (e), déclarées exactes par la seconde annotation du 07/11/2026, (b), en sortent.
+
+**Mesures.**
+- *Vérifiée* par `architect`, 10/11/2026, R 4.3.3, à `937d268`. Les blocs `CLASSES_TOLERANCE` et `TOLERANCES` de `tests/reference/outils_reference.R` ont été évalués sous R, puis les 27 clés de (e) retirées :
+  - 175 → 148 clés, 68 → 41 exactes ; 27 clés présentes, distinctes, toutes à 0 ;
+  - lignes des clés relevées par `grep` ;
+  - ligne « exacte (36) » de l'annotation du 07/11/2026 : 34 clés présentes à `937d268`, 17 après le retrait.
+- *Vérifiée* par `architect` (`grep -E` sur `tests/reference/R1.tsv` à `R14.tsv`) : les 27 chemins occupent 65 lignes, toutes de type `double` (17, 17, 16, 5, 5, 5 dans R8 à R13 ; 0 ailleurs). `poids_exclusions/evenements` est `double` dans R13.
+- *Vérifiée*, M1, remesurée par `architect` (R 4.3.3) :
+  - `sum(c(1500000000L, 1500000000L))` rend `3e+09`, de type `double`, sans avertissement ;
+  - `1500000000L + 1500000000L` rend `NA` avec l'avertissement « NAs produced by integer overflow » ;
+  - `as.integer(2^31)` rend `NA` avec l'avertissement « NAs introduced by coercion to integer range ». C'est ce que l'assistant évite en refusant avant la conversion.
+- *Vérifiée*, M4, remesurée : `sprintf("%.0f", 21L)` et `sprintf("%d", 21)` rendent `"21"`.
+- *Vérifiés* par lecture à `937d268` : `R/exposition.R:707-712` (garde par cellule), `:767` (total, dans `exposition_cellules()`), `:589` (`length(ev)`, seam « fenêtres »), `:289` (`trop_de_cellules`) ; `R/validation.R:2447` ; `R/outils.R:43` et `:68`.
+- *Non remesurée* : M2 (entrée de R13 gonflée), mesure de la spécification.
+- *Non remesuré* : le relevé des 60 chemins (session).
+- *Hypothèses* : les effets de (g).
+
+**Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code.
+
+Issues : #199. Décisions du mainteneur M396 et M397 (10/11/2026). Branche `claude/validation-types-statuts`, PR #208.
