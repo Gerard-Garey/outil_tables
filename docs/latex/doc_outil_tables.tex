@@ -2490,7 +2490,37 @@ grandeur du corps en écart, l'empreinte du résultat change en
 conséquence, celle du code aussi, \code{R/} ayant changé, et toutes les
 autres grandeurs sont restées identiques au bit près, sur la plateforme de
 référence (processeur AMD EPYC 9V45), sans table finale, verdict ni valeur
-de table homologuée changés.
+de table homologuée changés. Les références R8 à R13 ont été régénérées
+\textbf{une huitième fois}, le 10/11/2026, en mode \code{regeneration}
+sur ces six plans seulement (exécution 42771679323 du workflow, calcul sur
+\code{ecaead0}, commit \code{cc7d849}, visa d'\code{actuary} du
+10/11/2026, décisions M359 à M362~; issues~\#174, \#177, \#179, \#178
+et~\#185), régénération unique de la branche
+\code{claude/validation-suites}, pour les seuls changements annoncés en
+transition par ces issues~: type \code{integer} au lieu de \code{double}
+de deux dénombrements, à valeurs identiques (\#174~; R8 à R10)~; type
+\code{character} au lieu de \code{logical} de la colonne
+\code{etat\_cellule} des tables de cellules vides de l'étape
+\code{importance\_exclusions} (\#177~; R8 et R10)~; ligne
+\code{khi2\_pearson}/\code{variance\_h0} et textes des statuts des
+p-valeurs asymptotiques de $X^2$ et de $G^2$ (\#179~; R8 à R10)~; trois
+colonnes \code{p\_\ldots\_asymptotique} des sous-groupes, toutes à
+\code{NA}, et ligne de statut \code{p\_valeurs\_asymptotiques} (\#178~;
+R8 à R10)~; textes des statuts de $\hat\theta_s$ et de
+$q_{\mathrm{pos}}$ (\#185~; R10 et R13) et du test d'homogénéité
+(\#185~; R11 et R12). L'empreinte du résultat change en conséquence,
+celle du code aussi, \code{R/} ayant changé~; \code{version\_fiche} est
+inchangée~; R13, créée le 09/11/2026, est régénérée pour la première
+fois~; toutes les autres grandeurs de R8 à R13 sont restées identiques au
+bit près, de même que R1 à R7 et R14, non visées, en comparaison réussie,
+sur la plateforme de référence (processeur AMD EPYC 7763, au lieu de l'EPYC
+9V45 consigné pour R8 à R12, sans effet mesuré~; ADR 0009, annotation du
+10/11/2026, (e)), sans table finale, verdict ni valeur de table homologuée
+changés. L'empreinte du résultat de R12 commitée est celle de la
+plateforme de référence~; un relevé sur un poste en diffère, par un écart
+d'une unité au dernier rang sur un double de l'étape \code{brut}, antérieur
+à la branche, conformément au statut «~même machine seulement~» de cette
+empreinte (section~\ref{sec:empreinte-resultat}).
 
 \begin{encadre}
 \small
@@ -2724,9 +2754,12 @@ propre à cette issue (\code{A\_REGENERER\_37}, vidée par le commit des
 références, puis remplacée par la liste unique), puis pour les issues~\#35
 et~\#42, dont les transitions ont été closes par la seconde régénération,
 puis pour les issues~\#57, \#64 et~\#67, dont les transitions ont été
-closes ensemble par la troisième, et pour les issues~\#73 et~\#31, dont
-les transitions ont été closes ensemble par la sixième («~Références
-existantes~», ci-dessus)~: la liste est de nouveau vide. Chaque
+closes ensemble par la troisième, pour les issues~\#73 et~\#31, dont
+les transitions ont été closes ensemble par la sixième, pour
+l'issue~\#169, dont la transition a été close par la septième, et pour
+les issues~\#174, \#177, \#179, \#178 et~\#185, dont les transitions
+ont été closes ensemble par la huitième («~Références existantes~»,
+ci-dessus)~: la liste est de nouveau vide. Chaque
 nature, l'union et ses conflits, l'observation, la forme de la liste, le
 rattachement de l'échec attendu, les doubles restants et la garde sont
 exercés par des témoins de la batterie, sur des objets en mémoire et jamais
