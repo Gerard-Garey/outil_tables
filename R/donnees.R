@@ -1093,6 +1093,22 @@ evaluer_motifs_agregats <- function(donnees, roles, p) {
   list(motifs = lapply(m, which))
 }
 
+# Tolérance relative des relevés de cohérence des deux expositions (E^i < E^c,
+# E^i - E^c > D ; #195), approximation numérique : une cellule n'est relevée
+# que si l'écart dépasse TOLERANCE_RELEVES_AGREGATS * max(|E^i|, |E^c|), sans
+# plancher (E^i = E^c = 0 : tolérance nulle, rien n'est relevé). Elle couvre
+# deux sources d'écart sans cause réelle : la conversion de décimaux en double
+# (erreur relative <= u, u = 2^-53) et les sommations amont des expositions par
+# deux chemins distincts (erreur <= (n - 1) u Σ|x| par somme, Higham,
+# Accuracy and Stability of Numerical Algorithms, 2e éd., chap. 4 ; cette borne
+# ne se ramène à une borne relative à max(E) que pour des termes positifs, cas
+# des expositions ; deux sommes, soit 2 (n - 1) u <= 1e-10 jusqu'à n = 4,5e5
+# termes). Un écart réel d'un jour (1/366 an) reste relevé tant que
+# l'exposition de la cellule reste inférieure à 2,7e7 années. Les comptages ne
+# peuvent que baisser par rapport à la comparaison exacte. Non portée par
+# `releves` ni par la fiche, ni par TOLERANCES (ADR 0009).
+TOLERANCE_RELEVES_AGREGATS <- 1e-10
+
 # Observations de la recette `agregats` sur les lignes retenues : une
 # observation par cellule reçue et conservée, sans aucune complétion (§ 5).
 # Unité d'observation `non_determinee` (Q4). Colonnes : sexe s'il est
@@ -1108,7 +1124,8 @@ evaluer_motifs_agregats <- function(donnees, roles, p) {
 #   n          : nombre de lignes reçues.
 # Rend list(unite, observations, observation_des_lignes, releves) : releves
 # porte le nombre de cellules conservées, les relevés de cohérence des deux
-# expositions quand elles sont déclarées ensemble (§ 2 ; NA sinon) et le
+# expositions quand elles sont déclarées ensemble (§ 2 ; NA sinon), comptés à
+# la tolérance relative TOLERANCE_RELEVES_AGREGATS (#195), et le
 # poids des cellules exclues, par motif déclaré (§ 7, Q6) : cellules exclues
 # sous le motif, puis, sur celles dont D et les expositions déclarées ne
 # portent aucun motif de valeur, leur nombre, Σ D et Σ E par exposition
@@ -1142,9 +1159,13 @@ observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, 
     poids <- data.frame(motif = character(0), cellules = integer(0), cellules_sommees = integer(0),
                         evenements = numeric(0), exposition_centrale = numeric(0),
                         exposition_initiale = numeric(0), stringsAsFactors = FALSE)
+  # Tolérance relative par cellule ; pas de na.rm (comportement inchangé pour NA
+  # et NaN ; les entrées infinies sont écartées en amont par les motifs, refus ou
+  # exclusion, E2.7).
+  tau <- if (deux) TOLERANCE_RELEVES_AGREGATS * pmax(abs(ei), abs(ec)) else NULL
   releves <- list(cellules = length(i),
-                  exposition_initiale_inferieure_centrale = if (deux) sum(ei < ec) else NA_integer_,
-                  complement_superieur_aux_evenements = if (deux) sum(ei - ec > observations$evenements)
+                  exposition_initiale_inferieure_centrale = if (deux) sum(ec - ei > tau) else NA_integer_,
+                  complement_superieur_aux_evenements = if (deux) sum(ei - ec - observations$evenements > tau)
                                                         else NA_integer_,
                   poids_exclusions = poids)
   list(unite = "non_determinee", observations = observations, observation_des_lignes = i, releves = releves)
@@ -1848,20 +1869,24 @@ UNITE_AGREGAT <- c(
 
 # Avertissements des relevés de la recette `agregats` (§ 2 et § 6.3), sur les
 # cellules conservées, quand les deux expositions sont déclarées : E^i < E^c,
-# E^i - E^c > D. Relevés non bloquants, jamais un refus. Rend `avert` augmenté.
+# E^i - E^c > D, au-delà de la tolérance relative TOLERANCE_RELEVES_AGREGATS
+# (#195). Relevés non bloquants, jamais un refus. Rend `avert` augmenté.
 avertir_releves_agregats <- function(avert, releves) {
   k <- releves$exposition_initiale_inferieure_centrale
   if (!is.na(k) && k > 0L)
     avert <- avertir(avert, "donnees", "exposition_initiale_inferieure_centrale",
                      sprintf(paste("Relevé : %d cellule(s) dont l'exposition initiale déclarée est inférieure à",
-                                   "l'exposition centrale déclarée (définition « cellule » : 0 <= E^i - E^c <= D)."), k),
+                                   "l'exposition centrale déclarée, au-delà d'une tolérance d'arrondi de 1e-10 fois la plus",
+                                   "grande des deux expositions déclarées de la cellule (définition « cellule » :",
+                                   "0 <= E^i - E^c <= D)."), k),
                      k)
   k <- releves$complement_superieur_aux_evenements
   if (!is.na(k) && k > 0L)
     avert <- avertir(avert, "donnees", "complement_superieur_aux_evenements",
                      sprintf(paste("Relevé : %d cellule(s) dont l'écart entre exposition initiale et exposition",
-                                   "centrale déclarées dépasse le nombre d'événements (définition « cellule » :",
-                                   "0 <= E^i - E^c <= D)."), k),
+                                   "centrale déclarées dépasse le nombre d'événements, au-delà d'une tolérance d'arrondi de",
+                                   "1e-10 fois la plus grande des deux expositions déclarées de la cellule (définition",
+                                   "« cellule » : 0 <= E^i - E^c <= D)."), k),
                      k)
   avert
 }
