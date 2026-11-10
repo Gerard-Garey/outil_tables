@@ -1109,7 +1109,7 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
     for (k in names(segments_cles)) d[[k]] <- segments_cles[[k]][seg_g]
     d$tranche_debut <- as.integer(tranches[tr_g])
     d$tranche_fin <- as.integer(fin_tranche[tr_g])
-    if (par_annee) d$annee <- as.integer(an_g)
+    if (par_annee) d$annee <- rep_len(as.integer(an_g), n_g)  # integer de longueur n_g, y compris pour n_g = 0 (#210)
     d$cellules_retenues <- nb
     d$observes <- denombrement_entier(O, "validation", "sous_groupes/observes")  # integer (#199) ; O reste double
     d$attendus <- At
@@ -2003,7 +2003,9 @@ cle_cellules <- function(t, cles, par_annee)
 # segmentée par `cles` : construire_observations() puis calculer_exposition(),
 # une seule implémentation de la fusion et de l'exposition (M242), sous la
 # recette et la convention validées de la construction (ctx$recette,
-# ctx$conv : une seule source, #82). NULL sans ligne.
+# ctx$conv : une seule source, #82). NULL sans ligne. Sans refus de la période
+# sans exposition (refuser_vide = FALSE, #210) : un sous-ensemble de lignes
+# exclues peut n'avoir aucune exposition dans la période.
 exposition_lignes <- function(lignes, cles, ctx) {
   if (!length(lignes)) return(NULL)
   ob <- construire_observations(ctx$donnees[lignes, , drop = FALSE], lignes, ctx$roles, cles, ctx$p)
@@ -2011,7 +2013,7 @@ exposition_lignes <- function(lignes, cles, ctx) {
     stop("exposition_lignes() : unité d'observation différente de la construction (erreur de programmation).",
          call. = FALSE)
   calculer_exposition(ob$observations, ctx$p, cles, ctx$recette, ctx$conv,
-                      ctx$par_annee)$resultat$exposition
+                      ctx$par_annee, refuser_vide = FALSE)$resultat$exposition
 }
 
 # Événements et exposition retirés par l'ensemble S (numéros de lignes
