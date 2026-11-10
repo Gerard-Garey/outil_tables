@@ -90,16 +90,37 @@ verifier("A STATUTS_HOMOGENEITE : p exacte et p de Monte-Carlo asymptotiques sou
 verifier("T185.1 STATUTS_HOMOGENEITE : p_asymptotique sous le régime de la plus petite valeur propre de V (texte de la spécification) ; z au même régime ; plus aucun « (D_. -> infini) »", {
   s <- tablexp:::STATUTS_HOMOGENEITE
   st <- function(t, g) s$statut[s$table == t & s$grandeur == g]
+  # Texte de #202 (texte (B) de la relecture (0')(c) d'actuary, commentaire 6775943400)
   p <- paste("asymptotique : loi du khi-deux à ddl degrés de liberté quand l'information du test croît (plus",
-             "petite valeur propre de V réduite -> infini, aucune strate ne portant à elle seule une part non",
-             "négligeable de V), le nombre de strates étant fixe ou croissant : D_. peut rester petit dans chaque",
-             "strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le modèle de survie ; queue",
-             "supérieure ;", tablexp:::INDEPENDANCE_HOMOGENEITE)
+             "petite valeur propre de V réduite -> infini), à nombre de groupes fixé, le nombre de strates étant",
+             "fixe ou croissant (D_. pouvant rester borné dans chaque strate quand le nombre de strates croît) ;",
+             "sous H0 avec E tenue pour fixe ; asymptotique aussi sous le modèle de survie ; queue supérieure ;",
+             tablexp:::INDEPENDANCE_HOMOGENEITE)
   identical(st("tests", "p_asymptotique"), p) &&
     grepl("de loi asymptotique N(0, 1) sous H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ;",
           st("segments", "z"), fixed = TRUE) &&
     sum(grepl("plus petite valeur propre de V", s$statut, fixed = TRUE)) == 1L &&
     !any(grepl("(D_. -> infini)", s$statut, fixed = TRUE))
+})
+# T202 (#202 ; relecture (0')(c) d'actuary) : la condition « aucune strate ne
+# portant à elle seule une part non négligeable de V » est retirée (superflue, et
+# impossible à nombre de strates fixe : la plus grande part vaut au moins 1/K) ;
+# « D_. peut rester petit dans chaque strate » (faux à K fixe) est remplacé ; le
+# nombre de groupes est dit fixé ; aucun numéro de théorème ni source citée (M388).
+verifier("T202 STATUTS_HOMOGENEITE : p_asymptotique sans condition sur les parts des strates, à nombre de groupes fixé, D_. borné seulement quand le nombre de strates croît ; z inchangé ; aucune source citée", {
+  s <- tablexp:::STATUTS_HOMOGENEITE
+  pa <- s$statut[s$table == "tests" & s$grandeur == "p_asymptotique"]
+  z <- s$statut[s$table == "segments" & s$grandeur == "z"]
+  length(pa) == 1L && length(z) == 1L &&
+    grepl("à nombre de groupes fixé", pa, fixed = TRUE) &&
+    grepl("quand le nombre de strates croît", pa, fixed = TRUE) &&
+    !grepl("peut rester petit", pa, fixed = TRUE) &&
+    !any(grepl("aucune strate ne portant|part non négligeable", s$statut)) &&
+    !any(grepl("théorème|Billingsley", s$statut, ignore.case = TRUE)) &&
+    identical(z, paste("z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous",
+                       "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ;",
+                       "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;",
+                       tablexp:::INDEPENDANCE_HOMOGENEITE))
 })
 verifier("A REFERENCE_METHODE_HOMOGENEITE : données consignées de la source (URL, SHA-256, pages ; E2.25), après relecture sur l'image (M290)", {
   r <- tablexp:::REFERENCE_METHODE_HOMOGENEITE

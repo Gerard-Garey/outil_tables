@@ -473,12 +473,53 @@ transition_200 <- function(plans) {
     list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
          valeurs = c(BORNES_APRES_200, P_VALEURS_APRES_200), positions = k0)))
 }
+# Transition #202 (B18 ; relecture (0')(c) d'actuary, commentaire 6775943400,
+# texte (B)) : texte de statut de la ligne tests/p_asymptotique de
+# STATUTS_HOMOGENEITE, 5e des 13 valeurs de
+# etapes/homogeneite/parametres/statuts/statut de R11 et R12 ; la position est
+# lue par le nom de la grandeur (colonne grandeur, table tests), commune aux
+# deux plans. Texte de la référence commitée (avant) contrôlé, littéraux
+# ci-dessous (échappements \u) ; l'empreinte du résultat n'est pas comparée
+# (jeton, ADR 0009). Close par la régénération unique (R) de B18, avec
+# transition_202() et les constantes *_202.
+P_ASYMPTOTIQUE_AVANT_202 <- paste(
+  "asymptotique : loi du khi-deux \u00e0 ddl degr\u00e9s de libert\u00e9 quand l'information du test cro\u00eet (plus",
+  "petite valeur propre de V r\u00e9duite -> infini, aucune strate ne portant \u00e0 elle seule une part non",
+  "n\u00e9gligeable de V), le nombre de strates \u00e9tant fixe ou croissant : D_. peut rester petit dans chaque",
+  "strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le mod\u00e8le de survie ; queue",
+  "sup\u00e9rieure ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
+  "sur-dispers\u00e9s et le test est anti-conservateur (p-valeurs trop petites)")
+P_ASYMPTOTIQUE_APRES_202 <- paste(
+  "asymptotique : loi du khi-deux \u00e0 ddl degr\u00e9s de libert\u00e9 quand l'information du test cro\u00eet (plus",
+  "petite valeur propre de V r\u00e9duite -> infini), \u00e0 nombre de groupes fix\u00e9, le nombre de strates \u00e9tant",
+  "fixe ou croissant (D_. pouvant rester born\u00e9 dans chaque strate quand le nombre de strates cro\u00eet) ;",
+  "sous H0 avec E tenue pour fixe ; asymptotique aussi sous le mod\u00e8le de survie ; queue sup\u00e9rieure ;",
+  "unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s et le test",
+  "est anti-conservateur (p-valeurs trop petites)")
+transition_202 <- function(plans) {
+  st <- "etapes/homogeneite/parametres/statuts/"
+  k0 <- NULL
+  for (id in plans) {
+    ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+    k <- which(ref[[paste0(st, "table")]] == "tests" & ref[[paste0(st, "grandeur")]] == "p_asymptotique")
+    if (length(k) != 1L) stop(sprintf("transition_202(%s) : ligne tests/p_asymptotique absente ou multiple", id))
+    if (!is.null(k0) && !identical(k, k0))
+      stop(sprintf("transition_202(%s) : position de p_asymptotique propre au plan", id))
+    k0 <- k
+    if (!identical(ref[[paste0(st, "statut")]][k], P_ASYMPTOTIQUE_AVANT_202))
+      stop(sprintf("transition_202(%s) : texte de p_asymptotique de la r\u00e9f\u00e9rence inattendu", id))
+  }
+  list(issue = "#202", plans = plans, changements = list(
+    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
+         valeurs = P_ASYMPTOTIQUE_APRES_202, positions = k0)))
+}
 TRANSITIONS_EN_COURS <- list(
   transition_199(c("R8", "R9"), c("validation", "importance_exclusions_1", "importance_exclusions_2")),
   transition_199("R10", c("positionnement", "validation", "importance_exclusions_1")),
   transition_199(c("R11", "R12"), "homogeneite"),
   transition_199("R13", "positionnement"),
-  transition_200(c("R8", "R9")))
+  transition_200(c("R8", "R9")),
+  transition_202(c("R11", "R12")))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
