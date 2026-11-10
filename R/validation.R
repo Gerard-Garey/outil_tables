@@ -203,6 +203,10 @@ STATUTS_VALIDATION <- local({
               "au nombre fini de réplications, distincte de l'erreur d'estimation")
   e_mc <- paste("erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre fini de",
                 "réplications, distincte de l'erreur d'estimation")
+  # Relation ajustee_hors_outil des p-valeurs de sous-groupe (#178, #200) :
+  # fragment commun à sous_groupes/p_valeurs et p_valeurs_asymptotiques.
+  ajustee_p <- paste("relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe",
+                     "(ddl_non_etabli) ; colonnes NA")
   signes_h <- "P(r_c > 0) = 1/2 par cellule, ce qui n'est pas H0 (i)"
   runs_h <- paste("conditionnellement à (n+, n-) par séquence, sous l'hypothèse que tous les ordres des signes",
                   "sont équiprobables, ce qui n'est pas H0 (i)")
@@ -320,13 +324,16 @@ STATUTS_VALIDATION <- local({
       paste(exact_h0, ": somme sur C+ de P(D_c hors de A +- z sqrt(A))")),
     c("sous_groupes", "smr", "FALSE", "résultat exact : O / A du sous-groupe (cellules retenues)"),
     c("sous_groupes", "bornes_exactes", "TRUE",
-      "exact sous la loi supposée (O ~ Poisson, A fixe) ; qgamma, approximation numérique"),
+      paste("relation independante : exactes sous la loi supposée (O ~ Poisson, A fixe), p = 0 :",
+            "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >=",
+            "niveau (intervalle exact conservatif) ; qgamma, approximation numérique ; relation ajustee_hors_outil :",
+            "non produites, p non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
     c("sous_groupes", "p_valeurs", "TRUE",
-      paste(exact_h0, "; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité")),
+      paste("relation independante :", exact_h0, "; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité ;",
+            ajustee_p)),
     c("sous_groupes", "p_valeurs_asymptotiques", "TRUE",
       paste("relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours",
-            "calculée ; relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe",
-            "(ddl_non_etabli) ; colonnes NA")))
+            "calculée ;", ajustee_p)))
   texte_moteur(data.frame(statistique = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
                           sous_h0 = vapply(l, `[`, "", 3L) == "TRUE", statut = vapply(l, `[`, "", 4L),
                           stringsAsFactors = FALSE))

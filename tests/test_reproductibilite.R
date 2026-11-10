@@ -431,11 +431,54 @@ transition_199 <- function(plans, familles)
   list(issue = "#199", plans = plans,
        changements = lapply(unlist(CHEMINS_199[familles], use.names = FALSE), function(ch)
          list(chemin = ch, nature = "type", de = "double", vers = "integer")))
+# Transition #200 (B18 ; avis (0')(e) d'actuary, commentaire 6775950806) : textes
+# de statut par relation (independante, ajustee_hors_outil) des lignes
+# sous_groupes/bornes_exactes et sous_groupes/p_valeurs de STATUTS_VALIDATION,
+# positions 2 et 3 de etapes/validation/parametres/statuts_sous_groupes/statut
+# de R8 et R9 (relation independante) ; R10 (relation positionnee) inchangé :
+# le texte de STATUTS_VALIDATION_POSITIONNEE ne change pas. Valeurs de la
+# référence commitée (avant) contrôlées, littéraux ci-dessous (échappements
+# \u) ; l'empreinte du résultat n'est pas comparée (jeton, ADR 0009). Close par
+# la régénération unique (R) de B18, avec transition_200() et les constantes
+# *_200.
+BORNES_AVANT_200 <- "exact sous la loi suppos\u00e9e (O ~ Poisson, A fixe) ; qgamma, approximation num\u00e9rique"
+BORNES_APRES_200 <- paste(
+  "relation independante : exactes sous la loi suppos\u00e9e (O ~ Poisson, A fixe), p = 0 :",
+  "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >=",
+  "niveau (intervalle exact conservatif) ; qgamma, approximation num\u00e9rique ; relation ajustee_hors_outil :",
+  "non produites, p non \u00e9tabli, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")
+P_VALEURS_AVANT_200 <- paste(
+  "exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le mod\u00e8le de survie ; fonctions de",
+  "r\u00e9partition de Poisson (ppois), approximation num\u00e9rique ; p = 0 : X ~ Poisson(A) ; aucune correction de",
+  "multiplicit\u00e9")
+P_VALEURS_APRES_200 <- paste(
+  "relation independante : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le mod\u00e8le de survie ;",
+  "fonctions de r\u00e9partition de Poisson (ppois), approximation num\u00e9rique ; p = 0 : X ~ Poisson(A) ; aucune",
+  "correction de multiplicit\u00e9 ; relation ajustee_hors_outil : non produites, p non \u00e9tabli, aucune p-valeur du",
+  "sous-groupe (ddl_non_etabli) ; colonnes NA")
+transition_200 <- function(plans) {
+  st <- "etapes/validation/parametres/statuts_sous_groupes/"
+  k0 <- NULL
+  for (id in plans) {
+    ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+    k <- match(c("bornes_exactes", "p_valeurs"), ref[[paste0(st, "grandeur")]])
+    # Positions lues par le nom, communes à tous les plans (constat mineur de l'audit)
+    if (!is.null(k0) && !identical(k, k0))
+      stop(sprintf("transition_200(%s) : positions de bornes_exactes et p_valeurs propres au plan", id))
+    k0 <- k
+    if (anyNA(k) || !identical(ref[[paste0(st, "statut")]][k], c(BORNES_AVANT_200, P_VALEURS_AVANT_200)))
+      stop(sprintf("transition_200(%s) : textes de bornes_exactes et p_valeurs de la r\u00e9f\u00e9rence inattendus", id))
+  }
+  list(issue = "#200", plans = plans, changements = list(
+    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
+         valeurs = c(BORNES_APRES_200, P_VALEURS_APRES_200), positions = k0)))
+}
 TRANSITIONS_EN_COURS <- list(
   transition_199(c("R8", "R9"), c("validation", "importance_exclusions_1", "importance_exclusions_2")),
   transition_199("R10", c("positionnement", "validation", "importance_exclusions_1")),
   transition_199(c("R11", "R12"), "homogeneite"),
-  transition_199("R13", "positionnement"))
+  transition_199("R13", "positionnement"),
+  transition_200(c("R8", "R9")))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
