@@ -270,7 +270,23 @@ verifier("H1, âge 59, E = 122/366 = 1/3 (valeur calculée à la main) : Poisson
 
 # --- 5. H10a : tables à zéro ligne (valeur calculée à la main) -----------------
 
-H10a <- construire_cas("1950-05-05", "2005-01-01", "2014-12-31", "deces")
+# H10a est refusé par l'étape exposition (#210, M399 : periode_sans_exposition) ;
+# les tables à zéro ligne de calculer_taux_bruts() s'obtiennent en appel direct,
+# sur l'exposition à zéro cellule de calculer_exposition(refuser_vide = FALSE).
+H10a <- local({
+  d <- data.frame(n = D("1950-05-05"), e = D("2005-01-01"), s = D("2014-12-31"), c = "deces", stringsAsFactors = FALSE)
+  roles <- c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c")
+  pl <- plan_brut(); pl$etapes$exposition <- NULL; pl$etapes$brut <- NULL
+  ob <- construire_table(d, roles, pl)$etapes$donnees$resultat$observations
+  rec <- tablexp:::deduire_recette(roles)
+  conv <- tablexp:::resoudre_convention("plus_fine", rec$convention_native)
+  ex <- tablexp:::calculer_exposition(ob, tablexp:::valeurs_parametres_donnees(VD, PER, 0), character(0), rec, conv,
+                                      FALSE, refuser_vide = FALSE)
+  b <- calculer_taux_bruts(ex$resultat$exposition, character(0), FALSE, conv$retenue, ex$parametres$unite_exposition,
+                           c("poisson", "binomial"), 0.95, rec)
+  list(p = b$resultat$poisson, b = b$resultat$binomial, objet = list(etapes = list(brut = b)),
+       refus = tryCatch(construire_table(d, roles, plan_brut()), refus_tablexp = function(r) r))
+})
 COL_P <- c("age", "evenements", "exposition_centrale", "taux", BORNES, "probabilite",
            "probabilite_borne_inf_exacte", "probabilite_borne_sup_exacte",
            "probabilite_borne_inf_asymptotique", "probabilite_borne_sup_asymptotique", "etat")
@@ -279,6 +295,9 @@ verifier("H10a (valeur calculée à la main) : tables Poisson et binomiale à z�
          nrow(H10a$p) == 0L && nrow(H10a$b) == 0L && identical(names(H10a$p), COL_P) &&
            identical(names(H10a$b), COL_B) && is.integer(H10a$p$evenements) && is.character(H10a$p$etat) &&
            is.double(H10a$b$taux) && identical(H10a$objet$etapes$brut$diagnostics$cellules, 0L))
+verifier("H10a par construire_table() : refus exposition / periode_sans_exposition avant l'étape brut (#210)",
+         inherits(H10a$refus, "refus_tablexp") &&
+           identical(c(H10a$refus$module, H10a$refus$motif), c("exposition", "periode_sans_exposition")))
 
 # --- 6. H13 : par_annee (valeur calculée à la main) ----------------------------
 

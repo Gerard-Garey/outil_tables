@@ -407,14 +407,21 @@ verifier("étape : clés distinctes pour positionnement et validation -> deux ta
   identical(names(x$fiche$tables_reference), c("autre", "tv"))
 })
 verifier("T2 (sur le jeu simulé) : invariant des états de la table positionnée", invariant_etats(P$resultat$table_positionnee))
-verifier("étape : période sans observation -> positionnement_sans_attendu « aucune cellule », details à zéro segment", {
+verifier("étape : période sans observation -> refus exposition / periode_sans_exposition avant l'étape positionnement (#210, M399)", {
   p <- plan_p(); p$periode <- list(debut = D("1990-01-01"), fin = D("1994-12-31"))
   r <- refus_de(construire_table(JEU, ROLES, p, tables_reference = list(tv = T_HF)))
+  ok <- controle(r, "exposition", "periode_sans_exposition")
+  if (!isTRUE(ok)) ok
+  else if (!identical(r$details$cellules, 0L) || !identical(r$details$fin_effective, D("1994-12-31"))) "details"
+  else TRUE
+})
+verifier("calculer_positionnement() en appel direct, exposition à zéro cellule -> positionnement_sans_attendu « aucune cellule », details à zéro segment (garde conservée)", {
+  r <- tryCatch({ positionnement_direct(expo = EXPO_B[0L, ]); NULL }, refus_tablexp = function(r) r)
   ok <- controle(r, "positionnement", "positionnement_sans_attendu")
   if (!isTRUE(ok)) ok
   else if (!grepl("aucune cellule", conditionMessage(r), fixed = TRUE)) conditionMessage(r)
   else if (!identical(nrow(r$details$segments), 0L) || !identical(r$details$attendus, numeric(0)) ||
-           !identical(r$details$cle, "tv")) "details"
+           !identical(r$details$cle, "t")) "details"
   else TRUE
 })
 verifier("rejeu : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution ; sans la table -> table_reference_absente", {

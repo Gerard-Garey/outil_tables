@@ -158,7 +158,19 @@ for (k in list(list("H10b", "1950-05-05", "2005-01-01", "2015-01-01", 64L, 241L,
   })
 }
 verifier("H10a (valeur calculée à la main) : tables kaplan_meier et kaplan_meier_sauts à zéro ligne, colonnes de la spécification (A.9), types conservés ; diagnostics nuls", {
-  cas <- construire_cas("1950-05-05", "2005-01-01", "2014-12-31", "deces")
+  # H10a est refusé par l'étape exposition (#210, M399) : appel direct sur
+  # l'exposition à zéro cellule (calculer_exposition(refuser_vide = FALSE)).
+  d <- data.frame(n = D("1950-05-05"), e = D("2005-01-01"), s = D("2014-12-31"), c = "deces", stringsAsFactors = FALSE)
+  roles <- c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c")
+  pl <- plan_km(); pl$etapes$exposition <- NULL; pl$etapes$brut <- NULL
+  ob <- construire_table(d, roles, pl)$etapes$donnees$resultat$observations
+  rec <- tablexp:::deduire_recette(roles)
+  conv <- tablexp:::resoudre_convention("plus_fine", rec$convention_native)
+  pp <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
+  ex <- tablexp:::calculer_exposition(ob, pp, character(0), rec, conv, FALSE, refuser_vide = FALSE)
+  b <- calculer_taux_bruts(ex$resultat$exposition, character(0), FALSE, conv$retenue, ex$parametres$unite_exposition,
+                           "kaplan_meier", 0.95, rec, ex$fenetres, pp, ex$parametres)
+  cas <- list(km = b$resultat$kaplan_meier, sauts = b$resultat$kaplan_meier_sauts, objet = list(etapes = list(brut = b)))
   dk <- cas$objet$etapes$brut$diagnostics$kaplan_meier
   nrow(cas$km) == 0L && nrow(cas$sauts) == 0L &&
     identical(names(cas$km), c("age", "evenements", "instants_evenement", "taux", "variance",

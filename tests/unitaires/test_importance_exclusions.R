@@ -976,3 +976,20 @@ verifier("rapport (valeur calculée à la main) : unité contrat -> mention d'an
     grepl("<p>Étape « importance_exclusions » : non demandée par le plan (chemin etapes/importance_exclusions absent de l'objet).</p>",
           h0, fixed = TRUE)
 })
+
+# Période sans exposition (#210, M399) : le refus de l'étape exposition porte
+# sur la table de la construction, non sur le sous-ensemble de lignes exclues
+# dont le contrefactuel recalcule l'exposition (exposition_lignes(),
+# refuser_vide = FALSE).
+verifier("sous-ensemble exclu sans exposition ni événement dans la période (#210 ; valeur calculée à la main) : construction produite, retraits nuls (1 ligne mesurable, 0 événement retiré, 0 jour retiré), aucun refus periode_sans_exposition, unités tête et contrat", {
+  d <- rbind(T1[1:4, ], data.frame(id_contrat = "C9", id_tete = "Z", sexe = NA_character_, date_naissance = D("1950-01-01"),
+                                   date_entree = D("2013-01-01"), date_sortie = D("2013-12-31"), cause_sortie = "deces",
+                                   stringsAsFactors = FALSE))
+  ok <- vapply(list(ROLES_SIM, ROLES_SANS_TETE), function(ro) {
+    x <- tryCatch(construire_table(d, ro, plan_ie("sexe_manquant")), error = function(e) e)
+    if (inherits(x, "error")) return(FALSE)
+    r <- de(x$etapes$importance_exclusions$resultat$retraits, "sexe_manquant", "A")
+    identical(r$lignes_mesurables, 1L) && r$evenements_retires == 0 && r$exposition_jours_retiree == 0
+  }, NA)
+  if (all(ok)) TRUE else sprintf("unité tête %s, unité contrat %s", ok[1L], ok[2L])
+})
