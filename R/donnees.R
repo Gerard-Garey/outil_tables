@@ -465,14 +465,16 @@ controler_recettes_concurrentes <- function(roles, catalogue) {
 # au moins un rôle déclaré ; des discriminants de deux recettes déclarés
 # ensemble sont un refus (recettes_concurrentes) ; aucune recette complète :
 # refus aucune_recette, qui liste la recette dont des rôles propres sont
-# déclarés, sinon toutes, dans l'ordre du catalogue. Argument `catalogue` par
-# défaut : injection en test (M247). Rend la valeur validée que
-# construire_table() transmet aux étapes (#82) : list(recette,
-# convention_native, roles_requis, roles_employes, seam, motifs (ligne puis
-# unité), matrice (lignes de MATRICE_RECETTES de la recette, sans la colonne
-# recette)) ; les étapes lisent ses propriétés, non son nom (ADR 0016,
+# déclarés, sinon toutes, dans l'ordre du catalogue. Arguments `catalogue` et
+# `matrice` par défaut les constantes du package : injection en test (M247 ;
+# #196) ; la matrice injectée doit porter les lignes de la recette d'un
+# catalogue injecté, sans quoi la matrice de la recette rendue est vide. Rend
+# la valeur validée que construire_table() transmet aux étapes (#82) :
+# list(recette, convention_native, roles_requis, roles_employes, seam, motifs
+# (ligne puis unité), matrice (lignes de `matrice` de la recette, sans la
+# colonne recette)) ; les étapes lisent ses propriétés, non son nom (ADR 0016,
 # point 4.4).
-deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES) {
+deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MATRICE_RECETTES) {
   controler_recettes_concurrentes(roles, catalogue)
   r <- names(roles)
   requis <- lapply(catalogue$requis, function(q) setdiff(q, r))
@@ -489,8 +491,8 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES) {
     stop(sprintf("deduire_recette() : recettes %s complètes sans discriminant concurrent (catalogue mal formé).",
                  paste(catalogue$recette[complete], collapse = ", ")), call. = FALSE)
   k <- complete
-  m <- MATRICE_RECETTES[MATRICE_RECETTES$recette == catalogue$recette[k],
-                        c("etape", "estimateur", "admis", "role_requis", "motif"), drop = FALSE]
+  m <- matrice[matrice$recette == catalogue$recette[k],
+               c("etape", "estimateur", "admis", "role_requis", "motif"), drop = FALSE]
   rownames(m) <- NULL
   list(recette = catalogue$recette[k], convention_native = catalogue$convention_native[k],
        roles_requis = catalogue$requis[[k]], roles_employes = roles_recette(catalogue, k),
@@ -998,6 +1000,36 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lign
 
 # --- motifs et observations de la recette `agregats` (#169, § 5 à § 7) -------
 
+# Lignes d'une même clé exacte, toutes les lignes en cause (règle commune de
+# cellule_dupliquee et d'inventaire_duplique) : rang de chaque valeur parmi les
+# valeurs distinctes de sa colonne (match(), égalité exacte, sans écriture
+# décimale), rangs collés par colonne de clé, puis doublons sur les rangs dans
+# les deux sens ; une ligne `complete` est une ligne retenue pour la
+# comparaison (clé renseignée, et, pour les inventaires, ligne d'inventaire) :
+# le masquage des rangs des autres lignes (NA) les écarte de l'appariement avec
+# une ligne complète de même clé apparente, et `complete &` les ramène à FALSE.
+#   cles     : liste de vecteurs de clé, de même longueur ;
+#   complete : logique, une valeur par ligne.
+# Rend un logique, une valeur par ligne.
+lignes_cle_dupliquee <- function(cles, complete) {
+  rangs <- do.call(paste, c(lapply(cles, function(v) match(v, unique(v))), list(sep = "\r")))
+  rangs[!complete] <- NA
+  complete & (duplicated(rangs, incomparables = NA) | duplicated(rangs, fromLast = TRUE, incomparables = NA))
+}
+
+# Sous-indiçage [i] d'une colonne de catégorie (sexe, segment) des
+# observations, type d'origine conservé. Un facteur est recopié sous forme
+# normalisée (#67, M72) : classe ramenée à factor, ou ordered s'il est
+# ordonné ; niveaux tels quels (ordre et niveaux inutilisés compris) ; tout
+# autre attribut (contrasts, sous-classe…) retiré, que l'empreinte du résultat
+# refuserait. Chaîne ou entier : sous-indiçage [i], qui retire les attributs
+# de colonne (M71, Q4).
+sous_indicer_categorie <- function(x, i) {
+  if (is.factor(x)) structure(unclass(x)[i], levels = levels(x),
+                              class = if (is.ordered(x)) c("ordered", "factor") else "factor")
+  else x[i]
+}
+
 # Évalue tous les motifs de ligne de la recette `agregats` (MOTIFS_LIGNES_AGREGATS)
 # sur toutes les lignes (une ligne est une cellule), sans court-circuit ; un
 # motif de comparaison n'est pas levé sur une valeur manquante, comme dans
@@ -1051,20 +1083,31 @@ evaluer_motifs_agregats <- function(donnees, roles, p) {
   m$evenements_negatifs <- vrai(ev < 0)
   m$evenements_sans_exposition <- vrai(ev > 0) & !m$exposition_manquante &
     !Reduce(`|`, lapply(expositions, function(e) vrai(e > 0)))
-  # Clé exacte : rang de chaque valeur parmi les valeurs distinctes de sa
-  # colonne (match(), égalité exacte, sans écriture décimale), puis doublons
-  # sur les rangs.
+  # Clé exacte (lignes_cle_dupliquee()).
   cles <- Filter(Negate(is.null), lapply(c("sexe", "segment", "age", "annee"), function(r) {
     v <- col(r)
     if (is.null(v)) NULL else if (is.factor(v)) as.character(v) else v
   }))
   complete <- !Reduce(`|`, lapply(cles, is.na))
-  rangs <- do.call(paste, c(lapply(cles, function(v) match(v, unique(v))), list(sep = "\r")))
-  rangs[!complete] <- NA
-  m$cellule_dupliquee <- complete & (duplicated(rangs, incomparables = NA) |
-                                     duplicated(rangs, fromLast = TRUE, incomparables = NA))
+  m$cellule_dupliquee <- lignes_cle_dupliquee(cles, complete)
   list(motifs = lapply(m, which))
 }
+
+# Tolérance relative des relevés de cohérence des deux expositions (E^i < E^c,
+# E^i - E^c > D ; #195), approximation numérique : une cellule n'est relevée
+# que si l'écart dépasse TOLERANCE_RELEVES_AGREGATS * max(|E^i|, |E^c|), sans
+# plancher (E^i = E^c = 0 : tolérance nulle, rien n'est relevé). Elle couvre
+# deux sources d'écart sans cause réelle : la conversion de décimaux en double
+# (erreur relative <= u, u = 2^-53) et les sommations amont des expositions par
+# deux chemins distincts (erreur <= (n - 1) u Σ|x| par somme, Higham,
+# Accuracy and Stability of Numerical Algorithms, 2e éd., chap. 4 ; cette borne
+# ne se ramène à une borne relative à max(E) que pour des termes positifs, cas
+# des expositions ; deux sommes, soit 2 (n - 1) u <= 1e-10 jusqu'à n = 4,5e5
+# termes). Un écart réel d'un jour (1/366 an) reste relevé tant que
+# l'exposition de la cellule reste inférieure à 2,7e7 années. Les comptages ne
+# peuvent que baisser par rapport à la comparaison exacte. Non portée par
+# `releves` ni par la fiche, ni par TOLERANCES (ADR 0009).
+TOLERANCE_RELEVES_AGREGATS <- 1e-10
 
 # Observations de la recette `agregats` sur les lignes retenues : une
 # observation par cellule reçue et conservée, sans aucune complétion (§ 5).
@@ -1081,7 +1124,8 @@ evaluer_motifs_agregats <- function(donnees, roles, p) {
 #   n          : nombre de lignes reçues.
 # Rend list(unite, observations, observation_des_lignes, releves) : releves
 # porte le nombre de cellules conservées, les relevés de cohérence des deux
-# expositions quand elles sont déclarées ensemble (§ 2 ; NA sinon) et le
+# expositions quand elles sont déclarées ensemble (§ 2 ; NA sinon), comptés à
+# la tolérance relative TOLERANCE_RELEVES_AGREGATS (#195), et le
 # poids des cellules exclues, par motif déclaré (§ 7, Q6) : cellules exclues
 # sous le motif, puis, sur celles dont D et les expositions déclarées ne
 # portent aucun motif de valeur, leur nombre, Σ D et Σ E par exposition
@@ -1089,13 +1133,9 @@ evaluer_motifs_agregats <- function(donnees, roles, p) {
 observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, exclusions, n, donnees) {
   col <- function(role, d = lignes) if (role %in% names(roles)) d[[roles[[role]]]] else NULL
   i <- seq_along(numeros)
-  categorie <- function(x)
-    if (is.factor(x)) structure(unclass(x)[i], levels = levels(x),
-                                class = if (is.ordered(x)) c("ordered", "factor") else "factor")
-    else x[i]
   observations <- data.frame(row.names = seq_along(i))
-  if ("sexe" %in% names(roles)) observations$sexe <- categorie(col("sexe"))
-  if ("segment" %in% segmentation) observations$segment <- categorie(col("segment"))
+  if ("sexe" %in% names(roles)) observations$sexe <- sous_indicer_categorie(col("sexe"), i)
+  if ("segment" %in% segmentation) observations$segment <- sous_indicer_categorie(col("segment"), i)
   observations$age <- as.numeric(col("age"))
   if ("annee" %in% names(roles)) observations$annee <- as.numeric(col("annee"))
   declarees <- intersect(c("exposition_centrale", "exposition_initiale"), names(roles))
@@ -1119,9 +1159,13 @@ observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, 
     poids <- data.frame(motif = character(0), cellules = integer(0), cellules_sommees = integer(0),
                         evenements = numeric(0), exposition_centrale = numeric(0),
                         exposition_initiale = numeric(0), stringsAsFactors = FALSE)
+  # Tolérance relative par cellule ; pas de na.rm (comportement inchangé pour NA
+  # et NaN ; les entrées infinies sont écartées en amont par les motifs, refus ou
+  # exclusion, E2.7).
+  tau <- if (deux) TOLERANCE_RELEVES_AGREGATS * pmax(abs(ei), abs(ec)) else NULL
   releves <- list(cellules = length(i),
-                  exposition_initiale_inferieure_centrale = if (deux) sum(ei < ec) else NA_integer_,
-                  complement_superieur_aux_evenements = if (deux) sum(ei - ec > observations$evenements)
+                  exposition_initiale_inferieure_centrale = if (deux) sum(ec - ei > tau) else NA_integer_,
+                  complement_superieur_aux_evenements = if (deux) sum(ei - ec - observations$evenements > tau)
                                                         else NA_integer_,
                   poids_exclusions = poids)
   list(unite = "non_determinee", observations = observations, observation_des_lignes = i, releves = releves)
@@ -1265,13 +1309,8 @@ evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
   m$inventaire_hors_grille <- inv & !is.na(dinv) & !(dinv %in% grille)
   m$inventaire_avec_sortie <- inv & (!is.na(sor) | !is.na(cause))
   m$naissance_apres_inventaire <- inv & vrai(nai > dinv)
-  # Clé exacte (identifiant, date) : rangs des valeurs distinctes (match(),
-  # égalité exacte), comme cellule_dupliquee.
-  cle <- inv & !is.na(id) & !is.na(dinv)
-  rangs <- paste(match(id, unique(id)), match(dinv, unique(dinv)), sep = "\r")
-  rangs[!cle] <- NA
-  m$inventaire_duplique <- cle & (duplicated(rangs, incomparables = NA) |
-                                  duplicated(rangs, fromLast = TRUE, incomparables = NA))
+  # Clé exacte (identifiant, date), comme cellule_dupliquee (lignes_cle_dupliquee()).
+  m$inventaire_duplique <- lignes_cle_dupliquee(list(id, dinv), inv & !is.na(id) & !is.na(dinv))
   m$sortie_manquante <- evt & is.na(sor) & !is.na(cause) & cause != "en_cours"
   m$cause_manquante <- evt & is.na(cause)
   m$cause_hors_modalites <- evt & !is.na(cause) & !(cause %in% MODALITES_CAUSE)
@@ -1416,15 +1455,11 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
   premiere <- match(seq_len(G), g)
   i <- premiere[o]
   as_date <- function(j) structure(as.numeric(j), class = "Date")
-  categorie <- function(x)
-    if (is.factor(x)) structure(unclass(x)[i], levels = levels(x),
-                                class = if (is.ordered(x)) c("ordered", "factor") else "factor")
-    else x[i]
   observations <- data.frame(unite = id[i], ligne = numeros[i], nb_lignes = tabulate(g, nbins = G)[o],
                              stringsAsFactors = FALSE, row.names = NULL)
   observations$date_naissance <- col("date_naissance")[i]
-  if ("sexe" %in% names(roles)) observations$sexe <- categorie(col("sexe"))
-  if ("segment" %in% segmentation) observations$segment <- categorie(col("segment"))
+  if ("sexe" %in% names(roles)) observations$sexe <- sous_indicer_categorie(col("sexe"), i)
+  if ("segment" %in% segmentation) observations$segment <- sous_indicer_categorie(col("segment"), i)
   observations$premier_inventaire <- fu$f[o]
   observations$dernier_inventaire <- fu$l[o]
   observations$date_sortie <- as_date(fu$s_min[o])
@@ -1834,20 +1869,25 @@ UNITE_AGREGAT <- c(
 
 # Avertissements des relevés de la recette `agregats` (§ 2 et § 6.3), sur les
 # cellules conservées, quand les deux expositions sont déclarées : E^i < E^c,
-# E^i - E^c > D. Relevés non bloquants, jamais un refus. Rend `avert` augmenté.
+# E^i - E^c > D, au-delà de la tolérance relative TOLERANCE_RELEVES_AGREGATS
+# (#195). Relevés non bloquants, jamais un refus. Rend `avert` augmenté.
 avertir_releves_agregats <- function(avert, releves) {
+  tol <- sprintf("%g", TOLERANCE_RELEVES_AGREGATS)  # le texte suit la constante
   k <- releves$exposition_initiale_inferieure_centrale
   if (!is.na(k) && k > 0L)
     avert <- avertir(avert, "donnees", "exposition_initiale_inferieure_centrale",
                      sprintf(paste("Relevé : %d cellule(s) dont l'exposition initiale déclarée est inférieure à",
-                                   "l'exposition centrale déclarée (définition « cellule » : 0 <= E^i - E^c <= D)."), k),
+                                   "l'exposition centrale déclarée, au-delà d'une tolérance d'arrondi de %s fois la plus",
+                                   "grande des deux expositions déclarées de la cellule (définition « cellule » :",
+                                   "0 <= E^i - E^c <= D)."), k, tol),
                      k)
   k <- releves$complement_superieur_aux_evenements
   if (!is.na(k) && k > 0L)
     avert <- avertir(avert, "donnees", "complement_superieur_aux_evenements",
                      sprintf(paste("Relevé : %d cellule(s) dont l'écart entre exposition initiale et exposition",
-                                   "centrale déclarées dépasse le nombre d'événements (définition « cellule » :",
-                                   "0 <= E^i - E^c <= D)."), k),
+                                   "centrale déclarées dépasse le nombre d'événements, au-delà d'une tolérance d'arrondi de",
+                                   "%s fois la plus grande des deux expositions déclarées de la cellule (définition",
+                                   "« cellule » : 0 <= E^i - E^c <= D)."), k, tol),
                      k)
   avert
 }
@@ -1974,18 +2014,9 @@ construire_observations <- function(lignes, numeros, roles, segmentation, p) {
     composante_ligne <- seq_along(i)
   }
   # Sexe s'il est déclaré ; segment s'il est employé par la segmentation ;
-  # type d'origine conservé. Un facteur est recopié sous forme normalisée
-  # (#67, M72) : classe ramenée à factor, ou ordered s'il est ordonné ;
-  # niveaux tels quels (ordre et niveaux inutilisés compris) ; tout autre
-  # attribut (contrasts, sous-classe…) retiré, que l'empreinte du résultat
-  # refuserait. Chaîne ou entier : sous-indiçage [i], qui retire les
-  # attributs de colonne (M71, Q4).
-  categorie <- function(x)
-    if (is.factor(x)) structure(unclass(x)[i], levels = levels(x),
-                                class = if (is.ordered(x)) c("ordered", "factor") else "factor")
-    else x[i]
-  if ("sexe" %in% names(roles)) observations$sexe <- categorie(col("sexe"))
-  if ("segment" %in% segmentation) observations$segment <- categorie(col("segment"))
+  # type d'origine conservé (sous_indicer_categorie()).
+  if ("sexe" %in% names(roles)) observations$sexe <- sous_indicer_categorie(col("sexe"), i)
+  if ("segment" %in% segmentation) observations$segment <- sous_indicer_categorie(col("segment"), i)
   if (unite == "tete") {
     observations$debut <- as_date(fusion$debut); observations$fin <- as_date(fusion$fin)
     observations$cause <- cause_k

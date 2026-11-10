@@ -301,6 +301,30 @@ verifier("deduire_recette(), catalogue injecté : discriminants de deux recettes
     identical(r$details, list(recette = c("lignes_dates_completes", "agregats_test"),
                               role = c("date_entree", "age", "evenements"), colonne = c("e", "a", "ev")))
 })
+# Matrice injectée (#196, point 1) : une matrice de test qui porte les lignes
+# de la recette fictive du catalogue injecté (étape exposition non admise sous
+# un motif de test) ; sans elle, la recette injectée reçoit une matrice vide.
+R_AGR <- c(age = "a", evenements = "ev", exposition_initiale = "x")
+MAT_INJ <- rbind(MAT[MAT$recette == "lignes_dates_completes", ],
+                 data.frame(recette = "agregats_test", etape = c("donnees", "exposition"), estimateur = NA_character_,
+                            admis = c("oui", "non"), role_requis = NA_character_, motif = c(NA, "motif_injecte"),
+                            stringsAsFactors = FALSE))
+verifier("deduire_recette(), catalogue et matrice injectés : matrice de la recette = lignes de la matrice injectée (valeur écrite à la main) ; matrice par défaut sous un catalogue injecté : 0 ligne ; les lignes de la recette des lignes ne sont pas reprises", {
+  r <- tablexp:::deduire_recette(R_AGR, CAT2, MAT_INJ)
+  m <- data.frame(etape = c("donnees", "exposition"), estimateur = NA_character_, admis = c("oui", "non"),
+                  role_requis = NA_character_, motif = c(NA, "motif_injecte"), stringsAsFactors = FALSE)
+  identical(r$recette, "agregats_test") && identical(r$matrice, m) &&
+    nrow(tablexp:::deduire_recette(R_AGR, CAT2)$matrice) == 0L &&
+    identical(tablexp:::deduire_recette(R0, CAT2, MAT_INJ)$matrice, tablexp:::deduire_recette(R0)$matrice)
+})
+verifier("controler_matrice_recette(), voie de la matrice par injection : recette déduite sous le catalogue et la matrice injectés -> refus sous le motif de la ligne injectée (étape exposition non admise), module donnees", {
+  rec <- tablexp:::deduire_recette(R_AGR, CAT2, MAT_INJ)
+  r <- rf(tablexp:::controler_matrice_recette(rec, R_AGR, plan_type(), NULL, NULL))
+  !is.null(r) && identical(r$module, "donnees") && identical(r$motif, "motif_injecte") &&
+    identical(conditionMessage(r), paste("Sous la recette « agregats_test », l'étape « exposition » n'est pas admise ;",
+                                         "la construction est refusée.")) &&
+    identical(r$details, list(recette = "agregats_test", etape = "exposition", estimateur = NA_character_))
+})
 
 # --- ordre des refus de controler_roles() (ADR 0016, point 2.2) --------------
 

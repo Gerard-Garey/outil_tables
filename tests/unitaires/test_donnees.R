@@ -1087,3 +1087,25 @@ d <- avec(naissance = J(c(-712457, as.numeric(D("1960-07-01")), as.numeric(D("19
                           as.numeric(D("1945-06-06")))))
 verifier("naissance en l'an 19 (0019-05-12) : relevée par age_aberrant (ligne 1), non refusée comme date",
          identical(refus(prep(d = d))$details$lignes$age_aberrant, 1L))
+
+# --- assistants du module (#196, points 4 et 5) --------------------------------
+
+verifier("lignes_cle_dupliquee() : toutes les lignes d'une même clé exacte (deux colonnes, valeurs distinctes mais proches non confondues), lignes incomplètes jamais en cause, aucune ligne -> logique(0) (valeur écrite à la main)", {
+  f <- tablexp:::lignes_cle_dupliquee
+  id <- c("a", "a", "b", "a", "b", NA, NA)
+  v <- c(1, 1, 1, 1 + 1e-12, 1, 1, 1)
+  identical(f(list(id, v), !is.na(id)), c(TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE)) &&
+    identical(f(list(id, v), !is.na(id) & seq_along(id) != 2L), c(FALSE, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE)) &&
+    identical(f(list(factor(c("x", "y", "x")), c(1, 2, 1)), rep(TRUE, 3L)), c(TRUE, FALSE, TRUE)) &&
+    identical(f(list(character(0), numeric(0)), logical(0)), logical(0))
+})
+verifier("sous_indicer_categorie() : chaîne et entier sous-indicés sans attribut ; facteur recopié sous forme normalisée (classe factor ou ordered, niveaux et ordre inchangés, niveau inutilisé conservé, autre attribut retiré) (valeur écrite à la main)", {
+  f <- tablexp:::sous_indicer_categorie
+  fa <- factor(c("b", "a", "b"), levels = c("a", "b", "c")); attr(fa, "contrasts") <- "x"
+  fo <- factor(c("b", "a", "b"), levels = c("b", "a", "c"), ordered = TRUE)
+  ca <- structure(c("H", "F", "H"), label = "sexe")
+  identical(f(ca, c(3L, 1L)), c("H", "H")) && identical(f(c(2L, 1L, 3L), 2:3), c(1L, 3L)) &&
+    identical(f(fa, c(2L, 1L)), factor(c("a", "b"), levels = c("a", "b", "c"))) &&
+    identical(f(fo, 1:2), factor(c("b", "a"), levels = c("b", "a", "c"), ordered = TRUE)) &&
+    identical(class(f(fo, 1:2)), c("ordered", "factor"))
+})

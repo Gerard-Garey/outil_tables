@@ -3004,6 +3004,31 @@ méthode qui l'introduit, dans la constante \code{ADMIS}, vide à cette date &
 ADR 0002, point 3 et A8~; M44 \\
 \code{graphe\_modules.R} & graphe d'appels autorisés et appels dynamiques
 interdits (section~\ref{sec:graphe}) & ADR 0007, points 2.1 à 2.3 \\
+\code{recettes\_invariant.R} & aucun module ne teste un nom de recette
+(section~\ref{sec:recettes})~: fichiers de \code{R/} lus par \code{parse()}
+et \code{utils::getParseData()}, sans charger \code{tablexp}~; noms des
+recettes lus dans l'arbre de \code{R/donnees.R}, à la colonne
+\code{recette} de \code{CATALOGUE\_RECETTES}, jamais recopiés (absents ou
+non littéraux~: écart)~; trois règles~: sujet d'un \code{switch()} terminé
+par \code{\$recette} ou \code{[["recette"]]} (R1), étiquette de cas d'un
+\code{switch()} égale à un nom de recette (R2), opérande de \code{==},
+\code{!=} ou \code{\%in\%}, ou argument d'\code{identical()}, de
+\code{match()} ou d'\code{is.element()}, égal à un nom de recette ou
+terminé par \code{\$recette} ou \code{[["recette"]]} (R3)~; occurrences
+admises par fonction englobante dans cinq lieux, liste fermée~:
+\code{R/donnees.R} entier (R1 à R3), l'aiguillage
+\code{exposition\_fenetres()} (R1, R2), la recherche par clé de
+\code{controler\_parametres\_recette()} (R3), les comparaisons sur le nom
+de forme du simulateur de \code{controler\_forme()} et de
+\code{simuler\_portefeuille()} (R3)~; une admission devenue inutile est un
+écart. \textbf{Limites}, écrites dans l'en-tête du script~: le contrôle est
+syntaxique, et une indirection par variable, le pipe natif, un opérateur
+écrit en appel, un argument nommé dans \code{[[} et les fonctions hors de
+la liste de R3 (\code{grepl()}, \code{startsWith()}, \code{all.equal()}…)
+lui échappent~; l'audit reste en appui. Témoins dans
+\code{test\_controles.R}~; étape «~Invariant des recettes (ADR 0016,
+point 4.4)~» du job «~Tests (R 4.3.3)~», hors liste des batteries &
+ADR 0016, point 4.4 et annotation du 10/11/2026~; M380~; issue~\#194 \\
 \code{graines.R} & aucune graine littérale d'au moins $1\,000$ réemployée
 hors de la liste blanche \code{graines\_admises.csv} et de l'héritage figé
 \code{HERITAGE\_176}, ensembles de fichiers exacts~; aucune constante
@@ -3445,8 +3470,10 @@ la recette sous laquelle il est requis et hors de laquelle il est interdit
 (seul cas~: \code{entree\_entre\_inventaires}, recette
 \code{stocks\_successifs}). \code{valider\_plan()}, qui ne connaît pas
 les rôles, n'exige que les paramètres sans recette et contrôle la forme et
-la valeur d'un paramètre conditionnel présent
+la valeur d'un paramètre conditionnel présent, valeur \code{NULL} comprise
 (\code{entree\_entre\_inventaires\_invalide}, module \code{exposition})~;
+aucune valeur du plan n'y est évaluée, si bien qu'un objet de langage
+est refusé comme toute valeur de mauvais type (issue~\#196)~;
 après la déduction de la recette, \code{controler\_parametres\_recette()}
 refuse un paramètre conditionnel absent sous sa recette
 (\code{parametre\_manquant}) ou présent sous une autre
@@ -5502,16 +5529,59 @@ initiale, $0 \le E^i - E^c \le D$ (section~\ref{sec:exposition-cellules})~:
 $E^i < E^c$) et \code{complement\_superieur\_aux\_evenements} (cellules
 où $E^i - E^c > D$)~; ils valent \code{NA} si une seule exposition est
 déclarée. Chacun donne, s'il est positif, un avertissement de même code
-(\code{avertir\_releves\_agregats()}), jamais un refus. Les deux
-comparaisons sont faites en arithmétique flottante, \textbf{sans
-tolérance}~: une cellule dont les valeurs décimales vérifient exactement
-$E^i - E^c = D$ peut être relevée, la différence calculée en double
-dépassant $D$ d'un arrondi (\emph{constat}, R~4.3.3~: $E^c = 1{,}14$,
-$E^i = 2{,}14$, $D = 1$ donnent une différence écrite
-\code{1.0000000000000002} en \code{\%.17g}, et la cellule est relevée
-par \code{construire\_table()}). Le relevé signale une incohérence
-possible, à vérifier dans la base~; il n'en prouve aucune. Une tolérance
-d'arrondi est proposée par l'issue~\#195.
+(\code{avertir\_releves\_agregats()}), jamais un refus.
+
+\textbf{Tolérance d'arrondi} (issue~\#195, décision M381). Les deux
+comparaisons sont faites en arithmétique flottante, à une
+\emph{tolérance relative} $\tau$ propre à chaque cellule~:
+\[
+  \tau = \rho \, \max\bigl(|E^i|, |E^c|\bigr), \qquad \rho = 10^{-10},
+\]
+où $\rho$ est la constante \code{TOLERANCE\_RELEVES\_AGREGATS} de
+\code{R/donnees.R}, sans plancher~; une cellule est relevée si $E^c - E^i > \tau$ (premier
+relevé) ou si $(E^i - E^c) - D > \tau$ (second relevé), les différences
+étant calculées en double~; pour $E^i = E^c = 0$, $\tau = 0$ et rien n'est
+relevé. La tolérance est une \emph{approximation numérique}~: elle ne
+couvre que deux sources d'écart sans cause dans la base. (i) La conversion
+d'une valeur décimale en double, d'erreur relative au plus
+$u = 2^{-53}$ (arrondi au plus proche). (ii) Les sommations en amont,
+quand $E^i$ et $E^c$ d'une cellule résultent chacune d'une somme de
+contributions, calculées par deux chemins distincts~: l'erreur d'une somme récursive
+de $n$ termes est bornée, au premier ordre en $u$, par
+$(n-1)\,u \sum_k |x_k|$ (N.\,J.~Higham, \emph{Accuracy and Stability of
+Numerical Algorithms}, 2\textsuperscript{e}~éd., SIAM, 2002, chap.~4,
+«~Summation~»)~; les contributions à une exposition étant positives,
+$\sum_k |x_k|$ est l'exposition elle-même, et l'erreur qui en résulte sur
+la différence $E^i - E^c$ reste au plus $2(n-1)\,u \max(E^i, E^c)$,
+inférieur à $\tau$ jusqu'à environ $4{,}5 \cdot 10^5$~termes par somme
+($n - 1 \le 10^{-10}/(2u)$). Au-delà, cette borne du pire cas ne garantit
+plus qu'un écart d'arrondi soit absorbé. C'est la raison du choix de
+$\rho = 10^{-10}$ plutôt que de deux fois l'epsilon machine
+($\rho = 2^{-51}$, proposé par l'issue~\#195), qui ne couvrirait que la
+conversion (i) et l'arrondi de la soustraction~; une tolérance absolue
+ne suivrait pas la taille de la cellule. Un écart réel d'un jour, soit au
+moins $1/366$~d'année quelle que soit la convention de décompte, reste
+relevé tant que la plus grande des deux expositions de la cellule est
+inférieure à $(1/366)/\rho$, soit environ $2{,}7 \cdot 10^7$~années. Les
+comptages ne peuvent que baisser par rapport à la comparaison sans
+tolérance (\emph{résultat exact}~: $\tau \ge 0$, la différence intérieure
+$E^i - E^c$ du second relevé est la même double qu'avant, et une différence
+calculée en double a le signe de la différence exacte de ses deux
+opérandes, l'arrondi au plus proche avec dénormalisés ne rendant zéro que
+pour deux opérandes égaux). Exemple~: $E^c = 1{,}14$, $E^i = 2{,}14$,
+$D = 1$ vérifient exactement $E^i - E^c = D$ en décimal, mais la
+différence calculée en double s'écrit \code{1.0000000000000002} en
+\code{\%.17g}, et dépasse $D$ de $2{,}2 \cdot 10^{-16}$~; avec
+$\tau = 2{,}14 \cdot 10^{-10}$, la cellule n'est plus relevée par
+\code{construire\_table()}, alors qu'elle l'était sans tolérance. Le texte
+des deux avertissements mentionne la tolérance~: «~au-delà d'une tolérance
+d'arrondi de 1e-10 fois la plus grande des deux expositions déclarées de
+la cellule~». La constante n'est ni restituée dans les relevés ni
+inscrite dans la fiche de construction, et n'appartient pas à la table
+\code{TOLERANCES} des comparaisons aux références de non-régression
+(tableau~\ref{tab:tolerances}~; ADR 0009). Le relevé signale une
+incohérence possible, à vérifier dans la base~; il n'en prouve aucune.
+
 Le relevé \code{poids\_exclusions} (spécification M327, Q6) restitue,
 pour chaque motif déclaré en exclusion, dans l'ordre du plan~: le nombre de
 cellules exclues sous le motif (\code{cellules}), puis, parmi elles, le
@@ -5608,8 +5678,8 @@ est recopié par sous-indiçage (première ligne de chaque composante en unité
 tête, chaque ligne conservée en unité contrat), dans les deux unités, ce qui
 garde valeurs, type et classe et retire les attributs de colonne de
 l'entrée (par exemple \code{label}). Un facteur \code{sexe} ou
-\code{segment} est reconstruit par la fonction locale \code{categorie} de
-\code{preparer\_donnees()}~: codes sous-indicés, niveaux tels quels (ordre et
+\code{segment} est reconstruit par \code{sous\_indicer\_categorie()}
+(module \code{donnees}, commune aux trois recettes~; issue~\#196)~: codes sous-indicés, niveaux tels quels (ordre et
 niveaux inutilisés compris), classe ramenée à \code{factor}, ou à
 \code{c("ordered", "factor")} s'il est ordonné~; \code{contrasts}, sous-classe
 et tout autre attribut sont retirés. La table des observations porte des
@@ -5804,7 +5874,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & recettes, rôles requis absents, groupes non couverts & message du refus \code{aucune\_recette}, recette par recette \\
 \catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
-\catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue (par défaut, celui du module) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de matrice~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
+\catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue et matrice (par défaut, ceux du module~; injection en test) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de la matrice reçue (aucune ligne pour une recette absente de cette matrice~; issue~\#196)~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
 \catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique, convention validée (\code{NULL} sans étape \code{exposition}), valeurs validées \code{p} & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis règles qui ne tiennent pas dans une ligne (fonction de la ligne suivante), puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
 \catalogue{fonctions-donnees}{regles\_conditionnelles\_recette()} & interne & recette, rôles, étapes du plan, convention, valeurs validées \code{p} & règles de la matrice qui ne tiennent pas dans une ligne~; sous \code{agregats}, dans cet ordre, refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle \code{annee}) et \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire} (binomial avec le rôle \code{annee} sous la convention retenue \code{dernier\_anniversaire})~; sous \code{stocks\_successifs}, refus \code{identifiants\_concurrents} puis \code{identifiant\_inadapte}~; aucune sous \code{lignes\_dates\_completes}~; rend \code{NULL} \\
@@ -5817,8 +5887,11 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
 \catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
 \catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation, \code{lignes\_tete} (\code{NULL} par défaut) & numéros des lignes porteuses de chaque motif~; \code{lignes\_tete} désigne les lignes où les motifs de tête sont évalués (section~\ref{sec:controles-donnees}~; issue~\#69) \\
+\catalogue{fonctions-donnees}{lignes\_cle\_dupliquee()} & interne & liste de vecteurs de clé de même longueur, indicateur par ligne des lignes retenues pour la comparaison & vrai pour chaque ligne retenue dont la clé, comparée exactement (rang de chaque valeur parmi les valeurs distinctes de sa colonne), est portée par une autre ligne retenue~; toutes les lignes du groupe sont marquées~; règle commune des motifs \code{cellule\_dupliquee} et \code{inventaire\_duplique} (issue~\#196) \\
+\catalogue{fonctions-donnees}{sous\_indicer\_categorie()} & interne & colonne de catégorie (sexe, segment), indices & colonne sous-indicée, type d'origine conservé~; un facteur est reconstruit sous forme normalisée (section~\ref{sec:unite-observation})~; partagée par la construction des observations des trois recettes (issue~\#196) \\
 \catalogue{fonctions-donnees}{evaluer\_motifs\_agregats()} & interne & données, rôles, valeurs validées \code{p} & numéros des lignes porteuses de chaque motif de \code{MOTIFS\_LIGNES\_AGREGATS}, évaluation exhaustive sans court-circuit \\
-\catalogue{fonctions-donnees}{observations\_agregats()} & interne & lignes retenues, leurs numéros, rôles, segmentation, motifs, exclusions, nombre de lignes reçues, données & une observation par cellule conservée, sans complétion, unité d'observation \code{non\_determinee}~; relevés (cellules conservées, cohérence des deux expositions déclarées ensemble, poids des cellules exclues par motif déclaré) \\
+\catalogue{fonctions-donnees}{TOLERANCE\_RELEVES\_AGREGATS} & constante & --- & $10^{-10}$~: tolérance relative $\rho$ des deux relevés de cohérence des expositions de la recette \code{agregats}, appliquée à la plus grande des deux expositions déclarées de la cellule, sans plancher (approximation numérique~; section~\ref{sec:unite-observation}, «~Relevés et avertissements~», issue~\#195)~; hors \code{TOLERANCES} (ADR 0009), ni restituée dans les relevés ni inscrite dans la fiche \\
+\catalogue{fonctions-donnees}{observations\_agregats()} & interne & lignes retenues, leurs numéros, rôles, segmentation, motifs, exclusions, nombre de lignes reçues, données & une observation par cellule conservée, sans complétion, unité d'observation \code{non\_determinee}~; relevés (cellules conservées, cohérence des deux expositions déclarées ensemble, comptée au-delà de la tolérance \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, poids des cellules exclues par motif déclaré) \\
 \catalogue{fonctions-donnees}{identifiant\_stocks()} & interne & rôles & identifiant d'unité déclaré, \code{id\_tete} ou \code{id\_contrat}~; erreur de programmation s'il n'y en a pas exactement un \\
 \catalogue{fonctions-donnees}{faits\_unites\_stocks()} & interne & unité de chaque ligne, lignes d'inventaire et d'événement, indice dans la grille, date et cause de sortie, nombre d'unités & par unité~: indices $f$ et $l$ du premier et du dernier inventaire, nombres de lignes d'inventaire et d'événement, plus petite et plus grande date de sortie, cause du premier événement \\
 \catalogue{fonctions-donnees}{evaluer\_motifs\_stocks()} & interne & données, rôles, valeurs validées \code{p} (dont la grille), segmentation & numéros des lignes porteuses de chaque motif (ligne, puis unité sur les unités exemptes de motif de ligne), lignes de propagation et nombre d'unités concernées (section~\ref{sec:controles-donnees}) \\
@@ -5827,7 +5900,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
 \catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat) \\
-\catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements})~; jamais un refus \\
+\catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements}), au-delà de la tolérance relative \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, que le texte de l'avertissement mentionne~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_stocks()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{stocks\_successifs}~: \code{entrees\_entre\_inventaires} (unités E), \code{evenements\_hors\_fenetre} (unités HF)~; le relevé des unités ES est averti par l'étape \code{exposition}~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_lignes()} & interne & avertissements, relevés, unité d'observation & avertissements des relevés de la recette \code{lignes\_dates\_completes} (fusion par tête, fenêtres vides, observations après décès hors période)~; extraite de \code{preparer\_donnees()} à résultats identiques \\
 \catalogue{fonctions-donnees}{construire\_observations()} & interne & lignes retenues, leurs numéros dans l'entrée, rôles, segmentation, valeurs des paramètres & unité d'observation, observations (fusion par tête en unité tête), correspondance des lignes aux observations, relevés~; extraite de \code{preparer\_donnees()} à résultats identiques, seule implémentation de la fusion, rappelée par l'étape \code{importance\_exclusions} (section~\ref{sec:unite-observation}~; issue~\#69) \\
@@ -5908,7 +5981,19 @@ l'emploient (\code{donnees}, \code{exposition}, \code{brut},
 sa convention native et ses rôles requis qu'elle rend, avec la convention
 que rend \code{resoudre\_convention()}~; aucune fonction d'étape ne les
 recalcule, et la fiche porte la même recette (une seule source~; issue~\#82,
-section~\ref{sec:execution}). Après la convention,
+section~\ref{sec:execution}). Hors du module \code{donnees} et de
+l'aiguillage d'\code{exposition\_fenetres()}, aucun module ne teste le nom
+de la recette~: il lit une propriété de la recette (forme rendue au noyau,
+ligne de la matrice, colonnes présentes de la table d'exposition), et ne
+lit ce nom que pour l'inscrire (paramètres retenus, fiche, messages~; ADR
+0016, point~4.4). Deux formes, qui ne sont pas des branches propres à une
+recette, sont admises en outre~: la recherche par clé de
+\code{controler\_parametres\_recette()} dans la colonne \code{recette} du
+catalogue des paramètres, et les comparaisons du simulateur sur le nom de
+sa forme, dont les valeurs coïncident avec des noms de recettes (ADR 0016,
+annotations du 09/11/2026 et du 10/11/2026). L'invariant est contrôlé
+mécaniquement par \code{tests/controles/recettes\_invariant.R}
+(tableau~\ref{tab:scripts-controle}). Après la convention,
 \code{controler\_matrice\_recette()} vérifie que chaque étape du plan, et
 chaque estimateur de l'étape \code{brut}, est admis sous la recette retenue
 (matrice \code{MATRICE\_RECETTES}~; refus sous le motif de la ligne de
@@ -6338,8 +6423,8 @@ zéro ni en \code{NA}, et l'étape ne rend pas d'objet
 sous cette recette. L'exposition initiale reçue est présumée de définition
 «~cellule~»~: $E^i = E^c$ plus, pour chaque événement de la transition, le
 complément jusqu'à la fin de la cellule, aucun complément pour une sortie
-concurrente, soit $0 \le E^i - E^c \le D$ (relevés de cohérence de
-l'étape \code{donnees}, section~\ref{sec:unite-observation}, «~Relevés et
+concurrente, soit $0 \le E^i - E^c \le D$ (relevés de cohérence, à une
+tolérance d'arrondi près, de l'étape \code{donnees}, section~\ref{sec:unite-observation}, «~Relevés et
 avertissements~»)~; aucune exposition n'est déduite de l'autre.
 
 \medskip
@@ -6538,7 +6623,18 @@ lecture~:\par}
     force de mortalité avec l'âge pendant l'intervalle (terme d'ordre
     $\mu'_x L^3$~; hypothèse, non mesurée par le script)~; le biais propre
     sous-estime les taux et domine l'erreur d'estimation dès des
-    portefeuilles de taille courante~;
+    portefeuilles de taille courante. Aux petits effectifs par cellule de
+    ce scénario, l'écart au niveau nominal de la couverture des intervalles
+    de Poisson, exact et asymptotique, sous les trois lectures est
+    compatible avec la discrétisation, c'est-à-dire avec la couverture
+    calculée sous l'approximation de Poisson aux expositions réalisées,
+    laquelle intègre, sous \code{milieu}, la sur-exposition de cellule qui
+    réduit le manque dominant de l'intervalle asymptotique (constat de
+    simulation, lecture calibrée sur des jeux non vus au choix de la
+    règle, \code{tests/mesures/constat\_couverture\_s2.R}, hors CI, âges de
+    50 à 70~ans, 2\,000~jeux dont les 1\,000 de la PR~\#188~; passage
+    consigné au commentaire de la PR~\#204 du 10/11/2026, valeurs non
+    reproduites ici, E3.4~; Kaplan-Meier non couvert)~;
   \item \emph{entrées concentrées au lendemain d'un inventaire} (S4)~: par
     construction, un entrant qui survit à son premier inventaire reçoit
     $\hat a - e = 181$~jours et ne garde que 184 de ses 365~jours
@@ -6619,8 +6715,11 @@ attendu de nature nommée~: identité exacte des résultats des étapes
 \code{validation} calculés sur des agrégats formés depuis la table
 d'exposition d'une construction en lignes et de ceux de cette construction
 (C1), d'une permutation des lignes sans somme (C6) et de sommes dyadiques
-(C5)~; valeurs écrites à la main pour les motifs (C3), les relevés (C4), les
-refus et leurs messages (C2, C7, C8) et les champs de la fiche (C9)~;
+(C5)~; valeurs écrites à la main pour les motifs (C3), les relevés (C4, dont
+leur tolérance d'arrondi~: dérive d'arrondi présente puis absorbée, écart
+d'un jour relevé à $10^5$~années dans les deux sens, tolérance relative et
+non absolue, rapportée à la plus grande et non à la plus petite des deux
+expositions), les refus et leurs messages (C2, C7, C8) et les champs de la fiche (C9)~;
 contre-exemple écrit à la main de deux jeux de lignes aux mêmes agrégats et
 aux estimations de Kaplan-Meier 0,5 et~1, qui motive le refus de cet
 estimateur sous la recette (C8)~; forme agrégats du simulateur (C10,
@@ -7011,7 +7110,8 @@ l'arrondi (approximation numérique).
     ne vaut donc que si le producteur a bien formé $E^i$ selon cette
     définition~; les relevés de cohérence de l'étape \code{donnees}
     (section~\ref{sec:unite-observation}, «~Relevés et avertissements~»)
-    n'en vérifient que les bornes $0 \le E^i - E^c \le D$. Une seule
+    n'en vérifient que les bornes $0 \le E^i - E^c \le D$, à une tolérance
+    d'arrondi près. Une seule
     fonction donne $E^i$ et sa définition selon la forme
     (\code{exposition\_initiale\_brut()}~; ADR 0016, point 4.5).
   \item \textbf{Pourquoi la définition «~cellule~»} (spécification, A.2~;
@@ -11704,7 +11804,7 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     (\code{serialisation\_impossible}, converti en erreur de programmation).
     Aucune construction valide n'est ainsi refusée, par construction~: les
     facteurs de la table des observations sont reconstruits par
-    \code{categorie}, qui ne produit que ces deux classes (section~\ref{sec:unite-observation}).
+    \code{sous\_indicer\_categorie()}, qui ne produit que ces deux classes (section~\ref{sec:unite-observation}).
     Les niveaux ne sont pas écrits, et le libellé de type est \code{factor}
     pour un facteur ordonné ou non (tableau~\ref{tab:types-canoniques})~:
     deux facteurs aux mêmes libellés et aux niveaux différents, ou un

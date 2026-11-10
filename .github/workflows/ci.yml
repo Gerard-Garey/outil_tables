@@ -121,6 +121,12 @@ jobs:
       - name: Ordre des modules
         if: ${{ !cancelled() }}
         run: Rscript tests/controles/graphe_modules.R
+      # Issue #194 (ADR 0016, point 4.4 ; M380) : aucun module ne teste un nom
+      # de recette. Hors liste des batteries de CLAUDE.md : le nom ne commence
+      # pas par « Batterie : ».
+      - name: Invariant des recettes (ADR 0016, point 4.4)
+        if: ${{ !cancelled() }}
+        run: Rscript tests/controles/recettes_invariant.R
       - name: Unicité des graines
         if: ${{ !cancelled() }}
         run: Rscript tests/controles/graines.R

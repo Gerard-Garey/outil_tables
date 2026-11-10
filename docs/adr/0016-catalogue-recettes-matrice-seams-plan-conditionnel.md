@@ -236,3 +236,37 @@ Rédigée par `architect` à l'étape (A) de la branche `claude/recette-stocks-s
 **Effet sur les résultats : aucun.**
 
 Issues : #169, #180, #182, #194. Décisions M329, M331, M335, M339. Branche `claude/recette-stocks-successifs`, PR #188.
+
+## Annotation du 10 novembre 2026 — point 4.4 : portée du contrôle mécanique de l'invariant, lieux admis, clôture de l'annotation du 09/11/2026, (f) (#194, M380)
+
+Rédigée par `architect` à l'étape (0')(a) de la branche `claude/recettes-suites` (B17, PR #204), tête `23beccd`, sur l'avis de forme (0')(a) relatif à #194 **accepté par le mainteneur le 10/11/2026 (point P1 du § 1.18 de la feuille de route ; décision M380)**, qui admet aussi les comparaisons sur `forme$nom` du simulateur. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne relevés à `23beccd` par `git grep -n … HEAD -- R/` ; le nom de la fonction fait foi (M77, (b)).
+
+**(a) Clôture de l'annotation du 09/11/2026, (f).** Les comparaisons du module `simulation` sur le nom de **forme** du simulateur sont **admises** : `nom == "agregats"` et `nom == "stocks_successifs"` dans `controler_forme()` (`R/simulation.R:907`, `:917`, où `nom <- forme[["nom"]]`), `ctl_forme$nom == "agregats"` dans `simuler_portefeuille()` (`R/simulation.R:1326`). Elles portent sur la forme du jeu simulé (ADR 0003, point 9, mention du 08/11/2026), non sur l'objet `recette` ; leurs valeurs coïncident avec des noms de recettes, ce qui les fait relever par la règle R3 ci-dessous : elles figurent donc dans la liste des lieux admis, par fonction. Le point 4.4 n'est pas étendu au simulateur ; il n'est pas non plus contredit.
+
+**(b) Règles du contrôle.** Le contrôle lit l'arbre d'analyse de chaque fichier de `R/` (`parse(keep.source = TRUE)`, `utils::getParseData()`, R de base, sans `codetools`) ; les noms des recettes sont lus dans cet arbre, à l'argument `recette = c(…)` de l'affectation de premier niveau `CATALOGUE_RECETTES <- data.frame(…)` (`R/donnees.R:264-265`), jamais recopiés ; leur absence, ou une valeur qui n'est pas un vecteur littéral de chaînes, fait échouer le contrôle. Trois règles :
+
+- **R1 (sujet)** : un `switch(E, …)` dont le sujet `E` se termine par `$recette` ou `[["recette"]]` ;
+- **R2 (cas)** : dans un `switch`, une étiquette de cas (symbole ou chaîne) égale à un nom de recette ;
+- **R3 (comparaison)** : un opérande de `==`, `!=`, `%in%`, ou un argument de `identical()`, `match()`, `is.element()`, qui est soit un littéral égal à un nom de recette (seul ou dans `c(…)`), soit une expression terminée par `$recette` ou `[["recette"]]`.
+
+Aucune règle ne vise un littéral isolé : les noms de recettes servent aussi de clés hors de toute comparaison (famille de rôles `agregats`, `R/donnees.R:64` ; `CHAMPS_FORMES` et `CONVENTIONS_FORMES`, `R/simulation.R:870-872` ; colonne `recette` de `PARAMETRES_ETAPES`, `R/construire_table.R:115`). Lire `recette$recette` pour l'inscrire (paramètres retenus, fiche, bilan du rejeu, messages) n'est relevé par aucune règle, conformément au point 4.4.
+
+**(c) Lieux admis : liste fermée de cinq, par fonction.**
+
+| Fichier | Fonction | Règles admises | Fondement |
+|---|---|---|---|
+| `R/donnees.R` | tout le fichier | toutes | point 4.4 (catalogue, matrice, `preparer_donnees()`) |
+| `R/exposition.R` | `exposition_fenetres()` | R1, R2 | point 4.1 ; annotation du 09/11/2026, (c) (`:457-459`) |
+| `R/construire_table.R` | `controler_parametres_recette()` | R3 | annotation du 09/11/2026, (d) (`:317`, recherche par clé dans `PARAMETRES_ETAPES$recette`) |
+| `R/simulation.R` | `controler_forme()` | R3 | (a) ci-dessus (`:907`, `:917`) |
+| `R/simulation.R` | `simuler_portefeuille()` | R3 | (a) ci-dessus (`:1326`) |
+
+L'admission se fait **par fonction englobante**, jamais par numéro de ligne. Toute occurrence d'une règle hors de ces lieux, ou d'une règle non admise dans un lieu admis, est un écart. **Une admission devenue inutile est un écart** : un lieu admis où plus aucune occurrence de ses règles n'est relevée fait échouer le contrôle, de sorte que la liste ne garde pas d'admission morte. Ajouter, retirer ou étendre un lieu admis demande une annotation du présent ADR.
+
+**(d) Limites.** Le contrôle est syntaxique : une indirection par variable (nom de recette porté par une variable intermédiaire puis comparé ou passé à un `switch` sous un autre nom) lui échappe. Il en va de même des formes suivantes, non traitées : le pipe natif (`r$recette |> switch(…)`, `"agregats" |> identical(x)`), un opérateur écrit en appel (`` `==`(r$recette, "agregats") ``), un argument nommé dans `[[` (`r[["recette", exact = TRUE]]`) et les fonctions de chaîne ou de comparaison hors de la liste fermée de R3 (`grepl`, `startsWith`, `all.equal`, etc.). L'audit reste en appui sur ces points ; ces limites sont écrites en en-tête du script (`tests/controles/recettes_invariant.R:39-47`, à `553bb62`).
+
+**(e) Mise en œuvre, livrée dans B17 (#194).** Le contrôle est le script `tests/controles/recettes_invariant.R` (commit `553bb62` ; constante des lieux admis, un écart par ligne avec `fichier:ligne`, fonction englobante, règle et jeton ; sortie 1 en cas d'écart, 0 sinon ; tests sur un arbre fabriqué dans `tests/unitaires/test_controles.R`), lancé par l'étape « Invariant des recettes (ADR 0016, point 4.4) » du job « Tests (R 4.3.3) » de `.github/workflows/ci.yml`, après l'étape « Ordre des modules » (commit `8f707fa`) ; cette étape n'est pas une batterie (son nom ne commence pas par « Batterie : »), le bloc des batteries de `CLAUDE.md` est inchangé. Le présent point (e) et le point (d) ont été mis à jour le 10/11/2026, après la livraison du script et de l'étape ; dans leur première rédaction (tête `23beccd`), le script et l'étape étaient annoncés « à venir » et le contrôle restait, jusqu'à leur fusion, le `grep` à l'audit (point 4.4). Ce qui précède remplace, pour la portée, l'« Issue proposée » des « Conséquences » (« hors `R/donnees.R` et de l'aiguillage »), que les annotations du 09/11/2026, (d) et (f), avaient déjà rendue trop étroite. Circuit 3 (`coder` → `audit`).
+
+**Effet sur les résultats : aucun.** Mesure d'approche (*vérifié*, `git grep -nE` à `23beccd` sur `R/`, hors `R/donnees.R`) : sujets de `switch` en `$recette` seulement dans `exposition_fenetres()` (`R/exposition.R:457`) ; étiquettes de cas égales à un nom de recette dans un `switch` seulement aux lignes 458-459 du même ; comparaisons avec un littéral de recette seulement à `R/simulation.R:907`, `:917`, `:1326` ; opérande en `$recette` seulement à `R/construire_table.R:317`. Aucun écart n'est donc attendu du script après admissions. *Vérifié* par exécution à `0baebd2` (`Rscript tests/controles/recettes_invariant.R`) : 3 noms de recette lus dans `CATALOGUE_RECETTES`, 30 occurrences des règles R1 à R3, toutes en lieu admis, aucune admission inutile, code de sortie 0. Ce paragraphe a été mis à jour le 10/11/2026, après cette exécution ; dans sa première rédaction (tête `23beccd`), l'absence d'écart était qualifiée d'*hypothèse* jusqu'à l'exécution du script, le `grep` n'étant pas l'analyse de l'arbre.
+
+Issues : #194. Décisions M335, M377, M380. Branche `claude/recettes-suites`, PR #204.
