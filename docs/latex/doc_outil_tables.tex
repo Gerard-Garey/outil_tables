@@ -3470,8 +3470,10 @@ la recette sous laquelle il est requis et hors de laquelle il est interdit
 (seul cas~: \code{entree\_entre\_inventaires}, recette
 \code{stocks\_successifs}). \code{valider\_plan()}, qui ne connaît pas
 les rôles, n'exige que les paramètres sans recette et contrôle la forme et
-la valeur d'un paramètre conditionnel présent
+la valeur d'un paramètre conditionnel présent, valeur \code{NULL} comprise
 (\code{entree\_entre\_inventaires\_invalide}, module \code{exposition})~;
+aucune valeur du plan n'y est évaluée, si bien qu'un objet de langage
+est refusé comme toute valeur de mauvais type (issue~\#196)~;
 après la déduction de la recette, \code{controler\_parametres\_recette()}
 refuse un paramètre conditionnel absent sous sa recette
 (\code{parametre\_manquant}) ou présent sous une autre
@@ -5633,8 +5635,8 @@ est recopié par sous-indiçage (première ligne de chaque composante en unité
 tête, chaque ligne conservée en unité contrat), dans les deux unités, ce qui
 garde valeurs, type et classe et retire les attributs de colonne de
 l'entrée (par exemple \code{label}). Un facteur \code{sexe} ou
-\code{segment} est reconstruit par la fonction locale \code{categorie} de
-\code{preparer\_donnees()}~: codes sous-indicés, niveaux tels quels (ordre et
+\code{segment} est reconstruit par \code{sous\_indicer\_categorie()}
+(module \code{donnees}, commune aux trois recettes~; issue~\#196)~: codes sous-indicés, niveaux tels quels (ordre et
 niveaux inutilisés compris), classe ramenée à \code{factor}, ou à
 \code{c("ordered", "factor")} s'il est ordonné~; \code{contrasts}, sous-classe
 et tout autre attribut sont retirés. La table des observations porte des
@@ -5829,7 +5831,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & recettes, rôles requis absents, groupes non couverts & message du refus \code{aucune\_recette}, recette par recette \\
 \catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
-\catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue (par défaut, celui du module) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de matrice~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
+\catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue et matrice (par défaut, ceux du module~; injection en test) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de la matrice reçue (aucune ligne pour une recette absente de cette matrice~; issue~\#196)~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
 \catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique, convention validée (\code{NULL} sans étape \code{exposition}), valeurs validées \code{p} & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis règles qui ne tiennent pas dans une ligne (fonction de la ligne suivante), puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
 \catalogue{fonctions-donnees}{regles\_conditionnelles\_recette()} & interne & recette, rôles, étapes du plan, convention, valeurs validées \code{p} & règles de la matrice qui ne tiennent pas dans une ligne~; sous \code{agregats}, dans cet ordre, refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle \code{annee}) et \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire} (binomial avec le rôle \code{annee} sous la convention retenue \code{dernier\_anniversaire})~; sous \code{stocks\_successifs}, refus \code{identifiants\_concurrents} puis \code{identifiant\_inadapte}~; aucune sous \code{lignes\_dates\_completes}~; rend \code{NULL} \\
@@ -5842,6 +5844,8 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{extremes\_par\_groupe()} & interne & groupes, valeurs & minimum et maximum par groupe \\
 \catalogue{fonctions-donnees}{deces\_par\_tete()} & interne & têtes, sorties, causes & premier décès de chaque tête et observation au-delà \\
 \catalogue{fonctions-donnees}{evaluer\_motifs()} & interne & données, rôles, période, borne, segmentation, \code{lignes\_tete} (\code{NULL} par défaut) & numéros des lignes porteuses de chaque motif~; \code{lignes\_tete} désigne les lignes où les motifs de tête sont évalués (section~\ref{sec:controles-donnees}~; issue~\#69) \\
+\catalogue{fonctions-donnees}{lignes\_cle\_dupliquee()} & interne & liste de vecteurs de clé de même longueur, indicateur par ligne des lignes retenues pour la comparaison & vrai pour chaque ligne retenue dont la clé, comparée exactement (rang de chaque valeur parmi les valeurs distinctes de sa colonne), est portée par une autre ligne retenue~; toutes les lignes du groupe sont marquées~; règle commune des motifs \code{cellule\_dupliquee} et \code{inventaire\_duplique} (issue~\#196) \\
+\catalogue{fonctions-donnees}{sous\_indicer\_categorie()} & interne & colonne de catégorie (sexe, segment), indices & colonne sous-indicée, type d'origine conservé~; un facteur est reconstruit sous forme normalisée (section~\ref{sec:unite-observation})~; partagée par la construction des observations des trois recettes (issue~\#196) \\
 \catalogue{fonctions-donnees}{evaluer\_motifs\_agregats()} & interne & données, rôles, valeurs validées \code{p} & numéros des lignes porteuses de chaque motif de \code{MOTIFS\_LIGNES\_AGREGATS}, évaluation exhaustive sans court-circuit \\
 \catalogue{fonctions-donnees}{observations\_agregats()} & interne & lignes retenues, leurs numéros, rôles, segmentation, motifs, exclusions, nombre de lignes reçues, données & une observation par cellule conservée, sans complétion, unité d'observation \code{non\_determinee}~; relevés (cellules conservées, cohérence des deux expositions déclarées ensemble, poids des cellules exclues par motif déclaré) \\
 \catalogue{fonctions-donnees}{identifiant\_stocks()} & interne & rôles & identifiant d'unité déclaré, \code{id\_tete} ou \code{id\_contrat}~; erreur de programmation s'il n'y en a pas exactement un \\
@@ -11741,7 +11745,7 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     (\code{serialisation\_impossible}, converti en erreur de programmation).
     Aucune construction valide n'est ainsi refusée, par construction~: les
     facteurs de la table des observations sont reconstruits par
-    \code{categorie}, qui ne produit que ces deux classes (section~\ref{sec:unite-observation}).
+    \code{sous\_indicer\_categorie()}, qui ne produit que ces deux classes (section~\ref{sec:unite-observation}).
     Les niveaux ne sont pas écrits, et le libellé de type est \code{factor}
     pour un facteur ordonné ou non (tableau~\ref{tab:types-canoniques})~:
     deux facteurs aux mêmes libellés et aux niveaux différents, ou un
