@@ -6621,7 +6621,16 @@ lecture~:\par}
     force de mortalité avec l'âge pendant l'intervalle (terme d'ordre
     $\mu'_x L^3$~; hypothèse, non mesurée par le script)~; le biais propre
     sous-estime les taux et domine l'erreur d'estimation dès des
-    portefeuilles de taille courante~;
+    portefeuilles de taille courante. Aux petits effectifs par cellule de
+    ce scénario, l'écart au niveau nominal de la couverture des intervalles
+    de Poisson, exact et asymptotique, sous les trois lectures est
+    compatible avec la discrétisation, c'est-à-dire avec la couverture
+    calculée sous l'approximation de Poisson aux expositions réalisées,
+    laquelle intègre, sous \code{milieu}, la sur-exposition de cellule qui
+    réduit le manque dominant de l'intervalle asymptotique (constat de
+    simulation, lecture calibrée sur des jeux non vus au choix de la
+    règle, \code{tests/mesures/constat\_couverture\_s2.R}, hors CI, âges de
+    50 à 70~ans~; Kaplan-Meier non couvert)~;
   \item \emph{entrées concentrées au lendemain d'un inventaire} (S4)~: par
     construction, un entrant qui survit à son premier inventaire reçoit
     $\hat a - e = 181$~jours et ne garde que 184 de ses 365~jours
