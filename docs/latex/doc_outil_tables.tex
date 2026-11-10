@@ -8400,15 +8400,31 @@ loi du khi-deux~; mais la variance de la contribution d'une cellule vaut,
 sous la loi de Poisson, $2 + 1/A_c$ (résultat exact~: quatrième moment
 centré $A_c + 3A_c^2$), et en est la limite sous la loi binomiale quand
 $\pi_c \to 0$ à $A_c$ fixé, contre~2 par degré de liberté pour la loi du
-khi-deux~: la variance de $X^2$ dépasse alors celle de la loi de
-référence, ce qui, avec les mesures à attendus fixés, explique une queue
-plus lourde quand des $A_c$ sont petits (explication, non démonstration). Pour $G^2$, le sens de l'écart
-dépend des $A_c$. Ces statuts sont à compléter par l'issue~\#179
-(décision M310), hors du périmètre de la branche. \textbf{Réserve}~: le
+khi-deux. Conditionnellement aux $O_s$, la variance exacte de $X^2$
+(moments multinomiaux, résultat exact~; issue~\#179) dépasse $2(n - S)$
+quand des $A_c$ sont petits devant ceux de leur segment, et peut lui être
+inférieure quand les $A_c$ d'un segment sont égaux
+(section~\ref{sec:validation-statistiques}, «~Sous la relation
+\code{positionnee}~»)~: aux premiers âges de la plage, dont les $A_c$
+sont petits devant ceux des autres cellules du segment, la variance de
+$X^2$ dépasse donc celle de la loi de référence, ce qui, avec les mesures
+à attendus fixés, explique une queue plus lourde (explication, non
+démonstration). Pour $G^2$, le sens de l'écart dépend
+de la répartition des $A_c$~: sous la loi de Poisson, l'espérance de la
+contribution d'une cellule est inférieure à~1 pour $A_c$ inférieur à
+$0{,}49$ environ et supérieure à~1 au-delà (approximation numérique).
+Depuis l'issue~\#179 (décisions M310 et M359), les statuts des p-valeurs
+asymptotiques de $X^2$ et de $G^2$ le disent, sous les relations
+\code{independante} et \code{positionnee}, et la grandeur
+\code{khi2\_pearson}/\code{variance\_h0} restitue la variance exacte de
+$X^2$ sous $H_0$ (section~\ref{sec:validation-statistiques}). \textbf{Réserve}~: le
 constat ne couvre que la relation \code{positionnee}~; la relation
 \code{independante} n'y est pas simulée, et l'effet y est le même d'après
-l'avis d'\code{actuary-approfondi} (mêmes mesures à attendus fixés), sans
-constat de simulation du moteur.
+l'avis d'\code{actuary-approfondi} (mêmes mesures à attendus fixés)~; sous
+cette relation, la mesure hors batterie du constat J5, sur un autre jeu
+(commit \code{e9cbf53}~; section~\ref{sec:validation-verifications}),
+donne des écarts de même sens (p-valeur asymptotique de $X^2$ au-dessus
+de 5~\%, de $G^2$ au-dessous).
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-positionnement}
@@ -8925,9 +8941,11 @@ dans la colonne \code{statut} du résultat.
     P(|D_c - A_c| > k\sqrt{A_c})$, calculée par la fonction de répartition
     de Poisson.
   \item \textbf{S2, khi-deux de Pearson} (\code{khi2\_pearson})~: $X^2 =
-    \sum_{C^{+}} r_c^2 / A_c$~; degrés de liberté $n - p$~; p-valeur
-    asymptotique $P(\chi^2_{n-p} \ge X^2)$ et p-valeur de Monte-Carlo, queue
-    supérieure.
+    \sum_{C^{+}} r_c^2 / A_c$~; degrés de liberté $n - p$~; variance exacte
+    de $X^2$ sous $H_0$~(i), $\sum_{C^{+}} (2 + 1/A_c)$ (grandeur
+    \code{variance\_h0}, issue~\#179~; paragraphe «~Attendus faibles~»
+    ci-dessous)~; p-valeur asymptotique $P(\chi^2_{n-p} \ge X^2)$ et
+    p-valeur de Monte-Carlo, queue supérieure.
   \item \textbf{S3, déviance} (\code{deviance})~: $G^2 = 2\sum_{C^{+}} [D_c
     \ln(D_c/A_c) - (D_c - A_c)]$, statistique du rapport de vraisemblance
     de $H_0$~(i) contre le modèle saturé (une seule statistique, la note
@@ -9080,6 +9098,45 @@ diagnostic $E_{H_0}[n_{+}]$ du test des signes mesure cet écart. Seules les
 le rapport figé le dit (section~\ref{sec:rapport-fige}).
 
 \medskip
+{\sloppy\noindent
+\textbf{Attendus faibles~: p-valeurs asymptotiques de $X^2$ et de $G^2$}
+(issue~\#179~; spécification d'\code{actuary-approfondi} du 09/11/2026~;
+décisions M359 et M360). La loi de référence $\chi^2_{n-p}$ est
+asymptotique quand $A_c \to \infty$ dans \emph{chaque} cellule retenue~;
+une base modeste compte des cellules à attendus faibles (premiers âges de
+la plage), où rien ne garantit l'approximation. Pour $X^2$, sous $H_0$~(i),
+$E^c$ tenue pour fixe, $E[(D_c - A_c)^2 / A_c] = 1$, donc $E[X^2] = n - p$
+\textbf{exactement}, mais $\operatorname{Var}[(D_c - A_c)^2 / A_c] = 2 +
+1/A_c$ (quatrième moment centré de la loi de Poisson, $A_c + 3A_c^2$) et,
+les cellules étant indépendantes, $\operatorname{Var}(X^2) = \sum_{C^{+}}
+(2 + 1/A_c) > 2(n - p)$, variance de la loi de référence (résultat
+exact). Cette variance est restituée par la ligne
+\code{khi2\_pearson}/\code{variance\_h0}, placée entre \code{ddl} et
+\code{p\_asymptotique}~; définie par $H_0$, elle est dans l'état
+\code{ddl\_non\_etabli} sous \code{ajustee\_hors\_outil}. Une variance
+plus grande à espérance égale ne fixe pas, à elle seule, le sens de
+l'erreur de niveau~: le niveau réel du test fondé sur la p-valeur
+asymptotique de $X^2$ n'est pas établi en général~; il dépasse le niveau
+nominal dans les constats de simulation du projet, sous
+\code{independante} (mesure hors batterie du constat J5,
+section~\ref{sec:validation-verifications}) comme sous
+\code{positionnee} (constat \code{bad9a70},
+section~\ref{sec:positionnement-verifications}). Pour $G^2$, sous la loi
+de Poisson, l'espérance de la contribution
+$2[D_c \ln(D_c/A_c) - (D_c - A_c)]$ d'une cellule est inférieure à~1 pour
+$A_c$ inférieur à $0{,}49$ environ et supérieure à~1 au-delà (maximum
+voisin de $1{,}16$), valeurs obtenues par sommation des probabilités
+(approximation numérique)~: la p-valeur asymptotique de $G^2$ est trop
+grande ou trop petite selon la répartition des $A_c$. Les statuts des deux
+p-valeurs asymptotiques (\code{STATUTS\_VALIDATION}) le disent, et
+rappellent que seule la p-valeur de Monte-Carlo a un niveau garanti sous
+$H_0$~(i). \textbf{Aucun seuil} sur les attendus n'est appliqué ni
+affiché~: la règle usuelle d'un attendu minimal par cellule n'a pas été
+lue à sa source dans le projet et n'est donc pas citée (décision M360)~;
+la variance exacte chiffre l'avertissement à sa place, à comparer à
+$2(n - p)$.\par}
+
+\medskip
 \noindent
 \textbf{Sous la relation \code{positionnee}} (spécification
 d'\code{actuary-approfondi} sur l'issue~\#167, §~8~; décision M289~;
@@ -9100,17 +9157,38 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
   \item \textbf{S2 et S3}~: degrés de liberté $n - S$~; p-valeurs
     asymptotiques sur $\chi^2_{n-S}$, $\theta$ étant estimé par maximum de
     vraisemblance sur ces cellules (résultat asymptotique, $A_c \to
-    \infty$)~; $G^2$ et $X^2$ sont la déviance et la statistique de Pearson
-    du modèle de Poisson à un niveau par segment et offset $\ln \tilde A_c$
-    (recoupement par \code{glm()}, ci-dessous)~; sur une base modeste, à
-    attendus faibles, les p-valeurs asymptotiques de $X^2$ et de $G^2$
-    s'écartent de leur niveau nominal ($X^2$ anti-conservatrice, $G^2$
-    dans un sens qui dépend des $A_c$~; constat de
-    simulation, section~\ref{sec:positionnement-verifications}~; statuts à
-    compléter par l'issue~\#179). Si $n - S = 0$ (une seule
+    \infty$ dans chaque cellule retenue)~; $G^2$ et $X^2$ sont la déviance
+    et la statistique de Pearson du modèle de Poisson à un niveau par
+    segment et offset $\ln \tilde A_c$ (recoupement par \code{glm()},
+    ci-dessous). Attendus faibles (issue~\#179~; paragraphe «~Attendus
+    faibles~» ci-dessus)~: conditionnellement aux $O_s$, $E[X^2] = n - S$
+    exactement, et la variance exacte de $X^2$, restituée par
+    \code{variance\_h0}, est
+    \[
+      \operatorname{Var}(X^2 \mid O_s) = \sum_s \Bigl[2(n_s - 1) +
+      \sum_{c \in C^{+}_s} \frac{1}{A_c} - \frac{n_s^2 + 2n_s - 2}{O_s}\Bigr],
+      \qquad A_c = O_s \pi_c,
+    \]
+    $n_s$ nombre de cellules retenues du segment $s$ (moments
+    multinomiaux d'ordre~4, résultat exact), à comparer à $2(n - S)$~;
+    elle lui est supérieure quand des $A_c$ sont petits devant ceux de leur
+    segment, et inférieure quand les $A_c$ d'un segment sont égaux (trois
+    cellules, $O_s = 40$, $\pi_c = 1/3$~: $3{,}9$ contre~4, calcul exact).
+    Sur une base modeste, à attendus faibles, les p-valeurs asymptotiques
+    de $X^2$ et de $G^2$ s'écartent de leur niveau nominal (rejet trop
+    fréquent pour $X^2$, trop rare pour $G^2$, sous la loi~B du constat de
+    simulation \code{bad9a70}, section~\ref{sec:positionnement-verifications}~;
+    pour $G^2$, le sens de l'écart dépend en général de la répartition des
+    $A_c$). Le statut de
+    \code{deviance}/\code{p\_asymptotique} donne les valeurs de
+    l'espérance de la contribution d'une cellule sous la loi de Poisson,
+    sans conditionner par les $O_s$~: conditionnellement, $D_c$ suit une loi
+    binomiale, et ces valeurs ne valent qu'approximativement, quand $\pi_c$
+    est petit. Si $n - S = 0$ (une seule
     cellule retenue par segment), la loi conditionnelle est dégénérée
     ($D_c = O_s$)~: aucun test n'est défini et aucun tirage n'est fait~;
-    les statistiques standardisées, les moments des suites, la variance de
+    les statistiques standardisées, la variance exacte de $X^2$, les
+    moments des suites, la variance de
     Wilcoxon, les p-valeurs asymptotiques, exactes et de Monte-Carlo et
     leurs erreurs prennent l'état \code{contraint\_par\_positionnement}
     (décision M309 pour la forme conditionnelle du statut).
@@ -9235,8 +9313,8 @@ suites, Wilcoxon)~; \code{variance\_nulle} (suites)~; \code{ex\_aequo} et
 \code{effectif\_au\_dela\_n\_max} (p-valeurs exactes)~;
 \code{aucun\_deces} (MAPE)~; \code{variance\_observee\_nulle} ($R^2$)~;
 \code{contraint\_par\_positionnement} (sous \code{positionnee}~: grandeurs
-sous $H_0$ du SMR global, et toutes les grandeurs de test quand $n - S =
-0$).\par}
+sous $H_0$ du SMR global, et toutes les grandeurs de test, variance exacte
+de $X^2$ comprise, quand $n - S = 0$).\par}
 
 {\footnotesize
 \rowcolors{2}{tablerow}{white}
@@ -9256,8 +9334,8 @@ sous $H_0$ du SMR global, et toutes les grandeurs de test quand $n - S =
 \textcolor{financeblue}{\textbf{Statut}} \\
 \endhead
 S1 \code{residus} & décomptes au-delà de 2 et 3~; leurs espérances & --- & décomptes descriptifs~; espérances exactes sous $H_0$~(i), $E^c$ fixe (asymptotiques sous le modèle de survie), \code{ppois()} en approximation numérique \\
-S2 \code{khi2\_pearson} & $X^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & $X^2$ descriptif~; p asymptotique ($\chi^2_{n-p}$, $A_c \to \infty$)~; Monte-Carlo de niveau exact \\
-S3 \code{deviance} & $G^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & comme S2 \\
+S2 \code{khi2\_pearson} & $X^2$, ddl, variance exacte sous $H_0$, p asymptotique, p et erreur de Monte-Carlo & supérieure & $X^2$ descriptif~; variance exacte sous $H_0$~(i), $E^c$ fixe (moments de Poisson)~; p asymptotique ($\chi^2_{n-p}$, $A_c \to \infty$ dans chaque cellule retenue), non garantie aux attendus faibles~; Monte-Carlo de niveau exact \\
+S3 \code{deviance} & $G^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & comme S2, sans variance~; aux attendus faibles, erreur de la p asymptotique de sens variable selon les $A_c$ \\
 S4 \code{smr} & $O$, $A$, SMR, $O - A$, bornes exactes, p inférieure, supérieure, centrale, $z$ et p de la racine cubique & centrale (et unilatérales) & SMR~: résultat exact (maximum de vraisemblance)~; bornes exactes sous la loi supposée, couverture $\ge$ niveau, \code{qgamma()} en approximation numérique~; p exactes sous $H_0$~(i)~; racine cubique asymptotique \\
 S5 sous-groupes & $O$, $A$, SMR, bornes exactes, p-valeurs & centrale (et unilatérales) & comme S4, sans correction de multiplicité (statuts dans les paramètres de l'étape) \\
 S6 \code{signes} & $n_{+}$, $n_{-}$, nuls, $n$, statistique, p asymptotique, p exacte, $E_{H_0}[n_{+}]$, p et erreur de Monte-Carlo & centrale & décomptes descriptifs~; p asymptotique et exacte sous $P(r_c > 0) = 1/2$, \textbf{qui n'est pas} $H_0$~(i)~; $E_{H_0}[n_{+}]$ exact sous $H_0$~(i)~; Monte-Carlo de niveau exact \\
@@ -10230,7 +10308,22 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{STATUTS\_VALIDATION} en statistique, grandeur et \code{sous\_h0},
     statuts de Wilcoxon, du $R^2$ et de la distance qui nomment la table
     positionnée, statut conditionnel de ddl (décision M309), empreinte des
-    statuts stable sous les locales C et UTF-8~; \code{statuts\_validation()}
+    statuts stable sous les locales C et UTF-8~; ligne
+    \code{khi2\_pearson}/\code{variance\_h0} définie par $H_0$, entre
+    \code{ddl} et \code{p\_asymptotique}, sous les deux relations, et
+    textes des p-valeurs asymptotiques de $X^2$ et de $G^2$ (formule de
+    variance de chaque relation, répartition des $A_c$, phrases communes
+    identiques sous les deux relations, absence de «~conservat~» hors de la
+    mention de l'unité d'observation~; issue~\#179)~; variance exacte de
+    $X^2$ égale, à $10^{-12}$ près en relatif, à celle obtenue par
+    énumération exacte --- loi de Poisson conjointe de trois cellules,
+    tronquée, avec $E[X^2] = n$, sous \code{independante}~; toutes les compositions
+    multinomiales de deux segments, avec $E[X^2] = n - S$, puis d'un cas à
+    segments non contigus et non ordonnés, cellule exclue intercalée et
+    segment d'une seule cellule retenue, sous \code{positionnee} ---, et
+    ses états \code{contraint\_par\_positionnement} ($n - S = 0$),
+    \code{ddl\_non\_etabli} et \code{aucune\_cellule\_retenue}
+    (issue~\#179)~; \code{statuts\_validation()}
     et chaque branchement à trois valeurs, erreur de programmation par
     défaut~; sur un jeu d'un segment, $X^2$, $G^2$, ddl $= n - S$, SMR
     global égal à 1 et grandeurs sous $H_0$ non produites, fluctuation
