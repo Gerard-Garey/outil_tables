@@ -8451,11 +8451,15 @@ centré $A_c + 3A_c^2$), et en est la limite sous la loi binomiale quand
 $\pi_c \to 0$ à $A_c$ fixé, contre~2 par degré de liberté pour la loi du
 khi-deux. Conditionnellement aux $O_s$, la variance exacte de $X^2$
 (moments multinomiaux, résultat exact~; issue~\#179) dépasse $2(n - S)$
-quand des $A_c$ sont petits devant ceux de leur segment, et peut lui être
-inférieure quand les $A_c$ d'un segment sont égaux
-(section~\ref{sec:validation-statistiques}, «~Sous la relation
-\code{positionnee}~»)~: aux premiers âges de la plage, dont les $A_c$
-sont petits devant ceux des autres cellules du segment, la variance de
+si et seulement si $\sum_s \sum_{c \in C^{+}_s} 1/A_c > \sum_s (n_s^2 +
+2n_s - 2)/O_s$~; il suffit que, dans chaque segment qui compte au moins
+deux cellules retenues, une cellule retenue ait $A_c < O_s/(n_s^2 + 2n_s
+- 2)$ (un segment d'une seule cellule apporte un excès nul)~; quand les
+$A_c$ de chaque segment
+sont égaux, elle lui est inférieure dès qu'un segment compte au moins deux
+cellules retenues (section~\ref{sec:validation-statistiques}, «~Sous la
+relation \code{positionnee}~»). Aux premiers âges de la plage, quand
+leurs $A_c$ sont assez petits pour remplir ce critère, la variance de
 $X^2$ dépasse donc celle de la loi de référence, ce qui, avec les mesures
 à attendus fixés, explique une queue plus lourde (explication, non
 démonstration). Pour $G^2$, le sens de l'écart dépend
@@ -9220,9 +9224,16 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     \]
     $n_s$ nombre de cellules retenues du segment $s$ (moments
     multinomiaux d'ordre~4, résultat exact), à comparer à $2(n - S)$~;
-    elle lui est supérieure quand des $A_c$ sont petits devant ceux de leur
-    segment, et inférieure quand les $A_c$ d'un segment sont égaux (trois
-    cellules, $O_s = 40$, $\pi_c = 1/3$~: $3{,}9$ contre~4, calcul exact).
+    elle lui est supérieure si et seulement si $\sum_s \sum_{c \in
+    C^{+}_s} 1/A_c > \sum_s (n_s^2 + 2n_s - 2)/O_s$~; il suffit que, dans
+    chaque segment qui compte au moins deux cellules retenues, une cellule
+    retenue ait $A_c < O_s/(n_s^2 + 2n_s - 2)$ (un segment d'une seule
+    cellule apporte un excès nul), les autres termes $1/A_c$ étant
+    positifs (condition suffisante,
+    non nécessaire)~; elle lui est inférieure quand les $A_c$ de chaque
+    segment sont égaux, dès qu'un segment compte au moins deux cellules
+    retenues (trois cellules, $O_s = 40$, $\pi_c = 1/3$~: $3{,}9$
+    contre~4, calcul exact).
     Sur une base modeste, à attendus faibles, les p-valeurs asymptotiques
     de $X^2$ et de $G^2$ s'écartent de leur niveau nominal (rejet trop
     fréquent pour $X^2$, trop rare pour $G^2$, sous la loi~B du constat de
@@ -9306,9 +9317,10 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     $\{0, 1\}$), cas inatteignable au-delà du plafond. Les trois colonnes
     sont présentes sous les trois relations et valent \code{NA} dans tout
     autre état~: sous \code{independante}, la loi de Poisson exacte du
-    sous-groupe est toujours calculée ($p = 0$)~; sous
-    \code{ajustee\_hors\_outil}, aucune p-valeur du sous-groupe n'est
-    produite ($p$ non établi). La ligne de statut
+    sous-groupe est toujours calculée (aucun paramètre estimé sur ces
+    données, $p = 0$)~; sous \code{ajustee\_hors\_outil}, aucune
+    p-valeur du sous-groupe n'est produite (nombre $p$ de paramètres
+    estimés non établi). La ligne de statut
     \code{sous\_groupes}/\code{p\_valeurs\_asymptotiques}, quatrième des
     statuts des sous-groupes (\code{statuts\_sous\_groupes}), le dit pour
     chaque relation, et le statut \code{sous\_groupes}/\code{p\_valeurs}
@@ -9324,7 +9336,18 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     $1{,}82 \times 10^{-3}$ (p supérieure et p centrale, $o = 3000$, où la
     p centrale exacte vaut $0{,}0039$)~; le test exige au plus $5 \times
     10^{-5}$ et $3 \times 10^{-3}$. Au-delà du plafond, où la loi exacte
-    n'est pas calculée, l'écart n'est mesuré par aucune batterie.
+    n'est pas calculée, l'écart n'est mesuré par aucune batterie. La
+    spécification (commentaire 6747040204 de l'issue~\#178) donne une
+    mesure hors batterie au-delà du plafond, par calcul de la loi exacte
+    hors CI (comparaison à une loi calculée, non un constat de simulation,
+    non rejouée par le dépôt), sur le pire cas mesuré, de 40~segments (coût $2{,}1
+    \times 10^{8}$, $\sigma_b \approx 48$), en notant $z = (o - m_b)/\sigma_b$
+    (notation de la présente documentation~; la spécification ne précise
+    pas si $z$ inclut la correction de continuité, écart de
+    $1/(2\sigma_b) \approx 0{,}01$ sans effet à la précision donnée)~:
+    écart absolu au plus $1{,}2 \times 10^{-3}$ et relatif au plus
+    $2{,}3$~\% pour $|z| \le 2$, de $7{,}7$ à $8{,}9$~\% à $|z| = 3$,
+    jusqu'à 23~\% à $|z| = 4$.
   \item \textbf{S6, S7 et S8} (signes, suites, Wilcoxon), exactes et
     asymptotiques~: produites, avec le statut de la relation
     \code{independante} complété par «~table positionnée sur ces données~:
@@ -9634,8 +9657,8 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     par tranche)~: $E^c$, $O_s$, $A_s$, $O_s / A_s$ --- rapport interne au
     regroupé, qui \textbf{n'est pas un SMR} rapporté à une table --- et
     l'écart réduit $z_s = (O_s - A_s)/\sqrt{V_{ss}}$, de loi asymptotique
-    $\mathcal{N}(0, 1)$ sous $H_0$ quand $V_{ss} \to \infty$, aucune
-    strate ne dominant (même régime que la p-valeur asymptotique,
+    $\mathcal{N}(0, 1)$ sous $H_0$ quand $V_{ss} \to \infty$ (même
+    régime que la p-valeur asymptotique,
     ci-dessous~; issue~\#185)~; aucune p-valeur n'en est tirée, et
     aucune correction de multiplicité. Le rapport $(O_s - A_s)^2/A_s$,
     conservateur, n'est pas produit.
@@ -9650,18 +9673,29 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     asymptotique dans le régime d'information croissante (issue~\#185)~:
     plus petite valeur propre de $V$ réduite (de façon équivalente, à
     nombre de groupes fixé, plus petite valeur propre non nulle de $V$)
-    tendant vers l'infini, aucune strate ne portant à elle seule une part
-    non négligeable de $V$, le nombre de strates étant fixe ou
-    croissant~; $D_{\cdot c}$ peut rester petit dans chaque strate, car
-    $U$ est la somme, sur les strates, de contributions indépendantes
-    sachant les $D_{\cdot c}$, centrées sous $H_0$, dont les matrices de
-    variance, exactement connues, somment à $V$~; le régime
-    $D_{\cdot c} \to \infty$ dans chaque strate, plus strict, n'est pas
-    requis (constat de simulation de la spécification de l'issue~\#185,
-    commentaire 6747045250, hors batterie et non reproduit ici~: niveau
-    réel voisin du niveau nominal, ou un peu inférieur, avec moins d'un
-    décès attendu par strate)~; sous $H_0$ avec $E$ tenue pour fixe et aussi sous le modèle
-    de survie~; $z_s$, même régime, $V_{ss} \to \infty$~; p-valeur exacte, exacte
+    tendant vers l'infini, le nombre de strates étant fixe ou croissant~;
+    $D_{\cdot c}$ peut rester petit dans chaque strate~: sachant les
+    $D_{\cdot c}$, $U$ est la somme de $\sum_c D_{\cdot c}$ vecteurs
+    indépendants, un par décès (vecteur indicateur du groupe du décès
+    moins $\pi_c$), centrés sous $H_0$ et bornés, dont les matrices de
+    variance somment à $V$~; le théorème central limite de Lindeberg, sous
+    sa forme multivariée, s'applique dès que cette valeur propre tend vers
+    l'infini, et le régime $D_{\cdot c} \to \infty$ dans chaque strate
+    n'est donc pas requis. La condition, reprise du statut, qu'aucune
+    strate ne porte à elle seule une part non négligeable de $V$ est
+    suffisante sans être nécessaire, et ne peut être remplie quand le
+    nombre de strates est fixe (issue~\#202, décision du mainteneur du
+    10/11/2026~: correction du statut du code renvoyée hors de B16).
+    Illustration~: constat de simulation m8 de la spécification
+    (commentaire 6747045250 de l'issue~\#185), hors batterie, $10^4$
+    réplications par cas, erreur de Monte-Carlo $0{,}0022$ sur un taux de
+    5~\%~: niveau réel au seuil de 5~\% de $0{,}0490$ (71~strates,
+    2~groupes, $0{,}3$~décès attendu par strate), $0{,}0468$ ($0{,}1$~décès
+    attendu par strate), $0{,}0463$ (3~groupes), $0{,}0415$ (10~strates,
+    5~décès en tout)~: voisin du niveau nominal, ou un peu inférieur, avec
+    moins d'un décès attendu par strate. La loi limite $\chi^2_{\mathrm{ddl}}$ de la p-valeur
+    asymptotique vaut sous $H_0$ avec $E$ tenue pour fixe et aussi sous le
+    modèle de survie~; $z_s$, même régime, $V_{ss} \to \infty$~; p-valeur exacte, exacte
     conditionnellement aux $D_{\cdot c}$ sous $H_0$, $E$ tenue pour fixe, et
     asymptotique sous le modèle de survie (convolution~: approximation
     numérique)~; p-valeur de Monte-Carlo, de niveau exact au sens
