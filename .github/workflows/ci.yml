@@ -68,6 +68,12 @@ jobs:
       # (exécution 38903692466, ADR 0008, point 2). Même chaîne dans
       # TABLEXP_IMAGE ci-dessous (tests/controles/identite_batteries.R).
       image: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
+      # Résolveurs DNS explicites : depuis le 11/11/2026 (vers 13 h 45), le
+      # conteneur ne résout plus archive.ubuntu.com ni security.ubuntu.com
+      # (« Could not resolve », dès la première étape ; exécutions
+      # 43040316925, 43057249734, 43061193301), et l'installation de python3
+      # échoue. Aucun effet sur les calculs.
+      options: --dns 1.1.1.1 --dns 8.8.8.8
     env:
       TABLEXP_IMAGE: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
       OPENBLAS_NUM_THREADS: "1"
@@ -102,21 +108,6 @@ jobs:
           echo "libblas.so.3   -> $(readlink -f "$lib/libblas.so.3")"
           echo "liblapack.so.3 -> $(readlink -f "$lib/liblapack.so.3")"
           dpkg-query -W -f='${Package} ${Version}\n' libblas3 liblapack3
-      # Paquets de python3 téléchargés sans installation, pour l'étape
-      # « Écriture %.17g des doubles » : la batterie unitaire tourne sans
-      # python3 (décision du mainteneur du 06/11/2026, PR #157), et la
-      # résolution DNS des dépôts Ubuntu peut manquer en fin de job (constaté
-      # le 11/11/2026, exécutions 43040316925 et 43057249734). Les listes de
-      # paquets sont celles de l'étape précédente ; aucun calcul ici.
-      - name: Paquets de python3 (téléchargement seul)
-        run: |
-          set -euo pipefail
-          if ! command -v python3 > /dev/null; then
-            mkdir -p /opt/paquets-python3/partial
-            apt-get install -y -q --no-install-recommends --download-only \
-              -o Dir::Cache::Archives=/opt/paquets-python3 python3
-            ls /opt/paquets-python3/*.deb
-          fi
       - name: Plateforme (mode strict)
         run: Rscript tests/controles/plateforme.R --exiger
       # Batteries de CLAUDE.md, « Commandes » : une étape « Batterie : » par
@@ -191,17 +182,15 @@ jobs:
       # (sprintf) et Python (format(x, '.17g')) ; il recalcule les MD5 des
       # témoins T2 et T3 de la batterie unitaire et vérifie la table des
       # puissances contre les entiers exacts de Python. python3 est installé
-      # s'il manque à l'image, hors ligne, depuis les paquets téléchargés par
-      # l'étape « Paquets de python3 » ; son absence fait échouer le contrôle
-      # (aucun saut). Hors liste des batteries de CLAUDE.md.
+      # s'il manque à l'image ; son absence fait échouer le contrôle (aucun
+      # saut). Hors liste des batteries de CLAUDE.md.
       - name: Écriture %.17g des doubles (juges glibc et Python)
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           if ! command -v python3 > /dev/null; then
-            # Installation hors ligne des paquets téléchargés par l'étape
-            # « Paquets de python3 » (aucun accès réseau ici).
-            dpkg -i /opt/paquets-python3/*.deb
+            apt-get update -q
+            apt-get install -y -q --no-install-recommends python3
           fi
           python3 --version
           Rscript tests/controles/ecriture_doubles_texte.R
