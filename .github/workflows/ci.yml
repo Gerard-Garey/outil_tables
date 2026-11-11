@@ -68,6 +68,12 @@ jobs:
       # (exécution 38903692466, ADR 0008, point 2). Même chaîne dans
       # TABLEXP_IMAGE ci-dessous (tests/controles/identite_batteries.R).
       image: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
+      # Résolveurs DNS explicites : depuis le 11/11/2026 (vers 13 h 45), le
+      # conteneur ne résout plus archive.ubuntu.com ni security.ubuntu.com
+      # (« Could not resolve », dès la première étape ; exécutions
+      # 43040316925, 43057249734, 43061193301), et l'installation de python3
+      # échoue. Aucun effet sur les calculs.
+      options: --dns 1.1.1.1 --dns 8.8.8.8
     env:
       TABLEXP_IMAGE: rocker/r-ver:4.3.3@sha256:732d15020af326da9e919c07f70ca32bf5d3e409220af32e0a4b6d0a89437309
       OPENBLAS_NUM_THREADS: "1"
