@@ -14239,9 +14239,12 @@ deux inventaires par cause, unités présentes à $t_M$. Sous cette forme,
 \code{forme\_invalide} refuse en outre une grille mal formée ou non
 alignée~; un mode multi-contrats y est refusé parce que l'unité inventoriée,
 tête ou contrat, serait ambiguë et que la fusion par tête des contrats
-inventoriés n'est pas prise en charge (issue~\#190). L'argument
+inventoriés n'est pas prise en charge (issue~\#190), avec ou sans
+l'argument \code{defauts}, au même message. L'argument
 \code{defauts} y est admis, avec le catalogue de défauts propre à cette
-forme (\code{DEFAUTS\_FORMES}~; issue~\#191). Le jeu propre sous cette forme est l'entrée du
+forme (\code{DEFAUTS\_FORMES}~; issue~\#191~;
+section~\ref{sec:defauts-parametres}, «~Forme «~stocks successifs~»~»), les
+défauts étant injectés après la projection. Le jeu propre sous cette forme est l'entrée du
 plan de référence R14 (section~\ref{sec:non-regression}).\par}
 
 \medskip
@@ -14269,8 +14272,10 @@ celle-ci, selon les règles propres à la forme, lues par le nom de forme
 dans \code{DEFAUTS\_FORMES} (issue~\#189~; avis de forme
 d'\code{architect}, Q2)~: pour la forme agrégats, une cellule de la
 \emph{table agrégée propre}, projection du jeu propre avant toute
-injection (ci-dessous, «~Forme «~agrégats~»~»)~; la forme stocks
-successifs a ses propres règles (issue~\#191). Sauf mention contraire, les
+injection (ci-dessous, «~Forme «~agrégats~»~»)~; pour la forme stocks
+successifs, une unité inventoriée, une ligne ou une date de la grille de la
+projection du jeu propre en stocks successifs (issue~\#191~; ci-dessous,
+«~Forme «~stocks successifs~»~»). Sauf mention contraire, les
 paragraphes qui suivent décrivent les défauts des lignes individuelles
 (\code{forme = NULL}), dont les règles forment l'entrée \code{lignes} de
 \code{DEFAUTS\_FORMES}, qui reprend à l'identique \code{CATALOGUE\_DEFAUTS},
@@ -14324,12 +14329,15 @@ exactement \code{graine} et \code{declarations}~:
     \code{integer} sans attribut. \code{type} est un type du catalogue
     (tableau~\ref{tab:catalogue-defauts}) ou une combinaison admise~; sous
     une forme, un type du catalogue de la forme (pour les agrégats,
-    tableau~\ref{tab:catalogue-defauts-agregats}), tout autre type étant un
+    tableau~\ref{tab:catalogue-defauts-agregats}~; pour les stocks
+    successifs, tableau~\ref{tab:catalogue-defauts-stocks}), tout autre type étant un
     type inconnu.
     \code{cible}, sous-ensemble non vide, sans doublon, de \code{deces},
     \code{rachat} et \code{en\_cours} (causes de sortie du jeu propre), est
     requise pour un type de ligne et interdite pour un type de tête~; elle
-    est interdite pour tout type de la forme agrégats.
+    est interdite pour tout type de la forme agrégats~; sous la forme stocks
+    successifs, elle est requise pour les types d'unité \code{ligne} et
+    \code{unite}, et interdite pour \code{inventaire\_perdu}.
 \end{itemize}
 
 \noindent
@@ -14578,11 +14586,14 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{defauts\_invalides} (module \code{simulation})~: forme ou
     valeur de \code{defauts} ou d'une déclaration, type inconnu (hors du
-    catalogue de la forme du jeu~: un type des agrégats sans forme, ou un
-    type des lignes sous la forme agrégats, est inconnu),
+    catalogue de la forme du jeu~: un type des agrégats ou des stocks
+    successifs sans forme, un type des lignes sous l'une de ces formes, ou
+    un type de l'une sous l'autre, est inconnu),
     combinaison non admise, \code{cible} manquante, interdite, mal formée
     ou disjointe par construction, type dont une condition est
-    structurellement vide pour le portefeuille (ci-dessus~; issue~\#112),
+    structurellement vide pour le portefeuille (ci-dessus~; issue~\#112) ou
+    pour la forme, type exclusif accompagné d'une autre déclaration (forme
+    stocks successifs, ci-dessous),
     \code{taux} et \code{nombre} tous deux
     présents ou tous deux absents, graine des défauts mal formée ou égale à
     celle du jeu. Il est levé \textbf{avant tout tirage}, après les
@@ -14596,7 +14607,9 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
     «~Défauts~: déclaration [k] ([type])~: nombre = [nombre] dépasse le
     nombre d'unités éligibles ([éligibles]) non encore altérées (unité
     [unité]).~», l'unité étant celle du type (\code{ligne} ou \code{tete}
-    en lignes individuelles, \code{cellule} sous la forme agrégats)~; les
+    en lignes individuelles, \code{cellule} sous la forme agrégats,
+    \code{unite}, \code{ligne} ou \code{inventaire} sous la forme stocks
+    successifs)~; les
     \code{details} sont \code{declaration}, \code{type}, \code{nombre} et
     \code{eligibles}. Il est levé
     \textbf{après le tirage du jeu propre} (sous une forme, après sa
@@ -14752,6 +14765,295 @@ catalogue, réunis aux treize motifs des agrégats qu'il ne produit pas
 bien qu'un motif des agrégats ajouté sans décision sur le simulateur fait
 échouer la batterie. Le catalogue des lignes individuelles reste celui du
 tableau~\ref{tab:catalogue-defauts}, inchangé.\par}
+
+\subsubsection*{Forme «~stocks successifs~»}
+
+{\sloppy\hbadness=10000 Sous la forme stocks successifs (issue~\#191~;
+spécification d'\code{actuary} de l'issue~\#191, § 1 à 3~; avis de forme
+d'\code{architect}, partie \#191~; décision du mainteneur du 11/11/2026
+pour l'inventaire perdu), les défauts portent sur la projection du jeu
+propre en stocks successifs (section~\ref{sec:portefeuille-simule},
+«~Sortie~»), appelée ci-dessous \emph{jeu propre de la forme}, avec le
+catalogue de l'entrée \code{stocks\_successifs} de \code{DEFAUTS\_FORMES}
+(tableau~\ref{tab:catalogue-defauts-stocks})~: cinq types, dont quatre
+liés chacun au motif du même nom du module \code{donnees}
+(\code{MOTIFS\_LIGNES\_STOCKS} et \code{MOTIFS\_UNITE\_STOCKS},
+tableau~\ref{tab:motifs-stocks}), refus attendu \code{ligne\_invalide} sans
+exclusion déclarée, et \code{inventaire\_perdu}, lié au refus
+\code{inventaire\_sans\_ligne}, sans motif, sur le précédent de
+\code{date\_hors\_domaine}. Aucune combinaison n'est admise, et l'argument
+\code{defauts} garde sa forme, son validateur (\code{controler\_defauts()},
+qui reçoit les règles de la forme) et ses codes de refus~: aucun code
+nouveau.\par}
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Unité de sélection et éligibles.} L'unité
+de sélection est l'\emph{unité inventoriée}, identifiée par
+\code{id\_contrat} (la forme n'est admise que dans les modes \code{uniforme}
+et \code{age\_exact}, où tête et contrat se confondent). La colonne
+\code{unite} du catalogue décrit ce que le défaut altère~: \code{unite},
+un motif d'unité, porté par toutes les lignes restantes de l'unité~;
+\code{ligne}, une ligne d'inventaire de l'unité, modifiée ou copiée~;
+\code{inventaire}, une date de la grille. La cause d'une unité dans le jeu
+propre est celle de sa ligne d'événement, \code{en\_cours} si elle n'en a
+pas~: une unité présente à un inventaire et sortie ensuite a toujours sa
+ligne d'événement, sa sortie étant au plus tard $t_M$, fin de la période.
+Pour un type d'unité \code{unite} ou \code{ligne}, le champ \code{cible}
+est requis, et les éligibles sont les unités non encore altérées dont la
+cause est à la fois admise par le catalogue et dans la cible, qui ont au
+moins le nombre de lignes d'inventaire requis et, pour
+\code{sortie\_non\_renseignee}, une ligne d'événement. Pour
+\code{inventaire\_perdu}, le champ \code{cible} est interdit et les
+éligibles sont les dates de la grille. Dans le tableau, $t_1 < \dots <
+t_M$ est la grille de la forme et $t_f$ le premier inventaire de l'unité,
+comme au tableau~\ref{tab:motifs-stocks}.\par}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.9cm}p{1.4cm}p{3.2cm}p{4.7cm}@{}}
+\caption{Catalogue des défauts paramétrés de la forme stocks successifs
+(\code{DEFAUTS\_FORMES}, entrée \code{stocks\_successifs}~; spécification
+d'\code{actuary} de l'issue~\#191, § 1). Le motif attendu porte le nom du
+type, sauf pour \code{inventaire\_perdu} (refus)~; les causes des
+éligibles sont celles de l'unité dans le jeu propre, à intersecter avec la
+cible.}
+\label{tab:catalogue-defauts-stocks}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Type}} &
+\textcolor{financeblue}{\textbf{Unité}} &
+\textcolor{financeblue}{\textbf{Éligibles}} &
+\textcolor{financeblue}{\textbf{Altération}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Type}} &
+\textcolor{financeblue}{\textbf{Unité}} &
+\textcolor{financeblue}{\textbf{Éligibles}} &
+\textcolor{financeblue}{\textbf{Altération}} \\
+\endhead
+\code{sortie\_non\_renseignee} & unite & décès, rachat~; au moins un inventaire et une ligne d'événement & ligne d'événement de l'unité retirée~; motif sur les lignes restantes de l'unité \\
+\code{presence\_interrompue} & unite & toutes~; au moins trois inventaires (grille d'au moins trois dates) & inventaire $t_{f+1}$ de l'unité retiré~; motif sur les lignes restantes de l'unité \\
+\code{inventaire\_hors\_grille} & ligne & toutes~; au moins un inventaire & date du premier inventaire $t_f$ remplacée par le plus petit jour postérieur à $t_f$ hors de la grille~; autres lignes de l'unité en propagation \\
+\code{inventaire\_duplique} & ligne & toutes~; au moins un inventaire & copie du premier inventaire ajoutée en fin de jeu~; motif sur l'original et sur la copie~; autres lignes de l'unité en propagation \\
+\code{inventaire\_perdu} & inventaire & dates de la grille~; \code{cible} interdite~; type exclusif & toutes les lignes d'inventaire de la date retirées~; refus \code{inventaire\_sans\_ligne}, aucun motif \\
+\end{longtable}
+}
+
+\noindent
+{\sloppy\hbadness=10000 \textbf{Éligibilités et altérations.} Chacune est
+choisie pour que l'unité altérée ne lève que son motif, d'après la lecture
+des contrôles des stocks du module \code{donnees}
+(\code{evaluer\_motifs\_stocks()}~; tableau~\ref{tab:motifs-stocks})~:
+une unité sortie par décès ou rachat qui a un inventaire est absente
+de~$t_M$, son dernier inventaire $t_l$ vérifie donc $l < M$, et le retrait
+de sa ligne d'événement la laisse sans ligne d'événement, ce qui est la
+définition de \code{sortie\_non\_renseignee}~; une unité en cours n'a pas
+de ligne d'événement, et une unité sans inventaire, entrée et sortie entre
+deux inventaires, disparaîtrait tout entière. Pour
+\code{presence\_interrompue}, trois inventaires au moins laissent
+l'inventaire retiré $t_{f+1}$ entre deux inventaires conservés, $t_f$ et
+$t_l$ inchangé~: avec deux seulement, $t_f$ deviendrait le dernier
+inventaire, et l'unité lèverait \code{sortie\_non\_renseignee} ou
+\code{evenement\_apres\_absence} au lieu de son motif. Sur une grille de
+moins de trois dates, aucune unité n'a trois inventaires~: la condition
+\code{grille\_trois\_dates} est alors structurellement vide, connue par la
+seule forme (\code{conditions\_vides()}, qui reçoit la forme validée), et la
+déclaration est refusée avant tout tirage. Pour les deux types de
+ligne, l'unité porteuse d'un motif de ligne est exempte de tout motif
+d'unité (amendement A1~; section~\ref{sec:controles-donnees}, «~Motifs de
+la recette \code{stocks\_successifs}~»)~: l'absence de l'unité à $t_f$
+que crée le décalage de date ne lève pas \code{presence\_interrompue}.
+Le jour de remplacement est $t_f + 1$, ou le premier jour suivant qui n'est
+pas une date de la grille quand celle-ci a des dates consécutives. Que
+chaque type à motif ne lève que son motif est vérifié par le test~B2
+(section~\ref{sec:verifications-simulation}).\par}
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Disjonction par unité entière.} Une unité
+est altérée au plus une fois, \emph{tous types confondus}, règle plus
+stricte que la disjonction par ligne des lignes individuelles~: une unité
+porteuse d'un motif de ligne n'étant soumise à aucun motif d'unité, et
+l'exclusion d'un motif de ligne écartant toutes les lignes de l'unité
+(propagation), deux défauts sur une même unité ne lèveraient pas chacun
+leur motif (spécification de l'issue~\#191, § 1~: les motifs d'unité et
+la propagation portent sur l'unité entière).\par}
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Inventaire perdu.} Toutes les dates de la
+grille sont éligibles, dans l'ordre de la grille (décision du mainteneur du
+11/11/2026, sur la recommandation d'\code{actuary}~; option écartée~: la
+première date seule, seul cas sans cascade de motifs). Le type est
+\textbf{exclusif}~: il doit être la seule déclaration. Son attendu est le
+refus de toute la construction, et il fait naître sur les unités présentes
+aux dates voisines des motifs qui ne se sépareraient pas de ceux d'une
+autre déclaration. Retirer toutes les lignes d'inventaire d'une date ne
+change pas la grille du plan, qui n'est jamais déduite des valeurs de
+\code{date\_inventaire} (\code{CONTEXT.md}, «~Grille d'inventaires~»)~: la
+date reste attendue, et le module \code{donnees} refuse
+(\code{inventaire\_sans\_ligne}~; section~\ref{sec:unite-observation},
+«~Relevés et avertissements~») une date de la grille à laquelle aucune
+unité n'est présente sur les lignes conservées. Ce refus naît après le refus
+par défaut des motifs~; l'attendu, consigné dans le texte de validité, est
+donc une \emph{cascade}, selon les unités présentes~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item une date perdue~: $t_1$, refus \code{inventaire\_sans\_ligne}
+    direct, quelles que soient les exclusions, les unités présentes
+    à~$t_1$ paraissant alors entrées après $t_1$, ce qui n'est pas un
+    motif~; date intermédiaire, motifs parmi
+    \code{presence\_interrompue} et \code{evenement\_apres\_absence} (refus
+    \code{ligne\_invalide}), puis, ces motifs exclus, refus
+    \code{inventaire\_sans\_ligne}~; $t_M$, motif
+    \code{sortie\_non\_renseignee}, puis, exclu, refus
+    \code{inventaire\_sans\_ligne}~;
+  \item plusieurs dates perdues~: si elles forment un segment initial $t_1,
+    \dots, t_k$ de la grille (grille entière comprise), aucun motif et refus
+    \code{inventaire\_sans\_ligne} direct~; sinon, motifs cumulés parmi
+    \code{presence\_interrompue} (date perdue comprise entre deux dates
+    conservées), \code{evenement\_apres\_absence} (date perdue autre que
+    $t_M$, postérieure à une date conservée) et
+    \code{sortie\_non\_renseignee} ($t_M$ perdue, postérieure à une date
+    conservée), refus \code{ligne\_invalide}, puis, ces motifs exclus,
+    refus \code{inventaire\_sans\_ligne}.
+\end{itemize}
+La cascade à une date est celle que la spécification a mesurée et que le
+test~B3 vérifie aux dates $t_1$, $t_2$ et $t_4$ d'une grille de quatre
+dates~; à plusieurs dates, le test vérifie le cas de $t_1$ et $t_3$
+perdues. Une date perdue reste sans ligne~: elle apparaît dans le champ
+\code{retirees} de l'attribut, non dans \code{lignes}.\par}
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Présents sains.} Sous l'exclusion de tous
+les motifs attendus, toute date de la grille où ne reste aucune unité
+présente fait refuser la construction (\code{inventaire\_sans\_ligne}),
+quel que soit le type. Le décompte \code{presents\_sains} en donne, pour
+chaque date de la grille, le nombre d'unités qui y ont une ligne
+d'inventaire dans le jeu rendu, hors unités altérées et hors unités
+qu'une ligne retirée rend incohérentes (absence d'un inventaire entre le
+premier et le dernier, dernier inventaire $t_l$ avec $l < M$ sans ligne
+d'événement ou suivi d'une sortie postérieure à $t_{l+1}$)~; la règle est
+écrite dans le simulateur d'après la spécification, jamais calculée par le
+module \code{donnees}. Le refus porte ainsi sur les dates de présents
+sains nuls, dates perdues comprises (test~B6).\par}
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Propagation.} Pour les deux types de
+ligne (\code{inventaire\_hors\_grille}, \code{inventaire\_duplique}), les
+autres lignes de l'unité altérée sont déclarées sous le rôle
+\code{propagation}, sans motif ni refus attendus (\code{NA})~: elles ne
+portent aucun motif, mais l'exclusion du motif les écarte (amendement A1~;
+section~\ref{sec:controles-donnees}, «~Propagation d'une exclusion~»). Ce
+rôle diffère du rôle \code{tete} des lignes individuelles, dont les lignes
+portent le motif de la tête~; les lignes de propagation ne comptent pas
+dans \code{lignes\_en\_defaut}. Sous les deux types d'unité, toutes les
+lignes restantes de l'unité portent le motif (rôle \code{unite}), et il
+n'y a pas de propagation.\par}
+
+\medskip
+\noindent
+\textbf{Ordre et graine.} Les contrôles précèdent tout tirage (forme, puis
+défauts avec le catalogue de la forme)~; le jeu propre est tiré, puis
+projeté par \code{projeter\_stocks()}, sans tirage~; un seul appel de
+\code{sous\_graine()}, sous la graine des défauts, toujours distincte de
+celle du jeu, sélectionne alors par \code{tirer\_defauts()}, dans l'ordre
+des déclarations, les unités non encore altérées, en ordre croissant
+d'identifiant, ou, pour \code{inventaire\_perdu}, les dates de la grille.
+Les altérations portent sur les valeurs du jeu propre de la forme. La table
+rendue est faite des lignes du jeu propre de la forme, dans leur ordre,
+moins les lignes retirées, puis des copies (\code{inventaire\_duplique}),
+en fin, dans l'ordre des déclarations puis des unités, aux valeurs des
+originaux. Le texte de cet ordre est consigné dans le champ
+\code{ordre\_tirages} de l'attribut, dont les règles du taux et du nombre
+sont celles des lignes individuelles. L'attribut \code{simulation}, dont
+les décomptes de la projection restent ceux du jeu propre de la forme, et
+les lignes ni retirées ni altérées sont identiques à ceux de la forme
+propre (test~B1).
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Attribut \code{defauts}.} Il a les sept
+champs des lignes individuelles, dans le même ordre, \code{ordre\_tirages}
+et le texte de validité étant ceux de la forme, puis, \emph{en fin}, le
+champ \code{retirees}.
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{lignes}~: mêmes colonnes, numéros des lignes de la table
+    rendue (lignes présentes seulement), unité \code{unite} ou
+    \code{ligne}, rôles \code{alteree} (\code{inventaire\_hors\_grille}),
+    \code{original} et \code{copie} (\code{inventaire\_duplique}),
+    \code{unite} et \code{propagation} (ci-dessus), \code{premier\_deces}
+    restant manquant~;
+  \item \code{retirees}~: une ligne par ligne retirée, de colonnes
+    \code{ligne} (rang dans le jeu propre de la forme), \code{declaration},
+    \code{defaut}, \code{unite}, \code{id\_contrat}, \code{type\_ligne},
+    \code{date\_inventaire} (la date perdue pour \code{inventaire\_perdu},
+    manquante pour une ligne d'événement), \code{motif\_attendu} et
+    \code{refus\_attendu}~;
+  \item \code{decomptes}~: les champs des lignes individuelles, les lignes
+    du jeu propre de la forme tenant lieu de lignes du jeu propre et
+    \code{lignes\_en\_defaut} excluant le rôle \code{propagation}, puis,
+    en fin, \code{retirees} (nombre de lignes retirées),
+    \code{lignes\_propagation}, \code{unites\_propagation} (identifiants
+    distincts des lignes de propagation) et \code{presents\_sains}
+    (\code{data.frame} de colonnes \code{date\_inventaire} et
+    \code{presents\_sains}, une ligne par date de la grille)~;
+  \item \code{validite}~: les rôles aux noms des colonnes (identifiant
+    \code{id\_contrat} seul, \code{id\_tete} n'étant pas déclaré), la
+    période de la simulation, le délai de déclaration nul et le texte,
+    puis, en fin, la grille \code{inventaires}.
+\end{itemize}
+Les motifs et refus sont attendus sous ces conditions~: recette
+\code{stocks\_successifs}, rôles déclarés aux noms des colonnes, plan de
+même période que la simulation, délai de déclaration nul, grille du plan
+égale à celle de la forme. Pour les quatre types à motif, sans exclusion
+déclarée, le module \code{donnees} refuse (\code{ligne\_invalide}) en
+nommant les motifs attendus~; avec toutes les exclusions des motifs
+attendus déclarées, les lignes exclues sont, motif par motif, les lignes
+de l'attribut qui portent le motif, et le nombre de lignes exclues ajoute
+à celles-ci les lignes de propagation. Pour \code{inventaire\_perdu}, la
+cascade ci-dessus.\par}
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Refus.} \code{defauts\_invalides}, avant
+tout tirage~: un type hors du catalogue de la forme~; un type d'unité
+\code{unite} sans \code{cible} («~Défauts~: déclaration [k]~: type d'unité
+«~[type]~»~: champ cible requis (sous-ensemble de «~deces~», «~rachat~»,
+«~en\_cours~»).~»), un type d'unité \code{ligne} sans \code{cible} recevant
+le message des lignes individuelles~; une \code{cible} pour
+\code{inventaire\_perdu} («~[\dots]~type «~inventaire\_perdu~» (unité
+inventaire)~: champ cible interdit.~»)~; une cible disjointe par
+construction des causes admises («~[\dots]~: aucune unité éligible par
+construction.~»)~; \code{presence\_interrompue} sous une grille de moins
+de trois dates, en taux comme en nombre, au message «~Défauts~:
+déclaration [k]~: type presence\_interrompue~: aucune unité éligible par
+construction (grille de [M] dates d'inventaire, moins de trois), quel que
+soit le tirage.~»~; \code{inventaire\_perdu} accompagné d'une autre
+déclaration, avant ou après lui, y compris d'un second
+\code{inventaire\_perdu}, au message «~Défauts~: déclaration [k]~: type
+«~inventaire\_perdu~» exclusif~: il doit être la seule déclaration ([n]
+déclarations reçues).~», [k] étant le rang de la première déclaration
+exclusive, contrôle fait après celui de chaque déclaration.
+\code{defauts\_ineligibles}, après la projection, quand un \code{nombre}
+dépasse les unités éligibles non encore altérées ou, pour
+\code{inventaire\_perdu}, le nombre de dates de la grille (ci-dessus,
+«~Refus~»). Le mode multi-contrats reste refusé par
+\code{forme\_invalide}, au même message avec ou sans défauts (issue~\#190).\par}
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Clôture.} Les quatre motifs attendus du
+catalogue, réunis aux vingt-cinq autres motifs du
+tableau~\ref{tab:motifs-stocks}, qu'il ne produit pas, sont exactement les
+vingt-neuf motifs de \code{MOTIFS\_LIGNES\_STOCKS} et de
+\code{MOTIFS\_UNITE\_STOCKS}~; \code{evenement\_apres\_absence}, qui
+n'est l'attendu d'aucun type, n'apparaît que dans la cascade de
+l'inventaire perdu, et \code{inventaire\_sans\_ligne} est un refus, non un
+motif. Un test de clôture (B7) le vérifie, si bien qu'un motif des stocks
+ajouté sans décision sur le simulateur fait échouer la batterie. Les
+catalogues des lignes individuelles et des agrégats restent inchangés.\par}
 
 \subsection{Constats de simulation}
 \label{sec:constats-simulation}
@@ -15357,9 +15659,63 @@ périmètre forment exactement \code{MOTIFS\_LIGNES\_AGREGATS}~; l'entrée
 \code{lignes} de \code{DEFAUTS\_FORMES} est identique à
 \code{CATALOGUE\_DEFAUTS} (dix-huit types), \code{COMBINAISONS\_DEFAUTS}
 et \code{ORDRE\_TIRAGES\_DEFAUTS}~; un type des lignes est refusé sous la
-forme stocks successifs (\code{defauts\_invalides})~;
+forme stocks successifs (\code{defauts\_invalides}, type inconnu du
+catalogue des stocks)~;
 \code{conditions\_vides()} rend le même résultat sans forme qu'avec une
 forme \code{NULL}.
+\code{tests/unitaires/test\_simulateur\_stocks.R} vérifie la forme stocks
+successifs de l'issue~\#191 (critères B1 à B7 de la spécification), chaque
+attendu de nature nommée, sans constat Monte-Carlo, sur un jeu simulé en
+mode \code{uniforme} et une grille de quatre dates, les graines étant
+écrites dans le test. \emph{Identité exacte} (B1), pour chaque type à
+motif~: deux appels avec défauts identiques~; l'attribut \code{simulation}
+identique à celui de la forme propre, les lignes ni retirées ni altérées à
+celles de la projection propre, les copies aux originaux~; l'état du
+générateur de l'appelant inchangé. \emph{Valeurs écrites à la main}, les
+attendus étant lus dans l'attribut \code{defauts}, écrits en dur dans le
+catalogue de la forme et jamais calculés par le module \code{donnees}~:
+\emph{détection} (B2), pour chaque type à motif avec un \code{nombre}
+de~2, refus \code{ligne\_invalide} nommant ce seul motif, aux lignes qui
+le portent~; sous l'exclusion du motif, sous les deux hypothèses d'entrée
+\code{premier\_inventaire} et \code{milieu}, lignes exclues égales aux
+lignes porteuses, nombre de lignes exclues égal à celles-ci plus les lignes
+de propagation, et relevé \code{unites\_exclues\_par\_propagation} égal à
+\code{decomptes\$unites\_propagation}~; \code{evaluer\_motifs\_stocks()}
+ne levant que ce motif, avec les mêmes lignes de propagation~; de la
+propagation sous les seuls types de ligne, aucune sous les types d'unité,
+dont toutes les lignes restantes portent le motif~; \emph{inventaire
+perdu} (B3), aux dates $t_1$, $t_2$ et $t_4$, les lignes retirées et leur
+consignation, aucune ligne dans \code{lignes}, des présents sains nuls à la
+seule date perdue, la cascade (refus direct à $t_1$~; motifs, puis refus,
+à $t_2$ et à $t_4$~; dates et lignes reçues nulles dans les
+\code{details} du refus), le cas de $t_1$ et $t_3$ perdues, et le refus de
+l'inventaire perdu accompagné d'une autre déclaration, avant ou après lui,
+avec son message~; \emph{jeu de six unités} écrit à la main (B4),
+défauts injectés par \code{injecter\_defauts\_stocks()} en appel direct~:
+pour chaque type, les éligibles, les lignes retirées, la renumérotation,
+les rôles et les présents sains, la date hors grille sur une grille de
+dates consécutives, la disjonction par unité, les champs de l'attribut et
+de sa \code{validite}~; \emph{refus} (B5), avant tout tirage, aucun appel
+de \code{sous\_graine()} n'étant compté (fonction tracée)~:
+\code{defauts\_invalides} pour \code{presence\_interrompue} sous une
+grille de deux dates, une cible disjointe, une \code{cible} sous
+\code{inventaire\_perdu}, un type d'unité sans \code{cible}, un type des
+lignes ou des agrégats sous la forme et un type des stocks sans forme, avec
+leurs messages~; \code{forme\_invalide} sous un mode multi-contrats, au
+même message avec et sans défauts~; \code{defauts\_ineligibles} après la
+projection (deux appels de \code{sous\_graine()}, état du générateur de
+l'appelant inchangé)~; \emph{présents sains} (B6), sur le jeu de six
+unités, le refus \code{inventaire\_sans\_ligne} à la seule date sans
+présent sain, et, sur le jeu simulé, des présents sains tous positifs et
+la construction acceptée sous l'exclusion de chaque type à motif, et les
+dates du refus de l'inventaire perdu égales aux dates sans présent sain~;
+\emph{clôture} (B7), les quatre motifs du catalogue et les vingt-cinq
+motifs hors de son périmètre formant exactement \code{MOTIFS\_LIGNES\_STOCKS}
+et \code{MOTIFS\_UNITE\_STOCKS}, le refus attendu et le motif manquant de
+l'inventaire perdu, son exclusivité, les catalogues des lignes et des
+agrégats inchangés, la condition \code{grille\_trois\_dates} vide sous
+une grille de deux dates et non sous une grille de quatre dates, et
+\code{controler\_forme()} à quatre arguments.
 \code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
 identique, attribut compris, dans un autre processus R.
 
@@ -15392,7 +15748,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{CATALOGUE\_DEFAUTS} & constante & --- & catalogue des 18 types de défauts paramétrés~: unité, causes éligibles, condition, altération, motif et refus attendus, écrits en dur (tableau~\ref{tab:catalogue-defauts}) \\
 \catalogue{fonctions-simulation}{COMBINAISONS\_DEFAUTS} & constante & --- & combinaisons de types admises sur une même ligne (liste fermée) \\
 \catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_DEFAUTS} & constante & --- & ordre des tirages des défauts, consigné dans l'attribut \code{defauts} \\
-\catalogue{fonctions-simulation}{DEFAUTS\_FORMES} & constante & --- & règles des défauts par forme, lues par le nom de forme (\code{lignes} pour \code{forme = NULL}, \code{agregats}, \code{stocks\_successifs})~: catalogue, combinaisons, domaine de \code{cible}, unités à cible requise, ordre des tirages et texte de validité consignés~; l'entrée \code{lignes} reprend à l'identique les trois constantes précédentes (tableaux~\ref{tab:catalogue-defauts} et~\ref{tab:catalogue-defauts-agregats}~; stocks successifs~: issue~\#191) \\
+\catalogue{fonctions-simulation}{DEFAUTS\_FORMES} & constante & --- & règles des défauts par forme, lues par le nom de forme (\code{lignes} pour \code{forme = NULL}, \code{agregats}, \code{stocks\_successifs})~: catalogue, combinaisons, domaine de \code{cible}, unités à cible requise, types exclusifs (stocks successifs~: \code{inventaire\_perdu}~; champ absent pour les autres formes), ordre des tirages et texte de validité consignés~; l'entrée \code{lignes} reprend à l'identique les trois constantes précédentes (tableaux~\ref{tab:catalogue-defauts}, \ref{tab:catalogue-defauts-agregats} et~\ref{tab:catalogue-defauts-stocks}) \\
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
@@ -15407,11 +15763,12 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
 \catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
-\catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut), règles de la forme (celles des lignes par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issue~\#112) et un type hors du catalogue de la forme (issue~\#189)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; cible requise ou interdite selon l'unité du type~; déclarations normalisées (types rangés dans l'ordre du catalogue, unité, cible, taux ou nombre) \\
-\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période, forme validée (\code{NULL} par défaut) & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête (issue~\#112), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres})~; sous une forme, les seules conditions de son catalogue, d'après la forme seule~: condition \code{annee} des agrégats sans \code{par\_annee} (issue~\#189) \\
+\catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut), règles de la forme (celles des lignes par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issue~\#112) et un type hors du catalogue de la forme (issue~\#189)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; cible requise ou interdite selon l'unité du type~; type exclusif de la forme accompagné d'une autre déclaration (issue~\#191)~; déclarations normalisées (types rangés dans l'ordre du catalogue, unité, cible, taux ou nombre) \\
+\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période, forme validée (\code{NULL} par défaut) & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête (issue~\#112), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres})~; sous une forme, les seules conditions de son catalogue, d'après la forme seule~: condition \code{annee} des agrégats sans \code{par\_annee} (issue~\#189), condition \code{grille\_trois\_dates} des stocks successifs sous une grille de moins de trois dates (issue~\#191) \\
 \catalogue{fonctions-simulation}{tirer\_defauts()} & interne & graine des défauts, déclarations contrôlées, état initial, fonctions des éligibles et de marquage & sélection des unités en défaut, règle unique de toutes les formes~: un seul \code{sous\_graine()}, déclarations dans l'ordre reçu, éligibles non encore altérées, taux ou nombre, puis marquage (disjonction)~; refus \code{defauts\_ineligibles}~; nombre d'éligibles et unités retenues par déclaration (issue~\#189) \\
 \catalogue{fonctions-simulation}{injecter\_defauts()} & interne & jeu propre, défauts contrôlés, défauts reçus, période & sélection par la règle unique de tirage (ligne précédente), refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de jeu~; jeu altéré et attribut \code{defauts} \\
 \catalogue{fonctions-simulation}{injecter\_defauts\_agregats()} & interne & table agrégée propre, défauts contrôlés, défauts reçus, période, forme validée & défauts de la forme agrégats après la projection~: sélection des cellules par la règle unique de tirage, refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de table~; table altérée et attribut \code{defauts} (validité~: convention et \code{par\_annee} en fin~; issue~\#189) \\
+\catalogue{fonctions-simulation}{injecter\_defauts\_stocks()} & interne & jeu propre de la forme stocks successifs, défauts contrôlés, défauts reçus, période, forme validée & défauts de la forme stocks successifs après la projection~: sélection des unités inventoriées ou des dates de la grille par la règle unique de tirage, refus \code{defauts\_ineligibles}, altérations déterministes, lignes retirées, copies en fin~; table altérée et attribut \code{defauts} (champ \code{retirees} en fin, décomptes de propagation et présents sains, validité~: grille en fin~; issue~\#191) \\
 \catalogue{fonctions-simulation}{CHAMPS\_FORMES} & constante & --- & champs requis de l'argument \code{forme}, par forme~: \code{agregats} (\code{nom}, \code{transition}, \code{convention}, \code{par\_annee}), \code{stocks\_successifs} (\code{nom}, \code{inventaires}) \\
 \catalogue{fonctions-simulation}{CONVENTIONS\_FORMES} & constante & --- & conventions d'âge mises en œuvre par forme~: \code{dernier\_anniversaire} et \code{age\_atteint\_annee} pour \code{agregats} \\
 \catalogue{fonctions-simulation}{CHAMPS\_FORMES\_MULTI} & constante & --- & champs ajoutés à la forme sous les modes multi-contrats, requis sous ces modes et refusés sous les autres~: \code{unite\_observation} pour \code{agregats}~; une forme absente (stocks successifs) est refusée sous ces modes (issue~\#189) \\
