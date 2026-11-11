@@ -13675,9 +13675,16 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
     $1{,}93\cdot 10^{-3}$ à 90, $1{,}05\cdot 10^{-3}$ à 100,
     $8{,}0\cdot 10^{-4}$ à 110 et $9{,}5\cdot 10^{-4}$ à 120 (résultat exact
     de la formule, évalué aux âges entiers)~: une fermeture de Kannisto
-    jugée sur un jeu simulé sous une loi à $a > 0$ est légèrement mal
-    spécifiée, et ce biais est à déclarer, ou le jeu à prendre avec
-    $a = 0$. Les tests emploient $a = 2\cdot 10^{-4}$,
+    jugée sur un jeu simulé sous une loi à $a > 0$ est mal spécifiée, d'un
+    biais déterministe qui ne décroît pas avec l'exposition~; le jugement
+    déclare ce biais, ou emploie un jeu à $a = 0$. Même à $a = 0$, la loi
+    vraie du jeu est la loi constante par morceaux $\Delta H_x$
+    («~Hypothèse de répartition dans l'année~», ci-dessous)~: l'écart
+    $\operatorname{logit}(\Delta H_x) - (\ln b + c\,(x + \tfrac12))$ vaut
+    alors $3{,}4\cdot 10^{-4}$ à 80~ans, $1{,}8\cdot 10^{-4}$ à 100 et
+    $-1{,}6\cdot 10^{-4}$ à 120 (même statut), et ne disparaît que si la
+    fermeture compare l'intégrale de son intensité sur $[x, x+1)$ à
+    $\Delta H_x$. Les tests emploient $a = 2\cdot 10^{-4}$,
     $b = 2{,}5\cdot 10^{-5}$, $c = \ln 1{,}1$, âges 0 à 130, loi appariée à
     la table de Gompertz-Makeham ci-dessus ($x^{*} \approx 111{,}2$~ans~;
     \emph{choix de conception} de la spécification, sans prétention de
@@ -13739,7 +13746,12 @@ $\mu(x + \tfrac12)$~: pour la loi logistique des tests, l'écart relatif
 $\Delta H_x / \mu(x + \tfrac12) - 1$ reste compris entre
 $-4{,}7\cdot 10^{-5}$ et $3{,}6\cdot 10^{-4}$ sur les âges 0 à 130
 (valeur calculée par la formule close). Une méthode qui ajuste une intensité
-paramétrique se compare à la loi vraie sur cette échelle.
+paramétrique $\mu_\theta$ se compare donc à la loi vraie par
+$\int_x^{x+1}\mu_\theta(t)\,dt$ face à $\Delta H_x$ (ou par $q_x$), et non
+par $\mu_\theta(x+\tfrac12)$ face à $\mu(x+\tfrac12)$~; ajustée au point
+$x+\tfrac12$, elle retrouve au mieux la loi constante par morceaux du jeu,
+et ses paramètres portent alors un biais déterministe, lié à cet écart, qui
+ne décroît pas avec l'exposition.
 
 \noindent
 Une probabilité $q_x = 1$ à un âge atteignable rend la force infinie~: le
@@ -14129,6 +14141,14 @@ la convention~:
     initiale du simulateur n'a pas d'équivalent dans la table d'exposition
     d'une construction en lignes, et son recoupement passe par la somme sur
     les années (section~\ref{sec:verifications-simulation}).
+    L'estimateur binomial du moteur ne la consomme que sommée sur les
+    années~: sous \code{par\_annee = TRUE}, il est refusé quelle que soit
+    la convention (\code{binomial\_par\_annee},
+    section~\ref{sec:brut-etape})~; avec le rôle \code{annee} et
+    \code{par\_annee = FALSE}, il est admis sous \code{age\_atteint\_annee}
+    (seule \code{dernier\_anniversaire} le refuse,
+    \code{binomial\_annee\_dernier\_anniversaire}), l'étape
+    \code{exposition} sommant l'exposition initiale par année.
 \end{itemize}
 
 \noindent
@@ -14156,8 +14176,16 @@ est refusé comme champ inconnu, sur le précédent de \code{loi\_contrats}.
   \item \code{"contrat"}~: la projection porte sur les lignes du jeu
     propre, une par contrat écrit~; une tête décédée compte autant
     d'événements que de contrats en cours à son décès, tous sortis le même
-    jour, si bien que ces événements ne sont pas indépendants entre eux.
-    C'est l'unité du moteur quand aucun identifiant de tête n'est déclaré
+    jour, si bien que ces événements ne sont pas indépendants entre eux~:
+    le décès d'une tête titulaire de $K$ contrats en cours est compté $K$
+    fois, et sa contribution à la variance du nombre d'événements est
+    $K^{2}$ fois celle d'un décès compté une fois (résultat exact, sous
+    l'indépendance des têtes)~; le nombre d'événements est donc surdispersé
+    par rapport à un comptage de têtes, et les intervalles et tests calculés
+    sur ces agrégats, qui supposent des unités indépendantes, sont trop
+    étroits (avertissement \code{unite\_agregat},
+    section~\ref{sec:unite-observation}). Aucun test du simulateur n'en
+    dépend, et l'effet n'est pas mesuré. C'est l'unité du moteur quand aucun identifiant de tête n'est déclaré
     (section~\ref{sec:unite-observation})~;
   \item \code{"tete"}~: les fenêtres des contrats de chaque tête sont
     d'abord réunies par \code{fusionner\_tetes()}, selon la règle de fusion
@@ -14760,7 +14788,13 @@ catalogue, réunis aux treize motifs des agrégats qu'il ne produit pas
 \code{sexe\_manquant}, \code{sexe\_hors\_modalites},
 \code{segment\_manquant}, \code{exposition\_manquante},
 \code{exposition\_non\_finie}, \code{evenements\_manquants},
-\code{evenements\_negatifs}), sont exactement les dix-huit motifs de
+\code{evenements\_negatifs}~; hors du périmètre de la spécification de
+l'issue~\#189 (§ 1)~: \code{segment\_manquant}, faute de colonne
+\code{segment} dans le jeu simulé (raison de M136)~; les douze autres,
+contrôles de la valeur d'une seule colonne (manquante, non entière, non
+finie ou hors domaine), sans cohérence entre colonnes ni entre cellules,
+vérifiés sur des tables écrites à la main par
+\code{tests/unitaires/test\_agregats.R}), sont exactement les dix-huit motifs de
 \code{MOTIFS\_LIGNES\_AGREGATS}~; un test de clôture (A7) le vérifie, si
 bien qu'un motif des agrégats ajouté sans décision sur le simulateur fait
 échouer la batterie. Le catalogue des lignes individuelles reste celui du
@@ -15048,10 +15082,21 @@ dépasse les unités éligibles non encore altérées ou, pour
 catalogue, réunis aux vingt-cinq autres motifs du
 tableau~\ref{tab:motifs-stocks}, qu'il ne produit pas, sont exactement les
 vingt-neuf motifs de \code{MOTIFS\_LIGNES\_STOCKS} et de
-\code{MOTIFS\_UNITE\_STOCKS}~; \code{evenement\_apres\_absence}, qui
-n'est l'attendu d'aucun type, n'apparaît que dans la cascade de
-l'inventaire perdu, et \code{inventaire\_sans\_ligne} est un refus, non un
-motif. Un test de clôture (B7) le vérifie, si bien qu'un motif des stocks
+\code{MOTIFS\_UNITE\_STOCKS}. Les vingt-cinq sont hors du périmètre de la
+spécification de l'issue~\#191 (§ 1), en quatre groupes~: trois, faute de
+colonne \code{segment} ou \code{annee\_naissance} dans le jeu simulé
+(\code{segment\_manquant}, \code{annee\_naissance\_incoherente},
+\code{unite\_segment\_incoherent}~; raison de M136)~; dix-sept, contrôles
+d'une seule ligne (valeur d'une colonne, ou cohérence entre les colonnes de
+la ligne), sans cohérence entre lignes~; quatre cohérences d'unité
+(\code{unite\_naissance\_incoherente}, \code{unite\_sexe\_incoherent},
+\code{evenements\_multiples}, \code{presence\_apres\_evenement}), écartées
+par choix de périmètre~; \code{evenement\_apres\_absence}, qui n'est
+l'attendu d'aucun type et n'apparaît que dans la cascade de l'inventaire
+perdu~; tous sont vérifiés par
+\code{tests/unitaires/test\_stocks\_successifs.R}.
+\code{inventaire\_sans\_ligne} est un refus, non un motif. Un test de
+clôture (B7) vérifie l'égalité des vingt-neuf motifs, si bien qu'un motif des stocks
 ajouté sans décision sur le simulateur fait échouer la batterie. Les
 catalogues des lignes individuelles et des agrégats restent inchangés.\par}
 
@@ -15628,7 +15673,8 @@ absent, inattendu, hors liste ou \code{NA}, et pour
 \code{sous\_graine()}, état du générateur de l'appelant inchangé)~; la
 disjonction, sous un taux de~1 pour tous les types. \emph{Recoupement
 contre le moteur} (A5~; \emph{approximation numérique}, tolérance relative
-$10^{-10}$, l'écart maximal mesuré étant imprimé par la batterie, un
+$10^{-10}$, l'écart maximal mesuré figurant dans l'intitulé du test,
+affiché en cas d'échec ou sous l'option \code{harnais.verbeux}, un
 dépassement étant un constat et jamais une tolérance à élargir)~: la
 projection du simulateur est comparée à la table d'exposition d'une
 construction en lignes sur le jeu propre (unité contrat~: rôles sans
@@ -15638,9 +15684,9 @@ transitions sans \code{par\_annee} et sous le décès avec
 \code{par\_annee}~; en mode \code{uniforme\_multi}, l'unité tête sous
 \code{dernier\_anniversaire} sans et avec \code{par\_annee} et sous
 \code{age\_atteint\_annee}, l'unité contrat sous les deux transitions~;
-mêmes cellules, événements identiques, $E^c$ et, sans \code{par\_annee},
-$E^i$ (comparée à $E^c$ plus \code{complement\_initial\_cellule}) à
-$10^{-10}$ près, chaque cas comptant au moins 50~événements. Sous
+mêmes cellules, événements identiques, $E^c$ dans les huit cas et $E^i$
+(comparée à $E^c$ plus \code{complement\_initial\_cellule}) dans les six
+cas sans \code{par\_annee}, à $10^{-10}$ près, chaque cas comptant au moins 50~événements. Sous
 \code{age\_atteint\_annee}, les sommes sur les années de $E^c$ et de
 $E^i$ par année sont égales, à $10^{-12}$ relatif près, aux valeurs sans
 année, et les événements identiques~: c'est, avec A3, le seul recoupement
@@ -15652,7 +15698,11 @@ le jeu propre. \emph{Identité exacte} (A6)~: les résultats de l'étape
 \code{brut} d'une construction sur les agrégats \code{age\_atteint\_annee}
 du simulateur et d'une construction en lignes sur le jeu propre sont
 identiques (\code{poisson} et \code{binomial} sans \code{par\_annee},
-\code{poisson} par année), et le positionnement d'une construction sur ces
+\code{poisson} par année)~; la table par année (rôle \code{annee})
+construite sans année, \code{poisson} et \code{binomial}, contre la
+construction en lignes~: recoupement en \emph{approximation numérique} à
+$10^{-12}$ relatif (sexe, âge, événements et état identiques)~; et le
+positionnement d'une construction sur ces
 agrégats est refusé (\code{convention\_positionnement\_non\_admise}). \emph{Clôture} (A7)~: les
 motifs du catalogue des agrégats et les treize motifs hors de son
 périmètre forment exactement \code{MOTIFS\_LIGNES\_AGREGATS}~; l'entrée
