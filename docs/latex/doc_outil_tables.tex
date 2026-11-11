@@ -9947,21 +9947,29 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     foi)~: décomptes de strates et de groupes et ddl, exacts~; $T$ et
     $z_s$, approximation numérique~; p-valeur asymptotique, résultat
     asymptotique dans le régime d'information croissante (issue~\#185)~:
-    plus petite valeur propre de $V$ réduite (de façon équivalente, à
-    nombre de groupes fixé, plus petite valeur propre non nulle de $V$)
-    tendant vers l'infini, le nombre de strates étant fixe ou croissant~;
-    $D_{\cdot c}$ peut rester petit dans chaque strate~: sachant les
+    plus petite valeur propre de $V$ réduite (de façon équivalente, plus
+    petite valeur propre non nulle de $V$) tendant vers l'infini, à nombre
+    de groupes fixé, le nombre de strates étant fixe ou croissant~;
+    $D_{\cdot c}$ peut rester borné dans chaque strate quand le nombre de
+    strates croît~: sachant les
     $D_{\cdot c}$, $U$ est la somme de $\sum_c D_{\cdot c}$ vecteurs
     indépendants, un par décès (vecteur indicateur du groupe du décès
     moins $\pi_c$), centrés sous $H_0$ et bornés, dont les matrices de
     variance somment à $V$~; le théorème central limite de Lindeberg, sous
     sa forme multivariée, s'applique dès que cette valeur propre tend vers
     l'infini, et le régime $D_{\cdot c} \to \infty$ dans chaque strate
-    n'est donc pas requis. La condition, reprise du statut, qu'aucune
-    strate ne porte à elle seule une part non négligeable de $V$ est
-    suffisante sans être nécessaire, et ne peut être remplie quand le
-    nombre de strates est fixe (issue~\#202, décision du mainteneur du
-    10/11/2026~: correction du statut du code renvoyée hors de B16).
+    n'est donc pas requis. Jusqu'à l'issue~\#202, le statut du code
+    ajoutait qu'aucune strate ne porte à elle seule une part non
+    négligeable de $V$~: cette condition, suffisante sans être nécessaire,
+    ne peut être remplie quand le nombre $K$ de strates est fixe, la plus
+    grande part valant alors au moins $1/K$~; il disait
+    aussi que $D_{\cdot c}$ peut rester petit dans chaque strate, ce qui est
+    faux à nombre de strates fixe, puisque la valeur propre ne tend alors
+    vers l'infini que si les décès croissent dans une strate au moins. La
+    condition est retirée du statut, qui dit désormais le nombre de groupes
+    fixé et ne laisse $D_{\cdot c}$ borné que si le nombre de strates croît
+    (issue~\#202, relecture d'\code{actuary-approfondi}, texte repris mot
+    pour mot~; correction renvoyée hors de B16 par la décision M364).
     Illustration~: constat de simulation m8 de la spécification
     (commentaire 6747045250 de l'issue~\#185), hors batterie, $10^4$
     réplications par cas, erreur de Monte-Carlo $0{,}0022$ sur un taux de
@@ -10090,7 +10098,10 @@ recoupements~: la ligne de \code{ETAPES}, les paramètres, les états et les
 statuts (mention d'indépendance, place de la qualification «~asymptotique
 sous le modèle de survie~», $O/A$ non nommé SMR, aucune attribution~;
 régime d'information croissante de la p-valeur asymptotique et de $z_s$,
-T185.1, issue~\#185)~;
+T185.1, issue~\#185~; statut de la p-valeur asymptotique sans condition
+sur les parts des strates dans $V$, à nombre de groupes fixé, $D_{\cdot c}$
+borné seulement quand le nombre de strates croît, statut de $z_s$
+inchangé, aucune source citée, T202, issue~\#202)~;
 chaque refus de \code{valider\_plan()} et leur ordre, et l'invariance des
 refus de l'étape \code{validation} après l'extraction des briques de
 forme~; sur un petit jeu, $T$, ddl et p asymptotiques des tests global,
