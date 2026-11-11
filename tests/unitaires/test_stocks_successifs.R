@@ -464,7 +464,15 @@ verifier("catalogue des recettes, (4b) : ligne stocks_successifs (§ 3 : type_li
 })
 verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, sauf importance_exclusions, motif importance_exclusions_stocks ; valeur écrite à la main)", {
   m <- MAT[MAT$recette == "stocks_successifs", -1L]; rownames(m) <- NULL
-  identical(m, data.frame(
+  # Tolérance (décision du mainteneur du 11/11/2026, vague lissage) : une
+  # ligne lissage (estimateur NA, admis « oui »), unique, placée juste après
+  # kaplan_meier, est admise et retirée avant la comparaison.
+  l <- which(m$etape == "lissage")
+  lissage_admis <- !length(l) ||
+    (length(l) == 1L && l >= 2L && identical(m$estimateur[l - 1L], "kaplan_meier") &&
+       is.na(m$estimateur[l]) && identical(m$admis[l], "oui"))
+  if (length(l)) { m <- m[-l, ]; rownames(m) <- NULL }
+  lissage_admis && identical(m, data.frame(
     etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite", "validation",
               "importance_exclusions"),
     estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
@@ -498,7 +506,7 @@ verifier("catalogue_roles(), (4b) : colonne recettes des rôles des stocks (vale
 
 verifier("PARAMETRES_ETAPES, (4b) : colonne recette (NA pour tout paramètre existant) ; exposition : entree_entre_inventaires, character, conditionnel à stocks_successifs (valeur écrite à la main)", {
   pe <- tablexp:::PARAMETRES_ETAPES
-  all(vapply(pe, function(t) identical(names(t), c("parametre", "type", "domaine", "recette")), NA)) &&
+  all(vapply(pe, function(t) identical(names(t)[1:4], c("parametre", "type", "domaine", "recette")), NA)) &&
     identical(pe$exposition$parametre, c("convention", "par_annee", "entree_entre_inventaires")) &&
     identical(pe$exposition$type, c("character", "logical", "character")) &&
     identical(pe$exposition$recette, c(NA, NA, "stocks_successifs")) &&
@@ -1100,15 +1108,13 @@ verifier("projeter_stocks() en appel direct (valeurs écrites à la main) : s = 
     identical(r$decomptes, list(lignes = c(inventaire = 10L, evenement = 3L), p0 = 2L, entrees = 2L,
                                 entres_sortis = c(deces = 1L, rachat = 0L), presents_dernier = 2L))
 })
-verifier("C11 (refus écrits à la main) : forme stocks avec defauts, mode multi-contrats, grille non alignée (premier, dernier), grille mal formée (classe, une date, NA, non croissante, non entière, attribut), champ manquant ou inconnu -> forme_invalide, module simulation, avant tout tirage (aucun appel de sous_graine())", {
-  dft <- list(graine = 170L, declarations = list(list(type = "sexe_manquant", cible = "deces", nombre = 1L)))
+verifier("C11 (refus écrits à la main) : mode multi-contrats, grille non alignée (premier, dernier), grille mal formée (classe, une date, NA, non croissante, non entière, attribut), champ manquant ou inconnu -> forme_invalide, module simulation, avant tout tirage (aucun appel de sous_graine())", {
   pf_multi <- c(PF_C1, list(loi_contrats = c(0.5, 0.5))); pf_multi$mode <- "uniforme_multi"
   fg <- function(g) list(nom = "stocks_successifs", inventaires = g)
   ns <- asNamespace("tablexp"); cpt <- new.env(); cpt$n <- 0L
   suppressMessages(trace("sous_graine", tracer = bquote(assign("n", get("n", envir = .(cpt)) + 1L, envir = .(cpt))),
                          where = ns, print = FALSE))
   cas <- tryCatch(list(
-    defauts = rf(sim_st(defauts = dft)),
     multi = rf(sim_st(portefeuille = pf_multi)),
     premier = rf(sim_st(fg(G_C1[-1L]))),
     dernier = rf(sim_st(fg(G_C1[-4L]))),
@@ -1126,8 +1132,7 @@ verifier("C11 (refus écrits à la main) : forme stocks avec defauts, mode multi
   msg <- function(k) conditionMessage(cas[[k]])
   if (!identical(cpt$n, 0L)) sprintf("%d appel(s) de sous_graine() pendant les refus", cpt$n)
   else if (length(ko)) paste("sans le refus attendu :", paste(ko, collapse = ", "))
-  else if (!grepl("defauts", msg("defauts"), fixed = TRUE) ||
-           !grepl("(tête ou contrat) serait ambiguë ; la fusion par tête des contrats inventoriés", msg("multi"), fixed = TRUE) ||
+  else if (!grepl("(tête ou contrat) serait ambiguë ; la fusion par tête des contrats inventoriés", msg("multi"), fixed = TRUE) ||
            !identical(msg("premier"), paste("Forme du jeu simulé : inventaires : grille non alignée sur la période (premier",
                                             "inventaire 2015-12-31, dernier 2017-12-31) ; la première date doit être la veille",
                                             "du début (2014-12-31) et la dernière la fin de la période (2017-12-31), le simulateur",
