@@ -13608,7 +13608,7 @@ de 1 pour \code{F}) sont construits et contrôlés~; ils sont consignés dans
 \code{sexes\_controles}.
 
 \medskip
-Deux tables synthétiques, de statut \code{synthetique} et porteuses de leurs
+Trois tables synthétiques, de statut \code{synthetique} et porteuses de leurs
 paramètres (attribut \code{parametres}), sont construites par le module~:
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
@@ -13624,6 +13624,62 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
     0 à 120 (\emph{choix de conception} de la spécification, sans prétention
     de réalisme), qui donnent $q_{60} = 0{,}008153179142$ et
     $q_{100} = 0{,}303486068312$, et des facteurs $f_H = 1$, $f_F = 0{,}6$~;
+  \item \textbf{logistique} (\code{table\_logistique()}, issue~\#211)~:
+    intensité
+    \[
+      \mu(x) = a + \frac{b\,e^{cx}}{1 + b\,e^{cx}},
+    \]
+    «~forme simplifiée~» du modèle logistique des Lignes directrices
+    mortalité (Institut des actuaires, Commission d'agrément, version
+    approuvée, 2006, chap.~3, II.5, p.~25/40~; la forme générale, à quatre
+    paramètres, de dénominateur $1 + d\,e^{cx}$, figure p.~24/40), qui
+    donne, pour $a = 0$, le \emph{modèle de Kannisto} (même page). Les
+    paramètres $a \ge 0$, $b > 0$, $c > 0$ sont des réels finis déclarés,
+    sans valeur par défaut, et $e^{c}$ doit être fini en double précision
+    ($c \le \ln(\text{plus grand double}) \approx 709{,}78$~: au-delà,
+    $q_x$ vaudrait 1 à tort)~; les âges sont des entiers $\ge 0$ déclarés~;
+    sinon, refus \code{loi\_invalide}. Le risque cumulé est
+    $H(x) = a\,x + \ln(1 + b\,e^{cx})/c$, et la probabilité annuelle est
+    l'intégrale exacte de $\mu$ sur $[x, x+1)$ (résultat exact, calcul
+    direct)~:
+    \[
+      q_x = 1 - e^{-\Delta H_x}, \qquad
+      \Delta H_x = H(x+1) - H(x) = a + \frac{1}{c}
+      \ln\bigl(1 + (e^{c} - 1)\, v_x\bigr), \qquad
+      v_x = \frac{b\,e^{cx}}{1 + b\,e^{cx}}~;
+    \]
+    elle est évaluée sous cette forme, $v_x$ par \code{stats::plogis()} en
+    $\ln b + c\,x$, le logarithme par \code{log1p()}, $e^{c} - 1$ et
+    $1 - e^{-\Delta H_x}$ par \code{expm1()}, sans jamais former
+    $b\,e^{cx}$~: ni débordement aux grands âges, ni perte de précision
+    relative aux petites probabilités (approximation numérique, recoupée
+    par \code{stats::integrate()} à $10^{-12}$ relatif près, test~T3
+    ci-dessous). La table est sans distinction de sexe (\code{ensemble}).
+    $q_x$ croît strictement avec l'âge et tend vers le plateau
+    $1 - e^{-(a+1)}$ ($0{,}632120558828558$ pour $a = 0$), puisque
+    l'intensité tend vers $1 + a$~: la probabilité de décès tend vers une
+    limite inférieure à~1, ce que la source attribue au modèle logistique
+    (p.~24/40). À mêmes $a = A$, $b = B$ et $c_{GM} = e^{c}$, l'intensité
+    logistique est, à tout âge, strictement inférieure à celle de
+    Gompertz-Makeham ($b\,e^{cx}/(1 + b\,e^{cx}) < b\,e^{cx}$), et
+    $q_x$ aussi~; les deux lois ne diffèrent que par la décélération de la
+    queue, autour de l'inflexion de $v_x$ en $x^{*} = -\ln b / c$.
+    \textbf{Kannisto n'est exactement la loi vraie que pour $a = 0$}~: le
+    logit de l'intensité, $\ln\bigl(\mu(x)/(1 - \mu(x))\bigr)$, vaut alors
+    exactement $\ln b + c\,x$, linéaire en~$x$~; pour $a > 0$, il ne l'est
+    plus, et l'écart $\operatorname{logit}(a + v_x) - \operatorname{logit}(v_x)$
+    vaut, pour la loi des tests ci-dessous, $4{,}31\cdot 10^{-3}$ à 80~ans,
+    $1{,}93\cdot 10^{-3}$ à 90, $1{,}05\cdot 10^{-3}$ à 100,
+    $8{,}0\cdot 10^{-4}$ à 110 et $9{,}5\cdot 10^{-4}$ à 120 (résultat exact
+    de la formule, évalué aux âges entiers)~: une fermeture de Kannisto
+    jugée sur un jeu simulé sous une loi à $a > 0$ est légèrement mal
+    spécifiée, et ce biais est à déclarer, ou le jeu à prendre avec
+    $a = 0$. Les tests emploient $a = 2\cdot 10^{-4}$,
+    $b = 2{,}5\cdot 10^{-5}$, $c = \ln 1{,}1$, âges 0 à 130, loi appariée à
+    la table de Gompertz-Makeham ci-dessus ($x^{*} \approx 111{,}2$~ans~;
+    \emph{choix de conception} de la spécification, sans prétention de
+    réalisme), qui donnent $q_{60} = 0{,}008090365980$ et
+    $q_{100} = 0{,}233299664772$, et la même loi avec $a = 0$~;
   \item \textbf{table constante} (\code{table\_constante()})~: $q_x = q$ à tous
     les âges déclarés~; elle porte la loi de rachat ($q = 0{,}05$ dans les
     tests de portefeuille), ou une transition absente ($q = 0$). Une loi de
@@ -13668,6 +13724,19 @@ indépendants}. L'hypothèse est consignée dans le résultat
     plus uniforme~: l'hypothèse ne serait plus la même pour les deux
     transitions (résultat exact, calcul direct).
 \end{itemize}
+
+\noindent
+Pour une table synthétique définie par une intensité continue
+(Gompertz-Makeham, logistique), la table porte $q_x = 1 -
+e^{-\Delta H_x}$, où $\Delta H_x = \int_x^{x+1} \mu(t)\,dt$~; le simulateur
+remplace $\mu$ sur $[x, x+1)$ par sa moyenne $\mu_x = -\ln(1 - q_x) =
+\Delta H_x$. La loi vraie des jeux simulés se lit donc sur $q_x$, ou
+$\Delta H_x$, et non sur l'intensité continue en un point, $\mu(x)$ ou
+$\mu(x + \tfrac12)$~: pour la loi logistique des tests, l'écart relatif
+$\Delta H_x / \mu(x + \tfrac12) - 1$ reste compris entre
+$-4{,}7\cdot 10^{-5}$ et $3{,}6\cdot 10^{-4}$ sur les âges 0 à 130
+(valeur calculée par la formule close). Une méthode qui ajuste une intensité
+paramétrique se compare à la loi vraie sur cette échelle.
 
 \noindent
 Une probabilité $q_x = 1$ à un âge atteignable rend la force infinie~: le
@@ -14807,6 +14876,82 @@ décès et d'exposition exclus, taux bruts avant et après exclusion) sont
 imprimées par la batterie, sans verdict, et ne sont pas reproduites ici
 (E3.4).
 
+\subsubsection*{Loi logistique~: forme de queue}
+
+La table logistique (issue~\#211~; section~\ref{sec:loi-vraie}) est
+vérifiée par un constat de simulation de même forme que celui du simulateur
+minimal, qui porte sur six cohortes de $n = 10^{5}$ têtes, une par loi
+(logistique L, ou Gompertz-Makeham appariée G~: lois des tests de la
+section~\ref{sec:loi-vraie}, âges 0 à 130, facteurs $f_H = f_F = 1$) et par
+âge $x \in \{100, 110, 120\}$, entrées le 2016-03-15 à l'âge exact $x$ (mode
+\code{age\_exact}), période du 2016-03-15 au 2017-12-31, sans rachat (table
+constante de $q = 0$)~: l'année d'âge $x$ est observée entière.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Hypothèse nulle}~: le jeu suit la loi déclarée~; le nombre
+    $D$ de décès datés avant l'anniversaire $x + 1$ (2017-03-15) suit alors
+    exactement la loi binomiale $\mathcal{B}(n, q_x)$.
+  \item \textbf{Statistique}~: $D$.
+  \item \textbf{Loi de référence et région}~: bilatérale exacte,
+    $[\text{qbinom}(\alpha_k/2, n, q_x), \text{qbinom}(1 - \alpha_k/2, n,
+    q_x)]$, $\alpha = 10^{-3}$ global partagé également entre $K = 6$
+    tests, $\alpha_k = \alpha/6$ (tableau~\ref{tab:constat-logistique}).
+  \item \textbf{Fausse alarme}~: exacte pour chaque test~; la fausse alarme
+    familiale est bornée exactement par $\sum_k FA_k = 9{,}836\cdot 10^{-4}
+    \le 10^{-3}$ (inégalité de l'union, sans hypothèse d'indépendance).
+  \item \textbf{Pouvoir discriminant}~: à chaque âge, les régions de L et
+    de G sont disjointes, et la probabilité exacte, sous l'une des deux
+    lois, que $D$ tombe dans la région de l'autre est au plus $10^{-12}$
+    (critère du test)~: un simulateur qui ignorerait la décélération de la
+    queue échouerait.
+  \item \textbf{Conditions de validité}~: loi exacte, sans condition
+    d'effectif~; six graines distinctes (22001202 à 22001207), fixées avant
+    exécution, l'indépendance des cohortes n'étant pas requise par la
+    borne.
+\end{itemize}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{6.2cm}p{2.6cm}p{3.4cm}p{2.2cm}@{}}
+\caption{Constat de simulation de la loi logistique~: probabilité exacte
+$q_x$ sous le modèle, région d'acceptation et fausse alarme exacte
+(\code{tests/unitaires/test\_simulateur\_logistique.R}, T9).}
+\label{tab:constat-logistique}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$q_x$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Cohorte}} &
+\textcolor{financeblue}{\textbf{$q_x$}} &
+\textcolor{financeblue}{\textbf{Région}} &
+\textcolor{financeblue}{\textbf{$FA_k$}} \\
+\endhead
+L, $x = 100$ & $0{,}233299664772$ & $[22\,828\,;\ 23\,835]$ & $1{,}643\cdot 10^{-4}$ \\
+G, $x = 100$ & $0{,}303486068312$ & $[29\,802\,;\ 30\,897]$ & $1{,}638\cdot 10^{-4}$ \\
+L, $x = 110$ & $0{,}383682964335$ & $[37\,790\,;\ 38\,948]$ & $1{,}642\cdot 10^{-4}$ \\
+G, $x = 110$ & $0{,}608493656259$ & $[60\,268\,;\ 61\,430]$ & $1{,}649\cdot 10^{-4}$ \\
+L, $x = 120$ & $0{,}507713611711$ & $[50\,176\,;\ 51\,367]$ & $1{,}633\cdot 10^{-4}$ \\
+G, $x = 120$ & $0{,}912136646914$ & $[90\,875\,;\ 91\,549]$ & $1{,}632\cdot 10^{-4}$ \\
+\end{longtable}
+}
+
+\noindent
+\textbf{Statuts} (E2.20)~: la formule de $q_x$ logistique (intégrale de
+$\mu$), la loi binomiale de $D$, les régions, les $FA_k$, l'inégalité de
+l'union et le pouvoir discriminant~: résultats exacts~; leur évaluation en
+virgule flottante (forme stable de $q_x$, quantiles et probabilités
+binomiaux)~: approximations numériques, le critère $\sum_k FA_k \le
+10^{-3}$ étant vérifié sur les valeurs évaluées~; le passage des six
+tests~: constat de simulation. L'erreur Monte-Carlo est la dispersion
+binomiale de $D$ autour de $n\,q_x$, avec $n = 10^{5}$ têtes par
+cohorte~; aucune erreur d'estimation n'intervient, $D$ étant comparé à la
+probabilité exacte du modèle, sans taux estimé sur une exposition. Les
+valeurs observées de $D$ sont écrites par la batterie et ne sont pas
+reproduites ici (E3.4).
+
 \subsection{Vérifications}
 \label{sec:verifications-simulation}
 
@@ -14864,6 +15009,20 @@ manquante, avec ses \code{details}, la raison et les dates citées, et
 l'aléa de l'appelant inchangé, et, dans les quatre modes, le cas voisin
 d'une entrée la veille de la fin admis~; \code{conditions\_vides()}~; le
 constat ci-dessus.
+\code{tests/unitaires/test\_simulateur\_logistique.R} vérifie la table
+logistique (issue~\#211)~: la forme (paramètres sans valeur par défaut,
+classe, statut, sexe, âges, attribut \code{parametres}, nom~; T1)~; les
+valeurs de $q_x$ à 12 décimales de la spécification, établies par
+\code{stats::integrate()}, pour la loi des tests et pour $a = 0$ (T2)~; le
+recoupement à $10^{-12}$ relatif près par \code{stats::integrate()}, que
+la fonction n'emploie pas, sur 27 lois aux âges 0 à 130, et la reprise à
+l'identique des $q_x$ par \code{loi\_effective()} (T3)~; la stricte
+croissance, la majoration par le plateau $1 - e^{-(a+1)}$ et son
+atteinte à $10^{-14}$ relatif près à 1\,000~ans (T4)~; la comparaison à la table de Gompertz-Makeham
+appariée (T5)~; les cas extrêmes de $b$ et de $c$ (T6)~; chaque refus
+\code{loi\_invalide} (T7)~; l'identité de deux jeux de même graine et la
+consignation de la table et de la graine, pour chaque forme de queue
+(T8)~; le constat de simulation ci-dessus (T9).
 \code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
 identique, attribut compris, dans un autre processus R.
 
@@ -14897,6 +15056,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{COMBINAISONS\_DEFAUTS} & constante & --- & combinaisons de types admises sur une même ligne (liste fermée) \\
 \catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_DEFAUTS} & constante & --- & ordre des tirages des défauts, consigné dans l'attribut \code{defauts} \\
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
+\catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
 \catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
