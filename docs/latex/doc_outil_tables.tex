@@ -1070,14 +1070,17 @@ conforme à \code{MOTIF\_CODE\_REFUS}) ou le nombre est mal formé
 (section~\ref{sec:avertissements}~; issues~\#9, \#24, \#50 et~\#60) \\
 \catalogue{fonctions-outils}{denombrement\_entier()} & interne & \code{x}
 (vecteur \code{double} ou \code{integer} à valeurs entières positives ou
-nulles, \code{NA} admis), \code{etape}, \code{grandeur} (chaînes du
+nulles, \code{NA} admis, ou vecteur \code{logical} entièrement \code{NA}),
+\code{etape}, \code{grandeur} (chaînes du
 moteur) & \code{x} rangé en \code{integer}, de même longueur, sans
 attribut, \code{NA} devenant \code{NA\_integer\_}~; refus
 \code{denombrement\_hors\_plage} de l'étape \code{etape} si un élément
 dépasse \code{.Machine\$integer.max}, avant toute conversion
-(\code{details}~: \code{grandeur}, \code{valeur}, le plus grand élément,
-\code{limite})~; \code{stop()} pour une valeur non finie (\code{NaN}
-compris), négative ou non entière, ou un autre type~; aucun
+(\code{details}~: \code{grandeur}, \code{valeur} (le plus grand élément)
+et \code{limite})~; \code{stop()} pour une valeur non finie (\code{NaN}
+compris), négative ou non entière, ou pour un autre type (un
+\code{logical} non entièrement \code{NA} compris~; \code{NA} logique rendu
+en \code{NA\_integer\_})~; aucun
 \code{warning()}~; assistant unique du rangement des sommes d'événements
 (section~\ref{sec:non-regression}, «~Type des dénombrements~»~;
 issue~\#199) \\
@@ -2264,9 +2267,12 @@ tableau~\ref{tab:fonctions-outils}), qui refuse au-delà de
 de l'étape qui forme la somme. La garde porte, à la source, sur le total
 des événements de l'étape \code{exposition} sous la recette
 \code{agregats} (section~\ref{sec:exposition-cellules})~; celles
-des étapes \code{positionnement}, \code{validation}, \code{homogeneite} et
-\code{importance\_exclusions}, qui somment des sous-ensembles de cellules,
-sont défensives et testées en appel direct (ADR 0009, point~9.6, (d)~4).
+des étapes \code{positionnement}, \code{validation} et \code{homogeneite},
+qui somment des sous-ensembles des cellules de l'exposition, et celles de
+l'étape \code{importance\_exclusions}, dont les totaux sont majorés par le
+nombre de lignes sous le seam «~fenêtres~», seul admis pour cette étape,
+sont défensives et testées en appel direct (ADR 0009, point~9.6, (d)~4, et
+troisième annotation du 10/11/2026).
 Vingt-sept chemins de ces quatre étapes (5, 9, 5 et~8) sont ainsi passés
 de \code{double} à \code{integer}, à valeurs identiques, et leurs 27 clés
 exactes sont retirées de \code{TOLERANCES}, qui passe de 175 à 148 clés,
@@ -6483,17 +6489,23 @@ calculer dans un état nommé (par exemple \code{aucune\_cellule\_retenue}).
 Sous \code{stocks\_successifs}, le vide total n'est pas atteignable par
 \code{construire\_table()}~: la grille alignée sur la période (refus
 \code{inventaires\_periode}) et l'inventaire sans unité présente (refus
-\code{inventaire\_sans\_ligne}) l'excluent en amont, l'unité présente au
-dernier inventaire gardant au moins un jour d'exposition (\emph{constat} sur
-une base minimale, \code{tests/unitaires/test\_stocks\_successifs.R})~; le
-refus s'y vérifie en appel direct. Le refus porte sur la table de la
+\code{inventaire\_sans\_ligne}) l'excluent en amont~: une unité présente
+au dernier inventaire $t_M$, la fin effective, n'a aucune sortie à une date
+au plus égale à $t_M$ (motif \code{presence\_apres\_evenement}~: refus
+\code{ligne\_invalide}, ou exclusion et alors refus
+\code{inventaire\_sans\_ligne}), et son entrée, observée ou imputée, est au
+plus $t_M$ sous les deux hypothèses d'entrée~: sa fenêtre contient le jour
+$t_M$ (vérifié sur une base minimale,
+\code{tests/unitaires/test\_stocks\_successifs.R})~; le refus s'y vérifie
+en appel direct. Le refus porte sur la table de la
 construction~: l'argument \code{refuser\_vide} de
 \code{calculer\_exposition()}, \code{TRUE} par défaut, vaut \code{FALSE}
 dans \code{exposition\_lignes()}, qui recalcule l'exposition des
 sous-ensembles de lignes exclues pour le contrefactuel de l'étape
 \code{importance\_exclusions} (section~\ref{sec:importance-exclusions})~:
 un tel sous-ensemble peut légitimement n'avoir aucune exposition dans la
-période (écart à la lettre de M399, visé par \code{actuary}).\par}
+période (écart à la lettre de M399, visé par \code{actuary} le
+10/11/2026).\par}
 
 \medskip
 \textbf{Fenêtres transmises à l'étape \code{brut}} (issue~\#38~; ADR 0007,
@@ -6776,8 +6788,8 @@ lecture~:\par}
     sous-estime les taux et domine l'erreur d'estimation dès des
     portefeuilles de taille courante. Aux petits effectifs par cellule de
     ce scénario, l'écart au niveau nominal de la couverture des intervalles
-    de Poisson, exact et asymptotique, sous les trois lectures est
-    compatible avec la discrétisation, c'est-à-dire avec la couverture
+    de Poisson, exact et asymptotique, sous les trois lectures est, selon
+    la lecture calibrée, compatible avec la discrétisation, c'est-à-dire avec la couverture
     calculée sous l'approximation de Poisson aux expositions réalisées,
     laquelle intègre, sous \code{milieu}, la sur-exposition de cellule qui
     réduit le manque dominant de l'intervalle asymptotique (constat de
@@ -9300,12 +9312,12 @@ dans la colonne \code{statut} du résultat.
     (\code{docs/recherche/}\allowbreak\code{2026-11-05-sources-v1.md},
     §~4).
   \item \textbf{S5, sous-groupes} (\code{resultat\$sous\_groupes})~:
-    $O$, $A$, SMR, bornes exactes et p-valeurs de Poisson exactes (sous
+    $O$, $A$, SMR, bornes exactes et p-valeurs exactes (de Poisson sous
     \code{independante}, où le nombre $p$ de paramètres estimés est nul,
     table prise telle quelle~: loi de référence $X \sim \mathcal{P}(A)$~;
     non produites sous \code{ajustee\_hors\_outil}, état
-    \code{ddl\_non\_etabli}~; sous \code{positionnee}, lois conditionnelles
-    du paragraphe «~Sous la relation \code{positionnee}~») par regroupement \code{segment\_tranche}
+    \code{ddl\_non\_etabli}~; sous \code{positionnee}, lois binomiales
+    conditionnelles du paragraphe «~Sous la relation \code{positionnee}~») par regroupement \code{segment\_tranche}
     (segment $\times$ tranche d'âge) et \code{segment} si la segmentation
     n'est pas vide, \code{tranche} toujours, \code{annee} sous
     \code{par\_annee}, sur les cellules retenues, dont le nombre est
@@ -9978,8 +9990,10 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     ne peut être remplie quand le nombre $K$ de strates est fixe, la plus
     grande part valant alors au moins $1/K$~; il disait
     aussi que $D_{\cdot c}$ peut rester petit dans chaque strate, ce qui est
-    faux à nombre de strates fixe, puisque la valeur propre ne tend alors
-    vers l'infini que si les décès croissent dans une strate au moins. La
+    faux à nombre de strates fixe, puisque la valeur propre, majorée par
+    la trace de $V$, elle-même au plus $\sum_c D_{\cdot c}$, ne tend alors
+    vers l'infini que si le plus grand des $D_{\cdot c}$ tend vers
+    l'infini. La
     condition est retirée du statut, qui dit désormais le nombre de groupes
     fixé et ne laisse $D_{\cdot c}$ borné que si le nombre de strates croît
     (issue~\#202, relecture d'\code{actuary-approfondi}, texte repris mot
@@ -10178,7 +10192,7 @@ commentaire 6775962003 de l'issue~\#184, décision M398~; script
 Gompertz-Makeham ($A = 2 \cdot 10^{-4}$, $B = 2{,}5 \cdot 10^{-5}$,
 $c = 1{,}1$), rachat de 5~\%~; un portefeuille simulé par segment, une
 tête par contrat~; plan du constat de taille (âges 20 à 90, tranches de
-bornes 20, 50 et 70, $B = 199$). Alternative~: force de mortalité d'un seul
+bornes 20, 50 et 70, $B = 199$~réplications). Alternative~: force de mortalité d'un seul
 segment multipliée par $\theta$ (famille~P~: $S = 2$, 4 ou 8 segments de
 parts égales~; famille~U~: deux segments de parts $0{,}9$ et $0{,}1$, le
 petit étant déviant), ou par $\tau$ avant 70~ans et $1/\tau$ ensuite
