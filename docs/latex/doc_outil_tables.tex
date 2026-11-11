@@ -1026,6 +1026,7 @@ exacte (classe \code{Date} seule, stockage \code{double} ou
 règle partagée par les bornes de la période d'observation (modules
 \code{donnees} et \code{simulation}) et par les dates du portefeuille
 simulé (issues~\#58 et~\#113) \\
+\catalogue{fonctions-outils}{valeurs\_entieres\_double()} & interne & valeur & \code{TRUE} pour un \code{double} sans attribut, sans \code{NA}, fini, à valeurs entières \\
 \catalogue{fonctions-outils}{vers\_utf8\_locale()} & interne & \code{x}
 (\code{character}) & chaînes converties en UTF-8 selon la locale de la
 session~: \code{enc2utf8()} sur toutes sous une locale UTF-8 ou latin-1
@@ -7056,6 +7057,8 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{exposition\_cellules()} & interne & mêmes arguments & forme \code{cellules} (recette \code{agregats})~: somme des cellules reçues par clé (segmentation, âge, année sous \code{par\_annee}), sans en créer~; relevés \code{annees\_sommees}, \code{ages\_manquants}, \code{evenement\_sans\_exposition}, avertissement \code{convention\_declaree}~; refus \code{evenements\_hors\_plage}~; aucun objet \code{fenetres\_exposition} \\
 \catalogue{fonctions-exposition}{hypotheses\_stocks()} & interne & hypothèse d'entrée validée & les neuf hypothèses nommées de la recette \code{stocks\_successifs} (\code{data.frame}~: code, énoncé, nature, statut~; énoncé et statut de deux lignes selon le mode)~; champ \code{hypotheses\_recette} des paramètres et de la fiche \\
 \catalogue{fonctions-exposition}{fenetres\_stocks\_successifs()} & interne & observations de l'étape \code{donnees}, valeurs validées \code{p} (dont la grille), segmentation, hypothèse d'entrée & une observation à fenêtre par unité exposable (début $\hat a$, fin $\hat s$, cause), paramètres (\code{entree\_entre\_}\allowbreak\code{inventaires}, \code{hypotheses\_recette}), diagnostics (\code{unites\_sans\_fenetre}, \code{exposition\_}\allowbreak\code{imputee\_jours}, \code{fenetres\_vides}), avertissements \code{entres\_sortis\_}\allowbreak\code{entre\_inventaires} et \code{intervalle\_}\allowbreak\code{inventaires\_long} (section~\ref{sec:stocks-fenetres}) \\
+\catalogue{fonctions-exposition}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} (étapes \code{positionnement} et \code{validation}) \\
+\catalogue{fonctions-exposition}{controler\_plage\_ages()} & interne & plage, étape appelante & \code{TRUE} invisible, ou refus \code{plage\_ages\_invalide} sous le module de l'étape (\code{positionnement}, \code{validation} ou \code{homogeneite}) \\
 \end{longtable}
 }
 
@@ -8780,11 +8783,8 @@ de 5~\%, de $G^2$ au-dessous).
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-positionnement}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} (étapes \code{positionnement} et \code{validation}) \\
-\catalogue{fonctions-positionnement}{valeurs\_entieres\_double()} & interne & valeur & \code{TRUE} pour un \code{double} sans attribut, sans \code{NA}, fini, à valeurs entières \\
 \catalogue{fonctions-positionnement}{ETAPES\_TABLE} & constante & --- & étapes qui lisent une table par les briques du module~: \code{positionnement}, \code{validation}~; chacune donne aux refus son module et le préfixe de leur message (F2) \\
 \catalogue{fonctions-positionnement}{controler\_cle\_table()} & interne & clé, étape appelante & \code{TRUE} invisible, ou refus \code{cle\_table\_invalide} sous le module de l'étape~; message propre à l'étape \\
-\catalogue{fonctions-positionnement}{controler\_plage\_ages()} & interne & plage, étape appelante & \code{TRUE} invisible, ou refus \code{plage\_ages\_invalide} sous le module de l'étape (\code{positionnement}, \code{validation} ou \code{homogeneite}) \\
 \catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage, étape appelante & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre, sous le module et le préfixe de l'étape (motif de convention propre à l'étape)~; appelée par \code{controler\_entrees()} seule, pour chaque étape qui lit une table, une fois par construction (au rejeu, par l'unique appel de \code{construire\_table()}~; issue~\#82) \\
 \catalogue{fonctions-positionnement}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé, étape appelante & grille des cellules et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table} sous le module de l'étape, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
 \catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé, étape appelante & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} sous le module de l'étape \\
