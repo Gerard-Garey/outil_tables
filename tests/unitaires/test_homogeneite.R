@@ -46,10 +46,10 @@ ligne_test <- function(r, test, variable = NA_character_, debut = NA_integer_) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A ETAPES : homogeneite après positionnement, avant validation (F10), module validation, calculer_homogeneite, préalables donnees et exposition, aléatoire", {
+verifier("A ETAPES : homogeneite après positionnement, avant validation (F10), module validation, calculer_homogeneite, préalables donnees et exposition, aléatoire (rang 6 depuis l'étape lissage, #223)", {
   e <- tablexp:::ETAPES
   k <- match("homogeneite", e$etape)
-  identical(k, 5L) && identical(e$etape[k + c(-1L, 1L)], c("positionnement", "validation")) &&
+  identical(k, 6L) && identical(e$etape[k + c(-1L, 1L)], c("positionnement", "validation")) &&
     identical(e$module[k], "validation") && identical(e$fonction[k], "calculer_homogeneite") &&
     identical(e$prealable[[k]], c("donnees", "exposition")) && identical(e$aleatoire[k], TRUE)
 })

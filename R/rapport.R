@@ -1655,7 +1655,7 @@ lire_fiche <- function(octets) {
 # concordance des sections `etape` avec ETAPES$etape est un test.
 SECTIONS_RAPPORT <- data.frame(
   section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
-              "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements",
+              "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements", "etape_lissage",
               "etape_positionnement", "etape_homogeneite", "etape_validation", "etape_importance_exclusions",
               "table_finale", "rejeu"),
   titre = texte_moteur(c(
@@ -1670,6 +1670,7 @@ SECTIONS_RAPPORT <- data.frame(
     "Étape brut : taux bruts et intervalles",
     "Indicateurs de suffisance",
     "Avertissements",
+    "Étape lissage : lissage de Whittaker-Henderson et table lissée",
     "Étape positionnement : positionnement par SMR sur une table de référence et table positionnée",
     "Étape homogeneite : test d'homogénéité entre segments (tests du score conditionnels aux décès de chaque strate)",
     "Étape validation : statistiques de validation de la table de référence prise telle quelle",
@@ -1677,9 +1678,9 @@ SECTIONS_RAPPORT <- data.frame(
     "Table finale et comparaisons",
     "Rejeu")),
   nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
-             "objet", "etape", "etape", "etape", "etape", "non_produite", "texte"),
-  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "positionnement", "homogeneite",
-            "validation", "importance_exclusions", NA, NA),
+             "objet", "etape", "etape", "etape", "etape", "etape", "non_produite", "texte"),
+  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "lissage", "positionnement",
+            "homogeneite", "validation", "importance_exclusions", NA, NA),
   racines = I(list(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
@@ -1695,6 +1696,7 @@ SECTIONS_RAPPORT <- data.frame(
     "etapes/brut",
     character(0),
     "avertissements",
+    "etapes/lissage",
     "etapes/positionnement",
     "etapes/homogeneite",
     "etapes/validation",
@@ -1704,7 +1706,8 @@ SECTIONS_RAPPORT <- data.frame(
   renvois = I(list(
     character(0), character(0), character(0), character(0), character(0), character(0), character(0),
     character(0), character(0), c("etapes/exposition/resultat/exposition", "etapes/brut/resultat"),
-    character(0), character(0), character(0), character(0), character(0), character(0), character(0))),
+    character(0), character(0), character(0), character(0), character(0), character(0), character(0),
+    character(0))),
   stringsAsFactors = FALSE)
 
 # Tables dont le volume croît avec la base : chemin, type et dimension (lus
@@ -1773,6 +1776,23 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   etape_absente_1 = "Étape « ",
   etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
   etape_absente_3 = " absent de l'objet).",
+  # Section etape_lissage (#223 ; spécification de forme (0')(b)
+  # d'actuary-approfondi, § 5) : mentions de la méthode wh_quadratique ;
+  # aucune mention d'unité (amendement d'actuary du 11/11/2026, point 6).
+  lissage_quadratique = paste(
+    "Lissage de Whittaker-Henderson, critère quadratique (etapes/lissage/parametres/methode = wh_quadratique) :",
+    "par segment, g minimise M = F + h S, F = somme des w_x (g_x - q^_x)^2, S = somme des (Delta^z g_x)^2, sur la",
+    "plage d'âges déclarée, q^ estimateur binomial de l'étape brut (Lignes directrices, chap. 3, IV.2.a).",
+    "parametre_lissage est h, déclaré ; aucun critère de choix de h n'est donné par la source. Les cellules de",
+    "poids nul (état interpolee) sont interpolées ; aucune extrapolation hors de la plage."),
+  lissage_conservation = paste(
+    "Sous la pondération exposition, somme des E^i g = somme des D exactement, et somme des x E^i g = somme des",
+    "x D pour z >= 2 seulement (la seconde identité, énoncée sans condition par les Lignes directrices, p. 32-33,",
+    "est fausse pour z = 1) ; résidus dans etapes/lissage/resultat/segments. Sous la pondération uniforme, aucune",
+    "conservation des décès."),
+  lissage_echelle = paste(
+    "parametre_lissage est h (pénalité sur q) sous wh_quadratique et lambda (pénalité sur ln mu) sous wh_poisson :",
+    "grandeurs d'échelles différentes, jamais comparables d'une méthode à l'autre."),
   # Section etape_positionnement (#167 ; spécification d'actuary-approfondi,
   # § 7, textes acceptés sans lecture de regulatory, M289, Q7 ; notation de la
   # section validation : theta, q~, somme) ; la mention
@@ -2311,6 +2331,19 @@ corps_section <- function(x, k) {
                if (r$tests) c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[[r$mc]])),
                paragraphe(m[["validation_reference"]]),
                lignes_racines(x, racines)))
+    }
+    if (identical(e, "lissage")) {
+      # Étape lissage : mentions de la méthode (#223, spécification de forme,
+      # § 5) ; aucune mention d'unité sous wh_quadratique (g fonction
+      # déterministe de q^, sans test ni intervalle ; amendement d'actuary du
+      # 11/11/2026, point 6). Une méthode sans mentions est une erreur de
+      # programmation.
+      methode <- x[["etapes"]][["lissage"]][["parametres"]][["methode"]]
+      mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
+        wh_quadratique = c(paragraphe(m[["lissage_quadratique"]]), paragraphe(m[["lissage_conservation"]]),
+                           paragraphe(m[["lissage_echelle"]])),
+        stop("corps_section() : méthode de lissage sans mentions (erreur de programmation).", call. = FALSE))
+      return(c(mentions, lignes_racines(x, racines)))
     }
     if (identical(e, "positionnement")) {
       # Étape positionnement : mentions fixes (#167, M289, Q7), puis mention

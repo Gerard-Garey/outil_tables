@@ -121,9 +121,10 @@ RELAIS <- list(
 # locale, qui rend un texte formé (règle 4, contrôlée dans son fichier) ; son
 # appel est admis en tout fichier.
 AIDES <- data.frame(
-  fichier = c("donnees.R", "simulation.R", "construire_table.R", "rapport.R", "rapport.R", "positionnement.R"),
+  fichier = c("donnees.R", "simulation.R", "construire_table.R", "rapport.R", "rapport.R", "positionnement.R",
+              "lissage.R"),
   nom = c("message_aucune_recette", "ecart_noms", "decrire_forme", "decrire_valeur", "valeur_message",
-          "segments_cites"),
+          "segments_cites", "segments_cites"),
   stringsAsFactors = FALSE)
 
 # Exceptions : une ligne par site (une expression peut revenir plusieurs fois

@@ -90,7 +90,7 @@ cas_refus <- list(
   list("etapes non nommée", "etapes_mal_formees", modifier(plan_type(), etapes = list(list()))),
   list("aucune étape", "aucune_etape", modifier(plan_type(), etapes = list())),
   list("étape inconnue", "etape_inconnue",
-       modifier(plan_type(), etapes = c(plan_type()$etapes, list(lissage = list())))),
+       modifier(plan_type(), etapes = c(plan_type()$etapes, list(fermeture = list())))),
   list("étape en double", "etape_en_double",
        modifier(plan_type(), etapes = list(donnees = list(exclusions = character(0)),
                                            donnees = list(exclusions = character(0))))),
@@ -299,6 +299,12 @@ VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalide
                     exposition.entree_entre_inventaires = list("milieu", "entree_entre_inventaires_invalide"),
                     brut.estimateurs = list("poisson", "estimateurs_invalides"),
                     brut.niveau = list(0.95, "niveau_invalide"),
+                    lissage.methode = list("wh_quadratique", "methode_lissage_invalide"),
+                    lissage.plage_ages = list(c(20, 90), "plage_ages_invalide"),
+                    lissage.ordre_difference = list(2, "ordre_difference_invalide"),
+                    lissage.critere_lissage = list("declare", "critere_lissage_invalide"),
+                    lissage.ponderation = list("uniforme", "ponderation_invalide"),
+                    lissage.parametre_lissage = list(100, "parametre_lissage_invalide"),
                     positionnement.methode = list("smr", "methode_invalide"),
                     positionnement.table_reference = list("t", "cle_table_invalide"),
                     positionnement.plage_ages = list(c(20, 90), "plage_ages_invalide"),
@@ -325,12 +331,18 @@ plan_positionnement <- function() modifier(plan_complet(), etapes = c(plan_compl
 # segmentation sexe du plan type).
 plan_homogeneite <- function() modifier(plan_complet(), graine = 1L, etapes = c(plan_complet()$etapes, list(
   homogeneite = list(plage_ages = c(20, 90), tranches_age = c(20, 50), replications = 99))))
+# Plan complet muni de l'étape lissage (#223, non aléatoire ; binomial dans
+# l'étape brut du plan complet).
+plan_lissage <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
+  lissage = list(methode = "wh_quadratique", plage_ages = c(20, 90), ordre_difference = 2, critere_lissage = "declare",
+                 ponderation = "uniforme", parametre_lissage = 100))))
 # Plan complet muni de l'étape importance_exclusions (#69, non aléatoire).
 plan_importance <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
   importance_exclusions = list(niveau = 0.95))))
 plan_de <- function(cle) {
   if (startsWith(cle, "validation.")) plan_validation()
   else if (startsWith(cle, "positionnement.")) plan_positionnement()
+  else if (startsWith(cle, "lissage.")) plan_lissage()
   else if (startsWith(cle, "homogeneite.")) plan_homogeneite()
   else if (startsWith(cle, "importance_exclusions.")) plan_importance() else plan_complet()
 }

@@ -33,10 +33,10 @@ tous <- function(...) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A ETAPES : positionnement après brut, avant homogeneite (#168) et validation, module positionnement, calculer_positionnement, préalables donnees et exposition, non aléatoire", {
+verifier("A ETAPES : positionnement après brut et lissage (#223), avant homogeneite (#168) et validation, module positionnement, calculer_positionnement, préalables donnees et exposition, non aléatoire", {
   e <- tablexp:::ETAPES
   k <- match("positionnement", e$etape)
-  identical(k, 4L) && identical(e$etape[k + 1:2], c("homogeneite", "validation")) &&
+  identical(k, 5L) && identical(e$etape[k - 1L], "lissage") && identical(e$etape[k + 1:2], c("homogeneite", "validation")) &&
     identical(e$module[k], "positionnement") &&
     identical(e$fonction[k], "calculer_positionnement") && identical(e$prealable[[k]], c("donnees", "exposition")) &&
     identical(e$aleatoire[k], FALSE)

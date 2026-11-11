@@ -39,7 +39,9 @@
 #    details et messages des refus inchangés) ;
 #  - grille_plage() : grille des cellules segments x âges de la plage
 #    [x années] (E^c, D, cellules sans ligne à zéro, hors plage), extraite
-#    d'apparier_table() (module positionnement ; ADR 0017, point 10.1).
+#    d'apparier_table() (module positionnement ; ADR 0017, point 10.1) ;
+#    lue aussi par l'étape `lissage` (#223), qui n'y emploie ni E^c ni
+#    l'exposition hors plage (une table d'agrégats peut ne pas porter E^c).
 #
 #  Conventions de temps (A.0) : une date est un jour ; une observation est
 #  l'intervalle [debut, fin) (fin = +Inf pour une observation en cours) ; un
@@ -991,8 +993,8 @@ CONVENTIONS_VALIDATION <- "dernier_anniversaire"
 # Étapes admises par controler_plage_ages() : chacune donne au refus son
 # module (F2 de #167). Liste blanche propre à ce module, qui ne lit pas
 # ETAPES_TABLE (module positionnement, de rang supérieur) ; elle ne nomme que
-# des étapes qui existent.
-ETAPES_PLAGE_AGES <- c("positionnement", "validation", "homogeneite")
+# des étapes qui existent (`lissage` : #223, ADR 0017, point 10.1).
+ETAPES_PLAGE_AGES <- c("lissage", "positionnement", "validation", "homogeneite")
 
 # Forme de la plage d'âges (plage_ages_invalide), sous le module de l'étape
 # `etape` (F2 ; extraite de controler_parametres_validation(), messages de
@@ -1018,7 +1020,11 @@ controler_plage_ages <- function(plage_ages, etape) {
 # Grille : segments présents dans la table d'exposition (dans son ordre) x
 # âges de la plage (x années de la table d'exposition si par_annee), E^c = 0
 # et D = 0 pour une cellule sans ligne d'exposition ; aucun segment absent
-# n'est créé. Aucun refus. Rend
+# n'est créé. Aucun refus. Table d'exposition sans colonne
+# exposition_centrale (recette agrégats sans E^c déclarée ; lue par l'étape
+# `lissage` seule, qui ne lit pas E^c) : ni colonne exposition_centrale dans
+# `cellules`, ni exposition hors plage (NA) ; arithmétique inchangée sinon.
+# Rend
 # list(cellules (clés, age [, annee], exposition_centrale, evenements),
 # segment (indice du segment de chaque cellule), ligne (integer : ligne de la
 # table d'exposition de chaque cellule, NA sans ligne ; les lignes de la
@@ -1045,14 +1051,15 @@ grille_plage <- function(exposition, segmentation, par_annee, plage_ages) {
   dans <- exposition$age >= plage_ages[1L] & exposition$age <= plage_ages[2L]
   i <- ((g_expo[dans] - 1) * n_age + (exposition$age[dans] - ages[1L])) * n_an +
     (if (isTRUE(par_annee)) match(exposition$annee[dans], annees) else 1)
+  centrale <- "exposition_centrale" %in% names(exposition)
   Ec <- numeric(n); D <- integer(n)
-  Ec[i] <- exposition$exposition_centrale[dans]
+  if (centrale) Ec[i] <- exposition$exposition_centrale[dans]
   D[i] <- exposition$evenements[dans]
   ligne <- rep(NA_integer_, n)
   ligne[i] <- which(dans)
-  cellules$exposition_centrale <- Ec
+  if (centrale) cellules$exposition_centrale <- Ec
   cellules$evenements <- D
   list(cellules = cellules, segment = g, ligne = ligne,
        hors_plage = list(cellules = sum(!dans), evenements = sum(as.numeric(exposition$evenements[!dans])),
-                         exposition = sum(exposition$exposition_centrale[!dans])))
+                         exposition = if (centrale) sum(exposition$exposition_centrale[!dans]) else NA_real_))
 }

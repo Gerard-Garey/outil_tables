@@ -198,14 +198,14 @@ verifier("matrice, (3a) : sous lignes_dates_completes, toute étape et tout esti
 verifier("matrice, (3b) : lignes agregats (#169, § 4 et § 7 ; ADR 0016, point 5.1 ; valeur écrite à la main)", {
   m <- MAT[MAT$recette == "agregats", -1L]; rownames(m) <- NULL
   identical(m, data.frame(
-    etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite", "validation",
-              "importance_exclusions"),
-    estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
-    admis = c("oui", "oui", "oui", "si_role", "si_role", "non", "si_role", "si_role", "si_role", "non"),
-    role_requis = c(NA, NA, NA, "exposition_centrale", "exposition_initiale", NA, "exposition_centrale",
+    etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "lissage", "positionnement", "homogeneite",
+              "validation", "importance_exclusions"),
+    estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA, NA),
+    admis = c("oui", "oui", "oui", "si_role", "si_role", "non", "oui", "si_role", "si_role", "si_role", "non"),
+    role_requis = c(NA, NA, NA, "exposition_centrale", "exposition_initiale", NA, NA, "exposition_centrale",
                     "exposition_centrale", "exposition_centrale", NA),
     motif = c(NA, NA, NA, "poisson_sans_exposition_centrale", "binomial_sans_exposition_initiale", "kaplan_meier_agregats",
-              "etape_exige_exposition_centrale", "etape_exige_exposition_centrale", "etape_exige_exposition_centrale",
+              NA, "etape_exige_exposition_centrale", "etape_exige_exposition_centrale", "etape_exige_exposition_centrale",
               "importance_exclusions_agregats"),
     stringsAsFactors = FALSE))
 })

@@ -17,6 +17,7 @@
 #    structurels du plan ; valeurs contrôlées par les modules qui les
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
 #    controler_parametres_exposition(), controler_parametres_brut(),
+#    controler_gouvernants_lissage(), controler_parametres_lissage(),
 #    controler_parametres_positionnement(), controler_parametres_homogeneite(),
 #    controler_parametres_validation(),
 #    controler_parametres_importance_exclusions()) ;
@@ -31,9 +32,10 @@
 #    deux couches (#82) ; la première (plan, rôles, recette, convention,
 #    matrice recette x étape x estimateur, provenance) est partagée par
 #    construire_table() et rejouer_fiche() ; la
-#    seconde y ajoute le contrôle 1.3 et les contrôles d'entrée des étapes
-#    qui lisent une table (controler_entrees_validation(), module
-#    positionnement, pour `positionnement` puis `validation`), et n'est
+#    seconde y ajoute le contrôle 1.3, la convention de l'étape `lissage`
+#    (controler_convention_lissage(), module lissage) et les contrôles
+#    d'entrée des étapes qui lisent une table (controler_entrees_validation(),
+#    module positionnement, pour `positionnement` puis `validation`), et n'est
 #    appelée que par construire_table() ; toutes deux
 #    rendent les valeurs validées transmises aux étapes ;
 #  - construire_table() : contrôle les entrées une fois (controler_entrees()),
@@ -83,20 +85,27 @@ CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentat
 # `validation`, après `positionnement` et avant `validation` (premier rang que
 # permet l'ordre des modules), préalables `donnees` et `exposition`,
 # aléatoire (Monte-Carlo conditionnel ; chaque étape aléatoire tire sous la
-# graine du plan, flux propre, F11). Colonne `table_construite` (ADR 0017,
-# point 1.5) : nom de l'élément du `resultat` de l'étape productrice qui
-# porte la table construite (`table_positionnee` pour `positionnement`), NA
-# pour les autres étapes ; lue par construire_table() (table_construite()),
-# aucun nom d'étape productrice n'est testé.
+# graine du plan, flux propre, F11). `lissage` (#223 ; ADR 0017, point 2.1) :
+# module `lissage`, après `brut` et avant `positionnement`, préalables
+# `donnees`, `exposition` et `brut` (table binomial), non aléatoire. Colonne
+# `table_construite` (ADR 0017, point 1.5) : nom de l'élément du `resultat`
+# de l'étape productrice qui porte la table construite (`table_lissee` pour
+# `lissage`, `table_positionnee` pour `positionnement`), NA pour les autres
+# étapes ; lue par construire_table() (table_construite()) et par
+# valider_plan() (une seule étape productrice par plan, D9), aucun nom
+# d'étape productrice n'est testé.
 ETAPES <- data.frame(
-  etape = c("donnees", "exposition", "brut", "positionnement", "homogeneite", "validation", "importance_exclusions"),
-  module = c("donnees", "exposition", "brut", "positionnement", "validation", "validation", "validation"),
-  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_positionnement",
-               "calculer_homogeneite", "calculer_validation", "calculer_importance_exclusions"),
-  prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition"),
-                     c("donnees", "exposition"), c("donnees", "exposition"), c("donnees", "exposition"))),
-  aleatoire = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE),
-  table_construite = c(NA, NA, NA, "table_positionnee", NA, NA, NA),
+  etape = c("donnees", "exposition", "brut", "lissage", "positionnement", "homogeneite", "validation",
+            "importance_exclusions"),
+  module = c("donnees", "exposition", "brut", "lissage", "positionnement", "validation", "validation", "validation"),
+  fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_lissage",
+               "calculer_positionnement", "calculer_homogeneite", "calculer_validation",
+               "calculer_importance_exclusions"),
+  prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition", "brut"),
+                     c("donnees", "exposition"), c("donnees", "exposition"), c("donnees", "exposition"),
+                     c("donnees", "exposition"))),
+  aleatoire = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE),
+  table_construite = c(NA, NA, NA, "table_lissee", "table_positionnee", NA, NA, NA),
   stringsAsFactors = FALSE
 )
 
@@ -148,6 +157,24 @@ PARAMETRES_ETAPES <- list(
     recette = NA_character_,
     selon = NA_character_,
     valeurs = I(rep(list(character(0)), 2L)),
+    stringsAsFactors = FALSE),
+  # Lissage de Whittaker-Henderson (#223 ; ADR 0017, point 3.4 ;
+  # spécification de forme, § 1) : deux gouvernants sans condition (methode,
+  # critere_lissage) ; ponderation requise sous wh_quadratique,
+  # parametre_lissage sous critere_lissage = declare ; tous sans défaut,
+  # entiers en double (M246), un integer est refusé (M257).
+  lissage = data.frame(
+    parametre = c("methode", "plage_ages", "ordre_difference", "critere_lissage", "ponderation", "parametre_lissage"),
+    type = c("character", "double", "double", "character", "character", "double"),
+    domaine = c("wh_quadratique (critère quadratique de Whittaker-Henderson)",
+                "deux valeurs entières, 0 <= min <= max",
+                "nombre entier unique dans {1, 2, 3, 4}, au plus max(plage_ages) - min(plage_ages)",
+                "declare ou laml ; laml refusé sous wh_quadratique",
+                "uniforme ou exposition",
+                "nombre double unique, fini, strictement positif (h sous wh_quadratique)"),
+    recette = NA_character_,
+    selon = c(NA, NA, NA, NA, "methode", "critere_lissage"),
+    valeurs = I(list(character(0), character(0), character(0), character(0), "wh_quadratique", "declare")),
     stringsAsFactors = FALSE),
   # Méthode requise, sans défaut (M293) ; plage_ages à valeur entière en
   # double (M246, M257).
@@ -424,8 +451,11 @@ controler_parametres_condition <- function(nom_etape, parametres_etape, catalogu
 # n'est pas exigé par la boucle des noms : sa présence est contrôlée dans la
 # phase des valeurs, pour chaque étape du plan et dans l'ordre, après le
 # contrôle de forme et de domaine des gouvernants de l'étape (fonction du
-# module ; aucune étape n'a de gouvernant dans cette version) et avant le
-# contrôle des valeurs par le module (controler_parametres_condition()).
+# module : controler_gouvernants_lissage() pour l'étape `lissage`) et avant
+# le contrôle des valeurs par le module (controler_parametres_condition()).
+# Une seule étape productrice d'une table construite par plan (colonne
+# table_construite d'ETAPES ; ADR 0017, point 2.2 ; D9) : refus
+# tables_construites_multiples, juste après l'ordre des étapes.
 valider_plan <- function(plan) {
   refus_plan <- function(motif, message, details = list())
     refuser("construire_table", motif, message, details)
@@ -470,6 +500,13 @@ valider_plan <- function(plan) {
                formuler("Étapes hors de l'ordre des modules : %s reçu, ordre attendu %s.",
                         liste_guillemets(noms), liste_guillemets(ETAPES$etape[sort(rang)])),
                list(etape = noms))
+  productrices <- noms[!is.na(ETAPES$table_construite[rang])]
+  if (length(productrices) > 1L)
+    refus_plan("tables_construites_multiples",
+               formuler(paste("Le plan déclare plusieurs étapes qui produisent une table construite (%s) : une seule",
+                              "est admise par construction (décision D9 du 11/11/2026)."),
+                        liste_guillemets(productrices)),
+               list(etape = productrices))
   # Chaque préalable de chaque étape est contrôlé ; seuls les préalables
   # absents sont cités. `etape` et `prealable` sont les vecteurs aplatis ;
   # `prealables_par_etape` dit quel préalable manque à quelle étape (#27).
@@ -512,10 +549,13 @@ valider_plan <- function(plan) {
   # ADR 0007, annotation du 17/10/2026, point d), pour chaque étape du plan
   # dans l'ordre (celui d'ETAPES, contrôlé ci-dessus) : (1) forme et domaine
   # des gouvernants de l'étape, contrôle croisé compris (fonction du module ;
-  # aucune étape n'en a dans cette version) ; (2) présence des paramètres
-  # conditionnels à la valeur d'un gouvernant (ADR 0017, point 3.2) ;
-  # (3) valeurs, par la fonction de contrôle du module.
+  # étape `lissage` seule dans cette version ; les gouvernants, sans
+  # condition, sont présents) ; (2) présence des paramètres conditionnels à
+  # la valeur d'un gouvernant (ADR 0017, point 3.2) ; (3) valeurs, par la
+  # fonction de contrôle du module.
   for (nom in noms) {
+    if (identical(nom, "lissage"))
+      controler_gouvernants_lissage(etapes[["lissage"]][["methode"]], etapes[["lissage"]][["critere_lissage"]])
     controler_parametres_condition(nom, etapes[[nom]], PARAMETRES_ETAPES[[nom]])
     switch(nom,
       donnees = {
@@ -545,6 +585,17 @@ valider_plan <- function(plan) {
       # elle) : par_annee est déjà validé.
       brut = controler_parametres_brut(etapes[["brut"]][["estimateurs"]], etapes[["brut"]][["niveau"]],
                                        etapes[["exposition"]][["par_annee"]]),
+      # `lissage` (#223) : paramètres présents passés par leur nom (absent =
+      # missing() dans controler_parametres_lissage()), quote = TRUE comme
+      # pour `exposition` ; contexte : paramètres de l'étape brut et
+      # par_annee, préalables contrôlés avant elle.
+      lissage = {
+        pl <- etapes[["lissage"]]
+        do.call(controler_parametres_lissage,
+                c(pl[intersect(PARAMETRES_ETAPES[["lissage"]]$parametre, names(pl))],
+                  list(brut = etapes[["brut"]], par_annee = etapes[["exposition"]][["par_annee"]])),
+                quote = TRUE)
+      },
       positionnement = {
         pp <- etapes[["positionnement"]]
         controler_parametres_positionnement(pp[["methode"]], pp[["table_reference"]], pp[["plage_ages"]],
@@ -925,7 +976,9 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
 
 # Seconde couche, appelée par construire_table() seule, une fois, avant toute
 # étape : controler_plan_roles(), puis le contrôle 1.3 des tables de
-# référence (controler_tables_reference(), ADR 0015, point 1.3), puis le
+# référence (controler_tables_reference(), ADR 0015, point 1.3), puis, dans
+# l'ordre des étapes, la convention retenue de l'étape `lissage`
+# (controler_convention_lissage(), module lissage ; #223) et le
 # contrôle d'entrée de chaque étape qui lit une table (ADR 0015, point 7.3 ;
 # M253) : controler_entrees_validation() (module positionnement) sur la table
 # citée par l'étape `positionnement` (#167), puis sur celle citée par l'étape
@@ -938,6 +991,7 @@ controler_entrees <- function(donnees, roles, plan, provenance, tables_reference
   e <- controler_plan_roles(donnees, roles, plan, provenance)
   etapes_plan <- e$plan[["etapes"]]
   tables_fiche <- controler_tables_reference(tables_reference, e$plan)
+  if ("lissage" %in% names(etapes_plan)) controler_convention_lissage(e$conv$retenue)
   tables <- list()
   if ("positionnement" %in% names(etapes_plan)) {
     pp <- etapes_plan[["positionnement"]]
@@ -1041,8 +1095,9 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
 
   etapes <- list()
   avertissements <- avertissements_vides()
-  # Table construite de l'étape productrice exécutée (ADR 0017, point 1.5),
-  # contrat contrôlé ; aucun lecteur dans cette version.
+  # Table construite de l'étape productrice exécutée (ADR 0017, point 1.5 ;
+  # `lissage` ou `positionnement`), contrat contrôlé ; aucun lecteur dans
+  # cette version.
   construite <- NULL
   for (nom in names(etapes_plan)) {
     pe <- etapes_plan[[nom]]
@@ -1061,6 +1116,12 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                  estimateurs = pe[["estimateurs"]], niveau = pe[["niveau"]], recette = recette,
                                  observations = fenetres, p = p,
                                  parametres_exposition = etapes[["exposition"]][["parametres"]]),
+      lissage = calculer_lissage(etapes[["exposition"]][["resultat"]][["exposition"]],
+                                 brut = etapes[["brut"]][["resultat"]], segmentation = plan[["segmentation"]],
+                                 convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
+                                 methode = pe[["methode"]], plage_ages = pe[["plage_ages"]],
+                                 ordre_difference = pe[["ordre_difference"]], critere_lissage = pe[["critere_lissage"]],
+                                 ponderation = pe[["ponderation"]], parametre_lissage = pe[["parametre_lissage"]]),
       positionnement = calculer_positionnement(etapes[["exposition"]][["resultat"]][["exposition"]],
                                                segmentation = plan[["segmentation"]],
                                                par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],

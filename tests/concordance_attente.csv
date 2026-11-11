@@ -3,3 +3,4 @@ entree,fonctions-exposition:ETAPES_PLAGE_AGES,#223,"définition ajoutée à R/ex
 entree,fonctions-exposition:grille_plage,#223,"définition ajoutée à R/exposition.R (commit préparatoire (1a) de B19, ADR 0017, point 10.1) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
 entree,fonctions-construire-table:table_construite,#223,"définition ajoutée à R/construire_table.R (commit préparatoire (1a) de B19, ADR 0017, point 1.5) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
 entree,fonctions-construire-table:controler_parametres_condition,#223,"définition ajoutée à R/construire_table.R (commit préparatoire (1a) de B19, ADR 0017, point 3.2) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
+catalogue,fonctions-lissage,#223,"module R/lissage.R créé au commit (1b) de B19 (ADR 0017, points 2, 3, 9 et 10) ; catalogue écrit par docwriter en fin de branche (règle 9)"

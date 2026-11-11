@@ -297,24 +297,27 @@ CATALOGUE_RECETTES <- data.frame(
 # Sous `stocks_successifs` (#180, § 8) : tout est admis (les trois
 # estimateurs reçoivent les mêmes fenêtres), sauf importance_exclusions,
 # dont le contrefactuel fusionne des lignes par tête et n'existe pas pour les
-# stocks (QS4, #192).
+# stocks (QS4, #192). `lissage` (#223 ; ADR 0017, point 4.1) : admis sous
+# les trois recettes ; l'admission d'une méthode est portée par l'estimateur
+# brut qu'elle exige (binomial sous wh_quadratique), déjà réglé par les
+# lignes de `brut`, et contrôlée par controler_parametres_lissage().
 MATRICE_RECETTES <- data.frame(
-  recette = rep(c("lignes_dates_completes", "agregats", "stocks_successifs"), each = 10L),
-  etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite",
+  recette = rep(c("lignes_dates_completes", "agregats", "stocks_successifs"), each = 11L),
+  etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "lissage", "positionnement", "homogeneite",
             "validation", "importance_exclusions"),
-  estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
-  admis = c(rep("oui", 10L),
-            "oui", "oui", "oui", "si_role", "si_role", "non", "si_role", "si_role", "si_role", "non",
-            rep("oui", 9L), "non"),
-  role_requis = c(rep(NA_character_, 10L),
-                  NA, NA, NA, "exposition_centrale", "exposition_initiale", NA, "exposition_centrale",
+  estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA, NA),
+  admis = c(rep("oui", 11L),
+            "oui", "oui", "oui", "si_role", "si_role", "non", "oui", "si_role", "si_role", "si_role", "non",
+            rep("oui", 10L), "non"),
+  role_requis = c(rep(NA_character_, 11L),
+                  NA, NA, NA, "exposition_centrale", "exposition_initiale", NA, NA, "exposition_centrale",
                   "exposition_centrale", "exposition_centrale", NA,
-                  rep(NA_character_, 10L)),
-  motif = c(rep(NA_character_, 10L),
+                  rep(NA_character_, 11L)),
+  motif = c(rep(NA_character_, 11L),
             NA, NA, NA, "poisson_sans_exposition_centrale", "binomial_sans_exposition_initiale",
-            "kaplan_meier_agregats", "etape_exige_exposition_centrale", "etape_exige_exposition_centrale",
+            "kaplan_meier_agregats", NA, "etape_exige_exposition_centrale", "etape_exige_exposition_centrale",
             "etape_exige_exposition_centrale", "importance_exclusions_agregats",
-            rep(NA_character_, 9L), "importance_exclusions_stocks"),
+            rep(NA_character_, 10L), "importance_exclusions_stocks"),
   stringsAsFactors = FALSE
 )
 

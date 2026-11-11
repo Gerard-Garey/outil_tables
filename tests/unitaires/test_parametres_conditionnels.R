@@ -77,8 +77,11 @@ cpc <- function(pe, cat = CAT_F) tablexp:::controler_parametres_condition("lissa
 
 verifier("A PARAMETRES_ETAPES : colonnes parametre, type, domaine, recette, selon, valeurs ; invariants (i) à (iii) (ADR 0017, point 3.2 ; valeur calculée à la main)",
          invariants_catalogue(tablexp:::PARAMETRES_ETAPES))
-verifier("A PARAMETRES_ETAPES : aucun paramètre conditionnel à la valeur d'un paramètre en (1a) (selon NA, valeurs vides partout)",
-         all(vapply(tablexp:::PARAMETRES_ETAPES, function(t) all(is.na(t$selon)) && all(lengths(t$valeurs) == 0L), NA)))
+verifier("A PARAMETRES_ETAPES : paramètres conditionnels à la valeur d'un paramètre dans l'étape lissage seule (ponderation, parametre_lissage, #223) ; selon NA et valeurs vides ailleurs",
+         all(vapply(tablexp:::PARAMETRES_ETAPES[names(tablexp:::PARAMETRES_ETAPES) != "lissage"], function(t)
+           all(is.na(t$selon)) && all(lengths(t$valeurs) == 0L), NA)) &&
+           identical(tablexp:::PARAMETRES_ETAPES$lissage$parametre[!is.na(tablexp:::PARAMETRES_ETAPES$lissage$selon)],
+                     c("ponderation", "parametre_lissage")))
 verifier("A invariants : le catalogue fabriqué les tient ; chaque violation fabriquée est détectée (témoins)", {
   c1 <- CAT_F; c1$recette[3L] <- "agregats"                       # (i)
   c2 <- CAT_F; c2$selon[3L] <- "inconnu"                           # (ii) gouvernant absent
@@ -91,8 +94,8 @@ verifier("A invariants : le catalogue fabriqué les tient ; chaque violation fab
   isTRUE(invariants_catalogue(list(lissage = CAT_F))) &&
     all(vapply(list(c1, c2, c3, c4, c5, c6, c7, c8), function(c_) !isTRUE(invariants_catalogue(list(lissage = c_))), NA))
 })
-verifier("A controler_parametres_condition() : sans effet sur chaque étape du catalogue réel (aucun gouvernant), paramètres quelconques",
-         all(vapply(names(tablexp:::PARAMETRES_ETAPES), function(e)
+verifier("A controler_parametres_condition() : sans effet sur chaque étape du catalogue réel sans gouvernant (toutes sauf lissage), paramètres quelconques",
+         all(vapply(setdiff(names(tablexp:::PARAMETRES_ETAPES), "lissage"), function(e)
            is.null(tablexp:::controler_parametres_condition(e, list(x = 1), tablexp:::PARAMETRES_ETAPES[[e]])), NA)))
 
 # --- B. controler_parametres_condition() par injection (M247) -------------------
@@ -163,8 +166,8 @@ local({
 
 # --- D. ETAPES$table_construite et table_construite() (ADR 0017, points 1.2 et 1.5)
 
-verifier("D ETAPES$table_construite : character, table_positionnee pour positionnement, NA ailleurs (valeur calculée à la main)",
-         identical(tablexp:::ETAPES$table_construite, c(NA, NA, NA, "table_positionnee", NA, NA, NA)) &&
+verifier("D ETAPES$table_construite : character, table_lissee pour lissage (#223), table_positionnee pour positionnement, NA ailleurs (valeur calculée à la main)",
+         identical(tablexp:::ETAPES$table_construite, c(NA, NA, NA, "table_lissee", "table_positionnee", NA, NA, NA)) &&
            identical(names(tablexp:::ETAPES), c("etape", "module", "fonction", "prealable", "aleatoire", "table_construite")))
 
 local({
@@ -205,8 +208,8 @@ local({
 
 # --- E. Liste blanche de controler_plage_ages() (module exposition) ----------------
 
-verifier("E ETAPES_PLAGE_AGES : positionnement, validation, homogeneite (constante du module exposition ; ADR 0017, point 10.1)",
-         identical(tablexp:::ETAPES_PLAGE_AGES, c("positionnement", "validation", "homogeneite")))
+verifier("E ETAPES_PLAGE_AGES : lissage (#223), positionnement, validation, homogeneite (constante du module exposition ; ADR 0017, point 10.1)",
+         identical(tablexp:::ETAPES_PLAGE_AGES, c("lissage", "positionnement", "validation", "homogeneite")))
 verifier("E controler_plage_ages() : refus plage_ages_invalide sous le module de chaque étape admise, message inchangé", {
   m <- paste("La plage d'âges (plage_ages) doit être un vecteur double sans attribut de deux valeurs",
              "entières finies, 0 <= min <= max (un integer est refusé).")
@@ -214,5 +217,5 @@ verifier("E controler_plage_ages() : refus plage_ages_invalide sous le module de
     r <- refus_de(tablexp:::controler_plage_ages(c(20L, 90L), e))
     !is.null(r) && identical(r$module, e) && identical(r$motif, "plage_ages_invalide") &&
       identical(conditionMessage(r), m) && identical(r$details, list(plage_ages = c(20L, 90L)))
-  }, NA)) && erreur_programmation(tablexp:::controler_plage_ages(c(20, 90), "lissage"))
+  }, NA)) && erreur_programmation(tablexp:::controler_plage_ages(c(20, 90), "fermeture"))
 })
