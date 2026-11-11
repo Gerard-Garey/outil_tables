@@ -289,15 +289,16 @@ DEFAUTS_FORMES <- list(
                      "plus celles du rôle propagation (amendement A1 : autres lignes d'une unité porteuse d'un motif",
                      "de ligne, sans motif ; decomptes$lignes_propagation, decomptes$unites_propagation).",
                      "inventaire_perdu (une ou plusieurs dates perdues) : refus inventaire_sans_ligne ; cascade",
-                     "attendue, selon les unités présentes. Une date perdue : première date, refus",
+                     "attendue, selon les unités présentes. Une date perdue : t_1, première date de la grille, refus",
                      "inventaire_sans_ligne direct, quelles que soient les exclusions ; date intermédiaire, motifs",
                      "parmi presence_interrompue et evenement_apres_absence (refus ligne_invalide), puis, ces motifs",
-                     "exclus, refus inventaire_sans_ligne ; dernière date, motif sortie_non_renseignee, puis, exclu,",
-                     "refus inventaire_sans_ligne. Plusieurs dates perdues : aucun motif si elles forment un segment",
-                     "initial t_1, ..., t_k de la grille (grille entière comprise), refus inventaire_sans_ligne direct ;",
-                     "sinon, motifs cumulés parmi presence_interrompue (date perdue comprise entre deux dates",
-                     "conservées), evenement_apres_absence (date perdue autre que la dernière, postérieure à une date",
-                     "conservée) et sortie_non_renseignee (dernière date perdue, postérieure à une date conservée),",
+                     "exclus, refus inventaire_sans_ligne ; t_M, dernière date de la grille, motif",
+                     "sortie_non_renseignee, puis, exclu, refus inventaire_sans_ligne. Plusieurs dates perdues :",
+                     "aucun motif si elles forment un segment initial t_1, ..., t_k de la grille (grille entière",
+                     "comprise), refus inventaire_sans_ligne direct ; sinon, motifs cumulés parmi presence_interrompue",
+                     "(date perdue comprise entre deux dates conservées), evenement_apres_absence (date perdue autre",
+                     "que t_M, postérieure à une date conservée) et sortie_non_renseignee (t_M perdue, postérieure à",
+                     "une date conservée),",
                      "refus ligne_invalide, puis, ces motifs exclus, refus inventaire_sans_ligne. Sous exclusion de",
                      "tous les motifs, refus inventaire_sans_ligne aux dates sans présent sain",
                      "(decomptes$presents_sains), dates perdues comprises.")))
@@ -1494,8 +1495,9 @@ controler_forme <- function(forme, mode, debut, fin) {
   ctl
 }
 
-# Projection du jeu propre `jeu` (lignes individuelles d'un mode à une tête
-# par contrat) en agrégats par cellule (sexe, âge au dernier anniversaire
+# Projection du jeu propre `jeu` (lignes individuelles, mode simple ou
+# multi-contrats ; unité d'observation `unite` ci-dessous) en agrégats par
+# cellule (sexe, âge au dernier anniversaire
 # [, année civile]) ; spécification (0') de #169, § 11. Par l'arithmétique de
 # dates du simulateur (jours_civils(), jour_anniversaire(),
 # age_anniversaire()), sans appel au module `exposition` (ADR 0003, point 9 ;
