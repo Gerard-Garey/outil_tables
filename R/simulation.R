@@ -231,8 +231,10 @@ DEFAUTS_FORMES <- list(
                      "déclaration nul, convention et par_annee de la forme (convention, par_annee).",
                      "Aucune exclusion déclarée : refus ligne_invalide nommant les motifs attendus ; toutes les",
                      "exclusions des motifs attendus déclarées : lignes exclues = lignes de l'attribut, motif par",
-                     "motif. Toute cellule exclue manque à la table (cellule_dupliquee : l'original et la copie) :",
-                     "relevé ages_manquants possible.")),
+                     "motif. Exception : si ces exclusions ne conservent aucune cellule, refus",
+                     "aucune_ligne_conservee ; si aucune cellule conservée n'a d'exposition strictement positive",
+                     "ni d'événement, refus periode_sans_exposition. Toute cellule exclue manque à la table",
+                     "(cellule_dupliquee : l'original et la copie) : relevé ages_manquants possible.")),
   # Stocks successifs (#191 ; spécification d'actuary-approfondi de #191,
   # § 1 à § 3 ; avis de forme d'architect, partie #191 ; décision du
   # mainteneur du 11/11/2026 : inventaire perdu, toutes les dates de la grille
@@ -335,9 +337,13 @@ table_gompertz_makeham <- function(A, B, c, ages) {
 # a = 0 : modèle de Kannisto ; spécification d'actuary, #211). Risque cumulé
 # H(x) = a x + ln(1 + b e^(cx)) / c ; avec v = plogis(ln b + c x) (identité
 # exacte), Delta H_x = a + log1p(expm1(c) v) / c et q_x = -expm1(-Delta H_x) :
-# intégrale exacte de mu sur [x, x+1) (A.2), sans débordement de b e^(cx)
-# (plateau q -> 1 - exp(-(a + 1))). exp(c) fini exigé : au-delà, q vaudrait 1
-# à tort. Paramètres déclarés, sans valeur par défaut.
+# intégrale exacte de mu sur [x, x+1) (A.2). Forme d'évaluation : z =
+# expm1(c) v, r = log1p(z) / z, Delta H_x = a + v (expm1(c) / c) r, le
+# rapport r étant pris égal à 1 quand z vaut 0 en double (limite exacte) ;
+# sans former b e^(cx) (plateau q -> 1 - exp(-(a + 1))) ni diviser par c un
+# logarithme annulé par dépassement inférieur (c ou b infimes : q faux,
+# voire nul, sinon). exp(c) fini exigé : au-delà, q vaudrait 1 à tort.
+# Paramètres déclarés, sans valeur par défaut.
 table_logistique <- function(a, b, c, ages) {
   reel <- function(v) is.numeric(v) && length(v) == 1L && is.finite(v)
   if (!reel(a) || !reel(b) || !reel(c) || a < 0 || b <= 0 || c <= 0 || !is.finite(expm1(c)))
@@ -350,7 +356,10 @@ table_logistique <- function(a, b, c, ages) {
             formuler("Logistique : les âges sont des entiers >= 0."), list(ages = ages))
   ages <- as.integer(ages)
   v <- stats::plogis(log(b) + c * ages)
-  qx <- -expm1(-(a + log1p(expm1(c) * v) / c))
+  z <- expm1(c) * v
+  r <- log1p(z) / z
+  r[z == 0] <- 1
+  qx <- -expm1(-(a + v * (expm1(c) / c) * r))
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = qx, stringsAsFactors = FALSE),
                   nom = sprintf("Logistique synthétique (a = %s, b = %s, c = %s)",
                                 format(a), format(b), format(c)),
