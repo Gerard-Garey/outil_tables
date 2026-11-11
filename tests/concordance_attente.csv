@@ -1,3 +1,2 @@
 type,nom,issue,motif
-entree,fonctions-outils:denombrement_entier,#199,assistant de rangement des dénombrements en integer ajouté par #199 (ADR 0009 point 9.6 (d)) ; entrée du catalogue à écrire par docwriter en fin de branche (règle 9)
 entree,fonctions-validation:PHRASES_ATTENDUS_FAIBLES,#200,constante ajoutée par #200 (phrases des statuts des p asymptotiques sur attendus faibles posées une fois pour STATUTS_VALIDATION et STATUTS_VALIDATION_POSITIONNEE) ; entrée du catalogue à écrire par docwriter en fin de branche (règle 9)

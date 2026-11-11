@@ -1068,6 +1068,19 @@ message marqué UTF-8 par \code{texte\_moteur()}, sans \code{warning()}~;
 \code{stop()} si le code (chaîne unique au sens de \code{chaine\_unique()},
 conforme à \code{MOTIF\_CODE\_REFUS}) ou le nombre est mal formé
 (section~\ref{sec:avertissements}~; issues~\#9, \#24, \#50 et~\#60) \\
+\catalogue{fonctions-outils}{denombrement\_entier()} & interne & \code{x}
+(vecteur \code{double} ou \code{integer} à valeurs entières positives ou
+nulles, \code{NA} admis), \code{etape}, \code{grandeur} (chaînes du
+moteur) & \code{x} rangé en \code{integer}, de même longueur, sans
+attribut, \code{NA} devenant \code{NA\_integer\_}~; refus
+\code{denombrement\_hors\_plage} de l'étape \code{etape} si un élément
+dépasse \code{.Machine\$integer.max}, avant toute conversion
+(\code{details}~: \code{grandeur}, \code{valeur}, le plus grand élément,
+\code{limite})~; \code{stop()} pour une valeur non finie (\code{NaN}
+compris), négative ou non entière, ou un autre type~; aucun
+\code{warning()}~; assistant unique du rangement des sommes d'événements
+(section~\ref{sec:non-regression}, «~Type des dénombrements~»~;
+issue~\#199) \\
 \catalogue{fonctions-outils}{texte\_moteur()} & interne & \code{x}, chaîne ou
 liste (\code{data.frame} compris) & le même objet, chaînes et noms non ASCII
 du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
@@ -2227,6 +2240,58 @@ dans l'ADR 0009, datée, avec l'avis d'\code{actuary}.
 
 \medskip
 \noindent
+\textbf{Type des dénombrements} (issue~\#199~; ADR 0009, point~9.6,
+seconde annotation du 10/11/2026~; décisions M396 et M397). Depuis
+l'issue~\#199, la règle est générale~: un \emph{dénombrement}, décompte
+d'objets (cellules, lignes, têtes, segments, séquences, suites, signes
+$n_{+}$ et $n_{-}$, tirages effectués) ou somme d'événements non pondérés
+formée par le moteur sur des données admises, est rangé en
+\code{integer}. Le motif est que le type d'une somme dépendait des
+données~: \code{sum()} d'un vecteur \code{integer} rend un \code{integer}
+tant que le total tient dans la plage des entiers, et un \code{double}
+au-delà, sans avertissement, si bien qu'un écart de type relevé à la
+comparaison pouvait venir des données et non d'une modification du
+code~; le type d'un chemin ne dépend désormais ni du plan ni des
+données. \code{integer} est un type de \textbf{stockage}~: les sommes et
+les identités (par exemple $O + {}$événements sans attendu${} + {}$%
+événements hors plage${} = {}$total) se forment en \code{double}, exactes
+sous $2^{53}$, et la conversion n'a lieu qu'au rangement dans l'objet. Un
+décompte borné par une longueur ou par un paramètre contrôlé se convertit
+par \code{as.integer()}, sans garde~; une somme d'événements, par
+\code{denombrement\_entier()} (\code{R/outils.R},
+tableau~\ref{tab:fonctions-outils}), qui refuse au-delà de
+\code{.Machine\$integer.max} sous le code \code{denombrement\_hors\_plage}
+de l'étape qui forme la somme. La garde porte, à la source, sur le total
+des événements de l'étape \code{exposition} sous la recette
+\code{agregats} (section~\ref{sec:exposition-cellules})~; celles
+des étapes \code{positionnement}, \code{validation}, \code{homogeneite} et
+\code{importance\_exclusions}, qui somment des sous-ensembles de cellules,
+sont défensives et testées en appel direct (ADR 0009, point~9.6, (d)~4).
+Vingt-sept chemins de ces quatre étapes (5, 9, 5 et~8) sont ainsi passés
+de \code{double} à \code{integer}, à valeurs identiques, et leurs 27 clés
+exactes sont retirées de \code{TOLERANCES}, qui passe de 175 à 148 clés,
+dont 41 exactes au lieu de 68 (ADR 0009, seconde annotation du
+10/11/2026, (e)). Restent en \code{double}~: l'exposition, même en jours
+entiers~; les attendus et leurs bornes~; les bornes de fluctuation
+exactes, quantiles à valeurs entières~; la colonne hétérogène
+\code{validation/resultat/statistiques/valeur}~; les échos de paramètres,
+\code{monte\_carlo/replications} compris~; et, seule exception motivée
+parmi les sommes d'événements,
+\code{donnees/diagnostics/releves/}\allowbreak\code{poids\_exclusions/evenements},
+qui somme les événements de cellules exclues, non passées par la garde
+par cellule~: une garde en \code{integer} refuserait une construction à
+cause de données justement écartées (sa clé exacte reste). Un test de
+\code{tests/test\_reproductibilite.R} exige, dans chaque plan de
+référence, le type \code{integer} de tout chemin dont le dernier segment
+(nom de colonne ou de diagnostic, jamais nom de table) est nommé comme un
+dénombrement (\code{observes}, \code{evenements\ldots},
+\code{cellules\ldots}, \code{lignes\ldots}, \code{tetes\ldots},
+\code{tirages\_effectues}, \code{runs}, \code{positifs},
+\code{negatifs}), hors la liste fermée \code{EXCEPTIONS\_DENOMBREMENT},
+qui ne contient que ce dernier chemin.
+
+\medskip
+\noindent
 \textbf{Invariants de structure de la table} (\code{tests/test\_reproductibilite.R},
 pour chaque plan de référence)~: (a)~aucune clé nue, sans «~\code{/}~»~;
 (b)~tout double d'une étape (chemin sous \code{etapes/<e>/} ou
@@ -2258,7 +2323,7 @@ point~(a)~4).
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
 point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
-07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)).
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)~; 27 clés exactes des dénombrements retirées par l'issue~\#199~: ADR 0009, seconde annotation du 10/11/2026, (e)~; 148 clés, dont 41 exactes, 33 à $10^{-14}$, 71 à $10^{-12}$ et 3 à $10^{-10}$).
 Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
 groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
@@ -2276,7 +2341,7 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
+exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13~; seule exception à la règle des dénombrements, issue~\#199)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table} et \code{resultat/table\_positionnee/qx\_reference}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan) et \code{resultat/monte\_carlo/replications}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table} et \code{resultat/monte\_carlo/replications}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
 $10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
 $10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires)~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
 $10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z} & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a)) \\
@@ -2520,7 +2585,27 @@ changés. L'empreinte du résultat de R12 commitée est celle de la
 plateforme de référence~; un relevé sur un poste en diffère, par un écart
 d'une unité au dernier rang sur un double de l'étape \code{brut}, antérieur
 à la branche, conformément au statut «~même machine seulement~» de cette
-empreinte (section~\ref{sec:empreinte-resultat}).
+empreinte (section~\ref{sec:empreinte-resultat}). Les références R8 à R13
+ont été régénérées \textbf{une neuvième fois}, le 11/11/2026, en mode
+\code{regeneration} sur ces six plans seulement (exécution 42982198441 du
+workflow, calcul sur \code{140a41b}, commit \code{9aaeba9}, visa
+d'\code{actuary-approfondi} du 11/11/2026~; issues~\#199, \#200
+et~\#202), régénération unique de la branche
+\code{claude/validation-types-statuts}, pour les seuls changements annoncés
+en transition par ces issues~: type \code{integer} au lieu de
+\code{double} des chemins de dénombrement, à valeurs et longueurs
+identiques, sur 17 lignes de R8, 17 de R9, 16 de R10 et 5 de chacun de
+R11, R12 et R13 (\#199~; «~Type des dénombrements~», ci-dessus)~; textes,
+propres à chaque relation, des statuts \code{bornes\_exactes} et
+\code{p\_valeurs} des sous-groupes de la validation (\#200~; R8 et R9)~;
+texte du statut de \code{p\_asymptotique} du test d'homogénéité (\#202~;
+R11 et R12). L'empreinte du résultat change en conséquence, celle du code
+aussi, \code{R/} ayant changé~; \code{version\_fiche} est inchangée~;
+toutes les autres grandeurs de R8 à R13 sont restées identiques au bit
+près, de même que R1 à R7 et R14, non visées, en comparaison réussie, sur
+la plateforme de référence (processeur AMD EPYC 9V74, au lieu de l'EPYC
+7763 consigné à la huitième, sans effet mesuré), sans table finale,
+verdict ni valeur de table homologuée changés.
 
 \begin{encadre}
 \small
@@ -2758,8 +2843,9 @@ closes ensemble par la troisième, pour les issues~\#73 et~\#31, dont
 les transitions ont été closes ensemble par la sixième, pour
 l'issue~\#169, dont la transition a été close par la septième, et pour
 les issues~\#174, \#177, \#179, \#178 et~\#185, dont les transitions
-ont été closes ensemble par la huitième («~Références existantes~»,
-ci-dessus)~: la liste est de nouveau vide. Chaque
+ont été closes ensemble par la huitième, et pour les issues~\#199, \#200
+et~\#202, dont les transitions ont été closes ensemble par la neuvième
+(«~Références existantes~», ci-dessus)~: la liste est de nouveau vide. Chaque
 nature, l'union et ses conflits, l'observation, la forme de la liste, le
 rattachement de l'échec attendu, les doubles restants et la garde sont
 exercés par des témoins de la batterie, sur des objets en mémoire et jamais
@@ -6404,7 +6490,19 @@ déclaré mais absent de la clé est ainsi sommé sur ses modalités
 \code{annees\_sommees}, ci-dessous). Les événements sont sommés exactement
 et rendus en \code{integer}~; une somme qui dépasse le plus grand entier du
 moteur ($2^{31} - 1$, \code{.Machine\$integer.max}) est refusée
-(\code{evenements\_hors\_plage}, module \code{exposition}). Les expositions
+(\code{evenements\_hors\_plage}, module \code{exposition}). Le total des
+événements de la table, somme de ses cellules formée en \code{double},
+est ensuite rangé en \code{integer} dans le diagnostic \code{evenements}
+de l'étape par \code{denombrement\_entier()}~: au-delà de $2^{31} - 1$,
+même quand chaque cellule tient dans la plage, l'étape refuse
+(\code{denombrement\_hors\_plage}, module \code{exposition}, détails
+\code{grandeur}~$=$~\code{evenements}, \code{valeur} et \code{limite}~;
+issue~\#199, décision M397), là où \code{sum()} d'un \code{integer}
+aurait rendu un \code{double} sans avertissement~; un total égal à
+\code{.Machine\$integer.max} est admis (section~\ref{sec:non-regression},
+«~Type des dénombrements~»). Sous les recettes à fenêtres d'exposition
+(\code{exposition\_fenetres()}), ce total est le nombre des événements des
+fenêtres, \code{integer} par construction, sans garde. Les expositions
 sont sommées en arithmétique flottante, dans l'ordre des lignes, comme sous
 la recette des lignes~: une permutation des lignes reçues peut changer les
 derniers bits d'une somme, et une cellule sans somme garde sa valeur
@@ -8268,9 +8366,12 @@ passent les premières.
     \code{log1p()}, \code{expm1()}.
   \item \textbf{Statut} (E2.20~; constante \code{STATUTS\_POSITIONNEMENT},
     rendue dans \code{etapes\$positionnement\$parametres\$statuts}, une
-    ligne par colonne double de \code{resultat\$smr} et de
-    \code{resultat\$table\_positionnee}, qui fait foi)~: $O_s$ et $A_s$,
-    descriptifs (arithmétique flottante)~; $\hat\theta_s$, résultat exact
+    ligne par grandeur statistique de \code{resultat\$smr} et de
+    \code{resultat\$table\_positionnee}, hors clés de segment, âge, état
+    et nombre de cellules retenues, qui fait foi)~: $O_s$, somme des
+    décès des cellules retenues du segment, rangée en \code{integer}
+    (issue~\#199), et $A_s$, en arithmétique flottante, descriptifs~;
+    $\hat\theta_s$, résultat exact
     (maximum de vraisemblance, ci-dessus), en forme close, $O_s / A_s$,
     sans optimisation numérique~: le statut porte sur la formule de
     l'estimateur, et l'erreur d'estimation de $\theta_s$ est décrite par
@@ -8613,7 +8714,7 @@ de 5~\%, de $G^2$ au-dessous).
 \catalogue{fonctions-positionnement}{ETATS\_TABLE\_POSITIONNEE} & constante & --- & états d'une ligne de la table positionnée~: \code{produite}, \code{taux\_table\_nul}, \code{taux\_table\_egal\_un}, \code{qx\_arrondi\_un} (section~\ref{sec:positionnement-etape}) \\
 \catalogue{fonctions-positionnement}{ETATS\_CELLULE\_POSITIONNEMENT} & constante & --- & états d'une cellule, mêmes valeurs dans le même ordre que ceux de l'étape \code{validation} \\
 \catalogue{fonctions-positionnement}{REFERENCE\_METHODE\_POSITIONNEMENT} & constante & --- & identité de la note II1291-12 v1.7 (titre, fichier, SHA-256 complet, §~3.1, statut de référence de place) \\
-\catalogue{fonctions-positionnement}{STATUTS\_POSITIONNEMENT} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque colonne double de \code{smr} et de \code{table\_positionnee} (E2.20), mention d'indépendance comprise \\
+\catalogue{fonctions-positionnement}{STATUTS\_POSITIONNEMENT} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque grandeur statistique de \code{smr} et de \code{table\_positionnee} (E2.20), $O_s$ (\code{observes}, en \code{integer}, issue~\#199) compris, mention d'indépendance comprise \\
 \catalogue{fonctions-positionnement}{controler\_parametres\_positionnement()} & interne & méthode, clé, plage, niveau & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue (module \code{positionnement})~; appelée par \code{valider\_plan()} seule \\
 \catalogue{fonctions-positionnement}{calculer\_positionnement()} & interne & table d'exposition, segmentation, découpage, convention, table, clé, méthode, plage, niveau & fonction d'étape \code{positionnement}~: paramètres, résultat (\code{cellules}, \code{smr}, \code{table\_positionnee}), diagnostics, avertissements~; ne contrôle aucun paramètre (issue~\#82) \\
 \end{longtable}
@@ -10031,9 +10132,13 @@ niveau, repris dans \code{details} (\code{ensemble}, \code{niveau},
 \code{integer} qui, au-delà de la borne, rendrait \code{NA} avec un simple
 avertissement~; en deçà, le total est rendu en \code{integer}. Hors ce
 refus, tout ce qui ne peut être calculé est rendu dans
-un état nommé (ci-dessous), sans refus~; seules les gardes des fonctions
-d'exposition qu'elle rappelle (par exemple \code{trop\_de\_cellules})
-restent en vigueur. Les incohérences internes (lignes reçues
+un état nommé (ci-dessous), sans refus~; seules restent en vigueur les
+gardes des fonctions d'exposition qu'elle rappelle (par exemple
+\code{trop\_de\_cellules}) et la garde générique
+\code{denombrement\_hors\_plage} du rangement en \code{integer} des
+décès observés et des événements restitués des deux comparateurs,
+défensive et testée en appel direct (issue~\#199~;
+section~\ref{sec:non-regression}, «~Type des dénombrements~»). Les incohérences internes (lignes reçues
 différentes de conservées plus exclues, invariants des retraits, ligne non
 mesurable dans un ensemble mesuré) sont des \emph{erreurs de programmation},
 non des refus. La fiche de construction ne change pas~: les grandeurs sont
