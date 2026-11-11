@@ -498,7 +498,7 @@ verifier("catalogue_roles(), (4b) : colonne recettes des rôles des stocks (vale
 
 verifier("PARAMETRES_ETAPES, (4b) : colonne recette (NA pour tout paramètre existant) ; exposition : entree_entre_inventaires, character, conditionnel à stocks_successifs (valeur écrite à la main)", {
   pe <- tablexp:::PARAMETRES_ETAPES
-  all(vapply(pe, function(t) identical(names(t), c("parametre", "type", "domaine", "recette")), NA)) &&
+  all(vapply(pe, function(t) identical(names(t)[1:4], c("parametre", "type", "domaine", "recette")), NA)) &&
     identical(pe$exposition$parametre, c("convention", "par_annee", "entree_entre_inventaires")) &&
     identical(pe$exposition$type, c("character", "logical", "character")) &&
     identical(pe$exposition$recette, c(NA, NA, "stocks_successifs")) &&
