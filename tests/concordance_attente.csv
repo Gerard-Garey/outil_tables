@@ -1,1 +1,2 @@
 type,nom,issue,motif
+entree,fonctions-simulation:table_logistique,#211,"définition ajoutée à R/simulation.R (#211) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"

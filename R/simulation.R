@@ -3,9 +3,9 @@
 #  E2.19, E2.20 ; ADR 0003, point 9 ; ADR 0007, points 3.2, 7 et 8 ;
 #  spécification d'actuary, A.0 et A.2)
 #
-#  - table_gompertz_makeham(), table_constante() : tables synthétiques à
-#    paramètres déclarés (classe `table_reference`, statut `synthetique`,
-#    attribut `parametres`) ;
+#  - table_gompertz_makeham(), table_logistique() (#211), table_constante() :
+#    tables synthétiques à paramètres déclarés (classe `table_reference`,
+#    statut `synthetique`, attribut `parametres`) ;
 #  - loi_effective() : loi vraie effective par transition et par sexe,
 #    q_x^s = min(f_s q_x, 1), force mu_x = -ln(1 - q_x) ;
 #  - jours_civils(), jour_anniversaire(), age_anniversaire() : dates
@@ -187,6 +187,38 @@ table_gompertz_makeham <- function(A, B, c, ages) {
                                  "q_x = 1 - exp(-A - B c^x (c - 1) / ln c) (spécification d'actuary, A.2, #10)"),
                   parametres = list(loi = "gompertz_makeham", A = A, B = B, c = c,
                                     ages = range(ages)))
+}
+
+# Table logistique, mu(x) = a + b e^(cx) / (1 + b e^(cx)), sans distinction de
+# sexe (Lignes directrices mortalité, Institut des actuaires, 2006, p. 25/40 ;
+# a = 0 : modèle de Kannisto ; spécification d'actuary, #211). Risque cumulé
+# H(x) = a x + ln(1 + b e^(cx)) / c ; avec v = plogis(ln b + c x) (identité
+# exacte), Delta H_x = a + log1p(expm1(c) v) / c et q_x = -expm1(-Delta H_x) :
+# intégrale exacte de mu sur [x, x+1) (A.2), sans débordement de b e^(cx)
+# (plateau q -> 1 - exp(-(a + 1))). exp(c) fini exigé : au-delà, q vaudrait 1
+# à tort. Paramètres déclarés, sans valeur par défaut.
+table_logistique <- function(a, b, c, ages) {
+  reel <- function(v) is.numeric(v) && length(v) == 1L && is.finite(v)
+  if (!reel(a) || !reel(b) || !reel(c) || a < 0 || b <= 0 || c <= 0 || !is.finite(expm1(c)))
+    refuser("simulation", "loi_invalide",
+            formuler("Logistique : a >= 0, b > 0 et c > 0, réels finis, exp(c) fini, à déclarer."),
+            list(a = a, b = b, c = c))
+  if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
+      any(ages < 0))
+    refuser("simulation", "loi_invalide",
+            formuler("Logistique : les âges sont des entiers >= 0."), list(ages = ages))
+  ages <- as.integer(ages)
+  v <- stats::plogis(log(b) + c * ages)
+  qx <- -expm1(-(a + log1p(expm1(c) * v) / c))
+  table_reference(data.frame(age = ages, sexe = "ensemble", qx = qx, stringsAsFactors = FALSE),
+                  nom = sprintf("Logistique synthétique (a = %s, b = %s, c = %s)",
+                                format(a), format(b), format(c)),
+                  statut = "synthetique",
+                  source = paste("Table synthétique : mu(x) = a + b e^(cx) / (1 + b e^(cx)) (Lignes directrices",
+                                 "mortalité, Institut des actuaires, 2006, p. 25/40 ; a = 0 : modèle de Kannisto) ;",
+                                 "q_x = 1 - exp(-a - log1p(expm1(c) plogis(ln b + c x)) / c) (spécification",
+                                 "d'actuary, #211)"),
+                  parametres = list(loi = "logistique", a = a, b = b, c = c, ages = range(ages)))
 }
 
 # Table à q_x constant sur les âges `ages`, sans distinction de sexe (loi de
