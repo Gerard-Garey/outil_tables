@@ -393,11 +393,12 @@ verifier("A7 (valeur écrite à la main) : motifs du catalogue des agrégats et 
     identical(tablexp:::DEFAUTS_FORMES$lignes$ordre_tirages, tablexp:::ORDRE_TIRAGES_DEFAUTS) &&
     identical(tablexp:::DEFAUTS_FORMES$lignes$combinaisons, tablexp:::COMBINAISONS_DEFAUTS)
 })
-verifier("A7 : stocks successifs avec defauts toujours refusés (forme_invalide, #191) ; conditions_vides() et controler_defauts() aux appels existants inchangés", {
+verifier("A7 : stocks successifs avec un type du catalogue des lignes refusés (defauts_invalides, type inconnu du catalogue des stocks, #191) ; conditions_vides() et controler_defauts() aux appels existants inchangés", {
   r <- rf(simuler(LOI, PF, PER, GRAINE_JEU, defauts = dft(list(list(type = "sexe_manquant", cible = "deces", nombre = 1L))),
                   forme = list(nom = "stocks_successifs", inventaires = D(c("2014-12-31", "2024-12-31")))))
   v <- tablexp:::conditions_vides("uniforme", PF, PER)
-  !is.null(r) && identical(r$motif, "forme_invalide") && grepl("defauts", conditionMessage(r), fixed = TRUE) &&
+  !is.null(r) && identical(r$motif, "defauts_invalides") &&
+    grepl("type « sexe_manquant » inconnu ; types admis : « sortie_non_renseignee »", conditionMessage(r), fixed = TRUE) &&
     identical(v, tablexp:::conditions_vides("uniforme", PF, PER, NULL)) &&
     identical(tablexp:::conditions_vides("uniforme", PF, PER, list(par_annee = TRUE)), stats::setNames(character(0), character(0)))
 })

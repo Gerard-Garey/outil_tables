@@ -31,7 +31,8 @@
 #    d'actuary-approfondi de #180, § 11, M328) : projection du jeu propre en
 #    lignes d'inventaire et d'événement sur une grille alignée sur la période,
 #    décomptes de la projection dans l'attribut `simulation`, sans tirage
-#    supplémentaire ni appel à `exposition`.
+#    supplémentaire ni appel à `exposition` ; défauts propres aux stocks
+#    (DEFAUTS_FORMES, injecter_defauts_stocks() ; #191).
 #
 #  Hypothèse de répartition dans l'année (A.2) : force constante par âge
 #  entier, dans l'échelle des années d'âge (A.0, T3 : une année d'âge de
@@ -175,10 +176,10 @@ ORDRE_TIRAGES_DEFAUTS <- c(
 # cible (domaine du champ cible : causes de sortie du jeu propre ; vide si
 # la forme n'en a pas) ; unites_cible (unités des types dont la cible est
 # requise ; interdite pour les autres) ; ordre_tirages et validite (textes
-# consignés dans l'attribut `defauts`). Forme absente de la liste : défauts
-# refusés (controler_forme() ; stocks successifs, #191). L'entrée `lignes`
-# reprend CATALOGUE_DEFAUTS, COMBINAISONS_DEFAUTS et ORDRE_TIRAGES_DEFAUTS
-# tels quels.
+# consignés dans l'attribut `defauts`) ; exclusifs (facultatif : types qui
+# doivent être l'unique déclaration ; absent, aucun). Toute forme de
+# CHAMPS_FORMES y a son entrée. L'entrée `lignes` reprend CATALOGUE_DEFAUTS,
+# COMBINAISONS_DEFAUTS et ORDRE_TIRAGES_DEFAUTS tels quels.
 # Agrégats (spécification de #189, § 1) : unité cellule (ligne de la table
 # agrégée propre), cible interdite, une cellule altérée au plus une fois,
 # copie jamais éligible ; colonnes d'éligibilité exposition_positive
@@ -231,7 +232,75 @@ DEFAUTS_FORMES <- list(
                      "Aucune exclusion déclarée : refus ligne_invalide nommant les motifs attendus ; toutes les",
                      "exclusions des motifs attendus déclarées : lignes exclues = lignes de l'attribut, motif par",
                      "motif. Toute cellule exclue manque à la table (cellule_dupliquee : l'original et la copie) :",
-                     "relevé ages_manquants possible.")))
+                     "relevé ages_manquants possible.")),
+  # Stocks successifs (#191 ; spécification d'actuary-approfondi de #191,
+  # § 1 à § 3 ; avis de forme d'architect, partie #191 ; décision du
+  # mainteneur du 11/11/2026 : inventaire perdu, toutes les dates de la grille
+  # éligibles). Unité de sélection : l'unité inventoriée (id_contrat), altérée
+  # au plus une fois tous types confondus ; unite décrit le défaut : ligne
+  # (ligne d'inventaire altérée ou copiée), unite (motif d'unité), inventaire
+  # (date de la grille). Colonnes d'éligibilité : deces, rachat, en_cours
+  # (cause de l'unité dans le jeu propre, à intersecter avec la cible ; NA :
+  # sans objet, cible interdite) ; inventaires_min (nombre minimal de lignes
+  # d'inventaire de l'unité) ; evenement (ligne d'événement requise) ;
+  # condition « grille_trois_dates » : grille d'au moins trois dates, vide
+  # structurel sinon (conditions_vides()). inventaire_perdu : type exclusif,
+  # refus inventaire_sans_ligne (précédent date_hors_domaine). Attendus écrits
+  # en dur d'après la spécification, motifs de MOTIFS_LIGNES_STOCKS et
+  # MOTIFS_UNITE_STOCKS (R/donnees.R), jamais calculés par `donnees`.
+  stocks_successifs = list(
+    catalogue = data.frame(
+      defaut = c("sortie_non_renseignee", "presence_interrompue", "inventaire_hors_grille", "inventaire_duplique",
+                 "inventaire_perdu"),
+      unite = c("unite", "unite", "ligne", "ligne", "inventaire"),
+      deces = c(TRUE, TRUE, TRUE, TRUE, NA),
+      rachat = c(TRUE, TRUE, TRUE, TRUE, NA),
+      en_cours = c(FALSE, TRUE, TRUE, TRUE, NA),
+      inventaires_min = c(1L, 3L, 1L, 1L, NA),
+      evenement = c(TRUE, FALSE, FALSE, FALSE, NA),
+      condition = c("", "grille_trois_dates", "", "", ""),
+      alteration = c("ligne d'événement de l'unité retirée",
+                     "ligne d'inventaire t_(f+1) de l'unité retirée (f : premier inventaire de l'unité)",
+                     "date_inventaire du premier inventaire t_f <- min{d > t_f : d hors de la grille}",
+                     "copie du premier inventaire de l'unité ajoutée en fin de jeu (lignes N' + 1, ...)",
+                     "toutes les lignes d'inventaire de la date retirées"),
+      motif_attendu = c("sortie_non_renseignee", "presence_interrompue", "inventaire_hors_grille",
+                        "inventaire_duplique", NA),
+      refus_attendu = c(rep("ligne_invalide", 4L), "inventaire_sans_ligne"),
+      stringsAsFactors = FALSE),
+    combinaisons = list(), cible = c("deces", "rachat", "en_cours"), unites_cible = c("ligne", "unite"),
+    exclusifs = "inventaire_perdu",
+    ordre_tirages = c(
+      paste("0. après le tirage complet du jeu propre et sa projection en stocks successifs (aucun tirage), un",
+            "seul sous_graine(defauts$graine), graine différente de celle du jeu ; déclarations traitées dans",
+            "l'ordre reçu"),
+      paste("1. éligibles : unités inventoriées (id_contrat) non encore altérées, en ordre croissant",
+            "d'identifiant (une unité est altérée au plus une fois, tous types confondus) ; inventaire_perdu :",
+            "dates de la grille, dans l'ordre de la grille"),
+      ORDRE_TIRAGES_DEFAUTS[3:4],
+      paste("4. numérotation : lignes de la projection dans leur ordre, moins les lignes retirées, puis copies",
+            "(inventaire_duplique) en fin, dans l'ordre des déclarations, puis des unités")),
+    validite = paste("Motifs et refus attendus sous ces conditions : recette stocks_successifs, rôles déclarés aux",
+                     "noms des colonnes (roles ; identifiant id_contrat seul), plan de période égale à celle de la",
+                     "simulation, délai de déclaration nul, grille du plan égale à celle de la forme (inventaires).",
+                     "Motifs (sans inventaire_perdu) : aucune exclusion déclarée, refus ligne_invalide nommant les",
+                     "motifs attendus ; toutes les exclusions des motifs attendus déclarées, lignes exclues = lignes",
+                     "de l'attribut qui portent le motif, motif par motif ; nombre de lignes exclues = ces lignes",
+                     "plus celles du rôle propagation (amendement A1 : autres lignes d'une unité porteuse d'un motif",
+                     "de ligne, sans motif ; decomptes$lignes_propagation, decomptes$unites_propagation).",
+                     "inventaire_perdu (une ou plusieurs dates perdues) : refus inventaire_sans_ligne ; cascade",
+                     "attendue, selon les unités présentes. Une date perdue : première date, refus",
+                     "inventaire_sans_ligne direct, quelles que soient les exclusions ; date intermédiaire, motifs",
+                     "parmi presence_interrompue et evenement_apres_absence (refus ligne_invalide), puis, ces motifs",
+                     "exclus, refus inventaire_sans_ligne ; dernière date, motif sortie_non_renseignee, puis, exclu,",
+                     "refus inventaire_sans_ligne. Plusieurs dates perdues : aucun motif si elles forment un segment",
+                     "initial t_1, ..., t_k de la grille (grille entière comprise), refus inventaire_sans_ligne direct ;",
+                     "sinon, motifs cumulés parmi presence_interrompue (date perdue comprise entre deux dates",
+                     "conservées), evenement_apres_absence (date perdue autre que la dernière, postérieure à une date",
+                     "conservée) et sortie_non_renseignee (dernière date perdue, postérieure à une date conservée),",
+                     "refus ligne_invalide, puis, ces motifs exclus, refus inventaire_sans_ligne. Sous exclusion de",
+                     "tous les motifs, refus inventaire_sans_ligne aux dates sans présent sain",
+                     "(decomptes$presents_sains), dates perdues comprises.")))
 
 # --- tables synthétiques ------------------------------------------------------
 
@@ -642,8 +711,9 @@ temps_latent <- function(l, cn, x0, frac0, entree, e) {
 # refusée (ADR 0007, annotation du 05/11/2026, seconde, (c) et (d) ; #112,
 # #135). `regles` : règles des défauts de la forme (entrée de
 # DEFAUTS_FORMES ; par défaut, lignes individuelles) : catalogue,
-# combinaisons, domaine de la cible et unités qui la requièrent ; un type
-# hors du catalogue de la forme est un type inconnu (#189).
+# combinaisons, domaine de la cible et unités qui la requièrent, types
+# exclusifs (seule déclaration admise ; #191) ; un type hors du catalogue de
+# la forme est un type inconnu (#189).
 # Rend list(graine,
 # declarations) : graine entière ; pour chaque déclaration, list(type,
 # unite, cible, taux, nombre), cible = causes du catalogue si absente (vide
@@ -707,7 +777,10 @@ controler_defauts <- function(defauts, graine, vides = stats::setNames(character
       inv(if (unite == "tete") formuler("type de tête « %s » : champ cible interdit.", citer(type))
           else formuler("type « %s » (unité %s) : champ cible interdit.", citer(type), citer(unite)))
     if (cible_requise && !a_cible)
-      inv(formuler("type de ligne : champ cible requis (sous-ensemble de « deces », « rachat », « en_cours »)."))
+      inv(if (unite == "ligne")
+            formuler("type de ligne : champ cible requis (sous-ensemble de « deces », « rachat », « en_cours »).")
+          else formuler("type d'unité « %s » : champ cible requis (sous-ensemble de %s).", citer(type),
+                        liste_guillemets(causes)))
     cible <- if (a_cible) d[["cible"]] else causes
     if (a_cible && (!forme_exacte(cible, "character") || !length(cible) || anyNA(cible) || anyDuplicated(cible) ||
         !all(cible %in% causes)))
@@ -728,9 +801,10 @@ controler_defauts <- function(defauts, graine, vides = stats::setNames(character
     if (cible_requise) {
       admises <- causes[vapply(causes, function(cs) all(cat_[[cs]][i_cat]), logical(1L))]
       if (!any(cible %in% admises))
-        inv(formuler("cible %s disjointe des causes admises pour %s (%s) : aucune ligne éligible par construction.",
+        inv(formuler("cible %s disjointe des causes admises pour %s (%s) : aucune %s éligible par construction.",
                      liste_guillemets(cible), paste(citer(type), collapse = " + "),
-                     if (length(admises)) liste_guillemets(admises) else "aucune"))
+                     if (length(admises)) liste_guillemets(admises) else "aucune",
+                     if (unite == "ligne") "ligne" else formuler("unité")))
     }
     # Noms vides ("") jamais retenus : une chaîne vide ne fait pas refuser un
     # type sans condition.
@@ -750,6 +824,13 @@ controler_defauts <- function(defauts, graine, vides = stats::setNames(character
     list(type = type, unite = unite, cible = cible,
          taux = if (a_taux) as.numeric(v), nombre = if (a_nombre) as.integer(v))
   })
+  # Type exclusif de la forme (regles$exclusifs ; stocks successifs :
+  # inventaire_perdu, #191) : seule déclaration admise.
+  excl <- which(vapply(declarations, function(d) any(d$type %in% regles$exclusifs), logical(1L)))
+  if (length(excl) && length(declarations) > 1L)
+    invalide(formuler("déclaration %d : type « %s » exclusif : il doit être la seule déclaration (%d déclarations reçues).",
+                      excl[1L], citer(declarations[[excl[1L]]]$type), length(declarations)),
+             list(parametre = "defauts$declarations", declaration = excl[1L]))
   list(graine = as.integer(dg), declarations = declarations)
 }
 
@@ -773,12 +854,17 @@ controler_defauts <- function(defauts, graine, vides = stats::setNames(character
 # `forme` : forme validée (controler_forme()), NULL par défaut (lignes
 # individuelles) ; sinon, seules les conditions du catalogue de la forme
 # (DEFAUTS_FORMES) sont examinées, d'après la forme seule (#189) : agrégats
-# sans colonne annee (par_annee = FALSE), condition `annee` vide.
+# sans colonne annee (par_annee = FALSE), condition `annee` vide ; stocks
+# successifs sur une grille de moins de trois dates, condition
+# `grille_trois_dates` vide (#191).
 conditions_vides <- function(mode, portefeuille, periode, forme = NULL) {
   vides <- stats::setNames(character(0), character(0))
   if (!is.null(forme)) {
     if (identical(forme$par_annee, FALSE))
       vides <- c(vides, annee = formuler("aucune colonne annee dans les agrégats : par_annee = FALSE"))
+    if (!is.null(forme$inventaires) && length(forme$inventaires) < 3L)
+      vides <- c(vides, grille_trois_dates = formuler("grille de %d dates d'inventaire, moins de trois",
+                                                      length(forme$inventaires)))
     return(vides)
   }
   raison <- if (mode == MODE_BASE[[mode]])
@@ -1100,6 +1186,202 @@ injecter_defauts_agregats <- function(tab, ctl, defauts, periode, forme) {
   res
 }
 
+# Injecte les défauts d'une forme « stocks successifs » (#191 ; spécification
+# d'actuary-approfondi de #191, § 1 à § 3 ; avis de forme d'architect, partie
+# #191) dans le jeu propre de la forme `tab` (projeter_stocks(), attribut
+# `simulation`), après la projection. Unités : identifiants id_contrat
+# distincts, en ordre croissant (tab trié par id_contrat) ; cause de l'unité
+# dans le jeu propre : celle de sa ligne d'événement, « en_cours » sans ligne
+# d'événement (une sortie finie postérieure à t_1 a toujours sa ligne
+# d'événement, t_M étant la fin de la période). Sélection par tirer_defauts()
+# sous ctl$graine : unités non encore altérées (une unité altérée au plus une
+# fois, tous types confondus), dates de la grille pour inventaire_perdu
+# (type exclusif, controler_defauts()) ; éligibilité lue dans le catalogue de
+# la forme (DEFAUTS_FORMES). Altérations déterministes (colonne alteration du
+# catalogue) ; f désigne le premier inventaire de l'unité. Table rendue :
+# lignes de la projection dans leur ordre, moins les lignes retirées, puis
+# copies (inventaire_duplique) en fin, dans l'ordre des déclarations puis des
+# unités ; lignes non altérées et attribut `simulation` inchangés. `forme` :
+# forme validée (controler_forme()). Attribut `defauts` : les sept champs de
+# injecter_defauts(), puis `retirees` en fin ; validite : rôles aux noms des
+# colonnes (identifiant id_contrat seul), période, délai nul, texte, puis la
+# grille (inventaires) ; lignes (numéros de la table rendue, lignes présentes
+# seulement) : rôles alteree (inventaire_hors_grille), original et copie
+# (inventaire_duplique), unite (toute ligne restante d'une unité à motif
+# d'unité, qui porte ce motif), propagation (autre ligne d'une unité porteuse
+# d'un motif de ligne, amendement A1 : motif_attendu et refus_attendu NA) ;
+# retirees (une ligne par ligne retirée : rang dans le jeu propre de la
+# forme, declaration, defaut, unite, id_contrat, type_ligne, date_inventaire
+# — la date perdue pour inventaire_perdu —, motif_attendu, refus_attendu).
+# decomptes : ceux de injecter_defauts() (lignes = lignes de la table
+# rendue ; lignes_en_defaut : lignes de `lignes` qui portent un motif ou un
+# refus attendu, rôle propagation exclu), puis retirees (nombre de lignes
+# retirées), lignes_propagation, unites_propagation et presents_sains
+# (data.frame date_inventaire, presents_sains : unités présentes à chaque
+# date de la grille, hors unités altérées et hors unités qu'une ligne retirée
+# rend incohérentes : présence interrompue, dernier inventaire l < M sans
+# événement, ou événement postérieur à t_(l+1) ; règle écrite ici d'après la
+# spécification, jamais calculée par `donnees`).
+injecter_defauts_stocks <- function(tab, ctl, defauts, periode, forme) {
+  N <- nrow(tab)
+  regles <- DEFAUTS_FORMES[[forme$nom]]
+  cat_ <- regles$catalogue
+  decl <- ctl$declarations
+  g <- as.numeric(unclass(forme$inventaires)); M <- length(g)
+  id <- tab$id_contrat
+  if (is.unsorted(id))
+    stop("injecter_defauts_stocks() : jeu propre de la forme non trié par id_contrat (erreur de programmation).",
+         call. = FALSE)
+  inv <- tab$type_ligne == "inventaire"
+  di <- as.numeric(unclass(tab$date_inventaire))
+  uid <- unique(id); U <- length(uid)
+  u <- match(id, uid)
+  n_inv <- tabulate(u[inv], nbins = U)
+  # Ligne d'événement de chaque unité (au plus une), premier inventaire
+  # (lignes d'une unité contiguës, inventaires dans l'ordre de la grille, puis
+  # l'événement ; projeter_stocks()).
+  evt_l <- rep(NA_integer_, U); evt_l[u[!inv]] <- which(!inv)
+  cause_u <- rep("en_cours", U); cause_u[u[!inv]] <- tab$cause_sortie[!inv]
+  prem <- which(inv)[match(seq_len(U), u[inv])]
+
+  # Sélection, dans l'ordre reçu ; état : unités et dates déjà altérées.
+  selection <- tirer_defauts(ctl$graine, decl, list(unites = logical(U), dates = logical(M)),
+    eligibles = function(d, etat) {
+      if (d$unite == "inventaire") return(which(!etat$dates))
+      i <- match(d$type, cat_$defaut)
+      admis <- c(deces = cat_$deces[i], rachat = cat_$rachat[i], en_cours = cat_$en_cours[i])
+      ok <- !etat$unites & cause_u %in% d$cible & unname(admis[cause_u]) & n_inv >= cat_$inventaires_min[i]
+      if (cat_$evenement[i]) ok <- ok & !is.na(evt_l)
+      which(ok)
+    },
+    marquer = function(d, r, etat) {
+      if (d$unite == "inventaire") etat$dates[r] <- TRUE else etat$unites[r] <- TRUE
+      etat
+    })
+  retenues <- selection$retenues
+
+  # Altérations déterministes, numérotation du jeu propre de la forme (copies :
+  # N + 1, ..., renumérotées ensuite).
+  ligne_df <- function(ligne, k, defaut, role) {
+    i <- match(defaut, cat_$defaut)
+    role <- rep_len(role, length(ligne))
+    motif <- rep(cat_$motif_attendu[i], length(ligne)); refus <- rep(cat_$refus_attendu[i], length(ligne))
+    motif[role == "propagation"] <- NA_character_; refus[role == "propagation"] <- NA_character_
+    data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), length(ligne)),
+               defaut = rep(defaut, length(ligne)), unite = rep(cat_$unite[i], length(ligne)), role = role,
+               motif_attendu = motif, refus_attendu = refus,
+               premier_deces = structure(rep(NA_real_, length(ligne)), class = "Date"), stringsAsFactors = FALSE)
+  }
+  retire_df <- function(ligne, k, defaut) {
+    i <- match(defaut, cat_$defaut)
+    data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), length(ligne)),
+               defaut = rep(defaut, length(ligne)), unite = rep(cat_$unite[i], length(ligne)),
+               id_contrat = id[ligne], type_ligne = tab$type_ligne[ligne], date_inventaire = en_date(di[ligne]),
+               motif_attendu = rep(cat_$motif_attendu[i], length(ligne)),
+               refus_attendu = rep(cat_$refus_attendu[i], length(ligne)), stringsAsFactors = FALSE)
+  }
+  dinv <- di
+  copies <- integer(0)
+  morceaux <- vector("list", length(decl)); retraits <- vector("list", length(decl))
+  for (k in seq_along(decl)) {
+    t <- decl[[k]]$type; r <- retenues[[k]]
+    lu <- which(u %in% r)
+    rm <- integer(0); m <- ligne_df(integer(0), k, t, character(0))
+    switch(t,
+           sortie_non_renseignee = {
+             rm <- evt_l[r]
+             m <- ligne_df(setdiff(lu, rm), k, t, "unite")
+           },
+           presence_interrompue = {
+             rm <- prem[r] + 1L
+             m <- ligne_df(setdiff(lu, rm), k, t, "unite")
+           },
+           inventaire_hors_grille = {
+             l <- prem[r]
+             d0 <- di[l] + 1
+             while (any(sur <- d0 %in% g)) d0[sur] <- d0[sur] + 1
+             dinv[l] <- d0
+             m <- rbind(ligne_df(l, k, t, rep("alteree", length(l))),
+                        ligne_df(setdiff(lu, l), k, t, "propagation"))
+           },
+           inventaire_duplique = {
+             l <- prem[r]
+             nouv <- N + length(copies) + seq_along(r)
+             copies <- c(copies, l)
+             m <- rbind(ligne_df(c(l, nouv), k, t, rep(c("original", "copie"), each = length(l))),
+                        ligne_df(setdiff(lu, l), k, t, "propagation"))
+           },
+           inventaire_perdu = rm <- which(inv & di %in% g[r]),
+           stop("injecter_defauts_stocks() : type sans altération (erreur de programmation).", call. = FALSE))
+    morceaux[[k]] <- m[order(m$ligne, method = "radix"), , drop = FALSE]
+    retraits[[k]] <- retire_df(sort(rm), k, t)
+  }
+  retirees <- do.call(rbind, c(list(retire_df(integer(0), 0L, character(0))), retraits))
+  row.names(retirees) <- NULL
+  gardees <- setdiff(seq_len(N), retirees$ligne)
+  lignes <- do.call(rbind, c(list(ligne_df(integer(0), 0L, character(0), character(0))), morceaux))
+  row.names(lignes) <- NULL
+  lignes$ligne <- ifelse(lignes$ligne > N, length(gardees) + lignes$ligne - N, match(lignes$ligne, gardees))
+  lignes$ligne <- as.integer(lignes$ligne)
+  if (anyNA(lignes$ligne))
+    stop("injecter_defauts_stocks() : ligne citée retirée (erreur de programmation).", call. = FALSE)
+
+  # Table rendue : lignes gardées puis copies (valeurs du jeu propre).
+  res <- tab
+  res$date_inventaire <- en_date(dinv)
+  res <- res[c(gardees, copies), , drop = FALSE]
+  row.names(res) <- NULL
+
+  # Présents sains par date (voir l'en-tête) : unités non altérées, sur les
+  # lignes gardées, sans incohérence née d'un retrait.
+  alterees <- logical(U)
+  for (k in seq_along(decl)) if (decl[[k]]$unite != "inventaire") alterees[retenues[[k]]] <- TRUE
+  gi <- seq_len(N) %in% gardees
+  ki <- inv & gi
+  kk <- match(di[ki], g)
+  f <- rep(NA_integer_, U); l <- rep(NA_integer_, U)
+  n_g <- tabulate(u[ki], nbins = U)
+  ord <- order(u[ki], kk, method = "radix")
+  uu <- u[ki][ord]; ko <- kk[ord]
+  f[uu[!duplicated(uu)]] <- ko[!duplicated(uu)]
+  l[uu[!duplicated(uu, fromLast = TRUE)]] <- ko[!duplicated(uu, fromLast = TRUE)]
+  s_u <- rep(NA_real_, U)
+  ev_g <- !inv & gi
+  s_u[u[ev_g]] <- as.numeric(unclass(tab$date_sortie))[ev_g]
+  a_inv <- n_g > 0L
+  avant_fin <- a_inv & l < M
+  suivant <- rep(NA_real_, U); suivant[which(avant_fin)] <- g[l[which(avant_fin)] + 1L]
+  incoherente <- a_inv & ((l - f + 1L) != n_g | (avant_fin & (is.na(s_u) | s_u > suivant)))
+  incoherente[is.na(incoherente)] <- FALSE
+  sain <- !alterees & !incoherente
+  presents <- tabulate(kk[sain[u[ki]]], nbins = M)
+
+  attr(res, "simulation") <- attr(tab, "simulation")
+  roles <- setdiff(names(tab), "id_tete")
+  prop <- lignes$role == "propagation"
+  attr(res, "defauts") <- list(
+    parametre = defauts, graine = ctl$graine, generateur = GENERATEUR,
+    ordre_tirages = regles$ordre_tirages,
+    validite = list(roles = stats::setNames(roles, roles), periode = periode, delai_declaration = 0,
+                    texte = regles$validite, inventaires = forme$inventaires),
+    lignes = lignes,
+    decomptes = list(
+      lignes_jeu_propre = N, copies = length(copies), lignes = length(gardees) + length(copies),
+      lignes_en_defaut = length(unique(lignes$ligne[!prop])),
+      lignes_alterees = length(unique(lignes$ligne[lignes$role %in% c("alteree", "copie")])),
+      declarations = data.frame(declaration = seq_along(decl),
+                                defaut = vapply(decl, function(d) paste(d$type, collapse = " + "), character(1L)),
+                                unite = vapply(decl, `[[`, character(1L), "unite"),
+                                eligibles = selection$eligibles, retenues = lengths(retenues),
+                                stringsAsFactors = FALSE),
+      retirees = nrow(retirees),
+      lignes_propagation = sum(prop),
+      unites_propagation = length(unique(res$id_contrat[lignes$ligne[prop]])),
+      presents_sains = data.frame(date_inventaire = forme$inventaires, presents_sains = presents)),
+    retirees = retirees)
+  res
+}
+
 # --- formes du simulateur (#169, commit (3c) ; #180, commit (4c)) ------------------
 
 # Formes admises de l'argument `forme` (ADR 0007, annotation du 08/11/2026,
@@ -1121,13 +1403,13 @@ CHAMPS_FORMES_MULTI <- list(agregats = "unite_observation")
 
 # Contrôle de l'argument `forme` (non NULL), avant tout tirage ; refus
 # forme_invalide, module simulation. `mode` : mode validé du portefeuille ;
-# `avec_defauts` : TRUE si l'argument `defauts` est déclaré ; `debut`, `fin` :
-# bornes de la période validée (jours). Refus nommés (spécification (0') de
-# #169, § 11 ; spécification de #180, § 11 ; spécification de #189, § 3) :
-# forme avec défauts sans catalogue de défauts propre (absente de
-# DEFAUTS_FORMES : stocks successifs, #191) ; mode multi-contrats pour une
-# forme absente de CHAMPS_FORMES_MULTI (fusion par tête des stocks non prise
-# en charge, #190) ; agrégats sous mode multi-contrats : unite_observation
+# `debut`, `fin` : bornes de la période validée (jours). Toute forme a son
+# catalogue de défauts (DEFAUTS_FORMES ; stocks successifs, #191) : les
+# défauts ne sont plus refusés ici (paramètre avec_defauts retiré, avis de
+# forme d'architect, Q4). Refus nommés (spécification (0') de #169, § 11 ;
+# spécification de #180, § 11 ; spécification de #189, § 3) : mode
+# multi-contrats pour une forme absente de CHAMPS_FORMES_MULTI (fusion par
+# tête des stocks non prise en charge, #190) ; agrégats sous mode multi-contrats : unite_observation
 # requise, « tete » ou « contrat », « tete » refusée sous la transition de
 # rachat (transition du contrat, M46) ; grille mal formée ou non alignée
 # (stocks : t_1 = début - 1, t_M = fin, délai nul).
@@ -1137,7 +1419,7 @@ CHAMPS_FORMES_MULTI <- list(agregats = "unite_observation")
 # autres sorties étant des censures ; unite_observation sous les modes
 # multi-contrats seulement ; pour les stocks, list(nom, inventaires), grille
 # en Date à stockage double.
-controler_forme <- function(forme, mode, avec_defauts, debut, fin) {
+controler_forme <- function(forme, mode, debut, fin) {
   invalide <- function(msg, details = list())
     refuser("simulation", "forme_invalide", formuler("Forme du jeu simulé : %s", msg), details)
   if (!forme_exacte(forme, "list", "names"))
@@ -1153,10 +1435,6 @@ controler_forme <- function(forme, mode, avec_defauts, debut, fin) {
   champs <- c(CHAMPS_FORMES[[nom]], if (multi) CHAMPS_FORMES_MULTI[[nom]])
   e <- ecart_noms(forme, champs, champs)
   if (nzchar(e)) invalide(formuler("forme « %s » : %s.", citer(nom), e), list(parametre = "forme"))
-  if (avec_defauts && is.null(DEFAUTS_FORMES[[nom]]))
-    invalide(formuler(paste("forme « %s » avec l'argument defauts : les défauts paramétrés ne sont injectés que",
-                            "dans les lignes individuelles (forme = NULL) et dans les agrégats."), citer(nom)),
-             list(parametre = "forme", forme = nom))
   if (multi && is.null(CHAMPS_FORMES_MULTI[[nom]]))
     invalide(formuler(paste("forme « %s » sous le mode multi-contrats « %s » : l'unité inventoriée (tête ou",
                             "contrat) serait ambiguë ; la fusion par tête des contrats inventoriés n'est pas prise",
@@ -1482,7 +1760,9 @@ projeter_stocks <- function(jeu, grille) {
 #                  "stocks_successifs", inventaires) (grille alignée : t_1 =
 #                  début - 1, t_M = fin) : projection du jeu propre en lignes
 #                  d'inventaire et d'événement (projeter_stocks()), de même
-#                  (#180).
+#                  (#180) ; défauts admis, propres aux stocks
+#                  (DEFAUTS_FORMES), injectés après la projection
+#                  (injecter_defauts_stocks(), #191).
 # Rend un data.frame (id_contrat, id_tete, sexe, date_naissance, date_entree,
 # date_sortie, cause_sortie) avec l'attribut `simulation` (et `defauts` si des
 # défauts sont déclarés). Toutes les lignes sont gardées, y compris celles
@@ -1492,8 +1772,8 @@ projeter_stocks <- function(jeu, grille) {
 # d'attribut `simulation` celui du jeu propre plus un champ `forme` ajouté en
 # fin : forme validée (agrégats ; unite_observation sous les modes
 # multi-contrats seulement) ; nom, grille (Date à stockage double) et
-# décomptes de la projection (stocks) ; attribut `defauts` des agrégats si
-# des défauts sont déclarés.
+# décomptes de la projection (stocks) ; attribut `defauts` de la forme si
+# des défauts sont déclarés (agrégats, #189 ; stocks, #191).
 simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = NULL, forme = NULL) {
   if (!liste_aux_noms(loi, names(CAUSES_SIMULEES)))
     refuser("simulation", "loi_invalide",
@@ -1509,12 +1789,12 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
   controler_couverture(effective, ctl$age_bas, ctl$age_haut, sexes)
   debut <- as.numeric(periode$debut); fin <- as.numeric(periode$fin); borne <- fin + 1
   # Forme : contrôlée avant tout tirage et avant les défauts (refus
-  # forme_invalide ; une forme sans catalogue de défauts propre, stocks
-  # successifs, est refusée avec défauts quels qu'ils soient, #191).
-  if (!is.null(forme)) ctl_forme <- controler_forme(forme, ctl$mode, !is.null(defauts), debut, fin)
+  # forme_invalide).
+  if (!is.null(forme)) ctl_forme <- controler_forme(forme, ctl$mode, debut, fin)
   # Défauts : contrôlés avant tout tirage (refus defauts_invalides).
-  # Avec une forme (agrégats, #189) : catalogue des défauts de la forme
-  # (DEFAUTS_FORMES, lu par clé) et conditions vides de la forme validée.
+  # Avec une forme (agrégats, #189 ; stocks successifs, #191) : catalogue des
+  # défauts de la forme (DEFAUTS_FORMES, lu par clé) et conditions vides de la
+  # forme validée.
   if (!is.null(defauts)) {
     graine_jeu <- if (missing(graine)) NULL else graine
     ctl_defauts <- if (is.null(forme))
@@ -1680,16 +1960,17 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
       # unite_observation en fin, sous les modes multi-contrats seulement (#189).
       sim$forme <- ctl_forme[c("nom", "transition", "convention", "par_annee",
                                if (!is.null(ctl_forme$unite_observation)) "unite_observation")]
+      injecter <- injecter_defauts_agregats
     } else {
       pr <- projeter_stocks(resultat, ctl_forme$inventaires)
       resultat <- pr$lignes
       sim$forme <- list(nom = ctl_forme$nom, inventaires = ctl_forme$inventaires, decomptes = pr$decomptes)
+      injecter <- injecter_defauts_stocks
     }
     attr(resultat, "simulation") <- sim
-    # Défauts de la forme (#189), après la projection, sous leur propre graine
-    # ; une forme sans catalogue de défauts (stocks successifs, #191) est
-    # refusée avec defauts par controler_forme().
-    if (!is.null(defauts)) resultat <- injecter_defauts_agregats(resultat, ctl_defauts, defauts, periode, ctl_forme)
+    # Défauts de la forme (#189, #191), après la projection, sous leur propre
+    # graine.
+    if (!is.null(defauts)) resultat <- injecter(resultat, ctl_defauts, defauts, periode, ctl_forme)
   }
   resultat
 }
