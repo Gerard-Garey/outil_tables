@@ -9191,7 +9191,12 @@ paramètres, le \code{nom} de la table (\code{table\_nom}),
 \code{n\_max\_runs\_exact}, l'hypothèse nulle
 (\code{HYPOTHESE\_VALIDATION}, ou \code{HYPOTHESE\_VALIDATION\_POSITIONNEE}
 sous \code{positionnee}), la référence de méthode et les statuts des
-sous-groupes (\code{statuts\_sous\_groupes}, selon la relation). \code{resultat}~:
+sous-groupes (\code{statuts\_sous\_groupes}, selon la relation~: lignes
+\code{sous\_groupes} de \code{STATUTS\_VALIDATION} sous \code{independante}
+et \code{ajustee\_hors\_outil}, dont les statuts des bornes exactes et des
+p-valeurs donnent un texte pour chacune de ces deux relations, la seconde
+ne les produisant pas, état \code{ddl\_non\_etabli}, issue~\#200~; de
+\code{STATUTS\_VALIDATION\_POSITIONNEE} sous \code{positionnee}). \code{resultat}~:
 \code{cellules} (clés de segmentation, \code{age}, \code{annee} sous
 \code{par\_annee}, $E^c$, $D$, \code{qx\_table}, \code{taux\_table} pour
 $\tilde\mu$, \code{attendus}, \code{taux\_brut} pour $\hat\mu$,
@@ -9450,7 +9455,9 @@ $A_c$ inférieur à $0{,}49$ environ et supérieure à~1 au-delà (maximum
 voisin de $1{,}16$), valeurs obtenues par sommation des probabilités
 (approximation numérique)~: la p-valeur asymptotique de $G^2$ est trop
 grande ou trop petite selon la répartition des $A_c$. Les statuts des deux
-p-valeurs asymptotiques (\code{STATUTS\_VALIDATION}) le disent, et
+p-valeurs asymptotiques (\code{STATUTS\_VALIDATION}, et
+\code{STATUTS\_VALIDATION\_POSITIONNEE}~; phrases écrites une seule fois,
+dans \code{PHRASES\_ATTENDUS\_FAIBLES}, issue~\#200) le disent, et
 rappellent que seule la p-valeur de Monte-Carlo a un niveau garanti sous
 $H_0$~(i). \textbf{Aucun seuil} sur les attendus n'est appliqué ni
 affiché~: la règle usuelle d'un attendu minimal par cellule n'a pas été
@@ -9728,7 +9735,7 @@ S1 \code{residus} & décomptes au-delà de 2 et 3~; leurs espérances & --- & d�
 S2 \code{khi2\_pearson} & $X^2$, ddl, variance exacte sous $H_0$, p asymptotique, p et erreur de Monte-Carlo & supérieure & $X^2$ descriptif~; variance exacte sous $H_0$~(i), $E^c$ fixe (moments de Poisson)~; p asymptotique ($\chi^2_{n-p}$, $A_c \to \infty$ dans chaque cellule retenue), non garantie aux attendus faibles~; Monte-Carlo de niveau exact \\
 S3 \code{deviance} & $G^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & comme S2, sans variance~; aux attendus faibles, erreur de la p asymptotique de sens variable selon les $A_c$ \\
 S4 \code{smr} & $O$, $A$, SMR, $O - A$, bornes exactes, p inférieure, supérieure, centrale, $z$ et p de la racine cubique & centrale (et unilatérales) & SMR~: résultat exact (maximum de vraisemblance)~; bornes exactes sous la loi supposée, couverture $\ge$ niveau, \code{qgamma()} en approximation numérique~; p exactes sous $H_0$~(i)~; racine cubique asymptotique \\
-S5 sous-groupes & $O$, $A$, SMR, bornes exactes, p-valeurs~; p-valeurs asymptotiques (sous \code{positionnee}, au-delà du plafond de convolution seulement) & centrale (et unilatérales) & comme S4, sans correction de multiplicité~; p-valeurs asymptotiques~: approximation normale, résultat asymptotique (statuts dans les paramètres de l'étape) \\
+S5 sous-groupes & $O$, $A$, SMR, bornes exactes, p-valeurs~; p-valeurs asymptotiques (sous \code{positionnee}, au-delà du plafond de convolution seulement) & centrale (et unilatérales) & comme S4, sans correction de multiplicité~; sous \code{ajustee\_hors\_outil}, bornes exactes et p-valeurs non produites (état \code{ddl\_non\_etabli}), statut propre à chaque relation (issue~\#200)~; p-valeurs asymptotiques~: approximation normale, résultat asymptotique (statuts dans les paramètres de l'étape) \\
 S6 \code{signes} & $n_{+}$, $n_{-}$, nuls, $n$, statistique, p asymptotique, p exacte, $E_{H_0}[n_{+}]$, p et erreur de Monte-Carlo & centrale & décomptes descriptifs~; p asymptotique et exacte sous $P(r_c > 0) = 1/2$, \textbf{qui n'est pas} $H_0$~(i)~; $E_{H_0}[n_{+}]$ exact sous $H_0$~(i)~; Monte-Carlo de niveau exact \\
 S7 \code{runs} & séquences, $R$, espérance, variance, statistique, p asymptotique, p exacte, p et erreur de Monte-Carlo & inférieure & moments, p asymptotique et exacte conditionnelles à $(n_{+}, n_{-})$ sous l'équiprobabilité des ordres, \textbf{qui n'est pas} $H_0$~(i)~; p exacte par \code{lchoose()} en approximation numérique~; Monte-Carlo de niveau exact \\
 S8 \code{wilcoxon} & $n$, nuls, groupes d'ex aequo, $w_{+}$, variance, $z$, p asymptotique, p exacte, p et erreur de Monte-Carlo & centrale & sous la symétrie des différences autour de 0, \textbf{qui n'est pas} $H_0$~(i)~; p exacte par \code{psignrank()} en approximation numérique~; Monte-Carlo de niveau exact \\
@@ -10754,7 +10761,14 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{character} sans aucun groupe, par
     \code{sous\_groupes\_positionnee()} et par
     \code{sous\_groupes\_validation()} sous les trois relations
-    (issue~\#201)~; \code{statuts\_validation()}
+    (issue~\#201)~; statuts des bornes exactes et des p-valeurs de
+    sous-groupe propres à \code{independante} et à
+    \code{ajustee\_hors\_outil}, mot pour mot, fragment
+    \code{ajustee\_hors\_outil} commun aux p-valeurs exactes et
+    asymptotiques, et, par \code{construire\_table()} sous ces deux
+    relations, \code{statuts\_sous\_groupes} égal aux lignes de
+    \code{STATUTS\_VALIDATION}, état \code{ddl\_non\_etabli} et colonnes
+    \code{NA} sous la seconde (issue~\#200)~; \code{statuts\_validation()}
     et chaque branchement à trois valeurs, erreur de programmation par
     défaut~; sur un jeu d'un segment, $X^2$, $G^2$, ddl $= n - S$, SMR
     global égal à 1 et grandeurs sous $H_0$ non produites, fluctuation
@@ -10877,6 +10891,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{ETATS\_CELLULE\_VALIDATION} & constante & --- & les cinq états d'une cellule (section~\ref{sec:validation-etape}) \\
 \catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les états d'une grandeur, dont \code{contraint\_par\_}\allowbreak\code{positionnement} (section~\ref{sec:validation-statistiques}) \\
 \catalogue{fonctions-validation}{ETATS\_SOUS\_GROUPES\_VALIDATION} & constante & --- & les états d'une ligne des sous-groupes~: \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_}\allowbreak\code{retenue}, et, sous \code{positionnee}, \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{bornes\_non\_}\allowbreak\code{definies}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max} \\
+\catalogue{fonctions-validation}{PHRASES\_ATTENDUS\_FAIBLES} & constante & --- & liste de trois phrases écrites une seule fois et lues par \code{STATUTS\_VALIDATION} et \code{STATUTS\_VALIDATION\_}\allowbreak\code{POSITIONNEE}~: \code{petits} (approximation non garantie aux attendus $A_c$ petits, statuts de \code{khi2\_pearson}/\allowbreak\code{p\_asymptotique} et de \code{deviance}/\allowbreak\code{p\_asymptotique}), \code{fin\_x2} (niveau réel de la p asymptotique de $X^2$ non établi, au-dessus du niveau nominal dans les constats de simulation) et \code{g2} (espérance de la contribution d'une cellule à $G^2$)~; section~\ref{sec:validation-statistiques}, issues~\#179 et~\#200 \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION} & constante & --- & \code{data.frame} (\code{statistique}, \code{grandeur}, \code{sous\_h0}, \code{statut})~: une ligne par grandeur, dans l'ordre du résultat~; \code{sous\_h0} désigne les grandeurs non produites sous \code{ajustee\_hors\_outil} (tableau~\ref{tab:statistiques-validation}) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION\_POSITIONNEE} & constante & --- & mêmes lignes que \code{STATUTS\_VALIDATION}, statuts remplacés sous \code{positionnee} (lois conditionnelles, ddl $n - S$, table positionnée~; décision M309) \\
 \catalogue{fonctions-validation}{statuts\_validation()} & interne & relation & statuts de la relation (\code{switch} à trois valeurs, erreur de programmation par défaut) \\
