@@ -13560,8 +13560,11 @@ section~\ref{sec:portefeuille-simule}). Des \emph{défauts paramétrés}
 peuvent être injectés dans le jeu propre (issue~\#93~;
 section~\ref{sec:defauts-parametres}). Le jeu propre peut être rendu sous
 la forme «~agrégats~» de E2.1 (issue~\#169~;
-section~\ref{sec:portefeuille-simule}, «~Sortie~») et sous la forme
-«~stocks successifs~» (issue~\#180, même section). Son point
+section~\ref{sec:portefeuille-simule}, «~Sortie~»), y compris dans les
+modes multi-contrats et sous la convention \code{age\_atteint\_annee}
+(issue~\#189), et sous la forme
+«~stocks successifs~» (issue~\#180, même section)~; chaque forme a son
+catalogue de défauts paramétrés (issues~\#189 et~\#191). Son point
 d'entrée est \code{simuler\_portefeuille(loi, portefeuille, periode,
 graine, defauts = NULL, forme = NULL)}, exporté (ADR 0007, point 3.2, et annotation du
 25/10/2026, point~(b)). Le contenu de fond vient de la
@@ -14066,26 +14069,70 @@ s'écrit \code{list(nom = "agregats", transition, convention, par\_annee)},
 tous les champs requis, sans défaut implicite (\code{CHAMPS\_FORMES})~:
 \code{transition} est l'une des deux transitions simulées, dont la cause
 est comptée comme événement, les autres sorties étant des censures~;
-\code{convention} ne peut valoir que \code{dernier\_anniversaire}
-(\code{CONVENTIONS\_FORMES})~; \code{par\_annee} est \code{TRUE} ou
-\code{FALSE}. Le jeu propre est tiré exactement comme sans forme (aucune
-graine nouvelle, aucun tirage supplémentaire), puis projeté en cellules par
+\code{convention} vaut \code{dernier\_anniversaire} ou
+\code{age\_atteint\_annee} (\code{CONVENTIONS\_FORMES}~; la seconde depuis
+l'issue~\#189)~; \code{par\_annee} est \code{TRUE} ou
+\code{FALSE}. Sous les modes multi-contrats, la forme porte en outre le
+champ \code{unite\_observation} (\code{CHAMPS\_FORMES\_MULTI}~;
+ci-dessous, «~Unité de l'agrégat~»). Le jeu propre est tiré exactement
+comme sans forme (aucune graine nouvelle, aucun tirage supplémentaire),
+puis projeté en cellules par
 \code{projeter\_agregats()}, par l'arithmétique de dates du simulateur,
 sans appel au module \code{exposition}, ce qui garde la projection
 indépendante du code qu'elle sert à vérifier (ADR 0003, point~9~; graphe
 contrôlé par \code{graphe\_modules.R}). La fenêtre de chaque ligne est
-$[a, b)$, $a = \max(\text{entrée}, D)$, $b = \min(\text{sortie}, B)$~; une
-année d'âge $[\text{anniv}(x), \text{anniv}(x + 1))$ de $L_x$ jours vaut~1.
+$[a, b)$, $a = \max(\text{entrée}, D)$, $b = \min(\text{sortie}, B)$.
 L'événement est la sortie de la cause comptée, de jour $s$ avec
-$D \le s < B$, rangée dans la cellule de ce jour.
-\code{exposition\_centrale} est la somme, sur les morceaux de fenêtre de la
-cellule, de leur longueur divisée par $L_x$~; sans \code{par\_annee},
-\code{exposition\_initiale} lui ajoute, pour chaque événement,
-$(\text{anniv}(x + 1) - s) / L_x$, complément jusqu'à la fin de la cellule,
-aucun pour une censure (définition «~cellule~», section~\ref{sec:exposition-cellules})~;
-sous \code{par\_annee}, les morceaux sont coupés au 1\textsuperscript{er}
-janvier, l'événement va à l'année civile de sa sortie, et la colonne
-\code{exposition\_initiale} n'est pas produite. Les lignes sont formées par
+$D \le s < B$, rangée dans la cellule de ce jour. Les cellules dépendent de
+la convention~:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \sloppy\hbadness=10000 \code{dernier\_anniversaire}~: une
+    année d'âge $[\text{anniv}(x), \text{anniv}(x + 1))$ de $L_x$ jours vaut~1~;
+    \code{exposition\_centrale} est la somme, sur les morceaux de fenêtre de la
+    cellule, de leur longueur divisée par $L_x$~; sans \code{par\_annee},
+    \code{exposition\_initiale} lui ajoute, pour chaque événement,
+    $(\text{anniv}(x + 1) - s) / L_x$, complément jusqu'à la fin de la cellule,
+    aucun pour une censure (définition «~cellule~», section~\ref{sec:exposition-cellules})~;
+    sous \code{par\_annee}, les morceaux sont coupés au 1\textsuperscript{er}
+    janvier, l'événement va à l'année civile de sa sortie, et la colonne
+    \code{exposition\_initiale} n'est pas produite~;
+  \item \code{age\_atteint\_annee} (issue~\#189~; spécification
+    d'\code{actuary} du 11/11/2026, § 4)~: la cellule de l'année civile $t$
+    est $[1^{\text{er}}\text{ janvier } t,\ 1^{\text{er}}\text{ janvier }
+    t + 1)$, à l'âge atteint $x = t - \operatorname{an}(\text{naissance})$~;
+    les morceaux de fenêtre sont coupés au 1\textsuperscript{er} janvier, et
+    un jour vaut $1/\ell_t$, $\ell_t$ étant la longueur, 365 ou 366 jours, de
+    l'année civile $t$ (unité du moteur sous cette convention,
+    section~\ref{sec:recettes}, «~Conventions d'âge~»). Un événement ou une
+    autre sortie du jour $s$ va à l'âge $\operatorname{an}(s) -
+    \operatorname{an}(\text{naissance})$, dans l'année civile
+    $\operatorname{an}(s)$~; \code{exposition\_initiale} ajoute à
+    \code{exposition\_centrale}, pour chaque événement,
+    $\bigl(1^{\text{er}}\text{ janvier } (\operatorname{an}(s) + 1) -
+    s\bigr) / \ell_{\operatorname{an}(s)}$, complément jusqu'à la fin de la
+    cellule, aucun pour une censure. Sans \code{par\_annee}, les cellules
+    sont $(\text{sexe}, x)$ et leurs valeurs les sommes sur $t$.
+    \textbf{La colonne \code{exposition\_initiale} est produite avec et sans
+    \code{par\_annee}}~: la cellule étant l'année civile, le complément d'un
+    événement s'arrête au 1\textsuperscript{er} janvier qui suit et ne
+    franchit jamais la coupure par année~; il est le même avec ou sans
+    \code{par\_annee}, et l'exposition initiale par année se somme en celle
+    de la cellule sans année, à l'arrondi de l'addition près. Sous
+    \code{dernier\_anniversaire}, le complément jusqu'à l'anniversaire
+    suivant peut franchir le 1\textsuperscript{er} janvier, d'où l'absence
+    de la colonne sous \code{par\_annee}. L'étape \code{exposition} du
+    moteur, elle, ne restitue pas \code{complement\_initial\_cellule} sous
+    \code{par\_annee}, quelle que soit la convention
+    (section~\ref{sec:troncature-censure}, «~Table d'exposition~»)~: sous
+    \code{age\_atteint\_annee} avec \code{par\_annee}, l'exposition
+    initiale du simulateur n'a pas d'équivalent dans la table d'exposition
+    d'une construction en lignes, et son recoupement passe par la somme sur
+    les années (section~\ref{sec:verifications-simulation}).
+\end{itemize}
+
+\noindent
+Les lignes sont formées par
 sexe (ordre des octets), sur la plage contiguë des âges des cellules qui
 portent un morceau de fenêtre, un événement ou une autre sortie dans
 $[D, B)$, et, sous \code{par\_annee}, pour chaque âge, toutes les années
@@ -14093,19 +14140,75 @@ civiles de $D$ à $B - 1$~; les cellules vides sont écrites avec des
 \textbf{zéros explicites}. Le résultat est un \code{data.frame} de colonnes
 aux noms des rôles (\code{sexe}, \code{age}, \code{annee} sous
 \code{par\_annee}, \code{exposition\_centrale}, \code{exposition\_initiale}
-sans \code{par\_annee}, \code{evenements}~; âge, année et événements en
-\code{integer}). Son attribut \code{simulation} est celui du jeu propre,
+sans \code{par\_annee} ou sous \code{age\_atteint\_annee},
+\code{evenements}~; âge, année et événements en \code{integer}).
+
+\medskip
+\noindent
+\textbf{Unité de l'agrégat} (modes multi-contrats~; issue~\#189,
+spécification, § 3). Sous \code{uniforme\_multi} et
+\code{age\_exact\_multi}, le champ \code{unite\_observation} est requis,
+sans défaut, et vaut \code{"contrat"} ou \code{"tete"}~; sous
+\code{uniforme} et \code{age\_exact}, où tête et contrat se confondent, il
+est refusé comme champ inconnu, sur le précédent de \code{loi\_contrats}.
+
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{"contrat"}~: la projection porte sur les lignes du jeu
+    propre, une par contrat écrit~; une tête décédée compte autant
+    d'événements que de contrats en cours à son décès, tous sortis le même
+    jour, si bien que ces événements ne sont pas indépendants entre eux.
+    C'est l'unité du moteur quand aucun identifiant de tête n'est déclaré
+    (section~\ref{sec:unite-observation})~;
+  \item \code{"tete"}~: les fenêtres des contrats de chaque tête sont
+    d'abord réunies par \code{fusionner\_tetes()}, selon la règle de fusion
+    du moteur (E2.4~; section~\ref{sec:unite-observation}, «~Fusion des
+    intervalles d'une tête~»), écrite dans le simulateur sans appel au
+    module \code{donnees}, qu'elle sert à vérifier (non-circularité)~: les
+    contrats d'une tête étant rangés par date d'entrée, une fenêtre
+    $[e, s)$ ($s = +\infty$ en cours) rejoint la composante courante si $e$
+    est au plus égal à la fin courante, plus grande sortie des fenêtres
+    précédentes de la tête~; une composante va de sa première entrée à sa
+    fin courante, et sa cause est \code{deces} si l'une de ses lignes sort
+    par décès (les contrats en cours au décès sortent tous ce jour-là, et
+    aucun contrat n'est écrit après), \code{en\_cours} si sa fin est
+    infinie, \code{rachat} sinon, c'est-à-dire une censure. Chaque
+    composante est ensuite projetée comme une ligne. Le décès d'une tête
+    dont tous les contrats écrits sont déjà rachetés n'apparaît sur aucune
+    ligne (\code{tetes\_decedees\_sans\_contrat}, ci-dessus)~: il n'est pas
+    compté. L'unité \code{"tete"} n'est admise que sous la transition de
+    décès~: le rachat est une transition du contrat (décision M46~;
+    \code{CONTEXT.md}, «~Tête~»).
+\end{itemize}
+
+\noindent
+Les deux unités sont offertes, sans défaut, parce que le moteur connaît
+l'une et l'autre selon les rôles déclarés, qu'un producteur d'agrégats
+peut compter l'une ou l'autre, et que le nombre d'événements en dépend~;
+les options «~toujours contrat~» et «~toujours tête~» ont été écartées, une
+règle fixe étant un choix de fond (spécification et avis de forme de
+l'issue~\#189).
+
+\medskip
+Son attribut \code{simulation} est celui du jeu propre,
 suivi en fin d'un champ \code{forme} (nom, transition, convention,
-\code{par\_annee}). La forme est contrôlée par \code{controler\_forme()},
-avant tout tirage et avant les défauts~; tout écart est refusé sous
-\code{forme\_invalide} (module \code{simulation}), avec trois cas nommés~:
-une forme avec l'argument \code{defauts} (les défauts paramétrés ne sont
-injectés que dans les lignes individuelles~; défauts propres aux formes~:
-issue~\#189), une forme sous un mode multi-contrats (l'unité d'un agrégat,
-têtes ou contrats, serait ambiguë~; modes admis lus dans \code{MODE\_BASE}),
-et la convention \code{age\_atteint\_annee}, non mise en œuvre pour cette
-forme (issue~\#189). Le jeu propre sous forme agrégats est l'entrée du plan
-de référence R13 (section~\ref{sec:non-regression}).
+\code{par\_annee}, puis \code{unite\_observation} sous les modes
+multi-contrats seulement~: le champ \code{forme} des modes \code{uniforme}
+et \code{age\_exact} est inchangé). La forme est contrôlée par
+\code{controler\_forme()}, avant tout tirage et avant les défauts~; tout
+écart est refusé sous \code{forme\_invalide} (module \code{simulation}).
+Outre la forme et la valeur de chaque champ (dont une convention hors de
+\code{CONVENTIONS\_FORMES}), les cas nommés sont, sous la forme agrégats~:
+le champ \code{unite\_observation} manquant sous un mode multi-contrats, ou
+présent sous les modes \code{uniforme} et \code{age\_exact}, au message
+commun des champs («~manquants~» ou «~inconnus~»)~; une valeur autre que
+\code{"tete"} ou \code{"contrat"}~; et \code{"tete"} sous la transition de
+rachat, au message «~Forme du jeu simulé~: unite\_observation «~tete~»
+sous la transition «~en\_cours -> rachat~»~: le rachat est une transition
+du contrat~; unité admise~: «~contrat~».~». Les défauts paramétrés sont
+admis sous la forme, avec le catalogue qui lui est propre
+(section~\ref{sec:defauts-parametres}, «~Forme «~agrégats~»~»). Le jeu
+propre sous forme agrégats est l'entrée du plan de référence R13
+(section~\ref{sec:non-regression}).
 
 \medskip
 {\sloppy\hbadness=10000 \textbf{Forme «~stocks successifs~»} (issue~\#180~;
@@ -14136,9 +14239,9 @@ deux inventaires par cause, unités présentes à $t_M$. Sous cette forme,
 \code{forme\_invalide} refuse en outre une grille mal formée ou non
 alignée~; un mode multi-contrats y est refusé parce que l'unité inventoriée,
 tête ou contrat, serait ambiguë et que la fusion par tête des contrats
-inventoriés n'est pas prise en charge (issue~\#190), et l'argument
-\code{defauts} parce que les défauts propres à cette forme ne sont pas
-mis en œuvre (issue~\#191). Le jeu propre sous cette forme est l'entrée du
+inventoriés n'est pas prise en charge (issue~\#190). L'argument
+\code{defauts} y est admis, avec le catalogue de défauts propre à cette
+forme (\code{DEFAUTS\_FORMES}~; issue~\#191). Le jeu propre sous cette forme est l'entrée du
 plan de référence R14 (section~\ref{sec:non-regression}).\par}
 
 \medskip
@@ -14160,7 +14263,18 @@ tire sous la loi vraie et la graine, avant toute injection (\code{CONTEXT.md}~;
 issue~\#93~; décisions M132 à M134 et M136~; ADR 0007, annotation du
 25/10/2026, points 6 à 9). Il sert à vérifier les contrôles du module
 \code{donnees}~: chaque défaut est consigné avec le motif d'exclusion ou le
-code de refus que ce module doit produire.
+code de refus que ce module doit produire. Sous une forme (argument
+\code{forme}), le défaut altère la projection du jeu propre, après
+celle-ci, selon les règles propres à la forme, lues par le nom de forme
+dans \code{DEFAUTS\_FORMES} (issue~\#189~; avis de forme
+d'\code{architect}, Q2)~: pour la forme agrégats, une cellule de la
+\emph{table agrégée propre}, projection du jeu propre avant toute
+injection (ci-dessous, «~Forme «~agrégats~»~»)~; la forme stocks
+successifs a ses propres règles (issue~\#191). Sauf mention contraire, les
+paragraphes qui suivent décrivent les défauts des lignes individuelles
+(\code{forme = NULL}), dont les règles forment l'entrée \code{lignes} de
+\code{DEFAUTS\_FORMES}, qui reprend à l'identique \code{CATALOGUE\_DEFAUTS},
+\code{COMBINAISONS\_DEFAUTS} et \code{ORDRE\_TIRAGES\_DEFAUTS}.
 
 \subsubsection*{Argument \code{defauts}}
 
@@ -14208,10 +14322,14 @@ exactement \code{graine} et \code{declarations}~:
     \code{taux} (réel de $[0, 1]$, tirage de Bernoulli) et \code{nombre}
     (entier positif ou nul, tirage sans remise), de type \code{double} ou
     \code{integer} sans attribut. \code{type} est un type du catalogue
-    (tableau~\ref{tab:catalogue-defauts}) ou une combinaison admise.
+    (tableau~\ref{tab:catalogue-defauts}) ou une combinaison admise~; sous
+    une forme, un type du catalogue de la forme (pour les agrégats,
+    tableau~\ref{tab:catalogue-defauts-agregats}), tout autre type étant un
+    type inconnu.
     \code{cible}, sous-ensemble non vide, sans doublon, de \code{deces},
     \code{rachat} et \code{en\_cours} (causes de sortie du jeu propre), est
-    requise pour un type de ligne et interdite pour un type de tête.
+    requise pour un type de ligne et interdite pour un type de tête~; elle
+    est interdite pour tout type de la forme agrégats.
 \end{itemize}
 
 \noindent
@@ -14390,6 +14508,13 @@ dans l'ordre reçu (\code{ORDRE\_TIRAGES\_DEFAUTS})~: pour chacune, les
 encore altérées}, en ordre croissant~; avec \code{taux}, une unité est
 retenue si \code{runif(nombre d'éligibles) < taux}~; avec \code{nombre}, les
 unités retenues sont \code{sort(eligibles[sample.int(nombre d'eligibles, nombre)])}.
+Cette sélection est écrite une seule fois, dans \code{tirer\_defauts()},
+commune à toutes les formes (issue~\#189~; avis de forme
+d'\code{architect}, Q4)~: chaque forme n'y fournit que ses éligibles et sa
+règle de disjonction~; son extraction d'\code{injecter\_defauts()} n'a
+changé ni l'appel de \code{sous\_graine()} ni l'ordre des tirages
+(constat hors CI~: jeux témoins à défauts en lignes identiques, attributs
+compris, avant et après l'extraction).
 \textbf{Disjonction}~: une ligne est altérée au plus une fois~; une tête
 retenue rend toutes ses lignes inéligibles ensuite~; une tête n'est
 éligible à un défaut de tête que si aucune de ses lignes n'est déjà
@@ -14402,8 +14527,8 @@ l'original.
 
 Le jeu altéré porte un attribut \code{defauts}, \textbf{séparé} de
 l'attribut \code{simulation}, qui reste celui du jeu propre (M134)~; il
-est absent si \code{defauts = NULL}. Ses champs, dans cet ordre~:
-\code{parametre} (l'argument reçu, tel quel), \code{graine},
+est absent si \code{defauts = NULL}. En lignes individuelles, ses
+champs sont, dans cet ordre~: \code{parametre} (l'argument reçu, tel quel), \code{graine},
 \code{generateur}, \code{ordre\_tirages} (\code{ORDRE\_TIRAGES\_DEFAUTS}),
 \code{validite}, \code{lignes} et \code{decomptes}.
 
@@ -14452,20 +14577,30 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
 
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{defauts\_invalides} (module \code{simulation})~: forme ou
-    valeur de \code{defauts} ou d'une déclaration, type inconnu,
+    valeur de \code{defauts} ou d'une déclaration, type inconnu (hors du
+    catalogue de la forme du jeu~: un type des agrégats sans forme, ou un
+    type des lignes sous la forme agrégats, est inconnu),
     combinaison non admise, \code{cible} manquante, interdite, mal formée
     ou disjointe par construction, type dont une condition est
     structurellement vide pour le portefeuille (ci-dessus~; issue~\#112),
     \code{taux} et \code{nombre} tous deux
     présents ou tous deux absents, graine des défauts mal formée ou égale à
     celle du jeu. Il est levé \textbf{avant tout tirage}, après les
-    contrôles de la loi, du portefeuille et de la couverture, et avant le
+    contrôles de la loi, du portefeuille, de la couverture et, sous une
+    forme, de la forme (\code{forme\_invalide} l'emporte), et avant le
     contrôle de la graine du jeu par \code{sous\_graine()}~: si la graine
     du jeu et les défauts sont tous deux invalides, le refus est
     \code{defauts\_invalides}~; il ne dépend d'aucun tirage.
   \item \code{defauts\_ineligibles} (module \code{simulation})~: un
-    \code{nombre} dépasse le nombre d'unités éligibles. Il est levé
-    \textbf{après le tirage du jeu propre}, dont il dépend~: à la
+    \code{nombre} dépasse le nombre d'unités éligibles, au message
+    «~Défauts~: déclaration [k] ([type])~: nombre = [nombre] dépasse le
+    nombre d'unités éligibles ([éligibles]) non encore altérées (unité
+    [unité]).~», l'unité étant celle du type (\code{ligne} ou \code{tete}
+    en lignes individuelles, \code{cellule} sous la forme agrégats)~; les
+    \code{details} sont \code{declaration}, \code{type}, \code{nombre} et
+    \code{eligibles}. Il est levé
+    \textbf{après le tirage du jeu propre} (sous une forme, après sa
+    projection), dont il dépend~: à la
     différence du précédent, il dépend de la graine du jeu. Il ne couvre
     plus que les vides qui dépendent du tirage, à deux exceptions près,
     vides connus avant tout tirage mais hors de la règle de la cible
@@ -14484,6 +14619,139 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
 \noindent
 L'état du générateur de l'appelant est restauré dans tous les cas, comme
 pour tout tirage sous \code{sous\_graine()}.
+
+\subsubsection*{Forme «~agrégats~»}
+
+{\sloppy\hbadness=10000 Sous la forme agrégats (issue~\#189~; spécification
+d'\code{actuary} du 11/11/2026, § 1, 2 et 5~; avis de forme
+d'\code{architect}, Q2 à Q4), les défauts portent sur les cellules de la
+table agrégée propre, avec le catalogue de l'entrée \code{agregats} de
+\code{DEFAUTS\_FORMES} (tableau~\ref{tab:catalogue-defauts-agregats})~: cinq
+types, d'unité \code{cellule}, chacun lié au motif du même nom du module
+\code{donnees} (\code{MOTIFS\_LIGNES\_AGREGATS},
+tableau~\ref{tab:motifs-agregats}), refus attendu \code{ligne\_invalide}
+sans exclusion déclarée. Le champ \code{cible} est interdit, aucune
+combinaison n'est admise, et l'argument \code{defauts} garde sa forme, son
+validateur (\code{controler\_defauts()}, qui reçoit les règles de la forme)
+et ses codes de refus~: aucun code nouveau.\par}
+
+{\footnotesize
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}p{4.9cm}p{0.9cm}p{2.5cm}p{5.9cm}@{}}
+\caption{Catalogue des défauts paramétrés de la forme agrégats
+(\code{DEFAUTS\_FORMES}, entrée \code{agregats}~; spécification
+d'\code{actuary} de l'issue~\#189, § 1). Le motif attendu porte le nom du
+type~; $E^c$~: \code{exposition\_centrale}~; $D$~: \code{evenements}.}
+\label{tab:catalogue-defauts-agregats}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Type}} &
+\textcolor{financeblue}{\textbf{Unité}} &
+\textcolor{financeblue}{\textbf{Éligibles}} &
+\textcolor{financeblue}{\textbf{Altération}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Type}} &
+\textcolor{financeblue}{\textbf{Unité}} &
+\textcolor{financeblue}{\textbf{Éligibles}} &
+\textcolor{financeblue}{\textbf{Altération}} \\
+\endhead
+\code{cellule\_dupliquee} & cellule & toutes & copie de la cellule ajoutée en fin de table, aux valeurs de la table propre~; motif attendu sur l'original et sur la copie \\
+\code{exposition\_negative} & cellule & $E^c > 0$ et $D = 0$ & chaque colonne d'exposition présente changée de signe \\
+\code{evenements\_non\_entiers} & cellule & $E^c > 0$ & $D + 0{,}5$~; la colonne \code{evenements} passe en \code{double} si une cellule au moins est retenue \\
+\code{evenements\_sans\_exposition} & cellule & $E^c > 0$ et $D \ge 1$ & chaque colonne d'exposition présente mise à~0 \\
+\code{annee\_hors\_periode} & cellule & toutes~; colonne \code{annee} requise & année diminuée de $n$, nombre d'années civiles de la période ($n = \operatorname{an}(\text{fin}) - \operatorname{an}(\text{début}) + 1$) \\
+\end{longtable}
+}
+
+\noindent
+{\sloppy\hbadness=10000 \textbf{Éligibilités.} Chacune est choisie pour que la cellule altérée ne
+lève que son motif, d'après la lecture des contrôles des agrégats du
+module \code{donnees} (\code{evaluer\_motifs\_agregats()}, où
+\code{evenements\_sans\_exposition} vaut pour un nombre d'événements
+positif sans aucune exposition positive)~: sans $D = 0$, une exposition
+rendue négative lèverait aussi \code{evenements\_sans\_exposition}~; sans
+$E^c > 0$, des événements non entiers sur une cellule sans exposition
+positive le lèveraient aussi~; \code{evenements\_sans\_exposition} exige
+une cellule exposée qui compte un événement, que l'altération rend sans
+exposition. Le décalage de l'année est fait d'un nombre entier d'années
+égal à la longueur de la période~: les années de la table propre allant de
+$\operatorname{an}(\text{début})$ à $\operatorname{an}(\text{fin})$, toute
+année décalée est antérieure au début de la période, et deux cellules
+distinctes restent distinctes après le décalage, si bien que l'altération
+ne crée aucun doublon de clé (\emph{résultat exact}, par construction~;
+une année constante en créerait). Que chaque type ne lève que son motif est
+vérifié par le test~A2 (section~\ref{sec:verifications-simulation}).\par}
+
+\medskip
+\noindent
+\textbf{Ordre et graine.} Les contrôles précèdent tout tirage (forme, puis
+défauts avec le catalogue de la forme)~; le jeu propre est tiré, puis
+projeté, sans tirage~; un seul appel de \code{sous\_graine()}, sous la
+graine des défauts, toujours distincte de celle du jeu, sélectionne alors
+les cellules par \code{tirer\_defauts()}, dans l'ordre des déclarations,
+les éligibles étant les cellules de la table propre non encore altérées,
+en ordre croissant~: une cellule est altérée au plus une fois, et une copie
+n'est jamais éligible. Les altérations portent sur les valeurs de la table
+propre~; les copies prennent les numéros $N + 1, N + 2, \dots$, $N$ étant
+le nombre de cellules de la table propre, dans l'ordre des déclarations
+puis des cellules. Le texte de cet ordre est consigné dans le champ
+\code{ordre\_tirages} de l'attribut. \code{sous\_graine()} rétablissant
+l'état du générateur, le jeu propre et sa projection ne changent pas avec
+les défauts~: l'attribut \code{simulation} et les cellules non altérées
+sont identiques à ceux de la forme propre (test~A1).
+
+\medskip
+\noindent
+\textbf{Attribut \code{defauts}.} Il a les sept champs des lignes
+individuelles, dans le même ordre, \code{ordre\_tirages} et le texte de
+validité étant ceux de la forme. \code{lignes} déclare l'unité
+\code{cellule} et les rôles \code{alteree}, \code{original} et
+\code{copie}, \code{premier\_deces} restant manquant~; \code{decomptes} a
+les mêmes champs, les cellules tenant lieu de lignes. \code{validite}
+consigne les rôles aux noms des colonnes, la période de la simulation, le
+délai de déclaration nul et le texte, puis, en fin, la \code{convention} et
+\code{par\_annee} de la forme. Les motifs sont attendus sous ces
+conditions~: recette \code{agregats}, rôles déclarés aux noms des colonnes,
+transition de la forme, plan de même période que la simulation, délai de
+déclaration nul, convention et \code{par\_annee} de la forme. Sans
+exclusion déclarée, le module \code{donnees} refuse
+(\code{ligne\_invalide}) en nommant les motifs attendus~; avec toutes les
+exclusions des motifs attendus déclarées, les lignes exclues sont celles de
+l'attribut, motif par motif. Toute cellule exclue manque à la table
+(pour \code{cellule\_dupliquee}, l'original et la copie)~: le relevé
+\code{ages\_manquants} peut alors apparaître.
+
+\medskip
+\noindent
+\textbf{Refus.} \code{defauts\_invalides}, avant tout tirage~: un type
+hors du catalogue de la forme (un type des lignes individuelles est
+inconnu sous la forme agrégats, et un type des agrégats sans forme), un
+champ \code{cible} («~Défauts~: déclaration [k]~: type «~[type]~» (unité
+cellule)~: champ cible interdit.~»), une combinaison («~combinaisons
+admises~: aucune~»), et \code{annee\_hors\_periode} sans colonne
+\code{annee}, condition structurellement vide connue par la seule forme
+(\code{par\_annee = FALSE}~; \code{conditions\_vides()}, qui reçoit la
+forme validée), en taux comme en nombre, au message «~Défauts~:
+déclaration [k]~: type annee\_hors\_periode~: aucune unité éligible par
+construction (aucune colonne annee dans les agrégats~: par\_annee =
+FALSE), quel que soit le tirage.~». \code{defauts\_ineligibles}, après la
+projection, quand un \code{nombre} dépasse les cellules éligibles non
+encore altérées (ci-dessus, «~Refus~»).
+
+\medskip
+\noindent
+{\sloppy\hbadness=10000 \textbf{Clôture.} Les cinq motifs attendus du
+catalogue, réunis aux treize motifs des agrégats qu'il ne produit pas
+(\code{age\_manquant}, \code{age\_non\_entier}, \code{age\_negatif},
+\code{age\_aberrant}, \code{annee\_manquante}, \code{annee\_non\_entiere},
+\code{sexe\_manquant}, \code{sexe\_hors\_modalites},
+\code{segment\_manquant}, \code{exposition\_manquante},
+\code{exposition\_non\_finie}, \code{evenements\_manquants},
+\code{evenements\_negatifs}), sont exactement les dix-huit motifs de
+\code{MOTIFS\_LIGNES\_AGREGATS}~; un test de clôture (A7) le vérifie, si
+bien qu'un motif des agrégats ajouté sans décision sur le simulateur fait
+échouer la batterie. Le catalogue des lignes individuelles reste celui du
+tableau~\ref{tab:catalogue-defauts}, inchangé.\par}
 
 \subsection{Constats de simulation}
 \label{sec:constats-simulation}
@@ -15023,6 +15291,75 @@ appariée (T5)~; les cas extrêmes de $b$ et de $c$ (T6)~; chaque refus
 \code{loi\_invalide} (T7)~; l'identité de deux jeux de même graine et la
 consignation de la table et de la graine, pour chaque forme de queue
 (T8)~; le constat de simulation ci-dessus (T9).
+\code{tests/unitaires/test\_simulateur\_agregats.R} vérifie la forme
+agrégats de l'issue~\#189 (critères A1 à A7 de la spécification), chaque
+attendu de nature nommée, sans constat Monte-Carlo. Six configurations
+servent à A1 et A2~: les deux conventions, avec et sans \code{par\_annee},
+en mode \code{uniforme}~; l'unité tête sous la transition de décès et
+l'unité contrat sous celle de rachat (\code{age\_atteint\_annee}, par
+année), en mode \code{uniforme\_multi}. \emph{Identité exacte} (A1)~: deux
+appels avec défauts identiques~; l'attribut \code{simulation} et les
+cellules non altérées identiques à ceux de la forme propre, les copies aux
+originaux~; la colonne \code{evenements} en \code{integer} tant
+qu'\code{evenements\_non\_entiers} ne retient aucune cellule, en
+\code{double} sinon. \emph{Détection} (A2), pour chaque type et chaque
+configuration, avec un \code{nombre} de~2~: refus \code{ligne\_invalide}
+nommant ce seul motif, aux lignes de l'attribut~; sous l'exclusion du
+motif, lignes exclues égales à celles de l'attribut~;
+\code{evaluer\_motifs\_agregats()} ne levant que ce motif.
+\emph{Valeurs écrites à la main} (A3)~: la projection d'un jeu de deux
+lignes sous \code{age\_atteint\_annee}, sans et avec \code{par\_annee}
+($E^c$, $E^i$, $D$, cellules et zéros explicites)~;
+\code{fusionner\_tetes()} sur deux têtes écrites à la main (fenêtres
+contiguës réunies, trou gardé)~; les altérations des cinq types~; les
+champs de l'attribut \code{defauts} et de sa \code{validite}~;
+\code{unite\_observation} en fin du champ \code{forme} sous un mode
+multi-contrats seulement. \emph{Refus} (A4), avant tout tirage, aucun
+appel de \code{sous\_graine()} n'étant compté (fonction tracée)~:
+\code{defauts\_invalides} pour \code{annee\_hors\_periode} sans
+\code{annee}, un type des lignes sous la forme, un type des agrégats sans
+forme, une \code{cible}, une combinaison et une graine des défauts égale à
+celle du jeu~; \code{forme\_invalide} pour \code{unite\_observation}
+absent, inattendu, hors liste ou \code{NA}, et pour
+\code{"tete"} sous le rachat, avec ou sans défauts~; leurs messages~;
+\code{defauts\_ineligibles} après la projection (deux appels de
+\code{sous\_graine()}, état du générateur de l'appelant inchangé)~; la
+disjonction, sous un taux de~1 pour tous les types. \emph{Recoupement
+contre le moteur} (A5~; \emph{approximation numérique}, tolérance relative
+$10^{-10}$, l'écart maximal mesuré étant imprimé par la batterie, un
+dépassement étant un constat et jamais une tolérance à élargir)~: la
+projection du simulateur est comparée à la table d'exposition d'une
+construction en lignes sur le jeu propre (unité contrat~: rôles sans
+\code{id\_tete}~; unité tête~: \code{id\_tete} et \code{id\_contrat}
+déclarés), dans huit cas~: \code{age\_atteint\_annee} sous les deux
+transitions sans \code{par\_annee} et sous le décès avec
+\code{par\_annee}~; en mode \code{uniforme\_multi}, l'unité tête sous
+\code{dernier\_anniversaire} sans et avec \code{par\_annee} et sous
+\code{age\_atteint\_annee}, l'unité contrat sous les deux transitions~;
+mêmes cellules, événements identiques, $E^c$ et, sans \code{par\_annee},
+$E^i$ (comparée à $E^c$ plus \code{complement\_initial\_cellule}) à
+$10^{-10}$ près, chaque cas comptant au moins 50~événements. Sous
+\code{age\_atteint\_annee}, les sommes sur les années de $E^c$ et de
+$E^i$ par année sont égales, à $10^{-12}$ relatif près, aux valeurs sans
+année, et les événements identiques~: c'est, avec A3, le seul recoupement
+de l'exposition initiale par année, que le moteur ne restitue pas
+(section~\ref{sec:portefeuille-simule}, «~Sortie~»). En unité tête, la
+somme des événements est le nombre de têtes distinctes décédées dans
+$[D, B)$, et, en unité contrat, le nombre de lignes à décès, recomptés sur
+le jeu propre. \emph{Identité exacte} (A6)~: les résultats de l'étape
+\code{brut} d'une construction sur les agrégats \code{age\_atteint\_annee}
+du simulateur et d'une construction en lignes sur le jeu propre sont
+identiques (\code{poisson} et \code{binomial} sans \code{par\_annee},
+\code{poisson} par année), et le positionnement d'une construction sur ces
+agrégats est refusé (\code{convention\_positionnement\_non\_admise}). \emph{Clôture} (A7)~: les
+motifs du catalogue des agrégats et les treize motifs hors de son
+périmètre forment exactement \code{MOTIFS\_LIGNES\_AGREGATS}~; l'entrée
+\code{lignes} de \code{DEFAUTS\_FORMES} est identique à
+\code{CATALOGUE\_DEFAUTS} (dix-huit types), \code{COMBINAISONS\_DEFAUTS}
+et \code{ORDRE\_TIRAGES\_DEFAUTS}~; un type des lignes est refusé sous la
+forme stocks successifs (\code{defauts\_invalides})~;
+\code{conditions\_vides()} rend le même résultat sans forme qu'avec une
+forme \code{NULL}.
 \code{tests/test\_reproductibilite.R} vérifie qu'un jeu simulé est
 identique, attribut compris, dans un autre processus R.
 
@@ -15055,6 +15392,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{CATALOGUE\_DEFAUTS} & constante & --- & catalogue des 18 types de défauts paramétrés~: unité, causes éligibles, condition, altération, motif et refus attendus, écrits en dur (tableau~\ref{tab:catalogue-defauts}) \\
 \catalogue{fonctions-simulation}{COMBINAISONS\_DEFAUTS} & constante & --- & combinaisons de types admises sur une même ligne (liste fermée) \\
 \catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_DEFAUTS} & constante & --- & ordre des tirages des défauts, consigné dans l'attribut \code{defauts} \\
+\catalogue{fonctions-simulation}{DEFAUTS\_FORMES} & constante & --- & règles des défauts par forme, lues par le nom de forme (\code{lignes} pour \code{forme = NULL}, \code{agregats}, \code{stocks\_successifs})~: catalogue, combinaisons, domaine de \code{cible}, unités à cible requise, ordre des tirages et texte de validité consignés~; l'entrée \code{lignes} reprend à l'identique les trois constantes précédentes (tableaux~\ref{tab:catalogue-defauts} et~\ref{tab:catalogue-defauts-agregats}~; stocks successifs~: issue~\#191) \\
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
@@ -15069,15 +15407,19 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
 \catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
-\catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issue~\#112)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; déclarations normalisées (types rangés dans l'ordre du catalogue, cible, taux ou nombre) \\
-\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête (issue~\#112), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres}) \\
-\catalogue{fonctions-simulation}{injecter\_defauts()} & interne & jeu propre, défauts contrôlés, défauts reçus, période & sélection sous la graine des défauts, refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de jeu~; jeu altéré et attribut \code{defauts} \\
+\catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut), règles de la forme (celles des lignes par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issue~\#112) et un type hors du catalogue de la forme (issue~\#189)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; cible requise ou interdite selon l'unité du type~; déclarations normalisées (types rangés dans l'ordre du catalogue, unité, cible, taux ou nombre) \\
+\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période, forme validée (\code{NULL} par défaut) & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête (issue~\#112), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres})~; sous une forme, les seules conditions de son catalogue, d'après la forme seule~: condition \code{annee} des agrégats sans \code{par\_annee} (issue~\#189) \\
+\catalogue{fonctions-simulation}{tirer\_defauts()} & interne & graine des défauts, déclarations contrôlées, état initial, fonctions des éligibles et de marquage & sélection des unités en défaut, règle unique de toutes les formes~: un seul \code{sous\_graine()}, déclarations dans l'ordre reçu, éligibles non encore altérées, taux ou nombre, puis marquage (disjonction)~; refus \code{defauts\_ineligibles}~; nombre d'éligibles et unités retenues par déclaration (issue~\#189) \\
+\catalogue{fonctions-simulation}{injecter\_defauts()} & interne & jeu propre, défauts contrôlés, défauts reçus, période & sélection par la règle unique de tirage (ligne précédente), refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de jeu~; jeu altéré et attribut \code{defauts} \\
+\catalogue{fonctions-simulation}{injecter\_defauts\_agregats()} & interne & table agrégée propre, défauts contrôlés, défauts reçus, période, forme validée & défauts de la forme agrégats après la projection~: sélection des cellules par la règle unique de tirage, refus \code{defauts\_ineligibles}, altérations déterministes, copies en fin de table~; table altérée et attribut \code{defauts} (validité~: convention et \code{par\_annee} en fin~; issue~\#189) \\
 \catalogue{fonctions-simulation}{CHAMPS\_FORMES} & constante & --- & champs requis de l'argument \code{forme}, par forme~: \code{agregats} (\code{nom}, \code{transition}, \code{convention}, \code{par\_annee}), \code{stocks\_successifs} (\code{nom}, \code{inventaires}) \\
-\catalogue{fonctions-simulation}{CONVENTIONS\_FORMES} & constante & --- & conventions d'âge mises en œuvre par forme~: \code{dernier\_anniversaire} seule pour \code{agregats} \\
-\catalogue{fonctions-simulation}{controler\_forme()} & interne & forme, mode validé, présence de défauts, bornes de la période & forme validée (pour \code{agregats}~: nom, transition, cause comptée, convention, \code{par\_annee}~; pour \code{stocks\_successifs}~: nom, grille en \code{Date} à stockage \code{double})~; refus \code{forme\_invalide}, avant tout tirage \\
-\catalogue{fonctions-simulation}{projeter\_agregats()} & interne & jeu propre, cause comptée, \code{par\_annee}, début et borne de la période & cellules agrégées (sexe, âge au dernier anniversaire, année sous \code{par\_annee}), zéros explicites, par l'arithmétique de dates du simulateur~; aucun tirage, aucun appel au module \code{exposition} \\
+\catalogue{fonctions-simulation}{CONVENTIONS\_FORMES} & constante & --- & conventions d'âge mises en œuvre par forme~: \code{dernier\_anniversaire} et \code{age\_atteint\_annee} pour \code{agregats} \\
+\catalogue{fonctions-simulation}{CHAMPS\_FORMES\_MULTI} & constante & --- & champs ajoutés à la forme sous les modes multi-contrats, requis sous ces modes et refusés sous les autres~: \code{unite\_observation} pour \code{agregats}~; une forme absente (stocks successifs) est refusée sous ces modes (issue~\#189) \\
+\catalogue{fonctions-simulation}{controler\_forme()} & interne & forme, mode validé, bornes de la période & forme validée (pour \code{agregats}~: nom, transition, cause comptée, convention, \code{par\_annee}, et \code{unite\_observation} sous les modes multi-contrats~; pour \code{stocks\_successifs}~: nom, grille en \code{Date} à stockage \code{double})~; refus \code{forme\_invalide}, avant tout tirage, dont l'unité tête sous le rachat \\
+\catalogue{fonctions-simulation}{projeter\_agregats()} & interne & jeu propre, cause comptée, \code{par\_annee}, début et borne de la période, convention et unité (facultatives~: dernier anniversaire, contrat) & cellules agrégées (sexe, âge au dernier anniversaire ou âge atteint, année sous \code{par\_annee}), zéros explicites, par l'arithmétique de dates du simulateur, après réunion des fenêtres par tête en unité tête~; aucun tirage, aucun appel au module \code{exposition} \\
+\catalogue{fonctions-simulation}{fusionner\_tetes()} & interne & jeu propre multi-contrats, trié par tête puis entrée & composantes par tête (fenêtres réunies si l'entrée suivante ne dépasse pas la fin courante), cause \code{deces}, \code{en\_cours} ou \code{rachat}~; règle de E2.4 écrite sans appel au module \code{donnees} (issue~\#189) \\
 \catalogue{fonctions-simulation}{projeter\_stocks()} & interne & jeu propre, grille validée & forme empilée (lignes d'inventaire et d'événement, par \code{id\_contrat} puis date) et décomptes de la projection~; aucun tirage, aucun appel au module \code{exposition} \\
-\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine, défauts et forme (\code{NULL} par défaut) & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation}~; jeu altéré et attribut \code{defauts} si des défauts sont déclarés~; sous une forme, table de la forme demandée, attribut \code{simulation} suivi du champ \code{forme} \\
+\catalogue{fonctions-simulation}{simuler\_portefeuille()} & exportée & loi, portefeuille, période, graine, défauts et forme (\code{NULL} par défaut) & jeu simulé (une ligne par contrat écrit) et attribut \code{simulation}~; jeu altéré et attribut \code{defauts} si des défauts sont déclarés~; sous une forme, table de la forme demandée, attribut \code{simulation} suivi du champ \code{forme}, altérée par les défauts de la forme s'il en est déclaré \\
 \end{longtable}
 }
 
