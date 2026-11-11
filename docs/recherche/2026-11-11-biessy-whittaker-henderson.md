@@ -115,7 +115,7 @@ Propositions de la session, à arbitrer par `actuary-approfondi` (spécification
 - **Terme** : « WH généralisé » (Biessy, § 4.1) désigne la variante (b) ; « WH original » (Biessy) désigne le lissage de ln(d/e_c) pondéré par d, **distinct** de la variante (a) d'E2.12 (q_x, Lignes directrices).
 - **Point de décision** (spécification de I-L2) : traitement des âges sans décès (ϵ de départ) et des cellules internes sans exposition, non traités par la source.
 
-*Note du 11/11/2026* : décisions prises après la rédaction — terme LAML retenu, E2.12 corrigée (M413, D5) ; validation d'une table lissée : statistiques d'ajustement à n − Σν degrés de liberté, statut d'approximation non établie (M413, D7) ; la proposition de lecture « REML (…) » ci-dessus et les mentions « à confirmer par `actuary` » des § 2.4 et § 3 sont sans objet. `R/validation.R:87` relu par `actuary` à `8ba2db4` : exact.
+*Note du 11/11/2026* : décisions prises après la rédaction — terme LAML retenu, E2.12 corrigée (M413, D5) ; validation d'une table lissée : statistiques d'ajustement à n − Σν degrés de liberté, statut d'approximation non établie (M413, D7) ; la proposition de lecture « REML (…) » ci-dessus et les renvois à `actuary` (§ 2.4 : « à confirmer », « reste à spécifier » ; § 3 : « à arbitrer », point 5) sont sans objet. `R/validation.R:87` relu par `actuary` à `8ba2db4` : exact.
 
 ## 5. Ce qui n'a pas été fait
 
