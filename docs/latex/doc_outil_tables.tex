@@ -3681,7 +3681,11 @@ le calcul a donc lieu avant la première étape~; seuls les refus de l'étape
 (\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un}),
 et ceux de l'étape \code{positionnement} sur ses cellules et ses segments
 (les mêmes, plus \code{positionnement\_sans\_attendu} et
-\code{positionnement\_sans\_deces}), sont levés pendant l'étape, après
+\code{positionnement\_sans\_deces}), et ceux de l'étape \code{exposition}
+sur la table qu'elle forme (\code{trop\_de\_cellules},
+\code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} et
+\code{periode\_sans\_exposition},
+section~\ref{sec:troncature-censure}), sont levés pendant l'étape, après
 celles qui la précèdent (l'étape
 \code{importance\_exclusions} ne lève aucun refus sur ses cellules,
 section~\ref{sec:importance-exclusions})~; un nom de colonne ou un
@@ -6438,9 +6442,53 @@ base de cette taille étant hors de portée d'un test, la garde est vérifiée
 par appel direct de \code{nombre\_cellules()} sous ses deux libellés, et son
 placement avant le \code{tabulate()} de présence par une copie instrumentée
 de \code{calculer\_exposition()} (\code{tests/unitaires/test\_exposition.R}).
-Avertissements~: \code{convention\_forcee},
-\code{evenement\_sans\_exposition} et \code{aucune\_exposition} (aucune
-exposition ni aucun événement dans la période).
+Avertissements~: \code{convention\_forcee} et
+\code{evenement\_sans\_exposition}~; l'avertissement
+\code{aucune\_exposition}, que levait une table sans cellule, est retiré
+par l'issue~\#210, ce cas étant désormais refusé (ci-dessous).
+
+\medskip
+{\sloppy \textbf{Période sans exposition} (issue~\#210~; décision M399).
+\code{calculer\_exposition()} refuse, après l'aiguillage, donc sous les deux
+formes rendues au noyau et sous les trois recettes (motif
+\code{periode\_sans\_exposition}, module \code{exposition}), une table
+d'exposition dont aucune cellule n'a d'exposition strictement positive
+(\code{exposition\_jours}, \code{exposition\_centrale} ou
+\code{exposition\_initiale}, selon les colonnes de la recette) et qui ne
+compte aucun événement de la transition~: c'est le \emph{vide total}, le
+plus souvent une erreur de période, que le moteur ne corrige pas, la période
+étant déclarée, jamais déduite (E2.5). Avant l'issue~\#210, une telle
+construction aboutissait, tables vides, ou s'arrêtait sur une erreur R de
+l'étape \code{validation} sous \code{par\_annee}. Le message cite le début
+de la période, sa fin effective, la fin déclarée et le délai, les nombres
+d'observations et de cellules, repris dans \code{details} (\code{debut},
+\code{fin\_effective}, \code{observations}, \code{cellules}). Le nombre de
+cellules est celui des lignes de la table d'exposition, zéros explicites
+compris~: une table d'agrégats à exposition nulle partout et sans événement
+est refusée avec une cellule par clé reçue, et une ligne
+entrée et rachetée le même jour, seule de sa base, avec une cellule. Seuls
+comptent les événements de la transition~: une table dont les seules
+sorties sont des sorties concurrentes, sans exposition, est refusée. Ne sont
+pas refusés un événement sans exposition (état
+\code{evenement\_sans\_exposition}, cas H10b et H11, avertissement du même
+nom), qui n'est pas un vide total, ni un \emph{vide partiel} (une année, un
+segment ou une plage d'âges sans exposition), produit avec ses zéros
+explicites, les étapes en aval rendant les grandeurs qu'elles ne peuvent
+calculer dans un état nommé (par exemple \code{aucune\_cellule\_retenue}).
+Sous \code{stocks\_successifs}, le vide total n'est pas atteignable par
+\code{construire\_table()}~: la grille alignée sur la période (refus
+\code{inventaires\_periode}) et l'inventaire sans unité présente (refus
+\code{inventaire\_sans\_ligne}) l'excluent en amont, l'unité présente au
+dernier inventaire gardant au moins un jour d'exposition (\emph{constat} sur
+une base minimale, \code{tests/unitaires/test\_stocks\_successifs.R})~; le
+refus s'y vérifie en appel direct. Le refus porte sur la table de la
+construction~: l'argument \code{refuser\_vide} de
+\code{calculer\_exposition()}, \code{TRUE} par défaut, vaut \code{FALSE}
+dans \code{exposition\_lignes()}, qui recalcule l'exposition des
+sous-ensembles de lignes exclues pour le contrefactuel de l'étape
+\code{importance\_exclusions} (section~\ref{sec:importance-exclusions})~:
+un tel sous-ensemble peut légitimement n'avoir aucune exposition dans la
+période (écart à la lettre de M399, visé par \code{actuary}).\par}
 
 \medskip
 \textbf{Fenêtres transmises à l'étape \code{brut}} (issue~\#38~; ADR 0007,
@@ -6835,7 +6883,15 @@ exclusions et de celle sur la base privée des unités exclues (C16-oracle,
 section~\ref{sec:controles-donnees})~; inégalité exacte, sous
 \code{premier\_inventaire}, de $E^c$ et de $D$ de chaque cellule au plus
 égaux à ceux de la construction en lignes du jeu propre (C3)~; forme du
-simulateur (C11). Quelques-uns illustrent les règles
+simulateur (C11). Le refus \code{periode\_sans\_exposition} (issue~\#210)
+est vérifié sous les trois recettes, message et détails compris, par des
+valeurs écrites à la main~: ligne sortie avant le début de la période
+(H10a), lignes hors de la période sous deux conventions, avec ou sans
+\code{par\_annee} et avec ou sans l'étape \code{brut}~; agrégats
+d'exposition nulle partout et sans événement, sous les trois jeux de
+colonnes d'exposition~; stocks successifs en appel direct~; H10b, H11 et
+un vide partiel restent produits, et un sous-ensemble exclu sans exposition
+ne fait pas refuser l'étape \code{importance\_exclusions}. Quelques-uns illustrent les règles
 ci-dessus (période du 2015-01-01 au 2024-12-31, délai nul, vivant $\to$
 décédé)~:
 
@@ -6969,7 +7025,7 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur ni du marquage d'encodage (ordre des octets UTF-8 de l'empreinte des données) \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
-\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, valeurs validées \code{p}, segmentation, recette et convention validées, \code{par\_annee}, hypothèse d'entrée (stocks successifs) & fonction d'étape \code{exposition}, aiguillage sur la forme rendue au noyau par la recette (\code{seam})~: \code{exposition\_fenetres()} (\code{fenetres}) ou \code{exposition\_cellules()} (\code{cellules}), dont elle rend la valeur~; ne contrôle ni les paramètres, ni la recette, ni la convention, et ne les recalcule pas (issues~\#22 et~\#82) \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, valeurs validées \code{p}, segmentation, recette et convention validées, \code{par\_annee}, hypothèse d'entrée (stocks successifs), \code{refuser\_vide} (\code{TRUE} par défaut) & fonction d'étape \code{exposition}, aiguillage sur la forme rendue au noyau par la recette (\code{seam})~: \code{exposition\_fenetres()} (\code{fenetres}) ou \code{exposition\_cellules()} (\code{cellules}), dont elle rend la valeur~; refus \code{periode\_sans\_exposition} d'une table sans exposition strictement positive ni événement de la transition, sauf \code{refuser\_vide = FALSE} (issue~\#210)~; ne contrôle ni les paramètres, ni la recette, ni la convention, et ne les recalcule pas (issues~\#22 et~\#82) \\
 \catalogue{fonctions-exposition}{exposition\_fenetres()} & interne & mêmes arguments & forme \code{fenetres} (recettes \code{lignes\_dates\_completes} et \code{stocks\_successifs}, la seconde après la formation de ses fenêtres, ligne ci-dessous, sans autre différence de calcul)~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; corps de \code{calculer\_exposition()} extrait à l'identique (issue~\#169) \\
 \catalogue{fonctions-exposition}{UNITE\_EXPOSITION\_DECLAREE} & constante & --- & unité de l'exposition reçue sous la forme \code{cellules}, inscrite à la place de \code{UNITES\_EXPOSITION} \\
 \catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE\_DECLAREE} & constante & --- & hypothèse sur les sorties concurrentes sous la forme \code{cellules} (traitement fait par le producteur, non vérifiable), inscrite à la place de \code{HYPOTHESE\_CENSURE} \\
@@ -8461,9 +8517,11 @@ section~\ref{sec:rapport-fige}).
 d'une table par sexe) et \code{taux\_table\_egal\_un} ($\tilde q = 1$ dans
 une cellule d'exposition $E^c > 0$), par les briques partagées, sous le
 module \code{positionnement}~; puis \code{positionnement\_sans\_attendu}
-($A_s = 0$~: aucune cellule retenue dans un segment, ou aucune cellule dans
-la table d'exposition, période sans observation~; $\hat\theta_s$ n'est pas
-défini) et \code{positionnement\_sans\_deces} ($O_s = 0$~:
+($A_s = 0$~: aucune cellule retenue dans un segment, ou, en appel direct
+seulement, aucune cellule dans la table d'exposition, une période sans
+exposition ni événement étant refusée en amont par \code{construire\_table()}
+à l'étape \code{exposition}, \code{periode\_sans\_exposition},
+issue~\#210~; $\hat\theta_s$ n'est pas défini) et \code{positionnement\_sans\_deces} ($O_s = 0$~:
 $\hat\theta_s = 0$ donnerait une table à mortalité nulle), chacun citant
 tous les segments en défaut avec leur $A_s$ (décision M289, Q2~: refus
 plutôt qu'un segment sans table). Le message de
@@ -9237,7 +9295,14 @@ dans la colonne \code{statut} du résultat.
     retenue est dans l'état \code{aucune\_cellule\_retenue}. Les colonnes
     \code{smr} (\code{double}) et \code{etat} (\code{character}) gardent
     leur type pour un regroupement sans aucun groupe, sous les trois
-    relations (issue~\#201). Aucune
+    relations (issue~\#201). Sans aucune cellule sous \code{par\_annee}
+    (appel direct sur une exposition à 0 ligne), la table est produite sans
+    erreur~: aucune ligne pour les
+    regroupements dont les modalités viennent des cellules
+    (\code{segment\_tranche}, \code{segment}, \code{annee}), une ligne par
+    tranche déclarée, à l'état \code{aucune\_cellule\_retenue}, et
+    \code{annee} en \code{integer} (issue~\#210, décision M400~; avant, R
+    s'arrêtait sur une erreur d'affectation). Aucune
     correction de multiplicité (décision M217).
   \item \textbf{S6, signes} (\code{signes})~: $n_{+}$, $n_{-}$ et
     nombre de résidus nuls (retirés du test), $n = n_{+} + n_{-}$~;
@@ -10857,7 +10922,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{classe\_motifs()} & interne & motifs, unité, clés & classe de chaque motif~: mesurable, non calculable faute de clé, non mesurable \\
 \catalogue{fonctions-validation}{classer\_lignes\_exclues()} & interne & lignes exclues par motif, unité, clés & lignes distinctes et leur classe~; seule source des ensembles $S$ \\
 \catalogue{fonctions-validation}{cle\_cellules()} & interne & cellules, clés, découpage & clé de chaque cellule (segmentation, âge, année) \\
-\catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}~; même unité que la construction, sinon erreur de programmation \\
+\catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}, sans refus de la période sans exposition (\code{refuser\_vide = FALSE}, issue~\#210)~; même unité que la construction, sinon erreur de programmation \\
 \catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes $S$, clés, contexte & cellules retirées (événements, jours, $E^c$), têtes touchées et indéterminées~; garde de réintégration et invariants \\
 \catalogue{fonctions-validation}{cellules\_regroupees()} & interne & table d'exposition, découpage & cellules des lignes conservées au niveau~A, sommées sur les segments \\
 \catalogue{fonctions-validation}{smr\_comparateur\_1()} & interne & cellules retirées et conservées, clés, découpage, niveau & taux conservés et attendus par cellule~; $O$, $A$, SMR, bornes, rapport de variance, état \\
