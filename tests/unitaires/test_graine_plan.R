@@ -173,7 +173,7 @@ verifier("graine double : fiche identical(), octets de ecrire_fiche() égaux, fi
            identical(XD$fiche$plan$graine, GRAINE_I) &&
            identical(XD$etapes$validation$resultat$monte_carlo$graine, GRAINE_I))
 verifier("graine double : le chemin est bien exercé (39 tirages de Monte-Carlo effectués, étape importance_exclusions présente)",
-         identical(XD$etapes$validation$resultat$monte_carlo$tirages_effectues, 39) &&
+         identical(XD$etapes$validation$resultat$monte_carlo$tirages_effectues, 39L) &&
            !is.null(XD$etapes$importance_exclusions$resultat))
 verifier("graine double : rejouer_fiche() sur la fiche aboutit, construction identical() hors execution à l'originale, ligne de graine entière dans la fiche écrite", {
   f <- lire_fiche(ecrire_fiche(XD$fiche))

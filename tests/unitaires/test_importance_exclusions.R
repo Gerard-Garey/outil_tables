@@ -586,7 +586,7 @@ verifier("comparateur 2 (valeur calculée à la main) : sexe absent de la table 
   x <- construire_table(d, ROLES_SIM, plan_ie(EXC6, "sexe", val = VALQ), tables_reference = list(tq = th))
   s <- de(x$etapes$importance_exclusions$resultat$smr_comparateur_2, "id_contrat_manquant", "B")
   identical(s$etat, "cellule_sans_valeur_table") && identical(s$cellules_sans_valeur_table, 1L) &&
-    identical(s$evenements_sans_valeur_table, 1) && is.na(s$smr)
+    identical(s$evenements_sans_valeur_table, 1L) && is.na(s$smr)
 })
 
 # Comparateur 2, tout ou rien (avis d'actuary, C2 et Q2) : deux lignes
@@ -608,7 +608,7 @@ verifier("comparateur 2, tout ou rien (valeur calculée à la main) : cellule H 
                 TRUE else paste(s$etat, collapse = ", "),
        na = if (all(is.na(na))) TRUE else "valeurs non NA",
        restitues = if (identical(s$cellules_sans_valeur_table, c(1L, 1L)) &&
-                       identical(s$evenements_sans_valeur_table, c(1, 1)) &&
+                       identical(s$evenements_sans_valeur_table, c(1L, 1L)) &&
                        identical(s$cellules_taux_table_egal_un, c(0L, 0L))) TRUE else "décomptes")
 })
 # T1 plus Z (C9 : sexe manquant, née le 1949-01-01, 66 ans en 2015, décès
@@ -627,7 +627,7 @@ verifier("comparateur 2, q~ = 1 (valeur calculée à la main) : construction abo
     s <- x$etapes$importance_exclusions$resultat$smr_comparateur_2
     s <- s[s$ensemble == "total", ]
     all(s$etat == "taux_table_egal_un") && all(is.na(unlist(s[c("observes", "attendus", "smr", "borne_inf_exacte")]))) &&
-      identical(s$cellules_taux_table_egal_un, c(1L, 1L)) && identical(s$evenements_taux_table_egal_un, c(1, 1)) &&
+      identical(s$cellules_taux_table_egal_un, c(1L, 1L)) && identical(s$evenements_taux_table_egal_un, c(1L, 1L)) &&
       identical(s$cellules_sans_valeur_table, c(0L, 0L))
   }, TRUE)
   if (all(ok)) TRUE else sprintf("unité tête %s, unité contrat %s", ok[1L], ok[2L])
@@ -669,6 +669,56 @@ verifier("aucune exclusion déclarée (valeur calculée à la main) : total vide
   identical(r$etat, "produite") && identical(c(r$evenements_retires, r$exposition_jours_retiree,
                                                r$exposition_centrale_retiree), c(0, 0, 0)) &&
     is.na(r$tetes_touchees) && all(i$smr_comparateur_1$etat == "aucun_attendu")
+})
+
+# Type des dénombrements (#199 ; ADR 0009, point 9.6) : colonnes observes et
+# evenements_* de smr_comparateur_1 (2) et smr_comparateur_2 (6) en integer,
+# lignes produites et lignes NA_integer_ (ensemble non produit :
+# aucune_ligne_mesurable ; comparateur 2 non calculable :
+# cellule_sans_valeur_table) ; gardes défensives au-delà de
+# .Machine$integer.max (appel direct : le total de l'étape exposition est
+# gardé en amont, M397).
+COLS_C1_199 <- c("observes", "evenements_sans_exposition_retenue")
+COLS_C2_199 <- c("observes", "evenements_sans_valeur_table", "evenements_taux_table_egal_un", "evenements_sans_attendu",
+                 "evenements_hors_plage", "observes_conserves")
+verifier("dénombrements (#199) : smr_comparateur_1 (observes, evenements_sans_exposition_retenue) et smr_comparateur_2 (observes, observes_conserves, evenements_*) en integer, lignes produites et lignes NA (aucune_ligne_mesurable, cellule_sans_valeur_table)", {
+  x <- construire_table(T1, ROLES_SIM, plan_ie(c("id_contrat_manquant", "entree_manquante", "sexe_manquant"), val = VALQ),
+                        tables_reference = list(tq = TQ))
+  i <- x$etapes$importance_exclusions$resultat
+  t1 <- vapply(i$smr_comparateur_1[COLS_C1_199], typeof, "")
+  t2 <- vapply(i$smr_comparateur_2[COLS_C2_199], typeof, "")
+  na1 <- de(i$smr_comparateur_1, "entree_manquante", "A")
+  na2 <- de(i$smr_comparateur_2, "entree_manquante", "A")
+  ret <- data.frame(sexe = c("H", "F"), age = c(66L, 65L), evenements_retires = c(1L, 1L),
+                    exposition_jours_retiree = c(31, 59), exposition_centrale_retiree = c(31, 59) / 365)
+  th <- table_reference(data.frame(age = 0:120, sexe = "H", qx = 0.01), "q H", "importee", "test")
+  nc <- tablexp:::smr_comparateur_2(ret, "sexe", FALSE, th, c(60, 70), "tq", "independante", 0.95)
+  t_nc <- vapply(nc[setdiff(COLS_C2_199, "observes_conserves")], typeof, "")
+  tous(c1 = if (all(t1 == "integer")) TRUE else paste(names(t1), t1, collapse = ", "),
+       c2 = if (all(t2 == "integer")) TRUE else paste(names(t2), t2, collapse = ", "),
+       na = if (identical(na1$etat, "aucune_ligne_mesurable") && identical(na1$observes, NA_integer_) &&
+                identical(na1$evenements_sans_exposition_retenue, NA_integer_) &&
+                identical(unname(unlist(na2[COLS_C2_199[-6L]])), rep(NA_integer_, 5L))) TRUE else "lignes NA",
+       nc = if (identical(nc$etat, "cellule_sans_valeur_table") && identical(nc$observes, NA_integer_) &&
+                all(t_nc == "integer") && identical(nc$evenements_sans_valeur_table, 1L)) TRUE else "non calculable")
+})
+verifier("dénombrements (#199) : comparateurs 1 et 2 en appel direct, sommes au-delà de .Machine$integer.max (deux cellules de 1,5e9 événements retirés) -> refus importance_exclusions / denombrement_hors_plage, grandeur nommée", {
+  big <- c(1500000000L, 1500000000L)
+  r_de <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r)
+  c1 <- function(ages_r) tablexp:::smr_comparateur_1(
+    data.frame(age = 65:66, evenements_retires = big, exposition_jours_retiree = c(365, 365), exposition_centrale_retiree = c(1, 1)),
+    data.frame(age = ages_r, evenements = 2L, exposition_jours = 365, exposition_centrale = 1), character(0), FALSE, 0.95)
+  c2 <- function(ages) tablexp:::smr_comparateur_2(
+    data.frame(sexe = "H", age = ages, evenements_retires = big, exposition_jours_retiree = c(365, 365),
+               exposition_centrale_retiree = c(1, 1)),
+    "sexe", FALSE, TQ, c(60, 70), "tq", "independante", 0.95)
+  attendu <- function(r, g) if (is.null(r)) "aucun refus levé" else
+    if (identical(c(r$module, r$motif), c("importance_exclusions", "denombrement_hors_plage")) &&
+        identical(r$details$grandeur, g) && identical(r$details$valeur, 3e9)) TRUE else paste(r$module, r$motif, r$details$grandeur)
+  tous(c1_observes = attendu(r_de(c1(c(65L, 66L))), "smr_comparateur_1/observes"),
+       c1_sans_exposition = attendu(r_de(c1(c(70L, 71L))), "smr_comparateur_1/evenements_sans_exposition_retenue"),
+       c2_observes = attendu(r_de(c2(65:66)), "smr_comparateur_2/observes"),
+       c2_hors_plage = attendu(r_de(c2(75:76)), "smr_comparateur_2/evenements_hors_plage"))
 })
 
 # contrat_duplique (décision du mainteneur du 06/11/2026, option (b)) : C1
@@ -925,4 +975,21 @@ verifier("rapport (valeur calculée à la main) : unité contrat -> mention d'an
   length(s) == 1L && grepl("Unité d'observation contrat, sans identifiant de tête", s, fixed = TRUE) &&
     grepl("<p>Étape « importance_exclusions » : non demandée par le plan (chemin etapes/importance_exclusions absent de l'objet).</p>",
           h0, fixed = TRUE)
+})
+
+# Période sans exposition (#210, M399) : le refus de l'étape exposition porte
+# sur la table de la construction, non sur le sous-ensemble de lignes exclues
+# dont le contrefactuel recalcule l'exposition (exposition_lignes(),
+# refuser_vide = FALSE).
+verifier("sous-ensemble exclu sans exposition ni événement dans la période (#210 ; valeur calculée à la main) : construction produite, retraits nuls (1 ligne mesurable, 0 événement retiré, 0 jour retiré), aucun refus periode_sans_exposition, unités tête et contrat", {
+  d <- rbind(T1[1:4, ], data.frame(id_contrat = "C9", id_tete = "Z", sexe = NA_character_, date_naissance = D("1950-01-01"),
+                                   date_entree = D("2013-01-01"), date_sortie = D("2013-12-31"), cause_sortie = "deces",
+                                   stringsAsFactors = FALSE))
+  ok <- vapply(list(ROLES_SIM, ROLES_SANS_TETE), function(ro) {
+    x <- tryCatch(construire_table(d, ro, plan_ie("sexe_manquant")), error = function(e) e)
+    if (inherits(x, "error")) return(FALSE)
+    r <- de(x$etapes$importance_exclusions$resultat$retraits, "sexe_manquant", "A")
+    identical(r$lignes_mesurables, 1L) && r$evenements_retires == 0 && r$exposition_jours_retiree == 0
+  }, NA)
+  if (all(ok)) TRUE else sprintf("unité tête %s, unité contrat %s", ok[1L], ok[2L])
 })

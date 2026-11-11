@@ -7,6 +7,9 @@
 #    un objet retourné (ADR 0007, point 6.4) ;
 #  - avertissements_vides() et avertir() : les avertissements métier sont
 #    inscrits dans l'objet, jamais émis par warning() (ADR 0007, point 6.5) ;
+#  - denombrement_entier() : rangement en integer d'une somme d'événements
+#    formée en double, refus au-delà de .Machine$integer.max (ADR 0009,
+#    point 9.6 ; #199) ;
 #  - forme_exacte() : type de base exact, aucun attribut hors de ceux admis
 #    (forme canonique des valeurs du plan, #23) ;
 #  - liste_aux_noms() et chaine_unique() : les deux contrôles de forme qui s'y
@@ -214,6 +217,39 @@ avertir <- function(acc, etape, code, message, nombre) {
     stop("avertir() : 'nombre' doit être un entier unique, fini, positif ou nul.", call. = FALSE)
   rbind(acc, data.frame(etape = etape, code = code, message = texte_moteur(message),
                         nombre = as.integer(nombre), stringsAsFactors = FALSE))
+}
+
+# Rangement d'une somme d'événements non pondérés en integer (ADR 0009, point
+# 9.6, (ii) à (iv) et (d) ; #199). integer est un type de stockage : la somme
+# et les identités se forment en double (exacte sous 2^53), l'appelant ne
+# convertit qu'au rangement dans l'objet résultat. x : vecteur double (ou
+# integer) à valeurs entières positives ou nulles, NA admis (absence) ; NA
+# logique admis aussi (vecteur tout NA). Rend un integer de même longueur,
+# NA devenant NA_integer_, sans attribut. Au-delà de .Machine$integer.max :
+# refus de l'étape `etape` sous le code générique denombrement_hors_plage,
+# détails grandeur, valeur (le plus grand élément) et limite, avant toute
+# conversion (as.integer() rendrait NA avec un simple avertissement).
+# Valeur non finie (NaN compris : ce n'est pas une absence), négative ou non
+# entière, type autre : erreur de programmation (stop()), les données étant
+# admises en amont. Aucun warning(). Sans contenu métier : `etape` et
+# `grandeur` sont des chaînes du moteur passées par l'appelant.
+denombrement_entier <- function(x, etape, grandeur) {
+  if (!chaine_unique(etape) || !chaine_unique(grandeur))
+    stop("denombrement_entier() : 'etape' et 'grandeur' doivent être des chaînes uniques.", call. = FALSE)
+  if (!(is.double(x) || is.integer(x) || (is.logical(x) && all(is.na(x)))) || is.object(x))
+    stop(sprintf("denombrement_entier() : '%s' doit être un vecteur numérique (erreur de programmation).", grandeur),
+         call. = FALSE)
+  v <- x[!(is.na(x) & !is.nan(x))]
+  if (length(v) && (!all(is.finite(v)) || any(v < 0) || any(v != trunc(v))))
+    stop(sprintf(paste("denombrement_entier() : '%s' doit être fait de valeurs entières, finies, positives ou",
+                       "nulles (erreur de programmation)."), grandeur), call. = FALSE)
+  if (length(v) && max(v) > .Machine$integer.max)
+    refuser(etape, "denombrement_hors_plage",
+            formuler(paste("Le dénombrement « %s » (%.0f) est hors de la plage des entiers du moteur (au plus %d) :",
+                           "la construction est refusée."),
+                     neutraliser_citation(grandeur), max(v), .Machine$integer.max),
+            list(grandeur = grandeur, valeur = max(v), limite = .Machine$integer.max))
+  as.integer(x)
 }
 
 # Texte produit par le moteur (littéraux du package, et ce que paste() ou

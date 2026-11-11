@@ -146,15 +146,74 @@ H9r <- construire_cas("1970-03-03", "2017-05-05", "2021-08-08", "rachat", transi
 verifier("H9 transition en cours -> racheté (valeur calculée à la main) : même exposition ; événement 51, 207/365",
          controler_cas(H9r$table, 47:51, c(302, 365, 366, 365, 158), c(365, 365, 366, 365, 365),
                        1556, 4.260273972602739, 51L, 207, 207, 365))
-H10a <- construire_cas("1950-05-05", "2005-01-01", "2014-12-31", "deces")
-verifier("H10a sortie avant le début (valeur calculée à la main) : aucune cellule, 0 j, aucun événement ; avertissement aucune_exposition",
-         nrow(H10a$table) == 0L && "aucune_exposition" %in% H10a$objet$avertissements$code)
+# H10a (#210, M399) : une période sans exposition ni événement est refusée
+# par l'étape ; l'objet à zéro cellule s'obtient en appel direct de
+# calculer_exposition() avec refuser_vide = FALSE, sur les observations d'un
+# plan réduit à l'étape donnees.
+refus_de <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r)
+H10a_d <- data.frame(n = D("1950-05-05"), e = D("2005-01-01"), s = D("2014-12-31"), c = "deces",
+                     stringsAsFactors = FALSE)
+H10a_roles <- c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c")
+H10a_plan <- function(...) list(transition = VD, periode = PER, delai_declaration = 0, segmentation = character(0),
+                                etapes = c(list(donnees = list(exclusions = character(0))), list(...)))
+H10a_refus <- refus_de(construire_table(H10a_d, H10a_roles,
+                                        H10a_plan(exposition = list(convention = "plus_fine", par_annee = FALSE))))
+verifier("H10a sortie avant le début (valeur calculée à la main) : refus exposition / periode_sans_exposition ; message : période 2015-01-01, fin effective 2024-12-31 ; détails : 1 observation, 0 cellule",
+         !is.null(H10a_refus) && identical(c(H10a_refus$module, H10a_refus$motif), c("exposition", "periode_sans_exposition")) &&
+           grepl("2015-01-01", conditionMessage(H10a_refus), fixed = TRUE) &&
+           grepl("fin effective 2024-12-31", conditionMessage(H10a_refus), fixed = TRUE) &&
+           identical(H10a_refus$details$observations, 1L) && identical(H10a_refus$details$cellules, 0L) &&
+           identical(H10a_refus$details$debut, D("2015-01-01")) &&
+           identical(H10a_refus$details$fin_effective, D("2024-12-31")))
+H10a_x <- local({
+  ob <- construire_table(H10a_d, H10a_roles, H10a_plan())$etapes$donnees$resultat$observations
+  rec <- tablexp:::deduire_recette(H10a_roles)
+  tablexp:::calculer_exposition(ob, tablexp:::valeurs_parametres_donnees(VD, PER, 0), character(0), rec,
+                                tablexp:::resoudre_convention("plus_fine", rec$convention_native), FALSE,
+                                refuser_vide = FALSE)
+})
+H10a <- list(table = H10a_x$resultat$exposition, objet = list(etapes = list(exposition = H10a_x),
+                                                               avertissements = H10a_x$avertissements))
+verifier("H10a, appel direct refuser_vide = FALSE (valeur calculée à la main) : aucune cellule, 0 j, aucun événement ; l'avertissement aucune_exposition n'existe plus (#210)",
+         nrow(H10a$table) == 0L && identical(H10a_x$diagnostics$cellules, 0L) &&
+           identical(H10a_x$diagnostics$evenements, 0L) && identical(H10a_x$diagnostics$exposition_jours, 0) &&
+           !("aucune_exposition" %in% H10a$objet$avertissements$code))
 H10b <- construire_cas("1950-05-05", "2005-01-01", "2015-01-01", "deces")
 verifier("H10b décès le premier jour de la période (valeur calculée à la main) : aucune exposition ; événement 64, exposition nulle, 124/365",
          identical(H10b$table$age, 64L) && controler_cas(H10b$table, integer(0), numeric(0), numeric(0), 0, NA, 64L, 124, 124, 365))
 H11 <- construire_cas("1980-01-01", "2018-06-15", "2018-06-15", "deces")
 verifier("H11 décès le jour de l'entrée (valeur calculée à la main) : aucune exposition ; événement 38, 200/365",
          identical(H11$table$age, 38L) && controler_cas(H11$table, integer(0), numeric(0), numeric(0), 0, NA, 38L, 200, 200, 365))
+verifier("CA5 (#210) : H10b et H11 (événement sans exposition) restent produits, état evenement_sans_exposition et avertissement inchangés (une cellule, un événement)",
+         all(vapply(list(H10b, H11), function(h)
+           identical(h$objet$etapes$exposition$diagnostics$cellules_evenement_sans_exposition, 1L) &&
+             "evenement_sans_exposition" %in% h$objet$avertissements$code &&
+             !("aucune_exposition" %in% h$objet$avertissements$code), NA)))
+# CA1 (#210) : période sans exposition ni événement (lignes de 2015-2024, période 1990) -> refus, quelles que
+# soient les étapes et la valeur de par_annee, sous les deux conventions.
+verifier("CA1 (#210) : lignes de 2015-2024, période 1990 -> refus exposition / periode_sans_exposition ; étapes exposition seule ou avec brut ; par_annee FALSE et TRUE ; conventions plus_fine et age_atteint_annee ; aucune erreur R brute", {
+  d <- data.frame(n = D(c("1950-05-05", "1960-01-01")), e = D(c("2015-01-01", "2016-06-01")), s = D(c("2019-03-03", NA)),
+                  c = c("deces", "en_cours"), stringsAsFactors = FALSE)
+  roles <- c(date_naissance = "n", date_entree = "e", date_sortie = "s", cause_sortie = "c")
+  e <- character(0)
+  for (pa in c(FALSE, TRUE)) for (cv in c("plus_fine", "age_atteint_annee")) for (avec_brut in c(FALSE, TRUE)) {
+    pl <- H10a_plan(exposition = list(convention = cv, par_annee = pa))
+    if (avec_brut) pl$etapes$brut <- list(estimateurs = "poisson", niveau = 0.95)
+    pl$periode <- list(debut = D("1990-01-01"), fin = D("1990-12-31"))
+    r <- tryCatch(construire_table(d, roles, pl), error = function(c) c)
+    if (!inherits(r, "refus_tablexp") || !identical(c(r$module, r$motif), c("exposition", "periode_sans_exposition")))
+      e <- c(e, paste(pa, cv, avec_brut, class(r)[1L]))
+  }
+  if (length(e)) paste(e, collapse = " | ") else TRUE
+})
+verifier("vide partiel (#210) : une année sans exposition sous par_annee (fin de période) produite, avec ses zéros explicites ; ligne à exposition nulle présente", {
+  d <- data.frame(n = D("1950-05-05"), e = D("2015-01-01"), s = D("2017-06-30"), c = "rachat", stringsAsFactors = FALSE)
+  x <- construire_table(d, H10a_roles, H10a_plan(exposition = list(convention = "plus_fine", par_annee = TRUE)))
+  t <- x$etapes$exposition$resultat$exposition
+  identical(sort(unique(t$annee)), 2015:2024) && all(t$exposition_jours[t$annee >= 2018L] == 0) &&
+    sum(t$exposition_jours[t$annee <= 2017L]) > 0 && !("aucune_exposition" %in% x$avertissements$code)
+})
+
 H12 <- construire_cas("1945-10-15", "2016-05-20", "2019-02-10", "deces", convention = "age_atteint_annee")
 verifier("H12 forçage age_atteint_annee (valeur calculée à la main) : 71 : 226/366 ; 72, 73 : 1 ; 74 : 40/365 ; 996 j ; événement 74, 325/365",
          controler_cas(H12$table, 71:74, c(226, 365, 365, 40), c(366, 365, 365, 365), 996, NA,

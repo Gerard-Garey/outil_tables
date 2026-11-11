@@ -11,14 +11,14 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
+# plateforme consignée : Processeur                    : AMD EPYC 9V74 80-Core Processor
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : ecaead01b17df3422635911c8eaee9b96db70964
+# plateforme consignée : GITHUB_SHA                    : 140a41b9371a1c2aab7985b214d37e9517753ed9
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -27,13 +27,13 @@
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
-# fiche$empreintes/resultat : 527507072e05496cc39e1e27189b3501
-# fiche$empreintes/code : a28d41c3359f3a5c741c4788359124c3
-# commit : ecaead01b17df3422635911c8eaee9b96db70964
-# execution : 42771679323
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42771679323
+# fiche$empreintes/resultat : 208990422c3ebdb4a344960c13909e3d
+# fiche$empreintes/code : d7917f7f246ae52fa871ecb9fec94509
+# commit : 140a41b9371a1c2aab7985b214d37e9517753ed9
+# execution : 42982198441
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42982198441
 # mode : regeneration
-# date : 2026-11-10 06:55:24 UTC
+# date : 2026-11-11 07:48:59 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -189,7 +189,7 @@ etapes/homogeneite/parametres/statuts/@colonnes	character	3	"table"	"grandeur"	"
 etapes/homogeneite/parametres/statuts/@lignes	integer	1	13
 etapes/homogeneite/parametres/statuts/table	character	13	"tests"	"tests"	"tests"	"tests"	"tests"	"tests"	"tests"	"tests"	"segments"	"segments"	"segments"	"segments"	"segments"
 etapes/homogeneite/parametres/statuts/grandeur	character	13	"strates_informatives"	"groupes"	"statistique"	"ddl"	"p_asymptotique"	"p_exacte"	"p_monte_carlo"	"erreur_monte_carlo"	"exposition_centrale"	"observes"	"attendus"	"rapport_observes_attendus"	"z"
-etapes/homogeneite/parametres/statuts/statut	character	13	"décompte exact : strates (cellules ; cellule x modalité de l'autre variable pour un test par variable) où D_. > 0 et où au moins deux groupes sont exposés ; les autres strates apportent 0 à U et V (exact) ; somme_tranches : somme sur les tranches à ddl > 0"	"décompte exact : groupes (segments ; modalités de la variable testée) exposés dans une strate informative ; somme_tranches : NA (un décompte par tranche)"	"T = U' V^- U, U = O - A, V = somme sur les strates informatives de D_. (diag pi - pi pi') ; somme des T des tranches (ddl > 0) pour somme_tranches ; arithmétique flottante, système linéaire résolu sur V réduite (un groupe de référence par composante connexe du graphe groupes-strates) : approximation numérique"	"exact (combinatoire) : rang de V, nombre de groupes exposés dans les strates informatives moins nombre de composantes connexes du graphe groupes-strates ; somme des ddl des tranches pour somme_tranches"	"asymptotique : loi du khi-deux à ddl degrés de liberté quand l'information du test croît (plus petite valeur propre de V réduite -> infini, aucune strate ne portant à elle seule une part non négligeable de V), le nombre de strates étant fixe ou croissant : D_. peut rester petit dans chaque strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le modèle de survie ; queue supérieure ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"	"exacte conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe, quand deux groupes seulement sont comparés ; asymptotique sous le modèle de survie ; O_1 somme de binomiales indépendantes Bin(D_., pi_1), p = P(|O_1 - A_1| >= |o_1 - A_1|), égalité à 1e-10 A_1 près ; convolution des dbinom, approximation numérique ; produite si le nombre de produits de la convolution est au plus N_MAX_PRODUITS_CONVOLUTION (état convolution_au_dela_n_max sinon) ; plus de deux groupes : état plus_de_deux_groupes ; somme_tranches : état non_produite_par_cette_version ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"	"niveau exact conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe : P_H0(p_MC <= alpha) <= alpha, p_MC = (1 + K) / (B + 1), queue supérieure ; asymptotique sous le modèle de survie ; réplications multinomiales (D_. ; pi) par strate sous la graine du plan, un seul jeu pour les tests global, tranche et somme_tranches, un jeu par test par variable ; e est l'erreur due au nombre fini de réplications, distincte de l'erreur d'estimation ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"	"erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre fini de réplications, distincte de l'erreur d'estimation"	"descriptif : somme de E^c du segment sur les cellules de la portée (plage, ou tranche), hors cellules qui portent un événement sans exposition (restituées aux diagnostics)"	"descriptif : O_s, somme des décès du segment sur les mêmes cellules"	"descriptif : A_s = somme sur les mêmes cellules de D_.c pi_sc, décès attendus si les taux étaient communs aux segments de chaque cellule (standardisation interne)"	"descriptif : O_s / A_s, rapport interne au regroupé (standardisation interne) ; ce n'est pas un SMR rapporté à une table"	"z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ; calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"
+etapes/homogeneite/parametres/statuts/statut	character	13	"décompte exact : strates (cellules ; cellule x modalité de l'autre variable pour un test par variable) où D_. > 0 et où au moins deux groupes sont exposés ; les autres strates apportent 0 à U et V (exact) ; somme_tranches : somme sur les tranches à ddl > 0"	"décompte exact : groupes (segments ; modalités de la variable testée) exposés dans une strate informative ; somme_tranches : NA (un décompte par tranche)"	"T = U' V^- U, U = O - A, V = somme sur les strates informatives de D_. (diag pi - pi pi') ; somme des T des tranches (ddl > 0) pour somme_tranches ; arithmétique flottante, système linéaire résolu sur V réduite (un groupe de référence par composante connexe du graphe groupes-strates) : approximation numérique"	"exact (combinatoire) : rang de V, nombre de groupes exposés dans les strates informatives moins nombre de composantes connexes du graphe groupes-strates ; somme des ddl des tranches pour somme_tranches"	"asymptotique : loi du khi-deux à ddl degrés de liberté quand l'information du test croît (plus petite valeur propre de V réduite -> infini), à nombre de groupes fixé, le nombre de strates étant fixe ou croissant (D_. pouvant rester borné dans chaque strate quand le nombre de strates croît) ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le modèle de survie ; queue supérieure ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"	"exacte conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe, quand deux groupes seulement sont comparés ; asymptotique sous le modèle de survie ; O_1 somme de binomiales indépendantes Bin(D_., pi_1), p = P(|O_1 - A_1| >= |o_1 - A_1|), égalité à 1e-10 A_1 près ; convolution des dbinom, approximation numérique ; produite si le nombre de produits de la convolution est au plus N_MAX_PRODUITS_CONVOLUTION (état convolution_au_dela_n_max sinon) ; plus de deux groupes : état plus_de_deux_groupes ; somme_tranches : état non_produite_par_cette_version ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"	"niveau exact conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe : P_H0(p_MC <= alpha) <= alpha, p_MC = (1 + K) / (B + 1), queue supérieure ; asymptotique sous le modèle de survie ; réplications multinomiales (D_. ; pi) par strate sous la graine du plan, un seul jeu pour les tests global, tranche et somme_tranches, un jeu par test par variable ; e est l'erreur due au nombre fini de réplications, distincte de l'erreur d'estimation ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"	"erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1), due au nombre fini de réplications, distincte de l'erreur d'estimation"	"descriptif : somme de E^c du segment sur les cellules de la portée (plage, ou tranche), hors cellules qui portent un événement sans exposition (restituées aux diagnostics)"	"descriptif : O_s, somme des décès du segment sur les mêmes cellules"	"descriptif : A_s = somme sur les mêmes cellules de D_.c pi_sc, décès attendus si les taux étaient communs aux segments de chaque cellule (standardisation interne)"	"descriptif : O_s / A_s, rapport interne au regroupé (standardisation interne) ; ce n'est pas un SMR rapporté à une table"	"z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ; calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)"
 etapes/homogeneite/parametres/reference_methode	character	1	"Breslow N. E., Day N. E. (1987), Statistical Methods in Cancer Research, vol. II, IARC Scientific Publications n° 82 ; chap. 3, https://publications.iarc.who.int/download/SP82_vol2-3.pdf, SHA-256 8c20ae8827229febf2f21aca19abf695ad436542ab5875ed2568d7232e6d0dba : § 3.5, éq. (3.13), p. 104 ; § 3.6, p. 107-108 ; § 3.6 (f), éq. (3.23)-(3.24), p. 113-114 ; § 3.6 (g), p. 114-115 (exemple) ; chap. 4, https://publications.iarc.who.int/download/SP82_vol2-4.pdf, SHA-256 a270d917a68b30985b27c37f3d1cf7b1dbd92aed6bee1c7318c23f8863e0cac9 : § 4.2, p. 131-135 ; consultés le 07/11/2026, lus sur l'image ; source de méthode, qui ne prescrit rien pour l'actuariat ; écarts documentés : degrés de liberté pris au rang de V (K - 1 dans la source), tests par tranche d'âge et leur somme, p-valeur exacte bilatérale à deux groupes et p-valeur de Monte-Carlo conditionnelle, absents de la source"
 etapes/homogeneite/resultat/@noms	character	3	"tests"	"segments"	"monte_carlo"
 etapes/homogeneite/resultat/tests/@colonnes	character	15	"test"	"variable"	"conditionnellement_a"	"tranche_debut"	"tranche_fin"	"strates_informatives"	"groupes"	"statistique"	"ddl"	"p_asymptotique"	"p_exacte"	"etat_p_exacte"	"p_monte_carlo"	"erreur_monte_carlo"	"etat"
@@ -216,7 +216,7 @@ etapes/homogeneite/resultat/segments/sexe	character	8	"F"	"H"	"F"	"H"	"F"	"H"	"F
 etapes/homogeneite/resultat/segments/tranche_debut	integer	8	NA	NA	20	20	50	50	70	70
 etapes/homogeneite/resultat/segments/tranche_fin	integer	8	NA	NA	49	49	69	69	90	90
 etapes/homogeneite/resultat/segments/exposition_centrale	double	8	249910.39203533201	242388.82044314689	110408.4737630062	108524.1996107493	91718.226401676773	90403.889610000711	47783.691870648974	43460.731222396884
-etapes/homogeneite/resultat/segments/observes	double	8	12806	12495	5732	5563	4658	4682	2416	2250
+etapes/homogeneite/resultat/segments/observes	integer	8	12806	12495	5732	5563	4658	4682	2416	2250
 etapes/homogeneite/resultat/segments/attendus	double	8	12843.798493457143	12457.201506542857	5695.7763258911036	5599.2236741088955	4703.8621880593237	4636.1378119406763	2444.159979506715	2221.8400204932846
 etapes/homogeneite/resultat/segments/rapport_observes_attendus	double	8	0.9970570627158003	1.0030342684460303	1.0063597430861595	0.99353058991438481	0.99025009955101484	1.0098923263111814	0.98847866762289505	1.0126741706184874
 etapes/homogeneite/resultat/segments/z	double	8	-0.47542788406588005	0.47542788406588404	0.68173124289367737	-0.68173124289367215	-0.94921860726901541	0.94921860726901353	-0.82567049141798976	0.82567049141799342
@@ -227,18 +227,18 @@ etapes/homogeneite/resultat/monte_carlo/graine	integer	1	20261115
 etapes/homogeneite/resultat/monte_carlo/jeux/@colonnes	character	2	"jeu"	"tirages_effectues"
 etapes/homogeneite/resultat/monte_carlo/jeux/@lignes	integer	1	1
 etapes/homogeneite/resultat/monte_carlo/jeux/jeu	character	1	"cellules"
-etapes/homogeneite/resultat/monte_carlo/jeux/tirages_effectues	double	1	999
+etapes/homogeneite/resultat/monte_carlo/jeux/tirages_effectues	integer	1	999
 etapes/homogeneite/diagnostics/@noms	character	10	"cellules"	"cellules_informatives"	"cellules_sans_deces"	"cellules_non_informatives"	"cellules_evenement_sans_exposition"	"evenements_cellules_evenement_sans_exposition"	"lignes_exposition_hors_plage"	"evenements_hors_plage"	"exposition_hors_plage"	"evenements_total"
 etapes/homogeneite/diagnostics/cellules	integer	1	71
 etapes/homogeneite/diagnostics/cellules_informatives	integer	1	71
 etapes/homogeneite/diagnostics/cellules_sans_deces	integer	1	0
 etapes/homogeneite/diagnostics/cellules_non_informatives	integer	1	0
 etapes/homogeneite/diagnostics/cellules_evenement_sans_exposition	integer	1	0
-etapes/homogeneite/diagnostics/evenements_cellules_evenement_sans_exposition	double	1	0
+etapes/homogeneite/diagnostics/evenements_cellules_evenement_sans_exposition	integer	1	0
 etapes/homogeneite/diagnostics/lignes_exposition_hors_plage	integer	1	7
-etapes/homogeneite/diagnostics/evenements_hors_plage	double	1	11
+etapes/homogeneite/diagnostics/evenements_hors_plage	integer	1	11
 etapes/homogeneite/diagnostics/exposition_hors_plage	double	1	123.51628115876936
-etapes/homogeneite/diagnostics/evenements_total	double	1	25312
+etapes/homogeneite/diagnostics/evenements_total	integer	1	25312
 avertissements/@colonnes	character	4	"etape"	"code"	"message"	"nombre"
 avertissements/@lignes	integer	1	1
 avertissements/etape	character	1	"donnees"

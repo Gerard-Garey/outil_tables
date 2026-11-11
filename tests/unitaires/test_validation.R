@@ -161,7 +161,7 @@ verifier("J1 sous ajustee_hors_outil : grandeurs sous H0 NA (ddl_non_etabli), de
   h0 <- tablexp:::STATUTS_VALIDATION$sous_h0[tablexp:::STATUTS_VALIDATION$statistique != "sous_groupes"]
   if (!all(s$etat[h0] == "ddl_non_etabli") || !all(is.na(s$valeur[h0]))) "grandeurs sous H0"
   else if (!all(s$etat[!h0] == "produite") || !identical(s$valeur[!h0], s1$valeur[!h0])) "grandeurs descriptives"
-  else if (!identical(S$tirages_effectues, 0) || !all(is.na(S$cellules$fluctuation_inf_exacte))) "tirages ou intervalles"
+  else if (!identical(S$tirages_effectues, 0L) || !all(is.na(S$cellules$fluctuation_inf_exacte))) "tirages ou intervalles"
   else TRUE
 })
 verifier("aucune cellule retenue : toutes les grandeurs NA, état aucune_cellule_retenue, aucun tirage", {
@@ -387,7 +387,7 @@ verifier("étape : paramètres (référence de méthode M244, p = 0, appariement
   p <- V$parametres
   identical(p$reference_methode, tablexp:::REFERENCE_METHODE_VALIDATION) && identical(p$parametres_estimes, 0L) &&
     identical(p$appariement_sexe, "par_sexe") && identical(p$table_reference, "tv") &&
-    identical(p$table_nom, "GM vraie par sexe") && identical(V$resultat$monte_carlo$tirages_effectues, 199) &&
+    identical(p$table_nom, "GM vraie par sexe") && identical(V$resultat$monte_carlo$tirages_effectues, 199L) &&
     identical(V$resultat$monte_carlo$graine, 20261106L) && identical(X$fiche$graine_mention, "graine du plan")
 })
 verifier("étape : sous-groupes segment x tranche, tranche, segment ; somme des O par regroupement = O global", {
@@ -417,7 +417,7 @@ verifier("étape : relation ajustee_hors_outil -> aucun tirage, sous-groupes san
   v <- x$etapes$validation
   g <- v$resultat$sous_groupes
   h <- rawToChar(ecrire_rapport(x)); Encoding(h) <- "UTF-8"
-  identical(v$resultat$monte_carlo$tirages_effectues, 0) && identical(v$parametres$parametres_estimes, NA_integer_) &&
+  identical(v$resultat$monte_carlo$tirages_effectues, 0L) && identical(v$parametres$parametres_estimes, NA_integer_) &&
     all(g$etat == "ddl_non_etabli") && all(is.na(g$p_centrale)) && !anyNA(g$smr) &&
     grepl("Relation « ajustee_hors_outil »", h, fixed = TRUE) &&
     !grepl("seules les p-valeurs de Monte-Carlo ont un niveau garanti", h, fixed = TRUE) &&
@@ -449,8 +449,8 @@ verifier("états : retenue, sans_exposition (âges 50 et 57), taux_table_nul, ev
   identical(c_$age, 50:57) &&
     identical(c_$etat, c("sans_exposition", "evenement_sans_exposition", "taux_table_nul", "evenement_sous_taux_nul",
                          "retenue", "retenue", "retenue", "sans_exposition")) &&
-    identical(d$etats$cellules, c(3L, 2L, 1L, 1L, 1L)) && identical(d$evenements_sans_attendu, 3) &&
-    identical(d$evenements_hors_plage, 4) && identical(d$exposition_hors_plage, 50) && identical(d$cellules_hors_plage, 1L) &&
+    identical(d$etats$cellules, c(3L, 2L, 1L, 1L, 1L)) && identical(d$evenements_sans_attendu, 3L) &&
+    identical(d$evenements_hors_plage, 4L) && identical(d$exposition_hors_plage, 50) && identical(d$cellules_hors_plage, 1L) &&
     identical(r$avertissements$code, "evenements_sans_attendu") && identical(r$avertissements$nombre, 2L) &&
     identical(valeur(r$resultat$statistiques, "smr/observes"), 4) && all(is.na(c_$residu_pearson[c_$etat != "retenue"]))
 })
@@ -473,6 +473,36 @@ verifier("dénombrements (#174) : sous_groupes$cellules_retenues et diagnostics$
          som <- vapply(c("segment", "tranche"), function(r) sum(sg$cellules_retenues[sg$regroupement == r]), 0)
          if (identical(as.integer(som), rep(cas$par_sexe$diagnostics$cellules_retenues, 2L))) TRUE else "somme par regroupement"
        })
+})
+# Type des dénombrements (#199 ; ADR 0009, point 9.6) : les neuf chemins de
+# l'étape validation en integer dans toutes les branches (cellules retenues,
+# aucune cellule retenue avec sequences_runs vide, ajustee_hors_outil sans
+# tirage, par_annee sans cellule, construction par sexe) ; valeurs écrites à
+# la main sur un_segment.
+types_validation_199 <- function(r) {
+  t <- c(sous_groupes_observes = typeof(r$resultat$sous_groupes$observes),
+         positifs = typeof(r$resultat$sequences_runs$positifs), negatifs = typeof(r$resultat$sequences_runs$negatifs),
+         runs = typeof(r$resultat$sequences_runs$runs),
+         tirages_effectues = typeof(r$resultat$monte_carlo$tirages_effectues),
+         etats_evenements = typeof(r$diagnostics$etats$evenements),
+         evenements_sans_attendu = typeof(r$diagnostics$evenements_sans_attendu),
+         evenements_hors_plage = typeof(r$diagnostics$evenements_hors_plage),
+         evenements_total = typeof(r$diagnostics$evenements_total))
+  if (all(t == "integer")) TRUE else paste(names(t)[t != "integer"], t[t != "integer"], collapse = ", ")
+}
+verifier("dénombrements (#199) : sous_groupes$observes, sequences_runs (positifs, negatifs, runs), tirages_effectues, diagnostics (etats$evenements, evenements_sans_attendu, evenements_hors_plage, evenements_total) en integer, cinq branches ; valeurs inchangées", {
+  expo_a <- EXPO; expo_a$annee <- 2020L
+  un <- validation_directe()
+  vide <- validation_directe(expo = EXPO[0L, ])
+  cas <- list(un_segment = un, vide = vide, ajustee = validation_directe(relation_table = "ajustee_hors_outil"),
+              annee_vide = validation_directe(expo = expo_a[0L, ], par_annee = TRUE), par_sexe = X$etapes$validation)
+  d <- un$diagnostics
+  do.call(tous, c(lapply(cas, types_validation_199), list(
+    vide_seq = if (nrow(vide$resultat$sequences_runs) == 0L && identical(vide$resultat$monte_carlo$tirages_effectues, 0L))
+                 TRUE else "aucune cellule retenue : sequences_runs vide et aucun tirage attendus",
+    valeurs = if (identical(d$etats$evenements, c(4L, 0L, 0L, 1L, 2L)) && identical(d$evenements_total, 11L) &&
+                  identical(un$resultat$sous_groupes$observes, 4L) &&
+                  identical(un$resultat$monte_carlo$tirages_effectues, 19L)) TRUE else "valeurs")))
 })
 verifier("états : E^c = 0 et q~ = 1 -> A = 0, état sans_exposition, pas de refus ni de NaN", {
   t1 <- table_reference(data.frame(age = 40:70, sexe = "ensemble", qx = ifelse(40:70 == 50, 1, 0.01)), "u", "importee", "test")
@@ -652,4 +682,93 @@ verifier("rapport : unité contrat (sans id_tete) -> mention d'anti-conservatism
   x <- construire_table(JEU, ROLES[names(ROLES) != "id_tete"], plan_v(brut = FALSE), tables_reference = list(tv = T_HF))
   h <- rawToChar(ecrire_rapport(x)); Encoding(h) <- "UTF-8"
   grepl("Unité d'observation contrat, sans identifiant de tête", h, fixed = TRUE)
+})
+
+# --- période sans exposition, vide partiel et sous-groupes vides (#210, M399) -------
+
+# Portefeuille réduit (3 000 têtes) : mêmes lois et période que JEU.
+JEU_P <- local({
+  ra <- tablexp:::table_constante(0.05, 0:120, "rachat constant 5 %")
+  loi <- list(deces = list(table = GM, facteurs = c(H = 1, F = 0.6)), rachat = list(table = ra, facteurs = c(H = 1, F = 1)))
+  pf <- list(mode = "uniforme", n = 3000, proportion_hommes = 0.5, age_min = 20, age_max = 75, origine = D("2005-01-01"))
+  simuler_portefeuille(loi, pf, PERIODE, 20261106L)
+})
+VAL_P <- modifyList(VAL, list(replications = 19))
+verifier("CA1 (#210) : données de 2005-2024, période 1990 -> refus exposition / periode_sans_exposition, quelles que soient la relation (independante, ajustee_hors_outil) et la valeur de par_annee (avant : erreur « replacement has 1 row, data has 0 » sous par_annee = TRUE) ; aucune erreur R brute", {
+  p0 <- list(debut = D("1990-01-01"), fin = D("1990-12-31"))
+  e <- character(0)
+  for (rel in c("independante", "ajustee_hors_outil")) for (pa in c(TRUE, FALSE)) {
+    pl <- plan_v(par_annee = pa, val = modifyList(VAL_P, list(relation_table = rel)))
+    pl$periode <- p0
+    r <- tryCatch(construire_table(JEU_P, ROLES, pl, tables_reference = list(tv = T_HF)), error = function(c) c)
+    ok <- if (!inherits(r, "refus_tablexp")) paste("erreur ou construction :", class(r)[1L]) else controle(r, "exposition", "periode_sans_exposition")
+    if (!isTRUE(ok)) e <- c(e, paste(rel, pa, ok))
+  }
+  if (length(e)) paste(e, collapse = " | ") else TRUE
+})
+verifier("CA4 (#210) : le message cite la période, sa fin effective (fin moins délai) ; les détails donnent les nombres d'observations et de cellules (valeurs écrites à la main : début 1990-01-01, fin 1990-12-31, délai 30 j -> fin effective 1990-12-01)", {
+  pl <- plan_v(par_annee = FALSE, val = NULL, graine = NULL)
+  pl$periode <- list(debut = D("1990-01-01"), fin = D("1990-12-31")); pl$delai_declaration <- 30
+  r <- refus_de(construire_table(JEU_P, ROLES, pl))
+  m <- if (is.null(r)) "" else conditionMessage(r)
+  ok <- controle(r, "exposition", "periode_sans_exposition")
+  if (!isTRUE(ok)) ok
+  else if (!all(vapply(c("entre 1990-01-01 et la fin effective 1990-12-01", "(fin 1990-12-31, délai 30 jour(s))",
+                         "construction est refusée"), grepl, NA, x = m, fixed = TRUE))) m
+  else if (!identical(r$details$debut, D("1990-01-01")) || !identical(r$details$fin_effective, D("1990-12-01")) ||
+           !identical(r$details$cellules, 0L) || !is.integer(r$details$observations) || r$details$observations < 1L)
+    "details"
+  else TRUE
+})
+verifier("CA6 (#210) : vide partiel produit de bout en bout (contrats sortis avant 2018, par_annee, relations independante et ajustee_hors_outil) : toutes les étapes produites ; années 2018 à 2024 à cellules_retenues 0, observes 0, attendus 0, état aucune_cellule_retenue ; années 2015 à 2017 à cellules retenues ; annee integer", {
+  j2 <- JEU_P[JEU_P$date_entree < D("2018-01-01"), ]
+  fin_av <- is.na(j2$date_sortie) | j2$date_sortie >= D("2018-01-01")
+  j2$date_sortie[fin_av] <- D("2017-12-31"); j2$cause_sortie[fin_av] <- "rachat"
+  e <- character(0)
+  for (rel in c("independante", "ajustee_hors_outil")) {
+    x <- tryCatch(construire_table(j2, ROLES, plan_v(par_annee = TRUE, val = modifyList(VAL_P, list(relation_table = rel))),
+                                   tables_reference = list(tv = T_HF)), error = function(c) c)
+    if (inherits(x, "error")) { e <- c(e, paste(rel, ":", conditionMessage(x))); next }
+    sg <- x$etapes$validation$resultat$sous_groupes
+    a <- sg[sg$regroupement == "annee", ]
+    vides <- a$annee >= 2018L
+    if (!is.integer(sg$annee) || !identical(a$annee, 2015:2024) || !all(a$cellules_retenues[!vides] > 0L) ||
+        !all(a$cellules_retenues[vides] == 0L) || !all(a$observes[vides] == 0L) || !all(a$attendus[vides] == 0) ||
+        !all(a$etat[vides] == "aucune_cellule_retenue") || any(a$etat[!vides] == "aucune_cellule_retenue"))
+      e <- c(e, paste(rel, ": sous-groupes par année"))
+  }
+  if (length(e)) paste(e, collapse = " | ") else TRUE
+})
+verifier("CA6 (#210) : plage de validation sans cellule exposée (âges 100 à 110) sous par_annee, par sexe : étape produite, tous les sous-groupes en état aucune_cellule_retenue, cellules_retenues 0", {
+  x <- construire_table(JEU_P, ROLES, plan_v(par_annee = TRUE, val = modifyList(VAL_P, list(plage_ages = c(100, 110), tranches_age = 100))),
+                        tables_reference = list(tv = T_HF))
+  sg <- x$etapes$validation$resultat$sous_groupes
+  if (identical(unique(sg$etat), "aucune_cellule_retenue") && all(sg$cellules_retenues == 0L) &&
+      identical(x$etapes$validation$diagnostics$cellules_retenues, 0L) && is.integer(sg$annee)) TRUE else
+    paste(unique(sg$etat), collapse = ", ")
+})
+verifier("CA7 (#210) : sous_groupes_validation() sans cellule, par_annee = TRUE, segmentation par sexe (avant : erreur « replacement has 1 row, data has 0 ») : pas d'erreur, 0 ligne pour segment_tranche, segment et annee, annee integer ; 3 lignes de tranche (annee NA), pour les relations independante et ajustee_hors_outil", {
+  vide <- data.frame(sexe = character(0), stringsAsFactors = FALSE)
+  e <- character(0)
+  for (rel in c("independante", "ajustee_hors_outil")) {
+    r <- tryCatch(tablexp:::sous_groupes_validation(data.frame(annee = integer(0)), integer(0), vide, integer(0), c(20, 50, 70),
+                                                    c(20, 90), integer(0), numeric(0), logical(0), TRUE, 0.95, rel),
+                  error = function(c) c)
+    if (inherits(r, "error")) { e <- c(e, paste(rel, ":", conditionMessage(r))); next }
+    n <- table(factor(r$regroupement, c("segment_tranche", "tranche", "segment", "annee")))
+    if (!identical(as.integer(n), c(0L, 3L, 0L, 0L)) || !is.integer(r$annee) || !all(is.na(r$annee)) ||
+        !is.integer(r$cellules_retenues) || !is.integer(r$observes) || !all(r$etat == "aucune_cellule_retenue"))
+      e <- c(e, paste(rel, ":", paste(n, collapse = " ")))
+  }
+  if (length(e)) paste(e, collapse = " | ") else TRUE
+})
+verifier("CA7 (#210) : calculer_validation() en appel direct sur une exposition à 0 ligne, segmentation par sexe, par_annee = TRUE : produite, aucune erreur ; annee de sous_groupes integer", {
+  expo <- data.frame(sexe = character(0), age = integer(0), annee = integer(0), exposition_jours = numeric(0),
+                     exposition_centrale = numeric(0), evenements = integer(0), sorties_concurrentes = integer(0))
+  tb <- table_reference(data.frame(age = 40:70, sexe = "H", qx = 0.01), "t", "importee", "test")
+  r <- tryCatch(tablexp:::calculer_validation(expo, "sexe", TRUE, "dernier_anniversaire", tb, "t", "independante", c(50, 57), 50,
+                                              0.95, 19, 5L, NULL), error = function(c) c)
+  if (inherits(r, "error")) conditionMessage(r) else
+    if (is.integer(r$resultat$sous_groupes$annee) && !any(r$resultat$sous_groupes$regroupement %in% c("segment", "annee"))) TRUE else
+      "types ou regroupements"
 })

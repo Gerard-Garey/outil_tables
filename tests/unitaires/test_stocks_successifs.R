@@ -1311,3 +1311,41 @@ verifier("C16-oracle sur jeux simulés (A1.8 ; identité exacte) : défauts de l
   }
   if (length(e)) paste("écart :", paste(e, collapse = " | ")) else TRUE
 })
+
+# --- période sans exposition sous stocks_successifs (#210, M399, CA3) -------------
+
+# Base minimale d'une unité par date d'inventaire (U1 à t_1, U2 à t_2, U3 à
+# t_3), U1 et U2 rachetées le lendemain de leur inventaire : sous la grille
+# alignée (inventaires_periode) et l'inventaire exhaustif (inventaire_sans_ligne),
+# l'unité présente au dernier inventaire t_M est censurée à B = t_M + 1 jour :
+# au moins un jour d'exposition, quelle que soit l'hypothèse d'entrée. Une
+# construction par construire_table() ne peut donc pas atteindre le vide total
+# sous cette recette (mesuré ici) ; le refus de l'étape exposition s'exerce par
+# appel direct, avec une période décalée par rapport à la grille.
+B_MIN <- data.frame(id = c("U1", "U1", "U2", "U2", "U3"),
+                    t = c("inventaire", "evenement", "inventaire", "evenement", "inventaire"),
+                    di = c(G3[1L], NA_D, G3[2L], NA_D, G3[3L]), sx = "H", seg = "a",
+                    n = D("1950-03-01"), an = 1950L,
+                    s = D(c(NA, "2015-01-01", NA, "2016-01-01", NA)), c = c(NA, "rachat", NA, "rachat", NA),
+                    stringsAsFactors = FALSE)
+verifier("stocks_successifs, base minimale (une unité par inventaire ; valeur écrite à la main) : exposition_jours strictement positive par construire_table() sous les deux hypothèses d'entrée (pas de période sans exposition)", {
+  e <- vapply(c("milieu", "premier_inventaire"), function(m) {
+    x <- construire_table(B_MIN, RS, plan_st(m))
+    x$etapes$exposition$diagnostics$exposition_jours
+  }, 0)
+  if (all(e > 0)) TRUE else paste("exposition_jours :", paste(e, collapse = " et "))
+})
+verifier("stocks_successifs, appel direct de calculer_exposition() avec une période (1990) hors de la grille : aucune fenêtre exposée -> refus exposition / periode_sans_exposition, 3 observations, 0 cellule ; refuser_vide = FALSE : produite", {
+  pl <- plan_st(exposition = FALSE)
+  ob <- construire_table(B_MIN, RS, pl)$etapes$donnees$resultat$observations
+  rec <- tablexp:::deduire_recette(RS)
+  conv <- tablexp:::resoudre_convention("plus_fine", rec$convention_native)
+  p90 <- tablexp:::valeurs_parametres_donnees(VD, list(debut = D("1990-01-01"), fin = D("1990-12-31")), 0, G3)
+  r <- rf(tablexp:::calculer_exposition(ob, p90, "segment", rec, conv, FALSE, "milieu"))
+  x <- tablexp:::calculer_exposition(ob, p90, "segment", rec, conv, FALSE, "milieu", refuser_vide = FALSE)
+  ok <- controle(r, "exposition", "periode_sans_exposition")
+  if (!isTRUE(ok)) ok
+  else if (!identical(c(r$details$observations, r$details$cellules), c(3L, 0L))) "details"
+  else if (!identical(x$diagnostics$cellules, 0L) || !identical(x$diagnostics$fenetres_vides, 3L)) "refuser_vide = FALSE"
+  else TRUE
+})

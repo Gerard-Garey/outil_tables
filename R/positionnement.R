@@ -461,7 +461,7 @@ calculer_positionnement <- function(exposition, segmentation, par_annee, convent
   sup_a <- sm$smr * exp(z / sqrt(O))
   smr <- segs
   smr$cellules_retenues <- lengths(par_segment, use.names = FALSE)
-  smr$observes <- O
+  smr$observes <- denombrement_entier(O, "positionnement", "observes")  # integer (#199)
   smr$attendus <- A
   smr$smr <- sm$smr
   smr$borne_inf_exacte <- sm$borne_inf
@@ -498,13 +498,19 @@ calculer_positionnement <- function(exposition, segmentation, par_annee, convent
   total <- sum(as.numeric(exposition$evenements))
   if (!identical(sum(O) + ev_sans + ap$hors_plage$evenements, total))
     stop("calculer_positionnement() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
+  # Rangement en integer après l'identité, vérifiée en double (#199 ; ADR 0009,
+  # point 9.6, (iii)) : garde défensive, le total de l'étape exposition étant
+  # déjà gardé (M397) ; l'avertissement qui suit cite la valeur rangée.
+  ev_sans <- denombrement_entier(ev_sans, "positionnement", "evenements_sans_attendu")
+  ev_hors <- denombrement_entier(ap$hors_plage$evenements, "positionnement", "evenements_hors_plage")
+  total <- denombrement_entier(total, "positionnement", "evenements_total")
   avert <- avertissements_vides()
   if (any(sans_attendu))
     avert <- avertir(avert, "positionnement", "evenements_sans_attendu",
                      sprintf(paste("Positionnement : %d cellule(s) qui comptent %d événement(s) sans attendu",
                                    "(exposition nulle, ou q_x de la table nul) : hors de O et de A (états",
                                    "evenement_sans_exposition, evenement_sous_taux_nul) ; événements restitués à part."),
-                             sum(sans_attendu), as.integer(ev_sans)),
+                             sum(sans_attendu), ev_sans),
                      sum(sans_attendu))
   if (any(arrondi))
     avert <- avertir(avert, "positionnement", "qx_arrondi_un",
@@ -524,8 +530,9 @@ calculer_positionnement <- function(exposition, segmentation, par_annee, convent
   etats <- ETATS_CELLULE_POSITIONNEMENT
   etats <- data.frame(etat = etats,
                       cellules = vapply(etats, function(e) sum(at$etat == e), 0L, USE.NAMES = FALSE),
-                      evenements = vapply(etats, function(e) sum(as.numeric(cel$evenements[at$etat == e])), 0,
-                                          USE.NAMES = FALSE),
+                      evenements = denombrement_entier(vapply(etats, function(e)
+                        sum(as.numeric(cel$evenements[at$etat == e])), 0, USE.NAMES = FALSE),
+                        "positionnement", "etats/evenements"),
                       stringsAsFactors = FALSE)
   parametres <- list(methode = methode, table_reference = table_reference,
                      table_nom = attr(table, "nom", exact = TRUE), plage_ages = plage_ages, niveau = niveau,
@@ -536,7 +543,7 @@ calculer_positionnement <- function(exposition, segmentation, par_annee, convent
        resultat = list(cellules = cel, smr = smr, table_positionnee = tp),
        diagnostics = list(cellules = nrow(cel), cellules_retenues = sum(ret), etats = etats,
                           evenements_sans_attendu = ev_sans, cellules_hors_plage = ap$hors_plage$cellules,
-                          evenements_hors_plage = ap$hors_plage$evenements,
+                          evenements_hors_plage = ev_hors,
                           exposition_hors_plage = ap$hors_plage$exposition, evenements_total = total),
        avertissements = avert)
 }

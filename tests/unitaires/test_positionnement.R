@@ -142,9 +142,11 @@ verifier("B : paramètres de l'étape (méthode, clé, plage, niveau, convention
     identical(p$appariement_sexe, "sans_sexe") && identical(p$statuts, tablexp:::STATUTS_POSITIONNEMENT) &&
     identical(names(RB$resultat), c("cellules", "smr", "table_positionnee"))
 })
-verifier("B : statuts : une ligne par colonne double de resultat$smr et de resultat$table_positionnee, dans l'ordre", {
+# observes, dénombrement rangé en integer depuis #199 (ADR 0009, point 9.6),
+# garde sa ligne de statut (descriptif).
+verifier("B : statuts : une ligne par colonne double de resultat$smr et de resultat$table_positionnee, et pour observes (integer, #199), dans l'ordre", {
   s <- tablexp:::STATUTS_POSITIONNEMENT
-  doubles <- function(t) names(t)[vapply(t, is.double, NA)]
+  doubles <- function(t) names(t)[vapply(t, is.double, NA) | names(t) == "observes"]
   identical(s$grandeur[s$table == "smr"], doubles(RB$resultat$smr)) &&
     identical(s$grandeur[s$table == "table_positionnee"], doubles(RB$resultat$table_positionnee))
 })
@@ -171,10 +173,31 @@ verifier("états : cellules (sans_exposition, evenement_sans_exposition, taux_ta
   d <- RE$diagnostics
   identical(c_$etat, c("sans_exposition", "evenement_sans_exposition", "taux_table_nul", "evenement_sous_taux_nul",
                        "retenue", "retenue", "retenue", "sans_exposition")) &&
-    identical(RE$resultat$smr$observes, 4) && identical(d$evenements_sans_attendu, 3) &&
-    identical(d$evenements_hors_plage, 4) && identical(d$cellules_hors_plage, 1L) &&
+    identical(RE$resultat$smr$observes, 4L) && identical(d$evenements_sans_attendu, 3L) &&
+    identical(d$evenements_hors_plage, 4L) && identical(d$cellules_hors_plage, 1L) &&
     identical(d$etats$cellules, c(3L, 2L, 1L, 1L, 1L)) &&
     identical(RE$avertissements$etape, "positionnement") && identical(RE$avertissements$code, "evenements_sans_attendu")
+})
+
+# Type des dénombrements (#199 ; ADR 0009, point 9.6) : integer avec ou sans
+# cellules hors plage et sans attendu ; garde défensive au-delà de
+# .Machine$integer.max (appel direct : le total de l'étape exposition est
+# gardé en amont, M397).
+verifier("dénombrements (#199) : smr$observes, etats$evenements, evenements_sans_attendu, evenements_hors_plage, evenements_total en integer (jeux B et états) ; valeurs écrites à la main", {
+  ty <- function(r) vapply(list(r$resultat$smr$observes, r$diagnostics$etats$evenements, r$diagnostics$evenements_sans_attendu,
+                                r$diagnostics$evenements_hors_plage, r$diagnostics$evenements_total), typeof, "")
+  tous(b = if (all(ty(RB) == "integer")) TRUE else paste(ty(RB), collapse = " "),
+       e = if (all(ty(RE) == "integer")) TRUE else paste(ty(RE), collapse = " "),
+       valeurs = if (identical(RB$resultat$smr$observes, 8L) && identical(RB$diagnostics$evenements_total, 8L) &&
+                     identical(RE$diagnostics$etats$evenements, c(4L, 0L, 0L, 1L, 2L)) &&
+                     identical(RE$diagnostics$evenements_total, 11L)) TRUE else "valeurs")
+})
+verifier("dénombrements (#199) : O au-delà de .Machine$integer.max (deux cellules de 1,5e9 décès, appel direct) -> refus positionnement / denombrement_hors_plage, grandeur observes, valeur 3e9", {
+  e <- EXPO_B; e$evenements <- c(0L, 1500000000L, 1500000000L)
+  r <- tryCatch({ positionnement_direct(expo = e); NULL }, refus_tablexp = function(r) r)
+  if (is.null(r)) "aucun refus levé"
+  else if (!identical(c(r$module, r$motif), c("positionnement", "denombrement_hors_plage"))) paste(r$module, r$motif)
+  else identical(r$details, list(grandeur = "observes", valeur = 3e9, limite = .Machine$integer.max))
 })
 
 # Arrondi à 1 en double précision (avis d'actuary du 07/11/2026) :
@@ -384,14 +407,21 @@ verifier("étape : clés distinctes pour positionnement et validation -> deux ta
   identical(names(x$fiche$tables_reference), c("autre", "tv"))
 })
 verifier("T2 (sur le jeu simulé) : invariant des états de la table positionnée", invariant_etats(P$resultat$table_positionnee))
-verifier("étape : période sans observation -> positionnement_sans_attendu « aucune cellule », details à zéro segment", {
+verifier("étape : période sans observation -> refus exposition / periode_sans_exposition avant l'étape positionnement (#210, M399)", {
   p <- plan_p(); p$periode <- list(debut = D("1990-01-01"), fin = D("1994-12-31"))
   r <- refus_de(construire_table(JEU, ROLES, p, tables_reference = list(tv = T_HF)))
+  ok <- controle(r, "exposition", "periode_sans_exposition")
+  if (!isTRUE(ok)) ok
+  else if (!identical(r$details$cellules, 0L) || !identical(r$details$fin_effective, D("1994-12-31"))) "details"
+  else TRUE
+})
+verifier("calculer_positionnement() en appel direct, exposition à zéro cellule -> positionnement_sans_attendu « aucune cellule », details à zéro segment (garde conservée)", {
+  r <- tryCatch({ positionnement_direct(expo = EXPO_B[0L, ]); NULL }, refus_tablexp = function(r) r)
   ok <- controle(r, "positionnement", "positionnement_sans_attendu")
   if (!isTRUE(ok)) ok
   else if (!grepl("aucune cellule", conditionMessage(r), fixed = TRUE)) conditionMessage(r)
   else if (!identical(nrow(r$details$segments), 0L) || !identical(r$details$attendus, numeric(0)) ||
-           !identical(r$details$cle, "tv")) "details"
+           !identical(r$details$cle, "t")) "details"
   else TRUE
 })
 verifier("rejeu : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution ; sans la table -> table_reference_absente", {

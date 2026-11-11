@@ -455,11 +455,13 @@ verifier("C4 #195 (pmax, non pmin) : E^c = 0, E^i = 1e6 + 1e-5, D = 1e6 : E^i - 
   if (!(ecart > 9.9e-6 && ecart < 1.01e-5)) sprintf("témoin : écart %g au lieu de 1e-5 environ", ecart) else
     if (identical(unname(r$rl), c(0L, 0L)) && !length(r$codes)) TRUE else paste("relevés", paste(r$rl, collapse = " et "))
 })
-verifier("C4 #195 (CA6) : une exposition manquante laisse les deux relevés NA (pas de na.rm), comme avant la tolérance ; E^i = E^c = 0 : tolérance nulle, rien relevé", {
+verifier("C4 #195 (CA6) : une exposition manquante laisse les deux relevés NA (pas de na.rm), comme avant la tolérance ; E^i = E^c = 0 : tolérance nulle, rien relevé (cellule nulle à côté d'une cellule exposée, #210)", {
   ro <- R_REL
   l <- data.frame(age = 60:62, ec = c(1, NA, 3), ei = c(2, 2, 3), d = c(0, 0, 0))
   rl <- tablexp:::observations_agregats(l, 1:3, ro, character(0), list(), character(0), 3L, l)$releves
-  r0 <- releves_de(0, 0, 0)
+  # Cellule E^i = E^c = 0, D = 0 accompagnée d'une cellule exposée : une table
+  # sans aucune exposition ni événement est refusée (#210, M399).
+  r0 <- releves_de(c(0, 1), c(0, 1), c(0, 0))
   if (!(is.na(rl$exposition_initiale_inferieure_centrale) && is.na(rl$complement_superieur_aux_evenements)))
     "relevés non NA avec une exposition manquante" else
     if (identical(unname(r0$rl), c(0L, 0L))) TRUE else paste("E^i = E^c = 0 :", paste(r0$rl, collapse = " et "))
@@ -528,6 +530,40 @@ verifier("evenements_hors_plage (appel direct du seam cellules) : somme au-delà
     identical(msg(r), sprintf(paste("Somme des événements hors de la plage des entiers du moteur (au plus %d) dans 1",
                                     "cellule(s) ; vérifier la colonne du rôle « evenements » ; la construction est refusée."),
                               .Machine$integer.max)) && identical(r$details, list(cellules = 1L))
+})
+
+# Garde du total des événements (#199, M397 ; ADR 0009, point 9.6, (d) 3) :
+# agrégats du jeu simulé (forme de l'entrée de R13), deux cellules (âges 40
+# et 60, sexe H) portées à 1,5e9 événements, chacune sous la borne de la
+# garde par cellule : construire_table() refuse à l'étape exposition, avant
+# toute étape en aval ; un total exactement égal à .Machine$integer.max
+# n'est pas refusé et reste integer dans les diagnostics des étapes.
+P_TOTAL <- plan_ag(c(BRUT, POS))
+tous <- function(...) {
+  l <- list(...)
+  for (n in names(l)) if (!isTRUE(l[[n]])) return(paste(n, ":", l[[n]]))
+  TRUE
+}
+verifier("garde du total (#199, M397) : deux cellules à 1,5e9 événements (sous la garde par cellule) -> refus exposition / denombrement_hors_plage, message et détails (grandeur evenements, valeur, limite) ; total égal à .Machine$integer.max -> construction aboutie, totaux integer", {
+  k <- which(AGG$sexe == "H" & AGG$age %in% c(40, 60))
+  g <- AGG; g$d[k] <- 1500000000L
+  total <- sum(as.numeric(g$d))
+  r <- rf(construire_table(g, R_AG, P_TOTAL, tables_reference = list(tv = T_HF)))
+  b <- AGG; b$d[k[1L]] <- as.integer(b$d[k[1L]] + (.Machine$integer.max - sum(as.numeric(AGG$d))))
+  x <- tryCatch(construire_table(b, R_AG, P_TOTAL, tables_reference = list(tv = T_HF)), refus_tablexp = function(e) e)
+  ok <- controle(r, "exposition", "denombrement_hors_plage")
+  tous(cellules = if (length(k) == 2L) TRUE else "deux cellules attendues",
+       refus = ok,
+       message = if (isTRUE(ok) && identical(msg(r), sprintf(paste(
+         "Le dénombrement « evenements » (%.0f) est hors de la plage des entiers du moteur (au plus %d) : la",
+         "construction est refusée."), total, .Machine$integer.max))) TRUE else "message",
+       details = if (isTRUE(ok) && identical(r$details, list(grandeur = "evenements", valeur = total,
+                                                             limite = .Machine$integer.max))) TRUE else "détails",
+       borne = if (!inherits(x, "refus_tablexp") &&
+                   identical(x$etapes$exposition$diagnostics$evenements, .Machine$integer.max) &&
+                   identical(x$etapes$brut$diagnostics$evenements, .Machine$integer.max) &&
+                   identical(x$etapes$positionnement$diagnostics$evenements_total, .Machine$integer.max)) TRUE
+               else if (inherits(x, "refus_tablexp")) paste("refus inattendu :", x$motif) else "total à la borne")
 })
 
 # --- C5 et C6 : sommes et ordre ------------------------------------------------------
@@ -720,4 +756,23 @@ verifier("calculer_exposition() en appel direct : seam inconnu -> erreur de prog
   rec <- tablexp:::deduire_recette(R_EC); rec$seam <- "autre"
   e <- tryCatch(tablexp:::calculer_exposition(data.frame(), P_BV, character(0), rec, NULL, FALSE), error = function(c) c)
   inherits(e, "error") && !inherits(e, "refus_tablexp") && grepl("erreur de programmation", conditionMessage(e), fixed = TRUE)
+})
+
+# --- période sans exposition sous la recette `agregats` (#210, M399, CA2) ------------
+
+verifier("CA2 (#210) : agrégats d'exposition nulle partout et sans événement -> refus exposition / periode_sans_exposition (exposition centrale seule, centrale et initiale, initiale seule ; avec et sans par_annee) ; détails : 3 observations, 3 cellules", {
+  e <- character(0)
+  d <- data.frame(age = 60:62, ec = 0, ei = 0, d = 0L)
+  for (ro in list(c(age = "age", exposition_centrale = "ec", evenements = "d"),
+                  c(age = "age", exposition_centrale = "ec", exposition_initiale = "ei", evenements = "d"),
+                  c(age = "age", exposition_initiale = "ei", evenements = "d")))
+    for (pa in c(FALSE, TRUE)) {
+      dd <- if (pa) transform(d, annee = 2020L) else d
+      ro2 <- if (pa) c(ro, annee = "annee") else ro
+      r <- rf(construire_table(dd, ro2, plan_ag(segmentation = character(0), par_annee = pa)))
+      ok <- controle(r, "exposition", "periode_sans_exposition")
+      if (!isTRUE(ok)) e <- c(e, paste(paste(names(ro), collapse = "+"), pa, ok))
+      else if (!identical(c(r$details$observations, r$details$cellules), c(3L, 3L))) e <- c(e, paste("details", pa))
+    }
+  if (length(e)) paste(e, collapse = " | ") else TRUE
 })

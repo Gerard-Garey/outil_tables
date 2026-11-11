@@ -83,6 +83,63 @@ for (cas in list(list("nommé", c(a = "code")), list("à attribut", structure("c
   verifier(sprintf("avertir() : code %s -> erreur de programmation (#60)", cas[[1L]]),
            erreur_code(avertir(a0, "donnees", cas[[2L]], "msg", 1)))
 
+# --- dénombrements en integer (ADR 0009, point 9.6 ; #199) -------------------
+
+# Valeur écrite à la main : conversion, refus (module, motif, message,
+# détails), erreurs de programmation, absence de tout warning().
+denombrement_entier <- tablexp:::denombrement_entier
+imax <- .Machine$integer.max
+tous <- function(...) {
+  l <- list(...)
+  for (n in names(l)) if (!isTRUE(l[[n]])) return(paste(n, ":", l[[n]]))
+  TRUE
+}
+sans_warning <- function(expr) {
+  w <- NULL
+  r <- withCallingHandlers(tryCatch(expr, error = function(e) e),
+                           warning = function(x) { w <<- x; invokeRestart("muffleWarning") })
+  list(valeur = r, warning = w)
+}
+verifier("denombrement_entier() (#199) : 2147483647 -> 2147483647L ; c(0, NA, 3) -> c(0L, NA, 3L) ; NA (logique) et NA_real_ -> NA_integer_ ; vide -> integer(0) ; integer reçu inchangé ; noms retirés", {
+  tous(borne = identical(denombrement_entier(imax + 0, "validation", "evenements_total"), imax),
+       na = identical(denombrement_entier(c(0, NA, 3), "validation", "observes"), c(0L, NA, 3L)),
+       na_logique = identical(denombrement_entier(NA, "validation", "observes"), NA_integer_),
+       na_double = identical(denombrement_entier(NA_real_, "validation", "observes"), NA_integer_),
+       vide = identical(denombrement_entier(numeric(0), "validation", "observes"), integer(0)),
+       entier = identical(denombrement_entier(c(4L, 0L), "validation", "observes"), c(4L, 0L)),
+       noms = identical(denombrement_entier(c(a = 2), "validation", "observes"), 2L))
+})
+verifier("denombrement_entier() (#199) : 2^31 -> refus de l'étape passée, motif denombrement_hors_plage, message à gabarit fixe, détails grandeur, valeur (le plus grand élément), limite", {
+  r <- tryCatch({ denombrement_entier(c(5, 2^31, NA, 2^31 - 1), "homogeneite", "evenements_total"); NULL },
+                refus_tablexp = function(e) e)
+  if (is.null(r)) return("aucun refus levé")
+  tous(module = identical(r$module, "homogeneite"), motif = identical(r$motif, "denombrement_hors_plage"),
+       message = identical(conditionMessage(r), paste(
+         "Le dénombrement « evenements_total » (2147483648) est hors de la plage des entiers du moteur (au plus",
+         "2147483647) : la construction est refusée.")),
+       details = identical(r$details, list(grandeur = "evenements_total", valeur = 2^31, limite = imax)))
+})
+# Valeur non finie (NaN compris), négative, non entière, type autre :
+# erreur de programmation (stop()), jamais un refus typé.
+for (cas in list(list("non entier", c(1, 2.5)), list("négatif", c(-1, 3)), list("Inf", Inf), list("-Inf", -Inf),
+                 list("NaN", c(NaN, 1)), list("caractère", "3"), list("logique non NA", TRUE),
+                 list("facteur", factor(3)), list("liste", list(1))))
+  verifier(sprintf("denombrement_entier() (#199) : %s -> erreur de programmation, pas un refus", cas[[1L]]), {
+    e <- tryCatch({ denombrement_entier(cas[[2L]], "validation", "observes"); NULL }, error = function(e) e)
+    inherits(e, "error") && !inherits(e, "refus_tablexp") &&
+      grepl("denombrement_entier()", conditionMessage(e), fixed = TRUE)
+  })
+verifier("denombrement_entier() (#199) : étape ou grandeur mal formée -> erreur de programmation", {
+  e1 <- tryCatch(denombrement_entier(1, NA_character_, "observes"), error = function(e) e)
+  e2 <- tryCatch(denombrement_entier(1, "validation", c("a", "b")), error = function(e) e)
+  inherits(e1, "error") && !inherits(e1, "refus_tablexp") && inherits(e2, "error") && !inherits(e2, "refus_tablexp")
+})
+verifier("denombrement_entier() (#199) : aucun warning() émis (conversion, NA, refus au-delà de la borne, erreurs de programmation)", {
+  cas <- list(1, c(NA, 2), NA, 2^31, c(1e12, 1), 2.5, -1, Inf, NaN)
+  w <- vapply(cas, function(x) is.null(sans_warning(denombrement_entier(x, "validation", "observes"))$warning), NA)
+  if (all(w)) TRUE else paste("warning émis pour le cas", paste(which(!w), collapse = ", "))
+})
+
 # --- générateur et graine locale ---------------------------------------------
 
 verifier("GENERATEUR : Mersenne-Twister / Inversion / Rejection (valeurs de R 4.3.3)",

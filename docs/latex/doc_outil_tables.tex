@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{10/11/2026}
+\newcommand{\datedoc}{11/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1068,6 +1068,22 @@ message marqué UTF-8 par \code{texte\_moteur()}, sans \code{warning()}~;
 \code{stop()} si le code (chaîne unique au sens de \code{chaine\_unique()},
 conforme à \code{MOTIF\_CODE\_REFUS}) ou le nombre est mal formé
 (section~\ref{sec:avertissements}~; issues~\#9, \#24, \#50 et~\#60) \\
+\catalogue{fonctions-outils}{denombrement\_entier()} & interne & \code{x}
+(vecteur \code{double} ou \code{integer} à valeurs entières positives ou
+nulles, \code{NA} admis, ou vecteur \code{logical} entièrement \code{NA}),
+\code{etape}, \code{grandeur} (chaînes du
+moteur) & \code{x} rangé en \code{integer}, de même longueur, sans
+attribut, \code{NA} devenant \code{NA\_integer\_}~; refus
+\code{denombrement\_hors\_plage} de l'étape \code{etape} si un élément
+dépasse \code{.Machine\$integer.max}, avant toute conversion
+(\code{details}~: \code{grandeur}, \code{valeur} (le plus grand élément)
+et \code{limite})~; \code{stop()} pour une valeur non finie (\code{NaN}
+compris), négative ou non entière, ou pour un autre type (un
+\code{logical} non entièrement \code{NA} compris~; \code{NA} logique rendu
+en \code{NA\_integer\_})~; aucun
+\code{warning()}~; assistant unique du rangement des sommes d'événements
+(section~\ref{sec:non-regression}, «~Type des dénombrements~»~;
+issue~\#199) \\
 \catalogue{fonctions-outils}{texte\_moteur()} & interne & \code{x}, chaîne ou
 liste (\code{data.frame} compris) & le même objet, chaînes et noms non ASCII
 du moteur marqués UTF-8 en toute locale d'installation et d'exécution~;
@@ -2227,6 +2243,61 @@ dans l'ADR 0009, datée, avec l'avis d'\code{actuary}.
 
 \medskip
 \noindent
+\textbf{Type des dénombrements} (issue~\#199~; ADR 0009, point~9.6,
+seconde annotation du 10/11/2026~; décisions M396 et M397). Depuis
+l'issue~\#199, la règle est générale~: un \emph{dénombrement}, décompte
+d'objets (cellules, lignes, têtes, segments, séquences, suites, signes
+$n_{+}$ et $n_{-}$, tirages effectués) ou somme d'événements non pondérés
+formée par le moteur sur des données admises, est rangé en
+\code{integer}. Le motif est que le type d'une somme dépendait des
+données~: \code{sum()} d'un vecteur \code{integer} rend un \code{integer}
+tant que le total tient dans la plage des entiers, et un \code{double}
+au-delà, sans avertissement, si bien qu'un écart de type relevé à la
+comparaison pouvait venir des données et non d'une modification du
+code~; le type d'un chemin ne dépend désormais ni du plan ni des
+données. \code{integer} est un type de \textbf{stockage}~: les sommes et
+les identités (par exemple $O + {}$événements sans attendu${} + {}$%
+événements hors plage${} = {}$total) se forment en \code{double}, exactes
+sous $2^{53}$, et la conversion n'a lieu qu'au rangement dans l'objet. Un
+décompte borné par une longueur ou par un paramètre contrôlé se convertit
+par \code{as.integer()}, sans garde~; une somme d'événements, par
+\code{denombrement\_entier()} (\code{R/outils.R},
+tableau~\ref{tab:fonctions-outils}), qui refuse au-delà de
+\code{.Machine\$integer.max} sous le code \code{denombrement\_hors\_plage}
+de l'étape qui forme la somme. La garde porte, à la source, sur le total
+des événements de l'étape \code{exposition} sous la recette
+\code{agregats} (section~\ref{sec:exposition-cellules})~; celles
+des étapes \code{positionnement}, \code{validation} et \code{homogeneite},
+qui somment des sous-ensembles des cellules de l'exposition, et celles de
+l'étape \code{importance\_exclusions}, dont les totaux sont majorés par le
+nombre de lignes sous le seam «~fenêtres~», seul admis pour cette étape,
+sont défensives et testées en appel direct (ADR 0009, point~9.6, (d)~4, et
+troisième annotation du 10/11/2026).
+Vingt-sept chemins de ces quatre étapes (5, 9, 5 et~8) sont ainsi passés
+de \code{double} à \code{integer}, à valeurs identiques, et leurs 27 clés
+exactes sont retirées de \code{TOLERANCES}, qui passe de 175 à 148 clés,
+dont 41 exactes au lieu de 68 (ADR 0009, seconde annotation du
+10/11/2026, (e)). Restent en \code{double}~: l'exposition, même en jours
+entiers~; les attendus et leurs bornes~; les bornes de fluctuation
+exactes, quantiles à valeurs entières~; la colonne hétérogène
+\code{validation/resultat/statistiques/valeur}~; les échos de paramètres,
+\code{monte\_carlo/replications} compris~; et, seule exception motivée
+parmi les sommes d'événements,
+\code{donnees/diagnostics/releves/}\allowbreak\code{poids\_exclusions/evenements},
+qui somme les événements de cellules exclues, non passées par la garde
+par cellule~: une garde en \code{integer} refuserait une construction à
+cause de données justement écartées (sa clé exacte reste). Un test de
+\code{tests/test\_reproductibilite.R} exige, dans chaque plan de
+référence, le type \code{integer} de tout chemin dont le dernier segment
+(nom de colonne ou de diagnostic, jamais nom de table) est nommé comme un
+dénombrement (\code{observes}, \code{evenements\ldots},
+\code{cellules\ldots}, \code{lignes\ldots}, \code{tetes\ldots},
+\code{tirages\_effectues}, \code{runs}, \code{positifs},
+\code{negatifs}), hors la liste fermée \code{EXCEPTIONS\_DENOMBREMENT},
+qui ne contient que ce dernier chemin.
+
+\medskip
+\noindent
 \textbf{Invariants de structure de la table} (\code{tests/test\_reproductibilite.R},
 pour chaque plan de référence)~: (a)~aucune clé nue, sans «~\code{/}~»~;
 (b)~tout double d'une étape (chemin sous \code{etapes/<e>/} ou
@@ -2258,7 +2329,7 @@ point~(a)~4).
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
 point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
-07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)).
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)~; 27 clés exactes des dénombrements retirées par l'issue~\#199~: ADR 0009, seconde annotation du 10/11/2026, (e)~; 148 clés, dont 41 exactes, 33 à $10^{-14}$, 71 à $10^{-12}$ et 3 à $10^{-10}$).
 Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
 groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
@@ -2276,7 +2347,7 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table}, \code{resultat/smr/observes}, \code{resultat/table\_positionnee/qx\_reference}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/segments/observes}, \code{resultat/monte\_carlo/} \code{replications} et \code{jeux/tirages\_effectues}, \code{diagnostics/} \code{evenements\_cellules\_}\allowbreak\code{evenement\_sans\_exposition}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table}, \code{resultat/sous\_groupes/observes}, \code{resultat/sequences\_runs/} \code{positifs}, \code{negatifs} et \code{runs}, \code{resultat/monte\_carlo/} \code{replications} et \code{tirages\_effectues}, \code{diagnostics/etats/evenements}, \code{diagnostics/} \code{evenements\_sans\_attendu}, \code{evenements\_hors\_plage} et \code{evenements\_total}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}, \code{resultat/smr\_comparateur\_1/} \code{observes} et \code{evenements\_sans\_exposition\_retenue}, \code{resultat/smr\_comparateur\_2/} \code{observes}, \code{observes\_conserves}, \code{evenements\_sans\_valeur\_table}, \code{evenements\_taux\_table\_egal\_un}, \code{evenements\_sans\_attendu} et \code{evenements\_hors\_plage}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
+exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13~; seule exception à la règle des dénombrements, issue~\#199)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table} et \code{resultat/table\_positionnee/qx\_reference}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan) et \code{resultat/monte\_carlo/replications}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table} et \code{resultat/monte\_carlo/replications}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
 $10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
 $10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires)~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
 $10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z} & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a)) \\
@@ -2520,7 +2591,27 @@ changés. L'empreinte du résultat de R12 commitée est celle de la
 plateforme de référence~; un relevé sur un poste en diffère, par un écart
 d'une unité au dernier rang sur un double de l'étape \code{brut}, antérieur
 à la branche, conformément au statut «~même machine seulement~» de cette
-empreinte (section~\ref{sec:empreinte-resultat}).
+empreinte (section~\ref{sec:empreinte-resultat}). Les références R8 à R13
+ont été régénérées \textbf{une neuvième fois}, le 11/11/2026, en mode
+\code{regeneration} sur ces six plans seulement (exécution 42982198441 du
+workflow, calcul sur \code{140a41b}, commit \code{9aaeba9}, visa
+d'\code{actuary-approfondi} du 11/11/2026~; issues~\#199, \#200
+et~\#202), régénération unique de la branche
+\code{claude/validation-types-statuts}, pour les seuls changements annoncés
+en transition par ces issues~: type \code{integer} au lieu de
+\code{double} des chemins de dénombrement, à valeurs et longueurs
+identiques, sur 17 lignes de R8, 17 de R9, 16 de R10 et 5 de chacun de
+R11, R12 et R13 (\#199~; «~Type des dénombrements~», ci-dessus)~; textes,
+propres à chaque relation, des statuts \code{bornes\_exactes} et
+\code{p\_valeurs} des sous-groupes de la validation (\#200~; R8 et R9)~;
+texte du statut de \code{p\_asymptotique} du test d'homogénéité (\#202~;
+R11 et R12). L'empreinte du résultat change en conséquence, celle du code
+aussi, \code{R/} ayant changé~; \code{version\_fiche} est inchangée~;
+toutes les autres grandeurs de R8 à R13 sont restées identiques au bit
+près, de même que R1 à R7 et R14, non visées, en comparaison réussie, sur
+la plateforme de référence (processeur AMD EPYC 9V74, au lieu de l'EPYC
+7763 consigné à la huitième, sans effet mesuré), sans table finale,
+verdict ni valeur de table homologuée changés.
 
 \begin{encadre}
 \small
@@ -2758,8 +2849,9 @@ closes ensemble par la troisième, pour les issues~\#73 et~\#31, dont
 les transitions ont été closes ensemble par la sixième, pour
 l'issue~\#169, dont la transition a été close par la septième, et pour
 les issues~\#174, \#177, \#179, \#178 et~\#185, dont les transitions
-ont été closes ensemble par la huitième («~Références existantes~»,
-ci-dessus)~: la liste est de nouveau vide. Chaque
+ont été closes ensemble par la huitième, et pour les issues~\#199, \#200
+et~\#202, dont les transitions ont été closes ensemble par la neuvième
+(«~Références existantes~», ci-dessus)~: la liste est de nouveau vide. Chaque
 nature, l'union et ses conflits, l'observation, la forme de la liste, le
 rattachement de l'échec attendu, les doubles restants et la garde sont
 exercés par des témoins de la batterie, sur des objets en mémoire et jamais
@@ -3595,10 +3687,19 @@ le calcul a donc lieu avant la première étape~; seuls les refus de l'étape
 (\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un}),
 et ceux de l'étape \code{positionnement} sur ses cellules et ses segments
 (les mêmes, plus \code{positionnement\_sans\_attendu} et
-\code{positionnement\_sans\_deces}), sont levés pendant l'étape, après
+\code{positionnement\_sans\_deces}), le refus de capacité
+\code{evenements\_retires\_hors\_plage} de l'étape
+\code{importance\_exclusions}, sur ses ensembles de lignes exclues
+(issue~\#174), et ceux de l'étape \code{exposition}
+sur la table qu'elle forme (\code{trop\_de\_cellules},
+\code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} et
+\code{periode\_sans\_exposition},
+section~\ref{sec:troncature-censure}), sont levés pendant l'étape, après
 celles qui la précèdent (l'étape
-\code{importance\_exclusions} ne lève aucun refus sur ses cellules,
-section~\ref{sec:importance-exclusions})~; un nom de colonne ou un
+\code{importance\_exclusions} ne lève aucun refus sur ses cellules, et
+les gardes \code{denombrement\_hors\_plage} des étapes en aval de
+\code{exposition} sont défensives, section~\ref{sec:importance-exclusions}
+et section~\ref{sec:non-regression}, «~Type des dénombrements~»)~; un nom de colonne ou un
 chemin non ASCII de codage indéterminé, sous la locale C, n'est plus refusé
 après tous les calculs, à l'écriture de la fiche, en erreur de
 programmation. Chaque contrôle n'y est exécuté qu'une fois
@@ -6352,9 +6453,59 @@ base de cette taille étant hors de portée d'un test, la garde est vérifiée
 par appel direct de \code{nombre\_cellules()} sous ses deux libellés, et son
 placement avant le \code{tabulate()} de présence par une copie instrumentée
 de \code{calculer\_exposition()} (\code{tests/unitaires/test\_exposition.R}).
-Avertissements~: \code{convention\_forcee},
-\code{evenement\_sans\_exposition} et \code{aucune\_exposition} (aucune
-exposition ni aucun événement dans la période).
+Avertissements~: \code{convention\_forcee} et
+\code{evenement\_sans\_exposition}~; l'avertissement
+\code{aucune\_exposition}, que levait une table sans cellule, est retiré
+par l'issue~\#210, ce cas étant désormais refusé (ci-dessous).
+
+\medskip
+{\sloppy \textbf{Période sans exposition} (issue~\#210~; décision M399).
+\code{calculer\_exposition()} refuse, après l'aiguillage, donc sous les deux
+formes rendues au noyau et sous les trois recettes (motif
+\code{periode\_sans\_exposition}, module \code{exposition}), une table
+d'exposition dont aucune cellule n'a d'exposition strictement positive
+(\code{exposition\_jours}, \code{exposition\_centrale} ou
+\code{exposition\_initiale}, selon les colonnes de la recette) et qui ne
+compte aucun événement de la transition~: c'est le \emph{vide total}, le
+plus souvent une erreur de période, que le moteur ne corrige pas, la période
+étant déclarée, jamais déduite (E2.5). Avant l'issue~\#210, une telle
+construction aboutissait, tables vides, ou s'arrêtait sur une erreur R de
+l'étape \code{validation} sous \code{par\_annee}. Le message cite le début
+de la période, sa fin effective, la fin déclarée et le délai, les nombres
+d'observations et de cellules, repris dans \code{details} (\code{debut},
+\code{fin\_effective}, \code{observations}, \code{cellules}). Le nombre de
+cellules est celui des lignes de la table d'exposition, zéros explicites
+compris~: une table d'agrégats à exposition nulle partout et sans événement
+est refusée avec une cellule par clé reçue, et une ligne
+entrée et rachetée le même jour, seule de sa base, avec une cellule. Seuls
+comptent les événements de la transition~: une table dont les seules
+sorties sont des sorties concurrentes, sans exposition, est refusée. Ne sont
+pas refusés un événement sans exposition (état
+\code{evenement\_sans\_exposition}, cas H10b et H11, avertissement du même
+nom), qui n'est pas un vide total, ni un \emph{vide partiel} (une année, un
+segment ou une plage d'âges sans exposition), produit avec ses zéros
+explicites, les étapes en aval rendant les grandeurs qu'elles ne peuvent
+calculer dans un état nommé (par exemple \code{aucune\_cellule\_retenue}).
+Sous \code{stocks\_successifs}, le vide total n'est pas atteignable par
+\code{construire\_table()}~: la grille alignée sur la période (refus
+\code{inventaires\_periode}) et l'inventaire sans unité présente (refus
+\code{inventaire\_sans\_ligne}) l'excluent en amont~: une unité présente
+au dernier inventaire $t_M$, la fin effective, n'a aucune sortie à une date
+au plus égale à $t_M$ (motif \code{presence\_apres\_evenement}~: refus
+\code{ligne\_invalide}, ou exclusion et alors refus
+\code{inventaire\_sans\_ligne}), et son entrée, observée ou imputée, est au
+plus $t_M$ sous les deux hypothèses d'entrée~: sa fenêtre contient le jour
+$t_M$ (vérifié sur une base minimale,
+\code{tests/unitaires/test\_stocks\_successifs.R})~; le refus s'y vérifie
+en appel direct. Le refus porte sur la table de la
+construction~: l'argument \code{refuser\_vide} de
+\code{calculer\_exposition()}, \code{TRUE} par défaut, vaut \code{FALSE}
+dans \code{exposition\_lignes()}, qui recalcule l'exposition des
+sous-ensembles de lignes exclues pour le contrefactuel de l'étape
+\code{importance\_exclusions} (section~\ref{sec:importance-exclusions})~:
+un tel sous-ensemble peut légitimement n'avoir aucune exposition dans la
+période (écart à la lettre de M399, visé par \code{actuary} le
+10/11/2026).\par}
 
 \medskip
 \textbf{Fenêtres transmises à l'étape \code{brut}} (issue~\#38~; ADR 0007,
@@ -6404,7 +6555,19 @@ déclaré mais absent de la clé est ainsi sommé sur ses modalités
 \code{annees\_sommees}, ci-dessous). Les événements sont sommés exactement
 et rendus en \code{integer}~; une somme qui dépasse le plus grand entier du
 moteur ($2^{31} - 1$, \code{.Machine\$integer.max}) est refusée
-(\code{evenements\_hors\_plage}, module \code{exposition}). Les expositions
+(\code{evenements\_hors\_plage}, module \code{exposition}). Le total des
+événements de la table, somme de ses cellules formée en \code{double},
+est ensuite rangé en \code{integer} dans le diagnostic \code{evenements}
+de l'étape par \code{denombrement\_entier()}~: au-delà de $2^{31} - 1$,
+même quand chaque cellule tient dans la plage, l'étape refuse
+(\code{denombrement\_hors\_plage}, module \code{exposition}, détails
+\code{grandeur}~$=$~\code{evenements}, \code{valeur} et \code{limite}~;
+issue~\#199, décision M397), là où \code{sum()} d'un \code{integer}
+aurait rendu un \code{double} sans avertissement~; un total égal à
+\code{.Machine\$integer.max} est admis (section~\ref{sec:non-regression},
+«~Type des dénombrements~»). Sous les recettes à fenêtres d'exposition
+(\code{exposition\_fenetres()}), ce total est le nombre des événements des
+fenêtres, \code{integer} par construction, sans garde. Les expositions
 sont sommées en arithmétique flottante, dans l'ordre des lignes, comme sous
 la recette des lignes~: une permutation des lignes reçues peut changer les
 derniers bits d'une somme, et une cellule sans somme garde sa valeur
@@ -6625,13 +6788,18 @@ lecture~:\par}
     sous-estime les taux et domine l'erreur d'estimation dès des
     portefeuilles de taille courante. Aux petits effectifs par cellule de
     ce scénario, l'écart au niveau nominal de la couverture des intervalles
-    de Poisson, exact et asymptotique, sous les trois lectures est
-    compatible avec la discrétisation, c'est-à-dire avec la couverture
+    de Poisson, exact et asymptotique, sous les trois lectures est, selon
+    la lecture calibrée, compatible avec la discrétisation, c'est-à-dire avec la couverture
     calculée sous l'approximation de Poisson aux expositions réalisées,
     laquelle intègre, sous \code{milieu}, la sur-exposition de cellule qui
     réduit le manque dominant de l'intervalle asymptotique (constat de
-    simulation, lecture calibrée sur des jeux non vus au choix de la
-    règle, \code{tests/mesures/constat\_couverture\_s2.R}, hors CI, âges de
+    simulation~; lecture calibrée, ajoutée le 10/11/2026 après un pilote
+    sur les jeux 1 à 1\,000 et lue aussi sur les seuls jeux non vus au
+    choix de la règle, décision M383~; le \textbf{verdict de référence},
+    règle fixée avant le pilote (décision M382), sans risque global
+    contrôlé et au calibrage reconnu défaillant, conclut «~non
+    expliqué~»~; les deux verdicts sont publiés~;
+    \code{tests/mesures/constat\_couverture\_s2.R}, hors CI, âges de
     50 à 70~ans, 2\,000~jeux dont les 1\,000 de la PR~\#188~; passage
     consigné au commentaire de la PR~\#204 du 10/11/2026, valeurs non
     reproduites ici, E3.4~; Kaplan-Meier non couvert)~;
@@ -6737,7 +6905,15 @@ exclusions et de celle sur la base privée des unités exclues (C16-oracle,
 section~\ref{sec:controles-donnees})~; inégalité exacte, sous
 \code{premier\_inventaire}, de $E^c$ et de $D$ de chaque cellule au plus
 égaux à ceux de la construction en lignes du jeu propre (C3)~; forme du
-simulateur (C11). Quelques-uns illustrent les règles
+simulateur (C11). Le refus \code{periode\_sans\_exposition} (issue~\#210)
+est vérifié sous les trois recettes, message et détails compris, par des
+valeurs écrites à la main~: ligne sortie avant le début de la période
+(H10a), lignes hors de la période sous deux conventions, avec ou sans
+\code{par\_annee} et avec ou sans l'étape \code{brut}~; agrégats
+d'exposition nulle partout et sans événement, sous les trois jeux de
+colonnes d'exposition~; stocks successifs en appel direct~; H10b, H11 et
+un vide partiel restent produits, et un sous-ensemble exclu sans exposition
+ne fait pas refuser l'étape \code{importance\_exclusions}. Quelques-uns illustrent les règles
 ci-dessus (période du 2015-01-01 au 2024-12-31, délai nul, vivant $\to$
 décédé)~:
 
@@ -6871,7 +7047,7 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{fenetres\_observations()} & interne & observations, début de la période, borne $B$, cause cible & fenêtres $[a, b)$, événements et sorties concurrentes (section~\ref{sec:troncature-censure})~; composantes des naissances, table calendaire \\
 \catalogue{fonctions-exposition}{segments\_observations()} & interne & observations, segmentation & segment de chaque observation et table des clés, triées sans dépendre des niveaux d'un facteur ni du marquage d'encodage (ordre des octets UTF-8 de l'empreinte des données) \\
 \catalogue{fonctions-exposition}{position\_dans\_cellule()} & interne & table calendaire, composantes, jours, convention & cellule $x$ du jour, rang $j$ dans la cellule, longueur $L$ de la cellule, début de la suivante \\
-\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, valeurs validées \code{p}, segmentation, recette et convention validées, \code{par\_annee}, hypothèse d'entrée (stocks successifs) & fonction d'étape \code{exposition}, aiguillage sur la forme rendue au noyau par la recette (\code{seam})~: \code{exposition\_fenetres()} (\code{fenetres}) ou \code{exposition\_cellules()} (\code{cellules}), dont elle rend la valeur~; ne contrôle ni les paramètres, ni la recette, ni la convention, et ne les recalcule pas (issues~\#22 et~\#82) \\
+\catalogue{fonctions-exposition}{calculer\_exposition()} & interne & observations, valeurs validées \code{p}, segmentation, recette et convention validées, \code{par\_annee}, hypothèse d'entrée (stocks successifs), \code{refuser\_vide} (\code{TRUE} par défaut) & fonction d'étape \code{exposition}, aiguillage sur la forme rendue au noyau par la recette (\code{seam})~: \code{exposition\_fenetres()} (\code{fenetres}) ou \code{exposition\_cellules()} (\code{cellules}), dont elle rend la valeur~; refus \code{periode\_sans\_exposition} d'une table sans exposition strictement positive ni événement de la transition, sauf \code{refuser\_vide = FALSE} (issue~\#210)~; ne contrôle ni les paramètres, ni la recette, ni la convention, et ne les recalcule pas (issues~\#22 et~\#82) \\
 \catalogue{fonctions-exposition}{exposition\_fenetres()} & interne & mêmes arguments & forme \code{fenetres} (recettes \code{lignes\_dates\_completes} et \code{stocks\_successifs}, la seconde après la formation de ses fenêtres, ligne ci-dessous, sans autre différence de calcul)~: paramètres effectifs, résultat, diagnostics, avertissements, et fenêtres transmises à l'étape \code{brut} (objet \code{fenetres\_exposition}, hors de l'objet résultat~; issue~\#38)~; corps de \code{calculer\_exposition()} extrait à l'identique (issue~\#169) \\
 \catalogue{fonctions-exposition}{UNITE\_EXPOSITION\_DECLAREE} & constante & --- & unité de l'exposition reçue sous la forme \code{cellules}, inscrite à la place de \code{UNITES\_EXPOSITION} \\
 \catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE\_DECLAREE} & constante & --- & hypothèse sur les sorties concurrentes sous la forme \code{cellules} (traitement fait par le producteur, non vérifiable), inscrite à la place de \code{HYPOTHESE\_CENSURE} \\
@@ -8268,9 +8444,12 @@ passent les premières.
     \code{log1p()}, \code{expm1()}.
   \item \textbf{Statut} (E2.20~; constante \code{STATUTS\_POSITIONNEMENT},
     rendue dans \code{etapes\$positionnement\$parametres\$statuts}, une
-    ligne par colonne double de \code{resultat\$smr} et de
-    \code{resultat\$table\_positionnee}, qui fait foi)~: $O_s$ et $A_s$,
-    descriptifs (arithmétique flottante)~; $\hat\theta_s$, résultat exact
+    ligne par grandeur statistique de \code{resultat\$smr} et de
+    \code{resultat\$table\_positionnee}, hors clés de segment, âge, état
+    et nombre de cellules retenues, qui fait foi)~: $O_s$, somme des
+    décès des cellules retenues du segment, rangée en \code{integer}
+    (issue~\#199), et $A_s$, en arithmétique flottante, descriptifs~;
+    $\hat\theta_s$, résultat exact
     (maximum de vraisemblance, ci-dessus), en forme close, $O_s / A_s$,
     sans optimisation numérique~: le statut porte sur la formule de
     l'estimateur, et l'erreur d'estimation de $\theta_s$ est décrite par
@@ -8328,8 +8507,8 @@ de ce document.}\par}
 
 \medskip
 \textbf{Écart à la note II1291-12} (décisions M288, M80 et M192). La note
-pose $\tilde q_x^{\mathrm{pos}} = \mathrm{SMR} \times q_x^{\mathrm{réf}}$,
-avec $\mathrm{SMR} = \sum D / \sum E\, q^{\mathrm{réf}}$ sur «~la plage
+pose $\tilde q_x^{\mathrm{pos}} = \mathrm{SMR} \times q_x^{\text{réf}}$,
+avec $\mathrm{SMR} = \sum D / \sum E\, q^{\text{réf}}$ sur «~la plage
 d'âges et période d'observation communes avec la référence~», $E$ étant le
 temps d'observation des individus (§~2.3 et §~3.1, p.~3/13), donc une
 exposition centrale. L'outil
@@ -8360,9 +8539,11 @@ section~\ref{sec:rapport-fige}).
 d'une table par sexe) et \code{taux\_table\_egal\_un} ($\tilde q = 1$ dans
 une cellule d'exposition $E^c > 0$), par les briques partagées, sous le
 module \code{positionnement}~; puis \code{positionnement\_sans\_attendu}
-($A_s = 0$~: aucune cellule retenue dans un segment, ou aucune cellule dans
-la table d'exposition, période sans observation~; $\hat\theta_s$ n'est pas
-défini) et \code{positionnement\_sans\_deces} ($O_s = 0$~:
+($A_s = 0$~: aucune cellule retenue dans un segment, ou, en appel direct
+seulement, aucune cellule dans la table d'exposition, une période sans
+exposition ni événement étant refusée en amont par \code{construire\_table()}
+à l'étape \code{exposition}, \code{periode\_sans\_exposition},
+issue~\#210~; $\hat\theta_s$ n'est pas défini) et \code{positionnement\_sans\_deces} ($O_s = 0$~:
 $\hat\theta_s = 0$ donnerait une table à mortalité nulle), chacun citant
 tous les segments en défaut avec leur $A_s$ (décision M289, Q2~: refus
 plutôt qu'un segment sans table). Le message de
@@ -8613,7 +8794,7 @@ de 5~\%, de $G^2$ au-dessous).
 \catalogue{fonctions-positionnement}{ETATS\_TABLE\_POSITIONNEE} & constante & --- & états d'une ligne de la table positionnée~: \code{produite}, \code{taux\_table\_nul}, \code{taux\_table\_egal\_un}, \code{qx\_arrondi\_un} (section~\ref{sec:positionnement-etape}) \\
 \catalogue{fonctions-positionnement}{ETATS\_CELLULE\_POSITIONNEMENT} & constante & --- & états d'une cellule, mêmes valeurs dans le même ordre que ceux de l'étape \code{validation} \\
 \catalogue{fonctions-positionnement}{REFERENCE\_METHODE\_POSITIONNEMENT} & constante & --- & identité de la note II1291-12 v1.7 (titre, fichier, SHA-256 complet, §~3.1, statut de référence de place) \\
-\catalogue{fonctions-positionnement}{STATUTS\_POSITIONNEMENT} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque colonne double de \code{smr} et de \code{table\_positionnee} (E2.20), mention d'indépendance comprise \\
+\catalogue{fonctions-positionnement}{STATUTS\_POSITIONNEMENT} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque grandeur statistique de \code{smr} et de \code{table\_positionnee} (E2.20), $O_s$ (\code{observes}, en \code{integer}, issue~\#199) compris, mention d'indépendance comprise \\
 \catalogue{fonctions-positionnement}{controler\_parametres\_positionnement()} & interne & méthode, clé, plage, niveau & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue (module \code{positionnement})~; appelée par \code{valider\_plan()} seule \\
 \catalogue{fonctions-positionnement}{calculer\_positionnement()} & interne & table d'exposition, segmentation, découpage, convention, table, clé, méthode, plage, niveau & fonction d'étape \code{positionnement}~: paramètres, résultat (\code{cellules}, \code{smr}, \code{table\_positionnee}), diagnostics, avertissements~; ne contrôle aucun paramètre (issue~\#82) \\
 \end{longtable}
@@ -9032,7 +9213,12 @@ paramètres, le \code{nom} de la table (\code{table\_nom}),
 \code{n\_max\_runs\_exact}, l'hypothèse nulle
 (\code{HYPOTHESE\_VALIDATION}, ou \code{HYPOTHESE\_VALIDATION\_POSITIONNEE}
 sous \code{positionnee}), la référence de méthode et les statuts des
-sous-groupes (\code{statuts\_sous\_groupes}, selon la relation). \code{resultat}~:
+sous-groupes (\code{statuts\_sous\_groupes}, selon la relation~: lignes
+\code{sous\_groupes} de \code{STATUTS\_VALIDATION} sous \code{independante}
+et \code{ajustee\_hors\_outil}, dont les statuts des bornes exactes et des
+p-valeurs donnent un texte pour chacune de ces deux relations, la seconde
+ne les produisant pas, état \code{ddl\_non\_etabli}, issue~\#200~; de
+\code{STATUTS\_VALIDATION\_POSITIONNEE} sous \code{positionnee}). \code{resultat}~:
 \code{cellules} (clés de segmentation, \code{age}, \code{annee} sous
 \code{par\_annee}, $E^c$, $D$, \code{qx\_table}, \code{taux\_table} pour
 $\tilde\mu$, \code{attendus}, \code{taux\_brut} pour $\hat\mu$,
@@ -9126,14 +9312,28 @@ dans la colonne \code{statut} du résultat.
     (\code{docs/recherche/}\allowbreak\code{2026-11-05-sources-v1.md},
     §~4).
   \item \textbf{S5, sous-groupes} (\code{resultat\$sous\_groupes})~:
-    $O$, $A$, SMR, bornes exactes et p-valeurs de Poisson exactes ($p = 0$~:
-    $X \sim \mathcal{P}(A)$) par regroupement \code{segment\_tranche}
+    $O$, $A$, SMR, bornes exactes et p-valeurs exactes (de Poisson sous
+    \code{independante}, où le nombre $p$ de paramètres estimés est nul,
+    table prise telle quelle~: loi de référence $X \sim \mathcal{P}(A)$~;
+    non produites sous \code{ajustee\_hors\_outil}, état
+    \code{ddl\_non\_etabli}~; sous \code{positionnee}, lois binomiales
+    conditionnelles du paragraphe «~Sous la relation \code{positionnee}~») par regroupement \code{segment\_tranche}
     (segment $\times$ tranche d'âge) et \code{segment} si la segmentation
     n'est pas vide, \code{tranche} toujours, \code{annee} sous
     \code{par\_annee}, sur les cellules retenues, dont le nombre est
     restitué par groupe (\code{cellules\_retenues}, en \code{integer},
     issue~\#174)~; un groupe sans cellule
-    retenue est dans l'état \code{aucune\_cellule\_retenue}. Aucune
+    retenue est dans l'état \code{aucune\_cellule\_retenue}. Les colonnes
+    \code{smr} (\code{double}) et \code{etat} (\code{character}) gardent
+    leur type pour un regroupement sans aucun groupe, sous les trois
+    relations (issue~\#201). Sans aucune cellule sous \code{par\_annee}
+    (appel direct sur une exposition à 0 ligne), la table est produite sans
+    erreur~: aucune ligne pour les
+    regroupements dont les modalités viennent des cellules
+    (\code{segment\_tranche}, \code{segment}, \code{annee}), une ligne par
+    tranche déclarée, à l'état \code{aucune\_cellule\_retenue}, et
+    \code{annee} en \code{integer} (issue~\#210, décision M400~; avant, R
+    s'arrêtait sur une erreur d'affectation). Aucune
     correction de multiplicité (décision M217).
   \item \textbf{S6, signes} (\code{signes})~: $n_{+}$, $n_{-}$ et
     nombre de résidus nuls (retirés du test), $n = n_{+} + n_{-}$~;
@@ -9281,7 +9481,9 @@ $A_c$ inférieur à $0{,}49$ environ et supérieure à~1 au-delà (maximum
 voisin de $1{,}16$), valeurs obtenues par sommation des probabilités
 (approximation numérique)~: la p-valeur asymptotique de $G^2$ est trop
 grande ou trop petite selon la répartition des $A_c$. Les statuts des deux
-p-valeurs asymptotiques (\code{STATUTS\_VALIDATION}) le disent, et
+p-valeurs asymptotiques (\code{STATUTS\_VALIDATION}, et
+\code{STATUTS\_VALIDATION\_POSITIONNEE}~; phrases écrites une seule fois,
+dans \code{PHRASES\_ATTENDUS\_FAIBLES}, issue~\#200) le disent, et
 rappellent que seule la p-valeur de Monte-Carlo a un niveau garanti sous
 $H_0$~(i). \textbf{Aucun seuil} sur les attendus n'est appliqué ni
 affiché~: la règle usuelle d'un attendu minimal par cellule n'a pas été
@@ -9559,7 +9761,7 @@ S1 \code{residus} & décomptes au-delà de 2 et 3~; leurs espérances & --- & d�
 S2 \code{khi2\_pearson} & $X^2$, ddl, variance exacte sous $H_0$, p asymptotique, p et erreur de Monte-Carlo & supérieure & $X^2$ descriptif~; variance exacte sous $H_0$~(i), $E^c$ fixe (moments de Poisson)~; p asymptotique ($\chi^2_{n-p}$, $A_c \to \infty$ dans chaque cellule retenue), non garantie aux attendus faibles~; Monte-Carlo de niveau exact \\
 S3 \code{deviance} & $G^2$, ddl, p asymptotique, p et erreur de Monte-Carlo & supérieure & comme S2, sans variance~; aux attendus faibles, erreur de la p asymptotique de sens variable selon les $A_c$ \\
 S4 \code{smr} & $O$, $A$, SMR, $O - A$, bornes exactes, p inférieure, supérieure, centrale, $z$ et p de la racine cubique & centrale (et unilatérales) & SMR~: résultat exact (maximum de vraisemblance)~; bornes exactes sous la loi supposée, couverture $\ge$ niveau, \code{qgamma()} en approximation numérique~; p exactes sous $H_0$~(i)~; racine cubique asymptotique \\
-S5 sous-groupes & $O$, $A$, SMR, bornes exactes, p-valeurs~; p-valeurs asymptotiques (sous \code{positionnee}, au-delà du plafond de convolution seulement) & centrale (et unilatérales) & comme S4, sans correction de multiplicité~; p-valeurs asymptotiques~: approximation normale, résultat asymptotique (statuts dans les paramètres de l'étape) \\
+S5 sous-groupes & $O$, $A$, SMR, bornes exactes, p-valeurs~; p-valeurs asymptotiques (sous \code{positionnee}, au-delà du plafond de convolution seulement) & centrale (et unilatérales) & comme S4, sans correction de multiplicité~; sous \code{ajustee\_hors\_outil}, bornes exactes et p-valeurs non produites (état \code{ddl\_non\_etabli}), statut propre à chaque relation (issue~\#200)~; p-valeurs asymptotiques~: approximation normale, résultat asymptotique (statuts dans les paramètres de l'étape) \\
 S6 \code{signes} & $n_{+}$, $n_{-}$, nuls, $n$, statistique, p asymptotique, p exacte, $E_{H_0}[n_{+}]$, p et erreur de Monte-Carlo & centrale & décomptes descriptifs~; p asymptotique et exacte sous $P(r_c > 0) = 1/2$, \textbf{qui n'est pas} $H_0$~(i)~; $E_{H_0}[n_{+}]$ exact sous $H_0$~(i)~; Monte-Carlo de niveau exact \\
 S7 \code{runs} & séquences, $R$, espérance, variance, statistique, p asymptotique, p exacte, p et erreur de Monte-Carlo & inférieure & moments, p asymptotique et exacte conditionnelles à $(n_{+}, n_{-})$ sous l'équiprobabilité des ordres, \textbf{qui n'est pas} $H_0$~(i)~; p exacte par \code{lchoose()} en approximation numérique~; Monte-Carlo de niveau exact \\
 S8 \code{wilcoxon} & $n$, nuls, groupes d'ex aequo, $w_{+}$, variance, $z$, p asymptotique, p exacte, p et erreur de Monte-Carlo & centrale & sous la symétrie des différences autour de 0, \textbf{qui n'est pas} $H_0$~(i)~; p exacte par \code{psignrank()} en approximation numérique~; Monte-Carlo de niveau exact \\
@@ -9771,21 +9973,31 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     foi)~: décomptes de strates et de groupes et ddl, exacts~; $T$ et
     $z_s$, approximation numérique~; p-valeur asymptotique, résultat
     asymptotique dans le régime d'information croissante (issue~\#185)~:
-    plus petite valeur propre de $V$ réduite (de façon équivalente, à
-    nombre de groupes fixé, plus petite valeur propre non nulle de $V$)
-    tendant vers l'infini, le nombre de strates étant fixe ou croissant~;
-    $D_{\cdot c}$ peut rester petit dans chaque strate~: sachant les
+    plus petite valeur propre de $V$ réduite (de façon équivalente, plus
+    petite valeur propre non nulle de $V$) tendant vers l'infini, à nombre
+    de groupes fixé, le nombre de strates étant fixe ou croissant~;
+    $D_{\cdot c}$ peut rester borné dans chaque strate quand le nombre de
+    strates croît~: sachant les
     $D_{\cdot c}$, $U$ est la somme de $\sum_c D_{\cdot c}$ vecteurs
     indépendants, un par décès (vecteur indicateur du groupe du décès
     moins $\pi_c$), centrés sous $H_0$ et bornés, dont les matrices de
     variance somment à $V$~; le théorème central limite de Lindeberg, sous
     sa forme multivariée, s'applique dès que cette valeur propre tend vers
     l'infini, et le régime $D_{\cdot c} \to \infty$ dans chaque strate
-    n'est donc pas requis. La condition, reprise du statut, qu'aucune
-    strate ne porte à elle seule une part non négligeable de $V$ est
-    suffisante sans être nécessaire, et ne peut être remplie quand le
-    nombre de strates est fixe (issue~\#202, décision du mainteneur du
-    10/11/2026~: correction du statut du code renvoyée hors de B16).
+    n'est donc pas requis. Jusqu'à l'issue~\#202, le statut du code
+    ajoutait qu'aucune strate ne porte à elle seule une part non
+    négligeable de $V$~: cette condition, suffisante sans être nécessaire,
+    ne peut être remplie quand le nombre $K$ de strates est fixe, la plus
+    grande part valant alors au moins $1/K$~; il disait
+    aussi que $D_{\cdot c}$ peut rester petit dans chaque strate, ce qui est
+    faux à nombre de strates fixe, puisque la valeur propre, majorée par
+    la trace de $V$, elle-même au plus $\sum_c D_{\cdot c}$, ne tend alors
+    vers l'infini que si le plus grand des $D_{\cdot c}$ tend vers
+    l'infini. La
+    condition est retirée du statut, qui dit désormais le nombre de groupes
+    fixé et ne laisse $D_{\cdot c}$ borné que si le nombre de strates croît
+    (issue~\#202, relecture d'\code{actuary-approfondi}, texte repris mot
+    pour mot~; correction renvoyée hors de B16 par la décision M364).
     Illustration~: constat de simulation m8 de la spécification
     (commentaire 6747045250 de l'issue~\#185), hors batterie, $10^4$
     réplications par cas, erreur de Monte-Carlo $0{,}0022$ sur un taux de
@@ -9839,7 +10051,9 @@ l'hypothèse nulle, les statuts et la référence de méthode
 (test, variable et variable de conditionnement, bornes de tranche,
 strates informatives, groupes, statistique, ddl, p-valeurs asymptotique,
 exacte avec son état, de Monte-Carlo avec son erreur, état)~;
-\code{segments}~; \code{monte\_carlo} ($B$, graine, tirages par jeu).
+\code{segments}, dont les colonnes \code{etat} (\code{character}),
+\code{rapport\_observes\_attendus} et \code{z} (\code{double}) gardent leur
+type même à 0 ligne (issue~\#201)~; \code{monte\_carlo} ($B$, graine, tirages par jeu).
 \code{diagnostics}~: cellules, cellules informatives, sans décès, non
 informatives et à événement sans exposition, décès de ces dernières,
 lignes, décès et exposition hors plage, total des décès. La fiche ne
@@ -9912,7 +10126,10 @@ recoupements~: la ligne de \code{ETAPES}, les paramètres, les états et les
 statuts (mention d'indépendance, place de la qualification «~asymptotique
 sous le modèle de survie~», $O/A$ non nommé SMR, aucune attribution~;
 régime d'information croissante de la p-valeur asymptotique et de $z_s$,
-T185.1, issue~\#185)~;
+T185.1, issue~\#185~; statut de la p-valeur asymptotique sans condition
+sur les parts des strates dans $V$, à nombre de groupes fixé, $D_{\cdot c}$
+borné seulement quand le nombre de strates croît, statut de $z_s$
+inchangé, aucune source citée, T202, issue~\#202)~;
 chaque refus de \code{valider\_plan()} et leur ordre, et l'invariance des
 refus de l'étape \code{validation} après l'extraction des briques de
 forme~; sur un petit jeu, $T$, ddl et p asymptotiques des tests global,
@@ -9923,7 +10140,9 @@ aequo du Monte-Carlo et l'accumulation de la somme des tranches~; la
 concordance de $p_{MC}$ avec la p-valeur exacte pour un grand $B$ (contrôle
 de cohérence)~; deux composantes connexes~; chaque cas aux limites~; la
 localité de la graine (F11), sa non-vacuité et l'égalité à l'appel direct
-sous la graine du plan~; l'état du générateur de l'appelant~; la section
+sous la graine du plan~; l'état du générateur de l'appelant~; les types
+des colonnes de \code{segments} sur une exposition à 0 ligne, identiques
+à ceux d'une exposition non vide (issue~\#201)~; la section
 du rapport figé et le rejeu. \textbf{Recoupements}~: $T$ et ddl égaux à la
 statistique de Rao et à ses degrés de liberté d'un \code{glm()} de Poisson
 à offset (\code{anova(\ldots, test = "Rao")}), pour le test global, chaque
@@ -9961,7 +10180,60 @@ est un résultat exact (lois conditionnelles discrètes, ex aequo comptés).
 La discrétude des lois conditionnelles,
 vérifiée par \code{actuary-approfondi}, l'explique en partie~; un écart
 résiduel n'est pas expliqué. \textbf{Réserve}~: le constat ne porte que sur
-deux segments, et la puissance n'y est pas mesurée.
+deux segments~; la puissance fait l'objet du constat suivant (issue~\#184).
+
+\medskip
+\noindent
+{\sloppy\textbf{Constat de simulation hors CI~: puissance du test
+d'homogénéité} (issue~\#184~; spécification d'\code{actuary-approfondi},
+commentaire 6775962003 de l'issue~\#184, décision M398~; script
+\code{tests/mesures/constat\_puissance\_homogeneite.R}, commit
+\code{81c83da}~; graines $[20\,841\,200~;\ 21\,991\,199]$). Loi commune de
+Gompertz-Makeham ($A = 2 \cdot 10^{-4}$, $B = 2{,}5 \cdot 10^{-5}$,
+$c = 1{,}1$), rachat de 5~\%~; un portefeuille simulé par segment, une
+tête par contrat~; plan du constat de taille (âges 20 à 90, tranches de
+bornes 20, 50 et 70, $B = 199$~réplications). Alternative~: force de mortalité d'un seul
+segment multipliée par $\theta$ (famille~P~: $S = 2$, 4 ou 8 segments de
+parts égales~; famille~U~: deux segments de parts $0{,}9$ et $0{,}1$, le
+petit étant déviant), ou par $\tau$ avant 70~ans et $1/\tau$ ensuite
+(famille~C)~; $n = 2\,000$, $8\,000$ ou $32\,000$ têtes~; $R = 1\,000$ jeux
+par cellule, nombres aléatoires communs par bloc~; règle de lecture fixée
+avant tout jeu (taille, prédiction, descriptif). \textbf{Statuts}~: taux
+de rejet, écarts et écart minimal détectable observé sont des
+\emph{constats de simulation} (erreur de Monte-Carlo due à $R$)~; la
+puissance prédite $P(\chi^2_{\mathrm{ddl}}(\lambda) >
+\chi^2_{\mathrm{ddl},1-\alpha})$, $\lambda = \delta^{\top} V^{-1} \delta$,
+$V$ variance de $U$ sous $H_0$, est une \emph{approximation asymptotique}
+pour des alternatives proches~; $E[U \mid \text{marges}] = \delta$ est
+\emph{exact} sous le modèle de Poisson à exposition fixée~; l'erreur
+d'estimation de chaque jeu (décès par segment) est distincte. Les taux ne
+sont pas reproduits ici (E3.4)~; ils sont dans les passages consignés en
+commentaires de la PR~\#208. \textbf{Conclusions qualitatives}~: (i)~la
+puissance croît avec les décès du segment déviant et décroît avec le
+nombre de segments~; sur une base de l'ordre d'une centaine de décès,
+seuls des écarts de force de mortalité de plusieurs dizaines de pour cent
+sont détectés avec une probabilité élevée~: \textbf{un test non
+significatif ne vaut pas homogénéité}~; (ii)~la prédiction suit les taux
+observés au voisinage d'une puissance de $0{,}8$ et s'en écarte de quelques
+points à forte puissance, dans un sens fixé par la variance de $U$ sous
+l'alternative (plus grande que sous $H_0$ quand le segment déviant porte
+une petite part des décès, plus petite à deux segments égaux)~: limite de
+l'approximation, non défaut du test~; (iii)~la taille est compatible avec
+$\alpha$, sauf à huit segments de 250~têtes, où le test global de
+Monte-Carlo est détecté au-dessus de $\alpha$~: le niveau de
+\code{p\_monte\_carlo} n'est garanti que sous le modèle de Poisson à
+exposition tenue pour fixe~; sous le modèle de survie, il est
+asymptotique, et un léger excès de taille ne peut être exclu quand les
+décès par segment sont peu nombreux~; (iv)~le test global détecte mal des
+écarts de sens opposés selon l'âge, qui se compensent~; la somme des
+tranches y est bien plus sensible~; (v)~aux plus petits segments, quelques
+jeux par mille portent une cellule avec un événement sans exposition~: le
+test n'y est pas produit (état \code{evenement\_sans\_exposition})~; ces
+jeux sont hors du dénominateur, comme fixé par la spécification, et la
+détection du point~(iii) ne dépend pas de ce choix. \textbf{Réserves}~:
+une seule loi, une tête par contrat, \code{par\_annee = FALSE}, une
+variable de segmentation, $\theta$ constant par âge (familles~P
+et~U).\par}
 
 \subsection{Étape \code{importance\_exclusions}}
 \label{sec:importance-exclusions}
@@ -10024,9 +10296,13 @@ niveau, repris dans \code{details} (\code{ensemble}, \code{niveau},
 \code{integer} qui, au-delà de la borne, rendrait \code{NA} avec un simple
 avertissement~; en deçà, le total est rendu en \code{integer}. Hors ce
 refus, tout ce qui ne peut être calculé est rendu dans
-un état nommé (ci-dessous), sans refus~; seules les gardes des fonctions
-d'exposition qu'elle rappelle (par exemple \code{trop\_de\_cellules})
-restent en vigueur. Les incohérences internes (lignes reçues
+un état nommé (ci-dessous), sans refus~; seules restent en vigueur les
+gardes des fonctions d'exposition qu'elle rappelle (par exemple
+\code{trop\_de\_cellules}) et la garde générique
+\code{denombrement\_hors\_plage} du rangement en \code{integer} des
+décès observés et des événements restitués des deux comparateurs,
+défensive et testée en appel direct (issue~\#199~;
+section~\ref{sec:non-regression}, «~Type des dénombrements~»). Les incohérences internes (lignes reçues
 différentes de conservées plus exclues, invariants des retraits, ligne non
 mesurable dans un ensemble mesuré) sont des \emph{erreurs de programmation},
 non des refus. La fiche de construction ne change pas~: les grandeurs sont
@@ -10573,7 +10849,18 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     segment d'une seule cellule retenue, sous \code{positionnee} ---, et
     ses états \code{contraint\_par\_positionnement} ($n - S = 0$),
     \code{ddl\_non\_etabli} et \code{aucune\_cellule\_retenue}
-    (issue~\#179)~; \code{statuts\_validation()}
+    (issue~\#179)~; \code{smr} en \code{double} et \code{etat} en
+    \code{character} sans aucun groupe, par
+    \code{sous\_groupes\_positionnee()} et par
+    \code{sous\_groupes\_validation()} sous les trois relations
+    (issue~\#201)~; statuts des bornes exactes et des p-valeurs de
+    sous-groupe propres à \code{independante} et à
+    \code{ajustee\_hors\_outil}, mot pour mot, fragment
+    \code{ajustee\_hors\_outil} commun aux p-valeurs exactes et
+    asymptotiques, et, par \code{construire\_table()} sous ces deux
+    relations, \code{statuts\_sous\_groupes} égal aux lignes de
+    \code{STATUTS\_VALIDATION}, état \code{ddl\_non\_etabli} et colonnes
+    \code{NA} sous la seconde (issue~\#200)~; \code{statuts\_validation()}
     et chaque branchement à trois valeurs, erreur de programmation par
     défaut~; sur un jeu d'un segment, $X^2$, $G^2$, ddl $= n - S$, SMR
     global égal à 1 et grandeurs sous $H_0$ non produites, fluctuation
@@ -10696,6 +10983,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{ETATS\_CELLULE\_VALIDATION} & constante & --- & les cinq états d'une cellule (section~\ref{sec:validation-etape}) \\
 \catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les états d'une grandeur, dont \code{contraint\_par\_}\allowbreak\code{positionnement} (section~\ref{sec:validation-statistiques}) \\
 \catalogue{fonctions-validation}{ETATS\_SOUS\_GROUPES\_VALIDATION} & constante & --- & les états d'une ligne des sous-groupes~: \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_}\allowbreak\code{retenue}, et, sous \code{positionnee}, \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{bornes\_non\_}\allowbreak\code{definies}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max} \\
+\catalogue{fonctions-validation}{PHRASES\_ATTENDUS\_FAIBLES} & constante & --- & liste de trois phrases écrites une seule fois et lues par \code{STATUTS\_VALIDATION} et \code{STATUTS\_VALIDATION\_}\allowbreak\code{POSITIONNEE}~: \code{petits} (approximation non garantie aux attendus $A_c$ petits, statuts de \code{khi2\_pearson}/\allowbreak\code{p\_asymptotique} et de \code{deviance}/\allowbreak\code{p\_asymptotique}), \code{fin\_x2} (niveau réel de la p asymptotique de $X^2$ non établi, au-dessus du niveau nominal dans les constats de simulation) et \code{g2} (espérance de la contribution d'une cellule à $G^2$)~; section~\ref{sec:validation-statistiques}, issues~\#179 et~\#200 \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION} & constante & --- & \code{data.frame} (\code{statistique}, \code{grandeur}, \code{sous\_h0}, \code{statut})~: une ligne par grandeur, dans l'ordre du résultat~; \code{sous\_h0} désigne les grandeurs non produites sous \code{ajustee\_hors\_outil} (tableau~\ref{tab:statistiques-validation}) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION\_POSITIONNEE} & constante & --- & mêmes lignes que \code{STATUTS\_VALIDATION}, statuts remplacés sous \code{positionnee} (lois conditionnelles, ddl $n - S$, table positionnée~; décision M309) \\
 \catalogue{fonctions-validation}{statuts\_validation()} & interne & relation & statuts de la relation (\code{switch} à trois valeurs, erreur de programmation par défaut) \\
@@ -10741,7 +11029,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{classe\_motifs()} & interne & motifs, unité, clés & classe de chaque motif~: mesurable, non calculable faute de clé, non mesurable \\
 \catalogue{fonctions-validation}{classer\_lignes\_exclues()} & interne & lignes exclues par motif, unité, clés & lignes distinctes et leur classe~; seule source des ensembles $S$ \\
 \catalogue{fonctions-validation}{cle\_cellules()} & interne & cellules, clés, découpage & clé de chaque cellule (segmentation, âge, année) \\
-\catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}~; même unité que la construction, sinon erreur de programmation \\
+\catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}, sans refus de la période sans exposition (\code{refuser\_vide = FALSE}, issue~\#210)~; même unité que la construction, sinon erreur de programmation \\
 \catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes $S$, clés, contexte & cellules retirées (événements, jours, $E^c$), têtes touchées et indéterminées~; garde de réintégration et invariants \\
 \catalogue{fonctions-validation}{cellules\_regroupees()} & interne & table d'exposition, découpage & cellules des lignes conservées au niveau~A, sommées sur les segments \\
 \catalogue{fonctions-validation}{smr\_comparateur\_1()} & interne & cellules retirées et conservées, clés, découpage, niveau & taux conservés et attendus par cellule~; $O$, $A$, SMR, bornes, rapport de variance, état \\

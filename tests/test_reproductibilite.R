@@ -402,6 +402,34 @@ SANS_REFERENCE <- character(0)
 # etat_cellule, ligne khi2_pearson/variance_h0, colonnes p_*_asymptotique des
 # sous-groupes, statuts du positionnement et de l'homogénéité) closes par la
 # régénération unique (R) de B16 (run CI 42771679323, ecaead0).
+# Transitions #199, #200 et #202 (B18 ; types des 27 chemins de dénombrement,
+# textes de statut de sous_groupes/bornes_exactes et sous_groupes/p_valeurs,
+# texte de tests/p_asymptotique de l'homogénéité) closes par la régénération
+# unique (R) de B18 (run CI 42982198441, 140a41b) ; transition_199(),
+# transition_200(), transition_202() et les constantes *_200 et *_202
+# retirées. CHEMINS_199 reste : liste des 27 chemins de dénombrement de #199
+# (ADR 0009, seconde annotation du 10/11/2026, point 9.6 et (e)), lue par le
+# contrôle des clés retirées de TOLERANCES ; quatre jeux de plans disjoints :
+# {R8, R9} 17 chemins (validation 9, importance_exclusions 8) ; {R10} 16
+# (positionnement 5, validation 9, importance_exclusions 2) ; {R11, R12} 5
+# (homogeneite) ; {R13} 5 (positionnement).
+CHEMINS_199 <- list(
+  validation = paste0("etapes/validation/", c(
+    "resultat/sous_groupes/observes", "resultat/sequences_runs/positifs", "resultat/sequences_runs/negatifs",
+    "resultat/sequences_runs/runs", "resultat/monte_carlo/tirages_effectues", "diagnostics/etats/evenements",
+    "diagnostics/evenements_sans_attendu", "diagnostics/evenements_hors_plage", "diagnostics/evenements_total")),
+  importance_exclusions_1 = paste0("etapes/importance_exclusions/resultat/smr_comparateur_1/", c(
+    "observes", "evenements_sans_exposition_retenue")),
+  importance_exclusions_2 = paste0("etapes/importance_exclusions/resultat/smr_comparateur_2/", c(
+    "observes", "evenements_sans_valeur_table", "evenements_taux_table_egal_un", "evenements_sans_attendu",
+    "evenements_hors_plage", "observes_conserves")),
+  positionnement = paste0("etapes/positionnement/", c(
+    "resultat/smr/observes", "diagnostics/etats/evenements", "diagnostics/evenements_sans_attendu",
+    "diagnostics/evenements_hors_plage", "diagnostics/evenements_total")),
+  homogeneite = paste0("etapes/homogeneite/", c(
+    "resultat/segments/observes", "resultat/monte_carlo/jeux/tirages_effectues",
+    "diagnostics/evenements_cellules_evenement_sans_exposition", "diagnostics/evenements_hors_plage",
+    "diagnostics/evenements_total")))
 TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
@@ -887,6 +915,32 @@ verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
   nues <- cles_nues()
   if (length(nues)) paste("clés nues :", paste(nues, collapse = ", ")) else TRUE
 })
+# Dénombrements en integer, sans clé (ADR 0009, seconde annotation du
+# 10/11/2026, (e) ; #199) : les 27 clés exactes des chemins de CHEMINS_199
+# sont retirées ; 148 clés, dont 41 exactes, restent.
+verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 148 clés dont 41 exactes (ADR 0009, point 9.6, (e))", {
+  cles_199 <- sub("^etapes/", "", unlist(CHEMINS_199, use.names = FALSE))
+  restantes <- intersect(cles_199, names(TOLERANCES))
+  if (length(cles_199) != 27L || anyDuplicated(cles_199)) "CHEMINS_199 : 27 chemins distincts attendus"
+  else if (length(restantes)) paste("clés encore présentes :", paste(restantes, collapse = ", "))
+  else if (length(TOLERANCES) != 148L || sum(TOLERANCES == 0) != 41L)
+    sprintf("%d clés dont %d exactes, au lieu de 148 et 41", length(TOLERANCES), sum(TOLERANCES == 0))
+  else TRUE
+})
+# Contrôle des types des dénombrements (ADR 0009, point 9.6, (f) ; #199, M396,
+# Q6) : tout chemin dont le dernier segment (nom de colonne ou de
+# diagnostic, jamais un nom de table) est nommé comme un dénombrement est
+# integer, dans chaque plan de référence, sauf la liste fermée
+# EXCEPTIONS_DENOMBREMENT, dont chaque exception est annotée à l'ADR 0009.
+MOTIF_DENOMBREMENT <- "^(observes|evenements.*|cellules.*|lignes.*|tetes.*|tirages_effectues|runs|positifs|negatifs)$"
+EXCEPTIONS_DENOMBREMENT <- c(
+  # (c) 1 : somme d'événements de cellules exclues, non gardées (M396, Q3 (b)).
+  "etapes/donnees/diagnostics/releves/poids_exclusions/evenements")
+denombrements_non_entiers <- function(g) {
+  ch <- names(g$types)
+  d <- ch[grepl(MOTIF_DENOMBREMENT, sub("^.*/", "", ch)) & !(ch %in% EXCEPTIONS_DENOMBREMENT)]
+  d[g$types[d] != "integer"]
+}
 aplatis <- list()
 for (p in plans_reference()) {
   id <- p$identifiant
@@ -956,6 +1010,11 @@ for (p in plans_reference()) {
   verifier(sprintf("%s : aucun chemin classé par deux clés", id), {
     conflit <- doubles_multi_cles(names(g$types)[g$types == "double"])
     if (length(conflit)) paste("classé par plusieurs clés :", paste(utils::head(conflit, 5L), collapse = ", ")) else TRUE
+  })
+  verifier(sprintf("%s : tout chemin nommé comme un dénombrement est integer, hors EXCEPTIONS_DENOMBREMENT (ADR 0009, point 9.6, (f) ; #199)", id), {
+    mal <- denombrements_non_entiers(g)
+    if (length(mal)) paste("dénombrement non integer :", paste(sprintf("%s (%s)", mal, g$types[mal]), collapse = ", "))
+    else TRUE
   })
   # T178.3 (#178 ; spécification (0'), M361) : aucun sous-groupe de R8, R9,
   # R10 ne dépasse N_MAX_PRODUITS_CONVOLUTION ; les trois colonnes des p
@@ -1398,6 +1457,33 @@ for (chemin_ie in c("etapes/validation/diagnostics/cellules_retenues",
     chemin_ie %in% doubles_sans_tolerance(g) && !chemin_ie %in% doubles_sans_tolerance(g, masque)
   })
 }
+# Témoins de #199 (ADR 0009, seconde annotation du 10/11/2026, (e) et (f) ;
+# critère 8 de la spécification) : un chemin par famille de clés retirées,
+# integer dans le plan qui le porte, remis en double en mémoire, est relevé
+# par doubles_sans_tolerance(), que la clé exacte retirée aurait masqué, et
+# par denombrements_non_entiers() (contrôle des types, (f)). Rien n'est écrit
+# sous tests/reference/.
+for (t199 in list(c("R8", "etapes/validation/diagnostics/evenements_total"),
+                  c("R8", "etapes/importance_exclusions/resultat/smr_comparateur_2/observes"),
+                  c("R10", "etapes/positionnement/resultat/smr/observes"),
+                  c("R11", "etapes/homogeneite/resultat/monte_carlo/jeux/tirages_effectues"))) {
+  verifier(sprintf("témoin (#199) : %s de %s remis en double -> relevé par doubles_sans_tolerance() (que sa clé retirée aurait masqué) et par le contrôle des dénombrements", t199[2], t199[1]), {
+    g <- aplatis[[t199[1]]]; c_ <- t199[2]
+    if (!identical(unname(g$types[c_]), "integer"))
+      return(sprintf("%s de %s : un chemin integer attendu, type %s", c_, t199[1], unname(g$types[c_])))
+    masque <- c(TOLERANCES, stats::setNames(0, sub("^etapes/", "", c_)))
+    g$types[[c_]] <- "double"; g$valeurs[[c_]] <- as.double(g$valeurs[[c_]])
+    c_ %in% doubles_sans_tolerance(g) && !c_ %in% doubles_sans_tolerance(g, masque) &&
+      identical(denombrements_non_entiers(g), c_)
+  })
+}
+verifier("témoin (#199) : l'exception poids_exclusions/evenements est double dans R13 et n'est pas relevée ; sans l'exception, elle le serait", {
+  g <- aplatis[["R13"]]; c_ <- EXCEPTIONS_DENOMBREMENT[1L]
+  if (!identical(unname(g$types[c_]), "double")) return(sprintf("%s de R13 : double attendu", c_))
+  !length(denombrements_non_entiers(g)) &&
+    identical(local({ EXCEPTIONS_DENOMBREMENT <- character(0); environment(denombrements_non_entiers) <- environment()
+                      denombrements_non_entiers(g) }), c_)
+})
 # Une table de même nom sous une autre étape n'hérite d'aucune classe (#166,
 # point 3.4) : cellules, statistiques, retraits de R8 recopiés sous
 # `etapes/etape_non_listee` et `etapes/homogeneite` (copies en mémoire ;

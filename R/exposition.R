@@ -400,7 +400,10 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 #   entree_entre_inventaires : hypothèse d'entrée entre inventaires validée,
 #                       paramètre conditionnel de la recette
 #                       `stocks_successifs` (lu sous cette recette seulement ;
-#                       NULL, paramètre absent du plan, sous les autres).
+#                       NULL, paramètre absent du plan, sous les autres) ;
+#   refuser_vide      : TRUE (défaut) pour refuser la période sans exposition
+#                       (motif periode_sans_exposition, ci-dessous) ; FALSE
+#                       pour un sous-ensemble de lignes (exposition_lignes()).
 # Aucun contrôle (#82 ; ADR 0007, annotation du 17/10/2026, (c) et (d)) : les
 # valeurs sont celles que construire_table() a validées (controler_entrees())
 # et inscrites dans la fiche ; une seule source pour la recette et la
@@ -427,16 +430,46 @@ position_dans_cellule <- function(cal, cn, t, convention) {
 # parametres$unite_exposition), complement_initial_cellule et
 # complement_initial_fenetre (sans par_annee seulement), evenements,
 # sorties_concurrentes.
+# Refus (#210, M399) : aucune cellule d'exposition strictement positive et
+# aucun événement de la transition -> refus_tablexp, module `exposition`,
+# motif `periode_sans_exposition` (message : période et fin effective ;
+# détails : debut, fin_effective, observations, cellules) ; un événement
+# sans exposition ou un vide partiel est produit.
 # Aiguillage à deux points (ADR 0016, point 4.1), seuls branchements sur la
 # recette hors du module donnees : sur la propriété `seam` de la recette
 # (exposition_fenetres() ou exposition_cellules()), puis, dans le seam
 # « fenêtres », sur le nom de la recette pour former les fenêtres.
-calculer_exposition <- function(observations, p, segmentation, recette, conv, par_annee, entree_entre_inventaires) {
-  switch(recette$seam,
+calculer_exposition <- function(observations, p, segmentation, recette, conv, par_annee, entree_entre_inventaires,
+                                refuser_vide = TRUE) {
+  res <- switch(recette$seam,
     fenetres = exposition_fenetres(observations, p, segmentation, recette, conv, par_annee, entree_entre_inventaires),
     cellules = exposition_cellules(observations, p, segmentation, recette, conv, par_annee),
     stop(sprintf("calculer_exposition() : seam « %s » inconnu (erreur de programmation).", recette$seam),
          call. = FALSE))
+  # Période sans exposition (#210, M399) : aucune cellule d'exposition
+  # strictement positive (exposition_jours, exposition_centrale ou
+  # exposition_initiale, selon les colonnes de la recette) et aucun événement
+  # de la transition. Un événement sans exposition (H10b, H11 : état
+  # evenement_sans_exposition) n'est pas un vide total ; un vide partiel (une
+  # année, un segment, une plage d'âges) est produit. Le plus souvent une
+  # erreur de période : la période est déclarée, jamais déduite (E2.3, E2.5).
+  # Le refus porte sur la table de la construction : exposition_lignes()
+  # (validation) passe refuser_vide = FALSE pour les sous-ensembles de lignes
+  # exclues, dont l'exposition peut être légitimement vide (mesuré, #210).
+  t <- res$resultat$exposition
+  colonnes <- intersect(c("exposition_jours", "exposition_centrale", "exposition_initiale"), names(t))
+  if (refuser_vide && !any(vapply(t[colonnes], function(v) any(v > 0, na.rm = TRUE), NA)) && !any(t$evenements > 0L, na.rm = TRUE))
+    refuser("exposition", "periode_sans_exposition",
+            formuler(paste("Période d'observation sans exposition : aucune exposition ni aucun événement de la",
+                           "transition entre %s et la fin effective %s (fin %s, délai %s jour(s)) ; %d observation(s),",
+                           "%d cellule(s). Vérifier la période déclarée (une erreur de période est la cause la plus",
+                           "fréquente) ; la construction est refusée."),
+                     citer(format(p$periode[["debut"]])), citer(format(res$parametres$fin_effective)),
+                     citer(format(p$periode[["fin"]])), citer(format(p$delai_declaration)),
+                     res$diagnostics$observations, res$diagnostics$cellules),
+            list(debut = p$periode[["debut"]], fin_effective = res$parametres$fin_effective,
+                 observations = res$diagnostics$observations, cellules = res$diagnostics$cellules))
+  res
 }
 
 # Seam « fenêtres » (ADR 0016, point 4.2 ; ADR 0014, point 6) : corps de
@@ -567,9 +600,6 @@ exposition_fenetres <- function(observations, p, segmentation, recette, conv, pa
     avert <- avertir(avert, "exposition", "evenement_sans_exposition",
                      sprintf("Relevé : %d cellule(s) à exposition nulle qui comptent au moins un événement.",
                              sans_exposition), sans_exposition)
-  if (!n_cel)
-    avert <- avertir(avert, "exposition", "aucune_exposition",
-                     "Aucune exposition ni aucun événement dans la période d'observation.", 0)
   # Avertissements propres à la recette (aucun sous `lignes_dates_completes`).
   for (k in seq_len(nrow(fs$avertissements)))
     avert <- avertir(avert, "exposition", fs$avertissements$code[k], fs$avertissements$message[k],
@@ -711,6 +741,12 @@ exposition_cellules <- function(observations, p, segmentation, recette, conv, pa
                      .Machine$integer.max, sum(d > .Machine$integer.max)),
             list(cellules = sum(d > .Machine$integer.max)))
   table_exp$evenements <- as.integer(d)
+  # Total des événements (#199, M397 ; ADR 0009, point 9.6, (d) 3) : formé en
+  # double, rangé en integer par denombrement_entier(), qui refuse au-delà de
+  # .Machine$integer.max (sum() d'un integer rendrait sinon un double, sans
+  # avertissement). Après la garde par cellule ; les sommes des étapes en aval
+  # portent sur des sous-ensembles de ces cellules.
+  evenements_total <- denombrement_entier(sum(d), "exposition", "evenements")
 
   # Relevés.
   sommees <- !par_annee && "annee" %in% names(observations)
@@ -764,7 +800,7 @@ exposition_cellules <- function(observations, p, segmentation, recette, conv, pa
                       hypothese_censure = texte_moteur(HYPOTHESE_CENSURE_DECLAREE),
                       hypotheses_recette = hypotheses_agregats(declarees, "annee" %in% names(observations), cv)),
     resultat = list(exposition = table_exp),
-    diagnostics = list(observations = n_obs, evenements = sum(table_exp$evenements), cellules = n_cel,
+    diagnostics = list(observations = n_obs, evenements = evenements_total, cellules = n_cel,
                        cellules_evenement_sans_exposition = sans_exposition,
                        cellules_absentes_de_la_plage = as.integer(trous)),
     avertissements = avert

@@ -87,7 +87,9 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
   # textes des deux p asymptotiques ; avant #179 : 3e1b88019ff1d3a567acbd3c37aed3ec)
   # puis par #178 (ligne sous_groupes/p_valeurs_asymptotiques, texte propre à
   # chaque relation, condition 1 du visa d'actuary ; avant #178 :
-  # 937ad009c51822ad825fff9a3c560527),
+  # 937ad009c51822ad825fff9a3c560527) puis par #200 (textes par relation de
+  # sous_groupes/bornes_exactes et p_valeurs ; avant #200 :
+  # 01c6538a2b101311732eed745fcb3c05),
   # valeur écrite en dur (identité exacte) : octets bruts des
   # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
   # lignes par un saut de ligne ; indépendante de la locale d'installation
@@ -115,7 +117,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
                         grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
                               useBytes = TRUE))
                       TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
-    independante = if (identical(unname(tools::md5sum(f)), "01c6538a2b101311732eed745fcb3c05")) TRUE
+    independante = if (identical(unname(tools::md5sum(f)), "7c535735fdb65e7aa57c22f86d60ffb3")) TRUE
                    else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(
@@ -182,7 +184,7 @@ verifier("J1 positionné : statuts de la colonne statut = STATUTS_VALIDATION_POS
   b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
   b <- b[b$statistique != "sous_groupes", ]
   identical(sp$statut, b$statut) && all(sp$etat %in% tablexp:::ETATS_GRANDEUR_VALIDATION) &&
-    identical(SP$tirages_effectues, 99)
+    identical(SP$tirages_effectues, 99L)
 })
 verifier("statistiques_validation() : relation inconnue -> erreur de programmation ; segment absent sous positionnee, ou présent sous independante -> erreur de programmation", tous(
   r = programmation(erreur_de(pos_j(relation = "autre", segment = NULL))),
@@ -355,7 +357,7 @@ verifier("étape : SMR global = 1 (1e-12), bornes et p-valeurs NA (contraint_par
   smr = proche(valeur(ST, "smr/smr"), 1, 1e-12, 0),
   na = if (all(etat_de(ST, c("smr/borne_inf_exacte", "smr/p_centrale", "smr/z_racine_cubique")) ==
                "contraint_par_positionnement")) TRUE else "états",
-  mc = if (identical(V$resultat$monte_carlo$tirages_effectues, 99) &&
+  mc = if (identical(V$resultat$monte_carlo$tirages_effectues, 99L) &&
            identical(V$resultat$monte_carlo$graine, 20261116L)) TRUE else "Monte-Carlo"))
 verifier("étape : paramètres (relation positionnee, p = 1 par segment, hypothèse nulle et statuts de la relation) ; statut des statistiques", {
   p <- V$parametres
@@ -502,11 +504,11 @@ verifier("A1 : ddl = n - S = 0 (une cellule par segment ; S = 1 et S = 2 ; E^c =
               une_cellule(c(13.7, 13.7), c(3L, 1L), c(1L, 2L)))
   e <- lapply(cas, etats_a1)
   all(vapply(e, function(a) identical(a$ddl, 0) && identical(a$contraints, attendu) && a$na_tests &&
-               identical(a$tirages, 0) && a$produits, NA))
+               identical(a$tirages, 0L) && a$produits, NA))
 })
 verifier("A1 témoin : ddl = 1 (un segment de deux cellules) -> tests produits, B tirages", {
   a <- etats_a1(une_cellule(c(7, 13.7), c(3L, 1L), c(1L, 1L)))
-  identical(a$ddl, 1) && identical(a$tirages, 99) &&
+  identical(a$ddl, 1) && identical(a$tirages, 99L) &&
     !any(c("khi2_pearson/p_asymptotique", "khi2_pearson/p_monte_carlo") %in% a$contraints)
 })
 
@@ -662,14 +664,20 @@ verifier("T179.1 statuts : p asymptotique de X2 avec 2 + 1/A_c (independante) et
              grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs", g2[2L],
                    fixed = TRUE))
            TRUE else "deviance",
-    # Phrases recopiées entre les deux tables (portée locale) : identiques.
+    # Phrases partagées entre les deux tables (PHRASES_ATTENDUS_FAIBLES, #200) :
+    # identiques ; `petits` précède « : sous H0 (i) » dans les quatre p
+    # asymptotiques.
     copies = local({
+      p4 <- c(k(a, "khi2_pearson", "p_asymptotique"), k(a, "deviance", "p_asymptotique"),
+              k(b, "khi2_pearson", "p_asymptotique"), k(b, "deviance", "p_asymptotique"))
+      if (!all(grepl("approximation non garantie quand des attendus A_c sont petits : sous H0 (i)", p4, fixed = TRUE)))
+        return("phrase petits absente d'une p asymptotique")
       phrase_g2 <- regmatches(g2, regexpr("l'espérance de la contribution.*garanti sous H0 \\(i\\)", g2))
       fin_x2 <- sub(".*khi2_pearson/variance_h0\\) ; ", "", k(a, "khi2_pearson", "p_asymptotique"))
       if (length(phrase_g2) == 2L && identical(phrase_g2[1L], phrase_g2[2L]) &&
           startsWith(fin_x2, "le niveau réel") &&
           grepl(paste0("sont égaux ; ", fin_x2, " ; unités d'observation"), k(b, "khi2_pearson", "p_asymptotique"),
-                fixed = TRUE)) TRUE else "phrases recopiées différentes"
+                fixed = TRUE)) TRUE else "phrases partagées différentes entre les tables"
     }),
     ligne = if (all(vapply(list(a, b), function(s)
                   identical(ordre(s), c("statistique", "ddl", "variance_h0", "p_asymptotique", "p_monte_carlo",
@@ -873,4 +881,132 @@ verifier("T178.3 statuts : ligne sous_groupes/p_valeurs_asymptotiques (sous_h0) 
     p_valeurs = if (grepl("état convolution_au_dela_n_max sinon, p-valeurs asymptotiques produites à leur place) ;",
                           k(b, "p_valeurs"), fixed = TRUE)) TRUE else "p_valeurs (positionnee)",
     etape = if (identical(nrow(V$parametres$statuts_sous_groupes), 4L)) TRUE else "statuts_sous_groupes")
+})
+verifier("T200.1 statuts : sous_groupes/bornes_exactes et p_valeurs, texte propre à chaque relation (independante, ajustee_hors_outil), mot pour mot selon l'avis d'actuary (#200) ; fragment ajustee_hors_outil des p-valeurs commun à p_valeurs et p_valeurs_asymptotiques ; positionnee inchangée", {
+  a <- tablexp:::STATUTS_VALIDATION; b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
+  k <- function(s, g) s$statut[s$statistique == "sous_groupes" & s$grandeur == g]
+  ajustee_p <- paste("relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe",
+                     "(ddl_non_etabli) ; colonnes NA")
+  tous(
+    bornes = if (identical(k(a, "bornes_exactes"),
+                           paste("relation independante : exactes sous la loi supposée (O ~ Poisson, A fixe), p = 0 :",
+                                 "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ;",
+                                 "couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ;",
+                                 "relation ajustee_hors_outil : non produites, p non établi, aucun intervalle du",
+                                 "sous-groupe (ddl_non_etabli) ; colonnes NA"))) TRUE else "texte bornes_exactes",
+    p_valeurs = if (identical(k(a, "p_valeurs"),
+                              paste("relation independante : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le",
+                                    "modèle de survie ; fonctions de répartition de Poisson (ppois), approximation",
+                                    "numérique ; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité ;",
+                                    ajustee_p))) TRUE else "texte p_valeurs",
+    commun = if (endsWith(k(a, "p_valeurs"), ajustee_p) && endsWith(k(a, "p_valeurs_asymptotiques"), ajustee_p)) TRUE
+             else "fragment ajustee_hors_outil",
+    relations = if (all(vapply(c("bornes_exactes", "p_valeurs", "p_valeurs_asymptotiques"), function(g)
+                         grepl("relation independante : ", k(a, g), fixed = TRUE) &&
+                           grepl("relation ajustee_hors_outil : non produites", k(a, g), fixed = TRUE), NA))) TRUE
+                else "relation absente",
+    positionnee = if (!any(grepl("relation ajustee_hors_outil", c(k(b, "bornes_exactes"), k(b, "p_valeurs")), fixed = TRUE))) TRUE
+                  else "positionnee modifiée")
+})
+verifier("T200.2 de bout en bout (construire_table sous ajustee_hors_outil et independante) : statuts_sous_groupes de l'étape = lignes de STATUTS_VALIDATION, texte ajustee_hors_outil présent ; sous ajustee_hors_outil, état ddl_non_etabli et colonnes bornes et p-valeurs NA, SMR produit", {
+  e <- character(0)
+  for (rel in c("independante", "ajustee_hors_outil")) {
+    x <- construire_table(JEU, ROLES, plan_vp(pos = NULL, val = modifyList(VAL, list(relation_table = rel))),
+                          tables_reference = list(tv = T_HF))
+    v <- x$etapes$validation
+    st <- v$parametres$statuts_sous_groupes
+    ref <- tablexp:::STATUTS_VALIDATION
+    ref <- ref[ref$statistique == "sous_groupes" & ref$grandeur %in% c("bornes_exactes", "p_valeurs"), ]
+    t_ <- function(g) st$statut[st$grandeur == g]
+    if (!identical(t_("bornes_exactes"), ref$statut[ref$grandeur == "bornes_exactes"]) ||
+        !identical(t_("p_valeurs"), ref$statut[ref$grandeur == "p_valeurs"]) ||
+        !grepl("relation ajustee_hors_outil : non produites, p non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA",
+               t_("bornes_exactes"), fixed = TRUE) ||
+        !grepl("relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA",
+               t_("p_valeurs"), fixed = TRUE))
+      e <- c(e, paste(rel, ": statuts_sous_groupes"))
+    g <- v$resultat$sous_groupes
+    cols <- c("borne_inf_exacte", "borne_sup_exacte", "p_inferieure", "p_superieure", "p_centrale")
+    if (rel == "ajustee_hors_outil" &&
+        (!all(g$etat == "ddl_non_etabli") || !all(vapply(g[cols], function(z) all(is.na(z)), NA)) || anyNA(g$smr)))
+      e <- c(e, "ajustee_hors_outil : état ou colonnes")
+    if (rel == "independante" && (!all(g$etat == "produite") || anyNA(g$p_centrale)))
+      e <- c(e, "independante : états ou p")
+  }
+  if (length(e)) paste(e, collapse = " | ") else TRUE
+})
+
+# --- K. Type des colonnes etat et smr sur entrée vide (#201) ------------------------
+# ifelse() sur un vecteur vide rendait logical(0) : etat (character) et smr
+# (double) sortaient en logical quand le regroupement n'avait aucun groupe.
+
+verifier("K (#201) : sous_groupes_positionnee() sans groupe (n_g = 0) -> smr double et etat character de longueur 0 ; avec groupes, inchangés", {
+  r <- tablexp:::sous_groupes_positionnee("tranche", integer(0), 0L, integer(0), logical(0), numeric(0), numeric(0),
+                                          numeric(0), numeric(0), 0.95)
+  p <- tablexp:::sous_groupes_positionnee("tranche", c(1L, 2L), 2L, c(1L, 1L), c(TRUE, TRUE), c(1, 0), c(2, 3),
+                                          c(1, 0), c(2, 0), 0.95)
+  tous(vide = if (identical(r$smr, numeric(0)) && identical(r$etat, character(0))) TRUE
+              else paste(typeof(r$smr), typeof(r$etat)),
+       pleine = if (identical(p$smr, c(0.5, NA)) && identical(p$etat[2L], "aucune_cellule_retenue") &&
+                    identical(typeof(p$etat), "character")) TRUE else "groupes non vides")
+})
+verifier("K (#201) : sous_groupes_validation() sans groupe (tranches vides), sous les trois relations -> 0 ligne, smr double et etat character", {
+  v <- function(rel) tablexp:::sous_groupes_validation(data.frame(age = integer(0)), integer(0), data.frame(), integer(0),
+                                                       numeric(0), c(20, 90), numeric(0), numeric(0), logical(0), FALSE,
+                                                       0.95, rel)
+  rels <- c("independante", "ajustee_hors_outil", "positionnee")
+  r <- lapply(stats::setNames(rels, rels), v)
+  do.call(tous, lapply(r, function(x)
+    if (nrow(x) == 0L && identical(typeof(x$etat), "character") && identical(typeof(x$smr), "double")) TRUE
+    else paste(nrow(x), typeof(x$etat), typeof(x$smr))))
+})
+
+# --- L. Type des dénombrements (#199 ; ADR 0009, point 9.6) ------------------------
+# Les chemins de dénombrement des étapes positionnement et validation sont
+# integer sous la relation positionnee, y compris dans le cas dégénéré
+# ddl = n - S = 0 (aucun tirage) et sans cellule retenue (séquences vides) ;
+# la garde de sous_groupes_validation() refuse au-delà de
+# .Machine$integer.max (garde défensive, appel direct).
+
+verifier("L (#199) : statistiques_validation() sous positionnee, cas dégénéré (ddl = 0), témoin ddl = 1 et aucune cellule retenue -> tirages_effectues et colonnes positifs, negatifs, runs en integer", {
+  deg <- une_cellule(7, 3L, 1L)
+  tem <- une_cellule(c(7, 13.7), c(3L, 1L), c(1L, 1L))
+  vide <- sv(0L, 0, 0.1, -log1p(-0.1), 0, "sans_exposition", 1L, 1L, 0.95, "positionnee", 9, 1L, 1L)
+  ty <- function(S) paste(c(typeof(S$tirages_effectues), vapply(S$sequences[c("positifs", "negatifs", "runs")], typeof, "")),
+                          collapse = " ")
+  attendu <- "integer integer integer integer"
+  tous(degenere = if (identical(ty(deg), attendu) && identical(deg$tirages_effectues, 0L)) TRUE else ty(deg),
+       temoin = if (identical(ty(tem), attendu) && identical(tem$tirages_effectues, 99L)) TRUE else ty(tem),
+       vide = if (identical(ty(vide), attendu) && nrow(vide$sequences) == 0L) TRUE else ty(vide))
+})
+verifier("L (#199) : construction positionnee -> dénombrements de positionnement (smr$observes, etats$evenements, evenements_sans_attendu, evenements_hors_plage, evenements_total) et de validation (sous_groupes$observes, sequences_runs, tirages_effectues, diagnostics) en integer ; identité O + sans attendu + hors plage = total", {
+  # Construction refaite : P, V et X sont réaffectés plus haut dans le fichier.
+  xp <- construire_table(JEU, ROLES, plan_vp(), tables_reference = list(tv = T_HF))
+  P <- xp$etapes$positionnement; V <- xp$etapes$validation
+  t <- c(p_observes = typeof(P$resultat$smr$observes), p_etats = typeof(P$diagnostics$etats$evenements),
+         p_sans = typeof(P$diagnostics$evenements_sans_attendu), p_hors = typeof(P$diagnostics$evenements_hors_plage),
+         p_total = typeof(P$diagnostics$evenements_total), v_sg = typeof(V$resultat$sous_groupes$observes),
+         v_seq = unique(vapply(V$resultat$sequences_runs[c("positifs", "negatifs", "runs")], typeof, "")),
+         v_tirages = typeof(V$resultat$monte_carlo$tirages_effectues), v_etats = typeof(V$diagnostics$etats$evenements),
+         v_sans = typeof(V$diagnostics$evenements_sans_attendu), v_hors = typeof(V$diagnostics$evenements_hors_plage),
+         v_total = typeof(V$diagnostics$evenements_total))
+  d <- P$diagnostics
+  tous(types = if (all(t == "integer")) TRUE else paste(names(t)[t != "integer"], collapse = ", "),
+       identite = if (identical(sum(P$resultat$smr$observes) + d$evenements_sans_attendu + d$evenements_hors_plage,
+                                d$evenements_total)) TRUE else "identité")
+})
+verifier("L (#199) : sous_groupes_validation() sans groupe -> observes integer(0) sous les trois relations ; somme des observés au-delà de .Machine$integer.max -> refus validation / denombrement_hors_plage (grandeur sous_groupes/observes), sous les trois relations", {
+  rels <- c("independante", "ajustee_hors_outil", "positionnee")
+  vide <- vapply(rels, function(rel) typeof(tablexp:::sous_groupes_validation(
+    data.frame(age = integer(0)), integer(0), data.frame(), integer(0), numeric(0), c(20, 90), numeric(0), numeric(0),
+    logical(0), FALSE, 0.95, rel)$observes), "")
+  # Deux cellules retenues d'une tranche, 1,5e9 décès chacune (integer valides).
+  gros <- lapply(rels, function(rel) tryCatch({
+    tablexp:::sous_groupes_validation(data.frame(age = c(50L, 51L)), c(1L, 1L), data.frame(row.names = 1L), c(1L, 1L),
+                                      20, c(20, 90), c(1500000000L, 1500000000L), c(1, 1), c(TRUE, TRUE), FALSE, 0.95, rel)
+    NULL }, refus_tablexp = function(r) r))
+  ok <- vapply(gros, function(r) !is.null(r) && identical(c(r$module, r$motif), c("validation", "denombrement_hors_plage")) &&
+                 identical(r$details$grandeur, "sous_groupes/observes") && identical(r$details$valeur, 3e9), NA)
+  tous(vide = if (all(vide == "integer")) TRUE else paste(vide, collapse = " "),
+       refus = if (all(ok)) TRUE else paste("relation(s) sans le refus attendu :", paste(rels[!ok], collapse = ", ")))
 })
