@@ -1105,6 +1105,17 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
   list(statistiques = stat, cellules = cl, sequences = seqs, tirages_effectues = tirages)
 }
 
+# Colonne annee d'un regroupement de sous_groupes_validation() : integer de
+# longueur n_g. n_g = 0 : integer(0) (#210) ; longueur des années égale à n_g :
+# as.integer() ; toute autre longueur est une erreur de programmation, jamais
+# recyclée en silence (#217 ; rep_len() la masquerait).
+annees_groupe <- function(an_g, n_g) {
+  if (n_g == 0L) return(integer(0))
+  if (length(an_g) != n_g)
+    stop("annees_groupe() : longueur des années différente du nombre de groupes (erreur de programmation).", call. = FALSE)
+  as.integer(an_g)
+}
+
 # Sous-groupes (S5 ; M253, point 5) : regroupements segment x tranche,
 # tranche, segment (si la segmentation n'est pas vide), année (si
 # par_annee), sur les cellules retenues ; selon la relation (switch
@@ -1126,7 +1137,7 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
     for (k in names(segments_cles)) d[[k]] <- segments_cles[[k]][seg_g]
     d$tranche_debut <- as.integer(tranches[tr_g])
     d$tranche_fin <- as.integer(fin_tranche[tr_g])
-    if (par_annee) d$annee <- rep_len(as.integer(an_g), n_g)  # integer de longueur n_g, y compris pour n_g = 0 (#210)
+    if (par_annee) d$annee <- annees_groupe(an_g, n_g)  # integer de longueur n_g, y compris pour n_g = 0 (#210, #217)
     d$cellules_retenues <- nb
     d$observes <- denombrement_entier(O, "validation", "sous_groupes/observes")  # integer (#199) ; O reste double
     d$attendus <- At
@@ -1158,11 +1169,11 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
   morceaux <- list()
   if (length(names(segments_cles))) {
     morceaux$segment_tranche <- groupe("segment_tranche", (segment - 1L) * n_tr + tranche, n_seg * n_tr,
-                                       rep(seq_len(n_seg), each = n_tr), rep(seq_len(n_tr), times = n_seg), na)
+                                       rep(seq_len(n_seg), each = n_tr), rep(seq_len(n_tr), times = n_seg), rep(na, n_seg * n_tr))
   }
-  morceaux$tranche <- groupe("tranche", tranche, n_tr, rep(na, n_tr), seq_len(n_tr), na)
+  morceaux$tranche <- groupe("tranche", tranche, n_tr, rep(na, n_tr), seq_len(n_tr), rep(na, n_tr))
   if (length(names(segments_cles)))
-    morceaux$segment <- groupe("segment", segment, n_seg, seq_len(n_seg), rep(na, n_seg), na)
+    morceaux$segment <- groupe("segment", segment, n_seg, seq_len(n_seg), rep(na, n_seg), rep(na, n_seg))
   if (par_annee) {
     an <- sort(unique(cellules$annee))
     morceaux$annee <- groupe("annee", match(cellules$annee, an), length(an), rep(na, length(an)),
