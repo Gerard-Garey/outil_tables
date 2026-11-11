@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{10/11/2026}
+\newcommand{\datedoc}{11/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -9133,7 +9133,10 @@ dans la colonne \code{statut} du résultat.
     \code{par\_annee}, sur les cellules retenues, dont le nombre est
     restitué par groupe (\code{cellules\_retenues}, en \code{integer},
     issue~\#174)~; un groupe sans cellule
-    retenue est dans l'état \code{aucune\_cellule\_retenue}. Aucune
+    retenue est dans l'état \code{aucune\_cellule\_retenue}. Les colonnes
+    \code{smr} (\code{double}) et \code{etat} (\code{character}) gardent
+    leur type pour un regroupement sans aucun groupe, sous les trois
+    relations (issue~\#201). Aucune
     correction de multiplicité (décision M217).
   \item \textbf{S6, signes} (\code{signes})~: $n_{+}$, $n_{-}$ et
     nombre de résidus nuls (retirés du test), $n = n_{+} + n_{-}$~;
@@ -9839,7 +9842,9 @@ l'hypothèse nulle, les statuts et la référence de méthode
 (test, variable et variable de conditionnement, bornes de tranche,
 strates informatives, groupes, statistique, ddl, p-valeurs asymptotique,
 exacte avec son état, de Monte-Carlo avec son erreur, état)~;
-\code{segments}~; \code{monte\_carlo} ($B$, graine, tirages par jeu).
+\code{segments}, dont les colonnes \code{etat} (\code{character}),
+\code{rapport\_observes\_attendus} et \code{z} (\code{double}) gardent leur
+type même à 0 ligne (issue~\#201)~; \code{monte\_carlo} ($B$, graine, tirages par jeu).
 \code{diagnostics}~: cellules, cellules informatives, sans décès, non
 informatives et à événement sans exposition, décès de ces dernières,
 lignes, décès et exposition hors plage, total des décès. La fiche ne
@@ -9923,7 +9928,9 @@ aequo du Monte-Carlo et l'accumulation de la somme des tranches~; la
 concordance de $p_{MC}$ avec la p-valeur exacte pour un grand $B$ (contrôle
 de cohérence)~; deux composantes connexes~; chaque cas aux limites~; la
 localité de la graine (F11), sa non-vacuité et l'égalité à l'appel direct
-sous la graine du plan~; l'état du générateur de l'appelant~; la section
+sous la graine du plan~; l'état du générateur de l'appelant~; les types
+des colonnes de \code{segments} sur une exposition à 0 ligne, identiques
+à ceux d'une exposition non vide (issue~\#201)~; la section
 du rapport figé et le rejeu. \textbf{Recoupements}~: $T$ et ddl égaux à la
 statistique de Rao et à ses degrés de liberté d'un \code{glm()} de Poisson
 à offset (\code{anova(\ldots, test = "Rao")}), pour le test global, chaque
@@ -10573,7 +10580,11 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     segment d'une seule cellule retenue, sous \code{positionnee} ---, et
     ses états \code{contraint\_par\_positionnement} ($n - S = 0$),
     \code{ddl\_non\_etabli} et \code{aucune\_cellule\_retenue}
-    (issue~\#179)~; \code{statuts\_validation()}
+    (issue~\#179)~; \code{smr} en \code{double} et \code{etat} en
+    \code{character} sans aucun groupe, par
+    \code{sous\_groupes\_positionnee()} et par
+    \code{sous\_groupes\_validation()} sous les trois relations
+    (issue~\#201)~; \code{statuts\_validation()}
     et chaque branchement à trois valeurs, erreur de programmation par
     défaut~; sur un jeu d'un segment, $X^2$, $G^2$, ddl $= n - S$, SMR
     global égal à 1 et grandeurs sous $H_0$ non produites, fluctuation
