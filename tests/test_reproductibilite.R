@@ -941,6 +941,91 @@ denombrements_non_entiers <- function(g) {
   d <- ch[grepl(MOTIF_DENOMBREMENT, sub("^.*/", "", ch)) & !(ch %in% EXCEPTIONS_DENOMBREMENT)]
   d[g$types[d] != "integer"]
 }
+# Commit préparatoire (1a) de B19 (#223 ; ADR 0017, points 1.5 et 10.1) :
+# apparier_table() appelle grille_plage() (module exposition). Ancien corps
+# d'apparier_table(), recopié de R/positionnement.R à 993068c (garde d'étape
+# retirée, sans effet sur la valeur rendue) : la valeur rendue doit être
+# identical() à celle de l'appel du package (identité exacte).
+apparier_table_993068c <- function(exposition, segmentation, par_annee, table, plage_ages) {
+  cles_seg <- if (length(segmentation))
+    do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r"))) else rep("", nrow(exposition))
+  premiers <- !duplicated(cles_seg)
+  segments <- exposition[premiers, segmentation, drop = FALSE]
+  rownames(segments) <- NULL
+  g_expo <- match(cles_seg, cles_seg[premiers])
+  n_seg <- sum(premiers)
+  ages <- seq(as.integer(plage_ages[1L]), as.integer(plage_ages[2L]))
+  annees <- if (isTRUE(par_annee)) sort(unique(exposition$annee)) else NA_integer_
+  n_age <- length(ages); n_an <- length(annees)
+  n <- n_seg * n_age * n_an
+  g <- rep(seq_len(n_seg), each = n_age * n_an)
+  cellules <- segments[g, , drop = FALSE]
+  rownames(cellules) <- NULL
+  cellules$age <- rep(rep(ages, each = n_an), times = n_seg)
+  if (isTRUE(par_annee)) cellules$annee <- as.integer(rep(annees, times = n_seg * n_age))
+  dans <- exposition$age >= plage_ages[1L] & exposition$age <= plage_ages[2L]
+  i <- ((g_expo[dans] - 1) * n_age + (exposition$age[dans] - ages[1L])) * n_an +
+    (if (isTRUE(par_annee)) match(exposition$annee[dans], annees) else 1)
+  Ec <- numeric(n); D <- integer(n)
+  Ec[i] <- exposition$exposition_centrale[dans]
+  D[i] <- exposition$evenements[dans]
+  cellules$exposition_centrale <- Ec
+  cellules$evenements <- D
+  sexes <- unique(table$sexe)
+  ensemble <- identical(sexes, "ensemble")
+  sexe_cle <- if (ensemble || !("sexe" %in% segmentation)) rep("ensemble", n) else as.character(cellules$sexe)
+  k <- match(paste(sexe_cle, cellules$age, sep = "\r"), paste(table$sexe, table$age, sep = "\r"))
+  cellules$qx_table <- table$qx[k]
+  list(cellules = cellules, segment = g,
+       hors_plage = list(cellules = sum(!dans), evenements = sum(as.numeric(exposition$evenements[!dans])),
+                         exposition = sum(exposition$exposition_centrale[!dans])),
+       appariement_sexe = if (!("sexe" %in% segmentation)) "sans_sexe"
+                          else if (ensemble) "ensemble_par_sexe" else "par_sexe")
+}
+# `ligne` de grille_plage() : chaque cellule à ligne non NA a les clés, l'âge
+# [, l'année], E^c et D de cette ligne de la table d'exposition ; chaque
+# ligne de la plage est désignée une fois ; une cellule sans ligne a E^c = 0
+# et D = 0. TRUE ou le texte de l'écart.
+controler_ligne_grille <- function(gr, ex, cles, par_annee, plage) {
+  l <- gr$ligne; c_ <- gr$cellules; a <- !is.na(l)
+  dans <- which(ex$age >= plage[1L] & ex$age <= plage[2L])
+  colonnes <- c(cles, "age", if (isTRUE(par_annee)) "annee", "exposition_centrale", "evenements")
+  if (!is.integer(l) || length(l) != nrow(c_)) "ligne : integer de la longueur de la grille attendu"
+  else if (!identical(sort(l[a]), dans)) "lignes désignées différentes des lignes de la plage"
+  else if (!isTRUE(all.equal(c_[a, colonnes], ex[l[a], colonnes], check.attributes = FALSE)) ||
+           !identical(c_$exposition_centrale[a], ex$exposition_centrale[l[a]]) ||
+           !identical(c_$evenements[a], ex$evenements[l[a]])) "cellule différente de sa ligne d'exposition"
+  else if (any(c_$exposition_centrale[!a] != 0) || any(c_$evenements[!a] != 0L)) "cellule sans ligne non nulle"
+  else TRUE
+}
+# Contrat de la table construite (ADR 0017, point 1.2) : table_construite()
+# lève une erreur de programmation (stop(), pas un refus) sur chaque
+# violation, appliquée à la table positionnée d'une construction. TRUE ou le
+# texte de l'écart.
+controler_violations_table_construite <- function(x, segmentation) {
+  et <- x$etapes
+  tp <- et$positionnement$resultat$table_positionnee
+  essai <- function(t) {
+    et$positionnement$resultat$table_positionnee <- t
+    tryCatch({ tablexp:::table_construite(et, segmentation, "positionnement"); "aucune erreur" },
+             refus_tablexp = function(r) "refus au lieu d'une erreur de programmation",
+             error = function(e) if (grepl("erreur de programmation", conditionMessage(e), fixed = TRUE)) "erreur"
+                                 else conditionMessage(e))
+  }
+  attr_en_trop <- tp; attr(attr_en_trop, "source") <- "x"
+  age_double <- tp; age_double$age <- as.double(age_double$age)
+  qx_15 <- tp; qx_15$qx[1L] <- 1.5
+  qx_na <- tp; qx_na$qx[1L] <- NA_real_
+  incomplet <- tp[-nrow(tp), , drop = FALSE]
+  avec_annee <- tp; avec_annee$annee <- 2020L
+  cas <- list(colonne_qx_absente = tp[setdiff(names(tp), "qx")], colonne_age_absente = tp[setdiff(names(tp), "age")],
+              colonne_etat_absente = tp[setdiff(names(tp), "etat")], age_double = age_double, qx_1_5 = qx_15,
+              qx_na = qx_na, segment_incomplet = incomplet, colonne_annee = avec_annee,
+              attribut_en_trop = attr_en_trop)
+  if (length(segmentation)) cas$cle_absente <- tp[setdiff(names(tp), segmentation[1L])]
+  v <- vapply(cas, essai, "")
+  if (all(v == "erreur")) TRUE else paste(sprintf("%s : %s", names(v)[v != "erreur"], v[v != "erreur"]), collapse = " ; ")
+}
 aplatis <- list()
 for (p in plans_reference()) {
   id <- p$identifiant
@@ -1028,6 +1113,35 @@ for (p in plans_reference()) {
     else if (any(sg$etat == "convolution_au_dela_n_max")) "état convolution_au_dela_n_max"
     else TRUE
   })
+  # Commit préparatoire (1a) de B19 (#223 ; ADR 0017, point 10.1), R1 et R4
+  # (par année) : apparier_table() sur la grille extraite rend un objet
+  # identical() à l'ancien corps (993068c), table de R8, plage 20 à 90 ;
+  # `ligne` de grille_plage() indexe la table d'exposition.
+  if (id %in% c("R1", "R4")) {
+    ex1 <- x_ref$etapes$exposition$resultat$exposition
+    pa1 <- x_ref$etapes$exposition$parametres$par_annee
+    tv1 <- tables_reference_r8()$tv
+    verifier(sprintf("%s : apparier_table() (grille_plage(), module exposition) identical() à l'ancien corps de 993068c (#223, ADR 0017, point 10.1)", id),
+             identical(tablexp:::apparier_table(ex1, p$plan$segmentation, pa1, tv1, c(20, 90), "tv", "validation"),
+                       apparier_table_993068c(ex1, p$plan$segmentation, pa1, tv1, c(20, 90))))
+    verifier(sprintf("%s : grille_plage() : ligne indexe la table d'exposition, cellules sans ligne nulles (#223)", id),
+             controler_ligne_grille(tablexp:::grille_plage(ex1, p$plan$segmentation, pa1, c(20, 90)), ex1,
+                                    p$plan$segmentation, pa1, c(20, 90)))
+  }
+  # Table construite (ADR 0017, points 1.2 et 1.5), R10 et R13 : la table
+  # positionnée tient le contrat (table_construite() la rend telle quelle,
+  # plage du positionnement, ddl_effectifs NULL faute de colonne) ; chaque
+  # violation lève une erreur de programmation.
+  if (id %in% c("R10", "R13")) {
+    verifier(sprintf("%s : table_construite() sur table_positionnee : table rendue identical(), plage_ages du positionnement, ddl_effectifs NULL (#223, ADR 0017, point 1.5)", id), {
+      tc <- tablexp:::table_construite(x_ref$etapes, p$plan$segmentation, "positionnement")
+      identical(names(tc), c("table", "plage_ages", "ddl_effectifs")) &&
+        identical(tc$table, x_ref$etapes$positionnement$resultat$table_positionnee) &&
+        identical(tc$plage_ages, p$plan$etapes$positionnement$plage_ages) && is.null(tc$ddl_effectifs)
+    })
+    verifier(sprintf("%s : table_construite() : colonne absente, age double, qx à 1,5 ou NA, segment incomplet, colonne annee, attribut en trop -> erreur de programmation (#223, ADR 0017, point 1.2)", id),
+             controler_violations_table_construite(x_ref, p$plan$segmentation))
+  }
   # R14 (#180, C6 à l'échelle de l'entrée de référence) : relevés de la
   # construction de référence égaux aux décomptes de l'attribut simulation
   # de son entrée (P0, E, ES par cause, présents au dernier inventaire) ;

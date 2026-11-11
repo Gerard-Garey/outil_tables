@@ -29,6 +29,9 @@
 #    de contrôle et séparateurs de ligne, encodage ; #94) ;
 #  - forme_graine() et date_unique() : prédicats de forme d'une graine et
 #    d'une date unique, écrits une seule fois (#113) ;
+#  - valeurs_entieres_double() : forme des paramètres à valeur entière en
+#    double (déplacée depuis le module positionnement, ADR 0017, point 10.1 ;
+#    corps inchangé) ;
 #  - vers_utf8_locale() : conversion des chaînes en UTF-8 selon la locale de
 #    la session, partagée par l'empreinte des données et l'ordre des segments
 #    (ADR 0007, point 9.3, annotation du 05/11/2026, (g) ; #113, #106).
@@ -131,6 +134,11 @@ forme_graine <- function(g) forme_exacte(g, c("double", "integer")) && length(g)
 date_unique <- function(x) forme_exacte(x, c("double", "integer"), "class") &&
   identical(class(x), "Date") && length(x) == 1L && !is.na(x) &&
   is.finite(unclass(x)) && unclass(x) == trunc(unclass(x))
+
+# Entier unique de type double, fini, à valeur entière (paramètres à valeur
+# entière, M246, M257 : un integer est refusé sous le motif du paramètre).
+# Forme pure, comme forme_exacte() (ADR 0017, point 10.1).
+valeurs_entieres_double <- function(v) forme_exacte(v, "double") && !anyNA(v) && all(is.finite(v)) && all(v == trunc(v))
 
 # Chaînes x (character) converties en UTF-8 selon la locale de la session
 # (ADR 0007, point 9.3 ; annotation du 05/11/2026, (g) ; #113) : sous une

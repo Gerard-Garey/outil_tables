@@ -7,17 +7,18 @@
 #  spécification d'actuary-approfondi décidée, M288, M289, M293 ; avis F2,
 #  F4, F7)
 #
-#  - CONVENTIONS_VALIDATION : conventions d'âge admises ;
-#  - valeurs_entieres_double() : forme des paramètres à valeur entière ;
-#  - controler_cle_table(), controler_plage_ages() : forme de la clé de table
-#    et de la plage d'âges, sous le module de l'étape appelante (F2) ;
+#  - controler_cle_table() : forme de la clé de table, sous le module de
+#    l'étape appelante (F2) ; CONVENTIONS_VALIDATION, valeurs_entieres_double()
+#    et controler_plage_ages() sont dans les modules `exposition` et `outils`
+#    (ADR 0017, point 10.1) ;
 #  - controler_entrees_validation() : convention d'âge retenue, table sans
 #    année, appariement par sexe, couverture de la plage ; appelée avant
 #    exécution par controler_entrees() (construire_table(), #82), une fois,
 #    rejeu compris, pour chaque étape qui lit une table ;
-#  - apparier_table(), attendus_cellules() : grille des cellules de la plage,
-#    q~ apparié par clé exacte (sexe, âge), A = E^c mu~, mu~ = -log1p(-q~),
-#    état de chaque cellule ;
+#  - apparier_table(), attendus_cellules() : grille des cellules de la plage
+#    (grille_plage(), module exposition ; ADR 0017, point 10.1), q~ apparié
+#    par clé exacte (sexe, âge), A = E^c mu~, mu~ = -log1p(-q~), état de
+#    chaque cellule ;
 #  - smr_poisson() : SMR et inférence de Poisson exacte et asymptotique ;
 #  - controler_parametres_positionnement() : paramètres de l'étape ; appelée
 #    par valider_plan() seule (#82) ;
@@ -30,27 +31,22 @@
 #  (F2). Aucun verdict, aucun seuil ; formules sans attribution d'auteur
 #  (M200).
 #  Ce module n'appelle que `outils` (refuser(), formuler(), forme_exacte(),
-#  chaine_unique(), avertissements_vides(), avertir(), texte_moteur()) et `donnees` (citer(),
-#  liste_guillemets(), SEXES_TABLE) (ADR 0007, point 2.1). Les arêtes vers
-#  donnees::table_reference éventuellement relevées par graphe_modules.R sont
-#  des homonymies de l'argument `table_reference` (clé de la table).
+#  chaine_unique(), avertissements_vides(), avertir(), texte_moteur(),
+#  valeurs_entieres_double()), `donnees` (citer(), liste_guillemets(),
+#  SEXES_TABLE) et `exposition` (CONVENTIONS_VALIDATION,
+#  controler_plage_ages(), grille_plage()) (ADR 0007, point 2.1). Les arêtes
+#  vers donnees::table_reference éventuellement relevées par graphe_modules.R
+#  sont des homonymies de l'argument `table_reference` (clé de la table).
 # -----------------------------------------------------------------------------
-
-# Conventions d'âge admises (M255, point 3) : cellule [x, x+1).
-CONVENTIONS_VALIDATION <- "dernier_anniversaire"
-
-# Entier unique de type double, fini, à valeur entière (paramètres à valeur
-# entière, M246, M257 : un integer est refusé sous le motif du paramètre).
-valeurs_entieres_double <- function(v) forme_exacte(v, "double") && !anyNA(v) && all(is.finite(v)) && all(v == trunc(v))
 
 # Étapes qui lisent une table de référence par les briques de ce module
 # (F2) : chacune donne aux refus son module et le préfixe de leur message.
 ETAPES_TABLE <- c("positionnement", "validation")
 
-# Forme de la clé de table (cle_table_invalide) et de la plage d'âges
-# (plage_ages_invalide), sous le module de l'étape `etape` (F2 ; extraites
-# de controler_parametres_validation(), messages de `validation` inchangés).
-# Rendent TRUE, invisible.
+# Forme de la clé de table (cle_table_invalide), sous le module de l'étape
+# `etape` (F2 ; extraite de controler_parametres_validation(), messages de
+# `validation` inchangés ; la forme de la plage d'âges est contrôlée par
+# controler_plage_ages(), module exposition). Rend TRUE, invisible.
 controler_cle_table <- function(table_reference, etape) {
   if (!(etape %in% ETAPES_TABLE)) stop("controler_cle_table() : étape inconnue (erreur de programmation).", call. = FALSE)
   if (!chaine_unique(table_reference))
@@ -63,19 +59,6 @@ controler_cle_table <- function(table_reference, etape) {
                              "sans attribut : le nom, dans l'argument « tables_reference », de la table sur laquelle",
                              "positionner.")),
             list(table_reference = table_reference))
-  invisible(TRUE)
-}
-controler_plage_ages <- function(plage_ages, etape) {
-  # Admise aussi pour l'étape `homogeneite` (#168, module validation), qui ne
-  # lit aucune table : même forme de plage_ages que `validation`.
-  if (!(etape %in% c(ETAPES_TABLE, "homogeneite")))
-    stop("controler_plage_ages() : étape inconnue (erreur de programmation).", call. = FALSE)
-  if (!valeurs_entieres_double(plage_ages) || length(plage_ages) != 2L || plage_ages[1L] < 0 ||
-      plage_ages[1L] > plage_ages[2L] || plage_ages[2L] > .Machine$integer.max)
-    refuser(etape, "plage_ages_invalide",
-            formuler(paste("La plage d'âges (plage_ages) doit être un vecteur double sans attribut de deux valeurs",
-                           "entières finies, 0 <= min <= max (un integer est refusé).")),
-            list(plage_ages = plage_ages))
   invisible(TRUE)
 }
 
@@ -150,10 +133,11 @@ controler_entrees_validation <- function(table, cle, convention, segmentation, p
 #   table : table_reference contrôlée par controler_entrees_validation() ;
 #   plage_ages ; cle : clé citée (messages) ; etape : étape appelante (module
 #   et préfixe du refus, F2).
-# Grille : segments présents dans la table d'exposition (dans son ordre) x
-# âges de la plage (x années de la table d'exposition si par_annee), E^c = 0
-# et D = 0 pour une cellule sans ligne d'exposition ; aucun segment absent
-# n'est créé. Appariement sur la clé exacte (sexe, âge), sans déduction : la
+# Grille : grille_plage() (module exposition ; ADR 0017, point 10.1) :
+# segments présents dans la table d'exposition (dans son ordre) x âges de la
+# plage (x années de la table d'exposition si par_annee), E^c = 0 et D = 0
+# pour une cellule sans ligne d'exposition ; aucun segment absent n'est créé.
+# Appariement sur la clé exacte (sexe, âge), sans déduction : la
 # modalité ensemble s'applique à chaque cellule ; sinon le sexe de la cellule.
 # Refus en cours d'étape : cellule_sans_valeur_table (sexe absent de la
 # table) ; avec refuser_sans_valeur = FALSE (comparateur 2 de l'étape
@@ -165,31 +149,9 @@ controler_entrees_validation <- function(table, cle, convention, segmentation, p
 apparier_table <- function(exposition, segmentation, par_annee, table, plage_ages, cle, etape,
                            refuser_sans_valeur = TRUE) {
   if (!(etape %in% ETAPES_TABLE)) stop("apparier_table() : étape inconnue (erreur de programmation).", call. = FALSE)
-  cles_seg <- if (length(segmentation))
-    do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r"))) else rep("", nrow(exposition))
-  premiers <- !duplicated(cles_seg)
-  segments <- exposition[premiers, segmentation, drop = FALSE]
-  rownames(segments) <- NULL
-  g_expo <- match(cles_seg, cles_seg[premiers])
-  n_seg <- sum(premiers)
-  ages <- seq(as.integer(plage_ages[1L]), as.integer(plage_ages[2L]))
-  annees <- if (isTRUE(par_annee)) sort(unique(exposition$annee)) else NA_integer_
-  n_age <- length(ages); n_an <- length(annees)
-  n <- n_seg * n_age * n_an
-  # Ordre de la grille : segment, âge, année (ordre de la table d'exposition).
-  g <- rep(seq_len(n_seg), each = n_age * n_an)
-  cellules <- segments[g, , drop = FALSE]
-  rownames(cellules) <- NULL
-  cellules$age <- rep(rep(ages, each = n_an), times = n_seg)
-  if (isTRUE(par_annee)) cellules$annee <- as.integer(rep(annees, times = n_seg * n_age))
-  dans <- exposition$age >= plage_ages[1L] & exposition$age <= plage_ages[2L]
-  i <- ((g_expo[dans] - 1) * n_age + (exposition$age[dans] - ages[1L])) * n_an +
-    (if (isTRUE(par_annee)) match(exposition$annee[dans], annees) else 1)
-  Ec <- numeric(n); D <- integer(n)
-  Ec[i] <- exposition$exposition_centrale[dans]
-  D[i] <- exposition$evenements[dans]
-  cellules$exposition_centrale <- Ec
-  cellules$evenements <- D
+  gr <- grille_plage(exposition, segmentation, par_annee, plage_ages)
+  cellules <- gr$cellules
+  n <- nrow(cellules)
   sexes <- unique(table$sexe)
   ensemble <- identical(sexes, "ensemble")
   sexe_cle <- if (ensemble || !("sexe" %in% segmentation)) rep("ensemble", n) else as.character(cellules$sexe)
@@ -205,9 +167,7 @@ apparier_table <- function(exposition, segmentation, par_annee, table, plage_age
             list(cle = cle, sexes = manquants, cellules = sum(is.na(k))))
   }
   cellules$qx_table <- table$qx[k]
-  list(cellules = cellules, segment = g,
-       hors_plage = list(cellules = sum(!dans), evenements = sum(as.numeric(exposition$evenements[!dans])),
-                         exposition = sum(exposition$exposition_centrale[!dans])),
+  list(cellules = cellules, segment = gr$segment, hors_plage = gr$hors_plage,
        appariement_sexe = if (!("sexe" %in% segmentation)) "sans_sexe"
                           else if (ensemble) "ensemble_par_sexe" else "par_sexe")
 }

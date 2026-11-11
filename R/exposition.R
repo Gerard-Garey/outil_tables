@@ -31,7 +31,15 @@
 #    de la recette `stocks_successifs` (#180, § 5) au seam « fenêtres » —
 #    début selon l'hypothèse d'entrée entre inventaires déclarée
 #    (entree_entre_inventaires), fin à la sortie ou censure à B —, relevés,
-#    hypothèses de la recette.
+#    hypothèses de la recette ;
+#  - CONVENTIONS_VALIDATION, ETAPES_PLAGE_AGES, controler_plage_ages() :
+#    conventions d'âge admises par les étapes qui lisent une plage d'âges,
+#    forme de la plage d'âges sous le module de l'étape appelante (déplacées
+#    depuis le module positionnement, ADR 0017, point 10.1 ; motifs, modules,
+#    details et messages des refus inchangés) ;
+#  - grille_plage() : grille des cellules segments x âges de la plage
+#    [x années] (E^c, D, cellules sans ligne à zéro, hors plage), extraite
+#    d'apparier_table() (module positionnement ; ADR 0017, point 10.1).
 #
 #  Conventions de temps (A.0) : une date est un jour ; une observation est
 #  l'intervalle [debut, fin) (fin = +Inf pour une observation en cours) ; un
@@ -973,4 +981,78 @@ fenetres_stocks_successifs <- function(observations, p, segmentation, entree) {
        diagnostics = list(unites_sans_fenetre = sum(!garder), exposition_imputee_jours = imputee,
                           fenetres_vides = sum(pmax(debut[garder], p$debut) >= pmin(fin_inf[garder], p$borne))),
        avertissements = avert)
+}
+
+# --- plage d'âges et grille des cellules (ADR 0017, point 10.1) ---------------
+
+# Conventions d'âge admises (M255, point 3) : cellule [x, x+1).
+CONVENTIONS_VALIDATION <- "dernier_anniversaire"
+
+# Étapes admises par controler_plage_ages() : chacune donne au refus son
+# module (F2 de #167). Liste blanche propre à ce module, qui ne lit pas
+# ETAPES_TABLE (module positionnement, de rang supérieur) ; elle ne nomme que
+# des étapes qui existent.
+ETAPES_PLAGE_AGES <- c("positionnement", "validation", "homogeneite")
+
+# Forme de la plage d'âges (plage_ages_invalide), sous le module de l'étape
+# `etape` (F2 ; extraite de controler_parametres_validation(), messages de
+# `validation` inchangés). Rend TRUE, invisible.
+controler_plage_ages <- function(plage_ages, etape) {
+  # Admise aussi pour l'étape `homogeneite` (#168, module validation), qui ne
+  # lit aucune table : même forme de plage_ages que `validation`.
+  if (!(etape %in% ETAPES_PLAGE_AGES))
+    stop("controler_plage_ages() : étape inconnue (erreur de programmation).", call. = FALSE)
+  if (!valeurs_entieres_double(plage_ages) || length(plage_ages) != 2L || plage_ages[1L] < 0 ||
+      plage_ages[1L] > plage_ages[2L] || plage_ages[2L] > .Machine$integer.max)
+    refuser(etape, "plage_ages_invalide",
+            formuler(paste("La plage d'âges (plage_ages) doit être un vecteur double sans attribut de deux valeurs",
+                           "entières finies, 0 <= min <= max (un integer est refusé).")),
+            list(plage_ages = plage_ages))
+  invisible(TRUE)
+}
+
+# Grille des cellules de la plage (M253, points 2 et 5 ; extraite
+# d'apparier_table(), ADR 0017, point 10.1, arithmétique inchangée).
+#   exposition : table de l'étape `exposition` ; segmentation, par_annee ;
+#   plage_ages : plage contrôlée (controler_plage_ages()).
+# Grille : segments présents dans la table d'exposition (dans son ordre) x
+# âges de la plage (x années de la table d'exposition si par_annee), E^c = 0
+# et D = 0 pour une cellule sans ligne d'exposition ; aucun segment absent
+# n'est créé. Aucun refus. Rend
+# list(cellules (clés, age [, annee], exposition_centrale, evenements),
+# segment (indice du segment de chaque cellule), ligne (integer : ligne de la
+# table d'exposition de chaque cellule, NA sans ligne ; les lignes de la
+# sortie de `brut` sont alignées sur celles de la table d'exposition),
+# hors_plage (cellules, evenements, exposition)).
+grille_plage <- function(exposition, segmentation, par_annee, plage_ages) {
+  cles_seg <- if (length(segmentation))
+    do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r"))) else rep("", nrow(exposition))
+  premiers <- !duplicated(cles_seg)
+  segments <- exposition[premiers, segmentation, drop = FALSE]
+  rownames(segments) <- NULL
+  g_expo <- match(cles_seg, cles_seg[premiers])
+  n_seg <- sum(premiers)
+  ages <- seq(as.integer(plage_ages[1L]), as.integer(plage_ages[2L]))
+  annees <- if (isTRUE(par_annee)) sort(unique(exposition$annee)) else NA_integer_
+  n_age <- length(ages); n_an <- length(annees)
+  n <- n_seg * n_age * n_an
+  # Ordre de la grille : segment, âge, année (ordre de la table d'exposition).
+  g <- rep(seq_len(n_seg), each = n_age * n_an)
+  cellules <- segments[g, , drop = FALSE]
+  rownames(cellules) <- NULL
+  cellules$age <- rep(rep(ages, each = n_an), times = n_seg)
+  if (isTRUE(par_annee)) cellules$annee <- as.integer(rep(annees, times = n_seg * n_age))
+  dans <- exposition$age >= plage_ages[1L] & exposition$age <= plage_ages[2L]
+  i <- ((g_expo[dans] - 1) * n_age + (exposition$age[dans] - ages[1L])) * n_an +
+    (if (isTRUE(par_annee)) match(exposition$annee[dans], annees) else 1)
+  Ec <- numeric(n); D <- integer(n)
+  Ec[i] <- exposition$exposition_centrale[dans]
+  D[i] <- exposition$evenements[dans]
+  ligne <- rep(NA_integer_, n)
+  ligne[i] <- which(dans)
+  cellules$exposition_centrale <- Ec
+  cellules$evenements <- D
+  list(cellules = cellules, segment = g, ligne = ligne,
+       hors_plage = list(cellules = sum(!dans), evenements = sum(as.numeric(exposition$evenements[!dans])),
+                         exposition = sum(exposition$exposition_centrale[!dans])))
 }

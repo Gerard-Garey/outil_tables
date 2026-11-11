@@ -880,9 +880,11 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # de `champs` ; transition (depart, arrivee) ; periode (debut, fin) ; étapes
 # dans l'ordre reçu (imposé par valider_plan()), paramètres de chaque étape
 # dans l'ordre de parametres[[étape]]$parametre restreint aux paramètres
-# présents (un paramètre conditionnel à la recette, colonne `recette` non
-# NA, peut manquer : sa présence selon la recette est contrôlée après la
-# canonisation ; ADR 0011, annotation du 08/11/2026, (b) 3) ; valeurs des champs ensembles
+# présents (un paramètre conditionnel, à la recette, colonne `recette` non
+# NA, ou à la valeur d'un gouvernant, colonne `selon` non NA, peut manquer :
+# sa présence selon la recette est contrôlée après la canonisation, selon la
+# valeur d'un gouvernant par valider_plan() ; ADR 0011, annotation du
+# 08/11/2026, (b) 3 ; ADR 0017, point 3.2) ; valeurs des champs ensembles
 # dans l'ordre de `ordres`, liste nommée par le chemin du champ dans le plan
 # (« segmentation », « etapes/donnees/exclusions », « etapes/brut/estimateurs ») ;
 # un chemin dont l'étape est absente du plan n'a rien à canoniser ; une valeur
@@ -898,7 +900,7 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # .Machine$integer.max ; domaine de graine_invalide, #61) -> integer. Un
 # autre stockage, une étape absente de `parametres` ou en double, aux noms
 # de paramètres en double, hors du catalogue de l'étape ou sans l'un de ses
-# paramètres sans recette, sont une erreur de
+# paramètres sans condition (ADR 0017, point 3.2), sont une erreur de
 # programmation (le plan n'a pas été validé ; un nom en double serait sinon
 # réduit en silence à sa première occurrence, #42). Idempotente : un plan
 # canonique est rendu identical(). Ce n'est pas un plan résolu (point 5.2 :
@@ -929,7 +931,8 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   for (n in names(e))
     if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) ||
         !all(names(e[[n]]) %in% parametres[[n]]$parametre) ||
-        !all(parametres[[n]]$parametre[is.na(parametres[[n]]$recette)] %in% names(e[[n]])))
+        !all(parametres[[n]]$parametre[is.na(parametres[[n]]$recette) & is.na(parametres[[n]]$selon)] %in%
+               names(e[[n]])))
       non_canonique(sprintf("etapes$%s", n))
   p[["etapes"]] <- stats::setNames(lapply(names(e), function(n)
     e[[n]][parametres[[n]]$parametre[parametres[[n]]$parametre %in% names(e[[n]])]]), names(e))

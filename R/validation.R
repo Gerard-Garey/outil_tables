@@ -64,16 +64,17 @@
 #  (D_c | O_s ~ Bin(O_s, pi_c), pi_c = A_c / A_s ; multinomiale (O_s ; pi_c)
 #  pour les réplications), libres de theta. Aucun verdict, aucun seuil (M217,
 #  Q4). Formules sans attribution d'auteur (M200).
-#  CONVENTIONS_VALIDATION, valeurs_entieres_double(),
 #  controler_entrees_validation(), apparier_table(), attendus_cellules() et
-#  smr_poisson() sont dans R/positionnement.R (#167, F1).
+#  smr_poisson() sont dans R/positionnement.R (#167, F1) ;
+#  CONVENTIONS_VALIDATION et controler_plage_ages() dans R/exposition.R,
+#  valeurs_entieres_double() dans R/outils.R (ADR 0017, point 10.1).
 #  Ce module n'appelle que `outils` (dont sous_graine(), par
-#  replications_poisson() et replications_multinomiales()), `donnees`
-#  (liste_guillemets() ; pour #69 : construire_observations(), evaluer_motifs(),
-#  MOTIFS_TETE, MODALITES_CAUSE), `exposition` (calculer_exposition(), #69), `brut`
-#  (taux_poisson()) et `positionnement` (valeurs_entieres_double(),
-#  controler_cle_table(), controler_plage_ages(), apparier_table(),
-#  attendus_cellules(), smr_poisson()) ; le
+#  replications_poisson() et replications_multinomiales() ;
+#  valeurs_entieres_double()), `donnees` (liste_guillemets() ; pour #69 :
+#  construire_observations(), evaluer_motifs(), MOTIFS_TETE, MODALITES_CAUSE),
+#  `exposition` (calculer_exposition(), #69 ; controler_plage_ages()), `brut`
+#  (taux_poisson()) et `positionnement` (controler_cle_table(),
+#  apparier_table(), attendus_cellules(), smr_poisson()) ; le
 #  niveau est contrôlé ici sous le code niveau_invalide de `brut` (M253)
 #  (ADR 0007, point 2.1 et seconde annotation du 06/11/2026, (d)). Les
 #  arêtes vers donnees::table_reference relevées par graphe_modules.R sont
@@ -523,8 +524,8 @@ controler_replications <- function(replications, etape) {
 # (#23) : type de base exact, aucun attribut, sinon refus sous le motif du
 # paramètre ; un integer reçu pour plage_ages, tranches_age ou replications
 # est refusé (M257). Clé et plage : controler_cle_table() et
-# controler_plage_ages() (module positionnement, sous le module validation ;
-# #167, F2). Puis, sous la relation positionnee (#167, F5), refus
+# controler_plage_ages() (modules positionnement et exposition, sous le
+# module validation ; #167, F2 ; ADR 0017, point 10.1). Puis, sous la relation positionnee (#167, F5), refus
 # inter-étapes, dans l'ordre : positionnement_absent (étape positionnement
 # absente du plan) ; plage_ages_differente_positionnement ;
 # table_reference_differente_positionnement (la table validée est la table
@@ -1523,7 +1524,7 @@ STATUTS_HOMOGENEITE <- local({
 
 # Contrôle les paramètres de l'étape `homogeneite` (valeurs ; les noms sont
 # contrôlés par valider_plan()), dans l'ordre du catalogue, sous le module
-# homogeneite : plage_ages (controler_plage_ages(), module positionnement),
+# homogeneite : plage_ages (controler_plage_ages(), module exposition),
 # tranches_age et replications (formes de `validation`), puis le refus
 # inter-champs homogeneite_sans_segmentation (avis (0''), F10) :
 # `segmentation` est le champ du plan, déjà contrôlé par
