@@ -402,14 +402,17 @@ SANS_REFERENCE <- character(0)
 # etat_cellule, ligne khi2_pearson/variance_h0, colonnes p_*_asymptotique des
 # sous-groupes, statuts du positionnement et de l'homogénéité) closes par la
 # régénération unique (R) de B16 (run CI 42771679323, ecaead0).
-# Transition #199 (B18 ; ADR 0009, seconde annotation du 10/11/2026, point
-# 9.6 et (g) ; M396) : 27 chemins de dénombrement passent de double à
-# integer, valeurs identiques au bit près, sur quatre jeux de plans
-# disjoints selon les étapes du plan : {R8, R9} 17 chemins (validation 9,
-# importance_exclusions 8) ; {R10} 16 (positionnement 5, validation 9,
-# importance_exclusions 2 : comparateur 2 non produit sous positionnee) ;
-# {R11, R12} 5 (homogeneite) ; {R13} 5 (positionnement). Close par la
-# régénération unique (R) de B18.
+# Transitions #199, #200 et #202 (B18 ; types des 27 chemins de dénombrement,
+# textes de statut de sous_groupes/bornes_exactes et sous_groupes/p_valeurs,
+# texte de tests/p_asymptotique de l'homogénéité) closes par la régénération
+# unique (R) de B18 (run CI 42982198441, 140a41b) ; transition_199(),
+# transition_200(), transition_202() et les constantes *_200 et *_202
+# retirées. CHEMINS_199 reste : liste des 27 chemins de dénombrement de #199
+# (ADR 0009, seconde annotation du 10/11/2026, point 9.6 et (e)), lue par le
+# contrôle des clés retirées de TOLERANCES ; quatre jeux de plans disjoints :
+# {R8, R9} 17 chemins (validation 9, importance_exclusions 8) ; {R10} 16
+# (positionnement 5, validation 9, importance_exclusions 2) ; {R11, R12} 5
+# (homogeneite) ; {R13} 5 (positionnement).
 CHEMINS_199 <- list(
   validation = paste0("etapes/validation/", c(
     "resultat/sous_groupes/observes", "resultat/sequences_runs/positifs", "resultat/sequences_runs/negatifs",
@@ -427,99 +430,7 @@ CHEMINS_199 <- list(
     "resultat/segments/observes", "resultat/monte_carlo/jeux/tirages_effectues",
     "diagnostics/evenements_cellules_evenement_sans_exposition", "diagnostics/evenements_hors_plage",
     "diagnostics/evenements_total")))
-transition_199 <- function(plans, familles)
-  list(issue = "#199", plans = plans,
-       changements = lapply(unlist(CHEMINS_199[familles], use.names = FALSE), function(ch)
-         list(chemin = ch, nature = "type", de = "double", vers = "integer")))
-# Transition #200 (B18 ; avis (0')(e) d'actuary, commentaire 6775950806) : textes
-# de statut par relation (independante, ajustee_hors_outil) des lignes
-# sous_groupes/bornes_exactes et sous_groupes/p_valeurs de STATUTS_VALIDATION,
-# positions 2 et 3 de etapes/validation/parametres/statuts_sous_groupes/statut
-# de R8 et R9 (relation independante) ; R10 (relation positionnee) inchangé :
-# le texte de STATUTS_VALIDATION_POSITIONNEE ne change pas. Valeurs de la
-# référence commitée (avant) contrôlées, littéraux ci-dessous (échappements
-# \u) ; l'empreinte du résultat n'est pas comparée (jeton, ADR 0009). Close par
-# la régénération unique (R) de B18, avec transition_200() et les constantes
-# *_200.
-BORNES_AVANT_200 <- "exact sous la loi suppos\u00e9e (O ~ Poisson, A fixe) ; qgamma, approximation num\u00e9rique"
-BORNES_APRES_200 <- paste(
-  "relation independante : exactes sous la loi suppos\u00e9e (O ~ Poisson, A fixe), p = 0 :",
-  "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >=",
-  "niveau (intervalle exact conservatif) ; qgamma, approximation num\u00e9rique ; relation ajustee_hors_outil :",
-  "non produites, p non \u00e9tabli, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")
-P_VALEURS_AVANT_200 <- paste(
-  "exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le mod\u00e8le de survie ; fonctions de",
-  "r\u00e9partition de Poisson (ppois), approximation num\u00e9rique ; p = 0 : X ~ Poisson(A) ; aucune correction de",
-  "multiplicit\u00e9")
-P_VALEURS_APRES_200 <- paste(
-  "relation independante : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le mod\u00e8le de survie ;",
-  "fonctions de r\u00e9partition de Poisson (ppois), approximation num\u00e9rique ; p = 0 : X ~ Poisson(A) ; aucune",
-  "correction de multiplicit\u00e9 ; relation ajustee_hors_outil : non produites, p non \u00e9tabli, aucune p-valeur du",
-  "sous-groupe (ddl_non_etabli) ; colonnes NA")
-transition_200 <- function(plans) {
-  st <- "etapes/validation/parametres/statuts_sous_groupes/"
-  k0 <- NULL
-  for (id in plans) {
-    ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-    k <- match(c("bornes_exactes", "p_valeurs"), ref[[paste0(st, "grandeur")]])
-    # Positions lues par le nom, communes à tous les plans (constat mineur de l'audit)
-    if (!is.null(k0) && !identical(k, k0))
-      stop(sprintf("transition_200(%s) : positions de bornes_exactes et p_valeurs propres au plan", id))
-    k0 <- k
-    if (anyNA(k) || !identical(ref[[paste0(st, "statut")]][k], c(BORNES_AVANT_200, P_VALEURS_AVANT_200)))
-      stop(sprintf("transition_200(%s) : textes de bornes_exactes et p_valeurs de la r\u00e9f\u00e9rence inattendus", id))
-  }
-  list(issue = "#200", plans = plans, changements = list(
-    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
-         valeurs = c(BORNES_APRES_200, P_VALEURS_APRES_200), positions = k0)))
-}
-# Transition #202 (B18 ; relecture (0')(c) d'actuary, commentaire 6775943400,
-# texte (B)) : texte de statut de la ligne tests/p_asymptotique de
-# STATUTS_HOMOGENEITE, 5e des 13 valeurs de
-# etapes/homogeneite/parametres/statuts/statut de R11 et R12 ; la position est
-# lue par le nom de la grandeur (colonne grandeur, table tests), commune aux
-# deux plans. Texte de la référence commitée (avant) contrôlé, littéraux
-# ci-dessous (échappements \u) ; l'empreinte du résultat n'est pas comparée
-# (jeton, ADR 0009). Close par la régénération unique (R) de B18, avec
-# transition_202() et les constantes *_202.
-P_ASYMPTOTIQUE_AVANT_202 <- paste(
-  "asymptotique : loi du khi-deux \u00e0 ddl degr\u00e9s de libert\u00e9 quand l'information du test cro\u00eet (plus",
-  "petite valeur propre de V r\u00e9duite -> infini, aucune strate ne portant \u00e0 elle seule une part non",
-  "n\u00e9gligeable de V), le nombre de strates \u00e9tant fixe ou croissant : D_. peut rester petit dans chaque",
-  "strate ; sous H0 avec E tenue pour fixe ; asymptotique aussi sous le mod\u00e8le de survie ; queue",
-  "sup\u00e9rieure ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
-  "sur-dispers\u00e9s et le test est anti-conservateur (p-valeurs trop petites)")
-P_ASYMPTOTIQUE_APRES_202 <- paste(
-  "asymptotique : loi du khi-deux \u00e0 ddl degr\u00e9s de libert\u00e9 quand l'information du test cro\u00eet (plus",
-  "petite valeur propre de V r\u00e9duite -> infini), \u00e0 nombre de groupes fix\u00e9, le nombre de strates \u00e9tant",
-  "fixe ou croissant (D_. pouvant rester born\u00e9 dans chaque strate quand le nombre de strates cro\u00eet) ;",
-  "sous H0 avec E tenue pour fixe ; asymptotique aussi sous le mod\u00e8le de survie ; queue sup\u00e9rieure ;",
-  "unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s et le test",
-  "est anti-conservateur (p-valeurs trop petites)")
-transition_202 <- function(plans) {
-  st <- "etapes/homogeneite/parametres/statuts/"
-  k0 <- NULL
-  for (id in plans) {
-    ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-    k <- which(ref[[paste0(st, "table")]] == "tests" & ref[[paste0(st, "grandeur")]] == "p_asymptotique")
-    if (length(k) != 1L) stop(sprintf("transition_202(%s) : ligne tests/p_asymptotique absente ou multiple", id))
-    if (!is.null(k0) && !identical(k, k0))
-      stop(sprintf("transition_202(%s) : position de p_asymptotique propre au plan", id))
-    k0 <- k
-    if (!identical(ref[[paste0(st, "statut")]][k], P_ASYMPTOTIQUE_AVANT_202))
-      stop(sprintf("transition_202(%s) : texte de p_asymptotique de la r\u00e9f\u00e9rence inattendu", id))
-  }
-  list(issue = "#202", plans = plans, changements = list(
-    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
-         valeurs = P_ASYMPTOTIQUE_APRES_202, positions = k0)))
-}
-TRANSITIONS_EN_COURS <- list(
-  transition_199(c("R8", "R9"), c("validation", "importance_exclusions_1", "importance_exclusions_2")),
-  transition_199("R10", c("positionnement", "validation", "importance_exclusions_1")),
-  transition_199(c("R11", "R12"), "homogeneite"),
-  transition_199("R13", "positionnement"),
-  transition_200(c("R8", "R9")),
-  transition_202(c("R11", "R12")))
+TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

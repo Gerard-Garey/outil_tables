@@ -11,14 +11,14 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
+# plateforme consignée : Processeur                    : AMD EPYC 9V74 80-Core Processor
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : ecaead01b17df3422635911c8eaee9b96db70964
+# plateforme consignée : GITHUB_SHA                    : 140a41b9371a1c2aab7985b214d37e9517753ed9
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -27,13 +27,13 @@
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
-# fiche$empreintes/resultat : 92991c9633f416420521df929e335c63
-# fiche$empreintes/code : a28d41c3359f3a5c741c4788359124c3
-# commit : ecaead01b17df3422635911c8eaee9b96db70964
-# execution : 42771679323
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42771679323
+# fiche$empreintes/resultat : 33250943f83a33cddee357739b8e87ba
+# fiche$empreintes/code : d7917f7f246ae52fa871ecb9fec94509
+# commit : 140a41b9371a1c2aab7985b214d37e9517753ed9
+# execution : 42982198441
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42982198441
 # mode : regeneration
-# date : 2026-11-10 06:55:24 UTC
+# date : 2026-11-11 07:48:59 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -197,7 +197,7 @@ etapes/validation/parametres/reference_methode	character	1	"note II1291-14 v1.4,
 etapes/validation/parametres/statuts_sous_groupes/@colonnes	character	2	"grandeur"	"statut"
 etapes/validation/parametres/statuts_sous_groupes/@lignes	integer	1	4
 etapes/validation/parametres/statuts_sous_groupes/grandeur	character	4	"smr"	"bornes_exactes"	"p_valeurs"	"p_valeurs_asymptotiques"
-etapes/validation/parametres/statuts_sous_groupes/statut	character	4	"résultat exact : O / A du sous-groupe (cellules retenues)"	"exact sous la loi supposée (O ~ Poisson, A fixe) ; qgamma, approximation numérique"	"exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ; fonctions de répartition de Poisson (ppois), approximation numérique ; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité"	"relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours calculée ; relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA"
+etapes/validation/parametres/statuts_sous_groupes/statut	character	4	"résultat exact : O / A du sous-groupe (cellules retenues)"	"relation independante : exactes sous la loi supposée (O ~ Poisson, A fixe), p = 0 : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ; relation ajustee_hors_outil : non produites, p non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA"	"relation independante : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ; fonctions de répartition de Poisson (ppois), approximation numérique ; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité ; relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA"	"relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours calculée ; relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA"
 etapes/validation/resultat/@noms	character	5	"cellules"	"statistiques"	"sous_groupes"	"sequences_runs"	"monte_carlo"
 etapes/validation/resultat/cellules/@colonnes	character	18	"sexe"	"age"	"exposition_centrale"	"evenements"	"qx_table"	"taux_table"	"attendus"	"taux_brut"	"probabilite_brute"	"residu_reponse"	"residu_pearson"	"residu_deviance"	"fluctuation_inf_exacte"	"fluctuation_sup_exacte"	"fluctuation_inf_asymptotique"	"fluctuation_sup_asymptotique"	"tranche_age"	"etat"
 etapes/validation/resultat/cellules/@lignes	integer	1	142
@@ -233,7 +233,7 @@ etapes/validation/resultat/sous_groupes/sexe	character	11	"F"	"F"	"F"	"H"	"H"	"H
 etapes/validation/resultat/sous_groupes/tranche_debut	integer	11	20	50	70	20	50	70	20	50	70	NA	NA
 etapes/validation/resultat/sous_groupes/tranche_fin	integer	11	49	69	90	49	69	90	49	69	90	NA	NA
 etapes/validation/resultat/sous_groupes/cellules_retenues	integer	11	30	20	21	30	20	21	60	40	42	71	71
-etapes/validation/resultat/sous_groupes/observes	double	11	83	502	1082	126	809	1606	209	1311	2688	1667	2541
+etapes/validation/resultat/sous_groupes/observes	integer	11	83	502	1082	126	809	1606	209	1311	2688	1667	2541
 etapes/validation/resultat/sous_groupes/attendus	double	11	89.386186365425559	496.37297496633346	1117.9177279203718	146.79991703688307	806.23444648016232	1674.7830959102018	236.18610340230865	1302.6074214464959	2792.7008238305739	1703.6768892521309	2627.8174594272473
 etapes/validation/resultat/sous_groupes/smr	double	11	0.92855510873550673	1.0113362840393318	0.96787086650178766	0.85831111177224195	1.0034302100733992	0.95893014678845923	0.88489541505326808	1.0064429070611194	0.96250911557115437	0.97847192182771758	0.96696214224629984
 etapes/validation/resultat/sous_groupes/borne_inf_exacte	double	11	0.73958896095576121	0.92479047107906243	0.91105247727727701	0.71499607786288821	0.93546735340028186	0.91259936024238186	0.76898613732745913	0.95269378522875126	0.92646311239896462	0.93205944016321285	0.9297266870558899
@@ -248,12 +248,12 @@ etapes/validation/resultat/sous_groupes/etat	character	11	"produite"	"produite"	
 etapes/validation/resultat/sequences_runs/@colonnes	character	4	"sexe"	"positifs"	"negatifs"	"runs"
 etapes/validation/resultat/sequences_runs/@lignes	integer	1	2
 etapes/validation/resultat/sequences_runs/sexe	character	2	"F"	"H"
-etapes/validation/resultat/sequences_runs/positifs	double	2	29	30
-etapes/validation/resultat/sequences_runs/negatifs	double	2	42	41
-etapes/validation/resultat/sequences_runs/runs	double	2	33	35
+etapes/validation/resultat/sequences_runs/positifs	integer	2	29	30
+etapes/validation/resultat/sequences_runs/negatifs	integer	2	42	41
+etapes/validation/resultat/sequences_runs/runs	integer	2	33	35
 etapes/validation/resultat/monte_carlo/@noms	character	3	"replications"	"tirages_effectues"	"graine"
 etapes/validation/resultat/monte_carlo/replications	double	1	999
-etapes/validation/resultat/monte_carlo/tirages_effectues	double	1	999
+etapes/validation/resultat/monte_carlo/tirages_effectues	integer	1	999
 etapes/validation/resultat/monte_carlo/graine	integer	1	20261107
 etapes/validation/diagnostics/@noms	character	8	"cellules"	"cellules_retenues"	"etats"	"evenements_sans_attendu"	"cellules_hors_plage"	"evenements_hors_plage"	"exposition_hors_plage"	"evenements_total"
 etapes/validation/diagnostics/cellules	integer	1	142
@@ -262,12 +262,12 @@ etapes/validation/diagnostics/etats/@colonnes	character	3	"etat"	"cellules"	"eve
 etapes/validation/diagnostics/etats/@lignes	integer	1	5
 etapes/validation/diagnostics/etats/etat	character	5	"retenue"	"sans_exposition"	"taux_table_nul"	"evenement_sans_exposition"	"evenement_sous_taux_nul"
 etapes/validation/diagnostics/etats/cellules	integer	5	142	0	0	0	0
-etapes/validation/diagnostics/etats/evenements	double	5	4208	0	0	0	0
-etapes/validation/diagnostics/evenements_sans_attendu	double	1	0
+etapes/validation/diagnostics/etats/evenements	integer	5	4208	0	0	0	0
+etapes/validation/diagnostics/evenements_sans_attendu	integer	1	0
 etapes/validation/diagnostics/cellules_hors_plage	integer	1	7
-etapes/validation/diagnostics/evenements_hors_plage	double	1	20
+etapes/validation/diagnostics/evenements_hors_plage	integer	1	20
 etapes/validation/diagnostics/exposition_hors_plage	double	1	123.51628115876936
-etapes/validation/diagnostics/evenements_total	double	1	4228
+etapes/validation/diagnostics/evenements_total	integer	1	4228
 etapes/importance_exclusions/@noms	character	3	"parametres"	"resultat"	"diagnostics"
 etapes/importance_exclusions/parametres/@noms	character	8	"niveau"	"unite_observation"	"segmentation"	"par_annee"	"classes_motifs"	"comparateurs"	"etats"	"statuts"
 etapes/importance_exclusions/parametres/niveau	double	1	0.94999999999999996
@@ -362,7 +362,7 @@ etapes/importance_exclusions/resultat/smr_comparateur_1/@colonnes	character	14	"
 etapes/importance_exclusions/resultat/smr_comparateur_1/@lignes	integer	1	6
 etapes/importance_exclusions/resultat/smr_comparateur_1/ensemble	character	6	"entree_manquante"	"sexe_manquant"	"total"	"entree_manquante"	"sexe_manquant"	"total"
 etapes/importance_exclusions/resultat/smr_comparateur_1/niveau	character	6	"A"	"A"	"A"	"B"	"B"	"B"
-etapes/importance_exclusions/resultat/smr_comparateur_1/observes	double	6	0	0	0	0	0	0
+etapes/importance_exclusions/resultat/smr_comparateur_1/observes	integer	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_1/attendus	double	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_1/smr	double	6	NA	NA	NA	NA	NA	NA
 etapes/importance_exclusions/resultat/smr_comparateur_1/borne_inf_exacte	double	6	NA	NA	NA	NA	NA	NA
@@ -371,7 +371,7 @@ etapes/importance_exclusions/resultat/smr_comparateur_1/borne_inf_asymptotique	d
 etapes/importance_exclusions/resultat/smr_comparateur_1/borne_sup_asymptotique	double	6	NA	NA	NA	NA	NA	NA
 etapes/importance_exclusions/resultat/smr_comparateur_1/rapport_variance	double	6	NA	NA	NA	NA	NA	NA
 etapes/importance_exclusions/resultat/smr_comparateur_1/cellules_sans_exposition_retenue	integer	6	0	0	0	0	0	0
-etapes/importance_exclusions/resultat/smr_comparateur_1/evenements_sans_exposition_retenue	double	6	0	0	0	0	0	0
+etapes/importance_exclusions/resultat/smr_comparateur_1/evenements_sans_exposition_retenue	integer	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_1/exposition_centrale_sans_exposition_retenue	double	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_1/etat	character	6	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"
 etapes/importance_exclusions/resultat/smr_comparateur_2/@colonnes	character	23	"ensemble"	"niveau"	"lignes_mesurables"	"lignes_non_calculables"	"observes"	"attendus"	"smr"	"borne_inf_exacte"	"borne_sup_exacte"	"borne_inf_asymptotique"	"borne_sup_asymptotique"	"cellules_sans_valeur_table"	"evenements_sans_valeur_table"	"cellules_taux_table_egal_un"	"evenements_taux_table_egal_un"	"evenements_sans_attendu"	"evenements_hors_plage"	"exposition_centrale_hors_plage"	"etat"	"etat_intervalle"	"observes_conserves"	"attendus_conserves"	"smr_conserves"
@@ -380,7 +380,7 @@ etapes/importance_exclusions/resultat/smr_comparateur_2/ensemble	character	6	"en
 etapes/importance_exclusions/resultat/smr_comparateur_2/niveau	character	6	"A"	"A"	"A"	"B"	"B"	"B"
 etapes/importance_exclusions/resultat/smr_comparateur_2/lignes_mesurables	integer	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_2/lignes_non_calculables	integer	6	0	0	0	0	0	0
-etapes/importance_exclusions/resultat/smr_comparateur_2/observes	double	6	0	0	0	0	0	0
+etapes/importance_exclusions/resultat/smr_comparateur_2/observes	integer	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_2/attendus	double	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_2/smr	double	6	NA	NA	NA	NA	NA	NA
 etapes/importance_exclusions/resultat/smr_comparateur_2/borne_inf_exacte	double	6	NA	NA	NA	NA	NA	NA
@@ -388,15 +388,15 @@ etapes/importance_exclusions/resultat/smr_comparateur_2/borne_sup_exacte	double	
 etapes/importance_exclusions/resultat/smr_comparateur_2/borne_inf_asymptotique	double	6	NA	NA	NA	NA	NA	NA
 etapes/importance_exclusions/resultat/smr_comparateur_2/borne_sup_asymptotique	double	6	NA	NA	NA	NA	NA	NA
 etapes/importance_exclusions/resultat/smr_comparateur_2/cellules_sans_valeur_table	integer	6	0	0	0	0	0	0
-etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_sans_valeur_table	double	6	0	0	0	0	0	0
+etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_sans_valeur_table	integer	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_2/cellules_taux_table_egal_un	integer	6	0	0	0	0	0	0
-etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_taux_table_egal_un	double	6	0	0	0	0	0	0
-etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_sans_attendu	double	6	0	0	0	0	0	0
-etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_hors_plage	double	6	0	0	0	0	0	0
+etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_taux_table_egal_un	integer	6	0	0	0	0	0	0
+etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_sans_attendu	integer	6	0	0	0	0	0	0
+etapes/importance_exclusions/resultat/smr_comparateur_2/evenements_hors_plage	integer	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_2/exposition_centrale_hors_plage	double	6	0	0	0	0	0	0
 etapes/importance_exclusions/resultat/smr_comparateur_2/etat	character	6	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"
 etapes/importance_exclusions/resultat/smr_comparateur_2/etat_intervalle	character	6	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"	"aucun_attendu"
-etapes/importance_exclusions/resultat/smr_comparateur_2/observes_conserves	double	6	4208	4208	4208	4208	4208	4208
+etapes/importance_exclusions/resultat/smr_comparateur_2/observes_conserves	integer	6	4208	4208	4208	4208	4208	4208
 etapes/importance_exclusions/resultat/smr_comparateur_2/attendus_conserves	double	6	4331.4943486793782	4331.4943486793782	4331.4943486793782	4331.4943486793782	4331.4943486793782	4331.4943486793782
 etapes/importance_exclusions/resultat/smr_comparateur_2/smr_conserves	double	6	0.97148920470898681	0.97148920470898681	0.97148920470898681	0.97148920470898681	0.97148920470898681	0.97148920470898681
 etapes/importance_exclusions/diagnostics/@noms	character	1	"calculs_contrefactuels"
