@@ -289,6 +289,37 @@ verifier("lecture hors UTF-8 : recettes_invariant.R refuse sous LC_ALL=C un nom 
          echoue(sous_C("recettes_invariant.R", shQuote(d)), "nom de recette non ASCII"))
 unlink(d, recursive = TRUE)
 
+# --- messages_refus.R sous LC_ALL=C : lecture de R/ en UTF-8 (#213, suite de #206) ---
+# Avant #213 (mesuré sous LC_ALL=C) : parse(encoding = "UTF-8") acceptait sans rien
+# dire un fichier de R/ dont les octets ne sont pas de l'UTF-8 valide (le même
+# fichier est refusé en UTF-8), et suppressWarnings() écartait tous les
+# avertissements du parseur, pas seulement « unable to translate ».
+octets_invalides <- function(chemin) writeBin(c(charToRaw("x <- \""), as.raw(0xff), charToRaw("\"\n")), chemin)
+csv_vide_213 <- tempfile("exceptions_", fileext = ".csv")
+writeLines("fichier,fonction,expression,raison", csv_vide_213)
+d <- tempfile("R_octets_invalides_"); dir.create(d)
+octets_invalides(file.path(d, "outils.R"))
+verifier("messages de refus : refuse sous LC_ALL=C un fichier de R/ qui n'est pas de l'UTF-8 valide (écart « illisible »)",
+         echoue_tous(sous_C("messages_refus.R", shQuote(d), shQuote(csv_vide_213)), c("outils.R : illisible", "octets non UTF-8")))
+verifier("messages de refus : refuse de même, hors LC_ALL=C, un fichier de R/ qui n'est pas de l'UTF-8 valide",
+         echoue(controle("messages_refus.R", shQuote(d), shQuote(csv_vide_213)), "outils.R : illisible"))
+unlink(d, recursive = TRUE)
+r <- sous_C("messages_refus.R")
+verifier("messages de refus : passe sur R/ du dépôt sous LC_ALL=C, sans avertissement (noms non ASCII de rapport.R compris)",
+         if (r$statut == 0L && !any(grepl("Warning|Avertissement|unable to translate", r$sortie, useBytes = TRUE))) TRUE
+         else paste(r$sortie, collapse = " | "))
+d <- dossier_R_temoin("outils.R", c("f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", citer(x)))",
+                                     "g <- c(\"délais\" = \"été\")"))
+r <- sous_C("messages_refus.R", shQuote(d), shQuote(csv_vide_213))
+verifier("messages de refus : sous LC_ALL=C, un nom et un littéral non ASCII hors d'un message passent, sans avertissement",
+         if (r$statut == 0L && !any(grepl("Warning|Avertissement|unable to translate", r$sortie, useBytes = TRUE))) TRUE
+         else paste(r$sortie, collapse = " | "))
+unlink(d, recursive = TRUE)
+d <- dossier_R_temoin("outils.R", "f <- function() refuser(\"m\", \"a\", formuler(\"x %s\", \"é\"))")
+verifier("messages de refus : sous LC_ALL=C, une constante non ASCII littérale sous %s reste refusée (littéral lu sans altération)",
+         echoue(sous_C("messages_refus.R", shQuote(d), shQuote(csv_vide_213)), "valeur insérée par %s sans citation ni forme admise"))
+unlink(c(d, csv_vide_213), recursive = TRUE)
+
 # --- ordre des modules (ADR 0007, points 2.1 à 2.3) --------------------------
 
 verifier("ordre des modules : passe sur R/ du dépôt", passe(controle("graphe_modules.R")))
@@ -628,6 +659,36 @@ A_ADMISE <- function(valeur, classe, fichiers, etendue = 1)
 
 verifier("graines : sortie 1 si la liste blanche est introuvable",
          echoue(graines(list("tests/a.R" = "x <- 1"), csv = FALSE), "liste blanche introuvable"))
+
+# graines.R sous LC_ALL=C : même lecture en UTF-8 que messages_refus.R (#213) ;
+# avant, un fichier de tests/, R/ ou inst/ qui n'est pas de l'UTF-8 valide
+# passait sans un mot (mesuré sous LC_ALL=C : code de sortie 0).
+graines_sous_C <- function(fichiers, octets = NULL) {
+  d <- arbre_graines(fichiers)
+  on.exit(unlink(d, recursive = TRUE))
+  if (!is.null(octets)) octets_invalides(file.path(d, octets))
+  sous_C("graines.R", shQuote(d), "--sans-heritage")
+}
+r <- graines_sous_C(list("R/a.R" = "x <- 1"), octets = "R/a.R")
+verifier("graines : refuse sous LC_ALL=C un fichier qui n'est pas de l'UTF-8 valide (écart « illisible »)",
+         echoue_tous(r, c("R/a.R : illisible", "octets non UTF-8")))
+d <- arbre_graines(list("R/a.R" = "x <- 1")); octets_invalides(file.path(d, "R", "a.R"))
+verifier("graines : refuse de même, hors LC_ALL=C, un fichier qui n'est pas de l'UTF-8 valide",
+         echoue(controle("graines.R", shQuote(d), "--sans-heritage"), "R/a.R : illisible"))
+unlink(d, recursive = TRUE)
+d <- arbre_graines(list("tests/a.R" = "x <- 1"))
+writeLines(enc2utf8(c("set.seed(20261201L)", "g <- c(\"délais\" = \"été\")  # commentaire é")),
+           file.path(d, "tests", "a.R"), useBytes = TRUE)
+r <- sous_C("graines.R", shQuote(d), "--sans-heritage")
+verifier("graines : sous LC_ALL=C, un fichier à noms, littéraux et commentaires non ASCII est lu, sans avertissement",
+         if (r$statut == 0L && !any(grepl("Warning|Avertissement|unable to translate", r$sortie, useBytes = TRUE)) &&
+             any(grepl("entier(s) de graine dans 1 fichier(s)", r$sortie, fixed = TRUE, useBytes = TRUE))) TRUE
+         else paste(r$sortie, collapse = " | "))
+unlink(d, recursive = TRUE)
+r <- sous_C("graines.R")
+verifier("graines : passe sur l'arbre du dépôt sous LC_ALL=C, sans avertissement",
+         if (r$statut == 0L && !any(grepl("Warning|Avertissement|unable to translate", r$sortie, useBytes = TRUE))) TRUE
+         else paste(r$sortie, collapse = " | "))
 verifier("graines : passe sur des graines toutes distinctes, tous contextes relevés",
          passe(graines(list(
            "tests/a.R" = c("set.seed(20261201L)", "sous_graine(20261202L, runif(1))"),

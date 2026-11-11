@@ -8,8 +8,98 @@
 # -----------------------------------------------------------------------------
 
 CONTROLES_ <- file.path(RACINE, "tests", "controles")
-charger_ <- function(script, env) {
-  for (e in suppressWarnings(parse(file.path(CONTROLES_, script), encoding = "UTF-8", keep.source = FALSE))) eval(e, env)
+# Lecture d'un script en UTF-8 quelle que soit la locale (#213) : les fonctions
+# restent dans ce local(), hors de l'environnement du fichier de test.
+lecture_ <- local({
+  # Analyse syntaxique d'un script de tests/controles/ (UTF-8), indépendante de
+  # la locale native (#213, suite de #206). En locale UTF-8 : parse(fichier,
+  # encoding = "UTF-8"). Sinon (mesuré sous LC_ALL=C, R 4.3.3), ce même appel accepte sans
+  # rien dire un fichier dont les octets ne sont pas de l'UTF-8 valide (en UTF-8,
+  # refusé dans un littéral : « EOF whilst reading MBCS char ») et avertit
+  # « unable to translate » pour chaque nom non ASCII (chaîne en position de nom
+  # d'argument : "délais" = ...), qu'il altère en « <U+00E9> » ; les littéraux non
+  # ASCII restent intacts. Le fichier est donc lu en octets UTF-8 (validUTF8() :
+  # sinon erreur) ; chaque caractère non ASCII est réécrit en échappement \U{...} (le
+  # parseur l'interprète sans traduction : chaîne ordinaire lue comme en UTF-8 ;
+  # sans effet dans un commentaire), puis le texte ASCII est analysé ; les
+  # numéros de ligne sont conservés. La réécriture lit autrement qu'en UTF-8 deux
+  # constructions, refusées (controler_non_ascii()) : un caractère non ASCII dans
+  # une chaîne brute (r"(...)"), et un caractère non ASCII précédé d'une barre
+  # oblique inverse dans une chaîne (échappement invalide en UTF-8). Limites : un
+  # nom (symbole, ou chaîne en position de nom d'argument) ne peut pas être natif
+  # hors UTF-8 ; parse() le traduit en « <U+00E9> » et avertit, avertissement
+  # écarté ici (seul son marqueur « <U+ » est écarté, tout autre avertissement
+  # passe). Un symbole non ASCII hors chaîne (nom de définition, d'appel) est
+  # refusé par le parseur. Divergence résiduelle : un symbole non ASCII entre
+  # accents graves est accepté en UTF-8 et refusé hors UTF-8 (parse() :
+  # « \Uxxxxxxxx sequences not supported inside backticks »), jamais accepté à
+  # tort hors UTF-8.
+  # Autre divergence (#213, constat d'audit) : dans une même chaîne,
+  # un échappement \x.. ou octal suivi d'un caractère non ASCII est refusé
+  # hors UTF-8 (« mixing Unicode and octal/hex escapes in a string is not
+  # allowed ») et accepté en UTF-8 : refus, jamais acceptation à tort.
+  # Un appel d'opérateur non ASCII (a %é% b) est lu hors UTF-8
+  # sous le nom littéral « %\U{e9}% » ; aucun tel opérateur ne peut être défini
+  # hors UTF-8 et le dépôt n'en contient aucun.
+  # Les noms non ASCII de ces scripts (étiquettes de cas, dans le corps d'une
+  # fonction de locale_c.R) ne sont exécutés par aucun cas de ce fichier.
+  session_utf8 <- function() isTRUE(l10n_info()[["UTF-8"]])
+  # Remplace chaque caractère non ASCII d'un vecteur de lignes UTF-8 par
+  # `par(points de code)`.
+  remplacer_non_ascii <- function(l, par) {
+    na <- grepl("[^\\001-\\177]", l, perl = TRUE, useBytes = TRUE)
+    l[na] <- vapply(l[na], function(s) {
+      cp <- utf8ToInt(s)
+      paste(ifelse(cp > 127L, par(cp), intToUtf8(cp, multiple = TRUE)), collapse = "")
+    }, "", USE.NAMES = FALSE)
+    l
+  }
+  # Refus des deux constructions que la réécriture en \U{...} lirait autrement
+  # qu'en UTF-8 (#206) : un caractère non ASCII dans une chaîne brute
+  # (r"(...)", R'[...]', avec ou sans tirets), où \U{e9} resterait le texte
+  # « \U{e9} » ; un caractère non ASCII précédé d'une barre oblique inverse dans
+  # une chaîne (échappement invalide en UTF-8, valide une fois réécrit). Les
+  # lignes sont analysées une fois avec un marqueur ASCII à la place de chaque
+  # caractère non ASCII : une barre oblique inverse devant le marqueur est un
+  # échappement invalide (erreur du parseur) ; un jeton chaîne commençant par r
+  # ou R qui contient le marqueur est une chaîne brute non ASCII.
+  # Marqueur en deux morceaux : le texte de ce bloc ne le contient pas, il reste
+  # lisible par lui-même (graines.R lit les fichiers de tests/, #213).
+  MARQUEUR_NON_ASCII <- paste0("QNONASCII", "Q")
+  controler_non_ascii <- function(l) {
+    if (any(grepl(MARQUEUR_NON_ASCII, l, fixed = TRUE)))
+      stop("le texte contient le marqueur interne ", MARQUEUR_NON_ASCII, " : lecture impossible", call. = FALSE)
+    e <- tryCatch(parse(text = remplacer_non_ascii(l, function(cp) MARQUEUR_NON_ASCII), keep.source = TRUE),
+                  error = function(e)
+                    stop("échappement invalide devant un caractère non ASCII, ou syntaxe (non ASCII remplacé par ",
+                         MARQUEUR_NON_ASCII, " pour l'analyse) : ", conditionMessage(e), call. = FALSE))
+    pd <- utils::getParseData(e, includeText = NA)
+    if (is.null(pd)) return(invisible(NULL))
+    s <- pd[pd$token == "STR_CONST", , drop = FALSE]
+    if (!nrow(s)) return(invisible(NULL))
+    texte <- utils::getParseText(pd, s$id)
+    brute <- grepl("^[rR]", texte) & grepl(MARQUEUR_NON_ASCII, texte, fixed = TRUE)
+    if (any(brute))
+      stop(sprintf("caractère non ASCII dans une chaîne brute (ligne %s) : lue hors UTF-8 comme du texte échappé, refusée",
+                   paste(s$line1[brute], collapse = ", ")), call. = FALSE)
+    invisible(NULL)
+  }
+  source_ascii <- function(fichier) {
+    l <- readLines(fichier, encoding = "UTF-8", warn = FALSE)
+    if (!all(validUTF8(l))) stop("octets non UTF-8 dans ", basename(fichier), call. = FALSE)
+    if (any(grepl("[^\\001-\\177]", l, perl = TRUE, useBytes = TRUE))) controler_non_ascii(l)
+    remplacer_non_ascii(l, function(cp) sprintf("\\U{%x}", cp))
+  }
+  analyser_fichier <- function(fichier, keep.source) {
+    if (session_utf8()) return(parse(fichier, keep.source = keep.source, encoding = "UTF-8"))
+    withCallingHandlers(parse(text = source_ascii(fichier), keep.source = keep.source),
+                        warning = function(w)
+                          if (grepl("<U+", conditionMessage(w), fixed = TRUE)) invokeRestart("muffleWarning"))
+  }
+  list(analyser_fichier = analyser_fichier, source_ascii = source_ascii)
+})
+charger_ <- function(script, env, dossier = CONTROLES_) {
+  for (e in lecture_$analyser_fichier(file.path(dossier, script), keep.source = FALSE)) eval(e, env)
   env
 }
 orch_ <- charger_("orchestration_locale.R", new.env())
@@ -17,6 +107,43 @@ orch_ <- charger_("orchestration_locale.R", new.env())
 verifier("orchestration : l'utilitaire ne définit que les huit fonctions communes",
          identical(sort(ls(orch_)), c("appeler_python", "avec_environnement", "duree", "ecart_octets", "executer",
                                      "installer", "message_python_absent", "trouver_python")))
+
+# --- lecture des scripts en UTF-8, quelle que soit la locale (#213) ---------------
+# Avant #213 (mesuré sous LC_ALL=C) : charger_() acceptait sans rien dire un script
+# dont les octets ne sont pas de l'UTF-8 valide (refusé en UTF-8) et écartait tous
+# les avertissements du parseur. Le sous-processus sous LC_ALL=C évalue les trois
+# premières définitions de ce fichier (CONTROLES_, lecture_, charger_), pour que le
+# cas porte sur la locale C quelle que soit la session de la batterie.
+
+dossier_octets_ <- tempfile("controle_octets_"); dir.create(dossier_octets_)
+writeBin(c(charToRaw("x <- \""), as.raw(0xff), charToRaw("\"\n")), file.path(dossier_octets_, "invalide.R"))
+writeBin(c(charToRaw("f <- function() c(\"d"), as.raw(c(0xc3, 0xa9)), charToRaw("lais\" = \""), as.raw(c(0xc3, 0xa9)),
+           charToRaw("t"), as.raw(c(0xc3, 0xa9)), charToRaw("\")  # "), as.raw(c(0xc3, 0xa9)), charToRaw("\n")),
+         file.path(dossier_octets_, "accentue.R"))
+verifier("charger_ : un script qui n'est pas de l'UTF-8 valide est refusé (session de la batterie)",
+         inherits(tryCatch(charger_("invalide.R", new.env(), dossier_octets_), error = function(e) e), "error"))
+verifier("lecture_ : source_ascii() refuse un fichier qui n'est pas de l'UTF-8 valide, quelle que soit la locale",
+         inherits(tryCatch(lecture_$source_ascii(file.path(dossier_octets_, "invalide.R")), error = function(e) e), "error"))
+avertissements_ <- character(0)
+e_ <- withCallingHandlers(charger_("accentue.R", new.env(), dossier_octets_),
+                          warning = function(w) { avertissements_ <<- c(avertissements_, conditionMessage(w)); invokeRestart("muffleWarning") })
+verifier("charger_ : un script à nom, littéral et commentaire non ASCII est chargé sans avertissement, littéral intact",
+         length(avertissements_) == 0L &&
+           identical(as.character(charToRaw(e_$f()[[1L]])), c("c3", "a9", "74", "c3", "a9")))
+lanceur_ <- tempfile(fileext = ".R")
+writeLines(c(sprintf("RACINE <- %s", deparse(RACINE)),
+             sprintf("for (e in parse(%s, encoding = 'UTF-8', keep.source = FALSE))",
+                     deparse(file.path(RACINE, "tests", "unitaires", "test_controles_portables.R"))),
+             "  if (is.call(e) && is.symbol(e[[2L]]) && as.character(e[[2L]]) %in% c('CONTROLES_', 'lecture_', 'charger_')) eval(e)",
+             sprintf("r <- tryCatch(charger_('invalide.R', new.env(), %s), error = function(e) conditionMessage(e))",
+                     deparse(dossier_octets_)),
+             "cat('UTF-8 :', l10n_info()[['UTF-8']], '\\n')",
+             "cat('RESULTAT :', if (is.environment(r)) 'charge' else r, '\\n')"), lanceur_)
+r_ <- executer_rscript(lanceur_, env = "LC_ALL=C")
+verifier("charger_ : sous LC_ALL=C, un script qui n'est pas de l'UTF-8 valide est refusé (octets non UTF-8)",
+         if (any(r_$sortie == "UTF-8 : FALSE ") && any(grepl("^RESULTAT : octets non UTF-8", r_$sortie, useBytes = TRUE))) TRUE
+         else paste(r_$sortie, collapse = " | "))
+unlink(c(dossier_octets_, lanceur_), recursive = TRUE)
 
 # --- avec_environnement ---------------------------------------------------------
 
