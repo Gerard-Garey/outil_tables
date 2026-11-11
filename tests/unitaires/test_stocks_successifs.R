@@ -464,7 +464,15 @@ verifier("catalogue des recettes, (4b) : ligne stocks_successifs (§ 3 : type_li
 })
 verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, sauf importance_exclusions, motif importance_exclusions_stocks ; valeur écrite à la main)", {
   m <- MAT[MAT$recette == "stocks_successifs", -1L]; rownames(m) <- NULL
-  identical(m, data.frame(
+  # Tolérance (décision du mainteneur du 11/11/2026, vague lissage) : une
+  # ligne lissage (estimateur NA, admis « oui »), unique, placée juste après
+  # kaplan_meier, est admise et retirée avant la comparaison.
+  l <- which(m$etape == "lissage")
+  lissage_admis <- !length(l) ||
+    (length(l) == 1L && l >= 2L && identical(m$estimateur[l - 1L], "kaplan_meier") &&
+       is.na(m$estimateur[l]) && identical(m$admis[l], "oui"))
+  if (length(l)) { m <- m[-l, ]; rownames(m) <- NULL }
+  lissage_admis && identical(m, data.frame(
     etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite", "validation",
               "importance_exclusions"),
     estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
