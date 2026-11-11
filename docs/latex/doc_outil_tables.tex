@@ -13651,11 +13651,15 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
       \ln\bigl(1 + (e^{c} - 1)\, v_x\bigr), \qquad
       v_x = \frac{b\,e^{cx}}{1 + b\,e^{cx}}~;
     \]
-    elle est évaluée sous cette forme, $v_x$ par \code{stats::plogis()} en
-    $\ln b + c\,x$, le logarithme par \code{log1p()}, $e^{c} - 1$ et
+    elle est évaluée sous la forme
+    $\Delta H_x = a + v_x\,\frac{e^{c}-1}{c}\,\frac{\ln(1+z_x)}{z_x}$,
+    $z_x = (e^{c}-1)\,v_x$, le dernier rapport pris égal à 1 quand $z_x$
+    vaut 0 en double précision~; $v_x$ par \code{stats::plogis()} en
+    $\ln b + c\,x$, $\ln(1+z_x)$ par \code{log1p()}, $e^{c} - 1$ et
     $1 - e^{-\Delta H_x}$ par \code{expm1()}, sans jamais former
-    $b\,e^{cx}$~: ni débordement aux grands âges, ni perte de précision
-    relative aux petites probabilités (approximation numérique, recoupée
+    $b\,e^{cx}$ ni diviser par $c$ un logarithme qu'un dépassement
+    inférieur aurait annulé~: ni débordement aux grands âges, ni perte de
+    précision relative aux petites probabilités (approximation numérique, recoupée
     par \code{stats::integrate()} à $10^{-12}$ relatif près, test~T3
     ci-dessous). La table est sans distinction de sexe (\code{ensemble}).
     $q_x$ croît strictement avec l'âge et tend vers le plateau
@@ -14758,7 +14762,10 @@ déclaration nul, convention et \code{par\_annee} de la forme. Sans
 exclusion déclarée, le module \code{donnees} refuse
 (\code{ligne\_invalide}) en nommant les motifs attendus~; avec toutes les
 exclusions des motifs attendus déclarées, les lignes exclues sont celles de
-l'attribut, motif par motif. Toute cellule exclue manque à la table
+l'attribut, motif par motif, sauf si ces exclusions ne conservent aucune
+cellule (refus \code{aucune\_ligne\_conservee}) ou aucune cellule
+d'exposition strictement positive ni aucun événement (refus
+\code{periode\_sans\_exposition}). Toute cellule exclue manque à la table
 (pour \code{cellule\_dupliquee}, l'original et la copie)~: le relevé
 \code{ages\_manquants} peut alors apparaître.
 
@@ -15634,7 +15641,11 @@ la fonction n'emploie pas, sur 27 lois aux âges 0 à 130, et la reprise à
 l'identique des $q_x$ par \code{loi\_effective()} (T3)~; la stricte
 croissance, la majoration par le plateau $1 - e^{-(a+1)}$ et son
 atteinte à $10^{-14}$ relatif près à 1\,000~ans (T4)~; la comparaison à la table de Gompertz-Makeham
-appariée (T5)~; les cas extrêmes de $b$ et de $c$ (T6)~; chaque refus
+appariée (T5)~; les cas extrêmes de $b$ et de $c$, dont trois cas où
+$z_x$ passe sous le plus petit double normalisé ($c = 5 \cdot 10^{-324}$
+et $b = 1$~; $c$ égal à ce plus petit double et $b = 10^{-10}$~;
+$c = 10^{-12}$ et $b = 10^{-300}$), à valeurs calculées à la main
+(T6)~; chaque refus
 \code{loi\_invalide} (T7)~; l'identité de deux jeux de même graine et la
 consignation de la table et de la graine, pour chaque forme de queue
 (T8)~; le constat de simulation ci-dessus (T9).
