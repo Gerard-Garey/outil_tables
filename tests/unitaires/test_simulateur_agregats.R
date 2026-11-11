@@ -15,8 +15,10 @@
 #    refus (A4), clôture (A7) ;
 #  - recoupement, approximation numérique à tolérance relative 1e-10 :
 #    modes multi-contrats et age_atteint_annee contre la table d'exposition
-#    du moteur en lignes (A5) ; somme sur les années de E^i à 1e-12 ; un
-#    dépassement est un constat, jamais une tolérance à élargir.
+#    du moteur en lignes (A5) ; somme sur les années de E^i à 1e-12 ; table
+#    par année construite sans année contre la construction en lignes, à
+#    1e-12 (A6) ; un dépassement est un constat, jamais une tolérance à
+#    élargir.
 #  Aucun constat Monte-Carlo (spécification, § 6). Graines dans la sous-plage
 #  22 001 230 - 22 001 264 (spécification, § 6, A8), une valeur par contexte.
 # -----------------------------------------------------------------------------
@@ -308,7 +310,7 @@ verifier("A4 (disjonction) : une cellule altérée au plus une fois ; taux = 1 s
 # lignes sur le jeu propre (recette lignes_dates_completes) : unité contrat,
 # rôles sans id_tete ; unité tête, id_tete et id_contrat déclarés.
 RECOUPEMENT <- local({
-  e <- character(0); ecart <- 0
+  e <- character(0); ecart <- 0; n_ei <- 0L
   cas <- list(
     list(pf = PF, f = fa(convention = "age_atteint_annee"), roles = ROLES_LIGNES),
     list(pf = PF, f = fa(RA, convention = "age_atteint_annee"), roles = ROLES_LIGNES),
@@ -331,15 +333,16 @@ RECOUPEMENT <- local({
     ecart <- max(ecart, rel(a$exposition_centrale, el$exposition_centrale))
     if (rel(a$exposition_centrale, el$exposition_centrale) > 1e-10) e <- c(e, paste(lab, ": E^c au-delà de 1e-10"))
     if (!is.null(el$complement_initial_cellule)) {
+      n_ei <- n_ei + 1L
       ecart <- max(ecart, rel(a$exposition_initiale, el$exposition_centrale + el$complement_initial_cellule))
       if (rel(a$exposition_initiale, el$exposition_centrale + el$complement_initial_cellule) > 1e-10)
         e <- c(e, paste(lab, ": E^i au-delà de 1e-10"))
     }
     if (sum(a$evenements) < 50L) e <- c(e, paste(lab, ": moins de 50 événements (cas vide)"))
   }
-  list(ecarts = e, ecart = ecart, cas = length(cas))
+  list(ecarts = e, ecart = ecart, cas = length(cas), cas_ei = n_ei)
 })
-verifier(sprintf("A5 (approximation numérique, tolérance relative 1e-10) : simulateur <-> moteur en lignes, age_atteint_annee et modes multi-contrats (%d cas) : mêmes cellules, D identical(), E^c et E^i à 1e-10 (écart maximal mesuré : %.3g)", RECOUPEMENT$cas, RECOUPEMENT$ecart), {
+verifier(sprintf("A5 (approximation numérique, tolérance relative 1e-10) : simulateur <-> moteur en lignes, age_atteint_annee et modes multi-contrats (%d cas) : mêmes cellules, D identical(), E^c sur les %d cas, E^i sur les %d cas sans par_annee, à 1e-10 (écart maximal mesuré : %.3g)", RECOUPEMENT$cas, RECOUPEMENT$cas, RECOUPEMENT$cas_ei, RECOUPEMENT$ecart), {
   if (length(RECOUPEMENT$ecarts)) paste(RECOUPEMENT$ecarts, collapse = " | ") else TRUE
 })
 verifier("A5 (approximation numérique, 1e-12) : age_atteint_annee, somme sur les années de E^c, E^i et D par année = valeurs sans année (cellules (sexe, âge))", {
@@ -376,6 +379,23 @@ verifier("A6 (identité exacte) : construction en agrégats age_atteint_annee = 
             !is.null(ra) && identical(ra$motif, "convention_positionnement_non_admise"))
   }
   all(ok)
+})
+verifier("A6 (recoupement, approximation numérique, tolérance relative 1e-12) : table age_atteint_annee par année (colonne annee, rôle déclaré) construite sans année = construction en lignes sans année (poisson et binomial) : colonnes, sexe, age, evenements et etat identical(), valeurs numériques à 1e-12", {
+  j <- simuler(LOI, PF, PER, GRAINE_JEU)
+  a <- PROPRES$aa_annee
+  f <- fa(convention = "age_atteint_annee", par_annee = FALSE)
+  br <- list(brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95))
+  xl <- construire_table(j, ROLES_LIGNES, plan_ag(f, etapes = br))$etapes$brut$resultat
+  xa <- construire_table(a, roles_de(a), plan_ag(f, etapes = br))$etapes$brut$resultat
+  ok <- "annee" %in% names(a) && identical(names(xa), c("poisson", "binomial")) && identical(names(xa), names(xl)) &&
+    all(vapply(xl, function(v) nrow(v) > 0L && sum(v$evenements) >= 50L, logical(1L)))
+  for (est in names(xl)) {
+    u <- xa[[est]]; v <- xl[[est]]
+    ok <- ok && identical(names(u), names(v)) && identical(u[c("sexe", "age", "evenements", "etat")], v[c("sexe", "age", "evenements", "etat")])
+    for (k in setdiff(names(v), c("sexe", "age", "evenements", "etat")))
+      ok <- ok && identical(is.na(u[[k]]), is.na(v[[k]])) && rel(u[[k]][!is.na(v[[k]])], v[[k]][!is.na(v[[k]])]) <= 1e-12
+  }
+  ok
 })
 
 # --- A7 : clôture --------------------------------------------------------------------------

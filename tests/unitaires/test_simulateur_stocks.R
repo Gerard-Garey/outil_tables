@@ -288,8 +288,8 @@ verifier("B4 (valeur écrite à la main) : attribut defauts des stocks : sept ch
                                       "date_sortie", "cause_sortie")]) &&
     identical(ad$validite$periode, PER) && identical(ad$validite$delai_declaration, 0) &&
     identical(ad$validite$inventaires, G4 + 0) &&
-    grepl("dernière date, motif sortie_non_renseignee, puis, exclu, refus inventaire_sans_ligne", ad$validite$texte,
-          fixed = TRUE) &&
+    grepl("t_M, dernière date de la grille, motif sortie_non_renseignee, puis, exclu, refus inventaire_sans_ligne",
+          ad$validite$texte, fixed = TRUE) &&
     identical(names(ad$lignes), c("ligne", "declaration", "defaut", "unite", "role", "motif_attendu", "refus_attendu",
                                   "premier_deces")) &&
     identical(names(ad$decomptes), c("lignes_jeu_propre", "copies", "lignes", "lignes_en_defaut", "lignes_alterees",
