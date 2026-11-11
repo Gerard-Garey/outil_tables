@@ -1161,3 +1161,19 @@ Rédigée par `architect` (fiche de routine) à la consignation de fin de la bra
 **Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code. Les changements de R8 à R13 sont ceux du tableau avant / après de `9aaeba9`. `VERSION_FICHE` inchangée (6).
 
 Issues : #199, #200, #202 (et #201 pour la rectification). Décisions du mainteneur M396 et M397 (10/11/2026). Branche `claude/validation-types-statuts`, PR #208.
+
+## Annotation du 11 novembre 2026 (troisième) — points 3.4 et 9.3 : annonce d'une cinquième classe de tolérance, `optimisation`, pour les grandeurs issues d'un calcul itératif ou d'une optimisation ; valeur fixée par mesure au commit (3) de B19 (ADR 0017, point 8, M415 ; #225)
+
+Rédigée par `architect` à l'étape (0')(d) de la porteuse `claude/lissage-whittaker` (B19, PR #221), tête `fedd350`, après l'acceptation de l'ADR 0017 par le mainteneur le 11/11/2026 (M415 ; point G retenu). Annotation d'**annonce** : elle ne modifie ni `CLASSES_TOLERANCE` ni `TOLERANCES` ; l'annotation de **constat** exigée par les points 3.4 et 9.3 suivra au commit (3) de B19 (#225), avec la valeur mesurée et l'avis d'`actuary`. Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne relevés à `fedd350` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Motif (ADR 0017, point 8.1).** Sur la plateforme de référence, une construction est identique au bit près ; la tolérance absorbe un écart numérique bénin. Une grandeur issue d'une boucle arrêtée sur un critère (PIRLS de Whittaker-Henderson (b), arrêt sur ε_d) ou d'une optimisation (λ̂ par la LAML, grille puis Brent) peut, sous une perturbation de l'ordre de l'unité d'arrondi, s'arrêter à une itération ou en un point voisins : son écart est borné par la tolérance de l'algorithme, non par l'arithmétique. Aucune des quatre classes actuelles (`CLASSES_TOLERANCE`, `tests/reference/outils_reference.R:91` : exacte, 1e-14, 1e-12, 1e-10) n'est justifiée pour elle sans mesure.
+
+**(b) Classe annoncée.** Une cinquième classe de `CLASSES_TOLERANCE`, nom indicatif **`optimisation`**. Sa **valeur n'est pas fixée ici** : au commit (3), `coder` mesure, sur les plans de référence de Whittaker-Henderson (b), l'écart relatif de λ̂, ν, LAML et `qx` entre l'exécution nominale et des exécutions perturbées de l'ordre de l'arrondi (départ de la grille décalé d'une unité de dernier rang, ordre de sommation modifié) ; il propose la plus petite classe décimale qui couvre dix fois l'écart maximal mesuré ; `actuary` donne son avis. Statut de la valeur : **constat de mesure**, non résultat exact.
+
+**(c) Portée (ADR 0017, point 8.3).** Les clés restent par chemin, non par méthode (point 3.4 ; seconde annotation du 07/11/2026). La classe vaut pour les chemins de l'étape `lissage` qui reçoivent une valeur itérée sous (b) — `qx` de la table lissée, bornes de crédibilité, ν, LAML, λ̂ —, y compris quand le plan est sous (a), le chemin étant le même ; la perte de sensibilité sous (a) est couverte par les tests unitaires (contre-vérification `WH` à 1e-10). Les grandeurs de la validation `lissee` qui en dérivent (attendus, X², ddl) reçoivent la même classe par leurs clés propres. Le nombre d'itérations (`integer`) est exact. Options écartées : la classe 1e-10 sans mesure ; des clés qualifiées par la méthode ; des chemins distincts par méthode (ADR 0017, point 8.4).
+
+**(d) Règle de complétude inchangée** (point 3.4) : toute grandeur `double` nouvelle de l'étape `lissage`, de `coherence_regularite` et de la validation `lissee` reçoit sa classe d'`actuary` avant d'entrer dans une référence (R15, R16, R17, créées au (R) de B19, M415) ; aucune classe n'est devinée ni élargie pour « faire passer » un écart (point 9.3).
+
+**Effet sur les résultats : aucun** par la présente annotation. R1 à R14 ne contiennent aucune grandeur de l'étape `lissage`.
+
+Issues : #225, #223, #224. Décisions M413, M415. ADR 0017. Branche `claude/lissage-whittaker`, PR #221.
