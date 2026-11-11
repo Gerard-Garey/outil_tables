@@ -128,6 +128,15 @@ verifier("T6 (valeur calculée à la main) : c = 709 accepté, q_x finis dans (0
          all(is.finite(C_GRAND$qx)) && all(C_GRAND$qx > 0) && all(C_GRAND$qx <= 1))
 verifier("T6 (valeur calculée à la main : limite c -> 0, mu = a + b/(1 + b)) : c = 1e-8, b = 1e-2, x = 0, 1e-7 relatif",
          proche(table_logistique(0, 1e-2, 1e-8, 0)$qx, -expm1(-1e-2 / (1 + 1e-2)), rel = 1e-7, abs = 0))
+# z = expm1(c) v sous .Machine$double.xmin (dépassement inférieur) : le
+# rapport log1p(z) / z vaut 1 (limite exacte), Delta H_0 = v expm1(c) / c.
+verifier("T6 (valeur calculée à la main : v = plogis(0) = 1/2, expm1(c)/c = 1, q = 1 - exp(-1/2)) : c = 5e-324, b = 1, x = 0, 1e-15 relatif",
+         proche(table_logistique(0, 1, 5e-324, 0)$qx, 0.3934693402873666, rel = 1e-15, abs = 0))
+verifier("T6 (valeur calculée à la main : expm1(c)/c = 1, q = 1 - exp(-plogis(ln b))) : c = .Machine$double.xmin, b = 1e-10, x = 0, 1e-15 relatif",
+         proche(table_logistique(0, 1e-10, .Machine$double.xmin, 0)$qx, -expm1(-stats::plogis(log(1e-10))),
+                rel = 1e-15, abs = 0))
+verifier("T6 (valeur calculée à la main : v = b, expm1(c)/c = 1 + c/2, q = b (1 + 5e-13)) : c = 1e-12, b = 1e-300, x = 0, 1e-12 relatif",
+         proche(table_logistique(0, 1e-300, 1e-12, 0)$qx, 1e-300 * (1 + 5e-13), rel = 1e-12, abs = 0))
 
 # --- T7 : refus ----------------------------------------------------------------------------------
 
