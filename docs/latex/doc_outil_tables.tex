@@ -3681,14 +3681,19 @@ le calcul a donc lieu avant la première étape~; seuls les refus de l'étape
 (\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un}),
 et ceux de l'étape \code{positionnement} sur ses cellules et ses segments
 (les mêmes, plus \code{positionnement\_sans\_attendu} et
-\code{positionnement\_sans\_deces}), et ceux de l'étape \code{exposition}
+\code{positionnement\_sans\_deces}), le refus de capacité
+\code{evenements\_retires\_hors\_plage} de l'étape
+\code{importance\_exclusions}, sur ses ensembles de lignes exclues
+(issue~\#174), et ceux de l'étape \code{exposition}
 sur la table qu'elle forme (\code{trop\_de\_cellules},
 \code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} et
 \code{periode\_sans\_exposition},
 section~\ref{sec:troncature-censure}), sont levés pendant l'étape, après
 celles qui la précèdent (l'étape
-\code{importance\_exclusions} ne lève aucun refus sur ses cellules,
-section~\ref{sec:importance-exclusions})~; un nom de colonne ou un
+\code{importance\_exclusions} ne lève aucun refus sur ses cellules, et
+les gardes \code{denombrement\_hors\_plage} des étapes en aval de
+\code{exposition} sont défensives, section~\ref{sec:importance-exclusions}
+et section~\ref{sec:non-regression}, «~Type des dénombrements~»)~; un nom de colonne ou un
 chemin non ASCII de codage indéterminé, sous la locale C, n'est plus refusé
 après tous les calculs, à l'écriture de la fiche, en erreur de
 programmation. Chaque contrôle n'y est exécuté qu'une fois
@@ -6776,8 +6781,13 @@ lecture~:\par}
     calculée sous l'approximation de Poisson aux expositions réalisées,
     laquelle intègre, sous \code{milieu}, la sur-exposition de cellule qui
     réduit le manque dominant de l'intervalle asymptotique (constat de
-    simulation, lecture calibrée sur des jeux non vus au choix de la
-    règle, \code{tests/mesures/constat\_couverture\_s2.R}, hors CI, âges de
+    simulation~; lecture calibrée, ajoutée le 10/11/2026 après un pilote
+    sur les jeux 1 à 1\,000 et lue aussi sur les seuls jeux non vus au
+    choix de la règle, décision M383~; le \textbf{verdict de référence},
+    règle fixée avant le pilote (décision M382), sans risque global
+    contrôlé et au calibrage reconnu défaillant, conclut «~non
+    expliqué~»~; les deux verdicts sont publiés~;
+    \code{tests/mesures/constat\_couverture\_s2.R}, hors CI, âges de
     50 à 70~ans, 2\,000~jeux dont les 1\,000 de la PR~\#188~; passage
     consigné au commentaire de la PR~\#204 du 10/11/2026, valeurs non
     reproduites ici, E3.4~; Kaplan-Meier non couvert)~;
@@ -8485,8 +8495,8 @@ de ce document.}\par}
 
 \medskip
 \textbf{Écart à la note II1291-12} (décisions M288, M80 et M192). La note
-pose $\tilde q_x^{\mathrm{pos}} = \mathrm{SMR} \times q_x^{\mathrm{réf}}$,
-avec $\mathrm{SMR} = \sum D / \sum E\, q^{\mathrm{réf}}$ sur «~la plage
+pose $\tilde q_x^{\mathrm{pos}} = \mathrm{SMR} \times q_x^{\text{réf}}$,
+avec $\mathrm{SMR} = \sum D / \sum E\, q^{\text{réf}}$ sur «~la plage
 d'âges et période d'observation communes avec la référence~», $E$ étant le
 temps d'observation des individus (§~2.3 et §~3.1, p.~3/13), donc une
 exposition centrale. L'outil
@@ -9290,8 +9300,12 @@ dans la colonne \code{statut} du résultat.
     (\code{docs/recherche/}\allowbreak\code{2026-11-05-sources-v1.md},
     §~4).
   \item \textbf{S5, sous-groupes} (\code{resultat\$sous\_groupes})~:
-    $O$, $A$, SMR, bornes exactes et p-valeurs de Poisson exactes ($p = 0$~:
-    $X \sim \mathcal{P}(A)$) par regroupement \code{segment\_tranche}
+    $O$, $A$, SMR, bornes exactes et p-valeurs de Poisson exactes (sous
+    \code{independante}, où le nombre $p$ de paramètres estimés est nul,
+    table prise telle quelle~: loi de référence $X \sim \mathcal{P}(A)$~;
+    non produites sous \code{ajustee\_hors\_outil}, état
+    \code{ddl\_non\_etabli}~; sous \code{positionnee}, lois conditionnelles
+    du paragraphe «~Sous la relation \code{positionnee}~») par regroupement \code{segment\_tranche}
     (segment $\times$ tranche d'âge) et \code{segment} si la segmentation
     n'est pas vide, \code{tranche} toujours, \code{annee} sous
     \code{par\_annee}, sur les cellules retenues, dont le nombre est
