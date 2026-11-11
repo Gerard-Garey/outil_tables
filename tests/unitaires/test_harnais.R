@@ -122,6 +122,35 @@ r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)))
 verifier("lanceur : fichier témoin conforme -> code 0",
          if (r$statut == 0L) TRUE else paste(r$sortie, collapse = " | "))
 unlink(d, recursive = TRUE)
+# Lecture des fichiers de test en UTF-8 quelle que soit la locale (#213) : sous
+# LC_ALL=C, un fichier qui n'est pas de l'UTF-8 valide est refusé (avant :
+# chargé sans rien dire, code 0 mesuré ; en UTF-8 : refusé) ; un fichier à nom,
+# littéral et commentaire non ASCII est chargé, littéral intact, sans
+# avertissement du parseur.
+dossier_octets <- function(fichiers) {
+  d <- tempfile("unitaires_octets_"); dir.create(d)
+  for (n in names(fichiers)) writeBin(fichiers[[n]], file.path(d, n))
+  d
+}
+d <- dossier_octets(list(test_temoin.R = c(charToRaw("verifier(\"vrai\", TRUE)\nx <- \""), as.raw(0xff), charToRaw("\"\n"))))
+for (env in list(character(0), "LC_ALL=C")) {
+  r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)), env = env)
+  verifier(sprintf("lanceur : fichier de test qui n'est pas de l'UTF-8 valide -> code non nul, chargement refusé (%s)",
+                   if (length(env)) env else "locale de la session"),
+           if (r$statut == 0L) "code de sortie 0"
+           else if (!any(grepl("chargement complet du fichier", r$sortie, fixed = TRUE, useBytes = TRUE)))
+             paste("motif non signalé :", paste(r$sortie, collapse = " | ")) else TRUE)
+}
+unlink(d, recursive = TRUE)
+d <- dossier_octets(list(test_temoin.R = c(
+  charToRaw("# commentaire "), as.raw(c(0xc3, 0xa9)), charToRaw("\nx <- list(\"d"), as.raw(c(0xc3, 0xa9)), charToRaw("lais\" = 1)\n"),
+  charToRaw("verifier(\"litteral UTF-8 intact\", identical(charToRaw(\""), as.raw(c(0xc3, 0xa9)),
+  charToRaw("\"), as.raw(c(0xc3, 0xa9))))\n"))))
+r <- executer_rscript(LANCEUR, c("--dossier", shQuote(d)), env = "LC_ALL=C")
+verifier("lanceur : sous LC_ALL=C, fichier de test à nom, littéral et commentaire non ASCII -> code 0, littéral intact, aucun avertissement du parseur",
+         if (r$statut == 0L && !any(grepl("unable to translate|In parse\\(", r$sortie, useBytes = TRUE))) TRUE
+         else paste(r$sortie, collapse = " | "))
+unlink(d, recursive = TRUE)
 # Le lanceur ne laisse aucune de ses variables dans globalenv(), parent des
 # environnements de test : un test qui lirait `e`, `f`, `env`, `r`, `avant` ou
 # `t0` comme variable libre lirait celle du lanceur (ou d'un fichier précédent).

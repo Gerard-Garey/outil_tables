@@ -177,9 +177,11 @@ creer_arbre <- function(pd) {
 
 # Analyse syntaxique d'un fichier de R/ (UTF-8), indépendante de la locale
 # native (#206). En locale UTF-8 : parse(fichier, encoding = "UTF-8"). Sinon
-# (mesuré sous LC_ALL=C), parse() ne peut pas traduire vers l'encodage natif
-# les littéraux non ASCII : il avertit et les altère (« <U+00E9> »), sans
-# refus. Le fichier est alors lu en octets UTF-8 (validUTF8() : sinon erreur),
+# (mesuré sous LC_ALL=C, R 4.3.3), parse() accepte sans rien dire un fichier
+# dont les octets ne sont pas de l'UTF-8 valide, et altère en « <U+00E9> »
+# les noms non ASCII (chaîne en position de nom d'argument), avec un
+# avertissement ; les littéraux non ASCII restent intacts (#213). Le fichier est alors lu
+# en octets UTF-8 (validUTF8() : sinon erreur),
 # chaque caractère non ASCII est réécrit en échappement \U{...} (le parseur
 # l'interprète sans traduction : chaîne ordinaire lue comme en UTF-8 ; sans
 # effet dans un commentaire), puis analysé en texte ASCII ; les numéros de
@@ -196,6 +198,10 @@ creer_arbre <- function(pd) {
 # entre accents graves est accepté en UTF-8 et refusé hors UTF-8 (parse() :
 # « \Uxxxxxxxx sequences not supported inside backticks »), jamais accepté à
 # tort hors UTF-8.
+# Autre divergence (#213, constat d'audit) : dans une même chaîne,
+# un échappement \x.. ou octal suivi d'un caractère non ASCII est refusé
+# hors UTF-8 (« mixing Unicode and octal/hex escapes in a string is not
+# allowed ») et accepté en UTF-8 : refus, jamais acceptation à tort.
 # Un appel d'opérateur non ASCII (a %é% b) est lu hors UTF-8 sous le nom
 # littéral « %\U{e9}% » ; aucun tel opérateur ne peut être défini hors UTF-8
 # (forme entre accents graves refusée par parse()) et R/ n'en contient aucun.
@@ -225,7 +231,9 @@ remplacer_non_ascii <- function(l, par) {
 # caractère non ASCII : une barre oblique inverse devant le marqueur est un
 # échappement invalide (erreur du parseur) ; un jeton chaîne commençant par r
 # ou R qui contient le marqueur est une chaîne brute non ASCII.
-MARQUEUR_NON_ASCII <- "QNONASCIIQ"
+# Marqueur en deux morceaux : le texte de ce bloc ne le contient pas, il reste
+# lisible par lui-même (graines.R lit les fichiers de tests/, #213).
+MARQUEUR_NON_ASCII <- paste0("QNONASCII", "Q")
 controler_non_ascii <- function(l) {
   if (any(grepl(MARQUEUR_NON_ASCII, l, fixed = TRUE)))
     stop("le texte contient le marqueur interne ", MARQUEUR_NON_ASCII, " : lecture impossible", call. = FALSE)
