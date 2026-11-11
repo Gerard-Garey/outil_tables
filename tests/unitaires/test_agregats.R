@@ -664,9 +664,9 @@ verifier("C10 : événements des agrégats = sorties de la cause comptée dans [
   sum(AG_SIM$evenements) == dans("deces") && sum(sim_ag(forme_ag(RA))$evenements) == dans("rachat") &&
     sum(sim_ag(forme_ag(par_annee = TRUE))$evenements) == dans("deces")
 })
-verifier("C10 (refus écrits à la main) : forme avec defauts, mode multi-contrats, convention age_atteint_annee, forme mal formée -> forme_invalide, module simulation, avant tout tirage (aucun appel de sous_graine(), état .Random.seed de l'appelant inchangé)", {
-  dft <- list(graine = 170L, declarations = list(list(type = "sexe_manquant", cible = "deces", nombre = 1L)))
-  pf_multi <- c(PF_SIM, list(loi_contrats = c(0.5, 0.5))); pf_multi$mode <- "uniforme_multi"
+# Défauts, modes multi-contrats et convention age_atteint_annee admis depuis
+# #189 : leurs cas sont dans test_simulateur_agregats.R (M412).
+verifier("C10 (refus écrits à la main) : forme mal formée -> forme_invalide, module simulation, avant tout tirage (aucun appel de sous_graine(), état .Random.seed de l'appelant inchangé)", {
   # « Avant tout tirage » : tous les tirages du simulateur passent par
   # sous_graine() (outils), qui rétablit l'état de l'appelant même après un
   # tirage ; .Random.seed seul ne le prouve donc pas. Les appels de
@@ -681,9 +681,6 @@ verifier("C10 (refus écrits à la main) : forme avec defauts, mode multi-contra
     temoin <- cpt$n
     cpt$n <- 0L; graine_temoin <- .Random.seed
     list(
-      defauts = rf(sim_ag(forme_ag(), defauts = dft)),
-      multi = rf(sim_ag(forme_ag(), portefeuille = pf_multi)),
-      age_atteint_annee = rf(sim_ag(forme_ag(convention = "age_atteint_annee"))),
       convention = rf(sim_ag(forme_ag(convention = "plus_fine"))),
       nom = rf(sim_ag(list(nom = "stocks", transition = VD, convention = "dernier_anniversaire", par_annee = FALSE))),
       champ_manquant = rf(sim_ag(forme_ag()[c("nom", "transition", "convention")])),
@@ -696,13 +693,10 @@ verifier("C10 (refus écrits à la main) : forme avec defauts, mode multi-contra
   tirages_refus <- cpt$n
   graine_inchangee <- identical(.Random.seed, graine_temoin) && identical(graine_temoin, graine_avant)
   ko <- names(cas)[!vapply(cas, function(r) isTRUE(controle(r, "simulation", "forme_invalide")), NA)]
-  msg <- function(k) cas[[k]]$message
   if (!identical(temoin, 1L)) sprintf("témoin : %d appel(s) de sous_graine() sans forme au lieu de 1", temoin)
   else if (!identical(tirages_refus, 0L)) sprintf("%d appel(s) de sous_graine() pendant les refus", tirages_refus)
   else if (!graine_inchangee) ".Random.seed de l'appelant modifié"
   else if (length(ko)) paste("sans le refus attendu :", paste(ko, collapse = ", "))
-  else if (!grepl("defauts", msg("defauts"), fixed = TRUE) || !grepl("multi-contrats", msg("multi"), fixed = TRUE) ||
-           !grepl("age_atteint_annee", msg("age_atteint_annee"), fixed = TRUE)) "message sans la raison nommée"
   else TRUE
 })
 # C11 : la table d'exposition des lignes (recette lignes_dates_completes,
