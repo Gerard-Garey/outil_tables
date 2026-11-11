@@ -42,7 +42,7 @@ Ce relevé confirme celui de `docs/recherche/2026-11-05-sources-v1.md`, § 2.1 (
 
 *Remarque de la session (non tirée de la source)* :
 - La formule du modèle (p. 6/13) et celle de la prévision (p. 7/13) ne sont cohérentes que si le prédicteur linéaire est **log μ** (lien logarithmique, lien canonique du GLM de Poisson) : la prévision applique exp au prédicteur. Avec le membre de gauche imprimé (μ = prédicteur, lien identité), la prévision devrait être le prédicteur lui-même. La lecture « log μ » est la seule qui rende les deux formules cohérentes, mais elle n'est pas imprimée.
-- La prévision identifie en outre q̃_x(t) à μ_x(t) (q = exp(prédicteur) au lieu de q = 1 − exp(−μ) sous la convention de force constante du moteur, `R/brut.R:122`, cité par l'avis M369). C'est un second écart d'écriture, distinct du premier.
+- La prévision identifie en outre q̃_x(t) à μ_x(t) (q = exp(prédicteur) au lieu de q = 1 − exp(−μ) sous la convention de force constante du moteur : « probabilite = 1 - exp(-taux) », `R/brut.R:94` à `9697f0c`). C'est un second écart d'écriture, distinct du premier.
 - Pour le plan de `claude/positionnement-brass-glm` : la méthode 3 se spécifie sous sa forme statistique usuelle (log μ = prédicteur, log E en décalage), écart à l'écriture de la note documenté au sens de M80 et M192 ; la relation entre q et μ suit la convention du moteur. À arbitrer par `actuary` ; la source de la forme (Tomas et Planchet, 2013) reste à lire.
 
 ## 2. Source v1 du bootstrap par têtes (E2.14 ; M351 : « non trouvée »)
