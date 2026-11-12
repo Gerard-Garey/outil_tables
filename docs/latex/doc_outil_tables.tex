@@ -3831,8 +3831,9 @@ observations calculées par l'étape \code{exposition}, avec les valeurs
 validées de la transition, de la période et du délai~; l'étape
 \code{lissage} lit la table d'exposition, la convention retenue de
 l'étape \code{exposition}, la segmentation du plan et le résultat de
-l'étape \code{brut}, dont la table de l'estimateur \code{binomial}
-(section~\ref{sec:lissage-etape})~; l'étape
+l'étape \code{brut}, dont la table de l'estimateur \code{binomial} sous
+Whittaker-Henderson~(a)~; sous~(b), elle lit $D$ et $E^c$ sur la table
+d'exposition (section~\ref{sec:lissage-etape})~; l'étape
 \code{positionnement} lit la table d'exposition et les paramètres effectifs
 de l'étape \code{exposition} (découpage par année, convention retenue) et
 la table de la clé citée (section~\ref{sec:positionnement-etape})~; l'étape
@@ -6296,9 +6297,10 @@ avec le rôle \code{annee} sous la convention retenue
 \code{dernier\_anniversaire}). L'étape \code{lissage} est admise sous
 les trois recettes~: l'admission d'une variante de lissage passe par
 l'estimateur brut qu'elle exige à l'étape \code{brut} (\code{binomial}
-pour Whittaker-Henderson~(a), section~\ref{sec:lissage-etape}), que la
-matrice règle déjà, sous \code{agregats} par le rôle
-\code{exposition\_initiale}~; aucune ligne de matrice ne porte sur la
+pour Whittaker-Henderson~(a), \code{poisson} pour~(b),
+section~\ref{sec:lissage-etape}), que la matrice règle déjà, sous
+\code{agregats} par les rôles \code{exposition\_initiale} et
+\code{exposition\_centrale}~; aucune ligne de matrice ne porte sur la
 variante (ADR 0017, point~4). La recette \code{agregats} n'a pas de
 convention native~: la convention d'âge des cellules se déclare
 (\code{plus\_fine} est refusé, \code{convention\_non\_declaree}~; fonction
@@ -8554,14 +8556,19 @@ dans la phase des valeurs, quand vient l'étape \code{lissage}
     \code{intervalle\_lissage\_invalide}~; puis deux refus qui lisent une
     autre étape~: \code{estimateur\_lissage\_absent}, si l'estimateur brut
     qu'exige la méthode (\code{binomial} sous \code{wh\_quadratique},
-    décision D1) manque aux estimateurs de l'étape \code{brut}, et
+    décision D1~; \code{poisson} sous \code{wh\_poisson}) manque aux
+    estimateurs de l'étape \code{brut}, et
     \code{lissage\_par\_annee}, si \code{par\_annee = TRUE}~: le lissage
     porte sur l'âge seul. Sous \code{wh\_quadratique}, un plan à
     \code{par\_annee = TRUE} est refusé avant, par
     \code{binomial\_par\_annee} de l'étape \code{brut}, contrôlée avant
     l'étape \code{lissage}~; \code{lissage\_par\_annee} n'y est levé que par
-    un appel direct de la fonction de contrôle. Les deux refus sont
-    conservés (ADR 0017, point~4.1).
+    un appel direct de la fonction de contrôle~; sous \code{wh\_poisson},
+    l'estimateur \code{poisson} étant admis sous \code{par\_annee},
+    \code{lissage\_par\_annee} est levé par \code{valider\_plan()}. Les deux
+    refus sont conservés (ADR 0017, point~4.1). Le refus
+    \code{niveau\_invalide} porte ici un message propre aux intervalles de
+    crédibilité.
 \end{enumerate}
 \code{controler\_parametres\_lissage()} reçoit un argument formel par
 paramètre du catalogue de l'étape, un paramètre absent étant lu par
@@ -8609,7 +8616,18 @@ en cause), dans cet ordre, sous \code{wh\_quadratique}~:
     écrêter modifierait la solution du problème en silence~; l'utilisateur
     change le paramètre de lissage, l'ordre, la pondération ou la plage.
 \end{enumerate}
-Sous \code{wh\_poisson}, la liste diffère (section~\ref{sec:lissage-poisson}).
+Sous \code{wh\_poisson}, dans cet ordre~: \code{lissage\_sans\_segment}~;
+\code{lissage\_evenement\_sans\_exposition} ($E^c = 0$ et $D > 0$, à la
+place du refus $D > E^i$, qui ne vaut pas sous~(b))~;
+\code{lissage\_plage\_bornee\_sans\_exposition},
+\code{lissage\_cellules\_insuffisantes} et \code{lissage\_sans\_deces},
+comme sous~(a), le poids étant nul si et seulement si $E^c = 0$~;
+\code{lissage\_interpolation\_deces\_nul} (exactement $z$ cellules exposées,
+dont au moins une sans décès~: aucun maximum fini)~;
+\code{lissage\_systeme\_rang\_deficient}~; \code{lissage\_non\_convergent}
+(plafond d'itérations, recherche linéaire épuisée sans convergence
+numérique, ou rang perdu en cours d'itération), chacun cité au $\lambda$
+de l'échec~; aucun refus de domaine (section~\ref{sec:lissage-poisson}).
 Une table d'exposition dont les décomptes de la plage et hors de la plage
 ne redonnent pas le total des événements est une erreur de programmation.\par}
 
@@ -8784,7 +8802,200 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
 \subsection{Whittaker-Henderson~(b)~: vraisemblance de Poisson pénalisée}
 \label{sec:lissage-poisson}
 
-\emph{À rédiger (issue~\#225).}
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Objet}~: la force lissée $\mu_x = e^{\theta_x}$ de la
+    transition, par segment, sur l'axe de l'âge, aux âges entiers de la
+    plage, restituée en probabilité $q_x = 1 - e^{-\hat\mu_x}$
+    (\code{-expm1(-exp(theta))})~; \code{methode = "wh\_poisson"}~;
+    paramètre de lissage $\lambda$ déclaré (\code{critere\_lissage =
+    "declare"}, \code{parametre\_lissage}) ou choisi par la LAML
+    (\code{critere\_lissage = "laml"}, \code{intervalle\_lissage}).
+  \item \textbf{Données retenues}~: les décès $D_x$ et l'exposition
+    centrale $E^c_x$ de chaque cellule de la plage, statistiques de
+    l'estimateur \code{poisson} de l'étape \code{brut}
+    (section~\ref{sec:brut-poisson}), lus sur la grille des cellules
+    (\code{grille\_plage()}). Une cellule est \emph{exposée} si et
+    seulement si $E^c_x > 0$~; une cellule sans exposition ($E^c = 0$,
+    $D = 0$, ou sans ligne) a un poids nul et une valeur interpolée (état
+    \code{interpolee})~; une cellule $E^c = 0$ avec $D > 0$ est un refus
+    (\code{lissage\_evenement\_sans\_exposition}~: la vraisemblance y est
+    nulle quel que soit $\mu$). Aucun refus $D > E^i$~: la force brute
+    $D / E^c$ peut dépasser~1 sans incohérence (ADR 0017, point~15).
+  \item \textbf{Hypothèses}~: celle de l'estimateur \code{poisson} (force
+    constante par âge entier), qui est aussi la règle de la force de la
+    table~; vraisemblance de Poisson exacte en $\theta = \ln\mu$, sans
+    surdispersion~; unités d'observation indépendantes~; aucune
+    extrapolation hors de la plage (D11). Le texte complet, règles non tirées
+    de la source comprises, est recopié dans les paramètres
+    (\code{HYPOTHESE\_LISSAGE\_POISSON}).
+  \item \textbf{Estimateur} (Biessy, §~4.1)~: $\hat\theta$ maximise la
+    log-vraisemblance pénalisée
+    \[
+      \ell_P(\theta) = \sum_{x : E^c_x > 0} \bigl(D_x \theta_x - E^c_x
+      e^{\theta_x}\bigr) - \frac{\lambda}{2}\, S(\theta), \qquad
+      S(\theta) = \sum_x (\Delta^z \theta_x)^2,
+    \]
+    $\hat\theta$ étant le mode \emph{a posteriori} sous l'a priori gaussien
+    impropre de la pénalité~; le terme $-\sum \ln D_x!$, constant en
+    $\theta$ et en $\lambda$, est omis. Avec $m = E^c e^{\theta}$,
+    $W = \operatorname{Diag}(m)$ et $P = \lambda K^{\mathsf T} K$, la
+    condition du premier ordre est l'équation du score
+    $D - m - P\theta = 0$ sur les cellules exposées.
+  \item \textbf{Unicité, existence} (raisonnement écrit). La hessienne de
+    $\ell_P$ est $-(W + P)$~; comme sous la variante~(a)
+    (section~\ref{sec:lissage-quadratique}), $W + P$ est définie positive si
+    et seulement si le segment compte au moins $z$ cellules exposées~:
+    $\ell_P$ est alors strictement concave et admet au plus un maximum
+    (moins de $z$ cellules exposées~: refus
+    \code{lissage\_cellules\_insuffisantes}). Si le segment compte
+    exactement $z$ cellules exposées, tout choix de valeurs en ces $z$ âges
+    se prolonge par le polynôme de degré au plus $z - 1$ qui les
+    interpole, de pénalité nulle~: la borne supérieure de $\ell_P$ est la
+    somme des bornes supérieures, cellule par cellule, de $D_x\theta_x -
+    E^c_x e^{\theta_x}$~; pour une cellule exposée sans décès, cette borne
+    vaut~0 et n'est atteinte pour aucun $\theta_x$ fini~: aucun maximum
+    fini n'existe, d'où le refus \code{lissage\_interpolation\_deces\_nul}
+    (avis d'\code{actuary}, Q4 de l'issue~\#239). Hors de ce cas, le
+    document n'établit pas l'existence du maximum pour toutes les données
+    (décès d'un segment à un seul âge extrême, $z = 2$~: l'algorithme ne
+    converge pas, test A6)~; un échec de l'algorithme est refusé
+    (\code{lissage\_non\_convergent}), sans table.
+  \item \textbf{Calcul} (\code{lisser\_poisson()}~; Biessy, annexe~D,
+    algorithme~1, p.~54~; ADR 0017, point~9.1)~: départ $\theta_0 =
+    \ln(\max(D, \varepsilon)/E^c)$ aux cellules exposées, 0 ailleurs
+    ($\varepsilon$ = \code{EPSILON\_DEPART\_LISSAGE})~; à chaque
+    itération de Newton (\code{iteration\_pirls()}), réponse de travail
+    $z_k = \theta + D/m - 1$ aux cellules exposées, $\theta$ ailleurs, et
+    nouveau $\theta$ par QR des moindres carrés augmentés
+    $[W^{1/2}~; \sqrt{\lambda} K]$ (\code{qr()} avec \code{LAPACK = FALSE},
+    puis \code{qr.coef()}), comme sous~(a)~; déviance pénalisée
+    $\mathrm{dev}_P = 2 \sum_{E^c > 0} [D \ln(D/m) - (D - m)] + \lambda
+    S(\theta)$ ($0 \ln 0 = 0$), $S$ calculée par
+    \code{somme\_differences\_carrees()}, jamais sous la forme
+    $\theta^{\mathsf T} P \theta$, qui bruite la LAML aux grands $\lambda$
+    (mesure d'\code{actuary}, spécification de forme)~; recherche linéaire~:
+    pas divisé par deux, au plus \code{DEMI\_PAS\_MAX\_LISSAGE} fois, tant
+    que $\mathrm{dev}_P$ croît ou n'est pas finie~; poursuite si et
+    seulement si $\mathrm{dev}_P$ décroît d'au moins
+    \code{EPSILON\_DEVIANCE\_LISSAGE} en relatif («~$<$~» au lieu du
+    «~$\le$~» de la source, pour arrêter à l'égalité), au plus
+    \code{ITERATIONS\_MAX\_LISSAGE} itérations. Après convergence, QR à
+    $\hat\theta$~: $V = (W + P)^{-1}$ par \code{chol2inv()}, leviers $m_x
+    V_{xx}$ (0 exactement aux cellules sans exposition), $\nu$ leur somme,
+    $\ln\lvert W + P\rvert$ par la diagonale du facteur triangulaire,
+    $\ln\lvert P\rvert_+ = (n - z)\ln\lambda + \ln\lvert K^{\mathsf T}
+    K\rvert_+$ (\code{log\_det\_penalite()}~: somme des logarithmes des
+    $n - z$ plus grandes valeurs propres de $K^{\mathsf T}K$, par
+    \code{eigen()}).
+  \item \textbf{Règles non tirées de la source} (décision D12~; nommées
+    dans l'hypothèse)~: reprises du code de \code{WH} 2.0.0~: le départ
+    $\theta_0$ et sa valeur 0 aux cellules sans exposition, la réponse de
+    travail $\theta$ aux cellules sans exposition, la recherche linéaire par
+    divisions du pas~; propres à l'outil~: la réponse de travail $\theta - 1$
+    aux cellules exposées sans décès ($D/m$ pris nul, valeur exacte pour
+    $m > 0$, conservée quand $m$ s'arrondit à~0~; réserve R-a
+    d'\code{actuary-approfondi})~; à l'épuisement des divisions du pas,
+    arrêt au dernier itéré si la diminution de $\mathrm{dev}_P$ prédite
+    par le pas de Newton est au plus
+    \code{EPSILON\_DEVIANCE\_LISSAGE}~$\lvert\mathrm{dev}_P\rvert$ plus
+    l'epsilon machine fois $\sum D$ (convergence numérique), refus
+    \code{lissage\_non\_convergent} sinon~; rang numérique du système
+    perdu à la première itération ou au maximum~: refus
+    \code{lissage\_systeme\_rang\_deficient}, à une itération suivante~:
+    \code{lissage\_non\_convergent}.
+  \item \textbf{Constantes} (\code{CONSTANTES\_LISSAGE\_POISSON}, recopiées
+    dans les paramètres avec leur origine~; ADR 0017, point~9.3)~:
+    \code{EPSILON\_DEPART\_LISSAGE} $= 10^{-8}$ (non tirée de la source,
+    code de \code{WH} 2.0.0)~; \code{EPSILON\_DEVIANCE\_LISSAGE} $= 10^{-8}$
+    (tirée de la source, algorithme~1, p.~54)~;
+    \code{ITERATIONS\_MAX\_LISSAGE} $= 100$ et
+    \code{DEMI\_PAS\_MAX\_LISSAGE} $= 30$ (non tirées de la source)~; sous
+    \code{laml} seulement, \code{POINTS\_GRILLE\_LISSAGE} $= 31$ et
+    \code{TOLERANCE\_BRENT\_LISSAGE} $= 10^{-6}$ en $\ln\lambda$ (non tirées
+    de la source)~; quatre lignes sous \code{declare}, six sous
+    \code{laml} (\code{R/lissage.R}).
+  \item \textbf{Choix de $\lambda$ par la LAML} (\code{choisir\_lambda\_poisson()}~;
+    Biessy, §~5.4, p.~19~; décision D5)~: critère
+    \[
+      \mathrm{LAML}(\lambda) = \ell(\hat\theta_\lambda) - \tfrac12\bigl[
+      \lambda S(\hat\theta_\lambda) + \ln\lvert W + P\rvert - \ln\lvert
+      P\rvert_+ - z \ln(2\pi)\bigr],
+    \]
+    approximation de Laplace de la vraisemblance marginale, exacte dans le
+    seul cas normal (le terme «~REML~» lui est réservé)~; $\ell$ sans le
+    terme $-\sum\ln D!$. Grille de \code{POINTS\_GRILLE\_LISSAGE} valeurs de
+    $\ln\lambda$ sur $[\ln a, \ln b]$, $(a, b)$ = \code{intervalle\_lissage},
+    les extrémités évaluées à $\lambda = a$ et $b$ exactement (réserve R-c),
+    chaque point ajusté à froid depuis $\theta_0$, pour que le résultat ne
+    dépende pas du chemin~; si le meilleur point de la grille (premier
+    maximum) est intérieur, méthode de Brent (\code{stats::optimize()},
+    tolérance \code{TOLERANCE\_BRENT\_LISSAGE}) dans l'encadrement de ses
+    deux voisins, et $\hat\lambda$ est celui des deux points, de grille ou
+    de Brent, de plus grande LAML (le point de grille en cas d'égalité)~;
+    s'il est une borne, état \code{lambda\_a\_la\_borne}, $\hat\lambda$ est
+    la borne déclarée elle-même, sans recherche de Brent (règle Q1
+    d'\code{actuary}~: le $\lambda$ publié ne dépend pas du bruit de la LAML
+    sur un plateau), et l'avertissement \code{lambda\_a\_la\_borne} en est
+    émis par segment (un maximum intérieur peut ne pas exister~: la LAML
+    peut croître vers les taux bruts quand $\lambda \to 0$, ou vers la
+    limite polynomiale quand $\lambda \to \infty$). Un échec de
+    l'algorithme en un point évalué refuse le segment, cité au $\lambda$ de
+    l'échec. $\hat\lambda$ est un maximiseur local~; l'unimodalité de la
+    LAML n'est pas établie.
+  \item \textbf{Intervalles de crédibilité} (décision D6)~: $\hat\theta_x
+    \pm z_\alpha \sqrt{V_{xx}}$, $z_\alpha$ quantile d'ordre $(1 +
+    \text{niveau})/2$ de la loi normale, image par $q = 1 - e^{-e^{\theta}}$
+    (colonnes \code{borne\_inf\_credibilite}, \code{borne\_sup\_credibilite}).
+    Ce sont des intervalles bayésiens asymptotiques (approximation de
+    Laplace), conditionnels au $\lambda$ retenu~; \textbf{ce ne sont pas des
+    intervalles de confiance}, et leur couverture fréquentiste n'est pas
+    établie (section~\ref{sec:lissage-verifications}, constat de
+    couverture).
+  \item \textbf{Conservation}~: l'équation du score, $P\mathbf{1} = 0$ et,
+    pour $z \ge 2$, $P x = 0$, donne $\sum (\hat m - D) = 0$ et, pour
+    $z \ge 2$, $\sum x (\hat m - D) = 0$, à la convergence de l'algorithme
+    près~: $\sum E^c \hat\mu = \sum D$, soit un SMR égal à~1 contre sa
+    propre table (Biessy, p.~15). Les deux résidus sont restitués par
+    segment.
+  \item \textbf{Comportement aux limites}~: quand $\lambda \to \infty$, la
+    table tend vers le polynôme de degré $z - 1$ en $\ln\mu$ ajusté par
+    maximum de vraisemblance de Poisson (recoupement B1 par \code{glm()})~;
+    au-delà du rang numérique du système, refus
+    \code{lissage\_systeme\_rang\_deficient}. Un segment de $z$ cellules
+    exposées toutes à décès positifs est interpolé (leviers des cellules
+    exposées égaux à~1).
+  \item \textbf{États et force}~: une ligne est \code{interpolee} si
+    $E^c = 0$ (prioritaire), sinon \code{qx\_arrondi\_un} si \code{qx} ou
+    une borne vaut~1 par arrondi ($\mu \ge 54 \ln 2$, $e^{-\mu} < 2^{-54}$~;
+    avertissement \code{qx\_arrondi\_un}, ni refus ni plafonnement), sinon
+    \code{observee}. La force se relit par $\mu = -\ln(1 - q)$ à quelques
+    unités de dernier rang près, sauf $q$ arrondi à~1. Aucun refus de
+    domaine~: $q \in [0, 1]$ par construction.
+  \item \textbf{Statut} (E2.20~; \code{STATUTS\_LISSAGE\_POISSON})~:
+    \code{table\_lissee/qx}, caractérisation exacte (mode \emph{a
+    posteriori}), valeur calculée par l'algorithme itératif, approximation
+    numérique, aucune propriété fréquentiste revendiquée~; leviers et
+    \code{segments/ddl\_effectifs}, trace de $(W + P)^{-1} W$ à la
+    convergence, définition du cas normal transposée, approximation
+    numérique~; bornes de crédibilité~: ci-dessus~; \code{regle\_force},
+    transformation exacte, hypothèse même de l'estimateur d'entrée~;
+    \code{segments/parametre\_lissage} (sous \code{laml} seulement)~:
+    maximiseur local d'un critère approché, unimodalité non établie,
+    approximation numérique de précision fixée par mesure~;
+    \code{segments/laml}~: approximation de Laplace, valeur au maximum
+    approché~; \code{segments/deviance\_penalisee}, \code{segments/regularite}
+    ($S(\hat\theta)$, échelle $\ln\mu$)~: approximation numérique et
+    descriptif~; résidus~: nuls à la convergence près.
+  \item \textbf{Références}~: G.~Biessy, \emph{Whittaker-Henderson Smoothing
+    Revisited}, arXiv:2306.06932 v5, §~4.1 (vraisemblance pénalisée), §~5.1,
+    p.~15 (degrés de liberté effectifs~; conservation), §~5.4, p.~19 (LAML),
+    annexe~D, algorithme~1, p.~54 (section~\ref{sec:references})~; identité
+    recopiée dans les paramètres (\code{REFERENCE\_METHODE\_LISSAGE\_POISSON}).
+    Le «~WH original~» de la source (lissage de $\ln(D/E^c)$ pondéré par
+    $D$) n'est pas la variante~(a)~: il coïncide avec la première itération
+    de Newton depuis $\theta_0$ quand toutes les cellules ont des décès
+    (test A3).
+\end{itemize}
 
 \subsection{Résultat, paramètres et diagnostics}
 \label{sec:lissage-resultat}
@@ -8825,12 +9036,46 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     hors plage $=$ total des événements est vérifiée en \code{double} avant
     le rangement en \code{integer}~;
   \item aucun avertissement sous \code{wh\_quadratique}.
-\end{itemize}\par}
+\end{itemize}
+Sous \code{wh\_poisson}~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \code{parametres}~: les paramètres du plan présents (dont
+    \code{niveau}, et \code{parametre\_lissage} ou \code{intervalle\_lissage}),
+    puis les mêmes champs, avec \code{estimateur\_brut} \code{"poisson"},
+    \code{echelle\_penalite} \code{"ln\_mu"}, l'hypothèse et la référence
+    de la variante, \code{constantes} (quatre lignes sous \code{declare},
+    six sous \code{laml}) et \code{statuts} (sans la ligne
+    \code{segments/parametre\_lissage} sous \code{declare}, $\lambda$ y
+    étant déclaré)~;
+  \item \code{resultat\$table\_lissee}~: clés, \code{age}, \code{qx},
+    \code{etat} (\code{observee}, \code{interpolee} ou
+    \code{qx\_arrondi\_un}), \code{levier}, \code{borne\_inf\_credibilite},
+    \code{borne\_sup\_credibilite}~; aucune colonne \code{poids}~;
+  \item \code{resultat\$segments}~: clés, \code{cellules},
+    \code{cellules\_ponderees} (exposées), \code{cellules\_interpolees},
+    \code{evenements}, \code{parametre\_lissage} ($\lambda$ déclaré ou
+    $\hat\lambda$), \code{ddl\_effectifs}, \code{regularite}
+    ($S(\hat\theta)$, échelle $\ln\mu$), \code{laml} (sous les deux
+    critères), \code{deviance\_penalisee}, \code{iterations}
+    (\code{integer}), \code{residu\_conservation\_0} ($\sum(\hat m - D)$),
+    \code{residu\_conservation\_1} ($\sum x(\hat m - D)$), \code{etat}
+    (\code{produite} ou \code{lambda\_a\_la\_borne})~;
+  \item \code{diagnostics}~: les mêmes, \code{exposition\_centrale\_hors\_plage}
+    (somme de $E^c$ hors de la plage) remplaçant
+    \code{exposition\_initiale\_hors\_plage}~;
+  \item avertissements \code{lambda\_a\_la\_borne} (un par segment concerné)
+    et \code{qx\_arrondi\_un} (toutes les lignes concernées, interpolées
+    comprises), module \code{lissage}.
+\end{itemize}
+Les noms de lignes de chaque \code{data.frame} de l'étape sont
+automatiques, condition de l'écriture des références (issue~\#225,
+commit \code{f31d91b}).\par}
 
 \noindent
 Les paramètres déclarés vivent dans le plan canonique (\code{fiche\$plan})~;
-$\nu$, $F$, $S$, $M$ et les résidus sont des résultats de l'étape, non des
-paramètres retenus, et aucun champ de fiche n'est ajouté par l'étape~: les
+$\nu$, $F$, $S$, $M$, les résidus et, sous~(b), $\hat\lambda$, la LAML et
+le nombre d'itérations sont des résultats de l'étape, non des
+paramètres retenus (le rejeu recalcule $\hat\lambda$, déterministe), et aucun champ de fiche n'est ajouté par l'étape~: les
 hypothèses, la référence et les statuts sont restitués par le rapport figé
 à partir de \code{etapes\$lissage\$parametres} (ADR 0017, point~6~;
 décision M415). La table lissée est une table construite~: un changement
@@ -8903,6 +9148,88 @@ de \code{WH} et $\nu$ contre la somme de ses degrés de liberté par cellule,
 batterie~; les valeurs ne sont régénérées que sur ordre du mainteneur,
 avec un tableau avant / après.\par}
 
+\medskip
+\noindent
+{\sloppy\textbf{Whittaker-Henderson~(b)}. \code{tests/unitaires/test\_lissage\_poisson.R}
+vérifie, sur des vecteurs fixés et des agrégats écrits à la main~: les
+identités A1 à A6 du corps de l'issue~\#225 (conservation $\sum \hat m =
+\sum D$ et, pour $z \ge 2$, $\sum x \hat m = \sum x D$, à $10^{-8}$ près en
+relatif, sur une grille de $\lambda$ de $10^{-6}$ à $10^{12}$~; équation
+du score~; première itération de Newton égale au «~WH original~» de
+Biessy quand toutes les cellules ont des décès~; insensibilité de
+$\hat\theta$ à $\varepsilon$~; LAML égale à la formule de la p.~19
+recalculée en clair par \code{determinant()} et \code{eigen()}, à
+$10^{-9}$ près~; non-convergence quand les décès sont à un seul âge
+extrême), les leviers et les degrés de liberté effectifs, la réponse de
+travail aux cellules exposées sans décès, la règle de la borne
+(\code{lambda\_a\_la\_borne}, $\hat\lambda$ égal à la borne déclarée),
+l'interpolation à $z$ cellules exposées~; le recoupement B1 ($\lambda =
+10^{12}$~: valeurs ajustées contre la régression de Poisson polynomiale
+de \code{stats::glm()}, à $10^{-6}$ près en relatif)~; les catalogues et
+les constantes~; chaque refus propre à la variante levé seul, avec son
+message, et leur ordre~; la structure de \code{etapes\$lissage} sous
+\code{declare} et \code{laml}, la table recalculée par
+\code{lisser\_poisson()}, le contrat de la table construite, la
+conservation sur l'objet, l'état \code{qx\_arrondi\_un}~; sous la relation
+\code{lissee}, un SMR égal à~1 à $10^{-10}$ près par segment et un ddl
+nul exactement sous interpolation~; la canonisation, l'aller-retour du
+plan, le rejeu de la fiche (objet identique hors \code{execution}) et la
+section du rapport figé.\par}
+
+\medskip
+\noindent
+{\sloppy\textbf{Contre-vérification de la variante~(b) par \code{WH}}
+(critères C1 et C2 de l'issue~\#225)~: le script
+\code{tests/contre\_verification/}\allowbreak\code{wh\_lissage\_poisson.R},
+hors CI et hors batterie, sans \code{tablexp}, lit le jeu fixé
+\code{tests/contre\_verification/}\allowbreak\code{jeu\_wh\_lissage\_poisson.csv}
+(trois jeux écrits par formule, sans aléa~: sans segmentation, par sexe,
+par sexe avec une cellule sans exposition) et appelle la fonction
+\code{WH} du package \code{WH}, sous la vraisemblance de Poisson~: C1 à
+$\lambda$ déclaré, avec une tolérance d'arrêt de $10^{-12}$ au lieu du
+défaut de \code{WH} (qui calcule les degrés de liberté et le déterminant
+avec les poids du début de sa dernière itération)~; C2 avec $\lambda$
+choisi par le critère que \code{WH} nomme «~REML~». Le fichier de valeurs,
+\code{tests/contre\_verification/}\allowbreak\code{valeurs\_wh\_lissage\_poisson.csv},
+a été produit le 12/11/2026 sous R~4.3.3 avec \code{WH} 2.0.0 (Ubuntu
+24.04.5), versions et \code{sessionInfo()} en en-tête. Le test I de
+\code{test\_lissage\_poisson.R} compare~: C1, $\hat\theta$ contre la valeur
+ajustée de \code{WH} à $10^{-8}$ près, $\nu$ contre la somme de ses
+degrés de liberté à $10^{-6}$ près, la LAML moins la log-vraisemblance
+saturée contre l'opposé du critère de \code{WH} à $10^{-8}$ près (écarts
+relatifs)~; C2, $\lvert\ln\hat\lambda - \ln\lambda_{\mathrm{WH}}\rvert
+\le 10^{-3}$ et LAML du moteur en $\hat\lambda$ au moins égale à sa LAML
+en $\lambda_{\mathrm{WH}}$ moins $10^{-6}$.\par}
+
+\medskip
+\noindent
+{\sloppy\textbf{Constat de couverture des intervalles de crédibilité}
+(\code{tests/mesures/}\allowbreak\code{constat\_couverture\_lissage.R}, hors CI~;
+constat C2 de l'issue~\#225, décision D6)~: \textbf{constat de
+simulation}, non résultat établi. Règle fixée avant le lancement~: 1\,000
+jeux par loi vraie (Gompertz-Makeham, et loi logistique, pour laquelle
+le logarithme de la force vraie n'est pas dans l'espace nul de la
+pénalité), $z = 3$, $\lambda$ choisi par la LAML sur $[1, 10^{12}]$,
+niveau 0,95, plage 20 à 90, portefeuille de l'entrée de référence~;
+grandeurs~: couverture de $\mu$ vrai par l'intervalle, par loi, sexe et
+âge, séparée selon l'état du segment (\code{produite} ou
+\code{lambda\_a\_la\_borne}), et couverture moyenne sur les cellules où
+$E^c \mu$ vrai est au moins~5~; erreur de Monte-Carlo, fonction du nombre
+de jeux, donnée pour chaque fréquence, l'erreur d'estimation de chaque
+jeu (exposition) n'étant pas mesurée~; aucune règle de verdict, la
+couverture fréquentiste n'étant pas une propriété revendiquée. Graines
+dans la plage de la branche (\code{tests/controles/graines\_admises.csv}).
+\textbf{Aucun résultat de ce constat n'est consigné au dépôt} à la date
+du document~: le statut des bornes (\code{STATUTS\_LISSAGE\_POISSON}), qui
+le dit «~documenté~», renvoie à ce script.\par}
+
+\medskip
+\noindent
+La durée de l'étape est mesurée par
+\code{tests/mesures/}\allowbreak\code{duree\_lissage.R} (hors CI~; ADR 0017,
+point~9.2)~; ses valeurs, propres au poste, ne sont pas reproduites
+ici (E3.4).
+
 \subsection{Fonctions du module}
 \label{sec:fonctions-lissage}
 
@@ -8953,12 +9280,12 @@ avec un tableau avant / après.\par}
 \catalogue{fonctions-lissage}{controler\_convention\_lissage()} & interne & convention retenue & \code{TRUE} invisible, ou refus \code{convention\_lissage\_}\allowbreak\code{non\_admise}~; appelée par \code{controler\_entrees()} \\
 \catalogue{fonctions-lissage}{somme\_differences\_carrees()} & interne & vecteur, ordre $z$ & $S = \sum (\Delta^z v)^2$ par \code{diff()}~; seule fonction de $S$, l'appelant choisissant l'échelle de $v$ \\
 \catalogue{fonctions-lissage}{lisser\_quadratique()} & interne & $\hat q$, poids, $h$, $z$, âges d'un segment & rang du système, puis $g$, leviers, $\nu$, $F$, $S$, $M$ et les deux résidus de conservation~; à rang numérique perdu, le rang seul, l'appelant refusant (section~\ref{sec:lissage-quadratique}) \\
-\catalogue{fonctions-lissage}{deviance\_penalisee()} & interne & $\theta$, $D$, $E^c$, cellules exposées, $\lambda$, $z$ & déviance pénalisée de \code{wh\_poisson} (section~\ref{sec:lissage-poisson}) \\
-\catalogue{fonctions-lissage}{iteration\_pirls()} & interne & $\theta$, $D$, $E^c$, cellules exposées, bloc de pénalité & une itération de Newton de \code{wh\_poisson}, par QR des moindres carrés augmentés \\
+\catalogue{fonctions-lissage}{deviance\_penalisee()} & interne & $\theta$, $D$, $E^c$, cellules exposées, $\lambda$, $z$ & $2\sum[D\ln(D/m) - (D - m)] + \lambda S(\theta)$, $S$ par la fonction de $S$ du module~; éventuellement non finie (section~\ref{sec:lissage-poisson}) \\
+\catalogue{fonctions-lissage}{iteration\_pirls()} & interne & $\theta$, $D$, $E^c$, cellules exposées, bloc de pénalité & une itération de Newton de \code{wh\_poisson} (réponse de travail, QR des moindres carrés augmentés)~; signale un itéré non fini ou un rang perdu \\
 \catalogue{fonctions-lissage}{log\_det\_penalite()} & interne & $n$, $z$ & $\ln \lvert K^{\mathsf T} K \rvert_+$, somme des logarithmes des $n - z$ plus grandes valeurs propres (\code{wh\_poisson}) \\
-\catalogue{fonctions-lissage}{lisser\_poisson()} & interne & $D$, $E^c$, $\lambda$, $z$, âges d'un segment & maximum de la vraisemblance de Poisson pénalisée à $\lambda$ fixé, ou l'échec de l'algorithme (section~\ref{sec:lissage-poisson}) \\
-\catalogue{fonctions-lissage}{choisir\_lambda\_poisson()} & interne & $D$, $E^c$, $z$, âges, intervalle de $\lambda$ & $\lambda$ choisi par la LAML (grille, puis méthode de Brent), avec l'ajustement retenu, ou l'échec \\
-\catalogue{fonctions-lissage}{lisser\_segments\_poisson()} & interne & cellules, segments, décomptes, paramètres de l'étape & suite de \code{calculer\_lissage()} sous \code{wh\_poisson}~: refus propres à la variante, table lissée, segments, avertissements \\
+\catalogue{fonctions-lissage}{lisser\_poisson()} & interne & $D$, $E^c$, $\lambda$, $z$, âges d'un segment & maximum de la vraisemblance de Poisson pénalisée à $\lambda$ fixé (départ, itérations, recherche linéaire, arrêt), puis $\hat\theta$, variances, leviers, $\nu$, LAML, déviance pénalisée, résidus~; ou l'échec (\code{non\_convergent}, \code{rang\_deficient}) (section~\ref{sec:lissage-poisson}) \\
+\catalogue{fonctions-lissage}{choisir\_lambda\_poisson()} & interne & $D$, $E^c$, $z$, âges, intervalle de $\lambda$ & $\hat\lambda$ par la LAML~: grille à froid, extrémités aux bornes déclarées, Brent si le meilleur point est intérieur, la borne sinon~; ajustement retenu et borne atteinte, ou l'échec et son $\lambda$ \\
+\catalogue{fonctions-lissage}{lisser\_segments\_poisson()} & interne & cellules, segments, décomptes, paramètres de l'étape & suite de \code{calculer\_lissage()} sous \code{wh\_poisson}~: refus \code{lissage\_interpolation\_}\allowbreak\code{deces\_nul}, \code{lissage\_systeme\_}\allowbreak\code{rang\_deficient}, \code{lissage\_non\_}\allowbreak\code{convergent}, puis table lissée et bornes, segments, avertissements \\
 \catalogue{fonctions-lissage}{calculer\_lissage()} & interne & table d'exposition, résultat de l'étape \code{brut}, segmentation, convention retenue, paramètres de l'étape & fonction d'étape \code{lissage}~: paramètres, résultat (\code{table\_lissee}, \code{segments}), diagnostics, avertissements~; refus en cours d'étape (section~\ref{sec:lissage-etape})~; ne refait aucun contrôle de \code{valider\_plan()} \\
 \end{longtable}
 }
@@ -13965,7 +14292,22 @@ sous wh\_poisson~: grandeurs d'échelles différentes, jamais comparables
 d'une méthode à l'autre.~» Aucune mention d'unité sous
 \code{wh\_quadratique}~: $g$ y est une fonction déterministe de $\hat q$,
 sans test ni intervalle (amendement d'\code{actuary} du 11/11/2026,
-point~6). La section \emph{étape
+point~6). Sous \code{wh\_poisson}, trois aussi~: la mention
+\code{lissage\_poisson}, qui décrit la vraisemblance de Poisson pénalisée
+sur $\theta = \ln\mu$ (Biessy, §~4.1), l'algorithme de la source complété
+de règles non tirées de la source, $q = 1 - \exp(-\exp(\theta))$, le
+paramètre $\lambda$ déclaré ou choisi comme maximiseur local de la LAML
+sur l'intervalle déclaré (grille, puis Brent, ou la borne à l'état
+\code{lambda\_a\_la\_borne}), les bornes de crédibilité, «~intervalles
+bayésiens asymptotiques, conditionnels au paramètre de lissage retenu,
+qui ne sont pas des intervalles de confiance (couverture fréquentiste non
+établie)~», l'interpolation des cellules sans exposition et le renvoi aux
+constantes et à l'hypothèse~; la mention
+\code{lissage\_conservation\_poisson}~: «~Somme des E\^{}c mu\^{} = somme
+des D (SMR = 1) par l'équation du score, et somme des x E\^{}c mu\^{} =
+somme des x D pour z >= 2, à la convergence de l'algorithme près~;
+résidus dans etapes/lissage/resultat/segments.~»~; et la même mention
+\code{lissage\_echelle}~; aucune mention d'unité non plus. La section \emph{étape
 positionnement}, quand l'étape est au plan, fait précéder ses tables de
 trois mentions fixes, choisies par la méthode lue dans l'objet
 (\code{etapes/positionnement/parametres/methode}~; une autre valeur que
@@ -16953,13 +17295,13 @@ E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, donn�
 E2.8 & pondération par les montants~: rôle refusé tant que ses intervalles ne sont pas spécifiés & \ref{sec:catalogue-roles} \\
 E2.9 & segmentation déclarée, vide explicite admis~; test d'homogénéité entre segments restitué comme diagnostic, sans verdict, la décision de regrouper restant à l'utilisateur & \ref{sec:plan}, \ref{sec:troncature-censure}, \ref{sec:homogeneite} \\
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
-E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; lissage de Whittaker-Henderson~(a), critère quadratique, d'après les Lignes directrices, chap.~3, IV.2~; positionnement par SMR sur une table de référence (méthode~1), d'après II1291-12~; test d'homogénéité entre segments, d'après Breslow et Day (1987)~; statistiques de validation d'une table de référence prise telle quelle, de la table positionnée ou de la table lissée, d'après II1291-14 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:lissage}, \ref{sec:positionnement}, \ref{sec:validation}, \ref{sec:homogeneite} \\
+E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; lissage de Whittaker-Henderson~(a), critère quadratique, d'après les Lignes directrices, chap.~3, IV.2, et~(b), vraisemblance de Poisson pénalisée sur $\ln\mu$, $\lambda$ déclaré ou choisi par la LAML, d'après Biessy (arXiv:2306.06932 v5)~; positionnement par SMR sur une table de référence (méthode~1), d'après II1291-12~; test d'homogénéité entre segments, d'après Breslow et Day (1987)~; statistiques de validation d'une table de référence prise telle quelle, de la table positionnée ou de la table lissée, d'après II1291-14 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:lissage}, \ref{sec:positionnement}, \ref{sec:validation}, \ref{sec:homogeneite} \\
 E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-groupes, SMR, signes, suites, intervalles (en partie~: statistiques écrites une fois et appliquées par l'étape \code{validation} aux observations de la construction~; la fonction de suivi sur de nouvelles observations viendra avec sa branche) & \ref{sec:validation-statistiques} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
-E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
-E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
+E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
 E3.4 & aucun chiffre issu d'une exécution & Objet du document \\
 E3.5 & rapport figé HTML autonome et fiche de construction (en partie~: les tables CSV et xlsx à en-tête viendront avec la première table finale) & \ref{sec:fiche}, \ref{sec:rapport-fige} \\
@@ -16991,8 +17333,11 @@ E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, 
     17/09/2025 (\url{https://arxiv.org/pdf/2306.06932v5}~; SHA-256
     \code{1af94c962b3f6b9cc1bc571ccec08856}\allowbreak\code{30454cb52f14b6d43753b8b0ed0b1cdd}~;
     lecture consignée dans \code{docs/recherche/}\allowbreak\code{2026-11-11-biessy-whittaker-henderson.md}),
-    §~5.1, p.~15 (degrés de liberté effectifs, trace de la matrice chapeau)~;
-    section~\ref{sec:lissage-quadratique}.\par}
+    §~4.1 (vraisemblance de Poisson pénalisée), §~5.1, p.~15 (degrés de
+    liberté effectifs, trace de la matrice chapeau~; conservation des
+    décès), §~5.4, p.~19 (LAML), annexe~D, algorithme~1, p.~54 (pages 15,
+    19 et 54 relues le 12/11/2026 sur le texte extrait du même PDF)~;
+    sections~\ref{sec:lissage-quadratique} et~\ref{sec:lissage-poisson}.\par}
   \item W.~Hoeffding, \emph{Probability inequalities for sums of bounded
     random variables}, \emph{Journal of the American Statistical
     Association}, 58, 1963, p.~13--30 (numéro du théorème non vérifié sur
