@@ -462,22 +462,14 @@ verifier("catalogue des recettes, (4b) : ligne stocks_successifs (§ 3 : type_li
     identical(CAT$motifs_ligne[[k]], tablexp:::MOTIFS_LIGNES_STOCKS) &&
     identical(CAT$motifs_unite[[k]], tablexp:::MOTIFS_UNITE_STOCKS)
 })
-verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, sauf importance_exclusions, motif importance_exclusions_stocks ; coherence_regularite admise, #144 ; valeur écrite à la main)", {
+verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, lissage compris, sauf importance_exclusions, motif importance_exclusions_stocks ; coherence_regularite admise, #144 ; valeur écrite à la main)", {
   m <- MAT[MAT$recette == "stocks_successifs", -1L]; rownames(m) <- NULL
-  # Tolérance (décision du mainteneur du 11/11/2026, vague lissage) : une
-  # ligne lissage (estimateur NA, admis « oui »), unique, placée juste après
-  # kaplan_meier, est admise et retirée avant la comparaison.
-  l <- which(m$etape == "lissage")
-  lissage_admis <- !length(l) ||
-    (length(l) == 1L && l >= 2L && identical(m$estimateur[l - 1L], "kaplan_meier") &&
-       is.na(m$estimateur[l]) && identical(m$admis[l], "oui"))
-  if (length(l)) { m <- m[-l, ]; rownames(m) <- NULL }
-  lissage_admis && identical(m, data.frame(
-    etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite",
+  identical(m, data.frame(
+    etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "lissage", "positionnement", "homogeneite",
               "coherence_regularite", "validation", "importance_exclusions"),
-    estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA, NA),
-    admis = c(rep("oui", 10L), "non"), role_requis = NA_character_,
-    motif = c(rep(NA_character_, 10L), "importance_exclusions_stocks"), stringsAsFactors = FALSE))
+    estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", rep(NA, 6L)),
+    admis = c(rep("oui", 11L), "non"), role_requis = NA_character_,
+    motif = c(rep(NA_character_, 11L), "importance_exclusions_stocks"), stringsAsFactors = FALSE))
 })
 verifier("deduire_recette(), (4b) : rôles des stocks -> recette stocks_successifs, convention native dernier_anniversaire, rôles employés, seam fenetres, motifs ligne puis unité (valeur écrite à la main)", {
   r <- tablexp:::deduire_recette(RS)
@@ -504,9 +496,9 @@ verifier("catalogue_roles(), (4b) : colonne recettes des rôles des stocks (vale
 
 # --- paramètre conditionnel entree_entre_inventaires (ADR 0016, point 7.2) ------
 
-verifier("PARAMETRES_ETAPES, (4b) : colonne recette (NA pour tout paramètre existant) ; exposition : entree_entre_inventaires, character, conditionnel à stocks_successifs (valeur écrite à la main)", {
+verifier("PARAMETRES_ETAPES, (4b) : six colonnes ; colonne recette (NA pour tout paramètre existant) ; exposition : entree_entre_inventaires, character, conditionnel à stocks_successifs (valeur écrite à la main)", {
   pe <- tablexp:::PARAMETRES_ETAPES
-  all(vapply(pe, function(t) identical(names(t)[1:4], c("parametre", "type", "domaine", "recette")), NA)) &&
+  all(vapply(pe, function(t) identical(names(t), c("parametre", "type", "domaine", "recette", "selon", "valeurs")), NA)) &&
     identical(pe$exposition$parametre, c("convention", "par_annee", "entree_entre_inventaires")) &&
     identical(pe$exposition$type, c("character", "logical", "character")) &&
     identical(pe$exposition$recette, c(NA, NA, "stocks_successifs")) &&
