@@ -516,6 +516,16 @@ TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
   transition_textes_245("#144", "R15", paste0(STATUTS_COHERENCE_245, "statut"), TEXTES_245$c4,
                         paste0(STATUTS_COHERENCE_245, "grandeur"), "regularite",
                         list(chemin = paste0(STATUTS_COHERENCE_245, "table"), valeurs = "regularite"))))
+# #244, R15 : référence de méthode du lissage (a), IV.2.a (p. 31-32) et
+# IV.2.d (p. 33) (etapes/lissage/parametres/reference_methode).
+TEXTES_245$reference <- list(
+  avant = utf8_245(paste(
+    "Lignes directrices mortalité de la Commission d'agrément de l'Institut des actuaires, recommandation du 20",
+    "juin 2006, chap. 3, IV.2.a (p. 31 à 33), SHA-256 70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835",
+    "; écarts documentés")),
+  remplace = "IV.2.a (p. 31 à 33)", par = "IV.2.a (p. 31-32) et IV.2.d (p. 33)")
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
+  transition_textes_245("#244", "R15", "etapes/lissage/parametres/reference_methode", TEXTES_245$reference)))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

@@ -30,11 +30,11 @@
 #    posteriori), choix de lambda par la LAML (grille, puis Brent) ;
 #  - calculer_lissage() : fonction d'étape `lissage`.
 #
-#  Notations (a) (Lignes directrices mortalité, chap. 3, IV.2.a, p. 31 à 33) :
-#  q^ = D / E^i, estimateur binomial de l'étape brut (D1) ; w poids ; h
-#  paramètre de lissage (parametre_lissage, déclaré, D3) ; z ordre des
-#  différences (ordre_difference) ; K matrice des différences avant d'ordre
-#  z, (n - z) x n ; g minimise M = F + h S, F = somme des w (g - q^)^2,
+#  Notations (a) (Lignes directrices mortalité, chap. 3, IV.2.a, p. 31-32,
+#  et IV.2.d, p. 33) : q^ = D / E^i, estimateur binomial de l'étape brut
+#  (D1) ; w poids ; h paramètre de lissage (parametre_lissage, déclaré, D3) ;
+#  z ordre des différences (ordre_difference) ; K matrice des différences
+#  avant d'ordre z, (n - z) x n ; g minimise M = F + h S, F = somme des w (g - q^)^2,
 #  S = somme des (Delta^z g)^2. Aucune extrapolation hors de la plage (D11) ;
 #  aucun écrêtage (D4).
 #  Notations (b) (G. Biessy, « Whittaker-Henderson Smoothing Revisited »,
@@ -95,8 +95,8 @@ HYPOTHESE_LISSAGE <- paste(
   "les taux centraux de l'ordre de q^3/12.")
 REFERENCE_METHODE_LISSAGE <- paste(
   "Lignes directrices mortalité de la Commission d'agrément de l'Institut des actuaires, recommandation du 20 juin",
-  "2006, chap. 3, IV.2.a (p. 31 à 33), SHA-256 70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ;",
-  "écarts documentés")
+  "2006, chap. 3, IV.2.a (p. 31-32) et IV.2.d (p. 33), SHA-256",
+  "70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ; écarts documentés")
 # Variante (b) (#225 ; spécification de forme, §§ 2 et 3) : hypothèse, règles
 # non tirées de la source comprises (D12), et référence.
 HYPOTHESE_LISSAGE_POISSON <- paste(
@@ -933,8 +933,8 @@ calculer_lissage <- function(exposition, brut, segmentation, convention, methode
                                                       collapse = ", "))
                      }, "")), collapse = " ; ")),
             list(plage_ages = plage_ages, segments = segs[bornee, , drop = FALSE]))
-  # Moins de z cellules de poids non nul (Lignes directrices, p. 33 ; sous
-  # wh_poisson, W + P singulière : aucun maximum unique).
+  # Moins de z cellules de poids non nul (Lignes directrices, chap. 3, IV.2.d,
+  # p. 33 ; sous wh_poisson, W + P singulière : aucun maximum unique).
   ponderees <- vapply(par_segment, function(i) sum(pondere[i]), 0L, USE.NAMES = FALSE)
   insuffisants <- which(ponderees < z)
   if (length(insuffisants))
@@ -949,7 +949,8 @@ calculer_lissage <- function(exposition, brut, segmentation, convention, methode
                                       "cellules exposées requises : la pénalité ne contraint pas les polynômes de degré",
                                       "z - 1)."))
                      else formuler(paste("Le minimum de M = F + h S n'est pas unique (Lignes directrices, chap. 3,",
-                                         "IV.2.a, p. 33 : au moins z points pivots)."))),
+                                         "IV.2.d, p. 33 : au moins z points pivots, condition donnée comme",
+                                         "suffisante, ici aussi nécessaire)."))),
             list(plage_ages = plage_ages, ordre_difference = z, segments = segs[insuffisants, , drop = FALSE],
                  cellules_ponderees = ponderees[insuffisants]))
   # Aucun décès sur la plage (précédent positionnement_sans_deces).

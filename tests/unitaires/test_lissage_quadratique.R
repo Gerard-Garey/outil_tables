@@ -342,8 +342,8 @@ verifier("F lissage_cellules_insuffisantes : âges 40 et 60 seuls observés, z =
   controle(rc(d, lissage = avec(ordre_difference = 3)), "lissage", "lissage_cellules_insuffisantes",
            paste("Lissage : 2 segment(s) comptent moins de z = 3 cellule(s) de poids non nul sur la plage d'âges 40 à 60 :",
                  "sexe = « F » (2 cellule(s) de poids non nul) ; sexe = « H » (2 cellule(s) de poids non nul). Le minimum",
-                 "de M = F + h S n'est pas unique (Lignes directrices, chap. 3, IV.2.a, p. 33 : au moins z points",
-                 "pivots)."))
+                 "de M = F + h S n'est pas unique (Lignes directrices, chap. 3, IV.2.d, p. 33 : au moins z points",
+                 "pivots, condition donnée comme suffisante, ici aussi nécessaire)."))
 })
 verifier("F lissage_sans_deces : segment F sans décès sur la plage ; message exact", controle(
   rc(jeu(df = rep(0, length(AGES)))), "lissage", "lissage_sans_deces",
@@ -386,6 +386,7 @@ verifier("G etapes$lissage : parametres (paramètres du plan dans l'ordre du cat
     identical(p[1:6], LISSAGE) && identical(p$convention, "dernier_anniversaire") &&
     identical(p$estimateur_brut, "binomial") && identical(p$echelle_penalite, "q") &&
     identical(p$regle_force, "mu = -ln(1 - q) : force constante par âge entier, règle unique du moteur") &&
+    grepl("chap. 3, IV.2.a (p. 31-32) et IV.2.d (p. 33), SHA-256", p$reference_methode, fixed = TRUE) &&
     identical(dim(p$constantes), c(0L, 3L)) && identical(names(p$constantes), c("constante", "valeur", "origine")) &&
     is.double(p$constantes$valeur) &&
     identical(p$statuts$grandeur, c("table_lissee/qx", "table_lissee/levier", "regle_force", "segments/ddl_effectifs", "segments/fidelite",
