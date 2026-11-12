@@ -2614,7 +2614,25 @@ toutes les autres grandeurs de R8 à R13 sont restées identiques au bit
 près, de même que R1 à R7 et R14, non visées, en comparaison réussie, sur
 la plateforme de référence (processeur AMD EPYC 9V74, au lieu de l'EPYC
 7763 consigné à la huitième, sans effet mesuré), sans table finale,
-verdict ni valeur de table homologuée changés.
+verdict ni valeur de table homologuée changés. Les références R8 et R9 ont
+été régénérées \textbf{une dixième fois}, le 12/11/2026, en mode
+\code{regeneration} sur ces deux plans seulement (exécution 43177654210 du
+workflow, calcul sur \code{dc93db3}, commit \code{b5ed053}~; visa délégué
+par le mainteneur sous conditions, décision M420, (1), conditions
+remplies selon l'avis d'\code{actuary-approfondi} du 12/11/2026~;
+issue~\#215), pour le seul changement annoncé en transition par cette
+issue~: textes des trois derniers statuts des sous-groupes de la
+validation sous les relations \code{independante} et
+\code{ajustee\_hors\_outil} (\code{bornes\_exactes}, \code{p\_valeurs},
+\code{p\_valeurs\_asymptotiques}), récrits sans «~p~» nu à côté d'une
+loi~: «~nombre $p$ de paramètres estimés sur ces données nul~» ou «~non
+établi~», «~loi de référence du sous-groupe~» (section~\ref{sec:validation-etape},
+«~Résultat~»). L'empreinte du résultat de R8 et de R9 change en
+conséquence, celle du code aussi~; toutes les autres grandeurs de R8 et R9
+sont restées identiques au bit près, de même que R1 à R7 et R10 à R14, en
+comparaison réussie, sur la plateforme de référence (processeur Intel
+Xeon Platinum 8573C, consigné sans contrôle), sans table finale, verdict
+ni valeur de table homologuée changés.
 
 \begin{encadre}
 \small
@@ -2853,7 +2871,8 @@ les transitions ont été closes ensemble par la sixième, pour
 l'issue~\#169, dont la transition a été close par la septième, et pour
 les issues~\#174, \#177, \#179, \#178 et~\#185, dont les transitions
 ont été closes ensemble par la huitième, et pour les issues~\#199, \#200
-et~\#202, dont les transitions ont été closes ensemble par la neuvième
+et~\#202, dont les transitions ont été closes ensemble par la neuvième,
+et pour l'issue~\#215, dont la transition a été close par la dixième
 («~Références existantes~», ci-dessus)~: la liste est de nouveau vide. Chaque
 nature, l'union et ses conflits, l'observation, la forme de la liste, le
 rattachement de l'échec attendu, les doubles restants et la garde sont
@@ -10012,7 +10031,13 @@ sous-groupes (\code{statuts\_sous\_groupes}, selon la relation~: lignes
 \code{sous\_groupes} de \code{STATUTS\_VALIDATION} sous \code{independante}
 et \code{ajustee\_hors\_outil}, dont les statuts des bornes exactes et des
 p-valeurs donnent un texte pour chacune de ces deux relations, la seconde
-ne les produisant pas, état \code{ddl\_non\_etabli}, issue~\#200~; de
+ne les produisant pas, état \code{ddl\_non\_etabli}, issue~\#200~; ces
+textes nomment «~le nombre $p$ de paramètres estimés sur ces données~»
+(nul sous \code{independante}, table prise telle quelle~; non établi sous
+\code{ajustee\_hors\_outil}) et la «~loi de référence du sous-groupe~»
+$X \sim \mathcal{P}(A)$, sans jamais écrire un «~p~» nu à côté d'une loi,
+où il se lirait comme une p-valeur (issue~\#215, spécification
+d'\code{actuary-approfondi}, commentaire 6799551581)~; de
 \code{STATUTS\_VALIDATION\_POSITIONNEE} sous \code{positionnee}, de
 \code{STATUTS\_VALIDATION\_LISSEE} sous \code{lissee}). Sous \code{lissee},
 \code{table\_reference} et \code{table\_nom} sont absents,
