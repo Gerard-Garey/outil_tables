@@ -142,14 +142,15 @@ verifier("C ETAPES : ligne lissage entre brut et positionnement ; module lissage
     identical(et$prealable[[k]], c("donnees", "exposition", "brut")) && identical(et$aleatoire[k], FALSE) &&
     identical(et$table_construite[k], "table_lissee")
 })
-verifier("C PARAMETRES_ETAPES$lissage : methode, plage_ages, ordre_difference, critere_lissage, ponderation, parametre_lissage ; types ; conditions (ponderation selon methode = wh_quadratique, parametre_lissage selon critere_lissage = declare)", {
+verifier("C PARAMETRES_ETAPES$lissage : methode, plage_ages, ordre_difference, critere_lissage, ponderation, niveau, parametre_lissage, intervalle_lissage ; types ; conditions (ponderation selon methode = wh_quadratique, niveau selon methode = wh_poisson, parametre_lissage selon critere_lissage = declare, intervalle_lissage selon critere_lissage = laml ; #225)", {
   t <- tablexp:::PARAMETRES_ETAPES$lissage
-  identical(t$parametre, c("methode", "plage_ages", "ordre_difference", "critere_lissage", "ponderation",
-                           "parametre_lissage")) &&
-    identical(t$type, c("character", "double", "double", "character", "character", "double")) &&
-    all(is.na(t$recette)) && identical(t$selon, c(NA, NA, NA, NA, "methode", "critere_lissage")) &&
+  identical(t$parametre, c("methode", "plage_ages", "ordre_difference", "critere_lissage", "ponderation", "niveau",
+                           "parametre_lissage", "intervalle_lissage")) &&
+    identical(t$type, c("character", "double", "double", "character", "character", "double", "double", "double")) &&
+    all(is.na(t$recette)) &&
+    identical(t$selon, c(NA, NA, NA, NA, "methode", "methode", "critere_lissage", "critere_lissage")) &&
     identical(unclass(t$valeurs), list(character(0), character(0), character(0), character(0), "wh_quadratique",
-                                       "declare"))
+                                       "wh_poisson", "declare", "laml"))
 })
 verifier("C controler_parametres_lissage() : arguments formels hors contexte (brut, par_annee) = paramètres du catalogue, dans l'ordre (ADR 0017, point 3.5)", {
   f <- names(formals(tablexp:::controler_parametres_lissage))
@@ -193,7 +194,7 @@ rc <- function(d = jeu(), ...) refus_de(construire_table(d, ROLES, plan_l(...)))
 
 verifier("D methode_lissage_invalide (module lissage) : message exact, details", controle(
   rv(lissage = avec(methode = "wh_autre")), "lissage", "methode_lissage_invalide",
-  "La méthode de lissage (methode) doit être une chaîne unique, sans attribut, prise dans « wh_quadratique », sans défaut.",
+  "La méthode de lissage (methode) doit être une chaîne unique, sans attribut, prise dans « wh_quadratique », « wh_poisson », sans défaut.",
   list(methode = "wh_autre")))
 verifier("D critere_lissage_invalide : message exact, details", controle(
   rv(lissage = avec(critere_lissage = "auto")), "lissage", "critere_lissage_invalide",
@@ -306,7 +307,7 @@ verifier("F lissage_sans_segment (appel direct, table d'exposition vide) : messa
                                   exposition_initiale = numeric(0), taux = numeric(0), etat = character(0),
                                   stringsAsFactors = FALSE))
   controle(refus_de(tablexp:::calculer_lissage(ex, b, "sexe", "dernier_anniversaire", "wh_quadratique", c(40, 60), 2,
-                                               "declare", "exposition", 100)),
+                                               "declare", "exposition", NULL, 100, NULL)),
            "lissage", "lissage_sans_segment",
            paste("Lissage : la table d'exposition ne compte aucune cellule (aucune exposition sur la période",
                  "d'observation) : aucun segment à lisser sur la plage d'âges 40 à 60."),

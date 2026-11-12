@@ -82,11 +82,11 @@ cpc <- function(pe, cat = CAT_F) tablexp:::controler_parametres_condition("lissa
 
 verifier("A PARAMETRES_ETAPES : colonnes parametre, type, domaine, recette, selon, valeurs ; invariants (i) à (iii) (ADR 0017, point 3.2 ; valeur calculée à la main)",
          invariants_catalogue(tablexp:::PARAMETRES_ETAPES))
-verifier("A PARAMETRES_ETAPES : paramètres conditionnels à la valeur d'un paramètre dans les étapes lissage (ponderation, parametre_lissage, #223) et validation (table_reference, #224) seules ; selon NA et valeurs vides ailleurs",
+verifier("A PARAMETRES_ETAPES : paramètres conditionnels à la valeur d'un paramètre dans les étapes lissage (ponderation, parametre_lissage, #223 ; niveau, intervalle_lissage, #225) et validation (table_reference, #224) seules ; selon NA et valeurs vides ailleurs",
          all(vapply(tablexp:::PARAMETRES_ETAPES[!names(tablexp:::PARAMETRES_ETAPES) %in% c("lissage", "validation")],
                     function(t) all(is.na(t$selon)) && all(lengths(t$valeurs) == 0L), NA)) &&
            identical(tablexp:::PARAMETRES_ETAPES$lissage$parametre[!is.na(tablexp:::PARAMETRES_ETAPES$lissage$selon)],
-                     c("ponderation", "parametre_lissage")) &&
+                     c("ponderation", "niveau", "parametre_lissage", "intervalle_lissage")) &&
            identical(tablexp:::PARAMETRES_ETAPES$validation$parametre[!is.na(tablexp:::PARAMETRES_ETAPES$validation$selon)],
                      "table_reference"))
 verifier("A invariants : le catalogue fabriqué les tient ; chaque violation fabriquée est détectée (témoins)", {

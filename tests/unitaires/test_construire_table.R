@@ -304,7 +304,9 @@ VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalide
                     lissage.ordre_difference = list(2, "ordre_difference_invalide"),
                     lissage.critere_lissage = list("declare", "critere_lissage_invalide"),
                     lissage.ponderation = list("uniforme", "ponderation_invalide"),
+                    lissage.niveau = list(0.95, "niveau_invalide"),
                     lissage.parametre_lissage = list(100, "parametre_lissage_invalide"),
+                    lissage.intervalle_lissage = list(c(1, 1e8), "intervalle_lissage_invalide"),
                     positionnement.methode = list("smr", "methode_invalide"),
                     positionnement.table_reference = list("t", "cle_table_invalide"),
                     positionnement.plage_ages = list(c(20, 90), "plage_ages_invalide"),
@@ -336,12 +338,18 @@ plan_homogeneite <- function() modifier(plan_complet(), graine = 1L, etapes = c(
 plan_lissage <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
   lissage = list(methode = "wh_quadratique", plage_ages = c(20, 90), ordre_difference = 2, critere_lissage = "declare",
                  ponderation = "uniforme", parametre_lissage = 100))))
+# Plan complet muni de l'étape lissage sous wh_poisson et laml (#225 ; poisson
+# dans l'étape brut du plan complet), témoin de niveau et d'intervalle_lissage.
+plan_lissage_poisson <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
+  lissage = list(methode = "wh_poisson", plage_ages = c(20, 90), ordre_difference = 2, critere_lissage = "laml",
+                 niveau = 0.95, intervalle_lissage = c(1, 1e8)))))
 # Plan complet muni de l'étape importance_exclusions (#69, non aléatoire).
 plan_importance <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
   importance_exclusions = list(niveau = 0.95))))
 plan_de <- function(cle) {
   if (startsWith(cle, "validation.")) plan_validation()
   else if (startsWith(cle, "positionnement.")) plan_positionnement()
+  else if (cle %in% c("lissage.niveau", "lissage.intervalle_lissage")) plan_lissage_poisson()
   else if (startsWith(cle, "lissage.")) plan_lissage()
   else if (startsWith(cle, "homogeneite.")) plan_homogeneite()
   else if (startsWith(cle, "importance_exclusions.")) plan_importance() else plan_complet()

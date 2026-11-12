@@ -1790,6 +1790,26 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "x D pour z >= 2 seulement (la seconde identité, énoncée sans condition par les Lignes directrices, p. 32-33,",
     "est fausse pour z = 1) ; résidus dans etapes/lissage/resultat/segments. Sous la pondération uniforme, aucune",
     "conservation des décès."),
+  # Méthode wh_poisson (#225 ; spécification de forme (0')(b), § 3) : mêmes
+  # éléments, règle « lambda » (mention lissage_echelle reprise).
+  lissage_poisson = paste(
+    "Lissage de Whittaker-Henderson, vraisemblance de Poisson pénalisée (etapes/lissage/parametres/methode =",
+    "wh_poisson) : par segment, theta = ln mu maximise l_P(theta) = somme des [D_x theta_x - E^c_x exp(theta_x)] -",
+    "lambda S / 2, S = somme des (Delta^z theta_x)^2, sur la plage d'âges déclarée, D et E^c statistiques de",
+    "l'estimateur poisson de l'étape brut (G. Biessy, « Whittaker-Henderson Smoothing Revisited », § 4.1),",
+    "calculé par l'algorithme itératif de la source (annexe D, algorithme 1), complété de règles non tirées de la",
+    "source ; q = 1 - exp(-exp(theta)). parametre_lissage est lambda, déclaré (critere_lissage = declare) ou",
+    "choisi comme maximiseur local de la LAML, approximation de Laplace de la vraisemblance marginale",
+    "(critere_lissage = laml ; § 5.4), sur l'intervalle déclaré intervalle_lissage (grille de ln lambda, puis",
+    "méthode de Brent si le meilleur point de la grille est intérieur ; état lambda_a_la_borne si c'est une",
+    "borne, lambda retenu étant alors la borne déclarée, sans recherche de Brent). Bornes de",
+    "crédibilité : intervalles bayésiens asymptotiques, conditionnels au paramètre de lissage retenu, qui ne sont",
+    "pas des intervalles de confiance (couverture fréquentiste non établie). Les cellules sans exposition",
+    "(état interpolee) sont interpolées ; aucune extrapolation hors de la plage ; constantes numériques et règles",
+    "non tirées de la source dans etapes/lissage/parametres (constantes, hypothese)."),
+  lissage_conservation_poisson = paste(
+    "Somme des E^c mu^ = somme des D (SMR = 1) par l'équation du score, et somme des x E^c mu^ = somme des x D",
+    "pour z >= 2, à la convergence de l'algorithme près ; résidus dans etapes/lissage/resultat/segments."),
   lissage_echelle = paste(
     "parametre_lissage est h (pénalité sur q) sous wh_quadratique et lambda (pénalité sur ln mu) sous wh_poisson :",
     "grandeurs d'échelles différentes, jamais comparables d'une méthode à l'autre."),
@@ -2374,6 +2394,8 @@ corps_section <- function(x, k) {
       mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
         wh_quadratique = c(paragraphe(m[["lissage_quadratique"]]), paragraphe(m[["lissage_conservation"]]),
                            paragraphe(m[["lissage_echelle"]])),
+        wh_poisson = c(paragraphe(m[["lissage_poisson"]]), paragraphe(m[["lissage_conservation_poisson"]]),
+                       paragraphe(m[["lissage_echelle"]])),
         stop("corps_section() : méthode de lissage sans mentions (erreur de programmation).", call. = FALSE))
       return(c(mentions, lignes_racines(x, racines)))
     }

@@ -22,7 +22,8 @@
 #  Jeux : agrégats écrits à la main (aucune graine) ; jeu en lignes simulé
 #  pour importance_exclusions (graine 22011204, plage de la porteuse B19,
 #  k = 0, M416). Graine du plan 22011205 (étape aléatoire, aucun tirage sous
-#  lissee). Le critère C1 sous (b) (SMR = 1 à 1e-10) est ajouté avec #225.
+#  lissee). Le critère C1 sous (b) (SMR = 1 à 1e-10) est dans
+#  tests/unitaires/test_lissage_poisson.R (#225).
 # -----------------------------------------------------------------------------
 
 D_ <- as.Date
