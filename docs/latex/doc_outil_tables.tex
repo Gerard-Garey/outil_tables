@@ -1882,7 +1882,7 @@ cette graine~: une modification qui change le jeu tiré change l'empreinte et
 met toutes les références en «~entrée différente~». Chaque plan nomme son
 entrée (champ \code{entree}~; ADR 0009, point 4.1 amendé, annotation du
 07/11/2026, points~(d) et~(e))~: \code{reference}, le jeu ci-dessus, pour
-tous les plans sauf R9, R13 et R14~; \code{agregats\_reference} pour R13, le
+tous les plans sauf R9, R13, R14 et R17~; \code{agregats\_reference} pour R13 et R17, le
 même jeu propre rendu sous la forme «~agrégats~»
 (\code{simuler\_portefeuille(forme =)}, section~\ref{sec:portefeuille-simule},
 «~Sortie~»~; même loi, même portefeuille, même graine, aucun tirage
@@ -1951,6 +1951,9 @@ R11 & R1 avec le test d'homogénéité entre segments (issue~\#168) & \code{sexe
 R12 & R5 avec le test d'homogénéité, sous $H_0$ vraie (issue~\#168, décision M307) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
 R13 & recette \code{agregats} sur la forme agrégats de l'entrée, avec positionnement par SMR sur la table de R8 (issue~\#169) & \code{sexe} & 0 & \code{dernier\_}\allowbreak\code{anniversaire} (déclarée) & non & Poisson, binomial~; 0,95 \\
 R14 & recette des stocks successifs sur la forme stocks de l'entrée, grille annuelle, hypothèse d'entrée \code{milieu} (issue~\#180) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial, \code{kaplan\_meier}~; 0,95 \\
+R15 & Whittaker-Henderson~(a), cohérence et régularité, validation de la table lissée (issues~\#223, \#144, \#224) & \code{sexe} & 0 & \code{dernier\_}\allowbreak\code{anniversaire} & non & Poisson, binomial~; 0,95 \\
+R16 & Whittaker-Henderson~(b), $\lambda$ par la LAML, validation de la table lissée (issues~\#225, \#224) & \code{sexe} & 0 & \code{plus\_fine} & non & Poisson, binomial~; 0,95 \\
+R17 & recette \code{agregats} (entrée de R13), Whittaker-Henderson~(b), $\lambda$ déclaré, validation de la table lissée (issues~\#225, \#224) & \code{sexe} & 0 & \code{dernier\_}\allowbreak\code{anniversaire} (déclarée) & non & Poisson, binomial~; 0,95 \\
 \end{longtable}
 }
 
@@ -2092,6 +2095,44 @@ aucune unité n'est hors de la période~; $D$ est celui de R1, et $\sum E^c$ le 
 décomptes de classes de la construction sont égaux à ceux de l'attribut
 \code{simulation} de l'entrée (test de \code{tests/test\_reproductibilite.R}).
 
+\medskip
+\noindent
+{\sloppy\textbf{Plans R15, R16 et R17} (issues~\#223, \#224, \#225
+et~\#144~; ADR 0017, «~Conséquences~», références retenues par le
+mainteneur, M415~; plans fixés par M416~; création soumise au visa
+délégué par le mainteneur, M420, (1)). Ce sont les premières références
+qui contiennent une table lissée~; chacune valide sa table lissée par la
+relation \code{lissee} (âges 20 à 90, tranches de bornes 20, 50 et 70,
+niveau 0,95, 999~réplications). \textbf{R15}~: entrée \code{reference},
+convention \code{dernier\_anniversaire}, Whittaker-Henderson~(a) pondéré
+par l'exposition (\code{wh\_quadratique}, $h = 10^4$ déclaré, $z = 3$,
+âges 20 à 90), puis l'étape \code{coherence\_regularite} (table
+\code{tv} de R8 en comparaison, ordres déclarés $(3, 2, 1)$, non triés,
+ce qui épingle leur canonisation, ordre \code{H} au-dessus de \code{F}),
+sous la graine 22011201 (\code{GRAINE\_MONTE\_CARLO\_R15}). \textbf{R16}~:
+entrée \code{reference}, Whittaker-Henderson~(b) (\code{wh\_poisson},
+$z = 3$, âges 20 à 90, niveau 0,95, $\lambda$ choisi par la LAML sur
+$[1, 10^{12}]$), plan de la mesure de la classe \code{optimisation}
+(ci-dessous), graine 22011202. \textbf{R17}~: entrée
+\code{agregats\_reference}, convention déclarée
+\code{dernier\_anniversaire}, Whittaker-Henderson~(b) à $\lambda = 10^7$
+déclaré, graine 22011203. Les graines sont dans la plage de la branche
+(\code{tests/controles/graines\_admises.csv}) et ne sont consommées par
+aucun tirage~: la relation \code{lissee} ne réplique pas
+(\code{tirages\_effectues} vaut~0), et ces références ne figent aucun flux
+Monte-Carlo. Les étapes \code{donnees}, \code{exposition} et \code{brut}
+de R16 sont celles de R1, celles de R15 aussi hors de l'écho de la
+convention demandée, celles de R17 celles de R13 (\emph{constat} de la
+création, consigné dans son message). R15 fige une table lissée qui
+décroît aux premiers âges de la plage, ce que l'étape
+\code{coherence\_regularite} relève (C1)~: c'est l'effet du plan de
+lissage fixé (pénalité d'ordre~3 sur l'échelle de $q$, dont le noyau
+contient les paraboles, prolongées au bord gauche où les poids sont
+faibles), non un défaut du code (avis d'\code{actuary-approfondi} consigné
+au commit de création). Le test de permutation des lignes (issue~\#39)
+n'est pas étendu à R15, R16 ni R17 (ADR 0009, annotation du 12/11/2026,
+(d)~3).\par}
+
 \subsubsection*{Format des fichiers}
 
 Un fichier texte par plan, \code{tests/reference/<id>.tsv}, en UTF-8, lignes
@@ -2217,9 +2258,9 @@ les classaient tant qu'ils étaient stockés en \code{double},
 retirées de \code{TOLERANCES} pour la même raison, sans changement d'aucune
 valeur (visa d'\code{actuary} du 09/11/2026). Un double reçoit sa tolérance de la
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont chaque valeur
-est l'une des quatre classes de \code{CLASSES\_TOLERANCE} (exacte,
-$10^{-14}$, $10^{-12}$, $10^{-10}$~; \code{tests/reference/outils\_reference.R},
-l.~91), et dont les clés sont
+est l'une des cinq classes de \code{CLASSES\_TOLERANCE} (exacte,
+$10^{-14}$, $10^{-12}$, $10^{-10}$, \code{optimisation} $= 10^{-3}$~;
+\code{tests/reference/outils\_reference.R}, l.~98), et dont les clés sont
 cherchées parmi les suffixes du chemin, segment par segment, le
 \textbf{suffixe le plus long} l'emportant (\code{cles\_de},
 \code{tolerance\_de}, \code{tests/reference/outils\_reference.R}).
@@ -2280,7 +2321,9 @@ Vingt-sept chemins de ces quatre étapes (5, 9, 5 et~8) sont ainsi passés
 de \code{double} à \code{integer}, à valeurs identiques, et leurs 27 clés
 exactes sont retirées de \code{TOLERANCES}, qui passe de 175 à 148 clés,
 dont 41 exactes au lieu de 68 (ADR 0009, seconde annotation du
-10/11/2026, (e)). Restent en \code{double}~: l'exposition, même en jours
+10/11/2026, (e))~; les clés des étapes \code{lissage} et
+\code{coherence\_regularite} et de la validation \code{lissee}, déclarées
+avec R15 à R17, la portent à 191 (ci-dessous). Restent en \code{double}~: l'exposition, même en jours
 entiers~; les attendus et leurs bornes~; les bornes de fluctuation
 exactes, quantiles à valeurs entières~; la colonne hétérogène
 \code{validation/resultat/statistiques/valeur}~; les échos de paramètres,
@@ -2332,7 +2375,7 @@ point~(a)~4).
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
 point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
-07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)~; 27 clés exactes des dénombrements retirées par l'issue~\#199~: ADR 0009, seconde annotation du 10/11/2026, (e)~; 148 clés, dont 41 exactes, 33 à $10^{-14}$, 71 à $10^{-12}$ et 3 à $10^{-10}$).
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)~; 27 clés exactes des dénombrements retirées par l'issue~\#199~: ADR 0009, seconde annotation du 10/11/2026, (e)~; classe \code{optimisation} et clés des étapes \code{lissage} et \code{coherence\_regularite}~: ADR 0009, annotation du 12/11/2026, et avis d'\code{actuary-approfondi} du 12/11/2026~; 191 clés, dont 60 exactes, 42 à $10^{-14}$, 75 à $10^{-12}$, 3 à $10^{-10}$ et 11 \code{optimisation}, au lieu de 148, dont 41, 33, 71 et~3).
 Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
 groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
@@ -2350,15 +2393,54 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Grandeurs}} &
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
-exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13~; seule exception à la règle des dénombrements, issue~\#199)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table} et \code{resultat/table\_positionnee/qx\_reference}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan) et \code{resultat/monte\_carlo/replications}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table} et \code{resultat/monte\_carlo/replications}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif} & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
-$10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires)~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves} & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
+exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13~; seule exception à la règle des dénombrements, issue~\#199)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table} et \code{resultat/table\_positionnee/qx\_reference}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan) et \code{resultat/monte\_carlo/replications}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table} et \code{resultat/monte\_carlo/replications}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif}~; \code{lissage/}~: \code{plage\_ages}, \code{ordre\_difference}, \code{niveau}, \code{parametre\_lissage} et \code{intervalle\_lissage} (paramètres et écho du plan), \code{parametres/constantes/valeur}~; \code{coherence\_regularite/}~: \code{plage\_ages} et \code{ordres} (paramètres et écho du plan), \code{resultat/regularite/ordre}, \code{resultat/ages/qx}, \code{resultat/ordre\_segments/g\_superieure} et \code{g\_inferieure} (recopies de \code{qx}) & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
+$10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage}~; \code{lissage/}~: \code{diagnostics/exposition\_centrale\_hors\_plage}, \code{diagnostics/exposition\_initiale\_hors\_plage}, \code{resultat/table\_lissee/poids}~; \code{coherence\_regularite/resultat/}~: \code{ages/delta1}, \code{ages/delta2}, \code{ordre\_segments/ecart}, \code{regularite/} \code{regularite}, \code{r\_estime} et \code{regularite\_r} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
+$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires)~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves}~; \code{lissage/resultat/segments/}~: \code{fidelite} et \code{critere} (sous~(a) seule, jamais itérés)~; \code{validation/parametres/ddl\_effectifs/}~: \code{ddl\_effectifs} et \code{ddl\_effectifs\_retenus} (option~($\delta$), ci-dessous) & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
 $10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z} & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a)) \\
+\code{optimi}\allowbreak\code{sation} ($10^{-3}$) & \code{lissage/resultat/table\_lissee/}~: \code{qx}, \code{borne\_inf\_credibilite}, \code{borne\_sup\_credibilite}, \code{levier}~; \code{lissage/resultat/segments/}~: \code{parametre\_lissage}, \code{ddl\_effectifs}, \code{regularite}, \code{laml}, \code{deviance\_penalisee}, \code{residu\_conservation\_0}, \code{residu\_conservation\_1} & grandeurs issues d'un calcul itératif arrêté sur un critère ou d'une optimisation (Whittaker-Henderson~(b), $\hat\lambda$ argmax d'une LAML plate)~: une perturbation de l'ordre de l'arrondi déplace le point d'arrêt~; valeur fixée par mesure (ci-dessous~; ADR 0017, point~8~; ADR 0009, annotation du 12/11/2026) \\
 \end{longtable}
 }
 
 \noindent
-Les tolérances restent plusieurs ordres de grandeur sous le plus petit
+{\sloppy\textbf{Classe \code{optimisation}} (ADR 0017, points~8.2 et~8.3~;
+ADR 0009, annotation du 12/11/2026~; décisions M416, (3), et M420, (4)).
+\emph{Mesure}~: écarts relatifs entre l'exécution nominale et des
+exécutions perturbées de l'ordre de l'arrondi (départ de la grille
+décalé, $\lambda$ déclaré perturbé, lignes des données permutées), sur
+les plans R16 et R17 (\code{tests/mesures/}\allowbreak\code{tolerance\_optimisation.R},
+hors CI, et contre-mesure d'\code{actuary-approfondi})~; statut~:
+\textbf{constat} sur un nombre fini de perturbations, non borne démontrée.
+\emph{Règle}~: plus petite classe décimale au moins égale à dix fois
+l'écart maximal mesuré, d'où $10^{-3}$. Cette valeur dépasse le seuil de
+$10^{-6}$ que le mainteneur avait fixé (M416, (3))~; elle n'est retenue
+que par le jugement d'\code{actuary-approfondi} du 12/11/2026, sous la
+délégation M420, (4)~: $\hat\lambda$ est l'argmax d'une fonction plate, un
+bruit d'évaluation de la LAML s'y traduit par un déplacement en
+$\ln\hat\lambda$ que la tolérance de Brent ne réduit pas~; l'incertitude
+statistique de $\ln\hat\lambda$ est d'ordre~1, bien au-dessus~; sur
+\code{qx}, l'écart est négligeable devant la demi-largeur des
+intervalles de crédibilité. \emph{Portée} (option~($\delta$), M416)~: chemins
+\code{lissage/*} seulement, y compris sous Whittaker-Henderson~(a)~; les
+chemins de la validation gardent leur classe ($10^{-12}$), ce qui en fait
+de fait des références au bit près sur la plateforme de référence~: tout
+changement amont de l'ordre des sommes, ou toute variante de \code{libm}
+ou de BLAS, les fera échouer, et se résoudra par un tableau avant /
+après et une régénération sous visa. \emph{Limites écrites}~: hors de la
+plateforme de référence (\emph{hypothèse}, non mesurée), un écart d'une
+unité au dernier rang sur \code{-expm1} suffirait à faire échouer
+\code{qx\_table} (classe exacte) et le \code{smr} de la validation sous
+\code{lissee}~; la décision revient alors au mainteneur, entre comparaison
+stricte sur la plateforme de référence seule, retrait de la validation
+\code{lissee} de R16 et retour sur~($\delta$) (ADR 0009, même annotation,
+(d)~4)~; les grandeurs nulles par construction (résidus de conservation)
+ont, sous perturbation, un écart relatif d'ordre~1~: la tolérance
+relative n'y a pas de sens, elles sont classées \code{optimisation} avec
+cette limite, et une règle absolue est proposée par l'issue~\#243
+((d)~5).\par}
+
+\medskip
+\noindent
+Les tolérances des quatre premières classes restent plusieurs ordres de grandeur sous le plus petit
 changement significatif estimé par \code{actuary} (un jour d'exposition dans
 la cellule la plus exposée, un événement de plus~; ADR 0009, point 3.4).
 \textbf{Impression}, pour chaque plan, dans la batterie comme dans le
@@ -2632,7 +2714,22 @@ conséquence, celle du code aussi~; toutes les autres grandeurs de R8 et R9
 sont restées identiques au bit près, de même que R1 à R7 et R10 à R14, en
 comparaison réussie, sur la plateforme de référence (processeur Intel
 Xeon Platinum 8573C, consigné sans contrôle), sans table finale, verdict
-ni valeur de table homologuée changés.
+ni valeur de table homologuée changés. Les références R15, R16 et R17 ont été
+\textbf{créées} le 12/11/2026 en mode \code{creation} (exécution
+43184987915 du workflow, calcul sur \code{e8d7910}, commit \code{f9658e4},
+fichiers repris sans modification de l'artefact~; visa délégué par le
+mainteneur sous conditions, décision M420, (1), conditions remplies selon
+l'avis d'\code{actuary-approfondi} du 12/11/2026~; issues~\#223, \#224,
+\#225 et~\#144), sur la plateforme de référence (processeur AMD EPYC
+9V74, consigné sans contrôle)~: création seule, R1 à R14 restant
+identiques au bit près en comparaison réussie, aucune grandeur sans
+tolérance~; \code{SANS\_REFERENCE} est vide. Ce sont les premières
+références qui contiennent une table construite par lissage~: un
+changement de leurs tables lissées ou de leurs verdicts de validation
+relève du visa du mainteneur comme une table finale (décisions M308
+et M413). Le correctif \code{f31d91b} (noms de lignes automatiques de la
+table \code{constantes} sous \code{wh\_poisson}, sans quoi l'écriture de
+R16 et R17 était refusée) a précédé la création.
 
 \begin{encadre}
 \small
@@ -2674,7 +2771,21 @@ ni valeur de table homologuée changés.
     tests par variable conditionnellement à l'autre, la p-valeur exacte au
     delà du plafond de convolution et les cas aux limites ne sont couverts
     que par les tests unitaires.
-  \item La recette \code{agregats} n'est figée que par R13~: transition
+  \item Les étapes \code{lissage} et \code{coherence\_regularite} et la
+    relation \code{lissee} de la validation ne sont figées que par R15 à
+    R17~: segmentation \code{sexe}, âges 20 à 90, $z = 3$, Whittaker-Henderson~(a)
+    sous la seule pondération \code{exposition} (R15), (b) sous
+    \code{laml} (R16) et sous \code{declare} sur la recette
+    \code{agregats} (R17), une table de référence en comparaison et un
+    seul ordre entre segments (R15). La pondération \code{uniforme},
+    d'autres ordres, l'état \code{lambda\_a\_la\_borne}, les cellules
+    interpolées, l'interpolation exacte de la validation, les refus et
+    \code{coherence\_regularite} sous un positionnement ne sont couverts
+    que par les tests unitaires (\code{tests/unitaires/test\_lissage\_quadratique.R},
+    \code{test\_lissage\_poisson.R}, \code{test\_validation\_lissee.R},
+    \code{test\_coherence\_regularite.R}).
+  \item La recette \code{agregats} n'est figée que par R13 et, sous
+    Whittaker-Henderson~(b), par R17~: transition
     vivant $\to$ décédé, segmentation \code{sexe}, les deux expositions
     déclarées, convention \code{dernier\_anniversaire} sans rôle
     \code{annee} ni \code{par\_annee}, aucune exclusion, cellules à zéros
@@ -3500,6 +3611,12 @@ table~; \code{plage\_ages}~: âges entiers~; \code{niveau}
 \code{plage\_ages}, \code{tranches\_age}~: âges entiers~;
 \code{replications}~: entier $\ge 1$~; segmentation du plan non vide
 (section~\ref{sec:homogeneite}) \\
+\code{coherence\_}\allowbreak\code{regularite} & \code{calculer\_coherence\_regularite()} & \code{donnees},
+\code{exposition} &
+\code{tables\_reference}~: clés, $k \ge 0$~; \code{plage\_ages}~;
+\code{ordres}~; \code{ordre\_variable}, \code{ordre\_superieur},
+\code{ordre\_inferieur}~; étape productrice au plan
+(section~\ref{sec:coherence-regularite}) \\
 \code{validation} & \code{calculer\_validation()} & \code{donnees},
 \code{exposition} &
 \code{relation\_table}~:
@@ -3522,7 +3639,8 @@ table~; \code{plage\_ages}~: âges entiers~; \code{niveau}
 {\sloppy\noindent
 Les étapes \code{homogeneite} et \code{validation} tirent un aléa
 (colonne \code{aleatoire} de \code{ETAPES})~; les étapes \code{positionnement} et \code{validation}
-citent chacune une table de référence, par sa clé
+citent chacune une table de référence, par sa clé, et l'étape
+\code{coherence\_regularite} $k \ge 0$ tables, par leurs clés
 (section~\ref{sec:tables-reference-recues}~; constante
 \code{PARAMETRES\_CLE\_TABLE}). Les étapes \code{lissage} et
 \code{positionnement} sont des \emph{étapes productrices}~: chacune produit
@@ -3541,10 +3659,13 @@ convention native, déclarée.\par}
 exactement le type de base que déclare la colonne \code{type} de
 \code{PARAMETRES\_ETAPES} (\code{character} pour \code{exclusions},
 \code{convention}, \code{entree\_entre\_inventaires}, \code{estimateurs},
-\code{methode}, \code{critere\_lissage}, \code{ponderation}, \code{table\_reference} et
+\code{methode}, \code{critere\_lissage}, \code{ponderation}, \code{table\_reference},
+\code{tables\_reference}, \code{ordre\_variable}, \code{ordre\_superieur},
+\code{ordre\_inferieur} et
 \code{relation\_table}, \code{logical} pour \code{par\_annee},
-\code{double} pour \code{niveau} et \code{parametre\_lissage}, et pour \code{plage\_ages},
-\code{ordre\_difference}, \code{tranches\_age} et \code{replications}, à valeur entière, un
+\code{double} pour \code{niveau}, \code{parametre\_lissage} et
+\code{intervalle\_lissage}, et pour \code{plage\_ages},
+\code{ordre\_difference}, \code{ordres}, \code{tranches\_age} et \code{replications}, à valeur entière, un
 \code{integer} y étant refusé, section~\ref{sec:validation-etape}) et \textbf{ne porte
 aucun attribut}~: ni noms, ni dimension, ni classe (un facteur, une matrice
 ou un vecteur nommé sont refusés), sinon refus sous le motif propre au
@@ -3769,7 +3890,12 @@ la table de la clé qu'elle cite (\code{table\_citee()}) et contrôles
 d'entrée de cette étape (\code{controler\_entrees\_validation()}, module
 \code{positionnement}, refus sous le module de l'étape~: convention d'âge
 retenue, table sans année, modalités de sexe, couverture de la plage,
-sections~\ref{sec:positionnement-etape} et~\ref{sec:validation-etape})~; contrôle du codage des chaînes que la fiche
+sections~\ref{sec:positionnement-etape} et~\ref{sec:validation-etape}),
+et, entre les deux, pour chaque table citée par l'étape
+\code{coherence\_regularite}, dans l'ordre reçu, sa lecture et ses
+contrôles d'entrée (\code{controler\_entrees\_coherence\_regularite()},
+table sans année, couverture de la plage~;
+section~\ref{sec:coherence-regularite})~; contrôle du codage des chaînes que la fiche
 écrira hors des données, valeurs des rôles (noms de colonnes) et champs de
 la provenance, par l'écrivain de l'empreinte (\code{octets\_chaines()},
 refus \code{chaine\_codage\_bytes}, \code{chaine\_non\_utf8} et
@@ -3782,7 +3908,8 @@ et ceux de l'étape \code{positionnement} sur ses cellules et ses segments
 (les mêmes, plus \code{positionnement\_sans\_attendu} et
 \code{positionnement\_sans\_deces}), ceux de l'étape \code{lissage} sur
 ses cellules et ses segments (motifs préfixés \code{lissage\_},
-section~\ref{sec:lissage-etape}), le refus de capacité
+section~\ref{sec:lissage-etape}), le refus \code{ordre\_modalite\_absente}
+de l'étape \code{coherence\_regularite} (section~\ref{sec:coherence-regularite}), le refus de capacité
 \code{evenements\_retires\_hors\_plage} de l'étape
 \code{importance\_exclusions}, sur ses ensembles de lignes exclues
 (issue~\#174), et ceux de l'étape \code{exposition}
@@ -3851,6 +3978,9 @@ sans table de référence, la table construite et les degrés de liberté
 effectifs par segment rendus par \code{table\_construite()}, passés en
 valeur, et l'ordre des différences du lissage
 (\code{etapes\$lissage\$parametres\$ordre\_difference}, issue~\#239)~; l'étape
+\code{coherence\_regularite} lit la table construite, en valeur, les
+tables de référence qu'elle cite, la segmentation du plan et la
+convention retenue de l'étape \code{exposition}~; l'étape
 \code{importance\_exclusions} lit les données reçues et les rôles, le
 résultat des étapes \code{donnees} (unité d'observation, lignes conservées,
 lignes exclues par motif, observations) et \code{exposition} (table
@@ -3934,7 +4064,11 @@ nommée d'objets \code{table\_reference} rendus par \code{table\_reference()}
 \emph{clés de table}~: des étiquettes locales de la construction, libres, distinctes du
 \code{nom} de la table, qui est son attribut. \textbf{Le plan cite une clé,
 jamais une valeur}~: un paramètre d'étape qui lit une table est une chaîne
-unique, la clé~; les chemins de ces paramètres, de la forme
+unique, la clé, ou, pour le paramètre \code{tables\_reference} de l'étape
+\code{coherence\_regularite}, un vecteur de $k \ge 0$ clés (écart à la
+lettre de l'ADR 0015, point~1.2~; ADR 0017, point~13.3~; chaque clé
+citée compte pour les contrôles, \code{cles\_citees()} en rendant une ligne
+par élément)~; les chemins de ces paramètres, de la forme
 \code{etapes/<étape>/<paramètre>}, forment la constante
 \code{PARAMETRES\_CLE\_TABLE}, et chacun désigne un paramètre de type
 \code{character} de \code{PARAMETRES\_ETAPES} (un test le vérifie). Le plan
@@ -4925,7 +5059,7 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{CHAMPS\_PLAN\_REQUIS} & constante & --- & les cinq champs toujours requis (tous sauf \code{inventaires} et \code{graine}, conditionnels) \\
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa, table construite (élément du \code{resultat} qui la porte, \code{NA} hors des étapes productrices) \\
 \catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine, recette (\code{NA}, ou recette sous laquelle le paramètre est requis et hors de laquelle il est interdit), \code{selon} et \code{valeurs} (\code{NA} et \code{character(0)}, ou gouvernant de la même étape et valeurs sous lesquelles le paramètre est requis~; section~\ref{sec:plan}) \\
-\catalogue{fonctions-construire-table}{PARAMETRES\_CLE\_TABLE} & constante & --- & chemins \code{etapes/}\allowbreak\code{<étape>/}\allowbreak\code{<paramètre>} des paramètres du plan qui citent une table de référence par sa clé, chacun un paramètre \code{character} de \code{PARAMETRES\_ETAPES} (section~\ref{sec:tables-reference-recues}) \\
+\catalogue{fonctions-construire-table}{PARAMETRES\_CLE\_TABLE} & constante & --- & chemins \code{etapes/}\allowbreak\code{<étape>/}\allowbreak\code{<paramètre>} des paramètres du plan qui citent une ou plusieurs tables de référence par leurs clés (\code{positionnement}, \code{coherence\_regularite}, \code{validation}), chacun un paramètre \code{character} de \code{PARAMETRES\_ETAPES} (section~\ref{sec:tables-reference-recues}) \\
 \catalogue{fonctions-construire-table}{CHAMPS\_TABLE\_FICHE} & constante & --- & les sept champs d'un élément de \code{fiche\$tables\_reference}, dans l'ordre~: \code{nom}, \code{statut}, \code{source}, \code{forme\_origine}, \code{parametres}, \code{representation}, \code{empreinte}~; contrôle de forme de l'étape~2 du rejeu \\
 \catalogue{fonctions-construire-table}{liste\_noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms, par \code{forme\_exacte()}) aux noms complets au sens de \code{noms\_complets()} (module \code{outils}~: présents, non vides et non manquants), ou vide (sans noms admis)~; doublons non contrôlés~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#22, \#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{liste\_noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
@@ -4935,9 +5069,9 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{controler\_inventaires\_recette()} & interne & plan, recette validée & \code{NULL} invisible, ou refus \code{inventaires\_manquants} (recette dont les rôles requis comprennent \code{date\_inventaire}, champ absent), \code{inventaires\_inattendus} (autre recette, champ présent)~; appelée par \code{controler\_plan\_roles()} après \code{controler\_roles()} \\
 \catalogue{fonctions-construire-table}{controler\_parametres\_recette()} & interne & plan, recette validée, catalogue des paramètres (injectable pour les tests) & \code{NULL} invisible, ou, étape par étape dans l'ordre du plan, refus \code{parametre\_manquant} (paramètre de la recette retenue absent) puis \code{parametre\_inattendu} (paramètre d'une autre recette présent)~; appelée par \code{controler\_plan\_roles()} après le contrôle de présence de la grille \\
 \catalogue{fonctions-construire-table}{controler\_parametres\_condition()} & interne & nom de l'étape, ses paramètres, son catalogue & \code{NULL} invisible, ou, gouvernant par gouvernant dans l'ordre du catalogue, refus \code{parametre\_manquant} (requis sous la valeur du gouvernant, absent) puis \code{parametre\_inattendu} (requis sous une autre valeur, présent), module \code{construire\_table}~; gouvernant absent ou non contrôlé~: erreur de programmation~; appelée par \code{valider\_plan()} pour chaque étape, après ses gouvernants et avant ses valeurs (section~\ref{sec:plan}) \\
-\catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
+\catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{etapes/}\allowbreak\code{coherence\_regularite/}\allowbreak\code{ordres} marqué \code{TRI\_NUMERIQUE} (tri croissant)~; \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
-\catalogue{fonctions-construire-table}{cles\_citees()} & interne & plan, chemins des paramètres qui citent une clé & \code{data.frame} (\code{cle}, \code{parametre}) des clés citées par les étapes présentes au plan, dans l'ordre des chemins~; une clé citée deux fois y figure deux fois \\
+\catalogue{fonctions-construire-table}{cles\_citees()} & interne & plan, chemins des paramètres qui citent une clé & \code{data.frame} (\code{cle}, \code{parametre}) des clés citées par les étapes présentes au plan, dans l'ordre des chemins, une ligne par élément d'un vecteur de clés (vide~: aucune)~; une clé citée deux fois y figure deux fois \\
 \catalogue{fonctions-construire-table}{controler\_tables\_reference()} & interne & tables reçues, plan~; chemins des paramètres et catalogue (par défaut, les deux constantes de ce rôle) & valeur de \code{fiche\$tables\_reference}~; les quatre contrôles des tables reçues, dans l'ordre (section~\ref{sec:tables-reference-recues}), appelé une fois par \code{construire\_table()} \\
 \catalogue{fonctions-construire-table}{controler\_tables\_rejeu()} & interne & champ de la fiche, tables reçues, empreinte du code de la fiche~; catalogue des tables embarquées & étape~7~bis du rejeu (section~\ref{sec:rejeu})~: liste assemblée (tables reçues et relues), empreintes recalculées par clé, textes de la ligne \code{tables\_reference} du bilan~; ne reçoit plus le plan, le contrôle des tables reçues étant fait par \code{construire\_table()} (issue~\#82) \\
 \catalogue{fonctions-construire-table}{table\_citee()} & interne & tables reçues, clé & objet \code{table\_reference} de la clé, comparée en UTF-8 comme au contrôle des tables reçues~; erreur de programmation si la clé est absente (le contrôle des tables reçues l'a exclu)~; table citée par chaque étape qui lit une table, lue par \code{controler\_entrees()} \\
@@ -8451,7 +8585,10 @@ n'appelle que \code{outils}, \code{donnees} (\code{citer()},
 \code{liste\_guillemets()}) et \code{exposition}
 (\code{CONVENTIONS\_VALIDATION}, \code{controler\_plage\_ages()},
 \code{grille\_plage()}, section~\ref{sec:exposition})~; \code{construire\_table}
-l'appelle pour les contrôles et la fonction d'étape
+l'appelle pour les contrôles et la fonction d'étape, et le module
+\code{validation} pour \code{somme\_differences\_carrees()}, la seule
+fonction de $S$, que l'étape \code{coherence\_regularite} emploie
+(section~\ref{sec:coherence-regularite})
 (section~\ref{sec:graphe}~; ADR 0017, point~10.4).
 
 \medskip
@@ -9903,7 +10040,7 @@ par une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, 
 \section{Validation et suivi d'expérience~: \code{R/validation.R}}
 \label{sec:validation}
 
-{\sloppy Le module \code{validation} porte trois étapes du plan, toutes dans
+{\sloppy Le module \code{validation} porte quatre étapes du plan, toutes dans
 \code{R/validation.R} (décision M242~; avis de forme du 06/11/2026,
 issue~\#4~; pour \code{homogeneite}, avis de forme de l'issue~\#168,
 F10~: section~\ref{sec:homogeneite})~: l'étape \code{validation} (issue~\#4), qui calcule les
@@ -9914,6 +10051,10 @@ quelle}, de la table positionnée de la même construction (relation
 (sections~\ref{sec:validation-etape} à~\ref{sec:validation-verifications}),
 l'étape \code{homogeneite} (issue~\#168, section~\ref{sec:homogeneite}),
 qui compare les segments de la construction entre eux, sans table,
+l'étape \code{coherence\_regularite} (issue~\#144,
+section~\ref{sec:coherence-regularite}), qui restitue la cohérence des taux
+et la régularité de la table construite et de tables de référence évaluées
+en comparaison,
 et l'étape \code{importance\_exclusions} (issue~\#69,
 section~\ref{sec:importance-exclusions}). Les fonctions d'étape
 \code{calculer\_validation()} et \code{calculer\_importance\_exclusions()}
@@ -9927,13 +10068,16 @@ construite et les degrés de liberté effectifs par segment), jamais le plan ent
 situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
 (\code{citer()}, \code{liste\_guillemets()}, et, pour
 \code{importance\_exclusions}, \code{construire\_observations()},
-\code{evaluer\_motifs()}, \code{MOTIFS\_TETE} et \code{MODALITES\_CAUSE}~; ni
-\code{controler\_segmentation()} ni \code{valeurs\_parametres\_donnees()},
-qu'il appelait avant l'issue~\#82, ni \code{SEXES\_TABLE}, qu'emploient
-les briques déplacées vers \code{positionnement}),
+\code{evaluer\_motifs()}, \code{MOTIFS\_TETE} et \code{MODALITES\_CAUSE},
+et, pour \code{coherence\_regularite}, \code{MODALITES\_SEXE} et
+\code{SEXES\_TABLE}~; ni \code{controler\_segmentation()} ni
+\code{valeurs\_parametres\_donnees()}, qu'il appelait avant
+l'issue~\#82),
 \code{exposition} (\code{calculer\_exposition()}, pour
 \code{importance\_exclusions}, \code{controler\_plage\_ages()} et, sous la
-relation \code{lissee}, \code{grille\_plage()}) et
+relation \code{lissee}, \code{grille\_plage()}),
+\code{lissage} (\code{somme\_differences\_carrees()}, pour
+\code{coherence\_regularite}~; ADR 0017, point~10.3) et
 \code{brut} (\code{taux\_poisson()}) et, depuis l'issue~\#167,
 \code{positionnement} (\code{apparier\_table()}, \code{attendus\_cellules()},
 \code{smr\_poisson()} et \code{controler\_cle\_table()})~;
@@ -11482,6 +11626,194 @@ une seule loi, une tête par contrat, \code{par\_annee = FALSE}, une
 variable de segmentation, $\theta$ constant par âge (familles~P
 et~U).\par}
 
+\subsection{Étape \code{coherence\_regularite}~: cohérence des taux et régularité}
+\label{sec:coherence-regularite}
+
+{\sloppy L'étape \code{coherence\_regularite} (issue~\#144~; E2.12~;
+ADR 0017, point~13~; décisions D1 à D8 du mainteneur du 11/11/2026, M413,
+et M415) restitue, sur la table construite et sur des tables de
+référence évaluées en comparaison, les vérifications de \emph{cohérence
+des taux} des Lignes directrices mortalité (chap.~4, II.1 et II.3,
+p.~36 à~38) et leur mesure de \emph{régularité} (chap.~4, III.1, p.~38).
+Ce sont des \textbf{propriétés déterministes des tables}~: ni observation,
+ni hypothèse nulle, ni tirage, ni seuil, ni verdict, ni avertissement
+quand une inégalité n'est pas vérifiée (D4). Le fond vient de la
+spécification de l'issue~\#144 (critères C1 à C5, commentaire
+6795722466), de sa spécification de forme (commentaire 6799631402) et de
+l'ADR 0017, point~13. La comparaison aux tables de référence est un
+\textbf{choix de l'outil}, à finalité comparative, ni prescrit par les
+Lignes directrices ni attribué à leur p.~36 (D1~(a), M415). II.2 (tables
+sélectionnées-finales) est reporté (D7, issue~\#232).\par}
+
+\medskip
+\noindent
+\textbf{Tables évaluées.} La \emph{table construite} est toujours évaluée
+(section~\ref{sec:execution}), reçue en valeur, sans que l'étape
+connaisse le nom de l'étape productrice~; un plan sans étape productrice
+est refusé (\code{coherence\_sans\_table\_construite}). Puis, dans l'ordre
+reçu, chaque \emph{table de référence évaluée en comparaison}, citée par
+sa clé dans le paramètre \code{tables\_reference}. Les segments sont,
+pour la table construite, ceux de ses lignes~; pour une table de
+référence, ses modalités de sexe, dans l'ordre de \code{SEXES\_TABLE}.
+L'étape lit $g_x$ = \code{qx} de chaque table, sur la plage déclarée.
+
+\medskip
+{\sloppy\noindent
+\textbf{Paramètres} (\code{PARAMETRES\_ETAPES}), tous requis, sans
+défaut~: \code{tables\_reference}, vecteur de $k \ge 0$ clés, sans
+\code{NA}, non vides, sans doublon, dans l'ordre reçu, vide explicite
+admis (écart à la lettre de l'ADR 0015, point~1.2, qui prévoyait une clé
+unique~; ADR 0017, point~13.3)~; \code{plage\_ages}, deux valeurs
+entières en \code{double}, contenue dans la plage de l'étape productrice
+et couverte par chaque table~; \code{ordres}, au moins un ordre $z \ge 1$
+en \code{double}, sans doublon, au plus $x_{\sup} - x_{\inf}$, trié par
+ordre croissant à la canonisation (\code{TRI\_NUMERIQUE},
+section~\ref{sec:fiche})~; \code{ordre\_variable},
+\code{ordre\_superieur}, \code{ordre\_inferieur}, trois vecteurs
+\code{character} parallèles de même longueur $k \ge 0$, un \emph{triplet}
+$(v, a, b)$ par position (modalité $a$ attendue au-dessus de $b$ pour la
+variable de segmentation $v$~; \code{H} ou \code{F} pour \code{sexe}),
+vides explicites admis. L'étape a pour préalables \code{donnees} et
+\code{exposition}, vient après \code{homogeneite} et avant
+\code{validation} (ordre des Lignes directrices~: II et III.1, puis
+III.2), est non aléatoire et admise sous les trois recettes.\par}
+
+\medskip
+{\sloppy\noindent
+\textbf{Refus}, module \code{coherence\_regularite}. Par
+\code{controler\_parametres\_coherence\_regularite()}, appelée par
+\code{valider\_plan()} seule, dans cet ordre~:
+\code{cles\_tables\_invalides}~; \code{plage\_ages\_invalide} (brique du
+module \code{exposition})~; \code{ordres\_invalides}~;
+\code{ordre\_segments\_invalide}, qui cite tous les défauts (forme,
+longueurs différentes, variable hors de la segmentation du plan, donc
+tout ordre sans segmentation, modalités égales, triplet en double,
+modalité de sexe hors de \code{H} et \code{F})~;
+\code{coherence\_sans\_table\_construite}~;
+\code{plage\_ages\_hors\_table\_construite}. Avant exécution, par
+\code{controler\_entrees\_coherence\_regularite()}, pour chaque table
+citée, dans l'ordre reçu~: \code{table\_annee\_non\_admise} et
+\code{plage\_ages\_hors\_table}, motifs réemployés de la validation~; ni
+sexe ni convention d'âge ne sont exigés d'une table de référence. En
+cours d'étape~: \code{ordre\_modalite\_absente}, si une modalité déclarée
+n'apparaît dans aucun segment de la table construite (toutes citées).
+Les clés citées entrent dans les contrôles des tables reçues
+(\code{PARAMETRES\_CLE\_TABLE}, \code{cles\_citees()},
+section~\ref{sec:tables-reference-recues}).\par}
+
+\medskip
+\noindent
+\textbf{Critères}, par table et par segment, sur la plage $[x_{\inf},
+x_{\sup}]$~:
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{C1, croissance} (II.1)~: $\delta_1(x) = g_{x+1} - g_x$,
+    inégalité $g_x \le g_{x+1}$, égalité admise (colonnes \code{delta1},
+    \code{croissance}, \code{NA} au dernier âge)~;
+  \item \textbf{C2, croissance des différences premières} (II.1)~:
+    $\delta_2(x) = (g_{x+2} - g_{x+1}) - (g_{x+1} - g_x)$ (\code{diff()}
+    d'ordre~2), inégalité $\delta_2(x) \ge 0$ (colonnes \code{delta2},
+    \code{differences\_croissantes}, \code{NA} aux deux derniers âges)~;
+  \item \textbf{C3, ordre entre segments} (II.3)~: sur la table
+    construite, pour chaque triplet et chaque combinaison des autres
+    variables de segmentation où les deux segments existent, $e_x =
+    g_x(a) - g_x(b)$, inégalité $g_x(a) \ge g_x(b)$~; une combinaison où
+    l'un manque ne donne aucune ligne. Sur une table de référence~:
+    triplets sur \code{sexe} seulement, et si la table porte \code{H} et
+    \code{F}~; sinon une ligne de synthèse à l'état \code{sans\_objet}
+    (\code{ETATS\_ORDRE\_SEGMENTS}), sans refus (M415). Pour les sexes, la
+    propriété n'est attendue que «~si les groupes constitués par les hommes
+    et les femmes ont des distributions comparables vis-à-vis des autres
+    critères~» (p.~38)~; un défaut appelle une explication~;
+  \item \textbf{C4, régularité} (III.1)~: $S_z = \sum_{x = x_{\inf}}^{x_{\sup}
+    - z} (\Delta^z g_x)^2$, sans poids, sur $m_z = x_{\sup} - x_{\inf} - z
+    + 1$ termes (colonne \code{termes}), pour chaque $z$ de \code{ordres},
+    par \code{somme\_differences\_carrees()}, la fonction de $S$ du module
+    \code{lissage} (ADR 0017, point~10.3)~; toujours sur \code{qx}, jamais
+    repris du $S$ de l'étape \code{lissage}, qui porte sur $\ln\mu$
+    sous~(b) (ADR 0017, point~13.5)~; mesure comparable seulement entre
+    tables du même segment, sur la même plage et au même $z$~; pour une
+    table lissée par Whittaker-Henderson~(a) au même $z$, fonction non
+    croissante de $h$~;
+  \item \textbf{C5, régularité à composante exponentielle} (III.1, forme
+    de la p.~33)~: avec $a = \Delta^z g$ et $b = \Delta^{z-1} g$ sur les
+    $m_z$ mêmes âges, $\hat r = \sum a_x b_x / \sum b_x^2$ (minimum
+    explicite en $r$ à $g$ fixé, moindres carrés à un paramètre~: résultat
+    exact) et $S^r = \sum (a_x - \hat r b_x)^2$, calculée par la somme des
+    carrés et jamais par la soustraction, donc jamais négative, égale en
+    arithmétique exacte à $S_z - (\sum ab)^2 / \sum b^2 \le S_z$ (réserve
+    K1 d'\code{actuary})~; états (\code{ETATS\_REGULARITE})~:
+    \code{produite}, \code{differences\_nulles} ($\sum b^2 = 0$~: $\hat r$
+    et $S^r$ à \code{NA}), \code{r\_hors\_domaine} ($\hat r \le -1$~:
+    $\hat r$ restitué, $S^r$ à \code{NA}). L'itération de la p.~33, où $g$
+    dépend de $r$, vaut pour un lissage, non pour l'évaluation d'une table
+    donnée. Les colonnes \code{r\_estime} et \code{regularite\_r} ne portent
+    aucune attribution d'auteur (M200).
+\end{itemize}
+Aucune exception d'âge n'est appliquée.
+
+\medskip
+{\sloppy\noindent
+\textbf{Résultat} (\code{etapes\$coherence\_regularite}). \code{parametres}~:
+les paramètres du plan, \code{tables} (une ligne par table évaluée~:
+\code{nature} = \code{construite} ou \code{reference}, \code{cle},
+\code{NA} pour la table construite, \code{nom}, \code{NOM\_TABLE\_CONSTRUITE}
+pour la table construite, \code{statut}, \code{source},
+\code{convention\_age}, la convention retenue pour la table construite et
+\code{MENTION\_CONVENTION\_TABLE\_REFERENCE} pour une table de référence,
+l'objet n'en portant pas, \code{sexes}), la référence de méthode
+(\code{REFERENCE\_METHODE\_COHERENCE\_REGULARITE}) et les statuts
+(\code{STATUTS\_COHERENCE\_REGULARITE}). \code{resultat}~: \code{ages}
+(par table, segment et âge~: $g$, $\delta_1$, $\delta_2$ et les deux
+inégalités), \code{coherence} (synthèse par table et segment~: paires
+examinées, nombre et liste des âges en défaut pour C1 et C2),
+\code{ordre\_segments} (par âge) et \code{ordre\_segments\_synthese}
+(par triplet et combinaison~: âges examinés, nombre et liste des âges en
+défaut, état), \code{regularite} (par table, segment et ordre~:
+\code{termes}, $S_z$, $\hat r$, $S^r$, état). \code{diagnostics}~:
+décomptes des tables, segments, âges, défauts et états. Aucun
+avertissement.\par}
+
+\medskip
+\noindent
+\textbf{Statuts} (E2.20~; \code{STATUTS\_COHERENCE\_REGULARITE}, par
+table du résultat, grandeur et nature de table)~: C1 et C3, résultats
+exacts sur les valeurs enregistrées, comparaison en double précision, un
+écart de l'ordre de la précision de construction de la table n'établissant
+pas le sens~; C2, descriptif, erreur d'arrondi de l'ordre de
+$2u(\lvert g_x\rvert + 2\lvert g_{x+1}\rvert + \lvert g_{x+2}\rvert)$,
+$u = 2^{-53}$, plus l'erreur de construction~; C3 sur une table de
+référence~: choix de l'outil, non prescrit par II.3~; C4, descriptif,
+sans loi ni seuil~; C5, résultat exact à $g$ fixé, arithmétique
+flottante.
+
+\medskip
+\noindent
+\textbf{Portée.} Les Lignes directrices écrivent, pour la régularité et
+la fidélité~: «~sauf erreur de construction manifeste, les résultats de
+ces tests ne permettront pas de rejeter la table construite, ils
+donneront, en revanche, des éléments d'appréciation de sa qualité~»
+(chap.~4, III, p.~38)~; pour la cohérence des taux, elles prescrivent la
+vérification («~il faut~», II, p.~36-37) sans règle de rejet~; pour
+l'ordre entre segments, un défaut appelle à «~rechercher des
+explications~» (II.3, p.~37). L'outil restitue valeurs et âges en défaut,
+sans verdict~; l'appréciation revient à l'actuaire. Ces citations sont
+celles de la mention \code{coherence\_portee} du rapport figé
+(section~\ref{sec:rapport-fige}), lues sur le rendu des pages par
+\code{regulatory-approfondi} (spécification de l'issue~\#144, §~0) et
+retrouvées aux p.~36 à~38 du texte extrait du même PDF le 12/11/2026.
+
+\medskip
+\noindent
+{\sloppy\textbf{Vérifications} (\code{tests/unitaires/test\_coherence\_regularite.R}).
+Les critères sont vérifiés sur des tables fabriquées~: chaque refus avec
+son module et son message, l'ordre des refus, la table construite toujours
+évaluée sous les deux producteurs, C3 sur une table de référence (\code{H}
+et \code{F} évalués, \code{ensemble} et autre variable à l'état
+\code{sans\_objet}), $S_z$ sur \code{qx} sous~(a) et~(b), $S^r$ jamais
+négatif, la canonisation de \code{ordres}. Le plan de référence R15
+(section~\ref{sec:non-regression}) fige l'étape sur une table lissée,
+avec la table \code{tv} en comparaison.\par}
+
 \subsection{Étape \code{importance\_exclusions}}
 \label{sec:importance-exclusions}
 
@@ -12323,6 +12655,15 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives, statistique observée et fonction des répliques, données des réplications et de la p-valeur exacte \\
 \catalogue{fonctions-validation}{p\_exacte\_homogeneite()} & interne & résultat de la ligne précédente & p-valeur exacte bilatérale à deux groupes (somme de binomiales) et son état \\
 \catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{monte\_carlo}), diagnostics, avertissements~; ne contrôle aucun paramètre \\
+\catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices, chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
+\catalogue{fonctions-validation}{MENTION\_CONVENTION\_TABLE\_REFERENCE} & constante & --- & convention d'âge restituée pour une table de référence évaluée~: «~non portée par la table de référence~» \\
+\catalogue{fonctions-validation}{NOM\_TABLE\_CONSTRUITE} & constante & --- & nom restitué de la table construite, sans nom d'étape productrice \\
+\catalogue{fonctions-validation}{ETATS\_REGULARITE} & constante & --- & états d'une ligne de régularité (C5)~: \code{produite}, \code{differences\_nulles}, \code{r\_hors\_domaine} \\
+\catalogue{fonctions-validation}{ETATS\_ORDRE\_SEGMENTS} & constante & --- & états d'une ligne de synthèse de l'ordre entre segments~: \code{produite}, \code{sans\_objet} \\
+\catalogue{fonctions-validation}{STATUTS\_COHERENCE\_REGULARITE} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{nature}, \code{statut})~: statuts de C1 à C5 (section~\ref{sec:coherence-regularite}) \\
+\catalogue{fonctions-validation}{controler\_parametres\_coherence\_regularite()} & interne & paramètres de l'étape, segmentation, plage de l'étape productrice (\code{NULL} sans elle) & \code{TRUE} invisible, ou le premier des six refus de valeur, dans l'ordre~; appelée par \code{valider\_plan()} seule \\
+\catalogue{fonctions-validation}{controler\_entrees\_coherence\_regularite()} & interne & table, clé, plage & \code{TRUE} invisible, ou refus \code{table\_annee\_}\allowbreak\code{non\_admise} puis \code{plage\_ages\_}\allowbreak\code{hors\_table}~; appelée par \code{controler\_entrees()} pour chaque clé \\
+\catalogue{fonctions-validation}{calculer\_coherence\_regularite()} & interne & table construite, tables citées, segmentation, paramètres, convention retenue & fonction d'étape \code{coherence\_regularite}~: C1 à C5, paramètres, résultat, diagnostics, aucun avertissement~; refus \code{ordre\_modalite\_}\allowbreak\code{absente} \\
 \catalogue{fonctions-validation}{MOTIFS\_MESURABLES\_IMPORTANCE} & constante & --- & motifs mesurables~: \code{id\_contrat\_manquant}, \code{contrat\_duplique} (ce dernier en unité tête seulement~; section~\ref{sec:importance-exclusions}) \\
 \catalogue{fonctions-validation}{CLES\_MOTIFS\_IMPORTANCE} & constante & --- & motif $\to$ clé de cellule qu'il rend manquante~: \code{sexe} pour \code{sexe\_manquant} et \code{sexe\_hors\_modalites}, \code{segment} pour \code{segment\_manquant} \\
 \catalogue{fonctions-validation}{ETATS\_EVENEMENTS\_EXCLUS} & constante & --- & les cinq états des déclarations d'une ligne exclue \\
@@ -12565,7 +12906,15 @@ retirée en silence~: avant de réordonner, une valeur absente du vecteur
 d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que
 \code{character} arrêtent le calcul par une erreur de programmation
 (garde défensive, \code{valider\_plan()} refusant ces cas en amont)~; une
-étape absente du plan (plan sans \code{brut}) n'a rien à canoniser. Un
+étape absente du plan (plan sans \code{brut}) n'a rien à canoniser.
+Le paramètre \code{ordres} de l'étape \code{coherence\_regularite}, ensemble
+d'entiers en \code{double} sans catalogue de valeurs, est canonisé par tri
+croissant~: son entrée de la liste d'ordres est la marque
+\code{TRI\_NUMERIQUE} (\code{R/rapport.R}), et une valeur non
+\code{double}, un \code{NA}, un non fini, un doublon ou un attribut y
+sont une erreur de programmation (issue~\#144~; ADR 0011, annotation du
+12/11/2026, écart à la quatrième annotation, (c)~2, accepté~: la fonction
+lit cette marque, seule constante qui ne vienne pas de l'appelant). Un
 emboîtement de segments, s'il devient nécessaire avec plusieurs variables
 de segmentation, sera porté par un paramètre déclaré à part, jamais par
 l'ordre de \code{segmentation}. \textbf{Effet}~: les plans R1 à R6, déjà
@@ -14159,6 +14508,7 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{etape\_lissage} & Étape lissage~: lissage de Whittaker-Henderson et table lissée & etape & étape \code{lissage}~: \code{etapes/lissage}, précédée de mentions fixes selon la méthode (ci-dessous~; section~\ref{sec:lissage}) \\
 \code{etape\_}\allowbreak\code{positionnement} & Étape positionnement~: positionnement par SMR sur une table de référence et table positionnée & etape & étape \code{positionnement}~: \code{etapes/}\allowbreak\code{positionnement}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:positionnement-etape}) \\
 \code{etape\_}\allowbreak\code{homogeneite} & Étape homogeneite~: test d'homogénéité entre segments (tests du score conditionnels aux décès de chaque strate) & etape & étape \code{homogeneite}~: \code{etapes/homogeneite}, précédée d'une mention fixe (ci-dessous~; section~\ref{sec:homogeneite}) \\
+\code{etape\_coherence\_}\allowbreak\code{regularite} & Étape coherence\_regularite~: cohérence des taux et régularité de la table construite (Lignes directrices, chap.~4, II et III.1) & etape & étape \code{coherence\_regularite}~: \code{etapes/}\allowbreak\code{coherence\_regularite}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:coherence-regularite}) \\
 \code{etape\_validation} & Étape validation~: statistiques de validation de la table de référence prise telle quelle (titre propre à la relation sous \code{ajustee\_hors\_outil}, \code{positionnee} et \code{lissee}, ci-dessous) & etape & étape \code{validation}~: \code{etapes/validation}, précédée de mentions fixes (ci-dessous) \\
 \code{etape\_importance\_}\allowbreak\code{exclusions} & Étape importance\_exclusions~: importance des exclusions (volumes, événements, exposition et SMR des lignes exclues) & etape & étape \code{importance\_exclusions}~: \code{etapes/}\allowbreak\code{importance\_exclusions}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:importance-exclusions}) \\
 \code{table\_finale} & Table finale et comparaisons & non\_produite & \code{table}~: \code{NULL}, «~non produites par cette version~»~; autre valeur, refus (contrôle~4) \\
@@ -14347,7 +14697,17 @@ modeste~; la décision de regrouper reste à l'utilisateur et se déclare par
 la segmentation du plan. Aucune correction de multiplicité.~», puis de la
 mention d'unité sous la même condition (issue~\#168~; texte de la
 spécification, §~6, visé par \code{actuary}~; aucune mention «~les
-p-valeurs ne se combinent pas~», décision M302). La section \emph{étape validation},
+p-valeurs ne se combinent pas~», décision M302). La section \emph{étape
+coherence\_regularite}, quand l'étape est au plan, fait précéder ses tables
+de trois mentions fixes, sans mention d'unité (aucune observation lue)~:
+la portée (mention \code{coherence\_portee}, qui cite les Lignes
+directrices, section~\ref{sec:coherence-regularite}, «~Portée~»)~;
+«~Les tables de référence désignées sont évaluées côte à côte, par choix
+de l'outil~; la comparaison n'est pas prescrite par les Lignes
+directrices.~»~; et la convention d'âge de chaque table évaluée (colonne
+\code{convention\_age}~: la convention retenue pour la table construite~;
+pour une table de référence, non portée par l'objet, à vérifier dans sa
+source). La section \emph{étape validation},
 quand l'étape est au plan, porte un titre qui suit la relation déclarée
 (\code{titre\_section()}, lu dans l'objet, erreur de programmation pour
 une autre valeur~; ADR 0012, annotation du 07/11/2026, (b)~2)~: celui du
@@ -14854,7 +15214,8 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
-\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, grille d'inventaires en \code{Date} stockée en double, dans l'ordre reçu, délai en double, graine admise par \code{forme\_graine()} rendue en integer (issue~\#61), paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, restreint aux présents (un paramètre conditionnel, à la recette ou à la valeur d'un gouvernant, peut manquer~; ADR 0017, point~3.2), valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, une étape sans l'un de ses paramètres sans condition, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()}, et une fois par \code{rejouer\_fiche()} sur le plan de la fiche, à l'étape~6 du rejeu, avant son appel de \code{construire\_table()} (section~\ref{sec:rejeu}) \\
+\catalogue{fonctions-rapport}{TRI\_NUMERIQUE} & constante & --- & \code{"tri\_numerique"}~: marque de l'interface de \code{canoniser\_plan()}, tri croissant d'un champ ensemble d'entiers en \code{double} (\code{ordres} de \code{coherence\_regularite}~; section~\ref{sec:fiche}) \\
+\catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, grille d'inventaires en \code{Date} stockée en double, dans l'ordre reçu, délai en double, graine admise par \code{forme\_graine()} rendue en integer (issue~\#61), paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, restreint aux présents (un paramètre conditionnel, à la recette ou à la valeur d'un gouvernant, peut manquer~; ADR 0017, point~3.2), valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63), et de \code{ordres} de \code{coherence\_regularite} par tri croissant (\code{TRI\_NUMERIQUE}, issue~\#144)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, une étape sans l'un de ses paramètres sans condition, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()}, et une fois par \code{rejouer\_fiche()} sur le plan de la fiche, à l'étape~6 du rejeu, avant son appel de \code{construire\_table()} (section~\ref{sec:rejeu}) \\
 \catalogue{fonctions-rapport}{MENTION\_BIBLIOTHEQUE\_C\_NON\_RELEVEE} & constante & --- & mention «~non relevée~» de \code{fiche\$plateforme\$}\allowbreak\code{bibliotheque\_c}, quand la valeur lue est absente, \code{NA}, vide ou faite de blancs, ou n'est pas un texte (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{bibliotheque\_c()} & interne & versions des bibliothèques (par défaut celles de R~; paramètre pour les tests) & élément \code{iconv}, tel quel («~unknown~» compris), sinon la mention «~non relevée~» (constante ci-dessus)~; n'identifie la glibc que si la valeur commence par «~glibc~» (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{assembler\_fiche()} & interne & rôles, plan, recette, étapes, avertissements, empreintes, provenance, tables de référence (défaut \code{NULL}) & fiche de construction~: plan canonique, rôles dans l'ordre du catalogue, provenance dans l'ordre (\code{fichier}, \code{empreinte}, \code{algorithme}), \code{tables\_reference} reçu du contrôle des tables (\code{NULL} gardé comme élément)~; champ \code{hypotheses\_brut} si l'étape \code{brut} est exécutée~; champs réordonnés par \code{ordonner\_fiche()} selon \code{ORDRE\_CHAMPS\_FICHE} \\
@@ -17295,11 +17656,11 @@ E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, donn�
 E2.8 & pondération par les montants~: rôle refusé tant que ses intervalles ne sont pas spécifiés & \ref{sec:catalogue-roles} \\
 E2.9 & segmentation déclarée, vide explicite admis~; test d'homogénéité entre segments restitué comme diagnostic, sans verdict, la décision de regrouper restant à l'utilisateur & \ref{sec:plan}, \ref{sec:troncature-censure}, \ref{sec:homogeneite} \\
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
-E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; lissage de Whittaker-Henderson~(a), critère quadratique, d'après les Lignes directrices, chap.~3, IV.2, et~(b), vraisemblance de Poisson pénalisée sur $\ln\mu$, $\lambda$ déclaré ou choisi par la LAML, d'après Biessy (arXiv:2306.06932 v5)~; positionnement par SMR sur une table de référence (méthode~1), d'après II1291-12~; test d'homogénéité entre segments, d'après Breslow et Day (1987)~; statistiques de validation d'une table de référence prise telle quelle, de la table positionnée ou de la table lissée, d'après II1291-14 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:lissage}, \ref{sec:positionnement}, \ref{sec:validation}, \ref{sec:homogeneite} \\
+E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; lissage de Whittaker-Henderson~(a), critère quadratique, d'après les Lignes directrices, chap.~3, IV.2, et~(b), vraisemblance de Poisson pénalisée sur $\ln\mu$, $\lambda$ déclaré ou choisi par la LAML, d'après Biessy (arXiv:2306.06932 v5)~; positionnement par SMR sur une table de référence (méthode~1), d'après II1291-12~; test d'homogénéité entre segments, d'après Breslow et Day (1987)~; statistiques de validation d'une table de référence prise telle quelle, de la table positionnée ou de la table lissée, d'après II1291-14~; cohérence des taux et régularité de la table construite, d'après les Lignes directrices, chap.~4, II.1, II.3 et III.1 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:lissage}, \ref{sec:positionnement}, \ref{sec:validation}, \ref{sec:homogeneite}, \ref{sec:coherence-regularite} \\
 E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-groupes, SMR, signes, suites, intervalles (en partie~: statistiques écrites une fois et appliquées par l'étape \code{validation} aux observations de la construction~; la fonction de suivi sur de nouvelles observations viendra avec sa branche) & \ref{sec:validation-statistiques} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
-E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
+E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:coherence-regularite}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
