@@ -16,13 +16,13 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R14 sur l'entrée de chaque plan (jeu_reference(),
-#  jeu_reference_defauts() pour R9, agregats_reference() pour R13,
+#  3.8) : plans R1 à R17 sur l'entrée de chaque plan (jeu_reference(),
+#  jeu_reference_defauts() pour R9, agregats_reference() pour R13 et R17,
 #  stocks_reference() pour R14), aplatis, aller-retour exact du format,
 #  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
 #  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE, vide depuis la création de R13 et R14 par B15), aucune référence
-#  orpheline ;
+#  SANS_REFERENCE : R15 à R17 jusqu'à leur création au (R) de B19), aucune
+#  référence orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
 #  exclusions, table importée passée par tables_reference (#166) ; R9 : le
@@ -32,7 +32,9 @@
 #  (#168) ; R12 : le même test sous H0 vraie, transition en_cours -> rachat
 #  (#168, M307) ; R13 : recette agrégats sur la forme agrégats de l'entrée de
 #  référence (#169) ; R14 : recette stocks successifs sur la forme stocks de
-#  l'entrée de référence (#180) ; témoins sur des copies temporaires (jamais sur
+#  l'entrée de référence (#180) ; R15 à R17 : lissage de Whittaker-Henderson
+#  (a) et (b), coherence_regularite et validation de la table lissée (#223,
+#  #225, #144, #224) ; témoins sur des copies temporaires (jamais sur
 #  tests/reference/) ; règles des modes du workflow et lignes de commande
 #  produire_references.R (refus d'appel) et comparer_references.R ;
 #  permutation des lignes de l'entrée de référence
@@ -326,7 +328,7 @@ unlink(c(script, sortie))
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
 # référence sur son entrée (champ `entree`, point 4.1), aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R14, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R17, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
@@ -342,7 +344,11 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # R14 (#180, commit (4c) de B15 ; spécification de #180, § 13) : recette
 # stocks successifs ; créés par le commit de référence (R) de B15, après visa
 # d'actuary (M319), run CI 42637989632 (756fbfe).
-SANS_REFERENCE <- character(0)
+# R15 (#223, #144), R16 et R17 (#225) (B19, claude/lissage-whittaker ;
+# M415) : lissage de Whittaker-Henderson, coherence_regularite et validation
+# de la table lissée ; création au (R) de B19, sur la CI, après visa (issue
+# de création : celle de la méthode de lissage du plan).
+SANS_REFERENCE <- c(R15 = "#223", R16 = "#225", R17 = "#225")
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
@@ -785,14 +791,16 @@ controler_rapport_fige <- function(x, l, id) {
     e <- c(e, "U21 : rejeu")
   # Étape validation demandée (R8, #166) : le paragraphe « non demandée par le
   # plan » est absent, la section porte la légende des cellules et des
-  # statistiques, et l'étape importance_exclusions a sa section.
+  # statistiques, et l'étape importance_exclusions, si le plan la demande
+  # (R8 à R10 ; pas R15 à R17), a sa section.
   valid <- !is.null(x$etapes$validation)
+  importance <- !is.null(x$etapes$importance_exclusions)
   if (any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) == valid ||
       !any(grepl("<p>Table finale et comparaisons : non produites par cette version", l, fixed = TRUE))) e <- c(e, "U21 : sections 12 et 13")
   legende <- function(sec, chemin) any(startsWith(section_de(sec), paste0("<caption><code>", chemin, "</code>")))
   if (valid && !(legende("etape_validation", "etapes/validation/resultat/cellules") &&
                  legende("etape_validation", "etapes/validation/resultat/statistiques") &&
-                 legende("etape_importance_exclusions", "etapes/importance_exclusions/resultat/retraits")))
+                 (!importance || legende("etape_importance_exclusions", "etapes/importance_exclusions/resultat/retraits"))))
     e <- c(e, "U21 : sections validation et importance_exclusions")
   # U22 : section brut.
   b <- section_de("etape_brut")
@@ -808,13 +816,14 @@ controler_rapport_fige <- function(x, l, id) {
 
 # Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
 # distincte tirée une seule fois ; jeu_ref est l'entrée `reference` (R1 à R8,
-# R10 à R12), que les contrôles propres à un plan de cette entrée
+# R10 à R12, R15, R16), que les contrôles propres à un plan de cette entrée
 # (permutation, R6) lisent.
 entrees_ref <- entrees_des_plans(plans_reference())
 jeu_ref <- entrees_ref[["reference"]]
-verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts`, R13 sur `agregats_reference`, R14 sur `stocks_reference` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
+verifier("entrées des plans : R1 à R8, R10 à R12, R15, R16 sur `reference`, R9 sur `reference_defauts`, R13 et R17 sur `agregats_reference`, R14 sur `stocks_reference` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
   e <- unname(vapply(plans_reference(), function(p) p$entree, ""))
-  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L), "agregats_reference", "stocks_reference")
+  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L), "agregats_reference", "stocks_reference",
+               rep("reference", 2L), "agregats_reference")
   if (!identical(e, attendu))
     paste0("entrées des plans obtenues (", paste(e, collapse = ", "), ") contre attendues (", paste(attendu, collapse = ", "), ")")
   else if (!identical(names(entrees_ref), c("reference", "reference_defauts", "agregats_reference", "stocks_reference")))
@@ -922,14 +931,17 @@ verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
 })
 # Dénombrements en integer, sans clé (ADR 0009, seconde annotation du
 # 10/11/2026, (e) ; #199) : les 27 clés exactes des chemins de CHEMINS_199
-# sont retirées ; 148 clés, dont 41 exactes, restent.
-verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 148 clés dont 41 exactes (ADR 0009, point 9.6, (e))", {
+# sont retirées ; 148 clés, dont 41 exactes, restaient. Étape (R) de B19
+# (R15 à R17) : 21 clés de l'annotation du 12/11/2026, (e) (6 exactes) et 22
+# clés classées par actuary (13 exactes : 5 échos de lissage et 8 clés de
+# coherence_regularite ; avis du 12/11/2026) : 191 clés, dont 60 exactes.
+verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 191 clés dont 60 exactes (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e))", {
   cles_199 <- sub("^etapes/", "", unlist(CHEMINS_199, use.names = FALSE))
   restantes <- intersect(cles_199, names(TOLERANCES))
   if (length(cles_199) != 27L || anyDuplicated(cles_199)) "CHEMINS_199 : 27 chemins distincts attendus"
   else if (length(restantes)) paste("clés encore présentes :", paste(restantes, collapse = ", "))
-  else if (length(TOLERANCES) != 148L || sum(TOLERANCES == 0) != 41L)
-    sprintf("%d clés dont %d exactes, au lieu de 148 et 41", length(TOLERANCES), sum(TOLERANCES == 0))
+  else if (length(TOLERANCES) != 191L || sum(TOLERANCES == 0) != 60L)
+    sprintf("%d clés dont %d exactes, au lieu de 191 et 60", length(TOLERANCES), sum(TOLERANCES == 0))
   else TRUE
 })
 # Contrôle des types des dénombrements (ADR 0009, point 9.6, (f) ; #199, M396,
@@ -1488,7 +1500,7 @@ verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, to
   l <- imprimer_comparaison(r)
   e <- r$grandeurs[r$grandeurs$chemin == P_TAUX, ]
   sum(grepl("Écart relatif maximal, classe", l, fixed = TRUE, useBytes = TRUE)) == length(CLASSES_TOLERANCE) &&
-    length(CLASSES_TOLERANCE) == 4L &&
+    length(CLASSES_TOLERANCE) == 5L &&
     any(grepl(sprintf("%s | 149 | 1 | ", P_TAUX), l, fixed = TRUE, useBytes = TRUE)) &&
     any(grepl(sprintf("| %s | %s | 1e-14 | écart", e$avant, e$apres), l, fixed = TRUE, useBytes = TRUE)) &&
     identical(e$avant, sprintf("%.17g", avant$valeurs[[P_TAUX]][e$position])) &&
@@ -2736,9 +2748,19 @@ local({
 
 local({
   cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES, tablexp:::ordres_canoniques())
+  # Exception unique : R15 déclare ordres = c(3, 2, 1), non trié exprès
+  # (consigne d'actuary, étape (R) de B19), pour épingler la canonisation par
+  # tri croissant (TRI_NUMERIQUE ; #144) : canoniser_plan() ne change que ce
+  # paramètre, rendu c(1, 2, 3).
   for (id in names(plans_reference())) {
     p <- plans_reference()[[id]]$plan
-    verifier(sprintf("%s : plan de référence déjà canonique (canoniser_plan() le rend identical())", id), identical(cn(p), p))
+    if (id == "R15") {
+      q <- p
+      q$etapes$coherence_regularite$ordres <- c(1, 2, 3)
+      verifier("R15 : plan de référence canonique hors ordres déclaré c(3, 2, 1), que canoniser_plan() trie en c(1, 2, 3) (TRI_NUMERIQUE, #144)",
+               identical(p$etapes$coherence_regularite$ordres, c(3, 2, 1)) && identical(cn(p), q) && identical(cn(q), q))
+    } else
+      verifier(sprintf("%s : plan de référence déjà canonique (canoniser_plan() le rend identical())", id), identical(cn(p), p))
   }
   ch <- list(chemin = "s/n", nature = "ajout", type = "integer", longueur = 1L)
   t <- function(issue, plans) list(issue = issue, plans = plans, changements = list(ch))
@@ -2750,13 +2772,13 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R14 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R17 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R14, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R17, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant

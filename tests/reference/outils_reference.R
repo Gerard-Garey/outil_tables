@@ -15,7 +15,7 @@
 #  dans une session ni UTF-8 ni latin-1 est refusée, jamais convertie).
 #
 #  - plans_reference(), jeu_reference(), jeu_reference_defauts(),
-#    agregats_reference(), stocks_reference() : plans R1 à R14 et entrées de
+#    agregats_reference(), stocks_reference() : plans R1 à R17 et entrées de
 #    référence (points
 #    4.1 et 4.3 ; R6 : première annotation, (b) ; R7 : #32 ; R8 : #166, avec `tables_reference`, table importée en
 #    valeurs littérales ; R9 : #166, avec `entree`, une entrée par plan,
@@ -23,7 +23,9 @@
 #    validation de la table positionnée ; R11 : #168, test d'homogénéité entre
 #    segments ; R12 : #168, le même test sous H0 vraie ; R13 : #169, recette
 #    agrégats, entrée agregats_reference() ; R14 : #180, recette stocks
-#    successifs, entrée stocks_reference() ; plans de méthode, point 5.2) ;
+#    successifs, entrée stocks_reference() ; R15 à R17 : B19, lissage de
+#    Whittaker-Henderson (#223, #225), coherence_regularite (#144) et
+#    validation de la table lissée (#224) ; plans de méthode, point 5.2) ;
 #  - tirer_entree(nom), entrees_des_plans(plans) : tirage de l'entrée d'un
 #    plan, chaque entrée distincte une seule fois ;
 #  - aplatir_construction(x) : objet `construction` -> grandeurs (chemin,
@@ -88,14 +90,19 @@ TYPES_REFERENCE <- c("double", "integer", "logical", "character", "Date", "facto
 # les grandeurs de type double consultent cette table ; les autres types et
 # les lignes @ sont exacts par leur type. Toute modification est annotée
 # dans l'ADR 0009, datée, avec l'avis d'actuary (point 9.3).
-CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12, "1e-10" = 1e-10)
+# Classe `optimisation` (ADR 0009, annotation du 12/11/2026, (b) ; #225) :
+# 1e-3, constat de mesure (dix fois l'écart maximal mesuré sous perturbation
+# de l'ordre de l'arrondi, 3,88e-5, arrondi à la décimale supérieure),
+# chemins `lissage/*` seuls (M416, option (delta)) ; jugement
+# d'actuary-approfondi du 12/11/2026 sous M420, (4).
+CLASSES_TOLERANCE <- c(exacte = 0, "1e-14" = 1e-14, "1e-12" = 1e-12, "1e-10" = 1e-10, optimisation = 1e-3)
 # Aucune clé pour une grandeur de type integer (quatrième annotation, (b)) :
 # une clé la classerait aussi si elle redevenait double, et masquerait ce
 # retour à doubles_sans_tolerance().
 TOLERANCES <- c(
   # Aucune clé nue (#175) : toute clé commence par le nom de l'étape
-  # (`donnees`, `exposition`, `brut`, `positionnement`, `homogeneite`, `validation`,
-  # `importance_exclusions`) ou par
+  # (`donnees`, `exposition`, `brut`, `lissage`, `positionnement`, `homogeneite`,
+  # `coherence_regularite`, `validation`, `importance_exclusions`) ou par
   # `fiche/` (écho du plan et des hypothèses : fiche/plan/…,
   # fiche/hypotheses_<étape>/…). Une colonne de même nom d'une étape ultérieure
   # (#167, #168) ne reçoit ainsi aucune classe sans contrôle de complétude
@@ -286,7 +293,78 @@ TOLERANCES <- c(
   # écart relatif de U de l'ordre de eps A / |U|), puis T = U' V^- U,
   # z = U / sqrt(v) et pchisq(T, ddl)
   "homogeneite/resultat/tests/statistique" = 1e-10, "homogeneite/resultat/tests/p_asymptotique" = 1e-10,
-  "homogeneite/resultat/segments/z" = 1e-10)
+  "homogeneite/resultat/segments/z" = 1e-10,
+  # Lissage de Whittaker-Henderson (#223, #225 ; R15 à R17) et ddl effectifs
+  # de la validation `lissee` (#224) : clés de l'ADR 0009, annotation du
+  # 12/11/2026, (e) (liste d'actuary-approfondi). Toute clé commence par
+  # `lissage/` ou `validation/` (#175) ; aucune clé pour une grandeur integer
+  # (nombre d'itérations compris, point 9.6).
+  # optimisation (1e-3) : valeurs itérées sous (b) (PIRLS, lambda par la
+  # LAML), même chemin sous (a) (ADR 0017, point 8.3) ; résidus de
+  # conservation nuls à l'arrondi près sous (a), à la convergence du PIRLS près sous (b) : écart relatif sans objet, limite
+  # écrite en (d) 5 (règle absolue proposée en #243).
+  "lissage/resultat/table_lissee/qx" = 1e-3,
+  "lissage/resultat/table_lissee/borne_inf_credibilite" = 1e-3,
+  "lissage/resultat/table_lissee/borne_sup_credibilite" = 1e-3,
+  "lissage/resultat/table_lissee/levier" = 1e-3,
+  "lissage/resultat/segments/parametre_lissage" = 1e-3,
+  "lissage/resultat/segments/ddl_effectifs" = 1e-3,
+  "lissage/resultat/segments/regularite" = 1e-3,
+  "lissage/resultat/segments/laml" = 1e-3,
+  "lissage/resultat/segments/deviance_penalisee" = 1e-3,
+  "lissage/resultat/segments/residu_conservation_0" = 1e-3,
+  "lissage/resultat/segments/residu_conservation_1" = 1e-3,
+  # 1e-14 : sommes d'expositions hors de la plage
+  "lissage/diagnostics/exposition_centrale_hors_plage" = 1e-14,
+  "lissage/diagnostics/exposition_initiale_hors_plage" = 1e-14,
+  # exacte : paramètres déclarés
+  "lissage/parametres/plage_ages" = 0, "lissage/parametres/ordre_difference" = 0,
+  "lissage/parametres/niveau" = 0, "lissage/parametres/parametre_lissage" = 0,
+  "lissage/parametres/intervalle_lissage" = 0, "lissage/parametres/constantes/valeur" = 0,
+  # 1e-12 : ddl effectifs de la validation `lissee` (M416, option (delta) :
+  # les chemins de la validation gardent 1e-12)
+  "validation/parametres/ddl_effectifs/ddl_effectifs" = 1e-12,
+  "validation/parametres/ddl_effectifs/ddl_effectifs_retenus" = 1e-12,
+  # Avis d'actuary du 12/11/2026 (étape (R) de B19 ; troisième annotation
+  # du 11/11/2026, (d)) : doubles de R15 à R17 hors de la liste (e), classés
+  # par nature de calcul (point 3.4). Lissage sous (a) seulement (R15).
+  # 1e-14 : poids w = E^i / moyenne de E^i (quotient IEEE).
+  "lissage/resultat/table_lissee/poids" = 1e-14,
+  # 1e-12 : produits sous (a) seule, jamais itérés (hors du champ de la
+  # classe `optimisation`, troisième annotation du 11/11/2026, (c)) ; dix
+  # fois l'écart maximal mesuré sous 5 permutations (3,05e-14), avis
+  # d'actuary du 12/11/2026.
+  "lissage/resultat/segments/fidelite" = 1e-12,
+  "lissage/resultat/segments/critere" = 1e-12,
+  # Avis d'actuary du 12/11/2026 (étape (R) de B19) : écho des paramètres
+  # déclarés de lissage dans la fiche (fiche/plan/etapes/lissage/…), exacte,
+  # comme `validation/plage_ages`.
+  "lissage/plage_ages" = 0, "lissage/ordre_difference" = 0, "lissage/niveau" = 0,
+  "lissage/parametre_lissage" = 0, "lissage/intervalle_lissage" = 0,
+  # Avis d'actuary du 12/11/2026 (étape (R) de B19) : coherence_regularite
+  # (#144 ; R15). Étape sans libm (diff(), sommes, produits, un quotient).
+  # Toute clé commence par `coherence_regularite/` (#175).
+  # exacte : paramètres déclarés et leurs échos (ordres canonisé par tri,
+  # valeurs inchangées), ordre z recopié du plan, recopies de q de la table
+  # évaluée (aucune opération, comme `validation/resultat/cellules/qx_table`).
+  "coherence_regularite/parametres/plage_ages" = 0, "coherence_regularite/parametres/ordres" = 0,
+  "coherence_regularite/plage_ages" = 0, "coherence_regularite/ordres" = 0,
+  "coherence_regularite/resultat/regularite/ordre" = 0,
+  "coherence_regularite/resultat/ages/qx" = 0,
+  "coherence_regularite/resultat/ordre_segments/g_superieure" = 0,
+  "coherence_regularite/resultat/ordre_segments/g_inferieure" = 0,
+  # 1e-14 : différences (delta1, delta2, ecart), somme des carrés des
+  # différences d'ordre z (S_z), r = somme ab / somme b^2 et S^r = somme
+  # (a - r b)^2 : arithmétique IEEE de base. Annulation : une variation d'un
+  # ulp de q en amont se lit amplifiée (constat, lignes permutées de R15 :
+  # delta1 2,5e-11) ; sur la plateforme de référence, q est identique au bit
+  # près (même argument que (delta), annotation du 12/11/2026, (d) 1).
+  "coherence_regularite/resultat/ages/delta1" = 1e-14,
+  "coherence_regularite/resultat/ages/delta2" = 1e-14,
+  "coherence_regularite/resultat/ordre_segments/ecart" = 1e-14,
+  "coherence_regularite/resultat/regularite/regularite" = 1e-14,
+  "coherence_regularite/resultat/regularite/r_estime" = 1e-14,
+  "coherence_regularite/resultat/regularite/regularite_r" = 1e-14)
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 
@@ -310,6 +388,15 @@ GRAINE_MONTE_CARLO_R8 <- 20261107L  # Monte-Carlo de la validation de R8 et de R
 GRAINE_MONTE_CARLO_R10 <- 20261113L
 GRAINE_MONTE_CARLO_R11 <- 20261114L
 GRAINE_MONTE_CARLO_R12 <- 20261115L
+# R15 à R17 (B19, claude/lissage-whittaker ; M415) : Monte-Carlo de la
+# validation de la table lissée (relation lissee), une graine propre à chaque
+# plan, dans la plage de la porteuse [22011200 ; 22031199], k = 0
+# (tests/controles/graines_admises.csv) ; R16 et R17 sont lues aussi par
+# tests/mesures/tolerance_optimisation.R, qui a mesuré la classe
+# `optimisation` sur ces mêmes plans (#225 ; réemploi A1 consigné au CSV).
+GRAINE_MONTE_CARLO_R15 <- 22011201L
+GRAINE_MONTE_CARLO_R16 <- 22011202L
+GRAINE_MONTE_CARLO_R17 <- 22011203L
 ROLES_REFERENCE <- c(id_contrat = "id_contrat", id_tete = "id_tete", sexe = "sexe",
                      date_naissance = "date_naissance", date_entree = "date_entree",
                      date_sortie = "date_sortie", cause_sortie = "cause_sortie")
@@ -383,9 +470,9 @@ stocks_reference <- function()
   list(donnees = simuler_reference(forme = FORME_STOCKS_R14), roles = ROLES_STOCKS_R14)
 
 # Entrée d'un plan (champ `entree` de plans_reference() : le nom de l'entrée) :
-# `reference` (jeu_reference(), R1 à R8, R10 à R12), `reference_defauts`
+# `reference` (jeu_reference(), R1 à R8, R10 à R12, R15, R16), `reference_defauts`
 # (jeu_reference_defauts(), R9), `agregats_reference` (agregats_reference(),
-# R13) ou `stocks_reference` (stocks_reference(), R14). Un nom plutôt qu'une fonction, pour que l'outillage tire chaque entrée
+# R13, R17) ou `stocks_reference` (stocks_reference(), R14). Un nom plutôt qu'une fonction, pour que l'outillage tire chaque entrée
 # distincte une seule fois (entrees_des_plans()).
 tirer_entree <- function(nom)
   switch(nom, reference = jeu_reference(), reference_defauts = jeu_reference_defauts(),
@@ -455,6 +542,9 @@ tables_reference_r8 <- function() {
 # `graine` : étapes et graine facultatives (R8 ; R10 à R12 : #167, #168) ;
 # absents, le plan est celui de R1 à R7 (champs et ordre inchangés). Les
 # étapes sont écrites dans l'ordre d'ETAPES (R/construire_table.R).
+# `lissage` et `coherence` (R15 à R17 : #223, #225, #144) : NULL (étapes
+# absentes, plans R1 à R14 inchangés) ou les paramètres des étapes lissage et
+# coherence_regularite.
 # `inventaires` et `entree_entre_inventaires` (R14, #180) : NULL (champ et
 # paramètre absents, plans R1 à R13 inchangés) ou la grille et l'hypothèse
 # d'entrée de la recette des stocks successifs.
@@ -463,13 +553,16 @@ plan_reference <- function(transition = c("vivant", "deces"), segmentation = "se
                            estimateurs = c("poisson", "binomial"), niveau = 0.95,
                            exclusions = character(0), positionnement = NULL, homogeneite = NULL,
                            validation = NULL, importance = NULL, graine = NULL,
-                           inventaires = NULL, entree_entre_inventaires = NULL) {
+                           inventaires = NULL, entree_entre_inventaires = NULL,
+                           lissage = NULL, coherence = NULL) {
   exposition <- list(convention = convention, par_annee = par_annee)
   if (!is.null(entree_entre_inventaires)) exposition$entree_entre_inventaires <- entree_entre_inventaires
   etapes <- list(donnees = list(exclusions = exclusions), exposition = exposition,
                  brut = list(estimateurs = estimateurs, niveau = niveau))
+  if (!is.null(lissage)) etapes$lissage <- lissage
   if (!is.null(positionnement)) etapes$positionnement <- positionnement
   if (!is.null(homogeneite)) etapes$homogeneite <- homogeneite
+  if (!is.null(coherence)) etapes$coherence_regularite <- coherence
   if (!is.null(validation)) etapes$validation <- validation
   if (!is.null(importance)) etapes$importance_exclusions <- importance
   plan <- list(transition = list(depart = transition[1L], arrivee = transition[2L]),
@@ -490,8 +583,9 @@ plan_reference <- function(transition = c("vivant", "deces"), segmentation = "se
 tables_du_plan <- function(p) if (is.null(p$tables_reference)) NULL else p$tables_reference()
 
 # Un identifiant n'est jamais réemployé (point 4.3). `entree` : nom de
-# l'entrée du plan (tirer_entree()), `reference` pour R1 à R8, R10 à R12.
-# R13 (#169) : entrée `agregats_reference` ; R14 (#180) : `stocks_reference`.
+# l'entrée du plan (tirer_entree()), `reference` pour R1 à R8, R10 à R12,
+# R15 et R16. R13 (#169) et R17 (#225) : entrée `agregats_reference` ; R14
+# (#180) : `stocks_reference`.
 plans_reference <- function() {
   p <- function(id, description, plan, tables_reference = NULL, entree = "reference")
     list(identifiant = id, description = description, plan = plan, tables_reference = tables_reference,
@@ -509,6 +603,19 @@ plans_reference <- function() {
   validation_positionnee$relation_table <- "positionnee"
   # R11 (#168) et R12 (#168, M307) : test d'homogénéité entre segments (sexe), sous H0 fausse (R1) et vraie (R5).
   homogeneite <- list(plage_ages = c(20, 90), tranches_age = c(20, 50, 70), replications = 999)
+  # R15 à R17 (B19) : étapes lissage et coherence_regularite ; validation de
+  # la table lissée (relation lissee, sans table_reference), tranches et
+  # réplications de R8.
+  validation_lissee <- list(relation_table = "lissee", plage_ages = c(20, 90), tranches_age = c(20, 50, 70),
+                            niveau = 0.95, replications = 999)
+  lissage_r15 <- list(methode = "wh_quadratique", plage_ages = c(20, 90), ordre_difference = 3,
+                      critere_lissage = "declare", ponderation = "exposition", parametre_lissage = 1e4)
+  coherence_r15 <- list(tables_reference = "tv", plage_ages = c(20, 90), ordres = c(3, 2, 1),
+                        ordre_variable = "sexe", ordre_superieur = "H", ordre_inferieur = "F")
+  lissage_r16 <- list(methode = "wh_poisson", plage_ages = c(20, 90), ordre_difference = 3, critere_lissage = "laml",
+                      niveau = 0.95, intervalle_lissage = c(1, 1e12))
+  lissage_r17 <- list(methode = "wh_poisson", plage_ages = c(20, 90), ordre_difference = 3,
+                      critere_lissage = "declare", niveau = 0.95, parametre_lissage = 1e7)
   list(
     R1 = p("R1", "décès, référence principale", plan_reference()),
     R2 = p("R2", "sans segmentation, délai 90, niveau 0,99",
@@ -555,7 +662,34 @@ plans_reference <- function() {
     R14 = p("R14", "recette stocks successifs (forme stocks de l'entrée de référence, grille annuelle du 31/12/2014 au 31/12/2024, hypothèse d'entrée milieu ; Poisson, binomial, Kaplan-Meier)",
             plan_reference(estimateurs = c("poisson", "binomial", "kaplan_meier"), inventaires = INVENTAIRES_R14,
                            entree_entre_inventaires = "milieu"),
-            entree = "stocks_reference"))
+            entree = "stocks_reference"),
+    # R15 (#223, #144 ; ADR 0017, « Références nouvelles proposées » ; M415,
+    # M416 (2) ; visa d'actuary de #144) : Whittaker-Henderson (a), critère
+    # quadratique, pondération par l'exposition, h = 1e4 déclaré, z = 3 sur
+    # 20-90, convention dernier_anniversaire ; coherence_regularite sur la
+    # table construite et la table de R8 en comparaison, ordres déclarés
+    # c(3, 2, 1) non triés (exprès : la canonisation par tri croissant est
+    # ainsi épinglée), ordre H >= F ; validation de la table lissée ;
+    # aucune exclusion, sans importance_exclusions.
+    R15 = p("R15", "Whittaker-Henderson (a) pondéré par l'exposition (h = 1e4 déclaré, z = 3, 20-90, dernier_anniversaire), cohérence et régularité (table de R8 en comparaison, ordres 3, 2, 1, H >= F) et validation de la table lissée",
+            plan_reference(convention = "dernier_anniversaire", lissage = lissage_r15, coherence = coherence_r15,
+                           validation = validation_lissee, graine = GRAINE_MONTE_CARLO_R15),
+            tables_reference = tables_reference_r8),
+    # R16 (#225 ; M415) : Whittaker-Henderson (b), vraisemblance de Poisson
+    # pénalisée sur ln mu, lambda choisi par la LAML sur [1, 1e12], z = 3 sur
+    # 20-90, convention plus_fine ; validation de la table lissée. Plan
+    # repris exactement de tests/mesures/tolerance_optimisation.R (PLAN_R16),
+    # sur lequel la classe `optimisation` a été mesurée.
+    R16 = p("R16", "Whittaker-Henderson (b), Poisson pénalisée sur ln mu, lambda par la LAML sur [1, 1e12] (z = 3, 20-90), et validation de la table lissée",
+            plan_reference(lissage = lissage_r16, validation = validation_lissee, graine = GRAINE_MONTE_CARLO_R16)),
+    # R17 (#225 ; M415) : recette agrégats (seam « cellules », entrée de R13),
+    # convention dernier_anniversaire, Whittaker-Henderson (b), lambda = 1e7
+    # déclaré, z = 3 sur 20-90 ; validation de la table lissée. Plan repris
+    # exactement de tests/mesures/tolerance_optimisation.R (PLAN_R17).
+    R17 = p("R17", "recette agrégats (entrée de R13), Whittaker-Henderson (b), Poisson pénalisée sur ln mu, lambda = 1e7 déclaré (z = 3, 20-90), et validation de la table lissée",
+            plan_reference(convention = "dernier_anniversaire", lissage = lissage_r17, validation = validation_lissee,
+                           graine = GRAINE_MONTE_CARLO_R17),
+            entree = "agregats_reference"))
 }
 
 # --- aplatissement (points 1 et 2.3) ------------------------------------------
