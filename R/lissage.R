@@ -168,7 +168,7 @@ STATUTS_LISSAGE_POISSON <- local({
   bornes <- paste("intervalles bayésiens asymptotiques (approximation de Laplace), conditionnels au paramètre de",
                   "lissage retenu : theta^ ± z_alpha sqrt(diag((W + P)^-1)), z_alpha quantile d'ordre (1 + niveau) /",
                   "2 de la loi normale, image par q = 1 - exp(-exp(theta)) ; ce ne sont pas des intervalles de",
-                  "confiance ; couverture fréquentiste non établie (constat de simulation hors CI documenté)")
+                  "confiance ; couverture fréquentiste non établie (aucun constat de simulation versé)")
   l <- list(
     c("table_lissee/qx",
       paste("-expm1(-exp(theta^)), theta^ maximum de la vraisemblance de Poisson pénalisée (mode a posteriori),",

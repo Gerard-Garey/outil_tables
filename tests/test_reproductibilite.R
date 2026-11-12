@@ -543,6 +543,20 @@ TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
   transition_textes_245("#245", c("R15", "R16", "R17"), paste0(STATISTIQUES_245, "statut"), TEXTES_245$p_asym,
                         paste0(STATISTIQUES_245, "grandeur"), "p_asymptotique",
                         list(chemin = paste0(STATISTIQUES_245, "statistique"), valeurs = c("khi2_pearson", "deviance")))))
+# #246, R16 et R17 : statut des bornes de crédibilité de Whittaker-Henderson
+# (b), aucun constat versé (positions 3 et 4 de
+# etapes/lissage/parametres/statuts/statut).
+TEXTES_245$bornes <- list(
+  avant = utf8_245(paste(
+    "intervalles bayésiens asymptotiques (approximation de Laplace), conditionnels au paramètre de lissage",
+    "retenu : theta^ ± z_alpha sqrt(diag((W + P)^-1)), z_alpha quantile d'ordre (1 + niveau) / 2 de la loi",
+    "normale, image par q = 1 - exp(-exp(theta)) ; ce ne sont pas des intervalles de confiance ; couverture",
+    "fréquentiste non établie (constat de simulation hors CI documenté)")),
+  remplace = SANS_CONSTAT_245[1L], par = SANS_CONSTAT_245[2L])
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
+  transition_textes_245("#246", c("R16", "R17"), paste0(STATUTS_LISSAGE_245, "statut"), TEXTES_245$bornes,
+                        paste0(STATUTS_LISSAGE_245, "grandeur"),
+                        c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
