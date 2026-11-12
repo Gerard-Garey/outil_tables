@@ -921,7 +921,10 @@ même si la classe compte aussi \code{factor} (\code{a\_classe()} lirait
 pour une colonne \code{age}, \code{sexe} ou \code{annee} de classe
 \code{bytes} d'une table de référence, dont le contrôle des types est le
 même (\code{type\_conforme()}~; section~\ref{sec:table-reference}~;
-issue~\#150)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
+issue~\#150), et pour une table de référence entière de classe
+\code{bytes}, \code{details\$classe} portant la classe reçue
+(\code{classe\_bytes()} avant \code{is.data.frame()}~;
+section~\ref{sec:table-reference}~; issue~\#158)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
 de ses lois, de classe \code{bytes} (section~\ref{sec:loi-vraie}~;
 issue~\#150)~; \code{type\_non\_canonique} ou
 \code{serialisation\_impossible} pour une valeur écrite de classe
@@ -942,8 +945,8 @@ une classe \code{bytes} sur \code{plan/etapes}~:
 \code{etapes\_mal\_formees})~; ailleurs, témoin «~non déterminable~» ou
 «~différente~» (section~\ref{sec:rejeu}). Une classe d'encodage
 \code{bytes} est citée sous le repère de la règle ci-dessus.
-\textbf{Statut et limites}~: pour les données, les colonnes de rôle, les
-colonnes d'une table de référence et la loi du simulateur, \emph{lecture}
+\textbf{Statut et limites}~: pour les données, les colonnes de rôle, une
+table de référence et ses colonnes, et la loi du simulateur, \emph{lecture}
 du code (\code{classe\_bytes()} y précède toute fonction qui dispatche~;
 pour la loi vraie elle-même, \code{forme\_exacte()}, qui n'admet aucune
 classe, et noms des \code{details} lus par \code{attr()}) et
@@ -4202,7 +4205,22 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     en revanche ce contrôle~: c'est lui, table réellement employée, que
     portent l'empreinte et l'élément de fiche (une table passée au statut
     \code{embarquee} est ensuite refusée, \code{table\_embarquee\_absente}
-    ou \code{table\_embarquee\_discordante})~;
+    ou \code{table\_embarquee\_discordante}). Un attribut \code{nom} ou
+    \code{source} d'encodage \code{bytes} porté sur une table après le
+    constructeur est refusé à la reconstruction~(b), le constructeur le
+    refusant (section~\ref{sec:table-reference}, «~Encodage \code{bytes}
+    des métadonnées et de la table~»)~: raison «~refusé par
+    table\_reference() (motif [motif])~», \code{details\$motif\_constructeur}
+    \code{table\_nom\_manquant} ou \code{table\_source\_manquante},
+    \code{details\$chemin} manquant (issue~\#158~; il l'était
+    auparavant à l'écriture d'essai~(d), sous \code{chaine\_codage\_bytes}).
+    Un nom ou une valeur d'encodage \code{bytes} dans \code{parametres},
+    que le constructeur ne contrôle pas, est refusé à l'écriture
+    d'essai~(d)~: raison «~métadonnée sans écriture exacte dans la fiche
+    (refus chaine\_codage\_bytes, [chemin])~», \code{details\$lu} le motif
+    de l'écrivain, \code{details\$chemin}
+    \code{[clé]/parametres/[nom]} pour une valeur ou
+    \code{[clé]/parametres/@noms} pour un nom~;
   \item \textbf{clé citée et non reçue}, refus
     \code{table\_reference\_absente}~: une clé citée par un paramètre du
     plan (\code{cles\_citees()}, dans l'ordre de
@@ -6190,7 +6208,8 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
     \code{qx}), chacun une chaîne unique de forme exacte~--- sans attribut,
     noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
     section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
-    motif du champ~; issue~\#48)~---, et \code{parametres}~: une liste non vide est \textbf{requise}
+    motif du champ~; issue~\#48)~---, le nom et la source étant en outre
+    d'un encodage autre que \code{bytes} (ci-dessous), et \code{parametres}~: une liste non vide est \textbf{requise}
     pour une table synthétique, qui n'a d'autre provenance que sa loi, et
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
@@ -6215,6 +6234,46 @@ une colonne \code{sexe} de classe facteur, ce refus remplace l'erreur R
 «~translating strings with "bytes" encoding is not allowed~» que levait
 \code{anyNA()} (issue~\#150~; une colonne \code{age} ou \code{annee} de
 cette classe était déjà refusée sous ce motif).\par}
+
+\medskip
+\noindent
+\textbf{Encodage \code{bytes} des métadonnées et de la table}
+(issue~\#158, règle de l'issue~\#128). Une chaîne d'encodage
+\code{bytes} ne se convertit pas en UTF-8 sans deviner. Le nom et la
+source passent \code{chaine\_unique()}, qui admet une chaîne
+\code{bytes} (type \code{character}, aucun attribut), et
+s'écriraient dans la fiche, où l'écrivain les refuserait
+(\code{chaine\_codage\_bytes}, module \code{rapport},
+section~\ref{sec:serialisation}) après tous les calculs~; le
+constructeur les refuse donc dès l'entrée, sous le motif de l'argument,
+sans lire leurs octets ni les citer (\code{details} vide)~:
+\code{table\_nom\_manquant} pour le nom («~Le nom de la table de
+référence est une chaîne d'encodage «~bytes~», non convertible en UTF-8
+sans deviner~: il n'est pas lu. Passer un nom (chaîne non vide, sans
+attribut) sans encodage bytes.~»), \code{table\_source\_manquante} pour la
+source (même message, «~Table «~[nom]~»~: la source est\ldots~»). Le nom
+étant jugé le premier, un nom \code{bytes} est refusé quel que soit
+l'autre défaut de la table~; il n'est plus admis, ni cité sous le repère
+de la règle unique des refus (section~\ref{sec:refus}), comme il l'était
+depuis l'issue~\#111. Le statut et la forme d'origine, valeurs d'un
+ensemble fermé, sont refusés par \code{\%in\%} sous leur motif
+(\code{table\_statut\_inconnu}, \code{table\_forme\_inconnue}) sans
+erreur R~; une chaîne ASCII n'est jamais marquée \code{bytes} par R, si
+bien qu'une valeur admise ne peut pas porter cet encodage. Une table
+\code{x} dont la classe porte, à toute position, un élément d'encodage
+\code{bytes} est refusée sous \code{table\_mal\_formee}, avec un message
+propre («~la table porte une classe d'encodage «~bytes~» (classe
+[classes citées])~\ldots~») et \code{details\$classe} la classe reçue~:
+ce cas est jugé par \code{classe\_bytes()} avant \code{is.data.frame()},
+dont \code{inherits()} levait l'erreur R «~translating strings with
+"bytes" encoding is not allowed~» (un message «~un data.frame est
+attendu~» serait faux d'un data.frame sous-classé). Ordre des contrôles
+d'entrée~: nom, statut, source, paramètres, forme d'origine, classe
+\code{bytes}, puis \code{data.frame}. Les noms et les valeurs de
+\code{parametres} ne sont pas contrôlés par le constructeur~: une chaîne
+\code{bytes} y est refusée par l'écriture d'essai du contrôle des tables
+reçues (section~\ref{sec:tables-reference-recues}, «~Contrôle des tables reçues~», point~1~(d)),
+avant tout calcul.
 
 \medskip
 \noindent
@@ -6380,7 +6439,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques (section~\ref{sec:table-reference}) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158) \\
 \catalogue{fonctions-donnees}{TABLES\_EMBARQUEES} & constante & --- & catalogue des tables embarquées, liste nommée par \code{nom} d'objets \code{table\_reference} de statut \code{embarquee}~; vide dans cette version \\
 \catalogue{fonctions-donnees}{table\_embarquee()} & exportée & nom & table embarquée de ce nom, telle qu'au catalogue~; refus \code{table\_embarquee\_absente} (module \code{donnees}) d'un nom absent ou qui n'est pas une chaîne unique \\
 \end{longtable}
