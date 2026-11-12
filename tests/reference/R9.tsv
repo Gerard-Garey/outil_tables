@@ -11,14 +11,14 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 9V74 80-Core Processor
+# plateforme consignée : Processeur                    : INTEL(R) XEON(R) PLATINUM 8573C
 # plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 140a41b9371a1c2aab7985b214d37e9517753ed9
+# plateforme consignée : GITHUB_SHA                    : dc93db3a37ce26b85509898129510f02091547de
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
@@ -27,13 +27,13 @@
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
-# fiche$empreintes/resultat : 9fc808dee4b16ae3a6302677ef9eb6c2
-# fiche$empreintes/code : d7917f7f246ae52fa871ecb9fec94509
-# commit : 140a41b9371a1c2aab7985b214d37e9517753ed9
-# execution : 42982198441
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/42982198441
+# fiche$empreintes/resultat : 62b696e24aedd61bdaa0a84cb9b8e7ac
+# fiche$empreintes/code : 10c85a481a2ccae7e1d4165fe7a3f0b5
+# commit : dc93db3a37ce26b85509898129510f02091547de
+# execution : 43177654210
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/43177654210
 # mode : regeneration
-# date : 2026-11-11 07:48:59 UTC
+# date : 2026-11-12 07:46:22 UTC
 # empreinte des données : f21fed51a5f95db1c2774709df000ba2
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -197,7 +197,7 @@ etapes/validation/parametres/reference_methode	character	1	"note II1291-14 v1.4,
 etapes/validation/parametres/statuts_sous_groupes/@colonnes	character	2	"grandeur"	"statut"
 etapes/validation/parametres/statuts_sous_groupes/@lignes	integer	1	4
 etapes/validation/parametres/statuts_sous_groupes/grandeur	character	4	"smr"	"bornes_exactes"	"p_valeurs"	"p_valeurs_asymptotiques"
-etapes/validation/parametres/statuts_sous_groupes/statut	character	4	"résultat exact : O / A du sous-groupe (cellules retenues)"	"relation independante : exactes sous la loi supposée (O ~ Poisson, A fixe), p = 0 : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ; relation ajustee_hors_outil : non produites, p non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA"	"relation independante : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ; fonctions de répartition de Poisson (ppois), approximation numérique ; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité ; relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA"	"relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours calculée ; relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA"
+etapes/validation/parametres/statuts_sous_groupes/statut	character	4	"résultat exact : O / A du sous-groupe (cellules retenues)"	"relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) : exactes sous la loi supposée, O ~ Poisson(A) avec A fixe : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ; relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA"	"relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ; fonctions de répartition de Poisson (ppois), approximation numérique ; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de multiplicité ; relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA"	"relation independante : non produites, la loi de Poisson exacte du sous-groupe étant toujours calculée (table prise telle quelle, nombre p de paramètres estimés sur ces données nul) ; relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA"
 etapes/validation/resultat/@noms	character	5	"cellules"	"statistiques"	"sous_groupes"	"sequences_runs"	"monte_carlo"
 etapes/validation/resultat/cellules/@colonnes	character	18	"sexe"	"age"	"exposition_centrale"	"evenements"	"qx_table"	"taux_table"	"attendus"	"taux_brut"	"probabilite_brute"	"residu_reponse"	"residu_pearson"	"residu_deviance"	"fluctuation_inf_exacte"	"fluctuation_sup_exacte"	"fluctuation_inf_asymptotique"	"fluctuation_sup_asymptotique"	"tranche_age"	"etat"
 etapes/validation/resultat/cellules/@lignes	integer	1	142
