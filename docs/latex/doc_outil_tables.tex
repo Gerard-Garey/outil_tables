@@ -910,7 +910,10 @@ les noms lus par \code{attr()}, puis lu par position). Les contrôles des
 données et des rôles, l'écrivain unique, l'écriture de la fiche, le
 contrôle du rapport figé, le rejeu outillé, le constructeur des tables de
 référence et le simulateur les emploient, et refusent sous un motif nommé,
-à toute position du nom ou de l'élément \code{bytes} dans la classe~:
+à toute position du nom ou de l'élément \code{bytes} dans la classe (pour
+le simulateur, une classe \code{bytes} de la loi vraie ou de la table d'une
+de ses lois seulement~; un nom de colonne \code{bytes} de cette table reste
+hors de cette règle, ci-dessous)~:
 \code{donnees\_mal\_formees} pour des données de classe \code{bytes},
 \code{details\$classe} portant la classe reçue (issue~\#150)~;
 \code{type\_incompatible} pour une colonne de rôle de classe \code{bytes},
@@ -969,8 +972,8 @@ l'étape \code{importance\_}\allowbreak\code{exclusions} du module
 \code{calculer\_importance\_exclusions()}, pour \code{id\_tete}~;
 \emph{lecture} du code), ce qui fait lever l'erreur R (\emph{constat} pour
 \code{etats\_evenements\_exclus()} appelée directement sur une colonne
-\code{cause\_sortie} de ce nom, sous les locales C et C.UTF-8~; issue
-proposée au mainteneur). La préparation des données
+\code{cause\_sortie} de ce nom, sous les locales C et C.UTF-8~;
+issue~\#255). La préparation des données
 (\code{preparer\_donnees()}, fonction interne) lit au contraire ses
 colonnes de rôle par \code{lire\_champ()}~: appelée directement, elle lit
 une telle colonne sans erreur R et rend les mêmes observations et les
@@ -979,7 +982,15 @@ tests, chaque rôle des trois recettes et le chemin des exclusions~;
 issue~\#140). Ces deux cas, les fonctions exportées ne les atteignent
 pas~: \code{construire\_table()} et le rejeu refusent ce nom avant la
 première étape, au calcul des empreintes (\code{chaine\_codage\_bytes},
-module \code{rapport}).
+module \code{rapport}). Reste enfin hors de cette règle un cas que la
+fonction exportée \code{simuler\_portefeuille()} atteint~: une table d'une
+loi de la loi vraie dont un nom de colonne (\code{age}, \code{sexe} ou
+\code{qx}) est d'encodage \code{bytes} fait lever l'erreur R à la lecture
+\code{tab\$sexe} de \code{loi\_effective()} (module \code{simulation})
+au lieu d'un refus nommé (\emph{constat} de la revue finale de l'audit,
+remesuré sous les locales C et C.UTF-8 pour chacune des trois colonnes~;
+défaut antérieur, hors du champ de l'issue~\#150, qui porte sur les
+classes~; issue proposée au mainteneur).
 
 \subsection{Avertissements métier}
 \label{sec:avertissements}
@@ -4226,8 +4237,9 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     des métadonnées et de la table~»)~: raison «~refusé par
     table\_reference() (motif [motif])~», \code{details\$motif\_constructeur}
     \code{table\_nom\_manquant} ou \code{table\_source\_manquante},
-    \code{details\$chemin} manquant (issue~\#158~; il l'était
-    auparavant à l'écriture d'essai~(d), sous \code{chaine\_codage\_bytes}).
+    \code{details\$chemin} à \code{NA} (issue~\#158~; l'attribut était
+    auparavant refusé à l'écriture d'essai~(d), sous
+    \code{chaine\_codage\_bytes}).
     Un nom ou une valeur d'encodage \code{bytes} dans \code{parametres},
     que le constructeur ne contrôle pas, est refusé à l'écriture
     d'essai~(d)~: raison «~métadonnée sans écriture exacte dans la fiche
@@ -4887,7 +4899,7 @@ peut en différer au dernier bit, par les fonctions de la \code{libm}, et son
 rejeu y être refusé (\emph{possibilité} déduite de l'écriture, non
 mesurée~; ADR 0015, point~2.3)~; ses paramètres, dans la fiche, permettent
 alors au tiers de la recalculer et de mesurer l'écart, pour autant qu'ils
-aient été déclarés exactement~: déclarés par l'appelant, ils ne sont pas
+soient exacts~: déclarés par l'appelant, ils ne sont pas
 vérifiés par le moteur (section~\ref{sec:table-reference}, «~Statut des
 paramètres d'une table synthétique~»~; issue~\#163). Les
 témoins \textbf{signalent et ne refusent jamais}~:
