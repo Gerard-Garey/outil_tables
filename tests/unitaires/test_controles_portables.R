@@ -12,90 +12,11 @@ CONTROLES_ <- file.path(RACINE, "tests", "controles")
 # restent dans ce local(), hors de l'environnement du fichier de test.
 lecture_ <- local({
   # Analyse syntaxique d'un script de tests/controles/ (UTF-8), indépendante de
-  # la locale native (#213, suite de #206). En locale UTF-8 : parse(fichier,
-  # encoding = "UTF-8"). Sinon (mesuré sous LC_ALL=C, R 4.3.3), ce même appel accepte sans
-  # rien dire un fichier dont les octets ne sont pas de l'UTF-8 valide (en UTF-8,
-  # refusé dans un littéral : « EOF whilst reading MBCS char ») et avertit
-  # « unable to translate » pour chaque nom non ASCII (chaîne en position de nom
-  # d'argument : "délais" = ...), qu'il altère en « <U+00E9> » ; les littéraux non
-  # ASCII restent intacts. Le fichier est donc lu en octets UTF-8 (validUTF8() :
-  # sinon erreur) ; chaque caractère non ASCII est réécrit en échappement \U{...} (le
-  # parseur l'interprète sans traduction : chaîne ordinaire lue comme en UTF-8 ;
-  # sans effet dans un commentaire), puis le texte ASCII est analysé ; les
-  # numéros de ligne sont conservés. La réécriture lit autrement qu'en UTF-8 deux
-  # constructions, refusées (controler_non_ascii()) : un caractère non ASCII dans
-  # une chaîne brute (r"(...)"), et un caractère non ASCII précédé d'une barre
-  # oblique inverse dans une chaîne (échappement invalide en UTF-8). Limites : un
-  # nom (symbole, ou chaîne en position de nom d'argument) ne peut pas être natif
-  # hors UTF-8 ; parse() le traduit en « <U+00E9> » et avertit, avertissement
-  # écarté ici (seul son marqueur « <U+ » est écarté, tout autre avertissement
-  # passe). Un symbole non ASCII hors chaîne (nom de définition, d'appel) est
-  # refusé par le parseur. Divergence résiduelle : un symbole non ASCII entre
-  # accents graves est accepté en UTF-8 et refusé hors UTF-8 (parse() :
-  # « \Uxxxxxxxx sequences not supported inside backticks »), jamais accepté à
-  # tort hors UTF-8.
-  # Autre divergence (#213, constat d'audit) : dans une même chaîne,
-  # un échappement \x.. ou octal suivi d'un caractère non ASCII est refusé
-  # hors UTF-8 (« mixing Unicode and octal/hex escapes in a string is not
-  # allowed ») et accepté en UTF-8 : refus, jamais acceptation à tort.
-  # Un appel d'opérateur non ASCII (a %é% b) est lu hors UTF-8
-  # sous le nom littéral « %\U{e9}% » ; aucun tel opérateur ne peut être défini
-  # hors UTF-8 et le dépôt n'en contient aucun.
-  # Les noms non ASCII de ces scripts (étiquettes de cas, dans le corps d'une
-  # fonction de locale_c.R) ne sont exécutés par aucun cas de ce fichier.
-  session_utf8 <- function() isTRUE(l10n_info()[["UTF-8"]])
-  # Remplace chaque caractère non ASCII d'un vecteur de lignes UTF-8 par
-  # `par(points de code)`.
-  remplacer_non_ascii <- function(l, par) {
-    na <- grepl("[^\\001-\\177]", l, perl = TRUE, useBytes = TRUE)
-    l[na] <- vapply(l[na], function(s) {
-      cp <- utf8ToInt(s)
-      paste(ifelse(cp > 127L, par(cp), intToUtf8(cp, multiple = TRUE)), collapse = "")
-    }, "", USE.NAMES = FALSE)
-    l
-  }
-  # Refus des deux constructions que la réécriture en \U{...} lirait autrement
-  # qu'en UTF-8 (#206) : un caractère non ASCII dans une chaîne brute
-  # (r"(...)", R'[...]', avec ou sans tirets), où \U{e9} resterait le texte
-  # « \U{e9} » ; un caractère non ASCII précédé d'une barre oblique inverse dans
-  # une chaîne (échappement invalide en UTF-8, valide une fois réécrit). Les
-  # lignes sont analysées une fois avec un marqueur ASCII à la place de chaque
-  # caractère non ASCII : une barre oblique inverse devant le marqueur est un
-  # échappement invalide (erreur du parseur) ; un jeton chaîne commençant par r
-  # ou R qui contient le marqueur est une chaîne brute non ASCII.
-  # Marqueur en deux morceaux : le texte de ce bloc ne le contient pas, il reste
-  # lisible par lui-même (graines.R lit les fichiers de tests/, #213).
-  MARQUEUR_NON_ASCII <- paste0("QNONASCII", "Q")
-  controler_non_ascii <- function(l) {
-    if (any(grepl(MARQUEUR_NON_ASCII, l, fixed = TRUE)))
-      stop("le texte contient le marqueur interne ", MARQUEUR_NON_ASCII, " : lecture impossible", call. = FALSE)
-    e <- tryCatch(parse(text = remplacer_non_ascii(l, function(cp) MARQUEUR_NON_ASCII), keep.source = TRUE),
-                  error = function(e)
-                    stop("échappement invalide devant un caractère non ASCII, ou syntaxe (non ASCII remplacé par ",
-                         MARQUEUR_NON_ASCII, " pour l'analyse) : ", conditionMessage(e), call. = FALSE))
-    pd <- utils::getParseData(e, includeText = NA)
-    if (is.null(pd)) return(invisible(NULL))
-    s <- pd[pd$token == "STR_CONST", , drop = FALSE]
-    if (!nrow(s)) return(invisible(NULL))
-    texte <- utils::getParseText(pd, s$id)
-    brute <- grepl("^[rR]", texte) & grepl(MARQUEUR_NON_ASCII, texte, fixed = TRUE)
-    if (any(brute))
-      stop(sprintf("caractère non ASCII dans une chaîne brute (ligne %s) : lue hors UTF-8 comme du texte échappé, refusée",
-                   paste(s$line1[brute], collapse = ", ")), call. = FALSE)
-    invisible(NULL)
-  }
-  source_ascii <- function(fichier) {
-    l <- readLines(fichier, encoding = "UTF-8", warn = FALSE)
-    if (!all(validUTF8(l))) stop("octets non UTF-8 dans ", basename(fichier), call. = FALSE)
-    if (any(grepl("[^\\001-\\177]", l, perl = TRUE, useBytes = TRUE))) controler_non_ascii(l)
-    remplacer_non_ascii(l, function(cp) sprintf("\\U{%x}", cp))
-  }
-  analyser_fichier <- function(fichier, keep.source) {
-    if (session_utf8()) return(parse(fichier, keep.source = keep.source, encoding = "UTF-8"))
-    withCallingHandlers(parse(text = source_ascii(fichier), keep.source = keep.source),
-                        warning = function(w)
-                          if (grepl("<U+", conditionMessage(w), fixed = TRUE)) invokeRestart("muffleWarning"))
-  }
+  # la locale native (#213, suite de #206) : analyser_fichier() et source_ascii()
+  # sont celles de tests/controles/lecture_utf8.R (#228), chargé ici, dans ce
+  # local(). Les noms non ASCII de ces scripts (étiquettes de cas, dans le corps
+  # d'une fonction de locale_c.R) ne sont exécutés par aucun cas de ce fichier.
+  sys.source(file.path(CONTROLES_, "lecture_utf8.R"), envir = environment())
   list(analyser_fichier = analyser_fichier, source_ascii = source_ascii)
 })
 charger_ <- function(script, env, dossier = CONTROLES_) {
@@ -144,6 +65,112 @@ verifier("charger_ : sous LC_ALL=C, un script qui n'est pas de l'UTF-8 valide es
          if (any(r_$sortie == "UTF-8 : FALSE ") && any(grepl("^RESULTAT : octets non UTF-8", r_$sortie, useBytes = TRUE))) TRUE
          else paste(r_$sortie, collapse = " | "))
 unlink(c(dossier_octets_, lanceur_), recursive = TRUE)
+
+# --- une seule définition de la lecture (#228) ---------------------------------
+# Avant #228, analyser_fichier() et ses cinq auxiliaires étaient recopiés dans six
+# fichiers, sans contrôle d'identité. Ils sont dans lecture_utf8.R seul : aucun des
+# six fichiers ne les redéfinit, et chacun charge ce fichier par un appel
+# sys.source() qui le nomme. Contrôle sur l'arbre d'analyse : une indentation par
+# tabulation, une affectation par = ou un assign() ne lui échappent pas, un
+# commentaire ne compte pas. Les quatre contrôles portent en outre un chargeur
+# local({...}) recopié : leurs quatre blocs sont identiques.
+NOMS_LECTURE_ <- c("session_utf8", "remplacer_non_ascii", "controler_non_ascii", "source_ascii",
+                   "analyser_fichier", "MARQUEUR_NON_ASCII")
+# Noms de NOMS_LECTURE_ définis (<-, =, <<-, ->, assign()) dans des expressions analysées.
+definitions_lecture_ <- function(ex) {
+  trouvees <- character(0)
+  retenir <- function(n) if (!is.na(n) && n %in% NOMS_LECTURE_) trouvees <<- c(trouvees, n)
+  visiter <- function(e) {
+    if (is.call(e) || is.pairlist(e)) {
+      if (is.call(e)) {
+        f <- e[[1L]]
+        if (is.symbol(f) && as.character(f) %in% c("<-", "=", "<<-") && length(e) == 3L &&
+            (is.symbol(e[[2L]]) || (is.character(e[[2L]]) && length(e[[2L]]) == 1L)))
+          retenir(as.character(e[[2L]]))
+        if ((is.symbol(f) && identical(as.character(f), "assign")) ||
+            (is.call(f) && length(f) == 3L && identical(as.character(f[[3L]]), "assign")))
+          for (k in seq_along(e)[-1L])
+            if (!identical(e[[k]], quote(expr = )) && is.character(e[[k]]) && length(e[[k]]) == 1L) retenir(e[[k]])
+      }
+      for (k in seq_along(e)) if (!identical(e[[k]], quote(expr = ))) visiter(e[[k]])
+    }
+    invisible(NULL)
+  }
+  for (e in ex) visiter(e)
+  trouvees
+}
+# Vrai si une expression de premier niveau contient un appel sys.source() et le
+# littéral "lecture_utf8.R" (dans le même chargeur ou le même appel).
+charge_lecture_ <- function(ex) {
+  contient <- function(e, test) {
+    if (test(e)) return(TRUE)
+    if (is.call(e) || is.pairlist(e))
+      for (k in seq_along(e)) if (!identical(e[[k]], quote(expr = )) && contient(e[[k]], test)) return(TRUE)
+    FALSE
+  }
+  appel_sys_source <- function(x) is.call(x) && is.symbol(x[[1L]]) && identical(as.character(x[[1L]]), "sys.source")
+  nom_fichier <- function(x) is.character(x) && length(x) == 1L && identical(x, "lecture_utf8.R")
+  any(vapply(as.list(ex), function(e) contient(e, appel_sys_source) && contient(e, nom_fichier), NA))
+}
+# Noms des blocs (liste nommée de vecteurs de lignes) qui diffèrent du bloc le plus fréquent.
+divergents_ <- function(blocs) {
+  cles <- vapply(blocs, paste, "", collapse = "\n")
+  modal <- names(which.max(table(cles)))
+  names(blocs)[cles != modal]
+}
+# Témoins négatifs : les trois formes qu'une recherche ligne à ligne en `<-` laissait passer, plus
+# `<<-` et la forme qualifiée de assign() ; aucune fausse alerte sur un paramètre par défaut, un
+# argument nommé, une chaîne ou un commentaire.
+for (cas_ in list(
+  list("affectation par =", "analyser_fichier = function(f, k) parse(f)", "analyser_fichier"),
+  list("indentation par tabulation", "\tsource_ascii <- function(f) 1", "source_ascii"),
+  list("assign()", "assign(\"session_utf8\", function() TRUE)", "session_utf8"),
+  list("assign() qualifié", "base::assign(\"controler_non_ascii\", 1)", "controler_non_ascii"),
+  list("<<- dans une fonction", "f <- function() { MARQUEUR_NON_ASCII <<- 1 }", "MARQUEUR_NON_ASCII"),
+  list("paramètre par défaut (aucune alerte)", "g <- function(a, remplacer_non_ascii = 1) a", character(0)),
+  list("argument nommé, chaîne et commentaire (aucune alerte)",
+       c("l <- list(analyser_fichier = analyser_fichier)", "x <- \"source_ascii <- 1\"  # session_utf8 <- 1"), character(0))))
+  verifier(sprintf("lecture : redéfinition détectée sur l'arbre d'analyse (%s)", cas_[[1L]]),
+           identical(definitions_lecture_(parse(text = cas_[[2L]], keep.source = FALSE)), cas_[[3L]]))
+for (cas_ in list(
+  list("sys.source nommant le fichier", "sys.source(file.path(a, \"lecture_utf8.R\"), envir = e)", TRUE),
+  list("chargeur local() à chemin intermédiaire",
+       c("local({", "  p <- file.path(d, \"lecture_utf8.R\")", "  sys.source(p, envir = e)", "})"), TRUE),
+  list("sys.source qui ne nomme pas le fichier", "sys.source(p, envir = e)", FALSE),
+  list("nom sans appel", "p <- \"lecture_utf8.R\"", FALSE),
+  list("appel en commentaire", "# sys.source(\"lecture_utf8.R\", envir = e)", FALSE)))
+  verifier(sprintf("lecture : chargement de lecture_utf8.R détecté sur l'arbre d'analyse (%s)", cas_[[1L]]),
+           identical(charge_lecture_(parse(text = cas_[[2L]], keep.source = FALSE)), cas_[[3L]]))
+verifier("lecture : divergents_() nomme le bloc qui diffère des autres",
+         identical(divergents_(list(a = c("x", "y"), b = c("x", "y"), c = c("x", "z"), d = c("x", "y"))), "c") &&
+           identical(divergents_(list(a = "x", b = "x")), character(0)))
+for (fichier_ in c("tests/controles/graphe_modules.R", "tests/controles/recettes_invariant.R",
+                   "tests/controles/messages_refus.R", "tests/controles/graines.R",
+                   "tests/test_unitaires.R", "tests/unitaires/test_controles_portables.R")) {
+  ex_ <- lecture_$analyser_fichier(file.path(RACINE, fichier_), keep.source = FALSE)
+  redefinies_ <- definitions_lecture_(ex_)
+  verifier(sprintf("%s : la lecture n'est pas redéfinie, le fichier charge lecture_utf8.R par sys.source()", fichier_),
+           if (length(redefinies_)) paste("redéfinies :", paste(redefinies_, collapse = " | "))
+           else if (!charge_lecture_(ex_)) "aucun appel sys.source() qui nomme lecture_utf8.R" else TRUE)
+}
+# Chargeur local({...}) des quatre contrôles : de la ligne « local({ » qui précède la mention de
+# lecture_utf8.R à la ligne « }) » suivante.
+chargeurs_ <- lapply(c(graphe_modules = "graphe_modules.R", recettes_invariant = "recettes_invariant.R",
+                       messages_refus = "messages_refus.R", graines = "graines.R"), function(s) {
+  l_ <- readLines(file.path(CONTROLES_, s), encoding = "UTF-8", warn = FALSE)
+  debuts_ <- grep("^local\\(\\{$", l_)
+  debuts_ <- debuts_[vapply(debuts_, function(i) any(grepl("lecture_utf8.R", l_[i:min(i + 12L, length(l_))], fixed = TRUE)), NA)]
+  fins_ <- grep("^\\}\\)$", l_)
+  if (length(debuts_) != 1L || !any(fins_ > debuts_)) return(NULL)
+  l_[debuts_:min(fins_[fins_ > debuts_])]
+})
+manquants_ <- names(chargeurs_)[vapply(chargeurs_, is.null, NA)]
+verifier("lecture : chacun des quatre contrôles porte un seul chargeur local({...}) de lecture_utf8.R",
+         if (length(manquants_)) paste("chargeur introuvable ou multiple :", paste(manquants_, collapse = ", ")) else TRUE)
+verifier("lecture : les quatre chargeurs local({...}) des contrôles sont identiques",
+         if (length(manquants_)) "chargeur introuvable"
+         else if (length(divergents_(chargeurs_))) paste("chargeur divergent :", paste(divergents_(chargeurs_), collapse = ", "))
+         else TRUE)
 
 # --- avec_environnement ---------------------------------------------------------
 
