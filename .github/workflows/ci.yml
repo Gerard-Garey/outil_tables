@@ -47,6 +47,18 @@ jobs:
           exit $statut
       - name: Fiches -approfondi à jour
         run: bash .claude/outils/fiches_jumelles.sh --verifier
+      # Issue #230 : témoins de .claude/outils/branche_de_travail.sh (ADR 0013,
+      # annotation du 11/11/2026). Autonomes : dépôt git temporaire, PR et
+      # feuille de route simulées, gh et curl factices ; aucun accès au réseau,
+      # ni à une branche distante, ni à l'état d'une PR ouverte (le job tourne
+      # aussi sur main). Python 3 et git sont ceux de l'exécuteur. Le script
+      # lui-même, lancé sur la branche réelle, reste un contrôle de session
+      # (CLAUDE.md, « Git et GitHub ») : il suppose un `git fetch origin`
+      # préalable et lit les PR par l'API (réserve r1 de l'audit de #137,
+      # PR #219). Réserve r2 (forme du marqueur de vague) : documentée par
+      # l'ADR 0013, annotation du 11/11/2026, point (a), et par M403.
+      - name: Témoins du contrôle de la branche de travail
+        run: bash .claude/outils/branche_de_travail_temoins.sh
       - name: Aucun fichier sensible versionné
         run: |
           set -euo pipefail
