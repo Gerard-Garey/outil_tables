@@ -102,3 +102,20 @@ Rédigée par `architect-approfondi` au commit (0) de la porteuse de la vague li
 **Effet sur les résultats : aucun.**
 
 Issues : #137. Décisions M193, M194, M403, M404. Commits `8183c8e`, `9697f0c`.
+
+## Annotation du 12 novembre 2026 — point 7 : retrait du marqueur de vague à la fin d'une vague (M428)
+
+Rédigée par `architect` au commit (0) de la vingtième branche `claude/suites-bytes` (partie de `main` à `16131cb`), sur la décision du mainteneur du 12/11/2026 (M428, D7 du point d'étape qui suit B19). Annotation de **précision** du point 7 et de l'annotation du 11/11/2026, (a) : le texte ci-dessus n'est pas réécrit.
+
+**Constat** (*vérifié* le 12/11/2026 à `16131cb`). La porteuse fusionne en dernier (point 4) et elle seule écrit la feuille de route (point 2) : le marqueur de vague et le tableau des branches ouvertes qu'elle porte arrivent donc sur `main` par sa fusion, alors que la vague expire à cette même fusion (point 7). À `16131cb`, `bash .claude/outils/branche_de_travail.sh claude/lissage-consolidation` concluait encore à une vague déclarée (marqueur de la vague lissage, trois branches au tableau). Conséquences : une branche nouvelle y est signalée « absente du tableau » ; une session qui lit la feuille de `main` peut croire la vague ouverte.
+
+**Précision.**
+1. Quand aucune autre branche de la vague n'est ouverte, la porteuse retire le marqueur et le tableau des branches ouvertes à sa consignation de fin, avant la sortie du brouillon ; la feuille garde une phrase qui date la fin de la vague et renvoie au SHA où le tableau se lit. Le contrôle `--avant-fusion` de la porteuse s'applique alors hors vague (règle ordinaire : seule PR brouillon `claude/` ouverte vers `main`, ou PR non brouillon admise par `--avant-fusion`).
+2. À défaut, le commit (0) de la branche suivante retire le marqueur et le tableau ; la session ne lance `branche_de_travail.sh` sur cette branche qu'après ce commit (sur l'arbre de travail de la branche), puis ouvre la PR brouillon.
+3. Le retrait ne vaut ni prolongation, ni clôture anticipée : la vague a expiré à la fusion de sa dernière branche (point 7) ; il met la forme lue par le script en accord avec cet état.
+
+**Application.** Vague lissage : marqueur et tableau retirés par le commit (0) de `claude/suites-bytes` (cas 2) ; texte intégral à `16131cb` (`git show 16131cb:docs/feuille-de-route.md`, § 1).
+
+**Effet sur les résultats : aucun.**
+
+Issues : #137, #230. Décisions M404, M422, M428. Commit de référence `16131cb`.
