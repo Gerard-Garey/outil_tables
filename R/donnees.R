@@ -2073,9 +2073,10 @@ FORMES_ORIGINE <- c("qx", "lx")
 # data.frame long : age entier, sexe, qx, et annee entier si fournie) et la
 # contrôle ; refuse (module donnees) au lieu de corriger. Lignes rendues dans
 # l'ordre canonique (sexe, annee, age), row.names automatiques.
-#   x            : data.frame (age, sexe, qx [, annee]) ;
-#   nom, source  : chaînes non vides (source : arrêté, URL, fichier de
-#                  provenance) ;
+#   x            : data.frame (age, sexe, qx [, annee]), dont la classe ne porte
+#                  aucune chaîne d'encodage « bytes » (#158) ;
+#   nom, source  : chaînes non vides, d'encodage autre que « bytes » (#158 ;
+#                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
 #   parametres   : liste non vide des paramètres pour une table synthétique,
 #                  NULL sinon ;
@@ -2083,6 +2084,18 @@ FORMES_ORIGINE <- c("qx", "lx")
 table_reference <- function(x, nom, statut, source, parametres = NULL, forme_origine = "qx") {
   if (!chaine_unique(nom))
     refuser("donnees", "table_nom_manquant", formuler("La table de référence doit avoir un nom (chaîne non vide, sans attribut)."))
+  # Chaîne d'encodage « bytes » (#158 ; règle de #128) : chaine_unique() l'admet
+  # (type character, aucun attribut), et le nom ou la source serait écrit dans
+  # la fiche, où octets_chaines() la refuse (chaine_codage_bytes) après tous les
+  # calculs ; refus ici, sous le motif de l'argument, sans lire les octets.
+  # statut et forme_origine, valeurs d'un ensemble fermé, sont déjà refusés par
+  # %in% (mesuré). Le nom et la source bytes ne se citent pas (refus sans
+  # details) ; details$statut et details$classe portent, eux, la valeur reçue
+  # (précédent de controler_roles(), #150).
+  if (Encoding(nom) == "bytes")
+    refuser("donnees", "table_nom_manquant",
+            formuler(paste("Le nom de la table de référence est une chaîne d'encodage « bytes », non convertible en UTF-8",
+                           "sans deviner : il n'est pas lu. Passer un nom (chaîne non vide, sans attribut) sans encodage bytes.")))
   # Nom cité dans les messages : règle neutraliser_citation() (R/outils.R ;
   # #111, #94) ; `nom` lui-même reste celui de l'objet.
   nom_cite <- citer(nom)
@@ -2093,6 +2106,10 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (!chaine_unique(source))
     refuser("donnees", "table_source_manquante",
             formuler("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom_cite))
+  if (Encoding(source) == "bytes")
+    refuser("donnees", "table_source_manquante",
+            formuler(paste("Table « %s » : la source est une chaîne d'encodage « bytes », non convertible en UTF-8 sans deviner :",
+                           "elle n'est pas lue. Passer une source (chaîne non vide, sans attribut) sans encodage bytes."), nom_cite))
   if (statut == "synthetique" && (!is.list(parametres) || !length(parametres)))
     refuser("donnees", "table_parametres_manquants",
             formuler("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom_cite))
@@ -2102,6 +2119,17 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (!chaine_unique(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
     refuser("donnees", "table_forme_inconnue",
             formuler("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(FORMES_ORIGINE)))
+  # Classe d'encodage « bytes » lue par classe_bytes() avant is.data.frame(),
+  # dont inherits() lève une erreur R sur elle (#158, #150) ; refus propre à ce
+  # cas, comme controler_roles() (« un data.frame est attendu » serait faux
+  # d'un data.frame sous-classé).
+  if (classe_bytes(x))
+    refuser("donnees", "table_mal_formee",
+            formuler(paste("Table « %s » : la table porte une classe d'encodage « bytes » (classe %s), non convertible en UTF-8",
+                           "sans deviner : elle n'est pas lue. Passer un data.frame dont la classe ne porte aucune chaîne",
+                           "d'encodage bytes."),
+                     nom_cite, paste(citer(class(x)), collapse = "/")),
+            list(classe = class(x)))
   if (!is.data.frame(x))
     refuser("donnees", "table_mal_formee", formuler("Table « %s » : un data.frame est attendu.", nom_cite))
   colonnes <- c("age", "sexe", "qx", if ("annee" %in% names(x)) "annee")

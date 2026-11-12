@@ -1027,11 +1027,11 @@ for (k in names(CHAINES_ATTR)) {
 }
 verifier("table_reference : nom, statut, source et forme_origine nus admis (inchangé)",
          inherits(tr(forme_origine = "qx"), "table_reference"))
-# Nom au codage bytes (#111) : cité sous un repère dans le message, sans erreur R ;
-# le nom de l'objet reste celui reçu. Pour un nom ordinaire, le texte est inchangé.
+# Défauts de la table, jugés après le nom : un nom ordinaire laisse venir le refus
+# propre à chaque défaut (contre-épreuve du refus du nom bytes, #158).
 TR_SEXE <- TR; TR_SEXE$sexe[1L] <- "Z"
 TR_EN_PLUS <- TR; TR_EN_PLUS$zz <- 1
-NOM_BYTES_CAS <- list(
+DEFAUTS_TABLE <- list(
   list("statut inconnu", list(statut = "zzz"), "table_statut_inconnu"),
   list("source vide", list(source = ""), "table_source_manquante"),
   list("paramètres manquants", list(parametres = NULL), "table_parametres_manquants"),
@@ -1040,44 +1040,124 @@ NOM_BYTES_CAS <- list(
   list("x non data.frame", list(x = 1), "table_mal_formee"),
   list("colonne inconnue", list(x = TR_EN_PLUS), "table_colonne_inconnue"),
   list("sexe hors modalités", list(x = TR_SEXE), "table_sexe_hors_modalites"))
-for (k in NOM_BYTES_CAS) {
+# Nom au codage bytes (#158, règle de #128 ; avant, #111 le citait sous un repère
+# et l'admettait) : refus table_nom_manquant dès l'entrée, avant tout autre
+# contrôle de la table (donc quel que soit le défaut), message d'une ligne marqué
+# UTF-8, sans erreur R, aucune valeur citée ; refus plutôt que l'écriture de la
+# fiche, où octets_chaines() le refuserait (chaine_codage_bytes) après les calculs.
+ligne_utf8 <- function(r) !grepl("[\n\v\f]", conditionMessage(r)) && identical(Encoding(conditionMessage(r)), "UTF-8")
+for (k in c(list(list("aucun défaut", list(), NA_character_)), DEFAUTS_TABLE)) {
   x <- refus(do.call(tr, c(list(nom = OCTETS), k[[2]])))
-  verifier(sprintf("table_reference : nom au codage bytes, %s -> refus %s, nom remplacé par un repère", k[[1]], k[[3]]),
-           identical(x$motif, k[[3]]) && isTRUE(contient(x, "Table « <chaîne d'encodage bytes> »")) ||
-             identical(x$motif, k[[3]]) && isTRUE(contient(x, "Table synthétique « <chaîne d'encodage bytes> »")))
-  y <- refus(do.call(tr, c(list(nom = "essai"), k[[2]])))
-  verifier(sprintf("table_reference : nom ordinaire, %s -> même refus, nom cité tel quel", k[[1]]),
-           identical(y$motif, k[[3]]) &&
-             identical(conditionMessage(y), sub("<chaîne d'encodage bytes>", "essai", conditionMessage(x), fixed = TRUE)))
+  verifier(sprintf("table_reference : nom au codage bytes, %s -> refus table_nom_manquant, message propre, sans valeur citée", k[[1]]),
+           identical(x$motif, "table_nom_manquant") && identical(x$module, "donnees") && ligne_utf8(x) &&
+             isTRUE(contient(x, "Le nom de la table de référence est une chaîne d'encodage « bytes »", "sans deviner",
+                             "sans encodage bytes")) &&
+             !grepl("<chaîne d'encodage bytes>", conditionMessage(x), fixed = TRUE))
+  if (!is.na(k[[3]])) {
+    y <- refus(do.call(tr, c(list(nom = "essai"), k[[2]])))
+    verifier(sprintf("table_reference : nom ordinaire, %s -> refus %s (contre-épreuve)", k[[1]], k[[3]]),
+             identical(y$motif, k[[3]]) && !grepl("encodage « bytes »", conditionMessage(y), fixed = TRUE))
+  }
 }
-verifier("table_reference : nom au codage bytes admis hors refus, nom de l'objet inchangé",
-         identical(attr(tr(nom = OCTETS), "nom"), OCTETS))
+x <- refus(tr(nom = structure("essai", class = OCTETS)))
+verifier("table_reference : nom de classe bytes (attribut) -> refus table_nom_manquant existant, sans erreur R",
+         identical(x$motif, "table_nom_manquant") && isTRUE(contient(x, "sans attribut")))
+verifier("table_reference : nom ordinaire non ASCII (UTF-8) admis, nom de l'objet inchangé (contre-épreuve)",
+         identical(attr(tr(nom = "d\u00e9c\u00e8s"), "nom"), "d\u00e9c\u00e8s"))
+# Source au codage bytes : refus table_source_manquante, nom de la table cité ;
+# le nom est jugé d'abord ; un défaut antérieur (statut) l'emporte.
+x <- refus(tr(source = OCTETS))
+verifier("table_reference : source au codage bytes -> refus table_source_manquante, nom cité, message propre, sans valeur citée",
+         identical(x$motif, "table_source_manquante") && identical(x$module, "donnees") && ligne_utf8(x) &&
+           isTRUE(contient(x, "Table « essai » : la source est une chaîne d'encodage « bytes »", "sans deviner",
+                           "sans encodage bytes")) &&
+           !grepl("<chaîne d'encodage bytes>", conditionMessage(x), fixed = TRUE))
+verifier("table_reference : source ordinaire non ASCII (UTF-8) admise, attribut conservé (contre-épreuve)",
+         identical(attr(tr(source = "arr\u00eat\u00e9"), "source"), "arr\u00eat\u00e9"))
+verifier("table_reference : source bytes et nom bytes -> le nom est refusé d'abord",
+         identical(refus(tr(nom = OCTETS, source = OCTETS))$motif, "table_nom_manquant"))
+verifier("table_reference : source bytes et statut inconnu -> statut refusé d'abord (ordre nom, statut, source)",
+         identical(refus(tr(source = OCTETS, statut = "zzz"))$motif, "table_statut_inconnu"))
+x <- refus(tr(source = structure("s", class = OCTETS)))
+verifier("table_reference : source de classe bytes (attribut) -> refus table_source_manquante existant, sans erreur R",
+         identical(x$motif, "table_source_manquante") && isTRUE(contient(x, "sans attribut")))
+# statut et forme_origine bytes : valeurs d'un ensemble fermé, refusées par %in%
+# sous leur motif existant, sans erreur R et sans citer la valeur (mesuré).
+x <- refus(tr(statut = OCTETS))
+verifier("table_reference : statut au codage bytes -> refus table_statut_inconnu, sans erreur R, valeur non citée",
+         identical(x$motif, "table_statut_inconnu") && ligne_utf8(x) &&
+           !grepl("<chaîne d'encodage bytes>", conditionMessage(x), fixed = TRUE))
+x <- refus(tr(forme_origine = OCTETS))
+verifier("table_reference : forme_origine au codage bytes -> refus table_forme_inconnue, sans erreur R, valeur non citée",
+         identical(x$motif, "table_forme_inconnue") && ligne_utf8(x) &&
+           !grepl("<chaîne d'encodage bytes>", conditionMessage(x), fixed = TRUE))
+# Table entière de classe d'encodage bytes (#158, réserve de l'audit de #150) :
+# classe_bytes() avant is.data.frame(), dont inherits() levait l'erreur R
+# « translating strings with "bytes" encoding is not allowed » (contre-épreuve :
+# ces tests échouent sur le code antérieur) ; la classe est citée sous le repère.
+refus_ou_erreur <- function(expr) tryCatch({ force(expr); NULL }, error = function(e) e)
+for (k in list(list("c(<bytes>, data.frame)", c(OCTETS, "data.frame")),
+               list("c(data.frame, <bytes>)", c("data.frame", OCTETS)),
+               list("c(<bytes>, table_reference, data.frame)", c(OCTETS, "table_reference", "data.frame")))) {
+  x <- refus_ou_erreur(tr(x = structure(TR, class = k[[2]])))
+  verifier(sprintf("table_reference : x de classe %s -> refus table_mal_formee, classe citée sous le repère, sans erreur R", k[[1]]),
+           if (is.null(x)) "aucun refus" else if (!inherits(x, "refus_tablexp")) conditionMessage(x)
+           else identical(x$motif, "table_mal_formee") && identical(x$module, "donnees") && ligne_utf8(x) &&
+             identical(x$details$classe, k[[2]]) &&
+             isTRUE(contient(x, "Table « essai » : la table porte une classe d'encodage « bytes » (classe ",
+                             "<chaîne d'encodage bytes>", "sans deviner", "ne porte aucune chaîne d'encodage bytes")))
+}
+verifier("table_reference : x de classe c(\"autre\", \"data.frame\") (sans encodage bytes) : accepté (contre-épreuve)",
+         inherits(tr(x = structure(TR, class = c("autre", "data.frame"))), "table_reference"))
+verifier("table_reference : x non data.frame sans classe bytes -> message « un data.frame est attendu » inchangé",
+         isTRUE(contient(refus(tr(x = 1)), "un data.frame est attendu")))
 # Sous LC_ALL=C (sous-processus, bibliothèque des batteries) : un nom qui n'est pas bytes
 # est cité exactement comme le ferait sprintf() sur le nom reçu (oracle : la formule
 # d'avant #111, octet pour octet, sans traduction ajoutée par le masquage (un nom latin1
 # reste « déc » en UTF-8 valide, jamais « d<e9>c ») ; le nom bytes est remplacé par le repère.
 script_nom <- tempfile(fileext = ".R")
 writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(.harnais$bibliotheque)),
-  "tr <- function(nom) tryCatch(table_reference(data.frame(age = 0:1, sexe = 'ensemble', qx = c(.1, .2)), nom, 'zzz', 's'),",
+  "T0 <- data.frame(age = 0:1, sexe = 'ensemble', qx = c(.1, .2))",
+  "tr <- function(nom, source = 's', x = T0, statut = 'zzz') tryCatch(table_reference(x, nom, statut, source),",
   "                             refus_tablexp = function(c) conditionMessage(c))",
   "L1 <- 'd\\xe9c'; Encoding(L1) <- 'latin1'; B <- 'd\\xe9c'; Encoding(B) <- 'bytes'",
   "gabarit <- paste0('Table \\u00ab %s \\u00bb : statut (cha\\u00eene sans attribut) \\u00e0 prendre dans ',",
   "  '\\u00ab synthetique \\u00bb, \\u00ab embarquee \\u00bb, \\u00ab importee \\u00bb.')",
-  "repere <- '<cha\\u00eene d\\'encodage bytes>'",
-  "cas <- list(ascii = list('essai', 'essai'), latin1 = list(L1, L1), utf8 = list('d\\u00e9c\\u00e8s', 'd\\u00e9c\\u00e8s'),",
-  "            bytes = list(B, repere))",
+  "cas <- list(ascii = list('essai', 'essai'), latin1 = list(L1, L1), utf8 = list('d\\u00e9c\\u00e8s', 'd\\u00e9c\\u00e8s'))",
   "cat('LOCALE', Sys.getlocale('LC_CTYPE'), '\\n')",
   "for (k in names(cas)) {",
   "  m <- tr(cas[[k]][[1]]); e <- sprintf(gabarit, cas[[k]][[2]])",
   "  cat('CAS', k, identical(charToRaw(m), charToRaw(e)), if (!identical(charToRaw(m), charToRaw(e))) paste(charToRaw(m), collapse = ''), '\\n')",
+  "}",
+  "# Chaines bytes (#158) : nom, source, classe de x ; messages attendus octet pour octet.",
+  "gab_bytes <- list(",
+  "  nom = paste0('Le nom de la table de r\\u00e9f\\u00e9rence est une cha\\u00eene d\\'encodage \\u00ab bytes \\u00bb, non convertible en UTF-8 ',",
+  "               'sans deviner : il n\\'est pas lu. Passer un nom (cha\\u00eene non vide, sans attribut) sans encodage bytes.'),",
+  "  source = paste0('Table \\u00ab essai \\u00bb : la source est une cha\\u00eene d\\'encodage \\u00ab bytes \\u00bb, non convertible en UTF-8 sans deviner : ',",
+  "                  'elle n\\'est pas lue. Passer une source (cha\\u00eene non vide, sans attribut) sans encodage bytes.'),",
+  "  classe = paste0('Table \\u00ab essai \\u00bb : la table porte une classe d\\'encodage \\u00ab bytes \\u00bb (classe <cha\\u00eene d\\'encodage bytes>/data.frame), ',",
+  "                  'non convertible en UTF-8 sans deviner : elle n\\'est pas lue. Passer un data.frame dont la classe ne porte aucune ',",
+  "                  'cha\\u00eene d\\'encodage bytes.'))",
+  "obt <- list(nom = tr(B), source = tr('essai', source = B, statut = 'importee'),",
+  "            classe = tr('essai', x = structure(T0, class = c(B, 'data.frame')), statut = 'importee'))",
+  "for (k in names(gab_bytes)) {",
+  "  m <- obt[[k]]; e <- gab_bytes[[k]]",
+  "  cat('CAS bytes_', k, ' ', identical(charToRaw(m), charToRaw(e)), if (!identical(charToRaw(m), charToRaw(e))) paste(charToRaw(m), collapse = ''), '\\n', sep = '')",
   "}"), script_nom)
 r_nom <- executer_rscript(script_nom, env = "LC_ALL=C")
 unlink(script_nom)
-for (k in c("ascii", "latin1", "utf8", "bytes"))
-  verifier(sprintf("table_reference : nom %s sous LC_ALL=C, message égal octet pour octet à sprintf() sur le nom (repère pour bytes)", k), {
+for (k in c("ascii", "latin1", "utf8"))
+  verifier(sprintf("table_reference : nom %s sous LC_ALL=C, message égal octet pour octet à sprintf() sur le nom", k), {
     loc <- trimws(sub("^LOCALE ", "", grep("^LOCALE ", r_nom$sortie, value = TRUE)))
     l <- grep(paste0("^CAS ", k, " "), r_nom$sortie, value = TRUE)
     if (r_nom$statut == 0L && identical(loc, "C") && length(l) == 1L && grepl(" TRUE ", paste0(l, " "), fixed = TRUE)) TRUE
+    else paste("statut", r_nom$statut, ":", paste(r_nom$sortie, collapse = " | "))
+  })
+for (k in c("nom", "source", "classe"))
+  verifier(sprintf("table_reference : %s au codage bytes sous LC_ALL=C, refus de message égal octet pour octet au texte attendu, sans erreur R", k), {
+    loc <- trimws(sub("^LOCALE ", "", grep("^LOCALE ", r_nom$sortie, value = TRUE)))
+    l <- grep(paste0("^CAS bytes_", k, " "), r_nom$sortie, value = TRUE)
+    if (r_nom$statut == 0L && identical(loc, "C") && length(l) == 1L && grepl(" TRUE", l, fixed = TRUE)) TRUE
     else paste("statut", r_nom$statut, ":", paste(r_nom$sortie, collapse = " | "))
   })
 # Un nom d'état vide était refusé au second contrôle de la transition (non prise
