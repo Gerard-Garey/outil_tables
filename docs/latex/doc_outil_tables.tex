@@ -3829,7 +3829,8 @@ en son absence~; rien ne passe hors de l'objet~;
 section~\ref{sec:validation-etape}), ou, sous la relation \code{lissee},
 sans table de référence, la table construite et les degrés de liberté
 effectifs par segment rendus par \code{table\_construite()}, passés en
-valeur~; l'étape
+valeur, et l'ordre des différences du lissage
+(\code{etapes\$lissage\$parametres\$ordre\_difference}, issue~\#239)~; l'étape
 \code{importance\_exclusions} lit les données reçues et les rôles, le
 résultat des étapes \code{donnees} (unité d'observation, lignes conservées,
 lignes exclues par motif, observations) et \code{exposition} (table
@@ -3884,9 +3885,11 @@ contrat, n'en fait pas partie~: la validation sous la relation
 décision M417~; section~\ref{sec:validation-etape}). La table construite
 est passée aux lecteurs en valeur, avec la plage de l'étape et les degrés
 de liberté effectifs, sans qu'aucun lecteur ne connaisse le nom de l'étape
-productrice~; seule la cohérence entre une relation de validation et son
-producteur nomme celui-ci (\code{lissage\_absent},
-section~\ref{sec:validation-etape}). Une table qui ne tient pas ce contrat est une
+productrice~; seules la cohérence entre une relation de validation et son
+producteur (\code{lissage\_absent},
+section~\ref{sec:validation-etape}) et la lecture de l'ordre des
+différences du lissage sous la relation \code{lissee} (écart admis pour
+cette version, issue~\#242~; ADR 0017, point~5.6) nomment celui-ci. Une table qui ne tient pas ce contrat est une
 \textbf{erreur de programmation}, jamais un refus~: elle ne peut naître que
 d'un défaut du producteur, non des données. La table construite n'est pas
 la table finale~: elle reste dans le \code{resultat} de son étape, et
@@ -9844,7 +9847,31 @@ paramètres estimés sur ces données~:
     $E^i > 0$, donc un poids, avec $E^c = 0$, donc hors de $C^{+}$~; $n -
     \sum_s \nu_s$ serait alors faux, d'où la somme restreinte, qui ne
     recalcule pas la matrice de lissage mais additionne des valeurs
-    stockées (ADR 0017, point~5.5~(iii)). La table étant ajustée sur ces
+    stockées (ADR 0017, point~5.5~(iii)). \textbf{Interpolation exacte}
+    (issue~\#239~; ADR 0017, point~5.6~; décision M420, (3))~: un segment
+    qui compte exactement $z$ cellules pondérées par le lissage (levier
+    $> 0$~; $z$, ordre des différences du lissage), retenues ou non, est
+    interpolé~: le polynôme de degré au plus $z - 1$ qui passe par ses $z$
+    taux bruts annule $F$ et $S$, donc $M$, et il est le minimum unique
+    (section~\ref{sec:lissage-quadratique})~; $g$ coïncide alors avec
+    $\hat q$ sur les cellules pondérées, la matrice de lissage y est
+    l'identité, et chaque levier pondéré vaut~1 en arithmétique exacte.
+    Calculée en flottant, la somme de ses leviers retenus s'en écarte de
+    l'ordre de l'arrondi, ce qui publiait un ddl voisin de~0, parfois
+    négatif. Dans un tel segment, la somme
+    des leviers retenus est donc posée exactement au nombre de ses cellules
+    retenues pondérées, et sa contribution au ddl vaut exactement le nombre
+    de ses cellules retenues de poids nul (0 quand toutes sont pondérées).
+    La détection se fait par la structure (décompte des leviers non nuls
+    contre $z$), sans tolérance. Quand chaque segment interpole avec toutes
+    ses cellules retenues pondérées, le ddl vaut exactement~0. L'ordre $z$
+    est transmis à la validation par \code{construire\_table()}, qui le lit
+    dans \code{etapes\$lissage\$parametres\$ordre\_difference}~: la
+    validation lit là un paramètre du producteur, écart à l'esprit du
+    contrat de la table construite (aucun nom d'étape lu), admis pour cette
+    version sur le précédent du positionnement~; la forme plus durable,
+    propriété du lisseur portée par sa table \code{segments}, est proposée
+    par l'issue~\#242 (ADR 0017, point~5.6). La table étant ajustée sur ces
     décès, \textbf{aucune loi exacte} n'est établie sous une hypothèse
     nulle~: seules sont produites les p-valeurs asymptotiques de $X^2$ et
     $G^2$ à ce ddl, et les p-valeurs des signes, des suites et de Wilcoxon
@@ -9996,8 +10023,13 @@ segment les clés de segmentation, \code{ddl\_effectifs} ($\nu_s$,
 \code{double}, recopiés de l'étape \code{lissage}, sans recalcul) et
 \code{ddl\_effectifs\_retenus} (\code{double}, somme des leviers des
 cellules retenues du segment, analogue par segment de
-\code{parametres\_estimes})~; les deux colonnes sont égales, en
-arithmétique exacte, quand toute cellule pondérée est retenue (ADR 0017, points~5.2 et~5.5). Les degrés de
+\code{parametres\_estimes}~; posé exactement au nombre de ses cellules
+retenues pondérées sous interpolation exacte) et
+\code{interpolation\_exacte} (\code{logical}~: le segment compte exactement
+$z$ cellules pondérées)~; les deux premières colonnes sont égales, en
+arithmétique exacte, quand toute cellule pondérée est retenue~; dans un
+segment qui interpole, \code{ddl\_effectifs} reste la trace calculée en
+flottant (ADR 0017, points~5.2, 5.5 et~5.6). Les degrés de
 liberté effectifs ne sont pas un dénombrement. \code{resultat}~:
 \code{cellules} (clés de segmentation, \code{age}, \code{annee} sous
 \code{par\_annee}, $E^c$, $D$, \code{qx\_table}, \code{taux\_table} pour
@@ -10475,7 +10507,9 @@ Par grandeur~:\par}
     établi, approximation non garantie quand des $A_c$ sont petits~; elles
     sont produites bien que \code{parametres\_estimes} vaille \code{NA}.
     Si le ddl est au plus nul, elles ne le sont pas (état
-    \code{contraint\_par\_lissage}). La variance exacte de $X^2$ n'est pas
+    \code{contraint\_par\_lissage})~; il vaut exactement~0 quand chaque
+    segment interpole avec toutes ses cellules retenues pondérées
+    (interpolation exacte, section~\ref{sec:validation-etape}). La variance exacte de $X^2$ n'est pas
     produite (\code{non\_etabli\_sous\_lissage}).
   \item \textbf{S4, SMR global}~: $O$, $A$, SMR et $O - A$ descriptifs~;
     bornes, p-valeurs, $z$ et p de la racine cubique non produits
@@ -11790,7 +11824,16 @@ verdict~; titre et mentions du rapport figé sous les trois
     ddl $= n - \sum_s \nu_s$ quand toute cellule pondérée est retenue, et,
     au cas limite d'une cellule pondérée non retenue (recette
     \code{agregats}, $E^i > 0$, $E^c = 0$), ddl $= n - (\sum_s \nu_s -
-    h_c)$, à $10^{-12}$ près en relatif~; les p-valeurs asymptotiques par
+    h_c)$, à $10^{-12}$ près en relatif~; l'interpolation exacte
+    (issue~\#239)~: à $z = 3$, sur 25 configurations (trois cellules
+    pondérées par segment, toutes retenues), ddl de $X^2$ et $G^2$
+    \code{identical()} à~0, p-valeurs \code{NA}, état
+    \code{contraint\_par\_lissage}, et de même à $z = 2$ et $z = 4$~; un
+    mélange d'un segment qui interpole et d'un segment complet~; un segment
+    qui interpole avec une cellule retenue de poids nul (contribution
+    exacte~1) ou une cellule pondérée non retenue~; la non-régression du jeu
+    de base et du cas limite précédent, où aucun segment n'interpole
+    (\code{interpolation\_exacte} faux, somme des leviers inchangée)~; les p-valeurs asymptotiques par
     \code{pchisq()} bien que \code{parametres\_estimes} soit \code{NA}, et
     leur absence (\code{contraint\_par\_lissage}) quand le ddl est au plus
     nul~; les attendus recalculés sur la table lissée~; les états des
@@ -11915,7 +11958,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante~; sous \code{lissee}, SMR descriptif et états \\
 \catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau, plafond de convolution (\code{n\_max}, par défaut \code{N\_MAX\_}\allowbreak\code{PRODUITS\_}\allowbreak\code{CONVOLUTION}~; autre valeur pour les seuls tests) & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, exactes ou, au-delà du plafond, asymptotiques, bornes d'un segment, états \\
 \catalogue{fonctions-validation}{segments\_complets()} & interne & cellules du sous-groupe, segment, cellules retenues & segments touchés et, pour chacun, si le sous-groupe contient toutes ses cellules retenues (décompte, jamais un test flottant)~; partagée par les relations \code{positionnee} et \code{lissee} \\
-\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite et ddl effectifs (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
+\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite, ddl effectifs et ordre des différences du lissage (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs} \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version} \\
 \catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} \\
@@ -13982,7 +14025,12 @@ mêmes cellules, ses degrés de liberté effectifs ne sont en général pas
 entiers, les p-valeurs asymptotiques de $X^2$ et $G^2$ sont calculées à $n$
 moins la somme des leviers des cellules retenues, au statut
 d'approximation non établie, et le SMR et les sous-groupes sont
-descriptifs~; l'hypothèse nulle de Poisson, exacte avec $E^c$
+descriptifs~; elle ajoute que, dans un segment qui compte exactement $z$
+cellules pondérées, le lissage interpole, que la somme de ses leviers
+retenus est posée au nombre de ses cellules retenues pondérées et sa
+contribution au ddl au nombre exact de ses cellules retenues non
+pondérées (colonne \code{interpolation\_exacte}), et que les p ne sont
+pas produites si le ddl vaut~0 (\code{contraint\_par\_lissage})~; l'hypothèse nulle de Poisson, exacte avec $E^c$
 tenue pour fixe, asymptotique sous le modèle de survie, et, sous
 \code{positionnee}, sa forme à $\theta_s$ inconnu, conditionnelle aux décès
 de chaque segment (mention \code{validation\_h0\_positionnee}), ou, sous
