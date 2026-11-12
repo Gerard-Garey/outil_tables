@@ -347,8 +347,9 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # R15 (#223, #144), R16 et R17 (#225) (B19, claude/lissage-whittaker ;
 # M415) : lissage de Whittaker-Henderson, coherence_regularite et validation
 # de la table lissée ; création au (R) de B19, sur la CI, après visa (issue
-# de création : celle de la méthode de lissage du plan).
-SANS_REFERENCE <- c(R15 = "#223", R16 = "#225", R17 = "#225")
+# de création : celle de la méthode de lissage du plan) ; créés par le commit
+# de référence (R) de B19, run CI 43184987915 (e8d7910), visa délégué M420.
+SANS_REFERENCE <- character(0)
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
 # les références ne sont pas encore régénérées. Vide hors transition ; le
