@@ -162,7 +162,7 @@ HYPOTHESE_VALIDATION_LISSEE <- texte_moteur(paste(
   "Aucune loi exacte sous hypothèse nulle : A_c = E^c_c mu_c, mu_c = -ln(1 - g_c), g_c taux de la table lissée de",
   "cette construction, ajustée sur ces décès (nu_s degrés de liberté effectifs par segment) ; seules sont produites",
   "les p asymptotiques de X2 et G2 à n - somme des leviers des cellules retenues degrés de liberté (= n - somme des",
-  "nu_s quand toute cellule pondérée par le lissage est retenue) et les p des signes, des suites et de Wilcoxon",
+  "nu_s en arithmétique exacte, quand toute cellule pondérée par le lissage est retenue) et les p des signes, des suites et de Wilcoxon",
   "sous leurs hypothèses propres, au statut d'approximation non établie ; unités d'observation",
   "indépendantes ; cellule [x, x+1) de la convention dernier_anniversaire."))
 
@@ -538,16 +538,24 @@ STATUTS_VALIDATION_LISSEE <- local({
               "réplique, hors du périmètre) ; état non_etabli_sous_lissage ; aucun tirage")
   ddl <- paste("n - somme sur les cellules retenues des éléments diagonaux de la matrice de lissage (leviers, colonne",
                "levier de la table lissée ; = n - somme des nu_s quand toute cellule pondérée par le lissage est",
-               "retenue) : n cellules retenues, nu_s degrés de liberté effectifs du lissage du segment s (trace de la",
-               "matrice de lissage, recopiés dans etapes/validation/parametres/ddl_effectifs ; somme des leviers",
-               "retenus du segment dans ddl_effectifs_retenus), réel, en général non entier ; approximation : degrés de liberté",
-               "résiduels du cas normal transposés au modèle de Poisson, aucun résultat de loi établi après lissage")
+               "retenue, en arithmétique exacte seulement : dans un segment qui interpole, ddl_effectifs reste la",
+               "trace calculée en flottant, ddl_effectifs_retenus est posé exactement) : n cellules retenues, nu_s degrés de liberté effectifs du lissage",
+               "du segment s (trace de la matrice de lissage, recopiés dans etapes/validation/parametres/ddl_effectifs ;",
+               "somme des leviers retenus du segment dans ddl_effectifs_retenus), réel, en général non entier ;",
+               "contribution d'un segment qui compte exactement z cellules pondérées (z ordre des différences du",
+               "lissage, etapes/lissage/parametres/ordre_difference ; le lissage y interpole, chaque",
+               "levier pondéré vaut 1 en arithmétique exacte) posée au nombre exact de ses cellules retenues de poids",
+               "nul, 0 quand toutes sont pondérées ; ddl_effectifs_retenus = nombre de ses cellules retenues pondérées,",
+               "interpolation_exacte vrai ; approximation : degrés de liberté résiduels du cas normal transposés au",
+               "modèle de Poisson, aucun résultat de loi établi après lissage")
   p_asym <- paste("approximation non établie : loi du khi-deux à n - somme des leviers des cellules retenues degrés de",
-                  "liberté (ligne ddl ; = n - somme des nu_s quand toute cellule pondérée par le lissage est retenue ;",
+                  "liberté (ligne ddl ; = n - somme des nu_s en arithmétique exacte, quand toute cellule pondérée par le",
+                  "lissage est retenue ;",
                   "pchisq, ddl non entier), queue supérieure ; la table est ajustée sur ces décès : le niveau réel du",
                   "test fondé sur cette p n'est pas établi (constat de simulation hors CI documenté) ; approximation",
                   "non garantie quand des attendus A_c sont petits ; si ce ddl <= 0 : non produite (état",
-                  "contraint_par_lissage)")
+                  "contraint_par_lissage), en particulier quand chaque segment interpole avec toutes ses cellules",
+                  "retenues pondérées (ddl = 0 exactement)")
   conservation <- paste("égal à 1 par construction sous wh_poisson (équation du score, à la convergence près) ; voisin",
                         "de 1 sous wh_quadratique pondération exposition quand E^c est voisine de E^i - D/2 (somme des",
                         "E^i g = somme des D exactement ; l'écart vient de E^c (-ln(1 - g)) différent de E^i g) ; aucune",
@@ -1007,7 +1015,8 @@ pvaleur_monte_carlo <- function(t, t_rep, sens) {
 #   la table positionnée (theta^_s q~ sur l'échelle de la force) ;
 #   somme_ddl : somme des leviers des cellules retenues (= somme des degrés
 #   de liberté effectifs nu_s du lissage quand toute cellule pondérée est
-#   retenue ; relation lissee seule, ddl = n - somme_ddl en double ; NULL
+#   retenue ; nombre de cellules retenues pondérées, exact, pour un segment
+#   où le lissage interpole, #239 ; relation lissee seule, ddl = n - somme_ddl en double ; NULL
 #   sinon). Sous
 #   lissee, qx, mu et A sont ceux de la table lissée (#224).
 # Rend list(statistiques (format long, une ligne par ligne des statuts de la
@@ -1117,8 +1126,9 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
         sum(2 * (n_s - 1) + inv_s - (n_s^2 + 2 * n_s - 2) / Os)
       },
       stop("statistiques_validation() : relation inconnue (erreur de programmation).", call. = FALSE)))
-    # Sous lissee, n - somme des leviers retenus <= 0 : p asymptotiques non produites
-    # (contraint_par_lissage) ; pchisq() admet des ddl non entiers (L-b, D7).
+    # Sous lissee, n - somme des leviers retenus <= 0 (0 exactement quand le
+    # lissage interpole dans chaque segment, #239) : p asymptotiques non
+    # produites (contraint_par_lissage) ; pchisq() admet des ddl non entiers (L-b, D7).
     p_khi2 <- function(t) if (lissee && !(ddl > 0)) NULL else stats::pchisq(t, ddl, lower.tail = FALSE)
     p_k <- p_khi2(t_obs$khi2)
     if (is.null(p_k)) pose("khi2_pearson", "p_asymptotique", NA_real_, "contraint_par_lissage")
@@ -1536,7 +1546,11 @@ segments_complets <- function(dans, segment, ret) {
 #                      les autres. Argument nommé `construite`, non
 #                      `table_construite` : graphe_modules.R lirait ce nom
 #                      comme un appel de la fonction homonyme du module
-#                      construire_table, interdit (ADR 0007, point 2.1).
+#                      construire_table, interdit (ADR 0007, point 2.1) ;
+#   ordre_difference : ordre z des différences de l'étape lissage
+#                      (etapes/lissage/parametres, valeur entière en
+#                      double, au moins 1), ou NULL ; lu sous la seule
+#                      relation lissee (interpolation exacte, #239).
 # Relation positionnee : la grille (clés, âges, E^c, D, q~) est celle du
 # positionnement (même exposition, même table, même plage : contrôlé,
 # erreur de programmation sinon) ; attendus A_c = theta^_s A~_c, force
@@ -1550,7 +1564,9 @@ segments_complets <- function(dans, segment, ret) {
 # -ln(1 - q_c), A_c = E^c mu_c ; ddl = n - somme des leviers
 # (construite$levier) des cellules retenues, par segment puis sur les
 # segments (= n - somme des ddl effectifs quand toute cellule pondérée par
-# le lissage est retenue ; ADR 0017, point 5.5).
+# le lissage est retenue ; ADR 0017, point 5.5) ; contribution d'un segment
+# où le lissage interpole : nombre exact de ses cellules retenues de poids
+# nul (#239).
 # Aucun contrôle (#82 ; ADR 0007, annotation du 17/10/2026, (c) et (d)) :
 # construire_table() a validé la segmentation et les paramètres
 # (valider_plan()), la table (contrôle 1.3) et les entrées
@@ -1560,7 +1576,7 @@ segments_complets <- function(dans, segment, ret) {
 # la table (ADR 0015, point 5).
 calculer_validation <- function(exposition, segmentation, par_annee, convention, table, table_reference,
                                 relation_table, plage_ages, tranches_age, niveau, replications, graine,
-                                positionnement, construite, ddl_effectifs) {
+                                positionnement, construite, ddl_effectifs, ordre_difference) {
   manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
                         names(exposition))
   if (length(manquantes))
@@ -1573,9 +1589,10 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
   if (positionnee && is.null(positionnement))
     stop("calculer_validation() : étape positionnement requise sous la relation positionnee (erreur de programmation).",
          call. = FALSE)
-  if (lissee && (is.null(construite) || is.null(ddl_effectifs) || !("levier" %in% names(construite))))
-    stop(paste("calculer_validation() : table construite avec la colonne levier et ddl effectifs requis sous la",
-               "relation lissee (erreur de programmation)."), call. = FALSE)
+  if (lissee && (is.null(construite) || is.null(ddl_effectifs) || !("levier" %in% names(construite)) ||
+                 !valeurs_entieres_double(ordre_difference) || length(ordre_difference) != 1L || ordre_difference < 1))
+    stop(paste("calculer_validation() : table construite avec la colonne levier, ddl effectifs et ordre des",
+               "différences requis sous la relation lissee (erreur de programmation)."), call. = FALSE)
   if (lissee) {
     # Grille unique (ADR 0017, point 10.2), q de la table construite apparié
     # par (segment, âge) : clés et âges identiques, dans le même ordre.
@@ -1609,9 +1626,19 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
   # lus cellule par cellule dans l'ordre de la grille, sommés par segment sur
   # les seules cellules retenues (C+) ; une cellule pondérée par le lissage
   # mais non retenue (E^c = 0 sous la recette agregats) en est exclue.
+  # Interpolation exacte (#239), détectée par la structure, sans tolérance :
+  # segment qui compte exactement z cellules de levier > 0 (pondérées ; z
+  # ordre des différences), retenues ou non. Le lissage y interpole, chaque
+  # levier pondéré vaut 1 en arithmétique exacte (complément de Schur, avis
+  # d'actuary) et la somme des leviers retenus est posée au nombre de
+  # cellules retenues pondérées du segment : sa contribution au ddl vaut le
+  # nombre exact de ses cellules retenues de poids nul, 0 quand toutes sont
+  # pondérées (en flottant, écart de ±1e-15 à ±1e-11 sans cette règle).
   if (lissee) {
     lev <- construite$levier
-    retenus <- vapply(seq_len(nrow(seg_cles)), function(k) sum(lev[ret & ap$segment == k]), 0)
+    interpolation <- vapply(seq_len(nrow(seg_cles)), function(k) sum(lev[ap$segment == k] > 0) == ordre_difference, NA)
+    retenus <- vapply(seq_len(nrow(seg_cles)), function(k)
+      if (interpolation[k]) as.numeric(sum(ret & ap$segment == k & lev > 0)) else sum(lev[ret & ap$segment == k]), 0)
   }
   # Table validée : la référence (p = 0, ajustee_hors_outil), la table
   # positionnée, sur l'échelle de la force (positionnee), ou la table lissée
@@ -1686,12 +1713,15 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
                       stringsAsFactors = FALSE)
   # Sous lissee : table_reference et table_nom absents, ddl_effectifs
   # (clés, ddl_effectifs recopiés, ddl_effectifs_retenus : somme des leviers
-  # des cellules retenues, en double ; ADR 0017, point 5.5 (iii)) après
+  # des cellules retenues, en double, nombre de cellules retenues pondérées
+  # sous interpolation exacte ; ADR 0017, point 5.5 (iii) ;
+  # interpolation_exacte, logique par segment, #239) après
   # parametres_estimes (NA_integer_), appariement_sexe « par_segment » (#224).
   ddl_p <- if (lissee) {
     d_ <- ddl_effectifs[c(segmentation, "ddl_effectifs")]
     rownames(d_) <- NULL
     d_$ddl_effectifs_retenus <- retenus
+    d_$interpolation_exacte <- interpolation
     d_
   }
   parametres <- c(if (!lissee) list(table_reference = table_reference, table_nom = attr(table, "nom", exact = TRUE)),

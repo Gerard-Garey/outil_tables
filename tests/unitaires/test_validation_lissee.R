@@ -104,11 +104,22 @@ verifier("A STATUTS_VALIDATION_LISSEE : mêmes (statistique, grandeur, sous_h0) 
     statuts = identical(tablexp:::statuts_validation("lissee"), b),
     ddl = all(vapply(c("khi2_pearson", "deviance"), function(s) startsWith(k(s, "ddl"), paste(
       "n - somme sur les cellules retenues des éléments diagonaux de la matrice de lissage (leviers, colonne levier de",
-      "la table lissée ; = n - somme des nu_s quand toute cellule pondérée par le lissage est retenue) : n cellules")),
+      "la table lissée ; = n - somme des nu_s quand toute cellule pondérée par le lissage est retenue, en arithmétique",
+      "exacte seulement : dans un segment qui interpole, ddl_effectifs reste la trace calculée en flottant,",
+      "ddl_effectifs_retenus est posé exactement) : n cellules")),
       NA)),
     p_asym = identical(k("khi2_pearson", "p_asymptotique"), k("deviance", "p_asymptotique")) &&
       startsWith(k("deviance", "p_asymptotique"), paste("approximation non établie : loi du khi-deux à n - somme des",
-                                                        "leviers des cellules retenues degrés de liberté")),
+                                                        "leviers des cellules retenues degrés de liberté")) &&
+      endsWith(k("deviance", "p_asymptotique"), paste("contraint_par_lissage), en particulier quand chaque segment",
+                                                      "interpole avec toutes ses cellules retenues pondérées (ddl = 0",
+                                                      "exactement)")),
+    ddl_interpolation = all(vapply(c("khi2_pearson", "deviance"), function(s) grepl(paste(
+      "contribution d'un segment qui compte exactement z cellules pondérées (z ordre des différences du lissage,",
+      "etapes/lissage/parametres/ordre_difference ; le lissage y interpole, chaque levier",
+      "pondéré vaut 1 en arithmétique exacte) posée au nombre exact de ses cellules retenues de poids nul, 0 quand",
+      "toutes sont pondérées ; ddl_effectifs_retenus = nombre de ses cellules retenues pondérées, interpolation_exacte",
+      "vrai ;"), k(s, "ddl"), fixed = TRUE), NA)),
     mc = all(grepl("aucune réplication sous la relation lissee", b$statut[b$grandeur %in% c("p_monte_carlo",
                                                                                             "erreur_monte_carlo")],
                    fixed = TRUE)) && sum(b$grandeur %in% c("p_monte_carlo", "erreur_monte_carlo")) == 10L,
@@ -195,7 +206,7 @@ verifier("B controler_parametres_validation() en appel direct (C-1 d'actuary, m2
 
 # --- C. Étape validation sous lissee ------------------------------------------------
 
-verifier("C parametres : table_reference et table_nom absents ; parametres_estimes NA_integer_ ; ddl_effectifs (clés, ddl_effectifs double recopiés de l'étape lissage, ddl_effectifs_retenus double, identical() à ddl_effectifs, toute cellule étant retenue) ; appariement_sexe par_segment ; hypothèse nulle propre (valeur calculée à la main, identité exacte)", {
+verifier("C parametres : table_reference et table_nom absents ; parametres_estimes NA_integer_ ; ddl_effectifs (clés, ddl_effectifs double recopiés de l'étape lissage, ddl_effectifs_retenus double, identical() à ddl_effectifs, toute cellule étant retenue, interpolation_exacte FALSE par segment, #239) ; appariement_sexe par_segment ; hypothèse nulle propre (valeur calculée à la main, identité exacte)", {
   p <- V$parametres
   seg <- L$resultat$segments
   tous(list(
@@ -204,7 +215,8 @@ verifier("C parametres : table_reference et table_nom absents ; parametres_estim
                                  "n_max_runs_exact", "hypothese_nulle", "reference_methode", "statuts_sous_groupes")),
     pe = identical(p$parametres_estimes, NA_integer_),
     ddl = identical(p$ddl_effectifs, data.frame(sexe = seg$sexe, ddl_effectifs = seg$ddl_effectifs,
-                                                ddl_effectifs_retenus = seg$ddl_effectifs, stringsAsFactors = FALSE)) &&
+                                                ddl_effectifs_retenus = seg$ddl_effectifs,
+                                                interpolation_exacte = c(FALSE, FALSE), stringsAsFactors = FALSE)) &&
       is.double(p$ddl_effectifs$ddl_effectifs) && all(CV$etat == "retenue"),
     sexe = identical(p$appariement_sexe, "par_segment"),
     h0 = identical(p$hypothese_nulle, tablexp:::HYPOTHESE_VALIDATION_LISSEE),
@@ -245,6 +257,100 @@ local({
         proche(de$ddl_effectifs_retenus[de$sexe == "H"], de$ddl_effectifs[de$sexe == "H"] - h, rel = 1e-12, abs = 0),
       f = identical(de$ddl_effectifs_retenus[de$sexe == "F"], de$ddl_effectifs[de$sexe == "F"]),
       somme = identical(valeur(st, "deviance/ddl"), n - sum(de$ddl_effectifs_retenus))))
+  })
+})
+# Interpolation exacte (#239) : exposition gardée aux seuls âges 40, x et 60
+# (E^i = E^c = D = 0 ailleurs), z = 3 : chaque segment compte exactement z
+# cellules pondérées, toutes retenues ; le lissage interpole, chaque levier
+# vaut 1 en arithmétique exacte et ddl = 0 (avant #239 : ddl calculé entre
+# -3,7e-12 et 4e-12, p publiée jusqu'à 4,25e-11, état produite, pour 12 des
+# 25 configurations). Détection par la structure, sans tolérance.
+local({
+  L3 <- modifyList(LISSAGE, list(ordre_difference = 3))
+  garder <- function(j, g) { j$evenements[!g] <- 0; j$exposition_initiale[!g] <- 0; j$exposition_centrale[!g] <- 0; j }
+  ddl_p <- function(x) {
+    st <- x$etapes$validation$resultat$statistiques
+    cles <- c("khi2_pearson/ddl", "deviance/ddl", "khi2_pearson/p_asymptotique", "deviance/p_asymptotique")
+    list(valeur = valeur(st, cles), etat = etat_de(st, cles[3:4]), de = x$etapes$validation$parametres$ddl_effectifs)
+  }
+  verifier("C interpolation exacte (#239), 25 configurations (âge milieu 45, 48, 50, 53, 55 x h = 1, 10, 1e3, 1e5, 1e6 ; z = 3 ; trois cellules pondérées, toutes retenues, par segment) : ddl de X2 et G2 identical() à 0, p asymptotiques NA, état contraint_par_lissage, interpolation_exacte TRUE et ddl_effectifs_retenus identical() à 3 par segment (identité exacte)", {
+    r <- unlist(lapply(c(45, 48, 50, 53, 55), function(mid) vapply(c(1, 10, 1e3, 1e5, 1e6), function(h) {
+      x <- construire_table(garder(JEU, JEU$age %in% c(40, mid, 60)), ROLES,
+                            plan_l(lissage = modifyList(L3, list(parametre_lissage = h))))
+      d <- ddl_p(x)
+      identical(d$valeur[1:2], c(0, 0)) && all(is.na(d$valeur[3:4])) &&
+        identical(d$etat, c("contraint_par_lissage", "contraint_par_lissage")) &&
+        identical(d$de$interpolation_exacte, c(TRUE, TRUE)) && identical(d$de$ddl_effectifs_retenus, c(3, 3))
+    }, NA)))
+    length(r) == 25L && all(r)
+  })
+  verifier("C interpolation exacte (#239), z = 2 (âges 40 et 60 ; h = 1, 1e3, 1e6) et z = 4 (âges 40, 45, 52, 60 ; h = 1e3) : ddl de X2 et G2 identical() à 0, p NA, état contraint_par_lissage, interpolation_exacte TRUE, ddl_effectifs_retenus identical() à z par segment (z transmis par construire_table() ; m3 de l'audit) (identité exacte)", {
+    cas <- c(lapply(c(1, 1e3, 1e6), function(h) list(z = 2, ages = c(40, 60), h = h)),
+             list(list(z = 4, ages = c(40, 45, 52, 60), h = 1e3)))
+    r <- vapply(cas, function(cc) {
+      x <- construire_table(garder(JEU, JEU$age %in% cc$ages), ROLES,
+                            plan_l(lissage = modifyList(LISSAGE, list(ordre_difference = cc$z, parametre_lissage = cc$h))))
+      d <- ddl_p(x)
+      identical(d$valeur[1:2], c(0, 0)) && all(is.na(d$valeur[3:4])) &&
+        identical(d$etat, c("contraint_par_lissage", "contraint_par_lissage")) &&
+        identical(d$de$interpolation_exacte, c(TRUE, TRUE)) && identical(d$de$ddl_effectifs_retenus, c(cc$z, cc$z))
+    }, NA)
+    all(r)
+  })
+  verifier("C interpolation exacte (#239), mélange : segment H dégénéré (âges 40, 48, 60 ; h = 1e6), segment F complet : interpolation_exacte (F, H) = (FALSE, TRUE), ddl_effectifs_retenus de H identical() à 3, de F identical() à la somme des leviers retenus ; ddl identical() à n - somme des ddl_effectifs_retenus, > 0 ; p produites (identité exacte)", {
+    x <- construire_table(garder(JEU, JEU$sexe == "F" | JEU$age %in% c(40, 48, 60)), ROLES,
+                          plan_l(lissage = modifyList(L3, list(parametre_lissage = 1e6))))
+    d <- ddl_p(x)
+    tl <- x$etapes$lissage$resultat$table_lissee
+    ret <- x$etapes$validation$resultat$cellules$etat == "retenue"
+    n <- sum(ret)
+    tous(list(
+      interp = identical(d$de$sexe, c("F", "H")) && identical(d$de$interpolation_exacte, c(FALSE, TRUE)),
+      h = identical(d$de$ddl_effectifs_retenus[2L], 3),
+      f = identical(d$de$ddl_effectifs_retenus[1L], sum(tl$levier[ret & tl$sexe == "F"])),
+      ddl = identical(d$valeur[1:2], rep(n - sum(d$de$ddl_effectifs_retenus), 2L)) && d$valeur[1L] > 0,
+      p = identical(d$etat, c("produite", "produite")) && !anyNA(d$valeur[3:4])))
+  })
+  verifier("C interpolation exacte (#239) : z cellules pondérées et une cellule retenue de poids nul ((H, 50) : E^i = 0, E^c = 500, D = 0) ; interpolation_exacte TRUE pour F et H, ddl_effectifs_retenus identical() à (3, 3), contribution de H identical() à 1, ddl identical() à 1 (entier), p produites (identité exacte)", {
+    j <- garder(JEU, JEU$age %in% c(40, 48, 60))
+    k <- j$sexe == "H" & j$age == 50
+    j$exposition_centrale[k] <- 500
+    x <- construire_table(j, ROLES, plan_l(lissage = modifyList(L3, list(parametre_lissage = 1e6))))
+    d <- ddl_p(x)
+    cv <- x$etapes$validation$resultat$cellules
+    tl <- x$etapes$lissage$resultat$table_lissee
+    h <- cv$sexe == "H"
+    tous(list(
+      cellule = identical(cv$etat[h & cv$age == 50L], "retenue") && identical(tl$levier[h & tl$age == 50L], 0),
+      interp = identical(d$de$sexe, c("F", "H")) && identical(d$de$interpolation_exacte, c(TRUE, TRUE)) &&
+        identical(d$de$ddl_effectifs_retenus, c(3, 3)),
+      contribution = identical(sum(cv$etat[h] == "retenue") - d$de$ddl_effectifs_retenus[2L], 1),
+      ddl = identical(d$valeur[1:2], c(1, 1)),
+      p = identical(d$etat, c("produite", "produite")) && !anyNA(d$valeur[3:4])))
+  })
+  verifier("C interpolation exacte (#239) : z cellules pondérées dont une non retenue ((H, 48) : E^c = 0, D > 0, état evenement_sans_exposition) ; interpolation_exacte TRUE pour H et F, ddl_effectifs_retenus identical() à (3, 2), ddl identical() à 0, p NA, état contraint_par_lissage (identité exacte)", {
+    j <- garder(JEU, JEU$age %in% c(40, 48, 60))
+    j$exposition_centrale[j$sexe == "H" & j$age == 48] <- 0
+    x <- construire_table(j, ROLES, plan_l(lissage = modifyList(L3, list(parametre_lissage = 1e6))))
+    d <- ddl_p(x)
+    cv <- x$etapes$validation$resultat$cellules
+    identical(cv$etat[cv$sexe == "H" & cv$age == 48L], "evenement_sans_exposition") &&
+      identical(d$de$interpolation_exacte, c(TRUE, TRUE)) && identical(d$de$ddl_effectifs_retenus, c(3, 2)) &&
+      identical(d$valeur[1:2], c(0, 0)) && all(is.na(d$valeur[3:4])) &&
+      identical(d$etat, c("contraint_par_lissage", "contraint_par_lissage"))
+  })
+  verifier("C non-régression (#239), jeu de base et cas limite M417 (z = 2, plus de z cellules pondérées par segment) : interpolation_exacte FALSE, ddl_effectifs_retenus identical() à la somme des leviers des cellules retenues par segment, ddl identical() à n - leur somme (formule antérieure à #239, au bit près)", {
+    j <- JEU; k <- j$sexe == "H" & j$age == 50
+    j$evenements[k] <- 0; j$exposition_centrale[k] <- 0
+    all(vapply(list(X, construire_table(j, ROLES, plan_l())), function(x) {
+      d <- ddl_p(x)
+      tl <- x$etapes$lissage$resultat$table_lissee
+      ret <- x$etapes$validation$resultat$cellules$etat == "retenue"
+      identical(d$de$interpolation_exacte, c(FALSE, FALSE)) &&
+        identical(d$de$ddl_effectifs_retenus, vapply(d$de$sexe, function(s) sum(tl$levier[ret & tl$sexe == s]), 0,
+                                                      USE.NAMES = FALSE)) &&
+        identical(d$valeur[1:2], rep(sum(ret) - sum(d$de$ddl_effectifs_retenus), 2L))
+    }, NA))
   })
 })
 verifier("C p asymptotiques de X2 et G2 produites (état produite) bien que parametres_estimes soit NA : pchisq(statistique, n - somme des nu_s, queue supérieure) (identité exacte ; ADR 0017, point 5.1)", {
@@ -327,10 +433,10 @@ verifier("C statistiques_validation() : somme_ddl requise sous la seule relation
 # Appel direct de calculer_validation() sous lissee, table construite
 # fabriquée à partir de celle de X.
 cv_l <- function(construite = L$resultat$table_lissee, ddl = V$parametres$ddl_effectifs, relation = "lissee",
-                 table = NULL, cle = NULL)
+                 table = NULL, cle = NULL, z = LISSAGE$ordre_difference)
   tablexp:::calculer_validation(X$etapes$exposition$resultat$exposition, "sexe", FALSE, "dernier_anniversaire", table, cle,
                                 relation, c(40, 60), c(40, 50), 0.95, 99, V$resultat$monte_carlo$graine, NULL,
-                                construite, ddl)
+                                construite, ddl, z)
 verifier("C calculer_validation() appelé directement sur la table construite de X : identical() à l'étape de X (identité exacte)",
          identical(cv_l()[c("parametres", "resultat", "diagnostics")], V[c("parametres", "resultat", "diagnostics")]))
 verifier("C taux_table_egal_un (module validation) : q = 1 dans une cellule exposée de la table construite, message propre, details", {
@@ -340,7 +446,7 @@ verifier("C taux_table_egal_un (module validation) : q = 1 dans une cellule expo
                  "A = E^c (-ln(1 - q_x)) est infini, le modèle de Poisson ne s'applique pas."),
            list(cellules = 1L))
 })
-verifier("C calculer_validation() sous lissee : table construite ou ddl effectifs NULL, table construite sans colonne levier (ADR 0017, point 5.5), grille différente (âges permutés, segments permutés), ddl effectifs integer -> erreur de programmation", {
+verifier("C calculer_validation() sous lissee : table construite ou ddl effectifs NULL, table construite sans colonne levier (ADR 0017, point 5.5), grille différente (âges permutés, segments permutés), ddl effectifs integer, ordre des différences NULL, integer, non entier, nul ou de longueur 2 (#239) -> erreur de programmation", {
   t1 <- L$resultat$table_lissee
   perm <- t1[c(22:42, 1:21), ]; rownames(perm) <- NULL
   ages <- t1; ages$age <- rev(ages$age)
@@ -349,18 +455,19 @@ verifier("C calculer_validation() sous lissee : table construite ou ddl effectif
   tous(list(nul_t = erreur_programmation(cv_l(construite = NULL)), nul_d = erreur_programmation(cv_l(ddl = NULL)),
             sans_levier = erreur_programmation(cv_l(construite = sans_lev)),
             perm = erreur_programmation(cv_l(construite = perm)), ages = erreur_programmation(cv_l(construite = ages)),
-            d_int = erreur_programmation(cv_l(ddl = d_int))))
+            d_int = erreur_programmation(cv_l(ddl = d_int)),
+            z = all(vapply(list(NULL, 2L, 2.5, 0, c(2, 2)), function(z) erreur_programmation(cv_l(z = z)), NA))))
 })
 verifier("C relation independante : table construite et ddl effectifs passés ignorés (identical() à l'appel sans eux) (critère C2)", {
   gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
   t_ref <- table_reference(data.frame(age = gm$age, sexe = "ensemble", qx = gm$qx), "GM", "importee", "test")
   identical(cv_l(relation = "independante", table = t_ref, cle = "tv"),
-            cv_l(construite = NULL, ddl = NULL, relation = "independante", table = t_ref, cle = "tv"))
+            cv_l(construite = NULL, ddl = NULL, relation = "independante", table = t_ref, cle = "tv", z = NULL))
 })
 
 # --- D. Rapport figé, plan, importance_exclusions -----------------------------------
 
-verifier("D rapport figé : titre propre à la relation lissee, mentions validation_lissee, validation_h0_lissee et validation_monte_carlo_lissee, sans la phrase de la table de référence prise telle quelle (valeur calculée à la main)", {
+verifier("D rapport figé : titre propre à la relation lissee, mentions validation_lissee (dont la phrase de l'interpolation exacte, #239), validation_h0_lissee et validation_monte_carlo_lissee, sans la phrase de la table de référence prise telle quelle (valeur calculée à la main)", {
   h <- rawToChar(ecrire_rapport(X)); Encoding(h) <- "UTF-8"
   m <- tablexp:::MENTIONS_RAPPORT
   e <- tablexp:::echapper_html
@@ -368,11 +475,17 @@ verifier("D rapport figé : titre propre à la relation lissee, mentions validat
     titre = grepl("<h2>Étape validation : statistiques de validation de la table lissée de cette construction</h2>", h,
                   fixed = TRUE),
     relation = grepl(e(m[["validation_lissee"]]), h, fixed = TRUE),
+    interpolation = endsWith(m[["validation_lissee"]], paste(
+      "Dans un segment qui compte exactement z cellules pondérées (z ordre des différences du lissage), le lissage",
+      "interpole : la somme de ses leviers",
+      "retenus est posée au nombre de ses cellules retenues pondérées, et sa contribution au ddl est le nombre exact",
+      "de ses cellules retenues non pondérées (0 si toutes sont pondérées) ; colonne interpolation_exacte. Si le ddl",
+      "vaut 0, les p ne sont pas produites (contraint_par_lissage).")),
     h0 = grepl(e(m[["validation_h0_lissee"]]), h, fixed = TRUE),
     mc = grepl(e(m[["validation_monte_carlo_lissee"]]), h, fixed = TRUE),
     sans_table = !grepl(e(m[["validation_sans_verdict_table"]]), h, fixed = TRUE)))
 })
-verifier("D rapport figé : colonne levier de la table lissée rendue (table etapes/lissage/resultat/table_lissee, en-tête levier double, première valeur à 17 chiffres), colonne ddl_effectifs_retenus de etapes/validation/parametres/ddl_effectifs (valeur calculée à la main)", {
+verifier("D rapport figé : colonne levier de la table lissée rendue (table etapes/lissage/resultat/table_lissee, en-tête levier double, première valeur à 17 chiffres), colonnes ddl_effectifs_retenus et interpolation_exacte (logical, #239) de etapes/validation/parametres/ddl_effectifs, valeurs FALSE rendues pour X, (FALSE, TRUE) et ddl_effectifs_retenus 3 pour H dans le mélange (H dégénéré, z = 3, h = 1e6) (valeur calculée à la main)", {
   h <- rawToChar(ecrire_rapport(X)); Encoding(h) <- "UTF-8"
   tl <- L$resultat$table_lissee
   de <- V$parametres$ddl_effectifs
@@ -384,10 +497,26 @@ verifier("D rapport figé : colonne levier de la table lissée rendue (table eta
                           "</td><td>", sprintf("%.17g", tl$qx[1L]), "</td><td>&quot;observee&quot;</td><td>",
                           sprintf("%.17g", tl$levier[1L]), "</td>"), h, fixed = TRUE),
     retenus = grepl(paste0("<caption><code>etapes/validation/parametres/ddl_effectifs</code> : data.frame ; lignes : 2 ;",
-                           " colonnes : 3</caption>\n<thead>\n<tr><th>sexe<br>character</th><th>ddl_effectifs<br>",
-                           "double</th><th>ddl_effectifs_retenus<br>double</th></tr>\n</thead>\n<tbody>\n<tr><td>&quot;",
+                           " colonnes : 4</caption>\n<thead>\n<tr><th>sexe<br>character</th><th>ddl_effectifs<br>",
+                           "double</th><th>ddl_effectifs_retenus<br>double</th><th>interpolation_exacte<br>logical",
+                           "</th></tr>\n</thead>\n<tbody>\n<tr><td>&quot;",
                            de$sexe[1L], "&quot;</td><td>", sprintf("%.17g", de$ddl_effectifs[1L]), "</td><td>",
-                           sprintf("%.17g", de$ddl_effectifs_retenus[1L]), "</td></tr>"), h, fixed = TRUE)))
+                           sprintf("%.17g", de$ddl_effectifs_retenus[1L]), "</td><td>FALSE</td></tr>\n<tr><td>&quot;",
+                           de$sexe[2L], "&quot;</td><td>", sprintf("%.17g", de$ddl_effectifs[2L]), "</td><td>",
+                           sprintf("%.17g", de$ddl_effectifs_retenus[2L]), "</td><td>FALSE</td></tr>\n</tbody>"), h,
+                    fixed = TRUE),
+    vrai = local({
+      j <- JEU; g <- j$sexe == "F" | j$age %in% c(40, 48, 60)
+      j$evenements[!g] <- 0; j$exposition_initiale[!g] <- 0; j$exposition_centrale[!g] <- 0
+      xm <- construire_table(j, ROLES, plan_l(lissage = modifyList(LISSAGE, list(ordre_difference = 3,
+                                                                                 parametre_lissage = 1e6))))
+      dm <- xm$etapes$validation$parametres$ddl_effectifs
+      hm <- rawToChar(ecrire_rapport(xm)); Encoding(hm) <- "UTF-8"
+      grepl(paste0("<tr><td>&quot;F&quot;</td><td>", sprintf("%.17g", dm$ddl_effectifs[1L]), "</td><td>",
+                   sprintf("%.17g", dm$ddl_effectifs_retenus[1L]), "</td><td>FALSE</td></tr>\n<tr><td>&quot;H&quot;",
+                   "</td><td>", sprintf("%.17g", dm$ddl_effectifs[2L]), "</td><td>3</td><td>TRUE</td></tr>"), hm,
+            fixed = TRUE)
+    })))
 })
 verifier("D plan sous lissee : canoniser_plan() idempotente, aller-retour ecrire_plan() / lire_plan() identique, fiche$plan canonique sans table_reference (identité exacte)", {
   cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES,
