@@ -526,6 +526,23 @@ TEXTES_245$reference <- list(
   remplace = "IV.2.a (p. 31 à 33)", par = "IV.2.a (p. 31-32) et IV.2.d (p. 33)")
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
   transition_textes_245("#244", "R15", "etapes/lissage/parametres/reference_methode", TEXTES_245$reference)))
+# #245, R15 à R17 : statut des p asymptotiques de X2 et G2 sous la relation
+# lissee, aucun constat versé (positions 8 et 13 de
+# etapes/validation/resultat/statistiques/statut).
+TEXTES_245$p_asym <- list(
+  avant = utf8_245(paste(
+    "approximation non établie : loi du khi-deux à n - somme des leviers des cellules retenues degrés de",
+    "liberté (ligne ddl ; = n - somme des nu_s en arithmétique exacte, quand toute cellule pondérée par",
+    "le lissage est retenue ; pchisq, ddl non entier), queue supérieure ; la table est ajustée sur ces",
+    "décès : le niveau réel du test fondé sur cette p n'est pas établi (constat de simulation hors",
+    "CI documenté) ; approximation non garantie quand des attendus A_c sont petits ; si ce ddl <= 0 : non",
+    "produite (état contraint_par_lissage), en particulier quand chaque segment interpole avec toutes ses",
+    "cellules retenues pondérées (ddl = 0 exactement)")),
+  remplace = SANS_CONSTAT_245[1L], par = SANS_CONSTAT_245[2L])
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
+  transition_textes_245("#245", c("R15", "R16", "R17"), paste0(STATISTIQUES_245, "statut"), TEXTES_245$p_asym,
+                        paste0(STATISTIQUES_245, "grandeur"), "p_asymptotique",
+                        list(chemin = paste0(STATISTIQUES_245, "statistique"), valeurs = c("khi2_pearson", "deviance")))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

@@ -564,7 +564,7 @@ STATUTS_VALIDATION_LISSEE <- local({
                   "liberté (ligne ddl ; = n - somme des nu_s en arithmétique exacte, quand toute cellule pondérée par le",
                   "lissage est retenue ;",
                   "pchisq, ddl non entier), queue supérieure ; la table est ajustée sur ces décès : le niveau réel du",
-                  "test fondé sur cette p n'est pas établi (constat de simulation hors CI documenté) ; approximation",
+                  "test fondé sur cette p n'est pas établi (aucun constat de simulation versé) ; approximation",
                   "non garantie quand des attendus A_c sont petits ; si ce ddl <= 0 : non produite (état",
                   "contraint_par_lissage), en particulier quand chaque segment interpole avec toutes ses cellules",
                   "retenues pondérées (ddl = 0 exactement)")

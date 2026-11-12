@@ -1956,6 +1956,13 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "Les p-valeurs asymptotiques et exactes des signes, des suites et de Wilcoxon reposent sur une hypothèse",
     "qui n'est pas H0 (i) (colonne statut) ; seules les p-valeurs de Monte-Carlo ont un niveau garanti sous",
     "H0 (i)."),
+  # Hypothèses des tests sous la relation lissee, à la place de
+  # validation_hypotheses_tests (#245, b ; avis d'actuary du 12/11/2026).
+  validation_hypotheses_tests_lissee = paste(
+    "Sous la relation « lissee », aucune p-valeur n'a de niveau établi, la table étant ajustée sur ces mêmes décès :",
+    "ni les p-valeurs asymptotiques de X² et G², ni les p-valeurs asymptotiques et exactes des signes, des suites",
+    "et de Wilcoxon, calculées sous leurs hypothèses propres (colonne statut) ; aucune p-valeur de Monte-Carlo",
+    "n'est produite."),
   validation_multiplicite = paste(
     "Aucune correction de multiplicité : chaque p-valeur (statistiques et sous-groupes) est marginale ; sous H0,",
     "la probabilité qu'au moins une de ces p-valeurs soit petite croît avec leur nombre."),
@@ -2397,25 +2404,28 @@ corps_section <- function(x, k) {
       # omise, mentions validation_positionnee et validation_h0_positionnee
       # (C2), multiplicité, hypothèses des tests et Monte-Carlo multinomial ;
       # sous les deux autres, première phrase selon la présence de l'étape
-      # positionnement (décision du mainteneur du 08/11/2026).
+      # positionnement (décision du mainteneur du 08/11/2026). Sous lissee,
+      # hypothèses des tests par validation_hypotheses_tests_lissee (#245, b).
       pv <- x[["etapes"]][["validation"]][["parametres"]]
       table_prise <- if ("positionnement" %in% etapes) "validation_sans_verdict_table_positionnement"
                      else "validation_sans_verdict_table"
       sans_verdict <- paragraphe(m[[table_prise]], " ", m[["validation_sans_verdict"]])
       r <- switch(relation_lue(pv[["relation_table"]]),
         independante = list(verdict = sans_verdict, relation = "validation_independante", h0 = "validation_h0",
-                            tests = TRUE, mc = "validation_monte_carlo"),
+                            tests = TRUE, hyp = "validation_hypotheses_tests", mc = "validation_monte_carlo"),
         ajustee_hors_outil = list(verdict = sans_verdict, relation = "validation_ajustee", h0 = "validation_h0",
                                   tests = FALSE, mc = NULL),
         positionnee = list(verdict = paragraphe(m[["validation_sans_verdict"]]), relation = "validation_positionnee",
-                           h0 = "validation_h0_positionnee", tests = TRUE, mc = "validation_monte_carlo_positionnee"),
+                           h0 = "validation_h0_positionnee", tests = TRUE, hyp = "validation_hypotheses_tests",
+                           mc = "validation_monte_carlo_positionnee"),
         lissee = list(verdict = paragraphe(m[["validation_sans_verdict"]]), relation = "validation_lissee",
-                      h0 = "validation_h0_lissee", tests = TRUE, mc = "validation_monte_carlo_lissee"),
+                      h0 = "validation_h0_lissee", tests = TRUE, hyp = "validation_hypotheses_tests_lissee",
+                      mc = "validation_monte_carlo_lissee"),
         stop("corps_section() : relation de l'étape validation sans mentions (erreur de programmation).", call. = FALSE))
       return(c(r$verdict,
                paragraphe(m[[r$relation]]),
                paragraphe(m[[r$h0]]),
-               if (r$tests) paragraphe(m[["validation_hypotheses_tests"]]),
+               if (r$tests) paragraphe(m[[r$hyp]]),
                mention_unite(x),
                if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
                if (r$tests) c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[[r$mc]])),

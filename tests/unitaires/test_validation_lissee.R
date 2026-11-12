@@ -114,7 +114,10 @@ verifier("A STATUTS_VALIDATION_LISSEE : mêmes (statistique, grandeur, sous_h0) 
                                                         "leviers des cellules retenues degrés de liberté")) &&
       endsWith(k("deviance", "p_asymptotique"), paste("contraint_par_lissage), en particulier quand chaque segment",
                                                       "interpole avec toutes ses cellules retenues pondérées (ddl = 0",
-                                                      "exactement)")),
+                                                      "exactement)")) &&
+      grepl("le niveau réel du test fondé sur cette p n'est pas établi (aucun constat de simulation versé) ;",
+            k("deviance", "p_asymptotique"), fixed = TRUE),
+    sans_constat = !any(grepl("documenté", b$statut, fixed = TRUE)),
     ddl_interpolation = all(vapply(c("khi2_pearson", "deviance"), function(s) grepl(paste(
       "contribution d'un segment qui compte exactement z cellules pondérées (z ordre des différences du lissage,",
       "etapes/lissage/parametres/ordre_difference ; le lissage y interpole, chaque levier",
@@ -468,7 +471,7 @@ verifier("C relation independante : table construite et ddl effectifs passés ig
 
 # --- D. Rapport figé, plan, importance_exclusions -----------------------------------
 
-verifier("D rapport figé : titre propre à la relation lissee, mentions validation_lissee (dont la phrase de l'interpolation exacte, #239), validation_h0_lissee et validation_monte_carlo_lissee, sans la phrase de la table de référence prise telle quelle (valeur calculée à la main)", {
+verifier("D rapport figé : titre propre à la relation lissee, mentions validation_lissee (dont la phrase de l'interpolation exacte, #239), validation_h0_lissee, validation_hypotheses_tests_lissee (à la place de validation_hypotheses_tests, #245) et validation_monte_carlo_lissee, sans la phrase de la table de référence prise telle quelle (valeur calculée à la main)", {
   h <- rawToChar(ecrire_rapport(X)); Encoding(h) <- "UTF-8"
   m <- tablexp:::MENTIONS_RAPPORT
   e <- tablexp:::echapper_html
@@ -484,6 +487,12 @@ verifier("D rapport figé : titre propre à la relation lissee, mentions validat
       "vaut 0, les p ne sont pas produites (contraint_par_lissage).")),
     h0 = grepl(e(m[["validation_h0_lissee"]]), h, fixed = TRUE),
     mc = grepl(e(m[["validation_monte_carlo_lissee"]]), h, fixed = TRUE),
+    hypotheses = grepl(e(paste(
+      "Sous la relation « lissee », aucune p-valeur n'a de niveau établi, la table étant ajustée sur ces mêmes",
+      "décès : ni les p-valeurs asymptotiques de X² et G², ni les p-valeurs asymptotiques et exactes des signes, des",
+      "suites et de Wilcoxon, calculées sous leurs hypothèses propres (colonne statut) ; aucune p-valeur de",
+      "Monte-Carlo n'est produite.")), h, fixed = TRUE) &&
+      !grepl(e(m[["validation_hypotheses_tests"]]), h, fixed = TRUE),
     sans_table = !grepl(e(m[["validation_sans_verdict_table"]]), h, fixed = TRUE)))
 })
 verifier("D rapport figé : colonne levier de la table lissée rendue (table etapes/lissage/resultat/table_lissee, en-tête levier double, première valeur à 17 chiffres), colonnes ddl_effectifs_retenus et interpolation_exacte (logical, #239) de etapes/validation/parametres/ddl_effectifs, valeurs FALSE rendues pour X, (FALSE, TRUE) et ddl_effectifs_retenus 3 pour H dans le mélange (H dégénéré, z = 3, h = 1e6) (valeur calculée à la main)", {
