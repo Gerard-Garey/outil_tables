@@ -760,6 +760,7 @@ lisser_segments_poisson <- function(cel, g_seg, segs, par_segment, segmentation,
   if (!laml) statuts <- statuts[statuts$grandeur != "segments/parametre_lissage", , drop = FALSE]
   rownames(statuts) <- NULL
   constantes <- CONSTANTES_LISSAGE_POISSON[seq_len(if (laml) 6L else 4L), , drop = FALSE]
+  rownames(constantes) <- NULL
   parametres <- Filter(Negate(is.null),
                        list(methode = methode, plage_ages = plage_ages, ordre_difference = ordre_difference,
                             critere_lissage = critere_lissage, niveau = niveau, parametre_lissage = parametre_lissage,

@@ -388,6 +388,19 @@ verifier("G sous laml : intervalle_lissage dans les paramètres, constantes (6 l
   identical(names(p)[1:6], names(LAML)) && identical(p$intervalle_lissage, c(1e-2, 1e4)) &&
     identical(nrow(p$constantes), 6L) && "segments/parametre_lissage" %in% p$statuts$grandeur
 })
+verifier("G noms de lignes automatiques (.row_names_info(x, type = 1L) < 0, condition de l'aplatissement des références, #225) pour chaque data.frame de etapes$lissage, sous declare et sous laml ; au moins constantes, statuts, table_lissee, segments comptés (valeur calculée à la main)", {
+  vus <- function(v, chemin) {
+    if (is.data.frame(v)) return(setNames(.row_names_info(v, type = 1L) < 0L, chemin))
+    if (is.list(v)) return(unlist(lapply(names(v), function(n) vus(v[[n]], paste0(chemin, "/", n)))))
+    NULL
+  }
+  r <- list(declare = vus(X1$etapes$lissage, "lissage"), laml = vus(XL$etapes$lissage, "lissage"))
+  attendus <- paste0("lissage/", c("parametres/constantes", "parametres/statuts", "resultat/table_lissee",
+                                   "resultat/segments"))
+  if (!all(vapply(r, function(x) all(attendus %in% names(x)), NA))) return("data.frame attendus non parcourus")
+  mauvais <- unlist(lapply(names(r), function(k) { m <- names(r[[k]])[!r[[k]]]; if (length(m)) paste(k, m) }))
+  if (length(mauvais)) sprintf("noms de lignes non automatiques : %s", paste(mauvais, collapse = " ; ")) else TRUE
+})
 verifier("G table_lissee : data.frame nu, colonnes sexe, age, qx, etat, levier, borne_inf_credibilite, borne_sup_credibilite ; bornes encadrant qx", {
   t <- L1$resultat$table_lissee
   identical(class(t), "data.frame") &&
