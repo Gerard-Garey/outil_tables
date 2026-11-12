@@ -948,3 +948,23 @@ Rédigée par `architect` à l'étape (0')(d) de la porteuse `claude/lissage-whi
 **Effet sur les résultats : aucun** par la présente annotation. Par B19, celui de l'ADR 0017, « Conséquences » (R1 à R14 identiques hors jeton du code, sauf R8 et R9 par #215 ; messages `etape_inconnue` et `etapes_hors_ordre` changés, visa d'`actuary` ; HTML des rapports).
 
 Issues : #223, #224, #225, #144. Décisions M413, M414, M415. ADR 0017 ; ADR 0015, 0016 (annotations du même jour). Branche `claude/lissage-whittaker`, PR #221.
+
+## Annotation du 12 novembre 2026 — contrat « format des jeux simulés » (annotations du 25/10/2026, (c), et du 08/11/2026, (b) et (g)) : défauts des formes agrégats et stocks successifs (`[P4]`, #189, #191 ; M412, M414, M419)
+
+Rédigée par `architect` sur la porteuse `claude/lissage-whittaker` (B19, PR #221, tête `019bcfe`), après la fusion de `[P4]` (PR #226, `8ba2db4`), selon le corps de la PR #226 (« Décisions et termes proposés ») et l'étape (0')(d) du § 1.20 de la feuille de route. Le texte ci-dessus, annotations comprises, n'est pas réécrit ; le nom de l'objet fait foi (M77, (b)). Décrit le code fusionné, lu à `019bcfe` (`R/simulation.R`, *vérifié* par lecture).
+
+**(a) Champ `unite_observation` de la forme agrégats (#189).** Sous les modes multi-contrats (`uniforme_multi`, `age_exact_multi`), la forme agrégats exige `unite_observation`, « tete » (fenêtres réunies par tête avant la projection) ou « contrat » ; interdit sous les modes simples ; « tete » refusée sous la transition de rachat (transition du contrat, M46) ; refus `forme_invalide`. Le champ est ajouté en fin de `simulation$forme`, sous les modes multi-contrats seulement (ajout compatible). Liste des formes admises sous mode multi-contrats : `CHAMPS_FORMES_MULTI` (stocks successifs toujours refusés, #190).
+
+**(b) E^i sous `age_atteint_annee` : écart à l'annotation du 08/11/2026, (g).** (g) écrit « `exposition_initiale` (sans `annee` seulement) ». Sous la convention `age_atteint_annee` (admise par #189), `exposition_initiale` est produite **avec et sans** `annee` : la cellule (année civile, âge atteint dans l'année) finit au 1er janvier suivant, le complément de l'événement est défini. Sous `dernier_anniversaire`, (g) reste vrai. Écart accepté par `actuary` dans `[P4]` (M414, (3)).
+
+**(c) Constante `DEFAUTS_FORMES`** (catalogue des défauts d'une forme, `CONTEXT.md`) : une entrée par forme (`lignes`, `agregats`, `stocks_successifs`), avec catalogue (unité, éligibilité, altération, motif et refus attendus écrits en dur), combinaisons, cible, unités ciblables, ordre des tirages et texte de validité ; l'entrée `lignes` reprend les constantes existantes telles quelles. Toute forme a son entrée ; l'attendu n'est jamais calculé par `donnees` (non-circularité, annotation du 25/10/2026).
+
+**(d) Champ `retirees` de l'attribut `defauts` (#191).** Sous les stocks successifs, l'attribut `defauts` garde les sept champs de l'annotation du 25/10/2026, puis `retirees` en fin (ajout compatible) : une ligne par ligne retirée (rang dans le jeu propre de la forme, déclaration, défaut, unité, `id_contrat`, `type_ligne`, `date_inventaire`, motif et refus attendus) ; décompte `retirees` dans `decomptes`. « Inventaire perdu » : toutes les dates de la grille éligibles (décision du mainteneur du 11/11/2026, M414).
+
+**(e) Paramètre `avec_defauts` de `controler_forme()` retiré.** Les défauts ne sont plus refusés par forme : toute forme a son catalogue (refus `forme_invalide` « forme avec l'argument defauts » levés ; M412, V1). Fonction interne, aucune signature exportée touchée.
+
+**(f) Graines.** Plage de `[P4]` [22 001 200 ; 22 001 299] acceptée par le mainteneur (M412, (3)) ; valeurs employées 22 001 200 à 207, 230 à 235, 265 à 272 et 281 (*vérifié* par `grep`), dans `tests/unitaires/test_simulateur_logistique.R`, `test_simulateur_agregats.R` et `test_simulateur_stocks.R`. Déclaration dans `tests/controles/graines_admises.csv` par la session (fichier de `tests/`).
+
+**Effet sur les résultats : aucun** par la présente annotation ; par `[P4]`, R1 à R14 identiques au bit près (CI à `05ed733`, corps de la PR #226).
+
+Issues : #189, #191, #211 ; #190, #234, #235, #238. Décisions M412, M414, M419. Branche `claude/simulateur-additif`, PR #226 ; porteuse PR #221.
