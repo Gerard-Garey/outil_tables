@@ -10003,7 +10003,12 @@ dans la colonne \code{statut} du résultat.
     (\code{segment\_tranche}, \code{segment}, \code{annee}), une ligne par
     tranche déclarée, à l'état \code{aucune\_cellule\_retenue}, et
     \code{annee} en \code{integer} (issue~\#210, décision M400~; avant, R
-    s'arrêtait sur une erreur d'affectation). Aucune
+    s'arrêtait sur une erreur d'affectation). La colonne \code{annee} de
+    chaque regroupement (\code{NA} hors du regroupement \code{annee}) est
+    formée par \code{annees\_groupe()}~: un vecteur d'années de la longueur
+    du nombre de groupes, converti en \code{integer}~; toute autre longueur
+    est une erreur de programmation, jamais un recyclage silencieux
+    (issue~\#217~; auparavant, \code{rep\_len()} masquait un tel écart). Aucune
     correction de multiplicité (décision M217).
   \item \textbf{S6, signes} (\code{signes})~: $n_{+}$, $n_{-}$ et
     nombre de résidus nuls (retirés du test), $n = n_{+} + n_{-}$~;
@@ -11535,6 +11540,12 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     défaut~; sur un jeu d'un segment, $X^2$, $G^2$, ddl $= n - S$, SMR
     global égal à 1 et grandeurs sous $H_0$ non produites, fluctuation
     exacte et asymptotique et espérances binomiales par sommes directes~;
+    \code{annees\_groupe()} seule (nombre de groupes nul, longueur égale,
+    trois longueurs différentes en erreur de programmation), puis sous
+    \code{sous\_groupes\_validation()} par année et par sexe (colonne
+    \code{annee} en \code{integer}, \code{NA} hors du regroupement
+    \code{annee}), et une mutation qui lui substitue un recyclage par
+    \code{rep\_len()}, que le contrôle des longueurs détecte (issue~\#217)~;
     réplications multinomiales (somme des décès de chaque réplique égale à
     $O_s$, découpage par blocs sans effet, ordre de tirage, état du
     générateur restauré, reproductibilité à graine égale)~;
@@ -11675,6 +11686,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{p\_somme\_binomiales\_normale()} & interne & effectifs, probabilités, valeur observée $o$ & p-valeurs inférieure, supérieure et centrale de l'approximation normale d'une somme de binomiales indépendantes, avec correction de continuité (\code{pnorm()})~; erreur de programmation si la variance est nulle (issue~\#178) \\
 \catalogue{fonctions-validation}{pvaleur\_monte\_carlo()} & interne & observé, répliques, sens & $p_{MC}$ et erreur de Monte-Carlo \\
 \catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, relation, $B$, graine, segment (sous \code{positionnee} seulement) & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
+\catalogue{fonctions-validation}{annees\_groupe()} & interne & années, nombre de groupes $n_g$ & colonne \code{annee} d'un regroupement de S5~: \code{integer(0)} si $n_g = 0$, les années en \code{integer} si leur longueur vaut $n_g$, erreur de programmation sinon, sans recyclage (issue~\#217) \\
 \catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante \\
 \catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau, plafond de convolution (\code{n\_max}, par défaut \code{N\_MAX\_}\allowbreak\code{PRODUITS\_}\allowbreak\code{CONVOLUTION}~; autre valeur pour les seuls tests) & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, exactes ou, au-delà du plafond, asymptotiques, bornes d'un segment, états \\
 \catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine, étape \code{positionnement} & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
