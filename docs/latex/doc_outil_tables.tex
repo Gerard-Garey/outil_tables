@@ -393,7 +393,7 @@ d'appariement et de SMR partagées avec la validation
 \code{R/prospective.R} & tables prospectives (section~\ref{sec:prospective}) & à créer \\
 \code{R/fermeture.R} & fermeture aux âges extrêmes (section~\ref{sec:fermeture}) & à créer \\
 \code{R/validation.R} & statistiques de validation d'une table de référence
-prise telle quelle ou de la table positionnée, et importance des
+prise telle quelle, de la table positionnée ou de la table lissée, et importance des
 exclusions~; suivi d'expérience à venir
 (section~\ref{sec:validation}) & présent \\
 \code{R/rapport.R} & quantités des rapports, fiche de construction, empreintes,
@@ -3483,9 +3483,12 @@ table~; \code{plage\_ages}~: âges entiers~; \code{niveau}
 (section~\ref{sec:homogeneite}) \\
 \code{validation} & \code{calculer\_validation()} & \code{donnees},
 \code{exposition} &
-\code{table\_reference}~: clé de la table~; \code{relation\_table}~:
-\code{independante}, \code{ajustee\_hors\_outil} ou \code{positionnee}
-(étape \code{positionnement} au plan, même clé, même plage)~;
+\code{relation\_table}~:
+\code{independante}, \code{ajustee\_hors\_outil}, \code{positionnee}
+(étape \code{positionnement} au plan, même clé, même plage) ou
+\code{lissee} (étape \code{lissage} au plan, même plage)~;
+\code{table\_reference}~: clé de la table, requise sauf sous
+\code{lissee}, où elle est interdite~;
 \code{plage\_ages}, \code{tranches\_age}~: âges entiers~;
 \code{niveau}~; \code{replications}~: entier $\ge 1$
 (section~\ref{sec:validation-etape}) \\
@@ -3608,7 +3611,11 @@ et interdit sinon~; un paramètre sans condition est requis sous tous les
 plans~; aucun défaut implicite n'est créé. Cas de cette version~: à l'étape
 \code{lissage}, \code{ponderation} selon \code{methode} et
 \code{parametre\_lissage} selon \code{critere\_lissage}
-(section~\ref{sec:lissage-etape}). La valeur du gouvernant ne dépend pas
+(section~\ref{sec:lissage-etape})~; à l'étape \code{validation},
+\code{table\_reference} selon \code{relation\_table}, requis sous
+\code{independante}, \code{ajustee\_hors\_outil} et \code{positionnee},
+interdit sous \code{lissee}, où aucune table de référence n'est lue
+(section~\ref{sec:validation-etape}). La valeur du gouvernant ne dépend pas
 des rôles~: la présence de ces paramètres est contrôlée dès
 \code{valider\_plan()}, par \code{controler\_parametres\_condition()}
 (refus \code{parametre\_manquant} et \code{parametre\_inattendu}, module
@@ -3677,7 +3684,8 @@ point~d). Cette phase des valeurs parcourt les étapes du plan dans l'ordre
 et fait, pour chacune~: (1)~le contrôle de forme et de domaine de ses
 gouvernants, contrôle croisé entre gouvernants compris, par la fonction du
 module (\code{controler\_gouvernants\_lissage()} pour l'étape
-\code{lissage})~; (2)~la présence des paramètres conditionnels à la valeur
+\code{lissage}, \code{controler\_relation\_table()} pour l'étape
+\code{validation})~; (2)~la présence des paramètres conditionnels à la valeur
 d'un gouvernant (\code{controler\_parametres\_condition()})~; (3)~les
 valeurs, par la fonction de contrôle du module. Un gouvernant hors de son
 domaine, seul ou croisé avec un autre, est donc refusé sous son motif de
@@ -3736,7 +3744,8 @@ section~\ref{sec:tables-reference-recues})~; si le plan comprend l'étape
 (\code{controler\_convention\_lissage()}, refus
 \code{convention\_lissage\_non\_admise} du module \code{lissage},
 section~\ref{sec:lissage-etape})~; pour chaque étape du plan
-qui lit une table, \code{positionnement} puis \code{validation}, lecture de
+qui lit une table, \code{positionnement} puis \code{validation} si elle
+cite une table (non sous la relation \code{lissee}), lecture de
 la table de la clé qu'elle cite (\code{table\_citee()}) et contrôles
 d'entrée de cette étape (\code{controler\_entrees\_validation()}, module
 \code{positionnement}, refus sous le module de l'étape~: convention d'âge
@@ -3817,7 +3826,10 @@ d'exposition et les paramètres effectifs de l'étape \code{exposition}
 graine du plan et, sous la relation \code{positionnee}, le résultat de
 l'étape \code{positionnement} (\code{etapes\$positionnement}, \code{NULL}
 en son absence~; rien ne passe hors de l'objet~;
-section~\ref{sec:validation-etape})~; l'étape
+section~\ref{sec:validation-etape}), ou, sous la relation \code{lissee},
+sans table de référence, la table construite et les degrés de liberté
+effectifs par segment rendus par \code{table\_construite()}, passés en
+valeur~; l'étape
 \code{importance\_exclusions} lit les données reçues et les rôles, le
 résultat des étapes \code{donnees} (unité d'observation, lignes conservées,
 lignes exclues par motif, observations) et \code{exposition} (table
@@ -3866,7 +3878,15 @@ présente si et seulement si la table \code{segments} du résultat porte une
 colonne \code{ddl\_effectifs}, dont chaque valeur est alors identique à la
 somme des leviers de son segment (ADR 0017, point~5.5). Les colonnes propres
 au producteur suivent les colonnes communes et ne sont lues par aucun
-lecteur au titre du contrat. Une table qui ne tient pas ce contrat est une
+lecteur au titre du contrat~; \code{levier}, colonne facultative du
+contrat, n'en fait pas partie~: la validation sous la relation
+\code{lissee} l'exige et en lit les valeurs (ADR 0017, point~5.5,
+décision M417~; section~\ref{sec:validation-etape}). La table construite
+est passée aux lecteurs en valeur, avec la plage de l'étape et les degrés
+de liberté effectifs, sans qu'aucun lecteur ne connaisse le nom de l'étape
+productrice~; seule la cohérence entre une relation de validation et son
+producteur nomme celui-ci (\code{lissage\_absent},
+section~\ref{sec:validation-etape}). Une table qui ne tient pas ce contrat est une
 \textbf{erreur de programmation}, jamais un refus~: elle ne peut naître que
 d'un défaut du producteur, non des données. La table construite n'est pas
 la table finale~: elle reste dans le \code{resultat} de son étape, et
@@ -4890,7 +4910,7 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{valider\_plan()} & exportée & plan & plan inchangé, ou refus (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{controler\_inventaires\_plan()} & interne & grille, valeurs validées \code{p} & \code{NULL} invisible, ou refus \code{inventaires\_invalides} (forme, domaine, croissance~; tous les défauts cités), puis \code{inventaires\_periode} (première date $\neq$ veille du début, dernière $\neq$ fin effective)~; appelée par \code{valider\_plan()} si le champ est présent \\
 \catalogue{fonctions-construire-table}{controler\_inventaires\_recette()} & interne & plan, recette validée & \code{NULL} invisible, ou refus \code{inventaires\_manquants} (recette dont les rôles requis comprennent \code{date\_inventaire}, champ absent), \code{inventaires\_inattendus} (autre recette, champ présent)~; appelée par \code{controler\_plan\_roles()} après \code{controler\_roles()} \\
-\catalogue{fonctions-construire-table}{controler\_parametres\_recette()} & interne & plan, recette validée & \code{NULL} invisible, ou, étape par étape dans l'ordre du plan, refus \code{parametre\_manquant} (paramètre de la recette retenue absent) puis \code{parametre\_inattendu} (paramètre d'une autre recette présent)~; appelée par \code{controler\_plan\_roles()} après le contrôle de présence de la grille \\
+\catalogue{fonctions-construire-table}{controler\_parametres\_recette()} & interne & plan, recette validée, catalogue des paramètres (injectable pour les tests) & \code{NULL} invisible, ou, étape par étape dans l'ordre du plan, refus \code{parametre\_manquant} (paramètre de la recette retenue absent) puis \code{parametre\_inattendu} (paramètre d'une autre recette présent)~; appelée par \code{controler\_plan\_roles()} après le contrôle de présence de la grille \\
 \catalogue{fonctions-construire-table}{controler\_parametres\_condition()} & interne & nom de l'étape, ses paramètres, son catalogue & \code{NULL} invisible, ou, gouvernant par gouvernant dans l'ordre du catalogue, refus \code{parametre\_manquant} (requis sous la valeur du gouvernant, absent) puis \code{parametre\_inattendu} (requis sous une autre valeur, présent), module \code{construire\_table}~; gouvernant absent ou non contrôlé~: erreur de programmation~; appelée par \code{valider\_plan()} pour chaque étape, après ses gouvernants et avant ses valeurs (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des trois champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
@@ -4899,7 +4919,7 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{controler\_tables\_rejeu()} & interne & champ de la fiche, tables reçues, empreinte du code de la fiche~; catalogue des tables embarquées & étape~7~bis du rejeu (section~\ref{sec:rejeu})~: liste assemblée (tables reçues et relues), empreintes recalculées par clé, textes de la ligne \code{tables\_reference} du bilan~; ne reçoit plus le plan, le contrôle des tables reçues étant fait par \code{construire\_table()} (issue~\#82) \\
 \catalogue{fonctions-construire-table}{table\_citee()} & interne & tables reçues, clé & objet \code{table\_reference} de la clé, comparée en UTF-8 comme au contrôle des tables reçues~; erreur de programmation si la clé est absente (le contrôle des tables reçues l'a exclu)~; table citée par chaque étape qui lit une table, lue par \code{controler\_entrees()} \\
 \catalogue{fonctions-construire-table}{controler\_plan\_roles()} & interne & données, rôles, plan, provenance & première couche du contrôle des entrées, dans cet ordre~: \code{valider\_plan()} puis \code{canoniser\_plan()}, \code{controler\_roles()} sur la segmentation canonique, qui appelle \code{deduire\_recette()} et rend la recette, présence de la grille d'inventaires puis des paramètres conditionnels selon la recette (lignes ci-dessus), \code{resoudre\_convention()} si l'étape \code{exposition} est au plan, contrôle des étapes et des estimateurs admis sous la recette (module \code{donnees}, section~\ref{sec:recettes}), \code{controler\_provenance()}~; rend le plan canonique et les valeurs validées \code{p} (transition retenue, début, fin, borne $B$, période, délai et, si le plan la porte, grille d'inventaires, par la fonction sans contrôle du module \code{donnees}), \code{recette} et \code{conv} (\code{NULL} sans \code{exposition})~; appelée par \code{controler\_entrees()} et par \code{rejouer\_fiche()} (étape~6) (section~\ref{sec:execution}~; issue~\#82) \\
-\catalogue{fonctions-construire-table}{controler\_entrees()} & interne & données, rôles, plan, provenance, tables de référence & seconde couche~: \code{controler\_plan\_roles()}, puis le contrôle des tables reçues (section~\ref{sec:tables-reference-recues}), la convention retenue de l'étape \code{lissage} si elle est au plan (fonction de contrôle du module \code{lissage}) et, pour chaque étape du plan qui lit une table, la lecture de sa table (\code{table\_citee()}) et ses contrôles d'entrée (section~\ref{sec:validation-etape})~; rend les valeurs de la première couche, la valeur de \code{fiche\$tables\_reference} et la table citée par étape~; appelée une fois par \code{construire\_table()}, seule (section~\ref{sec:execution}~; issue~\#82) \\
+\catalogue{fonctions-construire-table}{controler\_entrees()} & interne & données, rôles, plan, provenance, tables de référence & seconde couche~: \code{controler\_plan\_roles()}, puis le contrôle des tables reçues (section~\ref{sec:tables-reference-recues}), la convention retenue de l'étape \code{lissage} si elle est au plan (fonction de contrôle du module \code{lissage}) et, pour chaque étape du plan qui lit une table (\code{validation} seulement si elle en cite une, non sous \code{lissee}), la lecture de sa table (\code{table\_citee()}) et ses contrôles d'entrée (section~\ref{sec:validation-etape})~; rend les valeurs de la première couche, la valeur de \code{fiche\$tables\_reference} et la table citée par étape~; appelée une fois par \code{construire\_table()}, seule (section~\ref{sec:execution}~; issue~\#82) \\
 \catalogue{fonctions-construire-table}{table\_construite()} & interne & étapes exécutées, segmentation, nom de l'étape productrice & table construite, plage d'âges de l'étape et ddl effectifs par segment (\code{NULL} si la table \code{segments} du résultat n'en porte pas)~; contrat commun contrôlé, toute violation étant une erreur de programmation~; appelée par \code{construire\_table()} juste après l'étape productrice (section~\ref{sec:execution}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance, tables de référence & objet \code{construction} (section~\ref{sec:objet-resultat})~; table construite contrôlée après l'étape productrice~; empreinte du résultat posée avant \code{execution} \\
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», longueur lue sans la classe si celle-ci est d'encodage \code{bytes} (issue~\#128), pour un message ou le bilan du rejeu \\
@@ -8793,7 +8813,9 @@ hypothèses, la référence et les statuts sont restitués par le rapport figé
 à partir de \code{etapes\$lissage\$parametres} (ADR 0017, point~6~;
 décision M415). La table lissée est une table construite~: un changement
 de ses valeurs est soumis au visa du mainteneur comme celui d'une table
-finale (décisions M308 et M413). Le rapport figé la restitue dans la
+finale (décisions M308 et M413). La validation sous la relation
+\code{lissee} la lit, colonne \code{levier} comprise
+(section~\ref{sec:validation-etape}). Le rapport figé la restitue dans la
 section \code{etape\_lissage} (section~\ref{sec:rapport-fige}).
 
 \subsection{Vérifications}
@@ -9537,8 +9559,9 @@ par une branche ultérieure (\code{docs/}\allowbreak\code{feuille-de-route.md}, 
 issue~\#4~; pour \code{homogeneite}, avis de forme de l'issue~\#168,
 F10~: section~\ref{sec:homogeneite})~: l'étape \code{validation} (issue~\#4), qui calcule les
 statistiques de validation d'une table de référence \emph{prise telle
-quelle}, ou de la table positionnée de la même construction (relation
-\code{positionnee}, issue~\#167), face aux observations de la construction
+quelle}, de la table positionnée de la même construction (relation
+\code{positionnee}, issue~\#167) ou de sa table lissée (relation
+\code{lissee}, issue~\#224), face aux observations de la construction
 (sections~\ref{sec:validation-etape} à~\ref{sec:validation-verifications}),
 l'étape \code{homogeneite} (issue~\#168, section~\ref{sec:homogeneite}),
 qui compare les segments de la construction entre eux, sans table,
@@ -9550,7 +9573,8 @@ concernent (et, pour la seconde, les données reçues, les rôles, la table
 de l'étape \code{validation} et les valeurs validées de la transition, de
 la période, du délai, de la recette et de la convention~; issue~\#82~;
 pour la première, sous la relation \code{positionnee}, le résultat de
-l'étape \code{positionnement}), jamais le plan entier. Le module n'appelle que des modules
+l'étape \code{positionnement}, et, sous la relation \code{lissee}, la table
+construite et les degrés de liberté effectifs par segment), jamais le plan entier. Le module n'appelle que des modules
 situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
 (\code{citer()}, \code{liste\_guillemets()}, et, pour
 \code{importance\_exclusions}, \code{construire\_observations()},
@@ -9559,7 +9583,8 @@ situés avant lui (section~\ref{sec:graphe})~: \code{outils}, \code{donnees}
 qu'il appelait avant l'issue~\#82, ni \code{SEXES\_TABLE}, qu'emploient
 les briques déplacées vers \code{positionnement}),
 \code{exposition} (\code{calculer\_exposition()}, pour
-\code{importance\_exclusions}, et \code{controler\_plage\_ages()}) et
+\code{importance\_exclusions}, \code{controler\_plage\_ages()} et, sous la
+relation \code{lissee}, \code{grille\_plage()}) et
 \code{brut} (\code{taux\_poisson()}) et, depuis l'issue~\#167,
 \code{positionnement} (\code{apparier\_table()}, \code{attendus\_cellules()},
 \code{smr\_poisson()} et \code{controler\_cle\_table()})~;
@@ -9586,7 +9611,14 @@ d'\code{actuary-approfondi} du 06/11/2026 (issue~\#4, commentaire
 M253 à M258) et des décisions M260 à M262~; la relation
 \code{positionnee}, du §~8 de la spécification d'\code{actuary-approfondi}
 sur l'issue~\#167 (décision M289), de l'avis de forme de la même issue (F3,
-F5 et F9, décision M292) et de la décision M309 (statuts).
+F5 et F9, décision M292) et de la décision M309 (statuts)~; la relation
+\code{lissee}, du corps de l'issue~\#224 (option L-b~; décisions D1 à D13
+du mainteneur du 11/11/2026, M413, dont D7~: statistiques d'ajustement à
+ddl effectifs non entiers, statut d'approximation non établie), de la
+spécification de forme d'\code{actuary-approfondi} (même issue,
+commentaire 6799594124), de l'ADR 0017 (points~1.5, 3.4, 5, 10.2, 12
+et~15~; M415) et de son amendement du 11/11/2026 (point~5.5, décision
+M417~: ddl par la somme des leviers des cellules retenues).
 Le \emph{suivi d'expérience} (E2.18), qui comparera une table à de nouvelles
 observations, n'est pas encore produit~: les statistiques sont écrites une
 seule fois, par des fonctions qui reçoivent des cellules (décès, exposition
@@ -9656,18 +9688,26 @@ est $\tilde q / (-\ln(1 - \tilde q)) - 1 < 0$, d'ordre $-\tilde q / 2$
 pour $\tilde q$ petit.
 
 \medskip
-{\sloppy \textbf{Paramètres}, tous requis, sans défaut (constante
+{\sloppy \textbf{Paramètres}, sans défaut (constante
 \code{PARAMETRES\_ETAPES}), soumis à la règle commune de forme
-(section~\ref{sec:plan})~:
+(section~\ref{sec:plan}), tous requis sauf \code{table\_reference},
+paramètre conditionnel~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{table\_reference}~: chaîne unique, non vide, la \emph{clé} de
     la table dans l'argument \code{tables\_reference} de
     \code{construire\_table()}~; le plan cite une clé, jamais une valeur
     (section~\ref{sec:tables-reference-recues}~; constante
-    \code{PARAMETRES\_CLE\_TABLE})~;
+    \code{PARAMETRES\_CLE\_TABLE})~; conditionnel au gouvernant
+    \code{relation\_table}~: requis sous \code{independante},
+    \code{ajustee\_hors\_outil} et \code{positionnee}, interdit sous
+    \code{lissee}, où la table validée est la table lissée et aucune table
+    de référence n'est lue (ADR 0017, point~3.4~; refus
+    \code{parametre\_manquant} et \code{parametre\_inattendu},
+    section~\ref{sec:plan})~;
   \item \code{relation\_table}~: \emph{relation table~/ observations},
-    \code{independante}, \code{ajustee\_hors\_outil} ou
-    \code{positionnee} (constante \code{RELATIONS\_TABLE}~; ci-dessous)~;
+    gouvernant, \code{independante}, \code{ajustee\_hors\_outil},
+    \code{positionnee} ou \code{lissee} (constante \code{RELATIONS\_TABLE}~;
+    ci-dessous)~;
   \item \code{plage\_ages}~: deux valeurs entières, $0 \le \min \le \max$~;
   \item \code{tranches\_age}~: bornes inférieures des tranches d'âge des
     sous-groupes, valeurs entières strictement croissantes, la première égale
@@ -9685,11 +9725,17 @@ exemple \code{999L}) y est \textbf{refusé} sous le motif du paramètre
 (décision M257)~: \code{canoniser\_plan()} ne convertit aucun paramètre
 d'étape, si bien qu'admettre les deux types donnerait deux fiches pour deux
 plans de même sens, défaut que la canonisation corrige pour les champs du
-plan (section~\ref{sec:fiche}). Refus du module \code{validation}, levés par
-\code{controler\_parametres\_validation()}, que seule \code{valider\_plan()}
-appelle, avant toute étape (après les contrôles des étapes amont), dans
-cet ordre~:
-\code{cle\_table\_invalide}, \code{relation\_table\_invalide},
+plan (section~\ref{sec:fiche}). Refus, levés par \code{valider\_plan()}
+avant toute étape (après les contrôles des étapes amont), dans cet ordre
+(phase des valeurs, section~\ref{sec:plan})~: \code{relation\_table\_invalide},
+module \code{validation}, par \code{controler\_relation\_table()}
+(contrôle du gouvernant), avant la présence et la forme de
+\code{table\_reference}~; puis la présence de \code{table\_reference}
+selon la relation (\code{parametre\_manquant} ou
+\code{parametre\_inattendu}, module \code{construire\_table})~; puis,
+module \code{validation}, par \code{controler\_parametres\_validation()},
+que seule \code{valider\_plan()} appelle~:
+\code{cle\_table\_invalide} (si \code{table\_reference} est au plan),
 \code{plage\_ages\_invalide}, \code{tranches\_age\_invalides},
 \code{niveau\_invalide} (même motif que dans le module \code{brut},
 spécification du 06/11/2026, §~1~; levé ici sous le module \code{validation}),
@@ -9701,7 +9747,16 @@ restent libres) et \code{table\_reference\_differente\_}\allowbreak\code{positio
 (clé différente de celle du positionnement), dans cet ordre~:
 $\hat\theta$ est estimé sur les cellules de cette plage et de cette table,
 et la contrainte $\sum A = O$ comme les lois conditionnelles des tests n'en
-tiennent qu'à ce prix. Sous \code{positionnee}, \code{table\_reference}
+tiennent qu'à ce prix~; sous la relation \code{lissee} seulement, les
+refus inter-étapes \code{lissage\_absent} (étape \code{lissage} absente
+du plan) et \code{plage\_ages\_differente\_}\allowbreak\code{lissage}
+(plage d'âges différente de celle du lissage~; les tranches restent
+libres), dans cet ordre~: les degrés de liberté effectifs sont ceux du
+lissage sur ses cellules (ADR 0017, point~15). Ces deux refus nomment le
+producteur attendu par la relation, à dessein~: la relation est une
+déclaration sur la table validée (ADR 0017, point~1.5, complément du
+11/11/2026). La fonction de contrôle rappelle d'abord le contrôle de la
+relation, si bien qu'un appel direct reste complet. Sous \code{positionnee}, \code{table\_reference}
 reste requise et désigne la référence de la table positionnée~: la clé est
 citée deux fois, et \code{fiche\$tables\_reference} n'en porte qu'une
 entrée. La fonction d'étape ne refait aucun
@@ -9769,9 +9824,37 @@ paramètres estimés sur ces données~:
     n'apparaît qu'une fois par plan). L'étape \code{positionnement}, qui
     précède \code{validation} dans l'ordre des étapes, n'en est pas un
     préalable au sens de \code{ETAPES}~: c'est le refus
-    \code{positionnement\_absent} qui l'exige sous cette seule relation.
+    \code{positionnement\_absent} qui l'exige sous cette seule relation~;
+  \item \code{lissee} (table lissée par l'étape \code{lissage} de la même
+    construction, section~\ref{sec:lissage}~; issue~\#224, option L-b,
+    décision D7)~: $p$ vaut \code{NA} dans \code{RELATIONS\_TABLE}, au sens
+    «~non entier, lu par segment~» et non «~non établi~»~: le sens du
+    \code{NA} est porté par le nom de la relation, sur lequel branchent
+    tous les choix du module. Les attendus sont ceux de la table lissée,
+    $A_c = E^c_c \mu_c$, $\mu_c = -\ln(1 - g_c)$, $g_c$ le taux lissé de la
+    cellule (règle unique de la force, ADR 0017, point~1.3), et
+    \textbf{ddl $= n - \sum_{c \in C^{+}} h_c$}, $h_c$ le levier de la
+    cellule (colonne \code{levier} de la table lissée, section~\ref{sec:lissage-quadratique}),
+    somme prise par segment sur les seules cellules retenues, puis sur les
+    segments~; quand toute cellule pondérée par le lissage est retenue, il
+    vaut $n - \sum_s \nu_s$ en arithmétique exacte, $\nu_s$ degrés de
+    liberté effectifs du segment~; il est en général non entier (ADR 0017,
+    point~5.5, décision M417). Une cellule pondérée par le lissage peut ne
+    pas être retenue~: sous la recette \code{agregats}, une cellule a
+    $E^i > 0$, donc un poids, avec $E^c = 0$, donc hors de $C^{+}$~; $n -
+    \sum_s \nu_s$ serait alors faux, d'où la somme restreinte, qui ne
+    recalcule pas la matrice de lissage mais additionne des valeurs
+    stockées (ADR 0017, point~5.5~(iii)). La table étant ajustée sur ces
+    décès, \textbf{aucune loi exacte} n'est établie sous une hypothèse
+    nulle~: seules sont produites les p-valeurs asymptotiques de $X^2$ et
+    $G^2$ à ce ddl, et les p-valeurs des signes, des suites et de Wilcoxon
+    sous leurs hypothèses propres, au statut d'approximation non établie~;
+    aucun tirage (section~\ref{sec:validation-statistiques}, «~Sous la
+    relation \code{lissee}~»). L'étape \code{lissage} n'est pas un
+    préalable au sens de \code{ETAPES}~: c'est le refus
+    \code{lissage\_absent} qui l'exige sous cette seule relation.
 \end{itemize}
-Chaque branchement sur la relation est écrit à trois valeurs, avec une
+Chaque branchement sur la relation est écrit à quatre valeurs, avec une
 erreur de programmation pour toute autre valeur (avis de forme, F5).
 Sous \code{positionnee}, les lois sous $H_0$ sont prises conditionnellement
 aux décès de chaque segment (section~\ref{sec:validation-statistiques},
@@ -9807,6 +9890,10 @@ sous le module \code{validation}~:
     ne contiennent pas la plage (les âges d'un sexe sont contigus, contrôle
     de \code{table\_reference()}, section~\ref{sec:table-reference}).
 \end{enumerate}
+Sous la relation \code{lissee}, aucune table de référence n'est lue~:
+ces cinq contrôles ne s'appliquent pas, et la convention d'âge est
+garantie par le refus \code{convention\_lissage\_non\_admise} de l'étape
+\code{lissage}, que la relation impose (section~\ref{sec:lissage-etape}).
 Au rejeu outillé, ces contrôles ne précèdent pas l'appel de
 \code{construire\_table()}~: ils sont faits une fois, par cet appel, sur la
 table reçue ou relue (section~\ref{sec:rejeu}, étape~8~; issue~\#82,
@@ -9838,6 +9925,17 @@ trace de la table dans l'objet, qui n'en garde aucune copie (ADR 0015,
 point~5). Sous \code{par\_annee = TRUE}, $H_0$ tient cellule par cellule,
 $O$ et $A$ sont additifs et le SMR global ne change pas~; les suites se
 comptent par séquence (segment $\times$ année).
+\textbf{Sous la relation \code{lissee}} (ADR 0017, point~10.2), la grille
+est formée par \code{grille\_plage()} (module \code{exposition}, même
+constructeur que celui d'\code{apparier\_table()}) et $g_c$ est lu dans la
+table construite par (segment, âge)~: clés et âges doivent être identiques,
+dans le même ordre, à ceux de la table construite, et les segments à ceux
+de ses degrés de liberté effectifs (erreur de programmation sinon)~;
+\code{appariement\_sexe} vaut \code{par\_segment}. Une cellule exposée où
+$g_c = 1$ (par arrondi) est refusée sous \code{taux\_table\_egal\_un},
+module \code{validation}, avec un message propre à la table construite,
+avant le calcul des attendus. Les colonnes \code{qx\_table} et
+\code{taux\_table} des cellules portent alors $g_c$ et $\mu_c$.
 
 \medskip
 \noindent
@@ -9876,8 +9974,8 @@ la table d'exposition est contrôlée à chaque exécution, un écart étant une
 erreur de programmation.
 
 \medskip
-{\sloppy\textbf{Résultat} (\code{etapes\$validation}). \code{parametres}~: les six
-paramètres, le \code{nom} de la table (\code{table\_nom}),
+{\sloppy\textbf{Résultat} (\code{etapes\$validation}). \code{parametres}~: les
+paramètres du plan, le \code{nom} de la table (\code{table\_nom}),
 \code{parametres\_estimes} ($p$), la convention retenue,
 \code{appariement\_sexe}, les plafonds \code{n\_max\_wilcoxon\_exact} et
 \code{n\_max\_runs\_exact}, l'hypothèse nulle
@@ -9888,7 +9986,19 @@ sous-groupes (\code{statuts\_sous\_groupes}, selon la relation~: lignes
 et \code{ajustee\_hors\_outil}, dont les statuts des bornes exactes et des
 p-valeurs donnent un texte pour chacune de ces deux relations, la seconde
 ne les produisant pas, état \code{ddl\_non\_etabli}, issue~\#200~; de
-\code{STATUTS\_VALIDATION\_POSITIONNEE} sous \code{positionnee}). \code{resultat}~:
+\code{STATUTS\_VALIDATION\_POSITIONNEE} sous \code{positionnee}, de
+\code{STATUTS\_VALIDATION\_LISSEE} sous \code{lissee}). Sous \code{lissee},
+\code{table\_reference} et \code{table\_nom} sont absents,
+\code{parametres\_estimes} vaut \code{NA\_integer\_}, l'hypothèse nulle est
+\code{HYPOTHESE\_VALIDATION\_LISSEE}, et un champ conditionnel
+\code{ddl\_effectifs}, placé après \code{parametres\_estimes}, porte par
+segment les clés de segmentation, \code{ddl\_effectifs} ($\nu_s$,
+\code{double}, recopiés de l'étape \code{lissage}, sans recalcul) et
+\code{ddl\_effectifs\_retenus} (\code{double}, somme des leviers des
+cellules retenues du segment, analogue par segment de
+\code{parametres\_estimes})~; les deux colonnes sont égales, en
+arithmétique exacte, quand toute cellule pondérée est retenue (ADR 0017, points~5.2 et~5.5). Les degrés de
+liberté effectifs ne sont pas un dénombrement. \code{resultat}~:
 \code{cellules} (clés de segmentation, \code{age}, \code{annee} sous
 \code{par\_annee}, $E^c$, $D$, \code{qx\_table}, \code{taux\_table} pour
 $\tilde\mu$, \code{attendus}, \code{taux\_brut} pour $\hat\mu$,
@@ -10263,7 +10373,10 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     \code{contraint\_par\_positionnement}. Les états d'une ligne de
     sous-groupe forment \code{ETATS\_SOUS\_GROUPES\_VALIDATION}~:
     \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_retenue}
-    et, sous \code{positionnee} seulement, les trois états ci-dessus.
+    et, sous \code{positionnee} seulement, les trois états ci-dessus~;
+    sous \code{lissee} seulement, \code{contraint\_par\_lissage} et
+    \code{non\_etabli\_sous\_lissage} (paragraphe «~Sous la relation
+    \code{lissee}~» ci-dessous).
   \item \textbf{S5, p-valeurs asymptotiques au-delà du plafond de
     convolution} (issue~\#178~; spécification d'\code{actuary-approfondi}
     du 09/11/2026, commentaire 6747040204~; décision M361). Dans l'état
@@ -10340,6 +10453,73 @@ Aucune p-valeur n'est produite pour le SMR de la table positionnée, et
 aucun verdict~: le test du facteur seul ($\theta = 1$) est celui de la
 relation \code{independante}, sur un autre plan (avis de forme, F6).
 
+\medskip
+{\sloppy\noindent
+\textbf{Sous la relation \code{lissee}} (issue~\#224, option L-b~;
+décision D7, M413~; constantes \code{HYPOTHESE\_VALIDATION\_LISSEE} et
+\code{STATUTS\_VALIDATION\_LISSEE}, cette dernière dérivée de
+\code{STATUTS\_VALIDATION} par remplacement, aux mêmes lignes). Les
+attendus sont ceux de la table lissée, $A_c = E^c_c \mu_c$, $\mu_c =
+-\ln(1 - g_c)$. La table est ajustée sur ces décès~: $A_c$ dépend des
+$D_c$ par le lissage, et \textbf{aucune loi de $D_c$ sous une hypothèse
+nulle n'est établie}~; à la différence de la relation \code{positionnee},
+aucun conditionnement ne rend les lois libres du paramètre de lissage.
+Par grandeur~:\par}
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{S2 et S3}~: ddl $= n - \sum_{c \in C^{+}} h_c$
+    (section~\ref{sec:validation-etape}), réel~; p-valeurs asymptotiques
+    sur la loi du khi-deux à ce ddl non entier (\code{pchisq()}, qui
+    l'admet), queue supérieure~: \textbf{approximation non établie} ---
+    degrés de liberté résiduels du cas normal transposés au modèle de
+    Poisson, aucun résultat de loi après lissage, niveau réel du test non
+    établi, approximation non garantie quand des $A_c$ sont petits~; elles
+    sont produites bien que \code{parametres\_estimes} vaille \code{NA}.
+    Si le ddl est au plus nul, elles ne le sont pas (état
+    \code{contraint\_par\_lissage}). La variance exacte de $X^2$ n'est pas
+    produite (\code{non\_etabli\_sous\_lissage}).
+  \item \textbf{S4, SMR global}~: $O$, $A$, SMR et $O - A$ descriptifs~;
+    bornes, p-valeurs, $z$ et p de la racine cubique non produits
+    (\code{contraint\_par\_lissage}). Le SMR vaut~1 par construction sous
+    Whittaker-Henderson~(b) (équation du score, à la convergence près)~;
+    sous~(a) pondération \code{exposition}, $\sum E^i g = \sum D$
+    exactement (section~\ref{sec:lissage-quadratique}), et le SMR, calculé
+    sur $E^c(-\ln(1 - g))$, n'est voisin de~1 que quand $E^c$ est voisine
+    de $E^i - D/2$~; aucune conservation sous la pondération
+    \code{uniforme}.
+  \item \textbf{S1, S6 et S12}~: nombres observés produits~; espérances
+    sous $H_0$ et intervalles de fluctuation non produits
+    (\code{non\_etabli\_sous\_lissage}), colonnes de fluctuation des
+    cellules à \code{NA}.
+  \item \textbf{S5, sous-groupes}~: SMR descriptif $O / A$~; bornes et
+    p-valeurs (exactes et asymptotiques) non produites~; état
+    \code{contraint\_par\_lissage} pour le regroupement \code{segment} et
+    tout sous-groupe qui contient, pour chaque segment qu'il touche, toutes
+    les cellules retenues de ce segment (même règle que sous
+    \code{positionnee}, décompte des cellules retenues par
+    \code{segments\_complets()}, jamais un test flottant),
+    \code{non\_etabli\_sous\_lissage} pour les autres.
+  \item \textbf{S6, S7 et S8} (signes, suites, Wilcoxon), exactes et
+    asymptotiques~: produites, avec le statut de la relation
+    \code{independante} complété par «~table lissée sur ces données~:
+    résidus contraints par le lissage (somme pondérée des résidus voisine
+    de~0, corrélation locale négative), niveau non établi~». Les
+    différences de Wilcoxon, le $R^2$ et la distance (S8, S10, S11)
+    portent sur la table lissée, $\mu_{\mathrm{lis}} = -\ln(1 - g)$ et
+    $q_{\mathrm{lis}} = g$, comme sous \code{positionnee} (décision M309).
+  \item \textbf{Monte-Carlo}~: aucune réplication, une réplique devant
+    réajuster la table lissée, hors du périmètre~; p-valeurs et erreurs de
+    Monte-Carlo non produites (\code{non\_etabli\_sous\_lissage}), aucun
+    tirage (\code{tirages\_effectues} vaut~0), la graine restant requise,
+    l'étape étant aléatoire.
+\end{itemize}
+Le texte du statut de \code{p\_asymptotique} (\code{STATUTS\_VALIDATION\_LISSEE})
+mentionne, pour le niveau réel du test, un «~constat de simulation hors
+CI documenté~»~; aucun constat de ce niveau sous la relation \code{lissee}
+n'est versé au dépôt à la date du document (le seul constat de simulation
+du lissage, \code{tests/mesures/}\allowbreak\code{constat\_couverture\_lissage.R},
+porte sur la couverture des intervalles de crédibilité de la variante~(b),
+issue~\#225)~: le niveau réel de ces p-valeurs n'est pas mesuré.
+
 \subsubsection*{P-valeurs de Monte-Carlo}
 \label{sec:validation-monte-carlo}
 
@@ -10413,12 +10593,18 @@ suites, Wilcoxon)~; \code{variance\_nulle} (suites)~; \code{ex\_aequo} et
 \code{aucun\_deces} (MAPE)~; \code{variance\_observee\_nulle} ($R^2$)~;
 \code{contraint\_par\_positionnement} (sous \code{positionnee}~: grandeurs
 sous $H_0$ du SMR global, et toutes les grandeurs de test, variance exacte
-de $X^2$ comprise, quand $n - S = 0$).\par}
+de $X^2$ comprise, quand $n - S = 0$)~; sous \code{lissee},
+\code{contraint\_par\_lissage} (bornes, p-valeurs et racine cubique du SMR
+global, table ajustée sur ces décès~; p-valeurs asymptotiques de $X^2$ et
+$G^2$ quand le ddl est au plus nul) et \code{non\_etabli\_sous\_lissage}
+(espérances sous $H_0$, variance exacte de $X^2$, intervalles de
+fluctuation, p-valeurs et erreurs de Monte-Carlo~: $A_c$ dépend des décès
+par le lissage).\par}
 
 {\footnotesize
 \rowcolors{2}{tablerow}{white}
 \begin{longtable}{@{}p{2.6cm}p{5.0cm}p{2.0cm}p{5.0cm}@{}}
-\caption{Statistiques de l'étape \code{validation} et statut de leurs grandeurs (\code{STATUTS\_VALIDATION}, qui fait foi grandeur par grandeur~; sous \code{ajustee\_hors\_outil}, les grandeurs définies par $H_0$ ne sont pas produites~; sous \code{positionnee}, \code{STATUTS\_VALIDATION\_POSITIONNEE}, mêmes lignes, statuts remplacés comme le dit le paragraphe «~Sous la relation \code{positionnee}~»).}
+\caption{Statistiques de l'étape \code{validation} et statut de leurs grandeurs (\code{STATUTS\_VALIDATION}, qui fait foi grandeur par grandeur~; sous \code{ajustee\_hors\_outil}, les grandeurs définies par $H_0$ ne sont pas produites~; sous \code{positionnee}, \code{STATUTS\_VALIDATION\_POSITIONNEE}, mêmes lignes, statuts remplacés comme le dit le paragraphe «~Sous la relation \code{positionnee}~»~; sous \code{lissee}, de même \code{STATUTS\_VALIDATION\_LISSEE}, paragraphe «~Sous la relation \code{lissee}~»).}
 \label{tab:statistiques-validation}\\
 \rowcolor{tableheader}
 \textcolor{financeblue}{\textbf{Statistique}} &
@@ -11192,8 +11378,9 @@ et Q2~(a), et M242). Le SMR des lignes exclues est $O/A$, où $A$ vient d'un
     si} \code{validation} est au plan (décision M242) sous la relation
     \code{independante} ou \code{ajustee\_hors\_outil}, sans quoi
     \code{smr\_comparateur\_2} vaut \code{NULL} et le comparateur est
-    «~non demandé par le plan~», ou, sous \code{positionnee}, «~non produit
-    par cette version~» (décision M289, Q6~; ci-dessous)~:
+    «~non demandé par le plan~», ou, sous \code{positionnee} et
+    \code{lissee}, «~non produit par cette version~» (décision M289, Q6~;
+    pour \code{lissee}, décision M415, point~H~; ci-dessous)~:
     même table, même \code{plage\_ages}, même appariement par clé exacte
     (\code{apparier\_table()}, sans refus d'une cellule sans valeur) et même
     attendu $A = \sum E^c_{e,c}\tilde\mu_c$, $\tilde\mu_c = -\ln(1 - \tilde
@@ -11282,9 +11469,11 @@ connu, $E^c$ étant tenue pour fixe.
 (\code{non\_demandee\_par\_le\_plan}, comparateur~2 sans \code{validation})~;
 «~non produite par cette version~»
 (\code{non\_produite\_par\_cette\_version}, comparateur~3, et comparateur~2
-sous la relation \code{positionnee}~: la table de l'étape \code{validation}
-y est estimée sur les lignes conservées, et le comparateur~2 n'est pas
-produit en attendant le comparateur~3~; décision M289, Q6)~; et, sous le
+sous les relations \code{positionnee} et \code{lissee}~: la table de
+l'étape \code{validation} y est estimée sur les lignes conservées, et le
+comparateur~2 n'est pas produit en attendant le comparateur~3~; décisions
+M289, Q6, et M415, point~H~; sous \code{lissee}, aucune table de référence
+n'est d'ailleurs reçue par l'étape)~; et, sous le
 libellé «~non calculable~: \emph{raison}~», \code{aucune\_ligne\_mesurable}
 (toutes les lignes de l'ensemble sont non mesurables~; un total dont toutes
 les lignes sont \code{contrat\_duplique} en unité contrat reste dans cet
@@ -11582,6 +11771,39 @@ verdict~; titre et mentions du rapport figé sous les trois
     résidus de Pearson et ddl par \code{df.residual} d'un \code{glm()} de
     Poisson à un niveau par segment et offset~; p-valeurs et bornes des
     sous-groupes d'un segment par \code{binom.test()}.
+  \item \textbf{relation \code{lissee}}
+    (\code{tests/unitaires/test\_validation\_lissee.R}, issue~\#224), sur
+    des agrégats écrits à la main, sans graine, et un jeu en lignes simulé
+    pour l'étape \code{importance\_exclusions}~: constantes
+    (\code{RELATIONS\_TABLE}, états nouveaux), lignes de
+    \code{STATUTS\_VALIDATION\_LISSEE} identiques à celles de
+    \code{STATUTS\_VALIDATION} en statistique, grandeur et \code{sous\_h0},
+    textes marqués UTF-8 sous toute locale, égalité de
+    \code{HYPOTHESE\_VALIDATION\_LISSEE} et de sa copie du rapport~; la
+    condition de \code{table\_reference} sur \code{relation\_table}
+    (\code{parametre\_inattendu} sous \code{lissee},
+    \code{parametre\_manquant} sous \code{independante},
+    \code{relation\_table\_invalide} avant la présence et la forme de la
+    clé), \code{lissage\_absent} et \code{plage\_ages\_differente\_}\allowbreak\code{lissage}
+    avec message et \code{details}, les appels directs de la fonction de
+    contrôle~; la structure des paramètres~; l'identité mathématique
+    ddl $= n - \sum_s \nu_s$ quand toute cellule pondérée est retenue, et,
+    au cas limite d'une cellule pondérée non retenue (recette
+    \code{agregats}, $E^i > 0$, $E^c = 0$), ddl $= n - (\sum_s \nu_s -
+    h_c)$, à $10^{-12}$ près en relatif~; les p-valeurs asymptotiques par
+    \code{pchisq()} bien que \code{parametres\_estimes} soit \code{NA}, et
+    leur absence (\code{contraint\_par\_lissage}) quand le ddl est au plus
+    nul~; les attendus recalculés sur la table lissée~; les états des
+    grandeurs et des sous-groupes~; le SMR sous la pondération
+    \code{exposition} contre l'écart $\sum E^i g - \sum E^c(-\ln(1 - g))$~;
+    \code{calculer\_validation()} appelée directement sur la table
+    construite, \code{identical()} à l'étape, et ses erreurs de
+    programmation (table, ddl effectifs ou colonne \code{levier} absents,
+    grille différente)~; \code{taux\_table\_egal\_un} sur la table
+    construite~; sous \code{independante}, table construite et ddl passés
+    ignorés~; titre et mentions du rapport figé, colonne \code{levier}
+    rendue~; canonisation et aller-retour d'un plan sans
+    \code{table\_reference}~; comparateur~2 non produit.
 \end{itemize}\par}
 
 \medskip
@@ -11652,7 +11874,7 @@ reproduites ici, E3.4).
 \textcolor{financeblue}{\textbf{Entrées}} &
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
-\catalogue{fonctions-validation}{RELATIONS\_TABLE} & constante & --- & \code{independante} $\to$ \code{0L}, \code{ajustee\_hors\_outil} $\to$ \code{NA}, \code{positionnee} $\to$ \code{1L} par segment positionné (nombre de paramètres estimés~; ddl $= n - S$ sous \code{positionnee}) \\
+\catalogue{fonctions-validation}{RELATIONS\_TABLE} & constante & --- & \code{independante} $\to$ \code{0L}, \code{ajustee\_hors\_outil} $\to$ \code{NA}, \code{positionnee} $\to$ \code{1L} par segment positionné, \code{lissee} $\to$ \code{NA} («~non entier, lu par segment~») (nombre de paramètres estimés~; ddl $= n - S$ sous \code{positionnee}, $n$ moins la somme des leviers retenus sous \code{lissee}) \\
 \catalogue{fonctions-validation}{N\_MAX\_WILCOXON\_EXACT} & constante & --- & 1000~: effectif maximal de la p-valeur exacte de Wilcoxon (décision M256) \\
 \catalogue{fonctions-validation}{N\_MAX\_RUNS\_EXACT} & constante & --- & 10000~: somme maximale des effectifs de la loi exacte des suites \\
 \catalogue{fonctions-validation}{TOLERANCE\_RESIDU\_NUL} & constante & --- & $10^{-10}$~: tolérance relative d'un résidu nul \\
@@ -11661,17 +11883,20 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_VALIDATION} & constante & --- & identité de la note II1291-14 v1.4 (titre, fichier, SHA-256 complet, statut de référence de place~; décision M244) \\
 \catalogue{fonctions-validation}{HYPOTHESE\_VALIDATION} & constante & --- & texte de l'hypothèse nulle $H_0$~(i) et de ses conditions \\
 \catalogue{fonctions-validation}{HYPOTHESE\_VALIDATION\_POSITIONNEE} & constante & --- & texte de l'hypothèse nulle sous \code{positionnee}~: $\theta_s$ inconnu par segment, loi multinomiale conditionnelle aux $O_s$ \\
+\catalogue{fonctions-validation}{HYPOTHESE\_VALIDATION\_LISSEE} & constante & --- & texte de l'hypothèse sous \code{lissee}~: aucune loi exacte, attendus de la table lissée, ddl $n$ moins la somme des leviers retenus, approximation non établie (copie dans les mentions du rapport) \\
 \catalogue{fonctions-validation}{ETATS\_CELLULE\_VALIDATION} & constante & --- & les cinq états d'une cellule (section~\ref{sec:validation-etape}) \\
-\catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les états d'une grandeur, dont \code{contraint\_par\_}\allowbreak\code{positionnement} (section~\ref{sec:validation-statistiques}) \\
-\catalogue{fonctions-validation}{ETATS\_SOUS\_GROUPES\_VALIDATION} & constante & --- & les états d'une ligne des sous-groupes~: \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_}\allowbreak\code{retenue}, et, sous \code{positionnee}, \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{bornes\_non\_}\allowbreak\code{definies}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max} \\
+\catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les états d'une grandeur, dont \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{contraint\_par\_}\allowbreak\code{lissage} et \code{non\_etabli\_}\allowbreak\code{sous\_lissage} (section~\ref{sec:validation-statistiques}) \\
+\catalogue{fonctions-validation}{ETATS\_SOUS\_GROUPES\_VALIDATION} & constante & --- & les états d'une ligne des sous-groupes~: \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_}\allowbreak\code{retenue}, et, sous \code{positionnee}, \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{bornes\_non\_}\allowbreak\code{definies}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, et, sous \code{lissee}, \code{contraint\_par\_}\allowbreak\code{lissage}, \code{non\_etabli\_}\allowbreak\code{sous\_lissage} \\
 \catalogue{fonctions-validation}{PHRASES\_ATTENDUS\_FAIBLES} & constante & --- & liste de trois phrases écrites une seule fois et lues par \code{STATUTS\_VALIDATION} et \code{STATUTS\_VALIDATION\_}\allowbreak\code{POSITIONNEE}~: \code{petits} (approximation non garantie aux attendus $A_c$ petits, statuts de \code{khi2\_pearson}/\allowbreak\code{p\_asymptotique} et de \code{deviance}/\allowbreak\code{p\_asymptotique}), \code{fin\_x2} (niveau réel de la p asymptotique de $X^2$ non établi, au-dessus du niveau nominal dans les constats de simulation) et \code{g2} (espérance de la contribution d'une cellule à $G^2$)~; section~\ref{sec:validation-statistiques}, issues~\#179 et~\#200 \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION} & constante & --- & \code{data.frame} (\code{statistique}, \code{grandeur}, \code{sous\_h0}, \code{statut})~: une ligne par grandeur, dans l'ordre du résultat~; \code{sous\_h0} désigne les grandeurs non produites sous \code{ajustee\_hors\_outil} (tableau~\ref{tab:statistiques-validation}) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION\_POSITIONNEE} & constante & --- & mêmes lignes que \code{STATUTS\_VALIDATION}, statuts remplacés sous \code{positionnee} (lois conditionnelles, ddl $n - S$, table positionnée~; décision M309) \\
-\catalogue{fonctions-validation}{statuts\_validation()} & interne & relation & statuts de la relation (\code{switch} à trois valeurs, erreur de programmation par défaut) \\
+\catalogue{fonctions-validation}{STATUTS\_VALIDATION\_LISSEE} & constante & --- & mêmes lignes que \code{STATUTS\_VALIDATION}, statuts remplacés sous \code{lissee} (grandeurs sous $H_0$ non établies, ddl effectifs, approximation non établie, table lissée) \\
+\catalogue{fonctions-validation}{statuts\_validation()} & interne & relation & statuts de la relation (\code{switch} à quatre valeurs, erreur de programmation par défaut) \\
 \catalogue{fonctions-validation}{ETAPES\_TRANCHES\_REPLICATIONS} & constante & --- & étapes admises par les briques de forme des tranches d'âge et des réplications~: \code{validation}, \code{homogeneite} \\
 \catalogue{fonctions-validation}{controler\_tranches\_age()} & interne & tranches, plage, étape appelante & \code{TRUE} invisible, ou refus \code{tranches\_age\_invalides} sous le module de l'étape \\
 \catalogue{fonctions-validation}{controler\_replications()} & interne & $B$, étape appelante & \code{TRUE} invisible, ou refus \code{replications\_invalides} sous le module de l'étape \\
-\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & les six paramètres, paramètres de l'étape \code{positionnement} du plan (\code{NULL} en son absence) & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue, puis, sous \code{positionnee}, les trois refus inter-étapes~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
+\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & paramètres de l'étape (\code{table\_reference} absent lu par \code{missing()}), paramètres des étapes \code{positionnement} et \code{lissage} du plan (\code{NULL} en leur absence) & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue (relation par la fonction de la ligne suivante), puis, sous \code{positionnee}, les trois refus inter-étapes, sous \code{lissee}, les deux~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
+\catalogue{fonctions-validation}{controler\_relation\_table()} & interne & relation & \code{TRUE} invisible, ou refus \code{relation\_table\_}\allowbreak\code{invalide}~; contrôle du gouvernant, appelé par \code{valider\_plan()} avant la présence de \code{table\_reference}, et par la fonction de la ligne précédente \\
 \catalogue{fonctions-validation}{probabilite\_hors()} & interne & $A$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{P}(A)$, par cellule \\
 \catalogue{fonctions-validation}{probabilite\_hors\_binomiale()} & interne & $n$, $p$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{B}(n, p)$, par cellule (loi conditionnelle sous \code{positionnee}) \\
 \catalogue{fonctions-validation}{loi\_runs()} & interne & $n_{+}$, $n_{-}$ par séquence & loi exacte du nombre total de suites, par convolution \\
@@ -11685,11 +11910,12 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe~; attribut \code{produits}~; brique partagée avec l'étape \code{homogeneite} \\
 \catalogue{fonctions-validation}{p\_somme\_binomiales\_normale()} & interne & effectifs, probabilités, valeur observée $o$ & p-valeurs inférieure, supérieure et centrale de l'approximation normale d'une somme de binomiales indépendantes, avec correction de continuité (\code{pnorm()})~; erreur de programmation si la variance est nulle (issue~\#178) \\
 \catalogue{fonctions-validation}{pvaleur\_monte\_carlo()} & interne & observé, répliques, sens & $p_{MC}$ et erreur de Monte-Carlo \\
-\catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, relation, $B$, graine, segment (sous \code{positionnee} seulement) & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
+\catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, relation, $B$, graine, segment (sous \code{positionnee} seulement), somme des leviers retenus (sous \code{lissee} seulement) & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
 \catalogue{fonctions-validation}{annees\_groupe()} & interne & années, nombre de groupes $n_g$ & colonne \code{annee} d'un regroupement de S5~: \code{integer(0)} si $n_g = 0$, les années en \code{integer} si leur longueur vaut $n_g$, erreur de programmation sinon, sans recyclage (issue~\#217) \\
-\catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante \\
+\catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante~; sous \code{lissee}, SMR descriptif et états \\
 \catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau, plafond de convolution (\code{n\_max}, par défaut \code{N\_MAX\_}\allowbreak\code{PRODUITS\_}\allowbreak\code{CONVOLUTION}~; autre valeur pour les seuls tests) & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, exactes ou, au-delà du plafond, asymptotiques, bornes d'un segment, états \\
-\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table, paramètres, graine, étape \code{positionnement} & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
+\catalogue{fonctions-validation}{segments\_complets()} & interne & cellules du sous-groupe, segment, cellules retenues & segments touchés et, pour chacun, si le sous-groupe contient toutes ses cellules retenues (décompte, jamais un test flottant)~; partagée par les relations \code{positionnee} et \code{lissee} \\
+\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite et ddl effectifs (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs} \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version} \\
 \catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} \\
@@ -11718,7 +11944,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
 \catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174) \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; table \code{NULL} si et seulement si \code{validation} est absente ou sous \code{lissee} (erreur de programmation sinon)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174) \\
 \catalogue{fonctions-validation}{total\_evenements\_retires()} & interne & événements retirés des cellules, ensemble, niveau & total en \code{integer}, formé en \code{double}~; refus \code{evenements\_retires\_}\allowbreak\code{hors\_plage} (module \code{importance\_exclusions}) au-delà de \code{.Machine\$integer.max}, le message citant le total, l'ensemble et le niveau (issue~\#174) \\
 \catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
@@ -13538,7 +13764,7 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{etape\_lissage} & Étape lissage~: lissage de Whittaker-Henderson et table lissée & etape & étape \code{lissage}~: \code{etapes/lissage}, précédée de mentions fixes selon la méthode (ci-dessous~; section~\ref{sec:lissage}) \\
 \code{etape\_}\allowbreak\code{positionnement} & Étape positionnement~: positionnement par SMR sur une table de référence et table positionnée & etape & étape \code{positionnement}~: \code{etapes/}\allowbreak\code{positionnement}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:positionnement-etape}) \\
 \code{etape\_}\allowbreak\code{homogeneite} & Étape homogeneite~: test d'homogénéité entre segments (tests du score conditionnels aux décès de chaque strate) & etape & étape \code{homogeneite}~: \code{etapes/homogeneite}, précédée d'une mention fixe (ci-dessous~; section~\ref{sec:homogeneite}) \\
-\code{etape\_validation} & Étape validation~: statistiques de validation de la table de référence prise telle quelle (titre propre à la relation sous \code{ajustee\_hors\_outil} et \code{positionnee}, ci-dessous) & etape & étape \code{validation}~: \code{etapes/validation}, précédée de mentions fixes (ci-dessous) \\
+\code{etape\_validation} & Étape validation~: statistiques de validation de la table de référence prise telle quelle (titre propre à la relation sous \code{ajustee\_hors\_outil}, \code{positionnee} et \code{lissee}, ci-dessous) & etape & étape \code{validation}~: \code{etapes/validation}, précédée de mentions fixes (ci-dessous) \\
 \code{etape\_importance\_}\allowbreak\code{exclusions} & Étape importance\_exclusions~: importance des exclusions (volumes, événements, exposition et SMR des lignes exclues) & etape & étape \code{importance\_exclusions}~: \code{etapes/}\allowbreak\code{importance\_exclusions}, précédée de mentions fixes (ci-dessous~; section~\ref{sec:importance-exclusions}) \\
 \code{table\_finale} & Table finale et comparaisons & non\_produite & \code{table}~: \code{NULL}, «~non produites par cette version~»~; autre valeur, refus (contrôle~4) \\
 \code{rejeu} & Rejeu & texte & ligne \code{\# rejeu} de la fiche (\code{TEXTE\_REJEU\_FICHE}) et textes du rejeu outillé (ci-dessous) \\
@@ -13719,11 +13945,14 @@ tableau~\ref{tab:sections-rapport} sous \code{independante}, «~Étape
 validation~: statistiques de validation de la table de référence ajustée
 hors de l'outil~» sous \code{ajustee\_hors\_outil}, «~Étape validation~:
 statistiques de validation de la table positionnée de cette
-construction~» sous \code{positionnee}~; la table des matières suit. Elle
+construction~» sous \code{positionnee}, «~Étape validation~: statistiques
+de validation de la table lissée de cette construction~» sous
+\code{lissee}~; la table des matières suit. Elle
 fait précéder ses tables de mentions fixes, dont
 le choix est lu dans l'objet (décisions M258 et M262~; ADR 0012, seconde
-annotation du 06/11/2026, (b)~; relation à trois valeurs, issue~\#167), dans
-cet ordre~: hors de \code{positionnee}, si l'étape \code{positionnement}
+annotation du 06/11/2026, (b)~; relation à quatre valeurs, issues~\#167
+et~\#224), dans
+cet ordre~: hors de \code{positionnee} et de \code{lissee}, si l'étape \code{positionnement}
 n'est pas au plan, «~Aucune table positionnée n'est produite~: la table de
 référence est prise telle quelle.~», et, si elle est au plan (combinaison
 admise, sans refus~; décision du mainteneur du 08/11/2026, texte
@@ -13747,11 +13976,21 @@ la table positionnée vaut 1 par construction~: ni intervalle ni p-valeur
 ne sont produits pour lui. Les lois sous H0 sont prises conditionnellement
 aux décès observés de chaque segment (binomiale par cellule ou sous-groupe,
 multinomiale pour les réplications de Monte-Carlo), qui ne dépendent pas de
-theta.~»~; l'hypothèse nulle de Poisson, exacte avec $E^c$
+theta.~»~; sous \code{lissee}, la mention \code{validation\_lissee}~: la
+table validée est la table lissée de cette construction, estimée sur ces
+mêmes cellules, ses degrés de liberté effectifs ne sont en général pas
+entiers, les p-valeurs asymptotiques de $X^2$ et $G^2$ sont calculées à $n$
+moins la somme des leviers des cellules retenues, au statut
+d'approximation non établie, et le SMR et les sous-groupes sont
+descriptifs~; l'hypothèse nulle de Poisson, exacte avec $E^c$
 tenue pour fixe, asymptotique sous le modèle de survie, et, sous
 \code{positionnee}, sa forme à $\theta_s$ inconnu, conditionnelle aux décès
-de chaque segment (mention \code{validation\_h0\_positionnee})~; sous
-\code{independante} et \code{positionnee}, «~Les p-valeurs asymptotiques et exactes
+de chaque segment (mention \code{validation\_h0\_positionnee}), ou, sous
+\code{lissee}, le texte de \code{HYPOTHESE\_VALIDATION\_LISSEE} (mention
+\code{validation\_h0\_lissee}, copie gardée égale par un test, le module
+\code{rapport} étant évalué avant le module \code{validation} à
+l'installation)~; sous
+\code{independante}, \code{positionnee} et \code{lissee}, «~Les p-valeurs asymptotiques et exactes
 des signes, des suites et de Wilcoxon reposent sur une hypothèse qui n'est
 pas H0 (i) (colonne statut)~; seules les p-valeurs de Monte-Carlo ont un
 niveau garanti sous H0 (i).~»~; si \code{fiche/avertissement\_unite} est
@@ -13763,12 +14002,16 @@ agrégats, la même sur-dispersion, d'un facteur au plus $\varphi$, si les
 effectifs comptent des contrats (mention
 \code{validation\_unite\_non\_determinee})~; si l'appariement est
 \code{ensemble\_par\_sexe}, la table \code{ensemble} appliquée à chaque
-sexe~; sous \code{independante} et \code{positionnee}, l'absence de correction de
-multiplicité, puis la formule des p-valeurs de Monte-Carlo, le chemin du
+sexe~; sous \code{independante}, \code{positionnee} et \code{lissee}, l'absence de correction de
+multiplicité, puis, hors de \code{lissee}, la formule des p-valeurs de Monte-Carlo, le chemin du
 nombre de tirages et l'erreur de Monte-Carlo, la mention précisant sous
 \code{positionnee} le tirage multinomial par segment et le niveau exact
 conditionnellement aux $O_s$ (mention
-\code{validation\_monte\_carlo\_positionnee}~; sous
+\code{validation\_monte\_carlo\_positionnee}~; sous \code{lissee}, la
+mention \code{validation\_monte\_carlo\_lissee}~: «~Aucune p-valeur de
+Monte-Carlo~: sous la relation «~lissee~», une réplication devrait
+réajuster la table lissée~; aucun tirage n'est effectué
+(etapes/validation/resultat/monte\_carlo/tirages\_effectues = 0).~»~; sous
 \code{ajustee\_hors\_outil}, aucune p-valeur n'est produite et aucun
 tirage n'est fait, décision M254)~; la référence de méthode, avec renvoi
 à la colonne \code{statut} des
@@ -14237,7 +14480,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{element\_liste()} & interne & textes & élément de liste HTML, texte échappé \\
 \catalogue{fonctions-rapport}{corps\_section()} & interne & objet, rang de la section & corps HTML d'une section de \code{SECTIONS\_RAPPORT}~; erreur de programmation pour une section sans rendu, une relation de l'étape \code{validation} ou une méthode de positionnement sans mentions \\
 \catalogue{fonctions-rapport}{relation\_lue()} & interne & valeur lue & la relation de l'étape \code{validation} si c'est une chaîne unique non manquante, \code{""} sinon (valeur sans mentions, erreur de programmation des \code{switch} qui la lisent) \\
-\catalogue{fonctions-rapport}{titre\_section()} & interne & objet, rang de la section & titre de la section~: celui de \code{SECTIONS\_RAPPORT}, sauf \code{etape\_validation} d'un objet qui porte l'étape, dont le titre suit la relation (trois valeurs, erreur de programmation par défaut~; issue~\#167) \\
+\catalogue{fonctions-rapport}{titre\_section()} & interne & objet, rang de la section & titre de la section~: celui de \code{SECTIONS\_RAPPORT}, sauf \code{etape\_validation} d'un objet qui porte l'étape, dont le titre suit la relation (quatre valeurs, erreur de programmation par défaut~; issues~\#167 et~\#224) \\
 \catalogue{fonctions-rapport}{ecrire\_rapport()} & exportée & objet \code{construction} & octets UTF-8 du rapport figé HTML, après \code{controler\_rapport()}~; aucun calcul, aucune date (section~\ref{sec:rapport-fige}) \\
 \end{longtable}
 }
@@ -16637,7 +16880,7 @@ E2.7 & refus par défaut, motifs en liste fermée, exclusions déclarées, donn�
 E2.8 & pondération par les montants~: rôle refusé tant que ses intervalles ne sont pas spécifiés & \ref{sec:catalogue-roles} \\
 E2.9 & segmentation déclarée, vide explicite admis~; test d'homogénéité entre segments restitué comme diagnostic, sans verdict, la décision de regrouper restant à l'utilisateur & \ref{sec:plan}, \ref{sec:troncature-censure}, \ref{sec:homogeneite} \\
 E2.11 & noyau multi-états~: une table estime une transition~; seconde transition couverte par les tests & \ref{sec:plan}, \ref{sec:simulation} \\
-E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; lissage de Whittaker-Henderson~(a), critère quadratique, d'après les Lignes directrices, chap.~3, IV.2~; positionnement par SMR sur une table de référence (méthode~1), d'après II1291-12~; test d'homogénéité entre segments, d'après Breslow et Day (1987)~; statistiques de validation d'une table de référence prise telle quelle ou de la table positionnée, d'après II1291-14 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:lissage}, \ref{sec:positionnement}, \ref{sec:validation}, \ref{sec:homogeneite} \\
+E2.12 & taux bruts~: estimateurs de Poisson, binomial et produit-limite avec troncature à gauche, hypothèses de répartition dans la cellule~; lissage de Whittaker-Henderson~(a), critère quadratique, d'après les Lignes directrices, chap.~3, IV.2~; positionnement par SMR sur une table de référence (méthode~1), d'après II1291-12~; test d'homogénéité entre segments, d'après Breslow et Day (1987)~; statistiques de validation d'une table de référence prise telle quelle, de la table positionnée ou de la table lissée, d'après II1291-14 (en partie~: les autres méthodes de la v1 viendront avec leurs modules) & \ref{sec:brut}, \ref{sec:lissage}, \ref{sec:positionnement}, \ref{sec:validation}, \ref{sec:homogeneite} \\
 E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-groupes, SMR, signes, suites, intervalles (en partie~: statistiques écrites une fois et appliquées par l'étape \code{validation} aux observations de la construction~; la fonction de suivi sur de nouvelles observations viendra avec sa branche) & \ref{sec:validation-statistiques} \\
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
