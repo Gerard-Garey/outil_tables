@@ -42,8 +42,9 @@ tous <- function(...) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement puis validation, #167)",
-         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L)) &&
+verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5 ; lissee = NA_integer_, #224), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement puis validation, #167)",
+         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L,
+                                                  lissee = NA_integer_)) &&
            identical(tablexp:::CONVENTIONS_VALIDATION, "dernier_anniversaire") &&
            identical(tablexp:::N_MAX_WILCOXON_EXACT, 1000) && identical(tablexp:::N_MAX_RUNS_EXACT, 10000) &&
            identical(tablexp:::TOLERANCE_RESIDU_NUL, 1e-10) &&

@@ -4,7 +4,9 @@
 #  `selon` et `valeurs` de PARAMETRES_ETAPES, controler_parametres_condition(),
 #  canoniser_plan() « sans condition », colonne `table_construite` d'ETAPES et
 #  contrat de la table construite (table_construite()), liste blanche de
-#  controler_plage_ages() dans le module exposition
+#  controler_plage_ages() dans le module exposition ; témoins des conditions
+#  d'actuary sur table_construite() et messages « « a » ou « b » » (#224,
+#  commit (2b) de B19)
 #
 #  Natures des attendus (ADR 0007, point 11.4), nommées dans chaque test :
 #  - valeur calculée à la main : catalogues fabriqués injectés (précédent
@@ -30,6 +32,9 @@ controle <- function(r, motif, message, details) {
   if (!identical(r$details, details)) return("details différents")
   TRUE
 }
+
+# Conjonction de contrôles nommés : TRUE ou les noms des contrôles en écart.
+tous <- function(l) { k <- vapply(l, isTRUE, NA); if (all(k)) TRUE else paste(names(l)[!k], collapse = ", ") }
 
 # Invariants du catalogue (ADR 0017, point 3.2) ; TRUE ou le texte de l'écart.
 #  (i) jamais `recette` et `selon` non NA ensemble ;
@@ -77,11 +82,13 @@ cpc <- function(pe, cat = CAT_F) tablexp:::controler_parametres_condition("lissa
 
 verifier("A PARAMETRES_ETAPES : colonnes parametre, type, domaine, recette, selon, valeurs ; invariants (i) à (iii) (ADR 0017, point 3.2 ; valeur calculée à la main)",
          invariants_catalogue(tablexp:::PARAMETRES_ETAPES))
-verifier("A PARAMETRES_ETAPES : paramètres conditionnels à la valeur d'un paramètre dans l'étape lissage seule (ponderation, parametre_lissage, #223) ; selon NA et valeurs vides ailleurs",
-         all(vapply(tablexp:::PARAMETRES_ETAPES[names(tablexp:::PARAMETRES_ETAPES) != "lissage"], function(t)
-           all(is.na(t$selon)) && all(lengths(t$valeurs) == 0L), NA)) &&
+verifier("A PARAMETRES_ETAPES : paramètres conditionnels à la valeur d'un paramètre dans les étapes lissage (ponderation, parametre_lissage, #223) et validation (table_reference, #224) seules ; selon NA et valeurs vides ailleurs",
+         all(vapply(tablexp:::PARAMETRES_ETAPES[!names(tablexp:::PARAMETRES_ETAPES) %in% c("lissage", "validation")],
+                    function(t) all(is.na(t$selon)) && all(lengths(t$valeurs) == 0L), NA)) &&
            identical(tablexp:::PARAMETRES_ETAPES$lissage$parametre[!is.na(tablexp:::PARAMETRES_ETAPES$lissage$selon)],
-                     c("ponderation", "parametre_lissage")))
+                     c("ponderation", "parametre_lissage")) &&
+           identical(tablexp:::PARAMETRES_ETAPES$validation$parametre[!is.na(tablexp:::PARAMETRES_ETAPES$validation$selon)],
+                     "table_reference"))
 verifier("A invariants : le catalogue fabriqué les tient ; chaque violation fabriquée est détectée (témoins)", {
   c1 <- CAT_F; c1$recette[3L] <- "agregats"                       # (i)
   c2 <- CAT_F; c2$selon[3L] <- "inconnu"                           # (ii) gouvernant absent
@@ -94,8 +101,8 @@ verifier("A invariants : le catalogue fabriqué les tient ; chaque violation fab
   isTRUE(invariants_catalogue(list(lissage = CAT_F))) &&
     all(vapply(list(c1, c2, c3, c4, c5, c6, c7, c8), function(c_) !isTRUE(invariants_catalogue(list(lissage = c_))), NA))
 })
-verifier("A controler_parametres_condition() : sans effet sur chaque étape du catalogue réel sans gouvernant (toutes sauf lissage), paramètres quelconques",
-         all(vapply(setdiff(names(tablexp:::PARAMETRES_ETAPES), "lissage"), function(e)
+verifier("A controler_parametres_condition() : sans effet sur chaque étape du catalogue réel sans gouvernant (toutes sauf lissage et validation), paramètres quelconques",
+         all(vapply(setdiff(names(tablexp:::PARAMETRES_ETAPES), c("lissage", "validation")), function(e)
            is.null(tablexp:::controler_parametres_condition(e, list(x = 1), tablexp:::PARAMETRES_ETAPES[[e]])), NA)))
 
 # --- B. controler_parametres_condition() par injection (M247) -------------------
@@ -116,11 +123,11 @@ verifier("B parametre_inattendu seul (niveau sous methode = a) : module, motif, 
   paste("Étape « lissage » : paramètre(s) « niveau » sans objet sous methode = « a » (employé(s) sous methode = « b ») ;",
         "un paramètre sans effet n'est pas admis dans le plan."),
   list(etape = "lissage", parametre = "niveau", gouvernant = "methode", valeur = "a")))
-verifier("B parametre_inattendu, valeurs d'emploi multiples (ponderation sous methode = b : employé sous a, c)", controle(
+verifier("B parametre_inattendu, valeurs d'emploi multiples (ponderation sous methode = b : employé sous a ou c ; « « a » ou « c » », décision du mainteneur du 11/11/2026)", controle(
   refus_de(cpc(list(methode = "b", critere = "laml", intervalle_lissage = c(1, 2), niveau = 0.9, ponderation = "uniforme"))),
   "parametre_inattendu",
   paste("Étape « lissage » : paramètre(s) « ponderation » sans objet sous methode = « b » (employé(s) sous methode =",
-        "« a », « c ») ; un paramètre sans effet n'est pas admis dans le plan."),
+        "« a » ou « c ») ; un paramètre sans effet n'est pas admis dans le plan."),
   list(etape = "lissage", parametre = "ponderation", gouvernant = "methode", valeur = "b")))
 verifier("B parametre_manquant sous le second gouvernant (parametre_lissage sous critere = declare)", controle(
   refus_de(cpc(list(methode = "a", critere = "declare", ponderation = "uniforme"))), "parametre_manquant",
@@ -134,9 +141,37 @@ verifier("B ordre : sous un gouvernant, parametre_manquant avant parametre_inatt
   r <- refus_de(cpc(list(methode = "a", critere = "declare", parametre_lissage = 1, niveau = 0.9)))
   !is.null(r) && identical(r$motif, "parametre_manquant") && identical(r$details$parametre, "ponderation")
 })
+verifier("B parametre_inattendu, trois valeurs d'emploi : « a », « c » ou « d » (décision du mainteneur du 11/11/2026)", {
+  c3 <- CAT_F; c3$valeurs[[5L]] <- c("a", "c", "d")
+  r <- refus_de(cpc(list(methode = "b", critere = "laml", intervalle_lissage = c(1, 2), niveau = 0.9,
+                         ponderation = "uniforme"), c3))
+  !is.null(r) && grepl("(employé(s) sous methode = « a », « c » ou « d ») ;", conditionMessage(r), fixed = TRUE)
+})
 verifier("B gouvernant absent ou non chaîne unique : erreur de programmation (gouvernant contrôlé avant)",
          erreur_programmation(cpc(list(critere = "declare", parametre_lissage = 1))) &&
            erreur_programmation(cpc(list(methode = c("a", "b"), critere = "declare"))))
+
+# controler_parametres_recette() par injection du catalogue (M247 ; audit m3
+# de #224) : catalogue fabriqué d'une étape, un paramètre par recette (d sous
+# r1, retenue ; a, b, c sous r2, r3, r4) ; le catalogue réel n'attribue
+# qu'une recette d'emploi aux paramètres inattendus possibles.
+CAT_R <- data.frame(parametre = c("d", "a", "b", "c"), type = "double", domaine = "fabriqué",
+                    recette = c("r1", "r2", "r3", "r4"), selon = NA_character_,
+                    valeurs = I(rep(list(character(0)), 4L)), stringsAsFactors = FALSE)
+cpr <- function(pe) tablexp:::controler_parametres_recette(list(etapes = list(exposition = pe)), list(recette = "r1"),
+                                                           list(exposition = CAT_R))
+verifier("B controler_parametres_recette(), catalogue injecté : plan complet sous la recette retenue, aucun refus",
+         is.null(refus_de(cpr(list(d = 1)))))
+verifier("B controler_parametres_recette(), catalogue injecté, deux recettes d'emploi : « « r2 » ou « r3 » » (décision du mainteneur du 11/11/2026) ; module, motif, message exact, details", controle(
+  refus_de(cpr(list(d = 1, a = 1, b = 1))), "parametre_inattendu",
+  paste("Étape « exposition » : paramètre(s) « a », « b » sans objet pour la recette « r1 » (employé(s) par la",
+        "recette « r2 » ou « r3 ») ; un paramètre sans effet n'est pas admis dans le plan."),
+  list(etape = "exposition", parametre = c("a", "b"), recette = "r1")))
+verifier("B controler_parametres_recette(), catalogue injecté, trois recettes d'emploi : « « r2 », « r3 » ou « r4 » » (décision du mainteneur du 11/11/2026)", {
+  r <- refus_de(cpr(list(d = 1, a = 1, b = 1, c = 1)))
+  !is.null(r) && identical(r$motif, "parametre_inattendu") &&
+    grepl("(employé(s) par la recette « r2 », « r3 » ou « r4 ») ;", conditionMessage(r), fixed = TRUE)
+})
 
 # --- C. canoniser_plan() : « sans condition » (ADR 0017, point 3.2) -------------
 
@@ -173,25 +208,91 @@ verifier("D ETAPES$table_construite : character, table_lissee pour lissage (#223
 local({
   tp <- data.frame(sexe = rep(c("H", "F"), each = 3L), age = rep(50:52, 2L), qx_reference = 0.01,
                    qx = c(0.01, 0.02, 0.03, 0.005, 0.01, 0.015), etat = "produite", stringsAsFactors = FALSE)
-  etapes_de <- function(t, segments = NULL, plage = c(50, 52)) {
+  # Table d'exposition fabriquée (segments H puis F ; âges 49 à 53, hors
+  # plage compris) : la grille de grille_plage() est celle de tp (condition
+  # d'actuary pour #224).
+  ex <- data.frame(sexe = rep(c("H", "F"), each = 5L), age = rep(49:53, 2L), exposition_centrale = 100,
+                   evenements = 1L, stringsAsFactors = FALSE)
+  etapes_de <- function(t, segments = NULL, plage = c(50, 52), expo = ex) {
     r <- list(table_positionnee = t)
     if (!is.null(segments)) r$segments <- segments
-    list(positionnement = list(parametres = list(plage_ages = plage), resultat = r))
+    list(exposition = list(resultat = list(exposition = expo)),
+         positionnement = list(parametres = if (!is.null(plage)) list(plage_ages = plage) else list(), resultat = r))
   }
   tc <- function(t, segmentation = "sexe", ...) tablexp:::table_construite(etapes_de(t, ...), segmentation, "positionnement")
+  # Colonne facultative levier (ADR 0017, point 5.5) : valeurs exactes en
+  # double, sommes par segment 3.5 (H) et 4 (F).
+  tl <- tp; tl$levier <- c(1, 1.5, 1, 1, 1, 2)
   verifier("D table_construite() : table fabriquée conforme rendue telle quelle, plage_ages de l'étape, ddl_effectifs NULL", {
     r <- tc(tp)
     identical(r, list(table = tp, plage_ages = c(50, 52), ddl_effectifs = NULL))
   })
-  verifier("D table_construite() : ddl_effectifs lu par propriété (table segments portant la colonne) : clés et ddl_effectifs ; sans la colonne, NULL", {
+  verifier("D table_construite() : ddl_effectifs lu par propriété (table segments portant la colonne, table portant levier) : clés et ddl_effectifs, table rendue telle quelle ; sans les deux colonnes, NULL", {
     sg <- data.frame(sexe = c("H", "F"), autre = 1:2, ddl_effectifs = c(3.5, 4), stringsAsFactors = FALSE)
-    identical(tc(tp, segments = sg)$ddl_effectifs, sg[c("sexe", "ddl_effectifs")]) &&
+    r <- tc(tl, segments = sg)
+    identical(r$ddl_effectifs, sg[c("sexe", "ddl_effectifs")]) && identical(r$table, tl) &&
       is.null(tc(tp, segments = sg[c("sexe", "autre")])$ddl_effectifs)
   })
   verifier("D table_construite() : position des colonnes non contrôlée ; sans segmentation, un seul segment", {
     t1 <- tp[c("qx", "etat", "age", "sexe", "qx_reference")]
     t0 <- tp[1:3, c("age", "qx", "etat")]
     identical(tc(t1)$table, t1) && identical(tc(t0, character(0))$table, t0)
+  })
+  # Témoins exigés par actuary pour #224 (conditions 1 à 3 de la PR #221) :
+  # chacun lève une erreur de programmation préfixée, jamais une erreur R
+  # générique.
+  prefixee <- function(expr) {
+    e <- tryCatch({ force(expr); NULL }, error = function(e) e)
+    !is.null(e) && startsWith(conditionMessage(e), "table_construite() : ") &&
+      grepl("(erreur de programmation)", conditionMessage(e), fixed = TRUE)
+  }
+  verifier("D table_construite(), témoins de #224 : table vide, segment manquant, segments permutés, clé de type différent (factor, integer), clé NA, plage_ages absent -> erreur de programmation préfixée par table_construite()", {
+    vide <- tp[0L, ]
+    manquant <- tp[1:3, ]
+    perm <- tp[c(4:6, 1:3), ]; rownames(perm) <- NULL
+    fac <- tp; fac$sexe <- factor(fac$sexe, levels = c("H", "F"))
+    ex_int <- ex; ex_int$sexe <- rep(1:2, each = 5L)
+    tp_int <- tp; tp_int$sexe <- rep(c(1, 2), each = 3L)
+    cle_na <- tp; cle_na$sexe[2L] <- NA
+    tous(list(vide = prefixee(tc(vide)), manquant = prefixee(tc(manquant)), permutes = prefixee(tc(perm)),
+              factor = prefixee(tc(fac)), integer = prefixee(tc(tp_int, expo = ex_int)), na = prefixee(tc(cle_na)),
+              plage_absente = prefixee(tc(tp, plage = NULL)), plage_integer = prefixee(tc(tp, plage = c(50L, 52L)))))
+  })
+  verifier("D table_construite() : segment en trop dans la table d'exposition (absent de la table construite), table d'exposition absente, table segments aux clés permutées ou ddl_effectifs integer -> erreur de programmation préfixée", {
+    ex3 <- rbind(ex, data.frame(sexe = "X", age = 50L, exposition_centrale = 1, evenements = 0L, stringsAsFactors = FALSE))
+    e0 <- etapes_de(tp); e0$exposition <- NULL
+    sg_perm <- data.frame(sexe = c("F", "H"), ddl_effectifs = c(3.5, 4), stringsAsFactors = FALSE)
+    sg_int <- data.frame(sexe = c("H", "F"), ddl_effectifs = c(3L, 4L), stringsAsFactors = FALSE)
+    tous(list(en_trop = prefixee(tc(tp, expo = ex3)),
+              sans_exposition = prefixee(tablexp:::table_construite(e0, "sexe", "positionnement")),
+              segments_permutes = prefixee(tc(tl, segments = sg_perm)), ddl_integer = prefixee(tc(tl, segments = sg_int))))
+  })
+  verifier("D table_construite(), colonne levier (ADR 0017, point 5.5 (i)-(ii)) : levier sans ddl_effectifs, ddl_effectifs sans levier, levier integer, levier NA, levier négatif, levier infini, somme par segment différente d'un ulp -> erreur de programmation préfixée par table_construite()", {
+    sg <- data.frame(sexe = c("H", "F"), ddl_effectifs = c(3.5, 4), stringsAsFactors = FALSE)
+    l_int <- tl; l_int$levier <- c(1L, 2L, 1L, 1L, 1L, 2L)
+    l_na <- tl; l_na$levier[2L] <- NA
+    l_neg <- tl; l_neg$levier[2L] <- -0.5; l_neg$levier[3L] <- 3
+    l_inf <- tl; l_inf$levier[2L] <- Inf
+    sg_ulp <- sg; sg_ulp$ddl_effectifs[2L] <- 4 + 4 * .Machine$double.eps
+    # Erreur préfixée et cause nommée dans le message (fragment ASCII du
+    # texte du contrôle : comparaison indépendante de la locale).
+    cause <- function(expr, texte) {
+      e <- tryCatch({ force(expr); NULL }, error = function(e) e)
+      !is.null(e) && prefixee(stop(e)) && grepl(texte, conditionMessage(e), fixed = TRUE)
+    }
+    seul <- "sans colonne ddl_effectifs de la table segments"
+    forme <- "colonne levier double finie, sans NA, >= 0 attendue"
+    tous(list(levier_seul = cause(tc(tl), seul), levier_seul_segments = cause(tc(tl, segments = sg["sexe"]), seul),
+              ddl_seul = cause(tc(tp, segments = sg), "sans colonne levier"),
+              integer = cause(tc(l_int, segments = sg), forme), na = cause(tc(l_na, segments = sg), forme),
+              negatif = cause(tc(l_neg, segments = sg), forme), infini = cause(tc(l_inf, segments = sg), forme),
+              ulp = cause(tc(tl, segments = sg_ulp), "somme de la colonne levier par segment"),
+              ulp_distinct = !identical(sg_ulp$ddl_effectifs[2L], 4)))
+  })
+  verifier("D table_construite(), témoins de l'audit m1 (#224) : table d'exposition sans la colonne evenements, ou avec un age NA -> erreur de programmation préfixée par table_construite(), avant grille_plage()", {
+    ex_na <- ex; ex_na$age[3L] <- NA
+    tous(list(sans_evenements = prefixee(tc(tp, expo = ex[c("sexe", "age", "exposition_centrale")])),
+              age_na = prefixee(tc(tp, expo = ex_na))))
   })
   verifier("D table_construite() : clés hors de l'ordre du champ segmentation, segments non contigus ou en double, âges décroissants, data.frame de classe dérivée -> erreur de programmation", {
     t2 <- tp; t2$region <- "N"

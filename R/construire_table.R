@@ -12,14 +12,15 @@
 #    controler_parametres_condition() : présence des paramètres conditionnels
 #    selon la valeur de leur gouvernant (ADR 0017, point 3) ;
 #  - table_construite() : table construite de l'étape productrice exécutée,
-#    contrat commun contrôlé (ADR 0017, points 1.2 et 1.5) ;
+#    contrat commun contrôlé (ADR 0017, points 1.2 et 1.5), dont la grille
+#    segments x âges de grille_plage() (module exposition ; #224) ;
 #  - valider_plan() : plan validé entièrement avant toute exécution (codes
 #    structurels du plan ; valeurs contrôlées par les modules qui les
 #    emploient, sans réimplémentation : controler_parametres_donnees(),
 #    controler_parametres_exposition(), controler_parametres_brut(),
 #    controler_gouvernants_lissage(), controler_parametres_lissage(),
 #    controler_parametres_positionnement(), controler_parametres_homogeneite(),
-#    controler_parametres_validation(),
+#    controler_relation_table(), controler_parametres_validation(),
 #    controler_parametres_importance_exclusions()) ;
 #    exporté (contrôle de saisie à sens métier, E4.3) ;
 #  - PARAMETRES_CLE_TABLE, controler_forme_tables(), cles_citees(),
@@ -35,7 +36,8 @@
 #    seconde y ajoute le contrôle 1.3, la convention de l'étape `lissage`
 #    (controler_convention_lissage(), module lissage) et les contrôles
 #    d'entrée des étapes qui lisent une table (controler_entrees_validation(),
-#    module positionnement, pour `positionnement` puis `validation`), et n'est
+#    module positionnement, pour `positionnement` puis `validation` si elle
+#    cite une table), et n'est
 #    appelée que par construire_table() ; toutes deux
 #    rendent les valeurs validées transmises aux étapes ;
 #  - construire_table() : contrôle les entrées une fois (controler_entrees()),
@@ -203,19 +205,23 @@ PARAMETRES_ETAPES <- list(
     valeurs = I(rep(list(character(0)), 3L)),
     stringsAsFactors = FALSE),
   # Paramètres à valeur entière en double (M246) ; un integer est refusé
-  # (M257).
+  # (M257). table_reference conditionnel au gouvernant relation_table (#224 ;
+  # ADR 0017, point 3.4) : requis sous independante, ajustee_hors_outil et
+  # positionnee, interdit sous lissee (aucune table de référence lue).
   validation = data.frame(
     parametre = c("table_reference", "relation_table", "plage_ages", "tranches_age", "niveau", "replications"),
     type = c("character", "character", "double", "double", "double", "double"),
     domaine = c("clé de la table dans l'argument tables_reference, chaîne unique non vide",
-                "independante, ajustee_hors_outil ou positionnee (étape positionnement au plan, même clé, même plage)",
+                paste("independante, ajustee_hors_outil, positionnee (étape positionnement au plan, même clé, même",
+                      "plage) ou lissee (étape lissage au plan, même plage, sans table_reference)"),
                 "deux valeurs entières, 0 <= min <= max, couvertes par la table",
                 "bornes inférieures entières strictement croissantes, la première égale au minimum de plage_ages",
                 "nombre double unique, fini, 0 < niveau < 1",
                 "nombre entier unique, au moins 1 (réplications de Monte-Carlo)"),
     recette = NA_character_,
-    selon = NA_character_,
-    valeurs = I(rep(list(character(0)), 6L)),
+    selon = c("relation_table", NA, NA, NA, NA, NA),
+    valeurs = I(list(c("independante", "ajustee_hors_outil", "positionnee"), character(0), character(0), character(0),
+                     character(0), character(0))),
     stringsAsFactors = FALSE),
   importance_exclusions = data.frame(
     parametre = "niveau",
@@ -367,12 +373,15 @@ controler_inventaires_recette <- function(plan, recette) {
 # du plan, dans l'ordre du plan : paramètre attribué à la recette retenue et
 # absent, refus parametre_manquant (aucun défaut implicite) ; paramètre
 # attribué à une autre recette et présent, refus parametre_inattendu (un
-# paramètre sans effet n'est pas admis). Module construire_table. Rend NULL,
-# invisible.
-controler_parametres_recette <- function(plan, recette) {
+# paramètre sans effet n'est pas admis). Module construire_table.
+# `catalogue` : PARAMETRES_ETAPES par défaut, injectable par les tests
+# (précédent M247, comme controler_parametres_condition() ; audit m3 de
+# #224 : rend atteignables les messages à plusieurs recettes d'emploi, que
+# le catalogue réel ne produit pas). Rend NULL, invisible.
+controler_parametres_recette <- function(plan, recette, catalogue = PARAMETRES_ETAPES) {
   etapes <- plan[["etapes"]]
   for (nom in names(etapes)) {
-    cat_e <- PARAMETRES_ETAPES[[nom]]
+    cat_e <- catalogue[[nom]]
     conditionnel <- !is.na(cat_e$recette)
     presents <- names(etapes[[nom]])
     sous <- conditionnel & cat_e$recette %in% recette$recette
@@ -384,13 +393,19 @@ controler_parametres_recette <- function(plan, recette) {
               list(etape = nom, parametre = absents, recette = recette$recette))
     autres <- conditionnel & !sous
     inattendus <- intersect(cat_e$parametre[autres], presents)
-    if (length(inattendus))
+    if (length(inattendus)) {
+      # Recettes d'emploi, alternatives : « a » ou « b » (décision du
+      # mainteneur du 11/11/2026).
+      emploi <- unique(cat_e$recette[autres & cat_e$parametre %in% inattendus])
+      recettes_emploi <- if (length(emploi) > 1L)
+        formuler("%s ou %s", liste_guillemets(emploi[-length(emploi)]), liste_guillemets(emploi[length(emploi)]))
+      else liste_guillemets(emploi)
       refuser("construire_table", "parametre_inattendu",
               formuler(paste("Étape « %s » : paramètre(s) %s sans objet pour la recette « %s » (employé(s) par la",
                              "recette %s) ; un paramètre sans effet n'est pas admis dans le plan."),
-                       citer(nom), liste_guillemets(inattendus), citer(recette$recette),
-                       liste_guillemets(unique(cat_e$recette[autres & cat_e$parametre %in% inattendus]))),
+                       citer(nom), liste_guillemets(inattendus), citer(recette$recette), recettes_emploi),
               list(etape = nom, parametre = inattendus, recette = recette$recette))
+    }
   }
   invisible(NULL)
 }
@@ -428,14 +443,20 @@ controler_parametres_condition <- function(nom_etape, parametres_etape, catalogu
               list(etape = nom_etape, parametre = absents, gouvernant = g, valeur = valeur))
     autres <- depend & !sous
     inattendus <- intersect(catalogue_etape$parametre[autres], presents)
-    if (length(inattendus))
+    if (length(inattendus)) {
+      # Valeurs d'emploi du gouvernant, alternatives : « a » ou « b »
+      # (décision du mainteneur du 11/11/2026).
+      emploi <- unique(unlist(catalogue_etape$valeurs[autres & catalogue_etape$parametre %in% inattendus]))
+      valeurs_emploi <- if (length(emploi) > 1L)
+        formuler("%s ou %s", liste_guillemets(emploi[-length(emploi)]), liste_guillemets(emploi[length(emploi)]))
+      else liste_guillemets(emploi)
       refuser("construire_table", "parametre_inattendu",
               formuler(paste("Étape « %s » : paramètre(s) %s sans objet sous %s = « %s » (employé(s) sous %s = %s) ;",
                              "un paramètre sans effet n'est pas admis dans le plan."),
                        citer(nom_etape), liste_guillemets(inattendus), citer(g), citer(valeur), citer(g),
-                       liste_guillemets(unique(unlist(catalogue_etape$valeurs[autres &
-                                                                              catalogue_etape$parametre %in% inattendus])))),
+                       valeurs_emploi),
               list(etape = nom_etape, parametre = inattendus, gouvernant = g, valeur = valeur))
+    }
   }
   invisible(NULL)
 }
@@ -451,8 +472,9 @@ controler_parametres_condition <- function(nom_etape, parametres_etape, catalogu
 # n'est pas exigé par la boucle des noms : sa présence est contrôlée dans la
 # phase des valeurs, pour chaque étape du plan et dans l'ordre, après le
 # contrôle de forme et de domaine des gouvernants de l'étape (fonction du
-# module : controler_gouvernants_lissage() pour l'étape `lissage`) et avant
-# le contrôle des valeurs par le module (controler_parametres_condition()).
+# module : controler_gouvernants_lissage() pour l'étape `lissage`,
+# controler_relation_table() pour l'étape `validation`, #224) et avant le
+# contrôle des valeurs par le module (controler_parametres_condition()).
 # Une seule étape productrice d'une table construite par plan (colonne
 # table_construite d'ETAPES ; ADR 0017, point 2.2 ; D9) : refus
 # tables_construites_multiples, juste après l'ordre des étapes.
@@ -549,13 +571,14 @@ valider_plan <- function(plan) {
   # ADR 0007, annotation du 17/10/2026, point d), pour chaque étape du plan
   # dans l'ordre (celui d'ETAPES, contrôlé ci-dessus) : (1) forme et domaine
   # des gouvernants de l'étape, contrôle croisé compris (fonction du module ;
-  # étape `lissage` seule dans cette version ; les gouvernants, sans
-  # condition, sont présents) ; (2) présence des paramètres conditionnels à
-  # la valeur d'un gouvernant (ADR 0017, point 3.2) ; (3) valeurs, par la
-  # fonction de contrôle du module.
+  # étapes `lissage` et `validation` dans cette version ; les gouvernants,
+  # sans condition, sont présents) ; (2) présence des paramètres
+  # conditionnels à la valeur d'un gouvernant (ADR 0017, point 3.2) ; (3)
+  # valeurs, par la fonction de contrôle du module.
   for (nom in noms) {
     if (identical(nom, "lissage"))
       controler_gouvernants_lissage(etapes[["lissage"]][["methode"]], etapes[["lissage"]][["critere_lissage"]])
+    if (identical(nom, "validation")) controler_relation_table(etapes[["validation"]][["relation_table"]])
     controler_parametres_condition(nom, etapes[[nom]], PARAMETRES_ETAPES[[nom]])
     switch(nom,
       donnees = {
@@ -606,11 +629,20 @@ valider_plan <- function(plan) {
         controler_parametres_homogeneite(ph[["plage_ages"]], ph[["tranches_age"]], ph[["replications"]],
                                          plan[["segmentation"]])
       },
+      # `validation` (#224) : table_reference, conditionnel à relation_table,
+      # passé par son nom s'il est au plan (absent = missing() dans
+      # controler_parametres_validation()), quote = TRUE comme pour
+      # `exposition` ; contexte : paramètres des étapes positionnement et
+      # lissage (NULL si absentes).
       validation = {
         pv <- etapes[["validation"]]
-        controler_parametres_validation(pv[["table_reference"]], pv[["relation_table"]], pv[["plage_ages"]],
-                                        pv[["tranches_age"]], pv[["niveau"]], pv[["replications"]],
-                                        positionnement = etapes[["positionnement"]])
+        do.call(controler_parametres_validation,
+                c(pv[intersect("table_reference", names(pv))],
+                  list(relation_table = pv[["relation_table"]], plage_ages = pv[["plage_ages"]],
+                       tranches_age = pv[["tranches_age"]], niveau = pv[["niveau"]],
+                       replications = pv[["replications"]], positionnement = etapes[["positionnement"]],
+                       lissage = etapes[["lissage"]])),
+                quote = TRUE)
       },
       importance_exclusions = controler_parametres_importance_exclusions(etapes[["importance_exclusions"]][["niveau"]]),
       stop(sprintf("valider_plan() : étape « %s » sans contrôle des valeurs (erreur de programmation).", nom),
@@ -982,7 +1014,10 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
 # contrôle d'entrée de chaque étape qui lit une table (ADR 0015, point 7.3 ;
 # M253) : controler_entrees_validation() (module positionnement) sur la table
 # citée par l'étape `positionnement` (#167), puis sur celle citée par l'étape
-# `validation`. Rend les valeurs de controler_plan_roles(),
+# `validation` si elle en cite une (table_reference au plan ; sous la
+# relation lissee, aucune table n'est lue et la convention est garantie par
+# controler_convention_lissage(), l'étape lissage étant imposée par
+# lissage_absent ; #224). Rend les valeurs de controler_plan_roles(),
 # plus tables_fiche (valeur de fiche$tables_reference) et tables (table citée
 # par étape, liste nommée par étape ; vide sans table citée). Au rejeu, ces
 # contrôles ne sont faits qu'ici, par l'unique appel de construire_table()
@@ -1003,7 +1038,7 @@ controler_entrees <- function(donnees, roles, plan, provenance, tables_reference
   # clé de table et la plage d'âges du positionnement : ce second contrôle
   # refait alors le premier, à l'identique. Il est gardé pour l'uniformité
   # (un contrôle par étape qui lit une table).
-  if ("validation" %in% names(etapes_plan)) {
+  if ("validation" %in% names(etapes_plan) && "table_reference" %in% names(etapes_plan[["validation"]])) {
     pv <- etapes_plan[["validation"]]
     tables$validation <- table_citee(tables_reference, pv[["table_reference"]])
     controler_entrees_validation(tables$validation, pv[["table_reference"]], e$conv$retenue,
@@ -1014,18 +1049,33 @@ controler_entrees <- function(donnees, roles, plan, provenance, tables_reference
 
 # Table construite de l'étape productrice `nom_etape` (ADR 0017, points 1.2
 # et 1.5), appelée par construire_table() juste après l'exécution d'une étape
-# dont ETAPES$table_construite n'est pas NA : `etapes` : étapes exécutées ;
-# `segmentation` : champ du plan. Contrat 1.2 contrôlé, toute violation est
-# une erreur de programmation (stop(), jamais refuser()) : data.frame nu
-# (classe exacte data.frame, attributs names, row.names et class seuls) ;
-# clés de segmentation présentes, dans l'ordre du champ segmentation
-# (position des colonnes non contrôlée) ; age integer, qx double fini dans
-# [0, 1], etat character sans NA (forme exacte, sans attribut) ; grille
-# complète : segments uniques et contigus, chacun avec exactement les âges de
-# la plage, croissants ; aucune colonne annee. Rend list(table, plage_ages
-# (paramètre plage_ages de l'étape), ddl_effectifs (table segments du
-# résultat restreinte aux clés et à ddl_effectifs si elle porte cette
-# colonne, sinon NULL ; propriété du résultat, aucun nom d'étape testé)).
+# dont ETAPES$table_construite n'est pas NA, avant tout lecteur : `etapes` :
+# étapes exécutées (dont `exposition`, préalable de toute étape
+# productrice) ; `segmentation` : champ du plan. Contrat 1.2 contrôlé, toute
+# violation est une erreur de programmation préfixée (stop(), jamais
+# refuser() ; aucune erreur R générique, conditions d'actuary pour #224),
+# dans l'ordre : paramètre plage_ages de l'étape (deux valeurs entières en
+# double, min <= max) ; table d'exposition présente (data.frame), avec les
+# clés de segmentation, age sans NA et la colonne evenements ; data.frame
+# nu (classe exacte data.frame, attributs names, row.names et class seuls) ;
+# au moins une ligne ; clés de segmentation présentes, dans l'ordre du champ
+# segmentation (position des colonnes non contrôlée), sans NA ; age integer,
+# qx double fini dans [0, 1], etat character sans NA (forme exacte, sans
+# attribut) ; aucune colonne annee ; clés de même classe et de même type que
+# celles de la table d'exposition ; clés et âges identical() à la grille
+# segments x âges de la plage de grille_plage() (module exposition, sans
+# année) sur la table d'exposition : mêmes segments, même ensemble et même
+# ordre, chacun avec exactement les âges de la plage, croissants ;
+# colonne facultative levier, si présente : double fini, sans NA, >= 0
+# (ADR 0017, point 5.5 (i)) ; levier et colonne ddl_effectifs de la table
+# segments du résultat présentes ensemble ou absentes ensemble (point 5.5
+# (ii)) ; si présentes : clés de la table segments identical() aux segments
+# de la grille, ddl_effectifs double fini, somme de levier par segment
+# (dans l'ordre de la table) identical() à ddl_effectifs. Rend
+# list(table, plage_ages (paramètre plage_ages de l'étape), ddl_effectifs
+# (table segments du résultat restreinte aux clés et à ddl_effectifs si elle
+# porte cette colonne, sinon NULL ; propriété du résultat, aucun nom d'étape
+# testé)).
 table_construite <- function(etapes, segmentation, nom_etape) {
   element <- ETAPES$table_construite[match(nom_etape, ETAPES$etape)]
   if (length(element) != 1L || is.na(element))
@@ -1037,12 +1087,24 @@ table_construite <- function(etapes, segmentation, nom_etape) {
   hors_contrat <- function(quoi)
     stop(sprintf(paste("table_construite() : la table « %s » de l'étape « %s » ne tient pas le contrat de la table",
                        "construite : %s (erreur de programmation)."), element, nom_etape, quoi), call. = FALSE)
+  if (!valeurs_entieres_double(plage_ages) || length(plage_ages) != 2L || plage_ages[1L] > plage_ages[2L] ||
+      abs(plage_ages[2L]) > .Machine$integer.max || abs(plage_ages[1L]) > .Machine$integer.max)
+    hors_contrat("paramètre plage_ages de l'étape absent ou mal formé")
+  expo <- etapes[["exposition"]][["resultat"]][["exposition"]]
+  if (!is.data.frame(expo) || !all(c(segmentation, "age") %in% names(expo)))
+    hors_contrat("table de l'étape exposition absente ou sans les clés de segmentation")
+  # Colonnes lues par grille_plage() (#224, audit m1) : evenements présente,
+  # age sans NA (un NA rendrait l'indice de cellule NA).
+  if (!("evenements" %in% names(expo))) hors_contrat("table de l'étape exposition sans la colonne evenements")
+  if (anyNA(expo[["age"]])) hors_contrat("table de l'étape exposition avec un age NA")
   if (!identical(class(tab), "data.frame") ||
       !all(names(attributes(tab)) %in% c("names", "row.names", "class")))
     hors_contrat("data.frame nu attendu")
+  if (!nrow(tab)) hors_contrat("table vide")
   pos <- match(segmentation, names(tab))
   if (anyNA(pos) || is.unsorted(pos, strictly = TRUE))
     hors_contrat("clés de segmentation absentes ou hors de l'ordre du champ segmentation")
+  if (any(vapply(segmentation, function(k) anyNA(tab[[k]]), NA))) hors_contrat("clé de segmentation NA")
   if (!forme_exacte(tab[["age"]], "integer")) hors_contrat("colonne age integer attendue")
   q <- tab[["qx"]]
   if (!forme_exacte(q, "double") || anyNA(q) || !all(is.finite(q)) || !all(q >= 0 & q <= 1))
@@ -1050,17 +1112,45 @@ table_construite <- function(etapes, segmentation, nom_etape) {
   if (!forme_exacte(tab[["etat"]], "character") || anyNA(tab[["etat"]]))
     hors_contrat("colonne etat character sans NA attendue")
   if ("annee" %in% names(tab)) hors_contrat("colonne annee non admise")
-  cles <- if (length(segmentation))
-    do.call(paste, c(unname(lapply(tab[segmentation], as.character)), list(sep = "\r"))) else rep("", nrow(tab))
-  r <- rle(cles)
-  ages <- seq(as.integer(plage_ages[1L]), as.integer(plage_ages[2L]))
-  if (anyDuplicated(r$values) || any(r$lengths != length(ages)) ||
-      !identical(tab[["age"]], rep(ages, times = length(r$values))))
-    hors_contrat("grille segments x âges de la plage incomplète, segments non contigus ou âges non croissants")
+  # Grille de référence : segments de la table d'exposition (dans son ordre)
+  # x âges de la plage (ADR 0017, point 1.2 ; condition d'actuary pour #224).
+  grille <- grille_plage(expo, segmentation, FALSE, plage_ages)
+  cel <- grille$cellules
+  for (k in segmentation)
+    if (!identical(class(tab[[k]]), class(cel[[k]])) || !identical(typeof(tab[[k]]), typeof(cel[[k]])))
+      hors_contrat(sprintf("clé « %s » de classe ou de type différent de celle de la table d'exposition", k))
+  if (!identical(lapply(tab[c(segmentation, "age")], identity), lapply(cel[c(segmentation, "age")], identity)))
+    hors_contrat(paste("clés et âges différents de la grille segments x âges de la plage sur la table d'exposition",
+                       "(segment manquant ou en trop, segments permutés ou non contigus, âges incomplets ou non",
+                       "croissants)"))
+  # Colonne facultative levier (ADR 0017, point 5.5 (i)) : double fini, sans
+  # NA, >= 0 (borne supérieure non fixée).
+  avec_levier <- "levier" %in% names(tab)
+  if (avec_levier) {
+    lev <- tab[["levier"]]
+    if (!forme_exacte(lev, "double") || anyNA(lev) || !all(is.finite(lev)) || !all(lev >= 0))
+      hors_contrat("colonne levier double finie, sans NA, >= 0 attendue")
+  }
   segs <- resultat[["segments"]]
-  list(table = tab, plage_ages = plage_ages,
-       ddl_effectifs = if (is.data.frame(segs) && "ddl_effectifs" %in% names(segs))
-                         segs[c(segmentation, "ddl_effectifs")])
+  avec_ddl <- is.data.frame(segs) && "ddl_effectifs" %in% names(segs)
+  # Une seule source (point 5.5 (ii)) : levier et ddl_effectifs ensemble.
+  if (avec_levier != avec_ddl)
+    hors_contrat(if (avec_levier) "colonne levier présente sans colonne ddl_effectifs de la table segments"
+                 else "colonne ddl_effectifs de la table segments présente sans colonne levier")
+  ddl <- NULL
+  if (avec_ddl) {
+    seg_grille <- cel[!duplicated(grille$segment), segmentation, drop = FALSE]
+    if (!all(segmentation %in% names(segs)) ||
+        !identical(lapply(segs[segmentation], identity), lapply(seg_grille, identity)))
+      hors_contrat("table segments du résultat aux clés différentes des segments de la grille")
+    if (!forme_exacte(segs[["ddl_effectifs"]], "double") || !all(is.finite(segs[["ddl_effectifs"]])))
+      hors_contrat("colonne ddl_effectifs de la table segments double finie attendue")
+    sommes <- vapply(seq_len(nrow(seg_grille)), function(s) sum(lev[grille$segment == s]), 0)
+    if (!identical(sommes, segs[["ddl_effectifs"]]))
+      hors_contrat("somme de la colonne levier par segment différente de ddl_effectifs de la table segments")
+    ddl <- segs[c(segmentation, "ddl_effectifs")]
+  }
+  list(table = tab, plage_ages = plage_ages, ddl_effectifs = ddl)
 }
 
 # Point d'entrée unique (ADR 0007, point 3.1).
@@ -1096,8 +1186,8 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
   etapes <- list()
   avertissements <- avertissements_vides()
   # Table construite de l'étape productrice exécutée (ADR 0017, point 1.5 ;
-  # `lissage` ou `positionnement`), contrat contrôlé ; aucun lecteur dans
-  # cette version.
+  # `lissage` ou `positionnement`), contrat contrôlé ; lue par l'étape
+  # validation sous la relation lissee (#224), en valeur.
   construite <- NULL
   for (nom in names(etapes_plan)) {
     pe <- etapes_plan[[nom]]
@@ -1143,7 +1233,8 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                        relation_table = pe[["relation_table"]], plage_ages = pe[["plage_ages"]],
                                        tranches_age = pe[["tranches_age"]], niveau = pe[["niveau"]],
                                        replications = pe[["replications"]], graine = plan[["graine"]],
-                                       positionnement = etapes[["positionnement"]]),
+                                       positionnement = etapes[["positionnement"]],
+                                       construite = construite$table, ddl_effectifs = construite$ddl_effectifs),
       importance_exclusions = calculer_importance_exclusions(donnees, roles, etapes[["donnees"]],
                                                              etapes[["exposition"]], etapes[["validation"]],
                                                              table = table_validation, p = p,

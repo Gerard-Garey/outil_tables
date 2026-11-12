@@ -5,3 +5,7 @@ entree,fonctions-construire-table:table_construite,#223,"définition ajoutée à
 entree,fonctions-construire-table:controler_parametres_condition,#223,"définition ajoutée à R/construire_table.R (commit préparatoire (1a) de B19, ADR 0017, point 3.2) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
 entree,fonctions-validation:annees_groupe,#217,"définition ajoutée à R/validation.R (commit (2a) de B19, #217) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
 catalogue,fonctions-lissage,#223,"module R/lissage.R créé au commit (1b) de B19 (ADR 0017, points 2, 3, 9 et 10) ; catalogue écrit par docwriter en fin de branche (règle 9)"
+entree,fonctions-validation:HYPOTHESE_VALIDATION_LISSEE,#224,"définition ajoutée à R/validation.R (commit (2b) de B19, #224 ; ADR 0017, points 3.4 et 5) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
+entree,fonctions-validation:STATUTS_VALIDATION_LISSEE,#224,"définition ajoutée à R/validation.R (commit (2b) de B19, #224 ; ADR 0017, points 3.4 et 5) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
+entree,fonctions-validation:controler_relation_table,#224,"définition ajoutée à R/validation.R (commit (2b) de B19, #224 ; ADR 0017, points 3.4 et 5) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"
+entree,fonctions-validation:segments_complets,#224,"définition ajoutée à R/validation.R (commit (2b) de B19, #224 ; ADR 0017, points 3.4 et 5) ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)"

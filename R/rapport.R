@@ -1858,6 +1858,14 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "sont produits pour lui. Les lois sous H0 sont prises conditionnellement aux décès observés de chaque segment",
     "(binomiale par cellule ou sous-groupe, multinomiale pour les réplications de Monte-Carlo), qui ne dépendent",
     "pas de theta."),
+  # Relation lissee (#224, spécification de forme, § 4).
+  validation_lissee = paste(
+    "Relation « lissee » : la table validée est la table lissée de cette construction (étape lissage), estimée",
+    "sur ces mêmes cellules ; ses degrés de liberté effectifs nu_s (etapes/validation/parametres/ddl_effectifs) ne",
+    "sont en général pas entiers. Les p asymptotiques de X² et G² sont calculées à n - somme des leviers des cellules",
+    "retenues degrés de liberté (colonne levier de la table lissée ; par segment, ddl_effectifs_retenus ; = n -",
+    "somme des nu_s quand toute cellule pondérée par le lissage est retenue), au statut d'approximation non",
+    "établie ; le SMR et les sous-groupes sont descriptifs."),
   validation_h0 = paste(
     "Hypothèse nulle : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec",
     "l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c aléatoire)."),
@@ -1870,6 +1878,17 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "des cellules retenues du segment suivent la loi multinomiale (O_s ; pi_c), pi_c = A_c / A_s, libre de",
     "theta_s : exacte avec l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c",
     "aléatoire)."),
+  # Hypothèse nulle sous la relation lissee : texte de
+  # HYPOTHESE_VALIDATION_LISSEE (module validation ; #224, spécification de
+  # forme, § 4), recopié ici (R/rapport.R est évalué avant R/validation.R à
+  # l'installation) ; égalité gardée par tests/unitaires/test_validation_lissee.R.
+  validation_h0_lissee = paste(
+    "Aucune loi exacte sous hypothèse nulle : A_c = E^c_c mu_c, mu_c = -ln(1 - g_c), g_c taux de la table lissée de",
+    "cette construction, ajustée sur ces décès (nu_s degrés de liberté effectifs par segment) ; seules sont produites",
+    "les p asymptotiques de X2 et G2 à n - somme des leviers des cellules retenues degrés de liberté (= n - somme des",
+    "nu_s quand toute cellule pondérée par le lissage est retenue) et les p des signes, des suites et de Wilcoxon",
+    "sous leurs hypothèses propres, au statut d'approximation non établie ; unités d'observation",
+    "indépendantes ; cellule [x, x+1) de la convention dernier_anniversaire."),
   validation_hypotheses_tests = paste(
     "Les p-valeurs asymptotiques et exactes des signes, des suites et de Wilcoxon reposent sur une hypothèse",
     "qui n'est pas H0 (i) (colonne statut) ; seules les p-valeurs de Monte-Carlo ont un niveau garanti sous",
@@ -1897,6 +1916,10 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "etapes/validation/resultat/monte_carlo/tirages_effectues. Niveau exact conditionnellement aux O_s, quel que",
     "soit theta : P_H0(p_MC <= alpha) <= alpha. Erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1),",
     "due au nombre fini de réplications, distincte de l'erreur d'estimation."),
+  # Monte-Carlo sous la relation lissee (#224, spécification de forme, § 4).
+  validation_monte_carlo_lissee = paste(
+    "Aucune p-valeur de Monte-Carlo : sous la relation « lissee », une réplication devrait réajuster la table",
+    "lissée ; aucun tirage n'est effectué (etapes/validation/resultat/monte_carlo/tirages_effectues = 0)."),
   validation_reference = paste(
     "Référence de méthode : etapes/validation/parametres/reference_methode (référence de place) ; statistiques",
     "sous leur forme usuelle, écarts à la note documentés ; le statut de chaque grandeur est dans la colonne",
@@ -1926,6 +1949,8 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "Étape validation : statistiques de validation de la table de référence ajustée hors de l'outil"),
   titre_validation_positionnee = paste(
     "Étape validation : statistiques de validation de la table positionnée de cette construction"),
+  titre_validation_lissee = paste(
+    "Étape validation : statistiques de validation de la table lissée de cette construction"),
   # Section etape_importance_exclusions (#69) : texte arrêté par le mainteneur
   # le 06/11/2026 (M259), sans citation de texte réglementaire ; la mention
   # validation_unite_contrat y est reprise sous la même condition (décision
@@ -2321,6 +2346,8 @@ corps_section <- function(x, k) {
                                   tests = FALSE, mc = NULL),
         positionnee = list(verdict = paragraphe(m[["validation_sans_verdict"]]), relation = "validation_positionnee",
                            h0 = "validation_h0_positionnee", tests = TRUE, mc = "validation_monte_carlo_positionnee"),
+        lissee = list(verdict = paragraphe(m[["validation_sans_verdict"]]), relation = "validation_lissee",
+                      h0 = "validation_h0_lissee", tests = TRUE, mc = "validation_monte_carlo_lissee"),
         stop("corps_section() : relation de l'étape validation sans mentions (erreur de programmation).", call. = FALSE))
       return(c(r$verdict,
                paragraphe(m[[r$relation]]),
@@ -2409,6 +2436,7 @@ titre_section <- function(x, k) {
   switch(relation_lue(x[["etapes"]][["validation"]][["parametres"]][["relation_table"]]),
          independante = t, ajustee_hors_outil = MENTIONS_RAPPORT[["titre_validation_ajustee"]],
          positionnee = MENTIONS_RAPPORT[["titre_validation_positionnee"]],
+         lissee = MENTIONS_RAPPORT[["titre_validation_lissee"]],
          stop("titre_section() : relation de l'étape validation sans titre (erreur de programmation).", call. = FALSE))
 }
 

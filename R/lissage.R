@@ -91,6 +91,12 @@ STATUTS_LISSAGE <- local({
             "poids non nul) ; valeur calculée par QR des moindres carrés augmentés, approximation numérique ;",
             "estimateur lissé, sans propriété de maximum de vraisemblance ni d'absence de biais ; aucun intervalle",
             "restitué")),
+    c("table_lissee/levier",
+      paste("approximation numérique : élément diagonal de la matrice de lissage de la cellule, w_i V_ii",
+            "(résolution QR, R base) ; dans [0, 1] en arithmétique exacte, égal à 1 seulement dans un segment",
+            "qui compte exactement z cellules de poids non nul ; valeur calculée >= 0, qui peut dépasser 1 de",
+            "l'ordre de l'erreur d'arrondi ; 0 exactement sur une cellule de poids nul ; somme sur le segment =",
+            "ddl_effectifs")),
     c("regle_force",
       paste("transformation exacte sous la force constante par âge entier ; diffère de l'hypothèse de répartition",
             "_(1-t)q_(x+t) = (1 - t) q_x du binomial d'entrée (écart entre les taux centraux de l'ordre de q^3/12)")),
@@ -225,9 +231,11 @@ somme_differences_carrees <- function(v, z) sum(diff(v, differences = z)^2)
 # (h très grand : amendement d'actuary du 11/11/2026 sur #223, point 4) :
 # rend list(rang) seul, sans calcul, l'appelant refuse
 # (lissage_systeme_rang_deficient). Sinon V = (W + h K'K)^-1 = chol2inv(R),
-# remise dans l'ordre de la permutation des colonnes ; ddl effectifs =
-# somme des w_i V_ii. Rend list(rang (n), g, ddl_effectifs, fidelite (F),
-# regularite (S), critere (M = F + h S), residu_conservation_0 (somme des
+# remise dans l'ordre de la permutation des colonnes ; leviers w_i V_ii
+# (0 exactement sur un poids nul), ddl effectifs = leur somme, calculée sur
+# ce vecteur (identité au bit près avec la somme de la colonne levier ; ADR
+# 0017, point 5.5 (ii)). Rend list(rang (n), g, levier, ddl_effectifs,
+# fidelite (F), regularite (S), critere (M = F + h S), residu_conservation_0 (somme des
 # w (g - q^)), residu_conservation_1 (somme des x w (g - q^))).
 lisser_quadratique <- function(q, w, h, z, x) {
   n <- length(q)
@@ -241,7 +249,9 @@ lisser_quadratique <- function(q, w, h, z, x) {
   r <- g - q
   fidelite <- sum(w * r^2)
   regularite <- somme_differences_carrees(g, z)
-  list(rang = Q$rank, g = g, ddl_effectifs = sum(w * diag(V)), fidelite = fidelite, regularite = regularite,
+  levier <- w * diag(V)
+  list(rang = Q$rank, g = g, levier = levier, ddl_effectifs = sum(levier), fidelite = fidelite,
+       regularite = regularite,
        critere = fidelite + h * regularite, residu_conservation_0 = sum(w * r),
        residu_conservation_1 = sum(x * w * r))
 }
@@ -424,6 +434,8 @@ calculer_lissage <- function(exposition, brut, segmentation, convention, methode
   table_lissee$age <- as.integer(x)
   table_lissee$qx <- g
   table_lissee$etat <- etat
+  table_lissee$levier <- numeric(nrow(cel))
+  for (s in seq_len(n_seg)) table_lissee$levier[par_segment[[s]]] <- res[[s]]$levier
   table_lissee$poids <- w
 
   lire <- function(nom) vapply(res, function(r) r[[nom]], 0)

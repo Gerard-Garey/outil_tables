@@ -49,7 +49,7 @@ loi_bin <- function(n, p) choose(n, 0:n) * p^(0:n) * (1 - p)^(n - 0:n)
 
 verifier("A RELATIONS_TABLE : positionnee = 1L (un paramètre par segment positionné), égal à PARAMETRES_ESTIMES_POSITIONNEMENT ; N_MAX_PRODUITS_CONVOLUTION = 1e8", {
   r <- tablexp:::RELATIONS_TABLE
-  identical(names(r), c("independante", "ajustee_hors_outil", "positionnee")) && identical(r[["positionnee"]], 1L) &&
+  identical(names(r), c("independante", "ajustee_hors_outil", "positionnee", "lissee")) && identical(r[["positionnee"]], 1L) &&
     identical(tablexp:::PARAMETRES_ESTIMES_POSITIONNEMENT, r[["positionnee"]]) &&
     identical(tablexp:::N_MAX_PRODUITS_CONVOLUTION, 1e8) &&
     "convolution_au_dela_n_max" %in% tablexp:::ETATS_SOUS_GROUPES_VALIDATION &&
@@ -533,10 +533,10 @@ verifier("refus valider_plan : clé de la validation différente du positionneme
        m = if (grepl("« autre »", conditionMessage(a), fixed = TRUE) && grepl("« tv »", conditionMessage(a), fixed = TRUE))
              TRUE else conditionMessage(a))
 })
-verifier("refus valider_plan : relation_table_invalide cite les trois relations admises", {
+verifier("refus valider_plan : relation_table_invalide cite les quatre relations admises (lissee, #224)", {
   r <- refus_de(valider_plan(plan_vp(val = modifyList(VAL, list(relation_table = "positionne")))))
   isTRUE(controle(r, "validation", "relation_table_invalide")) &&
-    grepl("« independante », « ajustee_hors_outil », « positionnee »", conditionMessage(r), fixed = TRUE)
+    grepl("« independante », « ajustee_hors_outil », « positionnee », « lissee »", conditionMessage(r), fixed = TRUE)
 })
 verifier("calculer_validation() : positionnee sans étape positionnement, ou relation inconnue -> erreur de programmation ; étape transmise sous independante ignorée (identical() au calcul sans elle)", {
   e <- X$etapes

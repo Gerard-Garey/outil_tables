@@ -387,14 +387,14 @@ verifier("G etapes$lissage : parametres (paramètres du plan dans l'ordre du cat
     identical(p$regle_force, "mu = -ln(1 - q) : force constante par âge entier, règle unique du moteur") &&
     identical(dim(p$constantes), c(0L, 3L)) && identical(names(p$constantes), c("constante", "valeur", "origine")) &&
     is.double(p$constantes$valeur) &&
-    identical(p$statuts$grandeur, c("table_lissee/qx", "regle_force", "segments/ddl_effectifs", "segments/fidelite",
+    identical(p$statuts$grandeur, c("table_lissee/qx", "table_lissee/levier", "regle_force", "segments/ddl_effectifs", "segments/fidelite",
                                     "segments/regularite", "segments/critere", "segments/residu_conservation_0",
                                     "segments/residu_conservation_1"))
 })
-verifier("G table_lissee : data.frame nu, colonnes sexe, age (integer), qx, etat, poids ; segments dans l'ordre de la table d'exposition, âges croissants", {
+verifier("G table_lissee : data.frame nu, colonnes sexe, age (integer), qx, etat, levier (double), poids ; segments dans l'ordre de la table d'exposition, âges croissants", {
   t <- L1$resultat$table_lissee
-  identical(class(t), "data.frame") && identical(names(t), c("sexe", "age", "qx", "etat", "poids")) &&
-    is.integer(t$age) && identical(t$age, rep(40:60, 2L)) &&
+  identical(class(t), "data.frame") && identical(names(t), c("sexe", "age", "qx", "etat", "levier", "poids")) &&
+    is.integer(t$age) && identical(t$age, rep(40:60, 2L)) && is.double(t$levier) &&
     identical(unique(t$sexe), unique(X1$etapes$exposition$resultat$exposition$sexe)) &&
     all(t$qx > 0 & t$qx < 1) && all(t$etat == "observee") && all(t$poids > 0)
 })
@@ -424,6 +424,7 @@ verifier("G table_lissee recalculée par lisser_quadratique() sur les entrées d
   t <- L1$resultat$table_lissee
   s <- L1$resultat$segments
   identical(t$qx[t$sexe == "H"], r$g) && identical(t$poids[t$sexe == "H"], w) &&
+    identical(t$levier[t$sexe == "H"], r$levier) &&
     identical(s$ddl_effectifs[s$sexe == "H"], r$ddl_effectifs) &&
     identical(s$residu_conservation_1[s$sexe == "H"], r$residu_conservation_1)
 })
@@ -444,6 +445,18 @@ verifier("G cellule intérieure sans ligne (H, âge 50) : état interpolee, poid
     identical(s$cellules_interpolees[s$sexe == "H"], 1L) && identical(s$cellules_interpolees[s$sexe == "F"], 0L) &&
     identical(s$cellules_ponderees[s$sexe == "H"], 20L) &&
     identical(x$etapes$lissage$diagnostics$cellules_interpolees, 1L)
+})
+verifier("G levier (ADR 0017, point 5.5) : 0 exactement sur la cellule interpolee (H, 50), > 0 ailleurs ; somme de levier par segment, dans l'ordre de la table, identical() à segments$ddl_effectifs", {
+  d <- jeu(); d <- d[!(d$sexe == "H" & d$age == 50), ]
+  x <- construire_table(d, ROLES, plan_l(lissage = avec(ordre_difference = 3, parametre_lissage = 1e3)))
+  t <- x$etapes$lissage$resultat$table_lissee
+  s <- x$etapes$lissage$resultat$segments
+  int <- t$etat == "interpolee"
+  sommes <- vapply(s$sexe, function(v) sum(t$levier[t$sexe == v]), 0, USE.NAMES = FALSE)
+  identical(sum(int), 1L) && identical(t$levier[int], 0) && all(t$levier[!int] > 0) &&
+    identical(sommes, s$ddl_effectifs) &&
+    identical(vapply(L1$resultat$segments$sexe, function(v) sum(L1$resultat$table_lissee$levier[
+      L1$resultat$table_lissee$sexe == v]), 0, USE.NAMES = FALSE), L1$resultat$segments$ddl_effectifs)
 })
 verifier("G pondération exposition : somme E^i g = somme D par segment à 1e-12 près en relatif (identité de conservation, sur l'objet)", {
   b <- X1$etapes$brut$resultat$binomial
@@ -476,7 +489,7 @@ verifier("G sans segmentation : un segment, table sans clé", {
   d <- jeu()[seq_along(AGES), ]; d$sexe <- NULL
   x <- construire_table(d, ROLES[-1L], plan_l(segmentation = character(0)))
   t <- x$etapes$lissage$resultat$table_lissee
-  identical(names(t), c("age", "qx", "etat", "poids")) && identical(nrow(x$etapes$lissage$resultat$segments), 1L)
+  identical(names(t), c("age", "qx", "etat", "levier", "poids")) && identical(nrow(x$etapes$lissage$resultat$segments), 1L)
 })
 verifier("G avertissements : aucun sous wh_quadratique (aucune ligne d'étape lissage)",
          !any(X1$avertissements$etape == "lissage"))
