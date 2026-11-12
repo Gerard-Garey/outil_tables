@@ -15,7 +15,7 @@
 #       en_US.UTF-8 : sondée comme le harnais) ;
 #    2. dans un sous-processus par bibliothèque, sous la locale de son
 #       installation, qui vérifie d'abord que la session est bien en C (resp.
-#       en UTF-8) : pour R1 à R14 (plans_reference() de
+#       en UTF-8) : pour R1 à R17 (plans_reference() de
 #       tests/reference/outils_reference.R, sur l'entrée de chaque plan :
 #       jeu_reference(), jeu_reference_defauts() pour R9,
 #       agregats_reference() pour R13, #169, ou
@@ -31,7 +31,7 @@
 #       trois refus de lire_texte() et deux type_incompatible sur un rôle
 #       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
 #       octet « <xx> » (#127) ;
-#    3. les textes (fiche, plan et rapport figé de R1 à R14, bilan du rejeu et
+#    3. les textes (fiche, plan et rapport figé de R1 à R17, bilan du rejeu et
 #       messages de refus de R1, messages de refus par module) écrits sous C
 #       et sous UTF-8 sont comparés
 #       octet à octet. Aucune
@@ -53,7 +53,7 @@
 
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
 LOCALE_INVENTEE <- "xx_XX.UTF-8"  # comme tests/harnais.R (critère de #109)
-IDENTIFIANTS <- paste0("R", 1:14)  # R13 : #169, recette agrégats ; R14 : #180, recette stocks successifs
+IDENTIFIANTS <- paste0("R", 1:17)  # R13 : #169, recette agrégats ; R14 : #180, recette stocks successifs ; R15 à R17 : #223, #225, #144, lissage
 
 # Orchestration commune (installer, executer, avec_environnement, duree,
 # ecart_octets : tests/controles/orchestration_locale.R, #117), chargée dans
@@ -98,7 +98,7 @@ locale_utf8_disponible <- function(candidats = LOCALES_UTF8) {
 
 environnement_locale <- function(locale) c(LC_ALL = locale, LANG = locale, LC_CTYPE = locale)
 
-# --- sous-processus : R1 à R14, fiche et plan --------------------------------
+# --- sous-processus : R1 à R17, fiche et plan --------------------------------
 
 travailleur <- function(args) {
   lib <- args[1L]; attendu <- args[2L]; sortie <- args[3L]; racine <- args[4L]
