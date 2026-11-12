@@ -58,8 +58,9 @@
 #  de la table ; mu~ = -log1p(-q~) ; A = E^c mu~ (A = 0 si E^c = 0, même pour
 #  q~ = 1) ; C+ = {A > 0} ; r = D - A ; mu^ = D / E^c (taux_poisson(), module
 #  brut) ; alpha = 1 - niveau. H0 (i) : D_c ~ Poisson(A_c) indépendants ;
-#  exacte avec E^c fixe, asymptotique sous le modèle de survie. p = 0
-#  (`independante`) ; `ajustee_hors_outil` : p non établi, aucune grandeur
+#  exacte avec E^c fixe, asymptotique sous le modèle de survie. p, nombre de
+#  paramètres estimés sur ces données : 0 (`independante`) ;
+#  `ajustee_hors_outil` : p non établi, aucune grandeur
 #  sous H0 produite, aucun tirage (M254) ; `positionnee` : table positionnée
 #  de l'étape `positionnement` de la même construction, A_c = theta^_s E^c
 #  mu~_c (force de la référence multipliée par theta^_s, jamais relue dans
@@ -244,8 +245,8 @@ STATUTS_VALIDATION <- local({
                 "réplications, distincte de l'erreur d'estimation")
   # Relation ajustee_hors_outil des p-valeurs de sous-groupe (#178, #200) :
   # fragment commun à sous_groupes/p_valeurs et p_valeurs_asymptotiques.
-  ajustee_p <- paste("relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe",
-                     "(ddl_non_etabli) ; colonnes NA")
+  ajustee_p <- paste("relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi,",
+                     "aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA")
   signes_h <- "P(r_c > 0) = 1/2 par cellule, ce qui n'est pas H0 (i)"
   runs_h <- paste("conditionnellement à (n+, n-) par séquence, sous l'hypothèse que tous les ordres des signes",
                   "sont équiprobables, ce qui n'est pas H0 (i)")
@@ -363,16 +364,18 @@ STATUTS_VALIDATION <- local({
       paste(exact_h0, ": somme sur C+ de P(D_c hors de A +- z sqrt(A))")),
     c("sous_groupes", "smr", "FALSE", "résultat exact : O / A du sous-groupe (cellules retenues)"),
     c("sous_groupes", "bornes_exactes", "TRUE",
-      paste("relation independante : exactes sous la loi supposée (O ~ Poisson, A fixe), p = 0 :",
-            "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >=",
-            "niveau (intervalle exact conservatif) ; qgamma, approximation numérique ; relation ajustee_hors_outil :",
-            "non produites, p non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
+      paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
+            "exactes sous la loi supposée, O ~ Poisson(A) avec A fixe : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A,",
+            "G_k loi gamma de forme k (0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma,",
+            "approximation numérique ; relation ajustee_hors_outil : non produites, nombre p de paramètres estimés",
+            "non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
     c("sous_groupes", "p_valeurs", "TRUE",
-      paste("relation independante :", exact_h0, "; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité ;",
+      paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
+            exact_h0, "; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de multiplicité ;",
             ajustee_p)),
     c("sous_groupes", "p_valeurs_asymptotiques", "TRUE",
-      paste("relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours",
-            "calculée ;", ajustee_p)))
+      paste("relation independante : non produites, la loi de Poisson exacte du sous-groupe étant toujours calculée",
+            "(table prise telle quelle, nombre p de paramètres estimés sur ces données nul) ;", ajustee_p)))
   texte_moteur(data.frame(statistique = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
                           sous_h0 = vapply(l, `[`, "", 3L) == "TRUE", statut = vapply(l, `[`, "", 4L),
                           stringsAsFactors = FALSE))

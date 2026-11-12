@@ -430,7 +430,78 @@ CHEMINS_199 <- list(
     "resultat/segments/observes", "resultat/monte_carlo/jeux/tirages_effectues",
     "diagnostics/evenements_cellules_evenement_sans_exposition", "diagnostics/evenements_hors_plage",
     "diagnostics/evenements_total")))
-TRANSITIONS_EN_COURS <- list()
+# Transition #215 (porteuse claude/lissage-whittaker, commit (2c) ;
+# spécification d'actuary-approfondi, commentaire 6799551581) : tournure S5
+# de #203 (nombre p de paramètres estimés nommé, jamais « p = 0 : loi ») des
+# lignes sous_groupes/bornes_exactes, p_valeurs et p_valeurs_asymptotiques de
+# STATUTS_VALIDATION, positions 2 à 4 de
+# etapes/validation/parametres/statuts_sous_groupes/statut de R8 et R9
+# (relation independante) ; R10 (relation positionnee) inchangé :
+# STATUTS_VALIDATION_POSITIONNEE ne change pas. Valeurs de la référence
+# commitée (avant) contrôlées, littéraux ci-dessous (échappements \u) ;
+# l'empreinte du résultat n'est pas comparée (jeton, ADR 0009). À clore par la
+# régénération (R) de la porteuse, avec transition_215() et les constantes
+# *_215. En locale C, les échappements \u et paste() rendent des octets UTF-8
+# sans marque (Encoding "unknown") : utf8_215() les marque, sinon identical()
+# ne les reconnaît pas égaux aux chaînes de la référence (lues marquées UTF-8).
+utf8_215 <- function(x) {
+  i <- Encoding(x) == "unknown" & validUTF8(x)
+  Encoding(x)[i] <- "UTF-8"
+  x
+}
+AJUSTEE_P_AVANT_215 <- paste(
+  "relation ajustee_hors_outil : non produites, p non \u00e9tabli, aucune p-valeur du sous-groupe",
+  "(ddl_non_etabli) ; colonnes NA")
+AJUSTEE_P_APRES_215 <- paste(
+  "relation ajustee_hors_outil : non produites, nombre p de param\u00e8tres estim\u00e9s non \u00e9tabli,",
+  "aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA")
+NUL_215 <- "(nombre p de param\u00e8tres estim\u00e9s sur ces donn\u00e9es nul)"
+STATUTS_AVANT_215 <- utf8_215(c(
+  bornes_exactes = paste(
+    "relation independante : exactes sous la loi suppos\u00e9e (O ~ Poisson, A fixe), p = 0 :",
+    "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >=",
+    "niveau (intervalle exact conservatif) ; qgamma, approximation num\u00e9rique ; relation ajustee_hors_outil :",
+    "non produites, p non \u00e9tabli, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA"),
+  p_valeurs = paste(
+    "relation independante : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le mod\u00e8le de survie ;",
+    "fonctions de r\u00e9partition de Poisson (ppois), approximation num\u00e9rique ; p = 0 : X ~ Poisson(A) ; aucune",
+    "correction de multiplicit\u00e9 ;", AJUSTEE_P_AVANT_215),
+  p_valeurs_asymptotiques = paste(
+    "relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours",
+    "calcul\u00e9e ;", AJUSTEE_P_AVANT_215)))
+STATUTS_APRES_215 <- utf8_215(c(
+  bornes_exactes = paste(
+    "relation independante, table prise telle quelle", NUL_215, ": exactes sous la loi suppos\u00e9e, O ~ Poisson(A)",
+    "avec A fixe : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ;",
+    "couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation num\u00e9rique ; relation",
+    "ajustee_hors_outil : non produites, nombre p de param\u00e8tres estim\u00e9s non \u00e9tabli, aucun intervalle du",
+    "sous-groupe (ddl_non_etabli) ; colonnes NA"),
+  p_valeurs = paste(
+    "relation independante, table prise telle quelle", NUL_215, ": exact sous H0 (i), E^c tenue pour fixe ;",
+    "asymptotique sous le mod\u00e8le de survie ; fonctions de r\u00e9partition de Poisson (ppois), approximation",
+    "num\u00e9rique ; loi de r\u00e9f\u00e9rence du sous-groupe X ~ Poisson(A) ; aucune correction de multiplicit\u00e9 ;",
+    AJUSTEE_P_APRES_215),
+  p_valeurs_asymptotiques = paste(
+    "relation independante : non produites, la loi de Poisson exacte du sous-groupe \u00e9tant toujours calcul\u00e9e",
+    "(table prise telle quelle,", sub("^\\(", "", NUL_215), ";", AJUSTEE_P_APRES_215)))
+transition_215 <- function(plans) {
+  st <- "etapes/validation/parametres/statuts_sous_groupes/"
+  k0 <- NULL
+  for (id in plans) {
+    ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+    k <- match(names(STATUTS_AVANT_215), ref[[paste0(st, "grandeur")]])
+    # Positions lues par le nom, communes à tous les plans (précédent de #200)
+    if (!is.null(k0) && !identical(k, k0))
+      stop(sprintf("transition_215(%s) : positions des trois lignes propres au plan", id))
+    k0 <- k
+    if (anyNA(k) || !identical(ref[[paste0(st, "statut")]][k], unname(STATUTS_AVANT_215)))
+      stop(sprintf("transition_215(%s) : textes des trois lignes de la r\u00e9f\u00e9rence inattendus ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_215() et les constantes *_215", id))
+  }
+  list(issue = "#215", plans = plans, changements = list(
+    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
+         valeurs = unname(STATUTS_APRES_215), positions = k0)))
+}
+TRANSITIONS_EN_COURS <- list(transition_215(c("R8", "R9")))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
