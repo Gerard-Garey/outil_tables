@@ -420,11 +420,12 @@ verifier("etape_prealable_manquante : brut seul, préalables donnees et expositi
     identical(r$details, list(etape = "brut", prealable = c("donnees", "exposition"),
                                  prealables_par_etape = list(brut = c("donnees", "exposition"))))
 })
-verifier("ETAPES : colonne prealable en liste (donnees : aucun ; exposition : donnees ; brut : donnees, exposition ; lissage : donnees, exposition, brut ; positionnement : donnees, exposition ; homogeneite : donnees, exposition ; validation : donnees, exposition ; importance_exclusions : donnees, exposition)",
+verifier("ETAPES : colonne prealable en liste (donnees : aucun ; exposition : donnees ; brut : donnees, exposition ; lissage : donnees, exposition, brut ; positionnement : donnees, exposition ; homogeneite : donnees, exposition ; coherence_regularite : donnees, exposition (#144) ; validation : donnees, exposition ; importance_exclusions : donnees, exposition)",
          identical(unclass(tablexp:::ETAPES$prealable), list(character(0), "donnees", c("donnees", "exposition"),
                                                             c("donnees", "exposition", "brut"),
                                                             c("donnees", "exposition"), c("donnees", "exposition"),
-                                                            c("donnees", "exposition"), c("donnees", "exposition"))))
+                                                            c("donnees", "exposition"), c("donnees", "exposition"),
+                                                            c("donnees", "exposition"))))
 
 # --- 6. forme, statuts, fiche, invariance ------------------------------------
 

@@ -33,10 +33,11 @@ tous <- function(...) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A ETAPES : positionnement après brut et lissage (#223), avant homogeneite (#168) et validation, module positionnement, calculer_positionnement, préalables donnees et exposition, non aléatoire", {
+verifier("A ETAPES : positionnement après brut et lissage (#223), avant homogeneite (#168), coherence_regularite (#144) et validation, module positionnement, calculer_positionnement, préalables donnees et exposition, non aléatoire", {
   e <- tablexp:::ETAPES
   k <- match("positionnement", e$etape)
-  identical(k, 5L) && identical(e$etape[k - 1L], "lissage") && identical(e$etape[k + 1:2], c("homogeneite", "validation")) &&
+  identical(k, 5L) && identical(e$etape[k - 1L], "lissage") &&
+    identical(e$etape[k + 1:3], c("homogeneite", "coherence_regularite", "validation")) &&
     identical(e$module[k], "positionnement") &&
     identical(e$fonction[k], "calculer_positionnement") && identical(e$prealable[[k]], c("donnees", "exposition")) &&
     identical(e$aleatoire[k], FALSE)
@@ -504,10 +505,11 @@ verifier("F2 : refus de validation inchangés en module, motif et message (conve
 
 # --- H. Rapport figé (valeur calculée à la main) --------------------------------------
 
-verifier("rapport : section etape_positionnement, avant etape_homogeneite (#168) et etape_validation, avec ses mentions fixes et ses tables", {
+verifier("rapport : section etape_positionnement, avant etape_homogeneite (#168), etape_coherence_regularite (#144) et etape_validation, avec ses mentions fixes et ses tables", {
   h <- rawToChar(ecrire_rapport(X)); Encoding(h) <- "UTF-8"
   s <- tablexp:::SECTIONS_RAPPORT$section
-  identical(match("etape_positionnement", s) + 1:2, match(c("etape_homogeneite", "etape_validation"), s)) &&
+  identical(match("etape_positionnement", s) + 1:3,
+            match(c("etape_homogeneite", "etape_coherence_regularite", "etape_validation"), s)) &&
     all(vapply(c("<section id=\"etape_positionnement\">", "Positionnement par SMR (etapes/positionnement/parametres/methode) : pour chaque segment, theta = O / A",
                  "ne couvrent que l'incertitude sur ce facteur", "Écart à la note de méthode",
                  "<caption><code>etapes/positionnement/resultat/smr</code>",

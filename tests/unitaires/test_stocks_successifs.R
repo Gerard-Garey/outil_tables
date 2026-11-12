@@ -462,7 +462,7 @@ verifier("catalogue des recettes, (4b) : ligne stocks_successifs (§ 3 : type_li
     identical(CAT$motifs_ligne[[k]], tablexp:::MOTIFS_LIGNES_STOCKS) &&
     identical(CAT$motifs_unite[[k]], tablexp:::MOTIFS_UNITE_STOCKS)
 })
-verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, sauf importance_exclusions, motif importance_exclusions_stocks ; valeur écrite à la main)", {
+verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, sauf importance_exclusions, motif importance_exclusions_stocks ; coherence_regularite admise, #144 ; valeur écrite à la main)", {
   m <- MAT[MAT$recette == "stocks_successifs", -1L]; rownames(m) <- NULL
   # Tolérance (décision du mainteneur du 11/11/2026, vague lissage) : une
   # ligne lissage (estimateur NA, admis « oui »), unique, placée juste après
@@ -473,11 +473,11 @@ verifier("matrice, (4b) : lignes stocks_successifs (§ 8 : tout admis, sauf impo
        is.na(m$estimateur[l]) && identical(m$admis[l], "oui"))
   if (length(l)) { m <- m[-l, ]; rownames(m) <- NULL }
   lissage_admis && identical(m, data.frame(
-    etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite", "validation",
-              "importance_exclusions"),
-    estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA),
-    admis = c(rep("oui", 9L), "non"), role_requis = NA_character_,
-    motif = c(rep(NA_character_, 9L), "importance_exclusions_stocks"), stringsAsFactors = FALSE))
+    etape = c("donnees", "exposition", "brut", "brut", "brut", "brut", "positionnement", "homogeneite",
+              "coherence_regularite", "validation", "importance_exclusions"),
+    estimateur = c(NA, NA, NA, "poisson", "binomial", "kaplan_meier", NA, NA, NA, NA, NA),
+    admis = c(rep("oui", 10L), "non"), role_requis = NA_character_,
+    motif = c(rep(NA_character_, 10L), "importance_exclusions_stocks"), stringsAsFactors = FALSE))
 })
 verifier("deduire_recette(), (4b) : rôles des stocks -> recette stocks_successifs, convention native dernier_anniversaire, rôles employés, seam fenetres, motifs ligne puis unité (valeur écrite à la main)", {
   r <- tablexp:::deduire_recette(RS)

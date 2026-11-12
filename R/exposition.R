@@ -993,8 +993,9 @@ CONVENTIONS_VALIDATION <- "dernier_anniversaire"
 # Étapes admises par controler_plage_ages() : chacune donne au refus son
 # module (F2 de #167). Liste blanche propre à ce module, qui ne lit pas
 # ETAPES_TABLE (module positionnement, de rang supérieur) ; elle ne nomme que
-# des étapes qui existent (`lissage` : #223, ADR 0017, point 10.1).
-ETAPES_PLAGE_AGES <- c("lissage", "positionnement", "validation", "homogeneite")
+# des étapes qui existent (`lissage` : #223, ADR 0017, point 10.1 ;
+# `coherence_regularite` : #144, spécification de forme, § 1).
+ETAPES_PLAGE_AGES <- c("lissage", "positionnement", "validation", "homogeneite", "coherence_regularite")
 
 # Forme de la plage d'âges (plage_ages_invalide), sous le module de l'étape
 # `etape` (F2 ; extraite de controler_parametres_validation(), messages de

@@ -18,8 +18,10 @@
 #  1.3 n'est plus fait par le 7 bis, #82) : au commit (1), aucune étape ne
 #  citait de clé ; depuis le commit (3) (#4), PARAMETRES_CLE_TABLE vaut
 #  « etapes/validation/table_reference », et, depuis #167, aussi
-#  « etapes/positionnement/table_reference » ; les plans de ce fichier, sans
-#  étape positionnement ni validation, ne citent aucune clé ; aucune table n'est embarquée
+#  « etapes/positionnement/table_reference », et, depuis #144,
+#  « etapes/coherence_regularite/tables_reference » ; les plans de ce fichier,
+#  sans étape positionnement, coherence_regularite ni validation, ne citent
+#  aucune clé ; aucune table n'est embarquée
 #  (TABLES_EMBARQUEES vide). Le chemin de bout en bout avec une table
 #  (construction puis rejeu) est dans tests/unitaires/test_validation.R.
 # -----------------------------------------------------------------------------
@@ -174,11 +176,12 @@ PLAN <- list(
                 brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95)))
 X <- construire_table(BASE, ROLES, PLAN)
 
-verifier("C constantes : VERSION_FICHE 6L, VERSIONS_FICHE_REJEU 6L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/positionnement/table_reference » (#167), « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
+verifier("C constantes : VERSION_FICHE 6L, VERSIONS_FICHE_REJEU 6L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/positionnement/table_reference » (#167), « etapes/coherence_regularite/tables_reference » (#144), « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
          identical(tablexp:::VERSION_FICHE, 6L) && identical(tablexp:::VERSIONS_FICHE_REJEU, 6L) &&
            identical(tablexp:::REPRESENTATION_TABLE, "tablexp table 1") &&
            identical(tablexp:::PARAMETRES_CLE_TABLE,
-                     c("etapes/positionnement/table_reference", "etapes/validation/table_reference")) &&
+                     c("etapes/positionnement/table_reference", "etapes/coherence_regularite/tables_reference",
+                       "etapes/validation/table_reference")) &&
            identical(tablexp:::TABLES_EMBARQUEES, structure(list(), names = character(0))))
 verifier("C constantes : tables_reference après empreintes dans ORDRE_CHAMPS_FICHE et dans BLOCS_LECTURE_FICHE$rejeu ; fiche/tables_reference après fiche/provenance_mention dans la section donnees_recues", {
   o <- tablexp:::ORDRE_CHAMPS_FICHE; b <- tablexp:::BLOCS_LECTURE_FICHE$rejeu; s <- tablexp:::SECTIONS_RAPPORT
@@ -497,7 +500,8 @@ local({
 })
 ns_cle <- ns$PARAMETRES_CLE_TABLE
 verifier("E injection de bout en bout : PARAMETRES_CLE_TABLE restauré et verrouillé",
-         identical(ns_cle, c("etapes/positionnement/table_reference", "etapes/validation/table_reference")) &&
+         identical(ns_cle, c("etapes/positionnement/table_reference", "etapes/coherence_regularite/tables_reference",
+                             "etapes/validation/table_reference")) &&
            bindingIsLocked("PARAMETRES_CLE_TABLE", ns))
 verifier("E injection : origine « relue dans le package » d'une table embarquée, liste assemblée et textes de la ligne 8", {
   el <- element_table_fiche(T_EMB)

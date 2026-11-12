@@ -20,6 +20,7 @@
 #    controler_parametres_exposition(), controler_parametres_brut(),
 #    controler_gouvernants_lissage(), controler_parametres_lissage(),
 #    controler_parametres_positionnement(), controler_parametres_homogeneite(),
+#    controler_parametres_coherence_regularite(),
 #    controler_relation_table(), controler_parametres_validation(),
 #    controler_parametres_importance_exclusions()) ;
 #    exporté (contrôle de saisie à sens métier, E4.3) ;
@@ -28,7 +29,7 @@
 #    référence reçues par l'argument tables_reference, contrôles 1.3 (entrée
 #    de construire_table()) et 7 bis (rejeu) de l'ADR 0015 (#73) ;
 #    table_citee() : table de la clé citée par une étape (`positionnement`,
-#    #167 ; `validation`, #4) ;
+#    #167 ; `coherence_regularite`, une par clé, #144 ; `validation`, #4) ;
 #  - controler_plan_roles(), controler_entrees() : contrôle des entrées en
 #    deux couches (#82) ; la première (plan, rôles, recette, convention,
 #    matrice recette x étape x estimateur, provenance) est partagée par
@@ -37,7 +38,8 @@
 #    (controler_convention_lissage(), module lissage) et les contrôles
 #    d'entrée des étapes qui lisent une table (controler_entrees_validation(),
 #    module positionnement, pour `positionnement` puis `validation` si elle
-#    cite une table), et n'est
+#    cite une table ; controler_entrees_coherence_regularite(), module
+#    validation, pour chaque table de `coherence_regularite`, #144), et n'est
 #    appelée que par construire_table() ; toutes deux
 #    rendent les valeurs validées transmises aux étapes ;
 #  - construire_table() : contrôle les entrées une fois (controler_entrees()),
@@ -95,19 +97,25 @@ CHAMPS_PLAN_REQUIS <- c("transition", "periode", "delai_declaration", "segmentat
 # `lissage`, `table_positionnee` pour `positionnement`), NA pour les autres
 # étapes ; lue par construire_table() (table_construite()) et par
 # valider_plan() (une seule étape productrice par plan, D9), aucun nom
-# d'étape productrice n'est testé.
+# d'étape productrice n'est testé. `coherence_regularite` (#144 ; ADR 0017,
+# point 13.1) : module `validation`, après `homogeneite` et avant
+# `validation` (ordre des Lignes directrices, chap. 4 : II et III.1, puis
+# III.2), préalables `donnees` et `exposition`, non aléatoire ; elle lit la
+# table construite, dont l'étape productrice est exigée au plan par le refus
+# coherence_sans_table_construite (valider_plan()).
 ETAPES <- data.frame(
-  etape = c("donnees", "exposition", "brut", "lissage", "positionnement", "homogeneite", "validation",
-            "importance_exclusions"),
-  module = c("donnees", "exposition", "brut", "lissage", "positionnement", "validation", "validation", "validation"),
+  etape = c("donnees", "exposition", "brut", "lissage", "positionnement", "homogeneite", "coherence_regularite",
+            "validation", "importance_exclusions"),
+  module = c("donnees", "exposition", "brut", "lissage", "positionnement", "validation", "validation", "validation",
+             "validation"),
   fonction = c("preparer_donnees", "calculer_exposition", "calculer_taux_bruts", "calculer_lissage",
-               "calculer_positionnement", "calculer_homogeneite", "calculer_validation",
-               "calculer_importance_exclusions"),
+               "calculer_positionnement", "calculer_homogeneite", "calculer_coherence_regularite",
+               "calculer_validation", "calculer_importance_exclusions"),
   prealable = I(list(character(0), "donnees", c("donnees", "exposition"), c("donnees", "exposition", "brut"),
                      c("donnees", "exposition"), c("donnees", "exposition"), c("donnees", "exposition"),
-                     c("donnees", "exposition"))),
-  aleatoire = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE),
-  table_construite = c(NA, NA, NA, "table_lissee", "table_positionnee", NA, NA, NA),
+                     c("donnees", "exposition"), c("donnees", "exposition"))),
+  aleatoire = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE),
+  table_construite = c(NA, NA, NA, "table_lissee", "table_positionnee", NA, NA, NA, NA),
   stringsAsFactors = FALSE
 )
 
@@ -210,6 +218,27 @@ PARAMETRES_ETAPES <- list(
     selon = NA_character_,
     valeurs = I(rep(list(character(0)), 3L)),
     stringsAsFactors = FALSE),
+  # Cohérence des taux et régularité de la table construite (#144 ; ADR
+  # 0017, point 13.2 ; spécification de forme, § 1) : tous sans condition et
+  # sans défaut ; entiers en double (M246), un integer est refusé (M257) ;
+  # ordres canonisé par tri croissant (ordres_canoniques()) ; ordre entre
+  # segments en trois vecteurs parallèles, longueur 0 explicite admise.
+  coherence_regularite = data.frame(
+    parametre = c("tables_reference", "plage_ages", "ordres", "ordre_variable", "ordre_superieur", "ordre_inferieur"),
+    type = c("character", "double", "double", "character", "character", "character"),
+    domaine = c(paste("clés de tables de l'argument tables_reference, évaluées en comparaison, sans NA, non vides, sans",
+                      "doublon, dans l'ordre reçu ; vide explicite admis"),
+                paste("deux valeurs entières, 0 <= min <= max, dans la plage de l'étape productrice et couvertes par",
+                      "chaque table"),
+                paste("au moins un entier >= 1, sans doublon, au plus max(plage_ages) - min(plage_ages) ; trié par",
+                      "ordre croissant"),
+                "variables de segmentation du plan, une par ordre déclaré ; vide explicite admis",
+                "modalité attendue supérieure, une par ordre déclaré (H ou F pour sexe) ; vide explicite admis",
+                "modalité attendue inférieure, une par ordre déclaré, différente de la supérieure ; vide explicite admis"),
+    recette = NA_character_,
+    selon = NA_character_,
+    valeurs = I(rep(list(character(0)), 6L)),
+    stringsAsFactors = FALSE),
   # Paramètres à valeur entière en double (M246) ; un integer est refusé
   # (M257). table_reference conditionnel au gouvernant relation_table (#224 ;
   # ADR 0017, point 3.4) : requis sous independante, ajustee_hors_outil et
@@ -242,10 +271,13 @@ PARAMETRES_ETAPES <- list(
 # Paramètres du plan qui citent une table de référence par sa clé (ADR 0015,
 # points 1.2 et 1.3 ; #73) : chemins « etapes/<étape>/<paramètre> », chacun
 # un paramètre `character` de PARAMETRES_ETAPES, dans l'ordre des étapes : la
-# clé de la table de l'étape `positionnement` (#167 ; F4) et celle de l'étape
+# clé de la table de l'étape `positionnement` (#167 ; F4), les clés des
+# tables évaluées en comparaison par l'étape `coherence_regularite` (#144 ;
+# ADR 0017, point 13.3 : k >= 0 clés, une par élément) et la clé de l'étape
 # `validation` (#4). Les contrôles des tables reçues la prennent en argument
 # (défaut), pour être testés par injection (M247).
-PARAMETRES_CLE_TABLE <- c("etapes/positionnement/table_reference", "etapes/validation/table_reference")
+PARAMETRES_CLE_TABLE <- c("etapes/positionnement/table_reference", "etapes/coherence_regularite/tables_reference",
+                          "etapes/validation/table_reference")
 
 # Champs d'un élément de fiche$tables_reference, dans l'ordre (ADR 0015,
 # point 3.1 ; element_table_fiche(), module rapport).
@@ -635,6 +667,17 @@ valider_plan <- function(plan) {
         controler_parametres_homogeneite(ph[["plage_ages"]], ph[["tranches_age"]], ph[["replications"]],
                                          plan[["segmentation"]])
       },
+      # `coherence_regularite` (#144 ; spécification de forme, § 1) : plage
+      # d'âges de l'étape productrice du plan (colonne table_construite
+      # d'ETAPES ; aucun nom de producteur passé), contrôlée avant elle, ou
+      # NULL sans étape productrice (refus coherence_sans_table_construite).
+      coherence_regularite = {
+        pc <- etapes[["coherence_regularite"]]
+        controler_parametres_coherence_regularite(pc[["tables_reference"]], pc[["plage_ages"]], pc[["ordres"]],
+                                                  pc[["ordre_variable"]], pc[["ordre_superieur"]],
+                                                  pc[["ordre_inferieur"]], plan[["segmentation"]],
+                                                  if (length(productrices)) etapes[[productrices]][["plage_ages"]])
+      },
       # `validation` (#224) : table_reference, conditionnel à relation_table,
       # passé par son nom s'il est au plan (absent = missing() dans
       # controler_parametres_validation()), quote = TRUE comme pour
@@ -659,7 +702,10 @@ valider_plan <- function(plan) {
 
 # Vecteurs d'ordre des trois champs du plan dont les valeurs forment un
 # ensemble (ADR 0011, point 5.1 (h), quatrième annotation du 20/10/2026 ; #63),
-# liste nommée par le chemin du champ dans le plan. Une fonction, non une
+# liste nommée par le chemin du champ dans le plan ; plus le paramètre
+# `ordres` de l'étape `coherence_regularite` (#144 ; ADR 0017, point 13.2),
+# ensemble d'entiers en double, marqué TRI_NUMERIQUE (module rapport) : tri
+# croissant par canoniser_plan(). Une fonction, non une
 # constante de premier niveau : les fichiers de R/ sont évalués par ordre
 # alphabétique à l'installation, `construire_table.R` avant `donnees.R`,
 # dont les constantes (ROLES_SEGMENTATION, MOTIFS_*) ne sont pas encore
@@ -670,7 +716,8 @@ valider_plan <- function(plan) {
 ordres_canoniques <- function()
   list(segmentation = ROLES_SEGMENTATION,
        "etapes/donnees/exclusions" = motifs_recettes(),
-       "etapes/brut/estimateurs" = ESTIMATEURS_BRUT)
+       "etapes/brut/estimateurs" = ESTIMATEURS_BRUT,
+       "etapes/coherence_regularite/ordres" = TRI_NUMERIQUE)
 
 # --- tables de référence reçues (ADR 0015, points 1.3 et 4 ; #73) --------------
 
@@ -771,19 +818,22 @@ controler_forme_tables <- function(tables) {
   list(tables = objets, champ = champ)
 }
 
-# Clés citées par le plan (ADR 0015, point 1.2) : pour chaque chemin
-# « etapes/<étape>/<paramètre> » de `parametres_cle` dont l'étape est au plan,
-# la valeur du paramètre si c'est une chaîne unique (sa forme est contrôlée
-# par le module de l'étape). Rend un data.frame (cle, parametre), dans l'ordre
-# de `parametres_cle` ; une clé citée par deux paramètres y figure deux fois.
+# Clés citées par le plan (ADR 0015, point 1.2 ; ADR 0017, point 13.3) : pour
+# chaque chemin « etapes/<étape>/<paramètre> » de `parametres_cle` dont
+# l'étape est au plan, la valeur du paramètre si c'est une chaîne unique (une
+# clé), sinon, si c'est un character sans attribut, sans NA, à éléments non
+# vides, une clé par élément, dans l'ordre (k >= 0 clés ; #144) ; la forme est
+# contrôlée par le module de l'étape. Rend un data.frame (cle, parametre),
+# dans l'ordre de `parametres_cle` ; une clé citée par deux paramètres y
+# figure deux fois.
 cles_citees <- function(plan, parametres_cle) {
   cle <- parametre <- character(0)
   for (chemin in parametres_cle) {
     s <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
     v <- plan
     for (n in s) v <- if (is.list(v)) lire_champ(v, n)
-    if (chaine_unique(v)) {
-      cle <- c(cle, v); parametre <- c(parametre, chemin)
+    if (chaine_unique(v) || (forme_exacte(v, "character") && !anyNA(v) && all(nzchar(v)))) {
+      cle <- c(cle, v); parametre <- c(parametre, rep(chemin, length(v)))
     }
   }
   data.frame(cle = cle, parametre = parametre, stringsAsFactors = FALSE)
@@ -1023,9 +1073,13 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
 # `validation` si elle en cite une (table_reference au plan ; sous la
 # relation lissee, aucune table n'est lue et la convention est garantie par
 # controler_convention_lissage(), l'étape lissage étant imposée par
-# lissage_absent ; #224). Rend les valeurs de controler_plan_roles(),
-# plus tables_fiche (valeur de fiche$tables_reference) et tables (table citée
-# par étape, liste nommée par étape ; vide sans table citée). Au rejeu, ces
+# lissage_absent ; #224) ; entre les deux, chaque table citée par l'étape
+# `coherence_regularite`, dans l'ordre reçu
+# (controler_entrees_coherence_regularite(), module validation ; #144).
+# Rend les valeurs de controler_plan_roles(), plus tables_fiche (valeur de
+# fiche$tables_reference) et tables (table citée par étape, liste nommée par
+# étape ; pour `coherence_regularite`, liste nommée par clé ; vide sans table
+# citée). Au rejeu, ces
 # contrôles ne sont faits qu'ici, par l'unique appel de construire_table()
 # (#82 ; #164, point 2).
 controler_entrees <- function(donnees, roles, plan, provenance, tables_reference) {
@@ -1039,6 +1093,18 @@ controler_entrees <- function(donnees, roles, plan, provenance, tables_reference
     tables$positionnement <- table_citee(tables_reference, pp[["table_reference"]])
     controler_entrees_validation(tables$positionnement, pp[["table_reference"]], e$conv$retenue,
                                  e$plan[["segmentation"]], pp[["plage_ages"]], "positionnement")
+  }
+  # Tables évaluées en comparaison par l'étape `coherence_regularite` (#144 ;
+  # ADR 0017, point 13.3) : liste nommée par clé, dans l'ordre reçu, chaque
+  # table contrôlée dans cet ordre (controler_entrees_coherence_regularite(),
+  # module validation : table sans année, plage couverte ; ni sexe ni
+  # convention exigés) ; liste vide sans clé.
+  if ("coherence_regularite" %in% names(etapes_plan)) {
+    pc <- etapes_plan[["coherence_regularite"]]
+    cles <- pc[["tables_reference"]]
+    tables$coherence_regularite <- stats::setNames(lapply(cles, function(k) table_citee(tables_reference, k)), cles)
+    for (k in cles)
+      controler_entrees_coherence_regularite(tables$coherence_regularite[[k]], k, pc[["plage_ages"]])
   }
   # Sous la relation positionnee, valider_plan() impose à la validation la
   # clé de table et la plage d'âges du positionnement : ce second contrôle
@@ -1233,6 +1299,14 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                          convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]],
                                          plage_ages = pe[["plage_ages"]], tranches_age = pe[["tranches_age"]],
                                          replications = pe[["replications"]], graine = plan[["graine"]]),
+      coherence_regularite = calculer_coherence_regularite(construite = construite$table,
+                                                           tables = entrees$tables[["coherence_regularite"]],
+                                                           segmentation = plan[["segmentation"]],
+                                                           plage_ages = pe[["plage_ages"]], ordres = pe[["ordres"]],
+                                                           ordre_variable = pe[["ordre_variable"]],
+                                                           ordre_superieur = pe[["ordre_superieur"]],
+                                                           ordre_inferieur = pe[["ordre_inferieur"]],
+                                                           convention = etapes[["exposition"]][["parametres"]][["convention"]][["retenue"]]),
       validation = calculer_validation(etapes[["exposition"]][["resultat"]][["exposition"]],
                                        segmentation = plan[["segmentation"]],
                                        par_annee = etapes[["exposition"]][["parametres"]][["par_annee"]],

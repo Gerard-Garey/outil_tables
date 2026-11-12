@@ -314,6 +314,12 @@ VALEUR_TYPE <- list(donnees.exclusions = list(character(0), "exclusions_invalide
                     homogeneite.plage_ages = list(c(20, 90), "plage_ages_invalide"),
                     homogeneite.tranches_age = list(c(20, 50), "tranches_age_invalides"),
                     homogeneite.replications = list(99, "replications_invalides"),
+                    coherence_regularite.tables_reference = list(character(0), "cles_tables_invalides"),
+                    coherence_regularite.plage_ages = list(c(20, 90), "plage_ages_invalide"),
+                    coherence_regularite.ordres = list(2, "ordres_invalides"),
+                    coherence_regularite.ordre_variable = list(character(0), "ordre_segments_invalide"),
+                    coherence_regularite.ordre_superieur = list(character(0), "ordre_segments_invalide"),
+                    coherence_regularite.ordre_inferieur = list(character(0), "ordre_segments_invalide"),
                     validation.table_reference = list("t", "cle_table_invalide"),
                     validation.relation_table = list("independante", "relation_table_invalide"),
                     validation.plage_ages = list(c(20, 90), "plage_ages_invalide"),
@@ -343,6 +349,12 @@ plan_lissage <- function() modifier(plan_complet(), etapes = c(plan_complet()$et
 plan_lissage_poisson <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
   lissage = list(methode = "wh_poisson", plage_ages = c(20, 90), ordre_difference = 2, critere_lissage = "laml",
                  niveau = 0.95, intervalle_lissage = c(1, 1e8)))))
+# Plan muni des étapes lissage et coherence_regularite (#144, non aléatoire ;
+# l'étape productrice lissage est exigée).
+plan_coherence <- function() modifier(plan_lissage(), etapes = c(plan_lissage()$etapes, list(
+  coherence_regularite = list(tables_reference = character(0), plage_ages = c(20, 90), ordres = 2,
+                              ordre_variable = character(0), ordre_superieur = character(0),
+                              ordre_inferieur = character(0)))))
 # Plan complet muni de l'étape importance_exclusions (#69, non aléatoire).
 plan_importance <- function() modifier(plan_complet(), etapes = c(plan_complet()$etapes, list(
   importance_exclusions = list(niveau = 0.95))))
@@ -352,6 +364,7 @@ plan_de <- function(cle) {
   else if (cle %in% c("lissage.niveau", "lissage.intervalle_lissage")) plan_lissage_poisson()
   else if (startsWith(cle, "lissage.")) plan_lissage()
   else if (startsWith(cle, "homogeneite.")) plan_homogeneite()
+  else if (startsWith(cle, "coherence_regularite.")) plan_coherence()
   else if (startsWith(cle, "importance_exclusions.")) plan_importance() else plan_complet()
 }
 AUTRES_TYPES <- list(logical = TRUE, integer = 1L, double = 0.5, complex = 0.5 + 0i, character = "poisson",
@@ -1680,8 +1693,10 @@ local({
   # fiche comprise, sur un portefeuille simulé (n = 5 000, graine 7) auquel est
   # ajouté un rôle segment constant par tête (trois segments).
   ord <- tablexp:::ordres_canoniques()
-  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête, puis motifs propres aux agrégats, puis aux stocks successifs (union des recettes, #169, #180) ; estimateurs = poisson, binomial, kaplan_meier",
-           identical(names(ord), c("segmentation", "etapes/donnees/exclusions", "etapes/brut/estimateurs")) &&
+  verifier("ordres_canoniques : segmentation = sexe, segment ; exclusions = motifs de ligne puis de tête, puis motifs propres aux agrégats, puis aux stocks successifs (union des recettes, #169, #180) ; estimateurs = poisson, binomial, kaplan_meier ; ordres de coherence_regularite marqués TRI_NUMERIQUE (#144)",
+           identical(names(ord), c("segmentation", "etapes/donnees/exclusions", "etapes/brut/estimateurs",
+                                   "etapes/coherence_regularite/ordres")) &&
+             identical(ord[["etapes/coherence_regularite/ordres"]], tablexp:::TRI_NUMERIQUE) &&
              identical(ord$segmentation, c("sexe", "segment")) &&
              identical(ord[["etapes/brut/estimateurs"]], c("poisson", "binomial", "kaplan_meier")) &&
              identical(ord[["etapes/donnees/exclusions"]],

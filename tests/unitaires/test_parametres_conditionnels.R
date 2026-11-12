@@ -202,7 +202,7 @@ local({
 # --- D. ETAPES$table_construite et table_construite() (ADR 0017, points 1.2 et 1.5)
 
 verifier("D ETAPES$table_construite : character, table_lissee pour lissage (#223), table_positionnee pour positionnement, NA ailleurs (valeur calculée à la main)",
-         identical(tablexp:::ETAPES$table_construite, c(NA, NA, NA, "table_lissee", "table_positionnee", NA, NA, NA)) &&
+         identical(tablexp:::ETAPES$table_construite, c(NA, NA, NA, "table_lissee", "table_positionnee", NA, NA, NA, NA)) &&
            identical(names(tablexp:::ETAPES), c("etape", "module", "fonction", "prealable", "aleatoire", "table_construite")))
 
 local({
@@ -309,8 +309,9 @@ local({
 
 # --- E. Liste blanche de controler_plage_ages() (module exposition) ----------------
 
-verifier("E ETAPES_PLAGE_AGES : lissage (#223), positionnement, validation, homogeneite (constante du module exposition ; ADR 0017, point 10.1)",
-         identical(tablexp:::ETAPES_PLAGE_AGES, c("lissage", "positionnement", "validation", "homogeneite")))
+verifier("E ETAPES_PLAGE_AGES : lissage (#223), positionnement, validation, homogeneite, coherence_regularite (#144) (constante du module exposition ; ADR 0017, point 10.1)",
+         identical(tablexp:::ETAPES_PLAGE_AGES, c("lissage", "positionnement", "validation", "homogeneite",
+                                                  "coherence_regularite")))
 verifier("E controler_plage_ages() : refus plage_ages_invalide sous le module de chaque étape admise, message inchangé", {
   m <- paste("La plage d'âges (plage_ages) doit être un vecteur double sans attribut de deux valeurs",
              "entières finies, 0 <= min <= max (un integer est refusé).")

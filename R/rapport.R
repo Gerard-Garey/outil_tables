@@ -872,6 +872,12 @@ empreinte_sources <- function(racine) {
 # statut le dit (STATUT_CODE_INTROUVABLE).
 EMPREINTE_CODE <- empreinte_sources(".")
 
+# Marque d'un champ ensemble d'entiers en double dans la liste `ordres` de
+# canoniser_plan() (paramètre `ordres` de l'étape coherence_regularite, #144 ;
+# ADR 0017, point 13.2) : valeurs triées par ordre croissant, au lieu de
+# l'ordre d'un catalogue (aucun catalogue de valeurs ne la contient).
+TRI_NUMERIQUE <- "tri_numerique"
+
 # Plan canonique (ADR 0011, point 5.1 ; #42 ; quatrième annotation du
 # 20/10/2026, #63), à partir d'un plan validé par valider_plan() ; `champs`,
 # `parametres` et `ordres` sont CHAMPS_PLAN, PARAMETRES_ETAPES et les vecteurs
@@ -887,6 +893,10 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # 08/11/2026, (b) 3 ; ADR 0017, point 3.2) ; valeurs des champs ensembles
 # dans l'ordre de `ordres`, liste nommée par le chemin du champ dans le plan
 # (« segmentation », « etapes/donnees/exclusions », « etapes/brut/estimateurs ») ;
+# un élément égal à TRI_NUMERIQUE (« etapes/coherence_regularite/ordres »,
+# #144) : valeurs double triées par ordre croissant (un autre type, un NA, une
+# valeur non finie, un doublon ou un attribut sont une erreur de
+# programmation) ;
 # un chemin dont l'étape est absente du plan n'a rien à canoniser ; une valeur
 # hors du vecteur d'ordre, un doublon ou un attribut sont une erreur de
 # programmation, jamais une valeur retirée en silence ; toute autre valeur
@@ -945,6 +955,12 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
       return(q)
     }
     x <- q[[cle]]
+    if (identical(o, TRI_NUMERIQUE)) {
+      if (!is.double(x) || !is.null(attributes(x)) || anyNA(x) || !all(is.finite(x)) || anyDuplicated(x))
+        non_canonique(chemin)
+      q[[cle]] <- x[order(x, method = "radix")]
+      return(q)
+    }
     if (!is.character(x) || !is.null(attributes(x)) || anyNA(x) || anyDuplicated(x) || !all(x %in% o))
       non_canonique(chemin)
     q[[cle]] <- o[o %in% x]
@@ -1656,8 +1672,8 @@ lire_fiche <- function(octets) {
 SECTIONS_RAPPORT <- data.frame(
   section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
               "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements", "etape_lissage",
-              "etape_positionnement", "etape_homogeneite", "etape_validation", "etape_importance_exclusions",
-              "table_finale", "rejeu"),
+              "etape_positionnement", "etape_homogeneite", "etape_coherence_regularite", "etape_validation",
+              "etape_importance_exclusions", "table_finale", "rejeu"),
   titre = texte_moteur(c(
     "Lecture du rapport",
     "Identification : empreintes, versions et plateforme",
@@ -1673,14 +1689,16 @@ SECTIONS_RAPPORT <- data.frame(
     "Étape lissage : lissage de Whittaker-Henderson et table lissée",
     "Étape positionnement : positionnement par SMR sur une table de référence et table positionnée",
     "Étape homogeneite : test d'homogénéité entre segments (tests du score conditionnels aux décès de chaque strate)",
+    paste("Étape coherence_regularite : cohérence des taux et régularité de la table construite (Lignes directrices,",
+          "chap. 4, II et III.1)"),
     "Étape validation : statistiques de validation de la table de référence prise telle quelle",
     "Étape importance_exclusions : importance des exclusions (volumes, événements, exposition et SMR des lignes exclues)",
     "Table finale et comparaisons",
     "Rejeu")),
   nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
-             "objet", "etape", "etape", "etape", "etape", "etape", "non_produite", "texte"),
+             "objet", "etape", "etape", "etape", "etape", "etape", "etape", "non_produite", "texte"),
   etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "lissage", "positionnement",
-            "homogeneite", "validation", "importance_exclusions", NA, NA),
+            "homogeneite", "coherence_regularite", "validation", "importance_exclusions", NA, NA),
   racines = I(list(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
@@ -1699,6 +1717,7 @@ SECTIONS_RAPPORT <- data.frame(
     "etapes/lissage",
     "etapes/positionnement",
     "etapes/homogeneite",
+    "etapes/coherence_regularite",
     "etapes/validation",
     "etapes/importance_exclusions",
     "table",
@@ -1707,7 +1726,7 @@ SECTIONS_RAPPORT <- data.frame(
     character(0), character(0), character(0), character(0), character(0), character(0), character(0),
     character(0), character(0), c("etapes/exposition/resultat/exposition", "etapes/brut/resultat"),
     character(0), character(0), character(0), character(0), character(0), character(0), character(0),
-    character(0))),
+    character(0), character(0))),
   stringsAsFactors = FALSE)
 
 # Tables dont le volume croît avec la base : chemin, type et dimension (lus
@@ -1843,6 +1862,25 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "de l'autre variable (par variable de segmentation conditionnellement à l'autre). Diagnostic sans verdict ni seuil : un test non significatif n'établit pas l'homogénéité, surtout",
     "sur une base modeste ; la décision de regrouper reste à l'utilisateur et se déclare par la segmentation du",
     "plan. Aucune correction de multiplicité."),
+  # Section etape_coherence_regularite (#144 ; spécification de forme, § 3 :
+  # texte de portée du § 5 de la spécification, D8 ; comparaison aux tables
+  # de référence, choix de l'outil non attribué à la p. 36, M415 ; mention de
+  # convention).
+  coherence_portee = paste(
+    "Pour les critères de régularité et de fidélité, les Lignes directrices écrivent : « sauf erreur de construction",
+    "manifeste, les résultats de ces tests ne permettront pas de rejeter la table construite, ils donneront, en",
+    "revanche, des éléments d'appréciation de sa qualité » (chap. 4, III, p. 38). Pour la cohérence des taux, elles",
+    "prescrivent la vérification (« il faut », chap. 4, II, p. 36-37) sans règle de rejet ; pour l'ordre entre",
+    "segments, un défaut appelle à « rechercher des explications » (II.3, p. 37). L'outil restitue les valeurs et les",
+    "âges où une inégalité n'est pas vérifiée, sans verdict ni seuil ; l'appréciation revient à l'actuaire."),
+  coherence_comparaison = paste(
+    "Les tables de référence désignées sont évaluées côte à côte, par choix de l'outil ; la comparaison n'est pas",
+    "prescrite par les Lignes directrices."),
+  coherence_convention = paste(
+    "Convention d'âge de chaque table évaluée (etapes/coherence_regularite/parametres/tables, colonne",
+    "convention_age) : pour la table construite, la convention retenue de l'étape exposition ; pour une table de",
+    "référence, non portée par l'objet table_reference, qui n'a pas de champ de convention d'âge : la vérifier dans",
+    "sa source (colonne source)."),
   # Section etape_validation (#4 ; M258 : textes acceptés ; ADR 0012, seconde
   # annotation du 06/11/2026, (b)). Première phrase de validation_sans_verdict
   # (validation_sans_verdict_table) conditionnelle à la relation (#167,
@@ -2418,6 +2456,13 @@ corps_section <- function(x, k) {
       # mention d'unité contrat sous la même condition que l'étape validation.
       return(c(paragraphe(m[["homogeneite_portee"]]),
                mention_unite(x),
+               lignes_racines(x, racines)))
+    }
+    if (identical(e, "coherence_regularite")) {
+      # Étape coherence_regularite : mentions fixes (#144, spécification de
+      # forme, § 3), sans mention d'unité (aucune observation lue).
+      return(c(paragraphe(m[["coherence_portee"]]), paragraphe(m[["coherence_comparaison"]]),
+               paragraphe(m[["coherence_convention"]]),
                lignes_racines(x, racines)))
     }
     if (identical(e, "importance_exclusions")) {

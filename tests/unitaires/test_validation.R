@@ -42,22 +42,23 @@ tous <- function(...) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5 ; lissee = NA_integer_, #224), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement puis validation, #167)",
+verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5 ; lissee = NA_integer_, #224), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement, coherence_regularite (#144) puis validation, #167)",
          identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L,
                                                   lissee = NA_integer_)) &&
            identical(tablexp:::CONVENTIONS_VALIDATION, "dernier_anniversaire") &&
            identical(tablexp:::N_MAX_WILCOXON_EXACT, 1000) && identical(tablexp:::N_MAX_RUNS_EXACT, 10000) &&
            identical(tablexp:::TOLERANCE_RESIDU_NUL, 1e-10) &&
            identical(tablexp:::PARAMETRES_CLE_TABLE,
-                     c("etapes/positionnement/table_reference", "etapes/validation/table_reference")))
-verifier("A ETAPES : validation après brut, lissage (#223), positionnement (#167) et homogeneite (#168), module validation, préalables donnees et exposition, aléatoire comme homogeneite (importance_exclusions après elle, #69)", {
+                     c("etapes/positionnement/table_reference", "etapes/coherence_regularite/tables_reference",
+                       "etapes/validation/table_reference")))
+verifier("A ETAPES : validation après brut, lissage (#223), positionnement (#167), homogeneite (#168) et coherence_regularite (#144), module validation, préalables donnees et exposition, aléatoire comme homogeneite (importance_exclusions après elle, #69)", {
   e <- tablexp:::ETAPES
   k <- match("validation", e$etape)
-  identical(e$etape, c("donnees", "exposition", "brut", "lissage", "positionnement", "homogeneite", "validation",
-                       "importance_exclusions")) &&
+  identical(e$etape, c("donnees", "exposition", "brut", "lissage", "positionnement", "homogeneite",
+                       "coherence_regularite", "validation", "importance_exclusions")) &&
     identical(e$module[k], "validation") &&
     identical(e$fonction[k], "calculer_validation") && identical(e$prealable[[k]], c("donnees", "exposition")) &&
-    identical(e$aleatoire, c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE))
+    identical(e$aleatoire, c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE))
 })
 verifier("A PARAMETRES_ETAPES$validation : six paramètres dans l'ordre, types character et double", {
   p <- tablexp:::PARAMETRES_ETAPES$validation
