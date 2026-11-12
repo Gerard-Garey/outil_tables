@@ -72,10 +72,21 @@ CATALOGUE_ROLES <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Libellé des types R admis, par code de type (restitué par catalogue_roles()).
+# Constantes non ASCII du module restituées hors de texte_moteur() (TYPES_ADMIS,
+# LIBELLES_MOTIFS ; #151 ; UNITE_AGREGAT passe par avertir(), qui marque) : les
+# octets du fichier sont de l'UTF-8 ; sans marque, la chaîne est d'encodage
+# « unknown » et suit la locale de la session. texte_moteur() (R/outils.R)
+# n'existe pas encore quand ce fichier est évalué (ordre alphabétique à
+# l'installation, ADR 0011, annotation du 20/10/2026, sans champ Collate) : le
+# marquage se fait à la source, par `Encoding<-`() ; le graphe des modules
+# n'admet au premier niveau que des affectations (d'où la forme fonctionnelle).
+
+# Libellé des types R admis, par code de type (restitué par catalogue_roles()
+# et details$type_attendu du refus type_incompatible ; marqué UTF-8 à la source :
+# « entières » est non ASCII).
 # `numerique` : classe seule (ADR 0016, point 6.5 ; #169, Q5) ; les défauts de
 # domaine (manquant, non entier, négatif, non fini) sont des motifs de ligne.
-TYPES_ADMIS <- c(
+TYPES_ADMIS <- `Encoding<-`(c(
   identifiant = "character, integer, double entier fini",
   categorie = "character, factor",
   categorie_ou_entier = "character, factor, integer",
@@ -84,7 +95,7 @@ TYPES_ADMIS <- c(
   entier_positif = "integer, double entier fini >= 0",
   reel_strictement_positif = "double fini > 0",
   numerique = "integer, double"
-)
+), "UTF-8")
 
 # Modalités des rôles catégoriels (A.1), comparées après as.character,
 # sensibles à la casse.
@@ -170,7 +181,7 @@ MOTIFS_UNITE_STOCKS <- c("unite_naissance_incoherente", "unite_sexe_incoherent",
 # un code a un seul sens, quelle que soit la recette qui le lève (invariant
 # « un libellé unique par code », avis d'actuary du 08/11/2026 sur #169,
 # point 2 ; contrôlé par tests/unitaires/test_catalogue_recettes.R).
-LIBELLES_MOTIFS <- c(
+LIBELLES_MOTIFS <- `Encoding<-`(c(
   id_contrat_manquant = "identifiant de contrat manquant",
   id_tete_manquant = "identifiant de tête manquant",
   naissance_manquante = "date de naissance manquante",
@@ -224,7 +235,7 @@ LIBELLES_MOTIFS <- c(
   sortie_non_renseignee = paste("unité absente de l'inventaire qui suit sa dernière présence, sans ligne",
                                 "d'événement"),
   evenement_apres_absence = paste("date de sortie postérieure à l'inventaire qui suit la dernière présence de",
-                                  "l'unité"))
+                                  "l'unité")), "UTF-8")
 
 # Nombre de numéros de ligne cités dans un message de refus (A.1) ; l'objet
 # de refus porte la liste complète.
@@ -579,9 +590,10 @@ controler_roles <- function(donnees, roles, segmentation) {
   colonne <- function(i) lire_champ(donnees, roles[[i]])
   ko <- !vapply(seq_along(r), function(i) type_conforme(colonne(i), types[i]),
                 logical(1L))
-  # TYPES_ADMIS (« entières », non ASCII) est une constante du moteur non
-  # marquée : texte_moteur() la marque UTF-8 avant l'insertion par %s (sous
-  # la locale C, sprintf() en écrirait les octets « <c3><a8> » ; #127).
+  # TYPES_ADMIS (« entières », non ASCII) est marquée UTF-8 à la source (#151) ;
+  # texte_moteur() reste appliquée avant l'insertion par %s, règle de formuler()
+  # (sous la locale C, sprintf() écrirait les octets « <c3><a8> » d'un libellé
+  # non marqué ; #127).
   if (any(ko))
     refuser("donnees", "type_incompatible",
             formuler("Type incompatible : %s.",
