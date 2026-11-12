@@ -907,11 +907,23 @@ d'encodage \code{bytes}~? l'appelant retire alors la classe par
 \code{unclass()} avant \code{length()}, \code{names()} ou \code{is.na()})
 et \code{lire\_champ()} (élément d'une liste trouvé par \code{match()} sur
 les noms lus par \code{attr()}, puis lu par position). Les contrôles des
-rôles, l'écrivain unique, l'écriture de la fiche, le contrôle du rapport
-figé et le rejeu outillé les emploient, et refusent sous un motif nommé, à
-toute position du nom~: \code{type\_incompatible} pour une colonne de rôle
-de classe \code{bytes}, ou de nom \code{bytes} et de type non conforme
-(section~\ref{sec:controles-donnees})~; \code{type\_non\_canonique} ou
+données et des rôles, l'écrivain unique, l'écriture de la fiche, le
+contrôle du rapport figé, le rejeu outillé, le constructeur des tables de
+référence et le simulateur les emploient, et refusent sous un motif nommé,
+à toute position du nom ou de l'élément \code{bytes} dans la classe~:
+\code{donnees\_mal\_formees} pour des données de classe \code{bytes},
+\code{details\$classe} portant la classe reçue (issue~\#150)~;
+\code{type\_incompatible} pour une colonne de rôle de classe \code{bytes},
+même si la classe compte aussi \code{factor} (\code{a\_classe()} lirait
+\code{c(<bytes>, "factor")} comme un facteur~; issue~\#150), ou de nom
+\code{bytes} et de type non conforme
+(section~\ref{sec:controles-donnees})~; \code{table\_colonne\_mal\_typee}
+pour une colonne \code{age}, \code{sexe} ou \code{annee} de classe
+\code{bytes} d'une table de référence, dont le contrôle des types est le
+même (\code{type\_conforme()}~; section~\ref{sec:table-reference}~;
+issue~\#150)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
+de ses lois, de classe \code{bytes} (section~\ref{sec:loi-vraie}~;
+issue~\#150)~; \code{type\_non\_canonique} ou
 \code{serialisation\_impossible} pour une valeur écrite de classe
 \code{bytes}, et \code{chaine\_codage\_bytes} pour un nom \code{bytes}
 d'une sous-liste écrite, rôle «~\emph{chemin}/@noms~»
@@ -930,7 +942,13 @@ une classe \code{bytes} sur \code{plan/etapes}~:
 \code{etapes\_mal\_formees})~; ailleurs, témoin «~non déterminable~» ou
 «~différente~» (section~\ref{sec:rejeu}). Une classe d'encodage
 \code{bytes} est citée sous le repère de la règle ci-dessus.
-\textbf{Statut et limites}~: pour l'écriture de la fiche, le rapport figé
+\textbf{Statut et limites}~: pour les données, les colonnes de rôle, les
+colonnes d'une table de référence et la loi du simulateur, \emph{lecture}
+du code (\code{classe\_bytes()} y précède toute fonction qui dispatche~;
+pour la loi vraie elle-même, \code{forme\_exacte()}, qui n'admet aucune
+classe, et noms des \code{details} lus par \code{attr()}) et
+\emph{constat} des tests, l'élément \code{bytes} placé en tête ou après
+une autre classe (en tête seulement pour la loi vraie elle-même)~; pour l'écriture de la fiche, le rapport figé
 et le rejeu, \emph{constat} des tests et de mesures sous les locales C et
 C.UTF-8, aux niveaux~1 à~7 de la fiche, non une propriété démontrée pour
 toute profondeur~; pour le témoin de la fiche (règle~V3,
@@ -1078,7 +1096,8 @@ issue~\#128) \\
 \code{TRUE} si un élément de l'attribut \code{class} de \code{x} est
 d'encodage \code{bytes}, \code{FALSE} sinon~; l'appelant retire alors la
 classe par \code{unclass()} avant toute fonction qui dispatche
-(issue~\#128) \\
+(issue~\#128), ou refuse sous un motif nommé (données, colonne de rôle,
+table d'une loi du simulateur~; issue~\#150) \\
 \catalogue{fonctions-outils}{lire\_champ()} & interne & \code{x} (liste),
 \code{nom} & premier élément de \code{x} de ce nom, \code{NULL} s'il est
 absent, comme \code{x[[nom]]}, mais trouvé par \code{match()} sur les noms
@@ -4363,7 +4382,10 @@ qu'elle n'exécute aucune étape du plan (issue~\#82, décision M291)~:
     fiche qui n'est pas une liste nommée aux noms uniques, sans autre
     attribut que ses noms (\code{liste\_nommee()}), est refusé sous
     \code{fiche\_non\_conforme}~; puis des données qui ne sont pas un
-    \code{data.frame} sont refusées par \code{controler\_roles()}, sous le
+    \code{data.frame}, ou dont la classe porte, à toute position, un
+    élément d'encodage \code{bytes} (\code{classe\_bytes()}, lue avant
+    \code{is.data.frame()}, qui lèverait une erreur R~; issue~\#150),
+    sont refusées par \code{controler\_roles()}, sous le
     motif \code{donnees\_mal\_formees} du module \code{donnees}, avec le
     message même qu'en donnerait \code{construire\_table()}~;
   \item \textbf{forme des champs que le rejeu lit lui-même}~:
@@ -5340,7 +5362,13 @@ rôle par la recette.}
 
 \code{controler\_roles()} contrôle la déclaration des rôles dans cet ordre, et
 chaque refus nomme tous les rôles et colonnes en cause~:
-\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame})~;
+\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame}, ou
+sa classe porte, à toute position, un élément d'encodage \code{bytes}~:
+ce cas, jugé d'abord par \code{classe\_bytes()} parce que
+\code{is.data.frame()} lèverait une erreur R, a son propre message, qui
+cite la classe sous le repère de la règle unique~--- «~doivent être un
+\code{data.frame}~» serait faux d'un \code{data.frame} sous-classé~---,
+et \code{details\$classe} porte la classe reçue~; issue~\#150)~;
 \code{roles\_mal\_formes} (les rôles ne sont pas un vecteur de chaînes nommé,
 de forme exacte \code{character} sans autre attribut que ses noms~--- une
 classe, \code{noquote} ou \code{AsIs} comprises, une dimension ou un
@@ -5357,8 +5385,13 @@ choisie à la place de l'utilisateur)~; ces deux refus ne lisent que les noms
 des rôles~; \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
 \code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
-\code{type\_incompatible} (une colonne de classe d'encodage
-\code{bytes} y est refusée comme toute classe non admise, et une colonne
+\code{type\_incompatible} (une colonne dont la classe porte, à toute
+position, un élément d'encodage \code{bytes} y est refusée, même si la
+classe compte aussi \code{factor}, sous-classe que le contrôle admet
+sinon~: \code{type\_conforme()} la juge non conforme avant tout autre
+test~; issue~\#150~; auparavant, une telle colonne passait ce contrôle et
+n'était refusée qu'au calcul des empreintes, module \code{rapport},
+\code{type\_non\_canonique}~; une colonne
 de nom \code{bytes} y est jugée sur son type, nom et classe cités sous le
 repère, sans erreur R~; un tel nom est refusé plus loin par le module
 \code{rapport}, \code{chaine\_codage\_bytes}~; section~\ref{sec:refus}~;
@@ -6125,7 +6158,8 @@ sur tout attribut ou toute classe hors de sa grammaire
 \code{label} sur \code{id\_contrat}, \code{id\_tete} ou
 \code{date\_naissance} en unité contrat, où ces colonnes étaient recopiées
 entières, ou facteur muni de \code{contrasts} ou de sous-classe, que le
-contrôle des types des rôles admet (section~\ref{sec:catalogue-roles}).
+contrôle des types des rôles admet (section~\ref{sec:catalogue-roles}~;
+une sous-classe d'encodage \code{bytes} y est refusée, issue~\#150).
 Option écartée~: refuser ces facteurs à la validation, ce qui resserrerait
 le contrat d'entrée pour une métadonnée sans effet sur le résultat. Pour les
 entrées déjà acceptées, la table des observations est inchangée~: celles des
@@ -6172,7 +6206,15 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
 \code{table\_colonne\_mal\_typee}, \code{table\_sexe\_hors\_modalites},
 \code{table\_sexes\_melanges}, \code{table\_qx\_non\_fini},
 \code{table\_qx\_hors\_bornes}, \code{table\_age\_double} et
-\code{table\_ages\_non\_contigus}.\par}
+\code{table\_ages\_non\_contigus}. Les colonnes \code{age}, \code{sexe} et
+\code{annee} sont jugées par le contrôle de type des rôles
+(\code{type\_conforme()}, section~\ref{sec:controles-donnees})~: une
+colonne dont la classe porte, à toute position, un élément d'encodage
+\code{bytes} est refusée sous \code{table\_colonne\_mal\_typee}~; pour
+une colonne \code{sexe} de classe facteur, ce refus remplace l'erreur R
+«~translating strings with "bytes" encoding is not allowed~» que levait
+\code{anyNA()} (issue~\#150~; une colonne \code{age} ou \code{annee} de
+cette classe était déjà refusée sous ce motif).\par}
 
 \medskip
 \noindent
@@ -6300,13 +6342,13 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{composantes\_date()} & interne & jours depuis 1970-01-01 & année, mois, jour \\
 \catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
 \catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
-\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne de classe d'encodage \code{bytes} étant non conforme sans erreur R (issue~\#128) \\
+\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne dont la classe porte un élément d'encodage \code{bytes}, à toute position, \code{factor} compris, étant non conforme sans erreur R (issues~\#128 et~\#150)~; partagée avec \code{table\_reference()} \\
 \catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & recettes, rôles requis absents, groupes non couverts & message du refus \code{aucune\_recette}, recette par recette \\
 \catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue et matrice (par défaut, ceux du module~; injection en test) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de la matrice reçue (aucune ligne pour une recette absente de cette matrice~; issue~\#196)~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{donnees\_mal\_formees} (message propre et \code{details\$classe} pour des données de classe \code{bytes}, lue par \code{classe\_bytes()} avant \code{is.data.frame()}~; issue~\#150), \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes} (à toute position, \code{factor} compris~; issue~\#150), ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
 \catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique, convention validée (\code{NULL} sans étape \code{exposition}), valeurs validées \code{p} & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis règles qui ne tiennent pas dans une ligne (fonction de la ligne suivante), puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
 \catalogue{fonctions-donnees}{regles\_conditionnelles\_recette()} & interne & recette, rôles, étapes du plan, convention, valeurs validées \code{p} & règles de la matrice qui ne tiennent pas dans une ligne~; sous \code{agregats}, dans cet ordre, refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle \code{annee}) et \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire} (binomial avec le rôle \code{annee} sous la convention retenue \code{dernier\_anniversaire})~; sous \code{stocks\_successifs}, refus \code{identifiants\_concurrents} puis \code{identifiant\_inadapte}~; aucune sous \code{lignes\_dates\_completes}~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide}, module \code{donnees}~; rend \code{NULL}~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22, \#59 et~\#82~; variantes des modules \code{brut}, \code{validation} et \code{importance\_exclusions} retirées par l'issue~\#82) \\
@@ -15374,7 +15416,17 @@ d'exactement autant d'éléments que de noms attendus (\code{deces} et
 quelconque~: un \code{data.frame}, un objet de classe, une liste munie d'un
 autre attribut ou un élément de plus, même nommé \code{NA}, sont refusés
 (\code{loi\_invalide}~; \code{liste\_aux\_noms()},
-section~\ref{sec:fonctions-outils}~; issue~\#44). Pour un sexe $s$, la loi effective est
+section~\ref{sec:fonctions-outils}~; issue~\#44)~; une loi vraie dont la
+classe porte un élément d'encodage \code{bytes} l'est sous le même
+message, sans erreur R, les noms reçus étant lus par \code{attr()} pour
+\code{details\$noms} (issue~\#150). La table d'une loi dont la classe
+porte, à toute position, un élément de cet encodage est refusée
+(\code{loi\_invalide}) par un message propre, qui cite la classe sous le
+repère de la règle unique (section~\ref{sec:refus}) et demande l'objet
+rendu par \code{table\_reference()}, sans modification~: ce contrôle,
+fait par \code{classe\_bytes()}, précède celui de la classe
+\code{table\_reference}, dont \code{inherits()} lèverait une erreur R
+(\code{loi\_effective()}~; issue~\#150). Pour un sexe $s$, la loi effective est
 \[
   q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
 \]
@@ -17588,7 +17640,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
-\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs et une table de classe d'encodage \code{bytes}, jugée avant \code{inherits()} (issue~\#150) \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
