@@ -961,11 +961,25 @@ la fiche rendue, avec un \emph{constat} aux niveaux~2 à~7. Restent hors de cett
 renvoyés à des issues~: une \emph{valeur} chaîne d'encodage \code{bytes}
 dans \code{versions} ou \code{plateforme} fait lever l'erreur R au rejeu
 (lecture des paires du témoin~; issue~\#142, constat)~; une colonne de
-rôle de nom \code{bytes} fait lever l'erreur R dans la préparation des
-données (\code{preparer\_donnees()}, fonction interne), cas que les
-fonctions exportées n'atteignent pas~: \code{construire\_table()} et le
-rejeu refusent ce nom avant la première étape, au calcul des empreintes
-(\code{chaine\_codage\_bytes}, module \code{rapport}~; issue~\#140).
+rôle de nom \code{bytes} et de type conforme, admise par
+\code{controler\_roles()} (issue~\#128), est lue par \code{[[} dans
+l'étape \code{importance\_}\allowbreak\code{exclusions} du module
+\code{validation} (\code{etats\_evenements\_exclus()}, pour
+\code{cause\_sortie} et \code{date\_sortie}, et
+\code{calculer\_importance\_exclusions()}, pour \code{id\_tete}~;
+\emph{lecture} du code), ce qui fait lever l'erreur R (\emph{constat} pour
+\code{etats\_evenements\_exclus()} appelée directement sur une colonne
+\code{cause\_sortie} de ce nom, sous les locales C et C.UTF-8~; issue
+proposée au mainteneur). La préparation des données
+(\code{preparer\_donnees()}, fonction interne) lit au contraire ses
+colonnes de rôle par \code{lire\_champ()}~: appelée directement, elle lit
+une telle colonne sans erreur R et rend les mêmes observations et les
+mêmes lignes conservées que sous le nom d'origine (\emph{constat} des
+tests, chaque rôle des trois recettes et le chemin des exclusions~;
+issue~\#140). Ces deux cas, les fonctions exportées ne les atteignent
+pas~: \code{construire\_table()} et le rejeu refusent ce nom avant la
+première étape, au calcul des empreintes (\code{chaine\_codage\_bytes},
+module \code{rapport}).
 
 \subsection{Avertissements métier}
 \label{sec:avertissements}
@@ -6454,7 +6468,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{observations\_stocks()} & interne & lignes retenues, leurs numéros, rôles, segmentation, valeurs validées \code{p}, données reçues & une observation par unité, rangée par identifiant, unité \code{tete} ou \code{contrat}, classes P0, E, ES, HF et fins S, C~; relevés par classe, par inventaire et par intervalle~; refus \code{inventaire\_sans\_ligne}~; erreur de programmation sur une unité incohérente (motifs non appliqués) \\
 \catalogue{fonctions-donnees}{empiler\_stocks()} & exportée & table des inventaires, table des événements, nom de la colonne du type de ligne & table empilée~: lignes d'inventaire puis d'événement dans l'ordre reçu, colonne du type déclarée par la table d'origine, colonnes absentes complétées par des valeurs manquantes, sans conversion~; six refus \code{empilement\_*} (section~\ref{sec:controles-donnees}) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
-\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat) \\
 \catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements}), au-delà de la tolérance relative \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, que le texte de l'avertissement mentionne~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_stocks()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{stocks\_successifs}~: \code{entrees\_entre\_inventaires} (unités E), \code{evenements\_hors\_fenetre} (unités HF)~; le relevé des unités ES est averti par l'étape \code{exposition}~; jamais un refus \\
