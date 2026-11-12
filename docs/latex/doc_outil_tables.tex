@@ -2725,7 +2725,23 @@ changement de leurs tables lissées ou de leurs verdicts de validation
 relève du visa du mainteneur comme une table finale (décisions M308
 et M413). Le correctif \code{f31d91b} (noms de lignes automatiques de la
 table \code{constantes} sous \code{wh\_poisson}, sans quoi l'écriture de
-R16 et R17 était refusée) a précédé la création.
+R16 et R17 était refusée) a précédé la création. Les références R15, R16
+et R17 ont été régénérées \textbf{une onzième fois}, le 12/11/2026, en
+mode \code{regeneration} sur ces trois plans seulement (exécution
+43203864780 du workflow, calcul sur \code{f1effbb}, commit
+\code{b85c819}~; visa délégué par le mainteneur sous conditions,
+décision M420, (1), conditions remplies selon l'avis
+d'\code{actuary-approfondi} du 12/11/2026~; issues~\#144, \#244, \#245
+et~\#246), pour les seuls changements de texte annoncés en transition~:
+référence de méthode du lissage~(a) (R15~; \#244), statut du critère C4
+de \code{coherence\_regularite} (R15~; \#144), statuts de
+\code{p\_asymptotique} de $X^2$ et $G^2$ sous \code{lissee} (R15 à R17~;
+\#245) et des bornes de crédibilité de la variante~(b) (R16, R17~; \#246).
+Les empreintes du résultat de ces trois plans et celle du code changent
+en conséquence~; aucune grandeur numérique, aucune structure ne change~;
+R1 à R14 restent identiques, en comparaison réussie, sur la plateforme de
+référence (processeur Intel Xeon Platinum 8370C, consigné sans
+contrôle).
 
 \begin{encadre}
 \small
@@ -2979,8 +2995,9 @@ l'issue~\#169, dont la transition a été close par la septième, et pour
 les issues~\#174, \#177, \#179, \#178 et~\#185, dont les transitions
 ont été closes ensemble par la huitième, et pour les issues~\#199, \#200
 et~\#202, dont les transitions ont été closes ensemble par la neuvième,
-et pour l'issue~\#215, dont la transition a été close par la dixième
-(«~Références existantes~», ci-dessus)~: la liste est de nouveau vide. Chaque
+pour l'issue~\#215, dont la transition a été close par la dixième, et
+pour les issues~\#144, \#244, \#245 et~\#246, dont les transitions ont
+été closes ensemble par la onzième («~Références existantes~», ci-dessus)~: la liste est de nouveau vide. Chaque
 nature, l'union et ses conflits, l'observation, la forme de la liste, le
 rattachement de l'échec attendu, les doubles restants et la garde sont
 exercés par des témoins de la batterie, sur des objets en mémoire et jamais
@@ -8923,8 +8940,11 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     PDF de SHA-256 \code{70ba7463\ldots26835}
     (section~\ref{sec:references})~; G.~Biessy, §~5.1, p.~15 (définition des
     degrés de liberté effectifs). La référence recopiée dans les paramètres
-    (\code{REFERENCE\_METHODE\_LISSAGE}) cite «~chap.~3, IV.2.a (p.~31
-    à~33)~».
+    (\code{REFERENCE\_METHODE\_LISSAGE}) cite «~chap.~3, IV.2.a (p.~31-32)
+    et IV.2.d (p.~33)~» (issue~\#244), et le message du refus
+    \code{lissage\_cellules\_insuffisantes} renvoie à IV.2.d, p.~33, pour
+    la condition des points pivots, donnée comme suffisante, ici aussi
+    nécessaire.
 \end{itemize}
 
 \subsection{Whittaker-Henderson~(b)~: vraisemblance de Poisson pénalisée}
@@ -9076,8 +9096,8 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     Ce sont des intervalles bayésiens asymptotiques (approximation de
     Laplace), conditionnels au $\lambda$ retenu~; \textbf{ce ne sont pas des
     intervalles de confiance}, et leur couverture fréquentiste n'est pas
-    établie (section~\ref{sec:lissage-verifications}, constat de
-    couverture).
+    établie~: aucun constat de simulation n'est versé
+    (section~\ref{sec:lissage-verifications}, constat de couverture).
   \item \textbf{Conservation}~: l'équation du score, $P\mathbf{1} = 0$ et,
     pour $z \ge 2$, $P x = 0$, donne $\sum (\hat m - D) = 0$ et, pour
     $z \ge 2$, $\sum x (\hat m - D) = 0$, à la convergence de l'algorithme
@@ -9346,8 +9366,9 @@ jeu (exposition) n'étant pas mesurée~; aucune règle de verdict, la
 couverture fréquentiste n'étant pas une propriété revendiquée. Graines
 dans la plage de la branche (\code{tests/controles/graines\_admises.csv}).
 \textbf{Aucun résultat de ce constat n'est consigné au dépôt} à la date
-du document~: le statut des bornes (\code{STATUTS\_LISSAGE\_POISSON}), qui
-le dit «~documenté~», renvoie à ce script.\par}
+du document~; le statut des bornes (\code{STATUTS\_LISSAGE\_POISSON}) le
+dit~: «~couverture fréquentiste non établie (aucun constat de simulation
+versé)~» (issue~\#246).\par}
 
 \medskip
 \noindent
@@ -9388,7 +9409,7 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{ETAT\_BRUT\_INFERIEUR} & constante & --- & \code{"effectif\_inferieur\_}\allowbreak\code{aux\_evenements"}~: état \code{binomial} refusé sur la plage \\
 \catalogue{fonctions-lissage}{REGLE\_FORCE\_LISSAGE} & constante & --- & texte de la règle de la force, $\mu = -\ln(1 - q)$, recopié dans les paramètres \\
 \catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE} & constante & --- & texte de l'hypothèse de \code{wh\_quadratique}, recopié dans les paramètres (section~\ref{sec:lissage-quadratique}) \\
-\catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE} & constante & --- & identité de la source de \code{wh\_quadratique}~: Lignes directrices mortalité, chap.~3, IV.2.a, SHA-256 du PDF~; écarts documentés \\
+\catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE} & constante & --- & identité de la source de \code{wh\_quadratique}~: Lignes directrices mortalité, chap.~3, IV.2.a (p.~31-32) et IV.2.d (p.~33), SHA-256 du PDF~; écarts documentés \\
 \catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE\_POISSON} & constante & --- & texte de l'hypothèse de \code{wh\_poisson}, règles non tirées de la source comprises (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE\_POISSON} & constante & --- & identité de la source de \code{wh\_poisson}~: Biessy, arXiv:2306.06932 v5, SHA-256, sections lues \\
 \catalogue{fonctions-lissage}{STATUTS\_LISSAGE} & constante & --- & statut de chaque grandeur sous \code{wh\_quadratique} (\code{grandeur}, \code{statut}~; section~\ref{sec:lissage-quadratique}) \\
@@ -11027,13 +11048,14 @@ Par grandeur~:\par}
     tirage (\code{tirages\_effectues} vaut~0), la graine restant requise,
     l'étape étant aléatoire.
 \end{itemize}
-Le texte du statut de \code{p\_asymptotique} (\code{STATUTS\_VALIDATION\_LISSEE})
-mentionne, pour le niveau réel du test, un «~constat de simulation hors
-CI documenté~»~; aucun constat de ce niveau sous la relation \code{lissee}
-n'est versé au dépôt à la date du document (le seul constat de simulation
-du lissage, \code{tests/mesures/}\allowbreak\code{constat\_couverture\_lissage.R},
+Le statut de \code{p\_asymptotique} (\code{STATUTS\_VALIDATION\_LISSEE})
+dit que le niveau réel du test n'est pas établi «~(aucun constat de
+simulation versé)~» (issue~\#245)~: aucun constat de ce niveau sous la
+relation \code{lissee} n'est versé au dépôt (le seul script de constat du
+lissage, \code{tests/mesures/}\allowbreak\code{constat\_couverture\_lissage.R},
 porte sur la couverture des intervalles de crédibilité de la variante~(b),
-issue~\#225)~: le niveau réel de ces p-valeurs n'est pas mesuré.
+et son résultat n'est pas consigné)~: le niveau réel de ces p-valeurs
+n'est pas mesuré.
 
 \subsubsection*{P-valeurs de Monte-Carlo}
 \label{sec:validation-monte-carlo}
@@ -11716,7 +11738,7 @@ x_{\sup}]$~:
     \code{lissage} (ADR 0017, point~10.3)~; toujours sur \code{qx}, jamais
     repris du $S$ de l'étape \code{lissage}, qui porte sur $\ln\mu$
     sous~(b) (ADR 0017, point~13.5)~; mesure comparable seulement entre
-    tables du même segment, sur la même plage et au même $z$~; pour une table lissée par Whittaker-Henderson~(a), au même $z$ et sur la plage même du lissage, fonction non croissante de $h$ (résultat exact~: pour $h_1 < h_2$, $(h_2-h_1)\bigl(S(g_{h_2}) - S(g_{h_1})\bigr) \le 0$, en sommant les deux inégalités d'optimalité)~; sur une plage strictement contenue dans celle du lissage, $S_z$ n'est pas monotone en $h$ en général (contre-exemple constaté par \code{actuary})~;
+    tables du même segment, sur la même plage et au même $z$~; pour une table lissée par Whittaker-Henderson~(a), au même $z$ et sur la plage même du lissage, fonction non croissante de $h$ en arithmétique exacte (résultat exact~: pour $h_1 < h_2$, $(h_2-h_1)\bigl(S_z(g_{h_2}) - S_z(g_{h_1})\bigr) \le 0$, en sommant les deux inégalités d'optimalité)~; sur une plage strictement contenue dans celle du lissage, $S_z$ n'est pas monotone en $h$ en général (contre-exemple constaté par \code{actuary})~;
   \item \textbf{C5, régularité à composante exponentielle} (III.1, forme
     de la p.~33)~: avec $a = \Delta^z g$ et $b = \Delta^{z-1} g$ sur les
     $m_z$ mêmes âges, $\hat r = \sum a_x b_x / \sum b_x^2$ (minimum
@@ -14634,7 +14656,8 @@ sur l'intervalle déclaré (grille, puis Brent, ou la borne à l'état
 \code{lambda\_a\_la\_borne}), les bornes de crédibilité, «~intervalles
 bayésiens asymptotiques, conditionnels au paramètre de lissage retenu,
 qui ne sont pas des intervalles de confiance (couverture fréquentiste non
-établie)~», l'interpolation des cellules sans exposition et le renvoi aux
+établie)~» (la mention du rapport~; le statut des bornes ajoute
+«~aucun constat de simulation versé~»), l'interpolation des cellules sans exposition et le renvoi aux
 constantes et à l'hypothèse~; la mention
 \code{lissage\_conservation\_poisson}~: «~Somme des E\^{}c mu\^{} = somme
 des D (SMR = 1) par l'équation du score, et somme des x E\^{}c mu\^{} =
@@ -14748,10 +14771,16 @@ de chaque segment (mention \code{validation\_h0\_positionnee}), ou, sous
 \code{validation\_h0\_lissee}, copie gardée égale par un test, le module
 \code{rapport} étant évalué avant le module \code{validation} à
 l'installation)~; sous
-\code{independante}, \code{positionnee} et \code{lissee}, «~Les p-valeurs asymptotiques et exactes
+\code{independante} et \code{positionnee}, «~Les p-valeurs asymptotiques et exactes
 des signes, des suites et de Wilcoxon reposent sur une hypothèse qui n'est
 pas H0 (i) (colonne statut)~; seules les p-valeurs de Monte-Carlo ont un
-niveau garanti sous H0 (i).~»~; si \code{fiche/avertissement\_unite} est
+niveau garanti sous H0 (i).~», et, sous \code{lissee}, à sa place
+(mention \code{validation\_hypotheses\_tests\_lissee}, issue~\#245)~:
+«~Sous la relation «~lissee~», aucune p-valeur n'a de niveau établi, la
+table étant ajustée sur ces mêmes décès~: ni les p-valeurs asymptotiques
+de X² et G², ni les p-valeurs asymptotiques et exactes des signes, des
+suites et de Wilcoxon, calculées sous leurs hypothèses propres (colonne
+statut)~; aucune p-valeur de Monte-Carlo n'est produite.~»~; si \code{fiche/avertissement\_unite} est
 présent, la mention d'unité (\code{mention\_unite()})~: sous l'unité
 contrat sans identifiant de tête, la sur-dispersion
 $\varphi \ge 1$ qui rend les tests anti-conservateurs (mention
