@@ -1224,3 +1224,37 @@ Les autres chemins `double` de la validation `lissee` et de `coherence_regularit
 **Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code ni aucune référence. R1 à R14 ne contiennent aucune grandeur de l'étape `lissage`.
 
 Issues : #225, #243, #39. Décisions du mainteneur M416, (3) et M420, (4) (11/11/2026) ; jugement d'`actuary-approfondi` du 12/11/2026 sous M420, (4). ADR 0017, points 5.5, 8.2 et 8.3. Branche `claude/lissage-whittaker`, PR #221.
+
+## Annotation du 12 novembre 2026 (seconde) — constat de fin de la porteuse B19 : clés de `TOLERANCES` effectivement déclarées (148 → 191), `fidelite` et `critere` à 1e-12, règle (d) 4 étendue aux chemins exacts de R15, reproduction de R15 à R17 au bit près sur trois plateformes
+
+Rédigée par `architect` (fiche de routine) à la mise à jour de fin de branche de la porteuse `claude/lissage-whittaker` (B19, PR #221), tête `1ce7c36`. Annotation de **constat**, annoncée par l'annotation du 12/11/2026, (e), dernière phrase (« Le constat des clés effectivement déclarées (décomptes par classe avant / après) sera porté par l'annotation de fin de branche »). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Numéros de ligne relevés à `1ce7c36` ; le nom de l'objet fait foi (M77, (b)).
+
+**(a) Décomptes de `TOLERANCES` par classe** (*vérifié* par `architect`, R 4.3.3 : `parse()` de `tests/reference/outils_reference.R`, évaluation des seules affectations de `CLASSES_TOLERANCE` et `TOLERANCES`, classe lue par `match()` sur `CLASSES_TOLERANCE`, à `origin/main` (`bb991db`) et à `1ce7c36`) :
+
+| Classe | `origin/main` | `1ce7c36` | Ajoutées |
+|---|---|---|---|
+| exacte | 41 | 60 | 19 |
+| 1e-14 | 33 | 42 | 9 |
+| 1e-12 | 71 | 75 | 4 |
+| 1e-10 | 3 | 3 | 0 |
+| `optimisation` (1e-3) | — | 11 | 11 |
+| **Total** | **148** | **191** | **43** |
+
+Aucune clé retirée, aucune clé existante changée de classe, aucun doublon de nom (même mesure). `CLASSES_TOLERANCE` compte cinq classes (`tests/reference/outils_reference.R:98`). Décompte identique à celui du message de `e8d7910` (commit des plans R15 à R17 et des clés), qui le rapportait sans la commande.
+
+**(b) Répartition des 43 clés ajoutées** (même mesure) :
+1. **21 clés de la liste (e)** de l'annotation du 12/11/2026, toutes présentes avec la classe prescrite : 11 `optimisation` (`lissage/resultat/table_lissee/{qx, borne_inf_credibilite, borne_sup_credibilite, levier}`, `lissage/resultat/segments/{parametre_lissage, ddl_effectifs, regularite, laml, deviance_penalisee, residu_conservation_0, residu_conservation_1}`) ; 2 à 1e-14 (`lissage/diagnostics/exposition_{centrale,initiale}_hors_plage`) ; 6 exactes (`lissage/parametres/{plage_ages, ordre_difference, niveau, parametre_lissage, intervalle_lissage, constantes/valeur}`) ; 2 à 1e-12 (`validation/parametres/ddl_effectifs/{ddl_effectifs, ddl_effectifs_retenus}`, M416, option (δ)) ;
+2. **22 clés hors de (e)**, classées sur avis d'`actuary` du 12/11/2026 (troisième annotation du 11/11/2026, (d) : complétude avant l'entrée dans une référence) : `lissage/resultat/segments/{fidelite, critere}` à **1e-12** (produits sous (a) seule, jamais itérés, donc hors du champ de la classe `optimisation` fixé par la troisième annotation du 11/11/2026, (c) ; dix fois l'écart maximal mesuré sous cinq permutations, 3,05e-14, mesure *rapportée* par le commentaire de `tests/reference/outils_reference.R:333-336`) ; `lissage/resultat/table_lissee/poids` à 1e-14 ; cinq échos exacts du plan (`lissage/{plage_ages, ordre_difference, niveau, parametre_lissage, intervalle_lissage}`) ; huit clés exactes et six à 1e-14 de `coherence_regularite` (#144 ; étape sans `libm`).
+
+**(c) Règle (d) 4 étendue à R15** (avis d'`actuary` du 12/11/2026 sur les classes, *rapporté* par la session). La règle de l'annotation du 12/11/2026, (d) 4, visait R16 et R17 ; elle vaut aussi pour les **chemins exacts de R15 hors plateforme de référence** (par exemple les recopies de q de la table évaluée, `coherence_regularite/resultat/ages/qx`, classe exacte, `tests/reference/outils_reference.R:353`). Les chemins à 1e-14 de `coherence_regularite`, où l'annulation amplifie un ulp amont (constat des lignes permutées de R15 : `delta1` 2,5e-11, commentaire de `tests/reference/outils_reference.R:356-361`), ne sont pas nommés par l'avis ; leur sort hors plateforme de référence n'est pas tranché ici : un échec sur un poste dans ces seuls chemins renvoie au mainteneur, entre les trois options de (d) 4 ; un échec ailleurs relève de la règle ordinaire (point 9.3).
+
+**(d) Constat de reproduction de R15 à R17** (*constat*, sur trois plateformes, non borne démontrée ; ne lève ni la réserve de (d) 4 ni celle de la `libm`) :
+1. **CI, AMD EPYC 9V74** : création, `f9658e4` (exécution 43184987915, calcul sur `e8d7910`), plateforme de référence (image `rocker/r-ver:4.3.3@sha256:732d1502…`, BLAS et LAPACK de référence 3.10.0, monothread) ; *rapporté* par le message du commit.
+2. **CI, Intel Xeon Platinum 8370C** : régénération pour les textes, `b85c819` (exécution 43203864780, calcul sur `f1effbb`), même image. Entre `f9658e4` et `b85c819`, les seules lignes changées de `tests/reference/R15.tsv`, `R16.tsv` et `R17.tsv` sont l'en-tête (processeur, commit, exécution, date, empreintes) et trois ou deux lignes `character` (textes de statut de #144, #244, #245, #246) ; **aucune ligne de double ne change** (*vérifié*, `git diff --unified=0 f9658e4 b85c819 -- tests/reference/R1{5,6,7}.tsv` : 13, 12 et 12 lignes retirées, toutes d'en-tête ou de type `character`).
+3. **Poste de session (cloud), Intel Xeon @ 2,10 GHz, R 4.3.3, BLAS et LAPACK 3.12.0** (`sessionInfo()`, `La_version()`) : `Rscript tests/test_reproductibilite.R` à `1ce7c36` (*vérifié* par `architect`, 12/11/2026, 3 min 25 s) : 600 tests, 0 échec, 0 échec attendu, 0 succès inattendu ; R15 : 502 grandeurs, 502 identiques au bit près ; R16 : 394 sur 394 ; R17 : 403 sur 403 ; 0 sous tolérance, 0 écart structurel. Les seules grandeurs non identiques au bit près de la batterie sont dans R4 et R5 (`etapes/brut/resultat/poisson/probabilite_borne_sup_asymptotique`, un élément chacun, écart relatif 1,3e-16, sous la tolérance 1e-12) : hors du lissage, déjà couvertes par la lecture des doubles selon la plateforme (annotation du 18/10/2026).
+
+Conséquence : sur ces trois plateformes, la classe `optimisation` et la règle (δ) n'ont absorbé aucun écart (écart relatif maximal 0 dans chaque classe, bilans de R15 à R17) ; la règle (d) 4 n'a pas été exercée.
+
+**Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code ni aucune référence.
+
+Issues : #223, #224, #225, #144, #244, #245, #246, #243. Décisions du mainteneur M415, M416, (3), M420, (1) et (4). Avis d'`actuary` et d'`actuary-approfondi` du 12/11/2026. Branche `claude/lissage-whittaker`, PR #221.
