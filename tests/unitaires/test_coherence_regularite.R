@@ -135,7 +135,11 @@ verifier("A statuts : sept lignes (C1, C2, C3 sur la table construite et sur une
                st("ordre_segments", "inegalite_verifiee", "construite"), fixed = TRUE),
     c3_ref = identical(st("ordre_segments", "inegalite_verifiee", "reference"),
                        "choix de l'outil, à finalité comparative, non prescrit par II.3"),
-    c4 = grepl("fonction non croissante du paramètre h", st("regularite", "regularite", "toutes"), fixed = TRUE),
+    c4 = endsWith(st("regularite", "regularite", "toutes"), paste(
+      "pour une table lissée par Whittaker-Henderson (a), au même z et sur la plage même du lissage, fonction non",
+      "croissante du paramètre h en arithmétique exacte (résultat exact : pour h1 < h2, (h2 - h1)(S_z(g_h2) -",
+      "S_z(g_h1)) <= 0, somme des deux inégalités d'optimalité) ; sur une plage strictement contenue dans celle du",
+      "lissage, S_z n'est pas monotone en h en général")),
     c5 = identical(st("regularite", "r_estime", "toutes"), st("regularite", "regularite_r", "toutes")) &&
       grepl("S^r = somme (a_x - r b_x)^2, égale en arithmétique exacte à S_z - (somme a b)^2 / somme b^2 <= S_z",
             st("regularite", "r_estime", "toutes"), fixed = TRUE) &&

@@ -2314,7 +2314,10 @@ STATUTS_COHERENCE_REGULARITE <- local({
             "chap. 4, III.1, et chap. 3, IV.2.a), arithmétique flottante ; aucune loi, aucun seuil ; dépend du niveau",
             "de la table (environ theta^2 sous un positionnement) et est dominée par les grands âges : comparable",
             "seulement entre tables du même segment, sur la même plage et au même z ; pour une table lissée par",
-            "Whittaker-Henderson (a) au même z, fonction non croissante du paramètre h")),
+            "Whittaker-Henderson (a), au même z et sur la plage même du lissage, fonction non croissante du",
+            "paramètre h en arithmétique exacte (résultat exact : pour h1 < h2, (h2 - h1)(S_z(g_h2) - S_z(g_h1))",
+            "<= 0, somme des deux inégalités d'optimalité) ; sur une plage strictement contenue dans celle du",
+            "lissage, S_z n'est pas monotone en h en général")),
     c("regularite", "r_estime", "toutes", c5),
     c("regularite", "regularite_r", "toutes", c5))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),

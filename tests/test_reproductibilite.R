@@ -442,7 +442,80 @@ CHEMINS_199 <- list(
 # p_valeurs_asymptotiques de STATUTS_VALIDATION, R8 et R9) close par la
 # régénération (R) de B19 ; transition_215(), utf8_215() et les constantes
 # *_215 retirées.
+# Transitions de la reprise des textes de statut et des mentions (porteuse
+# claude/lissage-whittaker, avis d'actuary-approfondi du 12/11/2026) : textes
+# seuls, aucune valeur numérique ; une transition par issue, déclarée par
+# transition_textes_245() ci-dessous. Texte avant (référence commitée) épinglé
+# en entier dans TEXTES_245, contrôlé à chaque exécution, positions lues par le
+# nom de la grandeur ; texte après tiré du texte avant par le remplacement
+# littéral déclaré, qui doit s'y trouver une fois. À clore par la régénération
+# (R) des plans portés, avec utf8_245(), apres_245(), transition_textes_245()
+# et les constantes *_245. utf8_245() : même rôle qu'utf8_215() (locale C).
+utf8_245 <- function(x) {
+  i <- Encoding(x) == "unknown" & validUTF8(x)
+  Encoding(x)[i] <- "UTF-8"
+  x
+}
+SANS_CONSTAT_245 <- utf8_245(c("(constat de simulation hors CI documenté)",
+                               "(aucun constat de simulation versé)"))
+STATISTIQUES_245 <- "etapes/validation/resultat/statistiques/"
+STATUTS_LISSAGE_245 <- "etapes/lissage/parametres/statuts/"
+STATUTS_COHERENCE_245 <- "etapes/coherence_regularite/parametres/statuts/"
+# Texte `t` (list(avant, remplace, par)) : après = avant où `remplace`,
+# présent une fois, devient `par`.
+apres_245 <- function(t) {
+  r <- utf8_245(t$remplace); n <- lengths(regmatches(t$avant, gregexpr(r, t$avant, fixed = TRUE)))
+  if (n != 1L) stop("apres_245() : fragment remplacé absent ou répété (erreur de programmation)")
+  utf8_245(sub(r, utf8_245(t$par), t$avant, fixed = TRUE))
+}
+# Transition de l'issue `issue` sur `plans` : texte `t` (TEXTES_245) au chemin
+# `chemin` ; `grandeur` NULL : vecteur entier ; sinon positions des lignes dont
+# la colonne sœur `chemin_grandeur` vaut `grandeur` (et, si `filtre` est
+# donné, dont la colonne `filtre$chemin` est dans `filtre$valeurs`), communes à
+# tous les plans.
+transition_textes_245 <- function(issue, plans, chemin, t, chemin_grandeur = NULL, grandeur = NULL, filtre = NULL) {
+  k0 <- NULL
+  for (id in plans) {
+    ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+    k <- if (is.null(grandeur)) NULL else {
+      garde <- ref[[chemin_grandeur]] %in% grandeur
+      if (!is.null(filtre)) garde <- garde & ref[[filtre$chemin]] %in% filtre$valeurs
+      which(garde)
+    }
+    if (!is.null(k0) && !identical(k, k0))
+      stop(sprintf("transition_textes_245(%s, %s) : positions propres au plan", issue, id))
+    k0 <- k
+    v <- if (is.null(k)) ref[[chemin]] else ref[[chemin]][k]
+    if ((!is.null(k) && !length(k)) || !length(v) || !all(v == t$avant))
+      stop(sprintf(paste("transition_textes_245(%s, %s) : textes de la référence inattendus ; référence",
+                         "déjà régénérée ? retirer transition_textes_245() et les constantes *_245"),
+                   issue, id))
+  }
+  ch <- list(chemin = chemin, nature = "valeur de chaîne", valeurs = rep(apres_245(t), max(1L, length(k0))))
+  if (!is.null(k0)) ch$positions <- k0
+  list(issue = issue, plans = plans, changements = list(ch))
+}
+TEXTES_245 <- list()
 TRANSITIONS_EN_COURS <- list()
+# #144, R15 : statut C4 de coherence_regularite borné à la plage du lissage
+# (position 5 de etapes/coherence_regularite/parametres/statuts/statut).
+TEXTES_245$c4 <- list(
+  avant = utf8_245(paste(
+    "descriptif : S_z = somme sur [x_inf, x_sup - z] de (Delta^z g_x)^2, sans poids (Lignes directrices, chap. 4,",
+    "III.1, et chap. 3, IV.2.a), arithmétique flottante ; aucune loi, aucun seuil ; dépend du niveau de la",
+    "table (environ theta^2 sous un positionnement) et est dominée par les grands âges : comparable seulement",
+    "entre tables du même segment, sur la même plage et au même z ; pour une table lissée par",
+    "Whittaker-Henderson (a) au même z, fonction non croissante du paramètre h")),
+  remplace = "Whittaker-Henderson (a) au même z, fonction non croissante du paramètre h",
+  par = paste(
+    "Whittaker-Henderson (a), au même z et sur la plage même du lissage, fonction non croissante du",
+    "paramètre h en arithmétique exacte (résultat exact : pour h1 < h2, (h2 - h1)(S_z(g_h2) -",
+    "S_z(g_h1)) <= 0, somme des deux inégalités d'optimalité) ; sur une plage strictement",
+    "contenue dans celle du lissage, S_z n'est pas monotone en h en général"))
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
+  transition_textes_245("#144", "R15", paste0(STATUTS_COHERENCE_245, "statut"), TEXTES_245$c4,
+                        paste0(STATUTS_COHERENCE_245, "grandeur"), "regularite",
+                        list(chemin = paste0(STATUTS_COHERENCE_245, "table"), valeurs = "regularite"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
