@@ -1502,7 +1502,7 @@ d'\code{ecrire\_fiche()}, ci-dessus). Le contrôle
 \code{tests/controles/locale\_c.R} (tableau~\ref{tab:scripts-controle})
 installe donc l'arbre de travail sous \code{LC\_ALL=C} et sous la première
 locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
-l'installation, les plans de référence R1 à R14 sur leur entrée de référence,
+l'installation, les plans de référence R1 à R17 sur leur entrée de référence,
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
 pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
 outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
@@ -1556,7 +1556,7 @@ dossier temporaire, sans droits particuliers, et \textbf{échoue}, sans
 jamais sauter, s'il ne peut pas la générer~; il installe l'arbre de travail
 sous cette locale et sous la première locale UTF-8 disponible, puis
 exécute dans chaque cas, sous la locale de l'installation et après avoir
-vérifié la locale effective, les plans de référence R1 à R14 et quatre jeux
+vérifié la locale effective, les plans de référence R1 à R17 et quatre jeux
 de segments non ASCII (valeurs natives non marquées, marquées latin-1,
 marquées UTF-8, et mêlées~: «~ÿ~» natif et «~€~» UTF-8), construits à
 partir de leurs octets avec un marquage explicite~; il écrit la fiche, le
@@ -2125,11 +2125,7 @@ de R16 sont celles de R1, celles de R15 aussi hors de l'écho de la
 convention demandée, celles de R17 celles de R13 (\emph{constat} de la
 création, consigné dans son message). R15 fige une table lissée qui
 décroît aux premiers âges de la plage, ce que l'étape
-\code{coherence\_regularite} relève (C1)~: c'est l'effet du plan de
-lissage fixé (pénalité d'ordre~3 sur l'échelle de $q$, dont le noyau
-contient les paraboles, prolongées au bord gauche où les poids sont
-faibles), non un défaut du code (avis d'\code{actuary-approfondi} consigné
-au commit de création). Le test de permutation des lignes (issue~\#39)
+\code{coherence\_regularite} relève (C1)~: c'est l'effet du plan de lissage fixé, non un défaut du code~: la pénalité d'ordre~3 sur l'échelle de $q$ a pour noyau les polynômes de degré au plus~2~; au bord gauche, où les poids, proportionnels à l'exposition, sont faibles, la table lissée prolonge par une parabole la courbure des âges voisins, qui remonte vers les premiers âges. Le même lissage de la loi vraie, sans fluctuation, avec les mêmes poids, décroît déjà aux tout premiers âges (constat d'\code{actuary} du 12/11/2026)~; la décroissance de R15, plus longue, y ajoute la fluctuation des cellules jeunes, peu exposées. La loi vraie étant croissante, c'est un biais de bord que R15 fige comme valeur de non-régression, non un calibrage recommandé (avis d'\code{actuary-approfondi} consigné au commit de création). Le test de permutation des lignes (issue~\#39)
 n'est pas étendu à R15, R16 ni R17 (ADR 0009, annotation du 12/11/2026,
 (d)~3).\par}
 
@@ -2442,7 +2438,7 @@ cette limite, et une règle absolue est proposée par l'issue~\#243
 \noindent
 Les tolérances des quatre premières classes restent plusieurs ordres de grandeur sous le plus petit
 changement significatif estimé par \code{actuary} (un jour d'exposition dans
-la cellule la plus exposée, un événement de plus~; ADR 0009, point 3.4).
+la cellule la plus exposée, un événement de plus~; ADR 0009, point 3.4). La classe \code{optimisation} n'est pas sous ce seuil~: un jour d'exposition, et même un événement de plus dans une cellule, peuvent déplacer un taux lissé de moins de $10^{-3}$ en relatif (constat d'\code{actuary} du 12/11/2026 sur R16)~; un tel changement des données n'est pas décelé par les chemins \code{lissage/*}, mais l'est par ceux des étapes amont (dénombrements exacts, expositions à $10^{-14}$) et de la validation \code{lissee} ($10^{-12}$).
 \textbf{Impression}, pour chaque plan, dans la batterie comme dans le
 workflow~: une ligne de bilan (grandeurs comparées, identiques, à écart sous
 tolérance, en écart, écarts structurels)~; l'écart relatif maximal observé
@@ -3275,7 +3271,7 @@ ADR 0008, points 3 à 5 \\
 \code{locale\_c.R} & \code{tablexp} installé dans deux bibliothèques
 temporaires, l'une sous \code{LC\_ALL=C}, l'autre sous la première locale
 UTF-8 disponible, et exécuté dans un sous-processus sous la locale de son
-installation, qui vérifie d'abord la locale effective~; pour R1 à R14,
+installation, qui vérifie d'abord la locale effective~; pour R1 à R17,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
 marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
@@ -3308,7 +3304,7 @@ du 05/11/2026, (c) et~(f)~; M182~; issue~\#127 \\
 temporaires, l'une sous \code{fr\_FR.ISO-8859-1}, générée par
 \code{localedef} (échec, jamais de saut, si elle ne peut pas l'être), l'autre
 sous la première locale UTF-8 disponible, et exécuté sous la locale de son
-installation, vérifiée d'abord~; pour R1 à R14 et quatre jeux de segments non
+installation, vérifiée d'abord~; pour R1 à R17 et quatre jeux de segments non
 ASCII (natifs, latin-1, UTF-8, mêlés), fiche, plan et rapport figé écrits,
 ordre des segments écrit et comparé à un ordre par octets UTF-8, puis
 textes (trois par plan, quatre par jeu) comparés octet à octet entre latin-1 et UTF-8, sans écart admis
@@ -8815,9 +8811,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     où $\bar E^i$ est la moyenne de $E^i$ sur les cellules \code{defini}
     de la plage du segment (forme $n_x / \bar n$ de la p.~32/40). Une cellule
     de poids nul a $w_x = 0$ sous l'une et l'autre.
-  \item \textbf{Existence et unicité} (preuve écrite). $M$ est une forme
-    quadratique en $g$, de matrice $W + h K^{\mathsf T} K$, semi-définie
-    positive. Le noyau de $K$ est l'ensemble des polynômes en $x$ de degré
+  \item \textbf{Existence et unicité} (preuve écrite). $M$ est une fonction quadratique de $g$, de hessienne $2(W + hK^{\mathsf T}K)$, semi-définie positive. Le noyau de $K$ est l'ensemble des polynômes en $x$ de degré
     au plus $z - 1$. Si un segment compte au moins $z$ cellules de poids
     non nul, un tel polynôme non nul ne peut s'annuler sur toutes (il a au
     plus $z - 1$ racines)~: $g^{\mathsf T}(W + h K^{\mathsf T} K) g > 0$
@@ -8827,7 +8821,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     pas unique~: d'où le refus \code{lissage\_cellules\_insuffisantes}. La
     condition «~au moins $z$ points pivots~» est donnée comme suffisante
     par les Lignes directrices (chap.~3, IV.2.d, p.~33/40)~; elle est ici
-    nécessaire et suffisante.
+    nécessaire et suffisante pour l'unicité du minimum, qui existe toujours ($M$ est quadratique et positive)~; au-dessous de $z$ cellules de poids non nul, les minima forment un sous-espace affine de dimension $z$ moins leur nombre.
   \item \textbf{Conservation} (preuve écrite). Le vecteur constant et, pour
     $z \ge 2$, le vecteur des âges sont dans le noyau de $K$~; les
     équations normales donnent donc
@@ -8899,10 +8893,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     table lissée ne stocke que $q$~; la force se lit par la règle unique du
     moteur, $\mu_x = -\ln(1 - q_x)$, force constante sur l'année d'âge
     (ADR 0017, point~1.3), qui n'est pas l'hypothèse de répartition du
-    \code{binomial} d'entrée. Sous celle-ci, le taux central vaut
-    $q / (1 - q/2) = q + q^2/2 + q^3/4 + O(q^4)$, alors que
-    $-\ln(1 - q) = q + q^2/2 + q^3/3 + O(q^4)$~: les deux taux centraux
-    diffèrent de $q^3/12 + O(q^4)$ (développement en série, exact).
+    \code{binomial} d'entrée. Sous celle-ci, la force est $\mu_{x+t} = q/(1-(1-t)q)$ et le taux central vaut $-q^2/\bigl((1-q)\ln(1-q)\bigr) = q + q^2/2 + 5q^3/12 + O(q^4)$, alors que $-\ln(1-q) = q + q^2/2 + q^3/3 + O(q^4)$~: les deux taux centraux diffèrent de $q^3/12 + O(q^4)$, le premier étant le plus grand (calcul direct et développement en série, exacts~; $q/(1-q/2)$ est le taux central de la répartition uniforme, non de cette hypothèse).
   \item \textbf{Statut} (E2.20~; \code{STATUTS\_LISSAGE}, recopié dans les
     paramètres de l'étape)~: \code{table\_lissee/qx}, résultat exact du
     problème quadratique (minimum unique dès qu'au moins $z$ cellules ont un
@@ -8994,8 +8985,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     fini n'existe, d'où le refus \code{lissage\_interpolation\_deces\_nul}
     (avis d'\code{actuary}, Q4 de l'issue~\#239). Hors de ce cas, le
     document n'établit pas l'existence du maximum pour toutes les données
-    (décès d'un segment à un seul âge extrême, $z = 2$~: l'algorithme ne
-    converge pas, test A6)~; un échec de l'algorithme est refusé
+    (il est des données sans maximum~: sous $z = 2$, si tous les décès d'un segment sont à un âge extrême $x_e$ de la plage, la direction $d_x = -\lvert x - x_e\rvert$, affine sur la plage, de pénalité nulle, nulle où il y a des décès et négative ailleurs, fait croître strictement $\ell_P$ sans maximum atteint~; l'algorithme ne converge pas, test A6 ; condition nécessaire et suffisante d'existence proposée en issue~\#247)~; un échec de l'algorithme est refusé
     (\code{lissage\_non\_convergent}), sans table.
   \item \textbf{Calcul} (\code{lisser\_poisson()}~; Biessy, annexe~D,
     algorithme~1, p.~54~; ADR 0017, point~9.1)~: départ $\theta_0 =
@@ -9124,8 +9114,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     ($S(\hat\theta)$, échelle $\ln\mu$)~: approximation numérique et
     descriptif~; résidus~: nuls à la convergence près.
   \item \textbf{Références}~: G.~Biessy, \emph{Whittaker-Henderson Smoothing
-    Revisited}, arXiv:2306.06932 v5, §~4.1 (vraisemblance pénalisée), §~5.1,
-    p.~15 (degrés de liberté effectifs~; conservation), §~5.4, p.~19 (LAML),
+    Revisited}, arXiv:2306.06932 v5, §~4.1 (vraisemblance pénalisée), §~4.2, p.~15 (conservation des décès, SMR de 100~\%), §~5.1, p.~15 (degrés de liberté effectifs, trace de la matrice chapeau), §~5.4, p.~19 (LAML),
     annexe~D, algorithme~1, p.~54 (section~\ref{sec:references})~; identité
     recopiée dans les paramètres (\code{REFERENCE\_METHODE\_LISSAGE\_POISSON}).
     Le «~WH original~» de la source (lissage de $\ln(D/E^c)$ pondéré par
@@ -10326,7 +10315,7 @@ paramètres estimés sur ces données~:
     tous les choix du module. Les attendus sont ceux de la table lissée,
     $A_c = E^c_c \mu_c$, $\mu_c = -\ln(1 - g_c)$, $g_c$ le taux lissé de la
     cellule (règle unique de la force, ADR 0017, point~1.3), et
-    \textbf{ddl $= n - \sum_{c \in C^{+}} h_c$}, $h_c$ le levier de la
+    \textbf{ddl $= n - \sum_{c \in C^{+}} \mathrm{lev}_c$}, $\mathrm{lev}_c$ le levier de la
     cellule (colonne \code{levier} de la table lissée, section~\ref{sec:lissage-quadratique}),
     somme prise par segment sur les seules cellules retenues, puis sur les
     segments~; quand toute cellule pondérée par le lissage est retenue, il
@@ -10341,11 +10330,7 @@ paramètres estimés sur ces données~:
     (issue~\#239~; ADR 0017, point~5.6~; décision M420, (3))~: un segment
     qui compte exactement $z$ cellules pondérées par le lissage (levier
     $> 0$~; $z$, ordre des différences du lissage), retenues ou non, est
-    interpolé~: le polynôme de degré au plus $z - 1$ qui passe par ses $z$
-    taux bruts annule $F$ et $S$, donc $M$, et il est le minimum unique
-    (section~\ref{sec:lissage-quadratique})~; $g$ coïncide alors avec
-    $\hat q$ sur les cellules pondérées, la matrice de lissage y est
-    l'identité, et chaque levier pondéré vaut~1 en arithmétique exacte.
+    interpolé~: sous~(a), le polynôme de degré au plus $z-1$ qui passe par ses $z$ taux bruts annule $F$ et $S$, donc $M$, et il est le minimum unique (section~\ref{sec:lissage-quadratique})~; sous~(b), celui qui passe par les $\ln(D/E^c)$ de ses $z$ cellules exposées, toutes à décès positifs (sinon refus \code{lissage\_interpolation\_deces\_nul}), annule la pénalité et maximise chaque terme de la vraisemblance (section~\ref{sec:lissage-poisson}). Sous l'une et l'autre, chaque levier pondéré vaut~1 en arithmétique exacte (preuve écrite)~: pour une cellule pondérée $x$, soit $v$ le vecteur des valeurs, aux âges de la plage, du polynôme de degré au plus $z-1$ qui vaut~1 en $x$ et~0 aux $z-1$ autres cellules pondérées~; $Kv = 0$ et $Wv = w_x e_x$ ($W = \operatorname{Diag}(w)$ sous~(a), $\operatorname{Diag}(\hat m)$ sous~(b)), donc $(W + hK^{\mathsf T}K)\,v = w_x e_x$ ($\lambda$ au lieu de $h$ sous~(b)), d'où $v = w_x V e_x$ et $w_x V_{xx} = v_x = 1$.
     Calculée en flottant, la somme de ses leviers retenus s'en écarte de
     l'ordre de l'arrondi, ce qui publiait un ddl voisin de~0, parfois
     négatif. Dans un tel segment, la somme
@@ -10994,7 +10979,7 @@ nulle n'est établie}~; à la différence de la relation \code{positionnee},
 aucun conditionnement ne rend les lois libres du paramètre de lissage.
 Par grandeur~:\par}
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \textbf{S2 et S3}~: ddl $= n - \sum_{c \in C^{+}} h_c$
+  \item \textbf{S2 et S3}~: ddl $= n - \sum_{c \in C^{+}} \mathrm{lev}_c$
     (section~\ref{sec:validation-etape}), réel~; p-valeurs asymptotiques
     sur la loi du khi-deux à ce ddl non entier (\code{pchisq()}, qui
     l'admet), queue supérieure~: \textbf{approximation non établie} ---
@@ -11731,9 +11716,7 @@ x_{\sup}]$~:
     \code{lissage} (ADR 0017, point~10.3)~; toujours sur \code{qx}, jamais
     repris du $S$ de l'étape \code{lissage}, qui porte sur $\ln\mu$
     sous~(b) (ADR 0017, point~13.5)~; mesure comparable seulement entre
-    tables du même segment, sur la même plage et au même $z$~; pour une
-    table lissée par Whittaker-Henderson~(a) au même $z$, fonction non
-    croissante de $h$~;
+    tables du même segment, sur la même plage et au même $z$~; pour une table lissée par Whittaker-Henderson~(a), au même $z$ et sur la plage même du lissage, fonction non croissante de $h$ (résultat exact~: pour $h_1 < h_2$, $(h_2-h_1)\bigl(S(g_{h_2}) - S(g_{h_1})\bigr) \le 0$, en sommant les deux inégalités d'optimalité)~; sur une plage strictement contenue dans celle du lissage, $S_z$ n'est pas monotone en $h$ en général (contre-exemple constaté par \code{actuary})~;
   \item \textbf{C5, régularité à composante exponentielle} (III.1, forme
     de la p.~33)~: avec $a = \Delta^z g$ et $b = \Delta^{z-1} g$ sur les
     $m_z$ mêmes âges, $\hat r = \sum a_x b_x / \sum b_x^2$ (minimum
@@ -12508,7 +12491,7 @@ verdict~; titre et mentions du rapport figé sous les trois
     ddl $= n - \sum_s \nu_s$ quand toute cellule pondérée est retenue, et,
     au cas limite d'une cellule pondérée non retenue (recette
     \code{agregats}, $E^i > 0$, $E^c = 0$), ddl $= n - (\sum_s \nu_s -
-    h_c)$, à $10^{-12}$ près en relatif~; l'interpolation exacte
+    \mathrm{lev}_c)$, à $10^{-12}$ près en relatif~; l'interpolation exacte
     (issue~\#239)~: à $z = 3$, sur 25 configurations (trois cellules
     pondérées par segment, toutes retenues), ddl de $X^2$ et $G^2$
     \code{identical()} à~0, p-valeurs \code{NA}, état
@@ -17694,9 +17677,7 @@ E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, 
     17/09/2025 (\url{https://arxiv.org/pdf/2306.06932v5}~; SHA-256
     \code{1af94c962b3f6b9cc1bc571ccec08856}\allowbreak\code{30454cb52f14b6d43753b8b0ed0b1cdd}~;
     lecture consignée dans \code{docs/recherche/}\allowbreak\code{2026-11-11-biessy-whittaker-henderson.md}),
-    §~4.1 (vraisemblance de Poisson pénalisée), §~5.1, p.~15 (degrés de
-    liberté effectifs, trace de la matrice chapeau~; conservation des
-    décès), §~5.4, p.~19 (LAML), annexe~D, algorithme~1, p.~54 (pages 15,
+    §~4.1 (vraisemblance de Poisson pénalisée), §~4.2, p.~15 (conservation des décès, SMR de 100~\%), §~5.1, p.~15 (degrés de liberté effectifs, trace de la matrice chapeau), §~5.4, p.~19 (LAML), annexe~D, algorithme~1, p.~54 (pages 15,
     19 et 54 relues le 12/11/2026 sur le texte extrait du même PDF)~;
     sections~\ref{sec:lissage-quadratique} et~\ref{sec:lissage-poisson}.\par}
   \item W.~Hoeffding, \emph{Probability inequalities for sums of bounded
