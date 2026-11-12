@@ -261,6 +261,60 @@ local({
                               error = function(e) conditionMessage(e)),
                      tablexp:::deduire_recette(ROLES)))
 })
+# Colonne de rôle de type conforme sous un nom d'encodage bytes, à
+# preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur
+# R ; observations et lignes conservées égales à celles du même jeu sous le
+# nom d'origine. Avant #140, `[[.data.frame` levait « translating strings with
+# "bytes" encoding is not allowed » dans les six lecteurs de colonne locaux
+# (contre-épreuve : ce test échoue sur le code antérieur). Une erreur R est
+# rendue, non propagée. Les trois recettes ; le data.frame est assemblé sans
+# `[[<-` ni `$<-`, qui lèveraient la même erreur.
+local({
+  renomme <- function(d, ancien, nom) {
+    l <- unclass(d); names(l)[names(l) == ancien] <- nom
+    structure(l, class = "data.frame", row.names = seq_len(nrow(d)))
+  }
+  prepare <- function(d, roles, p, segmentation, exclusions = character(0))
+    preparer_donnees(d, roles, p, segmentation, exclusions, tablexp:::controler_roles(d, roles, segmentation))
+  G3 <- D(c("2014-12-31", "2015-12-31", "2016-12-31"))
+  p_ldc <- tablexp:::controler_parametres_donnees(VD, PER, 0, "sexe", character(0))
+  AG <- data.frame(sexe = c("H", "F", "H", "F"), age = c(60L, 60L, 61L, 61L), ec = c(100, 90, 95, 85),
+                   d = c(1, 0, 2, 1), stringsAsFactors = FALSE)
+  ST <- data.frame(id = c("A", "A", "A", "B", "B", "B"),
+                   t = c("inventaire", "inventaire", "inventaire", "inventaire", "inventaire", "evenement"),
+                   di = c(G3, G3[1:2], D(NA)), sx = c("H", "H", "H", "F", "F", "F"),
+                   seg = c("a", "a", "a", "b", "b", "b"),
+                   n = D(c(rep("1950-03-01", 3), rep("1960-07-15", 3))), an = c(rep(1950L, 3), rep(1960L, 3)),
+                   s = D(c(NA, NA, NA, NA, NA, "2016-05-01")), c = c(NA, NA, NA, NA, NA, "deces"),
+                   stringsAsFactors = FALSE)
+  CAS <- list(
+    lignes_dates_completes = list(BASE, ROLES, "sexe", p_ldc),
+    agregats = list(AG, c(sexe = "sexe", age = "age", exposition_centrale = "ec", evenements = "d"), "sexe", p_ldc),
+    stocks_successifs = list(ST, c(id_tete = "id", sexe = "sx", date_naissance = "n", annee_naissance = "an",
+                                   type_ligne = "t", date_inventaire = "di", date_sortie = "s", cause_sortie = "c",
+                                   segment = "seg"),
+                             "segment", tablexp:::valeurs_parametres_donnees(VD, PER, 0, G3)))
+  for (recette in names(CAS)) {
+    k <- CAS[[recette]]
+    ref <- prepare(k[[1L]], k[[2L]], k[[4L]], k[[3L]])
+    for (role in names(k[[2L]])) {
+      x <- tryCatch(prepare(renomme(k[[1L]], k[[2L]][[role]], OCTETS), replace(k[[2L]], role, OCTETS),
+                            k[[4L]], k[[3L]]), error = function(e) e)
+      verifier(sprintf("preparer_donnees, recette %s, colonne du rôle %s sous un nom d'encodage bytes : sans erreur R, observations et lignes conservées égales", recette, role),
+               if (inherits(x, "error")) conditionMessage(x)
+               else identical(x$resultat$observations, ref$resultat$observations) &&
+                 identical(x$resultat$numeros_conserves, ref$resultat$numeros_conserves) &&
+                 identical(x$resultat$observation_des_lignes, ref$resultat$observation_des_lignes))
+    }
+  }
+  # Chemin des exclusions (retrait de lignes d'un data.frame aux noms bytes).
+  d <- BASE; d$sexe[2L] <- NA
+  x <- tryCatch(prepare(renomme(d, "sexe", OCTETS), replace(ROLES, "sexe", OCTETS), p_ldc, "sexe", "sexe_manquant"),
+                error = function(e) e)
+  verifier("preparer_donnees, ligne exclue (sexe_manquant), colonne sexe sous un nom d'encodage bytes : sans erreur R, une ligne exclue, lignes conservées 1, 3, 4",
+           if (inherits(x, "error")) conditionMessage(x)
+           else identical(x$resultat$nombre_lignes_exclues, 1L) && identical(x$resultat$numeros_conserves, c(1L, 3L, 4L)))
+})
 d <- BASE; d$an <- c(1950.5, 1960, 1945, 1945)
 verifier("type incompatible : annee_naissance non entière",
          leve_refus(prep(d = d, roles = c(ROLES, annee_naissance = "an")), "type_incompatible"))

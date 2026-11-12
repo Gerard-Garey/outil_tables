@@ -948,7 +948,7 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lign
                                 any(lignes_tete < 1L | lignes_tete > n)))
     stop(paste("evaluer_motifs() : lignes_tete hors de la forme admise (integer sans attribut, sans NA ni",
                "doublon, dans 1..nrow(donnees)) (erreur de programmation)."), call. = FALSE)
-  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   jours <- function(role) as.numeric(unclass(col(role)))
   nai <- jours("date_naissance"); ent <- jours("date_entree"); sor <- jours("date_sortie")
   cause <- as.character(col("cause_sortie"))
@@ -1066,7 +1066,7 @@ sous_indicer_categorie <- function(x, i) {
 # ligne (1-based, croissants), dans l'ordre MOTIFS_LIGNES_AGREGATS.
 evaluer_motifs_agregats <- function(donnees, roles, p) {
   n <- nrow(donnees)
-  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   vrai <- function(x) !is.na(x) & x
   non_entier <- function(x) !is.na(x) & (!is.finite(x) | x != trunc(x))
   m <- stats::setNames(rep(list(logical(n)), length(MOTIFS_LIGNES_AGREGATS)), MOTIFS_LIGNES_AGREGATS)
@@ -1149,7 +1149,7 @@ TOLERANCE_RELEVES_AGREGATS <- 1e-10
 # portent aucun motif de valeur, leur nombre, Σ D et Σ E par exposition
 # déclarée (NA pour une exposition non déclarée).
 observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, exclusions, n, donnees) {
-  col <- function(role, d = lignes) if (role %in% names(roles)) d[[roles[[role]]]] else NULL
+  col <- function(role, d = lignes) if (role %in% names(roles)) lire_champ(d, roles[[role]]) else NULL
   i <- seq_along(numeros)
   observations <- data.frame(row.names = seq_along(i))
   if ("sexe" %in% names(roles)) observations$sexe <- sous_indicer_categorie(col("sexe"), i)
@@ -1296,7 +1296,7 @@ evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
     stop("evaluer_motifs_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
   grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
   n <- nrow(donnees)
-  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   jours <- function(role) as.numeric(unclass(col(role)))
   vrai <- function(x) !is.na(x) & x
   role_id <- identifiant_stocks(roles)
@@ -1420,7 +1420,7 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
     stop("observations_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
   grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
   role_id <- identifiant_stocks(roles)
-  col <- function(role, d = lignes) if (role %in% names(roles)) d[[roles[[role]]]] else NULL
+  col <- function(role, d = lignes) if (role %in% names(roles)) lire_champ(d, roles[[role]]) else NULL
   id <- col(role_id)
   tl <- as.character(col("type_ligne"))
   inv <- !is.na(tl) & tl == "inventaire"; evt <- !is.na(tl) & tl == "evenement"
@@ -1974,7 +1974,7 @@ avertir_releves_lignes <- function(avert, releves, unite) {
 # unite_observation, observations et observation_des_lignes du résultat de
 # preparer_donnees() ; releves, ses diagnostics$releves.
 construire_observations <- function(lignes, numeros, roles, segmentation, p) {
-  col <- function(role) if (role %in% names(roles)) lignes[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(lignes, roles[[role]]) else NULL
   ent <- as.numeric(unclass(col("date_entree"))); sor <- as.numeric(unclass(col("date_sortie")))
   cause <- as.character(col("cause_sortie"))
   fin <- sor; fin[cause == "en_cours"] <- Inf
