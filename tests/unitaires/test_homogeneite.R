@@ -46,10 +46,10 @@ ligne_test <- function(r, test, variable = NA_character_, debut = NA_integer_) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A ETAPES : homogeneite après positionnement, avant validation (F10), module validation, calculer_homogeneite, préalables donnees et exposition, aléatoire", {
+verifier("A ETAPES : homogeneite après positionnement, avant coherence_regularite (#144) et validation (F10), module validation, calculer_homogeneite, préalables donnees et exposition, aléatoire (rang 6 depuis l'étape lissage, #223)", {
   e <- tablexp:::ETAPES
   k <- match("homogeneite", e$etape)
-  identical(k, 5L) && identical(e$etape[k + c(-1L, 1L)], c("positionnement", "validation")) &&
+  identical(k, 6L) && identical(e$etape[k + c(-1L, 1L, 2L)], c("positionnement", "coherence_regularite", "validation")) &&
     identical(e$module[k], "validation") && identical(e$fonction[k], "calculer_homogeneite") &&
     identical(e$prealable[[k]], c("donnees", "exposition")) && identical(e$aleatoire[k], TRUE)
 })
@@ -699,13 +699,14 @@ section <- function(l, id) {
   d <- match(paste0("<section id=\"", id, "\">"), l)
   if (is.na(d)) character(0) else l[d:(d - 1L + match("</section>", l[d:length(l)]))]
 }
-verifier("H rapport : section etape_homogeneite entre etape_positionnement et etape_validation ; mention fixe ; tables tests et segments", {
+verifier("H rapport : section etape_homogeneite entre etape_positionnement et etape_coherence_regularite (#144), avant etape_validation ; mention fixe ; tables tests et segments", {
   l <- lignes_rapport(X)
   s <- section(l, "etape_homogeneite")
   ids <- sub("^<section id=\"([a-z_]+)\">$", "\\1", grep("^<section id=", l, value = TRUE))
   k <- match("etape_homogeneite", ids)
   m <- tablexp:::MENTIONS_RAPPORT[["homogeneite_portee"]]
-  length(s) > 0L && identical(ids[k + c(-1L, 1L)], c("etape_positionnement", "etape_validation")) &&
+  length(s) > 0L &&
+    identical(ids[k + c(-1L, 1L, 2L)], c("etape_positionnement", "etape_coherence_regularite", "etape_validation")) &&
     any(s == paste0("<p>", m, "</p>")) &&
     any(startsWith(s, "<caption><code>etapes/homogeneite/resultat/tests</code>")) &&
     any(startsWith(s, "<caption><code>etapes/homogeneite/resultat/segments</code>")) &&

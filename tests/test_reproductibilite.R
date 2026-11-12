@@ -16,13 +16,13 @@
 #  (#15) : plan R6 (R1 avec kaplan_meier) identical() hors `execution`,
 #  rejeu de la fiche, même objet dans un autre processus R, invariance du
 #  plan sans kaplan_meier ; non-régression (#17, ADR 0009, points 3.6 à
-#  3.8) : plans R1 à R14 sur l'entrée de chaque plan (jeu_reference(),
-#  jeu_reference_defauts() pour R9, agregats_reference() pour R13,
+#  3.8) : plans R1 à R17 sur l'entrée de chaque plan (jeu_reference(),
+#  jeu_reference_defauts() pour R9, agregats_reference() pour R13 et R17,
 #  stocks_reference() pour R14), aplatis, aller-retour exact du format,
 #  comparés à leur fichier de tests/reference/ (échec attendu renvoyant à
 #  l'issue de création tant que le fichier n'existe pas, liste
-#  SANS_REFERENCE, vide depuis la création de R13 et R14 par B15), aucune référence
-#  orpheline ;
+#  SANS_REFERENCE : R15 à R17 jusqu'à leur création au (R) de B19), aucune
+#  référence orpheline ;
 #  R7 : aucun double sans classe de tolérance, Σd par cellule égale aux
 #  evenements de l'exposition (#32) ; R8 : validation et importance des
 #  exclusions, table importée passée par tables_reference (#166) ; R9 : le
@@ -32,7 +32,9 @@
 #  (#168) ; R12 : le même test sous H0 vraie, transition en_cours -> rachat
 #  (#168, M307) ; R13 : recette agrégats sur la forme agrégats de l'entrée de
 #  référence (#169) ; R14 : recette stocks successifs sur la forme stocks de
-#  l'entrée de référence (#180) ; témoins sur des copies temporaires (jamais sur
+#  l'entrée de référence (#180) ; R15 à R17 : lissage de Whittaker-Henderson
+#  (a) et (b), coherence_regularite et validation de la table lissée (#223,
+#  #225, #144, #224) ; témoins sur des copies temporaires (jamais sur
 #  tests/reference/) ; règles des modes du workflow et lignes de commande
 #  produire_references.R (refus d'appel) et comparer_references.R ;
 #  permutation des lignes de l'entrée de référence
@@ -326,7 +328,7 @@ unlink(c(script, sortie))
 # Non-régression (#17 ; ADR 0009, points 3.6 à 3.8) : chaque plan de
 # référence sur son entrée (champ `entree`, point 4.1), aplati et comparé à son fichier ;
 # témoins sur des copies temporaires.
-fichier_courant("références de non-régression (ADR 0009) : plans R1 à R14, aller-retour, comparaison aux fichiers")
+fichier_courant("références de non-régression (ADR 0009) : plans R1 à R17, aller-retour, comparaison aux fichiers")
 
 # Chargement par parse(encoding = "UTF-8") : littéraux marqués UTF-8 en
 # toute locale (charger_utf8() d'outils_reference.R, recopié ici).
@@ -342,6 +344,11 @@ DOSSIER_REFERENCES <- file.path(RACINE, "tests", "reference")
 # R14 (#180, commit (4c) de B15 ; spécification de #180, § 13) : recette
 # stocks successifs ; créés par le commit de référence (R) de B15, après visa
 # d'actuary (M319), run CI 42637989632 (756fbfe).
+# R15 (#223, #144), R16 et R17 (#225) (B19, claude/lissage-whittaker ;
+# M415) : lissage de Whittaker-Henderson, coherence_regularite et validation
+# de la table lissée ; création au (R) de B19, sur la CI, après visa (issue
+# de création : celle de la méthode de lissage du plan) ; créés par le commit
+# de référence (R) de B19, run CI 43184987915 (e8d7910), visa délégué M420.
 SANS_REFERENCE <- character(0)
 # Transitions en cours (ADR 0009, point 9.5 et troisième annotation du
 # 19/10/2026 ; #47) : liste unique des changements de résultat annoncés dont
@@ -430,6 +437,15 @@ CHEMINS_199 <- list(
     "resultat/segments/observes", "resultat/monte_carlo/jeux/tirages_effectues",
     "diagnostics/evenements_cellules_evenement_sans_exposition", "diagnostics/evenements_hors_plage",
     "diagnostics/evenements_total")))
+# Transition #215 (porteuse claude/lissage-whittaker, commit (2c) ; tournure
+# S5 de #203 des lignes sous_groupes/bornes_exactes, p_valeurs et
+# p_valeurs_asymptotiques de STATUTS_VALIDATION, R8 et R9) close par la
+# régénération (R) de B19 ; transition_215(), utf8_215() et les constantes
+# *_215 retirées.
+# Transitions de la reprise des textes de statut et des mentions (#144,
+# #244, #245, #246 ; avis d'actuary-approfondi du 12/11/2026) closes par la
+# régénération de R15 à R17 (exécution 43203864780) ; transition_textes_245(),
+# utf8_245(), apres_245() et les constantes *_245 retirées.
 TRANSITIONS_EN_COURS <- list()
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
@@ -780,14 +796,16 @@ controler_rapport_fige <- function(x, l, id) {
     e <- c(e, "U21 : rejeu")
   # Étape validation demandée (R8, #166) : le paragraphe « non demandée par le
   # plan » est absent, la section porte la légende des cellules et des
-  # statistiques, et l'étape importance_exclusions a sa section.
+  # statistiques, et l'étape importance_exclusions, si le plan la demande
+  # (R8 à R10 ; pas R15 à R17), a sa section.
   valid <- !is.null(x$etapes$validation)
+  importance <- !is.null(x$etapes$importance_exclusions)
   if (any(grepl("<p>\u00c9tape \u00ab validation \u00bb : non demand\u00e9e par le plan", l, fixed = TRUE)) == valid ||
       !any(grepl("<p>Table finale et comparaisons : non produites par cette version", l, fixed = TRUE))) e <- c(e, "U21 : sections 12 et 13")
   legende <- function(sec, chemin) any(startsWith(section_de(sec), paste0("<caption><code>", chemin, "</code>")))
   if (valid && !(legende("etape_validation", "etapes/validation/resultat/cellules") &&
                  legende("etape_validation", "etapes/validation/resultat/statistiques") &&
-                 legende("etape_importance_exclusions", "etapes/importance_exclusions/resultat/retraits")))
+                 (!importance || legende("etape_importance_exclusions", "etapes/importance_exclusions/resultat/retraits"))))
     e <- c(e, "U21 : sections validation et importance_exclusions")
   # U22 : section brut.
   b <- section_de("etape_brut")
@@ -803,13 +821,14 @@ controler_rapport_fige <- function(x, l, id) {
 
 # Une entrée par plan (`entree`, ADR 0009, point 4.1 amendé), chaque entrée
 # distincte tirée une seule fois ; jeu_ref est l'entrée `reference` (R1 à R8,
-# R10 à R12), que les contrôles propres à un plan de cette entrée
+# R10 à R12, R15, R16), que les contrôles propres à un plan de cette entrée
 # (permutation, R6) lisent.
 entrees_ref <- entrees_des_plans(plans_reference())
 jeu_ref <- entrees_ref[["reference"]]
-verifier("entrées des plans : R1 à R8, R10 à R12 sur `reference`, R9 sur `reference_defauts`, R13 sur `agregats_reference`, R14 sur `stocks_reference` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
+verifier("entrées des plans : R1 à R8, R10 à R12, R15, R16 sur `reference`, R9 sur `reference_defauts`, R13 et R17 sur `agregats_reference`, R14 sur `stocks_reference` ; une entrée tirée par nom distinct ; `reference` identical() à jeu_reference()", {
   e <- unname(vapply(plans_reference(), function(p) p$entree, ""))
-  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L), "agregats_reference", "stocks_reference")
+  attendu <- c(rep("reference", 8L), "reference_defauts", rep("reference", 3L), "agregats_reference", "stocks_reference",
+               rep("reference", 2L), "agregats_reference")
   if (!identical(e, attendu))
     paste0("entrées des plans obtenues (", paste(e, collapse = ", "), ") contre attendues (", paste(attendu, collapse = ", "), ")")
   else if (!identical(names(entrees_ref), c("reference", "reference_defauts", "agregats_reference", "stocks_reference")))
@@ -917,14 +936,17 @@ verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
 })
 # Dénombrements en integer, sans clé (ADR 0009, seconde annotation du
 # 10/11/2026, (e) ; #199) : les 27 clés exactes des chemins de CHEMINS_199
-# sont retirées ; 148 clés, dont 41 exactes, restent.
-verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 148 clés dont 41 exactes (ADR 0009, point 9.6, (e))", {
+# sont retirées ; 148 clés, dont 41 exactes, restaient. Étape (R) de B19
+# (R15 à R17) : 21 clés de l'annotation du 12/11/2026, (e) (6 exactes) et 22
+# clés classées par actuary (13 exactes : 5 échos de lissage et 8 clés de
+# coherence_regularite ; avis du 12/11/2026) : 191 clés, dont 60 exactes.
+verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 191 clés dont 60 exactes (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e))", {
   cles_199 <- sub("^etapes/", "", unlist(CHEMINS_199, use.names = FALSE))
   restantes <- intersect(cles_199, names(TOLERANCES))
   if (length(cles_199) != 27L || anyDuplicated(cles_199)) "CHEMINS_199 : 27 chemins distincts attendus"
   else if (length(restantes)) paste("clés encore présentes :", paste(restantes, collapse = ", "))
-  else if (length(TOLERANCES) != 148L || sum(TOLERANCES == 0) != 41L)
-    sprintf("%d clés dont %d exactes, au lieu de 148 et 41", length(TOLERANCES), sum(TOLERANCES == 0))
+  else if (length(TOLERANCES) != 191L || sum(TOLERANCES == 0) != 60L)
+    sprintf("%d clés dont %d exactes, au lieu de 191 et 60", length(TOLERANCES), sum(TOLERANCES == 0))
   else TRUE
 })
 # Contrôle des types des dénombrements (ADR 0009, point 9.6, (f) ; #199, M396,
@@ -940,6 +962,91 @@ denombrements_non_entiers <- function(g) {
   ch <- names(g$types)
   d <- ch[grepl(MOTIF_DENOMBREMENT, sub("^.*/", "", ch)) & !(ch %in% EXCEPTIONS_DENOMBREMENT)]
   d[g$types[d] != "integer"]
+}
+# Commit préparatoire (1a) de B19 (#223 ; ADR 0017, points 1.5 et 10.1) :
+# apparier_table() appelle grille_plage() (module exposition). Ancien corps
+# d'apparier_table(), recopié de R/positionnement.R à 993068c (garde d'étape
+# retirée, sans effet sur la valeur rendue) : la valeur rendue doit être
+# identical() à celle de l'appel du package (identité exacte).
+apparier_table_993068c <- function(exposition, segmentation, par_annee, table, plage_ages) {
+  cles_seg <- if (length(segmentation))
+    do.call(paste, c(unname(as.list(exposition[segmentation])), list(sep = "\r"))) else rep("", nrow(exposition))
+  premiers <- !duplicated(cles_seg)
+  segments <- exposition[premiers, segmentation, drop = FALSE]
+  rownames(segments) <- NULL
+  g_expo <- match(cles_seg, cles_seg[premiers])
+  n_seg <- sum(premiers)
+  ages <- seq(as.integer(plage_ages[1L]), as.integer(plage_ages[2L]))
+  annees <- if (isTRUE(par_annee)) sort(unique(exposition$annee)) else NA_integer_
+  n_age <- length(ages); n_an <- length(annees)
+  n <- n_seg * n_age * n_an
+  g <- rep(seq_len(n_seg), each = n_age * n_an)
+  cellules <- segments[g, , drop = FALSE]
+  rownames(cellules) <- NULL
+  cellules$age <- rep(rep(ages, each = n_an), times = n_seg)
+  if (isTRUE(par_annee)) cellules$annee <- as.integer(rep(annees, times = n_seg * n_age))
+  dans <- exposition$age >= plage_ages[1L] & exposition$age <= plage_ages[2L]
+  i <- ((g_expo[dans] - 1) * n_age + (exposition$age[dans] - ages[1L])) * n_an +
+    (if (isTRUE(par_annee)) match(exposition$annee[dans], annees) else 1)
+  Ec <- numeric(n); D <- integer(n)
+  Ec[i] <- exposition$exposition_centrale[dans]
+  D[i] <- exposition$evenements[dans]
+  cellules$exposition_centrale <- Ec
+  cellules$evenements <- D
+  sexes <- unique(table$sexe)
+  ensemble <- identical(sexes, "ensemble")
+  sexe_cle <- if (ensemble || !("sexe" %in% segmentation)) rep("ensemble", n) else as.character(cellules$sexe)
+  k <- match(paste(sexe_cle, cellules$age, sep = "\r"), paste(table$sexe, table$age, sep = "\r"))
+  cellules$qx_table <- table$qx[k]
+  list(cellules = cellules, segment = g,
+       hors_plage = list(cellules = sum(!dans), evenements = sum(as.numeric(exposition$evenements[!dans])),
+                         exposition = sum(exposition$exposition_centrale[!dans])),
+       appariement_sexe = if (!("sexe" %in% segmentation)) "sans_sexe"
+                          else if (ensemble) "ensemble_par_sexe" else "par_sexe")
+}
+# `ligne` de grille_plage() : chaque cellule à ligne non NA a les clés, l'âge
+# [, l'année], E^c et D de cette ligne de la table d'exposition ; chaque
+# ligne de la plage est désignée une fois ; une cellule sans ligne a E^c = 0
+# et D = 0. TRUE ou le texte de l'écart.
+controler_ligne_grille <- function(gr, ex, cles, par_annee, plage) {
+  l <- gr$ligne; c_ <- gr$cellules; a <- !is.na(l)
+  dans <- which(ex$age >= plage[1L] & ex$age <= plage[2L])
+  colonnes <- c(cles, "age", if (isTRUE(par_annee)) "annee", "exposition_centrale", "evenements")
+  if (!is.integer(l) || length(l) != nrow(c_)) "ligne : integer de la longueur de la grille attendu"
+  else if (!identical(sort(l[a]), dans)) "lignes désignées différentes des lignes de la plage"
+  else if (!isTRUE(all.equal(c_[a, colonnes], ex[l[a], colonnes], check.attributes = FALSE)) ||
+           !identical(c_$exposition_centrale[a], ex$exposition_centrale[l[a]]) ||
+           !identical(c_$evenements[a], ex$evenements[l[a]])) "cellule différente de sa ligne d'exposition"
+  else if (any(c_$exposition_centrale[!a] != 0) || any(c_$evenements[!a] != 0L)) "cellule sans ligne non nulle"
+  else TRUE
+}
+# Contrat de la table construite (ADR 0017, point 1.2) : table_construite()
+# lève une erreur de programmation (stop(), pas un refus) sur chaque
+# violation, appliquée à la table positionnée d'une construction. TRUE ou le
+# texte de l'écart.
+controler_violations_table_construite <- function(x, segmentation) {
+  et <- x$etapes
+  tp <- et$positionnement$resultat$table_positionnee
+  essai <- function(t) {
+    et$positionnement$resultat$table_positionnee <- t
+    tryCatch({ tablexp:::table_construite(et, segmentation, "positionnement"); "aucune erreur" },
+             refus_tablexp = function(r) "refus au lieu d'une erreur de programmation",
+             error = function(e) if (grepl("erreur de programmation", conditionMessage(e), fixed = TRUE)) "erreur"
+                                 else conditionMessage(e))
+  }
+  attr_en_trop <- tp; attr(attr_en_trop, "source") <- "x"
+  age_double <- tp; age_double$age <- as.double(age_double$age)
+  qx_15 <- tp; qx_15$qx[1L] <- 1.5
+  qx_na <- tp; qx_na$qx[1L] <- NA_real_
+  incomplet <- tp[-nrow(tp), , drop = FALSE]
+  avec_annee <- tp; avec_annee$annee <- 2020L
+  cas <- list(colonne_qx_absente = tp[setdiff(names(tp), "qx")], colonne_age_absente = tp[setdiff(names(tp), "age")],
+              colonne_etat_absente = tp[setdiff(names(tp), "etat")], age_double = age_double, qx_1_5 = qx_15,
+              qx_na = qx_na, segment_incomplet = incomplet, colonne_annee = avec_annee,
+              attribut_en_trop = attr_en_trop)
+  if (length(segmentation)) cas$cle_absente <- tp[setdiff(names(tp), segmentation[1L])]
+  v <- vapply(cas, essai, "")
+  if (all(v == "erreur")) TRUE else paste(sprintf("%s : %s", names(v)[v != "erreur"], v[v != "erreur"]), collapse = " ; ")
 }
 aplatis <- list()
 for (p in plans_reference()) {
@@ -1028,6 +1135,35 @@ for (p in plans_reference()) {
     else if (any(sg$etat == "convolution_au_dela_n_max")) "état convolution_au_dela_n_max"
     else TRUE
   })
+  # Commit préparatoire (1a) de B19 (#223 ; ADR 0017, point 10.1), R1 et R4
+  # (par année) : apparier_table() sur la grille extraite rend un objet
+  # identical() à l'ancien corps (993068c), table de R8, plage 20 à 90 ;
+  # `ligne` de grille_plage() indexe la table d'exposition.
+  if (id %in% c("R1", "R4")) {
+    ex1 <- x_ref$etapes$exposition$resultat$exposition
+    pa1 <- x_ref$etapes$exposition$parametres$par_annee
+    tv1 <- tables_reference_r8()$tv
+    verifier(sprintf("%s : apparier_table() (grille_plage(), module exposition) identical() à l'ancien corps de 993068c (#223, ADR 0017, point 10.1)", id),
+             identical(tablexp:::apparier_table(ex1, p$plan$segmentation, pa1, tv1, c(20, 90), "tv", "validation"),
+                       apparier_table_993068c(ex1, p$plan$segmentation, pa1, tv1, c(20, 90))))
+    verifier(sprintf("%s : grille_plage() : ligne indexe la table d'exposition, cellules sans ligne nulles (#223)", id),
+             controler_ligne_grille(tablexp:::grille_plage(ex1, p$plan$segmentation, pa1, c(20, 90)), ex1,
+                                    p$plan$segmentation, pa1, c(20, 90)))
+  }
+  # Table construite (ADR 0017, points 1.2 et 1.5), R10 et R13 : la table
+  # positionnée tient le contrat (table_construite() la rend telle quelle,
+  # plage du positionnement, ddl_effectifs NULL faute de colonne) ; chaque
+  # violation lève une erreur de programmation.
+  if (id %in% c("R10", "R13")) {
+    verifier(sprintf("%s : table_construite() sur table_positionnee : table rendue identical(), plage_ages du positionnement, ddl_effectifs NULL (#223, ADR 0017, point 1.5)", id), {
+      tc <- tablexp:::table_construite(x_ref$etapes, p$plan$segmentation, "positionnement")
+      identical(names(tc), c("table", "plage_ages", "ddl_effectifs")) &&
+        identical(tc$table, x_ref$etapes$positionnement$resultat$table_positionnee) &&
+        identical(tc$plage_ages, p$plan$etapes$positionnement$plage_ages) && is.null(tc$ddl_effectifs)
+    })
+    verifier(sprintf("%s : table_construite() : colonne absente, age double, qx à 1,5 ou NA, segment incomplet, colonne annee, attribut en trop -> erreur de programmation (#223, ADR 0017, point 1.2)", id),
+             controler_violations_table_construite(x_ref, p$plan$segmentation))
+  }
   # R14 (#180, C6 à l'échelle de l'entrée de référence) : relevés de la
   # construction de référence égaux aux décomptes de l'attribut simulation
   # de son entrée (P0, E, ES par cause, présents au dernier inventaire) ;
@@ -1369,7 +1505,7 @@ verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, to
   l <- imprimer_comparaison(r)
   e <- r$grandeurs[r$grandeurs$chemin == P_TAUX, ]
   sum(grepl("Écart relatif maximal, classe", l, fixed = TRUE, useBytes = TRUE)) == length(CLASSES_TOLERANCE) &&
-    length(CLASSES_TOLERANCE) == 4L &&
+    length(CLASSES_TOLERANCE) == 5L &&
     any(grepl(sprintf("%s | 149 | 1 | ", P_TAUX), l, fixed = TRUE, useBytes = TRUE)) &&
     any(grepl(sprintf("| %s | %s | 1e-14 | écart", e$avant, e$apres), l, fixed = TRUE, useBytes = TRUE)) &&
     identical(e$avant, sprintf("%.17g", avant$valeurs[[P_TAUX]][e$position])) &&
@@ -2617,9 +2753,19 @@ local({
 
 local({
   cn <- function(p) tablexp:::canoniser_plan(p, tablexp:::CHAMPS_PLAN, tablexp:::PARAMETRES_ETAPES, tablexp:::ordres_canoniques())
+  # Exception unique : R15 déclare ordres = c(3, 2, 1), non trié exprès
+  # (consigne d'actuary, étape (R) de B19), pour épingler la canonisation par
+  # tri croissant (TRI_NUMERIQUE ; #144) : canoniser_plan() ne change que ce
+  # paramètre, rendu c(1, 2, 3).
   for (id in names(plans_reference())) {
     p <- plans_reference()[[id]]$plan
-    verifier(sprintf("%s : plan de référence déjà canonique (canoniser_plan() le rend identical())", id), identical(cn(p), p))
+    if (id == "R15") {
+      q <- p
+      q$etapes$coherence_regularite$ordres <- c(1, 2, 3)
+      verifier("R15 : plan de référence canonique hors ordres déclaré c(3, 2, 1), que canoniser_plan() trie en c(1, 2, 3) (TRI_NUMERIQUE, #144)",
+               identical(p$etapes$coherence_regularite$ordres, c(3, 2, 1)) && identical(cn(p), q) && identical(cn(q), q))
+    } else
+      verifier(sprintf("%s : plan de référence déjà canonique (canoniser_plan() le rend identical())", id), identical(cn(p), p))
   }
   ch <- list(chemin = "s/n", nature = "ajout", type = "integer", longueur = 1L)
   t <- function(issue, plans) list(issue = issue, plans = plans, changements = list(ch))
@@ -2631,13 +2777,13 @@ local({
 })
 
 
-# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R14 ---
+# --- sérialisation (#50 ; ADR 0011, points 6.4 et 12) : plans et fiches de R1 à R17 ---
 
 # Aller-retour texte <-> objet identical() du plan et de la fiche ; rejeu
 # construire_table() sur le plan relu de la fiche écrite, identical() hors
 # execution à l'objet comparé aux références ci-dessus (même entrée, même
 # plan) ; le plan relu passe par valider_plan() (ADR 0011, point 9.2).
-fichier_courant("sérialisation (#50) : plans et fiches de R1 à R14, aller-retour identical(), rejeu depuis le texte")
+fichier_courant("sérialisation (#50) : plans et fiches de R1 à R17, aller-retour identical(), rejeu depuis le texte")
 local({
   for (p in plans_reference()) {
     id <- p$identifiant

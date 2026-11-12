@@ -872,6 +872,12 @@ empreinte_sources <- function(racine) {
 # statut le dit (STATUT_CODE_INTROUVABLE).
 EMPREINTE_CODE <- empreinte_sources(".")
 
+# Marque d'un champ ensemble d'entiers en double dans la liste `ordres` de
+# canoniser_plan() (paramètre `ordres` de l'étape coherence_regularite, #144 ;
+# ADR 0017, point 13.2) : valeurs triées par ordre croissant, au lieu de
+# l'ordre d'un catalogue (aucun catalogue de valeurs ne la contient).
+TRI_NUMERIQUE <- "tri_numerique"
+
 # Plan canonique (ADR 0011, point 5.1 ; #42 ; quatrième annotation du
 # 20/10/2026, #63), à partir d'un plan validé par valider_plan() ; `champs`,
 # `parametres` et `ordres` sont CHAMPS_PLAN, PARAMETRES_ETAPES et les vecteurs
@@ -880,11 +886,17 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # de `champs` ; transition (depart, arrivee) ; periode (debut, fin) ; étapes
 # dans l'ordre reçu (imposé par valider_plan()), paramètres de chaque étape
 # dans l'ordre de parametres[[étape]]$parametre restreint aux paramètres
-# présents (un paramètre conditionnel à la recette, colonne `recette` non
-# NA, peut manquer : sa présence selon la recette est contrôlée après la
-# canonisation ; ADR 0011, annotation du 08/11/2026, (b) 3) ; valeurs des champs ensembles
+# présents (un paramètre conditionnel, à la recette, colonne `recette` non
+# NA, ou à la valeur d'un gouvernant, colonne `selon` non NA, peut manquer :
+# sa présence selon la recette est contrôlée après la canonisation, selon la
+# valeur d'un gouvernant par valider_plan() ; ADR 0011, annotation du
+# 08/11/2026, (b) 3 ; ADR 0017, point 3.2) ; valeurs des champs ensembles
 # dans l'ordre de `ordres`, liste nommée par le chemin du champ dans le plan
 # (« segmentation », « etapes/donnees/exclusions », « etapes/brut/estimateurs ») ;
+# un élément égal à TRI_NUMERIQUE (« etapes/coherence_regularite/ordres »,
+# #144) : valeurs double triées par ordre croissant (un autre type, un NA, une
+# valeur non finie, un doublon ou un attribut sont une erreur de
+# programmation) ;
 # un chemin dont l'étape est absente du plan n'a rien à canoniser ; une valeur
 # hors du vecteur d'ordre, un doublon ou un attribut sont une erreur de
 # programmation, jamais une valeur retirée en silence ; toute autre valeur
@@ -898,7 +910,7 @@ EMPREINTE_CODE <- empreinte_sources(".")
 # .Machine$integer.max ; domaine de graine_invalide, #61) -> integer. Un
 # autre stockage, une étape absente de `parametres` ou en double, aux noms
 # de paramètres en double, hors du catalogue de l'étape ou sans l'un de ses
-# paramètres sans recette, sont une erreur de
+# paramètres sans condition (ADR 0017, point 3.2), sont une erreur de
 # programmation (le plan n'a pas été validé ; un nom en double serait sinon
 # réduit en silence à sa première occurrence, #42). Idempotente : un plan
 # canonique est rendu identical(). Ce n'est pas un plan résolu (point 5.2 :
@@ -929,7 +941,8 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
   for (n in names(e))
     if (is.null(parametres[[n]]) || anyDuplicated(names(e[[n]])) ||
         !all(names(e[[n]]) %in% parametres[[n]]$parametre) ||
-        !all(parametres[[n]]$parametre[is.na(parametres[[n]]$recette)] %in% names(e[[n]])))
+        !all(parametres[[n]]$parametre[is.na(parametres[[n]]$recette) & is.na(parametres[[n]]$selon)] %in%
+               names(e[[n]])))
       non_canonique(sprintf("etapes$%s", n))
   p[["etapes"]] <- stats::setNames(lapply(names(e), function(n)
     e[[n]][parametres[[n]]$parametre[parametres[[n]]$parametre %in% names(e[[n]])]]), names(e))
@@ -942,6 +955,12 @@ canoniser_plan <- function(plan, champs, parametres, ordres) {
       return(q)
     }
     x <- q[[cle]]
+    if (identical(o, TRI_NUMERIQUE)) {
+      if (!is.double(x) || !is.null(attributes(x)) || anyNA(x) || !all(is.finite(x)) || anyDuplicated(x))
+        non_canonique(chemin)
+      q[[cle]] <- x[order(x, method = "radix")]
+      return(q)
+    }
     if (!is.character(x) || !is.null(attributes(x)) || anyNA(x) || anyDuplicated(x) || !all(x %in% o))
       non_canonique(chemin)
     q[[cle]] <- o[o %in% x]
@@ -1652,9 +1671,9 @@ lire_fiche <- function(octets) {
 # concordance des sections `etape` avec ETAPES$etape est un test.
 SECTIONS_RAPPORT <- data.frame(
   section = c("lecture", "identification", "alea", "donnees_recues", "plan", "fiche_hypotheses",
-              "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements",
-              "etape_positionnement", "etape_homogeneite", "etape_validation", "etape_importance_exclusions",
-              "table_finale", "rejeu"),
+              "etape_donnees", "etape_exposition", "etape_brut", "suffisance", "avertissements", "etape_lissage",
+              "etape_positionnement", "etape_homogeneite", "etape_coherence_regularite", "etape_validation",
+              "etape_importance_exclusions", "table_finale", "rejeu"),
   titre = texte_moteur(c(
     "Lecture du rapport",
     "Identification : empreintes, versions et plateforme",
@@ -1667,16 +1686,19 @@ SECTIONS_RAPPORT <- data.frame(
     "Étape brut : taux bruts et intervalles",
     "Indicateurs de suffisance",
     "Avertissements",
+    "Étape lissage : lissage de Whittaker-Henderson et table lissée",
     "Étape positionnement : positionnement par SMR sur une table de référence et table positionnée",
     "Étape homogeneite : test d'homogénéité entre segments (tests du score conditionnels aux décès de chaque strate)",
+    paste("Étape coherence_regularite : cohérence des taux et régularité de la table construite (Lignes directrices,",
+          "chap. 4, II et III.1)"),
     "Étape validation : statistiques de validation de la table de référence prise telle quelle",
     "Étape importance_exclusions : importance des exclusions (volumes, événements, exposition et SMR des lignes exclues)",
     "Table finale et comparaisons",
     "Rejeu")),
   nature = c("texte", "objet", "objet", "objet", "objet", "objet", "etape", "etape", "etape", "renvoi",
-             "objet", "etape", "etape", "etape", "etape", "non_produite", "texte"),
-  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "positionnement", "homogeneite",
-            "validation", "importance_exclusions", NA, NA),
+             "objet", "etape", "etape", "etape", "etape", "etape", "etape", "non_produite", "texte"),
+  etape = c(NA, NA, NA, NA, NA, NA, "donnees", "exposition", "brut", NA, NA, "lissage", "positionnement",
+            "homogeneite", "coherence_regularite", "validation", "importance_exclusions", NA, NA),
   racines = I(list(
     character(0),
     c("fiche/version_fiche", "fiche/empreintes", "fiche/versions", "fiche/plateforme"),
@@ -1692,8 +1714,10 @@ SECTIONS_RAPPORT <- data.frame(
     "etapes/brut",
     character(0),
     "avertissements",
+    "etapes/lissage",
     "etapes/positionnement",
     "etapes/homogeneite",
+    "etapes/coherence_regularite",
     "etapes/validation",
     "etapes/importance_exclusions",
     "table",
@@ -1701,7 +1725,8 @@ SECTIONS_RAPPORT <- data.frame(
   renvois = I(list(
     character(0), character(0), character(0), character(0), character(0), character(0), character(0),
     character(0), character(0), c("etapes/exposition/resultat/exposition", "etapes/brut/resultat"),
-    character(0), character(0), character(0), character(0), character(0), character(0), character(0))),
+    character(0), character(0), character(0), character(0), character(0), character(0), character(0),
+    character(0), character(0))),
   stringsAsFactors = FALSE)
 
 # Tables dont le volume croît avec la base : chemin, type et dimension (lus
@@ -1770,6 +1795,43 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   etape_absente_1 = "Étape « ",
   etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
   etape_absente_3 = " absent de l'objet).",
+  # Section etape_lissage (#223 ; spécification de forme (0')(b)
+  # d'actuary-approfondi, § 5) : mentions de la méthode wh_quadratique ;
+  # aucune mention d'unité (amendement d'actuary du 11/11/2026, point 6).
+  lissage_quadratique = paste(
+    "Lissage de Whittaker-Henderson, critère quadratique (etapes/lissage/parametres/methode = wh_quadratique) :",
+    "par segment, g minimise M = F + h S, F = somme des w_x (g_x - q^_x)^2, S = somme des (Delta^z g_x)^2, sur la",
+    "plage d'âges déclarée, q^ estimateur binomial de l'étape brut (Lignes directrices, chap. 3, IV.2.a).",
+    "parametre_lissage est h, déclaré ; aucun critère de choix de h n'est donné par la source. Les cellules de",
+    "poids nul (état interpolee) sont interpolées ; aucune extrapolation hors de la plage."),
+  lissage_conservation = paste(
+    "Sous la pondération exposition, somme des E^i g = somme des D exactement, et somme des x E^i g = somme des",
+    "x D pour z >= 2 seulement (la seconde identité, énoncée sans condition par les Lignes directrices, p. 32-33,",
+    "est fausse pour z = 1) ; résidus dans etapes/lissage/resultat/segments. Sous la pondération uniforme, aucune",
+    "conservation des décès."),
+  # Méthode wh_poisson (#225 ; spécification de forme (0')(b), § 3) : mêmes
+  # éléments, règle « lambda » (mention lissage_echelle reprise).
+  lissage_poisson = paste(
+    "Lissage de Whittaker-Henderson, vraisemblance de Poisson pénalisée (etapes/lissage/parametres/methode =",
+    "wh_poisson) : par segment, theta = ln mu maximise l_P(theta) = somme des [D_x theta_x - E^c_x exp(theta_x)] -",
+    "lambda S / 2, S = somme des (Delta^z theta_x)^2, sur la plage d'âges déclarée, D et E^c statistiques de",
+    "l'estimateur poisson de l'étape brut (G. Biessy, « Whittaker-Henderson Smoothing Revisited », § 4.1),",
+    "calculé par l'algorithme itératif de la source (annexe D, algorithme 1), complété de règles non tirées de la",
+    "source ; q = 1 - exp(-exp(theta)). parametre_lissage est lambda, déclaré (critere_lissage = declare) ou",
+    "choisi comme maximiseur local de la LAML, approximation de Laplace de la vraisemblance marginale",
+    "(critere_lissage = laml ; § 5.4), sur l'intervalle déclaré intervalle_lissage (grille de ln lambda, puis",
+    "méthode de Brent si le meilleur point de la grille est intérieur ; état lambda_a_la_borne si c'est une",
+    "borne, lambda retenu étant alors la borne déclarée, sans recherche de Brent). Bornes de",
+    "crédibilité : intervalles bayésiens asymptotiques, conditionnels au paramètre de lissage retenu, qui ne sont",
+    "pas des intervalles de confiance (couverture fréquentiste non établie). Les cellules sans exposition",
+    "(état interpolee) sont interpolées ; aucune extrapolation hors de la plage ; constantes numériques et règles",
+    "non tirées de la source dans etapes/lissage/parametres (constantes, hypothese)."),
+  lissage_conservation_poisson = paste(
+    "Somme des E^c mu^ = somme des D (SMR = 1) par l'équation du score, et somme des x E^c mu^ = somme des x D",
+    "pour z >= 2, à la convergence de l'algorithme près ; résidus dans etapes/lissage/resultat/segments."),
+  lissage_echelle = paste(
+    "parametre_lissage est h (pénalité sur q) sous wh_quadratique et lambda (pénalité sur ln mu) sous wh_poisson :",
+    "grandeurs d'échelles différentes, jamais comparables d'une méthode à l'autre."),
   # Section etape_positionnement (#167 ; spécification d'actuary-approfondi,
   # § 7, textes acceptés sans lecture de regulatory, M289, Q7 ; notation de la
   # section validation : theta, q~, somme) ; la mention
@@ -1800,6 +1862,25 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "de l'autre variable (par variable de segmentation conditionnellement à l'autre). Diagnostic sans verdict ni seuil : un test non significatif n'établit pas l'homogénéité, surtout",
     "sur une base modeste ; la décision de regrouper reste à l'utilisateur et se déclare par la segmentation du",
     "plan. Aucune correction de multiplicité."),
+  # Section etape_coherence_regularite (#144 ; spécification de forme, § 3 :
+  # texte de portée du § 5 de la spécification, D8 ; comparaison aux tables
+  # de référence, choix de l'outil non attribué à la p. 36, M415 ; mention de
+  # convention).
+  coherence_portee = paste(
+    "Pour les critères de régularité et de fidélité, les Lignes directrices écrivent : « sauf erreur de construction",
+    "manifeste, les résultats de ces tests ne permettront pas de rejeter la table construite, ils donneront, en",
+    "revanche, des éléments d'appréciation de sa qualité » (chap. 4, III, p. 38). Pour la cohérence des taux, elles",
+    "prescrivent la vérification (« il faut », chap. 4, II, p. 36-37) sans règle de rejet ; pour l'ordre entre",
+    "segments, un défaut appelle à « rechercher des explications » (II.3, p. 37). L'outil restitue les valeurs et les",
+    "âges où une inégalité n'est pas vérifiée, sans verdict ni seuil ; l'appréciation revient à l'actuaire."),
+  coherence_comparaison = paste(
+    "Les tables de référence désignées sont évaluées côte à côte, par choix de l'outil ; la comparaison n'est pas",
+    "prescrite par les Lignes directrices."),
+  coherence_convention = paste(
+    "Convention d'âge de chaque table évaluée (etapes/coherence_regularite/parametres/tables, colonne",
+    "convention_age) : pour la table construite, la convention retenue de l'étape exposition ; pour une table de",
+    "référence, non portée par l'objet table_reference, qui n'a pas de champ de convention d'âge : la vérifier dans",
+    "sa source (colonne source)."),
   # Section etape_validation (#4 ; M258 : textes acceptés ; ADR 0012, seconde
   # annotation du 06/11/2026, (b)). Première phrase de validation_sans_verdict
   # (validation_sans_verdict_table) conditionnelle à la relation (#167,
@@ -1835,6 +1916,19 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "sont produits pour lui. Les lois sous H0 sont prises conditionnellement aux décès observés de chaque segment",
     "(binomiale par cellule ou sous-groupe, multinomiale pour les réplications de Monte-Carlo), qui ne dépendent",
     "pas de theta."),
+  # Relation lissee (#224, spécification de forme, § 4).
+  validation_lissee = paste(
+    "Relation « lissee » : la table validée est la table lissée de cette construction (étape lissage), estimée",
+    "sur ces mêmes cellules ; ses degrés de liberté effectifs nu_s (etapes/validation/parametres/ddl_effectifs) ne",
+    "sont en général pas entiers. Les p asymptotiques de X² et G² sont calculées à n - somme des leviers des cellules",
+    "retenues degrés de liberté (colonne levier de la table lissée ; par segment, ddl_effectifs_retenus ; = n -",
+    "somme des nu_s en arithmétique exacte, quand toute cellule pondérée par le lissage est retenue), au statut",
+    "d'approximation non",
+    "établie ; le SMR et les sous-groupes sont descriptifs. Dans un segment qui compte exactement z cellules",
+    "pondérées (z ordre des différences du lissage), le lissage interpole : la somme de ses leviers retenus est posée au nombre de ses cellules retenues",
+    "pondérées, et sa contribution au ddl est le nombre exact de ses cellules retenues non pondérées (0 si toutes",
+    "sont pondérées) ; colonne interpolation_exacte. Si le ddl vaut 0, les p ne sont pas produites",
+    "(contraint_par_lissage)."),
   validation_h0 = paste(
     "Hypothèse nulle : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec",
     "l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c aléatoire)."),
@@ -1847,10 +1941,28 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "des cellules retenues du segment suivent la loi multinomiale (O_s ; pi_c), pi_c = A_c / A_s, libre de",
     "theta_s : exacte avec l'exposition centrale E^c tenue pour fixe, asymptotique sous le modèle de survie (E^c",
     "aléatoire)."),
+  # Hypothèse nulle sous la relation lissee : texte de
+  # HYPOTHESE_VALIDATION_LISSEE (module validation ; #224, spécification de
+  # forme, § 4), recopié ici (R/rapport.R est évalué avant R/validation.R à
+  # l'installation) ; égalité gardée par tests/unitaires/test_validation_lissee.R.
+  validation_h0_lissee = paste(
+    "Aucune loi exacte sous hypothèse nulle : A_c = E^c_c mu_c, mu_c = -ln(1 - g_c), g_c taux de la table lissée de",
+    "cette construction, ajustée sur ces décès (nu_s degrés de liberté effectifs par segment) ; seules sont produites",
+    "les p asymptotiques de X2 et G2 à n - somme des leviers des cellules retenues degrés de liberté (= n - somme des",
+    "nu_s en arithmétique exacte, quand toute cellule pondérée par le lissage est retenue) et les p des signes, des suites et de Wilcoxon",
+    "sous leurs hypothèses propres, au statut d'approximation non établie ; unités d'observation",
+    "indépendantes ; cellule [x, x+1) de la convention dernier_anniversaire."),
   validation_hypotheses_tests = paste(
     "Les p-valeurs asymptotiques et exactes des signes, des suites et de Wilcoxon reposent sur une hypothèse",
     "qui n'est pas H0 (i) (colonne statut) ; seules les p-valeurs de Monte-Carlo ont un niveau garanti sous",
     "H0 (i)."),
+  # Hypothèses des tests sous la relation lissee, à la place de
+  # validation_hypotheses_tests (#245, b ; avis d'actuary du 12/11/2026).
+  validation_hypotheses_tests_lissee = paste(
+    "Sous la relation « lissee », aucune p-valeur n'a de niveau établi, la table étant ajustée sur ces mêmes décès :",
+    "ni les p-valeurs asymptotiques de X² et G², ni les p-valeurs asymptotiques et exactes des signes, des suites",
+    "et de Wilcoxon, calculées sous leurs hypothèses propres (colonne statut) ; aucune p-valeur de Monte-Carlo",
+    "n'est produite."),
   validation_multiplicite = paste(
     "Aucune correction de multiplicité : chaque p-valeur (statistiques et sous-groupes) est marginale ; sous H0,",
     "la probabilité qu'au moins une de ces p-valeurs soit petite croît avec leur nombre."),
@@ -1874,6 +1986,10 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "etapes/validation/resultat/monte_carlo/tirages_effectues. Niveau exact conditionnellement aux O_s, quel que",
     "soit theta : P_H0(p_MC <= alpha) <= alpha. Erreur de Monte-Carlo e = sqrt(B p_MC (1 - p_MC)) / (B + 1),",
     "due au nombre fini de réplications, distincte de l'erreur d'estimation."),
+  # Monte-Carlo sous la relation lissee (#224, spécification de forme, § 4).
+  validation_monte_carlo_lissee = paste(
+    "Aucune p-valeur de Monte-Carlo : sous la relation « lissee », une réplication devrait réajuster la table",
+    "lissée ; aucun tirage n'est effectué (etapes/validation/resultat/monte_carlo/tirages_effectues = 0)."),
   validation_reference = paste(
     "Référence de méthode : etapes/validation/parametres/reference_methode (référence de place) ; statistiques",
     "sous leur forme usuelle, écarts à la note documentés ; le statut de chaque grandeur est dans la colonne",
@@ -1903,6 +2019,8 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "Étape validation : statistiques de validation de la table de référence ajustée hors de l'outil"),
   titre_validation_positionnee = paste(
     "Étape validation : statistiques de validation de la table positionnée de cette construction"),
+  titre_validation_lissee = paste(
+    "Étape validation : statistiques de validation de la table lissée de cette construction"),
   # Section etape_importance_exclusions (#69) : texte arrêté par le mainteneur
   # le 06/11/2026 (M259), sans citation de texte réglementaire ; la mention
   # validation_unite_contrat y est reprise sous la même condition (décision
@@ -2286,28 +2404,48 @@ corps_section <- function(x, k) {
       # omise, mentions validation_positionnee et validation_h0_positionnee
       # (C2), multiplicité, hypothèses des tests et Monte-Carlo multinomial ;
       # sous les deux autres, première phrase selon la présence de l'étape
-      # positionnement (décision du mainteneur du 08/11/2026).
+      # positionnement (décision du mainteneur du 08/11/2026). Sous lissee,
+      # hypothèses des tests par validation_hypotheses_tests_lissee (#245, b).
       pv <- x[["etapes"]][["validation"]][["parametres"]]
       table_prise <- if ("positionnement" %in% etapes) "validation_sans_verdict_table_positionnement"
                      else "validation_sans_verdict_table"
       sans_verdict <- paragraphe(m[[table_prise]], " ", m[["validation_sans_verdict"]])
       r <- switch(relation_lue(pv[["relation_table"]]),
         independante = list(verdict = sans_verdict, relation = "validation_independante", h0 = "validation_h0",
-                            tests = TRUE, mc = "validation_monte_carlo"),
+                            tests = TRUE, hyp = "validation_hypotheses_tests", mc = "validation_monte_carlo"),
         ajustee_hors_outil = list(verdict = sans_verdict, relation = "validation_ajustee", h0 = "validation_h0",
                                   tests = FALSE, mc = NULL),
         positionnee = list(verdict = paragraphe(m[["validation_sans_verdict"]]), relation = "validation_positionnee",
-                           h0 = "validation_h0_positionnee", tests = TRUE, mc = "validation_monte_carlo_positionnee"),
+                           h0 = "validation_h0_positionnee", tests = TRUE, hyp = "validation_hypotheses_tests",
+                           mc = "validation_monte_carlo_positionnee"),
+        lissee = list(verdict = paragraphe(m[["validation_sans_verdict"]]), relation = "validation_lissee",
+                      h0 = "validation_h0_lissee", tests = TRUE, hyp = "validation_hypotheses_tests_lissee",
+                      mc = "validation_monte_carlo_lissee"),
         stop("corps_section() : relation de l'étape validation sans mentions (erreur de programmation).", call. = FALSE))
       return(c(r$verdict,
                paragraphe(m[[r$relation]]),
                paragraphe(m[[r$h0]]),
-               if (r$tests) paragraphe(m[["validation_hypotheses_tests"]]),
+               if (r$tests) paragraphe(m[[r$hyp]]),
                mention_unite(x),
                if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
                if (r$tests) c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[[r$mc]])),
                paragraphe(m[["validation_reference"]]),
                lignes_racines(x, racines)))
+    }
+    if (identical(e, "lissage")) {
+      # Étape lissage : mentions de la méthode (#223, spécification de forme,
+      # § 5) ; aucune mention d'unité sous wh_quadratique (g fonction
+      # déterministe de q^, sans test ni intervalle ; amendement d'actuary du
+      # 11/11/2026, point 6). Une méthode sans mentions est une erreur de
+      # programmation.
+      methode <- x[["etapes"]][["lissage"]][["parametres"]][["methode"]]
+      mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
+        wh_quadratique = c(paragraphe(m[["lissage_quadratique"]]), paragraphe(m[["lissage_conservation"]]),
+                           paragraphe(m[["lissage_echelle"]])),
+        wh_poisson = c(paragraphe(m[["lissage_poisson"]]), paragraphe(m[["lissage_conservation_poisson"]]),
+                       paragraphe(m[["lissage_echelle"]])),
+        stop("corps_section() : méthode de lissage sans mentions (erreur de programmation).", call. = FALSE))
+      return(c(mentions, lignes_racines(x, racines)))
     }
     if (identical(e, "positionnement")) {
       # Étape positionnement : mentions fixes (#167, M289, Q7), puis mention
@@ -2328,6 +2466,13 @@ corps_section <- function(x, k) {
       # mention d'unité contrat sous la même condition que l'étape validation.
       return(c(paragraphe(m[["homogeneite_portee"]]),
                mention_unite(x),
+               lignes_racines(x, racines)))
+    }
+    if (identical(e, "coherence_regularite")) {
+      # Étape coherence_regularite : mentions fixes (#144, spécification de
+      # forme, § 3), sans mention d'unité (aucune observation lue).
+      return(c(paragraphe(m[["coherence_portee"]]), paragraphe(m[["coherence_comparaison"]]),
+               paragraphe(m[["coherence_convention"]]),
                lignes_racines(x, racines)))
     }
     if (identical(e, "importance_exclusions")) {
@@ -2373,6 +2518,7 @@ titre_section <- function(x, k) {
   switch(relation_lue(x[["etapes"]][["validation"]][["parametres"]][["relation_table"]]),
          independante = t, ajustee_hors_outil = MENTIONS_RAPPORT[["titre_validation_ajustee"]],
          positionnee = MENTIONS_RAPPORT[["titre_validation_positionnee"]],
+         lissee = MENTIONS_RAPPORT[["titre_validation_lissee"]],
          stop("titre_section() : relation de l'étape validation sans titre (erreur de programmation).", call. = FALSE))
 }
 

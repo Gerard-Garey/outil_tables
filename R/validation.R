@@ -8,7 +8,8 @@
 #  (p = 1 par segment, relation `positionnee` ; #167, spécification
 #  d'actuary-approfondi, § 8, M289 ; avis de forme (0''), F3, F5, F9, M292) ;
 #  étape `homogeneite`, test d'homogénéité entre segments (#168 ; avis de
-#  forme (0''), F10, F11)
+#  forme (0''), F10, F11) ; étape `coherence_regularite`, cohérence des taux
+#  et régularité de la table construite (#144 ; ADR 0017, point 13)
 #
 #  - controler_tranches_age(), controler_replications() : forme des tranches
 #    d'âge et du nombre de réplications, sous le module de l'étape appelante
@@ -16,13 +17,17 @@
 #  - controler_parametres_validation() : paramètres de l'étape (clé de table,
 #    relation table / observations, plage d'âges, tranches, niveau,
 #    réplications) ; appelée par valider_plan() seule (#82) ;
+#    controler_relation_table() : forme et domaine du gouvernant
+#    relation_table (#224), appelée par valider_plan() avant la présence des
+#    paramètres conditionnels et par controler_parametres_validation() ;
 #  - statistiques_test() : statistiques des tests de Monte-Carlo (X2, G2,
 #    signes, runs, Wilcoxon) sur une matrice de décès (une colonne par jeu) :
 #    observé et répliques passent par la même fonction ;
 #  - loi_runs(), wilcoxon_rangs(), probabilite_hors(),
 #    probabilite_hors_binomiale() : briques exactes et asymptotiques ;
 #  - statuts_validation() : statuts des grandeurs selon la relation
-#    (STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE) ;
+#    (STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE,
+#    STATUTS_VALIDATION_LISSEE) ;
 #  - replications_poisson() et replications_multinomiales() (sous
 #    sous_graine()), pvaleur_monte_carlo() ;
 #  - loi_somme_binomiales() : loi d'une somme de binomiales indépendantes
@@ -31,8 +36,8 @@
 #    (approximation normale, correction de continuité ; #178) ;
 #  - statistiques_validation() : S1 à S12 sur les cellules (cœur partagé avec
 #    #69 et le futur suivre_experience(), ADR 0015, point 7.5) ;
-#  - sous_groupes_validation(), sous_groupes_positionnee() : S5 par
-#    regroupement ;
+#  - sous_groupes_validation(), sous_groupes_positionnee(),
+#    segments_complets() : S5 par regroupement ;
 #  - calculer_validation() : fonction d'étape `validation` ;
 #  - controler_parametres_homogeneite() : paramètres de l'étape
 #    `homogeneite` ; appelée par valider_plan() seule ;
@@ -40,6 +45,12 @@
 #    score conditionnels aux décès de chaque strate (U, V, ddl, statistique
 #    des répliques), p-valeur exacte à deux groupes ;
 #  - calculer_homogeneite() : fonction d'étape `homogeneite` (#168) ;
+#  - controler_parametres_coherence_regularite() : paramètres de l'étape
+#    `coherence_regularite` ; appelée par valider_plan() seule ;
+#    controler_entrees_coherence_regularite() : contrôle d'entrée de chaque
+#    table de référence évaluée, appelé par controler_entrees() ;
+#  - calculer_coherence_regularite() : fonction d'étape
+#    `coherence_regularite` (#144) ;
 #  - classe_motifs(), classer_lignes_exclues() : classes des motifs et des
 #    lignes exclues (mesurable, non calculable faute de clé, non mesurable),
 #    seule source des ensembles S (#69) ;
@@ -54,26 +65,38 @@
 #  de la table ; mu~ = -log1p(-q~) ; A = E^c mu~ (A = 0 si E^c = 0, même pour
 #  q~ = 1) ; C+ = {A > 0} ; r = D - A ; mu^ = D / E^c (taux_poisson(), module
 #  brut) ; alpha = 1 - niveau. H0 (i) : D_c ~ Poisson(A_c) indépendants ;
-#  exacte avec E^c fixe, asymptotique sous le modèle de survie. p = 0
-#  (`independante`) ; `ajustee_hors_outil` : p non établi, aucune grandeur
+#  exacte avec E^c fixe, asymptotique sous le modèle de survie. p, nombre de
+#  paramètres estimés sur ces données : 0 (`independante`) ;
+#  `ajustee_hors_outil` : p non établi, aucune grandeur
 #  sous H0 produite, aucun tirage (M254) ; `positionnee` : table positionnée
 #  de l'étape `positionnement` de la même construction, A_c = theta^_s E^c
 #  mu~_c (force de la référence multipliée par theta^_s, jamais relue dans
 #  table_positionnee$qx), p = 1 par segment positionné, ddl = n - S, lois
 #  sous H0 prises conditionnellement aux décès O_s de chaque segment
 #  (D_c | O_s ~ Bin(O_s, pi_c), pi_c = A_c / A_s ; multinomiale (O_s ; pi_c)
-#  pour les réplications), libres de theta. Aucun verdict, aucun seuil (M217,
+#  pour les réplications), libres de theta ; `lissee` (#224 ; ADR 0017,
+#  points 1.5, 5 et 10.2) : table lissée de l'étape `lissage` de la même
+#  construction, reçue en valeur (table construite), A_c = E^c mu_c, mu_c =
+#  -ln(1 - g_c), ddl = n - somme des leviers des cellules retenues (= n -
+#  somme des nu_s, degrés de liberté effectifs du lissage, quand toute
+#  cellule pondérée est retenue ; non entier), aucune loi exacte : p asymptotiques de X2 et G2 et
+#  p des signes, des suites et de Wilcoxon seules produites, au statut
+#  d'approximation non établie, aucun tirage. Aucun verdict, aucun seuil (M217,
 #  Q4). Formules sans attribution d'auteur (M200).
-#  CONVENTIONS_VALIDATION, valeurs_entieres_double(),
 #  controler_entrees_validation(), apparier_table(), attendus_cellules() et
-#  smr_poisson() sont dans R/positionnement.R (#167, F1).
+#  smr_poisson() sont dans R/positionnement.R (#167, F1) ;
+#  CONVENTIONS_VALIDATION et controler_plage_ages() dans R/exposition.R,
+#  valeurs_entieres_double() dans R/outils.R (ADR 0017, point 10.1).
 #  Ce module n'appelle que `outils` (dont sous_graine(), par
-#  replications_poisson() et replications_multinomiales()), `donnees`
-#  (liste_guillemets() ; pour #69 : construire_observations(), evaluer_motifs(),
-#  MOTIFS_TETE, MODALITES_CAUSE), `exposition` (calculer_exposition(), #69), `brut`
-#  (taux_poisson()) et `positionnement` (valeurs_entieres_double(),
-#  controler_cle_table(), controler_plage_ages(), apparier_table(),
-#  attendus_cellules(), smr_poisson()) ; le
+#  replications_poisson() et replications_multinomiales() ;
+#  valeurs_entieres_double()), `donnees` (liste_guillemets() ; pour #69 :
+#  construire_observations(), evaluer_motifs(), MOTIFS_TETE, MODALITES_CAUSE ; pour #144 :
+#  citer(), MODALITES_SEXE, SEXES_TABLE),
+#  `exposition` (calculer_exposition(), #69 ; controler_plage_ages() ;
+#  grille_plage(), relation lissee, #224), `lissage`
+#  (somme_differences_carrees(), #144 ; ADR 0017, point 10.3), `brut`
+#  (taux_poisson()) et `positionnement` (controler_cle_table(),
+#  apparier_table(), attendus_cellules(), smr_poisson()) ; le
 #  niveau est contrôlé ici sous le code niveau_invalide de `brut` (M253)
 #  (ADR 0007, point 2.1 et seconde annotation du 06/11/2026, (d)). Les
 #  arêtes vers donnees::table_reference relevées par graphe_modules.R sont
@@ -81,10 +104,16 @@
 # -----------------------------------------------------------------------------
 
 # Relation entre la table et les observations (ADR 0015, point 7.1 ; M237,
-# M253 ; #167, F5, M289) -> nombre de paramètres estimés sur ces données : 0
-# (table prise telle quelle), NA (non établi, ddl_non_etabli) ou 1 par
-# segment positionné (table positionnée de la construction : ddl = n - S).
-RELATIONS_TABLE <- c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L)
+# M253 ; #167, F5, M289 ; #224, ADR 0017, point 5.1) -> nombre de paramètres
+# estimés sur ces données : 0 (table prise telle quelle), NA (non établi,
+# ddl_non_etabli) ou 1 par segment positionné (table positionnée de la
+# construction : ddl = n - S) ; sous `lissee` (table lissée de la
+# construction), NA signifie « non entier, lu par segment » (degrés de
+# liberté effectifs nu_s de l'étape lissage, ddl = n - somme des leviers
+# des cellules retenues) : le
+# sens du NA est porté par le nom de la relation, sur lequel branchent tous
+# les switch du module (erreur de programmation par défaut).
+RELATIONS_TABLE <- c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L, lissee = NA_integer_)
 # Effectif maximal de la loi exacte de Wilcoxon par psignrank() (M256) :
 # finie jusqu'à n = 1038 sur l'hôte de mesure, hypothèse non mesurée ailleurs.
 N_MAX_WILCOXON_EXACT <- 1000
@@ -137,6 +166,15 @@ HYPOTHESE_VALIDATION_POSITIONNEE <- texte_moteur(paste(
   "multinomiale (O_s ; pi_c), pi_c = A~_c / A~_s (= A_c / A_s), libre de theta_s ; exacte avec E^c tenue pour fixe,",
   "asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes (l'unité contrat",
   "rend les tests anti-conservateurs) ; cellule [x, x+1) de la convention dernier_anniversaire."))
+# Hypothèse nulle sous la relation lissee (#224, spécification de forme,
+# § 2) : aucune loi exacte.
+HYPOTHESE_VALIDATION_LISSEE <- texte_moteur(paste(
+  "Aucune loi exacte sous hypothèse nulle : A_c = E^c_c mu_c, mu_c = -ln(1 - g_c), g_c taux de la table lissée de",
+  "cette construction, ajustée sur ces décès (nu_s degrés de liberté effectifs par segment) ; seules sont produites",
+  "les p asymptotiques de X2 et G2 à n - somme des leviers des cellules retenues degrés de liberté (= n - somme des",
+  "nu_s en arithmétique exacte, quand toute cellule pondérée par le lissage est retenue) et les p des signes, des suites et de Wilcoxon",
+  "sous leurs hypothèses propres, au statut d'approximation non établie ; unités d'observation",
+  "indépendantes ; cellule [x, x+1) de la convention dernier_anniversaire."))
 
 # États d'une cellule (M253, point 1) : retenue (A > 0, dans C+) ;
 # sans_exposition (E^c = 0, D = 0) ; taux_table_nul (A = 0 avec E^c > 0, D =
@@ -150,9 +188,15 @@ ETATS_CELLULE_VALIDATION <- c("retenue", "sans_exposition", "taux_table_nul", "e
 # relation positionnee (SMR = 1 par construction, non produite), et toute
 # grandeur de test sous positionnee quand ddl = n - S = 0 (une cellule
 # retenue par segment : D_c = O_s, loi conditionnelle dégénérée ; audit A1).
+# Sous la relation lissee (#224) : contraint_par_lissage (bornes, p et
+# racine cubique du SMR, table ajustée sur ces décès ; p asymptotiques de X2
+# et G2 quand n - somme des leviers retenus <= 0) ; non_etabli_sous_lissage
+# (espérances sous H0, variance_h0, intervalles de fluctuation, p et erreurs
+# de Monte-Carlo : A_c dépend des décès, aucun tirage).
 ETATS_GRANDEUR_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule_retenue", "aucun_residu_non_nul",
                                "variance_nulle", "ex_aequo", "effectif_au_dela_n_max", "aucun_deces",
-                               "variance_observee_nulle", "contraint_par_positionnement")
+                               "variance_observee_nulle", "contraint_par_positionnement", "contraint_par_lissage",
+                               "non_etabli_sous_lissage")
 # États d'une ligne de resultat$sous_groupes : produite ; ddl_non_etabli
 # (ajustee_hors_outil) ; aucune_cellule_retenue ; sous la relation
 # positionnee : contraint_par_positionnement (regroupement segment, et tout
@@ -163,9 +207,14 @@ ETATS_GRANDEUR_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule_ret
 # convolution_au_dela_n_max (sous-groupe de plusieurs segments, coût de la
 # convolution au-delà de N_MAX_PRODUITS_CONVOLUTION : p-valeurs exactes et
 # bornes NA, p-valeurs asymptotiques produites à la place des exactes ;
-# #178). Les colonnes p_*_asymptotique sont NA dans tout autre état.
+# #178). Sous la relation lissee (#224) : SMR descriptif, bornes et
+# p-valeurs NA ; contraint_par_lissage (regroupement segment, et tout
+# sous-groupe qui contient, pour chaque segment qu'il touche, toutes les
+# cellules retenues de ce segment), non_etabli_sous_lissage (autres
+# sous-groupes). Les colonnes p_*_asymptotique sont NA dans tout autre état.
 ETATS_SOUS_GROUPES_VALIDATION <- c("produite", "ddl_non_etabli", "aucune_cellule_retenue",
-                                   "contraint_par_positionnement", "bornes_non_definies", "convolution_au_dela_n_max")
+                                   "contraint_par_positionnement", "bornes_non_definies", "convolution_au_dela_n_max",
+                                   "contraint_par_lissage", "non_etabli_sous_lissage")
 
 # Phrases des statuts des p asymptotiques sur attendus faibles (#179, #200),
 # posées une fois pour STATUTS_VALIDATION et STATUTS_VALIDATION_POSITIONNEE :
@@ -205,8 +254,8 @@ STATUTS_VALIDATION <- local({
                 "réplications, distincte de l'erreur d'estimation")
   # Relation ajustee_hors_outil des p-valeurs de sous-groupe (#178, #200) :
   # fragment commun à sous_groupes/p_valeurs et p_valeurs_asymptotiques.
-  ajustee_p <- paste("relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe",
-                     "(ddl_non_etabli) ; colonnes NA")
+  ajustee_p <- paste("relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi,",
+                     "aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA")
   signes_h <- "P(r_c > 0) = 1/2 par cellule, ce qui n'est pas H0 (i)"
   runs_h <- paste("conditionnellement à (n+, n-) par séquence, sous l'hypothèse que tous les ordres des signes",
                   "sont équiprobables, ce qui n'est pas H0 (i)")
@@ -324,16 +373,18 @@ STATUTS_VALIDATION <- local({
       paste(exact_h0, ": somme sur C+ de P(D_c hors de A +- z sqrt(A))")),
     c("sous_groupes", "smr", "FALSE", "résultat exact : O / A du sous-groupe (cellules retenues)"),
     c("sous_groupes", "bornes_exactes", "TRUE",
-      paste("relation independante : exactes sous la loi supposée (O ~ Poisson, A fixe), p = 0 :",
-            "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ; couverture >=",
-            "niveau (intervalle exact conservatif) ; qgamma, approximation numérique ; relation ajustee_hors_outil :",
-            "non produites, p non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
+      paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
+            "exactes sous la loi supposée, O ~ Poisson(A) avec A fixe : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A,",
+            "G_k loi gamma de forme k (0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma,",
+            "approximation numérique ; relation ajustee_hors_outil : non produites, nombre p de paramètres estimés",
+            "non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
     c("sous_groupes", "p_valeurs", "TRUE",
-      paste("relation independante :", exact_h0, "; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité ;",
+      paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
+            exact_h0, "; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de multiplicité ;",
             ajustee_p)),
     c("sous_groupes", "p_valeurs_asymptotiques", "TRUE",
-      paste("relation independante : non produites, p = 0, la loi de Poisson exacte du sous-groupe est toujours",
-            "calculée ;", ajustee_p)))
+      paste("relation independante : non produites, la loi de Poisson exacte du sous-groupe étant toujours calculée",
+            "(table prise telle quelle, nombre p de paramètres estimés sur ces données nul) ;", ajustee_p)))
   texte_moteur(data.frame(statistique = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
                           sous_h0 = vapply(l, `[`, "", 3L) == "TRUE", statut = vapply(l, `[`, "", 4L),
                           stringsAsFactors = FALSE))
@@ -481,10 +532,107 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
   texte_moteur(s)
 })
 
+# Statuts sous la relation lissee (#224, spécification de forme, § 3) :
+# mêmes lignes (statistique, grandeur, sous_h0) que STATUTS_VALIDATION,
+# dérivée par remplacement (STATUTS_VALIDATION reste inchangée) ; A_c désigne
+# les attendus de la table lissée de la construction, A_c = E^c mu_c, mu_c =
+# -ln(1 - g_c). Textes marqués UTF-8 (texte_moteur()).
+STATUTS_VALIDATION_LISSEE <- local({
+  s <- STATUTS_VALIDATION
+  lis <- "A_c attendus de la table lissée, A_c = E^c mu_c, mu_c = -ln(1 - g_c)"
+  ne <- paste("non produit : A_c dépend des décès observés par le lissage, aucune loi de D_c sous une hypothèse nulle",
+              "n'est établie ; état non_etabli_sous_lissage")
+  # cpl est collé à un statut de STATUTS_VALIDATION, marqué UTF-8 : marqué
+  # aussi (même raison que nc de STATUTS_VALIDATION_POSITIONNEE).
+  cpl <- texte_moteur(paste(" ; table lissée sur ces données : résidus contraints par le lissage (somme pondérée des",
+                            "résidus voisine de 0, corrélation locale négative), niveau non établi"))
+  mc <- paste("non produite : aucune réplication sous la relation lissee (la table devrait être réajustée sur chaque",
+              "réplique, hors du périmètre) ; état non_etabli_sous_lissage ; aucun tirage")
+  ddl <- paste("n - somme sur les cellules retenues des éléments diagonaux de la matrice de lissage (leviers, colonne",
+               "levier de la table lissée ; = n - somme des nu_s quand toute cellule pondérée par le lissage est",
+               "retenue, en arithmétique exacte seulement : dans un segment qui interpole, ddl_effectifs reste la",
+               "trace calculée en flottant, ddl_effectifs_retenus est posé exactement) : n cellules retenues, nu_s degrés de liberté effectifs du lissage",
+               "du segment s (trace de la matrice de lissage, recopiés dans etapes/validation/parametres/ddl_effectifs ;",
+               "somme des leviers retenus du segment dans ddl_effectifs_retenus), réel, en général non entier ;",
+               "contribution d'un segment qui compte exactement z cellules pondérées (z ordre des différences du",
+               "lissage, etapes/lissage/parametres/ordre_difference ; le lissage y interpole, chaque",
+               "levier pondéré vaut 1 en arithmétique exacte) posée au nombre exact de ses cellules retenues de poids",
+               "nul, 0 quand toutes sont pondérées ; ddl_effectifs_retenus = nombre de ses cellules retenues pondérées,",
+               "interpolation_exacte vrai ; approximation : degrés de liberté résiduels du cas normal transposés au",
+               "modèle de Poisson, aucun résultat de loi établi après lissage")
+  p_asym <- paste("approximation non établie : loi du khi-deux à n - somme des leviers des cellules retenues degrés de",
+                  "liberté (ligne ddl ; = n - somme des nu_s en arithmétique exacte, quand toute cellule pondérée par le",
+                  "lissage est retenue ;",
+                  "pchisq, ddl non entier), queue supérieure ; la table est ajustée sur ces décès : le niveau réel du",
+                  "test fondé sur cette p n'est pas établi (aucun constat de simulation versé) ; approximation",
+                  "non garantie quand des attendus A_c sont petits ; si ce ddl <= 0 : non produite (état",
+                  "contraint_par_lissage), en particulier quand chaque segment interpole avec toutes ses cellules",
+                  "retenues pondérées (ddl = 0 exactement)")
+  conservation <- paste("égal à 1 par construction sous wh_poisson (équation du score, à la convergence près) ; voisin",
+                        "de 1 sous wh_quadratique pondération exposition quand E^c est voisine de E^i - D/2 (somme des",
+                        "E^i g = somme des D exactement ; l'écart vient de E^c (-ln(1 - g)) différent de E^i g) ; aucune",
+                        "conservation sous pondération uniforme")
+  non <- "non produit : table lissée ajustée sur ces décès ; état contraint_par_lissage"
+  zero <- "; zéro : |D - A| <= 1e-10 A"
+  remplacer <- function(stat, gr, texte) {
+    k <- which(s$statistique == stat & s$grandeur == gr)
+    if (length(k) != 1L) stop("STATUTS_VALIDATION_LISSEE : ligne inconnue (erreur de programmation).", call. = FALSE)
+    s$statut[k] <<- texte
+  }
+  completer <- function(stat, gr) remplacer(stat, gr, paste0(s$statut[s$statistique == stat & s$grandeur == gr], cpl))
+  for (k in 2:3) remplacer("residus", paste0("esperance_au_dela_", k), ne)
+  remplacer("khi2_pearson", "variance_h0", ne)
+  remplacer("signes", "esperance_positifs_h0", ne)
+  for (g in c("hors_intervalle_exact", "esperance_hors_intervalle_exact", "hors_intervalle_asymptotique",
+              "esperance_hors_intervalle_asymptotique"))
+    remplacer("fluctuation", g, ne)
+  for (st in c("khi2_pearson", "deviance", "signes", "runs", "wilcoxon")) {
+    remplacer(st, "p_monte_carlo", mc)
+    remplacer(st, "erreur_monte_carlo", mc)
+  }
+  for (st in c("khi2_pearson", "deviance")) {
+    remplacer(st, "ddl", ddl)
+    remplacer(st, "p_asymptotique", p_asym)
+  }
+  remplacer("smr", "attendus", paste("descriptif : A = somme de A_c sur C+,", lis))
+  remplacer("smr", "smr", paste("descriptif : O / A ;", conservation))
+  remplacer("smr", "ecart",
+            paste("descriptif : O - A ; nul par construction sous wh_poisson (équation du score, à la convergence",
+                  "près) ; voisin de 0 sous wh_quadratique pondération exposition quand E^c est voisine de E^i -",
+                  "D/2 (somme des E^i g = somme des D exactement ; l'écart vient de E^c (-ln(1 - g)) différent de",
+                  "E^i g) ; aucune conservation sous pondération uniforme"))
+  for (g in c("borne_inf_exacte", "borne_sup_exacte", "p_inferieure", "p_superieure", "p_centrale", "z_racine_cubique",
+              "p_racine_cubique"))
+    remplacer("smr", g, non)
+  for (g in c("statistique", "p_asymptotique", "p_exacte")) completer("signes", g)
+  for (g in c("esperance", "variance", "statistique", "p_asymptotique", "p_exacte")) completer("runs", g)
+  for (g in c("variance", "statistique", "p_asymptotique", "p_exacte")) completer("wilcoxon", g)
+  # Différences, R2 et distance sur la table lissée (mu_lis = -ln(1 - g),
+  # q_lis = g), comme sous positionnee (M309).
+  remplacer("wilcoxon", "effectif",
+            paste("descriptif : n = nombre de cellules retenues où la différence d = D / E^c - mu_lis (= mu^ - mu_lis),",
+                  "mu_lis = -ln(1 - g) (force de la table lissée), est non nulle", zero))
+  remplacer("wilcoxon", "groupes_ex_aequo", "descriptif : nombre de groupes de |mu^ - mu_lis| égaux (taille >= 2)")
+  remplacer("wilcoxon", "w_plus", "descriptif : somme des rangs moyens de |mu^ - mu_lis| des différences positives")
+  remplacer("r2", "valeur",
+            paste("descriptif, fragile : 1 - somme (mu^ - mu_lis)^2 / somme (mu^ - moyenne de mu^)^2 sur C+,",
+                  "mu_lis = -ln(1 - g) (force de la table lissée) ; peut être négatif"))
+  remplacer("distance_probabilites", "valeur",
+            "descriptif : somme sur C+ de |q^ - q_lis|, q^ = 1 - exp(-mu^), q_lis = g (table lissée ; échelle des probabilités)")
+  remplacer("sous_groupes", "smr",
+            paste("descriptif : O / A du sous-groupe (cellules retenues), A attendus de la table lissée ; regroupement",
+                  "segment et tout sous-groupe qui contient toutes les cellules retenues de chaque segment qu'il",
+                  "touche : état contraint_par_lissage"))
+  sg <- paste("relation lissee : non produites, table lissée ajustée sur ces décès, aucune loi du sous-groupe établie",
+              "(états contraint_par_lissage ou non_etabli_sous_lissage) ; colonnes NA")
+  for (g in c("bornes_exactes", "p_valeurs", "p_valeurs_asymptotiques")) remplacer("sous_groupes", g, sg)
+  texte_moteur(s)
+})
+
 # Statuts des grandeurs selon la relation (switch explicite, F5).
 statuts_validation <- function(relation_table)
   switch(relation_table, independante = , ajustee_hors_outil = STATUTS_VALIDATION,
-         positionnee = STATUTS_VALIDATION_POSITIONNEE,
+         positionnee = STATUTS_VALIDATION_POSITIONNEE, lissee = STATUTS_VALIDATION_LISSEE,
          stop("statuts_validation() : relation inconnue (erreur de programmation).", call. = FALSE))
 
 # Forme des tranches d'âge (tranches_age_invalides) et du nombre de
@@ -523,25 +671,29 @@ controler_replications <- function(replications, etape) {
 # (#23) : type de base exact, aucun attribut, sinon refus sous le motif du
 # paramètre ; un integer reçu pour plage_ages, tranches_age ou replications
 # est refusé (M257). Clé et plage : controler_cle_table() et
-# controler_plage_ages() (module positionnement, sous le module validation ;
-# #167, F2). Puis, sous la relation positionnee (#167, F5), refus
+# controler_plage_ages() (modules positionnement et exposition, sous le
+# module validation ; #167, F2 ; ADR 0017, point 10.1). Puis, sous la relation positionnee (#167, F5), refus
 # inter-étapes, dans l'ordre : positionnement_absent (étape positionnement
 # absente du plan) ; plage_ages_differente_positionnement ;
 # table_reference_differente_positionnement (la table validée est la table
 # positionnée sur cette référence, sur cette plage : la contrainte
 # somme A = O et les lois conditionnelles n'en tiennent qu'à ce prix).
 # `positionnement` : paramètres de l'étape positionnement du plan (déjà
-# contrôlés par valider_plan()), ou NULL si elle est absente. Rend TRUE,
-# invisible.
+# contrôlés par valider_plan()), ou NULL si elle est absente. Sous la
+# relation lissee (#224 ; ADR 0017, point 15), dans l'ordre : lissage_absent
+# (étape lissage absente du plan) ; plage_ages_differente_lissage (les ddl
+# effectifs sont ceux du lissage sur ses cellules). `lissage` : paramètres de
+# l'étape lissage du plan, ou NULL si elle est absente (défaut NULL : un
+# appel direct hors lissee peut l'omettre) ; lu sous la seule relation
+# lissee. `table_reference` : absent (missing()) quand le plan ne le porte
+# pas (paramètre conditionnel à relation_table, ADR 0017, point 3.4 ; sa
+# présence est contrôlée par controler_parametres_condition()) ; sa forme
+# n'est contrôlée que s'il est passé ; absent sous positionnee : erreur de
+# programmation préfixée. Rend TRUE, invisible.
 controler_parametres_validation <- function(table_reference, relation_table, plage_ages, tranches_age, niveau,
-                                            replications, positionnement) {
-  controler_cle_table(table_reference, "validation")
-  if (!chaine_unique(relation_table) || !(relation_table %in% names(RELATIONS_TABLE)))
-    refuser("validation", "relation_table_invalide",
-            formuler(paste("La relation entre la table et les observations (relation_table) doit être une chaîne",
-                           "unique, sans attribut, prise dans %s, sans défaut (ADR 0015, point 7.1)."),
-                     liste_guillemets(names(RELATIONS_TABLE))),
-            list(relation_table = relation_table))
+                                            replications, positionnement, lissage = NULL) {
+  if (!missing(table_reference)) controler_cle_table(table_reference, "validation")
+  controler_relation_table(relation_table)
   controler_plage_ages(plage_ages, "validation")
   controler_tranches_age(tranches_age, plage_ages, "validation")
   if (!forme_exacte(niveau, "double") || length(niveau) != 1L || !is.finite(niveau) || niveau <= 0 || niveau >= 1)
@@ -564,6 +716,10 @@ controler_parametres_validation <- function(table_reference, relation_table, pla
                        as.integer(plage_ages[1L]), as.integer(plage_ages[2L]),
                        as.integer(positionnement[["plage_ages"]][1L]), as.integer(positionnement[["plage_ages"]][2L])),
               list(plage_ages = plage_ages, plage_ages_positionnement = positionnement[["plage_ages"]]))
+    if (missing(table_reference))
+      stop(paste("controler_parametres_validation() : table_reference absent sous la relation positionnee (paramètre",
+                 "conditionnel requis, contrôlé par controler_parametres_condition() ; erreur de programmation)."),
+           call. = FALSE)
     if (!identical(table_reference, positionnement[["table_reference"]]))
       refuser("validation", "table_reference_differente_positionnement",
               formuler(paste("Relation « positionnee » : la clé de table de la validation (« %s ») doit être celle du",
@@ -572,6 +728,37 @@ controler_parametres_validation <- function(table_reference, relation_table, pla
               list(table_reference = table_reference,
                    table_reference_positionnement = positionnement[["table_reference"]]))
   }
+  if (identical(relation_table, "lissee")) {
+    if (is.null(lissage))
+      refuser("validation", "lissage_absent",
+              formuler(paste("La relation « lissee » valide la table lissée de cette construction : l'étape lissage",
+                             "doit figurer au plan (avant l'étape validation).")),
+              list(relation_table = relation_table))
+    if (!identical(plage_ages, lissage[["plage_ages"]]))
+      refuser("validation", "plage_ages_differente_lissage",
+              formuler(paste("Relation « lissee » : la plage d'âges de la validation (%d à %d) doit être celle du",
+                             "lissage (%d à %d) : les degrés de liberté effectifs sont ceux du lissage sur ses",
+                             "cellules (les tranches d'âge restent libres)."),
+                       as.integer(plage_ages[1L]), as.integer(plage_ages[2L]),
+                       as.integer(lissage[["plage_ages"]][1L]), as.integer(lissage[["plage_ages"]][2L])),
+              list(plage_ages = plage_ages, plage_ages_lissage = lissage[["plage_ages"]]))
+  }
+  invisible(TRUE)
+}
+
+# Forme et domaine de la relation entre la table et les observations
+# (relation_table_invalide), paramètre gouvernant de l'étape `validation`
+# (ADR 0017, point 3.4 ; #224) : appelée par valider_plan() avant le contrôle
+# de présence des paramètres conditionnels (controler_parametres_condition())
+# et par controler_parametres_validation(), à sa place, pour qu'un appel
+# direct reste complet. Rend TRUE, invisible.
+controler_relation_table <- function(relation_table) {
+  if (!chaine_unique(relation_table) || !(relation_table %in% names(RELATIONS_TABLE)))
+    refuser("validation", "relation_table_invalide",
+            formuler(paste("La relation entre la table et les observations (relation_table) doit être une chaîne",
+                           "unique, sans attribut, prise dans %s, sans défaut (ADR 0015, point 7.1)."),
+                     liste_guillemets(names(RELATIONS_TABLE))),
+            list(relation_table = relation_table))
   invisible(TRUE)
 }
 
@@ -831,29 +1018,39 @@ pvaleur_monte_carlo <- function(t, t_rep, sens) {
 #   sequence : identifiant de séquence (segment x année) de chaque cellule ;
 #   age : âge de chaque cellule ; niveau ;
 #   relation_table : relation (RELATIONS_TABLE), lue par des switch
-#   explicites à trois valeurs (F5) ;
+#   explicites sur son nom (F5) ;
 #   replications, graine : Monte-Carlo (aucun tirage sous ajustee_hors_outil
-#   ou si aucune cellule n'est retenue) ;
+#   ni sous lissee, ou si aucune cellule n'est retenue) ;
 #   segment : indice de segment de chaque cellule (relation positionnee
 #   seule : groupes des lois conditionnelles et des réplications
 #   multinomiales ; NULL sinon). Sous positionnee, qx, mu et A sont ceux de
-#   la table positionnée (theta^_s q~ sur l'échelle de la force).
+#   la table positionnée (theta^_s q~ sur l'échelle de la force) ;
+#   somme_ddl : somme des leviers des cellules retenues (= somme des degrés
+#   de liberté effectifs nu_s du lissage quand toute cellule pondérée est
+#   retenue ; nombre de cellules retenues pondérées, exact, pour un segment
+#   où le lissage interpole, #239 ; relation lissee seule, ddl = n - somme_ddl en double ; NULL
+#   sinon). Sous
+#   lissee, qx, mu et A sont ceux de la table lissée (#224).
 # Rend list(statistiques (format long, une ligne par ligne des statuts de la
 # relation hors sous_groupes : statistique, grandeur, valeur, etat, statut),
 # cellules (colonnes calculées par cellule), sequences (n+, n-, R par
 # séquence, dans l'ordre des séquences), tirages_effectues).
 statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, niveau, relation_table,
-                                    replications, graine, segment = NULL) {
+                                    replications, graine, segment = NULL, somme_ddl = NULL) {
   alpha <- 1 - niveau
   zq <- stats::qnorm(alpha / 2, lower.tail = FALSE)
   nc <- length(D)
   ret <- etat == "retenue"
   statuts <- statuts_validation(relation_table)
-  ajustee <- switch(relation_table, independante = FALSE, ajustee_hors_outil = TRUE, positionnee = FALSE,
+  ajustee <- switch(relation_table, independante = FALSE, ajustee_hors_outil = TRUE, positionnee = FALSE, lissee = FALSE,
                     stop("statistiques_validation() : relation inconnue (erreur de programmation).", call. = FALSE))
   positionnee <- identical(relation_table, "positionnee")
+  lissee <- identical(relation_table, "lissee")
   if (positionnee != !is.null(segment))
     stop("statistiques_validation() : segment requis sous la seule relation positionnee (erreur de programmation).",
+         call. = FALSE)
+  if (lissee != !is.null(somme_ddl))
+    stop("statistiques_validation() : somme_ddl requise sous la seule relation lissee (erreur de programmation).",
          call. = FALSE)
   # Cellules retenues rangées par séquence puis âge (ordre des suites).
   o <- which(ret)[order(sequence[ret], age[ret], method = "radix")]
@@ -907,11 +1104,14 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
     }
     # Statistiques de test observées (même fonction que les répliques).
     t_obs <- statistiques_test(matrix(Dr, ncol = 1L), Ar, Er, mur, debut)
-    # ddl = n - p (p = 0), n - S (un paramètre par segment positionné) ; NA
-    # sous ajustee_hors_outil (remplacé plus bas par ddl_non_etabli).
+    # ddl = n - p (p = 0), n - S (un paramètre par segment positionné),
+    # n - somme des leviers retenus en double (lissage, #224 ; ADR 0017,
+    # point 5.5) ; NA sous ajustee_hors_outil (remplacé plus bas par
+    # ddl_non_etabli).
     ddl <- switch(relation_table, independante = n - RELATIONS_TABLE[["independante"]],
                   ajustee_hors_outil = n - RELATIONS_TABLE[["ajustee_hors_outil"]],
                   positionnee = n - length(Os) * RELATIONS_TABLE[["positionnee"]],
+                  lissee = n - somme_ddl,
                   stop("statistiques_validation() : relation inconnue (erreur de programmation).", call. = FALSE))
     # Relation positionnee, ddl = n - S = 0 (une cellule retenue par segment,
     # D_c = O_s : loi conditionnelle dégénérée ; audit A1) : branchement
@@ -928,7 +1128,7 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
     # bas par ddl_non_etabli).
     pose("khi2_pearson", "variance_h0", switch(relation_table,
       independante = sum(2 + 1 / Ar),
-      ajustee_hors_outil = NA_real_,
+      ajustee_hors_outil = , lissee = NA_real_,
       positionnee = {
         n_s <- tabulate(gr, nbins = length(Os))
         # nr * pic = O_s pi_c, l'espérance conditionnelle A_c = O_s pi_c que
@@ -938,10 +1138,18 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
         sum(2 * (n_s - 1) + inv_s - (n_s^2 + 2 * n_s - 2) / Os)
       },
       stop("statistiques_validation() : relation inconnue (erreur de programmation).", call. = FALSE)))
-    pose("khi2_pearson", "p_asymptotique", stats::pchisq(t_obs$khi2, ddl, lower.tail = FALSE))
+    # Sous lissee, n - somme des leviers retenus <= 0 (0 exactement quand le
+    # lissage interpole dans chaque segment, #239) : p asymptotiques non
+    # produites (contraint_par_lissage) ; pchisq() admet des ddl non entiers (L-b, D7).
+    p_khi2 <- function(t) if (lissee && !(ddl > 0)) NULL else stats::pchisq(t, ddl, lower.tail = FALSE)
+    p_k <- p_khi2(t_obs$khi2)
+    if (is.null(p_k)) pose("khi2_pearson", "p_asymptotique", NA_real_, "contraint_par_lissage")
+    else pose("khi2_pearson", "p_asymptotique", p_k)
     pose("deviance", "statistique", t_obs$deviance)
     pose("deviance", "ddl", ddl)
-    pose("deviance", "p_asymptotique", stats::pchisq(t_obs$deviance, ddl, lower.tail = FALSE))
+    p_g <- p_khi2(t_obs$deviance)
+    if (is.null(p_g)) pose("deviance", "p_asymptotique", NA_real_, "contraint_par_lissage")
+    else pose("deviance", "p_asymptotique", p_g)
     # S4 : SMR global.
     O <- sum(Dr); At <- sum(Ar)
     sm <- smr_poisson(O, At, niveau)
@@ -952,6 +1160,11 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
       for (g in c("borne_inf_exacte", "borne_sup_exacte", "p_inferieure", "p_superieure", "p_centrale",
                   "z_racine_cubique", "p_racine_cubique"))
         pose("smr", g, NA_real_, "contraint_par_positionnement")
+    } else if (lissee) {
+      # Table lissée ajustée sur ces décès : aucune grandeur sous H0 du SMR.
+      for (g in c("borne_inf_exacte", "borne_sup_exacte", "p_inferieure", "p_superieure", "p_centrale",
+                  "z_racine_cubique", "p_racine_cubique"))
+        pose("smr", g, NA_real_, "contraint_par_lissage")
     } else {
       pose("smr", "borne_inf_exacte", sm$borne_inf); pose("smr", "borne_sup_exacte", sm$borne_sup)
       pose("smr", "p_inferieure", sm$p_inferieure); pose("smr", "p_superieure", sm$p_superieure)
@@ -1048,8 +1261,8 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
     pose("fluctuation", "esperance_hors_intervalle_asymptotique", sum(hors(la, ua)))
     # Monte-Carlo : un seul jeu de B réplications, Poisson(A_c) (p = 0) ou
     # multinomiales (O_s ; pi_c) par segment (positionnee), sauf relation
-    # ajustee_hors_outil (aucun tirage, M254).
-    if (!ajustee && !degenere) {
+    # ajustee_hors_outil (aucun tirage, M254) et lissee (aucun tirage, #224).
+    if (!ajustee && !degenere && !lissee) {
       f_stat <- function(Dm) statistiques_test(Dm, Ar, Er, mur, debut)
       t_rep <- switch(relation_table,
                       independante = replications_poisson(Ar, replications, graine, f_stat),
@@ -1090,6 +1303,21 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
       cl[c("fluctuation_inf_exacte", "fluctuation_sup_exacte", "fluctuation_inf_asymptotique",
            "fluctuation_sup_asymptotique")] <- list(rep_na())
     }
+    # Relation lissee (#224) : A_c dépend des décès par le lissage, aucune
+    # loi de D_c sous une hypothèse nulle : espérances sous H0, variance_h0,
+    # intervalles de fluctuation, p et erreurs de Monte-Carlo non produits
+    # (non_etabli_sous_lissage) ; colonnes fluctuation_* NA ; aucun tirage.
+    if (lissee) {
+      mc_ <- c("p_monte_carlo", "erreur_monte_carlo")
+      non_etablies <- list(residus = c("esperance_au_dela_2", "esperance_au_dela_3"),
+                           khi2_pearson = c("variance_h0", mc_), deviance = mc_,
+                           signes = c("esperance_positifs_h0", mc_), runs = mc_, wilcoxon = mc_,
+                           fluctuation = c("hors_intervalle_exact", "esperance_hors_intervalle_exact",
+                                           "hors_intervalle_asymptotique", "esperance_hors_intervalle_asymptotique"))
+      for (st in names(non_etablies)) for (g in non_etablies[[st]]) pose(st, g, NA_real_, "non_etabli_sous_lissage")
+      cl[c("fluctuation_inf_exacte", "fluctuation_sup_exacte", "fluctuation_inf_asymptotique",
+           "fluctuation_sup_asymptotique")] <- list(rep_na())
+    }
   }
   sv <- statuts[statuts$statistique != "sous_groupes", , drop = FALSE]
   cles <- paste(sv$statistique, sv$grandeur, sep = "/")
@@ -1104,13 +1332,29 @@ statistiques_validation <- function(D, Ec, qx, mu, A, etat, sequence, age, nivea
   list(statistiques = stat, cellules = cl, sequences = seqs, tirages_effectues = tirages)
 }
 
+# Colonne annee d'un regroupement de sous_groupes_validation() : integer de
+# longueur n_g. n_g = 0 : integer(0) (#210) ; longueur des années égale à n_g :
+# as.integer() ; toute autre longueur est une erreur de programmation, jamais
+# recyclée en silence (#217 ; rep_len() la masquerait).
+annees_groupe <- function(an_g, n_g) {
+  if (n_g == 0L) return(integer(0))
+  if (length(an_g) != n_g)
+    stop("annees_groupe() : longueur des années différente du nombre de groupes (erreur de programmation).", call. = FALSE)
+  as.integer(an_g)
+}
+
 # Sous-groupes (S5 ; M253, point 5) : regroupements segment x tranche,
 # tranche, segment (si la segmentation n'est pas vide), année (si
 # par_annee), sur les cellules retenues ; selon la relation (switch
 # explicite, F5) : p = 0 (independante) : Poisson exact (smr_poisson()) ;
 # ajustee_hors_outil : O, A et SMR seuls, bornes et p-valeurs NA, état
 # ddl_non_etabli ; positionnee (A attendus de la table positionnée) :
-# sous_groupes_positionnee() ; groupe sans cellule retenue : état
+# sous_groupes_positionnee() ; lissee (A attendus de la table lissée, #224) :
+# SMR descriptif, bornes et p-valeurs NA, état contraint_par_lissage pour le
+# regroupement segment et pour tout groupe qui contient toutes les cellules
+# retenues de chaque segment qu'il touche (segments_complets(), même
+# détection par décompte que la règle C1 de positionnee),
+# non_etabli_sous_lissage sinon ; groupe sans cellule retenue : état
 # aucune_cellule_retenue.
 sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, tranches, plage_ages, D, A, ret,
                                     par_annee, niveau, relation_table) {
@@ -1125,7 +1369,7 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
     for (k in names(segments_cles)) d[[k]] <- segments_cles[[k]][seg_g]
     d$tranche_debut <- as.integer(tranches[tr_g])
     d$tranche_fin <- as.integer(fin_tranche[tr_g])
-    if (par_annee) d$annee <- rep_len(as.integer(an_g), n_g)  # integer de longueur n_g, y compris pour n_g = 0 (#210)
+    if (par_annee) d$annee <- annees_groupe(an_g, n_g)  # integer de longueur n_g, y compris pour n_g = 0 (#210, #217)
     d$cellules_retenues <- nb
     d$observes <- denombrement_entier(O, "validation", "sous_groupes/observes")  # integer (#199) ; O reste double
     d$attendus <- At
@@ -1133,6 +1377,21 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
     if (identical(relation_table, "positionnee")) {
       v <- sous_groupes_positionnee(nom, cle, n_g, segment, ret, Dr, Ar, O, At, niveau)
       for (c_ in names(v)) d[[c_]] <- v[[c_]]
+      return(d)
+    }
+    if (identical(relation_table, "lissee")) {
+      # smr (double) et etat (character) même sans groupe (#201).
+      na_g <- rep(NA_real_, n_g)
+      smr <- na_g; smr[ok] <- (O / At)[ok]
+      etat <- rep("aucune_cellule_retenue", n_g)
+      for (k in which(ok))
+        etat[k] <- if (identical(nom, "segment") || all(segments_complets(ret & cle == k, segment, ret)$complet))
+                     "contraint_par_lissage" else "non_etabli_sous_lissage"
+      d$smr <- smr
+      for (c_ in c("borne_inf_exacte", "borne_sup_exacte", "p_inferieure", "p_superieure", "p_centrale",
+                   "p_inferieure_asymptotique", "p_superieure_asymptotique", "p_centrale_asymptotique"))
+        d[[c_]] <- na_g
+      d$etat <- etat
       return(d)
     }
     ajustee <- switch(relation_table, independante = FALSE, ajustee_hors_outil = TRUE,
@@ -1157,11 +1416,11 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
   morceaux <- list()
   if (length(names(segments_cles))) {
     morceaux$segment_tranche <- groupe("segment_tranche", (segment - 1L) * n_tr + tranche, n_seg * n_tr,
-                                       rep(seq_len(n_seg), each = n_tr), rep(seq_len(n_tr), times = n_seg), na)
+                                       rep(seq_len(n_seg), each = n_tr), rep(seq_len(n_tr), times = n_seg), rep(na, n_seg * n_tr))
   }
-  morceaux$tranche <- groupe("tranche", tranche, n_tr, rep(na, n_tr), seq_len(n_tr), na)
+  morceaux$tranche <- groupe("tranche", tranche, n_tr, rep(na, n_tr), seq_len(n_tr), rep(na, n_tr))
   if (length(names(segments_cles)))
-    morceaux$segment <- groupe("segment", segment, n_seg, seq_len(n_seg), rep(na, n_seg), na)
+    morceaux$segment <- groupe("segment", segment, n_seg, seq_len(n_seg), rep(na, n_seg), rep(na, n_seg))
   if (par_annee) {
     an <- sort(unique(cellules$annee))
     morceaux$annee <- groupe("annee", match(cellules$annee, an), length(an), rep(na, length(an)),
@@ -1198,6 +1457,8 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
 #     une ligne ne porte jamais à la fois une p exacte et une p asymptotique ;
 #   - groupe sans cellule retenue : NA, état aucune_cellule_retenue.
 # Colonnes p_*_asymptotique NA hors de l'état convolution_au_dela_n_max.
+# Détection d'un segment complet : segments_complets() (partagée avec la
+# relation lissee, #224).
 sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At, niveau,
                                      n_max = N_MAX_PRODUITS_CONVOLUTION) {
   alpha <- 1 - niveau
@@ -1216,12 +1477,12 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
   segs <- sort(unique(segment[ret]))
   Os <- vapply(segs, function(s_) sum(Dr[ret & segment == s_]), 0)
   As <- vapply(segs, function(s_) sum(Ar[ret & segment == s_]), 0)
-  Ns <- vapply(segs, function(s_) sum(ret & segment == s_), 0L)
   for (k in which(At > 0)) {
     dans <- ret & cle == k
-    sk <- sort(unique(segment[dans]))
+    sc <- segments_complets(dans, segment, ret)
+    sk <- sc$segments
     j <- match(sk, segs)
-    complet <- vapply(sk, function(s_) sum(dans & segment == s_), 0L) == Ns[j]
+    complet <- sc$complet
     if (all(complet)) {
       r$etat[k] <- "contraint_par_positionnement"
       next
@@ -1255,6 +1516,20 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
   r
 }
 
+# Segments touchés par les cellules `dans` (logique, cellules retenues d'un
+# groupe) et, pour chacun, si le groupe contient toutes ses cellules retenues
+# (`ret`) : décompte des cellules retenues, jamais un test flottant pi = 1
+# (règle C1 de la relation positionnee, #167 ; extraite de
+# sous_groupes_positionnee() pour la relation lissee, #224, résultats
+# inchangés). Rend list(segments (indices triés), complet (logique, un par
+# segment)).
+segments_complets <- function(dans, segment, ret) {
+  sk <- sort(unique(segment[dans]))
+  list(segments = sk,
+       complet = vapply(sk, function(s_) sum(dans & segment == s_), 0L) ==
+         vapply(sk, function(s_) sum(ret & segment == s_), 0L))
+}
+
 # Étape `validation` du plan (#4).
 #   exposition       : table de l'étape `exposition`
 #                      (etapes$exposition$resultat$exposition) ;
@@ -1262,21 +1537,48 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
 #   par_annee        : découpage par année de l'étape `exposition` ;
 #   convention       : convention d'âge retenue par l'étape `exposition` ;
 #   table            : objet table_reference de la clé citée (argument
-#                      tables_reference de construire_table()) ;
+#                      tables_reference de construire_table()), ou NULL
+#                      sous la relation lissee (aucune table de référence) ;
 #   table_reference, relation_table, plage_ages, tranches_age, niveau,
-#   replications     : paramètres de l'étape ;
+#   replications     : paramètres de l'étape (table_reference NULL sous
+#                      lissee : paramètre absent du plan) ;
 #   graine           : graine du plan (étape aléatoire, ADR 0015, point 7.2) ;
 #   positionnement   : etapes$positionnement de la construction (parametres,
 #                      resultat), ou NULL si l'étape n'est pas au plan ; lu
 #                      sous la seule relation positionnee (F5) : theta^ par
 #                      segment (resultat$smr), jamais table_positionnee$qx ;
-#                      ignoré sous les autres relations.
+#                      ignoré sous les autres relations ;
+#   construite, ddl_effectifs : table construite de l'étape productrice du
+#                      plan (colonne levier exigée sous lissee) et ddl
+#                      effectifs par segment (clés,
+#                      ddl_effectifs), rendus par la fonction d'orchestration
+#                      de la table construite (construire_table()), en
+#                      valeur, ou NULL ; lus sous la seule relation lissee
+#                      (#224 ; ADR 0017, points 1.5, 5 et 10.2), ignorés sous
+#                      les autres. Argument nommé `construite`, non
+#                      `table_construite` : graphe_modules.R lirait ce nom
+#                      comme un appel de la fonction homonyme du module
+#                      construire_table, interdit (ADR 0007, point 2.1) ;
+#   ordre_difference : ordre z des différences de l'étape lissage
+#                      (etapes/lissage/parametres, valeur entière en
+#                      double, au moins 1), ou NULL ; lu sous la seule
+#                      relation lissee (interpolation exacte, #239).
 # Relation positionnee : la grille (clés, âges, E^c, D, q~) est celle du
 # positionnement (même exposition, même table, même plage : contrôlé,
 # erreur de programmation sinon) ; attendus A_c = theta^_s A~_c, force
 # theta^_s mu~_c, q_c = 1 - exp(-theta^_s mu~_c) (critère d'actuary du
 # 07/11/2026 : calculés sur la force, finis même si la table positionnée
 # vaut 1 par arrondi, état qx_arrondi_un).
+# Relation lissee (#224) : grille par grille_plage() (module exposition),
+# clés et âges identical() à ceux de la table construite (erreur de
+# programmation sinon) ; q_c = construite$qx, refus taux_table_egal_un
+# (message propre) si q_c = 1 et E^c > 0, avant attendus_cellules() ; mu_c =
+# -ln(1 - q_c), A_c = E^c mu_c ; ddl = n - somme des leviers
+# (construite$levier) des cellules retenues, par segment puis sur les
+# segments (= n - somme des ddl effectifs quand toute cellule pondérée par
+# le lissage est retenue ; ADR 0017, point 5.5) ; contribution d'un segment
+# où le lissage interpole : nombre exact de ses cellules retenues de poids
+# nul (#239).
 # Aucun contrôle (#82 ; ADR 0007, annotation du 17/10/2026, (c) et (d)) :
 # construire_table() a validé la segmentation et les paramètres
 # (valider_plan()), la table (contrôle 1.3) et les entrées
@@ -1286,24 +1588,73 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
 # la table (ADR 0015, point 5).
 calculer_validation <- function(exposition, segmentation, par_annee, convention, table, table_reference,
                                 relation_table, plage_ages, tranches_age, niveau, replications, graine,
-                                positionnement) {
+                                positionnement, construite, ddl_effectifs, ordre_difference) {
   manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
                         names(exposition))
   if (length(manquantes))
     stop(sprintf("calculer_validation() : colonne(s) %s absente(s) de la table d'exposition (erreur de programmation).",
                  paste(manquantes, collapse = ", ")), call. = FALSE)
-  positionnee <- switch(relation_table, independante = , ajustee_hors_outil = FALSE, positionnee = TRUE,
+  positionnee <- switch(relation_table, independante = , ajustee_hors_outil = , lissee = FALSE, positionnee = TRUE,
                         stop("calculer_validation() : relation inconnue (erreur de programmation).", call. = FALSE))
+  lissee <- identical(relation_table, "lissee")
   pe <- RELATIONS_TABLE[[relation_table]]
   if (positionnee && is.null(positionnement))
     stop("calculer_validation() : étape positionnement requise sous la relation positionnee (erreur de programmation).",
          call. = FALSE)
-  ap <- apparier_table(exposition, segmentation, par_annee, table, plage_ages, table_reference, "validation")
-  cel <- ap$cellules
+  if (lissee && (is.null(construite) || is.null(ddl_effectifs) || !("levier" %in% names(construite)) ||
+                 !valeurs_entieres_double(ordre_difference) || length(ordre_difference) != 1L || ordre_difference < 1))
+    stop(paste("calculer_validation() : table construite avec la colonne levier, ddl effectifs et ordre des",
+               "différences requis sous la relation lissee (erreur de programmation)."), call. = FALSE)
+  if (lissee) {
+    # Grille unique (ADR 0017, point 10.2), q de la table construite apparié
+    # par (segment, âge) : clés et âges identiques, dans le même ordre.
+    ap <- grille_plage(exposition, segmentation, par_annee, plage_ages)
+    cel <- ap$cellules
+    seg_cles <- cel[!duplicated(ap$segment), segmentation, drop = FALSE]
+    rownames(seg_cles) <- NULL
+    if (!identical(lapply(cel[c(segmentation, "age")], identity),
+                   lapply(construite[c(segmentation, "age")], identity)) ||
+        !identical(lapply(seg_cles, identity), lapply(ddl_effectifs[segmentation], identity)) ||
+        !forme_exacte(ddl_effectifs[["ddl_effectifs"]], "double"))
+      stop("calculer_validation() : grille différente de celle de la table construite (erreur de programmation).",
+           call. = FALSE)
+    qx_c <- construite$qx
+    un <- qx_c == 1 & cel$exposition_centrale > 0
+    if (any(un))
+      refuser("validation", "taux_table_egal_un",
+              formuler(paste("Validation : %d cellule(s) exposée(s) où la table construite donne q_x = 1 (arrondi) :",
+                             "l'attendu A = E^c (-ln(1 - q_x)) est infini, le modèle de Poisson ne s'applique pas."),
+                       sum(un)),
+              list(cellules = sum(un)))
+    cel$qx_table <- qx_c
+    ap$appariement_sexe <- "par_segment"
+  } else {
+    ap <- apparier_table(exposition, segmentation, par_annee, table, plage_ages, table_reference, "validation")
+    cel <- ap$cellules
+  }
   at <- attendus_cellules(cel$exposition_centrale, cel$evenements, cel$qx_table, table_reference, "validation")
   ret <- at$etat == "retenue"
-  # Table validée : la référence (p = 0, ajustee_hors_outil) ou la table
-  # positionnée, sur l'échelle de la force (positionnee).
+  # Sous lissee (ADR 0017, point 5.5 (iii)) : leviers de la table construite,
+  # lus cellule par cellule dans l'ordre de la grille, sommés par segment sur
+  # les seules cellules retenues (C+) ; une cellule pondérée par le lissage
+  # mais non retenue (E^c = 0 sous la recette agregats) en est exclue.
+  # Interpolation exacte (#239), détectée par la structure, sans tolérance :
+  # segment qui compte exactement z cellules de levier > 0 (pondérées ; z
+  # ordre des différences), retenues ou non. Le lissage y interpole, chaque
+  # levier pondéré vaut 1 en arithmétique exacte (complément de Schur, avis
+  # d'actuary) et la somme des leviers retenus est posée au nombre de
+  # cellules retenues pondérées du segment : sa contribution au ddl vaut le
+  # nombre exact de ses cellules retenues de poids nul, 0 quand toutes sont
+  # pondérées (en flottant, écart de ±1e-15 à ±1e-11 sans cette règle).
+  if (lissee) {
+    lev <- construite$levier
+    interpolation <- vapply(seq_len(nrow(seg_cles)), function(k) sum(lev[ap$segment == k] > 0) == ordre_difference, NA)
+    retenus <- vapply(seq_len(nrow(seg_cles)), function(k)
+      if (interpolation[k]) as.numeric(sum(ret & ap$segment == k & lev > 0)) else sum(lev[ret & ap$segment == k]), 0)
+  }
+  # Table validée : la référence (p = 0, ajustee_hors_outil), la table
+  # positionnée, sur l'échelle de la force (positionnee), ou la table lissée
+  # (lissee : qx_table porte g, taux_table mu = -ln(1 - g)).
   qx_v <- cel$qx_table; mu_v <- at$taux_table; A_v <- at$attendus
   if (positionnee) {
     pc <- positionnement$resultat$cellules
@@ -1325,7 +1676,7 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
               else ap$segment
   s <- statistiques_validation(cel$evenements, cel$exposition_centrale, qx_v, mu_v, A_v,
                                at$etat, sequence, cel$age, niveau, relation_table, replications, graine,
-                               if (positionnee) ap$segment)
+                               if (positionnee) ap$segment, if (lissee) sum(retenus))
   tranche <- findInterval(cel$age, tranches_age)
   cel$taux_table <- at$taux_table
   if (positionnee) {
@@ -1372,15 +1723,34 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
                         sum(as.numeric(cel$evenements[at$etat == e])), 0, USE.NAMES = FALSE),
                         "validation", "etats/evenements"),
                       stringsAsFactors = FALSE)
-  parametres <- list(table_reference = table_reference, table_nom = attr(table, "nom", exact = TRUE),
-                     relation_table = relation_table, parametres_estimes = pe, plage_ages = plage_ages,
-                     tranches_age = tranches_age, niveau = niveau, replications = replications,
-                     convention = convention, appariement_sexe = ap$appariement_sexe,
-                     n_max_wilcoxon_exact = N_MAX_WILCOXON_EXACT, n_max_runs_exact = N_MAX_RUNS_EXACT,
-                     hypothese_nulle = if (positionnee) HYPOTHESE_VALIDATION_POSITIONNEE else HYPOTHESE_VALIDATION,
-                     reference_methode = REFERENCE_METHODE_VALIDATION,
-                     statuts_sous_groupes = texte_moteur(statuts_validation(relation_table)[
-                       statuts_validation(relation_table)$statistique == "sous_groupes", c("grandeur", "statut")]))
+  # Sous lissee : table_reference et table_nom absents, ddl_effectifs
+  # (clés, ddl_effectifs recopiés, ddl_effectifs_retenus : somme des leviers
+  # des cellules retenues, en double, nombre de cellules retenues pondérées
+  # sous interpolation exacte ; ADR 0017, point 5.5 (iii) ;
+  # interpolation_exacte, logique par segment, #239) après
+  # parametres_estimes (NA_integer_), appariement_sexe « par_segment » (#224).
+  ddl_p <- if (lissee) {
+    d_ <- ddl_effectifs[c(segmentation, "ddl_effectifs")]
+    rownames(d_) <- NULL
+    d_$ddl_effectifs_retenus <- retenus
+    d_$interpolation_exacte <- interpolation
+    d_
+  }
+  parametres <- c(if (!lissee) list(table_reference = table_reference, table_nom = attr(table, "nom", exact = TRUE)),
+                  list(relation_table = relation_table, parametres_estimes = pe),
+                  if (lissee) list(ddl_effectifs = ddl_p),
+                  list(plage_ages = plage_ages,
+                       tranches_age = tranches_age, niveau = niveau, replications = replications,
+                       convention = convention, appariement_sexe = ap$appariement_sexe,
+                       n_max_wilcoxon_exact = N_MAX_WILCOXON_EXACT, n_max_runs_exact = N_MAX_RUNS_EXACT,
+                       hypothese_nulle = switch(relation_table, independante = , ajustee_hors_outil = HYPOTHESE_VALIDATION,
+                                                positionnee = HYPOTHESE_VALIDATION_POSITIONNEE,
+                                                lissee = HYPOTHESE_VALIDATION_LISSEE,
+                                                stop("calculer_validation() : relation inconnue (erreur de programmation).",
+                                                     call. = FALSE)),
+                       reference_methode = REFERENCE_METHODE_VALIDATION,
+                       statuts_sous_groupes = texte_moteur(statuts_validation(relation_table)[
+                         statuts_validation(relation_table)$statistique == "sous_groupes", c("grandeur", "statut")])))
   rownames(parametres$statuts_sous_groupes) <- NULL
   list(parametres = parametres,
        resultat = list(cellules = cel, statistiques = texte_moteur(s$statistiques), sous_groupes = sg,
@@ -1523,7 +1893,7 @@ STATUTS_HOMOGENEITE <- local({
 
 # Contrôle les paramètres de l'étape `homogeneite` (valeurs ; les noms sont
 # contrôlés par valider_plan()), dans l'ordre du catalogue, sous le module
-# homogeneite : plage_ages (controler_plage_ages(), module positionnement),
+# homogeneite : plage_ages (controler_plage_ages(), module exposition),
 # tranches_age et replications (formes de `validation`), puis le refus
 # inter-champs homogeneite_sans_segmentation (avis (0''), F10) :
 # `segmentation` est le champ du plan, déjà contrôlé par
@@ -1865,6 +2235,428 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
                           exposition_hors_plage = sum(exposition$exposition_centrale[!dans]),
                           evenements_total = total),
        avertissements = avert)
+}
+
+# --- étape `coherence_regularite` (#144) ----------------------------------------
+#
+# Cohérence des taux (Lignes directrices mortalité, chap. 4, II.1 et II.3) et
+# régularité (chap. 4, III.1) de la table construite et des tables de
+# référence désignées en comparaison (spécification de #144, critères C1 à
+# C5, commentaire 6795722466 ; décisions D1 à D8 du mainteneur du 11/11/2026 ;
+# spécification de forme, commentaire 6799631402 ; ADR 0017, point 13 ;
+# M415). Notations : g_x = qx de la table évaluée, par segment, sur la plage
+# [x_inf, x_sup] ; Delta^z par base::diff(, differences = z) (ADR 0017,
+# point 10.3, aucune enveloppe) ; S_z par somme_differences_carrees() (module
+# lissage), toujours sur qx (ADR 0017, point 13.5). Propriétés déterministes
+# des tables : ni observation, ni hypothèse nulle, ni tirage, ni verdict, ni
+# seuil, ni avertissement quand une inégalité n'est pas vérifiée (D4).
+# Formules sans attribution d'auteur (M200). II.2 (table
+# sélectionnée-finale) est hors de cette version (D7).
+
+# Référence de méthode (texte de la spécification, § 3 ; source lue sur le
+# rendu des pages par regulatory-approfondi, SHA-256 consigné, § 0).
+REFERENCE_METHODE_COHERENCE_REGULARITE <- texte_moteur(paste(
+  "Lignes directrices mortalité de la Commission d'agrément, recommandation du 20 juin 2006, chap. 4, II (p. 36-38)",
+  "et III.1 (p. 38), SHA-256 70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ; propriétés",
+  "déterministes de la table, sans seuil ni verdict"))
+
+# Convention d'âge restituée pour une table de référence évaluée
+# (spécification de forme, § 3 ; ADR 0017, point 13.4 : option « non portée
+# par la table ») ; la table construite porte la convention retenue de
+# l'étape exposition.
+MENTION_CONVENTION_TABLE_REFERENCE <- texte_moteur(paste(
+  "non portée par la table de référence : l'objet table_reference n'a pas de champ de convention d'âge ; voir sa",
+  "source (colonne source)"))
+
+# Nom restitué de la table construite (parametres$tables, colonne nom) : la
+# table de l'étape productrice du plan, reçue en valeur (ADR 0017, point 1.5 :
+# aucun nom d'étape productrice connu du lecteur).
+NOM_TABLE_CONSTRUITE <- texte_moteur("table construite (table de l'étape productrice du plan)")
+
+# États d'une ligne de resultat$regularite (critère C5) : produite ;
+# differences_nulles (somme des b_x^2 nulle : r et S^r non définis, NA) ;
+# r_hors_domaine (r <= -1 : r restitué, S^r NA).
+ETATS_REGULARITE <- c("produite", "differences_nulles", "r_hors_domaine")
+# États d'une ligne de resultat$ordre_segments_synthese : produite ;
+# sans_objet (table de référence sans les deux modalités de sexe du moteur,
+# ou ordre déclaré sur une autre variable que sexe ; M415, Q1).
+ETATS_ORDRE_SEGMENTS <- c("produite", "sans_objet")
+
+# Statuts (E2.20) des grandeurs de l'étape (textes de la spécification, C1 à
+# C5 ; C3 sur une table de référence, M415) : table du résultat, grandeur,
+# nature des tables évaluées concernées (toutes, construite ou reference),
+# statut.
+STATUTS_COHERENCE_REGULARITE <- local({
+  c5 <- paste("résultat exact à g fixé (moindres carrés à un paramètre) : r = somme a_x b_x / somme b_x^2, a = Delta^z g,",
+              "b = Delta^(z-1) g sur les m_z âges ; S^r = somme (a_x - r b_x)^2, égale en arithmétique exacte à",
+              "S_z - (somme a b)^2 / somme b^2 <= S_z (Lignes directrices, chap. 4, III.1, p. 38, forme de la p. 33) ;",
+              "arithmétique flottante ; sans seuil ni verdict")
+  l <- list(
+    c("ages", "croissance", "toutes",
+      paste("résultat exact sur les valeurs enregistrées de la table : inégalité g_x <= g_(x+1) (Lignes directrices,",
+            "chap. 4, II.1), comparaison en double précision ; un écart de l'ordre de la précision numérique de la",
+            "construction de la table n'établit pas le sens de variation ; aucune exception d'âge appliquée, aucun",
+            "verdict")),
+    c("ages", "differences_croissantes", "toutes",
+      paste("descriptif : delta2_x = (g_(x+2) - g_(x+1)) - (g_(x+1) - g_x) en arithmétique flottante, inégalité",
+            "delta2_x >= 0 (Lignes directrices, chap. 4, II.1) ; erreur d'arrondi de l'ordre de 2u(|g_x| + 2|g_(x+1)| + |g_(x+2)|)",
+            "(u = 2^-53), plus l'erreur numérique de la construction de la table : un delta2_x de cet ordre n'établit",
+            "pas le signe ; aucune exception d'âge appliquée, aucun verdict")),
+    c("ordre_segments", "inegalite_verifiee", "construite",
+      paste("résultat exact sur les valeurs enregistrées : inégalité g_x(a) >= g_x(b) pour l'ordre déclaré (Lignes",
+            "directrices, chap. 4, II.3) ; pour les sexes, propriété attendue « si les groupes constitués par les",
+            "hommes et les femmes ont des distributions comparables vis-à-vis des autres critères » (p. 38) ; un",
+            "défaut appelle une explication, aucun verdict")),
+    c("ordre_segments", "inegalite_verifiee", "reference",
+      "choix de l'outil, à finalité comparative, non prescrit par II.3"),
+    c("regularite", "regularite", "toutes",
+      paste("descriptif : S_z = somme sur [x_inf, x_sup - z] de (Delta^z g_x)^2, sans poids (Lignes directrices,",
+            "chap. 4, III.1, et chap. 3, IV.2.a), arithmétique flottante ; aucune loi, aucun seuil ; dépend du niveau",
+            "de la table (environ theta^2 sous un positionnement) et est dominée par les grands âges : comparable",
+            "seulement entre tables du même segment, sur la même plage et au même z ; pour une table lissée par",
+            "Whittaker-Henderson (a), au même z et sur la plage même du lissage, fonction non croissante du",
+            "paramètre h en arithmétique exacte (résultat exact : pour h1 < h2, (h2 - h1)(S_z(g_h2) - S_z(g_h1))",
+            "<= 0, somme des deux inégalités d'optimalité) ; sur une plage strictement contenue dans celle du",
+            "lissage, S_z n'est pas monotone en h en général")),
+    c("regularite", "r_estime", "toutes", c5),
+    c("regularite", "regularite_r", "toutes", c5))
+  texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
+                          nature = vapply(l, `[`, "", 3L), statut = vapply(l, `[`, "", 4L),
+                          stringsAsFactors = FALSE))
+})
+
+# Contrôle les paramètres de l'étape `coherence_regularite` (valeurs ; les
+# noms sont contrôlés par valider_plan()), sous le module
+# coherence_regularite, dans l'ordre (spécification de forme, § 1) :
+# cles_tables_invalides ; plage_ages_invalide (controler_plage_ages(),
+# module exposition) ; ordres_invalides ; ordre_segments_invalide (tous les
+# défauts cités : forme, longueurs différentes, variable hors de la
+# segmentation, donc tout ordre sans segmentation, modalités égales, ordre en
+# double, modalité hors de MODALITES_SEXE pour sexe) ;
+# coherence_sans_table_construite (aucune étape productrice au plan :
+# `plage_table_construite` NULL ; M415) ; plage_ages_hors_table_construite.
+# `segmentation` : champ du plan, déjà contrôlé ; `plage_table_construite` :
+# plage_ages de l'étape productrice du plan, contrôlée avant elle, ou NULL.
+# Appelée par valider_plan() seule. Rend TRUE, invisible.
+controler_parametres_coherence_regularite <- function(tables_reference, plage_ages, ordres, ordre_variable,
+                                                      ordre_superieur, ordre_inferieur, segmentation,
+                                                      plage_table_construite) {
+  if (!forme_exacte(tables_reference, "character") || anyNA(tables_reference) || !all(nzchar(tables_reference)) ||
+      anyDuplicated(tables_reference))
+    refuser("coherence_regularite", "cles_tables_invalides",
+            formuler(paste("Cohérence et régularité : les clés des tables de référence évaluées en comparaison",
+                           "(tables_reference) doivent être un vecteur character sans attribut, sans NA, d'éléments",
+                           "non vides et sans doublon, chacun le nom d'une table dans l'argument « tables_reference » ;",
+                           "character(0) si aucune table de référence n'est évaluée.")),
+            list(tables_reference = tables_reference))
+  controler_plage_ages(plage_ages, "coherence_regularite")
+  etendue <- plage_ages[2L] - plage_ages[1L]
+  if (!valeurs_entieres_double(ordres) || !length(ordres) || any(ordres < 1) || anyDuplicated(ordres) ||
+      any(ordres > etendue))
+    refuser("coherence_regularite", "ordres_invalides",
+            formuler(paste("Cohérence et régularité : les ordres des différences (ordres) doivent être un vecteur",
+                           "double sans attribut d'au moins un entier >= 1, sans doublon, chacun au plus",
+                           "max(plage_ages) - min(plage_ages) = %d (au moins un terme dans chaque somme de",
+                           "régularité ; un integer est refusé)."), as.integer(etendue)),
+            list(ordres = ordres, plage_ages = plage_ages))
+  noms_ordre <- c("ordre_variable", "ordre_superieur", "ordre_inferieur")
+  vecteurs <- list(ordre_variable, ordre_superieur, ordre_inferieur)
+  defauts <- character(0)
+  formes <- vapply(vecteurs, function(v) forme_exacte(v, "character") && !anyNA(v) && all(nzchar(v)), NA)
+  if (!all(formes)) {
+    defauts <- c(defauts, formuler("vecteur character sans attribut, sans NA, d'éléments non vides attendu pour %s",
+                                   liste_guillemets(noms_ordre[!formes])))
+  } else if (length(unique(lengths(vecteurs))) > 1L) {
+    defauts <- c(defauts, formuler("longueurs différentes (%d, %d et %d)", length(ordre_variable),
+                                   length(ordre_superieur), length(ordre_inferieur)))
+  } else if (length(ordre_variable)) {
+    hors <- unique(ordre_variable[!(ordre_variable %in% segmentation)])
+    if (length(hors))
+      defauts <- c(defauts, formuler("variable(s) %s hors de la segmentation du plan (%s)", liste_guillemets(hors),
+                                     if (length(segmentation)) liste_guillemets(segmentation)
+                                     else formuler("aucune variable de segmentation")))
+    egales <- which(ordre_superieur == ordre_inferieur)
+    if (length(egales))
+      defauts <- c(defauts, formuler("modalités supérieure et inférieure égales (ordre(s) n° %s)",
+                                     paste(vapply(egales, function(i) formuler("%d", i), ""), collapse = ", ")))
+    triplets <- paste(ordre_variable, ordre_superieur, ordre_inferieur, sep = "\r")
+    doubles <- which(duplicated(triplets))
+    if (length(doubles))
+      defauts <- c(defauts, formuler("ordre(s) déclaré(s) en double (ordre(s) n° %s)",
+                                     paste(vapply(doubles, function(i) formuler("%d", i), ""), collapse = ", ")))
+    sexe <- ordre_variable == "sexe"
+    hors_sexe <- unique(c(ordre_superieur[sexe], ordre_inferieur[sexe]))
+    hors_sexe <- hors_sexe[!(hors_sexe %in% MODALITES_SEXE)]
+    if (length(hors_sexe))
+      defauts <- c(defauts, formuler("modalité(s) de sexe %s hors de %s", liste_guillemets(hors_sexe),
+                                     liste_guillemets(MODALITES_SEXE)))
+  }
+  if (length(defauts))
+    refuser("coherence_regularite", "ordre_segments_invalide",
+            formuler(paste("Cohérence et régularité : ordre entre segments (ordre_variable, ordre_superieur,",
+                           "ordre_inferieur) invalide : %s. Trois vecteurs character parallèles de même longueur, un",
+                           "ordre déclaré par position (variable de la segmentation du plan, modalité attendue",
+                           "supérieure, modalité attendue inférieure, différentes ; H ou F pour sexe) ; character(0)",
+                           "pour les trois si aucun ordre n'est déclaré."),
+                     paste(defauts, collapse = " ; ")),
+            list(ordre_variable = ordre_variable, ordre_superieur = ordre_superieur, ordre_inferieur = ordre_inferieur,
+                 segmentation = segmentation))
+  if (is.null(plage_table_construite))
+    refuser("coherence_regularite", "coherence_sans_table_construite",
+            formuler(paste("L'étape coherence_regularite évalue toujours la table construite de la construction : une",
+                           "étape qui la produit (lissage ou positionnement) doit figurer au plan, avant elle.")),
+            list(etape = "coherence_regularite"))
+  if (plage_ages[1L] < plage_table_construite[1L] || plage_ages[2L] > plage_table_construite[2L])
+    refuser("coherence_regularite", "plage_ages_hors_table_construite",
+            formuler(paste("Cohérence et régularité : la plage d'âges %d à %d n'est pas contenue dans celle de la",
+                           "table construite (%d à %d, plage d'âges de l'étape qui la produit)."),
+                     as.integer(plage_ages[1L]), as.integer(plage_ages[2L]), as.integer(plage_table_construite[1L]),
+                     as.integer(plage_table_construite[2L])),
+            list(plage_ages = plage_ages, plage_table_construite = plage_table_construite))
+  invisible(TRUE)
+}
+
+# Contrôle d'entrée avant exécution d'une table de référence évaluée en
+# comparaison (ADR 0017, point 13.3 ; spécification de forme, § 1), appelé
+# par controler_entrees() (construire_table()) pour chaque clé, dans l'ordre
+# reçu : table sans annee (table_annee_non_admise), puis chaque sexe de la
+# table couvre plage_ages (plage_ages_hors_table ; les âges d'un sexe sont
+# contigus, contrôlé par table_reference()). Mêmes motifs que la validation,
+# module coherence_regularite ; ni sexe ni convention exigés. Rend TRUE,
+# invisible.
+controler_entrees_coherence_regularite <- function(table, cle, plage_ages) {
+  if ("annee" %in% names(table))
+    refuser("coherence_regularite", "table_annee_non_admise",
+            formuler(paste("Cohérence et régularité : la table de clé « %s » porte une colonne annee ; cette version",
+                           "n'évalue que des tables sans année (ADR 0017, point 13.3)."), citer(cle)),
+            list(cle = cle))
+  for (s in SEXES_TABLE[SEXES_TABLE %in% table$sexe]) {
+    a <- table$age[table$sexe == s]
+    if (min(a) > plage_ages[1L] || max(a) < plage_ages[2L])
+      refuser("coherence_regularite", "plage_ages_hors_table",
+              formuler(paste("Cohérence et régularité : la table de clé « %s » (sexe %s) couvre les âges %d à %d, qui",
+                             "ne contiennent pas la plage d'âges %d à %d."),
+                       citer(cle), citer(s), as.integer(min(a)), as.integer(max(a)), as.integer(plage_ages[1L]),
+                       as.integer(plage_ages[2L])),
+              list(cle = cle, sexe = s, ages_table = range(a), plage_ages = plage_ages))
+  }
+  invisible(TRUE)
+}
+
+# Fonction d'étape `coherence_regularite` (#144).
+#   construite       : table construite de l'étape productrice, contrat
+#                      contrôlé par la fonction de même nom du module
+#                      construire_table, reçue en valeur (argument nommé
+#                      comme celui de calculer_validation() : le nom de cette
+#                      fonction ferait une arête interdite, graphe_modules.R) ;
+#   tables           : tables de référence évaluées en comparaison, liste
+#                      nommée par clé dans l'ordre reçu (vide sans clé),
+#                      contrôlées par controler_entrees_coherence_regularite() ;
+#   segmentation, plage_ages, ordres (canonisé, croissant), ordre_variable,
+#   ordre_superieur, ordre_inferieur : valeurs du plan, contrôlées ;
+#   convention       : convention retenue de l'étape exposition.
+# Tables évaluées dans l'ordre : la table construite (segments dans l'ordre
+# de ses lignes), puis les tables de référence dans l'ordre reçu (segments :
+# sexes dans l'ordre de SEXES_TABLE). Sur la plage : C1 (delta1_x =
+# g_(x+1) - g_x, test g_x <= g_(x+1)), C2 (delta2_x, Delta^2 de diff(), test
+# delta2_x >= 0), C3 (sur la table construite : pour chaque ordre (v, a, b)
+# et chaque combinaison des autres variables où les deux segments existent,
+# e_x = g_x(a) - g_x(b), test g_x(a) >= g_x(b) ; une combinaison où l'un
+# manque ne donne aucune ligne ; sur une table de référence : ordre sur sexe
+# et table portant H et F évalué, sinon une ligne de synthèse sans_objet),
+# C4 (S_z) et C5 (r = somme ab / somme b^2, S^r = somme (a - r b)^2, sans
+# soustraction : jamais négative ; égale à S_z - (somme ab)^2 / somme b^2 en
+# arithmétique exacte). Refus en cours d'étape : ordre_modalite_absente (modalité
+# déclarée absente de tous les segments de la table construite). Aucun
+# avertissement (D4). Âges en défaut restitués joints par « , » ("" sans
+# âge en défaut). Rend list(parametres, resultat (ages, coherence,
+# ordre_segments, ordre_segments_synthese, regularite), diagnostics,
+# avertissements).
+calculer_coherence_regularite <- function(construite, tables, segmentation, plage_ages, ordres, ordre_variable,
+                                          ordre_superieur, ordre_inferieur, convention) {
+  if (!is.data.frame(construite) || !all(c(segmentation, "age", "qx") %in% names(construite)))
+    stop("calculer_coherence_regularite() : table construite absente ou incomplète (erreur de programmation).",
+         call. = FALSE)
+  if (is.null(tables)) tables <- list()
+  ages <- seq(as.integer(plage_ages[1L]), as.integer(plage_ages[2L]))
+  n_a <- length(ages)
+  tc <- construite
+  libelle <- function(valeurs)
+    if (length(valeurs)) paste(paste(names(valeurs), "=", valeurs), collapse = " ; ") else "sans segmentation"
+  # Modalités déclarées présentes dans au moins un segment de la table
+  # construite (ordre_modalite_absente sinon, toutes citées).
+  absentes <- character(0); details_absentes <- list()
+  for (i in seq_along(ordre_variable)) {
+    v <- ordre_variable[i]
+    for (m in c(ordre_superieur[i], ordre_inferieur[i]))
+      if (!(m %in% as.character(tc[[v]])) && !(paste(v, m) %in% names(details_absentes))) {
+        absentes <- c(absentes, formuler("%s = « %s »", citer(v), citer(m)))
+        details_absentes[[paste(v, m)]] <- c(variable = v, modalite = m)
+      }
+  }
+  if (length(absentes))
+    refuser("coherence_regularite", "ordre_modalite_absente",
+            formuler(paste("Cohérence et régularité : modalité(s) déclarée(s) dans l'ordre entre segments absente(s) de",
+                           "tous les segments de la table construite : %s."), paste(absentes, collapse = ", ")),
+            list(variable = unname(vapply(details_absentes, `[[`, "", "variable")),
+                 modalite = unname(vapply(details_absentes, `[[`, "", "modalite"))))
+
+  # Séries évaluées : nature, clé, libellé du segment, valeurs des variables
+  # du segment, g sur la plage.
+  series <- list()
+  cle_seg <- if (length(segmentation))
+    do.call(paste, c(unname(lapply(tc[segmentation], as.character)), list(sep = "\r"))) else rep("", nrow(tc))
+  for (u in unique(cle_seg)) {
+    l <- which(cle_seg == u)
+    m <- match(ages, tc$age[l])
+    if (anyNA(m))
+      stop("calculer_coherence_regularite() : âge de la plage absent de la table construite (erreur de programmation).",
+           call. = FALSE)
+    valeurs <- vapply(segmentation, function(v) as.character(tc[[v]][l[1L]]), "")
+    series[[length(series) + 1L]] <- list(nature = "construite", cle = NA_character_, valeurs = valeurs,
+                                          g = tc$qx[l[m]])
+  }
+  for (k in names(tables)) {
+    t <- tables[[k]]
+    for (s in SEXES_TABLE[SEXES_TABLE %in% t$sexe]) {
+      l <- which(t$sexe == s)
+      m <- match(ages, t$age[l])
+      if (anyNA(m))
+        stop(paste("calculer_coherence_regularite() : âge de la plage absent d'une table de référence (erreur de",
+                   "programmation)."), call. = FALSE)
+      series[[length(series) + 1L]] <- list(nature = "reference", cle = k, valeurs = c(sexe = s), g = t$qx[l[m]])
+    }
+  }
+  nature <- vapply(series, `[[`, "", "nature")
+  cle <- vapply(series, `[[`, "", "cle")
+  segment <- vapply(series, function(s) libelle(s$valeurs), "")
+
+  # C1 et C2, par série.
+  ages_l <- coherence_l <- regularite_l <- vector("list", length(series))
+  for (j in seq_along(series)) {
+    g <- series[[j]]$g
+    d1 <- diff(g)
+    d2 <- diff(g, differences = 2L)
+    croissance <- g[-n_a] <= g[-1L]
+    diff_croissantes <- d2 >= 0
+    ages_l[[j]] <- data.frame(nature = rep(nature[j], n_a), cle = rep(cle[j], n_a), segment = rep(segment[j], n_a),
+                              age = ages, qx = g, delta1 = c(d1, NA_real_), delta2 = c(d2, NA_real_, NA_real_),
+                              croissance = c(croissance, NA), differences_croissantes = c(diff_croissantes, NA, NA),
+                              stringsAsFactors = FALSE)
+    a1 <- ages[which(!croissance)]
+    a2 <- ages[which(!diff_croissantes)]
+    coherence_l[[j]] <- data.frame(nature = nature[j], cle = cle[j], segment = segment[j],
+                                   croissance_examinees = length(croissance), croissance_en_defaut = length(a1),
+                                   croissance_ages_en_defaut = paste(a1, collapse = ", "),
+                                   differences_examinees = length(diff_croissantes),
+                                   differences_en_defaut = length(a2),
+                                   differences_ages_en_defaut = paste(a2, collapse = ", "),
+                                   stringsAsFactors = FALSE)
+    # C4 et C5, par ordre (croissant).
+    regularite_l[[j]] <- do.call(rbind, lapply(ordres, function(z) {
+      mz <- n_a - as.integer(z)
+      a <- diff(g, differences = z)
+      b <- if (z == 1) g[seq_len(mz)] else diff(g, differences = z - 1)[seq_len(mz)]
+      S <- somme_differences_carrees(g, z)
+      sab <- sum(a * b)
+      sbb <- sum(b^2)
+      r <- if (sbb > 0) sab / sbb else NA_real_
+      etat <- if (!(sbb > 0)) "differences_nulles" else if (r <= -1) "r_hors_domaine" else "produite"
+      data.frame(nature = nature[j], cle = cle[j], segment = segment[j], ordre = z, termes = mz, regularite = S,
+                 r_estime = r, regularite_r = if (identical(etat, "produite")) sum((a - r * b)^2) else NA_real_,
+                 etat = etat, stringsAsFactors = FALSE)
+    }))
+  }
+  ages_df <- do.call(rbind, ages_l)
+  coherence <- do.call(rbind, coherence_l)
+  regularite <- do.call(rbind, regularite_l)
+
+  # C3 : ordre entre segments.
+  detail <- data.frame(nature = character(0), cle = character(0), variable = character(0),
+                       superieure = character(0), inferieure = character(0), autres = character(0),
+                       age = integer(0), g_superieure = numeric(0), g_inferieure = numeric(0), ecart = numeric(0),
+                       inegalite_verifiee = logical(0), stringsAsFactors = FALSE)
+  synthese <- data.frame(nature = character(0), cle = character(0), variable = character(0),
+                         superieure = character(0), inferieure = character(0), autres = character(0),
+                         ages_examines = integer(0), ages_en_defaut = integer(0), liste_ages_en_defaut = character(0),
+                         etat = character(0), stringsAsFactors = FALSE)
+  paire <- function(nat, k, v, a, b, autres, ga, gb) {
+    ok <- ga >= gb
+    en_defaut <- ages[which(!ok)]
+    list(detail = data.frame(nature = rep(nat, n_a), cle = rep(k, n_a), variable = rep(v, n_a),
+                             superieure = rep(a, n_a), inferieure = rep(b, n_a), autres = rep(autres, n_a),
+                             age = ages, g_superieure = ga, g_inferieure = gb, ecart = ga - gb,
+                             inegalite_verifiee = ok, stringsAsFactors = FALSE),
+         synthese = data.frame(nature = nat, cle = k, variable = v, superieure = a, inferieure = b, autres = autres,
+                               ages_examines = n_a, ages_en_defaut = length(en_defaut),
+                               liste_ages_en_defaut = paste(en_defaut, collapse = ", "), etat = "produite",
+                               stringsAsFactors = FALSE))
+  }
+  sans_objet <- function(k, v, a, b)
+    data.frame(nature = "reference", cle = k, variable = v, superieure = a, inferieure = b, autres = NA_character_,
+               ages_examines = 0L, ages_en_defaut = NA_integer_, liste_ages_en_defaut = NA_character_,
+               etat = "sans_objet", stringsAsFactors = FALSE)
+  construites <- which(nature == "construite")
+  for (i in seq_along(ordre_variable)) {
+    v <- ordre_variable[i]; a <- ordre_superieur[i]; b <- ordre_inferieur[i]
+    autres_var <- setdiff(segmentation, v)
+    cle_autres <- vapply(construites, function(j)
+      paste(series[[j]]$valeurs[autres_var], collapse = "\r"), "")
+    for (u in unique(cle_autres)) {
+      dans <- construites[cle_autres == u]
+      ja <- dans[vapply(dans, function(j) identical(unname(series[[j]]$valeurs[v]), a), NA)]
+      jb <- dans[vapply(dans, function(j) identical(unname(series[[j]]$valeurs[v]), b), NA)]
+      if (!length(ja) || !length(jb)) next
+      autres <- if (length(autres_var)) libelle(series[[ja[1L]]]$valeurs[autres_var]) else "sans autre variable"
+      p <- paire("construite", NA_character_, v, a, b, autres, series[[ja[1L]]]$g, series[[jb[1L]]]$g)
+      detail <- rbind(detail, p$detail)
+      synthese <- rbind(synthese, p$synthese)
+    }
+  }
+  for (k in names(tables)) {
+    sexes_k <- vapply(which(nature == "reference" & cle %in% k), function(j) series[[j]]$valeurs[["sexe"]], "")
+    for (i in seq_along(ordre_variable)) {
+      v <- ordre_variable[i]; a <- ordre_superieur[i]; b <- ordre_inferieur[i]
+      if (identical(v, "sexe") && all(MODALITES_SEXE %in% sexes_k)) {
+        ja <- which(nature == "reference" & cle %in% k & segment == libelle(c(sexe = a)))
+        jb <- which(nature == "reference" & cle %in% k & segment == libelle(c(sexe = b)))
+        p <- paire("reference", k, v, a, b, "sans autre variable", series[[ja]]$g, series[[jb]]$g)
+        detail <- rbind(detail, p$detail)
+        synthese <- rbind(synthese, p$synthese)
+      } else synthese <- rbind(synthese, sans_objet(k, v, a, b))
+    }
+  }
+  rownames(detail) <- NULL
+  rownames(synthese) <- NULL
+
+  tables_df <- data.frame(
+    nature = c("construite", rep("reference", length(tables))),
+    cle = c(NA_character_, names(tables)),
+    nom = c(NOM_TABLE_CONSTRUITE, vapply(tables, function(t) attr(t, "nom", exact = TRUE), "", USE.NAMES = FALSE)),
+    statut = c(NA_character_, vapply(tables, function(t) attr(t, "statut", exact = TRUE), "", USE.NAMES = FALSE)),
+    source = c(NA_character_, vapply(tables, function(t) attr(t, "source", exact = TRUE), "", USE.NAMES = FALSE)),
+    convention_age = c(convention, rep(MENTION_CONVENTION_TABLE_REFERENCE, length(tables))),
+    sexes = c(NA_character_, vapply(tables, function(t) paste(SEXES_TABLE[SEXES_TABLE %in% t$sexe], collapse = ", "),
+                                    "", USE.NAMES = FALSE)),
+    stringsAsFactors = FALSE)
+
+  list(parametres = list(tables_reference = names(tables), plage_ages = plage_ages, ordres = ordres,
+                         ordre_variable = ordre_variable, ordre_superieur = ordre_superieur,
+                         ordre_inferieur = ordre_inferieur, tables = tables_df,
+                         reference_methode = REFERENCE_METHODE_COHERENCE_REGULARITE,
+                         statuts = STATUTS_COHERENCE_REGULARITE),
+       resultat = list(ages = ages_df, coherence = coherence, ordre_segments = detail,
+                       ordre_segments_synthese = synthese, regularite = regularite),
+       diagnostics = list(tables_evaluees = nrow(tables_df), segments_evalues = length(series), ages_plage = n_a,
+                          croissance_en_defaut = sum(coherence$croissance_en_defaut),
+                          differences_en_defaut = sum(coherence$differences_en_defaut),
+                          ordres_segments_declares = length(ordre_variable),
+                          ordre_segments_comparaisons = sum(synthese$etat == "produite"),
+                          ordre_segments_sans_objet = sum(synthese$etat == "sans_objet"),
+                          ordre_segments_en_defaut = sum(!detail$inegalite_verifiee),
+                          regularite_differences_nulles = sum(regularite$etat == "differences_nulles"),
+                          regularite_r_hors_domaine = sum(regularite$etat == "r_hors_domaine")),
+       avertissements = avertissements_vides())
 }
 
 # --- étape `importance_exclusions` (#69) ----------------------------------------
@@ -2258,9 +3050,12 @@ ligne_resultat <- function(ensemble, niveau, v)
 #   etape_donnees      : etapes$donnees (parametres, resultat) ;
 #   etape_exposition   : etapes$exposition (parametres, resultat) ;
 #   etape_validation   : etapes$validation, ou NULL si `validation` n'est pas
-#                        au plan (comparateur 2 non demandé) ; sous la
-#                        relation positionnee, comparateur 2 non produit ;
-#   table              : objet table_reference de l'étape validation, ou NULL ;
+#                        au plan (comparateur 2 non demandé) ; sous les
+#                        relations positionnee et lissee, comparateur 2 non
+#                        produit (M289 ; M415, point H, #224) ;
+#   table              : objet table_reference de l'étape validation, ou NULL
+#                        (validation absente, ou relation lissee : aucune
+#                        table de référence) ;
 #   p                  : valeurs validées de la transition, de la période et
 #                        du délai (valeurs_parametres_donnees()), dont
 #                        p$periode et p$delai_declaration (#182) ;
@@ -2277,7 +3072,17 @@ ligne_resultat <- function(ensemble, niveau, v)
 # smr_comparateur_2), diagnostics, avertissements). Aucun vecteur par ligne.
 calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_exposition, etape_validation, table,
                                            p, recette, conv, segmentation, niveau) {
-  if (is.null(etape_validation) != is.null(table))
+  # Table NULL si et seulement si l'étape validation est absente ou sous la
+  # relation lissee (aucune table de référence ; switch sur le nom, #224).
+  # Relation illisible (étape mal formée) : chaîne vide, erreur de
+  # programmation par défaut du switch.
+  sans_table <- is.null(etape_validation) || {
+    rel <- etape_validation$parametres$relation_table
+    switch(if (chaine_unique(rel)) rel else "", independante = , ajustee_hors_outil = , positionnee = FALSE,
+           lissee = TRUE,
+           stop("calculer_importance_exclusions() : relation inconnue (erreur de programmation).", call. = FALSE))
+  }
+  if (sans_table != is.null(table))
     stop("calculer_importance_exclusions() : étape validation et table incohérentes (erreur de programmation).",
          call. = FALSE)
   # Contrefactuel par lignes et fusion par tête : étape admise sans condition
@@ -2428,12 +3233,13 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
   })
 
   # Comparateur 2 : si et seulement si `validation` est au plan (M242), hors
-  # relation positionnee (#167, Q6 ; F5) : la table de l'étape validation y
-  # est estimée sur les lignes conservées, le comparateur 2 n'est pas produit
-  # (état non_produite_par_cette_version, en attendant le comparateur 3).
+  # relations positionnee (#167, Q6 ; F5) et lissee (M415, point H ; #224) :
+  # la table de l'étape validation y est estimée sur les lignes conservées,
+  # le comparateur 2 n'est pas produit (état non_produite_par_cette_version,
+  # en attendant le comparateur 3).
   etat_c2 <- if (is.null(etape_validation)) "non_demandee_par_le_plan"
              else switch(etape_validation$parametres$relation_table, independante = , ajustee_hors_outil = "produite",
-                         positionnee = "non_produite_par_cette_version",
+                         positionnee = , lissee = "non_produite_par_cette_version",
                          stop("calculer_importance_exclusions() : relation inconnue (erreur de programmation).",
                               call. = FALSE))
   smr2 <- NULL

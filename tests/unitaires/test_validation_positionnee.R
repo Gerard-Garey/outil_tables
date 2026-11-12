@@ -49,7 +49,7 @@ loi_bin <- function(n, p) choose(n, 0:n) * p^(0:n) * (1 - p)^(n - 0:n)
 
 verifier("A RELATIONS_TABLE : positionnee = 1L (un paramètre par segment positionné), égal à PARAMETRES_ESTIMES_POSITIONNEMENT ; N_MAX_PRODUITS_CONVOLUTION = 1e8", {
   r <- tablexp:::RELATIONS_TABLE
-  identical(names(r), c("independante", "ajustee_hors_outil", "positionnee")) && identical(r[["positionnee"]], 1L) &&
+  identical(names(r), c("independante", "ajustee_hors_outil", "positionnee", "lissee")) && identical(r[["positionnee"]], 1L) &&
     identical(tablexp:::PARAMETRES_ESTIMES_POSITIONNEMENT, r[["positionnee"]]) &&
     identical(tablexp:::N_MAX_PRODUITS_CONVOLUTION, 1e8) &&
     "convolution_au_dela_n_max" %in% tablexp:::ETATS_SOUS_GROUPES_VALIDATION &&
@@ -89,7 +89,10 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
   # chaque relation, condition 1 du visa d'actuary ; avant #178 :
   # 937ad009c51822ad825fff9a3c560527) puis par #200 (textes par relation de
   # sous_groupes/bornes_exactes et p_valeurs ; avant #200 :
-  # 01c6538a2b101311732eed745fcb3c05),
+  # 01c6538a2b101311732eed745fcb3c05) puis par #215 (tournure S5 de #203 :
+  # nombre p de paramètres estimés nommé, jamais « p = 0 : loi », dans
+  # sous_groupes/bornes_exactes, p_valeurs et p_valeurs_asymptotiques ;
+  # avant #215 : 7c535735fdb65e7aa57c22f86d60ffb3),
   # valeur écrite en dur (identité exacte) : octets bruts des
   # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
   # lignes par un saut de ligne ; indépendante de la locale d'installation
@@ -117,7 +120,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
                         grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
                               useBytes = TRUE))
                       TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
-    independante = if (identical(unname(tools::md5sum(f)), "7c535735fdb65e7aa57c22f86d60ffb3")) TRUE
+    independante = if (identical(unname(tools::md5sum(f)), "736e637e156df8d409b6943d333fe741")) TRUE
                    else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(
@@ -533,10 +536,10 @@ verifier("refus valider_plan : clé de la validation différente du positionneme
        m = if (grepl("« autre »", conditionMessage(a), fixed = TRUE) && grepl("« tv »", conditionMessage(a), fixed = TRUE))
              TRUE else conditionMessage(a))
 })
-verifier("refus valider_plan : relation_table_invalide cite les trois relations admises", {
+verifier("refus valider_plan : relation_table_invalide cite les quatre relations admises (lissee, #224)", {
   r <- refus_de(valider_plan(plan_vp(val = modifyList(VAL, list(relation_table = "positionne")))))
   isTRUE(controle(r, "validation", "relation_table_invalide")) &&
-    grepl("« independante », « ajustee_hors_outil », « positionnee »", conditionMessage(r), fixed = TRUE)
+    grepl("« independante », « ajustee_hors_outil », « positionnee », « lissee »", conditionMessage(r), fixed = TRUE)
 })
 verifier("calculer_validation() : positionnee sans étape positionnement, ou relation inconnue -> erreur de programmation ; étape transmise sous independante ignorée (identical() au calcul sans elle)", {
   e <- X$etapes
@@ -854,7 +857,7 @@ verifier("T178.3 : colonnes p_*_asymptotique entre p_centrale et etat sous les t
   }
   TRUE
 })
-verifier("T178.3 statuts : ligne sous_groupes/p_valeurs_asymptotiques (sous_h0) après p_valeurs, textes de la spécification ; p_valeurs (positionnee) complété ; statuts_sous_groupes de l'étape à 4 lignes", {
+verifier("T178.3 statuts : ligne sous_groupes/p_valeurs_asymptotiques (sous_h0) après p_valeurs, textes de la spécification (puis #215, tournure S5) ; p_valeurs (positionnee) complété ; statuts_sous_groupes de l'étape à 4 lignes", {
   a <- tablexp:::STATUTS_VALIDATION; b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
   k <- function(s, g) s$statut[s$statistique == "sous_groupes" & s$grandeur == g]
   indep <- paste("; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et les",
@@ -873,36 +876,40 @@ verifier("T178.3 statuts : ligne sous_groupes/p_valeurs_asymptotiques (sous_h0) 
                              isTRUE(s$sous_h0[s$statistique == "sous_groupes" & s$grandeur == "p_valeurs_asymptotiques"]), NA)))
               TRUE else "ligne p_valeurs_asymptotiques",
     independante = if (identical(k(a, "p_valeurs_asymptotiques"),
-                                 paste("relation independante : non produites, p = 0, la loi de Poisson exacte du",
-                                       "sous-groupe est toujours calculée ; relation ajustee_hors_outil : non",
-                                       "produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ;",
-                                       "colonnes NA"))) TRUE else "texte independante",
+                                 paste("relation independante : non produites, la loi de Poisson exacte du",
+                                       "sous-groupe étant toujours calculée (table prise telle quelle, nombre p de",
+                                       "paramètres estimés sur ces données nul) ; relation ajustee_hors_outil : non",
+                                       "produites, nombre p de paramètres estimés non établi, aucune p-valeur du",
+                                       "sous-groupe (ddl_non_etabli) ; colonnes NA"))) TRUE else "texte independante",
     positionnee = if (identical(k(b, "p_valeurs_asymptotiques"), texte_p)) TRUE else "texte positionnee",
     p_valeurs = if (grepl("état convolution_au_dela_n_max sinon, p-valeurs asymptotiques produites à leur place) ;",
                           k(b, "p_valeurs"), fixed = TRUE)) TRUE else "p_valeurs (positionnee)",
     etape = if (identical(nrow(V$parametres$statuts_sous_groupes), 4L)) TRUE else "statuts_sous_groupes")
 })
-verifier("T200.1 statuts : sous_groupes/bornes_exactes et p_valeurs, texte propre à chaque relation (independante, ajustee_hors_outil), mot pour mot selon l'avis d'actuary (#200) ; fragment ajustee_hors_outil des p-valeurs commun à p_valeurs et p_valeurs_asymptotiques ; positionnee inchangée", {
+verifier("T200.1 statuts : sous_groupes/bornes_exactes et p_valeurs, texte propre à chaque relation (independante, ajustee_hors_outil), mot pour mot selon l'avis d'actuary (#200), puis #215 (tournure S5) ; fragment ajustee_hors_outil des p-valeurs commun à p_valeurs et p_valeurs_asymptotiques ; positionnee inchangée", {
   a <- tablexp:::STATUTS_VALIDATION; b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
   k <- function(s, g) s$statut[s$statistique == "sous_groupes" & s$grandeur == g]
-  ajustee_p <- paste("relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe",
-                     "(ddl_non_etabli) ; colonnes NA")
+  ajustee_p <- paste("relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi,",
+                     "aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA")
   tous(
     bornes = if (identical(k(a, "bornes_exactes"),
-                           paste("relation independante : exactes sous la loi supposée (O ~ Poisson, A fixe), p = 0 :",
+                           paste("relation independante, table prise telle quelle (nombre p de paramètres estimés",
+                                 "sur ces données nul) : exactes sous la loi supposée, O ~ Poisson(A) avec A fixe :",
                                  "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ;",
                                  "couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ;",
-                                 "relation ajustee_hors_outil : non produites, p non établi, aucun intervalle du",
-                                 "sous-groupe (ddl_non_etabli) ; colonnes NA"))) TRUE else "texte bornes_exactes",
+                                 "relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi,",
+                                 "aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA"))) TRUE
+                         else "texte bornes_exactes",
     p_valeurs = if (identical(k(a, "p_valeurs"),
-                              paste("relation independante : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le",
+                              paste("relation independante, table prise telle quelle (nombre p de paramètres estimés",
+                                    "sur ces données nul) : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le",
                                     "modèle de survie ; fonctions de répartition de Poisson (ppois), approximation",
-                                    "numérique ; p = 0 : X ~ Poisson(A) ; aucune correction de multiplicité ;",
-                                    ajustee_p))) TRUE else "texte p_valeurs",
+                                    "numérique ; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de",
+                                    "multiplicité ;", ajustee_p))) TRUE else "texte p_valeurs",
     commun = if (endsWith(k(a, "p_valeurs"), ajustee_p) && endsWith(k(a, "p_valeurs_asymptotiques"), ajustee_p)) TRUE
              else "fragment ajustee_hors_outil",
     relations = if (all(vapply(c("bornes_exactes", "p_valeurs", "p_valeurs_asymptotiques"), function(g)
-                         grepl("relation independante : ", k(a, g), fixed = TRUE) &&
+                         grepl("relation independante[ ,]", k(a, g)) &&
                            grepl("relation ajustee_hors_outil : non produites", k(a, g), fixed = TRUE), NA))) TRUE
                 else "relation absente",
     positionnee = if (!any(grepl("relation ajustee_hors_outil", c(k(b, "bornes_exactes"), k(b, "p_valeurs")), fixed = TRUE))) TRUE
@@ -920,9 +927,9 @@ verifier("T200.2 de bout en bout (construire_table sous ajustee_hors_outil et in
     t_ <- function(g) st$statut[st$grandeur == g]
     if (!identical(t_("bornes_exactes"), ref$statut[ref$grandeur == "bornes_exactes"]) ||
         !identical(t_("p_valeurs"), ref$statut[ref$grandeur == "p_valeurs"]) ||
-        !grepl("relation ajustee_hors_outil : non produites, p non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA",
+        !grepl("relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA",
                t_("bornes_exactes"), fixed = TRUE) ||
-        !grepl("relation ajustee_hors_outil : non produites, p non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA",
+        !grepl("relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi, aucune p-valeur du sous-groupe (ddl_non_etabli) ; colonnes NA",
                t_("p_valeurs"), fixed = TRUE))
       e <- c(e, paste(rel, ": statuts_sous_groupes"))
     g <- v$resultat$sous_groupes

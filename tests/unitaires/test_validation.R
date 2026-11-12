@@ -42,21 +42,23 @@ tous <- function(...) {
 
 # --- A. Constantes et catalogue (valeur calculée à la main) -----------------------
 
-verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement puis validation, #167)",
-         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L)) &&
+verifier("A constantes : RELATIONS_TABLE (positionnee = 1L, #167, F5 ; lissee = NA_integer_, #224), CONVENTIONS_VALIDATION, N_MAX_WILCOXON_EXACT = 1000, N_MAX_RUNS_EXACT = 10000, TOLERANCE_RESIDU_NUL = 1e-10, PARAMETRES_CLE_TABLE (positionnement, coherence_regularite (#144) puis validation, #167)",
+         identical(tablexp:::RELATIONS_TABLE, c(independante = 0L, ajustee_hors_outil = NA_integer_, positionnee = 1L,
+                                                  lissee = NA_integer_)) &&
            identical(tablexp:::CONVENTIONS_VALIDATION, "dernier_anniversaire") &&
            identical(tablexp:::N_MAX_WILCOXON_EXACT, 1000) && identical(tablexp:::N_MAX_RUNS_EXACT, 10000) &&
            identical(tablexp:::TOLERANCE_RESIDU_NUL, 1e-10) &&
            identical(tablexp:::PARAMETRES_CLE_TABLE,
-                     c("etapes/positionnement/table_reference", "etapes/validation/table_reference")))
-verifier("A ETAPES : validation après brut, positionnement (#167) et homogeneite (#168), module validation, préalables donnees et exposition, aléatoire comme homogeneite (importance_exclusions après elle, #69)", {
+                     c("etapes/positionnement/table_reference", "etapes/coherence_regularite/tables_reference",
+                       "etapes/validation/table_reference")))
+verifier("A ETAPES : validation après brut, lissage (#223), positionnement (#167), homogeneite (#168) et coherence_regularite (#144), module validation, préalables donnees et exposition, aléatoire comme homogeneite (importance_exclusions après elle, #69)", {
   e <- tablexp:::ETAPES
   k <- match("validation", e$etape)
-  identical(e$etape, c("donnees", "exposition", "brut", "positionnement", "homogeneite", "validation",
-                       "importance_exclusions")) &&
+  identical(e$etape, c("donnees", "exposition", "brut", "lissage", "positionnement", "homogeneite",
+                       "coherence_regularite", "validation", "importance_exclusions")) &&
     identical(e$module[k], "validation") &&
     identical(e$fonction[k], "calculer_validation") && identical(e$prealable[[k]], c("donnees", "exposition")) &&
-    identical(e$aleatoire, c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE))
+    identical(e$aleatoire, c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE))
 })
 verifier("A PARAMETRES_ETAPES$validation : six paramètres dans l'ordre, types character et double", {
   p <- tablexp:::PARAMETRES_ETAPES$validation
@@ -771,4 +773,54 @@ verifier("CA7 (#210) : calculer_validation() en appel direct sur une exposition 
   if (inherits(r, "error")) conditionMessage(r) else
     if (is.integer(r$resultat$sous_groupes$annee) && !any(r$resultat$sous_groupes$regroupement %in% c("segment", "annee"))) TRUE else
       "types ou regroupements"
+})
+# --- #217 : annees_groupe(), longueur des années d'un regroupement de sous-groupes ---
+# Valeur calculée à la main (mesures du corps de #217, R 4.3.3) : rep_len(c(2015L, 2016L), 3L) donne
+# 2015 2016 2015, rep_len(integer(0), 2L) donne NA NA, rep_len(2015:2017, 2L) donne 2015 2016.
+# Message testé par ses fragments ASCII : sous la locale C, stop() traduit les caractères non ASCII d'un message en « <U+00E9> » (mesuré).
+MSG_ANNEES <- c("annees_groupe() : longueur des ann", "es diff", "rente du nombre de groupes (erreur de programmation).")
+message_annees <- function(m) startsWith(m, MSG_ANNEES[1L]) && endsWith(m, MSG_ANNEES[3L]) && grepl(MSG_ANNEES[2L], m, fixed = TRUE)
+# TRUE ou le texte des écarts de la fonction f aux trois longueurs différentes de n_g : erreur de programmation préfixée.
+controle_longueurs_differentes <- function(f) {
+  e <- character(0)
+  for (cas in list(list(c(2015L, 2016L), 3L), list(integer(0), 2L), list(2015:2017, 2L))) {
+    r <- tryCatch(f(cas[[1L]], cas[[2L]]), error = function(c) c)
+    if (!inherits(r, "error")) e <- c(e, sprintf("aucune erreur pour %d années et n_g = %d", length(cas[[1L]]), cas[[2L]]))
+    else if (!message_annees(conditionMessage(r)) || !is.null(conditionCall(r)))
+      e <- c(e, sprintf("message ou appel inattendu : %s", conditionMessage(r)))
+  }
+  if (length(e)) paste(e, collapse = " | ") else TRUE
+}
+verifier("#217 : annees_groupe(), n_g = 0 -> integer(0) (quelle que soit la longueur des années) ; longueur égale -> as.integer() (type integer, ordre conservé, NA admis)", {
+  f <- tablexp:::annees_groupe
+  if (identical(f(integer(0), 0L), integer(0)) && identical(f(NA_integer_, 0L), integer(0)) && identical(f(2015:2017, 0L), integer(0)) &&
+      identical(f(c(2015, 2016), 2L), c(2015L, 2016L)) && identical(f(c(NA_integer_, NA_integer_, NA_integer_), 3L), rep(NA_integer_, 3L)) &&
+      identical(f(2015L, 1L), 2015L)) TRUE else "valeur ou type inattendu"
+})
+verifier("#217 : annees_groupe(), longueur différente de n_g (c(2015L, 2016L) avec 3 ; integer(0) avec 2 ; 2015:2017 avec 2) -> erreur de programmation préfixée, sans appel", {
+  controle_longueurs_differentes(tablexp:::annees_groupe)
+})
+verifier("#217 : annees_groupe() sous sous_groupes_validation() par année, par sexe : annee integer, NA pour les regroupements autres que annee, 2015:2024 pour annee, aucune erreur (les quatre appels de groupe() passent une longueur n_g)", {
+  x <- construire_table(JEU_P, ROLES, plan_v(par_annee = TRUE), tables_reference = list(tv = T_HF))
+  sg <- x$etapes$validation$resultat$sous_groupes
+  a <- sg[sg$regroupement == "annee", ]
+  if (is.integer(sg$annee) && all(is.na(sg$annee[sg$regroupement != "annee"])) && nrow(a) > 0L && !anyNA(a$annee) &&
+      identical(a$annee, 2015:2024) && all(c("segment_tranche", "tranche", "segment", "annee") %in% sg$regroupement)) TRUE else
+    paste(unique(sg$regroupement), collapse = ", ")
+})
+verifier("#217, mutation : annees_groupe() remplacée dans l'espace de noms par la version rep_len() -> le contrôle des longueurs différentes échoue (aucune erreur levée), le contrôle de la version du package passe ; liaison restaurée et verrouillée", {
+  ns <- asNamespace("tablexp")
+  ancienne <- get("annees_groupe", envir = ns)
+  mutee <- function(an_g, n_g) rep_len(as.integer(an_g), n_g)
+  unlockBinding("annees_groupe", ns)
+  assign("annees_groupe", mutee, envir = ns)
+  r_mutee <- tryCatch(controle_longueurs_differentes(get("annees_groupe", envir = ns)), finally = {
+    assign("annees_groupe", ancienne, envir = ns); lockBinding("annees_groupe", ns)
+  })
+  r_vraie <- controle_longueurs_differentes(tablexp:::annees_groupe)
+  if (!isTRUE(r_mutee) && isTRUE(r_vraie) && grepl("aucune erreur pour 2 années et n_g = 3", r_mutee, fixed = TRUE) &&
+      grepl("aucune erreur pour 0 années et n_g = 2", r_mutee, fixed = TRUE) &&
+      grepl("aucune erreur pour 3 années et n_g = 2", r_mutee, fixed = TRUE) &&
+      identical(get("annees_groupe", envir = ns), ancienne) && bindingIsLocked("annees_groupe", ns)) TRUE else
+    paste("mutée :", paste(r_mutee, collapse = ""), "| vraie :", paste(r_vraie, collapse = ""))
 })
