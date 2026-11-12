@@ -691,6 +691,29 @@ et exécuté sous C, la constante est marquée UTF-8)~: elle n'est insérée
 que sous cette quatrième forme (ainsi le libellé du type \code{date} de \code{TYPES\_ADMIS},
 «~Date (valeurs entières finies)~», dans le refus
 \code{type\_incompatible}).
+Depuis l'issue~\#151, les deux constantes non ASCII du module
+\code{donnees} restituées hors de \code{texte\_moteur()},
+\code{TYPES\_ADMIS} (dont ce libellé est la seule chaîne non ASCII) et
+\code{LIBELLES\_MOTIFS} (libellés accentués~; M355~(a)), sont
+en outre marquées UTF-8 à la source, par une affectation de premier niveau
+qui applique au vecteur littéral, sous sa forme fonctionnelle, la fonction
+de remplacement \code{Encoding<-} avec la valeur \code{"UTF-8"}~: \code{texte\_moteur()}
+(\code{R/outils.R}) n'est pas encore définie quand \code{R/donnees.R} est
+évalué (ordre alphabétique d'évaluation à l'installation, sans champ
+\code{Collate}~; section~\ref{sec:fiche}~; ADR 0011, quatrième annotation
+du 20/10/2026, point~3), et le graphe des modules n'admet au premier
+niveau que des affectations. La colonne \code{type\_admis} de
+\code{catalogue\_roles()} et le champ
+\code{details\$type\_attendu} du refus \code{type\_incompatible}, qui
+recopient ce libellé sans passer par \code{texte\_moteur()}, sont ainsi
+marqués UTF-8 sous toute locale (\emph{constat de mesure}, paquet installé
+et exécuté sous la locale C~: toute chaîne non ASCII des deux constantes,
+de la colonne et du champ est d'encodage «~UTF-8~»~; avant ce marquage,
+«~unknown~»).
+L'insertion dans un message reste sous la quatrième forme~: le constat du
+06/11/2026 ci-dessus est antérieur à ce marquage, et le script de contrôle
+ci-dessous compte toujours ces deux constantes parmi les constantes non
+ASCII, \code{Encoding<-} n'étant pas \code{texte\_moteur()}.
 Un nombre inséré par
 \code{\%d}, \code{\%g} ou \code{\%f} n'est pas cité.
 \textbf{Garantie sur le champ \code{message}}~: un message qui contient un
@@ -1524,7 +1547,13 @@ illisible) et deux refus \code{type\_incompatible} sur un rôle date
 \code{bytes} et de \code{Date}~; le libellé «~entières~» de
 \code{TYPES\_ADMIS} y est exigé en octets UTF-8), messages qui doivent en outre ne contenir aucun octet écrit
 «~<xx>~» et garder la valeur citée en octets UTF-8 (issue~\#127~;
-section~\ref{sec:refus}, «~Règle de rédaction des messages~»), puis
+section~\ref{sec:refus}, «~Règle de rédaction des messages~»)~; il
+vérifie aussi, sous chacune des deux locales, que le champ
+\code{details\$type\_attendu} de ces deux refus et toute chaîne non ASCII
+de \code{TYPES\_ADMIS}, de \code{LIBELLES\_MOTIFS} et de la colonne
+\code{type\_admis} de \code{catalogue\_roles()} sont marqués UTF-8, avec
+un témoin (chacun des trois objets doit contenir au moins une chaîne non
+ASCII~; issue~\#151), puis
 compare octet à octet les textes
 obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
@@ -3298,12 +3327,15 @@ contrôlé sur son module et son motif attendus),
 de la lecture du texte du
 plan et de deux refus \code{type\_incompatible} sur un rôle date
 (marqués UTF-8, sur une ligne, sans octet écrit
-«~<xx>~»~; issue~\#127)~; puis ces textes (trois par plan, le bilan, les messages
+«~<xx>~»~; issue~\#127)~; marque UTF-8 de \code{details\$type\_attendu}
+de ces deux refus et des chaînes non ASCII de \code{TYPES\_ADMIS}, de
+\code{LIBELLES\_MOTIFS} et de \code{catalogue\_roles()\$type\_admis},
+avec témoin (issue~\#151)~; puis ces textes (trois par plan, le bilan, les messages
 de R1 et les messages par module~; leur nombre est écrit par la sortie du contrôle), comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11 et annotation du 05/11/2026, (f)~; M54~;
-issues~\#66 et~\#127 \\
+issues~\#66, \#127 et~\#151 \\
 \code{messages\_refus.R} & règle de rédaction des messages de refus
 (section~\ref{sec:refus})~: fichiers de \code{R/} lus par \code{parse()},
 sans charger \code{tablexp}~; gabarit de \code{formuler()} constant, aux
@@ -5187,7 +5219,12 @@ base (ADR 0007, point 4.1). Les colonnes sans rôle sont ignorées.
 \code{catalogue\_roles()}, exportée pour que l'application propose la
 déclaration des rôles, rend le catalogue sous la forme d'un \code{data.frame}
 de colonnes \code{role}, \code{famille}, \code{type\_admis} et
-\code{recettes} (tableau~\ref{tab:catalogue-roles}).
+\code{recettes} (tableau~\ref{tab:catalogue-roles}). La colonne
+\code{type\_admis} recopie les libellés de la constante
+\code{TYPES\_ADMIS}, marquée UTF-8 à la source~: ses chaînes non ASCII
+(«~entières~», rôles de type \code{date}) sont marquées UTF-8 quelle que soit la locale
+d'installation ou d'exécution (issue~\#151~; section~\ref{sec:refus},
+«~Règle de rédaction des messages~»).
 
 \medskip
 {\sloppy\hbadness=10000 La colonne \emph{recettes} nomme, dans l'ordre du
@@ -6239,7 +6276,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
 \catalogue{fonctions-donnees}{CATALOGUE\_ROLES} & constante & --- & catalogue fermé des rôles (rôle, famille, code de type) \\
-\catalogue{fonctions-donnees}{TYPES\_ADMIS} & constante & --- & libellé des types R admis par code de type \\
+\catalogue{fonctions-donnees}{TYPES\_ADMIS} & constante & --- & libellé des types R admis par code de type, marqué UTF-8 à la source (\#151) \\
 \catalogue{fonctions-donnees}{MODALITES\_SEXE} & constante & --- & \code{H}, \code{F} \\
 \catalogue{fonctions-donnees}{MODALITES\_CAUSE} & constante & --- & \code{deces}, \code{rachat}, \code{terme}, \code{autre}, \code{en\_cours} \\
 \catalogue{fonctions-donnees}{MODALITES\_TYPE\_LIGNE} & constante & --- & \code{inventaire}, \code{evenement}~: modalités du rôle \code{type\_ligne} (recette \code{stocks\_successifs}) \\
@@ -6252,7 +6289,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{MOTIFS\_LIGNES\_AGREGATS} & constante & --- & motifs de ligne de la recette \code{agregats} (une ligne est une cellule), dans l'ordre de restitution~; aucun motif d'unité \\
 \catalogue{fonctions-donnees}{MOTIFS\_LIGNES\_STOCKS} & constante & --- & les vingt et un motifs de ligne de la recette \code{stocks\_successifs}, dans l'ordre de restitution~: toute ligne, ligne d'inventaire, ligne d'événement (tableau~\ref{tab:motifs-stocks}) \\
 \catalogue{fonctions-donnees}{MOTIFS\_UNITE\_STOCKS} & constante & --- & les huit motifs d'unité de la recette \code{stocks\_successifs}, évalués sur les unités exemptes de motif de ligne \\
-\catalogue{fonctions-donnees}{LIBELLES\_MOTIFS} & constante & --- & libellé de chaque code de motif de l'union des recettes, un seul par code quelle que soit la recette qui le lève \\
+\catalogue{fonctions-donnees}{LIBELLES\_MOTIFS} & constante & --- & libellé de chaque code de motif de l'union des recettes, un seul par code quelle que soit la recette qui le lève, marqué UTF-8 à la source (\#151) \\
 \catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus \\
 \catalogue{fonctions-donnees}{CATALOGUE\_RECETTES} & constante & --- & catalogue des recettes d'exposition, une ligne par recette~: rôles requis, groupes de rôles dont un au moins est requis, rôles facultatifs, rôles propres (discriminants), convention native (\code{NA} si elle ne se déduit pas des rôles), forme rendue au noyau (\code{fenetres} ou \code{cellules}), motifs de ligne et d'unité~; lignes \code{lignes\_dates\_completes}, \code{agregats} et \code{stocks\_successifs} (tableau~\ref{tab:recettes}) \\
 \catalogue{fonctions-donnees}{MATRICE\_RECETTES} & constante & --- & matrice recette $\times$ étape $\times$ estimateur, complète, une ligne par étape et par estimateur de \code{brut}~: admis (\code{oui}, \code{non}, \code{si\_role}), rôle qui conditionne \code{si\_role}, motif du refus~; tout est admis sous \code{lignes\_dates\_completes}~; sous \code{agregats}, lignes \code{si\_role} et \code{non}~; sous \code{stocks\_successifs}, tout est admis sauf \code{importance\_exclusions}~; trois recettes $\times$ (étapes de \code{ETAPES} $+$ trois estimateurs) lignes~; l'étape \code{lissage} admise (\code{oui}) sous les trois recettes (section~\ref{sec:recettes}) \\
