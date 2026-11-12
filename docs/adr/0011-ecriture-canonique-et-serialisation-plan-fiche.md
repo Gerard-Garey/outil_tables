@@ -1109,3 +1109,44 @@ Rédigée par `architect` à l'étape (0''') de la branche `claude/recette-stock
 **Effet sur les résultats : aucun** par la présente annotation. Par B15 : celui de (a) ; R1 à R12 n'ont ni `inventaires` ni paramètre conditionnel, leur `fiche/plan` est inchangé.
 
 Issues : #169, #180, #181. Décisions M319, M331, M332, M333, M334, M335. ADR 0016 ; ADR 0007 et 0014 (annotations du même jour). Branche `claude/recette-stocks-successifs`, PR #188.
+
+## Annotation du 12 novembre 2026 — quatrième annotation du 20/10/2026, (c) 2 : `canoniser_plan()` lit la marque `TRI_NUMERIQUE`, constante de son propre module (#144)
+
+Rédigée par `architect` (fiche de routine) sur la porteuse `claude/lissage-whittaker` (B19, PR #221), tête `c3db116`, commit (4) de #144. L'écart a été relevé au visa d'`actuary-approfondi` sur #144 et signalé à `architect` par le message du commit `c3db116`. `actuary-approfondi` le juge sans effet sur les résultats et non bloquant ; la décision de forme revient à `architect`. Le texte ci-dessus, annotations comprises, n'est pas réécrit ; les renvois `fichier:ligne` datent de `c3db116`, le nom de l'objet fait foi (M77, (b)).
+
+**(a) Constat** (*vérifié* à `c3db116`). La quatrième annotation du 20/10/2026, (c) 2, écrit : « `canoniser_plan()` ne lit aucune constante. » Depuis `c3db116`, elle en lit une.
+- `git grep -n TRI_NUMERIQUE c3db116 -- R` rend cinq lignes :
+  - la définition `TRI_NUMERIQUE <- "tri_numerique"` (`R/rapport.R:879`), dans le module de `canoniser_plan()` ;
+  - deux commentaires (`R/rapport.R:896` ; `R/construire_table.R:707`) ;
+  - la lecture dans `canoniser_plan()`, `if (identical(o, TRI_NUMERIQUE))` (`R/rapport.R:958`), qui trie par ordre croissant les valeurs `double` du champ marqué ;
+  - l'élément `"etapes/coherence_regularite/ordres" = TRI_NUMERIQUE` d'`ordres_canoniques()` (`R/construire_table.R:720`).
+- Objets de l'espace de noms lus par le corps de `canoniser_plan()` : `all.names(body(.))` filtré sur les objets de l'espace de noms de `tablexp`, installé depuis `git archive c3db116` dans une bibliothèque temporaire, sous R 4.3.3. Sortie : `"forme_graine" "TRI_NUMERIQUE"`. `forme_graine()` est une fonction de `R/outils.R:127` (#61). `TRI_NUMERIQUE` est donc la **seule constante** lue.
+
+**(b) Lecture.** Le point (c) 2 a pour objet la **localité**. Il pose trois conditions :
+1. le seul endroit qui sait quel champ suit quel catalogue est l'appel ;
+2. la fonction ne dépend pas des constantes des autres modules (point 9.3) ;
+3. elle se teste avec des catalogues fabriqués.
+
+Les trois restent vraies.
+1. Le choix du champ trié numériquement reste au seul lieu d'appel, `ordres_canoniques()` (`R/construire_table.R:716-720`), qui est une fonction et non une constante de premier niveau. Le point (c) 3 est donc respecté : l'installation depuis `c3db116` passe, avec le chargement différé.
+2. `TRI_NUMERIQUE` n'est pas un catalogue de valeurs d'un autre module. C'est un **jeton de l'interface** de `canoniser_plan()` : une valeur admise de l'argument `ordres` qui choisit la règle « ordre croissant » au lieu de « ordre du catalogue ». Il est défini dans le même module, juste avant la fonction. Aucune arête n'est ajoutée au graphe : `construire_table.R` → `rapport` existait déjà, puisque `construire_table()` appelle `canoniser_plan()`.
+3. La marque est une valeur d'argument : un test peut toujours passer à `canoniser_plan()` une liste `ordres` fabriquée, marque comprise. Les tests actuels de la règle (`tests/unitaires/test_coherence_regularite.R:405-422` : tri, idempotence, aller-retour, refus d'un `integer`, d'un `NA` et d'un doublon) passent `ordres_canoniques()` et non une liste fabriquée (lus, non exécutés ici).
+
+La lettre de (c) 2 a été écrite quand l'argument `ordres` ne portait que des catalogues ; elle ne prévoyait pas de règle d'ordre sans catalogue.
+
+**(c) Décision.** L'écart est **accepté sans changement de code**. Le point (c) 2 se lit désormais ainsi : `canoniser_plan()` ne lit ni constante d'un autre module, ni catalogue de valeurs. Elle peut lire les **marques de sa propre interface**, définies dans `R/rapport.R` à côté d'elle, qui désignent une règle d'ordre et non des valeurs. Toute marque future suit la même règle : définie dans `rapport`, nommée dans le commentaire d'en-tête de `canoniser_plan()`, choisie dans `ordres_canoniques()` seule.
+
+**(d) Réserve : la marque est transmise dans la même bande que les catalogues.** Un catalogue réduit à la seule valeur `"tri_numerique"` serait lu comme la marque. Aucun catalogue actuel n'est dans ce cas. Mesure (*vérifiée*, même installation) :
+- `sapply(ordres_canoniques(), identical, TRI_NUMERIQUE)` rend `FALSE` pour `segmentation`, `etapes/donnees/exclusions` (52 motifs) et `etapes/brut/estimateurs`, et `TRUE` pour `etapes/coherence_regularite/ordres` seul ;
+- `any(unlist(ordres_canoniques()[1:3]) == "tri_numerique")` rend `FALSE`.
+
+Deux tests protègent la valeur de la marque et son emploi : `tests/unitaires/test_coherence_regularite.R:119-122` et `tests/unitaires/test_construire_table.R:1696-1699`. Si une deuxième marque devient nécessaire, ou si un catalogue peut contenir cette valeur, l'option (iii) ci-dessous est rouverte.
+
+**Options écartées.**
+- (i) **Faire passer la marque par l'appelant** : `construire_table()` transmettrait le jeton à `canoniser_plan()` par un argument de plus. Le jeton change de côté du seam, mais les deux côtés doivent toujours partager la même valeur. La signature s'allonge sans gain de localité. Il faudrait aussi un commit et un audit, pour un effet nul sur les résultats.
+- (ii) **Une fonction de tri comme élément d'`ordres`** : `canoniser_plan()` exécuterait du code fourni par l'appelant, ce qui élargit son interface.
+- (iii) **Une marque hors bande**, objet de classe propre au lieu d'une chaîne : elle lève la réserve (d). Mais elle reste une constante partagée, et le gain est marginal tant qu'il n'y a qu'une marque. Elle est gardée en réserve (condition de réouverture : (d)).
+
+**Effet sur les résultats : aucun.** Aucun code n'est modifié par la présente annotation.
+
+Issues : #144 ; #63. ADR 0017, point 13.2 (`ordres`, « ordre canonique croissant, ADR 0011, point 5.1 (h) »). Branche `claude/lissage-whittaker`, PR #221.
