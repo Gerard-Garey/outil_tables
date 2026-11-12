@@ -4872,7 +4872,10 @@ dite dans la colonne \code{lu}. Une empreinte de table porte sur des doubles
 peut en différer au dernier bit, par les fonctions de la \code{libm}, et son
 rejeu y être refusé (\emph{possibilité} déduite de l'écriture, non
 mesurée~; ADR 0015, point~2.3)~; ses paramètres, dans la fiche, permettent
-alors au tiers de la recalculer et de mesurer l'écart. Les
+alors au tiers de la recalculer et de mesurer l'écart, pour autant qu'ils
+aient été déclarés exactement~: déclarés par l'appelant, ils ne sont pas
+vérifiés par le moteur (section~\ref{sec:table-reference}, «~Statut des
+paramètres d'une table synthétique~»~; issue~\#163). Les
 témoins \textbf{signalent et ne refusent jamais}~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{code}~: égalité exacte de l'empreinte du code de la fiche et
@@ -6214,6 +6217,27 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
 \end{itemize}
+
+\medskip
+\noindent
+\textbf{Statut des paramètres d'une table synthétique} (issue~\#163,
+option~(a), décision M279). Les \code{parametres} sont \textbf{déclarés par
+l'appelant, non vérifiés par le moteur}~: \code{table\_reference()} en exige
+une liste non vide sans en contrôler ni la forme ni la cohérence avec les
+$q_x$ (une liste \code{loi = "gompertz\_makeham"} avec $c = 1$ est admise,
+alors que \code{table\_gompertz\_makeham()} refuse $c = 1$), et le contrôle de
+reconstruction de \code{construire\_table()} admet un attribut modifié après le
+constructeur. Il en va de même d'une table rendue par une loi du package
+(\code{table\_gompertz\_makeham()}, \code{table\_logistique()},
+\code{table\_constante()}), que le moteur ne distingue pas d'une table
+déclarée par l'appelant. La table entre en valeurs~: l'empreinte de table
+porte sur son contenu (âge, sexe, année si présente, $q_x$), non sur ses
+métadonnées, et aucune étape ne lit les paramètres~; ils permettent au tiers
+de recalculer la table et de mesurer l'écart (ADR 0015, point~2.3) pour
+autant qu'ils aient été déclarés exactement. Le rapport figé le dit par la
+mention \code{tables\_reference\_parametres} (section~\ref{sec:rapport-fige}).
+Les tables importées et embarquées n'ont pas de paramètres
+(\code{table\_parametres\_inattendus}) et ne sont pas concernées.
 
 \noindent
 {\sloppy\hbadness=10000 Le constructeur refuse au lieu de corriger, avec un code par contrôle~:
@@ -14640,7 +14664,7 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{lecture} & Lecture du rapport & texte & textes de lecture (ci-dessous)~; conventions d'écriture de \code{CONVENTIONS\_TEXTE}, dans leur ordre~; empreinte du code qui écrit le rapport \\
 \code{identification} & Identification~: empreintes, versions et plateforme & objet & \code{fiche/version\_fiche}, \code{fiche/empreintes}, \code{fiche/versions}, \code{fiche/plateforme}~; puis mentions des empreintes, phrase de plateforme et phrase du contrôle d'intégrité \\
 \code{alea} & Graine et générateur & objet & \code{fiche/graine}, \code{fiche/graine\_mention}, \code{fiche/generateur} \\
-\code{donnees\_recues} & Rôles, provenance, recette et unité d'observation & objet & \code{fiche/roles}, \code{fiche/provenance}, \code{fiche/provenance\_mention}, \code{fiche/tables\_reference}, \code{fiche/recette}, \code{fiche/unite\_observation}, \code{fiche/avertissement\_unite} \\
+\code{donnees\_recues} & Rôles, provenance, recette et unité d'observation & objet & \code{fiche/roles}, \code{fiche/provenance}, \code{fiche/provenance\_mention}, \code{fiche/tables\_reference}, \code{fiche/recette}, \code{fiche/unite\_observation}, \code{fiche/avertissement\_unite}~; puis, si au moins une table de \code{fiche/tables\_reference} est de statut \code{synthetique}, la mention \code{tables\_reference\_parametres}, une seule fois (ci-dessous~; issue~\#163) \\
 \code{plan} & Plan de construction (plan canonique), transition et fin effective de la période & objet & \code{fiche/plan}, \code{fiche/transition\_code}, \code{fiche/fin\_effective} \\
 \code{fiche\_hypotheses} & Paramètres retenus et hypothèses consignés dans la fiche & objet & \code{fiche/convention}, \code{fiche/unite\_exposition}, \code{fiche/par\_annee}, \code{fiche/exclusions}, \code{fiche/nombre\_lignes\_exclues}, \code{fiche/hypothese\_censure}, \code{fiche/hypotheses\_recette}, \code{fiche/hypotheses\_brut}, \code{fiche/avertissements} \\
 \code{etape\_donnees} & Étape donnees~: exclusions, unité d'observation et relevés & etape & étape \code{donnees}~: \code{etapes/donnees}, sous-arbre entier \\
@@ -14742,6 +14766,17 @@ et de deux phrases~:
     (valeurs, ou structure seule pour une table dont le volume croît avec la
     base) est lu dans l'objet, sans vérification.~»
 \end{itemize}
+% citation : MENTIONS_RAPPORT["tables_reference_parametres"]
+La section \emph{donnees\_recues}, quand au moins une table de
+\code{fiche/tables\_reference} est de statut \code{synthetique}, fait suivre son
+tableau de la mention \code{tables\_reference\_parametres}~: «~Tables de
+référence de statut synthetique~: leurs paramètres (champ parametres des
+éléments de fiche/tables\_reference) sont déclarés par l'appelant, non vérifiés
+par le moteur~; ni leur forme ni leur cohérence avec les q\_x de la table ne
+sont contrôlées. Une table de référence entre en valeurs~: son empreinte (champ
+empreinte) porte sur son contenu (âge, sexe, année si présente, q\_x), non sur
+ses métadonnées, et aucune étape de la construction ne lit ces paramètres.~»
+(issue~\#163, M279)~; sans table synthétique, la section est inchangée.
 La section \emph{étape brut} s'ouvre sur la note «~La colonne taux porte une
 force de transition pour l'estimateur poisson (D / E\^{}c) et une probabilité
 pour binomial (D / E\^{}i) et kaplan\_meier~; un taux brut se désigne avec son
