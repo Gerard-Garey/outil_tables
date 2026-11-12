@@ -1177,3 +1177,50 @@ Rédigée par `architect` à l'étape (0')(d) de la porteuse `claude/lissage-whi
 **Effet sur les résultats : aucun** par la présente annotation. R1 à R14 ne contiennent aucune grandeur de l'étape `lissage`.
 
 Issues : #225, #223, #224. Décisions M413, M415. ADR 0017. Branche `claude/lissage-whittaker`, PR #221.
+
+## Annotation du 12 novembre 2026 — points 3.4 et 9.3 : classe de tolérance `optimisation` fixée à 1e-3, constat de mesure, portée `lissage/*` seule (M416, option (δ)) ; dépassement du seuil de 1e-6 accepté par `actuary-approfondi` sous la délégation M420, (4) ; clés à déclarer à l'étape (R) de B19 (#225)
+
+Rédigée par `architect` (fiche de routine) au commit (3) de la porteuse `claude/lissage-whittaker` (B19, PR #221), tête `178d92e`, pendant la reprise de #225. Annotation de **constat de la classe**, annoncée par la troisième annotation du 11/11/2026, (b), et par l'ADR 0017, point 8.2 ; elle transcrit le jugement d'`actuary-approfondi` du 12/11/2026. `CLASSES_TOLERANCE` et `TOLERANCES` ne sont **pas** modifiées à ce commit (`tests/reference/outils_reference.R:91` à `178d92e` : quatre classes, *vérifié* par `git grep`) : les clés énumérées en (e) sont déclarées à l'étape (R), avec la création de R15 à R17 (M415). Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Mesures** (*rapportées* par la session : mesures de `coder` au commit (3) et contre-mesures d'`actuary-approfondi` ; *non remesurées* par `architect`). Écarts relatifs entre l'exécution nominale et des exécutions perturbées de l'ordre de l'arrondi, sur les plans de référence de Whittaker-Henderson (b) :
+- perturbations (i) à (iii) (départ de la grille décalé, ordre de sommation modifié) : au plus 3,4e-8 sur toutes les grandeurs ;
+- perturbation (iv), lignes permutées de R16 : `regularite` 3,46e-5, `parametre_lissage` 2,08e-5, `levier` 4,1e-6, `qx` 1,3e-6 ;
+- 20 permutations supplémentaires (`actuary-approfondi`) : |Δ ln λ̂| ≤ 2,34e-5 ; `regularite` 3,88e-5 ; `levier` 4,59e-6 ; `qx` 1,46e-6 ;
+- chemins de la validation `lissee` sous les mêmes perturbations : attendus 1,46e-6, résidus 1,34e-5.
+
+Écart maximal mesuré : 3,88e-5 (`regularite`). Statut : **constat de simulation** sur un nombre fini de perturbations, non borne démontrée.
+
+**(b) Classe fixée.** `optimisation` = **1e-3**, plus petite classe décimale au moins égale à dix fois l'écart maximal mesuré (10 × 3,88e-5 = 3,88e-4), règle de la troisième annotation du 11/11/2026, (b). Statut de la valeur : **constat de mesure**, non résultat exact. La classe dépasse le seuil de 1e-6 de M416, (3) : elle n'est retenue que par le jugement d'`actuary-approfondi` du 12/11/2026, rendu sous la délégation **M420, (4)** (« au-delà de 1e-6, `actuary-approfondi` juge si l'écart est acceptable et documenté ; s'il l'est, on continue en le notant au corps de la PR »). Motifs du jugement :
+1. λ̂ est l'argmax d'une fonction plate (la LAML au voisinage de son maximum) : un bruit d'évaluation de la LAML de l'ordre de 1e-9 se traduit en un déplacement de l'ordre de 1e-5 en ln λ̂ ; il est **irréductible** par la tolérance de Brent (la spécification de #225, § 6, notait déjà que la position du maximum n'est déterminée qu'à environ 1e-4 près en ln λ quelle que soit la tolérance) ;
+2. l'incertitude statistique de ln λ̂ est d'ordre 1 : l'écart numérique est de quatre ordres de grandeur en dessous ;
+3. sur `qx`, l'écart (1,5e-6 en relatif) est négligeable devant les demi-largeurs des intervalles de crédibilité (quelques pour cent).
+
+L'écart est donc jugé acceptable et documenté ; il est noté au corps de la PR #221 par la session (M420, (4)).
+
+**(c) Portée : chemins `lissage/*` seulement (M416, option (δ)).** Décision du mainteneur du 11/11/2026, consignée en M416, (3) (`docs/feuille-de-route.md` § 4) et formulée dans la spécification de forme de #225, § 6 (commentaire 6799616343 : « la classe mesurée ne vaut que pour les chemins `lissage/*` ; les chemins de la validation, communs aux quatre relations, gardent 1e-12 »). **M416 prévaut** sur :
+- la phrase de l'ADR 0017, point 8.3, sur la validation (« les grandeurs de la validation `lissee` qui dérivent de ces valeurs […] reçoivent la même classe par leurs clés propres ») ;
+- l'ADR 0017, point 5.5, (v), pour `parametres/ddl_effectifs/ddl_effectifs_retenus` (chemin de la validation, qui « suit la règle des chemins de ν ») ; `table_lissee/levier`, chemin du lissage, reçoit bien la classe `optimisation` ;
+- la troisième annotation du 11/11/2026, (c), phrase « Les grandeurs de la validation `lissee` qui en dérivent […] reçoivent la même classe par leurs clés propres », au même titre.
+Ces textes ne sont pas réécrits ; ils renvoient à la présente annotation.
+
+**(d) (δ) tenable sur la CI, et ses limites.**
+1. **Pourquoi la validation tient à 1e-12** : l'entrée des références est fixe (`jeu_reference()`, `agregats_reference()`, `identical()` contrôlé, point 4), l'image et le BLAS de référence sont les mêmes à la création et à la comparaison (point 5), l'algorithme est déterministe (ADR 0017, point 6.2). Pour R16 et R17, les chemins de la validation sont donc, de fait, des références **au bit près** sur la plateforme de référence.
+2. **Conséquence** : tout changement amont de l'ordre des sommes, ou toute variante de `libm` ou de BLAS, fera échouer ces chemins. Ce n'est pas une régression : cela se résout par un tableau avant / après, chaque ligne expliquée par la précision de λ̂ (b), puis par une régénération sous visa (point 9.3 ; règle 9.5).
+3. **Test de permutation** (#39, `TOLERANCE_PERMUTATION`, plans R2 à R6) : il **ne doit pas** être étendu à R15, R16 ni R17 (la perturbation (iv) de (a) dépasse 1e-12 sur la validation).
+4. **Hors plateforme de référence** (*hypothèse, non mesurée*) : un ulp d'écart sur `-expm1` suffirait à faire échouer `qx_table` (classe exacte) et la statistique `smr` sous `lissee`. **Règle** : si, après (R), la batterie de reproductibilité échoue sur un poste pour R16 ou R17 **dans ces seuls chemins**, la décision revient au mainteneur, entre trois options : comparaison stricte sur la plateforme de référence seule et constat ailleurs ; retrait de la validation `lissee` de R16 ; retour sur (δ). Un échec sur d'autres chemins relève de la règle ordinaire (point 9.3).
+5. **Grandeurs nulles par construction** (résidus de conservation `residu_conservation_0` et `residu_conservation_1` ; `smr` et `ecart` sous `lissee`) : leur écart relatif sous perturbation vaut environ 1, avec changement de signe ; la tolérance relative n'y a pas de sens. Elles sont classées `optimisation` (chemins `lissage/*`) avec cette **limite écrite** ; une règle absolue est proposée en #243.
+
+**(e) Clés à déclarer dans `TOLERANCES` à l'étape (R)** (liste d'`actuary-approfondi` ; aucune clé pour une grandeur `integer`, dont le nombre d'itérations : point 9.6 et commentaire de `TOLERANCES`, `tests/reference/outils_reference.R:92`) :
+
+| Classe | Clés |
+|---|---|
+| `optimisation` (1e-3) | `lissage/resultat/table_lissee/{qx, borne_inf_credibilite, borne_sup_credibilite, levier}` ; `lissage/resultat/segments/{parametre_lissage, ddl_effectifs, regularite, laml, deviance_penalisee, residu_conservation_0, residu_conservation_1}` |
+| 1e-14 | `lissage/diagnostics/exposition_centrale_hors_plage` ; `lissage/diagnostics/exposition_initiale_hors_plage` (sous la relation (a)) |
+| exacte | `lissage/parametres/{plage_ages, ordre_difference, niveau, parametre_lissage, intervalle_lissage}` ; valeurs des constantes |
+| 1e-12 (δ) | `validation/parametres/ddl_effectifs/{ddl_effectifs, ddl_effectifs_retenus}` |
+
+Les autres chemins `double` de la validation `lissee` et de `coherence_regularite` gardent la classe de leur clé existante, ou reçoivent la leur d'`actuary` avant d'entrer dans une référence (troisième annotation du 11/11/2026, (d)). Le constat des clés effectivement déclarées (décomptes par classe avant / après) sera porté par l'annotation de fin de branche.
+
+**Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code ni aucune référence. R1 à R14 ne contiennent aucune grandeur de l'étape `lissage`.
+
+Issues : #225, #243, #39. Décisions du mainteneur M416, (3) et M420, (4) (11/11/2026) ; jugement d'`actuary-approfondi` du 12/11/2026 sous M420, (4). ADR 0017, points 5.5, 8.2 et 8.3. Branche `claude/lissage-whittaker`, PR #221.
