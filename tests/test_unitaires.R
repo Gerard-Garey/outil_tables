@@ -70,9 +70,17 @@ local({
   # Un appel d'opérateur non ASCII (a %é% b) est lu hors UTF-8
   # sous le nom littéral « %\U{e9}% » ; aucun tel opérateur ne peut être défini
   # hors UTF-8 et le dépôt n'en contient aucun.
-  # Les noms non ASCII des fichiers de test (étiquettes de cas, champs d'un objet
-  # éprouvé) restent altérés hors UTF-8 : un cas écrit avec un tel nom ne porte
-  # alors pas sur le caractère non ASCII (limite de parse(), non levée ici).
+  # Règle de construction des noms de test (#229). Hors UTF-8, une chaîne non
+  # ASCII en position de nom (nom d'argument : list("é" = 1), c("é" = 1) ; après
+  # $ ; membre gauche : "é" <- 1) est altérée en « <U+00E9> » ; un symbole non
+  # ASCII, nu ou entre accents graves, est refusé (voir plus haut). Quand le nom
+  # est l'objet éprouvé (champ, nom d'élément que le code compare ou cite), le
+  # fichier de test ne l'écrit donc jamais ainsi : il le pose par setNames() ou
+  # `names<-`, ou par x[["é"]] <- v, à partir d'une chaîne en position de
+  # valeur, intacte en toute locale (setNames(list(1), "é")). Une étiquette de
+  # cas altérée ne touche que le libellé et reste admise. Une chaîne d'encodage
+  # « bytes » se construit par Encoding(x) <- "bytes" sur une chaîne en position
+  # de valeur ("\xe9", ou "é" pour les octets UTF-8).
   session_utf8 <- function() isTRUE(l10n_info()[["UTF-8"]])
   # Remplace chaque caractère non ASCII d'un vecteur de lignes UTF-8 par
   # `par(points de code)`.

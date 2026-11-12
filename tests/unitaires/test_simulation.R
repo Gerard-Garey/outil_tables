@@ -1346,7 +1346,10 @@ DEFAUTS_INVALIDES <- list(
   list("graine manquante", list(declarations = list(D1))),
   list("champ inconnu", list(graine = 1L, declarations = list(D1), seed = 2L)),
   list("noms en double", list(graine = 1L, graine = 2L)),
-  list("champ au nom non ASCII", list(graine = 1L, declarations = list(D1), "défauts" = 1)),
+  # Nom posé par `names<-` : en position de nom d'argument ("défauts" = 1), il
+  # devient « d<U+00E9>fauts » sous LC_ALL=C (#229, mesuré) et le cas ne porte
+  # plus sur le caractère non ASCII.
+  list("champ au nom non ASCII", `names<-`(list(1L, list(D1), 1), c("graine", "declarations", "défauts"))),
   list("graine non entière", list(graine = 1.5, declarations = list(D1))),
   list("graine NA", list(graine = NA_integer_, declarations = list(D1))),
   list("graine caractère", list(graine = "1", declarations = list(D1))),
@@ -1409,6 +1412,13 @@ for (k in DEFAUTS_INVALIDES) {
              leve_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = k[[2]]), "defauts_invalides") &&
              identical(globalenv()$.Random.seed, avant))
 }
+# Le code seul ne distingue pas le cas : un nom altéré (« d<U+00E9>fauts ») est
+# aussi un champ inconnu. Le message doit citer le champ en UTF-8 (#229).
+verifier("défauts : champ au nom non ASCII -> le message de refus cite « défauts » en UTF-8 (nom intact en toute locale)",
+         grepl("« défauts »",
+               message_refus(simuler(loi(), PF_M_1E3, PER, GRAINE,
+                 defauts = `names<-`(list(1L, list(D1), 1), c("graine", "declarations", "défauts")))),
+               fixed = TRUE))
 verifier("défauts : ordre des refus figé, graine du jeu invalide et défauts invalides -> defauts_invalides ; graine du jeu invalide et défauts valides -> graine_invalide", {
   d_inv <- list(graine = 1L, declarations = list(list(type = "sortie_manquante", cible = "en_cours", nombre = 0)))
   isTRUE(leve_refus(simuler(loi(), PF_M_1E3, PER, 1.5, defauts = d_inv), "defauts_invalides")) &&
