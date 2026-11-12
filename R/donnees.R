@@ -398,10 +398,12 @@ entiers_finis <- function(v) {
 # une matrice ou une classe autre que celles admises (POSIXct, difftime...)
 # est refusée. Dimension lue par attr() et facteur par a_classe() (R/outils.R,
 # #128) : dim() et is.factor() dispatchent sur la classe et lèvent une erreur R
-# sur une classe d'encodage « bytes » (mesuré) ; la colonne est alors refusée
-# comme toute classe non admise.
+# sur une classe d'encodage « bytes » (mesuré) ; une colonne dont un élément de
+# la classe est d'encodage « bytes » est refusée, où qu'il se place dans la
+# classe (#150) : a_classe(x, "factor") est vrai pour c(<bytes>, "factor"), et
+# la suite (anyNA(), as.character()) lèverait l'erreur R.
 type_conforme <- function(x, type) {
-  if (!is.atomic(x) || !is.null(attr(x, "dim", exact = TRUE))) return(FALSE)
+  if (!is.atomic(x) || !is.null(attr(x, "dim", exact = TRUE)) || classe_bytes(x)) return(FALSE)
   nu <- !is.object(x)
   chaine <- nu && is.character(x)
   entier <- nu && is.integer(x)
@@ -533,6 +535,16 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
 # le refus 8 suppose la sélection. Chaque refus nomme tous les rôles en
 # cause. Rend la recette retenue (deduire_recette()).
 controler_roles <- function(donnees, roles, segmentation) {
+  # Classe d'encodage « bytes » lue par classe_bytes() avant is.data.frame(),
+  # dont inherits() lève une erreur R sur elle (#150) ; le refus est propre à
+  # ce cas : « doivent être un data.frame » serait faux d'un data.frame sous-classé.
+  if (classe_bytes(donnees))
+    refuser("donnees", "donnees_mal_formees",
+            formuler(paste("Les données portent une classe d'encodage « bytes » (classe %s), non convertible en UTF-8",
+                           "sans deviner : elles ne sont pas lues. Passer un data.frame dont la classe ne porte aucune",
+                           "chaîne d'encodage bytes."),
+                     paste(citer(class(donnees)), collapse = "/")),
+            list(classe = class(donnees)))
   if (!is.data.frame(donnees))
     refuser("donnees", "donnees_mal_formees",
             formuler("Les données doivent être un data.frame (le moteur ne lit pas de fichier)."),

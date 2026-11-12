@@ -261,6 +261,78 @@ local({
                               error = function(e) conditionMessage(e)),
                      tablexp:::deduire_recette(ROLES)))
 })
+# Classe d'encodage bytes en position quelconque de la classe d'une colonne de
+# rôle ou des données (#150) : a_classe(x, "factor") est vrai pour
+# c(<bytes>, "factor") et la suite lèverait l'erreur R « translating strings
+# with "bytes" encoding is not allowed » ; is.data.frame() la lève pour des
+# données de classe c(<bytes>, "data.frame"). Colonne : refus type_incompatible
+# du module donnees (avant #150 : controler_roles() ne refusait rien, et
+# construire_table() refusait type_non_canonique au module rapport). Données :
+# refus donnees_mal_formees (avant #150 : erreur R). Témoins non bytes
+# (c("autre", "factor"), c("autre", "data.frame")) acceptés. Contre-épreuve : ces
+# tests échouent sur le code antérieur. Une erreur R est rendue, non propagée ;
+# les data.frame sont assemblés sans `$<-`, qui lèverait la même erreur.
+local({
+  b <- "\xe9"; Encoding(b) <- "bytes"
+  PLAN <- list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = character(0)),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  avec_sexe <- function(classe) {
+    l <- unclass(BASE)
+    l$sexe <- structure(as.integer(factor(l$sexe)), levels = c("F", "H"), class = classe)
+    structure(l, class = "data.frame", row.names = seq_len(nrow(BASE)))
+  }
+  avec_classe <- function(classe) structure(unclass(BASE), class = classe, row.names = seq_len(nrow(BASE)))
+  chemins <- list(controler_roles = function(d) tablexp:::controler_roles(d, ROLES, "sexe"),
+                  construire_table = function(d) construire_table(d, ROLES, PLAN))
+  verdict <- function(x, motif, fragments) {
+    if (is.null(x)) return("aucun refus levé")
+    if (!inherits(x, "refus_tablexp")) return(sprintf("condition %s : %s", class(x)[1L], conditionMessage(x)))
+    r <- contient(x, fragments)
+    if (!isTRUE(r)) r
+    else if (!identical(x$module, "donnees")) sprintf("module « %s »", x$module)
+    else if (!identical(x$motif, motif)) sprintf("motif « %s »", x$motif)
+    else if (grepl("[\n\v\f]", conditionMessage(x))) "message sur plusieurs lignes"
+    else if (!identical(Encoding(conditionMessage(x)), "UTF-8")) "message non marqué UTF-8" else TRUE
+  }
+  for (cl in list(list(c(b, "factor"), "<chaîne d'encodage bytes>/factor"),
+                  list(c("factor", b), "factor/<chaîne d'encodage bytes>")))
+    for (k in names(chemins))
+      verifier(sprintf("colonne sexe de classe %s : %s -> refus type_incompatible du module donnees, classe citée sous le repère, une ligne, UTF-8",
+                       cl[[2L]], k),
+               verdict(attrape(chemins[[k]](avec_sexe(cl[[1L]]))), "type_incompatible",
+                       c("rôle « sexe », colonne « sexe »", paste0("attendu, ", cl[[2L]], " reçu"))))
+  for (cl in list(list(c(b, "data.frame"), "<chaîne d'encodage bytes>/data.frame"),
+                  list(c("data.frame", b), "data.frame/<chaîne d'encodage bytes>")))
+    for (k in names(chemins)) {
+      x <- attrape(chemins[[k]](avec_classe(cl[[1L]])))
+      verifier(sprintf("données de classe %s : %s -> refus donnees_mal_formees du module donnees, classe citée sous le repère, une ligne, UTF-8",
+                       cl[[2L]], k),
+               verdict(x, "donnees_mal_formees",
+                       paste0("Les données portent une classe d'encodage « bytes » (classe ", cl[[2L]], ")")))
+      verifier(sprintf("données de classe %s : %s -> details$classe = la classe reçue", cl[[2L]], k),
+               inherits(x, "refus_tablexp") && identical(x$details, list(classe = cl[[1L]])))
+    }
+  for (k in names(chemins)) {
+    verifier(sprintf("colonne sexe de classe c(\"autre\", \"factor\") (sans encodage bytes) : %s ne refuse rien", k),
+             is.null(attrape(chemins[[k]](avec_sexe(c("autre", "factor"))))))
+    verifier(sprintf("données de classe c(\"autre\", \"data.frame\") (sans encodage bytes) : %s ne refuse rien", k),
+             is.null(attrape(chemins[[k]](avec_classe(c("autre", "data.frame"))))))
+  }
+  # Même colonne dans table_reference() (type_conforme() y juge age, sexe, annee) :
+  # refus table_colonne_mal_typee ; avant #150, anyNA() levait l'erreur R.
+  for (cl in list(c(b, "factor"), c("factor", b))) {
+    t <- structure(list(age = 0:1, sexe = structure(c(1L, 1L), levels = "H", class = cl), qx = c(0.1, 0.2)),
+                   class = "data.frame", row.names = 1:2)
+    verifier(sprintf("table_reference() : colonne sexe de classe %s -> refus table_colonne_mal_typee (pas une erreur R)",
+                     paste(tablexp:::neutraliser_citation(cl), collapse = "/")),
+             identical(verdict(attrape(table_reference(t, "t", "importee", "source de test")),
+                               "table_colonne_mal_typee", "colonne(s) mal typée(s)"), TRUE))
+  }
+})
 # Colonne de rôle de type conforme sous un nom d'encodage bytes, à
 # preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur
 # R ; observations et lignes conservées égales à celles du même jeu sous le
