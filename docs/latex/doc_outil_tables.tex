@@ -4295,8 +4295,9 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     portent l'empreinte et l'élément de fiche (une table passée au statut
     \code{embarquee} est ensuite refusée au point~4,
     \code{table\_embarquee\_absente} ou \code{table\_embarquee\_discordante},
-    sauf si son nom est celui d'une table du catalogue et son empreinte de
-    table celle de cette table). Un attribut \code{nom} ou
+    sauf si son nom est celui d'une table du catalogue et son élément de
+    fiche celui de cette table, empreinte de table et métadonnées
+    comprises). Un attribut \code{nom} ou
     \code{source} d'encodage \code{bytes} porté sur une table après le
     constructeur est refusé à la reconstruction~(b), le constructeur le
     refusant (section~\ref{sec:table-reference}, «~Encodage \code{bytes}
@@ -4327,9 +4328,35 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
   \item \textbf{tables de statut \code{embarquee}}~: le statut est une
     affirmation que le moteur vérifie, non une étiquette libre. Le
     \code{nom} de la table doit être celui d'une table déclarée au
-    catalogue, sinon refus \code{table\_embarquee\_absente}~; puis son
-    empreinte de table doit être celle de la table du catalogue de même
-    nom, sinon refus \code{table\_embarquee\_discordante}. La table du
+    catalogue, sinon refus \code{table\_embarquee\_absente}~; puis chaque
+    champ de son élément de fiche (\code{CHAMPS\_TABLE\_FICHE}~:
+    \code{nom}, \code{statut}, \code{source}, \code{forme\_origine},
+    \code{parametres}, \code{representation}, \code{empreinte}) doit être
+    celui de l'élément, formé par \code{element\_table\_fiche()}, de la
+    table du catalogue de même nom, sinon refus
+    \code{table\_embarquee\_discordante}, qui nomme chaque champ en écart
+    avec sa valeur reçue et celle du catalogue. Le nom et le statut sont
+    égaux par construction à ce stade (la table du catalogue est cherchée
+    par le nom, et seules les tables de statut \code{embarquee} sont
+    contrôlées)~: la comparaison porte en pratique sur la source, la forme
+    d'origine, les paramètres, la représentation et l'empreinte de table.
+    Raison~: l'empreinte de table ne porte que sur les valeurs (âge, sexe,
+    année, $q_x$), non sur les métadonnées, alors que le statut
+    \code{embarquee} affirme une provenance (texte, fac-similé lu, forme
+    imprimée, fichier de provenance) et que la fiche reprend les
+    métadonnées de l'objet reçu. Le contrôle antérieur à l'issue~\#263,
+    qui comparait les seules empreintes, admettait une table aux valeurs et
+    au nom d'une table du catalogue mais à la source ou à la forme
+    d'origine fausses~: la fiche portait une provenance que le package
+    n'affirme pas, sous un statut qui la garantit, et son rejeu, qui relit
+    la table dans le package, rendait une autre fiche (ADR 0015, seconde
+    annotation du 13/11/2026 au point~1.3, (a) à~(c)). Aucun remplacement
+    par la table du catalogue~: la table est refusée (\emph{constat de
+    mesure} du 13/11/2026 sur TH~00-02 du catalogue installé~: forme
+    d'origine \code{qx} au lieu de \code{lx}, puis source et forme
+    d'origine changées, empreinte de table égale à celle du catalogue~:
+    refus, \code{details\$champ} \code{"forme\_origine"}, puis
+    \code{c("source", "forme\_origine")}). La table du
     catalogue est construite par \code{table\_du\_catalogue()}, seul chemin
     vers une table du package (ADR 0018, point~1.4)~; un refus de cette
     construction~--- \code{table\_embarquee\_illisible}, ou refus du
@@ -4345,7 +4372,10 @@ arguments par défaut, ce qui permet de tester les quatre contrôles par
 injection d'un paramètre et d'un catalogue fabriqués (décision M247)~; le
 catalogue injecté a la forme de la constante (contenus, non objets) et
 passe par le même chemin, si bien qu'une table «~discordante~» s'obtient en
-changeant un $l_x$ du contenu injecté.
+changeant un $l_x$ du contenu injecté (\code{details\$champ}
+\code{"empreinte"}), ou, à valeurs égales, en construisant par
+\code{table\_reference()} une table de même nom et de même empreinte de
+table, de source ou de forme d'origine différentes.
 
 {\footnotesize
 \rowcolors{2}{tablerow}{white}
@@ -4367,7 +4397,7 @@ changeant un $l_x$ du contenu injecté.
 \code{table\_reference\_absente} & «~Le plan cite la table de clé «~[clé]~» (paramètre [chemin])~; «~tables\_reference~» [ne porte pas cette clé (clés reçues~: [clés]), ou ne porte aucune table (NULL)]. Passer la table, rendue par table\_reference(), sous cette clé~: le moteur ne lit aucun fichier et ne cherche aucune table par son nom.~» & \code{cle}, \code{parametre}, \code{lu}, \code{attendu} \\
 \code{table\_reference\_inattendue} & «~Table(s) de clé [clés] reçue(s) dans «~tables\_reference~» et citée(s) par aucun paramètre du plan (clés citées~: [clés, ou «~aucune~»])~: une table de référence n'entre dans la construction que si une étape la lit.~» & \code{cle}, \code{lu}, \code{attendu} \\
 \code{table\_embarquee\_absente} & «~Table de clé «~[clé]~», de statut «~embarquee~» et de nom «~[nom]~»~: ce package n'embarque aucune table de ce nom (tables embarquées~: [noms, ou «~aucune~»]). Le statut «~embarquee~» est vérifié contre le package~; une table importée se déclare de statut «~importee~».~» & \code{cle}, \code{nom}, \code{lu}, \code{attendu} \\
-\code{table\_embarquee\_discordante} & «~Table de clé «~[clé]~», de statut «~embarquee~» et de nom «~[nom]~»~: empreinte [lue], différente de celle de la table de ce nom embarquée dans le package installé ([empreinte du catalogue]). Obtenir la table par table\_embarquee(), ou la déclarer de statut «~importee~».~» & \code{cle}, \code{nom}, \code{lu}, \code{attendu} \\
+\code{table\_embarquee\_discordante} & «~Table de clé «~[clé]~», de statut «~embarquee~» et de nom «~[nom]~»~: champ de la fiche différent de celui [plusieurs~: champs de la fiche différents de ceux] de la table de ce nom embarquée dans le package installé ([écarts, séparés par «~~;~», chacun «~«~[champ]~»~: «~[valeur reçue]~» reçu, «~[valeur du catalogue]~» au catalogue~»]). Une table de statut «~embarquee~» est celle du package, métadonnées comprises (source, forme d'origine, paramètres, représentation, empreinte de table). Obtenir la table par table\_embarquee(), ou la déclarer de statut «~importee~».~» & \code{cle}, \code{nom}, \code{champ}~: champs en écart, dans l'ordre de \code{CHAMPS\_TABLE\_}\allowbreak\code{FICHE}~; \code{lu}, \code{attendu}~: leurs valeurs reçue et du catalogue, vecteurs \code{character} parallèles à \code{champ} (valeur non textuelle rendue par \code{deparse()}~; avant l'issue~\#263, les deux empreintes de table) \\
 \end{longtable}
 }
 
@@ -4612,7 +4642,19 @@ qu'elle n'exécute aucune étape du plan (issue~\#82, décision M291)~:
     ce qui la décrit (témoin)~: un refus sur un libellé reformulé
     interdirait le rejeu légitime d'une table réimportée sous un autre nom
     de fichier (ADR 0015, point~4.2, et «~Options écartées~»~; décision
-    M248 pour \code{source})~;
+    M248 pour \code{source}). Une table de statut \code{embarquee}, relue
+    dans le package, porte les métadonnées du catalogue~; la construction
+    refusant en amont une table embarquée dont un champ de l'élément de
+    fiche diffère de celui du catalogue (\code{table\_embarquee\_discordante},
+    section~\ref{sec:tables-reference-recues}), un écart de ses métadonnées
+    au rejeu vient d'une fiche écrite avant l'issue~\#263 ou altérée~: la
+    fiche se rejoue et donne au \code{temoin\_fiche} «~différente~»,
+    jamais un refus (ADR 0015, seconde annotation du 13/11/2026 au
+    point~1.3, (d)~; \emph{constat de mesure} du 13/11/2026~: fiche d'une
+    construction positionnée sur TH~00-02, \code{source} éditée à la main,
+    lignes~1 à~8 du bilan conformes, ligne~12 «~différente~:
+    tables\_reference/tv/source~»). Un refus de cet écart au rejeu n'est
+    pas décidé (même annotation, (d))~;
   \item[7~ter.] \textbf{entrées des étapes qui lisent une table}~: étape
     retirée du rejeu par l'issue~\#82 (décision M291~; ADR 0012, annotation
     du 07/11/2026, (a)~2, sur sa seconde annotation du 06/11/2026, (c))~;
@@ -5256,7 +5298,7 @@ du rejeu, sous les deux locales.\par}
 \catalogue{fonctions-construire-table}{ETAPES} & constante & --- & étapes~: module, fonction d'étape, préalables (colonne liste), tirage d'un aléa, table construite (élément du \code{resultat} qui la porte, \code{NA} hors des étapes productrices) \\
 \catalogue{fonctions-construire-table}{PARAMETRES\_ETAPES} & constante & --- & paramètres de chaque étape~: nom, type de base exigé (règle commune de forme, section~\ref{sec:plan}), domaine, recette (\code{NA}, ou recette sous laquelle le paramètre est requis et hors de laquelle il est interdit), \code{selon} et \code{valeurs} (\code{NA} et \code{character(0)}, ou gouvernant de la même étape et valeurs sous lesquelles le paramètre est requis~; section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{PARAMETRES\_CLE\_TABLE} & constante & --- & chemins \code{etapes/}\allowbreak\code{<étape>/}\allowbreak\code{<paramètre>} des paramètres du plan qui citent une ou plusieurs tables de référence par leurs clés (\code{positionnement}, \code{coherence\_regularite}, \code{validation}), chacun un paramètre \code{character} de \code{PARAMETRES\_ETAPES} (section~\ref{sec:tables-reference-recues}) \\
-\catalogue{fonctions-construire-table}{CHAMPS\_TABLE\_FICHE} & constante & --- & les sept champs d'un élément de \code{fiche\$tables\_reference}, dans l'ordre~: \code{nom}, \code{statut}, \code{source}, \code{forme\_origine}, \code{parametres}, \code{representation}, \code{empreinte}~; contrôle de forme de l'étape~2 du rejeu \\
+\catalogue{fonctions-construire-table}{CHAMPS\_TABLE\_FICHE} & constante & --- & les sept champs d'un élément de \code{fiche\$tables\_reference}, dans l'ordre~: \code{nom}, \code{statut}, \code{source}, \code{forme\_origine}, \code{parametres}, \code{representation}, \code{empreinte}~; contrôle de forme de l'étape~2 du rejeu, et champs comparés au catalogue, par le contrôle des tables reçues, pour une table de statut \code{embarquee} (refus \code{table\_embarquee\_}\allowbreak\code{discordante}) \\
 \catalogue{fonctions-construire-table}{liste\_noms\_complets()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms, par \code{forme\_exacte()}) aux noms complets au sens de \code{noms\_complets()} (module \code{outils}~: présents, non vides et non manquants), ou vide (sans noms admis)~; doublons non contrôlés~; partagée par \code{liste\_nommee()} et par le contrôle du champ \code{etapes} de \code{valider\_plan()}, qui admet les doublons pour que le refus \code{etape\_en\_double} les nomme (issues~\#22, \#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{liste\_nommee()} & interne & objet & \code{TRUE} pour une liste nue (seul attribut admis~: les noms) aux noms uniques, non vides et non manquants, ou vide~; \code{liste\_noms\_complets()} sans doublon (issues~\#23 et~\#60) \\
 \catalogue{fonctions-construire-table}{controler\_graine\_plan()} & interne & plan, indicateur \code{aleatoire} (une étape du plan tire un aléa) & \code{NULL} invisible, ou, dans l'ordre, refus \code{graine\_invalide} (champ présent, \code{NULL} compris, et \code{forme\_graine()} faux), \code{graine\_inattendue}, \code{graine\_manquante}, module \code{construire\_table}~; appelée par \code{valider\_plan()} après le contrôle des préalables~; l'indicateur en argument permet de tester les trois refus par injection (section~\ref{sec:plan}~; issue~\#61) \\
@@ -6778,7 +6820,9 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     TH~00-02 sous le nom «~th 00-02~», elle a l'empreinte de TH~00-02,
     \emph{constat de mesure} du 13/11/2026). Une table de statut \code{embarquee} qui
     porte ce nom est admise par le constructeur~: c'est le contrôle des
-    tables reçues qui la confronte au catalogue.
+    tables reçues qui la confronte au catalogue, empreinte de table et
+    métadonnées comprises (\code{table\_embarquee\_discordante},
+    section~\ref{sec:tables-reference-recues}).
   \item \textbf{Fichier de provenance et deux identités} (ADR 0018,
     point~3~; ADR 0006, annotation du 13/11/2026). À côté de chaque table,
     \code{inst/extdata/tables/<identifiant>.provenance.dcf}, installé avec
@@ -14907,9 +14951,11 @@ par leur forme, et leurs valeurs écrites dans l'en-tête
     refus pour discordance aurait un motif trompeur.
   \item \textbf{Calcul}~: \code{empreinte\_table()}, seule fonction qui
     calcule cette empreinte, MD5 des octets par \code{md5\_octets()}~;
-    appelée par \code{element\_table\_fiche()} pour la fiche, par le
-    contrôle des tables reçues pour comparer une table de statut
-    \code{embarquee} à celle du catalogue, et par l'étape~7~bis du rejeu
+    appelée par \code{element\_table\_fiche()} pour la fiche (et, par
+    elle, pour l'élément de la table du catalogue auquel le contrôle des
+    tables reçues compare une table de statut \code{embarquee}), par
+    \code{catalogue\_tables\_embarquees()} pour l'état des tables
+    embarquées, et par l'étape~7~bis du rejeu
     (sections~\ref{sec:tables-reference-recues} et~\ref{sec:rejeu}).
   \item \textbf{Statut}~: écriture exacte (octets fixés, MD5 d'octets),
     sans rôle de sécurité. Une valeur de $q_x$ différente au dernier bit
