@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{12/11/2026}
+\newcommand{\datedoc}{13/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -921,7 +921,7 @@ même si la classe compte aussi \code{factor} (\code{a\_classe()} lirait
 \code{c(<bytes>, "factor")} comme un facteur~; issue~\#150), ou de nom
 \code{bytes} et de type non conforme
 (section~\ref{sec:controles-donnees})~; \code{table\_colonne\_mal\_typee}
-pour une colonne \code{age}, \code{sexe} ou \code{annee} de classe
+pour une colonne \code{age}, \code{sexe}, \code{annee} ou \code{lx} de classe
 \code{bytes} d'une table de référence, dont le contrôle des types est le
 même (\code{type\_conforme()}~; section~\ref{sec:table-reference}~;
 issue~\#150), et pour une table de référence entière de classe
@@ -6227,14 +6227,19 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
   \item colonnes \code{age} (entier $\ge 0$), \code{sexe} (\code{H}, \code{F},
     ou \code{ensemble} pour une table sans distinction de sexe, modalité qui ne
     coexiste jamais avec \code{H} ou \code{F}, dans la table ou au sein d'une
-    même année), \code{qx} (double fini dans $[0, 1]$) et, facultative,
-    \code{annee} (entier), pour les tables prospectives de la v2~;
+    même année), \textbf{exactement une} des colonnes \code{qx} (double fini
+    dans $[0, 1]$) ou \code{lx} (nombre fini $\ge 0$, table transcrite en
+    $l_x$, convertie en $q_x$ par le constructeur, ci-dessous, «~Table
+    transcrite en $l_x$~») et, facultative,
+    \code{annee} (entier), pour les tables prospectives de la v2~; l'objet
+    rendu porte toujours \code{qx}, jamais \code{lx}~;
   \item âges sans doublon et contigus au sein de chaque sexe (et de chaque
     année), quel que soit l'ordre reçu des lignes~;
   \item attributs \code{nom}, \code{statut} (\code{synthetique},
     \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
     de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
-    \code{qx}), chacun une chaîne unique de forme exacte~--- sans attribut,
+    \code{qx}~; une colonne \code{lx} exige \code{lx}, une colonne
+    \code{qx} est admise sous l'une ou l'autre), chacun une chaîne unique de forme exacte~--- sans attribut,
     noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
     section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
     motif du champ~; issue~\#48)~---, le nom et la source étant en outre
@@ -6271,13 +6276,30 @@ Les tables importées et embarquées n'ont pas de paramètres
 \code{table\_source\_manquante}, \code{table\_parametres\_manquants},
 \code{table\_parametres\_inattendus}, \code{table\_forme\_inconnue},
 \code{table\_mal\_formee}, \code{table\_colonne\_manquante},
-\code{table\_colonne\_inconnue}, \code{table\_vide},
+\code{table\_colonne\_inconnue}, \code{table\_forme\_incoherente},
+\code{table\_vide},
 \code{table\_colonne\_mal\_typee}, \code{table\_sexe\_hors\_modalites},
 \code{table\_sexes\_melanges}, \code{table\_qx\_non\_fini},
-\code{table\_qx\_hors\_bornes}, \code{table\_age\_double} et
-\code{table\_ages\_non\_contigus}. Les colonnes \code{age}, \code{sexe} et
-\code{annee} sont jugées par le contrôle de type des rôles
-(\code{type\_conforme()}, section~\ref{sec:controles-donnees})~: une
+\code{table\_qx\_hors\_bornes} (table en $q_x$) ou
+\code{table\_lx\_non\_fini}, \code{table\_lx\_negatif} (table en $l_x$),
+\code{table\_age\_double},
+\code{table\_ages\_non\_contigus}, puis, pour une table en $l_x$ seulement,
+\code{table\_lx\_age\_unique}, \code{table\_lx\_non\_decroissants} et
+\code{table\_lx\_nul} (ci-dessous, «~Table transcrite en $l_x$~»~; issue~\#146).
+Une colonne manquante est citée par \code{table\_colonne\_manquante}
+(«~\ldots{}~colonne(s) manquante(s) [colonnes] (une table de référence entre
+par «~qx~» ou par «~lx~»).~», \code{details\$colonne} valant \code{qx}
+quand ni \code{qx} ni \code{lx} n'est présente), une colonne hors de
+l'ensemble \code{age}, \code{sexe}, \code{qx}, \code{lx}, \code{annee} par
+\code{table\_colonne\_inconnue} («~(admises~: age, sexe, qx ou lx,
+annee)~»). Les colonnes \code{age}, \code{sexe}, \code{annee} et
+\code{lx} (type \code{integer} ou \code{double} sans classe, valeur
+manquante admise ici et refusée ensuite sous \code{table\_lx\_non\_fini})
+sont jugées par le contrôle de type des rôles
+(\code{type\_conforme()}, section~\ref{sec:controles-donnees})~; la colonne
+\code{qx} doit être de type \code{double} sans classe~; le message de
+\code{table\_colonne\_mal\_typee} rappelle les cinq types («~age~: entier >= 0~;
+annee~: entier~; sexe~: chaîne~; qx~: double~; lx~: nombre~»). Une
 colonne dont la classe porte, à toute position, un élément d'encodage
 \code{bytes} est refusée sous \code{table\_colonne\_mal\_typee}~; pour
 une colonne \code{sexe} de classe facteur, ce refus remplace l'erreur R
@@ -6343,8 +6365,15 @@ contenu reçues dans deux ordres donnent le même objet. Le refus
 \code{table\_ages\_non\_croissants}, qui exigeait des âges croissants
 dans l'ordre reçu, est \textbf{retiré}~: l'ordre reçu n'est pas une
 propriété du contenu. Les contrôles ligne à ligne, jusqu'à
-\code{table\_qx\_hors\_bornes}, précèdent le tri et citent les lignes
-dans la numérotation reçue~; les doublons et les trous s'évaluent sur
+\code{table\_qx\_hors\_bornes} ou, pour une table en $l_x$,
+\code{table\_lx\_negatif}, précèdent le tri et citent les lignes
+dans la numérotation reçue~; \code{table\_qx\_hors\_bornes},
+\code{table\_lx\_non\_fini} et \code{table\_lx\_negatif} font suivre chaque
+ligne de son groupe et de son âge («~aux lignes 2 (ensemble, âge 1)~»,
+«~2 (H, année 1950, âge 1)~» avec une colonne \code{annee}), leurs
+\code{details} portant \code{lignes}, \code{ages}, \code{sexes} et
+\code{annees} (\code{NULL} sans colonne \code{annee}~; issue~\#146), alors
+que \code{table\_qx\_non\_fini} ne cite que les numéros~; les doublons et les trous s'évaluent sur
 l'ordre canonique et sont cités eux aussi dans la numérotation
 reçue~: \code{table\_age\_double} cite, pour chaque doublon, la ligne
 reçue la plus tardive, dans l'ordre croissant~; \code{table\_ages\_non\_contigus}
@@ -6359,6 +6388,124 @@ lirait l'ordre. Les deux tables synthétiques de l'entrée de référence
 (section~\ref{sec:non-regression}) ont la seule modalité \code{ensemble} et
 des âges croissants~: le tri y est l'identité, et l'entrée de référence est
 inchangée (\emph{constat} de la batterie unitaire).
+
+\medskip
+\noindent
+\textbf{Table transcrite en $l_x$} (issue~\#146 et sa spécification
+par \code{actuary}~; ADR 0007, annotation du 13/11/2026 au point~7.1~; ADR 0018, points~2.4
+et~7.2~; E2.26). Une table imprimée en nombre de survivants $l_x$, forme
+des tables homologuées, entre par une colonne \code{lx} déclarée
+\code{forme\_origine = "lx"}~; la signature de \code{table\_reference()}
+est inchangée. Le constructeur la convertit en $q_x$ et rend un objet de
+même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
+\code{qx}, \code{annee} s'il y a lieu), d'attribut
+\code{forme\_origine} \code{lx}, qui ne garde pas les $l_x$.
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Déclaration.} \code{table\_forme\_incoherente} refuse des
+    colonnes \code{qx} et \code{lx} reçues ensemble («~\ldots{}~une table
+    de référence entre par l'une ou l'autre.~») et une colonne \code{lx}
+    reçue sous la forme d'origine par défaut \code{qx} («~\ldots{}~déclarer
+    forme\_origine = «~lx~».~»)~; \code{details}~: \code{colonnes},
+    \code{forme\_origine}. Une colonne \code{qx} déclarée
+    \code{forme\_origine = "lx"} reste admise~: c'est la forme de l'objet
+    rendu, que le contrôle des tables reçues reconstruit par
+    \code{table\_reference()} à partir de ses colonnes et de ses
+    métadonnées (section~\ref{sec:tables-reference-recues}, «~Contrôle des
+    tables reçues~», point~1~(b))~; la refuser ferait refuser à
+    l'entrée de \code{construire\_table()} toute table issue de $l_x$.
+  \item \textbf{Contrôles avant le tri}, dans la numérotation reçue~:
+    \code{table\_lx\_non\_fini} («~l\_x manquant ou non fini aux lignes
+    \ldots~», \code{NA}, \code{NaN}, $\pm\infty$),
+    \code{table\_lx\_negatif} («~l\_x négatif aux lignes \ldots~»).
+  \item \textbf{Contrôles après le tri}, par groupe (sexe, et année si la
+    colonne est présente) dans l'ordre canonique, après
+    \code{table\_age\_double} et \code{table\_ages\_non\_contigus}, communs
+    aux deux formes~: les âges d'un groupe sont donc distincts et
+    consécutifs, et $l_{x+1}$ est la valeur de l'âge qui suit $x$.
+    (i)~\code{table\_lx\_age\_unique}~: un groupe d'un seul âge ne donne
+    aucun $q_x$ («~un seul âge pour [groupe (âge)]. Une table en l\_x donne
+    q\_x = (l\_x $-$ l\_\{x+1\}) / l\_x et demande au moins deux âges
+    consécutifs par sexe (et par année).~»). (ii)~\code{table\_lx\_non\_decroissants}~:
+    une hausse stricte $l_{x+1} > l_x$, soit $q_x < 0$, comparée
+    exactement, sans tolérance (ci-dessous). (iii)~\code{table\_lx\_nul}~:
+    un $l_x$ nul suivi d'un autre âge du groupe, pour lequel $q_x = 0/0$
+    n'est pas défini («~\ldots{}~Seul le dernier âge d'un sexe (et d'une
+    année) peut porter l\_x = 0.~»)~; $-0$ se comporte comme $0$. Les
+    \code{details} de (i) et (iii) portent \code{sexes}, \code{annees},
+    \code{ages} et \code{lignes} (numérotation reçue).
+  \item \textbf{Conversion.} Pour chaque âge $x$ qui a un successeur dans
+    son groupe,
+    \[
+      d_x = l_x - l_{x+1}, \qquad \hat q_x = d_x / l_x,
+    \]
+    calculés dans cet ordre par une soustraction puis une division de la
+    norme IEC~60559 (arrondi au plus près), sans \code{1 - l[i + 1] / l[i]},
+    \code{diff()}, logarithme, \code{cumprod()}, \code{round()},
+    normalisation par $l_0$ ni tolérance. Aucun $l_0$ ni premier âge n'est
+    imposé (une table peut commencer à 40 ou avoir $l_0 \neq 100\,000$), et
+    les $l_x$ peuvent ne pas être entiers. Une assertion interne vérifie que
+    chaque $\hat q_x$ est fini et dans $[0, 1]$ (erreur de programmation
+    sinon)~; \code{table\_qx\_hors\_bornes} n'est pas rejoué sur les $q_x$
+    dérivés.
+  \item \textbf{Dernier âge.} Le dernier âge $\omega$ de chaque groupe ne
+    donne \textbf{aucune} ligne~: une table qui finit à $l_\omega > 0$ donne
+    des $q_x$ du premier âge à $\omega - 1$. Poser $q_\omega = 1$
+    supposerait $l_{\omega+1} = 0$, c'est-à-dire une fermeture, qui est une
+    étape déclarée du plan et non une propriété de la table reçue. Une table
+    qui imprime une dernière ligne $l_{\omega+1} = 0$ est transcrite telle
+    quelle et donne $q_\omega = 1$ exactement.
+  \item \textbf{Égalité.} $l_{x+1} = l_x$ est admise et donne $q_x = +0$
+    (zéro positif, $d_x$ étant le zéro positif de la soustraction)~: le
+    refus vise la seule hausse stricte. L'aval traite déjà un $q_x$ nul
+    (état \code{taux\_table\_nul} du positionnement,
+    section~\ref{sec:positionnement-etape}, et de la validation,
+    section~\ref{sec:validation-etape}).
+  \item \textbf{Statut des $q_x$ dérivés.} Pour des $l_x$ entiers d'au plus
+    $2^{53}$, $d_x$ est un entier de $[0, l_x]$, représenté exactement en
+    double précision~; la soustraction est donc exacte et la division rend
+    l'\textbf{arrondi correct} du rapport rationnel
+    $(l_x - l_{x+1})/l_x$~: \emph{résultat exact} au sens de la norme
+    (un seul arrondi, celui que la norme impose), identique sur toute
+    plateforme conforme à IEC~60559 en double précision binaire. La forme
+    $1 - l_{x+1}/l_x$, qui arrondit deux fois, n'a pas cette propriété~:
+    pour les $100\,001$ paires $(100\,000,\ l_1)$, $l_1 = 0, \ldots,
+    100\,000$, elle diffère de la première au dernier bit pour
+    $41\,647$ d'entre elles (\emph{constat de mesure} du 13/11/2026,
+    R~4.3.3~; ainsi, pour $(100\,000,\ 99\,616)$,
+    \code{0x1.f75104d551dp-9} au lieu de \code{0x1.f75104d551d69p-9},
+    l'arrondi correct, valeurs écrites en dur dans la batterie unitaire). Pour des
+    $l_x$ non entiers, $d_x$ peut être arrondi~: au plus deux arrondis,
+    résultat déterministe, \emph{approximation numérique}. L'empreinte de
+    table porte sur les $q_x$ dérivés (section~\ref{sec:empreinte-resultat},
+    «~Empreinte d'une table de référence~»).
+\end{itemize}
+
+\noindent
+\textbf{Refus des $l_x$ non décroissants} (E2.26~; décision du mainteneur
+du 05/11/2026, \#13~; M448). Le moteur ne corrige pas une table de
+référence~: une table dont un $l_{x+1}$ dépasse $l_x$ est refusée sous
+\code{table\_lx\_non\_decroissants}, module \code{donnees}, quel que soit
+son statut, par le message «~Table «~[nom]~»~: l\_x non décroissants
+(l\_\{x+1\} > l\_x, soit q\_x < 0) pour [n] paire(s) d'âges consécutifs~:
+[paires]. La table est refusée sans correction~: le moteur ne corrige pas
+une table de référence~; une table corrigée est une autre table, importée
+sous la responsabilité de l'utilisateur (statut «~importee~»), qui ne se
+déclare pas homologuée.~» Chaque paire s'écrit «~ensemble, âges 10 et 11
+(l\_x = [l\_x] puis [l\_\{x+1\}])~», ou «~H, année 1950, âges \ldots~» avec
+une colonne \code{annee}~; les dix premières (\code{NB\_LIGNES\_CITEES})
+sont citées, puis, au-delà, «~\ldots{} ([n] paires en tout~; liste
+complète dans les détails du refus)~». Les \code{details} portent la liste
+complète~: \code{sexes}, \code{annees} (\code{NULL} sans colonne
+\code{annee}), \code{ages} (premier âge de chaque paire), \code{lx},
+\code{lx\_suivants}, \code{lignes} et \code{lignes\_suivantes}
+(numérotation reçue). Le refus cite des \textbf{paires d'âges
+consécutifs}, et non des âges~: une hausse $l_{x+1} > l_x$ dit que l'une
+des deux valeurs est fautive sans dire laquelle, et le moteur ne peut pas
+le savoir. Les $l_x$ du message sont écrits à quinze chiffres
+significatifs~: deux valeurs qui ne diffèrent qu'au-delà s'y écrivent
+identiques («~l\_x = 1 puis 1~» pour $l_x = 1$ et $l_{x+1} = 1 + 2^{-52}$,
+\emph{constat de mesure} du 13/11/2026), et seuls les \code{details} portent les
+valeurs exactes.
 
 \medskip
 \noindent
@@ -6392,7 +6539,16 @@ calculer, \code{empreinte\_table()} étant du module \code{rapport}
 rôle et de paramètre, chaque motif et les règles d'évaluation, les exclusions
 (lignes conservées identiques à l'entrée), la lecture~B de E2.4 au jour près
 de la borne $B$ (délais 0 et 30~jours) et le relevé après décès hors période
-(lignes conservées, deux unités), la table de référence et ses refus~;
+(lignes conservées, deux unités), la table de référence et ses refus,
+dont la table transcrite en $l_x$ (cas T1 à T11 de la spécification de
+l'issue~\#146)~: les $q_x$ convertis sont comparés au bit près à des
+littéraux hexadécimaux, arrondis corrects du rapport rationnel (confirmés
+hors du moteur par une arithmétique de fractions exactes), et la forme
+$1 - l_{x+1}/l_x$ y donne d'autres bits (non-vacuité)~; l'égalité
+($q_x = +0$), le $l_x$ nul au dernier âge ($q_x = 1$), les paires citées
+(lignes permutées, deux sexes, colonne \code{annee}, onze paires) et
+l'identité des $q_x$ et de l'empreinte de table pour $l$ et $2l$ le sont
+aussi~;
 l'ordre canonique, les refus évalués après le tri et l'accesseur des tables
 embarquées le sont par \code{tests/unitaires/test\_tables\_reference.R}
 (section~\ref{sec:verifications-construction}). Les cas
@@ -6489,7 +6645,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$, dernier âge de chaque groupe sans ligne, refus des $l_x$ non décroissants par paires d'âges (issue~\#146)~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158) \\
 \catalogue{fonctions-donnees}{TABLES\_EMBARQUEES} & constante & --- & catalogue des tables embarquées, liste nommée par \code{nom} d'objets \code{table\_reference} de statut \code{embarquee}~; vide dans cette version \\
 \catalogue{fonctions-donnees}{table\_embarquee()} & exportée & nom & table embarquée de ce nom, telle qu'au catalogue~; refus \code{table\_embarquee\_absente} (module \code{donnees}) d'un nom absent ou qui n'est pas une chaîne unique \\
 \end{longtable}
@@ -14161,7 +14317,13 @@ par leur forme, et leurs valeurs écrites dans l'en-tête
   \item \textbf{Statut}~: écriture exacte (octets fixés, MD5 d'octets),
     sans rôle de sécurité. Une valeur de $q_x$ différente au dernier bit
     change l'empreinte (vérifié par la batterie unitaire). Pour une table
-    importée ou embarquée, les valeurs sont reçues ou lues telles quelles~;
+    importée ou embarquée reçue en $q_x$, les valeurs sont reçues ou lues
+    telles quelles~; pour une table transcrite en $l_x$, l'empreinte porte
+    sur les $q_x$ dérivés par le constructeur, et non sur les $l_x$, que
+    l'objet ne garde pas~; pour des $l_x$ entiers d'au plus $2^{53}$, ces
+    $q_x$ sont l'arrondi correct du rapport $(l_x - l_{x+1})/l_x$, identique
+    sur toute plateforme conforme à IEC~60559 (section~\ref{sec:table-reference},
+    «~Table transcrite en $l_x$~»~; issue~\#146)~;
     pour une table synthétique, calculée hors de la construction par des
     fonctions de la \code{libm} (section~\ref{sec:loi-vraie}), les valeurs,
     et donc l'empreinte, peuvent différer d'une plateforme à l'autre
@@ -17882,6 +18044,7 @@ E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-gr
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:coherence-regularite}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
+E2.26 & tables de référence embarquées, avec leur provenance (en partie~: entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction) & \ref{sec:table-reference} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
