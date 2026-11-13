@@ -847,11 +847,17 @@ cles_citees <- function(plan, parametres_cle) {
 # `parametres_cle`) ; clé reçue citée par aucun paramètre
 # (table_reference_inattendue, toutes citées) ; table de statut embarquee
 # dont le nom est absent du catalogue `embarquees` (table_embarquee_absente),
-# puis dont l'empreinte diffère de celle de la table du catalogue
-# (table_embarquee_discordante). `parametres_cle` et `embarquees` :
-# PARAMETRES_CLE_TABLE et TABLES_EMBARQUEES par défaut, injectés par les
-# tests (M247). Rend la valeur de fiche$tables_reference : NULL, ou liste des
-# éléments par clé.
+# puis dont un champ de l'élément de fiche (CHAMPS_TABLE_FICHE : source,
+# forme_origine, parametres, representation, empreinte de table) diffère de
+# celui de la table du catalogue (table_embarquee_discordante ; details$champ :
+# champs en écart, details$lu et $attendu : leurs valeurs, dans le même
+# ordre), la table du catalogue étant construite par table_du_catalogue()
+# (ADR 0018, point 1.4 : un refus de sa construction, table_embarquee_illisible
+# ou refus de table_reference(), remonte tel quel).
+# `parametres_cle` et `embarquees` : PARAMETRES_CLE_TABLE et
+# TABLES_EMBARQUEES (contenus) par défaut, injectés par les tests (M247).
+# Rend la valeur de fiche$tables_reference : NULL, ou liste des éléments par
+# clé.
 controler_tables_reference <- function(tables_reference, plan, parametres_cle = PARAMETRES_CLE_TABLE,
                                        embarquees = TABLES_EMBARQUEES) {
   f <- controler_forme_tables(tables_reference)
@@ -894,16 +900,37 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
                        citer(k), citer(nom), if (length(catalogue)) liste_guillemets(catalogue) else formuler("aucune")),
               list(cle = k, nom = nom, lu = nom, attendu = catalogue))
   }
+  # Toutes les métadonnées de l'élément de fiche (CHAMPS_TABLE_FICHE : source,
+  # forme_origine, parametres, representation, empreinte) sont comparées à
+  # celles de la table du catalogue : la fiche reprend celles de l'objet reçu, et le rejeu
+  # reconstruit la table depuis le catalogue (controler_tables_rejeu()) ; une
+  # table embarquée reçue qui en diffère donnerait une fiche rejouée différente
+  # de l'originale. Aucun remplacement par la table du catalogue : refus.
   for (k in embarquees_recues) {
     nom <- champ[[k]]$nom
-    attendue <- empreinte_table(embarquees[[nom]])
-    if (!identical(champ[[k]]$empreinte, attendue))
+    recu <- champ[[k]]
+    catalogue_k <- element_table_fiche(table_du_catalogue(nom, embarquees))
+    discordants <- CHAMPS_TABLE_FICHE[!vapply(CHAMPS_TABLE_FICHE,
+                                               function(ch) identical(recu[[ch]], catalogue_k[[ch]]), NA)]
+    if (length(discordants)) {
+      texte_valeur <- function(v) if (is.character(v) && length(v) == 1L) v else paste(deparse(v), collapse = " ")
+      lus <- vapply(discordants, function(ch) texte_valeur(recu[[ch]]), "", USE.NAMES = FALSE)
+      attendus <- vapply(discordants, function(ch) texte_valeur(catalogue_k[[ch]]), "", USE.NAMES = FALSE)
+      ecarts <- vapply(seq_along(discordants), function(i)
+                         formuler("« %s » : « %s » reçu, « %s » au catalogue", citer(discordants[i]), citer(lus[i]),
+                                  citer(attendus[i])), "")
+      un <- length(discordants) == 1L
       refuser("construire_table", "table_embarquee_discordante",
-              formuler(paste("Table de clé « %s », de statut « embarquee » et de nom « %s » : empreinte %s, différente",
-                             "de celle de la table de ce nom embarquée dans le package installé (%s). Obtenir la table",
-                             "par table_embarquee(), ou la déclarer de statut « importee »."),
-                       citer(k), citer(nom), citer(champ[[k]]$empreinte), citer(attendue)),
-              list(cle = k, nom = nom, lu = champ[[k]]$empreinte, attendu = attendue))
+              formuler(paste("Table de clé « %s », de statut « embarquee » et de nom « %s » : %s de la fiche %s de %s",
+                             "la table de ce nom embarquée dans le package installé (%s). Une table de statut",
+                             "« embarquee » est celle du package, métadonnées comprises (source, forme d'origine,",
+                             "paramètres, représentation, empreinte de table). Obtenir la table par table_embarquee(),",
+                             "ou la déclarer de statut « importee »."),
+                       citer(k), citer(nom), if (un) "champ" else "champs",
+                       if (un) formuler("différent") else formuler("différents"),
+                       if (un) "celui de" else "ceux de", paste(ecarts, collapse = " ; ")),
+              list(cle = k, nom = nom, champ = discordants, lu = lus, attendu = attendus))
+    }
   }
   champ
 }
@@ -914,7 +941,8 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
 # de fiche$tables_reference ou de statut embarquee dans la fiche
 # (table_reference_inattendue, toutes citées) ; 2. pour chaque clé de la
 # fiche, dans son ordre : (a) représentation (representation_table_non_admise),
-# (b) origine, table relue dans `embarquees` par son nom (sinon
+# (b) origine, table construite par table_du_catalogue() à partir du contenu
+# de `embarquees` (ADR 0018, point 1.4 ; nom absent :
 # table_embarquee_absente) ou table reçue sous la clé (sinon
 # table_reference_absente), (c) empreinte recalculée par empreinte_table()
 # égale à celle de la fiche (empreinte_table_discordante). Le contrôle 1.3
@@ -963,7 +991,7 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, e
                          citer(k), citer(e$nom), if (length(catalogue)) liste_guillemets(catalogue) else formuler("aucune"),
                          citer(code_fiche)),
                 list(cle = k, nom = e$nom, lu = e$nom, attendu = catalogue))
-      t <- embarquees[[e$nom]]
+      t <- table_du_catalogue(e$nom, embarquees)
       origine <- texte_moteur("relue dans le package")
     } else {
       if (!k %in% recues)

@@ -22,6 +22,9 @@
 #  - empreinte_table(), element_table_fiche() : empreinte d'une table de
 #    référence (première ligne « tablexp table 1 ») et élément de
 #    fiche$tables_reference qui l'identifie (ADR 0015, points 2.2 et 3 ; #73) ;
+#  - catalogue_tables_embarquees(), tables_embarquees() : catalogue des
+#    tables embarquées, état et empreinte de chacune (exportée ; ADR 0018,
+#    point 8 ; #263) ;
 #  - empreinte_resultat() : empreinte du résultat, MD5 du texte de l'objet en
 #    forme « empreinte », première ligne « tablexp resultat 1 » (ADR 0011,
 #    point 11 ; cinquième et sixième annotations du 20/10/2026 ; septième,
@@ -781,6 +784,43 @@ element_table_fiche <- function(t) {
        parametres = attr(t, "parametres", exact = TRUE), representation = REPRESENTATION_TABLE,
        empreinte = empreinte_table(t))
 }
+
+# Catalogue des tables embarquées (ADR 0018, point 8), à partir des contenus
+# `catalogue` (TABLES_EMBARQUEES par défaut, injecté par les tests, M247) :
+# data.frame nu, une ligne par table déclarée, dans l'ordre de la
+# déclaration ; colonnes nom, sexe (modalité déclarée), forme_origine,
+# source (chemin du fichier de provenance), etat (admise ou refusee),
+# motif_refus (NA si admise), representation (REPRESENTATION_TABLE),
+# empreinte (empreinte de table, NA si refusée). L'état se calcule en
+# construisant la table par table_du_catalogue() : refusee quand
+# table_reference() refuse les valeurs transcrites (point 8.3) ; un nom
+# absent ou un contenu illisible n'est pas un état : le refus remonte.
+catalogue_tables_embarquees <- function(catalogue = TABLES_EMBARQUEES) {
+  noms <- attr(catalogue, "names", exact = TRUE)
+  if (is.null(noms)) noms <- character(0)
+  lignes <- lapply(noms, function(nom) {
+    t <- tryCatch(table_du_catalogue(nom, catalogue), refus_tablexp = function(r) r)
+    refusee <- inherits(t, "refus_tablexp")
+    if (refusee && t$motif %in% c("table_embarquee_absente", "table_embarquee_illisible")) stop(t)
+    list(sexe = catalogue[[nom]][["sexe"]],
+         source = provenance_table_embarquee(catalogue[[nom]][["identifiant"]]),
+         etat = if (refusee) "refusee" else "admise",
+         motif_refus = if (refusee) t$motif else NA_character_,
+         empreinte = if (refusee) NA_character_ else empreinte_table(t))
+  })
+  champ <- function(k) vapply(lignes, function(l) l[[k]], "")
+  data.frame(nom = noms, sexe = champ("sexe"), forme_origine = rep("lx", length(noms)), source = champ("source"),
+             etat = champ("etat"), motif_refus = champ("motif_refus"),
+             representation = rep(REPRESENTATION_TABLE, length(noms)), empreinte = champ("empreinte"),
+             stringsAsFactors = FALSE)
+}
+
+# Tables embarquées du package installé (ADR 0018, point 8 ; ADR 0015,
+# point 6.2), sans argument : catalogue_tables_embarquees() sur
+# TABLES_EMBARQUEES. Exportée (appelants : application, liste de choix ; tiers
+# qui compare l'empreinte au fichier de provenance ;
+# tests/controles/tables_embarquees.R).
+tables_embarquees <- function() catalogue_tables_embarquees()
 
 # Périmètre de l'empreinte du résultat (ADR 0011, point 11.1 ; #67) : l'objet
 # `construction` entier moins ces chemins, liste fermée. execution,

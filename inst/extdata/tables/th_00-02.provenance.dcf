@@ -1,0 +1,192 @@
+Format: tablexp provenance 1
+Nom: TH 00-02
+Fichier: inst/extdata/tables/th_00-02.csv
+Sexe: H
+ Modalité déclarée au catalogue (R/donnees.R, DECLARATIONS_TABLES_EMBARQUEES),
+ non lue dans le fichier de table (ADR 0018, points 1.1 et 2.3). Table des
+ hommes (arrêté du 20/12/2005, art. 5, selon la lecture sur l'image du
+ 05/11/2026, champ Homologation ; A132-18 : tables homologuées par sexe, E2.24).
+Forme-origine: lx
+Intitule: « ANNEXE À L'ARTICLE A. 132-18 » (p. 13 de l'extrait) ; « TABLE TH
+ 00-02 / (Lx nombre de vivants à l'âge X) » ; colonnes « X » et « Lx » (JO n° 301
+ du 29/12/2015, texte 35, p. 16 de l'extrait).
+Ages: 0 à 110 transcrits (111 lignes ; l_0 = 100000, l_110 = 1). Lignes 111 et
+ 112 imprimées sans valeur (cellule Lx vide, p. 19 de l'extrait), non
+ transcrites (ADR 0018, point 2.2 ; E2.26). L'objet construit par le moteur
+ porte les q_x des âges 0 à 109 (le dernier âge transcrit ne donne pas de q_x ;
+ ADR 0018, point 2.4).
+Homologation: Arrêté du 20 décembre 2005 relatif aux tables de mortalité, NOR
+ ECOT0591210A, JORF n° 302 du 29 décembre 2005, texte 40, art. 5 (TH00-02,
+ hommes, et TF00-02, femmes, pour les contrats autres que de rente viagère,
+ ainsi que les décalages d'âge, « sont homologués ») ; art. 7 : entrée en
+ vigueur au 1er janvier 2006. Statut : vérifié sur le fac-similé de l'édition
+ complète (joe_20051229_0302_p000.pdf, SHA-256
+ f6094cdeb63d3bb75cb0967d7e64799b0057a3e2216eda191ec3af3260689e08, texte 40 =
+ p. 103 à 108 du PDF, TH 00-02 p. 106 à 108), lu sur l'image le 05/11/2026
+ (https://github.com/Gerard-Garey/outil_tables/issues/13#issuecomment-6666559225) ;
+ pièce non versée au dépôt.
+Porteurs-usages:
+ Code des assurances : annexe à l'article A132-18, créée par l'arrêté du 28
+ décembre 2015 portant adaptation des dispositions comptables du code des
+ assurances (NOR FCPT1529210A), JO n° 301 du 29/12/2015, texte 35 ; entrée en
+ vigueur « à compter du 1er janvier 2016, ou à compter de l'entrée en vigueur
+ du règlement n° 2015-11 du 26 novembre 2015 de l'Autorité des normes
+ comptables relatif au cadre comptable des entreprises d'assurance, si
+ celle-ci est postérieure » (art. 4, p. 12 de l'extrait) ; statut : vérifié sur
+ le fac-similé versé (intitulé, NOR, art. 4 et « ANNEXE À L'ARTICLE A.
+ 132-18 », p. 1, 12 et 13 de l'extrait ; lecture sur l'image du 13/11/2026).
+ Mutualité : annexe de A223-8 du code de la mutualité, créée par l'art. 9 de
+ l'arrêté du 08/12/2006 (NOR SANS0624984A), modifié par l'arrêté du 30/12/2015
+ (NOR FCPS1531571A), art. 6 : « A l'article A. 223-8 du code de la
+ mutualité, il est créé une annexe contenant les tables TF00-02 et TH00-02 et les
+ décalages d'âge ci-annexés […] » (version initiale, BO Santé 2007-1, annonce
+ n° 58 : annexe à A. 212-10, annexe I) ; statut : vérifié (stock LEGI de la
+ DILA, art. 9 en vigueur LEGIARTI000031808338, lecture du 12/11/2026,
+ https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6828688504) ;
+ arrêté du 30/12/2015 : NOR FCPS1531571A, JORF n° 303 du 31/12/2015, texte 104 ;
+ statut : vérifié sur Légifrance, version électronique (lecture outillée du
+ 13/11/2026, regulatory), non lu sur fac-similé.
+ Sécurité sociale : annexe de A932-3-11 du code de la sécurité sociale, créée
+ par l'art. 10 de l'arrêté du 21/12/2006 relatif aux tables de mortalité
+ applicables aux institutions de prévoyance (NOR SANS0625193A, JORF n° 9 du
+ 11/01/2007, texte n° 31), modifié par l'arrêté du 30/12/2015 (NOR
+ FCPS1531571A), art. 3, « contenant les tables TF00-02 et TH00-02 […]
+ ci-annexés » ; statut : vérifié pour le texte de l'article (stocks LEGI et
+ JORF de la DILA, lecture du 12/11/2026, même commentaire) ; impression des
+ tables annexées non établie (aucun article « Annexe » dans le stock JORF) ;
+ arrêté du 30/12/2015 : même statut que pour la mutualité.
+ Comptes sociaux : règlement ANC 2015-11, art. 142-3, par renvoi : provisions
+ mathématiques calculées, « s'ils comportent un élément viager et sous réserve
+ de l'article 142-4 du présent règlement, d'après les tables en vigueur à
+ l'époque de l'application du tarif, dans le respect des dispositions du code
+ des assurances, du code de la mutualité ou du code de la sécurité sociale
+ s'appliquant à l'entreprise » (recueil des normes comptables /
+ assurance de l'ANC, « Version en vigueur au 1er janvier 2025 »,
+ https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/recueil/Assurance-Recueil-2025.pdf,
+ p. 18 du recueil, p. 19 du PDF) ; usage par renvoi aux dispositions du code
+ des assurances, du code de la mutualité ou du code de la sécurité sociale
+ (A132-18, A223-8, A932-3-11), sans nommer la table ; l'art. 142-4
+ (rentes viagères) ne porte pas la table ; la chaîne « 00-02 » n'apparaît pas
+ dans le recueil ; statut : vérifié par regulatory le 13/11/2026 sur le
+ recueil (SHA-256 0d7fb3c8…9766, champ Empreintes-hors-depot), lecture par
+ renvoi.
+Source: Journal officiel de la République française n° 301 du 29 décembre
+ 2015, texte 35 sur 159 : « Arrêté du 28 décembre 2015 portant adaptation des
+ dispositions comptables du code des assurances », NOR FCPT1529210A ; annexe à
+ l'article A132-18, « TABLE TH 00-02 » (texte en vigueur ; E2.26).
+Source-nature: fac-similé du JO (numéro complet publié au format PDF, pages
+ extraites sans rendu ni recompression ; docs/sources/README.md).
+Source-URL: aucune adresse imprimée sur les pages de l'extrait ; non consignée :
+ adresse du numéro et JORFTEXT du texte 35 non vérifiés (Légifrance 403) ;
+ adresse de téléchargement de la pièce déposée (joe_20151229_0301_p000.pdf) non
+ consignée ; identité de la pièce avec le PDF servi par Légifrance non mesurée.
+Source-consultation: pièce déposée le 13/11/2026 et versée au dépôt
+ (docs/sources/jo_2015-12-29_n301_texte35.pdf, M442).
+Source-licence: Licence etalab-2.0 retenue par interprétation (numéro servi par
+ Légifrance, sans mention contraire relevée) ; à défaut, réutilisation des
+ informations publiques (code des relations entre le public et
+ l'administration, L321-1 et L322-1 : informations non altérées, source et date
+ mentionnées). Statut : retenue par interprétation (M442 ;
+ docs/sources/README.md). La licence du dépôt (PolyForm Noncommercial 1.0.0)
+ ne couvre pas cette table (ADR 0006, point 2).
+Source-pages: p. 16 à 19 de l'extrait docs/sources/jo_2015-12-29_n301_texte35.pdf
+ (p. 235 à 238 du numéro complet) : âges 0 à 29 p. 16, 30 à 67 p. 17, 68 à 105
+ p. 18, 106 à 112 p. 19 (111 et 112 sans valeur) ; une colonne de couples X /
+ Lx.
+Transcription-methode: Transcription A (le fichier de table) : lecture directe
+ du rendu des pages par l'outil Read ; aucune extraction de couche texte, aucun
+ OCR, aucune autre transcription consultée. Lecteur : agent coder-approfondi
+ (IA), session du 13/11/2026 (B21). Fichier de A au format age;lx, avec la
+ ligne d'en-tête age;lx, fins de ligne LF, SHA-256 752e83cc…8c49 (empreinte
+ tronquée, commentaire
+ https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6849824170,
+ qui conserve les valeurs, le fichier ayant disparu avec le conteneur). Le
+ fichier de table est écrit au format 1 (age,lx) depuis les valeurs de ce
+ commentaire ; ces valeurs, réécrites au format age;lx (ligne d'en-tête age;lx,
+ fins de ligne LF), redonnent
+ 752e83cce4dc763c9810a242eea0191d7ee8ee870e77b2d7e5a19a6d9e318c49, dont le début
+ et la fin concordent avec l'empreinte tronquée (mesure du 13/11/2026). Relecture
+ de ces valeurs sur le rendu des p. 16 à 19 à 200 dpi (pdftoppm -r 200), page
+ par page, par un troisième agent coder-approfondi (IA), le 13/11/2026 : aucun
+ écart. Contrôle de conformité : relecture des 111 valeurs sur le rendu des
+ p. 16 à 19 par l'agent regulatory (IA), le 13/11/2026 : aucun écart
+ (https://github.com/Gerard-Garey/outil_tables/pull/262#issuecomment-6855968496).
+Transcription-date: 2026-11-13
+Transcription-B-releve: tests/contre_verification/tables/th_00-02.transcription_b.csv
+Transcription-B-methode: Transcription B (le relevé versé) : nouvelle
+ transcription aveugle, dite B2, par un agent coder-approfondi (IA) distinct,
+ le 13/11/2026 (session session_014w4CrWTXTzAuKuoi7iLoVe), sans accès aux
+ fichiers de table, aux relevés ni aux commentaires de #145, sans extraction de
+ couche texte ni OCR ; rendus pdftoppm -r 300 des p. 13 à 19 de l'extrait, avec
+ recadrages ; seconde lecture à rebours des âges. Fichier de B2 au format
+ age;lx, avec la ligne d'en-tête age;lx, fins de ligne LF : SHA-256
+ 752e83cce4dc763c9810a242eea0191d7ee8ee870e77b2d7e5a19a6d9e318c49,
+ égal à l'empreinte des fichiers de A et de B de la session précédente (B21 ;
+ B : lecteur distinct de A, images de 200 à 500 dpi, ordre inverse des âges),
+ consignée tronquée (752e83cc…8c49) au
+ commentaire
+ https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6849824170.
+ Converti au format 1 (tr ';' ','), le fichier de B2 est identique octet à
+ octet (cmp) au fichier de table et au relevé versé (SHA-256 90daff6a…efbc) ;
+ mesure du 13/11/2026.
+ Les lignes 111 et 112, imprimées sans valeur, ne sont pas relevées : la
+ cellule Lx y compte 0 pixel sombre, contre 62 à l'âge 110 (mesure de B2 sur
+ le rendu à 300 dpi, rapportée). Comparaison par script
+ (tests/controles/tables_embarquees.R, point (e)) : 111 lignes identiques,
+ aucun écart.
+Seconde-source-bo: Bulletin officiel Santé - Protection sociale - Solidarités
+ n° 2007-1, annonce n° 58 : arrêté du 8 décembre 2006 relatif aux tables de
+ mortalité applicables aux mutuelles (NOR SANS0624984A), annexe I « Table TH
+ 00-02 » ; impression PDF de
+ https://sante.gouv.fr/fichiers/bo/2007/07-01/a0010058.htm faite le 13/11/2026
+ à 09:52 ; docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf,
+ p. 6 à 9 (intitulé p. 6, valeurs p. 7 à 9 ; lignes 111 et 112 imprimées sans
+ valeur) ; licence non établie, extrait versé par exception datée (M446 ; ADR
+ 0006, annotation du 13/11/2026). Impression d'une page HTML, non un
+ fac-similé.
+Seconde-source-bo-methode: Couche texte de la pièce, pour la seule comparaison
+ (M445 ; E2.26), par pdftotext -layout (poppler) version 24.02.0, script hors
+ CI tests/contre_verification/tables/releves_couche_texte_th_tf_00-02.R ;
+ toutes les lignes imprimées avec une valeur (ADR 0018, point 5.2) ; une ligne
+ qui admet plus d'une lecture arrête le script.
+Seconde-source-bo-releve: tests/contre_verification/tables/th_00-02.seconde_source_bo.csv
+Seconde-source-bo-ecarts: aucun
+Controle-lecture-releve: tests/contre_verification/tables/th_00-02.couche_texte.csv
+Controle-lecture-ecarts: aucun
+Controle-lecture-methode: Couche texte du fac-similé source (JO n° 301 du
+ 29/12/2015, texte 35, p. 13 à 19 de l'extrait), extraite après le gel des deux
+ transcriptions visuelles, par pdftotext -layout (poppler) version 24.02.0,
+ script hors CI tests/contre_verification/tables/releves_couche_texte_th_tf_00-02.R ;
+ contrôle de lecture seulement, jamais une source (E2.26).
+Controles-coherence: l_x strictement décroissants sur 0 à 110 (aucune paire en
+ défaut) ; âges consécutifs ; l_0 = 100000 ; l_110 = 1 ; âges x >= 31 où
+ q_x < q_{x-1} (q_x = 1 - l_{x+1} / l_x ; contrôle de vraisemblance, non
+ correctif) : un seul, x = 108 (q_108 = 1 - 2/4 = 0,5 < q_107 = 1 - 4/9), dû à
+ l'arrondi des l_x à l'unité en fin de table (l_107 à l_110 : 9, 4, 2, 1) ;
+ mesure du 13/11/2026 sur le fichier de table. Le
+ moteur admet la table (tables_embarquees(), état admise).
+Ecarts-signales: Lignes 111 et 112 imprimées sans valeur dans la source de
+ transcription et dans la seconde source BO ; non transcrites (ADR 0018, point
+ 2.2 ; E2.26). Aucun écart entre les deux transcriptions, la seconde source BO
+ et la couche texte du fac-similé.
+ Décalages d'âge non embarqués : les décalages d'âge homologués avec la table
+ (arrêté du 20/12/2005, art. 5), imprimés p. 19 de l'extrait (« Décalage d'âge
+ TH 00-02 »), ne sont pas transcrits ; ils passent, avec leur
+ application aux q_x (A132-19), à la branche
+ claude/transcription-tables-generation (D9, M441).
+Empreintes-fichiers:
+ 90daff6a88b6269deedbe6efba79f3b7211bba8ffac730985e4592e464efbfbc  inst/extdata/tables/th_00-02.csv
+ 90daff6a88b6269deedbe6efba79f3b7211bba8ffac730985e4592e464efbfbc  tests/contre_verification/tables/th_00-02.transcription_b.csv
+ 90daff6a88b6269deedbe6efba79f3b7211bba8ffac730985e4592e464efbfbc  tests/contre_verification/tables/th_00-02.seconde_source_bo.csv
+ 90daff6a88b6269deedbe6efba79f3b7211bba8ffac730985e4592e464efbfbc  tests/contre_verification/tables/th_00-02.couche_texte.csv
+ db0f0c36322d4f2754e4ec050bd0858bc7826c274aea5a4f9678143469153e7c  tests/contre_verification/tables/releves_couche_texte_th_tf_00-02.R
+ 2e34890188164d547ea2a16e646afa25f2289e6f48310e37dbe410195ab79b56  docs/sources/jo_2015-12-29_n301_texte35.pdf
+ 0baeb0a75d45bd51a4e1e687d968079fabe441e75df82b2da3f0b874c32436d8  docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf
+Empreintes-hors-depot:
+ ec5ae04404a1e1cb8932585b01ddf5124ba4b8ae63071e61efa2f06a65f61854  joe_20151229_0301_p000.pdf (JO n° 301 du 29/12/2015, numéro complet, 926 p., déposé le 13/11/2026)
+ ad0f0d077c1b6e8b242a0519d39200c4d489fd1e023895fa0c74dd23b1c21814  BO.pdf (impression du BO Santé 2007-1 du 13/11/2026, avant réécriture du dictionnaire d'information)
+ f6094cdeb63d3bb75cb0967d7e64799b0057a3e2216eda191ec3af3260689e08  joe_20051229_0302_p000.pdf (JO n° 302 du 29/12/2005, numéro complet, 462 p., lu le 05/11/2026)
+ 0d7fb3c86e6293e57c4141bf859f926056ba6617bed4794830c83839e9319766  Assurance-Recueil-2025.pdf (recueil ANC, téléchargé le 13/11/2026)
+Representation: tablexp table 1
+Empreinte-table: d2e3d3c16212728091c85673f7ffef0e
+Visa: 2026-11-13, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/262#issuecomment-6855968496

@@ -188,13 +188,15 @@ for (cas in list(
 
 # --- réutilisation d'une bibliothèque (audit de #8, M1) ----------------------
 
-# Copie de l'arbre source (DESCRIPTION, NAMESPACE, R/) ; le témoin appelle
+# Copie de l'arbre source (DESCRIPTION, NAMESPACE, R/ et, s'il existe, inst/,
+# qui entre dans empreinte_source() : tables embarquées, ADR 0018) ; le témoin appelle
 # installer_tablexp() sur la copie avec la bibliothèque de la batterie,
 # transmise par executer_rscript() (TABLEXP_BIBLIOTHEQUE).
 copie_source <- function(modifier = NULL) {
   d <- tempfile("source_temoin_"); dir.create(file.path(d, "R"), recursive = TRUE)
   file.copy(file.path(RACINE, c("DESCRIPTION", "NAMESPACE", "LICENSE")), d)
   file.copy(list.files(file.path(RACINE, "R"), full.names = TRUE), file.path(d, "R"))
+  if (dir.exists(file.path(RACINE, "inst"))) file.copy(file.path(RACINE, "inst"), d, recursive = TRUE)
   if (!is.null(modifier)) modifier(d)
   d
 }

@@ -206,6 +206,28 @@ jobs:
           fi
           python3 --version
           Rscript tests/controles/ecriture_doubles_texte.R
+      # Issue #263 (ADR 0018, point 6) : tables embarquées — complétude,
+      # format des fichiers de table et des relevés, forme des fichiers de
+      # provenance, SHA-256 des fichiers cités (outil sha256sum de l'image ;
+      # son absence fait échouer le contrôle), empreinte de table ou refus
+      # attendu, contre-vérification rejouée sur les relevés versés,
+      # catalogue tables_embarquees(), installation depuis R CMD build sous
+      # LC_ALL=C et C.UTF-8 avec accès aux tables après suppression
+      # d'extdata. Étape du job, pas une batterie (point 6.3) : le nom ne
+      # commence pas par « Batterie : ».
+      - name: Tables embarquées (ADR 0018)
+        if: ${{ !cancelled() }}
+        run: Rscript tests/controles/tables_embarquees.R
+      # Témoin d'échec (ADR 0018, point 6.2), sur le modèle du cas témoin du
+      # job « Absence de Java » : copie de l'arbre munie de deux tables
+      # d'essai (admise, refusée) contrôlée intacte (succès attendu, mesure
+      # d'installation comprise, même catalogue vide), puis avec un l_x
+      # changé d'une unité (échec attendu sur (c), (d) et (e)), enfin avec
+      # les paires attendues de la table refusée changées (échec attendu sur
+      # (d)). Le script rend 0 si le témoin se comporte comme attendu.
+      - name: "Tables embarquées : témoin d'échec"
+        if: ${{ !cancelled() }}
+        run: Rscript tests/controles/tables_embarquees.R --temoin
 
   # ADR 0008, point 7 ; issue #3. Métadonnées de l'instantané daté du CRAN
   # (date dans tests/controles/absence_java.R), lues sans rien installer ;

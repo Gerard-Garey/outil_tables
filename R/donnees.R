@@ -34,9 +34,12 @@
 #    avertissements inscrits dans le résultat ;
 #  - table_reference() : représentation commune d'une table de référence et
 #    son contrôle, lignes dans l'ordre canonique (exportée ; ADR 0015,
-#    point 2.1) ;
-#  - TABLES_EMBARQUEES, table_embarquee() : catalogue des tables embarquées
-#    (vide) et son accesseur (exporté ; ADR 0015, point 6).
+#    point 2.1), dont le nom réservé d'une table embarquée
+#    (controler_nom_reserve(), ADR 0018, point 7.4) ;
+#  - DECLARATIONS_TABLES_EMBARQUEES, TABLES_EMBARQUEES : déclaration des
+#    tables embarquées et contenu de leurs fichiers, lu à l'installation ;
+#    table_du_catalogue() et table_embarquee() : table construite à l'appel
+#    (exportée ; ADR 0015, point 6 ; ADR 0018, point 1).
 #
 #  Conventions de temps (A.0) : une date est un jour ; un intervalle
 #  d'observation est [entrée, sortie) ; une ligne `en_cours` est ouverte à
@@ -2069,18 +2072,41 @@ STATUTS_TABLE <- c("synthetique", "embarquee", "importee")
 SEXES_TABLE <- c("H", "F", "ensemble")
 FORMES_ORIGINE <- c("qx", "lx")
 
+# Nom réservé (ADR 0018, point 7.4 ; M447, option (a)) : une table de statut
+# importee ou synthetique ne porte pas, à l'identique (sans normalisation de
+# casse ni d'espaces), le nom d'une table déclarée au catalogue
+# (`reserves` : DECLARATIONS_TABLES_EMBARQUEES$nom par défaut, injecté par les
+# tests) ; refus table_nom_reserve (module donnees). `nom` et `statut` sont
+# déjà contrôlés par table_reference().
+controler_nom_reserve <- function(nom, statut, reserves = DECLARATIONS_TABLES_EMBARQUEES$nom) {
+  if (statut != "embarquee" && nom %in% reserves)
+    refuser("donnees", "table_nom_reserve",
+            formuler(paste("Table « %s » de statut « %s » : ce nom est réservé à une table embarquée dans le",
+                           "package (tables embarquées : %s), lue par table_embarquee() et dont tables_embarquees()",
+                           "donne l'état ; une table corrigée ou modifiée est une autre table, qui porte un autre nom",
+                           "et ne se déclare pas homologuée."),
+                     citer(nom), citer(statut), liste_guillemets(reserves)),
+            list(nom = nom, statut = statut, lu = nom, attendu = reserves))
+  invisible(NULL)
+}
+
 # Construit une table de référence (classe S3 `table_reference` sur un
 # data.frame long : age entier, sexe, qx, et annee entier si fournie) et la
 # contrôle ; refuse (module donnees) au lieu de corriger. Lignes rendues dans
-# l'ordre canonique (sexe, annee, age), row.names automatiques.
-#   x            : data.frame (age, sexe, qx [, annee]), dont la classe ne porte
-#                  aucune chaîne d'encodage « bytes » (#158) ;
+# l'ordre canonique (sexe, annee, age), row.names automatiques. Une table
+# transcrite en l_x (forme_origine = "lx", colonne lx) est convertie ici en
+# q_x = (l_x - l_{x+1}) / l_x, sans garder les l_x ; le dernier âge de chaque
+# sexe (et année) ne donne aucune ligne (#146).
+#   x            : data.frame (age, sexe, qx ou lx [, annee]), dont la classe
+#                  ne porte aucune chaîne d'encodage « bytes » (#158) ;
 #   nom, source  : chaînes non vides, d'encodage autre que « bytes » (#158 ;
 #                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
 #   parametres   : liste non vide des paramètres pour une table synthétique,
 #                  NULL sinon ;
-#   forme_origine: qx ou lx (forme de la transcription).
+#   forme_origine: qx ou lx (forme de la transcription) ; une colonne lx
+#                  exige « lx », une colonne qx est admise sous l'une ou
+#                  l'autre.
 table_reference <- function(x, nom, statut, source, parametres = NULL, forme_origine = "qx") {
   if (!chaine_unique(nom))
     refuser("donnees", "table_nom_manquant", formuler("La table de référence doit avoir un nom (chaîne non vide, sans attribut)."))
@@ -2103,6 +2129,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     refuser("donnees", "table_statut_inconnu",
             formuler("Table « %s » : statut (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(STATUTS_TABLE)),
             list(statut = statut))
+  controler_nom_reserve(nom, statut)
   if (!chaine_unique(source))
     refuser("donnees", "table_source_manquante",
             formuler("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom_cite))
@@ -2132,27 +2159,45 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             list(classe = class(x)))
   if (!is.data.frame(x))
     refuser("donnees", "table_mal_formee", formuler("Table « %s » : un data.frame est attendu.", nom_cite))
-  colonnes <- c("age", "sexe", "qx", if ("annee" %in% names(x)) "annee")
-  manquantes <- setdiff(c("age", "sexe", "qx"), names(x))
+  # Colonnes (spécification de #146, § 1.2) : age, sexe, annee facultative, et
+  # exactement une des colonnes qx ou lx ; lx ne se reçoit que sous la forme
+  # d'origine « lx », qx est admise sous l'une ou l'autre (l'objet issu de l_x
+  # porte qx, et controler_forme_tables() le reconstruit sous sa forme
+  # d'origine, R/construire_table.R).
+  a_qx <- "qx" %in% names(x)
+  a_lx <- "lx" %in% names(x)
+  manquantes <- c(setdiff(c("age", "sexe"), names(x)), if (!a_qx && !a_lx) "qx")
   if (length(manquantes))
     refuser("donnees", "table_colonne_manquante",
-            formuler("Table « %s » : colonne(s) manquante(s) %s.", nom_cite, liste_guillemets(manquantes)),
+            formuler("Table « %s » : colonne(s) manquante(s) %s (une table de référence entre par « qx » ou par « lx »).",
+                     nom_cite, liste_guillemets(manquantes)),
             list(colonne = manquantes))
-  en_trop <- setdiff(names(x), colonnes)
+  en_trop <- setdiff(names(x), c("age", "sexe", "qx", "lx", "annee"))
   if (length(en_trop))
     refuser("donnees", "table_colonne_inconnue",
-            formuler("Table « %s » : colonne(s) inconnue(s) %s (admises : age, sexe, qx, annee).",
+            formuler("Table « %s » : colonne(s) inconnue(s) %s (admises : age, sexe, qx ou lx, annee).",
                      nom_cite, liste_guillemets(en_trop)),
             list(colonne = en_trop))
+  if (a_qx && a_lx)
+    refuser("donnees", "table_forme_incoherente",
+            formuler("Table « %s » : colonnes « qx » et « lx » reçues ensemble ; une table de référence entre par l'une ou l'autre.",
+                     nom_cite),
+            list(colonnes = c("qx", "lx"), forme_origine = forme_origine))
+  if (a_lx && forme_origine == "qx")
+    refuser("donnees", "table_forme_incoherente",
+            formuler("Table « %s » : colonne « lx » reçue avec la forme d'origine « qx » ; déclarer forme_origine = « lx ».",
+                     nom_cite),
+            list(colonnes = "lx", forme_origine = forme_origine))
   if (!nrow(x)) refuser("donnees", "table_vide", formuler("Table « %s » : aucune ligne.", nom_cite))
   mal_typees <- c(
     age = !type_conforme(x$age, "entier_positif") || anyNA(x$age),
     sexe = !type_conforme(x$sexe, "categorie") || anyNA(x$sexe),
-    qx = !(is.double(x$qx) && !is.object(x$qx)),
+    qx = a_qx && !(is.double(x$qx) && !is.object(x$qx)),
+    lx = a_lx && !type_conforme(x$lx, "numerique"),
     annee = "annee" %in% names(x) && (!type_conforme(x$annee, "entier") || anyNA(x$annee)))
   if (any(mal_typees))
     refuser("donnees", "table_colonne_mal_typee",
-            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; sexe : chaîne ; qx : double).",
+            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; sexe : chaîne ; qx : double ; lx : nombre).",
                      nom_cite, liste_guillemets(names(mal_typees)[mal_typees])),
             list(colonne = names(mal_typees)[mal_typees]))
   sexe <- as.character(x$sexe)
@@ -2171,20 +2216,56 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             formuler("Table « %s » : la modalité « ensemble » coexiste avec H ou F%s.", nom_cite,
                      if ("annee" %in% names(x)) formuler(" (années %s)", paste(utils::head(melange, NB_LIGNES_CITEES), collapse = ", ")) else ""),
             list(annees = if ("annee" %in% names(x)) melange else NULL))
-  non_fini <- which(!is.finite(x$qx))
-  if (length(non_fini))
-    refuser("donnees", "table_qx_non_fini",
-            formuler("Table « %s » : q_x manquant ou non fini aux lignes %s.", nom_cite,
-                     paste(utils::head(non_fini, NB_LIGNES_CITEES), collapse = ", ")),
-            list(lignes = non_fini))
-  hors_bornes <- which(x$qx < 0 | x$qx > 1)
-  if (length(hors_bornes))
-    refuser("donnees", "table_qx_hors_bornes",
-            formuler("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom_cite,
-                     paste(utils::head(hors_bornes, NB_LIGNES_CITEES), collapse = ", ")),
-            list(lignes = hors_bornes))
   age <- as.integer(x$age)
   annee <- if ("annee" %in% names(x)) as.integer(x$annee) else NULL
+  # Lignes reçues k citées avec leur groupe et leur âge (#146, § 2.5) :
+  # « 2 (ensemble, âge 1) », « 2 (H, année 1950, âge 1) », au plus
+  # NB_LIGNES_CITEES ; details : lignes, ages, sexes, annees (NULL sans annee).
+  if (a_qx) {
+    non_fini <- which(!is.finite(x$qx))
+    if (length(non_fini))
+      refuser("donnees", "table_qx_non_fini",
+              formuler("Table « %s » : q_x manquant ou non fini aux lignes %s.", nom_cite,
+                       paste(utils::head(non_fini, NB_LIGNES_CITEES), collapse = ", ")),
+              list(lignes = non_fini))
+    hors_bornes <- which(x$qx < 0 | x$qx > 1)
+    if (length(hors_bornes)) {
+      k <- utils::head(hors_bornes, NB_LIGNES_CITEES)
+      refuser("donnees", "table_qx_hors_bornes",
+              formuler("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom_cite,
+                       paste(if (is.null(annee)) formuler("%d (%s, âge %d)", k, citer(sexe[k]), age[k])
+                             else formuler("%d (%s, année %d, âge %d)", k, citer(sexe[k]), annee[k], age[k]),
+                             collapse = ", ")),
+              list(lignes = hors_bornes, ages = age[hors_bornes], sexes = sexe[hors_bornes],
+                   annees = if (is.null(annee)) NULL else annee[hors_bornes]))
+    }
+  } else {
+    # Table en l_x (#146, § 1.3 et 1.4) : l_x finis et positifs ou nuls,
+    # contrôlés dans la numérotation reçue, avant le tri.
+    l0 <- as.double(x$lx)
+    non_fini <- which(!is.finite(l0))
+    if (length(non_fini)) {
+      k <- utils::head(non_fini, NB_LIGNES_CITEES)
+      refuser("donnees", "table_lx_non_fini",
+              formuler("Table « %s » : l_x manquant ou non fini aux lignes %s.", nom_cite,
+                       paste(if (is.null(annee)) formuler("%d (%s, âge %d)", k, citer(sexe[k]), age[k])
+                             else formuler("%d (%s, année %d, âge %d)", k, citer(sexe[k]), annee[k], age[k]),
+                             collapse = ", ")),
+              list(lignes = non_fini, ages = age[non_fini], sexes = sexe[non_fini],
+                   annees = if (is.null(annee)) NULL else annee[non_fini]))
+    }
+    negatifs <- which(l0 < 0)
+    if (length(negatifs)) {
+      k <- utils::head(negatifs, NB_LIGNES_CITEES)
+      refuser("donnees", "table_lx_negatif",
+              formuler("Table « %s » : l_x négatif aux lignes %s.", nom_cite,
+                       paste(if (is.null(annee)) formuler("%d (%s, âge %d)", k, citer(sexe[k]), age[k])
+                             else formuler("%d (%s, année %d, âge %d)", k, citer(sexe[k]), annee[k], age[k]),
+                             collapse = ", ")),
+              list(lignes = negatifs, ages = age[negatifs], sexes = sexe[negatifs],
+                   annees = if (is.null(annee)) NULL else annee[negatifs]))
+    }
+  }
   # Ordre canonique (ADR 0015, point 2.1 ; M235) : rang du sexe dans
   # SEXES_TABLE (par match(), jamais par un tri de chaînes), puis annee si
   # présente, puis age ; tri radix stable, indépendant de la locale. L'objet
@@ -2220,30 +2301,236 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             list(lignes = o[trous]))
   # Colonnes construites par sous-indiçage [o], jamais x[o, ] : row.names
   # automatiques, aucun attribut de colonne reçu.
-  t <- data.frame(age = age[o], sexe = sexe[o], qx = as.numeric(x$qx)[o], stringsAsFactors = FALSE)
-  if (!is.null(annee)) t$annee <- annee[o]
+  if (a_qx) {
+    t <- data.frame(age = age[o], sexe = sexe[o], qx = as.numeric(x$qx)[o], stringsAsFactors = FALSE)
+    if (!is.null(annee)) t$annee <- annee[o]
+  } else {
+    # Table en l_x (#146, § 1.6 à 1.10), par groupe (sexe, annee) dans l'ordre
+    # canonique : s vrai si la ligne triée a une suivante dans son groupe
+    # (âge x + 1, les trous étant refusés ci-dessus) ; i : lignes qui donnent
+    # un q_x. Sexes, années et âges cités sont ceux de l'ordre trié ; details
+    # en portent les vecteurs complets, lignes dans la numérotation reçue.
+    l <- as.double(x$lx)[o]
+    s <- c(meme[-1L], FALSE)
+    i <- which(s)
+    sx <- sexe[o]; ag <- age[o]; an <- if (is.null(annee)) NULL else annee[o]
+    uniques <- which(!meme & !s)
+    if (length(uniques)) {
+      k <- utils::head(uniques, NB_LIGNES_CITEES)
+      refuser("donnees", "table_lx_age_unique",
+              formuler(paste("Table « %s » : un seul âge pour %s. Une table en l_x donne q_x = (l_x − l_{x+1}) / l_x et",
+                             "demande au moins deux âges consécutifs par sexe (et par année)."), nom_cite,
+                       paste(if (is.null(an)) formuler("%s (âge %d)", citer(sx[k]), ag[k])
+                             else formuler("%s, année %d (âge %d)", citer(sx[k]), an[k], ag[k]),
+                             collapse = " ; ")),
+              list(sexes = sx[uniques], annees = if (is.null(an)) NULL else an[uniques], ages = ag[uniques],
+                   lignes = o[uniques]))
+    }
+    # Hausse stricte l_{x+1} > l_x (q_x < 0), en comparaison exacte, sans
+    # tolérance ; l'égalité est admise (q_x = +0). Paires d'âges consécutifs :
+    # le moteur ne sait pas laquelle des deux valeurs est fautive (#146, C7).
+    hausses <- i[l[i + 1L] > l[i]]
+    if (length(hausses)) {
+      k <- utils::head(hausses, NB_LIGNES_CITEES)
+      refuser("donnees", "table_lx_non_decroissants",
+              formuler(paste("Table « %s » : l_x non décroissants (l_{x+1} > l_x, soit q_x < 0) pour %d paire(s)",
+                             "d'âges consécutifs : %s%s. La table est refusée sans correction : le moteur ne corrige pas",
+                             "une table de référence ; une table corrigée est une autre table, importée sous la",
+                             "responsabilité de l'utilisateur (statut « importee »), qui ne se déclare pas homologuée."),
+                       nom_cite, length(hausses),
+                       paste(if (is.null(an)) formuler("%s, âges %d et %d (l_x = %.15g puis %.15g)", citer(sx[k]),
+                                                       ag[k], ag[k + 1L], l[k], l[k + 1L])
+                             else formuler("%s, année %d, âges %d et %d (l_x = %.15g puis %.15g)", citer(sx[k]), an[k],
+                                           ag[k], ag[k + 1L], l[k], l[k + 1L]),
+                             collapse = " ; "),
+                       if (length(hausses) > NB_LIGNES_CITEES)
+                         formuler(" … (%d paires en tout ; liste complète dans les détails du refus)", length(hausses))
+                       else ""),
+              list(sexes = sx[hausses], annees = if (is.null(an)) NULL else an[hausses], ages = ag[hausses],
+                   lx = l[hausses], lx_suivants = l[hausses + 1L], lignes = o[hausses],
+                   lignes_suivantes = o[hausses + 1L]))
+    }
+    # l_x nul suivi d'un autre âge : q_x = 0 / 0 indéfini (-0 compris, -0 == 0) ;
+    # un l_x nul au dernier âge du groupe est admis.
+    nuls <- which(s & l == 0)
+    if (length(nuls)) {
+      k <- utils::head(nuls, NB_LIGNES_CITEES)
+      refuser("donnees", "table_lx_nul",
+              formuler(paste("Table « %s » : l_x nul suivi d'un autre âge (q_x indéfini) : %s. Seul le dernier âge",
+                             "d'un sexe (et d'une année) peut porter l_x = 0."), nom_cite,
+                       paste(if (is.null(an)) formuler("%s, âge %d", citer(sx[k]), ag[k])
+                             else formuler("%s, année %d, âge %d", citer(sx[k]), an[k], ag[k]),
+                             collapse = " ; ")),
+              list(sexes = sx[nuls], annees = if (is.null(an)) NULL else an[nuls], ages = ag[nuls],
+                   lignes = o[nuls]))
+    }
+    # Conversion (#146, § 1.7 ; chaque bit en dépend) : soustraction puis
+    # division IEC 60559, arrondi au plus près ; jamais 1 - l_{x+1} / l_x
+    # (arrondi incorrect pour 41 647 des 100 001 paires mesurées, C8), ni
+    # diff(), log, exp, cumprod, round(), normalisation par l_0 ou tolérance.
+    # Pour des l_x entiers d'au plus 2^53, d est exacte et q est l'arrondi
+    # correct du rapport (§ 5). Le dernier âge de chaque groupe ne donne aucun
+    # q_x (q_omega non posé, § 1.8).
+    d <- l[i] - l[i + 1L]
+    q <- d / l[i]
+    if (!all(is.finite(q) & q >= 0 & q <= 1))
+      stop("table_reference() : q_x dérivé de l_x non fini ou hors de [0, 1] (erreur de programmation).", call. = FALSE)
+    t <- data.frame(age = ag[i], sexe = sx[i], qx = q, stringsAsFactors = FALSE)
+    if (!is.null(annee)) t$annee <- an[i]
+  }
   structure(t, class = c("table_reference", "data.frame"), nom = nom, statut = statut,
             source = source, forme_origine = forme_origine, parametres = parametres)
 }
 
-# Catalogue des tables embarquées (ADR 0015, point 6 ; décision Q2 du
-# 06/11/2026) : liste nommée par `nom` d'objets table_reference de statut
-# embarquee, lue à l'installation. Vide tant que la branche de transcription
-# n'embarque aucune table : toute table de statut embarquee est refusée
-# (table_embarquee_absente).
-TABLES_EMBARQUEES <- structure(list(), names = character(0))
+# --- tables embarquées (ADR 0018 ; ADR 0015, point 6) -----------------------------
 
-# Table embarquée de nom `nom` (ADR 0015, point 6.2), objet table_reference
-# rendu tel qu'il est au catalogue ; refuse (module donnees) un nom absent du
-# catalogue, ou qui n'est pas une chaîne unique. Exportée (appelants :
-# application, tiers qui rejoue).
-table_embarquee <- function(nom) {
-  noms <- attr(TABLES_EMBARQUEES, "names", exact = TRUE)
+# Déclaration des tables embarquées (ADR 0018, point 1.1) : une ligne par
+# table, dans l'ordre du catalogue ; nom au catalogue, identifiant de fichier
+# ([a-z0-9_-]+ ; inst/extdata/tables/<identifiant>.csv et
+# <identifiant>.provenance.dcf) et modalité de sexe déclarée (SEXES_TABLE ;
+# le sexe n'est pas lu dans le fichier, point 2.3). Rien n'est embarqué sans y
+# être déclaré : aucun parcours de dossier. Ajouter une table modifie ce
+# fichier, donc l'empreinte du code.
+DECLARATIONS_TABLES_EMBARQUEES <- data.frame(
+  nom = c("TD 88-90", "TV 88-90", "TH 00-02", "TF 00-02"),
+  identifiant = c("td_88-90", "tv_88-90", "th_00-02", "tf_00-02"),
+  sexe = c("ensemble", "ensemble", "H", "F"),
+  stringsAsFactors = FALSE)
+
+# Dossier des tables embarquées, relatif à la racine des sources ; chemins des
+# deux fichiers d'une table (ADR 0018, points 2.1 et 3.1). Le chemin du
+# fichier de provenance est la `source` de l'objet construit (ADR 0011,
+# annotation du 05/11/2026, (c)).
+DOSSIER_TABLES_EMBARQUEES <- "inst/extdata/tables"
+fichier_table_embarquee <- function(identifiant) paste0(DOSSIER_TABLES_EMBARQUEES, "/", identifiant, ".csv")
+provenance_table_embarquee <- function(identifiant) paste0(DOSSIER_TABLES_EMBARQUEES, "/", identifiant, ".provenance.dcf")
+
+# Lecture du contenu des tables déclarées (ADR 0018, point 1.2), évaluée une
+# seule fois, par R CMD INSTALL, depuis la racine des sources (répertoire
+# courant ; même constat de plateforme qu'EMPREINTE_CODE, R/rapport.R),
+# contrôlée de façon permanente par tests/controles/tables_embarquees.R,
+# point (g). Fonctions de base seulement : ce fichier est évalué avant
+# R/outils.R (ordre alphabétique, sans champ Collate). Garde sur DESCRIPTION
+# comme empreinte_sources(), récrite ici (`donnees` n'appelle pas `rapport`).
+# Rend une liste nommée par `nom` ; chaque élément porte identifiant, sexe et
+# lignes (lignes du fichier, sans analyse, ou NULL si le fichier n'a pas pu
+# être lu). Aucune analyse, aucun contrôle, aucun refus : l'installation
+# n'échoue jamais du fait d'une table (M70).
+lire_tables_embarquees <- function(racine, declarations) {
+  description <- file.path(racine, "DESCRIPTION")
+  paquet <- if (file.exists(description))
+    tryCatch(read.dcf(description, fields = "Package")[1L, 1L], error = function(e) NA_character_)
+  sources <- identical(unname(paquet), "tablexp")
+  catalogue <- lapply(seq_len(nrow(declarations)), function(k) {
+    f <- file.path(racine, fichier_table_embarquee(declarations$identifiant[k]))
+    lignes <- if (sources && file.exists(f))
+      tryCatch(readLines(f, warn = FALSE), error = function(e) NULL, warning = function(w) NULL)
+    list(identifiant = declarations$identifiant[k], sexe = declarations$sexe[k], lignes = lignes)
+  })
+  names(catalogue) <- declarations$nom
+  catalogue
+}
+
+# Catalogue des tables embarquées (ADR 0018, point 1.2) : contenus lus à
+# l'installation, rangés dans la base de chargement différé ; à l'exécution,
+# aucun fichier n'est ouvert (E4.4). L'objet table_reference est construit à
+# l'appel, par table_du_catalogue().
+TABLES_EMBARQUEES <- lire_tables_embarquees(".", DECLARATIONS_TABLES_EMBARQUEES)
+
+# Ligne de valeurs du format 1 (ADR 0018, point 2.2) : âge et l_x entiers en
+# chiffres seuls (0, ou un chiffre non nul suivi de chiffres ; au plus quinze
+# chiffres), séparés par une virgule, sans espace.
+EN_TETE_TABLE_EMBARQUEE <- "age,lx"
+MOTIF_LIGNE_TABLE_EMBARQUEE <- "^(0|[1-9][0-9]{0,14}),(0|[1-9][0-9]{0,14})$"
+
+# Table embarquée de nom `nom` construite à l'appel (ADR 0018, point 1.3) à
+# partir de son contenu dans `catalogue` (TABLES_EMBARQUEES par défaut,
+# injecté par les tests, M247). Refuse (module donnees) : un nom absent
+# (table_embarquee_absente) ; un contenu non lu, ou hors du format 1
+# (table_embarquee_illisible : fichier et première ligne en défaut cités) —
+# en-tête, ligne de valeurs, âges croissants et consécutifs, âge au plus
+# .Machine$integer.max. Lignes analysées par découpage de chaînes, sans
+# connexion ni évaluation. La table est ensuite contrôlée et convertie par
+# table_reference(..., forme_origine = "lx"), dont un refus (par exemple
+# table_lx_non_decroissants) remonte tel quel, sans enveloppe (point 7.2).
+table_du_catalogue <- function(nom, catalogue = TABLES_EMBARQUEES) {
+  noms <- attr(catalogue, "names", exact = TRUE)
+  if (is.null(noms)) noms <- character(0)
   if (!chaine_unique(nom) || !(nom %in% noms))
     refuser("donnees", "table_embarquee_absente",
             formuler("Table embarquée « %s » : ce package n'embarque aucune table de ce nom (tables embarquées : %s).",
                      if (chaine_unique(nom)) citer(nom) else formuler("nom illisible"),
                      if (length(noms)) liste_guillemets(noms) else formuler("aucune")),
             list(lu = nom, attendu = noms))
-  TABLES_EMBARQUEES[[nom]]
+  e <- catalogue[[nom]]
+  fichier <- fichier_table_embarquee(e[["identifiant"]])
+  l <- e[["lignes"]]
+  if (is.null(l))
+    refuser("donnees", "table_embarquee_illisible",
+            formuler(paste("Table embarquée « %s » : fichier %s non lu à l'installation du package (fichier absent",
+                           "ou illisible) ; réinstaller le package depuis ses sources."),
+                     citer(nom), citer(fichier)),
+            list(nom = nom, fichier = fichier, ligne = NA_integer_, lu = NULL))
+  # Première ligne en défaut (0 : aucune), raison et ligne lue, dans l'ordre :
+  # en-tête, présence d'une ligne de valeurs, forme de chaque ligne, suite des
+  # âges.
+  ligne <- 0L
+  lu <- NULL
+  if (!length(l)) {
+    ligne <- 1L
+    raison <- formuler("fichier vide, sans en-tête « age,lx »")
+  } else if (!identical(l[1L], EN_TETE_TABLE_EMBARQUEE)) {
+    ligne <- 1L
+    raison <- formuler("en-tête « %s » au lieu de « age,lx »", citer(l[1L]))
+    lu <- l[1L]
+  } else if (length(l) < 2L) {
+    ligne <- 2L
+    raison <- formuler("aucune ligne de valeurs après l'en-tête")
+  } else {
+    corps <- l[-1L]
+    mal_formee <- which(!grepl(MOTIF_LIGNE_TABLE_EMBARQUEE, corps, useBytes = TRUE))
+    if (length(mal_formee)) {
+      ligne <- mal_formee[1L] + 1L
+      raison <- formuler("ligne « %s » mal formée", citer(corps[mal_formee[1L]]))
+      lu <- corps[mal_formee[1L]]
+    } else {
+      morceaux <- strsplit(corps, ",", fixed = TRUE)
+      age <- as.double(vapply(morceaux, function(m) m[1L], ""))
+      lx <- as.double(vapply(morceaux, function(m) m[2L], ""))
+      # Première ligne en défaut sur la suite des âges ; pour cette ligne, un
+      # âge au-delà de .Machine$integer.max a sa raison propre, testée avant
+      # celle de la suite.
+      hors_suite <- which(age != age[1L] + seq_along(age) - 1L | age > .Machine$integer.max)
+      if (length(hors_suite)) {
+        j <- hors_suite[1L]
+        ligne <- j + 1L
+        raison <- if (age[j] > .Machine$integer.max)
+          formuler("âge « %s » supérieur au plus grand entier du moteur (%d)", citer(morceaux[[j]][1L]),
+                   .Machine$integer.max)
+        else
+          formuler("âge %s hors de la suite croissante et consécutive commencée à l'âge %s",
+                   citer(morceaux[[j]][1L]), citer(morceaux[[1L]][1L]))
+        lu <- corps[j]
+      }
+    }
+  }
+  if (ligne > 0L)
+    refuser("donnees", "table_embarquee_illisible",
+            formuler(paste("Table embarquée « %s » : fichier %s, ligne %d, %s. Le contenu lu à l'installation n'est",
+                           "pas au format des tables embarquées (en-tête « age,lx », puis une ligne « <âge>,<l_x> »",
+                           "par âge, entiers en chiffres seuls, âges croissants et consécutifs) ; réinstaller le",
+                           "package depuis des sources intactes."),
+                     citer(nom), citer(fichier), ligne, raison),
+            list(nom = nom, fichier = fichier, ligne = ligne, lu = lu))
+  table_reference(data.frame(age = as.integer(age), sexe = rep(e[["sexe"]], length(age)), lx = lx,
+                             stringsAsFactors = FALSE),
+                  nom, "embarquee", provenance_table_embarquee(e[["identifiant"]]), forme_origine = "lx")
 }
+
+# Table embarquée de nom `nom` (ADR 0015, point 6.2 ; ADR 0018, point 1.3),
+# objet table_reference construit à l'appel à partir du contenu lu à
+# l'installation ; refuse (module donnees) un nom absent du catalogue, ou qui
+# n'est pas une chaîne unique, un contenu illisible, et lève tel quel le refus
+# de table_reference() d'une table refusée (TF 00-02, ADR 0018, point 7.2).
+# Exportée (appelants : application, tiers qui rejoue).
+table_embarquee <- function(nom) table_du_catalogue(nom)

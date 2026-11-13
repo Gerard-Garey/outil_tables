@@ -968,3 +968,19 @@ Rédigée par `architect` sur la porteuse `claude/lissage-whittaker` (B19, PR #2
 **Effet sur les résultats : aucun** par la présente annotation ; par `[P4]`, R1 à R14 identiques au bit près (CI à `05ed733`, corps de la PR #226).
 
 Issues : #189, #191, #211 ; #190, #234, #235, #238. Décisions M412, M414, M419. Branche `claude/simulateur-additif`, PR #226 ; porteuse PR #221.
+
+## Annotation du 13 novembre 2026 — point 7.1 : colonnes admises par `table_reference()` (`qx` ou `lx`), conversion des l_x en q_x, refus nouveaux, nom réservé (spécification de #146 ; ADR 0018, M447, M448)
+
+Rédigée par `architect` à l'étape (0')(c) de la branche `claude/transcription-tables-homologuees` (B21, PR #262), tête `d3fcdaf`, après l'acceptation de l'ADR 0018 par le mainteneur le 13/11/2026 (M447). Le texte ci-dessus, annotations comprises, n'est pas réécrit ; le nom de l'objet fait foi (M77, (b)). Décrit la spécification amont d'`actuary-approfondi` (https://github.com/Gerard-Garey/outil_tables/issues/146#issuecomment-6848954642), à mettre en œuvre par #146 ; noms de motifs et messages fixés par `coder-approfondi`, visés par `actuary`. **La signature de `table_reference()` ne change pas** (`x, nom, statut, source, parametres = NULL, forme_origine = "qx"`).
+
+**(a) Colonnes admises.** `age`, `sexe`, `annee` (facultative) et **exactement une** des colonnes `qx` ou `lx`. Une table en l_x se déclare par `forme_origine = "lx"` ; une colonne `qx` déclarée `forme_origine = "lx"` reste admise (reconstruction de l'objet par `controler_forme_tables()`). L'attribut `forme_origine` (`qx` ou `lx`) du point 7.1 cesse d'être une simple étiquette : sous `lx`, le constructeur convertit.
+
+**(b) Conversion, dans le constructeur.** Par groupe (sexe, et année si présente), après le tri canonique et les contrôles de doublon et de contiguïté : d = l_x − l_{x+1}, puis q_x = d / l_x (opérations IEC 60559 ; formes `1 - l[i+1]/l[i]`, `diff()`, logarithme, normalisation par l_0 et toute tolérance interdites). Le dernier âge de chaque groupe ne donne pas de q_x (aucun q_ω = 1 posé) ; l'égalité l_{x+1} = l_x est admise (q_x = 0). L'objet ne garde pas les l_x ; l'empreinte de table porte sur les q_x dérivés. Statut **exact** pour des l_x entiers (arrondi correct du rapport).
+
+**(c) Refus nouveaux ou changés** (valables pour tout statut) : `table_forme_incoherente` (`qx` et `lx` reçues ensemble, ou `lx` sous `forme_origine = "qx"`) ; `table_lx_non_fini`, `table_lx_negatif` (lignes citées avec groupe et âge) ; `table_lx_age_unique` ; **`table_lx_non_decroissants`**, comparaison exacte, qui cite des **paires d'âges consécutifs** — jusqu'à `NB_LIGNES_CITEES` (10), au-delà le total, liste complète dans `details` (décision Q2 du mainteneur, M448) ; `table_lx_nul` (l_x nul qui n'est pas le dernier âge du groupe). Messages de `table_colonne_manquante` et `table_colonne_inconnue` élargis à `lx` ; `table_qx_hors_bornes` cite désormais l'âge et le groupe de chaque ligne. La liste des refus du point 7.1 (« `qx` hors [0, 1], des âges non contigus ou en double, une colonne manquante ou mal typée ») s'en trouve complétée.
+
+**(d) Nom réservé** (ADR 0018, point 7.4 ; question Q4 (c) de #146, option (a), M447). `table_reference()` refuse une table de statut `importee` ou `synthetique` dont le `nom` est, à l'identique (sans normalisation), celui d'une table déclarée au catalogue des tables embarquées (motif nouveau, nom indicatif `table_nom_reserve`). Mise en œuvre avec le catalogue (#263), le constructeur et la déclaration étant dans le même module `donnees`.
+
+**Effet sur les résultats : aucun** par la présente annotation. Par #146 : R1 à R17 identiques au bit près attendus (aucune référence ne lit une table en l_x) ; `VERSION_FICHE` inchangée (6) ; changements de messages visés par `actuary`.
+
+Issues : #146, #263, #145. Décisions M443, M447, M448. ADR 0018 ; ADR 0015 (annotation du même jour). Branche `claude/transcription-tables-homologuees`, PR #262.
