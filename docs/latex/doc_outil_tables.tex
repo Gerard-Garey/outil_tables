@@ -6789,6 +6789,115 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     un identifiant change \code{source}, donc la fiche et l'empreinte du
     résultat de toute construction qui lit la table~: un identifiant ne se
     renomme pas sans tableau avant~/ après.
+  \item \textbf{TD~88-90 et TV~88-90} (issue~\#264~; E2.25 et E2.26~;
+    ADR 0018, points~3.4, 4.4 et~5.3~; décisions M443 à M446, M449 et
+    M451). Fichiers \code{inst/extdata/tables/td\_88-90.csv} et
+    \code{inst/extdata/tables/tv\_88-90.csv}, chacun avec son fichier de
+    provenance, qui fait foi pour tout ce qui suit et en donne les
+    empreintes.
+    \begin{itemize}[leftmargin=*, itemsep=1pt]
+      \item \emph{Source de transcription} (champs \code{Source} à
+        \code{Source-pages}~; M444). Le fac-similé du \emph{Journal
+        officiel} n\textsuperscript{o}~2 du 3~janvier 2016, texte~39 sur~136~: «~Arrêté du
+        28 décembre 2015 portant homologation des règlements [\ldots] de
+        l'Autorité des normes comptables (rectificatif)~», NOR
+        EINT1531578Z, qui complète l'annexe du règlement ANC n\textsuperscript{o}~2015-11.
+        Il imprime «~Art. 600-5 / Table de mortalité TD~88-90 / (Lx nombre
+        de vivants à l'âge X)~», âges 0 à~106, sur une colonne de couples
+        X~/ Lx (p.~19 à~21 de l'extrait
+        \code{docs/sources/jo\_2016-01-03\_n2\_texte39.pdf}, p.~171 à~173
+        du numéro), et «~Art. 600-6 / Table de mortalité TV~88-90~», âges
+        0 à~110, sur trois colonnes de couples, chaque colonne se lisant
+        sur toutes les pages avant la suivante (p.~21 à~23 de l'extrait,
+        p.~173 à~175 du numéro). Les deux tables commencent à
+        $l_0 = 100\,000$ et finissent à $l_\omega = 2$ ($\omega = 106$ pour
+        TD, $110$ pour TV), sans ligne nulle au-delà~; les objets
+        construits portent donc les $q_x$ des âges 0 à~105 (TD) et 0
+        à~109 (TV), sans $q_\omega = 1$ (ci-dessus, «~Table transcrite en
+        $l_x$~», «~Dernier âge~»), au statut de résultat exact, les $l_x$
+        étant entiers. Les valeurs sont lues sur le rendu des pages, jamais
+        par la couche texte (E2.25). Ce fac-similé remplace, comme source,
+        l'impression de la version électronique de Légifrance de l'arrêté
+        du 27~avril 1993, qui en tenait lieu faute du fac-similé du JO
+        de 1993 (exception du 05/11/2026, M220, tombée pour ces tables), et
+        celle-ci devient une seconde source. Licence~: etalab-2.0 retenue
+        par interprétation, à défaut réutilisation des informations
+        publiques (code des relations entre le public et l'administration,
+        L321-1 et L322-1)~; la licence du dépôt ne couvre pas ces tables
+        (champ \code{Source-licence}).
+      \item \emph{Acte d'homologation et porteurs} (champs
+        \code{Homologation} et \code{Porteurs-usages}~; M443, lecture~(B)).
+        L'acte d'homologation est l'arrêté du 27~avril 1993 relatif aux
+        tables de mortalité (NOR ECOT9390043A, JORF n\textsuperscript{o}~125 du 2~juin 1993,
+        p.~8011 d'après Légifrance~; page de fin non établie, fac-similé
+        de 1993 non obtenu). Il n'y a pas de porteur unique (E2.26)~: chaque
+        régime a le sien, et le fichier de provenance les liste, chacun
+        avec son statut. Comptes sociaux~:
+        règlement ANC 2015-11, art.~600-5 pour TD~88-90, et art.~143-2,
+        qui définit la loi de survie en invalidité des provisions de
+        rentes d'invalidité «~par la table de mortalité mentionnée à
+        l'article 600-5~», sauf loi certifiée par un actuaire indépendant
+        (statut \emph{vérifié}, recueil des normes comptables de l'ANC,
+        «~Version en vigueur au 1\textsuperscript{er} janvier 2025~»)~; art.~600-6 pour
+        TV~88-90, statut \emph{incertain}~: l'article est imprimé par le
+        rectificatif, mais le recueil de 2025 ne contient ni «~600-6~» ni
+        «~TV~88-90~». Mutualité~: annexe de l'article A223-8 du code de la
+        mutualité, créée par l'arrêté du 8~décembre 2006, art.~9, modifié
+        par l'arrêté du 30~décembre 2015, art.~6 (\emph{vérifié} sur la
+        version consolidée de Légifrance). Sécurité sociale~: annexe de
+        l'article A932-3-11 du code de la sécurité sociale, créée par
+        l'arrêté du 21~décembre 2006 (NOR SANS0625193A), art.~10, modifié
+        par l'arrêté du 30~décembre 2015, art.~3 (\emph{vérifié} de même).
+        Code des assurances~: l'arrêté de 1993 seul~; l'annexe à l'article
+        A132-18 (JO n\textsuperscript{o}~301 du 29/12/2015) ne porte pas ces tables, et
+        l'article du code que l'arrêté de 1993 appliquait, abrogé depuis le
+        1\textsuperscript{er}~janvier 2016, n'est pas cité. Les porteurs ne s'écrivent qu'au
+        fichier de provenance~: le moteur et le rapport figé ne citent, au
+        plus, que l'acte d'homologation (condition d'\code{actuary}, M443).
+        Dans cette version, le moteur ne cite aucun texte~: de la
+        provenance, il ne porte que le chemin du fichier, attribut
+        \code{source} de la table, repris dans
+        \code{fiche\$tables\_reference}.
+      \item \emph{Sexe «~ensemble~»} (M449). Les intitulés du texte
+        (ci-dessus) ne mentionnent aucun sexe~: le texte désigne ces tables
+        par la garantie, non par le sexe. Elles sont déclarées de modalité
+        \code{ensemble}~; l'empreinte de table couvre cette déclaration,
+        non le SHA-256 du fichier transcrit (ci-dessus, «~Déclaration~»).
+        Une table \code{ensemble} s'apparie à toute cellule, que la
+        construction soit segmentée par sexe ou non, l'appariement
+        \code{ensemble\_par\_sexe} étant signalé au rapport
+        (section~\ref{sec:validation-etape}, «~Valeurs appariées~»).
+      \item \emph{Contre-vérification} (M445~; relevés sous
+        \code{tests/contre\_verification/tables/}). (a)~Deux
+        transcriptions visuelles indépendantes, sur le rendu des pages,
+        par deux lecteurs dont le second n'avait pas accès à la première~:
+        identiques ligne à ligne. (b)~Seconde source Légifrance
+        (impression du 13/11/2026 de la version électronique de l'arrêté
+        de 1993, versée sous \code{docs/sources/}, sans couche texte,
+        relevée sur le rendu)~: aucun écart. (c)~Seconde source BO Santé
+        n\textsuperscript{o}~2007-1, annonce n\textsuperscript{o}~58, annexe~III (impression du 13/11/2026,
+        extrait versé par exception datée, M446), relevée par sa couche
+        texte (\code{pdftotext}) pour la seule comparaison~: les seuls
+        écarts sont des lignes à $l_x = 0$ que seul le BO imprime (âges 107
+        à~111 pour TD, âge~111 pour TV)~; elles ne sont pas transcrites, la
+        valeur retenue étant celle de la source (E2.26). (d)~Couche texte
+        du fac-similé source, extraite après le gel des deux transcriptions,
+        contrôle de lecture seulement~: aucun écart. Ces écarts sont
+        déclarés au fichier de provenance et le contrôle de la CI vérifie
+        que les écarts constatés sur les relevés versés leur sont égaux,
+        dans les deux sens (\code{tests/controles/tables\_embarquees.R},
+        point~(e), section~\ref{sec:scripts-controle}). Singularité
+        typographique sans incidence sur la valeur~: $l_{94}$ de TV~88-90
+        est imprimé «~10636~», sans l'espace de séparation des milliers des
+        autres valeurs (p.~21 de l'extrait), et transcrit $10\,636$, lu de
+        même par les deux transcriptions. \textbf{Portée}~: la
+        contre-vérification détecte une erreur de \emph{lecture} de la
+        source~; elle ne juge pas la valeur imprimée elle-même.
+      \item \emph{Visa.} Valeurs de tables homologuées embarquées, visées
+        par le mainteneur le 13/11/2026 (M451~; champ \code{Visa}). Les
+        deux tables sont admises par le moteur (état \code{admise} de
+        \code{tables\_embarquees()}).
+    \end{itemize}
 \end{itemize}
 
 \subsection{Vérifications}
@@ -18333,8 +18442,8 @@ E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-gr
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:coherence-regularite}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
-E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
-E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction) & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
+E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, la couche texte ne servant qu'à la comparaison et au contrôle de lecture) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
+E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction) & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
