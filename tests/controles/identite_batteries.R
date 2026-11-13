@@ -72,6 +72,9 @@ batteries_claude <- function(chemin) {
   if (length(fin_section)) suite <- suite[seq_len(fin_section[1L] - 1L)]
   clotures <- which(grepl("^```", suite))
   if (length(clotures) < 2L) return(character(0))
+  # Bloc vide (clôtures consécutives) : `a:b` décroîtrait et rendrait les
+  # deux clôtures (#266).
+  if (clotures[2L] - clotures[1L] < 2L) return(character(0))
   bloc <- trimws(suite[(clotures[1L] + 1L):(clotures[2L] - 1L)])
   bloc[nzchar(bloc)]
 }
