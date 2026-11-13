@@ -343,7 +343,9 @@ relever_graines <- function(racine) {
     dossier <- file.path(racine, d)
     if (!dir.exists(dossier)) next
     f <- list.files(dossier, pattern = "\\.[Rr]$", recursive = TRUE)
-    fichiers <- c(fichiers, paste(d, gsub("\\\\", "/", f), sep = "/"))
+    # Dossier sans fichier R (inst/ ne porte que des tables, ADR 0018) :
+    # paste() sur character(0) rendrait « inst/ », lu comme un fichier.
+    if (length(f)) fichiers <- c(fichiers, paste(d, gsub("\\\\", "/", f), sep = "/"))
   }
   fichiers <- sort(fichiers)
   arbres <- list(); formels <- list()
