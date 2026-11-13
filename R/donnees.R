@@ -2090,6 +2090,20 @@ controler_nom_reserve <- function(nom, statut, reserves = DECLARATIONS_TABLES_EM
   invisible(NULL)
 }
 
+# Citations des refus de table_reference() (#270, point 1 ; #146, § 2.5) :
+# une seule définition du format. groupes_cites_table() cite le groupe de
+# chaque position, sexe et année si `annees` n'est pas NULL (« H »,
+# « H, année 1950 ») ; lignes_citees_table() cite des lignes reçues `k`, au
+# plus NB_LIGNES_CITEES choisies par l'appelant, avec leur groupe et leur âge
+# (« 2 (ensemble, âge 1) », « 2 (H, année 1950, âge 1) »), séparées par des
+# virgules. Aides de message (tests/controles/messages_refus.R, AIDES).
+groupes_cites_table <- function(sexes, annees) {
+  if (is.null(annees)) citer(sexes) else formuler("%s, année %d", citer(sexes), annees)
+}
+lignes_citees_table <- function(k, sexes, annees, ages) {
+  paste(formuler("%d (%s, âge %d)", k, groupes_cites_table(sexes, annees), ages), collapse = ", ")
+}
+
 # Construit une table de référence (classe S3 `table_reference` sur un
 # data.frame long : age entier, sexe, qx, et annee entier si fournie) et la
 # contrôle ; refuse (module donnees) au lieu de corriger. Lignes rendues dans
@@ -2218,9 +2232,11 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             list(annees = if ("annee" %in% names(x)) melange else NULL))
   age <- as.integer(x$age)
   annee <- if ("annee" %in% names(x)) as.integer(x$annee) else NULL
-  # Lignes reçues k citées avec leur groupe et leur âge (#146, § 2.5) :
-  # « 2 (ensemble, âge 1) », « 2 (H, année 1950, âge 1) », au plus
-  # NB_LIGNES_CITEES ; details : lignes, ages, sexes, annees (NULL sans annee).
+  # Lignes reçues k citées avec leur groupe et leur âge (#146, § 2.5) par
+  # lignes_citees_table(), au plus NB_LIGNES_CITEES ; details_lignes() :
+  # lignes, ages, sexes, annees (NULL sans annee), dans la numérotation reçue.
+  details_lignes <- function(j)
+    list(lignes = j, ages = age[j], sexes = sexe[j], annees = if (is.null(annee)) NULL else annee[j])
   if (a_qx) {
     non_fini <- which(!is.finite(x$qx))
     if (length(non_fini))
@@ -2233,11 +2249,8 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
       k <- utils::head(hors_bornes, NB_LIGNES_CITEES)
       refuser("donnees", "table_qx_hors_bornes",
               formuler("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom_cite,
-                       paste(if (is.null(annee)) formuler("%d (%s, âge %d)", k, citer(sexe[k]), age[k])
-                             else formuler("%d (%s, année %d, âge %d)", k, citer(sexe[k]), annee[k], age[k]),
-                             collapse = ", ")),
-              list(lignes = hors_bornes, ages = age[hors_bornes], sexes = sexe[hors_bornes],
-                   annees = if (is.null(annee)) NULL else annee[hors_bornes]))
+                       lignes_citees_table(k, sexe[k], annee[k], age[k])),
+              details_lignes(hors_bornes))
     }
   } else {
     # Table en l_x (#146, § 1.3 et 1.4) : l_x finis et positifs ou nuls,
@@ -2248,22 +2261,16 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
       k <- utils::head(non_fini, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_non_fini",
               formuler("Table « %s » : l_x manquant ou non fini aux lignes %s.", nom_cite,
-                       paste(if (is.null(annee)) formuler("%d (%s, âge %d)", k, citer(sexe[k]), age[k])
-                             else formuler("%d (%s, année %d, âge %d)", k, citer(sexe[k]), annee[k], age[k]),
-                             collapse = ", ")),
-              list(lignes = non_fini, ages = age[non_fini], sexes = sexe[non_fini],
-                   annees = if (is.null(annee)) NULL else annee[non_fini]))
+                       lignes_citees_table(k, sexe[k], annee[k], age[k])),
+              details_lignes(non_fini))
     }
     negatifs <- which(l0 < 0)
     if (length(negatifs)) {
       k <- utils::head(negatifs, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_negatif",
               formuler("Table « %s » : l_x négatif aux lignes %s.", nom_cite,
-                       paste(if (is.null(annee)) formuler("%d (%s, âge %d)", k, citer(sexe[k]), age[k])
-                             else formuler("%d (%s, année %d, âge %d)", k, citer(sexe[k]), annee[k], age[k]),
-                             collapse = ", ")),
-              list(lignes = negatifs, ages = age[negatifs], sexes = sexe[negatifs],
-                   annees = if (is.null(annee)) NULL else annee[negatifs]))
+                       lignes_citees_table(k, sexe[k], annee[k], age[k])),
+              details_lignes(negatifs))
     }
   }
   # Ordre canonique (ADR 0015, point 2.1 ; M235) : rang du sexe dans
@@ -2308,23 +2315,23 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     # Table en l_x (#146, § 1.6 à 1.10), par groupe (sexe, annee) dans l'ordre
     # canonique : s vrai si la ligne triée a une suivante dans son groupe
     # (âge x + 1, les trous étant refusés ci-dessus) ; i : lignes qui donnent
-    # un q_x. Sexes, années et âges cités sont ceux de l'ordre trié ; details
-    # en portent les vecteurs complets, lignes dans la numérotation reçue.
+    # un q_x. Sexes, années et âges cités sont ceux de l'ordre trié
+    # (groupes_cites_table()) ; details en portent les vecteurs complets
+    # (details_groupes() : sexes, annees, ages), lignes dans la numérotation
+    # reçue.
     l <- as.double(x$lx)[o]
     s <- c(meme[-1L], FALSE)
     i <- which(s)
     sx <- sexe[o]; ag <- age[o]; an <- if (is.null(annee)) NULL else annee[o]
+    details_groupes <- function(j) list(sexes = sx[j], annees = if (is.null(an)) NULL else an[j], ages = ag[j])
     uniques <- which(!meme & !s)
     if (length(uniques)) {
       k <- utils::head(uniques, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_age_unique",
               formuler(paste("Table « %s » : un seul âge pour %s. Une table en l_x donne q_x = (l_x − l_{x+1}) / l_x et",
                              "demande au moins deux âges consécutifs par sexe (et par année)."), nom_cite,
-                       paste(if (is.null(an)) formuler("%s (âge %d)", citer(sx[k]), ag[k])
-                             else formuler("%s, année %d (âge %d)", citer(sx[k]), an[k], ag[k]),
-                             collapse = " ; ")),
-              list(sexes = sx[uniques], annees = if (is.null(an)) NULL else an[uniques], ages = ag[uniques],
-                   lignes = o[uniques]))
+                       paste(formuler("%s (âge %d)", groupes_cites_table(sx[k], an[k]), ag[k]), collapse = " ; ")),
+              c(details_groupes(uniques), list(lignes = o[uniques])))
     }
     # Hausse stricte l_{x+1} > l_x (q_x < 0), en comparaison exacte, sans
     # tolérance ; l'égalité est admise (q_x = +0). Paires d'âges consécutifs :
@@ -2338,17 +2345,14 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
                              "une table de référence ; une table corrigée est une autre table, importée sous la",
                              "responsabilité de l'utilisateur (statut « importee »), qui ne se déclare pas homologuée."),
                        nom_cite, length(hausses),
-                       paste(if (is.null(an)) formuler("%s, âges %d et %d (l_x = %.15g puis %.15g)", citer(sx[k]),
-                                                       ag[k], ag[k + 1L], l[k], l[k + 1L])
-                             else formuler("%s, année %d, âges %d et %d (l_x = %.15g puis %.15g)", citer(sx[k]), an[k],
-                                           ag[k], ag[k + 1L], l[k], l[k + 1L]),
+                       paste(formuler("%s, âges %d et %d (l_x = %.15g puis %.15g)", groupes_cites_table(sx[k], an[k]),
+                                      ag[k], ag[k + 1L], l[k], l[k + 1L]),
                              collapse = " ; "),
                        if (length(hausses) > NB_LIGNES_CITEES)
                          formuler(" … (%d paires en tout ; liste complète dans les détails du refus)", length(hausses))
                        else ""),
-              list(sexes = sx[hausses], annees = if (is.null(an)) NULL else an[hausses], ages = ag[hausses],
-                   lx = l[hausses], lx_suivants = l[hausses + 1L], lignes = o[hausses],
-                   lignes_suivantes = o[hausses + 1L]))
+              c(details_groupes(hausses),
+                list(lx = l[hausses], lx_suivants = l[hausses + 1L], lignes = o[hausses], lignes_suivantes = o[hausses + 1L])))
     }
     # l_x nul suivi d'un autre âge : q_x = 0 / 0 indéfini (-0 compris, -0 == 0) ;
     # un l_x nul au dernier âge du groupe est admis.
@@ -2358,11 +2362,8 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
       refuser("donnees", "table_lx_nul",
               formuler(paste("Table « %s » : l_x nul suivi d'un autre âge (q_x indéfini) : %s. Seul le dernier âge",
                              "d'un sexe (et d'une année) peut porter l_x = 0."), nom_cite,
-                       paste(if (is.null(an)) formuler("%s, âge %d", citer(sx[k]), ag[k])
-                             else formuler("%s, année %d, âge %d", citer(sx[k]), an[k], ag[k]),
-                             collapse = " ; ")),
-              list(sexes = sx[nuls], annees = if (is.null(an)) NULL else an[nuls], ages = ag[nuls],
-                   lignes = o[nuls]))
+                       paste(formuler("%s, âge %d", groupes_cites_table(sx[k], an[k]), ag[k]), collapse = " ; ")),
+              c(details_groupes(nuls), list(lignes = o[nuls])))
     }
     # Conversion (#146, § 1.7 ; chaque bit en dépend) : soustraction puis
     # division IEC 60559, arrondi au plus près ; jamais 1 - l_{x+1} / l_x
