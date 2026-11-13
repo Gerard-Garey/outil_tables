@@ -376,6 +376,57 @@ verifier("D injection : table embarquee discordante (un l_x changé d'une unité
                  "table_embarquee_discordante", empreinte_table(T_EMB), e_cat,
                  c("Obtenir la table par table_embarquee()", e_cat))
 })
+# Métadonnées d'une table embarquée reçue (revue finale de B21, constat 1) :
+# source et forme d'origine, reprises dans la fiche, sont celles du catalogue.
+# Les tables forgées ont les valeurs de T_EMB, donc son empreinte de table :
+# seule la comparaison des métadonnées peut les refuser (contre-test ci-dessous).
+forgee_e <- function(source = attr(T_EMB, "source", exact = TRUE), forme = "lx")
+  table_reference(data.frame(age = T_EMB$age, sexe = T_EMB$sexe, qx = T_EMB$qx), "TABLE_E", "embarquee", source,
+                  forme_origine = forme)
+verifier("D injection : table embarquee forgée de même nom et de même empreinte, source ou forme d'origine différente -> table_embarquee_discordante nommant le champ, lu et attendu en details", {
+  src <- attr(T_EMB, "source", exact = TRUE)
+  cas <- list(source = list(forgee_e("ma source"), "source", "ma source", src),
+              forme = list(forgee_e(forme = "qx"), "forme_origine", "qx", "lx"))
+  res <- lapply(cas, function(c_) {
+    r <- refus_de(controler_tables_reference(list(t1 = c_[[1L]]), PLAN_T1, CLE_ESSAI, CAT_E))
+    ok <- controle_refus(r, "construire_table", "table_embarquee_discordante", c_[[3L]], c_[[4L]],
+                         c(sprintf("« %s » : « %s » reçu, « %s » au catalogue", c_[[2L]], c_[[3L]], c_[[4L]]),
+                           "Obtenir la table par table_embarquee()",
+                           "champ de la fiche différent de celui de la table de ce nom embarquée dans le package installé",
+                           "(source, forme d'origine, paramètres, représentation, empreinte de table)"))
+    if (isTRUE(ok) && !(identical(r$details$champ, c_[[2L]]) && identical(r$details$cle, "t1"))) "details$champ ou $cle" else ok
+  })
+  if (all(vapply(res, isTRUE, NA))) TRUE else res[!vapply(res, isTRUE, NA)]
+})
+verifier("D injection : table embarquee forgée aux deux métadonnées fausses -> un refus, les deux champs en details dans l'ordre de la fiche, aucun remplacement par la table du catalogue", {
+  r <- refus_de(controler_tables_reference(list(t1 = forgee_e("ma source", "qx")), PLAN_T1, CLE_ESSAI, CAT_E))
+  ok <- controle_refus(r, "construire_table", "table_embarquee_discordante",
+                       c("ma source", "qx"), c(attr(T_EMB, "source", exact = TRUE), "lx"),
+                       c("champs de la fiche différents de ceux de la table de ce nom embarquée dans le package installé",
+                         "« source » : « ma source » reçu", " ; « forme_origine » : « qx » reçu, « lx » au catalogue)"))
+  if (isTRUE(ok) && !identical(r$details$champ, c("source", "forme_origine"))) "details$champ" else ok
+})
+verifier("D injection : table embarquee discordante par l'empreinte seule -> details$champ = empreinte", {
+  r <- refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, contenu_e(c(1000, 991, 979, 967))))
+  identical(r$details$champ, "empreinte") && grepl("« empreinte » : « ", conditionMessage(r), fixed = TRUE) &&
+    grepl("champ de la fiche différent de celui de la table", conditionMessage(r), fixed = TRUE)
+})
+verifier("contre-test : les tables forgées ont l'empreinte de table de T_EMB (la comparaison des empreintes seule les admettait) ; T_EMB intacte est admise", {
+  identical(c(a = identical(empreinte_table(forgee_e("ma source")), empreinte_table(T_EMB)),
+              b = identical(empreinte_table(forgee_e(forme = "qx")), empreinte_table(T_EMB)),
+              c = !identical(element_table_fiche(forgee_e("ma source")), element_table_fiche(T_EMB)),
+              d = identical(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, CAT_E),
+                            list(t1 = element_table_fiche(T_EMB)))),
+            c(a = TRUE, b = TRUE, c = TRUE, d = TRUE))
+})
+verifier("catalogue installé : TD 88-90 du package admise ; la même table de source « ma source » ou de forme qx est refusée table_embarquee_discordante", if (!"TD 88-90" %in% NOMS_EMBARQUEES) "TD 88-90 absente du catalogue installé" else {
+  td <- table_embarquee("TD 88-90")
+  forge <- function(...) table_reference(data.frame(age = td$age, sexe = td$sexe, qx = td$qx), "TD 88-90", "embarquee", ...)
+  motif <- function(t) { r <- refus_de(controler_tables_reference(list(t1 = t), PLAN_T1, CLE_ESSAI)); if (is.null(r)) "admise" else r$motif }
+  identical(c(motif(td), motif(forge("ma source", forme_origine = "lx")),
+              motif(forge(attr(td, "source", exact = TRUE), forme_origine = "qx"))),
+            c("admise", "table_embarquee_discordante", "table_embarquee_discordante"))
+})
 verifier("D injection : table embarquee dont le contenu au catalogue est refusé (l_x non décroissants) -> refus table_lx_non_decroissants de table_reference(), sans enveloppe (ADR 0018, point 7.2)", {
   r <- refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, contenu_e(c(1000, 990, 995, 967))))
   ok <- controle_refus(r, "donnees", "table_lx_non_decroissants", contient = "âges 61 et 62 (l_x = 990 puis 995)")
