@@ -6626,7 +6626,8 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     couvre la colonne \code{sexe}. Rien n'est embarqué sans y être déclaré~:
     aucun dossier n'est parcouru (un fichier déposé par erreur serait sinon
     embarqué), et ajouter une table modifie \code{R/donnees.R}, donc
-    l'empreinte du code. La déclaration porte quatre tables~: TD~88-90 et
+    l'empreinte du code. Dans cette version, la déclaration porte quatre
+    tables~: TD~88-90 et
     TV~88-90, de modalité \code{ensemble}, le texte les désignant par la
     garantie et non par le sexe (M449), TH~00-02 (\code{H}) et TF~00-02
     (\code{F}).
@@ -6766,10 +6767,16 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     rapport~; après le refus d'une table embarquée, le geste naturel serait
     d'importer une table corrigée sous le même nom, alors qu'une table
     corrigée ne se déclare pas homologuée (E2.26). La comparaison est
-    exacte, sans normalisation de casse, d'espaces ni de tirets~: elle
-    couvre ce cas naturel, non un contournement délibéré (un nom qui ne
-    diffère que par la casse est admis), que le statut et l'empreinte de
-    table continuent de signaler. Une table de statut \code{embarquee} qui
+    exacte, sans normalisation de casse, d'espaces, de tirets ni de
+    caractères d'apparence identique~: elle écarte ce cas naturel, non un
+    nom voisin, qui est admis («~tf 00-02~», «~TF 00-02~» suivi d'une
+    espace ou écrit avec une espace insécable~; \emph{constat de mesure}
+    du 13/11/2026). Une telle table reste distinguée par son statut
+    \code{importee}, que portent \code{fiche\$tables\_reference} et le
+    rapport figé~; son empreinte de table ne la distingue d'une table du
+    catalogue que si ses valeurs diffèrent (importée aux $l_x$ de
+    TH~00-02 sous le nom «~th 00-02~», elle a l'empreinte de TH~00-02,
+    \emph{constat de mesure} du 13/11/2026). Une table de statut \code{embarquee} qui
     porte ce nom est admise par le constructeur~: c'est le contrôle des
     tables reçues qui la confronte au catalogue.
   \item \textbf{Fichier de provenance et deux identités} (ADR 0018,
