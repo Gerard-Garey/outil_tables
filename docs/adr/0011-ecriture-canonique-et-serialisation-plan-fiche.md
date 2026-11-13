@@ -1150,3 +1150,17 @@ Deux tests protègent la valeur de la marque et son emploi : `tests/unitaires/te
 **Effet sur les résultats : aucun.** Aucun code n'est modifié par la présente annotation.
 
 Issues : #144 ; #63. ADR 0017, point 13.2 (`ordres`, « ordre canonique croissant, ADR 0011, point 5.1 (h) »). Branche `claude/lissage-whittaker`, PR #221.
+
+## Annotation du 13 novembre 2026 — annotation du 05/11/2026, (d) : mode d'appel du script de contrôle des tables embarquées, deux identités au fichier de provenance, statut exact de l'empreinte d'une table embarquée en l_x entiers (ADR 0018, M447 ; #263)
+
+Rédigée par `architect` à l'étape (0')(c) de la branche `claude/transcription-tables-homologuees` (B21, PR #262), tête `d3fcdaf`, après l'acceptation de l'ADR 0018 par le mainteneur le 13/11/2026 (M447). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Aucun renvoi `fichier:ligne`. Aucun code n'est écrit par la présente annotation.
+
+**(a) Mode d'appel fixé.** Le script de l'annotation du 05/11/2026, (d), est `tests/controles/tables_embarquees.R`, exécuté par une **étape** du job « Tests (R 4.3.3) » avec un témoin d'échec, **non** une quatrième batterie : la liste des batteries de `CLAUDE.md` et `tests/controles/identite_batteries.R` sont inchangées (ADR 0018, points 6.1 à 6.3). Il vérifie, outre l'égalité de l'empreinte de table au champ `Empreinte-table` du fichier de provenance, le refus attendu d'une table refusée par le moteur (champs `Refus-attendu`, `Refus-paires`) : une table refusée n'a pas d'empreinte de table (question Q4 (a) de #146).
+
+**(b) « La même empreinte au fichier de provenance » : deux identités.** Le fichier de provenance porte l'empreinte de table (ce que lit le moteur : q_x dérivés, sexe déclaré) et, à part, le SHA-256 du fichier de table (les l_x tels que transcrits) et des pièces et relevés du dépôt (ADR 0018, point 3.3). Les trois motifs de (d) pour exclure les octets du fichier embarqué de l'empreinte de table restent vrais ; l'identité des octets est portée par le SHA-256, hors moteur.
+
+**(c) Statut de portabilité.** L'empreinte de table d'une table embarquée transcrite en l_x **entiers** a le statut **exact** sur toute plateforme IEC 60559 binary64 : la conversion (soustraction exacte, puis division arrondie au plus près) donne l'arrondi correct du rapport (spécification de #146, § 5 ; ADR 0018, point 2.4). Ce statut complète celui de l'entrée « Empreinte » de `CONTEXT.md` (« toute plateforme pour des `qx` transcrits »).
+
+**Effet sur les résultats : aucun** par la présente annotation.
+
+Issues : #263, #146. Décisions M210, M447. ADR 0018 ; ADR 0006, 0015 (annotations du même jour). Branche `claude/transcription-tables-homologuees`, PR #262.

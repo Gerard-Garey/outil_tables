@@ -1,0 +1,266 @@
+---
+status: accepted
+date: 2026-11-13
+---
+
+# Tables embarquées : déclaration en constante du module `donnees`, contenu des fichiers lu à l'installation, objet construit à l'appel de `table_embarquee()` ; fichier de table `age,lx` tel qu'imprimé ; fichier de provenance en DCF (`tablexp provenance 1`) à deux identités ; relevés de contre-vérification versés et rejoués par un script de CI ; table refusée par le moteur présente au catalogue ; pièces sources sous `docs/sources/`
+
+*Proposé par `architect-approfondi` le 13/11/2026, à l'étape (0')(b) de la branche `claude/transcription-tables-homologuees` (B21, PR #262) ; rédaction d'office au titre de `docs/agents/routage.md`, § 4.1, cas 3 (ADR d'architecture ; contrat partagé du § 4.2 : « format des tables de référence embarquées et de leurs fichiers de provenance »), consultation 1/3 de B21. **La décision revenait au mainteneur** : les questions fermées sont en fin d'ADR, avec ses réponses. Sources : la fiche de B21 (`docs/feuille-de-route.md`, § 1.24, constats (i) à (v), décision D11) ; l'ADR 0015, point 6 (M239), l'ADR 0006, points 2 à 4, l'ADR 0011, annotation du 05/11/2026, (c) et (d) (M210), et son annotation du 20/10/2026, point 3 ; la spécification de #146 par `actuary-approfondi` (https://github.com/Gerard-Garey/outil_tables/issues/146#issuecomment-6848954642) ; la lecture de `regulatory-approfondi` du 13/11/2026 sur D13, D14 et la licence des pièces, **rapportée par la session** (non relue à sa source par `architect`) ; l'instruction du mainteneur du 13/11/2026 sur les pièces redéposées (`docs/sources/README.md` ; numéro M à attribuer). Numéros de ligne relevés à `162e775` (tête de B21 ; `R/` et `tests/` identiques à `main` à `8aa1c5e`, `git diff --stat 8aa1c5e 162e775`) ; le nom de l'objet fait foi (M77, (b)). Mesures d'`architect` sous R 4.3.3, hôte cloud Linux (glibc), hors plateforme de référence, marquées vérifié ; celles qui portent sur un **paquet jouet** le disent. Aucun identifiant de modèle n'est écrit ici.*
+
+*Accepté par le mainteneur le 13/11/2026 (M447), avec ses décisions du même jour reportées aux points qui en dépendaient par `architect`, à l'étape (0')(c) de B21 (tête `d3fcdaf`) : nom réservé, option (a) (point 7.4, M447) ; D13, lecture (B) (point 3.4, M443) ; source de transcription de TD/TV 88-90 devenue le fac-similé du JO n° 2 du 03/01/2016, texte 39 (points 3.2, 3.4 et 4.4, M444) ; D14, méthode admise sous conditions (point 5.3, M445) ; extrait du BO Santé 2007-1 maintenu, option (A) (point 4.3, M446) ; modalité de sexe « ensemble » pour TD/TV 88-90 (point 1.1, M449) ; Q2 et Q3 de #146 (point 7.2, M448). Ces reports sont marqués « (décision du 13/11/2026) » ; le reste du texte est celui de la proposition. Le Contexte décrit l'état au moment de la proposition et n'est pas mis à jour.*
+
+## Contexte
+
+### Ce que les décisions antérieures ont fixé, et ce qu'elles ont laissé ouvert
+
+1. **ADR 0015, point 6** (M239) : une table embarquée est un fichier texte sous `inst/extdata/`, avec son fichier de provenance ; le package la lit à l'installation en une constante ; aucun fichier n'est ouvert à l'exécution ; accesseurs exportés `table_embarquee(nom)` et `tables_embarquees()` ; repli `system.file()` dans l'accesseur seulement si la mesure de l'installation depuis `R CMD build` infirme la lecture à l'installation. Le point 6.1 écrit que la constante est une « liste nommée par `nom` d'objets `table_reference` » ; le point 6.3 laisse le **format du fichier** à la branche de transcription.
+2. **ADR 0006, points 2 à 4** : un fichier de provenance par table embarquée (source, URL, date de consultation, licence, empreintes du fichier source et de la table transcrite, méthode de transcription, contre-vérification) ; un commit `donnees:` par table, contenant la table, sa provenance et sa contre-vérification ; les textes sous licence etalab sont versés au dépôt avec mention de source et date, les autres cités par lien. Ni l'emplacement ni le format ne sont fixés (« Conséquences »).
+3. **ADR 0011, annotation du 05/11/2026** (M210) : l'« empreinte de la table transcrite » du fichier de provenance **est** l'empreinte de table `tablexp table 1` calculée par le package ; un script de `tests/controles/`, exécuté par la CI, la recalcule ; les octets du fichier embarqué n'entrent pas dans cette empreinte ; l'empreinte du code reste celle des `R/*.R` ; `source`, pour une table embarquée, est le chemin du fichier de provenance, relatif à la racine des sources.
+4. **E2.26** : TF 00-02 se transcrit telle qu'imprimée au JO du 29/12/2015, avec trois valeurs qui rompent la décroissance des l_x ; le moteur refuse toute table aux l_x non décroissants, sans correction.
+5. **Spécification de #146** (`actuary-approfondi`, 13/11/2026) : conversion dans `table_reference()`, signature inchangée, colonne `lx` déclarée par `forme_origine = "lx"` ; q_x = (l_x − l_{x+1}) / l_x, soustraction puis division ; l'objet ne garde pas les l_x ; le dernier âge de chaque groupe ne donne pas de q_x ; refus `table_lx_non_decroissants` qui cite des **paires d'âges consécutifs** ; l'empreinte de table porte sur les q_x dérivés. Trois questions sont renvoyées au présent ADR (Q4) : (a) une table refusée n'a pas d'empreinte de table ; (b) deux identités au fichier de provenance ; (c) sort d'une table `importee` qui porte le `nom` d'une table embarquée.
+
+### Ce que le code fait à `162e775` (vérifié)
+
+- `TABLES_EMBARQUEES <- structure(list(), names = character(0))` (`R/donnees.R:2234`) ; `table_embarquee(nom)` rend `TABLES_EMBARQUEES[[nom]]` (`:2240`) ; seul `table_embarquee` est exporté (`NAMESPACE`). `inst/` est absent (`ls inst` : « No such file or directory »).
+- `controler_tables_reference()` et `controler_tables_rejeu()` (`R/construire_table.R:855`, `:928`) reçoivent `embarquees = TABLES_EMBARQUEES` et y lisent des **objets** (`empreinte_table(embarquees[[nom]])`, `:899`) ; les tests injectent ce catalogue (M247 ; `tests/unitaires/test_tables_reference.R:351-363`), et un test fige le catalogue vide (`:185`).
+- `empreinte_table()` et `element_table_fiche()` sont dans le module `rapport` (`R/rapport.R:767`, `:778`), non exportées. Le graphe des appels n'autorise un module à appeler que ceux qui le précèdent dans `ORDRE_MODULES` (`tests/controles/graphe_modules.R:47-58`) : **`donnees` ne peut pas appeler `rapport`**.
+- **Ordre d'évaluation** : `R/` compte `brut`, `construire_table`, `donnees`, `exposition`, `lissage`, `outils`, `positionnement`, `rapport`, `simulation`, `validation` (`git ls-tree --name-only 162e775 R/`) ; `DESCRIPTION` n'a pas de champ `Collate` (`grep -n Collate DESCRIPTION` : rien). `R/donnees.R` est donc évalué avant `R/outils.R`.
+- Un refus est une condition de classe `refus_tablexp` (`R/outils.R:56-75`) ; le moteur en intercepte déjà pour en rendre compte (`R/construire_table.R:786-811`, `R/rapport.R:2131`).
+- `tools::sha256sum` n'existe pas sous R 4.3.3 (`exists("sha256sum", asNamespace("tools"))` : `FALSE`) ; `sha256sum` est un outil du système (`/usr/bin/sha256sum`).
+- `.gitattributes` impose `* text=auto eol=lf` : un fichier texte a les mêmes octets sur tout poste ; les PDF sont déclarés binaires.
+- `.Rbuildignore` exclut `^docs$` et `^tests$`. `R CMD build` sur `git archive 162e775` produit une archive qui ne contient que `DESCRIPTION`, `LICENSE`, `NAMESPACE` et `R/` (`tar tzf`) ; installé depuis cette archive, le package a une empreinte du code non `NA` (`ab96f35079b0a324235d686c78f7399f`) : le mécanisme de lecture à l'installation déjà en place tient depuis `R CMD build` sur cet hôte.
+- Aucune référence ni aucun test ne lit une table nommée comme une table homologuée, sauf le témoin du catalogue vide (`git grep` à `162e775` : une occurrence, `tests/unitaires/test_tables_reference.R:379`).
+
+### Mesures propres au présent ADR (vérifié, sauf mention)
+
+- **Constat (iii) de la fiche, sur paquet jouet** (deux fichiers `R/donnees.R` et `R/outils.R`, deux fichiers sous `inst/extdata/tables/`, `.Rbuildignore` du projet). Un appel, au premier niveau de `donnees.R`, d'une fonction qui appelle `refuser()` fait échouer l'installation : « could not find function "refuser" », « lazy loading failed ». L'hypothèse de la fiche est donc établie : aucun objet `table_reference` ne peut être construit à l'installation depuis `donnees.R`.
+- **Lecture du contenu à l'installation, sur le même jouet** : `R CMD build`, puis `R CMD INSTALL` de l'archive depuis un autre répertoire courant, sous `LC_ALL=C` et sous `C.UTF-8` : dans les deux cas la constante porte les lignes des deux fichiers ; l'appel de l'accesseur construit la première table et refuse la seconde ; **après suppression du dossier `extdata` de la bibliothèque d'installation**, l'accesseur rend le même résultat (aucun fichier lu à l'exécution). L'installation depuis le dossier des sources, répertoire courant ailleurs, donne la même constante. La mesure sur `tablexp` lui-même reste un critère d'acceptation de #263.
+- **Coût de la construction à l'appel**, `tablexp` installé depuis `git archive 162e775` : analyse du texte d'une table du moment de 111 lignes, 0,0002 s ; pour 12 826 lignes (ordre de grandeur d'une table de génération), analyse 0,008 s, `table_reference()` 0,002 s, `empreinte_table()` 0,010 s.
+- **`read.dcf()`** lit sous `C` comme sous `C.UTF-8` un fichier UTF-8 à champs sur plusieurs lignes (`keep.white` conserve les retours à la ligne) ; les valeurs sont d'encodage « unknown » et valides en UTF-8 une fois marquées ; avec `all = TRUE`, un champ écrit deux fois est **fusionné sans message** (« A, B ») et une ligne vide ouvre un second enregistrement.
+- `docs/sources/` pèse 5,5 Mo pour cinq pièces (`du -sh`) ; le commit qui les verse (`e2ba6ef`) est sur `origin/claude/transcription-tables-homologuees` (`git branch -r --contains e2ba6ef`).
+
+### Faits rapportés par la session, non remesurés ici
+
+- Deux transcriptions visuelles indépendantes A et B de TD 88-90 (âges 0 à 106), TV 88-90 (0 à 110), TH 00-02 (0 à 110) et TF 00-02 (0 à 112) : 442 cellules, aucun écart. Comparaison à la couche texte du BO Santé 2007-1 : identité, sauf trois valeurs de TF 00-02 (âges 11, 23 et 62) et des lignes à zéro que seul le BO imprime (TD de 107 à 111, TV à 111). Comparaison à la couche texte du JO de 2015 : aucun écart. Le JO imprime pour TH 00-02 des lignes 111 et 112 à cellule vide. Les relevés sont hors dépôt (forme `age;lx`), à verser selon le point 5.
+- Lecture de `regulatory-approfondi` : D13, trois rubriques de statut juridique (acte d'homologation ; source de transcription ; porteurs et usages par régime, chacun avec son statut), la source de TD/TV 88-90 pouvant changer si un fac-similé est déposé ; D14, méthode en trois volets (point 5.3) ; licence : etalab-2.0 établie pour Légifrance, retenue par interprétation pour les extraits du JO, **non établie** pour le BO Santé. D13, D14 et le sort de la pièce du BO sont **à décider par le mainteneur** : le présent ADR est écrit pour tenir quelle que soit la réponse, et marque chaque point qui en dépend.
+
+### Vocabulaire de conception
+
+Le catalogue est un **seam** entre des fichiers versionnés et le constructeur `table_reference()`, qui reste le seul endroit où une table est contrôlée (module profond : tri, contiguïté, conversion, refus). Test de suppression : si l'on retire le catalogue, il ne reste aucun contrôle propre aux tables embarquées à réécrire ailleurs — l'**adapter** ne fait que lire des lignes et appeler le constructeur. Le fichier de provenance est l'interface lue par le certificateur et par le script de CI ; le moteur ne le lit pas.
+
+## Décision
+
+Proposée par `architect-approfondi` le 13/11/2026 ; **arrêtée par le mainteneur le 13/11/2026** (M447). Les noms de fonctions, de constantes et de motifs sont indicatifs, fixés par `coder-approfondi` et visés par `actuary` pour les messages ; les noms de fichiers, de dossiers et de champs sont décidés ici.
+
+### 1. Catalogue : option (α)
+
+1.1. **Déclaration.** Les tables embarquées sont déclarées par une constante littérale du module `donnees` (nom indicatif `DECLARATIONS_TABLES_EMBARQUEES`) : pour chaque table, son `nom` (« TD 88-90 », « TV 88-90 », « TH 00-02 », « TF 00-02 »), son **identifiant de fichier** (`td_88-90`, `tv_88-90`, `th_00-02`, `tf_00-02` ; `[a-z0-9_-]+`) et sa modalité de `sexe` (`SEXES_TABLE`). *(Décision du 13/11/2026, M449 : TD 88-90 et TV 88-90 portent la modalité `ensemble`, le texte les désignant par la garantie, non par le sexe ; TH 00-02 `H`, TF 00-02 `F`.)* Une table = un nom = un fichier = une modalité de sexe. Rien n'est embarqué sans y être déclaré : aucun parcours de dossier. Ajouter une table modifie `R/donnees.R`, donc l'empreinte du code.
+
+1.2. **Lecture à l'installation : le contenu, rien d'autre.** `TABLES_EMBARQUEES` est affectée au premier niveau de `R/donnees.R` par une fonction du même fichier qui n'emploie que des fonctions de base (elle est évaluée avant `R/outils.R`) : garde sur `DESCRIPTION` comme `empreinte_sources()` (`R/rapport.R:851` ; la garde est récrite dans `donnees`, qui ne peut pas appeler `rapport`), puis lecture des **lignes** de chaque fichier déclaré. La constante est une liste nommée par `nom` ; chaque élément porte l'identifiant, le sexe déclaré et les lignes lues, ou `NULL` à la place des lignes si le fichier n'a pas pu être lu. Aucune analyse, aucun contrôle, aucun refus à l'installation : **l'installation n'échoue jamais du fait d'une table** (règle de l'empreinte du code, M70).
+
+1.3. **Construction à l'appel.** Une fonction interne de `donnees` (nom indicatif `table_du_catalogue(nom, catalogue = TABLES_EMBARQUEES)`) : refuse un nom absent (`table_embarquee_absente`, inchangé) ; refuse un contenu non lu ou qui n'est pas au format du point 2 (motif nouveau, indicatif `table_embarquee_illisible`, qui cite le fichier et la première ligne en défaut) ; analyse les lignes par découpage de chaînes, **sans connexion, sans évaluation** ; appelle `table_reference(data.frame(age, sexe, lx), nom, "embarquee", source, forme_origine = "lx")`, où `source` est le chemin du fichier de provenance relatif à la racine des sources (point 3.1 ; ADR 0011, annotation du 05/11/2026, (c)). `table_embarquee(nom)` rend ce résultat ; sa signature est inchangée. Aucune mémoire entre deux appels : pas d'état dans le package ; le coût mesuré ne le justifie pas.
+
+1.4. **Un seul chemin.** `controler_tables_reference()` et `controler_tables_rejeu()` obtiennent la table du package par la fonction du point 1.3, et non plus par lecture d'un objet dans la constante. Le seam d'injection des tests (M247) est conservé : l'argument `embarquees` reçoit un catalogue **de la forme de la constante** (contenus), construit par le même chemin. Le témoin « discordante » des tests s'écrit en changeant un l_x du contenu injecté.
+
+1.5. **Mesure exigée, repli.** Critère de #263 : `R CMD build` de l'arbre, installation de l'archive sous `C` et sous `C.UTF-8`, catalogue lu, puis accès aux tables **après suppression de `extdata` dans la bibliothèque temporaire**. Ce contrôle est permanent (point 6.1, (g)), parce que le répertoire courant de `R CMD INSTALL` est un constat de plateforme que R ne documente pas (`R/rapport.R:865-872`). Si la mesure infirmait la lecture à l'installation sur un chemin d'installation à tenir, le repli de l'ADR 0015, point 6.2, s'applique : `system.file()` **dans la fonction du point 1.3 seulement**, par annotation datée du présent ADR ; jamais en silence, jamais dans `construire_table()`.
+
+1.6. **Effet sur les résultats** : aucun pour R1 à R17 (aucune ne lit une table embarquée). L'ADR 0015, point 6.1, est précisé (la constante porte des contenus, non des objets) : annotation (point 10).
+
+### 2. Format du fichier de table (« tables du moment » ; format 1)
+
+2.1. **Emplacement et nom** : `inst/extdata/tables/<identifiant>.csv`.
+
+2.2. **Contenu** : ce que la source imprime, et rien d'autre.
+- texte ASCII, fins de ligne LF, une fin de ligne après la dernière ligne, ni BOM, ni ligne vide, ni commentaire, ni guillemet, ni espace ;
+- première ligne : `age,lx` ; puis une ligne par âge **imprimé avec une valeur**, `<âge>,<l_x>`, âges croissants et consécutifs ;
+- `age` et `lx` : entiers écrits en chiffres seuls (`0`, ou un chiffre non nul suivi de chiffres ; au plus quinze chiffres), **tels qu'imprimés**, sans le séparateur de milliers de la source, sans normalisation par l_0 ;
+- une ligne que la source imprime **sans valeur** n'est pas transcrite (TH 00-02, lignes 111 et 112) ; le fichier de provenance la signale (champ `Ages`) ;
+- une ligne que la source n'imprime pas n'est pas ajoutée, même si une autre source l'imprime (zéros du BO pour TD de 107 à 111 et TV à 111) : la valeur retenue est celle de la source de transcription.
+
+2.3. **Ce que le fichier ne porte pas** : ni le nom, ni le sexe, ni la source. Le sexe est une **déclaration** (points 1.1 et 3.2), non une valeur lue sur la page : la changer ne change pas le SHA-256 de la transcription ; elle change l'empreinte de table, qui couvre la colonne `sexe`.
+
+2.4. **Conséquence de la spécification de #146**, à lire avec ce format : l'objet embarqué porte des q_x du premier âge à l'avant-dernier âge transcrit (TD 88-90 : 0 à 105 ; TH 00-02 : 0 à 109, selon les relevés rapportés) ; aucun q_ω = 1 n'est posé. Le statut de la conversion est **exact** pour des l_x entiers (arrondi correct du rapport, toute plateforme IEC 60559) : l'empreinte de table d'une table embarquée est portable.
+
+2.5. **Hors du format 1** : tables de génération (colonne supplémentaire pour la génération ; sens de `annee`, ADR 0015, point 7.4), tables publiées en q_x décimaux (la conversion d'un texte décimal en double n'a pas le statut exact des entiers), tables à plusieurs sexes, décalages d'âge (qui ne sont pas un objet `table_reference`). Chacune se fixe par annotation du présent ADR, dans la branche qui embarque la première table de cette forme.
+
+### 3. Fichier de provenance
+
+3.1. **Emplacement, nom, forme** : `inst/extdata/tables/<identifiant>.provenance.dcf`, à côté de la table, installé avec elle. Format DCF (`champ: valeur`, lignes de suite indentées), lu par `read.dcf()` en R de base, sans évaluation, lisible tel quel par un certificateur ; UTF-8 sans BOM, LF ; noms de champs en ASCII ; **un seul enregistrement, chaque champ une seule fois, aucune ligne vide** (le script du point 6 le contrôle sur les lignes, `read.dcf()` fusionnant les doublons sans message). Premier champ : `Format: tablexp provenance 1`. Le moteur **ne lit pas** ce fichier : il en porte le chemin dans `source` (`inst/extdata/tables/<identifiant>.provenance.dcf`).
+
+3.2. **Champs.** « M » : lu et contrôlé par le script du point 6 ; « P » : prose, présence contrôlée ; « (f) » : facultatif.
+
+| Champ | Lecture | Contenu |
+|---|---|---|
+| `Format` | M | `tablexp provenance 1` |
+| `Nom`, `Fichier`, `Sexe`, `Forme-origine` | M | nom au catalogue ; chemin du fichier de table ; modalité de sexe déclarée et sa justification ; `lx`. Égaux à la déclaration du point 1.1 |
+| `Intitule` | P | intitulé imprimé par la source |
+| `Ages` | P | premier et dernier âge transcrits ; lignes imprimées sans valeur, non transcrites |
+| `Homologation` | P | acte d'homologation (arrêté, date, NOR, publication), avec son statut |
+| `Porteurs-usages` | P | une ligne par régime (code des assurances, comptes sociaux, mutualité, sécurité sociale) : texte qui porte ou emploie la table, **statut** (vérifié, incertain, non établi) et date de la lecture |
+| `Source`, `Source-nature` | P | pièce de transcription ; fac-similé du JO, ou impression de la version électronique (exception d'E2.26, M220, écart signalé). *(Décision du 13/11/2026, M444 : pour TD/TV 88-90, fac-similé du JO n° 2 du 03/01/2016, texte 39 (rectificatif de l'arrêté du 28/12/2015 homologuant le règlement ANC 2015-11, art. 600-5 et 600-6) ; l'exception M220 ne s'applique plus à aucune table de B21.)* |
+| `Source-URL`, `Source-consultation` | P | adresse imprimée et adresse canonique ; date de consultation et version affichée |
+| `Source-licence` | P | licence et **statut** : établie, retenue par interprétation, non établie |
+| `Source-pages` | P | pages lues, dans la numérotation de l'extrait de `docs/sources/` |
+| `Transcription-methode`, `Transcription-date` | P | lecture sur le rendu des pages (outil, résolution, lecteur), jamais par extraction de texte |
+| `Transcription-B-releve`, `Transcription-B-methode` | M, P | chemin du relevé de la seconde transcription ; en quoi elle est indépendante de la première |
+| `Seconde-source`, `Seconde-source-methode` | P | désignation, nature, adresse, consultation, licence, pages ; mode d'obtention du relevé (rendu des pages, ou couche texte avec outil et version) |
+| `Seconde-source-releve`, `Seconde-source-ecarts` | M | chemin du relevé ; écarts attendus (point 5.4), ou `aucun` |
+| `Controle-lecture-releve`, `Controle-lecture-ecarts`, `Controle-lecture-methode` | M, M, P (f) | relevé de la couche texte de la source de transcription, fait après le gel des transcriptions visuelles ; contrôle de lecture, jamais une source |
+| `Controles-coherence` | P | décroissance des l_x (ou paires en défaut), bornes, valeurs connues confrontées, avec leur source |
+| `Ecarts-signales` | P | tout écart à la règle (E2.25, E2.26) ou entre sources, et ce qui en a été fait |
+| `Empreintes-fichiers` | M | une ligne par fichier **du dépôt** cité, au format de `sha256sum` (`<SHA-256>  <chemin relatif à la racine>`) : fichier de table, pièces de `docs/sources/`, relevés |
+| `Empreintes-hors-depot` | P | SHA-256 des pièces qui ne sont pas au dépôt (pièce déposée dont l'extrait est tiré ; pièce citée par lien) |
+| `Representation`, `Empreinte-table` | M | `tablexp table 1` et le MD5 rendu par le moteur ; **ou bien** |
+| `Refus-attendu`, `Refus-paires` | M | motif du refus du moteur et paires d'âges citées (`10-11, 23-24, 61-62`) |
+| `Visa` | M | date (AAAA-MM-JJ), « mainteneur », renvoi au commentaire qui porte le visa |
+| `Historique` | P (f) | changements datés du fichier après le premier commit |
+
+3.3. **Deux identités** (question Q4 (b) de #146). (1) Le **SHA-256 du fichier de table** (`Empreintes-fichiers`) identifie les l_x tels que transcrits, octet par octet ; il se vérifie par `sha256sum -c`, sans R. (2) L'**empreinte de table** (`Empreinte-table`) identifie ce que le moteur lit — les q_x dérivés, le sexe déclaré — et c'est elle que porte `fiche$tables_reference`. Un fichier de provenance porte `Empreinte-table` **ou** `Refus-attendu`, jamais les deux, jamais aucun (question Q4 (a)).
+
+3.4. **Statut juridique : trois rubriques qui ne se confondent pas** — `Homologation`, `Source`, `Porteurs-usages`. Ce point dépendait de D13 : la **forme** est fixée ici, les **valeurs** des champs viennent de la lecture de `regulatory`, de l'avis d'`actuary` et de la décision du mainteneur. *(Décision du 13/11/2026, M443, lecture (B), précisée par M444 : pour TD/TV 88-90, `Homologation` = arrêté du 27/04/1993 ; `Source` = fac-similé du JO n° 2 du 03/01/2016, texte 39 (M444 ; l'impression Légifrance de l'arrêté de 1993 et le BO Santé 2007-1, annexe III, deviennent secondes sources) ; `Porteurs-usages`, chacun avec son statut : comptes sociaux, règlement ANC 2015-11, art. 600-5 et 143-2 pour TD, art. 600-6 pour TV (incertain) ; mutualité, annexe de A223-8 ; sécurité sociale, annexe de A932-3-11 ; code des assurances, arrêté de 1993 seul. Condition d'`actuary` : le moteur et le rapport figé ne citent que l'acte d'homologation ; les porteurs ne s'écrivent qu'au fichier de provenance.)* Un statut « non établi » ou « incertain » s'écrit tel quel : il n'empêche pas le commit, il se lit.
+
+3.5. **La licence du dépôt ne couvre pas les tables** (ADR 0006, point 2) : `Source-licence` le rappelle pour chaque table.
+
+### 4. Pièces sources : `docs/sources/`
+
+4.1. **Rôle.** `docs/sources/` conserve, sous leur forme d'origine, les pièces dont le projet a besoin pour transcrire et contre-vérifier une table embarquée et pour citer le texte qui la porte (instruction du mainteneur du 13/11/2026). Le dossier n'entre pas dans le paquet (`^docs$` de `.Rbuildignore` ; mesuré). Domaine de commit : `donnees:`.
+
+4.2. **Règles.**
+- **Extraits de pages utiles seulement**, sans rendu ni recompression du contenu ; jamais un numéro complet. Les métadonnées qui nommeraient une personne sont retirées (`docs/sources/README.md`, « Méthode d'extraction »).
+- **Une ligne par pièce dans `docs/sources/README.md`** : pièce déposée (nom, taille, SHA-256), extrait (nom, pages, SHA-256), correspondance des pages, contenu utile, adresse et date, nature (fac-similé ou impression), **licence et son statut**.
+- **Une pièce ne se modifie pas** : une nouvelle version est un nouveau fichier, daté dans son nom, avec sa ligne ; l'ancienne ligne reste, avec mention.
+- **Rien de dérivé** dans ce dossier : ni relevé, ni transcription, ni script (point 5).
+- Un fichier de provenance cite une pièce par son chemin, ses pages et son SHA-256 (`Empreintes-fichiers`) ; le script du point 6 vérifie que la pièce du dépôt est bien celle citée.
+
+4.3. **Licence : ce que l'ADR 0006, point 4, devient.** La règle « les textes sous licence etalab sont versés avec mention de source et date » reçoit son emplacement et sa forme (annotation, point 10). Trois cas, selon la lecture de `regulatory` rapportée :
+- impression de Légifrance : licence etalab-2.0 établie ; conforme au point 4 ;
+- extraits du fac-similé du JO : licence retenue **par interprétation** ; le statut s'écrit au README et dans `Source-licence` ; versement à confirmer par le mainteneur (question 8) *(décision du 13/11/2026, M447 : retenu)* ;
+- impression du BO Santé 2007-1 : licence **non établie**. Son versement (`e2ba6ef`) déroge au point 4. **Deux issues, décrites sans être tranchées ici** (question 9) :
+  - **(A) exception datée** : la pièce reste, par décision du mainteneur consignée en annotation de l'ADR 0006, point 4, avec la base que `regulatory` indique et que le mainteneur retient ; statut « non établie, versée par décision du … » au README ;
+  - **(B) retrait** : la pièce est retirée au profit d'un lien, d'une date de consultation et d'un SHA-256 (modèle d'E2.25 pour une source d'un autre éditeur) ; elle passe de `Empreintes-fichiers` à `Empreintes-hors-depot`.
+  *(Décision du 13/11/2026, M446 : **(A)**, l'extrait reste au dépôt, exception datée à l'ADR 0006, point 4, sur la base du code des relations entre le public et l'administration, L321-1 et L322-1, source et date mentionnées ; annotation du 13/11/2026 de l'ADR 0006. (B) est écarté ; la question du retrait de l'historique tombe.)*
+  Le format et le script tiennent dans les deux cas : la contre-vérification se rejoue sur le **relevé**, qui reste au dépôt (point 5). Sous (B), la pièce demeure dans l'historique de la branche, déjà poussée ; la fusion par commit de fusion la porterait dans l'historique de `main`. Si le retrait doit valoir aussi pour l'historique, la décision est à prendre **avant la fusion de B21**.
+
+4.4. **Changement de source.** La source d'une table peut changer sans que le format change (par exemple un fac-similé obtenu plus tard pour TD/TV 88-90, hypothèse de la lecture de `regulatory`) : commit `donnees:` propre, nouvelle pièce, champs `Source*` et `Empreintes-fichiers` récrits, contre-vérification rejouée contre la nouvelle source, `Historique` complété. *(Décision du 13/11/2026, M444 : le cas s'est produit pour TD/TV 88-90 **avant** leur premier commit `donnees:` — dépôt du JO n° 2 du 03/01/2016, versé en `d3fcdaf` ; les deux transcriptions visuelles se font sur ce fac-similé, l'impression Légifrance et le BO sont relevés comme secondes sources ; aucun `Historique` n'est dû, aucun fichier de table n'ayant été commité.)* Si aucune valeur ne change, le fichier de table, son SHA-256 et l'empreinte de table sont inchangés ; si une valeur change, tableau avant / après et visa du mainteneur (ADR 0006, « Conséquences »).
+
+### 5. Contre-vérification : relevés versés, comparaison par script
+
+5.1. **Emplacement** : `tests/contre_verification/tables/`, à côté des jeux et valeurs des autres contre-vérifications du dépôt ; hors du paquet (`^tests$`). Les relevés entrent dans le **commit `donnees:` de leur table** (ADR 0006, point 3).
+
+5.2. **Relevés** : même format que le fichier de table (point 2.2), une ligne par ligne **imprimée avec une valeur par la pièce relevée** (les zéros du BO y figurent).
+- `<identifiant>.transcription_b.csv` : seconde transcription visuelle, indépendante de la première, de la source de transcription ;
+- `<identifiant>.seconde_source.csv` : relevé de la seconde source ;
+- `<identifiant>.couche_texte.csv` (facultatif) : couche texte de la source de transcription.
+La première transcription est le fichier de table lui-même.
+
+5.3. **Méthode** (dépendait de D14, tranchée par M445 ; écrite selon la lecture de `regulatory`, la forme tenant si le mainteneur décide autrement) : (a) deux transcriptions visuelles indépendantes, comparées par script, **aucun écart admis** — un écart se tranche sur le rendu de la page avant le commit ; (b) seconde source relevée, pour la seule comparaison, par le mode que D14 admettra (couche texte sous conditions, ou rendu des pages : le champ `Seconde-source-methode` le dit, le fichier a la même forme) ; tout écart est tranché sur le rendu des deux pièces et la valeur retenue est celle de la source de transcription ; (c) la couche texte du fac-similé source n'est qu'un contrôle de lecture, fait après le gel des deux transcriptions visuelles. **Tout contrôle cité au fichier de provenance a son relevé au dépôt** ; un contrôle sans relevé ne se cite pas comme preuve. *(Décision du 13/11/2026, M445 : méthode admise sous conditions — (a) deux transcriptions visuelles indépendantes comparées par script ; (b) seconde source (BO) lue par la couche texte pour la seule comparaison, écarts tranchés sur le rendu des deux pièces, valeur retenue = celle de la source, lignes nulles du BO non transcrites ; (c) couche texte du fac-similé source = contrôle de lecture seulement, après le gel des transcriptions. Texte d'E2.26 par la session. Avec M444, plusieurs secondes sources par table (TD/TV : impression Légifrance et BO) : un relevé par seconde source, nommé `<identifiant>.seconde_source_<pièce>.csv`, à fixer par `coder-approfondi` dans la forme du point 5.2, chaque relevé ayant ses champs `Seconde-source*` ; point de forme noté pour #263 et #264, sans changer la règle.)*
+
+5.4. **Écarts attendus** : champs `Seconde-source-ecarts` et `Controle-lecture-ecarts`, `aucun` ou une ligne par écart, `<âge>,<l_x du fichier de table>,<l_x du relevé>`, un côté vide quand la ligne n'existe que de l'autre (`107,,0`). Le script exige l'égalité entre les écarts constatés et les écarts déclarés, dans les deux sens : pour TF 00-02, exactement trois écarts de valeur avec le BO ; pour TD et TV 88-90, exactement les lignes à zéro propres au BO. Un écart non déclaré, ou déclaré et non constaté, est un échec. Chaque écart déclaré est expliqué dans `Ecarts-signales`.
+
+5.5. **Scripts d'obtention** d'un relevé par couche texte : hors CI, sous `tests/contre_verification/tables/`, sur le modèle des contre-vérifications par packages avancés (outil et version consignés dans le champ de méthode) ; ils ne sont pas rejoués par la CI, qui compare les relevés versés. Le rejeu de la contre-vérification ne demande donc **ni les pièces, ni l'outil d'extraction**.
+
+### 6. Script de CI de #263
+
+6.1. `tests/controles/tables_embarquees.R [racine]`, en R de base, code de sortie 1 au premier écart, sur le modèle des autres contrôles. Il vérifie, pour chaque table déclarée :
+- (a) **complétude** : fichier de table et fichier de provenance présents ; aucun fichier de `inst/extdata/tables/` ni de `tests/contre_verification/tables/` qui ne soit rattaché à une table déclarée ;
+- (b) **format** du fichier de table et des relevés (point 2.2, sur les octets) ; **forme** du fichier de provenance (point 3.1 ; champs requis présents, aucun champ inconnu, valeurs valides en UTF-8) ; concordance de `Nom`, `Fichier`, `Sexe`, `Forme-origine` avec la déclaration ;
+- (c) **identité des fichiers** : `sha256sum` de chaque chemin d'`Empreintes-fichiers` égal à la valeur écrite ; le fichier de table et chaque relevé cité y figurent ; l'outil `sha256sum` absent est un échec, non un contrôle sauté ;
+- (d) **identité moteur** : `table_embarquee(nom)` rend un objet dont l'empreinte, lue dans `tables_embarquees()`, égale `Empreinte-table`, sous `Representation` ; ou lève le refus de motif `Refus-attendu`, dont les paires citées (`details`) égalent `Refus-paires` ; un objet là où un refus est attendu, ou l'inverse, est un échec ;
+- (e) **contre-vérification** : fichier de table et `transcription_b` identiques ligne à ligne ; écarts à `seconde_source` et à `couche_texte` égaux aux écarts déclarés (point 5.4) ; structure de chaque relevé (âges consécutifs depuis le premier) ;
+- (f) **cohérence du catalogue** : `tables_embarquees()` a une ligne par table déclarée, dans l'ordre de la déclaration, états conformes à (d) ;
+- (g) **installation** (point 1.5) : depuis `R CMD build`, sous `C` et `C.UTF-8`, accès après suppression de `extdata`.
+
+6.2. **Témoin d'échec** : le même script, lancé sur une copie de l'arbre où un l_x d'un fichier de table est changé d'une unité, doit sortir en échec sur (c), (d) et (e) ; une étape de CI le constate, sur le modèle du cas témoin du job « Absence de Java ». Tant que le catalogue est vide (étape (2) de B21, avant le premier commit `donnees:`), le témoin et la mesure (g) portent sur un arbre témoin muni d'une table d'essai.
+
+6.3. **Mode d'appel** : une **étape** du job « Tests (R 4.3.3) », avec les autres contrôles ; **pas une quatrième batterie** (la liste `BATTERIES` et `identite_batteries.R` ne changent pas ; ADR 0011, annotation du 05/11/2026, (d)). Les comportements du moteur (construction, refus, nom réservé, accesseur) sont testés dans la batterie unitaire.
+
+### 7. Table refusée par le moteur ; nom réservé
+
+7.1. **TF 00-02 est au catalogue**, transcrite telle qu'imprimée, avec son fichier de provenance, ses relevés et son visa. Le package ne l'omet pas : un utilisateur qui la cherche doit lire qu'elle existe et pourquoi elle ne s'emploie pas.
+
+7.2. **`table_embarquee("TF 00-02")` lève le refus de `table_reference()`**, `table_lx_non_decroissants`, module `donnees`, message et `details` de la spécification de #146, **sans motif d'enveloppe** : un seul refus, un seul texte. Le même refus remonte des contrôles 1.3 et 7 bis si un objet de statut `embarquee` porte ce nom. Le refus n'est codé nulle part comme « attendu » : il résulte des valeurs ; l'attente est écrite au fichier de provenance et vérifiée par le script (point 6.1, (d)). La fiche de B21 écrit « âges 11, 23 et 62 cités » : le message cite les paires (10, 11), (23, 24) et (61, 62), qui les contiennent (#146, question Q3, sur le texte d'E2.26). *(Décision du 13/11/2026, M448 : Q2, paires citées jusqu'à `NB_LIGNES_CITEES` (10), au-delà le total, liste complète dans `details` ; Q3, E2.26 reformulée par la session — « trois valeurs imprimées fautives (âges 11, 23 et 62), qui rompent la décroissance des l_x entre 10 et 11, entre 23 et 24, et entre 61 et 62 » —, critère du § 1.24 reformulé de même.)*
+
+7.3. **`tables_embarquees()` la liste** avec l'état `refusee` et son motif (point 8).
+
+7.4. **Nom réservé** (question Q4 (c) de #146). Recommandation : `table_reference()` **refuse** une table de statut `importee` ou `synthetique` dont le `nom` est, à l'identique, celui d'une table déclarée au catalogue (motif nouveau, indicatif `table_nom_reserve` ; message visé par `actuary`). Motif : le `nom` est ce que lisent la fiche et le rapport ; après le refus de TF 00-02, le geste naturel est d'importer une table corrigée sous le même nom, et E2.26 veut qu'elle se déclare non homologuée. La comparaison est exacte, sans normalisation de casse ni d'espaces : la réserve couvre le cas naturel, pas un contournement délibéré, que le statut et l'empreinte continuent de signaler. Effet sur les résultats : aucun (aucun test ni référence ne nomme ainsi une table importée ; contexte). *(Décision du 13/11/2026, M447 : option (a) retenue, correspondance exacte.)*
+
+### 8. Accesseur `tables_embarquees()`
+
+8.1. **Signature** : `tables_embarquees()`, sans argument. Rend un `data.frame` nu, une ligne par table déclarée, dans l'ordre de la déclaration, colonnes : `nom` ; `sexe` (modalité déclarée) ; `forme_origine` ; `source` (chemin du fichier de provenance) ; `etat` (`admise` ou `refusee`) ; `motif_refus` (`NA` si admise) ; `representation` (`tablexp table 1`) ; `empreinte` (empreinte de table, `NA` si refusée). Ce sont les colonnes de l'ADR 0015, point 6.2 (nom, source, empreinte, première ligne), plus ce qu'exige une table refusée et ce qu'affiche une liste de choix.
+
+8.2. **Module `rapport`**, à côté d'`empreinte_table()` et d'`element_table_fiche()`, et non `donnees` comme l'écrit l'ADR 0015, point 6.2 : `donnees` ne peut pas appeler `empreinte_table()` (graphe des appels ; contexte). `table_embarquee()` reste dans `donnees`.
+
+8.3. **États.** L'état se calcule en construisant la table : `refusee` quand `table_reference()` refuse les valeurs transcrites, avec son motif. Un contenu non lu ou mal formé (`table_embarquee_illisible`) **n'est pas un état** : c'est un défaut d'installation ou de fichier, et l'accesseur refuse.
+
+8.4. **`NAMESPACE`** : seul `export(tables_embarquees)` est ajouté ; appelants hors package : l'application (liste de choix), le tiers qui rejoue (comparaison de l'empreinte au fichier de provenance sans fonction interne), le script du point 6.
+
+### 9. Ce que chaque empreinte couvre
+
+L'empreinte du code couvre `R/*.R` : la **liste** des tables déclarées (point 1.1), pas leurs valeurs. Les valeurs lues par une construction sont identifiées par l'empreinte de table de `fiche$tables_reference` (ADR 0015, point 3) ; le fichier transcrit, par son SHA-256 au fichier de provenance. Le fichier de provenance n'est couvert par aucune empreinte : il change sans que la table change. Renommer un fichier de provenance change `source`, donc la fiche et l'empreinte du résultat de toute construction qui lit la table : un identifiant ne se renomme pas sans tableau avant / après.
+
+### 10. Annotations à porter par `architect` à l'étape (0')(c), après acceptation
+
+*(13/11/2026 : portées à l'étape (0')(c), annotations du 13/11/2026 des ADR 0006, 0007, 0011 et 0015 ; `CONTEXT.md` ; le dernier alinéa reste à la session, accord du mainteneur donné, question 10.)*
+
+- **ADR 0006** : point 2 (M210, M226) — emplacement, format et champs du fichier de provenance, deux identités (points 3.1 à 3.3) ; point 3 — relevés versés et script (points 5 et 6) ; point 4 — `docs/sources/`, statuts de licence, décision du mainteneur sur la pièce du BO (points 4.1 à 4.3) ; « Conséquences » — emplacements désormais fixés.
+- **ADR 0015** : point 2.3 (#261, sans rapport avec le présent ADR, même passage) ; point 6.1 — la constante porte des contenus, l'objet est construit à l'appel (point 1) ; point 6.2 — `tables_embarquees()` dans `rapport`, colonnes (point 8) ; point 6.3 — format fixé (point 2) ; points 1.3 et 4.2 — table du package obtenue par construction, refus d'une table embarquée refusée (points 1.4 et 7.2).
+- **ADR 0007, point 7.1** : colonnes admises (`qx` ou `lx`), conversion, refus nouveaux de #146 ; nom réservé si la question 6 est retenue. La signature de `table_reference()` ne change pas.
+- **ADR 0011, annotation du 05/11/2026, (d)** : mode d'appel du script fixé (étape de CI) ; l'empreinte de table d'une table embarquée en l_x entiers a le statut exact.
+- **`CONTEXT.md`** : « Fichier de provenance », « Table de référence » (catalogue, états), « Empreinte » (deux identités) ; entrées nouvelles « Pièce source », « Relevé », « Table refusée ».
+- **À la session, sur accord du mainteneur** : `docs/exigences.md`, E2.26 (phrase de D14 ; pièces versées au dépôt et non plus seulement consignées sur #13 ; question Q3 de #146) ; `CLAUDE.md`, « Données » (mention de `docs/sources/` et de `tests/contre_verification/tables/`) ; `docs/sources/README.md` (statut de licence par pièce ; renvoi au présent ADR).
+
+### 11. Tests qui protègent la décision
+
+Batterie unitaire : contenu injecté admis → objet `identical` à celui de `table_reference()` appelé à la main ; contenu `NULL`, en-tête faux, ligne mal formée → `table_embarquee_illisible`, fichier et ligne cités ; contenu aux l_x non décroissants → `table_lx_non_decroissants`, paires en `details` ; contrôles 1.3 et 7 bis par injection (absente, discordante par un l_x changé) ; nom réservé ; `tables_embarquees()` : colonnes, ordre, état et empreinte, catalogue vide. Après chaque commit `donnees:` : la table rendue par `table_embarquee()`, son nombre de lignes, ses âges extrêmes ; pour TF 00-02, le refus. Script de CI : point 6, avec son témoin. Contrôles mécaniques inchangés : `graphe_modules.R` (l'affectation de premier niveau du point 1.2 est une affectation, comme `EMPREINTE_CODE`), `messages_refus.R`, `locale_c.R`, `identite_batteries.R`.
+
+## Options écartées
+
+- **(β) Catalogue d'objets construits à l'installation dans un fichier évalué après `outils.R`** (`rapport.R`), TF 00-02 hors catalogue : la constante d'un module vivrait dans un autre ; la forme tiendrait à l'ordre alphabétique des fichiers ; TF 00-02, que E2.26 veut transcrite et refusée, disparaîtrait du package.
+- **(β′) Même construction, le refus de TF 00-02 intercepté à l'installation et rangé dans la constante** : le message d'un refus serait figé à l'installation, sous la locale de l'installateur, au lieu d'être formé à l'appel ; mêmes défauts de module et d'ordre que (β).
+- **(γ) Champ `Collate`** : change l'ordre d'évaluation de tout le package pour un besoin local ; l'ADR 0011 (annotation du 20/10/2026, point 3) a retenu, devant le même obstacle, la construction au moment de l'appel.
+- **`system.file()` à chaque appel** : fichier ouvert à l'exécution, chemin dépendant de la bibliothèque (ADR 0015, « Options écartées ») ; gardé en repli seulement (point 1.5).
+- **Catalogue par parcours de `inst/extdata/tables/`, ou par fichier d'index** : un fichier déposé par erreur serait embarqué sans déclaration ; un index ajoute un format et une lecture à l'installation, sans rien que la constante ne porte.
+- **Analyse du texte à l'installation** (`data.frame` dans la constante) : une cellule mal formée ferait échouer l'installation, ou serait convertie sans refus nommé ; à l'appel, le défaut est un refus du moteur, cité.
+- **`read.csv(text = …)` à l'appel** : ouvre une connexion et applique des conversions de type implicites ; le découpage de chaînes sur un format strict n'en a pas besoin.
+- **Colonne `sexe`, ou en-tête de commentaires, dans le fichier de table** : le fichier cesserait d'être ce que la source imprime ; changer une déclaration changerait l'identité de la transcription.
+- **Séparateur `;`** : les CSV du dépôt sont à virgule ; des entiers sans séparateur de milliers ne créent aucune ambiguïté.
+- **Fichier de table en source R (`dput`), en `.rds` ou en `sysdata.rda`** : évalué ou binaire, illisible par un certificateur (ADR 0015, « Options écartées »).
+- **q_x décimaux admis dès le format 1** : la lecture d'un texte décimal n'a pas le statut exact des entiers ; aucune table de B21 n'en a besoin.
+- **Fichier de provenance en Markdown** : lisible, mais les identités seraient cherchées par motif dans de la prose ; **en YAML ou JSON** : pas de lecteur en R de base ; **dans la grammaire de la fiche** : faite pour des objets R typés, non pour un texte à lire ; **lu par le moteur** (source unique du nom et du sexe) : le format d'un document de prose deviendrait un contrat du moteur.
+- **Identité du fichier en MD5** (`tools::md5sum`, en R de base) : les pièces du projet sont identifiées en SHA-256 (#13, `docs/sources/README.md`) ; une seule convention pour les fichiers, vérifiable par `sha256sum -c`.
+- **Empreinte de table sur les l_x, ou empreinte du code étendue à `inst/extdata/`** : écartées par la spécification de #146 et par l'ADR 0011 (annotation du 05/11/2026, (d)).
+- **Relevés sous `inst/extdata/`** : installés chez l'utilisateur sans usage ; **sous `docs/sources/`** : mêlerait des fichiers dérivés aux pièces d'origine ; **non versés** : rejouer la contre-vérification redemanderait les pièces et un outil d'extraction, ce que l'instruction du 13/11/2026 veut éviter.
+- **Pièces hors dépôt** (règle antérieure) : perdues avec le conteneur de session après chaque dépôt (dépôts des 05/11 et 12/11/2026, `docs/sources/README.md`, « Pièces antérieures » ; #13).
+- **TF 00-02 absente du catalogue, ou embarquée corrigée** : contraire à E2.26.
+- **Motif d'enveloppe pour le refus d'une table embarquée** : deux textes pour un même défaut.
+- **État d'une table déclaré dans le code** : pourrait diverger des valeurs ; l'état se calcule.
+- **`tables_embarquees()` dans `donnees`, sans empreinte**, ou **export d'`empreinte_table()`** : le tiers ne pourrait pas comparer l'empreinte au fichier de provenance sans fonction interne ; ou un export de plus pour un seul usage.
+- **Table importée homonyme admise** (question Q4 (c), option (b)) : laissée au choix du mainteneur (question 6) ; **homonymie par nom normalisé** : le moteur devinerait.
+- **Script de CI en quatrième batterie** : change la liste de `CLAUDE.md` sans nécessité.
+
+## Conséquences
+
+- **Fichiers** (par B21, après acceptation) : `R/donnees.R` (déclaration, lecture du contenu, construction à l'appel, nom réservé) ; `R/construire_table.R` (contrôles 1.3 et 7 bis par le chemin unique) ; `R/rapport.R` (`tables_embarquees()`) ; `NAMESPACE` (un export) ; `inst/extdata/tables/` (deux fichiers par table) ; `tests/contre_verification/tables/` (relevés, scripts d'obtention) ; `tests/controles/tables_embarquees.R` ; `.github/workflows/ci.yml` (une étape et son témoin) ; `tests/unitaires/` ; `docs/sources/README.md` ; `docs/latex/` par `docwriter` ; annotations du point 10.
+- **Effet sur les résultats : aucun par le présent ADR**, qui ne modifie aucun code. Par B21 : R1 à R17 identiques au bit près hors jeton de l'empreinte du code (hypothèse, à mesurer à chaque commit) ; aucune régénération ; `VERSION_FICHE` inchangée ; refus nouveaux et messages visés par `actuary` ; **visa du mainteneur sur les valeurs de chaque table**, consigné au champ `Visa`.
+- **Contrats partagés touchés** (`docs/agents/routage.md`, § 4.2) : format des tables de référence embarquées et de leurs fichiers de provenance (créé ici). Non touchés : signatures de `construire_table()`, de `rejouer_fiche()`, de `table_reference()` et de `table_embarquee()` ; format du plan et de la fiche ; objet résultat ; critère de non-régression.
+- **Critères d'acceptation mesurables**, en plus de ceux des issues : ceux des points 1.5, 6.1 et 6.2 ; `formals(table_embarquee)` = `nom` ; `git diff --quiet origin/main...HEAD -- tests/reference/` ; `sha256sum -c` sur les lignes d'`Empreintes-fichiers` de chaque fichier de provenance, sans erreur ; chaque fichier de provenance porte `Empreinte-table` ou `Refus-attendu`.
+- **Points qui dépendaient d'une décision en cours** : D13 (valeurs de `Homologation`, `Source*`, `Porteurs-usages` ; point 4.4 si la source change) ; D14 (point 5.3 ; présence de `couche_texte`) ; pièce du BO (point 4.3). *(Levés le 13/11/2026 : M443, M444, M445, M446.)*
+- **Ce que l'ADR ne règle pas** : la **modalité de sexe de TD 88-90 et de TV 88-90** (`H` et `F` par origine des observations, ou `ensemble` par usage ; elle commande l'appariement, `table_sexe_incompatible`) — `actuary` et `regulatory`, puis le mainteneur, avant l'étape (3) *(tranchée le 13/11/2026, M449 : `ensemble`)* ; ce que le rapport figé cite de la source d'une table embarquée (`regulatory`, avant le premier commit `donnees:` ; ADR 0011, annotation du 05/11/2026, (c)) *(tranché en principe le 13/11/2026, M443 : l'acte d'homologation seul ; texte à établir par `regulatory`)* ; les formes hors du format 1 (point 2.5) ; les tables INSEE ; une mention au rapport pour les tables issues de l_x (#146, § 5) ; la portabilité sous Windows et macOS (#49).
+- **Vocabulaire** : « pièce source », « extrait », « relevé », « seconde transcription », « seconde source », « contrôle de lecture », « table refusée », « identifiant de fichier ».
+
+## Questions fermées au mainteneur
+
+*Réponses du mainteneur du 13/11/2026 (M447) : questions 1 à 5, 7, 8 et 10 retenues selon la recommandation ; question 6 : (a) ; question 9 : (A) (M446).*
+
+1. **Catalogue** (point 1) : déclaration en constante de `donnees`, contenu lu à l'installation, objet construit à l'appel, chemin unique pour les contrôles 1.3 et 7 bis, repli par annotation seulement : **retenu ?** (Recommandation : oui.)
+2. **Fichier de table** (point 2) : `inst/extdata/tables/<identifiant>.csv`, `age,lx`, entiers tels qu'imprimés, lignes sans valeur non transcrites, sexe déclaré hors du fichier : **retenu ?** (Recommandation : oui.)
+3. **Fichier de provenance** (point 3) : DCF `tablexp provenance 1`, champs du tableau, deux identités, trois rubriques de statut juridique : **retenu ?** (Recommandation : oui.)
+4. **Contre-vérification** (points 5 et 6) : relevés sous `tests/contre_verification/tables/`, dans le commit `donnees:` de la table ; script `tests/controles/tables_embarquees.R` en étape de CI avec témoin d'échec, sans quatrième batterie : **retenu ?** (Recommandation : oui.)
+5. **Table refusée** (points 7.1 à 7.3) : TF 00-02 au catalogue, refus de `table_reference()` sans enveloppe, état `refusee` : **retenu ?** (Recommandation : oui.)
+6. **Nom réservé** (point 7.4) : (a) une table importée ou synthétique qui porte, à l'identique, le nom d'une table du catalogue est refusée (recommandé) ; (b) elle est admise, le statut et l'empreinte la distinguent.
+7. **`tables_embarquees()`** (point 8) : huit colonnes, module `rapport` (écart à la lettre de l'ADR 0015, point 6.2), un export : **retenu ?** (Recommandation : oui.)
+8. **`docs/sources/`** (points 4.1 et 4.2) : rôle et règles ; extraits du JO maintenus sous une licence retenue par interprétation, statut écrit : **retenu ?** (Recommandation : oui.)
+9. **Pièce du BO Santé 2007-1** (point 4.3) : (A) exception datée à l'ADR 0006, point 4 ; (B) retrait au profit d'un lien et d'une empreinte — et, sous (B), avec ou sans retrait de l'historique avant la fusion. Pas de recommandation d'architecture : le format tient dans les deux cas ; l'appréciation de la licence revient au mainteneur, sur la lecture de `regulatory`.
+10. **Écritures hors de la portée d'`architect`** (point 10, dernier alinéa) : E2.26, `CLAUDE.md` « Données », `docs/sources/README.md`, par la session : **accord ?** (Recommandation : oui, après D14.)
+
+Issues : #263 (points 1, 6, 8), #146 (points 2.4, 7.2, 7.4 ; questions Q3 et Q4), #264 et #145 (points 2 à 5 ; un commit `donnees:` par table), #261 (point 10), #13 (pièces, textes, porteurs), #49 (portabilité). Décisions : M70, M77, M210, M219, M220, M226, M228, M239, M247, M250, M435, M436 ; D11, D13, D14 du point d'étape du 13/11/2026 ; instruction du mainteneur du 13/11/2026 sur les pièces (M442) ; décisions du 13/11/2026, M441 à M450. ADR 0006 (points 2 à 4), 0007 (points 2.1, 7.1), 0011 (annotations des 20/10 et 05/11/2026), 0015 (points 1.3, 4.2, 6). Branche `claude/transcription-tables-homologuees` (B21), PR #262.
