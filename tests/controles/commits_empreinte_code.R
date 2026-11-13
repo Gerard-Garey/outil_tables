@@ -60,6 +60,11 @@
 #      non le package entier : DESCRIPTION, NAMESPACE ou inst/ peuvent différer
 #      entre deux commits d'une classe (hypothèse, non mesurée, qu'aucun
 #      résultat n'en dépend) ; lire l'écart par git diff entre deux commits.
+#      Seule exception connue : les valeurs des tables embarquées
+#      (inst/extdata/tables/), dont dépend toute construction qui en lit une ;
+#      l'empreinte du code n'en couvre que la liste déclarée, et les valeurs
+#      lues sont identifiées par l'empreinte de table de
+#      fiche$tables_reference (ADR 0018, point 9).
 #    - Un commit perdu (branche non fusionnée et supprimée, historique réécrit)
 #      rend sa fiche introuvable : le script le dit, il ne le répare pas.
 #    - Équivalence blob / fichier extrait : .gitattributes impose eol=lf ; un
