@@ -6537,8 +6537,14 @@ même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
     des $q_x$ du premier âge à $\omega - 1$. Poser $q_\omega = 1$
     supposerait $l_{\omega+1} = 0$, c'est-à-dire une fermeture, qui est une
     étape déclarée du plan et non une propriété de la table reçue. Une table
-    qui imprime une dernière ligne $l_{\omega+1} = 0$ est transcrite telle
-    quelle et donne $q_\omega = 1$ exactement.
+    reçue dont la dernière ligne d'un groupe porte $l_{\omega+1} = 0$ donne
+    $q_\omega = 1$ exactement~; deux lignes nulles ou plus en fin de groupe
+    sont refusées (\code{table\_lx\_nul}, (iii)~ci-dessus~; \emph{constat de
+    mesure} du 13/11/2026~: $l = (10, 2, 0)$ donne $q = (0{,}8\,;\ 1)$,
+    $l = (10, 2, 0, 0)$ est refusée). Pour une table embarquée, le fichier
+    ne porte que les lignes que la \emph{source de transcription} imprime
+    avec une valeur~: une ligne nulle que seule une seconde source imprime
+    n'est pas transcrite (E2.26~; TD et TV~88-90, ci-dessous).
   \item \textbf{Égalité.} $l_{x+1} = l_x$ est admise et donne $q_x = +0$
     (zéro positif, $d_x$ étant le zéro positif de la soustraction)~: le
     refus vise la seule hausse stricte. L'aval traite déjà un $q_x$ nul
@@ -6549,9 +6555,11 @@ même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
     $2^{53}$, $d_x$ est un entier de $[0, l_x]$, représenté exactement en
     double précision~; la soustraction est donc exacte et la division rend
     l'\textbf{arrondi correct} du rapport rationnel
-    $(l_x - l_{x+1})/l_x$~: \emph{résultat exact} au sens de la norme
-    (un seul arrondi, celui que la norme impose), identique sur toute
-    plateforme conforme à IEC~60559 en double précision binaire. La forme
+    $(l_x - l_{x+1})/l_x$ (la valeur double la plus proche, un seul
+    arrondi, celui que la norme impose, d'écart relatif au rapport au plus
+    $2^{-53}$)~: \emph{résultat exact} au sens d'E2.20 (formule fermée,
+    sans approximation de méthode), identique sur toute plateforme conforme
+    à IEC~60559 en double précision binaire. La forme
     $1 - l_{x+1}/l_x$, qui arrondit deux fois, n'a pas cette propriété~:
     pour les $100\,001$ paires $(100\,000,\ l_1)$, $l_1 = 0, \ldots,
     100\,000$, elle diffère de la première au dernier bit pour
@@ -6559,8 +6567,12 @@ même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
     R~4.3.3~; ainsi, pour $(100\,000,\ 99\,616)$,
     \code{0x1.f75104d551dp-9} au lieu de \code{0x1.f75104d551d69p-9},
     l'arrondi correct, valeurs écrites en dur dans la batterie unitaire). Pour des
-    $l_x$ non entiers, $d_x$ peut être arrondi~: au plus deux arrondis,
-    résultat déterministe, \emph{approximation numérique}. L'empreinte de
+    $l_x$ non entiers, $d_x$ peut être arrondi (seulement si
+    $l_{x+1} < l_x/2$, \emph{constat de simulation} du 13/11/2026, $10^6$ paires)~: au plus
+    deux arrondis, par deux opérations de base de la norme, donc identique
+    au bit près sur toute plateforme conforme, d'écart relatif au rapport
+    rationnel d'environ $2^{-52}$ au plus (\emph{constat de simulation})~:
+    \emph{approximation numérique}. L'empreinte de
     table porte sur les $q_x$ dérivés (section~\ref{sec:empreinte-resultat},
     «~Empreinte d'une table de référence~»).
 \end{itemize}
