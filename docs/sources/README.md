@@ -1,0 +1,36 @@
+# Pièces sources versées au dépôt
+
+> *Rédigé par la session principale (IA), le 13/11/2026, sur instruction du mainteneur (B21, PR #262).*
+
+Ce dossier conserve, **sous leur forme d'origine** (pages PDF extraites sans retouche du contenu), les pièces dont le projet a besoin pour transcrire et contre-vérifier les tables homologuées et pour citer les textes qui les portent. Ces pièces avaient été déposées dans des conteneurs de session, puis perdues avec eux (#13). Le mainteneur les a déposées de nouveau le 13/11/2026, avec cette instruction : les utiliser de façon à ne plus avoir à les redéposer, en transcrivant au dépôt les informations nécessaires.
+
+Règles de lecture (`CLAUDE.md` ; `docs/exigences.md`, E2.25 et E2.26) :
+
+- une table homologuée se lit **sur le rendu des pages** (l'image), jamais par extraction de texte, y compris quand le PDF porte une couche texte ;
+- TD/TV 88-90 : faute de fac-similé du JO n° 125 du 02/06/1993, l'impression de la version électronique de Légifrance en tient lieu, lue de même sur le rendu des pages (décision du mainteneur du 05/11/2026, #13) ;
+- le BO Santé 2007-1 est une **seconde source** (M436, (1)), jamais une source de transcription.
+
+## Méthode d'extraction
+
+- Les pièces déposées sont les numéros complets du JO (« `joe_AAAAMMJJ_NNNN_p000.pdf` », reçus en archives zip découpées) et deux impressions PDF de pages web (« Microsoft: Print To PDF »).
+- Seules les pages du texte utile sont conservées. Elles sont extraites par `pypdf` 6.17.0 (`PdfReader` puis `PdfWriter.add_page`), **sans rendu ni recompression** : les objets de page (contenu, polices, images) sont recopiés tels quels.
+- Le dictionnaire d'information du PDF est réécrit (`/Title` = nom du fichier, `/Producer` = `pypdf`, `/Author` vide). Les pièces imprimées portaient dans `/Author` le nom du compte qui les avait produites, qui n'a pas à entrer dans un dépôt public.
+- L'empreinte d'un extrait diffère donc de celle de la pièce déposée. Les deux sont consignées ci-dessous (`sha256sum`, 13/11/2026).
+- Les pages citées dans les fichiers de provenance sont celles de l'**extrait**, sauf mention contraire. Pour retrouver une page dans la pièce d'origine, appliquer le décalage donné dans le tableau.
+
+## Pièces
+
+| Extrait (ce dossier) | Pièce déposée | Pages retenues | Contenu utile |
+|---|---|---|---|
+| `jo_2015-12-29_n301_texte35.pdf` (83 p. ; SHA-256 `2e34890188164d547ea2a16e646afa25f2289e6f48310e37dbe410195ab79b56`) | JO n° 301 du 29/12/2015, numéro complet, 926 p. (`joe_20151229_0301_p000.pdf`, 27 972 829 octets, SHA-256 `ec5ae04404a1e1cb8932585b01ddf5124ba4b8ae63071e61efa2f06a65f61854`) | p. 220 à 302 de la pièce = p. 1 à 83 de l'extrait (« Texte 35 sur 159 ») | Arrêté du 28/12/2015 portant adaptation des dispositions comptables du code des assurances (NOR FCPT1529210A) : A132-18, A132-19 (art. 1er, 4°) ; art. 4 (entrée en vigueur) ; annexe à l'article A132-18 : TF 00-02, TH 00-02, décalages d'âge, TGF05, TGH05 (pages relevées le 05/11/2026 sur l'extrait « texte par texte » de 83 p., #13 ; à reconfirmer sur cet extrait) |
+| `jo_2006-08-26_n197_texte11.pdf` (38 p. ; SHA-256 `14e9711f5132198d5f61d807049d41920bec5bf49b292896e579481418cab4f9`) | JO n° 197 du 26/08/2006, numéro complet, 353 p. (`joe_20060826_0197_p000.pdf`, 6 552 917 octets, SHA-256 `0055308e92cfad0537d00242a65f7366d73b05e1d06c630bb9b593224e401c3a`) | p. 34 à 71 de la pièce = p. 1 à 38 de l'extrait (« Texte 11 sur 164 ») | Arrêté du 1er août 2006 portant homologation des tables de mortalité pour les rentes viagères (NOR ECOT0691259A) : TGH05 et TGF05 (E2.24) |
+| `jo_2024-11-22_n276_texte17.pdf` (34 p. ; SHA-256 `1a2f79c347620af519bd13f681c7cee63e3eedf545e12e8d7256c973e9ceef77`) | JO n° 276 du 22/11/2024, numéro complet, 329 p. (`joe_20241122_0276_p000.pdf`, 3 389 515 octets, SHA-256 `2d9eae5c56107f88fee921b7fd20738b792ef67314a982226f1db307ec602d41`) | p. 32 à 65 de la pièce = p. 1 à 34 de l'extrait (« Texte 17 sur 154 ») | Arrêté du 18/11/2024 : A132-18-1, A223-8-1, A932-3-12 ; table unique pour tous les assurés (annexe, p. 2 à 34 de l'extrait, relevé du 05/11/2026, #13) |
+| `legifrance_arrete_1993-04-27_impression_2026-11-13.pdf` (10 p. ; SHA-256 `eba41bb0396cc9d4773c4f483b2f8ac254749da0116f1a87a3b9362faece31c2`) | Impression PDF de la page Légifrance de l'arrêté du 27/04/1993 relatif aux tables de mortalité, faite le 13/11/2026 à 09:51 (`Tables.pdf`, 437 278 octets, SHA-256 `6ecbf63a92482068d6f40f60ec571d2e81ddf6d59476b63060bd380928bbc027`) | toutes (p. 1 à 10) | Version électronique de l'arrêté du 27/04/1993 (NOR ECOT9390043A), « En vigueur au 21/06/2024 », « Dernière mise à jour des données de ce texte : 02 juin 1993 » ; annexes TD 88-90 (âges 0 à 106) et TV 88-90 (âges 0 à 110), en l_x. **Aucune couche texte** (`pdftotext` ne rend que les en-têtes et pieds de page) |
+| `bo_sante_2007-1_annonce58_impression_2026-11-13.pdf` (71 p. ; SHA-256 `0baeb0a75d45bd51a4e1e687d968079fabe441e75df82b2da3f0b874c32436d8`) | Impression PDF de la page du Bulletin officiel Santé n° 2007-1, annonce n° 58 (`https://sante.gouv.fr/fichiers/bo/2007/07-01/a0010058.htm`), faite le 13/11/2026 à 09:52 (`BO.pdf`, 1 987 474 octets, SHA-256 `ad0f0d077c1b6e8b242a0519d39200c4d489fd1e023895fa0c74dd23b1c21814`) | toutes (p. 1 à 71) | Arrêté du 8 décembre 2006 relatif aux tables de mortalité applicables aux mutuelles (NOR SANS0624984A). Annexe I : TF 00-02 (p. 4), TH 00-02 (p. 6), décalages d'âge (p. 9). Annexe II : TGF05 (p. 10), TGH05 (p. 39). Annexe III : TD 88-90 et TV 88-90 (p. 68 à 71). Porte une couche texte |
+
+## Statut
+
+- **Nature** : les extraits du JO viennent des numéros complets publiés au format PDF, donc du **fac-similé**. Les deux impressions sont des rendus de pages web, pas des fac-similés.
+- **Pièces antérieures** : les empreintes consignées sur #13 pour les dépôts du 05/11 et du 12/11/2026 (`e5f916d4…`, `9948b78f…`, `085bb67b…`, `65ec0edf…`, `1fc578e3…`) désignent d'autres fichiers : extraits « texte par texte » de Légifrance, impressions de dates antérieures. Elles ne se comparent pas à celles de ce dossier. L'identité de contenu des pages de tables entre ces dépôts n'est pas mesurée.
+- **Versement** : les contenus de Légifrance sont publiés sous licence etalab-2.0 (ADR 0006, contexte, *vérifié* le 14/10/2026). Le JO est édité par la DILA. Pour la page du BO Santé, la licence n'est **pas établie** ; elle est à vérifier par `regulatory`. Le versement suit l'instruction du mainteneur du 13/11/2026 (décision à consigner dans `docs/feuille-de-route.md`, § 4).
+- **Fichiers de provenance des tables** : ils renvoient à ce dossier par le nom de l'extrait, ses pages et son empreinte (forme fixée par l'ADR 0018, à rédiger dans B21).
