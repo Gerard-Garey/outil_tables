@@ -226,20 +226,39 @@ verifier("controler_tables_rejeu() : table embarquée dont le contenu injecté e
 # --- tables déclarées (littéral de la source ; une ligne par commit donnees:) ------
 
 # nom, nombre de lignes de l'objet (âges transcrits moins le dernier, #146,
-# § 1.8), premier et dernier âge de l'objet, l_0 et l_1 imprimés.
+# § 1.8), premier et dernier âge de l'objet, l_0 et l_1 imprimés ; pour une
+# table refusée (ADR 0018, point 7), motif du refus (paires dans
+# PAIRES_ATTENDUES), aucun objet : lignes et âges à NA, l_0 et l_1 non lus.
 TABLES_ATTENDUES <- data.frame(
-  nom = c("TD 88-90", "TV 88-90", "TH 00-02"),
-  lignes = c(106L, 110L, 110L),
-  age_min = c(0L, 0L, 0L),
-  age_max = c(105L, 109L, 109L),
-  l0 = c(100000, 100000, 100000),
-  l1 = c(99129, 99352, 99511),
+  nom = c("TD 88-90", "TV 88-90", "TH 00-02", "TF 00-02"),
+  lignes = c(106L, 110L, 110L, NA),
+  age_min = c(0L, 0L, 0L, NA),
+  age_max = c(105L, 109L, 109L, NA),
+  l0 = c(100000, 100000, 100000, 100000),
+  l1 = c(99129, 99352, 99511, 99616),
+  refus = c(NA, NA, NA, "table_lx_non_decroissants"),
   stringsAsFactors = FALSE)
+# Paires d'une table refusée : premier âge, l_x imprimés aux deux âges
+# (littéral de la source).
+PAIRES_ATTENDUES <- list(
+  "TF 00-02" = data.frame(age = c(10L, 23L, 61L), lx = c(99478, 94171, 92892), lx_suivant = c(99647, 99137, 93425)))
 verifier("tables attendues : une ligne par table déclarée, dans l'ordre de la déclaration",
          identical(TABLES_ATTENDUES$nom, DECLARATIONS$nom))
 for (k in seq_len(nrow(TABLES_ATTENDUES))) local({
   a <- TABLES_ATTENDUES[k, ]
-  verifier(sprintf("table_embarquee(« %s ») : %d lignes, âges %d à %d, sexe déclaré, statut embarquee, forme lx, q_0 = (l_0 - l_1) / l_0 (littéral de la source)",
+  if (!is.na(a$refus)) {
+    p <- PAIRES_ATTENDUES[[a$nom]]
+    verifier(sprintf("table_embarquee(« %s ») : refus %s, module donnees, paires %s citées avec leurs l_x, sexe déclaré ; état refusee dans tables_embarquees() (littéral de la source)",
+                     a$nom, a$refus, paste(sprintf("%d-%d", p$age, p$age + 1L), collapse = ", ")), {
+      d <- DECLARATIONS[DECLARATIONS$nom == a$nom, ]
+      cat_ <- tables_embarquees()
+      r <- controle_refus(refus_de(table_embarquee(a$nom)), "donnees", a$refus,
+                          c(sprintf("Table « %s »", a$nom), sprintf("l_x = %.0f puis %.0f", p$lx, p$lx_suivant)),
+                          details = list(sexes = rep(d$sexe, nrow(p)), ages = p$age, lx = p$lx, lx_suivants = p$lx_suivant))
+      e <- identical(cat_$etat[cat_$nom == a$nom], "refusee") && identical(cat_$motif_refus[cat_$nom == a$nom], a$refus)
+      if (isTRUE(r) && e) TRUE else c(if (!isTRUE(r)) r, if (!e) "état ou motif du catalogue")
+    })
+  } else verifier(sprintf("table_embarquee(« %s ») : %d lignes, âges %d à %d, sexe déclaré, statut embarquee, forme lx, q_0 = (l_0 - l_1) / l_0 (littéral de la source)",
                    a$nom, a$lignes, a$age_min, a$age_max), {
     t <- table_embarquee(a$nom)
     d <- DECLARATIONS[DECLARATIONS$nom == a$nom, ]
