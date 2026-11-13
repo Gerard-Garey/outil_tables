@@ -67,3 +67,19 @@ Rédigée par `architect` à l'étape (0')(c) de la branche `claude/transcriptio
 **Effet sur les résultats : aucun** par la présente annotation.
 
 Issues : #263, #264, #145, #13. Décisions M210, M226, M442 à M447. ADR 0018 ; ADR 0015 (annotation du même jour). Branche `claude/transcription-tables-homologuees`, PR #262.
+
+## Annotation du 13 novembre 2026 (seconde) — point 1 : « sous licence ouverte vérifiée », lecture (a) retenue pour les quatre tables embarquées de B21 (M454 ; interprétation I1 ; #264, #145)
+
+Rédigée par `architect` en fin de branche de `claude/transcription-tables-homologuees` (B21, PR #262), tête `2feba60`, sur décision du mainteneur du 13/11/2026 (M454). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Aucun code n'est écrit par la présente annotation.
+
+**(a) Écart relevé.** Le point 1 embarque TD/TV 88-90 et TH/TF 00-02 « sous licence ouverte vérifiée ». Le champ `Source-licence` des quatre fichiers de provenance (`inst/extdata/tables/td_88-90.provenance.dcf`, `tv_88-90.provenance.dcf`, `th_00-02.provenance.dcf`, `tf_00-02.provenance.dcf`) écrit pour la pièce source, extrait du fac-similé du JO, une licence etalab-2.0 « retenue par interprétation », avec à défaut la réutilisation des informations publiques (code des relations entre le public et l'administration, L321-1 et L322-1). Interprétation I1 de la matrice de conformité de `regulatory` à la revue finale de B21 (*rapportée* par la session), deux lectures : (a) le versement des pièces, retenu par le mainteneur (M447, question 8 de l'ADR 0018), et la base du CRPA suffisent à satisfaire le point 1 ; (b) la licence « vérifiée » doit être établie par la version Légifrance, sous etalab-2.0, des mêmes valeurs.
+
+**(b) Décision (M454).** Lecture **(a)** retenue : pour ces quatre tables, la condition « sous licence ouverte vérifiée » du point 1 est tenue pour satisfaite par le versement des extraits du fac-similé du JO sous `docs/sources/` (M447, question 8 ; annotation du 13/11/2026 ci-dessus, (c)) et par la réutilisation des informations publiques au titre du CRPA, articles L321-1 et L322-1 (base indiquée par la lecture de `regulatory`, retenue par le mainteneur ; non relue à sa source par `architect`), informations non altérées, source et date mentionnées. Le statut écrit reste celui qui est : « retenue par interprétation ». **Aucun champ de provenance ne change**, et le statut n'est pas réécrit en « établie ».
+
+**(c) Lecture (b) écartée.** Établir la licence par la version Légifrance des mêmes valeurs ferait d'une seconde pièce, qui n'est pas la source de transcription (fac-similé du JO, E2.26), la porteuse de la licence ; le mainteneur ne l'a pas retenue. Elle reste une voie possible si le statut « retenue par interprétation » était un jour contesté.
+
+**(d) Portée.** La décision vaut pour les quatre tables embarquées par B21. Elle ne règle pas les tables suivantes de la liste du point 1 (TGH05/TGF05, décalages d'âge, table unique 2024, tables INSEE) : leur statut de licence se fixe au plan de leur branche, par décision propre ou par renvoi explicite à la présente. L'exception du BO Santé 2007-1 (annotation précédente, (d) ; M446) est inchangée. La règle de passage d'« importée » à « embarquée » est sans objet ici : les quatre tables figuraient déjà parmi les tables embarquées du point 1.
+
+**Effet sur les résultats : aucun.**
+
+Issues : #264, #145 ; #267 à #270 et le commentaire sur #233 (https://github.com/Gerard-Garey/outil_tables/issues/233#issuecomment-6859174947) créés le même jour pour les autres points de la revue finale (M455), sans lien avec la présente décision. Décisions M446, M447, M454. ADR 0018 (point 4.2, question 8). Branche `claude/transcription-tables-homologuees`, PR #262.
