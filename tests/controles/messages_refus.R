@@ -154,7 +154,6 @@ EXCEPTIONS <- exception_lignes(
   c("donnees.R", "table_reference", "paste(utils::head(hors, NB_LIGNES_CITEES), collapse = \", \")", "numéros de ligne (which())"),
   c("donnees.R", "table_reference", "paste(utils::head(melange, NB_LIGNES_CITEES), collapse = \", \")", "années (as.integer())"),
   c("donnees.R", "table_reference", "paste(utils::head(non_fini, NB_LIGNES_CITEES), collapse = \", \")", "numéros de ligne (which())"),
-  c("donnees.R", "table_reference", "paste(utils::head(hors_bornes, NB_LIGNES_CITEES), collapse = \", \")", "numéros de ligne (which())"),
   c("donnees.R", "table_reference", "paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = \", \")", "numéros de ligne (which())"),
   c("donnees.R", "table_reference", "paste(sprintf(\"%d et %d\", o[trous - 1L], o[trous])[seq_len(min(length(trous), NB_LIGNES_CITEES))], collapse = \", \")", "numéros de ligne (order())"),
   c("exposition.R", "resoudre_convention", "native", "convention native de la recette (catalogue du moteur)"),
