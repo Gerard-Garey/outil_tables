@@ -1,0 +1,6 @@
+source : bo_sante_2007-1_annonce58_impression_2026-11-13.pdf ; outil : pdftotext version 24.02.0 -bbox
+normalisation : cellule sans mot -> '-' : 9639
+tgf05 : lignes sans valeur non écrites au relevé : []
+tgf05 : 12826 cellules comparées, 0 écarts
+tgh05 : lignes sans valeur non écrites au relevé : []
+tgh05 : 12826 cellules comparées, 0 écarts
