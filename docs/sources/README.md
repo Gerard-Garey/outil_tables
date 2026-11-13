@@ -8,7 +8,7 @@ Règles de lecture (`CLAUDE.md` ; `docs/exigences.md`, E2.25 et E2.26) :
 
 - une table homologuée se lit **sur le rendu des pages** (l'image), jamais par extraction de texte, y compris quand le PDF porte une couche texte ;
 - TD/TV 88-90 : faute de fac-similé du JO n° 125 du 02/06/1993, l'impression de la version électronique de Légifrance en tenait lieu (décision du mainteneur du 05/11/2026, #13). Depuis le dépôt du JO n° 2 du 03/01/2016 (règlement ANC 2015-11, art. 600-5 et 600-6), ce fac-similé est la source de transcription de TD et TV 88-90 ; l'impression Légifrance et le BO Santé deviennent des secondes sources (décision du mainteneur du 13/11/2026) ;
-- le BO Santé 2007-1 est une **seconde source** (M436, (1)), jamais une source de transcription.
+- le BO Santé 2007-1 est une **seconde source** (M436, (1) ; M444), jamais une source de transcription ; ses valeurs peuvent être lues par la couche texte pour la seule comparaison (M445 ; E2.26).
 
 ## Méthode d'extraction
 
@@ -33,5 +33,8 @@ Règles de lecture (`CLAUDE.md` ; `docs/exigences.md`, E2.25 et E2.26) :
 
 - **Nature** : les extraits du JO viennent des numéros complets publiés au format PDF, donc du **fac-similé** ; leurs pages ne portent que « Texte N sur M », sans folio du JO. Chaque page du JO de 2015 porte un fond raster unique et un texte en polices vectorielles (`pdfimages -list`, `pdffonts`). Les deux impressions sont des rendus de pages web, pas des fac-similés.
 - **Pièces antérieures** : les empreintes consignées sur #13 pour les dépôts du 05/11 et du 12/11/2026 (`e5f916d4…`, `9948b78f…`, `085bb67b…`, `65ec0edf…`, `1fc578e3…`) désignent d'autres fichiers : extraits « texte par texte » de Légifrance, impressions de dates antérieures. Elles ne se comparent pas à celles de ce dossier. L'identité de contenu des pages de tables entre ces dépôts n'est pas mesurée.
-- **Versement** : les contenus de Légifrance sont publiés sous licence etalab-2.0 (ADR 0006, contexte, *vérifié* le 14/10/2026). Le JO est édité par la DILA. Pour la page du BO Santé, la licence n'est **pas établie** ; elle est à vérifier par `regulatory`. Le versement suit l'instruction du mainteneur du 13/11/2026 (décision à consigner dans `docs/feuille-de-route.md`, § 4).
-- **Fichiers de provenance des tables** : ils renvoient à ce dossier par le nom de l'extrait, ses pages et son empreinte (forme fixée par l'ADR 0018, à rédiger dans B21).
+- **Versement** (décisions du mainteneur du 13/11/2026, M442 et M446 ; ADR 0018 ; annotation du 13/11/2026 de l'ADR 0006, point 4) :
+  - Légifrance : licence etalab-2.0 (« Sauf mention contraire, tous les contenus de ce site sont sous licence etalab-2.0 », *vérifié* le 13/11/2026 par `regulatory`, aucune mention contraire sur la page de l'arrêté de 1993) ;
+  - extraits du JO : licence etalab-2.0 retenue par interprétation (numéros servis par Légifrance, sans mention contraire relevée) ; à défaut, réutilisation des informations publiques (code des relations entre le public et l'administration, L321-1 et L322-1 : informations non altérées, source et date mentionnées) ;
+  - BO Santé 2007-1 : licence du site **non établie** ; l'extrait est maintenu par **exception datée** sur la base du CRPA, L321-1 et L322-1 (M446).
+- **Fichiers de provenance des tables** : ils renvoient à ce dossier par le nom de l'extrait, ses pages et son empreinte (ADR 0018, points 3 et 4).
