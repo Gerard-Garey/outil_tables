@@ -28,31 +28,44 @@ Homologation: Arrêté du 20 décembre 2005 relatif aux tables de mortalité, NO
 Porteurs-usages:
  Code des assurances : annexe à l'article A132-18, créée par l'arrêté du 28
  décembre 2015 portant adaptation des dispositions comptables du code des
- assurances (NOR FCPT1529210A), JO n° 301 du 29/12/2015, texte 35, en vigueur au
- 1er janvier 2016 (art. 4) ; statut : vérifié sur le fac-similé versé
- (intitulé, NOR et « ANNEXE À L'ARTICLE A. 132-18 », p. 1 et 13 de l'extrait ;
- lecture sur l'image du 13/11/2026).
+ assurances (NOR FCPT1529210A), JO n° 301 du 29/12/2015, texte 35 ; entrée en
+ vigueur « à compter du 1er janvier 2016, ou à compter de l'entrée en vigueur
+ du règlement n° 2015-11 du 26 novembre 2015 de l'Autorité des normes
+ comptables relatif au cadre comptable des entreprises d'assurance, si
+ celle-ci est postérieure » (art. 4, p. 12 de l'extrait) ; statut : vérifié sur
+ le fac-similé versé (intitulé, NOR, art. 4 et « ANNEXE À L'ARTICLE A.
+ 132-18 », p. 1, 12 et 13 de l'extrait ; lecture sur l'image du 13/11/2026).
  Mutualité : annexe de A223-8 du code de la mutualité, créée par l'art. 9 de
- l'arrêté du 08/12/2006 (NOR SANS0624984A) : « A l'article A. 223-8 du code de la
+ l'arrêté du 08/12/2006 (NOR SANS0624984A), modifié par l'arrêté du 30/12/2015
+ (NOR FCPS1531571A), art. 6 : « A l'article A. 223-8 du code de la
  mutualité, il est créé une annexe contenant les tables TF00-02 et TH00-02 et les
  décalages d'âge ci-annexés […] » (version initiale, BO Santé 2007-1, annonce
  n° 58 : annexe à A. 212-10, annexe I) ; statut : vérifié (stock LEGI de la
  DILA, art. 9 en vigueur LEGIARTI000031808338, lecture du 12/11/2026,
- https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6828688504).
+ https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6828688504) ;
+ arrêté du 30/12/2015 : NOR FCPS1531571A, JORF n° 303 du 31/12/2015, texte 104 ;
+ statut : vérifié sur Légifrance, version électronique (lecture outillée du
+ 13/11/2026, regulatory), non lu sur fac-similé.
  Sécurité sociale : annexe de A932-3-11 du code de la sécurité sociale, créée
  par l'art. 10 de l'arrêté du 21/12/2006 relatif aux tables de mortalité
  applicables aux institutions de prévoyance (NOR SANS0625193A, JORF n° 9 du
- 11/01/2007, texte n° 31), « contenant les tables TF00-02 et TH00-02 […]
+ 11/01/2007, texte n° 31), modifié par l'arrêté du 30/12/2015 (NOR
+ FCPS1531571A), art. 3, « contenant les tables TF00-02 et TH00-02 […]
  ci-annexés » ; statut : vérifié pour le texte de l'article (stocks LEGI et
  JORF de la DILA, lecture du 12/11/2026, même commentaire) ; impression des
- tables annexées non établie (aucun article « Annexe » dans le stock JORF).
+ tables annexées non établie (aucun article « Annexe » dans le stock JORF) ;
+ arrêté du 30/12/2015 : même statut que pour la mutualité.
  Comptes sociaux : règlement ANC 2015-11, art. 142-3, par renvoi : provisions
- mathématiques des contrats à élément viager calculées « d'après les tables en
- vigueur à l'époque de l'application du tarif, dans le respect des
- dispositions du code des assurances… » (recueil des normes comptables /
+ mathématiques calculées, « s'ils comportent un élément viager et sous réserve
+ de l'article 142-4 du présent règlement, d'après les tables en vigueur à
+ l'époque de l'application du tarif, dans le respect des dispositions du code
+ des assurances, du code de la mutualité ou du code de la sécurité sociale
+ s'appliquant à l'entreprise » (recueil des normes comptables /
  assurance de l'ANC, « Version en vigueur au 1er janvier 2025 »,
  https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/recueil/Assurance-Recueil-2025.pdf,
- p. 18 du recueil, p. 19 du PDF), porteur par renvoi à A132-18 ; l'art. 142-4
+ p. 18 du recueil, p. 19 du PDF) ; usage par renvoi aux dispositions du code
+ des assurances, du code de la mutualité ou du code de la sécurité sociale
+ (A132-18, A223-8, A932-3-11), sans nommer la table ; l'art. 142-4
  (rentes viagères) ne porte pas la table ; la chaîne « 00-02 » n'apparaît pas
  dans le recueil ; statut : vérifié par regulatory le 13/11/2026 sur le
  recueil (SHA-256 0d7fb3c8…9766, champ Empreintes-hors-depot), lecture par
@@ -95,7 +108,9 @@ Transcription-methode: Transcription A (le fichier de table) : lecture directe
  et la fin concordent avec l'empreinte tronquée (mesure du 13/11/2026). Relecture
  de ces valeurs sur le rendu des p. 16 à 19 à 200 dpi (pdftoppm -r 200), page
  par page, par un troisième agent coder-approfondi (IA), le 13/11/2026 : aucun
- écart.
+ écart. Contrôle de conformité : relecture des 111 valeurs sur le rendu des
+ p. 16 à 19 par l'agent regulatory (IA), le 13/11/2026 : aucun écart
+ (https://github.com/Gerard-Garey/outil_tables/pull/262#issuecomment-6855968496).
 Transcription-date: 2026-11-13
 Transcription-B-releve: tests/contre_verification/tables/th_00-02.transcription_b.csv
 Transcription-B-methode: Transcription B (le relevé versé) : nouvelle
