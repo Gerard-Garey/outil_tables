@@ -7025,7 +7025,7 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         sociale~: annexe de l'article A932-3-11 du code de la sécurité
         sociale, créée par l'arrêté du 21~décembre 2006 (NOR SANS0625193A,
         JORF n\textsuperscript{o}~9 du 11~janvier 2007), art.~10, modifié
-        par le même arrêté, art.~3 (\emph{vérifié} pour le texte de l'article~; impression des tables
+        par l'arrêté du 30~décembre 2015, art.~3 (\emph{vérifié} pour le texte de l'article~; impression des tables
         annexées \emph{non établie}). Comptes sociaux~: règlement ANC
         2015-11, art.~142-3, \emph{usage} par renvoi (il emploie ces
         tables sans les porter)~: les provisions mathématiques des contrats
@@ -7104,15 +7104,22 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         \code{Refus-paires} (10-11, 23-24, 61-62), et non
         \code{Empreinte-table}. Le moteur cite des paires~; l'attribution
         de l'écart aux âges 11, 23 et~62 est celle d'E2.26 (M448), reprise
-        au fichier de provenance (champ \code{Ecarts-signales}). Elle se
-        lit sur les valeurs~: dans chaque paire, la valeur attribuée sort
-        de l'intervalle que forment les deux âges qui l'encadrent
-        ($l_{11} = 99\,647$ hors de $[l_{12}, l_{10}] = [99\,456,\
-        99\,478]$~; $l_{23} = 94\,171$ hors de $[99\,137,\ 99\,205]$~;
-        $l_{62} = 93\,425$ hors de $[91\,923,\ 92\,892]$), l'autre valeur
-        de la paire restant en ligne avec ses voisines, et le BO imprime à
-        ces trois âges, et à eux seuls, une valeur comprise dans cet
-        intervalle.
+        au fichier de provenance (champ \code{Ecarts-signales}).
+        Elle se lit sur les valeurs~: dans chaque paire d'âges $(x, x+1)$,
+        seule la valeur attribuée sort de l'intervalle $[l_{x+2}, l_{x-1}]$
+        que forment les deux âges extérieurs à la paire
+        ($l_{11} = 99\,647$ hors de $[l_{12}, l_{9}] = [99\,456,\
+        99\,488]$, qui contient $l_{10} = 99\,478$~; $l_{23} = 94\,171$
+        hors de $[l_{25}, l_{22}] = [99\,103,\ 99\,205]$, qui contient
+        $l_{24} = 99\,137$~; $l_{62} = 93\,425$ hors de
+        $[l_{63}, l_{60}] = [91\,923,\ 93\,329]$, qui contient
+        $l_{61} = 92\,892$)~; l'intervalle des deux âges qui encadrent
+        chaque valeur ne départage pas, les deux valeurs de chaque paire
+        en sortant. Le BO, qui ne diffère de la transcription qu'à ces
+        trois âges (champ \code{Seconde-source-bo-ecarts}), y imprime une
+        valeur comprise dans cet intervalle ($99\,467$, $99\,171$ et
+        $92\,425$), et la suite des $l_x$ ainsi corrigée est strictement
+        décroissante.
         \code{tables\_embarquees()} liste la table à l'état \code{refusee},
         de motif \code{table\_lx\_non\_decroissants}, d'empreinte
         \code{NA}~: c'est, dans cette version, la seule table refusée du catalogue.
