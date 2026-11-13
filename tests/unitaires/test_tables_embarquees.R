@@ -228,12 +228,12 @@ verifier("controler_tables_rejeu() : table embarquée dont le contenu injecté e
 # nom, nombre de lignes de l'objet (âges transcrits moins le dernier, #146,
 # § 1.8), premier et dernier âge de l'objet, l_0 et l_1 imprimés.
 TABLES_ATTENDUES <- data.frame(
-  nom = "TD 88-90",
-  lignes = 106L,
-  age_min = 0L,
-  age_max = 105L,
-  l0 = 100000,
-  l1 = 99129,
+  nom = c("TD 88-90", "TV 88-90"),
+  lignes = c(106L, 110L),
+  age_min = c(0L, 0L),
+  age_max = c(105L, 109L),
+  l0 = c(100000, 100000),
+  l1 = c(99129, 99352),
   stringsAsFactors = FALSE)
 verifier("tables attendues : une ligne par table déclarée, dans l'ordre de la déclaration",
          identical(TABLES_ATTENDUES$nom, DECLARATIONS$nom))
