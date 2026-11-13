@@ -677,3 +677,79 @@ verifier("U25 : la ligne « # rejeu : » de la fiche écrite égale TEXTE_REJEU_
   t <- lignes_de(ecrire_fiche(x1$fiche))
   identical(t[startsWith(t, "# rejeu : ")], paste0("# rejeu : ", tablexp:::TEXTE_REJEU_FICHE))
 })
+
+# --- #163 (option (a), M279) : mention tables_reference_parametres (valeur calculée à la main) ---
+# Texte d'actuary du 12/11/2026 (issue #163), écrit en dur ; condition : au
+# moins une table de fiche/tables_reference de statut synthetique ; une seule
+# fois, après le tableau de la section donnees_recues.
+
+MENTION_163 <- paste0("<p>", html(paste(
+  "Tables de référence de statut synthetique : leurs paramètres (champ parametres des éléments de",
+  "fiche/tables_reference) sont déclarés par l'appelant, non vérifiés par le moteur ; ni leur forme ni leur",
+  "cohérence avec les q_x de la table ne sont contrôlées. Une table de référence entre en valeurs : son",
+  "empreinte (champ empreinte) porte sur son contenu (âge, sexe, année si présente, q_x), non sur ses",
+  "métadonnées, et aucune étape de la construction ne lit ces paramètres.")), "</p>")
+PLAN_163 <- plan_forme()
+PLAN_163$etapes$validation <- list(table_reference = "tv", relation_table = "independante", plage_ages = c(20, 90),
+                                   tranches_age = c(20, 50, 70), niveau = 0.95, replications = 49)
+PLAN_163$graine <- 7L
+GM_163 <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
+DF_163 <- rbind(data.frame(age = GM_163$age, sexe = "H", qx = GM_163$qx),
+                data.frame(age = GM_163$age, sexe = "F", qx = 0.6 * GM_163$qx))
+PARAM_163 <- list(loi = "gompertz_makeham", A = 2e-4, B = 2.5e-5, c = 1.1, ages = c(0L, 120L))
+# Table synthétique déclarée par l'appelant, nom et source ASCII (utilisable sous LC_ALL=C).
+T_SYN_163 <- table_reference(DF_163, "tv synthetique", "synthetique", "essai #163", parametres = PARAM_163)
+T_IMP_163 <- table_reference(DF_163, "tv importee", "importee", "essai #163")
+X163 <- list(
+  synthetique = construire_table(JEU, ROLES, PLAN_163, tables_reference = list(tv = T_SYN_163)),
+  loi_package = construire_table(JEU, ROLES, PLAN_163, tables_reference = list(tv = GM_163)),
+  importee = construire_table(JEU, ROLES, PLAN_163, tables_reference = list(tv = T_IMP_163)),
+  sans_table = X$R1)
+L163 <- lapply(X163, function(x) lignes_de(ecrire_rapport(x)))
+# Lignes de la section donnees_recues : le tableau, puis la mention seule avant </section>.
+verifier("#163 : table synthétique déclarée par table_reference() (nom ASCII) : mention une seule fois dans le document, dernière ligne de donnees_recues, juste après </table>", {
+  l <- L163$synthetique; s <- section_de(l, "donnees_recues"); n <- length(s)
+  identical(X163$synthetique$fiche$tables_reference$tv$statut, "synthetique") &&
+    sum(l == MENTION_163) == 1L && identical(s[n - 1L], MENTION_163) && identical(s[n], "</section>") &&
+    identical(s[n - 2L], "</table>") && sum(s == MENTION_163) == 1L
+})
+verifier("#163 : table rendue par table_gompertz_makeham() (toute locale) : même mention, une seule fois, au même endroit", {
+  l <- L163$loi_package; s <- section_de(l, "donnees_recues"); n <- length(s)
+  identical(X163$loi_package$fiche$tables_reference$tv$statut, "synthetique") &&
+    sum(l == MENTION_163) == 1L && identical(s[n - 1L], MENTION_163) && identical(s[n - 2L], "</table>")
+})
+verifier("#163 : table importée, ou aucune table : aucune mention (aucun paragraphe de donnees_recues ne cite « statut synthetique »), section terminée par </table>", {
+  e <- character(0)
+  for (id in c("importee", "sans_table")) {
+    l <- L163[[id]]; s <- section_de(l, "donnees_recues"); n <- length(s)
+    if (any(l == MENTION_163) || any(grepl("Tables de référence de statut synthetique", l, fixed = TRUE)) ||
+        !identical(s[(n - 1L):n], c("</table>", "</section>")))
+      e <- c(e, id)
+  }
+  if (length(e)) e else TRUE
+})
+verifier("#163 contre-épreuve : même objet, statut de la table relu importee dans la fiche (empreinte du résultat reconsignée) : mention absente ; témoin de comptage : un texte à deux mentions en compte 2", {
+  y <- reconsigne(X163$synthetique, function(x) { x$fiche$tables_reference$tv$statut <- "importee"; x })
+  l <- lignes_de(ecrire_rapport(y))
+  sum(l == MENTION_163) == 0L && sum(c(L163$synthetique, MENTION_163) == MENTION_163) == 2L
+})
+verifier("#163 sous LC_ALL=C : table synthétique au nom ASCII construite par table_reference() : rapport écrit, mention une seule fois (sous-processus)", {
+  f <- tempfile(fileext = ".R"); e <- tempfile(fileext = ".rds"); on.exit(unlink(c(f, e)))
+  saveRDS(list(jeu = JEU, roles = ROLES, plan = PLAN_163, t = T_SYN_163, mention = MENTION_163), e)
+  writeLines(c(
+    'suppressMessages(library(tablexp, lib.loc = Sys.getenv("TABLEXP_BIBLIOTHEQUE")))',
+    sprintf('e <- readRDS(%s)', deparse(e)),
+    'x <- construire_table(e$jeu, e$roles, e$plan, tables_reference = list(tv = e$t))',
+    'o <- ecrire_rapport(x)',
+    'l <- strsplit(rawToChar(o), "\\n", fixed = TRUE)[[1L]]; Encoding(l) <- "UTF-8"',
+    'cat("RESULTAT", Sys.getlocale("LC_CTYPE"), sum(l == e$mention), "\\n")'), f)
+  s <- executer_rscript(f, env = c("LC_ALL=C", "LANG=C"))
+  l <- grep("^RESULTAT", s$sortie, value = TRUE)
+  if (s$statut != 0L || length(l) != 1L) paste(s$sortie, collapse = " | ")
+  else identical(l, "RESULTAT C 1 ")
+})
+verifier("#163 : MENTIONS_RAPPORT$tables_reference_parametres égale le texte de la spécification (marqué UTF-8) ; clé ASCII", {
+  m <- tablexp:::MENTIONS_RAPPORT
+  identical(Encoding(m[["tables_reference_parametres"]]), "UTF-8") &&
+    identical(paste0("<p>", html(unname(m[["tables_reference_parametres"]])), "</p>"), MENTION_163)
+})

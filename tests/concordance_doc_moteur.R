@@ -590,7 +590,7 @@ controle_fiche("blocs_lecture", "blocs de lecture du document égaux à BLOCS_LE
     sprintf("blocs absents du document : %s", paste(names(blocs_code)[ancres_blocs < 0L], collapse = ", "))
   else {
     debut <- min(ancres_blocs)
-    reste <- substring(plein, debut)
+    reste <- substring(plein, debut, nchar(plein))
     point <- regexpr("\\.(\\s|$)", reste)
     paragraphe <- substr(reste, 1L, if (point > 0L) point else nchar(reste))
     bornes <- c(sort(ancres_blocs) - debut + 1L, nchar(paragraphe) + 1L)

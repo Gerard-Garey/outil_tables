@@ -88,8 +88,11 @@ adverse <- list(
   nommes_vides = list(setNames(list(), character(0)), list()),
   null = list(a = NULL, b = list(NULL), c = list()),
   nommes = list(v = c(a = 1, b = 2), w = c(x = "é", "sans nom"), z = c("NA" = NA, "a/b" = TRUE)),
-  noms_inadmissibles = list(1, "a/b" = 2, "@noms" = 3, "#x" = 4, "[1]" = 5, d = 6, d = 7, "tab\tnom" = 8,
-                            "é" = 9, "lf\nnom" = 10),
+  # Noms posés par setNames() : un nom non ASCII en position de nom d'argument
+  # ("é" = 9) est altéré en « <U+00E9> » sous LC_ALL=C (#229, mesuré) ; une
+  # chaîne en position de valeur reste intacte en toute locale.
+  noms_inadmissibles = setNames(list(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+                                c("", "a/b", "@noms", "#x", "[1]", "d", "d", "tab\tnom", "é", "lf\nnom")),
   noms_na = setNames(list(1, 2), c("a", NA)),
   noms_vides_tous = setNames(list(1, 2), c("", "")),
   sans_noms = list(list(1, list(2, "x")), list()),

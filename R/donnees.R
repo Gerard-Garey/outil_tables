@@ -72,10 +72,21 @@ CATALOGUE_ROLES <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Libellé des types R admis, par code de type (restitué par catalogue_roles()).
+# Constantes non ASCII du module restituées hors de texte_moteur() (TYPES_ADMIS,
+# LIBELLES_MOTIFS ; #151 ; UNITE_AGREGAT passe par avertir(), qui marque) : les
+# octets du fichier sont de l'UTF-8 ; sans marque, la chaîne est d'encodage
+# « unknown » et suit la locale de la session. texte_moteur() (R/outils.R)
+# n'existe pas encore quand ce fichier est évalué (ordre alphabétique à
+# l'installation, ADR 0011, annotation du 20/10/2026, sans champ Collate) : le
+# marquage se fait à la source, par `Encoding<-`() ; le graphe des modules
+# n'admet au premier niveau que des affectations (d'où la forme fonctionnelle).
+
+# Libellé des types R admis, par code de type (restitué par catalogue_roles()
+# et details$type_attendu du refus type_incompatible ; marqué UTF-8 à la source :
+# « entières » est non ASCII).
 # `numerique` : classe seule (ADR 0016, point 6.5 ; #169, Q5) ; les défauts de
 # domaine (manquant, non entier, négatif, non fini) sont des motifs de ligne.
-TYPES_ADMIS <- c(
+TYPES_ADMIS <- `Encoding<-`(c(
   identifiant = "character, integer, double entier fini",
   categorie = "character, factor",
   categorie_ou_entier = "character, factor, integer",
@@ -84,7 +95,7 @@ TYPES_ADMIS <- c(
   entier_positif = "integer, double entier fini >= 0",
   reel_strictement_positif = "double fini > 0",
   numerique = "integer, double"
-)
+), "UTF-8")
 
 # Modalités des rôles catégoriels (A.1), comparées après as.character,
 # sensibles à la casse.
@@ -170,7 +181,7 @@ MOTIFS_UNITE_STOCKS <- c("unite_naissance_incoherente", "unite_sexe_incoherent",
 # un code a un seul sens, quelle que soit la recette qui le lève (invariant
 # « un libellé unique par code », avis d'actuary du 08/11/2026 sur #169,
 # point 2 ; contrôlé par tests/unitaires/test_catalogue_recettes.R).
-LIBELLES_MOTIFS <- c(
+LIBELLES_MOTIFS <- `Encoding<-`(c(
   id_contrat_manquant = "identifiant de contrat manquant",
   id_tete_manquant = "identifiant de tête manquant",
   naissance_manquante = "date de naissance manquante",
@@ -224,7 +235,7 @@ LIBELLES_MOTIFS <- c(
   sortie_non_renseignee = paste("unité absente de l'inventaire qui suit sa dernière présence, sans ligne",
                                 "d'événement"),
   evenement_apres_absence = paste("date de sortie postérieure à l'inventaire qui suit la dernière présence de",
-                                  "l'unité"))
+                                  "l'unité")), "UTF-8")
 
 # Nombre de numéros de ligne cités dans un message de refus (A.1) ; l'objet
 # de refus porte la liste complète.
@@ -387,10 +398,12 @@ entiers_finis <- function(v) {
 # une matrice ou une classe autre que celles admises (POSIXct, difftime...)
 # est refusée. Dimension lue par attr() et facteur par a_classe() (R/outils.R,
 # #128) : dim() et is.factor() dispatchent sur la classe et lèvent une erreur R
-# sur une classe d'encodage « bytes » (mesuré) ; la colonne est alors refusée
-# comme toute classe non admise.
+# sur une classe d'encodage « bytes » (mesuré) ; une colonne dont un élément de
+# la classe est d'encodage « bytes » est refusée, où qu'il se place dans la
+# classe (#150) : a_classe(x, "factor") est vrai pour c(<bytes>, "factor"), et
+# la suite (anyNA(), as.character()) lèverait l'erreur R.
 type_conforme <- function(x, type) {
-  if (!is.atomic(x) || !is.null(attr(x, "dim", exact = TRUE))) return(FALSE)
+  if (!is.atomic(x) || !is.null(attr(x, "dim", exact = TRUE)) || classe_bytes(x)) return(FALSE)
   nu <- !is.object(x)
   chaine <- nu && is.character(x)
   entier <- nu && is.integer(x)
@@ -522,6 +535,16 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
 # le refus 8 suppose la sélection. Chaque refus nomme tous les rôles en
 # cause. Rend la recette retenue (deduire_recette()).
 controler_roles <- function(donnees, roles, segmentation) {
+  # Classe d'encodage « bytes » lue par classe_bytes() avant is.data.frame(),
+  # dont inherits() lève une erreur R sur elle (#150) ; le refus est propre à
+  # ce cas : « doivent être un data.frame » serait faux d'un data.frame sous-classé.
+  if (classe_bytes(donnees))
+    refuser("donnees", "donnees_mal_formees",
+            formuler(paste("Les données portent une classe d'encodage « bytes » (classe %s), non convertible en UTF-8",
+                           "sans deviner : elles ne sont pas lues. Passer un data.frame dont la classe ne porte aucune",
+                           "chaîne d'encodage bytes."),
+                     paste(citer(class(donnees)), collapse = "/")),
+            list(classe = class(donnees)))
   if (!is.data.frame(donnees))
     refuser("donnees", "donnees_mal_formees",
             formuler("Les données doivent être un data.frame (le moteur ne lit pas de fichier)."),
@@ -579,9 +602,10 @@ controler_roles <- function(donnees, roles, segmentation) {
   colonne <- function(i) lire_champ(donnees, roles[[i]])
   ko <- !vapply(seq_along(r), function(i) type_conforme(colonne(i), types[i]),
                 logical(1L))
-  # TYPES_ADMIS (« entières », non ASCII) est une constante du moteur non
-  # marquée : texte_moteur() la marque UTF-8 avant l'insertion par %s (sous
-  # la locale C, sprintf() en écrirait les octets « <c3><a8> » ; #127).
+  # TYPES_ADMIS (« entières », non ASCII) est marquée UTF-8 à la source (#151) ;
+  # texte_moteur() reste appliquée avant l'insertion par %s, règle de formuler()
+  # (sous la locale C, sprintf() écrirait les octets « <c3><a8> » d'un libellé
+  # non marqué ; #127).
   if (any(ko))
     refuser("donnees", "type_incompatible",
             formuler("Type incompatible : %s.",
@@ -936,7 +960,7 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lign
                                 any(lignes_tete < 1L | lignes_tete > n)))
     stop(paste("evaluer_motifs() : lignes_tete hors de la forme admise (integer sans attribut, sans NA ni",
                "doublon, dans 1..nrow(donnees)) (erreur de programmation)."), call. = FALSE)
-  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   jours <- function(role) as.numeric(unclass(col(role)))
   nai <- jours("date_naissance"); ent <- jours("date_entree"); sor <- jours("date_sortie")
   cause <- as.character(col("cause_sortie"))
@@ -1054,7 +1078,7 @@ sous_indicer_categorie <- function(x, i) {
 # ligne (1-based, croissants), dans l'ordre MOTIFS_LIGNES_AGREGATS.
 evaluer_motifs_agregats <- function(donnees, roles, p) {
   n <- nrow(donnees)
-  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   vrai <- function(x) !is.na(x) & x
   non_entier <- function(x) !is.na(x) & (!is.finite(x) | x != trunc(x))
   m <- stats::setNames(rep(list(logical(n)), length(MOTIFS_LIGNES_AGREGATS)), MOTIFS_LIGNES_AGREGATS)
@@ -1137,7 +1161,7 @@ TOLERANCE_RELEVES_AGREGATS <- 1e-10
 # portent aucun motif de valeur, leur nombre, Σ D et Σ E par exposition
 # déclarée (NA pour une exposition non déclarée).
 observations_agregats <- function(lignes, numeros, roles, segmentation, motifs, exclusions, n, donnees) {
-  col <- function(role, d = lignes) if (role %in% names(roles)) d[[roles[[role]]]] else NULL
+  col <- function(role, d = lignes) if (role %in% names(roles)) lire_champ(d, roles[[role]]) else NULL
   i <- seq_along(numeros)
   observations <- data.frame(row.names = seq_along(i))
   if ("sexe" %in% names(roles)) observations$sexe <- sous_indicer_categorie(col("sexe"), i)
@@ -1284,7 +1308,7 @@ evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
     stop("evaluer_motifs_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
   grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
   n <- nrow(donnees)
-  col <- function(role) if (role %in% names(roles)) donnees[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   jours <- function(role) as.numeric(unclass(col(role)))
   vrai <- function(x) !is.na(x) & x
   role_id <- identifiant_stocks(roles)
@@ -1408,7 +1432,7 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
     stop("observations_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
   grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
   role_id <- identifiant_stocks(roles)
-  col <- function(role, d = lignes) if (role %in% names(roles)) d[[roles[[role]]]] else NULL
+  col <- function(role, d = lignes) if (role %in% names(roles)) lire_champ(d, roles[[role]]) else NULL
   id <- col(role_id)
   tl <- as.character(col("type_ligne"))
   inv <- !is.na(tl) & tl == "inventaire"; evt <- !is.na(tl) & tl == "evenement"
@@ -1962,7 +1986,7 @@ avertir_releves_lignes <- function(avert, releves, unite) {
 # unite_observation, observations et observation_des_lignes du résultat de
 # preparer_donnees() ; releves, ses diagnostics$releves.
 construire_observations <- function(lignes, numeros, roles, segmentation, p) {
-  col <- function(role) if (role %in% names(roles)) lignes[[roles[[role]]]] else NULL
+  col <- function(role) if (role %in% names(roles)) lire_champ(lignes, roles[[role]]) else NULL
   ent <- as.numeric(unclass(col("date_entree"))); sor <- as.numeric(unclass(col("date_sortie")))
   cause <- as.character(col("cause_sortie"))
   fin <- sor; fin[cause == "en_cours"] <- Inf
@@ -2049,9 +2073,10 @@ FORMES_ORIGINE <- c("qx", "lx")
 # data.frame long : age entier, sexe, qx, et annee entier si fournie) et la
 # contrôle ; refuse (module donnees) au lieu de corriger. Lignes rendues dans
 # l'ordre canonique (sexe, annee, age), row.names automatiques.
-#   x            : data.frame (age, sexe, qx [, annee]) ;
-#   nom, source  : chaînes non vides (source : arrêté, URL, fichier de
-#                  provenance) ;
+#   x            : data.frame (age, sexe, qx [, annee]), dont la classe ne porte
+#                  aucune chaîne d'encodage « bytes » (#158) ;
+#   nom, source  : chaînes non vides, d'encodage autre que « bytes » (#158 ;
+#                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
 #   parametres   : liste non vide des paramètres pour une table synthétique,
 #                  NULL sinon ;
@@ -2059,6 +2084,18 @@ FORMES_ORIGINE <- c("qx", "lx")
 table_reference <- function(x, nom, statut, source, parametres = NULL, forme_origine = "qx") {
   if (!chaine_unique(nom))
     refuser("donnees", "table_nom_manquant", formuler("La table de référence doit avoir un nom (chaîne non vide, sans attribut)."))
+  # Chaîne d'encodage « bytes » (#158 ; règle de #128) : chaine_unique() l'admet
+  # (type character, aucun attribut), et le nom ou la source serait écrit dans
+  # la fiche, où octets_chaines() la refuse (chaine_codage_bytes) après tous les
+  # calculs ; refus ici, sous le motif de l'argument, sans lire les octets.
+  # statut et forme_origine, valeurs d'un ensemble fermé, sont déjà refusés par
+  # %in% (mesuré). Le nom et la source bytes ne se citent pas (refus sans
+  # details) ; details$statut et details$classe portent, eux, la valeur reçue
+  # (précédent de controler_roles(), #150).
+  if (Encoding(nom) == "bytes")
+    refuser("donnees", "table_nom_manquant",
+            formuler(paste("Le nom de la table de référence est une chaîne d'encodage « bytes », non convertible en UTF-8",
+                           "sans deviner : il n'est pas lu. Passer un nom (chaîne non vide, sans attribut) sans encodage bytes.")))
   # Nom cité dans les messages : règle neutraliser_citation() (R/outils.R ;
   # #111, #94) ; `nom` lui-même reste celui de l'objet.
   nom_cite <- citer(nom)
@@ -2069,6 +2106,10 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (!chaine_unique(source))
     refuser("donnees", "table_source_manquante",
             formuler("Table « %s » : la source (arrêté, URL, fichier de provenance ; chaîne non vide, sans attribut) est requise.", nom_cite))
+  if (Encoding(source) == "bytes")
+    refuser("donnees", "table_source_manquante",
+            formuler(paste("Table « %s » : la source est une chaîne d'encodage « bytes », non convertible en UTF-8 sans deviner :",
+                           "elle n'est pas lue. Passer une source (chaîne non vide, sans attribut) sans encodage bytes."), nom_cite))
   if (statut == "synthetique" && (!is.list(parametres) || !length(parametres)))
     refuser("donnees", "table_parametres_manquants",
             formuler("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom_cite))
@@ -2078,6 +2119,17 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (!chaine_unique(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
     refuser("donnees", "table_forme_inconnue",
             formuler("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(FORMES_ORIGINE)))
+  # Classe d'encodage « bytes » lue par classe_bytes() avant is.data.frame(),
+  # dont inherits() lève une erreur R sur elle (#158, #150) ; refus propre à ce
+  # cas, comme controler_roles() (« un data.frame est attendu » serait faux
+  # d'un data.frame sous-classé).
+  if (classe_bytes(x))
+    refuser("donnees", "table_mal_formee",
+            formuler(paste("Table « %s » : la table porte une classe d'encodage « bytes » (classe %s), non convertible en UTF-8",
+                           "sans deviner : elle n'est pas lue. Passer un data.frame dont la classe ne porte aucune chaîne",
+                           "d'encodage bytes."),
+                     nom_cite, paste(citer(class(x)), collapse = "/")),
+            list(classe = class(x)))
   if (!is.data.frame(x))
     refuser("donnees", "table_mal_formee", formuler("Table « %s » : un data.frame est attendu.", nom_cite))
   colonnes <- c("age", "sexe", "qx", if ("annee" %in% names(x)) "annee")

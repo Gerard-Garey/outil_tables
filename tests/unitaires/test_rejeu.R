@@ -468,6 +468,44 @@ local({
     else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
   })
 })
+# Classe d'encodage bytes en position quelconque de la classe d'une colonne de
+# rôle ou des données reçues (#150), contrôle 6 (entrees_construction) : colonne
+# sexe de classe c(<bytes>, "factor") ou c("factor", <bytes>) : refus
+# type_incompatible du module donnees (avant #150 : type_non_canonique du module
+# rapport) ; données de classe c(<bytes>, "data.frame") : refus
+# donnees_mal_formees (avant #150 : erreur R « translating strings with "bytes"
+# encoding is not allowed », dans is.data.frame()). Une erreur R est rendue, non
+# propagée ; les data.frame sont assemblés sans `$<-`, qui lèverait la même erreur.
+local({
+  b <- "\xe9"; Encoding(b) <- "bytes"
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  une_ligne_utf8 <- function(r, ok) {
+    if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
+    else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
+  }
+  for (cl in list(list(c(b, "factor"), "<chaîne d'encodage bytes>/factor"),
+                  list(c("factor", b), "factor/<chaîne d'encodage bytes>"))) {
+    l <- unclass(BASE)
+    l$sexe <- structure(as.integer(factor(l$sexe)), levels = c("F", "H"), class = cl[[1L]])
+    d <- structure(l, class = "data.frame", row.names = seq_len(nrow(BASE)))
+    verifier(sprintf("T11 rejeu, colonne sexe de classe %s : refus type_incompatible du module donnees (pas type_non_canonique), classe citée, une ligne, UTF-8", cl[[2L]]), {
+      r <- attrape(rejouer_fiche(d, FICHE))
+      if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+      une_ligne_utf8(r, controle_refus(r, "donnees", "type_incompatible", NULL,
+                                       c("rôle « sexe », colonne « sexe »", paste0("attendu, ", cl[[2L]], " reçu"))))
+    })
+  }
+  for (cl in list(list(c(b, "data.frame"), "<chaîne d'encodage bytes>/data.frame"),
+                  list(c("data.frame", b), "data.frame/<chaîne d'encodage bytes>"))) {
+    d <- structure(unclass(BASE), class = cl[[1L]], row.names = seq_len(nrow(BASE)))
+    verifier(sprintf("T11 rejeu, données de classe %s : refus donnees_mal_formees du module donnees (pas une erreur R), classe citée, une ligne, UTF-8", cl[[2L]]), {
+      r <- attrape(rejouer_fiche(d, FICHE))
+      if (!inherits(r, "refus_tablexp")) return(sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)))
+      une_ligne_utf8(r, controle_refus(r, "donnees", "donnees_mal_formees", list(classe = cl[[1L]]),
+                                       paste0("Les données portent une classe d'encodage « bytes » (classe ", cl[[2L]], ")")))
+    })
+  }
+})
 # Nom ou classe d'encodage bytes au deuxième niveau de la fiche, valeur de champ
 # de classe bytes (#128) : refus fiche_non_conforme ou rejeu rendu, au lieu de
 # l'erreur R « translating strings with "bytes" encoding is not allowed »

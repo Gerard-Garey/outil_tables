@@ -30,7 +30,9 @@
 #       module citant une valeur non ASCII native, latin-1 et UTF-8, et
 #       trois refus de lire_texte() et deux type_incompatible sur un rôle
 #       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
-#       octet « <xx> » (#127) ;
+#       octet « <xx> » (#127) ; TYPES_ADMIS, LIBELLES_MOTIFS,
+#       catalogue_roles()$type_admis et details$type_attendu marqués UTF-8
+#       (#151) ;
 #    3. les textes (fiche, plan et rapport figé de R1 à R17, bilan du rejeu et
 #       messages de refus de R1, messages de refus par module) écrits sous C
 #       et sous UTF-8 sont comparés
@@ -245,12 +247,30 @@ travailleur <- function(args) {
                   "type_incompatible, rôle date, classe bytes" = structure(list(d = col_date), class = "data.frame",
                                                                           row.names = 1L))
     for (nom in names(dates)) {
-      m <- refus_msg(tablexp:::controler_roles(dates[[nom]], c(date_entree = "d"), character(0)))
-      if (is.na(m)) { d(sprintf("%s : refus attendu non levé", nom)); next }
+      cond <- tryCatch({ force(tablexp:::controler_roles(dates[[nom]], c(date_entree = "d"), character(0))); NULL },
+                       refus_tablexp = function(r) r)
+      if (is.null(cond)) { d(sprintf("%s : refus attendu non levé", nom)); next }
+      m <- conditionMessage(cond)
+      # details$type_attendu (#151) : même libellé, marqué UTF-8 comme le message.
+      ta <- cond$details$type_attendu
+      if (!identical(Encoding(ta), "UTF-8")) d(sprintf("%s : details$type_attendu non marqué UTF-8", nom))
       if (!grepl(rawToChar(as.raw(c(0x65, 0x6e, 0x74, 0x69, 0xc3, 0xa8, 0x72, 0x65, 0x73))), octets_bruts(m),
                  fixed = TRUE, useBytes = TRUE))
         d(sprintf("%s : libellé « entières » absent ou altéré : %s", nom, m))
       msgs <- c(msgs, m); noms <- c(noms, nom)
+    }
+    # Constantes non ASCII du module donnees (#151, M355 (a)) : toute chaîne non
+    # ASCII de TYPES_ADMIS, de LIBELLES_MOTIFS et de catalogue_roles()$type_admis
+    # est marquée UTF-8, sous la locale C comme sous la locale UTF-8 ; non
+    # ASCII attendus : « entières » (TYPES_ADMIS["date"]), libellés accentués.
+    non_ascii <- function(x) grepl("[^\001-\177]", x, useBytes = TRUE)
+    constantes <- list(TYPES_ADMIS = tablexp:::TYPES_ADMIS, LIBELLES_MOTIFS = tablexp:::LIBELLES_MOTIFS,
+                       "catalogue_roles()$type_admis" = catalogue_roles()$type_admis)
+    for (nom in names(constantes)) {
+      x <- unname(constantes[[nom]])
+      if (!any(non_ascii(x))) d(sprintf("%s : aucune chaîne non ASCII (témoin du contrôle)", nom))
+      if (any(non_ascii(x) & Encoding(x) != "UTF-8"))
+        d(sprintf("%s : %d chaîne(s) non ASCII non marquée(s) UTF-8", nom, sum(non_ascii(x) & Encoding(x) != "UTF-8")))
     }
     u8 <- function(...) { x <- rawToChar(as.raw(c(...))); Encoding(x) <- "UTF-8"; x }
     e_acute <- c(0xc3, 0xa9)

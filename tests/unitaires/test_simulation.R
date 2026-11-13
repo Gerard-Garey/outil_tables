@@ -227,6 +227,45 @@ verifier("facteur négatif : refus loi_invalide",
          leve_refus(simuler(loi(f_deces = c(H = 1, F = -1)), PF, PER, GRAINE), "loi_invalide"))
 verifier("table qui n'est pas une table_reference : refus loi_invalide",
          leve_refus(simuler(loi(deces = as.data.frame(GM)), PF, PER, GRAINE), "loi_invalide"))
+# Classe d'encodage bytes de la loi ou de la table d'une transition (#150) :
+# refus loi_invalide, au lieu de l'erreur R « translating strings with "bytes"
+# encoding is not allowed » (inherits() sur la table, names() dans les details
+# du refus sur la loi). Contre-épreuve : ces tests échouent sur le code
+# antérieur. Une erreur R est rendue, non propagée.
+local({
+  b <- "\xe9"; Encoding(b) <- "bytes"
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  verdict <- function(x, fragment) {
+    if (is.null(x)) return("aucun refus levé")
+    if (!inherits(x, "refus_tablexp")) return(sprintf("condition %s : %s", class(x)[1L], conditionMessage(x)))
+    if (!identical(x$module, "simulation") || !identical(x$motif, "loi_invalide"))
+      sprintf("refus %s/%s", x$module, x$motif)
+    else if (!grepl(fragment, conditionMessage(x), fixed = TRUE)) sprintf("message sans le fragment : %s", conditionMessage(x))
+    else if (grepl("[\n\v\f]", conditionMessage(x))) "message sur plusieurs lignes"
+    else if (!identical(Encoding(conditionMessage(x)), "UTF-8")) "message non marqué UTF-8" else TRUE
+  }
+  L <- structure(loi(), class = c(b, "list"))
+  x <- attrape(simuler(L, PF, PER, GRAINE))
+  verifier("loi de classe c(<bytes>, \"list\") : refus loi_invalide (pas une erreur R), message de la liste nommée",
+           verdict(x, "La loi vraie doit être une liste nommée « deces », « rachat »."))
+  verifier("loi de classe c(<bytes>, \"list\") : details$noms = noms de la loi, lus par attr()",
+           inherits(x, "refus_tablexp") && identical(x$details, list(noms = c("deces", "rachat"))))
+  for (cl in list(c(b, class(GM)), c(class(GM)[1L], b, class(GM)[-1L]))) {
+    T_BYTES <- structure(GM, class = cl)
+    verifier(sprintf("table de classe %s : refus loi_invalide (pas une erreur R), classe citée sous le repère, une ligne, UTF-8",
+                     paste(tablexp:::neutraliser_citation(cl), collapse = "/")),
+             verdict(attrape(simuler(loi(deces = T_BYTES), PF, PER, GRAINE)),
+                     sprintf("Loi « deces » : la table porte une classe d'encodage « bytes » (classe %s)",
+                             paste(tablexp:::neutraliser_citation(cl), collapse = "/"))))
+  }
+  verifier("table de classe c(<bytes>, ...) sur la transition rachat : refus loi_invalide, transition citée",
+           verdict(attrape(simuler(loi(rachat = structure(RACHAT, class = c(b, class(RACHAT)))), PF, PER, GRAINE)),
+                   "Loi « rachat » : la table porte une classe d'encodage « bytes »"))
+  # Témoin : une classe sans encodage bytes en tête n'est pas refusée pour cela.
+  verifier("table de classe c(\"autre\", \"table_reference\", \"data.frame\") (sans encodage bytes) : acceptée",
+           is.null(attrape(simuler(loi(deces = structure(GM, class = c("autre", class(GM)))),
+                                   modifyList(PF, list(n = 100)), PER, GRAINE))))
+})
 verifier("portefeuille : champ manquant (origine) refusé, sans défaut implicite",
          leve_refus(simuler(loi(), PF[setdiff(names(PF), "origine")], PER, GRAINE), "portefeuille_invalide"))
 verifier("portefeuille : champ inconnu refusé",
@@ -1346,7 +1385,10 @@ DEFAUTS_INVALIDES <- list(
   list("graine manquante", list(declarations = list(D1))),
   list("champ inconnu", list(graine = 1L, declarations = list(D1), seed = 2L)),
   list("noms en double", list(graine = 1L, graine = 2L)),
-  list("champ au nom non ASCII", list(graine = 1L, declarations = list(D1), "défauts" = 1)),
+  # Nom posé par `names<-` : en position de nom d'argument ("défauts" = 1), il
+  # devient « d<U+00E9>fauts » sous LC_ALL=C (#229, mesuré) et le cas ne porte
+  # plus sur le caractère non ASCII.
+  list("champ au nom non ASCII", `names<-`(list(1L, list(D1), 1), c("graine", "declarations", "défauts"))),
   list("graine non entière", list(graine = 1.5, declarations = list(D1))),
   list("graine NA", list(graine = NA_integer_, declarations = list(D1))),
   list("graine caractère", list(graine = "1", declarations = list(D1))),
@@ -1409,6 +1451,13 @@ for (k in DEFAUTS_INVALIDES) {
              leve_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = k[[2]]), "defauts_invalides") &&
              identical(globalenv()$.Random.seed, avant))
 }
+# Le code seul ne distingue pas le cas : un nom altéré (« d<U+00E9>fauts ») est
+# aussi un champ inconnu. Le message doit citer le champ en UTF-8 (#229).
+verifier("défauts : champ au nom non ASCII -> le message de refus cite « défauts » en UTF-8 (nom intact en toute locale)",
+         grepl("« défauts »",
+               message_refus(simuler(loi(), PF_M_1E3, PER, GRAINE,
+                 defauts = `names<-`(list(1L, list(D1), 1), c("graine", "declarations", "défauts")))),
+               fixed = TRUE))
 verifier("défauts : ordre des refus figé, graine du jeu invalide et défauts invalides -> defauts_invalides ; graine du jeu invalide et défauts valides -> graine_invalide", {
   d_inv <- list(graine = 1L, declarations = list(list(type = "sortie_manquante", cible = "en_cours", nombre = 0)))
   isTRUE(leve_refus(simuler(loi(), PF_M_1E3, PER, 1.5, defauts = d_inv), "defauts_invalides")) &&

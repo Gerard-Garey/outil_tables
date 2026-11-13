@@ -401,6 +401,13 @@ loi_effective <- function(loi_t, cause, sexes) {
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : liste (table, facteurs) attendue.", cause), list(cause = cause))
   tab <- loi_t$table; f <- loi_t$facteurs
+  # Classe d'encodage « bytes » lue par classe_bytes() avant inherits(), qui
+  # lève une erreur R sur elle (#150) ; refus propre à ce cas.
+  if (classe_bytes(tab))
+    refuser("simulation", "loi_invalide",
+            formuler("Loi « %s » : la table porte une classe d'encodage « bytes » (classe %s), non convertible en UTF-8 sans deviner ; passer l'objet rendu par table_reference(), sans modification.",
+                     cause, paste(citer(class(tab)), collapse = "/")),
+            list(cause = cause))
   if (!inherits(tab, "table_reference"))
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : la table doit être de classe table_reference (ADR 0007, point 7).", cause),
@@ -1789,7 +1796,7 @@ simuler_portefeuille <- function(loi, portefeuille, periode, graine, defauts = N
   if (!liste_aux_noms(loi, names(CAUSES_SIMULEES)))
     refuser("simulation", "loi_invalide",
             formuler("La loi vraie doit être une liste nommée %s.", liste_guillemets(names(CAUSES_SIMULEES))),
-            list(noms = names(loi)))
+            list(noms = attr(loi, "names", exact = TRUE)))
   ctl <- controler_portefeuille(portefeuille, periode)
   p <- portefeuille
   n <- as.integer(p$n)

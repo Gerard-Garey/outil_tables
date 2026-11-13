@@ -2029,6 +2029,15 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "Ces grandeurs mesurent le poids des lignes exclues par les règles d'exclusion déclarées (volumes,",
     "événements, exposition, SMR) et permettent d'apprécier l'importance des exclusions. Elles ne disent ni si",
     "les données exclues sont pertinentes, ni si leur exclusion est justifiée."),
+  # Section donnees_recues (#163, option (a), M279 ; texte d'actuary du
+  # 12/11/2026) : écrite une seule fois, après le tableau de la section, si au
+  # moins une table de fiche/tables_reference est de statut synthetique.
+  tables_reference_parametres = paste(
+    "Tables de référence de statut synthetique : leurs paramètres (champ parametres des éléments de",
+    "fiche/tables_reference) sont déclarés par l'appelant, non vérifiés par le moteur ; ni leur forme ni leur",
+    "cohérence avec les q_x de la table ne sont contrôlées. Une table de référence entre en valeurs : son",
+    "empreinte (champ empreinte) porte sur son contenu (âge, sexe, année si présente, q_x), non sur ses",
+    "métadonnées, et aucune étape de la construction ne lit ces paramètres."),
   table_finale = "Table finale et comparaisons : non produites par cette version (chemin table : NULL).",
   largeur = "Largeur des intervalles : non produite par cette version.",
   racine_absente = "absent de l'objet",
@@ -2391,6 +2400,15 @@ corps_section <- function(x, k) {
              paragraphe(m[["plateforme"]]),
              paragraphe(m[["integrite"]], m[["integrite_hors_1"]],
                         paste(setdiff(CHEMINS_HORS_RESULTAT, c("execution", "fiche/empreintes/resultat")), collapse = ", "), m[["integrite_hors_2"]])))
+  # Section donnees_recues : mention tables_reference_parametres après le
+  # tableau, une fois, si une table de fiche/tables_reference est de statut
+  # synthetique (lu dans l'objet, #163) ; rien sinon.
+  if (identical(id, "donnees_recues")) {
+    tr <- x[["fiche"]][["tables_reference"]]
+    synthetique <- is.list(tr) &&
+      any(vapply(tr, function(e) is.list(e) && identical(e[["statut"]], "synthetique"), NA))
+    return(c(lignes_racines(x, racines), if (synthetique) paragraphe(m[["tables_reference_parametres"]])))
+  }
   if (identical(nature, "objet")) return(lignes_racines(x, racines))
   if (identical(nature, "etape")) {
     e <- SECTIONS_RAPPORT$etape[k]

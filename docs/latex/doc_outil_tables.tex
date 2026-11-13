@@ -691,6 +691,29 @@ et exécuté sous C, la constante est marquée UTF-8)~: elle n'est insérée
 que sous cette quatrième forme (ainsi le libellé du type \code{date} de \code{TYPES\_ADMIS},
 «~Date (valeurs entières finies)~», dans le refus
 \code{type\_incompatible}).
+Depuis l'issue~\#151, les deux constantes non ASCII du module
+\code{donnees} restituées hors de \code{texte\_moteur()},
+\code{TYPES\_ADMIS} (dont ce libellé est la seule chaîne non ASCII) et
+\code{LIBELLES\_MOTIFS} (libellés accentués~; M355~(a)), sont
+en outre marquées UTF-8 à la source, par une affectation de premier niveau
+qui applique au vecteur littéral, sous sa forme fonctionnelle, la fonction
+de remplacement \code{Encoding<-} avec la valeur \code{"UTF-8"}~: \code{texte\_moteur()}
+(\code{R/outils.R}) n'est pas encore définie quand \code{R/donnees.R} est
+évalué (ordre alphabétique d'évaluation à l'installation, sans champ
+\code{Collate}~; section~\ref{sec:fiche}~; ADR 0011, quatrième annotation
+du 20/10/2026, point~3), et le graphe des modules n'admet au premier
+niveau que des affectations. La colonne \code{type\_admis} de
+\code{catalogue\_roles()} et le champ
+\code{details\$type\_attendu} du refus \code{type\_incompatible}, qui
+recopient ce libellé sans passer par \code{texte\_moteur()}, sont ainsi
+marqués UTF-8 sous toute locale (\emph{constat de mesure}, paquet installé
+et exécuté sous la locale C~: toute chaîne non ASCII des deux constantes,
+de la colonne et du champ est d'encodage «~UTF-8~»~; avant ce marquage,
+«~unknown~»).
+L'insertion dans un message reste sous la quatrième forme~: le constat du
+06/11/2026 ci-dessus est antérieur à ce marquage, et le script de contrôle
+ci-dessous compte toujours ces deux constantes parmi les constantes non
+ASCII, \code{Encoding<-} n'étant pas \code{texte\_moteur()}.
 Un nombre inséré par
 \code{\%d}, \code{\%g} ou \code{\%f} n'est pas cité.
 \textbf{Garantie sur le champ \code{message}}~: un message qui contient un
@@ -884,11 +907,29 @@ d'encodage \code{bytes}~? l'appelant retire alors la classe par
 \code{unclass()} avant \code{length()}, \code{names()} ou \code{is.na()})
 et \code{lire\_champ()} (élément d'une liste trouvé par \code{match()} sur
 les noms lus par \code{attr()}, puis lu par position). Les contrôles des
-rôles, l'écrivain unique, l'écriture de la fiche, le contrôle du rapport
-figé et le rejeu outillé les emploient, et refusent sous un motif nommé, à
-toute position du nom~: \code{type\_incompatible} pour une colonne de rôle
-de classe \code{bytes}, ou de nom \code{bytes} et de type non conforme
-(section~\ref{sec:controles-donnees})~; \code{type\_non\_canonique} ou
+données et des rôles, l'écrivain unique, l'écriture de la fiche, le
+contrôle du rapport figé, le rejeu outillé, le constructeur des tables de
+référence et le simulateur les emploient, et refusent sous un motif nommé,
+à toute position du nom ou de l'élément \code{bytes} dans la classe (pour
+le simulateur, une classe \code{bytes} de la loi vraie ou de la table d'une
+de ses lois seulement~; un nom de colonne \code{bytes} de cette table reste
+hors de cette règle, ci-dessous)~:
+\code{donnees\_mal\_formees} pour des données de classe \code{bytes},
+\code{details\$classe} portant la classe reçue (issue~\#150)~;
+\code{type\_incompatible} pour une colonne de rôle de classe \code{bytes},
+même si la classe compte aussi \code{factor} (\code{a\_classe()} lirait
+\code{c(<bytes>, "factor")} comme un facteur~; issue~\#150), ou de nom
+\code{bytes} et de type non conforme
+(section~\ref{sec:controles-donnees})~; \code{table\_colonne\_mal\_typee}
+pour une colonne \code{age}, \code{sexe} ou \code{annee} de classe
+\code{bytes} d'une table de référence, dont le contrôle des types est le
+même (\code{type\_conforme()}~; section~\ref{sec:table-reference}~;
+issue~\#150), et pour une table de référence entière de classe
+\code{bytes}, \code{details\$classe} portant la classe reçue
+(\code{classe\_bytes()} avant \code{is.data.frame()}~;
+section~\ref{sec:table-reference}~; issue~\#158)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
+de ses lois, de classe \code{bytes} (section~\ref{sec:loi-vraie}~;
+issue~\#150)~; \code{type\_non\_canonique} ou
 \code{serialisation\_impossible} pour une valeur écrite de classe
 \code{bytes}, et \code{chaine\_codage\_bytes} pour un nom \code{bytes}
 d'une sous-liste écrite, rôle «~\emph{chemin}/@noms~»
@@ -907,7 +948,13 @@ une classe \code{bytes} sur \code{plan/etapes}~:
 \code{etapes\_mal\_formees})~; ailleurs, témoin «~non déterminable~» ou
 «~différente~» (section~\ref{sec:rejeu}). Une classe d'encodage
 \code{bytes} est citée sous le repère de la règle ci-dessus.
-\textbf{Statut et limites}~: pour l'écriture de la fiche, le rapport figé
+\textbf{Statut et limites}~: pour les données, les colonnes de rôle, une
+table de référence et ses colonnes, et la loi du simulateur, \emph{lecture}
+du code (\code{classe\_bytes()} y précède toute fonction qui dispatche~;
+pour la loi vraie elle-même, \code{forme\_exacte()}, qui n'admet aucune
+classe, et noms des \code{details} lus par \code{attr()}) et
+\emph{constat} des tests, l'élément \code{bytes} placé en tête ou après
+une autre classe (en tête seulement pour la loi vraie elle-même)~; pour l'écriture de la fiche, le rapport figé
 et le rejeu, \emph{constat} des tests et de mesures sous les locales C et
 C.UTF-8, aux niveaux~1 à~7 de la fiche, non une propriété démontrée pour
 toute profondeur~; pour le témoin de la fiche (règle~V3,
@@ -917,11 +964,33 @@ la fiche rendue, avec un \emph{constat} aux niveaux~2 à~7. Restent hors de cett
 renvoyés à des issues~: une \emph{valeur} chaîne d'encodage \code{bytes}
 dans \code{versions} ou \code{plateforme} fait lever l'erreur R au rejeu
 (lecture des paires du témoin~; issue~\#142, constat)~; une colonne de
-rôle de nom \code{bytes} fait lever l'erreur R dans la préparation des
-données (\code{preparer\_donnees()}, fonction interne), cas que les
-fonctions exportées n'atteignent pas~: \code{construire\_table()} et le
-rejeu refusent ce nom avant la première étape, au calcul des empreintes
-(\code{chaine\_codage\_bytes}, module \code{rapport}~; issue~\#140).
+rôle de nom \code{bytes} et de type conforme, admise par
+\code{controler\_roles()} (issue~\#128), est lue par \code{[[} dans
+l'étape \code{importance\_}\allowbreak\code{exclusions} du module
+\code{validation} (\code{etats\_evenements\_exclus()}, pour
+\code{cause\_sortie} et \code{date\_sortie}, et
+\code{calculer\_importance\_exclusions()}, pour \code{id\_tete}~;
+\emph{lecture} du code), ce qui fait lever l'erreur R (\emph{constat} pour
+\code{etats\_evenements\_exclus()} appelée directement sur une colonne
+\code{cause\_sortie} de ce nom, sous les locales C et C.UTF-8~;
+issue~\#255). La préparation des données
+(\code{preparer\_donnees()}, fonction interne) lit au contraire ses
+colonnes de rôle par \code{lire\_champ()}~: appelée directement, elle lit
+une telle colonne sans erreur R et rend les mêmes observations et les
+mêmes lignes conservées que sous le nom d'origine (\emph{constat} des
+tests, chaque rôle des trois recettes et le chemin des exclusions~;
+issue~\#140). Ces deux cas, les fonctions exportées ne les atteignent
+pas~: \code{construire\_table()} et le rejeu refusent ce nom avant la
+première étape, au calcul des empreintes (\code{chaine\_codage\_bytes},
+module \code{rapport}). Reste enfin hors de cette règle un cas que la
+fonction exportée \code{simuler\_portefeuille()} atteint~: une table d'une
+loi de la loi vraie dont un nom de colonne (\code{age}, \code{sexe} ou
+\code{qx}) est d'encodage \code{bytes} fait lever l'erreur R à la lecture
+\code{tab\$sexe} de \code{loi\_effective()} (module \code{simulation})
+au lieu d'un refus nommé (\emph{constat} de la revue finale de l'audit,
+remesuré sous les locales C et C.UTF-8 pour chacune des trois colonnes~;
+défaut antérieur, hors du champ de l'issue~\#150, qui porte sur les
+classes~; issue proposée au mainteneur).
 
 \subsection{Avertissements métier}
 \label{sec:avertissements}
@@ -1055,7 +1124,8 @@ issue~\#128) \\
 \code{TRUE} si un élément de l'attribut \code{class} de \code{x} est
 d'encodage \code{bytes}, \code{FALSE} sinon~; l'appelant retire alors la
 classe par \code{unclass()} avant toute fonction qui dispatche
-(issue~\#128) \\
+(issue~\#128), ou refuse sous un motif nommé (données, colonne de rôle,
+table d'une loi du simulateur~; issue~\#150) \\
 \catalogue{fonctions-outils}{lire\_champ()} & interne & \code{x} (liste),
 \code{nom} & premier élément de \code{x} de ce nom, \code{NULL} s'il est
 absent, comme \code{x[[nom]]}, mais trouvé par \code{match()} sur les noms
@@ -1524,7 +1594,13 @@ illisible) et deux refus \code{type\_incompatible} sur un rôle date
 \code{bytes} et de \code{Date}~; le libellé «~entières~» de
 \code{TYPES\_ADMIS} y est exigé en octets UTF-8), messages qui doivent en outre ne contenir aucun octet écrit
 «~<xx>~» et garder la valeur citée en octets UTF-8 (issue~\#127~;
-section~\ref{sec:refus}, «~Règle de rédaction des messages~»), puis
+section~\ref{sec:refus}, «~Règle de rédaction des messages~»)~; il
+vérifie aussi, sous chacune des deux locales, que le champ
+\code{details\$type\_attendu} de ces deux refus et toute chaîne non ASCII
+de \code{TYPES\_ADMIS}, de \code{LIBELLES\_MOTIFS} et de la colonne
+\code{type\_admis} de \code{catalogue\_roles()} sont marqués UTF-8, avec
+un témoin (chacun des trois objets doit contenir au moins une chaîne non
+ASCII~; issue~\#151), puis
 compare octet à octet les textes
 obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
@@ -3298,12 +3374,15 @@ contrôlé sur son module et son motif attendus),
 de la lecture du texte du
 plan et de deux refus \code{type\_incompatible} sur un rôle date
 (marqués UTF-8, sur une ligne, sans octet écrit
-«~<xx>~»~; issue~\#127)~; puis ces textes (trois par plan, le bilan, les messages
+«~<xx>~»~; issue~\#127)~; marque UTF-8 de \code{details\$type\_attendu}
+de ces deux refus et des chaînes non ASCII de \code{TYPES\_ADMIS}, de
+\code{LIBELLES\_MOTIFS} et de \code{catalogue\_roles()\$type\_admis},
+avec témoin (issue~\#151)~; puis ces textes (trois par plan, le bilan, les messages
 de R1 et les messages par module~; leur nombre est écrit par la sortie du contrôle), comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11 et annotation du 05/11/2026, (f)~; M54~;
-issues~\#66 et~\#127 \\
+issues~\#66, \#127 et~\#151 \\
 \code{messages\_refus.R} & règle de rédaction des messages de refus
 (section~\ref{sec:refus})~: fichiers de \code{R/} lus par \code{parse()},
 sans charger \code{tablexp}~; gabarit de \code{formuler()} constant, aux
@@ -4151,7 +4230,23 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     en revanche ce contrôle~: c'est lui, table réellement employée, que
     portent l'empreinte et l'élément de fiche (une table passée au statut
     \code{embarquee} est ensuite refusée, \code{table\_embarquee\_absente}
-    ou \code{table\_embarquee\_discordante})~;
+    ou \code{table\_embarquee\_discordante}). Un attribut \code{nom} ou
+    \code{source} d'encodage \code{bytes} porté sur une table après le
+    constructeur est refusé à la reconstruction~(b), le constructeur le
+    refusant (section~\ref{sec:table-reference}, «~Encodage \code{bytes}
+    des métadonnées et de la table~»)~: raison «~refusé par
+    table\_reference() (motif [motif])~», \code{details\$motif\_constructeur}
+    \code{table\_nom\_manquant} ou \code{table\_source\_manquante},
+    \code{details\$chemin} à \code{NA} (issue~\#158~; l'attribut était
+    auparavant refusé à l'écriture d'essai~(d), sous
+    \code{chaine\_codage\_bytes}).
+    Un nom ou une valeur d'encodage \code{bytes} dans \code{parametres},
+    que le constructeur ne contrôle pas, est refusé à l'écriture
+    d'essai~(d)~: raison «~métadonnée sans écriture exacte dans la fiche
+    (refus chaine\_codage\_bytes, [chemin])~», \code{details\$lu} le motif
+    de l'écrivain, \code{details\$chemin}
+    \code{[clé]/parametres/[nom]} pour une valeur ou
+    \code{[clé]/parametres/@noms} pour un nom~;
   \item \textbf{clé citée et non reçue}, refus
     \code{table\_reference\_absente}~: une clé citée par un paramètre du
     plan (\code{cles\_citees()}, dans l'ordre de
@@ -4331,7 +4426,10 @@ qu'elle n'exécute aucune étape du plan (issue~\#82, décision M291)~:
     fiche qui n'est pas une liste nommée aux noms uniques, sans autre
     attribut que ses noms (\code{liste\_nommee()}), est refusé sous
     \code{fiche\_non\_conforme}~; puis des données qui ne sont pas un
-    \code{data.frame} sont refusées par \code{controler\_roles()}, sous le
+    \code{data.frame}, ou dont la classe porte, à toute position, un
+    élément d'encodage \code{bytes} (\code{classe\_bytes()}, lue avant
+    \code{is.data.frame()}, qui lèverait une erreur R~; issue~\#150),
+    sont refusées par \code{controler\_roles()}, sous le
     motif \code{donnees\_mal\_formees} du module \code{donnees}, avec le
     message même qu'en donnerait \code{construire\_table()}~;
   \item \textbf{forme des champs que le rejeu lit lui-même}~:
@@ -4800,7 +4898,10 @@ dite dans la colonne \code{lu}. Une empreinte de table porte sur des doubles
 peut en différer au dernier bit, par les fonctions de la \code{libm}, et son
 rejeu y être refusé (\emph{possibilité} déduite de l'écriture, non
 mesurée~; ADR 0015, point~2.3)~; ses paramètres, dans la fiche, permettent
-alors au tiers de la recalculer et de mesurer l'écart. Les
+alors au tiers de la recalculer et de mesurer l'écart, pour autant qu'ils
+soient exacts~: déclarés par l'appelant, ils ne sont pas
+vérifiés par le moteur (section~\ref{sec:table-reference}, «~Statut des
+paramètres d'une table synthétique~»~; issue~\#163). Les
 témoins \textbf{signalent et ne refusent jamais}~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{code}~: égalité exacte de l'empreinte du code de la fiche et
@@ -5187,7 +5288,12 @@ base (ADR 0007, point 4.1). Les colonnes sans rôle sont ignorées.
 \code{catalogue\_roles()}, exportée pour que l'application propose la
 déclaration des rôles, rend le catalogue sous la forme d'un \code{data.frame}
 de colonnes \code{role}, \code{famille}, \code{type\_admis} et
-\code{recettes} (tableau~\ref{tab:catalogue-roles}).
+\code{recettes} (tableau~\ref{tab:catalogue-roles}). La colonne
+\code{type\_admis} recopie les libellés de la constante
+\code{TYPES\_ADMIS}, marquée UTF-8 à la source~: ses chaînes non ASCII
+(«~entières~», rôles de type \code{date}) sont marquées UTF-8 quelle que soit la locale
+d'installation ou d'exécution (issue~\#151~; section~\ref{sec:refus},
+«~Règle de rédaction des messages~»).
 
 \medskip
 {\sloppy\hbadness=10000 La colonne \emph{recettes} nomme, dans l'ordre du
@@ -5303,7 +5409,13 @@ rôle par la recette.}
 
 \code{controler\_roles()} contrôle la déclaration des rôles dans cet ordre, et
 chaque refus nomme tous les rôles et colonnes en cause~:
-\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame})~;
+\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame}, ou
+sa classe porte, à toute position, un élément d'encodage \code{bytes}~:
+ce cas, jugé d'abord par \code{classe\_bytes()} parce que
+\code{is.data.frame()} lèverait une erreur R, a son propre message, qui
+cite la classe sous le repère de la règle unique~--- «~doivent être un
+\code{data.frame}~» serait faux d'un \code{data.frame} sous-classé~---,
+et \code{details\$classe} porte la classe reçue~; issue~\#150)~;
 \code{roles\_mal\_formes} (les rôles ne sont pas un vecteur de chaînes nommé,
 de forme exacte \code{character} sans autre attribut que ses noms~--- une
 classe, \code{noquote} ou \code{AsIs} comprises, une dimension ou un
@@ -5320,8 +5432,13 @@ choisie à la place de l'utilisateur)~; ces deux refus ne lisent que les noms
 des rôles~; \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonne figure
 plusieurs fois dans la base~: lire la première sans le dire serait deviner)~;
 \code{colonne\_declaree\_deux\_fois} (une colonne pour deux rôles)~;
-\code{type\_incompatible} (une colonne de classe d'encodage
-\code{bytes} y est refusée comme toute classe non admise, et une colonne
+\code{type\_incompatible} (une colonne dont la classe porte, à toute
+position, un élément d'encodage \code{bytes} y est refusée, même si la
+classe compte aussi \code{factor}, sous-classe que le contrôle admet
+sinon~: \code{type\_conforme()} la juge non conforme avant tout autre
+test~; issue~\#150~; auparavant, une telle colonne passait ce contrôle et
+n'était refusée qu'au calcul des empreintes, module \code{rapport},
+\code{type\_non\_canonique}~; une colonne
 de nom \code{bytes} y est jugée sur son type, nom et classe cités sous le
 repère, sans erreur R~; un tel nom est refusé plus loin par le module
 \code{rapport}, \code{chaine\_codage\_bytes}~; section~\ref{sec:refus}~;
@@ -6088,7 +6205,8 @@ sur tout attribut ou toute classe hors de sa grammaire
 \code{label} sur \code{id\_contrat}, \code{id\_tete} ou
 \code{date\_naissance} en unité contrat, où ces colonnes étaient recopiées
 entières, ou facteur muni de \code{contrasts} ou de sous-classe, que le
-contrôle des types des rôles admet (section~\ref{sec:catalogue-roles}).
+contrôle des types des rôles admet (section~\ref{sec:catalogue-roles}~;
+une sous-classe d'encodage \code{bytes} y est refusée, issue~\#150).
 Option écartée~: refuser ces facteurs à la validation, ce qui resserrerait
 le contrat d'entrée pour une métadonnée sans effet sur le résultat. Pour les
 entrées déjà acceptées, la table des observations est inchangée~: celles des
@@ -6119,11 +6237,33 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
     \code{qx}), chacun une chaîne unique de forme exacte~--- sans attribut,
     noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
     section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
-    motif du champ~; issue~\#48)~---, et \code{parametres}~: une liste non vide est \textbf{requise}
+    motif du champ~; issue~\#48)~---, le nom et la source étant en outre
+    d'un encodage autre que \code{bytes} (ci-dessous), et \code{parametres}~: une liste non vide est \textbf{requise}
     pour une table synthétique, qui n'a d'autre provenance que sa loi, et
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
 \end{itemize}
+
+\medskip
+\noindent
+\textbf{Statut des paramètres d'une table synthétique} (issue~\#163,
+option~(a), décision M279). Les \code{parametres} sont \textbf{déclarés par
+l'appelant, non vérifiés par le moteur}~: \code{table\_reference()} en exige
+une liste non vide sans en contrôler ni la forme ni la cohérence avec les
+$q_x$ (une liste \code{loi = "gompertz\_makeham"} avec $c = 1$ est admise,
+alors que \code{table\_gompertz\_makeham()} refuse $c = 1$), et le contrôle de
+reconstruction de \code{construire\_table()} admet un attribut modifié après le
+constructeur. Il en va de même d'une table rendue par une loi du package
+(\code{table\_gompertz\_makeham()}, \code{table\_logistique()},
+\code{table\_constante()}), que le moteur ne distingue pas d'une table
+déclarée par l'appelant. La table entre en valeurs~: l'empreinte de table
+porte sur son contenu (âge, sexe, année si présente, $q_x$), non sur ses
+métadonnées, et aucune étape ne lit les paramètres~; ils permettent au tiers
+de recalculer la table et de mesurer l'écart (ADR 0015, point~2.3) pour
+autant qu'ils aient été déclarés exactement. Le rapport figé le dit par la
+mention \code{tables\_reference\_parametres} (section~\ref{sec:rapport-fige}).
+Les tables importées et embarquées n'ont pas de paramètres
+(\code{table\_parametres\_inattendus}) et ne sont pas concernées.
 
 \noindent
 {\sloppy\hbadness=10000 Le constructeur refuse au lieu de corriger, avec un code par contrôle~:
@@ -6135,7 +6275,55 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
 \code{table\_colonne\_mal\_typee}, \code{table\_sexe\_hors\_modalites},
 \code{table\_sexes\_melanges}, \code{table\_qx\_non\_fini},
 \code{table\_qx\_hors\_bornes}, \code{table\_age\_double} et
-\code{table\_ages\_non\_contigus}.\par}
+\code{table\_ages\_non\_contigus}. Les colonnes \code{age}, \code{sexe} et
+\code{annee} sont jugées par le contrôle de type des rôles
+(\code{type\_conforme()}, section~\ref{sec:controles-donnees})~: une
+colonne dont la classe porte, à toute position, un élément d'encodage
+\code{bytes} est refusée sous \code{table\_colonne\_mal\_typee}~; pour
+une colonne \code{sexe} de classe facteur, ce refus remplace l'erreur R
+«~translating strings with "bytes" encoding is not allowed~» que levait
+\code{anyNA()} (issue~\#150~; une colonne \code{age} ou \code{annee} de
+cette classe était déjà refusée sous ce motif).\par}
+
+\medskip
+\noindent
+\textbf{Encodage \code{bytes} des métadonnées et de la table}
+(issue~\#158, règle de l'issue~\#128). Une chaîne d'encodage
+\code{bytes} ne se convertit pas en UTF-8 sans deviner. Le nom et la
+source passent \code{chaine\_unique()}, qui admet une chaîne
+\code{bytes} (type \code{character}, aucun attribut), et
+s'écriraient dans la fiche, où l'écrivain les refuserait
+(\code{chaine\_codage\_bytes}, module \code{rapport},
+section~\ref{sec:serialisation}) après tous les calculs~; le
+constructeur les refuse donc dès l'entrée, sous le motif de l'argument,
+sans lire leurs octets ni les citer (\code{details} vide)~:
+\code{table\_nom\_manquant} pour le nom («~Le nom de la table de
+référence est une chaîne d'encodage «~bytes~», non convertible en UTF-8
+sans deviner~: il n'est pas lu. Passer un nom (chaîne non vide, sans
+attribut) sans encodage bytes.~»), \code{table\_source\_manquante} pour la
+source (même message, «~Table «~[nom]~»~: la source est\ldots~»). Le nom
+étant jugé le premier, un nom \code{bytes} est refusé quel que soit
+l'autre défaut de la table~; il n'est plus admis, ni cité sous le repère
+de la règle unique des refus (section~\ref{sec:refus}), comme il l'était
+depuis l'issue~\#111. Le statut et la forme d'origine, valeurs d'un
+ensemble fermé, sont refusés par \code{\%in\%} sous leur motif
+(\code{table\_statut\_inconnu}, \code{table\_forme\_inconnue}) sans
+erreur R~; une chaîne ASCII n'est jamais marquée \code{bytes} par R, si
+bien qu'une valeur admise ne peut pas porter cet encodage. Une table
+\code{x} dont la classe porte, à toute position, un élément d'encodage
+\code{bytes} est refusée sous \code{table\_mal\_formee}, avec un message
+propre («~la table porte une classe d'encodage «~bytes~» (classe
+[classes citées])~\ldots~») et \code{details\$classe} la classe reçue~:
+ce cas est jugé par \code{classe\_bytes()} avant \code{is.data.frame()},
+dont \code{inherits()} levait l'erreur R «~translating strings with
+"bytes" encoding is not allowed~» (un message «~un data.frame est
+attendu~» serait faux d'un data.frame sous-classé). Ordre des contrôles
+d'entrée~: nom, statut, source, paramètres, forme d'origine, classe
+\code{bytes}, puis \code{data.frame}. Les noms et les valeurs de
+\code{parametres} ne sont pas contrôlés par le constructeur~: une chaîne
+\code{bytes} y est refusée par l'écriture d'essai du contrôle des tables
+reçues (section~\ref{sec:tables-reference-recues}, «~Contrôle des tables reçues~», point~1~(d)),
+avant tout calcul.
 
 \medskip
 \noindent
@@ -6239,7 +6427,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \textcolor{financeblue}{\textbf{Sortie et rôle}} \\
 \endhead
 \catalogue{fonctions-donnees}{CATALOGUE\_ROLES} & constante & --- & catalogue fermé des rôles (rôle, famille, code de type) \\
-\catalogue{fonctions-donnees}{TYPES\_ADMIS} & constante & --- & libellé des types R admis par code de type \\
+\catalogue{fonctions-donnees}{TYPES\_ADMIS} & constante & --- & libellé des types R admis par code de type, marqué UTF-8 à la source (\#151) \\
 \catalogue{fonctions-donnees}{MODALITES\_SEXE} & constante & --- & \code{H}, \code{F} \\
 \catalogue{fonctions-donnees}{MODALITES\_CAUSE} & constante & --- & \code{deces}, \code{rachat}, \code{terme}, \code{autre}, \code{en\_cours} \\
 \catalogue{fonctions-donnees}{MODALITES\_TYPE\_LIGNE} & constante & --- & \code{inventaire}, \code{evenement}~: modalités du rôle \code{type\_ligne} (recette \code{stocks\_successifs}) \\
@@ -6252,7 +6440,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{MOTIFS\_LIGNES\_AGREGATS} & constante & --- & motifs de ligne de la recette \code{agregats} (une ligne est une cellule), dans l'ordre de restitution~; aucun motif d'unité \\
 \catalogue{fonctions-donnees}{MOTIFS\_LIGNES\_STOCKS} & constante & --- & les vingt et un motifs de ligne de la recette \code{stocks\_successifs}, dans l'ordre de restitution~: toute ligne, ligne d'inventaire, ligne d'événement (tableau~\ref{tab:motifs-stocks}) \\
 \catalogue{fonctions-donnees}{MOTIFS\_UNITE\_STOCKS} & constante & --- & les huit motifs d'unité de la recette \code{stocks\_successifs}, évalués sur les unités exemptes de motif de ligne \\
-\catalogue{fonctions-donnees}{LIBELLES\_MOTIFS} & constante & --- & libellé de chaque code de motif de l'union des recettes, un seul par code quelle que soit la recette qui le lève \\
+\catalogue{fonctions-donnees}{LIBELLES\_MOTIFS} & constante & --- & libellé de chaque code de motif de l'union des recettes, un seul par code quelle que soit la recette qui le lève, marqué UTF-8 à la source (\#151) \\
 \catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus \\
 \catalogue{fonctions-donnees}{CATALOGUE\_RECETTES} & constante & --- & catalogue des recettes d'exposition, une ligne par recette~: rôles requis, groupes de rôles dont un au moins est requis, rôles facultatifs, rôles propres (discriminants), convention native (\code{NA} si elle ne se déduit pas des rôles), forme rendue au noyau (\code{fenetres} ou \code{cellules}), motifs de ligne et d'unité~; lignes \code{lignes\_dates\_completes}, \code{agregats} et \code{stocks\_successifs} (tableau~\ref{tab:recettes}) \\
 \catalogue{fonctions-donnees}{MATRICE\_RECETTES} & constante & --- & matrice recette $\times$ étape $\times$ estimateur, complète, une ligne par étape et par estimateur de \code{brut}~: admis (\code{oui}, \code{non}, \code{si\_role}), rôle qui conditionne \code{si\_role}, motif du refus~; tout est admis sous \code{lignes\_dates\_completes}~; sous \code{agregats}, lignes \code{si\_role} et \code{non}~; sous \code{stocks\_successifs}, tout est admis sauf \code{importance\_exclusions}~; trois recettes $\times$ (étapes de \code{ETAPES} $+$ trois estimateurs) lignes~; l'étape \code{lissage} admise (\code{oui}) sous les trois recettes (section~\ref{sec:recettes}) \\
@@ -6263,13 +6451,13 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{composantes\_date()} & interne & jours depuis 1970-01-01 & année, mois, jour \\
 \catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
 \catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
-\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne de classe d'encodage \code{bytes} étant non conforme sans erreur R (issue~\#128) \\
+\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne dont la classe porte un élément d'encodage \code{bytes}, à toute position, \code{factor} compris, étant non conforme sans erreur R (issues~\#128 et~\#150)~; partagée avec \code{table\_reference()} \\
 \catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & recettes, rôles requis absents, groupes non couverts & message du refus \code{aucune\_recette}, recette par recette \\
 \catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue et matrice (par défaut, ceux du module~; injection en test) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de la matrice reçue (aucune ligne pour une recette absente de cette matrice~; issue~\#196)~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes}, ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{donnees\_mal\_formees} (message propre et \code{details\$classe} pour des données de classe \code{bytes}, lue par \code{classe\_bytes()} avant \code{is.data.frame()}~; issue~\#150), \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes} (à toute position, \code{factor} compris~; issue~\#150), ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
 \catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique, convention validée (\code{NULL} sans étape \code{exposition}), valeurs validées \code{p} & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis règles qui ne tiennent pas dans une ligne (fonction de la ligne suivante), puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
 \catalogue{fonctions-donnees}{regles\_conditionnelles\_recette()} & interne & recette, rôles, étapes du plan, convention, valeurs validées \code{p} & règles de la matrice qui ne tiennent pas dans une ligne~; sous \code{agregats}, dans cet ordre, refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle \code{annee}) et \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire} (binomial avec le rôle \code{annee} sous la convention retenue \code{dernier\_anniversaire})~; sous \code{stocks\_successifs}, refus \code{identifiants\_concurrents} puis \code{identifiant\_inadapte}~; aucune sous \code{lignes\_dates\_completes}~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide}, module \code{donnees}~; rend \code{NULL}~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22, \#59 et~\#82~; variantes des modules \code{brut}, \code{validation} et \code{importance\_exclusions} retirées par l'issue~\#82) \\
@@ -6292,7 +6480,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{observations\_stocks()} & interne & lignes retenues, leurs numéros, rôles, segmentation, valeurs validées \code{p}, données reçues & une observation par unité, rangée par identifiant, unité \code{tete} ou \code{contrat}, classes P0, E, ES, HF et fins S, C~; relevés par classe, par inventaire et par intervalle~; refus \code{inventaire\_sans\_ligne}~; erreur de programmation sur une unité incohérente (motifs non appliqués) \\
 \catalogue{fonctions-donnees}{empiler\_stocks()} & exportée & table des inventaires, table des événements, nom de la colonne du type de ligne & table empilée~: lignes d'inventaire puis d'événement dans l'ordre reçu, colonne du type déclarée par la table d'origine, colonnes absentes complétées par des valeurs manquantes, sans conversion~; six refus \code{empilement\_*} (section~\ref{sec:controles-donnees}) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
-\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat) \\
 \catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements}), au-delà de la tolérance relative \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, que le texte de l'avertissement mentionne~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_stocks()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{stocks\_successifs}~: \code{entrees\_entre\_inventaires} (unités E), \code{evenements\_hors\_fenetre} (unités HF)~; le relevé des unités ES est averti par l'étape \code{exposition}~; jamais un refus \\
@@ -6301,7 +6489,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{STATUTS\_TABLE} & constante & --- & \code{synthetique}, \code{embarquee}, \code{importee} \\
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques (section~\ref{sec:table-reference}) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158) \\
 \catalogue{fonctions-donnees}{TABLES\_EMBARQUEES} & constante & --- & catalogue des tables embarquées, liste nommée par \code{nom} d'objets \code{table\_reference} de statut \code{embarquee}~; vide dans cette version \\
 \catalogue{fonctions-donnees}{table\_embarquee()} & exportée & nom & table embarquée de ce nom, telle qu'au catalogue~; refus \code{table\_embarquee\_absente} (module \code{donnees}) d'un nom absent ou qui n'est pas une chaîne unique \\
 \end{longtable}
@@ -14502,7 +14690,7 @@ restituée en entier, y compris ce qu'elle recopie d'une étape.
 \code{lecture} & Lecture du rapport & texte & textes de lecture (ci-dessous)~; conventions d'écriture de \code{CONVENTIONS\_TEXTE}, dans leur ordre~; empreinte du code qui écrit le rapport \\
 \code{identification} & Identification~: empreintes, versions et plateforme & objet & \code{fiche/version\_fiche}, \code{fiche/empreintes}, \code{fiche/versions}, \code{fiche/plateforme}~; puis mentions des empreintes, phrase de plateforme et phrase du contrôle d'intégrité \\
 \code{alea} & Graine et générateur & objet & \code{fiche/graine}, \code{fiche/graine\_mention}, \code{fiche/generateur} \\
-\code{donnees\_recues} & Rôles, provenance, recette et unité d'observation & objet & \code{fiche/roles}, \code{fiche/provenance}, \code{fiche/provenance\_mention}, \code{fiche/tables\_reference}, \code{fiche/recette}, \code{fiche/unite\_observation}, \code{fiche/avertissement\_unite} \\
+\code{donnees\_recues} & Rôles, provenance, recette et unité d'observation & objet & \code{fiche/roles}, \code{fiche/provenance}, \code{fiche/provenance\_mention}, \code{fiche/tables\_reference}, \code{fiche/recette}, \code{fiche/unite\_observation}, \code{fiche/avertissement\_unite}~; puis, si au moins une table de \code{fiche/tables\_reference} est de statut \code{synthetique}, la mention \code{tables\_reference\_parametres}, une seule fois (ci-dessous~; issue~\#163) \\
 \code{plan} & Plan de construction (plan canonique), transition et fin effective de la période & objet & \code{fiche/plan}, \code{fiche/transition\_code}, \code{fiche/fin\_effective} \\
 \code{fiche\_hypotheses} & Paramètres retenus et hypothèses consignés dans la fiche & objet & \code{fiche/convention}, \code{fiche/unite\_exposition}, \code{fiche/par\_annee}, \code{fiche/exclusions}, \code{fiche/nombre\_lignes\_exclues}, \code{fiche/hypothese\_censure}, \code{fiche/hypotheses\_recette}, \code{fiche/hypotheses\_brut}, \code{fiche/avertissements} \\
 \code{etape\_donnees} & Étape donnees~: exclusions, unité d'observation et relevés & etape & étape \code{donnees}~: \code{etapes/donnees}, sous-arbre entier \\
@@ -14604,6 +14792,17 @@ et de deux phrases~:
     (valeurs, ou structure seule pour une table dont le volume croît avec la
     base) est lu dans l'objet, sans vérification.~»
 \end{itemize}
+% citation : MENTIONS_RAPPORT["tables_reference_parametres"]
+La section \emph{donnees\_recues}, quand au moins une table de
+\code{fiche/tables\_reference} est de statut \code{synthetique}, fait suivre son
+tableau de la mention \code{tables\_reference\_parametres}~: «~Tables de
+référence de statut synthetique~: leurs paramètres (champ parametres des
+éléments de fiche/tables\_reference) sont déclarés par l'appelant, non vérifiés
+par le moteur~; ni leur forme ni leur cohérence avec les q\_x de la table ne
+sont contrôlées. Une table de référence entre en valeurs~: son empreinte (champ
+empreinte) porte sur son contenu (âge, sexe, année si présente, q\_x), non sur
+ses métadonnées, et aucune étape de la construction ne lit ces paramètres.~»
+(issue~\#163, M279)~; sans table synthétique, la section est inchangée.
 La section \emph{étape brut} s'ouvre sur la note «~La colonne taux porte une
 force de transition pour l'estimateur poisson (D / E\^{}c) et une probabilité
 pour binomial (D / E\^{}i) et kaplan\_meier~; un taux brut se désigne avec son
@@ -15337,7 +15536,17 @@ d'exactement autant d'éléments que de noms attendus (\code{deces} et
 quelconque~: un \code{data.frame}, un objet de classe, une liste munie d'un
 autre attribut ou un élément de plus, même nommé \code{NA}, sont refusés
 (\code{loi\_invalide}~; \code{liste\_aux\_noms()},
-section~\ref{sec:fonctions-outils}~; issue~\#44). Pour un sexe $s$, la loi effective est
+section~\ref{sec:fonctions-outils}~; issue~\#44)~; une loi vraie dont la
+classe porte un élément d'encodage \code{bytes} l'est sous le même
+message, sans erreur R, les noms reçus étant lus par \code{attr()} pour
+\code{details\$noms} (issue~\#150). La table d'une loi dont la classe
+porte, à toute position, un élément de cet encodage est refusée
+(\code{loi\_invalide}) par un message propre, qui cite la classe sous le
+repère de la règle unique (section~\ref{sec:refus}) et demande l'objet
+rendu par \code{table\_reference()}, sans modification~: ce contrôle,
+fait par \code{classe\_bytes()}, précède celui de la classe
+\code{table\_reference}, dont \code{inherits()} lèverait une erreur R
+(\code{loi\_effective()}~; issue~\#150). Pour un sexe $s$, la loi effective est
 \[
   q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
 \]
@@ -17551,7 +17760,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
-\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs et une table de classe d'encodage \code{bytes}, jugée avant \code{inherits()} (issue~\#150) \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\

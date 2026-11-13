@@ -1548,7 +1548,9 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                                  "file.size(fichier))), ou passer x$fiche."),
                          paste(neutraliser_citation(class(fiche)), collapse = "/"), typeof(fiche)),
                 list(champ = "(fiche)", lu = class(fiche), attendu = "liste nommée"))
-  if (!is.data.frame(donnees)) controler_roles(donnees, character(0), character(0))
+  # classe_bytes() avant is.data.frame() : inherits() lève sur une classe « bytes » (#150) ;
+  # controler_roles() refuse sous donnees_mal_formees.
+  if (classe_bytes(donnees) || !is.data.frame(donnees)) controler_roles(donnees, character(0), character(0))
 
   # 2. Forme des champs lus avant construire_table() : tous les champs en
   #    défaut dans un seul refus ; aucun n'est complété ni converti.
