@@ -2392,9 +2392,9 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
 # être déclaré : aucun parcours de dossier. Ajouter une table modifie ce
 # fichier, donc l'empreinte du code.
 DECLARATIONS_TABLES_EMBARQUEES <- data.frame(
-  nom = character(0),
-  identifiant = character(0),
-  sexe = character(0),
+  nom = "TD 88-90",
+  identifiant = "td_88-90",
+  sexe = "ensemble",
   stringsAsFactors = FALSE)
 
 # Dossier des tables embarquées, relatif à la racine des sources ; chemins des

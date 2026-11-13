@@ -1,0 +1,172 @@
+Format: tablexp provenance 1
+Nom: TD 88-90
+Fichier: inst/extdata/tables/td_88-90.csv
+Sexe: ensemble
+ Modalité déclarée au catalogue (R/donnees.R, DECLARATIONS_TABLES_EMBARQUEES),
+ non lue dans le fichier de table (ADR 0018, point 2.3). Le texte désigne la
+ table par la garantie, non par le sexe (décision du mainteneur du
+ 13/11/2026, M449 ; docs/exigences.md, E2.26).
+Forme-origine: lx
+Intitule: « Art. 600-5 / Table de mortalité TD 88-90 / (Lx nombre de vivants à
+ l'âge X) » ; colonnes « X » et « Lx » (JO n° 2 du 03/01/2016, texte 39, p. 19 de
+ l'extrait).
+Ages: 0 à 106 transcrits (107 lignes ; l_0 = 100000, l_106 = 2). Aucune ligne
+ imprimée sans valeur ; aucune ligne au-delà de 106 dans la source de
+ transcription. L'objet construit par le moteur porte les q_x des âges 0 à 105
+ (le dernier âge transcrit ne donne pas de q_x ; ADR 0018, point 2.4).
+Homologation: Arrêté du 27 avril 1993 relatif aux tables de mortalité, NOR
+ ECOT9390043A, JORF n° 125 du 2 juin 1993 ; tables : « Vous pouvez consulter le
+ tableau dans le JO n° 125 du 2 juin 1993, page 8011 » (Légifrance, version
+ JORF, https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000000164291, consultée le
+ 13/11/2026). Statut : NOR, intitulé, numéro et date du JO vérifiés (impression
+ Légifrance versée ; page JORF de Légifrance) ; page 8011 vérifiée comme page
+ citée par Légifrance ; page de fin non établie ; fac-similé de 1993 non obtenu.
+ Acte d'homologation seul cité par le moteur et le rapport (lecture (B), M443).
+Porteurs-usages:
+ Comptes sociaux : règlement ANC 2015-11, art. 600-5 (la table) et art. 143-2
+ (loi de survie en invalidité : TD 88-90 de l'art. 600-5, ou loi certifiée) ;
+ statut : vérifié (recueil des normes comptables / assurance de l'ANC, « Version
+ en vigueur au 1er janvier 2025 »,
+ https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/recueil/Assurance-Recueil-2025.pdf,
+ lu le 13/11/2026 : art. 143-2, 1. « une loi de survie en invalidité définie par
+ la table de mortalité mentionnée à l'article 600-5 du présent règlement.
+ Toutefois, il est possible […] certifiée par un actuaire indépendant […] » ;
+ art. 600-5, p. 166 du recueil ; art. 600-5 imprimé au JO n° 2 du 03/01/2016,
+ texte 39, p. 19) ; lecture du 13/11/2026.
+ Mutualité : annexe de A223-8 du code de la mutualité, créée par l'art. 9 de
+ l'arrêté du 08/12/2006 (NOR SANS0624984A), modifié par l'arrêté du 30/12/2015,
+ art. 6, en vigueur depuis le 01/01/2016 : « A l'article A. 223-8 du code de la
+ mutualité, il est créé une annexe contenant les tables TF00-02 et TH00-02 […]
+ les tables TV88-90 et TD88-90 annexées à l'arrêté du 2 mai 2002 susvisé »
+ (version initiale, BO Santé 2007-1, annonce n° 58 : annexe à A. 212-10) ;
+ statut : vérifié (Légifrance, version consolidée JORFTEXT000000460861, lecture
+ outillée du 13/11/2026) ; NOR de l'arrêté du 30/12/2015 non vérifié ; arrêté du
+ 2 mai 2002 non relu.
+ Sécurité sociale : annexe de A932-3-11 du code de la sécurité sociale, créée
+ par l'art. 10 de l'arrêté du 21/12/2006 relatif aux tables de mortalité
+ applicables aux institutions de prévoyance (NOR SANS0625193A, JORF n° 9 du
+ 11/01/2007, texte n° 31), modifié par l'arrêté du 30/12/2015, art. 3, en
+ vigueur depuis le 01/01/2016 : « A l'article A. 932-3-11 du code de la sécurité
+ sociale, il est créé une annexe […] les tables TV88-90 et TD88-90 annexées à
+ l'arrêté du 25 février 1997 susvisé » ; statut : vérifié (Légifrance, version
+ consolidée JORFTEXT000000241832, lecture outillée du 13/11/2026) ; NOR de
+ l'arrêté du 30/12/2015 non vérifié ; arrêté du 25 février 1997 non relu.
+ Code des assurances : l'arrêté du 27/04/1993 seul ; statut : vérifié pour
+ l'homologation par l'arrêté de 1993 (champ Homologation) ; l'article du code
+ qu'il appliquait est abrogé depuis le 01/01/2016 et n'est pas cité ; l'annexe à
+ A132-18 (JO n° 301 du 29/12/2015, texte 35) ne porte pas la table ; lecture du
+ 13/11/2026.
+Source: Journal officiel de la République française n° 2 du 3 janvier 2016,
+ texte 39 sur 136 : « Arrêté du 28 décembre 2015 portant homologation des
+ règlements n° 2015-5 du 2 juillet 2015, n° 2015-8 du 23 novembre 2015,
+ n° 2015-9 du 23 novembre 2015, n° 2015-10 du 26 novembre 2015, n° 2015-11 du 26
+ novembre 2015 et n° 2015-12 du 10 décembre 2015 de l'Autorité des normes
+ comptables (rectificatif) », NOR EINT1531578Z ; règlement ANC n° 2015-11,
+ art. 600-5 (décision du mainteneur du 13/11/2026, M444).
+Source-nature: fac-similé du JO (numéro complet publié au format PDF, pages
+ extraites sans rendu ni recompression ; docs/sources/README.md). L'exception
+ du 05/11/2026 (impression de la version électronique, M220) ne s'applique pas.
+Source-URL: aucune adresse imprimée sur les pages de l'extrait ; adresse
+ canonique du numéro : https://www.legifrance.gouv.fr/jorf/jo/2016/01/03/0002 ;
+ du texte 39 : https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000031742458
+ (titre et NOR EINT1531578Z vérifiés le 13/11/2026) ; adresse de téléchargement
+ de la pièce déposée (joe_20160103_0002_p000.pdf) non consignée ; identité de la
+ pièce avec le PDF servi par Légifrance non mesurée.
+Source-consultation: pièce déposée le 13/11/2026 et versée au dépôt
+ (docs/sources/jo_2016-01-03_n2_texte39.pdf, commit d3fcdaf).
+Source-licence: Licence etalab-2.0 retenue par interprétation (numéro servi par
+ Légifrance, sans mention contraire relevée) ; à défaut, réutilisation des
+ informations publiques (code des relations entre le public et
+ l'administration, L321-1 et L322-1 : informations non altérées, source et date
+ mentionnées). Statut : retenue par interprétation (M447 ;
+ docs/sources/README.md). La licence du dépôt (PolyForm Noncommercial 1.0.0)
+ ne couvre pas cette table (ADR 0006, point 2).
+Source-pages: p. 19 à 21 de l'extrait docs/sources/jo_2016-01-03_n2_texte39.pdf
+ (p. 171 à 173 du numéro complet) : âges 0 à 35 p. 19, 36 à 73 p. 20, 74 à 106
+ p. 21 ; une colonne de couples X / Lx.
+Transcription-methode: Transcription A (le fichier de table) : lecture sur le
+ rendu des pages seulement, pages 18 à 23 vues par l'outil Read (paramètre
+ pages), puis images de page à 200 dpi (pdftoppm -r 200) découpées en bandes
+ agrandies (bande X et bande Lx juxtaposées) ; saisie manuelle page par page,
+ chaque couple avec l'âge imprimé à sa gauche, tri par âge, séparateur de
+ milliers retiré ; aucune extraction de couche texte, aucun OCR, aucune autre
+ transcription consultée. Lecteur : agent coder-approfondi (IA), session du
+ 13/11/2026.
+Transcription-date: 2026-11-13
+Transcription-B-releve: tests/contre_verification/tables/td_88-90.transcription_b.csv
+Transcription-B-methode: Transcription B : lecteur distinct (autre agent
+ coder-approfondi, IA, sans accès à la transcription A), images à 250 dpi
+ (pdftoppm -r 250) recadrées en bandes de 9 à 11 lignes, lecture à l'œil de
+ chaque bande, TV d'abord puis TD, chaque table de la fin vers le début ;
+ aucune couche texte, aucun OCR. Comparaison par script
+ (tests/controles/tables_embarquees.R, point (e)) : 107 lignes identiques,
+ aucun écart.
+Seconde-source-legifrance: Impression PDF de la page Légifrance de l'arrêté du
+ 27/04/1993 (version électronique, « En vigueur au 21/06/2024 »), faite le
+ 13/11/2026 à 09:51, https://www.legifrance.gouv.fr/loda/id/JORFTEXT000000164291/20…
+ (adresse tronquée dans l'en-tête imprimé) ;
+ docs/sources/legifrance_arrete_1993-04-27_impression_2026-11-13.pdf, p. 1 à 6 ;
+ licence etalab-2.0, établie. Impression d'une ressaisie de la DILA, non un
+ fac-similé.
+Seconde-source-legifrance-methode: Lecture visuelle sur le rendu des pages (la
+ pièce n'a pas de couche texte), par un agent coder (IA) le 13/11/2026, sans
+ consulter aucune autre transcription ; deux passes (saisie puis relecture
+ ligne à ligne), séparateur de milliers et point final retirés.
+Seconde-source-legifrance-releve: tests/contre_verification/tables/td_88-90.seconde_source_legifrance.csv
+Seconde-source-legifrance-ecarts: aucun
+Seconde-source-bo: Bulletin officiel Santé - Protection sociale - Solidarités
+ n° 2007-1, annonce n° 58 : arrêté du 8 décembre 2006 relatif aux tables de
+ mortalité applicables aux mutuelles (NOR SANS0624984A), annexe III « Tables
+ TD 88-90 et TV 88-90 » ; impression PDF de
+ https://sante.gouv.fr/fichiers/bo/2007/07-01/a0010058.htm faite le 13/11/2026
+ à 09:52 ; docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf,
+ p. 68 à 71 ; licence non établie, extrait versé par exception datée (M446 ;
+ ADR 0006, annotation du 13/11/2026). Impression d'une page HTML, non un
+ fac-similé.
+Seconde-source-bo-methode: Couche texte de la pièce, pour la seule comparaison
+ (M445 ; E2.26), par pdftotext -layout (poppler) version 24.02.0, script hors
+ CI tests/contre_verification/tables/releves_couche_texte_td_tv_88-90.R ;
+ toutes les lignes imprimées avec une valeur, zéros compris (ADR 0018, point
+ 5.2) ; une ligne qui admet plus d'une lecture arrête le script.
+Seconde-source-bo-releve: tests/contre_verification/tables/td_88-90.seconde_source_bo.csv
+Seconde-source-bo-ecarts:
+ 107,,0
+ 108,,0
+ 109,,0
+ 110,,0
+ 111,,0
+Controle-lecture-releve: tests/contre_verification/tables/td_88-90.couche_texte.csv
+Controle-lecture-ecarts: aucun
+Controle-lecture-methode: Couche texte du fac-similé source (JO n° 2 du
+ 03/01/2016, texte 39, p. 19 à 23 de l'extrait), extraite après le gel des deux
+ transcriptions visuelles, par pdftotext -layout (poppler) version 24.02.0,
+ script hors CI tests/contre_verification/tables/releves_couche_texte_td_tv_88-90.R ;
+ contrôle de lecture seulement, jamais une source (E2.26).
+Controles-coherence: l_x strictement décroissants sur 0 à 106 (aucune paire en
+ défaut) ; âges consécutifs ; l_0 = 100000 ; l_106 = 2 ; aucun âge x >= 31 où
+ q_x < q_{x-1} (q_x = 1 - l_{x+1} / l_x ; contrôle de vraisemblance, non
+ correctif) ; mesure du 13/11/2026 sur le fichier de table. Le moteur admet la
+ table (tables_embarquees(), état admise).
+Ecarts-signales: Seconde source BO : cinq lignes à l_x = 0 (âges 107 à 111)
+ que seul le BO imprime ; non transcrites, la valeur retenue étant celle de la
+ source de transcription, qui s'arrête à 106 (ADR 0018, point 2.2 ; E2.26 ;
+ M445). Aucun autre écart entre les deux transcriptions, la seconde source
+ Légifrance, la seconde source BO et la couche texte du fac-similé.
+Empreintes-fichiers:
+ 860ca79485318d7640d778ad31075637e5bdebbf0d831303a785b3503b9b253c  inst/extdata/tables/td_88-90.csv
+ 860ca79485318d7640d778ad31075637e5bdebbf0d831303a785b3503b9b253c  tests/contre_verification/tables/td_88-90.transcription_b.csv
+ 860ca79485318d7640d778ad31075637e5bdebbf0d831303a785b3503b9b253c  tests/contre_verification/tables/td_88-90.seconde_source_legifrance.csv
+ 668492e1d0e39151419b290d2ce16b40e989f2818545272ba315937b79d88e20  tests/contre_verification/tables/td_88-90.seconde_source_bo.csv
+ 860ca79485318d7640d778ad31075637e5bdebbf0d831303a785b3503b9b253c  tests/contre_verification/tables/td_88-90.couche_texte.csv
+ 4a2e03435a36470da7786981ae6e4725b99bf9ddac3097d6a93721511acabba1  tests/contre_verification/tables/releves_couche_texte_td_tv_88-90.R
+ 146ca3ba6f14a12ef14c829b9c0a9f307a2dcbaabe9f8e41b73a6951eced76ec  docs/sources/jo_2016-01-03_n2_texte39.pdf
+ eba41bb0396cc9d4773c4f483b2f8ac254749da0116f1a87a3b9362faece31c2  docs/sources/legifrance_arrete_1993-04-27_impression_2026-11-13.pdf
+ 0baeb0a75d45bd51a4e1e687d968079fabe441e75df82b2da3f0b874c32436d8  docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf
+Empreintes-hors-depot:
+ fa4ce9901e7c36843542fe81052c6f42da74c011b76ccaf762a892a8dbed942f  joe_20160103_0002_p000.pdf (JO n° 2 du 03/01/2016, numéro complet, 282 p., déposé le 13/11/2026)
+ 6ecbf63a92482068d6f40f60ec571d2e81ddf6d59476b63060bd380928bbc027  Tables.pdf (impression Légifrance du 13/11/2026, avant réécriture du dictionnaire d'information)
+ ad0f0d077c1b6e8b242a0519d39200c4d489fd1e023895fa0c74dd23b1c21814  BO.pdf (impression du BO Santé 2007-1 du 13/11/2026, avant réécriture du dictionnaire d'information)
+ 0d7fb3c86e6293e57c4141bf859f926056ba6617bed4794830c83839e9319766  Assurance-Recueil-2025.pdf (recueil ANC, téléchargé le 13/11/2026)
+Representation: tablexp table 1
+Empreinte-table: 7eec92c57cdd5e1e506bfff23281ac51
+Visa: 2026-11-13, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/262#issuecomment-6852588839
