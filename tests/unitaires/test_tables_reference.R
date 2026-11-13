@@ -21,9 +21,13 @@
 #  « etapes/positionnement/table_reference », et, depuis #144,
 #  « etapes/coherence_regularite/tables_reference » ; les plans de ce fichier,
 #  sans étape positionnement, coherence_regularite ni validation, ne citent
-#  aucune clé ; aucune table n'est embarquée
-#  (TABLES_EMBARQUEES vide). Le chemin de bout en bout avec une table
-#  (construction puis rejeu) est dans tests/unitaires/test_validation.R.
+#  aucune clé. Le catalogue injecté porte des contenus (lignes d'un fichier
+#  de table, ADR 0018, point 1.4), la table étant construite par
+#  table_du_catalogue() ; les textes qui citent le catalogue installé le
+#  lisent dans tables_embarquees() (vide avant le premier commit `donnees:`
+#  de B21). Le catalogue lui-même est testé dans
+#  tests/unitaires/test_tables_embarquees.R ; le chemin de bout en bout avec
+#  une table (construction puis rejeu) est dans tests/unitaires/test_validation.R.
 # -----------------------------------------------------------------------------
 
 D <- as.Date
@@ -35,6 +39,9 @@ controler_tables_reference <- tablexp:::controler_tables_reference
 controler_tables_rejeu <- tablexp:::controler_tables_rejeu
 CHAMPS_TABLE_FICHE <- tablexp:::CHAMPS_TABLE_FICHE
 refus_de <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r)
+# Catalogue installé tel que le citent les messages (« aucune » s'il est vide).
+NOMS_EMBARQUEES <- tables_embarquees()$nom
+CITE_EMBARQUEES <- if (length(NOMS_EMBARQUEES)) paste0("« ", NOMS_EMBARQUEES, " »", collapse = ", ") else "aucune"
 
 # Refus attendu : module, motif, details$lu et details$attendu (si donnés), et
 # extraits du message (fixed = TRUE). Rend TRUE ou la liste des écarts.
@@ -176,13 +183,13 @@ PLAN <- list(
                 brut = list(estimateurs = c("poisson", "binomial"), niveau = 0.95)))
 X <- construire_table(BASE, ROLES, PLAN)
 
-verifier("C constantes : VERSION_FICHE 6L, VERSIONS_FICHE_REJEU 6L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/positionnement/table_reference » (#167), « etapes/coherence_regularite/tables_reference » (#144), « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée vide",
+verifier("C constantes : VERSION_FICHE 6L, VERSIONS_FICHE_REJEU 6L, REPRESENTATION_TABLE « tablexp table 1 », PARAMETRES_CLE_TABLE « etapes/positionnement/table_reference » (#167), « etapes/coherence_regularite/tables_reference » (#144), « etapes/validation/table_reference » (#4), TABLES_EMBARQUEES liste nommée par les noms déclarés (ADR 0018, point 1.2)",
          identical(tablexp:::VERSION_FICHE, 6L) && identical(tablexp:::VERSIONS_FICHE_REJEU, 6L) &&
            identical(tablexp:::REPRESENTATION_TABLE, "tablexp table 1") &&
            identical(tablexp:::PARAMETRES_CLE_TABLE,
                      c("etapes/positionnement/table_reference", "etapes/coherence_regularite/tables_reference",
                        "etapes/validation/table_reference")) &&
-           identical(tablexp:::TABLES_EMBARQUEES, structure(list(), names = character(0))))
+           identical(names(tablexp:::TABLES_EMBARQUEES), tablexp:::DECLARATIONS_TABLES_EMBARQUEES$nom))
 verifier("C constantes : tables_reference après empreintes dans ORDRE_CHAMPS_FICHE et dans BLOCS_LECTURE_FICHE$rejeu ; fiche/tables_reference après fiche/provenance_mention dans la section donnees_recues", {
   o <- tablexp:::ORDRE_CHAMPS_FICHE; b <- tablexp:::BLOCS_LECTURE_FICHE$rejeu; s <- tablexp:::SECTIONS_RAPPORT
   r <- s$racines[[match("donnees_recues", s$section)]]
@@ -329,7 +336,14 @@ verifier("D table_reference_inattendue de bout en bout (plan sans étape validat
 # etapes/essai/cle.
 PLAN_T1 <- list(etapes = list(essai = list(cle = "t1")))
 CLE_ESSAI <- "etapes/essai/cle"
-T_EMB <- table_reference(TR, "TABLE_E", "embarquee", "inst/extdata/table_e.provenance.md")
+# Contenu injecté (forme de TABLES_EMBARQUEES, ADR 0018, point 1.4) : une
+# table en l_x, construite par table_du_catalogue() ; la discordante change
+# un l_x d'une unité.
+contenu_e <- function(lx = c(1000, 990, 979, 967)) list(TABLE_E = list(identifiant = "table_e", sexe = "H",
+  lignes = c("age,lx", paste0(60:63, ",", lx))))
+CAT_E <- contenu_e()
+CAT_VIDE <- structure(list(), names = character(0))
+T_EMB <- tablexp:::table_du_catalogue("TABLE_E", CAT_E)
 verifier("D injection : table citée et reçue -> élément de fiche rendu", {
   r <- controler_tables_reference(list(t1 = T1), PLAN_T1, CLE_ESSAI)
   identical(r, list(t1 = element_table_fiche(T1)))
@@ -349,23 +363,32 @@ verifier("D injection : clé citée par deux paramètres, admise",
          identical(names(controler_tables_reference(list(t1 = T1), list(etapes = list(essai = list(cle = "t1", cle2 = "t1"))),
                                                     CLES_AB)), "t1"))
 verifier("D injection : table embarquee, catalogue vide -> table_embarquee_absente",
-         controle_refus(refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI)), "construire_table",
+         controle_refus(refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, CAT_VIDE)), "construire_table",
                         "table_embarquee_absente", "TABLE_E", character(0),
                         c("de statut « embarquee » et de nom « TABLE_E »", "(tables embarquées : aucune)")))
 verifier("D injection : table embarquee égale à celle du catalogue -> admise",
-         identical(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, list(TABLE_E = T_EMB)),
+         identical(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, CAT_E),
                    list(t1 = element_table_fiche(T_EMB))))
-verifier("D injection : table embarquee discordante (un ulp au catalogue) -> table_embarquee_discordante, empreintes en details", {
-  x <- TR; x$qx[1L] <- ulp_suivant(x$qx[1L])
-  cat_ <- list(TABLE_E = table_reference(x, "TABLE_E", "embarquee", "s"))
+verifier("D injection : table embarquee discordante (un l_x changé d'une unité au catalogue) -> table_embarquee_discordante, empreintes en details", {
+  cat_ <- contenu_e(c(1000, 991, 979, 967))
+  e_cat <- empreinte_table(tablexp:::table_du_catalogue("TABLE_E", cat_))
   controle_refus(refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, cat_)), "construire_table",
-                 "table_embarquee_discordante", empreinte_table(T_EMB), empreinte_table(cat_$TABLE_E),
-                 c("Obtenir la table par table_embarquee()", empreinte_table(cat_$TABLE_E)))
+                 "table_embarquee_discordante", empreinte_table(T_EMB), e_cat,
+                 c("Obtenir la table par table_embarquee()", e_cat))
+})
+verifier("D injection : table embarquee dont le contenu au catalogue est refusé (l_x non décroissants) -> refus table_lx_non_decroissants de table_reference(), sans enveloppe (ADR 0018, point 7.2)", {
+  r <- refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, contenu_e(c(1000, 990, 995, 967))))
+  ok <- controle_refus(r, "donnees", "table_lx_non_decroissants", contient = "âges 61 et 62 (l_x = 990 puis 995)")
+  if (isTRUE(ok) && !identical(r$details$ages, 61L)) "details$ages" else ok
+})
+verifier("D injection : table embarquee dont le contenu au catalogue est illisible -> table_embarquee_illisible (module donnees)", {
+  cat_ <- list(TABLE_E = list(identifiant = "table_e", sexe = "H", lignes = NULL))
+  controle_refus(refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, cat_)), "donnees",
+                 "table_embarquee_illisible", contient = "fichier inst/extdata/tables/table_e.csv non lu")
 })
 verifier("D ordre des quatre contrôles : mal formées, puis absente, puis inattendue, puis embarquées (absente avant discordante)", {
   m <- function(...) refus_de(controler_tables_reference(...))$motif
-  x <- TR; x$qx[1L] <- ulp_suivant(x$qx[1L])
-  cat_ <- list(TABLE_E = table_reference(x, "TABLE_E", "embarquee", "s"))
+  cat_ <- contenu_e(c(1000, 991, 979, 967))
   T_EMB2 <- table_reference(TR, "TABLE_F", "embarquee", "s")
   plan2 <- list(etapes = list(essai = list(cle = "t1", cle2 = "t2")))
   identical(c(m(list(t9 = 1), PLAN_T1, CLE_ESSAI),
@@ -375,10 +398,10 @@ verifier("D ordre des quatre contrôles : mal formées, puis absente, puis inatt
             c("tables_reference_mal_formees", "table_reference_absente", "table_reference_inattendue",
               "table_embarquee_absente"))
 })
-verifier("D table_embarquee() : catalogue vide, refus table_embarquee_absente (module donnees), nom cité ; nom non chaîne refusé de même", {
-  a <- controle_refus(refus_de(table_embarquee("TD 88-90")), "donnees", "table_embarquee_absente", "TD 88-90",
-                      character(0), c("« TD 88-90 »", "(tables embarquées : aucune)"))
-  b <- controle_refus(refus_de(table_embarquee(1)), "donnees", "table_embarquee_absente", 1, character(0), "nom illisible")
+verifier("D table_embarquee() : nom absent du catalogue installé, refus table_embarquee_absente (module donnees), nom et catalogue cités ; nom non chaîne refusé de même", {
+  a <- controle_refus(refus_de(table_embarquee("TABLE INCONNUE")), "donnees", "table_embarquee_absente", "TABLE INCONNUE",
+                      NOMS_EMBARQUEES, c("« TABLE INCONNUE »", sprintf("(tables embarquées : %s)", CITE_EMBARQUEES)))
+  b <- controle_refus(refus_de(table_embarquee(1)), "donnees", "table_embarquee_absente", 1, NOMS_EMBARQUEES, "nom illisible")
   if (isTRUE(a) && isTRUE(b)) TRUE else c(a, b)
 })
 
@@ -458,8 +481,8 @@ verifier("E fiche t1 de statut embarquee, table reçue -> table_reference_inatte
                         "Une table embarquée est relue par son nom dans le package"))
 verifier("E fiche t1 de statut embarquee hors catalogue -> table_embarquee_absente, empreinte du code de la fiche citée",
          controle_refus(refus_de(rejouer_fiche(BASE, fiche_t1(replace(EL, "statut", list("embarquee"))))),
-                        "construire_table", "table_embarquee_absente", "essai", character(0),
-                        c("(tables embarquées : aucune)", sprintf("empreinte du code de la fiche : %s", FICHE$empreintes$code))))
+                        "construire_table", "table_embarquee_absente", "essai", NOMS_EMBARQUEES,
+                        c(sprintf("(tables embarquées : %s)", CITE_EMBARQUEES), sprintf("empreinte du code de la fiche : %s", FICHE$empreintes$code))))
 verifier("E fiche t1 : un ulp sur un q_x de la table reçue -> empreinte_table_discordante, construire_table() non appelée", {
   x <- TR; x$qx[3L] <- ulp_suivant(x$qx[3L]); t <- importee(x)
   n <- compter_appels(rejouer_fiche(BASE, F_T1, list(t1 = t)))
@@ -522,7 +545,7 @@ verifier("E injection de bout en bout : PARAMETRES_CLE_TABLE restauré et verrou
            bindingIsLocked("PARAMETRES_CLE_TABLE", ns))
 verifier("E injection : origine « relue dans le package » d'une table embarquée, liste assemblée et textes de la ligne 8", {
   el <- element_table_fiche(T_EMB)
-  r <- controler_tables_rejeu(list(t1 = el), NULL, "code", list(TABLE_E = T_EMB))
+  r <- controler_tables_rejeu(list(t1 = el), NULL, "code", CAT_E)
   identical(r$tables, list(t1 = T_EMB)) && identical(unname(r$empreintes), el$empreinte) &&
     identical(r$attendu, paste0("t1 : ", el$empreinte)) && identical(r$lu, paste0("t1 : ", el$empreinte, " (relue dans le package)"))
 })

@@ -848,10 +848,13 @@ cles_citees <- function(plan, parametres_cle) {
 # (table_reference_inattendue, toutes citées) ; table de statut embarquee
 # dont le nom est absent du catalogue `embarquees` (table_embarquee_absente),
 # puis dont l'empreinte diffère de celle de la table du catalogue
-# (table_embarquee_discordante). `parametres_cle` et `embarquees` :
-# PARAMETRES_CLE_TABLE et TABLES_EMBARQUEES par défaut, injectés par les
-# tests (M247). Rend la valeur de fiche$tables_reference : NULL, ou liste des
-# éléments par clé.
+# (table_embarquee_discordante), la table du catalogue étant construite par
+# table_du_catalogue() (ADR 0018, point 1.4 : un refus de sa construction,
+# table_embarquee_illisible ou refus de table_reference(), remonte tel quel).
+# `parametres_cle` et `embarquees` : PARAMETRES_CLE_TABLE et
+# TABLES_EMBARQUEES (contenus) par défaut, injectés par les tests (M247).
+# Rend la valeur de fiche$tables_reference : NULL, ou liste des éléments par
+# clé.
 controler_tables_reference <- function(tables_reference, plan, parametres_cle = PARAMETRES_CLE_TABLE,
                                        embarquees = TABLES_EMBARQUEES) {
   f <- controler_forme_tables(tables_reference)
@@ -896,7 +899,7 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
   }
   for (k in embarquees_recues) {
     nom <- champ[[k]]$nom
-    attendue <- empreinte_table(embarquees[[nom]])
+    attendue <- empreinte_table(table_du_catalogue(nom, embarquees))
     if (!identical(champ[[k]]$empreinte, attendue))
       refuser("construire_table", "table_embarquee_discordante",
               formuler(paste("Table de clé « %s », de statut « embarquee » et de nom « %s » : empreinte %s, différente",
@@ -914,7 +917,8 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
 # de fiche$tables_reference ou de statut embarquee dans la fiche
 # (table_reference_inattendue, toutes citées) ; 2. pour chaque clé de la
 # fiche, dans son ordre : (a) représentation (representation_table_non_admise),
-# (b) origine, table relue dans `embarquees` par son nom (sinon
+# (b) origine, table construite par table_du_catalogue() à partir du contenu
+# de `embarquees` (ADR 0018, point 1.4 ; nom absent :
 # table_embarquee_absente) ou table reçue sous la clé (sinon
 # table_reference_absente), (c) empreinte recalculée par empreinte_table()
 # égale à celle de la fiche (empreinte_table_discordante). Le contrôle 1.3
@@ -963,7 +967,7 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, e
                          citer(k), citer(e$nom), if (length(catalogue)) liste_guillemets(catalogue) else formuler("aucune"),
                          citer(code_fiche)),
                 list(cle = k, nom = e$nom, lu = e$nom, attendu = catalogue))
-      t <- embarquees[[e$nom]]
+      t <- table_du_catalogue(e$nom, embarquees)
       origine <- texte_moteur("relue dans le package")
     } else {
       if (!k %in% recues)
