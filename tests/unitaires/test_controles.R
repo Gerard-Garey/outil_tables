@@ -1177,6 +1177,10 @@ for (cas in list(
   list(nom = "batterie modifiée dans CLAUDE.md", fichier = "CLAUDE.md",
        motif = "Rscript tests/concordance_doc_moteur.R --strict",
        remplacement = "Rscript tests/concordance_doc_moteur.R", ecart = "batteries différentes"),
+  # Deux clôtures consécutives : verdict « liste vide », non deux commandes « ``` » (#266).
+  list(nom = "bloc de code vide dans CLAUDE.md (#266)", fichier = "CLAUDE.md",
+       motif = "```\nRscript tests/test_unitaires.R\nRscript tests/test_reproductibilite.R\nRscript tests/concordance_doc_moteur.R --strict\n```",
+       remplacement = "```\n```", ecart = "CLAUDE.md : aucune batterie lue"),
   list(nom = "étape de batterie modifiée dans ci.yml", fichier = c(".github", "workflows", "ci.yml"),
        motif = "run: Rscript tests/test_unitaires.R", remplacement = "run: Rscript tests/test_unitaires.R --x",
        ecart = "batteries différentes"),
