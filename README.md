@@ -15,6 +15,7 @@ Le dépôt ne contient **aucune donnée réelle** : tous les jeux sont simulés 
 | `docs/exigences.md` | Cahier des charges, exigences numérotées E1.1 à E5.5 |
 | `docs/cadrage/` | Comptes rendus des entretiens de cadrage (décisions du mainteneur) |
 | `docs/recherche/` | Rapports de recherche d'agents, avec leurs statuts vérifié / incertain / non trouvé |
+| `docs/sources/` | Pièces sources versées (extraits de fac-similés du JO, impressions de Légifrance et du BO Santé), sous leur forme d'origine, avec leur méthode d'extraction et leurs empreintes (`docs/sources/README.md` ; ADR 0018, point 4) |
 | `docs/adr/` | Décisions consignées (0001 : routage ; 0002 à 0006 : décisions du cadrage ; 0007 : forme du package et contrats initiaux ; 0008 : plateforme de CI et de référence ; 0010 : modèle et effort des agents de réalisation et de vérification) |
 | `docs/feuille-de-route.md` | Périmètre des branches de travail, décisions du mainteneur numérotées (M1, M2…) |
 | `docs/latex/` | Documentation méthodologique (`doc_outil_tables.tex` et son PDF versionné, charte d'`outil_USP`) et ses règles de rédaction (`CONVENTIONS.md`) ; compilée par le job requis « Documentation » |

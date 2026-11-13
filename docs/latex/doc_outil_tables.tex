@@ -6716,7 +6716,8 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     ce refus, et \code{tables\_embarquees()} la liste à l'état
     \code{refusee}. Le refus n'est codé nulle part comme attendu~: il
     résulte des valeurs~; l'attente est écrite au fichier de provenance et
-    vérifiée par le contrôle de la CI (point~(d)).
+    vérifiée par le contrôle de la CI (point~(d)). TF~00-02 est dans ce
+    cas (ci-dessous, «~TH~00-02 et TF~00-02~»).
   \item \textbf{État du catalogue~: \code{tables\_embarquees()}} (ADR 0018,
     point~8~; ADR 0015, point~6.2). Exportée, sans argument, elle rend
     \code{catalogue\_tables\_embarquees()} sur \code{TABLES\_EMBARQUEES}~: un
@@ -6897,6 +6898,166 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         par le mainteneur le 13/11/2026 (M451~; champ \code{Visa}). Les
         deux tables sont admises par le moteur (état \code{admise} de
         \code{tables\_embarquees()}).
+    \end{itemize}
+  \item \textbf{TH~00-02 et TF~00-02} (issue~\#145~; E2.24 à E2.26~;
+    ADR 0018, points~2.2, 3 et~7~; décisions M441, M442, M445 à M448 et
+    M453). Fichiers \code{inst/extdata/tables/th\_00-02.csv} et
+    \code{inst/extdata/tables/tf\_00-02.csv}, chacun avec son fichier de
+    provenance, qui fait foi pour tout ce qui suit et en donne les
+    empreintes. TH~00-02 est admise par le moteur~; TF~00-02 est
+    transcrite telle qu'imprimée et \textbf{refusée} (ci-dessous).
+    \begin{itemize}[leftmargin=*, itemsep=1pt]
+      \item \emph{Source de transcription} (champs \code{Source} à
+        \code{Source-pages}). Le fac-similé du \emph{Journal officiel}
+        n\textsuperscript{o}~301 du 29~décembre 2015, texte~35 sur~159~:
+        «~Arrêté du 28 décembre 2015 portant adaptation des dispositions
+        comptables du code des assurances~», NOR FCPT1529210A, extrait
+        \code{docs/sources/jo\_2015-12-29\_n301\_texte35.pdf}. Sous
+        l'intitulé «~ANNEXE À L'ARTICLE A. 132-18~» (p.~13 de l'extrait),
+        il imprime «~TABLE TF 00-02 / (Lx nombre de vivants à l'âge X)~»,
+        âges 0 à~112 (p.~13 à~16 de l'extrait), puis «~TABLE TH 00-02~»,
+        âges 0 à~112 (p.~16 à~19), chacune sur une colonne de couples
+        X~/ Lx~; ce sont les p.~232 à~238 du numéro complet, qui n'est
+        pas versé (décalage consigné dans
+        \code{docs/sources/README.md}). C'est le texte en
+        vigueur (E2.26)~: l'article~4 de l'arrêté le fait entrer en
+        vigueur le 1\textsuperscript{er}~janvier 2016, ou à l'entrée en
+        vigueur du règlement ANC n\textsuperscript{o}~2015-11 si elle est
+        postérieure (p.~12 de l'extrait). TF~00-02 commence à
+        $l_0 = 100\,000$ et finit à $l_{112} = 1$, sans ligne imprimée sans
+        valeur (113~lignes transcrites). TH~00-02 commence à
+        $l_0 = 100\,000$ et finit à $l_{110} = 1$~; les lignes 111 et~112
+        sont imprimées avec une cellule Lx vide (p.~19 de l'extrait) et ne
+        sont pas transcrites (ci-dessus, «~Fichier de table~»~; E2.26), soit
+        111~lignes. L'objet construit pour TH~00-02 porte donc les $q_x$
+        des âges 0 à~109, sans $q_{110} = 1$ (ci-dessus, «~Dernier âge~»),
+        au statut de résultat exact, les $l_x$ étant entiers. Les valeurs
+        sont lues sur le rendu des pages, jamais par la couche texte
+        (E2.25). Licence~: etalab-2.0 retenue par interprétation, à défaut
+        réutilisation des informations publiques (code des relations entre
+        le public et l'administration, L321-1 et L322-1)~; la licence du
+        dépôt ne couvre pas ces tables (champ \code{Source-licence}).
+      \item \emph{Acte d'homologation et porteurs} (champs
+        \code{Homologation} et \code{Porteurs-usages}). L'acte
+        d'homologation est l'arrêté du 20~décembre 2005 relatif aux tables
+        de mortalité (NOR ECOT0591210A, JORF n\textsuperscript{o}~302 du
+        29~décembre 2005, texte~40)~: son article~5 homologue TH~00-02
+        (hommes), TF~00-02 (femmes), pour les contrats autres que de rente
+        viagère, et les décalages d'âge~; son article~7 fixe l'entrée en
+        vigueur au 1\textsuperscript{er}~janvier 2006 (statut
+        \emph{vérifié} sur le fac-similé de l'édition complète, lu sur
+        l'image le 05/11/2026, pièce non versée). Comme pour TD et TV~88-90,
+        chaque régime a son porteur, que le fichier de provenance liste avec
+        son statut. Code des assurances~: annexe à l'article A132-18, créée
+        par l'arrêté du 28~décembre 2015 ci-dessus (\emph{vérifié} sur le
+        fac-similé versé, p.~1 et~13 de l'extrait). Mutualité~: annexe de
+        l'article A223-8 du code de la mutualité, créée par l'arrêté du
+        8~décembre 2006 (NOR SANS0624984A), art.~9 (\emph{vérifié} sur la
+        version en vigueur de l'article, stock LEGI de la DILA). Sécurité
+        sociale~: annexe de l'article A932-3-11 du code de la sécurité
+        sociale, créée par l'arrêté du 21~décembre 2006 (NOR SANS0625193A,
+        JORF n\textsuperscript{o}~9 du 11~janvier 2007), art.~10
+        (\emph{vérifié} pour le texte de l'article~; impression des tables
+        annexées \emph{non établie}). Comptes sociaux~: règlement ANC
+        2015-11, art.~142-3, \emph{par renvoi}~: les provisions
+        mathématiques des contrats comportant un élément viager sont
+        calculées «~d'après les tables en vigueur à l'époque de
+        l'application du tarif, dans le respect des dispositions du code
+        des assurances, du code de la mutualité ou du code de la sécurité
+        sociale~» applicables à l'entreprise~; le recueil ne nomme pas ces
+        tables, et l'art.~142-4, qui vise les rentes viagères, ne les porte
+        pas (\emph{vérifié} sur le recueil des normes comptables de l'ANC,
+        «~Version en vigueur au 1\textsuperscript{er} janvier 2025~»,
+        lecture par renvoi). Le moteur ne cite aucun de ces textes~: comme
+        pour TD et TV~88-90, il ne porte de la provenance que le chemin du
+        fichier, attribut \code{source} de la table.
+      \item \emph{Sexe.} TH~00-02 est déclarée de modalité \code{H},
+        TF~00-02 de modalité \code{F}, conformément à l'article~5 de
+        l'arrêté d'homologation et aux tables par sexe de A132-18 (E2.24)~:
+        ce sont les premières tables sexuées du catalogue. La modalité est
+        une déclaration de \code{DECLARATIONS\_TABLES\_EMBARQUEES}, non une
+        valeur lue dans le fichier (ci-dessus, «~Déclaration~»).
+      \item \emph{Contre-vérification} (M445~; relevés sous
+        \code{tests/contre\_verification/tables/}~; mêmes étapes que pour
+        TD et TV~88-90, sans seconde source Légifrance). (a)~Deux
+        transcriptions visuelles indépendantes sur le rendu des pages, par
+        deux lecteurs distincts, des agents (IA) selon le fichier de
+        provenance~: la transcription~A, qui est le fichier de table, et
+        une transcription aveugle dite~B2, faite sans accès aux fichiers de
+        table, aux relevés ni aux échanges de l'issue, à 300~dpi, avec une
+        seconde lecture à rebours des âges~; identiques ligne à ligne,
+        et égales à une première transcription~B (champ
+        \code{Transcription-B-methode})~; les valeurs de~A ont en outre été
+        relues page par page sur le rendu par un troisième lecteur, sans
+        écart. (b)~Seconde source BO Santé n\textsuperscript{o}~2007-1,
+        annonce n\textsuperscript{o}~58, annexe~I (arrêté du 8~décembre
+        2006 relatif aux mutuelles~; impression du 13/11/2026 d'une page
+        HTML, non un fac-similé, extrait versé par exception datée, M446),
+        relevée par sa couche texte pour la seule comparaison~: aucun écart
+        pour TH~00-02, dont le BO imprime aussi les lignes 111 et~112 sans
+        valeur~; trois écarts pour TF~00-02 (ci-dessous). (c)~Couche texte
+        du fac-similé source, extraite après le gel des deux
+        transcriptions, contrôle de lecture seulement~: aucun écart pour
+        l'une et l'autre table. Les écarts déclarés au fichier de
+        provenance sont vérifiés par le contrôle de la CI
+        (\code{tests/controles/tables\_embarquees.R}, point~(e),
+        section~\ref{sec:scripts-controle}). \textbf{Portée}~: comme
+        ci-dessus, la contre-vérification détecte une erreur de
+        \emph{lecture}~; elle ne juge pas la valeur imprimée.
+      \item \emph{TF~00-02~: trois $l_x$ imprimés fautifs, table refusée}
+        (ADR 0018, points~7.1 à~7.4~; E2.26~; M447, M448~; décision du
+        mainteneur du 12/11/2026 sur \#145). Le fac-similé imprime
+        $l_{11} = 99\,647$, $l_{23} = 94\,171$ et $l_{62} = 93\,425$
+        (p.~13 et~14 de l'extrait), qui rompent la décroissance des $l_x$
+        entre 10 et~11 ($l_{10} = 99\,478$), entre 23 et~24
+        ($l_{24} = 99\,137$) et entre 61 et~62 ($l_{61} = 92\,892$). Le BO
+        Santé 2007-1 imprime aux mêmes âges $99\,467$, $99\,171$ et
+        $92\,425$, valeurs qui rendent la suite décroissante~; ces trois
+        écarts ont été vus sur le rendu des deux pièces. Le BO est une
+        seconde source \emph{citée}, non une correction~: la valeur retenue
+        est celle de la source de transcription (E2.26). Le fac-similé du
+        JO n\textsuperscript{o}~302 du 29/12/2005, qui porte l'arrêté
+        d'homologation, imprime déjà les trois valeurs à l'identique
+        (lecture sur l'image du 05/11/2026, consignée sur \#13)~; les
+        valeurs de 2015 en dérivant, il ne vaut pas seconde source
+        indépendante. Aucun rectificatif n'a été trouvé (recherche sur
+        Légifrance du 05/11/2026~; absence non démontrée). TF~00-02 est donc
+        transcrite \textbf{telle qu'imprimée}, et le moteur la refuse~:
+        \code{table\_embarquee("TF 00-02")} lève
+        \code{table\_lx\_non\_decroissants} (ci-dessus, «~Refus des $l_x$
+        non décroissants~»), dont le message cite les paires «~F, âges 10
+        et 11 (l\_x = 99478 puis 99647)~», «~F, âges 23 et 24 (l\_x = 94171
+        puis 99137)~» et «~F, âges 61 et 62 (l\_x = 92892 puis 93425)~», et
+        dont les \code{details} portent \code{ages} $= (10, 23, 61)$~; le
+        fichier de provenance porte \code{Refus-attendu} et
+        \code{Refus-paires} (10-11, 23-24, 61-62), et non
+        \code{Empreinte-table}. Le moteur cite des paires~; l'attribution
+        de l'écart aux âges 11, 23 et~62 vient de la comparaison aux âges
+        voisins et au BO, consignée au fichier de provenance (E2.26, M448).
+        \code{tables\_embarquees()} liste la table à l'état \code{refusee},
+        de motif \code{table\_lx\_non\_decroissants}, d'empreinte
+        \code{NA}~: c'est, dans cette version, la seule table refusée du catalogue.
+        \textbf{Ce que peut faire l'utilisateur}~: une TF~00-02 corrigée
+        est une autre table, qui ne se déclare pas homologuée~; il
+        l'importe sous sa responsabilité, au statut \code{importee}, et
+        sous un autre nom que «~TF 00-02~», ce nom étant réservé
+        (\code{table\_nom\_reserve}, ci-dessus, «~Nom réservé~»). Avec le
+        package de l'issue~\#145, une table importée sous le nom
+        «~TF 00-02 corrigée~», aux trois valeurs du BO, est admise, et la
+        même table sous le nom «~TF 00-02~» refusée sous
+        \code{table\_nom\_reserve} (\emph{constat de mesure} du
+        13/11/2026). Le choix des valeurs corrigées reste à l'utilisateur.
+      \item \emph{Décalages d'âge non embarqués.} Les décalages d'âge
+        homologués avec ces tables (arrêté du 20/12/2005, art.~5),
+        imprimés p.~19 de l'extrait («~Décalage d'âge TF 00-02~», «~Décalage
+        d'âge TH 00-02~»), ne sont pas transcrits~: ils sont hors du
+        format~1 (ci-dessus, «~Fichier de table~») et passent, avec leur
+        application aux $q_x$ (A132-19), à la branche des tables de
+        génération (\code{claude/transcription-tables-generation}, D9,
+        M441).
+      \item \emph{Visa.} Valeurs de tables homologuées embarquées, TF~00-02
+        telle qu'imprimée et refusée par le moteur, visées par le
+        mainteneur le 13/11/2026 (M453~; champ \code{Visa}).
     \end{itemize}
 \end{itemize}
 
@@ -18442,8 +18603,8 @@ E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-gr
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:coherence-regularite}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
-E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, la couche texte ne servant qu'à la comparaison et au contrôle de lecture) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
-E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction) & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
+E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, TH~00-02 et TF~00-02 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, la couche texte ne servant qu'à la comparaison et au contrôle de lecture) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
+E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; TH~00-02 (\code{H}, lignes 111 et~112 imprimées sans valeur, non transcrites) et TF~00-02 (\code{F}) transcrites du fac-similé du JO n\textsuperscript{o}~301 du 29/12/2015 (annexe à l'article A132-18), avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification, TF~00-02 telle qu'imprimée, ses trois valeurs fautives (âges 11, 23 et~62) signalées avec celles du BO Santé 2007-1, seconde source citée sans correction, et refusée par le moteur (état \code{refusee})~; décalages d'âge de TH et TF~00-02 non embarqués~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction) & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
