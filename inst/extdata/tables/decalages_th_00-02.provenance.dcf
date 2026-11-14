@@ -42,16 +42,33 @@ Porteurs-usages:
  TH00-02 et les décalages d'âge ci-annexés […] » ; statut et lecture : ceux
  du champ Porteurs-usages de inst/extdata/tables/th_00-02.provenance.dcf.
  Sécurité sociale : annexe de A932-3-11 du code de la sécurité sociale, créée
- par l'art. 10 de l'arrêté du 21/12/2006 (NOR SANS0625193A ; version
- initiale : annexe à A. 931-10-10), modifié par l'arrêté du 30/12/2015, art.
- 3 : « […] contenant les tables TF00-02 et TH00-02 et les décalages d'âge
- ci-annexés […] » ; statut : lu sur Légifrance, version électronique (lecture
- outillée du 14/11/2026, regulatory), non établi sur les pièces versées ni
- sur fac-similé.
- Comptes sociaux : règlement ANC 2015-11, art. 142-3 (recueil ANC 2025,
- SHA-256 identique à celui de inst/extdata/tables/tf_00-02.provenance.dcf),
- renvoi aux dispositions des trois codes ; aucune mention expresse des
- décalages dans le recueil (recherche du 14/11/2026). Deux lectures : (A)
+ par l'art. 10 de l'arrêté du 21/12/2006 relatif aux tables de mortalité
+ applicables aux institutions de prévoyance (NOR SANS0625193A,
+ JORFTEXT000000241832 ; version initiale : annexe à A. 931-10-10), art. 10
+ en vigueur (LEGIARTI000031808310, état VIGUEUR depuis le 01/01/2016),
+ modifié par l'arrêté du 30/12/2015 (NOR FCPS1531571A, JORFTEXT000031740543),
+ art. 3 : « A l'article A. 932-3-11 du code de la sécurité sociale, il est
+ créé une annexe contenant les tables TF00-02 et TH00-02 et les décalages
+ d'âge ci-annexés, les tables TV88-90 et TD88-90 annexées à l'arrêté du 25
+ février 1997 susvisé, ainsi que les tables TGF05 et TGH05 ci-annexées. » ;
+ statut : vérifié (stock LEGI de la DILA, lecture du 14/11/2026 par
+ regulatory, archive Freemium_legi_global_20261108-140000.tar.gz, SHA-256 de
+ l'archive non mesuré ; même nom d'archive que la lecture du 12/11/2026,
+ https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6828688504,
+ identité des deux archives non vérifiée ; SHA-256 du XML de l'article au
+ champ Empreintes-hors-depot) pour le texte de l'article ; l'art. 9 en
+ vigueur du même arrêté (LEGIARTI000031808315) ne nomme que TGF05 et TGH05,
+ pas les décalages. Impression des décalages annexés non établie (les
+ annexes ne sont pas des articles du stock LEGI) ; arrêté du 30/12/2015 non
+ lu sur fac-similé ; pièce à verser par #268, point 3.
+ Comptes sociaux : règlement ANC 2015-11, art. 142-3 (recueil des normes
+ comptables / assurance de l'ANC, « Version en vigueur au 1er janvier
+ 2025 »,
+ https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/recueil/Assurance-Recueil-2025.pdf,
+ p. 18 du recueil, p. 19 du PDF ; SHA-256 au champ Empreintes-hors-depot,
+ pièce hors dépôt, identique à celui de
+ inst/extdata/tables/tf_00-02.provenance.dcf), renvoi aux dispositions
+ des trois codes ; aucune mention expresse des décalages dans le recueil (recherche du 14/11/2026). Deux lectures : (A)
  le renvoi « dans le respect des dispositions du code des assurances, du
  code de la mutualité ou du code de la sécurité sociale » vaut application
  des décalages d'âge (A132-18, huitième alinéa ; A132-19) aux provisions
@@ -174,6 +191,8 @@ Empreintes-hors-depot:
  ec5ae04404a1e1cb8932585b01ddf5124ba4b8ae63071e61efa2f06a65f61854  joe_20151229_0301_p000.pdf (JO n° 301 du 29/12/2015, numéro complet, 926 p., déposé le 13/11/2026)
  ad0f0d077c1b6e8b242a0519d39200c4d489fd1e023895fa0c74dd23b1c21814  BO.pdf (impression du BO Santé 2007-1 du 13/11/2026)
  f6094cdeb63d3bb75cb0967d7e64799b0057a3e2216eda191ec3af3260689e08  joe_20051229_0302_p000.pdf (JO n° 302 du 29/12/2005, numéro complet, 462 p., déposé le 13/11/2026)
+ 0d7fb3c86e6293e57c4141bf859f926056ba6617bed4794830c83839e9319766  Assurance-Recueil-2025.pdf (recueil ANC, téléchargé le 13/11/2026)
+ 2b0a3db47a6bfc151c004177e9b53552aca89a75803773d5ab1460588bfc68d5  LEGIARTI000031808310.xml (art. 10 en vigueur de l'arrêté du 21/12/2006, stock LEGI de la DILA, archive Freemium_legi_global_20261108-140000.tar.gz, lu le 14/11/2026)
 Representation: tablexp decalages 1
 Empreinte-decalages: 885877ef3bf58cf848633bf58f2c5370
 Visa: 2026-11-14, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6877196722 (M477)

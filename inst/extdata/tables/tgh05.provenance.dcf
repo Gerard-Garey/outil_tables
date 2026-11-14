@@ -106,19 +106,35 @@ Porteurs-usages:
  Sécurité sociale : annexe de A932-3-11 du code de la sécurité sociale,
  arrêté du 21/12/2006 relatif aux tables de mortalité applicables aux
  institutions de prévoyance (NOR SANS0625193A, JORFTEXT000000241832, JORF
- n° 9 du 11/01/2007, texte n° 31), art. 9 et 10 en vigueur (art. 10
- modifié par l'arrêté du 30/12/2015, NOR FCPS1531571A, art. 3), qui
- nomment TGF05 et TGH05 pour A932-3-11 selon la lecture outillée de
- Légifrance du 14/11/2026 par regulatory (WebFetch, texte extrait par un
- modèle de synthèse ; indice, non vérifié, même commentaire de #268) ;
- statut : lu sur Légifrance, version électronique (lecture outillée du
- 14/11/2026, regulatory), non établi sur les pièces versées ni sur
- fac-similé, comme la sécurité sociale des décalages d'âge
- (inst/extdata/tables/decalages_th_00-02.provenance.dcf) ; la lecture des
- stocks LEGI et JORF du 12/11/2026, qui vérifie l'art. 10 pour TH et TF
- 00-02, n'en cite pas le passage relatif à TGF05 et TGH05 ; impression des
- tables annexées non établie (aucun article « Annexe » dans le stock JORF,
- même lecture) ; pièce à verser par #268, point 3.
+ n° 9 du 11/01/2007, texte n° 31), art. 9 et 10 en vigueur, tous deux
+ modifiés par l'arrêté du 30/12/2015 (NOR FCPS1531571A,
+ JORFTEXT000031740543), art. 3. Art. 9 (LEGIARTI000031808315, état VIGUEUR
+ depuis le 01/01/2016) : « Les tables homologuées prévues au quatrième
+ alinéa de l'article A. 932-3-11 du code de la sécurité sociale pour les
+ contrats de rente viagère sont à compter du 1er janvier 2008 : -la table
+ TGF05 ci-annexée concernant les assurés de sexe féminin ; -la table TGH05
+ ci-annexée concernant les assurés de sexe masculin. Elles peuvent être
+ appliquées à compter du 1er janvier 2007. » ; art. 10
+ (LEGIARTI000031808310, état VIGUEUR depuis le 01/01/2016) : « A l'article
+ A. 932-3-11 du code de la sécurité sociale, il est créé une annexe
+ contenant les tables TF00-02 et TH00-02 et les décalages d'âge ci-annexés,
+ les tables TV88-90 et TD88-90 annexées à l'arrêté du 25 février 1997
+ susvisé, ainsi que les tables TGF05 et TGH05 ci-annexées. » ; statut :
+ vérifié (stock LEGI de la DILA, lecture du 14/11/2026 par regulatory,
+ archive Freemium_legi_global_20261108-140000.tar.gz, SHA-256 de l'archive
+ non mesuré ; même nom d'archive que la lecture du 12/11/2026,
+ https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6828688504,
+ identité des deux archives non vérifiée ; SHA-256 des XML des deux
+ articles au champ Empreintes-hors-depot) pour le texte des articles ;
+ concordant avec la lecture outillée de Légifrance du 14/11/2026 par
+ regulatory (WebFetch, indice,
+ https://github.com/Gerard-Garey/outil_tables/issues/268#issuecomment-6883529833).
+ Impression des tables annexées non établie (les annexes ne sont pas des
+ articles du stock LEGI ; aucun article « Annexe » dans le stock JORF,
+ lecture du 12/11/2026) ; arrêté du 30/12/2015 non lu sur fac-similé ;
+ pièce à verser par #268, point 3. Même
+ statut que la sécurité sociale des décalages d'âge
+ (inst/extdata/tables/decalages_th_00-02.provenance.dcf).
  Comptes sociaux : règlement ANC 2015-11 (recueil des normes comptables /
  assurance de l'ANC, « Version en vigueur au 1er janvier 2025 »,
  https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/recueil/Assurance-Recueil-2025.pdf,
@@ -255,8 +271,9 @@ Controles-coherence: Par génération : âges consécutifs du premier au dernier
  consécutifs en treize cellules (q_x = 0 : 1919 et 1920 à 113 ans, 1926 à
  114 ans, 1931 et 1932 à 115 ans, 1936 et 1937 à 116 ans, 1941 et 1942 à
  117 ans, 1946 et 1947 à 118 ans, 1951 et 1952 à 119 ans) ; q_x dans [0 ;
- 0,75], aucun q_x = 1. Mesure du 14/11/2026 sur le fichier de table et sur
- table_embarquee("TGH05") (état admise dans tables_embarquees()).
+ 0,75], maximum 3/4 atteint en deux cellules (générations 1902 et 1920 à
+ 112 ans, l_112 = 4, l_113 = 1) ; aucun q_x = 1. Mesure du 14/11/2026 sur
+ le fichier de table et sur table_embarquee("TGH05") (état admise dans tables_embarquees()).
  Décroissances de q_x (contrôle de vraisemblance, non correctif) : couples
  (génération, âge x), aux âges x >= 31 (x est le second âge du couple
  d'âges (x-1, x)), où q_x < q_{x-1}, avec q_x = d_x / l_x et d_x = l_x -
@@ -275,13 +292,36 @@ Controles-coherence: Par génération : âges consécutifs du premier au dernier
  à 59 ans (les autres générations de 1938 à 2005, de 1945 à 2004) ; aucun
  arrondi des l_x imprimés ne les explique. Les 68 générations de 1938 à
  2005, toutes celles qui portent les âges 58 à 60, ont q_59 < q_58.
- Replat de 58 à 62 ans : propriété du profil publié, commune à TGF05 et
- TGH05 ; médianes des rapports q_x / q_{x-1} sur les générations 1940 à
- 2005 qui portent les âges x-1 à x+1 (66 générations aux âges 57 à 70, 62
- à 65 aux âges 53 à 56) : 0,9868 à 59 ans, puis 1,0170 à 60, 1,0471 à 61,
- 1,0366 à 62 et 1,0558 à 63, contre 1,0581 à 1,1496 aux âges 53 à 58 et
- 64 à 70 ; q_59 / q_58 entre 0,9673 et 0,9979 sur les 66 générations. Son
- origine dans la construction de la table est une hypothèse non vérifiée.
+ Le critère par couple est une condition locale, nécessaire : il ne
+ dit pas qu'un même jeu de l_x non arrondis rende q_x non décroissant sur
+ plusieurs âges consécutifs. Test joint (avis d'actuary,
+ https://github.com/Gerard-Garey/outil_tables/issues/279#issuecomment-6884093195) :
+ il existe des L_x dans [l_x - 1/2 ; l_x + 1/2] avec log L_x concave en x
+ (soit q_x non décroissant) sur une fenêtre d'âges si et seulement si la
+ plus petite majorante concave de log(l_x - 1/2) reste sous log(l_x + 1/2)
+ sur la fenêtre ; test fait, pour chaque génération, de 30 ans (ou du
+ premier âge à valeur) au dernier âge à valeur.
+ Résultat : 55 générations incompatibles sur les
+ 68 qui portent les âges 58 à 60, toutes en défaut à 59 ans et à aucun
+ autre âge : les
+ 53 des couples incompatibles, et les générations 2000 et 2005,
+ compatibles couple par couple à 59 ans mais incompatibles sur la fenêtre
+ 57-61 (déjà sur la fenêtre 58-61).
+ Ralentissement de la croissance de q_x autour de 60 ans : propriété du
+ profil publié, de forme différente dans les deux tables ; médianes des
+ rapports q_x / q_{x-1} sur les générations 1940 à 2005 qui portent les
+ âges x-1 à x+1 (66 générations aux âges 57 à 70, 62 à 65 aux âges 53 à
+ 56). TGH05 : q_59 < q_58 dans les 68 générations qui portent les âges 58
+ à 60 (1938 à 2005), q_60 revient au niveau de q_58 (médiane de q_60 /
+ q_58 : 1,0005), puis croissance de 3,7 à 5,6 % de 61 à 63 ans contre 5,8
+ à 15,0 % de 53 à 58 et de 64 à 70 ans. TGF05 : croissance de 0,3 à 1,9 %
+ de 60 à 63 ans contre 3,1 à 8,9 % de 56 à 59 et de 64 à 70 ans, un
+ ralentissement semblable existant à 54-55 ans (0,9 et 2,2 %), sans
+ décroissance des médianes. Médianes de TGH05 : 0,9868 à 59 ans, puis
+ 1,0170 à 60, 1,0471 à 61, 1,0366 à 62 et 1,0558 à 63, contre 1,0581 à
+ 1,1496 aux âges 53 à 58 et 64 à 70 ; q_59 / q_58 entre 0,9673 et 0,9979
+ sur les 66 générations. Son origine dans la construction de la table est
+ une hypothèse non vérifiée.
  Valeurs imprimées, identiques au JO de 2015, au JO de 2006 et au BO
  (relevés identiques octet pour octet au fichier de table, champ
  Empreintes-fichiers), aucune correction. Décomptes et rapports mesurés le
@@ -325,6 +365,8 @@ Empreintes-hors-depot:
  76de276ba38f765842eba84049a758f22bc199c16cfe7e9d54a53e2cd0859092  assembler.py (commit b949ced)
  db47aa40cf19737dd20bb9e0a668ba5890de678c11f0cf79b499194e476947e3  releves.py (commit b949ced)
  0d7fb3c86e6293e57c4141bf859f926056ba6617bed4794830c83839e9319766  Assurance-Recueil-2025.pdf (recueil ANC, téléchargé le 13/11/2026)
+ 26a8800e6d3303dc9c9ffe8b43af03c9ca8cf19debec0ca102d01453239866fc  LEGIARTI000031808315.xml (art. 9 en vigueur de l'arrêté du 21/12/2006, stock LEGI de la DILA, archive Freemium_legi_global_20261108-140000.tar.gz, lu le 14/11/2026)
+ 2b0a3db47a6bfc151c004177e9b53552aca89a75803773d5ab1460588bfc68d5  LEGIARTI000031808310.xml (art. 10 en vigueur de l'arrêté du 21/12/2006, même archive, lu le 14/11/2026)
 Representation: tablexp table 1
 Empreinte-table: 65a4862cbfc920662b4fae7087cda2f0
 Visa: 2026-11-13, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6866147841 (M473)
