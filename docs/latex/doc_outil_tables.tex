@@ -7513,24 +7513,37 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         dont l'art.~9 en vigueur de l'arrêté (modifié par l'arrêté du
         30/12/2015, art.~6) nomme «~les tables TGF05 et TGH05
         ci-annexées~» (\emph{vérifié} pour le texte de l'article, stock LEGI
-        de la DILA, lecture outillée, comme pour TH et TF~00-02, ci-dessus~;
+        de la DILA, lecture du 12/11/2026, comme pour TH et TF~00-02,
+        ci-dessus~;
         impression des tables annexées \emph{non établie}, pièce à verser,
         issue~\#268). Sécurité sociale~: annexe de l'article A932-3-11 du
-        code de la sécurité sociale, l'arrêté du 21/12/2006
-        (NOR SANS0625193A), art.~9 et~10 en vigueur, nommant TGF05 et TGH05
-        selon une lecture outillée de la version électronique de
-        Légifrance (14/11/2026, \code{regulatory}), simple indice~:
-        \emph{non établi} sur les pièces versées ni sur fac-similé~;
-        impression des tables
-        annexées \emph{non établie}. Comptes
+        code de la sécurité sociale, créée par l'arrêté du 21/12/2006
+        (NOR SANS0625193A), dont l'art.~10 en vigueur
+        (LEGIARTI000031808310, modifié par l'arrêté du 30/12/2015,
+        art.~3) la décrit comme «~contenant les tables TF00-02 et TH00-02
+        et les décalages d'âge ci-annexés, les tables TV88-90 et TD88-90
+        [\ldots], ainsi que les tables TGF05 et TGH05 ci-annexées~», et
+        dont l'art.~9 en vigueur (LEGIARTI000031808315) retient TGF05 et
+        TGH05 pour les rentes viagères à compter du
+        1\textsuperscript{er}~janvier 2008, applicables dès le
+        1\textsuperscript{er}~janvier 2007 (\emph{vérifié} pour le texte
+        des articles par \code{regulatory}, stock LEGI de la DILA, lecture
+        du 14/11/2026~; impression des tables annexées \emph{non établie},
+        issue~\#268). Comptes
         sociaux~: règlement ANC 2015-11 (recueil ANC, «~Version en vigueur
         au 1\textsuperscript{er} janvier 2025~», p.~18 du recueil (p.~19 du
         PDF)), art.~142-4 (rentes viagères), usage par renvoi aux codes,
         sans nommer la table (\emph{vérifié} par \code{regulatory}), et
         art.~142-3, usage par renvoi pour les contrats à élément viager non
-        liquidés, hors du champ de l'art.~142-4 (lecture retenue par le
-        mainteneur le 14/11/2026~; l'autre lecture, écartée, réservait ces
-        tables aux seules rentes de l'art.~142-4). Le détail par régime,
+        liquidés, hors du champ de l'art.~142-4, sous la condition du texte~:
+        les provisions sont calculées «~d'après les tables en vigueur à
+        l'époque de l'application du tarif~», si bien que TGF05 et TGH05 y
+        valent pour les tarifs en vigueur à compter du
+        1\textsuperscript{er}~janvier 2007 (ou, par le second alinéa de
+        l'article, en option, à la date de l'inventaire~; lecture de
+        \code{regulatory} du 14/11/2026 sur le recueil ANC, même page) (lecture retenue
+        par le mainteneur le 14/11/2026~; l'autre lecture, écartée,
+        réservait ces tables aux seules rentes de l'art.~142-4). Le détail par régime,
         avec les citations, est au fichier de provenance.
       \item \emph{Sexe.} TGF05 est déclarée \code{F}, TGH05 \code{H}, selon
         l'art.~2 de l'acte d'homologation et A132-18 (tables établies par
@@ -7559,7 +7572,8 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         Les objets ont 7\,986
         (TGF05) et 7\,815 (TGH05) lignes, de $q_x$ compris dans
         $[0~;\ 5/7]$ ($5/7 \approx 0{,}7142857$, génération 1901 à
-        115~ans) et $[0~;\ 3/4]$ (génération 1902 à 112~ans)~; des $l_x$
+        115~ans) et $[0~;\ 3/4]$ (deux cellules, générations 1902 et~1920
+        à 112~ans)~; des $l_x$
         égaux à deux âges consécutifs, en fin de génération (4~cellules
         de TGF05, 13 de TGH05, de 113 à~119~ans), donnent $q_x = +0$~:
         comme le $q_x = 1$ d'un groupe clos par un zéro (ci-dessus), ce sont
@@ -7568,14 +7582,25 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         de vraisemblance et non de correction, les âges $x \ge 31$ où
         $q_x < q_{x-1}$~: 65 couples (génération, âge) pour TGF05, 169
         pour TGH05. Ces décroissances sont de deux natures. (i)~Celles qui
-        sont compatibles avec un arrondi au plus proche des $l_x$
-        imprimés~: il existe des valeurs non arrondies, à $\pm\frac12$ au
-        plus de $l_{x-1}$, $l_x$ et $l_{x+1}$, qui ne donnent pas
-        $q_x < q_{x-1}$ si et seulement si
+        sont compatibles, couple par couple, avec un arrondi au plus proche
+        des $l_x$ imprimés~: il existe des valeurs non arrondies, à
+        $\pm\frac12$ au plus de $l_{x-1}$, $l_x$ et $l_{x+1}$, qui ne
+        donnent pas $q_x < q_{x-1}$ si et seulement si
         $(l_{x+1} - \frac12)(l_{x-1} - \frac12) \le (l_x + \frac12)^2$
         (\emph{résultat exact}~: $q_x \ge q_{x-1}$ s'écrit
         $l_{x+1}\,l_{x-1} \le l_x^2$, et l'inégalité est la plus facile à
-        satisfaire aux bornes de l'intervalle d'arrondi). Ce sont les 65 de
+        satisfaire aux bornes de l'intervalle d'arrondi). Cette condition
+        est locale, et seulement nécessaire~: chaque couple y est examiné
+        avec ses propres valeurs non arrondies, alors qu'un même $l_x$ entre
+        dans trois couples. Le test joint porte sur une fenêtre d'âges~: il
+        existe des $L_x \in [l_x - \frac12,\ l_x + \frac12]$ dont le
+        logarithme est concave sur la fenêtre (soit $q_x$ non décroissant
+        sur la fenêtre) si et seulement si la plus petite majorante concave
+        de $x \mapsto \log(l_x - \frac12)$ reste sous
+        $\log(l_x + \frac12)$ en chaque âge de la fenêtre (\emph{résultat
+        exact}~: toute suite à logarithme concave qui majore
+        $\log(l_x - \frac12)$ majore cette enveloppe, qui convient donc dès
+        qu'une suite convient). Ce sont les 65 de
         TGF05 (une à 44~ans, onze à 62~ans, 53 de 114 à~119~ans) et 116
         des 169 de TGH05 (les 85 de 110 à~119~ans, les 16 de 31 à~33~ans et
         15 des 68 à 59~ans). À partir de 107 à~120~ans selon la génération
@@ -7584,22 +7609,43 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         d'arrondi à l'entier, jusqu'à $\frac12$, y peut dépasser 0,5\,\%
         de $l_x$. (ii)~Les 53 autres couples de TGH05, tous à 59~ans
         (générations comprises entre 1945 et~2004), sont
-        \textbf{incompatibles avec un arrondi}~: c'est une propriété du
-        profil publié, qui présente un replat de 58 à~62~ans dans les deux
-        tables. Sur les générations 1940 à~2005, la médiane de
-        $q_{59}/q_{58}$ vaut 0,987 dans TGH05 (les 68 générations de 1938 à~2005
-        ont $q_{59} < q_{58}$), contre 1,058 à~1,150 pour $q_x/q_{x-1}$,
-        $x$ de 53 à~58 et de 64 à~70~; dans TGF05, $q_x$ croît en médiane
-        de 1,4\,\%, 1,3\,\% et 0,3\,\% de 59 à~62~ans, contre 3,1 à~8,9\,\%
-        pour $x$ de 56 à~59 et de 64 à~70 (1,9\,\% à 63~ans). Le replat est
+        \textbf{incompatibles avec un arrondi}, dès le test couple par
+        couple. Le test joint, appliqué à chaque génération sur toute la
+        fenêtre de 30~ans (ou du premier âge à valeur) au dernier âge à
+        valeur, ne relève aucune incompatibilité dans TGF05~; dans TGH05, il
+        n'en relève qu'à 59~ans, et pour 55~générations sur les 68 de 1938
+        à~2005 qui ont $q_{59} < q_{58}$~: les 53 ci-dessus et les
+        générations 2000 et~2005, compatibles couple par couple à 59~ans
+        mais incompatibles sur la seule fenêtre de 57 à~61~ans (génération
+        2000~: $l_{57}, \ldots, l_{61} = 97\,850$, $97\,731$, $97\,606$,
+        $97\,483$, $97\,360$, où $q_{60}$ est aussi inférieur à $q_{58}$).
+        Pour ces 55~générations, le profil publié à 59~ans n'est expliqué
+        par aucun arrondi des $l_x$. C'est une propriété du profil publié,
+        qui présente un ralentissement de la croissance de $q_x$ autour de
+        60~ans, de forme différente dans les deux tables (médianes sur les
+        générations 1940 à~2005). Dans TGH05, $q_{59} < q_{58}$ dans les
+        68~générations de 1938 à~2005 (médiane de $q_{59}/q_{58}$~:
+        0,987), $q_{60}$ revient au niveau de $q_{58}$ (médiane de
+        $q_{60}/q_{58}$~: 1,0005), puis $q_x$ croît de 3,7 à~5,6\,\% par
+        âge de 61 à~63~ans, contre 5,8 à~15,0\,\% pour $x$ de 53 à~58 et de
+        64 à~70~ans. Dans TGF05, $q_x$ croît de 0,3 à~1,9\,\% par âge de 60
+        à~63~ans (les onze décroissances à 62~ans relevées ci-dessus,
+        compatibles avec un arrondi, sont dans cette zone), contre 3,1
+        à~8,9\,\% pour $x$ de 56 à~59 et de 64 à~70~ans~; un ralentissement
+        semblable existe à 54 et~55~ans (0,9 et 2,2\,\%), sans décroissance
+        de $q_x$ dans aucune génération. Ce profil est
         imprimé de même au JO de 2015, au JO de 2006 et au BO (aucun écart
         entre les trois, ci-dessous, «~Contre-vérification~»)~: ce n'est
         pas une erreur de lecture. Son origine dans la construction des
         tables est une \emph{hypothèse non vérifiée}, que l'outil ne
         tranche pas. Dans les deux cas, ce sont des valeurs imprimées et
-        homologuées, que l'outil ne corrige pas. Un
+        homologuées, que l'outil ne corrige pas. Les décomptes du test joint
+        sont une mesure d'\code{actuary} du 14/11/2026, reproduite par
+        \code{docwriter} le même jour sur les fichiers de table, sans
+        script versé~: leur reproduction par script est l'objet de
+        l'issue~\#279. Un
         consommateur à venir qui compare des $q_x$ le long d'une génération,
-        ou qui positionne une table sur TGH05, héritera du replat~; au-delà
+        ou qui positionne une table sur TGH05, héritera de ce ralentissement~; au-delà
         de l'âge où $l_x < 100$, les $q_x$ sont sensibles à l'arrondi des
         $l_x$ et leurs variations d'un âge au suivant ne se lisent pas comme
         une donnée de mortalité
