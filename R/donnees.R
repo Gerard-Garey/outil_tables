@@ -2864,6 +2864,11 @@ decalages_age <- function(x, nom, table, source) {
   # deviendrait NA par as.integer().
   dans_plage <- function(v) { v <- v[!is.na(v)]; !is.double(v) || all(abs(v) <= .Machine$integer.max) }
   amin <- x[["age_min"]]; amax <- x[["age_max"]]; dec <- x[["decalage"]]
+  # age_max logique entièrement manquant (NA d'un data.frame écrit à la main,
+  # une seule bande ouverte) : manquant admis, lu en NA_integer_ ; tout autre
+  # logique reste mal typé.
+  if (is.logical(amax) && !is.object(amax) && is.null(attr(amax, "dim", exact = TRUE)) && all(is.na(amax)))
+    amax <- rep(NA_integer_, length(amax))
   mal_typees <- c(
     age_min = !type_conforme(amin, "entier_positif") || anyNA(amin) || !dans_plage(amin),
     age_max = !type_conforme(amax, "entier_positif") || !dans_plage(amax),
@@ -2953,17 +2958,23 @@ decalages_age <- function(x, nom, table, source) {
 # tables_embarquees(), ni dans table_embarquee(), ni dans la réserve des noms de
 # tables. Le nom s'écrit avec l'apostrophe ASCII (U+0027 ; il entre dans la
 # fiche et se compare à l'identique, M468, question 6). Il n'est pas ASCII :
-# R CMD INSTALL laisse ses octets UTF-8 d'encodage « unknown », sauf
-# installation sous une locale UTF-8 lue sous C (mesuré dans les quatre
-# combinaisons de C et C.UTF-8) : installé et lu hors UTF-8, le nom se lit en
-# octets échappés (contrôle (g) en échec sous LC_ALL=C) ; il est marqué
-# UTF-8 ici par iconv(, "UTF-8", "UTF-8"), fonction de base qui garde les
-# octets et pose la marque (ce fichier est évalué avant R/outils.R,
-# texte_moteur() n'y est pas encore défini), pour que le catalogue et l'accès
-# soient les mêmes sous toute locale (contrôle (g) de
-# tests/controles/tables_embarquees.R).
+# écrit en clair, il prendrait l'encodage de la locale d'installation (octets
+# UTF-8 non marqués sous C, puis lus en octets échappés : contrôle (g) en
+# échec sous LC_ALL=C ; source réencodée en latin-1 par R CMD INSTALL sous
+# une locale latin-1, où iconv(, "UTF-8", "UTF-8") rendait NA et
+# decalages_embarques() s'arrêtait, #273). Il s'écrit donc en octets UTF-8
+# échappés (ligne ASCII, que R CMD INSTALL ne réencode pas) marqués UTF-8 par
+# Encoding<-, fonction de base (ce fichier est évalué avant R/outils.R,
+# texte_moteur() n'y est pas encore défini) : nom marqué UTF-8, mêmes octets,
+# après installation et lecture sous C, C.UTF-8 et fr_FR.ISO-8859-1
+# (contrôle (g) de tests/controles/tables_embarquees.R pour C et C.UTF-8 ;
+# tests/controles/locale_latin1.R pour latin-1).
 DECLARATIONS_DECALAGES_EMBARQUES <- data.frame(
-  nom = iconv(c("Décalages d'âge TF 00-02", "Décalages d'âge TH 00-02"), "UTF-8", "UTF-8"),
+  nom = local({
+    x <- c("D\xc3\xa9calages d'\xc3\xa2ge TF 00-02", "D\xc3\xa9calages d'\xc3\xa2ge TH 00-02")
+    Encoding(x) <- "UTF-8"
+    x
+  }),
   identifiant = c("decalages_tf_00-02", "decalages_th_00-02"),
   table = c("TF 00-02", "TH 00-02"),
   stringsAsFactors = FALSE)

@@ -82,6 +82,10 @@ verifier("D2 : une seule bande, ouverte, au décalage positif, admise (valeur ca
   o <- dec(bandes(5, NA, 3))
   identical(o$age_min, 5L) && identical(o$age_max, NA_integer_) && identical(o$decalage, 3L) && nrow(o) == 1L
 })
+verifier("D2 : age_max logique entièrement manquant (NA nu d'un data.frame écrit à la main) admis, lu en NA_integer_ : objet identical() à celui d'un age_max integer (#273 ; identité exacte)", {
+  o <- dec(data.frame(age_min = 0L, age_max = NA, decalage = 0L))
+  is.logical(data.frame(age_max = NA)$age_max) && identical(o, dec(bandes(0, NA, 0))) && identical(o$age_max, NA_integer_)
+})
 verifier("D2 : décalages non monotones et de signes mêlés admis (aucune propriété des valeurs exigée, § 1.3)", {
   o <- dec(bandes(c(0, 10, 20), c(9, 19, NA), c(-4, 7, -1)))
   identical(o$decalage, c(-4L, 7L, -1L))
@@ -144,7 +148,7 @@ for (cas in list(list("age_min NA", "age_min", function(x) { x$age_min[1L] <- NA
                  list("age_min non fini", "age_min", function(x) { x$age_min <- c(10, 20, Inf); x }),
                  list("age_min au-delà de .Machine$integer.max", "age_min", function(x) { x$age_min <- c(10, 20, 2^31); x }),
                  list("age_max négatif", "age_max", function(x) { x$age_max[1L] <- -1L; x }),
-                 list("age_max logique (NA nus)", "age_max", function(x) { x$age_max <- c(NA, NA, NA); x }),
+                 list("age_max logique non entièrement manquant", "age_max", function(x) { x$age_max <- c(TRUE, FALSE, NA); x }),
                  list("decalage NA", "decalage", function(x) { x$decalage[2L] <- NA; x }),
                  list("decalage 1.5", "decalage", function(x) { x$decalage <- c(-2, -1.5, 0); x }),
                  list("decalage logique", "decalage", function(x) { x$decalage <- c(TRUE, FALSE, TRUE); x }),
@@ -159,6 +163,9 @@ verifier("D3 decalages_bande_inversee : bande [20 ; 10] (valeur calculée à la 
 verifier("D3 decalages_bande_ouverte : deux bandes ouvertes (valeur calculée à la main)",
          controle_refus(refus_de(dec(bandes(c(10, 20), c(NA, NA)))), "donnees", "decalages_bande_ouverte",
                         "2 bandes ouvertes", list(bandes = c("10 et plus", "20 et plus"))))
+verifier("D3 decalages_bande_ouverte : age_max logique entièrement manquant sur trois bandes, lu en NA_integer_ : trois bandes ouvertes (valeur calculée à la main)",
+         controle_refus(refus_de(dec(transform(d1(), age_max = NA))), "donnees", "decalages_bande_ouverte",
+                        "3 bandes ouvertes", list(bandes = c("10 et plus", "20 et plus", "30 et plus"))))
 verifier("D3 decalages_bande_ouverte : bande ouverte en premier (valeur calculée à la main)",
          controle_refus(refus_de(dec(bandes(c(10, 20), c(NA, 29)))), "donnees", "decalages_bande_ouverte",
                         c("« 10 et plus »", "« [20 ; 29] »"), list(bandes = "10 et plus")))
