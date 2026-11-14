@@ -1,7 +1,8 @@
 # -----------------------------------------------------------------------------
 #  tests/controles/tables_embarquees.R : tables embarquées, fichiers de
 #  provenance et contre-vérification (issue #263 ; ADR 0018, points 2, 3, 5
-#  et 6 ; ADR 0011, annotation du 05/11/2026, (d) ; M447)
+#  et 6 ; ADR 0011, annotation du 05/11/2026, (d) ; M447 ; formats 2 et 3,
+#  ADR 0019, point 7.5, #272 et #273)
 #
 #  Installe l'arbre `racine` dans une bibliothèque temporaire (sous une locale
 #  UTF-8), puis vérifie, pour chaque table déclarée
@@ -59,6 +60,29 @@
 #        l'archive sous LC_ALL=C et sous une locale UTF-8, catalogue identique
 #        à celui de (f) et tables accessibles après suppression du dossier
 #        extdata de la bibliothèque (aucun fichier lu à l'exécution).
+#  Décalages d'âge (DECLARATIONS_DECALAGES_EMBARQUES ; format 3, ADR 0019,
+#  points 6 et 7 ; spécification d'actuary de #273, § 5.9), mêmes contrôles :
+#    (a) fichiers de décalages et de provenance présents ; identifiants
+#        uniques entre tables et décalages ; relevés rattachés ;
+#    (b) format 3 sur les octets (en-tête age_min,age_max,decalage, ligne
+#        de bande, entiers au plus .Machine$integer.max, age_min strictement
+#        croissant ; un relevé peut répéter une ligne imprimée deux fois) ;
+#        provenance : Table et Bandes à la place de Sexe, Forme-origine et
+#        Ages, Representation et Empreinte-decalages requis, groupe
+#        Comparaison-acte facultatif et complet ; Nom, Fichier et Table
+#        égaux à la déclaration, Table nommant une table déclarée ;
+#    (c) identité des fichiers, comme pour une table ;
+#    (d) empreinte lue dans decalages_embarques(), la même sur toutes les
+#        bandes, égale à Empreinte-decalages ; bandes rendues égales aux
+#        lignes du fichier ;
+#    (e) transcription_b identique ligne à ligne ; autres relevés comparés
+#        en multiensembles de lignes, écarts déclarés « <ligne du
+#        fichier>;<ligne du relevé> », un côté vide quand la ligne n'existe
+#        que d'un côté, égaux de chaque côté aux écarts constatés ;
+#    (f) decalages_embarques() : objets dans l'ordre de la déclaration,
+#        table et source de la déclaration ;
+#    (g) decalages_embarques() identique après installation de l'archive et
+#        suppression d'extdata, sous les deux locales.
 #
 #  Témoin (--temoin, ADR 0018, point 6.2 ; ADR 0019, point 7.5) : copie de
 #  l'arbre munie de quatre tables d'essai déclarées, deux au format 1 et deux
@@ -73,7 +97,10 @@
 #  déclare la provenance n'est pas admis) ; puis de même pour les essais au
 #  format 2 : une cellule de l'essai admis changée d'une unité (écarts sur
 #  (c), (d) et (e)), puis, rétablie, les paires attendues de l'essai refusé
-#  changées (écart (d) seul).
+#  changées (écart (d) seul) ; enfin, des décalages d'essai au format 3 (nom
+#  non ASCII, seconde source à la borne basse différente et à la ligne en
+#  double, déclarées en écart) : un décalage changé d'une unité (écarts sur
+#  (c), (d) et (e)).
 #
 #  Usage : Rscript tests/controles/tables_embarquees.R [--sans-installation] [racine]
 #          Rscript tests/controles/tables_embarquees.R --temoin [racine]
@@ -125,6 +152,19 @@ CHAMPS_FORMAT2_REQUIS <- "Generations"
 CHAMPS_COMPARAISON_ACTE <- c("Comparaison-acte", "Comparaison-acte-methode", "Comparaison-acte-releve",
                              "Comparaison-acte-ecarts")
 MOTIF_VISA <- "^[0-9]{4}-[0-9]{2}-[0-9]{2}, mainteneur, [^ ].*$"
+# Format 3 (ADR 0019, points 6.2 et 7.1 ; spécification d'actuary de #273,
+# § 2 et § 5.8) : en-tête et ligne de bande ; champs du fichier de
+# provenance des décalages : Table et Bandes remplacent Sexe, Forme-origine
+# et Ages ; Representation et Empreinte-decalages remplacent Empreinte-table
+# (aucun état refusé : ni Refus-attendu, ni Refus-paires) ; groupe
+# Comparaison-acte facultatif, complet.
+EN_TETE_BANDES <- "age_min,age_max,decalage"
+MOTIF_BANDE <- "^(0|[1-9][0-9]{0,14}),(0|[1-9][0-9]{0,14})?,(0|-?[1-9][0-9]{0,14})$"
+REPRESENTATION_DECALAGES <- "tablexp decalages 1"
+CHAMPS_REQUIS_DECALAGES <- c(setdiff(CHAMPS_REQUIS, c("Sexe", "Forme-origine", "Ages")), "Table", "Bandes",
+                             "Representation", "Empreinte-decalages")
+CHAMPS_FACULTATIFS_DECALAGES <- c("Controle-lecture-releve", "Controle-lecture-ecarts", "Controle-lecture-methode",
+                                  "Historique", CHAMPS_COMPARAISON_ACTE)
 
 ecarts <- character(0)
 ecart <- function(section, texte) {
@@ -163,14 +203,12 @@ sha256 <- function(racine, chemins) {
 # format 2 par strsplit(paste0(x, ",."), ...) puis retrait du dernier
 # morceau : une cellule vide finale est gardée, puis refusée.
 lire_format <- function(chemin, format) {
-  o <- readBin(chemin, "raw", file.info(chemin)$size)
   defaut <- function(t) list(defaut = t)
   if (!(identical(format, 1L) || identical(format, 2L)))
     return(defaut(sprintf("format déclaré « %s » au lieu de 1 ou 2", paste(format, collapse = ", "))))
-  if (!length(o)) return(defaut("fichier vide"))
-  if (any(o > as.raw(0x7e) | (o < as.raw(0x20) & o != as.raw(0x0a)))) return(defaut("octet hors ASCII imprimable et LF (BOM, CR, tabulation...)"))
-  if (o[length(o)] != as.raw(0x0a)) return(defaut("pas de fin de ligne après la dernière ligne"))
-  l <- strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]]
+  a <- lignes_ascii(chemin)
+  if (!is.null(a$defaut)) return(a)
+  l <- a$lignes
   if (identical(format, 2L)) return(lire_grille(l))
   if (!identical(l[1L], "age,lx")) return(defaut(sprintf("en-tête « %s » au lieu de « age,lx »", l[1L])))
   if (length(l) < 2L) return(defaut("aucune ligne de valeurs"))
@@ -181,6 +219,56 @@ lire_format <- function(chemin, format) {
   k <- which(age != age[1L] + seq_along(age) - 1L)
   if (length(k)) return(defaut(sprintf("ligne %d : âge %s hors de la suite croissante et consécutive", k[1L] + 1L, age[k[1L]])))
   list(defaut = NULL, age = age, lx = lx, lignes = l)
+}
+
+# Octets communs aux trois formats (ADR 0018, point 2.2) : fichier non vide,
+# ASCII imprimable et LF, fin de ligne finale. Rend list(defaut = texte ou
+# NULL, lignes).
+lignes_ascii <- function(chemin) {
+  o <- readBin(chemin, "raw", file.info(chemin)$size)
+  defaut <- function(t) list(defaut = t)
+  if (!length(o)) return(defaut("fichier vide"))
+  if (any(o > as.raw(0x7e) | (o < as.raw(0x20) & o != as.raw(0x0a)))) return(defaut("octet hors ASCII imprimable et LF (BOM, CR, tabulation...)"))
+  if (o[length(o)] != as.raw(0x0a)) return(defaut("pas de fin de ligne après la dernière ligne"))
+  list(defaut = NULL, lignes = strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]])
+}
+
+# Format 3 (ADR 0019, point 6.2 ; spécification d'actuary de #273, § 2) d'un
+# fichier de décalages ou d'un relevé, sur les octets : en-tête
+# age_min,age_max,decalage, au moins une bande, chaque ligne conforme à
+# MOTIF_BANDE, entiers au plus .Machine$integer.max en valeur absolue ; pour
+# le fichier de décalages seul (releve = FALSE), age_min strictement
+# croissant (règles d'analyser_decalages_format3(), R/donnees.R). Un relevé
+# reproduit une ligne par ligne imprimée, doublon compris (§ 5.4) : ni ordre
+# ni unicité n'y sont exigés. La structure des bandes (bande ouverte,
+# contiguïté) est l'affaire du constructeur, contrôlée en (d). Rend
+# list(defaut, lignes, bandes = lignes de bande).
+lire_bandes <- function(chemin, releve = FALSE) {
+  defaut <- function(t) list(defaut = t)
+  a <- lignes_ascii(chemin)
+  if (!is.null(a$defaut)) return(a)
+  l <- a$lignes
+  if (!identical(l[1L], EN_TETE_BANDES)) return(defaut(sprintf("en-tête « %s » au lieu de « %s »", l[1L], EN_TETE_BANDES)))
+  if (length(l) < 2L) return(defaut("aucune bande"))
+  corps <- l[-1L]
+  k <- which(!grepl(MOTIF_BANDE, corps))
+  if (length(k)) return(defaut(sprintf("ligne %d « %s » mal formée", k[1L] + 1L, corps[k[1L]])))
+  v <- lapply(strsplit(corps, ",", fixed = TRUE), function(m) abs(as.double(m[nzchar(m)])))
+  k <- which(vapply(v, function(x) any(x > .Machine$integer.max), NA))
+  if (length(k)) return(defaut(sprintf("ligne %d : entier supérieur au plus grand entier du moteur", k[1L] + 1L)))
+  if (!releve) {
+    amin <- as.double(sub(",.*$", "", corps))
+    k <- which(c(FALSE, amin[-1L] <= amin[-length(amin)]))
+    if (length(k)) return(defaut(sprintf("ligne %d : âge minimal non supérieur à celui de la ligne précédente", k[1L] + 1L)))
+  }
+  list(defaut = NULL, lignes = l, bandes = corps)
+}
+
+# Éléments de `a` sans contrepartie dans `b`, multiplicité comprise
+# (multiensembles de lignes ; spécification d'actuary de #273, § 5.6), triés.
+difference_multi <- function(a, b) {
+  r <- unlist(lapply(unique(a), function(x) rep(x, max(0L, sum(a == x) - sum(b == x)))), use.names = FALSE)
+  sort(as.character(r), method = "radix")
 }
 
 # Format 2 (ADR 0019, point 5.2) sur les lignes `l` d'un fichier ASCII.
@@ -312,11 +400,21 @@ controler <- function(racine, installation = TRUE) {
     ecart("f", sprintf("tables_embarquees() refuse : %s (%s)", catalogue$motif, conditionMessage(catalogue)))
     catalogue <- NULL
   }
+  # Décalages d'âge (format 3 ; ADR 0019, points 6 et 7.5) : déclaration
+  # distincte, accesseur decalages_embarques() (identité moteur).
+  decl_d <- get("DECLARATIONS_DECALAGES_EMBARQUES", envir = asNamespace("tablexp"))
+  cat(sprintf("  décalages déclarés : %d (%s)\n", nrow(decl_d), if (nrow(decl_d)) paste(decl_d$nom, collapse = ", ") else "aucun"))
+  catalogue_d <- tryCatch(decalages_embarques(), refus_tablexp = function(r) r)
+  if (inherits(catalogue_d, "refus_tablexp")) {
+    ecart("f", sprintf("decalages_embarques() refuse : %s (%s)", catalogue_d$motif, conditionMessage(catalogue_d)))
+    catalogue_d <- NULL
+  }
 
   # (a) complétude : fichiers non rattachés.
-  ids <- decl$identifiant
+  ids <- c(decl$identifiant, decl_d$identifiant)
   dans_tables <- list.files(file.path(racine, DOSSIER_TABLES), all.files = TRUE, no.. = TRUE, recursive = TRUE)
   attendus_tables <- c(paste0(ids, ".csv"), paste0(ids, ".provenance.dcf"))
+  for (x in ids[duplicated(ids)]) ecart("a", sprintf("identifiant %s déclaré plus d'une fois (tables et décalages)", x))
   for (f in setdiff(dans_tables, attendus_tables)) ecart("a", sprintf("%s/%s rattaché à aucune table déclarée", DOSSIER_TABLES, f))
   dans_releves <- list.files(file.path(racine, DOSSIER_RELEVES), all.files = TRUE, no.. = TRUE, recursive = TRUE)
   cites <- character(0)         # chemins cités par les champs *-releve
@@ -461,6 +559,139 @@ controler <- function(racine, installation = TRUE) {
     }
   }
 
+  # Décalages d'âge, au format 3 (ADR 0019, points 6.2, 7.1, 7.2 et 7.5 ;
+  # spécification d'actuary de #273, § 5) : (a) à (e) comme pour une table.
+  for (k in seq_len(nrow(decl_d))) {
+    nom <- decl_d$nom[k]; id <- decl_d$identifiant[k]
+    cat(sprintf("  -- %s (%s, format 3, table %s)\n", nom, id, decl_d$table[k]))
+    f_table <- sprintf("%s/%s.csv", DOSSIER_TABLES, id)
+    f_prov <- sprintf("%s/%s.provenance.dcf", DOSSIER_TABLES, id)
+    if (!decl_d$table[k] %in% decl$nom)
+      ecart("b", sprintf("%s : table visée « %s » absente de DECLARATIONS_TABLES_EMBARQUEES", nom, decl_d$table[k]))
+    if (!file.exists(file.path(racine, f_table))) ecart("a", sprintf("%s : fichier de décalages %s absent", nom, f_table))
+    if (!file.exists(file.path(racine, f_prov))) { ecart("a", sprintf("%s : fichier de provenance %s absent", nom, f_prov)); next }
+
+    # (b) format 3, forme de la provenance, champs du format 3.
+    tab <- if (file.exists(file.path(racine, f_table))) lire_bandes(file.path(racine, f_table)) else list(defaut = "absent")
+    if (!is.null(tab$defaut)) ecart("b", sprintf("%s : %s : %s", nom, f_table, tab$defaut))
+    p <- lire_provenance(file.path(racine, f_prov))
+    for (d in p$defauts) ecart("b", sprintf("%s : %s : %s", nom, f_prov, d))
+    ch <- p$champs
+    n <- names(ch)
+    groupes <- unique(sub("(-methode|-releve|-ecarts)$", "", grep("^Seconde-source", n, value = TRUE)))
+    groupe_ok <- grepl(sprintf("^Seconde-source(-%s)?$", MOTIF_PIECE), groupes) &
+      !groupes %in% paste0("Seconde-source", SUFFIXES_GROUPE)
+    for (g in groupes[!groupe_ok]) ecart("b", sprintf("%s : champ de seconde source mal nommé : %s", nom, g))
+    groupes <- groupes[groupe_ok]
+    if (!length(groupes)) ecart("b", sprintf("%s : aucune seconde source (champs Seconde-source*)", nom))
+    connus <- c(CHAMPS_REQUIS_DECALAGES, CHAMPS_FACULTATIFS_DECALAGES, groupes, outer(groupes, SUFFIXES_GROUPE, paste0))
+    for (x in setdiff(n, connus)) ecart("b", sprintf("%s : champ inconnu %s", nom, x))
+    for (x in setdiff(c(CHAMPS_REQUIS_DECALAGES, groupes, outer(groupes, SUFFIXES_GROUPE, paste0)), n))
+      ecart("b", sprintf("%s : champ requis absent %s", nom, x))
+    controle_lecture <- c("Controle-lecture-releve", "Controle-lecture-ecarts", "Controle-lecture-methode")
+    if (any(controle_lecture %in% n) && !all(controle_lecture %in% n))
+      ecart("b", sprintf("%s : champs Controle-lecture-* incomplets (releve, ecarts et methode vont ensemble)", nom))
+    if (any(CHAMPS_COMPARAISON_ACTE %in% n) && !all(CHAMPS_COMPARAISON_ACTE %in% n))
+      ecart("b", sprintf("%s : champs Comparaison-acte* incomplets (Comparaison-acte, -methode, -releve et -ecarts vont ensemble)", nom))
+    egal <- function(champ, attendu)
+      if (!identical(valeur(ch, champ), attendu)) ecart("b", sprintf("%s : %s « %s » au lieu de « %s »", nom, champ, valeur(ch, champ), attendu))
+    egal("Format", FORMAT_PROVENANCE)
+    egal("Nom", nom)
+    egal("Fichier", f_table)
+    egal("Table", decl_d$table[k])
+    if (!is.na(valeur(ch, "Visa")) && !grepl(MOTIF_VISA, valeur(ch, "Visa")))
+      ecart("b", sprintf("%s : Visa « %s » : « AAAA-MM-JJ, mainteneur, <renvoi au commentaire du visa> » attendu", nom, valeur(ch, "Visa")))
+    releves <- c(transcription_b = valeur(ch, "Transcription-B-releve"))
+    for (g in groupes) {
+      piece <- sub("^Seconde-source-?", "", g)
+      releves[[paste0("seconde_source", if (nzchar(piece)) paste0("_", piece) else "")]] <- valeur(ch, paste0(g, "-releve"))
+    }
+    if ("Controle-lecture-releve" %in% n) releves[["couche_texte"]] <- valeur(ch, "Controle-lecture-releve")
+    if ("Comparaison-acte-releve" %in% n) releves[["comparaison_acte"]] <- valeur(ch, "Comparaison-acte-releve")
+    for (nature in names(releves)) {
+      attendu <- sprintf("%s/%s.%s.csv", DOSSIER_RELEVES, id, nature)
+      if (!identical(unname(releves[[nature]]), attendu))
+        ecart("b", sprintf("%s : relevé %s cité « %s » au lieu de « %s »", nom, nature, releves[[nature]], attendu))
+    }
+    releves <- releves[!is.na(releves)]
+    cites <- c(cites, releves)
+
+    # (c) identité des fichiers.
+    lignes_e <- if (is.na(valeur(ch, "Empreintes-fichiers"))) character(0) else strsplit(valeur(ch, "Empreintes-fichiers"), "\n", fixed = TRUE)[[1L]]
+    forme_e <- grepl("^[0-9a-f]{64}  [^ ./][^ ]*$", lignes_e) & !grepl("(^|/)\\.\\.(/|$)", substring(lignes_e, 67L))
+    for (x in lignes_e[!forme_e]) ecart("c", sprintf("%s : ligne d'Empreintes-fichiers mal formée « %s »", nom, x))
+    lignes_e <- lignes_e[forme_e]
+    chemins_e <- substring(lignes_e, 67L); attendus_e <- substr(lignes_e, 1L, 64L)
+    empreintes_citees <- c(empreintes_citees, chemins_e)
+    for (x in setdiff(c(f_table, releves), chemins_e)) ecart("c", sprintf("%s : %s absent d'Empreintes-fichiers", nom, x))
+    mesures <- sha256(racine, chemins_e)
+    if (!is.null(mesures)) for (j in seq_along(chemins_e)) {
+      if (is.na(mesures[j])) ecart("c", sprintf("%s : %s cité dans Empreintes-fichiers, absent de l'arbre", nom, chemins_e[j]))
+      else if (mesures[j] != attendus_e[j])
+        ecart("c", sprintf("%s : SHA-256 de %s : %s mesuré, %s écrit", nom, chemins_e[j], mesures[j], attendus_e[j]))
+      else cat(sprintf("     sha256 ok  %s\n", chemins_e[j]))
+    }
+
+    # (d) identité moteur : empreinte lue dans decalages_embarques(), la même
+    # sur toutes les bandes de l'objet, égale à Empreinte-decalages ; bandes
+    # rendues égales aux lignes du fichier.
+    if (!is.null(catalogue_d)) {
+      x <- catalogue_d[catalogue_d$nom == nom, , drop = FALSE]
+      if (!nrow(x)) ecart("d", sprintf("%s : aucune bande dans decalages_embarques()", nom))
+      else {
+        rendues <- sprintf("%d,%s,%d", x$age_min, ifelse(is.na(x$age_max), "", sprintf("%d", x$age_max)), x$decalage)
+        if (!identical(unique(x$representation), REPRESENTATION_DECALAGES) ||
+            !identical(valeur(ch, "Representation"), REPRESENTATION_DECALAGES))
+          ecart("d", sprintf("%s : Representation « %s », « %s » dans decalages_embarques()", nom, valeur(ch, "Representation"),
+                             paste(unique(x$representation), collapse = ", ")))
+        if (!identical(unique(x$empreinte), valeur(ch, "Empreinte-decalages")))
+          ecart("d", sprintf("%s : empreinte des décalages %s rendue par le moteur, %s écrite (Empreinte-decalages)", nom,
+                             paste(unique(x$empreinte), collapse = ", "), valeur(ch, "Empreinte-decalages")))
+        else if (is.null(tab$defaut) && !identical(rendues, tab$bandes))
+          ecart("d", sprintf("%s : bandes rendues par decalages_embarques() différentes des lignes du fichier", nom))
+        else cat(sprintf("     empreinte des décalages ok  %s (%d bandes, de %d)\n", unique(x$empreinte), nrow(x), x$age_min[1L]))
+      }
+    }
+
+    # (e) contre-vérification : transcription_b identique ligne à ligne ;
+    # autres relevés comparés en multiensembles de lignes de bande, écarts
+    # déclarés « <ligne du fichier>;<ligne du relevé> », un côté vide quand la
+    # ligne n'existe que d'un côté (ADR 0019, point 7.2 ; spécification
+    # d'actuary de #273, § 5.6) : égalité, de chaque côté, des lignes
+    # constatées sans contrepartie et des lignes déclarées.
+    if (is.null(tab$defaut)) for (nature in names(releves)) {
+      f <- file.path(racine, releves[[nature]])
+      if (!file.exists(f)) { ecart("a", sprintf("%s : relevé %s absent", nom, releves[[nature]])); next }
+      r <- lire_bandes(f, releve = nature != "transcription_b")
+      if (!is.null(r$defaut)) { ecart("b", sprintf("%s : %s : %s", nom, releves[[nature]], r$defaut)); next }
+      if (nature == "transcription_b") {
+        if (!identical(r$lignes, tab$lignes))
+          ecart("e", sprintf("%s : transcription_b différente du fichier de décalages (lignes %s du fichier sans contrepartie)", nom,
+                             paste(difference_multi(tab$bandes, r$bandes), collapse = " ; ")))
+        else cat(sprintf("     transcription_b identique (%d bandes)\n", length(r$bandes)))
+        next
+      }
+      champ <- if (nature == "couche_texte") "Controle-lecture-ecarts"
+               else if (nature == "comparaison_acte") "Comparaison-acte-ecarts"
+               else paste0("Seconde-source", if (nature == "seconde_source") "" else paste0("-", sub("^seconde_source_", "", nature)), "-ecarts")
+      declares <- ecarts_declares(valeur(ch, champ))
+      if (length(declares) == 1L && is.na(declares)) next  # champ absent, signalé en (b)
+      forme <- grepl("^[^;]*;[^;]*$", declares) & declares != ";"
+      for (x in declares[!forme]) ecart("b", sprintf("%s : écart déclaré mal formé « %s » (%s ; « <ligne du fichier>;<ligne du relevé> » attendu)", nom, x, champ))
+      declares <- declares[forme]
+      cote_a <- sub(";.*$", "", declares); cote_b <- sub("^[^;]*;", "", declares)
+      cote_a <- sort(cote_a[nzchar(cote_a)], method = "radix"); cote_b <- sort(cote_b[nzchar(cote_b)], method = "radix")
+      constates_a <- difference_multi(tab$bandes, r$bandes); constates_b <- difference_multi(r$bandes, tab$bandes)
+      for (x in difference_multi(constates_a, cote_a)) ecart("e", sprintf("%s : ligne %s du fichier sans contrepartie dans %s, non déclarée (%s)", nom, x, nature, champ))
+      for (x in difference_multi(cote_a, constates_a)) ecart("e", sprintf("%s : ligne %s du fichier déclarée en écart à %s (%s), non constatée", nom, x, nature, champ))
+      for (x in difference_multi(constates_b, cote_b)) ecart("e", sprintf("%s : ligne %s de %s sans contrepartie dans le fichier, non déclarée (%s)", nom, x, nature, champ))
+      for (x in difference_multi(cote_b, constates_b)) ecart("e", sprintf("%s : ligne %s de %s déclarée en écart (%s), non constatée", nom, x, nature, champ))
+      if (identical(constates_a, cote_a) && identical(constates_b, cote_b))
+        cat(sprintf("     %s : %d ligne(s) du fichier et %d du relevé sans contrepartie, égales aux écarts déclarés\n", nature,
+                    length(constates_a), length(constates_b)))
+    }
+  }
+
   # (a) relevés et scripts rattachés.
   for (f in dans_releves) {
     chemin <- sprintf("%s/%s", DOSSIER_RELEVES, f)
@@ -482,8 +713,20 @@ controler <- function(racine, installation = TRUE) {
     }
   }
 
+  if (!is.null(catalogue_d)) {
+    if (!identical(unique(catalogue_d$nom), decl_d$nom))
+      ecart("f", sprintf("decalages_embarques()$nom « %s », déclaration « %s »", paste(unique(catalogue_d$nom), collapse = ", "),
+                         paste(decl_d$nom, collapse = ", ")))
+    else {
+      i <- match(catalogue_d$nom, decl_d$nom)
+      if (!identical(catalogue_d$table, decl_d$table[i])) ecart("f", "decalages_embarques()$table différent de la déclaration")
+      if (!identical(catalogue_d$source, sprintf("%s/%s.provenance.dcf", DOSSIER_TABLES, decl_d$identifiant[i])))
+        ecart("f", "decalages_embarques()$source différent des chemins de provenance")
+    }
+  }
+
   # (g) installation depuis R CMD build, accès après suppression d'extdata.
-  if (installation) controler_installation(racine, catalogue, utf8)
+  if (installation) controler_installation(racine, catalogue, utf8, catalogue_d)
   else cat("  (g) installation depuis R CMD build : non mesurée (--sans-installation)\n")
   invisible()
 }
@@ -496,12 +739,15 @@ releve_acces <- function() {
     x <- tryCatch(table_embarquee(n), refus_tablexp = function(r) r)
     if (inherits(x, "refus_tablexp")) paste("refus", x$motif) else sprintf("objet %d lignes", nrow(x))
   }, "")
+  d <- decalages_embarques()
   c(sprintf("%s|%s|%s|%s|%s|%s|%s|%s", t$nom, t$sexe, t$forme_origine, t$source, t$etat, t$motif_refus,
-            t$representation, t$empreinte), unname(acces))
+            t$representation, t$empreinte), unname(acces),
+    sprintf("%s|%s|%s|%s|%s|%s|%s|%s", d$nom, d$table, d$age_min, d$age_max, d$decalage, d$source, d$representation,
+            d$empreinte))
 }
 
-controler_installation <- function(racine, catalogue, utf8) {
-  if (is.null(catalogue)) { ecart("g", "catalogue illisible : mesure d'installation sans objet"); return(invisible()) }
+controler_installation <- function(racine, catalogue, utf8, catalogue_d) {
+  if (is.null(catalogue) || is.null(catalogue_d)) { ecart("g", "catalogue illisible : mesure d'installation sans objet"); return(invisible()) }
   attendu <- releve_acces()
   if (!nrow(catalogue)) cat("  (g) catalogue vide : la mesure porte sur l'arbre témoin (--temoin)\n")
   construction <- tempfile("tablexp_build_"); dir.create(construction)
@@ -520,6 +766,9 @@ controler_installation <- function(racine, catalogue, utf8) {
                                                         sub("[.]provenance[.]dcf$", ".csv", sub("^.*/", "", catalogue$source[k])))))
       if (!f %in% contenu) ecart("g", sprintf("%s absent de l'archive", f))
   }
+  for (src in unique(catalogue_d$source))
+    for (f in sprintf("tablexp/%s", c(src, sub("[.]provenance[.]dcf$", ".csv", src))))
+      if (!f %in% contenu) ecart("g", sprintf("%s absent de l'archive", f))
   for (loc in c("C", utf8)) {
     lib <- tempfile("tablexp_lib_g_"); dir.create(lib)
     # Répertoire courant ailleurs que l'arbre : l'archive est dépaquetée par
@@ -527,7 +776,8 @@ controler_installation <- function(racine, catalogue, utf8) {
     i <- local({ ancien <- setwd(tempdir()); on.exit(setwd(ancien)); installer(archive, lib, environnement_locale(loc)) })
     if (!i$ok) { cat(i$sortie, sep = "\n"); ecart("g", sprintf("installation de l'archive sous LC_ALL=%s en échec", loc)); next }
     extdata <- file.path(lib, "tablexp", "extdata")
-    if (nrow(catalogue) && !dir.exists(file.path(extdata, "tables"))) ecart("g", sprintf("LC_ALL=%s : extdata/tables non installé", loc))
+    if ((nrow(catalogue) || nrow(catalogue_d)) && !dir.exists(file.path(extdata, "tables")))
+      ecart("g", sprintf("LC_ALL=%s : extdata/tables non installé", loc))
     unlink(extdata, recursive = TRUE)
     script <- tempfile("acces_", fileext = ".R")
     writeLines(c(sprintf("suppressPackageStartupMessages(library(tablexp, lib.loc = %s))", deparse(lib)),
@@ -543,8 +793,8 @@ controler_installation <- function(racine, catalogue, utf8) {
     if (!identical(r, attendu)) {
       ecart("g", sprintf("LC_ALL=%s : catalogue ou accès après suppression d'extdata différents de l'installation de référence", loc))
       cat("    attendu :", attendu, sep = "\n      "); cat("\n    obtenu :", r, sep = "\n      "); cat("\n")
-    } else cat(sprintf("  (g) LC_ALL=%s : archive installée (%s), extdata supprimé, %d table(s) accessible(s), catalogue identique\n",
-                       loc, i$duree, nrow(catalogue)))
+    } else cat(sprintf("  (g) LC_ALL=%s : archive installée (%s), extdata supprimé, %d table(s) et %d objet(s) de décalages accessible(s), catalogues identiques\n",
+                       loc, i$duree, nrow(catalogue), length(unique(catalogue_d$nom))))
   }
   invisible()
 }
@@ -571,9 +821,22 @@ ESSAIS <- list(
        lignes = c("age,1950,1951", "0,1000,1000", "1,990,995", "2,980,996", "3,970,990"),
        ajout = "4,0,0", ecarts = c("4,1950,,0", "4,1951,,0"), paires = "1951:1-2", ages = "0 à 3"))
 
+# Décalages d'essai du témoin (format 3 ; ADR 0019, point 7.5), nom non
+# ASCII comme ceux du catalogue (mesure (g) sous LC_ALL=C), visant la table
+# d'essai admise. Seconde source : première borne 0 au lieu de 16 et une
+# ligne imprimée deux fois, déclarées en écart (forme des écarts du BO,
+# spécification d'actuary de #273, § 5.6).
+ESSAI_DECALAGES <- list(nom = "Décalages d'âge ESSAI", identifiant = "decalages_essai", table = "ESSAI ADMISE",
+                        lignes = c("age_min,age_max,decalage", "16,29,-3", "30,59,-2", "60,,0"),
+                        seconde = c("age_min,age_max,decalage", "0,29,-3", "30,59,-2", "30,59,-2", "60,,0"),
+                        ecarts = c("16,29,-3;0,29,-3", ";30,59,-2"),
+                        # Repère ASCII des lignes ECART de l'essai : un sous-processus
+                        # sous une locale non UTF-8 écrit le nom en octets échappés.
+                        repere = "ge ESSAI : ")
+
 ecrire_lignes <- function(lignes, f) { con <- file(f, "wb"); on.exit(close(con)); writeBin(charToRaw(paste0(lignes, "\n", collapse = "")), con) }
 
-preparer_temoin <- function(racine, arbre, empreintes, decl) {
+preparer_temoin <- function(racine, arbre, empreintes, decl, decl_d, empreinte_d) {
   dir.create(arbre)
   for (x in c("DESCRIPTION", "NAMESPACE", "LICENSE", ".Rbuildignore", "R", "inst", "docs/sources", DOSSIER_RELEVES)) {
     s <- file.path(racine, x)
@@ -598,7 +861,41 @@ preparer_temoin <- function(racine, arbre, empreintes, decl) {
          # Format déclaré (ADR 0019, point 5.1), sans valeur par défaut.
          sprintf("  format = c(%s),", paste0(c(decl$format, vapply(ESSAIS, `[[`, 0L, "format")), "L", collapse = ", ")),
          "  stringsAsFactors = FALSE)", s[-seq_len(fin)])
+  # Déclaration des décalages : celle de l'arbre, plus l'essai.
+  debut <- grep("^DECLARATIONS_DECALAGES_EMBARQUES <- data.frame\\($", s)
+  fin <- debut - 1L + grep("stringsAsFactors = FALSE\\)$", s[debut:length(s)])[1L]
+  if (length(debut) != 1L || is.na(fin)) stop("déclaration des décalages introuvable dans R/donnees.R de l'arbre témoin")
+  ed <- ESSAI_DECALAGES
+  s <- c(s[seq_len(debut - 1L)],
+         "DECLARATIONS_DECALAGES_EMBARQUES <- data.frame(",
+         sprintf("  nom = %s,", q(c(decl_d$nom, ed$nom))),
+         sprintf("  identifiant = %s,", q(c(decl_d$identifiant, ed$identifiant))),
+         sprintf("  table = %s,", q(c(decl_d$table, ed$table))),
+         "  stringsAsFactors = FALSE)", s[-seq_len(fin)])
   writeLines(enc2utf8(s), f, useBytes = TRUE)
+  f_table <- sprintf("%s/%s.csv", DOSSIER_TABLES, ed$identifiant)
+  f_b <- sprintf("%s/%s.transcription_b.csv", DOSSIER_RELEVES, ed$identifiant)
+  f_s <- sprintf("%s/%s.seconde_source_essai.csv", DOSSIER_RELEVES, ed$identifiant)
+  ecrire_lignes(ed$lignes, file.path(arbre, f_table))
+  ecrire_lignes(ed$lignes, file.path(arbre, f_b))
+  ecrire_lignes(ed$seconde, file.path(arbre, f_s))
+  sha <- sha256(arbre, c(f_table, f_b, f_s))
+  prov <- c("Format: tablexp provenance 1", sprintf("Nom: %s", ed$nom), sprintf("Fichier: %s", f_table),
+            sprintf("Table: %s", ed$table), "Intitule: décalages d'essai",
+            "Bandes: 3 bandes, première borne 16, dernière bande ouverte (60 et plus) (témoin)",
+            "Homologation: aucune (témoin)", "Porteurs-usages: aucun (témoin)", "Source: témoin",
+            "Source-nature: témoin", "Source-URL: aucune", "Source-consultation: aucune", "Source-licence: aucune",
+            "Source-pages: aucune", "Transcription-methode: écrite par le script témoin",
+            "Transcription-date: 2026-11-14", sprintf("Transcription-B-releve: %s", f_b),
+            "Transcription-B-methode: copie (témoin)", "Seconde-source-essai: témoin",
+            "Seconde-source-essai-methode: borne basse 0 et ligne imprimée deux fois (témoin)",
+            sprintf("Seconde-source-essai-releve: %s", f_s),
+            "Seconde-source-essai-ecarts:", sprintf(" %s", ed$ecarts),
+            "Controles-coherence: aucun (témoin)", "Ecarts-signales: borne basse et ligne en double de la seconde source (témoin)",
+            "Empreintes-fichiers:", sprintf(" %s  %s", sha, c(f_table, f_b, f_s)),
+            "Empreintes-hors-depot: aucune", sprintf("Representation: %s", REPRESENTATION_DECALAGES),
+            sprintf("Empreinte-decalages: %s", empreinte_d), "Visa: 2026-11-14, mainteneur, témoin du script")
+  ecrire_lignes(enc2utf8(prov), file.path(arbre, sprintf("%s/%s.provenance.dcf", DOSSIER_TABLES, ed$identifiant)))
   for (k in seq_along(ESSAIS)) {
     e <- ESSAIS[[k]]
     lignes <- e$lignes
@@ -651,9 +948,14 @@ temoin <- function(racine) {
     vapply(admis, `[[`, "", "nom"))
   e <- ESSAIS[[1L]]
   decl <- get("DECLARATIONS_TABLES_EMBARQUEES", envir = asNamespace("tablexp"))
+  # Empreinte des décalages d'essai, calculée de même (contenu injecté).
+  ed <- ESSAI_DECALAGES
+  decl_d <- get("DECLARATIONS_DECALAGES_EMBARQUES", envir = ns)
+  empreinte_d <- get("empreinte_decalages", envir = ns)(get("decalages_du_catalogue", envir = ns)(ed$nom, stats::setNames(
+    list(list(identifiant = ed$identifiant, table = ed$table, lignes = ed$lignes)), ed$nom)))
   unloadNamespace("tablexp")
   arbre <- file.path(tempfile("tablexp_temoin_"))
-  preparer_temoin(racine, arbre, empreintes, decl)
+  preparer_temoin(racine, arbre, empreintes, decl, decl_d, empreinte_d)
   script <- normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))[1L])
   lancer <- function(args) {
     r <- suppressWarnings(system2(file.path(R.home("bin"), "Rscript"), c(shQuote(script), args, shQuote(arbre)),
@@ -740,9 +1042,29 @@ temoin <- function(racine) {
                 length(ecarts5), e4$nom))
     ok <- FALSE
   }
+  p4[p4 == "Refus-paires: 1950:1-2"] <- sprintf("Refus-paires: %s", e4$paires)
+  ecrire_lignes(p4, f_p4)
+  # Format 3 (ADR 0019, point 7.5 ; spécification d'actuary de #273,
+  # § 5.9) : un décalage de l'essai changé d'une unité.
+  f6 <- file.path(arbre, DOSSIER_TABLES, paste0(ed$identifiant, ".csv"))
+  l6 <- ed$lignes
+  l6[3L] <- "30,59,-1"
+  ecrire_lignes(l6, f6)
+  cat(sprintf("\n== 6. %s.provenance.dcf rétabli ; %s.csv (format 3), ligne 3 : « %s » devient « %s » : échec attendu sur (c), (d) et (e)\n",
+              e4$identifiant, ed$identifiant, ed$lignes[3L], l6[3L]))
+  r6 <- lancer("--sans-installation")
+  cat(sub("^::error", "(échec attendu) error", r6$sortie), sep = "\n")
+  manquants <- c("c", "d", "e")[!vapply(c("c", "d", "e"), function(s)
+    any(grepl(sprintf("ECART (%s) ", s), r6$sortie, fixed = TRUE) & grepl(ed$repere, r6$sortie, fixed = TRUE)), NA)]
+  if (r6$statut != 1L || length(manquants)) {
+    cat(sprintf("ECHEC du témoin : code %d (1 attendu)%s\n", r6$statut,
+                if (length(manquants)) sprintf(", aucun écart sur %s", paste(manquants, collapse = ", ")) else ""))
+    ok <- FALSE
+  }
   unlink(arbre, recursive = TRUE)
   if (ok) cat(paste("\nTémoin : arbre intact admis ; l_x changé d'une unité détecté sur (c), (d) et (e), code 1 ;",
-                    "paires d'un refus attendu discordantes détectées sur (d), code 1 ; de même au format 2.\nOK\n"))
+                    "paires d'un refus attendu discordantes détectées sur (d), code 1 ; de même au format 2 ;",
+                    "décalage changé d'une unité détecté sur (c), (d) et (e) au format 3, code 1.\nOK\n"))
   ok
 }
 

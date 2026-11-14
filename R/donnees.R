@@ -39,7 +39,13 @@
 #  - DECLARATIONS_TABLES_EMBARQUEES, TABLES_EMBARQUEES : déclaration des
 #    tables embarquées et contenu de leurs fichiers, lu à l'installation ;
 #    table_du_catalogue() et table_embarquee() : table construite à l'appel
-#    (exportée ; ADR 0015, point 6 ; ADR 0018, point 1).
+#    (exportée ; ADR 0015, point 6 ; ADR 0018, point 1) ;
+#  - decalages_age() : objet des décalages d'âge d'une table, une ligne par
+#    bande d'âges, et son contrôle (ADR 0019, point 6.1 ; #273) ;
+#    DECLARATIONS_DECALAGES_EMBARQUES, DECALAGES_EMBARQUES : déclaration et
+#    contenu des décalages embarqués, lu à l'installation ;
+#    analyser_decalages_format3() et decalages_du_catalogue() : objet
+#    construit à l'appel (ADR 0019, points 6.2 et 6.3).
 #
 #  Conventions de temps (A.0) : une date est un jour ; un intervalle
 #  d'observation est [entrée, sortie) ; une ligne `en_cours` est ouverte à
@@ -2772,3 +2778,297 @@ table_du_catalogue <- function(nom, catalogue = TABLES_EMBARQUEES) {
 # de table_reference() d'une table refusée (TF 00-02, ADR 0018, point 7.2).
 # Exportée (appelants : application, tiers qui rejoue).
 table_embarquee <- function(nom) table_du_catalogue(nom)
+
+# --- décalages d'âge (ADR 0019, point 6 ; #273) -----------------------------------
+
+# Colonnes d'un objet decalages_age, dans l'ordre (ADR 0019, point 6.1) ;
+# en-tête du format 3 du fichier (point 6.2) ; ligne d'une bande : âge
+# minimal, âge maximal (vide pour la bande ouverte) et décalage, entiers en
+# chiffres seuls (au plus quinze chiffres), décalage écrit 0, -n ou n (ni
+# « + », ni « -0 », ni espace).
+COLONNES_DECALAGES <- c("age_min", "age_max", "decalage")
+EN_TETE_DECALAGES_EMBARQUES <- "age_min,age_max,decalage"
+MOTIF_LIGNE_DECALAGES_EMBARQUES <- "^(0|[1-9][0-9]{0,14}),(0|[1-9][0-9]{0,14})?,(0|-?[1-9][0-9]{0,14})$"
+
+# Bandes citées sous leur forme imprimée (spécification d'actuary de #273,
+# § 1.3) : « [a ; b] », ou « a et plus » pour la bande ouverte (age_max NA).
+# Rend un vecteur de chaînes, une par bande. Aide de message
+# (tests/controles/messages_refus.R, AIDES).
+bandes_citees <- function(age_min, age_max)
+  ifelse(is.na(age_max), formuler("%d et plus", age_min), formuler("[%d ; %d]", age_min, age_max))
+
+# Fin d'une liste de `total` bandes ou paires citées, dont au plus
+# NB_LIGNES_CITEES le sont : le total au-delà (même formule que
+# table_ages_non_contigus), rien sinon. Aide de message.
+complement_citees <- function(total)
+  if (total > NB_LIGNES_CITEES) formuler(" … (%d en tout ; liste complète dans les détails du refus)", total) else ""
+
+# Construit l'objet des décalages d'âge d'une table (classe S3
+# `decalages_age` sur un data.frame age_min, age_max, decalage, integer ;
+# ADR 0019, point 6.1 ; spécification d'actuary de #273, § 1). Ce n'est pas un
+# table_reference. Refuse (module donnees), dans l'ordre : nom, table ou source
+# qui n'est pas une chaîne unique non vide, ou d'encodage « bytes »
+# (decalages_nom_manquant) ; x qui n'est pas un data.frame, sans ligne, ou aux
+# noms de colonnes en double (decalages_mal_formes) ; colonnes manquantes ou
+# inconnues ; colonnes mal typées (age_min : entier >= 0 sans NA ; age_max :
+# entier >= 0, NA admis ; decalage : entier relatif sans NA ; valeur absolue
+# au plus .Machine$integer.max) ; bande fermée inversée ; bande ouverte
+# absente, multiple ou qui n'est pas la dernière ; bandes chevauchantes (un
+# doublon d'age_min compte) ; bandes non contiguës. Ne corrige rien d'autre
+# que la forme : colonnes converties en integer (un double à valeur entière
+# et -0 donnent le même objet), lignes triées par age_min croissant (puis
+# bande ouverte en dernier : l'ordre, donc le refus et ses details, ne
+# dépendent pas de l'ordre reçu), noms de lignes automatiques. Aucune
+# propriété des valeurs n'est exigée (signe, monotonie) ; rien n'est supposé
+# sous la première borne. Les bandes sont citées sous leur forme imprimée
+# (bandes_citees()). Attributs : nom, table (nom au catalogue de la table
+# visée), source (chemin du fichier de provenance), hors de l'empreinte
+# (empreinte_decalages(), R/rapport.R).
+decalages_age <- function(x, nom, table, source) {
+  arguments <- list(nom = nom, table = table, source = source)
+  for (a in names(arguments)) {
+    v <- arguments[[a]]
+    if (!chaine_unique(v) || Encoding(v) == "bytes")
+      refuser("donnees", "decalages_nom_manquant",
+              formuler(paste("Décalages d'âge : l'argument « %s » (nom des décalages, nom au catalogue de la table",
+                             "visée, ou source) doit être une chaîne non vide, sans attribut, d'encodage autre que",
+                             "« bytes »."), citer(a)),
+              list(argument = a))
+  }
+  nom_cite <- citer(nom)
+  if (classe_bytes(x) || !is.data.frame(x))
+    refuser("donnees", "decalages_mal_formes",
+            formuler("Décalages d'âge « %s » : un data.frame est attendu (colonnes age_min, age_max, decalage).",
+                     nom_cite))
+  noms <- attr(x, "names", exact = TRUE)
+  if (anyDuplicated(noms))
+    refuser("donnees", "decalages_mal_formes",
+            formuler("Décalages d'âge « %s » : colonne(s) en double %s.", nom_cite,
+                     liste_guillemets(unique(noms[duplicated(noms)]))),
+            list(colonne = unique(noms[duplicated(noms)])))
+  if (!nrow(x))
+    refuser("donnees", "decalages_mal_formes", formuler("Décalages d'âge « %s » : aucune bande.", nom_cite))
+  manquantes <- setdiff(COLONNES_DECALAGES, noms)
+  if (length(manquantes))
+    refuser("donnees", "decalages_colonne_manquante",
+            formuler("Décalages d'âge « %s » : colonne(s) manquante(s) %s (colonnes : age_min, age_max, decalage).",
+                     nom_cite, liste_guillemets(manquantes)),
+            list(colonne = manquantes))
+  en_trop <- setdiff(noms, COLONNES_DECALAGES)
+  if (length(en_trop))
+    refuser("donnees", "decalages_colonne_inconnue",
+            formuler("Décalages d'âge « %s » : colonne(s) inconnue(s) %s (colonnes : age_min, age_max, decalage).",
+                     nom_cite, liste_guillemets(en_trop)),
+            list(colonne = en_trop))
+  # Entier dans la plage des integer de R : un double entier au-delà
+  # deviendrait NA par as.integer().
+  dans_plage <- function(v) { v <- v[!is.na(v)]; !is.double(v) || all(abs(v) <= .Machine$integer.max) }
+  amin <- x[["age_min"]]; amax <- x[["age_max"]]; dec <- x[["decalage"]]
+  mal_typees <- c(
+    age_min = !type_conforme(amin, "entier_positif") || anyNA(amin) || !dans_plage(amin),
+    age_max = !type_conforme(amax, "entier_positif") || !dans_plage(amax),
+    decalage = !type_conforme(dec, "entier") || anyNA(dec) || !dans_plage(dec))
+  if (any(mal_typees))
+    refuser("donnees", "decalages_colonne_mal_typee",
+            formuler(paste("Décalages d'âge « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age_min :",
+                           "entier >= 0 ; age_max : entier >= 0, manquant pour la bande ouverte seule ; decalage :",
+                           "entier relatif ; valeurs au plus %d en valeur absolue)."),
+                     nom_cite, liste_guillemets(names(mal_typees)[mal_typees]), .Machine$integer.max),
+            list(colonne = names(mal_typees)[mal_typees]))
+  amin <- as.integer(amin); amax <- as.integer(amax); dec <- as.integer(dec)
+  # Ordre canonique : age_min croissant, bande ouverte après une bande fermée
+  # de même age_min, puis age_max et decalage ; tri radix, indépendant de la
+  # locale. Seules des lignes identiques restent à égalité.
+  o <- order(amin, is.na(amax), amax, dec, method = "radix")
+  amin <- amin[o]; amax <- amax[o]; dec <- dec[o]
+  n <- length(o)
+  # Bandes citées : au plus NB_LIGNES_CITEES (k), puis le total
+  # (complement_citees()) ; details complets.
+  inversees <- which(!is.na(amax) & amin > amax)
+  if (length(inversees)) {
+    k <- utils::head(inversees, NB_LIGNES_CITEES)
+    refuser("donnees", "decalages_bande_inversee",
+            formuler("Décalages d'âge « %s » : bande(s) dont l'âge minimal dépasse l'âge maximal : %s%s.", nom_cite,
+                     paste(bandes_citees(amin[k], amax[k]), collapse = ", "), complement_citees(length(inversees))),
+            list(bandes = bandes_citees(amin[inversees], amax[inversees]), age_min = amin[inversees],
+                 age_max = amax[inversees]))
+  }
+  ouvertes <- which(is.na(amax))
+  if (!identical(ouvertes, n)) {
+    k <- utils::head(ouvertes, NB_LIGNES_CITEES)
+    refuser("donnees", "decalages_bande_ouverte",
+            formuler(paste("Décalages d'âge « %s » : %s ; une seule bande est ouverte (« n et plus », age_max",
+                           "manquant), la dernière."),
+                     nom_cite,
+                     if (!length(ouvertes))
+                       formuler("aucune bande ouverte, la dernière bande est « %s »", bandes_citees(amin[n], amax[n]))
+                     else if (length(ouvertes) > 1L)
+                       formuler("%d bandes ouvertes (%s%s)", length(ouvertes),
+                                paste(bandes_citees(amin[k], amax[k]), collapse = ", "),
+                                complement_citees(length(ouvertes)))
+                     else formuler("la bande ouverte « %s » n'est pas la dernière (bande suivante : « %s »)",
+                                   bandes_citees(amin[ouvertes], amax[ouvertes]),
+                                   bandes_citees(amin[ouvertes + 1L], amax[ouvertes + 1L]))),
+            list(bandes = if (length(ouvertes)) bandes_citees(amin[ouvertes], amax[ouvertes])
+                          else bandes_citees(amin[n], amax[n])))
+  }
+  # Paires de bandes consécutives dans l'ordre canonique (j >= 2) ; age_max
+  # de la précédente non manquant (seule la dernière est ouverte). Écart sans
+  # integer + 1 : amin et amax sont >= 0, la différence ne déborde pas.
+  j <- seq_len(n)[-1L]
+  chevauchantes <- j[amin[j] <= amax[j - 1L]]
+  if (length(chevauchantes)) {
+    k <- utils::head(chevauchantes, NB_LIGNES_CITEES)
+    refuser("donnees", "decalages_bandes_chevauchantes",
+            formuler("Décalages d'âge « %s » : bandes chevauchantes %s%s.", nom_cite,
+                     paste(formuler("« %s » et « %s »", bandes_citees(amin[k - 1L], amax[k - 1L]), bandes_citees(amin[k], amax[k])),
+                           collapse = ", "),
+                     complement_citees(length(chevauchantes))),
+            list(bandes = bandes_citees(amin[chevauchantes - 1L], amax[chevauchantes - 1L]),
+                 bandes_suivantes = bandes_citees(amin[chevauchantes], amax[chevauchantes])))
+  }
+  trous <- j[amin[j] - amax[j - 1L] > 1L]
+  if (length(trous)) {
+    k <- utils::head(trous, NB_LIGNES_CITEES)
+    refuser("donnees", "decalages_bandes_non_contigues",
+            formuler("Décalages d'âge « %s » : bandes non contiguës (âges sans bande) %s%s.", nom_cite,
+                     paste(formuler("« %s » et « %s » (âges %d à %d)", bandes_citees(amin[k - 1L], amax[k - 1L]),
+                                    bandes_citees(amin[k], amax[k]), amax[k - 1L] + 1L, amin[k] - 1L),
+                           collapse = ", "),
+                     complement_citees(length(trous))),
+            list(bandes = bandes_citees(amin[trous - 1L], amax[trous - 1L]),
+                 bandes_suivantes = bandes_citees(amin[trous], amax[trous]), ages_debut = amax[trous - 1L] + 1L,
+                 ages_fin = amin[trous] - 1L))
+  }
+  structure(data.frame(age_min = amin, age_max = amax, decalage = dec),
+            class = c("decalages_age", "data.frame"), nom = nom, table = table, source = source)
+}
+
+# Déclaration des décalages d'âge embarqués (ADR 0019, point 6.3 ; ADR 0018,
+# annotation du 13/11/2026, (a)) : une ligne par objet, dans l'ordre du
+# catalogue ; nom au catalogue des décalages, identifiant de fichier
+# ([a-z0-9_-]+ ; inst/extdata/tables/<identifiant>.csv au format 3 et
+# <identifiant>.provenance.dcf), nom au catalogue de la table visée. Constante
+# distincte de DECLARATIONS_TABLES_EMBARQUEES : les décalages n'entrent ni dans
+# tables_embarquees(), ni dans table_embarquee(), ni dans la réserve des noms de
+# tables. Vide tant qu'aucun commit `donnees:` n'a embarqué de décalages.
+DECLARATIONS_DECALAGES_EMBARQUES <- data.frame(
+  nom = character(0),
+  identifiant = character(0),
+  table = character(0),
+  stringsAsFactors = FALSE)
+
+# Lecture du contenu des décalages déclarés, à l'installation, par le
+# mécanisme de lire_tables_embarquees() (ADR 0018, point 1.2 : lignes du
+# fichier, sans analyse, NULL si le fichier n'a pas pu être lu ; garde sur
+# DESCRIPTION ; aucun refus). Rend une liste nommée par `nom` ; chaque élément
+# porte identifiant, table et lignes.
+lire_decalages_embarques <- function(racine, declarations) {
+  description <- file.path(racine, "DESCRIPTION")
+  paquet <- if (file.exists(description))
+    tryCatch(read.dcf(description, fields = "Package")[1L, 1L], error = function(e) NA_character_)
+  sources <- identical(unname(paquet), "tablexp")
+  catalogue <- lapply(seq_len(nrow(declarations)), function(k) {
+    f <- file.path(racine, fichier_table_embarquee(declarations$identifiant[k]))
+    lignes <- if (sources && file.exists(f))
+      tryCatch(readLines(f, warn = FALSE), error = function(e) NULL, warning = function(w) NULL)
+    list(identifiant = declarations$identifiant[k], table = declarations$table[k], lignes = lignes)
+  })
+  names(catalogue) <- declarations$nom
+  catalogue
+}
+
+# Catalogue des décalages embarqués : contenus lus à l'installation (ADR 0019,
+# point 6.3) ; l'objet decalages_age est construit à l'appel, par
+# decalages_du_catalogue().
+DECALAGES_EMBARQUES <- lire_decalages_embarques(".", DECLARATIONS_DECALAGES_EMBARQUES)
+
+# Analyse du contenu `l` (lignes lues à l'installation) de décalages embarqués
+# au format 3 (ADR 0019, point 6.2 ; spécification d'actuary de #273, § 2),
+# par découpage de chaînes, sans connexion ni évaluation : rend
+# list(age_min, age_max, decalage) (doubles ; age_max NA pour un champ vide),
+# ou refuse (decalages_embarques_illisibles : fichier, première ligne en
+# défaut et raison cités) — en-tête, présence d'une bande, forme de chaque
+# ligne, entier au plus .Machine$integer.max en valeur absolue, age_min
+# strictement croissant d'une ligne à la suivante (pour une même ligne,
+# l'entier hors bornes a sa raison propre, testée d'abord). La structure des
+# bandes (age_max vide ailleurs qu'en dernier, trou, chevauchement) est
+# refusée par decalages_age(), pas ici. `nom`, `fichier` : cités par le refus.
+analyser_decalages_format3 <- function(l, nom, fichier) {
+  ligne <- 0L
+  lu <- NULL
+  if (!length(l)) {
+    ligne <- 1L
+    raison <- formuler("fichier vide, sans en-tête « age_min,age_max,decalage »")
+  } else if (!identical(l[1L], EN_TETE_DECALAGES_EMBARQUES)) {
+    ligne <- 1L
+    raison <- formuler("en-tête « %s » au lieu de « age_min,age_max,decalage »", citer(l[1L]))
+    lu <- l[1L]
+  } else if (length(l) < 2L) {
+    ligne <- 2L
+    raison <- formuler("aucune bande après l'en-tête")
+  } else {
+    corps <- l[-1L]
+    mal_formee <- which(!grepl(MOTIF_LIGNE_DECALAGES_EMBARQUES, corps, useBytes = TRUE))
+    if (length(mal_formee)) {
+      ligne <- mal_formee[1L] + 1L
+      raison <- formuler("ligne « %s » mal formée", citer(corps[mal_formee[1L]]))
+      lu <- corps[mal_formee[1L]]
+    } else {
+      morceaux <- strsplit(corps, ",", fixed = TRUE)
+      champ <- function(j) as.double(vapply(morceaux, function(m) if (length(m) >= j && nzchar(m[j])) m[j] else NA_character_, ""))
+      age_min <- champ(1L); age_max <- champ(2L); decalage <- champ(3L)
+      grand <- abs(age_min) > .Machine$integer.max | (!is.na(age_max) & age_max > .Machine$integer.max) |
+        abs(decalage) > .Machine$integer.max
+      non_croissant <- c(FALSE, age_min[-1L] <= age_min[-length(age_min)])
+      hors <- which(grand | non_croissant)
+      if (length(hors)) {
+        j <- hors[1L]
+        ligne <- j + 1L
+        raison <- if (grand[j])
+          formuler("ligne « %s » : entier supérieur en valeur absolue au plus grand entier du moteur (%d)",
+                   citer(corps[j]), .Machine$integer.max)
+        else
+          formuler("âge minimal %s non supérieur à celui de la ligne précédente (%s)", citer(morceaux[[j]][1L]),
+                   citer(morceaux[[j - 1L]][1L]))
+        lu <- corps[j]
+      }
+    }
+  }
+  if (ligne > 0L)
+    refuser("donnees", "decalages_embarques_illisibles",
+            formuler(paste("Décalages d'âge embarqués « %s » : fichier %s, ligne %d, %s. Le contenu lu à l'installation",
+                           "n'est pas au format 3 des fichiers embarqués (en-tête « age_min,age_max,decalage », puis",
+                           "une ligne « <âge minimal>,<âge maximal>,<décalage> » par bande, âges minimaux croissants,",
+                           "entiers en chiffres seuls, âge maximal vide pour la bande ouverte, décalage écrit 0, -n",
+                           "ou n) ; réinstaller le package depuis des sources intactes."),
+                     citer(nom), citer(fichier), ligne, raison),
+            list(nom = nom, fichier = fichier, ligne = ligne, lu = lu))
+  list(age_min = age_min, age_max = age_max, decalage = decalage)
+}
+
+# Décalages embarqués de nom `nom`, objet decalages_age construit à l'appel
+# (ADR 0019, point 6.3) à partir de son contenu dans `catalogue`
+# (DECALAGES_EMBARQUES par défaut, injecté par les tests, M247). `nom` est un
+# nom du catalogue (appelant : catalogue_decalages_embarques(), R/rapport.R ;
+# un autre nom est une erreur de programmation). Refuse
+# (decalages_embarques_illisibles) un contenu non lu ou hors du format 3
+# (analyser_decalages_format3()) ; un refus de decalages_age() remonte tel
+# quel, sans enveloppe. source : chemin du fichier de provenance.
+decalages_du_catalogue <- function(nom, catalogue = DECALAGES_EMBARQUES) {
+  if (!chaine_unique(nom) || !(nom %in% attr(catalogue, "names", exact = TRUE)))
+    stop("decalages_du_catalogue() : nom absent du catalogue des décalages (erreur de programmation).", call. = FALSE)
+  e <- catalogue[[nom]]
+  fichier <- fichier_table_embarquee(e[["identifiant"]])
+  l <- e[["lignes"]]
+  if (is.null(l))
+    refuser("donnees", "decalages_embarques_illisibles",
+            formuler(paste("Décalages d'âge embarqués « %s » : fichier %s non lu à l'installation du package (fichier",
+                           "absent ou illisible) ; réinstaller le package depuis ses sources."),
+                     citer(nom), citer(fichier)),
+            list(nom = nom, fichier = fichier, ligne = NA_integer_, lu = NULL))
+  d <- analyser_decalages_format3(l, nom, fichier)
+  decalages_age(data.frame(age_min = as.integer(d$age_min), age_max = as.integer(d$age_max),
+                           decalage = as.integer(d$decalage)),
+                nom, e[["table"]], provenance_table_embarquee(e[["identifiant"]]))
+}
