@@ -360,12 +360,12 @@ verifier("decalages_embarques() : exportée, sans argument, identical() au catal
 # sur le fac-similé de la source (fichier de provenance : JO n° 301 du
 # 29/12/2015, texte 35, p. 19 de l'extrait), et table visée.
 DECALAGES_ATTENDUS <- data.frame(
-  nom = c("Décalages d'âge TF 00-02"),
-  table = c("TF 00-02"),
-  bandes = c(9L),
-  premiere_borne = c(16L),
-  borne_ouverte = c(94L),
-  decalage_ouvert = c(0L),
+  nom = c("Décalages d'âge TF 00-02", "Décalages d'âge TH 00-02"),
+  table = c("TF 00-02", "TH 00-02"),
+  bandes = c(9L, 5L),
+  premiere_borne = c(16L, 16L),
+  borne_ouverte = c(94L, 75L),
+  decalage_ouvert = c(0L, -3L),
   stringsAsFactors = FALSE)
 verifier("décalages attendus : une ligne par objet déclaré, dans l'ordre de la déclaration",
          identical(DECALAGES_ATTENDUS$nom, DECLARATIONS$nom))

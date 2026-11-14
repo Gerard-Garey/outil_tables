@@ -2963,9 +2963,9 @@ decalages_age <- function(x, nom, table, source) {
 # soient les mêmes sous toute locale (contrôle (g) de
 # tests/controles/tables_embarquees.R).
 DECLARATIONS_DECALAGES_EMBARQUES <- data.frame(
-  nom = iconv(c("Décalages d'âge TF 00-02"), "UTF-8", "UTF-8"),
-  identifiant = c("decalages_tf_00-02"),
-  table = c("TF 00-02"),
+  nom = iconv(c("Décalages d'âge TF 00-02", "Décalages d'âge TH 00-02"), "UTF-8", "UTF-8"),
+  identifiant = c("decalages_tf_00-02", "decalages_th_00-02"),
+  table = c("TF 00-02", "TH 00-02"),
   stringsAsFactors = FALSE)
 
 # Lecture du contenu des décalages déclarés, à l'installation, par le

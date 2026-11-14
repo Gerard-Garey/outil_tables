@@ -4,18 +4,20 @@
 
 ## Statut
 
-Ce dossier rassemble les transcriptions et les relevés produits pour #273 (décalages d'âge) et #274 (TGF05, TGH05). On les a versés comme **pièces de contrôle** : aucune valeur de ce dossier n'est lue par le package ou par un contrôle de la CI. Seule exception, transitoire : depuis le commit `donnees:` des décalages de TF 00-02, `decalages/transcription_a/decalages_tf_00-02.csv` a la même empreinte que le fichier embarqué `inst/extdata/tables/decalages_tf_00-02.csv` ; le sous-dossier `decalages/` est retiré au commit `donnees:` des décalages de TH 00-02.
+Ce dossier rassemble les transcriptions et les relevés produits pour #274 (TGF05, TGH05). On les a versés comme **pièces de contrôle** : aucune valeur de ce dossier n'est embarquée, déclarée au catalogue, ni lue par le package ou par un contrôle de la CI.
+
+Les pièces de #273 (décalages d'âge) ont quitté ce dossier au commit `donnees:` des décalages de TH 00-02 : voir la section `decalages/` ci-dessous.
 
 Décision du mainteneur du 13/11/2026 : verser ces pièces avant le code du format 2 (#272, pièces 3 à 5), pour ne pas perdre le travail. L'ordre du plan prévoyait « #272 avant tout commit `donnees:` » ; cet écart est consigné dans la PR #271.
 
-Le dossier est **provisoire**. Les commits `donnees:` de #273 et de #274 en reprendront le contenu :
+Le dossier est **provisoire**. Les commits `donnees:` de #274 en reprendront le contenu :
 - les fichiers de table iront sous `inst/extdata/tables/` ;
 - les relevés iront sous `tests/contre_verification/tables/`, au format et au nommage de l'ADR 0018, point 5, et de l'ADR 0019, point 7 ;
 - les fichiers de provenance seront rédigés à ce moment-là.
 
 Ensuite, le dossier sera supprimé. Il est placé hors de `tests/contre_verification/tables/`, parce que le contrôle (a) de `tests/controles/tables_embarquees.R` refuse tout fichier qui n'y est rattaché à aucune table déclarée.
 
-**Visa du mainteneur (13/11/2026)** : accordé aux valeurs de TGF05 et de TGH05 contenues dans `generation/tgf05.csv` et `generation/tgh05.csv` (SHA-256 ci-dessous), comme valeurs de tables homologuées à embarquer. Pour les décalages d'âge (#273), aucun visa n'a encore été demandé.
+**Visa du mainteneur (13/11/2026)** : accordé aux valeurs de TGF05 et de TGH05 contenues dans `generation/tgf05.csv` et `generation/tgh05.csv` (SHA-256 ci-dessous), comme valeurs de tables homologuées à embarquer. Décalages d'âge (#273) : visa accordé le 14/11/2026 (M477), décalages embarqués.
 
 ## Méthode commune
 
@@ -25,24 +27,18 @@ La méthode suit E2.26, M445 et M462, ainsi que la consigne du handoff de la PR 
 - **Gel** : chaque fichier rendu a été gelé par son SHA-256 (`gel.sha256`) avant toute comparaison.
 - **Comparaisons** : ensuite seulement, comparaison par script de A et de B, puis aux autres pièces, la couche texte ne servant qu'à la comparaison.
 
-## `decalages/` : décalages d'âge de TF 00-02 et de TH 00-02 (#273)
+## `decalages/` : décalages d'âge de TF 00-02 et de TH 00-02 (#273), retiré
 
-**Source.** p. 19 de l'extrait du JO de 2015 ; format 3 de l'ADR 0019, point 6.2.
+Le sous-dossier `decalages/` a été versé au commit `b949ced` et retiré au commit `donnees:` des décalages de TH 00-02. Son contenu reste lisible dans l'historique, à `b949ced` : les deux transcriptions aveugles, le gel (`gel.sha256`), les relevés du JO de 2005 et du BO, et les notes de chaque transcripteur.
 
-| Pièce | Contenu | Résultat de la comparaison |
-|---|---|---|
-| `transcription_a/`, `transcription_b/` | les deux transcriptions aveugles ; `gel.sha256` | identiques octet pour octet |
-| `releve_jo2005/` | relevé aveugle sur le rendu de la p. 6 de `docs/sources/jo_2005-12-29_n302_texte40.pdf` : comparaison à l'acte, arrêté du 20/12/2005, art. 5 | identique octet pour octet au gel |
-| `releve_bo/` | relevé par couche texte du BO Santé 2007-1, annexe I, p. 9 et 10 : seconde source, transcrite telle qu'imprimée | les trois écarts déjà annoncés par `docs/sources/README.md`, et aucun autre (voir ci-dessous) |
+Ce que les commits `donnees:` de #273 en ont repris (visa du mainteneur du 14/11/2026, M477) :
+- les fichiers de décalages, depuis `transcription_a/`, sous `inst/extdata/tables/decalages_<tf|th>_00-02.csv`, avec leur fichier de provenance ;
+- sous `tests/contre_verification/tables/`, les relevés :
+  - `transcription_b/` devient `.transcription_b.csv` ;
+  - `releve_jo2005/` devient `.comparaison_acte.csv` ;
+  - `releve_bo/` devient `.seconde_source_bo.csv`, où « - 0 » est écrit `0` (TF seulement) et où la ligne en double est gardée.
 
-Les trois écarts du BO, à déclarer au fichier de provenance :
-- bornes basses imprimées 0 au lieu de 16 (TF et TH) ;
-- ligne « [33 - 34] » de TF imprimée deux fois ;
-- « - 0 » pour « 94 et plus » (TF).
-
-Le relevé du BO garde la ligne en double et `-0` : il n'est donc **pas** au format 3. Il faudra choisir sa forme à verser avant le commit `donnees:` de #273.
-
-**Reste à faire, après le gel.** Le commentaire B d'`actuary` (exemples chiffrés sur TH 00-02) peut maintenant être reproduit et versé sur #273 (handoff, § 3.2).
+Les fichiers de provenance citent ces pièces par le commit `b949ced`.
 
 ## `generation/` : TGF05 et TGH05 (#274)
 
@@ -79,7 +75,7 @@ Aucune ligne n'est entièrement sans valeur. Les blocs de B, assemblés de même
 ## Points ouverts pour les commits `donnees:`
 
 1. **Langage des scripts.** `assembler.py` et `releves.py` sont en Python. L'ADR 0019, point 7.2, demande un script d'assemblage hors CI, versé à côté des relevés, sans fixer de langage, alors que les précédents de B21 sont en R. Il faut décider entre les garder ou les réécrire en R, avec un résultat identique au bit près, à vérifier par SHA-256.
-2. **Forme du relevé des décalages du BO** (ligne en double, `-0`) : voir la section `decalages/` ci-dessus.
+2. **Forme du relevé des décalages du BO** : réglée et versée avec les décalages (#273).
 3. **Fichiers de provenance** : champs de l'ADR 0018 et de l'ADR 0019, point 7.1, notamment :
    - `Generations` ;
    - `Comparaison-acte*` ;
