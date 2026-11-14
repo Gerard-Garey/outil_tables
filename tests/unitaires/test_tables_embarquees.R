@@ -344,7 +344,14 @@ GRILLES_ATTENDUES <- list(
   "TGF05" = list(lignes = 7986L, generations = 1900:2005, entree = 1996L,
                  derniers = data.frame(de = c(1900L, 1919L, 1926L, 1933L), a = c(1918L, 1925L, 1932L, 2005L),
                                        age = 117:120),
-                 premier = c(lx = 100000, lx_suivant = 80356), dernier = c(lx = 782, lx_suivant = 516)))
+                 premier = c(lx = 100000, lx_suivant = 80356), dernier = c(lx = 782, lx_suivant = 516)),
+  # TGH05 : génération 1900, âges 96 et 97, p. 54 ; génération 2005, âges 119
+  # et 120, p. 83 ; génération 1901 close à 113 ans (l_x imprimé 2).
+  "TGH05" = list(lignes = 7815L, generations = 1900:2005, entree = 1996L,
+                 derniers = data.frame(de = c(1900L, 1901L, 1919L, 1926L, 1931L, 1936L, 1941L, 1946L, 1951L),
+                                       a = c(1900L, 1918L, 1925L, 1930L, 1935L, 1940L, 1945L, 1950L, 2005L),
+                                       age = c(114L, 113L, 114:120)),
+                 premier = c(lx = 100000, lx_suivant = 73481), dernier = c(lx = 283, lx_suivant = 181)))
 verifier("tables attendues : une ligne par table déclarée au format 1, une entrée par table déclarée au format 2, dans l'ordre de la déclaration",
          identical(TABLES_ATTENDUES$nom, DECLARATIONS$nom[DECLARATIONS$format == 1L]) &&
            identical(names(GRILLES_ATTENDUES), DECLARATIONS$nom[DECLARATIONS$format == 2L]))

@@ -65,14 +65,13 @@
 #  <t>.seconde_source_bo.csv ; releve_jo2006_<t>.csv ->
 #  <t>.comparaison_acte.csv ; releve_jo2015_<t>.csv n'est pas versé (TGF05 :
 #  cellule `?66/72` de la ligne 117, hors format 2 ; anomalie A2).
-#  Rejeu, depuis la racine du dépôt, dans un dossier hors du dépôt. Tant que
-#  TGH05 n'est pas embarquée, les grilles sont le dossier de sortie de
-#  l'assemblage ($a ci-dessous : commande de rejeu d'assembler_tgf05_tgh05.R,
-#  en-tête de ce script, avec "$a" pour dossier de sortie) :
+#  Rejeu, depuis la racine du dépôt, dans un dossier hors du dépôt, sur les
+#  fichiers de table embarqués (TGF05 et TGH05) :
 #    d=$(mktemp -d)
 #    Rscript tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R \
-#      docs/sources "$a" "$d"
-#  Une fois TGH05 embarquée, inst/extdata/tables peut remplacer "$a".
+#      docs/sources inst/extdata/tables "$d"
+#  Le dossier de sortie d'assembler_tgf05_tgh05.R peut remplacer
+#  inst/extdata/tables (mêmes octets).
 #
 #  Usage : Rscript tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R
 #            <dossier docs/sources> <dossier des grilles assemblées> <dossier de sortie>
