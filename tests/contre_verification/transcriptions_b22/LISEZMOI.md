@@ -4,7 +4,7 @@
 
 ## Statut
 
-Ce dossier rassemble les transcriptions et les relevés produits pour #273 (décalages d'âge) et #274 (TGF05, TGH05). On les a versés comme **pièces de contrôle** : aucune valeur de ce dossier n'est embarquée, déclarée au catalogue, ni lue par le package ou par un contrôle de la CI.
+Ce dossier rassemble les transcriptions et les relevés produits pour #273 (décalages d'âge) et #274 (TGF05, TGH05). On les a versés comme **pièces de contrôle** : aucune valeur de ce dossier n'est lue par le package ou par un contrôle de la CI. Seule exception, transitoire : depuis le commit `donnees:` des décalages de TF 00-02, `decalages/transcription_a/decalages_tf_00-02.csv` a la même empreinte que le fichier embarqué `inst/extdata/tables/decalages_tf_00-02.csv` ; le sous-dossier `decalages/` est retiré au commit `donnees:` des décalages de TH 00-02.
 
 Décision du mainteneur du 13/11/2026 : verser ces pièces avant le code du format 2 (#272, pièces 3 à 5), pour ne pas perdre le travail. L'ordre du plan prévoyait « #272 avant tout commit `donnees:` » ; cet écart est consigné dans la PR #271.
 

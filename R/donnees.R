@@ -2951,11 +2951,21 @@ decalages_age <- function(x, nom, table, source) {
 # <identifiant>.provenance.dcf), nom au catalogue de la table visée. Constante
 # distincte de DECLARATIONS_TABLES_EMBARQUEES : les décalages n'entrent ni dans
 # tables_embarquees(), ni dans table_embarquee(), ni dans la réserve des noms de
-# tables. Vide tant qu'aucun commit `donnees:` n'a embarqué de décalages.
+# tables. Le nom s'écrit avec l'apostrophe ASCII (U+0027 ; il entre dans la
+# fiche et se compare à l'identique, M468, question 6). Il n'est pas ASCII :
+# R CMD INSTALL laisse ses octets UTF-8 d'encodage « unknown », sauf
+# installation sous une locale UTF-8 lue sous C (mesuré dans les quatre
+# combinaisons de C et C.UTF-8) : installé et lu hors UTF-8, le nom se lit en
+# octets échappés (contrôle (g) en échec sous LC_ALL=C) ; il est marqué
+# UTF-8 ici par iconv(, "UTF-8", "UTF-8"), fonction de base qui garde les
+# octets et pose la marque (ce fichier est évalué avant R/outils.R,
+# texte_moteur() n'y est pas encore défini), pour que le catalogue et l'accès
+# soient les mêmes sous toute locale (contrôle (g) de
+# tests/controles/tables_embarquees.R).
 DECLARATIONS_DECALAGES_EMBARQUES <- data.frame(
-  nom = character(0),
-  identifiant = character(0),
-  table = character(0),
+  nom = iconv(c("Décalages d'âge TF 00-02"), "UTF-8", "UTF-8"),
+  identifiant = c("decalages_tf_00-02"),
+  table = c("TF 00-02"),
   stringsAsFactors = FALSE)
 
 # Lecture du contenu des décalages déclarés, à l'installation, par le

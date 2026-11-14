@@ -327,6 +327,10 @@ verifier("déclaration : data.frame nu nom, identifiant, table (character) ; nom
     all(DECLARATIONS$table %in% tablexp:::DECLARATIONS_TABLES_EMBARQUEES$nom) &&
     !any(DECLARATIONS$identifiant %in% tablexp:::DECLARATIONS_TABLES_EMBARQUEES$identifiant)
 })
+verifier("déclaration : noms marqués UTF-8 (iconv() de R/donnees.R ; sans la marque, un nom non ASCII installé sous LC_ALL=C se lit en octets « unknown » ; valeur calculée à la main)",
+         all(Encoding(DECLARATIONS$nom) == "UTF-8" | !grepl("[^\001-\177]", DECLARATIONS$nom, useBytes = TRUE)) &&
+           all(Encoding(unique(decalages_embarques()$nom)) == "UTF-8" |
+                 !grepl("[^\001-\177]", unique(decalages_embarques()$nom), useBytes = TRUE)))
 verifier("DECALAGES_EMBARQUES : une entrée par déclaration, dans l'ordre ; identifiant et table de la déclaration ; lignes lues (non NULL) à l'installation", {
   e <- tablexp:::DECALAGES_EMBARQUES
   identical(names(e), DECLARATIONS$nom) &&
@@ -349,3 +353,34 @@ verifier("lire_decalages_embarques() : lignes du fichier telles quelles (sans an
 verifier("decalages_embarques() : exportée, sans argument, identical() au catalogue construit sur DECALAGES_EMBARQUES (identité exacte)",
          "decalages_embarques" %in% getNamespaceExports("tablexp") && is.null(names(formals(decalages_embarques))) &&
            identical(decalages_embarques(), catalogue_decalages_embarques(tablexp:::DECALAGES_EMBARQUES)))
+
+# --- décalages embarqués : littéral de la source (une ligne par commit `donnees:`) -----------
+
+# Nombre de bandes, première borne, borne et décalage de la bande ouverte, lus
+# sur le fac-similé de la source (fichier de provenance : JO n° 301 du
+# 29/12/2015, texte 35, p. 19 de l'extrait), et table visée.
+DECALAGES_ATTENDUS <- data.frame(
+  nom = c("Décalages d'âge TF 00-02"),
+  table = c("TF 00-02"),
+  bandes = c(9L),
+  premiere_borne = c(16L),
+  borne_ouverte = c(94L),
+  decalage_ouvert = c(0L),
+  stringsAsFactors = FALSE)
+verifier("décalages attendus : une ligne par objet déclaré, dans l'ordre de la déclaration",
+         identical(DECALAGES_ATTENDUS$nom, DECLARATIONS$nom))
+for (k in seq_len(nrow(DECALAGES_ATTENDUS))) local({
+  a <- DECALAGES_ATTENDUS[k, ]
+  verifier(sprintf("decalages_embarques(), « %s » : table %s, %d bandes, première borne %d, bande ouverte « %d et plus » au décalage %d, source et représentation (littéral de la source)",
+                   a$nom, a$table, a$bandes, a$premiere_borne, a$borne_ouverte, a$decalage_ouvert), {
+    x <- decalages_embarques()
+    x <- x[x$nom == a$nom, , drop = FALSE]
+    n <- nrow(x)
+    n == a$bandes && all(x$table == a$table) && identical(x$age_min[1L], a$premiere_borne) &&
+      identical(x$age_min[n], a$borne_ouverte) && is.na(x$age_max[n]) && !anyNA(x$age_max[-n]) &&
+      identical(x$decalage[n], a$decalage_ouvert) &&
+      all(x$source == sprintf("inst/extdata/tables/%s.provenance.dcf",
+                              DECLARATIONS$identifiant[DECLARATIONS$nom == a$nom])) &&
+      all(x$representation == "tablexp decalages 1") && length(unique(x$empreinte)) == 1L
+  })
+})

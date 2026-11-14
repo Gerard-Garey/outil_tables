@@ -826,7 +826,7 @@ ESSAIS <- list(
 # d'essai admise. Seconde source : première borne 0 au lieu de 16 et une
 # ligne imprimée deux fois, déclarées en écart (forme des écarts du BO,
 # spécification d'actuary de #273, § 5.6).
-ESSAI_DECALAGES <- list(nom = "Décalages d'âge ESSAI", identifiant = "decalages_essai", table = "ESSAI ADMISE",
+ESSAI_DECALAGES <- list(nom = iconv("Décalages d'âge ESSAI", "UTF-8", "UTF-8"), identifiant = "decalages_essai", table = "ESSAI ADMISE",
                         lignes = c("age_min,age_max,decalage", "16,29,-3", "30,59,-2", "60,,0"),
                         seconde = c("age_min,age_max,decalage", "0,29,-3", "30,59,-2", "30,59,-2", "60,,0"),
                         ecarts = c("16,29,-3;0,29,-3", ";30,59,-2"),
@@ -868,7 +868,8 @@ preparer_temoin <- function(racine, arbre, empreintes, decl, decl_d, empreinte_d
   ed <- ESSAI_DECALAGES
   s <- c(s[seq_len(debut - 1L)],
          "DECLARATIONS_DECALAGES_EMBARQUES <- data.frame(",
-         sprintf("  nom = %s,", q(c(decl_d$nom, ed$nom))),
+         # Noms marqués UTF-8 comme dans R/donnees.R (iconv(), base).
+         sprintf("  nom = iconv(%s, \"UTF-8\", \"UTF-8\"),", q(c(decl_d$nom, ed$nom))),
          sprintf("  identifiant = %s,", q(c(decl_d$identifiant, ed$identifiant))),
          sprintf("  table = %s,", q(c(decl_d$table, ed$table))),
          "  stringsAsFactors = FALSE)", s[-seq_len(fin)])
