@@ -51,8 +51,18 @@ Porteurs-usages:
  Comptes sociaux : règlement ANC 2015-11, art. 142-3 (recueil ANC 2025,
  SHA-256 identique à celui de inst/extdata/tables/tf_00-02.provenance.dcf),
  renvoi aux dispositions des trois codes ; aucune mention expresse des
- décalages dans le recueil (recherche du 14/11/2026) ; lecture par renvoi
- (interprétation, non tranchée).
+ décalages dans le recueil (recherche du 14/11/2026). Deux lectures : (A)
+ le renvoi « dans le respect des dispositions du code des assurances, du
+ code de la mutualité ou du code de la sécurité sociale » vaut application
+ des décalages d'âge (A132-18, huitième alinéa ; A132-19) aux provisions
+ mathématiques des contrats en cas de vie autres que les rentes, par le
+ lien entre la provision et le tarif ; (B) non : l'article ne vise que des
+ « tables ». Lecture (A) retenue par le mainteneur le 14/11/2026
+ (https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6883517873,
+ point 1), sur les lectures de regulatory et l'avis d'actuary
+ (https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6882991379,
+ § 3, point 1) ; l'art. 142-3 ne porte pas les décalages lui-même : il y
+ renvoie par les codes, qui les portent (champs ci-dessus).
 Source: Journal officiel de la République française n° 301 du 29 décembre
  2015, texte 35 sur 159 : « Arrêté du 28 décembre 2015 portant adaptation des
  dispositions comptables du code des assurances », NOR FCPT1529210A ; annexe à

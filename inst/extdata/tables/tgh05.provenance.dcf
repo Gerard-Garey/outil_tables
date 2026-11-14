@@ -83,16 +83,63 @@ Porteurs-usages:
  annexe II, « TABLE TGH05 » (BO Santé 2007-1, annonce n° 58, p. 3 et p. 39
  de l'impression versée, lues sur le rendu le 14/11/2026 ; champ
  Seconde-source-bo) ; statut : vérifié (porteur d'origine). Porteur en
- vigueur (annexe de A223-8 du code de la mutualité) : aucune pièce versée ;
- statut : non établi.
- Sécurité sociale : aucune lecture faite pour TGH05 ; statut : non établi.
- Comptes sociaux : règlement ANC 2015-11, art. 142-4 (rentes viagères) :
- usage par renvoi aux A132-18, A223-8 et A932-3-11, sans nommer la table ;
- statut : vérifié par regulatory sur le rendu de la p. 18 du recueil ANC
- 2025 (SHA-256 0d7fb3c8…9766, celui de
- inst/extdata/tables/tf_00-02.provenance.dcf, pièce hors dépôt), le
- 14/11/2026. Art. 142-3 : lecture pendante devant le mainteneur (deux
- lectures, non tranchées).
+ vigueur : annexe de A223-8 du code de la mutualité, art. 9 en vigueur de
+ l'arrêté du 08/12/2006 (LEGIARTI000031808338), modifié par l'arrêté du
+ 30/12/2015 (NOR FCPS1531571A), art. 6 : « A l'article A. 223-8 du code de
+ la mutualité, il est créé une annexe contenant les tables TF00-02 et
+ TH00-02 et les décalages d'âge ci-annexés, les tables TV88-90 et TD88-90
+ annexées à l'arrêté du 2 mai 2002 susvisé ainsi que les tables TGF05 et
+ TGH05 ci-annexées. » ; statut : vérifié (stock LEGI de la DILA, art. 9 en
+ vigueur LEGIARTI000031808338, lecture du 12/11/2026,
+ https://github.com/Gerard-Garey/outil_tables/issues/145#issuecomment-6828688504),
+ même lecture et même statut que pour TH et TF 00-02
+ (inst/extdata/tables/th_00-02.provenance.dcf) ; concordant avec la
+ lecture outillée de Légifrance du 14/11/2026 par regulatory (WebFetch,
+ texte extrait par un modèle de synthèse ; indice, non vérifié,
+ https://github.com/Gerard-Garey/outil_tables/issues/268#issuecomment-6883529833) ;
+ arrêté du 30/12/2015 : NOR FCPS1531571A, JORF n° 303 du 31/12/2015, texte
+ 104 ; statut : vérifié sur Légifrance, version électronique (lecture
+ outillée du 13/11/2026, regulatory), non lu sur fac-similé. Impression des
+ tables annexées à A223-8 non établie (les annexes ne sont pas des articles
+ du stock LEGI, lecture du 12/11/2026, même commentaire) ; pièce à verser
+ par #268, point 3.
+ Sécurité sociale : annexe de A932-3-11 du code de la sécurité sociale,
+ arrêté du 21/12/2006 relatif aux tables de mortalité applicables aux
+ institutions de prévoyance (NOR SANS0625193A, JORFTEXT000000241832, JORF
+ n° 9 du 11/01/2007, texte n° 31), art. 9 et 10 en vigueur (art. 10
+ modifié par l'arrêté du 30/12/2015, NOR FCPS1531571A, art. 3), qui
+ nomment TGF05 et TGH05 pour A932-3-11 selon la lecture outillée de
+ Légifrance du 14/11/2026 par regulatory (WebFetch, texte extrait par un
+ modèle de synthèse ; indice, non vérifié, même commentaire de #268) ;
+ statut : lu sur Légifrance, version électronique (lecture outillée du
+ 14/11/2026, regulatory), non établi sur les pièces versées ni sur
+ fac-similé, comme la sécurité sociale des décalages d'âge
+ (inst/extdata/tables/decalages_th_00-02.provenance.dcf) ; la lecture des
+ stocks LEGI et JORF du 12/11/2026, qui vérifie l'art. 10 pour TH et TF
+ 00-02, n'en cite pas le passage relatif à TGF05 et TGH05 ; impression des
+ tables annexées non établie (aucun article « Annexe » dans le stock JORF,
+ même lecture) ; pièce à verser par #268, point 3.
+ Comptes sociaux : règlement ANC 2015-11 (recueil des normes comptables /
+ assurance de l'ANC, « Version en vigueur au 1er janvier 2025 »,
+ https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/recueil/Assurance-Recueil-2025.pdf,
+ p. 18 du recueil, p. 19 du PDF ; SHA-256 au champ Empreintes-hors-depot,
+ pièce hors dépôt). Art. 142-4 (rentes viagères) : usage par renvoi aux
+ A132-18, A223-8 et A932-3-11, sans nommer la table ; statut : vérifié par
+ regulatory sur le rendu de la p. 18 du recueil (p. 19 du PDF), le
+ 14/11/2026. Art. 142-3 (même page) : provisions mathématiques calculées,
+ « s'ils comportent un élément viager et sous réserve de l'article 142-4
+ du présent règlement, d'après les tables en vigueur à l'époque de
+ l'application du tarif, dans le respect des dispositions du code des
+ assurances, du code de la mutualité ou du code de la sécurité sociale
+ s'appliquant à l'entreprise » ; deux lectures : (a) l'art. 142-3 est
+ aussi un usage de TGH05 pour les contrats à élément viager non liquidés,
+ hors du champ de l'art. 142-4 ; (b) non : l'usage de TGH05 en comptes
+ sociaux relève de l'art. 142-4 seul. Lecture (a) retenue par le
+ mainteneur le 14/11/2026
+ (https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6883517873,
+ point 2), sur les lectures de regulatory et l'avis d'actuary
+ (https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6882991379,
+ § 3, point 1).
 Source: Journal officiel de la République française n° 301 du 29 décembre
  2015, texte 35 sur 159 : « Arrêté du 28 décembre 2015 portant adaptation des
  dispositions comptables du code des assurances », NOR FCPT1529210A ; annexe à
@@ -208,15 +255,38 @@ Controles-coherence: Par génération : âges consécutifs du premier au dernier
  consécutifs en treize cellules (q_x = 0 : 1919 et 1920 à 113 ans, 1926 à
  114 ans, 1931 et 1932 à 115 ans, 1936 et 1937 à 116 ans, 1941 et 1942 à
  117 ans, 1946 et 1947 à 118 ans, 1951 et 1952 à 119 ans) ; q_x dans [0 ;
- 0,75], aucun q_x = 1. Âges x >= 31 où q_x < q_{x-1} (q_x = 1 - l_{x+1} /
- l_x ; contrôle de vraisemblance, non correctif) : 169 couples (génération,
- âge), dont 85 à 100 ans et plus (l_x petits, arrondis à l'entier), 68 à 59
- ans (toutes les générations de 1938 à 2005), 7 à 31 ans (1979, 1981, 1982,
- 1992, 1994, 1997, 2005), 3 à 32 ans (1967, 1984, 1996) et 6 à 33 ans
- (1978, 1982, 1988, 1993, 1997, 2001) ; valeurs imprimées, identiques au BO
- et au JO de 2006, aucune correction. Mesure du 14/11/2026 sur le fichier de
- table et sur table_embarquee("TGH05") (état admise dans
- tables_embarquees()).
+ 0,75], aucun q_x = 1. Mesure du 14/11/2026 sur le fichier de table et sur
+ table_embarquee("TGH05") (état admise dans tables_embarquees()).
+ Décroissances de q_x (contrôle de vraisemblance, non correctif) : couples
+ (génération, âge x), aux âges x >= 31 (x est le second âge du couple
+ d'âges (x-1, x)), où q_x < q_{x-1}, avec q_x = d_x / l_x et d_x = l_x -
+ l_{x+1} ; la comparaison se fait en entiers sur les l_x imprimés : d_x
+ l_{x-1} < d_{x-1} l_x. Chaque couple est qualifié par le critère exact de
+ compatibilité avec un arrondi au plus proche des l_x imprimés : des l_x
+ non arrondis, chacun à au plus une demi-unité de la valeur imprimée,
+ donnent q_x >= q_{x-1} si et seulement si (l_{x+1} - 1/2)(l_{x-1} - 1/2)
+ <= (l_x + 1/2)^2, comparé en entiers sous la forme (2 l_{x+1} - 1)(2
+ l_{x-1} - 1) <= (2 l_x + 1)^2. Résultat : 169 couples, dont 116
+ compatibles avec l'arrondi et 53 incompatibles. Compatibles : 85 à 100
+ ans et plus (110 à 119 ans, l_x petits), 7 à 31 ans (1979, 1981, 1982,
+ 1992, 1994, 1997, 2005), 3 à 32 ans (1967, 1984, 1996), 6 à 33 ans (1978,
+ 1982, 1988, 1993, 1997, 2001) et 15 à 59 ans (1938 à 1944, 1946, 1948,
+ 1953, 1956, 1986, 1989, 2000 et 2005). Incompatibles : 53 couples, tous
+ à 59 ans (les autres générations de 1938 à 2005, de 1945 à 2004) ; aucun
+ arrondi des l_x imprimés ne les explique. Les 68 générations de 1938 à
+ 2005, toutes celles qui portent les âges 58 à 60, ont q_59 < q_58.
+ Replat de 58 à 62 ans : propriété du profil publié, commune à TGF05 et
+ TGH05 ; médianes des rapports q_x / q_{x-1} sur les générations 1940 à
+ 2005 qui portent les âges x-1 à x+1 (66 générations aux âges 57 à 70, 62
+ à 65 aux âges 53 à 56) : 0,9868 à 59 ans, puis 1,0170 à 60, 1,0471 à 61,
+ 1,0366 à 62 et 1,0558 à 63, contre 1,0581 à 1,1496 aux âges 53 à 58 et
+ 64 à 70 ; q_59 / q_58 entre 0,9673 et 0,9979 sur les 66 générations. Son
+ origine dans la construction de la table est une hypothèse non vérifiée.
+ Valeurs imprimées, identiques au JO de 2015, au JO de 2006 et au BO
+ (relevés identiques octet pour octet au fichier de table, champ
+ Empreintes-fichiers), aucune correction. Décomptes et rapports mesurés le
+ 14/11/2026 sur le fichier de table par un script R non versé ; aucun
+ script versé ne les reproduit (issue #279).
 Ecarts-signales: Aucune anomalie de composition relevée dans TGH05 au
  fac-similé de 2015 (aucune cellule imprimée vide, aucune ligne décalée,
  aucune cellule à deux nombres : notes des deux transcripteurs, commit
@@ -254,6 +324,7 @@ Empreintes-hors-depot:
  71efa18fb60054f2ec1802ce4ffe72d1a419e5e432bd1696aee45b25f8a9c94a  gel.sha256 (gel des 40 blocs de TGF05 et TGH05, commit b949ced)
  76de276ba38f765842eba84049a758f22bc199c16cfe7e9d54a53e2cd0859092  assembler.py (commit b949ced)
  db47aa40cf19737dd20bb9e0a668ba5890de678c11f0cf79b499194e476947e3  releves.py (commit b949ced)
+ 0d7fb3c86e6293e57c4141bf859f926056ba6617bed4794830c83839e9319766  Assurance-Recueil-2025.pdf (recueil ANC, téléchargé le 13/11/2026)
 Representation: tablexp table 1
 Empreinte-table: 65a4862cbfc920662b4fae7087cda2f0
 Visa: 2026-11-13, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6866147841 (M473)
