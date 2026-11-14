@@ -6798,9 +6798,11 @@ même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
     l'identique~: un zéro terminal donnait déjà $q_x = 1$ à l'âge précédent.
     Trois conséquences, que le lecteur d'une table doit avoir en vue
     (ADR 0019, point~4.4, spécification d'\code{actuary})~:
-    (a)~le $q_x = 1$ d'un groupe clos par un zéro imprimé est un
-    \textbf{artefact d'arrondi} de la source (un dernier survivant imprimé,
-    puis 0), non une donnée de mortalité~; (b)~dans une même table, certains
+    (a)~le $q_x = 1$ d'un groupe clos par un zéro imprimé (un dernier $l_x$
+    imprimé petit, 1 ou~2, puis 0~: $l_{106} = 2$, puis 0, pour TD~88-90 au
+    BO, ci-dessous) est, dans une table publiée en $l_x$ entiers arrondis,
+    un \textbf{artefact d'arrondi}~; en général, une convention de la
+    source (arrondi ou fermeture), non une donnée de mortalité~; (b)~dans une même table, certains
     groupes peuvent être clos par un zéro imprimé et d'autres non (cellule
     sans valeur, ou dernière ligne à $l_\omega > 0$)~: aucun consommateur ne
     suppose $q_\omega = 1$~; (c)~deux impressions d'une même table donnent
@@ -7359,7 +7361,8 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         tables, et l'art.~142-4, qui vise les rentes viagères, ne les porte
         pas (\emph{vérifié} sur le recueil des normes comptables de l'ANC,
         «~Version en vigueur au 1\textsuperscript{er} janvier 2025~»,
-        lecture par renvoi). Le moteur ne cite aucun de ces textes~: comme
+        p.~18 du recueil (p.~19 du PDF), lecture par renvoi). Le moteur ne
+        cite aucun de ces textes~: comme
         pour TD et TV~88-90, il ne porte de la provenance que le chemin du
         fichier, attribut \code{source} de la table.
       \item \emph{Sexe.} TH~00-02 est déclarée de modalité \code{H},
@@ -7505,12 +7508,30 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         28/12/2015, qui ne nomme pas l'usage de la table, le lien aux rentes
         viagères étant celui de l'acte d'homologation. Mutualité~: porteur
         d'origine, l'arrêté du 8/12/2006 (NOR SANS0624984A), art.~8 et~9,
-        annexe~II (\emph{vérifié})~; porteur en vigueur \emph{non établi}.
-        Sécurité sociale~: \emph{non établi}. Comptes sociaux~: règlement
-        ANC 2015-11, art.~142-4 (rentes viagères), usage par renvoi aux
-        codes, sans nommer la table (\emph{vérifié} par \code{regulatory})~;
-        la lecture de l'art.~142-3 est pendante devant le mainteneur. Le
-        détail par régime, avec les citations, est au fichier de provenance.
+        annexe~II (\emph{vérifié} sur l'impression versée du BO)~; porteur
+        en vigueur, l'annexe de l'article A223-8 du code de la mutualité,
+        dont l'art.~9 en vigueur de l'arrêté (modifié par l'arrêté du
+        30/12/2015, art.~6) nomme «~les tables TGF05 et TGH05
+        ci-annexées~» (\emph{vérifié} pour le texte de l'article, stock LEGI
+        de la DILA, lecture outillée, comme pour TH et TF~00-02, ci-dessus~;
+        impression des tables annexées \emph{non établie}, pièce à verser,
+        issue~\#268). Sécurité sociale~: annexe de l'article A932-3-11 du
+        code de la sécurité sociale, l'arrêté du 21/12/2006
+        (NOR SANS0625193A), art.~9 et~10 en vigueur, nommant TGF05 et TGH05
+        selon une lecture outillée de la version électronique de
+        Légifrance (14/11/2026, \code{regulatory}), simple indice~:
+        \emph{non établi} sur les pièces versées ni sur fac-similé~;
+        impression des tables
+        annexées \emph{non établie}. Comptes
+        sociaux~: règlement ANC 2015-11 (recueil ANC, «~Version en vigueur
+        au 1\textsuperscript{er} janvier 2025~», p.~18 du recueil (p.~19 du
+        PDF)), art.~142-4 (rentes viagères), usage par renvoi aux codes,
+        sans nommer la table (\emph{vérifié} par \code{regulatory}), et
+        art.~142-3, usage par renvoi pour les contrats à élément viager non
+        liquidés, hors du champ de l'art.~142-4 (lecture retenue par le
+        mainteneur le 14/11/2026~; l'autre lecture, écartée, réservait ces
+        tables aux seules rentes de l'art.~142-4). Le détail par régime,
+        avec les citations, est au fichier de provenance.
       \item \emph{Sexe.} TGF05 est déclarée \code{F}, TGH05 \code{H}, selon
         l'art.~2 de l'acte d'homologation et A132-18 (tables établies par
         sexe).
@@ -7530,15 +7551,60 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         close par un zéro, et aucun $q_x$ ne vaut~1~; le dernier âge à
         valeur de chaque génération ne reçoit aucun $q_x$ (ci-dessus,
         «~Dernier âge et $l_x$ nuls terminaux~»), si bien que la génération
-        1901 de TGH05 finit à $q_{112} = 3/5$. Les objets ont 7\,986
+        1901 de TGH05 finit à $q_{112} = 3/5$. Les générations récentes ne
+        s'éteignent pas à 120~ans~: 73 générations de TGF05 (1933 à~2005)
+        et 55 de TGH05 (1951 à~2005) ont une valeur à 120~ans, jusqu'à
+        $l_{120} = 516$ (TGF05) et $181$ (TGH05) pour la génération 2005~;
+        tout usage au-delà de 119~ans demande donc une fermeture déclarée.
+        Les objets ont 7\,986
         (TGF05) et 7\,815 (TGH05) lignes, de $q_x$ compris dans
-        $[0~;\ 0{,}7142857]$ et $[0~;\ 0{,}75]$~; des $l_x$ égaux à deux
-        âges consécutifs, en fin de génération, donnent $q_x = +0$. Le
-        fichier de provenance relève en outre, comme contrôle de
-        vraisemblance et non de correction, les âges où $q_x$ décroît d'un
-        âge au suivant (surtout au-delà de 100~ans, où les $l_x$ sont
-        petits et arrondis à l'entier)~: valeurs imprimées, identiques au
-        BO et au JO de 2006, que l'outil ne corrige pas.
+        $[0~;\ 5/7]$ ($5/7 \approx 0{,}7142857$, génération 1901 à
+        115~ans) et $[0~;\ 3/4]$ (génération 1902 à 112~ans)~; des $l_x$
+        égaux à deux âges consécutifs, en fin de génération (4~cellules
+        de TGF05, 13 de TGH05, de 113 à~119~ans), donnent $q_x = +0$~:
+        comme le $q_x = 1$ d'un groupe clos par un zéro (ci-dessus), ce sont
+        des artefacts d'arrondi des $l_x$ imprimés, non des données de
+        mortalité. Le fichier de provenance relève en outre, comme contrôle
+        de vraisemblance et non de correction, les âges $x \ge 31$ où
+        $q_x < q_{x-1}$~: 65 couples (génération, âge) pour TGF05, 169
+        pour TGH05. Ces décroissances sont de deux natures. (i)~Celles qui
+        sont compatibles avec un arrondi au plus proche des $l_x$
+        imprimés~: il existe des valeurs non arrondies, à $\pm\frac12$ au
+        plus de $l_{x-1}$, $l_x$ et $l_{x+1}$, qui ne donnent pas
+        $q_x < q_{x-1}$ si et seulement si
+        $(l_{x+1} - \frac12)(l_{x-1} - \frac12) \le (l_x + \frac12)^2$
+        (\emph{résultat exact}~: $q_x \ge q_{x-1}$ s'écrit
+        $l_{x+1}\,l_{x-1} \le l_x^2$, et l'inégalité est la plus facile à
+        satisfaire aux bornes de l'intervalle d'arrondi). Ce sont les 65 de
+        TGF05 (une à 44~ans, onze à 62~ans, 53 de 114 à~119~ans) et 116
+        des 169 de TGH05 (les 85 de 110 à~119~ans, les 16 de 31 à~33~ans et
+        15 des 68 à 59~ans). À partir de 107 à~120~ans selon la génération
+        pour TGH05, de 111 à~120~ans pour TGF05 (9 et 26~générations
+        restent à $l_x \ge 100$ jusqu'à 120~ans), $l_x < 100$~: l'erreur
+        d'arrondi à l'entier, jusqu'à $\frac12$, y peut dépasser 0,5\,\%
+        de $l_x$. (ii)~Les 53 autres couples de TGH05, tous à 59~ans
+        (générations comprises entre 1945 et~2004), sont
+        \textbf{incompatibles avec un arrondi}~: c'est une propriété du
+        profil publié, qui présente un replat de 58 à~62~ans dans les deux
+        tables. Sur les générations 1940 à~2005, la médiane de
+        $q_{59}/q_{58}$ vaut 0,987 dans TGH05 (les 68 générations de 1938 à~2005
+        ont $q_{59} < q_{58}$), contre 1,058 à~1,150 pour $q_x/q_{x-1}$,
+        $x$ de 53 à~58 et de 64 à~70~; dans TGF05, $q_x$ croît en médiane
+        de 1,4\,\%, 1,3\,\% et 0,3\,\% de 59 à~62~ans, contre 3,1 à~8,9\,\%
+        pour $x$ de 56 à~59 et de 64 à~70 (1,9\,\% à 63~ans). Le replat est
+        imprimé de même au JO de 2015, au JO de 2006 et au BO (aucun écart
+        entre les trois, ci-dessous, «~Contre-vérification~»)~: ce n'est
+        pas une erreur de lecture. Son origine dans la construction des
+        tables est une \emph{hypothèse non vérifiée}, que l'outil ne
+        tranche pas. Dans les deux cas, ce sont des valeurs imprimées et
+        homologuées, que l'outil ne corrige pas. Un
+        consommateur à venir qui compare des $q_x$ le long d'une génération,
+        ou qui positionne une table sur TGH05, héritera du replat~; au-delà
+        de l'âge où $l_x < 100$, les $q_x$ sont sensibles à l'arrondi des
+        $l_x$ et leurs variations d'un âge au suivant ne se lisent pas comme
+        une donnée de mortalité
+        (\emph{constats de mesure} du 14/11/2026 sur le fichier de table et
+        sur \code{table\_embarquee()}).
       \item \emph{Anomalies A1 et A2 de TGF05} (ADR 0019, point~5.3~;
         décision du mainteneur M466~; lecture de \code{regulatory} du
         13/11/2026). Le fac-similé de 2015 porte deux anomalies de
@@ -7717,7 +7783,7 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         écrite par la branche qui la consomme
         (\code{claude/marge-comparaison}). Le mainteneur en a fixé le
         contenu~: les décalages portent sur les $q_x$, jamais sur les
-        $l_x$ (E2.26)~; la bande se choisit sur l'âge $x$ de chaque taux
+        $l_x$ (A132-19~; E2.26)~; la bande se choisit sur l'âge $x$ de chaque taux
         annuel, $q'_x = q_{x + d(x)}$, $d(x)$ étant le décalage de la bande
         qui contient $x$, la lecture où l'âge serait figé à la souscription
         étant écartée (E8, confirmée le 13/11/2026 après la lecture de
@@ -7738,7 +7804,16 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         TH~00-02 (0 à~109) de trois âges, 110 à~112~: une fermeture déclarée
         de la table décalée commencerait à 113, alors qu'une fermeture de
         TH~00-02 suivie du décalage porterait sur les $q$ de la table à
-        partir de 110~; l'ordre entre fermeture et décalage doit donc être
+        partir de 110. La raison est que les paramètres d'une fermeture
+        (âge de raccord, fenêtre, âge ultime) se lisent sur deux échelles
+        d'âge différentes selon l'ordre~: fermer TH~00-02 avec
+        $q_{120} = 1$, puis décaler, place $q'_{123} = 1$, alors que fermer
+        la table décalée à 120~ans place $q'_{120} = 1$. Les deux ordres ne
+        coïncident, en général, que si les paramètres de l'un sont ceux de l'autre
+        translatés du décalage de la dernière bande ($-3$) et si la
+        fermeture ne lit ni ne modifie aucun âge hors de cette bande (âges
+        décalés de 75~ans et plus, soit les âges $75 - 3 = 72$ et plus de la
+        table). L'ordre entre fermeture et décalage doit donc être
         déclaré~; (b)~les âges 0 à~2,
         26 à~31, 56, 59, 60 et~71 de la table ne sont jamais atteints, les
         sauts aux changements de bande étant l'effet de la règle et non un
@@ -7766,7 +7841,20 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         de mesure} sur \code{decalages\_embarques()}). Acte d'homologation~:
         l'arrêté du 20/12/2005, art.~5 (ci-dessus)~; porteurs et usages par
         régime au fichier de provenance, d'après la lecture de
-        \code{regulatory}. Contre-vérification (relevés sous
+        \code{regulatory}. Comptes sociaux~: le règlement ANC 2015-11,
+        art.~142-3 (p.~18 du recueil (p.~19 du PDF)), ne porte pas les
+        décalages et ne les nomme pas~; son renvoi «~dans le respect des
+        dispositions du code des assurances, du code de la mutualité ou du
+        code de la sécurité sociale~» vaut application des décalages
+        (A132-18, huitième alinéa~; A132-19) aux provisions mathématiques
+        des contrats en cas de vie autres que les rentes, par le lien entre
+        la provision et le tarif, dont la base est la table décalée
+        (lecture retenue par le mainteneur le 14/11/2026, sur avis
+        d'\code{actuary}~; l'autre lecture, écartée, tenait que l'article,
+        qui ne vise que des «~tables~», n'emporte pas les décalages). Cette
+        lecture ne change aucun calcul de cette version~: la règle d'A132-19
+        reste une transformation que déclarera le plan (ci-dessus, «~Règle
+        d'application~»). Contre-vérification (relevés sous
         \code{tests/contre\_verification/tables/})~: (a)~deux transcriptions
         visuelles aveugles, par deux agents (IA) distincts, sur le seul
         rendu de la page, identiques octet pour octet~; (b)~\emph{comparaison
@@ -19436,7 +19524,7 @@ E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-gr
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:coherence-regularite}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
-E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, TH~00-02 et TF~00-02 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, décalages d'âge de TH et TF~00-02 et grilles de TGF05 et TGH05 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, TGF05 et TGH05 comparées à l'acte sur l'extrait versé du JO n\textsuperscript{o}~197 du 26/08/2006, comparés à l'acte sur l'extrait versé du JO n\textsuperscript{o}~302 du 29/12/2005 (arrêté du 20/12/2005), la couche texte ne servant qu'à la comparaison et au contrôle de lecture~; textes cités non versés~: arrêtés du 08/12/2006, du 21/12/2006 et du 30/12/2015 (versions électroniques), \#13) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
+E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, TH~00-02 et TF~00-02 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, décalages d'âge de TH et TF~00-02 et grilles de TGF05 et TGH05 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, TGF05 et TGH05 comparées à l'acte sur l'extrait versé du JO n\textsuperscript{o}~197 du 26/08/2006, décalages d'âge de TH et TF~00-02 comparés à l'acte sur l'extrait versé du JO n\textsuperscript{o}~302 du 29/12/2005 (arrêté du 20/12/2005), la couche texte ne servant qu'à la comparaison et au contrôle de lecture~; version initiale de l'arrêté du 08/12/2006 versée par l'impression du BO Santé 2007-1, annonce n\textsuperscript{o}~58, seconde source~; textes cités non versés~: arrêtés du 08/12/2006 (version en vigueur), du 21/12/2006 et du 30/12/2015 (versions électroniques), \#13, \#268) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
 E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; TH~00-02 (\code{H}, lignes 111 et~112 imprimées sans valeur, non transcrites) et TF~00-02 (\code{F}) transcrites du fac-similé du JO n\textsuperscript{o}~301 du 29/12/2015 (annexe à l'article A132-18), avec leur acte d'homologation, leurs porteurs (et, pour les comptes sociaux, leur usage) par régime et leur statut, et leur contre-vérification, TF~00-02 telle qu'imprimée, ses trois valeurs fautives (âges 11, 23 et~62) signalées avec celles du BO Santé 2007-1, seconde source citée sans correction, et refusée par le moteur (état \code{refusee})~; décalages d'âge de TH et TF~00-02 embarqués en objet propre (\code{decalages\_age}, format~3, empreinte \code{tablexp decalages 1}, accesseur \code{decalages\_embarques()}), avec leur provenance et leur contre-vérification, leur application aux $q_x$ (A132-19) décidée mais non mise en œuvre~; TGF05 (\code{F}) et TGH05 (\code{H}), tables de génération au format~2, transcrites du même fac-similé, avec leur acte d'homologation (arrêté du 1\textsuperscript{er}~août 2006), leurs porteurs par régime et leur statut, leur comparaison à l'acte (JO de 2006) et leur seconde source (BO Santé 2007-1, annexe~II), les anomalies A1 et A2 de TGF05 traitées selon M466, leur contrôle par l'identité avec la table unique 2024 différé (\#275)~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction~; $l_x$ nuls terminaux admis, le premier clôturant le groupe~; table de génération (colonne \code{generation}, exclusive d'\code{annee}), lue par aucune étape de cette version, et format~2 du fichier de table, grille âge $\times$ génération telle qu'imprimée, cellule sans valeur «~-~») & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
