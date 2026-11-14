@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{13/11/2026}
+\newcommand{\datedoc}{14/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -923,7 +923,7 @@ même si la classe compte aussi \code{factor} (\code{a\_classe()} lirait
 \code{c(<bytes>, "factor")} comme un facteur~; issue~\#150), ou de nom
 \code{bytes} et de type non conforme
 (section~\ref{sec:controles-donnees})~; \code{table\_colonne\_mal\_typee}
-pour une colonne \code{age}, \code{sexe}, \code{annee} ou \code{lx} de classe
+pour une colonne \code{age}, \code{sexe}, \code{annee}, \code{generation} ou \code{lx} de classe
 \code{bytes} d'une table de référence, dont le contrôle des types est le
 même (\code{type\_conforme()}~; section~\ref{sec:table-reference}~;
 issue~\#150), et pour une table de référence entière de classe
@@ -3179,7 +3179,8 @@ dans la batterie unitaire, son témoin d'échec étant son propre mode
 \code{-{}-temoin}, exécuté par une étape de la CI (ci-dessous).
 
 \textbf{Tables embarquées et leur provenance} (issue~\#263~; ADR 0018,
-points~5 et~6~; ADR 0011, annotation du 05/11/2026, (d)).
+points~5 et~6~; ADR 0011, annotation du 05/11/2026, (d)~; format~2~:
+ADR 0019, points~5, 7.1, 7.2 et~7.5, issue~\#272).
 \code{tests/controles/tables\_embarquees.R} installe l'arbre dans une
 bibliothèque temporaire, sous une locale UTF-8, puis vérifie, pour chaque
 table déclarée (section~\ref{sec:table-reference}, «~Tables
@@ -3187,15 +3188,34 @@ embarquées~»)~: (a)~la \emph{complétude}~: fichier de table et fichier de
 provenance présents, aucun fichier de \code{inst/extdata/tables/} ni de
 \code{tests/contre\_verification/tables/} qui ne soit rattaché à une
 table déclarée~; (b)~le \emph{format}, sur les octets, du fichier de table
-et des relevés de contre-vérification (ASCII, fins de ligne LF, fin de
-ligne finale, en-tête \code{age,lx}, entiers en chiffres seuls, âges
-croissants et consécutifs), et la forme du fichier de provenance (UTF-8
+et des relevés de contre-vérification, selon le format de la déclaration
+(colonne \code{format}, sans valeur par défaut)~: ASCII, fins de ligne LF,
+fin de ligne finale, puis, au format~1, en-tête \code{age,lx}, entiers en
+chiffres seuls, âges croissants et consécutifs, et, au format~2, en-tête
+\code{age,<g\_1>,\ldots,<g\_n>}, générations au plus égales au plus grand
+entier du moteur, générations et âges croissants et consécutifs, une
+cellule par génération, $l_x$ entier en chiffres seuls ou \code{-}, cellule
+vide finale gardée par le découpage, donc refusée, au moins une valeur par
+ligne et par génération~; et la forme du fichier de provenance (UTF-8
 valide sans BOM, LF, aucune ligne vide, un seul enregistrement, premier
 champ \code{Format}, chaque champ une seule fois~--- contrôlé sur les
 lignes, \code{read.dcf()} fusionnant sans message un champ écrit deux
 fois~---, champs requis présents, aucun champ inconnu, visa daté), ses
 champs \code{Nom}, \code{Fichier}, \code{Sexe} et \code{Forme-origine}
-égaux à la déclaration~; (c)~l'\emph{identité des fichiers}~: le SHA-256
+égaux à la déclaration~; au format~2, le champ \code{Generations} est requis
+(générations transcrites, règle des premier et dernier âges à valeur, lignes
+imprimées sans valeur et non transcrites~; condition du visa
+d'\code{actuary} sur la question~5 de l'ADR 0019), et le groupe
+\code{Comparaison-acte}, \code{Comparaison-acte-methode},
+\code{Comparaison-acte-releve}, \code{Comparaison-acte-ecarts}
+(comparaison à l'acte d'homologation, relevé
+\code{<identifiant>.comparaison\_acte.csv}), facultatif, est complet ou
+absent~; ces champs sont inconnus au format~1, et les champs
+\code{Identite-regle} et \code{Identite-ecarts} que prévoit l'ADR 0019
+(point~7.1) sont refusés comme inconnus au format~2 tant que leur contrôle
+n'est pas écrit~: un champ lu par machine admis sans son contrôle
+donnerait une fausse assurance (issue~\#275, qui apportera ensemble leur
+admission, ce contrôle et un cas du témoin)~; (c)~l'\emph{identité des fichiers}~: le SHA-256
 de chaque fichier cité au champ \code{Empreintes-fichiers} (fichier de
 table, relevés, pièces sources de \code{docs/sources/}), calculé par
 l'outil système \code{sha256sum}, dont l'absence est un échec et non un
@@ -3203,12 +3223,19 @@ contrôle sauté, égal à la valeur écrite~; (d)~l'\emph{identité moteur}~:
 \code{table\_embarquee(nom)} rend un objet dont l'empreinte, lue dans
 \code{tables\_embarquees()}, égale \code{Empreinte-table}, ou lève le
 refus de motif \code{Refus-attendu} dont les paires d'âges citées égalent
-\code{Refus-paires}~; un objet là où un refus est attendu, ou l'inverse,
+\code{Refus-paires}, écrites \code{<âge>-<âge suivant>} au format~1 et
+\code{<génération>:<âge>-<âge suivant>} au format~2 (lues dans
+\code{details\$ages} et, au format~2, \code{details\$generations})~; un objet là où un refus est attendu, ou l'inverse,
 est un échec~; (e)~la \emph{contre-vérification}, rejouée sur les relevés
 versés, sans les pièces ni l'outil d'extraction~: fichier de table et
 seconde transcription identiques ligne à ligne, écarts à chaque seconde
 source et au relevé de contrôle de lecture égaux, dans les deux sens, aux
-écarts déclarés au fichier de provenance~; (f)~le \emph{catalogue}~:
+écarts déclarés au fichier de provenance, écrits
+\code{<âge>,<l\_x table>,<l\_x relevé>} au format~1 et
+\code{<âge>,<génération>,<cellule table>,<cellule relevé>} au format~2, un
+côté vide quand la ligne ou la cellule n'existe que de l'autre~; au
+format~2, le relevé de comparaison à l'acte est comparé aux mêmes
+conditions qu'une seconde source~; (f)~le \emph{catalogue}~:
 \code{tables\_embarquees()} a une ligne par table déclarée, dans l'ordre,
 avec le sexe et la source de la déclaration et des états conformes
 à~(d)~; (g)~l'\emph{installation}~: \code{R CMD build} de l'arbre,
@@ -3218,13 +3245,23 @@ du dossier \code{extdata} de la bibliothèque, ce qui montre qu'aucun
 fichier n'est lu à l'exécution. Le contrôle est permanent, et non une
 mesure faite une fois, parce que la lecture à l'installation repose sur un
 constat de plateforme. \textbf{Témoin d'échec} (\code{-{}-temoin}~;
-ADR 0018, point~6.2)~: une copie de l'arbre, munie de deux tables d'essai
-déclarées, l'une admise, l'autre refusée par le moteur, est contrôlée
+ADR 0018, point~6.2~; ADR 0019, point~7.5)~: une copie de l'arbre, munie de
+quatre tables d'essai déclarées, deux au format~1 et deux au format~2
+(chaque fois l'une admise, l'autre refusée par le moteur), est contrôlée
 intacte (succès attendu, mesure~(g) comprise), puis avec un $l_x$ de la
-table d'essai admise changé d'une unité (échec attendu, avec des écarts
-sur~(c), (d) et~(e)), puis, ce $l_x$ rétabli, avec les paires attendues de
-la table d'essai refusée changées (échec attendu, avec un écart sur~(d))~;
-le témoin sort avec le code~0 si les trois verdicts sont ceux attendus.
+première table admise déclarée au format~1 (table du catalogue s'il en
+porte une, sinon l'essai admis) changé d'une unité (échec attendu, avec
+des écarts sur~(c), (d) et~(e)), puis, ce $l_x$ rétabli, avec les paires
+attendues de la table d'essai refusée changées (échec attendu, avec un
+écart sur~(d) seul)~; de même au format~2, une cellule de l'essai admis
+changée d'une unité (écarts sur~(c), (d) et~(e)), puis, rétablie, les
+paires attendues de l'essai refusé changées (écart sur~(d))~; le témoin
+sort avec le code~0 si tous les verdicts sont ceux attendus.
+\textbf{Limite}~: la borne des âges (au plus le plus grand entier du
+moteur), que le moteur applique aux formats~1 et~2, n'est pas appliquée
+par le contrôle~(b), qui l'applique aux seules générations (écart relevé
+par l'audit de l'issue~\#272 et renvoyé à une issue proposée au
+mainteneur).
 Les comportements du moteur (construction, refus, nom réservé, accesseurs)
 sont testés dans la batterie unitaire (section~\ref{sec:verifications-donnees}).
 
@@ -3505,14 +3542,16 @@ en batterie)~; concordance des en-têtes des références (mode
 main sur un clone complet (section~\ref{sec:rejeu}) & ADR 0011, annotation
 du 27/10/2026, (e)~; M126, M166~; issue~\#89 \\
 \code{tables\_embarquees.R} & tables embarquées, fichiers de provenance et
-contre-vérification~: complétude, format des fichiers sur les octets,
+contre-vérification~: complétude, format des fichiers sur les octets
+(formats~1 et~2, selon la déclaration),
 SHA-256 des fichiers cités (outil \code{sha256sum}), empreinte de table ou
 refus attendu, relevés rejoués, catalogue, installation depuis
 \code{R CMD build} sous deux locales et accès sans \code{extdata}
 (ci-dessus)~; étapes «~Tables embarquées (ADR 0018)~» et «~Tables
 embarquées~: témoin d'échec~» (\code{-{}-temoin}) du job «~Tests
 (R 4.3.3)~», hors liste des batteries & ADR 0018, points~5, 6.1 à 6.3~;
-ADR 0011, annotation du 05/11/2026, (d)~; M447~; issue~\#263 \\
+ADR 0011, annotation du 05/11/2026, (d)~; M447~; issue~\#263~; ADR 0019,
+points~7.1, 7.2 et~7.5~; issue~\#272 \\
 \end{longtable}
 \end{center}
 
@@ -4275,7 +4314,11 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     (\code{octets\_chaines()}, section~\ref{sec:empreinte})~; une liste vide
     vaut \code{NULL}. Puis chaque élément, dans l'ordre des clés converties
     en UTF-8 et triées par octets, doit (a)~avoir exactement la classe
-    \code{table\_reference} et les colonnes du constructeur~; (b)~être
+    \code{table\_reference} et les colonnes du constructeur (\code{age},
+    \code{sexe}, \code{qx}, puis l'axe temporel, \code{annee} ou
+    \code{generation}, s'il est présent~; une table de génération passe donc
+    ce contrôle, puis est refusée par l'étape qui la lit,
+    section~\ref{sec:table-reference}, «~Axe temporel~»)~; (b)~être
     reconstruit sans refus par \code{table\_reference()} à partir du
     \code{data.frame} nu de ses colonnes et de ses métadonnées~; (c)~être
     \code{identical()} à cette reconstruction (classe, attributs, ordre
@@ -6356,11 +6399,15 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
     même année), \textbf{exactement une} des colonnes \code{qx} (double fini
     dans $[0, 1]$) ou \code{lx} (nombre fini $\ge 0$, table transcrite en
     $l_x$, convertie en $q_x$ par le constructeur, ci-dessous, «~Table
-    transcrite en $l_x$~») et, facultative,
-    \code{annee} (entier), pour les tables prospectives de la v2~; l'objet
-    rendu porte toujours \code{qx}, jamais \code{lx}~;
+    transcrite en $l_x$~») et, facultatif, \textbf{au plus un} axe
+    temporel (entier sans valeur manquante)~: \code{annee}, année
+    calendaire, pour les tables prospectives de la v2, ou \code{generation},
+    année de naissance, pour une table de génération (ci-dessous, «~Axe
+    temporel~»~; ADR 0019, point~1)~; l'objet rendu porte toujours
+    \code{qx}, jamais \code{lx}, ses colonnes étant \code{age}, \code{sexe},
+    \code{qx}, puis l'axe s'il est présent~;
   \item âges sans doublon et contigus au sein de chaque sexe (et de chaque
-    année), quel que soit l'ordre reçu des lignes~;
+    année ou de chaque génération), quel que soit l'ordre reçu des lignes~;
   \item attributs \code{nom}, \code{statut} (\code{synthetique},
     \code{embarquee} ou \code{importee}), \code{source} (arrêté, URL, fichier
     de provenance), \code{forme\_origine} (\code{qx} ou \code{lx}, défaut
@@ -6388,7 +6435,7 @@ constructeur. Il en va de même d'une table rendue par une loi du package
 (\code{table\_gompertz\_makeham()}, \code{table\_logistique()},
 \code{table\_constante()}), que le moteur ne distingue pas d'une table
 déclarée par l'appelant. La table entre en valeurs~: l'empreinte de table
-porte sur son contenu (âge, sexe, année si présente, $q_x$), non sur ses
+porte sur son contenu (âge, sexe, axe temporel s'il est présent, $q_x$), non sur ses
 métadonnées, et aucune étape ne lit les paramètres~; ils permettent au tiers
 de recalculer la table et de mesurer l'écart (ADR 0015, point~2.3) pour
 autant qu'ils aient été déclarés exactement. Le rapport figé le dit par la
@@ -6403,7 +6450,8 @@ Les tables importées et embarquées n'ont pas de paramètres
 réservé~»~; issue~\#263), \code{table\_source\_manquante}, \code{table\_parametres\_manquants},
 \code{table\_parametres\_inattendus}, \code{table\_forme\_inconnue},
 \code{table\_mal\_formee}, \code{table\_colonne\_manquante},
-\code{table\_colonne\_inconnue}, \code{table\_forme\_incoherente},
+\code{table\_colonne\_inconnue}, \code{table\_annee\_et\_generation}
+(ci-dessous, «~Axe temporel~»), \code{table\_forme\_incoherente},
 \code{table\_vide},
 \code{table\_colonne\_mal\_typee}, \code{table\_sexe\_hors\_modalites},
 \code{table\_sexes\_melanges}, \code{table\_qx\_non\_fini},
@@ -6417,22 +6465,107 @@ Une colonne manquante est citée par \code{table\_colonne\_manquante}
 («~\ldots{}~colonne(s) manquante(s) [colonnes] (une table de référence entre
 par «~qx~» ou par «~lx~»).~», \code{details\$colonne} valant \code{qx}
 quand ni \code{qx} ni \code{lx} n'est présente), une colonne hors de
-l'ensemble \code{age}, \code{sexe}, \code{qx}, \code{lx}, \code{annee} par
+l'ensemble \code{age}, \code{sexe}, \code{qx}, \code{lx}, \code{annee},
+\code{generation} par
 \code{table\_colonne\_inconnue} («~(admises~: age, sexe, qx ou lx,
-annee)~»). Les colonnes \code{age}, \code{sexe}, \code{annee} et
+annee ou generation)~»). Les colonnes \code{age}, \code{sexe}, \code{annee},
+\code{generation} et
 \code{lx} (type \code{integer} ou \code{double} sans classe, valeur
 manquante admise ici et refusée ensuite sous \code{table\_lx\_non\_fini})
 sont jugées par le contrôle de type des rôles
 (\code{type\_conforme()}, section~\ref{sec:controles-donnees})~; la colonne
-\code{qx} doit être de type \code{double} sans classe~; le message de
-\code{table\_colonne\_mal\_typee} rappelle les cinq types («~age~: entier >= 0~;
-annee~: entier~; sexe~: chaîne~; qx~: double~; lx~: nombre~»). Une
+\code{qx} doit être de type \code{double} sans classe~; une colonne
+\code{generation} de type \code{double} dont une valeur dépasse en valeur
+absolue le plus grand entier de R ($2^{31} - 1$) est refusée sous le même
+motif, au lieu de devenir une valeur manquante à la conversion en entier~;
+le message de
+\code{table\_colonne\_mal\_typee} rappelle les six types («~age~: entier >= 0~;
+annee~: entier~; generation~: entier~; sexe~: chaîne~; qx~: double~; lx~: nombre~»). Une
 colonne dont la classe porte, à toute position, un élément d'encodage
 \code{bytes} est refusée sous \code{table\_colonne\_mal\_typee}~; pour
 une colonne \code{sexe} de classe facteur, ce refus remplace l'erreur R
 «~translating strings with "bytes" encoding is not allowed~» que levait
 \code{anyNA()} (issue~\#150~; une colonne \code{age} ou \code{annee} de
 cette classe était déjà refusée sous ce motif).\par}
+
+\medskip
+\noindent
+\textbf{Axe temporel~: table prospective et table de génération}
+(ADR 0019, points~1 et~2~; issue~\#272). Une table de référence a au plus
+un axe temporel, que désigne le \emph{nom} de sa colonne~: \code{annee}
+est l'année calendaire, et elle seule (table prospective, dont chaque année
+porte une table du moment)~; \code{generation} (écrit sans accent) est
+l'année de naissance des têtes auxquelles la table s'applique (\emph{table
+de génération}~: pour un sexe et une génération $g$, $q^{g}_x$ est la
+probabilité, pour une tête de la génération $g$ vivante à l'âge exact $x$,
+de décéder avant l'âge exact $x + 1$). La signature du constructeur ne
+change pas, et le sens de l'axe n'est pas une déclaration~: aucun attribut,
+aucun argument, aucun champ de la fiche n'est ajouté, et ni la fiche ni sa
+version ne changent (ADR 0019, point~1.6).
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item \textbf{Exclusivité.} Les colonnes \code{annee} et
+    \code{generation} reçues ensemble sont refusées sous
+    \code{table\_annee\_}\allowbreak\code{et\_generation}, après
+    \code{table\_colonne\_inconnue} et avant tout contrôle de valeurs
+    («~Table «~[nom]~»~: colonnes «~annee~» et «~generation~» reçues
+    ensemble~; une table de référence a au plus un axe temporel~:
+    «~annee~» (année calendaire, table prospective) ou «~generation~»
+    (année de naissance, table de génération).~»~; \code{details\$colonnes}
+    vaut \code{annee}, \code{generation}). Trois raisons (spécification
+    d'\code{actuary}, ADR 0019, point~1.3)~: une table n'a qu'un groupe de
+    conversion et de contiguïté~; une colonne que les deux autres
+    déterminent (la génération, d'après l'année et l'âge) ne se contrôle
+    qu'en supposant une convention d'âge que rien ne déclare, donc en
+    devinant~; un appariement futur par \code{annee} (ADR 0015, point~7.3)
+    lirait une génération comme une année, sans refus. Passer d'une table de
+    génération à une table prospective, ou l'inverse, demande une
+    convention d'âge et en général une interpolation~: c'est une
+    transformation que déclarerait le plan, hors du constructeur.
+  \item \textbf{Groupe (sexe, axe).} Tri, doublons, contiguïté et
+    conversion d'une table en $l_x$ se font par sexe et par valeur de
+    l'axe~: aucun $q_x$ n'enchaîne deux années ni deux générations, et le
+    premier âge à valeur de chaque génération ouvre son groupe, rien n'étant
+    supposé avant lui. Les refus nomment la génération quand l'axe est
+    \code{generation} («~F, génération 1950, âge 60~»~; «~au sein d'un même
+    sexe et d'une même génération~» pour \code{table\_age\_double}~;
+    «~(générations [valeurs])~» pour \code{table\_sexes\_melanges}), et leurs
+    \code{details} portent alors \code{generations} à la place
+    d'\code{annees}~; pour une table sans axe ou à \code{annee}, leurs
+    messages et leurs \code{details} sont ceux décrits dans la suite.
+  \item \textbf{Prédicat unique.} La constante \code{AXES\_TEMPORELS\_TABLE}
+    (\code{annee}, \code{generation}) et la fonction interne
+    \code{axe\_temporel\_table()}, du module \code{donnees}, rendent l'axe
+    d'une table d'après ses noms de colonnes, lus par \code{attr()} (sans
+    erreur R sur une classe d'encodage \code{bytes}), ou \code{NA} sans
+    axe~; un objet qui porterait les deux colonnes, que le constructeur
+    refuse, est rendu comme une table à \code{annee}, jamais comme une table
+    sans axe. Le lisent~: \code{empreinte\_table()}, le contrôle de forme
+    des tables reçues (\code{controler\_forme\_tables()}), les contrôles
+    d'entrée du positionnement, de la validation et de la cohérence et
+    régularité, et la loi effective du simulateur
+    (\code{loi\_effective()})~; ajouter un axe touchera la constante et le
+    constructeur, admettre une table de génération dans une étape touchera
+    cette étape seule (ADR 0019, point~2.4).
+  \item \textbf{Aucune étape de cette version ne lit une table de
+    génération.} Elle passe le contrôle de forme des tables reçues
+    (section~\ref{sec:tables-reference-recues}), puis l'étape qui la
+    reçoit la refuse \textbf{avant tout calcul}, sous le motif nommé
+    \code{table\_generation\_non\_admise} (modules \code{positionnement},
+    \code{validation} et \code{coherence\_regularite}, \code{details\$cle}~;
+    sections~\ref{sec:positionnement-etape}, \ref{sec:validation-etape}
+    et~\ref{sec:coherence-regularite}) ou, pour le simulateur, sous
+    \code{loi\_invalide} («~Loi «~[cause]~»~: table de génération (colonne
+    generation) non prise en charge par le simulateur minimal.~»~;
+    section~\ref{sec:loi-vraie}). Une table à \code{annee} est refusée
+    comme auparavant (\code{table\_annee\_non\_admise}, ou
+    \code{loi\_invalide}).
+  \item \textbf{Empreinte.} Le texte empreinté écrit l'axe sous son nom~:
+    les mêmes valeurs rangées sous \code{annee} et sous \code{generation}
+    ont deux empreintes de table différentes, et le texte d'une table sans
+    axe ou à \code{annee} est inchangé, octet pour octet
+    (section~\ref{sec:empreinte-resultat}, «~Empreinte d'une table de
+    référence~»).
+\end{itemize}
 
 \medskip
 \noindent
@@ -6479,8 +6612,8 @@ avant tout calcul.
 \textbf{Ordre canonique} (ADR 0015, point~2.1~; décision M235~; issue~\#73).
 Le constructeur rend les lignes triées par rang du sexe dans
 \code{SEXES\_TABLE} (\code{H}, \code{F}, \code{ensemble}), obtenu par
-\code{match()} et jamais par un tri de chaînes, puis par \code{annee} si
-la colonne est présente, puis par \code{age}~; le tri est
+\code{match()} et jamais par un tri de chaînes, puis par l'axe temporel
+(\code{annee} ou \code{generation}) s'il est présent, puis par \code{age}~; le tri est
 \code{order(\ldots, method = "radix")}, stable et indépendant de la
 locale, et les noms de lignes de l'objet rendu sont automatiques (colonnes
 construites par sous-indiçage, jamais par \code{x[o, ]}). Un facteur
@@ -6497,16 +6630,32 @@ propriété du contenu. Les contrôles ligne à ligne, jusqu'à
 dans la numérotation reçue~; \code{table\_qx\_hors\_bornes},
 \code{table\_lx\_non\_fini} et \code{table\_lx\_negatif} font suivre chaque
 ligne de son groupe et de son âge («~aux lignes 2 (ensemble, âge 1)~»,
-«~2 (H, année 1950, âge 1)~» avec une colonne \code{annee}), leurs
+«~2 (H, année 1950, âge 1)~» avec une colonne \code{annee}, «~2 (F,
+génération 1950, âge 1)~» avec une colonne \code{generation}), leurs
 \code{details} portant \code{lignes}, \code{ages}, \code{sexes} et
-\code{annees} (\code{NULL} sans colonne \code{annee}~; issue~\#146), alors
-que \code{table\_qx\_non\_fini} ne cite que les numéros~; les doublons et les trous s'évaluent sur
+\code{annees} (\code{NULL} sans axe~; issue~\#146), ou \code{generations}
+pour une table de génération, alors
+que \code{table\_qx\_non\_fini} ne cite que les numéros~; le groupe cité
+est formé par une seule aide, \code{groupes\_cites\_table()}, et la liste
+des lignes citées par \code{lignes\_citees\_table()} (issue~\#270,
+point~1~: une définition du format au lieu de trois copies, messages
+inchangés)~; les doublons et les trous s'évaluent sur
 l'ordre canonique et sont cités eux aussi dans la numérotation
 reçue~: \code{table\_age\_double} cite, pour chaque doublon, la ligne
 reçue la plus tardive, dans l'ordre croissant~; \code{table\_ages\_non\_contigus}
 cite chaque trou par la paire des lignes qui l'encadrent dans l'ordre
-canonique («~entre les lignes $a$ et $b$~»), \code{details\$lignes} donnant
-la ligne qui suit le trou. La contiguïté reste exigée~: un trou est un
+canonique, suivie de son groupe et des deux âges qui l'encadrent («~entre
+les lignes $a$ et $b$ (H, âges 61 et 63)~», «~(H, année 2021, âges 60 et
+62)~», «~(F, génération 1950, âges 60 et 62)~»~; ADR 0019, point~1.5~: un
+numéro de ligne du \code{data.frame} long ne situe pas une cellule dans une
+grille âge $\times$ génération), les dix premiers trous
+(\code{NB\_LIGNES\_CITEES}) étant cités, puis, au-delà, «~\ldots{} ([n]
+paires en tout~; liste complète dans les détails du refus)~»~; ses
+\code{details} portent, un élément par trou, \code{lignes} (la ligne qui
+suit le trou, sens antérieur conservé), \code{sexes}, \code{annees} ou
+\code{generations} (\code{NULL} sans axe), \code{ages} (l'âge qui précède
+le trou), \code{ages\_suivants} (l'âge qui le suit) et
+\code{lignes\_precedentes} (la ligne qui le précède). La contiguïté reste exigée~: un trou est un
 défaut de contenu, dont dépendent la conversion d'une table transcrite en
 $l_x$, la plage d'âges et la fermeture. Option écartée~: trier pour l'empreinte
 seulement et garder l'objet dans l'ordre reçu, si bien que deux objets de
@@ -6525,7 +6674,7 @@ des tables homologuées, entre par une colonne \code{lx} déclarée
 \code{forme\_origine = "lx"}~; la signature de \code{table\_reference()}
 est inchangée. Le constructeur la convertit en $q_x$ et rend un objet de
 même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
-\code{qx}, \code{annee} s'il y a lieu), d'attribut
+\code{qx}, puis \code{annee} ou \code{generation} s'il y a lieu), d'attribut
 \code{forme\_origine} \code{lx}, qui ne garde pas les $l_x$.
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{Déclaration.} \code{table\_forme\_incoherente} refuse des
@@ -6544,24 +6693,30 @@ même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
     \code{table\_lx\_non\_fini} («~l\_x manquant ou non fini aux lignes
     \ldots~», \code{NA}, \code{NaN}, $\pm\infty$),
     \code{table\_lx\_negatif} («~l\_x négatif aux lignes \ldots~»).
-  \item \textbf{Contrôles après le tri}, par groupe (sexe, et année si la
-    colonne est présente) dans l'ordre canonique, après
+  \item \textbf{Contrôles après le tri}, par groupe (sexe, et année ou
+    génération si l'axe est présent) dans l'ordre canonique, après
     \code{table\_age\_double} et \code{table\_ages\_non\_contigus}, communs
     aux deux formes~: les âges d'un groupe sont donc distincts et
     consécutifs, et $l_{x+1}$ est la valeur de l'âge qui suit $x$.
     (i)~\code{table\_lx\_age\_unique}~: un groupe d'un seul âge ne donne
     aucun $q_x$ («~un seul âge pour [groupe (âge)]. Une table en l\_x donne
     q\_x = (l\_x $-$ l\_\{x+1\}) / l\_x et demande au moins deux âges
-    consécutifs par sexe (et par année).~»). (ii)~\code{table\_lx\_non\_decroissants}~:
+    consécutifs par sexe (et par année ou par génération).~»). (ii)~\code{table\_lx\_non\_decroissants}~:
     une hausse stricte $l_{x+1} > l_x$, soit $q_x < 0$, comparée
     exactement, sans tolérance (ci-dessous). (iii)~\code{table\_lx\_nul}~:
-    un $l_x$ nul suivi d'un autre âge du groupe, pour lequel $q_x = 0/0$
-    n'est pas défini («~\ldots{}~Seul le dernier âge d'un sexe (et d'une
-    année) peut porter l\_x = 0.~»)~; $-0$ se comporte comme $0$. Les
-    \code{details} de (i) et (iii) portent \code{sexes}, \code{annees},
-    \code{ages} et \code{lignes} (numérotation reçue).
+    le \textbf{premier âge} du groupe porte $l_x = 0$, si bien qu'aucun
+    $q_x$ n'y est défini («~l\_x nul au premier âge (aucun q\_x
+    défini)~: [groupe, âge]. Le premier l\_x nul d'un sexe (et d'une année
+    ou d'une génération) clôt le groupe et doit suivre un l\_x non
+    nul.~»)~; $-0$ se comporte comme $0$. Un $l_x$ nul ailleurs dans le
+    groupe n'est pas refusé~: (ii) ayant écarté toute hausse, il n'est
+    suivi que de $l_x$ nuls, et clôt le groupe (ci-dessous, «~Dernier âge
+    et $l_x$ nuls terminaux~»). Les \code{details} de (i) portent
+    \code{sexes}, \code{annees} ou \code{generations}, \code{ages} et
+    \code{lignes} (numérotation reçue), de même que ceux de (iii), réduits
+    au premier âge de chaque groupe refusé.
   \item \textbf{Conversion.} Pour chaque âge $x$ qui a un successeur dans
-    son groupe,
+    son groupe et un $l_x$ non nul,
     \[
       d_x = l_x - l_{x+1}, \qquad \hat q_x = d_x / l_x,
     \]
@@ -6574,19 +6729,48 @@ même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
     chaque $\hat q_x$ est fini et dans $[0, 1]$ (erreur de programmation
     sinon)~; \code{table\_qx\_hors\_bornes} n'est pas rejoué sur les $q_x$
     dérivés.
-  \item \textbf{Dernier âge.} Le dernier âge $\omega$ de chaque groupe ne
+  \item \textbf{Dernier âge et $l_x$ nuls terminaux} (ADR 0019, points~4.2
+    à~4.4~; décision M465~; issue~\#272). Le dernier âge $\omega$ de chaque groupe ne
     donne \textbf{aucune} ligne~: une table qui finit à $l_\omega > 0$ donne
     des $q_x$ du premier âge à $\omega - 1$. Poser $q_\omega = 1$
     supposerait $l_{\omega+1} = 0$, c'est-à-dire une fermeture, qui est une
-    étape déclarée du plan et non une propriété de la table reçue. Une table
-    reçue dont la dernière ligne d'un groupe porte $l_{\omega+1} = 0$ donne
-    $q_\omega = 1$ exactement~; deux lignes nulles ou plus en fin de groupe
-    sont refusées (\code{table\_lx\_nul}, (iii)~ci-dessus~; \emph{constat de
-    mesure} du 13/11/2026~: $l = (10, 2, 0)$ donne $q = (0{,}8\,;\ 1)$,
-    $l = (10, 2, 0, 0)$ est refusée). Pour une table embarquée, le fichier
-    ne porte que les lignes que la \emph{source de transcription} imprime
+    étape déclarée du plan et non une propriété de la table reçue. Quand un
+    groupe porte des $l_x$ nuls, le \textbf{premier $l_x$ nul clôt le
+    groupe}~: l'âge $x$ qui le précède reçoit
+    $(l_x - 0)/l_x = 1$, \textbf{calculé} par la formule commune et non posé,
+    et les âges à $l_x$ nul ne donnent aucune ligne. Un, deux ou plusieurs
+    zéros terminaux donnent donc le même objet (\emph{constat de mesure} du
+    14/11/2026~: $l = (10, 2, 0)$ et $l = (10, 2, 0, 0)$ donnent tous deux
+    $q = (0{,}8\,;\ 1)$, objets \code{identical()}~; $l = (10, -0, 0)$
+    donne $q_0 = 1$~; $l = (10, 0, 4)$ est refusée sous
+    \code{table\_lx\_non\_decroissants}~; $l = (0, 0, 0)$ sous
+    \code{table\_lx\_nul}). La règle vaut pour tout statut et toute table en
+    $l_x$, avec ou sans axe temporel. Elle remplace celle du 13/11/2026
+    (ADR 0007, annotation du 13/11/2026, (c), rouverte par l'ADR 0019,
+    point~4.3), qui admettait un seul zéro terminal et refusait deux zéros
+    ou plus sous \code{table\_lx\_nul}~: une suite de $l_x$ nuls en fin de
+    groupe est une fonction de survie valide, décroissante et éteinte~; le
+    «~$0/0$ indéfini~» que le refus invoquait porte sur des âges où il n'y a
+    plus personne, que la table n'a pas à définir~; l'extinction s'imprime
+    ordinairement ainsi (relevé du BO Santé 2007-1 de TD~88-90, ci-dessous)~;
+    et la distinction entre un zéro et deux n'avait pas de contenu
+    actuariel. Une entrée admise par l'ancienne règle est convertie à
+    l'identique~: un zéro terminal donnait déjà $q_x = 1$ à l'âge précédent.
+    Trois conséquences, que le lecteur d'une table doit avoir en vue
+    (ADR 0019, point~4.4, spécification d'\code{actuary})~:
+    (a)~le $q_x = 1$ d'un groupe clos par un zéro imprimé est un
+    \textbf{artefact d'arrondi} de la source (un dernier survivant imprimé,
+    puis 0), non une donnée de mortalité~; (b)~dans une même table, certains
+    groupes peuvent être clos par un zéro imprimé et d'autres non (cellule
+    sans valeur, ou dernière ligne à $l_\omega > 0$)~: aucun consommateur ne
+    suppose $q_\omega = 1$~; (c)~deux impressions d'une même table donnent
+    deux objets différents selon qu'elles impriment ou non les zéros~: la
+    valeur retenue reste celle de la \emph{source de transcription} (E2.26),
+    et les empreintes de table distinguent les deux objets (TD~88-90,
+    ci-dessous, «~Contre-vérification~»). Pour une table embarquée, le fichier
+    ne porte que les lignes que la source de transcription imprime
     avec une valeur~: une ligne nulle que seule une seconde source imprime
-    n'est pas transcrite (E2.26~; TD et TV~88-90, ci-dessous).
+    n'est pas transcrite (TD et TV~88-90, ci-dessous).
   \item \textbf{Égalité.} $l_{x+1} = l_x$ est admise et donne $q_x = +0$
     (zéro positif, $d_x$ étant le zéro positif de la soustraction)~: le
     refus vise la seule hausse stricte. L'aval traite déjà un $q_x$ nul
@@ -6631,11 +6815,12 @@ une table de référence~; une table corrigée est une autre table, importée
 sous la responsabilité de l'utilisateur (statut «~importee~»), qui ne se
 déclare pas homologuée.~» Chaque paire s'écrit «~ensemble, âges 10 et 11
 (l\_x = [l\_x] puis [l\_\{x+1\}])~», ou «~H, année 1950, âges \ldots~» avec
-une colonne \code{annee}~; les dix premières (\code{NB\_LIGNES\_CITEES})
+une colonne \code{annee}, «~F, génération 1950, âges \ldots~» avec une
+colonne \code{generation}~; les dix premières (\code{NB\_LIGNES\_CITEES})
 sont citées, puis, au-delà, «~\ldots{} ([n] paires en tout~; liste
 complète dans les détails du refus)~». Les \code{details} portent la liste
-complète~: \code{sexes}, \code{annees} (\code{NULL} sans colonne
-\code{annee}), \code{ages} (premier âge de chaque paire), \code{lx},
+complète~: \code{sexes}, \code{annees} (\code{NULL} sans axe) ou
+\code{generations}, \code{ages} (premier âge de chaque paire), \code{lx},
 \code{lx\_suivants}, \code{lignes} et \code{lignes\_suivantes}
 (numérotation reçue). Le refus cite des \textbf{paires d'âges
 consécutifs}, et non des âges~: une hausse $l_{x+1} > l_x$ dit que l'une
@@ -6661,8 +6846,13 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     \code{DECLARATIONS\_TABLES\_EMBARQUEES}, un \code{data.frame} nu, déclare
     chaque table, dans l'ordre du catalogue~: son \code{nom}, son
     \emph{identifiant de fichier} (lettres minuscules, chiffres, souligné et
-    tiret) et sa modalité de sexe, prise dans \code{SEXES\_TABLE}. Une table
-    est un nom, un fichier et une modalité de sexe. Le sexe est une
+    tiret), sa modalité de sexe, prise dans \code{SEXES\_TABLE}, et le
+    \emph{format} de son fichier (\code{format}, entier~: 1, une colonne de
+    $l_x$~; 2, une grille âge $\times$ génération~; ADR 0019, point~5.1).
+    Une table est un nom, un fichier, une modalité de sexe et un format. Le
+    format est une déclaration, non une déduction de l'en-tête du fichier~:
+    un contenu dont l'en-tête n'est pas celui du format déclaré est refusé
+    (ci-dessous, «~Refus \code{table\_embarquee\_illisible}~»). Le sexe est une
     \textbf{déclaration}, non une valeur lue dans le fichier~: le changer ne
     change pas le fichier transcrit, mais change l'empreinte de table, qui
     couvre la colonne \code{sexe}. Rien n'est embarqué sans y être déclaré~:
@@ -6686,10 +6876,49 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     Une ligne que la source imprime sans valeur n'est pas transcrite~; une
     ligne qu'elle n'imprime pas n'est pas ajoutée, même si une autre source
     l'imprime. Le fichier ne porte ni le nom, ni le sexe, ni la source. Les
-    tables de génération, les tables publiées en $q_x$ décimaux (la lecture
-    d'un texte décimal n'a pas le statut exact des entiers), les tables à
-    plusieurs sexes et les décalages d'âge sont hors du format~1 et se
-    fixeront par annotation de l'ADR 0018 (point~2.5).
+    tables de génération et les décalages d'âge sont hors du format~1~; les
+    premières ont le format~2 (ci-dessous), les seconds une forme propre
+    fixée par l'ADR 0019 (point~6), qui remplace pour eux l'annotation que
+    prévoyait l'ADR 0018 (point~2.5). Restent hors format les tables
+    publiées en $q_x$ décimaux (la lecture d'un texte décimal n'a pas le
+    statut exact des entiers) et les tables à plusieurs sexes.
+  \item \textbf{Fichier de table au format~2~: grille âge $\times$
+    génération} (ADR 0019, point~5~; issue~\#272). Même emplacement, même
+    nom et mêmes règles d'octets que le format~1 (ASCII, LF, fin de ligne
+    finale, ni BOM, ni ligne vide, ni commentaire, ni guillemet, ni
+    espace)~; le fichier porte la grille que la source imprime, les blocs de
+    générations imprimés sur des pages successives étant juxtaposés en une
+    seule grille, si bien qu'une valeur du fichier se retrouve sur la page
+    par son âge (ligne) et sa génération (colonne). Première ligne
+    \code{age,<g\_1>,\ldots,<g\_n>}, générations entières en chiffres seuls,
+    croissantes et consécutives~; puis une ligne
+    \code{<âge>,<c\_1>,\ldots,<c\_n>} par âge, âges croissants et
+    consécutifs, \textbf{une cellule par génération}. Une cellule est un
+    $l_x$ entier écrit en chiffres seuls, tel qu'imprimé, au plus quinze
+    chiffres, ou le tiret ASCII \code{-} pour une cellule imprimée
+    \textbf{sans valeur} (\code{MOTIF\_CELLULE\_TABLE\_EMBARQUEE}~; âge et
+    générations~: \code{MOTIF\_ENTIER\_TABLE\_EMBARQUEE}). Un \code{-} n'est
+    jamais un zéro (décision M464)~: il ne donne aucune ligne à l'objet, et
+    le dernier âge à valeur d'une génération, suivi de \code{-} ou porté
+    par la dernière ligne du fichier, ne reçoit aucun $q_x$, comme le dernier âge d'une
+    table du moment~; la cellule \code{0}, zéro imprimé, donne une ligne
+    (ci-dessus, «~Dernier âge et $l_x$ nuls terminaux~»). La cellule vide
+    est refusée, de même que \code{00}, \code{-0}, \code{+0}, un tiret
+    demi-cadratin ou un signe moins Unicode~: une cellule oubliée est une
+    erreur de format, non une absence de valeur. Chaque ligne et chaque
+    génération porte au moins une valeur~: une ligne que la source imprime
+    entièrement sans valeur n'est pas transcrite (même règle qu'au
+    format~1), et une génération sans aucune valeur disparaîtrait de l'objet
+    sans bruit (décision du mainteneur M468, question~5, et visa
+    d'\code{actuary}). Le format ne connaît que deux états de cellule, une
+    valeur ou \code{-}~: une cellule imprimée vide ou une ligne mal alignée
+    dans la source ne se représente pas dans le fichier, l'écart entre la
+    page et le fichier se déclarant au fichier de provenance (champ
+    \code{Ecarts-signales}~; ADR 0019, point~5.3). Un \code{-} entre deux
+    valeurs d'une même génération n'est pas refusé par l'analyse du fichier,
+    mais par le constructeur, sous \code{table\_ages\_non\_contigus} (sexe,
+    génération et deux âges cités), et une hausse sous
+    \code{table\_lx\_non\_decroissants}~: un seul contrôleur des valeurs.
   \item \textbf{Lecture à l'installation.} \code{TABLES\_EMBARQUEES} est
     affectée au premier niveau de \code{R/donnees.R} par
     \code{lire\_tables\_embarquees()}, évaluée une seule fois, par
@@ -6697,7 +6926,7 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     \code{DESCRIPTION} (paquet \code{tablexp}, comme pour l'empreinte du
     code), elle lit par \code{readLines()} les lignes de chaque fichier
     déclaré, \textbf{sans les analyser}, et range pour chaque table, sous
-    son \code{nom}, l'identifiant, le sexe déclaré et ces lignes, ou
+    son \code{nom}, l'identifiant, le sexe déclaré, le format déclaré et ces lignes, ou
     \code{NULL} si le fichier n'a pas pu être lu. Ce contenu entre dans la
     base de chargement différé du package~; aucun fichier n'est ouvert à
     l'exécution. Aucun contrôle ni refus n'a lieu à l'installation, qui
@@ -6722,10 +6951,17 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     (\code{table\_embarquee\_absente}~: «~Table embarquée «~[nom, ou nom
     illisible]~»~: ce package n'embarque aucune table de ce nom (tables
     embarquées~: [noms, ou «~aucune~»]).~»~; \code{details}~: \code{lu},
-    \code{attendu}), puis un contenu non lu ou hors du format~1
-    (\code{table\_embarquee\_illisible}, ci-dessous)~; elle découpe les
-    lignes par chaînes, sans connexion ni évaluation, et appelle
+    \code{attendu}), puis un contenu non lu, un format déclaré absent ou
+    autre que 1 ou 2, ou un contenu hors de son format
+    (\code{table\_embarquee\_illisible}, ci-dessous)~; elle confie
+    l'analyse des lignes à la fonction du format déclaré,
+    \code{analyser\_table\_format1()} ou \code{analyser\_table\_format2()},
+    qui les découpe par chaînes, sans connexion ni évaluation, et rend les
+    âges et les $l_x$ (et, au format~2, la génération de chaque cellule à
+    valeur, les cellules \code{-} ne donnant rien) ou refuse à la première
+    ligne en défaut~; elle appelle ensuite
     \code{table\_reference(data.frame(age, sexe, lx), nom, "embarquee", source, forme\_origine = "lx")},
+    avec une colonne \code{generation} de plus au format~2,
     où \code{source} est le chemin du
     fichier de provenance (\code{provenance\_table\_embarquee()}), relatif à
     la racine des sources (ADR 0011, annotation du 05/11/2026, (c)). La
@@ -6744,7 +6980,7 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     \code{donnees}). Un contenu non lu~: «~Table embarquée «~[nom]~»~:
     fichier [fichier] non lu à l'installation du package (fichier absent ou
     illisible)~; réinstaller le package depuis ses sources.~» Un contenu
-    hors du format~1~: «~Table embarquée «~[nom]~»~: fichier [fichier],
+    hors du format~1 (format déclaré~1)~: «~Table embarquée «~[nom]~»~: fichier [fichier],
     ligne [n], [raison]. Le contenu lu à l'installation n'est pas au format
     des tables embarquées (en-tête «~age,lx~», puis une ligne
     «~<âge>,<l\_x>~» par âge, entiers en chiffres seuls, âges croissants et
@@ -6758,9 +6994,38 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     «~âge [lu] hors de la suite croissante et consécutive commencée à l'âge
     [premier âge]~». \code{details}~: \code{nom}, \code{fichier},
     \code{ligne} (\code{NA} pour un contenu non lu), \code{lu} (la ligne en
-    défaut, \code{NULL} s'il n'y en a pas). Le moteur ne contrôle que ce
+    défaut, \code{NULL} s'il n'y en a pas). Un format déclaré absent ou
+    autre que l'entier 1 ou 2~: «~Table embarquée «~[nom]~»~: format déclaré
+    [absent, ou «~[valeur]~»], au lieu de 1 ou 2 (entier)~; réinstaller le
+    package depuis des sources intactes.~» (\code{ligne} \code{NA}, \code{lu}
+    \code{NULL}). Un contenu hors du format~2 (message inchangé pour le
+    format~1)~: «~Table embarquée «~[nom]~»~: fichier [fichier], ligne [n],
+    [raison]. Le contenu lu à l'installation n'est pas au format~2 des
+    tables embarquées (en-tête «~age,<g\_1>,\ldots,<g\_n>~», générations
+    croissantes et consécutives, puis une ligne «~<âge>,<c\_1>,\ldots,<c\_n>~»
+    par âge, âges croissants et consécutifs, une cellule par génération~:
+    l\_x entier en chiffres seuls, ou «~-~» sans valeur~; au moins une valeur
+    par ligne et par génération)~; réinstaller le package depuis des sources
+    intactes.~», la première ligne en défaut étant cherchée dans cet
+    ordre~: fichier vide (ligne~1)~; en-tête qui n'est pas «~age~» suivi
+    d'au moins une génération en chiffres seuls (ligne~1, ce qui refuse
+    l'en-tête du format~1 sous un format~2 déclaré)~; génération supérieure
+    au plus grand entier du moteur ou hors de la suite croissante et
+    consécutive (ligne~1)~; aucune ligne de valeurs (ligne~2)~; puis, ligne
+    par ligne, nombre de cellules différent du nombre de générations, âge
+    mal formé, cellule mal formée («~ligne «~[lu]~», cellule de la génération
+    [g] mal formée (l\_x entier en chiffres seuls, ou «~-~»)~», une cellule
+    vide finale étant gardée par le découpage, donc refusée)~; suite des
+    âges, comme au format~1~; ligne sans valeur («~ligne sans valeur (âge
+    [x]~: aucune génération n'y porte de l\_x~; une ligne imprimée sans
+    valeur n'est pas transcrite)~»)~; enfin génération sans valeur
+    («~génération [g] sans valeur (aucun âge n'y porte de l\_x)~»,
+    ligne~1), la ligne étant ainsi contrôlée avant la génération. Au
+    format~2, les \code{details} portent en outre \code{generation}, la
+    génération citée pour une cellule ou une génération, \code{NA} sinon.
+    Le moteur ne contrôle que ce
     que \code{readLines()} lui laisse voir (en-tête, forme de chaque ligne,
-    suite des âges)~; le format sur les octets (ASCII, fins de ligne LF,
+    suite des âges, présence des valeurs)~; le format sur les octets (ASCII, fins de ligne LF,
     fin de ligne finale) est contrôlé par
     \code{tests/controles/tables\_embarquees.R}, point~(b).
   \item \textbf{Table refusée par le moteur} (ADR 0018, points~7.1 à~7.3).
@@ -6878,7 +7143,7 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         TD, $110$ pour TV), sans ligne nulle au-delà~; les objets
         construits portent donc les $q_x$ des âges 0 à~105 (TD) et 0
         à~109 (TV), sans $q_\omega = 1$ (ci-dessus, «~Table transcrite en
-        $l_x$~», «~Dernier âge~»), au statut de résultat exact, les $l_x$
+        $l_x$~», «~Dernier âge et $l_x$ nuls terminaux~»), au statut de résultat exact, les $l_x$
         étant entiers. Les valeurs sont lues sur le rendu des pages, jamais
         par la couche texte (E2.25). Ce fac-similé remplace, comme source,
         l'impression de la version électronique de Légifrance de l'arrêté
@@ -6948,7 +7213,18 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         texte (\code{pdftotext}) pour la seule comparaison~: les seuls
         écarts sont des lignes à $l_x = 0$ que seul le BO imprime (âges 107
         à~111 pour TD, âge~111 pour TV)~; elles ne sont pas transcrites, la
-        valeur retenue étant celle de la source (E2.26). (d)~Couche texte
+        valeur retenue étant celle de la source (E2.26). Ces zéros ne sont
+        pas sans effet sur l'objet~: passé au constructeur sous la règle des
+        $l_x$ nuls terminaux (ci-dessus, «~Dernier âge et $l_x$ nuls
+        terminaux~»), le relevé du BO de TD~88-90 est admis et donne les
+        $q_x$ des âges 0 à~106, dont $q_{106} = 1$, quand la table
+        transcrite du JO donne ceux des âges 0 à~105, identiques, sans
+        $q_{106}$~; les deux objets ont des empreintes de table différentes
+        (\emph{constat de mesure} du 14/11/2026, relevé
+        \code{tests/contre\_verification/tables/td\_88-90.seconde\_source\_bo.csv}~;
+        avant la règle, ce relevé était refusé sous \code{table\_lx\_nul}).
+        Le $q_{106} = 1$ du BO est un artefact d'arrondi de l'impression, non
+        une donnée de mortalité. (d)~Couche texte
         du fac-similé source, extraite après le gel des deux transcriptions,
         contrôle de lecture seulement~: aucun écart. Ces écarts sont
         déclarés au fichier de provenance et le contrôle de la CI vérifie
@@ -6997,7 +7273,7 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         sont imprimées avec une cellule Lx vide (p.~19 de l'extrait) et ne
         sont pas transcrites (ci-dessus, «~Fichier de table~»~; E2.26), soit
         111~lignes. L'objet construit pour TH~00-02 porte donc les $q_x$
-        des âges 0 à~109, sans $q_{110} = 1$ (ci-dessus, «~Dernier âge~»),
+        des âges 0 à~109, sans $q_{110} = 1$ (ci-dessus, «~Dernier âge et $l_x$ nuls terminaux~»),
         au statut de résultat exact, les $l_x$ étant entiers. Les valeurs
         sont lues sur le rendu des pages, jamais par la couche texte
         (E2.25). Licence~: etalab-2.0 retenue par interprétation, à défaut
@@ -7166,10 +7442,18 @@ l'issue~\#146)~: les $q_x$ convertis sont comparés au bit près à des
 littéraux hexadécimaux, arrondis corrects du rapport rationnel (confirmés
 hors du moteur par une arithmétique de fractions exactes), et la forme
 $1 - l_{x+1}/l_x$ y donne d'autres bits (non-vacuité)~; l'égalité
-($q_x = +0$), le $l_x$ nul au dernier âge ($q_x = 1$), les paires citées
+($q_x = +0$), les $l_x$ nuls terminaux (un, deux ou plusieurs zéros donnant
+le même objet, $q_x = 1$ à l'âge qui précède le premier, $-0$ comme $0$,
+refus du seul groupe dont le premier âge est nul~; issue~\#272), les paires citées
 (lignes permutées, deux sexes, colonne \code{annee}, onze paires) et
 l'identité des $q_x$ et de l'empreinte de table pour $l$ et $2l$ le sont
-aussi~;
+aussi, de même que la table de génération (colonne \code{generation}~:
+groupe de conversion et de contiguïté, refus de \code{annee} et
+\code{generation} reçues ensemble, messages et \code{details} des refus
+qui nomment la génération, \code{details} inchangés pour une table sans
+axe ou à \code{annee}), et son refus par chaque étape qui lit une table
+(positionnement, validation, cohérence et régularité, simulateur, dans
+les fichiers de test de ces modules)~;
 l'ordre canonique, les refus évalués après le tri et l'accesseur des tables
 embarquées le sont par \code{tests/unitaires/test\_tables\_reference.R}
 (section~\ref{sec:verifications-construction})~; le catalogue des tables
@@ -7182,7 +7466,14 @@ objet construit à l'appel \code{identical()} à celui de
 ligne cités, valeurs calculées à la main), refus d'une table aux $l_x$ non
 décroissants remonté sans enveloppe, nom réservé (statuts, correspondance
 exacte, place dans l'ordre des contrôles), colonnes, ordre et états de
-\code{tables\_embarquees()}, catalogue vide, et, pour chaque table
+\code{tables\_embarquees()}, catalogue vide, le format~2 sur des contenus
+injectés (objet \code{identical()} à celui de \code{table\_reference()}
+appelé à la main, cellules \code{-} en tête et en queue de génération sans
+ligne, zéro terminal donnant $q_x = 1$, les raisons de refus du format,
+dont la cellule vide finale, \code{00}, \code{-0}, \code{+0}, la ligne et
+la génération sans valeur et l'en-tête du format~1, un format déclaré
+absent ou autre que 1 ou 2, et un \code{-} entre deux
+valeurs refusé sous \code{table\_ages\_non\_contigus}), et, pour chaque table
 déclarée, la table rendue (nombre de lignes, âges extrêmes, sexe déclaré,
 source, premier $q_x$ comparé à $(l_0 - l_1)/l_0$ écrit d'après la source)
 ou son refus (motif, paires citées). Les cas
@@ -7280,16 +7571,24 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{SEXES\_TABLE} & constante & --- & \code{H}, \code{F}, \code{ensemble} \\
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
 \catalogue{fonctions-donnees}{controler\_nom\_reserve()} & interne & nom, statut, noms réservés (par défaut, les noms de la déclaration des tables embarquées) & refus \code{table\_nom\_reserve} (module \code{donnees}) d'une table de statut \code{importee} ou \code{synthetique} qui porte, à l'identique, le nom d'une table déclarée~; appelé par le constructeur après le contrôle du statut (section~\ref{sec:table-reference}, «~Nom réservé~»~; issue~\#263) \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, année, âge), noms de lignes automatiques~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$, dernier âge de chaque groupe sans ligne, refus des $l_x$ non décroissants par paires d'âges (issue~\#146)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158) \\
-\catalogue{fonctions-donnees}{DECLARATIONS\_TABLES\_EMBARQUEES} & constante & --- & déclaration fermée des tables embarquées, \code{data.frame} nu~: \code{nom}, \code{identifiant} (de fichier), \code{sexe} (modalité déclarée), une ligne par table dans l'ordre du catalogue (section~\ref{sec:table-reference}, «~Tables embarquées~») \\
+\catalogue{fonctions-donnees}{AXES\_TEMPORELS\_TABLE} & constante & --- & \code{annee}, \code{generation}~: axes temporels d'une table de référence, au plus un par table (section~\ref{sec:table-reference}, «~Axe temporel~»~; ADR 0019, point~2.1) \\
+\catalogue{fonctions-donnees}{axe\_temporel\_table()} & interne & table & prédicat unique de l'axe d'une table d'après ses noms de colonnes (lus par \code{attr()})~: \code{annee}, \code{generation} ou \code{NA}~; un objet aux deux colonnes est rendu comme une table à \code{annee}~; lu par l'empreinte de table, le contrôle de forme des tables reçues, les contrôles d'entrée des étapes qui lisent une table et la loi effective du simulateur (issue~\#272) \\
+\catalogue{fonctions-donnees}{groupes\_cites\_table()} & interne & sexes, axe, valeurs de l'axe & groupe cité dans les refus du constructeur~: «~H~», «~H, année 1950~» ou «~F, génération 1950~»~; aide de message, seule définition du format (issues~\#270 et~\#272) \\
+\catalogue{fonctions-donnees}{lignes\_citees\_table()} & interne & lignes reçues, sexes, axe, valeurs de l'axe, âges & lignes citées avec leur groupe et leur âge («~2 (H, année 1950, âge 1)~»), séparées par des virgules, au plus \code{NB\_LIGNES\_CITEES} choisies par l'appelant~; aide de message (issue~\#270) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158) \\
+\catalogue{fonctions-donnees}{DECLARATIONS\_TABLES\_EMBARQUEES} & constante & --- & déclaration fermée des tables embarquées, \code{data.frame} nu~: \code{nom}, \code{identifiant} (de fichier), \code{sexe} (modalité déclarée), \code{format} (entier, 1 ou 2, déclaré et non déduit~; issue~\#272), une ligne par table dans l'ordre du catalogue (section~\ref{sec:table-reference}, «~Tables embarquées~») \\
 \catalogue{fonctions-donnees}{DOSSIER\_TABLES\_EMBARQUEES} & constante & --- & \code{inst/extdata/tables}, dossier des tables embarquées relatif à la racine des sources \\
 \catalogue{fonctions-donnees}{fichier\_table\_embarquee()} & interne & identifiant & chemin \code{<dossier>/}\allowbreak\code{<identifiant>.csv} du fichier de table \\
 \catalogue{fonctions-donnees}{provenance\_table\_embarquee()} & interne & identifiant & chemin \code{<dossier>/<identifiant>}\allowbreak\code{.provenance.dcf} du fichier de provenance, \code{source} de la table construite \\
-\catalogue{fonctions-donnees}{lire\_tables\_embarquees()} & interne & racine des sources, déclaration & contenus des tables déclarées, liste nommée par \code{nom}~: identifiant, sexe déclaré, lignes du fichier sans analyse, ou \code{NULL} si le fichier n'a pas pu être lu~; garde sur \code{DESCRIPTION}~; fonctions de base seulement, aucun refus (évaluée à l'installation) \\
+\catalogue{fonctions-donnees}{lire\_tables\_embarquees()} & interne & racine des sources, déclaration & contenus des tables déclarées, liste nommée par \code{nom}~: identifiant, sexe déclaré, format déclaré, lignes du fichier sans analyse, ou \code{NULL} si le fichier n'a pas pu être lu~; garde sur \code{DESCRIPTION}~; fonctions de base seulement, aucun refus (évaluée à l'installation) \\
 \catalogue{fonctions-donnees}{TABLES\_EMBARQUEES} & constante & --- & catalogue des tables embarquées~: contenus lus une fois par \code{R CMD INSTALL}, rangés dans la base de chargement différé~; l'objet \code{table\_reference} est construit à l'appel \\
 \catalogue{fonctions-donnees}{EN\_TETE\_TABLE\_EMBARQUEE} & constante & --- & \code{age,lx}, en-tête du fichier de table (format~1) \\
-\catalogue{fonctions-donnees}{MOTIF\_LIGNE\_TABLE\_EMBARQUEE} & constante & --- & expression régulière d'une ligne de valeurs~: âge et $l_x$ entiers en chiffres seuls, au plus quinze, séparés par une virgule \\
-\catalogue{fonctions-donnees}{table\_du\_catalogue()} & interne & nom, catalogue de contenus (par défaut celui du package, injecté par les tests) & table embarquée construite à l'appel par le constructeur (\code{forme\_origine} \code{lx}, source~: chemin du fichier de provenance)~; refus \code{table\_embarquee\_absente} et \code{table\_embarquee\_}\allowbreak\code{illisible} (module \code{donnees}), refus du constructeur remonté tel quel~; seul chemin vers une table du package \\
+\catalogue{fonctions-donnees}{MOTIF\_LIGNE\_TABLE\_EMBARQUEE} & constante & --- & expression régulière d'une ligne de valeurs du format~1~: âge et $l_x$ entiers en chiffres seuls, au plus quinze, séparés par une virgule \\
+\catalogue{fonctions-donnees}{MOTIF\_ENTIER\_TABLE\_EMBARQUEE} & constante & --- & expression régulière d'un entier du format~2 (âge, génération)~: chiffres seuls, au plus quinze (issue~\#272) \\
+\catalogue{fonctions-donnees}{MOTIF\_CELLULE\_TABLE\_EMBARQUEE} & constante & --- & expression régulière d'une cellule du format~2~: $l_x$ entier en chiffres seuls, au plus quinze, ou \code{-} pour une cellule sans valeur (issue~\#272) \\
+\catalogue{fonctions-donnees}{analyser\_table\_format1()} & interne & lignes lues, nom, fichier & âges et $l_x$ d'un contenu au format~1, ou refus \code{table\_embarquee\_illisible} à la première ligne en défaut~; analyse extraite de \code{table\_du\_catalogue()}, messages et \code{details} inchangés (issue~\#272) \\
+\catalogue{fonctions-donnees}{analyser\_table\_format2()} & interne & lignes lues, nom, fichier & âges, générations et $l_x$ des cellules à valeur d'un contenu au format~2 (une cellule \code{-} ne donne rien, une cellule \code{0} une entrée), ou refus \code{table\_embarquee\_illisible} à la première ligne en défaut, génération citée pour une cellule ou une génération (section~\ref{sec:table-reference}, «~Tables embarquées~»~; issue~\#272) \\
+\catalogue{fonctions-donnees}{table\_du\_catalogue()} & interne & nom, catalogue de contenus (par défaut celui du package, injecté par les tests) & table embarquée construite à l'appel par le constructeur (\code{forme\_origine} \code{lx}, colonne \code{generation} au format~2, source~: chemin du fichier de provenance), après l'analyse du format déclaré par la fonction de ce format (format absent ou autre que 1 ou 2 refusé)~; refus \code{table\_embarquee\_absente} et \code{table\_embarquee\_}\allowbreak\code{illisible} (module \code{donnees}), refus du constructeur remonté tel quel~; seul chemin vers une table du package \\
 \catalogue{fonctions-donnees}{table\_embarquee()} & exportée & nom & table embarquée de ce nom, construite à l'appel à partir du contenu lu à l'installation~; mêmes refus que la fonction précédente, dont un refus du constructeur pour une table refusée par le moteur \\
 \end{longtable}
 }
@@ -10528,6 +10827,9 @@ l'appariement d'une cellule d'année civile à $\tilde q_x$ n'est pas
 spécifié, même motif que la décision Q7~(a) de l'issue~\#4),
 \code{table\_annee\_non\_admise} (le positionnement d'une table
 prospective, $q_x(t)$, est hors de la v1~; ADR 0015, point~7.4),
+\code{table\_generation\_non\_admise} (table de génération, colonne
+\code{generation}~: aucune étape de cette version ne la lit~; ADR 0019,
+point~2.3~; section~\ref{sec:table-reference}, «~Axe temporel~»),
 \code{table\_sexes\_ambigus}, \code{table\_sexe\_incompatible},
 \code{plage\_ages\_hors\_table}. Quand les étapes \code{positionnement} et
 \code{validation} sont toutes deux au plan, celles du positionnement
@@ -10958,7 +11260,7 @@ de 5~\%, de $G^2$ au-dessous).
 \endhead
 \catalogue{fonctions-positionnement}{ETAPES\_TABLE} & constante & --- & étapes qui lisent une table par les briques du module~: \code{positionnement}, \code{validation}~; chacune donne aux refus son module et le préfixe de leur message (F2) \\
 \catalogue{fonctions-positionnement}{controler\_cle\_table()} & interne & clé, étape appelante & \code{TRUE} invisible, ou refus \code{cle\_table\_invalide} sous le module de l'étape~; message propre à l'étape \\
-\catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage, étape appelante & \code{TRUE} invisible, ou les cinq refus avant exécution, dans l'ordre, sous le module et le préfixe de l'étape (motif de convention propre à l'étape)~; appelée par \code{controler\_entrees()} seule, pour chaque étape qui lit une table, une fois par construction (au rejeu, par l'unique appel de \code{construire\_table()}~; issue~\#82) \\
+\catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage, étape appelante & \code{TRUE} invisible, ou les six refus avant exécution, dans l'ordre, sous le module et le préfixe de l'étape (motif de convention propre à l'étape)~; appelée par \code{controler\_entrees()} seule, pour chaque étape qui lit une table, une fois par construction (au rejeu, par l'unique appel de \code{construire\_table()}~; issue~\#82) \\
 \catalogue{fonctions-positionnement}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé, étape appelante & grille des cellules (\code{grille\_plage()}, module \code{exposition}) et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table} sous le module de l'étape, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
 \catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé, étape appelante & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} sous le module de l'étape \\
 \catalogue{fonctions-positionnement}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé \\
@@ -11390,6 +11692,10 @@ sous le module \code{validation}~:
   \item \code{table\_annee\_non\_admise}~: la table porte une colonne
     \code{annee}~; cette version ne valide que des tables sans année (ADR
     0015, point~7.4)~;
+  \item \code{table\_generation\_non\_admise}~: la table est une table
+    de génération (colonne \code{generation})~; cette version ne valide que
+    des tables sans axe temporel (ADR 0019, point~2.3~;
+    section~\ref{sec:table-reference}, «~Axe temporel~»)~;
   \item \code{table\_sexes\_ambigus}~: les modalités de \code{sexe} de la
     table mêlent \code{ensemble} et \code{H} ou \code{F}, ce qui rendrait
     l'appariement ambigu (décision M253)~;
@@ -12686,7 +12992,9 @@ modalité de sexe hors de \code{H} et \code{F})~;
 \code{coherence\_sans\_table\_construite}~;
 \code{plage\_ages\_hors\_table\_construite}. Avant exécution, par
 \code{controler\_entrees\_coherence\_regularite()}, pour chaque table
-citée, dans l'ordre reçu~: \code{table\_annee\_non\_admise} et
+citée, dans l'ordre reçu~: \code{table\_annee\_non\_admise},
+\code{table\_generation\_non\_admise} (table de génération~; ADR 0019,
+point~2.3) et
 \code{plage\_ages\_hors\_table}, motifs réemployés de la validation~; ni
 sexe ni convention d'âge ne sont exigés d'une table de référence. En
 cours d'étape~: \code{ordre\_modalite\_absente}, si une modalité déclarée
@@ -13654,7 +13962,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{ETATS\_ORDRE\_SEGMENTS} & constante & --- & états d'une ligne de synthèse de l'ordre entre segments~: \code{produite}, \code{sans\_objet} \\
 \catalogue{fonctions-validation}{STATUTS\_COHERENCE\_REGULARITE} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{nature}, \code{statut})~: statuts de C1 à C5 (section~\ref{sec:coherence-regularite}) \\
 \catalogue{fonctions-validation}{controler\_parametres\_coherence\_regularite()} & interne & paramètres de l'étape, segmentation, plage de l'étape productrice (\code{NULL} sans elle) & \code{TRUE} invisible, ou le premier des six refus de valeur, dans l'ordre~; appelée par \code{valider\_plan()} seule \\
-\catalogue{fonctions-validation}{controler\_entrees\_coherence\_regularite()} & interne & table, clé, plage & \code{TRUE} invisible, ou refus \code{table\_annee\_}\allowbreak\code{non\_admise} puis \code{plage\_ages\_}\allowbreak\code{hors\_table}~; appelée par \code{controler\_entrees()} pour chaque clé \\
+\catalogue{fonctions-validation}{controler\_entrees\_coherence\_regularite()} & interne & table, clé, plage & \code{TRUE} invisible, ou refus \code{table\_annee\_}\allowbreak\code{non\_admise}, \code{table\_generation\_}\allowbreak\code{non\_admise} puis \code{plage\_ages\_}\allowbreak\code{hors\_table}~; appelée par \code{controler\_entrees()} pour chaque clé \\
 \catalogue{fonctions-validation}{calculer\_coherence\_regularite()} & interne & table construite, tables citées, segmentation, paramètres, convention retenue & fonction d'étape \code{coherence\_regularite}~: C1 à C5, paramètres, résultat, diagnostics, aucun avertissement~; refus \code{ordre\_modalite\_}\allowbreak\code{absente} \\
 \catalogue{fonctions-validation}{MOTIFS\_MESURABLES\_IMPORTANCE} & constante & --- & motifs mesurables~: \code{id\_contrat\_manquant}, \code{contrat\_duplique} (ce dernier en unité tête seulement~; section~\ref{sec:importance-exclusions}) \\
 \catalogue{fonctions-validation}{CLES\_MOTIFS\_IMPORTANCE} & constante & --- & motif $\to$ clé de cellule qu'il rend manquante~: \code{sexe} pour \code{sexe\_manquant} et \code{sexe\_hors\_modalites}, \code{segment} pour \code{segment\_manquant} \\
@@ -14926,7 +15234,9 @@ par leur forme, et leurs valeurs écrites dans l'en-tête
     code, qui porte sur les seuls fichiers \code{R/*.R}, ne couvrent une
     table de référence.
   \item \textbf{Texte empreinté}~: le \code{data.frame} nu de la table~---
-    colonnes \code{age}, \code{sexe}, \code{annee} si présente et
+    colonnes \code{age}, \code{sexe}, l'axe temporel s'il est présent
+    (\code{annee} ou \code{generation}, sous son nom, lu par
+    \code{axe\_temporel\_table()}~; ADR 0019, point~3.1) et
     \code{qx}, dans cet ordre, seuls attributs \code{names}, \code{class}
     (\code{data.frame}) et \code{row.names} automatiques~---, rangé sous la
     racine \code{table\_reference} d'une liste et écrit par
@@ -14937,7 +15247,12 @@ par leur forme, et leurs valeurs écrites dans l'en-tête
     lignes \code{@noms} (la racine), \code{table\_reference/@colonnes},
     \code{table\_reference/@lignes}, puis une ligne par colonne
     (\code{table\_reference/age}, \code{table\_reference/sexe},
-    \code{table\_reference/annee} s'il y a lieu, \code{table\_reference/qx}).
+    \code{table\_reference/annee} ou \code{table\_reference/generation}
+    s'il y a lieu, \code{table\_reference/qx}). L'empreinte nomme donc
+    l'axe~: les mêmes valeurs rangées sous \code{annee} et sous
+    \code{generation} ont deux empreintes différentes (\emph{constat de
+    mesure} du 14/11/2026), ce qu'une métadonnée tenue hors de l'empreinte
+    n'aurait pas donné (ADR 0019, point~3.2).
     La racine s'appelle \code{table\_reference} et non \code{table}, nom
     réservé à la table finale de l'objet (ADR 0007, point~6.1). Les lignes
     sont celles de l'objet rendu par \code{table\_reference()}, dans
@@ -14955,7 +15270,25 @@ par leur forme, et leurs valeurs écrites dans l'en-tête
     (\code{representation\_table\_non\_admise}, section~\ref{sec:rejeu}),
     par le raisonnement de la représentation canonique des données~: une
     empreinte calculée sous une autre définition n'est jamais égale, et un
-    refus pour discordance aurait un motif trompeur.
+    refus pour discordance aurait un motif trompeur. La version
+    s'incrémente quand le texte empreinté d'une table \emph{déjà admise}
+    change (critère des octets, celui de la représentation canonique), non à
+    l'admission d'une forme d'entrée nouvelle dont le texte nomme lui-même
+    ses colonnes (ADR 0019, point~3.4~; décision M468, question~2)~: l'axe
+    \code{generation} a ainsi été admis sous \code{tablexp table 1}, le
+    texte d'une table sans axe ou à \code{annee} restant le même, octet pour
+    octet (empreintes de TD~88-90, TV~88-90 et TH~00-02 et références de
+    non-régression inchangées, \emph{constat} des batteries de
+    l'issue~\#272). La règle de l'ADR 0011 (annotation du 05/11/2026, (g)),
+    qui range «~colonnes et leur ordre~» parmi ce que la version numérote,
+    appellerait à la lettre une version~2~; la lecture retenue repose sur
+    ceci~: le texte empreinté d'une table n'est jamais lu par un autre
+    package, il est recalculé par celui qui a construit l'objet, et un
+    package qui ignore \code{generation} ne construit pas l'objet
+    (\code{table\_colonne\_inconnue}) ni ne le laisse entrer
+    (\code{tables\_reference\_mal\_formees})~: deux empreintes calculées
+    sous deux définitions ne sont jamais comparées, seul risque que couvre
+    la première ligne.
   \item \textbf{Calcul}~: \code{empreinte\_table()}, seule fonction qui
     calcule cette empreinte, MD5 des octets par \code{md5\_octets()}~;
     appelée par \code{element\_table\_fiche()} pour la fiche (et, par
@@ -16231,7 +16564,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{empreintes\_construction()} & interne & données, rôles, provenance & champ \code{empreintes} de la fiche, dans l'ordre de la section~\ref{sec:fiche}~; \code{resultat} à \code{NA}, posé ensuite par \code{construire\_table()}~; \code{code} égal à \code{EMPREINTE\_CODE}~; contrôle d'abord, par \code{octets\_chaines()}, le codage des valeurs des rôles et des champs de la provenance (refus de codage, issue~\#106) \\
 \catalogue{fonctions-rapport}{statut\_empreintes()} & interne & empreinte du code & \code{statut\_resultat\_code}~: libellé du résultat, \code{" ; "}, libellé du code calculé ou, si l'empreinte du code est \code{NA}, des sources introuvables~; marqué UTF-8 \\
 \catalogue{fonctions-rapport}{md5\_octets()} & interne & octets & MD5 des octets, écrits en binaire dans un fichier temporaire supprimé à la sortie \\
-\catalogue{fonctions-rapport}{empreinte\_table()} & interne & table de référence (objet rendu par le constructeur) & empreinte de table~: MD5 du texte, en forme \code{"empreinte"}, du \code{data.frame} nu (\code{age}, \code{sexe}, \code{annee} si présente, \code{qx}) sous la racine \code{table\_reference}, première ligne \code{REPRESENTATION\_TABLE}~; aucun tri, métadonnées exclues~; seule fonction qui la calcule (section~\ref{sec:empreinte-resultat}) \\
+\catalogue{fonctions-rapport}{empreinte\_table()} & interne & table de référence (objet rendu par le constructeur) & empreinte de table~: MD5 du texte, en forme \code{"empreinte"}, du \code{data.frame} nu (\code{age}, \code{sexe}, axe temporel \code{annee} ou \code{generation} s'il est présent, \code{qx}) sous la racine \code{table\_reference}, première ligne \code{REPRESENTATION\_TABLE}~; aucun tri, métadonnées exclues~; seule fonction qui la calcule (section~\ref{sec:empreinte-resultat}) \\
 \catalogue{fonctions-rapport}{element\_table\_fiche()} & interne & table de référence (objet rendu par le constructeur) & élément de \code{fiche\$tables\_reference}~: \code{nom}, \code{statut}, \code{source}, \code{forme\_origine}, \code{parametres}, \code{representation}, \code{empreinte}, dans cet ordre~; seul constructeur de l'élément (section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{catalogue\_tables\_embarquees()} & interne & catalogue de contenus (par défaut celui du package, injecté par les tests) & état des tables embarquées~: \code{data.frame} nu, une ligne par table déclarée, colonnes \code{nom}, \code{sexe}, \code{forme\_origine}, \code{source}, \code{etat} (\code{admise} ou \code{refusee}), \code{motif\_refus}, \code{representation}, \code{empreinte}~; état calculé en construisant la table, refus d'un nom absent ou d'un contenu illisible remonté (section~\ref{sec:table-reference}, «~Tables embarquées~»~; issue~\#263) \\
 \catalogue{fonctions-rapport}{tables\_embarquees()} & exportée & --- & la précédente sur le catalogue du package installé~; appelée par l'application, par le tiers qui compare l'empreinte au fichier de provenance et par le contrôle de la CI (ADR 0018, point~8) \\
@@ -16366,7 +16699,10 @@ fait par \code{classe\_bytes()}, précède celui de la classe
 \]
 où $q_x$ est lu dans la table du sexe si elle y figure, sinon dans la table
 \code{ensemble} (\code{loi\_effective()}). Une table prospective (colonne
-\code{annee}) est refusée par le simulateur minimal. Seuls les sexes
+\code{annee}) ou une table de génération (colonne \code{generation}),
+dont l'axe est lu par \code{axe\_temporel\_table()}, est refusée par le
+simulateur minimal (\code{loi\_invalide}, message propre à chaque axe~;
+ADR 0019, point~2.3). Seuls les sexes
 effectivement tirés (proportion d'hommes non nulle pour \code{H}, différente
 de 1 pour \code{F}) sont construits et contrôlés~; ils sont consignés dans
 \code{sexes\_controles}.
@@ -18574,7 +18910,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
-\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs et une table de classe d'encodage \code{bytes}, jugée avant \code{inherits()} (issue~\#150) \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs, une table de classe d'encodage \code{bytes}, jugée avant \code{inherits()} (issue~\#150), et une table à axe temporel, \code{annee} ou \code{generation} (issue~\#272) \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
@@ -18698,7 +19034,7 @@ E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:coherence-regularite}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
 E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, TH~00-02 et TF~00-02 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, la couche texte ne servant qu'à la comparaison et au contrôle de lecture~; textes cités non versés~: arrêté du 20/12/2005 (fac-similé lu le 05/11/2026), arrêtés du 08/12/2006, du 21/12/2006 et du 30/12/2015 (versions électroniques), \#13) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
-E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; TH~00-02 (\code{H}, lignes 111 et~112 imprimées sans valeur, non transcrites) et TF~00-02 (\code{F}) transcrites du fac-similé du JO n\textsuperscript{o}~301 du 29/12/2015 (annexe à l'article A132-18), avec leur acte d'homologation, leurs porteurs (et, pour les comptes sociaux, leur usage) par régime et leur statut, et leur contre-vérification, TF~00-02 telle qu'imprimée, ses trois valeurs fautives (âges 11, 23 et~62) signalées avec celles du BO Santé 2007-1, seconde source citée sans correction, et refusée par le moteur (état \code{refusee})~; décalages d'âge de TH et TF~00-02 non embarqués~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction) & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
+E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; TH~00-02 (\code{H}, lignes 111 et~112 imprimées sans valeur, non transcrites) et TF~00-02 (\code{F}) transcrites du fac-similé du JO n\textsuperscript{o}~301 du 29/12/2015 (annexe à l'article A132-18), avec leur acte d'homologation, leurs porteurs (et, pour les comptes sociaux, leur usage) par régime et leur statut, et leur contre-vérification, TF~00-02 telle qu'imprimée, ses trois valeurs fautives (âges 11, 23 et~62) signalées avec celles du BO Santé 2007-1, seconde source citée sans correction, et refusée par le moteur (état \code{refusee})~; décalages d'âge de TH et TF~00-02 non embarqués~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction~; $l_x$ nuls terminaux admis, le premier clôturant le groupe~; table de génération (colonne \code{generation}, exclusive d'\code{annee}), lue par aucune étape de cette version, et format~2 du fichier de table, grille âge $\times$ génération telle qu'imprimée, cellule sans valeur «~-~») & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\
