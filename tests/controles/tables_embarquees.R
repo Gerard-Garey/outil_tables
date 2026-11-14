@@ -834,6 +834,13 @@ ESSAI_DECALAGES <- list(nom = iconv("Décalages d'âge ESSAI", "UTF-8", "UTF-8")
                         # sous une locale non UTF-8 écrit le nom en octets échappés.
                         repere = "ge ESSAI : ")
 
+# Chaînes réécrites en ASCII pour une source R : chaque octet UTF-8 non ASCII
+# en séquence \\xhh (déclaration des décalages de l'arbre témoin).
+octets_echappes <- function(x) vapply(enc2utf8(x), function(s) {
+  o <- as.integer(charToRaw(s))
+  paste0(ifelse(o < 128L, vapply(o, function(b) rawToChar(as.raw(b)), ""), sprintf("\\x%02x", o)), collapse = "")
+}, "", USE.NAMES = FALSE)
+
 ecrire_lignes <- function(lignes, f) { con <- file(f, "wb"); on.exit(close(con)); writeBin(charToRaw(paste0(lignes, "\n", collapse = "")), con) }
 
 preparer_temoin <- function(racine, arbre, empreintes, decl, decl_d, empreinte_d) {
@@ -868,8 +875,9 @@ preparer_temoin <- function(racine, arbre, empreintes, decl, decl_d, empreinte_d
   ed <- ESSAI_DECALAGES
   s <- c(s[seq_len(debut - 1L)],
          "DECLARATIONS_DECALAGES_EMBARQUES <- data.frame(",
-         # Noms marqués UTF-8 comme dans R/donnees.R (iconv(), base).
-         sprintf("  nom = iconv(%s, \"UTF-8\", \"UTF-8\"),", q(c(decl_d$nom, ed$nom))),
+         # Noms écrits comme dans R/donnees.R : octets UTF-8 échappés (ligne
+         # ASCII), marqués UTF-8 par Encoding<-.
+         sprintf("  nom = local({ x <- %s; Encoding(x) <- \"UTF-8\"; x }),", q(octets_echappes(c(decl_d$nom, ed$nom)))),
          sprintf("  identifiant = %s,", q(c(decl_d$identifiant, ed$identifiant))),
          sprintf("  table = %s,", q(c(decl_d$table, ed$table))),
          "  stringsAsFactors = FALSE)", s[-seq_len(fin)])
