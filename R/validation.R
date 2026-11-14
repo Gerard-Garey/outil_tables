@@ -2419,16 +2419,25 @@ controler_parametres_coherence_regularite <- function(tables_reference, plage_ag
 # Contrôle d'entrée avant exécution d'une table de référence évaluée en
 # comparaison (ADR 0017, point 13.3 ; spécification de forme, § 1), appelé
 # par controler_entrees() (construire_table()) pour chaque clé, dans l'ordre
-# reçu : table sans annee (table_annee_non_admise), puis chaque sexe de la
+# reçu : table sans axe temporel, lu par axe_temporel_table() (module
+# donnees ; ADR 0019, point 2) : ni annee (table_annee_non_admise), ni
+# generation (table_generation_non_admise) ; puis chaque sexe de la
 # table couvre plage_ages (plage_ages_hors_table ; les âges d'un sexe sont
 # contigus, contrôlé par table_reference()). Mêmes motifs que la validation,
 # module coherence_regularite ; ni sexe ni convention exigés. Rend TRUE,
 # invisible.
 controler_entrees_coherence_regularite <- function(table, cle, plage_ages) {
-  if ("annee" %in% names(table))
+  axe <- axe_temporel_table(table)
+  if (identical(axe, "annee"))
     refuser("coherence_regularite", "table_annee_non_admise",
             formuler(paste("Cohérence et régularité : la table de clé « %s » porte une colonne annee ; cette version",
                            "n'évalue que des tables sans année (ADR 0017, point 13.3)."), citer(cle)),
+            list(cle = cle))
+  if (identical(axe, "generation"))
+    refuser("coherence_regularite", "table_generation_non_admise",
+            formuler(paste("Cohérence et régularité : la table de clé « %s » est une table de génération (colonne",
+                           "generation) ; cette version n'évalue que des tables sans axe temporel (ADR 0019)."),
+                     citer(cle)),
             list(cle = cle))
   for (s in SEXES_TABLE[SEXES_TABLE %in% table$sexe]) {
     a <- table$age[table$sexe == s]

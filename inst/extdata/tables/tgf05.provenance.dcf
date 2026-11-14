@@ -1,0 +1,266 @@
+Format: tablexp provenance 1
+Nom: TGF05
+Fichier: inst/extdata/tables/tgf05.csv
+Sexe: F
+ Modalité déclarée au catalogue (R/donnees.R, DECLARATIONS_TABLES_EMBARQUEES),
+ non lue dans le fichier de table (ADR 0018, points 1.1 et 2.3). Table des
+ assurés de sexe féminin (arrêté du 1er août 2006, art. 2 : « la table TGF05
+ ci-annexée concernant les assurés de sexe féminin », champ Homologation ;
+ A132-18, 2°, a : tables homologuées « établies par sexe », E2.24).
+Forme-origine: lx
+Intitule: « TABLE TGF05 » (JO n° 301 du 29/12/2015, texte 35, p. 19 de
+ l'extrait, dans l'« ANNEXE À L'ARTICLE A. 132-18 » ouverte p. 13) ; grille
+ à double entrée, colonne « ÂGE » puis une colonne par génération (« 1900 »
+ à « 2005 »), par blocs de onze générations ; aucun intitulé de grandeur
+ imprimé (ni « Lx ») ; cellules sans valeur imprimées « – ».
+Ages: 0 à 120 (121 lignes de la grille, toutes transcrites) ; premier et
+ dernier âge à valeur par génération au champ Generations.
+Generations: 1900 à 2005 transcrites (106 colonnes consécutives ; 12 826
+ cellules, dont 8 092 à valeur et 4 734 sans valeur écrites « - »). Premier
+ âge à valeur de la génération g : max(0, 1996 - g), au l_x imprimé 100000
+ pour les 106 générations (96 ans pour 1900, 0 an de 1996 à 2005). Dernier
+ âge à valeur : 117 pour 1900 à 1918 ; 118 pour 1919 à 1925 ; 119 pour 1926
+ à 1932 ; 120 pour 1933 à 2005 ; les 33 générations closes avant 120 le sont
+ sur un l_x imprimé égal à 1, suivi de « – » (aucun l_x nul imprimé). Aucun
+ « – » entre deux valeurs d'une même génération. Lignes imprimées sans
+ valeur, non transcrites (ADR 0019, point 5.2 ; condition 2 du visa
+ d'actuary, question 5 de l'ADR 0019) : aucune, chaque âge de 0 à 120
+ portant au moins une valeur ; aucune génération sans valeur. Le dernier âge
+ à valeur de chaque génération ne reçoit aucun q_x (ADR 0019, point 4.1) :
+ l'objet a 7 986 lignes (8 092 - 106), de 21 lignes (1900, âges 96 à 116) à
+ 120 lignes (1996 à 2005, âges 0 à 119). Mesure du 14/11/2026 sur le
+ fichier de table et sur table_embarquee("TGF05").
+Homologation: Arrêté du 1er août 2006 portant homologation des tables de
+ mortalité pour les rentes viagères et modifiant certaines dispositions du
+ code des assurances en matière d'assurance sur la vie et de capitalisation,
+ NOR ECOT0691259A, JORF n° 197 du 26 août 2006, texte 11, art. 2 : « Les
+ tables prévues au quatrième alinéa de l'article A. 335-1 du code des
+ assurances pour les contrats de rente viagère sont à compter du 1er janvier
+ 2007 : – la table TGF05 ci-annexée concernant les assurés de sexe féminin ;
+ […] Ces tables ci-annexées sont homologuées à compter de cette même date. »
+ (A335-1, abrogé, cité à titre historique ; art. 3 : tables ajoutées à
+ l'annexe de A335-1). Statut : vérifié sur le fac-similé versé
+ (docs/sources/jo_2006-08-26_n197_texte11.pdf, p. 1 et 2 de l'extrait) par
+ regulatory le 13/11/2026
+ (https://github.com/Gerard-Garey/outil_tables/issues/274#issuecomment-6861022307),
+ art. 2 relu sur le rendu de la p. 2 le 14/11/2026 ; le n° 197 n'est pas
+ imprimé sur l'extrait, il vient de la pièce déposée et de Légifrance
+ (JORFTEXT000000820127, même commentaire) ; E2.24. Annexe : « TABLE TGF05 »,
+ p. 3 à 20 de cet extrait (champ Comparaison-acte).
+Porteurs-usages:
+ Code des assurances : annexe à l'article A132-18, créée par l'arrêté du 28
+ décembre 2015 portant adaptation des dispositions comptables du code des
+ assurances (NOR FCPT1529210A), JO n° 301 du 29/12/2015, texte 35 ; A132-18,
+ 2°, a : « Tables homologuées par arrêté du ministre de l'économie et des
+ finances, établies par sexe, sur la base de populations d'assurés pour les
+ contrats de rente viagère, et sur la base de données publiées par l'Institut
+ national de la statistique et des études économiques pour les autres
+ contrats » ; « Pour les contrats de rentes viagères, en ce compris celles
+ revêtant un caractère temporaire, et à l'exception des contrats relevant du
+ chapitre III du titre IV du livre Ier, le tarif déterminé en utilisant les
+ tables mentionnées au b ne peut être inférieur à celui qui résulterait de
+ l'utilisation des tables appropriées mentionnées au a » ; entrée en vigueur
+ et statut de l'arrêté : ceux du champ Porteurs-usages de
+ inst/extdata/tables/tf_00-02.provenance.dcf (art. 4, p. 12 de l'extrait) ;
+ statut : texte d'A132-18 vérifié sur le rendu de la p. 5 de l'extrait,
+ « TABLE TGF05 » dans l'annexe sur le rendu de la p. 19 (lecture du
+ 14/11/2026). L'annexe ne nomme pas l'usage de la table ; le lien de TGF05
+ aux contrats de rente viagère est celui de l'acte d'homologation (champ
+ Homologation).
+ Mutualité : porteur d'origine, arrêté du 8 décembre 2006 relatif aux
+ tables de mortalité applicables aux mutuelles (NOR SANS0624984A), art. 8 :
+ « Les tables homologuées prévues au quatrième alinéa de l'article A. 212-10
+ du code de la mutualité pour les contrats de rente viagère sont, à compter
+ du 1er janvier 2008 : - la table TGF05 ci-annexée concernant les assurées de
+ sexe féminin […] Elles peuvent être appliquées à compter du 1er janvier
+ 2007. » ; art. 9 : « A l'article A. 212-10 du code de la mutualité, il est
+ créé une annexe contenant […] les tables TGF05 et TGH05 ci-annexées » ;
+ annexe II, « TABLE TGF05 » (BO Santé 2007-1, annonce n° 58, p. 3 et p. 10
+ de l'impression versée, lues sur le rendu le 14/11/2026 ; champ
+ Seconde-source-bo) ; statut : vérifié (porteur d'origine). Porteur en
+ vigueur (annexe de A223-8 du code de la mutualité) : aucune pièce versée ;
+ statut : non établi.
+ Sécurité sociale : aucune lecture faite pour TGF05 ; statut : non établi.
+ Comptes sociaux : règlement ANC 2015-11, art. 142-4 (rentes viagères) :
+ usage par renvoi aux A132-18, A223-8 et A932-3-11, sans nommer la table ;
+ statut : vérifié par regulatory sur le rendu de la p. 18 du recueil ANC
+ 2025 (SHA-256 0d7fb3c8…9766, celui de
+ inst/extdata/tables/tf_00-02.provenance.dcf, pièce hors dépôt), le
+ 14/11/2026. Art. 142-3 : lecture pendante devant le mainteneur (deux
+ lectures, non tranchées).
+Source: Journal officiel de la République française n° 301 du 29 décembre
+ 2015, texte 35 sur 159 : « Arrêté du 28 décembre 2015 portant adaptation des
+ dispositions comptables du code des assurances », NOR FCPT1529210A ; annexe à
+ l'article A132-18, « TABLE TGF05 » (texte en vigueur ; E2.26). Valeurs
+ transcrites telles qu'imprimées ; deux anomalies de composition de la page
+ (A1, A2) traitées selon la décision du mainteneur M466 (champ
+ Ecarts-signales).
+Source-nature: fac-similé du JO (numéro complet publié au format PDF, pages
+ extraites sans rendu ni recompression ; docs/sources/README.md).
+Source-URL: aucune adresse imprimée sur les pages de l'extrait ; non consignée
+ (même constat que inst/extdata/tables/tf_00-02.provenance.dcf).
+Source-consultation: pièce déposée le 13/11/2026 et versée au dépôt
+ (docs/sources/jo_2015-12-29_n301_texte35.pdf, M442).
+Source-licence: Licence etalab-2.0 retenue par interprétation (numéro servi par
+ Légifrance, sans mention contraire relevée) ; à défaut, réutilisation des
+ informations publiques (code des relations entre le public et
+ l'administration, L321-1 et L322-1 : informations non altérées, source et date
+ mentionnées). Statut : retenue par interprétation (M442 ; renvoi à la
+ lecture (a) de M454, ADR 0019, point 8.2, D9 ; docs/sources/README.md). La
+ licence du dépôt (PolyForm Noncommercial 1.0.0) ne couvre pas cette table
+ (ADR 0006, point 2).
+Source-pages: p. 19 à 51 de l'extrait docs/sources/jo_2015-12-29_n301_texte35.pdf
+ (p. 238 à 270 du numéro complet) : dix blocs de générations, 1900-1910,
+ 1911-1921, 1922-1932, 1933-1943, 1944-1954, 1955-1965, 1966-1976, 1977-1987,
+ 1988-1998 et 1999-2005, chacun aux âges 0 à 120 sur plusieurs pages ;
+ l'en-tête des générations n'est pas répété sur toutes les pages (repris du
+ bloc ; vu sur le rendu le 14/11/2026 aux p. 20, 21 et 22, bloc 1900-1910,
+ les autres pages n'ayant pas été relues pour ce point). La p. 51 porte la fin de TGF05 (bloc 1999-2005, âges 92 à 120) puis
+ le début de TGH05.
+Transcription-methode: Transcription A (le fichier de table) : lecture
+ visuelle du seul rendu image des p. 19 à 51 (pdftoppm, 300 dpi, recadrages
+ par bandes de lignes), par bloc de onze générations (D10, M459), par un
+ agent (IA) ; aucune extraction de texte, aucun OCR ; interdits du
+ transcripteur : toute autre pièce, toute issue ou tout commentaire contenant
+ des valeurs. Conventions des blocs : « – » imprimé écrit « - » (tiret
+ ASCII) ; cellule imprimée vide écrite VIDE ; ligne mal composée transcrite
+ dans l'ordre imprimé. Dix blocs (tgf05_<g1>-<g2>.csv), gelés par SHA-256
+ avant toute comparaison (gel.sha256), et notes du transcripteur versés en
+ pièces de contrôle au commit b949ced
+ (tests/contre_verification/transcriptions_b22/generation/blocs_a/,
+ notes/A_tgf05_*.md, gel.sha256 ; dossier provisoire à retirer au dernier
+ commit donnees: de #274, M474) ;
+ identité de l'agent et horodatage de la lecture non consignés au-delà de
+ ces notes. Assemblage en grille au format 2 (ADR 0019, points 5.2 et 7.2)
+ par le script hors CI
+ tests/contre_verification/tables/assembler_tgf05_tgh05.R (R base ;
+ réécriture en R d'assembler.py, commit b949ced, à sortie identique, M478),
+ qui applique M466 (A1 et A2, champ Ecarts-signales), échoue sur tout autre
+ VIDE ou toute autre ligne de longueur anormale, et contrôle le format 2 ;
+ rejeu du 14/11/2026 sur les blocs de b949ced (git archive b949ced, gel :
+ 40 lignes OK) : sortie « tgf05 : 106 générations (1900-2005), 121 âges
+ (0-120), 8092 cellules à valeur, 4734 cellules '-' », SHA-256 de la grille
+ assemblée a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e,
+ égal au fichier de table (cmp). Le SHA-256 du fichier de table est celui
+ de la grille assemblée (champ Empreintes-fichiers ; ADR 0019, point 7.2) :
+ gel.sha256 ne couvre que les blocs. Visa du mainteneur aux valeurs de la
+ grille de ce SHA-256 le 13/11/2026 (M473).
+Transcription-date: 2026-11-13
+Transcription-B-releve: tests/contre_verification/tables/tgf05.transcription_b.csv
+Transcription-B-methode: Transcription B : même méthode que A, par un agent
+ (IA) distinct, aveugle à A (rendu pdftoppm à 300 dpi, bandes recadrées de
+ cinq à dix lignes selon les blocs, d'après les notes), dix blocs gelés par
+ SHA-256 avant comparaison (commit b949ced,
+ blocs_b/, notes/B_tgf05_*.md, gel.sha256). Les deux transcripteurs ont
+ relevé A1 et A2 sans en avoir été prévenus ; blocs de A et de B identiques
+ (comparaison par script du 13/11/2026, rapport.md du commit b949ced). Le
+ relevé versé est l'assemblage des blocs de B par le même script (rejeu du
+ 14/11/2026, git archive b949ced) : identique octet pour octet (cmp) au
+ fichier de table. Comparaison par script (tests/controles/tables_embarquees.R,
+ point (e)) : 121 lignes identiques, aucun écart.
+Seconde-source-bo: Bulletin officiel Santé - Protection sociale - Solidarités
+ n° 2007-1, annonce n° 58 : arrêté du 8 décembre 2006 relatif aux tables de
+ mortalité applicables aux mutuelles (NOR SANS0624984A ; code de la
+ mutualité), annexe II, « TABLE TGF05 » ; ce n'est pas l'arrêté de 2015 ;
+ impression PDF de https://sante.gouv.fr/fichiers/bo/2007/07-01/a0010058.htm
+ faite le 13/11/2026 à 09:52 ;
+ docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf, p. 10 à
+ 39 ; licence non établie, extrait versé par exception datée (M446 ; ADR
+ 0006, annotation du 13/11/2026). Impression d'une page HTML, non un
+ fac-similé ; cellules sans valeur imprimées vides.
+Seconde-source-bo-methode: Couche texte de la pièce, pour la seule
+ comparaison (M445 ; E2.26), par pdftotext -bbox (poppler) version 24.02.0
+ (mots et coordonnées : le BO laissant vides les cellules sans valeur, la
+ colonne se déduit de l'abscisse), script hors CI
+ tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R
+ (réécriture en R de releves.py, commit b949ced, à sortie identique, M478) ;
+ fait après le gel et l'assemblage des transcriptions ; cellule sans mot
+ écrite « - » (9 639 cellules pour TGF05 et TGH05 ensemble, journal_bo2007.txt
+ du commit b949ced) ; aucune ligne sans valeur. Rejeu du 14/11/2026 : relevé,
+ écarts et journal identiques octet pour octet à ceux du commit b949ced ;
+ « bo2007 tgf05 : 12826 cellules comparées, 0 écarts ». A1 et A2 vus sur le
+ rendu à 300 dpi de la pièce (p. 16, ligne 120 du bloc 1911-1921
+ entièrement vide, forme ordinaire du BO ; p. 27, ligne 117 du bloc
+ 1955-1965 en onze cellules alignées : rapport.md du commit b949ced).
+Seconde-source-bo-releve: tests/contre_verification/tables/tgf05.seconde_source_bo.csv
+Seconde-source-bo-ecarts: aucun
+Comparaison-acte: Journal officiel n° 197 du 26 août 2006, texte 11 sur
+ 164 : arrêté du 1er août 2006 portant homologation des tables de mortalité
+ pour les rentes viagères (NOR ECOT0691259A), acte d'homologation de TGF05
+ (art. 2) ; annexe, « TABLE TGF05 », p. 3 à 20 de l'extrait
+ docs/sources/jo_2006-08-26_n197_texte11.pdf (p. 36 à 53 du numéro
+ complet). Comparaison à l'acte, jamais seconde source indépendante : les
+ valeurs de 2015 en dérivent (E2.26 ; M462 ; ADR 0019, point 7.3).
+Comparaison-acte-methode: Couche texte du fac-similé, pour la seule
+ comparaison, par le script et l'outil du champ Seconde-source-bo-methode
+ (pdftotext -bbox, poppler 24.02.0), après le gel et l'assemblage des
+ transcriptions ; « – » écrit « - » (9 639 pour TGF05 et TGH05 ensemble,
+ journal_jo2006.txt du commit b949ced). Rejeu du 14/11/2026 : relevé
+ identique octet pour octet à celui du commit b949ced et au fichier de table
+ ; « jo2006 tgf05 : 12826 cellules comparées, 0 écarts ». A1 et A2 vus sur
+ le rendu à 300 dpi (p. 6 : ligne 120 du bloc 1911-1921 à onze « – », dont
+ 1921 ; p. 13 : ligne 117 du bloc 1955-1965 en onze cellules alignées, mêmes
+ nombres : rapport.md du commit b949ced).
+Comparaison-acte-releve: tests/contre_verification/tables/tgf05.comparaison_acte.csv
+Comparaison-acte-ecarts: aucun
+Controles-coherence: Par génération : âges consécutifs du premier au dernier
+ âge à valeur, sans « – » intercalé ; l_x décroissants au sens large ; l_x =
+ 100000 au premier âge à valeur ; aucun l_x nul ; l_x égaux à deux âges
+ consécutifs en quatre cellules (q_x = 0 : 1919 à 117 ans, 1926 et 1927 à
+ 118 ans, 1933 à 119 ans) ; q_x dans [0 ; 0,7142857], aucun q_x = 1. Âges x
+ >= 31 où q_x < q_{x-1} (q_x = 1 - l_{x+1} / l_x ; contrôle de
+ vraisemblance, non correctif) : 65 couples (génération, âge), dont 53 à 100
+ ans et plus (l_x petits, arrondis à l'entier), 11 à 62 ans (générations
+ 1948, 1951, 1952, 1954, 1956, 1957, 1958, 1960, 1974, 1976 et 1980) et un à
+ 44 ans (génération 2000) ; valeurs imprimées, identiques au BO et au JO de
+ 2006, aucune correction. Mesure du 14/11/2026 sur le fichier de table et
+ sur table_embarquee("TGF05") (état admise dans tables_embarquees()).
+Ecarts-signales: Deux anomalies de composition du fac-similé de 2015,
+ absentes du JO de 2006 (lecture de regulatory du 13/11/2026,
+ https://github.com/Gerard-Garey/outil_tables/issues/274#issuecomment-6861022307),
+ traitées selon la décision du mainteneur M466 (ADR 0019, point 5.3) :
+ A1 (E5 (a)) : p. 26, cellule (âge 120, génération 1921) imprimée vide, les
+ dix autres cellules de la ligne portant « – » ; transcrite « - » (cellule
+ sans valeur ; la génération 1921 se clôt à 118 ans sur l_x = 1, l'âge 119
+ imprimé « – ») ; le JO de 2006 imprime « – » à cette cellule.
+ A2 (E4 (a)) : p. 38, bloc 1955-1965, ligne 117 : la première cellule porte
+ deux nombres « 66 72 », les nombres suivants sont décalés d'une colonne
+ vers la gauche et la cellule 1965 est vide ; les onze nombres imprimés sont
+ attribués dans l'ordre imprimé aux générations 1955 à 1965 (66, 72, 79,
+ 86, 94, 103, 112, 122, 133, 144, 156), chiffres inchangés ; le JO de 2006
+ et le BO impriment ces onze nombres alignés, dans cet ordre. Le contrôle
+ de A2 par l'identité avec la table unique 2024 (M466) est différé à #275,
+ sortie de B22 (M475) : il n'est pas fait ici.
+ Glyphes : « – » du JO écrit « - » (champ Transcription-methode).
+ Contrôle de lecture par la couche texte du fac-similé de 2015 : relevé fait
+ après le gel (pdftotext -bbox, même script), 11 écarts, tous dus à A2
+ (cellule (117, 1955) relevée « ?66/72 », nombres suivants décalés, cellule
+ (117, 1965) sans mot) ; ce relevé n'est pas au format 2 (cellule à deux
+ nombres, ADR 0019, point 5.3) et n'est pas versé sous
+ tests/contre_verification/tables/ (décision de la session du 14/11/2026) :
+ aucun champ Controle-lecture, et il n'est pas cité comme preuve (ADR 0018,
+ point 5.3) ; il reste lisible au commit b949ced (releve_jo2015_tgf05.csv,
+ ecarts_jo2015_tgf05.csv, journal_jo2015.txt). A1 n'y fait pas écart (cellule
+ sans mot écrite « - »). Aucun autre écart entre les deux transcriptions, la
+ seconde source BO et l'acte de 2006.
+Empreintes-fichiers:
+ a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e  inst/extdata/tables/tgf05.csv
+ a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e  tests/contre_verification/tables/tgf05.transcription_b.csv
+ a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e  tests/contre_verification/tables/tgf05.seconde_source_bo.csv
+ a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e  tests/contre_verification/tables/tgf05.comparaison_acte.csv
+ 0babb8013717fd1c00952cd5a9b60abb62dcee3a179c168b5848dc5318c3f432  tests/contre_verification/tables/assembler_tgf05_tgh05.R
+ 9f848753cbdfad9734b89a763c85d0e4c29a3f9e8d09abd88d6d72c06fea0af7  tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R
+ 2e34890188164d547ea2a16e646afa25f2289e6f48310e37dbe410195ab79b56  docs/sources/jo_2015-12-29_n301_texte35.pdf
+ 14e9711f5132198d5f61d807049d41920bec5bf49b292896e579481418cab4f9  docs/sources/jo_2006-08-26_n197_texte11.pdf
+ 0baeb0a75d45bd51a4e1e687d968079fabe441e75df82b2da3f0b874c32436d8  docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf
+Empreintes-hors-depot:
+ ec5ae04404a1e1cb8932585b01ddf5124ba4b8ae63071e61efa2f06a65f61854  joe_20151229_0301_p000.pdf (JO n° 301 du 29/12/2015, numéro complet, 926 p., déposé le 13/11/2026)
+ 0055308e92cfad0537d00242a65f7366d73b05e1d06c630bb9b593224e401c3a  joe_20060826_0197_p000.pdf (JO n° 197 du 26/08/2006, numéro complet, 353 p.)
+ ad0f0d077c1b6e8b242a0519d39200c4d489fd1e023895fa0c74dd23b1c21814  BO.pdf (impression du BO Santé 2007-1 du 13/11/2026)
+ 71efa18fb60054f2ec1802ce4ffe72d1a419e5e432bd1696aee45b25f8a9c94a  gel.sha256 (gel des 40 blocs de TGF05 et TGH05, commit b949ced)
+ 76de276ba38f765842eba84049a758f22bc199c16cfe7e9d54a53e2cd0859092  assembler.py (commit b949ced)
+ db47aa40cf19737dd20bb9e0a668ba5890de678c11f0cf79b499194e476947e3  releves.py (commit b949ced)
+ 0b970e3096df458896ea2b6958bb4f4ca7c197458612ed425c54bc2115130324  releve_jo2015_tgf05.csv (couche texte du JO de 2015, non versé sous tests/contre_verification/tables/, commit b949ced)
+Representation: tablexp table 1
+Empreinte-table: 6afcf281b7cd1cb28b629b56fd83cb9c
+Visa: 2026-11-13, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6866147841 (M473)

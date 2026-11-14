@@ -1,0 +1,175 @@
+Format: tablexp provenance 1
+Nom: Décalages d'âge TF 00-02
+Fichier: inst/extdata/tables/decalages_tf_00-02.csv
+Table: TF 00-02
+Intitule: « Décalage d'âge TF 00-02 » (titre en italique, apostrophe
+ typographique) ; colonnes « ÂGE » et « DÉCALAGE » (JO n° 301 du 29/12/2015,
+ texte 35, p. 19 de l'extrait).
+Bandes: 8 bandes imprimées « [a ; b] », contiguës, de 16 à 93, puis une bande
+ ouverte « 94 et plus » au décalage 0 ; 9 bandes en tout ; rien n'est supposé
+ sous 16 ans (ADR 0019, point 6.1). Décalages imprimés de « – 11 » à « 0 »,
+ non décroissants d'une bande à la suivante (mesure du 14/11/2026 sur
+ decalages_embarques()).
+Homologation: Arrêté du 20 décembre 2005 relatif aux tables de mortalité, NOR
+ ECOT0591210A, JORF n° 302 du 29 décembre 2005, texte 40, art. 5 : « Ces tables
+ ainsi que les décalages d'âge mentionnés au huitième alinéa de l'article
+ A. 335-1 du code des assurances, annexés au présent arrêté, sont homologués »
+ (A335-1, abrogé, cité à titre historique) ; statut : vérifié par regulatory
+ sur la version électronique de Légifrance (JORFTEXT000000636581), lecture du
+ 13/11/2026 (https://github.com/Gerard-Garey/outil_tables/issues/273#issuecomment-6863721035,
+ point 2), et sur le rendu de la p. 2 de l'extrait versé
+ docs/sources/jo_2005-12-29_n302_texte40.pdf (regulatory, 14/11/2026), où
+ figure l'art. 5 (docs/sources/README.md) ;
+ décalages annexés, p. 6 de cet extrait (champ Comparaison-acte).
+Porteurs-usages:
+ Code des assurances : annexe à l'article A132-18, créée par l'arrêté du 28
+ décembre 2015 portant adaptation des dispositions comptables du code des
+ assurances (NOR FCPT1529210A), JO n° 301 du 29/12/2015, texte 35 ; A132-18,
+ huitième alinéa : « Pour les contrats en cas de vie autres que les contrats
+ de rente viagère, les tables mentionnées au a sont utilisées en corrigeant
+ l'âge de l'assuré conformément aux décalages d'âge ci-annexés » ; A132-19 :
+ « chaque taux de mortalité annuel à un âge donné soit égal au taux de
+ mortalité annuel à l'âge ayant subi le décalage dans la table appropriée » ;
+ statut : vérifié sur le rendu de la p. 5 de l'extrait (spécification
+ d'actuary et lecture de regulatory sur #273,
+ https://github.com/Gerard-Garey/outil_tables/issues/273#issuecomment-6863721035,
+ point 1). Application aux q_x, jamais aux l_x (E2.26), mise en œuvre par la
+ branche claude/marge-comparaison (ADR 0019, point 6.6 ; M467).
+ Mutualité : annexe de A223-8 du code de la mutualité, créée par l'art. 9 de
+ l'arrêté du 08/12/2006 (NOR SANS0624984A), art. 9 en vigueur (modifié par
+ l'arrêté du 30/12/2015, NOR FCPS1531571A, art. 6) : « A l'article A. 223-8 du
+ code de la mutualité, il est créé une annexe contenant les tables TF00-02 et
+ TH00-02 et les décalages d'âge ci-annexés […] » ; statut et lecture : ceux
+ du champ Porteurs-usages de inst/extdata/tables/tf_00-02.provenance.dcf.
+ Sécurité sociale : annexe de A932-3-11 du code de la sécurité sociale, créée
+ par l'art. 10 de l'arrêté du 21/12/2006 (NOR SANS0625193A ; version
+ initiale : annexe à A. 931-10-10), modifié par l'arrêté du 30/12/2015, art.
+ 3 : « […] contenant les tables TF00-02 et TH00-02 et les décalages d'âge
+ ci-annexés […] » ; statut : lu sur Légifrance, version électronique (lecture
+ outillée du 14/11/2026, regulatory), non établi sur les pièces versées ni
+ sur fac-similé.
+ Comptes sociaux : règlement ANC 2015-11, art. 142-3 (recueil ANC 2025,
+ SHA-256 identique à celui de inst/extdata/tables/tf_00-02.provenance.dcf),
+ renvoi aux dispositions des trois codes ; aucune mention expresse des
+ décalages dans le recueil (recherche du 14/11/2026) ; lecture par renvoi
+ (interprétation, non tranchée).
+Source: Journal officiel de la République française n° 301 du 29 décembre
+ 2015, texte 35 sur 159 : « Arrêté du 28 décembre 2015 portant adaptation des
+ dispositions comptables du code des assurances », NOR FCPT1529210A ; annexe à
+ l'article A132-18, « Décalage d'âge TF 00-02 » (texte en vigueur ; E2.26).
+ Valeurs transcrites telles qu'imprimées.
+Source-nature: fac-similé du JO (numéro complet publié au format PDF, pages
+ extraites sans rendu ni recompression ; docs/sources/README.md).
+Source-URL: aucune adresse imprimée sur les pages de l'extrait ; non consignée
+ (même constat que inst/extdata/tables/tf_00-02.provenance.dcf).
+Source-consultation: pièce déposée le 13/11/2026 et versée au dépôt
+ (docs/sources/jo_2015-12-29_n301_texte35.pdf, M442).
+Source-licence: Licence etalab-2.0 retenue par interprétation (numéro servi par
+ Légifrance, sans mention contraire relevée) ; à défaut, réutilisation des
+ informations publiques (code des relations entre le public et
+ l'administration, L321-1 et L322-1 : informations non altérées, source et date
+ mentionnées). Statut : retenue par interprétation (M442 ;
+ docs/sources/README.md). La licence du dépôt (PolyForm Noncommercial 1.0.0)
+ ne couvre pas ces décalages (ADR 0006, point 2).
+Source-pages: p. 19 de l'extrait docs/sources/jo_2015-12-29_n301_texte35.pdf
+ (p. 238 du numéro complet) : tableau « Décalage d'âge TF 00-02 », 9 lignes,
+ entre la fin de TH 00-02 et le tableau « Décalage d'âge TH 00-02 ».
+Transcription-methode: Transcription A (le fichier de décalages) : lecture
+ visuelle du seul rendu image de la p. 19 (pdftoppm ; rendu à 400 dpi et
+ recadrages), par un agent (IA) ; aucune extraction de texte, aucun OCR ;
+ interdits des transcripteurs : toute autre pièce (dont le BO, la couche texte,
+ la notice de l'Institut des actuaires, M471), toute issue ou tout commentaire
+ contenant des valeurs. Conventions : bande « [a ; b] » écrite a,b ; bande
+ « n et plus » écrite avec age_max vide ; décalage « – n » (trait court, tiret
+ demi-cadratin ou signe moins typographique, indiscernables sur le rendu,
+ suivi d'une espace) écrit -n en tiret ASCII ; « 0 » imprimé sans signe écrit
+ 0 (format 3, ADR 0019, point 6.2). Gel par SHA-256 avant toute comparaison
+ (e896a10eb2523e5b66c19619f50d7b7a5aaa38051ce8f280a3eb2e33f8b2ff66). Notes du
+ transcripteur et gel versés en pièces de contrôle au commit b949ced
+ (tests/contre_verification/transcriptions_b22/decalages/transcription_a/,
+ gel.sha256) ; identité de l'agent et horodatage de la lecture non consignés
+ au-delà de ces notes. Visa du mainteneur aux valeurs le 14/11/2026 (M477).
+Transcription-date: 2026-11-13
+Transcription-B-releve: tests/contre_verification/tables/decalages_tf_00-02.transcription_b.csv
+Transcription-B-methode: Transcription B : même méthode que A, par un agent
+ (IA) distinct, aveugle à A (rendu pdftoppm à 200 dpi pour la vue
+ d'ensemble, 400 dpi recadré pour le tableau), gelée par SHA-256 avant
+ comparaison ; identique octet pour octet à A (même SHA-256, gel.sha256 du
+ commit b949ced). Comparaison par script (tests/controles/tables_embarquees.R,
+ point (e)) : 9 lignes identiques, aucun écart.
+Seconde-source-bo: Bulletin officiel Santé - Protection sociale - Solidarités
+ n° 2007-1, annonce n° 58 : arrêté du 8 décembre 2006 relatif aux tables de
+ mortalité applicables aux mutuelles (NOR SANS0624984A ; code de la
+ mutualité), annexe I, « Décalage d'âge - TF 00-02 » ; ce n'est pas l'arrêté
+ de 2015 ; impression PDF de
+ https://sante.gouv.fr/fichiers/bo/2007/07-01/a0010058.htm faite le 13/11/2026
+ à 09:52 ; docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf,
+ p. 9 et 10 ; licence non établie, extrait versé par exception datée (M446 ;
+ ADR 0006, annotation du 13/11/2026). Impression d'une page HTML, non un
+ fac-similé.
+Seconde-source-bo-methode: Couche texte de la pièce, pour la seule
+ comparaison (M445 ; E2.26), par pdftotext -layout -f 9 -l 10 (poppler),
+ contrôlée sur le rendu pdftoppm -r 200 des p. 9 et 10 ; aucune divergence de
+ valeur, de borne, d'ordre ni de nombre de lignes entre couche texte et rendu
+ (notes du relevé, commit b949ced,
+ tests/contre_verification/transcriptions_b22/decalages/releve_bo/notes.md) ;
+ aucun script versé. Une ligne par ligne imprimée, ligne en double comprise ;
+ bornes basses telles qu'imprimées ; crochets, glyphes et espaces retirés
+ (« [33 - 34] » écrit 33,34 ; signe U+002D de la couche texte, suivi ou non
+ d'une espace, écrit -n) ; « - 0 » imprimé pour « 94 et plus » écrit 0
+ (différence de glyphe, non écart de valeur ; § 5.4 de la spécification
+ d'actuary de #273) : le relevé versé diffère du relevé gelé
+ (SHA-256 207a9a6a997b0af718f2a827579cfb05fca5bfab1922bc8b951aaeba0de81784)
+ par cette seule ligne. Le BO ne confirme pas les bornes basses 16 (champ
+ Comparaison-acte).
+Seconde-source-bo-releve: tests/contre_verification/tables/decalages_tf_00-02.seconde_source_bo.csv
+Seconde-source-bo-ecarts:
+ 16,32,-11;0,32,-11
+ ;33,34,-8
+Comparaison-acte: Journal officiel n° 302 du 29 décembre 2005, texte 40 sur
+ 146 : arrêté du 20 décembre 2005 relatif aux tables de mortalité (NOR
+ ECOT0591210A), acte d'homologation des décalages (art. 5) ; annexe,
+ « Décalage d'âge TF 00-02 », p. 6 de l'extrait
+ docs/sources/jo_2005-12-29_n302_texte40.pdf (p. 108 du numéro complet).
+ Comparaison à l'acte, jamais seconde source indépendante (E2.26 ; M462,
+ M470) ; seule pièce indépendante du JO de 2015 qui confirme la borne basse
+ 16.
+Comparaison-acte-methode: Relevé visuel aveugle du rendu pdftoppm -r 400 de
+ la p. 6 (recadrages), sans couche texte, mêmes conventions que la
+ transcription A ; fait après le gel des transcriptions A et B, identique
+ octet pour octet à A (notes du relevé, commit b949ced,
+ tests/contre_verification/transcriptions_b22/decalages/releve_jo2005/notes.md).
+Comparaison-acte-releve: tests/contre_verification/tables/decalages_tf_00-02.comparaison_acte.csv
+Comparaison-acte-ecarts: aucun
+Controles-coherence: Table visée TF 00-02 (champ Table), refusée par le
+ moteur (inst/extdata/tables/tf_00-02.provenance.dcf, Refus-attendu) : ces
+ décalages ne s'appliquent à aucun objet, leur transcription vaut pièce et
+ contrôle (ADR 0019, point 6.6). 9 bandes, age_min strictement croissants, bandes
+ contiguës sans trou ni chevauchement, une seule bande ouverte, la dernière ;
+ décalages non décroissants (condition de monotonie de la règle d'A132-19,
+ spécification d'actuary de #273, § 7.3) ; mesure du 14/11/2026 sur
+ decalages_embarques(). Aucun contrôle de lecture par la couche texte du
+ fac-similé de 2015 (champs Controle-lecture absents).
+Ecarts-signales: Seconde source BO Santé 2007-1 (annexe I de l'arrêté du
+ 8/12/2006, code de la mutualité) : première borne basse imprimée 0 au lieu de
+ 16 (« [0 - 32] ») ; ligne « [33 - 34] » au décalage « - 8 » imprimée deux
+ fois ; « - 0 » pour « 94 et plus » (glyphe, écrit 0 dans le relevé, sans
+ écart de valeur). Ces écarts sont propres au BO (docs/sources/README.md) :
+ le JO de 2005 (acte d'homologation) imprime, comme le JO de 2015, la borne
+ 16, une seule ligne « [33 ; 34] » et « 0 ». Glyphe « – » du JO écrit « - »
+ (champ Transcription-methode). Aucun autre écart.
+Empreintes-fichiers:
+ e896a10eb2523e5b66c19619f50d7b7a5aaa38051ce8f280a3eb2e33f8b2ff66  inst/extdata/tables/decalages_tf_00-02.csv
+ e896a10eb2523e5b66c19619f50d7b7a5aaa38051ce8f280a3eb2e33f8b2ff66  tests/contre_verification/tables/decalages_tf_00-02.transcription_b.csv
+ f3c05e04d19f3632f29dc51d68d7b05fc77c9f0667face53365aa692c4c9d337  tests/contre_verification/tables/decalages_tf_00-02.seconde_source_bo.csv
+ e896a10eb2523e5b66c19619f50d7b7a5aaa38051ce8f280a3eb2e33f8b2ff66  tests/contre_verification/tables/decalages_tf_00-02.comparaison_acte.csv
+ 2e34890188164d547ea2a16e646afa25f2289e6f48310e37dbe410195ab79b56  docs/sources/jo_2015-12-29_n301_texte35.pdf
+ 0baeb0a75d45bd51a4e1e687d968079fabe441e75df82b2da3f0b874c32436d8  docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf
+ 7c367b8325b27d1b9576b937c81b8550346a20d5e5f56d4b1aa3e04fa662f6f6  docs/sources/jo_2005-12-29_n302_texte40.pdf
+Empreintes-hors-depot:
+ ec5ae04404a1e1cb8932585b01ddf5124ba4b8ae63071e61efa2f06a65f61854  joe_20151229_0301_p000.pdf (JO n° 301 du 29/12/2015, numéro complet, 926 p., déposé le 13/11/2026)
+ ad0f0d077c1b6e8b242a0519d39200c4d489fd1e023895fa0c74dd23b1c21814  BO.pdf (impression du BO Santé 2007-1 du 13/11/2026)
+ f6094cdeb63d3bb75cb0967d7e64799b0057a3e2216eda191ec3af3260689e08  joe_20051229_0302_p000.pdf (JO n° 302 du 29/12/2005, numéro complet, 462 p., déposé le 13/11/2026)
+Representation: tablexp decalages 1
+Empreinte-decalages: 2b5203e1eee076b43a526673438f4167
+Visa: 2026-11-14, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/271#issuecomment-6877196722 (M477)

@@ -123,10 +123,12 @@ verifier("A tri : doublon non adjacent (H 60 / F 60 / H 60) : table_age_double, 
   ok <- controle_refus(r, "donnees", "table_age_double", contient = "lignes 3.")
   if (isTRUE(ok) && !identical(r$details$lignes, 3L)) "details$lignes" else ok
 })
-verifier("A tri : trou cité en numérotation reçue (H reçu 63, 60, 61 : « entre les lignes 3 et 1 », ligne suivante 1)", {
+verifier("A tri : trou cité en numérotation reçue (H reçu 63, 60, 61 : « entre les lignes 3 et 1 (H, âges 61 et 63) », ligne suivante 1 ; ADR 0019, point 1.5)", {
   r <- refus_de(importee(transform(TR, age = c(63L, 60L, 61L, 60L, 61L, 62L))))
-  ok <- controle_refus(r, "donnees", "table_ages_non_contigus", contient = "entre les lignes 3 et 1.")
-  if (isTRUE(ok) && !identical(r$details$lignes, 1L)) "details$lignes" else ok
+  ok <- controle_refus(r, "donnees", "table_ages_non_contigus", contient = "entre les lignes 3 et 1 (H, âges 61 et 63).")
+  if (isTRUE(ok) && !identical(r$details, list(lignes = 1L, sexes = "H", annees = NULL, ages = 61L, ages_suivants = 63L,
+                                 lignes_precedentes = 3L)))
+    "details" else ok
 })
 verifier("A tri : tables synthétiques de jeu_reference() (Gompertz-Makeham, constante) : tri identité, objet reconstruit identical()", {
   gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
@@ -163,6 +165,50 @@ verifier("B empreinte : nom, source, statut et parametres ne la changent pas", {
   identical(empreinte_table(importee(nom = "autre", source = "autre source")), e) &&
     identical(empreinte_table(table_reference(TR, "essai", "synthetique", "s", parametres = list(A = 1))), e) &&
     identical(empreinte_table(table_reference(TR, "essai", "embarquee", "s")), e)
+})
+
+# Table de génération (ADR 0019, point 3 ; spécification de #272, § 4 et 5,
+# E1 à E4) : tablexp table 1 étendue, colonne generation sous son nom.
+# Témoins : E1, champs Empreinte-table des fichiers de provenance de
+# inst/extdata/tables/ ; E2, MD5 calculé hors R (printf | md5sum du texte
+# écrit à la main, doubles en struct.pack('<d', v).hex()) ; E3 et E4,
+# valeurs calculées à la main et identité exacte.
+TG_B <- data.frame(qx = c(0.011, 0.01), generation = 2020L, sexe = "H", age = c(61L, 60L))
+verifier("B empreinte (E1) : TD 88-90, TV 88-90 et TH 00-02 inchangées (champs Empreinte-table des fichiers de provenance)", {
+  e <- tables_embarquees()
+  identical(e$empreinte[match(c("TD 88-90", "TV 88-90", "TH 00-02"), e$nom)],
+            c("7eec92c57cdd5e1e506bfff23281ac51", "c7602b376a94cca55367a75551123b42", "d2e3d3c16212728091c85673f7ffef0e"))
+})
+verifier("B empreinte (E2) : mêmes valeurs sous annee et sous generation, empreintes différentes ; témoin hors R generation = 781892a17d8cd5ebe5e6885c3895c37d", {
+  ea <- empreinte_table(importee(setNames(TG_B, c("qx", "annee", "sexe", "age"))))
+  eg <- empreinte_table(importee(TG_B))
+  identical(ea, "d1f94fa332c4a430de6bfb4680870120") && identical(eg, "781892a17d8cd5ebe5e6885c3895c37d")
+})
+verifier("B empreinte (E3) : texte d'une table de génération, @colonnes age, sexe, generation, qx (valeur calculée à la main)", {
+  t <- importee(TG_B)
+  d <- data.frame(age = t$age, sexe = t$sexe, generation = t$generation, qx = t$qx, stringsAsFactors = FALSE)
+  o <- tablexp:::texte_objet(list(table_reference = d), "tablexp table 1", character(0), "empreinte")
+  l <- strsplit(rawToChar(o), "\n", fixed = TRUE)[[1L]]
+  identical(l[c(1L, 3L, 7L)], c("tablexp table 1",
+                                "table_reference/@colonnes\tcharacter\t4\t\"age\"\t\"sexe\"\t\"generation\"\t\"qx\"",
+                                "table_reference/generation\tinteger\t2\t2020\t2020")) &&
+    identical(tablexp:::md5_octets(o), empreinte_table(t))
+})
+verifier("B empreinte (E4) : table de génération, empreinte indépendante de l'ordre des lignes reçu (inverse, entrelacé)", {
+  g <- data.frame(age = c(60L, 61L, 60L, 61L), sexe = c("H", "H", "F", "F"), generation = c(1950L, 1950L, 1951L, 1951L),
+                  qx = c(0.01, 0.02, 0.03, 0.04))
+  e <- empreinte_table(importee(g))
+  identical(empreinte_table(importee(g[4:1, ])), e) && identical(empreinte_table(importee(g[c(2L, 4L, 1L, 3L), ])), e)
+})
+verifier("B forme (ADR 0019, point 2.2) : table de génération admise par controler_forme_tables() ; colonnes réordonnées refusées", {
+  t <- importee(TG_B)
+  f <- controler_forme_tables(list(g = t))
+  x <- t[c("age", "sexe", "generation", "qx")]
+  attributes(x) <- c(attributes(x)[c("names", "row.names")], attributes(t)[setdiff(names(attributes(t)), c("names", "row.names"))])
+  r <- refus_de(controler_forme_tables(list(g = x)))
+  identical(f$tables$g, t) && identical(r$motif, "tables_reference_mal_formees") &&
+    identical(r$details$lu, c("age", "sexe", "generation", "qx")) &&
+    identical(r$details$attendu, "age, sexe, qx [, annee ou generation] (colonnes de table_reference())")
 })
 
 # --- C. Fiche (ADR 0015, point 3 ; VERSION_FICHE 5) ------------------------------
@@ -339,7 +385,7 @@ CLE_ESSAI <- "etapes/essai/cle"
 # Contenu injecté (forme de TABLES_EMBARQUEES, ADR 0018, point 1.4) : une
 # table en l_x, construite par table_du_catalogue() ; la discordante change
 # un l_x d'une unité.
-contenu_e <- function(lx = c(1000, 990, 979, 967)) list(TABLE_E = list(identifiant = "table_e", sexe = "H",
+contenu_e <- function(lx = c(1000, 990, 979, 967)) list(TABLE_E = list(identifiant = "table_e", sexe = "H", format = 1L,
   lignes = c("age,lx", paste0(60:63, ",", lx))))
 CAT_E <- contenu_e()
 CAT_VIDE <- structure(list(), names = character(0))
@@ -433,7 +479,7 @@ verifier("D injection : table embarquee dont le contenu au catalogue est refusé
   if (isTRUE(ok) && !identical(r$details$ages, 61L)) "details$ages" else ok
 })
 verifier("D injection : table embarquee dont le contenu au catalogue est illisible -> table_embarquee_illisible (module donnees)", {
-  cat_ <- list(TABLE_E = list(identifiant = "table_e", sexe = "H", lignes = NULL))
+  cat_ <- list(TABLE_E = list(identifiant = "table_e", sexe = "H", format = 1L, lignes = NULL))
   controle_refus(refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, cat_)), "donnees",
                  "table_embarquee_illisible", contient = "fichier inst/extdata/tables/table_e.csv non lu")
 })

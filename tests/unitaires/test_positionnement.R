@@ -469,6 +469,17 @@ verifier("refus avant exécution : table avec annee -> table_annee_non_admise (m
                         "prospective", "importee", "test")
   avant_execution(plan_p(), list(tv = ta), "table_annee_non_admise")
 })
+verifier("refus avant exécution : table de génération -> table_generation_non_admise (module positionnement ; ADR 0019, point 2.3), message et details", {
+  tg <- table_reference(data.frame(age = rep(0:120, 2), sexe = "ensemble", qx = 0.01, generation = rep(1950:1951, each = 121)),
+                        "génération", "importee", "test")
+  r <- refus_de(construire_table(JEU, ROLES, plan_p(), tables_reference = list(tv = tg)))
+  ok <- controle(r, "positionnement", "table_generation_non_admise")
+  if (!isTRUE(ok)) ok else if (!identical(r$details, list(cle = "tv"))) "details"
+  else if (!identical(conditionMessage(r), paste("Positionnement : la table de clé « tv » est une table de génération (colonne",
+                                                 "generation) ; cette version ne positionne que sur des tables sans axe temporel",
+                                                 "(ADR 0019).")))
+    conditionMessage(r) else TRUE
+})
 verifier("refus avant exécution : table par sexe sans sexe dans la segmentation -> table_sexe_incompatible (module positionnement)",
          avant_execution(plan_p(segmentation = character(0)), list(tv = T_HF), "table_sexe_incompatible"))
 verifier("refus avant exécution : plage non couverte par la table -> plage_ages_hors_table (module positionnement)",

@@ -806,6 +806,13 @@ verifier("table_reference : âges H reçus 60, 62, 61, rendus 60, 61, 62 avec le
 verifier("table_reference : âges non contigus au sein d'une même année",
          leve_refus(tr(data.frame(age = c(60L, 61L, 60L, 62L), sexe = "H", qx = 0.01, annee = c(2020L, 2020L, 2021L, 2021L))),
                     "table_ages_non_contigus"))
+# Trou cité avec son groupe et ses deux âges, pour une table à annee comme pour
+# les deux autres formes (ADR 0019, point 1.5 ; valeurs calculées à la main).
+x <- refus(tr(data.frame(age = c(60L, 61L, 60L, 62L), sexe = "H", qx = 0.01, annee = c(2020L, 2020L, 2021L, 2021L))))
+verifier("table_reference : trou d'une table à annee, message citant sexe, année et âges, details (ADR 0019, point 1.5)",
+         identical(x$details, list(lignes = 4L, sexes = "H", annees = 2021L, ages = 60L, ages_suivants = 62L,
+                                   lignes_precedentes = 3L)) &&
+           isTRUE(contient(x, "entre les lignes 3 et 4 (H, année 2021, âges 60 et 62).")))
 x <- refus(tr(transform(TR, age = c(-1L, 0L, 1L, 60L, 61L, 62L))))
 verifier("table_reference : âge négatif, message explicite (entier >= 0)", contient(x, "age", ">= 0"))
 verifier("table_reference : ensemble et H dans la même année refusés, dans deux années différentes admis",
@@ -892,18 +899,32 @@ x <- refus(tl(lx_df(c(60:62, 70L), c(100, 90, 80, 50), sexe = c("H", "H", "H", "
 verifier("table_reference, l_x (T4) : H sur trois âges, F sur un seul, refus table_lx_age_unique sur F",
          identical(x$motif, "table_lx_age_unique") && identical(x$details$sexes, "F") &&
            identical(x$details$ages, 70L) && identical(x$details$lignes, 4L))
-# T5 : l_x nul au dernier âge admis (q_x = 1), nul suivi d'un âge refusé.
+# T5 : l_x nuls terminaux (ADR 0019, point 4.2 ; M465) : le premier l_x nul
+# clôt le groupe, q_x = 1 à l'âge qui le précède, aucune ligne aux âges nuls ;
+# un, deux ou trois zéros terminaux donnent le même objet ; un premier âge nul
+# est refusé (table_lx_nul). Valeurs calculées à la main.
 t <- tl(lx_df(108:110, c(10, 4, 0)))
 verifier("table_reference, l_x (T5) : l_x nul au dernier âge, q_x = 1 exactement",
          identical(t$age, 108:109) && identical(t$qx, c(0x1.3333333333333p-1, 1)))
-x <- refus(tl(lx_df(108:111, c(10, 4, 0, 0))))
-verifier("table_reference, l_x (T5) : l_x nul suivi d'un autre âge, refus table_lx_nul à l'âge 110",
-         identical(x$motif, "table_lx_nul") && identical(x$details$ages, 110L) && identical(x$details$lignes, 3L) &&
-           isTRUE(contient(x, "ensemble, âge 110", "q_x indéfini")))
+verifier("table_reference, l_x (T5) : deux et trois l_x nuls terminaux, objet identical() à un seul zéro terminal",
+         identical(tl(lx_df(108:111, c(10, 4, 0, 0))), t) && identical(tl(lx_df(108:112, c(10, 4, 0, 0, 0))), t))
+x <- refus(tl(lx_df(108:110, c(0, 0, 0))))
+verifier("table_reference, l_x (T5) : premier âge nul, refus table_lx_nul à l'âge 108 seul, message et details",
+         identical(x$motif, "table_lx_nul") &&
+           identical(x$details, list(sexes = "ensemble", annees = NULL, ages = 108L, lignes = 1L)) &&
+           isTRUE(contient(x, "l_x nul au premier âge (aucun q_x défini) : ensemble, âge 108.",
+                           "clôt le groupe et doit suivre un l_x non nul.")))
 verifier("table_reference, l_x (T5) : l_x = 10, 0, 4 : refus table_lx_non_decroissants (avant table_lx_nul)",
          leve_refus(tl(lx_df(108:110, c(10, 0, 4))), "table_lx_non_decroissants"))
-verifier("table_reference, l_x : -0 se comporte comme 0 (dernier âge admis, q_x = 1 ; suivi d'un âge, refus table_lx_nul)",
-         identical(tl(lx_df(0:1, c(10, -0)))$qx, 1) && leve_refus(tl(lx_df(0:2, c(10, -0, 0))), "table_lx_nul"))
+verifier("table_reference, l_x : -0 se comporte comme 0 (zéros terminaux admis, q_x = 1 ; premier âge -0, refus table_lx_nul)",
+         identical(tl(lx_df(0:1, c(10, -0)))$qx, 1) && identical(tl(lx_df(0:2, c(10, -0, 0))), tl(lx_df(0:1, c(10, 0)))) &&
+           leve_refus(tl(lx_df(0:1, c(-0, 0))), "table_lx_nul"))
+# Deux groupes (sexe, annee) : l'un clos par deux zéros, l'autre non ; aucun
+# q_x entre les groupes, le zéro de l'un n'affecte pas l'autre.
+t <- tl(lx_df(c(0:3, 0:2), c(8, 2, 0, 0, 5, 4, 1), sexe = "H", annee = rep(c(2000L, 2001L), c(4L, 3L))))
+verifier("table_reference, l_x (T5) : zéros terminaux par groupe (sexe, annee), q_x = 6/8 et 1 pour 2000, 1/5 et 3/4 pour 2001",
+         identical(t$age, c(0L, 1L, 0L, 1L)) && identical(t$annee, c(2000L, 2000L, 2001L, 2001L)) &&
+           identical(t$qx, c(0.75, 1, 0.2, 0.75)))
 # T6 : dernier âge l_omega > 0, q_omega non posé.
 verifier("table_reference, l_x (T6) : l_x = 10, 5, 2 aux âges 104 à 106 : deux lignes, q_106 absent",
          identical(tl(lx_df(104:106, c(10, 5, 2)))$age, 104:105))
@@ -959,14 +980,182 @@ verifier("table_reference : ni qx ni lx, refus table_colonne_manquante, details$
          identical(x$motif, "table_colonne_manquante") && identical(x$details$colonne, "qx") &&
            isTRUE(contient(x, "« qx » (une table de référence entre par « qx » ou par « lx »)")))
 x <- refus(tr(transform(TR, l_x = 1)))
-verifier("table_reference : colonne inconnue, message des colonnes admises (qx ou lx)",
-         isTRUE(contient(x, "(admises : age, sexe, qx ou lx, annee)")))
+verifier("table_reference : colonne inconnue, message des colonnes admises (qx ou lx ; annee ou generation, ADR 0019)",
+         isTRUE(contient(x, "(admises : age, sexe, qx ou lx, annee ou generation)")))
 # T11 : q_x hors bornes, lignes citées avec leur groupe et leur âge.
 x <- refus(tr(data.frame(age = 0:2, sexe = "ensemble", qx = c(0.01, -0.001, 0.02))))
 verifier("table_reference (T11) : q_x hors de [0, 1], ligne citée avec son groupe et son âge, details$ages",
          identical(x$motif, "table_qx_hors_bornes") && identical(x$details$lignes, 2L) &&
            identical(x$details$ages, 1L) && identical(x$details$sexes, "ensemble") && is.null(x$details$annees) &&
            isTRUE(contient(x, "lignes 2 (ensemble, âge 1)")))
+
+# --- table de génération (ADR 0019, points 1 et 2 ; #272) ----------------------
+# Spécification d'actuary-approfondi (commentaire 6860921818 de #272, § 5),
+# cas T1 à T7. Cas construits à la main, aucun tirage ; q_x attendus :
+# rapports de petits entiers, calculés à la main ; numéros de ligne, âges,
+# générations, motifs, details et extraits de message : valeurs calculées à
+# la main. details de T7 : valeurs à bb2c318, calculées à la main et
+# confirmées identical() à la bibliothèque installée depuis ce commit.
+G1 <- data.frame(age = c(60L, 61L, 60L, 61L, 60L, 61L), sexe = c("F", "F", "F", "F", "H", "H"),
+                 generation = c(1950L, 1950L, 1951L, 1951L, 1950L, 1950L), qx = c(0.01, 0.02, 0.03, 0.04, 0.05, 0.06),
+                 stringsAsFactors = FALSE)
+tg <- function(x) tr(x, statut = "importee", parametres = NULL)
+t <- tg(G1)
+verifier("table_reference, génération (T1) : table en q_x admise, colonnes age, sexe, qx, generation, types, ordre canonique (sexe, génération, âge)",
+         identical(names(t), c("age", "sexe", "qx", "generation")) && is.integer(t$age) && is.character(t$sexe) &&
+           is.double(t$qx) && is.integer(t$generation) && identical(t$sexe, c("H", "H", "F", "F", "F", "F")) &&
+           identical(t$generation, c(1950L, 1950L, 1950L, 1950L, 1951L, 1951L)) &&
+           identical(t$age, c(60L, 61L, 60L, 61L, 60L, 61L)) && identical(t$qx, c(0.05, 0.06, 0.01, 0.02, 0.03, 0.04)) &&
+           identical(class(t), c("table_reference", "data.frame")) && identical(attr(t, "row.names"), 1:6))
+verifier("table_reference, génération (T1) : objet identical() pour l'ordre reçu inverse et pour un ordre entrelacé",
+         identical(tg(G1[6:1, ]), t) && identical(tg(G1[c(2L, 5L, 1L, 6L, 3L, 4L), ]), t))
+# T2 : deux générations, premiers âges 2 et 0, derniers âges 4 et 1 ; reçues
+# 1951 d'abord.
+t <- tl(lx_df(c(0L, 1L, 2L, 3L, 4L), c(4, 3, 10, 8, 5), sexe = "F", generation = c(1951L, 1951L, 1950L, 1950L, 1950L)))
+verifier("table_reference, génération (T2) : l_x par génération, q_2 = 2/10, q_3 = 3/8 (1950), q_0 = 1/4 (1951), aucun q au dernier âge, rien avant le premier",
+         identical(t$age, c(2L, 3L, 0L)) && identical(t$generation, c(1950L, 1950L, 1951L)) &&
+           identical(t$qx, c(0.2, 0.375, 0.25)) && identical(t$sexe, rep("F", 3L)) &&
+           identical(names(t), c("age", "sexe", "qx", "generation")) && identical(attr(t, "forme_origine"), "lx"))
+# T3 : contre-exemple d'enchaînement (1950 finit à 5 ans, 1951 commence à 6) ;
+# enchaînées, les deux lignes donneraient l_6 = 9 > l_5 = 6 (hausse).
+X3 <- lx_df(c(4L, 5L, 6L, 7L), c(10, 6, 9, 3), sexe = "H", generation = c(1950L, 1950L, 1951L, 1951L))
+t3 <- tl(X3)
+X3a <- X3; names(X3a)[names(X3a) == "generation"] <- "annee"
+t3a <- tl(X3a)
+verifier("table_reference, génération (T3) : aucun q_x entre deux générations (q_4 = 4/10, q_6 = 6/9) ; sous annee, mêmes q_x, autre empreinte",
+         identical(t3$age, c(4L, 6L)) && identical(t3$qx, c(0.4, 2 / 3)) && identical(t3$generation, c(1950L, 1951L)) &&
+           identical(t3a$qx, t3$qx) && identical(t3a$age, t3$age) && identical(t3a$annee, t3$generation) &&
+           !identical(empreinte_table(t3a), empreinte_table(t3)))
+# T4 : refus de forme.
+x <- refus(tg(transform(G1, annee = 2000L)))
+verifier("table_reference, génération (T4) : annee et generation reçues ensemble, refus table_annee_et_generation, details$colonnes",
+         identical(x$module, "donnees") && identical(x$motif, "table_annee_et_generation") &&
+           identical(x$details, list(colonnes = c("annee", "generation"))) &&
+           isTRUE(contient(x, "colonnes « annee » et « generation » reçues ensemble", "au plus un axe temporel",
+                           "« annee » (année calendaire, table prospective)",
+                           "« generation » (année de naissance, table de génération).")))
+verifier("table_reference, génération (T4) : annee et generation avec q_x manquant, table_annee_et_generation avant tout contrôle de valeurs ; colonne inconnue d'abord",
+         leve_refus(tg(transform(G1, annee = 2000L, qx = NA_real_)), "table_annee_et_generation") &&
+           leve_refus(tg(transform(G1, annee = 2000L, z = 1)), "table_colonne_inconnue"))
+x <- refus(tg(setNames(G1, c("age", "sexe", "génération", "qx"))))
+verifier("table_reference, génération (T4) : colonne « génération » accentuée, refus table_colonne_inconnue",
+         identical(x$motif, "table_colonne_inconnue") && identical(x$details$colonne, "génération") &&
+           isTRUE(contient(x, "(admises : age, sexe, qx ou lx, annee ou generation)")))
+for (v in list(1950.5, NA_integer_, factor(1950L), "1950")) {
+  x <- refus(tg(transform(G1, generation = v)))
+  verifier(sprintf("table_reference, génération (T4) : generation %s (%s), refus table_colonne_mal_typee",
+                   format(v), class(v)),
+           identical(x$motif, "table_colonne_mal_typee") && identical(x$details$colonne, "generation") &&
+             isTRUE(contient(x, "generation : entier")))
+}
+# T5 : refus de contenu nommant la génération.
+x <- refus(tg(data.frame(age = c(60L, 62L, 60L, 61L), sexe = "F", generation = c(1951L, 1950L, 1950L, 1951L), qx = 0.01)))
+verifier("table_reference, génération (T5) : trou, table_ages_non_contigus citant sexe, génération et âges ; details",
+         identical(x$motif, "table_ages_non_contigus") &&
+           identical(x$details, list(lignes = 2L, sexes = "F", generations = 1950L, ages = 60L, ages_suivants = 62L,
+                                     lignes_precedentes = 3L)) &&
+           isTRUE(contient(x, "entre les lignes 3 et 2 (F, génération 1950, âges 60 et 62).")))
+# Onze trous reçus en ordre inverse (âges 22, 20, ..., 0) : dix paires citées
+# puis le total ; details complets, lignes_precedentes (ligne qui précède le
+# trou, âge ages) et lignes (ligne qui le suit, âge ages_suivants) en
+# numérotation reçue (visa d'actuary, C1 et C2 ; valeurs calculées à la main).
+x <- refus(tg(data.frame(age = seq(22L, 0L, by = -2L), sexe = "F", generation = 1950L, qx = 0.01)))
+verifier("table_reference, génération (T5) : onze trous, dix paires citées puis le total, details lignes_precedentes et lignes",
+         identical(x$motif, "table_ages_non_contigus") &&
+           identical(x$details, list(lignes = 11:1, sexes = rep("F", 11L), generations = rep(1950L, 11L),
+                                     ages = seq(0L, 20L, by = 2L), ages_suivants = seq(2L, 22L, by = 2L),
+                                     lignes_precedentes = 12:2)) &&
+           isTRUE(contient(x, "entre les lignes 12 et 11 (F, génération 1950, âges 0 et 2), 11 et 10",
+                           "3 et 2 (F, génération 1950, âges 18 et 20) … (11 paires en tout ; liste complète dans les détails du refus).")) &&
+           !grepl("âges 20 et 22", conditionMessage(x), fixed = TRUE))
+x <- refus(tg(data.frame(age = c(60L, 61L, 60L), sexe = "F", generation = 1950L, qx = 0.01)))
+verifier("table_reference, génération (T5) : doublon, table_age_double « au sein d'un même sexe et d'une même génération »",
+         identical(x$motif, "table_age_double") && identical(x$details, list(lignes = 3L)) &&
+           isTRUE(contient(x, "au sein d'un même sexe et d'une même génération, lignes 3.")))
+x <- refus(tl(lx_df(rep(0:2, 2), c(10, 11, 5, 10, 9, 12), sexe = "H", generation = rep(c(1950L, 1951L), each = 3L))))
+verifier("table_reference, génération (T5) : hausses dans deux générations, paires citées avec leur génération, aucune paire entre générations",
+         identical(x$motif, "table_lx_non_decroissants") &&
+           identical(x$details, list(sexes = c("H", "H"), generations = c(1950L, 1951L), ages = c(0L, 1L),
+                                     lx = c(10, 9), lx_suivants = c(11, 12), lignes = c(1L, 5L), lignes_suivantes = c(2L, 6L))) &&
+           isTRUE(contient(x, "2 paire(s)", "H, génération 1950, âges 0 et 1 (l_x = 10 puis 11) ; H, génération 1951, âges 1 et 2 (l_x = 9 puis 12)")))
+x <- refus(tl(lx_df(0:22, rep(c(10, 20), length.out = 23), generation = 1960L)))
+verifier("table_reference, génération (T5) : onze hausses, dix citées puis le total, liste complète dans details",
+         identical(x$motif, "table_lx_non_decroissants") && identical(x$details$ages, seq(0L, 20L, by = 2L)) &&
+           identical(x$details$generations, rep(1960L, 11L)) && !("annees" %in% names(x$details)) &&
+           isTRUE(contient(x, "11 paire(s)", "ensemble, génération 1960, âges 18 et 19",
+                           "… (11 paires en tout ; liste complète dans les détails du refus)")) &&
+           !grepl("âges 20 et 21", conditionMessage(x), fixed = TRUE))
+x <- refus(tl(lx_df(c(0L, 1L, 5L), c(10, 9, 8), sexe = "H", generation = c(1950L, 1950L, 1951L))))
+verifier("table_reference, génération (T5) : une génération à un seul âge, table_lx_age_unique",
+         identical(x$motif, "table_lx_age_unique") &&
+           identical(x$details, list(sexes = "H", generations = 1951L, ages = 5L, lignes = 3L)) &&
+           isTRUE(contient(x, "un seul âge pour H, génération 1951 (âge 5)", "par sexe (et par année ou par génération).")))
+x <- refus(tl(lx_df(c(0:2, 0:1), c(10, 0, 0, 0, 0), sexe = "H", generation = rep(c(1950L, 1951L), c(3L, 2L)))))
+verifier("table_reference, génération (T5) : 1950 close par deux zéros admise, 1951 à premier âge nul, table_lx_nul sur 1951 seule",
+         identical(x$motif, "table_lx_nul") &&
+           identical(x$details, list(sexes = "H", generations = 1951L, ages = 0L, lignes = 4L)) &&
+           isTRUE(contient(x, "H, génération 1951, âge 0", "(et d'une année ou d'une génération)")))
+x <- refus(tl(lx_df(0:2, c(10, NA, 5), sexe = "F", generation = 1950L)))
+verifier("table_reference, génération (T5) : l_x manquant, table_lx_non_fini",
+         identical(x$motif, "table_lx_non_fini") &&
+           identical(x$details, list(lignes = 2L, ages = 1L, sexes = "F", generations = 1950L)) &&
+           isTRUE(contient(x, "aux lignes 2 (F, génération 1950, âge 1)")))
+x <- refus(tl(lx_df(0:2, c(10, 5, -1), sexe = "F", generation = 1950L)))
+verifier("table_reference, génération (T5) : l_x négatif, table_lx_negatif",
+         identical(x$motif, "table_lx_negatif") &&
+           identical(x$details, list(lignes = 3L, ages = 2L, sexes = "F", generations = 1950L)) &&
+           isTRUE(contient(x, "aux lignes 3 (F, génération 1950, âge 2)")))
+x <- refus(tg(data.frame(age = 0:2, sexe = "ensemble", generation = 2000L, qx = c(0.01, 1.5, 0.02))))
+verifier("table_reference, génération (T5) : q_x hors de [0, 1], table_qx_hors_bornes",
+         identical(x$motif, "table_qx_hors_bornes") &&
+           identical(x$details, list(lignes = 2L, ages = 1L, sexes = "ensemble", generations = 2000L)) &&
+           isTRUE(contient(x, "aux lignes 2 (ensemble, génération 2000, âge 1)")))
+x <- refus(tg(data.frame(age = 0L, sexe = c("F", "ensemble", "H", "H"), generation = c(1950L, 1950L, 1951L, 1952L), qx = 0.01)))
+verifier("table_reference, génération (T5) : ensemble et F dans la même génération, table_sexes_melanges « (générations 1950) »",
+         identical(x$motif, "table_sexes_melanges") && identical(x$details, list(generations = 1950L)) &&
+           isTRUE(contient(x, "coexiste avec H ou F (générations 1950).")))
+# T6 : générations extrêmes adjacentes (aucune différence d'entiers calculée).
+M <- .Machine$integer.max
+t <- tg(data.frame(age = c(0L, 1L, 0L, 1L), sexe = "H", generation = c(M, M, -M, -M), qx = c(0.1, 0.2, 0.3, 0.4)))
+t6 <- tl(lx_df(c(0L, 1L, 0L, 1L), c(8, 6, 4, 1), sexe = "H", generation = c(M, M, -M, -M)))
+verifier("table_reference, génération (T6) : générations ±.Machine$integer.max, aucun débordement, deux groupes distincts",
+         identical(t$generation, c(-M, -M, M, M)) && identical(t$qx, c(0.3, 0.4, 0.1, 0.2)) &&
+           identical(t6$generation, c(-M, M)) && identical(t6$qx, c(0.75, 0.25)))
+# generation hors de la plage des integer de R (double entier) : refusée
+# comme mal typée, jamais convertie en NA (ADR 0019, point 1.1 ; constat
+# d'audit) ; la borne elle-même, en double, est admise.
+for (v in list(3e9, -3e9, -2147483648)) {
+  x <- refus(tg(data.frame(age = 0:1, sexe = "H", qx = 0.1, generation = v)))
+  verifier(sprintf("table_reference, génération : generation = %.0f (double hors des integer), refus table_colonne_mal_typee", v),
+           identical(x$motif, "table_colonne_mal_typee") && identical(x$details, list(colonne = "generation")))
+}
+verifier("table_reference, génération : generation = 2147483647 (double, borne des integer) admise, rendue integer",
+         identical(tg(data.frame(age = 0:1, sexe = "H", qx = 0.1, generation = 2147483647))$generation, rep(M, 2L)))
+# T7 : details des refus touchés, tables sans axe et à annee : inchangés.
+T7 <- list(
+  qx_hors_0 = list(refus(tr(data.frame(age = 0:2, sexe = "ensemble", qx = c(0.01, -0.001, 0.02)))),
+                   list(lignes = 2L, ages = 1L, sexes = "ensemble", annees = NULL)),
+  lx_non_fini_0 = list(refus(tl(lx_df(0:2, c(10, NA, 5)))), list(lignes = 2L, ages = 1L, sexes = "ensemble", annees = NULL)),
+  lx_negatif_an = list(refus(tl(lx_df(0:2, c(10, 5, -1), sexe = "F", annee = 2000L))),
+                       list(lignes = 3L, ages = 2L, sexes = "F", annees = 2000L)),
+  melange_0 = list(refus(tr(data.frame(age = 0L, sexe = c("H", "ensemble"), qx = 0.01))), list(annees = NULL)),
+  melange_an = list(refus(tr(data.frame(age = 0L, sexe = c("H", "ensemble"), qx = 0.01, annee = 2020L))), list(annees = 2020L)),
+  double_an = list(refus(tr(data.frame(age = c(0L, 0L), sexe = "H", qx = 0.01, annee = 2020L))), list(lignes = 2L)),
+  unique_0 = list(refus(tl(lx_df(c(60:62, 70L), c(100, 90, 80, 50), sexe = c("H", "H", "H", "F")))),
+                  list(sexes = "F", annees = NULL, ages = 70L, lignes = 4L)),
+  non_decr_0 = list(refus(tl(lx_df(0:2, c(10, 11, 5)))),
+                    list(sexes = "ensemble", annees = NULL, ages = 0L, lx = 10, lx_suivants = 11, lignes = 1L,
+                         lignes_suivantes = 2L)),
+  non_decr_an = list(refus(tl(lx_df(c(0:2, 0:2), c(10, 11, 5, 10, 9, 8), sexe = "H", annee = rep(c(1950L, 1951L), each = 3)))),
+                     list(sexes = "H", annees = 1950L, ages = 0L, lx = 10, lx_suivants = 11, lignes = 1L,
+                          lignes_suivantes = 2L)),
+  nul_an = list(refus(tl(lx_df(0:1, c(0, 0), sexe = "F", annee = 1990L))),
+                list(sexes = "F", annees = 1990L, ages = 0L, lignes = 1L)),
+  inconnue = list(refus(tr(transform(TR, foo = 1))), list(colonne = "foo")),
+  mal_typee = list(refus(tr(transform(TR, annee = 2020.5))), list(colonne = "annee")))
+for (n in names(T7))
+  verifier(sprintf("table_reference, génération (T7) : details du refus %s (table sans axe ou à annee) inchangés", n),
+           !is.null(T7[[n]][[1L]]) && identical(T7[[n]][[1L]]$details, T7[[n]][[2L]]))
 
 # --- cas limites ----------------------------------------------------------------
 
