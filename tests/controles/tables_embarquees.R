@@ -477,6 +477,9 @@ preparer_temoin <- function(racine, arbre, empreintes, decl) {
          sprintf("  nom = %s,", q(c(decl$nom, vapply(ESSAIS, `[[`, "", "nom")))),
          sprintf("  identifiant = %s,", q(c(decl$identifiant, vapply(ESSAIS, `[[`, "", "identifiant")))),
          sprintf("  sexe = %s,", q(c(decl$sexe, vapply(ESSAIS, `[[`, "", "sexe")))),
+         # Format déclaré (ADR 0019, point 5.1), sans valeur par défaut : les
+         # tables d'essai sont au format 1.
+         sprintf("  format = c(%s),", paste0(c(decl$format, rep(1L, length(ESSAIS))), "L", collapse = ", ")),
          "  stringsAsFactors = FALSE)", s[-seq_len(fin)])
   writeLines(enc2utf8(s), f, useBytes = TRUE)
   for (k in seq_along(ESSAIS)) {

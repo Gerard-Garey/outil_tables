@@ -385,7 +385,7 @@ CLE_ESSAI <- "etapes/essai/cle"
 # Contenu injecté (forme de TABLES_EMBARQUEES, ADR 0018, point 1.4) : une
 # table en l_x, construite par table_du_catalogue() ; la discordante change
 # un l_x d'une unité.
-contenu_e <- function(lx = c(1000, 990, 979, 967)) list(TABLE_E = list(identifiant = "table_e", sexe = "H",
+contenu_e <- function(lx = c(1000, 990, 979, 967)) list(TABLE_E = list(identifiant = "table_e", sexe = "H", format = 1L,
   lignes = c("age,lx", paste0(60:63, ",", lx))))
 CAT_E <- contenu_e()
 CAT_VIDE <- structure(list(), names = character(0))
@@ -479,7 +479,7 @@ verifier("D injection : table embarquee dont le contenu au catalogue est refusé
   if (isTRUE(ok) && !identical(r$details$ages, 61L)) "details$ages" else ok
 })
 verifier("D injection : table embarquee dont le contenu au catalogue est illisible -> table_embarquee_illisible (module donnees)", {
-  cat_ <- list(TABLE_E = list(identifiant = "table_e", sexe = "H", lignes = NULL))
+  cat_ <- list(TABLE_E = list(identifiant = "table_e", sexe = "H", format = 1L, lignes = NULL))
   controle_refus(refus_de(controler_tables_reference(list(t1 = T_EMB), PLAN_T1, CLE_ESSAI, cat_)), "donnees",
                  "table_embarquee_illisible", contient = "fichier inst/extdata/tables/table_e.csv non lu")
 })

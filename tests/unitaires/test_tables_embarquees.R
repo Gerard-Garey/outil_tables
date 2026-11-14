@@ -44,21 +44,24 @@ controle_refus <- function(r, module, motif, contient = character(0), details = 
 }
 
 # Contenu injecté, forme de TABLES_EMBARQUEES (ADR 0018, point 1.2).
-element <- function(lignes, identifiant = "essai", sexe = "ensemble") list(identifiant = identifiant, sexe = sexe, lignes = lignes)
+element <- function(lignes, identifiant = "essai", sexe = "ensemble", format = 1L)
+  list(identifiant = identifiant, sexe = sexe, format = format, lignes = lignes)
 lignes_lx <- function(age, lx) c("age,lx", sprintf("%d,%d", as.integer(age), as.integer(lx)))
 CAT <- list(ADMISE = element(lignes_lx(0:3, c(100000, 99129, 99057, 99010)), "admise", "H"),
             REFUSEE = element(lignes_lx(9:13, c(99500, 99478, 99647, 99456, 99430)), "refusee", "F"))
 
 # --- déclaration et lecture à l'installation (points 1.1 et 1.2) ---------------------
 
-verifier("déclaration : data.frame nu nom, identifiant, sexe (character) ; noms et identifiants uniques ; identifiant [a-z0-9_-]+ ; sexe dans SEXES_TABLE (valeur calculée à la main)", {
-  identical(names(DECLARATIONS), c("nom", "identifiant", "sexe")) && identical(class(DECLARATIONS), "data.frame") &&
-    all(vapply(DECLARATIONS, is.character, NA)) && !anyDuplicated(DECLARATIONS$nom) &&
+verifier("déclaration : data.frame nu nom, identifiant, sexe (character), format (integer 1 ou 2, ADR 0019, point 5.1) ; noms et identifiants uniques ; identifiant [a-z0-9_-]+ ; sexe dans SEXES_TABLE (valeur calculée à la main)", {
+  identical(names(DECLARATIONS), c("nom", "identifiant", "sexe", "format")) && identical(class(DECLARATIONS), "data.frame") &&
+    all(vapply(DECLARATIONS[c("nom", "identifiant", "sexe")], is.character, NA)) && is.integer(DECLARATIONS$format) &&
+    all(DECLARATIONS$format %in% 1:2) && !anyDuplicated(DECLARATIONS$nom) &&
     !anyDuplicated(DECLARATIONS$identifiant) && all(grepl("^[a-z0-9_-]+$", DECLARATIONS$identifiant)) &&
     all(DECLARATIONS$sexe %in% tablexp:::SEXES_TABLE)
 })
-verifier("TABLES_EMBARQUEES : une entrée par table déclarée, dans l'ordre ; identifiant et sexe de la déclaration ; lignes lues (non NULL) à l'installation", {
+verifier("TABLES_EMBARQUEES : une entrée par table déclarée, dans l'ordre ; identifiant, sexe et format de la déclaration ; lignes lues (non NULL) à l'installation", {
   identical(names(TABLES_EMBARQUEES), DECLARATIONS$nom) &&
+    identical(unname(vapply(TABLES_EMBARQUEES, function(e) e$format, 0L)), DECLARATIONS$format) &&
     identical(unname(vapply(TABLES_EMBARQUEES, function(e) e$identifiant, "")), DECLARATIONS$identifiant) &&
     identical(unname(vapply(TABLES_EMBARQUEES, function(e) e$sexe, "")), DECLARATIONS$sexe) &&
     all(vapply(TABLES_EMBARQUEES, function(e) is.character(e$lignes), NA))
@@ -69,14 +72,15 @@ verifier("lire_tables_embarquees() : lignes du fichier telles quelles (sans anal
   r <- tempfile("racine_"); dir.create(file.path(r, "inst", "extdata", "tables"), recursive = TRUE)
   on.exit(unlink(r, recursive = TRUE))
   writeLines(c("age,lx", "0,10", "1;x"), file.path(r, "inst", "extdata", "tables", "a.csv"))
-  d <- data.frame(nom = c("A", "B"), identifiant = c("a", "b"), sexe = c("H", "F"), stringsAsFactors = FALSE)
+  d <- data.frame(nom = c("A", "B"), identifiant = c("a", "b"), sexe = c("H", "F"), format = c(1L, 2L),
+                  stringsAsFactors = FALSE)
   sans <- lire_tables_embarquees(r, d)
   writeLines("Package: autre", file.path(r, "DESCRIPTION"))
   autre <- lire_tables_embarquees(r, d)
   writeLines("Package: tablexp", file.path(r, "DESCRIPTION"))
   avec <- lire_tables_embarquees(r, d)
-  identical(avec, list(A = list(identifiant = "a", sexe = "H", lignes = c("age,lx", "0,10", "1;x")),
-                       B = list(identifiant = "b", sexe = "F", lignes = NULL))) &&
+  identical(avec, list(A = list(identifiant = "a", sexe = "H", format = 1L, lignes = c("age,lx", "0,10", "1;x")),
+                       B = list(identifiant = "b", sexe = "F", format = 2L, lignes = NULL))) &&
     is.null(sans$A$lignes) && is.null(autre$A$lignes)
 })
 
@@ -152,6 +156,90 @@ verifier("table_du_catalogue() : trois paires (10-11, 23-24, 61-62), toutes cit�
 verifier("table_embarquee() : signature (nom) ; nom absent du catalogue installé -> table_embarquee_absente",
          identical(names(formals(table_embarquee)), "nom") &&
            identical(refus_de(table_embarquee("TABLE INCONNUE"))$motif, "table_embarquee_absente"))
+
+# --- format 2 : grille âge × génération (ADR 0019, point 5 ; #272) ------------------------
+
+# Contenus forgés (aucune table de génération embarquée à ce commit). Grille G :
+# 1950 de l'âge 2 à l'âge 3 (« - » en tête, et en queue à l'âge 4) ; 1951 de
+# 1 à 2 (« - » en tête et en queue) ; 1952 de 0 à 4, close par un l_x nul
+# imprimé « 0 » (q_3 = 1, ADR 0019, point 4.2). Valeurs calculées à la main.
+G <- c("age,1950,1951,1952", "0,-,-,1000", "1,-,900,990", "2,800,850,980", "3,700,-,970", "4,-,-,0")
+el2 <- function(lignes) element(lignes, "g", "F", 2L)
+illisible2 <- function(lignes, ligne, fragments, generation = NA_integer_, lu = NULL)
+  controle_refus(refus_de(table_du_catalogue("G", list(G = el2(lignes)))), "donnees", "table_embarquee_illisible",
+                 c("Table embarquée « G » : fichier inst/extdata/tables/g.csv, ligne", "pas au format 2 des tables embarquées",
+                   fragments),
+                 c(list(nom = "G", fichier = "inst/extdata/tables/g.csv", ligne = ligne, generation = generation),
+                   if (!is.null(lu)) list(lu = lu)))
+verifier("format 2 : contenu injecté -> objet identical() à table_reference(age, sexe, generation, lx) appelé à la main ; « - » en tête et en queue sans ligne, « 0 » terminal donnant q = 1 (valeurs calculées à la main)", {
+  a <- table_du_catalogue("G", list(G = el2(G)))
+  m <- table_reference(data.frame(age = c(2L, 3L, 1L, 2L, 0:4), sexe = "F",
+                                  generation = rep(c(1950L, 1951L, 1952L), c(2L, 2L, 5L)),
+                                  lx = c(800, 700, 900, 850, 1000, 990, 980, 970, 0), stringsAsFactors = FALSE),
+                       "G", "embarquee", "inst/extdata/tables/g.provenance.dcf", forme_origine = "lx")
+  identical(a, m) && identical(a$generation, c(1950L, 1951L, 1952L, 1952L, 1952L, 1952L)) &&
+    identical(a$age, c(2L, 1L, 0L, 1L, 2L, 3L)) &&
+    identical(a$qx, c((800 - 700) / 800, (900 - 850) / 900, (1000 - 990) / 1000, (990 - 980) / 990, (980 - 970) / 980, 1))
+})
+verifier("format 2 : ligne sans valeur en fin de grille refusée (raison « ligne sans valeur », ligne citée) ; le même contenu sans elle est admis (visa d'actuary, question 5, conditions 1 et 3)",
+         isTRUE(illisible2(c(G, "5,-,-,-"), 7L, "ligne 7, ligne sans valeur (âge 5 :", lu = "5,-,-,-")) &&
+           inherits(table_du_catalogue("G", list(G = el2(G))), "table_reference"))
+verifier("format 2 : ligne sans valeur en tête de grille refusée, ligne 2",
+         illisible2(c(G[1L], "0,-,-,-", G[3:6]), 2L, "ligne 2, ligne sans valeur (âge 0 :"))
+verifier("format 2 : ligne sans valeur au milieu de la grille refusée, ligne 4 (avant tout contrôle de contiguïté)",
+         illisible2(c(G[1:3], "2,-,-,-", G[5:6]), 4L, "ligne 4, ligne sans valeur (âge 2 :"))
+verifier("format 2 : génération sans aucune valeur refusée, génération citée, ligne 1, details$generation",
+         illisible2(c("age,1950,1951", "0,10,-", "1,9,-"), 1L, "ligne 1, génération 1951 sans valeur", 1951L))
+verifier("format 2 : « - » au milieu d'une génération -> table_ages_non_contigus de table_reference() (sexe, génération et âges cités), non table_embarquee_illisible", {
+  r <- refus_de(table_du_catalogue("G", list(G = el2(c(G[1:2], "1,-,900,-", G[4:6])))))
+  controle_refus(r, "donnees", "table_ages_non_contigus", "(F, génération 1952, âges 0 et 2)",
+                 list(sexes = "F", generations = 1952L, ages = 0L, ages_suivants = 2L))
+})
+verifier("format 2 : hausse d'un l_x -> table_lx_non_decroissants de table_reference(), sans enveloppe", {
+  r <- refus_de(table_du_catalogue("G", list(G = el2(c(G[1:3], "2,800,950,980", G[5:6])))))
+  controle_refus(r, "donnees", "table_lx_non_decroissants", "F, génération 1951, âges 1 et 2 (l_x = 900 puis 950)")
+})
+CELLULES_MAL_FORMEES <- list(c("tiret demi-cadratin U+2013", "\u2013"), c("signe moins U+2212", "\u2212"),
+                             c("séparateur de milliers", "100 000"), c("zéro de tête", "0100"), c("décimale", "1.5"),
+                             c("cellule vide", ""), c("double zéro", "00"), c("moins zéro", "-0"), c("plus zéro", "+0"))
+for (cas in CELLULES_MAL_FORMEES) {
+  cellule <- cas[2L]
+  verifier(sprintf("format 2 : cellule mal formée (%s) dans la génération 1951 -> table_embarquee_illisible, ligne 3, génération citée et en details", cas[1L]),
+           illisible2(c(G[1:2], paste0("1,-,", cellule, ",990"), G[4:6]), 3L,
+                      "cellule de la génération 1951 mal formée (l_x entier en chiffres seuls, ou « - »)", 1951L))
+}
+verifier("format 2 : cellule vide finale (« 3,700,-, ») gardée par le découpage, refusée, génération 1952 citée",
+         illisible2(c(G[1:4], "3,700,-,", G[6L]), 5L, "ligne « 3,700,-, », cellule de la génération 1952 mal formée", 1952L))
+verifier("format 2 : nombre de cellules faux (deux au lieu de trois ; quatre au lieu de trois)",
+         isTRUE(illisible2(c(G[1:2], "1,-,900", G[4:6]), 3L, "ligne « 1,-,900 » à 2 cellule(s) de valeurs au lieu de 3")) &&
+           isTRUE(illisible2(c(G[1:2], "1,-,900,990,5", G[4:6]), 3L, "à 4 cellule(s) de valeurs au lieu de 3")))
+verifier("format 2 : âge mal formé, âges non consécutifs",
+         isTRUE(illisible2(c(G[1:2], "01,-,900,990", G[4:6]), 3L, "ligne « 01,-,900,990 » mal formée (âge)")) &&
+           isTRUE(illisible2(c(G[1:2], G[4:6]), 3L, "ligne 3, âge 2 hors de la suite croissante et consécutive commencée à l'âge 0")))
+CAS_EN_TETE_2 <- list(
+  list("en-tête du format 1 (format déclaré 2)", c("age,lx", "0,10", "1,9"), "en-tête « age,lx » au lieu de « age,<g_1>,…,<g_n> »"),
+  list("séparateur point-virgule", c("age;1950", "0;10"), "en-tête « age;1950 » au lieu de"),
+  list("sans génération", c("age", "0"), "en-tête « age » au lieu de"),
+  list("génération accentuée en tête (« âge »)", c("âge,1950", "0,10"), "au lieu de « age,<g_1>,…,<g_n> »"),
+  list("générations non consécutives", c("age,1950,1952", "0,10,10"), "génération 1952 hors de la suite croissante et consécutive commencée à la génération 1950"),
+  list("générations décroissantes", c("age,1951,1950", "0,10,10"), "génération 1950 hors de la suite"),
+  list("génération au-delà des entiers R", c("age,2147483648", "0,10"), "génération « 2147483648 » supérieure au plus grand entier du moteur (2147483647)"))
+for (cas in CAS_EN_TETE_2)
+  verifier(sprintf("format 2 : %s -> table_embarquee_illisible, ligne 1", cas[[1L]]), illisible2(cas[[2L]], 1L, cas[[3L]]))
+verifier("format 2 : fichier vide (ligne 1) ; en-tête seul (ligne 2)",
+         isTRUE(illisible2(character(0), 1L, "fichier vide, sans en-tête « age,<g_1>,…,<g_n> »")) &&
+           isTRUE(illisible2("age,1950", 2L, "aucune ligne de valeurs après l'en-tête")))
+verifier("format déclaré 1 pour un contenu au format 2 : refus du format 1, en-tête cité, message du format 1",
+         controle_refus(refus_de(table_du_catalogue("G", list(G = element(G, "g", "F", 1L)))), "donnees",
+                        "table_embarquee_illisible", c("ligne 1, en-tête « age,1950,1951,1952 » au lieu de « age,lx »",
+                                                       "pas au format des tables embarquées (en-tête « age,lx »"),
+                        list(ligne = 1L, lu = "age,1950,1951,1952")))
+for (f in list(NULL, 3L, 1, NA_integer_, c(1L, 2L)))
+  verifier(sprintf("format déclaré %s : refus table_embarquee_illisible, aucun format par défaut", paste(deparse(f), collapse = "")),
+           controle_refus(refus_de(table_du_catalogue("X", list(X = element(lignes_lx(0:1, c(10, 9)), format = f)))),
+                          "donnees", "table_embarquee_illisible",
+                          c("Table embarquée « X » : format déclaré", "au lieu de 1 ou 2 (entier)"),
+                          list(nom = "X", fichier = "inst/extdata/tables/essai.csv", ligne = NA_integer_, lu = NULL)))
 
 # --- nom réservé (point 7.4 ; M447, option (a)) -----------------------------------------
 
