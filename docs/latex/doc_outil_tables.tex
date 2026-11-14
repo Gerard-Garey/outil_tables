@@ -1641,8 +1641,12 @@ de segments non ASCII (valeurs natives non marquées, marquées latin-1,
 marquées UTF-8, et mêlées~: «~ÿ~» natif et «~€~» UTF-8), construits à
 partir de leurs octets avec un marquage explicite~; il écrit la fiche, le
 plan et le rapport figé de chaque construction et, pour chaque jeu, l'ordre
-des segments. Les textes (trois par plan de référence, quatre par jeu~;
-leur nombre est écrit par la sortie du contrôle) sont comparés octet à octet entre les deux sessions, sans écart admis~; dans
+des segments~; il appelle enfin \code{decalages\_embarques()}, vérifie que
+les noms sont marqués UTF-8 et portent les octets attendus, et écrit les
+bandes et les empreintes (issue~\#273~: avant le commit \code{cbed325},
+l'appel s'arrêtait sous la locale latin-1, section~\ref{sec:table-reference}).
+Les textes (trois par plan de référence, quatre par jeu, un pour les
+décalages~; leur nombre est écrit par la sortie du contrôle) sont comparés octet à octet entre les deux sessions, sans écart admis~; dans
 chaque session, l'ordre des segments est en outre comparé à un ordre de
 référence par octets UTF-8, calculé par le script hors du code testé. Il est
 l'étape «~Locale latin-1 (installation et exécution)~» du job «~Tests
@@ -3534,8 +3538,10 @@ temporaires, l'une sous \code{fr\_FR.ISO-8859-1}, générée par
 sous la première locale UTF-8 disponible, et exécuté sous la locale de son
 installation, vérifiée d'abord~; pour R1 à R17 et quatre jeux de segments non
 ASCII (natifs, latin-1, UTF-8, mêlés), fiche, plan et rapport figé écrits,
-ordre des segments écrit et comparé à un ordre par octets UTF-8, puis
-textes (trois par plan, quatre par jeu) comparés octet à octet entre latin-1 et UTF-8, sans écart admis
+ordre des segments écrit et comparé à un ordre par octets UTF-8~; noms
+de \code{decalages\_embarques()} vérifiés marqués UTF-8 aux octets
+attendus, bandes et empreintes écrites (issue~\#273)~; puis
+textes (trois par plan, quatre par jeu, un pour les décalages) comparés octet à octet entre latin-1 et UTF-8, sans écart admis
 (section~\ref{sec:harnais})~; étape «~Locale latin-1 (installation et
 exécution)~» du job «~Tests (R 4.3.3)~», hors liste des batteries &
 ADR 0007, point 9.3~; issues~\#106 et~\#115 \\
@@ -7728,7 +7734,12 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         \code{decalages\_colonne\_inconnue} (\code{details\$colonne})~;
         \code{decalages\_colonne\_mal\_typee} (\code{age\_min}~: entier
         $\ge 0$ sans valeur manquante~; \code{age\_max}~: entier $\ge 0$,
-        manquant admis~; \code{decalage}~: entier relatif sans valeur
+        manquant admis, une colonne logique entièrement manquante, sans
+        classe ni dimension (le \code{NA} nu d'un \code{data.frame} écrit à
+        la main), étant lue en \code{NA\_integer\_}, tout autre logique
+        restant refusé sous ce motif~; plusieurs bandes à \code{age\_max}
+        ainsi manquant tombent sous \code{decalages\_bande\_ouverte}~;
+        \code{decalage}~: entier relatif sans valeur
         manquante~; valeurs au plus $2^{31} - 1$ en valeur absolue)~;
         \code{decalages\_bande\_inversee} (âge minimal supérieur à l'âge
         maximal)~; \code{decalages\_bande\_ouverte} (aucune bande ouverte,
@@ -7789,12 +7800,25 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         réserve des noms de tables (\emph{constat de mesure} du
         14/11/2026). Le nom au catalogue, «~Décalages d'âge TF 00-02~» ou
         «~Décalages d'âge TH 00-02~» (apostrophe ASCII, nom comparé à
-        l'identique), n'est pas ASCII~; il est marqué UTF-8
-        dans la déclaration (fonction de base \code{iconv()}, qui garde les
-        octets), faute de quoi, installé puis lu hors d'une locale UTF-8, il
-        se lisait en octets échappés (contrôle~(g) en échec sous
-        \code{LC\_ALL=C}, \emph{constat} rapporté par le commit
-        \code{adc9a9e}).
+        l'identique), n'est pas ASCII. Écrit en clair dans la déclaration,
+        il prendrait l'encodage de la locale d'installation~: installé puis
+        lu hors d'une locale UTF-8, il se lisait en octets échappés
+        (contrôle~(g) en échec sous \code{LC\_ALL=C}, \emph{constat}
+        rapporté par le commit \code{adc9a9e})~; sous une locale latin-1,
+        \code{R CMD INSTALL} réencode la source, et le marquage par
+        \code{iconv(, "UTF-8", "UTF-8")} alors employé rendait \code{NA},
+        si bien que \code{decalages\_embarques()} s'arrêtait («~nom absent
+        du catalogue~», issue~\#273, commit \code{cbed325}). Le nom s'écrit
+        donc en octets UTF-8 échappés (\code{\textbackslash xc3\textbackslash xa9}
+        pour «~é~»), sur une ligne ASCII que l'installation ne réencode
+        pas, et il est marqué UTF-8 par la fonction de remplacement de
+        base \code{Encoding<-}~: après installation et lecture sous
+        \code{C}, \code{C.UTF-8} et \code{fr\_FR.ISO-8859-1}, il porte les
+        mêmes octets, marqués UTF-8 (\emph{constat} sur la plateforme de
+        mesure, non une propriété démontrée~; garde-fous~: contrôle~(g) de
+        \code{tables\_embarquees.R} pour \code{C} et \code{C.UTF-8},
+        contrôle \code{locale\_latin1.R} pour la locale latin-1,
+        tableau~\ref{tab:scripts-controle}).
       \item \emph{Empreinte et accesseur} (ADR 0019, points~6.4 et~6.5).
         L'empreinte des décalages, calculée par la seule fonction
         \code{empreinte\_decalages()} (module \code{rapport}), est le MD5 du
