@@ -2380,9 +2380,9 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   } else {
     # Table en l_x (#146, § 1.6 à 1.10), par groupe (sexe, axe) dans l'ordre
     # canonique : s vrai si la ligne triée a une suivante dans son groupe
-    # (âge x + 1, les trous étant refusés ci-dessus) ; i : lignes qui donnent
-    # un q_x. Aucun q_x n'enchaîne deux années ou deux générations. Sexes,
-    # valeurs de l'axe et âges cités sont ceux de l'ordre trié
+    # (âge x + 1, les trous étant refusés ci-dessus) ; i : lignes qui ont une
+    # suivante (puis, après les refus, celles qui donnent un q_x). Aucun
+    # q_x n'enchaîne deux années ou deux générations. Sexes, valeurs de l'axe et âges cités sont ceux de l'ordre trié
     # (groupes_cites_table()) ; details en portent les vecteurs complets
     # (details_groupes() : sexes, annees ou generations, ages), lignes dans la
     # numérotation reçue.
@@ -2422,17 +2422,27 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
               c(details_groupes(hausses),
                 list(lx = l[hausses], lx_suivants = l[hausses + 1L], lignes = o[hausses], lignes_suivantes = o[hausses + 1L])))
     }
-    # l_x nul suivi d'un autre âge : q_x = 0 / 0 indéfini (-0 compris, -0 == 0) ;
-    # un l_x nul au dernier âge du groupe est admis.
-    nuls <- which(s & l == 0)
+    # l_x nuls (ADR 0019, point 4.2 ; M465) : après table_lx_negatif et
+    # table_lx_non_decroissants, un l_x nul n'est suivi que de l_x nuls ; le
+    # premier l_x nul d'un groupe le clôt. Refus table_lx_nul pour le seul
+    # groupe dont le premier âge porte l_x = 0 (-0 compris, -0 == 0) : aucun
+    # q_x n'y existe. Les groupes ont tous au moins deux âges
+    # (table_lx_age_unique ci-dessus).
+    nuls <- which(!meme & l == 0)
     if (length(nuls)) {
       k <- utils::head(nuls, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_nul",
-              formuler(paste("Table « %s » : l_x nul suivi d'un autre âge (q_x indéfini) : %s. Seul le dernier âge",
-                             "d'un sexe (et d'une année ou d'une génération) peut porter l_x = 0."), nom_cite,
+              formuler(paste("Table « %s » : l_x nul au premier âge (aucun q_x défini) : %s. Le premier l_x nul d'un",
+                             "sexe (et d'une année ou d'une génération) clôt le groupe et doit suivre un l_x non nul."),
+                       nom_cite,
                        paste(formuler("%s, âge %d", groupes_cites_table(sx[k], axe, an[k]), ag[k]), collapse = " ; ")),
               c(details_groupes(nuls), list(lignes = o[nuls])))
     }
+    # Lignes qui donnent un q_x : celles qui ont une suivante dans leur groupe
+    # et un l_x non nul. L'âge qui précède le premier l_x nul reçoit
+    # (l_x - 0) / l_x = 1 par la formule commune, non posé ; les âges à l_x
+    # nul ne donnent aucune ligne. Sans l_x nul, i est inchangé.
+    i <- which(s & l != 0)
     # Conversion (#146, § 1.7 ; chaque bit en dépend) : soustraction puis
     # division IEC 60559, arrondi au plus près ; jamais 1 - l_{x+1} / l_x
     # (arrondi incorrect pour 41 647 des 100 001 paires mesurées, C8), ni
