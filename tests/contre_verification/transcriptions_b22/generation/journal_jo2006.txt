@@ -1,6 +1,0 @@
-source : jo_2006-08-26_n197_texte11.pdf ; outil : pdftotext version 24.02.0 -bbox
-normalisation : tiret '–' -> '-' : 9639
-tgf05 : lignes sans valeur non écrites au relevé : []
-tgf05 : 12826 cellules comparées, 0 écarts
-tgh05 : lignes sans valeur non écrites au relevé : []
-tgh05 : 12826 cellules comparées, 0 écarts
