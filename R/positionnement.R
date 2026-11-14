@@ -64,9 +64,11 @@ controler_cle_table <- function(table_reference, etape) {
 
 # Contrôles d'entrée avant exécution (avis (0''), M253 ; ADR 0015, point 7.3),
 # dans l'ordre : convention d'âge retenue (convention_validation_non_admise,
-# ou convention_positionnement_non_admise) ; table sans annee
-# (table_annee_non_admise) ; modalités de sexe de la table M(T) mêlant
-# ensemble et H ou F (table_sexes_ambigus) ; table par sexe sans sexe dans la
+# ou convention_positionnement_non_admise) ; table sans axe temporel, lu par
+# axe_temporel_table() (module donnees ; ADR 0019, point 2) : ni annee
+# (table_annee_non_admise), ni generation (table_generation_non_admise) ;
+# modalités de sexe de la table M(T) mêlant ensemble et H ou F
+# (table_sexes_ambigus) ; table par sexe sans sexe dans la
 # segmentation (table_sexe_incompatible) ; chaque sexe de la table couvre
 # plage_ages (plage_ages_hors_table ; les âges d'un sexe sont contigus,
 # contrôlé par table_reference()). `table` : objet table_reference contrôlé
@@ -92,7 +94,8 @@ controler_entrees_validation <- function(table, cle, convention, segmentation, p
                      citer(convention), liste_guillemets(CONVENTIONS_VALIDATION)),
             list(convention = convention, attendu = CONVENTIONS_VALIDATION))
   }
-  if ("annee" %in% names(table))
+  axe <- axe_temporel_table(table)
+  if (identical(axe, "annee"))
     refuser(etape, "table_annee_non_admise",
             if (identical(etape, "validation"))
               formuler(paste("Validation : la table de clé « %s » porte une colonne annee ; cette version ne valide que",
@@ -100,6 +103,16 @@ controler_entrees_validation <- function(table, cle, convention, segmentation, p
             else
               formuler(paste("Positionnement : la table de clé « %s » porte une colonne annee ; cette version ne",
                              "positionne que sur des tables sans année (ADR 0015, point 7.4)."), citer(cle)),
+            list(cle = cle))
+  if (identical(axe, "generation"))
+    refuser(etape, "table_generation_non_admise",
+            if (identical(etape, "validation"))
+              formuler(paste("Validation : la table de clé « %s » est une table de génération (colonne generation) ;",
+                             "cette version ne valide que des tables sans axe temporel (ADR 0019)."), citer(cle))
+            else
+              formuler(paste("Positionnement : la table de clé « %s » est une table de génération (colonne",
+                             "generation) ; cette version ne positionne que sur des tables sans axe temporel",
+                             "(ADR 0019)."), citer(cle)),
             list(cle = cle))
   sexes <- unique(table$sexe)
   if ("ensemble" %in% sexes && length(sexes) > 1L)

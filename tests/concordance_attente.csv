@@ -1,3 +1,5 @@
 type,nom,issue,motif
 entree,fonctions-donnees:groupes_cites_table,#270,aide de citation des refus de table_reference() ; docwriter en fin de branche (règle 9)
 entree,fonctions-donnees:lignes_citees_table,#270,aide de citation des refus de table_reference() ; docwriter en fin de branche (règle 9)
+entree,fonctions-donnees:AXES_TEMPORELS_TABLE,#272,axes temporels des tables de référence (ADR 0019 point 2.1) ; docwriter en fin de branche (règle 9)
+entree,fonctions-donnees:axe_temporel_table,#272,prédicat unique des axes temporels (ADR 0019 point 2.1) ; docwriter en fin de branche (règle 9)

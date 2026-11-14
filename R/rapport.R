@@ -761,15 +761,18 @@ md5_octets <- function(octets) {
 
 # Empreinte d'une table de référence (ADR 0011, annotation du 05/11/2026, (b) ;
 # ADR 0015, point 2.2 ; #73) : MD5 du texte, en forme « empreinte », du
-# data.frame nu (age, sexe, annee si présente, qx ; seuls attributs names,
-# class et row.names automatiques) sous la racine `table_reference`, première
-# ligne REPRESENTATION_TABLE. Aucun tri : `t` est l'objet rendu par
-# table_reference(), dont les lignes sont dans l'ordre canonique. Les
-# métadonnées (nom, statut, source, forme_origine, parametres) n'y entrent pas.
+# data.frame nu (age, sexe, l'axe temporel s'il est présent, annee ou
+# generation sous son nom, lu par axe_temporel_table(), ADR 0019, point 3 ;
+# qx ; seuls attributs names, class et row.names automatiques) sous la racine
+# `table_reference`, première ligne REPRESENTATION_TABLE. Aucun tri : `t` est
+# l'objet rendu par table_reference(), dont les lignes sont dans l'ordre
+# canonique. Les métadonnées (nom, statut, source, forme_origine, parametres)
+# n'y entrent pas.
 # Seule fonction qui calcule cette empreinte.
 empreinte_table <- function(t) {
   d <- data.frame(age = t$age, sexe = t$sexe, stringsAsFactors = FALSE)
-  if ("annee" %in% names(t)) d$annee <- t$annee
+  axe <- axe_temporel_table(t)
+  if (!is.na(axe)) d[[axe]] <- t[[axe]]
   d$qx <- t$qx
   md5_octets(texte_objet(list(table_reference = d), REPRESENTATION_TABLE, character(0), "empreinte"))
 }

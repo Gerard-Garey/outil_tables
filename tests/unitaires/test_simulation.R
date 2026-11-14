@@ -227,6 +227,32 @@ verifier("facteur négatif : refus loi_invalide",
          leve_refus(simuler(loi(f_deces = c(H = 1, F = -1)), PF, PER, GRAINE), "loi_invalide"))
 verifier("table qui n'est pas une table_reference : refus loi_invalide",
          leve_refus(simuler(loi(deces = as.data.frame(GM)), PF, PER, GRAINE), "loi_invalide"))
+# Table de génération (ADR 0019, point 2.3 ; #272) : refus nommé, avant tout
+# tirage ; cas adverse : un objet forgé par structure() à colonne generation
+# (rendu deux lignes par âge avant le prédicat axe_temporel_table()) est
+# refusé, et un objet aux deux colonnes est lu comme une table à annee,
+# jamais comme une table sans axe. Valeurs calculées à la main.
+local({
+  TG <- table_reference(data.frame(age = rep(0:120, 2L), sexe = "ensemble", qx = rep(GM$qx, 2L),
+                                   generation = rep(1950:1951, each = 121L)),
+                        "génération", "importee", "test")
+  verdict <- function(x, fragment)
+    if (is.null(x)) "aucun refus levé" else if (!identical(x$module, "simulation") || !identical(x$motif, "loi_invalide"))
+      sprintf("refus %s/%s", x$module, x$motif) else if (!identical(x$details, list(cause = "deces"))) "details"
+    else if (!grepl(fragment, conditionMessage(x), fixed = TRUE)) sprintf("message : %s", conditionMessage(x)) else TRUE
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r)
+  gen <- "Loi « deces » : table de génération (colonne generation) non prise en charge par le simulateur minimal."
+  verifier("table de génération : refus loi_invalide nommé par simuler_portefeuille(), message de la table de génération",
+           verdict(attrape(simuler(loi(deces = TG), PF, PER, GRAINE)), gen))
+  forge <- structure(data.frame(age = c(0L, 0L), sexe = "H", qx = c(0.01, 0.005), generation = 1950:1951),
+                     class = c("table_reference", "data.frame"))
+  verifier("cas adverse : objet forgé à colonne generation, loi_effective() refuse (plus de lignes en double)",
+           verdict(attrape(loi_effective(list(table = forge, facteurs = c(H = 1, F = 1)), "deces", c("H", "F"))), gen))
+  forge2 <- forge; forge2$annee <- 2000L
+  verifier("cas adverse : objet forgé aux colonnes generation et annee, lu comme table à annee (message inchangé)",
+           verdict(attrape(loi_effective(list(table = forge2, facteurs = c(H = 1, F = 1)), "deces", c("H", "F"))),
+                   "Loi « deces » : table prospective (colonne annee) non prise en charge par le simulateur minimal."))
+})
 # Classe d'encodage bytes de la loi ou de la table d'une transition (#150) :
 # refus loi_invalide, au lieu de l'erreur R « translating strings with "bytes"
 # encoding is not allowed » (inherits() sur la table, names() dans les details

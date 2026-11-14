@@ -2090,29 +2090,50 @@ controler_nom_reserve <- function(nom, statut, reserves = DECLARATIONS_TABLES_EM
   invisible(NULL)
 }
 
+# Axes temporels d'une table de référence (ADR 0019, points 1 et 2) : annee
+# (année calendaire, table prospective) ou generation (année de naissance,
+# table de génération), au plus un par table. axe_temporel_table() est le
+# prédicat unique, lu par les modules qui reçoivent une table (empreinte,
+# forme de l'argument tables_reference, positionnement, validation,
+# cohérence et régularité, simulateur) : l'axe de `t` d'après ses noms de
+# colonnes (attr(t, "names"), qui ne lève pas sur une classe « bytes »),
+# NA_character_ sans axe. Un objet qui porterait les deux colonnes, que
+# table_reference() refuse, est rendu comme une table à annee (premier axe de
+# la constante), jamais comme une table sans axe.
+AXES_TEMPORELS_TABLE <- c("annee", "generation")
+axe_temporel_table <- function(t) {
+  a <- AXES_TEMPORELS_TABLE[AXES_TEMPORELS_TABLE %in% attr(t, "names", exact = TRUE)]
+  if (length(a)) a[1L] else NA_character_
+}
+
 # Citations des refus de table_reference() (#270, point 1 ; #146, § 2.5) :
 # une seule définition du format. groupes_cites_table() cite le groupe de
-# chaque position, sexe et année si `annees` n'est pas NULL (« H »,
-# « H, année 1950 ») ; lignes_citees_table() cite des lignes reçues `k`, au
-# plus NB_LIGNES_CITEES choisies par l'appelant, avec leur groupe et leur âge
-# (« 2 (ensemble, âge 1) », « 2 (H, année 1950, âge 1) »), séparées par des
-# virgules. Aides de message (tests/controles/messages_refus.R, AIDES).
-groupes_cites_table <- function(sexes, annees) {
-  if (is.null(annees)) citer(sexes) else formuler("%s, année %d", citer(sexes), annees)
+# chaque position : sexe, puis la valeur de l'axe `axe` (NA : aucun ; annee ;
+# generation) prise dans `valeurs` (« H », « H, année 1950 »,
+# « F, génération 1950 ») ; lignes_citees_table() cite des lignes reçues `k`,
+# au plus NB_LIGNES_CITEES choisies par l'appelant, avec leur groupe et leur
+# âge (« 2 (ensemble, âge 1) », « 2 (H, année 1950, âge 1) »), séparées par
+# des virgules. Aides de message (tests/controles/messages_refus.R, AIDES).
+groupes_cites_table <- function(sexes, axe, valeurs) {
+  if (is.na(axe)) citer(sexes)
+  else if (axe == "generation") formuler("%s, génération %d", citer(sexes), valeurs)
+  else formuler("%s, année %d", citer(sexes), valeurs)
 }
-lignes_citees_table <- function(k, sexes, annees, ages) {
-  paste(formuler("%d (%s, âge %d)", k, groupes_cites_table(sexes, annees), ages), collapse = ", ")
+lignes_citees_table <- function(k, sexes, axe, valeurs, ages) {
+  paste(formuler("%d (%s, âge %d)", k, groupes_cites_table(sexes, axe, valeurs), ages), collapse = ", ")
 }
 
 # Construit une table de référence (classe S3 `table_reference` sur un
-# data.frame long : age entier, sexe, qx, et annee entier si fournie) et la
-# contrôle ; refuse (module donnees) au lieu de corriger. Lignes rendues dans
-# l'ordre canonique (sexe, annee, age), row.names automatiques. Une table
-# transcrite en l_x (forme_origine = "lx", colonne lx) est convertie ici en
+# data.frame long : age entier, sexe, qx, et l'axe temporel, annee ou
+# generation, entier, s'il est fourni ; ADR 0019, point 1) et la contrôle ;
+# refuse (module donnees) au lieu de corriger. Lignes rendues dans l'ordre
+# canonique (sexe, axe, age), row.names automatiques. Une table transcrite en
+# l_x (forme_origine = "lx", colonne lx) est convertie ici en
 # q_x = (l_x - l_{x+1}) / l_x, sans garder les l_x ; le dernier âge de chaque
-# sexe (et année) ne donne aucune ligne (#146).
-#   x            : data.frame (age, sexe, qx ou lx [, annee]), dont la classe
-#                  ne porte aucune chaîne d'encodage « bytes » (#158) ;
+# sexe (et année ou génération) ne donne aucune ligne (#146).
+#   x            : data.frame (age, sexe, qx ou lx [, annee ou generation]),
+#                  dont la classe ne porte aucune chaîne d'encodage « bytes »
+#                  (#158) ;
 #   nom, source  : chaînes non vides, d'encodage autre que « bytes » (#158 ;
 #                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
@@ -2173,8 +2194,9 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             list(classe = class(x)))
   if (!is.data.frame(x))
     refuser("donnees", "table_mal_formee", formuler("Table « %s » : un data.frame est attendu.", nom_cite))
-  # Colonnes (spécification de #146, § 1.2) : age, sexe, annee facultative, et
-  # exactement une des colonnes qx ou lx ; lx ne se reçoit que sous la forme
+  # Colonnes (spécification de #146, § 1.2 ; ADR 0019, point 1.2) : age, sexe,
+  # au plus un axe temporel (annee ou generation), et exactement une des
+  # colonnes qx ou lx ; lx ne se reçoit que sous la forme
   # d'origine « lx », qx est admise sous l'une ou l'autre (l'objet issu de l_x
   # porte qx, et controler_forme_tables() le reconstruit sous sa forme
   # d'origine, R/construire_table.R).
@@ -2186,12 +2208,25 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             formuler("Table « %s » : colonne(s) manquante(s) %s (une table de référence entre par « qx » ou par « lx »).",
                      nom_cite, liste_guillemets(manquantes)),
             list(colonne = manquantes))
-  en_trop <- setdiff(names(x), c("age", "sexe", "qx", "lx", "annee"))
+  en_trop <- setdiff(names(x), c("age", "sexe", "qx", "lx", AXES_TEMPORELS_TABLE))
   if (length(en_trop))
     refuser("donnees", "table_colonne_inconnue",
-            formuler("Table « %s » : colonne(s) inconnue(s) %s (admises : age, sexe, qx ou lx, annee).",
+            formuler("Table « %s » : colonne(s) inconnue(s) %s (admises : age, sexe, qx ou lx, annee ou generation).",
                      nom_cite, liste_guillemets(en_trop)),
             list(colonne = en_trop))
+  # Un seul axe temporel (ADR 0019, point 1.3) : un seul groupe de conversion
+  # et de contiguïté, aucune convention d'âge devinée entre les deux axes.
+  if (all(AXES_TEMPORELS_TABLE %in% names(x)))
+    refuser("donnees", "table_annee_et_generation",
+            formuler(paste("Table « %s » : colonnes « annee » et « generation » reçues ensemble ; une table de",
+                           "référence a au plus un axe temporel : « annee » (année calendaire, table prospective)",
+                           "ou « generation » (année de naissance, table de génération)."), nom_cite),
+            list(colonnes = c("annee", "generation")))
+  # Axe de la table (prédicat unique) ; élément des details qui porte ses
+  # valeurs : generations pour une table de génération, annees sinon (NULL
+  # sans axe, details inchangés pour les tables sans axe et à annee).
+  axe <- axe_temporel_table(x)
+  nom_axe <- if (identical(axe, "generation")) "generations" else "annees"
   if (a_qx && a_lx)
     refuser("donnees", "table_forme_incoherente",
             formuler("Table « %s » : colonnes « qx » et « lx » reçues ensemble ; une table de référence entre par l'une ou l'autre.",
@@ -2208,10 +2243,17 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     sexe = !type_conforme(x$sexe, "categorie") || anyNA(x$sexe),
     qx = a_qx && !(is.double(x$qx) && !is.object(x$qx)),
     lx = a_lx && !type_conforme(x$lx, "numerique"),
-    annee = "annee" %in% names(x) && (!type_conforme(x$annee, "entier") || anyNA(x$annee)))
+    annee = "annee" %in% names(x) && (!type_conforme(x$annee, "entier") || anyNA(x$annee)),
+    # generation : entier sans NA (ADR 0019, point 1.1), donc dans la plage
+    # des integer de R ; un double entier hors de cette plage deviendrait NA à
+    # la conversion par as.integer(). Borne propre à generation dans cette
+    # pièce (age et annee : défaut hérité, hors de #272).
+    generation = "generation" %in% names(x) && (!type_conforme(x$generation, "entier") || anyNA(x$generation) ||
+                                                   (is.double(x$generation) &&
+                                                      any(abs(x$generation) > .Machine$integer.max))))
   if (any(mal_typees))
     refuser("donnees", "table_colonne_mal_typee",
-            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; sexe : chaîne ; qx : double ; lx : nombre).",
+            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; generation : entier ; sexe : chaîne ; qx : double ; lx : nombre).",
                      nom_cite, liste_guillemets(names(mal_typees)[mal_typees])),
             list(colonne = names(mal_typees)[mal_typees]))
   sexe <- as.character(x$sexe)
@@ -2221,22 +2263,28 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             formuler("Table « %s » : sexe hors de %s aux lignes %s.", nom_cite, liste_guillemets(SEXES_TABLE),
                      paste(utils::head(hors, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = hors))
+  # Valeurs de l'axe (entiers), NULL sans axe.
+  va <- if (is.na(axe)) NULL else as.integer(x[[axe]])
   # « ensemble » (table sans distinction de sexe) ne coexiste pas avec H ou
-  # F, dans toute la table ou, si elle a des années, au sein d'une année.
-  annee0 <- if ("annee" %in% names(x)) as.integer(x$annee) else rep(0L, length(sexe))
+  # F, dans toute la table ou, si elle a un axe, au sein d'une année ou d'une
+  # génération.
+  annee0 <- if (is.null(va)) rep(0L, length(sexe)) else va
   melange <- unique(annee0[annee0 %in% annee0[sexe == "ensemble"] & annee0 %in% annee0[sexe != "ensemble"]])
   if (length(melange))
     refuser("donnees", "table_sexes_melanges",
             formuler("Table « %s » : la modalité « ensemble » coexiste avec H ou F%s.", nom_cite,
-                     if ("annee" %in% names(x)) formuler(" (années %s)", paste(utils::head(melange, NB_LIGNES_CITEES), collapse = ", ")) else ""),
-            list(annees = if ("annee" %in% names(x)) melange else NULL))
+                     if (is.null(va)) ""
+                     else if (axe == "generation")
+                       formuler(" (générations %s)", paste(utils::head(melange, NB_LIGNES_CITEES), collapse = ", "))
+                     else formuler(" (années %s)", paste(utils::head(melange, NB_LIGNES_CITEES), collapse = ", "))),
+            stats::setNames(list(if (is.null(va)) NULL else melange), nom_axe))
   age <- as.integer(x$age)
-  annee <- if ("annee" %in% names(x)) as.integer(x$annee) else NULL
   # Lignes reçues k citées avec leur groupe et leur âge (#146, § 2.5) par
   # lignes_citees_table(), au plus NB_LIGNES_CITEES ; details_lignes() :
-  # lignes, ages, sexes, annees (NULL sans annee), dans la numérotation reçue.
+  # lignes, ages, sexes, annees ou generations (NULL sans axe), dans la
+  # numérotation reçue.
   details_lignes <- function(j)
-    list(lignes = j, ages = age[j], sexes = sexe[j], annees = if (is.null(annee)) NULL else annee[j])
+    stats::setNames(list(j, age[j], sexe[j], if (is.null(va)) NULL else va[j]), c("lignes", "ages", "sexes", nom_axe))
   if (a_qx) {
     non_fini <- which(!is.finite(x$qx))
     if (length(non_fini))
@@ -2249,7 +2297,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
       k <- utils::head(hors_bornes, NB_LIGNES_CITEES)
       refuser("donnees", "table_qx_hors_bornes",
               formuler("Table « %s » : q_x hors de [0, 1] aux lignes %s.", nom_cite,
-                       lignes_citees_table(k, sexe[k], annee[k], age[k])),
+                       lignes_citees_table(k, sexe[k], axe, va[k], age[k])),
               details_lignes(hors_bornes))
     }
   } else {
@@ -2261,7 +2309,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
       k <- utils::head(non_fini, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_non_fini",
               formuler("Table « %s » : l_x manquant ou non fini aux lignes %s.", nom_cite,
-                       lignes_citees_table(k, sexe[k], annee[k], age[k])),
+                       lignes_citees_table(k, sexe[k], axe, va[k], age[k])),
               details_lignes(non_fini))
     }
     negatifs <- which(l0 < 0)
@@ -2269,23 +2317,25 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
       k <- utils::head(negatifs, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_negatif",
               formuler("Table « %s » : l_x négatif aux lignes %s.", nom_cite,
-                       lignes_citees_table(k, sexe[k], annee[k], age[k])),
+                       lignes_citees_table(k, sexe[k], axe, va[k], age[k])),
               details_lignes(negatifs))
     }
   }
-  # Ordre canonique (ADR 0015, point 2.1 ; M235) : rang du sexe dans
-  # SEXES_TABLE (par match(), jamais par un tri de chaînes), puis annee si
-  # présente, puis age ; tri radix stable, indépendant de la locale. L'objet
-  # rendu et son empreinte ne dépendent plus de l'ordre reçu (aucun refus
-  # d'âges non croissants). Doublons et trous s'évaluent sur l'ordre trié ;
-  # les lignes sont citées dans la numérotation reçue (o[k]).
+  # Ordre canonique (ADR 0015, point 2.1 ; M235 ; ADR 0019, point 1.4) : rang
+  # du sexe dans SEXES_TABLE (par match(), jamais par un tri de chaînes), puis
+  # l'axe (annee ou generation) s'il est présent, puis age ; tri radix stable,
+  # indépendant de la locale. L'objet rendu et son empreinte ne dépendent plus
+  # de l'ordre reçu (aucun refus d'âges non croissants). Doublons et trous
+  # s'évaluent sur l'ordre trié ; les lignes sont citées dans la numérotation
+  # reçue (o[k]).
   rang <- match(sexe, SEXES_TABLE)
-  o <- if (is.null(annee)) order(rang, age, method = "radix") else order(rang, annee, age, method = "radix")
+  o <- if (is.null(va)) order(rang, age, method = "radix") else order(rang, va, age, method = "radix")
   n <- length(o)
-  # Même groupe (sexe, annee) que la ligne triée précédente ; comparaison et
-  # non diff() : une différence d'années extrêmes déborderait les integer.
+  # Même groupe (sexe, axe) que la ligne triée précédente ; comparaison et
+  # non diff() : une différence d'années ou de générations extrêmes
+  # déborderait les integer.
   meme <- c(FALSE, rang[o][-1L] == rang[o][-n])
-  if (!is.null(annee)) meme <- meme & c(FALSE, annee[o][-1L] == annee[o][-n])
+  if (!is.null(va)) meme <- meme & c(FALSE, va[o][-1L] == va[o][-n])
   pas <- c(NA_integer_, diff(age[o]))  # âges >= 0 : aucun débordement
   # Ligne reçue la plus tardive de chaque doublon (tri stable), en
   # numérotation reçue croissante.
@@ -2293,44 +2343,62 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (length(doublons))
     refuser("donnees", "table_age_double",
             formuler("Table « %s » : âge en double au sein d'un même sexe%s, lignes %s.", nom_cite,
-                     if (is.null(annee)) "" else formuler(" et d'une même année"),
+                     if (is.null(va)) "" else if (axe == "generation") formuler(" et d'une même génération")
+                     else formuler(" et d'une même année"),
                      paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = ", ")),
             list(lignes = doublons))
-  # Âges contigus par (sexe, annee) : un pas supérieur à 1 est un trou, cité
-  # par la paire des lignes qui l'encadrent dans l'ordre canonique ;
-  # details$lignes : ligne qui suit le trou.
+  # Âges contigus par (sexe, axe) : un pas supérieur à 1 est un trou, cité
+  # par la paire des lignes qui l'encadrent dans l'ordre canonique, avec son
+  # groupe et les deux âges (ADR 0019, point 1.5 : un numéro de ligne du
+  # data.frame long ne situe pas une cellule dans une grille) ;
+  # au-delà de NB_LIGNES_CITEES trous, le message annonce le total (même
+  # formule que table_lx_non_decroissants). details, un élément par trou :
+  # lignes (ligne reçue qui suit le trou, sens historique) et ages_suivants
+  # (son âge) ; lignes_precedentes (ligne reçue qui précède le trou) et ages
+  # (son âge) ; sexes, annees ou generations (NULL sans axe) du groupe.
   trous <- which(meme & pas > 1L)
-  if (length(trous))
+  if (length(trous)) {
+    k <- utils::head(trous, NB_LIGNES_CITEES)
     refuser("donnees", "table_ages_non_contigus",
-            formuler("Table « %s » : âges non contigus (âge manquant) au sein d'un même sexe, entre les lignes %s.",
-                     nom_cite, paste(sprintf("%d et %d", o[trous - 1L], o[trous])[seq_len(min(length(trous), NB_LIGNES_CITEES))],
-                                collapse = ", ")),
-            list(lignes = o[trous]))
+            formuler("Table « %s » : âges non contigus (âge manquant) au sein d'un même sexe, entre les lignes %s%s.",
+                     nom_cite,
+                     paste(formuler("%d et %d (%s, âges %d et %d)", o[k - 1L], o[k],
+                                    groupes_cites_table(sexe[o][k], axe, va[o][k]), age[o][k - 1L], age[o][k]),
+                           collapse = ", "),
+                     if (length(trous) > NB_LIGNES_CITEES)
+                       formuler(" … (%d paires en tout ; liste complète dans les détails du refus)", length(trous))
+                     else ""),
+            stats::setNames(list(o[trous], sexe[o][trous], if (is.null(va)) NULL else va[o][trous],
+                                 age[o][trous - 1L], age[o][trous], o[trous - 1L]),
+                            c("lignes", "sexes", nom_axe, "ages", "ages_suivants", "lignes_precedentes")))
+  }
   # Colonnes construites par sous-indiçage [o], jamais x[o, ] : row.names
   # automatiques, aucun attribut de colonne reçu.
   if (a_qx) {
     t <- data.frame(age = age[o], sexe = sexe[o], qx = as.numeric(x$qx)[o], stringsAsFactors = FALSE)
-    if (!is.null(annee)) t$annee <- annee[o]
+    if (!is.null(va)) t[[axe]] <- va[o]
   } else {
-    # Table en l_x (#146, § 1.6 à 1.10), par groupe (sexe, annee) dans l'ordre
+    # Table en l_x (#146, § 1.6 à 1.10), par groupe (sexe, axe) dans l'ordre
     # canonique : s vrai si la ligne triée a une suivante dans son groupe
     # (âge x + 1, les trous étant refusés ci-dessus) ; i : lignes qui donnent
-    # un q_x. Sexes, années et âges cités sont ceux de l'ordre trié
+    # un q_x. Aucun q_x n'enchaîne deux années ou deux générations. Sexes,
+    # valeurs de l'axe et âges cités sont ceux de l'ordre trié
     # (groupes_cites_table()) ; details en portent les vecteurs complets
-    # (details_groupes() : sexes, annees, ages), lignes dans la numérotation
-    # reçue.
+    # (details_groupes() : sexes, annees ou generations, ages), lignes dans la
+    # numérotation reçue.
     l <- as.double(x$lx)[o]
     s <- c(meme[-1L], FALSE)
     i <- which(s)
-    sx <- sexe[o]; ag <- age[o]; an <- if (is.null(annee)) NULL else annee[o]
-    details_groupes <- function(j) list(sexes = sx[j], annees = if (is.null(an)) NULL else an[j], ages = ag[j])
+    sx <- sexe[o]; ag <- age[o]; an <- if (is.null(va)) NULL else va[o]
+    details_groupes <- function(j)
+      stats::setNames(list(sx[j], if (is.null(an)) NULL else an[j], ag[j]), c("sexes", nom_axe, "ages"))
     uniques <- which(!meme & !s)
     if (length(uniques)) {
       k <- utils::head(uniques, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_age_unique",
               formuler(paste("Table « %s » : un seul âge pour %s. Une table en l_x donne q_x = (l_x − l_{x+1}) / l_x et",
-                             "demande au moins deux âges consécutifs par sexe (et par année)."), nom_cite,
-                       paste(formuler("%s (âge %d)", groupes_cites_table(sx[k], an[k]), ag[k]), collapse = " ; ")),
+                             "demande au moins deux âges consécutifs par sexe (et par année ou par génération)."), nom_cite,
+                       paste(formuler("%s (âge %d)", groupes_cites_table(sx[k], axe, an[k]), ag[k]), collapse = " ; ")),
               c(details_groupes(uniques), list(lignes = o[uniques])))
     }
     # Hausse stricte l_{x+1} > l_x (q_x < 0), en comparaison exacte, sans
@@ -2345,7 +2413,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
                              "une table de référence ; une table corrigée est une autre table, importée sous la",
                              "responsabilité de l'utilisateur (statut « importee »), qui ne se déclare pas homologuée."),
                        nom_cite, length(hausses),
-                       paste(formuler("%s, âges %d et %d (l_x = %.15g puis %.15g)", groupes_cites_table(sx[k], an[k]),
+                       paste(formuler("%s, âges %d et %d (l_x = %.15g puis %.15g)", groupes_cites_table(sx[k], axe, an[k]),
                                       ag[k], ag[k + 1L], l[k], l[k + 1L]),
                              collapse = " ; "),
                        if (length(hausses) > NB_LIGNES_CITEES)
@@ -2361,8 +2429,8 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
       k <- utils::head(nuls, NB_LIGNES_CITEES)
       refuser("donnees", "table_lx_nul",
               formuler(paste("Table « %s » : l_x nul suivi d'un autre âge (q_x indéfini) : %s. Seul le dernier âge",
-                             "d'un sexe (et d'une année) peut porter l_x = 0."), nom_cite,
-                       paste(formuler("%s, âge %d", groupes_cites_table(sx[k], an[k]), ag[k]), collapse = " ; ")),
+                             "d'un sexe (et d'une année ou d'une génération) peut porter l_x = 0."), nom_cite,
+                       paste(formuler("%s, âge %d", groupes_cites_table(sx[k], axe, an[k]), ag[k]), collapse = " ; ")),
               c(details_groupes(nuls), list(lignes = o[nuls])))
     }
     # Conversion (#146, § 1.7 ; chaque bit en dépend) : soustraction puis
@@ -2377,7 +2445,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     if (!all(is.finite(q) & q >= 0 & q <= 1))
       stop("table_reference() : q_x dérivé de l_x non fini ou hors de [0, 1] (erreur de programmation).", call. = FALSE)
     t <- data.frame(age = ag[i], sexe = sx[i], qx = q, stringsAsFactors = FALSE)
-    if (!is.null(annee)) t$annee <- an[i]
+    if (!is.null(va)) t[[axe]] <- an[i]
   }
   structure(t, class = c("table_reference", "data.frame"), nom = nom, statut = statut,
             source = source, forme_origine = forme_origine, parametres = parametres)
