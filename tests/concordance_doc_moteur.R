@@ -57,8 +57,8 @@
 #         VERSION_FICHE (tout entier qui suit \code{VERSION\_FICHE} à au plus
 #         15 caractères non numériques près, ou entier « (N) » de la 4e colonne
 #         d'une ligne de catalogue), ENTETE_CANONIQUE, REPRESENTATION_RESULTAT,
-#         REPRESENTATION_TABLE (#73), PREMIERE_LIGNE_PLAN et
-#         PREMIERE_LIGNE_FICHE (en-têtes « tablexp
+#         REPRESENTATION_TABLE (#73), REPRESENTATION_DECALAGES (#273),
+#         PREMIERE_LIGNE_PLAN et PREMIERE_LIGNE_FICHE (en-têtes « tablexp
 #         <nature> N » cités dans le texte). Limite : toute mention d'une
 #         autre valeur (« passe de 2 à 3 » à moins de 15 caractères de
 #         \code{VERSION\_FICHE}, « tablexp canonique 1 » historique) est lue
@@ -156,7 +156,7 @@ COLONNES_ATTENTE <- c("type", "nom", "issue", "motif")
 TYPES_ATTENTE <- c("export", "catalogue", "entree", "fiche")
 # Contrôles 5 : constantes de version (nom de la constante) et deux listes.
 CONSTANTES_VERSION <- c("VERSION_FICHE", "ENTETE_CANONIQUE", "REPRESENTATION_RESULTAT", "REPRESENTATION_TABLE",
-                        "PREMIERE_LIGNE_PLAN", "PREMIERE_LIGNE_FICHE")
+                        "REPRESENTATION_DECALAGES", "PREMIERE_LIGNE_PLAN", "PREMIERE_LIGNE_FICHE")
 NOMS_ATTENTE_FICHE <- c(CONSTANTES_VERSION, "champs_fiche", "blocs_lecture")
 # Noms cités dans la liste des champs de la fiche qui ne sont ni un nom de la
 # fiche (à tous les niveaux), ni un objet de tablexp, ni une valeur de

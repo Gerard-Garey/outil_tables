@@ -24,3 +24,4 @@ entree,fonctions-rapport:REPRESENTATION_DECALAGES,#273,première ligne du texte 
 entree,fonctions-rapport:empreinte_decalages,#273,empreinte des décalages d'âge (ADR 0019 point 6.4) ; docwriter en fin de branche (règle 9)
 entree,fonctions-rapport:catalogue_decalages_embarques,#273,catalogue des décalages embarqués à contenus injectables (ADR 0019 point 6.5) ; docwriter en fin de branche (règle 9)
 entree,fonctions-rapport:decalages_embarques,#273,accesseur exporté des décalages d'âge embarqués (ADR 0019 point 6.5) ; docwriter en fin de branche (règle 9)
+fiche,REPRESENTATION_DECALAGES,#273,"première ligne « tablexp decalages 1 » de l'empreinte des décalages ; docwriter en fin de branche (règle 9) ; ADR 0019 point 6.4"
