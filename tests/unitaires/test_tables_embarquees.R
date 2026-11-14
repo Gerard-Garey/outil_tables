@@ -12,7 +12,9 @@
 #    identical() au catalogue construit sur TABLES_EMBARQUEES ;
 #  - littéral de la source : nombre de lignes, âges extrêmes, l_0 et l_1 de
 #    chaque table déclarée, lus sur le fac-similé de sa source (fichier de
-#    provenance) ; une ligne de TABLES_ATTENDUES par commit `donnees:`.
+#    provenance) ; une ligne de TABLES_ATTENDUES (format 1) ou une entrée de
+#    GRILLES_ATTENDUES (format 2 : générations, âges extrêmes et nombre de
+#    lignes par génération, premier et dernier q_x) par commit `donnees:`.
 #  Les contenus sont injectés (seam M247) : le cas d'une table refusée (TF
 #  00-02, E2.26) est couvert ici par un contenu aux l_x non décroissants,
 #  quelles que soient les tables déclarées. Le format des fichiers versés,
@@ -330,8 +332,42 @@ TABLES_ATTENDUES <- data.frame(
 # (littéral de la source).
 PAIRES_ATTENDUES <- list(
   "TF 00-02" = data.frame(age = c(10L, 23L, 61L), lx = c(99478, 94171, 92892), lx_suivant = c(99647, 99137, 93425)))
-verifier("tables attendues : une ligne par table déclarée, dans l'ordre de la déclaration",
-         identical(TABLES_ATTENDUES$nom, DECLARATIONS$nom))
+# Tables de génération (format 2 ; ADR 0019, point 5), une entrée par commit
+# `donnees:` : nombre de lignes de l'objet ; générations transcrites ; premier
+# âge à valeur de la génération g, max(0, entree - g) ; dernier âge à valeur
+# par tranche de générations (aucun q_x à ce dernier âge, ADR 0019, point
+# 4.1) ; l_x imprimés au premier âge de la première génération et aux deux
+# derniers âges de la dernière (champ Generations du fichier de provenance ;
+# TGF05 : génération 1900, âges 96 et 97, p. 22 de l'extrait ; génération
+# 2005, âges 119 et 120, p. 51).
+GRILLES_ATTENDUES <- list(
+  "TGF05" = list(lignes = 7986L, generations = 1900:2005, entree = 1996L,
+                 derniers = data.frame(de = c(1900L, 1919L, 1926L, 1933L), a = c(1918L, 1925L, 1932L, 2005L),
+                                       age = 117:120),
+                 premier = c(lx = 100000, lx_suivant = 80356), dernier = c(lx = 782, lx_suivant = 516)))
+verifier("tables attendues : une ligne par table déclarée au format 1, une entrée par table déclarée au format 2, dans l'ordre de la déclaration",
+         identical(TABLES_ATTENDUES$nom, DECLARATIONS$nom[DECLARATIONS$format == 1L]) &&
+           identical(names(GRILLES_ATTENDUES), DECLARATIONS$nom[DECLARATIONS$format == 2L]))
+for (nom_ in names(GRILLES_ATTENDUES)) local({
+  a <- GRILLES_ATTENDUES[[nom_]]
+  verifier(sprintf("table_embarquee(« %s ») : colonne generation (%d à %d), %d lignes, âges de chaque génération du premier âge à valeur à l'avant-dernier, sexe déclaré, statut embarquee, forme lx, premier et dernier q_x (littéral de la source)",
+                   nom_, min(a$generations), max(a$generations), a$lignes), {
+    t <- table_embarquee(nom_)
+    d <- DECLARATIONS[DECLARATIONS$nom == nom_, ]
+    g <- a$generations
+    premier <- pmax(0L, a$entree - g)
+    dernier <- a$derniers$age[findInterval(g, a$derniers$de)]
+    ages <- unlist(Map(function(p, q) p:(q - 1L), premier, dernier), use.names = FALSE)
+    n <- nrow(t)
+    inherits(t, "table_reference") && identical(names(t), c("age", "sexe", "qx", "generation")) &&
+      n == a$lignes && identical(t$generation, rep(g, dernier - premier)) && identical(t$age, ages) &&
+      all(g <= a$derniers$a[findInterval(g, a$derniers$de)]) &&
+      all(t$sexe == d$sexe) && identical(attr(t, "statut"), "embarquee") && identical(attr(t, "forme_origine"), "lx") &&
+      identical(attr(t, "source"), sprintf("inst/extdata/tables/%s.provenance.dcf", d$identifiant)) &&
+      identical(t$qx[1L], (a$premier[["lx"]] - a$premier[["lx_suivant"]]) / a$premier[["lx"]]) &&
+      identical(t$qx[n], (a$dernier[["lx"]] - a$dernier[["lx_suivant"]]) / a$dernier[["lx"]])
+  })
+})
 for (k in seq_len(nrow(TABLES_ATTENDUES))) local({
   a <- TABLES_ATTENDUES[k, ]
   if (!is.na(a$refus)) {

@@ -1,13 +1,15 @@
 # -----------------------------------------------------------------------------
-#  releves.R : relevés de TGF05 et TGH05 par la couche texte de trois pièces,
+#  tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R :
+#  relevés de TGF05 et TGH05 par la couche texte de trois pièces,
 #  pour la seule comparaison (issue #274 ; ADR 0019, point 7.2 ; M445, M462) :
 #  la valeur retenue reste celle des transcriptions visuelles assemblées
-#  (assembler.R). Un relevé par la couche texte n'est jamais une source de
+#  (assembler_tgf05_tgh05.R). Un relevé par la couche texte n'est jamais une source de
 #  transcription (E2.26).
 #
 #  Hors CI : la CI ne lit ni les pièces ni l'outil d'extraction. Lancé à la
 #  main, après le gel des transcriptions et leur assemblage. Réécriture en R
-#  de releves.py, à sortie identique (décision du mainteneur du 14/11/2026) :
+#  de releves.py (commit b949ced), à sortie identique (décision du mainteneur
+#  du 14/11/2026, M478) :
 #  mêmes relevés, mêmes écarts, même journal, octet pour octet, mêmes lignes
 #  sur la sortie standard.
 #
@@ -49,7 +51,31 @@
 #  cellule d'un relevé n'est pas en ASCII, ou si une grille assemblée n'a pas
 #  une génération 1900 à 2005.
 #
-#  Usage : Rscript releves.R <dossier docs/sources> <dossier des grilles assemblées> <dossier de sortie>
+#  Emplacement des entrées. Le script ne lit aucun chemin en dur : pièces,
+#  grilles assemblées et dossier de sortie sont ses arguments. Les grilles
+#  assemblées sont les fichiers de table inst/extdata/tables/tgf05.csv et
+#  tgh05.csv, une fois les deux tables embarquées (ou leur assemblage par
+#  assembler_tgf05_tgh05.R, ou le dossier provisoire tant qu'il existe) ; les
+#  relevés, écarts et journaux qu'il écrit ont été versés au commit b949ced sous
+#  tests/contre_verification/transcriptions_b22/generation/ (dossier
+#  provisoire à retirer au dernier commit donnees: de #274, M474), où ils
+#  resteront lisibles. Les relevés
+#  versés sous tests/contre_verification/tables/ en sont des copies, au
+#  nommage de l'ADR 0018, point 5 : releve_bo2007_<t>.csv ->
+#  <t>.seconde_source_bo.csv ; releve_jo2006_<t>.csv ->
+#  <t>.comparaison_acte.csv ; releve_jo2015_<t>.csv n'est pas versé (TGF05 :
+#  cellule `?66/72` de la ligne 117, hors format 2 ; anomalie A2).
+#  Rejeu, depuis la racine du dépôt, dans un dossier hors du dépôt. Tant que
+#  TGH05 n'est pas embarquée, les grilles sont le dossier de sortie de
+#  l'assemblage ($a ci-dessous : commande de rejeu d'assembler_tgf05_tgh05.R,
+#  en-tête de ce script, avec "$a" pour dossier de sortie) :
+#    d=$(mktemp -d)
+#    Rscript tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R \
+#      docs/sources "$a" "$d"
+#  Une fois TGH05 embarquée, inst/extdata/tables peut remplacer "$a".
+#
+#  Usage : Rscript tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R
+#            <dossier docs/sources> <dossier des grilles assemblées> <dossier de sortie>
 # -----------------------------------------------------------------------------
 
 local({
@@ -296,7 +322,7 @@ lire_grille <- function(chemin) {
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 3L)
-  echec("usage : releves.R <dossier docs/sources> <dossier des grilles assembl\u00e9es> <dossier de sortie>")
+  echec("usage : releves_couche_texte_tgf05_tgh05.R <dossier docs/sources> <dossier des grilles assembl\u00e9es> <dossier de sortie>")
 sources <- args[1L]; assemblees <- args[2L]; sortie <- args[3L]
 version <- suppressWarnings(system2("pdftotext", "-v", stdout = TRUE, stderr = TRUE))[1L]
 for (nom in names(SOURCES)) {

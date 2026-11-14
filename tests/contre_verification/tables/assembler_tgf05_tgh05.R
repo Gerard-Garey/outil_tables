@@ -1,14 +1,34 @@
 # -----------------------------------------------------------------------------
-#  assembler.R : assemblage des transcriptions par blocs de TGF05 et TGH05
-#  (JO n° 301 du 29/12/2015, texte 35) en grilles au format 2 (issue #274 ;
-#  ADR 0019, points 5.2 et 7.2 ; D10)
+#  tests/contre_verification/tables/assembler_tgf05_tgh05.R : assemblage des
+#  transcriptions par blocs de TGF05 et TGH05 (JO n° 301 du 29/12/2015,
+#  texte 35) en grilles au format 2 (issue #274 ; ADR 0019, points 5.2 et
+#  7.2 ; D10)
 #
 #  Hors CI : lancé à la main, après le gel des transcriptions (gel.sha256).
+#  La CI compare le fichier de table et les relevés versés
+#  (tests/controles/tables_embarquees.R), sans les blocs.
+#
+#  Emplacement des blocs. Les blocs de pages des deux transcripteurs (blocs_a/
+#  et blocs_b/), leur gel (gel.sha256) et leurs notes ont été versés au commit
+#  b949ced sous tests/contre_verification/transcriptions_b22/generation/,
+#  dossier provisoire à retirer au dernier commit donnees: de #274 (M474) ;
+#  ils resteront lisibles dans l'historique à ce commit. Le script ne lit aucun chemin en dur : le
+#  dossier des blocs est son premier argument. Rejeu, depuis la racine du
+#  dépôt, contre les pièces de b949ced (le dossier provisoire, tant qu'il
+#  existe, peut être donné directement) :
+#    d=$(mktemp -d)
+#    git archive b949ced tests/contre_verification/transcriptions_b22/generation | tar -x -C "$d"
+#    g="$d/tests/contre_verification/transcriptions_b22/generation"
+#    (cd "$g" && sha256sum -c gel.sha256)
+#    Rscript tests/contre_verification/tables/assembler_tgf05_tgh05.R "$g/blocs_a" "$d"
+#  puis la même commande sur "$g/blocs_b" (transcription B), dans un autre
+#  dossier de sortie. Attendu : tgf05.csv égal à inst/extdata/tables/tgf05.csv
+#  (SHA-256 écrit sur la sortie standard et au fichier de provenance).
 #  R base seul (R 4.3.3), aucun outil externe. Déterministe : aucune horloge,
 #  aucun aléa ; l'ordre des blocs se déduit de leurs générations (noms
 #  `<table>_<g1>-<g2>.csv`, dix blocs par table, triés octet à octet).
-#  Réécriture en R d'assembler.py, à sortie identique (décision du mainteneur
-#  du 14/11/2026) : mêmes fichiers octet pour octet, mêmes lignes sur la
+#  Réécriture en R d'assembler.py (commit b949ced), à sortie identique
+#  (décision du mainteneur du 14/11/2026, M478) : mêmes fichiers octet pour octet, mêmes lignes sur la
 #  sortie standard, mêmes motifs d'échec (« ECHEC : … » sur la sortie
 #  d'erreur, code 1).
 #
@@ -29,7 +49,8 @@
 #  Écrit <sortie>/tgf05.csv et <sortie>/tgh05.csv, et le SHA-256 de chacun
 #  (calculé en R base ci-dessous, sans outil externe) sur la sortie standard.
 #
-#  Usage : Rscript assembler.R <dossier_des_blocs> <dossier_de_sortie>
+#  Usage : Rscript tests/contre_verification/tables/assembler_tgf05_tgh05.R
+#            <dossier_des_blocs> <dossier_de_sortie>
 # -----------------------------------------------------------------------------
 
 local({
@@ -209,7 +230,7 @@ controler <- function(table, generations, grille) {
 }
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 2L) echec("usage : assembler.R <dossier_des_blocs> <dossier_de_sortie>")
+if (length(args) != 2L) echec("usage : assembler_tgf05_tgh05.R <dossier_des_blocs> <dossier_de_sortie>")
 entree <- args[1L]; sortie <- args[2L]
 for (table in TABLES) {
   r <- assembler(entree, table)
