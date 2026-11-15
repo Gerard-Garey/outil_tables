@@ -3203,7 +3203,9 @@ grand entier du moteur, et, au format~2, en-tête
 plus grand entier du moteur, générations et âges croissants et
 consécutifs (pour les âges, aux deux formats, la première ligne en défaut
 est signalée, et la borne, motif propre, l'emporte sur la suite quand les
-deux sont en défaut sur cette ligne, comme dans le moteur~; issue~\#283), une
+deux sont en défaut sur cette ligne, comme dans le moteur~; issue~\#283~;
+pour les générations, la borne est testée sur tout l'en-tête avant la
+suite~: le refus est celui du moteur, le motif cité peut différer), une
 cellule par génération, $l_x$ entier en chiffres seuls ou \code{-}, cellule
 vide finale gardée par le découpage, donc refusée, au moins une valeur par
 ligne et par génération~; et la forme du fichier de provenance (UTF-8
@@ -3352,8 +3354,9 @@ provenances rétablies, les tables d'essai admises des formats~1 et~2
 réécrites sur les âges 2147483646 à 2147483648 (suite valide, seule la
 borne en cause) et les tables d'essai refusées sur les âges 0 puis
 3000000000 (hors de la suite et au-delà de la borne sur la même ligne)
-(échec attendu, avec, pour chacune des quatre, un écart sur~(b) au motif
-de la borne, qui doit donc l'emporter sur celui de la suite~; les écarts
+(échec attendu, avec un écart sur~(b) au motif de la borne pour chacune
+des quatre (pour les deux tables refusées, ce motif doit donc l'emporter
+sur celui de la suite)~; les écarts
 sur~(c), (d) et~(f) qui l'accompagnent ne sont pas examinés~;
 issue~\#283)~; enfin, dans le processus du témoin, le contrôle~(h) sur
 des grilles forgées, dont les décomptes sont calculés à la main dans le
@@ -7907,7 +7910,10 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         à elle (M211). Elle est en vigueur depuis le 23/11/2024, lendemain
         de la publication, l'arrêté ne fixant aucune date. Code des
         assurances~: A132-18-1, par dérogation au quatrième alinéa
-        d'A132-18, permet d'établir les tarifs des «~contrats conclus dans
+        d'A132-18 (le a) du 2\textsuperscript{o}~: lecture littérale
+        retenue~; lecture finaliste notée, la règle de la table unique du
+        septième alinéa, que suivent la notice et l'avis ANC 2024-05,
+        «~alinéa 7~»~; E2.25, M219), permet d'établir les tarifs des «~contrats conclus dans
         les conditions prévues à l'article L.~911-1 du code de la sécurité
         sociale~» d'après «~une table unique pour tous les assurés
         ci-annexée~» (usage facultatif, «~peuvent~»)~; usage second,
@@ -7916,11 +7922,14 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         rétablis par les art.~2 et~3, renvoient à cette même annexe, sans
         porteur propre (articles lus sur le rendu de la p.~1 par
         \code{regulatory} le 15/11/2026). \emph{Champ des contrats}
-        (lecture L1, décision du mainteneur du 15/11/2026, M486)~: le
-        dispositif, à la lettre~; la notice, bloc de présentation placé
-        avant les visas et sans portée normative, restreint ses rubriques
-        aux contrats de retraite collective~: elle est mentionnée au fichier
-        de provenance, non retenue pour le champ. \emph{Comptes sociaux}
+        (lecture L1, décision du mainteneur du 15/11/2026, M486)~: les
+        contrats du dispositif, à la lettre («~conclus dans les conditions
+        prévues à l'article L.~911-1 du code de la sécurité sociale~»,
+        ci-dessus)~; la notice, bloc de présentation placé avant les visas
+        et sans portée normative (interprétation), restreint ses rubriques
+        «~Publics concernés~» et «~Objet~» aux «~contrats de retraite
+        collective~» conclus dans ces conditions~: elle est mentionnée au
+        fichier de provenance, non retenue pour le champ. \emph{Comptes sociaux}
         (lecture L2, M486)~: aucun texte ne nomme la table~; lecture
         retenue, (a), le règlement ANC 2015-11, art.~142-3 (provisions
         calculées «~d'après les tables en vigueur à l'époque de
@@ -7928,12 +7937,35 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         dans les conditions de L.~911-1, tarifé sur la table unique et non
         liquidé, comme pour TGF05 et TGH05~; \textbf{réserve}~: une seconde
         lecture, (b), est ouverte par l'avis ANC n\textsuperscript{o}~2024-05
-        du 22/10/2024, visé par l'arrêté, selon lequel les provisions
-        resteraient calculées selon «~les TGH et TGF~», sous laquelle la
+        du 22/10/2024 (cité par lien au fichier de provenance, champ
+        \code{Empreintes-hors-depot}), visé par l'arrêté, qui écrit
+        (p.~1)~: «~Les provisions resteraient calculées selon les
+        “tables de mortalité appropriées” (cf. article 142-4 du règlement
+        2015-11 de l'ANC), c'est-à-dire les TGH et TGF~», en ne citant que
+        l'art.~142-4, qui porte sur les rentes~; sous cette lecture, la
         table n'a aucun usage en comptes sociaux. Le détail par régime, les
         citations et leur statut (vérifié sur le rendu des pages, ou indice
         pour les textes consolidés lus par un outil) sont au fichier de
         provenance.
+
+        \emph{Usage actuariel} (avis d'\code{actuary-approfondi} du
+        15/11/2026 sur P4, commentaire de l'issue~\#275). Construite sur
+        TGH05 et TGF05, homologuées pour les rentes viagères (ci-dessus), la
+        table unique est destinée par sa construction aux engagements en
+        cas de vie~; elle sous-estimerait la mortalité d'une garantie en cas
+        de décès. Ce constat ne restreint pas le champ des contrats (M486,
+        L1). À l'âge $x$, elle décrit un groupe fermé où la part des hommes
+        vaut $w_x$ (ci-dessous, «~Contenu~») et où chaque sexe meurt selon
+        TGH05 et TGF05. Pour un portefeuille plus féminin, elle surestime
+        donc la mortalité, et sous-estime la longévité, aux âges où
+        $q^F_x < q^H_x$, en particulier de 64 à~111~ans. C'est une table
+        réglementaire de tarif, \textbf{non une hypothèse biométrique de
+        meilleure estimation} (\emph{best estimate}~; directive
+        2009/138/CE, art.~77, §~2~; règlement délégué (UE) 2015/35,
+        art.~22, §~1)~: elle n'est pas estimée sur l'expérience d'un
+        portefeuille. Elle peut servir de table de référence à un
+        positionnement, mais pas d'hypothèse \emph{best estimate} par
+        elle-même.
       \item \emph{Sexe.} \code{ensemble}~: table «~pour tous les
         assurés~» (A132-18-1) et «~pour tous les membres participants~»
         (A223-8-1, A932-3-12).
@@ -7967,10 +7999,13 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         ($l_{120}$ de 1 à~315), sans $q_x$ à ce dernier âge, comme toutes
         les générations de TGF05 et de TGH05, qui n'impriment aucun zéro.
         Une même table mêle donc deux modes de clôture~: aucun consommateur
-        ne suppose $q_\omega = 1$, et le moteur ne ferme pas la table~; une
-        fermeture se déclare comme une étape, et, pour remplacer ces
-        $q_x = 1$, son âge de départ doit être au plus l'âge du $q_x = 1$
-        de chaque génération employée (116~ans pour 1900 à~1919). L'objet
+        ne suppose $q_\omega = 1$, et le moteur ne ferme pas la table. Une
+        fermeture, étape déclarée du plan que cette version ne propose pas
+        encore (\code{ETAPES}), ne remplacerait ces $q_x = 1$ que si son âge
+        de départ était au plus l'âge du $q_x = 1$ de chaque génération
+        employée (116~ans pour 1900 à~1919)~; c'est une condition de
+        construction à vérifier par l'utilisateur, que le moteur n'impose
+        pas. L'objet
         a 7\,982 lignes (8\,092 cellules à valeur, moins les 45 âges à
         $l_x$ nul, moins les 65 derniers âges sans $q_x$), de $q_x$ compris
         dans $[0~;\ 2/3]$ hors des 41 $q_x = 1$ (2/3 en 13~cellules), avec
@@ -7980,8 +8015,15 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         $L_x = (3H + 2F)/5$, donc
         $q_x = w_x\,q^H_x + (1 - w_x)\,q^F_x$ avec
         $w_x = 3\,l^H_x / (3\,l^H_x + 2\,l^F_x)$ (identité des mélanges,
-        \emph{résultat exact})~; le poids des hommes décroît avec l'âge et
-        s'annule là où TGH05 est éteinte. \emph{Cohérence} (même script~;
+        \emph{résultat exact})~; le poids des hommes vaut 0,6 au premier
+        âge à valeur, croît là où $q^H_x < q^F_x$, décroît là où
+        $q^H_x > q^F_x$ et s'annule là où TGH05 est éteinte~: il croît
+        légèrement de 11 à~63~ans dans 52 générations de 1954 à~2005
+        (1\,183 couples d'âges consécutifs, $w_x < 0{,}6018$) et dans
+        32 couples isolés de 112 à~119~ans, jamais de 64 à~111~ans
+        (\emph{constat de mesure} d'\code{actuary} du 15/11/2026 sur les
+        fichiers de TGH05 et TGF05~: 1\,215 hausses sur 7\,986 couples).
+        \emph{Cohérence} (même script~;
         définitions et critères~: ci-dessus, «~TGF05 et TGH05~»)~: 97
         couples (génération, âge) où $q_x < q_{x-1}$ pour $x \ge 31$, dont
         96 compatibles avec l'arrondi (17 de 31 à~34~ans, 9 à~59~ans, 70
@@ -7999,13 +8041,21 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         qui portent les âges 58 à~60, $q_{59} < q_{58}$ dans TGH05 pour
         les 68, dans TGF05 pour aucune, dans le mélange avant arrondi pour
         17, dont les 10 où la table imprimée décroît (comparaisons en
-        entiers sur $3H + 2F$)~; pour la génération 2003, $q_{59}/q_{58}$
+        entiers sur $3H + 2F$, mesure du 15/11/2026 par un script hors
+        dépôt, remesurée par \code{actuary} le même jour, que
+        \code{controles\_coherence\_generation.R} ne reproduit pas)~; pour la génération 2003, $q_{59}/q_{58}$
         vaut 0,9673 (TGH05), 1,0174 (TGF05), 0,9879 (mélange avant
         arrondi) et 0,9764 (table imprimée). Le ralentissement autour de
         60~ans et le défaut joint de 2003 sont donc \textbf{hérités de
-        TGH05 par le mélange} (identité des mélanges, résultat exact) et
-        accentués par l'arrondi, sans anomalie de transcription ni de
-        composition~; leur origine dans la construction de TGH05 reste non
+        TGH05 par le mélange}~: $\Delta q = w_{59}\,\Delta q^H + (1 -
+        w_{59})\,\Delta q^F + (w_{59} - w_{58})(q^H_{58} - q^F_{58})$
+        (résultat exact), où, sur les 17~générations, le terme de TGH05
+        ($-1{,}7$ à $-2{,}9 \cdot 10^{-5}$) l'emporte sur celui de TGF05
+        ($+0{,}9$ à $+2{,}6 \cdot 10^{-5}$), le glissement des poids restant
+        sous $2{,}3 \cdot 10^{-9}$ (approximation numérique). L'arrondi
+        accentue ensuite la décroissance dans 9 des 10~générations où la
+        table imprimée décroît, dont 2003, et la masque dans 7 des 17. Il
+        n'y a aucune anomalie de transcription ni de composition~; leur origine dans la construction de TGH05 reste non
         établie (ci-dessus). Statuts~: comparaisons en entiers exacts~;
         arrondi au plus proche \emph{constaté} par l'identité sur les
         12\,826 cellules (que le producteur ait procédé ainsi reste une
@@ -8014,15 +8064,17 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         marge positive $1{,}05 \cdot 10^{-6}$)~; médianes, approximation
         numérique.
       \item \emph{Identité avec TGH05 et TGF05, en lieu de seconde source}
-        (M486~; ADR 0019, point~7.4). Aucune seconde source de la table
-        n'est publiée (M472)~; pour elle seule, le groupe
+        (M486~; ADR 0019, point~7.4). Aucune seconde source n'est retenue
+        pour la table (M472~: l'impression de la version électronique de
+        Légifrance n'est pas requise, faute d'apporter une information
+        absente du fac-similé versé)~; pour elle seule, le groupe
         \code{Identite-regle}, \code{Identite-ecarts} et le contrôle~(h)
         tiennent lieu de seconde source (section~\ref{sec:scripts-controle},
         points~(b) et~(h)). L'identité est une \emph{contre-vérification,
         jamais une source} (M219~; E2.26)~: aucun texte ne fixe la règle.
         Le dispositif dit seulement «~une table unique pour tous les
-        assurés ci-annexée~»~; la pondération 0,6 / 0,4 ne figure que dans
-        la notice, sans portée normative, qui ne nomme ni TGH05 ni TGF05,
+        assurés ci-annexée~»~; la pondération 0,6 / 0,4 ne figure, dans
+        l'arrêté, que dans la notice, sans portée normative, qui ne nomme ni TGH05 ni TGF05,
         ne dit ni $l_x$ ni $q_x$ et ne fixe ni effectif de départ ni
         arrondi. Tables pondérées, grandeur pondérée ($l_x$) et arrondi
         sont des \emph{constats} de l'identité~: chaque cellule est
