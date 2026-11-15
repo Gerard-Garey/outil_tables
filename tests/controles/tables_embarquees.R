@@ -17,9 +17,10 @@
 #    (b) format du fichier de table et des relevés, celui de la déclaration
 #        (colonne format), sur les octets : ASCII, LF, fin de ligne finale ;
 #        format 1 (ADR 0018, point 2.2) : en-tête age,lx, entiers en chiffres
-#        seuls, âges croissants et consécutifs ; format 2 (ADR 0019, point
-#        5.2) : en-tête age,<g_1>,…,<g_n>, générations et âges croissants et
-#        consécutifs, une cellule par génération, l_x entier en chiffres
+#        seuls, âges croissants et consécutifs, au plus .Machine$integer.max ;
+#        format 2 (ADR 0019, point 5.2) : en-tête age,<g_1>,…,<g_n>,
+#        générations et âges croissants et consécutifs, au plus
+#        .Machine$integer.max, une cellule par génération, l_x entier en chiffres
 #        seuls ou « - », au moins une valeur par ligne et par génération ;
 #        forme du
 #        fichier de provenance (point 3.1 : UTF-8 valide sans BOM, LF, aucune
@@ -101,11 +102,18 @@
 #  changées (écart (d) seul) ; enfin, des décalages d'essai au format 3 (nom
 #  non ASCII, seconde source à la borne basse différente et à la ligne en
 #  double, déclarées en écart) : un décalage changé d'une unité (écarts sur
-#  (c), (d) et (e)) ; puis, ce décalage rétabli, quatre champs de provenance
+#  (c), (d) et (e)) ; puis, ce décalage rétabli, cinq champs de provenance
 #  vidés, Ages et Controle-lecture-ecarts (essai admis du format 1),
-#  Generations et Comparaison-acte-ecarts (essai admis du format 2) : quatre
-#  écarts (b) « champ vide », nom du champ dans le motif, et aucun autre
-#  (#284). Les essais portent les groupes facultatifs Controle-lecture-*
+#  Generations et Comparaison-acte-ecarts (essai admis du format 2),
+#  Seconde-source-essai-ecarts (décalages d'essai du format 3) : cinq écarts
+#  (b) « champ vide », nom du champ dans le motif, plus trois écarts (e) des
+#  décalages d'essai (le champ vide se lit comme aucun écart déclaré), et
+#  aucun autre (#284) ; enfin, les tables d'essai admises des formats 1 et 2
+#  réécrites sur trois âges consécutifs dont le dernier dépasse
+#  .Machine$integer.max, puis les tables d'essai refusées sur un âge hors de la
+#  suite et au-delà de la borne : écart (b) à la borne du moteur, prioritaire
+#  sur la suite (#283). Les essais
+#  portent les groupes facultatifs Controle-lecture-*
 #  (format 1) et Comparaison-acte-* (format 2), relevé copie de la table,
 #  écarts « aucun ».
 #
@@ -223,8 +231,12 @@ lire_format <- function(chemin, format) {
   k <- which(!grepl(MOTIF_LIGNE, corps))
   if (length(k)) return(defaut(sprintf("ligne %d « %s » mal formée", k[1L] + 1L, corps[k[1L]])))
   age <- as.double(sub(",.*$", "", corps)); lx <- as.double(sub("^.*,", "", corps))
-  k <- which(age != age[1L] + seq_along(age) - 1L)
-  if (length(k)) return(defaut(sprintf("ligne %d : âge %s hors de la suite croissante et consécutive", k[1L] + 1L, age[k[1L]])))
+  # Âge au plus .Machine$integer.max (borne d'analyser_table_format1(),
+  # R/donnees.R), testé sur la première ligne en défaut avant la suite des âges.
+  k <- which(age != age[1L] + seq_along(age) - 1L | age > .Machine$integer.max)
+  if (length(k)) return(defaut(if (age[k[1L]] > .Machine$integer.max)
+    sprintf("ligne %d : âge %s supérieur au plus grand entier du moteur (%d)", k[1L] + 1L, sub(",.*$", "", corps[k[1L]]), .Machine$integer.max)
+    else sprintf("ligne %d : âge %s hors de la suite croissante et consécutive", k[1L] + 1L, age[k[1L]])))
   list(defaut = NULL, age = age, lx = lx, lignes = l)
 }
 
@@ -302,8 +314,12 @@ lire_grille <- function(l) {
   if (length(k)) return(defaut(sprintf("ligne %d « %s » mal formée (%d cellule(s) attendues, l_x entier en chiffres seuls ou « - »)",
                                        k[1L] + 1L, l[k[1L] + 1L], n)))
   age <- as.double(vapply(corps, `[`, "", 1L))
-  k <- which(age != age[1L] + seq_along(age) - 1L)
-  if (length(k)) return(defaut(sprintf("ligne %d : âge %s hors de la suite croissante et consécutive", k[1L] + 1L, age[k[1L]])))
+  # Âge au plus .Machine$integer.max (borne d'analyser_table_format2()), même
+  # règle qu'au format 1 : première ligne en défaut, raison propre pour la borne.
+  k <- which(age != age[1L] + seq_along(age) - 1L | age > .Machine$integer.max)
+  if (length(k)) return(defaut(if (age[k[1L]] > .Machine$integer.max)
+    sprintf("ligne %d : âge %s supérieur au plus grand entier du moteur (%d)", k[1L] + 1L, vapply(corps[k[1L]], `[`, "", 1L), .Machine$integer.max)
+    else sprintf("ligne %d : âge %s hors de la suite croissante et consécutive", k[1L] + 1L, age[k[1L]])))
   grille <- matrix(unlist(lapply(corps, `[`, -1L), use.names = FALSE), nrow = length(corps), byrow = TRUE)
   k <- which(rowSums(grille != "-") == 0L)
   if (length(k)) return(defaut(sprintf("ligne %d : ligne sans valeur (âge %.0f)", k[1L] + 1L, age[k[1L]])))
@@ -943,8 +959,7 @@ preparer_temoin <- function(racine, arbre, empreintes, decl, decl_d, empreinte_d
     groupe <- if (e$format == 2L)
       c("Comparaison-acte: témoin", "Comparaison-acte-methode: copie (témoin)", sprintf("Comparaison-acte-releve: %s", f_g),
         "Comparaison-acte-ecarts: aucun")
-    else c("Controle-lecture-releve: ", "Controle-lecture-ecarts: aucun", "Controle-lecture-methode: copie (témoin)")
-    if (e$format != 2L) groupe[1L] <- sprintf("Controle-lecture-releve: %s", f_g)
+    else c(sprintf("Controle-lecture-releve: %s", f_g), "Controle-lecture-ecarts: aucun", "Controle-lecture-methode: copie (témoin)")
     sha <- sha256(arbre, c(f_table, f_b, f_s, f_g))
     identite <- if (is.null(e$paires)) c("Representation: tablexp table 1", sprintf("Empreinte-table: %s", empreintes[[e$nom]]))
                 else c("Refus-attendu: table_lx_non_decroissants", sprintf("Refus-paires: %s", e$paires))
@@ -1102,26 +1117,35 @@ temoin <- function(racine) {
   }
   # Champs vides (#284) : décalage rétabli, puis, dans la provenance des essais
   # admis, Ages et Controle-lecture-ecarts (format 1), Generations et
-  # Comparaison-acte-ecarts (format 2) vidés ; un champ vide passait la présence
-  # des champs requis, et un champ -ecarts vide se lisait comme « aucun ».
-  # Attendu : ces quatre écarts (b), et aucun autre.
+  # Comparaison-acte-ecarts (format 2), Seconde-source-essai-ecarts (format 3)
+  # vidés ; un champ vide passait la présence des champs requis, et un champ
+  # -ecarts vide se lisait comme « aucun ». Attendu : ces cinq écarts (b), et,
+  # au format 3 seul (les relevés des essais 1 et 2 sont des copies de la
+  # table), les trois écarts (e) de la seconde source, devenus non déclarés
+  # puisque le champ vide se lit comme aucun écart déclaré ; aucun autre.
   vider_champ <- function(f, motif, vide) {
     p <- readLines(f, encoding = "UTF-8", warn = FALSE)
     k <- grep(motif, p)
     if (length(k) != 1L) stop(sprintf("ligne « %s » introuvable (ou multiple) dans %s", motif, basename(f)))
+    # Lignes de suite du champ retirées : le champ est vide, pas seulement sa première ligne.
+    suite <- k + seq_len(length(p) - k)
+    suite <- suite[cumsum(!grepl("^[ \t]+[^ \t]", p[suite])) == 0L]
     p[k] <- vide
-    ecrire_lignes(p, f)
+    ecrire_lignes(if (length(suite)) p[-suite] else p, f)
   }
   ecrire_lignes(ed$lignes, f6)
   e1 <- ESSAIS[[1L]]
   f_p1 <- file.path(arbre, DOSSIER_TABLES, paste0(e1$identifiant, ".provenance.dcf"))
   f_p3 <- file.path(arbre, DOSSIER_TABLES, paste0(e3$identifiant, ".provenance.dcf"))
+  f_pd <- file.path(arbre, DOSSIER_TABLES, paste0(ed$identifiant, ".provenance.dcf"))
+  originales <- lapply(c(f_p1, f_p3, f_pd), readLines, encoding = "UTF-8", warn = FALSE)
   vider_champ(f_p1, "^Ages:", "Ages:")
   vider_champ(f_p3, "^Generations:", "Generations:")
   vider_champ(f_p1, "^Controle-lecture-ecarts:", "Controle-lecture-ecarts:")
   vider_champ(f_p3, "^Comparaison-acte-ecarts:", "Comparaison-acte-ecarts:")
-  cat(sprintf("\n== 7. %s.csv rétabli ; « Ages: » vidé dans %s.provenance.dcf, « Generations: » vidé dans %s.provenance.dcf, ainsi que « Controle-lecture-ecarts: » et « Comparaison-acte-ecarts: » : échec attendu sur (b), quatre écarts\n",
-              ed$identifiant, e1$identifiant, e3$identifiant))
+  vider_champ(f_pd, "^Seconde-source-essai-ecarts:", "Seconde-source-essai-ecarts:")
+  cat(sprintf("\n== 7. %s.csv rétabli ; « Ages: » vidé dans %s.provenance.dcf, « Generations: » vidé dans %s.provenance.dcf, ainsi que « Controle-lecture-ecarts: », « Comparaison-acte-ecarts: » et « Seconde-source-essai-ecarts: » (%s.provenance.dcf) : échec attendu sur (b), cinq écarts, et trois écarts (e) sur les décalages d'essai\n",
+              ed$identifiant, e1$identifiant, e3$identifiant, ed$identifiant))
   r7 <- lancer("--sans-installation")
   cat(sub("^::error", "(échec attendu) error", r7$sortie), sep = "\n")
   ecarts7 <- grep("ECART (", r7$sortie, fixed = TRUE, value = TRUE)
@@ -1129,16 +1153,61 @@ temoin <- function(racine) {
                  sprintf("  ECART (b) %s : champ vide Controle-lecture-ecarts", e1$nom),
                  sprintf("  ECART (b) %s : champ vide Generations", e3$nom),
                  sprintf("  ECART (b) %s : champ vide Comparaison-acte-ecarts", e3$nom))
-  if (r7$statut != 1L || !setequal(ecarts7, attendus7) || length(ecarts7) != length(attendus7)) {
-    cat(sprintf("ECHEC du témoin : code %d (1 attendu), %d écart(s), attendus : %s\n", r7$statut, length(ecarts7),
-                paste(sub("^ +", "", attendus7), collapse = " ; ")))
+  # Décalages d'essai : nom non ASCII, repéré par ed$repere (sortie d'un
+  # sous-processus sous une locale non UTF-8).
+  du_format3 <- grepl(ed$repere, ecarts7, fixed = TRUE)
+  # Un écart (e) par ligne en écart de la seconde source, soit chaque côté non
+  # vide des écarts déclarés de ESSAI_DECALAGES$ecarts (« 16,29,-3;0,29,-3 » et
+  # « ;30,59,-2 » : trois lignes), devenue non déclarée.
+  n_e_f3 <- sum(nzchar(unlist(strsplit(ed$ecarts, ";", fixed = TRUE))))
+  b_f3 <- ecarts7[du_format3 & grepl("^  ECART \\(b\\) ", ecarts7)]
+  e_f3 <- ecarts7[du_format3 & grepl("^  ECART \\(e\\) ", ecarts7)]
+  if (r7$statut != 1L || !setequal(ecarts7[!du_format3], attendus7) || sum(!du_format3) != length(attendus7) ||
+      length(b_f3) != 1L || !endsWith(b_f3, " : champ vide Seconde-source-essai-ecarts") ||
+      length(e_f3) != n_e_f3 || length(e_f3) + length(b_f3) != sum(du_format3)) {
+    cat(sprintf("ECHEC du témoin : code %d (1 attendu), %d écart(s), attendus : %s ; et, sur les décalages d'essai, un écart (b) champ vide Seconde-source-essai-ecarts et trois écarts (e)\n",
+                r7$statut, length(ecarts7), paste(sub("^ +", "", attendus7), collapse = " ; ")))
+    ok <- FALSE
+  }
+  # Rétablissement des provenances (scénarios suivants).
+  ecrire_lignes(originales[[1L]], f_p1); ecrire_lignes(originales[[2L]], f_p3); ecrire_lignes(originales[[3L]], f_pd)
+  # Âges au-delà de .Machine$integer.max (#283), aux formats 1 et 2. Essais
+  # admis (e1, e3) : trois âges consécutifs, le dernier au-delà de la borne
+  # (2147483646 à 2147483648) : la suite des âges est valide, seule la borne du
+  # moteur est en cause ; sans la borne au contrôle (b), l'écart n'apparaîtrait
+  # qu'en (d) et (f), le moteur refusant. Essais refusés (e2, e4) : un âge hors
+  # de la suite et au-delà de la borne sur la même ligne (0 puis 3000000000) :
+  # le motif de la borne l'emporte sur celui de la suite, comme dans le moteur.
+  # Attendu : un écart (b) par table, motif de la borne, à la ligne 4 (essais
+  # admis) ou 3 (essais refusés).
+  e2 <- ESSAIS[[2L]]; e4 <- ESSAIS[[4L]]
+  f1 <- file.path(arbre, DOSSIER_TABLES, paste0(e1$identifiant, ".csv"))
+  ecrire_lignes(c("age,lx", "2147483646,90000", "2147483647,89500", "2147483648,88900"), f1)
+  ecrire_lignes(c("age,1950,1951", "2147483646,-,1000", "2147483647,900,990", "2147483648,850,980"), f3)
+  ecrire_lignes(c("age,lx", "0,100000", "3000000000,99500"), file.path(arbre, DOSSIER_TABLES, paste0(e2$identifiant, ".csv")))
+  ecrire_lignes(c("age,1950,1951", "0,1000,1000", "3000000000,990,995"), file.path(arbre, DOSSIER_TABLES, paste0(e4$identifiant, ".csv")))
+  cat(sprintf("\n== 8. provenances rétablies ; %s.csv (format 1) et %s.csv (format 2) réécrits sur les âges 2147483646 à 2147483648, %s.csv (format 1) et %s.csv (format 2) sur les âges 0 puis 3000000000 : écart (b) attendu pour chacun, borne du moteur citée\n",
+              e1$identifiant, e3$identifiant, e2$identifiant, e4$identifiant))
+  r8 <- lancer("--sans-installation")
+  cat(sub("^::error", "(échec attendu) error", r8$sortie), sep = "\n")
+  attendus8 <- sprintf("  ECART (b) %s : %s/%s.csv : ligne %d : âge %s supérieur au plus grand entier du moteur (%d)",
+                       c(e1$nom, e3$nom, e2$nom, e4$nom), DOSSIER_TABLES,
+                       c(e1$identifiant, e3$identifiant, e2$identifiant, e4$identifiant),
+                       c(4L, 4L, 3L, 3L), c("2147483648", "2147483648", "3000000000", "3000000000"), .Machine$integer.max)
+  # Comparaison sur les octets : la sortie du sous-processus est en UTF-8, le
+  # marquage d'encodage de ses lignes dépend de la locale du processus courant.
+  presents8 <- vapply(attendus8, function(x) any(grepl(x, r8$sortie, fixed = TRUE, useBytes = TRUE)), NA)
+  if (r8$statut != 1L || !all(presents8)) {
+    cat(sprintf("ECHEC du témoin : code %d (1 attendu), écart(s) (b) attendus : %s\n", r8$statut,
+                paste(sub("^ +", "", attendus8), collapse = " ; ")))
     ok <- FALSE
   }
   unlink(arbre, recursive = TRUE)
   if (ok) cat(paste("\nTémoin : arbre intact admis ; l_x changé d'une unité détecté sur (c), (d) et (e), code 1 ;",
                     "paires d'un refus attendu discordantes détectées sur (d), code 1 ; de même au format 2 ;",
                     "décalage changé d'une unité détecté sur (c), (d) et (e) au format 3, code 1 ;",
-                    "champs Ages, Generations, Controle-lecture-ecarts et Comparaison-acte-ecarts vidés détectés sur (b), code 1.\nOK\n"))
+                    "champs Ages, Generations, Controle-lecture-ecarts, Comparaison-acte-ecarts et Seconde-source-essai-ecarts vidés détectés sur (b), code 1 ;",
+                    "âge au-delà de .Machine$integer.max détecté sur (b) aux formats 1 et 2, code 1.\nOK\n"))
   ok
 }
 
