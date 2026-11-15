@@ -351,7 +351,17 @@ GRILLES_ATTENDUES <- list(
                  derniers = data.frame(de = c(1900L, 1901L, 1919L, 1926L, 1931L, 1936L, 1941L, 1946L, 1951L),
                                        a = c(1900L, 1918L, 1925L, 1930L, 1935L, 1940L, 1945L, 1950L, 2005L),
                                        age = c(114L, 113L, 114:120)),
-                 premier = c(lx = 100000, lx_suivant = 73481), dernier = c(lx = 283, lx_suivant = 181)))
+                 premier = c(lx = 100000, lx_suivant = 73481), dernier = c(lx = 283, lx_suivant = 181)),
+  # Table unique 2024 (JO n° 276 du 22/11/2024, texte 17) : génération 1900,
+  # âges 96 et 97, p. 4 de l'extrait ; génération 2005, âges 119 et 120,
+  # p. 34. Générations 1900 à 1940 closes au premier l_x nul imprimé (117,
+  # 118, 119 ou 120 ans ; aucun q_x aux âges à l_x nul, q_x = 1 à l'âge qui
+  # précède ; ADR 0019, point 4.2) : `derniers` y est l'âge de ce premier
+  # zéro ; 1941 à 2005 closes à 120 ans sur une valeur.
+  "Table unique 2024" = list(lignes = 7982L, generations = 1900:2005, entree = 1996L,
+                             derniers = data.frame(de = c(1900L, 1920L, 1928L, 1934L), a = c(1919L, 1927L, 1933L, 2005L),
+                                                   age = 117:120),
+                             premier = c(lx = 100000, lx_suivant = 76231), dernier = c(lx = 483, lx_suivant = 315)))
 verifier("tables attendues : une ligne par table déclarée au format 1, une entrée par table déclarée au format 2, dans l'ordre de la déclaration",
          identical(TABLES_ATTENDUES$nom, DECLARATIONS$nom[DECLARATIONS$format == 1L]) &&
            identical(names(GRILLES_ATTENDUES), DECLARATIONS$nom[DECLARATIONS$format == 2L]))
@@ -374,6 +384,26 @@ for (nom_ in names(GRILLES_ATTENDUES)) local({
       identical(t$qx[1L], (a$premier[["lx"]] - a$premier[["lx_suivant"]]) / a$premier[["lx"]]) &&
       identical(t$qx[n], (a$dernier[["lx"]] - a$dernier[["lx_suivant"]]) / a$dernier[["lx"]])
   })
+})
+# Table unique 2024, cellules particulières (littéral de la source, p. 21 et
+# p. 5 de l'extrait) : ligne 117 du bloc 1955-1965, où TGF05 porte
+# l'anomalie A2 du JO de 2015 (M466), imprimée en onze nombres alignés, et
+# ligne 118 ; génération 1900 close par l_116 = 1 puis l_117 = 0 (q_116 = 1,
+# aucune ligne à 117 ans ; ADR 0019, point 4.2). L'identité avec TGH05 et
+# TGF05 est contrôlée sur les fichiers (tests/controles/tables_embarquees.R,
+# point (h)), jamais ici.
+verifier("table_embarquee(« Table unique 2024 ») : au catalogue (sexe ensemble, admise, empreinte égale à celle de l'objet) ; q_117 des générations 1955 à 1965 (cellules de A2) = (l_117 - l_118) / l_117 ; génération 1900 : q_116 = 1, aucune ligne à 117 ans (littéral de la source)", {
+  t <- table_embarquee("Table unique 2024")
+  cat_ <- tables_embarquees()
+  k <- cat_$nom == "Table unique 2024"
+  l117 <- c(32, 35, 38, 42, 47, 51, 56, 61, 67, 73, 80)
+  l118 <- c(17, 19, 21, 24, 26, 29, 32, 35, 39, 42, 46)
+  a2 <- t[t$age == 117L & t$generation %in% 1955:1965, ]
+  g1900 <- t[t$generation == 1900L, ]
+  sum(k) == 1L && identical(cat_$sexe[k], "ensemble") && identical(cat_$etat[k], "admise") &&
+    identical(cat_$empreinte[k], empreinte_table(t)) &&
+    identical(a2$generation, 1955:1965) && identical(a2$qx, (l117 - l118) / l117) &&
+    identical(max(g1900$age), 116L) && identical(g1900$qx[g1900$age == 116L], 1)
 })
 for (k in seq_len(nrow(TABLES_ATTENDUES))) local({
   a <- TABLES_ATTENDUES[k, ]

@@ -3197,16 +3197,27 @@ table déclarée~; (b)~le \emph{format}, sur les octets, du fichier de table
 et des relevés de contre-vérification, selon le format de la déclaration
 (colonne \code{format}, sans valeur par défaut)~: ASCII, fins de ligne LF,
 fin de ligne finale, puis, au format~1, en-tête \code{age,lx}, entiers en
-chiffres seuls, âges croissants et consécutifs, et, au format~2, en-tête
-\code{age,<g\_1>,\ldots,<g\_n>}, générations au plus égales au plus grand
-entier du moteur, générations et âges croissants et consécutifs, une
+chiffres seuls, âges croissants et consécutifs, au plus égaux au plus
+grand entier du moteur, et, au format~2, en-tête
+\code{age,<g\_1>,\ldots,<g\_n>}, générations et âges au plus égaux au
+plus grand entier du moteur, générations et âges croissants et
+consécutifs (pour les âges, aux deux formats, la première ligne en défaut
+est signalée, et la borne, motif propre, l'emporte sur la suite quand les
+deux sont en défaut sur cette ligne, comme dans le moteur~; issue~\#283~;
+pour les générations, la borne est testée sur tout l'en-tête avant la
+suite~: le refus est celui du moteur, le motif cité peut différer), une
 cellule par génération, $l_x$ entier en chiffres seuls ou \code{-}, cellule
 vide finale gardée par le découpage, donc refusée, au moins une valeur par
 ligne et par génération~; et la forme du fichier de provenance (UTF-8
 valide sans BOM, LF, aucune ligne vide, un seul enregistrement, premier
 champ \code{Format}, chaque champ une seule fois~--- contrôlé sur les
 lignes, \code{read.dcf()} fusionnant sans message un champ écrit deux
-fois~---, champs requis présents, aucun champ inconnu, visa daté), ses
+fois~---, champs requis présents, aucun champ inconnu, aucun champ présent
+vide, visa daté~; un champ connu, requis ou facultatif, écrit sans contenu
+ni ligne de suite, ou avec des blancs seulement, est refusé avec son nom
+dans le motif «~champ vide~», parce qu'il passerait la présence des champs
+requis et qu'un champ d'écarts vide se lirait comme «~aucun~», qui
+s'écrit~; issue~\#284), ses
 champs \code{Nom}, \code{Fichier}, \code{Sexe} et \code{Forme-origine}
 égaux à la déclaration~; au format~2, le champ \code{Generations} est requis
 (générations transcrites, règle des premier et dernier âges à valeur, lignes
@@ -3216,12 +3227,18 @@ d'\code{actuary} sur la question~5 de l'ADR 0019), et le groupe
 \code{Comparaison-acte-releve}, \code{Comparaison-acte-ecarts}
 (comparaison à l'acte d'homologation, relevé
 \code{<identifiant>.comparaison\_acte.csv}), facultatif, est complet ou
-absent~; ces champs sont inconnus au format~1, et les champs
-\code{Identite-regle} et \code{Identite-ecarts} que prévoit l'ADR 0019
-(point~7.1) sont refusés comme inconnus au format~2 tant que leur contrôle
-n'est pas écrit~: un champ lu par machine admis sans son contrôle
-donnerait une fausse assurance (issue~\#275, qui apportera ensemble leur
-admission, ce contrôle et un cas du témoin)~; (c)~l'\emph{identité des fichiers}~: le SHA-256
+absent~; ces champs sont inconnus au format~1~; au moins un groupe
+\code{Seconde-source*} est requis («~aucune seconde source~» sinon), sauf
+pour la table unique 2024~: pour elle seule, d'identifiant
+\code{table\_unique\_2024} et au format~2, les champs
+\code{Identite-regle} et \code{Identite-ecarts} (ADR 0019, point~7.1)
+sont requis et non vides (\code{aucun} admis) et tiennent lieu du groupe
+\code{Seconde-source*}, qui n'est plus exigé mais reste contrôlé s'il est
+présent~; ils sont inconnus sur toute autre table. La substitution suit
+l'identifiant, jamais la présence des champs, et n'est acquise qu'avec le
+contrôle~(h) satisfait dans la même exécution (décision du mainteneur du
+15/11/2026, M486~; ADR 0018, point~3.2, et ADR 0019, point~7.1,
+annotations du 15/11/2026~; issue~\#275)~; (c)~l'\emph{identité des fichiers}~: le SHA-256
 de chaque fichier cité au champ \code{Empreintes-fichiers} (fichier de
 table, relevés, pièces sources de \code{docs/sources/}), calculé par
 l'outil système \code{sha256sum}, dont l'absence est un échec et non un
@@ -3248,7 +3265,40 @@ avec le sexe et la source de la déclaration et des états conformes
 installation de l'archive sous \code{LC\_ALL=C} et sous une locale UTF-8,
 catalogue identique à celui de~(f) et tables accessibles après suppression
 du dossier \code{extdata} de la bibliothèque, ce qui montre qu'aucun
-fichier n'est lu à l'exécution. Les décalages d'âge déclarés
+fichier n'est lu à l'exécution~; (h)~l'\emph{identité de la table unique
+2024} (ADR 0019, point~7.4~; décisions M464, M466 et M486~; spécification
+d'\code{actuary-approfondi} du 15/11/2026~; issue~\#275), sans objet si
+et seulement si \code{table\_unique\_2024} n'est pas déclarée. Sinon, le
+contrôle échoue si TGH05 ou TGF05 n'est pas déclarée, si l'une des trois
+tables ne l'est pas au format~2 ou n'a pas de fichier de provenance (le
+contrôle~(h) n'est alors pas exécuté, et l'échec le dit), et sur quatre
+défauts~: (h1)~l'un des trois fichiers est
+illisible au format~2~; (h2)~les domaines (générations, âges) des trois
+grilles diffèrent~; (h3)~une cellule porte \code{-} dans TGF05 et une
+valeur dans TGH05~; (h4)~une cellule de l'anomalie A2 de TGF05 (âge 117,
+générations 1955 à~1965) est hors de la grille ou sans valeur dans l'une
+des trois. Chaque cellule de la table unique est comparée, comme chaîne,
+à la cellule calculée sur les chaînes des deux fichiers~: \code{-} si
+\code{-} dans les deux, sinon l'arrondi au plus proche de $s/5$,
+$s = 3H + 2F$, calculé en entiers ($s \mathbin{\%/\%} 5 + (s \bmod 5 \ge
+3)$~; la partie fractionnaire de $s/5$ est un multiple de 0,2, si bien
+qu'aucune égalité n'est à trancher), le \code{-} d'une seule source
+comptant pour 0. Cette convention est celle du producteur, \emph{constatée}
+par l'identité~; elle est propre au script et n'est jamais appliquée par
+le moteur (M464). Les cellules en écart, écrites
+\code{<âge>,<génération>,<cellule table unique>,<cellule calculée>},
+doivent égaler, dans les deux sens, celles du champ
+\code{Identite-ecarts}~; une ligne déclarée deux fois est un écart~(b).
+Le contrôle imprime les décomptes qui en mesurent la portée~: les cellules
+par catégorie (deux valeurs~; \code{-} de TGH05 seul~; \code{-} de TGF05
+seul~; \code{-} des deux), le nombre de cellules où l'arrondi au plus
+proche diffère de la troncature, celui des cellules où la convention
+\code{-}~=~0 donne une valeur nulle, et les onze cellules de~A2. Sur
+l'arbre (sortie de \code{tables\_embarquees.R -{}-sans-installation} du
+15/11/2026)~: catégories 7\,921, 171, 0 et 4\,734 (12\,826 cellules)~;
+arrondi discriminant sur 3\,205 des 8\,092 cellules à valeur~; 45 des
+171 cellules à \code{-} de TGH05 seul calculées nulles~; 0~écart~; onze
+cellules de A2 égales. Les décalages d'âge déclarés
 (\code{DECLARATIONS\_DECALAGES\_EMBARQUES}, format~3~; ADR 0019,
 points~6, 7.1, 7.2 et~7.5~; issue~\#273) subissent les mêmes
 contrôles~: (a)~fichiers de décalages et de provenance présents,
@@ -3260,7 +3310,8 @@ relevé pouvant répéter une ligne que sa pièce imprime deux fois), et
 fichier de provenance aux champs du format~3~: \code{Table} et
 \code{Bandes} à la place de \code{Sexe}, \code{Forme-origine} et
 \code{Ages}, \code{Representation} et \code{Empreinte-decalages}
-requis, groupe \code{Comparaison-acte} facultatif et complet, \code{Nom},
+requis, groupe \code{Comparaison-acte} facultatif et complet, aucun champ
+présent vide, \code{Nom},
 \code{Fichier} et \code{Table} égaux à la déclaration, \code{Table}
 nommant une table déclarée~; (c)~identité des fichiers, comme pour une
 table~; (d)~empreinte lue dans \code{decalages\_embarques()}, la même sur
@@ -3278,7 +3329,12 @@ constat de plateforme. \textbf{Témoin d'échec} (\code{-{}-temoin}~;
 ADR 0018, point~6.2~; ADR 0019, point~7.5)~: une copie de l'arbre, munie de
 quatre tables d'essai déclarées, deux au format~1 et deux au format~2
 (chaque fois l'une admise, l'autre refusée par le moteur), est contrôlée
-intacte (succès attendu, mesure~(g) comprise), puis avec un $l_x$ de la
+intacte (succès attendu, mesure~(g) comprise~; si la table unique est
+déclarée, la sortie doit porter la ligne des décomptes de~(h), de somme
+égale au nombre de cellules de sa grille, et la ligne «~0 écart(s), égaux
+aux écarts déclarés~», nombre lu dans \code{Identite-ecarts}, si bien
+qu'un contrôle~(h) qui ne s'exécuterait plus ferait échouer le témoin),
+puis avec un $l_x$ de la
 première table admise déclarée au format~1 (table du catalogue s'il en
 porte une, sinon l'essai admis) changé d'une unité (échec attendu, avec
 des écarts sur~(c), (d) et~(e)), puis, ce $l_x$ rétabli, avec les paires
@@ -3289,23 +3345,119 @@ paires attendues de l'essai refusé changées (écart sur~(d))~; enfin, la
 copie étant munie de décalages d'essai au format~3 (nom non ASCII, marqué
 UTF-8, et seconde source à la borne basse différente et à la ligne
 répétée, déclarées en écart), un décalage changé d'une unité (échec
-attendu, avec des écarts sur~(c), (d) et~(e))~; le témoin
+attendu, avec des écarts sur~(c), (d) et~(e))~; puis, ce décalage
+rétabli, cinq champs de provenance vidés, lignes de suite comprises~:
+\code{Ages} et \code{Controle-lecture-ecarts} de l'essai admis au
+format~1, \code{Generations} et \code{Comparaison-acte-ecarts} de l'essai
+admis au format~2, \code{Seconde-source-essai-ecarts} des décalages
+d'essai (échec attendu, avec exactement cinq écarts «~champ vide~»
+sur~(b), chacun nommant son champ, et, sur les seuls décalages d'essai,
+les trois écarts~(e) de la seconde source, devenus non déclarés puisque
+le champ vide se lit comme aucun écart déclaré~; aucun autre écart~;
+issue~\#284)~; les tables d'essai portent à cette fin le groupe
+facultatif \code{Controle-lecture-*} (format~1) ou \code{Comparaison-acte}
+(format~2), relevé copie de la table, écarts «~aucun~»~; puis, les
+provenances rétablies, les tables d'essai admises des formats~1 et~2
+réécrites sur les âges 2147483646 à 2147483648 (suite valide, seule la
+borne en cause) et les tables d'essai refusées sur les âges 0 puis
+3000000000 (hors de la suite et au-delà de la borne sur la même ligne)
+(échec attendu, avec un écart sur~(b) au motif de la borne pour chacune
+des quatre (pour les deux tables refusées, ce motif doit donc l'emporter
+sur celui de la suite)~; les écarts
+sur~(c), (d) et~(f) qui l'accompagnent ne sont pas examinés~;
+issue~\#283)~; puis, les tables d'essai rétablies, un écart fictif
+«~\code{60,1950,1,2}~» écrit au champ \code{Identite-ecarts} de la table
+unique de la copie (échec attendu, code~1, avec exactement un écart, sur~(h),
+«~déclaré (Identite-ecarts), non constaté~»~; sans objet si la table
+unique n'est pas déclarée)~; enfin, dans le processus du témoin, le contrôle~(h) sur
+des grilles forgées, dont les décomptes sont calculés à la main dans le
+commentaire du code (aucune table d'essai ne porte l'identifiant de la
+table unique~; les lignes d'écart y sont réécrites «~(écart attendu)~»)~:
+identité exacte admise~; détectés, une cellule changée, un écart déclaré
+non constaté, un écart déclaré deux fois (écart~(b)), une ligne déclarée
+mal formée, un \code{-} de TGF05 seul (h3), la table unique privée de sa
+dernière ligne ou munie d'un âge de plus (h2), la table unique déclarée
+sans l'une des sources, avec une source sans format déclaré ou sans
+fichier de provenance, une source illisible (h1), une cellule de A2 hors de la grille, ou à \code{-} dans
+TGH05 seule, dans TGF05 seule, dans la table unique seule ou dans les
+trois (h4)~; et les champs attendus de~(b)~: \code{Identite-*} sur une
+table d'essai refusés comme inconnus, table unique sans \code{Identite-*}
+ni \code{Seconde-source*} refusée, table unique munie d'\code{Identite-*}
+sans \code{Seconde-source*} admise (issue~\#275)~; le témoin
 sort avec le code~0 si tous les verdicts sont ceux attendus.
 Les relevés de contre-vérification et l'assemblage des grilles transcrites
 par blocs sont produits \textbf{hors CI} par des scripts R
 versés à côté des relevés, sous \code{tests/contre\_verification/tables/}
-(un script de relevé par couple de tables,
+(un script de relevé par la couche texte,
 \code{releves\_couche\_texte\_<tables>.R}, pour TD et TV~88-90, TH et
-TF~00-02, TGF05 et TGH05, et le script d'assemblage
-\code{assembler\_tgf05\_tgh05.R}), et cités, avec leur
+TF~00-02, TGF05 et TGH05, et la table unique 2024~; les scripts
+d'assemblage \code{assembler\_tgf05\_tgh05.R} et
+\code{assembler\_table\_unique\_2024.R}~; pour les trois tables de
+génération, le script des décomptes de cohérence
+\code{controles\_coherence\_generation.R}, ci-dessous), et cités, avec leur
 SHA-256, au champ \code{Empreintes-fichiers} du fichier de provenance~; le
 contrôle de la CI vérifie leur identité (point~(c)) et rattache chacun à
 une table (point~(a)), mais ne les exécute pas~: il rejoue la comparaison
-sur les relevés versés. \textbf{Limite}~: la borne des âges (au plus le plus grand entier du
-moteur), que le moteur applique aux formats~1 et~2, n'est pas appliquée
-par le contrôle~(b), qui l'applique aux seules générations (écart relevé
-par l'audit de l'issue~\#272 et renvoyé à une issue proposée au
-mainteneur).
+sur les relevés versés.
+\textbf{Décomptes de cohérence des tables de génération} (issue~\#279~;
+spécification d'\code{actuary-approfondi} du 15/11/2026, commentaires de
+l'issue). Le script \code{controles\_coherence\_generation.R}, versé
+sous \code{tests/contre\_verification/tables/}, en R de base, \textbf{hors CI}
+(lancé à la main, déterministe, sans aléa), lit des \emph{fichiers} de
+table au format~2, jamais les objets du moteur, refuse un fichier mal
+formé, et rend, par fichier, les nombres du champ
+\code{Controles-coherence} du fichier de provenance~: (S1)~la
+\emph{structure} (premier et dernier âges à valeur par génération, $l_x$
+au premier âge, $l_x$ nuls, $q_x = 1$, $l_x = l_{x+1} > 0$, plus grand
+$q_x < 1$ en fraction exacte), $q_x = d_x/l_x$ n'étant défini que si
+$l_x \ge 1$ et $l_{x+1}$ est une valeur, comme dans le moteur~;
+(S2)~les \emph{décroissances} $q_x < q_{x-1}$ aux âges $x \ge 31$,
+comparées en entiers ($d_x\,l_{x-1} < d_{x-1}\,l_x$), chaque couple
+classé par le critère par couple
+$(2l_{x+1} - 1)(2l_{x-1} - 1) \le (2l_x + 1)^2$, les égalités comptées
+à part~; (S3)~le \emph{test joint} par génération, sur la fenêtre de
+$\max(30,\ \text{premier âge à valeur})$ au dernier âge où $l_x \ge 1$,
+par la plus petite majorante concave $M$ de $\log(l_x - \frac12)$
+comparée à $\log(l_x + \frac12)$ (section~\ref{sec:table-reference},
+«~TGF05 et TGH05~», «~Contenu~»)~; (S4)~les médianes, minimum et
+maximum des rapports $q_x/q_{x-1}$, âges 53 à~70, sur les générations
+1940 à~2005 qui portent les âges $x-1$ à~$x+1$, et la médiane de
+$q_{60}/q_{58}$. \textbf{Statuts.} S1 et S2 sont des comparaisons en
+entiers exacts. L'arrondi au plus proche des $l_x$ imprimés, sous lequel
+S2 et S3 classent, est une \emph{hypothèse} sur le producteur pour TGF05
+et TGH05, non vérifiée~; pour la table unique 2024, il est
+\emph{constaté} par l'identité~(h) sur ses 12\,826 cellules, chaque $l_x$
+imprimé étant l'arrondi au plus proche de $L_x = (3H + 2F)/5$, si bien
+que l'intervalle $[l_x - \frac12,\ l_x + \frac12]$ contient $L_x$.
+Sous cette hypothèse ou ce constat, une incompatibilité du
+test joint (marge $m_x = \log(l_x + \frac12) - M_x < -10^{-9}$) est un
+\emph{résultat exact}~: elle est certifiée par un triplet témoin
+$(i, x, j)$ de largeur $j - i$ minimale, vérifié en entiers exacts,
+$(2l_i - 1)^{j-x}(2l_j - 1)^{x-i} > (2l_x + 1)^{j-i}$, et un défaut sans
+témoin entier fait échouer le script~; une compatibilité ($m_x > 10^{-9}$
+en tout âge hors des sommets de l'enveloppe) est une
+\emph{approximation numérique à marge certifiée}, sous l'hypothèse,
+non vérifiée, d'une fonction \code{log()} juste à quelques ulps près
+(erreur de $m_x$ de l'ordre de $10^{-12}$)~; une marge
+$|m_x| \le 10^{-9}$ est \emph{indécise}, et le script échoue en citant
+la cellule plutôt que de trancher. S4 est une approximation numérique
+(rapports en flottants, écrits à quatre décimales). Le script vérifie
+aussi que tout couple incompatible de S2 est un défaut joint. Sortie sur
+\code{inst/extdata/tables/tgf05.csv}, \code{tgh05.csv} et
+\code{table\_unique\_2024.csv}~: égale aux nombres des trois champs
+\code{Controles-coherence}, avec 0~égalité du critère par couple,
+0~indécis et une plus petite marge positive de
+$5{,}28 \cdot 10^{-6}$ (TGF05), $7{,}09 \cdot 10^{-7}$ (TGH05) et
+$1{,}05 \cdot 10^{-6}$ (table unique 2024),
+supérieure de plus de cinq ordres de grandeur à l'erreur estimée de $m_x$.
+\textbf{Témoin} (\code{-{}-temoin})~: grilles forgées, aux décomptes
+calculés à la main dans le commentaire du code~: un couple incompatible
+($l = 1000$, 990, 985), une génération en défaut joint seulement ($l =
+1000$, 985, 970, 957, témoin entier sur les quatre âges), le maximum de
+$q_x < 1$ en fraction exacte~; une égalité du critère par couple, qui
+rend le test joint indécis et doit faire échouer le script~; un
+«~--~» intercalé et un $l_x$ croissant, qui doivent être refusés~; code
+de sortie non nul si un cas n'est pas tenu.
 Les comportements du moteur (construction, refus, nom réservé, accesseurs)
 sont testés dans la batterie unitaire (section~\ref{sec:verifications-donnees}).
 
@@ -3592,12 +3744,14 @@ contre-vérification, et décalages d'âge embarqués~: complétude, format des 
 (formats~1, 2 et~3, selon la déclaration),
 SHA-256 des fichiers cités (outil \code{sha256sum}), empreinte de table ou
 refus attendu, relevés rejoués, catalogue, installation depuis
-\code{R CMD build} sous deux locales et accès sans \code{extdata}
+\code{R CMD build} sous deux locales et accès sans \code{extdata},
+identité de la table unique 2024 avec TGH05 et TGF05 (h)
 (ci-dessus)~; étapes «~Tables embarquées (ADR 0018)~» et «~Tables
 embarquées~: témoin d'échec~» (\code{-{}-temoin}) du job «~Tests
 (R 4.3.3)~», hors liste des batteries & ADR 0018, points~5, 6.1 à 6.3~;
 ADR 0011, annotation du 05/11/2026, (d)~; M447~; issue~\#263~; ADR 0019,
-points~6, 7.1, 7.2 et~7.5~; issues~\#272 et~\#273 \\
+points~6, 7.1, 7.2, 7.4 et~7.5~; M486~; issues~\#272, \#273, \#275,
+\#283 et~\#284 \\
 \end{longtable}
 \end{center}
 
@@ -6806,7 +6960,8 @@ même forme qu'une table reçue en $q_x$ (colonnes \code{age}, \code{sexe},
     (ADR 0019, point~4.4, spécification d'\code{actuary})~:
     (a)~le $q_x = 1$ d'un groupe clos par un zéro imprimé (un dernier $l_x$
     imprimé petit, 1 ou~2, puis 0~: $l_{106} = 2$, puis 0, pour TD~88-90 au
-    BO, ci-dessous) est, dans une table publiée en $l_x$ entiers arrondis,
+    BO, ci-dessous~; 41 générations de la table unique 2024,
+    ci-dessous) est, dans une table publiée en $l_x$ entiers arrondis,
     un \textbf{artefact d'arrondi}~; en général, une convention de la
     source (arrondi ou fermeture), non une donnée de mortalité~; (b)~dans une même table, certains
     groupes peuvent être clos par un zéro imprimé et d'autres non (cellule
@@ -6906,13 +7061,15 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     couvre la colonne \code{sexe}. Rien n'est embarqué sans y être déclaré~:
     aucun dossier n'est parcouru (un fichier déposé par erreur serait sinon
     embarqué), et ajouter une table modifie \code{R/donnees.R}, donc
-    l'empreinte du code. Dans cette version, la déclaration porte six
+    l'empreinte du code. Dans cette version, la déclaration porte sept
     tables~: au format~1, TD~88-90 et
     TV~88-90, de modalité \code{ensemble}, le texte les désignant par la
     garantie et non par le sexe (M449), TH~00-02 (\code{H}) et TF~00-02
-    (\code{F})~; au format~2, les tables de génération TGF05 (\code{F}) et
-    TGH05 (\code{H}) (\emph{constat de mesure} du 14/11/2026 sur
-    \code{tables\_embarquees()}~: cinq tables admises, TF~00-02 refusée).
+    (\code{F})~; au format~2, les tables de génération TGF05 (\code{F}),
+    TGH05 (\code{H}) et la table unique 2024 (\code{ensemble}, table
+    «~pour tous les assurés~»~; ci-dessous) (\emph{constat de mesure} du
+    15/11/2026 sur \code{tables\_embarquees()}, package installé depuis
+    l'arbre~: sept lignes, six tables admises, TF~00-02 refusée).
   \item \textbf{Fichier de table} (format~1, ADR 0018, point~2).
     \code{inst/extdata/tables/<identifiant>.csv}
     (\code{fichier\_table\_embarquee()}, sous
@@ -6969,8 +7126,8 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     mais par le constructeur, sous \code{table\_ages\_non\_contigus} (sexe,
     génération et deux âges cités), et une hausse sous
     \code{table\_lx\_non\_decroissants}~: un seul contrôleur des valeurs.
-    TGF05 et TGH05 sont, dans cette version, les tables embarquées à ce
-    format (ci-dessous).
+    TGF05, TGH05 et la table unique 2024 sont, dans cette version, les
+    tables embarquées à ce format (ci-dessous).
   \item \textbf{Lecture à l'installation.} \code{TABLES\_EMBARQUEES} est
     affectée au premier niveau de \code{R/donnees.R} par
     \code{lire\_tables\_embarquees()}, évaluée une seule fois, par
@@ -7145,7 +7302,8 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
     \code{inst/extdata/tables/<identifiant>.provenance.dcf}, installé avec
     elle, au format DCF (\code{champ: valeur}) de première ligne
     \code{Format: tablexp provenance 1}, lisible tel quel par un
-    certificateur, consigne la source, l'acte d'homologation, la licence, la
+    certificateur, consigne la source, l'acte d'homologation (pour la table
+    unique 2024, qui n'est pas homologuée, le texte qui la prescrit), la licence, la
     méthode de transcription, la contre-vérification et le visa du
     mainteneur. Le moteur \textbf{ne le lit pas}~: il en porte le chemin
     dans l'attribut \code{source}. Il donne deux identités, qui ne se
@@ -7617,12 +7775,14 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         (générations comprises entre 1945 et~2004), sont
         \textbf{incompatibles avec un arrondi}, dès le test couple par
         couple. Le test joint, appliqué à chaque génération sur toute la
-        fenêtre de 30~ans (ou du premier âge à valeur) au dernier âge à
-        valeur, ne relève aucune incompatibilité dans TGF05~; dans TGH05, il
+        fenêtre de 30~ans (ou du premier âge à valeur) au dernier âge où
+        $l_x \ge 1$, ici le dernier âge à valeur, aucune des deux tables
+        n'imprimant de $l_x$ nul, ne relève aucune incompatibilité dans TGF05~; dans TGH05, il
         n'en relève qu'à 59~ans, et pour 55~générations sur les 68 de 1938
         à~2005 qui ont $q_{59} < q_{58}$~: les 53 ci-dessus et les
         générations 2000 et~2005, compatibles couple par couple à 59~ans
-        mais incompatibles sur la seule fenêtre de 57 à~61~ans (génération
+        mais incompatibles dès la fenêtre de 58 à~61~ans (triplet témoin
+        $(i, x, j) = (58, 59, 61)$, vérifié en entiers~; génération
         2000~: $l_{57}, \ldots, l_{61} = 97\,850$, $97\,731$, $97\,606$,
         $97\,483$, $97\,360$, où $q_{60}$ est aussi inférieur à $q_{58}$).
         Pour ces 55~générations, le profil publié à 59~ans n'est expliqué
@@ -7645,11 +7805,20 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         pas une erreur de lecture. Son origine dans la construction des
         tables est une \emph{hypothèse non vérifiée}, que l'outil ne
         tranche pas. Dans les deux cas, ce sont des valeurs imprimées et
-        homologuées, que l'outil ne corrige pas. Les décomptes du test joint
-        sont une mesure d'\code{actuary} du 14/11/2026, reproduite par
-        \code{docwriter} le même jour sur les fichiers de table, sans
-        script versé~: leur reproduction par script est l'objet de
-        l'issue~\#279. Un
+        homologuées, que l'outil ne corrige pas. Les décomptes et les
+        médianes de ce paragraphe sont reproduits par le script hors CI
+        \code{tests/contre\_verification/tables/}\allowbreak
+        \code{controles\_coherence\_generation.R} (issue~\#279~;
+        section~\ref{sec:scripts-controle}), cité avec son SHA-256 aux
+        deux fichiers de provenance~; statuts~: décroissances et critère
+        par couple comparés en entiers exacts (aucune égalité du critère)~;
+        arrondi au plus proche des $l_x$ imprimés, \emph{hypothèse} sur le
+        producteur, non vérifiée~; incompatibilités du test joint,
+        \emph{résultat exact} sous cette hypothèse, chacune certifiée par
+        un triplet témoin vérifié en entiers (58-60 pour les 53~générations
+        des couples incompatibles, 58-61 pour 2000 et~2005)~; compatibilités
+        du test joint, \emph{approximation numérique à marge certifiée}
+        (aucun cas indécis)~; médianes, approximation numérique. Un
         consommateur à venir qui compare des $q_x$ le long d'une génération,
         ou qui positionne une table sur TGH05, héritera de ce ralentissement~; au-delà
         de l'âge où $l_x < 100$, les $q_x$ sont sensibles à l'arrondi des
@@ -7672,10 +7841,17 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         de 2006 et le BO. Le format~2 ne représente ni une cellule imprimée
         vide ni une ligne décalée~: l'écart entre la page et le fichier est
         déclaré au champ \code{Ecarts-signales}. Le contrôle de A2, et de
-        TGH05, par l'identité avec la table unique 2024 que prévoit M466 est
-        \textbf{différé} à l'issue~\#275, sortie de cette branche (M475)~:
-        il n'est pas fait ici. TGH05 ne porte aucune anomalie de
-        composition relevée.
+        TGH05, par l'identité avec la table unique 2024 que prévoit M466,
+        différé à l'issue~\#275 (M475), est fait par le contrôle~(h) de
+        \code{tests/controles/tables\_embarquees.R}
+        (section~\ref{sec:scripts-controle})~: les onze cellules de la
+        table unique à l'âge 117 des générations 1955 à~1965, imprimées
+        alignées (32, 35, 38, 42, 47, 51, 56, 61, 67, 73, 80), égalent les
+        cellules calculées depuis l'attribution de M466 et les $l_x$ de
+        TGH05 (9, 10, 11, 13, 15, 16, 18, 21, 23, 26, 29), ce qui confirme
+        cette attribution, et l'identité ne relève aucun écart sur les
+        12\,826 cellules (ci-dessous, «~Table unique 2024~»). TGH05 ne
+        porte aucune anomalie de composition relevée.
       \item \emph{Contre-vérification} (relevés sous
         \code{tests/contre\_verification/tables/}). (a)~Deux transcriptions
         visuelles aveugles sur le rendu des pages, par deux agents (IA)
@@ -7708,6 +7884,260 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         détecte une erreur de lecture, non une valeur imprimée fautive.
       \item \emph{Visa.} Valeurs des grilles assemblées visées par le
         mainteneur le 13/11/2026 (M473~; champ \code{Visa}).
+    \end{itemize}
+  \item \textbf{Table unique 2024} (issue~\#275~; E2.10, E2.24 à E2.26~;
+    ADR 0019, points~4, 5, 7 et~8.1~; décisions M211, M219, M464, M466,
+    M486 à M488). Fichier \code{inst/extdata/tables/table\_unique\_2024.csv},
+    au format~2, déclaré «~Table unique 2024~», de modalité
+    \code{ensemble}, avec son fichier de provenance, qui fait foi pour tout
+    ce qui suit et en donne les empreintes (empreinte de table
+    \code{e77470ac829a4afdd9037c8cd49c285d}). La table est admise par le
+    moteur, et aucune étape de cette version ne la lit (ci-dessus, «~Axe
+    temporel~»).
+    \begin{itemize}[leftmargin=*, itemsep=1pt]
+      \item \emph{Source de transcription.} Le fac-similé du JO
+        n\textsuperscript{o}~276 du 22/11/2024, texte~17 (arrêté du
+        18/11/2024 relatif à l'établissement des tarifs des contrats
+        d'assurance conclus dans les conditions prévues à l'article
+        L.~911-1 du code de la sécurité sociale, NOR ECOT2426307A),
+        «~ANNEXE À L'ARTICLE A.~132-18-1 DU CODE DES ASSURANCES~», p.~2
+        à~34 de l'extrait \code{docs/sources/jo\_2024-11-22\_n276\_texte17.pdf}~:
+        grille à double entrée, une colonne d'âges puis une colonne par année
+        imprimée en en-tête, de 1900 à~2005, par blocs de onze colonnes (le
+        dernier de sept), les cellules sans valeur étant imprimées «~-~».
+        L'annexe n'imprime ni titre de table, ni intitulé de grandeur, ni
+        libellé «~génération~»~: lire les colonnes comme des générations et
+        les valeurs comme des $l_x$ est une interprétation, appuyée par
+        l'identité ci-dessous (lecture de \code{regulatory} du
+        15/11/2026). Les valeurs sont lues sur le rendu des pages, jamais
+        par la couche texte (E2.25). Licence~: etalab-2.0, retenue par
+        interprétation, comme pour TGF05 et TGH05 (ADR 0019, point~8.2).
+      \item \emph{Statut et porteurs.} La table unique 2024 n'est
+        \textbf{pas une table homologuée}~: elle est prescrite par l'arrêté
+        du 18/11/2024, dont l'art.~1\textsuperscript{er},~1\textsuperscript{o},
+        crée l'article A132-18-1 et son annexe (champ \code{Homologation}~:
+        aucune)~; les règles du projet qui visent les tables homologuées
+        (lecture sur le fac-similé, fichier de provenance, visa) s'appliquent
+        à elle (M211). Elle est en vigueur depuis le 23/11/2024, lendemain
+        de la publication, l'arrêté ne fixant aucune date. Code des
+        assurances~: A132-18-1, par dérogation au quatrième alinéa
+        d'A132-18 (le a) du 2\textsuperscript{o}~: lecture littérale
+        retenue~; lecture finaliste notée, la règle de la table unique du
+        septième alinéa, que suivent la notice et l'avis ANC 2024-05,
+        «~alinéa 7~»~; E2.25, M219), permet d'établir les tarifs des «~contrats conclus dans
+        les conditions prévues à l'article L.~911-1 du code de la sécurité
+        sociale~» d'après «~une table unique pour tous les assurés
+        ci-annexée~» (usage facultatif, «~peuvent~»)~; usage second,
+        A441-4, III, complété par l'art.~1\textsuperscript{er},~3\textsuperscript{o}.
+        Mutualité et sécurité sociale~: A223-8-1 et A932-3-12, créés ou
+        rétablis par les art.~2 et~3, renvoient à cette même annexe, sans
+        porteur propre (articles lus sur le rendu de la p.~1 par
+        \code{regulatory} le 15/11/2026). \emph{Champ des contrats}
+        (lecture L1, décision du mainteneur du 15/11/2026, M486)~: les
+        contrats du dispositif, à la lettre («~conclus dans les conditions
+        prévues à l'article L.~911-1 du code de la sécurité sociale~»,
+        ci-dessus)~; la notice, bloc de présentation placé avant les visas
+        et sans portée normative (interprétation), restreint ses rubriques
+        «~Publics concernés~» et «~Objet~» aux «~contrats de retraite
+        collective~» conclus dans ces conditions~: elle est mentionnée au
+        fichier de provenance, non retenue pour le champ. \emph{Comptes sociaux}
+        (lecture L2, M486)~: aucun texte ne nomme la table~; lecture
+        retenue, (a), le règlement ANC 2015-11, art.~142-3 (provisions
+        calculées «~d'après les tables en vigueur à l'époque de
+        l'application du tarif~»), en fait un usage pour un contrat conclu
+        dans les conditions de L.~911-1, tarifé sur la table unique et non
+        liquidé, comme pour TGF05 et TGH05~; \textbf{réserve}~: une seconde
+        lecture, (b), est ouverte par l'avis ANC n\textsuperscript{o}~2024-05
+        du 22/10/2024 (cité par lien au fichier de provenance, champ
+        \code{Empreintes-hors-depot}), visé par l'arrêté, qui écrit
+        (p.~1)~: «~Les provisions resteraient calculées selon les
+        “tables de mortalité appropriées” (cf. article 142-4 du règlement
+        2015-11 de l'ANC), c'est-à-dire les TGH et TGF~», en ne citant que
+        l'art.~142-4, qui porte sur les rentes~; sous cette lecture, la
+        table n'a aucun usage en comptes sociaux. Le détail par régime, les
+        citations et leur statut (vérifié sur le rendu des pages, ou indice
+        pour les textes consolidés lus par un outil) sont au fichier de
+        provenance.
+
+        \emph{Usage actuariel} (avis d'\code{actuary-approfondi} du
+        15/11/2026 sur P4, commentaire de l'issue~\#275). Construite,
+        d'après l'identité constatée (ci-dessous), sur TGH05 et TGF05,
+        homologuées pour les rentes viagères (ci-dessus), la table unique
+        est adaptée par sa construction aux engagements en cas de vie, sans
+        que le dispositif en restreigne l'usage~; elle sous-estimerait la mortalité d'une garantie en cas
+        de décès. Ce constat ne restreint pas le champ des contrats (M486,
+        L1). À l'âge $x$, elle décrit un groupe fermé où la part des hommes
+        vaut $w_x$ (ci-dessous, «~Contenu~») et où chaque sexe meurt selon
+        TGH05 et TGF05. Pour un portefeuille plus féminin, elle surestime
+        donc la mortalité, et sous-estime la longévité, aux âges où
+        $q^F_x < q^H_x$, en particulier de 64 à~111~ans. C'est une table
+        réglementaire de tarif~: ni sa composition (part des hommes fixée
+        à 0,6 au premier âge, quel que soit le portefeuille) ni ses tables
+        sources ne sont estimées sur l'expérience du portefeuille de
+        l'entreprise qui l'emploie. L'employer comme hypothèse biométrique
+        de meilleure estimation (\emph{best estimate}) demanderait que
+        l'entreprise la justifie comme réaliste pour son portefeuille
+        (directive 2009/138/CE, art.~77, §~2~; règlement délégué (UE)
+        2015/35, art.~22, §~1~: hypothèses expliquées et justifiées,
+        fondées sur les caractéristiques du portefeuille)~; l'outil n'en
+        juge pas (E2.16). Elle peut servir de table de référence à un
+        positionnement.
+      \item \emph{Sexe.} \code{ensemble}~: table «~pour tous les
+        assurés~» (A132-18-1) et «~pour tous les membres participants~»
+        (A223-8-1, A932-3-12).
+      \item \emph{Contenu} (\emph{constat de mesure} du 15/11/2026 sur le
+        fichier de table, par le script hors CI
+        \code{controles\_coherence\_generation.R}, et sur
+        \code{table\_embarquee("Table unique 2024")}). Générations 1900
+        à~2005 (106), âges 0 à~120, 12\,826 cellules, dont 8\,092 à valeur
+        et 4\,734 sans valeur~; le premier âge à valeur de la génération
+        $g$ est $\max(0, 1996 - g)$, au $l_x$ imprimé $100\,000$~; la
+        ligne 121, imprimée sans valeur dans chaque bloc, n'est pas
+        transcrite. La table imprime 45 $l_x$ \textbf{nuls}, aux 41
+        générations 1900 à~1940~: le premier à 117~ans (1900 à~1919),
+        118~ans (1920 à~1927), 119~ans (1928 à~1933) ou 120~ans (1934
+        à~1940), et un second à l'âge suivant pour 1919, 1926, 1927
+        et~1933. Le premier zéro clôt la génération (ci-dessus,
+        «~Dernier âge et $l_x$ nuls terminaux~»)~: l'âge qui le précède
+        reçoit $q_x = 1$, calculé et non posé, soit 41 $q_x = 1$ (20
+        à~116~ans, 8 à~117, 6 à~118, 7 à~119), et les âges à $l_x$ nul ne
+        donnent aucune ligne. Ces $q_x = 1$ sont des \textbf{artefacts
+        d'arrondi}, non des données de mortalité (avis
+        d'\code{actuary-approfondi} du 15/11/2026, commentaire de
+        l'issue~\#275)~: à ces âges, TGH05 n'imprime plus de valeur, son
+        \code{-} compte pour 0 dans la règle de l'identité, et la cellule
+        est l'arrondi de $0{,}4\,l_x$ de TGF05~; TGF05 imprime 2 ou~3 à
+        l'âge du $q_x = 1$ (2 pour 28 générations, 3 pour~13) et 1 à l'âge
+        suivant, d'où 1 (arrondi de 0,8 ou de~1,2) puis 0 (arrondi
+        de~0,4)~; le second zéro de 1919, 1926, 1927 et~1933 vient de deux
+        $l_x$ égaux à~1 imprimés par TGF05 à ces générations. Les 65
+        générations 1941 à~2005 se closent sur la ligne 120, à valeur
+        ($l_{120}$ de 1 à~315), sans $q_x$ à ce dernier âge, comme toutes
+        les générations de TGF05 et de TGH05, qui n'impriment aucun zéro.
+        Une même table mêle donc deux modes de clôture~: aucun consommateur
+        ne suppose $q_\omega = 1$, et le moteur ne ferme pas la table. Une
+        fermeture, étape déclarée du plan que cette version ne propose pas
+        encore (\code{ETAPES}), ne remplacerait ces $q_x = 1$ que si son âge
+        de départ était au plus l'âge du $q_x = 1$ de chaque génération
+        employée (116~ans pour 1900 à~1919)~; c'est une condition de
+        construction à vérifier par l'utilisateur, que le moteur n'impose
+        pas. L'objet
+        a 7\,982 lignes (8\,092 cellules à valeur, moins les 45 âges à
+        $l_x$ nul, moins les 65 derniers âges sans $q_x$), de $q_x$ compris
+        dans $[0~;\ 2/3]$ hors des 41 $q_x = 1$ (2/3 en 13~cellules), avec
+        une cellule $q_x = 0$ ($l_x$ égaux, génération 1934 à~118~ans).
+        \emph{Pourquoi elle n'est pas «~$0{,}6\,q^H + 0{,}4\,q^F$~».} La
+        pondération porte sur les $l_x$~: avant arrondi, la cellule vaut
+        $L_x = (3H + 2F)/5$, donc
+        $q_x = w_x\,q^H_x + (1 - w_x)\,q^F_x$ avec
+        $w_x = 3\,l^H_x / (3\,l^H_x + 2\,l^F_x)$ (identité des mélanges,
+        \emph{résultat exact})~; le poids des hommes vaut 0,6 au premier
+        âge à valeur, croît là où $q^H_x < q^F_x$, décroît là où
+        $q^H_x > q^F_x$ et s'annule là où TGH05 est éteinte~: il croît
+        légèrement de 11 à~63~ans dans 52 générations de 1954 à~2005
+        (1\,183 couples d'âges consécutifs, $w_x < 0{,}6018$) et dans
+        32 couples isolés de 112 à~119~ans, jamais de 64 à~111~ans
+        (\emph{constat de mesure} d'\code{actuary} du 15/11/2026 sur les
+        fichiers de TGH05 et TGF05~: 1\,215 hausses sur 7\,986 couples).
+        \emph{Cohérence} (même script~;
+        définitions et critères~: ci-dessus, «~TGF05 et TGH05~»)~: 97
+        couples (génération, âge) où $q_x < q_{x-1}$ pour $x \ge 31$, dont
+        96 compatibles avec l'arrondi (17 de 31 à~34~ans, 9 à~59~ans, 70
+        de 112 à~119~ans) et un incompatible, génération 2003 à 59~ans
+        ($l_{57}$ à $l_{60}$ imprimés 97\,756, 97\,641, 97\,520,
+        97\,402), aucune égalité du critère~; le test joint, sur la
+        fenêtre de 30~ans (ou du premier âge à valeur) au dernier âge où
+        $l_x \ge 1$, close ici à l'âge du $q_x = 1$ pour 1900 à~1940, ne
+        relève que cette génération (triplet témoin entier 58, 59, 60),
+        aucun indécis. Médianes des rapports $q_x/q_{x-1}$ sur les
+        générations 1940 à~2005~: 1,0073 à 59~ans (de 0,9764 à~1,0175),
+        1,0163 à 60, 1,0346 à 61, 1,0234 à 62, contre 1,0727 à~1,1280
+        de 53 à~57 et de 64 à~70~ans~; médiane de $q_{60}/q_{58}$~: 1,0225.
+        \emph{Origine, établie pour cette table}~: sur les 68 générations
+        qui portent les âges 58 à~60, $q_{59} < q_{58}$ dans TGH05 pour
+        les 68, dans TGF05 pour aucune, dans le mélange avant arrondi pour
+        17, dont les 10 où la table imprimée décroît (comparaisons en
+        entiers sur $3H + 2F$, mesure du 15/11/2026 par un script hors
+        dépôt, remesurée par \code{actuary} le même jour, que
+        \code{controles\_coherence\_generation.R} ne reproduit pas)~; pour la génération 2003, $q_{59}/q_{58}$
+        vaut 0,9673 (TGH05), 1,0174 (TGF05), 0,9879 (mélange avant
+        arrondi) et 0,9764 (table imprimée). Le ralentissement autour de
+        60~ans et le défaut joint de 2003 sont donc \textbf{hérités de
+        TGH05 par le mélange}~: $\Delta q = w_{59}\,\Delta q^H + (1 -
+        w_{59})\,\Delta q^F + (w_{59} - w_{58})(q^H_{58} - q^F_{58})$
+        (résultat exact), où, sur les 17~générations, le terme de TGH05
+        ($-1{,}7$ à $-2{,}9 \cdot 10^{-5}$) l'emporte sur celui de TGF05
+        ($+0{,}9$ à $+2{,}6 \cdot 10^{-5}$), le glissement des poids restant
+        sous $2{,}3 \cdot 10^{-9}$ (approximation numérique). L'arrondi
+        accentue ensuite la décroissance dans 9 des 10~générations où la
+        table imprimée décroît, dont 2003, et la masque dans 7 des 17. Il
+        n'y a aucune anomalie de transcription ni de composition~; l'origine du ralentissement dans la construction de TGH05 reste non
+        établie (ci-dessus). Statuts~: comparaisons en entiers exacts~;
+        arrondi au plus proche \emph{constaté} par l'identité sur les
+        12\,826 cellules (que le producteur ait procédé ainsi reste une
+        inférence, sans incidence sur ces contrôles)~; compatibilités du
+        test joint, approximation numérique à marge certifiée (plus petite
+        marge positive $1{,}05 \cdot 10^{-6}$)~; médianes, approximation
+        numérique.
+      \item \emph{Identité avec TGH05 et TGF05, en lieu de seconde source}
+        (M486~; ADR 0019, point~7.4). Aucune seconde source n'est retenue
+        pour la table (M472~: l'impression de la version électronique de
+        Légifrance n'est pas requise, faute d'apporter une information
+        absente du fac-similé versé)~; pour elle seule, le groupe
+        \code{Identite-regle}, \code{Identite-ecarts} et le contrôle~(h)
+        tiennent lieu de seconde source (section~\ref{sec:scripts-controle},
+        points~(b) et~(h)). L'identité est une \emph{contre-vérification,
+        jamais une source} (M219~; E2.26)~: aucun texte ne fixe la règle.
+        Le dispositif dit seulement «~une table unique pour tous les
+        assurés ci-annexée~»~; la pondération 0,6 / 0,4 ne figure, dans
+        l'arrêté, que dans la notice, sans portée normative, qui ne nomme ni TGH05 ni TGF05,
+        ne dit ni $l_x$ ni $q_x$ et ne fixe ni effectif de départ ni
+        arrondi. Tables pondérées, grandeur pondérée ($l_x$) et arrondi
+        sont des \emph{constats} de l'identité~: chaque cellule est
+        \code{-} si et seulement si TGH05 et TGF05 portent \code{-}, sinon
+        l'arrondi au plus proche de $(3H + 2F)/5$, le \code{-} de TGH05
+        seule comptant pour 0 (convention du producteur, propre au script
+        de contrôle, jamais appliquée par le moteur~; M464). Résultat~:
+        0~écart sur les 12\,826 cellules (catégories~: deux valeurs
+        7\,921~; \code{-} de TGH05 seul 171, dont 45 calculées nulles, qui
+        sont les 45 $l_x$ nuls~; \code{-} de TGF05 seul~0~; \code{-} des
+        deux 4\,734)~; l'arrondi au plus proche diffère de la troncature
+        en 3\,205 des 8\,092 cellules à valeur, ce qui en fait un test
+        discriminant~; les onze cellules de A2 confirment l'attribution
+        de M466 (ci-dessus, «~TGF05 et TGH05~»).
+      \item \emph{Transcription et contre-vérification} (relevés sous
+        \code{tests/contre\_verification/tables/}). (a)~Deux transcriptions
+        visuelles aveugles, A et B, sur le seul rendu image des pages
+        (\code{pdftoppm -r 300}), sans extraction de texte, par blocs de
+        onze générations (dix blocs), en vingt consultations distinctes
+        d'un agent (IA), chacune sans accès à l'autre transcription, aux
+        fichiers de TGF05 et de TGH05 ni à la couche texte~; blocs et notes
+        des transcripteurs gelés par SHA-256 avant toute comparaison~: A et
+        B identiques octet pour octet sur les dix blocs (12\,932 cellules,
+        âges 0 à~121), aucune cellule imprimée vide, ligne mal composée ni
+        cellule douteuse relevée. Les blocs, les notes et le fichier de gel
+        ont été versés dans un dossier provisoire, puis retirés à
+        l'embarquement de la table~; ils restent lisibles au
+        commit \code{272f34e} (M487). La grille est assemblée sur B par le
+        script hors CI
+        \code{tests/contre\_verification/tables/}\allowbreak
+        \code{assembler\_table\_unique\_2024.R} (R de base), qui contrôle le
+        gel, A~=~B, la forme des blocs, la seule ligne 121 sans valeur et le
+        format~2, et dont le rejeu depuis \code{git archive 272f34e} rend un
+        fichier identique au fichier de table~; le relevé de la
+        transcription B lui est identique octet pour octet. (b)~Identité
+        avec TGH05 et TGF05, en lieu de seconde source (ci-dessus).
+        (c)~Couche texte du fac-similé, extraite après le gel et
+        l'assemblage (\code{pdftotext -bbox}, script hors CI
+        \code{releves\_couche\_texte\_table\_unique\_2024.R}), contrôle de
+        lecture seulement~: 12\,826 cellules comparées, aucun écart.
+        Les écarts déclarés au fichier de provenance (aucun) sont vérifiés
+        par le contrôle de la CI (points~(e) et~(h)). \textbf{Portée}~:
+        comme pour les autres tables, la contre-vérification détecte une
+        erreur de lecture, non une valeur imprimée fautive.
+      \item \emph{Visa.} Valeurs de la grille assemblée (SHA-256
+        \code{172b307c}\ldots\code{61b4}) visées par le mainteneur le
+        15/11/2026 (M488~; champ \code{Visa}).
     \end{itemize}
   \item \textbf{Décalages d'âge} (ADR 0019, point~6~; spécification
     d'\code{actuary} sur l'issue~\#273~; décisions M467, M469 et M477~;
@@ -7994,7 +8424,13 @@ déclarée, la table rendue (nombre de lignes, âges extrêmes, sexe déclaré,
 source, premier $q_x$ comparé à $(l_0 - l_1)/l_0$ écrit d'après la source~;
 pour TGF05 et TGH05, nombre de lignes, générations, âges de chaque
 génération du premier âge à valeur à l'avant-dernier, premier et dernier
-$q_x$ comparés à des $l_x$ écrits d'après la source~; issue~\#274)
+$q_x$ comparés à des $l_x$ écrits d'après la source~; issue~\#274~;
+pour la table unique 2024, de même, les générations 1900 à~1940 étant
+closes au premier $l_x$ nul, plus son état au catalogue, son empreinte
+égale à celle de l'objet, les $q_{117}$ des cellules de A2 et le
+$q_{116} = 1$ de la génération 1900, sans ligne à 117~ans~; l'identité
+avec TGH05 et TGF05 est contrôlée sur les fichiers, par le contrôle~(h),
+jamais dans la batterie~; issue~\#275)
 ou son refus (motif, paires citées)~; les décalages d'âge le sont par
 \code{tests/unitaires/test\_decalages\_age.R} (issue~\#273, cas D1 à
 D5, F1 à F3, P1 à P4 et A1 à A4 de la spécification d'\code{actuary})~:
@@ -19594,8 +20030,8 @@ E2.18 & suivi d'expérience~: rapport observés~/ attendus global et par sous-gr
 E2.14 & intervalles exacts et asymptotiques des taux bruts, avec leur statut (le bootstrap par têtes viendra avec les tables lissées et positionnées) & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:brut-statuts} \\
 E2.19 & simulateur~: loi vraie, entrées, têtes multi-contrats, sorties concurrentes, censure, défauts paramétrés, constat de simulation~; retrouver la loi vraie par les taux bruts et par le positionnement (constat hors CI) & \ref{sec:simulation}, \ref{sec:defauts-parametres}, \ref{sec:constats-brut}, \ref{sec:positionnement-verifications} \\
 E2.20 & quatre statuts, erreur Monte-Carlo et erreur d'estimation & \ref{sec:reproductibilite-exigence}, \ref{sec:recettes}, \ref{sec:constats-simulation}, \ref{sec:brut-statuts}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:coherence-regularite}, \ref{sec:positionnement-etape}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions} \\
-E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, TH~00-02 et TF~00-02 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, décalages d'âge de TH et TF~00-02 et grilles de TGF05 et TGH05 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, TGF05 et TGH05 comparées à l'acte sur l'extrait versé du JO n\textsuperscript{o}~197 du 26/08/2006, décalages d'âge de TH et TF~00-02 comparés à l'acte sur l'extrait versé du JO n\textsuperscript{o}~302 du 29/12/2005 (arrêté du 20/12/2005), la couche texte ne servant qu'à la comparaison et au contrôle de lecture~; version initiale de l'arrêté du 08/12/2006 versée par l'impression du BO Santé 2007-1, annonce n\textsuperscript{o}~58, seconde source~; textes cités non versés~: arrêtés du 08/12/2006 (version en vigueur), du 21/12/2006 et du 30/12/2015 (versions électroniques), \#13, \#268) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
-E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; TH~00-02 (\code{H}, lignes 111 et~112 imprimées sans valeur, non transcrites) et TF~00-02 (\code{F}) transcrites du fac-similé du JO n\textsuperscript{o}~301 du 29/12/2015 (annexe à l'article A132-18), avec leur acte d'homologation, leurs porteurs (et, pour les comptes sociaux, leur usage) par régime et leur statut, et leur contre-vérification, TF~00-02 telle qu'imprimée, ses trois valeurs fautives (âges 11, 23 et~62) signalées avec celles du BO Santé 2007-1, seconde source citée sans correction, et refusée par le moteur (état \code{refusee})~; décalages d'âge de TH et TF~00-02 embarqués en objet propre (\code{decalages\_age}, format~3, empreinte \code{tablexp decalages 1}, accesseur \code{decalages\_embarques()}), avec leur provenance et leur contre-vérification, leur application aux $q_x$ (A132-19) décidée mais non mise en œuvre~; TGF05 (\code{F}) et TGH05 (\code{H}), tables de génération au format~2, transcrites du même fac-similé, avec leur acte d'homologation (arrêté du 1\textsuperscript{er}~août 2006), leurs porteurs par régime et leur statut, leur comparaison à l'acte (JO de 2006) et leur seconde source (BO Santé 2007-1, annexe~II), les anomalies A1 et A2 de TGF05 traitées selon M466, leur contrôle par l'identité avec la table unique 2024 différé (\#275)~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction~; $l_x$ nuls terminaux admis, le premier clôturant le groupe~; table de génération (colonne \code{generation}, exclusive d'\code{annee}), lue par aucune étape de cette version, et format~2 du fichier de table, grille âge $\times$ génération telle qu'imprimée, cellule sans valeur «~-~») & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
+E2.25 & sources des textes et des tables (en partie~: pièces sources d'une table embarquée citées à son fichier de provenance par leur chemin et leur SHA-256, vérifié par un contrôle de la CI~; TD~88-90 et TV~88-90 lues sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, TH~00-02 et TF~00-02 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, décalages d'âge de TH et TF~00-02 et grilles de TGF05 et TGH05 sur celui du JO n\textsuperscript{o}~301 du 29/12/2015, TGF05 et TGH05 comparées à l'acte sur l'extrait versé du JO n\textsuperscript{o}~197 du 26/08/2006, décalages d'âge de TH et TF~00-02 comparés à l'acte sur l'extrait versé du JO n\textsuperscript{o}~302 du 29/12/2005 (arrêté du 20/12/2005), grille de la table unique 2024 sur le rendu des pages du fac-similé du JO n\textsuperscript{o}~276 du 22/11/2024, la couche texte ne servant qu'à la comparaison et au contrôle de lecture~; version initiale de l'arrêté du 08/12/2006 versée par l'impression du BO Santé 2007-1, annonce n\textsuperscript{o}~58, seconde source~; textes cités non versés~: arrêtés du 08/12/2006 (version en vigueur), du 21/12/2006 et du 30/12/2015 (versions électroniques), \#13, \#268) & \ref{sec:table-reference}, \ref{sec:scripts-controle} \\
+E2.26 & tables de référence embarquées, avec leur provenance (en partie~: catalogue déclaré, contenu lu à l'installation et table construite à l'appel~; fichier de provenance à deux identités, SHA-256 du fichier transcrit et empreinte de table, et contre-vérification rejouée par un contrôle de la CI~; table refusée par le moteur gardée au catalogue~; nom d'une table embarquée réservé~; TD~88-90 et TV~88-90 transcrites du fac-similé du JO n\textsuperscript{o}~2 du 03/01/2016, de modalité \code{ensemble}, avec leur acte d'homologation, leurs porteurs par régime et leur statut, et leur contre-vérification~; TH~00-02 (\code{H}, lignes 111 et~112 imprimées sans valeur, non transcrites) et TF~00-02 (\code{F}) transcrites du fac-similé du JO n\textsuperscript{o}~301 du 29/12/2015 (annexe à l'article A132-18), avec leur acte d'homologation, leurs porteurs (et, pour les comptes sociaux, leur usage) par régime et leur statut, et leur contre-vérification, TF~00-02 telle qu'imprimée, ses trois valeurs fautives (âges 11, 23 et~62) signalées avec celles du BO Santé 2007-1, seconde source citée sans correction, et refusée par le moteur (état \code{refusee})~; décalages d'âge de TH et TF~00-02 embarqués en objet propre (\code{decalages\_age}, format~3, empreinte \code{tablexp decalages 1}, accesseur \code{decalages\_embarques()}), avec leur provenance et leur contre-vérification, leur application aux $q_x$ (A132-19) décidée mais non mise en œuvre~; TGF05 (\code{F}) et TGH05 (\code{H}), tables de génération au format~2, transcrites du même fac-similé, avec leur acte d'homologation (arrêté du 1\textsuperscript{er}~août 2006), leurs porteurs par régime et leur statut, leur comparaison à l'acte (JO de 2006) et leur seconde source (BO Santé 2007-1, annexe~II), les anomalies A1 et A2 de TGF05 traitées selon M466~; table unique 2024 (\code{ensemble}), table de génération au format~2, prescrite et non homologuée, transcrite du fac-similé du JO n\textsuperscript{o}~276 du 22/11/2024 (annexe à l'article A132-18-1) par deux transcriptions aveugles identiques, avec ses porteurs par régime et leur statut (lectures L1 et L2, M486), contrôlée par son identité avec TGH05 et TGF05 en lieu de seconde source (0~écart sur 12\,826 cellules, A2 confirmée) et par la couche texte~; entrée d'une table transcrite en $l_x$, convertie en $q_x$, et refus de toute table de référence aux $l_x$ non décroissants, en citant les paires d'âges consécutifs, sans correction~; $l_x$ nuls terminaux admis, le premier clôturant le groupe~; table de génération (colonne \code{generation}, exclusive d'\code{annee}), lue par aucune étape de cette version, et format~2 du fichier de table, grille âge $\times$ génération telle qu'imprimée, cellule sans valeur «~-~») & \ref{sec:table-reference}, \ref{sec:tables-reference-recues}, \ref{sec:scripts-controle} \\
 E3.1 & document LaTeX unique, une partie par module, charte d'\code{outil\_USP}, tableaux de fonctions & ensemble du document \\
 E3.2 & fiche de chaque méthode~: objet, hypothèses, estimateur, fonction, statut, références~; fiche de chaque vérification & \ref{sec:brut-poisson}, \ref{sec:brut-binomial}, \ref{sec:brut-kaplan-meier}, \ref{sec:constats-brut}, \ref{sec:lissage-quadratique}, \ref{sec:lissage-poisson}, \ref{sec:lissage-verifications}, \ref{sec:validation-statistiques}, \ref{sec:importance-exclusions}, \ref{sec:validation-verifications} \\
 E3.3 & test de concordance entre la documentation et le code & \ref{sec:trois-batteries} \\

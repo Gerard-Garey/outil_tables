@@ -1,0 +1,489 @@
+Format: tablexp provenance 1
+Nom: Table unique 2024
+Fichier: inst/extdata/tables/table_unique_2024.csv
+Sexe: ensemble
+ Modalité déclarée au catalogue (R/donnees.R, DECLARATIONS_TABLES_EMBARQUEES),
+ non lue dans le fichier de table (ADR 0018, points 1.1 et 2.3). Table
+ « pour tous les assurés » (A132-18-1, créé par l'arrêté du 18 novembre
+ 2024, art. 1er, 1°) et « pour tous les membres participants » (A223-8-1,
+ art. 2 ; A932-3-12, art. 3) ; lus sur le rendu de la p. 1 de l'extrait
+ (regulatory, 15/11/2026,
+ https://github.com/Gerard-Garey/outil_tables/issues/275#issuecomment-6891996056).
+ Nom au catalogue et identifiant fixés par l'ADR 0019, point 8.1 (D8, M459).
+Forme-origine: lx
+Intitule: « ANNEXE » puis « ANNEXE À L'ARTICLE A. 132-18-1 DU CODE DES
+ ASSURANCES » (JO n° 276 du 22/11/2024, texte 17, p. 2 de l'extrait) ;
+ grille à double entrée, colonne « Age » (sans accent) puis une colonne par
+ année imprimée en en-tête (« 1900 » à « 2005 »), par blocs de onze colonnes
+ (le dernier de sept), en-tête des colonnes imprimé en haut des p. 4, 5,
+ 21 et 34 et au début des blocs 1911-1921 (p. 5) et 1966-1976 (p. 21), les
+ autres pages n'ayant pas été relues pour ce point ; aucun titre de table
+ imprimé, aucun intitulé de grandeur (ni « Lx »), ni libellé « génération »
+ ou « année de naissance » ; cellules sans valeur imprimées « - ». Lire les
+ colonnes comme des générations et les valeurs comme des l_x est une
+ interprétation, appuyée par l'identité (champ Identite-regle) ; E2.24
+ (« en l_x par génération ») est un constat, non un texte. Vu sur le rendu
+ des p. 2, 4, 5, 21 et 34 de l'extrait (regulatory le 15/11/2026 pour les
+ p. 2 et 34 ; coder-approfondi le 15/11/2026, pdftoppm à 100 dpi, pour les
+ p. 4, 5, 21 et 34).
+Ages: 0 à 120 transcrits (121 lignes de la grille) ; premier et dernier âge
+ à valeur par génération au champ Generations. Ligne 121 imprimée dans
+ chacun des dix blocs avec « - » dans toutes ses cellules (106 cellules),
+ seule ligne imprimée sans valeur, non transcrite (ADR 0019, point 5.2) :
+ constat des deux transcriptions (script d'assemblage, contrôle 4) et de la
+ couche texte (journal : « lignes sans valeur non écrites au relevé :
+ [121] »).
+Generations: 1900 à 2005 transcrites (106 colonnes consécutives ; 12 826
+ cellules aux âges 0 à 120, dont 8 092 à valeur, 45 de ces valeurs nulles,
+ et 4 734 sans valeur écrites « - »). Premier âge à valeur de la génération
+ g : max(0, 1996 - g), au l_x imprimé 100000 pour les 106 générations (96
+ ans pour 1900, 0 an de 1996 à 2005). Dernier âge à valeur imprimée, l_x nul
+ compris : 117 pour 1900 à 1918 ; 118 pour 1919 à 1925 ; 119 pour 1926 à
+ 1932 ; 120 pour 1933 à 2005. Aucun « - » entre deux valeurs d'une même
+ génération ; aucune génération sans valeur ; aucune ligne sans valeur aux
+ âges 0 à 120. L_x nuls imprimés (M465 ; ADR 0019, point 4.2) : 45, aux 41
+ générations 1900 à 1940, le premier à 117 ans (1900 à 1919), 118 ans (1920
+ à 1927), 119 ans (1928 à 1933) ou 120 ans (1934 à 1940) ; un second l_x nul
+ à l'âge suivant pour quatre générations (1919 à 118 ans, 1926 et 1927 à 119
+ ans, 1933 à 120 ans). Chaque génération est close au premier l_x nul :
+ l'âge qui le précède reçoit q_x = 1, calculé par la formule commune, non
+ posé, et les âges à l_x nul ne donnent aucune ligne ; les 65 générations
+ 1941 à 2005 se closent sur la ligne 120, dernière ligne transcrite (l_120
+ de 1 à 315), sans q_x à ce dernier âge (ADR 0019, point 4.1). L'objet a
+ 7 982 lignes (8 092 - 45 âges à l_x nul - 65 derniers âges sans q_x),
+ dernier âge de l'objet : 116 pour 1900 à 1919, 117 pour 1920 à 1927, 118
+ pour 1928 à 1933, 119 pour 1934 à 2005 ; 41 q_x = 1 (20 à 116 ans, 8 à 117,
+ 6 à 118, 7 à 119), aux générations 1900 à 1940. Mesure du 15/11/2026 sur
+ le fichier de table (tests/contre_verification/tables/controles_coherence_generation.R)
+ et sur table_embarquee("Table unique 2024"). Ces q_x = 1 sont des artefacts
+ de l'arrondi des l_x (avis d'actuary-approfondi,
+ https://github.com/Gerard-Garey/outil_tables/issues/275#issuecomment-6892055428 ;
+ champ Controles-coherence), non des données de mortalité.
+Homologation: aucune. La table unique 2024 n'est pas une table homologuée :
+ elle est prescrite par l'arrêté du 18 novembre 2024 relatif à
+ l'établissement des tarifs des contrats d'assurance conclus dans les
+ conditions prévues à l'article L. 911-1 du code de la sécurité sociale
+ (NOR ECOT2426307A, JO n° 276 du 22/11/2024, texte 17), art. 1er, 1°, qui
+ crée A132-18-1 et son annexe (« ci-annexée ») ; les articles 1 à 4
+ n'emploient pas le mot « homologation » ni ses dérivés ; seule la notice,
+ non normative (champ Identite-regle), la dit « moyenne pondérée des tables
+ homologuées ». Les règles du projet qui visent les tables homologuées
+ (fac-similé, provenance, visa) s'appliquent à elle (M211 ; CONTEXT.md,
+ « Table unique 2024 »). L'arrêté ne cite pas A335-1 (abrogé, cité à titre
+ historique). Statut : vérifié sur
+ le rendu des p. 1 et 2 de l'extrait par regulatory le 15/11/2026
+ (https://github.com/Gerard-Garey/outil_tables/issues/275#issuecomment-6891996056).
+Porteurs-usages:
+ Champ des contrats (M486, L1) : le dispositif, à la lettre : les « contrats
+ conclus dans les conditions prévues à l'article L. 911-1 du code de la
+ sécurité sociale » (A132-18-1 et A223-8-1 ; A932-3-12 : « conclus dans les
+ conditions prévues à l'article L. 911-1 »). La notice, bloc de
+ présentation placé avant les visas et la formule « Arrêtent : », hors des
+ articles 1 à 4 et sans portée normative (interprétation, regulatory,
+ 15/11/2026), restreint ses rubriques « Publics concernés » et « Objet » aux
+ « contrats de retraite collective conclus dans les conditions prévues à
+ l'article L. 911-1 du code de la sécurité sociale » ; elle est mentionnée
+ ici, non retenue pour le champ (décision du mainteneur du 15/11/2026, M486,
+ https://github.com/Gerard-Garey/outil_tables/pull/289#issuecomment-6892088133,
+ sur les lectures de regulatory-approfondi et l'avis d'actuary-approfondi,
+ https://github.com/Gerard-Garey/outil_tables/issues/275#issuecomment-6892051278).
+ Code des assurances : porteur unique, annexe à l'article A132-18-1
+ (« ANNEXE À L'ARTICLE A. 132-18-1 DU CODE DES ASSURANCES », p. 2 de
+ l'extrait), créée par l'arrêté du 18 novembre 2024 (NOR ECOT2426307A), JO
+ n° 276 du 22/11/2024, texte 17, art. 1er, 1° : « Art. A. 132-18-1. – Par
+ dérogation au quatrième alinéa de l'article A. 132-18, les tarifs des
+ contrats conclus dans les conditions prévues à l'article L. 911-1 du code
+ de la sécurité sociale peuvent être établis d'après une table unique pour
+ tous les assurés ci-annexée. » Usage facultatif (« peuvent »). Quatrième
+ alinéa : lecture littérale retenue, a) du 2° de A132-18 ; lecture
+ finaliste notée, septième alinéa, règle de la table unique (E2.25 ;
+ M219). Usage
+ second : A441-4, III, complété par l'art. 1er, 3° (« ou à l'article
+ A. 132-18-1 ») ; la rente issue de la conversion de la convention de
+ l'article R. 441-27 est tarifée « à l'aide du taux maximum prévu par
+ l'article A. 132-1 et de la table de mortalité appropriée, qui est
+ mentionnée au a du 2° de l'article A. 132-18 ou à l'article A. 132-18-1 »
+ (texte consolidé, indice). Disposition voisine, qui n'est pas un usage de
+ la table : A111-5, complété par l'art. 1er, 2° (« Le présent article ne
+ s'applique pas aux contrats conclus dans les conditions prévues à
+ l'article L. 911-1 du code de la sécurité sociale. »). Statut : art. 1er lu
+ sur le rendu de la p. 1 par regulatory le 15/11/2026 (vérifié) ; texte
+ consolidé de A132-18-1, de A441-4, III, et de A111-5 : Légifrance
+ (LEGIARTI000050653202, LEGIARTI000050653521, LEGIARTI000050653543), « En
+ vigueur depuis le 23 novembre 2024 », aucune modification affichée au
+ 15/11/2026 (lecture outillée du 15/11/2026 par regulatory, WebFetch, texte
+ extrait par un modèle de synthèse ; indice, non vérifié). Entrée en
+ vigueur : 23/11/2024, lendemain de la publication au JO du 22/11/2024 ;
+ l'arrêté ne fixe aucune date (art. 1er à 4, lus sur le rendu des p. 1 et
+ 2), la date résulte du code civil, art. 1er, premier alinéa (indice :
+ Légifrance, lecture outillée du 15/11/2026, LEGIARTI000006419280) ; la
+ mention « Entrée en vigueur : le lendemain de la publication. » du bloc de
+ présentation (p. 1) concorde, sans être normative.
+ Mutualité : aucun porteur propre. A223-8-1, créé par l'art. 2 : « Par
+ dérogation au quatrième alinéa de l'article A. 223-8, les tarifs des
+ contrats conclus dans les conditions prévues à l'article L. 911-1 du code
+ de la sécurité sociale peuvent être établis d'après la table unique pour
+ tous les membres participants annexée à l'article A. 132-18-1 du code des
+ assurances. » Statut : vérifié (rendu de la p. 1, regulatory, 15/11/2026) ;
+ numérotation des alinéas de A223-8 non établie ; consolidé
+ LEGIARTI000050653193 (indice).
+ Sécurité sociale : aucun porteur propre. A932-3-12, « rétabli » par
+ l'art. 3 : « Par dérogation au quatrième alinéa de l'article A. 932-3-11,
+ les tarifs des contrats conclus dans les conditions prévues à l'article
+ L. 911-1 peuvent être établis d'après une table unique pour tous les
+ membres participants annexée à l'article A. 132-18-1 du code des
+ assurances. » Statut : vérifié (rendu de la p. 1, regulatory, 15/11/2026) ;
+ numérotation des alinéas de A932-3-11 non établie ; consolidé
+ LEGIARTI000050653557 (indice). Le numéro A932-3-12 a porté un article
+ antérieur, abrogé : le règlement ANC 2015-11, art. 423-29 (recueil 2025,
+ p. 141), cite encore « A.932-3-12 » pour la participation aux résultats ;
+ ce renvoi vise l'ancien article, non la table unique (lecture de
+ regulatory du 15/11/2026).
+ La rubrique « Références » de la notice annonce « des annexes à ces
+ articles », au pluriel ; le dispositif n'en crée qu'une (A132-18-1),
+ A223-8-1 et A932-3-12 renvoyant à elle ; Légifrance n'affiche qu'une
+ « Annexe à l'article A132-18-1 » (LEGIARTI000050653208, indice).
+ Comptes sociaux (M486, L2) : aucun texte ne nomme la table. Règlement ANC
+ 2015-11 (recueil des normes comptables / assurance de l'ANC, « Version en
+ vigueur au 1er janvier 2025 », p. 18 du recueil, p. 19 du PDF ; SHA-256 au
+ champ Empreintes-hors-depot, pièce hors dépôt). Art. 142-3 : provisions
+ mathématiques calculées, « s'ils comportent un élément viager et sous
+ réserve de l'article 142-4 du présent règlement, d'après les tables en
+ vigueur à l'époque de l'application du tarif, dans le respect des
+ dispositions du code des assurances, du code de la mutualité ou du code de
+ la sécurité sociale s'appliquant à l'entreprise » (texte cité au champ
+ Porteurs-usages de inst/extdata/tables/tgf05.provenance.dcf, lu par
+ regulatory sur le rendu de la p. 18 du recueil le 14/11/2026, relu au
+ contrôle de conformité du 15/11/2026, pièce retéléchargée, SHA-256 égal).
+ Lecture
+ retenue, (a) : pour un contrat conclu dans les conditions de L. 911-1,
+ tarifé sur la table unique et non liquidé, la table unique est « table en
+ vigueur à l'époque de l'application du tarif » : l'art. 142-3 est un usage
+ de la table en comptes sociaux, comme pour TGF05 et TGH05 (M479, M480 ;
+ décision du mainteneur du 15/11/2026, M486). Réserve (M486) : une seconde
+ lecture, (b), est ouverte par l'avis ANC n° 2024-05 du 22/10/2024 (visé par
+ l'arrêté : « Vu l'avis de l'Autorité des normes comptables en date du 22
+ octobre 2024 », p. 1), p. 1 : « le calcul des provisions mathématiques
+ afférentes aux contrats concernés, défini par le règlement ANC n° 2015-11
+ de l'ANC, n'est pas modifié. Les provisions resteraient calculées selon les
+ « tables de mortalité appropriées » (cf. article 142-4 du règlement
+ 2015-11 de l'ANC), c'est-à-dire les TGH et TGF. » ; sous (b), la table
+ unique n'a aucun usage en comptes sociaux ; l'avis ne cite que
+ l'art. 142-4, qui porte sur les rentes ; le Collège y constate aussi,
+ p. 1, que les modifications « n'ont pas d'impact sur les règles comptables
+ applicables aux organismes d'assurance ». Statut de la citation : vérifiée
+ sur le rendu de la p. 1 de l'avis par regulatory le 15/11/2026, relue au
+ contrôle de conformité du même jour (pièce retéléchargée, SHA-256 égal au
+ champ Empreintes-hors-depot) ; pièce hors dépôt, citée par lien (E2.25).
+ Le règlement n'a
+ pas été modifié : recueil 2025, aucune occurrence de « 132-18-1 » ni de
+ « 223-8-1 » (recherche par la couche texte d'un document qui n'est pas une
+ table, regulatory, 15/11/2026) ; art. 142-4 renvoyant aux seuls A132-18,
+ A223-8 et A932-3-11 (rendu de la p. 18 du recueil, lecture de regulatory
+ du 14/11/2026).
+Source: Journal officiel de la République française n° 276 du 22 novembre
+ 2024, texte 17 sur 154 : « Arrêté du 18 novembre 2024 relatif à
+ l'établissement des tarifs des contrats d'assurance conclus dans les
+ conditions prévues à l'article L. 911-1 du code de la sécurité sociale »,
+ NOR ECOT2426307A ; « ANNEXE À L'ARTICLE A. 132-18-1 DU CODE DES
+ ASSURANCES » (texte en vigueur ; E2.26). Valeurs transcrites telles
+ qu'imprimées, sans aucune anomalie de composition relevée (champ
+ Ecarts-signales).
+Source-nature: fac-similé du JO (numéro complet publié au format PDF, pages
+ extraites sans rendu ni recompression ; docs/sources/README.md).
+Source-URL: aucune adresse de la source imprimée sur les pages de l'extrait
+ (l'adresse https://www.legifrance.gouv.fr de la rubrique « Références » de
+ la notice renvoie aux codes consolidés) ; non consignée. Version
+ électronique : JORFTEXT000050651850 (information, non source).
+Source-consultation: pièce déposée et versée au dépôt
+ (docs/sources/jo_2024-11-22_n276_texte17.pdf, M442).
+Source-licence: Licence etalab-2.0 retenue par interprétation (numéro servi
+ par Légifrance ; mention générale du site « Sauf mention contraire, tous les
+ contenus de ce site sont sous licence etalab-2.0 », relevée aussi sur la
+ page JORFTEXT000050651850 le 15/11/2026, lecture outillée de regulatory,
+ indice ; aucune mention contraire relevée) ; à défaut, réutilisation des
+ informations publiques (code des relations entre le public et
+ l'administration, L321-1 et L322-1 : informations non altérées, source et
+ date mentionnées). Statut : retenue par interprétation (renvoi à la
+ lecture (a) de M454, ADR 0019, point 8.2, D9 de B22 ; M442 ;
+ docs/sources/README.md). La licence du dépôt (PolyForm Noncommercial
+ 1.0.0) ne couvre pas cette table (ADR 0006, point 2 ; ADR 0018, point 3.5).
+Source-pages: p. 2 à 34 de l'extrait docs/sources/jo_2024-11-22_n276_texte17.pdf
+ (p. 33 à 65 du numéro complet ; extrait p. 1 à 34 = pièce p. 32 à 65,
+ docs/sources/README.md) ; texte de l'arrêté p. 1 et 2. Dix blocs de
+ générations, chacun aux âges 0 à 121 sur plusieurs pages, repérés par la
+ session sur les seuls en-têtes de colonnes (LISEZMOI.md des transcriptions,
+ commit 272f34e) : 1900-1910, p. 2 à 5 ; 1911-1921, p. 5 à 8 ; 1922-1932,
+ p. 8 à 11 ; 1933-1943, p. 12 à 15 ; 1944-1954, p. 15 à 18 ; 1955-1965,
+ p. 18 à 21 ; 1966-1976, p. 21 à 24 ; 1977-1987, p. 24 à 28 ; 1988-1998,
+ p. 28 à 31 ; 1999-2005, p. 31 à 34. La p. 2 porte la fin du texte de
+ l'arrêté puis le début de l'annexe.
+Transcription-methode: Transcription A : lecture visuelle du seul rendu
+ image des p. 2 à 34 (pdftoppm -r 300, recadrages à volonté), par bloc de
+ onze générations (le dernier de sept), en dix consultations distinctes de
+ coder-approfondi (Opus, effort medium ; D3 (b), M485), une par bloc ;
+ aucune extraction de texte, aucun OCR ; interdits du transcripteur : toute
+ autre pièce, tout fichier du dépôt contenant des valeurs de tables
+ (inst/extdata/tables/, tests/contre_verification/, docs/), l'historique
+ git, les issues et commentaires, le dossier de l'autre transcripteur,
+ Internet (consigne commune brief_transcription.md, sans valeur).
+ Conventions des blocs : âges 0 à 121 ; « - » imprimé écrit « - » ; cellule
+ imprimée vide écrite VIDE (aucune) ; ligne mal composée transcrite dans
+ l'ordre imprimé (aucune). Dix blocs (unique2024_<g1>-<g2>.csv) et notes
+ des transcripteurs (notes/A_<g1>.md), gelés par SHA-256 avant toute
+ comparaison (gel.sha256 : 20 blocs et 20 notes des deux transcriptions),
+ versés en pièces de contrôle au commit 272f34e
+ (tests/contre_verification/transcriptions_b23/, dossier provisoire retiré
+ au commit donnees: de la table, lisible à 272f34e) ; identité de l'agent
+ et horodatage de la lecture non consignés au-delà de ces notes ; écart à
+ la consigne consigné au LISEZMOI.md (transcripteur A du bloc 1977-1987 :
+ seconde lecture par contrôles de régularité et zooms ciblés, bloc couvert
+ par A = B). Assemblage en grille au format 2 (ADR 0019, points 5.2 et 7.2)
+ par le script hors CI
+ tests/contre_verification/tables/assembler_table_unique_2024.R (R base),
+ qui contrôle le gel, A = B octet pour octet, la forme des blocs, la ligne
+ 121 seule sans valeur, et le format 2, et échoue sur toute cellule VIDE ;
+ la grille est assemblée sur la transcription B, identique à A. Rejeu du
+ 15/11/2026 (git archive 272f34e) : sortie « gel : 40 fichiers conformes à
+ gel.sha256 », « A = B : 10 blocs identiques octet pour octet »,
+ « table_unique_2024 : 106 générations (1900-2005), 121 âges (0-120), 8092
+ cellules à valeur, 4734 cellules '-' », SHA-256 de la grille assemblée
+ 172b307ce2bb1ea4e5a6802e59c2cfef62371620ba94a804303b772eb7a561b4, égal au
+ fichier de table (cmp). Le SHA-256 du fichier de table est celui de la
+ grille assemblée (champ Empreintes-fichiers ; ADR 0019, point 7.2) :
+ gel.sha256 ne couvre que les blocs et les notes. Le script d'assemblage
+ versé diffère de celui du dossier de visa (SHA-256
+ d8664bf502f94a01dd8605b55c3ba429fe05558fe70faac0661b0e35e6f0e144) par son
+ seul en-tête de commentaire ; sortie identique (172b307c…, cmp, rejeu du
+ 15/11/2026). Visa du mainteneur aux
+ valeurs de la grille de ce SHA-256 le 15/11/2026 (champ Visa).
+Transcription-date: 2026-11-15
+Transcription-B-releve: tests/contre_verification/tables/table_unique_2024.transcription_b.csv
+Transcription-B-methode: Transcription B : même méthode que A, en dix
+ autres consultations distinctes de coder-approfondi, aveugles à A, blocs et
+ notes (notes/B_<g1>.md) gelés par le même gel.sha256 avant comparaison
+ (commit 272f34e). Blocs de A et de B identiques octet pour octet (cmp, 10
+ blocs, 12 932 cellules aux âges 0 à 121). Le relevé versé est la grille
+ assemblée sur B par le même script (rejeu du 15/11/2026, git archive
+ 272f34e) : identique octet pour octet (cmp) au fichier de table.
+ Comparaison par script (tests/controles/tables_embarquees.R, point (e)) :
+ 121 lignes identiques, aucun écart.
+Identite-regle: Contre-vérification, jamais source (M219 ; E2.26 ; ADR
+ 0019, point 7.4) ; tient lieu de seconde source pour cette seule table
+ (aucune seconde source n'est retenue : M472, l'impression de la version
+ électronique de Légifrance n'est pas requise, faute d'apporter une
+ information absente du fac-similé versé ; substitution décidée par le
+ mainteneur le 15/11/2026, M486 ; ADR 0018, point 3.2, et ADR 0019, point
+ 7.1, annotations du 15/11/2026). Règle constatée sur les fichiers de table
+ par le contrôle (h) de tests/controles/tables_embarquees.R : cellule « - »
+ si et seulement si « - » dans inst/extdata/tables/tgh05.csv et dans
+ inst/extdata/tables/tgf05.csv ; sinon l'arrondi au plus proche de (3 H +
+ 2 F) / 5, calculé en entiers, (3 H + 2 F) %/% 5 + ((3 H + 2 F) %% 5 >= 3),
+ le « - » d'une seule des deux sources comptant pour 0 : convention du
+ producteur constatée par l'identité, propre au script de contrôle, jamais
+ appliquée par le moteur (M464, E2 (a)). La partie fractionnaire de (3 H +
+ 2 F) / 5 est un multiple de 0,2 : aucun cas d'égalité ; une troncature
+ différerait dès 0,6. Aucun texte ne fixe cette règle. Le dispositif dit
+ seulement « une table unique pour tous les assurés ci-annexée » (art. 1er,
+ 1°, A132-18-1). La pondération figure dans la seule notice, bloc de
+ présentation placé avant les visas et la formule « Arrêtent : », hors des
+ articles 1 à 4 (p. 1 de l'extrait), sans portée normative : « Cette table
+ correspond à la moyenne pondérée des tables homologuées à la date d'entrée
+ en vigueur de l'arrêté, avec une pondération de 0,4 pour la table établie
+ pour le sexe féminin et 0,6 pour la table établie pour le sexe masculin. »
+ La notice ne nomme ni TGH05 ni TGF05, ne dit ni l_x ni q_x, ne fixe ni
+ effectif de départ ni arrondi ; l'avis ANC n° 2024-05 (p. 1) écrit « la
+ somme de 60% de la table homme (TGH) et de 40% de la table femme (TGF) »
+ (lu par regulatory le 15/11/2026, pièce hors dépôt). Tables pondérées
+ (TGH05 et TGF05 de l'annexe à A132-18), grandeur pondérée (l_x) et arrondi
+ sont des constats de l'identité, non des prescriptions. Catégories des
+ 12 826 cellules (âges 0 à 120, générations 1900 à 2005) : deux valeurs
+ 7 921 ; « - » de TGH05 seul 171 ; « - » de TGF05 seul 0 ; « - » des deux
+ 4 734. Anomalie A2 de TGF05 (JO de 2015, âge 117, générations 1955 à 1965 ;
+ M466 ; champ Ecarts-signales de inst/extdata/tables/tgf05.provenance.dcf) :
+ les onze cellules de la table unique, imprimées 32, 35, 38, 42, 47, 51, 56,
+ 61, 67, 73 et 80 alignées (p. 21 de l'extrait), sont égales aux cellules
+ calculées depuis l'attribution de M466 (TGF05 66, 72, 79, 86, 94, 103, 112,
+ 122, 133, 144, 156 ; TGH05 9, 10, 11, 13, 15, 16, 18, 21, 23, 26, 29) : le
+ contrôle de A2 par l'identité, différé à #275 (M475), confirme
+ l'attribution de M466. Résultat : 0 écart sur 12 826 cellules (sortie du
+ contrôle (h) reproduite au champ Controles-coherence). Pouvoir
+ discriminant (même sortie) : l'arrondi au plus proche diffère de la
+ troncature en 3 205 des 8 092 cellules à valeur ; la convention « - » = 0
+ porte sur les 171 cellules à « - » de TGH05 seul, dont 45 calculées
+ nulles et 126 non nulles. Les 45 l_x nuls sont ces 45 cellules : TGF05 y
+ imprime 1, dont 0,4 s'arrondit à 0 (mesure du 15/11/2026 sur les trois
+ fichiers ; champ Generations). Les SHA-256 de tgh05.csv et tgf05.csv
+ (champ Empreintes-fichiers) fixent les termes de l'identité.
+Identite-ecarts: aucun
+Controle-lecture-releve: tests/contre_verification/tables/table_unique_2024.couche_texte.csv
+Controle-lecture-ecarts: aucun
+Controle-lecture-methode: Couche texte du fac-similé source (JO n° 276 du
+ 22/11/2024, texte 17, p. 2 à 34 de l'extrait), extraite après le gel des
+ deux transcriptions visuelles et leur assemblage, par pdftotext -bbox
+ (poppler) version 24.02.0 (mots et coordonnées ; colonne déduite de
+ l'abscisse, en-tête courant repris), script hors CI
+ tests/contre_verification/tables/releves_couche_texte_table_unique_2024.R
+ (sur le modèle de releves_couche_texte_tgf05_tgh05.R, mêmes règles de
+ reconstruction et de normalisation), qui contrôle en R base le SHA-256 de
+ la pièce avant lecture ; contrôle de lecture seulement, jamais une source
+ (E2.26 ; M445). Rejeu du 15/11/2026 : relevé, écarts (fichier vide) et
+ journal identiques octet pour octet (cmp) à ceux de la préparation du
+ visa ; journal : « tiret '-' -> '-' : 4840 », « cellules lues : 12932 sur
+ 12932 (âges 0 à 121, générations 1900 à 2005) », « lignes sans valeur non
+ écrites au relevé : [121] » ; sortie « jo2024 table_unique_2024 : 12826
+ cellules comparées, 0 écarts ». Le relevé est identique octet pour octet
+ (cmp) au fichier de table.
+Controles-coherence: Par génération : âges consécutifs du premier au dernier
+ âge à valeur, sans « - » intercalé ; l_x décroissants au sens large ; l_x =
+ 100000 au premier âge à valeur ; 45 l_x nuls aux générations 1900 à 1940
+ (champ Generations) ; 41 q_x = 1 (âges 116 à 119, générations 1900 à 1940),
+ artefacts de l'arrondi : à ces âges TGH05 n'imprime plus de valeur, la
+ cellule est l'arrondi de 0,4 l_x de TGF05 ; TGF05 imprime 2 ou 3 à l'âge du
+ q_x = 1 et 1 à l'âge suivant, d'où 1 (arrondi de 0,8 ou de 1,2) puis 0
+ (arrondi de 0,4) ; le second zéro de 1919, 1926, 1927 et 1933 vient
+ des l_x égaux (1, puis 1) de TGF05 à ces générations (avis
+ d'actuary-approfondi,
+ https://github.com/Gerard-Garey/outil_tables/issues/275#issuecomment-6892055428 ;
+ ADR 0019, point 4.4). Une même table mêle donc deux modes de clôture (q_x =
+ 1 au dernier âge non nul pour 1900 à 1940 ; aucun q_x au dernier âge pour
+ 1941 à 2005) ; le moteur ne ferme pas la table et aucun consommateur ne
+ doit supposer q_omega = 1. L_x égaux à deux âges consécutifs non nuls en
+ une cellule (q_x = 0 : 1934 à 118 ans) ; q_x < 1 dans [0 ; 2/3], maximum
+ atteint en 13 cellules (l_x = 3, l_{x+1} = 1 ou l_x = 6, l_{x+1} = 2 ; de
+ 1900 à 115 ans à 1946 à 119 ans). Mesure du 15/11/2026 sur le fichier de
+ table et sur table_embarquee("Table unique 2024") (état admise dans
+ tables_embarquees(), 7 982 lignes).
+ Décroissances de q_x (contrôle de vraisemblance, non correctif) : couples
+ (génération, âge x), aux âges x >= 31 (x est le second âge du couple
+ d'âges (x-1, x)), où q_x < q_{x-1}, avec q_x = d_x / l_x et d_x = l_x -
+ l_{x+1} ; la comparaison se fait en entiers sur les l_x imprimés : d_x
+ l_{x-1} < d_{x-1} l_x. Chaque couple est qualifié par le critère exact de
+ compatibilité avec un arrondi au plus proche des l_x imprimés, (2 l_{x+1}
+ - 1)(2 l_{x-1} - 1) <= (2 l_x + 1)^2, comparé en entiers (définitions et
+ critère : champ Controles-coherence de
+ inst/extdata/tables/tgf05.provenance.dcf). Résultat : 97 couples, 96
+ compatibles avec l'arrondi, 1 incompatible, aucune égalité du critère :
+ 17 de 31 à 34 ans (générations 1978 à 2005), tous compatibles ; 10 à 59
+ ans, dont 9 compatibles (générations 1984, 1985, 1987, 1993, 1995 à 1999)
+ et un incompatible (génération 2003 : l_57 à l_60 imprimés 97756, 97641,
+ 97520, 97402) ; 70 de 112 à 119 ans (l_x petits), tous compatibles.
+ Test joint (avis d'actuary,
+ https://github.com/Gerard-Garey/outil_tables/issues/279#issuecomment-6884093195) :
+ il existe des L_x dans [l_x - 1/2 ; l_x + 1/2] avec log L_x concave en x
+ (soit q_x non décroissant) sur une fenêtre d'âges si et seulement si la
+ plus petite majorante concave de log(l_x - 1/2) reste sous log(l_x + 1/2)
+ sur la fenêtre ; test fait, pour chaque génération, de 30 ans (ou du
+ premier âge à valeur) au dernier âge où l_x >= 1 (fenêtre close à l'âge du
+ q_x = 1 pour 1900 à 1940, à 120 ans pour 1941 à 2005). Résultat : une
+ génération en défaut sur 106 (2003, à 59 ans, sur les 68 qui portent les
+ âges 58 à 60), certifiée par le triplet témoin entier (58, 59, 60) de
+ largeur 2 ; c'est le couple incompatible ci-dessus, aucune génération en
+ défaut joint n'étant compatible couple par couple ; aucun indécis.
+ Ralentissement de la croissance de q_x autour de 60 ans : médianes des
+ rapports q_x / q_{x-1} sur les générations 1940 à 2005 qui portent les
+ âges x-1 à x+1 (66 générations aux âges 57 à 70, 62 à 65 aux âges 53 à
+ 56) : 1,0478 à 58 ans, 1,0073 à 59 (minimum 0,9764, maximum 1,0175), 1,0163
+ à 60, 1,0346 à 61, 1,0234 à 62 et 1,0414 à 63, contre 1,0727 à 1,1280 de
+ 53 à 57 et de 64 à 70 ans ; médiane de q_60 / q_58 : 1,0225 (66
+ générations). Origine, établie pour cette table : avant arrondi, la
+ cellule vaut L_x = (3 H + 2 F) / 5 (identité, contrôle (h), 0 écart), donc
+ q_x = w_x q^H_x + (1 - w_x) q^F_x avec w_x = 3 l^H_x / (3 l^H_x + 2 l^F_x)
+ (identité des mélanges, résultat exact). Sur les 68 générations qui
+ portent les âges 58 à 60, q_59 < q_58 dans TGH05 pour les 68 (champ
+ Controles-coherence de inst/extdata/tables/tgh05.provenance.dcf), dans
+ TGF05 pour aucune, dans le mélange avant arrondi pour 17, dont les 10 où
+ la table imprimée décroît (comparaison en entiers sur 3 H + 2 F).
+ Génération 2003 : 3 H + 2 F aux âges 57 à 60 = 488781, 488204, 487602,
+ 487008 ; q_59 / q_58 = 0,9673 (TGH05), 1,0174 (TGF05), 0,9879 (mélange
+ avant arrondi), 0,9764 (table imprimée). Décomposition exacte de
+ l'écart du mélange : q_59 - q_58 = w_59 (q^H_59 - q^H_58) + (1 - w_59)
+ (q^F_59 - q^F_58) + (w_59 - w_58)(q^H_58 - q^F_58) ; sur les 17
+ générations où le mélange décroît, terme de TGH05 de -2,9e-5 à -1,7e-5,
+ terme de TGF05 de +0,9e-5 à +2,6e-5, glissement des poids de -2,3e-9 à
+ -1,7e-12 (flottants, approximation numérique ; résidu de l'identité
+ inférieur à 1,1e-16) : la décroissance vient du terme de TGH05, que celui
+ de TGF05 compense en partie. L'arrondi au plus proche joue dans les deux
+ sens : parmi les 10 générations où la table imprimée décroît, il accentue
+ la décroissance pour 9 (rapport q_59 / q_58 imprimé inférieur à celui du
+ mélange, dont 2003) ; pour 1999, le rapport est égal à quatre décimales
+ (0,9936) et dépasse celui du mélange de 5,5e-9 en valeur relative ;
+ parmi les 17 où le mélange décroît, il masque la décroissance pour 7
+ (1982, 1991, 1992, 1994, 2001, 2002, 2004) ; rapports comparés par
+ produits croisés en entiers exacts (jusqu'à 4,7e16, au-delà de 2^53 :
+ précision arbitraire). Le ralentissement autour de 60 ans et le défaut
+ joint de 2003 sont donc hérités de TGH05 par le mélange, sans anomalie de
+ transcription ni de composition ; l'arrondi en modifie la trace couple par
+ couple sans en être l'origine ; « compatible avec l'arrondi » ne signifie
+ pas « dû à l'arrondi ». Leur origine dans la construction de TGH05 reste
+ non établie (même champ de TGH05). Origine (depuis « Origine, établie pour
+ cette table » jusqu'ici) : mesure du 15/11/2026 sur les trois fichiers de
+ table par un script hors dépôt de la reprise (comparaisons en entiers
+ exacts ; rapports en flottants, écrits à quatre décimales), remesurée par
+ actuary et par regulatory, non reproduite par le script versé
+ controles_coherence_generation.R (ci-dessous).
+ Valeurs imprimées, identiques aux deux transcriptions, à la couche texte
+ et à l'identité (relevés identiques octet pour octet au fichier de table,
+ champ Empreintes-fichiers ; 0 écart d'identité), aucune correction.
+ Décomptes et rapports reproduits par le script
+ tests/contre_verification/tables/controles_coherence_generation.R (issue
+ #279 ; spécification d'actuary-approfondi,
+ https://github.com/Gerard-Garey/outil_tables/issues/279#issuecomment-6892063963),
+ qui lit le fichier de table : sortie du 15/11/2026 (R 4.3.3) ; les
+ nombres qu'elle imprime (structure, décroissances, test joint, médianes
+ des rapports, médiane de q_60 / q_58 comprise) sont égaux à ceux de ce
+ champ. Les autres nombres du champ n'en sont pas reproduits : ceux de
+ l'origine du ralentissement (ci-dessus : 17 générations, 10 et 9 / 7,
+ termes de la décomposition, 3 H + 2 F de la génération 2003, rapports
+ 0,9673, 1,0174 et 0,9879, 5,5e-9 pour 1999), mesurés par le script hors
+ dépôt ; les générations 1900 à 1940 des 45 l_x nuls, le second zéro de
+ 1919, 1926, 1927 et 1933 et l_57 à l_60 de la génération 2003, lus sur le
+ fichier de table ; les 7 982 lignes, mesurées sur table_embarquee().
+ Contrôle (h) de tests/controles/tables_embarquees.R, sortie du 15/11/2026 :
+ « deux_valeurs 7921 ; h_tiret_seul 171 ; f_tiret_seul 0 ; deux_tirets
+ 4734 (somme 12826) », 0 écart, onze cellules de A2 égales.
+ Statuts : décroissances et critère par couple comparés en entiers exacts
+ (aucune égalité du critère) ; arrondi au plus proche : pour cette table,
+ constaté sur les 12 826 cellules par l'identité (contrôle (h), comparaison
+ exacte de chaînes), chaque l_x imprimé étant l'arrondi au plus proche de
+ L_x = (3 H + 2 F) / 5 des l_x imprimés de TGH05 et TGF05 ; la boîte [l_x -
+ 1/2 ; l_x + 1/2] du critère par couple et du test joint contient donc L_x
+ (exact) ; que le producteur ait procédé ainsi reste une inférence, sans
+ incidence sur ces contrôles ; test joint :
+ incompatibilité, résultat exact certifié par un triplet témoin vérifié en
+ entiers ; compatibilités, approximation numérique à marge certifiée sous
+ l'hypothèse d'une fonction log() juste à quelques ulps près (non
+ vérifiée ; erreur de m_x de l'ordre de 1e-12), bande d'indécision 1e-9,
+ aucun indécis, plus petite marge positive m_x hors sommets de l'enveloppe
+ 1,05e-6 (1995 à 59 ans) ; médianes des rapports calculées en flottants,
+ écrites à quatre décimales ; identité (h) : comparaison exacte de chaînes
+ et d'entiers.
+Ecarts-signales: Aucune anomalie de composition relevée dans la table unique
+ 2024 au fac-similé de 2024 : aucune cellule imprimée vide aux âges 0 à
+ 121, aucune ligne mal composée, aucune cellule douteuse (notes des vingt
+ consultations, commit 272f34e ; LISEZMOI.md). L'anomalie A2 du JO de 2015
+ (TGF05, âge 117, bloc 1955-1965) n'a pas de pendant ici : la ligne 117 du
+ bloc 1955-1965 (p. 21 de l'extrait) porte onze nombres alignés, égaux à
+ l'identité sous l'attribution de M466 (champ Identite-regle). Ligne 121
+ sans valeur non transcrite (champ Ages). Glyphes : le « - » imprimé est le
+ trait d'union (journal de la couche texte : « tiret '-' -> '-' : 4840 »,
+ soit 4 734 cellules aux âges 0 à 120 et 106 à la ligne 121) ; écrit « - ».
+ Aucun écart entre les deux transcriptions, la couche texte et l'identité.
+Empreintes-fichiers:
+ 172b307ce2bb1ea4e5a6802e59c2cfef62371620ba94a804303b772eb7a561b4  inst/extdata/tables/table_unique_2024.csv
+ 172b307ce2bb1ea4e5a6802e59c2cfef62371620ba94a804303b772eb7a561b4  tests/contre_verification/tables/table_unique_2024.transcription_b.csv
+ 172b307ce2bb1ea4e5a6802e59c2cfef62371620ba94a804303b772eb7a561b4  tests/contre_verification/tables/table_unique_2024.couche_texte.csv
+ edf5280e6217a8e67bc6fc7434eb98ea303f729fc335289b9ba1d7c31deca796  tests/contre_verification/tables/assembler_table_unique_2024.R
+ 22bf14be4fa97a5fe0693ab3c61613a72bd2e1703e7f64d794545da0a3e6c906  tests/contre_verification/tables/releves_couche_texte_table_unique_2024.R
+ 0b866d8f7efa9c0d6e2fd0fb9e0c73ef05a6c0391580daecc7b168293e600850  tests/contre_verification/tables/controles_coherence_generation.R
+ a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e  inst/extdata/tables/tgf05.csv
+ cb6ad2b740f151b3e8ee6689dafb979b630e4ab6209873249445edba0a7d9dc4  inst/extdata/tables/tgh05.csv
+ 1a2f79c347620af519bd13f681c7cee63e3eedf545e12e8d7256c973e9ceef77  docs/sources/jo_2024-11-22_n276_texte17.pdf
+Empreintes-hors-depot:
+ 2d9eae5c56107f88fee921b7fd20738b792ef67314a982226f1db307ec602d41  joe_20241122_0276_p000.pdf (JO n° 276 du 22/11/2024, numéro complet, 329 p. ; valeur de docs/sources/README.md, non remesurée)
+ 6f0222227323e2748476921238dafc46e4e36099feae45412760984fbbfc6605  gel.sha256 (gel des 20 blocs et des 20 notes des transcriptions A et B, commit 272f34e)
+ 0d7fb3c86e6293e57c4141bf859f926056ba6617bed4794830c83839e9319766  Assurance-Recueil-2025.pdf (recueil ANC, https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/recueil/Assurance-Recueil-2025.pdf, retéléchargé le 15/11/2026 par regulatory, identique au téléchargement du 13/11/2026)
+ 6ecbf9643a73d8a1570884d5985c4a01f311cf5178290673fe41a2b95c1662da  Avis-2024-05.pdf (avis ANC n° 2024-05, https://www.anc.gouv.fr/files/anc/files/1_Normes_fran%C3%A7aises/Avis/2025/Avis-2024-05.pdf, 297 822 octets, 2 p., téléchargé le 15/11/2026 par regulatory)
+Representation: tablexp table 1
+Empreinte-table: e77470ac829a4afdd9037c8cd49c285d
+Visa: 2026-11-15, mainteneur, https://github.com/Gerard-Garey/outil_tables/pull/289#issuecomment-6893409633 (dossier : https://github.com/Gerard-Garey/outil_tables/pull/289#issuecomment-6893387532 ; grille de SHA-256 172b307ce2bb1ea4e5a6802e59c2cfef62371620ba94a804303b772eb7a561b4)
