@@ -169,11 +169,12 @@ Ecarts-signales: Lignes 111 et 112 imprimées sans valeur dans la source de
  transcription et dans la seconde source BO ; non transcrites (ADR 0018, point
  2.2 ; E2.26). Aucun écart entre les deux transcriptions, la seconde source BO
  et la couche texte du fac-similé.
- Décalages d'âge non embarqués : les décalages d'âge homologués avec la table
- (arrêté du 20/12/2005, art. 5), imprimés p. 19 de l'extrait (« Décalage d'âge
- TH 00-02 »), ne sont pas transcrits ; ils passent, avec leur
- application aux q_x (A132-19), à la branche
- claude/transcription-tables-generation (D9, M441).
+ Décalages d'âge : les décalages d'âge homologués avec la table (arrêté du
+ 20/12/2005, art. 5), imprimés p. 19 de l'extrait (« Décalage d'âge TH
+ 00-02 »), sont embarqués à part (#273 ; provenance
+ inst/extdata/tables/decalages_th_00-02.provenance.dcf) ; leur application
+ aux q_x (A132-19) sera mise en œuvre par la branche claude/marge-comparaison
+ (ADR 0019, point 6.6).
 Empreintes-fichiers:
  90daff6a88b6269deedbe6efba79f3b7211bba8ffac730985e4592e464efbfbc  inst/extdata/tables/th_00-02.csv
  90daff6a88b6269deedbe6efba79f3b7211bba8ffac730985e4592e464efbfbc  tests/contre_verification/tables/th_00-02.transcription_b.csv

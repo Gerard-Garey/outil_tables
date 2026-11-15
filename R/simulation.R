@@ -412,9 +412,17 @@ loi_effective <- function(loi_t, cause, sexes) {
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : la table doit être de classe table_reference (ADR 0007, point 7).", cause),
             list(cause = cause))
-  if ("annee" %in% names(tab))
+  # Axe temporel lu par le prédicat unique (axe_temporel_table(), module
+  # donnees ; ADR 0019, point 2) : aucune table à axe n'est simulée.
+  axe <- axe_temporel_table(tab)
+  if (identical(axe, "annee"))
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : table prospective (colonne annee) non prise en charge par le simulateur minimal.", cause),
+            list(cause = cause))
+  if (identical(axe, "generation"))
+    refuser("simulation", "loi_invalide",
+            formuler("Loi « %s » : table de génération (colonne generation) non prise en charge par le simulateur minimal.",
+                     cause),
             list(cause = cause))
   # Facteurs : forme exacte (#58, forme_exacte()) : double ou integer, seul
   # attribut names (ni classe, ni dim), de noms exactement H et F, sans tri :

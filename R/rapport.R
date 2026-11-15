@@ -25,6 +25,10 @@
 #  - catalogue_tables_embarquees(), tables_embarquees() : catalogue des
 #    tables embarquées, état et empreinte de chacune (exportée ; ADR 0018,
 #    point 8 ; #263) ;
+#  - empreinte_decalages(), catalogue_decalages_embarques(),
+#    decalages_embarques() : empreinte des décalages d'âge (première ligne
+#    « tablexp decalages 1 ») et catalogue des décalages embarqués, une ligne
+#    par bande (exportée ; ADR 0019, points 6.4 et 6.5 ; #273) ;
 #  - empreinte_resultat() : empreinte du résultat, MD5 du texte de l'objet en
 #    forme « empreinte », première ligne « tablexp resultat 1 » (ADR 0011,
 #    point 11 ; cinquième et sixième annotations du 20/10/2026 ; septième,
@@ -101,6 +105,9 @@ REPRESENTATION_RESULTAT <- "tablexp resultat 1"
 # fiche$tables_reference/<clé>/representation (ADR 0011, annotation du
 # 05/11/2026, (b) ; ADR 0015, point 2.2 ; #73).
 REPRESENTATION_TABLE <- "tablexp table 1"
+# Première ligne du texte empreinté des décalages d'âge (ADR 0019, point 6.4 :
+# septième version au sens du point 10 de l'ADR 0011 ; #273).
+REPRESENTATION_DECALAGES <- "tablexp decalages 1"
 # Statut des empreintes du résultat et du code (cinquième annotation du
 # 20/10/2026, (d)), réunis dans fiche$empreintes$statut_resultat_code par
 # « ; ». Littéraux laissés tels quels, marqués UTF-8 à l'emploi (#50) ;
@@ -761,15 +768,18 @@ md5_octets <- function(octets) {
 
 # Empreinte d'une table de référence (ADR 0011, annotation du 05/11/2026, (b) ;
 # ADR 0015, point 2.2 ; #73) : MD5 du texte, en forme « empreinte », du
-# data.frame nu (age, sexe, annee si présente, qx ; seuls attributs names,
-# class et row.names automatiques) sous la racine `table_reference`, première
-# ligne REPRESENTATION_TABLE. Aucun tri : `t` est l'objet rendu par
-# table_reference(), dont les lignes sont dans l'ordre canonique. Les
-# métadonnées (nom, statut, source, forme_origine, parametres) n'y entrent pas.
+# data.frame nu (age, sexe, l'axe temporel s'il est présent, annee ou
+# generation sous son nom, lu par axe_temporel_table(), ADR 0019, point 3 ;
+# qx ; seuls attributs names, class et row.names automatiques) sous la racine
+# `table_reference`, première ligne REPRESENTATION_TABLE. Aucun tri : `t` est
+# l'objet rendu par table_reference(), dont les lignes sont dans l'ordre
+# canonique. Les métadonnées (nom, statut, source, forme_origine, parametres)
+# n'y entrent pas.
 # Seule fonction qui calcule cette empreinte.
 empreinte_table <- function(t) {
   d <- data.frame(age = t$age, sexe = t$sexe, stringsAsFactors = FALSE)
-  if ("annee" %in% names(t)) d$annee <- t$annee
+  axe <- axe_temporel_table(t)
+  if (!is.na(axe)) d[[axe]] <- t[[axe]]
   d$qx <- t$qx
   md5_octets(texte_objet(list(table_reference = d), REPRESENTATION_TABLE, character(0), "empreinte"))
 }
@@ -821,6 +831,50 @@ catalogue_tables_embarquees <- function(catalogue = TABLES_EMBARQUEES) {
 # qui compare l'empreinte au fichier de provenance ;
 # tests/controles/tables_embarquees.R).
 tables_embarquees <- function() catalogue_tables_embarquees()
+
+# Empreinte des décalages d'âge (ADR 0019, point 6.4 ; ADR 0011, annotation
+# du 05/11/2026, (d)) : MD5 du texte, en forme « empreinte », du data.frame nu
+# (age_min, age_max, decalage, integer) sous la racine `decalages_age`,
+# première ligne REPRESENTATION_DECALAGES. Aucun tri : `d` est l'objet rendu
+# par decalages_age(), dont les lignes sont dans l'ordre canonique. Les
+# métadonnées (nom, table, source) n'y entrent pas. Seule fonction qui calcule
+# cette empreinte.
+empreinte_decalages <- function(d) {
+  x <- data.frame(age_min = d$age_min, age_max = d$age_max, decalage = d$decalage)
+  md5_octets(texte_objet(list(decalages_age = x), REPRESENTATION_DECALAGES, character(0), "empreinte"))
+}
+
+# Catalogue des décalages d'âge embarqués (ADR 0019, point 6.5 ; ADR 0018,
+# annotation du 13/11/2026, (g)), à partir des contenus `catalogue`
+# (DECALAGES_EMBARQUES par défaut, injecté par les tests, M247) : data.frame
+# nu, une ligne par bande, dans l'ordre de la déclaration puis des bandes ;
+# colonnes nom, table (nom au catalogue de la table visée), age_min, age_max
+# (NA pour la bande ouverte), decalage (integer), source (chemin du fichier de
+# provenance), representation (REPRESENTATION_DECALAGES), empreinte
+# (empreinte_decalages(), la même sur toutes les bandes d'un objet). Catalogue
+# vide : zéro ligne, mêmes colonnes et types. Un contenu illisible ou un refus
+# de decalages_age() remonte tel quel (aucun état refusee).
+catalogue_decalages_embarques <- function(catalogue = DECALAGES_EMBARQUES) {
+  noms <- attr(catalogue, "names", exact = TRUE)
+  if (is.null(noms)) noms <- character(0)
+  objets <- lapply(noms, function(nom) decalages_du_catalogue(nom, catalogue))
+  n <- vapply(objets, nrow, 0L)
+  par_bande <- function(f) rep(vapply(objets, f, ""), n)
+  colonne <- function(k) unlist(lapply(objets, function(d) d[[k]]), use.names = FALSE)
+  data.frame(nom = rep(noms, n), table = par_bande(function(d) attr(d, "table", exact = TRUE)),
+             age_min = c(integer(0), colonne("age_min")), age_max = c(integer(0), colonne("age_max")),
+             decalage = c(integer(0), colonne("decalage")),
+             source = par_bande(function(d) attr(d, "source", exact = TRUE)),
+             representation = rep(REPRESENTATION_DECALAGES, sum(n)), empreinte = par_bande(empreinte_decalages),
+             stringsAsFactors = FALSE)
+}
+
+# Décalages d'âge embarqués du package installé (ADR 0019, point 6.5),
+# sans argument : catalogue_decalages_embarques() sur DECALAGES_EMBARQUES.
+# Exportée (appelants : tests/controles/tables_embarquees.R ; tiers qui
+# compare l'empreinte au fichier de provenance et lit les bandes ;
+# application).
+decalages_embarques <- function() catalogue_decalages_embarques()
 
 # Périmètre de l'empreinte du résultat (ADR 0011, point 11.1 ; #67) : l'objet
 # `construction` entier moins ces chemins, liste fermée. execution,

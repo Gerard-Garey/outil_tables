@@ -32,7 +32,9 @@
 #       diffère selon que les octets natifs sont traduits ou non),
 #       segments_observations() puis construire_table() ; fiche, plan et
 #       rapport figé sont écrits, avec l'ordre des segments et les indices de
-#       segment de chaque ligne ;
+#       segment de chaque ligne ; enfin decalages_embarques() (#273) : noms
+#       marqués UTF-8 et égaux à leurs octets attendus, bandes et empreintes
+#       écrites ;
 #    4. les textes écrits sous latin-1 et sous UTF-8 sont comparés octet à
 #       octet. Aucune différence n'est admise : l'empreinte des données, dans
 #       la fiche, et l'ordre des segments ne dépendent pas de la locale. Les
@@ -232,6 +234,30 @@ travailleur <- function(args) {
     if (inherits(r, "error")) d(sprintf("erreur [%s] : %s", paste(class(r)[1L], collapse = "/"), conditionMessage(r)))
     cat(sprintf("  %s : %s\n", id, if (any(startsWith(defauts, paste0(id, " :")))) "ECHEC" else "ok"))
   }
+  # Décalages d'âge embarqués (#273) : noms non ASCII de la déclaration,
+  # marqués UTF-8 avec leurs octets attendus, bandes et empreintes écrites
+  # pour la comparaison octet à octet (un nom réencodé à l'installation
+  # rendait NA et decalages_embarques() s'arrêtait sous latin-1).
+  local({
+    id <- "decalages"
+    d <- function(m) defauts <<- c(defauts, sprintf("%s : %s", id, ascii(m)))
+    r <- tryCatch({
+      x <- decalages_embarques()
+      noms <- unique(x$nom)
+      attendus <- vapply(c("TF 00-02", "TH 00-02"), function(t) marque(c(charToRaw("D"), as.raw(c(0xc3, 0xa9)),
+                                                                          charToRaw("calages d'"), as.raw(c(0xc3, 0xa2)),
+                                                                          charToRaw(paste0("ge ", t))), "UTF-8"), "")
+      if (!identical(Encoding(noms), rep("UTF-8", length(noms))) || !identical(hex_octets(noms), hex_octets(unname(attendus))))
+        d(sprintf("noms des decalages (octets) %s, attendu %s", paste(hex_octets(noms), collapse = " "),
+                  paste(hex_octets(unname(attendus)), collapse = " ")))
+      lignes <- enc2utf8(sprintf("%s|%s|%s|%s|%s|%s|%s", x$nom, x$table, x$age_min, x$age_max, x$decalage,
+                                 x$representation, x$empreinte))
+      writeBin(unlist(lapply(lignes, function(s) c(charToRaw(s), as.raw(10L)))), file.path(sortie, "decalages.txt"))
+      NULL
+    }, error = function(e) e)
+    if (inherits(r, "error")) d(sprintf("erreur [%s] : %s", paste(class(r)[1L], collapse = "/"), conditionMessage(r)))
+    cat(sprintf("  %s : %s\n", id, if (any(startsWith(defauts, paste0(id, " :")))) "ECHEC" else "ok"))
+  })
   if (length(defauts)) { cat(paste0("  DEFAUT ", defauts, "\n"), sep = ""); quit(save = "no", status = 1L) }
   invisible(TRUE)
 }
@@ -280,7 +306,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
   if (length(defauts)) echec()
   for (c_ in cas) {
-    cat(sprintf("  %s et jeux de segments non ASCII (%s), sous LC_ALL=%s :\n", paste(IDENTIFIANTS, collapse = ", "), paste(JEUX_NON_ASCII, collapse = ", "), c_$nom))
+    cat(sprintf("  %s, jeux de segments non ASCII (%s) et décalages d'âge embarqués, sous LC_ALL=%s :\n", paste(IDENTIFIANTS, collapse = ", "), paste(JEUX_NON_ASCII, collapse = ", "), c_$nom))
     e <- executer(script, racine, c_$lib, c_$env, c_$attendu, c_$sortie)
     cat(paste0("  ", e$sortie), sep = "\n")
     cat(sprintf("  durée : %s\n", e$duree))
@@ -289,7 +315,8 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   if (length(defauts)) echec()
   # Comparaison octet à octet : textes écrits sous latin-1 contre sous UTF-8.
   noms <- c(sprintf("%s.%s.txt", rep(IDENTIFIANTS, each = 3L), c("fiche", "plan", "rapport")),
-            sprintf("seg_%s.%s.txt", rep(JEUX_NON_ASCII, each = 4L), c("fiche", "plan", "rapport", "segments")))
+            sprintf("seg_%s.%s.txt", rep(JEUX_NON_ASCII, each = 4L), c("fiche", "plan", "rapport", "segments")),
+            "decalages.txt")
   n_comparees <- 0L
   for (nom in noms) {
     f <- file.path(vapply(cas, `[[`, "", "sortie"), nom)
@@ -301,7 +328,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   }
   if (n_comparees != length(noms) && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
-  cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s et de %d jeux de segments non ASCII, ordre des segments) identiques octet à octet sous %s et sous %s ; aller-retour identical() ; durée totale %s.\n",
+  cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s et de %d jeux de segments non ASCII, ordre des segments, décalages d'âge embarqués) identiques octet à octet sous %s et sous %s ; aller-retour identical() ; durée totale %s.\n",
               n_comparees, paste(IDENTIFIANTS, collapse = ", "), length(JEUX_NON_ASCII), LOCALE_LATIN1, utf8, duree(t_debut)))
   invisible(TRUE)
 }

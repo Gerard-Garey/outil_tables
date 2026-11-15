@@ -227,6 +227,15 @@ verifier("C table_annee_non_admise puis plage_ages_hors_table, module coherence_
                      paste("Cohérence et régularité : la table de clé « c » (sexe ensemble) couvre les âges 45 à 60, qui",
                            "ne contiennent pas la plage d'âges 40 à 60."))))
 })
+verifier("C table_generation_non_admise (ADR 0019, point 2.3), module coherence_regularite, message et details", {
+  t_gen <- importee(data.frame(age = rep(40:60, 2L), sexe = "H", qx = 0.01, generation = rep(1950:1951, each = 21L)),
+                    "génération")
+  r <- refus_de(construire_table(JEU, ROLES, plan_c(coherence = coh(tables_reference = "g")), tables_reference = list(g = t_gen)))
+  ok <- controle(r, "table_generation_non_admise",
+                 paste("Cohérence et régularité : la table de clé « g » est une table de génération (colonne",
+                       "generation) ; cette version n'évalue que des tables sans axe temporel (ADR 0019)."))
+  if (isTRUE(ok) && !identical(r$details, list(cle = "g"))) "details" else ok
+})
 verifier("C clés multiples : deux tables évaluées dans l'ordre reçu (hf puis ens) ; une clé citée à la fois par la validation et par coherence_regularite", {
   x2 <- construire_table(JEU, ROLES, plan_c(coherence = coh(tables_reference = c("hf", "ens"))),
                          tables_reference = list(ens = T_ENS, hf = T_HF))

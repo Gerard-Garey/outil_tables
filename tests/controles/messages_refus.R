@@ -122,10 +122,11 @@ RELAIS <- list(
 # locale, qui rend un texte formé (règle 4, contrôlée dans son fichier) ; son
 # appel est admis en tout fichier.
 AIDES <- data.frame(
-  fichier = c("donnees.R", "simulation.R", "construire_table.R", "rapport.R", "rapport.R", "positionnement.R",
-              "lissage.R"),
-  nom = c("message_aucune_recette", "ecart_noms", "decrire_forme", "decrire_valeur", "valeur_message",
-          "segments_cites", "segments_cites"),
+  fichier = c("donnees.R", "donnees.R", "donnees.R", "simulation.R", "construire_table.R", "rapport.R", "rapport.R",
+              "positionnement.R", "lissage.R", "donnees.R", "donnees.R"),
+  nom = c("message_aucune_recette", "groupes_cites_table", "lignes_citees_table", "ecart_noms", "decrire_forme",
+          "decrire_valeur", "valeur_message", "segments_cites", "segments_cites", "bandes_citees",
+          "complement_citees"),
   stringsAsFactors = FALSE)
 
 # Exceptions : une ligne par site (une expression peut revenir plusieurs fois
@@ -152,10 +153,9 @@ EXCEPTIONS <- exception_lignes(
   c("donnees.R", "preparer_donnees", "non_declares", "codes de motif du moteur (MOTIFS_LIGNES, MOTIFS_TETE)"),
   c("donnees.R", "preparer_donnees", "vapply(premieres, paste, character(1L), collapse = \", \")", "numéros de ligne (which())"),
   c("donnees.R", "table_reference", "paste(utils::head(hors, NB_LIGNES_CITEES), collapse = \", \")", "numéros de ligne (which())"),
-  c("donnees.R", "table_reference", "paste(utils::head(melange, NB_LIGNES_CITEES), collapse = \", \")", "années (as.integer())"),
+  c("donnees.R", "table_reference", "paste(utils::head(melange, NB_LIGNES_CITEES), collapse = \", \")", "années ou générations (as.integer())"),
   c("donnees.R", "table_reference", "paste(utils::head(non_fini, NB_LIGNES_CITEES), collapse = \", \")", "numéros de ligne (which())"),
   c("donnees.R", "table_reference", "paste(utils::head(doublons, NB_LIGNES_CITEES), collapse = \", \")", "numéros de ligne (which())"),
-  c("donnees.R", "table_reference", "paste(sprintf(\"%d et %d\", o[trous - 1L], o[trous])[seq_len(min(length(trous), NB_LIGNES_CITEES))], collapse = \", \")", "numéros de ligne (order())"),
   c("exposition.R", "resoudre_convention", "native", "convention native de la recette (catalogue du moteur)"),
   c("exposition.R", "nombre_cellules", "libelle", "gabarit passé par l'appelant, texte du moteur passé comme gabarit à formuler() (défaut ou appel de exposition.R) ; valeurs : un nombre mis en forme par format(), un %d"),
   c("rapport.R", "ecrire_valeurs", "paste(format(utils::head(u[ni], 3L), digits = 15L), collapse = \", \")", "doubles mis en forme par format()"),

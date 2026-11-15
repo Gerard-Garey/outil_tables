@@ -777,9 +777,12 @@ controler_forme_tables <- function(tables) {
     if (!identical(cl, classe_attendue))
       mal_formee(formuler("objet de classe %s au lieu de table_reference", paste(citer(class(x)), collapse = "/")),
                  class(x), classe_attendue)
+    # Colonnes : age, sexe, qx, puis au plus un axe temporel, celui que rend
+    # axe_temporel_table() (module donnees ; ADR 0019, point 2.2).
     colonnes <- attr(x, "names", exact = TRUE)
-    if (!identical(colonnes, c("age", "sexe", "qx")) && !identical(colonnes, c("age", "sexe", "qx", "annee")))
-      mal_formee(modifie, colonnes, "age, sexe, qx [, annee] (colonnes de table_reference())")
+    axe <- axe_temporel_table(x)
+    if (!identical(colonnes, c("age", "sexe", "qx", if (!is.na(axe)) axe)))
+      mal_formee(modifie, colonnes, "age, sexe, qx [, annee ou generation] (colonnes de table_reference())")
     # (b) Reconstruction : data.frame nu des colonnes, métadonnées lues dans
     # les attributs (un attribut absent est passé NULL, que le constructeur
     # refuse) ; une erreur R du data.frame nu vaut objet modifié.

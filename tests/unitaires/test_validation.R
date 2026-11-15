@@ -563,6 +563,16 @@ verifier("refus avant exécution : table avec annee -> table_annee_non_admise", 
                         "prospective", "importee", "test")
   avant_execution(P0, list(tv = ta), "table_annee_non_admise")
 })
+verifier("refus avant exécution : table de génération -> table_generation_non_admise (ADR 0019, point 2.3), message et details", {
+  tg <- table_reference(data.frame(age = rep(0:120, 2), sexe = "ensemble", qx = 0.01, generation = rep(1950:1951, each = 121)),
+                        "génération", "importee", "test")
+  ok <- avant_execution(P0, list(tv = tg), "table_generation_non_admise")
+  r <- refus_de(construire_table(JEU, ROLES, P0, tables_reference = list(tv = tg)))
+  if (!isTRUE(ok)) ok else if (!identical(r$details, list(cle = "tv"))) "details"
+  else if (!identical(conditionMessage(r), paste("Validation : la table de clé « tv » est une table de génération (colonne generation) ;",
+                                                 "cette version ne valide que des tables sans axe temporel (ADR 0019).")))
+    conditionMessage(r) else TRUE
+})
 verifier("refus avant exécution : table par sexe sans sexe dans la segmentation -> table_sexe_incompatible",
          avant_execution(plan_v(segmentation = character(0)), list(tv = T_HF), "table_sexe_incompatible"))
 verifier("refus avant exécution : plage d'âges non couverte -> plage_ages_hors_table",
