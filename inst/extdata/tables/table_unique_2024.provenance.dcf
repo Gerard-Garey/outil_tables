@@ -416,9 +416,12 @@ Controles-coherence: Par génération : âges consécutifs du premier au dernier
  transcription ni de composition ; l'arrondi en modifie la trace couple par
  couple sans en être l'origine ; « compatible avec l'arrondi » ne signifie
  pas « dû à l'arrondi ». Leur origine dans la construction de TGH05 reste
- non établie (même champ de TGH05). Mesure du 15/11/2026 sur les trois fichiers de
- table (script hors dépôt de la reprise, comparaisons en entiers exacts ;
- rapports en flottants, écrits à quatre décimales).
+ non établie (même champ de TGH05). Origine (depuis « Origine, établie pour
+ cette table » jusqu'ici) : mesure du 15/11/2026 sur les trois fichiers de
+ table par un script hors dépôt de la reprise (comparaisons en entiers
+ exacts ; rapports en flottants, écrits à quatre décimales), remesurée par
+ actuary et par regulatory, non reproduite par le script versé
+ controles_coherence_generation.R (ci-dessous).
  Valeurs imprimées, identiques aux deux transcriptions, à la couche texte
  et à l'identité (relevés identiques octet pour octet au fichier de table,
  champ Empreintes-fichiers ; 0 écart d'identité), aucune correction.
@@ -427,7 +430,12 @@ Controles-coherence: Par génération : âges consécutifs du premier au dernier
  #279 ; spécification d'actuary-approfondi,
  https://github.com/Gerard-Garey/outil_tables/issues/279#issuecomment-6892063963),
  qui lit le fichier de table : sortie du 15/11/2026 (R 4.3.3) égale aux
- nombres de ce champ, structure, décroissances, test joint et médianes.
+ nombres de ce champ pour la structure, les décroissances, le test joint
+ et les médianes des rapports (médiane de q_60 / q_58 comprise), et à eux
+ seuls ; les nombres de l'origine du ralentissement (ci-dessus : 17
+ générations, 10 et 9 / 7, termes de la décomposition, 3 H + 2 F de la
+ génération 2003, rapports 0,9673, 1,0174 et 0,9879, 5,5e-9 pour 1999) n'en
+ sont pas reproduits.
  Contrôle (h) de tests/controles/tables_embarquees.R, sortie du 15/11/2026 :
  « deux_valeurs 7921 ; h_tiret_seul 171 ; f_tiret_seul 0 ; deux_tirets
  4734 (somme 12826) », 0 écart, onze cellules de A2 égales.
@@ -463,7 +471,7 @@ Empreintes-fichiers:
  172b307ce2bb1ea4e5a6802e59c2cfef62371620ba94a804303b772eb7a561b4  tests/contre_verification/tables/table_unique_2024.transcription_b.csv
  172b307ce2bb1ea4e5a6802e59c2cfef62371620ba94a804303b772eb7a561b4  tests/contre_verification/tables/table_unique_2024.couche_texte.csv
  edf5280e6217a8e67bc6fc7434eb98ea303f729fc335289b9ba1d7c31deca796  tests/contre_verification/tables/assembler_table_unique_2024.R
- 88bcf01a01f47cf17c12378331580e46699473528eff3984b2488f4df74ba828  tests/contre_verification/tables/releves_couche_texte_table_unique_2024.R
+ 013663d932ac3f20e44f8388d9eab68d2c653d82e87c690a6b3ee8891e38e45f  tests/contre_verification/tables/releves_couche_texte_table_unique_2024.R
  0b866d8f7efa9c0d6e2fd0fb9e0c73ef05a6c0391580daecc7b168293e600850  tests/contre_verification/tables/controles_coherence_generation.R
  a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e  inst/extdata/tables/tgf05.csv
  cb6ad2b740f151b3e8ee6689dafb979b630e4ab6209873249445edba0a7d9dc4  inst/extdata/tables/tgh05.csv

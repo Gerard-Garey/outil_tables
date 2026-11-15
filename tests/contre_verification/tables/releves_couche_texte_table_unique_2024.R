@@ -45,8 +45,9 @@
 #  Sur la sortie standard : le décompte des cellules comparées et des écarts.
 #  Échec (« ECHEC : … » sur la sortie d'erreur, code 1) si la pièce n'a pas
 #  l'empreinte attendue, si pdftotext échoue ou rend autre chose que de
-#  l'UTF-8, si une cellule du relevé n'est pas en ASCII, ou si la grille
-#  assemblée n'a pas une génération 1900 à 2005 à chaque âge.
+#  l'UTF-8, si une cellule du relevé n'est pas en ASCII, si une ligne de la
+#  grille assemblée n'a pas une cellule par génération de son en-tête ou y
+#  répète un âge, ou si elle n'a pas une génération 1900 à 2005 à chaque âge.
 #
 #  Emplacement des entrées. Le script ne lit aucun chemin en dur : dossier
 #  des pièces, fichier de table assemblé et dossier de sortie sont ses
@@ -320,18 +321,24 @@ relever <- function(pdf) {
 }
 
 # Grille au format 2 : liste nommée par l'âge de vecteurs nommés par la
-# génération.
+# génération. Échec sur une ligne qui n'a pas une cellule par génération de
+# l'en-tête (ni tronquée, ni complétée) ou sur un âge présent deux fois (ni
+# l'une ni l'autre ligne retenue), comme la lecture du contrôle
+# (tests/controles/tables_embarquees.R, lire_grille()).
 lire_grille <- function(chemin) {
   brut <- readBin(chemin, "raw", file.size(chemin))
   l <- strsplit(rawToChar(brut), "\n", fixed = TRUE)[[1L]]
   gens <- strsplit(l[1L], ",", fixed = TRUE)[[1L]][-1L]
-  r <- lapply(l[-1L], function(x) {
-    x <- strsplit(paste0(x, ","), ",", fixed = TRUE)[[1L]]
-    k <- seq_len(min(length(gens), length(x) - 1L))
-    list(age = as.character(as.integer(x[1L])), cel = setNames(x[-1L][k], gens[k]))
+  r <- lapply(seq_along(l)[-1L], function(i) {
+    x <- strsplit(paste0(l[i], ","), ",", fixed = TRUE)[[1L]]
+    if (length(x) - 1L != length(gens))
+      echec(sprintf("%s : ligne %d : %d cellule(s) au lieu de %d", chemin, i, length(x) - 1L, length(gens)))
+    list(age = as.character(as.integer(x[1L])), cel = setNames(x[-1L], gens))
   })
-  r <- setNames(lapply(r, `[[`, "cel"), vapply(r, `[[`, "", "age"))
-  r[!duplicated(names(r), fromLast = TRUE)]
+  ages <- vapply(r, `[[`, "", "age")
+  if (anyDuplicated(ages))
+    echec(sprintf("%s : âge %s présent plus d'une fois", chemin, ages[anyDuplicated(ages)]))
+  setNames(lapply(r, `[[`, "cel"), ages)
 }
 
 args <- commandArgs(trailingOnly = TRUE)
