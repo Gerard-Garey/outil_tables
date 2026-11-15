@@ -68,9 +68,10 @@
 #    (h) identité de la table unique 2024 (ADR 0019, point 7.4 ; M464, M486 ;
 #        spécification d'actuary-approfondi de l'étape (0')(b) de B23), si et
 #        seulement si table_unique_2024 est déclarée (sans objet sinon) ; échec
-#        si TGH05 ou TGF05 n'est pas déclarée au format 2, si l'un des trois
-#        fichiers est illisible au format 2 (h1), si les domaines (générations,
-#        âges) diffèrent (h2), si une cellule porte « - » dans TGF05 et une
+#        si TGH05 ou TGF05 n'est pas déclarée au format 2, si le fichier de
+#        provenance de l'une des trois tables est absent ((h) non exécuté), si
+#        l'un des trois fichiers est illisible au format 2 (h1), si les
+#        domaines (générations, âges) diffèrent (h2), si une cellule porte « - » dans TGF05 et une
 #        valeur dans TGH05 (h3), si une cellule de A2 (âge 117, générations
 #        1955 à 1965) est hors de la grille ou sans valeur dans l'une des
 #        trois grilles (h4) ; cellule calculée, sur les chaînes : « - » si
@@ -109,7 +110,11 @@
 #  l'arbre munie de quatre tables d'essai déclarées, deux au format 1 et deux
 #  au format 2 (chaque fois l'une admise, l'autre refusée par le moteur,
 #  champ Refus-attendu), contrôlée une première fois (succès attendu, mesure
-#  (g) comprise : elle porte sur ces tables même si le catalogue est vide),
+#  (g) comprise : elle porte sur ces tables même si le catalogue est vide ;
+#  la ligne de décomptes de (h), somme égale au nombre de cellules de la
+#  grille de la table unique, et la ligne « n écart(s), égaux aux écarts
+#  déclarés », n tiré d'Identite-ecarts, sont exigées si la table unique est
+#  déclarée, la ligne « sans objet » sinon),
 #  puis une seconde fois après qu'un l_x de la première table admise a été
 #  changé d'une unité : échec attendu, avec des écarts sur (c), (d) et (e) ;
 #  enfin, ce l_x rétabli, une troisième fois après que les paires attendues
@@ -131,16 +136,20 @@
 #  réécrites sur trois âges consécutifs dont le dernier dépasse
 #  .Machine$integer.max, puis les tables d'essai refusées sur un âge hors de la
 #  suite et au-delà de la borne : écart (b) à la borne du moteur, prioritaire
-#  sur la suite (#283) ; enfin, dans le processus du témoin, le contrôle (h)
-#  sur des grilles forgées (aucune table d'essai ne porte l'identifiant de la
-#  table unique ; lignes ECART réécrites « (écart attendu) ») : identité
-#  exacte admise ; cellule changée, écart déclaré non constaté, écart déclaré
-#  deux fois (b), ligne déclarée mal formée, « - » de TGF05 seul (h3), table
-#  unique privée de sa dernière ligne ou munie d'un âge de plus (h2), table
-#  unique déclarée sans l'une des sources ou avec une source sans format
-#  déclaré, source illisible (h1), cellule de A2 hors de la grille, ou à « - »
-#  dans TGH05 seule, dans TGF05 seule, dans la table unique seule, dans les
-#  trois (h4) détectés ; et les champs attendus de (b) : Identite-* sur
+#  sur la suite (#283) ; puis, ces tables rétablies, un écart fictif
+#  (60,1950,1,2) écrit dans Identite-ecarts de la table unique (si elle est
+#  déclarée) : un seul écart, « (h) écart 60,1950,1,2 déclaré
+#  (Identite-ecarts), non constaté » ; enfin, dans le processus du témoin,
+#  le contrôle (h) sur des grilles forgées (aucune table d'essai ne porte
+#  l'identifiant de la table unique ; lignes ECART réécrites « (écart
+#  attendu) ») : identité exacte admise ; cellule changée, écart déclaré non
+#  constaté, écart déclaré deux fois (b), ligne déclarée mal formée, « - »
+#  de TGF05 seul (h3), table unique privée de sa dernière ligne ou munie d'un
+#  âge de plus (h2), table unique déclarée sans l'une des sources ou avec une
+#  source sans format déclaré, source sans fichier de provenance, source
+#  illisible (h1), cellule de A2 hors de la grille, ou à « - » dans TGH05
+#  seule, dans TGF05 seule, dans la table unique seule, dans les trois (h4)
+#  détectés ; et les champs attendus de (b) : Identite-* sur
 #  une table d'essai, champs inconnus ; table unique sans Identite-* ni
 #  Seconde-source*, écart (b) ; avec Identite-* sans Seconde-source*, admise.
 #  Les essais
@@ -541,11 +550,12 @@ identite_table_unique <- function(u, h, f, a2 = CELLULES_A2) {
 }
 
 # Contrôle (h) d'un arbre. `grilles` : par identifiant déclaré, list(nom,
-# format, tab (lire_format()), champs (provenance)). Sans objet si
-# table_unique_2024 n'est pas déclarée ; sinon échec (jamais sans objet) si
-# l'une des trois tables n'est pas déclarée au format 2 ou est illisible
-# (h1) ; puis échecs h2 à h4 d'identite_table_unique() ; écarts constatés
-# égaux, dans les deux sens, à Identite-ecarts de la table unique.
+# format, tab (lire_format()), champs (provenance), provenance (FALSE si le
+# fichier de provenance est absent)). Sans objet si table_unique_2024 n'est
+# pas déclarée ; sinon échec (jamais sans objet) si l'une des trois tables
+# n'est pas déclarée au format 2, n'a pas de fichier de provenance ou est
+# illisible (h1) ; puis échecs h2 à h4 d'identite_table_unique() ; écarts
+# constatés égaux, dans les deux sens, à Identite-ecarts de la table unique.
 controler_identite <- function(grilles, a2 = CELLULES_A2) {
   ids <- IDENTITE_TABLE_UNIQUE
   if (!ids[["unique"]] %in% names(grilles)) {
@@ -558,6 +568,7 @@ controler_identite <- function(grilles, a2 = CELLULES_A2) {
     if (is.null(g)) { ecart("h", sprintf("%s déclarée, %s non déclarée", ids[["unique"]], id)); defaut <- TRUE }
     else if (!identical(g$format, 2L)) { ecart("h", sprintf("%s déclarée au format %s, 2 attendu", id,
                                                                                  if (length(g$format)) paste(g$format, collapse = ", ") else "absent")); defaut <- TRUE }
+    else if (isFALSE(g$provenance)) { ecart("h", sprintf("%s : fichier de provenance absent, (h) non exécuté", id)); defaut <- TRUE }
     else if (!is.null(g$tab$defaut)) { ecart("h", sprintf("%s : fichier de table illisible au format 2 (h1) : %s", id, g$tab$defaut)); defaut <- TRUE }
   }
   if (defaut) return(invisible())
@@ -635,7 +646,8 @@ controler <- function(racine, installation = TRUE) {
     # Format déclaré (ADR 0019, point 5.1), sans valeur par défaut.
     fmt <- if (is.null(decl$format)) NULL else decl$format[k]
     cat(sprintf("  -- %s (%s, format %s)\n", nom, id, if (is.null(fmt)) "absent" else fmt))
-    grilles[[id]] <- list(nom = nom, format = fmt, tab = list(defaut = "provenance absente, table non lue"), champs = list())
+    # Provenance absente : (h) le signale comme tel (échec), sans lire la table.
+    grilles[[id]] <- list(nom = nom, format = fmt, tab = NULL, champs = list(), provenance = FALSE)
     f_table <- sprintf("%s/%s.csv", DOSSIER_TABLES, id)
     f_prov <- sprintf("%s/%s.provenance.dcf", DOSSIER_TABLES, id)
     if (!file.exists(file.path(racine, f_table))) ecart("a", sprintf("%s : fichier de table %s absent", nom, f_table))
@@ -648,7 +660,7 @@ controler <- function(racine, installation = TRUE) {
     for (d in p$defauts) ecart("b", sprintf("%s : %s : %s", nom, f_prov, d))
     ch <- p$champs
     n <- names(ch)
-    grilles[[id]] <- list(nom = nom, format = fmt, tab = tab, champs = ch)
+    grilles[[id]] <- list(nom = nom, format = fmt, tab = tab, champs = ch, provenance = TRUE)
     # Champs attendus selon (identifiant, format) : groupe Identite-* tenant
     # lieu de seconde source pour la seule table unique 2024 (M486).
     ct <- champs_table(n, id, fmt)
@@ -1194,6 +1206,23 @@ temoin <- function(racine) {
   cat("\n== 1. arbre témoin intact (tables d'essai admise et refusée) : succès attendu, mesure (g) comprise\n")
   r1 <- lancer(character(0)); cat(r1$sortie, sep = "\n")
   if (r1$statut != 0L) { cat("ECHEC du témoin : l'arbre témoin intact est refusé\n"); ok <- FALSE }
+  # Contrôle (h) exécuté : sans ces lignes, un appel retiré de
+  # controler_identite() passerait sans message. Somme des catégories : nombre
+  # de cellules de la grille ; écarts : nombre de lignes d'Identite-ecarts.
+  id_u <- IDENTITE_TABLE_UNIQUE[["unique"]]
+  if (id_u %in% decl$identifiant) {
+    l_u <- readLines(file.path(arbre, DOSSIER_TABLES, paste0(id_u, ".csv")), warn = FALSE)
+    n_u <- (length(l_u) - 1L) * (length(strsplit(l_u[1L], ",", fixed = TRUE)[[1L]]) - 1L)
+    p_u <- lire_provenance(file.path(arbre, DOSSIER_TABLES, paste0(id_u, ".provenance.dcf")))$champs
+    n_e <- length(ecarts_declares(valeur(p_u, "Identite-ecarts")))
+    attendus1 <- c(sprintf("^  \\(h\\) identité de la table unique : deux_valeurs [0-9]+ ; h_tiret_seul [0-9]+ ; f_tiret_seul [0-9]+ ; deux_tirets [0-9]+ \\(somme %d\\)$", n_u),
+                   sprintf("^     %d écart\\(s\\), égaux aux écarts déclarés$", n_e))
+  } else attendus1 <- sprintf("^  \\(h\\) identité de la table unique : sans objet \\(%s non déclarée\\)$", id_u)
+  absents1 <- attendus1[!vapply(attendus1, function(x) any(grepl(x, r1$sortie, useBytes = TRUE)), NA)]
+  if (length(absents1)) {
+    cat(sprintf("ECHEC du témoin : ligne(s) du contrôle (h) absente(s) de la sortie (motifs) : %s\n", paste(absents1, collapse = " ; ")))
+    ok <- FALSE
+  }
   # Un l_x changé d'une unité : première table admise déclarée au format 1
   # (table réelle si le catalogue en porte une, sinon l'essai admis),
   # troisième ligne.
@@ -1376,14 +1405,36 @@ temoin <- function(racine) {
                 paste(sub("^ +", "", attendus8), collapse = " ; ")))
     ok <- FALSE
   }
+  # Identite-ecarts de la table unique muni d'un écart fictif (âge 60,
+  # génération 1950, cellules 1 et 2), tables d'essai rétablies : le contrôle
+  # (h) de bout en bout, sur la provenance lue dans l'arbre, doit le donner
+  # déclaré, non constaté, et seul.
+  for (x in list(e1, e2, e3, e4)) ecrire_lignes(x$lignes, file.path(arbre, DOSSIER_TABLES, paste0(x$identifiant, ".csv")))
+  if (id_u %in% decl$identifiant) {
+    f_pu <- file.path(arbre, DOSSIER_TABLES, paste0(id_u, ".provenance.dcf"))
+    vider_champ(f_pu, "^Identite-ecarts:", "Identite-ecarts: 60,1950,1,2")
+    cat(sprintf("\n== 9. tables d'essai rétablies ; %s.provenance.dcf, Identite-ecarts réécrit « 60,1950,1,2 » : échec attendu sur (h), un seul écart\n", id_u))
+    r9 <- lancer("--sans-installation")
+    cat(sub("^::error", "(échec attendu) error", r9$sortie), sep = "\n")
+    ecarts9 <- grep("ECART (", r9$sortie, fixed = TRUE, value = TRUE)
+    # Comparaison sur les octets (sortie du sous-processus en UTF-8 ; enc2utf8()
+    # échapperait la chaîne attendue sous une locale non UTF-8).
+    attendu9 <- "  ECART (h) écart 60,1950,1,2 déclaré (Identite-ecarts), non constaté"
+    if (r9$statut != 1L || length(ecarts9) != 1L || !identical(charToRaw(ecarts9), charToRaw(attendu9))) {
+      cat(sprintf("ECHEC du témoin : code %d (1 attendu), %d écart(s), seul attendu : %s\n", r9$statut, length(ecarts9),
+                  sub("^ +", "", attendu9)))
+      ok <- FALSE
+    }
+  } else cat(sprintf("\n== 9. %s non déclarée : écart fictif d'Identite-ecarts sans objet\n", id_u))
   unlink(arbre, recursive = TRUE)
-  cat("\n== 9. contrôle (h) et champs attendus de (b), dans ce processus, sur des grilles et des noms de champs forgés\n")
+  cat("\n== 10. contrôle (h) et champs attendus de (b), dans ce processus, sur des grilles et des noms de champs forgés\n")
   if (!temoin_identite()) ok <- FALSE
   if (ok) cat(paste("\nTémoin : arbre intact admis ; l_x changé d'une unité détecté sur (c), (d) et (e), code 1 ;",
                     "paires d'un refus attendu discordantes détectées sur (d), code 1 ; de même au format 2 ;",
                     "décalage changé d'une unité détecté sur (c), (d) et (e) au format 3, code 1 ;",
                     "champs Ages, Generations, Controle-lecture-ecarts, Comparaison-acte-ecarts et Seconde-source-essai-ecarts vidés détectés sur (b), code 1 ;",
                     "âge au-delà de .Machine$integer.max détecté sur (b) aux formats 1 et 2, code 1 ;",
+                    "contrôle (h) exécuté sur l'arbre intact ; écart fictif d'Identite-ecarts détecté seul sur (h), code 1 ;",
                     "identité de la table unique (h) admise exacte, ses défauts (h1 à h4, écarts constatés ou déclarés) détectés ; Identite-* inconnus hors de la table unique,",
                     "requis pour elle et tenant lieu de seconde source.\nOK\n"))
   ok
@@ -1409,13 +1460,15 @@ temoin_identite <- function() {
   ids <- IDENTITE_TABLE_UNIQUE
   # Les lignes ECART des essais sont réécrites « (écart attendu) » : un journal
   # vert ne montre aucun ECART nu ; le verdict porte sur le vecteur `ecarts`.
-  essai <- function(u, h = gh, f = gf, declares = "aucun", a2_ = a2, formats = list(2L, 2L, 2L)) {
+  essai <- function(u, h = gh, f = gf, declares = "aucun", a2_ = a2, formats = list(2L, 2L, 2L), sans_provenance = character(0)) {
     ecarts <<- character(0)
     g <- list(list(nom = "UNIQUE", format = formats[[1L]], tab = grille(u), champs = list(`Identite-ecarts` = declares)),
               list(nom = "H", format = formats[[2L]], tab = h, champs = list()),
               list(nom = "F", format = formats[[3L]], tab = f, champs = list()))
     names(g) <- ids
     if (is.null(f)) g[[ids[["f"]]]] <- NULL  # TGF05 non déclarée
+    # Fichier de provenance absent : grille comme controler() la remplit.
+    for (id in sans_provenance) g[[id]] <- list(nom = g[[id]]$nom, format = g[[id]]$format, tab = NULL, champs = list(), provenance = FALSE)
     sortie <- utils::capture.output(controler_identite(g, a2_))
     cat(sub("^  ECART ", "  (écart attendu) ", sortie), sep = "\n")
     e <- ecarts; ecarts <<- character(0); e
@@ -1472,6 +1525,8 @@ temoin_identite <- function() {
            "TGH05 sans format déclaré")
   verifier(essai(gu, h = list(defaut = "illisible (témoin)")),
            sprintf("(h) %s : fichier de table illisible au format 2 (h1) : illisible (témoin)", ids[["h"]]), "TGH05 illisible")
+  verifier(essai(gu, sans_provenance = ids[["h"]]),
+           sprintf("(h) %s : fichier de provenance absent, (h) non exécuté", ids[["h"]]), "TGH05 sans fichier de provenance")
   # Cellules de A2 : hors de la grille (coordonnées de CELLULES_A2) ; « - »
   # dans les trois grilles (2, 1951) (h4).
   verifier(essai(gu, a2_ = CELLULES_A2), h4(paste(sprintf("117,%d", 1955:1965), collapse = " ; ")),
@@ -1495,7 +1550,8 @@ temoin_identite <- function() {
            "table unique avec Identite-*, sans Seconde-source*")
   if (ok) cat(paste("  (h) témoin : identité exacte admise ; cellule changée, écart déclaré non constaté, écart déclaré deux fois,",
                     "ligne déclarée mal formée, « - » de TGF05 seul, table unique privée de sa dernière ligne ou munie d'un âge",
-                    "de plus, table unique sans ses deux sources au format 2, source sans format déclaré ou illisible, cellules",
+                    "de plus, table unique sans ses deux sources au format 2, source sans format déclaré, sans fichier de provenance",
+                    "ou illisible, cellules",
                     "de A2 hors de la grille ou à « - » dans une, ou dans les trois grilles détectés ; Identite-* inconnus hors",
                     "de la table unique au format 2, requis pour elle, tenant lieu de seconde source\n"))
   ok
