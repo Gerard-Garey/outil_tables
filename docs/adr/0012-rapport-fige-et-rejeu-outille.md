@@ -401,3 +401,15 @@ Rédigée par `architect` à l'étape (0')(d) de la porteuse `claude/lissage-whi
 **Effet sur les résultats** : HTML du rapport figé de R1 à R14 changé (deux entrées de table des matières, deux sections « non demandée par le plan ») ; ce n'est pas une grandeur de référence ; visa d'`actuary` (précédent `35da74b`). Aucune table finale ni verdict.
 
 Issues : #223, #225, #144. Décisions M415. ADR 0017. Branche `claude/lissage-whittaker`, PR #221.
+
+## Annotation du 15 novembre 2026 — points 3.4, 3.6 et 3.8, annotation du 06/11/2026, (c) : sens des colonnes `lu` et `attendu` ; contenu du témoin « fiche » pour une table embarquée (ADR 0015, annotations du même jour ; #160, #267 ; M496, M497)
+
+Rédigée par `architect-approfondi` à l'étape (0')(b) de la branche `claude/rejeu-suites` (B24, PR #291), tête `7a89e42`, après les décisions du mainteneur du 15/11/2026 sur P1a (accord, M497) et P1b (« (b) seule », M496) (*rapportées* par la session, https://github.com/Gerard-Garey/outil_tables/pull/291#issuecomment-6899273974). Le texte ci-dessus, annotations comprises, n'est pas réécrit. Aucun code n'est écrit par la présente annotation : mise en œuvre par les étapes (3) et (4) de B24.
+
+**(a) Points 3.4, 3.6 et 3.8 : sens des colonnes.** La règle générale de l'ADR 0015, annotation du 15/11/2026, (b) — `lu` : la valeur soumise au contrôle telle que le rejeu la reçoit (champ de la fiche, ou argument) ; `attendu` : la valeur que le code installé lui oppose (exigence, valeur recalculée, valeur rendue, clés imposées) ; pour une empreinte, `lu` = fiche, `attendu` = recalculée ou rendue — vaut pour tout le bilan des points 3.4 et 3.6 et pour les `details` des refus du point 3.8 (« chaque message cite la valeur lue et la valeur attendue » se lit dans ce sens), lignes et refus futurs compris. La ligne `tables_reference` y est alignée (ADR 0015, même annotation, (c)).
+
+**(b) Point 3.6 et annotation du 06/11/2026, (c) : témoin « fiche ».** Principe inchangé : témoin, jamais motif de refus, pour tous les statuts de table, `embarquee` compris, quel que soit le verdict du témoin du code. Contenu précisé pour une table de statut `embarquee` dont un champ est cité : la valeur de la fiche (`lu`), celle du catalogue du package installé (`attendu`) et le régime lu sur le verdict du témoin du code (ligne 9, `verdict_chaines()`), selon l'ADR 0015, seconde annotation du 15/11/2026, (b) et (d) ; **forme fixée par l'avis (0'')** d'`architect-approfondi`. Le refus au rejeu à empreinte du code identique n'est pas retenu (ADR 0015, même annotation, (c)) : l'ordre des contrôles du point 3.4 ne reçoit aucun contrôle nouveau, et `MENTIONS_RAPPORT` comme `TEXTE_REJEU_FICHE` sont inchangés.
+
+**Effet sur les résultats : aucun** (textes du bilan du rejeu seulement ; visa d'`actuary-approfondi`).
+
+Issues : #160, #267. Décisions M496, M497. ADR 0015 (annotations du même jour). Branche `claude/rejeu-suites`, PR #291.
