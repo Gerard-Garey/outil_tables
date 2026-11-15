@@ -315,9 +315,21 @@ Controles-coherence: Par génération : âges consécutifs du premier au dernier
  une hypothèse non vérifiée.
  Valeurs imprimées, identiques au JO de 2015, au JO de 2006 et au BO
  (relevés identiques octet pour octet au fichier de table, champ
- Empreintes-fichiers), aucune correction. Décomptes et rapports mesurés le
- 14/11/2026 sur le fichier de table par un script R non versé ; aucun
- script versé ne les reproduit (issue #279).
+ Empreintes-fichiers), aucune correction. Décomptes et rapports reproduits
+ par le script tests/contre_verification/tables/controles_coherence_generation.R
+ (issue #279 ; spécification d'actuary-approfondi,
+ https://github.com/Gerard-Garey/outil_tables/issues/279#issuecomment-6892063963),
+ qui lit le fichier de table : sortie du 15/11/2026 (R 4.3.3) égale aux
+ nombres de ce champ, structure, décroissances, test joint et médianes.
+ Statuts : décroissances et critère par couple comparés en entiers exacts
+ (aucune égalité du critère) ; arrondi au plus proche des l_x imprimés :
+ hypothèse sur le producteur de la table, non vérifiée ; test joint,
+ approximation numérique à marge certifiée sous l'hypothèse d'une
+ fonction log() juste à quelques ulps près (non vérifiée ; erreur de m_x
+ de l'ordre de 1e-12) : aucune incompatibilité, bande d'indécision 1e-9,
+ aucun indécis, plus petite marge positive m_x hors sommets de l'enveloppe 5,28e-6 (2000
+ à 44 ans, aussi la plus petite marge |m_x|) ; médianes des rapports
+ calculées en flottants, écrites à quatre décimales.
 Ecarts-signales: Deux anomalies de composition du fac-similé de 2015,
  absentes du JO de 2006 (lecture de regulatory du 13/11/2026,
  https://github.com/Gerard-Garey/outil_tables/issues/274#issuecomment-6861022307),
@@ -353,6 +365,7 @@ Empreintes-fichiers:
  a1f43cc182f3cddd176cc9213d8e5d411e23ee54ee59fae69b9eee885b43542e  tests/contre_verification/tables/tgf05.comparaison_acte.csv
  0babb8013717fd1c00952cd5a9b60abb62dcee3a179c168b5848dc5318c3f432  tests/contre_verification/tables/assembler_tgf05_tgh05.R
  9f848753cbdfad9734b89a763c85d0e4c29a3f9e8d09abd88d6d72c06fea0af7  tests/contre_verification/tables/releves_couche_texte_tgf05_tgh05.R
+ 0b866d8f7efa9c0d6e2fd0fb9e0c73ef05a6c0391580daecc7b168293e600850  tests/contre_verification/tables/controles_coherence_generation.R
  2e34890188164d547ea2a16e646afa25f2289e6f48310e37dbe410195ab79b56  docs/sources/jo_2015-12-29_n301_texte35.pdf
  14e9711f5132198d5f61d807049d41920bec5bf49b292896e579481418cab4f9  docs/sources/jo_2006-08-26_n197_texte11.pdf
  0baeb0a75d45bd51a4e1e687d968079fabe441e75df82b2da3f0b874c32436d8  docs/sources/bo_sante_2007-1_annonce58_impression_2026-11-13.pdf
