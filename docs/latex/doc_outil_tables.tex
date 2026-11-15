@@ -3270,7 +3270,9 @@ fichier n'est lu à l'exécution~; (h)~l'\emph{identité de la table unique
 d'\code{actuary-approfondi} du 15/11/2026~; issue~\#275), sans objet si
 et seulement si \code{table\_unique\_2024} n'est pas déclarée. Sinon, le
 contrôle échoue si TGH05 ou TGF05 n'est pas déclarée, si l'une des trois
-tables ne l'est pas au format~2, et sur quatre défauts~: (h1)~l'un des trois fichiers est
+tables ne l'est pas au format~2 ou n'a pas de fichier de provenance (le
+contrôle~(h) n'est alors pas exécuté, et l'échec le dit), et sur quatre
+défauts~: (h1)~l'un des trois fichiers est
 illisible au format~2~; (h2)~les domaines (générations, âges) des trois
 grilles diffèrent~; (h3)~une cellule porte \code{-} dans TGF05 et une
 valeur dans TGH05~; (h4)~une cellule de l'anomalie A2 de TGF05 (âge 117,
@@ -3327,7 +3329,12 @@ constat de plateforme. \textbf{Témoin d'échec} (\code{-{}-temoin}~;
 ADR 0018, point~6.2~; ADR 0019, point~7.5)~: une copie de l'arbre, munie de
 quatre tables d'essai déclarées, deux au format~1 et deux au format~2
 (chaque fois l'une admise, l'autre refusée par le moteur), est contrôlée
-intacte (succès attendu, mesure~(g) comprise), puis avec un $l_x$ de la
+intacte (succès attendu, mesure~(g) comprise~; si la table unique est
+déclarée, la sortie doit porter la ligne des décomptes de~(h), de somme
+égale au nombre de cellules de sa grille, et la ligne «~0 écart(s), égaux
+aux écarts déclarés~», nombre lu dans \code{Identite-ecarts}, si bien
+qu'un contrôle~(h) qui ne s'exécuterait plus ferait échouer le témoin),
+puis avec un $l_x$ de la
 première table admise déclarée au format~1 (table du catalogue s'il en
 porte une, sinon l'essai admis) changé d'une unité (échec attendu, avec
 des écarts sur~(c), (d) et~(e)), puis, ce $l_x$ rétabli, avec les paires
@@ -3358,7 +3365,11 @@ borne en cause) et les tables d'essai refusées sur les âges 0 puis
 des quatre (pour les deux tables refusées, ce motif doit donc l'emporter
 sur celui de la suite)~; les écarts
 sur~(c), (d) et~(f) qui l'accompagnent ne sont pas examinés~;
-issue~\#283)~; enfin, dans le processus du témoin, le contrôle~(h) sur
+issue~\#283)~; puis, les tables d'essai rétablies, un écart fictif
+«~\code{60,1950,1,2}~» écrit au champ \code{Identite-ecarts} de la table
+unique de la copie (échec attendu, code~1, avec exactement un écart, sur~(h),
+«~déclaré (Identite-ecarts), non constaté~»~; sans objet si la table
+unique n'est pas déclarée)~; enfin, dans le processus du témoin, le contrôle~(h) sur
 des grilles forgées, dont les décomptes sont calculés à la main dans le
 commentaire du code (aucune table d'essai ne porte l'identifiant de la
 table unique~; les lignes d'écart y sont réécrites «~(écart attendu)~»)~:
@@ -3366,8 +3377,8 @@ identité exacte admise~; détectés, une cellule changée, un écart déclaré
 non constaté, un écart déclaré deux fois (écart~(b)), une ligne déclarée
 mal formée, un \code{-} de TGF05 seul (h3), la table unique privée de sa
 dernière ligne ou munie d'un âge de plus (h2), la table unique déclarée
-sans l'une des sources ou avec une source sans format déclaré, une source
-illisible (h1), une cellule de A2 hors de la grille, ou à \code{-} dans
+sans l'une des sources, avec une source sans format déclaré ou sans
+fichier de provenance, une source illisible (h1), une cellule de A2 hors de la grille, ou à \code{-} dans
 TGH05 seule, dans TGF05 seule, dans la table unique seule ou dans les
 trois (h4)~; et les champs attendus de~(b)~: \code{Identite-*} sur une
 table d'essai refusés comme inconnus, table unique sans \code{Identite-*}
