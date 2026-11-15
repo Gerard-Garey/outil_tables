@@ -3326,11 +3326,66 @@ versés à côté des relevés, sous \code{tests/contre\_verification/tables/}
 (un script de relevé par couple de tables,
 \code{releves\_couche\_texte\_<tables>.R}, pour TD et TV~88-90, TH et
 TF~00-02, TGF05 et TGH05, et le script d'assemblage
-\code{assembler\_tgf05\_tgh05.R}), et cités, avec leur
+\code{assembler\_tgf05\_tgh05.R}~; pour TGF05 et TGH05, le script des
+décomptes de cohérence \code{controles\_coherence\_generation.R},
+ci-dessous), et cités, avec leur
 SHA-256, au champ \code{Empreintes-fichiers} du fichier de provenance~; le
 contrôle de la CI vérifie leur identité (point~(c)) et rattache chacun à
 une table (point~(a)), mais ne les exécute pas~: il rejoue la comparaison
 sur les relevés versés.
+\textbf{Décomptes de cohérence des tables de génération} (issue~\#279~;
+spécification d'\code{actuary-approfondi} du 15/11/2026, commentaires de
+l'issue). \code{tests/contre\_verification/tables/}\allowbreak
+\code{controles\_coherence\_generation.R}, en R de base, \textbf{hors CI}
+(lancé à la main, déterministe, sans aléa), lit des \emph{fichiers} de
+table au format~2, jamais les objets du moteur, refuse un fichier mal
+formé, et rend, par fichier, les nombres du champ
+\code{Controles-coherence} du fichier de provenance~: (S1)~la
+\emph{structure} (premier et dernier âges à valeur par génération, $l_x$
+au premier âge, $l_x$ nuls, $q_x = 1$, $l_x = l_{x+1} > 0$, plus grand
+$q_x < 1$ en fraction exacte), $q_x = d_x/l_x$ n'étant défini que si
+$l_x \ge 1$ et $l_{x+1}$ est une valeur, comme dans le moteur~;
+(S2)~les \emph{décroissances} $q_x < q_{x-1}$ aux âges $x \ge 31$,
+comparées en entiers ($d_x\,l_{x-1} < d_{x-1}\,l_x$), chaque couple
+classé par le critère par couple
+$(2l_{x+1} - 1)(2l_{x-1} - 1) \le (2l_x + 1)^2$, les égalités comptées
+à part~; (S3)~le \emph{test joint} par génération, sur la fenêtre de
+$\max(30,\ \text{premier âge à valeur})$ au dernier âge où $l_x \ge 1$,
+par la plus petite majorante concave $M$ de $\log(l_x - \frac12)$
+comparée à $\log(l_x + \frac12)$ (section~\ref{sec:table-reference},
+«~TGF05 et TGH05~», «~Contenu~»)~; (S4)~les médianes, minimum et
+maximum des rapports $q_x/q_{x-1}$, âges 53 à~70, sur les générations
+1940 à~2005 qui portent les âges $x-1$ à~$x+1$, et la médiane de
+$q_{60}/q_{58}$. \textbf{Statuts.} S1 et S2 sont des comparaisons en
+entiers exacts. L'arrondi au plus proche des $l_x$ imprimés est une
+\emph{hypothèse} sur le producteur de la table, non vérifiée, sous
+laquelle S2 et S3 classent. Sous cette hypothèse, une incompatibilité du
+test joint (marge $m_x = \log(l_x + \frac12) - M_x < -10^{-9}$) est un
+\emph{résultat exact}~: elle est certifiée par un triplet témoin
+$(i, x, j)$ de largeur $j - i$ minimale, vérifié en entiers exacts,
+$(2l_i - 1)^{j-x}(2l_j - 1)^{x-i} > (2l_x + 1)^{j-i}$, et un défaut sans
+témoin entier fait échouer le script~; une compatibilité ($m_x > 10^{-9}$
+en tout âge hors des sommets de l'enveloppe) est une
+\emph{approximation numérique à marge certifiée}, sous l'hypothèse,
+non vérifiée, d'une fonction \code{log()} juste à quelques ulps près
+(erreur de $m_x$ de l'ordre de $10^{-12}$)~; une marge
+$|m_x| \le 10^{-9}$ est \emph{indécise}, et le script échoue en citant
+la cellule plutôt que de trancher. S4 est une approximation numérique
+(rapports en flottants, écrits à quatre décimales). Le script vérifie
+aussi que tout couple incompatible de S2 est un défaut joint. Sortie sur
+\code{inst/extdata/tables/tgf05.csv} et \code{tgh05.csv}~: égale aux
+nombres des deux champs \code{Controles-coherence}, avec 0~égalité du
+critère par couple, 0~indécis et une plus petite marge positive de
+$5{,}28 \cdot 10^{-6}$ (TGF05) et $7{,}09 \cdot 10^{-7}$ (TGH05),
+supérieure de plus de cinq ordres de grandeur à l'erreur estimée de $m_x$.
+\textbf{Témoin} (\code{-{}-temoin})~: grilles forgées, aux décomptes
+calculés à la main dans le commentaire du code~: un couple incompatible
+($l = 1000$, 990, 985), une génération en défaut joint seulement ($l =
+1000$, 985, 970, 957, témoin entier sur les quatre âges), le maximum de
+$q_x < 1$ en fraction exacte~; une égalité du critère par couple, qui
+rend le test joint indécis et doit faire échouer le script~; un
+«~--~» intercalé et un $l_x$ croissant, qui doivent être refusés~; code
+de sortie non nul si un cas n'est pas tenu.
 Les comportements du moteur (construction, refus, nom réservé, accesseurs)
 sont testés dans la batterie unitaire (section~\ref{sec:verifications-donnees}).
 
@@ -7647,7 +7702,8 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         n'en relève qu'à 59~ans, et pour 55~générations sur les 68 de 1938
         à~2005 qui ont $q_{59} < q_{58}$~: les 53 ci-dessus et les
         générations 2000 et~2005, compatibles couple par couple à 59~ans
-        mais incompatibles sur la seule fenêtre de 57 à~61~ans (génération
+        mais incompatibles dès la fenêtre de 58 à~61~ans (triplet témoin
+        $(i, x, j) = (58, 59, 61)$, vérifié en entiers~; génération
         2000~: $l_{57}, \ldots, l_{61} = 97\,850$, $97\,731$, $97\,606$,
         $97\,483$, $97\,360$, où $q_{60}$ est aussi inférieur à $q_{58}$).
         Pour ces 55~générations, le profil publié à 59~ans n'est expliqué
@@ -7670,11 +7726,20 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         pas une erreur de lecture. Son origine dans la construction des
         tables est une \emph{hypothèse non vérifiée}, que l'outil ne
         tranche pas. Dans les deux cas, ce sont des valeurs imprimées et
-        homologuées, que l'outil ne corrige pas. Les décomptes du test joint
-        sont une mesure d'\code{actuary} du 14/11/2026, reproduite par
-        \code{docwriter} le même jour sur les fichiers de table, sans
-        script versé~: leur reproduction par script est l'objet de
-        l'issue~\#279. Un
+        homologuées, que l'outil ne corrige pas. Les décomptes et les
+        médianes de ce paragraphe sont reproduits par le script hors CI
+        \code{tests/contre\_verification/tables/}\allowbreak
+        \code{controles\_coherence\_generation.R} (issue~\#279~;
+        section~\ref{sec:scripts-controle}), cité avec son SHA-256 aux
+        deux fichiers de provenance~; statuts~: décroissances et critère
+        par couple comparés en entiers exacts (aucune égalité du critère)~;
+        arrondi au plus proche des $l_x$ imprimés, \emph{hypothèse} sur le
+        producteur, non vérifiée~; incompatibilités du test joint,
+        \emph{résultat exact} sous cette hypothèse, chacune certifiée par
+        un triplet témoin vérifié en entiers (58-60 pour les 53~générations
+        des couples incompatibles, 58-61 pour 2000 et~2005)~; compatibilités
+        du test joint, \emph{approximation numérique à marge certifiée}
+        (aucun cas indécis)~; médianes, approximation numérique. Un
         consommateur à venir qui compare des $q_x$ le long d'une génération,
         ou qui positionne une table sur TGH05, héritera de ce ralentissement~; au-delà
         de l'âge où $l_x < 100$, les $q_x$ sont sensibles à l'arrondi des
