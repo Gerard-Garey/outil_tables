@@ -337,7 +337,7 @@ lire_grille <- function(chemin) {
   })
   ages <- vapply(r, `[[`, "", "age")
   if (anyDuplicated(ages))
-    echec(sprintf("%s : âge %s présent plus d'une fois", chemin, ages[anyDuplicated(ages)]))
+    echec(sprintf("%s : \u00e2ge %s pr\u00e9sent plus d'une fois", chemin, ages[anyDuplicated(ages)]))
   setNames(lapply(r, `[[`, "cel"), ages)
 }
 
