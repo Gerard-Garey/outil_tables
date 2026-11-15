@@ -1555,15 +1555,16 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
 
   # 1. Nature des arguments : la fiche d'abord, puis les données (refus
   #    délégué à controler_roles(), motif donnees_mal_formees). Classe lue
-  #    par %in% (match()), qui ne lève pas sur une classe d'encodage « bytes »,
-  #    là où inherits() lève (« translating strings with "bytes" encoding is
-  #    not allowed », mesuré sous C et C.UTF-8 ; #94).
-  if ("construction" %in% class(fiche))
+  #    par a_classe() (R/outils.R : attr() et %in%), qui ne lève pas sur une
+  #    classe d'encodage « bytes », là où inherits() lève (« translating
+  #    strings with "bytes" encoding is not allowed », mesuré sous C et
+  #    C.UTF-8 ; #94).
+  if (a_classe(fiche, "construction"))
     refus_rejeu("fiche_non_conforme",
                 formuler(paste("Rejeu : objet `construction` reçu à la place de sa fiche ; passer x$fiche, ou la fiche",
                                "relue de son texte par lire_fiche().")),
                 list(champ = "(fiche)", lu = "construction", attendu = "liste nommée"))
-  if ("rejeu" %in% class(fiche))
+  if (a_classe(fiche, "rejeu"))
     refus_rejeu("fiche_non_conforme",
                 formuler("Rejeu : objet `rejeu` reçu à la place d'une fiche ; passer r$construction$fiche."),
                 list(champ = "(fiche)", lu = "rejeu", attendu = "liste nommée"))
