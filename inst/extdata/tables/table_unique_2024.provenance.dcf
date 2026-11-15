@@ -270,7 +270,9 @@ Transcription-B-methode: Transcription B : même méthode que A, en dix
  121 lignes identiques, aucun écart.
 Identite-regle: Contre-vérification, jamais source (M219 ; E2.26 ; ADR
  0019, point 7.4) ; tient lieu de seconde source pour cette seule table
- (aucune seconde source publiée, M472 ; substitution décidée par le
+ (aucune seconde source n'est retenue : M472, l'impression de la version
+ électronique de Légifrance n'est pas requise, faute d'apporter une
+ information absente du fac-similé versé ; substitution décidée par le
  mainteneur le 15/11/2026, M486 ; ADR 0018, point 3.2, et ADR 0019, point
  7.1, annotations du 15/11/2026). Règle constatée sur les fichiers de table
  par le contrôle (h) de tests/controles/tables_embarquees.R : cellule « - »
@@ -394,12 +396,27 @@ Controles-coherence: Par génération : âges consécutifs du premier au dernier
  la table imprimée décroît (comparaison en entiers sur 3 H + 2 F).
  Génération 2003 : 3 H + 2 F aux âges 57 à 60 = 488781, 488204, 487602,
  487008 ; q_59 / q_58 = 0,9673 (TGH05), 1,0174 (TGF05), 0,9879 (mélange
- avant arrondi), 0,9764 (table imprimée). Le ralentissement autour de 60
- ans et le défaut joint de 2003 sont donc hérités de TGH05 par le mélange et
- accentués par l'arrondi, sans anomalie de transcription ni de
- composition ; « compatible avec l'arrondi » ne signifie pas « dû à
- l'arrondi ». Leur origine dans la construction de TGH05 reste non établie
- (même champ de TGH05). Mesure du 15/11/2026 sur les trois fichiers de
+ avant arrondi), 0,9764 (table imprimée). Décomposition exacte de
+ l'écart du mélange : q_59 - q_58 = w_59 (q^H_59 - q^H_58) + (1 - w_59)
+ (q^F_59 - q^F_58) + (w_59 - w_58)(q^H_58 - q^F_58) ; sur les 17
+ générations où le mélange décroît, terme de TGH05 de -2,9e-5 à -1,7e-5,
+ terme de TGF05 de +0,9e-5 à +2,6e-5, glissement des poids de -2,3e-9 à
+ -1,7e-12 (flottants, approximation numérique ; résidu de l'identité
+ inférieur à 1,1e-16) : la décroissance vient du terme de TGH05, que celui
+ de TGF05 compense en partie. L'arrondi au plus proche joue dans les deux
+ sens : parmi les 10 générations où la table imprimée décroît, il accentue
+ la décroissance pour 9 (rapport q_59 / q_58 imprimé inférieur à celui du
+ mélange, dont 2003) ; pour 1999, le rapport est égal à quatre décimales
+ (0,9936) et dépasse celui du mélange de 5,5e-9 en valeur relative ;
+ parmi les 17 où le mélange décroît, il masque la décroissance pour 7
+ (1982, 1991, 1992, 1994, 2001, 2002, 2004) ; rapports comparés par
+ produits croisés en entiers exacts (jusqu'à 4,7e16, au-delà de 2^53 :
+ précision arbitraire). Le ralentissement autour de 60 ans et le défaut
+ joint de 2003 sont donc hérités de TGH05 par le mélange, sans anomalie de
+ transcription ni de composition ; l'arrondi en modifie la trace couple par
+ couple sans en être l'origine ; « compatible avec l'arrondi » ne signifie
+ pas « dû à l'arrondi ». Leur origine dans la construction de TGH05 reste
+ non établie (même champ de TGH05). Mesure du 15/11/2026 sur les trois fichiers de
  table (script hors dépôt de la reprise, comparaisons en entiers exacts ;
  rapports en flottants, écrits à quatre décimales).
  Valeurs imprimées, identiques aux deux transcriptions, à la couche texte
