@@ -141,8 +141,8 @@ verifier("T2 bilan : lignes 1, 2, 6, 8, 12 et 14 (textes fixes et composés ; li
     identical(b$lu[2L], "champs lus de la forme attendue") &&
     identical(b$lu[6L], paste("étapes : donnees, exposition, brut ; rôles : id_contrat, id_tete, sexe, date_naissance,",
                               "date_entree, date_sortie, cause_sortie ; recette : lignes_dates_completes ; provenance : NULL")) &&
-    identical(b$attendu[8L], "aucune table de référence (fiche/tables_reference : NULL)") &&
-    identical(b$lu[8L], "aucune table reçue ni relue") &&
+    identical(b$attendu[8L], "aucune empreinte recalculée (aucune table reçue ni relue)") &&
+    identical(b$lu[8L], "aucune table de référence (fiche/tables_reference : NULL)") &&
     identical(b$lu[12L], "fiche reçue, même périmètre") && identical(b$lu[14L], "NA") &&
     identical(b$attendu[14L], "non recalculée par le moteur (couche de lecture, E4.4)")
 })

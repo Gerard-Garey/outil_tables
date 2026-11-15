@@ -955,7 +955,8 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
 # fiche$tables_reference, de forme contrôlée (contrôle 2) ; `code_fiche` :
 # empreinte du code lue dans la fiche, citée. Rend la liste assemblée (NULL
 # sans table), les empreintes recalculées et les textes de la ligne
-# « tables_reference » du bilan.
+# « tables_reference » du bilan : `lu`, les empreintes de la fiche ;
+# `attendu`, les empreintes recalculées avec leur origine (#160).
 controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, embarquees = TABLES_EMBARQUEES) {
   f <- controler_forme_tables(tables_reference)
   recues <- if (is.null(f)) character(0) else names(f$tables)
@@ -1038,12 +1039,15 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, e
   }
   names(empreintes) <- cles
   tables <- if (length(assemblee)) assemblee
+  # Règle du bilan (#160, ADR 0015, point 4.3, annotation du 15/11/2026) :
+  # `lu` = valeur telle que le rejeu la reçoit (la fiche), `attendu` = valeur
+  # que le code installé oppose (recalculée, avec son origine).
   list(tables = tables, empreintes = empreintes,
-       attendu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
-                              else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
-                                          collapse = " ; ")),
-       lu = texte_moteur(if (!length(cles)) "aucune table reçue ni relue"
-                         else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")))
+       attendu = texte_moteur(if (!length(cles)) "aucune empreinte recalculée (aucune table reçue ni relue)"
+                              else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")),
+       lu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
+                         else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
+                                     collapse = " ; ")))
 }
 
 # Table de clé `cle` dans la liste `tables` (contrôlée par

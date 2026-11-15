@@ -607,6 +607,18 @@ verifier("bout en bout : fiche/tables_reference porte la clé tv (importee, empr
     identical(X$fiche$tables_reference$tv$empreinte, tablexp:::empreinte_table(T_HF)) &&
     identical(sans_execution(r$construction), sans_execution(X)) && all(r$bilan$verdict[1:8] == "conforme")
 })
+verifier("bout en bout : ligne 8 du bilan, table reçue : lu = empreinte de la fiche, attendu = empreinte recalculée (reçue), même sens que les details du refus (#160)", {
+  f <- lire_fiche(ecrire_fiche(X$fiche))
+  b <- rejouer_fiche(JEU, f, list(tv = T_HF))$bilan
+  emp <- tablexp:::empreinte_table(T_HF)
+  t2 <- T_HF; t2$qx[5L] <- t2$qx[5L] * (1 + .Machine$double.eps)
+  t2 <- table_reference(data.frame(age = t2$age, sexe = t2$sexe, qx = t2$qx), "GM vraie par sexe", "importee",
+                        "loi vraie du jeu simulé (test)")
+  d <- refus_de(rejouer_fiche(JEU, f, list(tv = t2)))$details
+  identical(b$controle[8L], "tables_reference") &&
+    identical(b$attendu[8L], sprintf("tv : %s (reçue)", emp)) && identical(b$lu[8L], sprintf("tv : %s", f$tables_reference$tv$empreinte)) &&
+    identical(f$tables_reference$tv$empreinte, emp) && identical(d$lu, emp) && identical(d$attendu, tablexp:::empreinte_table(t2))
+})
 verifier("bout en bout : rejeu sans la table -> table_reference_absente ; avec une table altérée d'un ulp -> empreinte_table_discordante", {
   f <- X$fiche
   t2 <- T_HF; t2$qx[5L] <- t2$qx[5L] * (1 + .Machine$double.eps)
