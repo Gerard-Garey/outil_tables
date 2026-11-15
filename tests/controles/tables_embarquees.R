@@ -35,10 +35,13 @@
 #        à valeur, lignes imprimées sans valeur non transcrites, condition 2
 #        du visa d'actuary de la question 5) ; groupe Comparaison-acte[-methode|
 #        -releve|-ecarts] complet (point 7.3) ; ces champs sont inconnus au
-#        format 1 ; Identite-regle et Identite-ecarts restent inconnus au
-#        format 2 jusqu'à #275 (ADR 0019, points 7.1 et 7.4), qui apportera
-#        dans un même commit leur admission, le contrôle (h) et un cas du
-#        témoin ;
+#        format 1 ; Identite-regle et Identite-ecarts requis et non vides
+#        (« aucun » admis) pour la seule table d'identifiant
+#        table_unique_2024 au format 2, inconnus partout ailleurs, et tenant
+#        lieu pour elle seule du groupe Seconde-source* (M486 ; ADR 0018,
+#        point 3.2, et ADR 0019, point 7.1, annotations du 15/11/2026 ;
+#        champs_attendus()) : la substitution suit l'identifiant, jamais la
+#        présence des champs, et n'est acquise qu'avec (h) satisfait ;
 #    (c) identité des fichiers : SHA-256 (outil sha256sum ; son absence est
 #        un échec) de chaque chemin d'Empreintes-fichiers égal à la valeur
 #        écrite ; fichier de table et relevés cités présents dans le champ ;
@@ -61,7 +64,23 @@
 #    (g) installation (point 1.5) : R CMD build de l'arbre, installation de
 #        l'archive sous LC_ALL=C et sous une locale UTF-8, catalogue identique
 #        à celui de (f) et tables accessibles après suppression du dossier
-#        extdata de la bibliothèque (aucun fichier lu à l'exécution).
+#        extdata de la bibliothèque (aucun fichier lu à l'exécution) ;
+#    (h) identité de la table unique 2024 (ADR 0019, point 7.4 ; M464, M486 ;
+#        spécification d'actuary-approfondi de l'étape (0')(b) de B23), si et
+#        seulement si table_unique_2024 est déclarée (sans objet sinon) ; échec
+#        si TGH05 ou TGF05 n'est pas déclarée au format 2, si l'un des trois
+#        fichiers est illisible au format 2 (h1), si les domaines (générations,
+#        âges) diffèrent (h2), si une cellule porte « - » dans TGF05 et une
+#        valeur dans TGH05 (h3), si une cellule de A2 (âge 117, générations
+#        1955 à 1965) est hors de la grille ou sans valeur dans l'une des
+#        trois grilles (h4) ; cellule calculée, sur les chaînes : « - » si
+#        « - » dans les deux sources, sinon s %/% 5 + (s %% 5 >= 3), s = 3 H +
+#        2 F, un « - » d'une seule source comptant pour 0 (convention du
+#        producteur constatée par l'identité, propre à ce script) ; cellules
+#        en écart égales, dans les deux sens, à Identite-ecarts
+#        (« <âge>,<génération>,<cellule table unique>,<cellule calculée> ») ;
+#        décomptes imprimés : catégories, pouvoir discriminant de l'arrondi et
+#        de la convention « - » = 0, cellules de A2.
 #  Décalages d'âge (DECLARATIONS_DECALAGES_EMBARQUES ; format 3, ADR 0019,
 #  points 6 et 7 ; spécification d'actuary de #273, § 5.9), mêmes contrôles :
 #    (a) fichiers de décalages et de provenance présents ; identifiants
@@ -112,7 +131,19 @@
 #  réécrites sur trois âges consécutifs dont le dernier dépasse
 #  .Machine$integer.max, puis les tables d'essai refusées sur un âge hors de la
 #  suite et au-delà de la borne : écart (b) à la borne du moteur, prioritaire
-#  sur la suite (#283). Les essais
+#  sur la suite (#283) ; enfin, dans le processus du témoin, le contrôle (h)
+#  sur des grilles forgées (aucune table d'essai ne porte l'identifiant de la
+#  table unique ; lignes ECART réécrites « (écart attendu) ») : identité
+#  exacte admise ; cellule changée, écart déclaré non constaté, écart déclaré
+#  deux fois (b), ligne déclarée mal formée, « - » de TGF05 seul (h3), table
+#  unique privée de sa dernière ligne ou munie d'un âge de plus (h2), table
+#  unique déclarée sans l'une des sources ou avec une source sans format
+#  déclaré, source illisible (h1), cellule de A2 hors de la grille, ou à « - »
+#  dans TGH05 seule, dans TGF05 seule, dans la table unique seule, dans les
+#  trois (h4) détectés ; et les champs attendus de (b) : Identite-* sur
+#  une table d'essai, champs inconnus ; table unique sans Identite-* ni
+#  Seconde-source*, écart (b) ; avec Identite-* sans Seconde-source*, admise.
+#  Les essais
 #  portent les groupes facultatifs Controle-lecture-*
 #  (format 1) et Comparaison-acte-* (format 2), relevé copie de la table,
 #  écarts « aucun ».
@@ -159,13 +190,20 @@ CHAMPS_FACULTATIFS <- c("Controle-lecture-releve", "Controle-lecture-ecarts", "C
 FORMAT_PROVENANCE <- "tablexp provenance 1"
 # Champs propres au format 2 (ADR 0019, point 7.1) : Generations requis ;
 # groupe de la comparaison à l'acte facultatif, complet. Identite-regle et
-# Identite-ecarts (champ M) restent inconnus jusqu'à #275 (ADR 0019, points
-# 7.1 et 7.4) : un champ lu par machine admis sans son contrôle (h) donnerait
-# une fausse assurance ; leur admission, le contrôle (h) et un cas du témoin
-# viendront dans un même commit.
+# Identite-ecarts (champ M) : requis pour la seule table unique 2024 au format
+# 2, que contrôle (h), inconnus ailleurs (un champ lu par machine contrôlé
+# sur aucune table donnerait une fausse assurance ; M486 ; champs_attendus()).
 CHAMPS_FORMAT2_REQUIS <- "Generations"
 CHAMPS_COMPARAISON_ACTE <- c("Comparaison-acte", "Comparaison-acte-methode", "Comparaison-acte-releve",
                              "Comparaison-acte-ecarts")
+CHAMPS_IDENTITE <- c("Identite-regle", "Identite-ecarts")
+# Contrôle (h) : identifiants de la table unique 2024 et de ses deux sources
+# (ADR 0019, point 8.1). Cellules de A2 : coordonnées codées en dur (TGF05,
+# ligne 117, générations 1955 à 1965 ; M466 et champ Ecarts-signales de
+# inst/extdata/tables/tgf05.provenance.dcf) ; chacune doit être dans la
+# grille et porter une valeur dans les trois grilles (h4).
+IDENTITE_TABLE_UNIQUE <- c(unique = "table_unique_2024", h = "tgh05", f = "tgf05")
+CELLULES_A2 <- data.frame(age = 117, generation = 1955:1965)
 MOTIF_VISA <- "^[0-9]{4}-[0-9]{2}-[0-9]{2}, mainteneur, [^ ].*$"
 # Format 3 (ADR 0019, points 6.2 et 7.1 ; spécification d'actuary de #273,
 # § 2 et § 5.8) : en-tête et ligne de bande ; champs du fichier de
@@ -413,6 +451,142 @@ ecarts_declares <- function(v) {
   if (identical(l, "aucun")) character(0) else l
 }
 
+# Champs attendus d'une provenance de table selon (identifiant, format)
+# (ADR 0018, point 3.2 ; ADR 0019, point 7.1 ; M486) : propres, champs requis
+# en plus de CHAMPS_REQUIS ; facultatifs, en plus de CHAMPS_FACULTATIFS ;
+# seconde_source, groupe Seconde-source* requis. Pour la seule
+# table_unique_2024 au format 2, Identite-regle et Identite-ecarts sont requis
+# et tiennent lieu de seconde source ; la règle suit l'identifiant de
+# IDENTITE_TABLE_UNIQUE, jamais la présence des champs.
+champs_attendus <- function(identifiant, format) {
+  format2 <- identical(format, 2L)
+  identite <- format2 && identical(identifiant, IDENTITE_TABLE_UNIQUE[["unique"]])
+  list(propres = c(if (format2) CHAMPS_FORMAT2_REQUIS, if (identite) CHAMPS_IDENTITE),
+       facultatifs = if (format2) CHAMPS_COMPARAISON_ACTE, seconde_source = !identite)
+}
+
+# Contrôle (b) des noms de champs d'une provenance de table (`n`, noms lus),
+# selon champs_attendus(identifiant, format). Rend list(defauts, groupes,
+# connus) : defauts, textes d'écart (b) sans le nom de la table ; groupes,
+# groupes Seconde-source* bien nommés ; connus, champs admis.
+champs_table <- function(n, identifiant, format) {
+  a <- champs_attendus(identifiant, format)
+  d <- character(0)
+  groupes <- unique(sub("(-methode|-releve|-ecarts)$", "", grep("^Seconde-source", n, value = TRUE)))
+  groupe_ok <- grepl(sprintf("^Seconde-source(-%s)?$", MOTIF_PIECE), groupes) &
+    !groupes %in% paste0("Seconde-source", SUFFIXES_GROUPE)
+  d <- c(d, sprintf("champ de seconde source mal nommé : %s", groupes[!groupe_ok]))
+  groupes <- groupes[groupe_ok]
+  if (!length(groupes) && a$seconde_source) d <- c(d, "aucune seconde source (champs Seconde-source*)")
+  connus <- c(CHAMPS_REQUIS, CHAMPS_FACULTATIFS, groupes, outer(groupes, SUFFIXES_GROUPE, paste0), a$propres, a$facultatifs)
+  d <- c(d, sprintf("champ inconnu %s", setdiff(n, connus)))
+  requis <- c(CHAMPS_REQUIS, groupes, outer(groupes, SUFFIXES_GROUPE, paste0), a$propres)
+  d <- c(d, sprintf("champ requis absent %s", setdiff(requis, n)))
+  list(defauts = d, groupes = groupes, connus = connus)
+}
+
+# Identité de la table unique (ADR 0019, point 7.4 ; M464 ; spécification
+# d'actuary-approfondi, étape (0')(b) de B23, § 2), sur trois grilles lues par
+# lire_grille() : u (table unique), h (TGH05), f (TGF05). Rend list(defauts,
+# categories, ecarts, arrondi, h_tiret_nulles, a2) : defauts, échecs non
+# déclarables h2 (domaines), h3 (« - » de TGF05 seul), h4 (A2) ; si h2, rien
+# d'autre. Cellule calculée, sur les chaînes : « - » si « - » dans H et dans
+# F ; sinon s %/% 5 + (s %% 5 >= 3), s = 3 H + 2 F, un « - » d'une seule
+# source comptant pour 0. Exact : cellule d'au plus 15 chiffres, s < 2^53 ;
+# s/5 n'a jamais 0,5 pour partie fractionnaire. ecarts : « âge,génération,
+# <cellule unique>,<cellule calculée> », par âge puis génération ; arrondi :
+# cellules à valeur où l'arrondi diffère de la troncature (s %% 5 >= 3) ;
+# h_tiret_nulles : cellules « - » de H seul calculées nulles ; a2 : une ligne
+# par cellule de `a2` (âge, génération, H, F, unique, calculée).
+identite_table_unique <- function(u, h, f, a2 = CELLULES_A2) {
+  domaine <- function(x) list(generation = unique(x$cellules$generation), age = unique(x$cellules$age))
+  du <- domaine(u)
+  defauts <- character(0)
+  for (s in list(list(nom = "TGH05", x = h), list(nom = "TGF05", x = f))) {
+    ds <- domaine(s$x)
+    for (axe in c("generation", "age")) {
+      hors <- sort(c(setdiff(ds[[axe]], du[[axe]]), setdiff(du[[axe]], ds[[axe]])))
+      if (length(hors))
+        defauts <- c(defauts, sprintf("domaine de %s différent de celui de la table unique : %s %.0f dans l'une seulement (h2)",
+                                      s$nom, if (axe == "age") "âge" else "génération", hors[1L]))
+    }
+  }
+  if (length(defauts)) return(list(defauts = defauts))
+  # Domaines égaux, cellules dans le même ordre (âge puis génération).
+  vu <- u$cellules$cellule; vh <- h$cellules$cellule; vf <- f$cellules$cellule
+  nombre <- function(v) ifelse(v == "-", 0, suppressWarnings(as.double(v)))
+  s <- 3 * nombre(vh) + 2 * nombre(vf)
+  tirets <- vh == "-" & vf == "-"
+  calcule <- ifelse(tirets, "-", sprintf("%.0f", s %/% 5 + (s %% 5 >= 3)))
+  categories <- c(deux_valeurs = sum(vh != "-" & vf != "-"), h_tiret_seul = sum(vh == "-" & vf != "-"),
+                  f_tiret_seul = sum(vh != "-" & vf == "-"), deux_tirets = sum(tirets))
+  age <- u$cellules$age; generation <- u$cellules$generation
+  k <- which(vf == "-" & vh != "-")
+  if (length(k))
+    defauts <- c(defauts, sprintf("%d cellule(s) où TGF05 porte « - » et TGH05 une valeur (0 attendu ; h3) : %s", length(k),
+                                  paste(sprintf("%.0f,%.0f", age[k], generation[k])[seq_len(min(10L, length(k)))], collapse = " ; ")))
+  cle <- function(a, g) sprintf("%.0f,%.0f", a, g)
+  i <- match(cle(a2$age, a2$generation), cle(age, generation))
+  a2 <- data.frame(age = a2$age, generation = a2$generation, h = vh[i], f = vf[i], unique = vu[i], calculee = calcule[i],
+                   stringsAsFactors = FALSE)
+  manque <- which(is.na(i) | a2$h %in% "-" | a2$f %in% "-" | a2$unique %in% "-")
+  if (length(manque))
+    defauts <- c(defauts, sprintf("cellule(s) de A2 hors de la grille ou sans valeur dans l'une des trois grilles (h4) : %s",
+                                  paste(cle(a2$age[manque], a2$generation[manque]), collapse = " ; ")))
+  e <- which(vu != calcule)
+  list(defauts = defauts, categories = categories,
+       ecarts = sprintf("%.0f,%.0f,%s,%s", age[e], generation[e], vu[e], calcule[e]),
+       arrondi = c(discriminant = sum(!tirets & s %% 5 >= 3), valeurs = sum(!tirets)),
+       h_tiret_nulles = sum(vh == "-" & vf != "-" & calcule == "0"), a2 = a2)
+}
+
+# Contrôle (h) d'un arbre. `grilles` : par identifiant déclaré, list(nom,
+# format, tab (lire_format()), champs (provenance)). Sans objet si
+# table_unique_2024 n'est pas déclarée ; sinon échec (jamais sans objet) si
+# l'une des trois tables n'est pas déclarée au format 2 ou est illisible
+# (h1) ; puis échecs h2 à h4 d'identite_table_unique() ; écarts constatés
+# égaux, dans les deux sens, à Identite-ecarts de la table unique.
+controler_identite <- function(grilles, a2 = CELLULES_A2) {
+  ids <- IDENTITE_TABLE_UNIQUE
+  if (!ids[["unique"]] %in% names(grilles)) {
+    cat(sprintf("  (h) identité de la table unique : sans objet (%s non déclarée)\n", ids[["unique"]]))
+    return(invisible())
+  }
+  defaut <- FALSE
+  for (id in ids) {
+    g <- grilles[[id]]
+    if (is.null(g)) { ecart("h", sprintf("%s déclarée, %s non déclarée", ids[["unique"]], id)); defaut <- TRUE }
+    else if (!identical(g$format, 2L)) { ecart("h", sprintf("%s déclarée au format %s, 2 attendu", id,
+                                                                                 if (length(g$format)) paste(g$format, collapse = ", ") else "absent")); defaut <- TRUE }
+    else if (!is.null(g$tab$defaut)) { ecart("h", sprintf("%s : fichier de table illisible au format 2 (h1) : %s", id, g$tab$defaut)); defaut <- TRUE }
+  }
+  if (defaut) return(invisible())
+  gu <- grilles[[ids[["unique"]]]]
+  r <- identite_table_unique(gu$tab, grilles[[ids[["h"]]]]$tab, grilles[[ids[["f"]]]]$tab, a2)
+  if (is.null(r$categories)) { for (d in r$defauts) ecart("h", d); return(invisible()) }
+  cat(sprintf("  (h) identité de la table unique : %s (somme %d)\n",
+              paste(sprintf("%s %d", names(r$categories), r$categories), collapse = " ; "), sum(r$categories)))
+  cat(sprintf("     arrondi au plus proche différent de la troncature : %d cellule(s) sur %d à valeur\n",
+              r$arrondi[["discriminant"]], r$arrondi[["valeurs"]]))
+  cat(sprintf("     convention « - » = 0 : h_tiret_seul %d, dont %d calculée(s) nulle(s) et %d non nulle(s)\n",
+              r$categories[["h_tiret_seul"]], r$h_tiret_nulles, r$categories[["h_tiret_seul"]] - r$h_tiret_nulles))
+  for (d in r$defauts) ecart("h", d)  # h3, h4
+  declares <- ecarts_declares(valeur(gu$champs, "Identite-ecarts"))
+  if (length(declares) == 1L && is.na(declares)) ecart("h", sprintf("%s : champ Identite-ecarts absent", gu$nom))
+  else {
+    for (x in unique(declares[duplicated(declares)]))
+      ecart("b", sprintf("%s : écart %s déclaré plus d'une fois (Identite-ecarts)", gu$nom, x))
+    for (x in setdiff(r$ecarts, declares)) ecart("h", sprintf("écart %s constaté, non déclaré (Identite-ecarts)", x))
+    for (x in setdiff(declares, r$ecarts)) ecart("h", sprintf("écart %s déclaré (Identite-ecarts), non constaté", x))
+    if (setequal(r$ecarts, declares)) cat(sprintf("     %d écart(s), égaux aux écarts déclarés\n", length(r$ecarts)))
+  }
+  a <- r$a2
+  cat("     cellules de A2 (âge, génération, H, F, table unique, calculée) :\n")
+  cat(sprintf("       %.0f, %.0f : %s, %s, %s, %s, %s\n", a$age, a$generation, a$h, a$f, a$unique, a$calculee,
+              ifelse(!is.na(a$unique) & a$unique == a$calculee, "égal", "écart")), sep = "")
+  invisible()
+}
+
 # --- contrôle d'un arbre ------------------------------------------------------------
 
 controler <- function(racine, installation = TRUE) {
@@ -455,11 +629,13 @@ controler <- function(racine, installation = TRUE) {
   empreintes_citees <- character(0)  # chemins d'Empreintes-fichiers, toutes tables
 
   etats <- list()
+  grilles <- list()  # par identifiant déclaré : nom, format, fichier lu, provenance (contrôle (h))
   for (k in seq_len(nrow(decl))) {
     nom <- decl$nom[k]; id <- decl$identifiant[k]
     # Format déclaré (ADR 0019, point 5.1), sans valeur par défaut.
     fmt <- if (is.null(decl$format)) NULL else decl$format[k]
     cat(sprintf("  -- %s (%s, format %s)\n", nom, id, if (is.null(fmt)) "absent" else fmt))
+    grilles[[id]] <- list(nom = nom, format = fmt, tab = list(defaut = "provenance absente, table non lue"), champs = list())
     f_table <- sprintf("%s/%s.csv", DOSSIER_TABLES, id)
     f_prov <- sprintf("%s/%s.provenance.dcf", DOSSIER_TABLES, id)
     if (!file.exists(file.path(racine, f_table))) ecart("a", sprintf("%s : fichier de table %s absent", nom, f_table))
@@ -472,18 +648,13 @@ controler <- function(racine, installation = TRUE) {
     for (d in p$defauts) ecart("b", sprintf("%s : %s : %s", nom, f_prov, d))
     ch <- p$champs
     n <- names(ch)
-    groupes <- unique(sub("(-methode|-releve|-ecarts)$", "", grep("^Seconde-source", n, value = TRUE)))
-    groupe_ok <- grepl(sprintf("^Seconde-source(-%s)?$", MOTIF_PIECE), groupes) &
-      !groupes %in% paste0("Seconde-source", SUFFIXES_GROUPE)
-    for (g in groupes[!groupe_ok]) ecart("b", sprintf("%s : champ de seconde source mal nommé : %s", nom, g))
-    groupes <- groupes[groupe_ok]
-    if (!length(groupes)) ecart("b", sprintf("%s : aucune seconde source (champs Seconde-source*)", nom))
+    grilles[[id]] <- list(nom = nom, format = fmt, tab = tab, champs = ch)
+    # Champs attendus selon (identifiant, format) : groupe Identite-* tenant
+    # lieu de seconde source pour la seule table unique 2024 (M486).
+    ct <- champs_table(n, id, fmt)
+    for (d in ct$defauts) ecart("b", sprintf("%s : %s", nom, d))
+    groupes <- ct$groupes; connus <- ct$connus
     format2 <- identical(fmt, 2L)
-    connus <- c(CHAMPS_REQUIS, CHAMPS_FACULTATIFS, groupes, outer(groupes, SUFFIXES_GROUPE, paste0),
-                if (format2) c(CHAMPS_FORMAT2_REQUIS, CHAMPS_COMPARAISON_ACTE))
-    for (x in setdiff(n, connus)) ecart("b", sprintf("%s : champ inconnu %s", nom, x))
-    requis <- c(CHAMPS_REQUIS, groupes, outer(groupes, SUFFIXES_GROUPE, paste0), if (format2) CHAMPS_FORMAT2_REQUIS)
-    for (x in setdiff(requis, n)) ecart("b", sprintf("%s : champ requis absent %s", nom, x))
     for (x in champs_vides(ch, connus)) ecart("b", sprintf("%s : champ vide %s", nom, x))
     controle_lecture <- c("Controle-lecture-releve", "Controle-lecture-ecarts", "Controle-lecture-methode")
     if (any(controle_lecture %in% n) && !all(controle_lecture %in% n))
@@ -593,6 +764,9 @@ controler <- function(racine, installation = TRUE) {
         cat(sprintf("     %s : %d écart(s), égaux aux écarts déclarés\n", nature, length(constates)))
     }
   }
+
+  # (h) identité de la table unique 2024 (ADR 0019, point 7.4 ; M486).
+  controler_identite(grilles)
 
   # Décalages d'âge, au format 3 (ADR 0019, points 6.2, 7.1, 7.2 et 7.5 ;
   # spécification d'actuary de #273, § 5) : (a) à (e) comme pour une table.
@@ -1203,11 +1377,127 @@ temoin <- function(racine) {
     ok <- FALSE
   }
   unlink(arbre, recursive = TRUE)
+  cat("\n== 9. contrôle (h) et champs attendus de (b), dans ce processus, sur des grilles et des noms de champs forgés\n")
+  if (!temoin_identite()) ok <- FALSE
   if (ok) cat(paste("\nTémoin : arbre intact admis ; l_x changé d'une unité détecté sur (c), (d) et (e), code 1 ;",
                     "paires d'un refus attendu discordantes détectées sur (d), code 1 ; de même au format 2 ;",
                     "décalage changé d'une unité détecté sur (c), (d) et (e) au format 3, code 1 ;",
                     "champs Ages, Generations, Controle-lecture-ecarts, Comparaison-acte-ecarts et Seconde-source-essai-ecarts vidés détectés sur (b), code 1 ;",
-                    "âge au-delà de .Machine$integer.max détecté sur (b) aux formats 1 et 2, code 1.\nOK\n"))
+                    "âge au-delà de .Machine$integer.max détecté sur (b) aux formats 1 et 2, code 1 ;",
+                    "identité de la table unique (h) admise exacte, ses défauts (h1 à h4, écarts constatés ou déclarés) détectés ; Identite-* inconnus hors de la table unique,",
+                    "requis pour elle et tenant lieu de seconde source.\nOK\n"))
+  ok
+}
+
+# Témoin du contrôle (h) et des champs attendus de (b) (spécification
+# d'actuary-approfondi, étape (0')(b) de B23, § 2 et 3), dans ce processus.
+# Grilles forgées, valeurs calculées à la main (règle (b), s = 3 H + 2 F) :
+# âge 0, 3000 + 2000 = 5000, soit 1000 ; (1, 1950) 33 + 40 = 73, 14 reste 3,
+# soit 15 ; (1, 1951) H « - » (0), F 5 : 10, soit 2 ; (1, 1952) 2700 + 1900 =
+# 4600, soit 920 ; (2, 1950) H « - », F 1 : 2, 0 reste 2, soit 0 ; (2, 1951)
+# « - » des deux côtés, « - » ; (2, 1952) 2400 + 1800 = 4200, soit 840.
+# Catégories : 6 deux valeurs, 2 H « - » seul, 0 F « - » seul, 1 deux « - » ;
+# arrondi différent de la troncature sur 1 cellule (73) des 8 à valeur ; H
+# « - » seul calculée nulle : 1 (2, 1950). Cellules tenant lieu de A2 :
+# (0, 1950) et (1, 1952), à valeur dans les trois grilles.
+temoin_identite <- function() {
+  grille <- function(l) lire_grille(l)
+  a2 <- data.frame(age = c(0, 1), generation = c(1950, 1952))
+  gh <- grille(c("age,1950,1951,1952", "0,1000,1000,1000", "1,11,-,900", "2,-,-,800"))
+  gf <- grille(c("age,1950,1951,1952", "0,1000,1000,1000", "1,20,5,950", "2,1,-,900"))
+  gu <- c("age,1950,1951,1952", "0,1000,1000,1000", "1,15,2,920", "2,0,-,840")
+  ids <- IDENTITE_TABLE_UNIQUE
+  # Les lignes ECART des essais sont réécrites « (écart attendu) » : un journal
+  # vert ne montre aucun ECART nu ; le verdict porte sur le vecteur `ecarts`.
+  essai <- function(u, h = gh, f = gf, declares = "aucun", a2_ = a2, formats = list(2L, 2L, 2L)) {
+    ecarts <<- character(0)
+    g <- list(list(nom = "UNIQUE", format = formats[[1L]], tab = grille(u), champs = list(`Identite-ecarts` = declares)),
+              list(nom = "H", format = formats[[2L]], tab = h, champs = list()),
+              list(nom = "F", format = formats[[3L]], tab = f, champs = list()))
+    names(g) <- ids
+    if (is.null(f)) g[[ids[["f"]]]] <- NULL  # TGF05 non déclarée
+    sortie <- utils::capture.output(controler_identite(g, a2_))
+    cat(sub("^  ECART ", "  (écart attendu) ", sortie), sep = "\n")
+    e <- ecarts; ecarts <<- character(0); e
+  }
+  ok <- TRUE
+  verifier <- function(obtenu, attendu, cas) {
+    if (!identical(obtenu, attendu)) {
+      cat(sprintf("ECHEC du témoin (h) : %s\n    attendu : %s\n    obtenu : %s\n", cas, paste(attendu, collapse = " | "),
+                  paste(obtenu, collapse = " | ")))
+      ok <<- FALSE
+    }
+  }
+  h4 <- function(x) sprintf("(h) cellule(s) de A2 hors de la grille ou sans valeur dans l'une des trois grilles (h4) : %s", x)
+  r <- identite_table_unique(grille(gu), gh, gf, a2)
+  verifier(list(r$categories, r$ecarts, r$arrondi, r$h_tiret_nulles, r$defauts),
+           list(c(deux_valeurs = 6L, h_tiret_seul = 2L, f_tiret_seul = 0L, deux_tirets = 1L), character(0),
+                c(discriminant = 1L, valeurs = 8L), 1L, character(0)), "décomptes de l'identité exacte")
+  verifier(essai(gu), character(0), "identité exacte refusée")
+  gu_change <- replace(gu, 3L, "1,14,2,920")
+  verifier(essai(gu_change), "(h) écart 1,1950,14,15 constaté, non déclaré (Identite-ecarts)", "cellule changée")
+  verifier(essai(gu, declares = "1,1950,14,15"), "(h) écart 1,1950,14,15 déclaré (Identite-ecarts), non constaté",
+           "écart déclaré non constaté")
+  # Écart déclaré deux fois : écart (b), l'écart lui-même étant constaté et
+  # déclaré ; ligne déclarée mal formée : déclarée, non constatée.
+  verifier(essai(gu_change, declares = "1,1950,14,15\n1,1950,14,15"),
+           "(b) UNIQUE : écart 1,1950,14,15 déclaré plus d'une fois (Identite-ecarts)", "écart déclaré deux fois")
+  verifier(essai(gu, declares = "1;1950;14;15"), "(h) écart 1;1950;14;15 déclaré (Identite-ecarts), non constaté",
+           "ligne déclarée mal formée")
+  # (2, 1951) : H 5, F « - » (compté 0) : 15, soit 3. Cellule tenant lieu de
+  # A2 : « - » dans TGF05 seule (h3 et h4).
+  gh2 <- grille(c("age,1950,1951,1952", "0,1000,1000,1000", "1,11,-,900", "2,-,5,800"))
+  verifier(essai(replace(gu, 4L, "2,0,3,840"), h = gh2),
+           "(h) 1 cellule(s) où TGF05 porte « - » et TGH05 une valeur (0 attendu ; h3) : 2,1951", "« - » de TGF05 seul")
+  verifier(essai(replace(gu, 4L, "2,0,3,840"), h = gh2, a2_ = data.frame(age = 2, generation = 1951)),
+           c("(h) 1 cellule(s) où TGF05 porte « - » et TGH05 une valeur (0 attendu ; h3) : 2,1951", h4("2,1951")),
+           "cellule de A2 à « - » dans TGF05 seule")
+  # Cellule tenant lieu de A2 à « - » dans TGH05 seule (1, 1951), puis dans la
+  # table unique seule (1, 1952 : « - » au lieu de 920, écart déclaré).
+  verifier(essai(gu, a2_ = data.frame(age = 1, generation = 1951)), h4("1,1951"), "cellule de A2 à « - » dans TGH05 seule")
+  verifier(essai(replace(gu, 3L, "1,15,2,-"), declares = "1,1952,-,920", a2_ = data.frame(age = 1, generation = 1952)),
+           h4("1,1952"), "cellule de A2 à « - » dans la table unique seule")
+  # (i) Table unique privée de sa dernière ligne, puis munie d'un âge de plus
+  # que les sources : domaines différents (h2).
+  verifier(essai(gu[-4L]), sprintf("(h) domaine de %s différent de celui de la table unique : âge 2 dans l'une seulement (h2)",
+                                   c("TGH05", "TGF05")), "table unique privée de sa dernière ligne")
+  verifier(essai(c(gu, "3,1,1,1")), sprintf("(h) domaine de %s différent de celui de la table unique : âge 3 dans l'une seulement (h2)",
+                                           c("TGH05", "TGF05")), "table unique munie d'un âge de plus")
+  # (ii) Table unique déclarée, TGH05 au format 1, TGF05 non déclarée : échec,
+  # pas « sans objet » ; TGH05 sans format déclaré ; TGH05 illisible (h1).
+  verifier(essai(gu, f = NULL, formats = list(2L, 1L, NULL)),
+           c(sprintf("(h) %s déclarée au format 1, 2 attendu", ids[["h"]]), sprintf("(h) %s déclarée, %s non déclarée", ids[["unique"]], ids[["f"]])),
+           "table unique déclarée sans ses deux sources au format 2")
+  verifier(essai(gu, formats = list(2L, NULL, 2L)), sprintf("(h) %s déclarée au format absent, 2 attendu", ids[["h"]]),
+           "TGH05 sans format déclaré")
+  verifier(essai(gu, h = list(defaut = "illisible (témoin)")),
+           sprintf("(h) %s : fichier de table illisible au format 2 (h1) : illisible (témoin)", ids[["h"]]), "TGH05 illisible")
+  # Cellules de A2 : hors de la grille (coordonnées de CELLULES_A2) ; « - »
+  # dans les trois grilles (2, 1951) (h4).
+  verifier(essai(gu, a2_ = CELLULES_A2), h4(paste(sprintf("117,%d", 1955:1965), collapse = " ; ")),
+           "cellules de A2 hors de la grille")
+  verifier(essai(gu, a2_ = data.frame(age = c(0, 2), generation = c(1950, 1951))), h4("2,1951"), "cellule de A2 sans valeur")
+  # Champs attendus (champs_attendus(), par (identifiant, format)) : (iii)
+  # Identite-* sur une table d'essai, ou sur l'identifiant de la table unique
+  # au format 1 : champs inconnus, seconde source requise ; (iv) table unique
+  # au format 2 sans Identite-* ni Seconde-source* : champs requis absents ;
+  # avec Identite-* et sans Seconde-source* : admise (substitution, M486).
+  base2 <- c(CHAMPS_REQUIS, CHAMPS_FORMAT2_REQUIS)
+  essai_ss <- c("Seconde-source-essai", paste0("Seconde-source-essai", SUFFIXES_GROUPE))
+  verifier(champs_table(c(base2, essai_ss, CHAMPS_IDENTITE), ESSAIS[[3L]]$identifiant, 2L)$defauts,
+           sprintf("champ inconnu %s", CHAMPS_IDENTITE), "Identite-* sur une table d'essai")
+  verifier(champs_table(c(CHAMPS_REQUIS, CHAMPS_IDENTITE), ids[["unique"]], 1L)$defauts,
+           c("aucune seconde source (champs Seconde-source*)", sprintf("champ inconnu %s", CHAMPS_IDENTITE)),
+           "Identite-* sur la table unique déclarée au format 1")
+  verifier(champs_table(base2, ids[["unique"]], 2L)$defauts, sprintf("champ requis absent %s", CHAMPS_IDENTITE),
+           "table unique sans Identite-* ni Seconde-source*")
+  verifier(champs_table(c(base2, CHAMPS_IDENTITE), ids[["unique"]], 2L)$defauts, character(0),
+           "table unique avec Identite-*, sans Seconde-source*")
+  if (ok) cat(paste("  (h) témoin : identité exacte admise ; cellule changée, écart déclaré non constaté, écart déclaré deux fois,",
+                    "ligne déclarée mal formée, « - » de TGF05 seul, table unique privée de sa dernière ligne ou munie d'un âge",
+                    "de plus, table unique sans ses deux sources au format 2, source sans format déclaré ou illisible, cellules",
+                    "de A2 hors de la grille ou à « - » dans une, ou dans les trois grilles détectés ; Identite-* inconnus hors",
+                    "de la table unique au format 2, requis pour elle, tenant lieu de seconde source\n"))
   ok
 }
 
