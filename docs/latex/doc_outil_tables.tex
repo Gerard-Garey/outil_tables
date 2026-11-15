@@ -3206,7 +3206,12 @@ ligne et par génération~; et la forme du fichier de provenance (UTF-8
 valide sans BOM, LF, aucune ligne vide, un seul enregistrement, premier
 champ \code{Format}, chaque champ une seule fois~--- contrôlé sur les
 lignes, \code{read.dcf()} fusionnant sans message un champ écrit deux
-fois~---, champs requis présents, aucun champ inconnu, visa daté), ses
+fois~---, champs requis présents, aucun champ inconnu, aucun champ présent
+vide, visa daté~; un champ connu, requis ou facultatif, écrit sans contenu
+ni ligne de suite, ou avec des blancs seulement, est refusé avec son nom
+dans le motif «~champ vide~», parce qu'il passerait la présence des champs
+requis et qu'un champ d'écarts vide se lirait comme «~aucun~», qui
+s'écrit~; issue~\#284), ses
 champs \code{Nom}, \code{Fichier}, \code{Sexe} et \code{Forme-origine}
 égaux à la déclaration~; au format~2, le champ \code{Generations} est requis
 (générations transcrites, règle des premier et dernier âges à valeur, lignes
@@ -3260,7 +3265,8 @@ relevé pouvant répéter une ligne que sa pièce imprime deux fois), et
 fichier de provenance aux champs du format~3~: \code{Table} et
 \code{Bandes} à la place de \code{Sexe}, \code{Forme-origine} et
 \code{Ages}, \code{Representation} et \code{Empreinte-decalages}
-requis, groupe \code{Comparaison-acte} facultatif et complet, \code{Nom},
+requis, groupe \code{Comparaison-acte} facultatif et complet, aucun champ
+présent vide, \code{Nom},
 \code{Fichier} et \code{Table} égaux à la déclaration, \code{Table}
 nommant une table déclarée~; (c)~identité des fichiers, comme pour une
 table~; (d)~empreinte lue dans \code{decalages\_embarques()}, la même sur
@@ -3289,7 +3295,18 @@ paires attendues de l'essai refusé changées (écart sur~(d))~; enfin, la
 copie étant munie de décalages d'essai au format~3 (nom non ASCII, marqué
 UTF-8, et seconde source à la borne basse différente et à la ligne
 répétée, déclarées en écart), un décalage changé d'une unité (échec
-attendu, avec des écarts sur~(c), (d) et~(e))~; le témoin
+attendu, avec des écarts sur~(c), (d) et~(e))~; puis, ce décalage
+rétabli, cinq champs de provenance vidés, lignes de suite comprises~:
+\code{Ages} et \code{Controle-lecture-ecarts} de l'essai admis au
+format~1, \code{Generations} et \code{Comparaison-acte-ecarts} de l'essai
+admis au format~2, \code{Seconde-source-essai-ecarts} des décalages
+d'essai (échec attendu, avec exactement cinq écarts «~champ vide~»
+sur~(b), chacun nommant son champ, et, sur les seuls décalages d'essai,
+les trois écarts~(e) de la seconde source, devenus non déclarés puisque
+le champ vide se lit comme aucun écart déclaré~; aucun autre écart~;
+issue~\#284)~; les tables d'essai portent à cette fin le groupe
+facultatif \code{Controle-lecture-*} (format~1) ou \code{Comparaison-acte}
+(format~2), relevé copie de la table, écarts «~aucun~»~; le témoin
 sort avec le code~0 si tous les verdicts sont ceux attendus.
 Les relevés de contre-vérification et l'assemblage des grilles transcrites
 par blocs sont produits \textbf{hors CI} par des scripts R
@@ -3597,7 +3614,7 @@ refus attendu, relevés rejoués, catalogue, installation depuis
 embarquées~: témoin d'échec~» (\code{-{}-temoin}) du job «~Tests
 (R 4.3.3)~», hors liste des batteries & ADR 0018, points~5, 6.1 à 6.3~;
 ADR 0011, annotation du 05/11/2026, (d)~; M447~; issue~\#263~; ADR 0019,
-points~6, 7.1, 7.2 et~7.5~; issues~\#272 et~\#273 \\
+points~6, 7.1, 7.2 et~7.5~; issues~\#272, \#273 et~\#284 \\
 \end{longtable}
 \end{center}
 
