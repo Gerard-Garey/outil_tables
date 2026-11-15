@@ -1391,8 +1391,9 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
 
 # Valeur lue dans la fiche, pour un message ou le bilan du rejeu : NULL ->
 # « absente » ; chaîne de longueur 1 sans attribut -> la chaîne (NA -> « NA ») ;
-# autre -> « illisible (<type> de longueur <n>) ». La valeur est rendue telle
-# quelle (sans_controle() pour un message).
+# autre -> « illisible (<type> de longueur <n>) ». La valeur est rendue brute :
+# l'appelant la cite par sans_controle() pour un message ou une cellule du
+# bilan (#142), et la laisse brute dans les `details`.
 texte_lu <- function(v) {
   if (is.null(v)) return("absente")
   if (is.character(v) && is.null(attributes(v)) && length(v) == 1L) return(if (is.na(v)) "NA" else v)
@@ -1444,14 +1445,17 @@ decrire_forme <- function(conteneur, nom) {
 
 # Paires « nom=valeur » d'une liste nommée de la fiche (versions,
 # plateforme), jointes par « ; » ; texte_lu() d'une autre valeur, dont une
-# liste de classe « bytes » (names() lèverait une erreur R, #128). Les noms
-# sont cités par neutraliser_citation() : un nom « bytes » l'est sous un
-# repère, au lieu de l'erreur R de sprintf() ; ces champs sont des témoins,
-# jamais motifs de refus (ADR 0012, point 3.6).
+# liste de classe « bytes » (names() lèverait une erreur R, #128). Noms et
+# valeurs sont cités par neutraliser_citation() (règle unique des valeurs de
+# la fiche qui entrent dans le bilan du rejeu, #142) : un nom ou une valeur
+# « bytes » l'est sous un repère, au lieu de l'erreur R de sprintf() ou de
+# write.csv() ; ces champs sont des témoins, jamais motifs de refus (ADR 0012,
+# point 3.6). texte_lu() garde sa valeur brute : il alimente aussi les
+# `details` des refus.
 paires_lues <- function(l) {
   n <- attr(l, "names", exact = TRUE)
-  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(texte_lu(l))
-  paste(sprintf("%s=%s", neutraliser_citation(n), vapply(l, texte_lu, "")), collapse = " ; ")
+  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(sans_controle(texte_lu(l)))
+  paste(sprintf("%s=%s", neutraliser_citation(n), sans_controle(vapply(l, texte_lu, ""))), collapse = " ; ")
 }
 
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
@@ -1463,16 +1467,22 @@ paires_lues <- function(l) {
 # R (mesuré) ; la liste est citée « différente » à son chemin. (Une classe
 # « bytes » est déjà une feuille par is.object().) Un nœud qui diffère sans
 # qu'aucun enfant ne diffère est cité « (ordre des champs ou attributs) » ;
-# `racine` nomme le nœud de départ. Rend character(0) si identical().
+# `racine` nomme le nœud de départ. Rend character(0) si identical(). Les
+# comparaisons et les lectures par nom se font sur les noms bruts ; chaque
+# segment de nom écrit dans un chemin est cité par neutraliser_citation()
+# (règle unique des valeurs de la fiche écrites dans le bilan, #142) : un nom
+# à caractère de contrôle ou qui n'est pas de l'UTF-8 valide ne coupe pas la
+# cellule et ne la rend pas invalide.
 champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   if (identical(rendu, recu)) return(character(0))
-  ici <- if (length(chemin)) paste(chemin, collapse = "/") else racine
+  cite <- function(ch) paste(neutraliser_citation(ch), collapse = "/")
+  ici <- if (length(chemin)) cite(chemin) else racine
   descend <- function(v) is.list(v) && !is.object(v) && !length(noms_bytes(v)) &&
     noms_complets(names(v)) && !anyDuplicated(names(v))
   if (!descend(rendu) || !descend(recu)) return(ici)
   d <- character(0)
   for (n in union(names(rendu), names(recu))) {
-    p <- paste(c(chemin, n), collapse = "/")
+    p <- cite(c(chemin, n))
     d <- c(d, if (!(n %in% names(recu))) paste(p, "(absent de la fiche reçue)")
               else if (!(n %in% names(rendu))) paste(p, "(absent de la fiche rendue)")
               else champs_differents(rendu[[n]], recu[[n]], racine, c(chemin, n)))
@@ -1747,19 +1757,29 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # faites sur les valeurs brutes, avant tout texte_moteur() ; les valeurs
   # lues viennent de lire_fiche() ou de x$fiche, au codage déjà déterminé ;
   # l'effet est mesuré identique sous C et C.UTF-8 (tests/controles/
-  # locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune comparaison ni à
-  # aucune écriture de valeur lue.
+  # locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune comparaison.
+  # Toute valeur ou tout nom de la fiche écrit dans une cellule du bilan est
+  # cité par la règle unique neutraliser_citation() (#142) : valeurs par
+  # sans_controle(texte_lu(v)), paires_lues(), liste_guillemets() ou
+  # sans_controle(v) ; noms de champs des chemins des verdicts par
+  # champs_differents(). Une chaîne « bytes » y est écrite sous son repère
+  # (sinon sprintf() et write.csv() du bilan lèveraient une erreur R), un
+  # caractère de contrôle <U+XXXX>, un octet invalide <xx> : une ligne par
+  # cellule, UTF-8 valide. Les lignes 1 à 5, 7 et 8 ne reçoivent que des
+  # valeurs refusées plus haut si elles sont « bytes » ou invalides (contrôles
+  # 2 à 7 bis) ou recalculées par le moteur ; la ligne 6, le nom du fichier de
+  # la provenance, que controler_provenance() ne contraint pas, est cité.
   # Empreinte(s) de fichier de la fiche, témoin 14 : k >= 2 empreintes
   # (provenance de k fichiers, #181 ; M332) citées une à une par
   # liste_guillemets() (règle neutraliser_citation(), NA écrit « NA »), dans
   # l'ordre de la fiche ; toute autre valeur par texte_lu(), dont k = 1
   # (texte inchangé). Ligne 6 : noms des fichiers de la provenance (qui a
-  # passé controler_provenance()), de même pour k >= 2, tels quels pour k = 1.
+  # passé controler_provenance()), de même pour k >= 2, cités de même pour k = 1.
   ef <- e[["fichier"]]
   fichiers_lus <- if (is.character(ef) && is.null(attributes(ef)) && length(ef) > 1L)
-    liste_guillemets(ef) else texte_lu(ef)
+    liste_guillemets(ef) else sans_controle(texte_lu(ef))
   pf <- fiche[["provenance"]][["fichier"]]
-  provenance_lue <- if (is.null(fiche[["provenance"]])) "NULL" else if (length(pf) > 1L) liste_guillemets(pf) else pf
+  provenance_lue <- if (is.null(fiche[["provenance"]])) "NULL" else if (length(pf) > 1L) liste_guillemets(pf) else sans_controle(pf)
   conforme <- texte_moteur("conforme")
   forme <- texte_moteur("contrôle de forme")
   exacte <- texte_moteur("comparaison exacte")
@@ -1789,9 +1809,9 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                                 paste(names(plan[["etapes"]]), collapse = ", "), paste(names(roles), collapse = ", "),
                                 recette$recette,
                                 provenance_lue)),
-           e[["donnees"]], tr$lu, texte_lu(e[["code"]]), paires_lues(fiche[["versions"]]),
+           e[["donnees"]], tr$lu, sans_controle(texte_lu(e[["code"]])), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
-           texte_lu(e[["resultat"]]), fichiers_lus),
+           sans_controle(texte_lu(e[["resultat"]])), fichiers_lus),
     verdict = c(rep(conforme, 8L),
                 verdict_chaines(EMPREINTE_CODE, e[["code"]]),
                 verdict_liste(r$versions, fiche[["versions"]], "versions"),

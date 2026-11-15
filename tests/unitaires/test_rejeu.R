@@ -712,3 +712,163 @@ for (k in list(list("LF", "a\nb", "a<U+000A>b"), list("VT", "a\u000bb", "a<U+000
     if (isTRUE(ok) && grepl("[\n\v\f]", conditionMessage(r))) "message sur plusieurs lignes"
     else if (isTRUE(ok) && !identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8" else ok
   })
+# Valeurs et noms de la fiche dans le bilan du rejeu (#142) : une règle unique,
+# neutraliser_citation() (R/outils.R), pour toute valeur ou tout nom de la
+# fiche écrit dans une cellule du bilan. Balayage de toutes les feuilles
+# `character` de FICHE, chacune remplacée successivement par une chaîne
+# d'encodage bytes, par « a<LF>b » et par des octets UTF-8 invalides : aucune
+# erreur R (avant #142 : « translating strings with "bytes" encoding is not
+# allowed », levée par sprintf() de paires_lues() pour les feuilles de versions
+# et de plateforme), un rejeu ou un refus nommé, jamais une condition autre ;
+# pour les rejeux rendus, 14 lignes et 5 colonnes, aucune cellule d'encodage
+# bytes (avant #142 : empreintes/code, empreintes/resultat et empreintes/fichier
+# la recopiaient dans bilan$lu), toutes de l'UTF-8 valide, aucune sur plusieurs
+# lignes (avant #142 : une valeur à LF ou à octets invalides était recopiée
+# brute), sprintf("%s") et write.csv() du bilan sans erreur. Noms : un nom de
+# champ à LF ou à octets invalides, ajouté ou substitué dans versions,
+# plateforme, empreintes, convention ou au premier niveau, est cité dans le
+# chemin du verdict « différente : <chemin> » (avant #142 : écrit brut).
+# Verdicts : règle V2 pour versions et plateforme (« différente : <chemin> »,
+# chemin de la feuille sous la liste) ; V1 pour code et résultat ; ligne 14
+# « non vérifiée ». Provenance à nom de fichier à LF : ligne 6 sur une ligne.
+# Contre-épreuve : le balayage échoue sur l'état antérieur.
+local({
+  b <- "\xe9t\xe9"; Encoding(b) <- "bytes"
+  repere <- "<chaîne d'encodage bytes>"
+  valeurs <- list(bytes = b, controle = "a\nb", invalide = "\xe9t\xe9")
+  feuilles <- function(x, chemin = character(0)) {
+    if (is.list(x)) do.call(c, lapply(names(x), function(n) feuilles(x[[n]], c(chemin, n))))
+    else if (is.character(x) && is.null(attributes(x))) list(chemin) else list()
+  }
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  cellules <- function(bilan) unlist(lapply(bilan, as.character), use.names = FALSE)
+  # Défauts du bilan d'un rejeu rendu (character(0) : aucun). Lectures par
+  # octets : une cellule invalide ne doit pas lever dans le contrôle lui-même.
+  defauts <- function(r) {
+    if (!inherits(r, "rejeu")) return(character(0))
+    k <- cellules(r$bilan)
+    c(if (!identical(dim(r$bilan), c(14L, 5L))) "dimensions",
+      if (any(Encoding(k) == "bytes")) "cellule d'encodage bytes",
+      if (!all(validUTF8(k))) "cellule qui n'est pas de l'UTF-8 valide",
+      if (any(grepl("[\n\v\f\r]", k, useBytes = TRUE))) "cellule sur plusieurs lignes",
+      if (any(grepl("[^\001-\177]", k, useBytes = TRUE) & Encoding(k) != "UTF-8")) "cellule non ASCII non marquée UTF-8",
+      if (inherits(attrape(sprintf("%s", k)), "error")) "sprintf() en erreur",
+      if (inherits(attrape(write.csv(r$bilan, tempfile())), "error")) "write.csv() en erreur")
+  }
+  F <- feuilles(FICHE)
+  cles <- vapply(F, paste, "", collapse = "/")
+  verifier("T11 balayage des feuilles character de la fiche : les feuilles de versions, de plateforme, empreintes/code, empreintes/resultat et empreintes/fichier y figurent",
+           all(c(paste0("versions/", names(FICHE$versions)), paste0("plateforme/", names(FICHE$plateforme)),
+                 "empreintes/code", "empreintes/resultat", "empreintes/fichier") %in% cles) && length(cles) > 40L)
+  for (nv in names(valeurs)) {
+    rj <- lapply(F, function(ch) {
+      f <- FICHE; f[[ch]] <- rep(valeurs[[nv]], length(FICHE[[ch]]))
+      attrape(rejouer_fiche(BASE, f))
+    })
+    names(rj) <- cles
+    if (nv == "bytes") rejeux <- rj
+    libelle <- c(bytes = "chaîne d'encodage bytes", controle = "chaîne « a<LF>b »", invalide = "octets UTF-8 invalides")[[nv]]
+    mal <- !vapply(rj, function(r) inherits(r, "rejeu") || inherits(r, "refus_tablexp"), NA)
+    verifier(sprintf("T11 balayage, feuille remplacée par %s : aucune erreur R (rejeu rendu ou refus nommé)", libelle),
+             if (any(mal)) paste(cles[mal], collapse = ", ") else TRUE)
+    d <- lapply(rj, defauts)
+    verifier(sprintf("T11 balayage, feuille remplacée par %s : rejeux rendus, bilan de 14 lignes et 5 colonnes, cellules en UTF-8 valide et d'une ligne, aucune d'encodage bytes, sprintf(\"%%s\") et write.csv() sans erreur", libelle),
+             if (any(lengths(d) > 0L)) paste(sprintf("%s (%s)", cles[lengths(d) > 0L], vapply(d[lengths(d) > 0L], paste, "", collapse = ", ")), collapse = " ; ") else TRUE)
+    verifier(sprintf("T11 balayage, feuille remplacée par %s : au moins 40 des rejeux sont rendus (le balayage porte sur des bilans)", libelle),
+             sum(vapply(rj, inherits, NA, "rejeu")) >= 40L)
+  }
+  # Noms de champs (champs_differents()) : un nom à LF ou à octets invalides
+  # ajouté dans versions, plateforme, empreintes, convention ou au premier
+  # niveau, ou substitué au dernier nom de versions ou de plateforme, est cité
+  # dans le chemin du verdict ; le chemin de versions et de plateforme n'a pas
+  # le nom de la liste en préfixe (règle V2 en place).
+  for (cas in list(list("controle", "x\ny", "x<U+000A>y"), list("invalide", "x\xe9y", "x<e9>y"))) {
+    for (cont in list(character(0), "versions", "plateforme", "empreintes", "convention")) {
+      ligne <- if (identical(cont, "versions")) 10L else if (identical(cont, "plateforme")) 11L else 12L
+      pref <- if (length(cont) && !(cont %in% c("versions", "plateforme"))) paste0(cont, "/") else ""
+      fb <- FICHE
+      if (length(cont)) { z <- fb[[cont]]; z[[cas[[2L]]]] <- "1"; fb[[cont]] <- z } else fb[[cas[[2L]]]] <- "1"
+      r <- attrape(rejouer_fiche(BASE, fb))
+      verifier(sprintf("T11 nom de champ %s (%s) ajouté à %s : rejeu rendu, ligne %d « différente : %s%s (absent de la fiche rendue) », cellules d'une ligne en UTF-8 valide",
+                       cas[[1L]], cas[[3L]], if (length(cont)) cont else "la fiche", ligne, pref, cas[[3L]]),
+               if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+               else if (!identical(r$bilan$verdict[ligne], paste0("différente : ", pref, cas[[3L]], " (absent de la fiche rendue)")))
+                 sprintf("verdict « %s »", r$bilan$verdict[ligne])
+               else if (length(dd <- defauts(r))) paste(dd, collapse = ", ")
+               else TRUE)
+    }
+    for (cont in c("versions", "plateforme")) {
+      ligne <- if (cont == "versions") 10L else 11L
+      nn <- names(FICHE[[cont]]); k <- length(nn)
+      fb <- FICHE; n2 <- nn; n2[k] <- cas[[2L]]; attr(fb[[cont]], "names") <- n2
+      r <- attrape(rejouer_fiche(BASE, fb))
+      verifier(sprintf("T11 dernier nom de fiche$%s remplacé par le nom %s (%s) : rejeu rendu, verdict « différente : %s (absent de la fiche reçue), %s (absent de la fiche rendue) », lu cite le nom",
+                       cont, cas[[1L]], cas[[3L]], nn[k], cas[[3L]]),
+               if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+               else if (!identical(r$bilan$verdict[ligne], paste0("différente : ", nn[k], " (absent de la fiche reçue), ", cas[[3L]], " (absent de la fiche rendue)")))
+                 sprintf("verdict « %s »", r$bilan$verdict[ligne])
+               else if (!grepl(paste0(cas[[3L]], "="), r$bilan$lu[ligne], fixed = TRUE)) sprintf("lu « %s »", r$bilan$lu[ligne])
+               else if (length(dd <- defauts(r))) paste(dd, collapse = ", ")
+               else TRUE)
+    }
+  }
+  # Nom de fichier de la provenance (ligne 6) : controler_provenance() ne
+  # refuse pas un caractère de contrôle ; la ligne 6 le cite, sur une ligne,
+  # fiche reçue sous forme d'objet ou relue de son texte.
+  for (mode in c("objet", "texte")) {
+    pr <- list(fichier = "a\nb.csv", empreinte = "0123456789abcdef0123456789abcdef", algorithme = "md5")
+    xp <- construire_table(BASE, ROLES, plan_complet(), pr)
+    r <- attrape(rejouer_fiche(BASE, if (mode == "objet") xp$fiche else lire_fiche(ecrire_fiche(xp$fiche))))
+    verifier(sprintf("T11 provenance à nom de fichier « a<LF>b.csv », fiche en %s : rejeu rendu, ligne 6 terminée par « provenance : a<U+000A>b.csv », bilan d'une ligne par cellule", mode),
+             if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else if (!endsWith(r$bilan$lu[6L], "; provenance : a<U+000A>b.csv")) sprintf("lu « %s »", r$bilan$lu[6L])
+             else if (length(dd <- defauts(r))) paste(dd, collapse = ", ")
+             else TRUE)
+  }
+  # Feuille de versions ou de plateforme : rejeu rendu, valeur citée sous le
+  # repère à sa place, témoin « différente : <feuille> », autres lignes de
+  # verdict inchangées.
+  for (ch in c("versions", "plateforme")) {
+    ligne <- if (ch == "versions") 10L else 11L
+    sain <- paste(names(FICHE[[ch]]), vapply(FICHE[[ch]], function(v) v, ""), sep = "=")
+    for (k in seq_along(FICHE[[ch]])) {
+      nom <- names(FICHE[[ch]])[k]
+      r <- rejeux[[paste0(ch, "/", nom)]]
+      verifier(sprintf("T11 fiche$%s$%s de classe d'encodage bytes : rejeu rendu, lu « %s=%s », verdict « différente : %s », autres verdicts inchangés",
+                       ch, nom, nom, repere, nom),
+               if (!inherits(r, "rejeu")) sprintf("condition %s", class(r)[1L])
+               else if (!identical(r$bilan$lu[ligne], paste(replace(sain, k, paste0(nom, "=", repere)), collapse = " ; "))) sprintf("lu « %s »", r$bilan$lu[ligne])
+               else if (!identical(r$bilan$verdict[ligne], paste("différente :", nom))) sprintf("verdict « %s »", r$bilan$verdict[ligne])
+               else if (!identical(r$bilan$verdict[-ligne], R0$bilan$verdict[-ligne])) "autres verdicts changés"
+               else TRUE)
+    }
+    # Liste remplacée en bloc par une chaîne bytes : rejeu rendu, « non déterminable ».
+    fb <- FICHE; fb[[ch]] <- b
+    r <- attrape(rejouer_fiche(BASE, fb))
+    verifier(sprintf("T11 fiche$%s chaîne d'encodage bytes (non une liste) : rejeu rendu, lu « %s », verdict « non déterminable », write.csv() du bilan sans erreur", ch, repere),
+             if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else if (!identical(r$bilan$lu[ligne], repere)) sprintf("lu « %s »", r$bilan$lu[ligne])
+             else if (!identical(r$bilan$verdict[ligne], "non déterminable")) sprintf("verdict « %s »", r$bilan$verdict[ligne])
+             else if (inherits(attrape(write.csv(r$bilan, tempfile())), "error")) "write.csv() en erreur"
+             else TRUE)
+  }
+  # Empreinte du code, du résultat et du fichier : repère à la ligne du témoin.
+  for (cas in list(list("code", 9L, "différente"), list("resultat", 13L, "différente"), list("fichier", 14L, "non vérifiée"))) {
+    r <- rejeux[[paste0("empreintes/", cas[[1L]])]]
+    verifier(sprintf("T11 empreintes/%s de classe d'encodage bytes : rejeu rendu, ligne %d, lu « %s », verdict « %s »",
+                     cas[[1L]], cas[[2L]], repere, cas[[3L]]),
+             if (!inherits(r, "rejeu")) sprintf("condition %s", class(r)[1L])
+             else identical(c(r$bilan$lu[cas[[2L]]], r$bilan$verdict[cas[[2L]]]), c(repere, cas[[3L]])))
+  }
+  # Plusieurs empreintes de fichier (k >= 2), dont une bytes : citées une à une.
+  r <- attrape(rejouer_fiche(BASE, fiche_modifiee("empreintes/fichier" = c(b, "abc"))))
+  verifier("T11 empreintes/fichier de deux éléments dont un d'encodage bytes : rejeu rendu, ligne 14 « <repère> », « abc » citées une à une",
+           if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+           else identical(r$bilan$lu[14L], paste0("« ", repere, " », « abc »")))
+  # Valeur de version non bytes mais à caractère de contrôle : même règle, une
+  # ligne par cellule, valeur exacte non perdue (écrite <U+000A>).
+  r <- attrape(rejouer_fiche(BASE, fiche_modifiee("versions/R" = "a\nb")))
+  verifier("T11 versions/R « a<LF>b » : rejeu rendu, valeur citée « R=a<U+000A>b » (même règle que la valeur bytes), une ligne",
+           if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+           else grepl("R=a<U+000A>b", r$bilan$lu[10L], fixed = TRUE) && !any(grepl("[\n\v\f\r]", cellules(r$bilan))))
+})
