@@ -24,8 +24,9 @@
 #        forme du
 #        fichier de provenance (point 3.1 : UTF-8 valide sans BOM, LF, aucune
 #        ligne vide, un seul enregistrement, premier champ Format, chaque
-#        champ une seule fois, champs requis présents, aucun champ inconnu),
-#        sur les lignes (read.dcf() fusionne les doublons sans message) ;
+#        champ une seule fois, champs requis présents, aucun champ
+#        inconnu, aucun champ présent vide), sur les lignes (read.dcf()
+#        fusionne les doublons sans message) ;
 #        Nom, Fichier, Sexe (première ligne), Forme-origine égaux à la
 #        déclaration ; chemins des relevés conformes ; Visa daté ; champs
 #        propres au format 2 (ADR 0019, point 7.1) : Generations requis
@@ -100,7 +101,13 @@
 #  changées (écart (d) seul) ; enfin, des décalages d'essai au format 3 (nom
 #  non ASCII, seconde source à la borne basse différente et à la ligne en
 #  double, déclarées en écart) : un décalage changé d'une unité (écarts sur
-#  (c), (d) et (e)).
+#  (c), (d) et (e)) ; puis, ce décalage rétabli, quatre champs de provenance
+#  vidés, Ages et Controle-lecture-ecarts (essai admis du format 1),
+#  Generations et Comparaison-acte-ecarts (essai admis du format 2) : quatre
+#  écarts (b) « champ vide », nom du champ dans le motif, et aucun autre
+#  (#284). Les essais portent les groupes facultatifs Controle-lecture-*
+#  (format 1) et Comparaison-acte-* (format 2), relevé copie de la table,
+#  écarts « aucun ».
 #
 #  Usage : Rscript tests/controles/tables_embarquees.R [--sans-installation] [racine]
 #          Rscript tests/controles/tables_embarquees.R --temoin [racine]
@@ -351,6 +358,17 @@ lire_provenance <- function(chemin) {
 
 valeur <- function(champs, n) { v <- champs[[n]]; if (is.null(v)) NA_character_ else v }
 
+# Champs de `connus` présents dans `champs` dont la valeur est vide (« Champ: »
+# sans contenu ni ligne de suite, ou seulement des blancs) : lire_provenance()
+# les range parmi les champs présents, setdiff(requis, names(champs)) ne les
+# voit pas. Un champ -ecarts vide (Seconde-source-*, Controle-lecture,
+# Comparaison-acte) se lirait en outre comme « aucun » (ecarts_declares()) :
+# « aucun » s'écrit. Règle : tout champ connu présent est non vide.
+champs_vides <- function(champs, connus) {
+  r <- intersect(connus, names(champs))
+  r[!nzchar(trimws(vapply(r, function(x) valeur(champs, x), "")))]
+}
+
 # Écarts entre deux relevés (vecteurs nommés par âge) : « âge,a,b », côté
 # vide si la ligne manque, triés par âge.
 ecarts_releves <- function(a, b) {
@@ -450,6 +468,7 @@ controler <- function(racine, installation = TRUE) {
     for (x in setdiff(n, connus)) ecart("b", sprintf("%s : champ inconnu %s", nom, x))
     requis <- c(CHAMPS_REQUIS, groupes, outer(groupes, SUFFIXES_GROUPE, paste0), if (format2) CHAMPS_FORMAT2_REQUIS)
     for (x in setdiff(requis, n)) ecart("b", sprintf("%s : champ requis absent %s", nom, x))
+    for (x in champs_vides(ch, connus)) ecart("b", sprintf("%s : champ vide %s", nom, x))
     controle_lecture <- c("Controle-lecture-releve", "Controle-lecture-ecarts", "Controle-lecture-methode")
     if (any(controle_lecture %in% n) && !all(controle_lecture %in% n))
       ecart("b", sprintf("%s : champs Controle-lecture-* incomplets (releve, ecarts et methode vont ensemble)", nom))
@@ -586,8 +605,9 @@ controler <- function(racine, installation = TRUE) {
     if (!length(groupes)) ecart("b", sprintf("%s : aucune seconde source (champs Seconde-source*)", nom))
     connus <- c(CHAMPS_REQUIS_DECALAGES, CHAMPS_FACULTATIFS_DECALAGES, groupes, outer(groupes, SUFFIXES_GROUPE, paste0))
     for (x in setdiff(n, connus)) ecart("b", sprintf("%s : champ inconnu %s", nom, x))
-    for (x in setdiff(c(CHAMPS_REQUIS_DECALAGES, groupes, outer(groupes, SUFFIXES_GROUPE, paste0)), n))
-      ecart("b", sprintf("%s : champ requis absent %s", nom, x))
+    requis <- c(CHAMPS_REQUIS_DECALAGES, groupes, outer(groupes, SUFFIXES_GROUPE, paste0))
+    for (x in setdiff(requis, n)) ecart("b", sprintf("%s : champ requis absent %s", nom, x))
+    for (x in champs_vides(ch, connus)) ecart("b", sprintf("%s : champ vide %s", nom, x))
     controle_lecture <- c("Controle-lecture-releve", "Controle-lecture-ecarts", "Controle-lecture-methode")
     if (any(controle_lecture %in% n) && !all(controle_lecture %in% n))
       ecart("b", sprintf("%s : champs Controle-lecture-* incomplets (releve, ecarts et methode vont ensemble)", nom))
@@ -915,7 +935,17 @@ preparer_temoin <- function(racine, arbre, empreintes, decl, decl_d, empreinte_d
     ecrire_lignes(lignes, file.path(arbre, f_b))
     seconde <- c(lignes, e$ajout)  # une ligne de plus, déclarée en écart
     ecrire_lignes(seconde, file.path(arbre, f_s))
-    sha <- sha256(arbre, c(f_table, f_b, f_s))
+    # Groupe facultatif (#284) : Controle-lecture-* au format 1 (relevé
+    # couche_texte), Comparaison-acte-* au format 2 ; relevé copie de la table.
+    nature_g <- if (e$format == 2L) "comparaison_acte" else "couche_texte"
+    f_g <- sprintf("%s/%s.%s.csv", DOSSIER_RELEVES, e$identifiant, nature_g)
+    ecrire_lignes(lignes, file.path(arbre, f_g))
+    groupe <- if (e$format == 2L)
+      c("Comparaison-acte: témoin", "Comparaison-acte-methode: copie (témoin)", sprintf("Comparaison-acte-releve: %s", f_g),
+        "Comparaison-acte-ecarts: aucun")
+    else c("Controle-lecture-releve: ", "Controle-lecture-ecarts: aucun", "Controle-lecture-methode: copie (témoin)")
+    if (e$format != 2L) groupe[1L] <- sprintf("Controle-lecture-releve: %s", f_g)
+    sha <- sha256(arbre, c(f_table, f_b, f_s, f_g))
     identite <- if (is.null(e$paires)) c("Representation: tablexp table 1", sprintf("Empreinte-table: %s", empreintes[[e$nom]]))
                 else c("Refus-attendu: table_lx_non_decroissants", sprintf("Refus-paires: %s", e$paires))
     prov <- c("Format: tablexp provenance 1", sprintf("Nom: %s", e$nom), sprintf("Fichier: %s", f_table),
@@ -929,9 +959,9 @@ preparer_temoin <- function(racine, arbre, empreintes, decl, decl_d, empreinte_d
               "Transcription-B-methode: copie (témoin)", "Seconde-source-essai: témoin",
               "Seconde-source-essai-methode: copie augmentée d'une ligne (témoin)",
               sprintf("Seconde-source-essai-releve: %s", f_s),
-              "Seconde-source-essai-ecarts:", sprintf(" %s", e$ecarts),
+              "Seconde-source-essai-ecarts:", sprintf(" %s", e$ecarts), groupe,
               "Controles-coherence: aucun (témoin)", "Ecarts-signales: ligne nulle propre à la seconde source (témoin)",
-              "Empreintes-fichiers:", sprintf(" %s  %s", sha, c(f_table, f_b, f_s)),
+              "Empreintes-fichiers:", sprintf(" %s  %s", sha, c(f_table, f_b, f_s, f_g)),
               "Empreintes-hors-depot: aucune", identite, "Visa: 2026-11-13, mainteneur, témoin du script")
     ecrire_lignes(enc2utf8(prov), file.path(arbre, sprintf("%s/%s.provenance.dcf", DOSSIER_TABLES, e$identifiant)))
   }
@@ -1070,10 +1100,45 @@ temoin <- function(racine) {
                 if (length(manquants)) sprintf(", aucun écart sur %s", paste(manquants, collapse = ", ")) else ""))
     ok <- FALSE
   }
+  # Champs vides (#284) : décalage rétabli, puis, dans la provenance des essais
+  # admis, Ages et Controle-lecture-ecarts (format 1), Generations et
+  # Comparaison-acte-ecarts (format 2) vidés ; un champ vide passait la présence
+  # des champs requis, et un champ -ecarts vide se lisait comme « aucun ».
+  # Attendu : ces quatre écarts (b), et aucun autre.
+  vider_champ <- function(f, motif, vide) {
+    p <- readLines(f, encoding = "UTF-8", warn = FALSE)
+    k <- grep(motif, p)
+    if (length(k) != 1L) stop(sprintf("ligne « %s » introuvable (ou multiple) dans %s", motif, basename(f)))
+    p[k] <- vide
+    ecrire_lignes(p, f)
+  }
+  ecrire_lignes(ed$lignes, f6)
+  e1 <- ESSAIS[[1L]]
+  f_p1 <- file.path(arbre, DOSSIER_TABLES, paste0(e1$identifiant, ".provenance.dcf"))
+  f_p3 <- file.path(arbre, DOSSIER_TABLES, paste0(e3$identifiant, ".provenance.dcf"))
+  vider_champ(f_p1, "^Ages:", "Ages:")
+  vider_champ(f_p3, "^Generations:", "Generations:")
+  vider_champ(f_p1, "^Controle-lecture-ecarts:", "Controle-lecture-ecarts:")
+  vider_champ(f_p3, "^Comparaison-acte-ecarts:", "Comparaison-acte-ecarts:")
+  cat(sprintf("\n== 7. %s.csv rétabli ; « Ages: » vidé dans %s.provenance.dcf, « Generations: » vidé dans %s.provenance.dcf, ainsi que « Controle-lecture-ecarts: » et « Comparaison-acte-ecarts: » : échec attendu sur (b), quatre écarts\n",
+              ed$identifiant, e1$identifiant, e3$identifiant))
+  r7 <- lancer("--sans-installation")
+  cat(sub("^::error", "(échec attendu) error", r7$sortie), sep = "\n")
+  ecarts7 <- grep("ECART (", r7$sortie, fixed = TRUE, value = TRUE)
+  attendus7 <- c(sprintf("  ECART (b) %s : champ vide Ages", e1$nom),
+                 sprintf("  ECART (b) %s : champ vide Controle-lecture-ecarts", e1$nom),
+                 sprintf("  ECART (b) %s : champ vide Generations", e3$nom),
+                 sprintf("  ECART (b) %s : champ vide Comparaison-acte-ecarts", e3$nom))
+  if (r7$statut != 1L || !setequal(ecarts7, attendus7) || length(ecarts7) != length(attendus7)) {
+    cat(sprintf("ECHEC du témoin : code %d (1 attendu), %d écart(s), attendus : %s\n", r7$statut, length(ecarts7),
+                paste(sub("^ +", "", attendus7), collapse = " ; ")))
+    ok <- FALSE
+  }
   unlink(arbre, recursive = TRUE)
   if (ok) cat(paste("\nTémoin : arbre intact admis ; l_x changé d'une unité détecté sur (c), (d) et (e), code 1 ;",
                     "paires d'un refus attendu discordantes détectées sur (d), code 1 ; de même au format 2 ;",
-                    "décalage changé d'une unité détecté sur (c), (d) et (e) au format 3, code 1.\nOK\n"))
+                    "décalage changé d'une unité détecté sur (c), (d) et (e) au format 3, code 1 ;",
+                    "champs Ages, Generations, Controle-lecture-ecarts et Comparaison-acte-ecarts vidés détectés sur (b), code 1.\nOK\n"))
   ok
 }
 
