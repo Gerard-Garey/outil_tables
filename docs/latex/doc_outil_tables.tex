@@ -3197,9 +3197,13 @@ table déclarée~; (b)~le \emph{format}, sur les octets, du fichier de table
 et des relevés de contre-vérification, selon le format de la déclaration
 (colonne \code{format}, sans valeur par défaut)~: ASCII, fins de ligne LF,
 fin de ligne finale, puis, au format~1, en-tête \code{age,lx}, entiers en
-chiffres seuls, âges croissants et consécutifs, et, au format~2, en-tête
-\code{age,<g\_1>,\ldots,<g\_n>}, générations au plus égales au plus grand
-entier du moteur, générations et âges croissants et consécutifs, une
+chiffres seuls, âges croissants et consécutifs, au plus égaux au plus
+grand entier du moteur, et, au format~2, en-tête
+\code{age,<g\_1>,\ldots,<g\_n>}, générations et âges au plus égaux au
+plus grand entier du moteur, générations et âges croissants et
+consécutifs (pour les âges, aux deux formats, la première ligne en défaut
+est signalée, et la borne, motif propre, l'emporte sur la suite quand les
+deux sont en défaut sur cette ligne, comme dans le moteur~; issue~\#283), une
 cellule par génération, $l_x$ entier en chiffres seuls ou \code{-}, cellule
 vide finale gardée par le découpage, donc refusée, au moins une valeur par
 ligne et par génération~; et la forme du fichier de provenance (UTF-8
@@ -3306,7 +3310,15 @@ les trois écarts~(e) de la seconde source, devenus non déclarés puisque
 le champ vide se lit comme aucun écart déclaré~; aucun autre écart~;
 issue~\#284)~; les tables d'essai portent à cette fin le groupe
 facultatif \code{Controle-lecture-*} (format~1) ou \code{Comparaison-acte}
-(format~2), relevé copie de la table, écarts «~aucun~»~; le témoin
+(format~2), relevé copie de la table, écarts «~aucun~»~; puis, les
+provenances rétablies, les tables d'essai admises des formats~1 et~2
+réécrites sur les âges 2147483646 à 2147483648 (suite valide, seule la
+borne en cause) et les tables d'essai refusées sur les âges 0 puis
+3000000000 (hors de la suite et au-delà de la borne sur la même ligne)
+(échec attendu, avec, pour chacune des quatre, un écart sur~(b) au motif
+de la borne, qui doit donc l'emporter sur celui de la suite~; les écarts
+sur~(c), (d) et~(f) qui l'accompagnent ne sont pas examinés~;
+issue~\#283)~; le témoin
 sort avec le code~0 si tous les verdicts sont ceux attendus.
 Les relevés de contre-vérification et l'assemblage des grilles transcrites
 par blocs sont produits \textbf{hors CI} par des scripts R
@@ -3318,11 +3330,7 @@ TF~00-02, TGF05 et TGH05, et le script d'assemblage
 SHA-256, au champ \code{Empreintes-fichiers} du fichier de provenance~; le
 contrôle de la CI vérifie leur identité (point~(c)) et rattache chacun à
 une table (point~(a)), mais ne les exécute pas~: il rejoue la comparaison
-sur les relevés versés. \textbf{Limite}~: la borne des âges (au plus le plus grand entier du
-moteur), que le moteur applique aux formats~1 et~2, n'est pas appliquée
-par le contrôle~(b), qui l'applique aux seules générations (écart relevé
-par l'audit de l'issue~\#272 et renvoyé à une issue proposée au
-mainteneur).
+sur les relevés versés.
 Les comportements du moteur (construction, refus, nom réservé, accesseurs)
 sont testés dans la batterie unitaire (section~\ref{sec:verifications-donnees}).
 
@@ -3614,7 +3622,7 @@ refus attendu, relevés rejoués, catalogue, installation depuis
 embarquées~: témoin d'échec~» (\code{-{}-temoin}) du job «~Tests
 (R 4.3.3)~», hors liste des batteries & ADR 0018, points~5, 6.1 à 6.3~;
 ADR 0011, annotation du 05/11/2026, (d)~; M447~; issue~\#263~; ADR 0019,
-points~6, 7.1, 7.2 et~7.5~; issues~\#272, \#273 et~\#284 \\
+points~6, 7.1, 7.2 et~7.5~; issues~\#272, \#273, \#283 et~\#284 \\
 \end{longtable}
 \end{center}
 
