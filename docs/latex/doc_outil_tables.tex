@@ -7949,23 +7949,28 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         provenance.
 
         \emph{Usage actuariel} (avis d'\code{actuary-approfondi} du
-        15/11/2026 sur P4, commentaire de l'issue~\#275). Construite sur
-        TGH05 et TGF05, homologuées pour les rentes viagères (ci-dessus), la
-        table unique est destinée par sa construction aux engagements en
-        cas de vie~; elle sous-estimerait la mortalité d'une garantie en cas
+        15/11/2026 sur P4, commentaire de l'issue~\#275). Construite,
+        d'après l'identité constatée (ci-dessous), sur TGH05 et TGF05,
+        homologuées pour les rentes viagères (ci-dessus), la table unique
+        est adaptée par sa construction aux engagements en cas de vie, sans
+        que le dispositif en restreigne l'usage~; elle sous-estimerait la mortalité d'une garantie en cas
         de décès. Ce constat ne restreint pas le champ des contrats (M486,
         L1). À l'âge $x$, elle décrit un groupe fermé où la part des hommes
         vaut $w_x$ (ci-dessous, «~Contenu~») et où chaque sexe meurt selon
         TGH05 et TGF05. Pour un portefeuille plus féminin, elle surestime
         donc la mortalité, et sous-estime la longévité, aux âges où
         $q^F_x < q^H_x$, en particulier de 64 à~111~ans. C'est une table
-        réglementaire de tarif, \textbf{non une hypothèse biométrique de
-        meilleure estimation} (\emph{best estimate}~; directive
-        2009/138/CE, art.~77, §~2~; règlement délégué (UE) 2015/35,
-        art.~22, §~1)~: elle n'est pas estimée sur l'expérience d'un
-        portefeuille. Elle peut servir de table de référence à un
-        positionnement, mais pas d'hypothèse \emph{best estimate} par
-        elle-même.
+        réglementaire de tarif~: ni sa composition (part des hommes fixée
+        à 0,6 au premier âge, quel que soit le portefeuille) ni ses tables
+        sources ne sont estimées sur l'expérience du portefeuille de
+        l'entreprise qui l'emploie. L'employer comme hypothèse biométrique
+        de meilleure estimation (\emph{best estimate}) demanderait que
+        l'entreprise la justifie comme réaliste pour son portefeuille
+        (directive 2009/138/CE, art.~77, §~2~; règlement délégué (UE)
+        2015/35, art.~22, §~1~: hypothèses expliquées et justifiées,
+        fondées sur les caractéristiques du portefeuille)~; l'outil n'en
+        juge pas (E2.16). Elle peut servir de table de référence à un
+        positionnement.
       \item \emph{Sexe.} \code{ensemble}~: table «~pour tous les
         assurés~» (A132-18-1) et «~pour tous les membres participants~»
         (A223-8-1, A932-3-12).
@@ -8055,7 +8060,7 @@ contrôlée~; il ne fait que lire des lignes et appeler le constructeur.
         sous $2{,}3 \cdot 10^{-9}$ (approximation numérique). L'arrondi
         accentue ensuite la décroissance dans 9 des 10~générations où la
         table imprimée décroît, dont 2003, et la masque dans 7 des 17. Il
-        n'y a aucune anomalie de transcription ni de composition~; leur origine dans la construction de TGH05 reste non
+        n'y a aucune anomalie de transcription ni de composition~; l'origine du ralentissement dans la construction de TGH05 reste non
         établie (ci-dessus). Statuts~: comparaisons en entiers exacts~;
         arrondi au plus proche \emph{constaté} par l'identité sur les
         12\,826 cellules (que le producteur ait procédé ainsi reste une
