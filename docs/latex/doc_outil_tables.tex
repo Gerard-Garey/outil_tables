@@ -4588,9 +4588,15 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     octet nul (les octets ne se convertissent pas en chaîne~; l'échec est
     absorbé, sans erreur R qui masque le refus) et pour un premier
     champ vide ou qui n'est pas de l'UTF-8 valide. Cette branche est
-    défensive~: aucune table connue n'écrit un texte que le lecteur
-    refuse, et les tests la provoquent en altérant les octets écrits
-    (\emph{constat}, non preuve). La raison «~relecture différente~» reste
+    défensive~: l'écrivain et le lecteur suivent la même grammaire
+    (section~\ref{sec:serialisation}), et aucun élément de fiche des
+    tables des tests ni des six tables embarquées que rend
+    \code{table\_embarquee()} n'est refusé à la relecture
+    (\emph{constat} sur ces cas, non preuve que l'écrivain n'écrit jamais
+    un texte que le lecteur refuse)~; les tests provoquent la branche en
+    remplaçant, le temps de l'appel, \code{texte\_objet()} par une
+    version qui altère les octets écrits, le refus levé étant celui, réel,
+    de \code{lire\_texte()}. La raison «~relecture différente~» reste
     celle d'une relecture sans refus mais non \code{identical()} à
     l'élément écrit~: \code{details\$lu} «~élément relu différent~»,
     \code{details\$attendu} «~élément relu identical() à l'élément
@@ -5336,7 +5342,7 @@ règles, la ligne \code{temoin\_catalogue} ayant la sienne (ci-dessous,
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \textbf{V1} (\code{verdict\_chaines()}, empreintes du code et du
     résultat)~: «~non déterminable~» si l'un des deux côtés --- la fiche
-    (\code{lu}) ou le code installé (\code{attendu}) --- n'a pas la
+    (\code{lu}) ou le côté recalculé (\code{attendu}~: \code{EMPREINTE\_CODE} à la ligne~9, empreinte du résultat de l'objet rendu à la ligne~13) --- n'a pas la
     \emph{forme d'une empreinte MD5} (\code{forme\_md5()})~: chaîne unique,
     non vide, non \code{NA}, sans attribut (\code{chaine\_unique()}), dont
     les octets sont exactement~32, chacun dans \code{0123456789abcdef},
@@ -5635,7 +5641,7 @@ témoins \textbf{signalent et ne refusent jamais}~:
     «~a=b ; c=d~», et les verdicts «~différente~: «~a=b ; c~» (absent de
     la fiche rendue)~» et «~différente~: a (absent de la fiche rendue)~»~;
     cas propre à une fiche altérée ou à un chemin de bibliothèque
-    inhabituel~; spécification de l'issue~\#298, §~8). Les chemins des
+    inhabituel~; spécification de l'issue~\#298, §~8~; suite ouverte, issue~\#305). Les chemins des
     verdicts des lignes~10 à~12 et~15 et les clés des lignes~8 et~15 ne sont
     plus ambigus depuis l'issue~\#298 (ci-dessous, «~Citation des valeurs
     de la fiche dans le bilan~»), hors la limite du repère \code{bytes}.
@@ -6118,7 +6124,7 @@ locales.\par}
 \catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu et cellules du bilan du rejeu (issue~\#142) \\
 \catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets, nom(s) d'encodage \code{bytes}~; valeur de classe \code{bytes} décrite sans sa classe (section~\ref{sec:rejeu}~; issue~\#128) \\
 \catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & paires «~nom=valeur~» jointes par «~;~», noms et valeurs cités par la règle unique (repère pour un nom ou une valeur \code{bytes}~; issue~\#142), ou \code{texte\_lu()} d'une autre valeur, citée de même, liste de classe \code{bytes} comprise~; colonnes du bilan pour \code{versions} et \code{plateforme} (issue~\#128) \\
-\catalogue{fonctions-construire-table}{citer\_segment()} & interne & vecteur de segments (clés de tables de référence, noms lus dans la fiche~; converti par \code{as.character()} s'il n'est pas de type \code{character}) & citations de même longueur, sans noms~: \code{NA} et chaîne \code{bytes} par \code{neutraliser\_citation()}, jamais entre «~…~»~; segment qui contient l'un de «~/ , ; : ( ) < « »~» ou qui commence ou finit par une espace entre «~…~», «~<~», «~«~» et «~»~» écrits \code{<U+003C>}, \code{<U+00AB>} et \code{<U+00BB>} (remplacés sur les octets), puis cité par \code{neutraliser\_citation()}~; tout autre segment par \code{neutraliser\_citation()}~; segments des chemins des lignes~10 à~12 et~15 et clés des lignes~8 et~15 du bilan du rejeu (section~\ref{sec:rejeu}, «~Citation d'un segment de chemin~»~; issue~\#298) \\
+\catalogue{fonctions-construire-table}{citer\_segment()} & interne & vecteur de segments de chemin (clés de tables de référence, noms lus dans la fiche~; converti par \code{as.character()} s'il n'est pas de type \code{character}) & citations de même longueur, sans noms~: \code{NA} et chaîne \code{bytes} par \code{neutraliser\_citation()}, jamais entre «~…~»~; segment qui contient l'un de «~/ , ; : ( ) < « »~» ou qui commence ou finit par une espace entre «~…~», «~<~», «~«~» et «~»~» écrits \code{<U+003C>}, \code{<U+00AB>} et \code{<U+00BB>} (remplacés sur les octets), puis cité par \code{neutraliser\_citation()}~; tout autre segment par \code{neutraliser\_citation()}~; segments des chemins des lignes~10 à~12 et~15 et clés des lignes~8 et~15 du bilan du rejeu (section~\ref{sec:rejeu}, «~Citation d'un segment de chemin~»~; issue~\#298) \\
 \catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; une liste à nom d'encodage \code{bytes} est une feuille (issue~\#128)~; comparaisons sur les noms bruts, chaque nom écrit dans un chemin cité par \code{citer\_segment()} (règle unique, issue~\#142~; entre «~…~» s'il contient un séparateur du bilan, issue~\#298)~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
 \catalogue{fonctions-construire-table}{verdict\_chemins()} & interne & fiche rendue, fiche reçue, racine & verdict~V3~: «~identique~» ou «~différente~:~» et les chemins \\
 \catalogue{fonctions-construire-table}{forme\_md5()} & interne & valeur & \code{TRUE} si et seulement si la valeur est une chaîne unique dont les octets sont exactement~32, chacun dans \code{0-9a-f}~; lecture des octets, sans expression régulière, conversion ni repli de casse~; jamais \code{NA} (section~\ref{sec:rejeu}, règle~V1~; issue~\#295) \\
