@@ -1249,7 +1249,13 @@ informations_execution <- function(debut) {
 # n'ouvre aucun refus, et un execution d'une autre forme reste admis s'il est
 # canonique. Le contrôle 5 n'en lit que l'exception de classe : le champ
 # déclaré POSIXct/POSIXt (debut), admis en POSIXct nu
-# (controler_forme_hors_resultat()). session/systeme : utils::osVersion, « a
+# (controler_forme_hors_resultat()). L'exception est unique (execution/debut ;
+# ADR 0012, seconde annotation, (a) 3) : une ligne POSIXct ajoutée ici
+# l'élargirait de fait, ce que l'ADR n'admet pas sans annotation ; admettre un
+# autre champ en POSIXct (ou un POSIXct imbriqué) demande une annotation de
+# l'ADR 0012 ((a) 3) et la reprise du test N1 (#301), comme toute exigence de
+# forme sur execution le demanderait ((b)).
+# session/systeme : utils::osVersion, « a
 # character string (or possibly NULL on bizarre platforms) » (aide de R 4.3.3,
 # ?sessionInfo). Liée à informations_execution(Sys.time()) par un test.
 FORME_EXECUTION <- data.frame(
