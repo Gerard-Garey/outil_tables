@@ -1602,12 +1602,40 @@ verdict_chemins <- function(rendu, recu, racine) {
   if (!length(d)) texte_moteur("identique") else paste0(texte_moteur("différente : "), paste(d, collapse = ", "))
 }
 
-# Verdict d'un témoin par chaînes (V1) : « non déterminable » si l'un des deux
-# côtés n'est pas une chaîne unique (deux NA ne prouvent pas une identité),
-# sinon « identique » ou « différente ».
+# Forme d'une empreinte MD5 (#295 ; ADR 0012, annotation du 16/11/2026, (a)) :
+# TRUE si et seulement si `v` est une chaîne unique (chaine_unique()) dont les
+# octets sont exactement 32, chacun dans 0-9a-f (forme rendue par
+# tools::md5sum() et md5_octets()). Lecture des octets (charToRaw()), sans
+# expression régulière, conversion ni repli de casse : même résultat sous les
+# locales C et UTF-8 ; une chaîne latin-1 ou « bytes » contient un octet
+# >= 0x80 et n'a jamais cette forme. Rend TRUE ou FALSE, jamais NA.
+forme_md5 <- function(v) {
+  chaine_unique(v) && { o <- charToRaw(v); length(o) == 32L && all(o %in% charToRaw("0123456789abcdef")) }
+}
+
+# Verdict d'un témoin d'empreinte (V1 : lignes 9 et 13 du bilan) : « non
+# déterminable » si l'un des deux côtés n'a pas la forme d'une empreinte MD5
+# (forme_md5() : NA, absente, non-chaîne, chaîne d'une autre forme ; deux NA ne
+# prouvent pas une identité, et une valeur qui n'est pas une empreinte ne
+# permet de conclure ni à l'identité ni à l'écart ; #295), sinon « identique »
+# ou « différente » entre deux MD5 bien formées.
 verdict_chaines <- function(attendu, lu) {
-  texte_moteur(if (!chaine_unique(attendu) || !chaine_unique(lu)) "non déterminable"
+  texte_moteur(if (!forme_md5(attendu) || !forme_md5(lu)) "non déterminable"
                else if (identical(attendu, lu)) "identique" else "différente")
+}
+
+# Empreinte lue dans la fiche, citée dans la colonne `lu` des lignes 9 et 13
+# du bilan (#295) : une chaîne de longueur 1 sans attribut, non NA, qui n'a
+# pas la forme MD5 (forme_md5() ; chaîne vide comprise) est citée
+# « « <valeur> » (forme invalide : … attendue) », la valeur par
+# neutraliser_citation() (règle unique, #142) ; toute autre valeur garde
+# sans_controle(texte_lu()) (MD5 bien formée telle quelle, « absente », « NA »,
+# « illisible (…) »).
+texte_empreinte_lue <- function(v) {
+  if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v) && !forme_md5(v))
+    return(formuler("« %s » (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)",
+                    sans_controle(v)))
+  sans_controle(texte_lu(v))
 }
 
 # Verdict d'un témoin de liste nommée de la fiche (V2 : versions,
@@ -1994,9 +2022,9 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
            formuler("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
                     paste(sans_controle(names(plan[["etapes"]])), collapse = ", "),
                     paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette), provenance_lue),
-           e[["donnees"]], tr$lu, sans_controle(texte_lu(e[["code"]])), paires_lues(fiche[["versions"]]),
+           e[["donnees"]], tr$lu, texte_empreinte_lue(e[["code"]]), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
-           sans_controle(texte_lu(e[["resultat"]])), fichiers_lus, tc[["lu"]]),
+           texte_empreinte_lue(e[["resultat"]]), fichiers_lus, tc[["lu"]]),
     verdict = c(rep(conforme, 8L),
                 verdict_code,
                 verdict_liste(r$versions, fiche[["versions"]], "versions"),

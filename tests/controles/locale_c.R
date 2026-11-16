@@ -27,7 +27,8 @@
 #       relue : chaînes non ASCII du bilan marquées UTF-8 (#86), dont celles
 #       des verdicts et des lignes 1 et 6 pour un nom non ASCII de la fiche,
 #       une classe des données non ASCII, à LF ou à octet invalide et un nom
-#       de fichier de provenance non ASCII (bilans_non_ascii(), #142) ; messages
+#       de fichier de provenance non ASCII (bilans_non_ascii(), #142), et
+#       des empreintes du code et du résultat de forme non MD5 (#295) ; messages
 #       de refus du rejeu et de objet_modifie (et citation d'une chaîne
 #       latin-1) marqués UTF-8 et sur une ligne (#94) ; puis un refus par
 #       module citant une valeur non ASCII native, latin-1 et UTF-8, et
@@ -192,7 +193,33 @@ bilans_non_ascii <- function(jeu, p, fr, d) {
               paste0(ck, "/source : ", q1, " inst/extdata/tables/tv_88-90.provenance.dcf ", q2, " (catalogue du package install", E, ")"))
       verifie("D2 ligne 8, lu", rk$bilan$lu[8L], paste0(ck, " : ", emp))
       verifie("D2 ligne 8, attendu", rk$bilan$attendu[8L], paste0(ck, " : ", emp, " (relue dans le package)"))
+      # Empreinte du code de forme non MD5 sur la même fiche (#295, C3) :
+      # ligne 9 « non déterminable », régime de la ligne 15 qui en suit.
+      fz <- fk; fz$empreintes$code <- "zz"
+      rz <- rendu(rejouer_fiche(bd, fz))
+      if (!inherits(rz, "rejeu")) d(sprintf("#295 C3 : rejeu non rendu (%s)", conditionMessage(rz)))
+      else {
+        verifie("#295 C3 ligne 9, verdict", rz$bilan$verdict[9L], paste0("non d", E, "terminable"))
+        verifie("#295 C3 ligne 15, statut", rz$bilan$statut[15L],
+                paste0("comparaison exacte ; empreinte du code non d", E, "terminable (temoin_code) : origine de l'",
+                       E, "cart non d", E, "terminable"))
+      }
     }
+  }
+  # Empreintes du code et du résultat de forme non MD5 (#295, C1, C2 et C7) :
+  # « zz » et chaîne latin-1 « zzé » ; colonne lu des lignes 9 et 13 citée
+  # avec le motif, verdict « non déterminable ».
+  latin <- rawToChar(as.raw(c(0x7a, 0x7a, 0xe9))); Encoding(latin) <- "latin1"
+  motif <- paste0(" ", q2, " (forme invalide : empreinte MD5 de 32 caract", u(0xe8), "res hexad", E,
+                  "cimaux minuscules attendue)")
+  for (champ in c("code", "resultat")) for (cas in list(list("zz", "zz"), list(latin, paste0("zz", E)))) {
+    fb <- fr; fb$empreintes[[champ]] <- cas[[1L]]
+    r <- rendu(rejouer_fiche(jeu$donnees, fb, tables_reference = tables_du_plan(p)))
+    nom <- sprintf("#295 empreintes/%s « %s »", champ, cas[[2L]])
+    if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+    k <- if (champ == "code") 9L else 13L
+    verifie(paste(nom, "lu"), r$bilan$lu[k], paste0(q1, " ", cas[[2L]], motif))
+    verifie(paste(nom, "verdict"), r$bilan$verdict[k], paste0("non d", E, "terminable"))
   }
   for (cas in list(list("plateforme", 11L, "blas, lapack"), list("fiche", 12L, "graine/x"))) {
     fb <- fr
