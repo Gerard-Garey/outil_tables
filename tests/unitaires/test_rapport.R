@@ -533,6 +533,92 @@ local({
   })
 })
 
+# --- #301 : contrôle 5, forme d'execution déclarée et règle des ancêtres ------
+#
+# N1 (valeur calculée à la main) : FORME_EXECUTION, déclarée à côté
+# d'informations_execution(), décrit la forme produite (champs feuilles dans
+# l'ordre, classes) ; le contrôle 5 en lit l'exception du POSIXct nu. Contre-
+# épreuves : un champ produit ajouté, une classe changée ou une ligne retirée de
+# la constante sont détectés ; une constante qui ne déclare plus debut en
+# POSIXct fait refuser l'execution produite (la constante est bien lue).
+# N4, critère (3) amendé par M520 (variante (A) ; ADR 0012, seconde annotation
+# du 16/11/2026, (c)) : appel direct de controler_forme_hors_resultat() ; un
+# ancêtre de classe « bytes » (fiche, fiche/empreintes, racine) est traversé
+# comme un ancêtre de classe « k » et le sous-arbre fautif est refusé
+# type_non_canonique, rôle = son chemin ; sans défaut dessous, TRUE. Sur le code
+# antérieur (1e548c5), l'ancêtre bytes faisait sauter le sous-arbre (TRUE).
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  forme <- tryCatch(tablexp:::FORME_EXECUTION, error = function(e) NULL)
+  cfh <- tablexp:::controler_forme_hors_resultat
+  # Champs feuilles d'une liste sans classe (chemin joint par /, classe jointe par /).
+  feuilles <- function(v, pref = character(0)) {
+    if (is.list(v) && is.null(attr(v, "class", exact = TRUE)))
+      return(do.call(rbind, c(list(data.frame(champ = character(0), classe = character(0))),
+                              lapply(names(v), function(n) feuilles(v[[n]], c(pref, n))))))
+    data.frame(champ = paste(pref, collapse = "/"), classe = paste(class(v), collapse = "/"))
+  }
+  ecarts <- function(e, f) {
+    p <- feuilles(e)
+    r <- character(0)
+    if (!identical(p$champ, unique(f$champ)))
+      r <- c(r, sprintf("champs produits %s, déclarés %s", paste(p$champ, collapse = ","), paste(unique(f$champ), collapse = ",")))
+    for (i in seq_len(nrow(p)))
+      if (!p$classe[i] %in% f$classe[f$champ == p$champ[i]]) r <- c(r, sprintf("%s de classe %s non déclarée", p$champ[i], p$classe[i]))
+    r
+  }
+  e <- tablexp:::informations_execution(Sys.time())
+  e_null <- e; e_null$session["systeme"] <- list(NULL)
+  verifier("#301, N1 : FORME_EXECUTION décrit la forme produite par informations_execution(Sys.time()) (champs feuilles dans l'ordre, classes ; session/systeme character ou NULL) ; le contrôle 5 admet l'execution produite, systeme NULL compris", {
+    r <- if (is.null(forme)) "FORME_EXECUTION absente" else c(ecarts(e, forme), ecarts(e_null, forme))
+    if (length(r)) r
+    else if (!identical(forme$champ[forme$classe == "POSIXct/POSIXt"], "debut")) "debut seul déclaré POSIXct attendu"
+    else isTRUE(cfh(list(execution = e))) && isTRUE(cfh(list(execution = e_null)))
+  })
+  verifier("#301, N1 : contre-épreuves : champ ajouté sans déclaration, classe changée, ligne retirée de la constante : écart détecté ; constante sans debut en POSIXct : execution produite refusée type_non_canonique, rôle execution/debut", {
+    e_z <- e; e_z$session$z <- 1
+    e_cl <- e; e_cl$duree_secondes <- 1L
+    f_moins <- forme[forme$champ != "session/locale", ]
+    f_debut <- forme; f_debut$classe[f_debut$champ == "debut"] <- "numeric"
+    ns <- asNamespace("tablexp")
+    utils::assignInNamespace("FORME_EXECUTION", f_debut, ns)
+    r <- tryCatch(attrape(cfh(list(execution = e))), finally = utils::assignInNamespace("FORME_EXECUTION", forme, ns))
+    if (!length(ecarts(e_z, forme)) || !length(ecarts(e_cl, forme)) || !length(ecarts(e, f_moins))) "écart non détecté"
+    else if (!identical(tablexp:::FORME_EXECUTION, forme)) "constante non restaurée"
+    else if (!inherits(r, "refus_tablexp") || !identical(r$motif, "type_non_canonique") || !identical(r$details$role, "execution/debut"))
+      "constante sans debut POSIXct : refus type_non_canonique, rôle execution/debut attendu"
+    else TRUE
+  })
+  avec_classe <- function(o, cl) { class(o) <- cl; o }
+  u <- unclass(x1)
+  cas <- list(
+    list("fiche de classe k, fiche/versions de classe k", function(y, cl) { y$fiche$versions <- avec_classe(y$fiche$versions, "k"); y$fiche <- avec_classe(y$fiche, cl); y }, "fiche/versions"),
+    list("fiche/empreintes de classe k, fiche/empreintes/code d'attribut z", function(y, cl) { attr(y$fiche$empreintes$code, "z") <- 1; y$fiche$empreintes <- avec_classe(y$fiche$empreintes, cl); y }, "fiche/empreintes/code"),
+    list("racine de classe k, fiche/versions de classe k", function(y, cl) { y$fiche$versions <- avec_classe(y$fiche$versions, "k"); avec_classe(y, cl) }, "fiche/versions"),
+    list("racine de classe k, execution de classe k", function(y, cl) { y$execution <- avec_classe(y$execution, "k"); avec_classe(y, cl) }, "execution"),
+    list("fiche de classe k, sous-arbres intacts", function(y, cl) { y$fiche <- avec_classe(y$fiche, cl); y }, NA),
+    list("fiche/empreintes de classe k, sous-arbres intacts", function(y, cl) { y$fiche$empreintes <- avec_classe(y$fiche$empreintes, cl); y }, NA),
+    list("racine de classe k, sous-arbres intacts", function(y, cl) avec_classe(y, cl), NA))
+  for (c_ in cas) {
+    verifier(sprintf("#301, N4 : appel direct, %s, et même ancêtre de classe bytes : %s", c_[[1L]],
+                     if (is.na(c_[[3L]])) "TRUE dans les deux cas" else sprintf("refus type_non_canonique, rôle %s, dans les deux cas", c_[[3L]])), {
+      r <- lapply(list(k = "k", bytes = CLASSE_BYTES), function(cl) attrape(cfh(c_[[2L]](u, cl))))
+      ok <- vapply(r, function(z) if (is.na(c_[[3L]])) isTRUE(z)
+                   else inherits(z, "refus_tablexp") && identical(z$module, "rapport") && identical(z$motif, "type_non_canonique") &&
+                     identical(z$details$role, c_[[3L]]), NA)
+      if (all(ok)) TRUE
+      else sprintf("ancêtre de classe %s : %s", names(r)[!ok],
+                   vapply(r[!ok], function(z) if (inherits(z, "condition")) conditionMessage(z) else "TRUE", ""))
+    })
+  }
+  verifier("#301, N4 : par ecrire_rapport(), un ancêtre de classe bytes (fiche, fiche/empreintes) reste refusé objet_modifie par le contrôle 3, sous-arbre fautif ou non (motif inchangé)", {
+    r <- list(attrape(ecrire_rapport(structure(cas[[1L]][[2L]](u, CLASSE_BYTES), class = "construction"))),
+              attrape(ecrire_rapport(structure(cas[[2L]][[2L]](u, CLASSE_BYTES), class = "construction"))),
+              attrape(ecrire_rapport(structure(cas[[5L]][[2L]](u, CLASSE_BYTES), class = "construction"))))
+    all(vapply(r, function(z) inherits(z, "refus_tablexp") && identical(z$motif, "objet_modifie"), NA))
+  })
+})
+
 # --- U11, U12 : ressources, balises, attributs, entités (valeur calculée à la main) ---
 
 BALISES <- c("!DOCTYPE", "html", "head", "meta", "title", "style", "body", "h1", "h2", "nav", "ol", "ul", "li", "a",

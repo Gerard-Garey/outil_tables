@@ -953,26 +953,30 @@ CHEMINS_FORME_HORS_RESULTAT <- setdiff(CHEMINS_HORS_RESULTAT, "etapes/donnees/re
 # l'écrivain et jetées, codage des chaînes contrôlé (ces valeurs sont rendues).
 # execution : forme seule (valeurs = FALSE), aucun contrôle de codage, car
 # aucune de ses valeurs n'est rendue. Seule valeur de classe que l'écrivain ne
-# sait pas écrire et que ce contrôle admet : execution/debut, POSIXct nu
-# (classe seule, type double), contrôlé sur sa valeur nue ; `debut` est trouvé
+# sait pas écrire et que ce contrôle admet : le champ de premier niveau
+# d'execution que FORME_EXECUTION déclare en POSIXct (debut ; #301, N1), POSIXct
+# nu (classe seule, type double), contrôlé sur sa valeur nue ; il est trouvé
 # par match() sur les noms lus par attr(), qui ne lève pas sur un nom
 # d'encodage « bytes », et un tel nom ailleurs dans execution ne retire pas
-# l'exception (aucune valeur d'execution n'est rendue, nom compris). Rend TRUE.
+# l'exception (aucune valeur d'execution n'est rendue, nom compris).
+# Chemins parcourus par lire_chemin() (R/outils.R ; #301, N3) : tout ancêtre
+# qui est une liste est traversé, quelle que soit sa classe, « bytes » comprise
+# (ADR 0012, seconde annotation du 16/11/2026, (c) ; M520, variante (A)) ; le
+# contrôle juge les sous-arbres, jamais leurs ancêtres (racine, fiche,
+# fiche/empreintes), dont la forme relève du contrôle 3 (objet_modifie). Un
+# sous-arbre absent, ou présent de valeur NULL, n'est pas contrôlé. Rend TRUE.
 controler_forme_hors_resultat <- function(x) {
+  posixct <- FORME_EXECUTION$champ[FORME_EXECUTION$classe == "POSIXct/POSIXt"]
   for (chemin in CHEMINS_FORME_HORS_RESULTAT) {
     segments <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
-    v <- x
-    for (s in segments) {
-      if (!is.list(v) || classe_bytes(v)) { v <- NULL; break }
-      k <- match(s, attr(v, "names", exact = TRUE))
-      if (is.na(k)) { v <- NULL; break }
-      v <- .subset2(v, k)
-    }
+    v <- lire_chemin(x, segments)$valeur
     if (is.null(v)) next
     if (identical(chemin, "execution") && is.list(v) && is.null(attr(v, "class", exact = TRUE))) {
-      k <- match("debut", attr(v, "names", exact = TRUE))
-      if (!is.na(k) && is.double(v[[k]]) && identical(attributes(v[[k]]), list(class = c("POSIXct", "POSIXt"))))
-        v[[k]] <- unclass(v[[k]])
+      for (champ in posixct) {
+        k <- match(champ, attr(v, "names", exact = TRUE))
+        if (!is.na(k) && is.double(v[[k]]) && identical(attributes(v[[k]]), list(class = c("POSIXct", "POSIXt"))))
+          v[[k]] <- unclass(v[[k]])
+      }
     }
     for (s in rev(segments)) { v <- list(v); attr(v, "names") <- s }
     texte_objet(v, PREMIERE_LIGNE_FICHE, character(0), "texte", canonique = TRUE, valeurs = !identical(chemin, "execution"))
@@ -1237,6 +1241,23 @@ informations_execution <- function(debut) {
                       paquets_attaches = .packages()))
 }
 
+# Forme produite d'execution par informations_execution() (#301, N1 ; ADR 0012,
+# seconde annotation du 16/11/2026, (e) ; M520) : une ligne par champ feuille,
+# dans l'ordre de production, chemin sous execution (segments joints par /) et
+# classe (class(), éléments joints par /) ; un champ de plusieurs classes
+# possibles a une ligne par classe. Elle décrit, elle n'exige pas : elle
+# n'ouvre aucun refus, et un execution d'une autre forme reste admis s'il est
+# canonique. Le contrôle 5 n'en lit que l'exception de classe : le champ
+# déclaré POSIXct/POSIXt (debut), admis en POSIXct nu
+# (controler_forme_hors_resultat()). session/systeme : utils::osVersion, « a
+# character string (or possibly NULL on bizarre platforms) » (aide de R 4.3.3,
+# ?sessionInfo). Liée à informations_execution(Sys.time()) par un test.
+FORME_EXECUTION <- data.frame(
+  champ = c("debut", "duree_secondes", "session/R", "session/plateforme", "session/systeme", "session/systeme",
+            "session/locale", "session/paquets_attaches"),
+  classe = c("POSIXct/POSIXt", "numeric", "character", "character", "character", "NULL", "character", "character"),
+  stringsAsFactors = FALSE)
+
 # --- Sérialisation du plan et de la fiche (ADR 0011, points 6, 8, 9 et 10, troisième annotation ; #50) ---
 #
 # Texte ↔ objet, sans fichier (E4.4) : les écrivains rendent des octets (raw)
@@ -1350,7 +1371,7 @@ segments_texte <- function(noms, n) {
 # type_non_canonique (rôle : le chemin, details$role) et un data.frame n'est pas
 # admis (liste classée : refusé par la branche des listes, comme toute classe).
 # `valeurs` (TRUE : écriture ordinaire) : FALSE, forme seule, pour un sous-arbre
-# dont aucune valeur n'est rendue (execution ; M499 (a)) : le parcours est le
+# dont aucune valeur n'est rendue (execution ; M499 (b)) : le parcours est le
 # même et noeud() et atome() refusent les mêmes formes (profondeur, classe,
 # attribut, type, facteur, Date à stockage ou attribut non admis, vecteur nommé
 # de longueur 0, forme du data.frame, objet non atomique, racine qui n'est pas
@@ -2312,17 +2333,6 @@ valeur_message <- function(v) {
   decrire_valeur(v)
 }
 
-# Élément de chemin `chemin` (segments joints par /) de l'objet x : present
-# FALSE si un segment manque (ou si son parent n'est pas une liste).
-lire_racine <- function(x, chemin) {
-  v <- x
-  for (s in strsplit(chemin, "/", fixed = TRUE)[[1L]]) {
-    if (!is.list(v) || !(s %in% names(v))) return(list(present = FALSE, valeur = NULL))
-    v <- v[[s]]
-  }
-  list(present = TRUE, valeur = v)
-}
-
 # Contrôles avant le rendu (ADR 0012, point 2.5, et seconde annotation du
 # 24/10/2026, (b) 3 et 4), dans l'ordre ; au premier refus, rien n'est rendu.
 controler_rapport <- function(x) {
@@ -2420,7 +2430,7 @@ controler_rapport <- function(x) {
   for (e in names(x[["etapes"]])) if (!couvert(joindre_chemin("etapes", e))) non_prevu(joindre_chemin("etapes", e))
   for (n in names(f)) if (!couvert(joindre_chemin("fiche", n))) non_prevu(joindre_chemin("fiche", n))
   for (r in unlist(SECTIONS_RAPPORT$racines[SECTIONS_RAPPORT$nature == "non_produite"], use.names = FALSE)) {
-    l <- lire_racine(x, r)
+    l <- lire_chemin(x, strsplit(r, "/", fixed = TRUE)[[1L]])
     if (l$present && !is.null(l$valeur)) non_prevu(r)
   }
   # 5. Forme canonique des sous-arbres que l'empreinte du résultat n'écrit pas
@@ -2521,7 +2531,7 @@ lignes_racines <- function(x, racines, apres = list()) {
     vecteur(v, chemin)
   }
   for (r in racines) {
-    l <- lire_racine(x, r)
+    l <- lire_chemin(x, strsplit(r, "/", fixed = TRUE)[[1L]])
     if (l$present) noeud(l$valeur, r)
     else ligne(r, "", "", echapper_html(MENTIONS_RAPPORT[["racine_absente"]]))
   }

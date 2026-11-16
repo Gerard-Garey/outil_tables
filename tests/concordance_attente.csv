@@ -1,1 +1,3 @@
 type,nom,issue,motif
+entree,fonctions-outils:lire_chemin,#301,seul assistant de parcours par chemin (forme F301 ; N3) ; entrée de catalogue ajoutée au commit docs: de la branche (règle 9)
+entree,fonctions-rapport:FORME_EXECUTION,#301,forme produite d'execution déclarée à côté d'informations_execution() (forme F301 ; N1 ; M520) ; entrée de catalogue ajoutée au commit docs: de la branche (règle 9)

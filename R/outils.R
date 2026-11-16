@@ -19,7 +19,8 @@
 #  - noms_bytes() : positions des noms d'encodage « bytes » d'un objet (#114) ;
 #  - a_classe(), classe_bytes() et lire_champ() : lectures de la classe et d'un
 #    champ par nom sans dispatch ni traduction, sûres sur une classe ou un nom
-#    d'encodage « bytes » (#128) ;
+#    d'encodage « bytes » (#128) ; lire_chemin() : parcours d'un chemin par
+#    lire_champ(), seul assistant de parcours par chemin (#301) ;
 #  - texte_moteur() : texte produit par le moteur marqué UTF-8, quelle que
 #    soit la locale d'installation ou d'exécution (#50) ;
 #  - formuler() : seul point de passage des messages de refus, gabarit
@@ -189,7 +190,16 @@ noms_bytes <- function(x) {
 #  - lire_champ(x, nom) : élément `nom` de la liste x, trouvé par match() sur
 #    les noms lus par attr() puis lu par position (.subset2()), donc sans
 #    erreur R sur un nom ou une classe « bytes », quelle que soit sa position ;
-#    premier élément de ce nom, NULL s'il est absent (comme x[[nom]]).
+#    premier élément de ce nom, NULL s'il est absent (comme x[[nom]]) ;
+#  - lire_chemin(x, segments) : élément de x au chemin `segments` (vecteur de
+#    noms, de la racine à l'élément), lu segment par segment par lire_champ() ;
+#    rend list(present, valeur) : present FALSE (valeur NULL) dès qu'un
+#    ancêtre n'est pas une liste (is.list()) ou qu'un segment manque à ses noms,
+#    TRUE sinon, valeur NULL comprise (élément présent de valeur NULL). Tout
+#    ancêtre qui est une liste est traversé, quelle que soit sa classe, classe
+#    d'encodage « bytes » comprise (#301, variante (A), M520) : la décision sur
+#    sa forme appartient à l'appelant. Seul assistant de parcours par chemin
+#    (#301, N3).
 a_classe <- function(x, classe) classe %in% attr(x, "class", exact = TRUE)
 
 classe_bytes <- function(x) {
@@ -200,6 +210,15 @@ classe_bytes <- function(x) {
 lire_champ <- function(x, nom) {
   k <- match(nom, attr(x, "names", exact = TRUE))
   if (is.na(k)) NULL else .subset2(x, k)
+}
+
+lire_chemin <- function(x, segments) {
+  v <- x
+  for (s in segments) {
+    if (!is.list(v) || !(s %in% attr(v, "names", exact = TRUE))) return(list(present = FALSE, valeur = NULL))
+    v <- lire_champ(v, s)
+  }
+  list(present = TRUE, valeur = v)
 }
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
