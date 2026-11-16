@@ -270,10 +270,10 @@ verifier("provenance k = 2 (identité exacte) : fiche écrite puis relue identic
   identical(lue, X_P2$fiche) &&
     identical(sans_execution(construire_table(EMP_E, lue$roles, lue$plan, lue$provenance)), sans_execution(X_P2))
 })
-verifier("provenance k = 2 (identité exacte) : rejouer_fiche() sur la fiche relue rend la construction identical() hors execution, bilan de 14 lignes sans écart ; ligne 6 et témoin 14 citent chacun des deux fichiers entre guillemets, dans l'ordre", {
+verifier("provenance k = 2 (identité exacte) : rejouer_fiche() sur la fiche relue rend la construction identical() hors execution, bilan de 15 lignes sans écart ; ligne 6 et témoin 14 citent chacun des deux fichiers entre guillemets, dans l'ordre", {
   r <- rejouer_fiche(EMP_E, lire_fiche(ecrire_fiche(X_P2$fiche)))
-  identical(sans_execution(r$construction), sans_execution(X_P2)) && identical(nrow(r$bilan), 14L) &&
-    identical(r$bilan$verdict, c(rep("conforme", 8L), rep("identique", 5L), "non vérifiée")) &&
+  identical(sans_execution(r$construction), sans_execution(X_P2)) && identical(nrow(r$bilan), 15L) &&
+    identical(r$bilan$verdict, c(rep("conforme", 8L), rep("identique", 5L), "non vérifiée", "identique")) &&
     endsWith(r$bilan$lu[6L], "; provenance : « inventaires.csv », « evenements.csv »") &&
     identical(r$bilan$lu[14L], paste0("« ", PROV2$empreinte, " »", collapse = ", "))
 })

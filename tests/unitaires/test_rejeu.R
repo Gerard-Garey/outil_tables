@@ -44,16 +44,17 @@ R0 <- rejouer_fiche(BASE, FICHE)
 EMPREINTE_CODE <- tablexp:::EMPREINTE_CODE
 
 # Ligne 8 « tables_reference » (contrôle 7 bis, ADR 0015, point 4.3 ; #73) :
-# témoins aux lignes 9 à 14.
+# témoins aux lignes 9 à 15 (ligne 15 « temoin_catalogue », #267 ; M498).
 CONTROLES <- c("nature_arguments", "forme_fiche", "version_fiche", "algorithme_empreinte", "representation",
                "entrees_construction", "empreinte_donnees", "tables_reference", "temoin_code", "temoin_versions",
-               "temoin_plateforme", "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier")
+               "temoin_plateforme", "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier",
+               "temoin_catalogue")
 STATUTS <- c("contrôle de forme", "contrôle de forme", "comparaison exacte", "comparaison exacte",
              "comparaison exacte", "contrôles délégués aux modules", "exacte ; sans rôle de sécurité",
              "exacte ; sans rôle de sécurité", "exacte ; sans rôle de sécurité", "comparaison exacte",
              "comparaison exacte", "comparaison exacte", "témoin, même machine seulement",
-             "reprise de la fiche, non vérifiée par le moteur")
-VERDICTS_SUCCES <- c(rep("conforme", 8L), rep("identique", 5L), "non vérifiée")
+             "reprise de la fiche, non vérifiée par le moteur", "comparaison exacte")
+VERDICTS_SUCCES <- c(rep("conforme", 8L), rep("identique", 5L), "non vérifiée", "identique")
 
 # Fiche FICHE modifiée : chaque argument nommé est un chemin « a/b/c » de la
 # fiche, posé à sa valeur (NULL retire le champ).
@@ -117,13 +118,13 @@ verifier("T1 VERSIONS_FICHE_REJEU : integer sans attribut ni NA, identical() à 
 
 verifier("T2 rejeu réussi : classe rejeu, éléments construction et bilan",
          identical(class(R0), "rejeu") && identical(names(R0), c("construction", "bilan")))
-verifier("T2 bilan : data.frame de 14 lignes, 5 colonnes character dans l'ordre, sans NA, noms de lignes automatiques", {
+verifier("T2 bilan : data.frame de 15 lignes, 5 colonnes character dans l'ordre, sans NA, noms de lignes automatiques", {
   b <- R0$bilan
   is.data.frame(b) && identical(names(b), c("controle", "attendu", "lu", "verdict", "statut")) &&
-    all(vapply(b, is.character, NA)) && nrow(b) == 14L && !anyNA(b) &&
-    identical(attr(b, "row.names"), 1:14) && identical(b$controle, CONTROLES)
+    all(vapply(b, is.character, NA)) && nrow(b) == 15L && !anyNA(b) &&
+    identical(attr(b, "row.names"), 1:15) && identical(b$controle, CONTROLES)
 })
-verifier("T2 bilan : verdicts (1 à 8 « conforme », 9 à 13 « identique », 14 « non vérifiée ») et statuts exacts",
+verifier("T2 bilan : verdicts (1 à 8 « conforme », 9 à 13 « identique », 14 « non vérifiée », 15 « identique ») et statuts exacts",
          identical(R0$bilan$verdict, VERDICTS_SUCCES) && identical(R0$bilan$statut, STATUTS))
 verifier("T2 bilan : attendu et lu des lignes 3, 4, 5, 7, 9 et 13 égaux aux constantes et aux valeurs de la fiche", {
   b <- R0$bilan; e <- FICHE$empreintes
@@ -720,7 +721,7 @@ for (k in list(list("LF", "a\nb", "a<U+000A>b"), list("VT", "a\u000bb", "a<U+000
 # erreur R (avant #142 : « translating strings with "bytes" encoding is not
 # allowed », levée par sprintf() de paires_lues() pour les feuilles de versions
 # et de plateforme), un rejeu ou un refus nommé, jamais une condition autre ;
-# pour les rejeux rendus, 14 lignes et 5 colonnes, aucune cellule d'encodage
+# pour les rejeux rendus, 15 lignes et 5 colonnes, aucune cellule d'encodage
 # bytes (avant #142 : empreintes/code, empreintes/resultat et empreintes/fichier
 # la recopiaient dans bilan$lu), toutes de l'UTF-8 valide, aucune sur plusieurs
 # lignes (avant #142 : une valeur à LF ou à octets invalides était recopiée
@@ -747,7 +748,7 @@ local({
   defauts <- function(r) {
     if (!inherits(r, "rejeu")) return(character(0))
     k <- cellules(r$bilan)
-    c(if (!identical(dim(r$bilan), c(14L, 5L))) "dimensions",
+    c(if (!identical(dim(r$bilan), c(15L, 5L))) "dimensions",
       if (any(Encoding(k) == "bytes")) "cellule d'encodage bytes",
       if (!all(validUTF8(k))) "cellule qui n'est pas de l'UTF-8 valide",
       if (any(grepl("[\n\v\f\r]", k, useBytes = TRUE))) "cellule sur plusieurs lignes",
@@ -772,7 +773,7 @@ local({
     verifier(sprintf("T11 balayage, feuille remplacée par %s : aucune erreur R (rejeu rendu ou refus nommé)", libelle),
              if (any(mal)) paste(cles[mal], collapse = ", ") else TRUE)
     d <- lapply(rj, defauts)
-    verifier(sprintf("T11 balayage, feuille remplacée par %s : rejeux rendus, bilan de 14 lignes et 5 colonnes, cellules en UTF-8 valide et d'une ligne, aucune d'encodage bytes, sprintf(\"%%s\") et write.csv() sans erreur", libelle),
+    verifier(sprintf("T11 balayage, feuille remplacée par %s : rejeux rendus, bilan de 15 lignes et 5 colonnes, cellules en UTF-8 valide et d'une ligne, aucune d'encodage bytes, sprintf(\"%%s\") et write.csv() sans erreur", libelle),
              if (any(lengths(d) > 0L)) paste(sprintf("%s (%s)", cles[lengths(d) > 0L], vapply(d[lengths(d) > 0L], paste, "", collapse = ", ")), collapse = " ; ") else TRUE)
     verifier(sprintf("T11 balayage, feuille remplacée par %s : au moins 40 des rejeux sont rendus (le balayage porte sur des bilans)", libelle),
              sum(vapply(rj, inherits, NA, "rejeu")) >= 40L)
@@ -871,4 +872,186 @@ local({
   verifier("T11 versions/R « a<LF>b » : rejeu rendu, valeur citée « R=a<U+000A>b » (même règle que la valeur bytes), une ligne",
            if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
            else grepl("R=a<U+000A>b", r$bilan$lu[10L], fixed = TRUE) && !any(grepl("[\n\v\f\r]", cellules(r$bilan))))
+})
+
+# --- T12 : témoin « catalogue », ligne 15 (#267 ; ADR 0015, seconde annotation
+#     du 15/11/2026, (b) ; ADR 0012, annotation du 15/11/2026, (b) ; DF1 à DF7,
+#     M498). Critères B1 à B8 de la spécification d'actuary-approfondi,
+#     reformulés sur la ligne 15, et critère de forme (B9, invariant des
+#     métadonnées : tests/unitaires/test_tables_embarquees.R). Valeur calculée
+#     à la main (textes, verdicts, statuts) ; identité exacte (construction
+#     rejouée identical() hors execution ; lignes 1 à 14).
+
+# Construction de BASE avec la table embarquée TV 88-90 sous la clé « tv »
+# (positionnement, sans segmentation) ; fiche relue de son texte.
+PLAN_TV <- local({
+  p <- plan_complet()
+  p$segmentation <- character(0)
+  p$etapes$brut$estimateurs <- "poisson"
+  p$etapes$positionnement <- list(methode = "smr", table_reference = "tv", plage_ages = c(60, 80), niveau = 0.95)
+  p
+})
+X_TV <- construire_table(BASE, ROLES, PLAN_TV, tables_reference = list(tv = table_embarquee("TV 88-90")))
+FICHE_TV <- lire_fiche(ecrire_fiche(X_TV$fiche))
+SOURCE_TV <- tables_embarquees()$source[tables_embarquees()$nom == "TV 88-90"]
+# Fiche FICHE_TV dont le champ `champ` de l'élément tv vaut `v` (NULL gardé :
+# le champ reste présent, de valeur NULL).
+fiche_tv <- function(champ, v, f = FICHE_TV) { f$tables_reference$tv[champ] <- list(v); f }
+STATUT_REGIME <- c(
+  identique = "comparaison exacte ; empreinte du code identique (temoin_code) : écart non imputable à une évolution du catalogue",
+  differente = paste("comparaison exacte ; empreinte du code différente (temoin_code) : écart imputable à la fiche ou à",
+                     "une évolution du catalogue, non départagées"),
+  non_determinable = paste("comparaison exacte ; empreinte du code non déterminable (temoin_code) : origine de l'écart",
+                           "non déterminable"))
+ligne15 <- function(r) unlist(r$bilan[15L, ], use.names = FALSE)
+attrape <- function(expr) tryCatch(expr, error = function(e) e)
+R_TV <- rejouer_fiche(BASE, FICHE_TV)
+
+verifier("T12 forme : bilan de 15 lignes ; controle[15] « temoin_catalogue » ; lignes 1 à 14 inchangées en place et en nom, statuts 1 à 14 inchangés", {
+  b <- R_TV$bilan
+  identical(nrow(b), 15L) && identical(b$controle[15L], "temoin_catalogue") &&
+    identical(b$controle[1:14],
+              c("nature_arguments", "forme_fiche", "version_fiche", "algorithme_empreinte", "representation",
+                "entrees_construction", "empreinte_donnees", "tables_reference", "temoin_code", "temoin_versions",
+                "temoin_plateforme", "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier")) &&
+    identical(b$statut[1:14], STATUTS[1:14]) && identical(R0$bilan$controle, b$controle)
+})
+verifier("T12 B5 fiche intacte à table embarquée : construction identical() hors execution ; ligne 15 « identique », « comparaison exacte », textes de la clé", {
+  identical(sans_execution(R_TV$construction), sans_execution(X_TV)) && identical(R_TV$bilan$verdict, VERDICTS_SUCCES) &&
+    identical(ligne15(R_TV), c("temoin_catalogue", "tv : métadonnées du catalogue du package installé",
+                               "tv : métadonnées de la fiche", "identique", "comparaison exacte"))
+})
+verifier("T12 B5 fiche intacte, empreinte du code NA : ligne 9 « non déterminable », ligne 15 « identique », « comparaison exacte » (régime dit seulement en cas d'écart, DF2)", {
+  r <- rejouer_fiche(BASE, fiche_modifiee("empreintes/code" = NA_character_, f = FICHE_TV))
+  identical(r$bilan$verdict[9L], "non déterminable") && identical(ligne15(r)[4:5], c("identique", "comparaison exacte"))
+})
+verifier("T12 B8 bornes : fiche sans table de référence (R0) -> ligne 15 « identique », textes « aucune métadonnée du catalogue opposée » et « aucune table de statut « embarquee » »", {
+  identical(ligne15(R0), c("temoin_catalogue", "aucune métadonnée du catalogue opposée (aucune table de statut « embarquee »)",
+                           "aucune table de statut « embarquee » dans fiche/tables_reference", "identique",
+                           "comparaison exacte"))
+})
+verifier("T12 B1 fausse source de la table embarquée : rejeu rendu, sans refus ; ligne 15 cite clé, champ, valeur de la fiche (lu) et du catalogue installé (attendu), régime « identique » ; construction identical() hors execution", {
+  r <- attrape(rejouer_fiche(BASE, fiche_tv("source", "ma source")))
+  if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+  else identical(ligne15(r), c("temoin_catalogue",
+                               sprintf("tv/source : « %s » (catalogue du package installé)", SOURCE_TV),
+                               "tv/source : « ma source »", "différente : tables_reference/tv/source",
+                               STATUT_REGIME[["identique"]])) &&
+    identical(SOURCE_TV, "inst/extdata/tables/tv_88-90.provenance.dcf") &&
+    identical(sans_execution(r$construction), sans_execution(X_TV))
+})
+verifier("T12 B1 contre-épreuve : le témoin « fiche » (ligne 12) nommait déjà le champ, sans ses valeurs ; ni la valeur de la fiche ni celle du catalogue n'y figurent", {
+  b <- rejouer_fiche(BASE, fiche_tv("source", "ma source"))$bilan
+  identical(b$verdict[12L], "différente : tables_reference/tv/source") &&
+    !any(grepl("ma source", b[12L, ], fixed = TRUE)) && !any(grepl(SOURCE_TV, b[12L, ], fixed = TRUE))
+})
+verifier("T12 B8 bornes : deux champs en écart (source, forme_origine) -> textes joints par « ; » dans l'ordre de CHAMPS_TABLE_FICHE, chemins par « , »", {
+  r <- rejouer_fiche(BASE, fiche_tv("forme_origine", "qx", fiche_tv("source", "ma source")))
+  identical(ligne15(r)[2:4],
+            c(sprintf("tv/source : « %s » (catalogue du package installé) ; tv/forme_origine : « lx » (catalogue du package installé)",
+                      SOURCE_TV),
+              "tv/source : « ma source » ; tv/forme_origine : « qx »",
+              "différente : tables_reference/tv/source, tables_reference/tv/forme_origine"))
+})
+verifier("T12 B4 régime lu sur le verdict de la ligne 9 (verdict_chaines(), non identical()) : code identique, différent, NA, absent -> trois statuts", {
+  f <- fiche_tv("source", "ma source")
+  st <- function(...) { r <- rejouer_fiche(BASE, fiche_modifiee(..., f = f)); c(r$bilan$verdict[9L], r$bilan$statut[15L]) }
+  identical(rbind(st(), st("empreintes/code" = FAUX_MD5), st("empreintes/code" = NA_character_), st("empreintes/code" = NULL)),
+            rbind(c("identique", STATUT_REGIME[["identique"]]), c("différente", STATUT_REGIME[["differente"]]),
+                  c("non déterminable", STATUT_REGIME[["non_determinable"]]),
+                  c("non déterminable", STATUT_REGIME[["non_determinable"]])))
+})
+verifier("T12 B8 bornes : table importée de source modifiée -> ligne 12 « différente », ligne 15 « identique », sans comparaison au catalogue (hors de #267)", {
+  ti <- table_reference(data.frame(age = 0:110, sexe = "ensemble", qx = c(rep(0.01, 110L), 1)), "imp", "importee", "test")
+  x <- construire_table(BASE, ROLES, PLAN_TV, tables_reference = list(tv = ti))
+  f <- lire_fiche(ecrire_fiche(x$fiche)); f$tables_reference$tv$source <- "autre"
+  r <- rejouer_fiche(BASE, f, list(tv = ti))
+  identical(r$bilan$verdict[12L], "différente : tables_reference/tv/source") &&
+    identical(ligne15(r)[4:5], c("identique", "comparaison exacte")) &&
+    identical(ligne15(r)[2L], "aucune métadonnée du catalogue opposée (aucune table de statut « embarquee »)")
+})
+# Balayage de 23 formes altérées de source, forme_origine et parametres : les
+# dix-sept de l'avis (F7), dont quatre sous une valeur de même classe (chaîne
+# « bytes » de source, liste à nom « bytes » de source et de parametres, chaîne
+# de parametres), et six propres au test (liste écrite ici ; ADR 0015, seconde
+# annotation du 15/11/2026, (b)) : valeurs illisibles, NA, vides,
+# NULL, de type ou de classe autre, « bytes » (chaîne, classe, nom de liste),
+# caractères de contrôle et séparateur U+2028, octets invalides.
+local({
+  b <- function(s) { Encoding(s) <- "bytes"; s }
+  lb <- list(1); names(lb) <- b("n\xe9")
+  repere <- "« <chaîne d'encodage bytes> »"
+  formes <- list(
+    list("source", "ma source", "« ma source »"), list("source", NA_character_, "NA"),
+    list("source", character(0), "illisible (character de longueur 0)"),
+    list("source", c("a", "b"), "illisible (character de longueur 2)"), list("source", NULL, "absente"),
+    list("source", 1, "illisible (double de longueur 1)"), list("source", b("x\xe9"), repere),
+    list("source", "a\nb c", "« a<U+000A>b<U+2028>c »"), list("source", "\xe9t\xe9", "« <e9>t<e9> »"),
+    list("source", list(a = 1), "illisible (list de longueur 1)"),
+    list("source", structure("x", class = "bytes"), "illisible (character de longueur 1)"),
+    list("forme_origine", "qx", "« qx »"), list("forme_origine", NA_character_, "NA"),
+    list("forme_origine", lb, "illisible (list de longueur 1)"),
+    list("parametres", list(a = 1), "illisible (list de longueur 1)"),
+    list("parametres", lb, "illisible (list de longueur 1)"), list("parametres", "x", "« x »"),
+    # Formes de l'avis (F7) ajoutées à la reprise de #267 (visa d'actuary-approfondi).
+    list("source", 3L, "illisible (integer de longueur 1)"), list("source", "", "«  »"),
+    list("source", "a\nb\u0007c", "« a<U+000A>b<U+0007>c »"),
+    list("source", structure("x", class = "k"), "illisible (character de longueur 1)"),
+    list("source", lb, "illisible (list de longueur 1)"),
+    list("forme_origine", b("abc\xe9"), repere))
+  attendu_catalogue <- c(source = sprintf("« %s »", SOURCE_TV), forme_origine = "« lx »", parametres = "absente")
+  cellules <- function(bilan) unlist(lapply(bilan, as.character), use.names = FALSE)
+  ecarts <- character(0)
+  for (i in seq_along(formes)) {
+    ch <- formes[[i]][[1L]]
+    r <- attrape(rejouer_fiche(BASE, fiche_tv(ch, formes[[i]][[2L]])))
+    e <- if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r)) else {
+      k <- cellules(r$bilan)
+      chemin <- paste0("tables_reference/tv/", ch)
+      c(if (!identical(nrow(r$bilan), 15L)) "lignes",
+        if (!identical(ligne15(r), c("temoin_catalogue",
+                                     sprintf("tv/%s : %s (catalogue du package installé)", ch, attendu_catalogue[[ch]]),
+                                     sprintf("tv/%s : %s", ch, formes[[i]][[3L]]), paste("différente :", chemin),
+                                     STATUT_REGIME[["identique"]]))) "ligne 15",
+        # B2 : chaque chemin de la ligne 15 est cité par le témoin « fiche ».
+        if (!grepl(chemin, r$bilan$verdict[12L], fixed = TRUE)) "ligne 12 sans le chemin",
+        if (!identical(sans_execution(r$construction), sans_execution(X_TV))) "construction",
+        if (!all(validUTF8(k)) || any(Encoding(k) == "bytes")) "cellule non UTF-8",
+        if (any(grepl("[\n\v\f\r]", k, useBytes = TRUE))) "cellule sur plusieurs lignes",
+        if (inherits(attrape(write.csv(r$bilan, tempfile())), "error")) "write.csv() en erreur")
+    }
+    if (length(e)) ecarts <- c(ecarts, sprintf("forme %d (%s) : %s", i, ch, paste(e, collapse = ", ")))
+  }
+  verifier("T12 B3, B2, B6 balayage de 23 formes : les dix-sept de l'avis (F7), dont quatre sous une valeur de même classe, et six propres au test, altérées de source, forme_origine et parametres : aucune erreur R, aucun refus ; ligne 15 au texte attendu (valeurs citées par la règle de #142) ; chemin cité aussi par la ligne 12 ; construction identical() hors execution ; cellules UTF-8 sur une ligne, write.csv() sans erreur",
+           if (length(formes) != 23L) "23 formes" else if (length(ecarts)) ecarts else TRUE)
+})
+verifier("T12 B6, B7 aucun refus nouveau : MENTIONS_RAPPORT et TEXTE_REJEU_FICHE inchangés (MD5 de leurs octets UTF-8 relevés à 8a81102)", {
+  o <- function(x) tablexp:::md5_octets(charToRaw(enc2utf8(paste(x, collapse = "\n"))))
+  m <- tablexp:::MENTIONS_RAPPORT
+  identical(c(o(c(names(m), unname(m))), o(tablexp:::TEXTE_REJEU_FICHE)),
+            c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f"))
+})
+verifier("T12 B8 bornes, par injection (catalogue à deux tables) : écarts de deux clés dans l'ordre de la fiche ; textes joints par « ; » ; clé intacte citée (option (b) du visa d'actuary-approfondi)", {
+  cat_ <- list(A = list(identifiant = "a", sexe = "H", format = 1L, lignes = c("age,lx", "0,1000", "1,990", "2,970")),
+               B = list(identifiant = "b", sexe = "F", format = 1L, lignes = c("age,lx", "0,1000", "1,995", "2,985")))
+  el <- function(n) tablexp:::element_table_fiche(tablexp:::table_du_catalogue(n, cat_))
+  ft <- list(a = replace(el("A"), "source", list("s1")), b = el("B"), c = replace(el("B"), "forme_origine", list("qx")))
+  tr <- tablexp:::controler_tables_rejeu(ft, NULL, "code", cat_)
+  t15 <- tablexp:::temoin_catalogue(tr$ecarts, "différente")
+  identical(tr$ecarts, list(cles = c("a", "b", "c"), cle = c("a", "c"), champ = c("source", "forme_origine"), lu = list("s1", "qx"),
+                            attendu = list("inst/extdata/tables/a.provenance.dcf", "lx"))) &&
+    identical(unname(t15), c(paste("a/source : « inst/extdata/tables/a.provenance.dcf » (catalogue du package installé) ;",
+                                   "b : métadonnées du catalogue du package installé ;",
+                                   "c/forme_origine : « lx » (catalogue du package installé)"),
+                             "a/source : « s1 » ; b : métadonnées de la fiche ; c/forme_origine : « qx »",
+                             "différente : tables_reference/a/source, tables_reference/c/forme_origine",
+                             STATUT_REGIME[["differente"]]))
+})
+verifier("T12 ecarts_catalogue() : élément du catalogue -> aucun écart ; valeurs brutes rendues (NULL compris), dans l'ordre de CHAMPS_TABLE_FICHE", {
+  t <- table_embarquee("TV 88-90")
+  e <- tablexp:::element_table_fiche(t)
+  e2 <- e; e2["parametres"] <- list(list(a = 1)); e2$source <- "s"
+  identical(tablexp:::ecarts_catalogue(e, t), list(champ = character(0), lu = list(), attendu = list())) &&
+    identical(tablexp:::ecarts_catalogue(e2, t),
+              list(champ = c("source", "parametres"), lu = list("s", list(a = 1)), attendu = list(SOURCE_TV, NULL)))
 })

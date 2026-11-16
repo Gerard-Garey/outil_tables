@@ -299,6 +299,42 @@ verifier("catalogue_tables_embarquees() : contenu illisible -> le refus table_em
   controle_refus(r, "donnees", "table_embarquee_illisible", "ligne « 0,1 0 » mal formée")
 })
 
+# --- invariant des métadonnées (ADR 0015, seconde annotation du 15/11/2026, (d) ; DF6 de #267) ---
+# Les métadonnées de l'élément de fiche d'une table embarquée ne dépendent que
+# de R/ : le régime « empreinte du code identique » du témoin « catalogue »
+# du rejeu n'a de sens que sous cet invariant (EMPREINTE_CODE ne couvre pas
+# inst/extdata). Valeur calculée à la main (volet (i)) ; identité exacte
+# (volet (ii)), avec contre-épreuve sur les empreintes.
+
+ADMISES <- tables_embarquees()$nom[tables_embarquees()$etat == "admise"]
+CHAMPS_METADONNEES <- setdiff(tablexp:::CHAMPS_TABLE_FICHE, "empreinte")
+element_fiche <- function(nom, catalogue = TABLES_EMBARQUEES)
+  tablexp:::element_table_fiche(table_du_catalogue(nom, catalogue))
+verifier("invariant (d), volet (i) : pour chaque table admise, nom, statut, source, forme_origine, parametres et representation de l'élément de fiche se dérivent de DECLARATIONS_TABLES_EMBARQUEES et des constantes de R/", {
+  ok <- vapply(ADMISES, function(nom) {
+    d <- DECLARATIONS[DECLARATIONS$nom == nom, ]
+    identical(element_fiche(nom)[CHAMPS_METADONNEES],
+              list(nom = d$nom, statut = "embarquee",
+                   source = paste0("inst/extdata/tables/", d$identifiant, ".provenance.dcf"), forme_origine = "lx",
+                   parametres = NULL, representation = tablexp:::REPRESENTATION_TABLE))
+  }, NA)
+  length(ADMISES) >= 6L && all(ok)
+})
+verifier("invariant (d), volet (ii) : lignes de inst/extdata échangées entre tables admises de même format (permutation circulaire) -> métadonnées identical(), empreintes toutes différentes (contre-épreuve : l'échange atteint bien le contenu)", {
+  cat2 <- TABLES_EMBARQUEES
+  for (f in unique(DECLARATIONS$format)) {
+    n <- intersect(DECLARATIONS$nom[DECLARATIONS$format == f], ADMISES)
+    if (length(n) >= 2L) for (i in seq_along(n))
+      cat2[[n[i]]]$lignes <- TABLES_EMBARQUEES[[n[c(seq_along(n)[-1L], 1L)[i]]]]$lignes
+  }
+  avant <- lapply(ADMISES, element_fiche)
+  apres <- lapply(ADMISES, element_fiche, catalogue = cat2)
+  echangees <- vapply(ADMISES, function(nom) !identical(cat2[[nom]]$lignes, TABLES_EMBARQUEES[[nom]]$lignes), NA)
+  all(echangees) &&
+    identical(lapply(avant, `[`, CHAMPS_METADONNEES), lapply(apres, `[`, CHAMPS_METADONNEES)) &&
+    all(vapply(seq_along(ADMISES), function(i) !identical(avant[[i]]$empreinte, apres[[i]]$empreinte), NA))
+})
+
 # --- contrôle 7 bis du rejeu par le chemin unique (point 1.4) ----------------------
 
 verifier("controler_tables_rejeu() : table embarquée dont le contenu injecté est refusé -> refus table_lx_non_decroissants tel quel ; contenu changé d'un l_x -> empreinte_table_discordante", {

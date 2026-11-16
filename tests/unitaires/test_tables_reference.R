@@ -506,11 +506,11 @@ verifier("D table_embarquee() : nom absent du catalogue installé, refus table_e
 
 FICHE <- lire_fiche(ecrire_fiche(X$fiche))
 R0 <- rejouer_fiche(BASE, FICHE)
-verifier("E fiche sans table rejouée avec NULL et list() : objet identical() hors execution, 14 lignes, ligne 8 (valeur calculée à la main)", {
+verifier("E fiche sans table rejouée avec NULL et list() : objet identical() hors execution, 15 lignes, ligne 8 (valeur calculée à la main)", {
   r1 <- rejouer_fiche(BASE, FICHE, list())
   b <- R0$bilan
   identical(sans_execution(R0$construction), sans_execution(X)) &&
-    identical(sans_execution(r1$construction), sans_execution(X)) && identical(r1$bilan, b) && nrow(b) == 14L &&
+    identical(sans_execution(r1$construction), sans_execution(X)) && identical(r1$bilan, b) && nrow(b) == 15L &&
     identical(unlist(b[8L, ], use.names = FALSE),
               c("tables_reference", "aucune empreinte recalculée (aucune table reçue ni relue)",
                 "aucune table de référence (fiche/tables_reference : NULL)", "conforme", "exacte ; sans rôle de sécurité"))
