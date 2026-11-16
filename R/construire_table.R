@@ -1106,9 +1106,9 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, e
   # que le code installé oppose (recalculée, avec son origine).
   list(tables = tables, empreintes = empreintes, ecarts = ecarts,
        attendu = texte_moteur(if (!length(cles)) "aucune empreinte recalculée (aucune table reçue ni relue)"
-                              else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")),
+                              else paste0(citer_segment(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")),
        lu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
-                         else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
+                         else paste0(citer_segment(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
                                      collapse = " ; ")))
 }
 
@@ -1525,6 +1525,39 @@ paires_lues <- function(l) {
   paste(sprintf("%s=%s", neutraliser_citation(n), sans_controle(vapply(l, texte_lu, ""))), collapse = " ; ")
 }
 
+# Segment d'un chemin du bilan du rejeu (clé de tables_reference, nom lu dans
+# la fiche ; #298, option (b) ; ADR 0012, annotation du 16/11/2026, (c)) : les
+# chemins joignent leurs segments par « / » et les chemins par « , », et les
+# textes des lignes 8 et 15 joignent « <clé> : <valeur> » par « ; ». Un
+# segment qui contient l'un de / , ; : ( ) < « » ou qui commence ou finit par
+# une espace est réservé : il s'écrit entre « … » (guillemets, une espace de
+# chaque côté). Dans un segment réservé, « < », guillemet ouvrant et guillemet
+# fermant s'écrivent <U+003C>, <U+00AB> et <U+00BB>, remplacés sur les octets
+# dans cet ordre avant neutraliser_citation() : une notation <U+XXXX> tapée ne
+# se confond plus avec celle d'un caractère de contrôle neutralisé, la
+# citation est injective (hors la limite du repère « bytes », #128, #142). Un
+# segment non réservé est cité par neutraliser_citation(), comme avant ; NA et
+# une chaîne d'encodage « bytes » aussi, jamais entre « … ». Octets lus et
+# remplacés (useBytes) : gsub() sans useBytes lève une erreur R sur une chaîne
+# marquée UTF-8 sous la locale C (mesuré, #298). Les motifs non ASCII sont
+# construits par octets, sans littéral ni marque d'encodage.
+citer_segment <- function(x) {
+  if (!is.character(x)) x <- as.character(x)
+  reserves <- c("/", ",", ";", ":", "(", ")", "<", rawToChar(as.raw(c(0xC2, 0xAB))), rawToChar(as.raw(c(0xC2, 0xBB))))
+  remplacements <- list(c("<", "<U+003C>"), c(reserves[8L], "<U+00AB>"), c(reserves[9L], "<U+00BB>"))
+  une <- function(s) {
+    if (is.na(s) || Encoding(s) == "bytes") return(neutraliser_citation(s))
+    y <- if (Encoding(s) == "latin1") enc2utf8(s) else s
+    reserve <- any(vapply(reserves, function(r) grepl(r, y, fixed = TRUE, useBytes = TRUE), NA)) ||
+      grepl("^ | $", y, useBytes = TRUE)
+    if (!reserve) return(neutraliser_citation(s))
+    for (r in remplacements) y <- gsub(r[1L], r[2L], y, fixed = TRUE, useBytes = TRUE)
+    Encoding(y) <- if (validUTF8(y)) "UTF-8" else "unknown"
+    paste0(texte_moteur("« "), neutraliser_citation(y), texte_moteur(" »"))
+  }
+  vapply(x, une, "", USE.NAMES = FALSE)
+}
+
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
 # fiche reçue (`recu`) (descente D de la spécification de #86) : deux listes
 # nommées sans classe, aux noms complets et uniques, sont parcourues sur
@@ -1536,16 +1569,17 @@ paires_lues <- function(l) {
 # qu'aucun enfant ne diffère est cité « (ordre des champs ou attributs) » ;
 # `racine` nomme le nœud de départ. Rend character(0) si identical(). Les
 # comparaisons et les lectures par nom se font sur les noms bruts ; chaque
-# segment de nom écrit dans un chemin est cité par neutraliser_citation()
-# (règle unique des valeurs de la fiche écrites dans le bilan, #142) : un nom
-# à caractère de contrôle ou qui n'est pas de l'UTF-8 valide ne coupe pas la
-# cellule et ne la rend pas invalide. Les littéraux non ASCII sont marqués par
-# texte_moteur() avant tout collage à un nom cité (marqué UTF-8) : un littéral
-# non marqué collé par paste() s'écrirait « <c3><a7> » sous la locale C
-# (mesuré, #86 ; #127).
+# segment de nom écrit dans un chemin est cité par citer_segment() (règle
+# unique des valeurs de la fiche écrites dans le bilan, #142, complétée pour
+# les chemins, #298) : un nom à caractère de contrôle ou qui n'est pas de
+# l'UTF-8 valide ne coupe pas la cellule et ne la rend pas invalide, un nom
+# qui contient un séparateur du bilan est entre « … ». Les littéraux non ASCII
+# sont marqués par texte_moteur() avant tout collage à un nom cité (marqué
+# UTF-8) : un littéral non marqué collé par paste() s'écrirait « <c3><a7> »
+# sous la locale C (mesuré, #86 ; #127).
 champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   if (identical(rendu, recu)) return(character(0))
-  cite <- function(ch) paste(neutraliser_citation(ch), collapse = "/")
+  cite <- function(ch) paste(citer_segment(ch), collapse = "/")
   ici <- if (length(chemin)) cite(chemin) else racine
   descend <- function(v) is.list(v) && !is.object(v) && !length(noms_bytes(v)) &&
     noms_complets(names(v)) && !anyDuplicated(names(v))
@@ -1603,7 +1637,8 @@ perimetre_temoin_fiche <- function(f) {
 # `verdict_code` : verdict du témoin du code (ligne 9, verdict_chaines()),
 # dont se lit le régime, jamais identical() des empreintes (identical(NA, NA)
 # vaut TRUE là où le verdict est « non déterminable »). Toutes les clés de
-# statut embarquee sont citées, dans l'ordre de la fiche, jointes par « ; » :
+# statut embarquee sont citées par citer_segment() (#298), dans l'ordre de la
+# fiche, jointes par « ; » :
 # une clé en écart par un texte « <clé>/<champ> : <valeur> » par champ en
 # écart (ordre de CHAMPS_TABLE_FICHE), une clé intacte par « <clé> :
 # métadonnées du catalogue du package installé » (attendu) et « <clé> :
@@ -1626,7 +1661,7 @@ temoin_catalogue <- function(ecarts, verdict_code) {
   citer_valeur <- function(v)
     if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v)) formuler("« %s »", sans_controle(v))
     else sans_controle(texte_lu(v))
-  chemins <- paste0(sans_controle(ecarts$cle), "/", sans_controle(ecarts$champ))
+  chemins <- paste0(citer_segment(ecarts$cle), "/", sans_controle(ecarts$champ))
   attendus <- lus <- character(0)
   for (k in ecarts$cles) {
     j <- which(ecarts$cle == k)
@@ -1637,8 +1672,8 @@ temoin_catalogue <- function(ecarts, verdict_code) {
                                      texte_moteur(" (catalogue du package installé)")))
       lus <- c(lus, paste0(chemins[j], " : ", vapply(ecarts$lu[j], citer_valeur, "", USE.NAMES = FALSE)))
     } else {
-      attendus <- c(attendus, formuler("%s : métadonnées du catalogue du package installé", sans_controle(k)))
-      lus <- c(lus, formuler("%s : métadonnées de la fiche", sans_controle(k)))
+      attendus <- c(attendus, formuler("%s : métadonnées du catalogue du package installé", citer_segment(k)))
+      lus <- c(lus, formuler("%s : métadonnées de la fiche", citer_segment(k)))
     }
   }
   if (!length(ecarts$champ)) {
@@ -1902,7 +1937,9 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # cité par la règle unique neutraliser_citation() (#142) : valeurs par
   # sans_controle(texte_lu(v)), paires_lues(), liste_guillemets() ou
   # sans_controle(v) ; noms de champs des chemins des verdicts par
-  # champs_differents(). Une chaîne « bytes » y est écrite sous son repère
+  # champs_differents(), clés de tables_reference des lignes 8 et 15 et noms
+  # des chemins par citer_segment() (#298 : un segment à séparateur est entre
+  # « … »). Une chaîne « bytes » y est écrite sous son repère
   # (sinon sprintf() et write.csv() du bilan lèveraient une erreur R), un
   # caractère de contrôle <U+XXXX>, un octet invalide <xx> : une ligne par
   # cellule, UTF-8 valide. Les lignes 1 à 5, 7 et 8 ne reçoivent que des

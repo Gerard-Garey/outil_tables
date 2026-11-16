@@ -17,9 +17,10 @@
 #       alors pas contrôlées ;
 #    2. valeurs insérées : chaque argument de formuler() placé sous une
 #       conversion %s est une forme admise :
-#         - appel de citer(), neutraliser_citation() ou sans_controle()
-#           (valeur citée), de liste_guillemets() ou de formuler() (texte
-#           formé), ou d'une aide de message (AIDES) ;
+#         - appel de citer(), neutraliser_citation(), sans_controle() ou
+#           citer_segment() (valeur citée ; segment de chemin, #298), de
+#           liste_guillemets() ou de formuler() (texte formé), ou d'une aide
+#           de message (AIDES) ;
 #         - constante chaîne ASCII, ou constante numérique (une constante
 #           non ASCII passe par formuler() : sous la locale C, sprintf()
 #           traduirait ses octets non marqués) ;
@@ -72,8 +73,9 @@
 #  définir les fonctions.
 # -----------------------------------------------------------------------------
 
-# Fonctions qui citent une valeur reçue (règle de #94).
-CITATIONS <- c("citer", "neutraliser_citation", "sans_controle")
+# Fonctions qui citent une valeur reçue (règle de #94 ; citer_segment() :
+# segment de chemin du bilan du rejeu, #298).
+CITATIONS <- c("citer", "neutraliser_citation", "sans_controle", "citer_segment")
 # Fonctions qui rendent un texte formé selon la règle.
 FORMES <- c("liste_guillemets", "formuler")
 

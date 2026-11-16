@@ -132,6 +132,7 @@ bilans_non_ascii <- function(jeu, p, fr, d) {
     if (!validUTF8(obtenu) || grepl("[\n\v\f\r]", obtenu, useBytes = TRUE))
       d(sprintf("%s : cellule invalide ou sur plusieurs lignes : %s", nom, octets_bruts(obtenu)))
   }
+  q1 <- u(0xab); q2 <- u(0xbb)  # guillemets « et »
   nom_u8 <- E
   nom_brut <- rawToChar(as.raw(c(0xc3, 0xa9)))  # mêmes octets, codage non déclaré
   for (cas in list(list("marqué UTF-8", nom_u8), list("non marqué", nom_brut))) {
@@ -150,6 +151,66 @@ bilans_non_ascii <- function(jeu, p, fr, d) {
   verifie("verdict_chemins(), nom non ASCII dont la valeur diffère",
           tablexp:::verdict_chemins(stats::setNames(list(1, 2), c("a", E)), stats::setNames(list(1, 3), c("a", E)), "fiche"),
           paste0(differente, E))
+  # Segments de chemin à séparateur (#298 ; critères D1, D2, D5 et D6) : clé
+  # « tv/forme_origine, tables_reference/tv » d'une table embarquée dont la
+  # source est altérée (lignes 8, 12 et 15), noms libres de la fiche
+  # « blas, lapack » (ligne 11) et « graine/x » (ligne 12), verdict_chemins()
+  # sur des noms réservés ; octets des cellules comparés ensuite entre les deux
+  # installations. Données et plan propres au cas (quatre lignes).
+  d1 <- as.Date
+  bd <- data.frame(
+    contrat = c("C1", "C2", "C3", "C4"), tete = c("T1", "T2", "T3", "T3"), sexe = c("H", "F", "H", "H"),
+    naissance = d1(c("1950-03-15", "1960-07-01", "1945-06-06", "1945-06-06")),
+    entree = d1(c("2016-01-01", "2020-03-01", "2016-01-01", "2019-01-01")),
+    sortie = d1(c("2019-12-31", NA, "2022-03-01", "2022-03-01")),
+    cause = c("rachat", "en_cours", "deces", "deces"), stringsAsFactors = FALSE)
+  rd <- c(id_contrat = "contrat", id_tete = "tete", sexe = "sexe", date_naissance = "naissance",
+          date_entree = "entree", date_sortie = "sortie", cause_sortie = "cause")
+  Kc <- "tv/forme_origine, tables_reference/tv"
+  pk <- list(transition = list(depart = "vivant", arrivee = "deces"),
+             periode = list(debut = d1("2015-01-01"), fin = d1("2024-12-31")), delai_declaration = 0,
+             segmentation = character(0),
+             etapes = list(donnees = list(exclusions = character(0)),
+                           exposition = list(convention = "plus_fine", par_annee = FALSE),
+                           brut = list(estimateurs = "poisson", niveau = 0.95),
+                           positionnement = list(methode = "smr", table_reference = Kc, plage_ages = c(60, 80),
+                                                 niveau = 0.95)))
+  xk <- rendu(construire_table(bd, rd, pk, tables_reference = stats::setNames(list(table_embarquee("TV 88-90")), Kc)))
+  if (inherits(xk, "error")) d(sprintf("clé à séparateur : construction refusée (%s)", conditionMessage(xk)))
+  else {
+    fk <- lire_fiche(ecrire_fiche(xk$fiche))
+    fk$tables_reference[[Kc]]$source <- "ma source"
+    rk <- rendu(rejouer_fiche(bd, fk))
+    if (!inherits(rk, "rejeu")) d(sprintf("clé à séparateur : rejeu non rendu (%s)", conditionMessage(rk)))
+    else {
+      ck <- paste0(q1, " ", Kc, " ", q2)
+      emp <- fk$tables_reference[[Kc]]$empreinte
+      verifie("D1 ligne 12, clé à séparateur", rk$bilan$verdict[12L], paste0(differente, "tables_reference/", ck, "/source"))
+      verifie("D1 ligne 15, verdict", rk$bilan$verdict[15L], paste0(differente, "tables_reference/", ck, "/source"))
+      verifie("D1 ligne 15, lu", rk$bilan$lu[15L], paste0(ck, "/source : ", q1, " ma source ", q2))
+      verifie("D1 ligne 15, attendu", rk$bilan$attendu[15L],
+              paste0(ck, "/source : ", q1, " inst/extdata/tables/tv_88-90.provenance.dcf ", q2, " (catalogue du package install", E, ")"))
+      verifie("D2 ligne 8, lu", rk$bilan$lu[8L], paste0(ck, " : ", emp))
+      verifie("D2 ligne 8, attendu", rk$bilan$attendu[8L], paste0(ck, " : ", emp, " (relue dans le package)"))
+    }
+  }
+  for (cas in list(list("plateforme", 11L, "blas, lapack"), list("fiche", 12L, "graine/x"))) {
+    fb <- fr
+    if (identical(cas[[1L]], "plateforme")) { z <- fb$plateforme; z[[cas[[3L]]]] <- "y"; fb$plateforme <- z }
+    else fb[[cas[[3L]]]] <- "y"
+    r <- rendu(rejouer_fiche(jeu$donnees, fb, tables_reference = tables_du_plan(p)))
+    nom <- sprintf("D5 ligne %d, nom libre %s", cas[[2L]], cas[[3L]])
+    if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+    verifie(nom, r$bilan$verdict[cas[[2L]]], paste0(differente, q1, " ", cas[[3L]], " ", q2, " (absent de la fiche rendue)"))
+  }
+  for (cas in list(list("notation tapée", "a<U+000B>b", paste0(q1, " a<U+003C>U+000B>b ", q2)),
+                   list("caractère de contrôle", "a\vb", "a<U+000B>b"),
+                   list("guillemets", paste0(q1, "a", q2), paste0(q1, " <U+00AB>a<U+00BB> ", q2)),
+                   list("espace de tête", " tv", paste0(q1, "  tv ", q2)),
+                   list("séparateurs de cellule", "x : y ; z", paste0(q1, " x : y ; z ", q2))))
+    verifie(sprintf("D6 verdict_chemins(), nom %s", cas[[1L]]),
+            tablexp:::verdict_chemins(stats::setNames(list(1), cas[[2L]]), stats::setNames(list(2), cas[[2L]]), "fiche"),
+            paste0(differente, cas[[3L]]))
   # Classes des données (ligne 1) : le texte attendu est celui de la fiche
   # intacte, où « classe data.frame » devient la classe citée.
   intact <- rejouer_fiche(jeu$donnees, fr, tables_reference = tables_du_plan(p))$bilan$lu[1L]
@@ -164,7 +225,6 @@ bilans_non_ascii <- function(jeu, p, fr, d) {
   }
   # Nom de fichier de la provenance non ASCII (ligne 6 : « étapes », « rôles »),
   # un puis deux fichiers (#181), fiche en objet puis relue de son texte (#296).
-  q1 <- u(0xab); q2 <- u(0xbb)
   for (k in 1:2) for (mode in c("objet", "texte")) {
     if (mode == "objet") {
       pr <- list(fichier = c(paste0("a", E, ".csv"), "b.csv")[seq_len(k)],

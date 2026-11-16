@@ -1111,3 +1111,129 @@ verifier("T12 ecarts_catalogue() : élément du catalogue -> aucun écart ; vale
     identical(tablexp:::ecarts_catalogue(e2, t),
               list(champ = c("source", "parametres"), lu = list("s", list(a = 1)), attendu = list(SOURCE_TV, NULL)))
 })
+
+# --- T13 : citation d'un segment de chemin du bilan (#298, option (b) ; M515 ;
+#     ADR 0012, annotation du 16/11/2026, (c)). Critères D1 à D9 de la
+#     spécification d'actuary-approfondi. Valeur calculée à la main (textes) ;
+#     identité exacte (construction rejouée identical() hors execution). Un
+#     segment qui contient / , ; : ( ) < « » ou qui commence ou finit par une
+#     espace s'écrit entre « … », <, « et » devenant <U+003C>, <U+00AB> et
+#     <U+00BB> ; les autres segments sont cités comme avant.
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  u <- function(...) intToUtf8(c(...))
+  GA <- u(0xab); GF <- u(0xbb)  # guillemets ouvrant et fermant
+  K <- "tv/forme_origine, tables_reference/tv"
+  PLAN_K <- PLAN_TV
+  PLAN_K$etapes$positionnement$table_reference <- K
+  X_K <- construire_table(BASE, ROLES, PLAN_K, tables_reference = setNames(list(table_embarquee("TV 88-90")), K))
+  FICHE_K <- lire_fiche(ecrire_fiche(X_K$fiche))
+  EMP_K <- FICHE_K$tables_reference[[K]]$empreinte
+  fiche_k <- function(champ, v, f = FICHE_K) { f$tables_reference[[K]][champ] <- list(v); f }
+  entre <- function(s) paste0(GA, " ", s, " ", GF)
+  CLE_CITEE <- entre(K)
+  octets_egaux <- function(a, b) identical(charToRaw(a), charToRaw(b)) && identical(Encoding(a), "UTF-8")
+
+  verifier("T13 D1 clé « tv/forme_origine, tables_reference/tv » (table embarquée), source altérée : lignes 12 et 15 citent la clé entre « … », un seul champ en écart ; statut « identique » (régime) ; construction identical() hors execution", {
+    r <- attrape(rejouer_fiche(BASE, fiche_k("source", "ma source")))
+    if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+    else {
+      b <- r$bilan
+      v <- paste0("différente : tables_reference/", CLE_CITEE, "/source")
+      octets_egaux(b$verdict[12L], v) && octets_egaux(b$verdict[15L], v) &&
+        octets_egaux(b$lu[15L], paste0(CLE_CITEE, "/source : ", GA, " ma source ", GF)) &&
+        octets_egaux(b$attendu[15L], paste0(CLE_CITEE, "/source : ", GA, " ", SOURCE_TV, " ", GF,
+                                            " (catalogue du package installé)")) &&
+        identical(b$statut[15L], STATUT_REGIME[["identique"]]) && identical(nrow(b), 15L) &&
+        identical(sans_execution(r$construction), sans_execution(X_K))
+    }
+  })
+  verifier("T13 D2 même fiche, ligne 8 : la clé est citée entre « … » dans lu et attendu, empreinte lue sur la fiche", {
+    b <- rejouer_fiche(BASE, fiche_k("source", "ma source"))$bilan
+    octets_egaux(b$lu[8L], paste0(CLE_CITEE, " : ", EMP_K)) &&
+      octets_egaux(b$attendu[8L], paste0(CLE_CITEE, " : ", EMP_K, " (relue dans le package)")) &&
+      identical(b$verdict[8L], "conforme")
+  })
+  verifier("T13 D2 fiche intacte de clé K : ligne 15 « identique », textes de la clé citée entre « … » (clé intacte)", {
+    b <- rejouer_fiche(BASE, FICHE_K)$bilan
+    identical(b$verdict, VERDICTS_SUCCES) &&
+      octets_egaux(b$attendu[15L], paste0(CLE_CITEE, " : métadonnées du catalogue du package installé")) &&
+      octets_egaux(b$lu[15L], paste0(CLE_CITEE, " : métadonnées de la fiche"))
+  })
+  verifier("T13 D3 clé ordinaire « tv », source et forme_origine altérées : textes inchangés (clé nue), verdicts des lignes 12 et 15 à deux chemins ; lignes 8 et 15 comme avant #298", {
+    f <- fiche_tv("forme_origine", "qx", fiche_tv("source", "ma source"))
+    b <- rejouer_fiche(BASE, f)$bilan
+    emp <- f$tables_reference$tv$empreinte
+    v <- "différente : tables_reference/tv/source, tables_reference/tv/forme_origine"
+    identical(b$verdict[12L], v) && identical(b$verdict[15L], v) &&
+      identical(b$lu[8L], paste0("tv : ", emp)) && identical(b$attendu[8L], paste0("tv : ", emp, " (relue dans le package)")) &&
+      identical(b$lu[15L], "tv/source : « ma source » ; tv/forme_origine : « qx »") &&
+      identical(b$attendu[15L],
+                sprintf("tv/source : « %s » (catalogue du package installé) ; tv/forme_origine : « lx » (catalogue du package installé)",
+                        SOURCE_TV))
+  })
+  verifier("T13 D4 table importée sous la clé K, source altérée, table reçue sous K : ligne 12 cite la clé entre « … » ; ligne 8 se termine par « (reçue) » ; ligne 15 « identique »", {
+    ti <- table_reference(data.frame(age = 0:110, sexe = "ensemble", qx = c(rep(0.01, 110L), 1)), "imp", "importee", "test")
+    tk <- setNames(list(ti), K)
+    x <- construire_table(BASE, ROLES, PLAN_K, tables_reference = tk)
+    f <- lire_fiche(ecrire_fiche(x$fiche)); f$tables_reference[[K]]$source <- "autre"
+    r <- attrape(rejouer_fiche(BASE, f, tk))
+    if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+    else octets_egaux(r$bilan$verdict[12L], paste0("différente : tables_reference/", CLE_CITEE, "/source")) &&
+      endsWith(r$bilan$attendu[8L], " (reçue)") && startsWith(r$bilan$attendu[8L], paste0(CLE_CITEE, " : ")) &&
+      identical(r$bilan$verdict[15L], "identique")
+  })
+  verifier("T13 D5 noms libres de la fiche : plateforme « blas, lapack » (ligne 11) et champ de premier niveau « graine/x » (ligne 12) cités entre « … »", {
+    fb <- FICHE; z <- fb$plateforme; z[["blas, lapack"]] <- "y"; fb$plateforme <- z
+    fg <- FICHE; fg[["graine/x"]] <- "1"
+    rb <- attrape(rejouer_fiche(BASE, fb)); rg <- attrape(rejouer_fiche(BASE, fg))
+    if (!inherits(rb, "rejeu") || !inherits(rg, "rejeu")) "rejeu non rendu"
+    else octets_egaux(rb$bilan$verdict[11L], paste0("différente : ", entre("blas, lapack"), " (absent de la fiche rendue)")) &&
+      octets_egaux(rg$bilan$verdict[12L], paste0("différente : ", entre("graine/x"), " (absent de la fiche rendue)"))
+  })
+  verifier("T13 D6 verdict_chemins() appelée directement : notation <U+000B> tapée citée entre « … » et <U+003C>, caractère de contrôle neutralisé nu, « et » en <U+00AB> et <U+00BB>, espace de tête, « x : y ; z » ; nom bytes sous le repère seul", {
+    vc <- function(nom) tablexp:::verdict_chemins(setNames(list(1), nom), setNames(list(2), nom), "fiche")
+    d <- "différente : "
+    octets_egaux(vc("a<U+000B>b"), paste0(d, entre("a<U+003C>U+000B>b"))) &&
+      octets_egaux(vc("a\vb"), "différente : a<U+000B>b") &&
+      octets_egaux(vc(paste0(GA, "a", GF)), paste0(d, entre("<U+00AB>a<U+00BB>"))) &&
+      octets_egaux(vc(" tv"), paste0(d, entre(" tv"))) && octets_egaux(vc("tv "), paste0(d, entre("tv "))) &&
+      octets_egaux(vc("x : y ; z"), paste0(d, entre("x : y ; z"))) &&
+      octets_egaux(vc("clé"), "différente : clé") && identical(vc("tv"), "différente : tv") &&
+      identical(vc("a b"), "différente : a b")
+  })
+  verifier("T13 D6 chaque caractère réservé / , ; : ( ) < « » (et espace de tête ou de queue) fait citer le segment ; un segment sans séparateur n'est pas cité", {
+    reserves <- c("/", ",", ";", ":", "(", ")", "<", GA, GF)
+    cites <- vapply(reserves, function(s) startsWith(tablexp:::citer_segment(paste0("a", s, "b")), paste0(GA, " ")), NA)
+    nus <- vapply(c("tv", "a b", "a-b", "a_b", "a.b", "clé", "[1]", "@a", "#a", "a=b"),
+                  function(s) identical(tablexp:::citer_segment(s), s), NA)
+    all(cites) && all(nus)
+  })
+  verifier("T13 D6 injectivité : « et » d'un segment cité ne se confondent pas avec les guillemets de la citation ; octets invalides et chaîne latin-1 réservés cités ; NA et nom bytes jamais entre « … »", {
+    cs <- tablexp:::citer_segment
+    inv <- "a/\xe9"; lat <- "a/\xe9"; Encoding(lat) <- "latin1"
+    by <- "a/\xe9"; Encoding(by) <- "bytes"
+    octets_egaux(cs(paste0(GA, " x ", GF)), paste0(GA, " <U+00AB> x <U+00BB> ", GF)) &&
+      identical(cs(inv), paste0(GA, " a/<e9> ", GF)) && octets_egaux(cs(lat), paste0(GA, " a/", u(0xe9), " ", GF)) &&
+      identical(cs(NA_character_), NA_character_) && identical(cs(by), tablexp:::neutraliser_citation(by)) &&
+      !grepl(GA, cs(by), fixed = TRUE) && identical(cs(character(0)), character(0)) &&
+      identical(cs(c("tv", "a/b")), c("tv", paste0(GA, " a/b ", GF)))
+  })
+  verifier("T13 D8 aucun refus nouveau, résultats inchangés : MENTIONS_RAPPORT et TEXTE_REJEU_FICHE inchangés ; fiche de clé K construite et rejouée sans refus ; bilan à 15 lignes", {
+    o <- function(x) tablexp:::md5_octets(charToRaw(enc2utf8(paste(x, collapse = "\n"))))
+    m <- tablexp:::MENTIONS_RAPPORT
+    r <- attrape(rejouer_fiche(BASE, fiche_k("forme_origine", "qx", fiche_k("source", "ma source"))))
+    identical(c(o(c(names(m), unname(m))), o(tablexp:::TEXTE_REJEU_FICHE)),
+              c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f")) &&
+      inherits(r, "rejeu") && identical(nrow(r$bilan), 15L) &&
+      identical(r$bilan$verdict[12L],
+                paste0("différente : tables_reference/", CLE_CITEE, "/source, tables_reference/", CLE_CITEE, "/forme_origine")) &&
+      identical(r$bilan$verdict[15L], r$bilan$verdict[12L])
+  })
+  verifier("T13 D9 fiche de version 6 à clé « / », intacte (texte écrit par ecrire_fiche(), que #298 ne touche pas) : se rejoue sans refus ; seuls les textes des lignes 8 et 15 portent la clé citée ; les autres cellules lu et attendu sont celles d'une clé ordinaire (hors ligne 13, empreinte du résultat : le plan cite une autre clé)", {
+    r <- attrape(rejouer_fiche(BASE, FICHE_K))
+    inherits(r, "rejeu") && identical(r$bilan$verdict, VERDICTS_SUCCES) && identical(r$bilan$statut[1:14], STATUTS[1:14]) &&
+      identical(r$bilan$lu[-c(8L, 13L, 15L)], R_TV$bilan$lu[-c(8L, 13L, 15L)]) &&
+      identical(r$bilan$attendu[-c(8L, 13L, 15L)], R_TV$bilan$attendu[-c(8L, 13L, 15L)])
+  })
+})

@@ -1,1 +1,2 @@
 type,nom,issue,motif
+entree,fonctions-construire-table:citer_segment,#298,fonction de citation d'un segment de chemin du bilan du rejeu ; entrée de catalogue ajoutée au commit docs: de la branche (règle 9)
