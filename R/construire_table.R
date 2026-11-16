@@ -814,6 +814,31 @@ controler_forme_tables <- function(tables) {
                  octets$motif, texte_moteur("écriture du texte de fiche sans refus"), chemin = ch)
     }
     relu <- tryCatch(lire_texte(octets, PREMIERE_LIGNE_FICHE, "fiche"), refus_tablexp = function(e) e)
+    # Refus de la relecture : motif et chemin gardés comme à l'écriture (#165).
+    # Chemin : celui que porte le refus (details$chemin), sinon le chemin attendu
+    # en fin de texte (details$attendu), sinon le premier champ de la ligne
+    # refusée (details$ligne ; la ligne 1 est la première ligne du texte, sans
+    # chemin).
+    if (inherits(relu, "refus_tablexp")) {
+      ch <- relu$details$chemin
+      if (is.null(ch)) ch <- relu$details$attendu
+      ligne <- relu$details$ligne
+      if (is.null(ch) && length(ligne) == 1L && !is.na(ligne) && ligne >= 2L) {
+        # Un octet nul (rawToChar() lève une erreur R) laisse le chemin à NA ;
+        # de même un premier champ vide ou qui n'est pas de l'UTF-8 valide.
+        lignes <- tryCatch(strsplit(rawToChar(octets), "\n", fixed = TRUE, useBytes = TRUE)[[1L]],
+                           error = function(e) character(0))
+        if (ligne <= length(lignes)) {
+          ch <- strsplit(lignes[ligne], "\t", fixed = TRUE, useBytes = TRUE)[[1L]][1L]
+          Encoding(ch) <- "UTF-8"
+          if (is.na(ch) || !nzchar(ch) || !validUTF8(ch)) ch <- NA_character_
+        }
+      }
+      if (!is.character(ch) || length(ch) != 1L) ch <- NA_character_
+      mal_formee(formuler("métadonnée sans écriture exacte dans la fiche (%s)",
+                          formuler("refus %s, %s", citer(relu$motif), citer(ch))),
+                 relu$motif, texte_moteur("relecture du texte de fiche sans refus"), chemin = ch)
+    }
     if (!identical(relu, ecrit))
       mal_formee(formuler("métadonnée sans écriture exacte dans la fiche (%s)", formuler("relecture différente")),
                  texte_moteur("élément relu différent"), texte_moteur("élément relu identical() à l'élément écrit"))
