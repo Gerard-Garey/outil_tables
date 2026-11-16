@@ -842,6 +842,25 @@ cles_citees <- function(plan, parametres_cle) {
   data.frame(cle = cle, parametre = parametre, stringsAsFactors = FALSE)
 }
 
+# Écarts d'un élément de fiche$tables_reference (`element`, sept champs
+# CHAMPS_TABLE_FICHE) à la table de même nom du catalogue (`table`, rendue par
+# table_du_catalogue()), comparés par identical() à l'élément formé par
+# element_table_fiche() (ADR 0015, seconde annotation du 15/11/2026, (b) ;
+# DF3 de #267). Assistant commun du contrôle de construction
+# (table_embarquee_discordante, controler_tables_reference()) et du témoin
+# « catalogue » du rejeu (controler_tables_rejeu(), temoin_catalogue()).
+# Rend list(champ, lu, attendu) : champs en écart dans l'ordre de
+# CHAMPS_TABLE_FICHE (character(0) sans écart), valeurs brutes de l'élément
+# (lu) et du catalogue (attendu), une par champ, sans citation : chaque
+# appelant cite par sa propre règle.
+ecarts_catalogue <- function(element, table) {
+  catalogue <- element_table_fiche(table)
+  champ <- CHAMPS_TABLE_FICHE[!vapply(CHAMPS_TABLE_FICHE,
+                                      function(ch) identical(element[[ch]], catalogue[[ch]]), NA)]
+  list(champ = champ, lu = lapply(champ, function(ch) element[[ch]]),
+       attendu = lapply(champ, function(ch) catalogue[[ch]]))
+}
+
 # Contrôle 1.3 (ADR 0015, point 1.3 ; spécification de #73, § 3), à l'entrée
 # de construire_table(), après controler_provenance() et avant toute étape ;
 # refus de module construire_table, dans cet ordre : forme
@@ -911,14 +930,12 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
   # de l'originale. Aucun remplacement par la table du catalogue : refus.
   for (k in embarquees_recues) {
     nom <- champ[[k]]$nom
-    recu <- champ[[k]]
-    catalogue_k <- element_table_fiche(table_du_catalogue(nom, embarquees))
-    discordants <- CHAMPS_TABLE_FICHE[!vapply(CHAMPS_TABLE_FICHE,
-                                               function(ch) identical(recu[[ch]], catalogue_k[[ch]]), NA)]
+    ec <- ecarts_catalogue(champ[[k]], table_du_catalogue(nom, embarquees))
+    discordants <- ec$champ
     if (length(discordants)) {
       texte_valeur <- function(v) if (is.character(v) && length(v) == 1L) v else paste(deparse(v), collapse = " ")
-      lus <- vapply(discordants, function(ch) texte_valeur(recu[[ch]]), "", USE.NAMES = FALSE)
-      attendus <- vapply(discordants, function(ch) texte_valeur(catalogue_k[[ch]]), "", USE.NAMES = FALSE)
+      lus <- vapply(ec$lu, texte_valeur, "", USE.NAMES = FALSE)
+      attendus <- vapply(ec$attendu, texte_valeur, "", USE.NAMES = FALSE)
       ecarts <- vapply(seq_along(discordants), function(i)
                          formuler("« %s » : « %s » reçu, « %s » au catalogue", citer(discordants[i]), citer(lus[i]),
                                   citer(attendus[i])), "")
@@ -951,11 +968,18 @@ controler_tables_reference <- function(tables_reference, plan, parametres_cle = 
 # égale à celle de la fiche (empreinte_table_discordante). Le contrôle 1.3
 # sur la liste assemblée et le plan de la fiche n'est pas fait ici : il l'est
 # une fois, par construire_table(), que rejouer_fiche() appelle ensuite avec
-# cette liste (#82 ; #164, point 2). `fiche_tables` : champ
-# fiche$tables_reference, de forme contrôlée (contrôle 2) ; `code_fiche` :
-# empreinte du code lue dans la fiche, citée. Rend la liste assemblée (NULL
-# sans table), les empreintes recalculées et les textes de la ligne
-# « tables_reference » du bilan.
+# cette liste (#82 ; #164, point 2). Après (c), pour une table de statut
+# embarquee : (d) écarts de ses métadonnées au catalogue du package installé
+# (ecarts_catalogue() ; témoin « catalogue », aucun refus ; #267).
+# `fiche_tables` : champ fiche$tables_reference, de forme contrôlée
+# (contrôle 2) ; `code_fiche` : empreinte du code lue dans la fiche, citée.
+# Rend la liste assemblée (NULL sans table), les empreintes recalculées, les
+# écarts (`ecarts` : list(cles, cle, champ, lu, attendu) ; cles : clés de
+# statut embarquee, dans l'ordre de la fiche ; cle, champ, lu, attendu : une
+# entrée par champ en écart, dans l'ordre des clés puis de CHAMPS_TABLE_FICHE ;
+# lu et attendu : valeurs brutes) et les textes de la ligne « tables_reference » du
+# bilan : `lu`, les empreintes de la fiche ; `attendu`, les empreintes
+# recalculées avec leur origine (#160).
 controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, embarquees = TABLES_EMBARQUEES) {
   f <- controler_forme_tables(tables_reference)
   recues <- if (is.null(f)) character(0) else names(f$tables)
@@ -974,6 +998,7 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, e
   if (is.null(catalogue)) catalogue <- character(0)
   assemblee <- list()
   empreintes <- origines <- character(0)
+  ecarts <- list(cles = character(0), cle = character(0), champ = character(0), lu = list(), attendu = list())
   for (k in cles) {
     e <- fiche_tables[[k]]
     # (a) Représentation de l'empreinte de table.
@@ -1032,18 +1057,32 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, e
                        texte_moteur(REPRESENTATION_TABLE), complement),
               list(cle = k, nom = e$nom, statut = e$statut, lu = e$empreinte, attendu = calculee, origine = origine))
     }
+    # (d) Table embarquée : métadonnées de la fiche comparées à celles du
+    #     catalogue du package installé, après l'empreinte (témoin, jamais
+    #     refus ; ADR 0015, seconde annotation du 15/11/2026, (b) ; #267).
+    if (identical(e$statut, "embarquee")) {
+      ec <- ecarts_catalogue(e, t)
+      ecarts$cles <- c(ecarts$cles, k)
+      ecarts$cle <- c(ecarts$cle, rep(k, length(ec$champ)))
+      ecarts$champ <- c(ecarts$champ, ec$champ)
+      ecarts$lu <- c(ecarts$lu, ec$lu)
+      ecarts$attendu <- c(ecarts$attendu, ec$attendu)
+    }
     assemblee[k] <- list(t)
     empreintes <- c(empreintes, calculee)
     origines <- c(origines, origine)
   }
   names(empreintes) <- cles
   tables <- if (length(assemblee)) assemblee
-  list(tables = tables, empreintes = empreintes,
-       attendu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
-                              else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
-                                          collapse = " ; ")),
-       lu = texte_moteur(if (!length(cles)) "aucune table reçue ni relue"
-                         else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")))
+  # Règle du bilan (#160, ADR 0015, point 4.3, annotation du 15/11/2026) :
+  # `lu` = valeur telle que le rejeu la reçoit (la fiche), `attendu` = valeur
+  # que le code installé oppose (recalculée, avec son origine).
+  list(tables = tables, empreintes = empreintes, ecarts = ecarts,
+       attendu = texte_moteur(if (!length(cles)) "aucune empreinte recalculée (aucune table reçue ni relue)"
+                              else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")),
+       lu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
+                         else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
+                                     collapse = " ; ")))
 }
 
 # Table de clé `cle` dans la liste `tables` (contrôlée par
@@ -1391,8 +1430,9 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
 
 # Valeur lue dans la fiche, pour un message ou le bilan du rejeu : NULL ->
 # « absente » ; chaîne de longueur 1 sans attribut -> la chaîne (NA -> « NA ») ;
-# autre -> « illisible (<type> de longueur <n>) ». La valeur est rendue telle
-# quelle (sans_controle() pour un message).
+# autre -> « illisible (<type> de longueur <n>) ». La valeur est rendue brute :
+# l'appelant la cite par sans_controle() pour un message ou une cellule du
+# bilan (#142), et la laisse brute dans les `details`.
 texte_lu <- function(v) {
   if (is.null(v)) return("absente")
   if (is.character(v) && is.null(attributes(v)) && length(v) == 1L) return(if (is.na(v)) "NA" else v)
@@ -1444,14 +1484,17 @@ decrire_forme <- function(conteneur, nom) {
 
 # Paires « nom=valeur » d'une liste nommée de la fiche (versions,
 # plateforme), jointes par « ; » ; texte_lu() d'une autre valeur, dont une
-# liste de classe « bytes » (names() lèverait une erreur R, #128). Les noms
-# sont cités par neutraliser_citation() : un nom « bytes » l'est sous un
-# repère, au lieu de l'erreur R de sprintf() ; ces champs sont des témoins,
-# jamais motifs de refus (ADR 0012, point 3.6).
+# liste de classe « bytes » (names() lèverait une erreur R, #128). Noms et
+# valeurs sont cités par neutraliser_citation() (règle unique des valeurs de
+# la fiche qui entrent dans le bilan du rejeu, #142) : un nom ou une valeur
+# « bytes » l'est sous un repère, au lieu de l'erreur R de sprintf() ou de
+# write.csv() ; ces champs sont des témoins, jamais motifs de refus (ADR 0012,
+# point 3.6). texte_lu() garde sa valeur brute : il alimente aussi les
+# `details` des refus.
 paires_lues <- function(l) {
   n <- attr(l, "names", exact = TRUE)
-  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(texte_lu(l))
-  paste(sprintf("%s=%s", neutraliser_citation(n), vapply(l, texte_lu, "")), collapse = " ; ")
+  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(sans_controle(texte_lu(l)))
+  paste(sprintf("%s=%s", neutraliser_citation(n), sans_controle(vapply(l, texte_lu, ""))), collapse = " ; ")
 }
 
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
@@ -1463,18 +1506,27 @@ paires_lues <- function(l) {
 # R (mesuré) ; la liste est citée « différente » à son chemin. (Une classe
 # « bytes » est déjà une feuille par is.object().) Un nœud qui diffère sans
 # qu'aucun enfant ne diffère est cité « (ordre des champs ou attributs) » ;
-# `racine` nomme le nœud de départ. Rend character(0) si identical().
+# `racine` nomme le nœud de départ. Rend character(0) si identical(). Les
+# comparaisons et les lectures par nom se font sur les noms bruts ; chaque
+# segment de nom écrit dans un chemin est cité par neutraliser_citation()
+# (règle unique des valeurs de la fiche écrites dans le bilan, #142) : un nom
+# à caractère de contrôle ou qui n'est pas de l'UTF-8 valide ne coupe pas la
+# cellule et ne la rend pas invalide. Les littéraux non ASCII sont marqués par
+# texte_moteur() avant tout collage à un nom cité (marqué UTF-8) : un littéral
+# non marqué collé par paste() s'écrirait « <c3><a7> » sous la locale C
+# (mesuré, #86 ; #127).
 champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   if (identical(rendu, recu)) return(character(0))
-  ici <- if (length(chemin)) paste(chemin, collapse = "/") else racine
+  cite <- function(ch) paste(neutraliser_citation(ch), collapse = "/")
+  ici <- if (length(chemin)) cite(chemin) else racine
   descend <- function(v) is.list(v) && !is.object(v) && !length(noms_bytes(v)) &&
     noms_complets(names(v)) && !anyDuplicated(names(v))
   if (!descend(rendu) || !descend(recu)) return(ici)
   d <- character(0)
   for (n in union(names(rendu), names(recu))) {
-    p <- paste(c(chemin, n), collapse = "/")
-    d <- c(d, if (!(n %in% names(recu))) paste(p, "(absent de la fiche reçue)")
-              else if (!(n %in% names(rendu))) paste(p, "(absent de la fiche rendue)")
+    p <- cite(c(chemin, n))
+    d <- c(d, if (!(n %in% names(recu))) paste(p, texte_moteur("(absent de la fiche reçue)"))
+              else if (!(n %in% names(rendu))) paste(p, texte_moteur("(absent de la fiche rendue)"))
               else champs_differents(rendu[[n]], recu[[n]], racine, c(chemin, n)))
   }
   if (!length(d)) d <- paste(ici, "(ordre des champs ou attributs)")
@@ -1485,7 +1537,7 @@ champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
 # suivi des chemins de champs_differents().
 verdict_chemins <- function(rendu, recu, racine) {
   d <- champs_differents(rendu, recu, racine)
-  texte_moteur(if (!length(d)) "identique" else paste("différente :", paste(d, collapse = ", ")))
+  if (!length(d)) texte_moteur("identique") else paste0(texte_moteur("différente : "), paste(d, collapse = ", "))
 }
 
 # Verdict d'un témoin par chaînes (V1) : « non déterminable » si l'un des deux
@@ -1514,6 +1566,70 @@ perimetre_temoin_fiche <- function(f) {
   f
 }
 
+# Témoin « catalogue » du rejeu (ligne 15 du bilan, temoin_catalogue ; ADR
+# 0015, seconde annotation du 15/11/2026, (b) ; ADR 0012, annotation du
+# 15/11/2026, (b) ; DF1, DF2, DF4, DF5 de #267) : métadonnées des tables de
+# statut embarquee de la fiche (`lu`) comparées au catalogue du package
+# installé (`attendu`). `ecarts` : écarts rendus par controler_tables_rejeu(),
+# clés de statut embarquee comprises (ecarts$cles, ordre de la fiche) ;
+# `verdict_code` : verdict du témoin du code (ligne 9, verdict_chaines()),
+# dont se lit le régime, jamais identical() des empreintes (identical(NA, NA)
+# vaut TRUE là où le verdict est « non déterminable »). Toutes les clés de
+# statut embarquee sont citées, dans l'ordre de la fiche, jointes par « ; » :
+# une clé en écart par un texte « <clé>/<champ> : <valeur> » par champ en
+# écart (ordre de CHAMPS_TABLE_FICHE), une clé intacte par « <clé> :
+# métadonnées du catalogue du package installé » (attendu) et « <clé> :
+# métadonnées de la fiche » (lu). Verdict « identique » sans écart, sinon
+# « différente : tables_reference/<clé>/<champ> » des seuls champs en écart
+# (chemins joints par « , », comme verdict_chemins()) ; statut « comparaison
+# exacte » sans écart, sinon le régime. Valeurs citées par la règle de #142 :
+# chaîne unique sans attribut, non NA, entre « » par neutraliser_citation() ;
+# toute autre valeur par sans_controle(texte_lu()) (« absente », « NA »,
+# « illisible (<type> de longueur <n>) »), jamais par deparse(). Rend
+# c(attendu, lu, verdict, statut).
+temoin_catalogue <- function(ecarts, verdict_code) {
+  # Gabarits marqués avant tout collage (formuler(), texte_moteur()) : un
+  # littéral non ASCII non marqué collé à une valeur citée marquée UTF-8
+  # s'écrirait « <c2><ab> » sous la locale C (mesuré ; #86).
+  if (!length(ecarts$cles))
+    return(texte_moteur(c(attendu = "aucune métadonnée du catalogue opposée (aucune table de statut « embarquee »)",
+                          lu = "aucune table de statut « embarquee » dans fiche/tables_reference",
+                          verdict = "identique", statut = "comparaison exacte")))
+  citer_valeur <- function(v)
+    if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v)) formuler("« %s »", sans_controle(v))
+    else sans_controle(texte_lu(v))
+  chemins <- paste0(sans_controle(ecarts$cle), "/", sans_controle(ecarts$champ))
+  attendus <- lus <- character(0)
+  for (k in ecarts$cles) {
+    j <- which(ecarts$cle == k)
+    if (length(j)) {
+      # paste0() de morceaux déjà marqués (valeurs citées, constante par
+      # texte_moteur()) : même codage que formuler(), sous toute locale.
+      attendus <- c(attendus, paste0(chemins[j], " : ", vapply(ecarts$attendu[j], citer_valeur, "", USE.NAMES = FALSE),
+                                     texte_moteur(" (catalogue du package installé)")))
+      lus <- c(lus, paste0(chemins[j], " : ", vapply(ecarts$lu[j], citer_valeur, "", USE.NAMES = FALSE)))
+    } else {
+      attendus <- c(attendus, formuler("%s : métadonnées du catalogue du package installé", sans_controle(k)))
+      lus <- c(lus, formuler("%s : métadonnées de la fiche", sans_controle(k)))
+    }
+  }
+  if (!length(ecarts$champ)) {
+    verdict <- texte_moteur("identique")
+    statut <- texte_moteur("comparaison exacte")
+  } else {
+    verdict <- formuler("différente : %s", paste0("tables_reference/", chemins, collapse = ", "))
+    statut <- if (identical(verdict_code, texte_moteur("identique")))
+      texte_moteur(paste("comparaison exacte ; empreinte du code identique (temoin_code) : écart non imputable à une",
+                         "évolution du catalogue"))
+    else if (identical(verdict_code, texte_moteur("différente")))
+      texte_moteur(paste("comparaison exacte ; empreinte du code différente (temoin_code) : écart imputable à la",
+                         "fiche ou à une évolution du catalogue, non départagées"))
+    else texte_moteur(paste("comparaison exacte ; empreinte du code non déterminable (temoin_code) : origine de",
+                            "l'écart non déterminable"))
+  }
+  c(attendu = paste(attendus, collapse = " ; "), lu = paste(lus, collapse = " ; "), verdict = verdict, statut = statut)
+}
+
 # Rejeu outillé d'une fiche (E3.7 ; ADR 0012, point 3 ; #86).
 #   donnees : data.frame (le moteur ne lit pas de fichier) ;
 #   fiche   : liste de la fiche, relue de son texte par lire_fiche() ou prise
@@ -1534,9 +1650,9 @@ perimetre_temoin_fiche <- function(f) {
 # validation) y sont faits une fois, avant toute étape (mêmes motifs, mêmes
 # messages ; #82 ; #164, point 2). Rend un objet de classe `rejeu` :
 # construction, l'objet rendu par construire_table() sans retouche ; bilan,
-# data.frame de 14 lignes (controle, attendu, lu, verdict, statut) :
-# 8 contrôles, tous « conforme » dans un bilan rendu, puis 6 témoins, jamais
-# motifs de refus.
+# data.frame de 15 lignes (controle, attendu, lu, verdict, statut) :
+# 8 contrôles, tous « conforme » dans un bilan rendu, puis 7 témoins, jamais
+# motifs de refus (le septième, temoin_catalogue, en dernière ligne ; #267).
 rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # Message marqué UTF-8 sous toute locale (#94) : chaque message est formé
   # par formuler(), qui marque le gabarit avant sprintf() (#127).
@@ -1545,15 +1661,16 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
 
   # 1. Nature des arguments : la fiche d'abord, puis les données (refus
   #    délégué à controler_roles(), motif donnees_mal_formees). Classe lue
-  #    par %in% (match()), qui ne lève pas sur une classe d'encodage « bytes »,
-  #    là où inherits() lève (« translating strings with "bytes" encoding is
-  #    not allowed », mesuré sous C et C.UTF-8 ; #94).
-  if ("construction" %in% class(fiche))
+  #    par a_classe() (R/outils.R : attr() et %in%), qui ne lève pas sur une
+  #    classe d'encodage « bytes », là où inherits() lève (« translating
+  #    strings with "bytes" encoding is not allowed », mesuré sous C et
+  #    C.UTF-8 ; #94).
+  if (a_classe(fiche, "construction"))
     refus_rejeu("fiche_non_conforme",
                 formuler(paste("Rejeu : objet `construction` reçu à la place de sa fiche ; passer x$fiche, ou la fiche",
                                "relue de son texte par lire_fiche().")),
                 list(champ = "(fiche)", lu = "construction", attendu = "liste nommée"))
-  if ("rejeu" %in% class(fiche))
+  if (a_classe(fiche, "rejeu"))
     refus_rejeu("fiche_non_conforme",
                 formuler("Rejeu : objet `rejeu` reçu à la place d'une fiche ; passer r$construction$fiche."),
                 list(champ = "(fiche)", lu = "rejeu", attendu = "liste nommée"))
@@ -1740,34 +1857,58 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
     stop("rejouer_fiche() : empreintes des tables de la construction différentes de celles du rejeu (erreur de programmation).",
          call. = FALSE)
 
-  # Bilan : 8 contrôles (passés), puis 6 témoins. texte_moteur() s'applique
-  # aussi au texte composé (lignes 1 et 6, verdicts « différente : … ») :
-  # sprintf() d'un gabarit marqué UTF-8 avec un argument non ASCII non marqué
-  # écrit « <c3><a9> » sous la locale C (mesuré, #86). Les comparaisons sont
-  # faites sur les valeurs brutes, avant tout texte_moteur() ; les valeurs
-  # lues viennent de lire_fiche() ou de x$fiche, au codage déjà déterminé ;
-  # l'effet est mesuré identique sous C et C.UTF-8 (tests/controles/
-  # locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune comparaison ni à
-  # aucune écriture de valeur lue.
+  # Bilan : 8 contrôles (passés), puis 7 témoins. Tout texte composé qui mêle
+  # un littéral non ASCII à une valeur citée (marquée UTF-8) est formé par
+  # formuler() (lignes 1 et 6), ou par paste() de morceaux déjà marqués
+  # (texte_moteur(), citations : verdicts « différente : … » des lignes 10 à
+  # 12 et 15) : un littéral non marqué collé à une citation marquée
+  # s'écrirait « <c3><a9> » sous la locale C, et texte_moteur() après coup
+  # viendrait trop tard (mesuré, #86 ; #127 ; tests/controles/locale_c.R,
+  # noms non ASCII de la fiche, classe des données et provenance). Les
+  # comparaisons sont faites sur les valeurs brutes, avant tout marquage ; les
+  # valeurs lues viennent de lire_fiche() ou de x$fiche, au codage déjà
+  # déterminé ; l'effet est mesuré identique sous C et C.UTF-8
+  # (tests/controles/locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune
+  # comparaison.
+  # Toute valeur ou tout nom de la fiche écrit dans une cellule du bilan est
+  # cité par la règle unique neutraliser_citation() (#142) : valeurs par
+  # sans_controle(texte_lu(v)), paires_lues(), liste_guillemets() ou
+  # sans_controle(v) ; noms de champs des chemins des verdicts par
+  # champs_differents(). Une chaîne « bytes » y est écrite sous son repère
+  # (sinon sprintf() et write.csv() du bilan lèveraient une erreur R), un
+  # caractère de contrôle <U+XXXX>, un octet invalide <xx> : une ligne par
+  # cellule, UTF-8 valide. Les lignes 1 à 5, 7 et 8 ne reçoivent que des
+  # valeurs refusées plus haut si elles sont « bytes » ou invalides (contrôles
+  # 2 à 7 bis) ou recalculées par le moteur ; la ligne 6, le nom du fichier de
+  # la provenance, que controler_provenance() ne contraint pas, est cité ; la
+  # ligne 15, valeurs des métadonnées des tables embarquées (source,
+  # forme_origine, parametres, que le contrôle 2 ne contraint pas), par
+  # temoin_catalogue().
   # Empreinte(s) de fichier de la fiche, témoin 14 : k >= 2 empreintes
   # (provenance de k fichiers, #181 ; M332) citées une à une par
   # liste_guillemets() (règle neutraliser_citation(), NA écrit « NA »), dans
-  # l'ordre de la fiche ; toute autre valeur par texte_lu(), dont k = 1
-  # (texte inchangé). Ligne 6 : noms des fichiers de la provenance (qui a
-  # passé controler_provenance()), de même pour k >= 2, tels quels pour k = 1.
+  # l'ordre de la fiche ; toute autre valeur par sans_controle(texte_lu()),
+  # dont k = 1 (chaîne citée par la règle de #142 : inchangée tant qu'elle n'a
+  # ni caractère de contrôle, ni octet invalide, ni codage « bytes »). Ligne 6 :
+  # noms des fichiers de la provenance (qui a passé controler_provenance()), de
+  # même pour k >= 2, cités de même pour k = 1.
   ef <- e[["fichier"]]
   fichiers_lus <- if (is.character(ef) && is.null(attributes(ef)) && length(ef) > 1L)
-    liste_guillemets(ef) else texte_lu(ef)
+    liste_guillemets(ef) else sans_controle(texte_lu(ef))
   pf <- fiche[["provenance"]][["fichier"]]
-  provenance_lue <- if (is.null(fiche[["provenance"]])) "NULL" else if (length(pf) > 1L) liste_guillemets(pf) else pf
+  provenance_lue <- if (is.null(fiche[["provenance"]])) "NULL" else if (length(pf) > 1L) liste_guillemets(pf) else sans_controle(pf)
   conforme <- texte_moteur("conforme")
   forme <- texte_moteur("contrôle de forme")
   exacte <- texte_moteur("comparaison exacte")
   securite <- texte_moteur("exacte ; sans rôle de sécurité")
+  # Témoin 15 (catalogue, #267) : régime lu sur le verdict de la ligne 9.
+  verdict_code <- verdict_chaines(EMPREINTE_CODE, e[["code"]])
+  tc <- temoin_catalogue(tr$ecarts, verdict_code)
   bilan <- data.frame(
     controle = c("nature_arguments", "forme_fiche", "version_fiche", "algorithme_empreinte", "representation",
                  "entrees_construction", "empreinte_donnees", "tables_reference", "temoin_code", "temoin_versions",
-                 "temoin_plateforme", "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier"),
+                 "temoin_plateforme", "temoin_fiche", "temoin_empreinte_resultat", "temoin_empreinte_fichier",
+                 "temoin_catalogue"),
     attendu = c(texte_moteur("fiche : liste nommée ; donnees : data.frame"),
                 texte_moteur(paste("version_fiche : integer de longueur 1, non NA, sans attribut ;",
                                    "empreintes/algorithme, empreintes/representation, empreintes/donnees :",
@@ -1780,28 +1921,27 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                 texte_moteur(paste("fiche rendue par construire_table(), hors versions, plateforme,",
                                    "empreintes/resultat, empreintes/code, empreintes/statut_resultat_code")),
                 texte_lu(r$empreintes$resultat),
-                texte_moteur("non recalculée par le moteur (couche de lecture, E4.4)")),
-    lu = c(texte_moteur(sprintf("fiche : liste nommée de %d champs ; donnees : classe %s, %d lignes, %d colonnes",
-                                length(fiche), paste(class(donnees), collapse = "/"), nrow(donnees), ncol(donnees))),
+                texte_moteur("non recalculée par le moteur (couche de lecture, E4.4)"), tc[["attendu"]]),
+    lu = c(formuler("fiche : liste nommée de %d champs ; donnees : classe %s, %d lignes, %d colonnes",
+                    length(fiche), paste(sans_controle(class(donnees)), collapse = "/"), nrow(donnees), ncol(donnees)),
            texte_moteur("champs lus de la forme attendue"),
            sprintf("%d", v), e[["algorithme"]], e[["representation"]],
-           texte_moteur(sprintf("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
-                                paste(names(plan[["etapes"]]), collapse = ", "), paste(names(roles), collapse = ", "),
-                                recette$recette,
-                                provenance_lue)),
-           e[["donnees"]], tr$lu, texte_lu(e[["code"]]), paires_lues(fiche[["versions"]]),
+           formuler("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
+                    paste(sans_controle(names(plan[["etapes"]])), collapse = ", "),
+                    paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette), provenance_lue),
+           e[["donnees"]], tr$lu, sans_controle(texte_lu(e[["code"]])), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
-           texte_lu(e[["resultat"]]), fichiers_lus),
+           sans_controle(texte_lu(e[["resultat"]])), fichiers_lus, tc[["lu"]]),
     verdict = c(rep(conforme, 8L),
-                verdict_chaines(EMPREINTE_CODE, e[["code"]]),
+                verdict_code,
                 verdict_liste(r$versions, fiche[["versions"]], "versions"),
                 verdict_liste(r$plateforme, fiche[["plateforme"]], "plateforme"),
                 verdict_chemins(perimetre_temoin_fiche(r), perimetre_temoin_fiche(fiche), "fiche"),
                 verdict_chaines(r$empreintes$resultat, e[["resultat"]]),
-                texte_moteur("non vérifiée")),
+                texte_moteur("non vérifiée"), tc[["verdict"]]),
     statut = c(forme, forme, exacte, exacte, exacte, texte_moteur("contrôles délégués aux modules"), securite,
                securite, securite, exacte, exacte, exacte, texte_moteur("témoin, même machine seulement"),
-               texte_moteur("reprise de la fiche, non vérifiée par le moteur")),
+               texte_moteur("reprise de la fiche, non vérifiée par le moteur"), tc[["statut"]]),
     stringsAsFactors = FALSE)
   structure(list(construction = x, bilan = bilan), class = "rejeu")
 }

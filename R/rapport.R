@@ -933,6 +933,53 @@ empreinte_resultat <- function(x) {
   md5_octets(octets)
 }
 
+# Chemins de CHEMINS_HORS_RESULTAT dont la forme est canonique : tous sauf
+# etapes/donnees/resultat/lignes_conservees, copie de l'entrée telle que reçue
+# (classe, attributs et colonnes de l'utilisateur compris, M71, Q1 ; rendue en
+# structure seule), qui n'a pas de forme canonique.
+CHEMINS_FORME_HORS_RESULTAT <- setdiff(CHEMINS_HORS_RESULTAT, "etapes/donnees/resultat/lignes_conservees")
+
+# Forme canonique des sous-arbres que l'empreinte du résultat n'écrit pas (#141 ;
+# M230 étendue par M493) : l'empreinte ne voit ni une classe, ni un attribut,
+# ni un data.frame posé sur fiche/versions, fiche/plateforme, execution ou les
+# trois derniers champs de fiche/empreintes, et le rapport les rendrait sans
+# rien dire. Chaque sous-arbre présent de CHEMINS_FORME_HORS_RESULTAT est
+# soumis à l'écrivain unique, texte_objet(x, canonique = TRUE), sous son chemin
+# dans l'objet (chemins cités tels quels) : liste de classe ou d'attribut autre
+# que names (dont data.frame), vecteur de classe, d'attribut autre que names ou
+# de type sans écriture : refus type_non_canonique, rôle cité. Une Date nue est
+# admise, comme par l'écrivain de la fiche (rendue avec son type) ; un facteur
+# est refusé (forme « texte »). fiche/* : valeurs écrites dans le tampon de
+# l'écrivain et jetées, codage des chaînes contrôlé (ces valeurs sont rendues).
+# execution : forme seule (valeurs = FALSE), aucun contrôle de codage, car
+# aucune de ses valeurs n'est rendue. Seule valeur de classe que l'écrivain ne
+# sait pas écrire et que ce contrôle admet : execution/debut, POSIXct nu
+# (classe seule, type double), contrôlé sur sa valeur nue ; `debut` est trouvé
+# par match() sur les noms lus par attr(), qui ne lève pas sur un nom
+# d'encodage « bytes », et un tel nom ailleurs dans execution ne retire pas
+# l'exception (aucune valeur d'execution n'est rendue, nom compris). Rend TRUE.
+controler_forme_hors_resultat <- function(x) {
+  for (chemin in CHEMINS_FORME_HORS_RESULTAT) {
+    segments <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
+    v <- x
+    for (s in segments) {
+      if (!is.list(v) || classe_bytes(v)) { v <- NULL; break }
+      k <- match(s, attr(v, "names", exact = TRUE))
+      if (is.na(k)) { v <- NULL; break }
+      v <- .subset2(v, k)
+    }
+    if (is.null(v)) next
+    if (identical(chemin, "execution") && is.list(v) && is.null(attr(v, "class", exact = TRUE))) {
+      k <- match("debut", attr(v, "names", exact = TRUE))
+      if (!is.na(k) && is.double(v[[k]]) && identical(attributes(v[[k]]), list(class = c("POSIXct", "POSIXt"))))
+        v[[k]] <- unclass(v[[k]])
+    }
+    for (s in rev(segments)) { v <- list(v); attr(v, "names") <- s }
+    texte_objet(v, PREMIERE_LIGNE_FICHE, character(0), "texte", canonique = TRUE, valeurs = !identical(chemin, "execution"))
+  }
+  invisible(TRUE)
+}
+
 # Empreinte des sources du package (option (iv), M70 ; cinquième annotation
 # du 20/10/2026, (c)) : MD5 du texte « <md5><2 espaces>R/<fichier> », une
 # ligne par fichier R/*.R, fichiers triés par octets, LF ; égale à
@@ -1296,16 +1343,39 @@ segments_texte <- function(noms, n) {
 # Octets du texte de l'objet `x` (liste), de première ligne `premiere`, avec
 # les lignes d'en-tête `entete` (vecteur de chaînes nommé clé -> valeur) ;
 # valeurs écrites en forme `forme` : « texte » (plan, fiche), « empreinte »
-# (empreinte du résultat, empreinte_resultat()).
-texte_objet <- function(x, premiere, entete, forme = "texte") {
+# (empreinte du résultat, empreinte_resultat()). `canonique` (FALSE : écriture
+# du plan et de la fiche) : contrôle de la forme canonique d'un sous-arbre que
+# l'empreinte du résultat n'écrit pas (controler_forme_hors_resultat(), #141,
+# M493) ; mêmes règles, un seul écrivain, mais le refus est de motif
+# type_non_canonique (rôle : le chemin, details$role) et un data.frame n'est pas
+# admis (liste classée : refusé par la branche des listes, comme toute classe).
+# `valeurs` (TRUE : écriture ordinaire) : FALSE, forme seule, pour un sous-arbre
+# dont aucune valeur n'est rendue (execution ; M499 (a)) : le parcours est le
+# même et noeud() et atome() refusent les mêmes formes (profondeur, classe,
+# attribut, type, facteur, Date à stockage ou attribut non admis, vecteur nommé
+# de longueur 0, forme du data.frame, objet non atomique, racine qui n'est pas
+# une liste) ; en revanche aucune valeur ni aucun nom n'est écrit (ajouter()
+# sort avant d'évaluer les octets, noms_ligne() est sauté), donc ne sont
+# contrôlés ni le codage des chaînes et des noms (bytes, non UTF-8, non ASCII
+# sans codage déclaré), ni le domaine des valeurs de ecrire_valeurs() : une
+# Date hors domaine, infinie ou non entière est admise (motifs
+# date_hors_domaine et date_non_entiere), refusée sous fiche/* ; rien n'est
+# ajouté au texte.
+texte_objet <- function(x, premiere, entete, forme = "texte", canonique = FALSE, valeurs = TRUE) {
   tab <- as.raw(0x09); lf <- as.raw(0x0a)
   impossible <- function(chemin, message)
-    refuser("rapport", "serialisation_impossible",
-            formuler("Écriture du texte, « %s » : %s.", if (nzchar(chemin)) neutraliser_citation(chemin) else "(racine)",
-                     message),
-            list(chemin = chemin))
+    if (canonique)
+      refuser("rapport", "type_non_canonique",
+              formuler("Rôle « %s » : %s.", if (nzchar(chemin)) neutraliser_citation(chemin) else "(racine)", message),
+              list(role = chemin))
+    else
+      refuser("rapport", "serialisation_impossible",
+              formuler("Écriture du texte, « %s » : %s.", if (nzchar(chemin)) neutraliser_citation(chemin) else "(racine)",
+                       message),
+              list(chemin = chemin))
   morceaux <- list()
   ajouter <- function(chemin, type, n, octets) {
+    if (!valeurs) return(invisible())
     tete <- c(charToRaw(enc2utf8(chemin)), tab, charToRaw(type), tab, charToRaw(sprintf("%d", n)))
     if (length(octets)) {
       octets[octets == lf] <- tab
@@ -1315,6 +1385,7 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
   }
   # Ligne @noms (attribut names présent) ; liste sans noms : ligne @longueur.
   noms_ligne <- function(v, chemin) {
+    if (!valeurs) return(invisible())
     n <- names(v)
     if (is.null(n)) ajouter(joindre_chemin(chemin, "@longueur"), "integer", 1L, octets_lignes(sprintf("%d", length(v))))
     else ajouter(joindre_chemin(chemin, "@noms"), "character", length(n),
@@ -1363,13 +1434,14 @@ texte_objet <- function(x, premiere, entete, forme = "texte") {
     if (!is.null(names(v)) && !length(v))
       impossible(chemin, formuler("vecteur atomique nommé de longueur 0, sans écriture distincte d'une liste nommée vide"))
     if (!is.null(names(v))) noms_ligne(v, chemin)
+    if (!valeurs) return(invisible())
     cc <- ecrire_valeurs(v, forme, chemin)
     ajouter(chemin, cc$type, length(v), cc$octets)
   }
   noeud <- function(v, chemin, profondeur) {
     profonde(chemin, profondeur)
     if (is.null(v)) return(ajouter(chemin, "NULL", 0L, raw(0)))
-    if (a_classe(v, "data.frame")) {
+    if (!canonique && a_classe(v, "data.frame")) {
       a <- names(attributes(v))
       if (!identical(class(v), "data.frame") || !all(a %in% c("names", "class", "row.names")))
         impossible(chemin, formuler("data.frame de classe %s ou d'attribut(s) %s",
@@ -2351,6 +2423,11 @@ controler_rapport <- function(x) {
     l <- lire_racine(x, r)
     if (l$present && !is.null(l$valeur)) non_prevu(r)
   }
+  # 5. Forme canonique des sous-arbres que l'empreinte du résultat n'écrit pas
+  #    (execution, versions, plateforme, trois champs d'empreintes ; #141, M493) :
+  #    classe, attribut autre que names ou data.frame refusés type_non_canonique
+  #    par l'écrivain unique, au lieu d'être rendus sans rien dire.
+  controler_forme_hors_resultat(x)
   invisible(TRUE)
 }
 

@@ -358,7 +358,9 @@ local({
 # classe de la fiche ou d'une sous-liste : serialisation_impossible (chemin
 # cité). ecrire_rapport() : `empreintes` et fiche de classe bytes, objet_modifie
 # (empreinte non recalculable) ; sous-liste exclue de l'empreinte (versions,
-# plateforme) de classe bytes, type_non_canonique à l'écriture de la section.
+# plateforme) de classe bytes, type_non_canonique par le contrôle de forme
+# canonique des sous-arbres hors empreinte (#141, M493 ; auparavant à l'écriture
+# de la section, sous un autre libellé).
 local({
   attrape <- function(expr) tryCatch(expr, error = function(e) e)
   verdict <- function(r, motif, details, contient) {
@@ -410,8 +412,125 @@ local({
     else
       verifier(sprintf("U10 : fiche$%s de classe bytes (hors empreinte du résultat) : ecrire_rapport() refuse type_non_canonique, rôle fiche/%s", ch, ch),
                verdict(attrape(ecrire_rapport(xb)), "type_non_canonique", list(role = paste0("fiche/", ch)),
-                       "classe « <chaîne d'encodage bytes> » sans représentation canonique"))
+                       "liste de classe <chaîne d'encodage bytes> ou d'attribut(s) names, class"))
   }
+})
+
+# #141, élargie par M493 (Q2) : forme canonique des sous-arbres hors empreinte
+# du résultat (CHEMINS_HORS_RESULTAT sauf lignes_conservees, copie de l'entrée),
+# contrôlée par l'écrivain unique, texte_objet(canonique = TRUE) : classe,
+# attribut autre que names, dim, data.frame, sur la liste, sur un élément, sur
+# execution et sur les trois derniers champs de fiche/empreintes ; refus
+# type_non_canonique, chemin cité (details$role). Chaque cas passait sans refus
+# au code antérieur (versions converti en data.frame : rendu différent), sauf
+# les classes posées sur un élément, déjà refusées (contre-épreuve).
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  avec_classe <- function(o) { class(o) <- "k"; o }
+  avec_attr <- function(o) { attr(o, "z") <- 1; o }
+  avec_dim <- function(o) { dim(o) <- 1L; o }
+  cas <- list(
+    list("classe k sur fiche$versions", function(y) { y$fiche$versions <- avec_classe(y$fiche$versions); y }, "fiche/versions", "liste de classe k"),
+    list("classe k sur fiche$plateforme", function(y) { y$fiche$plateforme <- avec_classe(y$fiche$plateforme); y }, "fiche/plateforme", "liste de classe k"),
+    list("classe k sur execution", function(y) { y$execution <- avec_classe(y$execution); y }, "execution", "liste de classe k"),
+    list("attribut z sur fiche$versions", function(y) { y$fiche$versions <- avec_attr(y$fiche$versions); y }, "fiche/versions", "attribut(s) names, z"),
+    list("attribut z sur fiche$versions[[1]]", function(y) { y$fiche$versions[[1L]] <- avec_attr(y$fiche$versions[[1L]]); y }, "fiche/versions/tablexp", "attribut(s) z"),
+    list("attribut z sur execution", function(y) { y$execution <- avec_attr(y$execution); y }, "execution", "attribut(s) names, z"),
+    list("attribut z sur fiche$empreintes$code", function(y) { y$fiche$empreintes$code <- avec_attr(y$fiche$empreintes$code); y }, "fiche/empreintes/code", "attribut(s) z"),
+    list("attribut z sur fiche$empreintes$statut_resultat_code", function(y) { y$fiche$empreintes$statut_resultat_code <- avec_attr(y$fiche$empreintes$statut_resultat_code); y }, "fiche/empreintes/statut_resultat_code", "attribut(s) z"),
+    list("attribut z sur execution$debut", function(y) { y$execution$debut <- avec_attr(y$execution$debut); y }, "execution/debut", "attribut(s) class, z"),
+    list("dim sur fiche$plateforme[[1]]", function(y) { y$fiche$plateforme[[1L]] <- avec_dim(y$fiche$plateforme[[1L]]); y }, "fiche/plateforme/sysname", "attribut(s) dim"),
+    list("fiche$versions convertie en data.frame", function(y) { y$fiche$versions <- as.data.frame(y$fiche$versions); y }, "fiche/versions", "liste de classe data.frame"),
+    list("execution$session convertie en data.frame", function(y) { y$execution$session <- as.data.frame(y$execution$session[1:5]); y }, "execution/session", "liste de classe data.frame"),
+    # Déjà refusés avant #141 (classe posée sur un élément) : contre-épreuve de
+    # la règle, motif et chemin inchangés, libellé de l'écrivain.
+    list("classe k sur fiche$versions[[1]] (élément)", function(y) { y$fiche$versions[[1L]] <- avec_classe(y$fiche$versions[[1L]]); y }, "fiche/versions/tablexp", "classe k"),
+    # Formes sans écriture (reprise unique de #141) : tzone, POSIXlt, facteur
+    # (refusé en forme texte), closure, environnement, data.frame profond, matrice.
+    list("tzone sur execution$debut", function(y) { attr(y$execution$debut, "tzone") <- "UTC"; y }, "execution/debut", "attribut(s) class, tzone"),
+    list("execution$debut en POSIXlt", function(y) { y$execution$debut <- as.POSIXlt(y$execution$debut); y }, "execution/debut", "liste de classe POSIXlt/POSIXt"),
+    list("facteur sur fiche$versions[[1]]", function(y) { y$fiche$versions[[1L]] <- factor("a"); y }, "fiche/versions/tablexp", "facteur, sans écriture"),
+    list("facteur sur execution$session$R", function(y) { y$execution$session$R <- factor("a"); y }, "execution/session/R", "facteur, sans écriture"),
+    list("closure sur execution$session$R", function(y) { y$execution$session$R <- function(x) x; y }, "execution/session/R", "objet de type closure"),
+    list("environnement sur fiche$versions[[1]]", function(y) { y$fiche$versions[[1L]] <- new.env(); y }, "fiche/versions/tablexp", "objet de type environment"),
+    list("data.frame profond execution/session/z/a/b", function(y) { y$execution$session$z <- list(a = list(b = data.frame(q = 1))); y }, "execution/session/z/a/b", "liste de classe data.frame"),
+    list("matrice sur fiche$plateforme[[1]]", function(y) { y$fiche$plateforme[[1L]] <- matrix("a", 1L, 1L); y }, "fiche/plateforme/sysname", "attribut(s) dim"),
+    list("matrice sur execution$duree_secondes", function(y) { y$execution$duree_secondes <- matrix(1, 1L, 1L); y }, "execution/duree_secondes", "attribut(s) dim"))
+  for (c_ in cas) {
+    verifier(sprintf("#141 : %s : ecrire_rapport() refuse type_non_canonique, chemin %s cité (details$role), une ligne, UTF-8", c_[[1L]], c_[[3L]]), {
+      r <- attrape(ecrire_rapport(c_[[2L]](x1)))
+      if (!inherits(r, "refus_tablexp")) sprintf("condition ou rendu : %s", class(r)[1L])
+      else une_ligne_utf8(r, controle_refus(r, "type_non_canonique", list(role = c_[[3L]]),
+                                            c(sprintf("Rôle « %s » : ", c_[[3L]]), c_[[4L]])))
+    })
+  }
+  verifier("#141 : objet intact : aucun refus, octets inchangés (identical à o1) ; execution, versions et plateforme d'origine admis", {
+    identical(ecrire_rapport(x1), o1) && is.list(x1$execution) && inherits(x1$execution$debut, "POSIXct")
+  })
+  verifier("#141 : entrée de classe tbl_df et d'attribut quelconque (etapes/donnees/resultat/lignes_conservees, copie de l'entrée, hors forme canonique) : rapport rendu sans refus", {
+    j <- JEU; class(j) <- c("tbl_df", "tbl", "data.frame"); attr(j, "simulation") <- list(a = 1)
+    y <- construire_table(j, ROLES, PLANS$R1)
+    r <- attrape(ecrire_rapport(y))
+    if (inherits(r, "error")) conditionMessage(r) else is.raw(r) && inherits(y$etapes$donnees$resultat$lignes_conservees, "tbl_df")
+  })
+  verifier("#141 : execution absent ou de forme libre (liste simple de chaînes et de nombres, comme U3) : rendu identique à o1", {
+    y <- x1; y$execution <- NULL
+    z <- x1; z$execution <- list(debut = "autre", duree_secondes = -1)
+    identical(ecrire_rapport(y), o1) && identical(ecrire_rapport(z), o1)
+  })
+  # Reprise unique de #141. execution : forme seule, aucun contrôle de codage (ses
+  # valeurs et ses noms ne sont jamais rendus) ; fiche/* : codage contrôlé,
+  # refus inchangés (mesurés sur l'état antérieur, sous C et C.UTF-8).
+  non_ascii_inconnu <- rawToChar(as.raw(c(0xc3, 0xa9)))
+  verifier("#141 : chaîne bytes, ou non ASCII sans codage déclaré, ou nom bytes dans execution/session (objet intact par ailleurs) : rendu, octets identiques à o1", {
+    a <- function(f) { y <- x1; y$execution$session <- f(y$execution$session); identical(attrape(ecrire_rapport(y)), o1) }
+    nom_bytes <- function(l) { n <- names(l); n[1L] <- CLASSE_BYTES; names(l) <- n; l }
+    a(function(l) { l$systeme <- CLASSE_BYTES; l }) && a(function(l) { l$systeme <- non_ascii_inconnu; l }) && a(nom_bytes)
+  })
+  # Réserve R1 de l'audit de #141 : un nom bytes au premier niveau d'execution
+  # (hors forme : ses noms ne sont jamais rendus) ne désactive pas l'exception du
+  # POSIXct nu de execution/debut ; le rapport est rendu, octets identiques à o1.
+  # Contre-épreuve : un attribut tzone sur debut reste refusé, l'exception étant
+  # bornée au POSIXct nu.
+  verifier("#141, réserve R1 : nom bytes au premier niveau d'execution (autre que debut, quelle que soit sa position) : rendu, octets identiques à o1 ; avec attribut tzone sur debut : refus type_non_canonique, rôle execution/debut", {
+    nb <- function(k) { y <- x1; n <- attr(y$execution, "names", exact = TRUE); n[k] <- CLASSE_BYTES; attr(y$execution, "names") <- n; y }
+    e <- character(0)
+    for (k in seq_along(x1$execution)[names(x1$execution) != "debut"]) {
+      r <- attrape(ecrire_rapport(nb(k)))
+      if (!identical(r, o1)) e <- c(e, sprintf("nom bytes en position %d : %s", k, if (is.raw(r)) "octets différents de o1" else conditionMessage(r)))
+    }
+    y <- nb(which(names(x1$execution) != "debut")[1L]); attr(y$execution$debut, "tzone") <- "UTC"
+    r <- attrape(ecrire_rapport(y))
+    if (length(e)) e
+    else if (!inherits(r, "refus_tablexp") || !identical(r$motif, "type_non_canonique") || !identical(r$details$role, "execution/debut")) "tzone sur debut : refus type_non_canonique, rôle execution/debut attendu"
+    else TRUE
+  })
+  verifier("#141 : même chaîne bytes dans fiche/plateforme : refus chaine_codage_bytes, rôle fiche/plateforme/sysname (inchangé) ; non ASCII sans codage déclaré : chaine_codage_indetermine hors locale UTF-8 ou latin-1, rendu sinon (inchangé)", {
+    y <- x1; y$fiche$plateforme$sysname <- CLASSE_BYTES
+    r1 <- attrape(ecrire_rapport(y))
+    z <- x1; z$fiche$plateforme$sysname <- non_ascii_inconnu
+    r2 <- attrape(ecrire_rapport(z))
+    li <- l10n_info()
+    if (!inherits(r1, "refus_tablexp") || !identical(r1$motif, "chaine_codage_bytes") || !identical(r1$details$role, "fiche/plateforme/sysname")) "bytes : motif ou rôle"
+    else if (isTRUE(li[["UTF-8"]]) || isTRUE(li[["Latin-1"]])) { if (is.raw(r2)) TRUE else "non ASCII inconnu rendu attendu" }
+    else if (inherits(r2, "refus_tablexp") && identical(r2$motif, "chaine_codage_indetermine")) TRUE else "non ASCII inconnu : refus attendu"
+  })
+  verifier("#141 : Date nue admise (règle de l'écrivain unique) : sur fiche/versions rendue avec son type Date, sur execution rendue sans effet sur les octets", {
+    y <- x1; y$fiche$versions[[1L]] <- as.Date("2026-01-02")
+    z <- x1; z$execution$session$locale <- as.Date("2026-01-02")
+    l <- lignes_de(attrape(ecrire_rapport(y)))
+    any(startsWith(l, "<tr><td>fiche/versions/tablexp</td><td>Date</td>")) && identical(attrape(ecrire_rapport(z)), o1)
+  })
+  verifier("#141 : ecrire_fiche() d'une liste de classe k sur fiche$versions : serialisation_impossible (règle de l'écrivain, inchangée) ; texte_objet(canonique = FALSE) admet un data.frame, canonique = TRUE le refuse", {
+    fb <- x1$fiche; fb$versions <- avec_classe(fb$versions)
+    r1 <- attrape(ecrire_fiche(fb))
+    a <- attrape(tablexp:::texte_objet(list(d = data.frame(a = 1)), "t", character(0)))
+    b <- attrape(tablexp:::texte_objet(list(d = data.frame(a = 1)), "t", character(0), canonique = TRUE))
+    if (!inherits(r1, "refus_tablexp") || !identical(r1$motif, "serialisation_impossible")) "ecrire_fiche : motif"
+    else if (!is.raw(a)) "texte_objet(data.frame) refusé en forme libre"
+    else if (!inherits(b, "refus_tablexp") || !identical(b$motif, "type_non_canonique") || !identical(b$details$role, "d")) "canonique = TRUE : motif ou rôle"
+    else TRUE
+  })
 })
 
 # --- U11, U12 : ressources, balises, attributs, entités (valeur calculée à la main) ---

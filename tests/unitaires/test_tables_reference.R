@@ -506,14 +506,14 @@ verifier("D table_embarquee() : nom absent du catalogue installé, refus table_e
 
 FICHE <- lire_fiche(ecrire_fiche(X$fiche))
 R0 <- rejouer_fiche(BASE, FICHE)
-verifier("E fiche sans table rejouée avec NULL et list() : objet identical() hors execution, 14 lignes, ligne 8 (valeur calculée à la main)", {
+verifier("E fiche sans table rejouée avec NULL et list() : objet identical() hors execution, 15 lignes, ligne 8 (valeur calculée à la main)", {
   r1 <- rejouer_fiche(BASE, FICHE, list())
   b <- R0$bilan
   identical(sans_execution(R0$construction), sans_execution(X)) &&
-    identical(sans_execution(r1$construction), sans_execution(X)) && identical(r1$bilan, b) && nrow(b) == 14L &&
+    identical(sans_execution(r1$construction), sans_execution(X)) && identical(r1$bilan, b) && nrow(b) == 15L &&
     identical(unlist(b[8L, ], use.names = FALSE),
-              c("tables_reference", "aucune table de référence (fiche/tables_reference : NULL)",
-                "aucune table reçue ni relue", "conforme", "exacte ; sans rôle de sécurité"))
+              c("tables_reference", "aucune empreinte recalculée (aucune table reçue ni relue)",
+                "aucune table de référence (fiche/tables_reference : NULL)", "conforme", "exacte ; sans rôle de sécurité"))
 })
 verifier("E fiche sans table, liste non vide reçue : table_reference_inattendue (texte du rejeu), construire_table() non appelée", {
   n <- compter_appels(rejouer_fiche(BASE, FICHE, list(t1 = T1)))
@@ -623,8 +623,11 @@ local({
   verifier("E injection de bout en bout : fiche aux clés triées (plus_fine, poisson), rejeu identical() hors execution, ligne 8 « (reçue) »",
            identical(names(x$fiche$tables_reference), c("plus_fine", "poisson")) &&
              identical(sans_execution(r$construction), sans_execution(x)) &&
-             identical(r$bilan$lu[8L], sprintf("plus_fine : %s (reçue) ; poisson : %s (reçue)",
-                                               empreinte_table(T1), empreinte_table(tb))) &&
+             identical(r$bilan$attendu[8L], sprintf("plus_fine : %s (reçue) ; poisson : %s (reçue)",
+                                                    empreinte_table(T1), empreinte_table(tb))) &&
+             identical(r$bilan$lu[8L], sprintf("plus_fine : %s ; poisson : %s",
+                                               x$fiche$tables_reference$plus_fine$empreinte,
+                                               x$fiche$tables_reference$poisson$empreinte)) &&
              identical(r$bilan$verdict[1:8], rep("conforme", 8L)))
   f2 <- f; f2$tables_reference <- f$tables_reference[c("poisson", "plus_fine")]
   verifier("E contrôle 2 : clés de fiche$tables_reference hors de l'ordre par octets -> fiche_non_conforme (pas d'erreur R)", {
@@ -644,12 +647,19 @@ verifier("E injection : origine « relue dans le package » d'une table embarqu�
   el <- element_table_fiche(T_EMB)
   r <- controler_tables_rejeu(list(t1 = el), NULL, "code", CAT_E)
   identical(r$tables, list(t1 = T_EMB)) && identical(unname(r$empreintes), el$empreinte) &&
-    identical(r$attendu, paste0("t1 : ", el$empreinte)) && identical(r$lu, paste0("t1 : ", el$empreinte, " (relue dans le package)"))
+    identical(r$lu, paste0("t1 : ", el$empreinte)) && identical(r$attendu, paste0("t1 : ", el$empreinte, " (relue dans le package)"))
 })
 verifier("E injection : origine « reçue », deux tables dans l'ordre de la fiche, textes joints par « ; »", {
   r <- controler_tables_rejeu(CHAMP_AB, list(b = T1, a = T_SYNTH), "code")
   identical(names(r$tables), c("a", "b")) &&
-    identical(r$lu, sprintf("a : %s (reçue) ; b : %s (reçue)", CHAMP_AB$a$empreinte, CHAMP_AB$b$empreinte))
+    identical(r$attendu, sprintf("a : %s (reçue) ; b : %s (reçue)", empreinte_table(T_SYNTH), empreinte_table(T1))) &&
+    identical(r$lu, sprintf("a : %s ; b : %s", CHAMP_AB$a$empreinte, CHAMP_AB$b$empreinte))
+})
+verifier("E injection : deux clés d'origines mêlées (b embarquée relue, a reçue), textes joints par « ; » dans l'ordre de la fiche", {
+  ab <- list(a = CHAMP_AB$a, b = element_table_fiche(T_EMB))
+  r <- controler_tables_rejeu(ab, list(a = T_SYNTH), "code", CAT_E)
+  identical(r$attendu, sprintf("a : %s (reçue) ; b : %s (relue dans le package)", empreinte_table(T_SYNTH), empreinte_table(T_EMB))) &&
+    identical(r$lu, sprintf("a : %s ; b : %s", ab$a$empreinte, ab$b$empreinte))
 })
 # Le verdict cite le chemin sous la fiche, sans préfixe « fiche/ » (comme
 # « différente : convention », tests/unitaires/test_rejeu.R, T11) ; le rejeu

@@ -1058,10 +1058,14 @@ for (p in plans_reference()) {
              identical(x_ref$fiche$empreintes$resultat, oracle_empreinte_resultat(x_ref)))
   # Rejeu outillé de la fiche écrite puis relue (#86, critère 4 ; identité
   # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
-  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 « identique », 14 « non vérifiée »", id), {
+  # Ligne 15 (temoin_catalogue, #267) : « identique », statut « comparaison
+  # exacte » ; aucun plan de référence ne porte de table de statut embarquee,
+  # la ligne y vaut le cas sans table de statut embarquee (mesuré, R1 à R17).
+  verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 et 15 « identique » (15 : « comparaison exacte »), 14 « non vérifiée »", id), {
     r <- rejouer_fiche(entree_p$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)), tables_reference = tables_du_plan(p))
     identical(sans_execution(r$construction), sans_execution(x_ref)) &&
-      identical(r$bilan$verdict[9:14], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e"))
+      identical(r$bilan$verdict[9:15], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e", "identique")) &&
+      identical(r$bilan$controle[15L], "temoin_catalogue") && identical(r$bilan$statut[15L], "comparaison exacte")
   })
   # Rapport figé (#87, U24, U25) : contrôles du document ; taille (octets) et
   # durée du rendu imprimées (constat, sans seuil ; critère 7 de #87).

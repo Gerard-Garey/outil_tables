@@ -24,7 +24,10 @@
 #       lire_fiche() et lire_plan() : aller-retour identical(), et réécriture
 #       de l'objet relu identique octet à octet au texte écrit ; rapport figé
 #       ecrire_rapport(x) (#87, C1) ; pour R1, rejouer_fiche() sur la fiche
-#       relue : chaînes non ASCII du bilan marquées UTF-8 (#86) ; messages
+#       relue : chaînes non ASCII du bilan marquées UTF-8 (#86), dont celles
+#       des verdicts et des lignes 1 et 6 pour un nom non ASCII de la fiche,
+#       une classe des données non ASCII, à LF ou à octet invalide et un nom
+#       de fichier de provenance non ASCII (bilans_non_ascii(), #142) ; messages
 #       de refus du rejeu et de objet_modifie (et citation d'une chaîne
 #       latin-1) marqués UTF-8 et sur une ligne (#94) ; puis un refus par
 #       module citant une valeur non ASCII native, latin-1 et UTF-8, et
@@ -102,6 +105,88 @@ environnement_locale <- function(locale) c(LC_ALL = locale, LANG = locale, LC_CT
 
 # --- sous-processus : R1 à R17, fiche et plan --------------------------------
 
+# Cellules du bilan du rejeu qui mêlent un gabarit non ASCII du moteur à un nom
+# ou une valeur citée de la fiche ou des données (revue finale de B24, constats
+# mineurs ; #142, #86, #127) : nom non ASCII marqué UTF-8 et non marqué ajouté à
+# fiche$versions (ligne 10) et à fiche$empreintes (ligne 12), nom non ASCII
+# présent d'un seul côté de champs_differents() (« absent de la fiche reçue »),
+# classe des données non ASCII, à caractère de contrôle et à octet invalide
+# (ligne 1), nom de fichier non ASCII de la provenance, un et deux fichiers, fiche
+# en objet et relue (ligne 6 ; #296). Les attendus
+# sont écrits octet par octet (la session peut être en C) ; `d` consigne les
+# défauts. Rend les cellules vérifiées, pour la comparaison entre
+# installations. Sous la locale C avec le paquet installé sous C, un gabarit
+# non marqué collé par paste() ou sprintf() à une citation marquée UTF-8
+# s'écrit « diff<c3><a9>rente » (mesuré avant correction).
+bilans_non_ascii <- function(jeu, p, fr, d) {
+  u <- function(...) intToUtf8(c(...))
+  E <- u(0xe9); C <- u(0xe7); O <- u(0xf4)
+  rendu <- function(expr) tryCatch(expr, error = function(e) e)
+  differente <- paste0("diff", E, "rente : ")
+  cellules <- character(0)
+  verifie <- function(nom, obtenu, attendu) {
+    cellules <<- c(cellules, obtenu)
+    if (!identical(charToRaw(obtenu), charToRaw(attendu)))
+      d(sprintf("%s : « %s » au lieu de « %s »", nom, octets_bruts(obtenu), octets_bruts(attendu)))
+    if (!identical(Encoding(obtenu), "UTF-8")) d(sprintf("%s : cellule non marquée UTF-8", nom))
+    if (!validUTF8(obtenu) || grepl("[\n\v\f\r]", obtenu, useBytes = TRUE))
+      d(sprintf("%s : cellule invalide ou sur plusieurs lignes : %s", nom, octets_bruts(obtenu)))
+  }
+  nom_u8 <- E
+  nom_brut <- rawToChar(as.raw(c(0xc3, 0xa9)))  # mêmes octets, codage non déclaré
+  for (cas in list(list("marqué UTF-8", nom_u8), list("non marqué", nom_brut))) {
+    for (cont in c("versions", "empreintes")) {
+      fb <- fr; z <- fb[[cont]]; z[[cas[[2L]]]] <- "1"; fb[[cont]] <- z
+      r <- rendu(rejouer_fiche(jeu$donnees, fb, tables_reference = tables_du_plan(p)))
+      nom <- sprintf("verdict, nom %s ajouté à fiche$%s", cas[[1L]], cont)
+      if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+      verifie(nom, r$bilan$verdict[if (cont == "versions") 10L else 12L],
+              paste0(differente, if (cont == "empreintes") "empreintes/", E, " (absent de la fiche rendue)"))
+    }
+  }
+  verifie("verdict_chemins(), nom non ASCII absent de la fiche reçue",
+          tablexp:::verdict_chemins(stats::setNames(list(1, 2), c("a", E)), list(a = 1), "fiche"),
+          paste0(differente, E, " (absent de la fiche re", C, "ue)"))
+  verifie("verdict_chemins(), nom non ASCII dont la valeur diffère",
+          tablexp:::verdict_chemins(stats::setNames(list(1, 2), c("a", E)), stats::setNames(list(1, 3), c("a", E)), "fiche"),
+          paste0(differente, E))
+  # Classes des données (ligne 1) : le texte attendu est celui de la fiche
+  # intacte, où « classe data.frame » devient la classe citée.
+  intact <- rejouer_fiche(jeu$donnees, fr, tables_reference = tables_du_plan(p))$bilan$lu[1L]
+  for (cas in list(list("non ASCII", paste0("cl", E), paste0("cl", E)),
+                   list("à LF", "ma\nclasse", "ma<U+000A>classe"),
+                   list("à octet invalide", rawToChar(as.raw(c(0x63, 0x6c, 0xe9))), "cl<e9>"))) {
+    dn <- jeu$donnees; class(dn) <- c(cas[[2L]], "data.frame")
+    r <- rendu(rejouer_fiche(dn, fr, tables_reference = tables_du_plan(p)))
+    nom <- sprintf("ligne 1, classe des données %s", cas[[1L]])
+    if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+    verifie(nom, r$bilan$lu[1L], sub("classe data.frame", paste0("classe ", cas[[3L]], "/data.frame"), intact, fixed = TRUE))
+  }
+  # Nom de fichier de la provenance non ASCII (ligne 6 : « étapes », « rôles »),
+  # un puis deux fichiers (#181), fiche en objet puis relue de son texte (#296).
+  q1 <- u(0xab); q2 <- u(0xbb)
+  for (k in 1:2) for (mode in c("objet", "texte")) {
+    if (mode == "objet") {
+      pr <- list(fichier = c(paste0("a", E, ".csv"), "b.csv")[seq_len(k)],
+                 empreinte = rep("0123456789abcdef0123456789abcdef", k), algorithme = rep("md5", k))
+      xp <- construire_table(jeu$donnees, jeu$roles, p$plan, pr, tables_du_plan(p))
+    }
+    r <- rendu(rejouer_fiche(jeu$donnees, if (mode == "objet") xp$fiche else lire_fiche(ecrire_fiche(xp$fiche)),
+                             tables_reference = tables_du_plan(p)))
+    nom <- sprintf("ligne 6, provenance non ASCII de %d fichier(s), fiche en %s", k, mode)
+    if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+    l6 <- r$bilan$lu[6L]
+    fin <- if (k == 1L) paste0("; provenance : a", E, ".csv$")
+           else paste0("; provenance : ", q1, " a", E, ".csv ", q2, ", ", q1, " b.csv ", q2, "$")
+    for (m in list(list("préfixe", paste0("^", E, "tapes : ")), list("rôles", paste0("; r", O, "les : ")),
+                   list("fin", fin)))
+      if (!grepl(m[[2L]], octets_bruts(l6), useBytes = TRUE))
+        d(sprintf("%s : %s absent : %s", nom, m[[1L]], octets_bruts(l6)))
+    verifie(nom, l6, l6)
+  }
+  cellules
+}
+
 travailleur <- function(args) {
   lib <- args[1L]; attendu <- args[2L]; sortie <- args[3L]; racine <- args[4L]
   library(tablexp, lib.loc = lib)
@@ -151,6 +236,9 @@ travailleur <- function(args) {
         v <- unlist(rejouer_fiche(jeu$donnees, lire_fiche(tf))$bilan, use.names = FALSE)
         if (any(grepl("[^\001-\177]", v, useBytes = TRUE) & Encoding(v) != "UTF-8"))
           d("bilan du rejeu : chaîne non ASCII non marquée UTF-8")
+        # Bilans de fiches et de données à nom ou classe non ASCII (ci-dessus) :
+        # leurs cellules s'ajoutent au texte comparé entre les deux installations.
+        v <- c(v, bilans_non_ascii(jeu, p, lire_fiche(tf), d))
         writeBin(unlist(lapply(v, function(s) c(charToRaw(s), as.raw(10L)))), file.path(sortie, "R1.bilan.txt"))
         # Messages de refus du rejeu et de objet_modifie (#94, critère 3) :
         # marqués UTF-8 sous la locale C, sur une ligne ; citation latin-1
