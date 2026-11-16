@@ -319,7 +319,9 @@ controler_graine_plan <- function(plan, aleatoire) {
 # Grille des inventaires du plan (champ `inventaires` ; ADR 0016, point 7.1 ;
 # spécification d'actuary-approfondi de #180, § 2, M328), appelée par
 # valider_plan() si le champ est présent, après controler_parametres_donnees()
-# dont elle reçoit les valeurs validées `p` (debut, borne). Dans cet ordre :
+# dont elle reçoit les valeurs validées du plan reçu : la période et le délai
+# (#186 : le début est lu dans `periode`, la fin effective vaut fin - délai). Dans
+# cet ordre :
 #   - inventaires_invalides : classe Date exacte, stockage double ou integer,
 #     sans autre attribut ; puis au moins deux dates, sans valeur manquante,
 #     en jours entiers finis, dans le domaine des dates (dates_hors_domaine(),
@@ -331,7 +333,7 @@ controler_graine_plan <- function(plan, aleatoire) {
 #     effective (t_M = fin - délai = borne - 1) ; une date d'inventaire désigne
 #     l'état en fin de journée (A.0 : présence à l'instant d).
 # Module construire_table. Rend NULL, invisible.
-controler_inventaires_plan <- function(inventaires, p) {
+controler_inventaires_plan <- function(inventaires, periode, delai_declaration) {
   x <- inventaires
   defauts <- character(0)
   if (!forme_exacte(x, c("double", "integer"), "class") || !identical(class(x), "Date")) {
@@ -356,7 +358,7 @@ controler_inventaires_plan <- function(inventaires, p) {
                      paste(defauts, collapse = " ; ")),
             list(inventaires = inventaires))
   j <- as.numeric(unclass(x)); M <- length(j)
-  attendu <- c(p$debut - 1, p$borne - 1)
+  attendu <- c(as.numeric(periode[["debut"]]) - 1, as.numeric(periode[["fin"]]) - delai_declaration)
   ecart <- c(j[1L] != attendu[1L], j[M] != attendu[2L])
   if (any(ecart)) {
     premier <- citer(format(structure(j[1L], class = "Date")))
@@ -620,12 +622,12 @@ valider_plan <- function(plan) {
     controler_parametres_condition(nom, etapes[[nom]], PARAMETRES_ETAPES[[nom]])
     switch(nom,
       donnees = {
-        p <- controler_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
-                                          plan[["segmentation"]], etapes[["donnees"]][["exclusions"]])
+        controler_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
+                                     plan[["segmentation"]], etapes[["donnees"]][["exclusions"]])
         # Grille des inventaires, si le champ est présent (sa présence selon
         # la recette est contrôlée par controler_plan_roles(), qui connaît les
         # rôles).
-        if ("inventaires" %in% names(plan)) controler_inventaires_plan(plan[["inventaires"]], p)
+        if ("inventaires" %in% names(plan)) controler_inventaires_plan(plan[["inventaires"]], plan[["periode"]], plan[["delai_declaration"]])
       },
       exposition = {
         pe <- etapes[["exposition"]]
@@ -1106,9 +1108,9 @@ table_citee <- function(tables, cle) {
 # matrice recette x étape x estimateur (controler_matrice_recette(), module
 # donnees ; ADR 0016, point 5.3), provenance (controler_provenance()).
 # Rend les valeurs validées : list(plan (canonique), p (transition, période
-# et délai : valeurs_parametres_donnees(), module donnees, la valeur que rend
-# controler_parametres_donnees() appelée par valider_plan(), plus la grille
-# canonique p$inventaires si le plan la porte), recette, conv
+# et délai : valeurs_parametres_donnees(), module donnees, formée ici seule
+# (#186), sur le plan canonique, plus la grille canonique p$inventaires si le
+# plan la porte), recette, conv
 # (NULL sans exposition)). Une seule source de la recette et de la convention
 # pour les étapes et la fiche.
 controler_plan_roles <- function(donnees, roles, plan, provenance) {
@@ -1119,12 +1121,13 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
   etapes_plan <- plan[["etapes"]]
   conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
-  # p recalculé par la fonction qui forme la valeur de
-  # controler_parametres_donnees() dans valider_plan(), ici sur le plan
-  # canonique : valeurs identical() mesurées sur R1 à R12 (revue finale de
-  # B14). Un chemin unique demanderait de changer le contrat de valider_plan()
-  # (exportée) ou les comptes de contrôles du test « contrôles non répétés »
-  # (#22, #82 ; tests/unitaires/test_construire_table.R) : renvoyé à une issue.
+  # Seule formation de p (#186) : sur le plan canonique, avec la grille. Les
+  # contrôles de valider_plan() (controler_parametres_donnees(),
+  # controler_inventaires_plan()) lisent le plan reçu et ne forment pas p : le
+  # p du plan reçu diffère du canonique par le stockage (bornes Date en integer,
+  # période dans l'ordre (fin, debut), délai integer : identical() faux, mesuré)
+  # et p$periode, p$delai_declaration entrent dans les résultats
+  # (R/exposition.R).
   p <- valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
                                   plan[["inventaires"]])
   controler_matrice_recette(recette, roles, plan, conv, p)

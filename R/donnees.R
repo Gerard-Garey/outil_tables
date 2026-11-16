@@ -821,9 +821,10 @@ ligne_transition <- function(transition)
 # les paramètres de l'étape exposition), puis la grille des inventaires telle
 # que le plan la porte (champ conditionnel `inventaires`, ADR 0016, point
 # 7.1 ; #180) : l'élément n'existe que si `inventaires` n'est pas NULL (champ
-# absent du plan). Ne contrôle rien : rendue par controler_transition_periode()
-# (sans grille) et par controler_plan_roles() (orchestration, grille du plan
-# canonique), qui la transmet aux fonctions d'étape après valider_plan() (#82).
+# absent du plan). Ne contrôle rien : formée une seule fois, par
+# controler_plan_roles() (orchestration, sur le plan canonique, avec la grille),
+# qui la transmet aux fonctions d'étape après valider_plan() (#82, #186) ; les
+# contrôles de valider_plan() ne la forment pas.
 valeurs_parametres_donnees <- function(transition, periode, delai_declaration, inventaires = NULL) {
   fin <- as.numeric(periode[["fin"]])
   v <- list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]), fin = fin,
@@ -833,7 +834,8 @@ valeurs_parametres_donnees <- function(transition, periode, delai_declaration, i
 }
 
 # Contrôle la transition, la période d'observation et le délai de déclaration
-# du plan (controler_parametres_donnees()) ; rend valeurs_parametres_donnees().
+# du plan (controler_parametres_donnees()) ; rend NULL, invisible (#186 : les
+# valeurs validées se forment dans valeurs_parametres_donnees()).
 # Forme exacte (#23, forme_exacte()) : chaque valeur a son type de base exact
 # et ne porte aucun attribut (ni names, ni dim, ni classe), hormis les noms
 # des listes `transition` et `periode` et la classe Date des bornes de la
@@ -884,16 +886,16 @@ controler_transition_periode <- function(transition, periode, delai_declaration)
                      citer(format(periode[["debut"]])), citer(format(structure(fin_effective, class = "Date"))),
                      citer(format(periode[["fin"]])), citer(format(delai_declaration))),
             list(debut = periode[["debut"]], fin_effective = structure(fin_effective, class = "Date")))
-  valeurs_parametres_donnees(transition, periode, delai_declaration)
+  invisible(NULL)
 }
 
-# Contrôle les paramètres que l'étape `donnees` reçoit ; rend la ligne de
-# TRANSITIONS et les bornes de la période (controler_transition_periode()).
+# Contrôle les paramètres que l'étape `donnees` reçoit (transition, période et
+# délai : controler_transition_periode()) ; rend NULL, invisible (#186).
 # Ordre : transition, période, délai, période vide, segmentation (motif
 # segmentation_invalide), exclusions.
 controler_parametres_donnees <- function(transition, periode, delai_declaration,
                                          segmentation, exclusions) {
-  p <- controler_transition_periode(transition, periode, delai_declaration)
+  controler_transition_periode(transition, periode, delai_declaration)
   controler_segmentation(segmentation)
   if (!forme_exacte(exclusions, "character") || anyNA(exclusions) || anyDuplicated(exclusions))
     refuser("donnees", "exclusions_invalides",
@@ -905,7 +907,7 @@ controler_parametres_donnees <- function(transition, periode, delai_declaration,
     refuser("donnees", "exclusion_inconnue",
             formuler("Code d'exclusion inconnu : %s (liste fermée des motifs).", liste_guillemets(inconnus)),
             list(exclusions = inconnus))
-  p
+  invisible(NULL)
 }
 
 # --- motifs de ligne et de tête (A.1) -----------------------------------------

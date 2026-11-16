@@ -36,11 +36,14 @@ ROLES <- c(id_contrat = "contrat", id_tete = "tete", sexe = "sexe", date_naissan
 
 # Contrôles du module donnees dans l'ordre de construire_table() (paramètres
 # par controler_parametres_donnees(), que valider_plan() appelle, puis rôles
-# par controler_roles()), puis l'étape sur les valeurs validées : la fonction
-# d'étape ne contrôle plus rien (#82).
+# par controler_roles()), puis l'étape sur les valeurs validées
+# (valeurs_parametres_donnees(), que controler_plan_roles() forme seule ; le
+# contrôle ne les rend plus, #186) : la fonction d'étape ne contrôle plus rien
+# (#82).
 prep <- function(d = BASE, roles = ROLES, exclusions = character(0), transition = VD,
                  segmentation = "sexe", periode = PER, delai = 0) {
-  p <- tablexp:::controler_parametres_donnees(transition, periode, delai, segmentation, exclusions)
+  tablexp:::controler_parametres_donnees(transition, periode, delai, segmentation, exclusions)
+  p <- tablexp:::valeurs_parametres_donnees(transition, periode, delai)
   recette <- tablexp:::controler_roles(d, roles, segmentation)
   preparer_donnees(d, roles, p, segmentation, exclusions, recette)
 }
@@ -349,7 +352,7 @@ local({
   prepare <- function(d, roles, p, segmentation, exclusions = character(0))
     preparer_donnees(d, roles, p, segmentation, exclusions, tablexp:::controler_roles(d, roles, segmentation))
   G3 <- D(c("2014-12-31", "2015-12-31", "2016-12-31"))
-  p_ldc <- tablexp:::controler_parametres_donnees(VD, PER, 0, "sexe", character(0))
+  p_ldc <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
   AG <- data.frame(sexe = c("H", "F", "H", "F"), age = c(60L, 60L, 61L, 61L), ec = c(100, 90, 95, 85),
                    d = c(1, 0, 2, 1), stringsAsFactors = FALSE)
   ST <- data.frame(id = c("A", "A", "A", "B", "B", "B"),
@@ -1609,8 +1612,8 @@ verifier("période : borne début à 0000-12-31 (-719163) ou borne fin à 10000-
            leve_refus(prep(periode = list(debut = PER$debut, fin = J(2932897))), "date_hors_domaine") &&
            leve_refus(prep(periode = list(debut = J(-719163), fin = J(2932897))), "date_hors_domaine"))
 verifier("période : bornes 0001-01-01 et 9999-12-31 acceptées par le contrôle des paramètres",
-         is.list(tablexp:::controler_parametres_donnees(VD, list(debut = J(-719162), fin = J(2932896)), 0, "sexe",
-                                                          character(0))))
+         is.null(refus(tablexp:::controler_parametres_donnees(VD, list(debut = J(-719162), fin = J(2932896)), 0, "sexe",
+                                                               character(0)))))
 verifier("période : borne non finie ou manquante reste periode_invalide (non date_hors_domaine)",
          leve_refus(prep(periode = list(debut = J(NA_real_), fin = PER$fin)), "periode_invalide") &&
            leve_refus(prep(periode = list(debut = PER$debut, fin = J(Inf))), "periode_invalide"))
