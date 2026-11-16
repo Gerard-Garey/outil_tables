@@ -447,6 +447,19 @@ verifier("D tables_reference_mal_formees, relecture refusée sur la première li
     "texte_objet() non restauré" else
     identical(r1$details$chemin, NA_character_) && identical(r2$details$chemin, NA_character_)
 })
+verifier("D tables_reference_mal_formees, relecture refusée sur un CR dans le chemin : chemin brut dans details, CR neutralisé dans le message", {
+  r <- relecture_alteree(remplacer_texte("a/parametres/p\t", "a/parametres/p\r\t"), controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_retour_chariot",
+                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, a/parametres/p<U+000D>)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/p\r") &&
+    !grepl("\r", conditionMessage(r), fixed = TRUE)
+})
+verifier("D tables_reference_mal_formees, relecture refusée sur un CRLF en fin de ligne : chemin de la ligne refusée sans le CR", {
+  r <- relecture_alteree(remplacer_texte('\t"pv"\n', '\t"pv"\r\n'), controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_retour_chariot",
+                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, a/parametres/p)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/p")
+})
 verifier("D tables_reference_mal_formees, relecture sans refus mais différente (Date integer) : motif « relecture différente » inchangé, chemin NA", {
   t_date <- table_reference(TR, "s", "synthetique", "x", parametres = list(d = structure(1L, class = "Date")))
   r <- refus_de(controler_forme_tables(list(a = t_date)))
