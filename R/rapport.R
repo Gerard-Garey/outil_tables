@@ -954,7 +954,10 @@ CHEMINS_FORME_HORS_RESULTAT <- setdiff(CHEMINS_HORS_RESULTAT, "etapes/donnees/re
 # execution : forme seule (valeurs = FALSE), aucun contrôle de codage, car
 # aucune de ses valeurs n'est rendue. Seule valeur de classe que l'écrivain ne
 # sait pas écrire et que ce contrôle admet : execution/debut, POSIXct nu
-# (classe seule, type double), contrôlé sur sa valeur nue. Rend TRUE.
+# (classe seule, type double), contrôlé sur sa valeur nue ; `debut` est trouvé
+# par match() sur les noms lus par attr(), qui ne lève pas sur un nom
+# d'encodage « bytes », et un tel nom ailleurs dans execution ne retire pas
+# l'exception (aucune valeur d'execution n'est rendue, nom compris). Rend TRUE.
 controler_forme_hors_resultat <- function(x) {
   for (chemin in CHEMINS_FORME_HORS_RESULTAT) {
     segments <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
@@ -966,7 +969,7 @@ controler_forme_hors_resultat <- function(x) {
       v <- .subset2(v, k)
     }
     if (is.null(v)) next
-    if (identical(chemin, "execution") && is.list(v) && is.null(attr(v, "class", exact = TRUE)) && !length(noms_bytes(v))) {
+    if (identical(chemin, "execution") && is.list(v) && is.null(attr(v, "class", exact = TRUE))) {
       k <- match("debut", attr(v, "names", exact = TRUE))
       if (!is.na(k) && is.double(v[[k]]) && identical(attributes(v[[k]]), list(class = c("POSIXct", "POSIXt"))))
         v[[k]] <- unclass(v[[k]])

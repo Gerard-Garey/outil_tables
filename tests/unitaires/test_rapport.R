@@ -487,6 +487,24 @@ local({
     nom_bytes <- function(l) { n <- names(l); n[1L] <- CLASSE_BYTES; names(l) <- n; l }
     a(function(l) { l$systeme <- CLASSE_BYTES; l }) && a(function(l) { l$systeme <- non_ascii_inconnu; l }) && a(nom_bytes)
   })
+  # Réserve R1 de l'audit de #141 : un nom bytes au premier niveau d'execution
+  # (hors forme : ses noms ne sont jamais rendus) ne désactive pas l'exception du
+  # POSIXct nu de execution/debut ; le rapport est rendu, octets identiques à o1.
+  # Contre-épreuve : un attribut tzone sur debut reste refusé, l'exception étant
+  # bornée au POSIXct nu.
+  verifier("#141, réserve R1 : nom bytes au premier niveau d'execution (autre que debut, quelle que soit sa position) : rendu, octets identiques à o1 ; avec attribut tzone sur debut : refus type_non_canonique, rôle execution/debut", {
+    nb <- function(k) { y <- x1; n <- attr(y$execution, "names", exact = TRUE); n[k] <- CLASSE_BYTES; attr(y$execution, "names") <- n; y }
+    e <- character(0)
+    for (k in seq_along(x1$execution)[names(x1$execution) != "debut"]) {
+      r <- attrape(ecrire_rapport(nb(k)))
+      if (!identical(r, o1)) e <- c(e, sprintf("nom bytes en position %d : %s", k, if (is.raw(r)) "octets différents de o1" else conditionMessage(r)))
+    }
+    y <- nb(which(names(x1$execution) != "debut")[1L]); attr(y$execution$debut, "tzone") <- "UTC"
+    r <- attrape(ecrire_rapport(y))
+    if (length(e)) e
+    else if (!inherits(r, "refus_tablexp") || !identical(r$motif, "type_non_canonique") || !identical(r$details$role, "execution/debut")) "tzone sur debut : refus type_non_canonique, rôle execution/debut attendu"
+    else TRUE
+  })
   verifier("#141 : même chaîne bytes dans fiche/plateforme : refus chaine_codage_bytes, rôle fiche/plateforme/sysname (inchangé) ; non ASCII sans codage déclaré : chaine_codage_indetermine hors locale UTF-8 ou latin-1, rendu sinon (inchangé)", {
     y <- x1; y$fiche$plateforme$sysname <- CLASSE_BYTES
     r1 <- attrape(ecrire_rapport(y))
