@@ -1584,7 +1584,10 @@ installe donc l'arbre de travail sous \code{LC\_ALL=C} et sous la première
 locale UTF-8 disponible, exécute dans chaque cas, sous la locale de
 l'installation, les plans de référence R1 à R17 sur leur entrée de référence,
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
-pour R1, le bilan du rejeu outillé et cinq messages (deux refus du rejeu
+pour R1, le bilan du rejeu outillé, complété des cellules des bilans de
+fiches et de données à nom, classe des données ou fichier de provenance
+non ASCII (lignes~1, 6, 10 et~12~; issues~\#142 et~\#296), et cinq
+messages (deux refus du rejeu
 outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
 citent des valeurs à caractères de contrôle ou non ASCII, et la citation
 d'une chaîne latin-1~; issue~\#94), qui doivent être marqués UTF-8 et tenir sur une
@@ -1616,7 +1619,7 @@ obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
 l'identité des textes est un \emph{constat} sur la machine qui exécute le
-contrôle (la plateforme de référence en CI) et sur ces quatorze plans, non une
+contrôle (la plateforme de référence en CI) et sur ces dix-sept plans, non une
 propriété démontrée~; il ne couvre ni une locale latin-1 (contrôle
 suivant), ni Windows (issue~\#49), ni des données de l'utilisateur à chaînes
 non ASCII.
@@ -3152,7 +3155,7 @@ Windows. La batterie unitaire garde en outre un échantillon de l'écriture
 recoupée par \code{ecriture\_doubles.R} et les témoins T1 à T3 de
 \code{ecriture\_doubles\_texte.R}, que la CI exécute en entier
 (section~\ref{sec:verifications-rapport}). Pour
-\code{locale\_c.R}, dont l'exécution complète (deux installations, quatorze plans)
+\code{locale\_c.R}, dont l'exécution complète (deux installations, dix-sept plans)
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
 sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
@@ -3661,7 +3664,9 @@ UTF-8 disponible, et exécuté dans un sous-processus sous la locale de son
 installation, qui vérifie d'abord la locale effective~; pour R1 à R17,
 fiche et plan écrits, relus \code{identical()} et réécrits à l'identique,
 rapport figé écrit, et, pour R1, bilan du rejeu outillé (chaînes non ASCII
-marquées UTF-8) et messages de refus (marqués UTF-8, sur une ligne~;
+marquées UTF-8), complété des bilans à nom, classe des données ou fichier
+de provenance non ASCII (lignes~1, 6, 10 et~12~; issues~\#142
+et~\#296) et messages de refus (marqués UTF-8, sur une ligne~;
 issue~\#94)~; messages de refus par module (neuf modules, dont
 \code{positionnement}, \code{validation} et \code{homogeneite}, chacun
 contrôlé sur son module et son motif attendus),
@@ -3676,7 +3681,7 @@ de R1 et les messages par module~; leur nombre est écrit par la sortie du contr
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11 et annotation du 05/11/2026, (f)~; M54~;
-issues~\#66, \#127 et~\#151 \\
+issues~\#66, \#127, \#142, \#151 et~\#296 \\
 \code{messages\_refus.R} & règle de rédaction des messages de refus
 (section~\ref{sec:refus})~: fichiers de \code{R/} lus par \code{parse()},
 sans charger \code{tablexp}~; gabarit de \code{formuler()} constant, aux
@@ -5260,12 +5265,12 @@ antérieur se lit en conséquence.
 \textcolor{financeblue}{\textbf{\code{verdict}}} &
 \textcolor{financeblue}{\textbf{\code{statut}}} \\
 \endhead
-\code{nature\_arguments} & «~fiche~: liste nommée~; donnees~: data.frame~» / «~fiche~: liste nommée de [n] champs~; donnees~: classe [classes], [n] lignes, [m] colonnes~» & conforme & contrôle de forme \\
+\code{nature\_arguments} & «~fiche~: liste nommée~; donnees~: data.frame~» / «~fiche~: liste nommée de [n] champs~; donnees~: classe [classes], [n] lignes, [m] colonnes~», classes citées par la règle unique & conforme & contrôle de forme \\
 \code{forme\_fiche} & formes exigées à l'étape~2 / «~champs lus de la forme attendue~» & conforme & contrôle de forme \\
 \code{version\_fiche} & \code{VERSIONS\_FICHE\_REJEU} / \code{version\_fiche} de la fiche & conforme & comparaison exacte \\
 \code{algorithme\_empreinte} & \code{ALGORITHME\_EMPREINTE} / \code{empreintes\$algorithme} & conforme & comparaison exacte \\
 \code{representation} & \code{ENTETE\_CANONIQUE} / \code{empreintes\$representation} & conforme & comparaison exacte \\
-\code{entrees\_construction} & «~valider\_plan(), controler\_roles(), recette et convention, controler\_matrice\_recette(), controler\_provenance()~: aucun refus~» / «~étapes~: [étapes du plan]~; rôles~: [rôles de la fiche]~; recette~: [recette déduite]~; provenance~: [fichier, ou les $k \ge 2$ fichiers cités entre guillemets, ou NULL]~» & conforme & contrôles délégués aux modules \\
+\code{entrees\_construction} & «~valider\_plan(), controler\_roles(), recette et convention, controler\_matrice\_recette(), controler\_provenance()~: aucun refus~» / «~étapes~: [étapes du plan]~; rôles~: [rôles de la fiche]~; recette~: [recette déduite]~; provenance~: [fichier, ou les $k \ge 2$ fichiers cités entre guillemets, ou NULL]~», noms cités par la règle unique & conforme & contrôles délégués aux modules \\
 \code{empreinte\_donnees} & empreinte recalculée / \code{empreintes\$donnees} & conforme & exacte~; sans rôle de sécurité \\
 \code{tables\_reference} & «~[clé] : [empreinte recalculée] (reçue)~» ou «~(relue dans le package)~», joints par «~;~», ou «~aucune empreinte recalculée (aucune table reçue ni relue)~» / «~[clé] : [empreinte de la fiche]~», joints par «~;~», ou «~aucune table de référence (fiche/tables\_reference~: NULL)~» & conforme & exacte~; sans rôle de sécurité \\
 \code{temoin\_code} & \code{EMPREINTE\_CODE} / \code{empreintes\$code} & V1 & exacte~; sans rôle de sécurité \\
@@ -5273,7 +5278,7 @@ antérieur se lit en conséquence.
 \code{temoin\_plateforme} & idem pour \code{plateforme} & V2 & comparaison exacte \\
 \code{temoin\_fiche} & «~fiche rendue par construire\_table(), hors versions, plateforme, empreintes/resultat, empreintes/code, empreintes/statut\_resultat\_code~» / «~fiche reçue, même périmètre~» & V3 & comparaison exacte \\
 \code{temoin\_empreinte\_resultat} & empreinte du résultat de l'objet rendu / \code{empreintes\$resultat} de la fiche & V1 & témoin, même machine seulement \\
-\code{temoin\_empreinte\_fichier} & «~non recalculée par le moteur (couche de lecture, E4.4)~» / \code{empreintes\$fichier}, telle quelle pour un fichier, les $k \ge 2$ empreintes citées une à une entre guillemets dans l'ordre de la fiche & non vérifiée & reprise de la fiche, non vérifiée par le moteur \\
+\code{temoin\_empreinte\_fichier} & «~non recalculée par le moteur (couche de lecture, E4.4)~» / \code{empreintes\$fichier}, citée par la règle unique pour un fichier, les $k \ge 2$ empreintes citées une à une entre guillemets dans l'ordre de la fiche & non vérifiée & reprise de la fiche, non vérifiée par le moteur \\
 \code{temoin\_catalogue} & pour chaque clé de statut \code{embarquee} de la fiche, dans son ordre, textes joints par «~;~»~: clé en écart, «~[clé]/[champ] : [valeur du catalogue] (catalogue du package installé)~» par champ en écart~; clé intacte, «~[clé] : métadonnées du catalogue du package installé~»~; aucune table de ce statut, «~aucune métadonnée du catalogue opposée (aucune table de statut «~embarquee~»)~» / de même, «~[clé]/[champ] : [valeur de la fiche]~», «~[clé] : métadonnées de la fiche~», ou «~aucune table de statut «~embarquee~» dans fiche/tables\_reference~» & «~identique~», ou «~différente~: tables\_reference/\allowbreak[clé]/\allowbreak[champ]~», chemins joints par «~,~» & «~comparaison exacte~» sans écart~; sinon l'un des trois statuts de régime (ci-dessous) \\
 \end{longtable}
 }
@@ -5523,10 +5528,7 @@ témoins \textbf{signalent et ne refusent jamais}~:
     place (ci-dessus et ci-après)~: la forme MD5 des empreintes du code et du résultat
     lues dans la fiche n'est pas contrôlée, si bien qu'un verdict
     «~différente~» des lignes~9 et~13 peut venir d'une valeur de la fiche
-    qui n'est pas une empreinte (issue~\#295)~; sous la locale C, la ligne
-    \code{entrees\_construction} abîme les mots «~étapes~» et «~rôles~» du
-    gabarit quand le nom du fichier de la provenance n'est pas ASCII
-    (issue~\#296)~; une clé de \code{tables\_reference} qui contient «~/~»
+    qui n'est pas une empreinte (issue~\#295)~; une clé de \code{tables\_reference} qui contient «~/~»
     ou «~,~» rend ambigus les chemins des lignes~12 et~15 (issue~\#298).
 \end{itemize}
 
@@ -5543,8 +5545,10 @@ d'encodage bytes>~», un caractère de contrôle ou un séparateur de ligne
 citées les colonnes \code{lu} des témoins du code, de l'empreinte du
 résultat et de l'empreinte de chaque fichier lu, les paires «~nom=valeur~»
 de \code{versions} et de \code{plateforme} (noms et valeurs, colonnes
-\code{attendu} et \code{lu}, par \code{paires\_lues()}), le nom du fichier
-de la provenance à la ligne \code{entrees\_construction}, et chaque nom
+\code{attendu} et \code{lu}, par \code{paires\_lues()}), la classe des données à la ligne
+\code{nature\_arguments}, les noms des étapes du plan et des rôles, la
+recette et le nom du fichier de la provenance à la ligne
+\code{entrees\_construction}, et chaque nom
 écrit dans un chemin d'un verdict «~différente~: \emph{chemins}~» (par
 \code{champs\_differents()}), et, à la ligne \code{temoin\_catalogue},
 chaque clé et chaque valeur des métadonnées d'une table embarquée,
@@ -5552,8 +5556,8 @@ chaque clé et chaque valeur des métadonnées d'une table embarquée,
 l'étape~2 ne contraint pas (par \code{temoin\_catalogue()}~; ci-dessus,
 \textbf{catalogue}). Les autres valeurs écrites aux lignes~1
 à~8 sont soit des valeurs que les étapes~1 à~7~bis auraient refusées si
-elles étaient d'encodage \code{bytes} ou hors UTF-8 valide (noms des
-étapes du plan et des rôles, libellés et empreintes comparés), soit des
+elles étaient d'encodage \code{bytes} ou hors UTF-8 valide (libellés et
+empreintes comparés), soit des
 valeurs recalculées par le moteur (\emph{lecture} du code).
 \code{texte\_lu()} garde sa sortie brute, qui alimente aussi les
 \code{details} de \code{version\_fiche\_non\_admise}~: la citation est
@@ -5586,16 +5590,29 @@ locales C et C.UTF-8, valeur \code{bytes} ou «~zz~» posée sur
 \medskip
 \noindent
 Les textes fixes et composés du bilan sont du texte du moteur, marqué
-UTF-8 (\code{texte\_moteur()})~; les comparaisons portent sur les valeurs
-brutes. Le bilan du rejeu de R1 est identique octet à octet sous la locale
-C et sous une locale UTF-8 (constat du contrôle
-\code{tests/controles/locale\_c.R}, section~\ref{sec:scripts-controle}).
-Un bilan ne l'est pas, à la ligne \code{entrees\_construction}, quand le nom du
-fichier de la provenance n'est pas ASCII~: sous la locale C, les mots
-«~étapes~» et «~rôles~» du gabarit y sont écrits
-\code{<c3><a9>tapes} et \code{r<c3><b4>les} (\emph{constat} sous les
-locales C et C.UTF-8, nom marqué UTF-8~; défaut antérieur à
-l'issue~\#142 selon la mesure de l'audit rapportée dans l'issue~\#296).\par
+UTF-8. La marque est posée avant tout collage d'un littéral non ASCII à
+une valeur citée~: les textes composés des lignes \code{nature\_arguments}
+et \code{entrees\_construction} sont formés par \code{formuler()}, les
+verdicts «~différente~: \emph{chemins}~» par collage de morceaux déjà
+marqués (littéraux «~différente~:~», «~(absent de la fiche reçue)~»,
+«~(absent de la fiche rendue)~» passés par \code{texte\_moteur()},
+chemins cités). Une marque posée après le collage viendrait trop tard~:
+sous la locale C, un littéral non marqué collé à une citation marquée
+UTF-8 voit ses octets non ASCII écrits en échappements, «~différente~»
+devenant \code{diff<c3><a9>rente} (\emph{constat} sous la locale C sur
+le code antérieur à la correction, nom non ASCII ajouté à
+\code{versions}~; issues~\#86 et~\#127). Les comparaisons portent
+sur les valeurs brutes, avant tout marquage. Le bilan du rejeu de R1, et
+ceux de fiches et de données à nom, classe ou fichier de provenance non
+ASCII, sont identiques octet à octet sous la locale C et sous une locale
+UTF-8 (constat du contrôle \code{tests/controles/locale\_c.R},
+section~\ref{sec:scripts-controle}). Avant l'issue~\#296, la ligne
+\code{entrees\_construction} faisait exception quand le nom du fichier de
+la provenance n'était pas ASCII~: sous la locale C, les mots «~étapes~» et
+«~rôles~» du gabarit y étaient écrits \code{<c3><a9>tapes} et
+\code{r<c3><b4>les}, comme le mot «~nommée~» de la ligne
+\code{nature\_arguments} pour une classe des données non ASCII~;
+défauts corrigés au titre des issues~\#296 et~\#142.\par
 \endgroup
 
 \subsection{Vérifications}
@@ -5759,7 +5776,15 @@ inchangés) et de \code{empreintes\$code}, \code{\$resultat} et
 contrôle ou hors UTF-8 valide (cité dans le chemin du verdict), et un nom
 de fichier de la provenance à caractère de contrôle (ligne
 \code{entrees\_construction} sur une ligne, fiche en objet et relue de son
-texte)~; pour l'issue~\#267, le témoin «~catalogue~» (tests~T12, valeurs
+texte)~; en outre (tests~T11~bis), la classe des données citée à la
+ligne \code{nature\_arguments} (classe non ASCII, à LF, à octets hors
+UTF-8 valide, à deux éléments à caractère de contrôle~: texte exact,
+cellule d'une ligne en UTF-8 valide, verdicts inchangés) et le texte exact,
+en octets, et la marque UTF-8 des verdicts «~différente~: \ldots~(absent
+de la fiche rendue)~» des lignes~10 et~12 pour un nom non ASCII, marqué
+UTF-8 ou non, ajouté à \code{versions} ou à \code{empreintes}, et de
+\code{verdict\_chemins()} pour un nom absent de la fiche reçue~; pour
+l'issue~\#267, le témoin «~catalogue~» (tests~T12, valeurs
 calculées à la main)~: forme du bilan (quinze lignes, dernière
 \code{temoin\_catalogue}, les quatorze premières inchangées en place, en
 nom et en statut), fiche intacte à table embarquée (TV~88-90 sous la clé
@@ -5790,10 +5815,17 @@ embarquées est vérifié par \code{tests/unitaires/test\_tables\_embarquees.R}
 référence, la fiche écrite puis relue~: objet \code{identical()} hors
 \code{execution} à l'objet de référence, témoins du code, des versions, de
 la plateforme, de la fiche et de l'empreinte du résultat «~identique~»,
-empreinte du fichier «~non vérifiée~» (lignes~9 à~14~; la ligne~15 n'y
-est pas contrôlée). \code{tests/controles/locale\_c.R}
-compare les octets du bilan du rejeu de R1, et ceux de messages de refus
-du rejeu, sous les deux locales.\par}
+empreinte du fichier «~non vérifiée~», témoin «~catalogue~»
+«~identique~» au statut «~comparaison exacte~» (lignes~9 à~15~; aucun
+plan de référence ne porte de table de statut \code{embarquee}, si bien
+que la ligne~15 y est celle d'une fiche sans telle table).
+\code{tests/controles/locale\_c.R} compare les octets du bilan du rejeu
+de R1, des cellules des bilans de fiches et de données à nom, classe ou
+fichier de provenance non ASCII (verdicts des lignes~10 et~12, ligne~1
+pour une classe non ASCII, à LF ou à octet invalide, ligne~6 pour un et
+deux fichiers, fiche en objet et relue~; textes attendus écrits octet par
+octet, motifs «~étapes~», «~rôles~» et fin de cellule pour la ligne~6), et ceux de messages de refus du rejeu, sous les deux
+locales.\par}
 
 \subsection{Fonctions du module}
 \label{sec:fonctions-construire-table}
@@ -16795,7 +16827,9 @@ section~\ref{sec:rapport-fige}~; issue~\#141)~: appelé en mode
 \code{canonique}, il refuse les mêmes cas sous \code{type\_non\_canonique},
 rôle le chemin, au lieu de \code{serialisation\_impossible}, et refuse en
 outre tout \code{data.frame}~; avec \code{valeurs = FALSE}, il parcourt la
-forme sans écrire aucun nom ni aucune valeur, donc sans contrôle de codage.
+forme et en refuse les mêmes cas, sans écrire aucun nom ni aucune valeur,
+donc sans contrôle de codage ni du domaine des dates (\code{date\_hors\_domaine},
+\code{date\_non\_entiere}).
 Le texte du plan et de la fiche reste écrit en mode ordinaire, inchangé.
 
 \noindent
@@ -17061,9 +17095,12 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     section~\ref{sec:empreinte}), le rôle étant le chemin de la valeur ou
     «~\emph{chemin}/@noms~». \code{execution} est contrôlé en \textbf{forme
     seule} (type, classe, attributs~; \code{valeurs = FALSE})~: aucun nom ni
-    aucune valeur n'en est écrit, donc aucun codage n'y est contrôlé, parce
-    qu'aucune de ses valeurs n'est rendue~; une chaîne \code{bytes}, ou non
-    ASCII sans codage déclaré, y est admise~: par \code{execution}, la
+    aucune valeur n'en est écrit, donc ni le codage ni le domaine des
+    valeurs n'y sont contrôlés, parce qu'aucune de ses valeurs n'est
+    rendue~; une chaîne \code{bytes}, ou non ASCII sans codage déclaré, y
+    est admise, de même qu'une \code{Date} hors du domaine, infinie ou non
+    entière (refusée sous \code{fiche/} par \code{date\_hors\_domaine} ou
+    \code{date\_non\_entiere})~: par \code{execution}, la
     locale de la construction ne peut motiver aucun refus (décision M499,
     (b)~; \emph{lecture} du code, \code{valeurs = FALSE}~; \emph{constat}
     sous les locales C et C.UTF-8). Seule exception~:
@@ -17985,7 +18022,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{BLOCS\_LECTURE\_FICHE} & constante & --- & partition des champs de la fiche en trois blocs (E3.7)~: \code{calculé}, \code{hypothèses}, \code{rejeu}, champs de chaque bloc dans l'ordre de \code{ORDRE\_CHAMPS\_FICHE}~; rappelée par la ligne d'en-tête \code{\# lecture} \\
 \catalogue{fonctions-rapport}{joindre\_chemin()} & interne & chemin, segment & chemin d'un élément, segments séparés par \code{/} \\
 \catalogue{fonctions-rapport}{segments\_texte()} & interne & noms, longueur & segment de chemin de chaque élément~: son nom, ou \code{[i]} (rang) si le nom est absent, vide, \code{NA}, en double, contient \code{/}, une tabulation ou une fin de ligne, ou commence par \code{@}, \code{\#} ou \code{[} \\
-\catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête, forme, \code{canonique}, \code{valeurs} & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"} (défaut~: plan, fiche) ou \code{"empreinte"} (\code{empreinte\_resultat()})~; refus \code{serialisation\_impossible} (facteur en forme \code{"texte"}~; en forme \code{"empreinte"}, facteur de classe autre qu'exactement \code{factor} ou \code{c("ordered", "factor")} ou d'attribut autre que \code{names}, \code{levels}, \code{class}~; classe ou attribut non écrits, \code{Date} de stockage autre que \code{double} ou \code{integer}, vecteur atomique nommé de longueur~0, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE})~; \code{canonique = TRUE} (contrôle~5 du rapport figé)~: mêmes cas refusés sous \code{type\_non\_canonique} (rôle~: le chemin), \code{data.frame} compris~; \code{valeurs = FALSE}~: forme seule, aucun nom ni aucune valeur écrits, donc aucun contrôle de codage (issue~\#141) \\
+\catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête, forme, \code{canonique}, \code{valeurs} & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"} (défaut~: plan, fiche) ou \code{"empreinte"} (\code{empreinte\_resultat()})~; refus \code{serialisation\_impossible} (facteur en forme \code{"texte"}~; en forme \code{"empreinte"}, facteur de classe autre qu'exactement \code{factor} ou \code{c("ordered", "factor")} ou d'attribut autre que \code{names}, \code{levels}, \code{class}~; classe ou attribut non écrits, \code{Date} de stockage autre que \code{double} ou \code{integer}, vecteur atomique nommé de longueur~0, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE})~; \code{canonique = TRUE} (contrôle~5 du rapport figé)~: mêmes cas refusés sous \code{type\_non\_canonique} (rôle~: le chemin), \code{data.frame} compris~; \code{valeurs = FALSE}~: forme seule, mêmes refus de forme, aucun nom ni aucune valeur écrits, donc aucun contrôle de codage ni du domaine des \code{Date} (issue~\#141~; décision M499, (b)) \\
 \catalogue{fonctions-rapport}{valeurs\_texte()} & interne & type, textes d'une ligne, refus & valeurs relues sans évaluation~; refus \code{texte\_valeur\_invalide}, \code{texte\_double\_}\allowbreak\code{sous\_depassement} (décimal non nul relu 0) \\
 \catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne} \\
 \catalogue{fonctions-rapport}{ecrire\_plan()} & exportée & plan & octets du texte du plan, écrit tel qu'il est reçu, sans validation ni canonisation \\
