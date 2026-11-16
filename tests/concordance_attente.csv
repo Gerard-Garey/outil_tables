@@ -1,3 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-construire-table:ecarts_catalogue,#267,assistant commun de comparaison au catalogue (DF3 ; M498) ; docwriter en fin de branche (règle 9)
-entree,fonctions-construire-table:temoin_catalogue,#267,mise en texte du témoin catalogue du rejeu (ligne 15 du bilan ; DF4 et DF5 ; M498) ; docwriter en fin de branche (règle 9)
