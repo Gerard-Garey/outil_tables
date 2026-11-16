@@ -5428,24 +5428,24 @@ témoins \textbf{signalent et ne refusent jamais}~:
     l'est par \code{texte\_lu()}, cité de même~: «~absente~»
     (\code{NULL}, ce que vaut \code{parametres} au catalogue), «~NA~»,
     «~illisible ([type] de longueur [n])~», jamais par \code{deparse()}.
-    \textbf{Le verdict fait foi} pour la liste des champs en écart~: ses
-    chemins ne portent que la clé et le nom d'un champ de
-    \code{CHAMPS\_TABLE\_FICHE}, aucune valeur de la fiche, et une clé
-    intacte n'y figure pas. Les colonnes \code{lu} et \code{attendu} citent
+    \textbf{Le verdict ne cite aucune valeur}~: ses chemins ne portent que
+    la clé et le nom d'un champ de \code{CHAMPS\_TABLE\_FICHE}, et une clé
+    intacte n'y figure pas~; c'est lui, non les colonnes \code{lu} et
+    \code{attendu}, qui donne la liste des champs en écart. Les colonnes \code{lu} et \code{attendu} citent
     des valeurs, et la règle unique n'échappe ni «~«~», ni «~»~», ni
     «~<~»~: une valeur fabriquée peut y imiter un second écart ou le repère
     d'une chaîne \code{bytes} (\emph{constat de mesure} du 16/11/2026~: la
     source «~x » ; tv/forme\_origine : « qx~» donne en \code{lu}
     «~tv/source : « x » ; tv/forme\_origine : « qx »~», le verdict restant
-    «~différente~: tables\_reference/tv/source~»). Le verdict a pourtant une
-    limite, qu'il partage avec la règle~V3~: la clé y est écrite telle que la
+    «~différente~: tables\_reference/tv/source~»). Sa lecture a une limite,
+    partagée avec la règle~V3~: la clé y est écrite telle que la
     règle unique la cite, et ni la construction ni le rejeu ne refusent une
     clé qui contient «~/~» ou «~,~»~; une telle clé rend la lecture des
     chemins ambiguë (\emph{constat de mesure} du 16/11/2026~: sous la clé
     «~tv/forme\_origine, tables\_reference/tv~», une source altérée donne
     aux lignes~12 et~15 le verdict «~différente~:
     tables\_reference/tv/forme\_origine, tables\_reference/tv/source~»
-    pour un seul champ en écart). Le \emph{régime}, dit dans le statut
+    pour un seul champ en écart~; issue~\#298). Le \emph{régime}, dit dans le statut
     seulement en cas d'écart, est lu sur le \textbf{verdict} de la ligne
     \code{temoin\_code} (\code{verdict\_chaines()}), jamais par
     \code{identical()} des empreintes, qui vaut \code{TRUE} pour deux
@@ -5456,9 +5456,12 @@ témoins \textbf{signalent et ne refusent jamais}~:
     «~Tables embarquées~», «~Ce que couvre chaque empreinte~»)~; l'empreinte
     du code couvrant \code{R/}, une empreinte du code identique implique un
     catalogue aux mêmes métadonnées, et l'écart ne vient pas d'une évolution
-    du catalogue~: il vient de la fiche (écrite avant l'issue~\#263, ou
-    altérée)~; une empreinte du code différente laisse les deux origines
-    possibles, sans les départager~; non déterminable, l'origine l'est aussi.
+    du catalogue~: il vient d'une fiche altérée après sa construction, le
+    code de même empreinte refusant à la construction une table embarquée
+    aux métadonnées discordantes (\code{table\_embarquee\_discordante})~;
+    une empreinte du code différente laisse les deux origines possibles,
+    sans les départager (fiche écrite avant l'issue~\#263 ou altérée, ou
+    évolution du catalogue)~; non déterminable, l'origine l'est aussi.
     Ce raisonnement vaut pour une empreinte du code authentique~: comme
     elle, le témoin est sans rôle de sécurité, et il suffit d'altérer aussi
     \code{empreintes\$code} pour quitter le régime «~identique~». Le témoin
@@ -5516,6 +5519,15 @@ témoins \textbf{signalent et ne refusent jamais}~:
     valeurs --- le rapport figé, qui les écrit en \code{\%.17g}, en est un
     (section~\ref{sec:rapport-fige}) --- et relèverait d'une issue à part,
     si le besoin est confirmé (ADR 0012, «~Conséquences~»).
+  \item \textbf{Lecture des témoins~: limites ouvertes}, décrites à leur
+    place (ci-dessus et ci-après)~: la forme MD5 des empreintes du code et du résultat
+    lues dans la fiche n'est pas contrôlée, si bien qu'un verdict
+    «~différente~» des lignes~9 et~13 peut venir d'une valeur de la fiche
+    qui n'est pas une empreinte (issue~\#295)~; sous la locale C, la ligne
+    \code{entrees\_construction} abîme les mots «~étapes~» et «~rôles~» du
+    gabarit quand le nom du fichier de la provenance n'est pas ASCII
+    (issue~\#296)~; une clé de \code{tables\_reference} qui contient «~/~»
+    ou «~,~» rend ambigus les chemins des lignes~12 et~15 (issue~\#298).
 \end{itemize}
 
 \medskip
@@ -5565,8 +5577,9 @@ valeur \code{bytes} «~différente~: \emph{nom}~» (règle~V3, la valeur
 brute n'étant pas \code{identical()} à celle de la fiche rendue). Une
 valeur \code{bytes} de \code{empreintes\$code} ou
 \code{empreintes\$resultat} donne «~différente~» (règle~V1), sans que la
-forme d'une empreinte MD5 soit contrôlée~: cet écart peut alors venir de la
-fiche elle-même, non d'un écart à E4.6 (\emph{constat} sous les
+forme d'une empreinte MD5 soit contrôlée~: un tel verdict des lignes~9
+et~13 peut donc venir d'une valeur de la fiche qui n'est pas une empreinte,
+et non d'un autre code ou d'une autre plateforme (E4.6) (\emph{constat} sous les
 locales C et C.UTF-8, valeur \code{bytes} ou «~zz~» posée sur
 \code{empreintes\$resultat}~; issue~\#295).
 
@@ -5577,7 +5590,7 @@ UTF-8 (\code{texte\_moteur()})~; les comparaisons portent sur les valeurs
 brutes. Le bilan du rejeu de R1 est identique octet à octet sous la locale
 C et sous une locale UTF-8 (constat du contrôle
 \code{tests/controles/locale\_c.R}, section~\ref{sec:scripts-controle}).
-Il ne l'est pas, à la ligne \code{entrees\_construction}, quand le nom du
+Un bilan ne l'est pas, à la ligne \code{entrees\_construction}, quand le nom du
 fichier de la provenance n'est pas ASCII~: sous la locale C, les mots
 «~étapes~» et «~rôles~» du gabarit y sont écrits
 \code{<c3><a9>tapes} et \code{r<c3><b4>les} (\emph{constat} sous les
@@ -17050,8 +17063,10 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     seule} (type, classe, attributs~; \code{valeurs = FALSE})~: aucun nom ni
     aucune valeur n'en est écrit, donc aucun codage n'y est contrôlé, parce
     qu'aucune de ses valeurs n'est rendue~; une chaîne \code{bytes}, ou non
-    ASCII sans codage déclaré, y est admise, et un objet intact n'est pas
-    refusé à cause de la locale de sa construction. Seule exception~:
+    ASCII sans codage déclaré, y est admise~: par \code{execution}, la
+    locale de la construction ne peut motiver aucun refus (décision M499,
+    (b)~; \emph{lecture} du code, \code{valeurs = FALSE}~; \emph{constat}
+    sous les locales C et C.UTF-8). Seule exception~:
     \code{execution/debut}, que \code{construire\_table()} pose en
     \code{POSIXct} nu (classe \code{c("POSIXct", "POSIXt")} seule, type
     \code{double}) et que l'écrivain ne sait pas écrire, est contrôlé sur sa
