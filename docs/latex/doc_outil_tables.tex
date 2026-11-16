@@ -5007,6 +5007,9 @@ type et sa longueur sans sa classe, ses attributs, \code{class} compris,
 lèveraient l'erreur R sur elle). Pour ces formes, \code{details\$lu} est ce texte descriptif, et
 non la valeur brute~: la valeur exacte est celle de la fiche reçue au
 chemin \code{details\$champ}.
+Les éléments \code{lu} et \code{attendu} des \code{details} suivent la
+règle du bilan (ci-dessous, «~Sens des colonnes \code{lu} et
+\code{attendu}~»~: valeur reçue, valeur que le code installé oppose).
 Dans le tableau, un crochet désigne une valeur insérée.
 
 {\footnotesize
@@ -5157,15 +5160,7 @@ n'est pas touché ---, et \code{bilan}, un \code{data.frame} de quatorze lignes
 et cinq colonnes \code{character}, sans \code{NA} (\code{controle},
 \code{attendu}, \code{lu}, \code{verdict}, \code{statut})~: huit contrôles,
 puis six témoins (tableau~\ref{tab:bilan-rejeu}~; la ligne
-\code{tables\_reference}, huitième, vient de l'issue~\#73). La colonne \code{lu}
-porte ce que reçoit le rejeu (la fiche, et les données pour la première
-ligne), la colonne \code{attendu} ce que le code installé exige ou obtient~;
-la ligne \code{tables\_reference} fait exception (ADR 0015, point~4.3)~: les
-tables y sont l'entrée reçue ou relue, si bien que \code{lu} porte
-l'empreinte recalculée sur chacune et \code{attendu} celle que la fiche
-exige. Les \code{details} du refus \code{empreinte\_table\_discordante}
-suivent, eux, la règle générale (\code{lu}~: empreinte de la fiche~;
-\code{attendu}~: empreinte recalculée).
+\code{tables\_reference}, huitième, vient de l'issue~\#73).
 Le bilan \textbf{n'entre pas dans l'objet}~: un champ ou un attribut de plus
 ferait que l'objet rejoué ne serait plus \code{identical()} à un original,
 changerait le périmètre de l'empreinte du résultat, et
@@ -5174,6 +5169,38 @@ tout attribut inconnu. Un bilan n'existe
 que pour un rejeu abouti~: ses huit lignes de contrôle valent donc toujours
 «~conforme~»~; elles disent ce qui a été contrôlé, sur quelles valeurs. Un
 refus est une condition R (section~\ref{sec:refus}) et ne rend aucun bilan.
+
+\medskip
+\noindent
+\textbf{Sens des colonnes \code{lu} et \code{attendu}} (ADR 0015, point~4.3,
+annotation du 15/11/2026~; issue~\#160~; décision M497). Une règle unique
+vaut pour toutes les lignes du bilan et pour les \code{details} des refus du
+rejeu (tableau~\ref{tab:refus-rejeu})~: \code{lu} porte la valeur soumise au
+contrôle \textbf{telle que le rejeu la reçoit}, un champ de la fiche ou un
+argument (\code{donnees} à la première ligne, \code{tables\_reference})~;
+\code{attendu} porte la valeur que \textbf{le code installé lui oppose}~: une
+exigence (version, algorithme, représentation, forme), une valeur
+recalculée (empreinte des données, empreinte de table, avec l'origine de la
+table, «~reçue~» ou «~relue dans le package~»), une valeur rendue par
+\code{construire\_table()} (fiche rendue, empreinte du résultat), ou les
+clés de \code{fiche\$tables\_reference} opposées à l'argument
+\code{tables\_reference} (\code{details} de
+\code{table\_reference\_inattendue} et de \code{table\_reference\_absente}
+à l'étape~7~bis).
+Pour une empreinte, \code{lu} est donc celle de la fiche et \code{attendu}
+celle que le code recalcule ou rend~: les lignes \code{empreinte\_donnees}
+et \code{tables\_reference} et les \code{details} de
+\code{empreinte\_donnees\_discordante} et de
+\code{empreinte\_table\_discordante} ont le même sens. Quand le code
+n'oppose aucune valeur, \code{attendu} le dit (ligne
+\code{tables\_reference} d'une fiche sans table, ligne
+\code{temoin\_empreinte\_fichier}). Un élément de \code{details} d'un autre
+nom (\code{admises} de \code{version\_fiche\_non\_admise}, \code{origine},
+\code{lignes}\ldots) complète la règle sans y déroger. Avant l'issue~\#160,
+la ligne \code{tables\_reference} suivait le sens inverse (\code{lu}~:
+empreintes recalculées avec leur origine, ou «~aucune table reçue ni
+relue~»~; \code{attendu}~: empreintes de la fiche), seule exception à la règle~: un bilan produit par un code
+antérieur se lit en conséquence.
 
 {\footnotesize
 \rowcolors{2}{tablerow}{white}
@@ -5199,7 +5226,7 @@ refus est une condition R (section~\ref{sec:refus}) et ne rend aucun bilan.
 \code{representation} & \code{ENTETE\_CANONIQUE} / \code{empreintes\$representation} & conforme & comparaison exacte \\
 \code{entrees\_construction} & «~valider\_plan(), controler\_roles(), recette et convention, controler\_matrice\_recette(), controler\_provenance()~: aucun refus~» / «~étapes~: [étapes du plan]~; rôles~: [rôles de la fiche]~; recette~: [recette déduite]~; provenance~: [fichier, ou les $k \ge 2$ fichiers cités entre guillemets, ou NULL]~» & conforme & contrôles délégués aux modules \\
 \code{empreinte\_donnees} & empreinte recalculée / \code{empreintes\$donnees} & conforme & exacte~; sans rôle de sécurité \\
-\code{tables\_reference} & «~[clé] : [empreinte de la fiche]~», joints par «~;~», ou «~aucune table de référence (fiche/tables\_reference~: NULL)~» / «~[clé] : [empreinte recalculée] (reçue)~» ou «~(relue dans le package)~», joints par «~;~», ou «~aucune table reçue ni relue~» & conforme & exacte~; sans rôle de sécurité \\
+\code{tables\_reference} & «~[clé] : [empreinte recalculée] (reçue)~» ou «~(relue dans le package)~», joints par «~;~», ou «~aucune empreinte recalculée (aucune table reçue ni relue)~» / «~[clé] : [empreinte de la fiche]~», joints par «~;~», ou «~aucune table de référence (fiche/tables\_reference~: NULL)~» & conforme & exacte~; sans rôle de sécurité \\
 \code{temoin\_code} & \code{EMPREINTE\_CODE} / \code{empreintes\$code} & V1 & exacte~; sans rôle de sécurité \\
 \code{temoin\_versions} & \code{versions} de la fiche rendue / de la fiche reçue, en paires «~nom=valeur~» jointes par «~;~», noms et valeurs cités par la règle unique & V2 & comparaison exacte \\
 \code{temoin\_plateforme} & idem pour \code{plateforme} & V2 & comparaison exacte \\
@@ -5274,7 +5301,7 @@ toute empreinte du projet, sans rôle de sécurité~: elle identifie un
 contenu, elle ne le protège pas contre une modification délibérée~; la
 ligne~8 est, pour chaque table de la fiche, la même égalité exacte de deux
 empreintes de table, dont l'origine (reçue, ou relue dans le package) est
-dite dans la colonne \code{lu}. Une empreinte de table porte sur des doubles
+dite dans la colonne \code{attendu}. Une empreinte de table porte sur des doubles
 écrits en octets~: une table synthétique recalculée sur une autre plateforme
 peut en différer au dernier bit, par les fonctions de la \code{libm}, et son
 rejeu y être refusé (\emph{possibilité} déduite de l'écriture, non
@@ -5524,7 +5551,9 @@ testés par injection d'un paramètre qui cite une clé et d'un catalogue de
 tables embarquées (décision M247)~; l'absence d'appel de
 \code{preparer\_donnees()} sur un refus, comptée par \code{trace()}~; au
 rejeu, chaque refus de l'étape~7~bis, les textes de la ligne
-\code{tables\_reference} du bilan (table reçue, table relue), l'absence
+\code{tables\_reference} du bilan (fiche sans table, table reçue, table
+relue, deux tables d'origines mêlées~; \code{lu}~: empreintes de la fiche,
+\code{attendu}~: empreintes recalculées avec leur origine, issue~\#160), l'absence
 d'appel de \code{construire\_table()} sur \code{empreinte\_table\_discordante},
 une table reçue qu'aucun paramètre du plan ne cite, admise par l'étape~7~bis
 puis refusée sous \code{table\_reference\_inattendue}, texte de la
@@ -14760,6 +14789,9 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{identical()} hors \code{execution}~; refus
     \code{table\_reference\_absente} sans la table et
     \code{empreinte\_table\_discordante} pour une table altérée d'un ulp~;
+    ligne \code{tables\_reference} du bilan pour la table reçue, de même
+    sens que les \code{details} de ce refus (\code{lu}~: empreinte de la
+    fiche~; \code{attendu}~: empreinte recalculée~; issue~\#160)~;
     refus \code{plage\_ages\_hors\_table} au rejeu, levé par l'unique
     appel de \code{construire\_table()} avant toute étape, sans appel de
     \code{preparer\_donnees()} (issue~\#82)~; section \code{etape\_validation} du
