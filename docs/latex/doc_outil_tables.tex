@@ -5601,9 +5601,9 @@ sous la locale C, un littéral non marqué collé à une citation marquée
 UTF-8 voit ses octets non ASCII écrits en échappements, «~différente~»
 devenant \code{diff<c3><a9>rente} (\emph{constat} sous la locale C sur
 le code antérieur à la correction, nom non ASCII ajouté à
-\code{versions}~; issues~\#86 et~\#127). Les comparaisons portent
-sur les valeurs brutes, avant tout marquage. Le bilan du rejeu de R1, et
-ceux de fiches et de données à nom, classe ou fichier de provenance non
+\code{versions}~; revue finale de B24, issue~\#142~; règle du marquage
+avant collage~: issues~\#86 et~\#127). Les comparaisons portent
+sur les valeurs brutes, avant tout marquage. Le bilan du rejeu de R1, et les cellules des lignes~1, 6, 10 et~12 des bilans de fiches et de données à nom, classe ou fichier de provenance non
 ASCII, sont identiques octet à octet sous la locale C et sous une locale
 UTF-8 (constat du contrôle \code{tests/controles/locale\_c.R},
 section~\ref{sec:scripts-controle}). Avant l'issue~\#296, la ligne
