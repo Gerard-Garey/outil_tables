@@ -1822,6 +1822,37 @@ verifier("contrôles : construire_table() avec plan refusé par valider_plan(), 
          ecart_22(compter_controles(refus(construire_table(BASE, ROLES, modifier(plan_km_22, delai_declaration = -1)))),
                   attendu_22(controler_parametres_donnees = 1, controler_transition_periode = 1)))
 
+# Formation de p (#186) : valeurs_parametres_donnees() n'est pas un contrôle,
+# elle n'entre donc pas dans CONTROLES_22 (dont les comptes restent ceux de
+# #22 et #82) ; son nombre d'appels se compte à part, par le même mécanisme
+# (trace() sur l'espace de noms installé). Valeurs calculées à la main : p est
+# formé une fois par controler_plan_roles() (sur le plan canonique), donc une
+# fois par construire_table(), zéro fois par valider_plan() (les contrôles du
+# plan reçu ne forment pas p) et par un plan refusé par valider_plan(), deux
+# fois par rejouer_fiche() (contrôle 6, puis construire_table() : la couche
+# plan-rôles passe deux fois au rejeu, M281). Contre-épreuve : le code
+# antérieur à #186 donne 2, 2, 0, 1, 4 (mesuré à 7ebca1b).
+compter_formations_p <- function(expr) {
+  ns <- asNamespace("tablexp"); n <- new.env(); assign("n", 0L, envir = n)
+  suppressMessages(trace("valeurs_parametres_donnees", where = ns, print = FALSE,
+                         tracer = bquote(assign("n", get("n", envir = .(n)) + 1L, envir = .(n)))))
+  on.exit(suppressMessages(untrace("valeurs_parametres_donnees", where = ns)))
+  force(expr)
+  get("n", envir = n)
+}
+verifier("formation de p (#186) : valeurs_parametres_donnees() appelée une fois par construire_table() (deux plans), zéro fois par un plan refusé et par valider_plan(), deux fois par rejouer_fiche()", {
+  fiche_22 <- lire_fiche(ecrire_fiche(construire_table(BASE, ROLES, plan_km_22)$fiche))
+  obtenu <- c(construire_table = compter_formations_p(construire_table(BASE, ROLES, plan_km_22)),
+              donnees_seule = compter_formations_p(construire_table(BASE, ROLES, plan_donnees_22)),
+              plan_refuse = compter_formations_p(refus(construire_table(BASE, ROLES, modifier(plan_km_22, delai_declaration = -1)))),
+              valider_plan = compter_formations_p(tablexp:::valider_plan(plan_km_22)),
+              rejouer_fiche = compter_formations_p(rejouer_fiche(BASE, fiche_22)))
+  attendu <- c(construire_table = 1L, donnees_seule = 1L, plan_refuse = 0L, valider_plan = 0L, rejouer_fiche = 2L)
+  if (identical(obtenu, attendu)) TRUE else
+    sprintf("obtenu %s ; attendu %s", paste(names(obtenu), obtenu, sep = "=", collapse = " "),
+            paste(names(attendu), attendu, sep = "=", collapse = " "))
+})
+
 # Valeurs validées (#82) : celles que controler_entrees() transmet aux étapes.
 P_22 <- tablexp:::valeurs_parametres_donnees(VD, PER, 0)
 REC_22 <- tablexp:::deduire_recette(ROLES)
@@ -1880,15 +1911,18 @@ verifier("contrôles (#82) : calculer_exposition() avec les valeurs validées, c
   if (all(ok)) TRUE else paste("cas", paste(which(!ok), collapse = ", "))
 })
 
-# Les valeurs dérivées sans contrôle égalent celles que rendent les contrôles.
-verifier("contrôles : valeurs_parametres_donnees() égale la valeur rendue par controler_parametres_donnees(), pour chaque transition prise en charge et plusieurs délais", {
+# Les contrôles de paramètres ne rendent aucune valeur (#186) : p se forme
+# ailleurs (valeurs_parametres_donnees()), une seule fois (test « formation de
+# p » ci-dessus).
+verifier("contrôles (#186) : controler_parametres_donnees() et controler_transition_periode() rendent NULL, invisible, pour chaque transition prise en charge et les délais 0, 1 et 90", {
   tr <- tablexp:::TRANSITIONS
   ok <- unlist(lapply(seq_len(nrow(tr)), function(i) lapply(c(0, 1, 90), function(d) {
     t <- list(depart = tr$depart[i], arrivee = tr$arrivee[i])
-    identical(tablexp:::valeurs_parametres_donnees(t, PER, d),
-              tablexp:::controler_parametres_donnees(t, PER, d, "sexe", character(0)))
+    vide <- list(value = NULL, visible = FALSE)
+    identical(withVisible(tablexp:::controler_parametres_donnees(t, PER, d, "sexe", character(0))), vide) &&
+      identical(withVisible(tablexp:::controler_transition_periode(t, PER, d)), vide)
   })))
-  if (all(ok)) TRUE else "valeurs et contrôle diffèrent"
+  if (all(ok)) TRUE else "un contrôle rend une valeur ou une valeur visible"
 })
 verifier("contrôles (#82) : recette_branche() et convention_retenue() n'existent plus (intégrées à deduire_recette() et resoudre_convention()) ; resoudre_convention() : plus_fine, native, forcée (valeur calculée à la main)", {
   ns <- asNamespace("tablexp")

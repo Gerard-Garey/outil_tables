@@ -310,6 +310,36 @@ verifier("controler_parametres_exposition : convention non chaîne -> convention
 verifier("controler_parametres_exposition : par_annee NA ou non logique -> par_annee_invalide",
          isTRUE(leve_refus(controler_parametres_exposition("plus_fine", NA), "par_annee_invalide")) &&
            isTRUE(leve_refus(controler_parametres_exposition("plus_fine", "oui"), "par_annee_invalide")))
+# Lien catalogue <-> arguments formels (#205) : valider_plan() passe par leur
+# nom, par do.call() (R/construire_table.R, étape `exposition`), les
+# paramètres conditionnels à la recette du catalogue ; un paramètre
+# conditionnel sans argument formel donnerait l'erreur R « argument inutilisé »
+# au lieu d'un refus nommé. Le catalogue est lu, aucune liste n'est recopiée.
+# (a) couverture par les arguments formels ; (b) appel de la forme de
+# valider_plan(), chaque paramètre conditionnel passé à NULL (valeur sans
+# validité possible) : un refus nommé de l'étape `exposition` est admis (le
+# plan porte le paramètre), une erreur R ne l'est pas. Nature : contrôle de
+# structure (lecture du catalogue et des formals), sans valeur de résultat.
+verifier("PARAMETRES_ETAPES$exposition : chaque paramètre conditionnel à la recette est un argument formel de controler_parametres_exposition() ; appel do.call() de valider_plan() sans erreur R (#205)", {
+  ce <- tablexp:::PARAMETRES_ETAPES[["exposition"]]
+  cond <- ce$parametre[!is.na(ce$recette)]
+  sans_formel <- setdiff(cond, names(formals(controler_parametres_exposition)))
+  if (length(sans_formel))
+    sprintf("paramètre(s) conditionnel(s) sans argument formel : %s", paste(sans_formel, collapse = ", "))
+  else {
+    ecarts <- character(0)
+    for (p in cond) {
+      e <- tryCatch({
+        do.call(controler_parametres_exposition, c(list("plus_fine", FALSE), stats::setNames(list(NULL), p)),
+                quote = TRUE)
+        NULL
+      }, refus_tablexp = function(r) if (identical(r$module, "exposition")) NULL else r,
+         error = function(e) e)
+      if (!is.null(e)) ecarts <- c(ecarts, sprintf("%s : %s", p, conditionMessage(e)))
+    }
+    if (length(ecarts)) paste(ecarts, collapse = " ; ") else TRUE
+  }
+})
 
 # --- arithmétique de dates (recoupement : as.Date ; comparaison à age_revolu()) --
 

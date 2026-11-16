@@ -366,6 +366,112 @@ verifier("D tables_reference_mal_formees : motif du constructeur et chemin dans 
     identical(r3$details$motif_constructeur, "table_nom_manquant") && identical(r3$details$chemin, NA_character_) &&
     identical(names(r1$details), c("cle", "lu", "attendu", "motif_constructeur", "chemin"))
 })
+# Refus de lire_texte() à la relecture de l'élément de fiche (étape (d) de
+# controler_forme_tables(), #165) : motif et chemin gardés dans les details et
+# le message, comme à l'écriture. Aucune table réelle n'écrit un texte que
+# lire_texte() refuse (les deux sont tenus d'accord par construction) : le refus
+# est provoqué en remplaçant texte_objet() le temps de l'appel, par une version
+# qui altère les octets écrits (ceux que lit lire_texte() et que relit le repli
+# sur la ligne refusée sont ainsi les mêmes ; trace() sur lire_texte() n'altère
+# que les premiers) ; le refus levé est celui, réel, de lire_texte(). Valeurs
+# attendues calculées à la main sur le texte écrit :
+#   ligne 2 : @noms ; ligne 8 : a/parametres/p<TAB>character<TAB>1<TAB>"pv" ;
+#   ligne 10 : a/representation ; ligne 11 (dernière) : a/empreinte.
+T_PARAM <- table_reference(TR, "s", "synthetique", "x", parametres = list(p = "pv"))
+# refus_de(expr) avec texte_objet() remplacé par une version qui applique
+# `alterer` aux octets de l'écriture de l'élément de fiche (première ligne de
+# la fiche, sans argument supplémentaire), puis restauré (finally).
+relecture_alteree <- function(alterer, expr) {
+  ancienne <- get("texte_objet", envir = ns)
+  unlockBinding("texte_objet", ns)
+  assign("texte_objet", function(x, premiere, entete, ...) {
+    o <- ancienne(x, premiere, entete, ...)
+    if (identical(premiere, tablexp:::PREMIERE_LIGNE_FICHE) && !length(entete) && !length(list(...))) alterer(o) else o
+  }, envir = ns)
+  tryCatch(refus_de(expr), finally = { assign("texte_objet", ancienne, envir = ns); lockBinding("texte_objet", ns) })
+}
+remplacer_texte <- function(de, vers)
+  function(octets) charToRaw(sub(de, vers, rawToChar(octets), fixed = TRUE, useBytes = TRUE))
+lignes_texte <- function(octets) strsplit(rawToChar(octets), "\n", fixed = TRUE)[[1L]]
+verifier("D tables_reference_mal_formees, métadonnée écrite et non relue (valeur sans guillemets) : motif du refus de relecture, chemin de la ligne refusée (details$chemin, message)", {
+  r <- relecture_alteree(remplacer_texte('\t"pv"\n', "\tpv\n"),
+                         construire_table(BASE, ROLES, PLAN, tables_reference = list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_valeur_invalide",
+                       "relecture du texte de fiche sans refus",
+                       c("Table de clé « a » : métadonnée sans écriture exacte dans la fiche",
+                         "(refus texte_valeur_invalide, a/parametres/p)"))
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/p") && identical(r$details$cle, "a") &&
+    identical(r$details$motif_constructeur, NA_character_) &&
+    identical(names(r$details), c("cle", "lu", "attendu", "motif_constructeur", "chemin")) &&
+    !grepl("relecture différente", conditionMessage(r), fixed = TRUE)
+})
+verifier("D tables_reference_mal_formees, métadonnée écrite et non relue (chemin inattendu) : chemin porté par le refus de relecture", {
+  r <- relecture_alteree(remplacer_texte("a/parametres/p\t", "a/parametres/q\t"), controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_chemin_inattendu",
+                       "relecture du texte de fiche sans refus", "(refus texte_chemin_inattendu, a/parametres/q)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/q")
+})
+verifier("D tables_reference_mal_formees, relecture refusée en fin de texte (dernière ligne retirée) : chemin attendu (details$attendu), non la dernière ligne lue", {
+  r <- relecture_alteree(function(o) { l <- lignes_texte(o); charToRaw(paste0(paste(l[-length(l)], collapse = "\n"), "\n")) },
+                         controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_chemin_inattendu",
+                       "relecture du texte de fiche sans refus", "(refus texte_chemin_inattendu, a/empreinte)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/empreinte")
+})
+verifier("D tables_reference_mal_formees, relecture refusée sur une ligne dont le premier champ est vide (ligne commençant par une tabulation) : chemin NA, motif gardé", {
+  r <- relecture_alteree(remplacer_texte("\na/parametres/p\t", "\n\ta/parametres/p\t"), controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_ligne_mal_formee",
+                       "relecture du texte de fiche sans refus", "(refus texte_ligne_mal_formee, NA)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_)
+})
+verifier("D tables_reference_mal_formees, relecture refusée sur une ligne qui n'est pas de l'UTF-8 valide : chemin NA, motif gardé", {
+  # Octet 0xff dans le chemin d'une ligne du corps.
+  r <- relecture_alteree(function(o) charToRaw(sub("a/parametres/p", "a/parametres/p\xff", rawToChar(o), fixed = TRUE, useBytes = TRUE)),
+                         controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_utf8_invalide",
+                       "relecture du texte de fiche sans refus", "(refus texte_utf8_invalide, NA)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_)
+})
+verifier("D tables_reference_mal_formees, relecture refusée sur la première ligne ou sur un octet nul écrit : motif gardé, chemin NA, aucune erreur R", {
+  r1 <- relecture_alteree(remplacer_texte("tablexp fiche 1", "tablexp fiche 2"), controler_forme_tables(list(a = T_PARAM)))
+  # Octet nul dans le texte écrit (octet 20 : ligne 2, « @noms ») : rawToChar()
+  # lèverait une erreur R, que le contrôle ne laisse pas masquer le refus.
+  r2 <- tryCatch(relecture_alteree(function(o) { o[20L] <- as.raw(0L); o }, controler_forme_tables(list(a = T_PARAM))),
+                 error = function(e) paste("erreur R :", conditionMessage(e)))
+  ok1 <- controle_refus(r1, "construire_table", "tables_reference_mal_formees", "texte_version_inconnue",
+                        "relecture du texte de fiche sans refus", "(refus texte_version_inconnue, NA)")
+  ok2 <- if (is.character(r2)) r2 else
+    controle_refus(r2, "construire_table", "tables_reference_mal_formees", "texte_octet_nul",
+                   "relecture du texte de fiche sans refus", "(refus texte_octet_nul, NA)")
+  if (!isTRUE(ok1)) ok1 else if (!isTRUE(ok2)) ok2 else if (!bindingIsLocked("texte_objet", ns))
+    "texte_objet() non restauré" else
+    identical(r1$details$chemin, NA_character_) && identical(r2$details$chemin, NA_character_)
+})
+verifier("D tables_reference_mal_formees, relecture refusée sur un CR dans le chemin : chemin brut dans details, CR neutralisé dans le message", {
+  r <- relecture_alteree(remplacer_texte("a/parametres/p\t", "a/parametres/p\r\t"), controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_retour_chariot",
+                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, a/parametres/p<U+000D>)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/p\r") &&
+    !grepl("\r", conditionMessage(r), fixed = TRUE)
+})
+verifier("D tables_reference_mal_formees, relecture refusée sur un CRLF en fin de ligne : chemin de la ligne refusée sans le CR", {
+  r <- relecture_alteree(remplacer_texte('\t"pv"\n', '\t"pv"\r\n'), controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_retour_chariot",
+                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, a/parametres/p)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/p")
+})
+verifier("D tables_reference_mal_formees, relecture sans refus mais différente (Date integer) : motif « relecture différente » inchangé, chemin NA", {
+  t_date <- table_reference(TR, "s", "synthetique", "x", parametres = list(d = structure(1L, class = "Date")))
+  r <- refus_de(controler_forme_tables(list(a = t_date)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", tablexp:::texte_moteur("élément relu différent"),
+                       tablexp:::texte_moteur("élément relu identical() à l'élément écrit"),
+                       "métadonnée sans écriture exacte dans la fiche (relecture différente)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_)
+})
+verifier("D tables_reference_mal_formees : relecture non altérée, table acceptée (texte_objet() restauré)", {
+  f <- controler_forme_tables(list(a = T_PARAM))
+  identical(f$tables$a, T_PARAM) && identical(names(f$champ), "a")
+})
 verifier("D tables_reference_mal_formees : éléments contrôlés dans l'ordre des clés triées par octets (« B » avant « a »)", {
   r <- refus_de(controler_forme_tables(list(a = 1, B = 2)))
   identical(r$details$cle, "B")

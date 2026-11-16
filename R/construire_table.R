@@ -319,7 +319,9 @@ controler_graine_plan <- function(plan, aleatoire) {
 # Grille des inventaires du plan (champ `inventaires` ; ADR 0016, point 7.1 ;
 # spécification d'actuary-approfondi de #180, § 2, M328), appelée par
 # valider_plan() si le champ est présent, après controler_parametres_donnees()
-# dont elle reçoit les valeurs validées `p` (debut, borne). Dans cet ordre :
+# dont elle reçoit les valeurs validées du plan reçu : la période et le délai
+# (#186 : le début est lu dans `periode`, la fin effective vaut fin - délai). Dans
+# cet ordre :
 #   - inventaires_invalides : classe Date exacte, stockage double ou integer,
 #     sans autre attribut ; puis au moins deux dates, sans valeur manquante,
 #     en jours entiers finis, dans le domaine des dates (dates_hors_domaine(),
@@ -331,7 +333,7 @@ controler_graine_plan <- function(plan, aleatoire) {
 #     effective (t_M = fin - délai = borne - 1) ; une date d'inventaire désigne
 #     l'état en fin de journée (A.0 : présence à l'instant d).
 # Module construire_table. Rend NULL, invisible.
-controler_inventaires_plan <- function(inventaires, p) {
+controler_inventaires_plan <- function(inventaires, periode, delai_declaration) {
   x <- inventaires
   defauts <- character(0)
   if (!forme_exacte(x, c("double", "integer"), "class") || !identical(class(x), "Date")) {
@@ -356,7 +358,7 @@ controler_inventaires_plan <- function(inventaires, p) {
                      paste(defauts, collapse = " ; ")),
             list(inventaires = inventaires))
   j <- as.numeric(unclass(x)); M <- length(j)
-  attendu <- c(p$debut - 1, p$borne - 1)
+  attendu <- c(as.numeric(periode[["debut"]]) - 1, as.numeric(periode[["fin"]]) - delai_declaration)
   ecart <- c(j[1L] != attendu[1L], j[M] != attendu[2L])
   if (any(ecart)) {
     premier <- citer(format(structure(j[1L], class = "Date")))
@@ -620,12 +622,12 @@ valider_plan <- function(plan) {
     controler_parametres_condition(nom, etapes[[nom]], PARAMETRES_ETAPES[[nom]])
     switch(nom,
       donnees = {
-        p <- controler_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
-                                          plan[["segmentation"]], etapes[["donnees"]][["exclusions"]])
+        controler_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
+                                     plan[["segmentation"]], etapes[["donnees"]][["exclusions"]])
         # Grille des inventaires, si le champ est présent (sa présence selon
         # la recette est contrôlée par controler_plan_roles(), qui connaît les
         # rôles).
-        if ("inventaires" %in% names(plan)) controler_inventaires_plan(plan[["inventaires"]], p)
+        if ("inventaires" %in% names(plan)) controler_inventaires_plan(plan[["inventaires"]], plan[["periode"]], plan[["delai_declaration"]])
       },
       exposition = {
         pe <- etapes[["exposition"]]
@@ -812,6 +814,31 @@ controler_forme_tables <- function(tables) {
                  octets$motif, texte_moteur("écriture du texte de fiche sans refus"), chemin = ch)
     }
     relu <- tryCatch(lire_texte(octets, PREMIERE_LIGNE_FICHE, "fiche"), refus_tablexp = function(e) e)
+    # Refus de la relecture : motif et chemin gardés comme à l'écriture (#165).
+    # Chemin : celui que porte le refus (details$chemin), sinon le chemin attendu
+    # en fin de texte (details$attendu), sinon le premier champ de la ligne
+    # refusée (details$ligne ; la ligne 1 est la première ligne du texte, sans
+    # chemin).
+    if (inherits(relu, "refus_tablexp")) {
+      ch <- relu$details$chemin
+      if (is.null(ch)) ch <- relu$details$attendu
+      ligne <- relu$details$ligne
+      if (is.null(ch) && length(ligne) == 1L && !is.na(ligne) && ligne >= 2L) {
+        # Un octet nul (rawToChar() lève une erreur R) laisse le chemin à NA ;
+        # de même un premier champ vide ou qui n'est pas de l'UTF-8 valide.
+        lignes <- tryCatch(strsplit(rawToChar(octets), "\n", fixed = TRUE, useBytes = TRUE)[[1L]],
+                           error = function(e) character(0))
+        if (ligne <= length(lignes)) {
+          ch <- strsplit(lignes[ligne], "\t", fixed = TRUE, useBytes = TRUE)[[1L]][1L]
+          Encoding(ch) <- "UTF-8"
+          if (is.na(ch) || !nzchar(ch) || !validUTF8(ch)) ch <- NA_character_
+        }
+      }
+      if (!is.character(ch) || length(ch) != 1L) ch <- NA_character_
+      mal_formee(formuler("métadonnée sans écriture exacte dans la fiche (%s)",
+                          formuler("refus %s, %s", citer(relu$motif), citer(ch))),
+                 relu$motif, texte_moteur("relecture du texte de fiche sans refus"), chemin = ch)
+    }
     if (!identical(relu, ecrit))
       mal_formee(formuler("métadonnée sans écriture exacte dans la fiche (%s)", formuler("relecture différente")),
                  texte_moteur("élément relu différent"), texte_moteur("élément relu identical() à l'élément écrit"))
@@ -1079,9 +1106,9 @@ controler_tables_rejeu <- function(fiche_tables, tables_reference, code_fiche, e
   # que le code installé oppose (recalculée, avec son origine).
   list(tables = tables, empreintes = empreintes, ecarts = ecarts,
        attendu = texte_moteur(if (!length(cles)) "aucune empreinte recalculée (aucune table reçue ni relue)"
-                              else paste0(sans_controle(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")),
+                              else paste0(citer_segment(cles), " : ", empreintes, " (", origines, ")", collapse = " ; ")),
        lu = texte_moteur(if (!length(cles)) "aucune table de référence (fiche/tables_reference : NULL)"
-                         else paste0(sans_controle(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
+                         else paste0(citer_segment(cles), " : ", vapply(fiche_tables, function(e) e$empreinte, ""),
                                      collapse = " ; ")))
 }
 
@@ -1106,9 +1133,9 @@ table_citee <- function(tables, cle) {
 # matrice recette x étape x estimateur (controler_matrice_recette(), module
 # donnees ; ADR 0016, point 5.3), provenance (controler_provenance()).
 # Rend les valeurs validées : list(plan (canonique), p (transition, période
-# et délai : valeurs_parametres_donnees(), module donnees, la valeur que rend
-# controler_parametres_donnees() appelée par valider_plan(), plus la grille
-# canonique p$inventaires si le plan la porte), recette, conv
+# et délai : valeurs_parametres_donnees(), module donnees, formée ici seule
+# (#186), sur le plan canonique, plus la grille canonique p$inventaires si le
+# plan la porte), recette, conv
 # (NULL sans exposition)). Une seule source de la recette et de la convention
 # pour les étapes et la fiche.
 controler_plan_roles <- function(donnees, roles, plan, provenance) {
@@ -1119,12 +1146,13 @@ controler_plan_roles <- function(donnees, roles, plan, provenance) {
   etapes_plan <- plan[["etapes"]]
   conv <- if ("exposition" %in% names(etapes_plan))
     resoudre_convention(etapes_plan[["exposition"]][["convention"]], recette$convention_native)
-  # p recalculé par la fonction qui forme la valeur de
-  # controler_parametres_donnees() dans valider_plan(), ici sur le plan
-  # canonique : valeurs identical() mesurées sur R1 à R12 (revue finale de
-  # B14). Un chemin unique demanderait de changer le contrat de valider_plan()
-  # (exportée) ou les comptes de contrôles du test « contrôles non répétés »
-  # (#22, #82 ; tests/unitaires/test_construire_table.R) : renvoyé à une issue.
+  # Seule formation de p (#186) : sur le plan canonique, avec la grille. Les
+  # contrôles de valider_plan() (controler_parametres_donnees(),
+  # controler_inventaires_plan()) lisent le plan reçu et ne forment pas p : le
+  # p du plan reçu diffère du canonique par le stockage (bornes Date en integer,
+  # période dans l'ordre (fin, debut), délai integer : identical() faux, mesuré)
+  # et p$periode, p$delai_declaration entrent dans les résultats
+  # (R/exposition.R).
   p <- valeurs_parametres_donnees(plan[["transition"]], plan[["periode"]], plan[["delai_declaration"]],
                                   plan[["inventaires"]])
   controler_matrice_recette(recette, roles, plan, conv, p)
@@ -1497,6 +1525,39 @@ paires_lues <- function(l) {
   paste(sprintf("%s=%s", neutraliser_citation(n), sans_controle(vapply(l, texte_lu, ""))), collapse = " ; ")
 }
 
+# Segment d'un chemin du bilan du rejeu (clé de tables_reference, nom lu dans
+# la fiche ; #298, option (b) ; ADR 0012, annotation du 16/11/2026, (c)) : les
+# chemins joignent leurs segments par « / » et les chemins par « , », et les
+# textes des lignes 8 et 15 joignent « <clé> : <valeur> » par « ; ». Un
+# segment qui contient l'un de / , ; : ( ) < « » ou qui commence ou finit par
+# une espace est réservé : il s'écrit entre « … » (guillemets, une espace de
+# chaque côté). Dans un segment réservé, « < », guillemet ouvrant et guillemet
+# fermant s'écrivent <U+003C>, <U+00AB> et <U+00BB>, remplacés sur les octets
+# dans cet ordre avant neutraliser_citation() : une notation <U+XXXX> tapée ne
+# se confond plus avec celle d'un caractère de contrôle neutralisé, la
+# citation est injective (hors la limite du repère « bytes », #128, #142). Un
+# segment non réservé est cité par neutraliser_citation(), comme avant ; NA et
+# une chaîne d'encodage « bytes » aussi, jamais entre « … ». Octets lus et
+# remplacés (useBytes) : gsub() sans useBytes lève une erreur R sur une chaîne
+# marquée UTF-8 sous la locale C (mesuré, #298). Les motifs non ASCII sont
+# construits par octets, sans littéral ni marque d'encodage.
+citer_segment <- function(x) {
+  if (!is.character(x)) x <- as.character(x)
+  reserves <- c("/", ",", ";", ":", "(", ")", "<", rawToChar(as.raw(c(0xC2, 0xAB))), rawToChar(as.raw(c(0xC2, 0xBB))))
+  remplacements <- list(c("<", "<U+003C>"), c(reserves[8L], "<U+00AB>"), c(reserves[9L], "<U+00BB>"))
+  une <- function(s) {
+    if (is.na(s) || Encoding(s) == "bytes") return(neutraliser_citation(s))
+    y <- if (Encoding(s) == "latin1") enc2utf8(s) else s
+    reserve <- any(vapply(reserves, function(r) grepl(r, y, fixed = TRUE, useBytes = TRUE), NA)) ||
+      grepl("^ | $", y, useBytes = TRUE)
+    if (!reserve) return(neutraliser_citation(s))
+    for (r in remplacements) y <- gsub(r[1L], r[2L], y, fixed = TRUE, useBytes = TRUE)
+    Encoding(y) <- if (validUTF8(y)) "UTF-8" else "unknown"
+    paste0(texte_moteur("« "), neutraliser_citation(y), texte_moteur(" »"))
+  }
+  vapply(x, une, "", USE.NAMES = FALSE)
+}
+
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
 # fiche reçue (`recu`) (descente D de la spécification de #86) : deux listes
 # nommées sans classe, aux noms complets et uniques, sont parcourues sur
@@ -1508,16 +1569,17 @@ paires_lues <- function(l) {
 # qu'aucun enfant ne diffère est cité « (ordre des champs ou attributs) » ;
 # `racine` nomme le nœud de départ. Rend character(0) si identical(). Les
 # comparaisons et les lectures par nom se font sur les noms bruts ; chaque
-# segment de nom écrit dans un chemin est cité par neutraliser_citation()
-# (règle unique des valeurs de la fiche écrites dans le bilan, #142) : un nom
-# à caractère de contrôle ou qui n'est pas de l'UTF-8 valide ne coupe pas la
-# cellule et ne la rend pas invalide. Les littéraux non ASCII sont marqués par
-# texte_moteur() avant tout collage à un nom cité (marqué UTF-8) : un littéral
-# non marqué collé par paste() s'écrirait « <c3><a7> » sous la locale C
-# (mesuré, #86 ; #127).
+# segment de nom écrit dans un chemin est cité par citer_segment() (règle
+# unique des valeurs de la fiche écrites dans le bilan, #142, complétée pour
+# les chemins, #298) : un nom à caractère de contrôle ou qui n'est pas de
+# l'UTF-8 valide ne coupe pas la cellule et ne la rend pas invalide, un nom
+# qui contient un séparateur du bilan est entre « … ». Les littéraux non ASCII
+# sont marqués par texte_moteur() avant tout collage à un nom cité (marqué
+# UTF-8) : un littéral non marqué collé par paste() s'écrirait « <c3><a7> »
+# sous la locale C (mesuré, #86 ; #127).
 champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   if (identical(rendu, recu)) return(character(0))
-  cite <- function(ch) paste(neutraliser_citation(ch), collapse = "/")
+  cite <- function(ch) paste(citer_segment(ch), collapse = "/")
   ici <- if (length(chemin)) cite(chemin) else racine
   descend <- function(v) is.list(v) && !is.object(v) && !length(noms_bytes(v)) &&
     noms_complets(names(v)) && !anyDuplicated(names(v))
@@ -1540,12 +1602,40 @@ verdict_chemins <- function(rendu, recu, racine) {
   if (!length(d)) texte_moteur("identique") else paste0(texte_moteur("différente : "), paste(d, collapse = ", "))
 }
 
-# Verdict d'un témoin par chaînes (V1) : « non déterminable » si l'un des deux
-# côtés n'est pas une chaîne unique (deux NA ne prouvent pas une identité),
-# sinon « identique » ou « différente ».
+# Forme d'une empreinte MD5 (#295 ; ADR 0012, annotation du 16/11/2026, (a)) :
+# TRUE si et seulement si `v` est une chaîne unique (chaine_unique()) dont les
+# octets sont exactement 32, chacun dans 0-9a-f (forme rendue par
+# tools::md5sum() et md5_octets()). Lecture des octets (charToRaw()), sans
+# expression régulière, conversion ni repli de casse : même résultat sous les
+# locales C et UTF-8 ; une chaîne latin-1 ou « bytes » contient un octet
+# >= 0x80 et n'a jamais cette forme. Rend TRUE ou FALSE, jamais NA.
+forme_md5 <- function(v) {
+  chaine_unique(v) && { o <- charToRaw(v); length(o) == 32L && all(o %in% charToRaw("0123456789abcdef")) }
+}
+
+# Verdict d'un témoin d'empreinte (V1 : lignes 9 et 13 du bilan) : « non
+# déterminable » si l'un des deux côtés n'a pas la forme d'une empreinte MD5
+# (forme_md5() : NA, absente, non-chaîne, chaîne d'une autre forme ; deux NA ne
+# prouvent pas une identité, et une valeur qui n'est pas une empreinte ne
+# permet de conclure ni à l'identité ni à l'écart ; #295), sinon « identique »
+# ou « différente » entre deux MD5 bien formées.
 verdict_chaines <- function(attendu, lu) {
-  texte_moteur(if (!chaine_unique(attendu) || !chaine_unique(lu)) "non déterminable"
+  texte_moteur(if (!forme_md5(attendu) || !forme_md5(lu)) "non déterminable"
                else if (identical(attendu, lu)) "identique" else "différente")
+}
+
+# Empreinte lue dans la fiche, citée dans la colonne `lu` des lignes 9 et 13
+# du bilan (#295) : une chaîne de longueur 1 sans attribut, non NA, qui n'a
+# pas la forme MD5 (forme_md5() ; chaîne vide comprise) est citée
+# « « <valeur> » (forme invalide : … attendue) », la valeur par
+# neutraliser_citation() (règle unique, #142) ; toute autre valeur garde
+# sans_controle(texte_lu()) (MD5 bien formée telle quelle, « absente », « NA »,
+# « illisible (…) »).
+texte_empreinte_lue <- function(v) {
+  if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v) && !forme_md5(v))
+    return(formuler("« %s » (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)",
+                    sans_controle(v)))
+  sans_controle(texte_lu(v))
 }
 
 # Verdict d'un témoin de liste nommée de la fiche (V2 : versions,
@@ -1575,7 +1665,8 @@ perimetre_temoin_fiche <- function(f) {
 # `verdict_code` : verdict du témoin du code (ligne 9, verdict_chaines()),
 # dont se lit le régime, jamais identical() des empreintes (identical(NA, NA)
 # vaut TRUE là où le verdict est « non déterminable »). Toutes les clés de
-# statut embarquee sont citées, dans l'ordre de la fiche, jointes par « ; » :
+# statut embarquee sont citées par citer_segment() (#298), dans l'ordre de la
+# fiche, jointes par « ; » :
 # une clé en écart par un texte « <clé>/<champ> : <valeur> » par champ en
 # écart (ordre de CHAMPS_TABLE_FICHE), une clé intacte par « <clé> :
 # métadonnées du catalogue du package installé » (attendu) et « <clé> :
@@ -1598,7 +1689,7 @@ temoin_catalogue <- function(ecarts, verdict_code) {
   citer_valeur <- function(v)
     if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v)) formuler("« %s »", sans_controle(v))
     else sans_controle(texte_lu(v))
-  chemins <- paste0(sans_controle(ecarts$cle), "/", sans_controle(ecarts$champ))
+  chemins <- paste0(citer_segment(ecarts$cle), "/", sans_controle(ecarts$champ))
   attendus <- lus <- character(0)
   for (k in ecarts$cles) {
     j <- which(ecarts$cle == k)
@@ -1609,8 +1700,8 @@ temoin_catalogue <- function(ecarts, verdict_code) {
                                      texte_moteur(" (catalogue du package installé)")))
       lus <- c(lus, paste0(chemins[j], " : ", vapply(ecarts$lu[j], citer_valeur, "", USE.NAMES = FALSE)))
     } else {
-      attendus <- c(attendus, formuler("%s : métadonnées du catalogue du package installé", sans_controle(k)))
-      lus <- c(lus, formuler("%s : métadonnées de la fiche", sans_controle(k)))
+      attendus <- c(attendus, formuler("%s : métadonnées du catalogue du package installé", citer_segment(k)))
+      lus <- c(lus, formuler("%s : métadonnées de la fiche", citer_segment(k)))
     }
   }
   if (!length(ecarts$champ)) {
@@ -1874,7 +1965,9 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # cité par la règle unique neutraliser_citation() (#142) : valeurs par
   # sans_controle(texte_lu(v)), paires_lues(), liste_guillemets() ou
   # sans_controle(v) ; noms de champs des chemins des verdicts par
-  # champs_differents(). Une chaîne « bytes » y est écrite sous son repère
+  # champs_differents(), clés de tables_reference des lignes 8 et 15 et noms
+  # des chemins par citer_segment() (#298 : un segment à séparateur est entre
+  # « … »). Une chaîne « bytes » y est écrite sous son repère
   # (sinon sprintf() et write.csv() du bilan lèveraient une erreur R), un
   # caractère de contrôle <U+XXXX>, un octet invalide <xx> : une ligne par
   # cellule, UTF-8 valide. Les lignes 1 à 5, 7 et 8 ne reçoivent que des
@@ -1929,9 +2022,9 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
            formuler("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
                     paste(sans_controle(names(plan[["etapes"]])), collapse = ", "),
                     paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette), provenance_lue),
-           e[["donnees"]], tr$lu, sans_controle(texte_lu(e[["code"]])), paires_lues(fiche[["versions"]]),
+           e[["donnees"]], tr$lu, texte_empreinte_lue(e[["code"]]), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
-           sans_controle(texte_lu(e[["resultat"]])), fichiers_lus, tc[["lu"]]),
+           texte_empreinte_lue(e[["resultat"]]), fichiers_lus, tc[["lu"]]),
     verdict = c(rep(conforme, 8L),
                 verdict_code,
                 verdict_liste(r$versions, fiche[["versions"]], "versions"),

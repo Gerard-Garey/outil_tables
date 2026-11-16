@@ -854,12 +854,17 @@ local({
              else TRUE)
   }
   # Empreinte du code, du résultat et du fichier : repère à la ligne du témoin.
-  for (cas in list(list("code", 9L, "différente"), list("resultat", 13L, "différente"), list("fichier", 14L, "non vérifiée"))) {
+  # Code et résultat : une chaîne « bytes » n'a pas la forme MD5 (#295, C4) :
+  # « non déterminable », repère cité avec le motif de forme invalide.
+  forme_invalide <- paste0("« ", repere, " » (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)")
+  for (cas in list(list("code", 9L, "non déterminable", forme_invalide),
+                   list("resultat", 13L, "non déterminable", forme_invalide),
+                   list("fichier", 14L, "non vérifiée", repere))) {
     r <- rejeux[[paste0("empreintes/", cas[[1L]])]]
-    verifier(sprintf("T11 empreintes/%s de classe d'encodage bytes : rejeu rendu, ligne %d, lu « %s », verdict « %s »",
-                     cas[[1L]], cas[[2L]], repere, cas[[3L]]),
+    verifier(sprintf("T11 empreintes/%s chaîne d'encodage bytes : rejeu rendu, ligne %d, lu « %s », verdict « %s »",
+                     cas[[1L]], cas[[2L]], cas[[4L]], cas[[3L]]),
              if (!inherits(r, "rejeu")) sprintf("condition %s", class(r)[1L])
-             else identical(c(r$bilan$lu[cas[[2L]]], r$bilan$verdict[cas[[2L]]]), c(repere, cas[[3L]])))
+             else identical(c(r$bilan$lu[cas[[2L]]], r$bilan$verdict[cas[[2L]]]), c(cas[[4L]], cas[[3L]])))
   }
   # Plusieurs empreintes de fichier (k >= 2), dont une bytes : citées une à une.
   r <- attrape(rejouer_fiche(BASE, fiche_modifiee("empreintes/fichier" = c(b, "abc"))))
@@ -1110,4 +1115,231 @@ verifier("T12 ecarts_catalogue() : élément du catalogue -> aucun écart ; vale
   identical(tablexp:::ecarts_catalogue(e, t), list(champ = character(0), lu = list(), attendu = list())) &&
     identical(tablexp:::ecarts_catalogue(e2, t),
               list(champ = c("source", "parametres"), lu = list("s", list(a = 1)), attendu = list(SOURCE_TV, NULL)))
+})
+
+# --- T13 : citation d'un segment de chemin du bilan (#298, option (b) ; M515 ;
+#     ADR 0012, annotation du 16/11/2026, (c)). Critères D1 à D9 de la
+#     spécification d'actuary-approfondi. Valeur calculée à la main (textes) ;
+#     identité exacte (construction rejouée identical() hors execution). Un
+#     segment qui contient / , ; : ( ) < « » ou qui commence ou finit par une
+#     espace s'écrit entre « … », <, « et » devenant <U+003C>, <U+00AB> et
+#     <U+00BB> ; les autres segments sont cités comme avant.
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  u <- function(...) intToUtf8(c(...))
+  GA <- u(0xab); GF <- u(0xbb)  # guillemets ouvrant et fermant
+  K <- "tv/forme_origine, tables_reference/tv"
+  PLAN_K <- PLAN_TV
+  PLAN_K$etapes$positionnement$table_reference <- K
+  X_K <- construire_table(BASE, ROLES, PLAN_K, tables_reference = setNames(list(table_embarquee("TV 88-90")), K))
+  FICHE_K <- lire_fiche(ecrire_fiche(X_K$fiche))
+  EMP_K <- FICHE_K$tables_reference[[K]]$empreinte
+  fiche_k <- function(champ, v, f = FICHE_K) { f$tables_reference[[K]][champ] <- list(v); f }
+  entre <- function(s) paste0(GA, " ", s, " ", GF)
+  CLE_CITEE <- entre(K)
+  octets_egaux <- function(a, b) identical(charToRaw(a), charToRaw(b)) && identical(Encoding(a), "UTF-8")
+
+  verifier("T13 D1 clé « tv/forme_origine, tables_reference/tv » (table embarquée), source altérée : lignes 12 et 15 citent la clé entre « … », un seul champ en écart ; statut « identique » (régime) ; construction identical() hors execution", {
+    r <- attrape(rejouer_fiche(BASE, fiche_k("source", "ma source")))
+    if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+    else {
+      b <- r$bilan
+      v <- paste0("différente : tables_reference/", CLE_CITEE, "/source")
+      octets_egaux(b$verdict[12L], v) && octets_egaux(b$verdict[15L], v) &&
+        octets_egaux(b$lu[15L], paste0(CLE_CITEE, "/source : ", GA, " ma source ", GF)) &&
+        octets_egaux(b$attendu[15L], paste0(CLE_CITEE, "/source : ", GA, " ", SOURCE_TV, " ", GF,
+                                            " (catalogue du package installé)")) &&
+        identical(b$statut[15L], STATUT_REGIME[["identique"]]) && identical(nrow(b), 15L) &&
+        identical(sans_execution(r$construction), sans_execution(X_K))
+    }
+  })
+  verifier("T13 D2 même fiche, ligne 8 : la clé est citée entre « … » dans lu et attendu, empreinte lue sur la fiche", {
+    b <- rejouer_fiche(BASE, fiche_k("source", "ma source"))$bilan
+    octets_egaux(b$lu[8L], paste0(CLE_CITEE, " : ", EMP_K)) &&
+      octets_egaux(b$attendu[8L], paste0(CLE_CITEE, " : ", EMP_K, " (relue dans le package)")) &&
+      identical(b$verdict[8L], "conforme")
+  })
+  verifier("T13 D2 fiche intacte de clé K : ligne 15 « identique », textes de la clé citée entre « … » (clé intacte)", {
+    b <- rejouer_fiche(BASE, FICHE_K)$bilan
+    identical(b$verdict, VERDICTS_SUCCES) &&
+      octets_egaux(b$attendu[15L], paste0(CLE_CITEE, " : métadonnées du catalogue du package installé")) &&
+      octets_egaux(b$lu[15L], paste0(CLE_CITEE, " : métadonnées de la fiche"))
+  })
+  verifier("T13 D3 clé ordinaire « tv », source et forme_origine altérées : textes inchangés (clé nue), verdicts des lignes 12 et 15 à deux chemins ; lignes 8 et 15 comme avant #298", {
+    f <- fiche_tv("forme_origine", "qx", fiche_tv("source", "ma source"))
+    b <- rejouer_fiche(BASE, f)$bilan
+    emp <- f$tables_reference$tv$empreinte
+    v <- "différente : tables_reference/tv/source, tables_reference/tv/forme_origine"
+    identical(b$verdict[12L], v) && identical(b$verdict[15L], v) &&
+      identical(b$lu[8L], paste0("tv : ", emp)) && identical(b$attendu[8L], paste0("tv : ", emp, " (relue dans le package)")) &&
+      identical(b$lu[15L], "tv/source : « ma source » ; tv/forme_origine : « qx »") &&
+      identical(b$attendu[15L],
+                sprintf("tv/source : « %s » (catalogue du package installé) ; tv/forme_origine : « lx » (catalogue du package installé)",
+                        SOURCE_TV))
+  })
+  verifier("T13 D4 table importée sous la clé K, source altérée, table reçue sous K : ligne 12 cite la clé entre « … » ; ligne 8 se termine par « (reçue) » ; ligne 15 « identique »", {
+    ti <- table_reference(data.frame(age = 0:110, sexe = "ensemble", qx = c(rep(0.01, 110L), 1)), "imp", "importee", "test")
+    tk <- setNames(list(ti), K)
+    x <- construire_table(BASE, ROLES, PLAN_K, tables_reference = tk)
+    f <- lire_fiche(ecrire_fiche(x$fiche)); f$tables_reference[[K]]$source <- "autre"
+    r <- attrape(rejouer_fiche(BASE, f, tk))
+    if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+    else octets_egaux(r$bilan$verdict[12L], paste0("différente : tables_reference/", CLE_CITEE, "/source")) &&
+      endsWith(r$bilan$attendu[8L], " (reçue)") && startsWith(r$bilan$attendu[8L], paste0(CLE_CITEE, " : ")) &&
+      identical(r$bilan$verdict[15L], "identique")
+  })
+  verifier("T13 D5 noms libres de la fiche : plateforme « blas, lapack » (ligne 11) et champ de premier niveau « graine/x » (ligne 12) cités entre « … »", {
+    fb <- FICHE; z <- fb$plateforme; z[["blas, lapack"]] <- "y"; fb$plateforme <- z
+    fg <- FICHE; fg[["graine/x"]] <- "1"
+    rb <- attrape(rejouer_fiche(BASE, fb)); rg <- attrape(rejouer_fiche(BASE, fg))
+    if (!inherits(rb, "rejeu") || !inherits(rg, "rejeu")) "rejeu non rendu"
+    else octets_egaux(rb$bilan$verdict[11L], paste0("différente : ", entre("blas, lapack"), " (absent de la fiche rendue)")) &&
+      octets_egaux(rg$bilan$verdict[12L], paste0("différente : ", entre("graine/x"), " (absent de la fiche rendue)"))
+  })
+  verifier("T13 D6 verdict_chemins() appelée directement : notation <U+000B> tapée citée entre « … » et <U+003C>, caractère de contrôle neutralisé nu, « et » en <U+00AB> et <U+00BB>, espace de tête, « x : y ; z » ; nom bytes sous le repère seul", {
+    vc <- function(nom) tablexp:::verdict_chemins(setNames(list(1), nom), setNames(list(2), nom), "fiche")
+    d <- "différente : "
+    octets_egaux(vc("a<U+000B>b"), paste0(d, entre("a<U+003C>U+000B>b"))) &&
+      octets_egaux(vc("a\vb"), "différente : a<U+000B>b") &&
+      octets_egaux(vc(paste0(GA, "a", GF)), paste0(d, entre("<U+00AB>a<U+00BB>"))) &&
+      octets_egaux(vc(" tv"), paste0(d, entre(" tv"))) && octets_egaux(vc("tv "), paste0(d, entre("tv "))) &&
+      octets_egaux(vc("x : y ; z"), paste0(d, entre("x : y ; z"))) &&
+      octets_egaux(vc("clé"), "différente : clé") && identical(vc("tv"), "différente : tv") &&
+      identical(vc("a b"), "différente : a b")
+  })
+  verifier("T13 D6 chaque caractère réservé / , ; : ( ) < « » (et espace de tête ou de queue) fait citer le segment ; un segment sans séparateur n'est pas cité", {
+    reserves <- c("/", ",", ";", ":", "(", ")", "<", GA, GF)
+    cites <- vapply(reserves, function(s) startsWith(tablexp:::citer_segment(paste0("a", s, "b")), paste0(GA, " ")), NA)
+    nus <- vapply(c("tv", "a b", "a-b", "a_b", "a.b", "clé", "[1]", "@a", "#a", "a=b"),
+                  function(s) identical(tablexp:::citer_segment(s), s), NA)
+    all(cites) && all(nus)
+  })
+  verifier("T13 D6 injectivité : « et » d'un segment cité ne se confondent pas avec les guillemets de la citation ; octets invalides et chaîne latin-1 réservés cités ; NA et nom bytes jamais entre « … »", {
+    cs <- tablexp:::citer_segment
+    inv <- "a/\xe9"; lat <- "a/\xe9"; Encoding(lat) <- "latin1"
+    by <- "a/\xe9"; Encoding(by) <- "bytes"
+    octets_egaux(cs(paste0(GA, " x ", GF)), paste0(GA, " <U+00AB> x <U+00BB> ", GF)) &&
+      identical(cs(inv), paste0(GA, " a/<e9> ", GF)) && octets_egaux(cs(lat), paste0(GA, " a/", u(0xe9), " ", GF)) &&
+      identical(cs(NA_character_), NA_character_) && identical(cs(by), tablexp:::neutraliser_citation(by)) &&
+      !grepl(GA, cs(by), fixed = TRUE) && identical(cs(character(0)), character(0)) &&
+      identical(cs(c("tv", "a/b")), c("tv", paste0(GA, " a/b ", GF)))
+  })
+  verifier("T13 D8 aucun refus nouveau, résultats inchangés : MENTIONS_RAPPORT et TEXTE_REJEU_FICHE inchangés ; fiche de clé K construite et rejouée sans refus ; bilan à 15 lignes", {
+    o <- function(x) tablexp:::md5_octets(charToRaw(enc2utf8(paste(x, collapse = "\n"))))
+    m <- tablexp:::MENTIONS_RAPPORT
+    r <- attrape(rejouer_fiche(BASE, fiche_k("forme_origine", "qx", fiche_k("source", "ma source"))))
+    identical(c(o(c(names(m), unname(m))), o(tablexp:::TEXTE_REJEU_FICHE)),
+              c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f")) &&
+      inherits(r, "rejeu") && identical(nrow(r$bilan), 15L) &&
+      identical(r$bilan$verdict[12L],
+                paste0("différente : tables_reference/", CLE_CITEE, "/source, tables_reference/", CLE_CITEE, "/forme_origine")) &&
+      identical(r$bilan$verdict[15L], r$bilan$verdict[12L])
+  })
+  verifier("T13 D9 fiche de version 6 à clé « / », intacte (texte écrit par ecrire_fiche(), que #298 ne touche pas) : se rejoue sans refus ; seuls les textes des lignes 8 et 15 portent la clé citée ; les autres cellules lu et attendu sont celles d'une clé ordinaire (hors ligne 13, empreinte du résultat : le plan cite une autre clé)", {
+    r <- attrape(rejouer_fiche(BASE, FICHE_K))
+    inherits(r, "rejeu") && identical(r$bilan$verdict, VERDICTS_SUCCES) && identical(r$bilan$statut[1:14], STATUTS[1:14]) &&
+      identical(r$bilan$lu[-c(8L, 13L, 15L)], R_TV$bilan$lu[-c(8L, 13L, 15L)]) &&
+      identical(r$bilan$attendu[-c(8L, 13L, 15L)], R_TV$bilan$attendu[-c(8L, 13L, 15L)])
+  })
+})
+
+# --- T14 : forme MD5 des empreintes du code et du résultat lues au rejeu (#295 ;
+#     M515 ; ADR 0012, annotation du 16/11/2026, (a) et (b)). Critères C1 à C6
+#     et C8 de la spécification d'actuary-approfondi (C7, locales :
+#     tests/controles/locale_c.R). Valeur calculée à la main (verdicts,
+#     textes) ; identité exacte (construction rejouée identical() hors
+#     execution). Lignes 9 et 13 : « non déterminable » si l'un des deux côtés
+#     n'a pas la forme d'une MD5 (32 octets dans 0-9a-f) ; colonne lu d'une
+#     chaîne d'une autre forme : « « <valeur> » (forme invalide : …) ».
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  MOTIF <- " » (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)"
+  invalide <- function(s) paste0("« ", s, MOTIF)
+  md5 <- X$fiche$empreintes$resultat
+  ligne <- c(code = 9L, resultat = 13L)
+  VERDICTS_FERMES <- c("conforme", "identique", "différente", "non déterminable", "non vérifiée")
+  STATUTS_FERMES <- c(unique(STATUTS), unname(STATUT_REGIME))
+  # Fiche f dont empreintes/<champ> vaut v (NULL retire le champ).
+  empreinte_posee <- function(f, champ, v) {
+    if (is.null(v)) f$empreintes[[champ]] <- NULL else f$empreintes[champ] <- list(v)
+    f
+  }
+  ferme <- function(b) nrow(b) == 15L && all(b$verdict %in% VERDICTS_FERMES | startsWith(b$verdict, "différente : ")) &&
+    all(b$statut %in% STATUTS_FERMES)
+
+  verifier("T14 C1 empreintes/resultat « zz » : rejeu rendu sans refus ; ligne 13 « non déterminable », lu cité avec le motif, statut inchangé ; lignes 9 à 12 « identique » ; construction identical() hors execution", {
+    r <- attrape(rejouer_fiche(BASE, fiche_modifiee("empreintes/resultat" = "zz")))
+    if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+    else identical(r$bilan$verdict[13L], "non déterminable") &&
+      identical(r$bilan$lu[13L], "« zz » (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)") &&
+      identical(r$bilan$verdict[9:12], rep("identique", 4L)) &&
+      identical(r$bilan$statut[13L], "témoin, même machine seulement") &&
+      identical(r$bilan$attendu[13L], md5) && ferme(r$bilan) &&
+      identical(sans_execution(r$construction), sans_execution(X))
+  })
+  verifier("T14 C2 empreintes/code « zz » : ligne 9 « non déterminable », lu cité avec le motif, statut et attendu inchangés ; ligne 13 « identique »", {
+    b <- rejouer_fiche(BASE, fiche_modifiee("empreintes/code" = "zz"))$bilan
+    identical(b$verdict[9L], "non déterminable") && identical(b$lu[9L], invalide("zz")) &&
+      identical(b$verdict[13L], "identique") && identical(b$statut[9L], "exacte ; sans rôle de sécurité") &&
+      identical(b$attendu[9L], EMPREINTE_CODE) && ferme(b)
+  })
+  verifier("T14 C3 régime : empreintes/code « zz », source de la table embarquée altérée -> statut de la ligne 15 « non déterminable » ; verdict de la ligne 15 inchangé", {
+    b <- rejouer_fiche(BASE, fiche_modifiee("empreintes/code" = "zz", f = fiche_tv("source", "ma source")))$bilan
+    identical(b$statut[15L], STATUT_REGIME[["non_determinable"]]) &&
+      identical(b$verdict[15L], "différente : tables_reference/tv/source") && ferme(b)
+  })
+  lat <- "zz\xe9"; Encoding(lat) <- "latin1"
+  by <- "\xe9t\xe9"; Encoding(by) <- "bytes"
+  formes <- list(list(toupper(md5), toupper(md5)), list(substr(md5, 1, 31), substr(md5, 1, 31)),
+                 list(paste0(md5, "0"), paste0(md5, "0")),
+                 list(paste0(substr(md5, 1, 31), "g"), paste0(substr(md5, 1, 31), "g")),
+                 list(paste0(md5, " "), paste0(md5, " ")), list("", ""), list(lat, "zzé"),
+                 list(by, "<chaîne d'encodage bytes>"))
+  for (champ in names(ligne)) {
+    ecarts <- character(0)
+    for (i in seq_along(formes)) {
+      k <- ligne[[champ]]
+      r <- attrape(rejouer_fiche(BASE, empreinte_posee(FICHE, champ, formes[[i]][[1L]])))
+      e <- if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+      else c(if (!identical(r$bilan$verdict[k], "non déterminable")) sprintf("verdict « %s »", r$bilan$verdict[k]),
+             if (!identical(charToRaw(r$bilan$lu[k]), charToRaw(invalide(formes[[i]][[2L]]))) ||
+                 !identical(Encoding(r$bilan$lu[k]), "UTF-8")) sprintf("lu « %s »", r$bilan$lu[k]),
+             if (!all(validUTF8(unlist(r$bilan))) || any(grepl("[\n\v\f\r]", unlist(r$bilan), useBytes = TRUE)))
+               "cellule non UTF-8 ou sur plusieurs lignes",
+             if (!ferme(r$bilan)) "bilan hors des ensembles fermés",
+             if (!identical(sans_execution(r$construction), sans_execution(X))) "construction différente")
+      if (length(e)) ecarts <- c(ecarts, sprintf("forme %d : %s", i, paste(e, collapse = ", ")))
+    }
+    verifier(sprintf("T14 C4 balayage de huit formes non MD5 de empreintes/%s (majuscules, 31 et 33 caractères, « g », espace finale, vide, latin-1, bytes) : ligne %d « non déterminable », lu cité par la règle unique avec le motif, marqué UTF-8 ; aucune erreur R, aucun refus", champ, ligne[[champ]]),
+             if (length(ecarts)) ecarts else TRUE)
+  }
+  for (champ in names(ligne)) {
+    k <- ligne[[champ]]
+    lu <- function(v) { b <- rejouer_fiche(BASE, empreinte_posee(FICHE, champ, v))$bilan; c(b$verdict[k], b$lu[k]) }
+    nd <- "non déterminable"
+    verifier(sprintf("T14 C5 empreintes/%s : NA, absente, longueur 2, nommée, entier, classe bytes -> textes inchangés ; FAUX_MD5 « différente », lu tel quel", champ), {
+      identical(rbind(lu(NA_character_), lu(NULL), lu(c(md5, md5)), lu(c(a = md5)), lu(1L),
+                      lu(structure(md5, class = "bytes")), lu(FAUX_MD5)),
+                rbind(c(nd, "NA"), c(nd, "absente"), c(nd, "illisible (character de longueur 2)"),
+                      c(nd, "illisible (character de longueur 1)"), c(nd, "illisible (integer de longueur 1)"),
+                      c(nd, "illisible (character de longueur 1)"), c("différente", FAUX_MD5)))
+    })
+  }
+  verifier("T14 C6 forme_md5() et verdict_chaines() appelées directement : MD5 minuscule seule bien formée ; identique, différente, non déterminable", {
+    fm <- tablexp:::forme_md5; vc <- tablexp:::verdict_chaines
+    autre <- tablexp:::md5_octets(charToRaw("autre"))
+    isTRUE(fm(md5)) && isTRUE(fm(FAUX_MD5)) &&
+      !any(vapply(list("zz", toupper(md5), substr(md5, 1, 31), paste0(md5, "0"), paste0(substr(md5, 1, 31), "g"),
+                       paste0(md5, " "), "", lat, by, NA_character_, NULL, c(md5, md5), c(a = md5), 1L,
+                       structure(md5, class = "bytes")), fm, NA)) &&
+      identical(c(vc(md5, md5), vc(md5, autre), vc(NA_character_, md5), vc(md5, NA_character_), vc("zz", md5),
+                  vc(md5, "zz"), vc("zz", "zz")),
+                c("identique", "différente", rep("non déterminable", 5L)))
+  })
+  verifier("T14 C8 MENTIONS_RAPPORT et TEXTE_REJEU_FICHE inchangés (MD5 de leurs octets UTF-8 relevés à 8a81102)", {
+    o <- function(x) tablexp:::md5_octets(charToRaw(enc2utf8(paste(x, collapse = "\n"))))
+    m <- tablexp:::MENTIONS_RAPPORT
+    identical(c(o(c(names(m), unname(m))), o(tablexp:::TEXTE_REJEU_FICHE)),
+              c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f"))
+  })
 })
