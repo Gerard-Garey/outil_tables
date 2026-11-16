@@ -1511,7 +1511,10 @@ paires_lues <- function(l) {
 # segment de nom écrit dans un chemin est cité par neutraliser_citation()
 # (règle unique des valeurs de la fiche écrites dans le bilan, #142) : un nom
 # à caractère de contrôle ou qui n'est pas de l'UTF-8 valide ne coupe pas la
-# cellule et ne la rend pas invalide.
+# cellule et ne la rend pas invalide. Les littéraux non ASCII sont marqués par
+# texte_moteur() avant tout collage à un nom cité (marqué UTF-8) : un littéral
+# non marqué collé par paste() s'écrirait « <c3><a7> » sous la locale C
+# (mesuré, #86 ; #127).
 champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   if (identical(rendu, recu)) return(character(0))
   cite <- function(ch) paste(neutraliser_citation(ch), collapse = "/")
@@ -1522,8 +1525,8 @@ champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
   d <- character(0)
   for (n in union(names(rendu), names(recu))) {
     p <- cite(c(chemin, n))
-    d <- c(d, if (!(n %in% names(recu))) paste(p, "(absent de la fiche reçue)")
-              else if (!(n %in% names(rendu))) paste(p, "(absent de la fiche rendue)")
+    d <- c(d, if (!(n %in% names(recu))) paste(p, texte_moteur("(absent de la fiche reçue)"))
+              else if (!(n %in% names(rendu))) paste(p, texte_moteur("(absent de la fiche rendue)"))
               else champs_differents(rendu[[n]], recu[[n]], racine, c(chemin, n)))
   }
   if (!length(d)) d <- paste(ici, "(ordre des champs ou attributs)")
@@ -1534,7 +1537,7 @@ champs_differents <- function(rendu, recu, racine, chemin = character(0)) {
 # suivi des chemins de champs_differents().
 verdict_chemins <- function(rendu, recu, racine) {
   d <- champs_differents(rendu, recu, racine)
-  texte_moteur(if (!length(d)) "identique" else paste("différente :", paste(d, collapse = ", ")))
+  if (!length(d)) texte_moteur("identique") else paste0(texte_moteur("différente : "), paste(d, collapse = ", "))
 }
 
 # Verdict d'un témoin par chaînes (V1) : « non déterminable » si l'un des deux
@@ -1854,14 +1857,19 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
     stop("rejouer_fiche() : empreintes des tables de la construction différentes de celles du rejeu (erreur de programmation).",
          call. = FALSE)
 
-  # Bilan : 8 contrôles (passés), puis 7 témoins. texte_moteur() s'applique
-  # aussi au texte composé (lignes 1 et 6, verdicts « différente : … ») :
-  # sprintf() d'un gabarit marqué UTF-8 avec un argument non ASCII non marqué
-  # écrit « <c3><a9> » sous la locale C (mesuré, #86). Les comparaisons sont
-  # faites sur les valeurs brutes, avant tout texte_moteur() ; les valeurs
-  # lues viennent de lire_fiche() ou de x$fiche, au codage déjà déterminé ;
-  # l'effet est mesuré identique sous C et C.UTF-8 (tests/controles/
-  # locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune comparaison.
+  # Bilan : 8 contrôles (passés), puis 7 témoins. Tout texte composé qui mêle
+  # un littéral non ASCII à une valeur citée (marquée UTF-8) est formé par
+  # formuler() (lignes 1 et 6), ou par paste() de morceaux déjà marqués
+  # (texte_moteur(), citations : verdicts « différente : … » des lignes 10 à
+  # 12 et 15) : un littéral non marqué collé à une citation marquée
+  # s'écrirait « <c3><a9> » sous la locale C, et texte_moteur() après coup
+  # viendrait trop tard (mesuré, #86 ; #127 ; tests/controles/locale_c.R,
+  # noms non ASCII de la fiche, classe des données et provenance). Les
+  # comparaisons sont faites sur les valeurs brutes, avant tout marquage ; les
+  # valeurs lues viennent de lire_fiche() ou de x$fiche, au codage déjà
+  # déterminé ; l'effet est mesuré identique sous C et C.UTF-8
+  # (tests/controles/locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune
+  # comparaison.
   # Toute valeur ou tout nom de la fiche écrit dans une cellule du bilan est
   # cité par la règle unique neutraliser_citation() (#142) : valeurs par
   # sans_controle(texte_lu(v)), paires_lues(), liste_guillemets() ou
@@ -1879,9 +1887,11 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # Empreinte(s) de fichier de la fiche, témoin 14 : k >= 2 empreintes
   # (provenance de k fichiers, #181 ; M332) citées une à une par
   # liste_guillemets() (règle neutraliser_citation(), NA écrit « NA »), dans
-  # l'ordre de la fiche ; toute autre valeur par texte_lu(), dont k = 1
-  # (texte inchangé). Ligne 6 : noms des fichiers de la provenance (qui a
-  # passé controler_provenance()), de même pour k >= 2, cités de même pour k = 1.
+  # l'ordre de la fiche ; toute autre valeur par sans_controle(texte_lu()),
+  # dont k = 1 (chaîne citée par la règle de #142 : inchangée tant qu'elle n'a
+  # ni caractère de contrôle, ni octet invalide, ni codage « bytes »). Ligne 6 :
+  # noms des fichiers de la provenance (qui a passé controler_provenance()), de
+  # même pour k >= 2, cités de même pour k = 1.
   ef <- e[["fichier"]]
   fichiers_lus <- if (is.character(ef) && is.null(attributes(ef)) && length(ef) > 1L)
     liste_guillemets(ef) else sans_controle(texte_lu(ef))
@@ -1912,14 +1922,13 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                                    "empreintes/resultat, empreintes/code, empreintes/statut_resultat_code")),
                 texte_lu(r$empreintes$resultat),
                 texte_moteur("non recalculée par le moteur (couche de lecture, E4.4)"), tc[["attendu"]]),
-    lu = c(texte_moteur(sprintf("fiche : liste nommée de %d champs ; donnees : classe %s, %d lignes, %d colonnes",
-                                length(fiche), paste(class(donnees), collapse = "/"), nrow(donnees), ncol(donnees))),
+    lu = c(formuler("fiche : liste nommée de %d champs ; donnees : classe %s, %d lignes, %d colonnes",
+                    length(fiche), paste(sans_controle(class(donnees)), collapse = "/"), nrow(donnees), ncol(donnees)),
            texte_moteur("champs lus de la forme attendue"),
            sprintf("%d", v), e[["algorithme"]], e[["representation"]],
-           texte_moteur(sprintf("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
-                                paste(names(plan[["etapes"]]), collapse = ", "), paste(names(roles), collapse = ", "),
-                                recette$recette,
-                                provenance_lue)),
+           formuler("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
+                    paste(sans_controle(names(plan[["etapes"]])), collapse = ", "),
+                    paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette), provenance_lue),
            e[["donnees"]], tr$lu, sans_controle(texte_lu(e[["code"]])), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
            sans_controle(texte_lu(e[["resultat"]])), fichiers_lus, tc[["lu"]]),

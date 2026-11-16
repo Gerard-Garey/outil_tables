@@ -1350,10 +1350,17 @@ segments_texte <- function(noms, n) {
 # type_non_canonique (rôle : le chemin, details$role) et un data.frame n'est pas
 # admis (liste classée : refusé par la branche des listes, comme toute classe).
 # `valeurs` (TRUE : écriture ordinaire) : FALSE, forme seule, pour un sous-arbre
-# dont aucune valeur n'est rendue (execution) : le parcours est le même, les
-# refus de forme sont les mêmes, mais aucune valeur ni aucun nom n'est écrit,
-# donc aucun contrôle de codage des chaînes (bytes, non UTF-8, non ASCII sans
-# codage déclaré) ; rien n'est ajouté au texte.
+# dont aucune valeur n'est rendue (execution ; M499 (a)) : le parcours est le
+# même et noeud() et atome() refusent les mêmes formes (profondeur, classe,
+# attribut, type, facteur, Date à stockage ou attribut non admis, vecteur nommé
+# de longueur 0, forme du data.frame, objet non atomique, racine qui n'est pas
+# une liste) ; en revanche aucune valeur ni aucun nom n'est écrit (ajouter()
+# sort avant d'évaluer les octets, noms_ligne() est sauté), donc ne sont
+# contrôlés ni le codage des chaînes et des noms (bytes, non UTF-8, non ASCII
+# sans codage déclaré), ni le domaine des valeurs de ecrire_valeurs() : une
+# Date hors domaine, infinie ou non entière est admise (motifs
+# date_hors_domaine et date_non_entiere), refusée sous fiche/* ; rien n'est
+# ajouté au texte.
 texte_objet <- function(x, premiere, entete, forme = "texte", canonique = FALSE, valeurs = TRUE) {
   tab <- as.raw(0x09); lf <- as.raw(0x0a)
   impossible <- function(chemin, message)

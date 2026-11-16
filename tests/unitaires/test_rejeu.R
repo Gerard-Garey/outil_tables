@@ -874,6 +874,62 @@ local({
            else grepl("R=a<U+000A>b", r$bilan$lu[10L], fixed = TRUE) && !any(grepl("[\n\v\f\r]", cellules(r$bilan))))
 })
 
+# --- T11 bis : classe des données et gabarits non ASCII du bilan (revue finale
+#     de B24, constats mineurs ; #142) ------------------------------------------
+# Ligne 1 : la classe des données est citée par la règle unique de #142 (avant :
+# collée brute, d'où un LF dans la cellule pour « ma<LF>classe » et une cellule
+# qui n'est pas de l'UTF-8 valide pour des octets invalides). Verdicts
+# « différente : » et « (absent de la fiche reçue / rendue) » : texte exact avec
+# un nom non ASCII, marqué UTF-8 et non marqué (sous la locale C, avec le
+# paquet installé sous C, ces deux cas sont contrôlés par tests/controles/
+# locale_c.R : la bibliothèque des batteries est installée en UTF-8).
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  u <- function(...) intToUtf8(c(...))
+  intact <- R0$bilan$lu[1L]
+  verifier("T11 bis ligne 1 : fiche intacte, « classe data.frame » ; classe seule citée, aucun LF",
+           grepl("; donnees : classe data.frame, 4 lignes, 7 colonnes$", intact) && !grepl("\n", intact))
+  for (cas in list(list("non ASCII", paste0("cl", u(0xe9)), paste0("cl", u(0xe9))),
+                   list("à LF", "ma\nclasse", "ma<U+000A>classe"),
+                   list("à octets invalides", "cl\xe9", "cl<e9>"),
+                   list("à deux éléments de contrôle", c("a\vb", "c\rd"), "a<U+000B>b/c<U+000D>d"))) {
+    dn <- BASE; class(dn) <- c(cas[[2L]], "data.frame")
+    r <- attrape(rejouer_fiche(dn, FICHE))
+    verifier(sprintf("T11 bis ligne 1 : classe des données %s, rejeu rendu, classe citée « %s », cellule d'une ligne en UTF-8 valide, autres lignes inchangées",
+                     cas[[1L]], cas[[3L]]),
+             if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else if (!identical(r$bilan$lu[1L], sub("classe data.frame", paste0("classe ", cas[[3L]], "/data.frame"), intact, fixed = TRUE)))
+               sprintf("lu « %s »", r$bilan$lu[1L])
+             else if (!validUTF8(r$bilan$lu[1L]) || grepl("[\n\v\f\r]", r$bilan$lu[1L], useBytes = TRUE))
+               "cellule invalide ou sur plusieurs lignes"
+             else if (!identical(r$bilan$verdict, VERDICTS_SUCCES)) "verdicts changés"
+             else TRUE)
+  }
+  # Noms non ASCII : texte exact des verdicts, marqué UTF-8 (nom marqué, puis
+  # mêmes octets sans marque).
+  E <- u(0xe9)
+  nom_brut <- rawToChar(as.raw(c(0xc3, 0xa9)))
+  for (cas in list(list("marqué UTF-8", E), list("non marqué", nom_brut))) {
+    for (cont in c("versions", "empreintes")) {
+      fb <- FICHE; z <- fb[[cont]]; z[[cas[[2L]]]] <- "1"; fb[[cont]] <- z
+      ligne <- if (cont == "versions") 10L else 12L
+      r <- attrape(rejouer_fiche(BASE, fb))
+      attendu <- paste0("diff", E, "rente : ", if (cont == "empreintes") "empreintes/", E, " (absent de la fiche rendue)")
+      verifier(sprintf("T11 bis nom non ASCII %s ajouté à fiche$%s : ligne %d « différente : … %s (absent de la fiche rendue) », octets exacts, marqué UTF-8",
+                       cas[[1L]], cont, ligne, E),
+               if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+               else identical(charToRaw(r$bilan$verdict[ligne]), charToRaw(attendu)) &&
+                 identical(Encoding(r$bilan$verdict[ligne]), "UTF-8"))
+    }
+  }
+  verifier("T11 bis verdict_chemins() : nom non ASCII absent de la fiche reçue ; « re<ç>ue » en UTF-8 valide, octets exacts",
+           {
+             v <- tablexp:::verdict_chemins(setNames(list(1, 2), c("a", E)), list(a = 1), "fiche")
+             identical(charToRaw(v), charToRaw(paste0("diff", E, "rente : ", E, " (absent de la fiche re", u(0xe7), "ue)"))) &&
+               identical(Encoding(v), "UTF-8")
+           })
+})
+
 # --- T12 : témoin « catalogue », ligne 15 (#267 ; ADR 0015, seconde annotation
 #     du 15/11/2026, (b) ; ADR 0012, annotation du 15/11/2026, (b) ; DF1 à DF7,
 #     M498). Critères B1 à B8 de la spécification d'actuary-approfondi,
