@@ -4567,7 +4567,29 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     (refus chaine\_codage\_bytes, [chemin])~», \code{details\$lu} le motif
     de l'écrivain, \code{details\$chemin}
     \code{[clé]/parametres/[nom]} pour une valeur ou
-    \code{[clé]/parametres/@noms} pour un nom~;
+    \code{[clé]/parametres/@noms} pour un nom.
+    Un refus du lecteur \code{lire\_texte()} à la relecture~(d) garde de
+    même son motif et son chemin (issue~\#165)~: raison «~métadonnée sans
+    écriture exacte dans la fiche (refus [motif], [chemin])~»,
+    \code{details\$lu} le motif du lecteur, \code{details\$attendu}
+    «~relecture du texte de fiche sans refus~», \code{details\$chemin} le
+    chemin que porte le refus, sinon, pour un texte qui s'arrête avant la
+    fin de l'objet, le chemin attendu à cet endroit, sinon le premier champ
+    de la ligne refusée (\code{details\$ligne} du lecteur). Il vaut
+    \code{NA} pour un refus sans numéro de ligne ou de la ligne~1
+    (première ligne du texte, sans chemin), pour un texte qui contient un
+    octet nul (les octets ne se convertissent pas en chaîne~; l'échec est
+    absorbé, sans erreur R qui masque le refus) et pour un premier
+    champ vide ou qui n'est pas de l'UTF-8 valide. Cette branche est
+    défensive~: aucune table connue n'écrit un texte que le lecteur
+    refuse, et les tests la provoquent en altérant les octets écrits
+    (\emph{constat}, non preuve). La raison «~relecture différente~» reste
+    celle d'une relecture sans refus mais non \code{identical()} à
+    l'élément écrit~: \code{details\$lu} «~élément relu différent~»,
+    \code{details\$attendu} «~élément relu identical() à l'élément
+    écrit~», \code{details\$chemin} \code{NA} (\emph{constat de mesure} du
+    16/11/2026~: paramètre de classe \code{Date} stocké en \code{integer},
+    relu en \code{double})~;
   \item \textbf{clé citée et non reçue}, refus
     \code{table\_reference\_absente}~: une clé citée par un paramètre du
     plan (\code{cles\_citees()}, dans l'ordre de
