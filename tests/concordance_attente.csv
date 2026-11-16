@@ -1,4 +1,3 @@
 type,nom,issue,motif
-entree,fonctions-construire-table:citer_segment,#298,fonction de citation d'un segment de chemin du bilan du rejeu ; entrée de catalogue ajoutée au commit docs: de la branche (règle 9)
 entree,fonctions-construire-table:forme_md5,#295,prédicat de forme MD5 des empreintes du code et du résultat lues au rejeu ; entrée de catalogue ajoutée au commit docs: de la branche (règle 9)
 entree,fonctions-construire-table:texte_empreinte_lue,#295,citation de l'empreinte lue aux lignes 9 et 13 du bilan du rejeu ; entrée de catalogue ajoutée au commit docs: de la branche (règle 9)
