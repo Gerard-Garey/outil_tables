@@ -1747,12 +1747,12 @@ verdict_chaines <- function(attendu, lu) {
 # guillemets d'une valeur écrits <U+003C>, <U+00AB>, <U+00BB>), suivie de
 # « (forme invalide : … attendue) » ; toute autre valeur garde
 # sans_controle(texte_lu()) (MD5 bien formée telle quelle, « absente », « NA »,
-# « illisible (…) »). paste0() de morceaux marqués UTF-8 (citation, constante
-# par texte_moteur()) : même codage que formuler(), sous toute locale.
+# « illisible (…) »). Texte formé par formuler() (#299) : la citation est
+# insérée par %s, forme de citation déclarée de messages_refus.R.
 texte_empreinte_lue <- function(v) {
   if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v) && !forme_md5(v))
-    return(paste0(citer_valeur_lue(v, "toujours"),
-                  texte_moteur(" (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)")))
+    return(formuler("%s (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)",
+                    citer_valeur_lue(v, "toujours")))
   sans_controle(texte_lu(v))
 }
 
@@ -1810,12 +1810,13 @@ temoin_catalogue <- function(ecarts, verdict_code) {
   for (k in ecarts$cles) {
     j <- which(ecarts$cle == k)
     if (length(j)) {
-      # paste0() de morceaux déjà marqués (valeurs citées, constante par
-      # texte_moteur()) : même codage que formuler(), sous toute locale.
-      attendus <- c(attendus, paste0(chemins[j], " : ",
-                                     vapply(ecarts$attendu[j], citer_valeur_lue, "", "toujours", USE.NAMES = FALSE),
-                                     texte_moteur(" (catalogue du package installé)")))
-      lus <- c(lus, paste0(chemins[j], " : ", vapply(ecarts$lu[j], citer_valeur_lue, "", "toujours", USE.NAMES = FALSE)))
+      # Textes formés par formuler() (#299) : chemin cité par citer_segment() et
+      # valeurs par citer_valeur_lue() (vapply() de la forme de citation
+      # déclarée de messages_refus.R).
+      ch <- paste0(citer_segment(ecarts$cle[j]), "/", sans_controle(ecarts$champ[j]))
+      attendus <- c(attendus, formuler("%s : %s (catalogue du package installé)", ch,
+                                       vapply(ecarts$attendu[j], citer_valeur_lue, "", "toujours", USE.NAMES = FALSE)))
+      lus <- c(lus, formuler("%s : %s", ch, vapply(ecarts$lu[j], citer_valeur_lue, "", "toujours", USE.NAMES = FALSE)))
     } else {
       attendus <- c(attendus, formuler("%s : métadonnées du catalogue du package installé", citer_segment(k)))
       lus <- c(lus, formuler("%s : métadonnées de la fiche", citer_segment(k)))
@@ -2134,13 +2135,12 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                     length(fiche), paste(sans_controle(class(donnees)), collapse = "/"), nrow(donnees), ncol(donnees)),
            texte_moteur("champs lus de la forme attendue"),
            sprintf("%d", v), e[["algorithme"]], e[["representation"]],
-           # provenance_lue (citer_fichiers_lus(), #307) collée par paste0() à
-           # un texte formé, marqué UTF-8 par formuler() (même codage, sous
-           # toute locale) ; son insertion par %s attend #299.
-           paste0(formuler("étapes : %s ; rôles : %s ; recette : %s ; provenance : ",
-                           paste(sans_controle(names(plan[["etapes"]])), collapse = ", "),
-                           paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette)),
-                  provenance_lue),
+           # provenance_lue : NULL écrit « NULL », sinon citer_fichiers_lus()
+           # (#307), insérée par %s (#299).
+           formuler("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
+                    paste(sans_controle(names(plan[["etapes"]])), collapse = ", "),
+                    paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette),
+                    provenance_lue),
            e[["donnees"]], tr$lu, texte_empreinte_lue(e[["code"]]), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
            texte_empreinte_lue(e[["resultat"]]), fichiers_lus, tc[["lu"]]),
