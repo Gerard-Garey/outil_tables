@@ -17417,10 +17417,35 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     M71), avec la classe et les attributs de l'utilisateur, n'a pas de forme
     canonique et reste hors de ce contrôle, sans quoi une entrée de classe
     \code{tbl\_df} serait refusée (M499)~; sa cohérence avec le périmètre de
-    l'empreinte relève du contrôle~6. Le contrôle n'exige pas
-    d'\code{execution} qu'il soit une liste aux champs attendus~: une
-    chaîne nue à sa place passe et le rapport est inchangé
-    (\emph{constat}~; issue~\#297, ouverte). Un objet rendu par
+    l'empreinte relève du contrôle~6. \textbf{Admission documentée
+    d'\code{execution}} (issue~\#297~; décision M520~; ADR 0012, seconde
+    annotation du 16/11/2026, (d)~1)~: le contrôle n'exige d'\code{execution}
+    ni sa présence, ni sa structure. Un \code{execution} qui n'est pas une
+    liste (une chaîne, un vecteur d'entiers), une liste vide, une liste
+    dont des champs produits sont absents ou à laquelle un champ est ajouté,
+    ou dont un champ porte une valeur d'un autre type que l'écrivain sait
+    écrire (une chaîne pour \code{debut}, par exemple) est admis, et le
+    rapport est rendu aux octets de l'objet intact. Motif~: rien
+    d'\code{execution} n'est restitué (\emph{Déterminisme}, ci-dessus~;
+    ADR 0012, point~2.4) et aucune donnée du périmètre de l'empreinte ne
+    l'ancre~; un contrôle de sa structure demanderait cet ancrage (doctrine,
+    au contrôle~6 ci-dessous), et exiger cette structure placerait le seuil
+    le plus strict là où l'enjeu est nul. Un refus
+    \code{type\_non\_canonique} serait faux dans les termes de son motif,
+    une chaîne nue étant une forme canonique, et un refus
+    \code{objet\_modifie} n'aurait aucun ancrage~: l'un et l'autre ont été
+    écartés, comme une forme exigée sous le refus
+    \code{rapport\_objet\_invalide} (même annotation, (d)~3).
+    \code{FORME\_EXECUTION}, qui décrit la forme produite sans l'exiger
+    (ci-dessus), ne change rien à cette admission. La frontière
+    de forme est inchangée~: à la place d'\code{execution}, une chaîne de
+    classe «~k~», une chaîne munie d'un attribut autre que \code{names} ou
+    un facteur sont refusés par \code{type\_non\_canonique}, rôle
+    \code{execution}~; la liste produite privée de ses noms
+    (\code{unname()}) l'est sous le rôle \code{execution/[1]}, parce que
+    l'exception du \code{POSIXct} nu est liée au nom \code{debut}
+    (\emph{constat} des tests et de mesures sous les locales C et
+    C.UTF-8). Un objet rendu par
     \code{construire\_table()} passe ce contrôle (\emph{constat} des tests),
     qui n'écrit rien dans le rapport.
   \item \textbf{lignes conservées} (issue~\#294~; ADR 0012, seconde
@@ -18303,7 +18328,13 @@ l'objet intact, d'un \code{execution} absent, de forme libre, ou portant
 une chaîne ou un nom \code{bytes} (à toute position hors \code{debut}),
 ou une chaîne non ASCII sans codage déclaré~; la \code{Date} nue, rendue avec son type sous
 \code{fiche/versions}, sans effet sous \code{execution}~; les refus de
-codage inchangés sous \code{fiche/plateforme}~; pour l'issue~\#294, le refus \code{objet\_modifie}, chemin cité, d'une copie
+codage inchangés sous \code{fiche/plateforme}~; pour l'issue~\#297, le
+rendu, aux octets de l'objet intact, d'un \code{execution} remplacé par
+une chaîne, un vecteur d'entiers, une liste vide ou une liste à champ
+inconnu, et, en contre-épreuve, le refus \code{type\_non\_canonique} d'un
+\code{execution} de classe «~k~», d'attribut \code{z} ou facteur (rôle
+\code{execution}) et de la liste produite sans ses noms (rôle
+\code{execution/[1]})~; pour l'issue~\#294, le refus \code{objet\_modifie}, chemin cité, d'une copie
 \code{lignes\_conservees} qui n'est pas un \code{data.frame} (chaîne,
 \code{NULL}, liste sans la classe ou d'une autre classe, vecteur portant
 la classe), qui a moins de lignes que \code{numeros\_conserves} (une de
@@ -18401,7 +18432,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{CHEMINS\_HORS\_RESULTAT} & constante & --- & liste fermée des sept chemins hors du périmètre de l'empreinte du résultat (section~\ref{sec:empreinte-resultat}) \\
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{CHEMINS\_FORME\_HORS\_RESULTAT} & constante & --- & chemins de \code{CHEMINS\_HORS\_RESULTAT} dont la forme est contrôlée avant l'écriture du rapport figé, tous sauf la copie de l'entrée \code{lignes\_conservees} (issue~\#141~; M499) \\
-\catalogue{fonctions-rapport}{controler\_forme\_hors\_resultat()} & interne & objet \code{construction} & contrôle~5 de \code{controler\_rapport()}~: chaque sous-arbre présent aux chemins de la constante précédente, sous son chemin, passé à \code{texte\_objet()} en mode \code{canonique}, sortie jetée~; refus \code{type\_non\_canonique} (rôle~: le chemin) et, sous \code{fiche/}, refus de codage de l'écrivain~; \code{execution} en forme seule (\code{valeurs = FALSE}), le champ que \code{FORME\_EXECUTION} déclare \code{POSIXct} (\code{debut}), \code{POSIXct} nu, contrôlé sans sa classe~; chemins parcourus par \code{lire\_chemin()}~: tout ancêtre liste traversé, de classe quelconque, \code{bytes} comprise, le sous-arbre seul jugé (issue~\#301)~; sous-arbre absent ou \code{NULL} sauté~; rend \code{TRUE}, invisible (issue~\#141, section~\ref{sec:rapport-fige}) \\
+\catalogue{fonctions-rapport}{controler\_forme\_hors\_resultat()} & interne & objet \code{construction} & contrôle~5 de \code{controler\_rapport()}~: chaque sous-arbre présent aux chemins de la constante précédente, sous son chemin, passé à \code{texte\_objet()} en mode \code{canonique}, sortie jetée~; refus \code{type\_non\_canonique} (rôle~: le chemin) et, sous \code{fiche/}, refus de codage de l'écrivain~; \code{execution} en forme seule (\code{valeurs = FALSE}), le champ que \code{FORME\_EXECUTION} déclare \code{POSIXct} (\code{debut}), \code{POSIXct} nu, contrôlé sans sa classe~; chemins parcourus par \code{lire\_chemin()}~: tout ancêtre liste traversé, de classe quelconque, \code{bytes} comprise, le sous-arbre seul jugé (issue~\#301)~; sous-arbre absent ou \code{NULL} sauté~; ni la présence ni la structure d'\code{execution} exigées (admission documentée, issue~\#297)~; rend \code{TRUE}, invisible (issue~\#141, section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{controler\_lignes\_conservees()} & interne & objet \code{construction} & contrôle~6 de \code{controler\_rapport()}~: copie de l'entrée \code{lignes\_conservees}, hors de l'empreinte, rapprochée de \code{numeros\_conserves} et de \code{fiche/roles}, qui sont dans son périmètre~; refus \code{objet\_modifie}, chemin cité, d'une valeur qui n'est pas un \code{data.frame}, d'un nombre de lignes autre que la longueur de \code{numeros\_conserves} ou illisible, d'une colonne de rôle manquante, d'une absence alors que \code{numeros\_conserves} est présent~; lecture sans dispatch (\code{lire\_chemin()}, \code{a\_classe()}, \code{attr()}, \code{.row\_names\_info()})~; ni type ni valeurs des colonnes contrôlés (issue~\#311)~; rend \code{TRUE}, invisible (issue~\#294, section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
