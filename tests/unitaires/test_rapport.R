@@ -473,10 +473,244 @@ local({
     r <- attrape(ecrire_rapport(y))
     if (inherits(r, "error")) conditionMessage(r) else is.raw(r) && inherits(y$etapes$donnees$resultat$lignes_conservees, "tbl_df")
   })
+  # #294 (ADR 0012, seconde annotation du 16/11/2026, (b), « exception ancrée ») :
+  # lignes_conservees, copie de l'entrée hors empreinte et hors forme canonique,
+  # rapprochée de numeros_conserves et de fiche/roles (périmètre de l'empreinte).
+  # Refus objet_modifie, chemin cité (details$chemin) ; valeurs calculées à la
+  # main (3 000 lignes, 7 colonnes de rôle, jeu du test). Les trois écarts de
+  # l'issue sont mesurés sur R1 : JEU[1:5, 1:2], "x", classe « k ».
+  LC <- "etapes/donnees/resultat/lignes_conservees"
+  lc1 <- x1$etapes$donnees$resultat$lignes_conservees
+  avec_lc <- function(v) { y <- x1; y$etapes$donnees$resultat["lignes_conservees"] <- list(v); y }
+  classe_k <- function(o) { class(o) <- "k"; o }
+  M1 <- "n'est pas un data.frame (liste de classe data.frame) ; valeur lue : "
+  cas_294 <- list(
+    list("JEU[1:5, 1:2]", function() JEU[1:5, 1:2], list(lu = 5L, attendu = 3000L),
+         "compte 5 ligne(s) au lieu de 3000, longueur de etapes/donnees/resultat/numeros_conserves"),
+    list("\"x\"", function() "x", list(lu = "character", attendu = "data.frame"),
+         paste0(M1, "\"x\" (character)")),
+    list("classe « k » sur la liste", function() classe_k(unclass(lc1)), list(lu = "k", attendu = "data.frame"),
+         paste0(M1, "objet de type list, de classe k")),
+    list("NULL (élément présent)", function() NULL, list(lu = "NULL", attendu = "data.frame"),
+         paste0(M1, "NULL")),
+    list("liste sans classe data.frame", function() as.list(lc1), list(lu = "list", attendu = "data.frame"),
+         paste0(M1, "objet de type list, de classe list")),
+    list("vecteur de classe data.frame", function() structure(letters, class = "data.frame"),
+         list(lu = "data.frame", attendu = "data.frame"), paste0(M1, "objet de type character, de classe data.frame")),
+    list("1 ligne de moins", function() lc1[-1L, ], list(lu = 2999L, attendu = 3000L),
+         "compte 2999 ligne(s) au lieu de 3000"),
+    list("0 ligne", function() lc1[0L, ], list(lu = 0L, attendu = 3000L), "compte 0 ligne(s) au lieu de 3000"),
+    list("row.names compacts c(NA, NA) : nombre de lignes illisible", function() { v <- lc1; attr(v, "row.names") <- c(NA_integer_, NA_integer_); v },
+         list(lu = NA_integer_, attendu = 3000L), "compte NA ligne(s) au lieu de 3000, longueur de etapes/donnees/resultat/numeros_conserves"),
+    list("colonne sexe retirée", function() lc1[, names(lc1) != "sexe"], list(colonnes = "sexe"),
+         "ne porte pas la ou les colonne(s) « sexe », déclarée(s) par fiche/roles"),
+    list("colonnes id_contrat et date_sortie retirées", function() lc1[, !(names(lc1) %in% c("id_contrat", "date_sortie"))],
+         list(colonnes = c("id_contrat", "date_sortie")),
+         "ne porte pas la ou les colonne(s) « id_contrat », « date_sortie », déclarée(s) par fiche/roles"),
+    list("colonne renommée", function() { v <- lc1; names(v)[3L] <- "genre"; v }, list(colonnes = "sexe"),
+         "colonne(s) « sexe »"),
+    list("aucune colonne, 3 000 lignes", function() lc1[, character(0)], list(colonnes = names(lc1)),
+         "ne porte pas la ou les colonne(s) « id_contrat », « id_tete », « sexe »"))
+  for (c_ in cas_294) {
+    verifier(sprintf("#294 : lignes_conservees %s : ecrire_rapport() refuse objet_modifie, chemin cité, une ligne, UTF-8", c_[[1L]]), {
+      r <- attrape(ecrire_rapport(avec_lc(c_[[2L]]())))
+      if (!inherits(r, "refus_tablexp")) sprintf("condition ou rendu : %s", class(r)[1L])
+      else une_ligne_utf8(r, controle_refus(r, "objet_modifie", c(list(chemin = LC), c_[[3L]]),
+                                            c(paste("Rapport figé : objet modifié après sa construction :", LC,
+                                                    "(copie de l'entrée, hors de l'empreinte du résultat)"), c_[[4L]],
+                                              "Le rapport ne restitue un objet que tel que construire_table() l'a rendu.")))
+    })
+  }
+  verifier("#294 : message d'une valeur de classe d'encodage bytes ou d'un nom de colonne bytes : refus objet_modifie (pas une erreur R), classe ou colonne citée sous le repère", {
+    b <- as.list(lc1); class(b) <- CLASSE_BYTES
+    n <- lc1[, names(lc1) != "sexe"]; names(n)[1L] <- CLASSE_BYTES
+    r1 <- attrape(ecrire_rapport(avec_lc(b))); r2 <- attrape(ecrire_rapport(avec_lc(n)))
+    if (!inherits(r1, "refus_tablexp") || !inherits(r2, "refus_tablexp")) return("refus attendus")
+    ok <- une_ligne_utf8(r1, controle_refus(r1, "objet_modifie", list(chemin = LC), paste0(M1, "objet de type list, de classe <chaîne d'encodage bytes>")))
+    if (!isTRUE(ok)) ok
+    else une_ligne_utf8(r2, controle_refus(r2, "objet_modifie", list(chemin = LC), "colonne(s) « id_contrat », « sexe »"))
+  })
+  verifier("#294 : lignes_conservees admise sans refus, rendue : tbl_df et attribut quelconque ajoutés à l'objet construit (même empreinte), classe « k » devant data.frame, colonne hors rôle ajoutée, noms de lignes quelconques", {
+    j <- lc1; class(j) <- c("tbl_df", "tbl", "data.frame"); attr(j, "simulation") <- list(a = 1); attr(j, "z") <- "z"
+    k <- lc1; class(k) <- c("k", "data.frame")
+    h <- lc1; h$autre <- seq_len(nrow(h))
+    r <- lc1; rownames(r) <- paste0("l", seq_len(nrow(r)))
+    e <- character(0)
+    for (cas in list(list("tbl_df", j), list("classe k", k), list("colonne hors rôle", h), list("noms de lignes", r))) {
+      o <- attrape(ecrire_rapport(avec_lc(cas[[2L]])))
+      if (!is.raw(o)) e <- c(e, sprintf("%s : %s", cas[[1L]], if (inherits(o, "error")) conditionMessage(o) else "pas de rendu"))
+    }
+    if (length(e)) e else TRUE
+  })
+  # Absence (décision du mainteneur du 17/11/2026, M522) : refusée, distincte de
+  # l'élément présent de valeur NULL (cas « NULL » ci-dessus).
+  verifier("#294 : lignes_conservees absente de l'objet, numeros_conserves présent (3 000 numéros) : refus objet_modifie, chemin cité, texte exact, une ligne, UTF-8", {
+    y <- x1; y$etapes$donnees$resultat$lignes_conservees <- NULL
+    r <- attrape(ecrire_rapport(y))
+    if (!inherits(r, "refus_tablexp")) sprintf("condition ou rendu : %s", class(r)[1L])
+    else une_ligne_utf8(r, controle_refus(r, "objet_modifie", list(chemin = LC, lu = "absente", attendu = "data.frame"),
+      paste("Rapport figé : objet modifié après sa construction :", LC,
+            "(copie de l'entrée, hors de l'empreinte du résultat) est absente, alors que",
+            "etapes/donnees/resultat/numeros_conserves établit 3000 ligne(s) conservée(s). Le rapport ne restitue un objet",
+            "que tel que construire_table() l'a rendu.")))
+  })
+  verifier("#294 : textes exacts des refus de valeur non data.frame (\"x\") et de colonne manquante (sexe)", {
+    r1 <- attrape(ecrire_rapport(avec_lc("x"))); r2 <- attrape(ecrire_rapport(avec_lc(lc1[, names(lc1) != "sexe"])))
+    if (!inherits(r1, "refus_tablexp") || !inherits(r2, "refus_tablexp")) return("refus attendus")
+    ok <- controle_refus(r1, "objet_modifie", NULL,
+      paste("Rapport figé : objet modifié après sa construction :", LC,
+            "(copie de l'entrée, hors de l'empreinte du résultat) n'est pas un data.frame (liste de classe data.frame) ;",
+            "valeur lue : \"x\" (character). Le rapport ne restitue un objet que tel que construire_table() l'a rendu."))
+    if (!isTRUE(ok)) ok
+    else controle_refus(r2, "objet_modifie", NULL,
+      paste("Rapport figé : objet modifié après sa construction :", LC,
+            "(copie de l'entrée, hors de l'empreinte du résultat) ne porte pas la ou les colonne(s) « sexe », déclarée(s) par",
+            "fiche/roles. Le rapport ne restitue un objet que tel que construire_table() l'a rendu."))
+  })
+  # Classe de l'entrée à méthodes S3 (admise par M499 (a)) : le contrôle et le
+  # rendu lisent la structure sans dispatch (.row_names_info(), attr()), les
+  # méthodes dim(), names(), length(), [[ et $ ne sont jamais appelées (elles
+  # mentent ou lèvent une erreur : un appel ferait échouer le test) ; méthodes définies dans
+  # globalenv() (trouvées par le dispatch) puis retirées.
+  verifier("#294 : lignes_conservees de classe « k » à méthodes dim(), names(), length(), [[ et $ (qui mentent ou lèvent une erreur) : rendue, octets identiques à o1 (structure lue sans dispatch) ; moins de lignes que numeros_conserves : refus objet_modifie", {
+    m <- list(dim.k = function(x) c(5L, 2L), names.k = function(x) c("a", "b"), length.k = function(x) stop("length.k appelée"),
+              `[[.k` = function(x, i, ...) stop("[[.k appelée"), `$.k` = function(x, name) stop("$.k appelée"))
+    for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+    tryCatch({
+      k <- lc1; class(k) <- c("k", "data.frame")
+      k2 <- lc1[-1L, ]; class(k2) <- c("k", "data.frame")
+      o <- attrape(ecrire_rapport(avec_lc(k))); r <- attrape(ecrire_rapport(avec_lc(k2)))
+      if (!is.raw(o)) sprintf("classe k : %s", if (inherits(o, "error")) conditionMessage(o) else class(o)[1L])
+      else if (!identical(o, o1)) "classe k : octets différents de o1"
+      else if (!inherits(r, "refus_tablexp")) sprintf("classe k, 2999 lignes : %s", class(r)[1L])
+      else controle_refus(r, "objet_modifie", list(chemin = LC, lu = 2999L, attendu = 3000L), "compte 2999 ligne(s) au lieu de 3000")
+    }, finally = rm(list = names(m), envir = globalenv()))
+  })
   verifier("#141 : execution absent ou de forme libre (liste simple de chaînes et de nombres, comme U3) : rendu identique à o1", {
     y <- x1; y$execution <- NULL
     z <- x1; z$execution <- list(debut = "autre", duree_secondes = -1)
     identical(ecrire_rapport(y), o1) && identical(ecrire_rapport(z), o1)
+  })
+  # #297 (M520 ; ADR 0012, seconde annotation du 16/11/2026, point (d) 1) :
+  # admission documentée. Le contrôle 5 garantit la fidélité de la restitution,
+  # non l'authenticité ; rien d'execution n'est restitué ni ancré sur le
+  # périmètre de l'empreinte. Ni la présence ni la structure d'execution ne sont
+  # exigées : un non-liste (chaîne, entiers, liste vide, liste à champ inconnu)
+  # est rendu, octets identiques à o1. Seules la forme canonique (ni classe, ni
+  # attribut autre que names) et l'exception du POSIXct nu sous le nom debut sont
+  # contrôlées. Valeurs mesurées sous C et C.UTF-8 (o1 : 146 052 octets).
+  verifier("#297 : execution remplacé par \"abc\", 1:3, list() ou list(z = 1) (non-liste ou liste sans les champs attendus) : rapport rendu, octets identiques à o1 (admission documentée)", {
+    e <- character(0)
+    for (v in list("abc", 1:3, list(), list(z = 1))) {
+      y <- x1; y$execution <- v
+      r <- attrape(ecrire_rapport(y))
+      if (!identical(r, o1)) e <- c(e, sprintf("execution = %s : %s", paste(deparse(v), collapse = ""),
+                                               if (is.raw(r)) "octets différents de o1" else if (inherits(r, "error")) conditionMessage(r) else class(r)[1L]))
+    }
+    if (length(e)) e else TRUE
+  })
+  verifier("#297 : contre-épreuves, frontière de forme inchangée : execution de classe k, d'attribut z ou facteur : refus type_non_canonique, rôle execution ; unname(execution) : refus type_non_canonique, rôle execution/[1] (l'exception du POSIXct nu est liée au nom debut)", {
+    cas <- list(list("chaîne de classe k", structure("abc", class = "k"), "execution"),
+                list("chaîne d'attribut z", structure("abc", z = 1), "execution"),
+                list("facteur", factor("abc"), "execution"),
+                list("liste sans noms", unname(x1$execution), "execution/[1]"))
+    e <- character(0)
+    for (c_ in cas) {
+      y <- x1; y$execution <- c_[[2L]]
+      r <- attrape(ecrire_rapport(y))
+      if (!inherits(r, "refus_tablexp")) e <- c(e, sprintf("%s : %s", c_[[1L]], if (is.raw(r)) "rendu sans refus" else class(r)[1L]))
+      else {
+        v <- controle_refus(r, "type_non_canonique", list(role = c_[[3L]]), sprintf("Rôle « %s » : ", c_[[3L]]))
+        if (!isTRUE(v)) e <- c(e, paste0(c_[[1L]], " : ", v))
+      }
+    }
+    if (length(e)) e else TRUE
+  })
+  # #302 (M520 ; ADR 0012, seconde annotation du 16/11/2026, point (d) 2) :
+  # admission documentée. Un nom vide, NA, en double ou réservé ("[2]") dans un
+  # sous-arbre hors empreinte (fiche/versions, fiche/plateforme) est une forme
+  # canonique de la grammaire 1 (ADR 0011, troisième annotation du 19/10/2026,
+  # (f) 2) : écrit [i], le nom étant porté par @noms, comme à l'écriture de la
+  # fiche. Le rapport le restitue sans refus, de façon injective (vide, NA sans
+  # guillemets, "NA" entre guillemets, trois documents distincts). Le contrôle 5
+  # garantit la fidélité, non l'authenticité. Contre-épreuve : un nom bytes
+  # reste refusé (chaine_codage_bytes) ; la classe k reste refusée (#141, plus
+  # haut). Valeurs mesurées sous C et C.UTF-8 (o1 : 146 052 octets ; nom 2
+  # "", NA, "NA" : 146 053, 146 043, 146 054 octets ; le volet du rejeu, ligne
+  # 10 du bilan, relève de #305).
+  nom_k <- function(o, k, v) { n <- names(o); n[k] <- v; names(o) <- n; o }
+  ligne_tr <- function(chemin, type, longueur, valeurs)
+    paste0("<tr><td>", chemin, "</td><td>", type, "</td><td>", longueur, "</td><td>", paste(valeurs, collapse = "<br>"), "</td></tr>")
+  guil <- function(s) paste0("&quot;", html(s), "&quot;")
+  verifier("#302 : fiche/versions, nom 2 \"\", NA ou \"NA\" : rapport rendu sans refus, ligne @noms (\"\" entre guillemets, NA sans, \"NA\" entre guillemets) et chemin de l'élément 2 (fiche/versions/[2], [2], NA) ; trois documents deux à deux différents et différents de o1", {
+    v2 <- x1$fiche$versions[[2L]]; n1 <- names(x1$fiche$versions)[1L]
+    cas <- list(list("\"\"", "", "&quot;&quot;", "[2]"),
+                list("NA", NA_character_, "NA", "[2]"),
+                list("\"NA\"", "NA", "&quot;NA&quot;", "NA"))
+    e <- character(0); o_ <- list()
+    for (c_ in cas) {
+      y <- x1; y$fiche$versions <- nom_k(y$fiche$versions, 2L, c_[[2L]])
+      o <- attrape(ecrire_rapport(y))
+      if (!is.raw(o)) { e <- c(e, sprintf("nom 2 %s : %s", c_[[1L]], if (inherits(o, "error")) conditionMessage(o) else class(o)[1L])); next }
+      o_[[length(o_) + 1L]] <- o
+      l <- lignes_de(o)
+      if (!ligne_tr("fiche/versions/@noms", "character", 2L, c(guil(n1), c_[[3L]])) %in% l) e <- c(e, sprintf("nom 2 %s : ligne @noms", c_[[1L]]))
+      if (!ligne_tr(paste0("fiche/versions/", c_[[4L]]), "character", 1L, guil(v2)) %in% l) e <- c(e, sprintf("nom 2 %s : ligne de l'élément 2", c_[[1L]]))
+      if (any(startsWith(l, "<tr><td>fiche/versions/R</td>"))) e <- c(e, sprintf("nom 2 %s : ligne fiche/versions/R encore présente", c_[[1L]]))
+    }
+    if (length(e)) return(e)
+    if (identical(o_[[1L]], o_[[2L]]) || identical(o_[[1L]], o_[[3L]]) || identical(o_[[2L]], o_[[3L]])) "deux documents identiques"
+    else if (any(vapply(o_, identical, NA, o1))) "un document identique à o1"
+    else TRUE
+  })
+  verifier("#302 : fiche/versions, nom 2 \"[2]\" (réservé) ou nom 2 égal au nom 1 (doublon) : rapport rendu sans refus, éléments aux chemins [1], [2] ou [2] selon la grammaire 1, noms portés par @noms", {
+    v1 <- x1$fiche$versions[[1L]]; v2 <- x1$fiche$versions[[2L]]; n1 <- names(x1$fiche$versions)[1L]
+    y1 <- x1; y1$fiche$versions <- nom_k(y1$fiche$versions, 2L, "[2]")
+    y2 <- x1; y2$fiche$versions <- nom_k(y2$fiche$versions, 2L, n1)
+    o1_ <- attrape(ecrire_rapport(y1)); o2_ <- attrape(ecrire_rapport(y2))
+    if (!is.raw(o1_) || !is.raw(o2_)) return(sprintf("rendu attendu : %s, %s", class(o1_)[1L], class(o2_)[1L]))
+    l1 <- lignes_de(o1_); l2 <- lignes_de(o2_)
+    if (!ligne_tr("fiche/versions/@noms", "character", 2L, c(guil(n1), "&quot;[2]&quot;")) %in% l1 ||
+        !ligne_tr("fiche/versions/[2]", "character", 1L, guil(v2)) %in% l1) "nom \"[2]\" : lignes @noms ou [2]"
+    else if (!ligne_tr("fiche/versions/@noms", "character", 2L, c(guil(n1), guil(n1))) %in% l2 ||
+             !ligne_tr("fiche/versions/[1]", "character", 1L, guil(v1)) %in% l2 ||
+             !ligne_tr("fiche/versions/[2]", "character", 1L, guil(v2)) %in% l2) "doublon : lignes @noms, [1] ou [2]"
+    else TRUE
+  })
+  verifier("#302 : fiche/plateforme, nom 1 NA : rapport rendu sans refus, @noms avec NA sans guillemets, élément 1 au chemin fiche/plateforme/[1]", {
+    p <- x1$fiche$plateforme
+    y <- x1; y$fiche$plateforme <- nom_k(y$fiche$plateforme, 1L, NA_character_)
+    o <- attrape(ecrire_rapport(y))
+    if (!is.raw(o)) return(sprintf("rendu attendu : %s", class(o)[1L]))
+    l <- lignes_de(o)
+    if (!ligne_tr("fiche/plateforme/@noms", "character", length(p), c("NA", guil(names(p)[-1L]))) %in% l) "ligne @noms"
+    else if (!ligne_tr("fiche/plateforme/[1]", "character", 1L, guil(p[[1L]])) %in% l) "ligne de l'élément 1"
+    else if (any(startsWith(l, paste0("<tr><td>fiche/plateforme/", names(p)[1L], "</td>")))) "ligne du nom d'origine encore présente"
+    else TRUE
+  })
+  verifier("#302 : contre-épreuve, nom 2 d'encodage bytes dans fiche/versions (ou nom 1 dans fiche/plateforme) : refus chaine_codage_bytes, rôle fiche/versions/@noms (ou fiche/plateforme/@noms), une ligne, UTF-8", {
+    y1 <- x1; y1$fiche$versions <- nom_k(y1$fiche$versions, 2L, CLASSE_BYTES)
+    y2 <- x1; y2$fiche$plateforme <- nom_k(y2$fiche$plateforme, 1L, CLASSE_BYTES)
+    r1 <- attrape(ecrire_rapport(y1)); r2 <- attrape(ecrire_rapport(y2))
+    if (!inherits(r1, "refus_tablexp") || !inherits(r2, "refus_tablexp")) return("refus attendus")
+    ok <- une_ligne_utf8(r1, controle_refus(r1, "chaine_codage_bytes", list(role = "fiche/versions/@noms"), "Rôle « fiche/versions/@noms » : "))
+    if (!isTRUE(ok)) ok
+    else une_ligne_utf8(r2, controle_refus(r2, "chaine_codage_bytes", list(role = "fiche/plateforme/@noms"), "Rôle « fiche/plateforme/@noms » : "))
+  })
+  verifier("#302 : forme canonique au sens de l'écrivain : lire_fiche(ecrire_fiche(f)) identique à f pour un nom 2 de fiche$versions \"\", NA, \"NA\" ou égal au nom 1 ; texte écrit : ligne versions/@noms puis versions/[2] (NA sans guillemets)", {
+    n1 <- names(x1$fiche$versions)[1L]
+    e <- character(0)
+    for (c_ in list(list("\"\"", ""), list("NA", NA_character_), list("\"NA\"", "NA"), list("doublon", n1))) {
+      f <- x1$fiche; f$versions <- nom_k(f$versions, 2L, c_[[2L]])
+      g <- attrape(lire_fiche(ecrire_fiche(f)))
+      if (!identical(g, f)) e <- c(e, sprintf("nom 2 %s : aller-retour %s", c_[[1L]], if (inherits(g, "error")) conditionMessage(g) else "différent"))
+    }
+    f <- x1$fiche; f$versions <- nom_k(f$versions, 2L, NA_character_)
+    t <- lignes_de(ecrire_fiche(f)); t <- t[startsWith(t, "versions/")]
+    if (length(e)) e
+    else if (!identical(t[1L], paste0("versions/@noms\tcharacter\t2\t\"", n1, "\"\tNA"))) sprintf("ligne @noms : %s", t[1L])
+    else if (!"versions/[2]" %in% sub("\t.*$", "", t)) "ligne versions/[2] absente"
+    else TRUE
   })
   # Reprise unique de #141. execution : forme seule, aucun contrôle de codage (ses
   # valeurs et ses noms ne sont jamais rendus) ; fiche/* : codage contrôlé,
@@ -530,6 +764,92 @@ local({
     else if (!is.raw(a)) "texte_objet(data.frame) refusé en forme libre"
     else if (!inherits(b, "refus_tablexp") || !identical(b$motif, "type_non_canonique") || !identical(b$details$role, "d")) "canonique = TRUE : motif ou rôle"
     else TRUE
+  })
+})
+
+# --- #301 : contrôle 5, forme d'execution déclarée et règle des ancêtres ------
+#
+# N1 (valeur calculée à la main) : FORME_EXECUTION, déclarée à côté
+# d'informations_execution(), décrit la forme produite (champs feuilles dans
+# l'ordre, classes) ; le contrôle 5 en lit l'exception du POSIXct nu. Contre-
+# épreuves : un champ produit ajouté, une classe changée ou une ligne retirée de
+# la constante sont détectés ; une constante qui ne déclare plus debut en
+# POSIXct fait refuser l'execution produite (la constante est bien lue).
+# N4, critère (3) amendé par M520 (variante (A) ; ADR 0012, seconde annotation
+# du 16/11/2026, (c)) : appel direct de controler_forme_hors_resultat() ; un
+# ancêtre de classe « bytes » (fiche, fiche/empreintes, racine) est traversé
+# comme un ancêtre de classe « k » et le sous-arbre fautif est refusé
+# type_non_canonique, rôle = son chemin ; sans défaut dessous, TRUE. Sur le code
+# antérieur (1e548c5), l'ancêtre bytes faisait sauter le sous-arbre (TRUE).
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  forme <- tryCatch(tablexp:::FORME_EXECUTION, error = function(e) NULL)
+  cfh <- tablexp:::controler_forme_hors_resultat
+  # Champs feuilles d'une liste sans classe (chemin joint par /, classe jointe par /).
+  feuilles <- function(v, pref = character(0)) {
+    if (is.list(v) && is.null(attr(v, "class", exact = TRUE)))
+      return(do.call(rbind, c(list(data.frame(champ = character(0), classe = character(0))),
+                              lapply(names(v), function(n) feuilles(v[[n]], c(pref, n))))))
+    data.frame(champ = paste(pref, collapse = "/"), classe = paste(class(v), collapse = "/"))
+  }
+  ecarts <- function(e, f) {
+    p <- feuilles(e)
+    r <- character(0)
+    if (!identical(p$champ, unique(f$champ)))
+      r <- c(r, sprintf("champs produits %s, déclarés %s", paste(p$champ, collapse = ","), paste(unique(f$champ), collapse = ",")))
+    for (i in seq_len(nrow(p)))
+      if (!p$classe[i] %in% f$classe[f$champ == p$champ[i]]) r <- c(r, sprintf("%s de classe %s non déclarée", p$champ[i], p$classe[i]))
+    r
+  }
+  e <- tablexp:::informations_execution(Sys.time())
+  e_null <- e; e_null$session["systeme"] <- list(NULL)
+  verifier("#301, N1 : FORME_EXECUTION décrit la forme produite par informations_execution(Sys.time()) (champs feuilles dans l'ordre, classes ; session/systeme character ou NULL) ; le contrôle 5 admet l'execution produite, systeme NULL compris", {
+    r <- if (is.null(forme)) "FORME_EXECUTION absente" else c(ecarts(e, forme), ecarts(e_null, forme))
+    if (length(r)) r
+    else if (!identical(forme$champ[forme$classe == "POSIXct/POSIXt"], "debut")) "debut seul déclaré POSIXct attendu"
+    else isTRUE(cfh(list(execution = e))) && isTRUE(cfh(list(execution = e_null)))
+  })
+  verifier("#301, N1 : contre-épreuves : champ ajouté sans déclaration, classe changée, ligne retirée de la constante : écart détecté ; constante sans debut en POSIXct : execution produite refusée type_non_canonique, rôle execution/debut", {
+    e_z <- e; e_z$session$z <- 1
+    e_cl <- e; e_cl$duree_secondes <- 1L
+    f_moins <- forme[forme$champ != "session/locale", ]
+    f_debut <- forme; f_debut$classe[f_debut$champ == "debut"] <- "numeric"
+    ns <- asNamespace("tablexp")
+    utils::assignInNamespace("FORME_EXECUTION", f_debut, ns)
+    r <- tryCatch(attrape(cfh(list(execution = e))), finally = utils::assignInNamespace("FORME_EXECUTION", forme, ns))
+    if (!length(ecarts(e_z, forme)) || !length(ecarts(e_cl, forme)) || !length(ecarts(e, f_moins))) "écart non détecté"
+    else if (!identical(tablexp:::FORME_EXECUTION, forme)) "constante non restaurée"
+    else if (!inherits(r, "refus_tablexp") || !identical(r$motif, "type_non_canonique") || !identical(r$details$role, "execution/debut"))
+      "constante sans debut POSIXct : refus type_non_canonique, rôle execution/debut attendu"
+    else TRUE
+  })
+  avec_classe <- function(o, cl) { class(o) <- cl; o }
+  u <- unclass(x1)
+  cas <- list(
+    list("fiche de classe k, fiche/versions de classe k", function(y, cl) { y$fiche$versions <- avec_classe(y$fiche$versions, "k"); y$fiche <- avec_classe(y$fiche, cl); y }, "fiche/versions"),
+    list("fiche/empreintes de classe k, fiche/empreintes/code d'attribut z", function(y, cl) { attr(y$fiche$empreintes$code, "z") <- 1; y$fiche$empreintes <- avec_classe(y$fiche$empreintes, cl); y }, "fiche/empreintes/code"),
+    list("racine de classe k, fiche/versions de classe k", function(y, cl) { y$fiche$versions <- avec_classe(y$fiche$versions, "k"); avec_classe(y, cl) }, "fiche/versions"),
+    list("racine de classe k, execution de classe k", function(y, cl) { y$execution <- avec_classe(y$execution, "k"); avec_classe(y, cl) }, "execution"),
+    list("fiche de classe k, sous-arbres intacts", function(y, cl) { y$fiche <- avec_classe(y$fiche, cl); y }, NA),
+    list("fiche/empreintes de classe k, sous-arbres intacts", function(y, cl) { y$fiche$empreintes <- avec_classe(y$fiche$empreintes, cl); y }, NA),
+    list("racine de classe k, sous-arbres intacts", function(y, cl) avec_classe(y, cl), NA))
+  for (c_ in cas) {
+    verifier(sprintf("#301, N4 : appel direct, %s, et même ancêtre de classe bytes : %s", c_[[1L]],
+                     if (is.na(c_[[3L]])) "TRUE dans les deux cas" else sprintf("refus type_non_canonique, rôle %s, dans les deux cas", c_[[3L]])), {
+      r <- lapply(list(k = "k", bytes = CLASSE_BYTES), function(cl) attrape(cfh(c_[[2L]](u, cl))))
+      ok <- vapply(r, function(z) if (is.na(c_[[3L]])) isTRUE(z)
+                   else inherits(z, "refus_tablexp") && identical(z$module, "rapport") && identical(z$motif, "type_non_canonique") &&
+                     identical(z$details$role, c_[[3L]]), NA)
+      if (all(ok)) TRUE
+      else sprintf("ancêtre de classe %s : %s", names(r)[!ok],
+                   vapply(r[!ok], function(z) if (inherits(z, "condition")) conditionMessage(z) else "TRUE", ""))
+    })
+  }
+  verifier("#301, N4 : par ecrire_rapport(), un ancêtre de classe bytes (fiche, fiche/empreintes) reste refusé objet_modifie par le contrôle 3, sous-arbre fautif ou non (motif inchangé)", {
+    r <- list(attrape(ecrire_rapport(structure(cas[[1L]][[2L]](u, CLASSE_BYTES), class = "construction"))),
+              attrape(ecrire_rapport(structure(cas[[2L]][[2L]](u, CLASSE_BYTES), class = "construction"))),
+              attrape(ecrire_rapport(structure(cas[[5L]][[2L]](u, CLASSE_BYTES), class = "construction"))))
+    all(vapply(r, function(z) inherits(z, "refus_tablexp") && identical(z$motif, "objet_modifie"), NA))
   })
 })
 

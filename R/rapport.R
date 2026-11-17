@@ -953,29 +953,122 @@ CHEMINS_FORME_HORS_RESULTAT <- setdiff(CHEMINS_HORS_RESULTAT, "etapes/donnees/re
 # l'écrivain et jetées, codage des chaînes contrôlé (ces valeurs sont rendues).
 # execution : forme seule (valeurs = FALSE), aucun contrôle de codage, car
 # aucune de ses valeurs n'est rendue. Seule valeur de classe que l'écrivain ne
-# sait pas écrire et que ce contrôle admet : execution/debut, POSIXct nu
-# (classe seule, type double), contrôlé sur sa valeur nue ; `debut` est trouvé
+# sait pas écrire et que ce contrôle admet : le champ de premier niveau
+# d'execution que FORME_EXECUTION déclare en POSIXct (debut ; #301, N1), POSIXct
+# nu (classe seule, type double), contrôlé sur sa valeur nue ; il est trouvé
 # par match() sur les noms lus par attr(), qui ne lève pas sur un nom
 # d'encodage « bytes », et un tel nom ailleurs dans execution ne retire pas
-# l'exception (aucune valeur d'execution n'est rendue, nom compris). Rend TRUE.
+# l'exception (aucune valeur d'execution n'est rendue, nom compris).
+# Chemins parcourus par lire_chemin() (R/outils.R ; #301, N3) : tout ancêtre
+# qui est une liste est traversé, quelle que soit sa classe, « bytes » comprise
+# (ADR 0012, seconde annotation du 16/11/2026, (c) ; M520, variante (A)) ; le
+# contrôle juge les sous-arbres, jamais leurs ancêtres (racine, fiche,
+# fiche/empreintes), dont la forme relève du contrôle 3 (objet_modifie). Un
+# sous-arbre absent, ou présent de valeur NULL, n'est pas contrôlé. Rend TRUE.
 controler_forme_hors_resultat <- function(x) {
+  posixct <- FORME_EXECUTION$champ[FORME_EXECUTION$classe == "POSIXct/POSIXt"]
   for (chemin in CHEMINS_FORME_HORS_RESULTAT) {
     segments <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
-    v <- x
-    for (s in segments) {
-      if (!is.list(v) || classe_bytes(v)) { v <- NULL; break }
-      k <- match(s, attr(v, "names", exact = TRUE))
-      if (is.na(k)) { v <- NULL; break }
-      v <- .subset2(v, k)
-    }
+    v <- lire_chemin(x, segments)$valeur
     if (is.null(v)) next
     if (identical(chemin, "execution") && is.list(v) && is.null(attr(v, "class", exact = TRUE))) {
-      k <- match("debut", attr(v, "names", exact = TRUE))
-      if (!is.na(k) && is.double(v[[k]]) && identical(attributes(v[[k]]), list(class = c("POSIXct", "POSIXt"))))
-        v[[k]] <- unclass(v[[k]])
+      for (champ in posixct) {
+        k <- match(champ, attr(v, "names", exact = TRUE))
+        if (!is.na(k) && is.double(v[[k]]) && identical(attributes(v[[k]]), list(class = c("POSIXct", "POSIXt"))))
+          v[[k]] <- unclass(v[[k]])
+      }
     }
     for (s in rev(segments)) { v <- list(v); attr(v, "names") <- s }
     texte_objet(v, PREMIERE_LIGNE_FICHE, character(0), "texte", canonique = TRUE, valeurs = !identical(chemin, "execution"))
+  }
+  invisible(TRUE)
+}
+
+# Lignes conservées rapprochées du périmètre de l'empreinte (#294 ; ADR 0012,
+# seconde annotation du 16/11/2026, (b), « exception ancrée » ; décision du
+# mainteneur du 17/11/2026, M522) : lignes_conservees est hors de l'empreinte du
+# résultat (M71) et hors de la forme canonique (M499 (a) : classe tbl_df et
+# attributs quelconques admis) ; le rapport en restitue pourtant le type, les
+# dimensions et les noms de colonnes. Quatre écarts à ce que le périmètre de
+# l'empreinte établit sont refusés objet_modifie, chemin cité, dans l'ordre (4)
+# d'abord, puis (1), (2), (3) :
+# (1) la valeur n'est pas un data.frame (liste portant la classe) ; (2) son
+# nombre de lignes diffère de la longueur de numeros_conserves, ou n'est pas
+# lisible (row.names compacts de la forme c(NA, NA) : NA) ; (3) une colonne
+# déclarée par fiche/roles manque à ses noms ; (4) elle est absente de l'objet
+# alors que numeros_conserves, qui est dans le périmètre, établit des lignes
+# conservées (M522 : une absence que l'empreinte ne peut pas établir est un
+# objet modifié, non une mention « absent de l'objet »). Un segment absent
+# (refus 4) se distingue d'un élément présent de valeur NULL (refus 1).
+# numeros_conserves et fiche/roles sont dans le périmètre : le contrôle 3 les a
+# vérifiés, ce contrôle se place après lui (après le contrôle 5, pour ne pas
+# renuméroter les contrôles 4 et 5 cités par l'ADR 0012, les tests et la
+# documentation). Rien d'autre n'est exigé de la valeur (ni classe, ni
+# attribut, ni type des colonnes, ni valeurs : copie de l'entrée, hors d'une
+# authenticité que l'empreinte ne peut pas établir). Une lecture sans dispatch
+# (lire_chemin(), a_classe(), attr(), .row_names_info()), la même que celle du
+# rendu (structure_seule() de lignes_racines()) : une classe de l'entrée, avec
+# ou sans méthode dim(), names() ou length(), ne change ni le contrôle ni le
+# rendu et ne lève pas d'erreur R. Une classe d'encodage « bytes » passe le
+# contrôle 6 mais est refusée au rendu, type_non_canonique (#128), comme à tout
+# chemin (comportement inchangé). Une entrée dont la méthode dim() annonce moins
+# de lignes qu'elle n'en a donne dès la construction un objet incohérent, que ce
+# contrôle refuse ; si elle en annonce plus, la construction s'arrête sur une
+# erreur R (#312). Un chemin numeros_conserves absent ou NULL ou un fiche/roles
+# qui n'est pas un vecteur de chaînes n'est pas contrôlé (même règle que le
+# contrôle 5). Rend TRUE.
+controler_lignes_conservees <- function(x) {
+  # Copie de l'entrée (hors empreinte) et les deux chemins du périmètre de
+  # l'empreinte qui l'ancrent : lignes conservées et colonnes de rôle.
+  chemin_lignes <- "etapes/donnees/resultat/lignes_conservees"
+  chemin_numeros <- "etapes/donnees/resultat/numeros_conserves"
+  chemin_roles <- "fiche/roles"
+  lire <- function(chemin) lire_chemin(x, strsplit(chemin, "/", fixed = TRUE)[[1L]])
+  n <- lire(chemin_numeros)$valeur
+  l <- lire(chemin_lignes)
+  if (!l$present) {
+    # Absence : refusée si numeros_conserves est présent (M522).
+    if (!is.null(n))
+      refuser("rapport", "objet_modifie",
+              formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                             "l'empreinte du résultat) est absente, alors que %s établit %d ligne(s) conservée(s). Le",
+                             "rapport ne restitue un objet que tel que construire_table() l'a rendu."),
+                       chemin_lignes, chemin_numeros, length(unclass(n))),
+              list(chemin = chemin_lignes, lu = "absente", attendu = "data.frame"))
+    return(invisible(TRUE))
+  }
+  v <- l$valeur
+  if (!a_classe(v, "data.frame") || !is.list(v)) {
+    d <- decrire_valeur(v)
+    refuser("rapport", "objet_modifie",
+            formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                           "l'empreinte du résultat) n'est pas un data.frame (liste de classe data.frame) ; valeur",
+                           "lue : %s. Le rapport ne restitue un objet que tel que construire_table() l'a rendu."),
+                     chemin_lignes, if (is.null(d)) "NULL" else d),
+            list(chemin = chemin_lignes, lu = class(v), attendu = "data.frame"))
+  }
+  if (!is.null(n)) {
+    attendu <- length(unclass(n))
+    lu <- .row_names_info(v, 2L)
+    if (is.na(lu) || lu != attendu)
+      refuser("rapport", "objet_modifie",
+              formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                             "l'empreinte du résultat) compte %d ligne(s) au lieu de %d, longueur de %s. Le rapport",
+                             "ne restitue un objet que tel que construire_table() l'a rendu."),
+                       chemin_lignes, lu, attendu, chemin_numeros),
+              list(chemin = chemin_lignes, lu = lu, attendu = attendu))
+  }
+  r <- lire(chemin_roles)$valeur
+  if (is.character(r)) {
+    colonnes <- unique(as.character(unclass(r)))
+    manquantes <- colonnes[!(colonnes %in% attr(v, "names", exact = TRUE))]
+    if (length(manquantes))
+      refuser("rapport", "objet_modifie",
+              formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                             "l'empreinte du résultat) ne porte pas la ou les colonne(s) %s, déclarée(s) par %s. Le",
+                             "rapport ne restitue un objet que tel que construire_table() l'a rendu."),
+                       chemin_lignes, liste_guillemets(manquantes), chemin_roles),
+              list(chemin = chemin_lignes, colonnes = manquantes))
   }
   invisible(TRUE)
 }
@@ -1237,6 +1330,29 @@ informations_execution <- function(debut) {
                       paquets_attaches = .packages()))
 }
 
+# Forme produite d'execution par informations_execution() (#301, N1 ; ADR 0012,
+# seconde annotation du 16/11/2026, (e) ; M520) : une ligne par champ feuille,
+# dans l'ordre de production, chemin sous execution (segments joints par /) et
+# classe (class(), éléments joints par /) ; un champ de plusieurs classes
+# possibles a une ligne par classe. Elle décrit, elle n'exige pas : elle
+# n'ouvre aucun refus, et un execution d'une autre forme reste admis s'il est
+# canonique. Le contrôle 5 n'en lit que l'exception de classe : le champ
+# déclaré POSIXct/POSIXt (debut), admis en POSIXct nu
+# (controler_forme_hors_resultat()). L'exception est unique (execution/debut ;
+# ADR 0012, seconde annotation, (a) 3) : une ligne POSIXct ajoutée ici
+# l'élargirait de fait, ce que l'ADR n'admet pas sans annotation ; admettre un
+# autre champ en POSIXct (ou un POSIXct imbriqué) demande une annotation de
+# l'ADR 0012 ((a) 3) et la reprise du test N1 (#301), comme toute exigence de
+# forme sur execution le demanderait ((b)).
+# session/systeme : utils::osVersion, « a
+# character string (or possibly NULL on bizarre platforms) » (aide de R 4.3.3,
+# ?sessionInfo). Liée à informations_execution(Sys.time()) par un test.
+FORME_EXECUTION <- data.frame(
+  champ = c("debut", "duree_secondes", "session/R", "session/plateforme", "session/systeme", "session/systeme",
+            "session/locale", "session/paquets_attaches"),
+  classe = c("POSIXct/POSIXt", "numeric", "character", "character", "character", "NULL", "character", "character"),
+  stringsAsFactors = FALSE)
+
 # --- Sérialisation du plan et de la fiche (ADR 0011, points 6, 8, 9 et 10, troisième annotation ; #50) ---
 #
 # Texte ↔ objet, sans fichier (E4.4) : les écrivains rendent des octets (raw)
@@ -1350,7 +1466,7 @@ segments_texte <- function(noms, n) {
 # type_non_canonique (rôle : le chemin, details$role) et un data.frame n'est pas
 # admis (liste classée : refusé par la branche des listes, comme toute classe).
 # `valeurs` (TRUE : écriture ordinaire) : FALSE, forme seule, pour un sous-arbre
-# dont aucune valeur n'est rendue (execution ; M499 (a)) : le parcours est le
+# dont aucune valeur n'est rendue (execution ; M499 (b)) : le parcours est le
 # même et noeud() et atome() refusent les mêmes formes (profondeur, classe,
 # attribut, type, facteur, Date à stockage ou attribut non admis, vecteur nommé
 # de longueur 0, forme du data.frame, objet non atomique, racine qui n'est pas
@@ -2312,19 +2428,9 @@ valeur_message <- function(v) {
   decrire_valeur(v)
 }
 
-# Élément de chemin `chemin` (segments joints par /) de l'objet x : present
-# FALSE si un segment manque (ou si son parent n'est pas une liste).
-lire_racine <- function(x, chemin) {
-  v <- x
-  for (s in strsplit(chemin, "/", fixed = TRUE)[[1L]]) {
-    if (!is.list(v) || !(s %in% names(v))) return(list(present = FALSE, valeur = NULL))
-    v <- v[[s]]
-  }
-  list(present = TRUE, valeur = v)
-}
-
 # Contrôles avant le rendu (ADR 0012, point 2.5, et seconde annotation du
-# 24/10/2026, (b) 3 et 4), dans l'ordre ; au premier refus, rien n'est rendu.
+# 24/10/2026, (b) 3 et 4 ; seconde annotation du 16/11/2026, (a) et (b)), dans
+# l'ordre ; au premier refus, rien n'est rendu.
 controler_rapport <- function(x) {
   refus <- function(motif, texte, details) refuser("rapport", motif, texte, details)
   # 1. Classe exacte, et fiche qui est une liste ; un objet qui n'est pas une
@@ -2420,7 +2526,7 @@ controler_rapport <- function(x) {
   for (e in names(x[["etapes"]])) if (!couvert(joindre_chemin("etapes", e))) non_prevu(joindre_chemin("etapes", e))
   for (n in names(f)) if (!couvert(joindre_chemin("fiche", n))) non_prevu(joindre_chemin("fiche", n))
   for (r in unlist(SECTIONS_RAPPORT$racines[SECTIONS_RAPPORT$nature == "non_produite"], use.names = FALSE)) {
-    l <- lire_racine(x, r)
+    l <- lire_chemin(x, strsplit(r, "/", fixed = TRUE)[[1L]])
     if (l$present && !is.null(l$valeur)) non_prevu(r)
   }
   # 5. Forme canonique des sous-arbres que l'empreinte du résultat n'écrit pas
@@ -2428,6 +2534,10 @@ controler_rapport <- function(x) {
   #    classe, attribut autre que names ou data.frame refusés type_non_canonique
   #    par l'écrivain unique, au lieu d'être rendus sans rien dire.
   controler_forme_hors_resultat(x)
+  # 6. Lignes conservées (copie de l'entrée, hors empreinte et hors forme
+  #    canonique) rapprochées de numeros_conserves et des colonnes de rôle, qui
+  #    sont dans le périmètre de l'empreinte (#294) : objet_modifie.
+  controler_lignes_conservees(x)
   invisible(TRUE)
 }
 
@@ -2488,9 +2598,13 @@ lignes_racines <- function(x, racines, apres = list()) {
   structure_seule <- function(v, chemin) {
     mention <- echapper_html(MENTIONS_RAPPORT[["structure_seule"]])
     if (is.data.frame(v)) {
-      colonnes <- gsub("\n", " ", echapper_html(texte_valeurs(names(v), joindre_chemin(chemin, "@colonnes"))$texte),
+      # Lecture sans dispatch (.row_names_info(), attr()), la même que celle du
+      # contrôle 6 : une classe de l'entrée définissant dim() ou names() ne
+      # change pas ce que le rapport restitue (#294).
+      colonnes <- gsub("\n", " ",
+                       echapper_html(texte_valeurs(attr(v, "names", exact = TRUE), joindre_chemin(chemin, "@colonnes"))$texte),
                        fixed = TRUE)
-      ligne(chemin, "data.frame", texte_entier(nrow(v), chemin),
+      ligne(chemin, "data.frame", texte_entier(.row_names_info(v, 2L), chemin),
             paste0(mention, echapper_html(MENTIONS_RAPPORT[["structure_colonnes"]]), colonnes))
     } else {
       ligne(chemin, typeof(v), texte_entier(length(v), chemin),
@@ -2521,7 +2635,7 @@ lignes_racines <- function(x, racines, apres = list()) {
     vecteur(v, chemin)
   }
   for (r in racines) {
-    l <- lire_racine(x, r)
+    l <- lire_chemin(x, strsplit(r, "/", fixed = TRUE)[[1L]])
     if (l$present) noeud(l$valeur, r)
     else ligne(r, "", "", echapper_html(MENTIONS_RAPPORT[["racine_absente"]]))
   }

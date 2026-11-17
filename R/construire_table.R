@@ -860,8 +860,7 @@ cles_citees <- function(plan, parametres_cle) {
   cle <- parametre <- character(0)
   for (chemin in parametres_cle) {
     s <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
-    v <- plan
-    for (n in s) v <- if (is.list(v)) lire_champ(v, n)
+    v <- lire_chemin(plan, s)$valeur
     if (chaine_unique(v) || (forme_exacte(v, "character") && !anyNA(v) && all(nzchar(v)))) {
       cle <- c(cle, v); parametre <- c(parametre, rep(chemin, length(v)))
     }

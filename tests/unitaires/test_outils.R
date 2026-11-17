@@ -472,3 +472,40 @@ verifier("lire_champ : champ lu par nom sans erreur sur un nom ou une classe byt
     identical(lire_champ(list(abc = 1), "a"), NULL) &&
     identical(lire_champ(data.frame(x = 1:2, y = 3:4), "y"), 3:4)
 })
+
+# lire_chemin() (#301, N3 ; variante (A), M520) : seul assistant de parcours par
+# chemin, par lire_champ() ; présence et valeur ; tout ancêtre liste traversé,
+# de classe quelconque, « bytes » comprise. Contre-épreuve : la lecture par
+# names() et [[ ]] (celle de lire_racine(), supprimée) lève sur une classe ou un
+# nom bytes, et dispatche [[ ]] sur une classe qui le définit.
+verifier("lire_chemin : présence et valeur par lire_champ() ; absent si segment manquant ou ancêtre non liste ; présent de valeur NULL ; ancêtre de classe bytes ou à méthode [[ traversé sans dispatch ; premier de ce nom", {
+  b <- octets_de(0xe9); Encoding(b) <- "bytes"
+  lire_chemin <- tablexp:::lire_chemin
+  absent <- list(present = FALSE, valeur = NULL)
+  vu <- function(v) list(present = TRUE, valeur = v)
+  lb <- structure(list(a = list(c = 3)), class = b)
+  ln <- setNames(list(1, list(c = 3)), c(b, "a"))
+  # Méthode définie dans globalenv() (le dispatch depuis le package ne voit pas le
+  # cadre local de verifier()), puis retirée.
+  assign("[[.kk_test", function(x, i) "dispatch", envir = globalenv())
+  lk <- structure(list(a = 1), class = "kk_test")
+  tryCatch(
+  inherits(tryCatch(lb[["a"]], error = function(e) e), "error") &&
+    inherits(tryCatch(names(lb), error = function(e) e), "error") &&
+    inherits(tryCatch(ln[["a"]], error = function(e) e), "error") && identical(lk[["a"]], "dispatch") &&
+    identical(lire_chemin(list(a = list(b = 1)), c("a", "b")), vu(1)) &&
+    identical(lire_chemin(list(a = list(b = 1)), "a"), vu(list(b = 1))) &&
+    identical(lire_chemin(list(a = 1), character(0)), vu(list(a = 1))) &&
+    identical(lire_chemin(list(a = list(b = 1)), c("a", "z")), absent) &&
+    identical(lire_chemin(list(a = c(b = 1)), c("a", "b")), absent) &&
+    identical(lire_chemin(NULL, "a"), absent) &&
+    identical(lire_chemin(list(a = list(b = NULL)), c("a", "b")), vu(NULL)) &&
+    identical(lire_chemin(lb, c("a", "c")), vu(3)) &&
+    identical(lire_chemin(list(x = lb), c("x", "a", "c")), vu(3)) &&
+    identical(lire_chemin(ln, c("a", "c")), vu(3)) &&
+    identical(lire_chemin(lk, "a"), vu(1)) &&
+    identical(lire_chemin(list(a = 1, a = 2), "a"), vu(1)) &&
+    identical(lire_chemin(list(abc = 1), "a"), absent) &&
+    identical(lire_chemin(list(d = data.frame(x = 1:2, y = 3:4)), c("d", "y")), vu(3:4)),
+  finally = rm("[[.kk_test", envir = globalenv()))
+})
