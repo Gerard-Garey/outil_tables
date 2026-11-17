@@ -28,7 +28,10 @@
 #       des verdicts et des lignes 1 et 6 pour un nom non ASCII de la fiche,
 #       une classe des données non ASCII, à LF ou à octet invalide et un nom
 #       de fichier de provenance non ASCII (bilans_non_ascii(), #142), et
-#       des empreintes du code et du résultat de forme non MD5 (#295) ; messages
+#       des empreintes du code et du résultat de forme non MD5 (#295), et
+#       des cellules T1 à T8 et T12 à T15 de la citation d'une chaîne lue
+#       (forme F307, lignes 9, 13, 14 et 15 ; #307) et de « NA, NA » (k = 1,
+#       entre « … » ; C1 de l'audit de #307) ; messages
 #       de refus du rejeu et de objet_modifie (et citation d'une chaîne
 #       latin-1) marqués UTF-8 et sur une ligne (#94) ; puis un refus par
 #       module citant une valeur non ASCII native, latin-1 et UTF-8, et
@@ -220,6 +223,46 @@ bilans_non_ascii <- function(jeu, p, fr, d) {
     k <- if (champ == "code") 9L else 13L
     verifie(paste(nom, "lu"), r$bilan$lu[k], paste0(q1, " ", cas[[2L]], motif))
     verifie(paste(nom, "verdict"), r$bilan$verdict[k], paste0("non d", E, "terminable"))
+  }
+  # Citation d'une chaîne lue (forme F307, #307, T11 de la spécification) :
+  # cellules T1 à T5 (lignes 9 et 13), T12 à T15 et C1 (ligne 14), T6 à T8 (ligne
+  # 15, sur la fiche de clé Kc) ; « < », « et » d'une valeur citée écrits
+  # <U+003C>, <U+00AB>, <U+00BB> ; octets comparés entre les deux
+  # installations.
+  entre <- function(s) paste0(q1, " ", s, " ", q2)
+  motif307 <- paste0(" (forme invalide : empreinte MD5 de 32 caract", u(0xe8), "res hexad", E,
+                     "cimaux minuscules attendue)")
+  repere <- paste0("<cha", u(0xee), "ne d'encodage bytes>")
+  octets_bytes <- rawToChar(as.raw(c(0xe9, 0x74, 0xe9))); Encoding(octets_bytes) <- "bytes"
+  for (cas in list(list("T1", "code", paste0("x ", q2, motif307, " ", q1, " y"),
+                        paste0(entre(paste0("x <U+00BB>", motif307, " <U+00AB> y")), motif307)),
+                   list("T2", "code", "<U+0001>", paste0(entre("<U+003C>U+0001>"), motif307)),
+                   list("T3", "code", "<ff>", paste0(entre("<U+003C>ff>"), motif307)),
+                   list("T4", "code", repere, paste0(entre(paste0("<U+003C>cha", u(0xee), "ne d'encodage bytes>")), motif307)),
+                   list("T4 bytes", "code", octets_bytes, paste0(entre(repere), motif307)),
+                   list("T5", "resultat", paste0(q1, " z ", q2), paste0(entre("<U+00AB> z <U+00BB>"), motif307)),
+                   list("T12", "fichier", "NA", entre("NA")), list("T13", "fichier", "NULL", entre("NULL")),
+                   list("T14", "fichier", paste0(entre("a"), ", ", entre("b")), entre("<U+00AB> a <U+00BB>, <U+00AB> b <U+00BB>")),
+                   list("T15", "fichier", c("a", NA), paste0(entre("a"), ", NA")),
+                   list("C1", "fichier", "NA, NA", entre("NA, NA")))) {
+    fb <- fr; fb$empreintes[cas[[2L]]] <- list(cas[[3L]])
+    r <- rendu(rejouer_fiche(jeu$donnees, fb, tables_reference = tables_du_plan(p)))
+    nom <- sprintf("#307 %s empreintes/%s", cas[[1L]], cas[[2L]])
+    if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+    verifie(nom, r$bilan$lu[c(code = 9L, resultat = 13L, fichier = 14L)[[cas[[2L]]]]], cas[[4L]])
+  }
+  if (!inherits(xk, "error")) {
+    ck <- paste0(q1, " ", Kc, " ", q2)
+    for (cas in list(list("T6", paste0("a ", q2, " ; tv/forme_origine : ", q1, " b"),
+                          entre("a <U+00BB> ; tv/forme_origine : <U+00AB> b")),
+                     list("T7", "<U+0001>", entre("<U+003C>U+0001>")),
+                     list("T8", repere, entre(paste0("<U+003C>cha", u(0xee), "ne d'encodage bytes>"))))) {
+      fs <- lire_fiche(ecrire_fiche(xk$fiche)); fs$tables_reference[[Kc]]$source <- cas[[2L]]
+      r <- rendu(rejouer_fiche(bd, fs))
+      nom <- sprintf("#307 %s source, ligne 15", cas[[1L]])
+      if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+      verifie(nom, r$bilan$lu[15L], paste0(ck, "/source : ", cas[[3L]]))
+    }
   }
   for (cas in list(list("plateforme", 11L, "blas, lapack"), list("fiche", 12L, "graine/x"))) {
     fb <- fr

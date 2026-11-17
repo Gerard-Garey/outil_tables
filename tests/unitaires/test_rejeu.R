@@ -1343,3 +1343,178 @@ local({
               c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f"))
   })
 })
+
+# --- T15 : citation d'une chaîne lue dans le bilan du rejeu (forme F307 ; #307,
+#     spécification d'actuary-approfondi, option M et extension aux lignes 6
+#     et 14 ; M526 ; ADR 0012, annotation du 17/11/2026, point 3.6). Cellules
+#     T1 à T18 de la spécification, avec leurs contre-épreuves (T11, octets
+#     sous LC_ALL=C et C.UTF-8 : tests/controles/locale_c.R). Valeur calculée
+#     à la main (textes, verdicts) ; identité exacte (construction rejouée
+#     identical() hors execution). Lignes 9, 13 et 15 : toute chaîne entre
+#     « … », « < », « et » d'une valeur écrits <U+003C>, <U+00AB>, <U+00BB> ;
+#     lignes 6 et 14 : k = 1 nue sauf caractère réservé, mot NA, NULL,
+#     absente ou chaîne NA(, NA)+ (motif réservé, C1 de l'audit de #307) ;
+#     k >= 2, chaque élément entre « … », NA nu. Littéraux non ASCII par
+#     \u00XX ou intToUtf8().
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  u <- function(...) intToUtf8(c(...))
+  GA <- u(0xab); GF <- u(0xbb)
+  entre <- function(s) paste0(GA, " ", s, " ", GF)
+  MOTIF <- " (forme invalide : empreinte MD5 de 32 caract\u00e8res hexad\u00e9cimaux minuscules attendue)"
+  REPERE <- "<cha\u00eene d'encodage bytes>"
+  by <- function(s) { Encoding(s) <- "bytes"; s }
+  octets_egaux <- function(a, b) identical(charToRaw(a), charToRaw(b))
+  empreinte_posee <- function(f, champ, v) {
+    if (is.null(v)) f$empreintes[[champ]] <- NULL else f$empreintes[champ] <- list(v)
+    f
+  }
+  # Cellule k (lu, verdict) du bilan rejoué de f ; texte de la condition sinon.
+  cellule <- function(f, k) {
+    r <- attrape(rejouer_fiche(BASE, f))
+    if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+    else c(lu = r$bilan$lu[k], verdict = r$bilan$verdict[k])
+  }
+  # Bilan rejoué de la fiche construite avec la provenance de `fichiers` (NULL : sans provenance).
+  bilan_provenance <- function(fichiers) {
+    pr <- if (!is.null(fichiers)) list(fichier = fichiers, empreinte = rep(FAUX_MD5, length(fichiers)),
+                                       algorithme = rep("md5", length(fichiers)))
+    xp <- construire_table(BASE, ROLES, plan_complet(), pr)
+    r <- rejouer_fiche(BASE, lire_fiche(ecrire_fiche(xp$fiche)))
+    if (!identical(sans_execution(r$construction), sans_execution(xp))) stop("construction rejou\u00e9e diff\u00e9rente")
+    r$bilan
+  }
+  nd <- "non d\u00e9terminable"
+  code <- function(v) cellule(empreinte_posee(FICHE, "code", v), 9L)
+
+  verifier("T15 #307-T1 empreintes/code \u00e0 guillemets et motif tap\u00e9s : ligne 9 cit\u00e9e d'une seule pi\u00e8ce, \u00ab et \u00bb de la valeur en <U+00BB>, <U+00AB> ; contre-\u00e9preuve \u00ab x \u00bb inchang\u00e9e ; \u00ab non d\u00e9terminable \u00bb dans les deux cas", {
+    a <- code(paste0("x ", GF, MOTIF, " ", GA, " y")); b <- code("x")
+    octets_egaux(a[["lu"]], paste0(entre(paste0("x <U+00BB>", MOTIF, " <U+00AB> y")), MOTIF)) &&
+      octets_egaux(b[["lu"]], paste0(entre("x"), MOTIF)) && identical(unname(c(a[["verdict"]], b[["verdict"]])), c(nd, nd))
+  })
+  verifier("T15 #307-T2 \u00e0 T4 empreintes/code : notation <U+0001>, <ff> et rep\u00e8re bytes tap\u00e9s cit\u00e9es par <U+003C>, distinctes de \\001, de l'octet \\xff et d'une cha\u00eene bytes (inchang\u00e9es)", {
+    attendus <- list(list("<U+0001>", "<U+003C>U+0001>"), list("\001", "<U+0001>"),
+                     list("<ff>", "<U+003C>ff>"), list("\xff", "<ff>"),
+                     list(REPERE, "<U+003C>cha\u00eene d'encodage bytes>"), list(by("\xe9t\xe9"), REPERE))
+    ok <- vapply(attendus, function(a) { c <- code(a[[1L]]); octets_egaux(c[["lu"]], paste0(entre(a[[2L]]), MOTIF)) &&
+                                                             identical(c[["verdict"]], nd) }, NA)
+    if (all(ok)) TRUE else sprintf("cas %s en \u00e9cart", paste(which(!ok), collapse = ", "))
+  })
+  verifier("T15 #307-T5 empreintes/resultat \u00ab \u00ab z \u00bb \u00bb : ligne 13 \u00ab <U+00AB> z <U+00BB> \u00bb ; \u00ab zz \u00bb inchang\u00e9e", {
+    a <- cellule(empreinte_posee(FICHE, "resultat", paste0(GA, " z ", GF)), 13L)
+    b <- cellule(empreinte_posee(FICHE, "resultat", "zz"), 13L)
+    octets_egaux(a[["lu"]], paste0(entre("<U+00AB> z <U+00BB>"), MOTIF)) && octets_egaux(b[["lu"]], paste0(entre("zz"), MOTIF)) &&
+      identical(unname(c(a[["verdict"]], b[["verdict"]])), c(nd, nd))
+  })
+  verifier("T15 #307-T6 source \u00ab a \u00bb ; tv/forme_origine : \u00ab b \u00bb en une seule valeur : ligne 15 distincte de source \u00ab a \u00bb et forme_origine \u00ab b \u00bb (inchang\u00e9e) ; verdicts distincts", {
+    a <- cellule(fiche_tv("source", paste0("a ", GF, " ; tv/forme_origine : ", GA, " b")), 15L)
+    b <- cellule(fiche_tv("forme_origine", "b", fiche_tv("source", "a")), 15L)
+    octets_egaux(a[["lu"]], paste0("tv/source : ", entre("a <U+00BB> ; tv/forme_origine : <U+00AB> b"))) &&
+      octets_egaux(b[["lu"]], paste0("tv/source : ", entre("a"), " ; tv/forme_origine : ", entre("b"))) &&
+      !identical(a[["lu"]], b[["lu"]]) && identical(a[["verdict"]], "diff\u00e9rente : tables_reference/tv/source") &&
+      identical(b[["verdict"]], "diff\u00e9rente : tables_reference/tv/source, tables_reference/tv/forme_origine")
+  })
+  verifier("T15 #307-T7 et T8 source : notation <U+0001> et rep\u00e8re bytes tap\u00e9s cit\u00e9es par <U+003C>, distinctes de \\001 et d'une cha\u00eene bytes (inchang\u00e9es)", {
+    s <- function(v) cellule(fiche_tv("source", v), 15L)[["lu"]]
+    octets_egaux(s("<U+0001>"), paste0("tv/source : ", entre("<U+003C>U+0001>"))) &&
+      octets_egaux(s("\001"), paste0("tv/source : ", entre("<U+0001>"))) &&
+      octets_egaux(s(REPERE), paste0("tv/source : ", entre("<U+003C>cha\u00eene d'encodage bytes>"))) &&
+      octets_egaux(s(by("\xe9t\xe9")), paste0("tv/source : ", entre(REPERE)))
+  })
+  verifier("T15 #307-T9 textes inchang\u00e9s, deux \u00e0 deux distincts : code NA, \u00ab NA \u00bb, absente, \u00ab absente \u00bb, vide, 1, \u00ab illisible (double\u2026) \u00bb ; source NA, \u00ab NA \u00bb, absente, \u00ab absente \u00bb, vide ; parametres list(a = 1) et \u00ab illisible (list\u2026) \u00bb", {
+    lc <- vapply(list(NA_character_, "NA", NULL, "absente", "", 1, "illisible (double de longueur 1)"),
+                 function(v) code(v)[["lu"]], "")
+    ls <- vapply(list(NA_character_, "NA", NULL, "absente", ""), function(v) cellule(fiche_tv("source", v), 15L)[["lu"]], "")
+    lp <- vapply(list(list(a = 1), "illisible (list de longueur 1)"),
+                 function(v) cellule(fiche_tv("parametres", v), 15L)[["lu"]], "")
+    identical(lc, c("NA", paste0(entre("NA"), MOTIF), "absente", paste0(entre("absente"), MOTIF), paste0(entre(""), MOTIF),
+                    "illisible (double de longueur 1)", paste0(entre("illisible (double de longueur 1)"), MOTIF))) &&
+      identical(ls, paste0("tv/source : ", c("NA", entre("NA"), "absente", entre("absente"), entre("")))) &&
+      identical(lp, paste0("tv/parametres : ", c("illisible (list de longueur 1)", entre("illisible (list de longueur 1)")))) &&
+      !anyDuplicated(lc) && !anyDuplicated(ls) && !anyDuplicated(lp)
+  })
+  verifier("T15 #307-T10 fiches ordinaires : FICHE, FICHE_TV, provenance d'un et de deux fichiers, sans provenance : cellules des lignes 6, 9, 13, 14 et 15 inchang\u00e9es ; verdicts de succ\u00e8s", {
+    b1 <- bilan_provenance("base.csv"); b2 <- bilan_provenance(c("a.csv", "b.csv"))
+    ok_verdicts <- all(vapply(list(R0$bilan, R_TV$bilan, b1, b2), function(b) identical(b$verdict, VERDICTS_SUCCES), NA))
+    ok_verdicts && endsWith(R0$bilan$lu[6L], "; provenance : NULL") && endsWith(b1$lu[6L], "; provenance : base.csv") &&
+      octets_egaux(b2$lu[6L], sub("base.csv$", paste0(entre("a.csv"), ", ", entre("b.csv")), b1$lu[6L])) &&
+      identical(R0$bilan$lu[c(9L, 13L, 14L)], c(EMPREINTE_CODE, X$fiche$empreintes$resultat, "NA")) &&
+      identical(c(b1$lu[14L], b2$lu[14L]), c(FAUX_MD5, paste0(entre(FAUX_MD5), ", ", entre(FAUX_MD5)))) &&
+      identical(R0$bilan$lu[15L], "aucune table de statut \u00ab embarquee \u00bb dans fiche/tables_reference") &&
+      identical(R_TV$bilan$lu[15L], "tv : m\u00e9tadonn\u00e9es de la fiche") &&
+      identical(R_TV$bilan$lu[c(9L, 13L, 14L)], c(EMPREINTE_CODE, X_TV$fiche$empreintes$resultat, "NA"))
+  })
+  fichier <- function(v) cellule(empreinte_posee(FICHE, "fichier", v), 14L)
+  verifier("T15 #307-T12 et T13 empreintes/fichier \u00ab NA \u00bb, \u00ab absente \u00bb, \u00ab NULL \u00bb entre \u00ab \u2026 \u00bb ; NA et champ absent inchang\u00e9s (NA, absente) ; verdict \u00ab non v\u00e9rifi\u00e9e \u00bb", {
+    l <- lapply(list("NA", NA_character_, "absente", "NULL", NULL), fichier)
+    identical(vapply(l, `[[`, "", "lu"), c(entre("NA"), "NA", entre("absente"), entre("NULL"), "absente")) &&
+      identical(vapply(l, `[[`, "", "verdict"), rep("non v\u00e9rifi\u00e9e", 5L))
+  })
+  verifier("T15 #307-T14 et T15 empreintes/fichier : \u00ab \u00ab a \u00bb, \u00ab b \u00bb \u00bb (k = 1) distincte de c(a, b) (inchang\u00e9e) ; c(a, NA) \u00e9crit NA nu, distinct de c(a, \u00ab NA \u00bb) (inchang\u00e9e)", {
+    l <- vapply(list(paste0(entre("a"), ", ", entre("b")), c("a", "b"), c("a", NA), c("a", "NA")),
+                function(v) fichier(v)[["lu"]], "")
+    octets_egaux(l[1L], entre("<U+00AB> a <U+00BB>, <U+00AB> b <U+00BB>")) &&
+      identical(l[2:4], c(paste0(entre("a"), ", ", entre("b")), paste0(entre("a"), ", NA"), paste0(entre("a"), ", ", entre("NA"))))
+  })
+  verifier("T15 #307-T16 et T17 ligne 6 : fichier de provenance \u00ab NULL \u00bb entre \u00ab \u2026 \u00bb, distinct d'une provenance NULL (inchang\u00e9e) ; fichier \u00ab \u00ab a.csv \u00bb, \u00ab b.csv \u00bb \u00bb (k = 1) distinct de deux fichiers (inchang\u00e9e)", {
+    l <- vapply(list("NULL", paste0(entre("a.csv"), ", ", entre("b.csv")), c("a.csv", "b.csv")),
+                function(f) bilan_provenance(f)$lu[6L], "")
+    endsWith(l[1L], paste0("; provenance : ", entre("NULL"))) && endsWith(R0$bilan$lu[6L], "; provenance : NULL") &&
+      endsWith(l[2L], paste0("; provenance : ", entre("<U+00AB> a.csv <U+00BB>, <U+00AB> b.csv <U+00BB>"))) &&
+      endsWith(l[3L], paste0("; provenance : ", entre("a.csv"), ", ", entre("b.csv"))) && !anyDuplicated(l)
+  })
+  verifier("T15 #307-C1 empreintes/fichier \u00ab NA, NA \u00bb et \u00ab NA, NA, NA \u00bb (k = 1) entre \u00ab \u2026 \u00bb, distinctes de c(NA, NA) et rep(NA, 3) (NA nus joints par \u00ab , \u00bb) ; verdict \u00ab non v\u00e9rifi\u00e9e \u00bb", {
+    l <- lapply(list("NA, NA", rep(NA_character_, 2L), "NA, NA, NA", rep(NA_character_, 3L)), fichier)
+    lu <- vapply(l, `[[`, "", "lu")
+    identical(lu, c(entre("NA, NA"), "NA, NA", entre("NA, NA, NA"), "NA, NA, NA")) && !anyDuplicated(lu) &&
+      identical(vapply(l, `[[`, "", "verdict"), rep("non v\u00e9rifi\u00e9e", 4L))
+  })
+  verifier("T15 #307-C1 motif ancr\u00e9 ^NA(, NA)+$ : empreintes/fichier \u00ab NA, NA, a \u00bb, \u00ab a, NA, NA \u00bb, \u00ab NA,NA \u00bb, \u00ab a, NA \u00bb (k = 1) nues", {
+    v <- c("NA, NA, a", "a, NA, NA", "NA,NA", "a, NA")
+    identical(vapply(v, function(x) fichier(x)[["lu"]], "", USE.NAMES = FALSE), v)
+  })
+  verifier("T15 #307-C1 m\u00e9langes de la ligne 14 : c(a, NA), \u00ab \u00ab a \u00bb, NA \u00bb, c(NA, a), \u00ab NA, \u00ab a \u00bb \u00bb deux \u00e0 deux distincts", {
+    l <- vapply(list(c("a", NA), paste0(entre("a"), ", NA"), c(NA, "a"), paste0("NA, ", entre("a"))),
+                function(v) fichier(v)[["lu"]], "")
+    identical(l, c(paste0(entre("a"), ", NA"), entre("<U+00AB> a <U+00BB>, NA"),
+                   paste0("NA, ", entre("a")), entre("NA, <U+00AB> a <U+00BB>"))) && !anyDuplicated(l)
+  })
+  verifier("T15 #307-C1 ligne 6 : fichier de provenance \u00ab NA, NA \u00bb (k = 1) entre \u00ab \u2026 \u00bb ; \u00ab a, b.csv \u00bb et \u00ab x,y.csv \u00bb nus ; c(x,y.csv, a b.csv) (k = 2) chacun entre \u00ab \u2026 \u00bb", {
+    l <- vapply(list("NA, NA", "a, b.csv", "x,y.csv", c("x,y.csv", "a b.csv")),
+                function(f) bilan_provenance(f)$lu[6L], "")
+    endsWith(l[1L], paste0("; provenance : ", entre("NA, NA"))) && endsWith(l[2L], "; provenance : a, b.csv") &&
+      endsWith(l[3L], "; provenance : x,y.csv") &&
+      endsWith(l[4L], paste0("; provenance : ", entre("x,y.csv"), ", ", entre("a b.csv"))) && !anyDuplicated(l)
+  })
+  verifier("T15 #307-T18 empreintes/fichier \u00ab abc \u00bb (forme quelconque) : ligne 14 nue, sans motif de forme ; \u00ab non v\u00e9rifi\u00e9e \u00bb", {
+    identical(unname(fichier("abc")), c("abc", "non v\u00e9rifi\u00e9e"))
+  })
+  verifier("T15 #307 citer_chaine() appel\u00e9e directement : contextes segment, valeur_isolee, toujours ; mots et motifs r\u00e9serv\u00e9s propres au contexte (option M ; C1) ; pr\u00e9fixe \u00ab illisible ( \u00bb ; espace de t\u00eate ou de queue ; cha\u00eene vide nue hors \u00ab toujours \u00bb ; NA rendu NA", {
+    cc <- tablexp:::citer_chaine
+    identical(cc(c("NULL", "absente", "abc", "NA, NA"), "segment"), c("NULL", "absente", "abc", entre("NA, NA"))) &&
+      identical(cc(c("NULL", "absente", "NA", "abc", "a/b", "a=b", "NA, NA", "NA, NA, NA", "NA, NA, a"), "valeur_isolee"),
+                c(entre("NULL"), entre("absente"), entre("NA"), "abc", "a/b", "a=b",
+                  entre("NA, NA"), entre("NA, NA, NA"), "NA, NA, a")) &&
+      identical(cc("NA, NA", "toujours"), entre("NA, NA")) &&
+      identical(cc(c("illisible (x", "illisible", " a", "a ", ""), "valeur_isolee"),
+                c(entre("illisible (x"), "illisible", entre(" a"), entre("a "), "")) &&
+      identical(cc(c("abc", "", NA), "toujours"), c(entre("abc"), entre(""), NA)) &&
+      octets_egaux(cc(by("\xe9"), "toujours"), entre(REPERE)) && identical(cc(by("\xe9"), "valeur_isolee"), REPERE) &&
+      identical(cc(character(0), "toujours"), character(0)) &&
+      identical(tablexp:::citer_segment("a/b"), entre("a/b"))
+  })
+  # Règle cible du segment (ADR 0012, annotation acceptée M527 ; #305) : NA
+  # écrit nu « NA », chaîne vide nue, chaîne « NA » réservée. Défaut connu à
+  # e740f77 (citer_segment() rend NA, "", "NA") ; R1 du visa
+  # d'actuary-approfondi sur #307.
+  echec_attendu("T15 #307 citer_segment(c(NA, \"\", \"NA\")) : NA \u00e9crit \u00ab NA \u00bb, cha\u00eene vide nue, \u00ab NA \u00bb entre \u00ab \u2026 \u00bb (r\u00e8gle cible, M527)", "#305", {
+    identical(tablexp:::citer_segment(c(NA, "", "NA")), c("NA", "", entre("NA")))
+  })
+  verifier("T15 #307 citer_valeur_lue() : cha\u00eene unique cit\u00e9e selon le contexte ; autre valeur d\u00e9crite par sa forme, nue (NA, absente, illisible)", {
+    cv <- tablexp:::citer_valeur_lue
+    identical(vapply(list(NA_character_, NULL, 1, c("a", "b"), c(a = "x"), "x"), cv, "", "toujours"),
+              c("NA", "absente", "illisible (double de longueur 1)", "illisible (character de longueur 2)",
+                "illisible (character de longueur 1)", entre("x"))) &&
+      identical(cv("x", "valeur_isolee"), "x")
+  })
+})
