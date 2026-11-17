@@ -17496,13 +17496,20 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     exigées. \code{lignes\_conservees} fait exception parce que ce que le
     rapport en restitue (type, nombre de lignes, noms des colonnes~:
     structure seule, ci-dessous) se rapproche de données du périmètre~: un
-    écart y établit, à une collision du MD5 près (contrôle~3), que l'objet a
-    été modifié après sa construction, d'où le motif
+    écart y établit que l'objet n'est pas tel que \code{construire\_table()}
+    l'a rendu d'une entrée dont \code{dim()} est celui de R base~:
+    \code{numeros\_conserves} et
+    \code{fiche/roles} sont établis par le contrôle~3, à une collision du
+    MD5 près~; la copie ne l'est pas, et un écart signale soit une
+    modification après la construction, soit une entrée dont le décompte
+    des lignes est faussé (issue~\#312), d'où le motif
     \code{objet\_modifie}, et non \code{type\_non\_canonique}. Tout autre
     contrôle de structure d'un sous-arbre hors empreinte demanderait un tel
     ancrage et une nouvelle annotation de l'ADR 0012. Sont refusés sous
     \code{objet\_modifie}, le chemin étant cité dans le message et porté
-    par \code{details\$chemin}, dans cet ordre~:
+    par \code{details\$chemin} (l'absence, refus~(d), est testée
+    d'abord~; la valeur présente, les refus~(a), (b) et~(c) le sont
+    ensuite, dans cet ordre)~:
     \begin{enumerate}[label=(\alph*), leftmargin=*, itemsep=1pt]
       \item la valeur, présente, n'est pas un \code{data.frame}, au sens
         d'une liste dont l'attribut de classe contient \code{data.frame}~:
@@ -17530,7 +17537,12 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     Rien d'autre n'est exigé de la copie~: une classe ou des attributs
     quelconques (\code{tbl\_df}, classe placée devant \code{data.frame}),
     une colonne hors rôle ajoutée, des noms de lignes quelconques sont
-    admis et rendus (\emph{constat} des tests). \textbf{Lecture sans
+    admis et rendus (\emph{constat} des tests), hors classe d'encodage
+    \code{bytes}, admise par le contrôle~6 et refusée au rendu sous
+    \code{type\_non\_canonique}, rôle
+    \code{etapes/donnees/resultat/}\allowbreak\code{lignes\_conservees}
+    (issue~\#128~; \emph{constat} de mesure, comportement antérieur à
+    l'issue~\#294). \textbf{Lecture sans
     dispatch}~: la valeur est lue par \code{lire\_chemin()}, sa classe par
     \code{a\_classe()}, ses noms par \code{attr(v, "names", exact = TRUE)}
     et son nombre de lignes par \code{.row\_names\_info(v, 2L)}, comme au
@@ -17544,9 +17556,19 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     contrôlés~; une colonne de rôle vidée (\code{NA}) ou convertie en
     facteur passe, et le rapport, qui n'en restitue que la structure, est
     identique octet à octet à celui de l'objet intact (\emph{constat}).
+    La longueur des colonnes n'est pas contrôlée non plus~: un
+    \code{data.frame} dont les noms de lignes annoncent le bon nombre de
+    lignes et dont les colonnes en ont moins passe, et le rapport est
+    identique octet à octet à celui de l'objet intact (\emph{constat} de
+    mesure)~; ce constat, de même nature, est renvoyé à l'issue~\#311.
     Le contrôle établit la cohérence de la copie avec le périmètre, non son
-    origine. Un objet rendu par \code{construire\_table()} passe ce
-    contrôle (\emph{constat} des tests).
+    origine. Un objet rendu par \code{construire\_table()} d'une entrée
+    dont \code{dim()} est celui de R base passe ce contrôle
+    (\emph{constat} des tests)~; une entrée dont la méthode \code{dim()}
+    annonce moins de lignes qu'elle n'en a donne dès la construction un
+    objet incohérent, refusé ici~; si elle en annonce plus, la
+    construction s'arrête sur une erreur R (issue~\#312~; \emph{constat}
+    de mesure).
 \end{enumerate}
 
 {\footnotesize
@@ -17642,7 +17664,8 @@ au contrôle d'intégrité~; leur forme, hors \code{lignes\_conservees}, relève
 du contrôle~5, qui n'en vérifie pas l'exactitude, et la cohérence de
 \code{lignes\_conservees} avec le périmètre (présence, classe
 \code{data.frame}, nombre de lignes, colonnes de rôle), du contrôle~6, qui
-ne vérifie ni le type ni les valeurs de ses colonnes.
+ne vérifie ni le type ni les valeurs de ses colonnes (limite acceptée,
+M522), ni leur longueur (constat, issue~\#311).
 
 \medskip
 \noindent
@@ -18472,7 +18495,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{CHEMINS\_FORME\_HORS\_RESULTAT} & constante & --- & chemins de \code{CHEMINS\_HORS\_RESULTAT} dont la forme est contrôlée avant l'écriture du rapport figé, tous sauf la copie de l'entrée \code{lignes\_conservees} (issue~\#141~; M499) \\
 \catalogue{fonctions-rapport}{controler\_forme\_hors\_resultat()} & interne & objet \code{construction} & contrôle~5 de \code{controler\_rapport()}~: chaque sous-arbre présent aux chemins de la constante précédente, sous son chemin, passé à \code{texte\_objet()} en mode \code{canonique}, sortie jetée~; refus \code{type\_non\_canonique} (rôle~: le chemin) et, sous \code{fiche/}, refus de codage de l'écrivain~; \code{execution} en forme seule (\code{valeurs = FALSE}), le champ que \code{FORME\_EXECUTION} déclare \code{POSIXct} (\code{debut}), \code{POSIXct} nu, contrôlé sans sa classe~; chemins parcourus par \code{lire\_chemin()}~: tout ancêtre liste traversé, de classe quelconque, \code{bytes} comprise, le sous-arbre seul jugé (issue~\#301)~; sous-arbre absent ou \code{NULL} sauté~; ni la présence ni la structure d'\code{execution} exigées (admission documentée, issue~\#297)~; nom vide, \code{NA}, en double ou qui n'est pas un segment, sous \code{fiche/versions} et \code{fiche/plateforme}, admis et restitué par \code{@noms} et \code{[i]} (admission documentée, issue~\#302)~; rend \code{TRUE}, invisible (issue~\#141, section~\ref{sec:rapport-fige}) \\
-\catalogue{fonctions-rapport}{controler\_lignes\_conservees()} & interne & objet \code{construction} & contrôle~6 de \code{controler\_rapport()}~: copie de l'entrée \code{lignes\_conservees}, hors de l'empreinte, rapprochée de \code{numeros\_conserves} et de \code{fiche/roles}, qui sont dans son périmètre~; refus \code{objet\_modifie}, chemin cité, d'une valeur qui n'est pas un \code{data.frame}, d'un nombre de lignes autre que la longueur de \code{numeros\_conserves} ou illisible, d'une colonne de rôle manquante, d'une absence alors que \code{numeros\_conserves} est présent~; lecture sans dispatch (\code{lire\_chemin()}, \code{a\_classe()}, \code{attr()}, \code{.row\_names\_info()})~; ni type ni valeurs des colonnes contrôlés (issue~\#311)~; rend \code{TRUE}, invisible (issue~\#294, section~\ref{sec:rapport-fige}) \\
+\catalogue{fonctions-rapport}{controler\_lignes\_conservees()} & interne & objet \code{construction} & contrôle~6 de \code{controler\_rapport()}~: copie de l'entrée \code{lignes\_conservees}, hors de l'empreinte, rapprochée de \code{numeros\_conserves} et de \code{fiche/roles}, qui sont dans son périmètre~; refus \code{objet\_modifie}, chemin cité, d'une valeur qui n'est pas un \code{data.frame}, d'un nombre de lignes autre que la longueur de \code{numeros\_conserves} ou illisible, d'une colonne de rôle manquante, d'une absence alors que \code{numeros\_conserves} est présent~; lecture sans dispatch (\code{lire\_chemin()}, \code{a\_classe()}, \code{attr()}, \code{.row\_names\_info()})~; ni type ni valeurs des colonnes contrôlés (limite acceptée, M522, issue~\#311), ni leur longueur (constat, issue~\#311)~; rend \code{TRUE}, invisible (issue~\#294, section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
 \catalogue{fonctions-rapport}{TRI\_NUMERIQUE} & constante & --- & \code{"tri\_numerique"}~: marque de l'interface de \code{canoniser\_plan()}, tri croissant d'un champ ensemble d'entiers en \code{double} (\code{ordres} de \code{coherence\_regularite}~; section~\ref{sec:fiche}) \\
