@@ -591,6 +591,41 @@ local({
     z <- x1; z$execution <- list(debut = "autre", duree_secondes = -1)
     identical(ecrire_rapport(y), o1) && identical(ecrire_rapport(z), o1)
   })
+  # #297 (M520 ; ADR 0012, seconde annotation du 16/11/2026, point (d) 1) :
+  # admission documentée. Le contrôle 5 garantit la fidélité de la restitution,
+  # non l'authenticité ; rien d'execution n'est restitué ni ancré sur le
+  # périmètre de l'empreinte. Ni la présence ni la structure d'execution ne sont
+  # exigées : un non-liste (chaîne, entiers, liste vide, liste à champ inconnu)
+  # est rendu, octets identiques à o1. Seules la forme canonique (ni classe, ni
+  # attribut autre que names) et l'exception du POSIXct nu sous le nom debut sont
+  # contrôlées. Valeurs mesurées sous C et C.UTF-8 (o1 : 146 052 octets).
+  verifier("#297 : execution remplacé par \"abc\", 1:3, list() ou list(z = 1) (non-liste ou liste sans les champs attendus) : rapport rendu, octets identiques à o1 (admission documentée)", {
+    e <- character(0)
+    for (v in list("abc", 1:3, list(), list(z = 1))) {
+      y <- x1; y$execution <- v
+      r <- attrape(ecrire_rapport(y))
+      if (!identical(r, o1)) e <- c(e, sprintf("execution = %s : %s", paste(deparse(v), collapse = ""),
+                                               if (is.raw(r)) "octets différents de o1" else if (inherits(r, "error")) conditionMessage(r) else class(r)[1L]))
+    }
+    if (length(e)) e else TRUE
+  })
+  verifier("#297 : contre-épreuves, frontière de forme inchangée : execution de classe k, d'attribut z ou facteur : refus type_non_canonique, rôle execution ; unname(execution) : refus type_non_canonique, rôle execution/[1] (l'exception du POSIXct nu est liée au nom debut)", {
+    cas <- list(list("chaîne de classe k", structure("abc", class = "k"), "execution"),
+                list("chaîne d'attribut z", structure("abc", z = 1), "execution"),
+                list("facteur", factor("abc"), "execution"),
+                list("liste sans noms", unname(x1$execution), "execution/[1]"))
+    e <- character(0)
+    for (c_ in cas) {
+      y <- x1; y$execution <- c_[[2L]]
+      r <- attrape(ecrire_rapport(y))
+      if (!inherits(r, "refus_tablexp")) e <- c(e, sprintf("%s : %s", c_[[1L]], if (is.raw(r)) "rendu sans refus" else class(r)[1L]))
+      else {
+        v <- controle_refus(r, "type_non_canonique", list(role = c_[[3L]]), sprintf("Rôle « %s » : ", c_[[3L]]))
+        if (!isTRUE(v)) e <- c(e, paste0(c_[[1L]], " : ", v))
+      }
+    }
+    if (length(e)) e else TRUE
+  })
   # Reprise unique de #141. execution : forme seule, aucun contrôle de codage (ses
   # valeurs et ses noms ne sont jamais rendus) ; fiche/* : codage contrôlé,
   # refus inchangés (mesurés sur l'état antérieur, sous C et C.UTF-8).
