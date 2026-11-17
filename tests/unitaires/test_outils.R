@@ -485,8 +485,11 @@ verifier("lire_chemin : présence et valeur par lire_champ() ; absent si segment
   vu <- function(v) list(present = TRUE, valeur = v)
   lb <- structure(list(a = list(c = 3)), class = b)
   ln <- setNames(list(1, list(c = 3)), c(b, "a"))
-  `[[.kk_test` <- function(x, i) "dispatch"
+  # Méthode définie dans globalenv() (le dispatch depuis le package ne voit pas le
+  # cadre local de verifier()), puis retirée.
+  assign("[[.kk_test", function(x, i) "dispatch", envir = globalenv())
   lk <- structure(list(a = 1), class = "kk_test")
+  tryCatch(
   inherits(tryCatch(lb[["a"]], error = function(e) e), "error") &&
     inherits(tryCatch(names(lb), error = function(e) e), "error") &&
     inherits(tryCatch(ln[["a"]], error = function(e) e), "error") && identical(lk[["a"]], "dispatch") &&
@@ -503,5 +506,6 @@ verifier("lire_chemin : présence et valeur par lire_champ() ; absent si segment
     identical(lire_chemin(lk, "a"), vu(1)) &&
     identical(lire_chemin(list(a = 1, a = 2), "a"), vu(1)) &&
     identical(lire_chemin(list(abc = 1), "a"), absent) &&
-    identical(lire_chemin(list(d = data.frame(x = 1:2, y = 3:4)), c("d", "y")), vu(3:4))
+    identical(lire_chemin(list(d = data.frame(x = 1:2, y = 3:4)), c("d", "y")), vu(3:4)),
+  finally = rm("[[.kk_test", envir = globalenv()))
 })
