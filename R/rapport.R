@@ -1400,9 +1400,12 @@ FORME_EXECUTION <- data.frame(
 # mantisse porte un chiffre non nul et relu 0 est refusé (sous-dépassement,
 # M66, troisième annotation, (b)) ; les autres types exigent leur écriture
 # canonique. Refus nommés (module rapport), avec le numéro de la ligne fautive
-# dans details$ligne. lire_plan() ne valide pas le plan (point 9.2) :
-# valider_plan() par l'appelant, ou construire_table() ; lire_fiche() ne
-# contrôle pas version_fiche (troisième annotation, (i)).
+# dans details$ligne et le chemin écrit sur cette ligne dans details$chemin
+# (#306 ; NA pour un refus antérieur au découpage en champs, une ligne « # »
+# ou à premier champ vide, et en fin de texte : voir lire_texte()).
+# lire_plan() ne valide pas le plan (point 9.2) : valider_plan() par
+# l'appelant, ou construire_table() ; lire_fiche() ne contrôle pas
+# version_fiche (troisième annotation, (i)).
 
 PREMIERE_LIGNE_PLAN <- "tablexp plan 1"
 PREMIERE_LIGNE_FICHE <- "tablexp fiche 1"

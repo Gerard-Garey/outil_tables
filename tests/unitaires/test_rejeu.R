@@ -1541,8 +1541,8 @@ local({
       identical(tablexp:::citer_segment("a/b"), entre("a/b"))
   })
   # Règle du segment (ADR 0012, annotation acceptée M527 ; #305, Q3, cellule
-  # N8) : NA écrit nu « NA », chaîne vide nue, chaîne « NA » réservée ; échec
-  # attendu jusqu'à #305 (R1 du visa d'actuary-approfondi sur #307).
+  # N8) : NA écrit nu « NA », chaîne vide nue, chaîne « NA » réservée ; test
+  # ordinaire depuis #305 (`5b5de58` ; R1 du visa d'actuary-approfondi sur #307).
   verifier("T15 #307 citer_segment(c(NA, \"\", \"NA\")) : NA \u00e9crit \u00ab NA \u00bb, cha\u00eene vide nue, \u00ab NA \u00bb entre \u00ab \u2026 \u00bb (r\u00e8gle M527, #305 N8)", {
     identical(tablexp:::citer_segment(c(NA, "", "NA")), c("NA", "", entre("NA")))
   })

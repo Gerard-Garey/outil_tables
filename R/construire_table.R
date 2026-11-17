@@ -2079,17 +2079,19 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # comparaison.
   # Toute valeur ou tout nom de la fiche écrit dans une cellule du bilan est
   # cité par la règle unique neutraliser_citation() (#142), sous la forme F307
-  # (citer_chaine(), #307, #305) pour les lignes 6, 9 à 11, 13 à 15 : valeurs par
+  # (citer_chaine(), #307, #305) : valeurs des lignes 6, 9 à 11, 13 à 15 par
   # sans_controle(texte_lu(v)), paires_lues(), texte_empreinte_lue(),
-  # citer_fichiers_lus() ou citer_valeur_lue() ; noms de champs des chemins
-  # des verdicts par champs_differents(), clés de tables_reference des lignes
-  # 8 et 15 et noms des chemins par citer_segment() (#298 : un segment à
-  # séparateur est entre « … »). Une chaîne « bytes » y est écrite sous son repère
-  # (sinon sprintf() et write.csv() du bilan lèveraient une erreur R), un
-  # caractère de contrôle <U+XXXX>, un octet invalide <xx> : une ligne par
-  # cellule, UTF-8 valide. Les lignes 1 à 5, 7 et 8 ne reçoivent que des
-  # valeurs refusées plus haut si elles sont « bytes » ou invalides (contrôles
-  # 2 à 7 bis) ou recalculées par le moteur ; la ligne 6, le nom du fichier de
+  # citer_fichiers_lus() ou citer_valeur_lue() ; clés de tables_reference de la
+  # ligne 8 (empreintes recalculée et lue) et de la ligne 15, et segments des
+  # chemins des verdicts des lignes 10 à 12 (champs_differents()) et 15
+  # (temoin_catalogue()), par citer_segment(), contexte « segment » de F307
+  # (#298 : un segment à séparateur est entre « … » ; #305 : NA écrit nu). Une
+  # chaîne « bytes » y est écrite sous son repère (sinon sprintf() et
+  # write.csv() du bilan lèveraient une erreur R), un caractère de contrôle
+  # <U+XXXX>, un octet invalide <xx> : une ligne par cellule, UTF-8 valide.
+  # Les lignes 1 à 5, 7 et 8 ne reçoivent que des valeurs refusées plus haut
+  # si elles sont « bytes » ou invalides (contrôles 2 à 7 bis) ou recalculées
+  # par le moteur ; la ligne 6, le nom du fichier de
   # la provenance, que controler_provenance() ne contraint pas, est cité ; la
   # ligne 15, valeurs des métadonnées des tables embarquées (source,
   # forme_origine, parametres, que le contrôle 2 ne contraint pas), par

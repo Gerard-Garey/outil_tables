@@ -813,10 +813,12 @@ ligne_transition <- function(transition)
               drop = FALSE]
 
 # Fin effective de la période d'observation, en jours depuis 1970-01-01
-# (double) : fin - délai de déclaration (A.0, T4 ; #308). Seul endroit où
-# s'écrit la convention : lue par controler_transition_periode() (période
-# vide), controler_inventaires_plan() (dernière date d'inventaire) et
-# valeurs_parametres_donnees() (borne B = fin effective + 1). Ne contrôle rien :
+# (double) : fin - délai de déclaration (A.0, T4 ; #308). Seul calcul de la fin
+# effective à partir de la période et du délai : appelée par
+# controler_transition_periode() (période vide), controler_inventaires_plan()
+# (dernière date d'inventaire) et valeurs_parametres_donnees() (borne B = fin
+# effective + 1, dont dérive p$borne des valeurs validées ; les étapes qui
+# relisent la fin effective le font par p$borne - 1). Ne contrôle rien :
 # `periode` et `delai_declaration` sont déjà validés par l'appelant.
 fin_effective <- function(periode, delai_declaration)
   as.numeric(periode[["fin"]]) - delai_declaration
