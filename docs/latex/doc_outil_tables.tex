@@ -5338,7 +5338,7 @@ antérieur se lit en conséquence.
 \code{empreinte\_donnees} & empreinte recalculée / \code{empreintes\$donnees} & conforme & exacte~; sans rôle de sécurité \\
 \code{tables\_reference} & «~[clé] : [empreinte recalculée] (reçue)~» ou «~(relue dans le package)~», joints par «~;~», ou «~aucune empreinte recalculée (aucune table reçue ni relue)~» / «~[clé] : [empreinte de la fiche]~», joints par «~;~», ou «~aucune table de référence (fiche/tables\_reference~: NULL)~»~; clé citée par \code{citer\_segment()} & conforme & exacte~; sans rôle de sécurité \\
 \code{temoin\_code} & \code{EMPREINTE\_CODE} / \code{empreintes\$code}, une chaîne de forme non MD5 citée «~«~[valeur]~» (forme invalide~: empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)~», en contexte \code{toujours} de la forme F307 (\code{texte\_empreinte\_lue()}) & V1 & exacte~; sans rôle de sécurité \\
-\code{temoin\_versions} & \code{versions} de la fiche rendue / de la fiche reçue, en paires «~nom=valeur~» jointes par «~;~», noms et valeurs cités par la règle unique, «~=~» et «~;~» d'un nom ou d'une valeur n'étant pas échappés (ci-dessous, «~Limites~») & V2 & comparaison exacte \\
+\code{temoin\_versions} & \code{versions} de la fiche rendue / de la fiche reçue, en paires «~nom=valeur~» jointes par «~;~», noms en contexte \code{nom\_paire} et valeurs en contexte \code{valeur\_paire} de la forme F307 (\code{paires\_lues()}~; issue~\#305), une valeur qui n'est pas une liste nommée en contexte \code{toujours} (ci-dessous, «~Citation d'une chaîne lue~: forme F307~») & V2 & comparaison exacte \\
 \code{temoin\_plateforme} & idem pour \code{plateforme} & V2 & comparaison exacte \\
 \code{temoin\_fiche} & «~fiche rendue par construire\_table(), hors versions, plateforme, empreintes/resultat, empreintes/code, empreintes/statut\_resultat\_code~» / «~fiche reçue, même périmètre~» & V3 & comparaison exacte \\
 \code{temoin\_empreinte\_resultat} & empreinte du résultat de l'objet rendu / \code{empreintes\$resultat} de la fiche, citée comme à la ligne~9 & V1 & témoin, même machine seulement \\
@@ -5424,7 +5424,21 @@ règles, la ligne \code{temoin\_catalogue} ayant la sienne (ci-dessous,
     \emph{constat} aux niveaux~2 à~7), citée «~différente~» à son chemin,
     ou à celui de son plus proche ancêtre qui est une feuille de la fiche
     rendue, sans que ses noms soient lus (issue~\#128)~; un nœud qui diffère sans qu'aucun de ses enfants diffère est
-    cité «~(ordre des champs ou attributs)~». Les comparaisons et les
+    cité «~(ordre des champs ou attributs)~». Une liste aux noms incomplets
+    (\code{NA} ou vides) ou en double est, comme une liste qui porte un nom
+    \code{bytes}, une feuille~: elle est citée «~différente~» à son propre
+    chemin, sans que ses enfants soient comparés, l'appariement par nom
+    n'y étant pas défini et un appariement par position supposant un ordre
+    que la fiche ne garantit pas (issue~\#305, décision M526~; le premier
+    nom de \code{convention} mis à \code{NA} ou vide, ou égal au second,
+    donne «~différente~: convention~», et la valeur du même champ changée
+    sous son nom complet «~différente~: convention/demandee~»~:
+    \emph{constat de mesure} du 17/11/2026 sous les locales C.UTF-8 et C~;
+    le nom \code{NA} et la contre-épreuve sont testés, test~T16)~; ce cas
+    ne vient que d'une fiche altérée après sa construction (avis
+    d'\code{actuary-approfondi} sur l'issue~\#305, Q4~: le moteur n'écrit
+    pas de nom incomplet dans ces nœuds), et n'atteint ni \code{versions} ni \code{plateforme}, que la
+    règle~V2 rend alors «~non déterminables~». Les comparaisons et les
     lectures par nom portent sur les noms bruts~; chaque nom écrit dans
     un chemin est un segment cité par \code{citer\_segment()}~: par la
     règle unique (issue~\#142), et entre «~…~» s'il contient un séparateur
@@ -5683,20 +5697,28 @@ témoins \textbf{signalent et ne refusent jamais}~:
     (section~\ref{sec:rapport-fige}) --- et relèverait d'une issue à part,
     si le besoin est confirmé (ADR 0012, «~Conséquences~»).
   \item \textbf{Lecture des témoins~: limites ouvertes}, décrites à leur
-    place (ci-dessus et ci-après)~: les paires «~nom=valeur~»
-    des colonnes \code{attendu} et \code{lu} des lignes~10 et~11
-    (\code{paires\_lues()}) n'échappent ni «~=~» ni «~;~»~: un nom ou une
-    valeur qui en contient se lit de façon ambiguë, les verdicts de ces
-    lignes restant exacts (\emph{constat de mesure} du 16/11/2026~: un nom
-    «~a=b ; c~» de valeur «~d~» et un nom «~a~» de valeur «~b ; c=d~»
-    ajoutés à \code{plateforme} donnent la même fin de \code{lu},
-    «~a=b ; c=d~», et les verdicts «~différente~: «~a=b ; c~» (absent de
-    la fiche rendue)~» et «~différente~: a (absent de la fiche rendue)~»~;
-    cas propre à une fiche altérée ou à un chemin de bibliothèque
-    inhabituel~; spécification de l'issue~\#298, §~8~; suite ouverte, issue~\#305). Les chemins des
+    place (ci-dessus et ci-après)~: jusqu'à l'issue~\#305, les paires
+    «~nom=valeur~» des colonnes \code{attendu} et \code{lu} des lignes~10
+    et~11 (\code{paires\_lues()}) n'échappaient ni «~=~» ni «~;~», si bien
+    qu'un nom ou une valeur qui en contenait se lisait de façon ambiguë,
+    les verdicts de ces lignes restant exacts (\emph{constat de mesure} du
+    16/11/2026~: un nom «~a=b ; c~» de valeur «~d~» et un nom «~a~» de
+    valeur «~b ; c=d~» ajoutés à \code{plateforme} donnaient la même fin
+    de \code{lu}, «~a=b ; c=d~»~; spécification de l'issue~\#298, §~8).
+    Cette limite est levée par l'issue~\#305~: noms et valeurs sont cités
+    par la forme F307 (ci-dessous, «~Citation d'une chaîne lue~: forme
+    F307~»), et les deux mêmes fiches donnent les fins «~; «~a=b ;
+    c~»=d~» et «~; a=«~b ; c=d~»~», sous les verdicts inchangés
+    «~différente~: «~a=b ; c~» (absent de la fiche rendue)~» et
+    «~différente~: a (absent de la fiche rendue)~» (\emph{constat de
+    mesure} du 17/11/2026 sous les locales C.UTF-8 et C, octets
+    identiques~; test~T16~P3)~; restent, pour ces paires comme pour les
+    autres cellules, les limites L1 à L3 ci-après. Les chemins des
     verdicts des lignes~10 à~12 et~15 et les clés des lignes~8 et~15 ne sont
     plus ambigus depuis l'issue~\#298 (ci-dessous, «~Citation des valeurs
-    de la fiche dans le bilan~»), hors la limite du repère \code{bytes}.
+    de la fiche dans le bilan~»), hors les limites L1 et~L2 ci-après, et
+    \code{NA} ne s'y confond plus avec la chaîne «~NA~» depuis
+    l'issue~\#305 (ci-dessous, «~Citation d'un segment de chemin~»).
     La forme MD5 des empreintes du code et du résultat lues dans la fiche
     est contrôlée depuis l'issue~\#295 (règle~V1)~: un verdict
     «~différente~» des lignes~9 et~13 ne vient plus d'une valeur qui n'est
@@ -5718,6 +5740,13 @@ témoins \textbf{signalent et ne refusent jamais}~:
     C.UTF-8 et C~: deux chaînes \code{bytes} distinctes, «~aé~» en
     latin-1 et en UTF-8, \code{c(1, 2)} et \code{c(3, 4)}). Les deux
     premières sont inchangées par l'issue~\#307, la troisième est voulue.
+    Les trois valent aussi pour les segments de chemin et pour les noms et
+    valeurs des paires des lignes~10 et~11, cités par la même forme depuis
+    l'issue~\#305 (\emph{constats de mesure} du 17/11/2026 sous la locale
+    C.UTF-8~: les mêmes paires de chaînes citées dans les contextes
+    \code{segment}, \code{nom\_paire} et \code{valeur\_paire}, et les
+    valeurs \code{c(1, 2)} et \code{c(3, 4)} d'une paire, écrites toutes
+    deux «~a=illisible (double de longueur~2)~»).
 \end{itemize}
 
 \medskip
@@ -5745,7 +5774,9 @@ chaque clé et chaque valeur des métadonnées d'une table embarquée,
 l'étape~2 ne contraint pas (par \code{temoin\_catalogue()}~; ci-dessus,
 \textbf{catalogue})~; depuis l'issue~\#307, les chaînes lues des
 lignes~6 (fichiers de la provenance), 9, 13, 14 et~15 le sont par la
-forme F307, qui complète la règle unique par une citation entre «~…~»
+forme F307, qui complète la règle unique par une citation entre «~…~»,
+et, depuis l'issue~\#305, les noms et les valeurs des paires des
+lignes~10 et~11 aussi
 (ci-dessous, «~Citation d'une chaîne lue~: forme F307~»). Les autres valeurs écrites aux lignes~1
 à~8 sont soit des valeurs que les étapes~1 à~7~bis auraient refusées si
 elles étaient d'encodage \code{bytes} ou hors UTF-8 valide (libellés et
@@ -5800,14 +5831,17 @@ citation, non sur les clés admises. Chaque \emph{segment} --- clé de
 un chemin des verdicts des lignes~10 à~12 (règle~V3) --- est cité par
 \code{citer\_segment()}, élément par élément~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
-  \item \code{NA} et une chaîne d'encodage \code{bytes} sont cités par
-    \code{neutraliser\_citation()}, comme avant, jamais entre «~…~»
-    (\code{NA}~; repère «~<chaîne d'encodage bytes>~»)~;
+  \item \code{NA} s'écrit la chaîne «~NA~», nue, et une chaîne d'encodage
+    \code{bytes} le repère «~<chaîne d'encodage bytes>~» de
+    \code{neutraliser\_citation()}, jamais entre «~…~» (avant
+    l'issue~\#305, \code{NA} restait une valeur manquante, que le collage
+    du chemin écrivait aussi «~NA~»)~;
   \item sinon, le segment est \emph{réservé} si ses octets (après
     conversion en UTF-8 d'une chaîne latin-1, comme dans
     \code{neutraliser\_citation()}) contiennent l'un des neuf caractères
-    «~/~», «~,~», «~;~», «~:~», «~(~», «~)~», «~<~», «~«~», «~»~», ou
-    s'il commence ou finit par une espace (U+0020)~;
+    «~/~», «~,~», «~;~», «~:~», «~(~», «~)~», «~<~», «~«~», «~»~», s'il
+    commence ou finit par une espace (U+0020), ou s'il est égal à la
+    chaîne «~NA~» (mot réservé, issue~\#305)~;
   \item un segment non réservé est cité par \code{neutraliser\_citation()},
     comme avant~: c'est le cas des clés et noms ordinaires («~tv~»,
     «~clé~», «~a b~», «~[1]~», «~@a~», «~a=b~»), dont les textes du bilan
@@ -5830,8 +5864,12 @@ z~»~», «~a(b)~» «~«~a(b)~»~», le texte tapé «~a<U+000B>b~»
 \code{" tv"}, à espace de tête, se cite entre «~…~» en gardant cette
 espace.
 Il s'ensuit, par \emph{lecture} du code, que la citation d'un segment est
-injective, hors la limite du repère \code{bytes} (deux noms \code{bytes}
-distincts se citent sous le même repère~; issues~\#128 et~\#142)~: un
+injective, hors les limites L1 et~L2 (ci-dessus, «~Limites~»~: deux noms
+\code{bytes} distincts se citent sous le même repère, issues~\#128
+et~\#142~; une chaîne latin-1 et la même suite de caractères en UTF-8 se
+citent de même)~: \code{NA}, la chaîne «~NA~» et la chaîne vide
+s'écrivent «~NA~», «~«~NA~»~» et une chaîne vide, trois textes
+distincts~; un
 segment cité nu ne contient ni «~«~», ni «~»~», ni aucun séparateur, et
 tout «~<~» qu'il contient vient de la règle unique~; un segment cité
 entre guillemets commence par «~«~» suivi d'une espace et finit au premier
@@ -5839,16 +5877,64 @@ entre guillemets commence par «~«~» suivi d'une espace et finit au premier
 paraît jamais tel quel, si bien qu'une notation \code{<U+XXXX>} tapée ne
 se confond plus avec celle d'un caractère de contrôle neutralisé (limite
 de l'issue~\#94 levée pour les chemins, section~\ref{sec:refus},
-«~Citation d'une valeur dans un message~»). Les tests~T13 en
+«~Citation d'une valeur dans un message~»). Avant l'issue~\#305, cette
+phrase était inexacte comme propriété de la fonction~: \code{NA} et la
+chaîne «~NA~» s'écrivaient tous deux «~NA~» une fois collés dans un
+chemin (\emph{constat} du 17/11/2026 consigné sur l'issue~\#305,
+remesuré sur le commit \code{b213c2b}), cas
+qu'aucune fiche n'atteignait, une \code{tables\_reference} à clé
+\code{NA} n'étant pas une liste nommée pour \code{liste\_nommee()} et
+\code{champs\_differents()} ne descendant pas dans une liste aux noms
+incomplets (règle~V3), mais
+qu'atteindrait toute évolution qui y descendrait. La chaîne «~NA~» est
+réservée dans les segments pour deux raisons (spécification
+d'\code{actuary-approfondi}, Q3, décision M526)~: la propriété devient
+vraie de la fonction, et non du seul usage actuel, et un même nom «~NA~»
+s'écrit de même dans la colonne \code{lu} et dans le chemin du verdict
+d'une même ligne («~«~NA~»=\ldots~» et «~«~NA~» (absent de la fiche
+rendue)~», lignes~10 et~11)~; l'option qui laissait les segments
+inchangés sous la précondition «~jamais \code{NA}~» a été écartée parce
+qu'elle ferait citer «~NA~» de deux façons dans deux cellules d'une même
+ligne. Les tests~T13 en
 \emph{constatent} la tenue sur les cas cités, chaque caractère réservé
-compris (section~\ref{sec:verifications-construction}). Aucun refus,
+compris, et les tests~T16 sur \code{NA}, la chaîne vide et la chaîne
+«~NA~» (section~\ref{sec:verifications-construction}). Aucun refus,
 aucun contrôle, aucun verdict ni statut n'est ajouté~: le gabarit
 «~différente~: \emph{chemins}~» de l'ensemble fermé est rempli sans être
 changé, une fiche dont une clé contient un séparateur se rejoue sans
-refus, seuls ses textes cités changent (test~T13~D9). Les messages et les
+refus, seuls ses textes cités changent (test~T13~D9). Depuis
+l'issue~\#305, tout segment égal à la chaîne «~NA~» s'écrit «~«~NA~»~»
+dans les textes de verdict des lignes~10, 11, 12 et~15~: la catégorie
+«~différente~» et le gabarit sont inchangés, seul le segment cité change
+(classe de textes acceptée par le mainteneur, décisions M526 et M528~;
+visa d'\code{actuary}~; témoins du rejeu, non verdicts de validation).
+Exemples (\emph{constat de mesure} du 17/11/2026, mêmes octets sous les
+locales C.UTF-8 et C, textes d'avant mesurés sur le code qui précède
+l'issue~\#305, commit \code{b213c2b}~; les cas des lignes~8, 10, 12
+(champ de premier niveau) et~15 sont aussi les tests~T16~N1, N2, N9
+à~N11)~: le second nom de
+\code{versions} remplacé par «~NA~» donne à la ligne~10 «~différente~:
+R (absent de la fiche reçue), «~NA~» (absent de la fiche rendue)~»
+(avant~: «~\ldots, NA (absent de la fiche rendue)~»), le nom
+\code{sysname} de \code{plateforme} remplacé par «~NA~» «~différente~:
+sysname (absent de la fiche reçue), «~NA~» (absent de la fiche
+rendue)~» à la ligne~11, un champ «~NA~» ajouté à \code{convention}
+«~différente~: convention/«~NA~» (absent de la fiche rendue)~» à la
+ligne~12, un champ «~NA~» de premier niveau «~différente~: «~NA~»
+(absent de la fiche rendue)~» à la ligne~12~; une fiche non altérée dont
+la clé de \code{tables\_reference} vaut «~NA~» (clé libre, ADR 0015,
+point~1.1) se rejoue avec les verdicts d'un rejeu réussi et les
+colonnes \code{lu} «~«~NA~» : \emph{empreinte}~» à la ligne~8 et
+«~«~NA~» : métadonnées de la fiche~» à la ligne~15 (avant~: «~NA :
+\ldots~»), et la même fiche, sa source altérée, «~différente~:
+tables\_reference/«~NA~»/source~» aux lignes~12 et~15. En revanche, un
+nom \code{NA} ou vide de \code{versions} ou de \code{plateforme} rend
+toujours le témoin «~non déterminable~» (règle~V2) et n'entre dans aucun
+chemin. Les messages et les
 \code{details} des refus, qui citent déjà une clé entre «~»,
-et les paires «~nom=valeur~» de \code{paires\_lues()} ne sont pas
-touchés (ci-dessus, «~Limites~»).
+ne sont pas touchés~; les paires «~nom=valeur~» de \code{paires\_lues()}
+sont citées par leurs propres contextes depuis l'issue~\#305 (ci-dessous,
+«~Citation d'une chaîne lue~: forme F307~»).
 
 \medskip
 \noindent
@@ -5891,6 +5977,15 @@ Le contexte est celui de la cellule~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item \code{segment}~: segments des chemins des lignes~10 à~12 et~15 et
     clés des lignes~8 et~15 (\code{citer\_segment()}, ci-dessus)~;
+    séparateurs «~/ , ; : ( )~», mot réservé «~NA~» (issue~\#305)~;
+  \item \code{nom\_paire}~: noms des paires «~nom=valeur~» des
+    lignes~10 et~11 (\code{paires\_lues()}~; issue~\#305)~; séparateurs
+    du contexte \code{segment} et «~=~», mot réservé «~NA~»~;
+  \item \code{valeur\_paire}~: valeurs des mêmes paires, chaîne unique
+    sans attribut (\code{citer\_valeur\_lue()}~; issue~\#305)~;
+    séparateurs «~;~» et «~=~», mots réservés «~NA~» et «~absente~», textes
+    que \code{paires\_lues()} écrit nus à cette place pour une valeur
+    \code{NA} et une valeur absente~;
   \item \code{valeur\_isolee}~: empreinte de fichier de la ligne~14 et
     fichier de la provenance de la ligne~6, pour un seul élément
     (\code{citer\_fichiers\_lus()})~; aucun séparateur, mots réservés
@@ -5901,12 +5996,12 @@ Le contexte est celui de la cellule~:
     MD5 (lignes~9 et~13, \code{texte\_empreinte\_lue()}), valeurs des
     métadonnées de la ligne~15 (\code{temoin\_catalogue()}), et chaque
     élément d'une liste de $k \ge 2$ fichiers ou empreintes de fichier
-    (lignes~6 et~14), joints par «~,~», \code{NA} nu~: toute chaîne y est
-    entre «~…~».
+    (lignes~6 et~14), joints par «~,~», \code{NA} nu, et \code{versions}
+    ou \code{plateforme} entière aux lignes~10 et~11 quand elle n'est pas
+    une liste nommée (non-liste, liste sans noms, liste de classe
+    \code{bytes}~; issue~\#305)~: toute chaîne y est entre «~…~».
 \end{itemize}
-\code{CITATION\_CONTEXTES} porte aussi les deux contextes des paires
-«~nom=valeur~» des lignes~10 et~11 (\code{nom\_paire},
-\code{valeur\_paire}~; issue~\#305). Une valeur lue qui n'est pas une
+Une valeur lue qui n'est pas une
 chaîne unique sans attribut garde son texte de forme, nu
 (\code{citer\_valeur\_lue()}~: \code{texte\_lu()} cité par la règle
 unique~: «~absente~», «~NA~», «~illisible (\emph{type} de longueur
@@ -5923,6 +6018,53 @@ l'entoure. À la ligne~14, aucun motif de forme n'est ajouté~: le moteur
 n'y juge pas la forme (statut «~reprise de la fiche, non vérifiée par le
 moteur~»), et une empreinte «~abc~» s'y écrit nue.
 
+Aux lignes~10 et~11 (issue~\#305~; volet du rejeu de l'issue~\#302~;
+spécifications d'\code{actuary-approfondi}, Q2 et~Q3, décision M526),
+\code{paires\_lues()} écrit, pour une liste nommée, chaque paire
+«~\emph{nom cité}=\emph{valeur citée}~», les paires jointes par «~;~»~:
+le nom par \code{citer\_chaine()} en contexte \code{nom\_paire}, la
+valeur par \code{citer\_valeur\_lue()} en contexte \code{valeur\_paire}
+(une valeur qui n'est pas une chaîne unique sans attribut décrite par sa
+forme, nue~: «~absente~», «~NA~», «~illisible (\ldots)~»)~; toute autre
+valeur de \code{versions} ou de \code{plateforme} est citée entière en
+contexte \code{toujours}. Une cellule se découpe ainsi d'une seule façon
+(\emph{lecture} du code)~: un nom nu ne contient ni «~=~» ni «~;~», une
+valeur nue ne contient pas «~;~», et une forme citée finit au premier
+«~»~». La chaîne vide n'est pas réservée~: un nom vide s'écrit
+«~=\emph{valeur}~», une valeur vide «~\emph{nom}=~», tous deux
+délimités. Le contexte \code{segment}, où «~=~» n'est pas un séparateur,
+n'a pas été changé, pour ne pas modifier les textes de verdict décidés
+par l'issue~\#298~: un nom «~a=b~» s'écrit donc «~«~a=b~»=\ldots~» dans
+la colonne \code{lu} et «~a=b~», nu, dans le chemin du verdict de la
+même ligne («~différente~: R (absent de la fiche reçue), a=b (absent de
+la fiche rendue)~», test~T16~P1). \emph{Hypothèse} sur les valeurs
+ordinaires~: aucune valeur que le moteur écrit dans \code{versions} ou
+\code{plateforme} (version du package, \code{R.version.string},
+\code{Sys.info()}, \code{extSoftVersion()}, \code{La\_library()},
+\code{bibliotheque\_c()}) n'est réservée, si bien que les cellules d'une
+fiche ordinaire sont inchangées~: \emph{constat} sur l'hôte de mesure,
+aux fiches des tests (test~T16~P8) et aux bilans de R1 à R17, de R10 sur
+TV~88-90 et des fiches des tests, identiques à l'octet à ceux du code qui
+précède l'issue sous les locales C et C.UTF-8 (\emph{constat} de
+l'audit de l'issue~\#305, commit \code{5b5de58})~; \emph{non mesuré}
+sous Windows et macOS. Exemples (\emph{constat de mesure} du
+17/11/2026, mêmes octets sous les locales C.UTF-8 et C, textes d'avant
+mesurés sur le commit \code{b213c2b}~; tests~T16)~: le second nom de
+\code{versions} remplacé par «~a=b ; c~» donne «~tablexp=\emph{version du package} ;
+«~a=b ; c~»=R version \ldots~» (avant~: «~\ldots{} ; a=b ;
+c=R version \ldots~»), et par «~NA~» «~\ldots{} ; «~NA~»=R version
+\ldots~», distinct d'un nom \code{NA}, «~\ldots{} ; NA=R version
+\ldots~» (avant~: le même texte pour les deux)~; la valeur de \code{R}
+remplacée par «~b ; c=d~», «~NA~» ou «~absente~» donne «~R=«~b ;
+c=d~»~», «~R=«~NA~»~» et «~R=«~absente~»~», distincts de «~R=NA~» pour
+une valeur \code{NA} et de «~R=absente~» pour une valeur \code{NULL}
+(avant~: les trois chaînes écrites nues)~; \code{versions} entière
+remplacée par la chaîne «~a=1~» donne «~«~a=1~»~», distinct de «~a=1~»
+pour la liste \code{list(a = "1")} (avant~: le même texte). Ces
+changements ne portent que sur les colonnes \code{attendu} et
+\code{lu}~: les verdicts des lignes~10 et~11 ne changent que pour un
+segment égal à «~NA~» (ci-dessus, «~Citation d'un segment de chemin~»).
+
 Il s'ensuit, par \emph{lecture} du code, deux propriétés, hors les
 limites L1 à L3 (ci-dessus, «~Limites~»)~: \textbf{(P1) délimitation}~:
 chaque cellule se découpe d'une seule façon en ses éléments, parce
@@ -5932,7 +6074,8 @@ notation de \code{neutraliser\_citation()}, et qu'une forme citée finit
 au premier «~»~»~; \textbf{(P2) injectivité}~: changer une seule chaîne
 citée change la cellule, et un mot réservé écrit nu est toujours un
 texte de l'outil, jamais une chaîne lue. Les tests~T15 en
-\emph{constatent} la tenue sur les cas de la spécification
+\emph{constatent} la tenue sur les cas de la spécification, et les
+tests~T16 sur ceux des paires des lignes~10 et~11
 (section~\ref{sec:verifications-construction}). Exemples (\emph{constat
 de mesure} du 17/11/2026, sous les locales C.UTF-8 et C, avec le texte
 d'avant l'issue~\#307 mesuré sur le code qui la précède), à la
@@ -6201,7 +6344,8 @@ sous la clé \code{tv} (textes inchangés), table importée sous la même clé
 contrôle, guillemets, espace de tête ou de queue, «~x : y ; z~», noms
 ordinaires nus), chacun des neuf caractères réservés, injectivité
 (guillemets d'un segment cité, octets hors UTF-8 valide, latin-1,
-\code{NA} et nom \code{bytes} jamais entre «~…~»), MD5 de
+\code{NA}, écrit «~NA~» depuis l'issue~\#305, et nom \code{bytes}
+jamais entre «~…~»), MD5 de
 \code{MENTIONS\_RAPPORT} et de \code{TEXTE\_REJEU\_FICHE} inchangés, et
 fiche intacte de version~6 à clé «~/~» rejouée sans refus, ses cellules
 \code{lu} et \code{attendu} hors lignes~8, 13 et~15 égales à celles d'une
@@ -6247,6 +6391,28 @@ NA~» et «~NA, NA, NA~» entre «~…~», «~NA, NA, a~», «~NA,NA~» et
 \code{citer\_chaine()}, \code{citer\_segment()} et
 \code{citer\_valeur\_lue()} appelées directement~; les octets des
 cellules T1 à T8, T12 à T15 et C1 sont comparés sous les deux locales par
+\code{tests/controles/locale\_c.R}. Pour l'issue~\#305, les noms et les
+valeurs des paires des lignes~10 et~11 et le mot «~NA~» réservé (tests~T16,
+valeurs calculées à la main~; section~\ref{sec:rejeu}, «~Citation d'un
+segment de chemin~» et «~Citation d'une chaîne lue~: forme F307~»)~:
+cellules P1 à P8 et N1 à N11 des spécifications --- nom «~a=b ; c~» et
+nom «~a=b~» (cité en \code{lu}, nu dans le verdict), valeur «~b ;
+c=d~», les deux fiches du cas de l'ancienne limite (deux lignes~11
+distinctes), notation \code{<U+0001>} tapée et caractère de contrôle,
+nom à espace de tête ou à guillemets, valeurs «~absente~», «~illisible
+(\ldots~», repère \code{bytes} tapé et à guillemets et leurs
+contre-épreuves (\code{NULL}, nombre, chaîne \code{bytes}, nues),
+\code{versions} entière remplacée par une chaîne et ses contre-épreuves,
+fiches ordinaires aux paires nues, nom et valeur «~NA~», \code{NA} et
+vides, \code{citer\_segment()} appelée sur \code{NA}, la chaîne vide et
+«~NA~», clé «~NA~» de \code{tables\_reference} sur une fiche non altérée
+puis à source altérée, champ «~NA~» de premier niveau --- et le constat
+de la règle~V3 (nom de \code{convention} mis à \code{NA}, avec sa
+contre-épreuve)~; les tests~T13~D6 et~T15 constatent \code{NA} rendu par
+la chaîne «~NA~», et le test~T11 le repère d'une \code{versions} ou
+d'une \code{plateforme} remplacée par une chaîne \code{bytes}, entre
+«~…~» (contexte \code{toujours})~; les octets des cellules P1, P3, N1,
+N2 et N11 sont comparés sous les deux locales par
 \code{tests/controles/locale\_c.R}.
 L'invariant des métadonnées des tables
 embarquées est vérifié par \code{tests/unitaires/test\_tables\_embarquees.R}
@@ -6339,17 +6505,17 @@ locales.\par}
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», longueur lue sans la classe si celle-ci est d'encodage \code{bytes} (issue~\#128), pour un message ou le bilan du rejeu~; sortie brute, citée par \code{sans\_controle()} chez l'appelant dans un message ou une cellule du bilan, brute dans les \code{details} (issue~\#142) \\
 \catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu et cellules du bilan du rejeu (issue~\#142) \\
 \catalogue{fonctions-construire-table}{decrire\_forme()} & interne & conteneur, nom & forme lue d'un champ pour \code{fiche\_non\_conforme}~: «~champ absent~», ou type et longueur complétés de \code{NA}, vide, attributs, noms en double, noms incomplets, nom(s) d'encodage \code{bytes}~; valeur de classe \code{bytes} décrite sans sa classe (section~\ref{sec:rejeu}~; issue~\#128) \\
-\catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & paires «~nom=valeur~» jointes par «~;~», noms et valeurs cités par la règle unique (repère pour un nom ou une valeur \code{bytes}~; issue~\#142), ou \code{texte\_lu()} d'une autre valeur, citée de même, liste de classe \code{bytes} comprise~; colonnes du bilan pour \code{versions} et \code{plateforme} (issue~\#128) \\
+\catalogue{fonctions-construire-table}{paires\_lues()} & interne & liste & liste nommée~: paires «~nom=valeur~» jointes par «~;~», nom par \code{citer\_chaine()} en contexte \code{nom\_paire}, valeur par \code{citer\_valeur\_lue()} en contexte \code{valeur\_paire} (forme F307~; repère pour un nom ou une valeur \code{bytes}~; issues~\#142 et~\#305)~; toute autre valeur (non-liste, liste sans noms, liste de classe \code{bytes}) par \code{citer\_valeur\_lue()} en contexte \code{toujours}~; colonnes \code{attendu} et \code{lu} des lignes~10 et~11 du bilan du rejeu (issue~\#128) \\
 \catalogue{fonctions-construire-table}{GUILLEMETS\_CITATION} & constante & --- & guillemets ouvrant «~«~» et fermant «~»~» (\code{ouvrant}, \code{fermant}), construits par octets, sans littéral non ASCII~; bornes d'une chaîne réservée de la forme F307 (section~\ref{sec:rejeu}, «~Citation d'une chaîne lue~: forme F307~»~; issue~\#307) \\
 \catalogue{fonctions-construire-table}{CARACTERES\_RESERVES\_CITATION} & constante & --- & «~<~» et les deux guillemets de \code{GUILLEMETS\_CITATION}~: caractères qui rendent une chaîne réservée dans tous les contextes de la forme F307 (issue~\#307) \\
-\catalogue{fonctions-construire-table}{CITATION\_CONTEXTES} & constante & --- & contextes de la forme F307, chacun avec ses séparateurs, ses mots réservés (chaîne entière), ses motifs réservés et l'indicateur \code{toujours}~: \code{segment} (séparateurs «~/ , ; : ( )~»~; \code{citer\_segment()}), \code{nom\_paire} et \code{valeur\_paire} (paires des lignes~10 et~11, issue~\#305), \code{valeur\_isolee} (aucun séparateur~; mots «~NA~», «~NULL~», «~absente~»~; motif \code{\^{}NA(, NA)+\$}), \code{toujours} (toute chaîne réservée)~; issue~\#307, option~M, décision M526 \\
+\catalogue{fonctions-construire-table}{CITATION\_CONTEXTES} & constante & --- & contextes de la forme F307, chacun avec ses séparateurs, ses mots réservés (chaîne entière), ses motifs réservés et l'indicateur \code{toujours}~: \code{segment} (séparateurs «~/ , ; : ( )~»~; mot «~NA~»~; \code{citer\_segment()}), \code{nom\_paire} (séparateurs du segment et «~=~»~; mot «~NA~»~; noms des paires des lignes~10 et~11, issue~\#305), \code{valeur\_paire} (séparateurs «~; =~»~; mots «~NA~», «~absente~»~; valeurs des mêmes paires, issue~\#305), \code{valeur\_isolee} (aucun séparateur~; mots «~NA~», «~NULL~», «~absente~»~; motif \code{\^{}NA(, NA)+\$}), \code{toujours} (toute chaîne réservée)~; issue~\#307, option~M, décision M526 \\
 \catalogue{fonctions-construire-table}{PREFIXE\_RESERVE\_CITATION} & constante & --- & «~illisible (~»~: début d'un texte de forme de \code{texte\_lu()}~; une chaîne lue qui commence ainsi est réservée dans tous les contextes (issue~\#307) \\
 \catalogue{fonctions-construire-table}{REMPLACEMENTS\_CITATION} & constante & --- & remplacements appliqués, dans cet ordre et sur les octets, à une chaîne réservée avant sa citation~: «~<~» par \code{<U+003C>}, «~«~» par \code{<U+00AB>}, «~»~» par \code{<U+00BB>} (issue~\#307~; règle de l'issue~\#298) \\
-\catalogue{fonctions-construire-table}{citer\_chaine()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}), nom d'un contexte de \code{CITATION\_}\allowbreak\code{CONTEXTES} & cœur de la forme F307, élément par élément, citations de même longueur, sans noms~: \code{NA} écrit «~NA~», nu~; chaîne \code{bytes} sous son repère, nu, entre «~…~» en contexte \code{toujours} seulement~; toute autre chaîne, convertie en UTF-8 si elle est en latin-1, réservée selon le contexte, citée par \code{neutraliser\_citation()} si elle ne l'est pas, sinon entre «~…~» après \code{REMPLACEMENTS\_CITATION}~; chaîne vide nue hors \code{toujours} (section~\ref{sec:rejeu}, «~Citation d'une chaîne lue~: forme F307~»~; issue~\#307) \\
-\catalogue{fonctions-construire-table}{citer\_valeur\_lue()} & interne & valeur lue, contexte & chaîne unique sans attribut, non \code{NA}, par \code{citer\_chaine()} dans le contexte~; toute autre valeur décrite par sa forme, nue, par \code{texte\_lu()} cité par \code{sans\_controle()} («~absente~», «~NA~», «~illisible (\emph{type} de longueur \emph{n})~»~; limite~L3)~; lignes~9, 13 et~15 du bilan du rejeu en contexte \code{toujours} (issue~\#307) \\
+\catalogue{fonctions-construire-table}{citer\_chaine()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}), nom d'un contexte de \code{CITATION\_}\allowbreak\code{CONTEXTES} & cœur de la forme F307, élément par élément, citations de même longueur, sans noms~: \code{NA} écrit «~NA~», nu, chaîne et non valeur manquante, dans tous les contextes (issue~\#305)~; chaîne \code{bytes} sous son repère, nu, entre «~…~» en contexte \code{toujours} seulement~; toute autre chaîne, convertie en UTF-8 si elle est en latin-1, réservée selon le contexte, citée par \code{neutraliser\_citation()} si elle ne l'est pas, sinon entre «~…~» après \code{REMPLACEMENTS\_CITATION}~; chaîne vide nue hors \code{toujours} (section~\ref{sec:rejeu}, «~Citation d'une chaîne lue~: forme F307~»~; issue~\#307) \\
+\catalogue{fonctions-construire-table}{citer\_valeur\_lue()} & interne & valeur lue, contexte & chaîne unique sans attribut, non \code{NA}, par \code{citer\_chaine()} dans le contexte~; toute autre valeur décrite par sa forme, nue, par \code{texte\_lu()} cité par \code{sans\_controle()} («~absente~», «~NA~», «~illisible (\emph{type} de longueur \emph{n})~»~; limite~L3)~; lignes~9, 13 et~15 du bilan du rejeu en contexte \code{toujours} (issue~\#307), valeurs des paires des lignes~10 et~11 en contexte \code{valeur\_paire} et liste qui n'est pas nommée en contexte \code{toujours} (\code{paires\_lues()}~; issue~\#305) \\
 \catalogue{fonctions-construire-table}{citer\_fichiers\_lus()} & interne & valeur lue (\code{empreintes\$}\allowbreak\code{fichier}, ou \code{provenance\$}\allowbreak\code{fichier}) & $k \ge 2$ chaînes sans attribut citées une à une en contexte \code{toujours}, \code{NA} nu, jointes par «~,~» dans l'ordre de la fiche~; toute autre valeur par \code{citer\_valeur\_lue()} en contexte \code{valeur\_isolee}~; colonne \code{lu} des lignes~6 (fichiers de la provenance, \code{NULL} écrit «~NULL~» par l'appelant) et~14 du bilan du rejeu (issue~\#307, extension retenue par la décision M526) \\
-\catalogue{fonctions-construire-table}{citer\_segment()} & interne & vecteur de segments de chemin (clés de tables de référence, noms lus dans la fiche~; converti par \code{as.character()} s'il n'est pas de type \code{character}) & \code{citer\_chaine()} en contexte \code{segment} (forme F307~; issue~\#307)~; citations de même longueur, sans noms~: \code{NA} et chaîne \code{bytes} par \code{neutraliser\_citation()}, jamais entre «~…~»~; segment qui contient l'un de «~/ , ; : ( ) < « »~» ou qui commence ou finit par une espace entre «~…~», «~<~», «~«~» et «~»~» écrits \code{<U+003C>}, \code{<U+00AB>} et \code{<U+00BB>} (remplacés sur les octets), puis cité par \code{neutraliser\_citation()}~; tout autre segment par \code{neutraliser\_citation()}~; segments des chemins des lignes~10 à~12 et~15 et clés des lignes~8 et~15 du bilan du rejeu (section~\ref{sec:rejeu}, «~Citation d'un segment de chemin~»~; issue~\#298) \\
-\catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; une liste à nom d'encodage \code{bytes} est une feuille (issue~\#128)~; comparaisons sur les noms bruts, chaque nom écrit dans un chemin cité par \code{citer\_segment()} (règle unique, issue~\#142~; entre «~…~» s'il contient un séparateur du bilan, issue~\#298)~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
+\catalogue{fonctions-construire-table}{citer\_segment()} & interne & vecteur de segments de chemin (clés de tables de référence, noms lus dans la fiche~; converti par \code{as.character()} s'il n'est pas de type \code{character}) & \code{citer\_chaine()} en contexte \code{segment} (forme F307~; issue~\#307)~; citations de même longueur, sans noms~: \code{NA} écrit la chaîne «~NA~», nue, chaîne \code{bytes} sous le repère de \code{neutraliser\_citation()}, jamais entre «~…~»~; segment qui contient l'un de «~/ , ; : ( ) < « »~», qui commence ou finit par une espace ou qui est égal à «~NA~» (issue~\#305) entre «~…~», «~<~», «~«~» et «~»~» écrits \code{<U+003C>}, \code{<U+00AB>} et \code{<U+00BB>} (remplacés sur les octets), puis cité par \code{neutraliser\_citation()}~; tout autre segment par \code{neutraliser\_citation()}~; segments des chemins des lignes~10 à~12 et~15 et clés des lignes~8 et~15 du bilan du rejeu (section~\ref{sec:rejeu}, «~Citation d'un segment de chemin~»~; issue~\#298) \\
+\catalogue{fonctions-construire-table}{champs\_differents()} & interne & fiche rendue, fiche reçue, racine & chemins des feuilles qui diffèrent, par descente sur l'union des noms~; une liste à nom d'encodage \code{bytes} (issue~\#128), ou aux noms incomplets ou en double (issue~\#305, règle~V3), est une feuille~; comparaisons sur les noms bruts, chaque nom écrit dans un chemin cité par \code{citer\_segment()} (règle unique, issue~\#142~; entre «~…~» s'il contient un séparateur du bilan, issue~\#298)~; absent d'un côté, ou «~(ordre des champs ou attributs)~»~; vide si \code{identical()} \\
 \catalogue{fonctions-construire-table}{verdict\_chemins()} & interne & fiche rendue, fiche reçue, racine & verdict~V3~: «~identique~» ou «~différente~:~» et les chemins \\
 \catalogue{fonctions-construire-table}{forme\_md5()} & interne & valeur & \code{TRUE} si et seulement si la valeur est une chaîne unique dont les octets sont exactement~32, chacun dans \code{0-9a-f}~; lecture des octets, sans expression régulière, conversion ni repli de casse~; jamais \code{NA} (section~\ref{sec:rejeu}, règle~V1~; issue~\#295) \\
 \catalogue{fonctions-construire-table}{verdict\_chaines()} & interne & attendu, lu & verdict~V1 des lignes~9 et~13 du bilan du rejeu~: «~non déterminable~» si l'un des deux n'a pas la forme d'une empreinte MD5 (\code{forme\_md5()}), sinon «~identique~» ou «~différente~» (issue~\#295) \\
@@ -17687,7 +17853,12 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     d'encodage \code{bytes} reste refusé, par \code{chaine\_codage\_bytes},
     rôle «~\emph{chemin}/@noms~» (ci-dessus, \textbf{Codage}). La citation
     de ces noms par le bilan du rejeu (section~\ref{sec:rejeu}) n'est pas
-    touchée par cette admission et relève de l'issue~\#305. Un objet rendu par
+    touchée par cette admission~; depuis l'issue~\#305, elle les distingue
+    aussi dans les colonnes \code{attendu} et \code{lu} des lignes~10
+    et~11~: un nom \code{NA} s'écrit «~NA~», nu, la chaîne «~NA~»
+    «~«~NA~»~», un nom vide une chaîne vide (section~\ref{sec:rejeu},
+    «~Citation d'une chaîne lue~: forme F307~»)~; un nom \code{NA} ou vide
+    y rend le témoin «~non déterminable~» (règle~V2). Un objet rendu par
     \code{construire\_table()} passe ce contrôle (\emph{constat} des tests),
     qui n'écrit rien dans le rapport.
   \item \textbf{lignes conservées} (issue~\#294~; ADR 0012, seconde
