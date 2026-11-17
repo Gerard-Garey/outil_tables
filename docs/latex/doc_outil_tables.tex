@@ -17461,10 +17461,12 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     «~NA~» \code{"NA"}, entre guillemets (écrivain des valeurs,
     section~\ref{sec:empreinte})~; la chaîne «~NA~», segment admis, garde
     son nom pour chemin (\code{fiche/versions/NA}). Sur l'objet du plan R1
-    des tests du rapport (rapport de 146\,052 octets), le second nom de
+    des tests du rapport, le second nom de
     \code{fiche/versions} remplacé par \code{""}, \code{NA} ou \code{"NA"}
-    donne trois rapports deux à deux différents, de 146\,053, 146\,043 et
-    146\,054 octets, et l'aller-retour \code{lire\_fiche(ecrire\_fiche(f))}
+    donne trois rapports deux à deux différents, plus longs de~1, plus
+    courts de~9 et plus longs de~2 octets que celui de l'objet intact (la
+    taille absolue dépend de la plateforme et des versions, que le rapport
+    restitue par \code{fiche/plateforme} et \code{fiche/versions}), et l'aller-retour \code{lire\_fiche(ecrire\_fiche(f))}
     de la fiche ainsi modifiée est identique à \code{f} pour ces trois noms
     et pour un nom en double (\emph{constat} des tests et de mesures sous
     les locales C et C.UTF-8). Motif~: ces formes sont canoniques, si bien
