@@ -320,7 +320,8 @@ controler_graine_plan <- function(plan, aleatoire) {
 # spécification d'actuary-approfondi de #180, § 2, M328), appelée par
 # valider_plan() si le champ est présent, après controler_parametres_donnees()
 # dont elle reçoit les valeurs validées du plan reçu : la période et le délai
-# (#186 : le début est lu dans `periode`, la fin effective vaut fin - délai). Dans
+# (#186 : le début est lu dans `periode`, la fin effective est celle de
+# fin_effective(), module donnees, #308). Dans
 # cet ordre :
 #   - inventaires_invalides : classe Date exacte, stockage double ou integer,
 #     sans autre attribut ; puis au moins deux dates, sans valeur manquante,
@@ -358,21 +359,21 @@ controler_inventaires_plan <- function(inventaires, periode, delai_declaration) 
                      paste(defauts, collapse = " ; ")),
             list(inventaires = inventaires))
   j <- as.numeric(unclass(x)); M <- length(j)
-  attendu <- c(as.numeric(periode[["debut"]]) - 1, as.numeric(periode[["fin"]]) - delai_declaration)
+  attendu <- c(as.numeric(periode[["debut"]]) - 1, fin_effective(periode, delai_declaration))
   ecart <- c(j[1L] != attendu[1L], j[M] != attendu[2L])
   if (any(ecart)) {
     premier <- citer(format(structure(j[1L], class = "Date")))
     dernier <- citer(format(structure(j[M], class = "Date")))
     veille <- citer(format(structure(attendu[1L], class = "Date")))
-    fin_effective <- citer(format(structure(attendu[2L], class = "Date")))
+    fin_eff <- citer(format(structure(attendu[2L], class = "Date")))
     ecarts <- character(0)
     if (ecart[1L]) ecarts <- c(ecarts, formuler("premier inventaire %s au lieu de %s", premier, veille))
-    if (ecart[2L]) ecarts <- c(ecarts, formuler("dernier inventaire %s au lieu de %s", dernier, fin_effective))
+    if (ecart[2L]) ecarts <- c(ecarts, formuler("dernier inventaire %s au lieu de %s", dernier, fin_eff))
     refuser("construire_table", "inventaires_periode",
             formuler(paste("Grille des inventaires non alignée sur la période d'observation : %s ; la première date",
                            "doit être la veille du début (%s) et la dernière la fin effective (%s : fin moins le",
                            "délai de déclaration), une date d'inventaire désignant l'état en fin de journée."),
-                     paste(ecarts, collapse = " ; "), veille, fin_effective),
+                     paste(ecarts, collapse = " ; "), veille, fin_eff),
             list(inventaires = inventaires, attendu = structure(attendu, class = "Date"),
                  bornes = c("premier", "dernier")[ecart]))
   }
@@ -1542,9 +1543,11 @@ paires_lues <- function(l) {
 # mots et motifs réservés propres à chaque contexte, préfixe réservé de texte_lu(),
 # remplacements d'une chaîne réservée (dans cet ordre, sur les octets). Les
 # motifs non ASCII sont construits par octets, sans littéral ni marque
-# d'encodage ; chaque caractère réservé est cherché seul, en motif fixe sur
-# les octets (une classe [...] d'expression régulière comparerait des octets
-# isolés et réserverait « ° » ou l'espace insécable, mesuré par actuary, #307).
+# d'encodage ; les caractères réservés sont cherchés par une alternance de
+# littéraux sur les octets, jamais par une classe [...] d'expression régulière
+# (elle comparerait des octets isolés et réserverait « ° » ou l'espace
+# insécable, mesuré par actuary, #307) ; une seule recherche par chaîne
+# (MOTIFS_RESERVES_CITATION, #308).
 # Contextes (CITATION_CONTEXTES) :
 #   segment       chemins des verdicts des lignes 10 à 12 et 15, clés des
 #                 lignes 8 et 15 (citer_segment(), #298) : mot NA (#305) ;
@@ -1572,6 +1575,20 @@ CITATION_CONTEXTES <- list(
   valeur_isolee = list(separateurs = character(0), mots = c("NA", "NULL", "absente"), motifs = "^NA(, NA)+$", toujours = FALSE),
   toujours = list(separateurs = character(0), mots = character(0), motifs = character(0), toujours = TRUE))
 PREFIXE_RESERVE_CITATION <- "illisible ("
+# Motif réservé de chaque contexte, un seul grepl() par chaîne (#308) : alternance
+# de littéraux, sans classe [...] (qui comparerait des octets isolés : « ° » ou
+# l'espace insécable seraient réservés, cf. ci-dessus). Alternants : un
+# caractère réservé ou un séparateur du contexte, espace en tête ou en queue,
+# mot réservé (chaîne entière), motifs réservés du contexte, préfixe réservé.
+# Les métacaractères des séparateurs et du préfixe sont échappés. NA : aucun
+# motif (tout NA s'écrit « NA » avant la recherche) ; contexte « toujours » :
+# toute chaîne est réservée, motif inutilisé.
+MOTIFS_RESERVES_CITATION <- lapply(CITATION_CONTEXTES, function(ctx) {
+  litteral <- function(z) gsub("([][{}()|.*+?^$\\\\])", "\\\\\\1", z, useBytes = TRUE)
+  paste(c(litteral(c(ctx$separateurs, CARACTERES_RESERVES_CITATION)), "^ ", " $",
+          if (length(ctx$mots)) paste0("^(", paste(litteral(ctx$mots), collapse = "|"), ")$"),
+          ctx$motifs, paste0("^", litteral(PREFIXE_RESERVE_CITATION))), collapse = "|")
+})
 REMPLACEMENTS_CITATION <- list(c("<", "<U+003C>"), c(GUILLEMETS_CITATION[["ouvrant"]], "<U+00AB>"),
                                c(GUILLEMETS_CITATION[["fermant"]], "<U+00BB>"))
 
@@ -1610,8 +1627,7 @@ REMPLACEMENTS_CITATION <- list(c("<", "<U+003C>"), c(GUILLEMETS_CITATION[["ouvra
 citer_chaine <- function(x, contexte) {
   if (!is.character(x)) x <- as.character(x)
   ctx <- CITATION_CONTEXTES[[contexte]]
-  reserves <- c(ctx$separateurs, CARACTERES_RESERVES_CITATION)
-  prefixe <- charToRaw(PREFIXE_RESERVE_CITATION)
+  motif <- MOTIFS_RESERVES_CITATION[[contexte]]
   entre_guillemets <- function(s) paste0(texte_moteur("« "), s, texte_moteur(" »"))
   une <- function(s) {
     if (is.na(s)) return("NA")
@@ -1620,13 +1636,7 @@ citer_chaine <- function(x, contexte) {
       return(if (ctx$toujours) entre_guillemets(r) else r)
     }
     y <- if (Encoding(s) == "latin1") enc2utf8(s) else s
-    o <- charToRaw(y)
-    reserve <- ctx$toujours ||
-      any(vapply(reserves, function(r) grepl(r, y, fixed = TRUE, useBytes = TRUE), NA)) ||
-      grepl("^ | $", y, useBytes = TRUE) ||
-      any(vapply(ctx$mots, function(m) identical(o, charToRaw(m)), NA)) ||
-      any(vapply(ctx$motifs, function(m) grepl(m, y, useBytes = TRUE), NA)) ||
-      (length(o) >= length(prefixe) && identical(o[seq_along(prefixe)], prefixe))
+    reserve <- ctx$toujours || grepl(motif, y, useBytes = TRUE)
     if (!reserve) return(neutraliser_citation(s))
     for (r in REMPLACEMENTS_CITATION) y <- gsub(r[1L], r[2L], y, fixed = TRUE, useBytes = TRUE)
     Encoding(y) <- if (validUTF8(y)) "UTF-8" else "unknown"

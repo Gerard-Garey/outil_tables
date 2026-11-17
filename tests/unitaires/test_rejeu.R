@@ -1216,6 +1216,25 @@ local({
                   function(s) identical(tablexp:::citer_segment(s), s), NA)
     all(cites) && all(nus)
   })
+  # Réserve R2 d'actuary-approfondi (#308) : le motif réservé est une alternance
+  # de littéraux sur les octets ; « ° » (C2 B0) et l'espace insécable (C2 A0)
+  # partagent l'octet C2 avec « et » (C2 AB, C2 BB) sans être réservés. Les
+  # chaînes non ASCII sont construites par intToUtf8() (jamais de littéral brut).
+  verifier("T13 #308 \u00ab \u00b0 \u00bb et l'espace ins\u00e9cable (U+00A0) ne sont pas r\u00e9serv\u00e9s (segment rendu tel quel, sans <U+\u2026> ni guillemets) ; en contre-\u00e9preuve \u00ab, \u00bb et < le sont, \u00ab \u00b0 et \u00b0 \u00bb compris", {
+    deg <- u(0xb0); nbsp <- u(0xa0)
+    libres <- c(deg, paste0("5", deg), paste0("a", deg, "b"), nbsp, paste0("a", nbsp, "b"), paste0("a", deg, nbsp, "b"),
+                paste0(u(0xe9), deg, u(0xe9)))
+    ok_libres <- vapply(libres, function(s) {
+      r <- tablexp:::citer_segment(s)
+      octets_egaux(r, s) && !grepl("<U+", r, fixed = TRUE) && !startsWith(r, GA)
+    }, NA)
+    cs <- tablexp:::citer_segment
+    reserves <- c(GA, GF, "<", paste0(deg, GF), paste0(GA, deg), paste0(nbsp, "<"))
+    ok_reserves <- vapply(reserves, function(s) startsWith(cs(s), paste0(GA, " ")) && endsWith(cs(s), paste0(" ", GF)), NA)
+    all(ok_libres) && all(ok_reserves) &&
+      octets_egaux(cs(GA), entre("<U+00AB>")) && octets_egaux(cs(GF), entre("<U+00BB>")) &&
+      octets_egaux(cs("<"), entre("<U+003C>")) && octets_egaux(cs(paste0(deg, GF)), entre(paste0(deg, "<U+00BB>")))
+  })
   verifier("T13 D6 injectivité : « et » d'un segment cité ne se confondent pas avec les guillemets de la citation ; octets invalides et chaîne latin-1 réservés cités ; NA écrit « NA », nu (chaîne, #305), et nom bytes jamais entre « … »", {
     cs <- tablexp:::citer_segment
     inv <- "a/\xe9"; lat <- "a/\xe9"; Encoding(lat) <- "latin1"
