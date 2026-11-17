@@ -1666,12 +1666,15 @@ lire_texte <- function(octets, premiere, nature) {
   # Toute valeur reçue citée dans un message (classe, première ligne, type,
   # longueur, chemin, colonne, valeur) passe par neutraliser_citation()
   # (R/outils.R, #94) ; la classe, le chemin ou la colonne bruts sont dans
-  # `details`.
-  refus <- function(motif, message, ligne = NA_integer_, details = list())
+  # `details`. Tout refus porte `details$chemin` (character(1), #306) : le
+  # premier champ brut de la ligne refusée ; NA quand le refus précède le
+  # découpage, quand la ligne commence par « # » ou a un premier champ vide, et
+  # en fin de texte (`details$attendu` y porte le chemin attendu).
+  refus <- function(motif, message, ligne = NA_integer_, details = list(), chemin = NA_character_)
     refuser("rapport", motif,
             formuler("Lecture du texte de %s%s : %s.", nature,
                      if (is.na(ligne)) "" else formuler(", ligne %d", ligne), message),
-            c(list(ligne = ligne), details))
+            c(list(ligne = ligne, chemin = chemin), details))
   if (!is.raw(octets))
     refus("texte_non_octets", formuler(paste("le texte doit être reçu en octets (raw), pas en %s ; lire un",
                                              "fichier par readBin(fichier, \"raw\", file.size(fichier))"),
@@ -1702,21 +1705,29 @@ lire_texte <- function(octets, premiere, nature) {
   corps <- l[numeros]
   if (!length(corps)) refus("texte_ligne_mal_formee", formuler("texte sans corps"), length(l))
   champs <- strsplit(paste0(corps, "\t"), "\t", fixed = TRUE, useBytes = TRUE)
+  # Chemin de la ligne i du corps pour `details$chemin` : son premier champ brut,
+  # NA s'il est vide ou commence par « # » (ce n'est pas un chemin).
+  chemin_de <- function(i) {
+    ch <- champs[[i]][1L]
+    Encoding(ch) <- "UTF-8"
+    if (!nzchar(ch) || startsWith(ch, "#")) NA_character_ else ch
+  }
   for (i in seq_along(champs)) {
     f <- champs[[i]]
     if (length(f) < 3L || any(!nzchar(f)) || startsWith(f[1L], "#") || !grepl("^(0|[1-9][0-9]{0,9})$", f[3L]))
       refus("texte_ligne_mal_formee",
             formuler("ligne hors de la forme chemin<TAB>type<TAB>longueur<TAB>valeurs (champ vide, longueur illisible, ligne d'en-tête dans le corps)"),
-            numeros[i])
+            numeros[i], chemin = chemin_de(i))
     if (!f[2L] %in% TYPES_TEXTE)
       refus("texte_type_inconnu", formuler("type « %s » inconnu (types admis : %s)", neutraliser_citation(f[2L]),
                                            paste(TYPES_TEXTE, collapse = ", ")),
-            numeros[i])
+            numeros[i], chemin = chemin_de(i))
     if (f[2L] == "NULL" && f[3L] != "0")
-      refus("texte_longueur_incoherente", formuler("NULL : longueur 0 attendue, longueur %s déclarée", neutraliser_citation(f[3L])), numeros[i])
+      refus("texte_longueur_incoherente", formuler("NULL : longueur 0 attendue, longueur %s déclarée", neutraliser_citation(f[3L])),
+            numeros[i], chemin = chemin_de(i))
     if (length(f) - 3L != as.numeric(f[3L]))
       refus("texte_longueur_incoherente", formuler("longueur déclarée %s, %d valeur(s) lue(s)", neutraliser_citation(f[3L]), length(f) - 3L),
-            numeros[i])
+            numeros[i], chemin = chemin_de(i))
   }
   chemins <- vapply(champs, `[`, "", 1L)
   Encoding(chemins) <- "UTF-8"
@@ -1724,7 +1735,7 @@ lire_texte <- function(octets, premiere, nature) {
   if (length(double_))
     refus("texte_chemin_en_double",
           formuler("chemin « %s » en double", neutraliser_citation(chemins[double_[1L]])),
-          numeros[double_[1L]])
+          numeros[double_[1L]], chemin = chemin_de(double_[1L]))
   # Profondeur, avant toute reconstruction (troisième annotation, (g)) :
   # segments du chemin, sans le dernier s'il commence par @.
   segs <- strsplit(chemins, "/", fixed = TRUE, useBytes = TRUE)
@@ -1732,7 +1743,7 @@ lire_texte <- function(octets, premiere, nature) {
   trop <- which(profondeur > PROFONDEUR_MAX_TEXTE)
   if (length(trop))
     refus("texte_profondeur_excessive", formuler("profondeur %d au-delà de %d", profondeur[trop[1L]], PROFONDEUR_MAX_TEXTE),
-          numeros[trop[1L]])
+          numeros[trop[1L]], chemin = chemin_de(trop[1L]))
   n <- length(champs)
   k <- 1L
   inattendu <- function(attendu)
@@ -1741,13 +1752,13 @@ lire_texte <- function(octets, premiere, nature) {
           else formuler("chemin « %s » au lieu de « %s » (structure incohérente)",
                         neutraliser_citation(chemins[k]), neutraliser_citation(attendu)),
           if (k > n) length(l) else numeros[k],
-          if (k > n) list(attendu = attendu) else list(chemin = chemins[k], attendu = attendu))
+          list(attendu = attendu), if (k > n) NA_character_ else chemins[k])
   lue <- function(i) {
     f <- champs[[i]]
     if (f[2L] == "NULL") return(NULL)
     s <- f[-(1:3)]
     Encoding(s) <- "UTF-8"
-    valeurs_texte(f[2L], s, function(motif, message) refus(motif, message, numeros[i]))
+    valeurs_texte(f[2L], s, function(motif, message) refus(motif, message, numeros[i], chemin = chemin_de(i)))
   }
   type_de <- function(i) champs[[i]][2L]
   noeud <- function(chemin) {
@@ -1757,13 +1768,14 @@ lire_texte <- function(octets, premiere, nature) {
       # Liste sans noms : exactement n éléments [1] à [n].
       nb <- if (type_de(k) == "integer" && champs[[k]][3L] == "1") lue(k)
       if (length(nb) != 1L || is.na(nb) || nb < 0L)
-        refus("texte_ligne_mal_formee", formuler("ligne @longueur autre qu'un integer unique positif ou nul"), numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @longueur autre qu'un integer unique positif ou nul"),
+              numeros[k], chemin = chemin_de(k))
       # Borne de l'effectif avant toute allocation : chaque élément occupe au
       # moins une ligne, il ne peut y en avoir plus que de lignes restantes.
       if (nb > n - k)
         refus("texte_longueur_incoherente",
               formuler("@longueur %d au-delà des %d ligne(s) restantes (une ligne au moins par élément)", nb, n - k),
-              numeros[k])
+              numeros[k], chemin = chemin_de(k))
       k <<- k + 1L
       v <- vector("list", nb)
       for (i in seq_len(nb)) v[i] <- list(noeud(joindre_chemin(chemin, sprintf("[%d]", i))))
@@ -1771,15 +1783,17 @@ lire_texte <- function(octets, premiere, nature) {
     }
     if (identical(chemins[k], joindre_chemin(chemin, "@noms"))) {
       if (type_de(k) != "character")
-        refus("texte_ligne_mal_formee", formuler("ligne @noms de type %s (character attendu)", neutraliser_citation(type_de(k))), numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @noms de type %s (character attendu)", neutraliser_citation(type_de(k))),
+              numeros[k], chemin = chemin_de(k))
       noms <- lue(k)
       k <<- k + 1L
       if (k <= n && identical(chemins[k], chemin)) {
         # Vecteur atomique nommé.
-        if (type_de(k) == "NULL") refus("texte_ligne_mal_formee", formuler("NULL nommé"), numeros[k])
+        if (type_de(k) == "NULL") refus("texte_ligne_mal_formee", formuler("NULL nommé"), numeros[k], chemin = chemin_de(k))
         v <- lue(k)
         if (length(v) != length(noms))
-          refus("texte_longueur_incoherente", formuler("%d nom(s) pour %d valeur(s)", length(noms), length(v)), numeros[k])
+          refus("texte_longueur_incoherente", formuler("%d nom(s) pour %d valeur(s)", length(noms), length(v)),
+              numeros[k], chemin = chemin_de(k))
         k <<- k + 1L
         names(v) <- noms
         return(v)
@@ -1792,13 +1806,15 @@ lire_texte <- function(octets, premiere, nature) {
     }
     if (identical(chemins[k], joindre_chemin(chemin, "@colonnes")) && nzchar(chemin)) {
       if (type_de(k) != "character")
-        refus("texte_ligne_mal_formee", formuler("ligne @colonnes de type %s (character attendu)", neutraliser_citation(type_de(k))), numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @colonnes de type %s (character attendu)", neutraliser_citation(type_de(k))),
+              numeros[k], chemin = chemin_de(k))
       colonnes <- lue(k)
       k <<- k + 1L
       if (k > n || !identical(chemins[k], joindre_chemin(chemin, "@lignes"))) inattendu(joindre_chemin(chemin, "@lignes"))
       nl <- if (type_de(k) == "integer") lue(k)
       if (length(nl) != 1L || is.na(nl) || nl < 0L)
-        refus("texte_ligne_mal_formee", formuler("ligne @lignes autre qu'un entier positif ou nul"), numeros[k])
+        refus("texte_ligne_mal_formee", formuler("ligne @lignes autre qu'un entier positif ou nul"),
+              numeros[k], chemin = chemin_de(k))
       k <<- k + 1L
       s <- segments_texte(colonnes, length(colonnes))
       v <- vector("list", length(colonnes))
@@ -1806,15 +1822,16 @@ lire_texte <- function(octets, premiere, nature) {
         cc <- joindre_chemin(chemin, s[i])
         if (k > n || !chemins[k] %in% c(cc, joindre_chemin(cc, "@noms"))) inattendu(cc)
         ligne <- numeros[k]
+        ligne_k <- k
         x <- noeud(cc)
         if (!is.atomic(x) || is.null(x))
           refus("texte_ligne_mal_formee", formuler("colonne « %s » non atomique", neutraliser_citation(cc)),
-                ligne, list(colonne = cc))
+                ligne, list(colonne = cc), chemin_de(ligne_k))
         if (length(x) != nl)
           refus("texte_longueur_incoherente",
                 formuler("colonne « %s » de %d valeur(s) pour %d ligne(s)", neutraliser_citation(cc),
                          length(x), nl),
-                ligne, list(colonne = cc))
+                ligne, list(colonne = cc), chemin_de(ligne_k))
         v[i] <- list(x)
       }
       names(v) <- colonnes
@@ -1829,7 +1846,7 @@ lire_texte <- function(octets, premiere, nature) {
   if (k <= n)
     refus("texte_chemin_inattendu", formuler("chemin « %s » après la fin de l'objet",
                                              neutraliser_citation(chemins[k])),
-          numeros[k], list(chemin = chemins[k]))
+          numeros[k], chemin = chemins[k])
   x
 }
 

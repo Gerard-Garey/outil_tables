@@ -268,6 +268,22 @@ verifier("T3 étape 1 : message des données en matrice identical() à celui de 
 verifier("T6 rejeu réussi : construire_table() et preparer_donnees() appelées exactement une fois",
          identical(compter_appels(rejouer_fiche(BASE, FICHE)), c(construire_table = 1L, preparer_donnees = 1L)))
 
+# Chemin dans les refus de lire_fiche() (#306 ; spécification d'actuary, M526,
+# cellules R4 et R5) : details$chemin porte le premier champ brut de la ligne
+# refusée, NA pour une ligne de commentaire du corps ; message et ligne inchangés
+# (valeur calculée à la main : ligne 15 du texte, « versions/tablexp »).
+verifier("T3 lire_fiche(), refus d'une ligne de commentaire dans le corps (ligne 15) : details$chemin NA, message et ligne inchangés (R4)", {
+  r <- refus_de(lire_fiche(octets(append(TEXTE, "#commentaire", 14L))))
+  controle_refus(r, "rapport", "texte_ligne_mal_formee", list(ligne = 15L, chemin = NA_character_),
+                 paste0("Lecture du texte de fiche, ligne 15 : ligne hors de la forme chemin<TAB>type<TAB>longueur<TAB>valeurs ",
+                        "(champ vide, longueur illisible, ligne d'en-tête dans le corps)."))
+})
+verifier("T3 lire_fiche(), refus d'un type inconnu (ligne 15) : details$chemin = premier champ brut, ligne et message inchangés (R5)", {
+  r <- refus_de(lire_fiche(octets(replace(TEXTE, 15L, "versions/zz\tchose\t1\ta"))))
+  controle_refus(r, "rapport", "texte_type_inconnu", list(ligne = 15L, chemin = "versions/zz"),
+                 "Lecture du texte de fiche, ligne 15 : type « chose » inconnu (types admis : ")
+})
+
 # --- T4 : ordre des contrôles (valeur calculée à la main) -----------------------
 
 BASE_SANS_SEXE <- BASE[setdiff(names(BASE), "sexe")]

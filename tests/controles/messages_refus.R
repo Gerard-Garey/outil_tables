@@ -111,7 +111,7 @@ RELAIS <- list(
   list(fichier = "rapport.R", haut = "valeurs_texte", nom = "invalide", parametre = "quoi",
        modele = function(quoi, i, motif) NULL),
   list(fichier = "rapport.R", haut = "lire_texte", nom = "refus", parametre = "message",
-       modele = function(motif, message, ligne, details) NULL),
+       modele = function(motif, message, ligne, details, chemin) NULL),
   list(fichier = "rapport.R", haut = "lire_texte", nom = "<anonyme>", parametre = "message",
        modele = NULL),
   list(fichier = "rapport.R", haut = "controler_rapport", nom = "refus", parametre = "texte",
