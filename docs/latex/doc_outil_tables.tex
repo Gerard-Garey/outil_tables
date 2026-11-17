@@ -813,7 +813,8 @@ la description de forme (section~\ref{sec:rejeu}), citée par la même
 règle, et la valeur exacte est celle de la fiche reçue au chemin
 \code{details\$champ}~; pour la lecture du texte du plan et de la fiche,
 la valeur reçue brute est dans les \code{details} (\code{classe},
-\code{chemin}, \code{colonne}, \code{attendu}) ou, à défaut, dans le
+\code{chemin}, \code{colonne}, \code{attendu}) ou, à défaut
+(\code{details\$chemin} à \code{NA}~; tableau~\ref{tab:refus-texte}), dans le
 texte reçu à la ligne \code{details\$ligne}~; pour
 \code{version\_fiche\_non\_admise}, à l'étape~3 du rejeu, les
 \code{details} \code{tablexp}, \code{code} et \code{code\_installe} sont
@@ -4614,14 +4615,35 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     écriture exacte dans la fiche (refus [motif], [chemin])~»,
     \code{details\$lu} le motif du lecteur, \code{details\$attendu}
     «~relecture du texte de fiche sans refus~», \code{details\$chemin} le
-    chemin que porte le refus, sinon, pour un texte qui s'arrête avant la
-    fin de l'objet, le chemin attendu à cet endroit, sinon le premier champ
-    de la ligne refusée (\code{details\$ligne} du lecteur). Il vaut
-    \code{NA} pour un refus sans numéro de ligne ou de la ligne~1
-    (première ligne du texte, sans chemin), pour un texte qui contient un
-    octet nul (les octets ne se convertissent pas en chaîne~; l'échec est
-    absorbé, sans erreur R qui masque le refus) et pour un premier
-    champ vide ou qui n'est pas de l'UTF-8 valide. Cette branche est
+    chemin que porte le refus du lecteur (son \code{details\$chemin}~:
+    le chemin écrit sur la ligne refusée, tableau~\ref{tab:refus-texte}),
+    sinon, pour un texte qui s'arrête avant la fin de l'objet, le chemin
+    attendu à cet endroit (\code{details\$attendu} du lecteur), sinon
+    \code{NA}~; l'appelant ne redécoupe pas les octets (issue~\#306). Le
+    lecteur ne porte dans \code{details\$chemin} que le chemin écrit sur la
+    ligne refusée, jamais un chemin déduit d'une ligne voisine (spécification Q5 d'\code{actuary-approfondi} sur
+    l'issue~\#306, décision M526). Hors fin de texte, le chemin vaut donc \code{NA} pour un
+    refus qui précède le découpage du texte en lignes (première ligne,
+    texte sans corps, octet nul, retour chariot, dernière ligne sans LF,
+    ligne qui n'est pas de l'UTF-8 valide), pour une ligne du corps qui
+    commence par «~\#~», qui n'est pas un élément, et pour une ligne à
+    premier champ vide. Avant l'issue~\#306, l'appelant rattachait à
+    l'aide de \code{details\$ligne} certains de ces refus au premier
+    champ de la ligne~; six cas de la branche défensive perdent ainsi leur
+    chemin (\emph{constat de mesure} du 17/11/2026, chemin de la raison
+    avant~/ après)~: deux lignes du corps qui commencent par «~\#~»
+    (refus \code{texte\_ligne\_mal\_formee}, «~\#commentaire~» puis
+    «~NA~», «~\#x~» puis «~NA~») et quatre refus d'octets, CR
+    dans un chemin (\code{texte\_retour\_chariot},
+    «~a/parametres/p<U+000D>~» puis «~NA~»), fin de ligne CRLF
+    (\code{texte\_retour\_chariot}, «~a/parametres/p~» puis «~NA~»),
+    octet non UTF-8 dans une valeur (\code{texte\_utf8\_invalide},
+    «~a/parametres/p~» puis «~NA~») et dernière ligne sans LF
+    (\code{texte\_sans\_lf\_final}, «~a/empreinte~» puis «~NA~»)~; un
+    octet nul, un premier champ vide et un texte sans corps donnaient
+    déjà «~NA~», et les autres refus mesurés (ligne sans tabulation, type
+    inconnu, chemin en double, valeur invalide, fin de texte) gardent
+    leur chemin. Cette branche est
     défensive~: l'écrivain et le lecteur suivent la même grammaire
     (section~\ref{sec:serialisation}), et aucun élément de fiche des
     tables des tests ni des six tables embarquées que rend
@@ -17450,14 +17472,22 @@ point~3.2).
 \begin{longtable}{@{}p{5.4cm}p{9.4cm}@{}}
 \caption{Refus de la lecture et de l'écriture du texte (module
 \code{rapport}~; à la lecture, numéro de la ligne fautive dans
-\code{details\$ligne} (\code{NA} pour \code{texte\_non\_octets} et pour un texte vide), et en outre
+\code{details\$ligne} (\code{NA} pour \code{texte\_non\_octets} et pour un texte vide)~;
+dans tous les refus, chemin écrit sur la ligne refusée dans
+\code{details\$chemin}, premier champ brut de la ligne, \code{NA} pour un
+refus qui précède le découpage en lignes (texte non octets ou vide, marque
+d'ordre des octets, CR, octet nul, dernière ligne sans LF, UTF-8 invalide,
+première ligne, texte sans corps), pour une ligne du corps qui commence
+par «~\#~» ou dont le premier champ est vide, et en fin de texte
+(issue~\#306)~; en outre
 classe reçue dans \code{details\$classe} (\code{texte\_non\_octets}), chemin
-lu et chemin attendu dans \code{details\$chemin} et \code{details\$attendu}
-(\code{texte\_chemin\_inattendu}~; \code{chemin} seul pour une ligne après
-la fin de l'objet, \code{attendu} seul en fin de texte), colonne dans
+attendu dans \code{details\$attendu}
+(\code{texte\_chemin\_inattendu}, sauf pour une ligne après
+la fin de l'objet~; en fin de texte, \code{details\$chemin} y est \code{NA}), colonne dans
 \code{details\$colonne} (\code{texte\_ligne\_mal\_formee} et
 \code{texte\_longueur\_incoherente}, colonne non atomique ou d'une autre
-longueur que \code{@lignes})~; à l'écriture, chemin fautif dans
+longueur que \code{@lignes}~; \code{details\$chemin} y porte le premier
+champ de la ligne citée, la colonne ou son \code{@noms})~; à l'écriture, chemin fautif dans
 \code{details\$chemin}).}
 \label{tab:refus-texte}\\
 \rowcolor{tableheader}
@@ -18928,7 +18958,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{segments\_texte()} & interne & noms, longueur & segment de chemin de chaque élément~: son nom, ou \code{[i]} (rang) si le nom est absent, vide, \code{NA}, en double, contient \code{/}, une tabulation ou une fin de ligne, ou commence par \code{@}, \code{\#} ou \code{[} \\
 \catalogue{fonctions-rapport}{texte\_objet()} & interne & liste, première ligne, en-tête, forme, \code{canonique}, \code{valeurs} & octets UTF-8 du texte~: une ligne par feuille, dans l'ordre de l'objet~; valeurs par \code{ecrire\_valeurs()} en forme \code{"texte"} (défaut~: plan, fiche) ou \code{"empreinte"} (\code{empreinte\_resultat()})~; refus \code{serialisation\_impossible} (facteur en forme \code{"texte"}~; en forme \code{"empreinte"}, facteur de classe autre qu'exactement \code{factor} ou \code{c("ordered", "factor")} ou d'attribut autre que \code{names}, \code{levels}, \code{class}~; classe ou attribut non écrits, \code{Date} de stockage autre que \code{double} ou \code{integer}, vecteur atomique nommé de longueur~0, profondeur au-delà de \code{PROFONDEUR\_MAX\_TEXTE})~; \code{canonique = TRUE} (contrôle~5 du rapport figé)~: mêmes cas refusés sous \code{type\_non\_canonique} (rôle~: le chemin), \code{data.frame} compris~; \code{valeurs = FALSE}~: forme seule, mêmes refus de forme, aucun nom ni aucune valeur écrits, donc aucun contrôle de codage ni du domaine des \code{Date} (issue~\#141~; décision M499, (b)) \\
 \catalogue{fonctions-rapport}{valeurs\_texte()} & interne & type, textes d'une ligne, refus & valeurs relues sans évaluation~; refus \code{texte\_valeur\_invalide}, \code{texte\_double\_}\allowbreak\code{sous\_depassement} (décimal non nul relu 0) \\
-\catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne} \\
+\catalogue{fonctions-rapport}{lire\_texte()} & interne & octets, première ligne, nature & objet relu sans évaluation~; refus nommés \code{texte\_\ldots}, numéro de la ligne fautive dans \code{details\$ligne}, chemin écrit sur cette ligne dans \code{details\$chemin}, \code{NA} si elle n'en porte pas (tableau~\ref{tab:refus-texte}~; issue~\#306) \\
 \catalogue{fonctions-rapport}{ecrire\_plan()} & exportée & plan & octets du texte du plan, écrit tel qu'il est reçu, sans validation ni canonisation \\
 \catalogue{fonctions-rapport}{lire\_plan()} & exportée & octets & plan relu, \textbf{non validé}~: à passer à \code{valider\_plan()} ou à \code{construire\_table()} \\
 \catalogue{fonctions-rapport}{ecrire\_fiche()} & exportée & fiche & octets du texte de la fiche (\code{x\$fiche}, refus \code{serialisation\_impossible} pour l'objet \code{construction} entier~; \code{chaine\_codage\_bytes} pour un nom de premier niveau d'encodage \code{bytes}, et, par l'écrivain, pour un nom de cet encodage plus bas~; \code{serialisation\_impossible} pour une classe de cet encodage~; issues~\#114 et~\#128)~; l'en-tête rappelle \code{version\_fiche}, la représentation canonique, les blocs de lecture (\code{\# lecture}) et la procédure de rejeu (\code{\# rejeu}, \code{TEXTE\_REJEU\_FICHE}) \\
