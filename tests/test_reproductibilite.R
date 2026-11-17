@@ -47,6 +47,8 @@
 #  Rapport figé (#87, U24, U25) : ecrire_rapport() sur R1 à R12 (sections et
 #  leur ordre, cellules décimales en %.17g, textes fixes, section brut ; taille
 #  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
+#  Table embarquée (#303, M520, sans référence nouvelle) : plan R10 sur
+#  TV 88-90 lue par son nom, fiche, rejeu (ligne 15 du bilan), rapport figé.
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -1060,7 +1062,8 @@ for (p in plans_reference()) {
   # exacte hors execution ; verdicts des témoins, valeur calculée à la main).
   # Ligne 15 (temoin_catalogue, #267) : « identique », statut « comparaison
   # exacte » ; aucun plan de référence ne porte de table de statut embarquee,
-  # la ligne y vaut le cas sans table de statut embarquee (mesuré, R1 à R17).
+  # la ligne y vaut le cas sans table de statut embarquee (mesuré, R1 à R17) ;
+  # le cas « table embarquée » est couvert par le bloc qui suit la boucle (#303).
   verifier(sprintf("%s : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution, témoins 9 à 13 et 15 « identique » (15 : « comparaison exacte »), 14 « non vérifiée »", id), {
     r <- rejouer_fiche(entree_p$donnees, lire_fiche(ecrire_fiche(x_ref$fiche)), tables_reference = tables_du_plan(p))
     identical(sans_execution(r$construction), sans_execution(x_ref)) &&
@@ -1274,6 +1277,72 @@ verifier("aucune référence orpheline sous tests/reference/ (point 3.7)", {
   o <- if (dir.exists(DOSSIER_REFERENCES)) references_orphelines(DOSSIER_REFERENCES) else character(0)
   if (length(o)) paste("orphelines :", paste(o, collapse = ", ")) else TRUE
 })
+
+# Plan R10 sur une table embarquée (#303 ; avis d'actuary du 16/11/2026, M520 ;
+# aucune référence nouvelle : identités exactes et textes). Aucun plan de
+# référence ne porte de table de statut embarquee ; la ligne 15 du bilan du
+# rejeu (temoin_catalogue, #267) n'y vaut que dans le cas « aucune table de
+# statut embarquee ». Le plan de R10 (positionnement par SMR sur la clé tv,
+# validation en relation positionnee, segmentation par sexe), construit ici et
+# non dans plans_reference(), lit TV 88-90 par table_embarquee() sur l'entrée
+# `reference`. Le rejeu ne reçoit aucune table : une table embarquée est relue
+# par son nom dans le package installé, et sa réception est refusée (ADR 0015).
+# Textes de la ligne 15 : valeurs de tests/unitaires/test_rejeu.R, T12.
+p_emb <- plans_reference()[["R10"]]
+entree_emb <- entrees_ref[[p_emb$entree]]
+NOM_EMBARQUEE <- "TV 88-90"
+x_emb <- tryCatch(construire_table(entree_emb$donnees, entree_emb$roles, p_emb$plan,
+                                   tables_reference = list(tv = table_embarquee(NOM_EMBARQUEE))),
+                  refus_tablexp = function(e) e)
+verifier("table embarqu\u00e9e (R10 sur TV 88-90) : construction sans refus", {
+  if (inherits(x_emb, "refus_tablexp")) conditionMessage(x_emb) else TRUE
+})
+if (!inherits(x_emb, "refus_tablexp")) {
+  cat_emb <- tablexp::tables_embarquees()
+  cat_emb <- cat_emb[cat_emb$nom == NOM_EMBARQUEE, ]
+  verifier("table embarqu\u00e9e : fiche/tables_reference/tv de statut embarquee, source, forme_origine et empreinte \u00e9gales \u00e0 celles du catalogue install\u00e9", {
+    t <- x_emb$fiche$tables_reference$tv
+    if (!identical(names(x_emb$fiche$tables_reference), "tv")) "tables_reference : cl\u00e9 tv seule attendue"
+    else if (!identical(t$nom, NOM_EMBARQUEE) || !identical(t$statut, "embarquee")) "nom ou statut diff\u00e9rents"
+    else if (nrow(cat_emb) != 1L || !grepl("^[0-9a-f]{32}$", cat_emb$empreinte)) "catalogue : une ligne et une empreinte de 32 hexad\u00e9cimaux attendues"
+    else if (!identical(t$source, cat_emb$source) || !nzchar(t$source)) "source diff\u00e9rente de celle du catalogue"
+    else if (!identical(t$forme_origine, cat_emb$forme_origine) || !identical(t$forme_origine, "lx")) "forme_origine diff\u00e9rente"
+    else if (!identical(t$empreinte, cat_emb$empreinte)) "empreinte diff\u00e9rente de celle du catalogue"
+    else TRUE
+  })
+  # Fiche écrite puis relue, rejeu sans tables_reference : la table est relue
+  # par son nom. Lignes 9 à 15 comme pour R1 à R17 ; ligne 15, textes de
+  # l'attendu et du lu, verdict « identique », statut « comparaison exacte ».
+  f_emb <- tryCatch(lire_fiche(ecrire_fiche(x_emb$fiche)), error = function(e) e)
+  r_emb <- if (inherits(f_emb, "error")) f_emb
+           else tryCatch(rejouer_fiche(entree_emb$donnees, f_emb), error = function(e) e)
+  verifier("table embarqu\u00e9e : fiche relue, \u00e9l\u00e9ment tables_reference identical() \u00e0 celui de la construction", {
+    if (inherits(f_emb, "error")) conditionMessage(f_emb) else identical(f_emb$tables_reference, x_emb$fiche$tables_reference)
+  })
+  verifier("table embarqu\u00e9e : rejouer_fiche() sans tables_reference, identical() hors execution, t\u00e9moins 9 \u00e0 13 et 15 \u00ab identique \u00bb, 14 \u00ab non v\u00e9rifi\u00e9e \u00bb", {
+    if (inherits(r_emb, "error")) conditionMessage(r_emb)
+    else identical(sans_execution(r_emb$construction), sans_execution(x_emb)) &&
+      identical(r_emb$bilan$verdict[9:15], c(rep("identique", 5L), "non v\u00e9rifi\u00e9e", "identique"))
+  })
+  verifier("table embarqu\u00e9e : ligne 15 \u00ab tv : m\u00e9tadonn\u00e9es du catalogue du package install\u00e9 \u00bb contre \u00ab tv : m\u00e9tadonn\u00e9es de la fiche \u00bb, \u00ab identique \u00bb, \u00ab comparaison exacte \u00bb", {
+    if (inherits(r_emb, "error")) conditionMessage(r_emb)
+    else identical(unlist(r_emb$bilan[15L, ], use.names = FALSE),
+                   c("temoin_catalogue", "tv : m\u00e9tadonn\u00e9es du catalogue du package install\u00e9",
+                     "tv : m\u00e9tadonn\u00e9es de la fiche", "identique", "comparaison exacte"))
+  })
+  # Rapport figé (U24) : mêmes contrôles que pour R1 à R17.
+  t_emb <- system.time(o_emb <- tryCatch(ecrire_rapport(x_emb), error = function(e) e))[["elapsed"]]
+  if (!inherits(o_emb, "error"))
+    cat(sprintf("  -- table embarqu\u00e9e (R10 sur %s) : rapport fig\u00e9, %d octets, rendu en %.2f s\n", NOM_EMBARQUEE, length(o_emb), t_emb))
+  verifier("table embarqu\u00e9e : rapport fig\u00e9 (U24) : sections et nav, cellules d\u00e9cimales en %.17g, textes fixes, section brut", {
+    if (inherits(o_emb, "error")) conditionMessage(o_emb)
+    else {
+      l <- strsplit(rawToChar(o_emb), "\n", fixed = TRUE)[[1L]]
+      Encoding(l) <- "UTF-8"
+      controler_rapport_fige(x_emb, l, "R10")
+    }
+  })
+}
 
 # Permutation des lignes de l'entrée de référence (#39) : une base dont les
 # lignes sont permutées a une autre empreinte (E4.6 ne porte que sur des
