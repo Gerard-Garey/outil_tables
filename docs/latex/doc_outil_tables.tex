@@ -781,9 +781,12 @@ contenu d'une valeur citée~; il vérifie qu'une valeur est citée par une
 forme de citation déclarée, non que cette forme reçoit le bon contexte de
 la forme F307~: \code{citer\_valeur\_lue()} appelée en contexte
 \code{valeur\_isolee} au lieu de \code{toujours} dans
-\code{texte\_empreinte\_lue()} passe le contrôle, et seuls les tests du
-rejeu (\code{tests/unitaires/test\_rejeu.R}) la refusent (\emph{constat}
-sur un mutant, 17/11/2026~; issue~\#299)~; il reconnaît un relais ou une
+\code{texte\_empreinte\_lue()} passe le contrôle~; le refusent les tests
+du rejeu (\code{tests/unitaires/test\_rejeu.R}, dix échecs, seuls échecs
+de la batterie unitaire) et \code{tests/controles/locale\_c.R} (cinq
+défauts, cellules des lignes~9 et~13 comparées à leur texte attendu), la
+batterie de reproductibilité passant (\emph{constat} sur un mutant,
+17/11/2026~; issue~\#299)~; il reconnaît un relais ou une
 aide de message par son nom.
 
 \medskip
@@ -4623,8 +4626,9 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     lecteur ne porte dans \code{details\$chemin} que le chemin écrit sur la
     ligne refusée, jamais un chemin déduit d'une ligne voisine (spécification Q5 d'\code{actuary-approfondi} sur
     l'issue~\#306, décision M526). Hors fin de texte, le chemin vaut donc \code{NA} pour un
-    refus qui précède le découpage du texte en lignes (première ligne,
-    texte sans corps, octet nul, retour chariot, dernière ligne sans LF,
+    refus qui précède le découpage des lignes du corps en champs (texte
+    vide, marque d'ordre des octets, première ligne, texte sans corps,
+    octet nul, retour chariot, dernière ligne sans LF,
     ligne qui n'est pas de l'UTF-8 valide), pour une ligne du corps qui
     commence par «~\#~», qui n'est pas un élément, et pour une ligne à
     premier champ vide. Avant l'issue~\#306, l'appelant rattachait à
@@ -4640,7 +4644,8 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     octet non UTF-8 dans une valeur (\code{texte\_utf8\_invalide},
     «~a/parametres/p~» puis «~NA~») et dernière ligne sans LF
     (\code{texte\_sans\_lf\_final}, «~a/empreinte~» puis «~NA~»)~; un
-    octet nul, un premier champ vide et un texte sans corps donnaient
+    octet nul, une première ligne remplacée, un octet non UTF-8 dans le
+    chemin, un premier champ vide et un texte sans corps donnaient
     déjà «~NA~», et les autres refus mesurés (ligne sans tabulation, type
     inconnu, chemin en double, valeur invalide, fin de texte) gardent
     leur chemin. Cette branche est
@@ -5465,8 +5470,14 @@ règles, la ligne \code{temoin\_catalogue} ayant la sienne (ci-dessous,
     le nom \code{NA} et la contre-épreuve sont testés, test~T16)~; ce cas
     ne vient que d'une fiche altérée après sa construction (avis
     d'\code{actuary-approfondi} sur l'issue~\#305, Q4~: le moteur n'écrit
-    pas de nom incomplet dans ces nœuds), et n'atteint ni \code{versions} ni \code{plateforme}, que la
-    règle~V2 rend alors «~non déterminables~». Les comparaisons et les
+    pas de nom incomplet dans ces nœuds). À \code{versions} et à
+    \code{plateforme}, un nom \code{NA} ou vide rend le témoin «~non
+    déterminable~» (règle~V2) avant toute comparaison~; deux noms égaux,
+    que la règle~V2 n'écarte pas, y donnent «~différente~: versions~»
+    (ligne~10) ou «~différente~: plateforme~» (ligne~11), la liste
+    entière étant la feuille (\emph{constat de mesure} du 17/11/2026 sous
+    les locales C.UTF-8 et C, deuxième nom mis égal au premier~; non
+    testé). Les comparaisons et les
     lectures par nom portent sur les noms bruts~; chaque nom écrit dans
     un chemin est un segment cité par \code{citer\_segment()}~: par la
     règle unique (issue~\#142), et entre «~…~» s'il contient un séparateur
@@ -5760,7 +5771,11 @@ témoins \textbf{signalent et ne refusent jamais}~:
     \code{bytes} distinctes se citent sous le même repère (issues~\#128
     et~\#142)~; (L2)~une chaîne latin-1 et la même suite de caractères en
     UTF-8 se citent de même, la citation portant sur les caractères, non
-    sur la marque d'encodage~; (L3)~une valeur qui n'est pas une chaîne
+    sur la marque d'encodage, comme \code{identical()}, qui tient ces
+    deux chaînes pour égales sous toute locale (documentation de
+    \code{identical()}, R~4.3.3~; \emph{constat de mesure} du 17/11/2026
+    sous C, POSIX et C.UTF-8), si bien que les verdicts des témoins les
+    tiennent aussi pour identiques~; (L3)~une valeur qui n'est pas une chaîne
     unique sans attribut est décrite par sa forme, non par son contenu
     (\code{c(1, 2)} et \code{c(3, 4)} donnent tous deux «~illisible
     (double de longueur~2)~»), \code{texte\_lu()} ne citant aucun contenu
@@ -6015,8 +6030,9 @@ devient le cas d'une règle commune à toute chaîne lue dans la fiche et
     retient pas). Les citations sont inchangées (\emph{constat de
     mesure} du 17/11/2026~: sorties de \code{citer\_chaine()}, octets et
     marque d'encodage, identiques avant et après l'issue~\#308 sur
-    20\,007~chaînes tirées sous graine et les cinq contextes, exécution
-    sous les locales C et C.UTF-8).
+    20\,281~chaînes, dont 20\,000 tirées sous graine, et les cinq
+    contextes, installation et exécution sous les locales C et C.UTF-8,
+    huit exécutions~; audit de l'issue~\#308, commit \code{c59b046}).
 \end{itemize}
 Le contexte est celui de la cellule~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
@@ -6135,7 +6151,7 @@ le même texte pour les deux)~; \code{c("a", NA)} donne «~«~a~», NA~»
 ligne~6, un fichier de provenance nommé «~NULL~» donne «~provenance~:
 «~NULL~»~», une provenance absente «~provenance~: NULL~». Les cellules
 d'une fiche ordinaire sont inchangées~: «~a.csv~», deux fichiers
-«~«~a.csv~», «~«~b.csv~»~», une empreinte du code «~x~» et la source
+«~«~a.csv~», «~b.csv~»~», une empreinte du code «~x~» et la source
 «~ma source~» de la ligne~15 ont le même texte avant et après (même
 mesure)~; les bilans de R1 à R17, de R10 sur TV~88-90 et des fiches des
 tests sont identiques à l'octet à ceux du code qui précède l'issue, sous
@@ -6471,8 +6487,9 @@ empreinte du fichier «~non vérifiée~», témoin «~catalogue~»
 plan de référence ne porte de table de statut \code{embarquee}, si bien
 que la ligne~15 y est celle d'une fiche sans telle table). Le cas d'une
 table embarquée y est couvert sans référence nouvelle (issue~\#303~; avis
-d'\code{actuary} du 16/11/2026, décision M520)~: le plan de R10, construit
-dans le test et non par \code{plans\_reference}, lit TV~88-90 par
+d'\code{actuary} du 16/11/2026, décision M520)~: la construction du plan
+de R10 (lu dans \code{plans\_reference}, fonction des tests) est faite dans le test, hors
+de la boucle des plans de référence~; elle lit TV~88-90 par
 \code{table\_embarquee()} sous la clé \code{tv}, sur l'entrée de
 référence~; six tests vérifient la construction sans refus~; l'élément
 \code{fiche\$tables\_reference\$tv}, seule clé, de nom «~TV 88-90~» et de
@@ -17475,7 +17492,7 @@ point~3.2).
 \code{details\$ligne} (\code{NA} pour \code{texte\_non\_octets} et pour un texte vide)~;
 dans tous les refus, chemin écrit sur la ligne refusée dans
 \code{details\$chemin}, premier champ brut de la ligne, \code{NA} pour un
-refus qui précède le découpage en lignes (texte non octets ou vide, marque
+refus qui précède le découpage des lignes du corps en champs (texte non octets ou vide, marque
 d'ordre des octets, CR, octet nul, dernière ligne sans LF, UTF-8 invalide,
 première ligne, texte sans corps), pour une ligne du corps qui commence
 par «~\#~» ou dont le premier champ est vide, et en fin de texte
