@@ -626,6 +626,92 @@ local({
     }
     if (length(e)) e else TRUE
   })
+  # #302 (M520 ; ADR 0012, seconde annotation du 16/11/2026, point (d) 2) :
+  # admission documentée. Un nom vide, NA, en double ou réservé ("[2]") dans un
+  # sous-arbre hors empreinte (fiche/versions, fiche/plateforme) est une forme
+  # canonique de la grammaire 1 (ADR 0011, troisième annotation du 19/10/2026,
+  # (f) 2) : écrit [i], le nom étant porté par @noms, comme à l'écriture de la
+  # fiche. Le rapport le restitue sans refus, de façon injective (vide, NA sans
+  # guillemets, "NA" entre guillemets, trois documents distincts). Le contrôle 5
+  # garantit la fidélité, non l'authenticité. Contre-épreuve : un nom bytes
+  # reste refusé (chaine_codage_bytes) ; la classe k reste refusée (#141, plus
+  # haut). Valeurs mesurées sous C et C.UTF-8 (o1 : 146 052 octets ; nom 2
+  # "", NA, "NA" : 146 053, 146 043, 146 054 octets ; le volet du rejeu, ligne
+  # 10 du bilan, relève de #305).
+  nom_k <- function(o, k, v) { n <- names(o); n[k] <- v; names(o) <- n; o }
+  ligne_tr <- function(chemin, type, longueur, valeurs)
+    paste0("<tr><td>", chemin, "</td><td>", type, "</td><td>", longueur, "</td><td>", paste(valeurs, collapse = "<br>"), "</td></tr>")
+  guil <- function(s) paste0("&quot;", html(s), "&quot;")
+  verifier("#302 : fiche/versions, nom 2 \"\", NA ou \"NA\" : rapport rendu sans refus, ligne @noms (\"\" entre guillemets, NA sans, \"NA\" entre guillemets) et chemin de l'élément 2 (fiche/versions/[2], [2], NA) ; trois documents deux à deux différents et différents de o1", {
+    v2 <- x1$fiche$versions[[2L]]; n1 <- names(x1$fiche$versions)[1L]
+    cas <- list(list("\"\"", "", "&quot;&quot;", "[2]"),
+                list("NA", NA_character_, "NA", "[2]"),
+                list("\"NA\"", "NA", "&quot;NA&quot;", "NA"))
+    e <- character(0); o_ <- list()
+    for (c_ in cas) {
+      y <- x1; y$fiche$versions <- nom_k(y$fiche$versions, 2L, c_[[2L]])
+      o <- attrape(ecrire_rapport(y))
+      if (!is.raw(o)) { e <- c(e, sprintf("nom 2 %s : %s", c_[[1L]], if (inherits(o, "error")) conditionMessage(o) else class(o)[1L])); next }
+      o_[[length(o_) + 1L]] <- o
+      l <- lignes_de(o)
+      if (!ligne_tr("fiche/versions/@noms", "character", 2L, c(guil(n1), c_[[3L]])) %in% l) e <- c(e, sprintf("nom 2 %s : ligne @noms", c_[[1L]]))
+      if (!ligne_tr(paste0("fiche/versions/", c_[[4L]]), "character", 1L, guil(v2)) %in% l) e <- c(e, sprintf("nom 2 %s : ligne de l'élément 2", c_[[1L]]))
+      if (any(startsWith(l, "<tr><td>fiche/versions/R</td>"))) e <- c(e, sprintf("nom 2 %s : ligne fiche/versions/R encore présente", c_[[1L]]))
+    }
+    if (length(e)) return(e)
+    if (identical(o_[[1L]], o_[[2L]]) || identical(o_[[1L]], o_[[3L]]) || identical(o_[[2L]], o_[[3L]])) "deux documents identiques"
+    else if (any(vapply(o_, identical, NA, o1))) "un document identique à o1"
+    else TRUE
+  })
+  verifier("#302 : fiche/versions, nom 2 \"[2]\" (réservé) ou nom 2 égal au nom 1 (doublon) : rapport rendu sans refus, éléments aux chemins [1], [2] ou [2] selon la grammaire 1, noms portés par @noms", {
+    v1 <- x1$fiche$versions[[1L]]; v2 <- x1$fiche$versions[[2L]]; n1 <- names(x1$fiche$versions)[1L]
+    y1 <- x1; y1$fiche$versions <- nom_k(y1$fiche$versions, 2L, "[2]")
+    y2 <- x1; y2$fiche$versions <- nom_k(y2$fiche$versions, 2L, n1)
+    o1_ <- attrape(ecrire_rapport(y1)); o2_ <- attrape(ecrire_rapport(y2))
+    if (!is.raw(o1_) || !is.raw(o2_)) return(sprintf("rendu attendu : %s, %s", class(o1_)[1L], class(o2_)[1L]))
+    l1 <- lignes_de(o1_); l2 <- lignes_de(o2_)
+    if (!ligne_tr("fiche/versions/@noms", "character", 2L, c(guil(n1), "&quot;[2]&quot;")) %in% l1 ||
+        !ligne_tr("fiche/versions/[2]", "character", 1L, guil(v2)) %in% l1) "nom \"[2]\" : lignes @noms ou [2]"
+    else if (!ligne_tr("fiche/versions/@noms", "character", 2L, c(guil(n1), guil(n1))) %in% l2 ||
+             !ligne_tr("fiche/versions/[1]", "character", 1L, guil(v1)) %in% l2 ||
+             !ligne_tr("fiche/versions/[2]", "character", 1L, guil(v2)) %in% l2) "doublon : lignes @noms, [1] ou [2]"
+    else TRUE
+  })
+  verifier("#302 : fiche/plateforme, nom 1 NA : rapport rendu sans refus, @noms avec NA sans guillemets, élément 1 au chemin fiche/plateforme/[1]", {
+    p <- x1$fiche$plateforme
+    y <- x1; y$fiche$plateforme <- nom_k(y$fiche$plateforme, 1L, NA_character_)
+    o <- attrape(ecrire_rapport(y))
+    if (!is.raw(o)) return(sprintf("rendu attendu : %s", class(o)[1L]))
+    l <- lignes_de(o)
+    if (!ligne_tr("fiche/plateforme/@noms", "character", length(p), c("NA", guil(names(p)[-1L]))) %in% l) "ligne @noms"
+    else if (!ligne_tr("fiche/plateforme/[1]", "character", 1L, guil(p[[1L]])) %in% l) "ligne de l'élément 1"
+    else if (any(startsWith(l, paste0("<tr><td>fiche/plateforme/", names(p)[1L], "</td>")))) "ligne du nom d'origine encore présente"
+    else TRUE
+  })
+  verifier("#302 : contre-épreuve, nom 2 d'encodage bytes dans fiche/versions (ou nom 1 dans fiche/plateforme) : refus chaine_codage_bytes, rôle fiche/versions/@noms (ou fiche/plateforme/@noms), une ligne, UTF-8", {
+    y1 <- x1; y1$fiche$versions <- nom_k(y1$fiche$versions, 2L, CLASSE_BYTES)
+    y2 <- x1; y2$fiche$plateforme <- nom_k(y2$fiche$plateforme, 1L, CLASSE_BYTES)
+    r1 <- attrape(ecrire_rapport(y1)); r2 <- attrape(ecrire_rapport(y2))
+    if (!inherits(r1, "refus_tablexp") || !inherits(r2, "refus_tablexp")) return("refus attendus")
+    ok <- une_ligne_utf8(r1, controle_refus(r1, "chaine_codage_bytes", list(role = "fiche/versions/@noms"), "Rôle « fiche/versions/@noms » : "))
+    if (!isTRUE(ok)) ok
+    else une_ligne_utf8(r2, controle_refus(r2, "chaine_codage_bytes", list(role = "fiche/plateforme/@noms"), "Rôle « fiche/plateforme/@noms » : "))
+  })
+  verifier("#302 : forme canonique au sens de l'écrivain : lire_fiche(ecrire_fiche(f)) identique à f pour un nom 2 de fiche$versions \"\", NA, \"NA\" ou égal au nom 1 ; texte écrit : ligne versions/@noms puis versions/[2] (NA sans guillemets)", {
+    n1 <- names(x1$fiche$versions)[1L]
+    e <- character(0)
+    for (c_ in list(list("\"\"", ""), list("NA", NA_character_), list("\"NA\"", "NA"), list("doublon", n1))) {
+      f <- x1$fiche; f$versions <- nom_k(f$versions, 2L, c_[[2L]])
+      g <- attrape(lire_fiche(ecrire_fiche(f)))
+      if (!identical(g, f)) e <- c(e, sprintf("nom 2 %s : aller-retour %s", c_[[1L]], if (inherits(g, "error")) conditionMessage(g) else "différent"))
+    }
+    f <- x1$fiche; f$versions <- nom_k(f$versions, 2L, NA_character_)
+    t <- lignes_de(ecrire_fiche(f)); t <- t[startsWith(t, "versions/")]
+    if (length(e)) e
+    else if (!identical(t[1L], paste0("versions/@noms\tcharacter\t2\t\"", n1, "\"\tNA"))) sprintf("ligne @noms : %s", t[1L])
+    else if (!"versions/[2]" %in% sub("\t.*$", "", t)) "ligne versions/[2] absente"
+    else TRUE
+  })
   # Reprise unique de #141. execution : forme seule, aucun contrôle de codage (ses
   # valeurs et ses noms ne sont jamais rendus) ; fiche/* : codage contrôlé,
   # refus inchangés (mesurés sur l'état antérieur, sous C et C.UTF-8).
