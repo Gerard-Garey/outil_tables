@@ -777,8 +777,14 @@ puisqu'elle doit être marquée à l'insertion.
 \textbf{Limites}~: les messages d'avertissement
 (section~\ref{sec:avertissements}) et les erreurs de programmation
 (\code{stop()}) sont hors de la règle~; le script ne contrôle pas le
-contenu d'une valeur citée, et reconnaît un relais ou une aide de message
-par son nom.
+contenu d'une valeur citée~; il vérifie qu'une valeur est citée par une
+forme de citation déclarée, non que cette forme reçoit le bon contexte de
+la forme F307~: \code{citer\_valeur\_lue()} appelée en contexte
+\code{valeur\_isolee} au lieu de \code{toujours} dans
+\code{texte\_empreinte\_lue()} passe le contrôle, et seuls les tests du
+rejeu (\code{tests/unitaires/test\_rejeu.R}) la refusent (\emph{constat}
+sur un mutant, 17/11/2026~; issue~\#299)~; il reconnaît un relais ou une
+aide de message par son nom.
 
 \medskip
 \noindent
