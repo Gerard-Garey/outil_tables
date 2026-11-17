@@ -17445,7 +17445,36 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     (\code{unname()}) l'est sous le rôle \code{execution/[1]}, parce que
     l'exception du \code{POSIXct} nu est liée au nom \code{debut}
     (\emph{constat} des tests et de mesures sous les locales C et
-    C.UTF-8). Un objet rendu par
+    C.UTF-8). \textbf{Admission documentée des noms de
+    \code{fiche/versions} et de \code{fiche/plateforme}} (issue~\#302~;
+    décision M520~; ADR 0012, seconde annotation du 16/11/2026, (d)~2)~:
+    un nom vide, \code{NA}, en double ou qui ne peut pas être un segment de
+    chemin (par exemple «~[2]~», qui commence par \code{[}) est une forme
+    canonique de la grammaire~1 (section~\ref{sec:serialisation},
+    «~corps~»~; ADR 0011, troisième annotation du 19/10/2026, (f)~2)~:
+    l'élément y a pour segment \code{[i]}, son rang, et le nom est porté
+    par la ligne \code{@noms}~; deux noms égaux donnent chacun leur rang
+    (\code{[1]} et \code{[2]}). Le contrôle l'admet donc, et le rapport le
+    restitue par ces lignes, comme à l'écriture de la fiche, de façon
+    injective~: dans la ligne \code{@noms}, un nom vide s'écrit \code{""},
+    un nom \code{NA} s'écrit \code{NA}, sans guillemets, et la chaîne
+    «~NA~» \code{"NA"}, entre guillemets (écrivain des valeurs,
+    section~\ref{sec:empreinte})~; la chaîne «~NA~», segment admis, garde
+    son nom pour chemin (\code{fiche/versions/NA}). Sur l'objet du plan R1
+    des tests du rapport (rapport de 146\,052 octets), le second nom de
+    \code{fiche/versions} remplacé par \code{""}, \code{NA} ou \code{"NA"}
+    donne trois rapports deux à deux différents, de 146\,053, 146\,043 et
+    146\,054 octets, et l'aller-retour \code{lire\_fiche(ecrire\_fiche(f))}
+    de la fiche ainsi modifiée est identique à \code{f} pour ces trois noms
+    et pour un nom en double (\emph{constat} des tests et de mesures sous
+    les locales C et C.UTF-8). Motif~: ces formes sont canoniques, si bien
+    qu'un refus \code{type\_non\_canonique} serait faux dans les termes de
+    son motif, et un refus \code{objet\_modifie} n'aurait aucun ancrage
+    dans le périmètre de l'empreinte (même annotation, (d)~3). Un nom
+    d'encodage \code{bytes} reste refusé, par \code{chaine\_codage\_bytes},
+    rôle «~\emph{chemin}/@noms~» (ci-dessus, \textbf{Codage}). La citation
+    de ces noms par le bilan du rejeu (section~\ref{sec:rejeu}) n'est pas
+    touchée par cette admission et relève de l'issue~\#305. Un objet rendu par
     \code{construire\_table()} passe ce contrôle (\emph{constat} des tests),
     qui n'écrit rien dans le rapport.
   \item \textbf{lignes conservées} (issue~\#294~; ADR 0012, seconde
@@ -18334,7 +18363,17 @@ une chaîne, un vecteur d'entiers, une liste vide ou une liste à champ
 inconnu, et, en contre-épreuve, le refus \code{type\_non\_canonique} d'un
 \code{execution} de classe «~k~», d'attribut \code{z} ou facteur (rôle
 \code{execution}) et de la liste produite sans ses noms (rôle
-\code{execution/[1]})~; pour l'issue~\#294, le refus \code{objet\_modifie}, chemin cité, d'une copie
+\code{execution/[1]})~; pour l'issue~\#302, le rendu sans refus d'un
+second nom de \code{fiche/versions} vide, \code{NA}, «~NA~», «~[2]~» ou
+égal au premier, et d'un premier nom \code{NA} de \code{fiche/plateforme},
+avec les lignes \code{@noms} (\code{""} et \code{"NA"} entre guillemets,
+\code{NA} sans) et les chemins des éléments (\code{[1]}, \code{[2]} ou
+\code{NA}) attendus, trois documents deux à deux différents et différents
+de celui de l'objet intact pour \code{""}, \code{NA} et «~NA~»,
+l'aller-retour \code{lire\_fiche(ecrire\_fiche(f))} identique pour ces
+noms et pour un doublon, et, en contre-épreuve, le refus
+\code{chaine\_codage\_bytes} d'un nom \code{bytes}, rôle
+\code{fiche/versions/@noms} ou \code{fiche/plateforme/@noms}~; pour l'issue~\#294, le refus \code{objet\_modifie}, chemin cité, d'une copie
 \code{lignes\_conservees} qui n'est pas un \code{data.frame} (chaîne,
 \code{NULL}, liste sans la classe ou d'une autre classe, vecteur portant
 la classe), qui a moins de lignes que \code{numeros\_conserves} (une de
@@ -18432,7 +18471,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{CHEMINS\_HORS\_RESULTAT} & constante & --- & liste fermée des sept chemins hors du périmètre de l'empreinte du résultat (section~\ref{sec:empreinte-resultat}) \\
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{CHEMINS\_FORME\_HORS\_RESULTAT} & constante & --- & chemins de \code{CHEMINS\_HORS\_RESULTAT} dont la forme est contrôlée avant l'écriture du rapport figé, tous sauf la copie de l'entrée \code{lignes\_conservees} (issue~\#141~; M499) \\
-\catalogue{fonctions-rapport}{controler\_forme\_hors\_resultat()} & interne & objet \code{construction} & contrôle~5 de \code{controler\_rapport()}~: chaque sous-arbre présent aux chemins de la constante précédente, sous son chemin, passé à \code{texte\_objet()} en mode \code{canonique}, sortie jetée~; refus \code{type\_non\_canonique} (rôle~: le chemin) et, sous \code{fiche/}, refus de codage de l'écrivain~; \code{execution} en forme seule (\code{valeurs = FALSE}), le champ que \code{FORME\_EXECUTION} déclare \code{POSIXct} (\code{debut}), \code{POSIXct} nu, contrôlé sans sa classe~; chemins parcourus par \code{lire\_chemin()}~: tout ancêtre liste traversé, de classe quelconque, \code{bytes} comprise, le sous-arbre seul jugé (issue~\#301)~; sous-arbre absent ou \code{NULL} sauté~; ni la présence ni la structure d'\code{execution} exigées (admission documentée, issue~\#297)~; rend \code{TRUE}, invisible (issue~\#141, section~\ref{sec:rapport-fige}) \\
+\catalogue{fonctions-rapport}{controler\_forme\_hors\_resultat()} & interne & objet \code{construction} & contrôle~5 de \code{controler\_rapport()}~: chaque sous-arbre présent aux chemins de la constante précédente, sous son chemin, passé à \code{texte\_objet()} en mode \code{canonique}, sortie jetée~; refus \code{type\_non\_canonique} (rôle~: le chemin) et, sous \code{fiche/}, refus de codage de l'écrivain~; \code{execution} en forme seule (\code{valeurs = FALSE}), le champ que \code{FORME\_EXECUTION} déclare \code{POSIXct} (\code{debut}), \code{POSIXct} nu, contrôlé sans sa classe~; chemins parcourus par \code{lire\_chemin()}~: tout ancêtre liste traversé, de classe quelconque, \code{bytes} comprise, le sous-arbre seul jugé (issue~\#301)~; sous-arbre absent ou \code{NULL} sauté~; ni la présence ni la structure d'\code{execution} exigées (admission documentée, issue~\#297)~; nom vide, \code{NA}, en double ou qui n'est pas un segment, sous \code{fiche/versions} et \code{fiche/plateforme}, admis et restitué par \code{@noms} et \code{[i]} (admission documentée, issue~\#302)~; rend \code{TRUE}, invisible (issue~\#141, section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{controler\_lignes\_conservees()} & interne & objet \code{construction} & contrôle~6 de \code{controler\_rapport()}~: copie de l'entrée \code{lignes\_conservees}, hors de l'empreinte, rapprochée de \code{numeros\_conserves} et de \code{fiche/roles}, qui sont dans son périmètre~; refus \code{objet\_modifie}, chemin cité, d'une valeur qui n'est pas un \code{data.frame}, d'un nombre de lignes autre que la longueur de \code{numeros\_conserves} ou illisible, d'une colonne de rôle manquante, d'une absence alors que \code{numeros\_conserves} est présent~; lecture sans dispatch (\code{lire\_chemin()}, \code{a\_classe()}, \code{attr()}, \code{.row\_names\_info()})~; ni type ni valeurs des colonnes contrôlés (issue~\#311)~; rend \code{TRUE}, invisible (issue~\#294, section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
