@@ -1510,18 +1510,28 @@ decrire_forme <- function(conteneur, nom) {
 }
 
 # Paires « nom=valeur » d'une liste nommée de la fiche (versions,
-# plateforme), jointes par « ; » ; texte_lu() d'une autre valeur, dont une
-# liste de classe « bytes » (names() lèverait une erreur R, #128). Noms et
-# valeurs sont cités par neutraliser_citation() (règle unique des valeurs de
-# la fiche qui entrent dans le bilan du rejeu, #142) : un nom ou une valeur
-# « bytes » l'est sous un repère, au lieu de l'erreur R de sprintf() ou de
-# write.csv() ; ces champs sont des témoins, jamais motifs de refus (ADR 0012,
-# point 3.6). texte_lu() garde sa valeur brute : il alimente aussi les
-# `details` des refus.
+# plateforme), lignes 10 et 11 du bilan, jointes par « ; » (#305 ; volet du
+# rejeu de #302 ; spécification d'actuary-approfondi, Q2 et Q3, M526) : chaque
+# nom par citer_chaine() en contexte « nom_paire » (NA écrit NA, nu ; nom
+# « NA » ou à séparateur / , ; : ( ) = entre « … ») ; chaque valeur par
+# citer_valeur_lue() en contexte « valeur_paire » (chaîne unique égale à
+# « NA » ou « absente », ou qui contient « ; » ou « = », entre « … », comme
+# toute chaîne réservée par citer_chaine() ; toute autre valeur décrite par
+# sa forme, nue). Toute autre valeur que la liste nommée (non-liste,
+# liste sans noms, liste de classe « bytes », dont names() lèverait une
+# erreur R, #128) par citer_valeur_lue() en contexte « toujours » : une
+# chaîne unique entre « … », toute autre valeur décrite par sa forme, nue.
+# La cellule se découpe d'une seule façon : un nom nu ne contient ni « = » ni
+# « ; », une valeur nue pas « ; », une forme citée finit au premier guillemet
+# fermant. Un nom ou une valeur « bytes » est cité sous son repère, au lieu de
+# l'erreur R de sprintf() ou de write.csv() ; ces champs sont des témoins,
+# jamais motifs de refus (ADR 0012, point 3.6). texte_lu() garde sa valeur
+# brute : il alimente aussi les `details` des refus.
 paires_lues <- function(l) {
   n <- attr(l, "names", exact = TRUE)
-  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(sans_controle(texte_lu(l)))
-  paste(sprintf("%s=%s", neutraliser_citation(n), sans_controle(vapply(l, texte_lu, ""))), collapse = " ; ")
+  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(citer_valeur_lue(l, "toujours"))
+  paste(sprintf("%s=%s", citer_chaine(n, "nom_paire"), vapply(l, citer_valeur_lue, "", "valeur_paire", USE.NAMES = FALSE)),
+        collapse = " ; ")
 }
 
 # Citation d'une chaîne lue dans la fiche et écrite dans une cellule du bilan
@@ -1537,8 +1547,13 @@ paires_lues <- function(l) {
 # isolés et réserverait « ° » ou l'espace insécable, mesuré par actuary, #307).
 # Contextes (CITATION_CONTEXTES) :
 #   segment       chemins des verdicts des lignes 10 à 12 et 15, clés des
-#                 lignes 8 et 15 (citer_segment(), #298) ; « NA » n'y est pas
-#                 encore réservé (#305) ;
+#                 lignes 8 et 15 (citer_segment(), #298) : mot NA (#305) ;
+#   nom_paire     noms des paires « nom=valeur » des lignes 10 et 11
+#                 (paires_lues(), #305) : séparateurs du segment et « = »,
+#                 mot NA ;
+#   valeur_paire  valeurs des mêmes paires : séparateurs « ; » et « = », mots
+#                 NA et absente (textes que paires_lues() écrit nus à cette
+#                 place) ;
 #   valeur_isolee ligne 14 pour une empreinte de fichier, ligne 6 pour un
 #                 fichier de la provenance (k = 1) : mots NA, NULL, absente,
 #                 textes que le bilan écrit nus à cette place, et toute chaîne
@@ -1546,12 +1561,14 @@ paires_lues <- function(l) {
 #                 k >= 2 de NA, écrite nue à cette place) ;
 #   toujours      lignes 9 et 13 (empreinte d'une autre forme que MD5), valeurs
 #                 de la ligne 15, chaque élément des lignes 6 et 14 pour k >= 2 :
-#                 toute chaîne est entre « … ».
-# Les contextes des paires « nom=valeur » des lignes 10 et 11 relèvent de #305.
+#                 toute chaîne est entre « … » ; aussi les lignes 10 et 11
+#                 quand versions ou plateforme n'est pas une liste nommée.
 GUILLEMETS_CITATION <- c(ouvrant = rawToChar(as.raw(c(0xC2, 0xAB))), fermant = rawToChar(as.raw(c(0xC2, 0xBB))))
 CARACTERES_RESERVES_CITATION <- c("<", unname(GUILLEMETS_CITATION))
 CITATION_CONTEXTES <- list(
-  segment = list(separateurs = c("/", ",", ";", ":", "(", ")"), mots = character(0), motifs = character(0), toujours = FALSE),
+  segment = list(separateurs = c("/", ",", ";", ":", "(", ")"), mots = "NA", motifs = character(0), toujours = FALSE),
+  nom_paire = list(separateurs = c("/", ",", ";", ":", "(", ")", "="), mots = "NA", motifs = character(0), toujours = FALSE),
+  valeur_paire = list(separateurs = c(";", "="), mots = c("NA", "absente"), motifs = character(0), toujours = FALSE),
   valeur_isolee = list(separateurs = character(0), mots = c("NA", "NULL", "absente"), motifs = "^NA(, NA)+$", toujours = FALSE),
   toujours = list(separateurs = character(0), mots = character(0), motifs = character(0), toujours = TRUE))
 PREFIXE_RESERVE_CITATION <- "illisible ("
@@ -1560,7 +1577,9 @@ REMPLACEMENTS_CITATION <- list(c("<", "<U+003C>"), c(GUILLEMETS_CITATION[["ouvra
 
 # Cœur de la citation (forme F307), élément par élément de `x`, dans le
 # contexte `contexte` (nom d'un élément de CITATION_CONTEXTES) :
-#   - NA reste NA (l'appelant l'écrit nu « NA », comme neutraliser_citation()) ;
+#   - NA s'écrit « NA », nu, dans tous les contextes (chaîne, jamais
+#     NA_character_ : #305, Q3 ; une chaîne « NA » est réservée là où le
+#     mot NA l'est) ;
 #   - une chaîne d'encodage « bytes » est citée sous le repère de
 #     neutraliser_citation(), nu, sauf en contexte « toujours » où il est
 #     entre « … » (limite L1 : deux chaînes « bytes » se citent de même ;
@@ -1595,7 +1614,7 @@ citer_chaine <- function(x, contexte) {
   prefixe <- charToRaw(PREFIXE_RESERVE_CITATION)
   entre_guillemets <- function(s) paste0(texte_moteur("« "), s, texte_moteur(" »"))
   une <- function(s) {
-    if (is.na(s)) return(NA_character_)
+    if (is.na(s)) return("NA")
     if (Encoding(s) == "bytes") {
       r <- neutraliser_citation(s)
       return(if (ctx$toujours) entre_guillemets(r) else r)
@@ -1645,12 +1664,14 @@ citer_fichiers_lus <- function(v) {
 # citer_chaine() en contexte « segment ». Les chemins joignent leurs segments
 # par « / » et les chemins par « , », et les textes des lignes 8 et 15
 # joignent « <clé> : <valeur> » par « ; ». Un segment qui contient l'un de
-# / , ; : ( ) < « » ou qui commence ou finit par une espace est réservé : il
-# s'écrit entre « … » (guillemets, une espace de chaque côté), « < »,
-# guillemet ouvrant et guillemet fermant devenant <U+003C>, <U+00AB> et
-# <U+00BB>. Un segment non réservé est cité par neutraliser_citation(), comme
-# avant ; NA (rendu NA) et une chaîne d'encodage « bytes » aussi, jamais entre
-# « … ».
+# / , ; : ( ) < « », qui commence ou finit par une espace ou qui égale « NA »
+# (#305, Q3) est réservé : il s'écrit entre « … » (guillemets, une espace de
+# chaque côté), « < », guillemet ouvrant et guillemet fermant devenant
+# <U+003C>, <U+00AB> et <U+00BB>. Un segment non réservé est cité par
+# neutraliser_citation(), comme avant ; NA s'écrit la chaîne « NA », nue, et
+# une chaîne d'encodage « bytes » sous son repère, jamais entre « … ». NA, la
+# chaîne « NA » et la chaîne vide s'écrivent donc NA, « NA » entre « … », et
+# vide.
 citer_segment <- function(x) citer_chaine(x, "segment")
 
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
@@ -2059,7 +2080,7 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # comparaison.
   # Toute valeur ou tout nom de la fiche écrit dans une cellule du bilan est
   # cité par la règle unique neutraliser_citation() (#142), sous la forme F307
-  # (citer_chaine(), #307) pour les lignes 6, 9, 13, 14 et 15 : valeurs par
+  # (citer_chaine(), #307, #305) pour les lignes 6, 9 à 11, 13 à 15 : valeurs par
   # sans_controle(texte_lu(v)), paires_lues(), texte_empreinte_lue(),
   # citer_fichiers_lus() ou citer_valeur_lue() ; noms de champs des chemins
   # des verdicts par champs_differents(), clés de tables_reference des lignes

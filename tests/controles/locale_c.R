@@ -31,7 +31,9 @@
 #       des empreintes du code et du résultat de forme non MD5 (#295), et
 #       des cellules T1 à T8 et T12 à T15 de la citation d'une chaîne lue
 #       (forme F307, lignes 9, 13, 14 et 15 ; #307) et de « NA, NA » (k = 1,
-#       entre « … » ; C1 de l'audit de #307) ; messages
+#       entre « … » ; C1 de l'audit de #307), des cellules P1, P3a, P3b,
+#       N1, N2 et N11 des noms et valeurs des paires des lignes 10 et 11
+#       et du mot NA réservé (#305) ; messages
 #       de refus du rejeu et de objet_modifie (et citation d'une chaîne
 #       latin-1) marqués UTF-8 et sur une ligne (#94) ; puis un refus par
 #       module citant une valeur non ASCII native, latin-1 et UTF-8, et
@@ -272,6 +274,39 @@ bilans_non_ascii <- function(jeu, p, fr, d) {
     nom <- sprintf("D5 ligne %d, nom libre %s", cas[[2L]], cas[[3L]])
     if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
     verifie(nom, r$bilan$verdict[cas[[2L]]], paste0(differente, q1, " ", cas[[3L]], " ", q2, " (absent de la fiche rendue)"))
+  }
+  # Noms et valeurs des paires des lignes 10 et 11, mot NA réservé (#305 ;
+  # spécifications Q2, cellules P1 et P3, et Q3, cellules N1, N2 et N11) :
+  # chaque cellule contient un guillemet « ou » (marque UTF-8 exigée par
+  # verifie()) ; préfixe de la ligne 10 et ligne 11 intacte relus sur la fiche
+  # de R1 ; octets comparés entre les deux installations.
+  r0 <- rendu(rejouer_fiche(jeu$donnees, fr, tables_reference = tables_du_plan(p)))
+  if (!inherits(r0, "rejeu")) d(sprintf("#305 : rejeu de la fiche intacte non rendu (%s)", conditionMessage(r0)))
+  else if (length(fr$versions) != 2L) d(sprintf("#305 : fiche$versions de longueur %d, 2 attendue", length(fr$versions)))
+  else {
+    pre10 <- paste0(names(fr$versions)[1L], "=", fr$versions[[1L]], " ; ")
+    v2 <- fr$versions[[2L]]; n2 <- names(fr$versions)[2L]; l11 <- r0$bilan$lu[11L]
+    rj <- function(f) rendu(rejouer_fiche(jeu$donnees, f, tables_reference = tables_du_plan(p)))
+    nom2 <- function(nom) { f <- fr; names(f$versions)[2L] <- nom; f }
+    plat <- function(nom, v) { f <- fr; f$plateforme <- c(f$plateforme, stats::setNames(list(v), nom)); f }
+    fna <- fr; fna[["NA"]] <- 1
+    for (cas in list(list("P1 ligne 10, nom 2 a=b ; c", nom2("a=b ; c"), "lu", 10L,
+                          paste0(pre10, entre("a=b ; c"), "=", v2)),
+                     list("P3a ligne 11, plateforme + nom a=b ; c de valeur d", plat("a=b ; c", "d"), "lu", 11L,
+                          paste0(l11, " ; ", entre("a=b ; c"), "=d")),
+                     list("P3b ligne 11, plateforme + nom a de valeur b ; c=d", plat("a", "b ; c=d"), "lu", 11L,
+                          paste0(l11, " ; a=", entre("b ; c=d"))),
+                     list("N1 ligne 10, nom 2 NA (cha\u00eene)", nom2("NA"), "lu", 10L, paste0(pre10, entre("NA"), "=", v2)),
+                     list("N2 verdict 10, nom 2 NA (cha\u00eene)", nom2("NA"), "verdict", 10L,
+                          paste0(differente, n2, " (absent de la fiche re", C, "ue), ", entre("NA"),
+                                 " (absent de la fiche rendue)")),
+                     list("N11 verdict 12, champ NA ajout\u00e9 \u00e0 la fiche", fna, "verdict", 12L,
+                          paste0(differente, entre("NA"), " (absent de la fiche rendue)")))) {
+      r <- rj(cas[[2L]])
+      nom <- sprintf("#305 %s", cas[[1L]])
+      if (!inherits(r, "rejeu")) { d(sprintf("%s : rejeu non rendu (%s)", nom, conditionMessage(r))); next }
+      verifie(nom, r$bilan[[cas[[3L]]]][cas[[4L]]], cas[[5L]])
+    }
   }
   for (cas in list(list("notation tapée", "a<U+000B>b", paste0(q1, " a<U+003C>U+000B>b ", q2)),
                    list("caractère de contrôle", "a\vb", "a<U+000B>b"),

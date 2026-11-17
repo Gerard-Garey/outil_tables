@@ -843,12 +843,14 @@ local({
                else if (!identical(r$bilan$verdict[-ligne], R0$bilan$verdict[-ligne])) "autres verdicts changés"
                else TRUE)
     }
-    # Liste remplacée en bloc par une chaîne bytes : rejeu rendu, « non déterminable ».
+    # Liste remplacée en bloc par une chaîne bytes : rejeu rendu, « non
+    # déterminable » ; repère entre « … » (contexte « toujours » d'une valeur
+    # de versions ou plateforme qui n'est pas une liste nommée, #305).
     fb <- FICHE; fb[[ch]] <- b
     r <- attrape(rejouer_fiche(BASE, fb))
-    verifier(sprintf("T11 fiche$%s chaîne d'encodage bytes (non une liste) : rejeu rendu, lu « %s », verdict « non déterminable », write.csv() du bilan sans erreur", ch, repere),
+    verifier(sprintf("T11 fiche$%s chaîne d'encodage bytes (non une liste) : rejeu rendu, lu « « %s » », verdict « non déterminable », write.csv() du bilan sans erreur", ch, repere),
              if (!inherits(r, "rejeu")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
-             else if (!identical(r$bilan$lu[ligne], repere)) sprintf("lu « %s »", r$bilan$lu[ligne])
+             else if (!identical(r$bilan$lu[ligne], paste0("« ", repere, " »"))) sprintf("lu « %s »", r$bilan$lu[ligne])
              else if (!identical(r$bilan$verdict[ligne], "non déterminable")) sprintf("verdict « %s »", r$bilan$verdict[ligne])
              else if (inherits(attrape(write.csv(r$bilan, tempfile())), "error")) "write.csv() en erreur"
              else TRUE)
@@ -1214,13 +1216,13 @@ local({
                   function(s) identical(tablexp:::citer_segment(s), s), NA)
     all(cites) && all(nus)
   })
-  verifier("T13 D6 injectivité : « et » d'un segment cité ne se confondent pas avec les guillemets de la citation ; octets invalides et chaîne latin-1 réservés cités ; NA et nom bytes jamais entre « … »", {
+  verifier("T13 D6 injectivité : « et » d'un segment cité ne se confondent pas avec les guillemets de la citation ; octets invalides et chaîne latin-1 réservés cités ; NA écrit « NA », nu (chaîne, #305), et nom bytes jamais entre « … »", {
     cs <- tablexp:::citer_segment
     inv <- "a/\xe9"; lat <- "a/\xe9"; Encoding(lat) <- "latin1"
     by <- "a/\xe9"; Encoding(by) <- "bytes"
     octets_egaux(cs(paste0(GA, " x ", GF)), paste0(GA, " <U+00AB> x <U+00BB> ", GF)) &&
       identical(cs(inv), paste0(GA, " a/<e9> ", GF)) && octets_egaux(cs(lat), paste0(GA, " a/", u(0xe9), " ", GF)) &&
-      identical(cs(NA_character_), NA_character_) && identical(cs(by), tablexp:::neutraliser_citation(by)) &&
+      identical(cs(NA_character_), "NA") && identical(cs(by), tablexp:::neutraliser_citation(by)) &&
       !grepl(GA, cs(by), fixed = TRUE) && identical(cs(character(0)), character(0)) &&
       identical(cs(c("tv", "a/b")), c("tv", paste0(GA, " a/b ", GF)))
   })
@@ -1489,7 +1491,7 @@ local({
   verifier("T15 #307-T18 empreintes/fichier \u00ab abc \u00bb (forme quelconque) : ligne 14 nue, sans motif de forme ; \u00ab non v\u00e9rifi\u00e9e \u00bb", {
     identical(unname(fichier("abc")), c("abc", "non v\u00e9rifi\u00e9e"))
   })
-  verifier("T15 #307 citer_chaine() appel\u00e9e directement : contextes segment, valeur_isolee, toujours ; mots et motifs r\u00e9serv\u00e9s propres au contexte (option M ; C1) ; pr\u00e9fixe \u00ab illisible ( \u00bb ; espace de t\u00eate ou de queue ; cha\u00eene vide nue hors \u00ab toujours \u00bb ; NA rendu NA", {
+  verifier("T15 #307 citer_chaine() appel\u00e9e directement : contextes segment, valeur_isolee, toujours ; mots et motifs r\u00e9serv\u00e9s propres au contexte (option M ; C1) ; pr\u00e9fixe \u00ab illisible ( \u00bb ; espace de t\u00eate ou de queue ; cha\u00eene vide nue hors \u00ab toujours \u00bb ; NA \u00e9crit \u00ab NA \u00bb, nu (cha\u00eene, #305)", {
     cc <- tablexp:::citer_chaine
     identical(cc(c("NULL", "absente", "abc", "NA, NA"), "segment"), c("NULL", "absente", "abc", entre("NA, NA"))) &&
       identical(cc(c("NULL", "absente", "NA", "abc", "a/b", "a=b", "NA, NA", "NA, NA, NA", "NA, NA, a"), "valeur_isolee"),
@@ -1498,16 +1500,15 @@ local({
       identical(cc("NA, NA", "toujours"), entre("NA, NA")) &&
       identical(cc(c("illisible (x", "illisible", " a", "a ", ""), "valeur_isolee"),
                 c(entre("illisible (x"), "illisible", entre(" a"), entre("a "), "")) &&
-      identical(cc(c("abc", "", NA), "toujours"), c(entre("abc"), entre(""), NA)) &&
+      identical(cc(c("abc", "", NA), "toujours"), c(entre("abc"), entre(""), "NA")) &&
       octets_egaux(cc(by("\xe9"), "toujours"), entre(REPERE)) && identical(cc(by("\xe9"), "valeur_isolee"), REPERE) &&
       identical(cc(character(0), "toujours"), character(0)) &&
       identical(tablexp:::citer_segment("a/b"), entre("a/b"))
   })
-  # Règle cible du segment (ADR 0012, annotation acceptée M527 ; #305) : NA
-  # écrit nu « NA », chaîne vide nue, chaîne « NA » réservée. Défaut connu à
-  # e740f77 (citer_segment() rend NA, "", "NA") ; R1 du visa
-  # d'actuary-approfondi sur #307.
-  echec_attendu("T15 #307 citer_segment(c(NA, \"\", \"NA\")) : NA \u00e9crit \u00ab NA \u00bb, cha\u00eene vide nue, \u00ab NA \u00bb entre \u00ab \u2026 \u00bb (r\u00e8gle cible, M527)", "#305", {
+  # Règle du segment (ADR 0012, annotation acceptée M527 ; #305, Q3, cellule
+  # N8) : NA écrit nu « NA », chaîne vide nue, chaîne « NA » réservée ; échec
+  # attendu jusqu'à #305 (R1 du visa d'actuary-approfondi sur #307).
+  verifier("T15 #307 citer_segment(c(NA, \"\", \"NA\")) : NA \u00e9crit \u00ab NA \u00bb, cha\u00eene vide nue, \u00ab NA \u00bb entre \u00ab \u2026 \u00bb (r\u00e8gle M527, #305 N8)", {
     identical(tablexp:::citer_segment(c(NA, "", "NA")), c("NA", "", entre("NA")))
   })
   verifier("T15 #307 citer_valeur_lue() : cha\u00eene unique cit\u00e9e selon le contexte ; autre valeur d\u00e9crite par sa forme, nue (NA, absente, illisible)", {
@@ -1516,5 +1517,130 @@ local({
               c("NA", "absente", "illisible (double de longueur 1)", "illisible (character de longueur 2)",
                 "illisible (character de longueur 1)", entre("x"))) &&
       identical(cv("x", "valeur_isolee"), "x")
+  })
+})
+
+# --- T16 : noms et valeurs des paires des lignes 10 et 11 ; NA, "" et « NA »
+#     dans un segment, un nom et une valeur (#305 ; volet du rejeu de #302 ;
+#     spécifications d'actuary-approfondi Q2, cellules P1 à P9, et Q3,
+#     cellules N1 à N12 ; M526 ; ADR 0012, annotation du 17/11/2026, point
+#     3.6). Valeur calculée à la main (textes, verdicts) ; P9 et N12 (octets
+#     sous C et C.UTF-8) : ce fichier lancé sous LC_ALL=C, attendus comparés
+#     octet à octet. Règle V3 précisée (Q4, aucun code) : test de constat d'un
+#     nœud aux noms incomplets cité à son propre chemin, avec contre-épreuve.
+#     Littéraux non ASCII par \u00XX ou intToUtf8().
+local({
+  u <- function(...) intToUtf8(c(...))
+  GA <- u(0xab); GF <- u(0xbb)
+  entre <- function(s) paste0(GA, " ", s, " ", GF)
+  REPERE <- "<chaîne d'encodage bytes>"
+  by <- function(s) { Encoding(s) <- "bytes"; s }
+  octets_egaux <- function(a, b) identical(charToRaw(a), charToRaw(b))
+  nd <- "non déterminable"
+  d <- "différente : "
+  # Cellule une ligne, UTF-8 valide (P9, N12).
+  saine <- function(s) validUTF8(s) && !grepl("[\n\v\f\r]", s, useBytes = TRUE)
+  bilan_de <- function(f) rejouer_fiche(BASE, f)$bilan
+  nom2 <- function(nom, f = FICHE) { names(f$versions)[2L] <- nom; f }
+  val_r <- function(v, f = FICHE) { f$versions["R"] <- list(v); f }
+  versions_ent <- function(v, f = FICHE) { f["versions"] <- list(v); f }
+  plat_plus <- function(nom, v, f = FICHE) { f$plateforme <- c(f$plateforme, setNames(list(v), nom)); f }
+  lu10 <- function(f) bilan_de(f)$lu[10L]
+  RV <- FICHE$versions$R
+  PRE <- paste0("tablexp=", FICHE$versions$tablexp, " ; ")
+  paires_nues <- function(l) paste(names(l), unlist(l), sep = "=", collapse = " ; ")
+
+  verifier("T16 #305 préalable : versions de la fiche nommées tablexp, R (position 2 : R)",
+           identical(names(FICHE$versions), c("tablexp", "R")))
+  verifier("T16 #305-P1 nom 2 « a=b ; c » : ligne 10 « « a=b ; c »=R version … » (nom cité, « = » séparateur du contexte nom de paire)", {
+    l <- lu10(nom2("a=b ; c"))
+    octets_egaux(l, paste0(PRE, entre("a=b ; c"), "=", RV)) && saine(l)
+  })
+  verifier("T16 #305-P1 nom 2 « a=b » (seul séparateur « = ») : ligne 10 « « a=b »=R version … » ; verdict 10 « différente : R (absent de la fiche reçue), a=b (absent de la fiche rendue) », segment nu (Q2, « Conséquence visible »)", {
+    b <- bilan_de(nom2("a=b"))
+    octets_egaux(b$lu[10L], paste0(PRE, entre("a=b"), "=", RV)) && saine(b$lu[10L]) &&
+      octets_egaux(b$verdict[10L], paste0(d, "R (absent de la fiche re\u00e7ue), a=b (absent de la fiche rendue)"))
+  })
+  verifier("T16 #305-P2 valeur R « b ; c=d » : ligne 10 « R=« b ; c=d » »", {
+    l <- lu10(val_r("b ; c=d"))
+    octets_egaux(l, paste0(PRE, "R=", entre("b ; c=d"))) && saine(l)
+  })
+  verifier("T16 #305-P3 plateforme + nom « a=b ; c » de valeur d, ou + nom a de valeur « b ; c=d » : deux lignes 11 distinctes (identiques avant #305)", {
+    l11 <- bilan_de(FICHE)$lu[11L]
+    a <- bilan_de(plat_plus("a=b ; c", "d"))$lu[11L]; b <- bilan_de(plat_plus("a", "b ; c=d"))$lu[11L]
+    octets_egaux(a, paste0(l11, " ; ", entre("a=b ; c"), "=d")) &&
+      octets_egaux(b, paste0(l11, " ; a=", entre("b ; c=d"))) && !identical(a, b) && saine(a) && saine(b)
+  })
+  verifier("T16 #305-P4 nom 2 « <U+0001> » tapé cité « « <U+003C>U+0001> » » ; contre-épreuve : caractère de contrôle \\001 neutralisé nu <U+0001> (inchangé)", {
+    octets_egaux(lu10(nom2("<U+0001>")), paste0(PRE, entre("<U+003C>U+0001>"), "=", RV)) &&
+      octets_egaux(lu10(nom2("\001")), paste0(PRE, "<U+0001>=", RV))
+  })
+  verifier("T16 #305-P5 nom 2 «  R » (espace de tête) et nom 2 à guillemets : cités, guillemets du nom en <U+00AB>, <U+00BB>", {
+    octets_egaux(lu10(nom2(" R")), paste0(PRE, entre(" R"), "=", RV)) &&
+      octets_egaux(lu10(nom2(paste0(GA, " x ", GF))), paste0(PRE, entre("<U+00AB> x <U+00BB>"), "=", RV))
+  })
+  verifier("T16 #305-P6 valeur R « absente », « illisible (… », repère bytes tapé, à guillemets : entre « … » ; contre-épreuves NULL, 1 et chaîne bytes nues (inchangées)", {
+    l <- vapply(list("absente", "illisible (double de longueur 1)", REPERE, paste0(GA, " v ", GF), NULL, 1, by("\xe9t\xe9")),
+                function(v) lu10(val_r(v)), "")
+    attendus <- paste0(PRE, "R=", c(entre("absente"), entre("illisible (double de longueur 1)"),
+                                    entre("<U+003C>chaîne d'encodage bytes>"), entre("<U+00AB> v <U+00BB>"),
+                                    "absente", "illisible (double de longueur 1)", REPERE))
+    all(mapply(octets_egaux, l, attendus)) && !anyDuplicated(l) && all(vapply(l, saine, NA))
+  })
+  verifier("T16 #305-P7 et N7 versions chaîne « a=1 », « », « absente », « NA » : entre « … » (contexte toujours) ; contre-épreuves list(a = \"1\"), liste nommée vide, NULL, NA nues (inchangées) ; huit textes distincts", {
+    l <- vapply(list("a=1", "", "absente", "NA", list(a = "1"), setNames(list(), character(0)), NULL, NA_character_),
+                function(v) lu10(versions_ent(v)), "")
+    attendus <- c(entre("a=1"), entre(""), entre("absente"), entre("NA"), "a=1", "", "absente", "NA")
+    all(mapply(octets_egaux, l, attendus)) && !anyDuplicated(l)
+  })
+  verifier("T16 #305-P8 fiche ordinaire (FICHE, FICHE_TV) : attendu et lu des lignes 10 et 11 égaux aux paires nom=valeur nues (aucune valeur ordinaire réservée)", {
+    ok <- function(f) { b <- bilan_de(f)
+      identical(b$lu[10:11], c(paires_nues(f$versions), paires_nues(f$plateforme))) && identical(b$attendu[10:11], b$lu[10:11]) }
+    ok(FICHE) && ok(FICHE_TV)
+  })
+  verifier("T16 #305-N1 N2 nom 2 « NA » (chaîne) : ligne 10 « « NA »=R version … » ; verdict « différente : R (absent de la fiche reçue), « NA » (absent de la fiche rendue) » (texte de verdict changé, M526)", {
+    b <- bilan_de(nom2("NA"))
+    octets_egaux(b$lu[10L], paste0(PRE, entre("NA"), "=", RV)) &&
+      octets_egaux(b$verdict[10L], paste0(d, "R (absent de la fiche reçue), ", entre("NA"), " (absent de la fiche rendue)"))
+  })
+  verifier("T16 #305-N3 N4 nom 2 NA et nom 2 vide : « NA=R version … » et « =R version … », « non déterminable » (inchangés) ; distincts de N1", {
+    a <- bilan_de(nom2(NA_character_)); b <- bilan_de(nom2(""))
+    identical(a$lu[10L], paste0(PRE, "NA=", RV)) && identical(b$lu[10L], paste0(PRE, "=", RV)) &&
+      identical(c(a$verdict[10L], b$verdict[10L]), c(nd, nd)) && !identical(a$lu[10L], lu10(nom2("NA")))
+  })
+  verifier("T16 #305-N5 N6 valeur R « NA » (chaîne) citée « R=« NA » » ; valeur NA « R=NA » et vide « R= » (inchangées) ; trois textes distincts", {
+    l <- c(lu10(val_r("NA")), lu10(val_r(NA_character_)), lu10(val_r("")))
+    octets_egaux(l[1L], paste0(PRE, "R=", entre("NA"))) && identical(l[2:3], paste0(PRE, c("R=NA", "R=")))
+  })
+  verifier("T16 #305-N8 citer_segment(c(NA, \"\", \"NA\")) : trois chaînes distinctes, aucune NA", {
+    s <- tablexp:::citer_segment(c(NA, "", "NA"))
+    is.character(s) && !anyNA(s) && !anyDuplicated(s)
+  })
+  local({
+    p <- PLAN_TV; p$etapes$positionnement$table_reference <- "NA"
+    x <- construire_table(BASE, ROLES, p, tables_reference = list("NA" = table_embarquee("TV 88-90")))
+    f <- lire_fiche(ecrire_fiche(x$fiche))
+    verifier("T16 #305-N9 clé de tables_reference « NA », fiche non altérée : lignes 8 et 15 « « NA » : … » ; verdicts de succès", {
+      b <- bilan_de(f)
+      identical(b$verdict, VERDICTS_SUCCES) &&
+        octets_egaux(b$lu[8L], paste0(entre("NA"), " : ", f$tables_reference[["NA"]]$empreinte)) &&
+        octets_egaux(b$lu[15L], paste0(entre("NA"), " : métadonnées de la fiche"))
+    })
+    verifier("T16 #305-N10 même clé, source altérée : verdicts 12 et 15 « différente : tables_reference/« NA »/source » (texte de verdict changé, M526)", {
+      g <- f; g$tables_reference[["NA"]]["source"] <- list("ma source")
+      b <- bilan_de(g)
+      octets_egaux(b$verdict[12L], paste0(d, "tables_reference/", entre("NA"), "/source")) &&
+        identical(b$verdict[15L], b$verdict[12L])
+    })
+  })
+  verifier("T16 #305-N11 champ de premier niveau « NA » ajouté à la fiche : verdict 12 « différente : « NA » (absent de la fiche rendue) » (texte de verdict changé, M526)", {
+    f <- FICHE; f[["NA"]] <- 1
+    octets_egaux(bilan_de(f)$verdict[12L], paste0(d, entre("NA"), " (absent de la fiche rendue)"))
+  })
+  verifier("T16 #305-Q4 règle V3 : nom 1 de convention mis à NA, nœud aux noms incomplets cité à son propre chemin « différente : convention » ; contre-épreuve : valeur du même champ changée sous son nom complet, « différente : convention/<nom> »", {
+    f <- FICHE; names(f$convention)[1L] <- NA
+    g <- FICHE; g$convention[[1L]] <- "zz"
+    identical(bilan_de(f)$verdict[12L], paste0(d, "convention")) &&
+      identical(bilan_de(g)$verdict[12L], paste0(d, "convention/", names(FICHE$convention)[1L]))
   })
 })
