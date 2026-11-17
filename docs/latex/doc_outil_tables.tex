@@ -6076,7 +6076,26 @@ la plateforme, de la fiche et de l'empreinte du résultat «~identique~»,
 empreinte du fichier «~non vérifiée~», témoin «~catalogue~»
 «~identique~» au statut «~comparaison exacte~» (lignes~9 à~15~; aucun
 plan de référence ne porte de table de statut \code{embarquee}, si bien
-que la ligne~15 y est celle d'une fiche sans telle table).
+que la ligne~15 y est celle d'une fiche sans telle table). Le cas d'une
+table embarquée y est couvert sans référence nouvelle (issue~\#303~; avis
+d'\code{actuary} du 16/11/2026, décision M520)~: le plan de R10, construit
+dans le test et non par \code{plans\_reference}, lit TV~88-90 par
+\code{table\_embarquee()} sous la clé \code{tv}, sur l'entrée de
+référence~; six tests vérifient la construction sans refus~; l'élément
+\code{fiche\$tables\_reference\$tv}, seule clé, de nom «~TV 88-90~» et de
+statut \code{embarquee}, dont \code{source}, \code{forme\_origine}
+(\code{lx}) et \code{empreinte} sont égales à celles du catalogue installé
+(\code{tables\_embarquees()})~; la fiche écrite puis relue, son élément
+\code{tables\_reference} \code{identical()} à celui de la construction~;
+le rejeu sans \code{tables\_reference} (la table est relue par son nom
+dans le package, ADR~0015)~: objet \code{identical()} hors
+\code{execution}, lignes~9 à~15 comme ci-dessus~; la ligne~15 au texte
+exact (\code{attendu}~: «~tv~: métadonnées du catalogue du package
+installé~»~; \code{lu}~: «~tv~: métadonnées de la fiche~»~; «~identique~»,
+«~comparaison exacte~»)~; le rapport figé de la construction, sous les
+contrôles appliqués aux plans de référence (section~\ref{sec:rapport-fige}).
+Ce sont des identités exactes et des textes~: aucune valeur de la table
+positionnée n'y est comparée à une référence.
 \code{tests/controles/locale\_c.R} compare les octets du bilan du rejeu
 de R1, des cellules des bilans de fiches et de données à nom, classe ou
 fichier de provenance non ASCII (verdicts des lignes~10 et~12, ligne~1
@@ -18429,7 +18448,9 @@ décimaux, les textes fixes et les légendes (pour un plan qui demande l'étape
 \code{validation}, comme R8~: absence du paragraphe «~non demandée par le
 plan~», légendes des tables \code{cellules} et \code{statistiques} de la
 validation et \code{retraits} de l'importance des exclusions), et vérifie que la ligne
-\code{\# rejeu} de la fiche écrite est \code{TEXTE\_REJEU\_FICHE}.
+\code{\# rejeu} de la fiche écrite est \code{TEXTE\_REJEU\_FICHE}~; elle
+refait les mêmes contrôles du document sur le plan de R10 lu sur TV~88-90
+embarquée (issue~\#303~; section~\ref{sec:verifications-construction}).
 \code{tests/controles/locale\_c.R} compare les octets du rapport de chacun des plans de référence sous
 les deux locales.\par}
 
