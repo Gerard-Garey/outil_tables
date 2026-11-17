@@ -990,7 +990,8 @@ controler_forme_hors_resultat <- function(x) {
 # résultat (M71) et hors de la forme canonique (M499 (a) : classe tbl_df et
 # attributs quelconques admis) ; le rapport en restitue pourtant le type, les
 # dimensions et les noms de colonnes. Quatre écarts à ce que le périmètre de
-# l'empreinte établit sont refusés objet_modifie, chemin cité, dans cet ordre :
+# l'empreinte établit sont refusés objet_modifie, chemin cité, dans l'ordre (4)
+# d'abord, puis (1), (2), (3) :
 # (1) la valeur n'est pas un data.frame (liste portant la classe) ; (2) son
 # nombre de lignes diffère de la longueur de numeros_conserves, ou n'est pas
 # lisible (row.names compacts de la forme c(NA, NA) : NA) ; (3) une colonne
@@ -1007,10 +1008,15 @@ controler_forme_hors_resultat <- function(x) {
 # authenticité que l'empreinte ne peut pas établir). Une lecture sans dispatch
 # (lire_chemin(), a_classe(), attr(), .row_names_info()), la même que celle du
 # rendu (structure_seule() de lignes_racines()) : une classe de l'entrée, avec
-# ou sans méthode dim(), names() ou length(), d'encodage « bytes » comprise, ne
-# change ni le contrôle ni le rendu et ne lève pas d'erreur R. Un chemin
-# numeros_conserves absent ou NULL ou un fiche/roles qui n'est pas un vecteur
-# de chaînes n'est pas contrôlé (même règle que le contrôle 5). Rend TRUE.
+# ou sans méthode dim(), names() ou length(), ne change ni le contrôle ni le
+# rendu et ne lève pas d'erreur R. Une classe d'encodage « bytes » passe le
+# contrôle 6 mais est refusée au rendu, type_non_canonique (#128), comme à tout
+# chemin (comportement inchangé). Une entrée dont la méthode dim() annonce moins
+# de lignes qu'elle n'en a donne dès la construction un objet incohérent, que ce
+# contrôle refuse ; si elle en annonce plus, la construction s'arrête sur une
+# erreur R (#312). Un chemin numeros_conserves absent ou NULL ou un fiche/roles
+# qui n'est pas un vecteur de chaînes n'est pas contrôlé (même règle que le
+# contrôle 5). Rend TRUE.
 controler_lignes_conservees <- function(x) {
   # Copie de l'entrée (hors empreinte) et les deux chemins du périmètre de
   # l'empreinte qui l'ancrent : lignes conservées et colonnes de rôle.
