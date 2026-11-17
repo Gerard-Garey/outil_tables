@@ -1,3 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-construire-table:MOTIFS_RESERVES_CITATION,#308,"constante de la citation F307 (motif réservé par contexte, un seul grepl()), documentée par docwriter en fin de branche (règle 9)"
-entree,fonctions-donnees:fin_effective,#308,"assistant de la fin effective (fin moins délai), documenté par docwriter en fin de branche (règle 9)"
