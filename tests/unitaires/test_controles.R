@@ -968,6 +968,14 @@ for (cas in list(
   list(nom = "paste() d'une valeur non citée sous %s",
        fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", paste(x, collapse = \", \")))"),
        motif = "valeur insérée par %s sans citation ni forme admise : paste(x"),
+  # Formes de citation du bilan du rejeu (#299) : seules celles de CITATIONS
+  # sont admises, en appel direct ou comme fonction appliquée d'un vapply().
+  list(nom = "vapply() d'une fonction non d\u00e9clar\u00e9e sous %s",
+       fichiers = list(outils = "f <- function(x) refuser(\"m\", \"a\", formuler(\"x %s\", vapply(x, identity, \"\", USE.NAMES = FALSE)))"),
+       motif = "valeur ins\u00e9r\u00e9e par %s sans citation ni forme admise : vapply(x, identity"),
+  list(nom = "valeur lue non cit\u00e9e sous %s \u00e0 c\u00f4t\u00e9 d'une citation d\u00e9clar\u00e9e",
+       fichiers = list(outils = "f <- function(x, y) refuser(\"m\", \"a\", formuler(\"x %s %s\", citer_valeur_lue(x, \"toujours\"), y))"),
+       motif = "valeur ins\u00e9r\u00e9e par %s sans citation ni forme admise : y"),
   list(nom = "gabarit non constant",
        fichiers = list(outils = "f <- function(g, x) refuser(\"m\", \"a\", formuler(g, citer(x)))"),
        motif = "gabarit de formuler() non constant : g"),
@@ -1021,6 +1029,15 @@ verifier("messages de refus : échoue sur une exception couvrant une constante n
 unlink(c(d, e), recursive = TRUE)
 d <- modules_temoins(list(outils = c(constante_non_ascii[1L], sub("@@", "texte_moteur(TYPES[x])", constante_non_ascii[2L], fixed = TRUE))))
 verifier("messages de refus : passe sur une constante non ASCII du moteur marquée par texte_moteur(), sans exception",
+         passe(controle("messages_refus.R", shQuote(d), shQuote(sans_exception))))
+unlink(d, recursive = TRUE)
+d <- modules_temoins(list(outils = c(
+  "f <- function(x, y) {",
+  "  p <- if (is.null(y)) \"NULL\" else citer_fichiers_lus(y)",
+  "  refuser(\"m\", \"a\", formuler(\"x %s %s %s %s\", citer_valeur_lue(x, \"toujours\"), p, citer_segment(x),",
+  "                                 vapply(x, citer_valeur_lue, \"\", \"toujours\", USE.NAMES = FALSE)))",
+  "}")))
+verifier("messages de refus : passe sur citer_valeur_lue(), citer_fichiers_lus() et citer_segment() (appel direct, symbole suivi, vapply() par leur nom ; #299)",
          passe(controle("messages_refus.R", shQuote(d), shQuote(sans_exception))))
 unlink(d, recursive = TRUE)
 d <- modules_temoins(list(outils = c(
