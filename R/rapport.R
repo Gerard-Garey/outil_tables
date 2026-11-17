@@ -984,6 +984,89 @@ controler_forme_hors_resultat <- function(x) {
   invisible(TRUE)
 }
 
+# Lignes conservées rapprochées du périmètre de l'empreinte (#294 ; ADR 0012,
+# seconde annotation du 16/11/2026, (b), « exception ancrée » ; décision du
+# mainteneur du 17/11/2026, M522) : lignes_conservees est hors de l'empreinte du
+# résultat (M71) et hors de la forme canonique (M499 (a) : classe tbl_df et
+# attributs quelconques admis) ; le rapport en restitue pourtant le type, les
+# dimensions et les noms de colonnes. Quatre écarts à ce que le périmètre de
+# l'empreinte établit sont refusés objet_modifie, chemin cité, dans cet ordre :
+# (1) la valeur n'est pas un data.frame (liste portant la classe) ; (2) son
+# nombre de lignes diffère de la longueur de numeros_conserves, ou n'est pas
+# lisible (row.names compacts de la forme c(NA, NA) : NA) ; (3) une colonne
+# déclarée par fiche/roles manque à ses noms ; (4) elle est absente de l'objet
+# alors que numeros_conserves, qui est dans le périmètre, établit des lignes
+# conservées (M522 : une absence que l'empreinte ne peut pas établir est un
+# objet modifié, non une mention « absent de l'objet »). Un segment absent
+# (refus 4) se distingue d'un élément présent de valeur NULL (refus 1).
+# numeros_conserves et fiche/roles sont dans le périmètre : le contrôle 3 les a
+# vérifiés, ce contrôle se place après lui (après le contrôle 5, pour ne pas
+# renuméroter les contrôles 4 et 5 cités par l'ADR 0012, les tests et la
+# documentation). Rien d'autre n'est exigé de la valeur (ni classe, ni
+# attribut, ni type des colonnes, ni valeurs : copie de l'entrée, hors d'une
+# authenticité que l'empreinte ne peut pas établir). Une lecture sans dispatch
+# (lire_chemin(), a_classe(), attr(), .row_names_info()), la même que celle du
+# rendu (structure_seule() de lignes_racines()) : une classe de l'entrée, avec
+# ou sans méthode dim(), names() ou length(), d'encodage « bytes » comprise, ne
+# change ni le contrôle ni le rendu et ne lève pas d'erreur R. Un chemin
+# numeros_conserves absent ou NULL ou un fiche/roles qui n'est pas un vecteur
+# de chaînes n'est pas contrôlé (même règle que le contrôle 5). Rend TRUE.
+controler_lignes_conservees <- function(x) {
+  # Copie de l'entrée (hors empreinte) et les deux chemins du périmètre de
+  # l'empreinte qui l'ancrent : lignes conservées et colonnes de rôle.
+  chemin_lignes <- "etapes/donnees/resultat/lignes_conservees"
+  chemin_numeros <- "etapes/donnees/resultat/numeros_conserves"
+  chemin_roles <- "fiche/roles"
+  lire <- function(chemin) lire_chemin(x, strsplit(chemin, "/", fixed = TRUE)[[1L]])
+  n <- lire(chemin_numeros)$valeur
+  l <- lire(chemin_lignes)
+  if (!l$present) {
+    # Absence : refusée si numeros_conserves est présent (M522).
+    if (!is.null(n))
+      refuser("rapport", "objet_modifie",
+              formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                             "l'empreinte du résultat) est absente, alors que %s établit %d ligne(s) conservée(s). Le",
+                             "rapport ne restitue un objet que tel que construire_table() l'a rendu."),
+                       chemin_lignes, chemin_numeros, length(unclass(n))),
+              list(chemin = chemin_lignes, lu = "absente", attendu = "data.frame"))
+    return(invisible(TRUE))
+  }
+  v <- l$valeur
+  if (!a_classe(v, "data.frame") || !is.list(v)) {
+    d <- decrire_valeur(v)
+    refuser("rapport", "objet_modifie",
+            formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                           "l'empreinte du résultat) n'est pas un data.frame (liste de classe data.frame) ; valeur",
+                           "lue : %s. Le rapport ne restitue un objet que tel que construire_table() l'a rendu."),
+                     chemin_lignes, if (is.null(d)) "NULL" else d),
+            list(chemin = chemin_lignes, lu = class(v), attendu = "data.frame"))
+  }
+  if (!is.null(n)) {
+    attendu <- length(unclass(n))
+    lu <- .row_names_info(v, 2L)
+    if (is.na(lu) || lu != attendu)
+      refuser("rapport", "objet_modifie",
+              formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                             "l'empreinte du résultat) compte %d ligne(s) au lieu de %d, longueur de %s. Le rapport",
+                             "ne restitue un objet que tel que construire_table() l'a rendu."),
+                       chemin_lignes, lu, attendu, chemin_numeros),
+              list(chemin = chemin_lignes, lu = lu, attendu = attendu))
+  }
+  r <- lire(chemin_roles)$valeur
+  if (is.character(r)) {
+    colonnes <- unique(as.character(unclass(r)))
+    manquantes <- colonnes[!(colonnes %in% attr(v, "names", exact = TRUE))]
+    if (length(manquantes))
+      refuser("rapport", "objet_modifie",
+              formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
+                             "l'empreinte du résultat) ne porte pas la ou les colonne(s) %s, déclarée(s) par %s. Le",
+                             "rapport ne restitue un objet que tel que construire_table() l'a rendu."),
+                       chemin_lignes, liste_guillemets(manquantes), chemin_roles),
+              list(chemin = chemin_lignes, colonnes = manquantes))
+  }
+  invisible(TRUE)
+}
+
 # Empreinte des sources du package (option (iv), M70 ; cinquième annotation
 # du 20/10/2026, (c)) : MD5 du texte « <md5><2 espaces>R/<fichier> », une
 # ligne par fichier R/*.R, fichiers triés par octets, LF ; égale à
@@ -2340,7 +2423,8 @@ valeur_message <- function(v) {
 }
 
 # Contrôles avant le rendu (ADR 0012, point 2.5, et seconde annotation du
-# 24/10/2026, (b) 3 et 4), dans l'ordre ; au premier refus, rien n'est rendu.
+# 24/10/2026, (b) 3 et 4 ; seconde annotation du 16/11/2026, (a) et (b)), dans
+# l'ordre ; au premier refus, rien n'est rendu.
 controler_rapport <- function(x) {
   refus <- function(motif, texte, details) refuser("rapport", motif, texte, details)
   # 1. Classe exacte, et fiche qui est une liste ; un objet qui n'est pas une
@@ -2444,6 +2528,10 @@ controler_rapport <- function(x) {
   #    classe, attribut autre que names ou data.frame refusés type_non_canonique
   #    par l'écrivain unique, au lieu d'être rendus sans rien dire.
   controler_forme_hors_resultat(x)
+  # 6. Lignes conservées (copie de l'entrée, hors empreinte et hors forme
+  #    canonique) rapprochées de numeros_conserves et des colonnes de rôle, qui
+  #    sont dans le périmètre de l'empreinte (#294) : objet_modifie.
+  controler_lignes_conservees(x)
   invisible(TRUE)
 }
 
@@ -2504,9 +2592,13 @@ lignes_racines <- function(x, racines, apres = list()) {
   structure_seule <- function(v, chemin) {
     mention <- echapper_html(MENTIONS_RAPPORT[["structure_seule"]])
     if (is.data.frame(v)) {
-      colonnes <- gsub("\n", " ", echapper_html(texte_valeurs(names(v), joindre_chemin(chemin, "@colonnes"))$texte),
+      # Lecture sans dispatch (.row_names_info(), attr()), la même que celle du
+      # contrôle 6 : une classe de l'entrée définissant dim() ou names() ne
+      # change pas ce que le rapport restitue (#294).
+      colonnes <- gsub("\n", " ",
+                       echapper_html(texte_valeurs(attr(v, "names", exact = TRUE), joindre_chemin(chemin, "@colonnes"))$texte),
                        fixed = TRUE)
-      ligne(chemin, "data.frame", texte_entier(nrow(v), chemin),
+      ligne(chemin, "data.frame", texte_entier(.row_names_info(v, 2L), chemin),
             paste0(mention, echapper_html(MENTIONS_RAPPORT[["structure_colonnes"]]), colonnes))
     } else {
       ligne(chemin, typeof(v), texte_entier(length(v), chemin),

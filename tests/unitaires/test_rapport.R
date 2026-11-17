@@ -473,6 +473,119 @@ local({
     r <- attrape(ecrire_rapport(y))
     if (inherits(r, "error")) conditionMessage(r) else is.raw(r) && inherits(y$etapes$donnees$resultat$lignes_conservees, "tbl_df")
   })
+  # #294 (ADR 0012, seconde annotation du 16/11/2026, (b), « exception ancrée ») :
+  # lignes_conservees, copie de l'entrée hors empreinte et hors forme canonique,
+  # rapprochée de numeros_conserves et de fiche/roles (périmètre de l'empreinte).
+  # Refus objet_modifie, chemin cité (details$chemin) ; valeurs calculées à la
+  # main (3 000 lignes, 7 colonnes de rôle, jeu du test). Les trois écarts de
+  # l'issue sont mesurés sur R1 : JEU[1:5, 1:2], "x", classe « k ».
+  LC <- "etapes/donnees/resultat/lignes_conservees"
+  lc1 <- x1$etapes$donnees$resultat$lignes_conservees
+  avec_lc <- function(v) { y <- x1; y$etapes$donnees$resultat["lignes_conservees"] <- list(v); y }
+  classe_k <- function(o) { class(o) <- "k"; o }
+  M1 <- "n'est pas un data.frame (liste de classe data.frame) ; valeur lue : "
+  cas_294 <- list(
+    list("JEU[1:5, 1:2]", function() JEU[1:5, 1:2], list(lu = 5L, attendu = 3000L),
+         "compte 5 ligne(s) au lieu de 3000, longueur de etapes/donnees/resultat/numeros_conserves"),
+    list("\"x\"", function() "x", list(lu = "character", attendu = "data.frame"),
+         paste0(M1, "\"x\" (character)")),
+    list("classe « k » sur la liste", function() classe_k(unclass(lc1)), list(lu = "k", attendu = "data.frame"),
+         paste0(M1, "objet de type list, de classe k")),
+    list("NULL (élément présent)", function() NULL, list(lu = "NULL", attendu = "data.frame"),
+         paste0(M1, "NULL")),
+    list("liste sans classe data.frame", function() as.list(lc1), list(lu = "list", attendu = "data.frame"),
+         paste0(M1, "objet de type list, de classe list")),
+    list("vecteur de classe data.frame", function() structure(letters, class = "data.frame"),
+         list(lu = "data.frame", attendu = "data.frame"), paste0(M1, "objet de type character, de classe data.frame")),
+    list("1 ligne de moins", function() lc1[-1L, ], list(lu = 2999L, attendu = 3000L),
+         "compte 2999 ligne(s) au lieu de 3000"),
+    list("0 ligne", function() lc1[0L, ], list(lu = 0L, attendu = 3000L), "compte 0 ligne(s) au lieu de 3000"),
+    list("row.names compacts c(NA, NA) : nombre de lignes illisible", function() { v <- lc1; attr(v, "row.names") <- c(NA_integer_, NA_integer_); v },
+         list(lu = NA_integer_, attendu = 3000L), "compte NA ligne(s) au lieu de 3000, longueur de etapes/donnees/resultat/numeros_conserves"),
+    list("colonne sexe retirée", function() lc1[, names(lc1) != "sexe"], list(colonnes = "sexe"),
+         "ne porte pas la ou les colonne(s) « sexe », déclarée(s) par fiche/roles"),
+    list("colonnes id_contrat et date_sortie retirées", function() lc1[, !(names(lc1) %in% c("id_contrat", "date_sortie"))],
+         list(colonnes = c("id_contrat", "date_sortie")),
+         "ne porte pas la ou les colonne(s) « id_contrat », « date_sortie », déclarée(s) par fiche/roles"),
+    list("colonne renommée", function() { v <- lc1; names(v)[3L] <- "genre"; v }, list(colonnes = "sexe"),
+         "colonne(s) « sexe »"),
+    list("aucune colonne, 3 000 lignes", function() lc1[, character(0)], list(colonnes = names(lc1)),
+         "ne porte pas la ou les colonne(s) « id_contrat », « id_tete », « sexe »"))
+  for (c_ in cas_294) {
+    verifier(sprintf("#294 : lignes_conservees %s : ecrire_rapport() refuse objet_modifie, chemin cité, une ligne, UTF-8", c_[[1L]]), {
+      r <- attrape(ecrire_rapport(avec_lc(c_[[2L]]())))
+      if (!inherits(r, "refus_tablexp")) sprintf("condition ou rendu : %s", class(r)[1L])
+      else une_ligne_utf8(r, controle_refus(r, "objet_modifie", c(list(chemin = LC), c_[[3L]]),
+                                            c(paste("Rapport figé : objet modifié après sa construction :", LC,
+                                                    "(copie de l'entrée, hors de l'empreinte du résultat)"), c_[[4L]],
+                                              "Le rapport ne restitue un objet que tel que construire_table() l'a rendu.")))
+    })
+  }
+  verifier("#294 : message d'une valeur de classe d'encodage bytes ou d'un nom de colonne bytes : refus objet_modifie (pas une erreur R), classe ou colonne citée sous le repère", {
+    b <- as.list(lc1); class(b) <- CLASSE_BYTES
+    n <- lc1[, names(lc1) != "sexe"]; names(n)[1L] <- CLASSE_BYTES
+    r1 <- attrape(ecrire_rapport(avec_lc(b))); r2 <- attrape(ecrire_rapport(avec_lc(n)))
+    if (!inherits(r1, "refus_tablexp") || !inherits(r2, "refus_tablexp")) return("refus attendus")
+    ok <- une_ligne_utf8(r1, controle_refus(r1, "objet_modifie", list(chemin = LC), paste0(M1, "objet de type list, de classe <chaîne d'encodage bytes>")))
+    if (!isTRUE(ok)) ok
+    else une_ligne_utf8(r2, controle_refus(r2, "objet_modifie", list(chemin = LC), "colonne(s) « id_contrat », « sexe »"))
+  })
+  verifier("#294 : lignes_conservees admise sans refus, rendue : tbl_df et attribut quelconque ajoutés à l'objet construit (même empreinte), classe « k » devant data.frame, colonne hors rôle ajoutée, noms de lignes quelconques", {
+    j <- lc1; class(j) <- c("tbl_df", "tbl", "data.frame"); attr(j, "simulation") <- list(a = 1); attr(j, "z") <- "z"
+    k <- lc1; class(k) <- c("k", "data.frame")
+    h <- lc1; h$autre <- seq_len(nrow(h))
+    r <- lc1; rownames(r) <- paste0("l", seq_len(nrow(r)))
+    e <- character(0)
+    for (cas in list(list("tbl_df", j), list("classe k", k), list("colonne hors rôle", h), list("noms de lignes", r))) {
+      o <- attrape(ecrire_rapport(avec_lc(cas[[2L]])))
+      if (!is.raw(o)) e <- c(e, sprintf("%s : %s", cas[[1L]], if (inherits(o, "error")) conditionMessage(o) else "pas de rendu"))
+    }
+    if (length(e)) e else TRUE
+  })
+  # Absence (décision du mainteneur du 17/11/2026, M522) : refusée, distincte de
+  # l'élément présent de valeur NULL (cas « NULL » ci-dessus).
+  verifier("#294 : lignes_conservees absente de l'objet, numeros_conserves présent (3 000 numéros) : refus objet_modifie, chemin cité, texte exact, une ligne, UTF-8", {
+    y <- x1; y$etapes$donnees$resultat$lignes_conservees <- NULL
+    r <- attrape(ecrire_rapport(y))
+    if (!inherits(r, "refus_tablexp")) sprintf("condition ou rendu : %s", class(r)[1L])
+    else une_ligne_utf8(r, controle_refus(r, "objet_modifie", list(chemin = LC, lu = "absente", attendu = "data.frame"),
+      paste("Rapport figé : objet modifié après sa construction :", LC,
+            "(copie de l'entrée, hors de l'empreinte du résultat) est absente, alors que",
+            "etapes/donnees/resultat/numeros_conserves établit 3000 ligne(s) conservée(s). Le rapport ne restitue un objet",
+            "que tel que construire_table() l'a rendu.")))
+  })
+  verifier("#294 : textes exacts des refus de valeur non data.frame (\"x\") et de colonne manquante (sexe)", {
+    r1 <- attrape(ecrire_rapport(avec_lc("x"))); r2 <- attrape(ecrire_rapport(avec_lc(lc1[, names(lc1) != "sexe"])))
+    if (!inherits(r1, "refus_tablexp") || !inherits(r2, "refus_tablexp")) return("refus attendus")
+    ok <- controle_refus(r1, "objet_modifie", NULL,
+      paste("Rapport figé : objet modifié après sa construction :", LC,
+            "(copie de l'entrée, hors de l'empreinte du résultat) n'est pas un data.frame (liste de classe data.frame) ;",
+            "valeur lue : \"x\" (character). Le rapport ne restitue un objet que tel que construire_table() l'a rendu."))
+    if (!isTRUE(ok)) ok
+    else controle_refus(r2, "objet_modifie", NULL,
+      paste("Rapport figé : objet modifié après sa construction :", LC,
+            "(copie de l'entrée, hors de l'empreinte du résultat) ne porte pas la ou les colonne(s) « sexe », déclarée(s) par",
+            "fiche/roles. Le rapport ne restitue un objet que tel que construire_table() l'a rendu."))
+  })
+  # Classe de l'entrée à méthodes S3 (admise par M499 (a)) : le contrôle et le
+  # rendu lisent la structure sans dispatch (.row_names_info(), attr()), les
+  # méthodes dim(), names(), length(), [[ et $ ne sont jamais appelées (elles
+  # mentent ou lèvent une erreur : un appel ferait échouer le test) ; méthodes définies dans
+  # globalenv() (trouvées par le dispatch) puis retirées.
+  verifier("#294 : lignes_conservees de classe « k » à méthodes dim(), names(), length(), [[ et $ (qui mentent ou lèvent une erreur) : rendue, octets identiques à o1 (structure lue sans dispatch) ; moins de lignes que numeros_conserves : refus objet_modifie", {
+    m <- list(dim.k = function(x) c(5L, 2L), names.k = function(x) c("a", "b"), length.k = function(x) stop("length.k appelée"),
+              `[[.k` = function(x, i, ...) stop("[[.k appelée"), `$.k` = function(x, name) stop("$.k appelée"))
+    for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+    tryCatch({
+      k <- lc1; class(k) <- c("k", "data.frame")
+      k2 <- lc1[-1L, ]; class(k2) <- c("k", "data.frame")
+      o <- attrape(ecrire_rapport(avec_lc(k))); r <- attrape(ecrire_rapport(avec_lc(k2)))
+      if (!is.raw(o)) sprintf("classe k : %s", if (inherits(o, "error")) conditionMessage(o) else class(o)[1L])
+      else if (!identical(o, o1)) "classe k : octets différents de o1"
+      else if (!inherits(r, "refus_tablexp")) sprintf("classe k, 2999 lignes : %s", class(r)[1L])
+      else controle_refus(r, "objet_modifie", list(chemin = LC, lu = 2999L, attendu = 3000L), "compte 2999 ligne(s) au lieu de 3000")
+    }, finally = rm(list = names(m), envir = globalenv()))
+  })
   verifier("#141 : execution absent ou de forme libre (liste simple de chaînes et de nombres, comme U3) : rendu identique à o1", {
     y <- x1; y$execution <- NULL
     z <- x1; z$execution <- list(debut = "autre", duree_secondes = -1)
