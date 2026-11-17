@@ -1,2 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-rapport:controler_lignes_conservees,#294,contrôle 6 de controler_rapport() : lignes_conservees rapprochée de numeros_conserves et de fiche/roles (objet_modifie) ; entrée de catalogue ajoutée au commit docs: de la branche (règle 9)
