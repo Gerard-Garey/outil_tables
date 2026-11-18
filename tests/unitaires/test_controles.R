@@ -1770,7 +1770,11 @@ unlink(attente_vide)
 
 COMMITS <- "commits_empreinte_code.R"
 recalcul_releve <- function(racine) {
-  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  fichiers <- list.files(file.path(racine, "R"))
+  fichiers <- fichiers[grepl("[.]R$", fichiers, useBytes = TRUE)]
+  # Tri par l'hexadécimal des octets, indépendant du moteur (#131).
+  hex <- vapply(fichiers, function(n) paste(sprintf("%02x", as.integer(charToRaw(n))), collapse = ""), "")
+  fichiers <- fichiers[order(hex, method = "radix")]
   md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
   t <- tempfile(); on.exit(unlink(t))
   writeBin(charToRaw(paste0(md5, "  R/", fichiers, "\n", collapse = "")), t)
@@ -1792,6 +1796,58 @@ verifier("commits_empreinte_code arbre : racine témoin (fichiers .r et cachés 
   r <- controle(COMMITS, "arbre", "--racine", shQuote(d))
   r$statut == 0L && identical(r$sortie, recalcul_releve(d)) && identical(r$sortie, tablexp:::empreinte_sources(d))
 })
+# Nom de R/ qui n'est pas de l'UTF-8 valide (#131). Avant : empreinte_arbre()
+# (list.files(pattern =)) écartait ce fichier en silence sous une locale UTF-8 ;
+# mesuré à 5e4f92d sur ce témoin : deux empreintes différentes sous LC_ALL=C et
+# sous C.UTF-8. Attendu : même empreinte sous les deux, égale au relevé construit
+# ici en octets (noms posés par octets bruts, tri par l'hexadécimal des octets,
+# hachage de chaque contenu par un fichier témoin), non au recalcul en R de
+# recalcul_releve() (aligné sur la même règle en octets, tri par l'hexadécimal).
+# Aucun nom ASCII ne précède les noms non ASCII dans l'ordre de list.files() : le
+# premier nom lu n'est pas ASCII, cas où sort(method = "radix") levait « Character
+# encoding must be UTF-8, Latin-1 or bytes » (mesuré sur la première version du
+# correctif, 2fbe1b6c). Sautés si le système de fichiers refuse ces noms
+# (temoin_131() rend NA).
+octets_131 <- function(...) as.raw(c(...))
+NOMS_131 <- list(rapport.R = charToRaw("rapport.R"), z.R = charToRaw("z.R"),
+                 latin1 = c(charToRaw("caf"), octets_131(0xe9), charToRaw(".R")),
+                 seul = c(octets_131(0xe9), charToRaw(".R")),
+                 utf8 = c(charToRaw("caf"), octets_131(0xc3, 0xa9), charToRaw(".R")),
+                 autre = charToRaw("b.r"))
+CONTENUS_131 <- vapply(seq_along(NOMS_131), function(i) sprintf("v%d <- %d\n", i, i), "")
+# Pose le témoin dans `d` ; rend l'empreinte attendue, ou NA si les noms sont refusés.
+temoin_131 <- function(d) {
+  dir.create(file.path(d, "R"), recursive = TRUE)
+  writeLines(c("Package: tablexp", "Version: 1"), file.path(d, "DESCRIPTION"))
+  for (i in seq_along(NOMS_131))
+    suppressWarnings(try(writeBin(charToRaw(CONTENUS_131[i]), file.path(d, "R", rawToChar(NOMS_131[[i]]))), silent = TRUE))
+  if (length(list.files(file.path(d, "R"))) != length(NOMS_131)) return(NA_character_)
+  md5_contenu <- function(texte) { t <- tempfile(); on.exit(unlink(t)); writeBin(charToRaw(texte), t); unname(tools::md5sum(t)) }
+  retenus <- setdiff(seq_along(NOMS_131), match("autre", names(NOMS_131)))   # tout sauf b.r
+  hex <- vapply(NOMS_131[retenus], function(n) paste(sprintf("%02x", as.integer(n)), collapse = ""), "")
+  ordre <- retenus[order(hex, method = "radix")]
+  releve <- unlist(lapply(ordre, function(i) c(charToRaw(paste0(md5_contenu(CONTENUS_131[i]), "  R/")), NOMS_131[[i]], octets_131(10L))))
+  md5_contenu(rawToChar(releve))
+}
+LOCALE_UTF8_131 <- locale_utf8_disponible()
+arbre_sous_locale <- function(racine, locale)
+  executer_rscript(file.path(CONTROLES, COMMITS), c("arbre", "--racine", shQuote(racine)), env = paste0("LC_ALL=", locale))
+verifier("#131 : une locale UTF-8 est disponible pour les témoins (sinon la moitié des témoins ne porte pas)",
+         nzchar(LOCALE_UTF8_131) || "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
+d_131 <- tempfile("racine_commits_131_")
+ATTENDU_131 <- temoin_131(d_131)
+if (!is.na(ATTENDU_131)) {
+  verifier("commits_empreinte_code arbre (#131) : nom de R/ non UTF-8, sous LC_ALL=C : empreinte = relevé en octets, égale à empreinte_sources()", {
+    r <- arbre_sous_locale(d_131, "C")
+    r$statut == 0L && identical(r$sortie, ATTENDU_131) && identical(r$sortie, tablexp:::empreinte_sources(d_131))
+  })
+  if (nzchar(LOCALE_UTF8_131))
+    verifier("commits_empreinte_code arbre (#131) : nom de R/ non UTF-8, sous une locale UTF-8 : même empreinte que sous LC_ALL=C (relevé en octets)", {
+      r <- arbre_sous_locale(d_131, LOCALE_UTF8_131)
+      r$statut == 0L && identical(r$sortie, ATTENDU_131)
+    })
+} else cat("  [sauté] commits_empreinte_code arbre (#131) : le système de fichiers refuse un nom de fichier qui n'est pas de l'UTF-8 valide\n")
+unlink(d_131, recursive = TRUE)
 verifier("commits_empreinte_code arbre : sources introuvables (sans DESCRIPTION, autre paquet, sans R/rapport.R) -> refus code 1, rien de deviné", {
   d <- tempfile("racine_commits_"); dir.create(file.path(d, "R"), recursive = TRUE); on.exit(unlink(d, recursive = TRUE))
   r1 <- controle(COMMITS, "arbre", "--racine", shQuote(d))
@@ -2031,5 +2087,25 @@ if (nzchar(Sys.which("git"))) {
   verifier("commits_empreinte_code references (noms de R/ cités par git) : commit dans la classe de l'empreinte -> code 0", {
     references(cites, c(releve_de(noms_cites), court(cc)))$statut == 0L
   })
+  # Nom de R/ non UTF-8 (#131), fichiers sur disque : l'empreinte que rend le mode
+  # arbre sous locale UTF-8 doit retrouver le commit (le mode historique lit déjà
+  # les noms en octets). Mesuré à 5e4f92d : arbre sous C.UTF-8 rendait une autre
+  # empreinte, d'où « aucun commit » (code 2).
+  non_utf8 <- tempfile("depot_commits_131_")
+  attendu_131 <- temoin_131(non_utf8)
+  if (!is.na(attendu_131)) {
+    git_t(non_utf8, "init", "-q"); git_t(non_utf8, "add", "-A"); git_t(non_utf8, "commit", "-q", "-m", shQuote("nom non UTF-8 dans R/"))
+    c131 <- git_t(non_utf8, "rev-parse", "HEAD")
+    for (loc in c("C", LOCALE_UTF8_131)) if (nzchar(loc)) local({
+      loc <- loc
+      verifier(sprintf("commits_empreinte_code (#131) : sous LC_ALL=%s, l'empreinte du mode arbre (nom de R/ non UTF-8) retrouve le commit en mode historique (code 0)", loc), {
+        ra <- sans_env_git(arbre_sous_locale)(non_utf8, loc)
+        rh <- sans_env_git(executer_rscript)(file.path(CONTROLES, COMMITS), c("historique", ra$sortie[1L], "--racine", shQuote(non_utf8)),
+                                             env = paste0("LC_ALL=", loc))
+        ra$statut == 0L && identical(ra$sortie, attendu_131) && rh$statut == 0L && identical(shas_de(rh), c131)
+      })
+    })
+  } else cat("  [sauté] commits_empreinte_code (#131) : le système de fichiers refuse un nom de fichier qui n'est pas de l'UTF-8 valide\n")
+  unlink(non_utf8, recursive = TRUE)
   unlink(c(depot, clone, temoin, lien, remise, cites), recursive = TRUE)
 } else cat("  [sauté] commits_empreinte_code : git absent : parcours de l'historique sur dépôts synthétiques non exécuté\n")

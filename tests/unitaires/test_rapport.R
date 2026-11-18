@@ -1192,3 +1192,69 @@ verifier("#163 : MENTIONS_RAPPORT$tables_reference_parametres égale le texte de
   identical(Encoding(m[["tables_reference_parametres"]]), "UTF-8") &&
     identical(paste0("<p>", html(unname(m[["tables_reference_parametres"]])), "</p>"), MENTION_163)
 })
+
+# --- #313 : lecture sans dispatch de l'écrivain, des contrôles et du rendu (identité exacte) ---
+# Une méthode S3 de la session, posée dans globalenv() (trouvée par le
+# dispatch, base ne définissant ni names() ni length() pour data.frame et
+# Date, ni rien pour construction), ne change ni l'empreinte du résultat
+# recalculée ni les octets du rapport figé d'un objet intact : R1 (x1, o1) et
+# le plan de #163 qui lit une table de référence importée. Méthodes qui
+# mentent (noms en capitales, longueur 0, dimensions 1 x 1, élément "z") ;
+# chacune posée seule, puis toutes ensemble, retirée dans un finally. Attendus
+# calculés avant la pose des méthodes. Témoin : sur 2e79567 (code qui précède
+# #313), onze des dix-neuf méthodes faisaient refuser le rapport d'un objet
+# intact : objet_modifie (names.data.frame, length.data.frame, names.Date,
+# length.Date, $.POSIXlt, $.default) ou rapport_objet_invalide
+# (names.construction, [[.construction, $.data.frame, unlist.AsIs,
+# unlist.default) ; les huit autres le laissaient inchangé (docs/latex,
+# « Lecture sans dispatch », Motif).
+local({
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  objets <- list(R1 = x1, table_importee = X163$importee)
+  attendus <- lapply(objets, function(x) list(rapport = ecrire_rapport(x), empreinte = tablexp:::empreinte_resultat(x)))
+  menteuses <- list(names = function(x) toupper(attr(x, "names", exact = TRUE)), length = function(x) 0L,
+                    dim = function(x) c(1L, 1L), "[[" = function(x, i, ...) "z", "$" = function(x, name) "z",
+                    unlist = function(x, recursive = TRUE, use.names = TRUE) "z")
+  methodes <- list()
+  # unlist et $ aussi sur AsIs (colonne racines de SECTIONS_RAPPORT), POSIXlt
+  # (composantes_date(), R/donnees.R) et default (reprise de #313 après audit).
+  paires <- rbind(expand.grid(g = names(menteuses), cl = c("data.frame", "Date", "construction"), stringsAsFactors = FALSE),
+                  data.frame(g = c("unlist", "unlist", "$", "$"), cl = c("AsIs", "default", "POSIXlt", "default")))
+  for (j in seq_len(nrow(paires))) {
+    nom <- paste0(paires$g[j], ".", paires$cl[j])
+    if (!exists(nom, envir = baseenv(), inherits = FALSE)) methodes[[nom]] <- menteuses[[paires$g[j]]]
+  }
+  # Écarts (rapport ou empreinte) des objets sous les méthodes `m`, posées puis retirées.
+  ecarts <- function(m) {
+    for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+    r <- tryCatch(lapply(objets, function(x) list(rapport = attrape(ecrire_rapport(x)),
+                                                   empreinte = attrape(tablexp:::empreinte_resultat(x)))),
+                  finally = rm(list = names(m), envir = globalenv()))
+    e <- character(0)
+    for (id in names(objets)) {
+      if (!identical(r[[id]]$rapport, attendus[[id]]$rapport))
+        e <- c(e, sprintf("%s : rapport %s", id, if (inherits(r[[id]]$rapport, "error")) conditionMessage(r[[id]]$rapport) else "différent"))
+      if (!identical(r[[id]]$empreinte, attendus[[id]]$empreinte)) e <- c(e, sprintf("%s : empreinte différente", id))
+    }
+    e
+  }
+  verifier(sprintf("#313 : méthodes de session %s, chacune seule : empreinte du résultat recalculée et octets du rapport identiques à ceux de l'objet intact (R1 et plan à table de référence)",
+                   paste(names(methodes), collapse = ", ")), {
+    e <- character(0)
+    for (n in names(methodes)) { k <- ecarts(methodes[n]); if (length(k)) e <- c(e, paste0(n, " : ", k)) }
+    if (length(e)) e else TRUE
+  })
+  verifier("#313 : les mêmes méthodes de session toutes ensemble : empreinte et octets du rapport identiques ; aucune méthode laissée dans globalenv()", {
+    e <- ecarts(methodes)
+    restantes <- names(methodes)[vapply(names(methodes), exists, NA, envir = globalenv(), inherits = FALSE)]
+    if (length(e) || length(restantes)) c(e, restantes) else TRUE
+  })
+  verifier("#313 : longueur_lue() : longueur sans dispatch (length.Date de session ignorée), classe d'encodage bytes sans erreur R, valeur sans classe inchangée", {
+    d <- as.Date("2020-01-01") + 0:4
+    b <- structure(1:3, class = CLASSE_BYTES)
+    assign("length.Date", function(x) 0L, envir = globalenv())
+    n <- tryCatch(tablexp:::longueur_lue(d), finally = rm("length.Date", envir = globalenv()))
+    identical(n, 5L) && identical(tablexp:::longueur_lue(b), 3L) && identical(tablexp:::longueur_lue(list(1, 2)), 2L) &&
+      identical(tablexp:::longueur_lue(NULL), 0L)
+  })
+})

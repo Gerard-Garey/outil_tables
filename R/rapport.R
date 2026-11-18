@@ -966,7 +966,7 @@ CHEMINS_FORME_HORS_RESULTAT <- setdiff(CHEMINS_HORS_RESULTAT, "etapes/donnees/re
 # fiche/empreintes), dont la forme relève du contrôle 3 (objet_modifie). Un
 # sous-arbre absent, ou présent de valeur NULL, n'est pas contrôlé. Rend TRUE.
 controler_forme_hors_resultat <- function(x) {
-  posixct <- FORME_EXECUTION$champ[FORME_EXECUTION$classe == "POSIXct/POSIXt"]
+  posixct <- .subset2(FORME_EXECUTION, "champ")[.subset2(FORME_EXECUTION, "classe") == "POSIXct/POSIXt"]
   for (chemin in CHEMINS_FORME_HORS_RESULTAT) {
     segments <- strsplit(chemin, "/", fixed = TRUE)[[1L]]
     v <- lire_chemin(x, segments)$valeur
@@ -1011,10 +1011,13 @@ controler_forme_hors_resultat <- function(x) {
 # ou sans méthode dim(), names() ou length(), ne change ni le contrôle ni le
 # rendu et ne lève pas d'erreur R. Une classe d'encodage « bytes » passe le
 # contrôle 6 mais est refusée au rendu, type_non_canonique (#128), comme à tout
-# chemin (comportement inchangé). Une entrée dont la méthode dim() annonce moins
-# de lignes qu'elle n'en a donne dès la construction un objet incohérent, que ce
-# contrôle refuse ; si elle en annonce plus, la construction s'arrête sur une
-# erreur R (#312). Un chemin numeros_conserves absent ou NULL ou un fiche/roles
+# chemin (comportement inchangé). Une entrée dont nrow(), les noms de lignes ou
+# une colonne comptent un autre nombre de lignes est refusée avant toute étape
+# (donnees_mal_formees, controler_lignes_donnees(), #312) : construire_table()
+# ne produit plus un objet de cette forme (ni, depuis #319, par une méthode `[`
+# de la classe qui ne rend pas les lignes demandées : preparer_donnees() la
+# refuse, donnees_mal_formees), et ce contrôle ne lit pas la longueur des
+# colonnes. Un chemin numeros_conserves absent ou NULL ou un fiche/roles
 # qui n'est pas un vecteur de chaînes n'est pas contrôlé (même règle que le
 # contrôle 5). Rend TRUE.
 controler_lignes_conservees <- function(x) {
@@ -1033,7 +1036,7 @@ controler_lignes_conservees <- function(x) {
               formuler(paste("Rapport figé : objet modifié après sa construction : %s (copie de l'entrée, hors de",
                              "l'empreinte du résultat) est absente, alors que %s établit %d ligne(s) conservée(s). Le",
                              "rapport ne restitue un objet que tel que construire_table() l'a rendu."),
-                       chemin_lignes, chemin_numeros, length(unclass(n))),
+                       chemin_lignes, chemin_numeros, longueur_lue(n)),
               list(chemin = chemin_lignes, lu = "absente", attendu = "data.frame"))
     return(invisible(TRUE))
   }
@@ -1048,7 +1051,7 @@ controler_lignes_conservees <- function(x) {
             list(chemin = chemin_lignes, lu = class(v), attendu = "data.frame"))
   }
   if (!is.null(n)) {
-    attendu <- length(unclass(n))
+    attendu <- longueur_lue(n)
     lu <- .row_names_info(v, 2L)
     if (is.na(lu) || lu != attendu)
       refuser("rapport", "objet_modifie",
@@ -1075,9 +1078,12 @@ controler_lignes_conservees <- function(x) {
 
 # Empreinte des sources du package (option (iv), M70 ; cinquième annotation
 # du 20/10/2026, (c)) : MD5 du texte « <md5><2 espaces>R/<fichier> », une
-# ligne par fichier R/*.R, fichiers triés par octets, LF ; égale à
-# `LC_ALL=C md5sum -t R/*.R | md5sum` (-t : mode texte ; sans lui, le md5sum de
-# Rtools écrit « * » devant les noms, rapporté en #107). `racine` doit être la racine des sources
+# ligne par fichier R/*.R, LF ; noms filtrés (`grepl(useBytes = TRUE)`) et
+# triés en octets (#131), donc même valeur sous toute locale ; égale à
+# `LC_ALL=C md5sum -t R/*.R | md5sum` pour des noms sans `\` ni saut de ligne
+# (restriction, M532 (c) : md5sum échappe le nom qui en contient, la commande
+# rend alors une autre valeur ; -t : mode texte, sans lui le md5sum de Rtools
+# écrit « * » devant les noms, rapporté en #107). `racine` doit être la racine des sources
 # de tablexp (DESCRIPTION lisible, Package: tablexp, R/rapport.R présent) ;
 # sinon, ou si un fichier de R/ est illisible, NA : rien n'est deviné.
 # Fonctions de base seulement, aucune constante d'un autre module (ordre
@@ -1088,7 +1094,16 @@ empreinte_sources <- function(racine) {
     tryCatch(read.dcf(description, fields = "Package")[1L, 1L], error = function(e) NA_character_)
   if (!identical(unname(paquet), "tablexp") || !file.exists(file.path(racine, "R", "rapport.R")))
     return(NA_character_)
-  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  # Filtre et tri en octets (#131) : sous une locale UTF-8, `list.files(pattern =)`
+  # écarte en silence un nom qui n'est pas de l'UTF-8 valide ; `useBytes = TRUE`
+  # donne sous toute locale la liste que voit `md5sum` sous LC_ALL=C. Le tri
+  # radix d'une chaîne native non ASCII lève « Character encoding must be UTF-8,
+  # Latin-1 or bytes » dès que le premier élément n'est pas ASCII (fr_FR.UTF-8
+  # met un nom accentué en tête) : les noms sont triés marqués « bytes ».
+  fichiers <- list.files(file.path(racine, "R"))
+  fichiers <- fichiers[grepl("[.]R$", fichiers, useBytes = TRUE)]
+  en_octets <- fichiers; Encoding(en_octets) <- "bytes"
+  fichiers <- fichiers[order(en_octets, method = "radix")]
   md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
   # Fichier illisible (md5sum rend NA) : sources introuvables, jamais un
   # relevé haché avec « NA » (#67, audit).
@@ -1479,7 +1494,11 @@ segments_texte <- function(noms, n) {
 # sans codage déclaré), ni le domaine des valeurs de ecrire_valeurs() : une
 # Date hors domaine, infinie ou non entière est admise (motifs
 # date_hors_domaine et date_non_entiere), refusée sous fiche/* ; rien n'est
-# ajouté au texte.
+# ajouté au texte. Lecture sans dispatch (#313 ; R/outils.R) : noms par
+# attr(v, "names", exact = TRUE), éléments par .subset2(), longueur par
+# longueur_lue(), lignes d'un data.frame par .row_names_info(v, 2L) ; une
+# méthode de la session (names, length, dim, [[) sur une classe d'une valeur
+# (data.frame, Date, facteur) ne change pas le texte.
 texte_objet <- function(x, premiere, entete, forme = "texte", canonique = FALSE, valeurs = TRUE) {
   tab <- as.raw(0x09); lf <- as.raw(0x0a)
   impossible <- function(chemin, message)
@@ -1505,8 +1524,8 @@ texte_objet <- function(x, premiere, entete, forme = "texte", canonique = FALSE,
   # Ligne @noms (attribut names présent) ; liste sans noms : ligne @longueur.
   noms_ligne <- function(v, chemin) {
     if (!valeurs) return(invisible())
-    n <- names(v)
-    if (is.null(n)) ajouter(joindre_chemin(chemin, "@longueur"), "integer", 1L, octets_lignes(sprintf("%d", length(v))))
+    n <- attr(v, "names", exact = TRUE)
+    if (is.null(n)) ajouter(joindre_chemin(chemin, "@longueur"), "integer", 1L, octets_lignes(sprintf("%d", longueur_lue(v))))
     else ajouter(joindre_chemin(chemin, "@noms"), "character", length(n),
                  octets_chaines(n, joindre_chemin(chemin, "@noms")))
   }
@@ -1550,12 +1569,13 @@ texte_objet <- function(x, premiere, entete, forme = "texte", canonique = FALSE,
     # principale, revue finale de #50) ; écrit chemin/@noms character 0 puis
     # chemin, son texte coupé après la ligne @noms se relirait comme une liste
     # nommée vide (préfixe accepté, contraire à la troisième annotation, (d)).
-    if (!is.null(names(v)) && !length(v))
+    nommee <- !is.null(attr(v, "names", exact = TRUE))
+    if (nommee && !longueur_lue(v))
       impossible(chemin, formuler("vecteur atomique nommé de longueur 0, sans écriture distincte d'une liste nommée vide"))
-    if (!is.null(names(v))) noms_ligne(v, chemin)
+    if (nommee) noms_ligne(v, chemin)
     if (!valeurs) return(invisible())
     cc <- ecrire_valeurs(v, forme, chemin)
-    ajouter(chemin, cc$type, length(v), cc$octets)
+    ajouter(chemin, cc$type, longueur_lue(v), cc$octets)
   }
   noeud <- function(v, chemin, profondeur) {
     profonde(chemin, profondeur)
@@ -1566,15 +1586,18 @@ texte_objet <- function(x, premiere, entete, forme = "texte", canonique = FALSE,
         impossible(chemin, formuler("data.frame de classe %s ou d'attribut(s) %s",
                                     paste(neutraliser_citation(class(v)), collapse = "/"),
                                     paste(neutraliser_citation(a), collapse = ", ")))
-      if (!identical(attr(v, "row.names"), seq_len(nrow(v))))
+      nl <- .row_names_info(v, 2L)
+      if (!identical(attr(v, "row.names"), seq_len(nl)))
         impossible(chemin, formuler("data.frame aux noms de lignes non automatiques"))
-      ajouter(joindre_chemin(chemin, "@colonnes"), "character", length(v),
-              octets_chaines(names(v), joindre_chemin(chemin, "@colonnes")))
-      ajouter(joindre_chemin(chemin, "@lignes"), "integer", 1L, octets_lignes(sprintf("%d", nrow(v))))
-      s <- segments_texte(enc2utf8(names(v)), length(v))
-      for (i in seq_along(v)) {
-        if (is.null(v[[i]]) || !is.atomic(v[[i]])) impossible(joindre_chemin(chemin, s[i]), formuler("colonne non atomique"))
-        atome(v[[i]], joindre_chemin(chemin, s[i]), profondeur + 1L)
+      nc <- longueur_lue(v)
+      ajouter(joindre_chemin(chemin, "@colonnes"), "character", nc,
+              octets_chaines(attr(v, "names", exact = TRUE), joindre_chemin(chemin, "@colonnes")))
+      ajouter(joindre_chemin(chemin, "@lignes"), "integer", 1L, octets_lignes(sprintf("%d", nl)))
+      s <- segments_texte(enc2utf8(attr(v, "names", exact = TRUE)), nc)
+      for (i in seq_len(nc)) {
+        colonne <- .subset2(v, i)
+        if (is.null(colonne) || !is.atomic(colonne)) impossible(joindre_chemin(chemin, s[i]), formuler("colonne non atomique"))
+        atome(colonne, joindre_chemin(chemin, s[i]), profondeur + 1L)
       }
       return(invisible())
     }
@@ -1585,8 +1608,9 @@ texte_objet <- function(x, premiere, entete, forme = "texte", canonique = FALSE,
                                     paste(neutraliser_citation(class(v)), collapse = "/"),
                                     paste(neutraliser_citation(a), collapse = ", ")))
       noms_ligne(v, chemin)
-      s <- segments_texte(if (is.null(names(v))) NULL else enc2utf8(names(v)), length(v))
-      for (i in seq_along(v)) noeud(v[[i]], joindre_chemin(chemin, s[i]), profondeur + 1L)
+      n <- attr(v, "names", exact = TRUE)
+      s <- segments_texte(if (is.null(n)) NULL else enc2utf8(n), longueur_lue(v))
+      for (i in seq_len(longueur_lue(v))) noeud(.subset2(v, i), joindre_chemin(chemin, s[i]), profondeur + 1L)
       return(invisible())
     }
     if (!is.atomic(v)) impossible(chemin, formuler("objet de type %s, sans écriture dans le texte", typeof(v)))
@@ -2479,9 +2503,12 @@ controler_rapport <- function(x) {
                    nb[1L], if (nzchar(chemin)) "la fiche" else "l'objet", neutraliser_citation(no[nb[1L]])),
           list(chemin = chemin, lignes = nb, lu = no[nb]))
   }
+  # Champs de l'objet lus sans dispatch (lire_champ(), attr() ; #313) : une
+  # méthode [[ ou names() de la session sur la classe « construction » ne
+  # change pas les contrôles.
   nb <- noms_bytes(x)
   if (length(nb)) noms_bytes_refus(x, "", nb)
-  f <- x[["fiche"]]
+  f <- lire_champ(x, "fiche")
   if (!is.list(f)) {
     d <- decrire_valeur(f)
     refus("rapport_objet_invalide",
@@ -2539,13 +2566,15 @@ controler_rapport <- function(x) {
                          "de cette version de fiche n'en porte pas, et le rapport n'omet aucun élément en silence."),
                    neutraliser_citation(chemin)),
           list(chemin = chemin))
-  hors <- setdiff(names(x), c("table", "etapes", "avertissements", "fiche", "execution"))
+  hors <- setdiff(attr(x, "names", exact = TRUE), c("table", "etapes", "avertissements", "fiche", "execution"))
   if (length(hors)) non_prevu(hors[1L])
-  racines <- unlist(SECTIONS_RAPPORT$racines, use.names = FALSE)
+  racines_sections <- .subset2(SECTIONS_RAPPORT, "racines")
+  racines <- unlist(unclass(racines_sections), use.names = FALSE)
   couvert <- function(chemin) any(racines == chemin | startsWith(chemin, paste0(racines, "/")))
-  for (e in names(x[["etapes"]])) if (!couvert(joindre_chemin("etapes", e))) non_prevu(joindre_chemin("etapes", e))
-  for (n in names(f)) if (!couvert(joindre_chemin("fiche", n))) non_prevu(joindre_chemin("fiche", n))
-  for (r in unlist(SECTIONS_RAPPORT$racines[SECTIONS_RAPPORT$nature == "non_produite"], use.names = FALSE)) {
+  for (e in attr(lire_champ(x, "etapes"), "names", exact = TRUE))
+    if (!couvert(joindre_chemin("etapes", e))) non_prevu(joindre_chemin("etapes", e))
+  for (n in attr(f, "names", exact = TRUE)) if (!couvert(joindre_chemin("fiche", n))) non_prevu(joindre_chemin("fiche", n))
+  for (r in unlist(unclass(racines_sections)[.subset2(SECTIONS_RAPPORT, "nature") == "non_produite"], use.names = FALSE)) {
     l <- lire_chemin(x, strsplit(r, "/", fixed = TRUE)[[1L]])
     if (l$present && !is.null(l$valeur)) non_prevu(r)
   }
@@ -2563,14 +2592,16 @@ controler_rapport <- function(x) {
 
 # Table de colonnes d'un data.frame v de chemin `chemin` : légende (chemin,
 # lignes, colonnes), en-tête (segment du nom de colonne, type), une ligne <tr>
-# par ligne de l'objet, dans son ordre ; valeurs par l'écrivain.
+# par ligne de l'objet, dans son ordre ; valeurs par l'écrivain. Lecture sans
+# dispatch, la même que celle de texte_objet() (#313).
 table_colonnes <- function(v, chemin) {
-  s <- segments_texte(enc2utf8(names(v)), length(v))
-  n <- nrow(v)
-  entetes <- character(length(v))
-  colonnes <- vector("list", length(v))
-  for (i in seq_along(v)) {
-    w <- texte_valeurs(v[[i]], joindre_chemin(chemin, s[i]))
+  nc <- longueur_lue(v)
+  s <- segments_texte(enc2utf8(attr(v, "names", exact = TRUE)), nc)
+  n <- .row_names_info(v, 2L)
+  entetes <- character(nc)
+  colonnes <- vector("list", nc)
+  for (i in seq_len(nc)) {
+    w <- texte_valeurs(.subset2(v, i), joindre_chemin(chemin, s[i]))
     entetes[i] <- paste0("<th>", echapper_html(s[i]), "<br>", echapper_html(w$type), "</th>")
     colonnes[[i]] <- if (n) strsplit(echapper_html(w$texte), "\n", fixed = TRUE)[[1L]] else character(0)
     if (length(colonnes[[i]]) != n)
@@ -2578,10 +2609,10 @@ table_colonnes <- function(v, chemin) {
                   " sans une valeur par ligne (erreur de programmation)."),
            call. = FALSE)
   }
-  corps <- if (length(v) && n) paste0("<tr><td>", do.call(paste, c(unname(colonnes), sep = "</td><td>")), "</td></tr>")
+  corps <- if (nc && n) paste0("<tr><td>", do.call(paste, c(unname(colonnes), sep = "</td><td>")), "</td></tr>")
   c("<table>",
     paste0("<caption><code>", echapper_html(chemin), "</code> : data.frame ; lignes : ", texte_entier(n, chemin),
-           " ; colonnes : ", texte_entier(length(v), chemin), "</caption>"),
+           " ; colonnes : ", texte_entier(nc, chemin), "</caption>"),
     "<thead>", paste0("<tr>", paste(entetes, collapse = ""), "</tr>"), "</thead>",
     "<tbody>", corps, "</tbody>", "</table>")
 }
@@ -2592,7 +2623,8 @@ table_colonnes <- function(v, chemin) {
 # lignes du texte de la grammaire 1, texte_objet()), interrompue par une table
 # de colonnes à chaque data.frame ; structure seule pour CHEMINS_STRUCTURE_SEULE ;
 # racine absente : « absent de l'objet ». `apres` : lignes HTML insérées après
-# la table de colonnes du chemin qui les nomme.
+# la table de colonnes du chemin qui les nomme. Lecture sans dispatch, la même
+# que celle de texte_objet() (#313).
 lignes_racines <- function(x, racines, apres = list()) {
   sortie <- character(0)
   en_cours <- character(0)
@@ -2608,12 +2640,13 @@ lignes_racines <- function(x, racines, apres = list()) {
                                     longueur, "</td><td>", valeurs, "</td></tr>"))
   vecteur <- function(v, chemin) {
     w <- texte_valeurs(v, chemin)
-    ligne(chemin, w$type, texte_entier(length(v), chemin), gsub("\n", "<br>", echapper_html(w$texte), fixed = TRUE))
+    ligne(chemin, w$type, texte_entier(longueur_lue(v), chemin), gsub("\n", "<br>", echapper_html(w$texte), fixed = TRUE))
   }
   noms <- function(v, chemin) {
-    if (is.null(names(v))) ligne(joindre_chemin(chemin, "@longueur"), "integer", texte_entier(1L, chemin),
-                                 texte_entier(length(v), chemin))
-    else vecteur(names(v), joindre_chemin(chemin, "@noms"))
+    n <- attr(v, "names", exact = TRUE)
+    if (is.null(n)) ligne(joindre_chemin(chemin, "@longueur"), "integer", texte_entier(1L, chemin),
+                          texte_entier(longueur_lue(v), chemin))
+    else vecteur(n, joindre_chemin(chemin, "@noms"))
   }
   structure_seule <- function(v, chemin) {
     mention <- echapper_html(MENTIONS_RAPPORT[["structure_seule"]])
@@ -2627,14 +2660,14 @@ lignes_racines <- function(x, racines, apres = list()) {
       ligne(chemin, "data.frame", texte_entier(.row_names_info(v, 2L), chemin),
             paste0(mention, echapper_html(MENTIONS_RAPPORT[["structure_colonnes"]]), colonnes))
     } else {
-      ligne(chemin, typeof(v), texte_entier(length(v), chemin),
+      ligne(chemin, typeof(v), texte_entier(longueur_lue(v), chemin),
             paste0(mention, if (identical(chemin, "etapes/donnees/resultat/lignes_exclues"))
                               echapper_html(MENTIONS_RAPPORT[["structure_exclues"]])))
     }
   }
   noeud <- function(v, chemin) {
-    # Valeur de classe d'encodage « bytes » (#128) : names(), length() et
-    # is.data.frame() lèveraient une erreur R ; l'écrivain la refuse
+    # Valeur de classe d'encodage « bytes » (#128) : is.data.frame() lèverait
+    # une erreur R ; l'écrivain la refuse
     # (type_non_canonique, chemin cité), y compris aux chemins que l'empreinte
     # du résultat exclut (fiche/versions, fiche/plateforme...).
     if (classe_bytes(v)) return(vecteur(v, chemin))
@@ -2647,11 +2680,12 @@ lignes_racines <- function(x, racines, apres = list()) {
     }
     if (is.list(v)) {
       noms(v, chemin)
-      s <- segments_texte(if (is.null(names(v))) NULL else enc2utf8(names(v)), length(v))
-      for (i in seq_along(v)) noeud(v[[i]], joindre_chemin(chemin, s[i]))
+      n <- attr(v, "names", exact = TRUE)
+      s <- segments_texte(if (is.null(n)) NULL else enc2utf8(n), longueur_lue(v))
+      for (i in seq_len(longueur_lue(v))) noeud(.subset2(v, i), joindre_chemin(chemin, s[i]))
       return(invisible())
     }
-    if (!is.null(names(v))) noms(v, chemin)
+    if (!is.null(attr(v, "names", exact = TRUE))) noms(v, chemin)
     vecteur(v, chemin)
   }
   for (r in racines) {
@@ -2670,9 +2704,9 @@ lignes_racines <- function(x, racines, apres = list()) {
 # rien sinon (avis d'actuary du 08/11/2026 sur #169, point 3 : la mention
 # d'unité contrat serait fausse sous les agrégats).
 mention_unite <- function(x) {
-  au <- x[["fiche"]][["avertissement_unite"]]
+  au <- lire_chemin(x, c("fiche", "avertissement_unite"))$valeur
   if (!(is.character(au) && length(au) == 1L && !is.na(au))) return(NULL)
-  unite <- x[["fiche"]][["unite_observation"]]
+  unite <- lire_chemin(x, c("fiche", "unite_observation"))$valeur
   if (identical(unite, "contrat")) return(paragraphe(MENTIONS_RAPPORT[["validation_unite_contrat"]]))
   if (identical(unite, "non_determinee")) return(paragraphe(MENTIONS_RAPPORT[["validation_unite_non_determinee"]]))
   NULL
@@ -2683,12 +2717,15 @@ paragraphe <- function(...) paste0("<p>", echapper_html(paste0(...)), "</p>")
 element_liste <- function(...) paste0("<li>", echapper_html(paste0(...)), "</li>")
 
 # Corps HTML de la section k de SECTIONS_RAPPORT pour l'objet x (contrôlé).
+# Champs de l'objet et colonnes de SECTIONS_RAPPORT lus sans dispatch
+# (lire_champ(), lire_chemin(), attr(), .subset2() ; #313), comme dans
+# titre_section(), mention_unite() et ecrire_rapport().
 corps_section <- function(x, k) {
   m <- MENTIONS_RAPPORT
-  id <- SECTIONS_RAPPORT$section[k]
-  nature <- SECTIONS_RAPPORT$nature[k]
-  racines <- SECTIONS_RAPPORT$racines[[k]]
-  etapes <- names(x[["etapes"]])
+  id <- .subset2(SECTIONS_RAPPORT, "section")[k]
+  nature <- .subset2(SECTIONS_RAPPORT, "nature")[k]
+  racines <- .subset2(.subset2(SECTIONS_RAPPORT, "racines"), k)
+  etapes <- attr(lire_champ(x, "etapes"), "names", exact = TRUE)
   if (identical(id, "lecture")) {
     conventions <- vapply(seq_along(CONVENTIONS_TEXTE), function(i)
       element_liste(names(CONVENTIONS_TEXTE)[i], " : ", CONVENTIONS_TEXTE[i]), "")
@@ -2709,14 +2746,14 @@ corps_section <- function(x, k) {
   # tableau, une fois, si une table de fiche/tables_reference est de statut
   # synthetique (lu dans l'objet, #163) ; rien sinon.
   if (identical(id, "donnees_recues")) {
-    tr <- x[["fiche"]][["tables_reference"]]
+    tr <- lire_chemin(x, c("fiche", "tables_reference"))$valeur
     synthetique <- is.list(tr) &&
-      any(vapply(tr, function(e) is.list(e) && identical(e[["statut"]], "synthetique"), NA))
+      any(vapply(tr, function(e) is.list(e) && identical(lire_champ(e, "statut"), "synthetique"), NA))
     return(c(lignes_racines(x, racines), if (synthetique) paragraphe(m[["tables_reference_parametres"]])))
   }
   if (identical(nature, "objet")) return(lignes_racines(x, racines))
   if (identical(nature, "etape")) {
-    e <- SECTIONS_RAPPORT$etape[k]
+    e <- .subset2(SECTIONS_RAPPORT, "etape")[k]
     if (!(e %in% etapes))
       return(paragraphe(m[["etape_absente_1"]], e, m[["etape_absente_2"]], e, m[["etape_absente_3"]]))
     if (identical(e, "validation")) {
@@ -2729,11 +2766,11 @@ corps_section <- function(x, k) {
       # sous les deux autres, première phrase selon la présence de l'étape
       # positionnement (décision du mainteneur du 08/11/2026). Sous lissee,
       # hypothèses des tests par validation_hypotheses_tests_lissee (#245, b).
-      pv <- x[["etapes"]][["validation"]][["parametres"]]
+      pv <- lire_chemin(x, c("etapes", "validation", "parametres"))$valeur
       table_prise <- if ("positionnement" %in% etapes) "validation_sans_verdict_table_positionnement"
                      else "validation_sans_verdict_table"
       sans_verdict <- paragraphe(m[[table_prise]], " ", m[["validation_sans_verdict"]])
-      r <- switch(relation_lue(pv[["relation_table"]]),
+      r <- switch(relation_lue(lire_champ(pv, "relation_table")),
         independante = list(verdict = sans_verdict, relation = "validation_independante", h0 = "validation_h0",
                             tests = TRUE, hyp = "validation_hypotheses_tests", mc = "validation_monte_carlo"),
         ajustee_hors_outil = list(verdict = sans_verdict, relation = "validation_ajustee", h0 = "validation_h0",
@@ -2750,7 +2787,7 @@ corps_section <- function(x, k) {
                paragraphe(m[[r$h0]]),
                if (r$tests) paragraphe(m[[r$hyp]]),
                mention_unite(x),
-               if (identical(pv[["appariement_sexe"]], "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
+               if (identical(lire_champ(pv, "appariement_sexe"), "ensemble_par_sexe")) paragraphe(m[["validation_ensemble"]]),
                if (r$tests) c(paragraphe(m[["validation_multiplicite"]]), paragraphe(m[[r$mc]])),
                paragraphe(m[["validation_reference"]]),
                lignes_racines(x, racines)))
@@ -2761,7 +2798,7 @@ corps_section <- function(x, k) {
       # déterministe de q^, sans test ni intervalle ; amendement d'actuary du
       # 11/11/2026, point 6). Une méthode sans mentions est une erreur de
       # programmation.
-      methode <- x[["etapes"]][["lissage"]][["parametres"]][["methode"]]
+      methode <- lire_chemin(x, c("etapes", "lissage", "parametres", "methode"))$valeur
       mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
         wh_quadratique = c(paragraphe(m[["lissage_quadratique"]]), paragraphe(m[["lissage_conservation"]]),
                            paragraphe(m[["lissage_echelle"]])),
@@ -2775,7 +2812,7 @@ corps_section <- function(x, k) {
       # d'unité contrat sous la même condition que l'étape validation.
       # Mentions de la méthode SMR, seule mise en oeuvre (M293) ; une autre
       # valeur est une erreur de programmation (avis d'actuary du 07/11/2026).
-      methode <- x[["etapes"]][["positionnement"]][["parametres"]][["methode"]]
+      methode <- lire_chemin(x, c("etapes", "positionnement", "parametres", "methode"))$valeur
       mentions <- switch(if (is.character(methode) && length(methode) == 1L && !is.na(methode)) methode else "",
         smr = c(paragraphe(m[["positionnement_methode"]]), paragraphe(m[["positionnement_forme"]]),
                 paragraphe(m[["positionnement_ecart_note"]])),
@@ -2809,7 +2846,7 @@ corps_section <- function(x, k) {
     # Étape brut : note sur la colonne taux en tête ; légendes immédiatement
     # après le tableau des statuts (spécification d'actuary, § 2.4).
     legendes <- c(paragraphe(m[["brut_legende"]]),
-                  if ("binomial" %in% x[["etapes"]][["brut"]][["parametres"]][["estimateurs"]])
+                  if ("binomial" %in% lire_chemin(x, c("etapes", "brut", "parametres", "estimateurs"))$valeur)
                     paragraphe(m[["brut_binomial"]]))
     return(c(paragraphe(m[["brut_note"]]),
              lignes_racines(x, racines, list("etapes/brut/parametres/statuts" = legendes))))
@@ -2835,10 +2872,11 @@ relation_lue <- function(r) if (is.character(r) && length(r) == 1L && !is.na(r))
 # la relation (#167 ; critère d'actuary du 07/11/2026 : trois valeurs,
 # erreur de programmation par défaut).
 titre_section <- function(x, k) {
-  t <- SECTIONS_RAPPORT$titre[k]
-  if (!identical(SECTIONS_RAPPORT$section[k], "etape_validation") || !("validation" %in% names(x[["etapes"]])))
+  t <- .subset2(SECTIONS_RAPPORT, "titre")[k]
+  if (!identical(.subset2(SECTIONS_RAPPORT, "section")[k], "etape_validation") ||
+      !("validation" %in% attr(lire_champ(x, "etapes"), "names", exact = TRUE)))
     return(t)
-  switch(relation_lue(x[["etapes"]][["validation"]][["parametres"]][["relation_table"]]),
+  switch(relation_lue(lire_chemin(x, c("etapes", "validation", "parametres", "relation_table"))$valeur),
          independante = t, ajustee_hors_outil = MENTIONS_RAPPORT[["titre_validation_ajustee"]],
          positionnee = MENTIONS_RAPPORT[["titre_validation_positionnee"]],
          lissee = MENTIONS_RAPPORT[["titre_validation_lissee"]],
@@ -2852,7 +2890,7 @@ titre_section <- function(x, k) {
 ecrire_rapport <- function(x) {
   controler_rapport(x)
   titre <- echapper_html(MENTIONS_RAPPORT[["titre_document"]])
-  ids <- SECTIONS_RAPPORT$section
+  ids <- .subset2(SECTIONS_RAPPORT, "section")
   titres <- echapper_html(vapply(seq_along(ids), function(k) titre_section(x, k), ""))
   sections <- lapply(seq_along(ids), function(k)
     c(paste0("<section id=\"", ids[k], "\">"), paste0("<h2>", titres[k], "</h2>"), corps_section(x, k), "</section>"))

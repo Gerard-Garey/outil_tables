@@ -523,6 +523,59 @@ local({
     })
   }
 })
+# Décomptes de lignes des données discordants (#312, ADR 0012, point 3.4, étape 6) :
+# l'étape 1 ne juge que la classe (bytes, data.frame) ; le refus
+# donnees_mal_formees du module donnees est levé à l'étape 6, par
+# controler_plan_roles(), avant l'empreinte des données (étape 7) et avant le
+# refus de colonne absente de l'ordre de controler_roles() (avant #312 :
+# empreinte_donnees_discordante, ou erreur R pour dim() qui rend NULL ; mesuré
+# sur 8d9ef92). Fiche du témoin FICHE ; méthodes S3 définies dans globalenv()
+# puis retirées ; littéraux ASCII.
+local({
+  m312 <- list(dim.k312moins = function(x) c(.row_names_info(x, 2L) - 1L, length(unclass(x))),
+               dim.k312cols = function(x) c(.row_names_info(x, 2L), length(unclass(x)) + 1L),
+               dim.k312null = function(x) NULL)
+  for (n in names(m312)) assign(n, m312[[n]], envir = globalenv())
+  on.exit(rm(list = names(m312), envir = globalenv()))
+  attrape <- function(expr) tryCatch(expr, error = function(e) e)
+  avec_rn <- function(d, m) { attr(d, "row.names") <- m; d }
+  col_courte <- function(d, nom) { l <- unclass(d); l[[nom]] <- l[[nom]][-1L]; structure(l, class = "data.frame", row.names = 1:4) }
+  cas <- list(
+    list("(1) dim() d'une ligne de moins", structure(BASE, class = c("k312moins", "data.frame"))),
+    list("(3) noms de lignes n + 1", avec_rn(BASE, c(NA_integer_, -5L))),
+    list("(5) colonne de role de n - 1 valeurs", col_courte(BASE, "sexe")),
+    list("(7) noms de lignes c(NA, NA)", avec_rn(BASE, c(NA_integer_, NA_integer_))),
+    list("(8) dim() qui rend NULL", structure(BASE, class = c("k312null", "data.frame"))),
+    list("(9) attribut row.names absent", avec_rn(BASE, NULL)),
+    list("(10) colonne hors role de n - 1 valeurs", col_courte(transform(BASE, autre = 1:4), "autre")))
+  for (c1 in cas)
+    verifier(sprintf("#312 rejeu, %s : refus donnees_mal_formees du module donnees (etape 6), pas empreinte_donnees_discordante ni une erreur R", c1[[1L]]), {
+      r <- attrape(rejouer_fiche(c1[[2L]], FICHE))
+      if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+      else controle_refus(r, "donnees", "donnees_mal_formees", NULL, "n'y donnent pas un m")
+    })
+  verifier("#312 rejeu, dim() qui ne ment que sur les colonnes : admis, bilan aux verdicts de succes (inchange)", {
+    r <- attrape(rejouer_fiche(structure(BASE, class = c("k312cols", "data.frame")), FICHE))
+    !inherits(r, "error") && identical(r$bilan$verdict, VERDICTS_SUCCES)
+  })
+  verifier("#312 rejeu, decomptes discordants et colonne de role absente : donnees_mal_formees (les decomptes passent avant colonne_absente, ordre de controler_roles())", {
+    r <- attrape(rejouer_fiche(avec_rn(BASE_SANS_SEXE, c(NA_integer_, -5L)), FICHE))
+    inherits(r, "refus_tablexp") && identical(r$module, "donnees") && identical(r$motif, "donnees_mal_formees")
+  })
+  # Objet classé « data.frame » qui n'est pas une liste : refus de l'étape 1, au
+  # message « pas un data.frame » (avant : erreur R ; mesuré sur 17b601e1).
+  e312 <- new.env(); class(e312) <- "data.frame"
+  for (c1 in list(list("environnement", e312), list("vecteur de caracteres", structure(letters[1:4], class = "data.frame"))))
+    verifier(sprintf("#312 rejeu, %s de classe data.frame : refus donnees_mal_formees du module donnees au message existant, details$classe (etape 1)", c1[[1L]]), {
+      r <- attrape(rejouer_fiche(c1[[2L]], FICHE))
+      if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+      else controle_refus(r, "donnees", "donnees_mal_formees", list(classe = "data.frame"), "doivent")
+    })
+  verifier("#312 T4 ordre : fiche de version 3 et donnees aux decomptes discordants : version_fiche_non_admise (etape 3 avant l'etape 6)", {
+    r <- attrape(rejouer_fiche(avec_rn(BASE, c(NA_integer_, -5L)), fiche_modifiee(version_fiche = 3L)))
+    inherits(r, "refus_tablexp") && identical(r$motif, "version_fiche_non_admise")
+  })
+})
 # Nom ou classe d'encodage bytes au deuxième niveau de la fiche, valeur de champ
 # de classe bytes (#128) : refus fiche_non_conforme ou rejeu rendu, au lieu de
 # l'erreur R « translating strings with "bytes" encoding is not allowed »

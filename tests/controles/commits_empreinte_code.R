@@ -74,6 +74,10 @@
 #      deviné).
 #    - Les noms de R/ sont lus par git ls-tree -z, en octets, sans guillemets
 #      (git cite sinon les noms à ", \, tabulation ou saut de ligne).
+#    - Modes arbre et historique : les noms sont filtrés et triés en octets,
+#      même empreinte sous toute locale, y compris pour un nom qui n'est pas de
+#      l'UTF-8 valide (#131). Égalité avec md5sum pour des noms sans « \ » ni
+#      saut de ligne (md5sum échappe ces noms dans son relevé).
 # -----------------------------------------------------------------------------
 
 ARGS <- commandArgs(trailingOnly = TRUE)
@@ -124,7 +128,14 @@ empreinte_arbre <- function(racine) {
     tryCatch(read.dcf(description, fields = "Package")[1L, 1L], error = function(e) NA_character_)
   if (!identical(unname(paquet), "tablexp") || !file.exists(file.path(racine, "R", "rapport.R")))
     return(NA_character_)
-  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  # Filtre et tri en octets (#131), comme empreinte_sources() : sous une locale
+  # UTF-8, list.files(pattern =) écarte en silence un nom qui n'est pas de l'UTF-8
+  # valide, et sort(method = "radix") lève une erreur sur une chaîne native non
+  # ASCII en tête (noms triés marqués « bytes »).
+  fichiers <- list.files(file.path(racine, "R"))
+  fichiers <- fichiers[grepl("[.]R$", fichiers, useBytes = TRUE)]
+  en_octets <- fichiers; Encoding(en_octets) <- "bytes"
+  fichiers <- fichiers[order(en_octets, method = "radix")]
   md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
   if (anyNA(md5)) return(NA_character_)
   releve_md5(md5, fichiers)
@@ -218,7 +229,10 @@ empreintes_historique <- function() {
     d <- data.frame(mode = vapply(m, `[`, "", 1L), type = vapply(m, `[`, "", 2L),
                     oid = vapply(m, `[`, "", 3L), nom = vapply(m, `[`, "", 4L))
     d <- d[grepl("[.]R$", d$nom, useBytes = TRUE) & !grepl("^[.]", d$nom, useBytes = TRUE), , drop = FALSE]
-    d[order(d$nom, method = "radix"), , drop = FALSE]
+    # Tri en octets (#131) : order(method = "radix") lève une erreur sur une chaîne
+    # native non ASCII en tête ; les noms sont triés marqués « bytes ».
+    en_octets <- d$nom; Encoding(en_octets) <- "bytes"
+    d[order(en_octets, method = "radix"), , drop = FALSE]
   }), arbres)
   ordinaire <- function(d) d$type == "blob" & d$mode %in% c("100644", "100755")
 
