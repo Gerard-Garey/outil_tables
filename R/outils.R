@@ -199,7 +199,18 @@ noms_bytes <- function(x) {
 #    ancêtre qui est une liste est traversé, quelle que soit sa classe, classe
 #    d'encodage « bytes » comprise (#301, variante (A), M520) : la décision sur
 #    sa forme appartient à l'appelant. Seul assistant de parcours par chemin
-#    (#301, N3).
+#    (#301, N3) ;
+#  - longueur_lue(x) : longueur du vecteur sous-jacent de x, lue sans dispatch,
+#    length(unclass(x)) (11 champs pour un POSIXlt, qu'aucun appelant ne lit) :
+#    une méthode length() de la session sur une classe de x (length.Date,
+#    length.data.frame...) n'est pas appelée, et une classe « bytes » ne lève
+#    pas (#313). Seul assistant de la lecture sans dispatch : les noms se lisent
+#    par attr(x, "names", exact = TRUE), les éléments par .subset2(), les
+#    lignes d'un data.frame par .row_names_info(x, 2L), en ligne. Coût mesuré
+#    (R 4.3.3, 10^6 valeurs ; Date, facteur, data.frame de quatre colonnes) :
+#    moins de 0,01 ms par appel, aucune mémoire ajoutée ; unclass() d'un
+#    vecteur atomique classé rend une enveloppe ALTREP (« wrapper ») sans
+#    recopier les valeurs, et rend x tel quel s'il n'a pas de classe.
 a_classe <- function(x, classe) classe %in% attr(x, "class", exact = TRUE)
 
 classe_bytes <- function(x) {
@@ -220,6 +231,8 @@ lire_chemin <- function(x, segments) {
   }
   list(present = TRUE, valeur = v)
 }
+
+longueur_lue <- function(x) length(unclass(x))
 
 # Accumulateur d'avertissements métier (ADR 0007, points 6.1 et 6.5) :
 # data.frame (etape, code, message, nombre), restitué dans l'objet. avertir()

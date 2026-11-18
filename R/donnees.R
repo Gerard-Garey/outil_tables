@@ -380,10 +380,12 @@ catalogue_roles <- function() {
 
 # --- outils de dates ----------------------------------------------------------
 
-# Composantes (année, mois 0-11, jour) de jours depuis 1970-01-01.
+# Composantes (année, mois 0-11, jour) de jours depuis 1970-01-01. Champs du
+# POSIXlt lus par .subset2(), sans dispatch : base ne définit pas $.POSIXlt, et
+# une méthode $ de la session ne change pas les composantes (#313).
 composantes_date <- function(j) {
   lt <- as.POSIXlt(structure(as.numeric(j), class = "Date"))
-  list(an = lt$year + 1900L, mois = lt$mon, jour = lt$mday)
+  list(an = .subset2(lt, "year") + 1900L, mois = .subset2(lt, "mon"), jour = .subset2(lt, "mday"))
 }
 
 # Âge au dernier anniversaire (A.0, T2) :
