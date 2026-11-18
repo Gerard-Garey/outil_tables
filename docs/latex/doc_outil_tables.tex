@@ -7363,8 +7363,12 @@ tête), son décompte et s'il est exclu.
 
 \medskip
 \textbf{Les lignes conservées sont celles de l'entrée}~: \code{donnees}
-lui-même s'il n'y a aucune exclusion, sinon le sous-ensemble de ses lignes,
-sans aucune modification de valeur~; les quantités dérivées (observations
+lui-même s'il n'y a aucune exclusion, sinon le sous-ensemble de ses lignes
+que rend la méthode \code{[} de sa classe, sans qu'aucune valeur soit
+modifiée par le moteur~; les valeurs des colonnes de rôle y sont
+contrôlées, non celles des colonnes hors rôle, qu'une méthode \code{[}
+admise peut changer dans cette copie (ci-dessous, «~Extraction des lignes
+conservées et son contrôle~»)~; les quantités dérivées (observations
 fusionnées) sont rangées à part. Une réserve technique~: l'extraction des
 lignes conservées par l'opérateur d'indexation de R retire des colonnes les
 attributs autres que la classe et les niveaux d'un facteur (par exemple
@@ -7428,7 +7432,10 @@ lignes demandées (ou qui n'a pas de méthode «~[~» propre).~», où
   \item (1~bis)~«~comptent M ligne(s) comme demandé mais n'ont pas les
     colonnes des données ([écarts])~», où [écarts] énumère, séparés par
     «~;~», «~N colonne(s) au lieu de P~» si les nombres de colonnes
-    diffèrent, «~absente(s)~: [noms]~» et «~en trop~: [noms]~» (au plus
+    diffèrent, «~absente(s)~: [noms]~» et «~en trop~: [noms]~» (noms de
+    l'entrée absents des noms du résultat, et inversement, qui ne
+    désignent pas nécessairement les colonnes en cause~: réserve
+    ci-dessous, à propos de \code{details\$colonne}~; au plus
     \code{NB\_LIGNES\_CITEES} noms de chaque sorte, puis «~et N autre(s)
     absente(s)~» ou «~et N autre(s) en trop~»), «~N colonne(s) sans nom~»
     pour les colonnes en trop de nom vide ou manquant (celles que laisse
@@ -7483,21 +7490,24 @@ toutes les colonnes discordantes, sans plafond, \code{NA} pour un
 décompte illisible)~; un champ sans objet pour la cause est vide.
 Sous la cause~(1~bis), \code{colonne} porte les noms des colonnes de
 l'entrée absents des noms du résultat, et \code{position} et
-\code{lignes\_colonne} restent vides~; \textbf{ces noms ne désignent pas
+\code{lignes\_colonne} restent vides~; \textbf{ces noms, qui sont aussi
+ceux de la liste «~absente(s)~» du message, ne désignent pas
 nécessairement les colonnes en cause}~: après le décalage que laisse
 \code{[.data.frame}, ils peuvent nommer une colonne saine et omettre une
 colonne en cause (\emph{constat} de mesure~: sur onze colonnes, deux
 colonnes hors rôle dont la méthode \code{[} rend \code{NULL}, aux
 positions~8 et~10, donnent dans \code{colonne} le nom de la colonne de la
 position~8 et celui de la colonne saine de la position~11, non celui de
-la position~10). Les colonnes en trop ou sans nom ne figurent que dans
+la position~10, et le message les cite de même sous «~absente(s)~»). Les colonnes en trop ou sans nom ne figurent que dans
 le message. Motif~: une méthode \code{[} qui ne rend pas les lignes demandées (une ligne de
 moins ou de plus, des lignes dupliquées ou dans un autre ordre) faisait
 calculer, sans aucun signal, sur d'autres lignes que celles que décrit la
 fiche, ou sur les mêmes lignes mal appariées à leurs numéros (lignes dans
 l'ordre inverse~: tables brutes identiques à celles du même jeu sans
-classe, mais \code{observation\_des\_lignes} et l'ordre des observations
-faux~; \emph{constat} de mesure sur le code qui précède l'issue), les empreintes des données restant identiques, si bien que le
+classe sur le jeu de test de quatre lignes, égales aux arrondis près
+--- écart au plus de $10^{-13}$, l'ordre des sommes changeant --- sur un
+jeu simulé de 2~000 contrats, mais \code{observation\_des\_lignes} et
+l'ordre des observations faux~; \emph{constat} de mesure sur le code qui précède l'issue), les empreintes des données restant identiques, si bien que le
 rejeu ne le décelait pas~; le rapport refusait alors l'objet au
 contrôle~6 sous un diagnostic inexact (section~\ref{sec:rapport-fige}~;
 \emph{constat} de mesure rapporté par l'issue~\#319, pour une ligne de
@@ -7539,8 +7549,8 @@ qui inverse l'ordre des lignes, les six colonnes de rôle dont les valeurs
 changent étant citées (la septième, le sexe, est constante sur les lignes
 conservées du jeu de test). Laissent construire l'objet, dont le rapport
 est rendu sans refus, identique octet à octet à celui du même jeu sans
-classe, une méthode correcte, y compris qui rend la classe complétée et
-retire un attribut, et une méthode qui retire les niveaux inutilisés
+classe, une méthode correcte, y compris qui rend une autre sous-classe de
+\code{data.frame} et retire un attribut, et une méthode qui retire les niveaux inutilisés
 d'un facteur de rôle. Laissent aussi construire l'objet, le rapport n'y
 étant pas examiné, des colonnes hors rôle matrice ou \code{data.frame} de
 bon décompte (tests) et une méthode qui ne change que les valeurs d'une
