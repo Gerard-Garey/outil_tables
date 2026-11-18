@@ -1078,9 +1078,12 @@ controler_lignes_conservees <- function(x) {
 
 # Empreinte des sources du package (option (iv), M70 ; cinquième annotation
 # du 20/10/2026, (c)) : MD5 du texte « <md5><2 espaces>R/<fichier> », une
-# ligne par fichier R/*.R, fichiers triés par octets, LF ; égale à
-# `LC_ALL=C md5sum -t R/*.R | md5sum` (-t : mode texte ; sans lui, le md5sum de
-# Rtools écrit « * » devant les noms, rapporté en #107). `racine` doit être la racine des sources
+# ligne par fichier R/*.R, LF ; noms filtrés (`grepl(useBytes = TRUE)`) et
+# triés en octets (#131), donc même valeur sous toute locale ; égale à
+# `LC_ALL=C md5sum -t R/*.R | md5sum` pour des noms sans `\` ni saut de ligne
+# (restriction, M532 (c) : md5sum échappe le nom qui en contient, la commande
+# rend alors une autre valeur ; -t : mode texte, sans lui le md5sum de Rtools
+# écrit « * » devant les noms, rapporté en #107). `racine` doit être la racine des sources
 # de tablexp (DESCRIPTION lisible, Package: tablexp, R/rapport.R présent) ;
 # sinon, ou si un fichier de R/ est illisible, NA : rien n'est deviné.
 # Fonctions de base seulement, aucune constante d'un autre module (ordre
