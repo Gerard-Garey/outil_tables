@@ -1014,9 +1014,10 @@ controler_forme_hors_resultat <- function(x) {
 # chemin (comportement inchangé). Une entrée dont nrow(), les noms de lignes ou
 # une colonne comptent un autre nombre de lignes est refusée avant toute étape
 # (donnees_mal_formees, controler_lignes_donnees(), #312) : construire_table()
-# ne produit plus un objet de cette forme (sauf méthode `[` de la classe qui ne
-# rend pas les lignes demandées, #319), et ce contrôle ne lit pas la longueur
-# des colonnes. Un chemin numeros_conserves absent ou NULL ou un fiche/roles
+# ne produit plus un objet de cette forme (ni, depuis #319, par une méthode `[`
+# de la classe qui ne rend pas les lignes demandées : preparer_donnees() la
+# refuse, donnees_mal_formees), et ce contrôle ne lit pas la longueur des
+# colonnes. Un chemin numeros_conserves absent ou NULL ou un fiche/roles
 # qui n'est pas un vecteur de chaînes n'est pas contrôlé (même règle que le
 # contrôle 5). Rend TRUE.
 controler_lignes_conservees <- function(x) {
