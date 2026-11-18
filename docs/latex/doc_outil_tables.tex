@@ -17438,7 +17438,10 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     erreur R dès que le premier nom n'était pas ASCII. \textbf{Restriction}
     (décision M532~(c))~: pour un nom qui contient une barre oblique inverse
     ou un saut de ligne, \code{md5sum} échappe le nom dans son relevé (ligne
-    préfixée par une barre oblique inverse, caractère doublé), et la
+    préfixée par une barre oblique inverse~; dans le nom, une barre oblique
+    inverse est doublée et un saut de ligne écrit en deux caractères, une
+    barre oblique inverse suivie de \code{n}~; \emph{constat} de mesure,
+    coreutils~9.4), et la
     commande rend une autre valeur que \code{empreinte\_sources()}~;
     \code{R/} ne contient aucun tel nom. \emph{Constat de mesure} (R~4.3.3,
     coreutils~9.4)~: pour un dossier aux noms latin-1, UTF-8 valide et
@@ -19194,9 +19197,13 @@ le premier nom \code{*.R} lu n'étant pas ASCII, l'égalité de
 \code{empreinte\_sources()}, calculée dans un sous-processus sous
 \code{LC\_ALL=C} puis sous une locale UTF-8, au relevé construit en octets
 par le test et, si \code{md5sum} et \code{sh} sont présents hors
-Windows, à la commande \code{LC\_ALL=C md5sum -t R/*.R | md5sum}, les mêmes
-égalités pour le mode \code{arbre} de
-\code{tests/controles/commits\_empreinte\_code.R}~; le test «~une locale
+Windows, à la commande \code{LC\_ALL=C md5sum -t R/*.R | md5sum}, et,
+pour le mode \code{arbre} de
+\code{tests/controles/commits\_empreinte\_code.R}, l'égalité de
+l'empreinte qu'il rend au relevé construit en octets, sous \code{LC\_ALL=C}
+puis sous une locale UTF-8, et, sous \code{LC\_ALL=C}, à
+\code{empreinte\_sources()} (le mode \code{arbre} n'est pas comparé à la
+commande \code{md5sum})~; le test «~une locale
 UTF-8 est disponible~» \textbf{échoue} en son absence, sans saut silencieux
 (décision M532~(b)), la moitié des témoins ne portant pas sinon~;
 le statut a le libellé exact, marqué UTF-8, et nomme les sources
