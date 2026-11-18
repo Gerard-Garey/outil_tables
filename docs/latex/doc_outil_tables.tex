@@ -5219,7 +5219,11 @@ indépendant de \code{empreinte\_sources()} et la recoupe. Aucun registre
 incrémentée à chaque fusion. Le script applique la définition et la garde
 de l'empreinte du code (section~\ref{sec:empreinte-resultat}, «~Empreinte
 du code~»)~: fichiers de premier niveau de \code{R/} dont le nom finit par
-\code{.R}, ni cachés ni dossiers, triés par octets~; MD5 de chaque
+\code{.R}, ni cachés ni dossiers, filtrés et triés en octets sous toute
+locale, comme dans \code{empreinte\_sources()} (issue~\#131), y compris
+dans le mode \code{historique}, où le tri des entrées de l'arbre d'un
+commit levait une erreur R quand cet arbre n'avait aucun nom \code{*.R}
+ASCII (\emph{constat} rapporté par le commit de l'issue)~; MD5 de chaque
 fichier~; relevé «~\code{<md5>}, deux espaces, \code{R/<fichier>}~», une
 ligne par fichier, LF~; MD5 du relevé~; pas d'empreinte, jamais devinée,
 pour un commit sans \code{DESCRIPTION} de «~Package: tablexp~» ou sans
@@ -17298,7 +17302,25 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     \code{LC\_ALL=C md5sum -t R/*.R | md5sum}, commande donnée aux tiers
     par la fiche elle-même (libellé ci-dessous~; issue~\#107, décision M151~;
     ADR 0011, annotation du 26/10/2026, (e)), la locale \code{C} fixant
-    l'ordre des fichiers. L'option \code{-t} (mode texte) est
+    l'ordre des fichiers. \textbf{Noms en octets} (issue~\#131)~: les noms
+    de \code{R/} sont filtrés (suffixe \code{.R}, par \code{grepl()} avec
+    \code{useBytes = TRUE}) et triés en octets (tri \code{radix} d'une
+    copie marquée \code{bytes}), si bien que l'empreinte est la même sous
+    toute locale, y compris pour un nom qui n'est pas de l'UTF-8 valide, et
+    égale à la valeur de la commande. Auparavant, \code{list.files()},
+    filtrant par son argument \code{pattern}, écartait en silence, sous une locale UTF-8, un nom non UTF-8
+    valide, et le tri \code{radix} d'une chaîne native non ASCII levait une
+    erreur R dès que le premier nom n'était pas ASCII. \textbf{Restriction}
+    (décision M532~(c))~: pour un nom qui contient une barre oblique inverse
+    ou un saut de ligne, \code{md5sum} échappe le nom dans son relevé (ligne
+    préfixée par une barre oblique inverse, caractère doublé), et la
+    commande rend une autre valeur que \code{empreinte\_sources()}~;
+    \code{R/} ne contient aucun tel nom. \emph{Constat de mesure} (R~4.3.3,
+    coreutils~9.4)~: pour un dossier aux noms latin-1, UTF-8 valide et
+    ASCII, même empreinte sous \code{LC\_ALL=C} et sous \code{C.UTF-8},
+    égale à celle de la commande~; pour un nom \code{a\textbackslash
+    b.R}, même empreinte sous les deux locales, différente de celle de la
+    commande. L'option \code{-t} (mode texte) est
     nécessaire sous Windows~: le \code{md5sum} de Rtools (MSYS2) lit par
     défaut en mode binaire et préfixe les noms par «~*~», ce qui change le
     relevé, donc l'empreinte (issue~\#101). \textbf{Portée}~: sous GNU/Linux,
@@ -17323,7 +17345,8 @@ fichier temporaire, supprimé à la sortie (\code{md5\_octets()}), et non de
     \code{empreintes\_construction()} lit cette chaîne et le moteur n'ouvre
     aucun fichier (E4.4~; ADR 0011, point~8.1). \code{empreinte\_sources()}
     n'emploie que des fonctions de base (\code{read.dcf()},
-    \code{list.files()}, \code{tools::md5sum()}) et aucune constante d'un
+    \code{list.files()}, \code{grepl()}, \code{order()},
+    \code{tools::md5sum()}) et aucune constante d'un
     autre module, les fichiers de \code{R/} étant évalués par ordre
     alphabétique à l'installation (section~\ref{sec:fiche}).
   \item \textbf{Garde}~: la racine doit être celle des sources de
@@ -19025,6 +19048,16 @@ batterie sur \code{R/*.R} de la racine qu'elle a installée, en R et, si
 fichiers \code{*.R}~; \code{empreinte\_sources()} rend \code{NA} sans
 \code{DESCRIPTION}, pour un autre paquet, sans \code{R/rapport.R} et pour
 un fichier illisible (lien cassé), et le recalcul sur une racine conforme~;
+pour l'issue~\#131, sur une racine aux noms latin-1, UTF-8 valide et ASCII,
+le premier nom \code{*.R} lu n'étant pas ASCII, l'égalité de
+\code{empreinte\_sources()}, calculée dans un sous-processus sous
+\code{LC\_ALL=C} puis sous une locale UTF-8, au relevé construit en octets
+par le test et, si \code{md5sum} et \code{sh} sont présents hors
+Windows, à la commande \code{LC\_ALL=C md5sum -t R/*.R | md5sum}, les mêmes
+égalités pour le mode \code{arbre} de
+\code{tests/controles/commits\_empreinte\_code.R}~; le test «~une locale
+UTF-8 est disponible~» \textbf{échoue} en son absence, sans saut silencieux
+(décision M532~(b)), la moitié des témoins ne portant pas sinon~;
 le statut a le libellé exact, marqué UTF-8, et nomme les sources
 introuvables si et seulement si l'empreinte du code est \code{NA}.
 \code{tests/test\_reproductibilite.R} recalcule l'empreinte du résultat dans
@@ -19198,7 +19231,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{CHEMINS\_FORME\_HORS\_RESULTAT} & constante & --- & chemins de \code{CHEMINS\_HORS\_RESULTAT} dont la forme est contrôlée avant l'écriture du rapport figé, tous sauf la copie de l'entrée \code{lignes\_conservees} (issue~\#141~; M499) \\
 \catalogue{fonctions-rapport}{controler\_forme\_hors\_resultat()} & interne & objet \code{construction} & contrôle~5 de \code{controler\_rapport()}~: chaque sous-arbre présent aux chemins de la constante précédente, sous son chemin, passé à \code{texte\_objet()} en mode \code{canonique}, sortie jetée~; refus \code{type\_non\_canonique} (rôle~: le chemin) et, sous \code{fiche/}, refus de codage de l'écrivain~; \code{execution} en forme seule (\code{valeurs = FALSE}), le champ que \code{FORME\_EXECUTION} déclare \code{POSIXct} (\code{debut}), \code{POSIXct} nu, contrôlé sans sa classe~; chemins parcourus par \code{lire\_chemin()}~: tout ancêtre liste traversé, de classe quelconque, \code{bytes} comprise, le sous-arbre seul jugé (issue~\#301)~; sous-arbre absent ou \code{NULL} sauté~; ni la présence ni la structure d'\code{execution} exigées (admission documentée, issue~\#297)~; lecture sans dispatch (issue~\#313)~; nom vide, \code{NA}, en double ou qui n'est pas un segment, sous \code{fiche/versions} et \code{fiche/plateforme}, admis et restitué par \code{@noms} et \code{[i]} (admission documentée, issue~\#302)~; rend \code{TRUE}, invisible (issue~\#141, section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{controler\_lignes\_conservees()} & interne & objet \code{construction} & contrôle~6 de \code{controler\_rapport()}~: copie de l'entrée \code{lignes\_conservees}, hors de l'empreinte, rapprochée de \code{numeros\_conserves} et de \code{fiche/roles}, qui sont dans son périmètre~; refus \code{objet\_modifie}, chemin cité, d'une valeur qui n'est pas un \code{data.frame}, d'un nombre de lignes autre que la longueur de \code{numeros\_conserves} ou illisible, d'une colonne de rôle manquante, d'une absence alors que \code{numeros\_conserves} est présent~; lecture sans dispatch (\code{lire\_chemin()}, \code{a\_classe()}, \code{attr()}, \code{.row\_names\_info()})~; ni type ni valeurs des colonnes contrôlés (limite acceptée, M522~; issue~\#311 close sans suite, M526), ni leur longueur (sans objet pour un objet construit par le moteur~; issue~\#312)~; rend \code{TRUE}, invisible (issue~\#294, section~\ref{sec:rapport-fige}) \\
-\catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
+\catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R}, noms filtrés et triés en octets, même valeur sous toute locale (issue~\#131), égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum} pour des noms sans barre oblique inverse ni saut de ligne (décision M532~(c))~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
 \catalogue{fonctions-rapport}{TRI\_NUMERIQUE} & constante & --- & \code{"tri\_numerique"}~: marque de l'interface de \code{canoniser\_plan()}, tri croissant d'un champ ensemble d'entiers en \code{double} (\code{ordres} de \code{coherence\_regularite}~; section~\ref{sec:fiche}) \\
 \catalogue{fonctions-rapport}{canoniser\_plan()} & interne & plan validé, champs, paramètres d'étape, ordres & plan canonique (ADR~0011, point~5.1)~: champs dans l'ordre de \code{CHAMPS\_PLAN}, \code{transition} en (\code{depart}, \code{arrivee}), \code{periode} en (\code{debut}, \code{fin}) à bornes \code{Date} stockées en double, grille d'inventaires en \code{Date} stockée en double, dans l'ordre reçu, délai en double, graine admise par \code{forme\_graine()} rendue en integer (issue~\#61), paramètres d'étape dans l'ordre de \code{PARAMETRES\_ETAPES}, restreint aux présents (un paramètre conditionnel, à la recette ou à la valeur d'un gouvernant, peut manquer~; ADR 0017, point~3.2), valeurs de \code{segmentation}, \code{exclusions} et \code{estimateurs} dans l'ordre des vecteurs de \code{ordres} (issue~\#63), et de \code{ordres} de \code{coherence\_regularite} par tri croissant (\code{TRI\_NUMERIQUE}, issue~\#144)~; idempotente~; erreur de programmation sur un stockage non prévu, un nom d'étape ou de paramètre en double, une étape sans l'un de ses paramètres sans condition, ou, dans un champ ensemble, une valeur hors du vecteur d'ordre, un doublon, un \code{NA}, un attribut ou un type autre que \code{character}~; appelée une fois par \code{construire\_table()} après \code{valider\_plan()}, et une fois par \code{rejouer\_fiche()} sur le plan de la fiche, à l'étape~6 du rejeu, avant son appel de \code{construire\_table()} (section~\ref{sec:rejeu}) \\
