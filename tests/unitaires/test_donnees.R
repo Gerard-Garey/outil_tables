@@ -336,6 +336,192 @@ local({
                                "table_colonne_mal_typee", "colonne(s) mal typée(s)"), TRUE))
   }
 })
+# Décomptes de lignes des données (#312) : nrow() (avec dispatch), noms de
+# lignes (.row_names_info(, 2L)) et nombre de lignes de chaque colonne, toutes
+# les colonnes, doivent concorder ; sinon refus donnees_mal_formees de
+# controler_roles(), avant toute étape, sans avertissement R (avant #312 :
+# objet construit sous avertissements de recyclage, erreur R, base_vide au
+# diagnostic faux ou ligne_invalide au diagnostic faux ; mesuré sur 8d9ef92).
+# Messages attendus écrits à la main (gabarit de la spécification d'actuary,
+# #312) ; littéraux non ASCII en \u00XX ; méthodes S3 définies dans globalenv()
+# (trouvées par le dispatch) puis retirées. Une erreur R est rendue, non propagée.
+local({
+  PLAN <- list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = character(0)),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  m312 <- list(dim.k312moins = function(x) c(.row_names_info(x, 2L) - 1L, length(unclass(x))),
+               dim.k312plus = function(x) c(.row_names_info(x, 2L) + 1L, length(unclass(x))),
+               dim.k312cols = function(x) c(.row_names_info(x, 2L), length(unclass(x)) + 1L),
+               dim.k312null = function(x) NULL,
+               length.k312fac = function(x) length(unclass(x)) + 1L,
+               length.k312na = function(x) NA_integer_,
+               length.k312abc = function(x) "abc",
+               length.k312l2 = function(x) c(4L, 4L))
+  for (n in names(m312)) assign(n, m312[[n]], envir = globalenv())
+  on.exit(rm(list = names(m312), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  # Nombre d'avertissements R levés par expr (refus et erreur rattrapés).
+  avertissements <- function(expr) {
+    n <- 0L
+    withCallingHandlers(attrape(expr), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    n
+  }
+  chemins <- list(controler_roles = function(d) tablexp:::controler_roles(d, ROLES, "sexe"),
+                  construire_table = function(d) construire_table(d, ROLES, PLAN))
+  avec_rn <- function(d, m) { attr(d, "row.names") <- m; d }
+  col_courte <- function(d, nom) { l <- unclass(d); l[[nom]] <- l[[nom]][-1L]; structure(l, class = "data.frame", row.names = 1:4) }
+  avec_col <- function(nom, v) { l <- unclass(BASE); l[[nom]] <- v; structure(l, class = "data.frame", row.names = 1:4) }
+  PREFIXE <- "Les donn\u00e9es sont un data.frame mal form\u00e9 : nrow(), les noms de lignes et les colonnes n'y donnent pas un m\u00eame nombre de lignes ("
+  SUFFIXE <- "). Le moteur ne choisit pas entre ces d\u00e9comptes, et ne les corrige pas : passer un data.frame dont nrow(), les noms de lignes et chaque colonne comptent le m\u00eame nombre de lignes."
+  col8 <- function(k) paste0("colonne \u00ab ", c("contrat", "tete", "sexe", "naissance", "entree", "sortie", "cause", "autre_colonne"), " \u00bb : ", k, collapse = " ; ")
+  cas <- list(
+    list("(1) dim() d'une ligne de moins", structure(BASE, class = c("k312moins", "data.frame")),
+         "noms de lignes : 4 ; nrow() : 3, classe k312moins/data.frame",
+         list(classe = c("k312moins", "data.frame"), lignes = 4L, nrow = 3L, colonne = character(0), position = integer(0), lignes_colonne = numeric(0))),
+    list("(2) dim() d'une ligne de plus", structure(BASE, class = c("k312plus", "data.frame")),
+         "noms de lignes : 4 ; nrow() : 5, classe k312plus/data.frame",
+         list(classe = c("k312plus", "data.frame"), lignes = 4L, nrow = 5L, colonne = character(0), position = integer(0), lignes_colonne = numeric(0))),
+    list("(3) noms de lignes n + 1", avec_rn(BASE, c(NA_integer_, -5L)),
+         paste0("noms de lignes : 5 ; nrow() : 5 ; ", col8(4L)),
+         list(classe = "data.frame", lignes = 5L, nrow = 5L, colonne = names(BASE), position = 1:8, lignes_colonne = rep(4, 8))),
+    list("(4) noms de lignes n - 1", avec_rn(BASE, c(NA_integer_, -3L)),
+         paste0("noms de lignes : 3 ; nrow() : 3 ; ", col8(4L)),
+         list(classe = "data.frame", lignes = 3L, nrow = 3L, colonne = names(BASE), position = 1:8, lignes_colonne = rep(4, 8))),
+    list("(5) colonne de r\u00f4le de n - 1 valeurs (sexe)", col_courte(BASE, "sexe"),
+         "noms de lignes : 4 ; nrow() : 4 ; colonne \u00ab sexe \u00bb : 3",
+         list(classe = "data.frame", lignes = 4L, nrow = 4L, colonne = "sexe", position = 3L, lignes_colonne = 3)),
+    list("(7) noms de lignes c(NA, NA)", avec_rn(BASE, c(NA_integer_, NA_integer_)),
+         "noms de lignes : illisibles ; nrow() : illisible (type \u00ab integer \u00bb, longueur 1)",
+         list(classe = "data.frame", lignes = NA_integer_, nrow = NA_integer_, colonne = character(0), position = integer(0), lignes_colonne = numeric(0))),
+    list("(8) dim() qui rend NULL", structure(BASE, class = c("k312null", "data.frame")),
+         "noms de lignes : 4 ; nrow() : illisible (type \u00ab NULL \u00bb, longueur 0)",
+         list(classe = c("k312null", "data.frame"), lignes = 4L, nrow = NA_integer_, colonne = character(0), position = integer(0), lignes_colonne = numeric(0))),
+    list("(9) attribut row.names absent", avec_rn(BASE, NULL),
+         paste0("noms de lignes : 0 ; nrow() : 0 ; ", col8(4L)),
+         list(classe = "data.frame", lignes = 0L, nrow = 0L, colonne = names(BASE), position = 1:8, lignes_colonne = rep(4, 8))),
+    list("(10) colonne hors r\u00f4le de n - 1 valeurs", col_courte(BASE, "autre_colonne"),
+         "noms de lignes : 4 ; nrow() : 4 ; colonne \u00ab autre_colonne \u00bb : 3",
+         list(classe = "data.frame", lignes = 4L, nrow = 4L, colonne = "autre_colonne", position = 8L, lignes_colonne = 3)))
+  for (c1 in cas) for (k in names(chemins)) {
+    x <- attrape(chemins[[k]](c1[[2L]]))
+    avertissements(chemins[[k]](c1[[2L]]))  # amorce : premier appel sous la locale C (chargement paresseux)
+    verifier(sprintf("#312 %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details \u00e0 six cl\u00e9s, 0 avertissement R", c1[[1L]], k), {
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), paste0(PREFIXE, c1[[3L]], SUFFIXE))) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+      else if (!identical(x$details, c1[[4L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](c1[[2L]])) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  verifier("#312 : onze colonnes dont les noms de lignes comptent une ligne de plus : dix colonnes cit\u00e9es puis \u00ab et 1 autre(s) colonne(s) \u00bb ; details$colonne et position sans plafond", {
+    l <- stats::setNames(rep(list(1:4), 11L), sprintf("v%02d", 1:11))
+    x <- attrape(tablexp:::controler_roles(structure(l, class = "data.frame", row.names = 1:5), ROLES, "sexe"))
+    if (!inherits(x, "refus_tablexp")) return("aucun refus")
+    identical(x$motif, "donnees_mal_formees") &&
+      grepl(paste0("colonne \u00ab v10 \u00bb : 4 ; et 1 autre(s) colonne(s)", SUFFIXE), conditionMessage(x), fixed = TRUE) &&
+      !grepl("v11", conditionMessage(x), fixed = TRUE) &&
+      identical(x$details$colonne, sprintf("v%02d", 1:11)) && identical(x$details$position, 1:11)
+  })
+  verifier("#312 : colonnes sans nom, noms de lignes discordants : refus donnees_mal_formees (pas d'erreur R), colonne de nom vide cit\u00e9e, position 2", {
+    d <- structure(list(1:3, 1:2), class = "data.frame", row.names = 1:3)
+    x <- attrape(tablexp:::controler_roles(d, ROLES, "sexe"))
+    inherits(x, "refus_tablexp") && identical(x$motif, "donnees_mal_formees") &&
+      grepl("colonne \u00ab  \u00bb : 2", conditionMessage(x), fixed = TRUE) &&
+      identical(x$details$colonne, "") && identical(x$details$position, 2L)
+  })
+  # Décompte de colonne illisible (reprise de #312, audit léger) : la méthode
+  # length() d'une colonne de classe liste rend NA, du texte ou deux valeurs ;
+  # le décompte n'est retenu que s'il est lisible (jugé avant toute conversion),
+  # sinon la colonne est discordante : refus donnees_mal_formees au fragment
+  # « illisible (type, longueur) », lignes_colonne NA (avant : erreur R de
+  # vapply() ou colonne tenue pour concordante ; mesuré sur 17b601e1).
+  for (c1 in list(list("length() rend NA", "k312na", "integer", 1L), list("length() rend \"abc\"", "k312abc", "character", 1L),
+                  list("length() rend deux valeurs", "k312l2", "integer", 2L)))
+    for (k in names(chemins)) {
+      l <- unclass(BASE); l$l <- structure(list(1, 2, 3, 4), class = c1[[2L]])
+      d <- structure(l, class = "data.frame", row.names = 1:4)
+      x <- attrape(chemins[[k]](d))
+      avertissements(chemins[[k]](d))
+      verifier(sprintf("#312 colonne de classe liste dont %s : %s -> refus donnees_mal_formees, fragment \u00ab l \u00bb : illisible (type %s, longueur %d), lignes_colonne NA, 0 avertissement R", c1[[1L]], k, c1[[3L]], c1[[4L]]), {
+        if (is.null(x)) "aucun refus"
+        else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+        else if (!identical(x$motif, "donnees_mal_formees")) x$motif
+        else if (!identical(conditionMessage(x), paste0(PREFIXE, "noms de lignes : 4 ; nrow() : 4 ; colonne \u00ab l \u00bb : illisible (type \u00ab ",
+                                                         c1[[3L]], " \u00bb, longueur ", c1[[4L]], ")", SUFFIXE))) paste("message :", conditionMessage(x))
+        else if (!identical(x$details, list(classe = "data.frame", lignes = 4L, nrow = 4L, colonne = "l", position = 9L,
+                                            lignes_colonne = NA_real_))) paste("details :", paste(deparse(x$details), collapse = " "))
+        else if (avertissements(chemins[[k]](d)) != 0L) "avertissement R"
+        else TRUE
+      })
+    }
+  # Objet classé « data.frame » qui n'est pas une liste (environnement, vecteur
+  # de caractères) : refus du message « pas un data.frame », avant la lecture
+  # des colonnes (avant : erreur R de unclass() ou refus aux colonnes absurdes ;
+  # mesuré sur 17b601e1).
+  e312 <- new.env(); class(e312) <- "data.frame"
+  for (c1 in list(list("environnement", e312), list("vecteur de caract\u00e8res", structure(letters[1:4], class = "data.frame"))))
+    for (k in names(chemins)) {
+      x <- attrape(chemins[[k]](c1[[2L]]))
+      avertissements(chemins[[k]](c1[[2L]]))
+      verifier(sprintf("#312 %s de classe data.frame : %s -> refus donnees_mal_formees au message existant (pas un data.frame), details$classe, 0 avertissement R", c1[[1L]], k), {
+        if (is.null(x)) "aucun refus"
+        else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+        else if (!identical(x$motif, "donnees_mal_formees") || !identical(x$module, "donnees")) sprintf("%s / %s", x$module, x$motif)
+        else if (!identical(conditionMessage(x), "Les donn\u00e9es doivent \u00eatre un data.frame (le moteur ne lit pas de fichier).")) conditionMessage(x)
+        else if (!identical(x$details, list(classe = "data.frame"))) "details"
+        else if (avertissements(chemins[[k]](c1[[2L]])) != 0L) "avertissement R"
+        else TRUE
+      })
+    }
+  # Entrées bien formées, à colonne hors rôle d'un type objet : admises, mêmes
+  # empreintes des données et même estimation brute que le témoin ; le cas dim()
+  # qui ne ment que sur les colonnes reste admis (le décompte des colonnes n'est
+  # pas lu) ; base vide bien formée : base_vide ; colonne de rôle de classe
+  # factorielle à méthode length() qui ment : admise (le vecteur compte n
+  # valeurs). La colonne de classe bytes se construit sans `$<-`.
+  b <- "\xe9"; Encoding(b) <- "bytes"
+  X0 <- construire_table(BASE, ROLES, PLAN)
+  bien <- list(
+    list("colonne hors r\u00f4le POSIXlt", avec_col("autre_colonne", as.POSIXlt(as.Date("2016-01-01") + 0:3))),
+    list("colonne hors r\u00f4le matrice n x 2", avec_col("autre_colonne", matrix(1:8, 4L, 2L))),
+    list("colonne hors r\u00f4le data.frame", avec_col("autre_colonne", structure(list(a = 1:4, b = 4:1), class = "data.frame", row.names = 1:4))),
+    list("colonne hors r\u00f4le liste", avec_col("autre_colonne", list(1, 2, 3, 4))),
+    list("colonne hors r\u00f4le I(liste)", avec_col("autre_colonne", I(list(1, 2, 3, 4)))),
+    list("colonne hors r\u00f4le facteur", avec_col("autre_colonne", factor(c("a", "b", "a", "b")))),
+    list("colonne hors r\u00f4le POSIXct", avec_col("autre_colonne", as.POSIXct(as.Date("2016-01-01") + 0:3))),
+    list("colonne hors r\u00f4le de classe bytes (n valeurs)", avec_col("autre_colonne", structure(1:4, class = b))),
+    list("dim() qui ment sur le nombre de colonnes", structure(BASE, class = c("k312cols", "data.frame"))),
+    list("data.frame sans autre colonne", BASE[setdiff(names(BASE), "autre_colonne")]))
+  for (c1 in bien) {
+    verifier(sprintf("#312 %s : admis par controler_roles() et construire_table(), empreinte des donn\u00e9es et estimation brute du t\u00e9moin, 0 avertissement R", c1[[1L]]), {
+      r <- attrape(chemins$controler_roles(c1[[2L]]))
+      x <- tryCatch(construire_table(c1[[2L]], ROLES, PLAN), error = function(e) e)
+      if (!is.null(r)) sprintf("controler_roles : %s", conditionMessage(r))
+      else if (inherits(x, "error")) sprintf("construire_table : %s", conditionMessage(x))
+      else if (!identical(x$fiche$empreintes$donnees, X0$fiche$empreintes$donnees)) "empreinte des donn\u00e9es diff\u00e9rente"
+      else if (!identical(x$etapes$brut$resultat, X0$etapes$brut$resultat)) "estimation brute diff\u00e9rente"
+      else if (avertissements(construire_table(c1[[2L]], ROLES, PLAN)) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  verifier("#312 base vide bien form\u00e9e (BASE[0, ]) : refus base_vide, inchang\u00e9 (noms de lignes, nrow() et colonnes \u00e0 0)", {
+    x <- attrape(construire_table(BASE[0L, ], ROLES, PLAN))
+    inherits(x, "refus_tablexp") && identical(x$module, "donnees") && identical(x$motif, "base_vide")
+  })
+  verifier("#312 colonne de r\u00f4le sexe de classe c(\"k312fac\", \"factor\") \u00e0 m\u00e9thode length() qui ajoute 1 : admise par controler_roles() et construire_table(), 0 avertissement R (le vecteur compte n valeurs)", {
+    l <- unclass(BASE)
+    l$sexe <- structure(as.integer(factor(l$sexe)), levels = c("F", "H"), class = c("k312fac", "factor"))
+    d <- structure(l, class = "data.frame", row.names = 1:4)
+    is.null(attrape(chemins$controler_roles(d))) && is.null(attrape(chemins$construire_table(d))) &&
+      avertissements(chemins$construire_table(d)) == 0L
+  })
+})
 # Colonne de rôle de type conforme sous un nom d'encodage bytes, à
 # preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur
 # R ; observations et lignes conservées égales à celles du même jeu sous le

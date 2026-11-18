@@ -1,2 +1,3 @@
 type,nom,issue,motif
 entree,fonctions-outils:longueur_lue,#313,assistant de lecture sans dispatch ajoute a R/outils.R par #313 ; entree du catalogue par docwriter en fin de branche (regle 9)
+entree,fonctions-donnees:controler_lignes_donnees,#312,controle des decomptes de lignes des donnees ajoute a R/donnees.R par #312 ; entree du catalogue par docwriter en fin de branche (regle 9)

@@ -530,11 +530,90 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
        matrice = m)
 }
 
+# Décomptes de lignes d'un data.frame (#312), contrôle « (1) forme » des
+# données : .row_names_info(donnees, 2L) (attribut row.names, lu sans dispatch ;
+# la valeur que lisent dim.data.frame, `[.data.frame` et le rapport), nrow()
+# (avec dispatch : la grandeur que lit preparer_donnees()) et le nombre de
+# lignes de chaque colonne, toutes les colonnes, doivent être égaux ; sinon
+# refus donnees_mal_formees, sans rien corriger. Une méthode dim() de la
+# classe qui lève une erreur la propage (R2 de #312). Colonnes parcourues par
+# position (unclass(), jamais [[, names(), ncol() ni length(donnees), qui
+# dispatchent) ; coût en O(colonnes), aucune colonne copiée. Nombre de lignes
+# d'une colonne : dim[1] si elle porte un attribut dim (matrice, tableau) ;
+# NROW(), avec dispatch, pour une liste munie d'une classe autre que « bytes »
+# (POSIXlt, colonne data.frame : son nombre de lignes n'est défini que par sa
+# méthode) ; sinon longueur_lue(), sans dispatch (vecteur atomique classé ou
+# non, liste nue, classe « bytes » que NROW() ne lit pas : erreur R). Ce
+# décompte n'est retenu que s'il est lisible (numérique, longueur 1, non NA,
+# entier, de 0 à .Machine$integer.max, jugé avant toute conversion) ; sinon la
+# colonne est discordante, son décompte NA, et le message cite le type et la
+# longueur de la valeur rendue (méthode length() ou dim() de la classe qui
+# rend NA, du texte ou deux valeurs). Une erreur levée par la méthode se
+# propage (R2). Noms de lignes illisibles (NA) : aucune colonne n'est
+# comparée. Message d'une ligne : décomptes divergents, au plus
+# NB_LIGNES_CITEES colonnes citées puis leur nombre restant ; details :
+# classe, lignes (noms de lignes, NA si illisibles), nrow (NA si illisible),
+# colonne, position et lignes_colonne (toutes les colonnes discordantes, sans
+# plafond ; NA pour une colonne illisible). Précondition : donnees est une
+# liste classée data.frame (controler_roles() refuse le reste avant).
+# Rend TRUE si les décomptes concordent.
+controler_lignes_donnees <- function(donnees) {
+  # Décompte lisible : numérique, de longueur 1, non NA, entier, entre 0 et
+  # .Machine$integer.max (au-delà, %d lèverait une erreur R) ; jugé avant toute
+  # conversion (une méthode length() ou dim() de la classe peut rendre « abc »,
+  # NA ou deux valeurs).
+  lisible <- function(v)
+    is.numeric(v) && longueur_lue(v) == 1L && !is.na(v) && v >= 0 && v <= .Machine$integer.max && v == trunc(v)
+  # Valeur rendue pour une colonne, non convertie.
+  rendu_colonne <- function(v) {
+    dm <- attr(v, "dim", exact = TRUE)
+    if (!is.null(dm)) return(dm[1L])
+    if (is.list(v) && !is.null(attr(v, "class", exact = TRUE)) && !classe_bytes(v)) return(NROW(v))
+    longueur_lue(v)
+  }
+  rn <- .row_names_info(donnees, 2L)
+  nr <- nrow(donnees)
+  lisible_nr <- lisible(nr)
+  rendus <- lapply(unclass(donnees), rendu_colonne)
+  lisibles <- vapply(rendus, lisible, logical(1L))
+  lc <- rep(NA_real_, length(rendus))
+  lc[lisibles] <- vapply(rendus[lisibles], as.double, numeric(1L))
+  k <- if (is.na(rn)) integer(0) else which(is.na(lc) | lc != rn)
+  if (!is.na(rn) && lisible_nr && nr == rn && !length(k)) return(TRUE)
+  noms <- attr(donnees, "names", exact = TRUE)
+  if (is.null(noms)) noms <- character(length(lc))
+  cites <- utils::head(k, NB_LIGNES_CITEES)
+  colonnes_citees <- vapply(cites, function(i)
+    if (lisibles[i]) formuler("colonne « %s » : %.0f", citer(noms[i]), lc[i])
+    else formuler("colonne « %s » : illisible (type « %s », longueur %d)", citer(noms[i]),
+                  citer(typeof(rendus[[i]])), longueur_lue(rendus[[i]])),
+    character(1L))
+  if (length(k) > NB_LIGNES_CITEES)
+    colonnes_citees <- c(colonnes_citees, formuler("et %d autre(s) colonne(s)", length(k) - NB_LIGNES_CITEES))
+  refuser("donnees", "donnees_mal_formees",
+          formuler(paste("Les données sont un data.frame mal formé : nrow(), les noms de lignes et les colonnes",
+                         "n'y donnent pas un même nombre de lignes (%s). Le moteur ne choisit pas entre ces",
+                         "décomptes, et ne les corrige pas : passer un data.frame dont nrow(), les noms de",
+                         "lignes et chaque colonne comptent le même nombre de lignes."),
+                   paste(c(if (is.na(rn)) "noms de lignes : illisibles" else formuler("noms de lignes : %d", rn),
+                           if (!lisible_nr)
+                             formuler("nrow() : illisible (type « %s », longueur %d)", citer(typeof(nr)), longueur_lue(nr))
+                           else if (!is.na(rn) && nr == rn) formuler("nrow() : %d", as.integer(nr))
+                           else formuler("nrow() : %d, classe %s", as.integer(nr),
+                                         paste(citer(class(donnees)), collapse = "/")),
+                           colonnes_citees),
+                         collapse = " ; ")),
+          list(classe = class(donnees), lignes = rn, nrow = if (lisible_nr) as.integer(nr) else NA_integer_,
+               colonne = noms[k], position = k, lignes_colonne = lc[k]))
+}
+
 # Contrôle `roles` (vecteur de chaînes nommé rôle -> colonne, ADR 0007,
 # point 4.1) contre le catalogue et `donnees`. Forme exacte (#62,
 # forme_exacte()) : type character, seul attribut names (ni classe, ni dim,
 # ni attribut quelconque), sans nom ni valeur manquants. Ordre des contrôles
-# (ADR 0016, point 2.2) : (1) forme ; (2) rôle inconnu ; (3) rôle déclaré
+# (ADR 0016, point 2.2) : (1) forme (classe bytes, data.frame, décomptes de
+# lignes des données par controler_lignes_donnees(), #312, puis forme des
+# rôles) ; (2) rôle inconnu ; (3) rôle déclaré
 # deux fois ; (4) rôle qu'aucune recette du catalogue n'emploie
 # (role_non_pris_en_charge) ; (5) discriminants de plusieurs recettes
 # (recettes_concurrentes) ; (6) colonne absente, colonne ambiguë (nom présent
@@ -556,10 +635,13 @@ controler_roles <- function(donnees, roles, segmentation) {
                            "chaîne d'encodage bytes."),
                      paste(citer(class(donnees)), collapse = "/")),
             list(classe = class(donnees)))
-  if (!is.data.frame(donnees))
+  # !is.list() : un vecteur ou un environnement classé « data.frame » n'a pas
+  # de colonnes à lire (unclass() de controler_lignes_donnees()).
+  if (!is.data.frame(donnees) || !is.list(donnees))
     refuser("donnees", "donnees_mal_formees",
             formuler("Les données doivent être un data.frame (le moteur ne lit pas de fichier)."),
             list(classe = class(donnees)))
+  controler_lignes_donnees(donnees)
   if (!forme_exacte(roles, "character", "names") || !noms_complets(names(roles)) || anyNA(roles))
     refuser("donnees", "roles_mal_formes",
             formuler(paste("Les rôles doivent être un vecteur de chaînes nommé (nom du rôle -> nom",
