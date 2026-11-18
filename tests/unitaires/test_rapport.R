@@ -1201,10 +1201,13 @@ verifier("#163 : MENTIONS_RAPPORT$tables_reference_parametres égale le texte de
 # le plan de #163 qui lit une table de référence importée. Méthodes qui
 # mentent (noms en capitales, longueur 0, dimensions 1 x 1, élément "z") ;
 # chacune posée seule, puis toutes ensemble, retirée dans un finally. Attendus
-# calculés avant la pose des méthodes. Témoin : à b457972, names.data.frame,
-# length.data.frame, names.Date, length.Date et names.construction faisaient
-# refuser objet_modifie ou rapport_objet_invalide ; avant la reprise,
-# unlist.AsIs, unlist.default, $.POSIXlt et $.default aussi.
+# calculés avant la pose des méthodes. Témoin : sur 2e79567 (code qui précède
+# #313), onze des dix-neuf méthodes faisaient refuser le rapport d'un objet
+# intact : objet_modifie (names.data.frame, length.data.frame, names.Date,
+# length.Date, $.POSIXlt, $.default) ou rapport_objet_invalide
+# (names.construction, [[.construction, $.data.frame, unlist.AsIs,
+# unlist.default) ; les huit autres le laissaient inchangé (docs/latex,
+# « Lecture sans dispatch », Motif).
 local({
   attrape <- function(expr) tryCatch(expr, error = function(e) e)
   objets <- list(R1 = x1, table_importee = X163$importee)
