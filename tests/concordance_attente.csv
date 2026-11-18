@@ -1,2 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-donnees:controler_lignes_donnees,#312,controle des decomptes de lignes des donnees ajoute a R/donnees.R par #312 ; entree du catalogue par docwriter en fin de branche (regle 9)
