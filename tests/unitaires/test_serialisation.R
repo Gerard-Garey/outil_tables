@@ -245,6 +245,63 @@ local({
              identical(refus_de(lire_plan(octets(c(ok, "b\tcharacter\t1\t\"y\""))))$details$ligne, 5L))
   verifier("lire_fiche, refus : texte de plan lu par lire_fiche -> texte_version_inconnue",
            identical(refus_de(lire_fiche(octets(ok)))$motif, "texte_version_inconnue"))
+  # details$chemin dans tout refus de lire_texte() (#306 ; spécification
+  # d'actuary, M526, cellules R6 à R8) : premier champ brut de la ligne refusée ;
+  # NA avant le découpage, pour une ligne commençant par « # », un premier champ
+  # vide et en fin de texte (details$attendu y porte le chemin attendu). Valeurs
+  # calculées à la main sur le texte de référence `ok`.
+  chemin_de <- function(texte) { r <- refus_de(lire_plan(texte)); if (is.null(r)) "aucun refus" else r$details$chemin }
+  verifier("lire_plan, refus : CR en ligne 4 (refus avant découpage) : details$ligne 4, details$chemin NA (R6)",
+           identical(refus_de(lire_plan(octets(remplacer(4L, "b\tcharacter\t1\t\"x\ry\""))))$details,
+                     list(ligne = 4L, chemin = NA_character_)))
+  verifier("lire_plan, refus : chemin en double en ligne 5 : details$chemin = chemin doublé (R7)",
+           identical(refus_de(lire_plan(octets(c(ok, "b\tcharacter\t1\t\"y\""))))$details,
+                     list(ligne = 5L, chemin = "b")))
+  verifier("lire_plan, refus : « # » qui n'est pas en tête du premier champ (x#) : le chemin x# est gardé (R8)",
+           identical(chemin_de(octets(c(ok, "x#\tcomplex\t1\t1"))), "x#"))
+  verifier("lire_plan, refus : ligne du corps commençant par « # » : details$chemin NA, ligne conservée",
+           identical(refus_de(lire_plan(octets(c(ok[1:3], "#commentaire", ok[4L]))))$details,
+                     list(ligne = 4L, chemin = NA_character_)))
+  verifier("lire_plan, refus : ligne à premier champ vide : details$chemin NA",
+           identical(chemin_de(octets(c(ok[1:3], "\tcharacter\t1\t\"x\""))), NA_character_))
+  verifier("lire_plan, refus : type inconnu, longueur incohérente, valeur invalide, @noms de mauvais type : chemin brut de la ligne",
+           identical(c(chemin_de(octets(remplacer(3L, "a\tcomplex\t1\t1"))),
+                       chemin_de(octets(remplacer(3L, "a\tdouble\t2\t1"))),
+                       chemin_de(octets(remplacer(3L, "a\tdouble\t1\tx"))),
+                       chemin_de(octets(remplacer(2L, "@noms\tdouble\t1\t1")))),
+                     c("a", "a", "a", "@noms")))
+  verifier("lire_plan, refus : fin de texte (dernière ligne retirée) : details$chemin NA, details$attendu = chemin attendu",
+           identical(refus_de(lire_plan(octets(ok[1:3])))$details, list(ligne = 3L, chemin = NA_character_, attendu = "b")))
+  verifier("lire_plan, refus : chemin inattendu avant la fin du texte : details$chemin = chemin lu, details$attendu = chemin attendu",
+           identical(refus_de(lire_plan(octets(remplacer(3L, "z\tdouble\t1\t1"))))$details,
+                     list(ligne = 3L, chemin = "z", attendu = "a")))
+  verifier("lire_plan, refus avant découpage (texte vide, première ligne, BOM, octet nul, sans LF final, UTF-8 invalide) : details$chemin NA, character(1)",
+           all(vapply(list(raw(0), octets(remplacer(1L, "tablexp plan 2")), c(as.raw(c(0xef, 0xbb, 0xbf)), octets(ok)),
+                           c(octets(ok[1:3]), charToRaw("b\tcharacter\t1\t\""), as.raw(0), charToRaw("\"\n")),
+                           utils::head(octets(ok), -1L),
+                           c(octets(ok[1:3]), charToRaw("b\tcharacter\t1\t\""), as.raw(0xe9), charToRaw("\"\n")),
+                           1),
+                      function(o) { r <- refus_de(lire_plan(o)); !is.null(r) && identical(r$details$chemin, NA_character_) }, NA)))
+  # Colonne de data.frame de mauvaise longueur (#306 ; Q2 d'actuary) : details
+  # porte le chemin brut de la ligne refusée et la colonne. Texte de
+  # list(d = data.frame(x = 1:2, y = c("a", "b"))), écrit à la main (ligne 1 :
+  # version ; 2 : @noms ; 3 : d/@colonnes ; 4 : d/@lignes ; 5 : d/x ; 6 : d/y) ;
+  # d/y y est écrite avec 3 valeurs pour 2 lignes.
+  df <- c("tablexp plan 1", "@noms\tcharacter\t1\t\"d\"", "d/@colonnes\tcharacter\t2\t\"x\"\t\"y\"",
+          "d/@lignes\tinteger\t1\t2", "d/x\tinteger\t2\t1\t2", "d/y\tcharacter\t2\t\"a\"\t\"b\"")
+  verifier("lire_plan, texte de référence du data.frame d (x, y ; 2 lignes) : lu sans refus",
+           identical(lire_plan(octets(df)), list(d = data.frame(x = 1:2, y = c("a", "b")))))
+  verifier("lire_plan, refus : colonne d/y de 3 valeurs pour 2 lignes : details = (ligne 6, chemin d/y, colonne d/y)", {
+    r <- refus_de(lire_plan(octets(c(df[1:5], "d/y\tcharacter\t3\t\"a\"\t\"b\"\t\"c\""))))
+    !is.null(r) && identical(r$motif, "texte_longueur_incoherente") &&
+      identical(r$details, list(ligne = 6L, chemin = "d/y", colonne = "d/y"))
+  })
+  verifier("lire_plan, refus : colonne nommée d/y de 3 valeurs pour 2 lignes : details = (ligne 6, chemin d/y/@noms, colonne d/y)", {
+    r <- refus_de(lire_plan(octets(c(df[1:5], "d/y/@noms\tcharacter\t3\t\"u\"\t\"v\"\t\"w\"",
+                                     "d/y\tcharacter\t3\t\"a\"\t\"b\"\t\"c\""))))
+    !is.null(r) && identical(r$motif, "texte_longueur_incoherente") &&
+      identical(r$details, list(ligne = 6L, chemin = "d/y/@noms", colonne = "d/y"))
+  })
 })
 
 # --- refus nommés de l'écriture (valeur calculée à la main : codes) --------------

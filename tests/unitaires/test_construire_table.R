@@ -1924,6 +1924,31 @@ verifier("contrôles (#186) : controler_parametres_donnees() et controler_transi
   })))
   if (all(ok)) TRUE else "un contrôle rend une valeur ou une valeur visible"
 })
+# Fin effective en un seul assistant (#308) : valeur calculée à la main
+# (2024-12-31 = 20088 jours depuis 1970-01-01 ; moins 90 jours : 19998).
+verifier("fin effective (#308) : fin_effective() rend un double, fin - délai (20088 - 90 = 19998), pour un délai double ou integer et des dates de stockage double ou integer ; p$borne = fin effective + 1 ; période vide et inventaires lus sur la même valeur", {
+  fe <- tablexp:::fin_effective
+  vp <- tablexp:::valeurs_parametres_donnees
+  per_int <- PER; per_int$fin <- structure(20088L, class = "Date"); per_int$debut <- structure(16436L, class = "Date")
+  ok_val <- identical(fe(PER, 90), 19998) && identical(fe(PER, 90L), 19998) && identical(fe(per_int, 90L), 19998) &&
+    identical(fe(per_int, 0), 20088) && identical(as.numeric(PER$fin), 20088)
+  ok_borne <- identical(vp(VD, PER, 90)$borne, 19999) && identical(vp(VD, PER, 90L)$borne, 19999) &&
+    identical(vp(VD, per_int, 0L)$borne, 20089)
+  # début = fin effective : admis (une journée) ; début = fin effective + 1 : période_vide, fin effective citée = celle de fin_effective()
+  per_une <- list(debut = structure(19998, class = "Date"), fin = PER$fin)
+  per_vide <- list(debut = structure(19999, class = "Date"), fin = PER$fin)
+  ok_une <- is.null(tablexp:::controler_transition_periode(VD, per_une, 90))
+  r <- tryCatch(tablexp:::controler_transition_periode(VD, per_vide, 90), refus_tablexp = function(r) r)
+  ok_vide <- inherits(r, "refus_tablexp") && identical(r$motif, "periode_vide") &&
+    identical(as.numeric(r$details$fin_effective), fe(per_vide, 90))
+  # inventaires : dernière date = fin effective admise, fin effective + 1 refusée (inventaires_periode)
+  inv <- function(dernier) structure(c(as.numeric(PER$debut) - 1, dernier), class = "Date")
+  ok_inv <- is.null(tablexp:::controler_inventaires_plan(inv(19998), PER, 90)) &&
+    identical((tryCatch(tablexp:::controler_inventaires_plan(inv(19999), PER, 90), refus_tablexp = function(r) r))$motif,
+              "inventaires_periode")
+  if (all(ok_val, ok_borne, ok_une, ok_vide, ok_inv)) TRUE
+  else paste("écarts :", paste(c("valeurs", "borne", "une journée", "période vide", "inventaires")[!c(ok_val, ok_borne, ok_une, ok_vide, ok_inv)], collapse = ", "))
+})
 verifier("contrôles (#82) : recette_branche() et convention_retenue() n'existent plus (intégrées à deduire_recette() et resoudre_convention()) ; resoudre_convention() : plus_fine, native, forcée (valeur calculée à la main)", {
   ns <- asNamespace("tablexp")
   rc <- tablexp:::resoudre_convention

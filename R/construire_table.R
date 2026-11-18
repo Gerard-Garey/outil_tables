@@ -320,7 +320,8 @@ controler_graine_plan <- function(plan, aleatoire) {
 # spécification d'actuary-approfondi de #180, § 2, M328), appelée par
 # valider_plan() si le champ est présent, après controler_parametres_donnees()
 # dont elle reçoit les valeurs validées du plan reçu : la période et le délai
-# (#186 : le début est lu dans `periode`, la fin effective vaut fin - délai). Dans
+# (#186 : le début est lu dans `periode`, la fin effective est celle de
+# fin_effective(), module donnees, #308). Dans
 # cet ordre :
 #   - inventaires_invalides : classe Date exacte, stockage double ou integer,
 #     sans autre attribut ; puis au moins deux dates, sans valeur manquante,
@@ -358,21 +359,21 @@ controler_inventaires_plan <- function(inventaires, periode, delai_declaration) 
                      paste(defauts, collapse = " ; ")),
             list(inventaires = inventaires))
   j <- as.numeric(unclass(x)); M <- length(j)
-  attendu <- c(as.numeric(periode[["debut"]]) - 1, as.numeric(periode[["fin"]]) - delai_declaration)
+  attendu <- c(as.numeric(periode[["debut"]]) - 1, fin_effective(periode, delai_declaration))
   ecart <- c(j[1L] != attendu[1L], j[M] != attendu[2L])
   if (any(ecart)) {
     premier <- citer(format(structure(j[1L], class = "Date")))
     dernier <- citer(format(structure(j[M], class = "Date")))
     veille <- citer(format(structure(attendu[1L], class = "Date")))
-    fin_effective <- citer(format(structure(attendu[2L], class = "Date")))
+    fin_eff <- citer(format(structure(attendu[2L], class = "Date")))
     ecarts <- character(0)
     if (ecart[1L]) ecarts <- c(ecarts, formuler("premier inventaire %s au lieu de %s", premier, veille))
-    if (ecart[2L]) ecarts <- c(ecarts, formuler("dernier inventaire %s au lieu de %s", dernier, fin_effective))
+    if (ecart[2L]) ecarts <- c(ecarts, formuler("dernier inventaire %s au lieu de %s", dernier, fin_eff))
     refuser("construire_table", "inventaires_periode",
             formuler(paste("Grille des inventaires non alignée sur la période d'observation : %s ; la première date",
                            "doit être la veille du début (%s) et la dernière la fin effective (%s : fin moins le",
                            "délai de déclaration), une date d'inventaire désignant l'état en fin de journée."),
-                     paste(ecarts, collapse = " ; "), veille, fin_effective),
+                     paste(ecarts, collapse = " ; "), veille, fin_eff),
             list(inventaires = inventaires, attendu = structure(attendu, class = "Date"),
                  bornes = c("premier", "dernier")[ecart]))
   }
@@ -815,25 +816,13 @@ controler_forme_tables <- function(tables) {
     }
     relu <- tryCatch(lire_texte(octets, PREMIERE_LIGNE_FICHE, "fiche"), refus_tablexp = function(e) e)
     # Refus de la relecture : motif et chemin gardés comme à l'écriture (#165).
-    # Chemin : celui que porte le refus (details$chemin), sinon le chemin attendu
-    # en fin de texte (details$attendu), sinon le premier champ de la ligne
-    # refusée (details$ligne ; la ligne 1 est la première ligne du texte, sans
-    # chemin).
+    # Chemin : celui que porte le refus de lire_texte() (details$chemin, le
+    # premier champ de la ligne refusée ; NA pour une ligne de commentaire, un
+    # premier champ vide ou un refus avant découpage), sinon, en fin de texte, le
+    # chemin attendu (details$attendu), sinon NA (#306).
     if (inherits(relu, "refus_tablexp")) {
       ch <- relu$details$chemin
-      if (is.null(ch)) ch <- relu$details$attendu
-      ligne <- relu$details$ligne
-      if (is.null(ch) && length(ligne) == 1L && !is.na(ligne) && ligne >= 2L) {
-        # Un octet nul (rawToChar() lève une erreur R) laisse le chemin à NA ;
-        # de même un premier champ vide ou qui n'est pas de l'UTF-8 valide.
-        lignes <- tryCatch(strsplit(rawToChar(octets), "\n", fixed = TRUE, useBytes = TRUE)[[1L]],
-                           error = function(e) character(0))
-        if (ligne <= length(lignes)) {
-          ch <- strsplit(lignes[ligne], "\t", fixed = TRUE, useBytes = TRUE)[[1L]][1L]
-          Encoding(ch) <- "UTF-8"
-          if (is.na(ch) || !nzchar(ch) || !validUTF8(ch)) ch <- NA_character_
-        }
-      }
+      if (!is.character(ch) || length(ch) != 1L || is.na(ch)) ch <- relu$details$attendu
       if (!is.character(ch) || length(ch) != 1L) ch <- NA_character_
       mal_formee(formuler("métadonnée sans écriture exacte dans la fiche (%s)",
                           formuler("refus %s, %s", citer(relu$motif), citer(ch))),
@@ -1510,52 +1499,178 @@ decrire_forme <- function(conteneur, nom) {
 }
 
 # Paires « nom=valeur » d'une liste nommée de la fiche (versions,
-# plateforme), jointes par « ; » ; texte_lu() d'une autre valeur, dont une
-# liste de classe « bytes » (names() lèverait une erreur R, #128). Noms et
-# valeurs sont cités par neutraliser_citation() (règle unique des valeurs de
-# la fiche qui entrent dans le bilan du rejeu, #142) : un nom ou une valeur
-# « bytes » l'est sous un repère, au lieu de l'erreur R de sprintf() ou de
-# write.csv() ; ces champs sont des témoins, jamais motifs de refus (ADR 0012,
-# point 3.6). texte_lu() garde sa valeur brute : il alimente aussi les
-# `details` des refus.
+# plateforme), lignes 10 et 11 du bilan, jointes par « ; » (#305 ; volet du
+# rejeu de #302 ; spécification d'actuary-approfondi, Q2 et Q3, M526) : chaque
+# nom par citer_chaine() en contexte « nom_paire » (NA écrit NA, nu ; nom
+# « NA » ou à séparateur / , ; : ( ) = entre « … ») ; chaque valeur par
+# citer_valeur_lue() en contexte « valeur_paire » (chaîne unique égale à
+# « NA » ou « absente », ou qui contient « ; » ou « = », entre « … », comme
+# toute chaîne réservée par citer_chaine() ; toute autre valeur décrite par
+# sa forme, nue). Toute autre valeur que la liste nommée (non-liste,
+# liste sans noms, liste de classe « bytes », dont names() lèverait une
+# erreur R, #128) par citer_valeur_lue() en contexte « toujours » : une
+# chaîne unique entre « … », toute autre valeur décrite par sa forme, nue.
+# La cellule se découpe d'une seule façon : un nom nu ne contient ni « = » ni
+# « ; », une valeur nue pas « ; », une forme citée finit au premier guillemet
+# fermant. Un nom ou une valeur « bytes » est cité sous son repère, au lieu de
+# l'erreur R de sprintf() ou de write.csv() ; ces champs sont des témoins,
+# jamais motifs de refus (ADR 0012, point 3.6). texte_lu() garde sa valeur
+# brute : il alimente aussi les `details` des refus.
 paires_lues <- function(l) {
   n <- attr(l, "names", exact = TRUE)
-  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(sans_controle(texte_lu(l)))
-  paste(sprintf("%s=%s", neutraliser_citation(n), sans_controle(vapply(l, texte_lu, ""))), collapse = " ; ")
+  if (!is.list(l) || classe_bytes(l) || is.null(n)) return(citer_valeur_lue(l, "toujours"))
+  paste(sprintf("%s=%s", citer_chaine(n, "nom_paire"), vapply(l, citer_valeur_lue, "", "valeur_paire", USE.NAMES = FALSE)),
+        collapse = " ; ")
 }
 
-# Segment d'un chemin du bilan du rejeu (clé de tables_reference, nom lu dans
-# la fiche ; #298, option (b) ; ADR 0012, annotation du 16/11/2026, (c)) : les
-# chemins joignent leurs segments par « / » et les chemins par « , », et les
-# textes des lignes 8 et 15 joignent « <clé> : <valeur> » par « ; ». Un
-# segment qui contient l'un de / , ; : ( ) < « » ou qui commence ou finit par
-# une espace est réservé : il s'écrit entre « … » (guillemets, une espace de
-# chaque côté). Dans un segment réservé, « < », guillemet ouvrant et guillemet
-# fermant s'écrivent <U+003C>, <U+00AB> et <U+00BB>, remplacés sur les octets
-# dans cet ordre avant neutraliser_citation() : une notation <U+XXXX> tapée ne
-# se confond plus avec celle d'un caractère de contrôle neutralisé, la
-# citation est injective (hors la limite du repère « bytes », #128, #142). Un
-# segment non réservé est cité par neutraliser_citation(), comme avant ; NA et
-# une chaîne d'encodage « bytes » aussi, jamais entre « … ». Octets lus et
-# remplacés (useBytes) : gsub() sans useBytes lève une erreur R sur une chaîne
-# marquée UTF-8 sous la locale C (mesuré, #298). Les motifs non ASCII sont
-# construits par octets, sans littéral ni marque d'encodage.
-citer_segment <- function(x) {
+# Citation d'une chaîne lue dans la fiche et écrite dans une cellule du bilan
+# du rejeu (forme F307 ; #307, spécification d'actuary-approfondi, option M ;
+# M526 ; ADR 0012, annotation du 17/11/2026, point 3.6 ; #298 pour les
+# segments). Constantes déclarées une fois : caractères réservés communs à
+# tous les contextes (« < », guillemets ouvrant et fermant), séparateurs,
+# mots et motifs réservés propres à chaque contexte, préfixe réservé de texte_lu(),
+# remplacements d'une chaîne réservée (dans cet ordre, sur les octets). Les
+# motifs non ASCII sont construits par octets, sans littéral ni marque
+# d'encodage ; les caractères réservés sont cherchés par une alternance de
+# littéraux sur les octets, jamais par une classe [...] d'expression régulière
+# (elle comparerait des octets isolés et réserverait « ° » ou l'espace
+# insécable, mesuré par actuary, #307) ; une seule recherche par chaîne
+# (MOTIFS_RESERVES_CITATION, #308).
+# Contextes (CITATION_CONTEXTES) :
+#   segment       chemins des verdicts des lignes 10 à 12 et 15, clés des
+#                 lignes 8 et 15 (citer_segment(), #298) : mot NA (#305) ;
+#   nom_paire     noms des paires « nom=valeur » des lignes 10 et 11
+#                 (paires_lues(), #305) : séparateurs du segment et « = »,
+#                 mot NA ;
+#   valeur_paire  valeurs des mêmes paires : séparateurs « ; » et « = », mots
+#                 NA et absente (textes que paires_lues() écrit nus à cette
+#                 place) ;
+#   valeur_isolee ligne 14 pour une empreinte de fichier, ligne 6 pour un
+#                 fichier de la provenance (k = 1) : mots NA, NULL, absente,
+#                 textes que le bilan écrit nus à cette place, et toute chaîne
+#                 NA(, NA)+ (motif ancré ^NA(, NA)+$ : forme d'une liste
+#                 k >= 2 de NA, écrite nue à cette place) ;
+#   toujours      lignes 9 et 13 (empreinte d'une autre forme que MD5), valeurs
+#                 de la ligne 15, chaque élément des lignes 6 et 14 pour k >= 2 :
+#                 toute chaîne est entre « … » ; aussi les lignes 10 et 11
+#                 quand versions ou plateforme n'est pas une liste nommée.
+GUILLEMETS_CITATION <- c(ouvrant = rawToChar(as.raw(c(0xC2, 0xAB))), fermant = rawToChar(as.raw(c(0xC2, 0xBB))))
+CARACTERES_RESERVES_CITATION <- c("<", unname(GUILLEMETS_CITATION))
+CITATION_CONTEXTES <- list(
+  segment = list(separateurs = c("/", ",", ";", ":", "(", ")"), mots = "NA", motifs = character(0), toujours = FALSE),
+  nom_paire = list(separateurs = c("/", ",", ";", ":", "(", ")", "="), mots = "NA", motifs = character(0), toujours = FALSE),
+  valeur_paire = list(separateurs = c(";", "="), mots = c("NA", "absente"), motifs = character(0), toujours = FALSE),
+  valeur_isolee = list(separateurs = character(0), mots = c("NA", "NULL", "absente"), motifs = "^NA(, NA)+$", toujours = FALSE),
+  toujours = list(separateurs = character(0), mots = character(0), motifs = character(0), toujours = TRUE))
+PREFIXE_RESERVE_CITATION <- "illisible ("
+# Motif réservé de chaque contexte, un seul grepl() par chaîne (#308) : alternance
+# de littéraux, sans classe [...] (qui comparerait des octets isolés : « ° » ou
+# l'espace insécable seraient réservés, cf. ci-dessus). Alternants : un
+# caractère réservé ou un séparateur du contexte, espace en tête ou en queue,
+# mot réservé (chaîne entière), motifs réservés du contexte, préfixe réservé.
+# Les métacaractères des séparateurs et du préfixe sont échappés. NA : aucun
+# motif (tout NA s'écrit « NA » avant la recherche) ; contexte « toujours » :
+# toute chaîne est réservée, motif inutilisé.
+MOTIFS_RESERVES_CITATION <- lapply(CITATION_CONTEXTES, function(ctx) {
+  litteral <- function(z) gsub("([][{}()|.*+?^$\\\\])", "\\\\\\1", z, useBytes = TRUE)
+  paste(c(litteral(c(ctx$separateurs, CARACTERES_RESERVES_CITATION)), "^ ", " $",
+          if (length(ctx$mots)) paste0("^(", paste(litteral(ctx$mots), collapse = "|"), ")$"),
+          ctx$motifs, paste0("^", litteral(PREFIXE_RESERVE_CITATION))), collapse = "|")
+})
+REMPLACEMENTS_CITATION <- list(c("<", "<U+003C>"), c(GUILLEMETS_CITATION[["ouvrant"]], "<U+00AB>"),
+                               c(GUILLEMETS_CITATION[["fermant"]], "<U+00BB>"))
+
+# Cœur de la citation (forme F307), élément par élément de `x`, dans le
+# contexte `contexte` (nom d'un élément de CITATION_CONTEXTES) :
+#   - NA s'écrit « NA », nu, dans tous les contextes (chaîne, jamais
+#     NA_character_ : #305, Q3 ; une chaîne « NA » est réservée là où le
+#     mot NA l'est) ;
+#   - une chaîne d'encodage « bytes » est citée sous le repère de
+#     neutraliser_citation(), nu, sauf en contexte « toujours » où il est
+#     entre « … » (limite L1 : deux chaînes « bytes » se citent de même ;
+#     #128, #142) ;
+#   - toute autre chaîne, convertie en UTF-8 si elle est en latin-1, est
+#     réservée si le contexte est « toujours », si elle contient « < », un
+#     guillemet ouvrant ou fermant, ou un séparateur de son contexte, si elle
+#     commence ou finit par une espace, si elle est égale à un mot réservé ou
+#     conforme à un motif réservé de son contexte, ou si elle commence par
+#     « illisible ( » ; une chaîne non réservée est citée par
+#     neutraliser_citation() ; une chaîne réservée s'écrit « « <s′> » », s′
+#     étant la chaîne où « < », guillemet ouvrant et guillemet fermant sont
+#     remplacés par <U+003C>, <U+00AB> et <U+00BB> (dans cet ordre, sur les
+#     octets), puis neutraliser_citation().
+# Une notation <U+XXXX> tapée ne se confond donc plus avec celle d'un
+# caractère de contrôle neutralisé, et une forme citée finit au premier
+# guillemet fermant : la cellule se découpe d'une seule façon (P1) et la
+# citation est injective (P2), hors L1 et la limite L2 (une chaîne latin-1 et
+# la même suite de caractères en UTF-8 se citent de même). Aux lignes 6 et 14,
+# la jointure « , » d'une liste k >= 2 n'est pas un séparateur du contexte
+# « valeur_isolee » : c'est le motif réservé ^NA(, NA)+$ qui sépare k = 1
+# (chaîne « NA, NA » citée entre « … ») de k >= 2 (NA écrits nus, joints par
+# « , ») ; tout autre élément d'une liste k >= 2 est entre « … ». La chaîne
+# vide n'est réservée qu'en contexte « toujours ». Octets lus et remplacés
+# (useBytes) : gsub() sans useBytes lève une erreur R sur une chaîne marquée
+# UTF-8 sous la locale C (mesuré, #298) ; égalité aux mots, motifs et préfixe
+# lus sur les octets.
+citer_chaine <- function(x, contexte) {
   if (!is.character(x)) x <- as.character(x)
-  reserves <- c("/", ",", ";", ":", "(", ")", "<", rawToChar(as.raw(c(0xC2, 0xAB))), rawToChar(as.raw(c(0xC2, 0xBB))))
-  remplacements <- list(c("<", "<U+003C>"), c(reserves[8L], "<U+00AB>"), c(reserves[9L], "<U+00BB>"))
+  ctx <- CITATION_CONTEXTES[[contexte]]
+  motif <- MOTIFS_RESERVES_CITATION[[contexte]]
+  entre_guillemets <- function(s) paste0(texte_moteur("« "), s, texte_moteur(" »"))
   une <- function(s) {
-    if (is.na(s) || Encoding(s) == "bytes") return(neutraliser_citation(s))
+    if (is.na(s)) return("NA")
+    if (Encoding(s) == "bytes") {
+      r <- neutraliser_citation(s)
+      return(if (ctx$toujours) entre_guillemets(r) else r)
+    }
     y <- if (Encoding(s) == "latin1") enc2utf8(s) else s
-    reserve <- any(vapply(reserves, function(r) grepl(r, y, fixed = TRUE, useBytes = TRUE), NA)) ||
-      grepl("^ | $", y, useBytes = TRUE)
+    reserve <- ctx$toujours || grepl(motif, y, useBytes = TRUE)
     if (!reserve) return(neutraliser_citation(s))
-    for (r in remplacements) y <- gsub(r[1L], r[2L], y, fixed = TRUE, useBytes = TRUE)
+    for (r in REMPLACEMENTS_CITATION) y <- gsub(r[1L], r[2L], y, fixed = TRUE, useBytes = TRUE)
     Encoding(y) <- if (validUTF8(y)) "UTF-8" else "unknown"
-    paste0(texte_moteur("« "), neutraliser_citation(y), texte_moteur(" »"))
+    entre_guillemets(neutraliser_citation(y))
   }
   vapply(x, une, "", USE.NAMES = FALSE)
 }
+
+# Valeur lue dans la fiche, citée dans une cellule du bilan du rejeu (#307) :
+# chaîne unique sans attribut, non NA, par citer_chaine() dans le contexte
+# `contexte` ; toute autre valeur décrite par sa forme, nue, par
+# sans_controle(texte_lu()) (« absente », « NA », « illisible (<type> de
+# longueur <n>) » ; limite L3 : le contenu d'une valeur qui n'est pas une
+# chaîne unique n'est pas cité).
+citer_valeur_lue <- function(v, contexte) {
+  if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v)) citer_chaine(v, contexte)
+  else sans_controle(texte_lu(v))
+}
+
+# Fichier(s) lus dans la fiche, lignes 6 (noms des fichiers de la provenance)
+# et 14 (empreintes de fichier) du bilan (#307, extension retenue par M526) :
+# k >= 2 chaînes (provenance de k fichiers, #181 ; M332) citées une à une en
+# contexte « toujours », NA écrit nu, jointes par « , » dans l'ordre de la
+# fiche ; toute autre valeur par citer_valeur_lue() en contexte
+# « valeur_isolee » (k = 1 : « NA », « NULL », « absente », une chaîne
+# NA(, NA)+ — forme d'une liste k >= 2 de NA — ou une chaîne à caractère
+# réservé s'écrivent entre « … »).
+citer_fichiers_lus <- function(v) {
+  if (is.character(v) && is.null(attributes(v)) && length(v) > 1L) paste(citer_chaine(v, "toujours"), collapse = ", ")
+  else citer_valeur_lue(v, "valeur_isolee")
+}
+
+# Segment d'un chemin du bilan du rejeu (clé de tables_reference, nom lu dans
+# la fiche ; #298, option (b) ; ADR 0012, annotation du 16/11/2026, (c)) :
+# citer_chaine() en contexte « segment ». Les chemins joignent leurs segments
+# par « / » et les chemins par « , », et les textes des lignes 8 et 15
+# joignent « <clé> : <valeur> » par « ; ». Un segment qui contient l'un de
+# / , ; : ( ) < « », qui commence ou finit par une espace ou qui égale « NA »
+# (#305, Q3) est réservé : il s'écrit entre « … » (guillemets, une espace de
+# chaque côté), « < », guillemet ouvrant et guillemet fermant devenant
+# <U+003C>, <U+00AB> et <U+00BB>. Un segment non réservé est cité par
+# neutraliser_citation(), comme avant ; NA s'écrit la chaîne « NA », nue, et
+# une chaîne d'encodage « bytes » sous son repère, jamais entre « … ». NA, la
+# chaîne « NA » et la chaîne vide s'écrivent donc NA, « NA » entre « … », et
+# vide.
+citer_segment <- function(x) citer_chaine(x, "segment")
 
 # Chemins des feuilles qui diffèrent entre la fiche rendue (`rendu`) et la
 # fiche reçue (`recu`) (descente D de la spécification de #86) : deux listes
@@ -1624,16 +1739,18 @@ verdict_chaines <- function(attendu, lu) {
 }
 
 # Empreinte lue dans la fiche, citée dans la colonne `lu` des lignes 9 et 13
-# du bilan (#295) : une chaîne de longueur 1 sans attribut, non NA, qui n'a
-# pas la forme MD5 (forme_md5() ; chaîne vide comprise) est citée
-# « « <valeur> » (forme invalide : … attendue) », la valeur par
-# neutraliser_citation() (règle unique, #142) ; toute autre valeur garde
+# du bilan (#295, #307) : une chaîne de longueur 1 sans attribut, non NA, qui
+# n'a pas la forme MD5 (forme_md5() ; chaîne vide comprise) est citée par
+# citer_valeur_lue() en contexte « toujours » (entre « … », « < » et les
+# guillemets d'une valeur écrits <U+003C>, <U+00AB>, <U+00BB>), suivie de
+# « (forme invalide : … attendue) » ; toute autre valeur garde
 # sans_controle(texte_lu()) (MD5 bien formée telle quelle, « absente », « NA »,
-# « illisible (…) »).
+# « illisible (…) »). Texte formé par formuler() (#299) : la citation est
+# insérée par %s, forme de citation déclarée de messages_refus.R.
 texte_empreinte_lue <- function(v) {
   if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v) && !forme_md5(v))
-    return(formuler("« %s » (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)",
-                    sans_controle(v)))
+    return(formuler("%s (forme invalide : empreinte MD5 de 32 caractères hexadécimaux minuscules attendue)",
+                    citer_valeur_lue(v, "toujours")))
   sans_controle(texte_lu(v))
 }
 
@@ -1672,10 +1789,11 @@ perimetre_temoin_fiche <- function(f) {
 # métadonnées de la fiche » (lu). Verdict « identique » sans écart, sinon
 # « différente : tables_reference/<clé>/<champ> » des seuls champs en écart
 # (chemins joints par « , », comme verdict_chemins()) ; statut « comparaison
-# exacte » sans écart, sinon le régime. Valeurs citées par la règle de #142 :
-# chaîne unique sans attribut, non NA, entre « » par neutraliser_citation() ;
-# toute autre valeur par sans_controle(texte_lu()) (« absente », « NA »,
-# « illisible (<type> de longueur <n>) »), jamais par deparse(). Rend
+# exacte » sans écart, sinon le régime. Valeurs citées par citer_valeur_lue()
+# en contexte « toujours » (#307) : chaîne unique sans attribut, non NA, entre
+# « … » (« < » et les guillemets d'une valeur écrits <U+003C>, <U+00AB>,
+# <U+00BB>) ; toute autre valeur par sans_controle(texte_lu()) (« absente »,
+# « NA », « illisible (<type> de longueur <n>) »), jamais par deparse(). Rend
 # c(attendu, lu, verdict, statut).
 temoin_catalogue <- function(ecarts, verdict_code) {
   # Gabarits marqués avant tout collage (formuler(), texte_moteur()) : un
@@ -1685,19 +1803,18 @@ temoin_catalogue <- function(ecarts, verdict_code) {
     return(texte_moteur(c(attendu = "aucune métadonnée du catalogue opposée (aucune table de statut « embarquee »)",
                           lu = "aucune table de statut « embarquee » dans fiche/tables_reference",
                           verdict = "identique", statut = "comparaison exacte")))
-  citer_valeur <- function(v)
-    if (is.character(v) && is.null(attributes(v)) && length(v) == 1L && !is.na(v)) formuler("« %s »", sans_controle(v))
-    else sans_controle(texte_lu(v))
   chemins <- paste0(citer_segment(ecarts$cle), "/", sans_controle(ecarts$champ))
   attendus <- lus <- character(0)
   for (k in ecarts$cles) {
     j <- which(ecarts$cle == k)
     if (length(j)) {
-      # paste0() de morceaux déjà marqués (valeurs citées, constante par
-      # texte_moteur()) : même codage que formuler(), sous toute locale.
-      attendus <- c(attendus, paste0(chemins[j], " : ", vapply(ecarts$attendu[j], citer_valeur, "", USE.NAMES = FALSE),
-                                     texte_moteur(" (catalogue du package installé)")))
-      lus <- c(lus, paste0(chemins[j], " : ", vapply(ecarts$lu[j], citer_valeur, "", USE.NAMES = FALSE)))
+      # Textes formés par formuler() (#299) : chemin cité par citer_segment() et
+      # valeurs par citer_valeur_lue() (vapply() de la forme de citation
+      # déclarée de messages_refus.R).
+      ch <- paste0(citer_segment(ecarts$cle[j]), "/", sans_controle(ecarts$champ[j]))
+      attendus <- c(attendus, formuler("%s : %s (catalogue du package installé)", ch,
+                                       vapply(ecarts$attendu[j], citer_valeur_lue, "", "toujours", USE.NAMES = FALSE)))
+      lus <- c(lus, formuler("%s : %s", ch, vapply(ecarts$lu[j], citer_valeur_lue, "", "toujours", USE.NAMES = FALSE)))
     } else {
       attendus <- c(attendus, formuler("%s : métadonnées du catalogue du package installé", citer_segment(k)))
       lus <- c(lus, formuler("%s : métadonnées de la fiche", citer_segment(k)))
@@ -1961,34 +2078,34 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
   # (tests/controles/locale_c.R, bilan de R1) ; l'écart ne s'étend à aucune
   # comparaison.
   # Toute valeur ou tout nom de la fiche écrit dans une cellule du bilan est
-  # cité par la règle unique neutraliser_citation() (#142) : valeurs par
-  # sans_controle(texte_lu(v)), paires_lues(), liste_guillemets() ou
-  # sans_controle(v) ; noms de champs des chemins des verdicts par
-  # champs_differents(), clés de tables_reference des lignes 8 et 15 et noms
-  # des chemins par citer_segment() (#298 : un segment à séparateur est entre
-  # « … »). Une chaîne « bytes » y est écrite sous son repère
-  # (sinon sprintf() et write.csv() du bilan lèveraient une erreur R), un
-  # caractère de contrôle <U+XXXX>, un octet invalide <xx> : une ligne par
-  # cellule, UTF-8 valide. Les lignes 1 à 5, 7 et 8 ne reçoivent que des
-  # valeurs refusées plus haut si elles sont « bytes » ou invalides (contrôles
-  # 2 à 7 bis) ou recalculées par le moteur ; la ligne 6, le nom du fichier de
+  # cité par la règle unique neutraliser_citation() (#142), sous la forme F307
+  # (citer_chaine(), #307, #305) : valeurs des lignes 6, 9 à 11, 13 à 15 par
+  # sans_controle(texte_lu(v)), paires_lues(), texte_empreinte_lue(),
+  # citer_fichiers_lus() ou citer_valeur_lue() ; clés de tables_reference de la
+  # ligne 8 (empreintes recalculée et lue) et de la ligne 15, et segments des
+  # chemins des verdicts des lignes 10 à 12 (champs_differents()) et 15
+  # (temoin_catalogue()), par citer_segment(), contexte « segment » de F307
+  # (#298 : un segment à séparateur est entre « … » ; #305 : NA écrit nu). Une
+  # chaîne « bytes » y est écrite sous son repère (sinon sprintf() et
+  # write.csv() du bilan lèveraient une erreur R), un caractère de contrôle
+  # <U+XXXX>, un octet invalide <xx> : une ligne par cellule, UTF-8 valide.
+  # Les lignes 1 à 5, 7 et 8 ne reçoivent que des valeurs refusées plus haut
+  # si elles sont « bytes » ou invalides (contrôles 2 à 7 bis) ou recalculées
+  # par le moteur ; la ligne 6, le nom du fichier de
   # la provenance, que controler_provenance() ne contraint pas, est cité ; la
   # ligne 15, valeurs des métadonnées des tables embarquées (source,
   # forme_origine, parametres, que le contrôle 2 ne contraint pas), par
   # temoin_catalogue().
-  # Empreinte(s) de fichier de la fiche, témoin 14 : k >= 2 empreintes
-  # (provenance de k fichiers, #181 ; M332) citées une à une par
-  # liste_guillemets() (règle neutraliser_citation(), NA écrit « NA »), dans
-  # l'ordre de la fiche ; toute autre valeur par sans_controle(texte_lu()),
-  # dont k = 1 (chaîne citée par la règle de #142 : inchangée tant qu'elle n'a
-  # ni caractère de contrôle, ni octet invalide, ni codage « bytes »). Ligne 6 :
-  # noms des fichiers de la provenance (qui a passé controler_provenance()), de
-  # même pour k >= 2, cités de même pour k = 1.
+  # Empreinte(s) de fichier de la fiche, témoin 14, et noms des fichiers de la
+  # provenance (qui a passé controler_provenance()), ligne 6 : par
+  # citer_fichiers_lus() (#307) : k >= 2 éléments (provenance de k fichiers,
+  # #181 ; M332) chacun entre « … », NA écrit nu, dans l'ordre de la fiche ;
+  # k = 1 en contexte « valeur_isolee » (chaîne nue sauf caractère ou mot
+  # réservé) ; toute autre valeur par sans_controle(texte_lu()).
   ef <- e[["fichier"]]
-  fichiers_lus <- if (is.character(ef) && is.null(attributes(ef)) && length(ef) > 1L)
-    liste_guillemets(ef) else sans_controle(texte_lu(ef))
+  fichiers_lus <- citer_fichiers_lus(ef)
   pf <- fiche[["provenance"]][["fichier"]]
-  provenance_lue <- if (is.null(fiche[["provenance"]])) "NULL" else if (length(pf) > 1L) liste_guillemets(pf) else sans_controle(pf)
+  provenance_lue <- if (is.null(fiche[["provenance"]])) "NULL" else citer_fichiers_lus(pf)
   conforme <- texte_moteur("conforme")
   forme <- texte_moteur("contrôle de forme")
   exacte <- texte_moteur("comparaison exacte")
@@ -2018,9 +2135,12 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                     length(fiche), paste(sans_controle(class(donnees)), collapse = "/"), nrow(donnees), ncol(donnees)),
            texte_moteur("champs lus de la forme attendue"),
            sprintf("%d", v), e[["algorithme"]], e[["representation"]],
+           # provenance_lue : NULL écrit « NULL », sinon citer_fichiers_lus()
+           # (#307), insérée par %s (#299).
            formuler("étapes : %s ; rôles : %s ; recette : %s ; provenance : %s",
                     paste(sans_controle(names(plan[["etapes"]])), collapse = ", "),
-                    paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette), provenance_lue),
+                    paste(sans_controle(names(roles)), collapse = ", "), sans_controle(recette$recette),
+                    provenance_lue),
            e[["donnees"]], tr$lu, texte_empreinte_lue(e[["code"]]), paires_lues(fiche[["versions"]]),
            paires_lues(fiche[["plateforme"]]), texte_moteur("fiche reçue, même périmètre"),
            texte_empreinte_lue(e[["resultat"]]), fichiers_lus, tc[["lu"]]),

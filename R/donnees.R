@@ -812,6 +812,17 @@ ligne_transition <- function(transition)
   TRANSITIONS[TRANSITIONS$depart == transition[["depart"]] & TRANSITIONS$arrivee == transition[["arrivee"]], ,
               drop = FALSE]
 
+# Fin effective de la période d'observation, en jours depuis 1970-01-01
+# (double) : fin - délai de déclaration (A.0, T4 ; #308). Seul calcul de la fin
+# effective à partir de la période et du délai : appelée par
+# controler_transition_periode() (période vide), controler_inventaires_plan()
+# (dernière date d'inventaire) et valeurs_parametres_donnees() (borne B = fin
+# effective + 1, dont dérive p$borne des valeurs validées ; les étapes qui
+# relisent la fin effective le font par p$borne - 1). Ne contrôle rien :
+# `periode` et `delai_declaration` sont déjà validés par l'appelant.
+fin_effective <- function(periode, delai_declaration)
+  as.numeric(periode[["fin"]]) - delai_declaration
+
 # Valeurs que les paramètres de transition, de période et de délai déjà
 # contrôlés donnent (#22) : list(transition, debut, fin, borne, periode,
 # delai_declaration[, inventaires]), la ligne de TRANSITIONS, les bornes de la
@@ -826,9 +837,9 @@ ligne_transition <- function(transition)
 # qui la transmet aux fonctions d'étape après valider_plan() (#82, #186) ; les
 # contrôles de valider_plan() ne la forment pas.
 valeurs_parametres_donnees <- function(transition, periode, delai_declaration, inventaires = NULL) {
-  fin <- as.numeric(periode[["fin"]])
-  v <- list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]), fin = fin,
-            borne = (fin - delai_declaration) + 1, periode = periode, delai_declaration = delai_declaration)
+  v <- list(transition = ligne_transition(transition), debut = as.numeric(periode[["debut"]]),
+            fin = as.numeric(periode[["fin"]]), borne = fin_effective(periode, delai_declaration) + 1,
+            periode = periode, delai_declaration = delai_declaration)
   if (!is.null(inventaires)) v$inventaires <- inventaires
   v
 }
@@ -878,14 +889,13 @@ controler_transition_periode <- function(transition, periode, delai_declaration)
     refuser("donnees", "delai_invalide",
             formuler("Le délai de déclaration doit être un nombre entier unique de jours >= 0, sans attribut (A.0, T4)."),
             list(delai_declaration = delai_declaration))
-  debut <- as.numeric(periode[["debut"]]); fin <- as.numeric(periode[["fin"]])
-  fin_effective <- fin - delai_declaration
-  if (debut > fin_effective)
+  fin_eff <- fin_effective(periode, delai_declaration)
+  if (as.numeric(periode[["debut"]]) > fin_eff)
     refuser("donnees", "periode_vide",
             formuler("Période d'observation vide : début %s postérieur à la fin effective %s (fin %s, délai %s jour(s)).",
-                     citer(format(periode[["debut"]])), citer(format(structure(fin_effective, class = "Date"))),
+                     citer(format(periode[["debut"]])), citer(format(structure(fin_eff, class = "Date"))),
                      citer(format(periode[["fin"]])), citer(format(delai_declaration))),
-            list(debut = periode[["debut"]], fin_effective = structure(fin_effective, class = "Date")))
+            list(debut = periode[["debut"]], fin_effective = structure(fin_eff, class = "Date")))
   invisible(NULL)
 }
 

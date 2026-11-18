@@ -424,6 +424,13 @@ verifier("D tables_reference_mal_formees, relecture refusée sur une ligne dont 
                        "relecture du texte de fiche sans refus", "(refus texte_ligne_mal_formee, NA)")
   if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_)
 })
+verifier("D tables_reference_mal_formees, relecture refusée sans LF final (refus avant découpage) : motif texte_sans_lf_final, chemin NA dans details et dans le message (#306)", {
+  # Le dernier octet de l'écriture (le LF de la ligne 11, « a/empreinte ») est retiré.
+  r <- relecture_alteree(function(o) o[-length(o)], controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_sans_lf_final",
+                       "relecture du texte de fiche sans refus", "(refus texte_sans_lf_final, NA)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_)
+})
 verifier("D tables_reference_mal_formees, relecture refusée sur une ligne qui n'est pas de l'UTF-8 valide : chemin NA, motif gardé", {
   # Octet 0xff dans le chemin d'une ligne du corps.
   r <- relecture_alteree(function(o) charToRaw(sub("a/parametres/p", "a/parametres/p\xff", rawToChar(o), fixed = TRUE, useBytes = TRUE)),
@@ -447,19 +454,45 @@ verifier("D tables_reference_mal_formees, relecture refusée sur la première li
     "texte_objet() non restauré" else
     identical(r1$details$chemin, NA_character_) && identical(r2$details$chemin, NA_character_)
 })
-verifier("D tables_reference_mal_formees, relecture refusée sur un CR dans le chemin : chemin brut dans details, CR neutralisé dans le message", {
+verifier("D tables_reference_mal_formees, relecture refusée sur un CR dans le chemin (refus avant découpage) : chemin NA dans details et dans le message (#306)", {
   r <- relecture_alteree(remplacer_texte("a/parametres/p\t", "a/parametres/p\r\t"), controler_forme_tables(list(a = T_PARAM)))
   ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_retour_chariot",
-                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, a/parametres/p<U+000D>)")
-  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/p\r") &&
-    !grepl("\r", conditionMessage(r), fixed = TRUE)
+                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, NA)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_) && !grepl("\r", conditionMessage(r), fixed = TRUE)
 })
-verifier("D tables_reference_mal_formees, relecture refusée sur un CRLF en fin de ligne : chemin de la ligne refusée sans le CR", {
+verifier("D tables_reference_mal_formees, relecture refusée sur un CRLF en fin de ligne (refus avant découpage) : chemin NA (#306)", {
   r <- relecture_alteree(remplacer_texte('\t"pv"\n', '\t"pv"\r\n'), controler_forme_tables(list(a = T_PARAM)))
   ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_retour_chariot",
-                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, a/parametres/p)")
-  if (!isTRUE(ok)) ok else identical(r$details$chemin, "a/parametres/p")
+                       "relecture du texte de fiche sans refus", "(refus texte_retour_chariot, NA)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_)
 })
+# Chemin porté par lire_texte(), non redéduit des octets (#306 ; spécification
+# d'actuary, M526, cellules R1 à R3). Valeurs attendues calculées à la main sur le
+# texte écrit de l'élément de fiche : la ligne 3 est « a/@noms » ; l'insertion se
+# fait après elle (la ligne insérée est la ligne 4).
+inserer_apres <- function(i, ligne)
+  function(octets) { l <- lignes_texte(octets); charToRaw(paste0(paste(append(l, ligne, i), collapse = "\n"), "\n")) }
+cas_chemin <- list(
+  list("R1 ligne « # » du corps (commentaire)", inserer_apres(3L, "#commentaire"), "texte_ligne_mal_formee", NA_character_),
+  list("R2 ligne « # » du corps (#x, type et valeurs bien formés)", inserer_apres(3L, "#x\tcharacter\t1\t\"a\""),
+       "texte_ligne_mal_formee", NA_character_),
+  list("R3 ligne sans tabulation", inserer_apres(3L, "a/zz"), "texte_ligne_mal_formee", "a/zz"),
+  list("R3 type inconnu", inserer_apres(3L, "a/zz\tchose\t1\ta"), "texte_type_inconnu", "a/zz"),
+  list("R3 ligne 3 doublée", function(o) { l <- lignes_texte(o); charToRaw(paste0(paste(append(l, l[3L], 3L), collapse = "\n"), "\n")) },
+       "texte_chemin_en_double", "a/@noms"),
+  list("R3 première ligne remplacée", remplacer_texte("tablexp fiche 1", "tablexp fiche 2"), "texte_version_inconnue", NA_character_),
+  list("R3 dernière ligne retirée (details$attendu)", function(o) { l <- lignes_texte(o); charToRaw(paste0(paste(l[-length(l)], collapse = "\n"), "\n")) },
+       "texte_chemin_inattendu", "a/empreinte"),
+  list("R3 premier champ vide", inserer_apres(3L, "\tcharacter\t1\t\"a\""), "texte_ligne_mal_formee", NA_character_),
+  list("R8 « # » qui n'est pas en tête (x#)", inserer_apres(3L, "x#\tcharacter\t1\t\"a\""), "texte_chemin_inattendu", "x#"))
+for (c_ in cas_chemin)
+  verifier(sprintf("D tables_reference_mal_formees, relecture refusée, %s : motif %s, chemin %s dans details et dans le message (#306)",
+                   c_[[1L]], c_[[3L]], if (is.na(c_[[4L]])) "NA" else c_[[4L]]), {
+    r <- relecture_alteree(c_[[2L]], controler_forme_tables(list(a = T_PARAM)))
+    ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", c_[[3L]], "relecture du texte de fiche sans refus",
+                         sprintf("(refus %s, %s)", c_[[3L]], if (is.na(c_[[4L]])) "NA" else c_[[4L]]))
+    if (!isTRUE(ok)) ok else identical(r$details$chemin, c_[[4L]])
+  })
 verifier("D tables_reference_mal_formees, relecture sans refus mais différente (Date integer) : motif « relecture différente » inchangé, chemin NA", {
   t_date <- table_reference(TR, "s", "synthetique", "x", parametres = list(d = structure(1L, class = "Date")))
   r <- refus_de(controler_forme_tables(list(a = t_date)))
