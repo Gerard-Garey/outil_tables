@@ -4896,7 +4896,9 @@ qu'elle n'exécute aucune étape du plan (issue~\#82, décision M291)~:
     fiche qui n'est pas une liste nommée aux noms uniques, sans autre
     attribut que ses noms (\code{liste\_nommee()}), est refusé sous
     \code{fiche\_non\_conforme}~; puis des données qui ne sont pas un
-    \code{data.frame}, ou dont la classe porte, à toute position, un
+    \code{data.frame}, objet classé \code{data.frame} qui n'est pas une
+    liste compris (même condition que \code{controler\_roles()}~;
+    issue~\#312~; décision M532~(d)), ou dont la classe porte, à toute position, un
     élément d'encodage \code{bytes} (\code{classe\_bytes()}, lue avant
     \code{is.data.frame()}, qui lèverait une erreur R~; issue~\#150),
     sont refusées par \code{controler\_roles()}, sous le
@@ -4953,7 +4955,12 @@ qu'elle n'exécute aucune étape du plan (issue~\#82, décision M291)~:
     refus gardent leur module, leur motif et leur message
     (\code{colonne\_absente}, \code{type\_incompatible},
     \code{plan\_mal\_forme}, \code{convention\_invalide},
-    \code{provenance\_invalide}\ldots). La séquence n'est pas recopiée~:
+    \code{provenance\_invalide}\ldots), dont \code{donnees\_mal\_formees}
+    pour des données aux décomptes de lignes discordants
+    (section~\ref{sec:controles-donnees}~; issue~\#312), levé ici et non à
+    l'étape~1, sans refactorisation (option R-a, décision M531)~: une telle
+    entrée reçoit ce motif, et non \code{empreinte\_donnees\_discordante}
+    ni une erreur R. La séquence n'est pas recopiée~:
     c'est la fonction même de la construction (issue~\#82~; ADR 0012,
     annotation du 07/11/2026, (a)~1), et un test vérifie qu'elle donne le
     même refus par les deux chemins. Elle est donc exécutée deux fois par
@@ -6805,7 +6812,11 @@ rôle par la recette.}
 
 \code{controler\_roles()} contrôle la déclaration des rôles dans cet ordre, et
 chaque refus nomme tous les rôles et colonnes en cause~:
-\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame}, ou
+\code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame},
+objet classé \code{data.frame} qui n'est pas une liste compris
+--- environnement, vecteur ---, au message «~Les données doivent être un
+data.frame~», qui n'a pas de colonnes à lire~; issue~\#312~; ses
+décomptes de lignes ne concordent pas, ci-dessous~; ou
 sa classe porte, à toute position, un élément d'encodage \code{bytes}~:
 ce cas, jugé d'abord par \code{classe\_bytes()} parce que
 \code{is.data.frame()} lèverait une erreur R, a son propre message, qui
@@ -6859,6 +6870,71 @@ rôles de \code{agregats} (par exemple \code{date\_naissance})~; son
 message nomme la ou les recettes qui emploient le rôle, au pluriel s'il y
 en a deux (\code{lignes\_dates\_completes} et \code{stocks\_successifs}
 pour \code{date\_naissance}).
+
+\medskip
+\noindent
+\textbf{Décomptes de lignes discordants} (issue~\#312~; décision M531~;
+ADR 0012, mention datée du 18/11/2026, point~2). Juste après le refus
+d'une entrée qui n'est pas un \code{data.frame} et avant
+\code{roles\_mal\_formes}, dans le contrôle «~(1) forme~» de l'ADR 0016,
+point~2.2, \code{controler\_lignes\_donnees()} compare trois décomptes~:
+\code{nrow()}, lu \textbf{avec} dispatch (la grandeur que lit
+\code{preparer\_donnees()}), les noms de lignes, lus sans dispatch par
+\code{.row\_names\_info(donnees, 2L)} (la valeur que lisent
+\code{dim.data.frame}, l'extraction \code{[} de R base et le rapport
+figé), et le nombre de lignes de \textbf{chaque} colonne, de rôle ou non~:
+\code{dim[1]} si la colonne porte un attribut \code{dim} (matrice,
+tableau), \code{NROW()}, avec dispatch, pour une liste munie d'une classe
+autre que \code{bytes} (\code{POSIXlt}, colonne \code{data.frame}, dont
+le nombre de lignes n'est défini que par sa méthode), \code{longueur\_lue()}
+sinon. S'ils ne concordent pas, l'entrée est refusée sous
+\code{donnees\_mal\_formees}, module \code{donnees}, avant toute étape et
+sans avertissement R~: le moteur ne choisit pas entre ces lectures et ne
+corrige rien (E2.2). C'est l'exception~(1) de la lecture sans dispatch
+(section~\ref{sec:rapport-fige}, «~Lecture sans dispatch~»)~: le contrôle
+juge la concordance de lectures avec et sans dispatch, sans en retenir
+aucune. Un décompte n'est retenu que s'il est \emph{lisible} (numérique,
+de longueur~1, non \code{NA}, entier, de~0 à
+\code{.Machine\$integer.max}, jugé avant toute conversion)~; sinon,
+pour \code{nrow()} comme pour une colonne (méthode \code{dim()} ou
+\code{length()} qui rend \code{NULL}, \code{NA}, du texte ou deux
+valeurs), il est dit «~illisible~», avec le type et la longueur de la
+valeur rendue, et la colonne est discordante~; des noms de lignes
+illisibles (forme compacte \code{c(NA, NA)}) font refuser l'entrée sans
+qu'aucune colonne soit comparée. Le message, d'une ligne, est~:
+«~Les données sont un data.frame mal formé~: nrow(), les noms de lignes
+et les colonnes n'y donnent pas un même nombre de lignes ([décomptes]).
+Le moteur ne choisit pas entre ces décomptes, et ne les corrige pas~:
+passer un data.frame dont nrow(), les noms de lignes et chaque colonne
+comptent le même nombre de lignes.~», où [décomptes] énumère, séparés par
+«~;~», les noms de lignes («~noms de lignes~: N~» ou «~illisibles~»),
+\code{nrow()} (sa valeur, suivie de la classe des données si elle diffère
+des noms de lignes ou si ceux-ci sont illisibles, ou «~illisible~») et les colonnes discordantes
+(«~colonne «~nom~»~: N~»), au plus \code{NB\_LIGNES\_CITEES} (dix), puis
+«~et N autre(s) colonne(s)~». Les \code{details} ont six clés~:
+\code{classe} (classe des données), \code{lignes} (noms de lignes,
+\code{NA} s'ils sont illisibles), \code{nrow} (\code{NA} s'il est
+illisible), \code{colonne}, \code{position} et \code{lignes\_colonne}
+(toutes les colonnes discordantes, sans plafond~; \code{NA} pour un
+décompte illisible). Restent admis~: une méthode \code{dim()} qui ne ment
+que sur le nombre de colonnes, que le contrôle ne lit pas~; une colonne
+de rôle dont la méthode \code{length()} ment alors que son vecteur compte
+le bon nombre de valeurs~; la base vide bien formée (zéro ligne partout),
+refusée ensuite sous \code{base\_vide}. Une erreur levée par une méthode
+\code{dim()} de la classe se propage. Au rejeu, ce refus est levé à
+l'étape~6, avant l'empreinte des données (section~\ref{sec:rejeu}).
+\textbf{Statut}~: \emph{lecture} du code et \emph{constat} des tests
+(décomptes faussés par \code{dim()}, par les noms de lignes, par une
+colonne de rôle ou hors rôle, colonnes illisibles, plafond des colonnes
+citées), par \code{controler\_roles()} et par \code{construire\_table()}.
+Avant l'issue~\#312, ces entrées étaient construites, sous des
+avertissements R ou sans (colonne hors rôle d'une ligne de moins), ou
+arrêtaient la construction sur une erreur R (noms de lignes d'une ligne
+de plus ou illisibles, \code{dim()} qui rend \code{NULL}), ou recevaient
+un refus au diagnostic inexact (\code{base\_vide} pour un attribut
+\code{row.names} absent~; \emph{constat} de mesure sur le code qui
+précède l'issue~; \code{ligne\_invalide} dans d'autres cas, rapporté par
+le message du commit de l'issue).
 
 \medskip
 {\sloppy\hbadness=10000 \code{controler\_parametres\_donnees()} contrôle les champs du plan que l'étape
@@ -9536,7 +9612,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{MOTIFS\_LIGNES\_STOCKS} & constante & --- & les vingt et un motifs de ligne de la recette \code{stocks\_successifs}, dans l'ordre de restitution~: toute ligne, ligne d'inventaire, ligne d'événement (tableau~\ref{tab:motifs-stocks}) \\
 \catalogue{fonctions-donnees}{MOTIFS\_UNITE\_STOCKS} & constante & --- & les huit motifs d'unité de la recette \code{stocks\_successifs}, évalués sur les unités exemptes de motif de ligne \\
 \catalogue{fonctions-donnees}{LIBELLES\_MOTIFS} & constante & --- & libellé de chaque code de motif de l'union des recettes, un seul par code quelle que soit la recette qui le lève, marqué UTF-8 à la source (\#151) \\
-\catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus \\
+\catalogue{fonctions-donnees}{NB\_LIGNES\_CITEES} & constante & --- & 10 numéros de ligne cités par motif dans un message de refus~; aussi plafond des colonnes discordantes citées par le refus des décomptes de lignes (issue~\#312) \\
 \catalogue{fonctions-donnees}{CATALOGUE\_RECETTES} & constante & --- & catalogue des recettes d'exposition, une ligne par recette~: rôles requis, groupes de rôles dont un au moins est requis, rôles facultatifs, rôles propres (discriminants), convention native (\code{NA} si elle ne se déduit pas des rôles), forme rendue au noyau (\code{fenetres} ou \code{cellules}), motifs de ligne et d'unité~; lignes \code{lignes\_dates\_completes}, \code{agregats} et \code{stocks\_successifs} (tableau~\ref{tab:recettes}) \\
 \catalogue{fonctions-donnees}{MATRICE\_RECETTES} & constante & --- & matrice recette $\times$ étape $\times$ estimateur, complète, une ligne par étape et par estimateur de \code{brut}~: admis (\code{oui}, \code{non}, \code{si\_role}), rôle qui conditionne \code{si\_role}, motif du refus~; tout est admis sous \code{lignes\_dates\_completes}~; sous \code{agregats}, lignes \code{si\_role} et \code{non}~; sous \code{stocks\_successifs}, tout est admis sauf \code{importance\_exclusions}~; trois recettes $\times$ (étapes de \code{ETAPES} $+$ trois estimateurs) lignes~; l'étape \code{lissage} admise (\code{oui}) sous les trois recettes (section~\ref{sec:recettes}) \\
 \catalogue{fonctions-donnees}{roles\_recette()} & interne & catalogue, rang & rôles employés par la recette~: requis, d'un groupe, facultatifs, sans doublon \\
@@ -9552,7 +9628,8 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & recettes, rôles requis absents, groupes non couverts & message du refus \code{aucune\_recette}, recette par recette \\
 \catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue et matrice (par défaut, ceux du module~; injection en test) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de la matrice reçue (aucune ligne pour une recette absente de cette matrice~; issue~\#196)~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{donnees\_mal\_formees} (message propre et \code{details\$classe} pour des données de classe \code{bytes}, lue par \code{classe\_bytes()} avant \code{is.data.frame()}~; issue~\#150), \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes} (à toute position, \code{factor} compris~; issue~\#150), ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
+\catalogue{fonctions-donnees}{controler\_lignes\_donnees()} & interne & données (liste de classe \code{data.frame}) & contrôle des décomptes de lignes~: \code{nrow()} (avec dispatch), noms de lignes (\code{.row\_names\_info()}) et nombre de lignes de chaque colonne égaux et lisibles, sinon refus \code{donnees\_mal\_formees}, \code{details} à six clés, au plus \code{NB\_LIGNES\_CITEES} colonnes citées~; colonnes parcourues par position, sans copie~; rend \code{TRUE} (section~\ref{sec:controles-donnees}, «~Décomptes de lignes discordants~»~; issue~\#312) \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{donnees\_mal\_formees} (message propre et \code{details\$classe} pour des données de classe \code{bytes}, lue par \code{classe\_bytes()} avant \code{is.data.frame()}~; issue~\#150~; objet classé \code{data.frame} qui n'est pas une liste, et décomptes de lignes discordants (fonction précédente), avant \code{roles\_mal\_formes}~; issue~\#312), \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes} (à toute position, \code{factor} compris~; issue~\#150), ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
 \catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique, convention validée (\code{NULL} sans étape \code{exposition}), valeurs validées \code{p} & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis règles qui ne tiennent pas dans une ligne (fonction de la ligne suivante), puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
 \catalogue{fonctions-donnees}{regles\_conditionnelles\_recette()} & interne & recette, rôles, étapes du plan, convention, valeurs validées \code{p} & règles de la matrice qui ne tiennent pas dans une ligne~; sous \code{agregats}, dans cet ordre, refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle \code{annee}) et \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire} (binomial avec le rôle \code{annee} sous la convention retenue \code{dernier\_anniversaire})~; sous \code{stocks\_successifs}, refus \code{identifiants\_concurrents} puis \code{identifiant\_inadapte}~; aucune sous \code{lignes\_dates\_completes}~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide}, module \code{donnees}~; rend \code{NULL}~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22, \#59 et~\#82~; variantes des modules \code{brut}, \code{validation} et \code{importance\_exclusions} retirées par l'issue~\#82) \\
@@ -17967,13 +18044,14 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     rapport en restitue (type, nombre de lignes, noms des colonnes~:
     structure seule, ci-dessous) se rapproche de données du périmètre~: un
     écart y établit que l'objet n'est pas tel que \code{construire\_table()}
-    l'a rendu d'une entrée dont \code{dim()} est celui de R base~:
-    \code{numeros\_conserves} et
+    l'a rendu~: \code{numeros\_conserves} et
     \code{fiche/roles} sont établis par le contrôle~3, à une collision du
-    MD5 près~; la copie ne l'est pas, et un écart signale soit une
-    modification après la construction, soit une entrée dont le décompte
-    des lignes est faussé (issue~\#312), d'où le motif
-    \code{objet\_modifie}, et non \code{type\_non\_canonique}. Tout autre
+    MD5 près~; la copie ne l'est pas, et un écart signale une modification
+    après la construction, d'où le motif \code{objet\_modifie}, et non
+    \code{type\_non\_canonique}~; une entrée dont \code{nrow()}, les noms
+    de lignes et les colonnes ne donnent pas un même nombre de lignes est
+    refusée avant toute étape (\code{donnees\_mal\_formees},
+    section~\ref{sec:controles-donnees}~; issue~\#312). Tout autre
     contrôle de structure d'un sous-arbre hors empreinte demanderait un tel
     ancrage et une nouvelle annotation de l'ADR 0012. Sont refusés sous
     \code{objet\_modifie}, le chemin étant cité dans le message et porté
@@ -18024,7 +18102,7 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     une classe dont ces méthodes mentent ou lèvent une erreur donne un
     rapport identique octet à octet à celui de l'objet intact, et, avec une
     ligne de moins, le refus~(b)). \textbf{Limite acceptée} (M522~;
-    issue~\#311, ouverte)~: ni le type ni les valeurs des colonnes ne sont
+    issue~\#311 close sans suite, M526)~: ni le type ni les valeurs des colonnes ne sont
     contrôlés~; une colonne de rôle vidée (\code{NA}) ou convertie en
     facteur passe, et le rapport, qui n'en restitue que la structure, est
     identique octet à octet à celui de l'objet intact (\emph{constat}).
@@ -18032,15 +18110,25 @@ module \code{rapport} (tableau~\ref{tab:refus-rapport})~:
     \code{data.frame} dont les noms de lignes annoncent le bon nombre de
     lignes et dont les colonnes en ont moins passe, et le rapport est
     identique octet à octet à celui de l'objet intact (\emph{constat} de
-    mesure)~; ce constat, de même nature, est renvoyé à l'issue~\#311.
-    Le contrôle établit la cohérence de la copie avec le périmètre, non son
-    origine. Un objet rendu par \code{construire\_table()} d'une entrée
-    dont \code{dim()} est celui de R base passe ce contrôle
-    (\emph{constat} des tests)~; une entrée dont la méthode \code{dim()}
-    annonce moins de lignes qu'elle n'en a donne dès la construction un
-    objet incohérent, refusé ici~; si elle en annonce plus, la
-    construction s'arrête sur une erreur R (issue~\#312~; \emph{constat}
-    de mesure).
+    mesure)~; cette limite vaut pour une copie modifiée après la
+    construction~: \code{construire\_table()} ne produit plus une telle
+    copie, une entrée de cette forme étant refusée
+    (issue~\#312), et elle est sans objet pour un objet construit par le
+    moteur. Le contrôle établit la cohérence de la copie avec le périmètre,
+    non son origine~: l'authenticité de \code{lignes\_conservees} se
+    vérifie par le rejeu avec les données (section~\ref{sec:rejeu}), non
+    par le rapport (décision D4~(a), M530~; ADR 0012, mention datée du
+    18/11/2026, point~4). Un objet rendu par \code{construire\_table()}
+    passe ce contrôle (\emph{constat} des tests)~; une entrée dont la
+    méthode \code{dim()} ment sur le nombre de lignes, ou dont les noms de
+    lignes ou une colonne en comptent un autre, est refusée avant toute
+    étape sous \code{donnees\_mal\_formees} (issue~\#312~; \emph{constat}
+    des tests), sans avertissement R. Auparavant, elle donnait, sous des
+    avertissements R, un objet construit que le rapport rendait sans refus
+    (noms de lignes ou colonne d'une ligne de moins), ou un objet refusé
+    ici (\code{dim()} d'une ligne de moins), ou la construction s'arrêtait
+    sur une erreur R (\code{dim()} d'une ligne de plus) (\emph{constat} de
+    mesure sur le code qui précède l'issue~\#312).
 \end{enumerate}
 
 \medskip
@@ -18199,7 +18287,9 @@ du contrôle~5, qui n'en vérifie pas l'exactitude, et la cohérence de
 \code{lignes\_conservees} avec le périmètre (présence, classe
 \code{data.frame}, nombre de lignes, colonnes de rôle), du contrôle~6, qui
 ne vérifie ni le type ni les valeurs de ses colonnes (limite acceptée,
-M522), ni leur longueur (constat, issue~\#311).
+M522), ni leur longueur (limite sans objet pour un objet construit par le
+moteur, les décomptes de lignes discordants étant refusés à l'entrée~;
+issue~\#312).
 
 \medskip
 \noindent
@@ -19042,7 +19132,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{empreinte\_resultat()} & interne & objet \code{construction} & MD5 du texte de l'objet privé de \code{CHEMINS\_HORS\_RESULTAT}, en forme \code{"empreinte"}, de première ligne \code{REPRESENTATION\_RESULTAT}, sans en-tête~; classe de la racine vérifiée~; erreur de programmation sur un attribut ou une valeur sans écriture~; une liste de classe ou de nom d'encodage \code{bytes} n'est pas descendue au retrait des chemins exclus~: l'écrivain la refuse, refus converti en cette erreur de programmation, que \code{controler\_rapport()} cite sous \code{objet\_modifie} (issue~\#128) \\
 \catalogue{fonctions-rapport}{CHEMINS\_FORME\_HORS\_RESULTAT} & constante & --- & chemins de \code{CHEMINS\_HORS\_RESULTAT} dont la forme est contrôlée avant l'écriture du rapport figé, tous sauf la copie de l'entrée \code{lignes\_conservees} (issue~\#141~; M499) \\
 \catalogue{fonctions-rapport}{controler\_forme\_hors\_resultat()} & interne & objet \code{construction} & contrôle~5 de \code{controler\_rapport()}~: chaque sous-arbre présent aux chemins de la constante précédente, sous son chemin, passé à \code{texte\_objet()} en mode \code{canonique}, sortie jetée~; refus \code{type\_non\_canonique} (rôle~: le chemin) et, sous \code{fiche/}, refus de codage de l'écrivain~; \code{execution} en forme seule (\code{valeurs = FALSE}), le champ que \code{FORME\_EXECUTION} déclare \code{POSIXct} (\code{debut}), \code{POSIXct} nu, contrôlé sans sa classe~; chemins parcourus par \code{lire\_chemin()}~: tout ancêtre liste traversé, de classe quelconque, \code{bytes} comprise, le sous-arbre seul jugé (issue~\#301)~; sous-arbre absent ou \code{NULL} sauté~; ni la présence ni la structure d'\code{execution} exigées (admission documentée, issue~\#297)~; lecture sans dispatch (issue~\#313)~; nom vide, \code{NA}, en double ou qui n'est pas un segment, sous \code{fiche/versions} et \code{fiche/plateforme}, admis et restitué par \code{@noms} et \code{[i]} (admission documentée, issue~\#302)~; rend \code{TRUE}, invisible (issue~\#141, section~\ref{sec:rapport-fige}) \\
-\catalogue{fonctions-rapport}{controler\_lignes\_conservees()} & interne & objet \code{construction} & contrôle~6 de \code{controler\_rapport()}~: copie de l'entrée \code{lignes\_conservees}, hors de l'empreinte, rapprochée de \code{numeros\_conserves} et de \code{fiche/roles}, qui sont dans son périmètre~; refus \code{objet\_modifie}, chemin cité, d'une valeur qui n'est pas un \code{data.frame}, d'un nombre de lignes autre que la longueur de \code{numeros\_conserves} ou illisible, d'une colonne de rôle manquante, d'une absence alors que \code{numeros\_conserves} est présent~; lecture sans dispatch (\code{lire\_chemin()}, \code{a\_classe()}, \code{attr()}, \code{.row\_names\_info()})~; ni type ni valeurs des colonnes contrôlés (limite acceptée, M522, issue~\#311), ni leur longueur (constat, issue~\#311)~; rend \code{TRUE}, invisible (issue~\#294, section~\ref{sec:rapport-fige}) \\
+\catalogue{fonctions-rapport}{controler\_lignes\_conservees()} & interne & objet \code{construction} & contrôle~6 de \code{controler\_rapport()}~: copie de l'entrée \code{lignes\_conservees}, hors de l'empreinte, rapprochée de \code{numeros\_conserves} et de \code{fiche/roles}, qui sont dans son périmètre~; refus \code{objet\_modifie}, chemin cité, d'une valeur qui n'est pas un \code{data.frame}, d'un nombre de lignes autre que la longueur de \code{numeros\_conserves} ou illisible, d'une colonne de rôle manquante, d'une absence alors que \code{numeros\_conserves} est présent~; lecture sans dispatch (\code{lire\_chemin()}, \code{a\_classe()}, \code{attr()}, \code{.row\_names\_info()})~; ni type ni valeurs des colonnes contrôlés (limite acceptée, M522~; issue~\#311 close sans suite, M526), ni leur longueur (sans objet pour un objet construit par le moteur~; issue~\#312)~; rend \code{TRUE}, invisible (issue~\#294, section~\ref{sec:rapport-fige}) \\
 \catalogue{fonctions-rapport}{empreinte\_sources()} & interne & racine des sources & MD5 du relevé des MD5 de \code{R/*.R} (égal à \code{LC\_ALL=C md5sum -t R/*.R | md5sum})~; \code{NA} si la racine n'est pas celle de \code{tablexp} ou si un fichier est illisible \\
 \catalogue{fonctions-rapport}{EMPREINTE\_CODE} & constante & --- & empreinte du code, \code{empreinte\_sources(".")} évaluée une fois par \code{R CMD INSTALL} depuis la racine des sources~; \code{NA} si elles sont introuvables \\
 \catalogue{fonctions-rapport}{TRI\_NUMERIQUE} & constante & --- & \code{"tri\_numerique"}~: marque de l'interface de \code{canoniser\_plan()}, tri croissant d'un champ ensemble d'entiers en \code{double} (\code{ordres} de \code{coherence\_regularite}~; section~\ref{sec:fiche}) \\
