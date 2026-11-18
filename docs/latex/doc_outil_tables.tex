@@ -18013,8 +18013,10 @@ non-régression, sauf \code{fiche/empreintes/resultat} et
 \code{fiche/empreintes/code}, que les références remplacent par un jeton
 (section~\ref{sec:non-regression})~: un tiers
 rapproche les trois sans conversion. Ni somme, ni ratio, ni tri, ni filtre~;
-\code{nrow()}, \code{length()} et \code{names()} ne servent qu'à lire la
-structure de l'objet. \textbf{Aucun arrondi}~: 0{,}95 s'écrit
+la structure de l'objet n'est que lue, sans dispatch~: nombre de lignes
+par \code{.row\_names\_info()}, longueur par \code{longueur\_lue()}, noms
+par \code{attr(v, "names", exact = TRUE)} (ci-après, «~Lecture sans
+dispatch~»~; issue~\#313). \textbf{Aucun arrondi}~: 0{,}95 s'écrit
 \code{0.94999999999999996}, écriture à dix-sept chiffres significatifs du
 double le plus proche~; un certificateur ne recalcule un taux et ses bornes
 au bit près qu'à cette précision, et une vue arrondie, si elle est voulue,
@@ -19427,7 +19429,7 @@ les deux locales.\par}
 \catalogue{fonctions-rapport}{STYLE\_RAPPORT} & constante & --- & feuille de style en ligne de l'en-tête du document \\
 \catalogue{fonctions-rapport}{echapper\_html()} & interne & textes & \code{\&}, puis \code{<}, \code{>}, \code{"} remplacés par leurs entités~; marque UTF-8 conservée \\
 \catalogue{fonctions-rapport}{texte\_valeurs()} & interne & valeurs, chemin & type et texte de l'écrivain unique en forme \code{"texte"}, une valeur par ligne, marqué UTF-8 \\
-\catalogue{fonctions-rapport}{texte\_entier()} & interne & entier, chemin & dimension (\code{nrow()}, \code{length()}) écrite par l'écrivain \\
+\catalogue{fonctions-rapport}{texte\_entier()} & interne & entier, chemin & dimension (\code{.row\_names\_info()}, \code{longueur\_lue()}) écrite par l'écrivain \\
 \catalogue{fonctions-rapport}{decrire\_valeur()} & interne & valeur & valeur décrite pour un refus~: écriture et type d'un atomique de longueur~1 sans attribut, sinon type et classes~; \code{NULL} pour \code{NULL} \\
 \catalogue{fonctions-rapport}{valeur\_message()} & interne & valeur & la chaîne elle-même si elle est unique et sans caractère de contrôle, «~absente~» si \code{NULL}, sinon \code{decrire\_valeur()}~: message sur une ligne \\
 \catalogue{fonctions-rapport}{controler\_rapport()} & interne & objet & les six contrôles avant l'écriture et leurs refus nommés (tableau~\ref{tab:refus-rapport}), le cinquième par \code{controler\_forme\_hors\_resultat()} (issue~\#141), le sixième, sur les lignes conservées, par la fonction de ce tableau qui leur est consacrée (issue~\#294)~; champs de la fiche lus par \code{lire\_champ()} (contrôles~2 et~3), si bien qu'une classe ou un nom d'encodage \code{bytes} dans le périmètre de l'empreinte du résultat donne \code{objet\_modifie} au lieu d'une erreur R (issue~\#128)~; racines «~non produites~» du contrôle~4 lues par \code{lire\_chemin()} (issue~\#301)~; lecture sans dispatch dans les six contrôles (issue~\#313, section~\ref{sec:rapport-fige}) \\
