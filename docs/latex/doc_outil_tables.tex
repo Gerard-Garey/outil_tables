@@ -7493,7 +7493,10 @@ la position~10). Les colonnes en trop ou sans nom ne figurent que dans
 le message. Motif~: une méthode \code{[} qui ne rend pas les lignes demandées (une ligne de
 moins ou de plus, des lignes dupliquées ou dans un autre ordre) faisait
 calculer, sans aucun signal, sur d'autres lignes que celles que décrit la
-fiche, les empreintes des données restant identiques, si bien que le
+fiche, ou sur les mêmes lignes mal appariées à leurs numéros (lignes dans
+l'ordre inverse~: tables brutes identiques à celles du même jeu sans
+classe, mais \code{observation\_des\_lignes} et l'ordre des observations
+faux~; \emph{constat} de mesure sur le code qui précède l'issue), les empreintes des données restant identiques, si bien que le
 rejeu ne le décelait pas~; le rapport refusait alors l'objet au
 contrôle~6 sous un diagnostic inexact (section~\ref{sec:rapport-fige}~;
 \emph{constat} de mesure rapporté par l'issue~\#319, pour une ligne de
