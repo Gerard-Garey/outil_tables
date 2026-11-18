@@ -6818,8 +6818,9 @@ rôle par la recette.}
 chaque refus nomme tous les rôles et colonnes en cause~:
 \code{donnees\_mal\_formees} (l'entrée n'est pas un \code{data.frame},
 objet classé \code{data.frame} qui n'est pas une liste compris
---- environnement, vecteur ---, au message «~Les données doivent être un
-data.frame~», qui n'a pas de colonnes à lire~; issue~\#312~; ses
+--- environnement, vecteur, qui n'a pas de colonnes à lire ---, au
+message «~Les données doivent être un data.frame (le moteur ne lit pas de
+fichier).~»~; issue~\#312~; ses
 décomptes de lignes ne concordent pas, ci-dessous~; ou
 sa classe porte, à toute position, un élément d'encodage \code{bytes}~:
 ce cas, jugé d'abord par \code{classe\_bytes()} parce que
