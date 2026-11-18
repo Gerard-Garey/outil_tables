@@ -1857,7 +1857,20 @@ fusionner_intervalles <- function(g, entree, fin) {
 # Rend list(parametres, resultat, diagnostics, avertissements), noms communs
 # aux recettes, contenu propre à chacune ; les lignes
 # conservées (resultat$lignes_conservees) sont celles de l'entrée, inchangées
-# (`donnees` lui-même s'il n'y a aucune exclusion) ;
+# (`donnees` lui-même s'il n'y a aucune exclusion) ; sous une exclusion, elles
+# sont extraites par `[` avec dispatch sur la classe de l'entrée (la méthode
+# d'une sous-classe de data.frame admise, M499 (a), est respectée : attributs,
+# noms de lignes et classe qu'elle rend ne sont pas modifiés) et contrôlées
+# (#319), sinon refus donnees_mal_formees : une méthode `[` qui ne rend pas
+# les lignes demandées ferait calculer, sans signal, sur d'autres lignes que
+# celles de la fiche. Deux contrôles : leur nombre de lignes
+# (.row_names_info(, 2L), sans dispatch) est celui des numéros conservés ; puis,
+# pour chaque colonne de rôle (lue sans dispatch par lire_champ(), des deux
+# côtés), identical() à la même colonne de l'entrée indicée par les numéros
+# conservés (`[` de la classe de la colonne ; pour un facteur, libellés
+# identiques si les niveaux diffèrent). Les colonnes hors rôle ne sont
+# pas contrôlées ; l'identité des colonnes de rôle ne se contrôle que si le
+# décompte est juste ;
 # resultat$observation_des_lignes donne, pour chaque ligne conservée, le
 # numéro de son observation (composante fusionnée ou contrat ; la cellule
 # elle-même sous `agregats`).
@@ -1900,6 +1913,35 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
   if (is.null(exclues)) exclues <- integer(0)
   conservees <- if (length(exclues)) donnees[-exclues, , drop = FALSE] else donnees
   numeros <- setdiff(seq_len(n), exclues)
+  # Postcondition de l'extraction (#319) : voir l'en-tête.
+  if (length(exclues)) {
+    nc <- .row_names_info(conservees, 2L)
+    ecart_compte <- is.na(nc) || nc != length(numeros)
+    colonnes <- character(0)
+    if (!ecart_compte)
+      for (cc in unique(unname(roles))) {
+        a <- lire_champ(conservees, cc); b <- lire_champ(donnees, cc)[numeros]
+        # Facteur : libellés comparés, non les niveaux (une méthode `[` qui
+        # retire les niveaux inutilisés, droplevels(), reste admise).
+        if (!identical(a, b) && !(is.factor(a) && is.factor(b) && identical(as.character(a), as.character(b))))
+          colonnes <- c(colonnes, cc)
+      }
+    if (ecart_compte || length(colonnes)) {
+      constat <- if (ecart_compte)
+        formuler("comptent %s au lieu de %d",
+                 if (is.na(nc)) "un nombre de lignes illisible" else formuler("%d ligne(s)", nc), length(numeros))
+      else
+        formuler(paste("comptent %d ligne(s) comme demandé mais ne reprennent pas les valeurs des lignes demandées",
+                       "dans la ou les colonne(s) de rôle %s"), nc, liste_guillemets(colonnes))
+      refuser("donnees", "donnees_mal_formees",
+              formuler(paste("Les lignes conservées, extraites des données par la méthode « [ » de la classe %s,",
+                             "%s : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la",
+                             "méthode « [ » rend exactement les lignes demandées (ou qui n'a pas de méthode",
+                             "« [ » propre)."),
+                       paste(citer(class(donnees)), collapse = "/"), constat),
+              list(classe = class(donnees), lignes = nc, attendu = length(numeros), colonnes = colonnes))
+    }
+  }
   if (!length(numeros))
     refuser("donnees", "aucune_ligne_conservee",
             formuler("Toutes les lignes (%d) sont écartées par les règles d'exclusion déclarées (%s).",

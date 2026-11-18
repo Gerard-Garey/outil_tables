@@ -522,6 +522,149 @@ local({
       avertissements(chemins$construire_table(d)) == 0L
   })
 })
+# Extraction des lignes conservées sous une exclusion (#319 ; réserve R1 de la
+# spécification de #312) : preparer_donnees() extrait par `[` avec dispatch sur
+# la classe de l'entrée ; une méthode qui rend un nombre de lignes différent de
+# celui des numéros conservés fait refuser donnees_mal_formees (message propre,
+# details classe, lignes, attendu), avant toute étape et sans avertissement R
+# (avant #319 : objet construit sans signal, calculé sur d'autres lignes que
+# celles de la fiche, empreinte des données identique à celle du témoin ;
+# mesuré sur 101419a). Une méthode `[` correcte reste respectée telle quelle :
+# lignes_conservees est ce qu'elle rend (classe, attributs, noms de lignes),
+# les autres grandeurs celles du témoin (un `[.data.frame` appelé sans dispatch
+# aurait remplacé ses noms de lignes et ses attributs : piste (a) écartée sur
+# mesure). Sans exclusion, `[` n'est pas appelée. Méthodes S3 définies dans
+# globalenv() puis retirées ; littéraux non ASCII en \u00XX.
+local({
+  m319 <- list(
+    `[.k319moins` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"; r <- r[-1L, , drop = FALSE]; class(r) <- cl; r },
+    `[.k319plus` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"; r <- rbind(r, r[1L, ]); class(r) <- cl; r },
+    `[.k319na` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); attr(r, "row.names") <- c(NA_integer_, NA_integer_); r },
+    `[.k319sub` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"
+      r <- r[c(2L, 2:.row_names_info(r, 2L)), , drop = FALSE]; class(r) <- cl; r },
+    `[.k319perm` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"
+      r <- r[rev(seq_len(.row_names_info(r, 2L))), , drop = FALSE]; class(r) <- cl; r },
+    `[.k319dl` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"
+      r[] <- lapply(r, function(v) if (is.factor(v)) droplevels(v) else v); class(r) <- cl; r },
+    `[.k319ok` = function(x, i, j, ..., drop = TRUE) NextMethod(),
+    `[.k319reset` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); attr(r, "row.names") <- seq_len(.row_names_info(r, 2L)); attr(r, "histo") <- "extrait"; r })
+  for (n in names(m319)) assign(n, m319[[n]], envir = globalenv())
+  on.exit(rm(list = names(m319), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  avertissements <- function(expr) {
+    n <- 0L
+    withCallingHandlers(attrape(expr), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    n
+  }
+  PLAN <- list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = "entree_manquante"),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  PLAN0 <- PLAN; PLAN0$etapes$donnees$exclusions <- character(0)
+  B1 <- BASE; B1$entree[2L] <- as.Date(NA)  # une ligne exclue (entree_manquante) : 3 lignes conserv\u00e9es
+  classee <- function(d, k) structure(d, class = c(k, "data.frame"))
+  X0 <- construire_table(B1, ROLES, PLAN)
+  chemins <- list(prep = function(d) prep(d, exclusions = "entree_manquante"),
+                  construire_table = function(d) construire_table(d, ROLES, PLAN))
+  verifier("#319 t\u00e9moin : data.frame sans classe, une ligne exclue : 3 lignes conserv\u00e9es, numeros 1, 3, 4 (lignes_conservees de 3 lignes, noms de lignes 1, 3, 4)", {
+    lc <- X0$etapes$donnees$resultat$lignes_conservees
+    identical(X0$etapes$donnees$resultat$numeros_conserves, c(1L, 3L, 4L)) && identical(.row_names_info(lc, 2L), 3L) &&
+      identical(attr(lc, "row.names"), c(1L, 3L, 4L))
+  })
+  PREF <- "Les lignes conserv\u00e9es, extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe "
+  SUFF <- " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la m\u00e9thode \u00ab [ \u00bb rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode \u00ab [ \u00bb propre)."
+  cas <- list(
+    list("m\u00e9thode qui rend une ligne de moins (cas de la r\u00e9serve R1 de #312)", "k319moins",
+         "k319moins/data.frame, comptent 2 ligne(s) au lieu de 3", 2L, character(0)),
+    list("m\u00e9thode qui rend une ligne de plus", "k319plus",
+         "k319plus/data.frame, comptent 4 ligne(s) au lieu de 3", 4L, character(0)),
+    list("m\u00e9thode qui rend des noms de lignes illisibles (NA)", "k319na",
+         "k319na/data.frame, comptent un nombre de lignes illisible au lieu de 3", NA_integer_, character(0)),
+    list("m\u00e9thode qui rend le bon nombre de lignes, la premi\u00e8re remplac\u00e9e par un doublon de la deuxi\u00e8me", "k319sub",
+         paste0("k319sub/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais ne reprennent pas les valeurs des lignes demand\u00e9es dans la ou les colonne(s) de r\u00f4le ",
+                "\u00ab contrat \u00bb, \u00ab tete \u00bb, \u00ab naissance \u00bb, \u00ab sortie \u00bb, \u00ab cause \u00bb"),
+         3L, c("contrat", "tete", "naissance", "sortie", "cause")),
+    list("m\u00e9thode qui rend le bon nombre de lignes dans l'ordre inverse", "k319perm",
+         paste0("k319perm/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais ne reprennent pas les valeurs des lignes demand\u00e9es dans la ou les colonne(s) de r\u00f4le ",
+                "\u00ab contrat \u00bb, \u00ab tete \u00bb, \u00ab naissance \u00bb, \u00ab entree \u00bb, \u00ab sortie \u00bb, \u00ab cause \u00bb"),
+         3L, c("contrat", "tete", "naissance", "entree", "sortie", "cause")))
+  for (c1 in cas) for (k in names(chemins)) {
+    d <- classee(B1, c1[[2L]])
+    x <- attrape(chemins[[k]](d))
+    avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
+    verifier(sprintf("#319 %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details classe, lignes, attendu, colonnes, 0 avertissement R", c1[[1L]], k), {
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), paste0(PREF, c1[[3L]], SUFF))) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+      else if (!identical(x$details, list(classe = c(c1[[2L]], "data.frame"), lignes = c1[[4L]], attendu = 3L, colonnes = c1[[5L]])))
+        paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](d)) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Méthode `[` correcte : respectée telle quelle (lignes_conservees = ce qu'elle rend), autres grandeurs du témoin.
+  for (k in c("k319ok", "k319reset")) {
+    verifier(sprintf("#319 classe %s dont la m\u00e9thode `[` est correcte : construction accept\u00e9e, lignes_conservees identical() \u00e0 ce que rend sa m\u00e9thode (classe, attributs, noms de lignes), observations, exposition, brut et empreintes de donn\u00e9es et de r\u00e9sultat du t\u00e9moin, 0 avertissement R", k), {
+      d <- classee(B1, k)
+      x <- tryCatch(construire_table(d, ROLES, PLAN), error = function(e) e)
+      if (inherits(x, "error")) return(conditionMessage(x))
+      r <- x$etapes$donnees$resultat; r0 <- X0$etapes$donnees$resultat
+      if (!identical(r$lignes_conservees, d[-2L, , drop = FALSE])) "lignes_conservees diff\u00e9rentes de celles que rend la m\u00e9thode"
+      else if (k == "k319reset" && !identical(attr(r$lignes_conservees, "histo"), "extrait")) "attribut de la m\u00e9thode perdu"
+      else if (!identical(r$observations, r0$observations) || !identical(r$numeros_conserves, r0$numeros_conserves)) "observations ou numeros diff\u00e9rents du t\u00e9moin"
+      else if (!identical(x$etapes$exposition$resultat, X0$etapes$exposition$resultat) ||
+               !identical(x$etapes$brut$resultat, X0$etapes$brut$resultat)) "exposition ou brut diff\u00e9rents du t\u00e9moin"
+      else if (!identical(x$fiche$empreintes$donnees, X0$fiche$empreintes$donnees) ||
+               !identical(x$fiche$empreintes$resultat, X0$fiche$empreintes$resultat)) "empreintes diff\u00e9rentes du t\u00e9moin"
+      else if (avertissements(construire_table(d, ROLES, PLAN)) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Colonne de rôle facteur (sexe) à niveau inutilisé : une méthode `[` qui retire les niveaux
+  # inutilisés (droplevels()) rend les mêmes libellés sur les lignes demandées : admise (l'identité des
+  # colonnes de rôle compare les libellés d'un facteur, non ses niveaux).
+  verifier("#319 colonne de r\u00f4le sexe en facteur \u00e0 niveau inutilis\u00e9, classe dont la m\u00e9thode `[` retire les niveaux inutilis\u00e9s (droplevels) : construction accept\u00e9e, lignes_conservees identical() \u00e0 ce que rend sa m\u00e9thode (niveau H seul : F et X retir\u00e9s), observations et brut du t\u00e9moin, 0 avertissement R", {
+    Bf <- B1; Bf$sexe <- factor(Bf$sexe, levels = c("H", "F", "X"))
+    d <- classee(Bf, "k319dl")
+    xf <- construire_table(Bf, ROLES, PLAN)
+    x <- tryCatch(construire_table(d, ROLES, PLAN), error = function(e) e)
+    if (inherits(x, "error")) return(conditionMessage(x))
+    r <- x$etapes$donnees$resultat
+    if (!identical(r$lignes_conservees, d[-2L, , drop = FALSE]) || !identical(levels(r$lignes_conservees$sexe), "H"))
+      "lignes_conservees diff\u00e9rentes de celles que rend la m\u00e9thode"
+    else if (!identical(as.character(r$observations$sexe), as.character(xf$etapes$donnees$resultat$observations$sexe)))
+      "observations$sexe diff\u00e9rent du t\u00e9moin"
+    else if (!identical(x$etapes$brut$resultat, xf$etapes$brut$resultat)) "brut diff\u00e9rent du t\u00e9moin"
+    else if (avertissements(construire_table(d, ROLES, PLAN)) != 0L) "avertissement R"
+    else TRUE
+  })
+  verifier("#319 sans ligne exclue ni exclusion d\u00e9clar\u00e9e : `[` n'est pas appel\u00e9e, m\u00eame pour une classe dont la m\u00e9thode ment ; lignes_conservees est l'entr\u00e9e (identical())", {
+    d <- classee(BASE, "k319moins")
+    x <- attrape(construire_table(d, ROLES, PLAN0))
+    if (inherits(x, "error") || inherits(x, "refus_tablexp")) return(if (inherits(x, "error")) conditionMessage(x) else x$motif)
+    r <- construire_table(d, ROLES, PLAN0)$etapes$donnees$resultat
+    identical(r$lignes_conservees, d) && identical(r$numeros_conserves, 1:4)
+  })
+  verifier("#319 base enti\u00e8rement exclue, classe sans m\u00e9thode propre : refus aucune_ligne_conservee inchang\u00e9 (extraction \u00e0 0 ligne, d\u00e9compte concordant)", {
+    B0 <- B1; B0$entree <- as.Date(rep(NA, 4L))
+    x <- attrape(construire_table(B0, ROLES, PLAN))
+    inherits(x, "refus_tablexp") && identical(x$motif, "aucune_ligne_conservee")
+  })
+})
+verifier("#319 les m\u00e9thodes `[` de session sont retir\u00e9es de globalenv()",
+         !any(vapply(c("k319moins", "k319plus", "k319na", "k319sub", "k319perm", "k319dl", "k319ok", "k319reset"),
+                     function(k) exists(paste0("[.", k), envir = globalenv(), inherits = FALSE), logical(1L))))
 # Colonne de rôle de type conforme sous un nom d'encodage bytes, à
 # preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur
 # R ; observations et lignes conservées égales à celles du même jeu sous le
