@@ -1090,7 +1090,16 @@ empreinte_sources <- function(racine) {
     tryCatch(read.dcf(description, fields = "Package")[1L, 1L], error = function(e) NA_character_)
   if (!identical(unname(paquet), "tablexp") || !file.exists(file.path(racine, "R", "rapport.R")))
     return(NA_character_)
-  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  # Filtre et tri en octets (#131) : sous une locale UTF-8, `list.files(pattern =)`
+  # écarte en silence un nom qui n'est pas de l'UTF-8 valide ; `useBytes = TRUE`
+  # donne sous toute locale la liste que voit `md5sum` sous LC_ALL=C. Le tri
+  # radix d'une chaîne native non ASCII lève « Character encoding must be UTF-8,
+  # Latin-1 or bytes » dès que le premier élément n'est pas ASCII (fr_FR.UTF-8
+  # met un nom accentué en tête) : les noms sont triés marqués « bytes ».
+  fichiers <- list.files(file.path(racine, "R"))
+  fichiers <- fichiers[grepl("[.]R$", fichiers, useBytes = TRUE)]
+  en_octets <- fichiers; Encoding(en_octets) <- "bytes"
+  fichiers <- fichiers[order(en_octets, method = "radix")]
   md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
   # Fichier illisible (md5sum rend NA) : sources introuvables, jamais un
   # relevé haché avec « NA » (#67, audit).

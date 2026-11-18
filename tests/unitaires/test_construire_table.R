@@ -907,7 +907,11 @@ verifier("texte empreinté : facteur admis seulement de classe exactement factor
 # R/*.R de la racine installée par la batterie), ou à défaut recalculée en R
 # sans empreinte_sources().
 recalcul_code <- function(racine) {
-  fichiers <- sort(list.files(file.path(racine, "R"), pattern = "[.]R$"), method = "radix")
+  fichiers <- list.files(file.path(racine, "R"))
+  fichiers <- fichiers[grepl("[.]R$", fichiers, useBytes = TRUE)]
+  # Tri par l'hexadécimal des octets, indépendant du moteur (#131).
+  hex <- vapply(fichiers, function(n) paste(sprintf("%02x", as.integer(charToRaw(n))), collapse = ""), "")
+  fichiers <- fichiers[order(hex, method = "radix")]
   md5 <- unname(tools::md5sum(file.path(racine, "R", fichiers)))
   t <- tempfile(); on.exit(unlink(t))
   writeBin(charToRaw(paste0(md5, "  R/", fichiers, "\n", collapse = "")), t)
@@ -948,6 +952,73 @@ verifier("empreinte du code : sources introuvables -> NA (sans DESCRIPTION, autr
     startsWith(st, "résultat : témoin d'identité sur la même machine seulement (E3.6, E4.6)") &&
     identical(Encoding(st), "UTF-8") && !grepl("introuvables", tablexp:::statut_empreintes("0"), fixed = TRUE)
 })
+
+# Nom de R/ qui n'est pas de l'UTF-8 valide (#131). Avant : list.files(pattern =)
+# écartait ce fichier en silence sous une locale UTF-8 (mesuré à 5e4f92d : deux
+# empreintes différentes sous C et sous C.UTF-8) ; puis sort(method = "radix")
+# levait « Character encoding must be UTF-8, Latin-1 or bytes » dès que le
+# premier nom n'était pas ASCII (mesuré sur la première version du correctif,
+# 2fbe1b6c). Attendu : une seule empreinte, sous toute locale, égale au relevé
+# construit ici en octets (noms posés par octets bruts, relevé trié par
+# l'hexadécimal des octets, hachage de chaque contenu par un fichier témoin) et à
+# `LC_ALL=C md5sum -t R/*.R | md5sum`. Aucun nom ASCII ne précède les noms non
+# ASCII parmi les *.R dans l'ordre de list.files() (« rapport.R » et « z.R » viennent
+# après « caf... ») : le premier nom lu n'est pas ASCII. Les noms vont de l'octet
+# latin-1 isolé à l'UTF-8 valide : l'ordre des octets place « caf\xc3\xa9.R » avant
+# « caf\xe9.R ». Une locale par sous-processus (LC_ALL), comme locale_c.R. Sautés
+# si le système de fichiers refuse ces noms.
+octets_131 <- function(...) as.raw(c(...))
+NOMS_131 <- list(rapport.R = charToRaw("rapport.R"), z.R = charToRaw("z.R"),
+                 latin1 = c(charToRaw("caf"), octets_131(0xe9), charToRaw(".R")),
+                 seul = c(octets_131(0xe9), charToRaw(".R")),
+                 utf8 = c(charToRaw("caf"), octets_131(0xc3, 0xa9), charToRaw(".R")),
+                 autre = charToRaw("b.r"))
+LOCALE_UTF8_131 <- locale_utf8_disponible()
+verifier("#131 : une locale UTF-8 est disponible pour les témoins (sinon la moitié des témoins ne porte pas)",
+         nzchar(LOCALE_UTF8_131) || "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
+racine_131 <- tempfile("racine_131_"); dir.create(file.path(racine_131, "R"), recursive = TRUE)
+writeLines(c("Package: tablexp", "Version: 1"), file.path(racine_131, "DESCRIPTION"))
+CONTENUS_131 <- vapply(seq_along(NOMS_131), function(i) sprintf("v%d <- %d\n", i, i), "")
+for (i in seq_along(NOMS_131))
+  suppressWarnings(try(writeBin(charToRaw(CONTENUS_131[i]), file.path(racine_131, "R", rawToChar(NOMS_131[[i]]))), silent = TRUE))
+if (length(list.files(file.path(racine_131, "R"))) == length(NOMS_131)) {
+  md5_contenu <- function(texte) { t <- tempfile(); on.exit(unlink(t)); writeBin(charToRaw(texte), t); unname(tools::md5sum(t)) }
+  retenus <- setdiff(seq_along(NOMS_131), match("autre", names(NOMS_131)))   # tout sauf b.r
+  hex <- vapply(NOMS_131[retenus], function(n) paste(sprintf("%02x", as.integer(n)), collapse = ""), "")
+  ordre <- retenus[order(hex, method = "radix")]
+  releve <- unlist(lapply(ordre, function(i) c(charToRaw(paste0(md5_contenu(CONTENUS_131[i]), "  R/")), NOMS_131[[i]], octets_131(10L))))
+  ATTENDU_131 <- md5_contenu(rawToChar(releve))
+  script_131 <- tempfile(fileext = ".R")
+  writeLines(c(sprintf("library(tablexp, lib.loc = %s)", deparse(.harnais$bibliotheque)),
+               "cat('LOCALE', Sys.getlocale('LC_CTYPE'), '\\n')",
+               "cat('EMPREINTE', tablexp:::empreinte_sources(commandArgs(TRUE)[1L]), '\\n')"), script_131)
+  sous_locale_131 <- function(locale) {
+    r <- executer_rscript(script_131, shQuote(racine_131), env = paste0("LC_ALL=", locale))
+    list(statut = r$statut, locale = trimws(sub("^LOCALE ", "", grep("^LOCALE ", r$sortie, value = TRUE))),
+         empreinte = trimws(sub("^EMPREINTE ", "", grep("^EMPREINTE ", r$sortie, value = TRUE))))
+  }
+  verifier("#131 : prémisse du témoin : le premier nom *.R que rend list.files() n'est pas ASCII (le nom en .r, ASCII, est écarté du filtre)", {
+    l <- list.files(file.path(racine_131, "R")); l <- l[grepl("[.]R$", l, useBytes = TRUE)]
+    grepl("[^ -~]", l[1L], useBytes = TRUE)
+  })
+  verifier("#131 : le relevé attendu compte 5 fichiers *.R (le nom en .r en est écarté), nom latin-1 isolé compris",
+           length(ordre) == 5L && any(vapply(NOMS_131[ordre], identical, NA, NOMS_131$latin1)))
+  verifier("#131 : empreinte_sources() sous LC_ALL=C (sous-processus) = relevé en octets, nom non UTF-8 compris", {
+    r <- sous_locale_131("C")
+    r$statut == 0L && identical(r$locale, "C") && identical(r$empreinte, ATTENDU_131)
+  })
+  if (nzchar(LOCALE_UTF8_131))
+    verifier("#131 : empreinte_sources() sous une locale UTF-8 (sous-processus) = relevé en octets, nom non UTF-8 compris", {
+      r <- sous_locale_131(LOCALE_UTF8_131)
+      r$statut == 0L && grepl("UTF-?8", r$locale, ignore.case = TRUE) && identical(r$empreinte, ATTENDU_131)
+    })
+  if (nzchar(Sys.which("md5sum")) && nzchar(Sys.which("sh")) && .Platform$OS.type != "windows")
+    verifier("#131 : empreinte_sources() = `LC_ALL=C md5sum -t R/*.R | md5sum` (autre outil), nom non UTF-8 compris",
+             { s <- system2("sh", c("-c", shQuote(sprintf("cd %s && LC_ALL=C md5sum -t R/*.R | md5sum", shQuote(racine_131)))), stdout = TRUE)
+               identical(sub(" .*$", "", s), ATTENDU_131) })
+  unlink(script_131)
+} else cat("  [sauté] #131 : le système de fichiers refuse un nom de fichier qui n'est pas de l'UTF-8 valide\n")
+unlink(racine_131, recursive = TRUE)
 
 # --- portefeuille simulé (#10) : identités exactes et recoupement -----------
 
