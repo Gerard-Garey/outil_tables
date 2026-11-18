@@ -18376,13 +18376,19 @@ y sont lus par \code{.subset2()}. \textbf{Motif.} R base ne définit ni
 \code{names()} ni \code{length()} pour les classes \code{data.frame} et
 \code{Date}, ni aucune méthode pour la classe \code{construction}~: une
 méthode de ces fonctions génériques définie dans la session est donc
-trouvée par le dispatch. Avant l'issue~\#313, une telle méthode qui ment
-changeait le texte empreinté recalculé, et le rapport d'un objet intact
-était refusé~: \code{objet\_modifie} au contrôle~3 pour \code{names()} ou
-\code{length()} sur \code{data.frame} ou \code{Date} et pour \code{\$} sur
-\code{POSIXlt}, \code{rapport\_objet\_invalide} au contrôle~4 pour
-\code{names()} sur \code{construction} (\emph{constat} de mesure sur le
-code qui précède l'issue). Depuis, une méthode de session ne change ni
+trouvée par le dispatch. Avant l'issue~\#313, onze des dix-neuf méthodes
+qui mentent énumérées ci-dessous (\textbf{Statut}) faisaient refuser le
+rapport d'un objet intact~: \code{objet\_modifie} au contrôle~3, le texte
+empreinté recalculé changeant (\code{names()} ou \code{length()} sur
+\code{data.frame} ou \code{Date}) ou l'empreinte n'étant plus
+recalculable (\code{\$} sur \code{POSIXlt} ou \code{default})~;
+\code{rapport\_objet\_invalide} au contrôle~4 (\code{names()} sur
+\code{construction}, \code{\$} sur \code{data.frame}, \code{unlist()}
+sur \code{AsIs} ou \code{default}) ou au contrôle~1 (\code{[[} sur
+\code{construction}, la fiche étant lue «~z~»)~; les huit autres
+laissaient l'empreinte et les octets du rapport inchangés (\emph{constat}
+de mesure sur le code qui précède l'issue, \code{2e79567}, objet du plan
+R1 des tests du rapport, chaque méthode posée seule). Depuis, une méthode de session ne change ni
 l'empreinte du résultat recalculée ni les octets du rapport d'un objet
 intact. \textbf{Statut}~: \emph{lecture} du code et \emph{constat} des
 tests, non propriété démontrée pour toute méthode~: méthodes
@@ -18390,9 +18396,11 @@ tests, non propriété démontrée pour toute méthode~: méthodes
 \code{unlist()} qui mentent, posées sur les classes \code{data.frame},
 \code{Date} et \code{construction} hors celles que R base définit
 (\code{dim()} et \code{[[} sur \code{data.frame}, \code{[[} sur
-\code{Date}), et \code{unlist()} et \code{\$} sur \code{AsIs},
-\code{default} et \code{POSIXlt}, dix-neuf méthodes, chacune seule puis
-toutes ensemble, pour l'objet du plan de référence R1 et pour un objet dont le
+\code{Date}), plus \code{unlist()} sur \code{AsIs} et \code{default}
+et \code{\$} sur \code{POSIXlt} et \code{default}, dix-neuf méthodes,
+chacune seule puis toutes ensemble, pour l'objet du plan R1 des tests du
+rapport (paramètres du plan de référence R1, sur un jeu simulé de
+3~000 contrats et non sur l'entrée de référence) et pour un objet dont le
 plan lit une table de référence importée
 (section~\ref{sec:verifications-rapport}). \textbf{Limites.} La règle
 protège la restitution fidèle de l'objet reçu~; elle n'en établit pas
@@ -19268,8 +19276,9 @@ du plan R1 et pour un objet dont le plan lit une table de référence
 importée, identiques à ceux de l'objet intact sous des méthodes de session
 qui mentent (\code{names()}, \code{length()}, \code{dim()}, \code{[[},
 \code{\$} et \code{unlist()} sur \code{data.frame}, \code{Date} et
-\code{construction}, hors celles que R base définit~; \code{unlist()} et
-\code{\$} sur \code{AsIs}, \code{default} et \code{POSIXlt}), chacune seule puis toutes ensemble,
+\code{construction}, hors celles que R base définit~; \code{unlist()} sur
+\code{AsIs} et \code{default}, \code{\$} sur \code{POSIXlt} et
+\code{default}), chacune seule puis toutes ensemble,
 aucune n'étant laissée dans l'environnement global, et
 \code{longueur\_lue()} (méthode \code{length()} de session ignorée,
 classe d'encodage \code{bytes} sans erreur R)~; l'absence de toute
