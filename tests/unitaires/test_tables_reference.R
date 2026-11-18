@@ -439,6 +439,17 @@ verifier("D tables_reference_mal_formees, relecture refusée sur une ligne qui n
                        "relecture du texte de fiche sans refus", "(refus texte_utf8_invalide, NA)")
   if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_)
 })
+verifier("D tables_reference_mal_formees, relecture refusée sur une valeur qui n'est pas de l'UTF-8 valide (refus avant découpage) : motif texte_utf8_invalide, chemin NA dans details et dans le message, non a/parametres/p (#318)", {
+  # Octet 0xff dans la valeur « pv » de la ligne a/parametres/p : le chemin de
+  # la ligne est, lui, de l'UTF-8 valide ; un chemin redéduit des octets serait
+  # « a/parametres/p » (repli supprimé par #306), non NA.
+  r <- relecture_alteree(remplacer_texte('\t"pv"\n', rawToChar(as.raw(c(0x09, 0x22, 0x70, 0x76, 0xff, 0x22, 0x0a)))),
+                         controler_forme_tables(list(a = T_PARAM)))
+  ok <- controle_refus(r, "construire_table", "tables_reference_mal_formees", "texte_utf8_invalide",
+                       "relecture du texte de fiche sans refus", "(refus texte_utf8_invalide, NA)")
+  if (!isTRUE(ok)) ok else identical(r$details$chemin, NA_character_) && identical(r$details$cle, "a") &&
+    !grepl("a/parametres/p", conditionMessage(r), fixed = TRUE)
+})
 verifier("D tables_reference_mal_formees, relecture refusée sur la première ligne ou sur un octet nul écrit : motif gardé, chemin NA, aucune erreur R", {
   r1 <- relecture_alteree(remplacer_texte("tablexp fiche 1", "tablexp fiche 2"), controler_forme_tables(list(a = T_PARAM)))
   # Octet nul dans le texte écrit (octet 20 : ligne 2, « @noms ») : rawToChar()
