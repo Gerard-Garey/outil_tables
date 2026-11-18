@@ -536,6 +536,10 @@ local({
 # mesure). Sans exclusion, `[` n'est pas appelée. Méthodes S3 définies dans
 # globalenv() puis retirées ; littéraux non ASCII en \u00XX.
 local({
+  # r avec la colonne `nom` remplacée par f(colonne) ; classe, noms de lignes et autres attributs conservés.
+  # Classe d'encodage « bytes » posée par la méthode k319byt (position de valeur, intacte en toute locale).
+  CLASSE_BYTES <- "autre\xe9"; Encoding(CLASSE_BYTES) <- "bytes"
+  modifiee <- function(r, nom, f) { cl <- class(r); r <- unclass(r); r[[nom]] <- f(r[[nom]]); class(r) <- cl; r }
   m319 <- list(
     `[.k319moins` = function(x, i, j, ..., drop = TRUE) {
       r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"; r <- r[-1L, , drop = FALSE]; class(r) <- cl; r },
@@ -554,7 +558,46 @@ local({
       r[] <- lapply(r, function(v) if (is.factor(v)) droplevels(v) else v); class(r) <- cl; r },
     `[.k319ok` = function(x, i, j, ..., drop = TRUE) NextMethod(),
     `[.k319reset` = function(x, i, j, ..., drop = TRUE) {
-      r <- NextMethod(); attr(r, "row.names") <- seq_len(.row_names_info(r, 2L)); attr(r, "histo") <- "extrait"; r })
+      r <- NextMethod(); attr(r, "row.names") <- seq_len(.row_names_info(r, 2L)); attr(r, "histo") <- "extrait"; r },
+    # Reprise de #319 (constats M1 et M2 de la validation d'actuary) : forme du résultat, décompte des colonnes.
+    `[.k319cl0` = function(x, i, j, ..., drop = TRUE) { r <- NextMethod(); class(r) <- NULL; r },
+    `[.k319cla` = function(x, i, j, ..., drop = TRUE) { r <- NextMethod(); class(r) <- "autre"; r },
+    `[.k319atom` = function(x, i, j, ..., drop = TRUE) {
+      r <- seq_len(.row_names_info(NextMethod(), 2L)); class(r) <- "data.frame"; r },
+    `[.k319nul` = function(x, i, j, ..., drop = TRUE) NULL,
+    `[.k319byt` = function(x, i, j, ..., drop = TRUE) { r <- NextMethod(); class(r) <- CLASSE_BYTES; r },
+    `[.k319hrc` = function(x, i, j, ..., drop = TRUE) modifiee(NextMethod(), "autre_colonne", function(v) v[-1L]),
+    `[.k319hrl` = function(x, i, j, ..., drop = TRUE) modifiee(NextMethod(), "autre_colonne", function(v) c(v, v[1L])),
+    `[.k319hrm` = function(x, i, j, ..., drop = TRUE) modifiee(NextMethod(), "autre_colonne", function(v) matrix(v[-1L], ncol = 1L)),
+    `[.k319hrd` = function(x, i, j, ..., drop = TRUE) modifiee(NextMethod(), "autre_colonne", function(v) data.frame(a = v[-1L])),
+    `[.k319rol` = function(x, i, j, ..., drop = TRUE) modifiee(NextMethod(), "sortie", function(v) v[-1L]),
+    `[.k319tout` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); r <- unclass(r); r[] <- lapply(r, function(v) v[-1L]); class(r) <- cl; r },
+    # Message de la cause « colonne » sous un data.frame ordinaire : méthode `[` de colonne qui rend une valeur de moins.
+    `[.k319col` = function(x, i, ...) structure(unclass(x)[i][-1L], class = oldClass(x)),
+    # Colonne de rôle dont `[` dépend du signe de l'indice (`[.data.frame` extrait avec -exclues, le contrôle (3) relit avec numeros).
+    `[.k319neg` = function(x, i, ...) { r <- NextMethod(); if (all(i < 0)) r <- rev(r); r },
+    # Colonne dont `[` rend NULL : retirée sans signal par `[.data.frame` (contrôle (1 bis)).
+    `[.k319cnul` = function(x, i, ...) NULL,
+    # Colonne dont `[` rend 0 valeur (élément non NULL, de décompte 0).
+    `[.k319zero` = function(x, i, ...) unclass(x)[0L],
+    # Méthodes d'entrée qui rendent une colonne renommée, ajoutée, ou les colonnes dans l'ordre inverse.
+    `[.k319ren` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); nm <- names(r); nm[nm == "autre_colonne"] <- "renomme"; names(r) <- nm; r },
+    # Renommée en nom vide, ou en NA : colonne en trop sans nom (compte « N colonne(s) sans nom »).
+    `[.k319vid` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); nm <- names(r); nm[nm == "autre_colonne"] <- ""; names(r) <- nm; r },
+    `[.k319nan` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); nm <- names(r); nm[nm == "autre_colonne"] <- NA_character_; names(r) <- nm; r },
+    `[.k319dr12` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"; r <- r[1:8]; class(r) <- cl; r },
+    `[.k319add` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"; r$extra <- seq_len(.row_names_info(r, 2L)); class(r) <- cl; r },
+    `[.k319ord` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); cl <- class(r); class(r) <- "data.frame"; r <- r[rev(seq_along(r))]; class(r) <- cl; r },
+    # Réserves 2 et 3 d'actuary : méthode qui rend c("autre", "data.frame") et retire l'attribut non essentiel « histo ».
+    `[.k319qd` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); class(r) <- c("autre", "data.frame"); attr(r, "histo") <- NULL; r })
   for (n in names(m319)) assign(n, m319[[n]], envir = globalenv())
   on.exit(rm(list = names(m319), envir = globalenv()))
   attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
@@ -600,19 +643,281 @@ local({
     d <- classee(B1, c1[[2L]])
     x <- attrape(chemins[[k]](d))
     avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
-    verifier(sprintf("#319 %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details classe, lignes, attendu, colonnes, 0 avertissement R", c1[[1L]], k), {
+    verifier(sprintf("#319 %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details classe, classe_rendue, lignes, attendu, colonnes, colonne, position, lignes_colonne, 0 avertissement R", c1[[1L]], k), {
       if (is.null(x)) "aucun refus"
       else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
       else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
       else if (!identical(conditionMessage(x), paste0(PREF, c1[[3L]], SUFF))) paste("message :", conditionMessage(x))
       else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
                !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
-      else if (!identical(x$details, list(classe = c(c1[[2L]], "data.frame"), lignes = c1[[4L]], attendu = 3L, colonnes = c1[[5L]])))
+      else if (!identical(x$details, list(classe = c(c1[[2L]], "data.frame"), classe_rendue = c(c1[[2L]], "data.frame"),
+                                          lignes = c1[[4L]], attendu = 3L, colonnes = c1[[5L]], colonne = character(0),
+                                          position = integer(0), lignes_colonne = numeric(0))))
         paste("details :", paste(deparse(x$details), collapse = " "))
       else if (avertissements(chemins[[k]](d)) != 0L) "avertissement R"
       else TRUE
     })
   }
+  # Reprise de #319 : (0) forme du résultat de l'extraction (liste classée data.frame, sans dispatch) ;
+  # (2) décompte de lignes de chaque colonne, toutes, après celui des noms de lignes et avant l'identité
+  # des colonnes de rôle. Avant la reprise : M1, construction acceptée puis ecrire_rapport() refuse
+  # objet_modifie ; M2, colonne hors rôle raccourcie acceptée sans signal.
+  cc <- function(k, rendue, type) paste0(k, "/data.frame, ne sont pas un data.frame (classe rendue ", rendue, ", type \u00ab ", type, " \u00bb)")
+  col <- function(k, txt) paste0(k, "/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais leurs colonnes ne comptent pas toutes ce nombre de lignes (", txt, ")")
+  B12 <- B1; for (e in 1:4) B12[[paste0("x", e)]] <- 1:4 + 0
+  nm12 <- names(B12)
+  plafond <- paste(c(sprintf("colonne \u00ab %s \u00bb : 2", nm12[1:10]), "et 2 autre(s) colonne(s)"), collapse = " ; ")
+  cas2 <- list(
+    list("M1 : m\u00e9thode qui rend les bonnes lignes sans classe (class(r) <- NULL)", "k319cl0", B1,
+         cc("k319cl0", "list", "list"), NA_integer_, "list", character(0), integer(0), numeric(0)),
+    list("M1 : m\u00e9thode qui rend les bonnes lignes sous la classe \u00ab autre \u00bb", "k319cla", B1,
+         cc("k319cla", "autre", "list"), NA_integer_, "autre", character(0), integer(0), numeric(0)),
+    list("m\u00e9thode qui rend un vecteur entier de classe data.frame (a_classe() vrai, is.list() faux)", "k319atom", B1,
+         cc("k319atom", "data.frame", "integer"), NA_integer_, "data.frame", character(0), integer(0), numeric(0)),
+    list("m\u00e9thode qui rend une classe d'encodage bytes (cit\u00e9e sans erreur R)", "k319byt", B1,
+         cc("k319byt", "<cha\u00eene d'encodage bytes>", "list"), NA_integer_, CLASSE_BYTES, character(0), integer(0), numeric(0)),
+    list("m\u00e9thode qui rend NULL", "k319nul", B1, cc("k319nul", "NULL", "NULL"), NA_integer_, "NULL", character(0), integer(0), numeric(0)),
+    list("M2 : colonne hors r\u00f4le raccourcie d'une valeur (noms de lignes : 3, colonne : 2)", "k319hrc", B1,
+         col("k319hrc", "colonne \u00ab autre_colonne \u00bb : 2"), 3L, c("k319hrc", "data.frame"), "autre_colonne", 8L, 2),
+    list("M2 : colonne hors r\u00f4le allong\u00e9e d'une valeur (colonne : 4)", "k319hrl", B1,
+         col("k319hrl", "colonne \u00ab autre_colonne \u00bb : 4"), 3L, c("k319hrl", "data.frame"), "autre_colonne", 8L, 4),
+    list("colonne hors r\u00f4le remplac\u00e9e par une matrice \u00e0 2 lignes (dim[1])", "k319hrm", B1,
+         col("k319hrm", "colonne \u00ab autre_colonne \u00bb : 2"), 3L, c("k319hrm", "data.frame"), "autre_colonne", 8L, 2),
+    list("colonne hors r\u00f4le remplac\u00e9e par un data.frame \u00e0 2 lignes (NROW() avec dispatch)", "k319hrd", B1,
+         col("k319hrd", "colonne \u00ab autre_colonne \u00bb : 2"), 3L, c("k319hrd", "data.frame"), "autre_colonne", 8L, 2),
+    list("colonne de r\u00f4le raccourcie : le d\u00e9compte (2) est refus\u00e9 avant l'identit\u00e9 des colonnes de r\u00f4le", "k319rol", B1,
+         col("k319rol", "colonne \u00ab sortie \u00bb : 2"), 3L, c("k319rol", "data.frame"), "sortie", 6L, 2),
+    list("toutes les colonnes raccourcies (12 colonnes : dix citées puis leur nombre restant, details sans plafond)", "k319tout", B12,
+         col("k319tout", plafond), 3L, c("k319tout", "data.frame"), nm12, 1:12, rep(2, 12)))
+  for (c1 in cas2) for (k in names(chemins)) {
+    d <- classee(c1[[3L]], c1[[2L]])
+    x <- attrape(chemins[[k]](d))
+    avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
+    verifier(sprintf("#319 reprise, %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details complets, 0 avertissement R", c1[[1L]], k), {
+      forme_refusee <- is.na(c1[[5L]])
+      attendu <- if (forme_refusee) list(classe = c(c1[[2L]], "data.frame"), classe_rendue = c1[[6L]], lignes = NA_integer_,
+                                         attendu = 3L, colonnes = character(0), colonne = character(0),
+                                         position = integer(0), lignes_colonne = numeric(0))
+                 else list(classe = c(c1[[2L]], "data.frame"), classe_rendue = c1[[6L]], lignes = 3L, attendu = 3L,
+                           colonnes = character(0), colonne = c1[[7L]], position = c1[[8L]], lignes_colonne = c1[[9L]])
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), paste0(PREF, c1[[4L]], SUFF))) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+      else if (!identical(x$details, attendu)) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](d)) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Cause « colonne » sous une entrée de classe exactement « data.frame » (sans méthode `[` propre) : la méthode
+  # `[` en cause est celle d'une colonne hors rôle ; le message nomme la classe des colonnes citées (non « la classe
+  # data.frame » seule) et conseille leur méthode. Avant ce correctif : « la méthode « [ » de la classe data.frame »,
+  # conseil « ou qui n'a pas de méthode « [ » propre ».
+  PREF3 <- "Les lignes conserv\u00e9es, extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe data.frame, qui applique \u00e0 chaque colonne la m\u00e9thode \u00ab [ \u00bb de sa classe, comptent 3 ligne(s) comme demand\u00e9 mais leurs colonnes ne comptent pas toutes ce nombre de lignes ("
+  SUFF3 <- function(cl) paste0(") : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe ", cl, ") ont une m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de m\u00e9thode \u00ab [ \u00bb propre).")
+  B3a <- B1; B3a$autre_colonne <- structure(B3a$autre_colonne, class = "k319col")
+  B3b <- B3a; B3b$x1 <- structure(1:4 + 0, class = c("k319col2", "k319col")); B3b$x2 <- structure(1:4 + 0, class = "k319col")
+  cas3 <- list(
+    list("une colonne hors r\u00f4le de classe k319col", B3a,
+         "colonne \u00ab autre_colonne \u00bb (classe k319col) : 2", "k319col", "autre_colonne", 8L, 2),
+    list("trois colonnes hors r\u00f4le : classes k319col, k319col2/k319col (multiple, jointe par /), k319col (r\u00e9p\u00e9t\u00e9e, cit\u00e9e une fois dans le conseil)", B3b,
+         paste("colonne \u00ab autre_colonne \u00bb (classe k319col) : 2", "colonne \u00ab x1 \u00bb (classe k319col2/k319col) : 2",
+               "colonne \u00ab x2 \u00bb (classe k319col) : 2", sep = " ; "),
+         "k319col, k319col2/k319col", c("autre_colonne", "x1", "x2"), 8:10, rep(2, 3)))
+  for (c1 in cas3) for (k in names(chemins)) {
+    d <- c1[[2L]]
+    x <- attrape(chemins[[k]](d))
+    avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
+    verifier(sprintf("#319 reprise, entr\u00e9e data.frame ordinaire, %s : %s -> refus donnees_mal_formees, message qui nomme la classe des colonnes (et non celle de l'entr\u00e9e), une ligne UTF-8 valide, details complets, 0 avertissement R", c1[[1L]], k), {
+      attendu <- list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L, colonnes = character(0),
+                      colonne = c1[[5L]], position = c1[[6L]], lignes_colonne = c1[[7L]])
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), paste0(PREF3, c1[[3L]], SUFF3(c1[[4L]])))) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+      else if (!identical(x$details, attendu)) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](d)) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Cause « identit\u00e9 des colonnes de r\u00f4le » sous une entr\u00e9e de classe exactement \u00ab data.frame \u00bb : colonne de r\u00f4le
+  # de classe c("k319neg", "factor") (passe le contr\u00f4le de type) dont `[` d\u00e9pend du signe de l'indice ; le message nomme
+  # la classe des colonnes de r\u00f4le cit\u00e9es, lue sans dispatch (et non \u00ab la classe data.frame \u00bb seule).
+  Bneg <- B1; Bneg$cause <- structure(factor(B1$cause), class = c("k319neg", "factor"))
+  Bneg2 <- Bneg; Bneg2$sexe <- structure(factor(c("H", "H", "F", "F")), class = c("k319neg", "factor"))
+  PREF4 <- "Les lignes conserv\u00e9es, extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe data.frame, qui applique \u00e0 chaque colonne la m\u00e9thode \u00ab [ \u00bb de sa classe, comptent 3 ligne(s) comme demand\u00e9 mais "
+  cas4 <- list(
+    list("une colonne de r\u00f4le (cause) de classe k319neg/factor", Bneg, "\u00ab cause \u00bb (classe k319neg/factor)", "k319neg/factor", "cause"),
+    list("deux colonnes de r\u00f4le (sexe, cause), m\u00eame classe (cit\u00e9e une fois dans le conseil)", Bneg2,
+         "\u00ab sexe \u00bb (classe k319neg/factor), \u00ab cause \u00bb (classe k319neg/factor)", "k319neg/factor", c("sexe", "cause")))
+  for (c1 in cas4) for (k in names(chemins)) {
+    d <- c1[[2L]]
+    x <- attrape(chemins[[k]](d))
+    avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
+    verifier(sprintf("#319 reprise, entr\u00e9e data.frame ordinaire, cause identit\u00e9 des colonnes de r\u00f4le, %s : %s -> refus donnees_mal_formees, message qui nomme la classe des colonnes de r\u00f4le, une ligne UTF-8 valide, details complets, 0 avertissement R", c1[[1L]], k), {
+      msg <- paste0(PREF4, "ne reprennent pas les valeurs des lignes demand\u00e9es dans la ou les colonne(s) de r\u00f4le ", c1[[3L]],
+                    " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe ", c1[[4L]],
+                    ") ont une m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de m\u00e9thode \u00ab [ \u00bb propre).")
+      attendu <- list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L, colonnes = c1[[5L]],
+                      colonne = character(0), position = integer(0), lignes_colonne = numeric(0))
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), msg)) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+      else if (!identical(x$details, attendu)) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](d)) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Contr\u00f4le (1 bis), colonnes de l'extraction (nombre et noms) compar\u00e9es \u00e0 celles de l'entr\u00e9e, sans dispatch,
+  # avant le d\u00e9compte (2) : une colonne dont `[` rend NULL est retir\u00e9e sans signal par `[.data.frame` (avant la
+  # reprise : construction accept\u00e9e, lignes conserv\u00e9es sans cette colonne, rapport diff\u00e9rent du t\u00e9moin ; une colonne
+  # fautive plac\u00e9e apr\u00e8s elle \u00e9tait cit\u00e9e sous le nom d\u00e9cal\u00e9 de sa voisine). Entr\u00e9e data.frame ordinaire : le message
+  # nomme la classe de la colonne de l'entr\u00e9e \u00e0 la premi\u00e8re position \u00e9cart\u00e9e (seule cit\u00e9e avec sa classe, les suivantes
+  # \u00ab d\u00e9cal\u00e9es \u00bb : avant la reprise v4, des noms d\u00e9cal\u00e9s accusaient une colonne saine, et des noms r\u00e9p\u00e9t\u00e9s
+  # dont le premier `[` rend NULL donnaient le message de l'entr\u00e9e) ; details$colonne : les seules colonnes absentes ;
+  # sous-classe : message de l'entr\u00e9e, colonnes en trop sans nom compt\u00e9es.
+  Bnul <- B1; Bnul$autre_colonne <- structure(B1$autre_colonne, class = "k319cnul")
+  Bnul2 <- Bnul; Bnul2$x1 <- structure(1:4 + 0, class = "k319col")
+  # Sondes de la reprise v4 : deux colonnes \u00e0 `[` NULL suivies d'une colonne saine (x2) ; colonne fautive en premi\u00e8re
+  # position ; noms r\u00e9p\u00e9t\u00e9s dont la premi\u00e8re occurrence est fautive (aucune colonne absente au sens des noms).
+  Bnul3 <- Bnul; Bnul3$x1 <- structure(1:4, class = "k319cnul"); Bnul3$x2 <- 11:14
+  Bnul4 <- B1[c(8, 1:7)]; Bnul4$autre_colonne <- structure(Bnul4$autre_colonne, class = "k319cnul")
+  Bdup <- B1; Bdup$autre_colonne <- structure(Bdup$autre_colonne, class = "k319cnul"); Bdup$y <- 1:4 + 0
+  names(Bdup)[9] <- "autre_colonne"
+  prem <- function(pos) sprintf("colonne \u00ab autre_colonne \u00bb (position %d, classe k319cnul), premi\u00e8re position o\u00f9 l'extraction s'\u00e9carte des donn\u00e9es", pos)
+  decal <- "extraction d\u00e9cal\u00e9e \u00e0 partir de cette colonne"
+  B20 <- B1; for (e in 1:12) B20[[paste0("x", e)]] <- 1:4 + 0
+  # Réserve 1 de l'audit léger de la reprise v4 : première colonne écartée fausse par son décompte (k319col : une valeur de
+  # moins, position 9), suivie d'une colonne à `[` NULL (x1, position 10) puis d'une colonne saine : la première ne décale
+  # rien (« autres écarts à partir de la position 10 », sans « décalée »).
+  Bcn <- B1; Bcn$x0 <- structure(1:4 + 0, class = "k319col"); Bcn$x1 <- structure(1:4, class = "k319cnul"); Bcn$x2 <- 11:14
+  # Doute 1 d'actuary : « élément vide » = élément NULL laissé par `[.data.frame`, non un décompte 0 : une colonne dont `[`
+  # rend légitimement 0 valeur (k319zero, position 9) ne décale rien, même suivie d'une colonne à `[` NULL.
+  Bzero <- B1; Bzero$x0 <- structure(1:4 + 0, class = "k319zero"); Bzero$x1 <- structure(1:4, class = "k319cnul"); Bzero$x2 <- 11:14
+  col1 <- function(txt) paste0(PREF4, "n'ont pas les colonnes des donn\u00e9es (", txt, ")")
+  suff1 <- function(cl) paste0(" : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe ", cl, ") ont une m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de m\u00e9thode \u00ab [ \u00bb propre).")
+  cites10 <- paste(sprintf("\u00ab x%d \u00bb", 1:10), collapse = ", ")
+  cas5 <- list(
+    list("colonne hors r\u00f4le dont `[` rend NULL (7 colonnes au lieu de 8)", Bnul,
+         paste0(col1(paste("7 colonne(s) au lieu de 8", "absente(s) : \u00ab autre_colonne \u00bb", prem(8L), sep = " ; ")), suff1("k319cnul")),
+         c(class = "data.frame"), "autre_colonne"),
+    # `[.data.frame` range la colonne suivante \u00e0 la position de la colonne retir\u00e9e + 1 : la liste rendue compte 9 \u00e9l\u00e9ments (le
+    # 8e est NULL, de nom vide), comme l'entr\u00e9e ; seuls les noms diff\u00e8rent. La colonne fautive x1 n'est pas cit\u00e9e sous un nom d\u00e9cal\u00e9.
+    list("colonne retir\u00e9e puis colonne fautive (k319col) : refus (1 bis) (m\u00eame nombre de colonnes, noms diff\u00e9rents)", Bnul2,
+         paste0(col1(paste("absente(s) : \u00ab autre_colonne \u00bb", "1 colonne(s) sans nom", prem(8L), decal, sep = " ; ")), suff1("k319cnul")),
+         c(class = "data.frame"), "autre_colonne"),
+    list("sonde 1 : deux colonnes hors r\u00f4le dont `[` rend NULL (autre_colonne, x1) puis une colonne saine (x2, entier) : seule la premi\u00e8re est cit\u00e9e avec sa classe", Bnul3,
+         paste0(col1(paste("absente(s) : \u00ab autre_colonne \u00bb, \u00ab x2 \u00bb", "2 colonne(s) sans nom", prem(8L), decal, sep = " ; ")), suff1("k319cnul")),
+         c(class = "data.frame"), c("autre_colonne", "x2")),
+    list("colonne fautive en premi\u00e8re position (position 1, colonnes de r\u00f4le d\u00e9cal\u00e9es non accus\u00e9es)", Bnul4,
+         paste0(col1(paste("absente(s) : \u00ab autre_colonne \u00bb", "1 colonne(s) sans nom", prem(1L), decal, sep = " ; ")), suff1("k319cnul")),
+         c(class = "data.frame"), "autre_colonne"),
+    list("sonde 2 : noms r\u00e9p\u00e9t\u00e9s dont la premi\u00e8re occurrence est fautive (aucune colonne absente au sens des noms) : cause \u00ab colonne \u00bb, position de la colonne fautive", Bdup,
+         paste0(col1(paste("1 colonne(s) sans nom", prem(8L), decal, sep = " ; ")), suff1("k319cnul")),
+         c(class = "data.frame"), character(0)),
+    list("r\u00e9serve 1 de l'audit : premi\u00e8re colonne \u00e9cart\u00e9e fausse par son d\u00e9compte (k319col, position 9) puis colonne \u00e0 `[` NULL : \u00ab autres \u00e9carts \u00bb, sans \u00ab d\u00e9cal\u00e9e \u00bb", Bcn,
+         paste0(col1(paste("absente(s) : \u00ab x1 \u00bb", "1 colonne(s) sans nom",
+                           "colonne \u00ab x0 \u00bb (position 9, classe k319col), premi\u00e8re position o\u00f9 l'extraction s'\u00e9carte des donn\u00e9es",
+                           "autres \u00e9carts \u00e0 partir de la position 10", sep = " ; ")), suff1("k319col")),
+         c(class = "data.frame"), "x1"),
+    list("doute 1 d'actuary : premi\u00e8re colonne \u00e9cart\u00e9e qui rend 0 valeur (k319zero, position 9, \u00e9l\u00e9ment non NULL) puis colonne \u00e0 `[` NULL : \u00ab autres \u00e9carts \u00bb, sans \u00ab d\u00e9cal\u00e9e \u00bb", Bzero,
+         paste0(col1(paste("absente(s) : \u00ab x1 \u00bb", "1 colonne(s) sans nom",
+                           "colonne \u00ab x0 \u00bb (position 9, classe k319zero), premi\u00e8re position o\u00f9 l'extraction s'\u00e9carte des donn\u00e9es",
+                           "autres \u00e9carts \u00e0 partir de la position 10", sep = " ; ")), suff1("k319zero")),
+         c(class = "data.frame"), "x1"),
+    list("m\u00e9thode d'entr\u00e9e qui retire douze colonnes (dix cit\u00e9es, puis leur nombre restant ; details sans plafond)", classee(B20, "k319dr12"),
+         paste0(PREF, "k319dr12/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es (8 colonne(s) au lieu de 20 ; absente(s) : ",
+                cites10, " ; et 2 autre(s) absente(s))", SUFF),
+         c("k319dr12", "data.frame"), paste0("x", 1:12)),
+    list("m\u00e9thode d'entr\u00e9e qui renomme une colonne (absente et en trop, m\u00eame nombre)", classee(B1, "k319ren"),
+         paste0(PREF, "k319ren/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es (absente(s) : \u00ab autre_colonne \u00bb ; en trop : \u00ab renomme \u00bb)", SUFF),
+         c("k319ren", "data.frame"), "autre_colonne"),
+    list("m\u00e9thode d'entr\u00e9e qui renomme une colonne en nom vide (colonne en trop sans nom, compt\u00e9e)", classee(B1, "k319vid"),
+         paste0(PREF, "k319vid/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es (absente(s) : \u00ab autre_colonne \u00bb ; 1 colonne(s) sans nom)", SUFF),
+         c("k319vid", "data.frame"), "autre_colonne"),
+    list("m\u00e9thode d'entr\u00e9e qui renomme une colonne en NA (colonne en trop sans nom, compt\u00e9e)", classee(B1, "k319nan"),
+         paste0(PREF, "k319nan/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es (absente(s) : \u00ab autre_colonne \u00bb ; 1 colonne(s) sans nom)", SUFF),
+         c("k319nan", "data.frame"), "autre_colonne"),
+    list("m\u00e9thode d'entr\u00e9e qui ajoute une colonne (en trop)", classee(B1, "k319add"),
+         paste0(PREF, "k319add/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es (9 colonne(s) au lieu de 8 ; en trop : \u00ab extra \u00bb)", SUFF),
+         c("k319add", "data.frame"), character(0)),
+    list("m\u00e9thode d'entr\u00e9e qui rend les colonnes dans l'ordre inverse", classee(B1, "k319ord"),
+         paste0(PREF, "k319ord/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es (m\u00eames noms de colonnes, dans un autre ordre ou r\u00e9p\u00e9t\u00e9s)", SUFF),
+         c("k319ord", "data.frame"), character(0)))
+  for (c1 in cas5) for (k in names(chemins)) {
+    d <- c1[[2L]]
+    x <- attrape(chemins[[k]](d))
+    avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
+    verifier(sprintf("#319 reprise, contr\u00f4le (1 bis), %s : %s -> refus donnees_mal_formees, message attendu, une ligne UTF-8 valide, details complets, 0 avertissement R", c1[[1L]], k), {
+      attendu <- list(classe = unname(c1[[4L]]), classe_rendue = unname(c1[[4L]]), lignes = 3L, attendu = 3L, colonnes = character(0),
+                      colonne = c1[[5L]], position = integer(0), lignes_colonne = numeric(0))
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), c1[[3L]])) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+      else if (!identical(x$details, attendu)) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](d)) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Colonne hors r\u00f4le \u00e0 d\u00e9compte juste (matrice, data.frame) sous une m\u00e9thode `[` correcte : accept\u00e9e,
+  # lignes_conservees ce que rend la m\u00e9thode (m\u00eame r\u00e9sultat qu'avant la reprise).
+  verifier("#319 reprise : colonnes hors r\u00f4le matrice et data.frame \u00e0 d\u00e9compte juste (3 lignes), classe dont la m\u00e9thode `[` est correcte : construction accept\u00e9e, lignes_conservees identical() \u00e0 ce que rend sa m\u00e9thode, observations du t\u00e9moin, 0 avertissement R", {
+    Bn <- B1; Bn$mat <- matrix(1:4 + 0, ncol = 1L); Bn$dfc <- data.frame(a = 1:4)
+    d <- classee(Bn, "k319ok")
+    x <- tryCatch(construire_table(d, ROLES, PLAN), error = function(e) e)
+    if (inherits(x, "error")) return(conditionMessage(x))
+    r <- x$etapes$donnees$resultat
+    if (!identical(r$lignes_conservees, d[-2L, , drop = FALSE])) "lignes_conservees diff\u00e9rentes de celles que rend la m\u00e9thode"
+    else if (!identical(.row_names_info(r$lignes_conservees$dfc, 2L), 3L) || !identical(NROW(r$lignes_conservees$mat), 3L)) "colonnes imbriqu\u00e9es \u00e0 3 lignes attendues"
+    else if (!identical(r$observations, X0$etapes$donnees$resultat$observations)) "observations diff\u00e9rentes du t\u00e9moin"
+    else if (avertissements(construire_table(d, ROLES, PLAN)) != 0L) "avertissement R"
+    else TRUE
+  })
+  # Rapport figé d'une entrée admise (réserve 2 d'actuary, reprise de #319) : sous une classe dont la méthode `[`
+  # est correcte, ecrire_rapport() rend le rapport (octets HTML : en-tête, UTF-8 valide), sans refus, et ses octets
+  # sont ceux du témoin sans classe sur les mêmes données (B1 ; Bf3, facteur à niveaux H/F/X, pour k319dl).
+  Bf3 <- B1; Bf3$sexe <- factor(Bf3$sexe, levels = c("H", "F", "X"))
+  for (k in c("k319ok", "k319reset", "k319dl")) {
+    verifier(sprintf("#319 reprise : classe %s dont la m\u00e9thode `[` est correcte : ecrire_rapport() rend le rapport (raw non vide, <!DOCTYPE html> en t\u00eate, UTF-8 valide), sans refus, octets identiques \u00e0 ceux du t\u00e9moin sans classe", k), {
+      base <- if (k == "k319dl") Bf3 else B1
+      d <- classee(base, k)
+      h <- tryCatch(ecrire_rapport(construire_table(d, ROLES, PLAN)), error = function(e) e)
+      if (inherits(h, "error")) paste("erreur ou refus :", conditionMessage(h))
+      else if (!is.raw(h) || !length(h)) "pas un raw non vide"
+      else if (!identical(h[1:16], charToRaw("<!DOCTYPE html>\n")) || !validUTF8(rawToChar(h))) "en-t\u00eate ou UTF-8 invalide"
+      else if (!identical(h, ecrire_rapport(construire_table(base, ROLES, PLAN)))) "octets diff\u00e9rents de ceux du t\u00e9moin sans classe"
+      else TRUE
+    })
+  }
+  # Méthode `[` qui rend c("autre", "data.frame") et retire un attribut non essentiel (réserve 3 d'actuary, Q-d) :
+  # le résultat reste une liste classée data.frame, il est admis ; brut, observations et empreinte du résultat
+  # sont ceux du témoin sans classe, le rapport est rendu.
+  verifier("#319 reprise : m\u00e9thode `[` qui rend c(\"autre\", \"data.frame\") et retire l'attribut non essentiel \u00ab histo \u00bb de l'entr\u00e9e : construction admise, lignes_conservees de classe autre/data.frame sans \u00ab histo \u00bb, observations, brut et empreinte du r\u00e9sultat du t\u00e9moin, rapport rendu aux octets du t\u00e9moin sans classe, 0 avertissement R", {
+    d <- classee(B1, "k319qd"); attr(d, "histo") <- "source"
+    x <- tryCatch(construire_table(d, ROLES, PLAN), error = function(e) e)
+    if (inherits(x, "error")) return(conditionMessage(x))
+    r <- x$etapes$donnees$resultat; r0 <- X0$etapes$donnees$resultat
+    h <- tryCatch(ecrire_rapport(x), error = function(e) e)
+    if (!identical(class(r$lignes_conservees), c("autre", "data.frame")) || !is.null(attr(r$lignes_conservees, "histo")))
+      "lignes_conservees : classe ou attribut diff\u00e9rents de ce que rend la m\u00e9thode"
+    else if (!identical(r$observations, r0$observations) || !identical(r$numeros_conserves, r0$numeros_conserves)) "observations ou numeros diff\u00e9rents du t\u00e9moin"
+    else if (!identical(x$etapes$brut$resultat, X0$etapes$brut$resultat)) "brut diff\u00e9rent du t\u00e9moin"
+    else if (!identical(x$fiche$empreintes$resultat, X0$fiche$empreintes$resultat)) "empreinte du r\u00e9sultat diff\u00e9rente du t\u00e9moin"
+    else if (inherits(h, "error") || !is.raw(h) || !length(h)) "rapport non rendu"
+    else if (!identical(h, ecrire_rapport(X0))) "octets du rapport diff\u00e9rents de ceux du t\u00e9moin sans classe"
+    else if (avertissements(construire_table(d, ROLES, PLAN)) != 0L) "avertissement R"
+    else TRUE
+  })
   # Méthode `[` correcte : respectée telle quelle (lignes_conservees = ce qu'elle rend), autres grandeurs du témoin.
   for (k in c("k319ok", "k319reset")) {
     verifier(sprintf("#319 classe %s dont la m\u00e9thode `[` est correcte : construction accept\u00e9e, lignes_conservees identical() \u00e0 ce que rend sa m\u00e9thode (classe, attributs, noms de lignes), observations, exposition, brut et empreintes de donn\u00e9es et de r\u00e9sultat du t\u00e9moin, 0 avertissement R", k), {
@@ -663,7 +968,9 @@ local({
   })
 })
 verifier("#319 les m\u00e9thodes `[` de session sont retir\u00e9es de globalenv()",
-         !any(vapply(c("k319moins", "k319plus", "k319na", "k319sub", "k319perm", "k319dl", "k319ok", "k319reset"),
+         !any(vapply(c("k319moins", "k319plus", "k319na", "k319sub", "k319perm", "k319dl", "k319ok", "k319reset",
+                       "k319cl0", "k319cla", "k319atom", "k319nul", "k319byt", "k319hrc", "k319hrl", "k319hrm", "k319hrd", "k319rol", "k319tout",
+                       "k319col", "k319qd", "k319neg", "k319cnul", "k319zero", "k319ren", "k319add", "k319ord", "k319dr12"),
                      function(k) exists(paste0("[.", k), envir = globalenv(), inherits = FALSE), logical(1L))))
 # Colonne de rôle de type conforme sous un nom d'encodage bytes, à
 # preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur

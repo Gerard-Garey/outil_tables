@@ -131,10 +131,11 @@ RELAIS <- list(
 # appel est admis en tout fichier.
 AIDES <- data.frame(
   fichier = c("donnees.R", "donnees.R", "donnees.R", "simulation.R", "construire_table.R", "rapport.R", "rapport.R",
-              "positionnement.R", "lissage.R", "donnees.R", "donnees.R"),
+              "positionnement.R", "lissage.R", "donnees.R", "donnees.R", "donnees.R", "donnees.R", "donnees.R", "donnees.R"),
   nom = c("message_aucune_recette", "groupes_cites_table", "lignes_citees_table", "ecart_noms", "decrire_forme",
           "decrire_valeur", "valeur_message", "segments_cites", "segments_cites", "bandes_citees",
-          "complement_citees"),
+          "complement_citees", "colonnes_decompte_citees", "classes_colonnes_citees", "colonnes_classe_citees",
+          "colonnes_ecart_citees"),
   stringsAsFactors = FALSE)
 
 # Exceptions : une ligne par site (une expression peut revenir plusieurs fois
