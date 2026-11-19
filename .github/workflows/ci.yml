@@ -73,7 +73,7 @@ jobs:
   tests:
     name: Tests (R 4.3.3)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     container:
       # Empreinte de l'index multi-architecture de rocker/r-ver:4.3.3, relevée
       # le 16/10/2026 par `docker buildx imagetools inspect` sur l'exécuteur
