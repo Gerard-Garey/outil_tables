@@ -48,9 +48,10 @@ EMPREINTE_CODE <- tablexp:::EMPREINTE_CODE
 # TEXTE_REJEU_FICHE pour le second. Historique de MD5_MENTIONS_RAPPORT, une
 # ligne par issue qui change un texte de MENTIONS_RAPPORT :
 #  - relevé à 8a81102 (aa6024502e80e71c23a8e24106122012) ;
-#  - reporté à #129 (empreinte_donnees) : 870a195ddc27301e2de53ae9bc32d2fe.
+#  - reporté à #129 (empreinte_donnees) : 870a195ddc27301e2de53ae9bc32d2fe ;
+#  - reporté à #310 (integrite_hors_2) : 7d0667ba477d743b39ebd4e5174f0d8c.
 # TEXTE_REJEU_FICHE : relevé à 8a81102, inchangé.
-MD5_MENTIONS_RAPPORT <- "870a195ddc27301e2de53ae9bc32d2fe"
+MD5_MENTIONS_RAPPORT <- "7d0667ba477d743b39ebd4e5174f0d8c"
 MD5_TEXTE_REJEU_FICHE <- "ddbaf36e1e6fa260b51e57ca46e6604f"
 
 # Ligne 8 « tables_reference » (contrôle 7 bis, ADR 0015, point 4.3 ; #73) :

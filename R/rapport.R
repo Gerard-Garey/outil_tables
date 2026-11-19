@@ -2118,7 +2118,14 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   # insérés entre les deux morceaux ; fiche/empreintes/resultat, valeur comparée
   # par le contrôle, est nommée dans le morceau integrite.
   integrite_hors_1 = " Hors du périmètre de cette empreinte, et donc de ce contrôle : ",
-  integrite_hors_2 = " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.",
+  integrite_hors_2 = paste(
+    " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base)",
+    "est lu dans l'objet, sans vérification de son origine. Avant l'écriture sont contrôlées : pour",
+    "etapes/donnees/resultat/lignes_conservees, copie des lignes conservées de l'entrée, sa cohérence avec le",
+    "périmètre de l'empreinte (un data.frame dont le nombre de lignes est la longueur de",
+    "etapes/donnees/resultat/numeros_conserves et qui porte les colonnes nommées par fiche/roles) ; pour les autres",
+    "chemins, leur forme, soumise à l'écrivain de la fiche (listes et vecteurs sans classe ni attribut autre que les",
+    "noms, ou dates)."),
   etape_absente_1 = "Étape « ",
   etape_absente_2 = " » : non demandée par le plan (chemin etapes/",
   etape_absente_3 = " absent de l'objet).",
