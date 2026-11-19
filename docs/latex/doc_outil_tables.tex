@@ -1480,7 +1480,9 @@ d'exposition) est égal, nom pour nom, à sa source dans le code~; toute ligne d
 la liste d'attente désigne un export, un catalogue requis, une entrée d'un
 catalogue requis déjà écrit (type \code{entree}, de la forme
 \code{<catalogue>:<nom>}, pour une définition ajoutée à un module dont le
-tableau existe déjà) ou une valeur citée (type \code{fiche}, ci-dessous) et renvoie à une issue~; une entrée en attente absente du
+tableau existe déjà), une valeur citée (type \code{fiche}, ci-dessous) ou
+un écart de citation (type \code{citation}, nom \code{marqueurs},
+ci-dessous) et renvoie à une issue~; une entrée en attente absente du
 document compte en échec attendu, présente elle est un succès inattendu.
 Elle compare en outre au package les valeurs que le document cite
 (issue~\#70)~: chaque constante de version (\code{VERSION\_FICHE} et les
@@ -1497,7 +1499,17 @@ script~; les blocs de lecture sont ceux de \code{BLOCS\_LECTURE\_FICHE}
 (blocs, champs et ordre). Enfin, aucun nom de fonction n'est coupé par
 \code{\textbackslash allowbreak} entre deux \code{\textbackslash code\{\}}~: le
 fragment final serait lu comme une fonction et le nom entier échapperait au
-contrôle d'existence (issue~\#84). Le format des citations et des catalogues qu'elle lit est fixé par
+contrôle d'existence (issue~\#84). Elle contrôle aussi les citations des
+textes du moteur \code{CONVENTIONS\_TEXTE} et \code{MENTIONS\_RAPPORT}
+(\code{R/rapport.R}~; issue~\#130)~: une citation est désignée par un
+marqueur, ligne de commentaire LaTeX qui nomme la constante et le libellé,
+et le texte entre «~» qui le suit, normalisé par une règle fermée, est égal
+à la valeur du package~; toute expression «~mot pour mot~» du document
+% citation : aucune (description du contrôle 7, qui ne cite aucune constante)
+est suivie d'un tel marqueur, ou d'une exemption motivée quand la phrase ne
+cite aucune constante~; un marqueur mal formé est un écart. Le contrôle ne
+voit pas une citation qui n'est ni marquée ni annoncée par cette
+expression. Le format des citations et des catalogues qu'elle lit est fixé par
 \code{docs/latex/CONVENTIONS.md} (section~3)~; les tableaux de fonctions de
 chaque module en sont la principale application (E4.9). Sans \code{-{}-strict}, elle
 rend compte des écarts sans échouer.
@@ -14991,6 +15003,7 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     fixé et ne laisse $D_{\cdot c}$ borné que si le nombre de strates croît
     (issue~\#202, relecture d'\code{actuary-approfondi}, texte repris mot
     pour mot~; correction renvoyée hors de B16 par la décision M364).
+% citation : aucune (texte repris d'un avis d'actuary-approfondi, sans constante de R/rapport.R)
     Illustration~: constat de simulation m8 de la spécification
     (commentaire 6747045250 de l'issue~\#185), hors batterie, $10^4$
     réplications par cas, erreur de Monte-Carlo $0{,}0022$ sur un taux de
@@ -15896,6 +15909,7 @@ chaque test nommant la nature de son attendu)~:
     \code{age\_atteint\_annee}~: l'étape \code{exposition} et les
     expositions contrefactuelles emploient la recette et la convention de
     la fiche (issue~\#82)~; section du rapport figé, mention fixe mot pour mot,
+% citation : aucune (description d'un test unitaire, sans citation de la mention qu'il compare)
     mention d'unité contrat~;
   \item \textbf{identités exactes}~: \code{construire\_observations()}
     identique à la partie correspondante de \code{preparer\_donnees()} sur
@@ -16043,6 +16057,7 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     (issue~\#201)~; statuts des bornes exactes et des p-valeurs de
     sous-groupe propres à \code{independante} et à
     \code{ajustee\_hors\_outil}, mot pour mot, fragment
+% citation : aucune (description d'un test unitaire qui compare des statuts au code, sans citer de constante de R/rapport.R)
     \code{ajustee\_hors\_outil} commun aux p-valeurs exactes et
     asymptotiques, et, par \code{construire\_table()} sous ces deux
     relations, \code{statuts\_sous\_groupes} égal aux lignes de
@@ -17015,6 +17030,7 @@ forme par \code{sprintf()}, \code{format()}, \code{formatC()} ni
 entiers exacts, puis écrits en octets ASCII, une valeur par ligne, LF final.
 La ligne \code{doubles} de \code{CONVENTIONS\_TEXTE}, en en-tête des plans,
 des fiches et des rapports figés, le dit au relecteur, mot pour mot~:
+% citation : CONVENTIONS_TEXTE["doubles"]
 «~le double relu fait foi~; 17 chiffres significatifs (forme \%.17g de la
 norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par
 tablexp sans la bibliothèque C~; relecture au bit près constatée sous glibc
@@ -17990,8 +18006,9 @@ rapprocher de celui qu'on lui remet (E3.7)~; le rapport écrit chaque valeur
 par l'écrivain unique \code{ecrire\_valeurs()} et recalcule
 \code{empreinte\_resultat()}, deux fonctions internes qu'un rendu hors du
 package aurait dû exporter ou dupliquer (ADR 0011, point~3.1)~; ses textes
-méthodologiques, texte du moteur, sont cités par le présent document et
-contrôlés par la batterie de concordance~; enfin ses contrôles ont un sens
+méthodologiques, texte du moteur, sont cités par le présent document, et
+chaque citation marquée est contrôlée par la batterie de concordance
+(section~\ref{sec:trois-batteries}~; issue~\#130)~; enfin ses contrôles ont un sens
 métier et vont dans le package (E4.3), et le document n'a aucune dépendance
 à Shiny. Aucun module nouveau n'est créé pour un seul rendu~: un module
 dédié ne sera décidé qu'à l'arrivée d'un second (tables CSV et xlsx à
@@ -18666,6 +18683,7 @@ issue~\#181)~; statut du
 résultat et du code consigné dans \code{fiche/empreintes/statut\_resultat\_code})
 et de deux phrases~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
+% citation : MENTIONS_RAPPORT["plateforme"]
   \item «~L'empreinte du résultat dépend de la plateforme (R, BLAS, LAPACK,
     bibliothèque C)~; elle n'est un témoin d'identité que sur la même machine
     (E3.6, E4.6).~»~;
