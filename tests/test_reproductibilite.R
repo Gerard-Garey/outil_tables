@@ -531,6 +531,79 @@ transition_159 <- function(id, tables) {
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(paste0("R", 1:17), function(id)
   transition_159(id, c("brut", if (id %in% c("R8", "R9")) c("statistiques", "sous_groupes"),
                        if (id %in% c("R8", "R9", "R10")) "importance"))))
+# Transition #218 (B30, étape (3) ; spécification d'actuary-approfondi, #218,
+# commentaire 7012205013 ; avis de forme F218, M545, D4 (a)) : écart minimal
+# détectable theta_80 par segment du test global, R11 et R12 seuls (plans à
+# étape homogeneite), par ajouts : trois constantes dans les paramètres de
+# l'étape (après convention), table resultat/ecart_minimal (après segments),
+# deux lignes de statut en fin de parametres/statuts ; @noms et @lignes
+# allongés. Aucune valeur existante changée ; aucun avertissement nouveau.
+# Une transition pour les deux plans (changements identiques). Textes de
+# statut écrits ici en échappements \u (UTF-8 en toute locale), sans lire le
+# package ; texte avant (13 lignes) lu dans la référence. Valeurs des ajouts
+# contrôlées à part (C4 et recalcul indépendant, bloc R11 et R12 plus bas).
+# À clore par la régénération unique (R) de B30, avec transition_218() et
+# les constantes *_218.
+STATUT_SUP_218 <- paste(
+  "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
+  "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
+  "sur les strates informatives du test global de D_.c (p_c(theta) - pi_c), p_jc(theta) = pi_jc w_j / somme sur k de",
+  "pi_kc w_k, w_s = theta, w_j = 1 sinon : esp\u00e9rance exacte de U sachant les D_.c sous le mod\u00e8le de Poisson \u00e0 exposition",
+  "tenue pour fixe ; V variance de U sous H0, m\u00eame syst\u00e8me r\u00e9duit que le test global ; lambda_80 : non-centralit\u00e9 pour",
+  "laquelle la loi du khi-deux non centrale \u00e0 ddl degr\u00e9s de libert\u00e9 (ddl du test global) d\u00e9passe le quantile d'ordre",
+  "1 - niveau_ecart_minimal de la loi centrale avec la probabilit\u00e9 puissance_ecart_minimal (conventions) ; la variance",
+  "de U sous l'alternative diff\u00e8re de V : \u00e0 deux segments en strate unique, en approximation normale, la puissance",
+  "r\u00e9elle en theta_80 s'\u00e9carte de puissance_ecart_minimal de 0,03 au plus quand theta_80 est au plus",
+  "seuil_ecart_minimal, davantage au-del\u00e0, et la valeur est optimiste pour un segment minoritaire (theta_80 r\u00e9el plus",
+  "\u00e9loign\u00e9 de 1) ; au-del\u00e0 de deux segments ou \u00e0 parts diff\u00e9rentes entre strates, aucune borne \u00e9tablie ; lambda_80",
+  "(pchisq non centrale) et theta_80 (uniroot) par r\u00e9solution num\u00e9rique : approximation num\u00e9rique ; \u00e9tat non_atteint",
+  "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tol\u00e9rance relative de la r\u00e9solution num\u00e9rique,",
+  "lorsque theta tend vers l'infini ; unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
+  "sur-dispers\u00e9s et theta_80 est trop proche de 1 (\u00e9cart minimal d\u00e9tectable sous-estim\u00e9)")
+STATUT_INF_218 <- Reduce(function(t, r) sub(r[1L], r[2L], t, fixed = TRUE), list(
+  c("plus petit theta > 1", "plus grand theta < 1"),
+  c("quand theta_80 est au plus seuil_ecart_minimal", "quand theta_80 est au moins 1/seuil_ecart_minimal"),
+  c("la valeur est optimiste pour un segment minoritaire (theta_80 r\u00e9el plus \u00e9loign\u00e9 de 1)",
+    "la valeur est prudente pour un segment minoritaire (theta_80 r\u00e9el plus proche de 1)"),
+  c("lorsque theta tend vers l'infini", "lorsque theta tend vers 0")), STATUT_SUP_218)
+# Octets UTF-8 (échappements \u) ; sous la locale C, ces littéraux, et
+# paste() et sub() sur eux, sont d'encodage « unknown » (mesuré : LC_ALL=C,
+# Encoding("\u00e9") vaut "unknown", octets c3 a9), et identical() les
+# distingue alors de la même chaîne marquée UTF-8 : marquage explicite,
+# octets inchangés.
+Encoding(STATUT_SUP_218) <- "UTF-8"
+Encoding(STATUT_INF_218) <- "UTF-8"
+transition_218 <- function(plans) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plans[1L], ".tsv")))$valeurs
+  b <- "etapes/homogeneite/"
+  st <- paste0(b, "parametres/statuts/")
+  if (length(ref[[paste0(st, "statut")]]) != 13L)
+    stop("transition_218() : 13 lignes de statut attendues dans la r\u00e9f\u00e9rence (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_218() et les constantes *_218)")
+  noms_p <- ref[[paste0(b, "parametres/@noms")]]
+  k <- match("convention", noms_p)
+  noms_r <- ref[[paste0(b, "resultat/@noms")]]
+  j <- match("segments", noms_r)
+  ajout <- function(chemin, type, longueur) list(chemin = paste0(b, chemin), nature = "ajout", type = type, longueur = longueur)
+  em <- "resultat/ecart_minimal/"
+  list(issue = "#218", plans = plans, changements = c(
+    list(list(chemin = paste0(b, "parametres/@noms"), nature = "valeur de chaîne",
+              valeurs = append(noms_p, c("niveau_ecart_minimal", "puissance_ecart_minimal", "seuil_ecart_minimal"), k)),
+         ajout("parametres/niveau_ecart_minimal", "double", 1), ajout("parametres/puissance_ecart_minimal", "double", 1),
+         ajout("parametres/seuil_ecart_minimal", "double", 1),
+         list(chemin = paste0(st, "@lignes"), nature = "valeur", valeurs = 15),
+         list(chemin = paste0(st, "table"), nature = "valeur de chaîne",
+              valeurs = c(ref[[paste0(st, "table")]], "ecart_minimal", "ecart_minimal")),
+         list(chemin = paste0(st, "grandeur"), nature = "valeur de chaîne",
+              valeurs = c(ref[[paste0(st, "grandeur")]], "theta_80_superieur", "theta_80_inferieur")),
+         list(chemin = paste0(st, "statut"), nature = "valeur de chaîne",
+              valeurs = c(ref[[paste0(st, "statut")]], STATUT_SUP_218, STATUT_INF_218)),
+         list(chemin = paste0(b, "resultat/@noms"), nature = "valeur de chaîne", valeurs = append(noms_r, "ecart_minimal", j)),
+         ajout(paste0(em, "@colonnes"), "character", 5), ajout(paste0(em, "@lignes"), "integer", 1),
+         ajout(paste0(em, "sexe"), "character", 2), ajout(paste0(em, "theta_80_superieur"), "double", 2),
+         ajout(paste0(em, "etat_superieur"), "character", 2), ajout(paste0(em, "theta_80_inferieur"), "double", 2),
+         ajout(paste0(em, "etat_inferieur"), "character", 2))))
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_218(c("R11", "R12"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -1027,13 +1100,15 @@ verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
 # (R15 à R17) : 21 clés de l'annotation du 12/11/2026, (e) (6 exactes) et 22
 # clés classées par actuary (13 exactes : 5 échos de lissage et 8 clés de
 # coherence_regularite ; avis du 12/11/2026) : 191 clés, dont 60 exactes.
-verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 191 clés dont 60 exactes (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e))", {
+# #218 : cinq clés ajoutées (trois constantes exactes, deux colonnes theta_80
+# à 1e-10) : 191 et 60 -> 196 et 63.
+verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 196 clés dont 63 exactes (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e) ; #218)", {
   cles_199 <- sub("^etapes/", "", unlist(CHEMINS_199, use.names = FALSE))
   restantes <- intersect(cles_199, names(TOLERANCES))
   if (length(cles_199) != 27L || anyDuplicated(cles_199)) "CHEMINS_199 : 27 chemins distincts attendus"
   else if (length(restantes)) paste("clés encore présentes :", paste(restantes, collapse = ", "))
-  else if (length(TOLERANCES) != 191L || sum(TOLERANCES == 0) != 60L)
-    sprintf("%d clés dont %d exactes, au lieu de 191 et 60", length(TOLERANCES), sum(TOLERANCES == 0))
+  else if (length(TOLERANCES) != 196L || sum(TOLERANCES == 0) != 63L)
+    sprintf("%d clés dont %d exactes, au lieu de 196 et 63", length(TOLERANCES), sum(TOLERANCES == 0))
   else TRUE
 })
 # Contrôle des types des dénombrements (ADR 0009, point 9.6, (f) ; #199, M396,
@@ -1227,6 +1302,53 @@ for (p in plans_reference()) {
     else if (any(sg$etat == "convolution_au_dela_n_max")) "état convolution_au_dela_n_max"
     else TRUE
   })
+  # #218 (critère 2 de l'issue, C4 du § 1.33) : theta_80 de R11 et R12 égaux
+  # aux valeurs remesurées par actuary-approfondi (commentaire 7012205013 ;
+  # étai du corps de #218 à la cinquième décimale), à 5e-7 près (sixième
+  # décimale) ; recalcul indépendant du moteur à partir de la table
+  # d'exposition (cellules d'âge de la plage 20-90, segments sexe ; strates
+  # informatives D_.c > 0 et deux segments exposés ; V complète,
+  # pseudo-inverse de Moore-Penrose par svd() ; lambda_80 par uniroot sur
+  # pchisq ; racines par uniroot) : |lambda(theta_80) / lambda_80 - 1| <= 1e-8
+  # et theta_80 égal à la racine indépendante à 1e-8 en relatif ; tous les
+  # états produite ; aucun signal ecart_minimal_detectable.
+  if (id %in% c("R11", "R12")) verifier(sprintf("%s : #218 theta_80 (C4 : valeurs d'actuary-approfondi à 5e-7 ; recalcul indépendant à 1e-8 à partir de la table d'exposition), états produite, aucun signal", id), local({
+    # local() : les noms ci-dessous (g, D, E, k…) ne doivent pas masquer ceux
+    # de la boucle des plans.
+    em <- x_ref$etapes$homogeneite$resultat$ecart_minimal
+    attendu <- list(R11 = c(1.090574, 1.090240, 0.917229, 0.916948), R12 = c(1.035880, 1.035860, 0.965381, 0.965363))[[id]]
+    ex <- x_ref$etapes$exposition$resultat$exposition
+    ex <- ex[ex$age >= 20 & ex$age <= 90, ]
+    ages <- sort(unique(ex$age)); segs <- em$sexe
+    E <- D <- matrix(0, length(segs), length(ages))
+    ij <- cbind(match(ex$sexe, segs), match(ex$age, ages))
+    E[ij] <- ex$exposition_centrale; D[ij] <- ex$evenements
+    Dc <- colSums(D); inf <- Dc > 0 & colSums(E > 0) >= 2
+    V <- matrix(0, length(segs), length(segs))
+    for (k in which(inf)) { pk <- E[, k] / sum(E[, k]); V <- V + Dc[k] * (diag(pk) - tcrossprod(pk)) }
+    sv <- svd(V); g <- sv$d > max(sv$d) * 1e-12
+    Vp <- sv$v[, g, drop = FALSE] %*% (t(sv$u[, g, drop = FALSE]) / sv$d[g])
+    ddl <- sum(g); q <- stats::qchisq(0.95, ddl)
+    l80 <- stats::uniroot(function(l) stats::pchisq(q, ddl, ncp = l, lower.tail = FALSE) - 0.80, c(0, 100), tol = 1e-13)$root
+    lam <- function(s, th) {
+      de <- numeric(length(segs))
+      for (k in which(inf)) { pk <- E[, k] / sum(E[, k]); w <- rep(1, length(segs)); w[s] <- th
+        de <- de + Dc[k] * (pk * w / sum(pk * w) - pk) }
+      drop(crossprod(de, Vp %*% de))
+    }
+    obt <- c(em$theta_80_superieur, em$theta_80_inferieur)
+    seg_br <- rep(seq_along(segs), 2L)
+    rel <- vapply(seq_along(obt), function(i) lam(seg_br[i], obt[i]) / l80 - 1, 0)
+    rac <- vapply(seq_along(obt), function(i) {
+      bornes <- if (i <= length(segs)) c(1, 2) else c(0.5, 1)
+      stats::uniroot(function(th) lam(seg_br[i], th) - l80, bornes, tol = 1e-14)$root }, 0)
+    if (!all(c(em$etat_superieur, em$etat_inferieur) == "produite")) "états"
+    else if (any(abs(obt - attendu) > 5e-7)) paste("C4 :", paste(sprintf("%.7f", obt), collapse = ", "))
+    else if (any(abs(rel) > 1e-8)) paste("lambda(theta_80) / lambda_80 - 1 :", paste(sprintf("%.2e", rel), collapse = ", "))
+    else if (any(abs(rac / obt - 1) > 1e-8)) paste("racine indépendante :", paste(sprintf("%.10f", rac), collapse = ", "))
+    else if ("ecart_minimal_detectable" %in% x_ref$avertissements$code) "signal"
+    else TRUE
+  }))
   # Commit préparatoire (1a) de B19 (#223 ; ADR 0017, point 10.1), R1 et R4
   # (par année) : apparier_table() sur la grille extraite rend un objet
   # identical() à l'ancien corps (993068c), table de R8, plage 20 à 90 ;

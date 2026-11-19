@@ -593,11 +593,12 @@ VAL <- list(table_reference = "tv", relation_table = "independante", plage_ages 
             tranches_age = c(20, 50, 70), niveau = 0.95, replications = 99)
 X <- construire_table(JEU, ROLES, plan_h())
 H <- X$etapes$homogeneite
-verifier("G objet : parametres, resultat (tests, segments, monte_carlo), diagnostics ; graine du plan consignée", {
+verifier("G objet : parametres (constantes de l'écart minimal détectable après convention, #218), resultat (tests, segments, ecart_minimal, monte_carlo), diagnostics ; graine du plan consignée", {
   identical(names(H), c("parametres", "resultat", "diagnostics")) &&
-    identical(names(H$parametres), c("plage_ages", "tranches_age", "replications", "convention", "hypothese_nulle",
-                                     "statuts", "reference_methode")) &&
-    identical(names(H$resultat), c("tests", "segments", "monte_carlo")) &&
+    identical(names(H$parametres), c("plage_ages", "tranches_age", "replications", "convention",
+                                     "niveau_ecart_minimal", "puissance_ecart_minimal", "seuil_ecart_minimal",
+                                     "hypothese_nulle", "statuts", "reference_methode")) &&
+    identical(names(H$resultat), c("tests", "segments", "ecart_minimal", "monte_carlo")) &&
     identical(H$resultat$monte_carlo$graine, 20261106L) && identical(H$parametres$convention, "dernier_anniversaire") &&
     identical(names(H$resultat$tests), c("test", "variable", "conditionnellement_a", "tranche_debut", "tranche_fin",
                                          "strates_informatives", "groupes", "statistique", "ddl", "p_asymptotique",
@@ -707,7 +708,7 @@ verifier("H rapport : section etape_homogeneite entre etape_positionnement et et
   m <- tablexp:::MENTIONS_RAPPORT[["homogeneite_portee"]]
   length(s) > 0L &&
     identical(ids[k + c(-1L, 1L, 2L)], c("etape_positionnement", "etape_coherence_regularite", "etape_validation")) &&
-    any(s == paste0("<p>", m, "</p>")) &&
+    any(s == paste0("<p>", tablexp:::echapper_html(m), "</p>")) &&
     any(startsWith(s, "<caption><code>etapes/homogeneite/resultat/tests</code>")) &&
     any(startsWith(s, "<caption><code>etapes/homogeneite/resultat/segments</code>")) &&
     grepl("Diagnostic sans verdict ni seuil", m, fixed = TRUE)
@@ -720,4 +721,406 @@ verifier("H rapport : sans l'étape -> « Étape « homogeneite » : non demand�
 verifier("H rejeu : rejouer_fiche() sur la fiche écrite puis relue, identical() hors execution", {
   r <- rejouer_fiche(JEU, lire_fiche(ecrire_fiche(X$fiche)))
   identical(sans_execution(r$construction), sans_execution(X))
+})
+
+# --- I. Écart minimal détectable theta_80 par segment (#218) -----------------------
+#
+# Spécification d'actuary-approfondi, commentaire 7012205013 de #218 ; avis de
+# forme F218 (M545, D4 (a)) ; critères 2, 3 et 5 de l'issue. Natures des
+# attendus, nommées dans chaque test :
+# - littéral de la spécification : constantes, états, textes de statut, du
+#   signal et du rapport ;
+# - valeur calculée à la main : forme close à parts constantes,
+#   theta+ = 1 + r / (1 - pi r), theta- = 1 - r / (1 + pi r),
+#   r = sqrt(lambda_80 / (D pi (1 - pi))), D décès des strates informatives ;
+#   états des cas construits ;
+# - recalcul indépendant : lambda_s(theta) = delta' V^+ delta, V complète,
+#   pseudo-inverse de Moore-Penrose par svd(), reconstruit des agrégats sans
+#   score_homogeneite() ;
+# - calcul exact sans aléa (critère 3) : puissance exacte, loi binomiale, du
+#   test asymptotique en theta_80(D).
+# Recalcul indépendant sur R11 et R12 et valeurs de C4 : batterie de
+# reproductibilité (objets de référence construits une fois).
+
+L80_1 <- tablexp:::non_centralite_ecart_minimal(1)
+# Exposition construite : E et D matrices S x K (segments x âges) ; une ligne
+# par (segment, âge) ; segments s1, s2, ... ; âges 50, 51, ...
+expo_em <- function(E, D) {
+  S <- nrow(E); K <- ncol(E)
+  data.frame(segment = rep(sprintf("s%d", seq_len(S)), K), age = rep(50L + seq_len(K) - 1L, each = S),
+             exposition_centrale = as.vector(E), evenements = as.integer(as.vector(D)), stringsAsFactors = FALSE)
+}
+em_de <- function(E, D) homog(expo_em(E, D), "segment", c(50, 50 + ncol(E) - 1), 50, B = 9)
+forme_close <- function(lambda, D, pi) {
+  r <- sqrt(lambda / (D * pi * (1 - pi)))
+  c(superieur = 1 + r / (1 - pi * r), inferieur = 1 - r / (1 + pi * r))
+}
+# lambda_s(theta) indépendant : strates informatives (D_.c > 0, au moins deux
+# segments exposés), V complète, pseudo-inverse par svd().
+lambda_independant <- function(E, D, s, theta) {
+  Dc <- colSums(D); inf <- Dc > 0 & colSums(E > 0) >= 2
+  S <- nrow(E); delta <- numeric(S); V <- matrix(0, S, S)
+  for (k in which(inf)) {
+    pi <- E[, k] / sum(E[, k])
+    w <- rep(1, S); w[s] <- theta
+    delta <- delta + Dc[k] * (pi * w / sum(pi * w) - pi)
+    V <- V + Dc[k] * (diag(pi) - tcrossprod(pi))
+  }
+  sv <- svd(V); g <- sv$d > max(sv$d) * 1e-12
+  Vp <- sv$v[, g, drop = FALSE] %*% (t(sv$u[, g, drop = FALSE]) / sv$d[g])
+  list(lambda = drop(crossprod(delta, Vp %*% delta)), V = V, ddl = sum(g))
+}
+# lambda_s(theta) du moteur : système réduit de score_homogeneite() (même
+# appel que l'étape, lignes (segment, âge)), appliqué à D_.c p_c(theta).
+lambda_moteur <- function(E, D, s, theta) {
+  S <- nrow(E); K <- ncol(E)
+  sc <- tablexp:::score_homogeneite(as.vector(D), as.vector(E), rep(seq_len(K), each = S), rep(seq_len(S), K), K, S)
+  ru <- sc$strate_tirage
+  pi <- sc$poids / tablexp:::somme_par(sc$poids, ru, length(sc$effectifs))[ru]
+  pw <- pi * ifelse(sc$groupe_utilise == s, theta, 1)
+  p <- pw / tablexp:::somme_par(pw, ru, length(sc$effectifs))[ru]
+  list(lambda = sc$statistique(matrix(sc$effectifs[ru] * p, ncol = 1L)), v = sc$v)
+}
+
+# Parts constantes (pi_s identique dans chaque cellule), S = 2 et S = 4 ;
+# parts différentes entre cellules, S = 2 et S = 3.
+E_PC2 <- outer(c(0.3, 0.7), c(1000, 2000, 500)); D_PC2 <- rbind(c(10, 30, 5), c(30, 45, 25))
+E_PC4 <- outer(c(0.1, 0.2, 0.3, 0.4), c(800, 1500, 1200))
+D_PC4 <- rbind(c(9, 25, 14), c(21, 38, 30), c(30, 60, 47), c(40, 77, 59))
+E_PD2 <- rbind(c(100, 400, 900, 300), c(900, 600, 100, 300)); D_PD2 <- rbind(c(4, 12, 30, 9), c(30, 20, 5, 10))
+E_PD3 <- rbind(c(100, 400, 900, 300), c(900, 600, 100, 300), c(200, 50, 700, 400))
+D_PD3 <- rbind(c(4, 12, 30, 9), c(30, 20, 5, 10), c(6, 2, 25, 14))
+R_PC2 <- em_de(E_PC2, D_PC2); R_PC4 <- em_de(E_PC4, D_PC4); R_PD2 <- em_de(E_PD2, D_PD2); R_PD3 <- em_de(E_PD3, D_PD3)
+
+verifier("I constantes (littéral de la spécification, § 5 et 4) : niveau 0,05, puissance 0,80, seuil 1,25 ; états de ecart_minimal ; lambda_80 = 7,848860509 à 1 ddl (mesure d'actuary-approfondi)", {
+  tous(constantes = if (identical(tablexp:::NIVEAU_ECART_MINIMAL, 0.05) && identical(tablexp:::PUISSANCE_ECART_MINIMAL, 0.80) &&
+                        identical(tablexp:::SEUIL_ECART_MINIMAL, 1.25)) TRUE else "constantes",
+       etats = if (identical(tablexp:::ETATS_ECART_MINIMAL_HOMOGENEITE,
+                             c("produite", "non_atteint", "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
+                               "segment_sans_exposition", "variance_nulle"))) TRUE else "états",
+       lambda = proche(L80_1, 7.848860509, 0, 5e-10),
+       puissance = proche(stats::pchisq(stats::qchisq(0.95, 1), 1, ncp = L80_1, lower.tail = FALSE), 0.80, 0, 1e-12),
+       ddl3 = proche(stats::pchisq(stats::qchisq(0.95, 3), 3, ncp = tablexp:::non_centralite_ecart_minimal(3),
+                                   lower.tail = FALSE), 0.80, 0, 1e-12))
+})
+verifier("I paramètres de l'étape (F218) : niveau_ecart_minimal, puissance_ecart_minimal, seuil_ecart_minimal (double) après convention, avant hypothese_nulle, égaux aux constantes", {
+  p <- H$parametres
+  k <- match(c("convention", "niveau_ecart_minimal", "puissance_ecart_minimal", "seuil_ecart_minimal", "hypothese_nulle"),
+             names(p))
+  identical(k, 4:8) && identical(p$niveau_ecart_minimal, tablexp:::NIVEAU_ECART_MINIMAL) &&
+    identical(p$puissance_ecart_minimal, tablexp:::PUISSANCE_ECART_MINIMAL) &&
+    identical(p$seuil_ecart_minimal, tablexp:::SEUIL_ECART_MINIMAL)
+})
+# Texte de la spécification, § 7 (theta_80_superieur), et ses quatre
+# substitutions pour theta_80_inferieur.
+STATUT_SUP_218 <- paste(
+  "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
+  "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
+  "sur les strates informatives du test global de D_.c (p_c(theta) - pi_c), p_jc(theta) = pi_jc w_j / somme sur k de",
+  "pi_kc w_k, w_s = theta, w_j = 1 sinon : espérance exacte de U sachant les D_.c sous le modèle de Poisson à exposition",
+  "tenue pour fixe ; V variance de U sous H0, même système réduit que le test global ; lambda_80 : non-centralité pour",
+  "laquelle la loi du khi-deux non centrale à ddl degrés de liberté (ddl du test global) dépasse le quantile d'ordre",
+  "1 - niveau_ecart_minimal de la loi centrale avec la probabilité puissance_ecart_minimal (conventions) ; la variance",
+  "de U sous l'alternative diffère de V : à deux segments en strate unique, en approximation normale, la puissance",
+  "réelle en theta_80 s'écarte de puissance_ecart_minimal de 0,03 au plus quand theta_80 est au plus",
+  "seuil_ecart_minimal, davantage au-delà, et la valeur est optimiste pour un segment minoritaire (theta_80 réel plus",
+  "éloigné de 1) ; au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80",
+  "(pchisq non centrale) et theta_80 (uniroot) par résolution numérique : approximation numérique ; état non_atteint",
+  "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
+  "lorsque theta tend vers l'infini ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+  "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
+verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux lignes ecart_minimal en fin (theta_80_superieur, theta_80_inferieur), textes exacts, inférieur par les quatre substitutions ; 15 lignes, UTF-8", {
+  s <- tablexp:::STATUTS_HOMOGENEITE
+  inf <- STATUT_SUP_218
+  for (r in list(c("plus petit theta > 1", "plus grand theta < 1"),
+                 c("quand theta_80 est au plus seuil_ecart_minimal", "quand theta_80 est au moins 1/seuil_ecart_minimal"),
+                 c("la valeur est optimiste pour un segment minoritaire (theta_80 réel plus éloigné de 1)",
+                   "la valeur est prudente pour un segment minoritaire (theta_80 réel plus proche de 1)"),
+                 c("lorsque theta tend vers l'infini", "lorsque theta tend vers 0"))) {
+    if (lengths(regmatches(inf, gregexpr(r[1L], inf, fixed = TRUE))) != 1L) return(paste("substitution non unique :", r[1L]))
+    inf <- sub(r[1L], r[2L], inf, fixed = TRUE)
+  }
+  tous(lignes = if (nrow(s) == 15L && identical(s$table[14:15], c("ecart_minimal", "ecart_minimal")) &&
+                    identical(s$grandeur[14:15], c("theta_80_superieur", "theta_80_inferieur"))) TRUE else "lignes",
+       sup = if (identical(s$statut[14L], STATUT_SUP_218)) TRUE else "texte de theta_80_superieur",
+       inf = if (identical(s$statut[15L], inf)) TRUE else "texte de theta_80_inferieur",
+       utf8 = if (all(Encoding(s$statut[14:15]) == "UTF-8")) TRUE else "encodage")
+})
+verifier("I table ecart_minimal (F218) : une ligne par segment dans l'ordre des lignes globales de segments, clés de segmentation, theta_80_superieur, etat_superieur, theta_80_inferieur, etat_inferieur ; types (double, character) ; aucune ligne de tranche", {
+  em <- H$resultat$ecart_minimal
+  g <- H$resultat$segments[H$resultat$segments$portee == "global", ]
+  identical(names(em), c("sexe", "theta_80_superieur", "etat_superieur", "theta_80_inferieur", "etat_inferieur")) &&
+    identical(em$sexe, g$sexe) && identical(vapply(em, typeof, ""), c(sexe = "character", theta_80_superieur = "double",
+                                                                       etat_superieur = "character", theta_80_inferieur = "double",
+                                                                       etat_inferieur = "character")) &&
+    identical(rownames(em), as.character(seq_len(nrow(em))))
+})
+verifier("I forme close à parts constantes (valeur calculée à la main), S = 2 : quatre valeurs à 1e-8", {
+  em <- R_PC2$resultat$ecart_minimal; Dt <- sum(D_PC2)
+  f1 <- forme_close(L80_1, Dt, 0.3); f2 <- forme_close(L80_1, Dt, 0.7)
+  tous(etats = if (all(c(em$etat_superieur, em$etat_inferieur) == "produite")) TRUE else "états",
+       s1 = proche(c(em$theta_80_superieur[1L], em$theta_80_inferieur[1L]), unname(f1), 0, 1e-8),
+       s2 = proche(c(em$theta_80_superieur[2L], em$theta_80_inferieur[2L]), unname(f2), 0, 1e-8))
+})
+verifier("I forme close à parts constantes (valeur calculée à la main), S = 4 (ddl 3) : huit valeurs à 1e-8", {
+  em <- R_PC4$resultat$ecart_minimal; Dt <- sum(D_PC4); l3 <- tablexp:::non_centralite_ecart_minimal(3)
+  f <- vapply(c(0.1, 0.2, 0.3, 0.4), function(pi) forme_close(l3, Dt, pi), c(superieur = 0, inferieur = 0))
+  tous(ddl = if (identical(R_PC4$resultat$tests$ddl[1L], 3L)) TRUE else "ddl",
+       etats = if (all(c(em$etat_superieur, em$etat_inferieur) == "produite")) TRUE else "états",
+       sup = proche(em$theta_80_superieur, f["superieur", ], 0, 1e-8),
+       inf = proche(em$theta_80_inferieur, f["inferieur", ], 0, 1e-8))
+})
+verifier("I S = 2 (identité exacte, parts différentes et constantes) : theta_80+ du segment 1 x theta_80- du segment 2 = 1, et réciproquement, à 1e-8", {
+  pr <- function(r) { em <- r$resultat$ecart_minimal
+    c(em$theta_80_superieur[1L] * em$theta_80_inferieur[2L], em$theta_80_inferieur[1L] * em$theta_80_superieur[2L]) }
+  tous(pd = proche(pr(R_PD2), c(1, 1), 0, 1e-8), pc = proche(pr(R_PC2), c(1, 1), 0, 1e-8))
+})
+verifier("I lambda_s(theta_80) = lambda_80 à 1e-8 en relatif sur chaque branche produite (recalcul indépendant, V complète et pseudo-inverse ; et système réduit du moteur), S = 2, 3, 4", {
+  e <- character(0)
+  for (cas in list(list(R_PC2, E_PC2, D_PC2), list(R_PC4, E_PC4, D_PC4), list(R_PD2, E_PD2, D_PD2),
+                   list(R_PD3, E_PD3, D_PD3))) {
+    em <- cas[[1L]]$resultat$ecart_minimal; E <- cas[[2L]]; Dm <- cas[[3L]]
+    l80 <- tablexp:::non_centralite_ecart_minimal(lambda_independant(E, Dm, 1L, 1)$ddl)
+    for (s in seq_len(nrow(E))) for (th in c(em$theta_80_superieur[s], em$theta_80_inferieur[s])) {
+      if (is.na(th)) { e <- c(e, "branche non produite"); next }
+      li <- lambda_independant(E, Dm, s, th)$lambda; lm <- lambda_moteur(E, Dm, s, th)$lambda
+      if (abs(li / l80 - 1) > 1e-8 || abs(lm / l80 - 1) > 1e-8)
+        e <- c(e, sprintf("S = %d, segment %d, theta %.10f : %.3e, %.3e", nrow(E), s, th, li / l80 - 1, lm / l80 - 1))
+    }
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I premier ordre (identité asymptotique) : lambda_s(1 + h) / (h^2 V_ss) à 1e-4 de 1 pour h = 1e-6 et h = -1e-6, chaque segment, S = 3 à parts différentes (système réduit du moteur)", {
+  r <- unlist(lapply(1:3, function(s) vapply(c(1e-6, -1e-6), function(h) {
+    l <- lambda_moteur(E_PD3, D_PD3, s, 1 + h); l$lambda / (h^2 * l$v[s]) }, 0)))
+  proche(r, rep(1, 6L), 0, 1e-4)
+})
+verifier("I monotonie et extrémalité (contrôle sur un cas, non démonstratif (monotonie non établie à S > 2 sur plusieurs strates)) : lambda_s(theta) < lambda_80 entre 1 et theta_80 sur chaque branche (grille de 50 points), S = 3 à parts différentes", {
+  em <- R_PD3$resultat$ecart_minimal
+  l80 <- tablexp:::non_centralite_ecart_minimal(2L)
+  ok <- vapply(1:3, function(s) {
+    g <- c(seq(1, em$theta_80_superieur[s], length.out = 52L)[2:51], seq(em$theta_80_inferieur[s], 1, length.out = 52L)[2:51])
+    all(vapply(g, function(th) lambda_independant(E_PD3, D_PD3, s, th)$lambda, 0) < l80)
+  }, NA)
+  if (all(ok)) TRUE else paste("segments", paste(which(!ok), collapse = ", "))
+})
+verifier("I état non_atteint (valeur calculée à la main) : S = 2, une cellule, E = (10, 90), D = (2, 18) : branche - du segment 1 et branche + du segment 2 non_atteint (limite lambda = 20/9 < lambda_80), valeurs NA ; autres branches produites ; signal pour 2 segments", {
+  r <- em_de(matrix(c(10, 90), 2L), matrix(c(2, 18), 2L)); em <- r$resultat$ecart_minimal
+  a <- r$avertissements
+  tous(etats = if (identical(em$etat_superieur, c("produite", "non_atteint")) &&
+                   identical(em$etat_inferieur, c("non_atteint", "produite"))) TRUE
+               else paste(c(em$etat_superieur, em$etat_inferieur), collapse = ", "),
+       na = if (is.na(em$theta_80_inferieur[1L]) && is.na(em$theta_80_superieur[2L]) &&
+                is.finite(em$theta_80_superieur[1L]) && is.finite(em$theta_80_inferieur[2L])) TRUE else "valeurs",
+       limite = proche(lambda_independant(matrix(c(10, 90), 2L), matrix(c(2, 18), 2L), 1L, 1e-12)$lambda, 20 / 9, 1e-9, 0),
+       signal = if (identical(a$code, "ecart_minimal_detectable") && identical(a$nombre, 2L)) TRUE else "signal")
+})
+# Seuil de non_atteint (reprise de l'audit, M1 ; règle d'actuary) : S = 2,
+# une cellule, D = 1, E = (1, a) puis (a, 1), a = lambda_80 (1 + eps) ; la
+# limite de lambda vaut a sur la branche + du segment de part 1 / (1 + a) et
+# sur la branche - de l'autre (1 / a < lambda_80 sur les deux autres
+# branches). Le segment 1 est le groupe de référence du système réduit (hors
+# de garde), le segment 2 y est : chaque branche est éprouvée dans les deux
+# rôles. eps <= 1e-9 : non_atteint (seuil inclusif lambda_80 (1 + 1e-8)) ;
+# eps >= 2e-8 : produite, theta fini, postcondition recalculée.
+seuil_218 <- function(eps) {
+  a <- L80_1 * (1 + eps)
+  list(A = em_de(matrix(c(1, a), 2L), matrix(c(1, 0), 2L)), B = em_de(matrix(c(a, 1), 2L), matrix(c(1, 0), 2L)),
+       EA = matrix(c(1, a), 2L), EB = matrix(c(a, 1), 2L))
+}
+verifier("I seuil de non_atteint (valeur calculée à la main) : eps dans {0, 1e-14, 1e-13, 1e-9} -> non_atteint et NA sur chaque branche, segment de référence ou non, sans erreur ; signal ecart_minimal_detectable", {
+  e <- character(0)
+  for (eps in c(0, 1e-14, 1e-13, 1e-9)) {
+    r <- tryCatch(seuil_218(eps), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, sprintf("eps %g : erreur %s", eps, conditionMessage(r))); next }
+    a <- r$A$resultat$ecart_minimal; b <- r$B$resultat$ecart_minimal
+    ok <- identical(c(a$etat_superieur, a$etat_inferieur, b$etat_superieur, b$etat_inferieur), rep("non_atteint", 8L)) &&
+      all(is.na(c(a$theta_80_superieur, a$theta_80_inferieur, b$theta_80_superieur, b$theta_80_inferieur))) &&
+      identical(r$A$avertissements$code, "ecart_minimal_detectable") && identical(r$A$avertissements$nombre, 2L) &&
+      identical(r$B$avertissements$code, "ecart_minimal_detectable") && identical(r$B$avertissements$nombre, 2L)
+    if (!ok) e <- c(e, sprintf("eps %g : %s", eps, paste(c(a$etat_superieur, a$etat_inferieur, b$etat_superieur,
+                                                             b$etat_inferieur), collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I seuil de non_atteint (valeur calculée à la main) : eps dans {2e-8, 1e-6} -> produite, theta fini (theta+ > 1, 0 < theta- < 1), postcondition recalculée (recalcul indépendant) ; même résultat que le segment soit ou non le groupe de référence", {
+  e <- character(0)
+  for (eps in c(2e-8, 1e-6)) {
+    r <- seuil_218(eps)
+    a <- r$A$resultat$ecart_minimal; b <- r$B$resultat$ecart_minimal
+    # Branches au seuil : A, segment 1 (+) et segment 2 (-) ; B, segment 2 (+) et segment 1 (-).
+    th <- c(a$theta_80_superieur[1L], b$theta_80_superieur[2L], a$theta_80_inferieur[2L], b$theta_80_inferieur[1L])
+    et <- c(a$etat_superieur[1L], b$etat_superieur[2L], a$etat_inferieur[2L], b$etat_inferieur[1L])
+    rel <- c(lambda_independant(r$EA, matrix(c(1, 0), 2L), 1L, th[1L])$lambda,
+             lambda_independant(r$EB, matrix(c(1, 0), 2L), 2L, th[2L])$lambda,
+             lambda_independant(r$EA, matrix(c(1, 0), 2L), 2L, th[3L])$lambda,
+             lambda_independant(r$EB, matrix(c(1, 0), 2L), 1L, th[4L])$lambda) / L80_1 - 1
+    if (!all(et == "produite") || !all(is.finite(th)) || !all(th[1:2] > 1) || !all(th[3:4] > 0 & th[3:4] < 1))
+      e <- c(e, sprintf("eps %g : états ou valeurs (%s ; %s)", eps, paste(et, collapse = ", "), paste(format(th), collapse = ", ")))
+    else if (any(abs(rel) > 1e-8)) e <- c(e, sprintf("eps %g : postcondition %s", eps, paste(format(rel), collapse = ", ")))
+    else if (abs(th[1L] / th[2L] - 1) > 1e-6 || abs(th[3L] / th[4L] - 1) > 1e-6)
+      e <- c(e, sprintf("eps %g : résultat selon le rôle du segment (%s)", eps, paste(format(th, digits = 15), collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Limite en forme close (reprise de l'audit, m2) : S = 2, une cellule, D = 8,
+# parts pi et 1 - pi, (1 - pi) / pi = lambda_80 (1,002) / 8 : lambda(infini) =
+# 1,002 lambda_80, lambda(1000) < lambda_80 ; theta+ du segment 1 > 1000,
+# égal à la forme close. Une évaluation à theta fini (t = 0,999, theta = 1000)
+# au lieu de la limite rendrait non_atteint.
+verifier("I limite theta -> infini en forme close (valeur calculée à la main) : lambda(1000) < lambda_80 < lambda(infini) ; theta+ produit, > 1000, égal à la forme close à 1e-6", {
+  pi <- 1 / (1 + L80_1 * 1.002 / 8)
+  E <- matrix(1000 * c(pi, 1 - pi), 2L); Dm <- matrix(c(4, 4), 2L)
+  r <- em_de(E, Dm); em <- r$resultat$ecart_minimal
+  l1000 <- lambda_independant(E, Dm, 1L, 1000)$lambda
+  tous(cas = if (l1000 < L80_1 && lambda_independant(E, Dm, 1L, 1e12)$lambda > L80_1) TRUE else sprintf("lambda(1000) = %.6f", l1000),
+       etat = if (identical(em$etat_superieur[1L], "produite") && em$theta_80_superieur[1L] > 1000) TRUE
+              else paste(em$etat_superieur[1L], em$theta_80_superieur[1L]),
+       valeur = proche(em$theta_80_superieur[1L], forme_close(L80_1, 8, pi)[["superieur"]], 1e-6, 0))
+})
+verifier("I états hérités (valeur calculée à la main) : evenement_sans_exposition et moins_de_deux_segments_informatifs du test global ; segment_sans_exposition et variance_nulle de la ligne globale du segment ; valeurs NA ; aucun signal", {
+  em_e <- function(e) homog(e, "sexe", c(50, 54), c(50, 52))
+  r_ev <- em_e(rbind(EXPO_C, data.frame(sexe = "X", age = 52L, exposition_centrale = 0, evenements = 2L)))
+  e2 <- EXPO_C[EXPO_C$sexe == "F", ]
+  r_md <- em_e(rbind(e2, data.frame(sexe = "H", age = 53L, exposition_centrale = 100, evenements = 0L)))
+  r_se <- em_e(rbind(EXPO_C, data.frame(sexe = "X", age = 40L, exposition_centrale = 500, evenements = 3L)))
+  # Segment X exposé dans la seule cellule sans décès (âge 53) : V_XX = 0.
+  r_vn <- em_e(rbind(EXPO_C, data.frame(sexe = "X", age = 53L, exposition_centrale = 100, evenements = 0L)))
+  et <- function(r) paste(r$resultat$ecart_minimal$etat_superieur, r$resultat$ecart_minimal$etat_inferieur, sep = "/")
+  sans_signal <- function(r) !"ecart_minimal_detectable" %in% r$avertissements$code
+  tous(ev = if (identical(et(r_ev), rep("evenement_sans_exposition/evenement_sans_exposition", 3L))) TRUE else et(r_ev),
+       md = if (identical(et(r_md), rep("moins_de_deux_segments_informatifs/moins_de_deux_segments_informatifs", 2L))) TRUE
+            else et(r_md),
+       se = if (identical(et(r_se), c("produite/produite", "produite/produite", "segment_sans_exposition/segment_sans_exposition")))
+              TRUE else et(r_se),
+       vn = if (identical(et(r_vn), c("produite/produite", "produite/produite", "variance_nulle/variance_nulle"))) TRUE
+            else et(r_vn),
+       na = if (all(is.na(unlist(r_ev$resultat$ecart_minimal[c("theta_80_superieur", "theta_80_inferieur")]))) &&
+                all(is.na(unlist(r_md$resultat$ecart_minimal[c("theta_80_superieur", "theta_80_inferieur")]))) &&
+                is.na(r_se$resultat$ecart_minimal$theta_80_superieur[3L]) &&
+                is.na(r_vn$resultat$ecart_minimal$theta_80_inferieur[3L])) TRUE else "valeurs non NA",
+       # Les segments F et H gardent leurs valeurs : le test global est inchangé.
+       fh = proche(r_se$resultat$ecart_minimal$theta_80_superieur[1:2], RC$resultat$ecart_minimal$theta_80_superieur,
+                   1e-14, 0),
+       signal = if (sans_signal(r_ev) && sans_signal(r_md)) TRUE else "signal sur un état hérité")
+})
+verifier("I exposition à 0 ligne (#201) : ecart_minimal à 0 ligne, mêmes types de colonnes que sur une période exposée", {
+  e0 <- homog(X$etapes$exposition$resultat$exposition[0L, ], "sexe", HOM$plage_ages, HOM$tranches_age)$resultat$ecart_minimal
+  e1 <- H$resultat$ecart_minimal
+  if (nrow(e0) == 0L && nrow(e1) > 0L && identical(vapply(e0, typeof, ""), vapply(e1, typeof, ""))) TRUE else
+    paste(nrow(e0), paste(vapply(e0, typeof, ""), collapse = "/"))
+})
+# Signal (critère 5) : S = 2, une cellule, parts 0,2 / 0,8. À D = 1000 :
+# r = 0,2215 ; segment 1 : theta- = 0,7879 < 0,8 (signal), theta+ = 1,2318 <
+# 1,25 ; segment 2 : theta+ = 1,2692 > 1,25 (signal), theta- = 0,8118 > 0,8.
+# À D = 2000 : aucune branche au-delà du seuil.
+MESSAGE_218 <- paste("Homogénéité : 2 segment(s) pour lesquels le test global n'atteint pas la puissance 0,80 au niveau 0,05",
+                     "face à un écart de force d'un facteur 1,25 ou 1/1,25 (theta_80_superieur > 1,25, theta_80_inferieur <",
+                     "1/1,25 ou branche non_atteint ; etapes/homogeneite/resultat/ecart_minimal) : approximation",
+                     "asymptotique, seuil conventionnel ; avertissement, ni refus ni verdict.")
+verifier("I signal (critère 5, valeur calculée à la main) : de part et d'autre du seuil sur chaque branche ; code ecart_minimal_detectable, étape homogeneite, nombre de segments signalés, message littéral de la spécification ; jamais un refus", {
+  r1 <- em_de(matrix(c(200, 800), 2L), matrix(c(200, 800), 2L)); em <- r1$resultat$ecart_minimal
+  r2 <- em_de(matrix(c(200, 800), 2L), matrix(c(400, 1600), 2L))
+  a <- r1$avertissements
+  tous(valeurs = proche(c(em$theta_80_inferieur[1L], em$theta_80_superieur[1L], em$theta_80_superieur[2L],
+                          em$theta_80_inferieur[2L]),
+                        c(forme_close(L80_1, 1000, 0.2)[c("inferieur", "superieur")], forme_close(L80_1, 1000, 0.8)), 0, 1e-8),
+       cote = if (em$theta_80_inferieur[1L] < 0.8 && em$theta_80_superieur[1L] < 1.25 && em$theta_80_superieur[2L] > 1.25 &&
+                  em$theta_80_inferieur[2L] > 0.8) TRUE else "valeurs du mauvais côté du seuil",
+       signal = if (identical(a$etape, "homogeneite") && identical(a$code, "ecart_minimal_detectable") &&
+                    identical(a$nombre, 2L)) TRUE else "avertissement",
+       message = if (identical(a$message, MESSAGE_218) && identical(Encoding(a$message), "UTF-8")) TRUE else a$message,
+       sans = if (!nrow(r2$avertissements) &&
+                  all(r2$resultat$ecart_minimal$theta_80_superieur < 1.25) &&
+                  all(r2$resultat$ecart_minimal$theta_80_inferieur > 0.8)) TRUE else "signal à D = 2000")
+})
+verifier("I signal (critère 5) : un seul segment au-delà du seuil (S = 3, une cellule, parts 0,1 / 0,45 / 0,45, D = 1500) -> nombre 1 ; theta- du segment 1 sous 1/1,25, segments 2 et 3 dans le seuil", {
+  r <- em_de(matrix(c(100, 450, 450), 3L), matrix(c(150, 675, 675), 3L)); em <- r$resultat$ecart_minimal
+  l2 <- tablexp:::non_centralite_ecart_minimal(2L)
+  sig <- em$theta_80_superieur > 1.25 | em$theta_80_inferieur < 0.8
+  tous(valeurs = proche(c(em$theta_80_superieur, em$theta_80_inferieur),
+                        c(vapply(c(0.1, 0.45, 0.45), function(p) forme_close(l2, 1500, p)[["superieur"]], 0),
+                          vapply(c(0.1, 0.45, 0.45), function(p) forme_close(l2, 1500, p)[["inferieur"]], 0)), 0, 1e-8),
+       sig = if (identical(sig, c(TRUE, FALSE, FALSE))) TRUE else paste(sig, collapse = ", "),
+       nombre = if (identical(r$avertissements$nombre, 1L) &&
+                    startsWith(r$avertissements$message, "Homogénéité : 1 segment(s) pour lesquels")) TRUE else "nombre")
+})
+verifier("I signal (identité exacte) : construction plan_h() de la batterie (20 000 têtes, sexe) sans signal", {
+  !"ecart_minimal_detectable" %in% X$avertissements$code
+})
+# Critère 3 (calcul exact, sans graine) : S = 2, strate unique, O ~ Bin(D,
+# p(theta)), p(theta) = pi theta / (1 + pi (theta - 1)) ; rejet si T =
+# (O - D pi)^2 / (D pi (1 - pi)) >= quantile 0,95 du khi-deux à 1 ddl ;
+# theta_80(D) du moteur (ecart_minimal_homogeneite() sur score_homogeneite()
+# d'une cellule) ; D_0 = arrondi de lambda_80 / (pi (1 - pi) r_c^2), r_c =
+# |c - 1| / (1 + pi (c - 1)), fenêtre D_0 - 20 à D_0 + 20.
+puissance_exacte_218 <- function(pi, cible) {
+  q <- stats::qchisq(0.95, 1)
+  rc <- abs(cible - 1) / (1 + pi * (cible - 1))
+  D0 <- round(L80_1 / (pi * (1 - pi) * rc^2))
+  vapply((D0 - 20):(D0 + 20), function(Dt) {
+    sc <- tablexp:::score_homogeneite(c(round(Dt * pi), Dt - round(Dt * pi)), c(pi, 1 - pi), c(1L, 1L), 1:2, 1L, 2L)
+    em <- tablexp:::ecart_minimal_homogeneite(sc, "produite", c("produite", "produite"), 2L)
+    th <- if (cible > 1) em$superieur[1L] else em$inferieur[1L]
+    p <- pi * th / (1 + pi * (th - 1))
+    k <- 0:Dt
+    sum(stats::dbinom(k, Dt, p)[(k - Dt * pi)^2 / (Dt * pi * (1 - pi)) >= q])
+  }, 0)
+}
+verifier("I critère 3 (calcul exact sans aléa) : puissance exacte en theta_80(D) dans [0,75 ; 0,85] pour chaque D de la fenêtre, moyenne dans [0,76 ; 0,84] ; sous 0,80 pour la cible 1,25 et au-dessus pour la cible 0,80 quand pi < 0,5 ; moyenne dans [0,79 ; 0,81] à pi = 0,5", {
+  e <- character(0)
+  for (pi in c(0.5, 0.25, 0.10, 0.02)) for (cible in c(1.25, 0.80)) {
+    pw <- puissance_exacte_218(pi, cible); m <- mean(pw)
+    lib <- sprintf("pi = %.2f, cible %.2f (min %.4f, max %.4f, moyenne %.4f)", pi, cible, min(pw), max(pw), m)
+    if (any(pw < 0.75 | pw > 0.85)) e <- c(e, paste(lib, ": puissance hors de [0,75 ; 0,85]"))
+    if (m < 0.76 || m > 0.84) e <- c(e, paste(lib, ": moyenne hors de [0,76 ; 0,84]"))
+    if (pi == 0.5 && (m < 0.79 || m > 0.81)) e <- c(e, paste(lib, ": moyenne hors de [0,79 ; 0,81]"))
+    if (pi < 0.5 && ((cible > 1 && !(m < 0.80)) || (cible < 1 && !(m > 0.80)))) e <- c(e, paste(lib, ": sens"))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Textes du rapport (spécification, § 8 ; M546, P1-c).
+verifier("I MENTIONS_RAPPORT (littéral de la spécification, § 8) : suffisance_intro, suffisance_homogeneite, suffisance_homogeneite_absente ; homogeneite_portee : deux premières phrases inchangées, puis l'écart minimal détectable", {
+  m <- tablexp:::MENTIONS_RAPPORT
+  intro <- paste("Indicateurs de suffisance (E2.15 : exposition et événements par âge et par segment, largeur des intervalles,",
+                 "écart minimal détectable du test d'homogénéité) : ils signalent ce que les données portent, sans rien",
+                 "interdire. Le rapport n'en calcule aucun lui-même ; ceux que l'objet porte sont aux chemins suivants :")
+  oui <- paste("Écart minimal détectable par segment du test d'homogénéité : etapes/homogeneite/resultat/ecart_minimal",
+               "(section Étape homogeneite) ; signal ecart_minimal_detectable aux avertissements.")
+  non <- "Écart minimal détectable par segment du test d'homogénéité : non demandé par le plan."
+  portee <- paste(
+    "Test d'homogénéité entre segments : hypothèse nulle, dans chaque cellule de la plage (âge, et année civile si",
+    "par_annee), un taux commun à tous les segments, sur l'exposition centrale ; tests du score conditionnels aux décès",
+    "de chaque strate : la cellule (global, par tranche d'âge déclarée) ou la cellule croisée avec la modalité de",
+    "l'autre variable (par variable de segmentation conditionnellement à l'autre). Diagnostic sans verdict ni seuil :",
+    "un test non significatif n'établit pas l'homogénéité, surtout sur une base modeste ; la décision de regrouper",
+    "reste à l'utilisateur et se déclare par la segmentation du plan. Aucune correction de multiplicité. Écart",
+    "minimal détectable (etapes/homogeneite/resultat/ecart_minimal) : pour chaque segment, le facteur theta appliqué",
+    "à sa seule force dans toutes les cellules que le test global détecterait avec la puissance",
+    "puissance_ecart_minimal au niveau niveau_ecart_minimal (conventions, etapes/homogeneite/parametres), en deux",
+    "branches (theta > 1, theta < 1), conditionnellement aux décès de chaque strate ; approximation asymptotique ; il",
+    "mesure ce que les données portent, sans rien dire de l'homogénéité réelle. Le signal ecart_minimal_detectable",
+    "(seuil conventionnel seuil_ecart_minimal) est un avertissement, pas un verdict : aucune p-valeur n'est comparée",
+    "à un niveau.")
+  tous(intro = if (identical(m[["suffisance_intro"]], intro)) TRUE else "suffisance_intro",
+       oui = if (identical(m[["suffisance_homogeneite"]], oui)) TRUE else "suffisance_homogeneite",
+       non = if (identical(m[["suffisance_homogeneite_absente"]], non)) TRUE else "suffisance_homogeneite_absente",
+       portee = if (identical(m[["homogeneite_portee"]], portee)) TRUE else "homogeneite_portee")
+})
+verifier("I rapport figé : section suffisance, élément de l'écart minimal détectable après celui du brut, avant la largeur (étape au plan, puis absente) ; section etape_homogeneite : table etapes/homogeneite/resultat/ecart_minimal", {
+  m <- tablexp:::MENTIONS_RAPPORT
+  li <- function(k) paste0("<li>", tablexp:::echapper_html(m[[k]]), "</li>")
+  s1 <- section(lignes_rapport(X), "suffisance")
+  s0 <- section(lignes_rapport(construire_table(JEU, ROLES, plan_h(hom = NULL))), "suffisance")
+  # Plan de la batterie sans étape brut : élément suffisance_brut_absente.
+  k1 <- match(c(li("suffisance_brut_absente"), li("suffisance_homogeneite"), li("largeur")), s1)
+  k0 <- match(c(li("suffisance_brut_absente"), li("suffisance_homogeneite_absente"), li("largeur")), s0)
+  tous(intro = if (any(s1 == paste0("<p>", tablexp:::echapper_html(m[["suffisance_intro"]]), "</p>")) &&
+                   any(s0 == paste0("<p>", tablexp:::echapper_html(m[["suffisance_intro"]]), "</p>"))) TRUE else "intro",
+       au_plan = if (!anyNA(k1) && identical(diff(k1), c(1L, 1L)) && !li("suffisance_homogeneite_absente") %in% s1) TRUE
+                 else "élément (étape au plan)",
+       absente = if (!anyNA(k0) && identical(diff(k0), c(1L, 1L)) && !li("suffisance_homogeneite") %in% s0) TRUE
+                 else "élément (étape absente)",
+       table = if (any(startsWith(section(lignes_rapport(X), "etape_homogeneite"),
+                                  "<caption><code>etapes/homogeneite/resultat/ecart_minimal</code>"))) TRUE else "table")
 })

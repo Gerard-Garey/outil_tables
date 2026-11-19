@@ -294,6 +294,21 @@ TOLERANCES <- c(
   # z = U / sqrt(v) et pchisq(T, ddl)
   "homogeneite/resultat/tests/statistique" = 1e-10, "homogeneite/resultat/tests/p_asymptotique" = 1e-10,
   "homogeneite/resultat/segments/z" = 1e-10,
+  # Écart minimal détectable (#218) : constantes du package restituées dans
+  # les paramètres, exactes (spécification d'actuary-approfondi, § 5) ;
+  # theta_80, racine (uniroot) de lambda_s(theta) = lambda_80, lambda_s étant
+  # la statistique du score (même système réduit) appliquée à delta(theta) =
+  # D_.c (p(theta) - pi) : une erreur relative eps de lambda_s donne sur
+  # theta_80 une erreur relative d'environ eps |theta - 1| / 2 au premier
+  # ordre (exactement eps |theta - 1| (1 + pi (theta - 1)) / (2 theta) à deux
+  # segments en strate unique) ; rapport mesuré sur R11 : 0,043 (0,0432 à
+  # 0,0435 selon le segment et la branche) ;
+  # réexamen si un plan donne theta_80 très loin de 1 ; classe de la
+  # statistique, 1e-10 (avis d'actuary ; ADR 0009, point 9.3).
+  "homogeneite/parametres/niveau_ecart_minimal" = 0, "homogeneite/parametres/puissance_ecart_minimal" = 0,
+  "homogeneite/parametres/seuil_ecart_minimal" = 0,
+  "homogeneite/resultat/ecart_minimal/theta_80_superieur" = 1e-10,
+  "homogeneite/resultat/ecart_minimal/theta_80_inferieur" = 1e-10,
   # Lissage de Whittaker-Henderson (#223, #225 ; R15 à R17) et ddl effectifs
   # de la validation `lissee` (#224) : clés de l'ADR 0009, annotation du
   # 12/11/2026, (e) (liste d'actuary-approfondi). Toute clé commence par

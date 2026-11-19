@@ -1854,8 +1854,61 @@ REFERENCE_METHODE_HOMOGENEITE <- texte_moteur(paste(
   "degrés de liberté pris au rang de V (K - 1 dans la source), tests par tranche d'âge et leur somme, p-valeur",
   "exacte bilatérale à deux groupes et p-valeur de Monte-Carlo conditionnelle, absents de la source"))
 
+# Écart minimal détectable par segment du test global (#218, E2.15 ;
+# spécification d'actuary-approfondi, commentaire 7012205013 ; avis de forme
+# F218, M545, D4 (a)) : conventions du package (niveau du test, puissance
+# visée, seuil du signal ecart_minimal_detectable), restituées dans les
+# paramètres de l'étape ; ce ne sont pas des paramètres du plan (format du
+# plan et VERSION_FICHE inchangés). Seuil : décision du mainteneur du
+# 11/11/2026, convention sans source chiffrée.
+NIVEAU_ECART_MINIMAL <- 0.05
+PUISSANCE_ECART_MINIMAL <- 0.80
+SEUIL_ECART_MINIMAL <- 1.25
+# États d'une branche de resultat$ecart_minimal, par priorité : état du test
+# global s'il n'est pas produit (evenement_sans_exposition,
+# moins_de_deux_segments_informatifs) ; sinon état de la ligne globale du
+# segment dans resultat$segments s'il n'est pas produit
+# (segment_sans_exposition, variance_nulle ; evenement_sans_exposition) ;
+# sinon produite, ou non_atteint quand la limite de lambda_s(theta) au bout
+# de la branche reste au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL). Valeur
+# NA hors de l'état produite.
+ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "evenement_sans_exposition",
+                                     "moins_de_deux_segments_informatifs", "segment_sans_exposition",
+                                     "variance_nulle")
+# Postcondition de la résolution : |lambda_s(theta_80) / lambda_80 - 1| au
+# plus cette valeur (identité du critère 2 de #218), sinon erreur de
+# programmation.
+TOLERANCE_ECART_MINIMAL <- 1e-8
+# Statut des deux branches de theta_80 (spécification, § 7 ; clause
+# d'indépendance, Q3) : un gabarit, quatre substitutions d'une branche à
+# l'autre.
+statut_ecart_minimal <- function(superieur) {
+  paste("approximation asymptotique :", if (superieur) "plus petit theta > 1" else "plus grand theta < 1",
+        "tel que lambda_s(theta) >= lambda_80, theta multipliant la force du seul segment s dans chaque cellule ;",
+        "lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme sur les strates informatives",
+        "du test global de D_.c (p_c(theta) - pi_c), p_jc(theta) = pi_jc w_j / somme sur k de pi_kc w_k, w_s =",
+        "theta, w_j = 1 sinon : espérance exacte de U sachant les D_.c sous le modèle de Poisson à exposition tenue",
+        "pour fixe ; V variance de U sous H0, même système réduit que le test global ; lambda_80 : non-centralité",
+        "pour laquelle la loi du khi-deux non centrale à ddl degrés de liberté (ddl du test global) dépasse le",
+        "quantile d'ordre 1 - niveau_ecart_minimal de la loi centrale avec la probabilité puissance_ecart_minimal",
+        "(conventions) ; la variance de U sous l'alternative diffère de V : à deux segments en strate unique, en",
+        "approximation normale, la puissance réelle en theta_80 s'écarte de puissance_ecart_minimal de 0,03 au plus",
+        if (superieur) "quand theta_80 est au plus seuil_ecart_minimal,"
+        else "quand theta_80 est au moins 1/seuil_ecart_minimal,",
+        "davantage au-delà, et",
+        if (superieur) "la valeur est optimiste pour un segment minoritaire (theta_80 réel plus éloigné de 1) ;"
+        else "la valeur est prudente pour un segment minoritaire (theta_80 réel plus proche de 1) ;",
+        "au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80 (pchisq",
+        "non centrale) et theta_80 (uniroot) par résolution numérique : approximation numérique ; état non_atteint",
+        "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution",
+        if (superieur) "numérique, lorsque theta tend vers l'infini ;" else "numérique, lorsque theta tend vers 0 ;",
+        "unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et theta_80 est",
+        "trop proche de 1 (écart minimal détectable sous-estimé)")
+}
+
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
-# segments) ; spécification de #168, § 4.
+# segments, ecart_minimal) ; spécification de #168, § 4 ; deux lignes de
+# ecart_minimal en fin (#218, spécification, § 7).
 STATUTS_HOMOGENEITE <- local({
   ind <- INDEPENDANCE_HOMOGENEITE
   l <- list(
@@ -1909,7 +1962,9 @@ STATUTS_HOMOGENEITE <- local({
     c("segments", "z",
       paste("z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous",
             "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ;",
-            "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;", ind)))
+            "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;", ind)),
+    c("ecart_minimal", "theta_80_superieur", statut_ecart_minimal(TRUE)),
+    c("ecart_minimal", "theta_80_inferieur", statut_ecart_minimal(FALSE)))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
                           statut = vapply(l, `[`, "", 3L), stringsAsFactors = FALSE))
 })
@@ -1958,8 +2013,10 @@ somme_par <- function(x, i, n) {
 # utilisee (logique par ligne), presents, garde, ddl, strates_informatives,
 # statistique (fonction d'une matrice de décès des lignes utilisées, une
 # colonne par jeu ; observé et répliques passent par elle), t (observée),
-# poids, strate_tirage, effectifs (pour les réplications), exacte (list(n,
-# p, o, a) quand deux groupes seulement sont comparés, NULL sinon)).
+# poids, strate_tirage, effectifs (pour les réplications), groupe_utilise
+# (groupe de chaque ligne utilisée, pour l'écart minimal détectable, #218),
+# exacte (list(n, p, o, a) quand deux groupes seulement sont comparés, NULL
+# sinon)).
 score_homogeneite <- function(D, E, strate, groupe, K, G) {
   D <- as.numeric(D)
   Ds <- somme_par(D, strate, K)
@@ -2001,7 +2058,7 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
   list(O = somme_par(D, groupe, G), A = somme_par(Ar, groupe, G), U = somme_par(Du - Au, gu, G), v = diag(V),
        utilisee = u, presents = presents, garde = garde, ddl = ddl, strates_informatives = length(si),
        statistique = statistique, t = if (ddl) statistique(matrix(Du, ncol = 1L)) else NA_real_,
-       poids = E[u], strate_tirage = ru, effectifs = Ds[si], exacte = exacte)
+       poids = E[u], strate_tirage = ru, effectifs = Ds[si], groupe_utilise = gu, exacte = exacte)
 }
 
 # p-valeur exacte d'un test produit (score_homogeneite()) : deux groupes
@@ -2021,6 +2078,83 @@ p_exacte_homogeneite <- function(sc) {
   list(p = min(1, sum(loi[ext])), etat = "produite")
 }
 
+# Non-centralité lambda_80 (#218, spécification, § 2) : P(khi2_ddl(lambda) >
+# quantile d'ordre 1 - niveau de khi2_ddl) = puissance ; uniroot sur
+# [0 ; haut], haut trouvé par doublement à partir de 1 (approximation
+# numérique).
+non_centralite_ecart_minimal <- function(ddl, niveau = NIVEAU_ECART_MINIMAL, puissance = PUISSANCE_ECART_MINIMAL) {
+  q <- stats::qchisq(1 - niveau, ddl)
+  f <- function(l) stats::pchisq(q, ddl, ncp = l, lower.tail = FALSE) - puissance
+  haut <- 1
+  while (f(haut) <= 0) haut <- 2 * haut
+  stats::uniroot(f, c(0, haut), tol = 1e-13)$root
+}
+
+# Écart minimal détectable par segment du test global (#218 ; E2.15 ;
+# spécification d'actuary-approfondi, commentaire 7012205013, § 2 et 4 ;
+# avis de forme F218). sc : objet de score_homogeneite() du test global (un
+# seul système réduit : lambda_s(theta) = sc$statistique() appliquée aux
+# décès attendus sous l'alternative, D_.c p_jc(theta), sur les lignes
+# utilisées) ; etat_test : état du test global ; etats_segments : états des
+# lignes globales de resultat$segments (un par segment, 1..S). Branche + :
+# t = 1 - 1/theta dans [0 ; 1], limite theta -> infini en t = 1 ; branche - :
+# theta dans [0 ; 1], limite theta -> 0 en 0 ; limites en forme close (p = 1
+# pour s et 0 pour les autres, ou p = 0 pour s et pi_j / (1 - pi_sc) pour les
+# autres, dans chaque strate où s est exposé ; p = pi ailleurs) ; non_atteint
+# si la limite ne dépasse pas lambda_80 (1 + TOLERANCE_ECART_MINIMAL). Postcondition
+# |lambda_s(theta_80) / lambda_80 - 1| <= TOLERANCE_ECART_MINIMAL, sinon
+# stop() (erreur de programmation). Rend list(superieur, etat_superieur,
+# inferieur, etat_inferieur, lambda_80), vecteurs de longueur S (lambda_80 :
+# NA si le test global n'est pas produit).
+ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
+  sup <- rep(NA_real_, S); inf <- rep(NA_real_, S)
+  e_sup <- rep(etat_test, S); e_inf <- rep(etat_test, S)
+  if (!identical(etat_test, "produite"))
+    return(list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf,
+                lambda_80 = NA_real_))
+  e_sup <- etats_segments; e_inf <- etats_segments
+  lam80 <- non_centralite_ecart_minimal(sc$ddl)
+  ru <- sc$strate_tirage; gu <- sc$groupe_utilise
+  n <- length(sc$effectifs)
+  Dc <- sc$effectifs[ru]
+  pi <- sc$poids / somme_par(sc$poids, ru, n)[ru]
+  lambda <- function(p) sc$statistique(matrix(Dc * p, ncol = 1L))
+  for (s in which(etats_segments == "produite")) {
+    dans_s <- gu == s
+    pis <- somme_par(pi[dans_s], ru[dans_s], n)[ru]
+    expose <- pis > 0
+    p_theta <- function(theta) {
+      pw <- pi * ifelse(dans_s, theta, 1)
+      pw / somme_par(pw, ru, n)[ru]
+    }
+    p_infini <- pi; p_infini[expose] <- ifelse(dans_s[expose], pi[expose] / pis[expose], 0)
+    p_zero <- pi; p_zero[expose] <- ifelse(dans_s[expose], 0, pi[expose] / (1 - pis[expose]))
+    # Garde après uniroot : theta non fini (ou nul, branche -) et
+    # postcondition non tenue sont des erreurs de programmation, jamais un
+    # état produit.
+    verifie <- function(theta, inferieure) {
+      if (!is.finite(theta) || (inferieure && theta <= 0))
+        stop("ecart_minimal_homogeneite() : racine theta_80 non finie ou non positive (erreur de programmation).",
+             call. = FALSE)
+      if (!isTRUE(abs(lambda(p_theta(theta)) / lam80 - 1) <= TOLERANCE_ECART_MINIMAL))
+        stop("ecart_minimal_homogeneite() : lambda_s(theta_80) différent de lambda_80 (erreur de programmation).",
+             call. = FALSE)
+      theta
+    }
+    # non_atteint quand la limite reste au plus lambda_80 (1 +
+    # TOLERANCE_ECART_MINIMAL) : seuil inclusif, à la tolérance relative de la
+    # résolution (règle d'actuary, reprise de l'audit, M1).
+    seuil <- lam80 * (1 + TOLERANCE_ECART_MINIMAL)
+    f_sup <- function(t) (if (t >= 1) lambda(p_infini) else lambda(p_theta(1 / (1 - t)))) - lam80
+    if (lambda(p_infini) <= seuil) e_sup[s] <- "non_atteint"
+    else sup[s] <- verifie(1 / (1 - stats::uniroot(f_sup, c(0, 1), tol = 1e-14)$root), FALSE)
+    f_inf <- function(theta) (if (theta <= 0) lambda(p_zero) else lambda(p_theta(theta))) - lam80
+    if (lambda(p_zero) <= seuil) e_inf[s] <- "non_atteint"
+    else inf[s] <- verifie(stats::uniroot(f_inf, c(0, 1), tol = 1e-14)$root, TRUE)
+  }
+  list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf, lambda_80 = lam80)
+}
+
 # Étape `homogeneite` du plan (#168).
 #   exposition    : table de l'étape `exposition`
 #                   (etapes$exposition$resultat$exposition) ;
@@ -2038,9 +2172,11 @@ p_exacte_homogeneite <- function(sc) {
 # = somme des ddl) ; si la segmentation a deux variables, chaque variable
 # conditionnellement à l'autre. Un jeu de réplications pour global, tranches
 # et somme ; un par test par variable ; aucun tirage sans test produit.
+# Écart minimal détectable par segment du test global (#218) : table
+# ecart_minimal, une ligne par segment, et signal ecart_minimal_detectable.
 # Aucun contrôle (#82) : valider_plan() a contrôlé les paramètres. Rend
-# list(parametres, resultat (tests, segments, monte_carlo), diagnostics,
-# avertissements).
+# list(parametres, resultat (tests, segments, ecart_minimal, monte_carlo),
+# diagnostics, avertissements).
 calculer_homogeneite <- function(exposition, segmentation, par_annee, convention, plage_ages, tranches_age,
                                  replications, graine) {
   manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
@@ -2212,6 +2348,15 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   seg <- c(list(portee("global", na_i, na_i, sc_g, rep(TRUE, nrow(ex)), toute_faute)),
            lapply(seq_len(nb), function(b) portee("tranche", tranches_age[b], fin_tranche[b], sc_b[[b]], tranche == b,
                                                   tranche_fautive[b])))
+  # Écart minimal détectable (#218 ; F218) : une ligne par segment du test
+  # global, dans l'ordre des lignes globales de seg ; par le système réduit
+  # du test global (sc_g), sans seconde réduction.
+  em_calc <- ecart_minimal_homogeneite(sc_g, e_g, seg[[1L]]$etat, S)
+  em <- segments
+  em$theta_80_superieur <- em_calc$superieur
+  em$etat_superieur <- em_calc$etat_superieur
+  em$theta_80_inferieur <- em_calc$inferieur
+  em$etat_inferieur <- em_calc$etat_inferieur
   seg <- do.call(rbind, seg)
   rownames(seg) <- NULL
 
@@ -2238,12 +2383,34 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
                                    "qui les contiennent non produits (état evenement_sans_exposition)."),
                              sum(fautive), ev_fautives),
                      sum(fautive))
+  # Signal (#218, spécification, § 6) : segments dont une branche produite
+  # dépasse le seuil (theta_80_superieur > seuil, theta_80_inferieur <
+  # 1/seuil) ou dont une branche est non_atteint ; aucun signal hors des
+  # états produite et non_atteint. Avertissement, jamais un refus.
+  signale <- (em$etat_superieur == "produite" & em$theta_80_superieur > SEUIL_ECART_MINIMAL) |
+    (em$etat_inferieur == "produite" & em$theta_80_inferieur < 1 / SEUIL_ECART_MINIMAL) |
+    em$etat_superieur == "non_atteint" | em$etat_inferieur == "non_atteint"
+  if (any(signale)) {
+    virgule <- function(x) formatC(x, format = "f", digits = 2, decimal.mark = ",")
+    avert <- avertir(avert, "homogeneite", "ecart_minimal_detectable",
+                     sprintf(paste("Homogénéité : %d segment(s) pour lesquels le test global n'atteint pas la puissance %s",
+                                   "au niveau %s face à un écart de force d'un facteur %s ou 1/%s (theta_80_superieur >",
+                                   "%s, theta_80_inferieur < 1/%s ou branche non_atteint ;",
+                                   "etapes/homogeneite/resultat/ecart_minimal) : approximation asymptotique, seuil",
+                                   "conventionnel ; avertissement, ni refus ni verdict."),
+                             sum(signale), virgule(PUISSANCE_ECART_MINIMAL), virgule(NIVEAU_ECART_MINIMAL),
+                             virgule(SEUIL_ECART_MINIMAL), virgule(SEUIL_ECART_MINIMAL), virgule(SEUIL_ECART_MINIMAL),
+                             virgule(SEUIL_ECART_MINIMAL)),
+                     sum(signale))
+  }
   list(parametres = list(plage_ages = plage_ages, tranches_age = tranches_age, replications = replications,
-                         convention = convention, hypothese_nulle = HYPOTHESE_HOMOGENEITE,
+                         convention = convention, niveau_ecart_minimal = NIVEAU_ECART_MINIMAL,
+                         puissance_ecart_minimal = PUISSANCE_ECART_MINIMAL,
+                         seuil_ecart_minimal = SEUIL_ECART_MINIMAL, hypothese_nulle = HYPOTHESE_HOMOGENEITE,
                          statuts = STATUTS_HOMOGENEITE, reference_methode = REFERENCE_METHODE_HOMOGENEITE),
        # Tirages effectués par jeu en integer (#199), bornés par replications
        # (au plus .Machine$integer.max, contrôlé par controler_replications()).
-       resultat = list(tests = tests, segments = seg,
+       resultat = list(tests = tests, segments = seg, ecart_minimal = em,
                        monte_carlo = list(replications = replications, graine = graine,
                                           jeux = data.frame(jeu = names(jeux),
                                                             tirages_effectues = as.integer(unlist(jeux,
