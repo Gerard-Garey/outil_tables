@@ -1,2 +1,1 @@
 type,nom,issue,motif
-renvoi,lignes,#187,renvois par numéro de ligne dans docs/latex/ à réécrire par le symbole avant le passage de docwriter (règle 9) ; ligne à retirer par un commit tests: après le commit docs:
