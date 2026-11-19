@@ -1896,6 +1896,123 @@ verifier("concordance citations : `% Citation :`, `%% citation :`, `% citations 
                          "Marqueurs de citation : 5 ;")) })
 unlink(c(attente_vide, attente_citation))
 
+# --- concordance : aucun numéro de ligne vers un fichier du dépôt (contrôle 8 ; #187) ---
+#
+# Décision D4 (b) du 19/11/2026 : le renvoi se fait par le symbole. Témoins sur le
+# document minimal du bloc #70 (état juste) auquel on ajoute des phrases, sur une
+# copie temporaire. État juste : renvoi à une source externe (chemin hors du dépôt
+# ou \url dans la même phrase, y compris après une phrase qui cite un chemin du
+# dépôt), « ligne~N » d'un bilan sans chemin, chemins du dépôt cités sans numéro,
+# renvoi en commentaire LaTeX. Écarts : chaque forme lue (« l. », « ll. », `:N`,
+# « ligne N de <chemin> »), chaque variante de blanc (`~`, espace, `\ `, `\,`),
+# un chemin du dépôt cité par son seul nom, par app/ (dossier pas encore au
+# dépôt), un renvoi sur la ligne suivant le chemin, un renvoi sans source nommée
+# avant lui dans la phrase, et un renvoi à ligne accentuée (troncature par points
+# de code). Reprise de l'audit léger : phrase ouverte par une commande LaTeX
+# (frontière de phrase, deux sondes de l'audit), « Ligne~N de », « chemin~:~N »,
+# « chemin, ligne~N » ; URL du dépôt (règle d'`actuary`) : ancre #L sur une branche
+# et sur un SHA de 40 caractères, « l. N » rattaché à une URL du dépôt ; une URL du
+# dépôt sans numéro passe.
+attente_vide <- attente_temoin(character(0))
+renvois_justes <- c(
+  "",
+  "Source externe~: \\code{src/main/platform.c} de R (\\url{https://svn.r-project.org/R/tags/R-4-3-3/src/main/platform.c},",
+  "l.~3592--3610, relu le 24/10/2026).",
+  "",
+  "Voir \\code{R/validation.R}. Source~: \\code{src/main/platform.c}, l.~3592 à~3610.",
+  "",
+  "Les lignes~9 et~13 du bilan, la ligne~15 et les lignes 111 et~112 d'une table.",
+  "",
+  "Chemins cités sans numéro~: \\code{R/validation.R}, \\code{tests/harnais.R}, \\code{app/app.R}.",
+  "",
+  "URL du dépôt sans numéro~: \\url{https://github.com/Gerard-Garey/outil_tables/blob/main/R/validation.R}.",
+  "% \\code{R/validation.R}, l.~118 (renvoi en commentaire LaTeX, non lu)")
+renvois_refuses <- c(
+  "",
+  "Un~: \\code{R/validation.R}, l.~118.",
+  "Deux~: (\\code{tests/reference/outils\\_reference.R},",
+  "constantes l.~350 à~352, défauts l. 372 et~373).",
+  "Trois~: \\code{harnais.R}, ll.\\,3 à~5.",
+  "Quatre~: \\code{app/app.R}, l.\\ 7.",
+  "Cinq~: \\code{R/validation.R:118}.",
+  "Six~: \\code{R/validation.R}:~118.",
+  "Sept~: ligne~118 de \\code{R/validation.R}.",
+  "Huit~: lignes~118 à~120 du fichier \\code{R/validation.R}.",
+  "Neuf~: voir l.~42.",
+  "",
+  "Voir \\code{R/validation.R}. \\code{set.seed()} est décrite par \\url{https://x.org/c.pdf}. \\code{sum()} l.~9.",
+  "",
+  "\\url{https://x.org/d.pdf}. \\code{N\\_MAX} vaut 3 (l.~118).",
+  "",
+  "Ligne~118 de \\code{R/validation.R}.",
+  "Dix~: \\code{R/validation.R}~:~118.",
+  "Onze~: \\code{R/validation.R}, ligne~118.",
+  "Douze~: \\url{https://github.com/Gerard-Garey/outil_tables/blob/main/R/validation.R#L118-L120}.",
+  "Treize~: \\href{https://GitHub.com/gerard-garey/Outil_Tables/blob/0123456789abcdef0123456789abcdef01234567/R/validation.R\\#L118}{ici}.",
+  "Quatorze~: \\url{https://raw.githubusercontent.com/Gerard-Garey/outil_tables/main/R/validation.R}, l.~118.",
+  "",
+  "Éléphants énormes écrivent, \\code{R/validation.R}, l.~118 puis une très longue suite accentuée : éléphants énormes écrivent à l'éditeur.")
+lignes_renvois_justes <- fiche_temoin(phrase = renvois_justes)
+lignes_renvois_refuses <- fiche_temoin(phrase = renvois_refuses)
+ligne_de <- function(x) match(x, lignes_renvois_refuses)
+suite_accentuee <- "l.~118 puis une très longue suite accentuée : éléphants énormes écrivent à l'éditeur."
+debut_accentue <- intToUtf8(utf8ToInt(suite_accentuee)[1:60])
+motifs_refuses <- c(
+  "aucun renvoi par numéro de ligne vers un fichier du dépôt",
+  "19 renvoi(s) par numéro de ligne vers un fichier du dépôt ou sans source nommée",
+  sprintf("temoin.tex ligne %d « l.~118. » vers R/validation.R", ligne_de("Un~: \\code{R/validation.R}, l.~118.")),
+  sprintf("temoin.tex ligne %d « l.~350 à~352, défauts l. 372 et~373). » vers tests/reference/outils_reference.R",
+          ligne_de("constantes l.~350 à~352, défauts l. 372 et~373).")),
+  sprintf("temoin.tex ligne %d « l. 372 et~373). » vers tests/reference/outils_reference.R",
+          ligne_de("constantes l.~350 à~352, défauts l. 372 et~373).")),
+  sprintf("temoin.tex ligne %d « ll.\\,3 à~5. » vers harnais.R", ligne_de("Trois~: \\code{harnais.R}, ll.\\,3 à~5.")),
+  sprintf("temoin.tex ligne %d « l.\\ 7. » vers app/app.R", ligne_de("Quatre~: \\code{app/app.R}, l.\\ 7.")),
+  sprintf("temoin.tex ligne %d « R/validation.R:118}. » vers R/validation.R", ligne_de("Cinq~: \\code{R/validation.R:118}.")),
+  sprintf("temoin.tex ligne %d « R/validation.R}:~118. » vers R/validation.R", ligne_de("Six~: \\code{R/validation.R}:~118.")),
+  sprintf("temoin.tex ligne %d « R/validation.R}. » vers R/validation.R", ligne_de("Sept~: ligne~118 de \\code{R/validation.R}.")),
+  sprintf("temoin.tex ligne %d « R/validation.R}. » vers R/validation.R", ligne_de("Huit~: lignes~118 à~120 du fichier \\code{R/validation.R}.")),
+  sprintf("temoin.tex ligne %d « l.~42. » : aucune source nommée avant le renvoi dans la phrase", ligne_de("Neuf~: voir l.~42.")),
+  sprintf("temoin.tex ligne %d « l.~9. » : aucune source nommée avant le renvoi dans la phrase",
+          ligne_de("Voir \\code{R/validation.R}. \\code{set.seed()} est décrite par \\url{https://x.org/c.pdf}. \\code{sum()} l.~9.")),
+  sprintf("temoin.tex ligne %d « l.~118). » : aucune source nommée avant le renvoi dans la phrase",
+          ligne_de("\\url{https://x.org/d.pdf}. \\code{N\\_MAX} vaut 3 (l.~118).")),
+  sprintf("temoin.tex ligne %d « R/validation.R}. » vers R/validation.R", ligne_de("Ligne~118 de \\code{R/validation.R}.")),
+  sprintf("temoin.tex ligne %d « R/validation.R}~:~118. » vers R/validation.R", ligne_de("Dix~: \\code{R/validation.R}~:~118.")),
+  sprintf("temoin.tex ligne %d « R/validation.R}, ligne~118. » vers R/validation.R", ligne_de("Onze~: \\code{R/validation.R}, ligne~118.")),
+  sprintf("temoin.tex ligne %d « \\url{https://github.com/Gerard-Garey/outil_tables/blob/main/ » vers https://github.com/Gerard-Garey/outil_tables/blob/main/R/validation.R#L118-L120",
+          ligne_de("Douze~: \\url{https://github.com/Gerard-Garey/outil_tables/blob/main/R/validation.R#L118-L120}.")),
+  sprintf("temoin.tex ligne %d « \\href{https://GitHub.com/gerard-garey/Outil_Tables/blob/0123 » vers https://GitHub.com/gerard-garey/Outil_Tables/blob/0123456789abcdef0123456789abcdef01234567/R/validation.R#L118",
+          ligne_de("Treize~: \\href{https://GitHub.com/gerard-garey/Outil_Tables/blob/0123456789abcdef0123456789abcdef01234567/R/validation.R\\#L118}{ici}.")),
+  sprintf("temoin.tex ligne %d « l.~118. » vers https://raw.githubusercontent.com/Gerard-Garey/outil_tables/main/R/validation.R",
+          ligne_de("Quatorze~: \\url{https://raw.githubusercontent.com/Gerard-Garey/outil_tables/main/R/validation.R}, l.~118.")),
+  sprintf("« %s » vers R/validation.R", debut_accentue))
+verifier("concordance renvois : témoin exact (source externe, lignes de bilan, chemins et URL du dépôt sans numéro, commentaire) -> code 0",
+         { d <- latex_temoin(lignes_renvois_justes); on.exit(unlink(d, recursive = TRUE))
+           passe(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide))) })
+verifier("concordance renvois : dix-neuf renvois (l., ll., :N, ~:~N, , ligne N, (L)ligne N de, blancs, nom seul, app/, sans source avant, phrase ouverte par une commande, URL du dépôt) -> échec, un message par renvoi",
+         { d <- latex_temoin(lignes_renvois_refuses); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)), motifs_refuses) })
+verifier("concordance renvois : mêmes renvois sous LC_ALL=C -> même verdict, troncature par points de code",
+         { d <- latex_temoin(lignes_renvois_refuses); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(executer_rscript(CONCORDANCE, c("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                                        env = "LC_ALL=C"), motifs_refuses) })
+verifier("concordance renvois : témoin exact sous LC_ALL=C -> code 0",
+         { d <- latex_temoin(lignes_renvois_justes); on.exit(unlink(d, recursive = TRUE))
+           passe(executer_rscript(CONCORDANCE, c("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                                  env = "LC_ALL=C")) })
+attente_renvoi <- attente_temoin("renvoi,lignes,#187,documentation en retard")
+verifier("concordance renvois : renvois déclarés en attente (type renvoi) -> code 0",
+         { d <- latex_temoin(lignes_renvois_refuses); on.exit(unlink(d, recursive = TRUE))
+           passe(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_renvoi))) })
+verifier("concordance renvois : document juste et ligne encore en attente -> succès inattendu, échec",
+         { d <- latex_temoin(lignes_renvois_justes); on.exit(unlink(d, recursive = TRUE))
+           echoue(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_renvoi)), "succès inattendu") })
+verifier("concordance renvois : ligne d'attente de type renvoi à nom inconnu -> échec",
+         { d <- latex_temoin(lignes_renvois_justes); on.exit(unlink(d, recursive = TRUE))
+           echoue(concordance("--strict", "--latex", shQuote(d), "--attente",
+                              shQuote(attente_temoin("renvoi,inconnu,#187,x"))), "hors de : lignes") })
+unlink(c(attente_vide, attente_renvoi))
+
 # --- commits d'une empreinte du code (ADR 0011, annotation du 27/10/2026, (e) ; #89) ---
 # Mode « arbre » et refus : sans git, aussi dans le job « Tests (R 4.3.3) ». Le
 # parcours de l'historique exige git, absent du conteneur de ce job, et un clone
