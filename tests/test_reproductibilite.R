@@ -449,6 +449,88 @@ CHEMINS_199 <- list(
 # régénération de R15 à R17 (exécution 43203864780) ; transition_textes_245(),
 # utf8_245(), apres_245() et les constantes *_245 retirées.
 TRANSITIONS_EN_COURS <- list()
+# Transition #159 (B30, étape (2) ; spécification d'actuary-approfondi, #159,
+# commentaire 7012174895) : mention d'indépendance des unités en fin de statut
+# des lignes de loi ; textes seuls, aucune valeur numérique. Une transition
+# par plan (plans deux à deux disjoints), en « valeur de chaîne » aux
+# positions lues par les colonnes sœurs de la référence ; texte après tiré du
+# texte avant de la référence par la règle de la spécification (mention en
+# fin, ou insérée avant « ; relation ajustee_hors_outil »), mentions écrites
+# ici en échappements \u (UTF-8 en toute locale), sans lire le package. Chemins
+# : statuts du brut (étape et fiche, R1 à R17), statistiques et sous-groupes
+# de la validation (relation independante : R8, R9), statuts de
+# importance_exclusions (R8 à R10). À clore par la régénération unique (R)
+# de B30, avec transition_159(), apres_159() et les constantes *_159.
+M_BRUT_159 <- paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les contrats d'une",
+                    "m\u00eame t\u00eate sont suppos\u00e9s ind\u00e9pendants (une d\u00e9pendance positive rend",
+                    "%s ; relev\u00e9 tetes_multi_contrats de l'\u00e9tape donnees)")
+M_159 <- list(
+  brut_intervalle = sprintf(M_BRUT_159, "l'intervalle trop \u00e9troit"),
+  brut_variance = sprintf(M_BRUT_159, "la variance trop faible"),
+  tests = paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
+                "sur-dispers\u00e9s et les tests sont anti-conservateurs"),
+  intervalle = paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
+                     "sur-dispers\u00e9s et l'intervalle est trop \u00e9troit"),
+  variance_a = paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
+                     "sur-dispers\u00e9s et Var(A^) est sous-estim\u00e9e"))
+AJUSTEE_159 <- " ; relation ajustee_hors_outil"
+# Par table : clé de ligne -> nom de la mention dans M_159 ; mention en fin de
+# statut, sauf pour les clés de AVANT_AJUSTEE_159 (avant la relation
+# ajustee_hors_outil).
+REGLES_159 <- list(
+  brut = c(stats::setNames(rep("brut_intervalle", 6L),
+                           paste0(rep(c("poisson/taux/", "poisson/probabilite/", "binomial/taux/"), each = 2L),
+                                  c("exact", "asymptotique"))),
+           "kaplan_meier/variance/sans objet (estimation ponctuelle)" = "brut_variance"),
+  statistiques = c(stats::setNames(rep("tests", 18L), c(
+    "residus/esperance_au_dela_2", "residus/esperance_au_dela_3", "khi2_pearson/variance_h0",
+    "khi2_pearson/p_asymptotique", "khi2_pearson/p_monte_carlo", "deviance/p_asymptotique", "deviance/p_monte_carlo",
+    "smr/p_inferieure", "smr/p_superieure", "smr/p_centrale", "smr/z_racine_cubique", "smr/p_racine_cubique",
+    "signes/esperance_positifs_h0", "signes/p_monte_carlo", "runs/p_monte_carlo", "wilcoxon/p_monte_carlo",
+    "fluctuation/esperance_hors_intervalle_exact", "fluctuation/esperance_hors_intervalle_asymptotique")),
+    "smr/borne_inf_exacte" = "intervalle", "smr/borne_sup_exacte" = "intervalle"),
+  sous_groupes = c(bornes_exactes = "intervalle", p_valeurs = "tests"),
+  importance = c("smr_comparateur_1/bornes_exactes" = "intervalle",
+                 "smr_comparateur_1/bornes_asymptotiques" = "intervalle",
+                 "smr_comparateur_1/rapport_variance" = "variance_a", "smr_comparateur_2/bornes" = "intervalle"))
+AVANT_AJUSTEE_159 <- c("sous_groupes/bornes_exactes", "sous_groupes/p_valeurs", "importance/smr_comparateur_2/bornes")
+# Texte après : mention `m` en fin de `avant`, ou insérée avant la relation
+# ajustee_hors_outil (présente une fois) ; le texte avant ne porte pas encore
+# le marqueur (sinon référence déjà régénérée).
+apres_159 <- function(avant, m, avant_ajustee) {
+  marqueur <- "unit\u00e9s d'observation ind\u00e9pendantes"
+  if (grepl(marqueur, avant, fixed = TRUE, useBytes = TRUE))
+    stop("apres_159() : marqueur d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_159() et les constantes *_159")
+  if (!avant_ajustee) return(paste(avant, ";", m))
+  if (lengths(regmatches(avant, gregexpr(AJUSTEE_159, avant, fixed = TRUE))) != 1L)
+    stop("apres_159() : relation ajustee_hors_outil absente ou r\u00e9p\u00e9t\u00e9e (erreur de programmation)")
+  sub(AJUSTEE_159, paste0(" ; ", m, AJUSTEE_159), avant, fixed = TRUE)
+}
+# Transition #159 du plan `id` : un changement par table de statuts présente
+# dans la référence et retenue pour ce plan (`tables`).
+transition_159 <- function(id, tables) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  chemins <- list(
+    brut = list(base = c("etapes/brut/parametres/statuts/", "fiche/hypotheses_brut/statuts/"),
+                cles = c("estimateur", "grandeur", "intervalle")),
+    statistiques = list(base = "etapes/validation/resultat/statistiques/", cles = c("statistique", "grandeur")),
+    sous_groupes = list(base = "etapes/validation/parametres/statuts_sous_groupes/", cles = "grandeur"),
+    importance = list(base = "etapes/importance_exclusions/parametres/statuts/", cles = c("table", "grandeur")))
+  ch <- list()
+  for (t in tables) for (b in chemins[[t]]$base) {
+    cle <- do.call(paste, c(lapply(paste0(b, chemins[[t]]$cles), function(c_) ref[[c_]]), sep = "/"))
+    k <- which(cle %in% names(REGLES_159[[t]]))
+    if (!length(k)) stop(sprintf("transition_159(%s) : aucune ligne vis\u00e9e sous %s (erreur de programmation)", id, b))
+    avant <- ref[[paste0(b, "statut")]][k]
+    apres <- vapply(seq_along(k), function(j)
+      apres_159(avant[j], M_159[[REGLES_159[[t]][[cle[k[j]]]]]], paste(t, cle[k[j]], sep = "/") %in% AVANT_AJUSTEE_159), "")
+    ch <- c(ch, list(list(chemin = paste0(b, "statut"), nature = "valeur de chaîne", valeurs = apres, positions = k)))
+  }
+  list(issue = "#159", plans = id, changements = ch)
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(paste0("R", 1:17), function(id)
+  transition_159(id, c("brut", if (id %in% c("R8", "R9")) c("statistiques", "sous_groupes"),
+                       if (id %in% c("R8", "R9", "R10")) "importance"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

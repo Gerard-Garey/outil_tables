@@ -125,67 +125,85 @@ PORTEE_PROBABILITE <- c(
 
 # Statut de chaque grandeur restituée (A.1, A.3 ; E2.14, E2.20), une ligne par
 # (estimateur, grandeur, intervalle) ; « E^c fixe » et « E^i fixe » réservés
-# aux intervalles exacts (avis d'actuary sur la reprise de #14).
-STATUTS_BRUT <- data.frame(
-  estimateur = c(rep("poisson", 6L), rep("binomial", 3L), rep("kaplan_meier", 4L)),
-  grandeur = c(rep("taux", 3L), rep("probabilite", 3L), rep("taux", 3L), "taux", "variance", "taux", "taux"),
-  intervalle = c(rep(c("sans objet (estimation ponctuelle)", "exact", "asymptotique"), 3L),
-                 "sans objet (estimation ponctuelle)", "sans objet (estimation ponctuelle)", "asymptotique",
-                 "exact"),
-  statut = c(
-    "résultat exact : maximum de vraisemblance du modèle à force constante dans la cellule",
-    paste("exact sous la loi supposée : couverture >= niveau pour tout mu, E^c tenue pour fixe ;",
-          "sous le modèle de survie (E^c aléatoire), couverture seulement asymptotique"),
-    "asymptotique (mu E^c -> infini) ; non défini à D = 0",
-    paste("résultat exact : image du maximum de vraisemblance par q = 1 - exp(-mu) (invariance du",
-          "maximum de vraisemblance), force constante sur la cellule entière"),
-    paste("exact sous la loi supposée (transformation croissante des bornes exactes du taux :",
-          "couverture identique)"),
-    paste("asymptotique (transformation croissante des bornes asymptotiques du taux : même",
-          "régime) ; non défini à D = 0"),
-    paste("estimateur des moments : E[D] = q E[E^i] exactement sous l'hypothèse de répartition ;",
-          "convergent ; non sans biais à effectif fini"),
-    paste("exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, E^i",
-          "entier) ; avec une entrée ou une censure dans la cellule, couverture non établie, même si",
-          "E^i est entier (prolongement continu de la formule exacte si E^i n'est pas entier)"),
-    paste("asymptotique (E^i q(1-q) -> infini) pour une cellule observée entière ; avec une entrée ou",
-          "une censure dans la cellule, couverture non établie ; non défini à D = 0 et à D = E^i"),
-    paste("résultat exact : maximum de vraisemblance non paramétrique (risques discrets aux instants",
-          "d'événement) ; non sans biais à effectif fini"),
-    paste("asymptotique (méthode delta sur log P, ensemble à risque -> infini sur toute la cellule) ;",
-          "non définie à q = 0 et q = 1"),
-    paste("asymptotique (ensemble à risque -> infini sur toute la cellule), sous indépendance des",
-          "unités d'observation ; non défini à q = 0 et q = 1 ; sous l'unité contrat, les contrats",
-          "d'une même tête sont supposés indépendants (une dépendance positive rend l'intervalle trop",
-          "étroit ; relevé tetes_multi_contrats de l'étape donnees)"),
-    paste("aucun : non restitué (sous troncature et censure, D ne suit aucune loi binomiale)")),
-  loi_supposee = c(
-    rep(c("force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)",
-          "D ~ Poisson(mu E^c), E^c fixe", "D ~ Poisson(mu E^c)"), 2L),
-    "répartition _(1-t)q_(x+t) = (1 - t) q_x dans la cellule, censure indépendante",
-    "D ~ Bin(E^i, q), E^i fixe", "D ~ Bin(E^i, q)",
-    rep(paste("troncature à gauche et censure non informatives, unités indépendantes ; aucune",
-              "hypothèse de répartition dans la cellule"), 3L),
-    "sans objet"),
-  calcul = c(
-    "D / E^c",
-    paste("[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et",
-          "d'échelle 1 ; borne inférieure 0 si D = 0 ; approximation numérique (qgamma)"),
-    "taux exp(-+ z / sqrt(D)) : normal sur l'échelle de log mu ; z = qnorm(alpha/2, lower.tail = FALSE)",
-    "-expm1(-taux)",
-    "1 - exp(-borne), par -expm1(-borne)",
-    "1 - exp(-borne), par -expm1(-borne)",
-    "D / E^i",
-    paste("[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ;",
-          "0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"),
-    paste("plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : normal sur l'échelle de logit q ;",
-          "z = qnorm(alpha/2, lower.tail = FALSE)"),
-    "-expm1(sum(log1p(-d/r))) sur les instants d'événement de la cellule",
-    "P^2 Sigma, P = exp(sum(log1p(-d/r))) = 1 - q, Sigma = sum d / (r (r - d)) en double",
-    paste("plogis(qlogis(q) -+ z sqrt(Sigma) / q) : normal sur l'échelle de logit q, Var(logit q) ~ Sigma / q^2 ;",
-          "z = qnorm(alpha/2, lower.tail = FALSE)"),
-    "sans objet"),
-  stringsAsFactors = FALSE)
+# aux intervalles exacts (avis d'actuary sur la reprise de #14). Mention
+# d'indépendance des unités (#159) en fin de statut des seules lignes qui
+# affirment une loi (intervalles, variance ; marqueur commun « unités
+# d'observation indépendantes »), jamais sur une estimation ponctuelle ; la
+# ligne d'intervalle de Kaplan-Meier, qui l'écrit « indépendance des unités
+# d'observation », est inchangée ; loi_supposee n'en porte pas.
+STATUTS_BRUT <- local({
+  indep_int <- paste(
+    "unités d'observation indépendantes ; sous l'unité contrat, les contrats d'une même tête sont",
+    "supposés indépendants (une dépendance positive rend l'intervalle trop étroit ; relevé",
+    "tetes_multi_contrats de l'étape donnees)")
+  indep_var <- paste(
+    "unités d'observation indépendantes ; sous l'unité contrat, les contrats d'une même tête sont",
+    "supposés indépendants (une dépendance positive rend la variance trop faible ; relevé",
+    "tetes_multi_contrats de l'étape donnees)")
+  data.frame(
+    estimateur = c(rep("poisson", 6L), rep("binomial", 3L), rep("kaplan_meier", 4L)),
+    grandeur = c(rep("taux", 3L), rep("probabilite", 3L), rep("taux", 3L), "taux", "variance", "taux", "taux"),
+    intervalle = c(rep(c("sans objet (estimation ponctuelle)", "exact", "asymptotique"), 3L),
+                   "sans objet (estimation ponctuelle)", "sans objet (estimation ponctuelle)", "asymptotique",
+                   "exact"),
+    statut = c(
+      "résultat exact : maximum de vraisemblance du modèle à force constante dans la cellule",
+      paste("exact sous la loi supposée : couverture >= niveau pour tout mu, E^c tenue pour fixe ;",
+            "sous le modèle de survie (E^c aléatoire), couverture seulement asymptotique", ";",
+            indep_int),
+      paste("asymptotique (mu E^c -> infini) ; non défini à D = 0 ;", indep_int),
+      paste("résultat exact : image du maximum de vraisemblance par q = 1 - exp(-mu) (invariance du",
+            "maximum de vraisemblance), force constante sur la cellule entière"),
+      paste("exact sous la loi supposée (transformation croissante des bornes exactes du taux :",
+            "couverture identique) ;", indep_int),
+      paste("asymptotique (transformation croissante des bornes asymptotiques du taux : même",
+            "régime) ; non défini à D = 0 ;", indep_int),
+      paste("estimateur des moments : E[D] = q E[E^i] exactement sous l'hypothèse de répartition ;",
+            "convergent ; non sans biais à effectif fini"),
+      paste("exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, E^i",
+            "entier) ; avec une entrée ou une censure dans la cellule, couverture non établie, même si",
+            "E^i est entier (prolongement continu de la formule exacte si E^i n'est pas entier) ;",
+            indep_int),
+      paste("asymptotique (E^i q(1-q) -> infini) pour une cellule observée entière ; avec une entrée ou",
+            "une censure dans la cellule, couverture non établie ; non défini à D = 0 et à D = E^i ;",
+            indep_int),
+      paste("résultat exact : maximum de vraisemblance non paramétrique (risques discrets aux instants",
+            "d'événement) ; non sans biais à effectif fini"),
+      paste("asymptotique (méthode delta sur log P, ensemble à risque -> infini sur toute la cellule) ;",
+            "non définie à q = 0 et q = 1 ;", indep_var),
+      paste("asymptotique (ensemble à risque -> infini sur toute la cellule), sous indépendance des",
+            "unités d'observation ; non défini à q = 0 et q = 1 ; sous l'unité contrat, les contrats",
+            "d'une même tête sont supposés indépendants (une dépendance positive rend l'intervalle trop",
+            "étroit ; relevé tetes_multi_contrats de l'étape donnees)"),
+      paste("aucun : non restitué (sous troncature et censure, D ne suit aucune loi binomiale)")),
+    loi_supposee = c(
+      rep(c("force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)",
+            "D ~ Poisson(mu E^c), E^c fixe", "D ~ Poisson(mu E^c)"), 2L),
+      "répartition _(1-t)q_(x+t) = (1 - t) q_x dans la cellule, censure indépendante",
+      "D ~ Bin(E^i, q), E^i fixe", "D ~ Bin(E^i, q)",
+      rep(paste("troncature à gauche et censure non informatives, unités indépendantes ; aucune",
+                "hypothèse de répartition dans la cellule"), 3L),
+      "sans objet"),
+    calcul = c(
+      "D / E^c",
+      paste("[G_D^-1(alpha/2), G_(D+1)^-1(1 - alpha/2)] / E^c, G_k loi gamma de forme k et",
+            "d'échelle 1 ; borne inférieure 0 si D = 0 ; approximation numérique (qgamma)"),
+      "taux exp(-+ z / sqrt(D)) : normal sur l'échelle de log mu ; z = qnorm(alpha/2, lower.tail = FALSE)",
+      "-expm1(-taux)",
+      "1 - exp(-borne), par -expm1(-borne)",
+      "1 - exp(-borne), par -expm1(-borne)",
+      "D / E^i",
+      paste("[B^-1_(D, E^i - D + 1)(alpha/2), B^-1_(D+1, E^i - D)(1 - alpha/2)], B loi bêta ;",
+            "0 si D = 0, 1 si D = E^i ; approximation numérique (qbeta)"),
+      paste("plogis(qlogis(q) -+ z sqrt(1/D + 1/(E^i - D))) : normal sur l'échelle de logit q ;",
+            "z = qnorm(alpha/2, lower.tail = FALSE)"),
+      "-expm1(sum(log1p(-d/r))) sur les instants d'événement de la cellule",
+      "P^2 Sigma, P = exp(sum(log1p(-d/r))) = 1 - q, Sigma = sum d / (r (r - d)) en double",
+      paste("plogis(qlogis(q) -+ z sqrt(Sigma) / q) : normal sur l'échelle de logit q, Var(logit q) ~ Sigma / q^2 ;",
+            "z = qnorm(alpha/2, lower.tail = FALSE)"),
+      "sans objet"),
+    stringsAsFactors = FALSE)
+})
 
 # Contrôle les paramètres propres à l'étape `brut` (valeurs ; les noms sont
 # contrôlés par valider_plan()). par_annee : paramètre de l'étape

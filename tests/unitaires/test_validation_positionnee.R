@@ -92,7 +92,9 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
   # 01c6538a2b101311732eed745fcb3c05) puis par #215 (tournure S5 de #203 :
   # nombre p de paramètres estimés nommé, jamais « p = 0 : loi », dans
   # sous_groupes/bornes_exactes, p_valeurs et p_valeurs_asymptotiques ;
-  # avant #215 : 7c535735fdb65e7aa57c22f86d60ffb3),
+  # avant #215 : 7c535735fdb65e7aa57c22f86d60ffb3) puis par #159 (mention
+  # d'indépendance des unités sur les 22 lignes de loi ; avant #159 :
+  # 736e637e156df8d409b6943d333fe741),
   # valeur écrite en dur (identité exacte) : octets bruts des
   # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
   # lignes par un saut de ligne ; indépendante de la locale d'installation
@@ -120,7 +122,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
                         grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
                               useBytes = TRUE))
                       TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
-    independante = if (identical(unname(tools::md5sum(f)), "736e637e156df8d409b6943d333fe741")) TRUE
+    independante = if (identical(unname(tools::md5sum(f)), "4b66eb3d650c8a0483869866dce8cf12")) TRUE
                    else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(
@@ -676,7 +678,10 @@ verifier("T179.1 statuts : p asymptotique de X2 avec 2 + 1/A_c (independante) et
       if (!all(grepl("approximation non garantie quand des attendus A_c sont petits : sous H0 (i)", p4, fixed = TRUE)))
         return("phrase petits absente d'une p asymptotique")
       phrase_g2 <- regmatches(g2, regexpr("l'espérance de la contribution.*garanti sous H0 \\(i\\)", g2))
-      fin_x2 <- sub(".*khi2_pearson/variance_h0\\) ; ", "", k(a, "khi2_pearson", "p_asymptotique"))
+      # fin_x2 sans la mention d'indépendance de la relation independante
+      # (#159), que la table positionnee écrit à sa façon.
+      fin_x2 <- sub(" ; unités d'observation indépendantes.*", "",
+                    sub(".*khi2_pearson/variance_h0\\) ; ", "", k(a, "khi2_pearson", "p_asymptotique")))
       if (length(phrase_g2) == 2L && identical(phrase_g2[1L], phrase_g2[2L]) &&
           startsWith(fin_x2, "le niveau réel") &&
           grepl(paste0("sont égaux ; ", fin_x2, " ; unités d'observation"), k(b, "khi2_pearson", "p_asymptotique"),
@@ -897,6 +902,8 @@ verifier("T200.1 statuts : sous_groupes/bornes_exactes et p_valeurs, texte propr
                                  "sur ces données nul) : exactes sous la loi supposée, O ~ Poisson(A) avec A fixe :",
                                  "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ;",
                                  "couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ;",
+                                 "unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+                                 "sur-dispersés et l'intervalle est trop étroit ;",
                                  "relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi,",
                                  "aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA"))) TRUE
                          else "texte bornes_exactes",
@@ -905,7 +912,9 @@ verifier("T200.1 statuts : sous_groupes/bornes_exactes et p_valeurs, texte propr
                                     "sur ces données nul) : exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le",
                                     "modèle de survie ; fonctions de répartition de Poisson (ppois), approximation",
                                     "numérique ; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de",
-                                    "multiplicité ;", ajustee_p))) TRUE else "texte p_valeurs",
+                                    "multiplicité ; unités d'observation indépendantes ; sous l'unité contrat, les",
+                                    "décès sont sur-dispersés et les tests sont anti-conservateurs ;", ajustee_p))) TRUE
+                      else "texte p_valeurs",
     commun = if (endsWith(k(a, "p_valeurs"), ajustee_p) && endsWith(k(a, "p_valeurs_asymptotiques"), ajustee_p)) TRUE
              else "fragment ajustee_hors_outil",
     relations = if (all(vapply(c("bornes_exactes", "p_valeurs", "p_valeurs_asymptotiques"), function(g)
