@@ -156,7 +156,7 @@
 #       pas vue.
 #
 #    8. aucun numéro de ligne vers un fichier du dépôt (#187 ; décision D4 (b) du
-#       19/11/2026, feuille de route § 1.32 ; CONVENTIONS.md : règle à écrire) : le
+#       19/11/2026, feuille de route § 1.32 ; CONVENTIONS.md, section 3.6) : le
 #       renvoi à un emplacement du code se fait par le symbole, jamais par un
 #       numéro de ligne, qui dérive à chaque commit du fichier visé. Lu sur le
 #       texte sans commentaires LaTeX des .tex, fichier par fichier (CONVENTIONS.md
