@@ -5553,8 +5553,9 @@ contrôles de forme, exacts~; les lignes~3 à~5 comparent exactement des
 libellés (version, nom de l'algorithme, en-tête de la représentation), non
 des empreintes~; la ligne~6 dit seulement que les contrôles des modules
 n'ont rien refusé, sans rien ajouter à ce qu'ils vérifient~; la ligne~7 est
-l'égalité exacte de deux MD5~: l'empreinte des données est portable (exacte
-sous glibc, non mesurée ailleurs~; section~\ref{sec:empreinte}) et, comme
+l'égalité exacte de deux MD5~: l'empreinte des données est portable (même
+empreinte constatée sous glibc et sous Windows, R~4.3.3 ucrt, session
+UTF-8, non mesurée ailleurs~; section~\ref{sec:empreinte}) et, comme
 toute empreinte du projet, sans rôle de sécurité~: elle identifie un
 contenu, elle ne le protège pas contre une modification délibérée~; la
 ligne~8 est, pour chaque table de la fiche, la même égalité exacte de deux
@@ -16970,9 +16971,42 @@ relu à l'identique, parce que la lecture décimale de R n'est pas
 correctement arrondie. \textbf{Statut}~: écriture exacte par construction
 (norme IEC~60559 exigée par R, ordre des octets fixé, aucune mise en forme
 par la bibliothèque C), recoupée sous glibc par un juge indépendant (Python,
-\code{struct.pack}, section~\ref{sec:verifications-rapport})~; sous Windows
-et macOS, \textbf{non mesurée} (tests sous Windows ajournés, décision M61,
-issue~\#49~; ADR 0011, point~1). L'entrée de
+\code{struct.pack}, section~\ref{sec:verifications-rapport}). L'égalité
+des empreintes d'une plateforme à l'autre (statut «~toute plateforme~» visé
+par l'ADR 0011, point~1, qui la tenait pour une hypothèse non mesurée sous
+Windows et macOS) est, elle, un \emph{constat de mesure}~: sous Windows (R~4.3.3 ucrt, session UTF-8), les batteries ont
+rendu, avec 0~échec, les mêmes empreintes des données que sous glibc, lors
+de deux sessions locales du mainteneur (tests sous Windows ajournés par la
+décision M61, issue~\#49, et autorisés pour ces deux sessions, M153 et
+M170)~: (A)~au commit \code{aa1cf0b}, le 26/10/2026 (pull request~\#116~;
+page de code 65001~; 2\,054 tests unitaires et 295 de reproductibilité)~;
+(B)~au commit \code{050a6a1}, le 06/11/2026 (pull request~\#157~; 2\,381 et
+295 tests~; locale de la session parente non consignée, la batterie de
+reproductibilité recalculant l'empreinte du jeu témoin sous la locale C et
+sous la locale UTF-8 que trouve sa sonde). \textbf{Portée} des deux
+constats~: un jeu témoin de 3~lignes à 8~rôles (double, \code{NA}, chaîne
+UTF-8 non ASCII, facteur, dates), d'empreinte \code{2264ac10\ldots}
+calculée hors de R par \code{printf} et \code{md5sum}, et l'entrée de R1
+à R6 (100\,000 lignes, sans colonne double), d'empreinte
+\code{35ca5537\ldots}~; une session Windows hors UTF-8 (page de code 1252)
+et macOS ne sont \textbf{pas mesurées}. \textbf{Report au code actuel}
+(issue~\#129, commit \code{1ee8191}, comparaison refaite le 19/11/2026)~:
+les définitions des fonctions et constantes qu'appelle
+\code{empreinte\_donnees()}, comparées entre le commit de la mesure~B et le
+code que décrit ce document, ne diffèrent que par
+\code{composantes\_date()}, où \code{lt\$year}, \code{lt\$mon} et
+\code{lt\$mday} sont devenus \code{.subset2(lt, "year")} et ses analogues
+(issue~\#313). Les deux écritures rendent des valeurs \code{identical()}
+sur tous les jours du 0001-01-01 au 9999-12-31 et sur \code{NA}~: c'est un
+résultat exact (sémantique de R~: le package base ne définit aucune méthode
+\code{\$} pour \code{POSIXlt}), mesuré sous Linux~; que les sources du
+package base soient les mêmes sous Windows est une \textbf{hypothèse}. La
+mention du rapport figé (section~\ref{sec:rapport-fige}) dit «~même
+empreinte constatée sous glibc et sous Windows (R 4.3.3 ucrt, session
+UTF-8), non mesurée ailleurs~», sans date, puisque le rapport ne porte pas
+de date~: les dates et les commits des constats figurent ici. Windows
+n'étant pas dans la CI, ce constat ne vaut, au-delà de ce report, que
+jusqu'au prochain changement de la chaîne de l'empreinte des données. L'entrée de
 référence des tests ne porte aucune colonne double~: ses colonnes s'écrivent
 à l'identique sous les représentations~1 et~2, et seul l'en-tête change son
 empreinte.
@@ -18693,7 +18727,9 @@ au tableau \code{etapes/brut/parametres/statuts}, et l'empreinte du code
 \code{fiche/empreintes/code}, empreinte du code qui a construit l'objet.
 La section \emph{identification} fait suivre le tableau de quatre mentions
 d'empreinte (algorithme MD5 sans rôle de sécurité~; empreinte des données
-portable, exacte sous glibc, non mesurée ailleurs~; une empreinte par
+portable, même empreinte constatée sous glibc et sous Windows, R~4.3.3
+ucrt, session UTF-8, non mesurée ailleurs, constats datés à la
+section~\ref{sec:empreinte}~; une empreinte par
 fichier lu, calculée par la couche de lecture sur les octets de ce fichier,
 dans l'ordre de \code{fiche/provenance}, recopiée de la provenance et non
 vérifiée par le moteur, texte juste pour toute provenance de $k \ge 1$
