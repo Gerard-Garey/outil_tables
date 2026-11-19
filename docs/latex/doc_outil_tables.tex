@@ -11214,7 +11214,12 @@ l'arrondi (approximation numérique).
     au moins égale au niveau pour tout $\mu$~; sous le modèle de survie, où
     $E^c$ est aléatoire, sa couverture n'est qu'asymptotique~; bornes par
     approximation numérique (\code{qgamma})~; intervalle asymptotique,
-    asymptotique ($\mu E^c \to \infty$).
+    asymptotique ($\mu E^c \to \infty$). Les intervalles du taux et de la
+    probabilité supposent des unités d'observation indépendantes~: sous
+    l'unité contrat, les contrats d'une même tête sont supposés
+    indépendants, et une dépendance positive rend l'intervalle trop étroit,
+    ce que le relevé \code{tetes\_multi\_contrats} de l'étape \code{donnees}
+    permet d'apprécier (issue~\#159~; section~\ref{sec:brut-statuts}).
   \item \textbf{Références}~: à établir (issue~\#6).
 \end{itemize}
 
@@ -11306,6 +11311,10 @@ l'arrondi (approximation numérique).
     dans la cellule (alors $E^i$ est le nombre d'unités d'observation, entier)~;
     intervalle asymptotique, asymptotique ($E^i q(1 - q) \to \infty$) sous
     la même condition~; bornes par approximation numérique (\code{qbeta}).
+    Les deux intervalles supposent des unités d'observation
+    indépendantes~: sous l'unité contrat, les contrats d'une même tête sont
+    supposés indépendants, et une dépendance positive rend l'intervalle
+    trop étroit (relevé \code{tetes\_multi\_contrats}~; issue~\#159).
     \textbf{Avec une entrée ou une censure dans la cellule}, $D$ ne suit pas
     $\mathcal{B}(E^i, q)$, même si $E^i$ est entier~: seule l'égalité
     $E[D] = q\,E[E^i]$ subsiste, et la \textbf{couverture des deux
@@ -11525,11 +11534,12 @@ dans l'espace des paramètres, sans troncature à 0 ou à 1.
     paramétrique (risques discrets aux instants d'événement), résultat
     exact, valeur en arithmétique flottante~; non sans biais à effectif
     fini~; variance, asymptotique (ensemble à risque $\to \infty$ sur toute
-    la cellule)~; intervalle, asymptotique, sous indépendance des unités
-    d'observation. Sous l'unité contrat (rachat, ou décès sans
+    la cellule), sous indépendance des unités d'observation (mention ajoutée
+    à son statut par l'issue~\#159)~; intervalle, asymptotique, sous la même
+    hypothèse. Sous l'unité contrat (rachat, ou décès sans
     \code{id\_tete}), les contrats d'une même tête sont supposés
-    indépendants~: une dépendance positive rend l'intervalle trop étroit, ce
-    que le relevé \code{tetes\_multi\_contrats} de l'étape \code{donnees}
+    indépendants~: une dépendance positive rend la variance trop faible et
+    l'intervalle trop étroit, ce que le relevé \code{tetes\_multi\_contrats} de l'étape \code{donnees}
     permet d'apprécier. La validité asymptotique de la variance sous
     troncature à gauche est une hypothèse, sans source établie.
   \item \textbf{Références}~: à établir (issue~\#6)~: appellation, formule de
@@ -11558,7 +11568,18 @@ estimateurs retenus. Le tableau~\ref{tab:statuts-brut} en donne le contenu
 est inscrite dans le texte du code depuis l'issue~\#31, constat C2 de la
 décision M55)~;
 la mention «~$E^c$ fixe~» ou «~$E^i$ fixe~» est réservée aux intervalles
-exacts.
+exacts. L'hypothèse d'indépendance des unités d'observation est dite à la
+fin du statut des seules lignes qui affirment une loi (issue~\#159~;
+décision M546)~: les six intervalles du Poisson et du binomial, sous la
+forme «~unités d'observation indépendantes~; sous l'unité contrat, les
+contrats d'une même tête sont supposés indépendants (une dépendance
+positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}
+de l'étape \code{donnees})~», et la variance de Kaplan-Meier, sous la même
+forme où «~la variance trop faible~» remplace «~l'intervalle trop
+étroit~»~; l'intervalle asymptotique de Kaplan-Meier la portait déjà, sous
+la forme «~sous indépendance des unités d'observation~». Aucune estimation
+ponctuelle ne la porte, et la colonne \code{loi\_supposee} est inchangée.
+Le tableau abrège la mention.
 
 {\small
 \rowcolors{2}{tablerow}{white}
@@ -11579,16 +11600,16 @@ exacts.
 \textcolor{financeblue}{\textbf{Loi supposée}} \\
 \endhead
 \code{poisson}, taux & sans objet (estimation ponctuelle) & résultat exact~: maximum de vraisemblance du modèle à force constante dans la cellule & force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson) \\
-\code{poisson}, taux & exact & exact sous la loi supposée~: couverture $\ge$ niveau pour tout $\mu$, $E^c$ tenue pour fixe~; sous le modèle de survie ($E^c$ aléatoire), couverture seulement asymptotique & $D \sim \mathcal{P}(\mu E^c)$, $E^c$ fixe \\
-\code{poisson}, taux & asymptotique & asymptotique ($\mu E^c \to \infty$)~; non défini à $D = 0$ & $D \sim \mathcal{P}(\mu E^c)$ \\
+\code{poisson}, taux & exact & exact sous la loi supposée~: couverture $\ge$ niveau pour tout $\mu$, $E^c$ tenue pour fixe~; sous le modèle de survie ($E^c$ aléatoire), couverture seulement asymptotique~; unités d'observation indépendantes~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & $D \sim \mathcal{P}(\mu E^c)$, $E^c$ fixe \\
+\code{poisson}, taux & asymptotique & asymptotique ($\mu E^c \to \infty$)~; non défini à $D = 0$~; unités d'observation indépendantes~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & $D \sim \mathcal{P}(\mu E^c)$ \\
 \code{poisson}, probabilité & sans objet & résultat exact~: image du maximum de vraisemblance par $q = 1 - e^{-\mu}$, force constante sur la cellule entière & force constante dans la cellule \\
-\code{poisson}, probabilité & exact & exact sous la loi supposée (transformation croissante des bornes exactes du taux~: couverture identique) & $D \sim \mathcal{P}(\mu E^c)$, $E^c$ fixe \\
-\code{poisson}, probabilité & asymptotique & asymptotique (transformation croissante des bornes asymptotiques du taux~: même régime)~; non défini à $D = 0$ & $D \sim \mathcal{P}(\mu E^c)$ \\
+\code{poisson}, probabilité & exact & exact sous la loi supposée (transformation croissante des bornes exactes du taux~: couverture identique)~; unités d'observation indépendantes~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & $D \sim \mathcal{P}(\mu E^c)$, $E^c$ fixe \\
+\code{poisson}, probabilité & asymptotique & asymptotique (transformation croissante des bornes asymptotiques du taux~: même régime)~; non défini à $D = 0$~; unités d'observation indépendantes~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & $D \sim \mathcal{P}(\mu E^c)$ \\
 \code{binomial}, taux & sans objet & estimateur des moments~: $E[D] = q\,E[E^i]$ exactement sous l'hypothèse de répartition~; convergent~; non sans biais à effectif fini & ${}_{1-t}q_{x+t} = (1 - t)q_x$, censure indépendante \\
-\code{binomial}, taux & exact & exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, $E^i$ entier)~; avec une entrée ou une censure dans la cellule, couverture non établie, même si $E^i$ est entier (prolongement continu de la formule exacte si $E^i$ n'est pas entier) & $D \sim \mathcal{B}(E^i, q)$, $E^i$ fixe \\
-\code{binomial}, taux & asymptotique & asymptotique ($E^i q(1-q) \to \infty$) pour une cellule observée entière~; avec une entrée ou une censure dans la cellule, couverture non établie~; non défini à $D = 0$ et à $D = E^i$ & $D \sim \mathcal{B}(E^i, q)$ \\
+\code{binomial}, taux & exact & exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, $E^i$ entier)~; avec une entrée ou une censure dans la cellule, couverture non établie, même si $E^i$ est entier (prolongement continu de la formule exacte si $E^i$ n'est pas entier)~; unités d'observation indépendantes~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & $D \sim \mathcal{B}(E^i, q)$, $E^i$ fixe \\
+\code{binomial}, taux & asymptotique & asymptotique ($E^i q(1-q) \to \infty$) pour une cellule observée entière~; avec une entrée ou une censure dans la cellule, couverture non établie~; non défini à $D = 0$ et à $D = E^i$~; unités d'observation indépendantes~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & $D \sim \mathcal{B}(E^i, q)$ \\
 \code{kaplan\_meier}, taux & sans objet & résultat exact~: maximum de vraisemblance non paramétrique (risques discrets aux instants d'événement)~; non sans biais à effectif fini & troncature à gauche et censure non informatives, unités indépendantes~; aucune hypothèse de répartition dans la cellule \\
-\code{kaplan\_meier}, variance & sans objet & asymptotique (méthode delta sur $\log \hat P$, ensemble à risque $\to \infty$ sur toute la cellule)~; non définie à $q = 0$ et $q = 1$ & idem \\
+\code{kaplan\_meier}, variance & sans objet & asymptotique (méthode delta sur $\log \hat P$, ensemble à risque $\to \infty$ sur toute la cellule)~; non définie à $q = 0$ et $q = 1$~; unités d'observation indépendantes~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend la variance trop faible~; relevé \code{tetes\_multi\_contrats}) & idem \\
 \code{kaplan\_meier}, taux & asymptotique & asymptotique (ensemble à risque $\to \infty$ sur toute la cellule), sous indépendance des unités d'observation~; non défini à $q = 0$ et $q = 1$~; sous l'unité contrat, contrats d'une même tête supposés indépendants (une dépendance positive rend l'intervalle trop étroit~; relevé \code{tetes\_multi\_contrats}) & idem \\
 \code{kaplan\_meier}, taux & exact & aucun~: non restitué (sous troncature et censure, $D$ ne suit aucune loi binomiale) & sans objet \\
 \end{longtable}
@@ -11764,6 +11785,23 @@ l'appellation d'auteur retirée par la décision M267 dans tous les textes de
 \code{STATUTS\_VALIDATION}~; et, de bout en bout sur une construction à
 trois estimateurs, des statuts de l'étape et de la fiche \code{identical()}
 à \code{STATUTS\_BRUT}.
+
+\medskip
+\code{tests/unitaires/test\_independance\_unites.R} (issue~\#159, critère
+C3~; onze tests) vérifie la mention d'indépendance des unités, comptée par
+ligne sur les octets, donc sans dépendre de la locale~: exactement une fois
+sur les lignes~2, 3, 5, 6, 8, 9, 11 et~12 de \code{STATUTS\_BRUT} et sur
+aucune autre, à la fin du statut (sauf la ligne~12, inchangée), jamais dans
+\code{loi\_supposee}~; une fois sur les 22~lignes de loi de
+\code{STATUTS\_VALIDATION}, sur les 16~lignes de
+\code{STATUTS\_VALIDATION\_POSITIONNEE}, sur aucune de
+\code{STATUTS\_VALIDATION\_LISSEE}, sur les quatre lignes de loi de
+\code{STATUTS\_IMPORTANCE}, avec le texte et la place attendus~; au plus
+une fois par ligne dans les sept tables de statuts (positionnement et
+homogénéité compris)~; les mêmes décomptes dans un sous-processus sous
+\code{LC\_ALL=C}~; trois témoins d'altération, sur des copies des tables,
+où le contrôle signale l'écart (littéraux de la spécification, identité
+exacte et valeurs calculées à la main).
 
 \medskip
 \code{tests/unitaires/test\_brut\_kaplan\_meier.R} vérifie l'estimateur
@@ -14205,7 +14243,24 @@ $E$ étant l'exposition d'une tête dont les $k$ contrats couvrent la même
 période (exact sous le modèle de Poisson par tête dans ce cas), ce qui rend les tests
 \textbf{anti-conservateurs} (p-valeurs trop petites, intervalles trop
 étroits)~; $\varphi$ n'est pas mesurable sans identifiant de tête, et le
-rapport figé le mentionne (section~\ref{sec:rapport-fige}). Les
+rapport figé le mentionne (section~\ref{sec:rapport-fige}). Dans
+\code{STATUTS\_VALIDATION} (relations \code{independante} et
+\code{ajustee\_hors\_outil}), le statut de chacune des 22~grandeurs qui affirment une loi se termine par cette
+hypothèse (issue~\#159)~: «~unités d'observation indépendantes~; sous
+l'unité contrat, les décès sont sur-dispersés et les tests sont
+anti-conservateurs~» pour 19~d'entre elles (espérances et variance sous
+$H_0$~(i), p-valeurs fondées sur $H_0$~(i), dont celles de Monte-Carlo,
+racine cubique du SMR, p-valeurs des sous-groupes), «~\ldots{} et
+l'intervalle est trop étroit~» pour les trois bornes exactes (SMR global
+et sous-groupes)~; dans les deux lignes des sous-groupes, elle précède le
+texte propre à la relation \code{ajustee\_hors\_outil}. Les autres
+grandeurs (décomptes et grandeurs descriptives, degrés de liberté, SMR
+ponctuel, erreurs de Monte-Carlo, grandeurs calculées sous une hypothèse
+qui n'est pas $H_0$~(i)) ne la portent pas. Sous \code{positionnee},
+toutes les lignes de loi de \code{STATUTS\_VALIDATION\_POSITIONNEE} sont
+des lignes remplacées, qui portent leur propre mention (décision M278~;
+16~lignes) et n'héritent donc pas de celle de \code{STATUTS\_VALIDATION}~;
+sous \code{lissee}, aucune ligne ne la porte (issue~\#329). Les
 statistiques portent sur les seules cellules de $C^{+}$~; la
 table~\ref{tab:statistiques-validation} en donne la liste et les statuts,
 que la constante \code{STATUTS\_VALIDATION} écrit, grandeur par grandeur,
@@ -15857,7 +15912,14 @@ l'échelle de $\log(\mathrm{SMR})$, variance $1/D_e$, non défini à $D_e =
 $\operatorname{Var}(\hat A)/E[D_e]$, $\operatorname{Var}(\hat A)$ exacte
 sous Poisson à $\mu$ connu, $E^c$ fixe~; couverture limite~: résultat
 asymptotique~; couverture observée~: \textbf{constat de simulation}
-(ci-dessous). Les textes de \code{STATUTS\_IMPORTANCE} désignent les
+(ci-dessous). Les quatre statuts qui affirment une loi (bornes exactes et
+asymptotiques du comparateur~1, rapport de variance, bornes du
+comparateur~2) se terminent par l'hypothèse d'indépendance des unités
+(issue~\#159)~: «~unités d'observation indépendantes~; sous l'unité
+contrat, les décès sont sur-dispersés et l'intervalle est trop étroit~»,
+ou, pour le rapport de variance, «~\ldots{} et $\operatorname{Var}(\hat A)$
+est sous-estimée~»~; pour le comparateur~2, la mention précède le texte
+propre à la relation \code{ajustee\_hors\_outil}. Les textes de \code{STATUTS\_IMPORTANCE} désignent les
 intervalles par leur formule, sans attribution d'auteur (issue~\#31~;
 décision M267).
 
