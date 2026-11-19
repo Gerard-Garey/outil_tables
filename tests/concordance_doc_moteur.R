@@ -22,7 +22,8 @@
 #       `export`), un catalogue requis (type `catalogue`) ou une entrée de
 #       catalogue (type `entree`, nom de la forme `<catalogue>:<nom>`, nom
 #       de la source d'un catalogue requis qui n'est pas lui-même en
-#       attente) et porte un renvoi d'issue « #N » ; aucune ligne en double ;
+#       attente), un écart de citation (type `citation`, nom `marqueurs`, contrôle
+#       7) et porte un renvoi d'issue « #N » ; aucune ligne en double ;
 #    4. entrées \catalogue{<catalogue>}{<nom>} (CONVENTIONS.md, section 3.2 ;
 #       `\_` lu `_`, un `()` final retiré) :
 #       - une occurrence de \catalogue que le motif ne lit pas (ligne où
@@ -117,6 +118,42 @@
 #       Hors du motif : \hspace{0pt}, \- et \linebreak[0], qui coupent aussi
 #       sans que ce contrôle les voie.
 #
+#    7. citations « mot pour mot » (#130 ; CONVENTIONS.md, section 3.5) : une
+#       citation d'un libellé de CONVENTIONS_TEXTE ou de MENTIONS_RAPPORT
+#       (R/rapport.R) est désignée par un marqueur, ligne de commentaire
+#       LaTeX `% citation : CONVENTIONS_TEXTE["doubles"]` (lue sur le texte
+#       brut : les marqueurs sont des commentaires), suivie de la citation entre
+#       « » ; l'exemption, pour une phrase « mot pour mot » qui ne cite aucune
+#       constante, est `% citation : aucune (motif)` :
+#       - un marqueur illisible est un écart : toute ligne de commentaire de la
+#         forme `^\s*%+\s*citations?\s*:` (casse indifférente) est lue comme
+#         marqueur, valide seulement sous l'une des deux formes ci-dessus,
+#         exactes (`% Citation :`, `%% citation :`, `% citations :` sont
+#         illisibles) ; une constante autre que CONVENTIONS_TEXTE et
+#         MENTIONS_RAPPORT, un motif d'exemption vide en sont aussi ;
+#       - le libellé existe dans la constante, la citation « » existe entre le
+#         marqueur et la fin de son paragraphe (ligne blanche ou marqueur
+#         suivant) ; sinon écart ;
+#       - la citation, normalisée par la règle fermée (\code{x} lu x, ~ lu une
+#         espace, \% lu %, \_ lu _, blancs consécutifs réduits à une espace,
+#         blancs de bord retirés), est égale à la valeur de la constante dans
+#         l'espace de noms de tablexp ; sinon le message donne le libellé, les
+#         lignes et la première position d'écart (points de code du texte
+#         normalisé) ;
+#       - toute expression « mot pour mot » du texte (commentaires retirés,
+#         casse et passage à la ligne indifférents ; mots bornés, « mot pour
+#         motiver » n'en est pas une ; blancs, `~` et `\ ` admis entre les
+#         mots) est suivie, à la ligne qui suit celle où elle se termine, d'un
+#         marqueur ; sinon écart, attendu s'il est déclaré dans la liste
+#         d'attente (type `citation`, nom `marqueurs`), succès inattendu dès que
+#         tout est marqué.
+#       Limites : un libellé dont la valeur porte une barre oblique inverse,
+#       une accolade, un `~`, un `#`, un `$`, un `&`, un `^`, un « ou un », des
+#       blancs de bord ou deux blancs consécutifs ne se cite pas sous cette
+#       règle fermée (le texte LaTeX correspondant n'est pas l'inverse de la
+#       normalisation) ; une phrase qui cite sans écrire « mot pour mot » n'est
+#       pas vue.
+#
 #  docs/latex/ doit exister (LATEX_EXIGE) ; un dossier donné par --latex doit
 #  exister ; une option sans valeur est un échec.
 #
@@ -153,11 +190,15 @@ FICHIER_ATTENTE <- option("--attente", file.path(RACINE, "tests", "concordance_a
 # la batterie.
 LATEX_EXIGE <- TRUE
 COLONNES_ATTENTE <- c("type", "nom", "issue", "motif")
-TYPES_ATTENTE <- c("export", "catalogue", "entree", "fiche")
+TYPES_ATTENTE <- c("export", "catalogue", "entree", "fiche", "citation")
 # Contrôles 5 : constantes de version (nom de la constante) et deux listes.
 CONSTANTES_VERSION <- c("VERSION_FICHE", "ENTETE_CANONIQUE", "REPRESENTATION_RESULTAT", "REPRESENTATION_TABLE",
                         "REPRESENTATION_DECALAGES", "PREMIERE_LIGNE_PLAN", "PREMIERE_LIGNE_FICHE")
 NOMS_ATTENTE_FICHE <- c(CONSTANTES_VERSION, "champs_fiche", "blocs_lecture")
+# Contrôle 7 : constantes de R/rapport.R dont une citation est contrôlée, et
+# nom de l'écart transitoire admis dans la liste d'attente (type citation).
+CONSTANTES_CITABLES <- c("CONVENTIONS_TEXTE", "MENTIONS_RAPPORT")
+NOMS_ATTENTE_CITATION <- "marqueurs"
 # Noms cités dans la liste des champs de la fiche qui ne sont ni un nom de la
 # fiche (à tous les niveaux), ni un objet de tablexp, ni une valeur de
 # ESTIMATEURS_BRUT : les valeurs NA et NULL, le type integer, le code
@@ -213,14 +254,20 @@ retirer_commentaires <- function(lignes) {
   ifelse(p > 0L, substr(lignes, 1L, fin - 1L), lignes)
 }
 
-# Lignes des .tex du dossier, commentaires LaTeX retirés.
-texte_latex <- function(dossier) {
+# Lignes des .tex du dossier : data.frame(fichier, ligne, brut, texte), `fichier`
+# relatif au dossier, `ligne` numérotée dans le fichier, `brut` la ligne lue,
+# `texte` la ligne sans commentaire LaTeX. Les contrôles qui lisent le texte
+# prennent `texte` ; ceux qui lisent les commentaires (marqueurs, contrôle 7) ou
+# qui rapportent un emplacement fichier:ligne prennent `brut`, `fichier`, `ligne`.
+lignes_latex <- function(dossier) {
   tex <- if (dir.exists(dossier))
-    list.files(dossier, pattern = "\\.tex$", recursive = TRUE, full.names = TRUE) else character(0)
-  if (!length(tex)) return(character(0))
+    list.files(dossier, pattern = "\\.tex$", recursive = TRUE) else character(0)
   # Sans encoding = : chaînes non marquées (voir octets_utf8()).
-  texte <- unlist(lapply(tex, readLines, warn = FALSE))
-  retirer_commentaires(texte)
+  brut <- lapply(tex, function(f) readLines(file.path(dossier, f), warn = FALSE))
+  d <- data.frame(fichier = rep(tex, lengths(brut)), ligne = as.integer(unlist(lapply(lengths(brut), seq_len))),
+                  brut = as.character(unlist(brut)), stringsAsFactors = FALSE)
+  d$texte <- if (nrow(d)) retirer_commentaires(d$brut) else character(0)
+  d
 }
 
 # Citations \code{nom()} ou \code{pkg::nom()}.
@@ -312,7 +359,8 @@ SOURCES_CATALOGUES <- octets_utf8(local({
 # Catalogues où `()` marque une fonction ; ailleurs, aucun nom n'en porte.
 avec_fonctions <- function(catalogue) catalogue == "exports" || startsWith(catalogue, "fonctions-")
 
-texte <- texte_latex(DOSSIER_LATEX)
+lignes <- lignes_latex(DOSSIER_LATEX)
+texte <- lignes$texte
 entrees <- entrees_catalogue(texte)
 cites <- sort(unique(c(citations_latex(texte), entrees$nom[entrees$fonction])))
 exports <- octets_utf8(sort(getNamespaceExports("tablexp")))
@@ -330,6 +378,7 @@ attente_entrees <- attente[attente$type %in% "entree", , drop = FALSE]
 attente_entrees$catalogue <- sub(":.*$", "", attente_entrees$nom)
 attente_entrees$entree <- sub("^[^:]*:", "", attente_entrees$nom)
 attente_fiche <- attente[attente$type %in% "fiche", , drop = FALSE]
+attente_citation <- attente[attente$type %in% "citation", , drop = FALSE]
 
 cat(sprintf("Documentation : %s (%d fonction(s) citée(s), %d entrée(s) de catalogue)\n",
             DOSSIER_LATEX, length(cites), nrow(entrees)))
@@ -371,7 +420,7 @@ for (n in exports) {
 fichier_courant("3. liste d'attente")
 for (i in seq_len(nrow(attente))) {
   etiquette <- sprintf("attente %s %s", attente$type[i], attente$nom[i])
-  verifier(sprintf("%s : type admis (export, catalogue, entree, fiche)", etiquette),
+  verifier(sprintf("%s : type admis (export, catalogue, entree, fiche, citation)", etiquette),
            if (attente$type[i] %in% TYPES_ATTENTE) TRUE else sprintf("type « %s »", attente$type[i]))
   if (identical(attente$type[i], "export"))
     verifier(sprintf("%s : export existant", etiquette),
@@ -393,6 +442,10 @@ for (i in seq_len(nrow(attente))) {
     verifier(sprintf("%s : constante de version, champs_fiche ou blocs_lecture", etiquette),
              if (attente$nom[i] %in% NOMS_ATTENTE_FICHE) TRUE
              else sprintf("« %s » hors de : %s", attente$nom[i], paste(NOMS_ATTENTE_FICHE, collapse = ", ")))
+  if (identical(attente$type[i], "citation"))
+    verifier(sprintf("%s : écart de citation admis", etiquette),
+             if (attente$nom[i] %in% NOMS_ATTENTE_CITATION) TRUE
+             else sprintf("« %s » hors de : %s", attente$nom[i], paste(NOMS_ATTENTE_CITATION, collapse = ", ")))
   verifier(sprintf("%s : renvoi d'issue \"#N\"", etiquette),
            if (grepl(MOTIF_ISSUE, attente$issue[i])) TRUE else sprintf("issue « %s »", attente$issue[i]))
 }
@@ -628,6 +681,144 @@ verifier("aucun nom de fonction coupé par \\allowbreak entre deux \\code{} (\\c
          if (!length(coupes)) TRUE
          else sprintf("%d occurrence(s) : %s", length(coupes),
                       paste(sprintf("« %s »", gsub("\n", " ", coupes)), collapse = ", ")))
+
+fichier_courant("7. citations « mot pour mot » des constantes de R/rapport.R (#130)")
+# Règle de normalisation, fermée (CONVENTIONS.md, section 3.5) : \code{x} lu x,
+# `~` lu une espace, `\%` lu `%`, `\_` lu `_`, blancs consécutifs réduits à une
+# espace, blancs de bord retirés (dans « «~texte~» », le `~` de bord est une espace).
+normaliser_citation <- function(x) {
+  x <- gsub("\\\\code\\{([^{}]*)\\}", "\\1", x)
+  x <- gsub("~", " ", x, fixed = TRUE)
+  x <- gsub("\\%", "%", x, fixed = TRUE)
+  x <- gsub("\\_", "_", x, fixed = TRUE)
+  trimws(gsub("[[:space:]]+", " ", x))
+}
+# Première position (point de code, de 1 à n + 1) où deux textes diffèrent, NA
+# s'ils sont égaux ; utf8ToInt() lit les octets comme de l'UTF-8 quelle que soit
+# la locale.
+premiere_difference <- function(a, b) {
+  ca <- utf8ToInt(a); cb <- utf8ToInt(b)
+  n <- min(length(ca), length(cb))
+  i <- which(ca[seq_len(n)] != cb[seq_len(n)])
+  if (length(i)) i[1L] else if (length(ca) == length(cb)) NA_integer_ else n + 1L
+}
+# Les `n` premiers points de code de chaque élément de `x` (pas d'octets : sous
+# la locale C, substr() couperait un caractère en deux).
+tronquer <- function(x, n)
+  vapply(x, function(y) {
+    cp <- utf8ToInt(y)
+    octets_utf8(intToUtf8(cp[seq_len(min(n, length(cp)))]))
+  }, "", USE.NAMES = FALSE)
+# Voisinage de la position `pos` (points de code) de `x`, pour un message.
+voisinage <- function(x, pos, marge = 15L) {
+  cp <- utf8ToInt(x)
+  if (pos > length(cp)) return("(fin du texte)")
+  sprintf("« %s »", octets_utf8(intToUtf8(cp[max(1L, pos - marge):min(length(cp), pos + marge)])))
+}
+# Toute ligne de commentaire qui ressemble à un marqueur (`%` en nombre
+# quelconque, « Citation » ou « citations », casse indifférente) est lue comme
+# tel ; elle est valide seulement sous la forme exacte (un `%`, « citation »
+# en minuscules au singulier), sinon c'est un marqueur illisible.
+MOTIF_MARQUEUR_APPROCHE <- "^[[:space:]]*%+[[:space:]]*citations?[[:space:]]*:"
+MOTIF_MARQUEUR <- "^[[:space:]]*%[[:space:]]*citation[[:space:]]*:[[:space:]]*"
+MOTIF_MARQUEUR_CONSTANTE <- "^([A-Z_]+)\\[\"([^\"]+)\"\\][[:space:]]*$"
+MOTIF_MARQUEUR_AUCUNE <- "^aucune[[:space:]]*\\([^()[:space:]][^()]*\\)[[:space:]]*$"
+# Expression bornée (ni lettre ASCII, ni chiffre, ni souligné de part et d'autre :
+# « mot pour motiver » n'en est pas une), séparée par des blancs, `~` ou `\ `.
+MOTIF_MOT_POUR_MOT <- "(?<![A-Za-z0-9_])mot(?:[[:space:]~]|\\\\ )+pour(?:[[:space:]~]|\\\\ )+mot(?![A-Za-z0-9_])"
+# Marqueurs : data.frame(fichier, ligne, forme, constante, libelle), `forme`
+# valant constante, aucune ou illisible, lus sur le texte brut.
+lire_marqueurs <- function(lignes) {
+  est <- grepl(MOTIF_MARQUEUR_APPROCHE, lignes$brut, ignore.case = TRUE)
+  exact <- grepl(MOTIF_MARQUEUR, lignes$brut[est])
+  corps <- sub(MOTIF_MARQUEUR, "", lignes$brut[est])
+  forme <- ifelse(exact & grepl(MOTIF_MARQUEUR_CONSTANTE, corps), "constante",
+                  ifelse(exact & grepl(MOTIF_MARQUEUR_AUCUNE, corps), "aucune", "illisible"))
+  data.frame(fichier = lignes$fichier[est], ligne = lignes$ligne[est], forme = forme,
+             constante = ifelse(forme == "constante", sub(MOTIF_MARQUEUR_CONSTANTE, "\\1", corps), NA_character_),
+             libelle = ifelse(forme == "constante", sub(MOTIF_MARQUEUR_CONSTANTE, "\\2", corps), NA_character_),
+             stringsAsFactors = FALSE)
+}
+# Citation « » qui suit la ligne `j` d'un fichier (`f` : toutes les lignes du
+# fichier) : data.frame d'une ligne (texte, ligne) ou chaîne qui décrit
+# l'écart. Zone lue : de la ligne suivante à la dernière ligne avant la
+# première ligne blanche ou le premier marqueur, texte sans commentaire ; deux
+# lignes se joignent par une espace, sauf si la première portait un commentaire
+# (un `%` de fin de ligne colle les lignes, LaTeX).
+citation_apres <- function(f, j) {
+  suite <- seq_len(nrow(f))[seq_len(nrow(f)) > j]
+  arret <- suite[grepl("^[[:space:]]*$", f$brut[suite]) | grepl(MOTIF_MARQUEUR_APPROCHE, f$brut[suite], ignore.case = TRUE)]
+  zone <- if (length(arret)) suite[suite < arret[1L]] else suite
+  if (!length(zone)) return("aucune ligne entre le marqueur et la fin de son paragraphe")
+  t <- f$texte[zone]
+  collee <- t != f$brut[zone]
+  zone_texte <- paste0(t, ifelse(collee, "", " "), collapse = "")
+  ouvrante <- regexpr("«", zone_texte, fixed = TRUE)
+  if (ouvrante < 0L) return("aucune citation « » entre le marqueur et la fin de son paragraphe")
+  reste <- substring(zone_texte, ouvrante + attr(ouvrante, "match.length"))
+  fermante <- regexpr("»", reste, fixed = TRUE)
+  if (fermante < 0L) return("citation « non fermée par » avant la fin du paragraphe")
+  data.frame(texte = substr(reste, 1L, fermante - 1L),
+             ligne = f$ligne[zone][which(grepl("«", t, fixed = TRUE))[1L]], stringsAsFactors = FALSE)
+}
+# Écart du marqueur `m` (une ligne de lire_marqueurs()) : TRUE ou la description.
+ecart_citation <- function(m, f) {
+  if (!(m$constante %in% CONSTANTES_CITABLES))
+    return(sprintf("constante %s non citable (admises : %s)", m$constante, paste(CONSTANTES_CITABLES, collapse = ", ")))
+  valeurs <- octets_utf8(NS[[m$constante]])
+  if (!(m$libelle %in% names(valeurs)))
+    return(sprintf("libellé « %s » inexistant dans %s", m$libelle, m$constante))
+  c_ <- citation_apres(f, m$ligne)
+  if (is.character(c_)) return(c_)
+  doc <- normaliser_citation(c_$texte)
+  attendu <- valeurs[[m$libelle]]
+  pos <- premiere_difference(doc, attendu)
+  if (is.na(pos)) return(TRUE)
+  sprintf("première différence à la position %d du texte normalisé : document %s, constante %s (citation ligne %d)",
+          pos, voisinage(doc, pos), voisinage(attendu, pos), c_$ligne)
+}
+marqueurs <- lire_marqueurs(lignes)
+expressions <- local({
+  r <- list()
+  for (fi in unique(lignes$fichier)) {
+    f <- lignes[lignes$fichier == fi, , drop = FALSE]
+    plein_f <- paste0(f$texte, "\n", collapse = "")
+    debuts <- cumsum(c(1L, nchar(f$texte) + 1L))
+    p <- gregexpr(MOTIF_MOT_POUR_MOT, plein_f, ignore.case = TRUE, perl = TRUE)[[1L]]
+    if (p[1L] > 0L) {
+      fin <- p + attr(p, "match.length") - 1L
+      l <- f$ligne[findInterval(fin, debuts)]
+      r[[fi]] <- data.frame(fichier = fi, ligne = l, texte = trimws(f$texte[match(l, f$ligne)]), stringsAsFactors = FALSE)
+    }
+  }
+  if (length(r)) do.call(rbind, r) else data.frame(fichier = character(0), ligne = integer(0), texte = character(0))
+})
+cat(sprintf("Marqueurs de citation : %d ; expressions « mot pour mot » : %d\n", nrow(marqueurs), nrow(expressions)))
+
+verifier("marqueurs `% citation :` tous lisibles (CONSTANTE[\"libellé\"] ou aucune (motif))", {
+  il <- marqueurs[marqueurs$forme == "illisible", , drop = FALSE]
+  if (nrow(il)) paste("marqueur illisible :", paste(sprintf("%s ligne %d", il$fichier, il$ligne), collapse = " ; "))
+  else TRUE
+})
+for (i in which(marqueurs$forme == "constante")) {
+  m <- marqueurs[i, , drop = FALSE]
+  r <- ecart_citation(m, lignes[lignes$fichier == m$fichier, , drop = FALSE])
+  verifier(sprintf("citation %s[\"%s\"] (%s ligne %d) égale à la valeur de la constante", m$constante, m$libelle,
+                   m$fichier, m$ligne), r)
+}
+non_marquees <- expressions[!(paste(expressions$fichier, expressions$ligne + 1L) %in%
+                                paste(marqueurs$fichier, marqueurs$ligne)), , drop = FALSE]
+ligne_citation <- attente_citation[attente_citation$nom == "marqueurs", , drop = FALSE]
+r_marquees <- if (!nrow(non_marquees)) TRUE else
+  sprintf("%d expression(s) sans marqueur sur la ligne suivante : %s", nrow(non_marquees),
+          paste(sprintf("%s ligne %d « %s »", non_marquees$fichier, non_marquees$ligne,
+                        tronquer(non_marquees$texte, 60L)), collapse = " ; "))
+if (nrow(ligne_citation) == 1L && grepl(MOTIF_ISSUE, ligne_citation$issue)) {
+  echec_attendu("toute expression « mot pour mot » est suivie d'un marqueur de citation", ligne_citation$issue,
+                if (isTRUE(r_marquees)) TRUE else sprintf("%s (%s)", r_marquees, ligne_citation$motif))
+} else {
+  verifier("toute expression « mot pour mot » est suivie d'un marqueur de citation", r_marquees)
+}
 
 if (!STRICT) cat("\nMode rapport : code de sortie 0 même en cas d'écart (--strict pour échouer).\n")
 bilan(code_sortie = STRICT)

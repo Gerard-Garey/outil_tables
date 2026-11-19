@@ -1759,6 +1759,143 @@ verifier("concordance \\allowbreak : six noms coupés (même ligne, fin de ligne
                          "« \\code{lire\\_} \\allowbreak\\code{plan( »")) })
 unlink(attente_vide)
 
+# --- concordance : citations « mot pour mot » (contrôle 7 ; #130) -----------------
+#
+# Témoins sur le document minimal du bloc #70 (état juste) auquel on ajoute des
+# marqueurs `% citation : CONSTANTE["libellé"]` suivis de la citation « »,
+# construite ici, indépendamment du script, par l'inverse de la règle de
+# normalisation (% -> \%, _ -> \_, espaces et retours à la ligne), sur les
+# valeurs de CONVENTIONS_TEXTE et de MENTIONS_RAPPORT. Une valeur dont l'écriture
+# LaTeX n'est pas l'inverse de la règle fermée (barre oblique inverse, accolade,
+# ~, #, $, &, ^, « ou » qui borneraient la citation, blancs de bord ou doubles)
+# ne se cite pas : elle est écartée du témoin, et l'écart est compté ci-dessous. Les témoins opèrent sur une copie
+# temporaire, jamais sur docs/latex/.
+attente_vide <- attente_temoin(character(0))
+CITABLES <- list(CONVENTIONS_TEXTE = NS_TABLEXP[["CONVENTIONS_TEXTE"]], MENTIONS_RAPPORT = NS_TABLEXP[["MENTIONS_RAPPORT"]])
+citable <- function(v) !grepl("[\\\\~{}#$&^\u00ab\u00bb]|[[:space:]]{2}|^[[:space:]]|[[:space:]]$", v)
+libelles_citables <- lapply(CITABLES, function(v) names(v)[vapply(v, citable, logical(1L)) & !grepl("[^a-z0-9_]", names(v))])
+latex_citation <- function(v) {
+  l <- strwrap(gsub("_", "\\_", gsub("%", "\\%", v, fixed = TRUE), fixed = TRUE), width = 70)
+  l[1L] <- paste0("«~", l[1L]); l[length(l)] <- paste0(l[length(l)], "~»")
+  l
+}
+marqueur <- function(constante, libelle) sprintf("%% citation : %s[\"%s\"]", constante, libelle)
+bloc_citation <- function(constante, libelle, valeur = CITABLES[[constante]][[libelle]])
+  c("", marqueur(constante, libelle), latex_citation(valeur))
+blocs_justes <- unlist(lapply(names(CITABLES), function(k)
+  unlist(lapply(libelles_citables[[k]], function(l) bloc_citation(k, l)))), use.names = FALSE)
+# Phrases « mot pour mot » marquées : citation d'une constante, exemptions (dont
+# l'expression coupée par un passage à la ligne).
+phrases_marquees <- c("", "Le moteur écrit, mot pour mot~:", marqueur("CONVENTIONS_TEXTE", "dates"),
+                      latex_citation(CITABLES$CONVENTIONS_TEXTE[["dates"]]),
+                      "", "Un test relit la mention mot pour mot,", "% citation : aucune (témoin : test, aucune constante citée)",
+                      "puis la mention dite mot", "pour mot~;", "% citation : aucune (témoin : expression coupée par un retour à la ligne)",
+                      "", "Un autre test relit mot\\ pour\\ mot,", "% citation : aucune (témoin : espaces de contrôle)",
+                      # pas des expressions : mots non bornés
+                      "", "Le calcul est motivé : mot pour motiver, mot pour moteur, automot pour mots.")
+lignes_justes <- fiche_temoin(phrase = c(blocs_justes, phrases_marquees))
+# Écrit en octets (writeLines(useBytes = TRUE)) : sous la locale C, cat() d'une
+# chaîne marquée UTF-8 écrit « <U+00EE> ».
+writeLines(enc2utf8(sprintf("Temoin des citations : %d libelle(s) citable(s) sur %d (CONVENTIONS_TEXTE : %s non citables ; MENTIONS_RAPPORT : %d non citables)",
+                            sum(lengths(libelles_citables)), sum(lengths(CITABLES)),
+                            paste(setdiff(names(CITABLES$CONVENTIONS_TEXTE), libelles_citables$CONVENTIONS_TEXTE), collapse = ", "),
+                            length(CITABLES$MENTIONS_RAPPORT) - length(libelles_citables$MENTIONS_RAPPORT))),
+           useBytes = TRUE)
+verifier("concordance citations : témoin exact (tous les libellés citables, exemptions) -> code 0",
+         { d <- latex_temoin(lignes_justes); on.exit(unlink(d, recursive = TRUE))
+           passe(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide))) })
+verifier("concordance citations : le témoin cite doubles (valeur avec %) et au moins une valeur à souligné",
+         all(c("doubles", "dates") %in% libelles_citables$CONVENTIONS_TEXTE) &&
+           any(grepl("_", CITABLES$MENTIONS_RAPPORT[libelles_citables$MENTIONS_RAPPORT], fixed = TRUE)) &&
+           any(grepl("\\%", lignes_justes, fixed = TRUE)) && any(grepl("\\_", lignes_justes, fixed = TRUE)))
+# Critère 3 : un caractère altéré dans la copie de la citation de doubles ; le
+# message donne le libellé, la ligne du marqueur et la première position d'écart
+# (point de code du texte normalisé, de 1).
+doubles <- CITABLES$CONVENTIONS_TEXTE[["doubles"]]
+pos_altere <- regexpr("17 chiffres", doubles, fixed = TRUE)[[1L]] + 1L
+lignes_altere <- fiche_temoin(phrase = c(bloc_citation("CONVENTIONS_TEXTE", "doubles",
+                                                       sub("17 chiffres", "18 chiffres", doubles, fixed = TRUE)),
+                                         bloc_citation("MENTIONS_RAPPORT", "titre_document")))
+ligne_marqueur <- which(lignes_altere == marqueur("CONVENTIONS_TEXTE", "doubles"))
+verifier("concordance citations : un caractère altéré (17 -> 18) -> échec, libellé, ligne et position d'écart",
+         { d <- latex_temoin(lignes_altere); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                       c(sprintf("citation CONVENTIONS_TEXTE[\"doubles\"] (temoin.tex ligne %d) égale à la valeur de la constante",
+                                 ligne_marqueur),
+                         sprintf("première différence à la position %d du texte normalisé", pos_altere),
+                         "document « lu fait foi ; 18 chiffres", "constante « lu fait foi ; 17 chiffres")) })
+# Libellé inexistant, constante hors de la liste, marqueur illisible, citation
+# absente (paragraphe sans « »), citation tronquée du dernier caractère (position
+# n + 1), un marqueur juste en plus : chaque écart a son message.
+tronquee <- substr(CITABLES$CONVENTIONS_TEXTE[["dates"]], 1L, nchar(CITABLES$CONVENTIONS_TEXTE[["dates"]]) - 1L)
+lignes_ecarts <- fiche_temoin(phrase = c(
+  bloc_citation("CONVENTIONS_TEXTE", "libelle_inexistant", "texte quelconque"),
+  bloc_citation("CONSTANTES_INCONNUES", "doubles", "texte quelconque"),
+  "", "% citation : CONVENTIONS_TEXTE[doubles]", "«~texte~»",
+  "", marqueur("MENTIONS_RAPPORT", "titre_document"), "Aucune citation entre guillemets dans ce paragraphe.",
+  "", "% citation : aucune ()", "",
+  bloc_citation("CONVENTIONS_TEXTE", "dates", tronquee),
+  bloc_citation("MENTIONS_RAPPORT", "titre_document")))
+verifier("concordance citations : libellé inexistant, constante inconnue, marqueur illisible, citation absente, citation tronquée -> échec",
+         { d <- latex_temoin(lignes_ecarts); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                       c("libellé « libelle_inexistant » inexistant dans CONVENTIONS_TEXTE",
+                         "constante CONSTANTES_INCONNUES non citable (admises : CONVENTIONS_TEXTE, MENTIONS_RAPPORT)",
+                         "marqueur illisible : temoin.tex ligne", "aucune citation « » entre le marqueur et la fin de son paragraphe",
+                         sprintf("première différence à la position %d du texte normalisé", nchar(tronquee) + 1L),
+                         "citation MENTIONS_RAPPORT[\"titre_document\"] (temoin.tex ligne")) })
+# Critère 4 : une phrase « mot pour mot » sans marqueur sur la ligne suivante
+# (marqueur deux lignes plus loin, ou absent) fait échouer la batterie ; déclarée
+# en attente (type citation), elle est un échec attendu, et un document juste
+# avec la ligne encore là un succès inattendu.
+phrase_longue <- "Éléphants énormes écrivent à l'éditeur une très longue phrase accentuée, mot pour mot."
+lignes_sans_marqueur <- fiche_temoin(phrase = c("", "Le moteur écrit la mention mot pour mot.", "",
+                                                "Autre phrase, dite MOT POUR MOT,", "et sa suite.", marqueur("CONVENTIONS_TEXTE", "dates"),
+                                                latex_citation(CITABLES$CONVENTIONS_TEXTE[["dates"]]),
+                                                "", "Séparateur de contrôle, mot\\ pour\\ mot", "% commentaire", "", phrase_longue))
+debut_longue <- intToUtf8(utf8ToInt(phrase_longue)[1:60])
+attente_citation <- attente_temoin("citation,marqueurs,#130,documentation en retard")
+verifier("concordance citations : deux phrases « mot pour mot » sans marqueur sur la ligne suivante -> échec",
+         { d <- latex_temoin(lignes_sans_marqueur); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                       c("toute expression « mot pour mot » est suivie d'un marqueur de citation",
+                         "4 expression(s) sans marqueur sur la ligne suivante",
+                         "Le moteur écrit la mention mot pour mot.", "Autre phrase, dite MOT POUR MOT,",
+                         "Séparateur de contrôle, mot\\ pour\\ mot",
+                         # tronquée à 60 points de code, sans couper un caractère
+                         sprintf("« %s »", debut_longue))) })
+# m1 : même témoin sous la locale C
+verifier("concordance citations : phrases sans marqueur sous LC_ALL=C -> même verdict, troncature par points de code",
+         { d <- latex_temoin(lignes_sans_marqueur); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(executer_rscript(CONCORDANCE, c("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                                        env = "LC_ALL=C"),
+                       c("4 expression(s) sans marqueur sur la ligne suivante", sprintf("« %s »", debut_longue))) })
+verifier("concordance citations : phrases sans marqueur déclarées en attente (type citation) -> code 0",
+         { d <- latex_temoin(lignes_sans_marqueur); on.exit(unlink(d, recursive = TRUE))
+           passe(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_citation))) })
+verifier("concordance citations : document juste et ligne encore en attente -> succès inattendu, échec",
+         { d <- latex_temoin(lignes_justes); on.exit(unlink(d, recursive = TRUE))
+           echoue(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_citation)), "succès inattendu") })
+verifier("concordance citations : ligne d'attente de type citation à nom inconnu -> échec",
+         { d <- latex_temoin(lignes_justes); on.exit(unlink(d, recursive = TRUE))
+           echoue(concordance("--strict", "--latex", shQuote(d), "--attente",
+                              shQuote(attente_temoin("citation,inconnu,#130,x"))), "hors de : marqueurs") })
+# Marqueurs mal formés : variantes de casse, de nombre de `%` et de nombre du mot,
+# chacune lue comme marqueur et déclarée illisible (une ligne de commentaire qui
+# ressemble à un marqueur n'est jamais ignorée en silence) ; le marqueur exact du
+# même document reste lu.
+variantes <- c("% Citation : CONVENTIONS_TEXTE[\"dates\"]", "%% citation : CONVENTIONS_TEXTE[\"dates\"]",
+               "% citations : CONVENTIONS_TEXTE[\"dates\"]", "% CITATION: aucune (motif)")
+lignes_variantes <- fiche_temoin(phrase = c(unlist(lapply(variantes, function(v) c("", v))),
+                                            bloc_citation("CONVENTIONS_TEXTE", "dates")))
+verifier("concordance citations : `% Citation :`, `%% citation :`, `% citations :`, `% CITATION:` -> marqueurs illisibles, échec",
+         { d <- latex_temoin(lignes_variantes); on.exit(unlink(d, recursive = TRUE))
+           echoue_tous(concordance("--strict", "--latex", shQuote(d), "--attente", shQuote(attente_vide)),
+                       c(sprintf("marqueur illisible : %s",
+                                 paste(sprintf("temoin.tex ligne %d", match(variantes, lignes_variantes)), collapse = " ; ")),
+                         "Marqueurs de citation : 5 ;")) })
+unlink(c(attente_vide, attente_citation))
+
 # --- commits d'une empreinte du code (ADR 0011, annotation du 27/10/2026, (e) ; #89) ---
 # Mode « arbre » et refus : sans git, aussi dans le job « Tests (R 4.3.3) ». Le
 # parcours de l'historique exige git, absent du conteneur de ce job, et un clone
