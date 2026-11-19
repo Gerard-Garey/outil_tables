@@ -146,7 +146,7 @@ verifier("#159 C3 témoin (valeur calculée à la main) : copie de STATUTS_VALID
   if (identical(e1, "smr/p_centrale : 0 au lieu de 1") && identical(e2, "deviance/ddl : 1 au lieu de 0")) TRUE
   else paste("obtenu :", format(e1), "|", format(e2))
 })
-verifier("#159 C3 témoin (valeur calculée à la main) : copie de STATUTS_VALIDATION_POSITIONNEE dont une ligne porte la mention deux fois -> garde générale en échec (2)", {
+verifier("#159 C3 témoin (valeur calculée à la main) : copie de STATUTS_VALIDATION_POSITIONNEE dont une ligne porte la mention deux fois -> décompte par ligne (compter_159) de 2, que la garde générale (au plus 1) refuserait", {
   d <- tablexp:::STATUTS_VALIDATION_POSITIONNEE; i <- which(cle_159(d) == "deviance/p_monte_carlo")
   d$statut[i] <- paste(d$statut[i], ";", M_TESTS_159)
   if (identical(max(compter_159(d$statut)), 2L)) TRUE else "doublon non compté"
