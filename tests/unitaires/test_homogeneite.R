@@ -846,6 +846,26 @@ verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux li
        inf = if (identical(s$statut[15L], inf)) TRUE else "texte de theta_80_inferieur",
        utf8 = if (all(Encoding(s$statut[14:15]) == "UTF-8")) TRUE else "encodage")
 })
+# Audit de #218, constat m3 : le texte des deux statuts ecart_minimal écrit la
+# tolérance en dur, « (1 + 1e-8) » (statut_ecart_minimal()), alors que le calcul
+# lit TOLERANCE_ECART_MINIMAL (R/validation.R). Le test précédent compare le
+# texte à un littéral, pas à la constante : celui-ci relit la valeur citée par
+# chaque statut et la compare à la constante.
+verifier("I statuts ecart_minimal (m3 de #218) : chaque statut cite « (1 + x) » une seule fois, x relu du texte identique à TOLERANCE_ECART_MINIMAL ; littéral 1e-8 ; témoin : une autre valeur est détectée", {
+  tol <- tablexp:::TOLERANCE_ECART_MINIMAL
+  s <- tablexp:::STATUTS_HOMOGENEITE
+  citee <- function(txt) {
+    m <- regmatches(txt, gregexpr("\\(1 \\+ [^)]+\\)", txt))[[1L]]
+    if (length(m) != 1L) return(NA_real_)
+    suppressWarnings(as.numeric(sub("\\)$", "", sub("^\\(1 \\+ ", "", m))))
+  }
+  em <- s$statut[s$table == "ecart_minimal"]
+  v <- vapply(em, citee, 0, USE.NAMES = FALSE)
+  tous(lignes = if (length(em) == 2L) TRUE else "deux statuts ecart_minimal attendus",
+       citee = if (!anyNA(v) && all(v == tol)) TRUE else paste("valeur citée :", format(v), "; constante :", format(tol)),
+       litteral = if (identical(tol, 1e-8)) TRUE else paste("constante :", format(tol)),
+       temoin = if (!is.na(citee("(1 + 1e-9)")) && citee("(1 + 1e-9)") != tol && is.na(citee("sans mention"))) TRUE else "témoin")
+})
 verifier("I table ecart_minimal (F218) : une ligne par segment dans l'ordre des lignes globales de segments, clés de segmentation, theta_80_superieur, etat_superieur, theta_80_inferieur, etat_inferieur ; types (double, character) ; aucune ligne de tranche", {
   em <- H$resultat$ecart_minimal
   g <- H$resultat$segments[H$resultat$segments$portee == "global", ]
