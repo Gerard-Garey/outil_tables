@@ -16974,16 +16974,19 @@ par la bibliothèque C), recoupée sous glibc par un juge indépendant (Python,
 \code{struct.pack}, section~\ref{sec:verifications-rapport}). L'égalité
 des empreintes d'une plateforme à l'autre (statut «~toute plateforme~» visé
 par l'ADR 0011, point~1, qui la tenait pour une hypothèse non mesurée sous
-Windows et macOS) est, elle, un \emph{constat de mesure}~: sous Windows (R~4.3.3 ucrt, session UTF-8), les batteries ont
+Windows et macOS) est, elle, un \emph{constat de mesure}~: sous Windows (R~4.3.3 ucrt), les batteries ont
 rendu, avec 0~échec, les mêmes empreintes des données que sous glibc, lors
 de deux sessions locales du mainteneur (tests sous Windows ajournés par la
 décision M61, issue~\#49, et autorisés pour ces deux sessions, M153 et
 M170)~: (A)~au commit \code{aa1cf0b}, le 26/10/2026 (pull request~\#116~;
-page de code 65001~; 2\,054 tests unitaires et 295 de reproductibilité)~;
-(B)~au commit \code{050a6a1}, le 06/11/2026 (pull request~\#157~; 2\,381 et
-295 tests~; locale de la session parente non consignée, la batterie de
-reproductibilité recalculant l'empreinte du jeu témoin sous la locale C et
-sous la locale UTF-8 que trouve sa sonde). \textbf{Portée} des deux
+session UTF-8, page de code 65001~; 2\,054 tests unitaires et 295 de
+reproductibilité)~; (B)~au commit \code{050a6a1}, le 06/11/2026 (pull
+request~\#157~; 2\,381 et 295 tests~; locale de la session parente non
+consignée). Dans les deux sessions, la batterie de reproductibilité
+recalcule l'empreinte du jeu témoin dans deux sous-processus, l'un sous la
+locale C, l'autre sous la locale UTF-8 que trouve sa sonde, et la compare à
+la valeur calculée hors de R~: la mesure~B porte ainsi, pour le jeu témoin,
+sur ces deux locales, et non sur une session UTF-8 consignée. \textbf{Portée} des deux
 constats~: un jeu témoin de 3~lignes à 8~rôles (double, \code{NA}, chaîne
 UTF-8 non ASCII, facteur, dates), d'empreinte \code{2264ac10\ldots}
 calculée hors de R par \code{printf} et \code{md5sum}, et l'entrée de R1
@@ -17006,7 +17009,8 @@ empreinte constatée sous glibc et sous Windows (R 4.3.3 ucrt, session
 UTF-8), non mesurée ailleurs~», sans date, puisque le rapport ne porte pas
 de date~: les dates et les commits des constats figurent ici. Windows
 n'étant pas dans la CI, ce constat ne vaut, au-delà de ce report, que
-jusqu'au prochain changement de la chaîne de l'empreinte des données. L'entrée de
+jusqu'au prochain changement des fonctions et constantes qu'appelle
+\code{empreinte\_donnees()}, ou de la version de R. L'entrée de
 référence des tests ne porte aucune colonne double~: ses colonnes s'écrivent
 à l'identique sous les représentations~1 et~2, et seul l'en-tête change son
 empreinte.
