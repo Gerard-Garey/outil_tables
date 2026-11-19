@@ -1193,6 +1193,22 @@ verifier("#163 : MENTIONS_RAPPORT$tables_reference_parametres égale le texte de
     identical(paste0("<p>", html(unname(m[["tables_reference_parametres"]])), "</p>"), MENTION_163)
 })
 
+# --- #129 : mention de l'empreinte des données, portabilité constatée sous glibc et sous Windows ---
+# Texte arrêté par actuary-approfondi (#129, Q1), littéral de la spécification
+# (valeur calculée à la main) ; seule la dernière clause change.
+MENTION_129 <- paste(
+  "données (fiche/empreintes/donnees) : représentation canonique (fiche/empreintes/representation) des",
+  "colonnes des rôles telles que reçues par le moteur, toutes les lignes dans l'ordre reçu ; les colonnes hors",
+  "rôles n'y entrent pas ; portable : même empreinte constatée sous glibc et sous Windows (R 4.3.3 ucrt,",
+  "session UTF-8), non mesurée ailleurs.")
+verifier("#129 : MENTIONS_RAPPORT$empreinte_donnees égale mot pour mot le texte arrêté ; écrite une seule fois dans le rapport figé de R1", {
+  m <- unname(tablexp:::MENTIONS_RAPPORT[["empreinte_donnees"]])
+  h <- texte_de(ecrire_rapport(x1))
+  identical(m, MENTION_129) && identical(Encoding(m), "UTF-8") &&
+    lengths(regmatches(h, gregexpr(html(MENTION_129), h, fixed = TRUE))) == 1L &&
+    !grepl("exacte sous glibc", h, fixed = TRUE)
+})
+
 # --- #313 : lecture sans dispatch de l'écrivain, des contrôles et du rendu (identité exacte) ---
 # Une méthode S3 de la session, posée dans globalenv() (trouvée par le
 # dispatch, base ne définissant ni names() ni length() pour data.frame et

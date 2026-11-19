@@ -2098,7 +2098,8 @@ MENTIONS_RAPPORT <- texte_moteur(c(
   empreinte_donnees = paste(
     "données (fiche/empreintes/donnees) : représentation canonique (fiche/empreintes/representation) des",
     "colonnes des rôles telles que reçues par le moteur, toutes les lignes dans l'ordre reçu ; les colonnes hors",
-    "rôles n'y entrent pas ; portable : exacte sous glibc, non mesurée ailleurs."),
+    "rôles n'y entrent pas ; portable : même empreinte constatée sous glibc et sous Windows (R 4.3.3 ucrt,",
+    "session UTF-8), non mesurée ailleurs."),
   empreinte_fichier = paste(
     "fichier (fiche/empreintes/fichier, fiche/empreintes/algorithme_fichier) : une empreinte par fichier lu,",
     "calculée par la couche de lecture sur les octets de ce fichier, dans l'ordre de fiche/provenance, et",
