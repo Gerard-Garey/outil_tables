@@ -301,7 +301,9 @@ TOLERANCES <- c(
   # D_.c (p(theta) - pi) : une erreur relative eps de lambda_s donne sur
   # theta_80 une erreur relative d'environ eps |theta - 1| / 2 au premier
   # ordre (exactement eps |theta - 1| (1 + pi (theta - 1)) / (2 theta) à deux
-  # segments en strate unique) ; rapport mesuré sur R11 : 0,043 (0,0432 à
+  # segments en strate unique, pi : part de l'exposition centrale du segment
+  # dans la strate, part attendue des décès sous H0) ; rapport mesuré sur
+  # R11 : 0,043 (0,0432 à
   # 0,0435 selon le segment et la branche) ;
   # réexamen si un plan donne theta_80 très loin de 1 ; classe de la
   # statistique, 1e-10 (avis d'actuary ; ADR 0009, point 9.3).
