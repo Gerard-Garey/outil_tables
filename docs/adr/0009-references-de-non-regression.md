@@ -1258,3 +1258,44 @@ Conséquence : sur ces trois plateformes, la classe `optimisation` et la règle 
 **Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code ni aucune référence.
 
 Issues : #223, #224, #225, #144, #244, #245, #246, #243. Décisions du mainteneur M415, M416, (3), M420, (1) et (4). Avis d'`actuary` et d'`actuary-approfondi` du 12/11/2026. Branche `claude/lissage-whittaker`, PR #221.
+
+## Annotation du 19 novembre 2026 — points 3.4 et 9.3 : cinq clés de `TOLERANCES` ajoutées par #218 (écart minimal détectable de l'étape `homogeneite`), trois exactes et deux en classe 1e-10
+
+Rédigée par `architect` (fiche de routine) sur la branche `claude/statuts-suffisance` (B30, PR #328), sur l'arbre de travail non commité posé sur `805a5d9`, d'après l'avis d'`actuary` du 19/11/2026 (mesuré). Annotation de **constat**, exigée par les points 3.4 et 9.3 pour toute modification de `TOLERANCES` ; elle est soumise au mainteneur. Le texte ci-dessus, annotations comprises, n'est pas réécrit.
+
+**(a) Clés ajoutées (#218).** Bloc « Écart minimal détectable (#218) » de `TOLERANCES`, dans les clés de l'étape `homogeneite`, avant celles du lissage :
+
+| Clé | Classe | Justification |
+|---|---|---|
+| `homogeneite/parametres/niveau_ecart_minimal` | exacte | recopie de la constante `NIVEAU_ECART_MINIMAL` (littéral 0.05, sans arithmétique) |
+| `homogeneite/parametres/puissance_ecart_minimal` | exacte | recopie de `PUISSANCE_ECART_MINIMAL` (littéral 0.80) |
+| `homogeneite/parametres/seuil_ecart_minimal` | exacte | recopie de `SEUIL_ECART_MINIMAL` (littéral 1.25) |
+| `homogeneite/resultat/ecart_minimal/theta_80_superieur` | 1e-10 | racine θ_80 > 1 de λ_s(θ) = λ_80, λ_s étant la statistique du score du test global appliquée à δ_s(θ) ; voir (b) |
+| `homogeneite/resultat/ecart_minimal/theta_80_inferieur` | 1e-10 | racine θ_80 < 1, même construction |
+
+Les trois constantes sont des conventions du package restituées dans les paramètres de l'étape, non des paramètres du plan (commentaire qui précède `NIVEAU_ECART_MINIMAL` dans `R/validation.R`) : la même valeur littérale est recopiée, sans calcul, d'où la classe exacte (règle de la classe exacte pour les échos de constantes, annotation du 12/11/2026 (seconde), (b) 1, `lissage/parametres/constantes/valeur`).
+
+**(b) Classe 1e-10 de θ_80 (avis d'`actuary` du 19/11/2026, mesuré).**
+1. **Transmission de l'erreur.** θ_80 est obtenu par résolution (`stats::uniroot`, dans `ecart_minimal_homogeneite()` de `R/validation.R`) de λ_s(θ) = λ_80. Une erreur relative ε de λ_s se transmet à θ_80 en erreur relative ε |θ − 1| (1 + π(θ − 1)) / (2θ) à deux segments en strate unique, où π = π_sc est la part de l'exposition centrale du segment s dans la strate c, c'est-à-dire sa part attendue des décès de la strate sous H0 (résultat exact ; au premier ordre près de θ = 1, ε |θ − 1| / 2) ; le rapport (erreur relative de θ_80) / ε est mesuré par `actuary` à **environ 0,043** sur R11 (0,0432 à 0,0435 selon le segment et la branche) : ε = 1e-10 donne une erreur relative d'environ **4,3e-12** sur θ_80. La résolution **amortit** l'erreur de la statistique au lieu de l'amplifier (*rapporté* d'après l'avis d'`actuary` ; non remesuré par `architect`).
+2. **Choix de la classe.** 1e-10 est retenue pour que θ_80 reste dans la classe de la statistique du score dont il dépend (`homogeneite/resultat/tests/statistique`, classe 1e-10 depuis la seconde annotation du 08/11/2026, (a) 1, M313). Remarque d'`architect` : une classe plus fine (1e-12) serait tenable sur R11 d'après le rapport mesuré (environ 0,043), mais ferait dépendre la classe d'une grandeur aval d'un facteur propre au plan ; une classe plus large n'a aucun motif.
+3. **Tolérance de la résolution.** La racine est cherchée en u ∈ (0, 1) avec `tol = 1e-14` : θ = 1 / (1 − u) sur la branche supérieure, θ = u sur la branche inférieure (appels de `stats::uniroot` sur `f_sup` et `f_inf` dans `ecart_minimal_homogeneite()`, *vérifié* par lecture). Un changement du chemin d'itération sous une perturbation amont déplace la racine d'au plus l'ordre de cette tolérance, soit environ θ² · 1e-14 en absolu sur la branche supérieure (dθ = du / (1 − u)²) et 1e-14 sur la branche inférieure : très en deçà de 1e-10 tant que θ reste modéré (*hypothèse* de raisonnement, non mesurée). θ_80 n'entre donc pas dans le champ de la classe `optimisation`, réservée aux chemins `lissage/*` (annotation du 12/11/2026, M416, option (δ)).
+4. **Condition de réexamen.** Sur la branche supérieure, la sensibilité croît avec θ : le facteur exact tend vers π/2 quand θ → ∞ (vers 1/2 au plus) et le terme de résolution de (3) croît comme θ². Un plan de référence où θ_80 serait très loin de 1 appelle une nouvelle mesure d'`actuary` et, le cas échéant, une annotation qui reclasse les deux clés.
+
+**(c) Décompte** (*vérifié* par `architect`, 19/11/2026, R 4.3.3 : `parse()` du fichier, évaluation des seules affectations de `CLASSES_TOLERANCE` et `TOLERANCES`, `table()` des valeurs ; `HEAD` = `805a5d9` lu par `git show HEAD:tests/reference/outils_reference.R`) :
+
+| Classe | `805a5d9` | arbre de travail | Ajoutées |
+|---|---|---|---|
+| exacte | 60 | 63 | 3 |
+| 1e-14 | 42 | 42 | 0 |
+| 1e-12 | 75 | 75 | 0 |
+| 1e-10 | 3 | 5 | 2 |
+| `optimisation` (1e-3) | 11 | 11 | 0 |
+| **Total** | **191** | **196** | **5** |
+
+Aucune clé retirée, aucune clé reclassée, aucun doublon de nom (même mesure). `CLASSES_TOLERANCE` inchangée (cinq classes).
+
+**(d) Exercice des clés.** Seuls R11 et R12 ont l'étape `homogeneite` au plan ; les cinq chemins y entrent par la transition #218 (`tests/test_reproductibilite.R`, bloc « Transition #218 »), à clore par la régénération unique (R) de B30. Avant cette régénération, les deux clés 1e-10 ne sont exercées par aucune valeur figée, seulement par les contrôles de la transition et les tests unitaires.
+
+**Effet sur les résultats : aucun** par la présente annotation, qui ne modifie aucun code ni aucune référence. Les grandeurs ajoutées sont nouvelles ; aucune valeur existante ne change.
+
+Issues : #218, #168. Décision M313. Avis d'`actuary` du 19/11/2026. Branche `claude/statuts-suffisance`, PR #328.
