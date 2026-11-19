@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{18/11/2026}
+\newcommand{\datedoc}{19/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1469,7 +1469,7 @@ l'effet d'une permutation des lignes de l'entrée de référence
 (section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39), puis
 l'aller-retour du texte du plan et de la fiche et le rejeu à partir de ce
 texte pour chacun des plans de référence (quatorze~: fonction \code{plans\_reference} de
-\code{tests/reference/outils\_reference.R}, l.~516~; section~\ref{sec:serialisation}).
+\code{tests/reference/outils\_reference.R}~; section~\ref{sec:serialisation}).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -1480,7 +1480,10 @@ d'exposition) est égal, nom pour nom, à sa source dans le code~; toute ligne d
 la liste d'attente désigne un export, un catalogue requis, une entrée d'un
 catalogue requis déjà écrit (type \code{entree}, de la forme
 \code{<catalogue>:<nom>}, pour une définition ajoutée à un module dont le
-tableau existe déjà) ou une valeur citée (type \code{fiche}, ci-dessous) et renvoie à une issue~; une entrée en attente absente du
+tableau existe déjà), une valeur citée (type \code{fiche}, ci-dessous) ou
+un écart de citation (type \code{citation}, nom \code{marqueurs},
+ci-dessous) ou un écart de renvoi par numéro de ligne (type \code{renvoi},
+nom \code{lignes}, ci-dessous) et renvoie à une issue~; une entrée en attente absente du
 document compte en échec attendu, présente elle est un succès inattendu.
 Elle compare en outre au package les valeurs que le document cite
 (issue~\#70)~: chaque constante de version (\code{VERSION\_FICHE} et les
@@ -1497,7 +1500,33 @@ script~; les blocs de lecture sont ceux de \code{BLOCS\_LECTURE\_FICHE}
 (blocs, champs et ordre). Enfin, aucun nom de fonction n'est coupé par
 \code{\textbackslash allowbreak} entre deux \code{\textbackslash code\{\}}~: le
 fragment final serait lu comme une fonction et le nom entier échapperait au
-contrôle d'existence (issue~\#84). Le format des citations et des catalogues qu'elle lit est fixé par
+contrôle d'existence (issue~\#84). Elle contrôle aussi les citations des
+textes du moteur \code{CONVENTIONS\_TEXTE} et \code{MENTIONS\_RAPPORT}
+(\code{R/rapport.R}~; issue~\#130)~: une citation est désignée par un
+marqueur, ligne de commentaire LaTeX qui nomme la constante et le libellé,
+et le texte entre «~» qui le suit, normalisé par une règle fermée, est égal
+à la valeur du package~; toute expression «~mot pour mot~» du document
+% citation : aucune (description du contrôle 7, qui ne cite aucune constante)
+est suivie d'un tel marqueur, ou d'une exemption motivée quand la phrase ne
+cite aucune constante~; un marqueur mal formé est un écart. Le contrôle ne
+voit pas une citation qui n'est ni marquée ni annoncée par cette
+expression. Elle refuse enfin tout renvoi par numéro de ligne vers un
+fichier du dépôt (issue~\#187~; décision du mainteneur du 19/11/2026)~: un
+tel numéro dérive à chaque modification du fichier visé, et le renvoi à un
+emplacement du code se fait par le symbole (fonction, constante), avec le
+chemin du fichier. Sont lus, sur le texte sans commentaires, l'abréviation
+«~l.~» ou «~ll.~» suivie d'un numéro, un chemin suivi d'un deux-points et
+d'un numéro ou d'une virgule et de «~ligne~» avec un numéro, «~ligne~» et un
+numéro suivis de «~de~» et d'un chemin, et une adresse du dépôt sur GitHub
+portant une ancre de ligne~; un chemin est du dépôt si son premier segment
+existe à la racine du dépôt (ou est \code{app}), ou s'il est, sans dossier,
+le nom d'un fichier de l'arbre de travail. Un renvoi par numéro de ligne
+n'est admis que vers une source externe à étiquette fixe, nommée (chemin
+hors du dépôt ou \code{\textbackslash url}) avant lui dans la même phrase,
+comme le fichier C des sources de R~4.3.3 cité en section~\ref{sec:fiche}~;
+sans source nommée avant lui, il est refusé. Un écart transitoire se
+déclare dans la liste d'attente (type \code{renvoi}, nom \code{lignes}). Les
+formes non lues (un renvoi rédigé autrement) relèvent de la relecture. Le format des citations et des catalogues qu'elle lit est fixé par
 \code{docs/latex/CONVENTIONS.md} (section~3)~; les tableaux de fonctions de
 chaque module en sont la principale application (E4.9). Sans \code{-{}-strict}, elle
 rend compte des écarts sans échouer.
@@ -2052,7 +2081,9 @@ graines de Monte-Carlo~: 500~lignes (constante \code{NOMBRE\_PAR\_MOTIF\_R9})
 pour chacun des motifs \code{id\_contrat\_manquant}, \code{sexe\_manquant}
 et \code{entree\_manquante} (constante \code{MOTIFS\_DEFAUTS\_R9}), toutes
 causes de sortie admises (\code{tests/reference/outils\_reference.R},
-constantes l.~350 à~352, déclarations des défauts l.~372 et~373). Les lignes
+constantes \code{GRAINE\_DEFAUTS\_R9}, \code{NOMBRE\_PAR\_MOTIF\_R9} et
+\code{MOTIFS\_DEFAUTS\_R9}, déclarations des défauts dans la fonction
+\code{jeu\_reference\_defauts}). Les lignes
 que les défauts n'altèrent pas sont celles de \code{reference}~; un test le
 vérifie, avec la graine, les motifs, leurs effectifs et l'absence de ligne
 portant deux motifs.
@@ -2160,7 +2191,7 @@ l'étape \code{positionnement} (\code{methode = "smr"}, table \code{tv},
 relation \code{positionnee} (même clé, même plage, mêmes tranches, niveau
 et nombre de réplications que R8), sous la graine de Monte-Carlo
 20261113 (constante \code{GRAINE\_MONTE\_CARLO\_R10},
-\code{tests/reference/outils\_reference.R}, l.~331), distincte de celle du
+\code{tests/reference/outils\_reference.R}), distincte de celle du
 jeu, de celle de R8 et des défauts de R9. C'est la première référence qui
 contient une table positionnée~: sa création a demandé le visa du
 mainteneur (décisions M287 et M308), trois statuts textuels ayant été
@@ -2174,15 +2205,15 @@ corrigés avant elle (décision M309). Il fige aussi l'état
 08/11/2026, points~(a) et~(c)~; décision M307). R11 est le plan de R1
 augmenté de l'étape \code{homogeneite} (âges 20 à 90, tranches de bornes
 20, 50 et 70, 999~réplications), sous la graine de Monte-Carlo 20261114
-(\code{GRAINE\_MONTE\_CARLO\_R11}, \code{tests/reference/outils\_reference.R},
-l.~332)~; l'entrée de référence portant un facteur 0,6 sur les femmes
+(\code{GRAINE\_MONTE\_CARLO\_R11}, \code{tests/reference/outils\_reference.R})~;
+l'entrée de référence portant un facteur 0,6 sur les femmes
 (section~\ref{sec:simulation}), l'hypothèse nulle y est fausse~: R11 fige
 l'étape sous une alternative~; ce n'est ni un verdict ni une mesure de
 puissance (un seul jeu). Ses p-valeurs de Monte-Carlo sont au plancher
 $1/(B + 1)$, sauf celle de la tranche 20-49~: un changement du flux des
 réplications n'y changerait que cette p-valeur et son erreur. R12 est le plan de R5 (en cours $\to$
 racheté, unité contrat) augmenté de la même étape, sous la graine 20261115
-(\code{GRAINE\_MONTE\_CARLO\_R12}, l.~333)~: les facteurs de rachat de
+(\code{GRAINE\_MONTE\_CARLO\_R12}, \code{tests/reference/outils\_reference.R})~: les facteurs de rachat de
 l'entrée étant égaux pour les deux sexes, l'hypothèse nulle y est
 exactement vraie, les p-valeurs de Monte-Carlo tombent dans le corps de la
 loi, et R12 épingle le flux des réplications de l'homogénéité. Ce second
@@ -2402,7 +2433,7 @@ valeur (visa d'\code{actuary} du 09/11/2026). Un double reçoit sa tolérance de
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont chaque valeur
 est l'une des cinq classes de \code{CLASSES\_TOLERANCE} (exacte,
 $10^{-14}$, $10^{-12}$, $10^{-10}$, \code{optimisation} $= 10^{-3}$~;
-\code{tests/reference/outils\_reference.R}, l.~98), et dont les clés sont
+\code{tests/reference/outils\_reference.R}), et dont les clés sont
 cherchées parmi les suffixes du chemin, segment par segment, le
 \textbf{suffixe le plus long} l'emportant (\code{cles\_de},
 \code{tolerance\_de}, \code{tests/reference/outils\_reference.R}).
@@ -5522,8 +5553,9 @@ contrôles de forme, exacts~; les lignes~3 à~5 comparent exactement des
 libellés (version, nom de l'algorithme, en-tête de la représentation), non
 des empreintes~; la ligne~6 dit seulement que les contrôles des modules
 n'ont rien refusé, sans rien ajouter à ce qu'ils vérifient~; la ligne~7 est
-l'égalité exacte de deux MD5~: l'empreinte des données est portable (exacte
-sous glibc, non mesurée ailleurs~; section~\ref{sec:empreinte}) et, comme
+l'égalité exacte de deux MD5~: l'empreinte des données est portable (même
+empreinte constatée sous glibc et sous Windows, R~4.3.3 ucrt, session
+UTF-8, non mesurée ailleurs~; section~\ref{sec:empreinte}) et, comme
 toute empreinte du projet, sans rôle de sécurité~: elle identifie un
 contenu, elle ne le protège pas contre une modification délibérée~; la
 ligne~8 est, pour chaque table de la fiche, la même égalité exacte de deux
@@ -14491,8 +14523,8 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     \code{bornes\_non\_definies})~; la convolution n'est faite que si son
     nombre de produits, calculé avant elle
     (\code{cout\_convolution\_binomiales()}), est au plus
-    \code{N\_MAX\_PRODUITS\_CONVOLUTION} ($10^8$, \code{R/validation.R},
-    l.~118)~; au-delà, les p-valeurs exactes et les bornes valent
+    \code{N\_MAX\_PRODUITS\_CONVOLUTION} ($10^8$, \code{R/validation.R})~;
+    au-delà, les p-valeurs exactes et les bornes valent
     \code{NA}, état \code{convolution\_au\_dela\_n\_max}, et des p-valeurs
     asymptotiques sont produites à la place des exactes (paragraphe
     suivant)~; le regroupement \code{segment}, et
@@ -14991,6 +15023,7 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     fixé et ne laisse $D_{\cdot c}$ borné que si le nombre de strates croît
     (issue~\#202, relecture d'\code{actuary-approfondi}, texte repris mot
     pour mot~; correction renvoyée hors de B16 par la décision M364).
+% citation : aucune (texte repris d'un avis d'actuary-approfondi, sans constante de R/rapport.R)
     Illustration~: constat de simulation m8 de la spécification
     (commentaire 6747045250 de l'issue~\#185), hors batterie, $10^4$
     réplications par cas, erreur de Monte-Carlo $0{,}0022$ sur un taux de
@@ -15896,6 +15929,7 @@ chaque test nommant la nature de son attendu)~:
     \code{age\_atteint\_annee}~: l'étape \code{exposition} et les
     expositions contrefactuelles emploient la recette et la convention de
     la fiche (issue~\#82)~; section du rapport figé, mention fixe mot pour mot,
+% citation : aucune (description d'un test unitaire, sans citation de la mention qu'il compare)
     mention d'unité contrat~;
   \item \textbf{identités exactes}~: \code{construire\_observations()}
     identique à la partie correspondante de \code{preparer\_donnees()} sur
@@ -16043,6 +16077,7 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     (issue~\#201)~; statuts des bornes exactes et des p-valeurs de
     sous-groupe propres à \code{independante} et à
     \code{ajustee\_hors\_outil}, mot pour mot, fragment
+% citation : aucune (description d'un test unitaire qui compare des statuts au code, sans citer de constante de R/rapport.R)
     \code{ajustee\_hors\_outil} commun aux p-valeurs exactes et
     asymptotiques, et, par \code{construire\_table()} sous ces deux
     relations, \code{statuts\_sous\_groupes} égal aux lignes de
@@ -16936,9 +16971,46 @@ relu à l'identique, parce que la lecture décimale de R n'est pas
 correctement arrondie. \textbf{Statut}~: écriture exacte par construction
 (norme IEC~60559 exigée par R, ordre des octets fixé, aucune mise en forme
 par la bibliothèque C), recoupée sous glibc par un juge indépendant (Python,
-\code{struct.pack}, section~\ref{sec:verifications-rapport})~; sous Windows
-et macOS, \textbf{non mesurée} (tests sous Windows ajournés, décision M61,
-issue~\#49~; ADR 0011, point~1). L'entrée de
+\code{struct.pack}, section~\ref{sec:verifications-rapport}). L'égalité
+des empreintes d'une plateforme à l'autre (statut «~toute plateforme~» visé
+par l'ADR 0011, point~1, qui la tenait pour une hypothèse non mesurée sous
+Windows et macOS) est, elle, un \emph{constat de mesure}~: sous Windows (R~4.3.3 ucrt), les batteries ont
+rendu, avec 0~échec, les mêmes empreintes des données que sous glibc, lors
+de deux sessions locales du mainteneur (tests sous Windows ajournés par la
+décision M61, issue~\#49, et autorisés pour ces deux sessions, M153 et
+M170)~: (A)~au commit \code{aa1cf0b}, le 26/10/2026 (pull request~\#116~;
+session UTF-8, page de code 65001~; 2\,054 tests unitaires et 295 de
+reproductibilité)~; (B)~au commit \code{050a6a1}, le 06/11/2026 (pull
+request~\#157~; 2\,381 et 295 tests~; locale de la session parente non
+consignée). Dans les deux sessions, la batterie de reproductibilité
+recalcule l'empreinte du jeu témoin dans deux sous-processus, l'un sous la
+locale C, l'autre sous la locale UTF-8 que trouve sa sonde, et la compare à
+la valeur calculée hors de R~: la mesure~B porte ainsi, pour le jeu témoin,
+sur ces deux locales, et non sur une session UTF-8 consignée. \textbf{Portée} des deux
+constats~: un jeu témoin de 3~lignes à 8~rôles (double, \code{NA}, chaîne
+UTF-8 non ASCII, facteur, dates), d'empreinte \code{2264ac10\ldots}
+calculée hors de R par \code{printf} et \code{md5sum}, et l'entrée de R1
+à R6 (100\,000 lignes, sans colonne double), d'empreinte
+\code{35ca5537\ldots}~; une session Windows hors UTF-8 (page de code 1252)
+et macOS ne sont \textbf{pas mesurées}. \textbf{Report au code actuel}
+(issue~\#129, commit \code{1ee8191}, comparaison refaite le 19/11/2026)~:
+les définitions des fonctions et constantes qu'appelle
+\code{empreinte\_donnees()}, comparées entre le commit de la mesure~B et le
+code que décrit ce document, ne diffèrent que par
+\code{composantes\_date()}, où \code{lt\$year}, \code{lt\$mon} et
+\code{lt\$mday} sont devenus \code{.subset2(lt, "year")} et ses analogues
+(issue~\#313). Les deux écritures rendent des valeurs \code{identical()}
+sur tous les jours du 0001-01-01 au 9999-12-31 et sur \code{NA}~: c'est un
+résultat exact (sémantique de R~: le package base ne définit aucune méthode
+\code{\$} pour \code{POSIXlt}), mesuré sous Linux~; que les sources du
+package base soient les mêmes sous Windows est une \textbf{hypothèse}. La
+mention du rapport figé (section~\ref{sec:rapport-fige}) dit «~même
+empreinte constatée sous glibc et sous Windows (R 4.3.3 ucrt, session
+UTF-8), non mesurée ailleurs~», sans date, puisque le rapport ne porte pas
+de date~: les dates et les commits des constats figurent ici. Windows
+n'étant pas dans la CI, ce constat ne vaut, au-delà de ce report, que
+jusqu'au prochain changement des fonctions et constantes qu'appelle
+\code{empreinte\_donnees()}, ou de la version de R. L'entrée de
 référence des tests ne porte aucune colonne double~: ses colonnes s'écrivent
 à l'identique sous les représentations~1 et~2, et seul l'en-tête change son
 empreinte.
@@ -17015,6 +17087,7 @@ forme par \code{sprintf()}, \code{format()}, \code{formatC()} ni
 entiers exacts, puis écrits en octets ASCII, une valeur par ligne, LF final.
 La ligne \code{doubles} de \code{CONVENTIONS\_TEXTE}, en en-tête des plans,
 des fiches et des rapports figés, le dit au relecteur, mot pour mot~:
+% citation : CONVENTIONS_TEXTE["doubles"]
 «~le double relu fait foi~; 17 chiffres significatifs (forme \%.17g de la
 norme C), arrondi au plus proche, égalité vers le chiffre pair, calculé par
 tablexp sans la bibliothèque C~; relecture au bit près constatée sous glibc
@@ -17990,8 +18063,9 @@ rapprocher de celui qu'on lui remet (E3.7)~; le rapport écrit chaque valeur
 par l'écrivain unique \code{ecrire\_valeurs()} et recalcule
 \code{empreinte\_resultat()}, deux fonctions internes qu'un rendu hors du
 package aurait dû exporter ou dupliquer (ADR 0011, point~3.1)~; ses textes
-méthodologiques, texte du moteur, sont cités par le présent document et
-contrôlés par la batterie de concordance~; enfin ses contrôles ont un sens
+méthodologiques, texte du moteur, sont cités par le présent document, et
+chaque citation marquée est contrôlée par la batterie de concordance
+(section~\ref{sec:trois-batteries}~; issue~\#130)~; enfin ses contrôles ont un sens
 métier et vont dans le package (E4.3), et le document n'a aucune dépendance
 à Shiny. Aucun module nouveau n'est créé pour un seul rendu~: un module
 dédié ne sera décidé qu'à l'arrivée d'un second (tables CSV et xlsx à
@@ -18537,7 +18611,23 @@ du contrôle~5, qui n'en vérifie pas l'exactitude, et la cohérence de
 ne vérifie ni le type ni les valeurs de ses colonnes (limite acceptée,
 M522), ni leur longueur (limite sans objet pour un objet construit par le
 moteur, les décomptes de lignes discordants étant refusés à l'entrée et
-à l'extraction des lignes conservées~; issues~\#312 et~\#319).
+à l'extraction des lignes conservées~; issues~\#312 et~\#319). Chacune
+des deux comparaisons du contrôle~6 a sa condition (ci-dessus, contrôle~6)~:
+le nombre de lignes n'est comparé, et l'absence de la copie refusée, que si
+\code{etapes/donnees/resultat/}\allowbreak\code{numeros\_conserves} est
+présent (ni absent ni \code{NULL})~; les colonnes de rôle ne sont
+contrôlées que si \code{fiche/roles} est un vecteur de chaînes. Tout objet
+rendu par \code{construire\_table()} remplit les deux conditions~: un plan
+déclare au moins une étape, l'étape \code{donnees} est préalable à toutes
+les autres et écrit \code{numeros\_conserves}, non vide (refus
+\code{aucune\_ligne\_conservee} sinon), et des rôles qui ne sont pas un
+vecteur de chaînes nommé sont refusés à l'entrée
+(\code{roles\_mal\_formes}), \code{fiche/roles} en étant la copie
+réordonnée. Ces deux chemins étant dans le périmètre de l'empreinte, un
+objet qui passe le contrôle d'intégrité les porte encore, à une collision
+du MD5 près, sauf modification délibérée suivie du recalcul de
+l'empreinte, limite dite plus haut (lecture du code~; \emph{constat} sur
+les objets des plans R1 à R17).
 
 \medskip
 \noindent
@@ -18657,7 +18747,9 @@ au tableau \code{etapes/brut/parametres/statuts}, et l'empreinte du code
 \code{fiche/empreintes/code}, empreinte du code qui a construit l'objet.
 La section \emph{identification} fait suivre le tableau de quatre mentions
 d'empreinte (algorithme MD5 sans rôle de sécurité~; empreinte des données
-portable, exacte sous glibc, non mesurée ailleurs~; une empreinte par
+portable, même empreinte constatée sous glibc et sous Windows, R~4.3.3
+ucrt, session UTF-8, non mesurée ailleurs, constats datés à la
+section~\ref{sec:empreinte}~; une empreinte par
 fichier lu, calculée par la couche de lecture sur les octets de ce fichier,
 dans l'ordre de \code{fiche/provenance}, recopiée de la provenance et non
 vérifiée par le moteur, texte juste pour toute provenance de $k \ge 1$
@@ -18666,6 +18758,7 @@ issue~\#181)~; statut du
 résultat et du code consigné dans \code{fiche/empreintes/statut\_resultat\_code})
 et de deux phrases~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
+% citation : MENTIONS_RAPPORT["plateforme"]
   \item «~L'empreinte du résultat dépend de la plateforme (R, BLAS, LAPACK,
     bibliothèque C)~; elle n'est un témoin d'identité que sur la même machine
     (E3.6, E4.6).~»~;
@@ -18677,18 +18770,42 @@ et de deux phrases~:
     de \code{CHEMINS\_HORS\_RESULTAT} sauf \code{execution} et
     \code{fiche/empreintes/resultat}, joints par «~,~»]~; ce que le rapport en restitue
     (valeurs, ou structure seule pour une table dont le volume croît avec la
-    base) est lu dans l'objet, sans vérification.~»
+    base) est lu dans l'objet, sans vérification de son origine. Avant
+    l'écriture sont contrôlées~: pour
+    etapes/donnees/resultat/\allowbreak lignes\_conservees, copie des
+    lignes conservées de l'entrée, sa cohérence avec le périmètre de
+    l'empreinte (un data.frame dont le nombre de lignes est la longueur de
+    etapes/donnees/resultat/\allowbreak numeros\_conserves et qui porte les
+    colonnes nommées par fiche/roles)~; pour les autres chemins, leur forme,
+    soumise à l'écrivain de la fiche (listes et vecteurs sans classe ni
+    attribut autre que les noms, ou dates).~»
 \end{itemize}
 \noindent
-«~Sans vérification~» s'entend de l'\textbf{origine} de ce qui est
-restitué, que l'empreinte ne peut établir hors de son périmètre (exactitude
-des valeurs comprise)~: la forme de ces chemins est contrôlée avant
-l'écriture (contrôle~5), sauf celle de \code{lignes\_conservees}, dont la
-cohérence avec le périmètre de l'empreinte l'est (contrôle~6~: présence,
-classe \code{data.frame}, nombre de lignes, colonnes de rôle). La phrase,
-texte du moteur, n'a changé ni avec le contrôle~5 ni avec le contrôle~6~;
-sa reformulation, qui changerait les octets de tout rapport figé, est renvoyée à
-l'issue~\#310 (décision du mainteneur du 17/11/2026, M522).
+Cette seconde phrase assemble, dans l'ordre, \code{integrite},
+\code{integrite\_hors\_1}, la liste des chemins (élément de remplacement
+entre crochets) et \code{integrite\_hors\_2}~; elle n'est pas une valeur
+unique de \code{MENTIONS\_RAPPORT} et ne porte donc pas de marqueur de
+citation (les deux derniers morceaux commencent par une espace et ne sont
+pas citables seuls~: \code{docs/latex/CONVENTIONS.md}, section~3.5,
+limites~; section~\ref{sec:trois-batteries})~; sa concordance avec le
+paragraphe rendu relève de la relecture. «~Sans vérification de son
+origine~» est la non-authenticité de la doctrine de l'ADR 0012 (seconde
+annotation du 16/11/2026, (b))~: hors de son périmètre, l'empreinte ne peut
+établir ni l'origine de ce qui est restitué ni l'exactitude de ses valeurs.
+La suite de la phrase dit ce qui est contrôlé avant l'écriture~: la
+cohérence de \code{lignes\_conservees} avec le périmètre de l'empreinte
+(contrôle~6~: présence, classe \code{data.frame}, nombre de lignes,
+colonnes de rôle) et la forme des autres chemins (contrôle~5)~; elle ne
+numérote pas les contrôles, que le lecteur du rapport ne voit pas. Jusqu'à
+l'issue~\#310, la phrase s'achevait par «~est lu dans l'objet, sans
+vérification~», texte que ni le contrôle~5 ni le contrôle~6 n'avaient
+changé et dont la reformulation, qui change les octets de tout rapport
+figé, avait été renvoyée à cette issue (décision du mainteneur du
+17/11/2026, M522)~; le texte actuel est celui qu'a arrêté \code{actuary}
+le 19/11/2026 (ADR 0012, mention datée du 19/11/2026, acceptée, M542). Il
+allonge \code{integrite\_hors\_2} de 153 à 648~octets, et tout rapport
+figé d'autant (+495~octets), la phrase y figurant une seule fois, dans la
+section \emph{identification}, toujours rendue.
 
 % citation : MENTIONS_RAPPORT["tables_reference_parametres"]
 La section \emph{donnees\_recues}, quand au moins une table de

@@ -43,6 +43,17 @@ FICHE <- lire_fiche(octets(TEXTE))
 R0 <- rejouer_fiche(BASE, FICHE)
 EMPREINTE_CODE <- tablexp:::EMPREINTE_CODE
 
+# MD5 épinglés (T12 B6/B7, T13 D8, T14 C8) : octets UTF-8 de
+# c(names(m), unname(m)) joints par « \n » pour MENTIONS_RAPPORT, de
+# TEXTE_REJEU_FICHE pour le second. Historique de MD5_MENTIONS_RAPPORT, une
+# ligne par issue qui change un texte de MENTIONS_RAPPORT :
+#  - relevé à 8a81102 (aa6024502e80e71c23a8e24106122012) ;
+#  - reporté à #129 (empreinte_donnees) : 870a195ddc27301e2de53ae9bc32d2fe ;
+#  - reporté à #310 (integrite_hors_2) : 7d0667ba477d743b39ebd4e5174f0d8c.
+# TEXTE_REJEU_FICHE : relevé à 8a81102, inchangé.
+MD5_MENTIONS_RAPPORT <- "7d0667ba477d743b39ebd4e5174f0d8c"
+MD5_TEXTE_REJEU_FICHE <- "ddbaf36e1e6fa260b51e57ca46e6604f"
+
 # Ligne 8 « tables_reference » (contrôle 7 bis, ADR 0015, point 4.3 ; #73) :
 # témoins aux lignes 9 à 15 (ligne 15 « temoin_catalogue », #267 ; M498).
 CONTROLES <- c("nature_arguments", "forme_fiche", "version_fiche", "algorithme_empreinte", "representation",
@@ -1157,11 +1168,11 @@ local({
   verifier("T12 B3, B2, B6 balayage de 23 formes : les dix-sept de l'avis (F7), dont quatre sous une valeur de même classe, et six propres au test, altérées de source, forme_origine et parametres : aucune erreur R, aucun refus ; ligne 15 au texte attendu (valeurs citées par la règle de #142) ; chemin cité aussi par la ligne 12 ; construction identical() hors execution ; cellules UTF-8 sur une ligne, write.csv() sans erreur",
            if (length(formes) != 23L) "23 formes" else if (length(ecarts)) ecarts else TRUE)
 })
-verifier("T12 B6, B7 aucun refus nouveau : MENTIONS_RAPPORT et TEXTE_REJEU_FICHE inchangés (MD5 de leurs octets UTF-8 relevés à 8a81102)", {
+verifier("T12 B6, B7 aucun refus nouveau : MENTIONS_RAPPORT au MD5 épinglé (MD5_MENTIONS_RAPPORT, voir l'historique en tête) et TEXTE_REJEU_FICHE inchangé (MD5 relevé à 8a81102)", {
   o <- function(x) tablexp:::md5_octets(charToRaw(enc2utf8(paste(x, collapse = "\n"))))
   m <- tablexp:::MENTIONS_RAPPORT
   identical(c(o(c(names(m), unname(m))), o(tablexp:::TEXTE_REJEU_FICHE)),
-            c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f"))
+            c(MD5_MENTIONS_RAPPORT, MD5_TEXTE_REJEU_FICHE))
 })
 verifier("T12 B8 bornes, par injection (catalogue à deux tables) : écarts de deux clés dans l'ordre de la fiche ; textes joints par « ; » ; clé intacte citée (option (b) du visa d'actuary-approfondi)", {
   cat_ <- list(A = list(identifiant = "a", sexe = "H", format = 1L, lignes = c("age,lx", "0,1000", "1,990", "2,970")),
@@ -1314,12 +1325,12 @@ local({
       !grepl(GA, cs(by), fixed = TRUE) && identical(cs(character(0)), character(0)) &&
       identical(cs(c("tv", "a/b")), c("tv", paste0(GA, " a/b ", GF)))
   })
-  verifier("T13 D8 aucun refus nouveau, résultats inchangés : MENTIONS_RAPPORT et TEXTE_REJEU_FICHE inchangés ; fiche de clé K construite et rejouée sans refus ; bilan à 15 lignes", {
+  verifier("T13 D8 aucun refus nouveau, résultats inchangés : MENTIONS_RAPPORT au MD5 épinglé (MD5_MENTIONS_RAPPORT, voir l'historique en tête) et TEXTE_REJEU_FICHE inchangé (MD5 relevé à 8a81102) ; fiche de clé K construite et rejouée sans refus ; bilan à 15 lignes", {
     o <- function(x) tablexp:::md5_octets(charToRaw(enc2utf8(paste(x, collapse = "\n"))))
     m <- tablexp:::MENTIONS_RAPPORT
     r <- attrape(rejouer_fiche(BASE, fiche_k("forme_origine", "qx", fiche_k("source", "ma source"))))
     identical(c(o(c(names(m), unname(m))), o(tablexp:::TEXTE_REJEU_FICHE)),
-              c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f")) &&
+              c(MD5_MENTIONS_RAPPORT, MD5_TEXTE_REJEU_FICHE)) &&
       inherits(r, "rejeu") && identical(nrow(r$bilan), 15L) &&
       identical(r$bilan$verdict[12L],
                 paste0("différente : tables_reference/", CLE_CITEE, "/source, tables_reference/", CLE_CITEE, "/forme_origine")) &&
@@ -1426,11 +1437,11 @@ local({
                   vc(md5, "zz"), vc("zz", "zz")),
                 c("identique", "différente", rep("non déterminable", 5L)))
   })
-  verifier("T14 C8 MENTIONS_RAPPORT et TEXTE_REJEU_FICHE inchangés (MD5 de leurs octets UTF-8 relevés à 8a81102)", {
+  verifier("T14 C8 MENTIONS_RAPPORT au MD5 épinglé (MD5_MENTIONS_RAPPORT, voir l'historique en tête) et TEXTE_REJEU_FICHE inchangé (MD5 relevé à 8a81102)", {
     o <- function(x) tablexp:::md5_octets(charToRaw(enc2utf8(paste(x, collapse = "\n"))))
     m <- tablexp:::MENTIONS_RAPPORT
     identical(c(o(c(names(m), unname(m))), o(tablexp:::TEXTE_REJEU_FICHE)),
-              c("aa6024502e80e71c23a8e24106122012", "ddbaf36e1e6fa260b51e57ca46e6604f"))
+              c(MD5_MENTIONS_RAPPORT, MD5_TEXTE_REJEU_FICHE))
   })
 })
 

@@ -1056,6 +1056,14 @@ verifier("U20 : chaque ligne du corps de la fiche écrite (hors data.frame et @n
 
 # --- U21, U22 : textes fixes et section brut (valeur calculée à la main) --------
 
+# --- #310 : fin de la phrase du contrôle d'intégrité (integrite_hors_2) ---
+# Texte arrêté par actuary-approfondi (#310, Q3), littéral de la spécification
+# (valeur calculée à la main) ; commence par une espace, puis « ; ».
+MENTION_310 <- paste0(
+  " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification de son origine.",
+  " Avant l'écriture sont contrôlées : pour etapes/donnees/resultat/lignes_conservees, copie des lignes conservées de l'entrée, sa cohérence avec le périmètre de l'empreinte",
+  " (un data.frame dont le nombre de lignes est la longueur de etapes/donnees/resultat/numeros_conserves et qui porte les colonnes nommées par fiche/roles)",
+  " ; pour les autres chemins, leur forme, soumise à l'écrivain de la fiche (listes et vecteurs sans classe ni attribut autre que les noms, ou dates).")
 verifier("U21 : phrase de plateforme une fois ; « pas de date » ; conventions ; quatre mentions d'empreinte ; fiche/plateforme/<n> ; rejeu ; mentions des sections 12 et 13", {
   e <- character(0)
   ct <- tablexp:::CONVENTIONS_TEXTE
@@ -1078,7 +1086,7 @@ verifier("U21 : phrase de plateforme une fois ; « pas de date » ; conventions 
     if (length(integ) != 1L ||
         !grepl(html("trouvée égale à fiche/empreintes/resultat, la valeur consignée à laquelle ce contrôle la compare (exclue du texte empreinté, puisqu'elle en est l'empreinte). Hors du périmètre"), integ, fixed = TRUE) ||
         !grepl(paste0("Hors du périmètre de cette empreinte, et donc de ce contrôle : ", paste(html(hors), collapse = ", "),
-                      " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume croît avec la base) est lu dans l'objet, sans vérification.</p>"), integ, fixed = TRUE))
+                      MENTION_310, "</p>"), integ, fixed = TRUE))
       e <- c(e, paste(id, ": phrase du contrôle d'intégrité"))
     if (!"<p>Étape « validation » : non demandée par le plan (chemin etapes/validation absent de l'objet).</p>" %in% l ||
         !"<p>Table finale et comparaisons : non produites par cette version (chemin table : NULL).</p>" %in% l)
@@ -1191,6 +1199,30 @@ verifier("#163 : MENTIONS_RAPPORT$tables_reference_parametres égale le texte de
   m <- tablexp:::MENTIONS_RAPPORT
   identical(Encoding(m[["tables_reference_parametres"]]), "UTF-8") &&
     identical(paste0("<p>", html(unname(m[["tables_reference_parametres"]])), "</p>"), MENTION_163)
+})
+
+# --- #129 : mention de l'empreinte des données, portabilité constatée sous glibc et sous Windows ---
+# Texte arrêté par actuary-approfondi (#129, Q1), littéral de la spécification
+# (valeur calculée à la main) ; seule la dernière clause change.
+MENTION_129 <- paste(
+  "données (fiche/empreintes/donnees) : représentation canonique (fiche/empreintes/representation) des",
+  "colonnes des rôles telles que reçues par le moteur, toutes les lignes dans l'ordre reçu ; les colonnes hors",
+  "rôles n'y entrent pas ; portable : même empreinte constatée sous glibc et sous Windows (R 4.3.3 ucrt,",
+  "session UTF-8), non mesurée ailleurs.")
+verifier("#129 : MENTIONS_RAPPORT$empreinte_donnees égale mot pour mot le texte arrêté ; écrite une seule fois dans le rapport figé de R1", {
+  m <- unname(tablexp:::MENTIONS_RAPPORT[["empreinte_donnees"]])
+  h <- texte_de(ecrire_rapport(x1))
+  identical(m, MENTION_129) && identical(Encoding(m), "UTF-8") &&
+    lengths(regmatches(h, gregexpr(html(MENTION_129), h, fixed = TRUE))) == 1L &&
+    !grepl("exacte sous glibc", h, fixed = TRUE)
+})
+
+verifier("#310 : MENTIONS_RAPPORT$integrite_hors_2 égale mot pour mot le texte arrêté ; écrite une seule fois dans le rapport figé de R1, après la liste des chemins hors empreinte", {
+  m <- unname(tablexp:::MENTIONS_RAPPORT[["integrite_hors_2"]])
+  h <- texte_de(ecrire_rapport(x1))
+  identical(m, MENTION_310) && identical(Encoding(m), "UTF-8") && startsWith(m, " ; ce que le rapport") &&
+    lengths(regmatches(h, gregexpr(html(MENTION_310), h, fixed = TRUE))) == 1L &&
+    !grepl("sans vérification.</p>", h, fixed = TRUE)
 })
 
 # --- #313 : lecture sans dispatch de l'écrivain, des contrôles et du rendu (identité exacte) ---

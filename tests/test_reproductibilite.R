@@ -791,7 +791,10 @@ controler_rapport_fige <- function(x, l, id) {
   hors <- paste(html(setdiff(tablexp:::CHEMINS_HORS_RESULTAT, c("execution", "fiche/empreintes/resultat"))), collapse = ", ")
   if (length(integ) != 1L ||
       !grepl(html("trouv\u00e9e \u00e9gale \u00e0 fiche/empreintes/resultat, la valeur consign\u00e9e \u00e0 laquelle ce contr\u00f4le la compare (exclue du texte empreint\u00e9, puisqu'elle en est l'empreinte). Hors du p\u00e9rim\u00e8tre"), integ, fixed = TRUE) ||
-      !grepl(paste0("de ce contr\u00f4le : ", hors, " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume cro\u00eet avec la base) est lu dans l'objet, sans v\u00e9rification.</p>"), integ, fixed = TRUE))
+      !grepl(paste0("de ce contr\u00f4le : ", hors, " ; ce que le rapport en restitue (valeurs, ou structure seule pour une table dont le volume cro\u00eet avec la base) est lu dans l'objet, sans v\u00e9rification de son origine.",
+                      " Avant l'\u00e9criture sont contr\u00f4l\u00e9es : pour etapes/donnees/resultat/lignes_conservees, copie des lignes conserv\u00e9es de l'entr\u00e9e, sa coh\u00e9rence avec le p\u00e9rim\u00e8tre de l'empreinte",
+                      " (un data.frame dont le nombre de lignes est la longueur de etapes/donnees/resultat/numeros_conserves et qui porte les colonnes nomm\u00e9es par fiche/roles)",
+                      " ; pour les autres chemins, leur forme, soumise \u00e0 l'\u00e9crivain de la fiche (listes et vecteurs sans classe ni attribut autre que les noms, ou dates).</p>"), integ, fixed = TRUE))
     e <- c(e, "U21 : phrase du contrôle d'intégrité")
   rj <- section_de("rejeu")
   if (!any(grepl("rejouer_fiche(", rj, fixed = TRUE)) || !any(grepl(html(tablexp:::TEXTE_REJEU_FICHE), rj, fixed = TRUE)))
