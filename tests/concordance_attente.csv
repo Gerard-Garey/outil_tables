@@ -1,9 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-validation:ETATS_ECART_MINIMAL_HOMOGENEITE,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-validation:NIVEAU_ECART_MINIMAL,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-validation:PUISSANCE_ECART_MINIMAL,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-validation:SEUIL_ECART_MINIMAL,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-validation:TOLERANCE_ECART_MINIMAL,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-validation:ecart_minimal_homogeneite,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-validation:non_centralite_ecart_minimal,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-validation:statut_ecart_minimal,#218,"définition ajoutée à R/validation.R par #218 (écart minimal détectable), catalogue écrit par docwriter en fin de branche (règle 9)"
