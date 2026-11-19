@@ -1469,7 +1469,7 @@ l'effet d'une permutation des lignes de l'entrée de référence
 (section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39), puis
 l'aller-retour du texte du plan et de la fiche et le rejeu à partir de ce
 texte pour chacun des plans de référence (quatorze~: fonction \code{plans\_reference} de
-\code{tests/reference/outils\_reference.R}, l.~516~; section~\ref{sec:serialisation}).
+\code{tests/reference/outils\_reference.R}~; section~\ref{sec:serialisation}).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
 citée, ou inscrite dans la liste d'attente \code{tests/concordance\_attente.csv}
@@ -1482,7 +1482,8 @@ catalogue requis déjà écrit (type \code{entree}, de la forme
 \code{<catalogue>:<nom>}, pour une définition ajoutée à un module dont le
 tableau existe déjà), une valeur citée (type \code{fiche}, ci-dessous) ou
 un écart de citation (type \code{citation}, nom \code{marqueurs},
-ci-dessous) et renvoie à une issue~; une entrée en attente absente du
+ci-dessous) ou un écart de renvoi par numéro de ligne (type \code{renvoi},
+nom \code{lignes}, ci-dessous) et renvoie à une issue~; une entrée en attente absente du
 document compte en échec attendu, présente elle est un succès inattendu.
 Elle compare en outre au package les valeurs que le document cite
 (issue~\#70)~: chaque constante de version (\code{VERSION\_FICHE} et les
@@ -1509,7 +1510,23 @@ et le texte entre «~» qui le suit, normalisé par une règle fermée, est éga
 est suivie d'un tel marqueur, ou d'une exemption motivée quand la phrase ne
 cite aucune constante~; un marqueur mal formé est un écart. Le contrôle ne
 voit pas une citation qui n'est ni marquée ni annoncée par cette
-expression. Le format des citations et des catalogues qu'elle lit est fixé par
+expression. Elle refuse enfin tout renvoi par numéro de ligne vers un
+fichier du dépôt (issue~\#187~; décision du mainteneur du 19/11/2026)~: un
+tel numéro dérive à chaque modification du fichier visé, et le renvoi à un
+emplacement du code se fait par le symbole (fonction, constante), avec le
+chemin du fichier. Sont lus, sur le texte sans commentaires, l'abréviation
+«~l.~» ou «~ll.~» suivie d'un numéro, un chemin suivi d'un deux-points et
+d'un numéro ou d'une virgule et de «~ligne~» avec un numéro, «~ligne~» et un
+numéro suivis de «~de~» et d'un chemin, et une adresse du dépôt sur GitHub
+portant une ancre de ligne~; un chemin est du dépôt si son premier segment
+existe à la racine du dépôt (ou est \code{app}), ou s'il est, sans dossier,
+le nom d'un fichier de l'arbre de travail. Un renvoi par numéro de ligne
+n'est admis que vers une source externe à étiquette fixe, nommée (chemin
+hors du dépôt ou \code{\textbackslash url}) avant lui dans la même phrase,
+comme le fichier C des sources de R~4.3.3 cité en section~\ref{sec:fiche}~;
+sans source nommée avant lui, il est refusé. Un écart transitoire se
+déclare dans la liste d'attente (type \code{renvoi}, nom \code{lignes}). Les
+formes non lues (un renvoi rédigé autrement) relèvent de la relecture. Le format des citations et des catalogues qu'elle lit est fixé par
 \code{docs/latex/CONVENTIONS.md} (section~3)~; les tableaux de fonctions de
 chaque module en sont la principale application (E4.9). Sans \code{-{}-strict}, elle
 rend compte des écarts sans échouer.
@@ -2064,7 +2081,9 @@ graines de Monte-Carlo~: 500~lignes (constante \code{NOMBRE\_PAR\_MOTIF\_R9})
 pour chacun des motifs \code{id\_contrat\_manquant}, \code{sexe\_manquant}
 et \code{entree\_manquante} (constante \code{MOTIFS\_DEFAUTS\_R9}), toutes
 causes de sortie admises (\code{tests/reference/outils\_reference.R},
-constantes l.~350 à~352, déclarations des défauts l.~372 et~373). Les lignes
+constantes \code{GRAINE\_DEFAUTS\_R9}, \code{NOMBRE\_PAR\_MOTIF\_R9} et
+\code{MOTIFS\_DEFAUTS\_R9}, déclarations des défauts dans la fonction
+\code{jeu\_reference\_defauts}). Les lignes
 que les défauts n'altèrent pas sont celles de \code{reference}~; un test le
 vérifie, avec la graine, les motifs, leurs effectifs et l'absence de ligne
 portant deux motifs.
@@ -2172,7 +2191,7 @@ l'étape \code{positionnement} (\code{methode = "smr"}, table \code{tv},
 relation \code{positionnee} (même clé, même plage, mêmes tranches, niveau
 et nombre de réplications que R8), sous la graine de Monte-Carlo
 20261113 (constante \code{GRAINE\_MONTE\_CARLO\_R10},
-\code{tests/reference/outils\_reference.R}, l.~331), distincte de celle du
+\code{tests/reference/outils\_reference.R}), distincte de celle du
 jeu, de celle de R8 et des défauts de R9. C'est la première référence qui
 contient une table positionnée~: sa création a demandé le visa du
 mainteneur (décisions M287 et M308), trois statuts textuels ayant été
@@ -2186,15 +2205,15 @@ corrigés avant elle (décision M309). Il fige aussi l'état
 08/11/2026, points~(a) et~(c)~; décision M307). R11 est le plan de R1
 augmenté de l'étape \code{homogeneite} (âges 20 à 90, tranches de bornes
 20, 50 et 70, 999~réplications), sous la graine de Monte-Carlo 20261114
-(\code{GRAINE\_MONTE\_CARLO\_R11}, \code{tests/reference/outils\_reference.R},
-l.~332)~; l'entrée de référence portant un facteur 0,6 sur les femmes
+(\code{GRAINE\_MONTE\_CARLO\_R11}, \code{tests/reference/outils\_reference.R})~;
+l'entrée de référence portant un facteur 0,6 sur les femmes
 (section~\ref{sec:simulation}), l'hypothèse nulle y est fausse~: R11 fige
 l'étape sous une alternative~; ce n'est ni un verdict ni une mesure de
 puissance (un seul jeu). Ses p-valeurs de Monte-Carlo sont au plancher
 $1/(B + 1)$, sauf celle de la tranche 20-49~: un changement du flux des
 réplications n'y changerait que cette p-valeur et son erreur. R12 est le plan de R5 (en cours $\to$
 racheté, unité contrat) augmenté de la même étape, sous la graine 20261115
-(\code{GRAINE\_MONTE\_CARLO\_R12}, l.~333)~: les facteurs de rachat de
+(\code{GRAINE\_MONTE\_CARLO\_R12}, \code{tests/reference/outils\_reference.R})~: les facteurs de rachat de
 l'entrée étant égaux pour les deux sexes, l'hypothèse nulle y est
 exactement vraie, les p-valeurs de Monte-Carlo tombent dans le corps de la
 loi, et R12 épingle le flux des réplications de l'homogénéité. Ce second
@@ -2414,7 +2433,7 @@ valeur (visa d'\code{actuary} du 09/11/2026). Un double reçoit sa tolérance de
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont chaque valeur
 est l'une des cinq classes de \code{CLASSES\_TOLERANCE} (exacte,
 $10^{-14}$, $10^{-12}$, $10^{-10}$, \code{optimisation} $= 10^{-3}$~;
-\code{tests/reference/outils\_reference.R}, l.~98), et dont les clés sont
+\code{tests/reference/outils\_reference.R}), et dont les clés sont
 cherchées parmi les suffixes du chemin, segment par segment, le
 \textbf{suffixe le plus long} l'emportant (\code{cles\_de},
 \code{tolerance\_de}, \code{tests/reference/outils\_reference.R}).
@@ -14503,8 +14522,8 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     \code{bornes\_non\_definies})~; la convolution n'est faite que si son
     nombre de produits, calculé avant elle
     (\code{cout\_convolution\_binomiales()}), est au plus
-    \code{N\_MAX\_PRODUITS\_CONVOLUTION} ($10^8$, \code{R/validation.R},
-    l.~118)~; au-delà, les p-valeurs exactes et les bornes valent
+    \code{N\_MAX\_PRODUITS\_CONVOLUTION} ($10^8$, \code{R/validation.R})~;
+    au-delà, les p-valeurs exactes et les bornes valent
     \code{NA}, état \code{convolution\_au\_dela\_n\_max}, et des p-valeurs
     asymptotiques sont produites à la place des exactes (paragraphe
     suivant)~; le regroupement \code{segment}, et
