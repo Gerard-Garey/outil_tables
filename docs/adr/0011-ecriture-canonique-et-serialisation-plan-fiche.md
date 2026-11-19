@@ -1221,3 +1221,5 @@ Issues : #129, #49, #326. Décisions M61, M153, M170, M541 (D4 (b)), M543. ADR 0
 4. **Effet sur les résultats : aucun.** Aucun code, aucune référence, aucune table finale, aucun verdict de validation, aucune valeur de table homologuée.
 
 Issues : #129, #326. Décisions M543 (b), M545 (D6 (a)).
+
+*Mention datée du 19 novembre 2026, troisième (`architect`, sur `bc88483`) — acceptation de la mention précédente.* La mention datée du 19 novembre 2026, seconde (commit `e26f8a6`), est **acceptée telle quelle** par le mainteneur le 19/11/2026 (**M548**, P4 de B30 ; D6 (a), M545 ; *rapportée* par la session, réponse du mainteneur à sa question) ; elle vaut à compter de cette date. Rien de ce qui précède n'est réécrit, ligne de statut de la mention seconde comprise : celle-ci se lit avec la présente mention. L'annotation acceptée par M543 (a) se lit désormais avec les points 1 et 2 de la mention seconde. L'observation de son point 3 sur le contrôle de péremption de #326 reste à considérer au plan de la branche qui portera #326. **Effet sur les résultats : aucun.**
