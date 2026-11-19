@@ -7973,6 +7973,26 @@ métadonnées, et aucune étape ne lit les paramètres~; ils permettent au tiers
 de recalculer la table et de mesurer l'écart (ADR 0015, point~2.3) pour
 autant qu'ils aient été déclarés exactement. Le rapport figé le dit par la
 mention \code{tables\_reference\_parametres} (section~\ref{sec:rapport-fige}).
+\code{tests/unitaires/test\_invariance\_parametres\_table.R} vérifie
+l'affirmation (issue~\#257)~: sous un plan par étape qui lit une table
+(\code{positionnement}, \code{validation}, \code{importance\_exclusions}, qui
+reçoit la table de la validation, et \code{coherence\_regularite}), deux
+constructions dont la table citée ne diffère que par ses paramètres, modifiés
+après le constructeur, rendent des étapes, des avertissements et des
+empreintes de table identiques, et des fiches qui ne diffèrent que par le champ
+\code{parametres} de cette table et par l'empreinte du résultat, qui porte sur
+la fiche entière~; une lecture des paramètres injectée dans chacune des quatre
+étapes (\code{trace()}) fait échouer ce contrôle. En appoint, une recherche
+dans l'arbre syntaxique de \code{R/} relève les lectures de l'attribut, hors
+écritures (\code{attr()} au nom exact, partiel ou non littéral,
+\code{attributes()} suivi de \code{\$}, \code{[[ ]]} ou \code{[ ]})~: il n'y en a
+que deux, l'une à la reconstruction du contrôle de forme des tables reçues
+(\code{controler\_forme\_tables()}, section~\ref{sec:tables-reference-recues}),
+l'autre à la formation de l'élément de fiche (\code{element\_table\_fiche()}),
+aucune dans une étape. Une lecture indirecte (\code{do.call()},
+\code{getElement()}, attributs rangés dans une variable) échappe à cette
+recherche~; la garde est l'invariance, constatée sur un jeu simulé et sur ces
+plans, qui ne voit une lecture que si elle change un résultat.
 Les tables importées et embarquées n'ont pas de paramètres
 (\code{table\_parametres\_inattendus}) et ne sont pas concernées.
 
