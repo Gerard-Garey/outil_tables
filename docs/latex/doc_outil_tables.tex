@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{18/11/2026}
+\newcommand{\datedoc}{19/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -18607,7 +18607,23 @@ du contrôle~5, qui n'en vérifie pas l'exactitude, et la cohérence de
 ne vérifie ni le type ni les valeurs de ses colonnes (limite acceptée,
 M522), ni leur longueur (limite sans objet pour un objet construit par le
 moteur, les décomptes de lignes discordants étant refusés à l'entrée et
-à l'extraction des lignes conservées~; issues~\#312 et~\#319).
+à l'extraction des lignes conservées~; issues~\#312 et~\#319). Chacune
+des deux comparaisons du contrôle~6 a sa condition (ci-dessus, contrôle~6)~:
+le nombre de lignes n'est comparé, et l'absence de la copie refusée, que si
+\code{etapes/donnees/resultat/}\allowbreak\code{numeros\_conserves} est
+présent (ni absent ni \code{NULL})~; les colonnes de rôle ne sont
+contrôlées que si \code{fiche/roles} est un vecteur de chaînes. Tout objet
+rendu par \code{construire\_table()} remplit les deux conditions~: un plan
+déclare au moins une étape, l'étape \code{donnees} est préalable à toutes
+les autres et écrit \code{numeros\_conserves}, non vide (refus
+\code{aucune\_ligne\_conservee} sinon), et des rôles qui ne sont pas un
+vecteur de chaînes nommé sont refusés à l'entrée
+(\code{roles\_mal\_formes}), \code{fiche/roles} en étant la copie
+réordonnée. Ces deux chemins étant dans le périmètre de l'empreinte, un
+objet qui passe le contrôle d'intégrité les porte encore, à une collision
+du MD5 près, sauf modification délibérée suivie du recalcul de
+l'empreinte, limite dite plus haut (lecture du code~; \emph{constat} sur
+les objets des plans R1 à R17).
 
 \medskip
 \noindent
@@ -18750,18 +18766,42 @@ et de deux phrases~:
     de \code{CHEMINS\_HORS\_RESULTAT} sauf \code{execution} et
     \code{fiche/empreintes/resultat}, joints par «~,~»]~; ce que le rapport en restitue
     (valeurs, ou structure seule pour une table dont le volume croît avec la
-    base) est lu dans l'objet, sans vérification.~»
+    base) est lu dans l'objet, sans vérification de son origine. Avant
+    l'écriture sont contrôlées~: pour
+    etapes/donnees/resultat/\allowbreak lignes\_conservees, copie des
+    lignes conservées de l'entrée, sa cohérence avec le périmètre de
+    l'empreinte (un data.frame dont le nombre de lignes est la longueur de
+    etapes/donnees/resultat/\allowbreak numeros\_conserves et qui porte les
+    colonnes nommées par fiche/roles)~; pour les autres chemins, leur forme,
+    soumise à l'écrivain de la fiche (listes et vecteurs sans classe ni
+    attribut autre que les noms, ou dates).~»
 \end{itemize}
 \noindent
-«~Sans vérification~» s'entend de l'\textbf{origine} de ce qui est
-restitué, que l'empreinte ne peut établir hors de son périmètre (exactitude
-des valeurs comprise)~: la forme de ces chemins est contrôlée avant
-l'écriture (contrôle~5), sauf celle de \code{lignes\_conservees}, dont la
-cohérence avec le périmètre de l'empreinte l'est (contrôle~6~: présence,
-classe \code{data.frame}, nombre de lignes, colonnes de rôle). La phrase,
-texte du moteur, n'a changé ni avec le contrôle~5 ni avec le contrôle~6~;
-sa reformulation, qui changerait les octets de tout rapport figé, est renvoyée à
-l'issue~\#310 (décision du mainteneur du 17/11/2026, M522).
+Cette seconde phrase assemble, dans l'ordre, \code{integrite},
+\code{integrite\_hors\_1}, la liste des chemins (élément de remplacement
+entre crochets) et \code{integrite\_hors\_2}~; elle n'est pas une valeur
+unique de \code{MENTIONS\_RAPPORT} et ne porte donc pas de marqueur de
+citation (les deux derniers morceaux commencent par une espace et ne sont
+pas citables seuls~: \code{docs/latex/CONVENTIONS.md}, section~3.5,
+limites~; section~\ref{sec:trois-batteries})~; sa concordance avec le
+paragraphe rendu relève de la relecture. «~Sans vérification de son
+origine~» est la non-authenticité de la doctrine de l'ADR 0012 (seconde
+annotation du 16/11/2026, (b))~: hors de son périmètre, l'empreinte ne peut
+établir ni l'origine de ce qui est restitué ni l'exactitude de ses valeurs.
+La suite de la phrase dit ce qui est contrôlé avant l'écriture~: la
+cohérence de \code{lignes\_conservees} avec le périmètre de l'empreinte
+(contrôle~6~: présence, classe \code{data.frame}, nombre de lignes,
+colonnes de rôle) et la forme des autres chemins (contrôle~5)~; elle ne
+numérote pas les contrôles, que le lecteur du rapport ne voit pas. Jusqu'à
+l'issue~\#310, la phrase s'achevait par «~est lu dans l'objet, sans
+vérification~», texte que ni le contrôle~5 ni le contrôle~6 n'avaient
+changé et dont la reformulation, qui change les octets de tout rapport
+figé, avait été renvoyée à cette issue (décision du mainteneur du
+17/11/2026, M522)~; le texte actuel est celui qu'a arrêté \code{actuary}
+le 19/11/2026 (ADR 0012, mention datée du 19/11/2026, acceptée, M542). Il
+allonge \code{integrite\_hors\_2} de 153 à 648~octets, et tout rapport
+figé d'autant (+495~octets), la phrase y figurant une seule fois, dans la
+section \emph{identification}, toujours rendue.
 
 % citation : MENTIONS_RAPPORT["tables_reference_parametres"]
 La section \emph{donnees\_recues}, quand au moins une table de
