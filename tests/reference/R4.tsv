@@ -11,29 +11,29 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
+# plateforme consignée : Processeur                    : Intel(R) Xeon(R) 6975P-C
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : b29caa5b6d206c4677eeb47fff43e32b8dcbab2a
+# plateforme consignée : GITHUB_SHA                    : c35eb9d4cc379507292edd836c3c34c22bd78a69
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
-# fiche$plateforme/release : 7.0.0-1017-azure
+# fiche$plateforme/release : 7.0.0-1014-aws
 # fiche$plateforme/machine : x86_64
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
 # fiche$empreintes/resultat : 7921e6e3718142eb3e493dcdfefb625b
-# fiche$empreintes/code : 168837307b4e7ceb933d37115190126a
-# commit : b29caa5b6d206c4677eeb47fff43e32b8dcbab2a
-# execution : 44586537589
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/44586537589
+# fiche$empreintes/code : 52da81e3daa438a327fcca6f23cd41b0
+# commit : c35eb9d4cc379507292edd836c3c34c22bd78a69
+# execution : 44698750703
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/44698750703
 # mode : regeneration
-# date : 2026-11-19 18:19:46 UTC
+# date : 2026-11-20 07:57:48 UTC
 # empreinte des données : 35ca55371e72f0f0103993d70e3a64d3
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"

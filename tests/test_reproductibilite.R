@@ -456,49 +456,10 @@ CHEMINS_199 <- list(
 # bloc R11 et R12 de #218 (C4, recalcul indépendant, états, aucun signal) reste,
 # lu sur les références régénérées.
 TRANSITIONS_EN_COURS <- list()
-# Transition #218, correction de theta_80 (B30, constat C1 de la revue
-# finale ; spécification d'actuary-approfondi du 19/11/2026, § 2 ; décisions
-# du mainteneur du 19/11/2026, (a) et (b)) : textes des deux statuts
-# ecart_minimal de R11 et R12, en « valeur de chaîne » aux positions lues par
-# les colonnes sœurs de la référence (table ecart_minimal, grandeurs
-# theta_80_superieur et theta_80_inferieur) ; texte après tiré du texte avant
-# de la référence par les trois substitutions de la spécification (la
-# troisième, par branche), écrites ici en échappements \u (UTF-8 en toute
-# locale), sans lire le package. Valeurs de theta_80 : écarts sous la
-# tolérance de leur classe (1e-10), sans transition. Une transition pour les
-# deux plans (changements identiques). À clore par la régénération qui suit
-# la correction, avec transition_218c() et les constantes *_218C.
-SUBST_218C <- list(
-  c("V variance de U sous H0, m\u00eame syst\u00e8me r\u00e9duit que le test global ;",
-    "V variance de U sous H0 (celle du test global) ; lambda_s(theta) strictement monotone sur chaque branche (exact), racine unique ;"),
-  c("theta_80 (uniroot)", "theta_80 (uniroot en log theta, lambda_s calcul\u00e9e sans soustraction)"))
-INSUFFISANTE_218C <- paste("\u00e9tat precision_insuffisante (NA) quand la racine n'est pas repr\u00e9sentable en double",
-                           "pr\u00e9cision \u00e0 cette tol\u00e9rance ;")
-apres_218c <- function(avant, superieur) {
-  if (grepl("precision_insuffisante", avant, fixed = TRUE))
-    stop("apres_218c() : marqueur d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_218c() et les constantes *_218C")
-  bout <- if (superieur) "lorsque theta tend vers l'infini ;" else "lorsque theta tend vers 0 ;"
-  for (r in c(SUBST_218C, list(c(bout, paste(bout, INSUFFISANTE_218C))))) {
-    if (lengths(regmatches(avant, gregexpr(r[1L], avant, fixed = TRUE))) != 1L)
-      stop(sprintf("apres_218c() : \u00ab %s \u00bb absent ou r\u00e9p\u00e9t\u00e9 (erreur de programmation)", r[1L]))
-    avant <- sub(r[1L], r[2L], avant, fixed = TRUE)
-  }
-  avant
-}
-transition_218c <- function(plans) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plans[1L], ".tsv")))$valeurs
-  st <- "etapes/homogeneite/parametres/statuts/"
-  k <- match(c("theta_80_superieur", "theta_80_inferieur"), ref[[paste0(st, "grandeur")]])
-  if (anyNA(k) || !all(ref[[paste0(st, "table")]][k] == "ecart_minimal"))
-    stop("transition_218c() : lignes ecart_minimal absentes de la r\u00e9f\u00e9rence (erreur de programmation)")
-  avant <- ref[[paste0(st, "statut")]][k]
-  apres <- c(apres_218c(avant[1L], TRUE), apres_218c(avant[2L], FALSE))
-  Encoding(apres) <- "UTF-8"
-  list(issue = "#218", plans = plans,
-       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
-                               positions = k)))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_218c(c("R11", "R12"))))
+# Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
+# finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
+# (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
+# les constantes *_218C retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
