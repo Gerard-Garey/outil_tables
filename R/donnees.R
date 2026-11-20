@@ -531,7 +531,8 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
 }
 
 # Assistants de décompte de lignes, partagés par controler_lignes_donnees()
-# (#312) et par la postcondition de l'extraction de preparer_donnees() (#319).
+# (#312) et par controler_lignes_extraites() (#319, #322), la postcondition de
+# l'extraction des étapes `donnees` et `importance_exclusions`.
 # decompte_colonne() rend, non converti, le nombre de lignes d'une colonne :
 # dim[1] si elle porte un attribut dim (matrice, tableau) ; NROW(), avec
 # dispatch, pour une liste munie d'une classe autre que « bytes » (POSIXlt,
@@ -610,8 +611,10 @@ colonnes_classe_citees <- function(colonnes, classes)
     formuler("« %s » (classe %s)", citer(colonnes[i]), paste(citer(classes[[i]]), collapse = "/")),
     character(1L)), collapse = ", ")
 
-# Noms de colonnes lus sans dispatch (attr(), character(n) à défaut de noms ;
-# un attribut names a toujours la longueur de la liste, R le complète par NA).
+# Noms de colonnes lus sans dispatch (attr(), character(n) à défaut de noms).
+# La longueur de l'attribut names n'est pas celle de la liste : `[.data.frame`
+# sous une classe dont length() ment rend une liste d'un élément munie de noms
+# à plusieurs (contrôlé par controler_lignes_extraites(), #322).
 # Seule lecture des noms de colonnes de decomptes_colonnes() et de
 # controler_lignes_extraites() (#322, point 4).
 noms_colonnes_lus <- function(x) {
@@ -2006,9 +2009,13 @@ SUJETS_LIGNES_EXTRAITES <- c(
 # dispatch : une méthode qui retire ou remplace la classe est refusée) ; (1)
 # son nombre de lignes (.row_names_info(, 2L), sans dispatch) est celui des
 # numéros ; (1 bis) il a les mêmes colonnes que l'entrée, nombre et noms (lus
-# sans dispatch par noms_colonnes_lus() ; des noms identiques ont même nombre :
-# une colonne dont la méthode « [ » rend NULL est retirée sans signal par
-# `[.data.frame`, et le contrôle (2) lirait alors les noms décalés) ; (2)
+# sans dispatch par noms_colonnes_lus(), le nombre de colonnes étant lu aussi
+# sur la liste, length(unclass()), qui doit être celui des noms et celui de
+# l'entrée : des noms identiques n'ont pas même nombre quand length() de la
+# classe ment, `[.data.frame` rendant alors une liste plus courte que son
+# attribut names, et decomptes_colonnes() lèverait une erreur R ; une colonne
+# dont la méthode « [ » rend NULL est retirée sans signal par `[.data.frame`,
+# et le contrôle (2) lirait alors les noms décalés) ; (2)
 # chacune de ses colonnes, toutes, compte ce nombre de lignes (règle de
 # controler_lignes_donnees() : decomptes_colonnes()), y compris hors rôle ; (3)
 # chaque colonne de rôle (lue sans dispatch par lire_champ(), des deux côtés)
@@ -2045,18 +2052,26 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   attendu <- length(numeros)
   # (0) forme : liste classée data.frame, lue sans dispatch (a_classe(), is.list()).
   forme <- a_classe(extraites, "data.frame") && is.list(extraites)
-  # (1) décompte des lignes (noms de lignes, sans dispatch) ; (1 bis) mêmes colonnes que l'entrée (noms lus sans
-  # dispatch ; des noms identiques ont même nombre) ; (2) décompte de chaque colonne, toutes, selon la règle de
+  # (1) décompte des lignes (noms de lignes, sans dispatch) ; (1 bis) mêmes colonnes que l'entrée (nombre lu sur la
+  # liste, noms lus sans dispatch : le nombre de la liste est celui des noms et de l'entrée) ; (2) décompte de chaque colonne, toutes, selon la règle de
   # controler_lignes_donnees() ; (3) identité des colonnes de rôle.
   nc <- if (forme) .row_names_info(extraites, 2L) else NA_integer_
   ecart_compte <- forme && (is.na(nc) || nc != attendu)
   exact <- identical(class(donnees), "data.frame")
-  nom_c <- noms_colonnes_lus(extraites); nom_d <- noms_colonnes_lus(donnees)
-  ecart_colonnes <- forme && !ecart_compte && !identical(nom_c, nom_d)
+  # Rien de `extraites` n'est lu (noms, longueur) hors d'une liste : unclass() d'un environnement classé
+  # « data.frame » est une erreur R, le refus est le (0).
+  nom_d <- noms_colonnes_lus(donnees)
+  nom_c <- if (forme) noms_colonnes_lus(extraites) else character(0)
+  long_c <- if (forme) length(unclass(extraites)) else NA_integer_
+  # Cohérence de la liste lue : aucun lapply() sur unclass(extraites) sans elle (un attribut names de 7 éléments
+  # sur une liste de 1 : « 'names' attribute [7] must be the same length as the vector [1] »).
+  coherente <- forme && long_c == length(nom_c)
+  ecart_colonnes <- forme && !ecart_compte &&
+    (!coherente || long_c != length(unclass(donnees)) || !identical(nom_c, nom_d))
   dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL
   # Entrée exactement « data.frame » et écart de colonnes : décomptes lus pour situer la première position écartée
   # (et les éléments NULL, que `[.data.frame` laisse à la place d'une colonne retirée).
-  if (exact && ecart_colonnes) {
+  if (exact && ecart_colonnes && coherente) {
     dec <- decomptes_colonnes(extraites)
     premiere <- premiere_ecart_colonnes(nom_c, nom_d, dec$lc, attendu,
                                         vapply(unclass(extraites), is.null, logical(1L)))

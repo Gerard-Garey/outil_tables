@@ -1110,6 +1110,79 @@ local({
 verifier("#322 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
          !any(vapply(c("is.na.k322na", "is.numeric.k322num", "dim.k322dim", "[.k322v", "Ops.k322v", "is.na.k322v", "[.k322dl", "[.k322chr", "[.k322rev", "[.k322neg"),
                      exists, logical(1L), envir = globalenv(), inherits = FALSE)))
+# Revue finale de B31 (#322) : controler_lignes_extraites() lit le nombre de
+# colonnes de la liste rendue par `[`, non le seul attribut names. Une méthode
+# length() de la classe qui ment (length.k322klen rend 1) fait rendre à
+# `[.data.frame` une liste d'un élément munie de huit noms ; les noms de
+# l'extraction sont ceux de l'entrée, et decomptes_colonnes() levait l'erreur R
+# « 'names' attribute [8] must be the same length as the vector [1] » (mesuré
+# sur dab4345 ; à faa0709, refus donnees_mal_formees par le nombre de colonnes).
+# Même refus, même message et mêmes details qu'à faa0709, sous le module de
+# l'étape appelante : appel direct de l'outil (donnees, importance_exclusions),
+# preparer_donnees() et construire_table(). Témoin : un environnement classé
+# « data.frame » rendu par `[` est le refus (0), non l'erreur R « cannot
+# unclass an environment » (mesuré avant la correction : le refus lisait les
+# noms avant le contrôle de forme).
+local({
+  m <- list(`length.k322klen` = function(x) 1L,
+            `[.k322env` = function(x, ...) { e <- new.env(); class(e) <- "data.frame"; e })
+  for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+  on.exit(rm(list = names(m), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  d <- BASE; d$entree[2L] <- as.Date(NA)
+  dk <- structure(d, class = c("k322klen", "data.frame"))
+  PLAN <- list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = "entree_manquante"),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  verifier("#322 revue finale : length(unclass()) de l'extraction du témoin k322klen (1) diffère de celui des noms (7) et de l'entrée (8)",
+           identical(vapply(list(dk[-2L, , drop = FALSE]), function(e) c(length(unclass(e)), length(attr(e, "names", exact = TRUE))),
+                            integer(2L))[, 1L], c(1L, 8L)) && length(unclass(dk)) == 8L)
+  PREF_E <- "Les lignes conservées, extraites des données par la méthode « [ » de la classe "
+  SUFF_E <- " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la méthode « [ » rend exactement les lignes demandées (ou qui n'a pas de méthode « [ » propre)."
+  msg <- paste0(PREF_E, "k322klen/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es ",
+                "(m\u00eames noms de colonnes, dans un autre ordre ou r\u00e9p\u00e9t\u00e9s)", SUFF_E)
+  chemins <- list(
+    outil = function(x) tablexp:::controler_lignes_extraites(x, x[-2L, , drop = FALSE], c(1L, 3L, 4L), ROLES),
+    preparer_donnees = function(x) prep(x, exclusions = "entree_manquante"),
+    construire_table = function(x) construire_table(x, ROLES, PLAN))
+  for (ch in names(chemins)) {
+    r <- attrape(chemins[[ch]](dk))
+    verifier(sprintf("#322 revue finale, %s : entrée de classe dont length() ment -> refus donnees_mal_formees du module donnees (colonnes), non l'erreur R de names", ch),
+             if (is.null(r)) "aucun refus"
+             else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else if (!identical(r$module, "donnees") || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
+             else if (!grepl("n'ont pas les colonnes des données (", conditionMessage(r), fixed = TRUE)) paste("message :", conditionMessage(r))
+             else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8"
+             else if (!identical(r$details$classe, class(dk)) || !identical(r$details$classe_rendue, class(dk)) ||
+                      !identical(r$details$lignes, 3L) || !identical(r$details$attendu, 3L) ||
+                      !identical(r$details$colonne, character(0)) || !identical(r$details$colonnes, character(0)))
+               paste("details :", paste(deparse(r$details), collapse = " "))
+             else TRUE)
+  }
+  r <- attrape(tablexp:::controler_lignes_extraites(dk, dk[-2L, , drop = FALSE], c(1L, 3L, 4L), ROLES, etape = "importance_exclusions"))
+  verifier("#322 revue finale, outil, etape importance_exclusions : même refus sous le module importance_exclusions",
+           inherits(r, "refus_tablexp") && identical(r$module, "importance_exclusions") && identical(r$motif, "donnees_mal_formees") &&
+             grepl("n'ont pas les colonnes des données (", conditionMessage(r), fixed = TRUE))
+  # Témoin : environnement classé « data.frame » rendu par `[`, refus (0) sans erreur R.
+  e <- new.env(); class(e) <- "data.frame"
+  for (et in c("donnees", "importance_exclusions")) {
+    r <- attrape(tablexp:::controler_lignes_extraites(BASE, e, 1:3, ROLES, etape = et))
+    verifier(sprintf("#322 revue finale, %s : environnement classé data.frame rendu par `[` -> refus (0) donnees_mal_formees, non une erreur R", et),
+             if (is.null(r)) "aucun refus"
+             else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else if (!identical(r$module, et) || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
+             else grepl("ne sont pas un data.frame", conditionMessage(r), fixed = TRUE))
+  }
+  de <- structure(d, class = c("k322env", "data.frame"))
+  r <- attrape(prep(de, exclusions = "entree_manquante"))
+  verifier("#322 revue finale, preparer_donnees : `[` qui rend un environnement classé data.frame -> refus (0) du module donnees",
+           inherits(r, "refus_tablexp") && identical(r$module, "donnees") && identical(r$motif, "donnees_mal_formees") &&
+             grepl("ne sont pas un data.frame", conditionMessage(r), fixed = TRUE))
+})
+verifier("#322 revue finale : les méthodes de session sont retirées de globalenv()",
+         !any(vapply(c("length.k322klen", "[.k322env"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
 # Colonne de rôle de type conforme sous un nom d'encodage bytes, à
 # preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur
 # R ; observations et lignes conservées égales à celles du même jeu sous le
