@@ -993,3 +993,167 @@ verifier("sous-ensemble exclu sans exposition ni événement dans la période (#
   }, NA)
   if (all(ok)) TRUE else sprintf("unité tête %s, unité contrat %s", ok[1L], ok[2L])
 })
+
+# Extractions de lignes de l'étape (#320 ; spécification d'actuary, Q3, et
+# outil de #322, point 4) : exposition_lignes() et retrait_contrefactuel()
+# extraient par la méthode « [ » de la classe de l'entrée (M499 (a)), puis
+# controler_lignes_extraites() contrôle l'extraction avant
+# construire_observations() et evaluer_motifs() ; une méthode qui ne ment que
+# sous indices positifs (preparer_donnees() extrait par indices négatifs : sa
+# postcondition passe) fait refuser donnees_mal_formees du module
+# importance_exclusions (avant #320, mesuré sur 7abf58f : erreur R
+# « lignes_tete hors de la forme admise » en unité tête, « arguments imply
+# differing number of rows: 2, 3 » en unité contrat, objet construit sous
+# k320perm et k320cpos). Natures des attendus : valeur calculée à la main
+# (lignes relues : L = R_t u S = 1, 5, 6, 7 en unité tête, S = 5, 6, 7 en
+# unité contrat ; colonnes de rôle dont les valeurs diffèrent une fois ces
+# lignes inversées) ; identité exacte pour les classes à « [ » correcte.
+# Méthodes S3 définies dans globalenv() puis retirées.
+local({
+  m320 <- list(
+    `[.k320pos` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod()
+      if (!missing(i) && is.numeric(i) && all(i > 0)) {
+        cl <- class(r); class(r) <- "data.frame"; r <- r[-1L, , drop = FALSE]; class(r) <- cl
+      }
+      r },
+    `[.k320perm` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod()
+      if (!missing(i) && is.numeric(i) && all(i > 0)) {
+        cl <- class(r); class(r) <- "data.frame"; r <- r[rev(seq_len(.row_names_info(r, 2L))), , drop = FALSE]
+        class(r) <- cl
+      }
+      r },
+    # Ne ment que sur deux lignes ou moins demandées par indices positifs (cas ksel de l'audit léger de #320).
+    `[.k320sel` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod()
+      if (!missing(i) && is.numeric(i) && all(i > 0) && length(i) <= 2L) {
+        cl <- class(r); class(r) <- "data.frame"; r <- r[-1L, , drop = FALSE]; class(r) <- cl
+      }
+      r },
+    # Méthode de colonne (facteur sous-classé) qui inverse les valeurs sous indices positifs.
+    `[.k320cpos` = function(x, i, ...) {
+      r <- NextMethod()
+      if (is.numeric(i) && all(i > 0)) {
+        u <- unclass(r); r <- structure(rev(as.vector(u)), levels = attr(u, "levels"), class = oldClass(r))
+      }
+      r },
+    `[.k320ok` = function(x, i, j, ..., drop = TRUE) NextMethod(),
+    `[.k320reset` = function(x, i, j, ..., drop = TRUE) {
+      r <- NextMethod(); attr(r, "row.names") <- seq_len(.row_names_info(r, 2L)); r },
+    `[.k320attr` = function(x, i, j, ..., drop = TRUE) { r <- NextMethod(); attr(r, "histo") <- "extrait"; r })
+  for (n in names(m320)) assign(n, m320[[n]], envir = globalenv())
+  on.exit(rm(list = names(m320), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  SUJET <- paste("Les lignes relues par l'étape « importance_exclusions » (lignes exclues et, sous l'unité tête,",
+                 "lignes conservées des mêmes têtes), extraites des données par la méthode « [ » de la classe ")
+  SUFF <- paste(" : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la méthode « [ » rend",
+                "exactement les lignes demandées (ou qui n'a pas de méthode « [ » propre).")
+  SUFF_COL <- function(cl) paste0(" : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont les ",
+                                  "colonnes citées (classe ", cl, ") ont une méthode « [ » qui rend exactement les ",
+                                  "lignes demandées (ou n'ont pas de méthode « [ » propre).")
+  RV <- "comptent %d ligne(s) comme demandé mais ne reprennent pas les valeurs des lignes demandées dans la ou les colonne(s) de rôle %s"
+  T1c <- T1; T1c$cause_sortie[5L] <- "rachat"
+  colonne <- function(d, nom) { d[[nom]] <- structure(factor(d[[nom]]), class = c("k320cpos", "factor")); d }
+  # nom, données, rôles, message attendu, lignes, attendu, colonnes, classe
+  cas <- list(
+    list("méthode qui rend une ligne de moins sous indices positifs, unité tête", structure(T1, class = c("k320pos", "data.frame")),
+         ROLES_SIM, paste0(SUJET, "k320pos/data.frame, comptent 3 ligne(s) au lieu de 4", SUFF), 3L, 4L, character(0)),
+    list("méthode qui rend une ligne de moins sous indices positifs, unité contrat", structure(T1, class = c("k320pos", "data.frame")),
+         ROLES_SANS_TETE, paste0(SUJET, "k320pos/data.frame, comptent 2 ligne(s) au lieu de 3", SUFF), 2L, 3L, character(0)),
+    # Sens d'`attendu` (QD2, Q-A1) : sous l'unité tête, la troisième extraction (lignes conservées des têtes
+    # touchées, ici la ligne 1 seule, après R_t u S = 1, 5, 6, 7 et ses lignes hors têtes indéterminées, justes)
+    # est la première fausse : attendu 1, inférieur à |S| = 3 comme à |R_t u S| = 4.
+    list("méthode qui ne ment que sur deux lignes ou moins demandées, unité tête (attendu = lignes de la première extraction fausse)",
+         structure(T1, class = c("k320sel", "data.frame")), ROLES_SIM,
+         paste0(SUJET, "k320sel/data.frame, comptent 0 ligne(s) au lieu de 1", SUFF), 0L, 1L, character(0)),
+    list("méthode qui inverse les lignes sous indices positifs, unité tête", structure(T1, class = c("k320perm", "data.frame")),
+         ROLES_SIM, paste0(SUJET, "k320perm/data.frame, ",
+                           sprintf(RV, 4L, "« id_contrat », « id_tete », « sexe », « date_entree », « date_sortie »"), SUFF),
+         4L, 4L, c("id_contrat", "id_tete", "sexe", "date_entree", "date_sortie")),
+    list("méthode qui inverse les lignes sous indices positifs, unité contrat", structure(T1, class = c("k320perm", "data.frame")),
+         ROLES_SANS_TETE, paste0(SUJET, "k320perm/data.frame, ",
+                                 sprintf(RV, 3L, "« id_contrat », « date_entree », « date_sortie »"), SUFF),
+         3L, 3L, c("id_contrat", "date_entree", "date_sortie")),
+    list("entrée data.frame, colonne sexe dont la méthode « [ » inverse les valeurs sous indices positifs, unité tête",
+         colonne(T1, "sexe"), ROLES_SIM,
+         paste0(SUJET, "data.frame, qui applique à chaque colonne la méthode « [ » de sa classe, ",
+                sprintf(RV, 4L, "« sexe » (classe k320cpos/factor)"), SUFF_COL("k320cpos/factor")),
+         4L, 4L, "sexe"),
+    list("entrée data.frame, colonne cause_sortie dont la méthode « [ » inverse les valeurs sous indices positifs, unité contrat",
+         colonne(T1c, "cause_sortie"), ROLES_SANS_TETE,
+         paste0(SUJET, "data.frame, qui applique à chaque colonne la méthode « [ » de sa classe, ",
+                sprintf(RV, 3L, "« cause_sortie » (classe k320cpos/factor)"), SUFF_COL("k320cpos/factor")),
+         3L, 3L, "cause_sortie"))
+  for (c1 in cas) {
+    x <- attrape(construire_table(c1[[2L]], c1[[3L]], plan_ie()))
+    verifier(sprintf("#320 %s -> refus donnees_mal_formees du module importance_exclusions (valeur calculée à la main), message attendu, une ligne UTF-8 valide, details de #319", c1[[1L]]), {
+      cl <- class(c1[[2L]])
+      if (is.null(x)) "aucun refus (objet construit)"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "importance_exclusions") || !identical(x$motif, "donnees_mal_formees"))
+        sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), c1[[4L]])) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+      else if (!identical(x$details, list(classe = cl, classe_rendue = cl, lignes = c1[[5L]], attendu = c1[[6L]],
+                                          colonnes = c1[[7L]], colonne = character(0), position = integer(0),
+                                          lignes_colonne = numeric(0))))
+        paste("details :", paste(deparse(x$details), collapse = " "))
+      else TRUE
+    })
+  }
+  # Le même jeu sans l'étape importance_exclusions est construit : seule l'étape relit des lignes par indices positifs.
+  verifier("#320 les mêmes entrées, plan sans importance_exclusions : objet construit (preparer_donnees() extrait par indices négatifs, sa postcondition passe)", {
+    p <- plan_ie(); p$etapes$importance_exclusions <- NULL
+    ok <- vapply(cas, function(c1) is.null(attrape(construire_table(c1[[2L]], c1[[3L]], p))), NA)
+    if (all(ok)) TRUE else paste("refus ou erreur :", paste(which(!ok), collapse = ", "))
+  })
+  for (k in c("k320ok", "k320reset", "k320attr")) for (u in c("tête", "contrat")) {
+    ro <- if (u == "tête") ROLES_SIM else ROLES_SANS_TETE
+    ref <- if (u == "tête") X1 else X2
+    verifier(sprintf("#320 classe %s dont la méthode « [ » est correcte, unité %s (identité exacte) : étapes exposition et importance_exclusions et empreintes identical() au data.frame nu", k, u), {
+      x <- tryCatch(construire_table(structure(T1, class = c(k, "data.frame")), ro, plan_ie()),
+                    condition = function(e) e)
+      if (inherits(x, "condition")) conditionMessage(x)
+      else identical(x$etapes$importance_exclusions, ref$etapes$importance_exclusions) &&
+        identical(x$etapes$exposition, ref$etapes$exposition) && identical(x$empreintes, ref$empreintes)
+    })
+  }
+})
+verifier("#320 les méthodes `[` de session sont retirées de globalenv()",
+         !any(c("[.k320pos", "[.k320perm", "[.k320sel", "[.k320cpos", "[.k320ok", "[.k320reset", "[.k320attr") %in% ls(globalenv(), all.names = TRUE)))
+
+# Colonnes de rôle de nom d'encodage « bytes » (#255) : etats_evenements_exclus()
+# et calculer_importance_exclusions() lisent cause_sortie, date_sortie et
+# id_tete par lire_champ() ; avant (mesuré sur 7abf58f), « [[ » levait
+# « translating strings with "bytes" encoding is not allowed ». Appel direct :
+# construire_table() refuse ce nom avant la première étape (chaine_codage_bytes).
+# Identité exacte avec les mêmes appels sous des noms ASCII.
+local({
+  octets <- function(x) { Encoding(x) <- "bytes"; x }
+  NOMS <- c(id_tete = octets("id_t\xeate"), cause_sortie = octets("cause\xe9"), date_sortie = octets("sortie\xe9"))
+  d <- T1; ro <- ROLES_SIM
+  for (r in names(NOMS)) { names(d)[names(d) == ROLES_SIM[[r]]] <- NOMS[[r]]; ro[[r]] <- NOMS[[r]] }
+  e <- X1$etapes
+  verifier("#255 etats_evenements_exclus(), cause_sortie et date_sortie de noms bytes (identité exacte) : aucune erreur R, états identical() à ceux des noms ASCII", {
+    a <- tryCatch(tablexp:::etats_evenements_exclus(d, ro, 5:8, P_X1$debut, P_X1$borne, "deces"), error = function(e) e)
+    if (inherits(a, "error")) conditionMessage(a)
+    else identical(a, tablexp:::etats_evenements_exclus(T1, ROLES_SIM, 5:8, P_X1$debut, P_X1$borne, "deces")) &&
+      identical(a, rep("evenement_dans_fenetre", 4L))
+  })
+  verifier("#255 calculer_importance_exclusions(), id_tete, cause_sortie et date_sortie de noms bytes (identité exacte) : aucune erreur R, résultat identical() à celui de construire_table() sous les noms ASCII", {
+    r <- tryCatch(tablexp:::calculer_importance_exclusions(d, ro, e$donnees, e$exposition, NULL, NULL, P_X1, REC_X1,
+                                                           CONV_X1, character(0), 0.95), error = function(e) e)
+    if (inherits(r, "error")) conditionMessage(r)
+    else identical(r[c("parametres", "resultat", "diagnostics")], e$importance_exclusions)
+  })
+})
+# Lecture de cause_sortie sans dispatch (#320, Q1 de #322) : facteur à NA et
+# niveau inutilisé, facteur sans niveau (codes NA) : mêmes états que la chaîne.
+verifier("#320 etats_evenements_exclus(), cause_sortie facteur (NA, niveau inutilisé ; puis facteur sans niveau) (identité exacte) : états identical() à ceux de la même colonne en chaîne", {
+  et <- function(v) { d <- T1; d$cause_sortie <- v; tablexp:::etats_evenements_exclus(d, ROLES_SIM, 1:8, P_X1$debut, P_X1$borne, "deces") }
+  f <- factor(c(NA, T1$cause_sortie[-1L]), levels = c("deces", "en_cours", "rachat", "zz"))
+  f0 <- factor(rep(NA_character_, 8L))
+  identical(et(f), et(as.character(f))) && identical(et(f0), et(rep(NA_character_, 8L)))
+})

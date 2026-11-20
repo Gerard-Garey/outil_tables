@@ -1971,8 +1971,11 @@ libelles_facteur <- function(v, i) unname(attr(v, "levels", exact = TRUE)[.subse
 
 # Sujet du message de refus de controler_lignes_extraites(), par étape
 # appelante (nom de l'étape : champ module du refus) ; texte du moteur, inséré
-# par texte_moteur().
-SUJETS_LIGNES_EXTRAITES <- c(donnees = "Les lignes conservées")
+# par texte_moteur() ; clé importance_exclusions : texte d'actuary (#320, Q3).
+SUJETS_LIGNES_EXTRAITES <- c(
+  donnees = "Les lignes conservées",
+  importance_exclusions = paste("Les lignes relues par l'étape « importance_exclusions » (lignes exclues et, sous",
+                                "l'unité tête, lignes conservées des mêmes têtes)"))
 
 # Postcondition d'une extraction de lignes par la méthode « [ » de la classe
 # des données (#319 ; outil unique de #322, point 4, avis de forme F322) :
