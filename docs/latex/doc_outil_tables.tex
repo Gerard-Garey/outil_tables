@@ -1008,26 +1008,30 @@ la fiche rendue, avec un \emph{constat} aux niveaux~2 à~7. Une
 du rejeu, dont une valeur de \code{versions} ou de \code{plateforme}, y
 est citée sous le repère, et le rejeu est rendu (issue~\#142~;
 section~\ref{sec:rejeu}, «~Citation des valeurs de la fiche dans le
-bilan~»). Reste hors de cette règle, renvoyé à une issue~: une colonne de
-rôle de nom \code{bytes} et de type conforme, admise par
-\code{controler\_roles()} (issue~\#128), est lue par \code{[[} dans
+bilan~»). Une colonne de rôle de nom \code{bytes} et de type conforme,
+admise par \code{controler\_roles()} (issue~\#128), est lue par
+\code{lire\_champ()} dans la préparation des données
+(\code{preparer\_donnees()}, fonction interne~; issue~\#140) comme dans
 l'étape \code{importance\_}\allowbreak\code{exclusions} du module
 \code{validation} (\code{etats\_evenements\_exclus()}, pour
 \code{cause\_sortie} et \code{date\_sortie}, et
 \code{calculer\_importance\_exclusions()}, pour \code{id\_tete}~;
-\emph{lecture} du code), ce qui fait lever l'erreur R (\emph{constat} pour
-\code{etats\_evenements\_exclus()} appelée directement sur une colonne
-\code{cause\_sortie} de ce nom, sous les locales C et C.UTF-8~;
-issue~\#255). La préparation des données
-(\code{preparer\_donnees()}, fonction interne) lit au contraire ses
-colonnes de rôle par \code{lire\_champ()}~: appelée directement, elle lit
-une telle colonne sans erreur R et rend les mêmes observations et les
-mêmes lignes conservées que sous le nom d'origine (\emph{constat} des
-tests, chaque rôle des trois recettes et le chemin des exclusions~;
-issue~\#140). Ces deux cas, les fonctions exportées ne les atteignent
-pas~: \code{construire\_table()} et le rejeu refusent ce nom avant la
-première étape, au calcul des empreintes (\code{chaine\_codage\_bytes},
-module \code{rapport}). Reste enfin hors de cette règle un cas que la
+issue~\#255)~: appelées directement, ces fonctions lisent une telle
+colonne sans erreur R et rendent les mêmes résultats que sous le nom
+d'origine (\emph{constat} des tests~: pour \code{preparer\_donnees()},
+mêmes observations et mêmes lignes conservées, chaque rôle des trois
+recettes et le chemin des exclusions~; pour l'étape, les trois colonnes
+renommées ensemble, états des lignes exclues et résultat de l'étape
+identiques, par \code{identical()}, à ceux des noms d'origine, remesurés
+sous les locales C et C.UTF-8). Avant l'issue~\#255, l'étape
+\code{importance\_}\allowbreak\code{exclusions} lisait ces trois colonnes
+par \code{[[}, qui levait l'erreur R (\emph{constat} de mesure sur le code
+qui précède l'issue, \code{etats\_evenements\_exclus()} appelée
+directement, sous les locales C et C.UTF-8). Les fonctions exportées
+n'atteignent pas ces lectures~: \code{construire\_table()} et le rejeu
+refusent ce nom avant la première étape, au calcul des empreintes
+(\code{chaine\_codage\_bytes}, module \code{rapport}). Reste hors de
+cette règle un cas que la
 fonction exportée \code{simuler\_portefeuille()} atteint~: une table d'une
 loi de la loi vraie dont un nom de colonne (\code{age}, \code{sexe} ou
 \code{qx}) est d'encodage \code{bytes} fait lever l'erreur R à la lecture
@@ -4429,7 +4433,9 @@ section~\ref{sec:lissage-etape}), le refus \code{ordre\_modalite\_absente}
 de l'étape \code{coherence\_regularite} (section~\ref{sec:coherence-regularite}), le refus de capacité
 \code{evenements\_retires\_hors\_plage} de l'étape
 \code{importance\_exclusions}, sur ses ensembles de lignes exclues
-(issue~\#174), et ceux de l'étape \code{exposition}
+(issue~\#174), le refus \code{donnees\_mal\_formees} de la même étape,
+sur une extraction de lignes fausse de son contrefactuel (issue~\#320),
+et ceux de l'étape \code{exposition}
 sur la table qu'elle forme (\code{trop\_de\_cellules},
 \code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} et
 \code{periode\_sans\_exposition},
@@ -7466,8 +7472,13 @@ numéros sont formés par l'appelant, entiers positifs, sans \code{NA}, au
 plus le nombre de lignes de l'entrée~: l'outil ne les contrôle pas.
 L'étape donne le module du refus et le sujet de son message, lu dans la
 constante \code{SUJETS\_LIGNES\_EXTRAITES}, qui en a une entrée par
-étape appelante («~Les lignes conservées~» pour l'étape
-\code{donnees})~; une étape qui n'en est pas une clé est une erreur de
+étape appelante, soit deux~: «~Les lignes conservées~» pour l'étape
+\code{donnees}, et, pour l'étape \code{importance\_exclusions}, qui
+relit des lignes de l'entrée pour son contrefactuel (issue~\#320~;
+section~\ref{sec:importance-exclusions}, «~Extractions de lignes et leur
+contrôle~»), «~Les lignes relues par l'étape «~importance\_exclusions~»
+(lignes exclues et, sous l'unité tête, lignes conservées des mêmes
+têtes)~»~; une étape qui n'en est pas une clé est une erreur de
 programmation du package (\code{stop()}, non un refus), levée avant tout
 contrôle. Cinq contrôles se suivent, dans cet ordre~; chacun n'est fait
 que si les précédents sont satisfaits, et le premier en défaut donne le
@@ -7517,7 +7528,8 @@ refus~:
     la méthode \code{[.Date} de R base, sans méthode de l'utilisateur.
 \end{itemize}
 Sinon, la construction est refusée sous \code{donnees\_mal\_formees},
-module \code{donnees} (celui de l'étape appelante), par un message d'une
+module de l'étape appelante (\code{donnees} ici, \code{importance\_exclusions}
+pour les extractions de cette étape), par un message d'une
 ligne qui nomme la cause (ici, sous l'étape \code{donnees}~; le sujet
 «~Les lignes conservées~» est celui de l'étape)~:
 «~Les lignes conservées, extraites des données par la méthode «~[~» de
@@ -7584,7 +7596,10 @@ alors la première forme, sans attribution. \code{details} (huit
 champs)~: \code{classe} (classe des données), \code{classe\_rendue}
 (classe du résultat de l'extraction), \code{lignes} (nombre de lignes
 extraites, \code{NA} s'il est illisible ou sous la cause~(0)),
-\code{attendu} (nombre de numéros conservés), \code{colonnes} (colonnes
+\code{attendu} (nombre de lignes demandées à l'extraction contrôlée~:
+sous l'étape \code{donnees}, nombre de numéros conservés~; sous l'étape
+\code{importance\_exclusions}, nombre de lignes que demande la première
+extraction fausse, section~\ref{sec:importance-exclusions}), \code{colonnes} (colonnes
 de rôle qui diffèrent, cause~(3)), \code{colonne}, \code{position} et
 \code{lignes\_colonne} (cause~(2)~: noms, positions et décomptes de
 toutes les colonnes discordantes, sans plafond, \code{NA} pour un
@@ -10001,8 +10016,8 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{empiler\_stocks()} & exportée & table des inventaires, table des événements, nom de la colonne du type de ligne & table empilée~: lignes d'inventaire puis d'événement dans l'ordre reçu, colonne du type déclarée par la table d'origine, colonnes absentes complétées par des valeurs manquantes, sans conversion~; six refus \code{empilement\_*} (section~\ref{sec:controles-donnees}) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
 \catalogue{fonctions-donnees}{libelles\_facteur()} & interne & facteur, positions & libellés des éléments désignés, lus sans dispatch~: codes par \code{.subset()}, niveaux par l'attribut \code{levels}, noms des niveaux retirés~; égaux, pour un facteur sans classe propre, à sa conversion en chaînes, \code{NA} et niveaux inutilisés ou nommés compris~; contrôle~(3) d'une extraction de lignes (section~\ref{sec:controles-donnees}~; issue~\#322~; décision M558) \\
-\catalogue{fonctions-donnees}{SUJETS\_LIGNES\_EXTRAITES} & constante & --- & sujet du message de refus de la fonction suivante, une entrée par étape appelante (clé~: nom de l'étape, module du refus), dont «~Les lignes conservées~» pour l'étape \code{donnees}~; texte du moteur (issue~\#322) \\
-\catalogue{fonctions-donnees}{controler\_lignes\_extraites()} & interne & données, lignes extraites par l'appelant, numéros des lignes demandées, rôles, étape (\code{donnees} par défaut) & postcondition d'une extraction de lignes par la méthode \code{[} de la classe des données~: contrôles~(0) à~(3), sans dispatch, refus \code{donnees\_mal\_formees} du module de l'étape, message citant la classe des colonnes en cause sous une entrée de classe exactement \code{data.frame}, \code{details} à huit champs~; étape hors des clés de la constante précédente~: erreur de programmation (\code{stop()}), avant tout contrôle~; numéros non contrôlés~; rend \code{TRUE}, invisible (section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées et son contrôle~»~; issues~\#319 et~\#322) \\
+\catalogue{fonctions-donnees}{SUJETS\_LIGNES\_EXTRAITES} & constante & --- & sujet du message de refus de la fonction suivante, une entrée par étape appelante (clé~: nom de l'étape, module du refus), deux clés~: \code{donnees} («~Les lignes conservées~», issue~\#322) et \code{importance\_exclusions} (lignes relues par cette étape, issue~\#320~; section~\ref{sec:importance-exclusions})~; texte du moteur \\
+\catalogue{fonctions-donnees}{controler\_lignes\_extraites()} & interne & données, lignes extraites par l'appelant, numéros des lignes demandées, rôles, étape (\code{donnees} par défaut) & postcondition d'une extraction de lignes par la méthode \code{[} de la classe des données~: contrôles~(0) à~(3), sans dispatch, refus \code{donnees\_mal\_formees} du module de l'étape, message citant la classe des colonnes en cause sous une entrée de classe exactement \code{data.frame}, \code{details} à huit champs~; étape hors des clés de la constante précédente~: erreur de programmation (\code{stop()}), avant tout contrôle~; numéros non contrôlés~; rend \code{TRUE}, invisible~; appelée sous les étapes \code{donnees} et \code{importance\_exclusions} (section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées et son contrôle~»~; issues~\#319, \#322 et~\#320) \\
 \catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; sous une exclusion, lignes conservées extraites par la méthode \code{[} de la classe de l'entrée, puis contrôlées sans dispatch par la fonction précédente (forme, nombre de lignes, colonnes, décompte de chaque colonne, identité des colonnes de rôle), refus \code{donnees\_mal\_formees} sinon (section~\ref{sec:controles-donnees}~; issues~\#319 et~\#322)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat) \\
 \catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements}), au-delà de la tolérance relative \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, que le texte de l'avertissement mentionne~; jamais un refus \\
@@ -16204,8 +16219,12 @@ d'étape ne refait aucun contrôle des entrées ni des paramètres~: ni la segme
 qu'elle contrôlait en appel direct avant l'issue~\#82 (décisions M216 et
 M291~; section~\ref{sec:execution})~; elle reçoit les valeurs validées
 \code{p}, la recette et la convention, qu'elle transmet aux expositions
-contrefactuelles. L'étape ne
-définit qu'un autre refus, de capacité (issue~\#174)~:
+contrefactuelles. L'étape ne lève, en cours de calcul, que deux autres
+refus~: le refus \code{donnees\_mal\_formees}, sous le module
+\code{importance\_exclusions}, quand la méthode \code{[} de la classe de
+l'entrée rend autre chose que les lignes demandées par le contrefactuel
+(ci-dessous, «~Extractions de lignes et leur contrôle~»~; issue~\#320),
+et un refus de capacité (issue~\#174)~:
 \code{evenements\_retires\_hors\_plage}, levé sous le module
 \code{importance\_exclusions} par \code{total\_evenements\_retires()} quand le
 total des événements retirés d'un ensemble à un niveau, somme formée en
@@ -16215,8 +16234,8 @@ total des événements retirés d'un ensemble à un niveau, somme formée en
 niveau, repris dans \code{details} (\code{ensemble}, \code{niveau},
 \code{evenements\_retires}). Ce refus tient la place de la conversion en
 \code{integer} qui, au-delà de la borne, rendrait \code{NA} avec un simple
-avertissement~; en deçà, le total est rendu en \code{integer}. Hors ce
-refus, tout ce qui ne peut être calculé est rendu dans
+avertissement~; en deçà, le total est rendu en \code{integer}. Hors ces
+deux refus, tout ce qui ne peut être calculé est rendu dans
 un état nommé (ci-dessous), sans refus~; seules restent en vigueur les
 gardes des fonctions d'exposition qu'elle rappelle (par exemple
 \code{trop\_de\_cellules}) et la garde générique
@@ -16390,6 +16409,87 @@ retirés $\ge 0$ dans chaque cellule~; $E^c_{e,c}$ est posée à $0$ dans une
 cellule sans jour retiré, et doit être $> 0$ dans une cellule qui en a~;
 une cellule des lignes conservées ne peut manquer à $R \cup S$. Seules les
 cellules à événements ou à jours retirés non nuls sont gardées.
+
+\medskip
+\noindent
+\textbf{Extractions de lignes et leur contrôle} (issue~\#320~;
+spécification d'\code{actuary}, Q3, issue~\#320, commentaire
+7040083717). Le contrefactuel relit des lignes de l'entrée~: il les
+extrait par l'opérateur \code{[}, avec dispatch sur la classe de
+l'entrée, comme la préparation des données (décision M499, (a)), puis
+contrôle chaque extraction par \code{controler\_lignes\_extraites()},
+sous l'étape \code{importance\_exclusions}, avant de la passer à
+\code{evaluer\_motifs()} ou à \code{construire\_observations()}~: mêmes
+contrôles~(0) à~(3), mêmes constats et mêmes huit champs de
+\code{details} que sous l'étape \code{donnees}, refus
+\code{donnees\_mal\_formees} sous le module
+\code{importance\_exclusions}, message propre à l'étape par son seul sujet
+(section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées
+et son contrôle~»). Pour un ensemble $S$ et des clés de cellules,
+l'étape fait, en \textbf{unité tête}, jusqu'à trois extractions
+contrôlées~: $R_t \cup S$, pour la garde de réintégration~; puis, par
+\code{exposition\_lignes()}, les lignes de $R_t \cup S$ hors des têtes
+indéterminées (premier passage) et les lignes conservées des têtes
+restantes, soit $R_t$ hors des têtes indéterminées (second passage), un
+sous-ensemble vide n'étant pas extrait~; en \textbf{unité contrat}, une
+seule, $S$. Les ensembles sont parcourus par niveau (A puis B) puis,
+dans chaque niveau, motif par motif dans l'ordre des lignes exclues par
+motif de l'étape \code{donnees}, puis le total~; si le comparateur~2 est
+produit, les mêmes ensembles sont parcourus une seconde fois sous ses
+clés (niveau~A~: aucune clé, ou \code{sexe} face à une table par sexe~;
+niveau~B~: la segmentation). Un ensemble sans ligne mesurable sous les
+clés considérées n'extrait rien, et un même couple ($S$, clés) n'est
+calculé, donc extrait, qu'une fois~: le second parcours ne calcule que
+les couples absents du premier (\code{diagnostics\$calculs\_contrefactuels}
+les compte). Le refus est celui de la \emph{première} extraction fausse
+dans cet ordre~; \code{details\$attendu} vaut le nombre de lignes
+qu'elle demande, qui peut être inférieur à $|S|$ comme à $|R_t \cup S|$
+(\emph{constat} des tests~: une méthode \code{[} qui ne retire une ligne
+que des extractions d'au plus deux lignes demandées par indices positifs,
+sur le jeu~T1, où $S$ compte trois lignes, $R_t \cup S$ quatre et $R_t$
+une, fait refuser la troisième extraction, \code{attendu} valant~1).
+\textbf{Statut}~: \emph{lecture} du code pour l'ordre et le nombre des
+extractions, et \emph{constat} de mesure, par une méthode \code{[} qui
+consigne les lignes demandées~: sur le jeu~T1, en unité tête, lignes~1,
+5, 6, 7, les mêmes, puis la ligne~1, un seul calcul contrefactuel (le
+total a le même $S$ que le motif \code{sexe\_manquant}, et le motif
+\code{entree\_manquante} n'a pas de ligne mesurable)~; en unité contrat,
+lignes~5, 6, 7~; sur une variante segmentée par sexe et segment, avec le
+comparateur~2 face à une table par sexe, le second parcours extrait pour
+le seul couple nouveau (une ligne \code{segment\_manquant} de sexe connu,
+non calculable au niveau~B, mesurable sous la clé \code{sexe}), quatre
+calculs contrefactuels en tout. \textbf{Motif}~: avant l'issue~\#320, une
+méthode \code{[} qui ne ment que sous indices positifs passait la
+postcondition de la préparation des données, qui extrait par indices
+négatifs, puis faisait lever, dans cette étape, une erreur R pour une
+ligne de moins (en unité tête, l'erreur de programmation
+d'\code{evaluer\_motifs()} sur la forme de \code{lignes\_tete}~; en unité
+contrat, une erreur de R base à l'assemblage des colonnes), ou laissait
+construire l'objet, sans signal, sur des lignes ou des valeurs autres que
+celles demandées (lignes rendues dans l'ordre inverse, dans les deux
+unités~; colonne de rôle facteur sous-classée dont la méthode \code{[}
+inverse les valeurs) (\emph{constat} de mesure sur le code qui précède
+l'issue, sous les locales C et C.UTF-8). Chacun de ces cas est depuis
+refusé sous \code{donnees\_mal\_formees}, module
+\code{importance\_exclusions}, message et \code{details} contrôlés, le
+même jeu sans l'étape au plan étant construit~; une méthode correcte, y
+compris qui renumérote les noms de lignes ou ajoute un attribut, laisse
+les étapes \code{exposition} et \code{importance\_exclusions} et les
+empreintes identiques (\code{identical()}) à celles du \code{data.frame}
+sans classe propre, dans les deux unités (\emph{constat} des tests).
+Les colonnes de rôle que l'étape lit elle-même, hors des extractions,
+sont lues sans dispatch (issues~\#255 et~\#320)~: \code{cause\_sortie}
+et \code{date\_sortie} dans \code{etats\_evenements\_exclus()}, par
+\code{lire\_champ()}, puis libellés d'un facteur par
+\code{libelles\_facteur()} et valeurs d'une chaîne ou d'une date (classe
+exactement \code{Date}) par \code{.subset()}~; \code{id\_tete} dans
+\code{calculer\_importance\_exclusions()}, par \code{lire\_champ()}, un
+identifiant n'ayant pas de classe (contrôle des types), si bien que son
+indiçage ne cherche aucune méthode (\emph{lecture} du code~;
+\emph{constat} des tests~: un facteur \code{cause\_sortie} à valeur
+manquante et niveau inutilisé, et un facteur sans niveau, donnent les
+mêmes états que la même colonne en chaînes~; noms de colonne d'encodage
+\code{bytes}~: section~\ref{sec:refus}).
 
 \noindent
 Le tableau \code{resultat\$retraits} donne, par ensemble et par niveau, les
@@ -16642,7 +16742,12 @@ chaque test nommant la nature de son attendu)~:
     \code{validation} transmise sans sa table~; recette fictive de convention native
     \code{age\_atteint\_annee}~: l'étape \code{exposition} et les
     expositions contrefactuelles emploient la recette et la convention de
-    la fiche (issue~\#82)~; section du rapport figé, mention fixe mot pour mot,
+    la fiche (issue~\#82)~; refus \code{donnees\_mal\_formees} du module
+    \code{importance\_exclusions} sous une méthode \code{[} fausse sur les
+    seules lignes relues par l'étape, dans les deux unités (module, motif,
+    message, \code{details}, dont \code{attendu} de la première extraction
+    fausse~; même jeu construit sans l'étape au plan~; issue~\#320)~;
+    section du rapport figé, mention fixe mot pour mot,
 % citation : aucune (description d'un test unitaire, sans citation de la mention qu'il compare)
     mention d'unité contrat~;
   \item \textbf{identités exactes}~: \code{construire\_observations()}
@@ -16654,7 +16759,13 @@ chaque test nommant la nature de son attendu)~:
     relatif)~; T4, calcul local égal au calcul global en unité tête~; taux du
     comparateur~1 égaux au taux de Poisson de l'étape \code{brut}~; appel
     direct égal à \code{construire\_table()}~; reproductibilité et rejeu
-    \code{identical()} hors \code{execution}~;
+    \code{identical()} hors \code{execution}~; méthode \code{[} correcte
+    (sous-classe, noms de lignes renumérotés, attribut ajouté), étapes et
+    empreintes \code{identical()} à celles du \code{data.frame} sans classe
+    propre (issue~\#320)~; noms de colonnes de rôle d'encodage \code{bytes}
+    en appel direct, états et résultat \code{identical()} à ceux des noms
+    d'origine (issue~\#255)~; \code{cause\_sortie} facteur, mêmes états que
+    la colonne en chaînes (issue~\#320)~;
   \item \textbf{constats d'exécution}~: les invariants et les contrôles
     internes lèvent une erreur de programmation, non un refus.
 \end{itemize}
@@ -17035,14 +17146,14 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{classe\_motifs()} & interne & motifs, unité, clés & classe de chaque motif~: mesurable, non calculable faute de clé, non mesurable \\
 \catalogue{fonctions-validation}{classer\_lignes\_exclues()} & interne & lignes exclues par motif, unité, clés & lignes distinctes et leur classe~; seule source des ensembles $S$ \\
 \catalogue{fonctions-validation}{cle\_cellules()} & interne & cellules, clés, découpage & clé de chaque cellule (segmentation, âge, année) \\
-\catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}, sans refus de la période sans exposition (\code{refuser\_vide = FALSE}, issue~\#210)~; même unité que la construction, sinon erreur de programmation \\
-\catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes $S$, clés, contexte & cellules retirées (événements, jours, $E^c$), têtes touchées et indéterminées~; garde de réintégration et invariants \\
+\catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}, sans refus de la période sans exposition (\code{refuser\_vide = FALSE}, issue~\#210)~; lignes extraites par la méthode \code{[} de la classe de l'entrée et contrôlées par l'outil de contrôle des extractions du module \code{donnees} (tableau~\ref{tab:fonctions-donnees}~; refus \code{donnees\_mal\_formees}, module \code{importance\_exclusions}~; issue~\#320)~; même unité que la construction, sinon erreur de programmation \\
+\catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes $S$, clés, contexte & cellules retirées (événements, jours, $E^c$), têtes touchées et indéterminées~; garde de réintégration et invariants~; en unité tête, $R_t \cup S$ extraites et contrôlées comme par la fonction précédente, avant \code{evaluer\_motifs()} (issue~\#320) \\
 \catalogue{fonctions-validation}{cellules\_regroupees()} & interne & table d'exposition, découpage & cellules des lignes conservées au niveau~A, sommées sur les segments \\
 \catalogue{fonctions-validation}{smr\_comparateur\_1()} & interne & cellules retirées et conservées, clés, découpage, niveau & taux conservés et attendus par cellule~; $O$, $A$, SMR, bornes, rapport de variance, état \\
 \catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
-\catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne \\
+\catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne~; \code{cause\_sortie} et \code{date\_sortie} lues sans dispatch par \code{lire\_champ()} (issues~\#255 et~\#320) \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; table \code{NULL} si et seulement si \code{validation} est absente ou sous \code{lissee} (erreur de programmation sinon)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174) \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; table \code{NULL} si et seulement si \code{validation} est absente ou sous \code{lissee} (erreur de programmation sinon)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174), et refus \code{donnees\_mal\_formees} d'une extraction de lignes fausse, levé par l'outil de contrôle des extractions du module \code{donnees} (issue~\#320)~; \code{id\_tete} lu par \code{lire\_champ()} (issue~\#255) \\
 \catalogue{fonctions-validation}{total\_evenements\_retires()} & interne & événements retirés des cellules, ensemble, niveau & total en \code{integer}, formé en \code{double}~; refus \code{evenements\_retires\_}\allowbreak\code{hors\_plage} (module \code{importance\_exclusions}) au-delà de \code{.Machine\$integer.max}, le message citant le total, l'ensemble et le niveau (issue~\#174) \\
 \catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
@@ -19228,7 +19339,9 @@ sous une méthode de session sur \code{data.frame},
 n'est pas proposée)~; sous une exclusion, l'extraction des lignes
 conservées suit à dessein la méthode \code{[} de la classe de l'entrée,
 puis est contrôlée sans dispatch (section~\ref{sec:controles-donnees},
-«~Extraction des lignes conservées et son contrôle~»~; issue~\#319). L'écriture de la fiche
+«~Extraction des lignes conservées et son contrôle~»~; issue~\#319), de
+même que les lignes que relit l'étape \code{importance\_exclusions}
+(section~\ref{sec:importance-exclusions}~; issue~\#320). L'écriture de la fiche
 (\code{ecrire\_fiche()}) en suit la règle pour le corps, écrit par
 \code{texte\_objet()}~; le rappel de \code{version\_fiche} et de la
 représentation dans son en-tête lit la longueur par \code{length()}, que
