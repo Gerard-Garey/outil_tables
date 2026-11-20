@@ -6908,11 +6908,12 @@ des rôles~; \code{colonne\_absente}~; \code{colonne\_ambigue} (le nom de colonn
 plusieurs fois dans la base~: lire la première sans le dire serait deviner~;
 seules les colonnes des rôles sont jugées, le moteur ne lisant une colonne
 que par son rôle (E2.2)~: un nom de colonne vide, manquant
-(\code{NA}) ou en double hors des rôles est admis, la colonne recopiée dans
-\code{lignes\_conservees} et jamais lue par le calcul~; un rôle ne pouvant
-valoir \code{NA} (\code{roles\_mal\_formes}), une colonne nommée \code{NA}
-est toujours hors rôle, et une colonne de rôle renommée \code{NA} est refusée
-comme absente, \code{colonne\_absente}~; issue~\#321~; auparavant, un nom
+(\code{NA\_character\_}) ou en double hors des rôles est admis, la colonne
+recopiée dans \code{lignes\_conservees}, son nombre de lignes contrôlé comme
+celui de toute colonne, ses valeurs jamais lues par le calcul~; un rôle ne pouvant
+valoir \code{NA} (\code{roles\_mal\_formes}), une colonne nommée
+\code{NA\_character\_} est toujours hors rôle, et une colonne de rôle renommée
+\code{NA\_character\_} est refusée comme absente, \code{colonne\_absente}~; issue~\#321~; auparavant, un nom
 \code{NA} faisait refuser les données par \code{colonne\_ambigue}, le message
 citant «~NA~» comme colonne et comme rôle autant de fois que de rôles
 déclarés, au lieu des colonnes de rôle réellement en double)~;
@@ -7669,8 +7670,9 @@ et l'objet était construit sur d'autres valeurs que celles des lignes
 demandées (\emph{constat} de mesure sur le code qui précède l'issue~:
 méthode qui inverse l'ordre des valeurs, jeu de test de quatre lignes
 dont une exclue, sexes H, F, F des lignes conservées lus F, F, H par le
-moteur). Une telle colonne est depuis refusée sous la cause~(3), par le
-message ci-dessus, la classe de la colonne citée, l'entrée étant un
+moteur). Une telle colonne est depuis refusée sous la cause~(3), par la
+seconde forme du message ci-dessus (entrée de classe exactement
+\code{data.frame}), qui cite la colonne et sa classe, l'entrée étant un
 \code{data.frame} ordinaire (\emph{constat} des tests)~: les libellés
 étant lus sans dispatch des deux côtés, la colonne extraite n'est plus
 confrontée qu'aux valeurs que porte la colonne de l'entrée aux lignes
@@ -16229,8 +16231,8 @@ d'étape ne refait aucun contrôle des entrées ni des paramètres~: ni la segme
 qu'elle contrôlait en appel direct avant l'issue~\#82 (décisions M216 et
 M291~; section~\ref{sec:execution})~; elle reçoit les valeurs validées
 \code{p}, la recette et la convention, qu'elle transmet aux expositions
-contrefactuelles. L'étape ne lève, en cours de calcul, que deux autres
-refus~: le refus \code{donnees\_mal\_formees}, sous le module
+contrefactuelles. L'étape lève en propre, en cours de calcul, outre les
+gardes rappelées ci-dessous, deux autres refus~: le refus \code{donnees\_mal\_formees}, sous le module
 \code{importance\_exclusions}, quand la méthode \code{[} de la classe de
 l'entrée rend autre chose que les lignes demandées par le contrefactuel
 (ci-dessous, «~Extractions de lignes et leur contrôle~»~; issue~\#320),
