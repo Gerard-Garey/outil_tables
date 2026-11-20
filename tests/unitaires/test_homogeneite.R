@@ -1256,16 +1256,17 @@ verifier("I T4 balayage à deux segments en strate unique (valeur calculée à l
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
 # precision_insuffisante par la voie de T6 (racine très proche de 1 : en
-# strate unique 50 / 50, à partir de D entre 2e17 et 5e17 décès dans la
-# strate) est hors de portée de calculer_homogeneite() : les décès y sont des
-# entiers d'au plus 2^31 - 1 par ligne, une ligne par segment et par cellule,
-# et le test global s'annule (#334) ; appel direct de
+# strate unique 50 / 50, à partir d'un total de l'ordre de 1e17 décès dans la
+# strate (entre 2,5e17 et 3e17 pour les premières branches)) est hors de
+# portée de calculer_homogeneite() : les décès y sont des entiers d'au plus
+# 2^31 - 1 par ligne, une ligne par segment et par cellule ; le test global
+# y reste exact (T = 0, O = A à parts égales) ; appel direct de
 # ecart_minimal_homogeneite(). La voie du débordement de D_c |h_c| en
 # -infini est supprimée (C1 d'actuary, décision du mainteneur du 20/11/2026 ;
 # T7). L'état reste atteignable par l'étape dans des cas extrêmes : racine
 # non représentable (theta+ au-delà du plus grand double), parts
 # dénormalisées où la postcondition échoue, limite lambda(-+infini) qui
-# déborde quand la part d'un segment avoisine 1e-308.
+# déborde en +infini (b^2/d) quand la part d'un segment avoisine 1e-308 (#338).
 # D = 1e15 plutôt que 1e17, cas frontière où un ulp de décalage de la libm
 # ferait dépasser 1e-8 (C2 d'actuary).
 verifier("I T6 témoin precision_insuffisante (valeur calculée à la main) : strate unique 50 / 50 ; D = 1e20 : quatre branches precision_insuffisante, NA, sans erreur ; D = 1e15 : produites, postcondition |lambda(theta) / lambda_80 - 1| <= 1e-8 (recalcul indépendant)", {
