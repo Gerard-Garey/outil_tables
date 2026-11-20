@@ -1869,15 +1869,18 @@ SEUIL_ECART_MINIMAL <- 1.25
 # moins_de_deux_segments_informatifs) ; sinon état de la ligne globale du
 # segment dans resultat$segments s'il n'est pas produit
 # (segment_sans_exposition, variance_nulle ; evenement_sans_exposition) ;
-# sinon produite, ou non_atteint quand la limite de lambda_s(theta) au bout
-# de la branche reste au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL). Valeur
-# NA hors de l'état produite.
-ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "evenement_sans_exposition",
-                                     "moins_de_deux_segments_informatifs", "segment_sans_exposition",
-                                     "variance_nulle")
+# sinon produite, non_atteint quand la limite de lambda_s(theta) au bout de
+# la branche reste au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL), ou
+# precision_insuffisante quand la racine n'est pas représentable en double
+# précision à cette tolérance (pivot de l'élimination ou limite non finie,
+# postcondition non tenue ; décision du mainteneur du 19/11/2026, (b) ; aucun
+# signal). Valeur NA hors de l'état produite.
+ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "precision_insuffisante",
+                                     "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
+                                     "segment_sans_exposition", "variance_nulle")
 # Postcondition de la résolution : |lambda_s(theta_80) / lambda_80 - 1| au
-# plus cette valeur (identité du critère 2 de #218), sinon erreur de
-# programmation.
+# plus cette valeur (identité du critère 2 de #218), sinon état
+# precision_insuffisante.
 TOLERANCE_ECART_MINIMAL <- 1e-8
 # Statut des deux branches de theta_80 (spécification, § 7 ; clause
 # d'indépendance, Q3) : un gabarit, quatre substitutions d'une branche à
@@ -1888,10 +1891,11 @@ statut_ecart_minimal <- function(superieur) {
         "lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme sur les strates informatives",
         "du test global de D_.c (p_c(theta) - pi_c), p_jc(theta) = pi_jc w_j / somme sur k de pi_kc w_k, w_s =",
         "theta, w_j = 1 sinon : espérance exacte de U sachant les D_.c sous le modèle de Poisson à exposition tenue",
-        "pour fixe ; V variance de U sous H0, même système réduit que le test global ; lambda_80 : non-centralité",
-        "pour laquelle la loi du khi-deux non centrale à ddl degrés de liberté (ddl du test global) dépasse le",
-        "quantile d'ordre 1 - niveau_ecart_minimal de la loi centrale avec la probabilité puissance_ecart_minimal",
-        "(conventions) ; la variance de U sous l'alternative diffère de V : à deux segments en strate unique, en",
+        "pour fixe ; V variance de U sous H0 (celle du test global) ; lambda_s(theta) strictement monotone sur",
+        "chaque branche (exact), racine unique ; lambda_80 : non-centralité pour laquelle la loi du khi-deux non",
+        "centrale à ddl degrés de liberté (ddl du test global) dépasse le quantile d'ordre 1 - niveau_ecart_minimal",
+        "de la loi centrale avec la probabilité puissance_ecart_minimal (conventions) ; la variance de U sous",
+        "l'alternative diffère de V : à deux segments en strate unique, en",
         "approximation normale, la puissance réelle en theta_80 s'écarte de puissance_ecart_minimal de 0,03 au plus",
         if (superieur) "quand theta_80 est au plus seuil_ecart_minimal,"
         else "quand theta_80 est au moins 1/seuil_ecart_minimal,",
@@ -1899,11 +1903,13 @@ statut_ecart_minimal <- function(superieur) {
         if (superieur) "la valeur est optimiste pour un segment minoritaire (theta_80 réel plus éloigné de 1) ;"
         else "la valeur est prudente pour un segment minoritaire (theta_80 réel plus proche de 1) ;",
         "au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80 (pchisq",
-        "non centrale) et theta_80 (uniroot) par résolution numérique : approximation numérique ; état non_atteint",
-        "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution",
-        if (superieur) "numérique, lorsque theta tend vers l'infini ;" else "numérique, lorsque theta tend vers 0 ;",
-        "unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et theta_80 est",
-        "trop proche de 1 (écart minimal détectable sous-estimé)")
+        "non centrale) et theta_80 (uniroot en log theta, lambda_s calculée sans soustraction) par résolution",
+        "numérique : approximation numérique ; état non_atteint (NA) quand lambda_s(theta) reste au plus",
+        "lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
+        if (superieur) "lorsque theta tend vers l'infini ;" else "lorsque theta tend vers 0 ;",
+        "état precision_insuffisante (NA) quand la racine n'est pas représentable en double précision à cette",
+        "tolérance ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
+        "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 }
 
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
@@ -2014,8 +2020,9 @@ somme_par <- function(x, i, n) {
 # statistique (fonction d'une matrice de décès des lignes utilisées, une
 # colonne par jeu ; observé et répliques passent par elle), t (observée),
 # poids, strate_tirage, effectifs (pour les réplications), groupe_utilise
-# (groupe de chaque ligne utilisée, pour l'écart minimal détectable, #218),
-# exacte (list(n, p, o, a) quand deux groupes seulement sont comparés, NULL
+# (groupe de chaque ligne utilisée) et composante (racine de la composante
+# connexe de chaque groupe 1..G, lui-même pour un groupe absent), pour
+# l'écart minimal détectable (#218), exacte (list(n, p, o, a) quand deux groupes seulement sont comparés, NULL
 # sinon)).
 score_homogeneite <- function(D, E, strate, groupe, K, G) {
   D <- as.numeric(D)
@@ -2058,7 +2065,8 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
   list(O = somme_par(D, groupe, G), A = somme_par(Ar, groupe, G), U = somme_par(Du - Au, gu, G), v = diag(V),
        utilisee = u, presents = presents, garde = garde, ddl = ddl, strates_informatives = length(si),
        statistique = statistique, t = if (ddl) statistique(matrix(Du, ncol = 1L)) else NA_real_,
-       poids = E[u], strate_tirage = ru, effectifs = Ds[si], groupe_utilise = gu, exacte = exacte)
+       poids = E[u], strate_tirage = ru, effectifs = Ds[si], groupe_utilise = gu,
+       composante = vapply(seq_len(G), racine, 0L), exacte = exacte)
 }
 
 # p-valeur exacte d'un test produit (score_homogeneite()) : deux groupes
@@ -2092,20 +2100,44 @@ non_centralite_ecart_minimal <- function(ddl, niveau = NIVEAU_ECART_MINIMAL, pui
 
 # Écart minimal détectable par segment du test global (#218 ; E2.15 ;
 # spécification d'actuary-approfondi, commentaire 7012205013, § 2 et 4 ;
-# avis de forme F218). sc : objet de score_homogeneite() du test global (un
-# seul système réduit : lambda_s(theta) = sc$statistique() appliquée aux
-# décès attendus sous l'alternative, D_.c p_jc(theta), sur les lignes
-# utilisées) ; etat_test : état du test global ; etats_segments : états des
-# lignes globales de resultat$segments (un par segment, 1..S). Branche + :
-# t = 1 - 1/theta dans [0 ; 1], limite theta -> infini en t = 1 ; branche - :
-# theta dans [0 ; 1], limite theta -> 0 en 0 ; limites en forme close (p = 1
-# pour s et 0 pour les autres, ou p = 0 pour s et pi_j / (1 - pi_sc) pour les
-# autres, dans chaque strate où s est exposé ; p = pi ailleurs) ; non_atteint
-# si la limite ne dépasse pas lambda_80 (1 + TOLERANCE_ECART_MINIMAL). Postcondition
-# |lambda_s(theta_80) / lambda_80 - 1| <= TOLERANCE_ECART_MINIMAL, sinon
-# stop() (erreur de programmation). Rend list(superieur, etat_superieur,
-# inferieur, etat_inferieur, lambda_80), vecteurs de longueur S (lambda_80 :
-# NA si le test global n'est pas produit).
+# avis de forme F218 ; correction du 19/11/2026, constat C1 de la revue
+# finale de B30 : décisions du mainteneur du 19/11/2026, (a) clause « un seul
+# système réduit » levée pour theta_80, (b) état precision_insuffisante).
+# sc : objet de score_homogeneite() du test global ; etat_test : état du test
+# global ; etats_segments : états des lignes globales de resultat$segments
+# (un par segment, 1..S). V est celle du test global ; pour chaque segment s
+# produit, s est la référence dans sa composante connexe C(s) (aucun ordre
+# des segments ni référence du test global n'intervient) :
+#   delta_j(theta) = -somme_c D_.c pi_jc h_c(theta), j dans C(s) \ {s}, de
+#   même signe sur une branche ; lambda_s = b' L_s^-1 b, b_j = somme_c D_.c
+#   pi_jc |h_c|, L_s = V restreinte à C(s) \ {s} (identité exacte avec
+#   delta' V^- delta) ;
+#   |h_c| en u = log theta sans soustraction, a_c = somme des E_kc (k != s) /
+#   E_.c (jamais 1 - pi_sc) : pi_sc (-expm1(-u)) / (a_c e^-u + pi_sc) si
+#   u >= 0, pi_sc (-expm1(u)) / (a_c + pi_sc e^u) sinon ; 0 si pi_sc = 0 ou
+#   a_c = 0 (strate où s est seul exposé, sur plusieurs lignes : aucun autre
+#   segment n'y porte de terme, b_j n'en reçoit rien ; sinon 1/0 en
+#   -infini) ;
+#   limites exactes par les mêmes formules (1 en +infini, pi_sc / a_c en
+#   -infini) ;
+#   L_s = M diag(d) M' par élimination sans soustraction (type GTH), dans
+#   l'ordre croissant des indices de C(s) \ {s}, sur w_jk = somme_c D_.c pi_jc
+#   pi_kc et r_j = w_js : pivot d_i = somme_{k > i} w_ik + r_i, L[k, i] = w_ki
+#   / d_i, w_kl += L[k, i] w_il, r_k += L[k, i] r_i ; évaluation : b_k +=
+#   L[k, i] b_i, lambda_s = somme b_i^2 / d_i ; seulement +, x et / sur des
+#   positifs ; factorisation une fois par segment.
+# Par branche : precision_insuffisante si un pivot n'est pas fini et > 0 ou
+# si la limite lambda_s(+-infini) n'est pas finie ; sinon non_atteint si la
+# limite est au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL) ; sinon racine
+# en u (uniroot, tolérance .Machine$double.eps) sur [h/2 (ou 0) ; h] (au
+# signe de la branche), h doublé depuis 1 tant que lambda_s(h) <= lambda_80
+# et h < 1024
+# (lambda_s(+-1024) = lambda_s(+-infini) exactement : exp(-1024) vaut 0 en
+# double) ; theta = exp(u) ; postcondition : theta fini, > 0, différent de 1,
+# |lambda_s(log theta) / lambda_80 - 1| <= TOLERANCE_ECART_MINIMAL, sinon
+# precision_insuffisante. Rend list(superieur, etat_superieur, inferieur,
+# etat_inferieur, lambda_80), vecteurs de longueur S (lambda_80 : NA si le
+# test global n'est pas produit).
 ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
   sup <- rep(NA_real_, S); inf <- rep(NA_real_, S)
   e_sup <- rep(etat_test, S); e_inf <- rep(etat_test, S)
@@ -2114,43 +2146,74 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
                 lambda_80 = NA_real_))
   e_sup <- etats_segments; e_inf <- etats_segments
   lam80 <- non_centralite_ecart_minimal(sc$ddl)
+  # non_atteint quand la limite reste au plus lambda_80 (1 +
+  # TOLERANCE_ECART_MINIMAL) : seuil inclusif, à la tolérance relative de la
+  # résolution (règle d'actuary, reprise de l'audit, M1).
+  seuil <- lam80 * (1 + TOLERANCE_ECART_MINIMAL)
   ru <- sc$strate_tirage; gu <- sc$groupe_utilise
   n <- length(sc$effectifs)
-  Dc <- sc$effectifs[ru]
-  pi <- sc$poids / somme_par(sc$poids, ru, n)[ru]
-  lambda <- function(p) sc$statistique(matrix(Dc * p, ncol = 1L))
+  Ec <- somme_par(sc$poids, ru, n)
+  # P[c, j] = pi_jc (strates informatives x groupes), cumulé par (strate,
+  # segment) : un segment peut occuper plusieurs lignes d'une cellule (somme
+  # des parts, sans soustraction ; constat C-R1 de l'audit, décision du
+  # mainteneur du 20/11/2026, (a)) ; W[j, k] = w_jk.
+  P <- matrix(somme_par(sc$poids / Ec[ru], ru + n * (gu - 1L), n * S), n, S)
+  W0 <- crossprod(P, P * sc$effectifs)
+  diag(W0) <- 0
   for (s in which(etats_segments == "produite")) {
     dans_s <- gu == s
-    pis <- somme_par(pi[dans_s], ru[dans_s], n)[ru]
-    expose <- pis > 0
-    p_theta <- function(theta) {
-      pw <- pi * ifelse(dans_s, theta, 1)
-      pw / somme_par(pw, ru, n)[ru]
+    pis <- somme_par(sc$poids[dans_s], ru[dans_s], n) / Ec
+    autres <- somme_par(sc$poids[!dans_s], ru[!dans_s], n) / Ec
+    k_s <- pis > 0 & autres > 0
+    h_abs <- function(u) {
+      h <- numeric(n)
+      h[k_s] <- if (u >= 0) -pis[k_s] * expm1(-u) / (autres[k_s] * exp(-u) + pis[k_s])
+                else -pis[k_s] * expm1(u) / (autres[k_s] + pis[k_s] * exp(u))
+      h
     }
-    p_infini <- pi; p_infini[expose] <- ifelse(dans_s[expose], pi[expose] / pis[expose], 0)
-    p_zero <- pi; p_zero[expose] <- ifelse(dans_s[expose], 0, pi[expose] / (1 - pis[expose]))
-    # Garde après uniroot : theta non fini (ou nul, branche -) et
-    # postcondition non tenue sont des erreurs de programmation, jamais un
-    # état produit.
-    verifie <- function(theta, inferieure) {
-      if (!is.finite(theta) || (inferieure && theta <= 0))
-        stop("ecart_minimal_homogeneite() : racine theta_80 non finie ou non positive (erreur de programmation).",
-             call. = FALSE)
-      if (!isTRUE(abs(lambda(p_theta(theta)) / lam80 - 1) <= TOLERANCE_ECART_MINIMAL))
-        stop("ecart_minimal_homogeneite() : lambda_s(theta_80) différent de lambda_80 (erreur de programmation).",
-             call. = FALSE)
-      theta
+    # Élimination sur C(s) \ {s}, ordre croissant des indices.
+    garde <- setdiff(sc$presents[sc$composante[sc$presents] == sc$composante[s]], s)
+    m <- length(garde)
+    W <- W0[garde, garde, drop = FALSE]
+    r <- W0[garde, s]
+    d <- numeric(m)
+    L <- matrix(0, m, m)
+    for (i in seq_len(m)) {
+      k <- seq_len(m)[-seq_len(i)]
+      d[i] <- sum(W[i, k]) + r[i]
+      if (length(k)) {
+        L[k, i] <- W[k, i] / d[i]
+        W[k, k] <- W[k, k] + outer(L[k, i], W[i, k])
+        r[k] <- r[k] + L[k, i] * r[i]
+      }
     }
-    # non_atteint quand la limite reste au plus lambda_80 (1 +
-    # TOLERANCE_ECART_MINIMAL) : seuil inclusif, à la tolérance relative de la
-    # résolution (règle d'actuary, reprise de l'audit, M1).
-    seuil <- lam80 * (1 + TOLERANCE_ECART_MINIMAL)
-    f_sup <- function(t) (if (t >= 1) lambda(p_infini) else lambda(p_theta(1 / (1 - t)))) - lam80
-    if (lambda(p_infini) <= seuil) e_sup[s] <- "non_atteint"
-    else sup[s] <- verifie(1 / (1 - stats::uniroot(f_sup, c(0, 1), tol = 1e-14)$root), FALSE)
-    f_inf <- function(theta) (if (theta <= 0) lambda(p_zero) else lambda(p_theta(theta))) - lam80
-    if (lambda(p_zero) <= seuil) e_inf[s] <- "non_atteint"
-    else inf[s] <- verifie(stats::uniroot(f_inf, c(0, 1), tol = 1e-14)$root, TRUE)
+    Pg <- P[, garde, drop = FALSE]
+    lambda <- function(u) {
+      b <- drop(crossprod(Pg, sc$effectifs * h_abs(u)))
+      for (i in seq_len(m)) {
+        k <- seq_len(m)[-seq_len(i)]
+        b[k] <- b[k] + L[k, i] * b[i]
+      }
+      sum(b * b / d)
+    }
+    pivots <- all(is.finite(d) & d > 0)
+    # Une branche : signe 1 (theta > 1) ou -1 (theta < 1).
+    branche <- function(signe) {
+      limite <- lambda(signe * Inf)
+      if (!pivots || !is.finite(limite)) return(list(theta = NA_real_, etat = "precision_insuffisante"))
+      if (limite <= seuil) return(list(theta = NA_real_, etat = "non_atteint"))
+      haut <- 1
+      while (lambda(signe * haut) <= lam80 && haut < 1024) haut <- 2 * haut
+      bornes <- signe * c(if (haut > 1) haut / 2 else 0, haut)
+      u <- stats::uniroot(function(u) lambda(u) - lam80, sort(bornes), tol = .Machine$double.eps)$root
+      theta <- exp(u)
+      if (!is.finite(theta) || theta <= 0 || theta == 1 ||
+          !isTRUE(abs(lambda(log(theta)) / lam80 - 1) <= TOLERANCE_ECART_MINIMAL))
+        return(list(theta = NA_real_, etat = "precision_insuffisante"))
+      list(theta = theta, etat = "produite")
+    }
+    b_sup <- branche(1); sup[s] <- b_sup$theta; e_sup[s] <- b_sup$etat
+    b_inf <- branche(-1); inf[s] <- b_inf$theta; e_inf[s] <- b_inf$etat
   }
   list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf, lambda_80 = lam80)
 }
@@ -2349,8 +2412,9 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
            lapply(seq_len(nb), function(b) portee("tranche", tranches_age[b], fin_tranche[b], sc_b[[b]], tranche == b,
                                                   tranche_fautive[b])))
   # Écart minimal détectable (#218 ; F218) : une ligne par segment du test
-  # global, dans l'ordre des lignes globales de seg ; par le système réduit
-  # du test global (sc_g), sans seconde réduction.
+  # global, dans l'ordre des lignes globales de seg ; V du test global (sc_g),
+  # chaque segment pris pour référence dans sa composante (décision du
+  # mainteneur du 19/11/2026, (a)).
   em_calc <- ecart_minimal_homogeneite(sc_g, e_g, seg[[1L]]$etat, S)
   em <- segments
   em$theta_80_superieur <- em_calc$superieur
@@ -2386,7 +2450,9 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   # Signal (#218, spécification, § 6) : segments dont une branche produite
   # dépasse le seuil (theta_80_superieur > seuil, theta_80_inferieur <
   # 1/seuil) ou dont une branche est non_atteint ; aucun signal hors des
-  # états produite et non_atteint. Avertissement, jamais un refus.
+  # états produite et non_atteint (precision_insuffisante compris :
+  # décision du mainteneur du 19/11/2026, (b)). Avertissement, jamais un
+  # refus.
   signale <- (em$etat_superieur == "produite" & em$theta_80_superieur > SEUIL_ECART_MINIMAL) |
     (em$etat_inferieur == "produite" & em$theta_80_inferieur < 1 / SEUIL_ECART_MINIMAL) |
     em$etat_superieur == "non_atteint" | em$etat_inferieur == "non_atteint"

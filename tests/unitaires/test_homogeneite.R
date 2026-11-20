@@ -481,6 +481,23 @@ verifier("E deux composantes : ddl = 2, groupes = 4, T = somme des formes closes
        t = proche(t$statistique, tab + tcd, 1e-14, 0),
        pe = if (identical(t$etat_p_exacte, "plus_de_deux_groupes")) TRUE else t$etat_p_exacte)
 })
+# Écart minimal détectable par composante (#218, correction du 19/11/2026 ;
+# M1 de l'audit) : chaque segment est la référence de sa composante C(s),
+# lambda_s ne porte que sur l'autre segment de sa composante, lambda_80 à
+# 2 ddl (ddl du test global). Attendus : recalcul indépendant d'audit à deux
+# segments par composante (a : 8.5616380313444296 ; le moteur rend
+# 8.5616380313444367, écart 8,3e-16 ; b, c, d identiques au bit près). Un
+# calcul sur tous les segments présents au lieu de C(s) échoue.
+verifier("E deux composantes, écart minimal détectable (recalcul indépendant d'audit, deux segments par composante) : a theta+, b theta-, c theta+, d theta- produites à 1e-12 ; autres branches non_atteint", {
+  em <- homog(EXPO_E, "segment", c(50, 53), 50)$resultat$ecart_minimal
+  tous(segments = if (identical(em$segment, c("a", "b", "c", "d"))) TRUE else "segments",
+       etats = if (identical(em$etat_superieur, c("produite", "non_atteint", "produite", "non_atteint")) &&
+                   identical(em$etat_inferieur, c("non_atteint", "produite", "non_atteint", "produite"))) TRUE
+               else paste(c(em$etat_superieur, em$etat_inferieur), collapse = "/"),
+       valeurs = proche(c(em$theta_80_superieur[c(1L, 3L)], em$theta_80_inferieur[c(2L, 4L)]),
+                        c(8.5616380313444296, 5.7680030155899793, 0.11680007918332541, 0.17337022836103966), 1e-12, 0),
+       na = if (all(is.na(c(em$theta_80_superieur[c(2L, 4L)], em$theta_80_inferieur[c(1L, 3L)])))) TRUE else "NA")
+})
 
 # --- F. Cas aux limites (valeur calculée à la main : états, décomptes) -------------
 
@@ -796,8 +813,9 @@ verifier("I constantes (littéral de la spécification, § 5 et 4) : niveau 0,05
   tous(constantes = if (identical(tablexp:::NIVEAU_ECART_MINIMAL, 0.05) && identical(tablexp:::PUISSANCE_ECART_MINIMAL, 0.80) &&
                         identical(tablexp:::SEUIL_ECART_MINIMAL, 1.25)) TRUE else "constantes",
        etats = if (identical(tablexp:::ETATS_ECART_MINIMAL_HOMOGENEITE,
-                             c("produite", "non_atteint", "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
-                               "segment_sans_exposition", "variance_nulle"))) TRUE else "états",
+                             c("produite", "non_atteint", "precision_insuffisante", "evenement_sans_exposition",
+                               "moins_de_deux_segments_informatifs", "segment_sans_exposition", "variance_nulle"))) TRUE
+              else "états",
        lambda = proche(L80_1, 7.848860509, 0, 5e-10),
        puissance = proche(stats::pchisq(stats::qchisq(0.95, 1), 1, ncp = L80_1, lower.tail = FALSE), 0.80, 0, 1e-12),
        ddl3 = proche(stats::pchisq(stats::qchisq(0.95, 3), 3, ncp = tablexp:::non_centralite_ecart_minimal(3),
@@ -811,23 +829,29 @@ verifier("I paramètres de l'étape (F218) : niveau_ecart_minimal, puissance_eca
     identical(p$puissance_ecart_minimal, tablexp:::PUISSANCE_ECART_MINIMAL) &&
     identical(p$seuil_ecart_minimal, tablexp:::SEUIL_ECART_MINIMAL)
 })
-# Texte de la spécification, § 7 (theta_80_superieur), et ses quatre
-# substitutions pour theta_80_inferieur.
+# Texte de la spécification, § 7 (theta_80_superieur), modifié par la
+# correction du 19/11/2026 (constat C1 de la revue finale de B30 ;
+# spécification d'actuary-approfondi, § 2 : V « celle du test global »,
+# monotonie exacte, uniroot en log theta, état precision_insuffisante), et
+# ses quatre substitutions pour theta_80_inferieur.
 STATUT_SUP_218 <- paste(
   "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
   "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
   "sur les strates informatives du test global de D_.c (p_c(theta) - pi_c), p_jc(theta) = pi_jc w_j / somme sur k de",
   "pi_kc w_k, w_s = theta, w_j = 1 sinon : espérance exacte de U sachant les D_.c sous le modèle de Poisson à exposition",
-  "tenue pour fixe ; V variance de U sous H0, même système réduit que le test global ; lambda_80 : non-centralité pour",
+  "tenue pour fixe ; V variance de U sous H0 (celle du test global) ; lambda_s(theta) strictement monotone sur chaque",
+  "branche (exact), racine unique ; lambda_80 : non-centralité pour",
   "laquelle la loi du khi-deux non centrale à ddl degrés de liberté (ddl du test global) dépasse le quantile d'ordre",
   "1 - niveau_ecart_minimal de la loi centrale avec la probabilité puissance_ecart_minimal (conventions) ; la variance",
   "de U sous l'alternative diffère de V : à deux segments en strate unique, en approximation normale, la puissance",
   "réelle en theta_80 s'écarte de puissance_ecart_minimal de 0,03 au plus quand theta_80 est au plus",
   "seuil_ecart_minimal, davantage au-delà, et la valeur est optimiste pour un segment minoritaire (theta_80 réel plus",
   "éloigné de 1) ; au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80",
-  "(pchisq non centrale) et theta_80 (uniroot) par résolution numérique : approximation numérique ; état non_atteint",
+  "(pchisq non centrale) et theta_80 (uniroot en log theta, lambda_s calculée sans soustraction) par résolution",
+  "numérique : approximation numérique ; état non_atteint",
   "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
-  "lorsque theta tend vers l'infini ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+  "lorsque theta tend vers l'infini ; état precision_insuffisante (NA) quand la racine n'est pas représentable en",
+  "double précision à cette tolérance ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
   "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux lignes ecart_minimal en fin (theta_80_superieur, theta_80_inferieur), textes exacts, inférieur par les quatre substitutions ; 15 lignes, UTF-8", {
   s <- tablexp:::STATUTS_HOMOGENEITE
@@ -915,7 +939,11 @@ verifier("I premier ordre (identité asymptotique) : lambda_s(1 + h) / (h^2 V_ss
     l <- lambda_moteur(E_PD3, D_PD3, s, 1 + h); l$lambda / (h^2 * l$v[s]) }, 0)))
   proche(r, rep(1, 6L), 0, 1e-4)
 })
-verifier("I monotonie et extrémalité (contrôle sur un cas, non démonstratif (monotonie non établie à S > 2 sur plusieurs strates)) : lambda_s(theta) < lambda_80 entre 1 et theta_80 sur chaque branche (grille de 50 points), S = 3 à parts différentes", {
+# Monotonie stricte de lambda_s sur chaque branche : résultat exact
+# (spécification de la correction du 19/11/2026, § 2, Q1 : L_s Z-matrice
+# symétrique définie positive, d'inverse >= 0 ; |h_c| strictement croissant).
+# Ce test n'en est qu'un contrôle sur un cas.
+verifier("I monotonie et extrémalité (résultat exact ; contrôle sur un cas) : lambda_s(theta) < lambda_80 entre 1 et theta_80 sur chaque branche (grille de 50 points), S = 3 à parts différentes", {
   em <- R_PD3$resultat$ecart_minimal
   l80 <- tablexp:::non_centralite_ecart_minimal(2L)
   ok <- vapply(1:3, function(s) {
@@ -1096,6 +1124,210 @@ verifier("I critère 3 (calcul exact sans aléa) : puissance exacte en theta_80(
     if (m < 0.76 || m > 0.84) e <- c(e, paste(lib, ": moyenne hors de [0,76 ; 0,84]"))
     if (pi == 0.5 && (m < 0.79 || m > 0.81)) e <- c(e, paste(lib, ": moyenne hors de [0,79 ; 0,81]"))
     if (pi < 0.5 && ((cible > 1 && !(m < 0.80)) || (cible < 1 && !(m > 0.80)))) e <- c(e, paste(lib, ": sens"))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Correction du 19/11/2026 (constat C1 de la revue finale de B30 ;
+# spécification d'actuary-approfondi, § 4, T1 à T4 et T6 ; décisions du
+# mainteneur du 19/11/2026, (a) et (b)) : lambda_s sans soustraction, chaque
+# segment référence de sa composante, état precision_insuffisante. Formes
+# closes à deux segments en strate unique ou à parts constantes, écrites sans
+# soustraction : p part du segment, q part de l'autre (chacune E / E_.),
+# r = sqrt(lambda_80 / (D p q)), theta+ = (1 + q r) / (1 - p r),
+# theta- = (1 - q r) / (1 + p r) ; theta+ existe si et seulement si p r < 1,
+# theta- si et seulement si q r < 1.
+forme_close_pq <- function(lambda, D, p, q) {
+  r <- sqrt(lambda / (D * p * q))
+  c(superieur = (1 + q * r) / (1 - p * r), inferieur = (1 - q * r) / (1 + p * r))
+}
+expo_seg <- function(seg, age, E, D)
+  data.frame(segment = seg, age = as.integer(age), exposition_centrale = E, evenements = as.integer(D),
+             stringsAsFactors = FALSE)
+verifier("I T1 scénario de l'audit (valeur calculée à la main) : A (E = 1e-6, D = 0) et X (E = 1e5, D = 9000), âges 60 à 70, deux ordres : A theta+ produite, X theta- produite, à 1e-12 de la forme close sans soustraction et des valeurs de la spécification ; A theta- et X theta+ non_atteint ; sans erreur", {
+  d <- expo_seg(rep(c("A", "X"), each = 11L), rep(60:70, 2L), rep(c(1e-6, 1e5), each = 11L), rep(c(0, 9000), each = 11L))
+  pA <- 1e-6 / (1e-6 + 1e5); pX <- 1e5 / (1e-6 + 1e5)
+  fA <- forme_close_pq(L80_1, 99000, pA, pX); fX <- forme_close_pq(L80_1, 99000, pX, pA)
+  e <- character(0)
+  for (o in list(seq_len(22L), c(12:22, 1:11))) {
+    r <- tryCatch(homog(d[o, ], "segment", c(60, 70), 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste("erreur :", conditionMessage(r))); next }
+    em <- r$resultat$ecart_minimal
+    a <- match("A", em$segment); x <- match("X", em$segment)
+    if (!identical(c(em$etat_superieur[a], em$etat_inferieur[a], em$etat_superieur[x], em$etat_inferieur[x]),
+                   c("produite", "non_atteint", "non_atteint", "produite")))
+      { e <- c(e, "états"); next }
+    v <- c(em$theta_80_superieur[a], em$theta_80_inferieur[x])
+    if (!isTRUE(proche(v, c(fA[["superieur"]], fX[["inferieur"]]), 1e-12, 0)) ||
+        !isTRUE(proche(v, c(2816.6957177997049, 3.5502592405727154e-4), 1e-12, 0)))
+      e <- c(e, paste("valeurs :", paste(format(v, digits = 17), collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# T2 (scénario de /code-review) : âges 60 et 61 ; 60 : E 100 / 100, D 2 / 1 ;
+# 61 : E 5000 / 5000 k, D 600 / 0. Recalcul indépendant à deux segments :
+# lambda_A(theta) = (somme_c D_c pi_Ac pi_Bc (theta - 1) / (pi_Bc + pi_Ac
+# theta))^2 / somme_c D_c pi_Ac pi_Bc (et symétrique pour B), racine par
+# uniroot en log theta ; contre-vérification à 80 chiffres de la
+# spécification.
+lambda_deux <- function(Dc, pa, pb, theta)
+  sum(Dc * pa * pb * (theta - 1) / (pb + pa * theta))^2 / sum(Dc * pa * pb)
+verifier("I T2 scénario de /code-review (recalcul indépendant et contre-vérification à 80 chiffres) : k dans {1e-11, 1e-10}, deux ordres : B theta+ et A theta- produites, à 1e-10 ; A theta+ et B theta- non_atteint ; sans erreur", {
+  ref80 <- list(c(154612185.82495439, 6.4677955017863807e-9), c(15461223.865043793, 6.4677932919715056e-8))
+  e <- character(0)
+  for (i in 1:2) {
+    k <- c(1e-11, 1e-10)[i]
+    d <- expo_seg(c("A", "B", "A", "B"), c(60, 60, 61, 61), c(100, 100, 5000, 5000 * k), c(2, 1, 600, 0))
+    Ec <- c(200, 5000 + 5000 * k); pa <- c(100, 5000) / Ec; pb <- c(100, 5000 * k) / Ec; Dc <- c(3, 600)
+    bp <- exp(stats::uniroot(function(u) lambda_deux(Dc, pb, pa, exp(u)) - L80_1, c(0, 30), tol = 1e-14)$root)
+    am <- exp(stats::uniroot(function(u) lambda_deux(Dc, pa, pb, exp(u)) - L80_1, c(-30, 0), tol = 1e-14)$root)
+    for (o in list(1:4, c(2L, 1L, 4L, 3L))) {
+      r <- tryCatch(homog(d[o, ], "segment", c(60, 61), 60), error = function(x) x)
+      if (inherits(r, "error")) { e <- c(e, sprintf("k %g : erreur %s", k, conditionMessage(r))); next }
+      em <- r$resultat$ecart_minimal
+      a <- match("A", em$segment); b <- match("B", em$segment)
+      if (!identical(c(em$etat_superieur[b], em$etat_inferieur[a], em$etat_superieur[a], em$etat_inferieur[b]),
+                     c("produite", "produite", "non_atteint", "non_atteint")))
+        { e <- c(e, sprintf("k %g : états", k)); next }
+      v <- c(em$theta_80_superieur[b], em$theta_80_inferieur[a])
+      if (!isTRUE(proche(v, c(bp, am), 1e-10, 0)) || !isTRUE(proche(v, ref80[[i]], 1e-10, 0)))
+        e <- c(e, sprintf("k %g : %s", k, paste(format(v, digits = 17), collapse = ", ")))
+    }
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# T3 (invariance à l'ordre des segments) : cinq segments, deux âges ; les 120
+# ordres de première apparition des segments dans la table d'exposition.
+E_T3 <- rbind(c(0, 8.44e5), c(1.46e-5, 0), c(0, 3.56e4), c(1.66e-6, 6.14e-8), c(0.167, 4.99e-10))
+D_T3 <- rbind(c(0, 60), c(9, 0), c(0, 4026), c(211, 2654), c(9881, 577))
+permutations <- function(x) if (length(x) <= 1L) list(x) else
+  do.call(c, lapply(seq_along(x), function(i) lapply(permutations(x[-i]), function(p) c(x[i], p))))
+verifier("I T3 invariance à l'ordre des segments (contre-vérification à 80 chiffres) : 5 segments, 120 ordres : aucune erreur, états identiques, theta à 1e-12 de l'ordre naturel ; theta+ des segments 5 et 4 et theta- du segment 5 à 1e-12 des valeurs à 80 chiffres", {
+  d <- expo_seg(rep(sprintf("s%d", 1:5), 2L), rep(c(50, 51), each = 5L), as.vector(E_T3), as.vector(D_T3))
+  par_segment <- function(o) {
+    r <- tryCatch(homog(d[c(o, o + 5L), ], "segment", c(50, 51), 50, B = 9), error = function(x) x)
+    if (inherits(r, "error")) return(conditionMessage(r))
+    em <- r$resultat$ecart_minimal
+    em[match(sprintf("s%d", 1:5), em$segment), ]
+  }
+  ref <- par_segment(1:5)
+  if (is.character(ref)) return(paste("ordre naturel : erreur", ref))
+  e <- character(0)
+  for (o in permutations(1:5)) {
+    em <- par_segment(o)
+    lib <- paste(o, collapse = "")
+    if (is.character(em)) { e <- c(e, paste(lib, ": erreur", em)); next }
+    if (!identical(c(em$etat_superieur, em$etat_inferieur), c(ref$etat_superieur, ref$etat_inferieur)))
+      { e <- c(e, paste(lib, ": états")); next }
+    v <- c(em$theta_80_superieur, em$theta_80_inferieur); v0 <- c(ref$theta_80_superieur, ref$theta_80_inferieur)
+    if (!identical(is.na(v), is.na(v0)) || !isTRUE(proche(v[!is.na(v)], v0[!is.na(v0)], 1e-12, 0)))
+      e <- c(e, paste(lib, ": valeurs"))
+  }
+  tous(ordres = if (length(e)) paste(e, collapse = " ; ") else TRUE,
+       ref80 = proche(c(ref$theta_80_superieur[5:4], ref$theta_80_inferieur[5L]),
+                      c(18090774.751333403, 11.904576012616003, 0.22295785153163347), 1e-12, 0))
+})
+verifier("I T4 balayage à deux segments en strate unique (valeur calculée à la main) : p = 1e-1 à 1e-15, D dans {1, 1e3, 1e6, 1e9, 1e12}, deux ordres : aucune erreur ; états conformes à (p r < 1, q r < 1) ; theta à 1e-12 de la forme close ; écart entre ordres au plus 1e-14", {
+  e <- character(0)
+  for (p0 in 10^-(1:15)) for (Dt in c(1, 1e3, 1e6, 1e9, 1e12)) {
+    E <- c(p0, 1); p <- E[1L] / sum(E); q <- E[2L] / sum(E)
+    r <- sqrt(L80_1 / (Dt * p * q))
+    f1 <- forme_close_pq(L80_1, Dt, p, q); f2 <- forme_close_pq(L80_1, Dt, q, p)
+    # Attendu pour le segment de part p puis pour l'autre : (theta+, theta-).
+    att_et <- ifelse(c(p * r, q * r, q * r, p * r) < 1, "produite", "non_atteint")
+    att_v <- c(f1[["superieur"]], f1[["inferieur"]], f2[["superieur"]], f2[["inferieur"]])
+    att_v[att_et != "produite"] <- NA
+    obt <- list()
+    for (o in list(1:2, 2:1)) {
+      sc <- tablexp:::score_homogeneite(c(0, Dt)[o], E[o], c(1L, 1L), 1:2, 1L, 2L)
+      em <- tryCatch(tablexp:::ecart_minimal_homogeneite(sc, "produite", c("produite", "produite"), 2L), error = function(x) x)
+      lib <- sprintf("p %g, D %g, ordre %s", p0, Dt, paste(o, collapse = ""))
+      if (inherits(em, "error")) { e <- c(e, paste(lib, ": erreur", conditionMessage(em))); next }
+      k <- match(1:2, o)
+      et <- c(em$etat_superieur[k[1L]], em$etat_inferieur[k[1L]], em$etat_superieur[k[2L]], em$etat_inferieur[k[2L]])
+      v <- c(em$superieur[k[1L]], em$inferieur[k[1L]], em$superieur[k[2L]], em$inferieur[k[2L]])
+      if (!identical(et, att_et)) { e <- c(e, paste(lib, ": états", paste(et, collapse = "/"))); next }
+      if (!identical(is.na(v), is.na(att_v)) || !isTRUE(proche(v[!is.na(v)], att_v[!is.na(att_v)], 1e-12, 0)))
+        { e <- c(e, paste(lib, ": valeurs")); next }
+      obt[[length(obt) + 1L]] <- v
+    }
+    if (length(obt) == 2L && !isTRUE(proche(obt[[1L]][!is.na(obt[[1L]])], obt[[2L]][!is.na(obt[[2L]])], 1e-14, 0)))
+      e <- c(e, sprintf("p %g, D %g : écart entre ordres", p0, Dt))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# precision_insuffisante est aujourd'hui inatteignable par
+# calculer_homogeneite() (décès au-delà de 2^31 dans une colonne integer, et
+# annulation du test global, #334) : appel direct de
+# ecart_minimal_homogeneite(). D = 1e15 plutôt que 1e17, cas frontière où un
+# ulp de décalage de la libm ferait dépasser 1e-8 (C2 d'actuary).
+verifier("I T6 témoin precision_insuffisante (valeur calculée à la main) : strate unique 50 / 50 ; D = 1e20 : quatre branches precision_insuffisante, NA, sans erreur ; D = 1e15 : produites, postcondition |lambda(theta) / lambda_80 - 1| <= 1e-8 (recalcul indépendant)", {
+  em_D <- function(Dt) {
+    sc <- tablexp:::score_homogeneite(c(Dt / 2, Dt / 2), c(50, 50), c(1L, 1L), 1:2, 1L, 2L)
+    tryCatch(tablexp:::ecart_minimal_homogeneite(sc, "produite", c("produite", "produite"), 2L), error = function(x) x)
+  }
+  a <- em_D(1e20); b <- em_D(1e15)
+  if (inherits(a, "error") || inherits(b, "error")) return("erreur")
+  rel <- vapply(c(b$superieur, b$inferieur), function(th) lambda_deux(1e15, 0.5, 0.5, th) / L80_1 - 1, 0)
+  tous(insuffisante = if (identical(c(a$etat_superieur, a$etat_inferieur), rep("precision_insuffisante", 4L)) &&
+                          all(is.na(c(a$superieur, a$inferieur)))) TRUE else paste(c(a$etat_superieur, a$etat_inferieur), collapse = "/"),
+       produite = if (identical(c(b$etat_superieur, b$etat_inferieur), rep("produite", 4L)) &&
+                      all(b$superieur > 1) && all(b$inferieur < 1)) TRUE else "états à D = 1e15",
+       postcondition = if (all(abs(rel) <= 1e-8)) TRUE else paste(format(rel), collapse = ", "))
+})
+# Strate où s est seul exposé sur deux lignes (C1 d'actuary, visa de la
+# correction) : âge 60, A sur deux lignes (E 100, D 5 chacune) ; âge 61, A
+# (100, 5) et X (100, 9). La strate 60 est informative (deux lignes
+# exposées) mais a_c = 0 pour A : |h| y vaut 0, sans terme 1/0 en -infini.
+# Recalcul indépendant restreint à la cellule où les deux segments sont
+# exposés (âge 61 : D 14, parts 1/2 et 1/2).
+verifier("I strate à un seul segment exposé sur deux lignes (recalcul indépendant) : deux ordres ; theta- de A et de X produites, égales, à 1e-12 du recalcul et de 0.14367128799545387 ; signal ecart_minimal_detectable", {
+  d <- expo_seg(c("A", "A", "A", "X"), c(60, 60, 61, 61), rep(100, 4L), c(5, 5, 5, 9))
+  att <- exp(stats::uniroot(function(u) lambda_deux(14, 0.5, 0.5, exp(u)) - L80_1, c(-30, 0), tol = 1e-14)$root)
+  e <- character(0)
+  for (o in list(1:4, c(4L, 3L, 1L, 2L))) {
+    r <- tryCatch(homog(d[o, ], "segment", c(60, 61), 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste("erreur :", conditionMessage(r))); next }
+    em <- r$resultat$ecart_minimal[match(c("A", "X"), r$resultat$ecart_minimal$segment), ]
+    if (!identical(em$etat_inferieur, c("produite", "produite")))
+      { e <- c(e, paste("états", paste(em$etat_inferieur, collapse = "/"))); next }
+    if (!isTRUE(proche(em$theta_80_inferieur, rep(att, 2L), 1e-12, 0)) ||
+        !isTRUE(proche(em$theta_80_inferieur, rep(0.14367128799545387, 2L), 1e-12, 0)))
+      e <- c(e, paste("valeurs", paste(format(em$theta_80_inferieur, digits = 17), collapse = ", ")))
+    if (!"ecart_minimal_detectable" %in% r$avertissements$code) e <- c(e, "signal absent")
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Invariance au découpage d'une cellule en plusieurs lignes (constat C-R1 de
+# l'audit ; décision du mainteneur du 20/11/2026, (a) : pi_jc cumulé par
+# (strate, segment)). Âges 60 et 61 ; une ligne : A (100, 4), X (300, 9),
+# A (200, 6), X (100, 3). Découpage de (A, 61) en 150 / 4 et 50 / 2, puis de
+# (X, 61) en 30 / 1 et 70 / 2, chacun dans deux ordres : pour s = A, la
+# découpe porte tantôt sur s (référence de s), tantôt sur l'autre segment, et
+# inversement pour s = X. Attendus : valeurs du code de 303d6e0 (passage par
+# la statistique, agrégée par rowsum) sur une ligne.
+# Limite (#335) : score_homogeneite() n'agrège pas non plus par (strate,
+# groupe) ; T est faux quand la cellule découpée appartient à un segment
+# autre que la référence du test global (le premier de la table). Le segment
+# découpé est donc toujours placé en tête, seul cas où T est invariant.
+verifier("I invariance au découpage d'une cellule en plusieurs lignes (valeurs de 303d6e0 sur une ligne) : A puis X découpé, deux ordres chacun : T, états et theta à 1e-12 de la variante sur une ligne", {
+  un <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(100, 300, 200, 100), c(4, 9, 6, 3))
+  da <- expo_seg(c("A", "X", "A", "X", "A"), c(60, 60, 61, 61, 61), c(100, 300, 150, 100, 50), c(4, 9, 4, 3, 2))
+  dx <- expo_seg(c("X", "X", "A", "A", "X"), c(61, 60, 61, 60, 61), c(70, 300, 200, 100, 30), c(2, 9, 6, 4, 1))
+  variantes <- list(une_ligne = un, A_decoupe = da, A_decoupe_permute = da[c(1L, 2L, 5L, 4L, 3L), ],
+                    X_decoupe = dx, X_decoupe_permute = dx[c(5L, 4L, 2L, 3L, 1L), ])
+  att_v <- c(3.7393758326640887, 5.0691740146480493, 0.19727079739428313, 0.26742430949700979)
+  e <- character(0)
+  for (nom in names(variantes)) {
+    r <- tryCatch(homog(variantes[[nom]], "segment", c(60, 61), 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    em <- r$resultat$ecart_minimal[match(c("A", "X"), r$resultat$ecart_minimal$segment), ]
+    if (!identical(c(em$etat_superieur, em$etat_inferieur), rep("produite", 4L)))
+      { e <- c(e, paste(nom, ": états", paste(c(em$etat_superieur, em$etat_inferieur), collapse = "/"))); next }
+    v <- c(em$theta_80_superieur, em$theta_80_inferieur)
+    if (!isTRUE(proche(v, att_v, 1e-12, 0)))
+      e <- c(e, paste(nom, ": theta", paste(format(v, digits = 17), collapse = ", ")))
+    if (!isTRUE(proche(ligne_test(r, "global")$statistique, 0.12676056338028169, 1e-12, 0)))
+      e <- c(e, paste(nom, ": T"))
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
