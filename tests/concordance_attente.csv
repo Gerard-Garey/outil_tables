@@ -1,4 +1,1 @@
 type,nom,issue,motif
-entree,fonctions-donnees:controler_lignes_extraites,#322,"définition ajoutée à R/donnees.R par #322 (postcondition de l'extraction des lignes), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-donnees:libelles_facteur,#322,"définition ajoutée à R/donnees.R par #322 (postcondition de l'extraction des lignes), catalogue écrit par docwriter en fin de branche (règle 9)"
-entree,fonctions-donnees:SUJETS_LIGNES_EXTRAITES,#322,"définition ajoutée à R/donnees.R par #322 (postcondition de l'extraction des lignes), catalogue écrit par docwriter en fin de branche (règle 9)"
