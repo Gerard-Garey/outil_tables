@@ -2165,11 +2165,28 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
     pis <- somme_par(sc$poids[dans_s], ru[dans_s], n) / Ec
     autres <- somme_par(sc$poids[!dans_s], ru[!dans_s], n) / Ec
     k_s <- pis > 0 & autres > 0
-    h_abs <- function(u) {
-      h <- numeric(n)
-      h[k_s] <- if (u >= 0) -pis[k_s] * expm1(-u) / (autres[k_s] * exp(-u) + pis[k_s])
-                else -pis[k_s] * expm1(u) / (autres[k_s] + pis[k_s] * exp(u))
-      h
+    # M[c, j] |h_c| (M = Pg, pi_jc des segments éliminés), |h_c| =
+    # num_c / den_c, sans soustraction. |h_c| <= 1 en u >= 0 ; en u < 0, il
+    # atteint pi_sc / a_c en -infini, environ 1e308 pour a_c voisin de
+    # 1e-308, et déborde pour a_c dénormalisé plus petit. Le produit par D_c
+    # vient en dernier (crossprod) : l'ancienne forme D_c |h_c| débordait dès
+    # que ce produit dépassait le plus grand double, alors que M[c, j] |h_c|
+    # <= pi_sc <= 1 puisque pi_jc <= a_c. Sur les lignes où |h_c| n'est pas
+    # représentable, M / den est formé d'abord (<= 1, pi_jc <= a_c <= den_c),
+    # puis multiplié par num_c <= pi_sc ; ailleurs M * |h_c| (C1 d'actuary,
+    # décision du mainteneur du 20/11/2026, (b)).
+    h_pond <- function(u, M) {
+      num <- numeric(n); den <- rep(1, n)
+      if (u >= 0) {
+        num[k_s] <- -pis[k_s] * expm1(-u); den[k_s] <- autres[k_s] * exp(-u) + pis[k_s]
+      } else {
+        num[k_s] <- -pis[k_s] * expm1(u); den[k_s] <- autres[k_s] + pis[k_s] * exp(u)
+      }
+      h <- num / den
+      Q <- M * h
+      hors <- !is.finite(h)
+      if (any(hors)) Q[hors, ] <- M[hors, , drop = FALSE] / den[hors] * num[hors]
+      Q
     }
     # Élimination sur C(s) \ {s}, ordre croissant des indices.
     garde <- setdiff(sc$presents[sc$composante[sc$presents] == sc$composante[s]], s)
@@ -2189,7 +2206,7 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
     }
     Pg <- P[, garde, drop = FALSE]
     lambda <- function(u) {
-      b <- drop(crossprod(Pg, sc$effectifs * h_abs(u)))
+      b <- drop(crossprod(h_pond(u, Pg), sc$effectifs))
       for (i in seq_len(m)) {
         k <- seq_len(m)[-seq_len(i)]
         b[k] <- b[k] + L[k, i] * b[i]

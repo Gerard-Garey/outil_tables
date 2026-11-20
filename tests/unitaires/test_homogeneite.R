@@ -1255,11 +1255,19 @@ verifier("I T4 balayage à deux segments en strate unique (valeur calculée à l
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
-# precision_insuffisante est aujourd'hui inatteignable par
-# calculer_homogeneite() (décès au-delà de 2^31 dans une colonne integer, et
-# annulation du test global, #334) : appel direct de
-# ecart_minimal_homogeneite(). D = 1e15 plutôt que 1e17, cas frontière où un
-# ulp de décalage de la libm ferait dépasser 1e-8 (C2 d'actuary).
+# precision_insuffisante par la voie de T6 (racine très proche de 1 : en
+# strate unique 50 / 50, à partir de D entre 2e17 et 5e17 décès dans la
+# strate) est hors de portée de calculer_homogeneite() : les décès y sont des
+# entiers d'au plus 2^31 - 1 par ligne, une ligne par segment et par cellule,
+# et le test global s'annule (#334) ; appel direct de
+# ecart_minimal_homogeneite(). La voie du débordement de D_c |h_c| en
+# -infini est supprimée (C1 d'actuary, décision du mainteneur du 20/11/2026 ;
+# T7). L'état reste atteignable par l'étape dans des cas extrêmes : racine
+# non représentable (theta+ au-delà du plus grand double), parts
+# dénormalisées où la postcondition échoue, limite lambda(-+infini) qui
+# déborde quand la part d'un segment avoisine 1e-308.
+# D = 1e15 plutôt que 1e17, cas frontière où un ulp de décalage de la libm
+# ferait dépasser 1e-8 (C2 d'actuary).
 verifier("I T6 témoin precision_insuffisante (valeur calculée à la main) : strate unique 50 / 50 ; D = 1e20 : quatre branches precision_insuffisante, NA, sans erreur ; D = 1e15 : produites, postcondition |lambda(theta) / lambda_80 - 1| <= 1e-8 (recalcul indépendant)", {
   em_D <- function(Dt) {
     sc <- tablexp:::score_homogeneite(c(Dt / 2, Dt / 2), c(50, 50), c(1L, 1L), 1:2, 1L, 2L)
@@ -1273,6 +1281,37 @@ verifier("I T6 témoin precision_insuffisante (valeur calculée à la main) : st
        produite = if (identical(c(b$etat_superieur, b$etat_inferieur), rep("produite", 4L)) &&
                       all(b$superieur > 1) && all(b$inferieur < 1)) TRUE else "états à D = 1e15",
        postcondition = if (all(abs(rel) <= 1e-8)) TRUE else paste(format(rel), collapse = ", "))
+})
+# T7 (C1 d'actuary, décision du mainteneur du 20/11/2026, (b)) : part de X
+# voisine de 1e-308 ou dénormalisée à l'âge 60 (E_X dans {5e-305, 5e-307}) ;
+# |h_c| y vaut environ 1e308 ou plus en -infini, et D_c |h_c| débordait
+# (theta- de A precision_insuffisante alors que la racine est représentable).
+# Recalcul indépendant par la forme à deux segments sans soustraction
+# (lambda_deux) ; contre-vérification d'actuary (calcul décimal) : theta- de A
+# voisin de 6,468e-306 pour E_X = 5e-305.
+verifier("I T7 débordement de D_c |h_c| en -infini (recalcul indépendant ; contre-vérification d'actuary) : A (5000, 600 ; 100, 2), X (E_X, 0 ; 100, 1), E_X dans {5e-305, 5e-307}, deux ordres : A theta- et X theta+ produites, à 1e-10 du recalcul ; A theta+ et X theta- non_atteint ; theta- de A à 1e-4 de 6,468e-306 pour E_X = 5e-305 ; sans erreur", {
+  e <- character(0)
+  for (eX in c(5e-305, 5e-307)) {
+    d <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(5000, eX, 100, 100), c(600, 0, 2, 1))
+    Ec <- c(5000 + eX, 200); pa <- c(5000, 100) / Ec; px <- c(eX, 100) / Ec; Dc <- c(600, 3)
+    am <- exp(stats::uniroot(function(u) lambda_deux(Dc, pa, px, exp(u)) - L80_1, c(-740, 0), tol = 1e-14)$root)
+    xp <- exp(stats::uniroot(function(u) lambda_deux(Dc, px, pa, exp(u)) - L80_1, c(0, 709), tol = 1e-14)$root)
+    for (o in list(1:4, c(2L, 1L, 4L, 3L))) {
+      r <- tryCatch(homog(d[o, ], "segment", c(60, 61), 60), error = function(x) x)
+      if (inherits(r, "error")) { e <- c(e, sprintf("E_X %g : erreur %s", eX, conditionMessage(r))); next }
+      em <- r$resultat$ecart_minimal
+      a <- match("A", em$segment); x <- match("X", em$segment)
+      et <- c(em$etat_inferieur[a], em$etat_superieur[x], em$etat_superieur[a], em$etat_inferieur[x])
+      if (!identical(et, c("produite", "produite", "non_atteint", "non_atteint")))
+        { e <- c(e, sprintf("E_X %g : états %s", eX, paste(et, collapse = "/"))); next }
+      v <- c(em$theta_80_inferieur[a], em$theta_80_superieur[x])
+      if (!isTRUE(proche(v, c(am, xp), 1e-10, 0)))
+        e <- c(e, sprintf("E_X %g : %s", eX, paste(format(v, digits = 17), collapse = ", ")))
+      if (eX == 5e-305 && !isTRUE(proche(v[1L], 6.468e-306, 1e-4, 0)))
+        e <- c(e, sprintf("E_X %g : contre-vérification %s", eX, format(v[1L], digits = 17)))
+    }
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
 # Strate où s est seul exposé sur deux lignes (C1 d'actuary, visa de la
 # correction) : âge 60, A sur deux lignes (E 100, D 5 chacune) ; âge 61, A
