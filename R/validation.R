@@ -3100,10 +3100,16 @@ cle_cellules <- function(t, cles, par_annee)
 # recette et la convention validées de la construction (ctx$recette,
 # ctx$conv : une seule source, #82). NULL sans ligne. Sans refus de la période
 # sans exposition (refuser_vide = FALSE, #210) : un sous-ensemble de lignes
-# exclues peut n'avoir aucune exposition dans la période.
+# exclues peut n'avoir aucune exposition dans la période. Lignes extraites par
+# la méthode « [ » de la classe de l'entrée (M499 (a)) et contrôlées par
+# controler_lignes_extraites() avant construire_observations() (#320 ; outil
+# de #322, point 4), sinon refus donnees_mal_formees de l'étape
+# importance_exclusions.
 exposition_lignes <- function(lignes, cles, ctx) {
   if (!length(lignes)) return(NULL)
-  ob <- construire_observations(ctx$donnees[lignes, , drop = FALSE], lignes, ctx$roles, cles, ctx$p)
+  extraites <- ctx$donnees[lignes, , drop = FALSE]
+  controler_lignes_extraites(ctx$donnees, extraites, lignes, ctx$roles, "importance_exclusions")
+  ob <- construire_observations(extraites, lignes, ctx$roles, cles, ctx$p)
   if (!identical(ob$unite, ctx$unite))
     stop("exposition_lignes() : unité d'observation différente de la construction (erreur de programmation).",
          call. = FALSE)
@@ -3120,12 +3126,28 @@ exposition_lignes <- function(lignes, cles, ctx) {
 # la construction, seuls ses motifs de tête lus (ses motifs de ligne, dont
 # contrat_duplique, dépendent du jeu entier) ; une tête qui porte un motif de
 # tête est indéterminée et sort entièrement ; puis deux passages, R_t u S et
-# R_t, sur les têtes restantes. Invariants (erreur de programmation) : S n'a
-# que des lignes M (classer_lignes_exclues()) ; D_e,c >= 0, jours >= 0 ;
-# E^c_e,c = 0 si aucun jour retiré, > 0 sinon. Rend list(cellules (clés,
-# age [, annee], evenements_retires, exposition_jours_retiree,
-# exposition_centrale_retiree ; cellules à jours ou événements retirés
-# non nuls), tetes_touchees, tetes_indeterminees, lignes_indeterminees).
+# R_t, sur les têtes restantes. Lignes extraites par la méthode « [ » de la
+# classe de l'entrée et contrôlées par controler_lignes_extraites() (#320 ;
+# texte d'actuary, Q-A1) : sous l'unité tête, l'étape fait, pour chaque
+# ensemble d'exclusions, jusqu'à trois extractions contrôlées : R_t u S (avant
+# evaluer_motifs()), puis ses lignes hors têtes indéterminées, puis les lignes
+# conservées (R) des têtes restantes (exposition_lignes(), aucune extraction
+# pour un sous-ensemble vide) ; sous l'unité contrat, une seule : S. Ensembles
+# parcourus par niveau (A puis B) puis, dans chaque niveau, chaque motif
+# déclaré (ordre de lignes_exclues de l'étape donnees) puis le total ; puis,
+# si le comparateur 2 est produit, les mêmes ensembles sous ses clés (A : clé
+# de la table, B : segmentation), qui rappellent retrait() de la même façon ;
+# un ensemble sans ligne mesurable n'extrait rien, et un même couple (S, clés)
+# n'est calculé qu'une fois (cache de calculer_importance_exclusions(), commun
+# aux deux parcours : le second n'extrait que pour un couple absent du cache). Le
+# refus est celui de la première extraction fausse ; `attendu` vaut le nombre
+# de lignes qu'elle demande, qui peut donc être inférieur à |S| comme à
+# |R_t u S|. Invariants (erreur de programmation) : S n'a que des lignes M
+# (classer_lignes_exclues()) ; D_e,c >= 0, jours >= 0 ; E^c_e,c = 0 si aucun
+# jour retiré, > 0 sinon. Rend list(cellules (clés, age [, annee],
+# evenements_retires, exposition_jours_retiree, exposition_centrale_retiree ;
+# cellules à jours ou événements retirés non nuls), tetes_touchees,
+# tetes_indeterminees, lignes_indeterminees).
 retrait_contrefactuel <- function(S, cles, ctx) {
   cl <- classer_lignes_exclues(ctx$lignes_exclues, ctx$unite, cles)
   mesurables <- cl$lignes[cl$classe == "M"]
@@ -3145,7 +3167,9 @@ retrait_contrefactuel <- function(S, cles, ctx) {
     # Aucune ligne N (ni cle) n'entre dans lignes_tete (condition 1 du visa).
     if (any(L %in% cl$lignes[cl$classe != "M"]))
       stop("retrait_contrefactuel() : ligne non mesurable dans lignes_tete (erreur de programmation).", call. = FALSE)
-    ev <- evaluer_motifs(ctx$donnees[L, , drop = FALSE], ctx$roles, ctx$p$debut, ctx$p$fin, ctx$p$borne,
+    extraites <- ctx$donnees[L, , drop = FALSE]
+    controler_lignes_extraites(ctx$donnees, extraites, L, ctx$roles, "importance_exclusions")
+    ev <- evaluer_motifs(extraites, ctx$roles, ctx$p$debut, ctx$p$fin, ctx$p$borne,
                          ctx$segmentation, lignes_tete = seq_along(L))
     ti <- unique(idt[L[unique(unlist(ev$motifs[MOTIFS_TETE], use.names = FALSE))]])
     garde <- !(idt[L] %in% ti)
@@ -3312,10 +3336,17 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
 
 # État des déclarations de chaque ligne `lignes` (§ 1.2) : cause connue (dans
 # MODALITES_CAUSE) ou non, sortie datée ou non, dans la fenêtre [début,
-# borne) ou non ; `cible` : état d'arrivée de la transition.
+# borne) ou non ; `cible` : état d'arrivée de la transition. Colonnes lues sans
+# dispatch (#255, #320 ; spécification d'actuary, Q1 de #322) : lire_champ()
+# (aucun « [[ » : un nom de colonne d'encodage « bytes » ne lève pas), puis
+# libellés d'un facteur par libelles_facteur(), valeurs d'une chaîne ou d'une
+# Date (exactement Date, type_conforme()) par .subset() ; égal au bit près à
+# l'ancienne lecture par « [[ » et « [ » sur un facteur nu, une chaîne ou une
+# Date.
 etats_evenements_exclus <- function(donnees, roles, lignes, debut, borne, cible) {
-  cause <- as.character(donnees[[roles[["cause_sortie"]]]][lignes])
-  sor <- as.numeric(unclass(donnees[[roles[["date_sortie"]]]][lignes]))
+  v <- lire_champ(donnees, roles[["cause_sortie"]])
+  cause <- if (a_classe(v, "factor")) libelles_facteur(v, lignes) else .subset(v, lignes)
+  sor <- as.numeric(.subset(lire_champ(donnees, roles[["date_sortie"]]), lignes))
   connue <- !is.na(cause) & cause %in% MODALITES_CAUSE
   datee <- !is.na(sor)
   dans <- datee & sor >= debut & sor < borne
@@ -3397,7 +3428,7 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
   ctx <- list(donnees = donnees, roles = roles, p = p,
               recette = recette, conv = conv, par_annee = par_annee,
               unite = unite, segmentation = segmentation, lignes_exclues = le, R = rd$numeros_conserves,
-              id_tete = if ("id_tete" %in% names(roles)) donnees[[roles[["id_tete"]]]],
+              id_tete = if ("id_tete" %in% names(roles)) lire_champ(donnees, roles[["id_tete"]]),
               prototype = expo[0L, c(segmentation, "age", if (isTRUE(par_annee)) "annee"), drop = FALSE])
   # Ensembles : chaque motif déclaré (S_k), puis le total (lignes distinctes).
   ens <- c(names(le), "total")

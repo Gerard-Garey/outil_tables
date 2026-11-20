@@ -1180,6 +1180,24 @@ verifier("#163 contre-épreuve : même objet, statut de la table relu importee d
   l <- lignes_de(ecrire_rapport(y))
   sum(l == MENTION_163) == 0L && sum(c(L163$synthetique, MENTION_163) == MENTION_163) == 2L
 })
+# Classe posée sur fiche/tables_reference (#322, point 5) : la liste est dans le
+# périmètre de l'empreinte du résultat, l'écrivain refuse une liste de classe
+# (sur la liste comme sur un élément) ; l'empreinte ne se recalcule pas, refus
+# objet_modifie au contrôle 3, avant tout rendu. Méthode as.list.foo définie dans
+# globalenv() (qui échouerait si le rendu de donnees_recues parcourait la liste
+# classée par dispatch), puis retirée.
+for (cas in list(list("sur la liste", function(y) { class(y$fiche$tables_reference) <- "foo"; y }, "fiche/tables_reference"),
+                 list("sur l'élément tv", function(y) { class(y$fiche$tables_reference$tv) <- "foo"; y }, "fiche/tables_reference/tv")))
+  verifier(sprintf("#322 : classe foo posée %s de fiche$tables_reference : ecrire_rapport() refuse objet_modifie au contrôle 3, chemin %s cité (pas une erreur R, as.list.foo non appelée)", cas[[1L]], cas[[3L]]), {
+    assign("as.list.foo", function(x, ...) stop("as.list.foo appelée"), envir = globalenv())
+    tryCatch({
+      r <- tryCatch(ecrire_rapport(cas[[2L]](X163$synthetique)), error = function(e) e)
+      if (!inherits(r, "refus_tablexp")) sprintf("condition ou rendu : %s", if (inherits(r, "error")) conditionMessage(r) else class(r)[1L])
+      else une_ligne_utf8(r, controle_refus(r, "objet_modifie", list(attendu = NA_character_),
+                                            c("empreinte du résultat non recalculable (",
+                                              sprintf("« %s » : liste de classe foo", cas[[3L]]))))
+    }, finally = rm("as.list.foo", envir = globalenv()))
+  })
 verifier("#163 sous LC_ALL=C : table synthétique au nom ASCII construite par table_reference() : rapport écrit, mention une seule fois (sous-processus)", {
   f <- tempfile(fileext = ".R"); e <- tempfile(fileext = ".rds"); on.exit(unlink(c(f, e)))
   saveRDS(list(jeu = JEU, roles = ROLES, plan = PLAN_163, t = T_SYN_163, mention = MENTION_163), e)
