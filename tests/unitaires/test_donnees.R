@@ -1100,8 +1100,11 @@ local({
     verifier(sprintf("#322 C3 : etape = %s -> erreur de programmation nomm\u00e9e (non un refus)", paste(deparse(e), collapse = "")),
              if (is.null(r)) "aucune erreur"
              else if (inherits(r, "refus_tablexp")) "refus au lieu d'une erreur de programmation"
-             else identical(conditionMessage(r),
-                            "controler_lignes_extraites() : 'etape' doit \u00eatre une cl\u00e9 de SUJETS_LIGNES_EXTRAITES."))
+             # Fragments ASCII seuls : un message de stop() n'est pas marqué UTF-8, sa comparaison exacte
+             # dépend de l'encodage natif (échec sous LC_ALL=C).
+             else inherits(r, "error") &&
+               grepl("controler_lignes_extraites() : 'etape'", conditionMessage(r), fixed = TRUE) &&
+               grepl("SUJETS_LIGNES_EXTRAITES", conditionMessage(r), fixed = TRUE))
   }
 })
 verifier("#322 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
