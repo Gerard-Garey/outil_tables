@@ -1383,3 +1383,22 @@ Issues : #218. Décisions du mainteneur M551, M552, M554. Validation de la docum
 **Effet sur les résultats : aucun** par la présente mention. Constat du commit `25f8d54` (*rapporté*, message du commit) : R1 à R17 identiques au bit près, hors `EMPREINTE_CODE` et `fiche/empreintes/code` (comparée par jeton) ; pas de régénération (M554 (a)) ; les deux clés `homogeneite/resultat/ecart_minimal/theta_80_{superieur,inferieur}` restent en classe 1e-10.
 
 Issues : #218. Décision du mainteneur M554. Branche `claude/statuts-suffisance`, PR #328.
+
+*Mention datée du 20 novembre 2026 (troisième) (`architect`, sur `39c8a80`) — grandeur mesurée par le 8,9e-16 ; écart relatif exact.* Exécute M555 (c), décision du mainteneur du 20/11/2026 (acceptée dans son principe). Rien de ce qui précède n'est réécrit : le point (d) (4) de l'annotation du 19/11/2026 (troisième), son paragraphe « Effet sur les résultats » et le tableau du point 1 de la mention corrective du 20/11/2026 se lisent avec la présente.
+
+Le 8,9e-16 de ces trois passages est le quotient `abs(apres / avant - 1)` évalué en double : la division et la soustraction de 1 sont arrondies, et la valeur obtenue pour R12 θ⁺ H est exactement 4 `.Machine$double.eps` (8,8818e-16). L'**écart relatif exact** est |après − avant| / |avant| ; la différence après − avant est exacte en double, les deux valeurs étant dans un rapport compris entre 1/2 et 2 (lemme de Sterbenz). Il vaut au plus **8,5743e-16**, soit 8,6e-16, atteint en R12 θ⁺ H. Mesures de `docwriter` et d'`actuary` (20/11/2026, *rapportées*), remesurées par `architect` (20/11/2026, *vérifié* : valeurs lues par `git show 303d6e0:tests/reference/R1{1,2}.tsv` et `git show e6bbcad:…`, lignes `etapes/homogeneite/resultat/ecart_minimal/theta_80_*`, R 4.3.3) :
+
+| Grandeur | Quotient arrondi `abs(apres / avant - 1)` | En `.Machine$double.eps` | Écart relatif exact `abs(apres - avant) / abs(avant)` |
+|---|---|---|---|
+| R11 θ⁺ H | 2,2204e-16 | 1 | 2,0367e-16 |
+| R11 θ⁻ F | 4,4409e-16 | 2 | 4,8416e-16 |
+| R12 θ⁺ F | 6,6613e-16 | 3 | 6,4306e-16 |
+| R12 θ⁺ H | 8,8818e-16 | 4 | 8,5743e-16 |
+| R12 θ⁻ F | 6,6613e-16 | 3 | 6,9002e-16 |
+| R12 θ⁻ H | 4,4409e-16 | 2 | 3,4502e-16 |
+
+R11 θ⁺ F et R11 θ⁻ H sont inchangés (écart nul par les deux méthodes). Les deux méthodes mesurent la même grandeur, l'écart relatif entre valeurs avant et après ; elles diffèrent par l'arrondi du quotient, au plus de l'ordre de `.Machine$double.eps` / 2 en valeur absolue (approximation numérique quantifiée ci-dessus). **8,9e-16 reste une borne supérieure vraie du maximum** de l'écart relatif exact sur les huit valeurs (8,5743e-16 ≤ 8,8818e-16). Ligne par ligne, le quotient arrondi n'est pas un majorant : R11 θ⁻ F (4,84e-16 contre 4,44e-16) et R12 θ⁻ F (6,90e-16 contre 6,66e-16) le dépassent ; seule la borne sur le maximum est affirmée par les passages visés.
+
+**Effet sur les résultats : aucun.** La présente mention ne modifie aucun code, aucune référence ni aucune clé de `TOLERANCES` ; les deux clés `homogeneite/resultat/ecart_minimal/theta_80_{superieur,inferieur}` restent en classe 1e-10, à plus de cinq ordres de grandeur au-dessus de l'écart mesuré.
+
+Issues : #218. Décision du mainteneur M555 (c). Branche `claude/statuts-suffisance`, PR #328.
