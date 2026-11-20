@@ -1136,7 +1136,7 @@ local({
     etapes = list(donnees = list(exclusions = "entree_manquante"),
                   exposition = list(convention = "plus_fine", par_annee = FALSE),
                   brut = list(estimateurs = "poisson", niveau = 0.95)))
-  verifier("#322 revue finale : length(unclass()) de l'extraction du témoin k322klen (1) diffère de celui des noms (7) et de l'entrée (8)",
+  verifier("#322 revue finale : length(unclass()) de l'extraction du témoin k322klen (1) diffère de celui des noms (8), égal à celui de l'entrée",
            identical(vapply(list(dk[-2L, , drop = FALSE]), function(e) c(length(unclass(e)), length(attr(e, "names", exact = TRUE))),
                             integer(2L))[, 1L], c(1L, 8L)) && length(unclass(dk)) == 8L)
   PREF_E <- "Les lignes conservées, extraites des données par la méthode « [ » de la classe "
@@ -1165,6 +1165,27 @@ local({
   verifier("#322 revue finale, outil, etape importance_exclusions : même refus sous le module importance_exclusions",
            inherits(r, "refus_tablexp") && identical(r$module, "importance_exclusions") && identical(r$motif, "donnees_mal_formees") &&
              grepl("n'ont pas les colonnes des données (", conditionMessage(r), fixed = TRUE))
+  # Témoin : entrée de classe exactement « data.frame », extraction faite sous un length.data.frame qui ment
+  # (posé dans globalenv() le temps de l'extraction seul, puis retiré) : même cause, variante sans classe de colonne
+  # attribuée (le nombre de colonnes de la liste, 1, n'est pas celui des noms, 8), sans erreur R.
+  assign("length.data.frame", function(x) 1L, envir = globalenv())
+  ex <- tryCatch(d[-2L, , drop = FALSE], error = function(e) e)
+  rm(list = "length.data.frame", envir = globalenv())
+  verifier("#322 revue finale : length.data.frame de session retir\u00e9e de globalenv() apr\u00e8s l'extraction",
+           !exists("length.data.frame", envir = globalenv(), inherits = FALSE))
+  r <- if (inherits(ex, "error")) ex else attrape(tablexp:::controler_lignes_extraites(d, ex, c(1L, 3L, 4L), ROLES))
+  verifier("#322 revue finale, outil : entr\u00e9e exactement data.frame, extraction sous length.data.frame qui ment -> refus donnees_mal_formees du module donnees (colonnes, sans classe de colonne), non l'erreur R de names",
+           if (inherits(ex, "error")) paste("extraction :", conditionMessage(ex))
+           else if (!identical(c(length(unclass(ex)), length(attr(ex, "names", exact = TRUE))), c(1L, 8L))) "extraction de forme inattendue"
+           else if (is.null(r)) "aucun refus"
+           else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+           else if (!identical(r$module, "donnees") || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
+           else if (!identical(conditionMessage(r), sub("k322klen/data.frame", "data.frame", msg, fixed = TRUE))) paste("message :", conditionMessage(r))
+           else if (!identical(r$details, list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L,
+                                               colonnes = character(0), colonne = character(0), position = integer(0),
+                                               lignes_colonne = numeric(0))))
+             paste("details :", paste(deparse(r$details), collapse = " "))
+           else TRUE)
   # Témoin : environnement classé « data.frame » rendu par `[`, refus (0) sans erreur R.
   e <- new.env(); class(e) <- "data.frame"
   for (et in c("donnees", "importance_exclusions")) {
