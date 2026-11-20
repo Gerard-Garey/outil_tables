@@ -2463,7 +2463,9 @@ texte_valeurs <- function(v, chemin) {
   list(type = w$type, texte = s)
 }
 
-# Entier n (nrow(), length()) écrit par l'écrivain, pour une cellule HTML.
+# Entier n écrit par l'écrivain, pour une cellule HTML. Les appelants le lisent
+# sans dispatch : .row_names_info(v, 2L) pour les lignes d'un data.frame,
+# longueur_lue() pour une longueur (jamais nrow() ni length() ; #313).
 texte_entier <- function(n, chemin) texte_valeurs(n, chemin)$texte
 
 # Valeur v décrite pour un message de refus : NULL -> NULL ; atomique de
@@ -2769,7 +2771,15 @@ corps_section <- function(x, k) {
                         paste(setdiff(CHEMINS_HORS_RESULTAT, c("execution", "fiche/empreintes/resultat")), collapse = ", "), m[["integrite_hors_2"]])))
   # Section donnees_recues : mention tables_reference_parametres après le
   # tableau, une fois, si une table de fiche/tables_reference est de statut
-  # synthetique (lu dans l'objet, #163) ; rien sinon.
+  # synthetique (lu dans l'objet, #163) ; rien sinon. vapply(tr, …) parcourt la
+  # liste telle quelle, sans unclass() : une classe sur tr dispatcherait
+  # as.list() (mesuré : as.list.foo appelé, #322 point 5). Cela n'arrive pas
+  # par ecrire_rapport() : fiche/tables_reference est dans le périmètre de
+  # l'empreinte du résultat, et l'écrivain refuse une liste de classe, sur la
+  # liste comme sur un élément (erreur de recalcul : objet_modifie au contrôle 3,
+  # avant tout rendu ; l'empreinte ne se reconsigne pas non plus sur un tel
+  # objet). Seul un appel direct de corps_section() hors de ce contrôle
+  # dispatcherait.
   if (identical(id, "donnees_recues")) {
     tr <- lire_chemin(x, c("fiche", "tables_reference"))$valeur
     synthetique <- is.list(tr) &&
