@@ -2224,12 +2224,20 @@ minimal détectable (ajouts seuls, les autres valeurs inchangées)~; aucun
 de leurs segments ne franchit le seuil, si bien qu'aucun avertissement
 \code{ecart\_minimal\_detectable} n'y est figé. La correction du calcul
 de $\theta_{80}$ du 19/11/2026 (section~\ref{sec:homogeneite}) change sur
-ces deux plans les huit valeurs de $\theta_{80}$ dans leurs derniers
-chiffres, très en deçà de la tolérance de leur classe ($10^{-10}$,
-tableau~\ref{tab:tolerances}), et les textes des deux statuts de
-\code{ecart\_minimal}~; états et avertissements sont inchangés~; avec
-l'empreinte du code, qui change pour les dix-sept plans, elle appelle une
-seconde régénération des références de la branche (décision M551, (1)).
+ces deux plans six des huit valeurs de $\theta_{80}$ dans leurs derniers
+chiffres (au plus $8{,}6 \cdot 10^{-16}$ en relatif~; les deux autres
+sont restées identiques au bit près), très en deçà de la tolérance de
+leur classe ($10^{-10}$, tableau~\ref{tab:tolerances}), et les textes des
+deux statuts de \code{ecart\_minimal}~; états et avertissements sont
+inchangés. Avec l'empreinte du code, qui change pour les dix-sept plans,
+elle a appelé une seconde régénération des références de la branche
+(décision M551, (1)), faite sur la CI le 20/11/2026~: R1 à R10 et R13 à
+R17 y sont restés identiques au bit près, hors en-tête de provenance. La
+correction du 20/11/2026 (ordre des produits dans le calcul de
+$\lambda_s$, section~\ref{sec:homogeneite}) laisse les valeurs de
+$\theta_{80}$, les états et les empreintes de résultat des dix-sept plans
+identiques au bit près (seule l'empreinte du code change)~; elle n'a pas
+appelé de régénération (décision M554, (a)).
 Les valeurs ne sont pas reproduites ici (E3.4). Les graines 20261113 à 20261115 sont
 distinctes entre elles, de celle du jeu, de celles de R8 et des défauts de
 R9, et absentes du reste du dépôt à leur création.
@@ -2582,7 +2590,7 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13~; seule exception à la règle des dénombrements, issue~\#199)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table} et \code{resultat/table\_positionnee/qx\_reference}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/monte\_carlo/replications} et, recopies des constantes du package (issue~\#218), \code{parametres/} \code{niveau\_ecart\_minimal}, \code{puissance\_ecart\_minimal} et \code{seuil\_ecart\_minimal}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table} et \code{resultat/monte\_carlo/replications}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif}~; \code{lissage/}~: \code{plage\_ages}, \code{ordre\_difference}, \code{niveau}, \code{parametre\_lissage} et \code{intervalle\_lissage} (paramètres et écho du plan), \code{parametres/constantes/valeur}~; \code{coherence\_regularite/}~: \code{plage\_ages} et \code{ordres} (paramètres et écho du plan), \code{resultat/regularite/ordre}, \code{resultat/ages/qx}, \code{resultat/ordre\_segments/g\_superieure} et \code{g\_inferieure} (recopies de \code{qx}) & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
 $10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage}~; \code{lissage/}~: \code{diagnostics/exposition\_centrale\_hors\_plage}, \code{diagnostics/exposition\_initiale\_hors\_plage}, \code{resultat/table\_lissee/poids}~; \code{coherence\_regularite/resultat/}~: \code{ages/delta1}, \code{ages/delta2}, \code{ordre\_segments/ecart}, \code{regularite/} \code{regularite}, \code{r\_estime} et \code{regularite\_r} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
 $10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires)~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves}~; \code{lissage/resultat/segments/}~: \code{fidelite} et \code{critere} (sous~(a) seule, jamais itérés)~; \code{validation/parametres/ddl\_effectifs/}~: \code{ddl\_effectifs} et \code{ddl\_effectifs\_retenus} (option~($\delta$), ci-dessous) & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
-$10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z}, \code{ecart\_minimal/} \code{theta\_80\_superieur} et \code{theta\_80\_inferieur} (issue~\#218) & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a))~; $\theta_{80}$, racine par \code{uniroot()} en $u = \log\theta$ de $\lambda_s = \lambda_{80}$, $\lambda_s$ étant la même quantité que cette statistique appliquée à $\delta_s(\theta)$, calculée sans soustraction depuis le 19/11/2026 (section~\ref{sec:homogeneite}), reste dans sa classe, avec deux termes d'erreur, tous deux relatifs sur $\theta_{80}$~: (1)~l'erreur de résolution, au plus $(4|\log\theta| + 1)\,\varepsilon$, $\varepsilon$ = \code{.Machine\$double.eps} étant la tolérance de \code{uniroot()} (critère d'arrêt de \code{zeroin}, demi-largeur de l'encadrement au plus $2\varepsilon|u| + \mathrm{tol}/2$, lu dans les sources de R, version de développement, et supposé inchangé en R~4.3.3), soit au plus $9{,}1 \cdot 10^{-13}$ sur tout le domaine de la recherche ($|u| \le 1024$)~; (2)~la transmission de l'erreur de $\lambda_s$~: une erreur relative $\varepsilon$ de $\lambda_s$ se transmet à $\theta_{80}$ en $\varepsilon\,|\theta - 1|\,\bigl(1 + \pi(\theta - 1)\bigr)/(2\theta)$ à deux segments en strate unique ($\pi$, part de l'exposition centrale du segment dans la strate~; $\varepsilon\,|\theta - 1|/2$ au premier ordre), la résolution amortissant l'erreur (facteur inférieur à~1 pour toute valeur de $\pi$ dans $[0~; 1]$) si et seulement si $\theta_{80} \in \left]1/3~; 3\right[$, le maximum en $\pi$ étant atteint en $\pi = 1$ sur la branche~$+$ ($(\theta - 1)/2$) et en $\pi = 0$ sur la branche~$-$ ($(1 - \theta)/(2\theta)$)~; hors de cette plage, le facteur croît comme $\pi\theta/2$ quand $\theta \to \infty$ et comme $(1 - \pi)/(2\theta)$ quand $\theta \to 0$~; le calcul sans soustraction réduit l'erreur de $\lambda_s$, non ce facteur~: écart relatif des huit $\theta_{80}$ de R11 et R12 à une référence calculée à 80 chiffres, $9{,}9 \cdot 10^{-16}$ au plus avant la correction et $1{,}3 \cdot 10^{-16}$ au plus après (constat de mesure d'\code{actuary-approfondi}, script hors dépôt, rapporté)~; réexamen si un plan de référence donne $\theta_{80}$ hors de $\left]1/3~; 3\right[$, si la tolérance de \code{uniroot()}, la variable de résolution ou la postcondition (\code{TOLERANCE\_}\allowbreak\code{ECART\_}\allowbreak\code{MINIMAL}) change, ou si un plan de référence porte un segment à l'état \code{precision\_}\allowbreak\code{insuffisante} (avis d'\code{actuary} du 19/11/2026~; ADR 0009, annotation du 19/11/2026, seconde annotation du 19/11/2026, et troisième annotation du 19/11/2026, point~(f)) \\
+$10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z}, \code{ecart\_minimal/} \code{theta\_80\_superieur} et \code{theta\_80\_inferieur} (issue~\#218) & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par résolution d'un système linéaire par \code{solve()} (LAPACK de référence de la plateforme), $z = U/\sqrt{v}$ et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a))~; $\theta_{80}$, racine par \code{uniroot()} en $u = \log\theta$ de $\lambda_s = \lambda_{80}$, $\lambda_s$ étant la même quantité que cette statistique appliquée à $\delta_s(\theta)$, calculée sans soustraction depuis le 19/11/2026 (section~\ref{sec:homogeneite}), reste dans sa classe, avec deux termes d'erreur, tous deux relatifs sur $\theta_{80}$~: (1)~l'erreur de résolution, au plus $(4|\log\theta| + 1)\,\varepsilon$, $\varepsilon$ = \code{.Machine\$double.eps} étant la tolérance de \code{uniroot()} (critère d'arrêt de \code{zeroin}, demi-largeur de l'encadrement au plus $2\varepsilon|u| + \mathrm{tol}/2$, lu dans les sources de R~4.3.3, fichier \code{src/}\allowbreak\code{library/}\allowbreak\code{stats/}\allowbreak\code{src/}\allowbreak\code{zeroin.c}~; la borne suppose l'arrêt sur ce critère et non au nombre maximal d'itérations de \code{uniroot()}~; dans ce dernier cas, c'est la postcondition qui contrôle la valeur restituée, mais l'avertissement de non-convergence n'est pas capté, issue~\#339), soit au plus $9{,}1 \cdot 10^{-13}$ sur tout le domaine de la recherche ($|u| \le 1024$)~; (2)~la transmission de l'erreur de $\lambda_s$~: une erreur relative $\varepsilon$ de $\lambda_s$ se transmet à $\theta_{80}$ en $\varepsilon\,|\theta - 1|\,\bigl(1 + \pi(\theta - 1)\bigr)/(2\theta)$ à deux segments en strate unique ($\pi$, part de l'exposition centrale du segment dans la strate~; $\varepsilon\,|\theta - 1|/2$ au premier ordre), la résolution amortissant l'erreur (facteur inférieur à~1 pour toute valeur de $\pi$ dans $[0~; 1]$) si et seulement si $\theta_{80} \in \left]1/3~; 3\right[$, le maximum en $\pi$ étant atteint en $\pi = 1$ sur la branche~$+$ ($(\theta - 1)/2$) et en $\pi = 0$ sur la branche~$-$ ($(1 - \theta)/(2\theta)$)~; hors de cette plage, le facteur croît comme $\pi\theta/2$ quand $\theta \to \infty$ et comme $(1 - \pi)/(2\theta)$ quand $\theta \to 0$~; le calcul sans soustraction réduit l'erreur de $\lambda_s$, non ce facteur~: écart relatif des huit $\theta_{80}$ de R11 et R12 à une référence calculée en précision étendue (80 chiffres), $1{,}0 \cdot 10^{-15}$ au plus avant la correction et $1{,}4 \cdot 10^{-16}$ au plus après (remesure d'\code{actuary} du 20/11/2026 sur les références régénérées, $\lambda_{80}$ prise à sa valeur en double précision~; script hors dépôt, rapporté)~; réexamen si un plan de référence donne $\theta_{80}$ hors de $\left]1/3~; 3\right[$, si la tolérance de \code{uniroot()}, la variable de résolution ou la postcondition (\code{TOLERANCE\_}\allowbreak\code{ECART\_}\allowbreak\code{MINIMAL}) change, ou si un plan de référence porte un segment à l'état \code{precision\_}\allowbreak\code{insuffisante} (avis d'\code{actuary} du 19/11/2026~; ADR 0009, annotation du 19/11/2026, seconde annotation du 19/11/2026, et troisième annotation du 19/11/2026, point~(f)) \\
 \code{optimi}\allowbreak\code{sation} ($10^{-3}$) & \code{lissage/resultat/table\_lissee/}~: \code{qx}, \code{borne\_inf\_credibilite}, \code{borne\_sup\_credibilite}, \code{levier}~; \code{lissage/resultat/segments/}~: \code{parametre\_lissage}, \code{ddl\_effectifs}, \code{regularite}, \code{laml}, \code{deviance\_penalisee}, \code{residu\_conservation\_0}, \code{residu\_conservation\_1} & grandeurs issues d'un calcul itératif arrêté sur un critère ou d'une optimisation (Whittaker-Henderson~(b), $\hat\lambda$ argmax d'une LAML plate)~: une perturbation de l'ordre de l'arrondi déplace le point d'arrêt~; valeur fixée par mesure (ci-dessous~; ADR 0017, point~8~; ADR 0009, annotation du 12/11/2026) \\
 \end{longtable}
 }
@@ -15198,7 +15206,9 @@ p-valeur n'y est comparée à un niveau.
       \qquad
       \lambda_s(\theta) = \delta_s(\theta)^{\top} V^{-} \delta_s(\theta),
     \]
-    avec la même $V$ que le test global, $\pi_{jc}$ étant la part de
+    avec la même $V$ que le test global (hors lignes multiples d'un
+    segment dans une cellule, où la $V$ du test global n'agrège pas les
+    parts, issue~\#335), $\pi_{jc}$ étant la part de
     l'exposition centrale du segment $j$ dans la strate $c$, somme des
     parts de ses lignes quand il en occupe plusieurs dans la cellule~;
     $\lambda_s$ ne dépend ni de l'ordre des segments ni du groupe de
@@ -15334,9 +15344,36 @@ p-valeur n'y est comparée à un niveau.
         second cas, aucun autre segment n'a de part dans la strate, qui
         n'apporte rien à $b$, et la convention évite le quotient $1/0$ en
         $u \to -\infty$)~; les mêmes formules donnent les limites exactes,
-        $1$ en $u = +\infty$ et $\pi_{sc}/a_c$ en $u = -\infty$.
-      \item $L_s$ est factorisée en $M \operatorname{diag}(d) M^{\top}$
-        par une élimination sans soustraction (de type GTH), dans l'ordre
+        $1$ en $u = +\infty$ et $\pi_{sc}/a_c$ en $u = -\infty$. Le
+        second membre $b_j = \sum_c D_{\cdot c}\,\pi_{jc}\,|h_c|$ est formé
+        dans cet ordre~: le produit $\pi_{jc}\,|h_c|$ d'abord, puis sa
+        multiplication par $D_{\cdot c}$ (correction du 20/11/2026,
+        commit \code{25f8d54}). En $u < 0$, $|h_c|$ croît jusqu'à
+        $\pi_{sc}/a_c$, de l'ordre de $10^{308}$ quand la part $a_c$ des
+        autres segments avoisine $10^{-308}$ (exposition déclarée, recette
+        \code{agregats})~: formé d'abord, $D_{\cdot c}\,|h_c|$ dépassait la
+        capacité des doubles, la limite n'était plus finie et la branche
+        sortait \code{precision\_}\allowbreak\code{insuffisante} alors que
+        la racine était représentable (constat de mesure d'\code{actuary}
+        du 20/11/2026)~; au contraire, $\pi_{jc}\,|h_c| \le \pi_{sc} \le 1$
+        puisque $\pi_{jc} \le a_c$. Sur les strates où $|h_c|$ lui-même
+        n'est pas représentable ($a_c$ dénormalisé), le produit est formé
+        comme $(\pi_{jc}/n_c)\,m_c$, avec $m_c = \pi_{sc}(1 - e^{u})$ et
+        $n_c = a_c + \pi_{sc}\,e^{u}$ le numérateur et le dénominateur de
+        $|h_c|$~: chaque facteur est au plus~1 ($\pi_{jc} \le a_c \le
+        n_c$, $m_c \le \pi_{sc}$), sans soustraction. Ce repli est limité
+        à ces strates~: appliqué partout, il déplaçait une valeur de
+        $\theta_{80}$ de R11 d'une unité de dernier rang. Les deux ordres
+        de calcul sont algébriquement égaux, non égaux au bit près~:
+        l'identité au bit près des résultats n'est constatée que sur les
+        dix-sept plans de référence~; ailleurs, $\theta_{80}$ peut se
+        déplacer de quelques unités d'arrondi, au plus
+        $1{,}7 \cdot 10^{-14}$ en relatif sur 3\,000 tirages adverses de
+        l'audit, sans changement d'état (approximation numérique, constat
+        de mesure de l'audit du 20/11/2026, rapporté).
+      \item $L_s$ est factorisée en $M \operatorname{diag}(d) M^{\top}$,
+        $M$ triangulaire inférieure unitaire de coefficients $M_{ki} =
+        -\ell_{ki}$ ($k > i$), par une élimination sans soustraction (de type GTH), dans l'ordre
         croissant des indices de $G$, sur les $w_{jk}$ et les $r_j$~:
         pivot $d_i = \sum_{k > i} w_{ik} + r_i$, puis, pour $k, l > i$,
         $\ell_{ki} = w_{ki}/d_i$, $w_{kl} \leftarrow w_{kl} + \ell_{ki}\,
@@ -15346,9 +15383,12 @@ p-valeur n'y est comparée à un niveau.
         l'évaluation fait $b_k \leftarrow b_k + \ell_{ki}\, b_i$, puis
         $\lambda_s = \sum_i b_i^2/d_i$. Seules des additions, des
         multiplications et des divisions de nombres positifs
-        interviennent~: aucune annulation ne peut se produire, et l'erreur
-        relative de $\lambda_s$ reste de l'ordre de quelques unités
-        d'arrondi (argument d'arrondi, non une borne démontrée).
+        interviennent~: aucune annulation ne peut se produire, et, hors
+        dépassement de capacité et nombres dénormalisés, l'erreur relative
+        de $\lambda_s$ reste un multiple de l'unité d'arrondi
+        $\varepsilon$, qui croît avec le nombre d'opérations (nombre de
+        strates, taille de $G$) (argument d'arrondi, non une borne
+        démontrée).
         La factorisation est faite une fois par segment.
       \item Résolution en $u$~: sur la branche $+$, l'encadrement est
         $[h/2~; h]$ (ou $[0~; 1]$), $h$ doublé à partir de~1 tant que
@@ -15408,14 +15448,39 @@ p-valeur n'y est comparée à un niveau.
     19/11/2026, M551, (3)) dit que la racine n'est pas représentable en
     double précision à la tolérance de la postcondition~: ce n'est ni un
     écart non détectable ni une erreur de programmation, et il ne
-    déclenche aucun signal. Il n'est atteint par l'étape dans aucun cas
-    connu~: le cas qui l'exerce, deux segments de parts égales en strate
-    unique, demande un total de décès très supérieur à ce que porte la
-    colonne entière des décès par cellule ($2^{31} - 1$), et le test
-    global, qui calcule $U$ et $V$ réduite par soustraction, perdrait sa
-    précision avant lui (issue~\#334)~; un test unitaire l'exerce donc par
+    déclenche aucun signal. Il n'est atteint par aucun plan de référence.
+    Les voies qui y mènent, après la correction du 20/11/2026 (ordre des
+    produits, \textbf{Calcul}, point~(2)), sont les suivantes (constats
+    de mesure d'\code{actuary} et de \code{docwriter} du 20/11/2026, sur
+    des jeux construits pour cela). (i)~Une racine très proche de~1
+    (information très grande)~: deux segments de parts égales en strate
+    unique ne l'atteignent qu'à partir d'un total compris entre $2 \cdot
+    10^{17}$ (branches encore produites) et $3 \cdot 10^{17}$ décès dans
+    la strate, bien au-delà de ce que porte la
+    colonne des décès, entière ($2^{31} - 1$ au plus par ligne)~; le test
+    global y reste exact~; un test unitaire exerce donc cette voie par
     appel direct de \code{ecart\_minimal\_homogeneite()}
-    (\textbf{Vérifications}, ci-dessous).
+    (\textbf{Vérifications}, ci-dessous). (ii)~Une racine non
+    représentable en double précision~: limite finie, mais racine
+    au-delà du plus grand double (par exemple $\theta_{80}^{+}$ de l'ordre
+    de $10^{315}$ pour un segment de part d'exposition de l'ordre de
+    $10^{-318}$ dans une strate). (iii)~Une limite $\lambda_s(\pm\infty)$ qui
+    dépasse la capacité des doubles par le quotient $b_i^2/d_i$ alors que
+    la racine est représentable~: en strate unique, avec une part
+    d'exposition du segment de l'ordre de $10^{-308}$ (exposition
+    déclarée, recette \code{agregats}), $\theta_{80}^{+}$, de l'ordre de
+    $10^{153}$, n'est pas calculé~; une limite infinie pourrait être
+    comptée comme supérieure au seuil (issue~\#338). (iv)~Des parts
+    d'exposition dénormalisées (inférieures à environ $2{,}2 \cdot
+    10^{-308}$), dont la précision relative est perdue, si bien que la
+    postcondition échoue. En strate unique, le segment majoritaire face à
+    une part infime est d'abord \code{variance\_nulle} par l'arrondi du
+    test global (issue~\#333). L'état signale donc une racine non
+    calculable en double précision par cette méthode, pas nécessairement
+    non représentable~; le texte du statut («~la racine n'est pas
+    représentable en double précision à cette tolérance~», \textbf{Statut},
+    ci-dessous) est figé dans les références de non-régression, et sa
+    reformulation passe par l'issue~\#340.
   \item \textbf{Signal}~: l'avertissement \code{ecart\_minimal\_detectable}
     (étape \code{homogeneite}), \textbf{jamais un refus}, est émis quand au
     moins un segment a $\theta_{80}^{+} > 1{,}25$, $\theta_{80}^{-} <
@@ -15659,7 +15724,13 @@ n'agrège pas les parts par strate et segment~: $T$ n'est invariant que
 dans ce cas, issue~\#335)~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
-branches produites, postcondition recalculée)~; chaque état hérité~; la table
+branches produites, postcondition recalculée)~; le débordement corrigé le
+20/11/2026 (deux segments, deux âges, part du second à 60~ans de l'ordre
+de $10^{-308}$, puis dénormalisée~: la première exerce l'ordre des
+produits, la seconde le repli), par \code{calculer\_homogeneite()} dans
+les deux ordres des segments~: branches produites, à $10^{-10}$ d'un
+recalcul indépendant à deux segments, et à $10^{-4}$ d'une valeur
+calculée en arithmétique décimale par \code{actuary}~; chaque état hérité~; la table
 à 0~ligne~; le signal de part et d'autre du seuil sur chaque branche, son
 nombre et son message~; les textes du rapport. \textbf{Contrôle exact sans
 aléa} (critère~3)~: deux segments, strate unique, $O \sim
@@ -15813,8 +15884,10 @@ sont en état \code{produite}, loin de ce seuil, et leurs $\theta_{80}$
 sont restés identiques au bit près (mesure de l'audit de la reprise)~;
 il n'a donc pas été refait. La correction du calcul de $\theta_{80}$ du
 19/11/2026 ne peut toucher que l'identité, les tirages reposant sur la
-forme close du script~: remesurée sur le code corrigé, l'identité reste
-tenue, les huit cellules étant à l'état \code{produite}.\par}
+forme close du script~: remesurée par \code{docwriter} le 20/11/2026
+sur le code du commit \code{25f8d54}, qui inclut la correction du même
+jour (même script, copie de l'arbre), l'identité reste tenue, les huit
+cellules étant à l'état \code{produite}.\par}
 
 \subsection{Étape \code{coherence\_regularite}~: cohérence des taux et régularité}
 \label{sec:coherence-regularite}
