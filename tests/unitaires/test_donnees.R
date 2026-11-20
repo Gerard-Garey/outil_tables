@@ -1945,6 +1945,59 @@ x <- refus(pt(cbind(F1, sortie = D(c("2030-01-01", "2030-01-01")))))
 verifier("colonne présente deux fois dans les données : refus colonne_ambigue, message nomme colonne et rôle",
          identical(x$motif, "colonne_ambigue") && isTRUE(contient(x, "sortie", "date_sortie")))
 
+# Nom de colonne NA (#321 ; spécification d'actuary, Q2) : un rôle ne pouvant
+# valoir NA (roles_mal_formes), une colonne nommée NA est toujours hors rôle ;
+# comme un nom vide ou en double hors rôle, elle est admise et jamais lue (avant
+# #321 : refus colonne_ambigue citant sept rôles « NA », mesuré). Seul
+# lignes_conservees (l'entrée recopiée) diffère du témoin, par ce nom. Une colonne
+# de rôle nommée NA est une colonne absente ; une vraie colonne de rôle en double
+# reste refusée, sans « NA » dans le refus. Contre-épreuve : les cas 1 et 3
+# échouent sur le code antérieur.
+local({
+  PLAN <- list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = "entree_manquante"),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  PLAN0 <- PLAN; PLAN0$etapes$donnees$exclusions <- character(0)
+  B1 <- BASE; B1$entree[2L] <- as.Date(NA)  # une ligne exclue (entree_manquante)
+  avertissements <- function(expr) {
+    n <- 0L
+    withCallingHandlers(force(expr), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    n
+  }
+  nom_na <- function(d, nom) { names(d)[names(d) == nom] <- NA_character_; d }
+  for (cfg in list(list("sans exclusion", BASE, PLAN0), list("avec une exclusion (entree_manquante)", B1, PLAN))) {
+    d <- cfg[[2L]]; plan <- cfg[[3L]]
+    dn <- nom_na(d, "autre_colonne")
+    verifier(sprintf("#321 %s : colonne hors rôle nommée NA : construction admise sans erreur ni avertissement R, étapes identiques au témoin hors lignes_conservees, lignes_conservees identique au témoin au nom NA près, empreintes de données et de résultat du témoin", cfg[[1L]]), {
+      x <- tryCatch(construire_table(dn, ROLES, plan), error = function(e) e)
+      if (inherits(x, "error")) return(if (inherits(x, "refus_tablexp")) paste(x$motif, conditionMessage(x)) else conditionMessage(x))
+      x0 <- construire_table(d, ROLES, plan)
+      lc <- x$etapes$donnees$resultat$lignes_conservees
+      e <- x$etapes; e0 <- x0$etapes
+      e$donnees$resultat$lignes_conservees <- NULL; e0$donnees$resultat$lignes_conservees <- NULL
+      if (!identical(names(lc), c(names(d)[1:7], NA_character_))) "noms de lignes_conservees : le nom NA doit être recopié"
+      else if (!identical(setNames(lc, names(d)), x0$etapes$donnees$resultat$lignes_conservees)) "lignes_conservees différentes du témoin au nom NA près"
+      else if (!identical(e, e0)) "étapes différentes du témoin"
+      else if (!identical(x$fiche$empreintes$donnees, x0$fiche$empreintes$donnees) ||
+               !identical(x$fiche$empreintes$resultat, x0$fiche$empreintes$resultat)) "empreintes différentes du témoin"
+      else if (avertissements(construire_table(dn, ROLES, plan)) != 0L) "avertissement R"
+      else TRUE
+    })
+    x <- refus(construire_table(nom_na(d, "sexe"), ROLES, plan))
+    verifier(sprintf("#321 %s : colonne de rôle sexe nommée NA : refus colonne_absente, message et details exacts (rôle sexe, colonne sexe), aucun NA", cfg[[1L]]),
+             identical(x$motif, "colonne_absente") &&
+               identical(conditionMessage(x), "Colonne absente des données : « sexe » (rôle « sexe »).") &&
+               identical(x$details, list(role = "sexe", colonne = "sexe")))
+    x <- refus(construire_table(cbind(dn, sortie = d$sortie), ROLES, plan))
+    verifier(sprintf("#321 %s : colonne de rôle en double (sortie) en présence d'un nom NA : refus colonne_ambigue, message et details exacts (le seul rôle date_sortie, aucun NA)", cfg[[1L]]),
+             identical(x$motif, "colonne_ambigue") &&
+               identical(conditionMessage(x), "Colonne présente plusieurs fois sous le même nom dans les données : « sortie » (rôle « date_sortie »).") &&
+               identical(x$details, list(role = "date_sortie", colonne = "sortie")))
+  }
+})
+
 # Constat m2 : étendue des dates hors de la précision de la fusion.
 d <- tete("1950-01-01", c("2016-01-01", "2017-01-01"), c("2018-01-01", "2018-01-01"), c("rachat", "terme"))
 d$sortie[1] <- structure(5e15, class = "Date")

@@ -812,7 +812,10 @@ controler_roles <- function(donnees, roles, segmentation) {
             formuler("Colonne absente des données : %s (rôle %s).",
                      liste_guillemets(roles[absentes]), liste_guillemets(absentes)),
             list(role = absentes, colonne = unname(roles[absentes])))
-  ambigues <- r[vapply(roles, function(cl) sum(names(donnees) == cl) > 1L, logical(1L))]
+  # na.rm : un nom de colonne NA (hors rôle, puisqu'un rôle ne peut valoir NA,
+  # roles_mal_formes) rendrait la comparaison NA et citerait des rôles « NA »
+  # (#321) ; comme un nom vide ou en double hors rôle, il est admis et jamais lu.
+  ambigues <- r[vapply(roles, function(cl) sum(names(donnees) == cl, na.rm = TRUE) > 1L, logical(1L))]
   if (length(ambigues))
     refuser("donnees", "colonne_ambigue",
             formuler("Colonne présente plusieurs fois sous le même nom dans les données : %s (rôle %s).",
