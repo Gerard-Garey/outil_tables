@@ -15357,7 +15357,9 @@ p-valeur n'y est comparée à un niveau.
         la racine était représentable (constat de mesure d'\code{actuary}
         du 20/11/2026)~; au contraire, $\pi_{jc}\,|h_c| \le \pi_{sc} \le 1$
         puisque $\pi_{jc} \le a_c$. Sur les strates où $|h_c|$ lui-même
-        n'est pas représentable ($a_c$ dénormalisé), le produit est formé
+        n'est pas représentable (ce qui suppose $a_c <
+        \pi_{sc}/\mbox{\code{.Machine\$double.xmax}}$, soit $a_c$ dénormalisé et
+        inférieur à environ $5{,}6 \cdot 10^{-309}$), le produit est formé
         comme $(\pi_{jc}/n_c)\,m_c$, avec $m_c = \pi_{sc}(1 - e^{u})$ et
         $n_c = a_c + \pi_{sc}\,e^{u}$ le numérateur et le dénominateur de
         $|h_c|$~: chaque facteur est au plus~1 ($\pi_{jc} \le a_c \le
@@ -15367,10 +15369,10 @@ p-valeur n'y est comparée à un niveau.
         de calcul sont algébriquement égaux, non égaux au bit près~:
         l'identité au bit près des résultats n'est constatée que sur les
         dix-sept plans de référence~; ailleurs, $\theta_{80}$ peut se
-        déplacer de quelques unités d'arrondi, au plus
-        $1{,}7 \cdot 10^{-14}$ en relatif sur 3\,000 tirages adverses de
-        l'audit, sans changement d'état (approximation numérique, constat
-        de mesure de l'audit du 20/11/2026, rapporté).
+        déplacer dans ses derniers chiffres, sans changement d'état
+        (approximation numérique~; constat de mesure de l'audit du
+        20/11/2026, valeurs au commentaire 7037125377 de la PR~\#328, non
+        reproduites ici, E3.4).
       \item $L_s$ est factorisée en $M \operatorname{diag}(d) M^{\top}$,
         $M$ triangulaire inférieure unitaire de coefficients $M_{ki} =
         -\ell_{ki}$ ($k > i$), par une élimination sans soustraction (de type GTH), dans l'ordre
@@ -15454,22 +15456,24 @@ p-valeur n'y est comparée à un niveau.
     de mesure d'\code{actuary} et de \code{docwriter} du 20/11/2026, sur
     des jeux construits pour cela). (i)~Une racine très proche de~1
     (information très grande)~: deux segments de parts égales en strate
-    unique ne l'atteignent qu'à partir d'un total compris entre $2 \cdot
-    10^{17}$ (branches encore produites) et $3 \cdot 10^{17}$ décès dans
-    la strate, bien au-delà de ce que porte la
+    unique ne l'atteignent qu'à partir d'un total de l'ordre de
+    $10^{17}$ décès dans la strate (ordre de grandeur, constat de mesure
+    sur cas construits), bien au-delà de ce que porte la
     colonne des décès, entière ($2^{31} - 1$ au plus par ligne)~; le test
     global y reste exact~; un test unitaire exerce donc cette voie par
     appel direct de \code{ecart\_minimal\_homogeneite()}
     (\textbf{Vérifications}, ci-dessous). (ii)~Une racine non
     représentable en double précision~: limite finie, mais racine
-    au-delà du plus grand double (par exemple $\theta_{80}^{+}$ de l'ordre
-    de $10^{315}$ pour un segment de part d'exposition de l'ordre de
-    $10^{-318}$ dans une strate). (iii)~Une limite $\lambda_s(\pm\infty)$ qui
+    au-delà du plus grand double (par exemple $\theta_{80}^{+}$ au-delà de
+    $10^{308}$ pour une part d'exposition du segment de l'ordre de
+    $10^{-308}$, encore normalisée, dans une strate où la limite ne
+    dépasse le seuil que de peu~; avec une part dénormalisée, cette voie
+    se confond avec la voie~(iv)). (iii)~Une limite $\lambda_s(\pm\infty)$ qui
     dépasse la capacité des doubles par le quotient $b_i^2/d_i$ alors que
     la racine est représentable~: en strate unique, avec une part
     d'exposition du segment de l'ordre de $10^{-308}$ (exposition
-    déclarée, recette \code{agregats}), $\theta_{80}^{+}$, de l'ordre de
-    $10^{153}$, n'est pas calculé~; une limite infinie pourrait être
+    déclarée, recette \code{agregats}), $\theta_{80}^{+}$, pourtant
+    représentable, n'est pas calculé~; une limite infinie pourrait être
     comptée comme supérieure au seuil (issue~\#338). (iv)~Des parts
     d'exposition dénormalisées (inférieures à environ $2{,}2 \cdot
     10^{-308}$), dont la précision relative est perdue, si bien que la
@@ -15725,9 +15729,11 @@ dans ce cas, issue~\#335)~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
 branches produites, postcondition recalculée)~; le débordement corrigé le
-20/11/2026 (deux segments, deux âges, part du second à 60~ans de l'ordre
-de $10^{-308}$, puis dénormalisée~: la première exerce l'ordre des
-produits, la seconde le repli), par \code{calculer\_homogeneite()} dans
+20/11/2026 (deux segments, deux âges, part du second à 60~ans de
+$10^{-308}$ puis de $10^{-310}$, toutes deux dénormalisées~: à la
+première, $|h_c|$ en $-\infty$, d'environ $10^{308}$, reste
+représentable, et le cas exerce l'ordre des produits~; à la seconde, il
+ne l'est plus, et le cas exerce le repli), par \code{calculer\_homogeneite()} dans
 les deux ordres des segments~: branches produites, à $10^{-10}$ d'un
 recalcul indépendant à deux segments, et à $10^{-4}$ d'une valeur
 calculée en arithmétique décimale par \code{actuary}~; chaque état hérité~; la table
