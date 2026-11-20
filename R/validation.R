@@ -237,7 +237,23 @@ PHRASES_ATTENDUS_FAIBLES <- list(
 # statistique standardisée, ddl), non produite sous `ajustee_hors_outil`
 # (M254) ; les lignes `sous_groupes` décrivent resultat$sous_groupes.
 # Textes marqués UTF-8 (texte_moteur(), comme STATUTS_POSITIONNEMENT).
+# Mention d'indépendance des unités (#159), règle anti-doublon : la mention
+# (indep_tests, indep_int) s'ajoute ligne par ligne ci-dessous, en fin de
+# statut des seules lignes qui affirment une loi (intervalle, p-valeur, loi
+# de référence, espérance ou variance sous H0, niveau de Monte-Carlo ;
+# sous_groupes : avant la relation ajustee_hors_outil), jamais dans les
+# fragments exact_h0, mc ou chi2 ; les fragments collés par completer() (nc
+# de STATUTS_VALIDATION_POSITIONNEE, cpl de STATUTS_VALIDATION_LISSEE) ne
+# contiennent jamais le marqueur « unités d'observation indépendantes » ;
+# une table dérivée qui remplace une ligne de loi écrit sa propre mention.
+# Pas de mention sur les estimations ponctuelles, décomptes, descriptifs,
+# ddl, erreurs de Monte-Carlo ni sur les tests sous leurs hypothèses propres
+# (signes, suites, Wilcoxon).
 STATUTS_VALIDATION <- local({
+  indep_tests <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et les",
+                       "tests sont anti-conservateurs")
+  indep_int <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
+                     "l'intervalle est trop étroit")
   desc <- "descriptif : calcul direct sur les cellules retenues (C+), valeur en arithmétique flottante"
   exact_h0 <- paste("exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ;",
                     "fonctions de répartition de Poisson (ppois), approximation numérique")
@@ -265,27 +281,29 @@ STATUTS_VALIDATION <- local({
                     "(chaque séquence n'a qu'un signe, ou un résidu de chaque signe), p_exacte vaut 1")
   l <- list(
     c("residus", "au_dela_2", "FALSE", "descriptif : nombre de cellules retenues où |D - A| / sqrt(A) > 2"),
-    c("residus", "esperance_au_dela_2", "TRUE", paste(exact_h0, "; somme sur C+ de P(|D_c - A_c| > 2 sqrt(A_c))")),
+    c("residus", "esperance_au_dela_2", "TRUE", paste(exact_h0, "; somme sur C+ de P(|D_c - A_c| > 2 sqrt(A_c)) ;",
+                                                           indep_tests)),
     c("residus", "au_dela_3", "FALSE", "descriptif : nombre de cellules retenues où |D - A| / sqrt(A) > 3"),
-    c("residus", "esperance_au_dela_3", "TRUE", paste(exact_h0, "; somme sur C+ de P(|D_c - A_c| > 3 sqrt(A_c))")),
+    c("residus", "esperance_au_dela_3", "TRUE", paste(exact_h0, "; somme sur C+ de P(|D_c - A_c| > 3 sqrt(A_c)) ;",
+                                                           indep_tests)),
     c("khi2_pearson", "statistique", "FALSE", "descriptif : X2 = somme sur C+ de (D - A)^2 / A"),
     c("khi2_pearson", "ddl", "TRUE", "n - p : n cellules retenues, p paramètres estimés sur ces données (0)"),
     c("khi2_pearson", "variance_h0", "TRUE",
       paste("exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie : Var(X2) = somme sur C+",
             "de (2 + 1/A_c) (moments de Poisson d'ordre 4), à comparer à 2 (n - p), variance de la loi de référence",
-            "de khi2_pearson/p_asymptotique (les espérances sont égales) ; arithmétique flottante")),
+            "de khi2_pearson/p_asymptotique (les espérances sont égales) ; arithmétique flottante ;", indep_tests)),
     c("khi2_pearson", "p_asymptotique", "TRUE",
       paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe, E[X2] = n - p exactement mais",
             "Var(X2) = somme sur C+ de (2 + 1/A_c) > 2 (n - p) (moments de Poisson, résultat exact ;",
-            "khi2_pearson/variance_h0) ;", fin_x2)),
-    c("khi2_pearson", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure")),
+            "khi2_pearson/variance_h0) ;", fin_x2, ";", indep_tests)),
+    c("khi2_pearson", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure ;", indep_tests)),
     c("khi2_pearson", "erreur_monte_carlo", "TRUE", e_mc),
     c("deviance", "statistique", "FALSE",
       "descriptif : G2 = 2 somme sur C+ de [D ln(D / A) - (D - A)] (0 ln 0 = 0), rapport de vraisemblance"),
     c("deviance", "ddl", "TRUE", "n - p : n cellules retenues, p paramètres estimés sur ces données (0)"),
     c("deviance", "p_asymptotique", "TRUE",
-      paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe,", g2)),
-    c("deviance", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure")),
+      paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe,", g2, ";", indep_tests)),
+    c("deviance", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure ;", indep_tests)),
     c("deviance", "erreur_monte_carlo", "TRUE", e_mc),
     c("smr", "observes", "FALSE", "descriptif : O = somme de D sur C+"),
     c("smr", "attendus", "FALSE", "descriptif : A = somme de A_c sur C+"),
@@ -294,19 +312,21 @@ STATUTS_VALIDATION <- local({
     c("smr", "ecart", "FALSE", "descriptif : O - A"),
     c("smr", "borne_inf_exacte", "TRUE",
       paste("exact sous la loi supposée (O ~ Poisson, A fixe) : G_O^-1(alpha/2) / A, G_k loi gamma de forme k",
-            "(0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique")),
+            "(0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ;",
+            indep_int)),
     c("smr", "borne_sup_exacte", "TRUE",
       paste("exact sous la loi supposée (O ~ Poisson, A fixe) : G_(O+1)^-1(1 - alpha/2) / A ; couverture >= niveau",
-            "(intervalle exact conservatif) ; qgamma, approximation numérique")),
-    c("smr", "p_inferieure", "TRUE", paste(exact_h0, ": P(X <= O), X ~ Poisson(A)")),
-    c("smr", "p_superieure", "TRUE", paste(exact_h0, ": P(X >= O), X ~ Poisson(A)")),
-    c("smr", "p_centrale", "TRUE", paste(exact_h0, ": min(1, 2 min(P(X <= O), P(X >= O)))")),
+            "(intervalle exact conservatif) ; qgamma, approximation numérique ;", indep_int)),
+    c("smr", "p_inferieure", "TRUE", paste(exact_h0, ": P(X <= O), X ~ Poisson(A) ;", indep_tests)),
+    c("smr", "p_superieure", "TRUE", paste(exact_h0, ": P(X >= O), X ~ Poisson(A) ;", indep_tests)),
+    c("smr", "p_centrale", "TRUE", paste(exact_h0, ": min(1, 2 min(P(X <= O), P(X >= O))) ;",
+                                               indep_tests)),
     c("smr", "z_racine_cubique", "TRUE",
       paste("asymptotique : racine cubique corrigée, O >= A : z = 3 sqrt(O) (1 - 1/(9 O) - (A/O)^(1/3)) ;",
-            "O < A : O* = O + 1, z = 3 sqrt(O*) ((A/O*)^(1/3) + 1/(9 O*) - 1)")),
+            "O < A : O* = O + 1, z = 3 sqrt(O*) ((A/O*)^(1/3) + 1/(9 O*) - 1) ;", indep_tests)),
     c("smr", "p_racine_cubique", "TRUE",
       paste("asymptotique : 1 - Phi(z), approximation de la p-valeur unilatérale exacte dans le sens de l'écart",
-            "observé (P(X >= O) si O >= A, P(X <= O) sinon)")),
+            "observé (P(X >= O) si O >= A, P(X <= O) sinon) ;", indep_tests)),
     c("signes", "positifs", "FALSE", paste("descriptif : n+ = nombre de cellules retenues où D - A > 0", zero)),
     c("signes", "negatifs", "FALSE", paste("descriptif : n- = nombre de cellules retenues où D - A < 0", zero)),
     c("signes", "nuls", "FALSE",
@@ -317,9 +337,11 @@ STATUTS_VALIDATION <- local({
     c("signes", "p_asymptotique", "TRUE", paste("asymptotique sous", signes_h, ": min(1, 2 (1 - Phi(statistique)))")),
     c("signes", "p_exacte", "TRUE", paste("exacte sous", signes_h, ": loi binomiale (n, 1/2), p centrale ; pbinom")),
     c("signes", "esperance_positifs_h0", "TRUE",
-      paste(exact_h0, ": somme sur C+ de P(D_c - A_c > 1e-10 A_c), diagnostic de l'écart entre H0 (i) et", signes_h)),
+      paste(exact_h0, ": somme sur C+ de P(D_c - A_c > 1e-10 A_c), diagnostic de l'écart entre H0 (i) et", signes_h,
+            ";", indep_tests)),
     c("signes", "p_monte_carlo", "TRUE",
-      paste(mc, "; p centrale sur (n+ - n-) / sqrt(n), valeur 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé")),
+      paste(mc, "; p centrale sur (n+ - n-) / sqrt(n), valeur 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé",
+            ";", indep_tests)),
     c("signes", "erreur_monte_carlo", "TRUE", e_mc),
     c("runs", "sequences", "FALSE",
       paste("descriptif : nombre de séquences (segment x année), âges croissants, résidus nuls retirés", zero)),
@@ -336,7 +358,7 @@ STATUTS_VALIDATION <- local({
             "produite si la somme des n est au plus N_MAX_RUNS_EXACT")),
     c("runs", "p_monte_carlo", "TRUE",
       paste(mc, "; queue inférieure sur R ; statistique R non conditionnelle à (n+, n-) : sensible au déséquilibre",
-            "des signes comme au regroupement")),
+            "des signes comme au regroupement ;", indep_tests)),
     c("runs", "erreur_monte_carlo", "TRUE", e_mc),
     c("wilcoxon", "effectif", "FALSE",
       paste("descriptif : n = nombre de cellules retenues où la différence d = D / E^c - mu~ (= mu^ - mu~) est",
@@ -356,7 +378,7 @@ STATUTS_VALIDATION <- local({
       paste("loi exacte sous l'hypothèse de", wilc_h, "; psignrank, approximation numérique (écart relatif mesuré",
             "<= 1e-13) ; sans ex aequo et n <= N_MAX_WILCOXON_EXACT ; p centrale")),
     c("wilcoxon", "p_monte_carlo", "TRUE",
-      paste(mc, "; p centrale sur z, z = 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé")),
+      paste(mc, "; p centrale sur z, z = 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé ;", indep_tests)),
     c("wilcoxon", "erreur_monte_carlo", "TRUE", e_mc),
     c("mape", "valeur", "FALSE", "descriptif, fragile : 100 / m+ somme sur C+, D > 0, de |D - A| / D (m+ cellules)"),
     c("r2", "valeur", "FALSE",
@@ -366,22 +388,23 @@ STATUTS_VALIDATION <- local({
       "descriptif : somme sur C+ de |q^ - q~|, q^ = 1 - exp(-mu^) (échelle des probabilités)"),
     c("fluctuation", "hors_intervalle_exact", "TRUE",
       "nombre de cellules retenues où D est hors de [qpois(alpha/2, A), qpois(1 - alpha/2, A)]"),
-    c("fluctuation", "esperance_hors_intervalle_exact", "TRUE", paste(exact_h0, ": somme sur C+ de P(D_c hors intervalle)")),
+    c("fluctuation", "esperance_hors_intervalle_exact", "TRUE", paste(exact_h0, ": somme sur C+ de P(D_c hors intervalle) ;",
+                                                                                  indep_tests)),
     c("fluctuation", "hors_intervalle_asymptotique", "TRUE",
       "nombre de cellules retenues où D est hors de A +- z sqrt(A), z = qnorm(alpha/2, lower.tail = FALSE)"),
     c("fluctuation", "esperance_hors_intervalle_asymptotique", "TRUE",
-      paste(exact_h0, ": somme sur C+ de P(D_c hors de A +- z sqrt(A))")),
+      paste(exact_h0, ": somme sur C+ de P(D_c hors de A +- z sqrt(A)) ;", indep_tests)),
     c("sous_groupes", "smr", "FALSE", "résultat exact : O / A du sous-groupe (cellules retenues)"),
     c("sous_groupes", "bornes_exactes", "TRUE",
       paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
             "exactes sous la loi supposée, O ~ Poisson(A) avec A fixe : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A,",
             "G_k loi gamma de forme k (0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma,",
-            "approximation numérique ; relation ajustee_hors_outil : non produites, nombre p de paramètres estimés",
-            "non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
+            "approximation numérique ;", indep_int, "; relation ajustee_hors_outil : non produites, nombre p de",
+            "paramètres estimés non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
     c("sous_groupes", "p_valeurs", "TRUE",
       paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
             exact_h0, "; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de multiplicité ;",
-            ajustee_p)),
+            indep_tests, ";", ajustee_p)),
     c("sous_groupes", "p_valeurs_asymptotiques", "TRUE",
       paste("relation independante : non produites, la loi de Poisson exacte du sous-groupe étant toujours calculée",
             "(table prise telle quelle, nombre p de paramètres estimés sur ces données nul) ;", ajustee_p)))
@@ -1831,8 +1854,67 @@ REFERENCE_METHODE_HOMOGENEITE <- texte_moteur(paste(
   "degrés de liberté pris au rang de V (K - 1 dans la source), tests par tranche d'âge et leur somme, p-valeur",
   "exacte bilatérale à deux groupes et p-valeur de Monte-Carlo conditionnelle, absents de la source"))
 
+# Écart minimal détectable par segment du test global (#218, E2.15 ;
+# spécification d'actuary-approfondi, commentaire 7012205013 ; avis de forme
+# F218, M545, D4 (a)) : conventions du package (niveau du test, puissance
+# visée, seuil du signal ecart_minimal_detectable), restituées dans les
+# paramètres de l'étape ; ce ne sont pas des paramètres du plan (format du
+# plan et VERSION_FICHE inchangés). Seuil : décision du mainteneur du
+# 11/11/2026, convention sans source chiffrée.
+NIVEAU_ECART_MINIMAL <- 0.05
+PUISSANCE_ECART_MINIMAL <- 0.80
+SEUIL_ECART_MINIMAL <- 1.25
+# États d'une branche de resultat$ecart_minimal, par priorité : état du test
+# global s'il n'est pas produit (evenement_sans_exposition,
+# moins_de_deux_segments_informatifs) ; sinon état de la ligne globale du
+# segment dans resultat$segments s'il n'est pas produit
+# (segment_sans_exposition, variance_nulle ; evenement_sans_exposition) ;
+# sinon produite, non_atteint quand la limite de lambda_s(theta) au bout de
+# la branche reste au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL), ou
+# precision_insuffisante quand la racine n'est pas représentable en double
+# précision à cette tolérance (pivot de l'élimination ou limite non finie,
+# postcondition non tenue ; décision du mainteneur du 19/11/2026, (b) ; aucun
+# signal). Valeur NA hors de l'état produite.
+ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "precision_insuffisante",
+                                     "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
+                                     "segment_sans_exposition", "variance_nulle")
+# Postcondition de la résolution : |lambda_s(theta_80) / lambda_80 - 1| au
+# plus cette valeur (identité du critère 2 de #218), sinon état
+# precision_insuffisante.
+TOLERANCE_ECART_MINIMAL <- 1e-8
+# Statut des deux branches de theta_80 (spécification, § 7 ; clause
+# d'indépendance, Q3) : un gabarit, quatre substitutions d'une branche à
+# l'autre.
+statut_ecart_minimal <- function(superieur) {
+  paste("approximation asymptotique :", if (superieur) "plus petit theta > 1" else "plus grand theta < 1",
+        "tel que lambda_s(theta) >= lambda_80, theta multipliant la force du seul segment s dans chaque cellule ;",
+        "lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme sur les strates informatives",
+        "du test global de D_.c (p_c(theta) - pi_c), p_jc(theta) = pi_jc w_j / somme sur k de pi_kc w_k, w_s =",
+        "theta, w_j = 1 sinon : espérance exacte de U sachant les D_.c sous le modèle de Poisson à exposition tenue",
+        "pour fixe ; V variance de U sous H0 (celle du test global) ; lambda_s(theta) strictement monotone sur",
+        "chaque branche (exact), racine unique ; lambda_80 : non-centralité pour laquelle la loi du khi-deux non",
+        "centrale à ddl degrés de liberté (ddl du test global) dépasse le quantile d'ordre 1 - niveau_ecart_minimal",
+        "de la loi centrale avec la probabilité puissance_ecart_minimal (conventions) ; la variance de U sous",
+        "l'alternative diffère de V : à deux segments en strate unique, en",
+        "approximation normale, la puissance réelle en theta_80 s'écarte de puissance_ecart_minimal de 0,03 au plus",
+        if (superieur) "quand theta_80 est au plus seuil_ecart_minimal,"
+        else "quand theta_80 est au moins 1/seuil_ecart_minimal,",
+        "davantage au-delà, et",
+        if (superieur) "la valeur est optimiste pour un segment minoritaire (theta_80 réel plus éloigné de 1) ;"
+        else "la valeur est prudente pour un segment minoritaire (theta_80 réel plus proche de 1) ;",
+        "au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80 (pchisq",
+        "non centrale) et theta_80 (uniroot en log theta, lambda_s calculée sans soustraction) par résolution",
+        "numérique : approximation numérique ; état non_atteint (NA) quand lambda_s(theta) reste au plus",
+        "lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
+        if (superieur) "lorsque theta tend vers l'infini ;" else "lorsque theta tend vers 0 ;",
+        "état precision_insuffisante (NA) quand la racine n'est pas représentable en double précision à cette",
+        "tolérance ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
+        "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
+}
+
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
-# segments) ; spécification de #168, § 4.
+# segments, ecart_minimal) ; spécification de #168, § 4 ; deux lignes de
+# ecart_minimal en fin (#218, spécification, § 7).
 STATUTS_HOMOGENEITE <- local({
   ind <- INDEPENDANCE_HOMOGENEITE
   l <- list(
@@ -1886,7 +1968,9 @@ STATUTS_HOMOGENEITE <- local({
     c("segments", "z",
       paste("z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous",
             "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ;",
-            "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;", ind)))
+            "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;", ind)),
+    c("ecart_minimal", "theta_80_superieur", statut_ecart_minimal(TRUE)),
+    c("ecart_minimal", "theta_80_inferieur", statut_ecart_minimal(FALSE)))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
                           statut = vapply(l, `[`, "", 3L), stringsAsFactors = FALSE))
 })
@@ -1935,8 +2019,11 @@ somme_par <- function(x, i, n) {
 # utilisee (logique par ligne), presents, garde, ddl, strates_informatives,
 # statistique (fonction d'une matrice de décès des lignes utilisées, une
 # colonne par jeu ; observé et répliques passent par elle), t (observée),
-# poids, strate_tirage, effectifs (pour les réplications), exacte (list(n,
-# p, o, a) quand deux groupes seulement sont comparés, NULL sinon)).
+# poids, strate_tirage, effectifs (pour les réplications), groupe_utilise
+# (groupe de chaque ligne utilisée) et composante (racine de la composante
+# connexe de chaque groupe 1..G, lui-même pour un groupe absent), pour
+# l'écart minimal détectable (#218), exacte (list(n, p, o, a) quand deux groupes seulement sont comparés, NULL
+# sinon)).
 score_homogeneite <- function(D, E, strate, groupe, K, G) {
   D <- as.numeric(D)
   Ds <- somme_par(D, strate, K)
@@ -1978,7 +2065,8 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
   list(O = somme_par(D, groupe, G), A = somme_par(Ar, groupe, G), U = somme_par(Du - Au, gu, G), v = diag(V),
        utilisee = u, presents = presents, garde = garde, ddl = ddl, strates_informatives = length(si),
        statistique = statistique, t = if (ddl) statistique(matrix(Du, ncol = 1L)) else NA_real_,
-       poids = E[u], strate_tirage = ru, effectifs = Ds[si], exacte = exacte)
+       poids = E[u], strate_tirage = ru, effectifs = Ds[si], groupe_utilise = gu,
+       composante = vapply(seq_len(G), racine, 0L), exacte = exacte)
 }
 
 # p-valeur exacte d'un test produit (score_homogeneite()) : deux groupes
@@ -1998,6 +2086,155 @@ p_exacte_homogeneite <- function(sc) {
   list(p = min(1, sum(loi[ext])), etat = "produite")
 }
 
+# Non-centralité lambda_80 (#218, spécification, § 2) : P(khi2_ddl(lambda) >
+# quantile d'ordre 1 - niveau de khi2_ddl) = puissance ; uniroot sur
+# [0 ; haut], haut trouvé par doublement à partir de 1 (approximation
+# numérique).
+non_centralite_ecart_minimal <- function(ddl, niveau = NIVEAU_ECART_MINIMAL, puissance = PUISSANCE_ECART_MINIMAL) {
+  q <- stats::qchisq(1 - niveau, ddl)
+  f <- function(l) stats::pchisq(q, ddl, ncp = l, lower.tail = FALSE) - puissance
+  haut <- 1
+  while (f(haut) <= 0) haut <- 2 * haut
+  stats::uniroot(f, c(0, haut), tol = 1e-13)$root
+}
+
+# Écart minimal détectable par segment du test global (#218 ; E2.15 ;
+# spécification d'actuary-approfondi, commentaire 7012205013, § 2 et 4 ;
+# avis de forme F218 ; correction du 19/11/2026, constat C1 de la revue
+# finale de B30 : décisions du mainteneur du 19/11/2026, (a) clause « un seul
+# système réduit » levée pour theta_80, (b) état precision_insuffisante).
+# sc : objet de score_homogeneite() du test global ; etat_test : état du test
+# global ; etats_segments : états des lignes globales de resultat$segments
+# (un par segment, 1..S). V est celle du test global ; pour chaque segment s
+# produit, s est la référence dans sa composante connexe C(s) (aucun ordre
+# des segments ni référence du test global n'intervient) :
+#   delta_j(theta) = -somme_c D_.c pi_jc h_c(theta), j dans C(s) \ {s}, de
+#   même signe sur une branche ; lambda_s = b' L_s^-1 b, b_j = somme_c D_.c
+#   pi_jc |h_c|, L_s = V restreinte à C(s) \ {s} (identité exacte avec
+#   delta' V^- delta) ;
+#   |h_c| en u = log theta sans soustraction, a_c = somme des E_kc (k != s) /
+#   E_.c (jamais 1 - pi_sc) : pi_sc (-expm1(-u)) / (a_c e^-u + pi_sc) si
+#   u >= 0, pi_sc (-expm1(u)) / (a_c + pi_sc e^u) sinon ; 0 si pi_sc = 0 ou
+#   a_c = 0 (strate où s est seul exposé, sur plusieurs lignes : aucun autre
+#   segment n'y porte de terme, b_j n'en reçoit rien ; sinon 1/0 en
+#   -infini) ;
+#   limites exactes par les mêmes formules (1 en +infini, pi_sc / a_c en
+#   -infini) ;
+#   L_s = M diag(d) M' par élimination sans soustraction (type GTH), dans
+#   l'ordre croissant des indices de C(s) \ {s}, sur w_jk = somme_c D_.c pi_jc
+#   pi_kc et r_j = w_js : pivot d_i = somme_{k > i} w_ik + r_i, L[k, i] = w_ki
+#   / d_i, w_kl += L[k, i] w_il, r_k += L[k, i] r_i ; évaluation : b_k +=
+#   L[k, i] b_i, lambda_s = somme b_i^2 / d_i ; seulement +, x et / sur des
+#   positifs ; factorisation une fois par segment.
+# Par branche : precision_insuffisante si un pivot n'est pas fini et > 0 ou
+# si la limite lambda_s(+-infini) n'est pas finie ; sinon non_atteint si la
+# limite est au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL) ; sinon racine
+# en u (uniroot, tolérance .Machine$double.eps) sur [h/2 (ou 0) ; h] (au
+# signe de la branche), h doublé depuis 1 tant que lambda_s(h) <= lambda_80
+# et h < 1024
+# (lambda_s(+-1024) = lambda_s(+-infini) exactement : exp(-1024) vaut 0 en
+# double) ; theta = exp(u) ; postcondition : theta fini, > 0, différent de 1,
+# |lambda_s(log theta) / lambda_80 - 1| <= TOLERANCE_ECART_MINIMAL, sinon
+# precision_insuffisante. Rend list(superieur, etat_superieur, inferieur,
+# etat_inferieur, lambda_80), vecteurs de longueur S (lambda_80 : NA si le
+# test global n'est pas produit).
+ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
+  sup <- rep(NA_real_, S); inf <- rep(NA_real_, S)
+  e_sup <- rep(etat_test, S); e_inf <- rep(etat_test, S)
+  if (!identical(etat_test, "produite"))
+    return(list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf,
+                lambda_80 = NA_real_))
+  e_sup <- etats_segments; e_inf <- etats_segments
+  lam80 <- non_centralite_ecart_minimal(sc$ddl)
+  # non_atteint quand la limite reste au plus lambda_80 (1 +
+  # TOLERANCE_ECART_MINIMAL) : seuil inclusif, à la tolérance relative de la
+  # résolution (règle d'actuary, reprise de l'audit, M1).
+  seuil <- lam80 * (1 + TOLERANCE_ECART_MINIMAL)
+  ru <- sc$strate_tirage; gu <- sc$groupe_utilise
+  n <- length(sc$effectifs)
+  Ec <- somme_par(sc$poids, ru, n)
+  # P[c, j] = pi_jc (strates informatives x groupes), cumulé par (strate,
+  # segment) : un segment peut occuper plusieurs lignes d'une cellule (somme
+  # des parts, sans soustraction ; constat C-R1 de l'audit, décision du
+  # mainteneur du 20/11/2026, (a)) ; W[j, k] = w_jk.
+  P <- matrix(somme_par(sc$poids / Ec[ru], ru + n * (gu - 1L), n * S), n, S)
+  W0 <- crossprod(P, P * sc$effectifs)
+  diag(W0) <- 0
+  for (s in which(etats_segments == "produite")) {
+    dans_s <- gu == s
+    pis <- somme_par(sc$poids[dans_s], ru[dans_s], n) / Ec
+    autres <- somme_par(sc$poids[!dans_s], ru[!dans_s], n) / Ec
+    k_s <- pis > 0 & autres > 0
+    # M[c, j] |h_c| (M = Pg, pi_jc des segments éliminés), |h_c| =
+    # num_c / den_c, sans soustraction. |h_c| <= 1 en u >= 0 ; en u < 0, il
+    # atteint pi_sc / a_c en -infini, environ 1e308 pour a_c voisin de
+    # 1e-308, et déborde pour a_c dénormalisé plus petit. Le produit par D_c
+    # vient en dernier (crossprod) : l'ancienne forme D_c |h_c| débordait dès
+    # que ce produit dépassait le plus grand double, alors que M[c, j] |h_c|
+    # <= pi_sc <= 1 puisque pi_jc <= a_c. Sur les lignes où |h_c| n'est pas
+    # représentable, M / den est formé d'abord (<= 1, pi_jc <= a_c <= den_c),
+    # puis multiplié par num_c <= pi_sc ; ailleurs M * |h_c| (C1 d'actuary,
+    # décision du mainteneur du 20/11/2026, (b)).
+    h_pond <- function(u, M) {
+      num <- numeric(n); den <- rep(1, n)
+      if (u >= 0) {
+        num[k_s] <- -pis[k_s] * expm1(-u); den[k_s] <- autres[k_s] * exp(-u) + pis[k_s]
+      } else {
+        num[k_s] <- -pis[k_s] * expm1(u); den[k_s] <- autres[k_s] + pis[k_s] * exp(u)
+      }
+      h <- num / den
+      Q <- M * h
+      hors <- !is.finite(h)
+      if (any(hors)) Q[hors, ] <- M[hors, , drop = FALSE] / den[hors] * num[hors]
+      Q
+    }
+    # Élimination sur C(s) \ {s}, ordre croissant des indices.
+    garde <- setdiff(sc$presents[sc$composante[sc$presents] == sc$composante[s]], s)
+    m <- length(garde)
+    W <- W0[garde, garde, drop = FALSE]
+    r <- W0[garde, s]
+    d <- numeric(m)
+    L <- matrix(0, m, m)
+    for (i in seq_len(m)) {
+      k <- seq_len(m)[-seq_len(i)]
+      d[i] <- sum(W[i, k]) + r[i]
+      if (length(k)) {
+        L[k, i] <- W[k, i] / d[i]
+        W[k, k] <- W[k, k] + outer(L[k, i], W[i, k])
+        r[k] <- r[k] + L[k, i] * r[i]
+      }
+    }
+    Pg <- P[, garde, drop = FALSE]
+    lambda <- function(u) {
+      b <- drop(crossprod(h_pond(u, Pg), sc$effectifs))
+      for (i in seq_len(m)) {
+        k <- seq_len(m)[-seq_len(i)]
+        b[k] <- b[k] + L[k, i] * b[i]
+      }
+      sum(b * b / d)
+    }
+    pivots <- all(is.finite(d) & d > 0)
+    # Une branche : signe 1 (theta > 1) ou -1 (theta < 1).
+    branche <- function(signe) {
+      limite <- lambda(signe * Inf)
+      if (!pivots || !is.finite(limite)) return(list(theta = NA_real_, etat = "precision_insuffisante"))
+      if (limite <= seuil) return(list(theta = NA_real_, etat = "non_atteint"))
+      haut <- 1
+      while (lambda(signe * haut) <= lam80 && haut < 1024) haut <- 2 * haut
+      bornes <- signe * c(if (haut > 1) haut / 2 else 0, haut)
+      u <- stats::uniroot(function(u) lambda(u) - lam80, sort(bornes), tol = .Machine$double.eps)$root
+      theta <- exp(u)
+      if (!is.finite(theta) || theta <= 0 || theta == 1 ||
+          !isTRUE(abs(lambda(log(theta)) / lam80 - 1) <= TOLERANCE_ECART_MINIMAL))
+        return(list(theta = NA_real_, etat = "precision_insuffisante"))
+      list(theta = theta, etat = "produite")
+    }
+    b_sup <- branche(1); sup[s] <- b_sup$theta; e_sup[s] <- b_sup$etat
+    b_inf <- branche(-1); inf[s] <- b_inf$theta; e_inf[s] <- b_inf$etat
+  }
+  list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf, lambda_80 = lam80)
+}
+
 # Étape `homogeneite` du plan (#168).
 #   exposition    : table de l'étape `exposition`
 #                   (etapes$exposition$resultat$exposition) ;
@@ -2015,9 +2252,11 @@ p_exacte_homogeneite <- function(sc) {
 # = somme des ddl) ; si la segmentation a deux variables, chaque variable
 # conditionnellement à l'autre. Un jeu de réplications pour global, tranches
 # et somme ; un par test par variable ; aucun tirage sans test produit.
+# Écart minimal détectable par segment du test global (#218) : table
+# ecart_minimal, une ligne par segment, et signal ecart_minimal_detectable.
 # Aucun contrôle (#82) : valider_plan() a contrôlé les paramètres. Rend
-# list(parametres, resultat (tests, segments, monte_carlo), diagnostics,
-# avertissements).
+# list(parametres, resultat (tests, segments, ecart_minimal, monte_carlo),
+# diagnostics, avertissements).
 calculer_homogeneite <- function(exposition, segmentation, par_annee, convention, plage_ages, tranches_age,
                                  replications, graine) {
   manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
@@ -2189,6 +2428,16 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   seg <- c(list(portee("global", na_i, na_i, sc_g, rep(TRUE, nrow(ex)), toute_faute)),
            lapply(seq_len(nb), function(b) portee("tranche", tranches_age[b], fin_tranche[b], sc_b[[b]], tranche == b,
                                                   tranche_fautive[b])))
+  # Écart minimal détectable (#218 ; F218) : une ligne par segment du test
+  # global, dans l'ordre des lignes globales de seg ; V du test global (sc_g),
+  # chaque segment pris pour référence dans sa composante (décision du
+  # mainteneur du 19/11/2026, (a)).
+  em_calc <- ecart_minimal_homogeneite(sc_g, e_g, seg[[1L]]$etat, S)
+  em <- segments
+  em$theta_80_superieur <- em_calc$superieur
+  em$etat_superieur <- em_calc$etat_superieur
+  em$theta_80_inferieur <- em_calc$inferieur
+  em$etat_inferieur <- em_calc$etat_inferieur
   seg <- do.call(rbind, seg)
   rownames(seg) <- NULL
 
@@ -2215,12 +2464,36 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
                                    "qui les contiennent non produits (état evenement_sans_exposition)."),
                              sum(fautive), ev_fautives),
                      sum(fautive))
+  # Signal (#218, spécification, § 6) : segments dont une branche produite
+  # dépasse le seuil (theta_80_superieur > seuil, theta_80_inferieur <
+  # 1/seuil) ou dont une branche est non_atteint ; aucun signal hors des
+  # états produite et non_atteint (precision_insuffisante compris :
+  # décision du mainteneur du 19/11/2026, (b)). Avertissement, jamais un
+  # refus.
+  signale <- (em$etat_superieur == "produite" & em$theta_80_superieur > SEUIL_ECART_MINIMAL) |
+    (em$etat_inferieur == "produite" & em$theta_80_inferieur < 1 / SEUIL_ECART_MINIMAL) |
+    em$etat_superieur == "non_atteint" | em$etat_inferieur == "non_atteint"
+  if (any(signale)) {
+    virgule <- function(x) formatC(x, format = "f", digits = 2, decimal.mark = ",")
+    avert <- avertir(avert, "homogeneite", "ecart_minimal_detectable",
+                     sprintf(paste("Homogénéité : %d segment(s) pour lesquels le test global n'atteint pas la puissance %s",
+                                   "au niveau %s face à un écart de force d'un facteur %s ou 1/%s (theta_80_superieur >",
+                                   "%s, theta_80_inferieur < 1/%s ou branche non_atteint ;",
+                                   "etapes/homogeneite/resultat/ecart_minimal) : approximation asymptotique, seuil",
+                                   "conventionnel ; avertissement, ni refus ni verdict."),
+                             sum(signale), virgule(PUISSANCE_ECART_MINIMAL), virgule(NIVEAU_ECART_MINIMAL),
+                             virgule(SEUIL_ECART_MINIMAL), virgule(SEUIL_ECART_MINIMAL), virgule(SEUIL_ECART_MINIMAL),
+                             virgule(SEUIL_ECART_MINIMAL)),
+                     sum(signale))
+  }
   list(parametres = list(plage_ages = plage_ages, tranches_age = tranches_age, replications = replications,
-                         convention = convention, hypothese_nulle = HYPOTHESE_HOMOGENEITE,
+                         convention = convention, niveau_ecart_minimal = NIVEAU_ECART_MINIMAL,
+                         puissance_ecart_minimal = PUISSANCE_ECART_MINIMAL,
+                         seuil_ecart_minimal = SEUIL_ECART_MINIMAL, hypothese_nulle = HYPOTHESE_HOMOGENEITE,
                          statuts = STATUTS_HOMOGENEITE, reference_methode = REFERENCE_METHODE_HOMOGENEITE),
        # Tirages effectués par jeu en integer (#199), bornés par replications
        # (au plus .Machine$integer.max, contrôlé par controler_replications()).
-       resultat = list(tests = tests, segments = seg,
+       resultat = list(tests = tests, segments = seg, ecart_minimal = em,
                        monte_carlo = list(replications = replications, graine = graine,
                                           jeux = data.frame(jeu = names(jeux),
                                                             tirages_effectues = as.integer(unlist(jeux,
@@ -2708,7 +2981,11 @@ ETATS_IMPORTANCE <- texte_moteur(data.frame(
               "non calculable : contrat_duplique_unite_contrat", "non calculable : ddl_non_etabli"),
   stringsAsFactors = FALSE))
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat.
+# Mention d'indépendance des unités (#159) sur les seules lignes de loi
+# (bornes, rapport_variance), même règle que STATUTS_VALIDATION.
 STATUTS_IMPORTANCE <- local({
+  indep_int <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
+                     "l'intervalle est trop étroit")
   l <- list(
     c("volumes", "lignes", paste("décompte exact ; identité lignes_recues = lignes_conservees + lignes_exclues",
                                  "vérifiée")),
@@ -2743,12 +3020,13 @@ STATUTS_IMPORTANCE <- local({
             "l'année si par_annee), pas sur le segment")),
     c("smr_comparateur_1", "bornes_exactes",
       paste("exact sous D_e ~ Poisson(theta A), A tenu pour fixe ; le comparateur est estimé : la couverture n'est",
-            "pas garantie ; qgamma, approximation numérique")),
+            "pas garantie ; qgamma, approximation numérique ;", indep_int)),
     c("smr_comparateur_1", "bornes_asymptotiques",
-      "asymptotique : normal sur l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0"),
+      paste("asymptotique : normal sur l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0 ;", indep_int)),
     c("smr_comparateur_1", "rapport_variance",
       paste("somme E^c_e^2 mu^_r / E^c_r / A : estimation par substitution de Var(A^) / E(D_e) ; Var(A^) exacte sous",
-            "Poisson à mu connu, E^c fixe")),
+            "Poisson à mu connu, E^c fixe ; unités d'observation indépendantes ; sous l'unité contrat, les décès",
+            "sont sur-dispersés et Var(A^) est sous-estimée")),
     c("smr_comparateur_1", "sans_exposition_retenue",
       "cellules retirées sans exposition retenue (E^c_r = 0) : D_e et E^c_e restitués à part, hors du SMR"),
     c("smr_comparateur_2", "smr",
@@ -2761,8 +3039,8 @@ STATUTS_IMPORTANCE <- local({
     c("smr_comparateur_2", "bornes",
       paste("relation independante : bornes exactes, exact sous D_e ~ Poisson(theta A), A connu (table, E^c",
             "tenue pour fixe), qgamma, approximation numérique ; bornes asymptotiques, asymptotique (normal sur",
-            "l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0) ; relation ajustee_hors_outil :",
-            "valeurs ponctuelles seules, bornes non produites (ddl_non_etabli)")),
+            "l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0) ;", indep_int, "; relation",
+            "ajustee_hors_outil : valeurs ponctuelles seules, bornes non produites (ddl_non_etabli)")),
     c("smr_comparateur_2", "conserves",
       paste("SMR des lignes conservées de l'étape validation (etapes/validation/resultat/statistiques, smr),",
             "côte à côte, sans rapport entre eux")))

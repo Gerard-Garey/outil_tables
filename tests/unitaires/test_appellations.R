@@ -31,20 +31,28 @@ egal <- function(obtenu, attendu)
 # --- 1. littéraux de STATUTS_BRUT ----------------------------------------------
 
 Z_TEXTE <- "z = qnorm(alpha/2, lower.tail = FALSE)"
+# Mention d'indépendance des unités en fin de statut des lignes de loi (#159 ;
+# spécification d'actuary-approfondi, #159, commentaire 7012174895).
+M_BRUT_INTERVALLE <- paste(
+  "unités d'observation indépendantes ; sous l'unité contrat, les contrats d'une même tête sont supposés",
+  "indépendants (une dépendance positive rend l'intervalle trop étroit ; relevé tetes_multi_contrats de",
+  "l'étape donnees)")
+M_INTERVALLE <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
+                      "l'intervalle est trop étroit")
 verifier("STATUTS_BRUT (littéral de la spécification) : statut du binomial exact (ligne 8), condition « cellule observée entière »", {
   l <- ligne_brut("binomial", "taux", "exact")
   if (!identical(rownames(l), "8")) "ligne 8 absente" else
     (egal(l$statut, paste(
       "exact sous la loi supposée pour une cellule observée entière (sans entrée ni censure, E^i entier) ;",
       "avec une entrée ou une censure dans la cellule, couverture non établie, même si E^i est entier",
-      "(prolongement continu de la formule exacte si E^i n'est pas entier)")))
+      "(prolongement continu de la formule exacte si E^i n'est pas entier) ;", M_BRUT_INTERVALLE)))
 })
 verifier("STATUTS_BRUT (littéral de la spécification) : statut du binomial asymptotique (ligne 9), condition « cellule observée entière »", {
   l <- ligne_brut("binomial", "taux", "asymptotique")
   if (!identical(rownames(l), "9")) "ligne 9 absente" else
     (egal(l$statut, paste(
       "asymptotique (E^i q(1-q) -> infini) pour une cellule observée entière ; avec une entrée ou une",
-      "censure dans la cellule, couverture non établie ; non défini à D = 0 et à D = E^i")))
+      "censure dans la cellule, couverture non établie ; non défini à D = 0 et à D = E^i ;", M_BRUT_INTERVALLE)))
 })
 verifier("STATUTS_BRUT (littéral de la spécification) : calcul du Poisson asymptotique (ligne 3), « normal sur l'échelle de log mu »", {
   l <- ligne_brut("poisson", "taux", "asymptotique")
@@ -69,13 +77,14 @@ statut_importance <- function(table, grandeur)
   STATUTS_IMPORTANCE$statut[STATUTS_IMPORTANCE$table == table & STATUTS_IMPORTANCE$grandeur == grandeur]
 verifier("STATUTS_IMPORTANCE (littéral de la spécification) : smr_comparateur_1, bornes_asymptotiques, « normal sur l'échelle de log(SMR) »",
          egal(statut_importance("smr_comparateur_1", "bornes_asymptotiques"),
-              "asymptotique : normal sur l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0"))
+              paste("asymptotique : normal sur l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0 ;",
+                    M_INTERVALLE)))
 verifier("STATUTS_IMPORTANCE (littéral de la spécification) : smr_comparateur_2, bornes, exactes et asymptotiques distinguées",
          egal(statut_importance("smr_comparateur_2", "bornes"), paste(
            "relation independante : bornes exactes, exact sous D_e ~ Poisson(theta A), A connu (table, E^c tenue",
            "pour fixe), qgamma, approximation numérique ; bornes asymptotiques, asymptotique (normal sur l'échelle",
-           "de log(SMR), variance 1 / D_e ; non défini à D_e = 0) ; relation ajustee_hors_outil : valeurs",
-           "ponctuelles seules, bornes non produites (ddl_non_etabli)")))
+           "de log(SMR), variance 1 / D_e ; non défini à D_e = 0) ;", M_INTERVALLE, "; relation ajustee_hors_outil :",
+           "valeurs ponctuelles seules, bornes non produites (ddl_non_etabli)")))
 verifier("MENTIONS_RAPPORT (littéral de la spécification) : brut_binomial couvre les deux intervalles, condition « cellule observée entière »",
          egal(MENTIONS_RAPPORT[["brut_binomial"]], paste(
            "Intervalles binomiaux (colonnes borne_inf_exacte, borne_sup_exacte, borne_inf_asymptotique et",

@@ -294,6 +294,29 @@ TOLERANCES <- c(
   # z = U / sqrt(v) et pchisq(T, ddl)
   "homogeneite/resultat/tests/statistique" = 1e-10, "homogeneite/resultat/tests/p_asymptotique" = 1e-10,
   "homogeneite/resultat/segments/z" = 1e-10,
+  # Écart minimal détectable (#218) : constantes du package restituées dans
+  # les paramètres, exactes (spécification d'actuary-approfondi, § 5) ;
+  # theta_80, racine (uniroot, tolérance .Machine$double.eps) en u = log
+  # theta de lambda_s(u) = lambda_80, lambda_s = b' L_s^-1 b calculée sans
+  # soustraction (correction du 19/11/2026, constat C1 de la revue finale de
+  # B30 : sommes, produits et quotients de positifs, élimination de type GTH,
+  # erreur relative de quelques eps, sans annulation de U = O - A) : une
+  # erreur relative eps de lambda_s donne sur u une erreur relative d'environ
+  # eps / 2 au premier ordre près de theta = 1 (lambda_s proportionnelle à
+  # u^2), soit sur theta_80 une erreur relative d'environ eps |log theta| / 2,
+  # plus eps environ de la tolérance de uniroot ; écart relatif mesuré entre
+  # l'ancien calcul (système réduit du test global) et celui-ci : 4,8e-16 sur
+  # R11, 8,6e-16 sur R12 ; écart relatif à une référence en précision
+  # étendue (Decimal, 80 chiffres ; script hors dépôt, mesure ponctuelle du
+  # 19/11/2026, constat de mesure) : 9,9e-16 au plus avant, 1,3e-16 au plus
+  # après, sur R11 et R12 ; classe de la statistique, 1e-10, conservée (avis
+  # d'actuary ; ADR 0009, point 9.3 ; décision du mainteneur du 19/11/2026,
+  # (c)) ; condition de réexamen : ADR 0009, troisième annotation du
+  # 19/11/2026, point (f).
+  "homogeneite/parametres/niveau_ecart_minimal" = 0, "homogeneite/parametres/puissance_ecart_minimal" = 0,
+  "homogeneite/parametres/seuil_ecart_minimal" = 0,
+  "homogeneite/resultat/ecart_minimal/theta_80_superieur" = 1e-10,
+  "homogeneite/resultat/ecart_minimal/theta_80_inferieur" = 1e-10,
   # Lissage de Whittaker-Henderson (#223, #225 ; R15 à R17) et ddl effectifs
   # de la validation `lissee` (#224) : clés de l'ADR 0009, annotation du
   # 12/11/2026, (e) (liste d'actuary-approfondi). Toute clé commence par

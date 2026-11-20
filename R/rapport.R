@@ -2188,14 +2188,22 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "validation. Les deux tables diffèrent d'autant plus que q~_x est grand."),
   # Section etape_homogeneite (#168 ; spécification d'actuary-approfondi, § 6,
   # texte proposé) ; la mention validation_unite_contrat y est reprise sous
-  # la même condition (avis de forme (0''), F10).
+  # la même condition (avis de forme (0''), F10). Phrases de l'écart minimal
+  # détectable ajoutées en fin (#218, spécification, § 8) : noms des
+  # constantes, non leurs valeurs (rapport sans calcul, ADR 0012).
   homogeneite_portee = paste(
     "Test d'homogénéité entre segments : hypothèse nulle, dans chaque cellule de la plage (âge, et année civile si",
     "par_annee), un taux commun à tous les segments, sur l'exposition centrale ; tests du score conditionnels aux",
     "décès de chaque strate : la cellule (global, par tranche d'âge déclarée) ou la cellule croisée avec la modalité",
     "de l'autre variable (par variable de segmentation conditionnellement à l'autre). Diagnostic sans verdict ni seuil : un test non significatif n'établit pas l'homogénéité, surtout",
     "sur une base modeste ; la décision de regrouper reste à l'utilisateur et se déclare par la segmentation du",
-    "plan. Aucune correction de multiplicité."),
+    "plan. Aucune correction de multiplicité. Écart minimal détectable (etapes/homogeneite/resultat/ecart_minimal) :",
+    "pour chaque segment, le facteur theta appliqué à sa seule force dans toutes les cellules que le test global",
+    "détecterait avec la puissance puissance_ecart_minimal au niveau niveau_ecart_minimal (conventions,",
+    "etapes/homogeneite/parametres), en deux branches (theta > 1, theta < 1), conditionnellement aux décès de",
+    "chaque strate ; approximation asymptotique ; il mesure ce que les données portent, sans rien dire de",
+    "l'homogénéité réelle. Le signal ecart_minimal_detectable (seuil conventionnel seuil_ecart_minimal) est un",
+    "avertissement, pas un verdict : aucune p-valeur n'est comparée à un niveau."),
   # Section etape_coherence_regularite (#144 ; spécification de forme, § 3 :
   # texte de portée du § 5 de la spécification, D8 ; comparaison aux tables
   # de référence, choix de l'outil non attribué à la p. 36, M415 ; mention de
@@ -2392,16 +2400,25 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "nombre d'unités d'observation, entier). Avec une entrée ou une censure dans la cellule, D ne suit pas",
     "Bin(E^i, q), même si E^i est entier : la couverture des deux intervalles n'est pas établie ; si E^i n'est",
     "pas entier, la formule par quantiles de lois bêta en est en outre le prolongement continu."),
+  # Section suffisance : introduction commune à tous les plans (#218,
+  # spécification, § 8 ; M546, P1-c : réécriture sans condition), élément
+  # conditionnel de l'écart minimal détectable sur le modèle de
+  # suffisance_exposition (F218).
   suffisance_intro = paste(
     "Indicateurs de suffisance (E2.15 : exposition et événements par âge et par segment, largeur des",
-    "intervalles) : ils signalent ce que les données portent, sans rien interdire. Le rapport n'en calcule",
-    "aucun ; ceux que l'objet porte sont aux chemins suivants :"),
+    "intervalles, écart minimal détectable du test d'homogénéité) : ils signalent ce que les données portent,",
+    "sans rien interdire. Le rapport n'en calcule aucun lui-même ; ceux que l'objet porte sont aux chemins",
+    "suivants :"),
   suffisance_exposition = paste(
     "Exposition et événements par cellule : etapes/exposition/resultat/exposition (section Étape exposition)."),
   suffisance_exposition_absente = "Exposition et événements par cellule : non demandée par le plan.",
   suffisance_brut = paste(
     "Événements, exposition et bornes d'intervalle par estimateur : etapes/brut/resultat (section Étape brut)."),
   suffisance_brut_absente = "Événements, exposition et bornes d'intervalle par estimateur : non demandée par le plan.",
+  suffisance_homogeneite = paste(
+    "Écart minimal détectable par segment du test d'homogénéité : etapes/homogeneite/resultat/ecart_minimal",
+    "(section Étape homogeneite) ; signal ecart_minimal_detectable aux avertissements."),
+  suffisance_homogeneite_absente = "Écart minimal détectable par segment du test d'homogénéité : non demandé par le plan.",
   rejeu_1 = "Ligne de rejeu de la fiche de construction (en-tête de la fiche écrite par ecrire_fiche()) : ",
   rejeu_2 = paste(
     "Rejeu outillé : rejouer_fiche(donnees, fiche, tables_reference) reçoit le data.frame des données, la",
@@ -2863,6 +2880,8 @@ corps_section <- function(x, k) {
     return(c(paragraphe(m[["suffisance_intro"]]), "<ul>",
              element_liste(m[[if ("exposition" %in% etapes) "suffisance_exposition" else "suffisance_exposition_absente"]]),
              element_liste(m[[if ("brut" %in% etapes) "suffisance_brut" else "suffisance_brut_absente"]]),
+             element_liste(m[[if ("homogeneite" %in% etapes) "suffisance_homogeneite"
+                              else "suffisance_homogeneite_absente"]]),
              element_liste(m[["largeur"]]), "</ul>"))
   if (identical(id, "table_finale")) return(paragraphe(m[["table_finale"]]))
   if (identical(id, "rejeu"))

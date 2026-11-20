@@ -448,7 +448,18 @@ CHEMINS_199 <- list(
 # #244, #245, #246 ; avis d'actuary-approfondi du 12/11/2026) closes par la
 # régénération de R15 à R17 (exécution 43203864780) ; transition_textes_245(),
 # utf8_245(), apres_245() et les constantes *_245 retirées.
+# Transitions #159 (mention d'indépendance des unités en fin de statut des
+# lignes de loi, R1 à R17, textes seuls) et #218 (écart minimal détectable
+# theta_80 de l'homogénéité, R11 et R12, par ajouts) closes par la régénération
+# unique (R) de B30 (exécution 44586537589, b29caa5) ; transition_159(),
+# apres_159(), transition_218() et les constantes *_159 et *_218 retirées. Le
+# bloc R11 et R12 de #218 (C4, recalcul indépendant, états, aucun signal) reste,
+# lu sur les références régénérées.
 TRANSITIONS_EN_COURS <- list()
+# Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
+# finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
+# (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
+# les constantes *_218C retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -945,13 +956,15 @@ verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
 # (R15 à R17) : 21 clés de l'annotation du 12/11/2026, (e) (6 exactes) et 22
 # clés classées par actuary (13 exactes : 5 échos de lissage et 8 clés de
 # coherence_regularite ; avis du 12/11/2026) : 191 clés, dont 60 exactes.
-verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 191 clés dont 60 exactes (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e))", {
+# #218 : cinq clés ajoutées (trois constantes exactes, deux colonnes theta_80
+# à 1e-10) : 191 et 60 -> 196 et 63.
+verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 196 clés dont 63 exactes (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e) ; #218)", {
   cles_199 <- sub("^etapes/", "", unlist(CHEMINS_199, use.names = FALSE))
   restantes <- intersect(cles_199, names(TOLERANCES))
   if (length(cles_199) != 27L || anyDuplicated(cles_199)) "CHEMINS_199 : 27 chemins distincts attendus"
   else if (length(restantes)) paste("clés encore présentes :", paste(restantes, collapse = ", "))
-  else if (length(TOLERANCES) != 191L || sum(TOLERANCES == 0) != 60L)
-    sprintf("%d clés dont %d exactes, au lieu de 191 et 60", length(TOLERANCES), sum(TOLERANCES == 0))
+  else if (length(TOLERANCES) != 196L || sum(TOLERANCES == 0) != 63L)
+    sprintf("%d clés dont %d exactes, au lieu de 196 et 63", length(TOLERANCES), sum(TOLERANCES == 0))
   else TRUE
 })
 # Contrôle des types des dénombrements (ADR 0009, point 9.6, (f) ; #199, M396,
@@ -1145,6 +1158,53 @@ for (p in plans_reference()) {
     else if (any(sg$etat == "convolution_au_dela_n_max")) "état convolution_au_dela_n_max"
     else TRUE
   })
+  # #218 (critère 2 de l'issue, C4 du § 1.33) : theta_80 de R11 et R12 égaux
+  # aux valeurs remesurées par actuary-approfondi (commentaire 7012205013 ;
+  # étai du corps de #218 à la cinquième décimale), à 5e-7 près (sixième
+  # décimale) ; recalcul indépendant du moteur à partir de la table
+  # d'exposition (cellules d'âge de la plage 20-90, segments sexe ; strates
+  # informatives D_.c > 0 et deux segments exposés ; V complète,
+  # pseudo-inverse de Moore-Penrose par svd() ; lambda_80 par uniroot sur
+  # pchisq ; racines par uniroot) : |lambda(theta_80) / lambda_80 - 1| <= 1e-8
+  # et theta_80 égal à la racine indépendante à 1e-8 en relatif ; tous les
+  # états produite ; aucun signal ecart_minimal_detectable.
+  if (id %in% c("R11", "R12")) verifier(sprintf("%s : #218 theta_80 (C4 : valeurs d'actuary-approfondi à 5e-7 ; recalcul indépendant à 1e-8 à partir de la table d'exposition), états produite, aucun signal", id), local({
+    # local() : les noms ci-dessous (g, D, E, k…) ne doivent pas masquer ceux
+    # de la boucle des plans.
+    em <- x_ref$etapes$homogeneite$resultat$ecart_minimal
+    attendu <- list(R11 = c(1.090574, 1.090240, 0.917229, 0.916948), R12 = c(1.035880, 1.035860, 0.965381, 0.965363))[[id]]
+    ex <- x_ref$etapes$exposition$resultat$exposition
+    ex <- ex[ex$age >= 20 & ex$age <= 90, ]
+    ages <- sort(unique(ex$age)); segs <- em$sexe
+    E <- D <- matrix(0, length(segs), length(ages))
+    ij <- cbind(match(ex$sexe, segs), match(ex$age, ages))
+    E[ij] <- ex$exposition_centrale; D[ij] <- ex$evenements
+    Dc <- colSums(D); inf <- Dc > 0 & colSums(E > 0) >= 2
+    V <- matrix(0, length(segs), length(segs))
+    for (k in which(inf)) { pk <- E[, k] / sum(E[, k]); V <- V + Dc[k] * (diag(pk) - tcrossprod(pk)) }
+    sv <- svd(V); g <- sv$d > max(sv$d) * 1e-12
+    Vp <- sv$v[, g, drop = FALSE] %*% (t(sv$u[, g, drop = FALSE]) / sv$d[g])
+    ddl <- sum(g); q <- stats::qchisq(0.95, ddl)
+    l80 <- stats::uniroot(function(l) stats::pchisq(q, ddl, ncp = l, lower.tail = FALSE) - 0.80, c(0, 100), tol = 1e-13)$root
+    lam <- function(s, th) {
+      de <- numeric(length(segs))
+      for (k in which(inf)) { pk <- E[, k] / sum(E[, k]); w <- rep(1, length(segs)); w[s] <- th
+        de <- de + Dc[k] * (pk * w / sum(pk * w) - pk) }
+      drop(crossprod(de, Vp %*% de))
+    }
+    obt <- c(em$theta_80_superieur, em$theta_80_inferieur)
+    seg_br <- rep(seq_along(segs), 2L)
+    rel <- vapply(seq_along(obt), function(i) lam(seg_br[i], obt[i]) / l80 - 1, 0)
+    rac <- vapply(seq_along(obt), function(i) {
+      bornes <- if (i <= length(segs)) c(1, 2) else c(0.5, 1)
+      stats::uniroot(function(th) lam(seg_br[i], th) - l80, bornes, tol = 1e-14)$root }, 0)
+    if (!all(c(em$etat_superieur, em$etat_inferieur) == "produite")) "états"
+    else if (any(abs(obt - attendu) > 5e-7)) paste("C4 :", paste(sprintf("%.7f", obt), collapse = ", "))
+    else if (any(abs(rel) > 1e-8)) paste("lambda(theta_80) / lambda_80 - 1 :", paste(sprintf("%.2e", rel), collapse = ", "))
+    else if (any(abs(rac / obt - 1) > 1e-8)) paste("racine indépendante :", paste(sprintf("%.10f", rac), collapse = ", "))
+    else if ("ecart_minimal_detectable" %in% x_ref$avertissements$code) "signal"
+    else TRUE
+  }))
   # Commit préparatoire (1a) de B19 (#223 ; ADR 0017, point 10.1), R1 et R4
   # (par année) : apparier_table() sur la grille extraite rend un objet
   # identical() à l'ancien corps (993068c), table de R8, plage 20 à 90 ;
