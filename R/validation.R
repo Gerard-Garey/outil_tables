@@ -3130,13 +3130,16 @@ exposition_lignes <- function(lignes, cles, ctx) {
 # classe de l'entrée et contrôlées par controler_lignes_extraites() (#320 ;
 # texte d'actuary, Q-A1) : sous l'unité tête, l'étape fait, pour chaque
 # ensemble d'exclusions, jusqu'à trois extractions contrôlées : R_t u S (avant
-# evaluer_motifs()), puis ses lignes hors têtes indéterminées, puis les seules
-# lignes conservées de ces têtes (exposition_lignes(), aucune extraction pour
-# un sous-ensemble vide) ; sous l'unité contrat, une seule : S. Ensembles
+# evaluer_motifs()), puis ses lignes hors têtes indéterminées, puis les lignes
+# conservées (R) des têtes restantes (exposition_lignes(), aucune extraction
+# pour un sous-ensemble vide) ; sous l'unité contrat, une seule : S. Ensembles
 # parcourus par niveau (A puis B) puis, dans chaque niveau, chaque motif
-# déclaré (ordre de lignes_exclues de l'étape donnees) puis le total ; un
-# ensemble sans ligne mesurable n'extrait rien, et un même couple (S, clés)
-# n'est calculé qu'une fois (cache de calculer_importance_exclusions()). Le
+# déclaré (ordre de lignes_exclues de l'étape donnees) puis le total ; puis,
+# si le comparateur 2 est produit, les mêmes ensembles sous ses clés (A : clé
+# de la table, B : segmentation), qui rappellent retrait() de la même façon ;
+# un ensemble sans ligne mesurable n'extrait rien, et un même couple (S, clés)
+# n'est calculé qu'une fois (cache de calculer_importance_exclusions(), commun
+# aux deux parcours : le second n'extrait que pour un couple absent du cache). Le
 # refus est celui de la première extraction fausse ; `attendu` vaut le nombre
 # de lignes qu'elle demande, qui peut donc être inférieur à |S| comme à
 # |R_t u S|. Invariants (erreur de programmation) : S n'a que des lignes M
