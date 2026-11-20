@@ -612,9 +612,12 @@ colonnes_classe_citees <- function(colonnes, classes)
     character(1L)), collapse = ", ")
 
 # Noms de colonnes lus sans dispatch (attr(), character(n) à défaut de noms).
-# La longueur de l'attribut names n'est pas celle de la liste : `[.data.frame`
-# sous une classe dont length() ment rend une liste d'un élément munie de noms
-# à plusieurs (contrôlé par controler_lignes_extraites(), #322).
+# La longueur de l'attribut names n'est pas toujours celle de la liste :
+# `[.data.frame` sous une classe dont length() ment rend une liste d'un élément
+# munie de noms à plusieurs. Seule l'extraction est contrôlée
+# (controler_lignes_extraites(), #322) ; l'autre appelant de
+# decomptes_colonnes(), controler_lignes_donnees(), ne l'est pas (défaut
+# préexistant, issue à proposer au mainteneur).
 # Seule lecture des noms de colonnes de decomptes_colonnes() et de
 # controler_lignes_extraites() (#322, point 4).
 noms_colonnes_lus <- function(x) {
