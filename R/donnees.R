@@ -539,22 +539,30 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
 # sinon longueur_lue(), sans dispatch (vecteur atomique classé ou non, liste
 # nue, classe « bytes » que NROW() ne lit pas : erreur R). decompte_lisible()
 # juge une valeur ainsi rendue, avant toute conversion (une méthode length() ou
-# dim() de la classe peut rendre « abc », NA ou deux valeurs) : numérique, de
-# longueur 1, non NA, entière, entre 0 et .Machine$integer.max (au-delà, %d
-# lèverait une erreur R). decomptes_colonnes(x) parcourt les colonnes de la
+# dim() de la classe peut rendre « abc », NA ou deux valeurs) : numérique
+# (is.numeric(), avec dispatch, comme avant #322 : une Date, un facteur ou une
+# durée ne sont pas des décomptes ; un rendu autre que TRUE ou FALSE vaut non
+# numérique), puis, sur unclass() (#322, point 1 : aucune méthode is.na(),
+# >= ni == de la classe, dont un rendu de deux valeurs lèverait l'erreur R de
+# &&), de longueur 1, non NA, entière, entre 0 et .Machine$integer.max (au-delà,
+# %d lèverait une erreur R). decomptes_colonnes(x) parcourt les colonnes de la
 # liste x par position (unclass() : jamais [[, names(), ncol() ni length(x),
 # qui dispatchent ; coût en O(colonnes), aucune colonne copiée) et rend les
 # valeurs rendues (rendus), leur lisibilité (lisibles), les décomptes en double
-# (lc, NA si illisibles) et les noms des colonnes (attr(), character(n) à
-# défaut). colonnes_decompte_citees(k, dec, classes) : texte d'une ligne par colonne
+# (lc, as.double(unclass()), NA si illisibles) et les noms des colonnes
+# (noms_colonnes_lus(), seule lecture des noms de colonnes de ces contrôles).
+# colonnes_decompte_citees(k, dec, classes) : texte d'une ligne par colonne
 # discordante de position k (au plus NB_LIGNES_CITEES, puis leur nombre
 # restant), « colonne « nom » : décompte » ou, si illisible, son type et sa
 # longueur ; si `classes` (liste des classes des colonnes, par position) est
 # donnée : « colonne « nom » (classe c) : ... ». classes_colonnes_citees(k,
 # classes) : classes distinctes de ces colonnes citées. Une erreur levée par
 # une méthode se propage (R2 de #312).
-decompte_lisible <- function(v)
-  is.numeric(v) && longueur_lue(v) == 1L && !is.na(v) && v >= 0 && v <= .Machine$integer.max && v == trunc(v)
+decompte_lisible <- function(v) {
+  if (!isTRUE(is.numeric(v))) return(FALSE)
+  u <- unclass(v)
+  is.numeric(u) && length(u) == 1L && !is.na(u) && u >= 0 && u <= .Machine$integer.max && u == trunc(u)
+}
 
 decompte_colonne <- function(v) {
   dm <- attr(v, "dim", exact = TRUE)
@@ -567,10 +575,8 @@ decomptes_colonnes <- function(x) {
   rendus <- lapply(unclass(x), decompte_colonne)
   lisibles <- vapply(rendus, decompte_lisible, logical(1L))
   lc <- rep(NA_real_, length(rendus))
-  lc[lisibles] <- vapply(rendus[lisibles], as.double, numeric(1L))
-  noms <- attr(x, "names", exact = TRUE)
-  if (is.null(noms)) noms <- character(length(lc))
-  list(rendus = rendus, lisibles = lisibles, lc = lc, noms = noms)
+  lc[lisibles] <- vapply(rendus[lisibles], function(v) as.double(unclass(v)), numeric(1L))
+  list(rendus = rendus, lisibles = lisibles, lc = lc, noms = noms_colonnes_lus(x))
 }
 
 colonnes_decompte_citees <- function(k, dec, classes = NULL) {
@@ -604,7 +610,10 @@ colonnes_classe_citees <- function(colonnes, classes)
     formuler("« %s » (classe %s)", citer(colonnes[i]), paste(citer(classes[[i]]), collapse = "/")),
     character(1L)), collapse = ", ")
 
-# Noms de colonnes lus sans dispatch (attr(), character(n) à défaut de noms).
+# Noms de colonnes lus sans dispatch (attr(), character(n) à défaut de noms ;
+# un attribut names a toujours la longueur de la liste, R le complète par NA).
+# Seule lecture des noms de colonnes de decomptes_colonnes() et de
+# controler_lignes_extraites() (#322, point 4).
 noms_colonnes_lus <- function(x) {
   noms <- attr(x, "names", exact = TRUE)
   if (is.null(noms)) character(length(unclass(x))) else noms
@@ -708,6 +717,9 @@ controler_lignes_donnees <- function(donnees) {
   rn <- .row_names_info(donnees, 2L)
   nr <- nrow(donnees)
   lisible_nr <- decompte_lisible(nr)
+  # Décompte lisible : lu sur unclass() avant toute comparaison ou conversion (#322, C2 de l'audit : `==` et
+  # as.integer() dispatcheraient sur la classe de la valeur rendue par dim()).
+  if (lisible_nr) nr <- as.double(unclass(nr))
   dec <- decomptes_colonnes(donnees)
   lc <- dec$lc
   k <- if (is.na(rn)) integer(0) else which(is.na(lc) | lc != rn)
@@ -1945,6 +1957,183 @@ fusionner_intervalles <- function(g, entree, fin) {
                       ecarts_un_jour = sum(suite & es - prec == 1)))
 }
 
+# --- postcondition d'une extraction de lignes -----------------------------------
+
+# Libellés des éléments i d'un facteur v, lus sans dispatch (#322, point 2 ;
+# spécification d'actuary, Q1) : codes par .subset(), niveaux par attr() ;
+# aucune méthode « [ », levels() ni as.character() de la classe n'est appelée ;
+# noms des niveaux retirés par unname(), comme le fait as.character.factor
+# (C1 de l'audit de #322 : sans quoi un facteur aux niveaux nommés passé par
+# une méthode `[` qui applique droplevels() serait refusé à tort). Pour un
+# facteur nu, égal à as.character(v[i]), NA, niveaux inutilisés et niveaux
+# nommés compris.
+libelles_facteur <- function(v, i) unname(attr(v, "levels", exact = TRUE)[.subset(v, i)])
+
+# Sujet du message de refus de controler_lignes_extraites(), par étape
+# appelante (nom de l'étape : champ module du refus) ; texte du moteur, inséré
+# par texte_moteur().
+SUJETS_LIGNES_EXTRAITES <- c(donnees = "Les lignes conservées")
+
+# Postcondition d'une extraction de lignes par la méthode « [ » de la classe
+# des données (#319 ; outil unique de #322, point 4, avis de forme F322) :
+#   donnees  : l'entrée (data.frame, sous-classe admise, M499 (a)) ;
+#   extraites: ce qu'a rendu l'extraction, faite par l'appelant (le signe des
+#              indices fait partie de ce qui est contrôlé : preparer_donnees()
+#              extrait par donnees[-exclues, , drop = FALSE]) ;
+#   numeros  : numéros des lignes de l'entrée demandées, dans l'ordre attendu ;
+#   roles    : vecteur nommé rôle -> colonne ;
+#   etape    : étape appelante, module du refus et clé du sujet du message
+#              (SUJETS_LIGNES_EXTRAITES).
+# Préconditions (C3 de l'audit de #322) : `numeros` entiers positifs, sans NA,
+# au plus le nombre de lignes de l'entrée (non contrôlé : l'appelant les forme) ;
+# `etape` clé de SUJETS_LIGNES_EXTRAITES, contrôlée à l'entrée (sinon erreur de
+# programmation du package, stop()).
+# Rend TRUE (invisible) ou refuse donnees_mal_formees : une méthode `[` qui ne
+# rend pas les lignes demandées ferait calculer, sans signal, sur d'autres
+# lignes que celles de la fiche. Cinq contrôles, dans cet ordre, le premier en
+# défaut donnant son refus (le message et les details disent la cause :
+# classe_rendue, lignes, attendu, colonnes pour l'identité, colonne, position
+# et lignes_colonne pour les décomptes de colonne ; colonne seule pour le (1
+# bis) : les seules colonnes absentes de l'extraction, noms de l'entrée, les
+# colonnes en trop ou sans nom ne figurant que dans le message) : (0) le
+# résultat est une liste classée data.frame (a_classe(), is.list(), sans
+# dispatch : une méthode qui retire ou remplace la classe est refusée) ; (1)
+# son nombre de lignes (.row_names_info(, 2L), sans dispatch) est celui des
+# numéros ; (1 bis) il a les mêmes colonnes que l'entrée, nombre et noms (lus
+# sans dispatch par noms_colonnes_lus() ; des noms identiques ont même nombre :
+# une colonne dont la méthode « [ » rend NULL est retirée sans signal par
+# `[.data.frame`, et le contrôle (2) lirait alors les noms décalés) ; (2)
+# chacune de ses colonnes, toutes, compte ce nombre de lignes (règle de
+# controler_lignes_donnees() : decomptes_colonnes()), y compris hors rôle ; (3)
+# chaque colonne de rôle (lue sans dispatch par lire_champ(), des deux côtés)
+# reprend les valeurs des lignes demandées, jugées sans dispatch (#322, point
+# 2, spécification d'actuary, Q1 ; M558) : colonne de l'entrée facteur
+# (a_classe(), sous-classes comprises) : la colonne extraite est un facteur et
+# ses libellés (libelles_facteur()) sont ceux des numéros dans la colonne de
+# l'entrée, les niveaux n'étant pas comparés (une méthode `[` qui retire les
+# niveaux inutilisés, droplevels(), reste admise ; une méthode `[` de colonne
+# qui ment de façon cohérente sous les deux signes d'indice est refusée) ;
+# autre colonne : identical() à la colonne de l'entrée indicée par les numéros
+# (type_conforme() n'admet alors qu'un vecteur sans classe ou la classe
+# exactement Date : `[` interne ou `[.Date` de base, aucune méthode de
+# l'utilisateur). Les valeurs des colonnes hors rôle ne sont pas contrôlées,
+# seulement leur décompte ; les contrôles (1 bis), (2) et (3) ne se font que si
+# le décompte (1) est juste, le (2) que si le (1 bis) l'est, le (3) que si le
+# (2) l'est. Entrée de classe exactement « data.frame » (sans méthode « [ »
+# propre), cause (1 bis), (2) ou (3) : la méthode « [ » en cause est celle
+# d'une colonne, le message cite la classe de chaque colonne citée (lue sans
+# dispatch) et en conseille la méthode (non celle de l'entrée). Pour le (1
+# bis), `[.data.frame` laisse les valeurs des colonnes suivant celle dont la
+# méthode rend NULL décalées alors que les noms le sont autrement (jusqu'à se
+# confondre, noms répétés) : seule la colonne de l'entrée à la première
+# position écartée (nom, nombre de colonnes ou décompte de lignes de la colonne
+# extraite, premiere_ecart_colonnes()) est citée avec sa classe, les suivantes
+# sont signalées sans classe ni attribution : « extraction décalée à partir de
+# cette colonne » si celle-ci est un élément vide (NULL) laissé par
+# `[.data.frame`, sinon « autres écarts à partir de la position N+1 » ;
+# toujours cette cause « colonne » sous une entrée exactement data.frame, même
+# sans colonne absente au sens des noms.
+controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape = "donnees") {
+  if (!is.character(etape) || length(etape) != 1L || is.na(etape) || !(etape %in% names(SUJETS_LIGNES_EXTRAITES)))
+    stop("controler_lignes_extraites() : 'etape' doit être une clé de SUJETS_LIGNES_EXTRAITES.", call. = FALSE)
+  attendu <- length(numeros)
+  # (0) forme : liste classée data.frame, lue sans dispatch (a_classe(), is.list()).
+  forme <- a_classe(extraites, "data.frame") && is.list(extraites)
+  # (1) décompte des lignes (noms de lignes, sans dispatch) ; (1 bis) mêmes colonnes que l'entrée (noms lus sans
+  # dispatch ; des noms identiques ont même nombre) ; (2) décompte de chaque colonne, toutes, selon la règle de
+  # controler_lignes_donnees() ; (3) identité des colonnes de rôle.
+  nc <- if (forme) .row_names_info(extraites, 2L) else NA_integer_
+  ecart_compte <- forme && (is.na(nc) || nc != attendu)
+  exact <- identical(class(donnees), "data.frame")
+  nom_c <- noms_colonnes_lus(extraites); nom_d <- noms_colonnes_lus(donnees)
+  ecart_colonnes <- forme && !ecart_compte && !identical(nom_c, nom_d)
+  dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL
+  # Entrée exactement « data.frame » et écart de colonnes : décomptes lus pour situer la première position écartée
+  # (et les éléments NULL, que `[.data.frame` laisse à la place d'une colonne retirée).
+  if (exact && ecart_colonnes) {
+    dec <- decomptes_colonnes(extraites)
+    premiere <- premiere_ecart_colonnes(nom_c, nom_d, dec$lc, attendu,
+                                        vapply(unclass(extraites), is.null, logical(1L)))
+  }
+  if (forme && !ecart_compte && !ecart_colonnes) {
+    dec <- decomptes_colonnes(extraites)
+    k <- which(is.na(dec$lc) | dec$lc != attendu)
+    if (!length(k))
+      for (cc in unique(unname(roles))) {
+        a <- lire_champ(extraites, cc); b <- lire_champ(donnees, cc)
+        # Facteur : libellés lus sans dispatch, comparés, non les niveaux ; autre colonne (sans classe ou Date
+        # exacte, type_conforme()) : `[` interne ou de base.
+        identique <- if (a_classe(b, "factor"))
+                       a_classe(a, "factor") && identical(libelles_facteur(a, seq_len(longueur_lue(a))),
+                                                          libelles_facteur(b, numeros))
+                     else identical(a, b[numeros])
+        if (!identique) colonnes <- c(colonnes, cc)
+      }
+  }
+  if (!forme || ecart_compte || ecart_colonnes || length(k) || length(colonnes)) {
+    # Classe d'entrée exactement « data.frame » (sans méthode « [ » propre) et cause « colonne » (écart de
+    # colonnes, décompte de colonne faux, ou identité d'une colonne de rôle) : la méthode « [ » en cause est
+    # celle d'une colonne ; classes de colonnes lues sans dispatch, rangées par `cles` (positions de k, rang
+    # dans `colonnes`, ou la seule première position écartée, citée avec sa classe).
+    classes <- NULL; cles <- integer(0)
+    if (exact) {
+      if (ecart_colonnes) {
+        # Une première position au-delà des colonnes de l'entrée (extraction plus longue : `[.data.frame` n'en
+        # rend pas) n'a pas de colonne à citer : message de l'entrée, sans attribution.
+        if (!is.null(premiere) && premiere$position <= length(nom_d)) {
+          premiere$classe <- class(unclass(donnees)[[premiere$position]])
+          classes <- list(premiere$classe); cles <- 1L
+        } else premiere <- NULL
+      } else if (length(k)) {
+        entree <- unclass(donnees)
+        classes <- vector("list", length(entree))
+        classes[k] <- lapply(k, function(i) class(entree[[i]]))
+        cles <- k
+      } else if (length(colonnes)) {
+        classes <- lapply(colonnes, function(cc) class(lire_champ(donnees, cc)))
+        cles <- seq_along(colonnes)
+      }
+    }
+    constat <- if (!forme)
+      formuler("ne sont pas un data.frame (classe rendue %s, type « %s »)",
+               paste(citer(class(extraites)), collapse = "/"), citer(typeof(extraites)))
+    else if (ecart_compte)
+      formuler("comptent %s au lieu de %d",
+               if (is.na(nc)) "un nombre de lignes illisible" else formuler("%d ligne(s)", nc), attendu)
+    else if (ecart_colonnes)
+      formuler("comptent %d ligne(s) comme demandé mais n'ont pas les colonnes des données (%s)",
+               nc, paste(colonnes_ecart_citees(nom_c, nom_d, premiere), collapse = " ; "))
+    else if (length(k))
+      formuler("comptent %d ligne(s) comme demandé mais leurs colonnes ne comptent pas toutes ce nombre de lignes (%s)",
+               nc, paste(colonnes_decompte_citees(k, dec, classes), collapse = " ; "))
+    else
+      formuler(paste("comptent %d ligne(s) comme demandé mais ne reprennent pas les valeurs des lignes demandées",
+                     "dans la ou les colonne(s) de rôle %s"), nc,
+               if (is.null(classes)) liste_guillemets(colonnes) else colonnes_classe_citees(colonnes, classes))
+    refuser(etape, "donnees_mal_formees",
+            if (!is.null(classes))
+              formuler(paste("%s, extraites des données par la méthode « [ » de la classe data.frame,",
+                             "qui applique à chaque colonne la méthode « [ » de sa classe, %s : le moteur ne corrige",
+                             "pas une extraction fausse ; passer un data.frame dont les colonnes citées (classe %s)",
+                             "ont une méthode « [ » qui rend exactement les lignes demandées (ou n'ont pas de",
+                             "méthode « [ » propre)."),
+                       texte_moteur(SUJETS_LIGNES_EXTRAITES[[etape]]), constat, classes_colonnes_citees(cles, classes))
+            else
+              formuler(paste("%s, extraites des données par la méthode « [ » de la classe %s,",
+                             "%s : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la",
+                             "méthode « [ » rend exactement les lignes demandées (ou qui n'a pas de méthode",
+                             "« [ » propre)."),
+                       texte_moteur(SUJETS_LIGNES_EXTRAITES[[etape]]), paste(citer(class(donnees)), collapse = "/"),
+                       constat),
+            list(classe = class(donnees), classe_rendue = class(extraites), lignes = nc,
+                 attendu = attendu, colonnes = colonnes,
+                 colonne = if (ecart_colonnes) setdiff(nom_d, nom_c)
+                           else if (length(k)) dec$noms[k] else character(0),
+                 position = k, lignes_colonne = if (length(k)) dec$lc[k] else numeric(0)))
+  }
+  invisible(TRUE)
+}
+
 # --- fonction d'étape `donnees` -----------------------------------------------
 
 # Étape `donnees` du plan : contrôle des rôles et des lignes, refus par
@@ -1985,42 +2174,10 @@ fusionner_intervalles <- function(g, entree, fin) {
 # sont extraites par `[` avec dispatch sur la classe de l'entrée (la méthode
 # d'une sous-classe de data.frame admise, M499 (a), est respectée : attributs,
 # noms de lignes et classe qu'elle rend ne sont pas modifiés) et contrôlées
-# (#319), sinon refus donnees_mal_formees : une méthode `[` qui ne rend pas
-# les lignes demandées ferait calculer, sans signal, sur d'autres lignes que
-# celles de la fiche. Cinq contrôles, dans cet ordre, le premier en défaut
-# donnant son refus (le message et les details disent la cause : classe_rendue,
-# lignes, attendu, colonnes pour l'identité, colonne, position et
-# lignes_colonne pour les décomptes de colonne ; colonne seule pour le (1 bis) :
-# les seules colonnes absentes de l'extraction, noms de l'entrée, les colonnes
-# en trop ou sans nom ne figurant que dans le message) : (0) le résultat est une
-# liste classée data.frame (a_classe(), is.list(), sans dispatch : une méthode
-# qui retire ou remplace la classe est refusée) ; (1) son nombre de lignes
-# (.row_names_info(, 2L), sans dispatch) est celui des numéros conservés ; (1
-# bis) il a les mêmes colonnes que l'entrée, nombre et noms (lus sans
-# dispatch : une colonne dont la méthode « [ » rend NULL est retirée sans
-# signal par `[.data.frame`, et le contrôle (2) lirait alors les noms décalés) ;
-# (2) chacune de ses colonnes, toutes, compte ce nombre de lignes (règle de
-# controler_lignes_donnees() : decomptes_colonnes()), y compris hors rôle ;
-# (3) pour chaque colonne de rôle (lue sans dispatch par lire_champ(), des deux
-# côtés), identical() à la même colonne de l'entrée indicée par les numéros
-# conservés (`[` de la classe de la colonne ; pour un facteur, libellés
-# identiques si les niveaux diffèrent). Les valeurs des colonnes hors rôle ne
-# sont pas contrôlées, seulement leur décompte ; les contrôles (1 bis), (2) et
-# (3) ne se font que si le décompte (1) est juste, le (2) que si le (1 bis) l'est,
-# le (3) que si le (2) l'est. Entrée de classe exactement « data.frame » (sans
-# méthode « [ » propre), cause (1 bis), (2) ou (3) : la méthode « [ » en cause
-# est celle d'une colonne, le message cite la classe de chaque colonne citée
-# (lue sans dispatch) et en conseille la méthode (non celle de l'entrée). Pour
-# le (1 bis), `[.data.frame` laisse les valeurs des colonnes suivant celle dont
-# la méthode rend NULL décalées alors que les noms le sont autrement (jusqu'à se
-# confondre, noms répétés) : seule la colonne de l'entrée à la première position
-# écartée (nom, nombre de colonnes ou décompte de lignes de la colonne extraite,
-# premiere_ecart_colonnes()) est citée avec sa classe, les suivantes sont
-# signalées sans classe ni attribution : « extraction décalée à partir de cette
-# colonne » si celle-ci est un élément vide (NULL) laissé par `[.data.frame`, sinon
-# « autres écarts à partir de la position N+1 » ; toujours cette cause « colonne »
-# sous une entrée exactement data.frame, même sans colonne absente au sens des
-# noms ;
+# par controler_lignes_extraites() (#319 ; outil extrait par #322, point 4),
+# sinon refus donnees_mal_formees du module donnees : une méthode `[` qui ne
+# rend pas les lignes demandées ferait calculer, sans signal, sur d'autres
+# lignes que celles de la fiche ;
 # resultat$observation_des_lignes donne, pour chaque ligne conservée, le
 # numéro de son observation (composante fusionnée ou contrat ; la cellule
 # elle-même sous `agregats`).
@@ -2063,101 +2220,8 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
   if (is.null(exclues)) exclues <- integer(0)
   conservees <- if (length(exclues)) donnees[-exclues, , drop = FALSE] else donnees
   numeros <- setdiff(seq_len(n), exclues)
-  # Postcondition de l'extraction (#319) : voir l'en-tête.
-  if (length(exclues)) {
-    # (0) forme : liste classée data.frame, lue sans dispatch (a_classe(), is.list()).
-    forme <- a_classe(conservees, "data.frame") && is.list(conservees)
-    # (1) décompte des lignes (noms de lignes, sans dispatch) ; (1 bis) mêmes colonnes que l'entrée (nombre et
-    # noms, lus sans dispatch : une colonne dont la méthode « [ » rend NULL est retirée sans signal par
-    # `[.data.frame`) ; (2) décompte de chaque colonne, toutes, selon la règle de controler_lignes_donnees() ;
-    # (3) identité des colonnes de rôle.
-    nc <- if (forme) .row_names_info(conservees, 2L) else NA_integer_
-    ecart_compte <- forme && (is.na(nc) || nc != length(numeros))
-    exact <- identical(class(donnees), "data.frame")
-    nom_c <- noms_colonnes_lus(conservees); nom_d <- noms_colonnes_lus(donnees)
-    ecart_colonnes <- forme && !ecart_compte &&
-      (length(unclass(conservees)) != length(unclass(donnees)) || !identical(nom_c, nom_d))
-    dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL
-    # Entrée exactement « data.frame » et écart de colonnes : décomptes lus pour situer la première position écartée
-    # (et les éléments NULL, que `[.data.frame` laisse à la place d'une colonne retirée).
-    if (exact && ecart_colonnes) {
-      dec <- decomptes_colonnes(conservees)
-      premiere <- premiere_ecart_colonnes(nom_c, nom_d, dec$lc, length(numeros),
-                                          vapply(unclass(conservees), is.null, logical(1L)))
-    }
-    if (forme && !ecart_compte && !ecart_colonnes) {
-      dec <- decomptes_colonnes(conservees)
-      k <- which(is.na(dec$lc) | dec$lc != length(numeros))
-      if (!length(k))
-        for (cc in unique(unname(roles))) {
-          a <- lire_champ(conservees, cc); b <- lire_champ(donnees, cc)[numeros]
-          # Facteur : libellés comparés, non les niveaux (une méthode `[` qui
-          # retire les niveaux inutilisés, droplevels(), reste admise).
-          if (!identical(a, b) && !(is.factor(a) && is.factor(b) && identical(as.character(a), as.character(b))))
-            colonnes <- c(colonnes, cc)
-        }
-    }
-    if (!forme || ecart_compte || ecart_colonnes || length(k) || length(colonnes)) {
-      # Classe d'entrée exactement « data.frame » (sans méthode « [ » propre) et cause « colonne » (écart de
-      # colonnes, décompte de colonne faux, ou identité d'une colonne de rôle) : la méthode « [ » en cause est
-      # celle d'une colonne ; classes de colonnes lues sans dispatch, rangées par `cles` (positions de k, rang
-      # dans `colonnes`, ou la seule première position écartée, citée avec sa classe).
-      classes <- NULL; cles <- integer(0)
-      if (exact) {
-        if (ecart_colonnes) {
-          # Une première position au-delà des colonnes de l'entrée (extraction plus longue : `[.data.frame` n'en
-          # rend pas) n'a pas de colonne à citer : message de l'entrée, sans attribution.
-          if (!is.null(premiere) && premiere$position <= length(nom_d)) {
-            premiere$classe <- class(unclass(donnees)[[premiere$position]])
-            classes <- list(premiere$classe); cles <- 1L
-          } else premiere <- NULL
-        } else if (length(k)) {
-          entree <- unclass(donnees)
-          classes <- vector("list", length(entree))
-          classes[k] <- lapply(k, function(i) class(entree[[i]]))
-          cles <- k
-        } else if (length(colonnes)) {
-          classes <- lapply(colonnes, function(cc) class(lire_champ(donnees, cc)))
-          cles <- seq_along(colonnes)
-        }
-      }
-      constat <- if (!forme)
-        formuler("ne sont pas un data.frame (classe rendue %s, type « %s »)",
-                 paste(citer(class(conservees)), collapse = "/"), citer(typeof(conservees)))
-      else if (ecart_compte)
-        formuler("comptent %s au lieu de %d",
-                 if (is.na(nc)) "un nombre de lignes illisible" else formuler("%d ligne(s)", nc), length(numeros))
-      else if (ecart_colonnes)
-        formuler("comptent %d ligne(s) comme demandé mais n'ont pas les colonnes des données (%s)",
-                 nc, paste(colonnes_ecart_citees(nom_c, nom_d, premiere), collapse = " ; "))
-      else if (length(k))
-        formuler("comptent %d ligne(s) comme demandé mais leurs colonnes ne comptent pas toutes ce nombre de lignes (%s)",
-                 nc, paste(colonnes_decompte_citees(k, dec, classes), collapse = " ; "))
-      else
-        formuler(paste("comptent %d ligne(s) comme demandé mais ne reprennent pas les valeurs des lignes demandées",
-                       "dans la ou les colonne(s) de rôle %s"), nc,
-                 if (is.null(classes)) liste_guillemets(colonnes) else colonnes_classe_citees(colonnes, classes))
-      refuser("donnees", "donnees_mal_formees",
-              if (!is.null(classes))
-                formuler(paste("Les lignes conservées, extraites des données par la méthode « [ » de la classe data.frame,",
-                               "qui applique à chaque colonne la méthode « [ » de sa classe, %s : le moteur ne corrige",
-                               "pas une extraction fausse ; passer un data.frame dont les colonnes citées (classe %s)",
-                               "ont une méthode « [ » qui rend exactement les lignes demandées (ou n'ont pas de",
-                               "méthode « [ » propre)."),
-                         constat, classes_colonnes_citees(cles, classes))
-              else
-                formuler(paste("Les lignes conservées, extraites des données par la méthode « [ » de la classe %s,",
-                               "%s : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la",
-                               "méthode « [ » rend exactement les lignes demandées (ou qui n'a pas de méthode",
-                               "« [ » propre)."),
-                         paste(citer(class(donnees)), collapse = "/"), constat),
-              list(classe = class(donnees), classe_rendue = class(conservees), lignes = nc,
-                   attendu = length(numeros), colonnes = colonnes,
-                   colonne = if (ecart_colonnes) setdiff(nom_d, nom_c)
-                             else if (length(k)) dec$noms[k] else character(0),
-                   position = k, lignes_colonne = if (length(k)) dec$lc[k] else numeric(0)))
-    }
-  }
+  # Postcondition de l'extraction (#319) : controler_lignes_extraites().
+  if (length(exclues)) controler_lignes_extraites(donnees, conservees, numeros, roles)
   if (!length(numeros))
     refuser("donnees", "aucune_ligne_conservee",
             formuler("Toutes les lignes (%d) sont écartées par les règles d'exclusion déclarées (%s).",
