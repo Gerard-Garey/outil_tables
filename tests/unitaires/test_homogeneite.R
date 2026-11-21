@@ -1546,13 +1546,21 @@ verifier("I F339 non-convergence forcée (#339 ; valeur calculée à la main) : 
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
-verifier("I F339 cas adverses (#339) : une erreur émise dans lambda est relancée telle quelle (« boum ») ; un avertissement émis dans lambda pendant la résolution est relancé en erreur « convergence problem in zero finding: w-int », non converti, sans avertissement sorti ; un NaN de lambda en un point intérieur (0,3 < |u| < 1), signes 1 et -1, est relancé en erreur « convergence problem in zero finding: NA/Inf replaced by maximum positive value », non converti, sans avertissement sorti", {
+# Messages de R attendus dans la langue de la session : reconstruits par
+# gettext() dans le domaine de leur source (R 4.3.3), comme R les produit.
+# uniroot() relance l'avertissement de zeroin par stop("convergence problem
+# in zero finding: ", conditionMessage(w)) (corps de stats::uniroot), dont
+# chaque fragment passe par gettext() dans le domaine R-stats ;
+# l'avertissement « NA/Inf replaced by maximum positive value » vient du code
+# C de zeroin, domaine stats ; « w-int », émis par le test, reste littéral.
+MSG_CONVERGENCE_ZEROIN <- gettext("convergence problem in zero finding: ", domain = "R-stats")
+verifier("I F339 cas adverses (#339) : une erreur émise dans lambda est relancée telle quelle (« boum ») ; un avertissement émis dans lambda pendant la résolution est relancé en erreur « convergence problem in zero finding: w-int », non converti, sans avertissement sorti ; un NaN de lambda en un point intérieur (0,3 < |u| < 1), signes 1 et -1, est relancé en erreur « convergence problem in zero finding: NA/Inf replaced by maximum positive value », non converti, sans avertissement sorti (messages de R dans la langue de la session)", {
   r_e <- branche_factice(function(u) if (abs(u) > 0 && abs(u) < 1) stop("boum") else LAMBDA_FACTICE(u), 1)
   r_w <- branche_factice(function(u) { if (abs(u) > 0 && abs(u) < 1) warning("w-int"); LAMBDA_FACTICE(u) }, 1)
   tous(erreur = if (!is.null(r_e$erreur) && identical(conditionMessage(r_e$erreur), "boum") && is.null(r_e$valeur)) TRUE
                 else "erreur de lambda non relancée",
        avertissement = if (!is.null(r_w$erreur) &&
-                           identical(conditionMessage(r_w$erreur), "convergence problem in zero finding: w-int") &&
+                           identical(conditionMessage(r_w$erreur), paste0(MSG_CONVERGENCE_ZEROIN, "w-int")) &&
                            !length(r_w$avertissements) && is.null(r_w$valeur)) TRUE
                        else "avertissement de lambda converti ou sorti",
        nan = {
@@ -1561,7 +1569,8 @@ verifier("I F339 cas adverses (#339) : une erreur émise dans lambda est relanc�
            r <- branche_factice(ln, s)
            !is.null(r$erreur) && is.null(r$valeur) && !length(r$avertissements) &&
              identical(conditionMessage(r$erreur),
-                       "convergence problem in zero finding: NA/Inf replaced by maximum positive value")
+                       paste0(MSG_CONVERGENCE_ZEROIN,
+                              gettext("NA/Inf replaced by maximum positive value", domain = "stats")))
          }, TRUE)
          if (all(ok)) TRUE else "NaN intérieur de lambda converti ou sorti"
        })
@@ -1601,6 +1610,28 @@ verifier("I #338 Q1 limite indéterminée (par la seam) : limite NaN, NA ou -Inf
                         if (!is.null(r$erreur)) conditionMessage(r$erreur)
                         else paste(r$valeur$etat, format(r$valeur$theta), paste(r$avertissements, collapse = " / "))))
   }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Seuil inclusif (constat m1 de l'audit de la revue finale de B32) : limite
+# exactement égale au seuil : non_atteint ; témoin, limite au-dessus du seuil
+# de quelques ulp : encadrement et résolution, racines 4/3 et 3/4 (valeur
+# calculée à la main).
+verifier("I #338 seuil inclusif (par la seam) : limite égale à SEUIL_1, signes 1 et -1 : non_atteint, NA, sans erreur ni avertissement ; témoin, limite SEUIL_1 (1 + 4e-16) : produite, 4/3 et 3/4 à 1e-14", {
+  e <- character(0)
+  for (cas in list(list("égale au seuil", SEUIL_1, "non_atteint"), list("témoin", SEUIL_1 * (1 + 4e-16), "produite")))
+    for (s in c(1, -1)) {
+      lim <- cas[[2L]]
+      r <- branche_factice(function(u) if (is.infinite(u)) lim else LAMBDA_FACTICE(u), s)
+      att <- if (cas[[3L]] == "non_atteint") NA_real_ else if (s > 0) 4 / 3 else 3 / 4
+      ok <- is.null(r$erreur) && !length(r$avertissements) && identical(r$valeur$etat, cas[[3L]]) &&
+        (if (is.na(att)) identical(r$valeur$theta, NA_real_) else isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      if (!ok)
+        e <- c(e, sprintf("%s, signe %d : %s", cas[[1L]], s,
+                          if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                          else paste(r$valeur$etat, format(r$valeur$theta, digits = 17),
+                                     paste(r$avertissements, collapse = " / "))))
+    }
+  if (SEUIL_1 * (1 + 4e-16) <= SEUIL_1) e <- c(e, "témoin non distinct du seuil en double")
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
 verifier("I #338 Q1 limite +Inf (par la seam) : comptée au-delà du seuil, encadrement et résolution ; signes 1 et -1 : produite, 4/3 et 3/4 à 1e-14, sans erreur ni avertissement", {
@@ -1649,15 +1680,19 @@ verifier("I #338 Q2 pivots en échec (par la seam) : precision_insuffisante sur 
 # l'erreur de if ; en u = 0 ou |u| = 1024, seules bornes que la boucle n'a pas
 # évaluées sans NaN, uniroot lève « f.lower (f.upper) = ... is NA ». lambda
 # lente (racine en u voisin de 5,75) pour que la boucle double jusqu'à h = 8.
-verifier("I #338 m2 NaN de lambda hors de zeroin (par la seam ; messages de R 4.3.3) : en |u| = 1, 2, 4, 8 (boucle de doublement) : erreur « missing value where TRUE/FALSE needed » ; en u = 0 : « f.lower = f(lower) is NA » (signe 1) ; en |u| = 1024 (lambda finie sous lambda_80, limite au-delà) : « f.upper = f(upper) is NA » (signe 1)", {
+# Messages attendus reconstruits par gettext() dans la langue de la session :
+# erreur de if du code C de l'évaluateur, domaine R ; « f.lower (f.upper) =
+# ... is NA », stop() de stats::uniroot, domaine R-stats.
+verifier("I #338 m2 NaN de lambda hors de zeroin (par la seam ; messages de R 4.3.3, dans la langue de la session) : en |u| = 1, 2, 4, 8 (boucle de doublement) : erreur « missing value where TRUE/FALSE needed » ; en u = 0 : « f.lower = f(lower) is NA » (signe 1) ; en |u| = 1024 (lambda finie sous lambda_80, limite au-delà) : « f.upper = f(upper) is NA » (signe 1)", {
   lente <- function(u) 4 * L80_1 * (-expm1(-abs(u) / 20))
   msg <- function(lam) { r <- branche_factice(lam, 1); if (is.null(r$erreur)) "aucune erreur" else conditionMessage(r$erreur) }
   boucle <- vapply(c(1, 2, 4, 8), function(h) msg(function(u) if (is.finite(u) && abs(u) == h) NaN else lente(u)), "")
   zero <- msg(function(u) if (u == 0) NaN else LAMBDA_FACTICE(u))
   cap <- msg(function(u) if (is.finite(u) && abs(u) == 1024) NaN else if (is.infinite(u)) 2 * L80_1 else 0.5 * L80_1)
-  tous(boucle = if (all(boucle == "missing value where TRUE/FALSE needed")) TRUE else paste(boucle, collapse = " / "),
-       zero = if (identical(zero, "f.lower = f(lower) is NA")) TRUE else zero,
-       cap = if (identical(cap, "f.upper = f(upper) is NA")) TRUE else cap)
+  tous(boucle = if (all(boucle == gettext("missing value where TRUE/FALSE needed", domain = "R"))) TRUE
+                else paste(boucle, collapse = " / "),
+       zero = if (identical(zero, gettext("f.lower = f(lower) is NA", domain = "R-stats"))) TRUE else zero,
+       cap = if (identical(cap, gettext("f.upper = f(upper) is NA", domain = "R-stats"))) TRUE else cap)
 })
 # Scénario de Q1 de #338 par les données : âge 60 seul ; A (5000, 600), X
 # (E_X, 1), E_X dans {5e-305, 5e-307} ; lambda_X(+infini) déborde en +Inf
