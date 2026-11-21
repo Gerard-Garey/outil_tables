@@ -1888,7 +1888,20 @@ ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "precision_insuf
 TOLERANCE_ECART_MINIMAL <- 1e-8
 # Statut des deux branches de theta_80 (spécification, § 7 ; clause
 # d'indépendance, Q3) : un gabarit, quatre substitutions d'une branche à
-# l'autre.
+# l'autre. Sens de l'erreur sur la branche + (#331, spécification
+# d'actuary-approfondi, Q5, corrigée à la reprise) : identité exacte theta -
+# (1 + pi h)^2 = h (1 - 2 pi - pi^2 h), h = theta - 1, d'où rho > 1 si et
+# seulement si pi < 1 / (1 + sqrt(theta)), soit theta < 1 + (1 - 2 pi) / pi^2
+# (pi < 0,472 en theta_80 = 1,25) ; puissance réelle en approximation normale
+# P(m, rho) = Phi((m - z) / rho) + Phi(-(m + z) / rho), croissante en m > 0 ;
+# P = 0,80 en rho = 1, sous 0,80 sur (1, rho*), au moins 0,80 ailleurs, rho*^2
+# = 51,3865 (constat numérique sur grille) ; rho^2 <= theta et max en theta de
+# rho^2 = 1 / (4 pi (1 - pi)). Trois cas : prudent (rho <= 1) ; optimiste si
+# rho reste sous rho* sur tout (1, theta_80] ; non établi sinon (puissance non
+# monotone en theta). 51,38 (rho*^2 arrondi par défaut) et 0,0049 (pi_c =
+# 0,004889, racine de 1 / (4 pi (1 - pi)) = rho*^2, arrondi par excès) sont
+# choisis pour que les conditions citées restent suffisantes. Branche -
+# inchangée (rho < 1 pour pi < 0,5).
 statut_ecart_minimal <- function(superieur) {
   paste("approximation asymptotique :", if (superieur) "plus petit theta > 1" else "plus grand theta < 1",
         "tel que lambda_s(theta) >= lambda_80, theta multipliant la force du seul segment s dans chaque cellule ;",
@@ -1904,7 +1917,13 @@ statut_ecart_minimal <- function(superieur) {
         if (superieur) "quand theta_80 est au plus seuil_ecart_minimal,"
         else "quand theta_80 est au moins 1/seuil_ecart_minimal,",
         "davantage au-delà, et",
-        if (superieur) "la valeur est optimiste pour un segment minoritaire (theta_80 réel plus éloigné de 1) ;"
+        if (superieur)
+          paste("la valeur est prudente (theta_80 réel au plus aussi éloigné de 1) quand pi >= 1 / (1 +",
+                "sqrt(theta_80)), pi part d'exposition du segment (environ 0,472 quand theta_80 vaut",
+                "seuil_ecart_minimal), et, en deçà, où rho^2 = theta_80 / (1 + pi (theta_80 - 1))^2, rapport exact",
+                "des variances de U sous l'alternative et sous H0, dépasse 1, optimiste (theta_80 réel plus éloigné",
+                "de 1) si theta_80 <= 51,38 ou pi >= 0,0049, de sens non établi sinon (moins de 0,2 décès attendu dans",
+                "le segment en theta_80) ;")
         else "la valeur est prudente pour un segment minoritaire (theta_80 réel plus proche de 1) ;",
         "au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80 (pchisq",
         "non centrale) et theta_80 (uniroot en log theta, lambda_s calculée sans soustraction) par résolution",

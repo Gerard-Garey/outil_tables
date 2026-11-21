@@ -835,8 +835,10 @@ verifier("I paramètres de l'étape (F218) : niveau_ecart_minimal, puissance_eca
 # monotonie exacte, uniroot en log theta, état precision_insuffisante), puis
 # par le motif de precision_insuffisante (#340, spécification
 # d'actuary-approfondi, Q4, amendée : racine non calculable par cette
-# méthode, qu'elle soit ou non représentable), et ses quatre substitutions
-# pour theta_80_inferieur.
+# méthode, qu'elle soit ou non représentable), puis par le sens de l'erreur
+# de la branche + (#331, spécification d'actuary-approfondi, Q5, corrigée à
+# la reprise : prudente, optimiste ou de sens non établi ; branche -
+# inchangée), et ses quatre substitutions pour theta_80_inferieur.
 STATUT_SUP_218 <- paste(
   "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
   "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
@@ -848,8 +850,12 @@ STATUT_SUP_218 <- paste(
   "1 - niveau_ecart_minimal de la loi centrale avec la probabilité puissance_ecart_minimal (conventions) ; la variance",
   "de U sous l'alternative diffère de V : à deux segments en strate unique, en approximation normale, la puissance",
   "réelle en theta_80 s'écarte de puissance_ecart_minimal de 0,03 au plus quand theta_80 est au plus",
-  "seuil_ecart_minimal, davantage au-delà, et la valeur est optimiste pour un segment minoritaire (theta_80 réel plus",
-  "éloigné de 1) ; au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80",
+  "seuil_ecart_minimal, davantage au-delà, et la valeur est prudente (theta_80 réel au plus aussi éloigné de 1) quand",
+  "pi >= 1 / (1 + sqrt(theta_80)), pi part d'exposition du segment (environ 0,472 quand theta_80 vaut",
+  "seuil_ecart_minimal), et, en deçà, où rho^2 = theta_80 / (1 + pi (theta_80 - 1))^2, rapport exact des variances de",
+  "U sous l'alternative et sous H0, dépasse 1, optimiste (theta_80 réel plus éloigné de 1) si theta_80 <= 51,38 ou pi",
+  ">= 0,0049, de sens non établi sinon (moins de 0,2 décès attendu dans le segment en theta_80) ;",
+  "au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80",
   "(pchisq non centrale) et theta_80 (uniroot en log theta, lambda_s calculée sans soustraction) par résolution",
   "numérique : approximation numérique ; état non_atteint",
   "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
@@ -863,7 +869,12 @@ verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux li
   inf <- STATUT_SUP_218
   for (r in list(c("plus petit theta > 1", "plus grand theta < 1"),
                  c("quand theta_80 est au plus seuil_ecart_minimal", "quand theta_80 est au moins 1/seuil_ecart_minimal"),
-                 c("la valeur est optimiste pour un segment minoritaire (theta_80 réel plus éloigné de 1)",
+                 c(paste("la valeur est prudente (theta_80 réel au plus aussi éloigné de 1) quand pi >= 1 / (1 +",
+                         "sqrt(theta_80)), pi part d'exposition du segment (environ 0,472 quand theta_80 vaut",
+                         "seuil_ecart_minimal), et, en deçà, où rho^2 = theta_80 / (1 + pi (theta_80 - 1))^2, rapport",
+                         "exact des variances de U sous l'alternative et sous H0, dépasse 1, optimiste (theta_80 réel",
+                         "plus éloigné de 1) si theta_80 <= 51,38 ou pi >= 0,0049, de sens non établi sinon (moins de",
+                         "0,2 décès attendu dans le segment en theta_80)"),
                    "la valeur est prudente pour un segment minoritaire (theta_80 réel plus proche de 1)"),
                  c("lorsque theta tend vers l'infini", "lorsque theta tend vers 0"))) {
     if (lengths(regmatches(inf, gregexpr(r[1L], inf, fixed = TRUE))) != 1L) return(paste("substitution non unique :", r[1L]))
@@ -879,11 +890,16 @@ verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux li
 # tolérance en dur, « (1 + 1e-8) » (statut_ecart_minimal()), alors que le calcul
 # lit TOLERANCE_ECART_MINIMAL (R/validation.R). Le test précédent compare le
 # texte à un littéral, pas à la constante : celui-ci relit la valeur citée par
-# chaque statut et la compare à la constante.
-verifier("I statuts ecart_minimal (m3 de #218) : chaque statut cite « (1 + x) » une seule fois, x relu du texte identique à TOLERANCE_ECART_MINIMAL ; littéral 1e-8 ; témoin : une autre valeur est détectée", {
+# chaque statut et la compare à la constante. Depuis #331, la branche + cite
+# aussi « (1 + sqrt(theta_80)) » et « (1 + pi (theta_80 - 1)) » : ces deux
+# occurrences exactes (liste blanche) sont retirées avant la relecture ; toute
+# autre occurrence de « (1 + » compte.
+verifier("I statuts ecart_minimal (m3 de #218) : hors liste blanche exacte, chaque statut cite « (1 + x) » une seule fois, x relu du texte identique à TOLERANCE_ECART_MINIMAL ; littéral 1e-8 ; témoin : une autre valeur est détectée", {
   tol <- tablexp:::TOLERANCE_ECART_MINIMAL
   s <- tablexp:::STATUTS_HOMOGENEITE
+  blanche <- c("(1 + sqrt(theta_80))", "(1 + pi (theta_80 - 1))")
   citee <- function(txt) {
+    for (b in blanche) txt <- gsub(b, "", txt, fixed = TRUE)
     m <- regmatches(txt, gregexpr("\\(1 \\+ [^)]+\\)", txt))[[1L]]
     if (length(m) != 1L) return(NA_real_)
     suppressWarnings(as.numeric(sub("\\)$", "", sub("^\\(1 \\+ ", "", m))))
@@ -893,7 +909,47 @@ verifier("I statuts ecart_minimal (m3 de #218) : chaque statut cite « (1 + x) �
   tous(lignes = if (length(em) == 2L) TRUE else "deux statuts ecart_minimal attendus",
        citee = if (!anyNA(v) && all(v == tol)) TRUE else paste("valeur citée :", format(v), "; constante :", format(tol)),
        litteral = if (identical(tol, 1e-8)) TRUE else paste("constante :", format(tol)),
-       temoin = if (!is.na(citee("(1 + 1e-9)")) && citee("(1 + 1e-9)") != tol && is.na(citee("sans mention"))) TRUE else "témoin")
+       temoin = if (!is.na(citee("(1 + 1e-9)")) && citee("(1 + 1e-9)") != tol && is.na(citee("sans mention"))) TRUE else "témoin",
+       blanche = if (identical(citee("(1 + 1e-8) (1 + sqrt(theta_80)) (1 + pi (theta_80 - 1))"), 1e-8) &&
+                     is.na(citee("(1 + 1e-8) (1 + sqrt(theta))"))) TRUE else "liste blanche")
+})
+# #331 (spécification d'actuary-approfondi, Q5, corrigée à la reprise) :
+# chiffres cités par la branche + du statut, recalculés à partir des
+# constantes. rho* : seconde racine (au-delà du minimum, rho ~ 2,517) de
+# Phi(a / rho) + Phi(-b / rho) = puissance, a, b = sqrt(lambda_80) -/+ z ;
+# 0,472 = 1 / (1 + sqrt(seuil)) arrondi ; 51,38 = rho*^2 arrondi par défaut ;
+# 0,0049 = pi_c, racine de 1 / (4 pi (1 - pi)) = rho*^2, arrondi par excès ;
+# décès attendus dans le segment en theta_80, à D_. tenu pour fixe : D_. p,
+# D_. = lambda_80 pi (1 - pi) / (p - pi)^2, p = pi theta / (1 + pi (theta -
+# 1)), sous 0,2 au coin (51,38 ; 0,0049). Fragments ASCII (locale C).
+verifier("I statut theta_80_superieur (#331) : chiffres cités (0,472 ; 51,38 ; 0,0049 ; 0,2 décès) recalculés à partir de NIVEAU, PUISSANCE et SEUIL_ECART_MINIMAL et de non_centralite_ecart_minimal(1) ; témoin : un chiffre altéré est détecté", {
+  l80 <- tablexp:::non_centralite_ecart_minimal(1)
+  z <- stats::qnorm(1 - tablexp:::NIVEAU_ECART_MINIMAL / 2)
+  a <- sqrt(l80) - z; b <- sqrt(l80) + z
+  rs2 <- stats::uniroot(function(r) stats::pnorm(a / r) + stats::pnorm(-b / r) - tablexp:::PUISSANCE_ECART_MINIMAL,
+                        c(3, 100), tol = 1e-12)$root^2
+  pc <- (1 - sqrt(1 - 1 / rs2)) / 2
+  virgule <- function(x, n) sub(".", ",", sprintf("%.*f", n, x), fixed = TRUE)
+  seuil_pi <- virgule(round(1 / (1 + sqrt(tablexp:::SEUIL_ECART_MINIMAL)), 3), 3)
+  rho2 <- virgule(floor(100 * rs2) / 100, 2)
+  pi_c <- virgule(ceiling(1e4 * pc) / 1e4, 4)
+  th <- floor(100 * rs2) / 100; pp <- ceiling(1e4 * pc) / 1e4
+  p <- pp * th / (1 + pp * (th - 1))
+  deces <- l80 * pp * (1 - pp) * p / (p - pp)^2
+  fragments <- c(paste0("environ ", seuil_pi, " quand theta_80 vaut seuil_ecart_minimal"),
+                 paste0("si theta_80 <= ", rho2, " ou pi >= ", pi_c, ","), "(moins de 0,2 d")
+  controle <- function(txt) {
+    n <- vapply(fragments, function(f) lengths(regmatches(txt, gregexpr(f, txt, fixed = TRUE))), 0L)
+    if (all(n == 1L)) TRUE else paste("fragment(s) absent(s) ou répété(s) :", paste(fragments[n != 1L], collapse = " | "))
+  }
+  sup <- tablexp:::STATUTS_HOMOGENEITE$statut[14L]
+  tous(chiffres = if (identical(c(seuil_pi, rho2, pi_c), c("0,472", "51,38", "0,0049"))) TRUE
+                  else paste("recalculés :", seuil_pi, rho2, pi_c),
+       statut = controle(sup),
+       deces = if (deces < 0.2) TRUE else paste("décès attendus au coin :", format(deces, digits = 6)),
+       temoin = if (!isTRUE(controle(sub("51,38", "51,39", sup, fixed = TRUE))) &&
+                    !isTRUE(controle(sub("0,0049", "0,0048", sup, fixed = TRUE))) &&
+                    !isTRUE(controle(sub("0,472", "0,473", sup, fixed = TRUE)))) TRUE else "témoin")
 })
 verifier("I table ecart_minimal (F218) : une ligne par segment dans l'ordre des lignes globales de segments, clés de segmentation, theta_80_superieur, etat_superieur, theta_80_inferieur, etat_inferieur ; types (double, character) ; aucune ligne de tranche", {
   em <- H$resultat$ecart_minimal
