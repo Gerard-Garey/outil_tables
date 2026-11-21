@@ -1894,8 +1894,10 @@ TOLERANCE_ECART_MINIMAL <- 1e-8
 # seulement si pi < 1 / (1 + sqrt(theta)), soit theta < 1 + (1 - 2 pi) / pi^2
 # (pi < 0,472 en theta_80 = 1,25) ; puissance réelle en approximation normale
 # P(m, rho) = Phi((m - z) / rho) + Phi(-(m + z) / rho), croissante en m > 0 ;
-# P = 0,80 en rho = 1, sous 0,80 sur (1, rho*), au moins 0,80 ailleurs, rho*^2
-# = 51,3865 (constat numérique sur grille) ; rho^2 <= theta et max en theta de
+# P = 0,80 en rho = 1, sous 0,80 sur (1, rho*), au moins 0,80 ailleurs (exact :
+# en t = 1 / rho, dP/dt = a phi(a t) - b phi(b t) change de signe une seule
+# fois), rho*^2 = 51,3865 (racine numérique, uniroot) ; rho^2 <= theta et
+# max en theta de
 # rho^2 = 1 / (4 pi (1 - pi)). Trois cas : prudent (rho <= 1) ; optimiste si
 # rho reste sous rho* sur tout (1, theta_80] ; non établi sinon (puissance non
 # monotone en theta). 51,38 (rho*^2 arrondi par défaut) et 0,0049 (pi_c =
