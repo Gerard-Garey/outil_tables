@@ -460,6 +460,43 @@ TRANSITIONS_EN_COURS <- list()
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
 # les constantes *_218C retirées.
+# Transition #340, motif de precision_insuffisante (B32, étape (3) ;
+# spécification d'actuary-approfondi, Q4, amendée par l'avis d'actuary de
+# l'étape (2) ; Q7) : texte des deux statuts ecart_minimal de R11 et R12, en
+# « valeur de chaîne » aux positions lues par les colonnes sœurs de la
+# référence (table ecart_minimal, grandeurs theta_80_superieur et
+# theta_80_inferieur) ; texte après tiré du texte avant de la référence par
+# une substitution, commune aux deux branches, écrite ici en échappements \u
+# (UTF-8 en toute locale), sans lire le package. Aucune autre grandeur ne
+# change. Une transition pour les deux plans. À compléter par #331 (texte de
+# la branche +, même chemin, position de theta_80_superieur) et à clore par
+# la régénération (R) de B32, avec transition_340() et les constantes *_340.
+SUBST_340 <- c(
+  "\u00e9tat precision_insuffisante (NA) quand la racine n'est pas repr\u00e9sentable en double pr\u00e9cision \u00e0 cette tol\u00e9rance ;",
+  paste("\u00e9tat precision_insuffisante (NA) quand la racine n'est pas calculable par cette m\u00e9thode en double",
+        "pr\u00e9cision \u00e0 cette tol\u00e9rance, qu'elle soit ou non repr\u00e9sentable (pivot de l'\u00e9limination non fini",
+        "ou non positif, limite ind\u00e9termin\u00e9e, r\u00e9solution non converg\u00e9e, ou postcondition",
+        "|lambda_s(theta_80) / lambda_80 - 1| <= 1e-8 non tenue) ;"))
+apres_340 <- function(avant) {
+  if (grepl("n'est pas calculable par cette m\u00e9thode", avant, fixed = TRUE))
+    stop("apres_340() : motif nouveau d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_340() et les constantes *_340")
+  if (lengths(regmatches(avant, gregexpr(SUBST_340[1L], avant, fixed = TRUE))) != 1L)
+    stop(sprintf("apres_340() : \u00ab %s \u00bb absent ou r\u00e9p\u00e9t\u00e9 (erreur de programmation)", SUBST_340[1L]))
+  sub(SUBST_340[1L], SUBST_340[2L], avant, fixed = TRUE)
+}
+transition_340 <- function(plans) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plans[1L], ".tsv")))$valeurs
+  st <- "etapes/homogeneite/parametres/statuts/"
+  k <- match(c("theta_80_superieur", "theta_80_inferieur"), ref[[paste0(st, "grandeur")]])
+  if (anyNA(k) || !all(ref[[paste0(st, "table")]][k] == "ecart_minimal"))
+    stop("transition_340() : lignes ecart_minimal absentes de la r\u00e9f\u00e9rence (erreur de programmation)")
+  apres <- vapply(ref[[paste0(st, "statut")]][k], apres_340, "", USE.NAMES = FALSE)
+  Encoding(apres) <- "UTF-8"
+  list(issue = "#340", plans = plans,
+       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
+                               positions = k)))
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_340(c("R11", "R12"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

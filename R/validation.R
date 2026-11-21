@@ -1870,11 +1870,15 @@ SEUIL_ECART_MINIMAL <- 1.25
 # segment dans resultat$segments s'il n'est pas produit
 # (segment_sans_exposition, variance_nulle ; evenement_sans_exposition) ;
 # sinon produite, non_atteint quand la limite de lambda_s(theta) au bout de
-# la branche reste au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL), ou
-# precision_insuffisante quand la racine n'est pas représentable en double
-# précision à cette tolérance (pivot de l'élimination, limite NA, NaN ou
-# -Inf, postcondition non tenue ; décision du mainteneur du 19/11/2026, (b) ;
-# aucun signal). Valeur NA hors de l'état produite.
+# la branche reste au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL ; une
+# limite +Inf compte au-delà, #338), ou precision_insuffisante quand la
+# racine n'est pas calculable par cette méthode en double précision à cette
+# tolérance, qu'elle soit ou non représentable (#340) : pivot de
+# l'élimination non fini ou non positif (les deux branches), limite NA, NaN
+# ou -Inf, non-convergence d'uniroot (#339), postcondition non tenue (theta
+# non fini, nul ou égal à 1, ou résidu au-delà de la tolérance) ; décision du
+# mainteneur du 19/11/2026, (b) ; aucun signal. Valeur NA hors de l'état
+# produite.
 ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "precision_insuffisante",
                                      "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
                                      "segment_sans_exposition", "variance_nulle")
@@ -1907,9 +1911,11 @@ statut_ecart_minimal <- function(superieur) {
         "numérique : approximation numérique ; état non_atteint (NA) quand lambda_s(theta) reste au plus",
         "lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
         if (superieur) "lorsque theta tend vers l'infini ;" else "lorsque theta tend vers 0 ;",
-        "état precision_insuffisante (NA) quand la racine n'est pas représentable en double précision à cette",
-        "tolérance ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
-        "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
+        "état precision_insuffisante (NA) quand la racine n'est pas calculable par cette méthode en double",
+        "précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini ou non",
+        "positif, limite indéterminée, résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 -",
+        "1| <= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+        "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 }
 
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
@@ -2197,7 +2203,10 @@ resoudre_branche_ecart_minimal <- function(lambda, signe, lam80, seuil, pivots, 
 #   positifs ; factorisation une fois par segment.
 # Chaque branche (theta > 1, theta < 1) est résolue par
 # resoudre_branche_ecart_minimal(), avec la fonction lambda_s du segment et
-# le même indicateur des pivots pour les deux branches. Rend
+# le même indicateur des pivots pour les deux branches ; les voies vers
+# precision_insuffisante (motif : racine non calculable par cette méthode en
+# double précision à cette tolérance, #340) sont celles de cette fonction,
+# énumérées au commentaire de ETATS_ECART_MINIMAL_HOMOGENEITE. Rend
 # list(superieur, etat_superieur, inferieur, etat_inferieur, lambda_80),
 # vecteurs de longueur S (lambda_80 : NA si le test global n'est pas
 # produit).

@@ -832,8 +832,11 @@ verifier("I paramètres de l'étape (F218) : niveau_ecart_minimal, puissance_eca
 # Texte de la spécification, § 7 (theta_80_superieur), modifié par la
 # correction du 19/11/2026 (constat C1 de la revue finale de B30 ;
 # spécification d'actuary-approfondi, § 2 : V « celle du test global »,
-# monotonie exacte, uniroot en log theta, état precision_insuffisante), et
-# ses quatre substitutions pour theta_80_inferieur.
+# monotonie exacte, uniroot en log theta, état precision_insuffisante), puis
+# par le motif de precision_insuffisante (#340, spécification
+# d'actuary-approfondi, Q4, amendée : racine non calculable par cette
+# méthode, qu'elle soit ou non représentable), et ses quatre substitutions
+# pour theta_80_inferieur.
 STATUT_SUP_218 <- paste(
   "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
   "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
@@ -850,9 +853,11 @@ STATUT_SUP_218 <- paste(
   "(pchisq non centrale) et theta_80 (uniroot en log theta, lambda_s calculée sans soustraction) par résolution",
   "numérique : approximation numérique ; état non_atteint",
   "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
-  "lorsque theta tend vers l'infini ; état precision_insuffisante (NA) quand la racine n'est pas représentable en",
-  "double précision à cette tolérance ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-  "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
+  "lorsque theta tend vers l'infini ; état precision_insuffisante (NA) quand la racine n'est pas calculable par cette",
+  "méthode en double précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini",
+  "ou non positif, limite indéterminée, résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 - 1|",
+  "<= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
+  "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux lignes ecart_minimal en fin (theta_80_superieur, theta_80_inferieur), textes exacts, inférieur par les quatre substitutions ; 15 lignes, UTF-8", {
   s <- tablexp:::STATUTS_HOMOGENEITE
   inf <- STATUT_SUP_218
@@ -1255,7 +1260,9 @@ verifier("I T4 balayage à deux segments en strate unique (valeur calculée à l
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
-# precision_insuffisante par la voie de T6 (racine très proche de 1 : en
+# precision_insuffisante par la voie de T6 (postcondition : résidu au-delà
+# de la tolérance pour une racine très proche de 1 ; en D = 1e20, résidus
+# mesurés de 3,7e-7 et -3,0e-8 ; en
 # strate unique 50 / 50, à partir d'un total de l'ordre de 1e17 décès dans la
 # strate (entre 2,5e17 et 3e17 pour les premières branches)) est hors de
 # portée de calculer_homogeneite() : les décès y sont des entiers d'au plus
@@ -1263,12 +1270,22 @@ verifier("I T4 balayage à deux segments en strate unique (valeur calculée à l
 # y reste exact (T = 0, O = A à parts égales) ; appel direct de
 # ecart_minimal_homogeneite(). La voie du débordement de D_c |h_c| en
 # -infini est supprimée (C1 d'actuary, décision du mainteneur du 20/11/2026 ;
-# T7). L'état reste atteignable par l'étape dans des cas extrêmes : racine
-# non représentable (theta+ au-delà du plus grand double). Avec des parts
-# dénormalisées, la postcondition contrôle lambda calculée sur la part
-# arrondie et tient (cas mesurés) : la justesse de theta par rapport aux parts exactes est
-# dégradée, l'état reste produite (avis d'actuary, #338 ; E_X = 5e-307 du
-# scénario de Q1 ci-dessous). Une limite lambda(-+infini) qui déborde en
+# T7). Motif de l'état (#340 ; Q4 d'actuary-approfondi, amendée par l'avis
+# d'actuary de l'étape (2)) : racine non calculable par cette méthode en
+# double précision à cette tolérance, qu'elle soit ou non représentable ;
+# chaque voie a son test (C3) : pivot non fini ou non positif (« I #338 Q2
+# pivots en échec ») ; limite NA, NaN ou -Inf (« I #338 Q1 limite
+# indéterminée ») ; non-convergence d'uniroot (« I F339 non-convergence
+# forcée ») ; postcondition non tenue, par le résidu (T6) et par theta non
+# fini ou nul (« I #338 Q1 limite +Inf, racine non représentable » : signe 1,
+# exp(800) = Inf ; signe -1, exp(-800) = 0). L'état reste
+# atteignable par l'étape dans des cas extrêmes : racine non représentable
+# (theta+ au-delà du plus grand double). Une part d'exposition dénormalisée
+# n'est pas, par elle-même, une voie : la postcondition contrôle lambda
+# calculée sur la part arrondie et tient (cas mesurés) ; la justesse de theta
+# par rapport aux parts exactes est dégradée, l'état reste produite (avis
+# d'actuary, #338 ; E_X = 5e-307 du scénario de Q1 ci-dessous). Une limite
+# lambda(-+infini) qui déborde en
 # +infini (b^2/d) quand la part d'un segment avoisine 1e-308 ne mène plus à
 # precision_insuffisante : elle compte au-delà du seuil et la racine est
 # résolue (Q1 de #338 ; test « I #338 scénario de Q1 » ci-dessous).
