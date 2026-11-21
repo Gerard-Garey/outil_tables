@@ -15642,37 +15642,57 @@ p-valeur n'y est comparée à un niveau.
     \code{precision\_insuffisante} sinon. La
     valeur est \code{NA} dans tout état autre que \code{produite}.
     L'état \code{precision\_insuffisante} (décision du mainteneur du
-    19/11/2026, M551, (3)) dit que la racine n'est pas représentable en
-    double précision à la tolérance de la postcondition~: ce n'est ni un
-    écart non détectable ni une erreur de programmation, et il ne
-    déclenche aucun signal. Il n'est atteint par aucun plan de référence.
-    Les voies qui y mènent, après la correction du 20/11/2026 (ordre des
-    produits, \textbf{Calcul}, point~(2)), sont les suivantes (constats
-    de mesure d'\code{actuary} et de \code{docwriter} du 20/11/2026, sur
-    des jeux construits pour cela). (i)~Une racine très proche de~1
+    19/11/2026, M551, (3)~; motif reformulé par l'issue~\#340) dit que la
+    racine n'est pas calculable par cette méthode en double précision à
+    la tolérance de la postcondition, qu'elle soit ou non
+    représentable~: ce n'est ni un écart non détectable ni une erreur de
+    programmation, et il ne déclenche aucun signal. Il n'est atteint par
+    aucun plan de référence. Les voies qui y mènent sont les contrôles de
+    \code{resoudre\_branche\_ecart\_minimal()} (\textbf{Calcul},
+    point~(4)~; règle~(3) ci-dessus). (i)~Un pivot $d_i$ de l'élimination
+    non fini ou non strictement positif, pour les deux branches du
+    segment ensemble~: jamais observé~; un test l'exerce par appel direct.
+    (ii)~Une limite $\lambda_s(\pm\infty)$ indéterminée (\code{NA},
+    \code{NaN} ou $-\infty$)~: garde défensive, que des pivots valides
+    excluent (lecture du code)~; un test l'exerce par appel direct.
+    (iii)~La non-convergence de \code{uniroot()} en 1\,000 itérations
+    (issue~\#339), qui n'est atteinte par aucun plan de référence et n'a
+    été observée sur aucun jeu simulé (constat de simulation
+    d'\code{actuary} rapporté dans l'issue~\#339, non reproduit ici)~; un
+    test l'exerce par un nombre maximal d'itérations réduit.
+    (iv)~La postcondition non tenue~: $\theta_{80}$ non fini, nul ou égal
+    à~1, ou résidu $|\lambda_s(\theta_{80})/\lambda_{80} - 1|$ au-delà
+    de $10^{-8}$. Elle est atteinte par une racine très proche de~1
     (information très grande)~: deux segments de parts égales en strate
     unique ne l'atteignent qu'à partir d'un total de l'ordre de
     $10^{17}$ décès dans la strate (ordre de grandeur, constat de mesure
-    sur cas construits), bien au-delà de ce que porte la
-    colonne des décès, entière ($2^{31} - 1$ au plus par ligne)~; le test
-    global y reste exact~; un test unitaire exerce donc cette voie par
-    appel direct de \code{ecart\_minimal\_homogeneite()}
-    (\textbf{Vérifications}, ci-dessous). (ii)~Une racine non
-    représentable en double précision~: limite finie, mais racine
-    au-delà du plus grand double (par exemple $\theta_{80}^{+}$ au-delà de
-    $10^{308}$ pour une part d'exposition du segment de l'ordre de
-    $10^{-307}$, encore normalisée, dans une strate où la limite ne
-    dépasse le seuil que de peu). (iii)~Des parts
-    d'exposition dénormalisées (inférieures à environ $2{,}2 \cdot
-    10^{-308}$), dont la précision relative est perdue, si bien que la
-    postcondition échoue. En strate unique, le segment majoritaire face à
-    une part infime est d'abord \code{variance\_nulle} par l'arrondi du
-    test global (issue~\#333). (iv)~La non-convergence de \code{uniroot()}
-    en 1\,000 itérations (issue~\#339, \textbf{Calcul}, point~(4)), qui
-    n'est atteinte par aucun plan de référence et n'a été observée sur
-    aucun jeu simulé (constat de simulation d'\code{actuary} rapporté dans
-    l'issue~\#339, non reproduit ici)~; un test l'exerce par un nombre
-    maximal d'itérations réduit. Une limite $\lambda_s(\pm\infty)$ qui
+    d'\code{actuary} et de \code{docwriter} du 20/11/2026 sur cas
+    construits), bien au-delà de ce que porte la colonne des décès,
+    entière ($2^{31} - 1$ au plus par ligne)~; le test global y reste
+    exact~; un test unitaire exerce donc ce cas par appel direct de
+    \code{ecart\_minimal\_homogeneite()} (\textbf{Vérifications},
+    ci-dessous). Elle l'est aussi par une racine non représentable en
+    double précision~: limite finie, mais racine au-delà du plus grand
+    double (par exemple $\theta_{80}^{+}$ au-delà de $10^{308}$ pour une
+    part d'exposition du segment de l'ordre de $10^{-307}$, encore
+    normalisée, dans une strate où la limite ne dépasse le seuil que de
+    peu)~; un test l'exerce par appel direct, racine en $|u| = 800$.
+    Une part d'exposition dénormalisée (inférieure à environ $2{,}2 \cdot
+    10^{-308}$) n'est pas, par elle-même, une voie~: la postcondition
+    contrôle $\lambda_s$ calculée sur la part arrondie, et elle tient
+    (scénario de l'issue~\#338, $E_X = 5 \cdot 10^{-307}$~:
+    $\theta_{80}^{+}$ \code{produite}, \textbf{Vérifications},
+    ci-dessous)~; la justesse de $\theta_{80}$ par rapport aux parts
+    exactes est en revanche dégradée sans que la postcondition la voie~:
+    écart relatif jusqu'à $4{,}5 \cdot 10^{-9}$ pour une part voisine de
+    $2 \cdot 10^{-316}$, en strate unique, $10^{9}$ décès (constat de
+    simulation d'\code{actuary-approfondi} à l'étape~(2) de B32,
+    rapporté, non reproduit ici~; ADR 0009, mention du 21/11/2026, et
+    décision du mainteneur M565)~; pour des parts plus petites, le test
+    global s'arrête avant $\theta_{80}$ (issue~\#334). En strate unique,
+    le segment majoritaire face à une part infime est d'abord
+    \code{variance\_nulle} par l'arrondi du test global (issue~\#333).
+    Une limite $\lambda_s(\pm\infty)$ qui
     dépasse la capacité des doubles par le quotient $b_i^2/d_i$ alors que
     la racine est représentable n'est plus une voie depuis l'issue~\#338~:
     elle compte au-delà du seuil et la racine est résolue (en strate
@@ -15680,12 +15700,8 @@ p-valeur n'y est comparée à un niveau.
     $10^{-308}$, exposition déclarée, recette \code{agregats},
     $\theta_{80}^{+}$ était \code{precision\_}\allowbreak\code{insuffisante}
     et vaut désormais \code{produite}~; \textbf{Vérifications},
-    ci-dessous). L'état signale donc une racine non
-    calculable en double précision par cette méthode, pas nécessairement
-    non représentable~; le texte du statut («~la racine n'est pas
-    représentable en double précision à cette tolérance~», \textbf{Statut},
-    ci-dessous) est figé dans les références de non-régression, et sa
-    reformulation passe par l'issue~\#340.
+    ci-dessous). Le texte du statut énonce ce motif et ces quatre voies
+    (\textbf{Statut}, ci-dessous).
   \item \textbf{Signal}~: l'avertissement \code{ecart\_minimal\_detectable}
     (étape \code{homogeneite}), \textbf{jamais un refus}, est émis quand au
     moins un segment a $\theta_{80}^{+} > 1{,}25$, $\theta_{80}^{-} <
@@ -15727,8 +15743,11 @@ p-valeur n'y est comparée à un niveau.
     (uniroot en log theta, lambda\_s calculée sans soustraction) par
     résolution numérique~: approximation numérique~», et, après la règle
     de \code{non\_atteint}, «~état precision\_insuffisante (NA) quand la
-    racine n'est pas représentable en double précision à cette
-    tolérance~». La mention d'indépendance est propre à
+    racine n'est pas calculable par cette méthode en double précision à
+    cette tolérance, qu'elle soit ou non représentable (pivot de
+    l'élimination non fini ou non positif, limite indéterminée, résolution
+    non convergée, ou postcondition |lambda\_s(theta\_80) / lambda\_80 -
+    1| <= 1e-8 non tenue)~» (issue~\#340). La mention d'indépendance est propre à
     $\theta_{80}$~: «~unités d'observation indépendantes~; sous l'unité
     contrat, les décès sont sur-dispersés et theta\_80 est trop proche
     de~1 (écart minimal détectable sous-estimé)~»~; sous une
@@ -15889,7 +15908,7 @@ des colonnes de \code{segments} sur une exposition à 0 ligne, identiques
 du rapport figé et le rejeu. \textbf{Écart minimal détectable}
 (issue~\#218, critères~2, 3 et~5)~: les constantes, les paramètres
 restitués, les deux lignes de statut (texte littéral de la spécification,
-modifié par la correction du 19/11/2026, et ses quatre substitutions), la
+modifié par la correction du 19/11/2026 et par le motif de \code{precision\_insuffisante} de l'issue~\#340, et ses quatre substitutions), la
 liste des états, \code{precision\_insuffisante} compris, la forme de la
 table~; la forme close à
 parts constantes à deux et à quatre segments, à $10^{-8}$~; l'identité
