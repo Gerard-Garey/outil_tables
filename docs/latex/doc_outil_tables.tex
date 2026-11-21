@@ -16025,8 +16025,8 @@ pivots en échec~: \code{precision\_insuffisante} sur les deux branches,
 $\lambda_s$ jamais évaluée, y compris quand la limite est sous le seuil
 (\code{non\_atteint} si le seuil passait d'abord)~; racine non
 représentable ($\lambda_s(u) = \lambda_{80}\, e^{|u| - 800}$, de limite
-$+\infty$, racine en $|u| = 800$, $e^{800}$ valant $+\infty$ en double
-précision)~: \code{precision\_insuffisante} par la postcondition, sans
+$+\infty$, racine en $|u| = 800$, $e^{800}$ valant $+\infty$ et $e^{-800}$
+valant~0 en double précision, deux branches)~: \code{precision\_insuffisante} par la postcondition, sans
 erreur ni avertissement~; les messages d'une valeur \code{NaN} hors de
 \code{zeroin} (boucle de doublement en $|u| = 1$, 2, 4 et~8, bornes $u
 = 0$ et $|u| = 1024$, \textbf{Calcul}, point~(4))~; le scénario de
