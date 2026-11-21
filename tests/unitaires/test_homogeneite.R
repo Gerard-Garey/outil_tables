@@ -1582,28 +1582,39 @@ verifier("I #336 test 2 (D8) : Y seul à 62 ans, une ou deux lignes : groupes et
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
 # Test 3 (test par variable) : sexe x fumeur, âges 60 et 61 ; (H, o, 60) à E =
-# 0, D = 0 ; (H, n, 60) sur une ligne 410 / 9 ou deux lignes 200 / 4 et
-# 210 / 5. Test fumeur : la strate (60, H) n'a qu'une modalité exposée (n),
-# sur deux lignes : elle n'est pas informative. À d1517f2, la variante à deux
-# lignes donnait strates_informatives 4 pour fumeur (3 pour sexe, 2 pour le
-# global).
-verifier("I #336 test 3 (test par variable) : strate cellule x modalité à une seule modalité exposée sur deux lignes non informative : strates_informatives 3 (sexe), 3 (fumeur), 2 (global) ; deux lignes identical() à une ligne", {
+# 0, D = 0. Deux découpages, chacun comparé à la table à une ligne : (H, n, 60)
+# en deux lignes 200 / 4 et 210 / 5 (au lieu de 410 / 9) ; (F, o, 60) en deux
+# lignes 50 / 1 et 70 / 2 (au lieu de 120 / 3). Test fumeur : la strate
+# (60, H) n'a qu'une modalité exposée (n) ; test sexe : la strate (60, o) n'a
+# qu'un sexe exposé (F) ; découpées sur deux lignes, elles ne sont pas
+# informatives. À d1517f2, strates_informatives (global, sexe, fumeur) valait
+# 2 3 4 pour le premier découpage et 2 4 3 pour le second (constat m1 de
+# l'audit léger de 8ab9193).
+verifier("I #336 test 3 (test par variable) : strate cellule x modalité à une seule modalité exposée sur deux lignes non informative, (H, n, 60) ou (F, o, 60) découpée : strates_informatives 3 (sexe), 3 (fumeur), 2 (global) ; deux lignes identical() à une ligne", {
   g <- expand.grid(fumeur = c("o", "n"), sexe = c("F", "H"), age = 60:61, stringsAsFactors = FALSE)[, c("sexe", "fumeur", "age")]
   g$exposition_centrale <- c(120, 340, 0, 410, 150, 300, 110, 380)
   g$evenements <- c(3L, 6L, 0L, 9L, 5L, 7L, 4L, 11L)
-  k <- which(g$sexe == "H" & g$fumeur == "n" & g$age == 60)
-  v2 <- rbind(g, g[k, ])
-  v2$exposition_centrale[c(k, nrow(v2))] <- c(200, 210)
-  v2$evenements[c(k, nrow(v2))] <- c(4L, 5L)
-  r <- homog(v2, c("sexe", "fumeur"), c(60, 61), 60)
-  t <- r$resultat$tests
-  si <- c(global = t$strates_informatives[t$test == "global"],
-          sexe = t$strates_informatives[t$test == "variable" & t$variable %in% "sexe"],
-          fumeur = t$strates_informatives[t$test == "variable" & t$variable %in% "fumeur"])
-  tous(strates = if (identical(unname(si), c(2L, 3L, 3L))) TRUE else paste(names(si), si, collapse = ", "),
-       etats = if (all(t$etat == "produite")) TRUE else "tests non produits",
-       identique = if (identical(r, homog(g, c("sexe", "fumeur"), c(60, 61), 60))) TRUE
-                   else "résultat différent de la table à une ligne")
+  r1 <- homog(g, c("sexe", "fumeur"), c(60, 61), 60)
+  decoupe <- list(Hn60 = list(sexe = "H", fumeur = "n", E = c(200, 210), D = c(4L, 5L)),
+                  Fo60 = list(sexe = "F", fumeur = "o", E = c(50, 70), D = c(1L, 2L)))
+  e <- character(0)
+  for (nom in names(decoupe)) {
+    x <- decoupe[[nom]]
+    k <- which(g$sexe == x$sexe & g$fumeur == x$fumeur & g$age == 60)
+    v2 <- rbind(g, g[k, ])
+    v2$exposition_centrale[c(k, nrow(v2))] <- x$E
+    v2$evenements[c(k, nrow(v2))] <- x$D
+    r <- homog(v2, c("sexe", "fumeur"), c(60, 61), 60)
+    t <- r$resultat$tests
+    si <- c(global = t$strates_informatives[t$test == "global"],
+            sexe = t$strates_informatives[t$test == "variable" & t$variable %in% "sexe"],
+            fumeur = t$strates_informatives[t$test == "variable" & t$variable %in% "fumeur"])
+    if (!identical(unname(si), c(2L, 3L, 3L)))
+      e <- c(e, paste(nom, ": strates_informatives", paste(names(si), si, collapse = ", ")))
+    if (!all(t$etat == "produite")) e <- c(e, paste(nom, ": tests non produits"))
+    if (!identical(r, r1)) e <- c(e, paste(nom, ": résultat différent de la table à une ligne"))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
 # Ordre de première occurrence de l'agrégation (#335 ; constat C1 de l'audit
 # de l'étape (1) de B33) : sans couple (segment, cellule) répété, le vecteur
