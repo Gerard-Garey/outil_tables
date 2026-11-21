@@ -1826,8 +1826,10 @@ ETATS_P_EXACTE_HOMOGENEITE <- c("produite", "plus_de_deux_groupes", "convolution
 # qui y porte des décès (reprise de l'audit, m1) ; segment_sans_exposition
 # (E_s = 0 sur la portée, sans décès : hors du test, hors de ddl, O = A = 0) ;
 # evenement_sans_exposition (portée dont une cellule porte un événement sans
-# exposition : z non produit) ; variance_nulle (V_ss = 0, segment absent des
-# strates informatives : z non défini) ; produite.
+# exposition : z non produit) ; variance_nulle (V_ss nulle ; en arithmétique
+# exacte, segment exposé dans aucune strate informative : cellules où il est
+# seul exposé, ou sans décès ; z et theta_80 non définis ; aucun signal ;
+# spécification d'actuary-approfondi de #336, D8) ; produite.
 ETATS_SEGMENTS_HOMOGENEITE <- c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle")
 # Mention d'indépendance des unités (M278, #159), en fin de chaque statut
 # d'une loi.
@@ -2060,6 +2062,8 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
   D <- as.numeric(D)
   Ds <- somme_par(D, strate, K)
   Es <- somme_par(E, strate, K)
+  # ne compte des groupes distincts exposés (précondition : une ligne par
+  # (strate, groupe)) ; strate informative : D_. > 0 et ne >= 2 (#336).
   ne <- somme_par(E > 0, strate, K)
   inf <- Ds > 0 & ne >= 2
   pi <- numeric(length(D))

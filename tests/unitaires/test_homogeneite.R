@@ -1516,6 +1516,126 @@ verifier("I score_homogeneite() : deux lignes de même (strate, groupe) -> erreu
     grepl("erreur de programmation", conditionMessage(err), fixed = TRUE) &&
     grepl("(strate, groupe)", conditionMessage(err), fixed = TRUE)
 })
+# Strates informatives sur les lignes agrégées (#336 ; spécification
+# d'actuary-approfondi, Q2 et D8, commentaire 7068050253, § 4 ; avis d'actuary
+# du 21/11/2026 : mécanisme réglé par #335, critère ne >= 2 de
+# score_homogeneite() inchangé). Une strate est informative si D_. > 0 et si
+# au moins deux segments (groupes) distincts y sont exposés. Attendus :
+# valeurs mesurées sur le moteur de f0c61e8 ; mesures adverses (C7) sur
+# d1517f2 (avant #335), citées dans chaque test.
+# Test 1 (cas de l'issue) : âge 60, A seul, sur deux lignes 100 / 5 ou une
+# ligne 200 / 10 ; âge 61, A (100, 5) et X (100, 9). À d1517f2, la variante à
+# deux lignes donnait strates_informatives 2, cellules_informatives 2,
+# cellules_non_informatives 0 et p de Monte-Carlo 0.39.
+verifier("I #336 test 1 : A seul à 60 ans, une ou deux lignes : diagnostics cellules 2, informatives 1, non informatives 1, sans décès 0 ; strates_informatives 1 (global, tranche, somme) ; T, p exacte, p de Monte-Carlo 0.37 ; deux lignes identical() à une ligne", {
+  a1 <- expo_seg(c("A", "A", "X"), c(60, 61, 61), c(200, 100, 100), c(10, 5, 9))
+  a2 <- expo_seg(c("A", "A", "A", "X"), c(60, 61, 60, 61), c(100, 100, 100, 100), c(5, 5, 5, 9))
+  e <- character(0)
+  for (nom in c("a1", "a2")) {
+    r <- tryCatch(homog(get(nom), "segment", c(60, 61), 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    dg <- unlist(r$diagnostics[c("cellules", "cellules_informatives", "cellules_non_informatives", "cellules_sans_deces")])
+    if (!identical(unname(dg), c(2L, 1L, 1L, 0L))) e <- c(e, paste(nom, ": diagnostics", paste(dg, collapse = "/")))
+    t <- r$resultat$tests
+    if (!identical(t$test, c("global", "tranche", "somme_tranches")) || !identical(t$strates_informatives, rep(1L, 3L)))
+      e <- c(e, paste(nom, ": strates_informatives", paste(t$strates_informatives, collapse = "/")))
+    if (!isTRUE(proche(c(t$statistique[1L], t$p_exacte[1L], t$p_monte_carlo),
+                       c(1.1428571428571428, 0.42395019531249978, rep(0.37, 3L)), 1e-12, 0)))
+      e <- c(e, paste(nom, ": T, p exacte ou p de Monte-Carlo"))
+  }
+  if (!identical(homog(a2, "segment", c(60, 61), 60), homog(a1, "segment", c(60, 61), 60)))
+    e <- c(e, "a2 : résultat différent de a1")
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Test 2 (D8 : variance_nulle gardé, sans signal, sans état nouveau) : A et X
+# aux âges 60 et 61, Y seul à 62 ans, sur une ligne 500 / 10 (y1) ou deux
+# lignes 250 / 5 (y2). Y n'est exposé dans aucune strate informative : V_YY =
+# 0 (résultat exact), z et theta_80 non définis. À d1517f2, y2 donnait
+# groupes 3, strates_informatives 3, p exacte NA (plus_de_deux_groupes), p de
+# Monte-Carlo 0.78, Y produite (z = 0), theta de Y non_atteint aux deux
+# branches et un signal ecart_minimal_detectable de nombre 3.
+verifier("I #336 test 2 (D8) : Y seul à 62 ans, une ou deux lignes : groupes et strates_informatives 2, p exacte produite ; Y variance_nulle (z NA) aux portées globale et tranche ; theta de Y variance_nulle aux deux branches ; signal ecart_minimal_detectable de nombre 2 (A et X) ; deux lignes identical() à une ligne", {
+  un <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(100, 300, 200, 100), c(4, 9, 6, 3))
+  y1 <- rbind(un, expo_seg("Y", 62, 500, 10))
+  y2 <- rbind(un[1:2, ], expo_seg("Y", 62, 250, 5), un[3:4, ], expo_seg("Y", 62, 250, 5))
+  e <- character(0)
+  for (nom in c("y1", "y2")) {
+    r <- tryCatch(homog(get(nom), "segment", c(60, 62), 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    g <- ligne_test(r, "global")
+    if (!identical(c(g$groupes, g$strates_informatives), c(2L, 2L)) || !identical(g$etat_p_exacte, "produite") ||
+        !isTRUE(proche(c(g$p_exacte, g$p_monte_carlo), c(0.81249998595734196, 0.83), 1e-12, 0)))
+      e <- c(e, paste(nom, ": test global"))
+    s <- r$resultat$segments[r$resultat$segments$segment == "Y", ]
+    if (!identical(s$portee, c("global", "tranche")) || !identical(s$etat, rep("variance_nulle", 2L)) || !all(is.na(s$z)))
+      e <- c(e, paste(nom, ": Y aux segments", paste(s$etat, collapse = "/")))
+    em <- r$resultat$ecart_minimal[r$resultat$ecart_minimal$segment == "Y", ]
+    if (!identical(c(em$etat_superieur, em$etat_inferieur), rep("variance_nulle", 2L)) ||
+        !all(is.na(c(em$theta_80_superieur, em$theta_80_inferieur))))
+      e <- c(e, paste(nom, ": theta de Y", em$etat_superieur, em$etat_inferieur))
+    av <- r$avertissements
+    if (!identical(av$code, "ecart_minimal_detectable") || !identical(as.integer(av$nombre), 2L))
+      e <- c(e, paste(nom, ": avertissements", paste(av$code, av$nombre, collapse = "/")))
+  }
+  if (!identical(homog(y2, "segment", c(60, 62), 60), homog(y1, "segment", c(60, 62), 60)))
+    e <- c(e, "y2 : résultat différent de y1")
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Test 3 (test par variable) : sexe x fumeur, âges 60 et 61 ; (H, o, 60) à E =
+# 0, D = 0 ; (H, n, 60) sur une ligne 410 / 9 ou deux lignes 200 / 4 et
+# 210 / 5. Test fumeur : la strate (60, H) n'a qu'une modalité exposée (n),
+# sur deux lignes : elle n'est pas informative. À d1517f2, la variante à deux
+# lignes donnait strates_informatives 4 pour fumeur (3 pour sexe, 2 pour le
+# global).
+verifier("I #336 test 3 (test par variable) : strate cellule x modalité à une seule modalité exposée sur deux lignes non informative : strates_informatives 3 (sexe), 3 (fumeur), 2 (global) ; deux lignes identical() à une ligne", {
+  g <- expand.grid(fumeur = c("o", "n"), sexe = c("F", "H"), age = 60:61, stringsAsFactors = FALSE)[, c("sexe", "fumeur", "age")]
+  g$exposition_centrale <- c(120, 340, 0, 410, 150, 300, 110, 380)
+  g$evenements <- c(3L, 6L, 0L, 9L, 5L, 7L, 4L, 11L)
+  k <- which(g$sexe == "H" & g$fumeur == "n" & g$age == 60)
+  v2 <- rbind(g, g[k, ])
+  v2$exposition_centrale[c(k, nrow(v2))] <- c(200, 210)
+  v2$evenements[c(k, nrow(v2))] <- c(4L, 5L)
+  r <- homog(v2, c("sexe", "fumeur"), c(60, 61), 60)
+  t <- r$resultat$tests
+  si <- c(global = t$strates_informatives[t$test == "global"],
+          sexe = t$strates_informatives[t$test == "variable" & t$variable %in% "sexe"],
+          fumeur = t$strates_informatives[t$test == "variable" & t$variable %in% "fumeur"])
+  tous(strates = if (identical(unname(si), c(2L, 3L, 3L))) TRUE else paste(names(si), si, collapse = ", "),
+       etats = if (all(t$etat == "produite")) TRUE else "tests non produits",
+       identique = if (identical(r, homog(g, c("sexe", "fumeur"), c(60, 61), 60))) TRUE
+                   else "résultat différent de la table à une ligne")
+})
+# Ordre de première occurrence de l'agrégation (#335 ; constat C1 de l'audit
+# de l'étape (1) de B33) : sans couple (segment, cellule) répété, le vecteur
+# agrégé reprend les lignes saines dans leur ordre, dont dépend le flux des
+# réplications. Trois segments, âges 60 à 62, lignes mélangées ; ordre de
+# première occurrence des segments A, C, B ; dans les cellules, A, B, C à 60
+# ans, C, A, B à 61 ans, B, C, A à 62 ans. Attendus : valeurs remesurées
+# sur d1517f2 (moteur d'avant #335, sans agrégation ; résultat identical() à
+# celui de f0c61e8, mesuré). Un rangement des lignes agrégées par (cellule,
+# segment) laisse T et z inchangés mais donnait p de Monte-Carlo 0.91, 0.87,
+# 0.53 et 0.80 (mutant construit sur une copie).
+verifier("I ordre de première occurrence de l'agrégation (#335, C1) : trois segments, ordre des segments différent d'une cellule à l'autre, sans doublon : T, p de Monte-Carlo, erreur de Monte-Carlo et z des valeurs de d1517f2", {
+  d <- expo_seg(c("A", "C", "B", "B", "A", "C", "C", "A", "B"), c(60, 61, 60, 62, 61, 60, 62, 62, 61),
+                c(100, 220, 250, 260, 120, 180, 150, 140, 300), c(3, 8, 9, 10, 2, 4, 3, 6, 7))
+  r <- homog(d, "segment", c(60, 62), c(60, 62))
+  t <- r$resultat$tests
+  s <- r$resultat$segments
+  tous(tests = if (identical(t$test, c("global", "tranche", "tranche", "somme_tranches")) &&
+                   identical(t$etat, rep("produite", 4L))) TRUE else "lignes de test",
+       T = if (isTRUE(proche(t$statistique, c(0.22215301095965140, 0.29585222839658776, 1.31405436668594544,
+                                              1.60990659508253309), 1e-12, 0))) TRUE else "T",
+       p_monte_carlo = if (isTRUE(proche(t$p_monte_carlo, c(0.96, 0.85, 0.48, 0.83), 1e-12, 0))) TRUE
+                       else paste(t$p_monte_carlo, collapse = ", "),
+       erreur = if (isTRUE(proche(t$erreur_monte_carlo, c(0.019497692171126312, 0.035528157846981032,
+                                                          0.049709556425299145, 0.037374991638795055), 1e-12, 0))) TRUE
+                else "erreur de Monte-Carlo",
+       z = if (identical(s$segment, rep(c("A", "C", "B"), 3L)) &&
+               isTRUE(proche(s$z, c(-0.014533869254678681, -0.436273554792803164, 0.417352162176897690,
+                                    -0.537406223742030398, 0.265098964829306671, 0.168836372798534973,
+                                    0.612840174139278604, -1.123902973898032842, 0.467870382052322953),
+                             1e-12, 0))) TRUE else "z")
+})
 # Textes du rapport (spécification, § 8 ; M546, P1-c).
 verifier("I MENTIONS_RAPPORT (littéral de la spécification, § 8) : suffisance_intro, suffisance_homogeneite, suffisance_homogeneite_absente ; homogeneite_portee : deux premières phrases inchangées, puis l'écart minimal détectable", {
   m <- tablexp:::MENTIONS_RAPPORT
