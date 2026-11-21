@@ -832,8 +832,13 @@ verifier("I paramètres de l'étape (F218) : niveau_ecart_minimal, puissance_eca
 # Texte de la spécification, § 7 (theta_80_superieur), modifié par la
 # correction du 19/11/2026 (constat C1 de la revue finale de B30 ;
 # spécification d'actuary-approfondi, § 2 : V « celle du test global »,
-# monotonie exacte, uniroot en log theta, état precision_insuffisante), et
-# ses quatre substitutions pour theta_80_inferieur.
+# monotonie exacte, uniroot en log theta, état precision_insuffisante), puis
+# par le motif de precision_insuffisante (#340, spécification
+# d'actuary-approfondi, Q4, amendée : racine non calculable par cette
+# méthode, qu'elle soit ou non représentable), puis par le sens de l'erreur
+# de la branche + (#331, spécification d'actuary-approfondi, Q5, corrigée à
+# la reprise : prudente, optimiste ou de sens non établi ; branche -
+# inchangée), et ses quatre substitutions pour theta_80_inferieur.
 STATUT_SUP_218 <- paste(
   "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
   "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
@@ -845,20 +850,31 @@ STATUT_SUP_218 <- paste(
   "1 - niveau_ecart_minimal de la loi centrale avec la probabilité puissance_ecart_minimal (conventions) ; la variance",
   "de U sous l'alternative diffère de V : à deux segments en strate unique, en approximation normale, la puissance",
   "réelle en theta_80 s'écarte de puissance_ecart_minimal de 0,03 au plus quand theta_80 est au plus",
-  "seuil_ecart_minimal, davantage au-delà, et la valeur est optimiste pour un segment minoritaire (theta_80 réel plus",
-  "éloigné de 1) ; au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80",
+  "seuil_ecart_minimal, davantage au-delà, et la valeur est prudente (theta_80 réel au plus aussi éloigné de 1) quand",
+  "pi >= 1 / (1 + sqrt(theta_80)), pi part d'exposition du segment (environ 0,472 quand theta_80 vaut",
+  "seuil_ecart_minimal), et, en deçà, où rho^2 = theta_80 / (1 + pi (theta_80 - 1))^2, rapport exact des variances de",
+  "U sous l'alternative et sous H0, dépasse 1, optimiste (theta_80 réel plus éloigné de 1) si theta_80 <= 51,38 ou pi",
+  ">= 0,0049, de sens non établi sinon (moins de 0,2 décès attendu dans le segment en theta_80) ;",
+  "au-delà de deux segments ou à parts différentes entre strates, aucune borne établie ; lambda_80",
   "(pchisq non centrale) et theta_80 (uniroot en log theta, lambda_s calculée sans soustraction) par résolution",
   "numérique : approximation numérique ; état non_atteint",
   "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
-  "lorsque theta tend vers l'infini ; état precision_insuffisante (NA) quand la racine n'est pas représentable en",
-  "double précision à cette tolérance ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-  "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
+  "lorsque theta tend vers l'infini ; état precision_insuffisante (NA) quand la racine n'est pas calculable par cette",
+  "méthode en double précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini",
+  "ou non positif, limite indéterminée, résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 - 1|",
+  "<= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
+  "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux lignes ecart_minimal en fin (theta_80_superieur, theta_80_inferieur), textes exacts, inférieur par les quatre substitutions ; 15 lignes, UTF-8", {
   s <- tablexp:::STATUTS_HOMOGENEITE
   inf <- STATUT_SUP_218
   for (r in list(c("plus petit theta > 1", "plus grand theta < 1"),
                  c("quand theta_80 est au plus seuil_ecart_minimal", "quand theta_80 est au moins 1/seuil_ecart_minimal"),
-                 c("la valeur est optimiste pour un segment minoritaire (theta_80 réel plus éloigné de 1)",
+                 c(paste("la valeur est prudente (theta_80 réel au plus aussi éloigné de 1) quand pi >= 1 / (1 +",
+                         "sqrt(theta_80)), pi part d'exposition du segment (environ 0,472 quand theta_80 vaut",
+                         "seuil_ecart_minimal), et, en deçà, où rho^2 = theta_80 / (1 + pi (theta_80 - 1))^2, rapport",
+                         "exact des variances de U sous l'alternative et sous H0, dépasse 1, optimiste (theta_80 réel",
+                         "plus éloigné de 1) si theta_80 <= 51,38 ou pi >= 0,0049, de sens non établi sinon (moins de",
+                         "0,2 décès attendu dans le segment en theta_80)"),
                    "la valeur est prudente pour un segment minoritaire (theta_80 réel plus proche de 1)"),
                  c("lorsque theta tend vers l'infini", "lorsque theta tend vers 0"))) {
     if (lengths(regmatches(inf, gregexpr(r[1L], inf, fixed = TRUE))) != 1L) return(paste("substitution non unique :", r[1L]))
@@ -874,11 +890,16 @@ verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux li
 # tolérance en dur, « (1 + 1e-8) » (statut_ecart_minimal()), alors que le calcul
 # lit TOLERANCE_ECART_MINIMAL (R/validation.R). Le test précédent compare le
 # texte à un littéral, pas à la constante : celui-ci relit la valeur citée par
-# chaque statut et la compare à la constante.
-verifier("I statuts ecart_minimal (m3 de #218) : chaque statut cite « (1 + x) » une seule fois, x relu du texte identique à TOLERANCE_ECART_MINIMAL ; littéral 1e-8 ; témoin : une autre valeur est détectée", {
+# chaque statut et la compare à la constante. Depuis #331, la branche + cite
+# aussi « (1 + sqrt(theta_80)) » et « (1 + pi (theta_80 - 1)) » : ces deux
+# occurrences exactes (liste blanche) sont retirées avant la relecture ; toute
+# autre occurrence de « (1 + » compte.
+verifier("I statuts ecart_minimal (m3 de #218) : hors liste blanche exacte, chaque statut cite « (1 + x) » une seule fois, x relu du texte identique à TOLERANCE_ECART_MINIMAL ; littéral 1e-8 ; témoin : une autre valeur est détectée", {
   tol <- tablexp:::TOLERANCE_ECART_MINIMAL
   s <- tablexp:::STATUTS_HOMOGENEITE
+  blanche <- c("(1 + sqrt(theta_80))", "(1 + pi (theta_80 - 1))")
   citee <- function(txt) {
+    for (b in blanche) txt <- gsub(b, "", txt, fixed = TRUE)
     m <- regmatches(txt, gregexpr("\\(1 \\+ [^)]+\\)", txt))[[1L]]
     if (length(m) != 1L) return(NA_real_)
     suppressWarnings(as.numeric(sub("\\)$", "", sub("^\\(1 \\+ ", "", m))))
@@ -888,7 +909,47 @@ verifier("I statuts ecart_minimal (m3 de #218) : chaque statut cite « (1 + x) �
   tous(lignes = if (length(em) == 2L) TRUE else "deux statuts ecart_minimal attendus",
        citee = if (!anyNA(v) && all(v == tol)) TRUE else paste("valeur citée :", format(v), "; constante :", format(tol)),
        litteral = if (identical(tol, 1e-8)) TRUE else paste("constante :", format(tol)),
-       temoin = if (!is.na(citee("(1 + 1e-9)")) && citee("(1 + 1e-9)") != tol && is.na(citee("sans mention"))) TRUE else "témoin")
+       temoin = if (!is.na(citee("(1 + 1e-9)")) && citee("(1 + 1e-9)") != tol && is.na(citee("sans mention"))) TRUE else "témoin",
+       blanche = if (identical(citee("(1 + 1e-8) (1 + sqrt(theta_80)) (1 + pi (theta_80 - 1))"), 1e-8) &&
+                     is.na(citee("(1 + 1e-8) (1 + sqrt(theta))"))) TRUE else "liste blanche")
+})
+# #331 (spécification d'actuary-approfondi, Q5, corrigée à la reprise) :
+# chiffres cités par la branche + du statut, recalculés à partir des
+# constantes. rho* : seconde racine (au-delà du minimum, rho ~ 2,517) de
+# Phi(a / rho) + Phi(-b / rho) = puissance, a, b = sqrt(lambda_80) -/+ z ;
+# 0,472 = 1 / (1 + sqrt(seuil)) arrondi ; 51,38 = rho*^2 arrondi par défaut ;
+# 0,0049 = pi_c, racine de 1 / (4 pi (1 - pi)) = rho*^2, arrondi par excès ;
+# décès attendus dans le segment en theta_80, à D_. tenu pour fixe : D_. p,
+# D_. = lambda_80 pi (1 - pi) / (p - pi)^2, p = pi theta / (1 + pi (theta -
+# 1)), sous 0,2 au coin (51,38 ; 0,0049). Fragments ASCII (locale C).
+verifier("I statut theta_80_superieur (#331) : chiffres cités (0,472 ; 51,38 ; 0,0049 ; 0,2 décès) recalculés à partir de NIVEAU, PUISSANCE et SEUIL_ECART_MINIMAL et de non_centralite_ecart_minimal(1) ; témoin : un chiffre altéré est détecté", {
+  l80 <- tablexp:::non_centralite_ecart_minimal(1)
+  z <- stats::qnorm(1 - tablexp:::NIVEAU_ECART_MINIMAL / 2)
+  a <- sqrt(l80) - z; b <- sqrt(l80) + z
+  rs2 <- stats::uniroot(function(r) stats::pnorm(a / r) + stats::pnorm(-b / r) - tablexp:::PUISSANCE_ECART_MINIMAL,
+                        c(3, 100), tol = 1e-12)$root^2
+  pc <- (1 - sqrt(1 - 1 / rs2)) / 2
+  virgule <- function(x, n) sub(".", ",", sprintf("%.*f", n, x), fixed = TRUE)
+  seuil_pi <- virgule(round(1 / (1 + sqrt(tablexp:::SEUIL_ECART_MINIMAL)), 3), 3)
+  rho2 <- virgule(floor(100 * rs2) / 100, 2)
+  pi_c <- virgule(ceiling(1e4 * pc) / 1e4, 4)
+  th <- floor(100 * rs2) / 100; pp <- ceiling(1e4 * pc) / 1e4
+  p <- pp * th / (1 + pp * (th - 1))
+  deces <- l80 * pp * (1 - pp) * p / (p - pp)^2
+  fragments <- c(paste0("environ ", seuil_pi, " quand theta_80 vaut seuil_ecart_minimal"),
+                 paste0("si theta_80 <= ", rho2, " ou pi >= ", pi_c, ","), "(moins de 0,2 d")
+  controle <- function(txt) {
+    n <- vapply(fragments, function(f) lengths(regmatches(txt, gregexpr(f, txt, fixed = TRUE))), 0L)
+    if (all(n == 1L)) TRUE else paste("fragment(s) absent(s) ou répété(s) :", paste(fragments[n != 1L], collapse = " | "))
+  }
+  sup <- tablexp:::STATUTS_HOMOGENEITE$statut[14L]
+  tous(chiffres = if (identical(c(seuil_pi, rho2, pi_c), c("0,472", "51,38", "0,0049"))) TRUE
+                  else paste("recalculés :", seuil_pi, rho2, pi_c),
+       statut = controle(sup),
+       deces = if (deces < 0.2) TRUE else paste("décès attendus au coin :", format(deces, digits = 6)),
+       temoin = if (!isTRUE(controle(sub("51,38", "51,39", sup, fixed = TRUE))) &&
+                    !isTRUE(controle(sub("0,0049", "0,0048", sup, fixed = TRUE))) &&
+                    !isTRUE(controle(sub("0,472", "0,473", sup, fixed = TRUE)))) TRUE else "témoin")
 })
 verifier("I table ecart_minimal (F218) : une ligne par segment dans l'ordre des lignes globales de segments, clés de segmentation, theta_80_superieur, etat_superieur, theta_80_inferieur, etat_inferieur ; types (double, character) ; aucune ligne de tranche", {
   em <- H$resultat$ecart_minimal
@@ -1255,7 +1316,9 @@ verifier("I T4 balayage à deux segments en strate unique (valeur calculée à l
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
-# precision_insuffisante par la voie de T6 (racine très proche de 1 : en
+# precision_insuffisante par la voie de T6 (postcondition : résidu au-delà
+# de la tolérance pour une racine très proche de 1 ; en D = 1e20, résidus
+# mesurés de 3,7e-7 et -3,0e-8 ; en
 # strate unique 50 / 50, à partir d'un total de l'ordre de 1e17 décès dans la
 # strate (entre 2,5e17 et 3e17 pour les premières branches)) est hors de
 # portée de calculer_homogeneite() : les décès y sont des entiers d'au plus
@@ -1263,10 +1326,25 @@ verifier("I T4 balayage à deux segments en strate unique (valeur calculée à l
 # y reste exact (T = 0, O = A à parts égales) ; appel direct de
 # ecart_minimal_homogeneite(). La voie du débordement de D_c |h_c| en
 # -infini est supprimée (C1 d'actuary, décision du mainteneur du 20/11/2026 ;
-# T7). L'état reste atteignable par l'étape dans des cas extrêmes : racine
-# non représentable (theta+ au-delà du plus grand double), parts
-# dénormalisées où la postcondition échoue, limite lambda(-+infini) qui
-# déborde en +infini (b^2/d) quand la part d'un segment avoisine 1e-308 (#338).
+# T7). Motif de l'état (#340 ; Q4 d'actuary-approfondi, amendée par l'avis
+# d'actuary de l'étape (2)) : racine non calculable par cette méthode en
+# double précision à cette tolérance, qu'elle soit ou non représentable ;
+# chaque voie a son test (C3) : pivot non fini ou non positif (« I #338 Q2
+# pivots en échec ») ; limite NA, NaN ou -Inf (« I #338 Q1 limite
+# indéterminée ») ; non-convergence d'uniroot (« I F339 non-convergence
+# forcée ») ; postcondition non tenue, par le résidu (T6) et par theta non
+# fini ou nul (« I #338 Q1 limite +Inf, racine non représentable » : signe 1,
+# exp(800) = Inf ; signe -1, exp(-800) = 0). L'état reste
+# atteignable par l'étape dans des cas extrêmes : racine non représentable
+# (theta+ au-delà du plus grand double). Une part d'exposition dénormalisée
+# n'est pas, par elle-même, une voie : la postcondition contrôle lambda
+# calculée sur la part arrondie et tient (cas mesurés) ; la justesse de theta
+# par rapport aux parts exactes est dégradée, l'état reste produite (avis
+# d'actuary, #338 ; E_X = 5e-307 du scénario de Q1 ci-dessous). Une limite
+# lambda(-+infini) qui déborde en
+# +infini (b^2/d) quand la part d'un segment avoisine 1e-308 ne mène plus à
+# precision_insuffisante : elle compte au-delà du seuil et la racine est
+# résolue (Q1 de #338 ; test « I #338 scénario de Q1 » ci-dessous).
 # D = 1e15 plutôt que 1e17, cas frontière où un ulp de décalage de la libm
 # ferait dépasser 1e-8 (C2 d'actuary).
 verifier("I T6 témoin precision_insuffisante (valeur calculée à la main) : strate unique 50 / 50 ; D = 1e20 : quatre branches precision_insuffisante, NA, sans erreur ; D = 1e15 : produites, postcondition |lambda(theta) / lambda_80 - 1| <= 1e-8 (recalcul indépendant)", {
@@ -1415,4 +1493,304 @@ verifier("I rapport figé : section suffisance, élément de l'écart minimal d�
                  else "élément (étape absente)",
        table = if (any(startsWith(section(lignes_rapport(X), "etape_homogeneite"),
                                   "<caption><code>etapes/homogeneite/resultat/ecart_minimal</code>"))) TRUE else "table")
+})
+# Règle d'une branche de theta_80 (forme F339, #339 ; spécification
+# d'actuary-approfondi, Q3 de #339 et troncature de Q1 de #338) : appel direct
+# de resoudre_branche_ecart_minimal() avec une lambda factice, limite
+# 4 lambda_80, racines theta+ = 4/3 et theta- = 3/4 (valeur calculée à la
+# main : 4 (1 - 1/theta) = 1). La non-convergence de uniroot() n'est pas
+# atteignable par des données (5 039 résolutions, 67 itérations au plus,
+# corps de #339) : seul un maxiter réduit l'exerce. Conditions captées sans
+# les arrêter : valeur, erreur, avertissements sortis.
+capte_branche <- function(expr) {
+  av <- character(0)
+  r <- tryCatch(withCallingHandlers(expr, warning = function(w) {
+    av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning")
+  }), error = function(e) e)
+  list(valeur = if (inherits(r, "error")) NULL else r, erreur = if (inherits(r, "error")) r else NULL,
+       avertissements = av)
+}
+SEUIL_1 <- L80_1 * (1 + tablexp:::TOLERANCE_ECART_MINIMAL)
+LAMBDA_FACTICE <- function(u) 4 * L80_1 * (-expm1(-abs(u)))
+branche_factice <- function(lambda, signe, maxiter = 1000L)
+  capte_branche(tablexp:::resoudre_branche_ecart_minimal(lambda, signe, L80_1, SEUIL_1, TRUE, maxiter = maxiter))
+verifier("I F339 (#339) : resoudre_branche_ecart_minimal(lambda, signe, lam80, seuil, pivots, maxiter = 1000L) ; ecart_minimal_homogeneite() l'appelle deux fois (signes 1 et -1) et n'appelle plus uniroot() elle-même", {
+  f <- tablexp:::resoudre_branche_ecart_minimal
+  corps <- gsub("\\s+", " ", paste(deparse(body(tablexp:::ecart_minimal_homogeneite), width.cutoff = 500L), collapse = " "))
+  appels <- regmatches(corps, gregexpr("resoudre_branche_ecart_minimal\\(lambda, -?1, lam80, seuil, pivots\\)", corps))[[1L]]
+  tous(arguments = if (identical(names(formals(f)), c("lambda", "signe", "lam80", "seuil", "pivots", "maxiter"))) TRUE
+                   else paste(names(formals(f)), collapse = ", "),
+       maxiter = if (identical(formals(f)$maxiter, 1000L)) TRUE else "maxiter par défaut",
+       appels = if (identical(appels, c("resoudre_branche_ecart_minimal(lambda, 1, lam80, seuil, pivots)",
+                                        "resoudre_branche_ecart_minimal(lambda, -1, lam80, seuil, pivots)"))) TRUE
+                else paste(appels, collapse = " / "),
+       uniroot = if (!grepl("uniroot", corps, fixed = TRUE)) TRUE else "uniroot dans ecart_minimal_homogeneite()")
+})
+verifier("I F339 non-convergence forcée (#339 ; valeur calculée à la main) : lambda factice ; maxiter de 1 à 6, signes 1 et -1 : precision_insuffisante, NA, aucune erreur, aucun avertissement sorti ; témoin, maxiter par défaut : produite, 4/3 et 3/4 à 1e-14, sans avertissement", {
+  e <- character(0)
+  for (m in 1:6) for (s in c(1, -1)) {
+    r <- branche_factice(LAMBDA_FACTICE, s, maxiter = m)
+    if (!is.null(r$erreur)) { e <- c(e, sprintf("maxiter %d, signe %d : erreur %s", m, s, conditionMessage(r$erreur))); next }
+    if (length(r$avertissements))
+      e <- c(e, sprintf("maxiter %d, signe %d : avertissement %s", m, s, paste(r$avertissements, collapse = " / ")))
+    if (!identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("maxiter %d, signe %d : %s %s", m, s, r$valeur$etat, format(r$valeur$theta)))
+  }
+  for (s in c(1, -1)) {
+    r <- branche_factice(LAMBDA_FACTICE, s)
+    att <- if (s > 0) 4 / 3 else 3 / 4
+    if (!is.null(r$erreur) || length(r$avertissements) || !identical(r$valeur$etat, "produite") ||
+        !isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      e <- c(e, sprintf("témoin signe %d : %s", s, if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                                                   else paste(r$valeur$etat, format(r$valeur$theta, digits = 17))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Messages de R attendus dans la langue de la session : reconstruits par
+# gettext() dans le domaine de leur source (R 4.3.3), comme R les produit.
+# uniroot() relance l'avertissement de zeroin par stop("convergence problem
+# in zero finding: ", conditionMessage(w)) (corps de stats::uniroot), dont
+# chaque fragment passe par gettext() dans le domaine R-stats ;
+# l'avertissement « NA/Inf replaced by maximum positive value » vient du code
+# C de zeroin, domaine stats ; « w-int », émis par le test, reste littéral.
+MSG_CONVERGENCE_ZEROIN <- gettext("convergence problem in zero finding: ", domain = "R-stats")
+verifier("I F339 cas adverses (#339) : une erreur émise dans lambda est relancée telle quelle (« boum ») ; un avertissement émis dans lambda pendant la résolution est relancé en erreur « convergence problem in zero finding: w-int », non converti, sans avertissement sorti ; un NaN de lambda en un point intérieur (0,3 < |u| < 1), signes 1 et -1, est relancé en erreur « convergence problem in zero finding: NA/Inf replaced by maximum positive value », non converti, sans avertissement sorti (messages de R dans la langue de la session)", {
+  r_e <- branche_factice(function(u) if (abs(u) > 0 && abs(u) < 1) stop("boum") else LAMBDA_FACTICE(u), 1)
+  r_w <- branche_factice(function(u) { if (abs(u) > 0 && abs(u) < 1) warning("w-int"); LAMBDA_FACTICE(u) }, 1)
+  tous(erreur = if (!is.null(r_e$erreur) && identical(conditionMessage(r_e$erreur), "boum") && is.null(r_e$valeur)) TRUE
+                else "erreur de lambda non relancée",
+       avertissement = if (!is.null(r_w$erreur) &&
+                           identical(conditionMessage(r_w$erreur), paste0(MSG_CONVERGENCE_ZEROIN, "w-int")) &&
+                           !length(r_w$avertissements) && is.null(r_w$valeur)) TRUE
+                       else "avertissement de lambda converti ou sorti",
+       nan = {
+         ln <- function(u) if (abs(u) > 0.3 && abs(u) < 1) NaN else LAMBDA_FACTICE(u)
+         ok <- vapply(c(1, -1), function(s) {
+           r <- branche_factice(ln, s)
+           !is.null(r$erreur) && is.null(r$valeur) && !length(r$avertissements) &&
+             identical(conditionMessage(r$erreur),
+                       paste0(MSG_CONVERGENCE_ZEROIN,
+                              gettext("NA/Inf replaced by maximum positive value", domain = "stats")))
+         }, TRUE)
+         if (all(ok)) TRUE else "NaN intérieur de lambda converti ou sorti"
+       })
+})
+verifier("I F339 (#339, constat m1 de l'audit) : le message de non-convergence est régénéré par ngettext(..., domain = \"R-stats\") dans resoudre_branche_ecart_minimal() (structurel : aucune locale traduite installée sur l'hôte de mesure)", {
+  corps <- gsub("\\s+", " ", paste(deparse(body(tablexp:::resoudre_branche_ecart_minimal), width.cutoff = 500L), collapse = " "))
+  attendu <- paste0("ngettext(maxiter, \"_NOT_ converged in %d iteration\", \"_NOT_ converged in %d iterations\", ",
+                    "domain = \"R-stats\")")
+  if (grepl(attendu, corps, fixed = TRUE)) TRUE else "appel ngettext avec domain = \"R-stats\" absent"
+})
+verifier("I F339 troncature de f (Q1 de #338) : lambda = +Inf aux points intérieurs |u| > 0,3 (au-delà de la racine), limite finie : produite, 4/3 et 3/4 à 1e-14, aucune erreur ni avertissement", {
+  li <- function(u) if (is.finite(u) && abs(u) > 0.3) Inf else LAMBDA_FACTICE(u)
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(li, s)
+    att <- if (s > 0) 4 / 3 else 3 / 4
+    if (!is.null(r$erreur)) { e <- c(e, sprintf("signe %d : erreur %s", s, conditionMessage(r$erreur))); next }
+    if (length(r$avertissements)) e <- c(e, sprintf("signe %d : avertissement %s", s, paste(r$avertissements, collapse = " / ")))
+    if (!identical(r$valeur$etat, "produite") || !isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      e <- c(e, sprintf("signe %d : %s %s", s, r$valeur$etat, format(r$valeur$theta, digits = 17)))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Ordre des contrôles et limite +Inf (Q1 et Q2 de #338, spécification
+# d'actuary-approfondi) : pivots en échec avant toute évaluation de lambda ;
+# limite NA, NaN ou -Inf : precision_insuffisante ; limite finie au plus le
+# seuil : non_atteint ; limite +Inf comprise au-delà du seuil : encadrement et
+# résolution. lambda factice de limite remplacée (racines inchangées, 4/3 et
+# 3/4, valeur calculée à la main).
+verifier("I #338 Q1 limite indéterminée (par la seam) : limite NaN, NA ou -Inf, signes 1 et -1 : precision_insuffisante, NA, sans erreur ni avertissement", {
+  e <- character(0)
+  for (lim in list(NaN, NA_real_, -Inf)) for (s in c(1, -1)) {
+    r <- branche_factice(function(u) if (is.infinite(u)) lim else LAMBDA_FACTICE(u), s)
+    if (!is.null(r$erreur) || length(r$avertissements) ||
+        !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("limite %s, signe %d : %s", format(lim), s,
+                        if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                        else paste(r$valeur$etat, format(r$valeur$theta), paste(r$avertissements, collapse = " / "))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Seuil inclusif (constat m1 de l'audit de la revue finale de B32) : limite
+# exactement égale au seuil : non_atteint ; témoin, limite au-dessus du seuil
+# de quelques ulp : encadrement et résolution, racines 4/3 et 3/4 (valeur
+# calculée à la main).
+verifier("I #338 seuil inclusif (par la seam) : limite égale à SEUIL_1, signes 1 et -1 : non_atteint, NA, sans erreur ni avertissement ; témoin, limite SEUIL_1 (1 + 4e-16) : produite, 4/3 et 3/4 à 1e-14", {
+  e <- character(0)
+  for (cas in list(list("égale au seuil", SEUIL_1, "non_atteint"), list("témoin", SEUIL_1 * (1 + 4e-16), "produite")))
+    for (s in c(1, -1)) {
+      lim <- cas[[2L]]
+      r <- branche_factice(function(u) if (is.infinite(u)) lim else LAMBDA_FACTICE(u), s)
+      att <- if (cas[[3L]] == "non_atteint") NA_real_ else if (s > 0) 4 / 3 else 3 / 4
+      ok <- is.null(r$erreur) && !length(r$avertissements) && identical(r$valeur$etat, cas[[3L]]) &&
+        (if (is.na(att)) identical(r$valeur$theta, NA_real_) else isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      if (!ok)
+        e <- c(e, sprintf("%s, signe %d : %s", cas[[1L]], s,
+                          if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                          else paste(r$valeur$etat, format(r$valeur$theta, digits = 17),
+                                     paste(r$avertissements, collapse = " / "))))
+    }
+  if (SEUIL_1 * (1 + 4e-16) <= SEUIL_1) e <- c(e, "témoin non distinct du seuil en double")
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I #338 Q1 limite +Inf (par la seam) : comptée au-delà du seuil, encadrement et résolution ; signes 1 et -1 : produite, 4/3 et 3/4 à 1e-14, sans erreur ni avertissement", {
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(function(u) if (is.infinite(u)) Inf else LAMBDA_FACTICE(u), s)
+    att <- if (s > 0) 4 / 3 else 3 / 4
+    if (!is.null(r$erreur)) { e <- c(e, sprintf("signe %d : erreur %s", s, conditionMessage(r$erreur))); next }
+    if (length(r$avertissements) || !identical(r$valeur$etat, "produite") || !isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      e <- c(e, sprintf("signe %d : %s %s %s", s, r$valeur$etat, format(r$valeur$theta, digits = 17),
+                        paste(r$avertissements, collapse = " / ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Limite +Inf, racine en u = 800 (theta = exp(800) = Inf en double) : la
+# résolution aboutit, la postcondition (theta fini) rend precision_insuffisante
+# (recommandation de l'audit léger de l'étape (2) de #338).
+verifier("I #338 Q1 limite +Inf, racine non représentable (par la seam) : lambda_80 exp(|u| - 800), signes 1 et -1 : precision_insuffisante par la postcondition, NA, sans erreur ni avertissement", {
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(function(u) L80_1 * exp(abs(u) - 800), s)
+    if (!is.null(r$erreur) || length(r$avertissements) ||
+        !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("signe %d : %s", s, if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                                           else paste(r$valeur$etat, format(r$valeur$theta), paste(r$avertissements, collapse = " / "))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Précondition lambda(+-1024) = lambda(+-infini) non tenue (constat CR2 de la
+# revue finale de B32) : limite 4 lambda_80, lambda égale à 0,5 lambda_80 pour
+# tout |u| fini ; la boucle de doublement atteint 1024 sous lambda_80. Avant :
+# uniroot sur des bornes de même signe, erreur relancée ; après :
+# precision_insuffisante, sans signal.
+verifier("I #338 CR2 lambda sous lambda_80 en |u| = 1024, limite au-delà du seuil (par la seam) : limite 4 lambda_80, 0,5 lambda_80 pour tout |u| fini, signes 1 et -1 : precision_insuffisante, NA, sans erreur ni avertissement", {
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(function(u) if (is.infinite(u)) 4 * L80_1 else 0.5 * L80_1, s)
+    if (!is.null(r$erreur) || length(r$avertissements) ||
+        !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("signe %d : %s", s, if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                                           else paste(r$valeur$etat, format(r$valeur$theta), paste(r$avertissements, collapse = " / "))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I #338 Q2 pivots en échec (par la seam) : precision_insuffisante sur les deux signes, lambda jamais évaluée (compteur d'appels nul), y compris quand la limite est au plus le seuil (0,5 lambda_80 : non_atteint si le seuil passait d'abord) ou au-delà", {
+  e <- character(0)
+  for (cas in list(list("limite <= seuil", function(u) 0.5 * L80_1), list("limite 4 lambda_80", LAMBDA_FACTICE)))
+    for (s in c(1, -1)) {
+      n <- 0L
+      lam <- cas[[2L]]
+      r <- capte_branche(tablexp:::resoudre_branche_ecart_minimal(function(u) { n <<- n + 1L; lam(u) }, s, L80_1, SEUIL_1, FALSE))
+      if (!is.null(r$erreur) || length(r$avertissements) || n != 0L ||
+          !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+        e <- c(e, sprintf("%s, signe %d : %s, %d appel(s) de lambda", cas[[1L]], s,
+                          if (!is.null(r$erreur)) conditionMessage(r$erreur) else r$valeur$etat, n))
+    }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Constat m2 de l'audit de 1ef94e2 (commentaire de
+# resoudre_branche_ecart_minimal()) : un NaN de lambda (chemin qu'aucune
+# donnée n'atteint) dans la boucle de doublement en h < 1024 l'arrête sur
+# l'erreur de if ; en u = 0 ou |u| = 1024, seules bornes que la boucle n'a pas
+# évaluées sans NaN, uniroot lève « f.lower (f.upper) = ... is NA ». lambda
+# lente (racine en u voisin de 5,75) pour que la boucle double jusqu'à h = 8.
+# Messages attendus reconstruits par gettext() dans la langue de la session :
+# erreur de if du code C de l'évaluateur, domaine R ; « f.lower (f.upper) =
+# ... is NA », stop() de stats::uniroot, domaine R-stats.
+verifier("I #338 m2 NaN de lambda hors de zeroin (par la seam ; messages de R 4.3.3, dans la langue de la session) : en |u| = 1, 2, 4, 8 (boucle de doublement) : erreur « missing value where TRUE/FALSE needed » ; en u = 0 : « f.lower = f(lower) is NA » (signe 1) ; en |u| = 1024 (lambda finie sous lambda_80, limite au-delà) : « f.upper = f(upper) is NA » (signe 1)", {
+  lente <- function(u) 4 * L80_1 * (-expm1(-abs(u) / 20))
+  msg <- function(lam) { r <- branche_factice(lam, 1); if (is.null(r$erreur)) "aucune erreur" else conditionMessage(r$erreur) }
+  boucle <- vapply(c(1, 2, 4, 8), function(h) msg(function(u) if (is.finite(u) && abs(u) == h) NaN else lente(u)), "")
+  zero <- msg(function(u) if (u == 0) NaN else LAMBDA_FACTICE(u))
+  cap <- msg(function(u) if (is.finite(u) && abs(u) == 1024) NaN else if (is.infinite(u)) 2 * L80_1 else 0.5 * L80_1)
+  tous(boucle = if (all(boucle == gettext("missing value where TRUE/FALSE needed", domain = "R"))) TRUE
+                else paste(boucle, collapse = " / "),
+       zero = if (identical(zero, gettext("f.lower = f(lower) is NA", domain = "R-stats"))) TRUE else zero,
+       cap = if (identical(cap, gettext("f.upper = f(upper) is NA", domain = "R-stats"))) TRUE else cap)
+})
+# Scénario de Q1 de #338 par les données : âge 60 seul ; A (5000, 600), X
+# (E_X, 1), E_X dans {5e-305, 5e-307} ; lambda_X(+infini) déborde en +Inf
+# (part de X voisine de 1e-308 ou dénormalisée). Avant : theta+ de X
+# precision_insuffisante ; après : produite. Recalcul indépendant par
+# l'inverse exacte de la forme à deux segments en strate unique (D = 601) :
+# lambda = D p_X p_A g^2, g = (theta - 1) / (p_A + p_X theta), donc theta =
+# (1 + g p_A) / (1 - g p_X), g = sqrt(lambda_80 / (D p_X p_A)). Tolérance 1e-10
+# en relatif (celle de T7) : écart mesuré 5,2e-14 et 1,6e-14, sous la
+# précision qu'assure la postcondition (1e-8 sur lambda, environ 5e-9 sur
+# theta, lambda en theta^2). A reste variance_nulle (#333, #334). Le signal
+# ecart_minimal_detectable, déjà émis avant par theta- de X non_atteint, l'est
+# une fois, à l'identique (constat d'actuary).
+verifier("I #338 scénario de Q1 (recalcul indépendant) : âge 60, A (5000, 600), X (E_X, 1), ordre (A, X), E_X dans {5e-305, 5e-307} : theta+ de X produite, à 1e-10 de l'inverse exacte (1.142789047e+153 et 1.142789047e+154), postcondition <= 1e-8 ; theta- de X non_atteint ; A variance_nulle ; signal ecart_minimal_detectable une fois ; aucun avertissement de R", {
+  e <- character(0)
+  for (k in 1:2) {
+    eX <- c(5e-305, 5e-307)[k]
+    d <- expo_seg(c("A", "X"), c(60, 60), c(5000, eX), c(600, 1))
+    av <- character(0)
+    r <- tryCatch(withCallingHandlers(homog(d, "segment", c(60, 60), 60), warning = function(w) {
+      av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning")
+    }), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, sprintf("E_X %g : erreur %s", eX, conditionMessage(r))); next }
+    em <- r$resultat$ecart_minimal
+    a <- match("A", em$segment); x <- match("X", em$segment)
+    Ec <- 5000 + eX; px <- eX / Ec; pa <- 5000 / Ec
+    g <- sqrt(L80_1 / (601 * px * pa))
+    att <- (1 + g * pa) / (1 - g * px)
+    th <- em$theta_80_superieur[x]
+    et <- c(em$etat_superieur[x], em$etat_inferieur[x], em$etat_superieur[a], em$etat_inferieur[a])
+    if (!identical(et, c("produite", "non_atteint", "variance_nulle", "variance_nulle")))
+      e <- c(e, sprintf("E_X %g : états %s", eX, paste(et, collapse = "/")))
+    else if (!isTRUE(proche(th, att, 1e-10, 0)) || !isTRUE(proche(th, c(1.142789047e153, 1.142789047e154)[k], 1e-9, 0)) ||
+             !(abs(lambda_deux(601, px, pa, th) / L80_1 - 1) <= 1e-8))
+      e <- c(e, sprintf("E_X %g : theta+ de X %s, attendu %s", eX, format(th, digits = 17), format(att, digits = 17)))
+    n_sig <- sum(r$avertissements$code == "ecart_minimal_detectable")
+    if (n_sig != 1L) e <- c(e, sprintf("E_X %g : %d signal(aux) ecart_minimal_detectable", eX, n_sig))
+    if (length(av)) e <- c(e, sprintf("E_X %g : avertissements de R %s", eX, paste(av, collapse = " / ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Ordre (X, A) du même scénario : le test global s'arrête avant theta_80 sur
+# « Lapack routine dgesv: system is exactly singular » (V réduite par
+# soustraction, dépendance à l'ordre : défaut de #334), avant comme après #338.
+# Critère (avis d'actuary, Q3 de la reprise de #338) : invariance de toute la
+# table ecart_minimal à l'ordre des segments, sans figer l'état de A
+# (variance_nulle relève de #333) : pour chaque segment (apparié par son nom),
+# mêmes états des deux branches, theta égaux à 1e-10 en relatif quand l'état
+# est produite et NA tous deux sinon, même nombre de signaux
+# ecart_minimal_detectable ; plus, sur X, theta+ produite à 1e-10 de l'inverse
+# exacte et theta- non_atteint. Seul l'arrêt dgesv rend un écart décrit (échec
+# attendu) ; tout autre écart lève une erreur (ECHEC, pas un échec attendu).
+echec_attendu("I #338 scénario de Q1, ordre (X, A) : mêmes états et theta des deux segments qu'en ordre (A, X), sans arrêt dgesv", "#334", {
+  e <- character(0)
+  for (eX in c(5e-305, 5e-307)) {
+    d <- expo_seg(c("A", "X"), c(60, 60), c(5000, eX), c(600, 1))
+    r_ax <- homog(d, "segment", c(60, 60), 60)
+    r <- tryCatch(homog(d[2:1, ], "segment", c(60, 60), 60), error = function(x)
+      if (grepl("dgesv", conditionMessage(x), fixed = TRUE)) conditionMessage(x) else stop(x))
+    if (is.character(r)) { e <- c(e, sprintf("E_X %g : arrêt %s", eX, r)); next }
+    em1 <- r_ax$resultat$ecart_minimal; em2 <- r$resultat$ecart_minimal
+    k <- match(em1$segment, em2$segment)
+    if (nrow(em1) != nrow(em2) || anyNA(k)) stop(sprintf("E_X %g : segments différents d'un ordre à l'autre", eX))
+    for (b in c("superieur", "inferieur")) {
+      et1 <- em1[[paste0("etat_", b)]]; et2 <- em2[[paste0("etat_", b)]][k]
+      th1 <- em1[[paste0("theta_80_", b)]]; th2 <- em2[[paste0("theta_80_", b)]][k]
+      if (!identical(et1, et2))
+        stop(sprintf("E_X %g : états %s %s / %s", eX, b, paste(et1, collapse = ","), paste(et2, collapse = ",")))
+      p <- et1 == "produite"
+      if ((any(p) && !isTRUE(proche(th2[p], th1[p], 1e-10, 0))) || !all(is.na(th1[!p]) & is.na(th2[!p])))
+        stop(sprintf("E_X %g : theta %s %s / %s", eX, b, paste(format(th1, digits = 17, trim = TRUE), collapse = ","),
+                     paste(format(th2, digits = 17, trim = TRUE), collapse = ",")))
+    }
+    n1 <- sum(r_ax$avertissements$code == "ecart_minimal_detectable")
+    n2 <- sum(r$avertissements$code == "ecart_minimal_detectable")
+    if (n1 != n2) stop(sprintf("E_X %g : %d / %d signal(aux) ecart_minimal_detectable", eX, n1, n2))
+    x <- match("X", em2$segment)
+    Ec <- 5000 + eX; px <- eX / Ec; pa <- 5000 / Ec
+    g <- sqrt(L80_1 / (601 * px * pa))
+    if (!identical(c(em2$etat_superieur[x], em2$etat_inferieur[x]), c("produite", "non_atteint")) ||
+        !isTRUE(proche(em2$theta_80_superieur[x], (1 + g * pa) / (1 - g * px), 1e-10, 0)))
+      stop(sprintf("E_X %g : X %s %s", eX, em2$etat_superieur[x], format(em2$theta_80_superieur[x], digits = 17)))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
 })

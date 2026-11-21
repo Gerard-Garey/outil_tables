@@ -460,6 +460,12 @@ TRANSITIONS_EN_COURS <- list()
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
 # les constantes *_218C retirées.
+# Transitions #340 (motif de precision_insuffisante) et #331 (sens de l'erreur
+# de la branche +) de B32, sur les deux statuts ecart_minimal de R11 et R12,
+# closes par la régénération (R) de B32 (exécution 44894726135, sur 0a29756) :
+# transition_340(), transition_331(), apres_340(), apres_331(),
+# statuts_apres_b32(), substituer_b32() et les constantes *_340, *_331 et
+# CHEMIN_STATUTS_B32 retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
