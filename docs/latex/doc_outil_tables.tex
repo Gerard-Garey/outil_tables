@@ -15728,12 +15728,65 @@ p-valeur n'y est comparée à un niveau.
     $z$ quantile d'ordre $1 - \alpha/2$ de la loi normale~; elle s'écarte
     de 0,80 d'au plus 0,027 pour $\theta_{80}$ entre $1/1{,}25$ et $1{,}25$
     (calcul sur une grille de $\pi$ et de $\theta$), d'où la borne
-    «~0,03 au plus~» du statut, davantage au-delà. Pour un segment
-    minoritaire ($\pi < 0{,}5$), $\rho > 1$ sur la branche $+$~: la
-    puissance réelle est inférieure à 0,80 et la valeur est
-    \textbf{optimiste} ($\theta_{80}^{+}$ réel plus éloigné de~1)~;
-    $\rho < 1$ sur la branche $-$~: la valeur est \textbf{prudente}
-    ($\theta_{80}^{-}$ réel plus proche de~1). Au-delà de deux segments ou
+    «~0,03 au plus~» du statut, davantage au-delà. Sens de l'erreur
+    (issue~\#331), à deux segments en strate unique, avec $h = \theta -
+    1$~: (1)~l'identité $\theta - (1 + \pi h)^2 = h\,(1 - 2\pi - \pi^2
+    h)$ donne, sur la branche~$+$, $\rho > 1$ si et seulement si $\pi <
+    1/(1 + \sqrt{\theta})$ (résultat exact)~; au seuil, $1/(1 +
+    \sqrt{1{,}25}) = 2(\sqrt{5} - 2) \approx 0{,}4721$~; (2)~la puissance
+    réelle en approximation normale, $P(m, \rho) = \Phi\bigl((m -
+    z)/\rho\bigr) + \Phi\bigl((-m - z)/\rho\bigr)$, croît en $m > 0$
+    (résultat exact~: sa dérivée en $m$ vaut $\bigl(\varphi((m - z)/\rho)
+    - \varphi((m + z)/\rho)\bigr)/\rho > 0$), et $m = \sqrt{\lambda_s}$
+    croît sur chaque branche (résultat exact, \textbf{Monotonie},
+    ci-dessus)~; (3)~en $m = \sqrt{\lambda_{80}}$, $P$ vaut 0,80 en $\rho
+    = 1$, reste sous 0,80 pour $\rho \in \left]1~; \rho^{*}\right[$ et au
+    moins à 0,80 ailleurs, avec $\rho^{*2} \approx 51{,}3865$~: la
+    racine $\rho^{*}$ est une approximation numérique
+    (\code{uniroot()}), la forme de $P$ en $\rho$ un constat sur grille,
+    non démontré~; (4)~$\rho^2 \le \theta$ pour $\theta \ge 1$, et
+    $\max_\theta \rho^2 = 1/\bigl(4\pi(1 - \pi)\bigr)$, atteint en $\theta
+    = (1 - \pi)/\pi$ (résultat exact)~; (5)~d'où trois cas sur la
+    branche~$+$. La valeur est \textbf{prudente} ($\theta_{80}^{+}$ réel au
+    plus aussi éloigné de~1) si $\pi \ge 1/(1 + \sqrt{\theta_{80}})$~:
+    alors $\rho \le 1$ en $\theta_{80}$ et la puissance réelle y est au
+    moins 0,80, sans hypothèse de monotonie de la puissance réelle en
+    $\theta$. Elle est \textbf{optimiste} ($\theta_{80}^{+}$ réel plus
+    éloigné de~1) si $\pi < 1/(1 + \sqrt{\theta_{80}})$ et
+    ($\theta_{80} \le 51{,}38$ ou $\pi \ge 0{,}0049$)~: $\rho$ dépasse
+    alors~1 sur tout $\left]1~; \theta_{80}\right]$ (le seuil $1/(1 +
+    \sqrt{\theta})$ décroît en $\theta$) et reste sous $\rho^{*}$ (par~(4),
+    $\rho^2 \le \theta \le 51{,}38$, ou $\rho^2 \le 1/\bigl(4\pi(1 -
+    \pi)\bigr)$ avec $\pi \ge 0{,}0049$), si bien que, par~(2) et~(3), la
+    puissance réelle reste sous 0,80 sur tout cet intervalle~; la
+    condition porte sur tout l'intervalle parce que la puissance réelle
+    n'est pas monotone en $\theta$. Elle est \textbf{de sens non établi}
+    sinon. Les seuils 51,38 ($\rho^{*2}$ arrondi par défaut) et 0,0049
+    ($\pi_c \approx 0{,}004889$, racine de $1/\bigl(4\pi(1 - \pi)\bigr) =
+    \rho^{*2}$, arrondi par excès) sont choisis pour que les conditions
+    restent suffisantes. (6)~Dans la zone de sens non établi, le segment
+    compte moins de 0,2 décès attendu en $\theta_{80}$ (à $D_{\cdot c}$
+    tenu pour fixe)~: le maximum, 0,19908, est atteint au coin
+    $(51{,}38~; 0{,}0049)$~; c'est une borne exacte par monotonie de la
+    forme close selon \code{actuary-approfondi} (avis de la reprise de
+    l'issue~\#331, rapporté), et le maximum sur une grille de la zone le
+    retrouve au coin~; ce régime est hors du domaine de l'approximation
+    normale, et les deux sens de l'erreur y apparaissent sur grille
+    (constat d'\code{actuary-approfondi}, rapporté, non reproduit ici).
+    (7)~Sur la branche~$-$ ($h < 0$), l'identité~(1) donne $\rho < 1$
+    pour $\pi < 0{,}5$ (résultat exact)~: la puissance réelle est alors au
+    moins 0,80 et la valeur est \textbf{prudente} ($\theta_{80}^{-}$ réel
+    plus proche de~1). Le statut l'écrit ainsi, pour la branche~$+$~:
+    «~la valeur est prudente (theta\_80 réel au plus aussi éloigné de 1)
+    quand pi >= 1 / (1 + sqrt(theta\_80)), pi part d'exposition du segment
+    (environ 0,472 quand theta\_80 vaut seuil\_ecart\_minimal), et, en
+    deçà, où rho\textasciicircum 2 = theta\_80 / (1 + pi (theta\_80 -
+    1))\textasciicircum 2, rapport exact des variances de U sous
+    l'alternative et sous H0, dépasse 1, optimiste (theta\_80 réel plus
+    éloigné de 1) si theta\_80 <= 51,38 ou pi >= 0,0049, de sens non
+    établi sinon (moins de 0,2 décès attendu dans le segment en
+    theta\_80)~»~; pour la branche~$-$~: «~la valeur est prudente pour un
+    segment minoritaire (theta\_80 réel plus proche de 1)~». Au-delà de deux segments ou
     à parts différentes entre strates, aucune borne n'est établie.
     $\lambda_{80}$ et $\theta_{80}$, par résolution numérique~:
     approximation numérique. Le statut écrit aussi la définition et ses
@@ -15908,7 +15961,7 @@ des colonnes de \code{segments} sur une exposition à 0 ligne, identiques
 du rapport figé et le rejeu. \textbf{Écart minimal détectable}
 (issue~\#218, critères~2, 3 et~5)~: les constantes, les paramètres
 restitués, les deux lignes de statut (texte littéral de la spécification,
-modifié par la correction du 19/11/2026 et par le motif de \code{precision\_insuffisante} de l'issue~\#340, et ses quatre substitutions), la
+modifié par la correction du 19/11/2026, par le motif de \code{precision\_insuffisante} de l'issue~\#340 et par le sens de l'erreur sur la branche~$+$ de l'issue~\#331, et ses quatre substitutions)~; les chiffres que cite la branche~$+$ (0,472~; 51,38~; 0,0049~; 0,2~décès), recalculés à partir de \code{NIVEAU\_ECART\_MINIMAL}, \code{PUISSANCE\_ECART\_MINIMAL}, \code{SEUIL\_ECART\_MINIMAL} et de $\lambda_{80}$ à 1~ddl, chacun présent une fois dans le texte, un chiffre altéré étant détecté (témoin)~; la tolérance citée «~(1 + 1e-8)~», relue dans chaque statut et comparée à \code{TOLERANCE\_ECART\_MINIMAL}, après retrait des deux seules autres occurrences admises de «~(1 +~» (liste blanche exacte~: «~(1 + sqrt(theta\_80))~» et «~(1 + pi (theta\_80 - 1))~»), la
 liste des états, \code{precision\_insuffisante} compris, la forme de la
 table~; la forme close à
 parts constantes à deux et à quatre segments, à $10^{-8}$~; l'identité
@@ -16010,7 +16063,10 @@ cibles 1,25 et 0,80~; $D_0$ arrondi de $\lambda_{80}/\bigl(\pi(1 -
 $D_0 \pm 20$~: la puissance exacte du test asymptotique en
 $\theta_{80}(D)$ est exigée dans $[0{,}75~; 0{,}85]$ pour chaque $D$, sa
 moyenne sur la fenêtre dans $[0{,}76~; 0{,}84]$, sous 0,80 pour la cible
-1,25 et au-dessus pour la cible 0,80 quand $\pi < 0{,}5$, dans $[0{,}79~;
+1,25 et au-dessus pour la cible 0,80 quand $\pi < 0{,}5$ (les trois
+valeurs de $\pi$ inférieures à 0,5 le sont aussi à $0{,}4721$~: cas
+optimiste de la branche~$+$ et cas prudent de la branche~$-$, au sens du
+\textbf{Statut}~; critère inchangé par l'issue~\#331), dans $[0{,}79~;
 0{,}81]$ à $\pi = 0{,}5$~; un dépassement serait une question pour
 \code{actuary}, non une borne à élargir. La batterie de reproductibilité
 recalcule $\lambda_{80}$, $\lambda_s$ et la racine $\theta_{80}$
