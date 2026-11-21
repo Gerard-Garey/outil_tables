@@ -15636,7 +15636,7 @@ p-valeur n'y est comparée à un niveau.
     de $\lambda_s$), ou si la limite $\lambda_s(\pm\infty)$ vaut
     \code{NA}, \code{NaN} ou $-\infty$ (garde défensive~: avec des pivots
     finis et strictement positifs, $\lambda_s$ est dans $[0~; +\infty]$,
-    sans \code{NaN})~; (b)~sinon \code{non\_atteint} si la limite, finie,
+    sans \code{NaN}~; lecture du code, non une preuve)~; (b)~sinon \code{non\_atteint} si la limite, finie,
     est au plus $\lambda_{80}\,(1 + 10^{-8})$~; (c)~sinon, limite
     $+\infty$ comprise, résolution~: \code{precision\_insuffisante} si
     \code{uniroot()} ne converge pas (\textbf{Calcul}, point~(4)), sinon
@@ -15688,9 +15688,18 @@ p-valeur n'y est comparée à un niveau.
     exactes est en revanche dégradée sans que la postcondition la voie~:
     écart relatif jusqu'à $4{,}5 \cdot 10^{-9}$ pour une part voisine de
     $2 \cdot 10^{-316}$, en strate unique, $10^{9}$ décès (constat de
-    simulation d'\code{actuary-approfondi} à l'étape~(2) de B32,
-    rapporté, non reproduit ici~; ADR 0009, mention du 21/11/2026, et
-    décision du mainteneur M565)~; pour des parts plus petites, le test
+    mesure d'\code{actuary-approfondi} sur cas construits, à
+    l'étape~(2) de B32, rapporté, non reproduit ici~; ADR 0009, mention du 21/11/2026, et
+    décision du mainteneur M565)~; au premier ordre, à deux segments en
+    strate unique, l'erreur relative de $\theta_{80}^{+}$ vaut $-1/2$
+    fois l'erreur relative d'arrondi de la part ($\theta_{80}^{+} - 1$
+    varie comme $\pi^{-1/2}$ pour une part infime~; résultat exact au
+    premier ordre), soit au plus environ $6 \cdot 10^{-9}$ vers $2 \cdot
+    10^{-316}$, l'arrondi d'une part dénormalisée étant au plus
+    $2^{-1075} \approx 2{,}5 \cdot 10^{-324}$ en absolu (rapport
+    $-0{,}50$ mesuré par \code{actuary} à l'étape~(7) de B32 sur six
+    parts de $1{,}5 \cdot 10^{-316}$ à $10^{-314}$, script hors
+    dépôt)~; pour des parts plus petites, le test
     global s'arrête avant $\theta_{80}$ (issue~\#334). En strate unique,
     le segment majoritaire face à une part infime est d'abord
     \code{variance\_nulle} par l'arrondi du test global (issue~\#333).
