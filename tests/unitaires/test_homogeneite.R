@@ -1660,6 +1660,22 @@ verifier("I #338 Q1 limite +Inf, racine non représentable (par la seam) : lambd
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
+# Précondition lambda(+-1024) = lambda(+-infini) non tenue (constat CR2 de la
+# revue finale de B32) : limite 4 lambda_80, lambda égale à 0,5 lambda_80 pour
+# tout |u| fini ; la boucle de doublement atteint 1024 sous lambda_80. Avant :
+# uniroot sur des bornes de même signe, erreur relancée ; après :
+# precision_insuffisante, sans signal.
+verifier("I #338 CR2 lambda sous lambda_80 en |u| = 1024, limite au-delà du seuil (par la seam) : limite 4 lambda_80, 0,5 lambda_80 pour tout |u| fini, signes 1 et -1 : precision_insuffisante, NA, sans erreur ni avertissement", {
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(function(u) if (is.infinite(u)) 4 * L80_1 else 0.5 * L80_1, s)
+    if (!is.null(r$erreur) || length(r$avertissements) ||
+        !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("signe %d : %s", s, if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                                           else paste(r$valeur$etat, format(r$valeur$theta), paste(r$avertissements, collapse = " / "))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
 verifier("I #338 Q2 pivots en échec (par la seam) : precision_insuffisante sur les deux signes, lambda jamais évaluée (compteur d'appels nul), y compris quand la limite est au plus le seuil (0,5 lambda_80 : non_atteint si le seuil passait d'abord) ou au-delà", {
   e <- character(0)
   for (cas in list(list("limite <= seuil", function(u) 0.5 * L80_1), list("limite 4 lambda_80", LAMBDA_FACTICE)))

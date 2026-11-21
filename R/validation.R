@@ -1875,10 +1875,11 @@ SEUIL_ECART_MINIMAL <- 1.25
 # racine n'est pas calculable par cette méthode en double précision à cette
 # tolérance, qu'elle soit ou non représentable (#340) : pivot de
 # l'élimination non fini ou non positif (les deux branches), limite NA, NaN
-# ou -Inf, non-convergence d'uniroot (#339), postcondition non tenue (theta
-# non fini, nul ou égal à 1, ou résidu au-delà de la tolérance) ; décision du
-# mainteneur du 19/11/2026, (b) ; aucun signal. Valeur NA hors de l'état
-# produite.
+# ou -Inf, lambda_s encore au plus lambda_80 en |log theta| = 1024 (limite
+# au-delà du seuil ; garde défensive), non-convergence d'uniroot (#339),
+# postcondition non tenue (theta non fini, nul ou égal à 1, ou résidu au-delà
+# de la tolérance) ; décision du mainteneur du 19/11/2026, (b) ; aucun
+# signal. Valeur NA hors de l'état produite.
 ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "precision_insuffisante",
                                      "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
                                      "segment_sans_exposition", "variance_nulle")
@@ -1896,13 +1897,12 @@ TOLERANCE_ECART_MINIMAL <- 1e-8
 # P(m, rho) = Phi((m - z) / rho) + Phi(-(m + z) / rho), croissante en m > 0 ;
 # P = 0,80 en rho = 1, sous 0,80 sur (1, rho*), au moins 0,80 ailleurs (exact :
 # en t = 1 / rho, dP/dt = a phi(a t) - b phi(b t) change de signe une seule
-# fois), rho*^2 = 51,3865 (racine numérique, uniroot) ; rho^2 <= theta et
-# max en theta de
-# rho^2 = 1 / (4 pi (1 - pi)). Trois cas : prudent (rho <= 1) ; optimiste si
-# rho reste sous rho* sur tout (1, theta_80] ; non établi sinon (puissance non
-# monotone en theta). 51,38 (rho*^2 arrondi par défaut) et 0,0049 (pi_c =
-# 0,004889, racine de 1 / (4 pi (1 - pi)) = rho*^2, arrondi par excès) sont
-# choisis pour que les conditions citées restent suffisantes. Branche -
+# fois), rho*^2 = 51,3865 (racine numérique, uniroot) ; rho^2 <= theta et max en
+# theta de rho^2 = 1 / (4 pi (1 - pi)). Trois cas : prudent (rho <= 1) ;
+# optimiste si rho reste sous rho* sur tout (1, theta_80] ; non établi sinon
+# (puissance non monotone en theta). 51,38 (rho*^2 arrondi par défaut) et 0,0049
+# (pi_c = 0,004889, racine de 1 / (4 pi (1 - pi)) = rho*^2, arrondi par excès)
+# sont choisis pour que les conditions citées restent suffisantes. Branche -
 # inchangée (rho < 1 pour pi < 0,5).
 statut_ecart_minimal <- function(superieur) {
   paste("approximation asymptotique :", if (superieur) "plus petit theta > 1" else "plus grand theta < 1",
@@ -2151,7 +2151,8 @@ non_centralite_ecart_minimal <- function(ddl, niveau = NIVEAU_ECART_MINIMAL, pui
 #      exactement : exp(-1024) vaut 0 en double), de f(u) = min(lambda(u),
 #      plus grand double) - lambda_80 : la troncature fait la substitution de
 #      zeroin pour un +Inf en un point intérieur, sans son avertissement, et
-#      ne change rien quand lambda est finie (Q1 de #338).
+#      ne change rien quand lambda est finie (Q1 de #338) ; si lambda(+-1024)
+#      reste au plus lambda_80 : precision_insuffisante (voir le corps).
 # uniroot sous check.conv = TRUE : la non-convergence en maxiter itérations
 # devient precision_insuffisante, sans signal ; on la reconnaît à l'identité
 # du message, régénéré par le même appel ngettext dans le domaine R-stats
@@ -2180,6 +2181,16 @@ resoudre_branche_ecart_minimal <- function(lambda, signe, lam80, seuil, pivots, 
   if (limite <= seuil) return(list(theta = NA_real_, etat = "non_atteint"))
   haut <- 1
   while (lambda(signe * haut) <= lam80 && haut < 1024) haut <- 2 * haut
+  # lambda encore au plus lambda_80 en |u| = 1024 alors que la limite dépasse
+  # le seuil : la précondition lambda(+-1024) = lambda(+-infini) n'est pas
+  # tenue (le vrai lambda_s la tient), uniroot recevrait des bornes de même
+  # signe et s'arrêterait ; racine non calculable par cette méthode (#340) :
+  # precision_insuffisante, sans signal (constat CR2 de la revue finale de
+  # B32). Un NaN en |u| = 1024 n'est pas capté ici (isTRUE) : uniroot lève
+  # « f.upper = f(upper) is NA » (signe 1 ; « f.lower = f(lower) is NA »,
+  # signe -1), comme avant.
+  if (haut == 1024 && isTRUE(lambda(signe * haut) <= lam80))
+    return(list(theta = NA_real_, etat = "precision_insuffisante"))
   bornes <- signe * c(if (haut > 1) haut / 2 else 0, haut)
   f <- function(u) min(lambda(u), .Machine$double.xmax) - lam80
   non_convergence <- sprintf(ngettext(maxiter, "_NOT_ converged in %d iteration", "_NOT_ converged in %d iterations",
