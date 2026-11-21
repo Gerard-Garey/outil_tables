@@ -15675,10 +15675,22 @@ p-valeur n'y est comparée à un niveau.
     \code{ecart\_minimal\_homogeneite()} (\textbf{Vérifications},
     ci-dessous). Elle l'est aussi par une racine non représentable en
     double précision~: limite finie, mais racine au-delà du plus grand
-    double (par exemple $\theta_{80}^{+}$ au-delà de $10^{308}$ pour une
-    part d'exposition du segment de l'ordre de $10^{-307}$, encore
-    normalisée, dans une strate où la limite ne dépasse le seuil que de
-    peu)~; un test l'exerce par appel direct, racine en $|u| = 800$.
+    double (par exemple $\theta_{80}^{+}$ au-delà de $10^{308}$ quand la
+    limite du segment ne dépasse le seuil que de peu et que l'excédent
+    vient d'une strate où sa part d'exposition est de l'ordre de
+    $10^{-307}$, encore normalisée~; la racine dépend alors du partage de
+    la limite entre les strates~: deux segments A et X, strate~1 avec A
+    (exposition 0,31, 5~décès) et X (0,69, 5~décès), strate~2 avec A (1,
+    1~décès) et X ($10^{-307}$, aucun décès), limite de X à 0,13~\%
+    au-dessus du seuil~: $\theta_{80}^{+}$ de X au-delà de
+    $e^{712{,}8}$, \code{precision\_}\allowbreak\code{insuffisante}~;
+    même configuration avec une exposition de X de $10^{-305}$ en
+    strate~2~: \code{produite}, $\theta_{80}^{+} \approx 3{,}84 \cdot
+    10^{307}$, égal au recalcul indépendant par la forme à deux
+    segments~; avec A à 0,32 en strate~1 (limite à 3,3~\% au-dessus du
+    seuil) et X à $10^{-307}$~: \code{produite}, $\theta_{80}^{+} \approx
+    1{,}39 \cdot 10^{308}$~; constat de mesure d'\code{actuary} par appel
+    direct de \code{ecart\_minimal\_homogeneite()}, étape~(7) de B32)~; un test l'exerce par appel direct, racine en $|u| = 800$.
     Une part d'exposition dénormalisée (inférieure à environ $2{,}2 \cdot
     10^{-308}$) n'est pas, par elle-même, une voie~: la postcondition
     contrôle $\lambda_s$ calculée sur la part arrondie, et elle tient
