@@ -2098,6 +2098,59 @@ non_centralite_ecart_minimal <- function(ddl, niveau = NIVEAU_ECART_MINIMAL, pui
   stats::uniroot(f, c(0, haut), tol = 1e-13)$root
 }
 
+# Règle d'une branche de theta_80 (forme F339 ; #339 ; spécification
+# d'actuary-approfondi, Q1 de #338 et Q3 de #339). lambda : fonction de
+# u = log theta (lambda_s du segment, limites exactes en +-Inf) ; signe : 1
+# (theta > 1) ou -1 (theta < 1) ; lam80 : lambda_80 ; seuil : lambda_80 (1 +
+# TOLERANCE_ECART_MINIMAL) ; pivots : TRUE si les pivots de la factorisation
+# de L_s sont tous finis et > 0 (commun aux deux branches d'un segment) ;
+# maxiter : itérations de uniroot (1000L, sa valeur par défaut ; réduit
+# seulement par les tests). precision_insuffisante si un pivot n'est pas fini
+# et > 0 ou si la limite lambda(+-infini) n'est pas finie ; sinon non_atteint
+# si la limite est au plus seuil ; sinon racine en u (uniroot, tolérance
+# .Machine$double.eps) sur [h/2 (ou 0) ; h] (au signe de la branche), h
+# doublé depuis 1 tant que lambda(h) <= lambda_80 et h < 1024
+# (lambda_s(+-1024) = lambda_s(+-infini) exactement : exp(-1024) vaut 0 en
+# double), de f(u) = min(lambda(u), plus grand double) - lambda_80 : la
+# troncature fait la substitution de zeroin pour un +Inf en un point
+# intérieur, sans son avertissement, et ne change rien quand lambda est
+# finie (Q1 de #338). uniroot sous check.conv = TRUE : la non-convergence
+# en maxiter itérations devient precision_insuffisante, sans signal ; on la
+# reconnaît à l'identité du message, régénéré par le même appel ngettext
+# dans le domaine R-stats (l'erreur n'a pas de classe propre) ; toute autre
+# erreur est relancée. lambda est sans avertissement (seulement +, x, /, exp,
+# expm1, crossprod, sum sur des doubles) et sans NaN quand les pivots sont
+# finis et > 0. Seules les évaluations faites par zeroin sont sous le
+# tryCatch de check.conv : un avertissement ou un NaN de lambda en un point
+# intérieur y devient l'erreur relancée « convergence problem in zero
+# finding: ... » ; un NaN à une borne donne l'erreur « f.lower = f(lower) is
+# NA » (ou f.upper) ; un avertissement de lambda à la limite, dans la boucle
+# de doublement, aux bornes évaluées par uniroot ou dans la postcondition
+# n'est pas capté et sort tel quel (aucune donnée ne l'atteint). theta =
+# exp(u) ; postcondition :
+# theta fini, > 0, différent de 1, |lambda(log theta) / lambda_80 - 1| <=
+# TOLERANCE_ECART_MINIMAL, sinon precision_insuffisante. Rend list(theta,
+# etat).
+resoudre_branche_ecart_minimal <- function(lambda, signe, lam80, seuil, pivots, maxiter = 1000L) {
+  limite <- lambda(signe * Inf)
+  if (!pivots || !is.finite(limite)) return(list(theta = NA_real_, etat = "precision_insuffisante"))
+  if (limite <= seuil) return(list(theta = NA_real_, etat = "non_atteint"))
+  haut <- 1
+  while (lambda(signe * haut) <= lam80 && haut < 1024) haut <- 2 * haut
+  bornes <- signe * c(if (haut > 1) haut / 2 else 0, haut)
+  f <- function(u) min(lambda(u), .Machine$double.xmax) - lam80
+  non_convergence <- sprintf(ngettext(maxiter, "_NOT_ converged in %d iteration", "_NOT_ converged in %d iterations",
+                                      domain = "R-stats"), maxiter)
+  r <- tryCatch(stats::uniroot(f, sort(bornes), tol = .Machine$double.eps, maxiter = maxiter, check.conv = TRUE),
+                error = function(e) if (identical(conditionMessage(e), non_convergence)) NULL else stop(e))
+  if (is.null(r)) return(list(theta = NA_real_, etat = "precision_insuffisante"))
+  theta <- exp(r$root)
+  if (!is.finite(theta) || theta <= 0 || theta == 1 ||
+      !isTRUE(abs(lambda(log(theta)) / lam80 - 1) <= TOLERANCE_ECART_MINIMAL))
+    return(list(theta = NA_real_, etat = "precision_insuffisante"))
+  list(theta = theta, etat = "produite")
+}
+
 # Écart minimal détectable par segment du test global (#218 ; E2.15 ;
 # spécification d'actuary-approfondi, commentaire 7012205013, § 2 et 4 ;
 # avis de forme F218 ; correction du 19/11/2026, constat C1 de la revue
@@ -2126,18 +2179,12 @@ non_centralite_ecart_minimal <- function(ddl, niveau = NIVEAU_ECART_MINIMAL, pui
 #   / d_i, w_kl += L[k, i] w_il, r_k += L[k, i] r_i ; évaluation : b_k +=
 #   L[k, i] b_i, lambda_s = somme b_i^2 / d_i ; seulement +, x et / sur des
 #   positifs ; factorisation une fois par segment.
-# Par branche : precision_insuffisante si un pivot n'est pas fini et > 0 ou
-# si la limite lambda_s(+-infini) n'est pas finie ; sinon non_atteint si la
-# limite est au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL) ; sinon racine
-# en u (uniroot, tolérance .Machine$double.eps) sur [h/2 (ou 0) ; h] (au
-# signe de la branche), h doublé depuis 1 tant que lambda_s(h) <= lambda_80
-# et h < 1024
-# (lambda_s(+-1024) = lambda_s(+-infini) exactement : exp(-1024) vaut 0 en
-# double) ; theta = exp(u) ; postcondition : theta fini, > 0, différent de 1,
-# |lambda_s(log theta) / lambda_80 - 1| <= TOLERANCE_ECART_MINIMAL, sinon
-# precision_insuffisante. Rend list(superieur, etat_superieur, inferieur,
-# etat_inferieur, lambda_80), vecteurs de longueur S (lambda_80 : NA si le
-# test global n'est pas produit).
+# Chaque branche (theta > 1, theta < 1) est résolue par
+# resoudre_branche_ecart_minimal(), avec la fonction lambda_s du segment et
+# le même indicateur des pivots pour les deux branches. Rend
+# list(superieur, etat_superieur, inferieur, etat_inferieur, lambda_80),
+# vecteurs de longueur S (lambda_80 : NA si le test global n'est pas
+# produit).
 ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
   sup <- rep(NA_real_, S); inf <- rep(NA_real_, S)
   e_sup <- rep(etat_test, S); e_inf <- rep(etat_test, S)
@@ -2214,23 +2261,10 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
       sum(b * b / d)
     }
     pivots <- all(is.finite(d) & d > 0)
-    # Une branche : signe 1 (theta > 1) ou -1 (theta < 1).
-    branche <- function(signe) {
-      limite <- lambda(signe * Inf)
-      if (!pivots || !is.finite(limite)) return(list(theta = NA_real_, etat = "precision_insuffisante"))
-      if (limite <= seuil) return(list(theta = NA_real_, etat = "non_atteint"))
-      haut <- 1
-      while (lambda(signe * haut) <= lam80 && haut < 1024) haut <- 2 * haut
-      bornes <- signe * c(if (haut > 1) haut / 2 else 0, haut)
-      u <- stats::uniroot(function(u) lambda(u) - lam80, sort(bornes), tol = .Machine$double.eps)$root
-      theta <- exp(u)
-      if (!is.finite(theta) || theta <= 0 || theta == 1 ||
-          !isTRUE(abs(lambda(log(theta)) / lam80 - 1) <= TOLERANCE_ECART_MINIMAL))
-        return(list(theta = NA_real_, etat = "precision_insuffisante"))
-      list(theta = theta, etat = "produite")
-    }
-    b_sup <- branche(1); sup[s] <- b_sup$theta; e_sup[s] <- b_sup$etat
-    b_inf <- branche(-1); inf[s] <- b_inf$theta; e_inf[s] <- b_inf$etat
+    b_sup <- resoudre_branche_ecart_minimal(lambda, 1, lam80, seuil, pivots)
+    sup[s] <- b_sup$theta; e_sup[s] <- b_sup$etat
+    b_inf <- resoudre_branche_ecart_minimal(lambda, -1, lam80, seuil, pivots)
+    inf[s] <- b_inf$theta; e_inf[s] <- b_inf$etat
   }
   list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf, lambda_80 = lam80)
 }

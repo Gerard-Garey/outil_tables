@@ -1416,3 +1416,94 @@ verifier("I rapport figé : section suffisance, élément de l'écart minimal d�
        table = if (any(startsWith(section(lignes_rapport(X), "etape_homogeneite"),
                                   "<caption><code>etapes/homogeneite/resultat/ecart_minimal</code>"))) TRUE else "table")
 })
+# Règle d'une branche de theta_80 (forme F339, #339 ; spécification
+# d'actuary-approfondi, Q3 de #339 et troncature de Q1 de #338) : appel direct
+# de resoudre_branche_ecart_minimal() avec une lambda factice, limite
+# 4 lambda_80, racines theta+ = 4/3 et theta- = 3/4 (valeur calculée à la
+# main : 4 (1 - 1/theta) = 1). La non-convergence de uniroot() n'est pas
+# atteignable par des données (5 039 résolutions, 67 itérations au plus,
+# corps de #339) : seul un maxiter réduit l'exerce. Conditions captées sans
+# les arrêter : valeur, erreur, avertissements sortis.
+capte_branche <- function(expr) {
+  av <- character(0)
+  r <- tryCatch(withCallingHandlers(expr, warning = function(w) {
+    av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning")
+  }), error = function(e) e)
+  list(valeur = if (inherits(r, "error")) NULL else r, erreur = if (inherits(r, "error")) r else NULL,
+       avertissements = av)
+}
+SEUIL_1 <- L80_1 * (1 + tablexp:::TOLERANCE_ECART_MINIMAL)
+LAMBDA_FACTICE <- function(u) 4 * L80_1 * (-expm1(-abs(u)))
+branche_factice <- function(lambda, signe, maxiter = 1000L)
+  capte_branche(tablexp:::resoudre_branche_ecart_minimal(lambda, signe, L80_1, SEUIL_1, TRUE, maxiter = maxiter))
+verifier("I F339 (#339) : resoudre_branche_ecart_minimal(lambda, signe, lam80, seuil, pivots, maxiter = 1000L) ; ecart_minimal_homogeneite() l'appelle deux fois (signes 1 et -1) et n'appelle plus uniroot() elle-même", {
+  f <- tablexp:::resoudre_branche_ecart_minimal
+  corps <- gsub("\\s+", " ", paste(deparse(body(tablexp:::ecart_minimal_homogeneite), width.cutoff = 500L), collapse = " "))
+  appels <- regmatches(corps, gregexpr("resoudre_branche_ecart_minimal\\(lambda, -?1, lam80, seuil, pivots\\)", corps))[[1L]]
+  tous(arguments = if (identical(names(formals(f)), c("lambda", "signe", "lam80", "seuil", "pivots", "maxiter"))) TRUE
+                   else paste(names(formals(f)), collapse = ", "),
+       maxiter = if (identical(formals(f)$maxiter, 1000L)) TRUE else "maxiter par défaut",
+       appels = if (identical(appels, c("resoudre_branche_ecart_minimal(lambda, 1, lam80, seuil, pivots)",
+                                        "resoudre_branche_ecart_minimal(lambda, -1, lam80, seuil, pivots)"))) TRUE
+                else paste(appels, collapse = " / "),
+       uniroot = if (!grepl("uniroot", corps, fixed = TRUE)) TRUE else "uniroot dans ecart_minimal_homogeneite()")
+})
+verifier("I F339 non-convergence forcée (#339 ; valeur calculée à la main) : lambda factice ; maxiter de 1 à 6, signes 1 et -1 : precision_insuffisante, NA, aucune erreur, aucun avertissement sorti ; témoin, maxiter par défaut : produite, 4/3 et 3/4 à 1e-14, sans avertissement", {
+  e <- character(0)
+  for (m in 1:6) for (s in c(1, -1)) {
+    r <- branche_factice(LAMBDA_FACTICE, s, maxiter = m)
+    if (!is.null(r$erreur)) { e <- c(e, sprintf("maxiter %d, signe %d : erreur %s", m, s, conditionMessage(r$erreur))); next }
+    if (length(r$avertissements))
+      e <- c(e, sprintf("maxiter %d, signe %d : avertissement %s", m, s, paste(r$avertissements, collapse = " / ")))
+    if (!identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("maxiter %d, signe %d : %s %s", m, s, r$valeur$etat, format(r$valeur$theta)))
+  }
+  for (s in c(1, -1)) {
+    r <- branche_factice(LAMBDA_FACTICE, s)
+    att <- if (s > 0) 4 / 3 else 3 / 4
+    if (!is.null(r$erreur) || length(r$avertissements) || !identical(r$valeur$etat, "produite") ||
+        !isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      e <- c(e, sprintf("témoin signe %d : %s", s, if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                                                   else paste(r$valeur$etat, format(r$valeur$theta, digits = 17))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I F339 cas adverses (#339) : une erreur émise dans lambda est relancée telle quelle (« boum ») ; un avertissement émis dans lambda pendant la résolution est relancé en erreur « convergence problem in zero finding: w-int », non converti, sans avertissement sorti ; un NaN de lambda en un point intérieur (0,3 < |u| < 1), signes 1 et -1, est relancé en erreur « convergence problem in zero finding: NA/Inf replaced by maximum positive value », non converti, sans avertissement sorti", {
+  r_e <- branche_factice(function(u) if (abs(u) > 0 && abs(u) < 1) stop("boum") else LAMBDA_FACTICE(u), 1)
+  r_w <- branche_factice(function(u) { if (abs(u) > 0 && abs(u) < 1) warning("w-int"); LAMBDA_FACTICE(u) }, 1)
+  tous(erreur = if (!is.null(r_e$erreur) && identical(conditionMessage(r_e$erreur), "boum") && is.null(r_e$valeur)) TRUE
+                else "erreur de lambda non relancée",
+       avertissement = if (!is.null(r_w$erreur) &&
+                           identical(conditionMessage(r_w$erreur), "convergence problem in zero finding: w-int") &&
+                           !length(r_w$avertissements) && is.null(r_w$valeur)) TRUE
+                       else "avertissement de lambda converti ou sorti",
+       nan = {
+         ln <- function(u) if (abs(u) > 0.3 && abs(u) < 1) NaN else LAMBDA_FACTICE(u)
+         ok <- vapply(c(1, -1), function(s) {
+           r <- branche_factice(ln, s)
+           !is.null(r$erreur) && is.null(r$valeur) && !length(r$avertissements) &&
+             identical(conditionMessage(r$erreur),
+                       "convergence problem in zero finding: NA/Inf replaced by maximum positive value")
+         }, TRUE)
+         if (all(ok)) TRUE else "NaN intérieur de lambda converti ou sorti"
+       })
+})
+verifier("I F339 (#339, constat m1 de l'audit) : le message de non-convergence est régénéré par ngettext(..., domain = \"R-stats\") dans resoudre_branche_ecart_minimal() (structurel : aucune locale traduite installée sur l'hôte de mesure)", {
+  corps <- gsub("\\s+", " ", paste(deparse(body(tablexp:::resoudre_branche_ecart_minimal), width.cutoff = 500L), collapse = " "))
+  attendu <- paste0("ngettext(maxiter, \"_NOT_ converged in %d iteration\", \"_NOT_ converged in %d iterations\", ",
+                    "domain = \"R-stats\")")
+  if (grepl(attendu, corps, fixed = TRUE)) TRUE else "appel ngettext avec domain = \"R-stats\" absent"
+})
+verifier("I F339 troncature de f (Q1 de #338) : lambda = +Inf aux points intérieurs |u| > 0,3 (au-delà de la racine), limite finie : produite, 4/3 et 3/4 à 1e-14, aucune erreur ni avertissement", {
+  li <- function(u) if (is.finite(u) && abs(u) > 0.3) Inf else LAMBDA_FACTICE(u)
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(li, s)
+    att <- if (s > 0) 4 / 3 else 3 / 4
+    if (!is.null(r$erreur)) { e <- c(e, sprintf("signe %d : erreur %s", s, conditionMessage(r$erreur))); next }
+    if (length(r$avertissements)) e <- c(e, sprintf("signe %d : avertissement %s", s, paste(r$avertissements, collapse = " / ")))
+    if (!identical(r$valeur$etat, "produite") || !isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      e <- c(e, sprintf("signe %d : %s %s", s, r$valeur$etat, format(r$valeur$theta, digits = 17)))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
