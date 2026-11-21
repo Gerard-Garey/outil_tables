@@ -460,82 +460,12 @@ TRANSITIONS_EN_COURS <- list()
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
 # les constantes *_218C retirées.
-# Transition #340, motif de precision_insuffisante (B32, étape (3) ;
-# spécification d'actuary-approfondi, Q4, amendée par l'avis d'actuary de
-# l'étape (2) ; Q7) : texte des deux statuts ecart_minimal de R11 et R12, en
-# « valeur de chaîne » aux positions lues par les colonnes sœurs de la
-# référence (table ecart_minimal, grandeurs theta_80_superieur et
-# theta_80_inferieur) ; texte après tiré du texte avant de la référence par
-# une substitution, commune aux deux branches, écrite ici en échappements \u
-# (UTF-8 en toute locale), sans lire le package. Une transition pour les deux
-# plans.
-# Transition #331, sens de l'erreur de la branche + (B32, étape (4) ;
-# spécification d'actuary-approfondi, Q5) : texte du seul statut
-# theta_80_superieur, même chemin ; une substitution, en échappements \u ; le
-# statut theta_80_inferieur ne change pas.
-# Composition : aligner_reference() juge chaque changement sur la référence
-# d'avant et exige des valeurs identiques à une position déclarée par deux
-# transitions ; la position de theta_80_superieur porte les deux fragments.
-# Les deux transitions la déclarent donc à la même valeur, #340 puis #331
-# (statuts_apres_b32()) ; #340 déclare aussi theta_80_inferieur, à son seul
-# fragment. Aucune autre grandeur ne change. À clore par la régénération (R)
-# de B32, avec transition_340(), transition_331() et les constantes *_340 et
-# *_331.
-SUBST_340 <- c(
-  "\u00e9tat precision_insuffisante (NA) quand la racine n'est pas repr\u00e9sentable en double pr\u00e9cision \u00e0 cette tol\u00e9rance ;",
-  paste("\u00e9tat precision_insuffisante (NA) quand la racine n'est pas calculable par cette m\u00e9thode en double",
-        "pr\u00e9cision \u00e0 cette tol\u00e9rance, qu'elle soit ou non repr\u00e9sentable (pivot de l'\u00e9limination non fini",
-        "ou non positif, limite ind\u00e9termin\u00e9e, r\u00e9solution non converg\u00e9e, ou postcondition",
-        "|lambda_s(theta_80) / lambda_80 - 1| <= 1e-8 non tenue) ;"))
-SUBST_331 <- c(
-  "la valeur est optimiste pour un segment minoritaire (theta_80 r\u00e9el plus \u00e9loign\u00e9 de 1) ;",
-  paste("la valeur est prudente (theta_80 r\u00e9el au plus aussi \u00e9loign\u00e9 de 1) quand pi >= 1 / (1 +",
-        "sqrt(theta_80)), pi part d'exposition du segment (environ 0,472 quand theta_80 vaut",
-        "seuil_ecart_minimal), et, en de\u00e7\u00e0, o\u00f9 rho^2 = theta_80 / (1 + pi (theta_80 - 1))^2, rapport exact",
-        "des variances de U sous l'alternative et sous H0, d\u00e9passe 1, optimiste (theta_80 r\u00e9el plus \u00e9loign\u00e9",
-        "de 1) si theta_80 <= 51,38 ou pi >= 0,0049, de sens non \u00e9tabli sinon (moins de 0,2 d\u00e9c\u00e8s attendu dans",
-        "le segment en theta_80) ;"))
-# Substitution unique de `subst[1]` par `subst[2]` dans `avant` ; `nouveau`
-# est un fragment du seul texte après (garde de la référence déjà régénérée).
-substituer_b32 <- function(avant, subst, nouveau, issue, fonction) {
-  if (grepl(nouveau, avant, fixed = TRUE))
-    stop(sprintf("apres_%s() : texte nouveau d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer %s et les constantes *_%s",
-                 issue, fonction, issue))
-  if (lengths(regmatches(avant, gregexpr(subst[1L], avant, fixed = TRUE))) != 1L)
-    stop(sprintf("apres_%s() : \u00ab %s \u00bb absent ou r\u00e9p\u00e9t\u00e9 (erreur de programmation)", issue, subst[1L]))
-  sub(subst[1L], subst[2L], avant, fixed = TRUE)
-}
-apres_340 <- function(avant)
-  substituer_b32(avant, SUBST_340, "n'est pas calculable par cette m\u00e9thode", "340", "transition_340()")
-apres_331 <- function(avant)
-  substituer_b32(avant, SUBST_331, "quand pi >= 1 / (1 + sqrt(theta_80))", "331", "transition_331()")
-# Positions des deux statuts ecart_minimal dans la référence du plan et leurs
-# textes après #340 et #331 (theta_80_superieur, puis theta_80_inferieur).
-CHEMIN_STATUTS_B32 <- "etapes/homogeneite/parametres/statuts/"
-statuts_apres_b32 <- function(plan) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plan, ".tsv")))$valeurs
-  st <- CHEMIN_STATUTS_B32
-  k <- match(c("theta_80_superieur", "theta_80_inferieur"), ref[[paste0(st, "grandeur")]])
-  if (anyNA(k) || !all(ref[[paste0(st, "table")]][k] == "ecart_minimal"))
-    stop("statuts_apres_b32() : lignes ecart_minimal absentes de la r\u00e9f\u00e9rence (erreur de programmation)")
-  apres <- vapply(ref[[paste0(st, "statut")]][k], apres_340, "", USE.NAMES = FALSE)
-  apres[1L] <- apres_331(apres[1L])
-  Encoding(apres) <- "UTF-8"
-  list(positions = k, apres = apres)
-}
-transition_340 <- function(plans) {
-  a <- statuts_apres_b32(plans[1L])
-  list(issue = "#340", plans = plans,
-       changements = list(list(chemin = paste0(CHEMIN_STATUTS_B32, "statut"), nature = "valeur de chaîne",
-                               valeurs = a$apres, positions = a$positions)))
-}
-transition_331 <- function(plans) {
-  a <- statuts_apres_b32(plans[1L])
-  list(issue = "#331", plans = plans,
-       changements = list(list(chemin = paste0(CHEMIN_STATUTS_B32, "statut"), nature = "valeur de chaîne",
-                               valeurs = a$apres[1L], positions = a$positions[1L])))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_340(c("R11", "R12")), transition_331(c("R11", "R12"))))
+# Transitions #340 (motif de precision_insuffisante) et #331 (sens de l'erreur
+# de la branche +) de B32, sur les deux statuts ecart_minimal de R11 et R12,
+# closes par la régénération (R) de B32 (exécution 44894726135, sur 0a29756) :
+# transition_340(), transition_331(), apres_340(), apres_331(),
+# statuts_apres_b32(), substituer_b32() et les constantes *_340, *_331 et
+# CHEMIN_STATUTS_B32 retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
