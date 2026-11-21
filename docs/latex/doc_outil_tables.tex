@@ -15525,8 +15525,14 @@ p-valeur n'y est comparée à un niveau.
         $\lambda_s$ du segment et le même indicateur des pivots. Ses
         contrôles se font dans cet ordre (issue~\#338~; \textbf{États},
         point~(3))~: les pivots, avant toute évaluation de $\lambda_s$~; la
-        limite indéterminée~; \code{non\_atteint}~; sinon la résolution, une
-        limite $+\infty$ comprise. Les pivots passent avant le seuil parce
+        limite indéterminée~; \code{non\_atteint}~; sinon, une limite
+        $+\infty$ comprise, l'encadrement par doublement jusqu'à $|u| =
+        1024$ au plus, puis \code{precision\_}\allowbreak\code{insuffisante},
+        sans résolution, si $\lambda_s(\pm 1024)$ reste au plus
+        $\lambda_{80}$ (garde défensive inaccessible à la vraie
+        $\lambda_s$, dont la valeur en $\pm 1024$ égale exactement la
+        limite, qui dépasse alors le seuil~; constat CR2 de la revue finale
+        de B32), sinon la résolution. Les pivots passent avant le seuil parce
         qu'un pivot $d_i = +\infty$ annule son terme $b_i^2/d_i$~: la limite
         calculée pourrait alors passer sous le seuil et donner un
         \code{non\_atteint}, donc un signal \code{ecart\_minimal\_}\allowbreak\code{detectable},
@@ -15577,7 +15583,13 @@ p-valeur n'y est comparée à un niveau.
         donne l'erreur «~f.lower = f(lower) is NA~» à la borne inférieure,
         «~f.upper = f(upper) is NA~» à la borne supérieure (sur la
         branche~$-$, $u = -1024$ est la borne inférieure et $u = 0$ la
-        borne supérieure).
+        borne supérieure). Une valeur \code{NaN} en $|u| = 1024$ est
+        inaccessible à la vraie $\lambda_s$~: calculée par les mêmes
+        opérations sur les mêmes doubles que la limite, elle serait
+        \code{NaN} à la limite, déjà classée
+        \code{precision\_}\allowbreak\code{insuffisante}~; la garde de
+        $|u| = 1024$ ne la capte pas, une comparaison à \code{NaN} n'y
+        valant pas \code{TRUE}.
         Les avertissements de $\lambda_s$ émis hors des évaluations faites
         par \code{zeroin} ne sont pas captés et sortent tels quels~: à la
         limite, dans la boucle de doublement, aux bornes et à la racine que
@@ -15639,6 +15651,8 @@ p-valeur n'y est comparée à un niveau.
     sans \code{NaN}~; lecture du code, non une preuve)~; (b)~sinon \code{non\_atteint} si la limite, finie,
     est au plus $\lambda_{80}\,(1 + 10^{-8})$~; (c)~sinon, limite
     $+\infty$ comprise, résolution~: \code{precision\_insuffisante} si
+    $\lambda_s(\pm 1024)$ reste au plus $\lambda_{80}$ (garde défensive
+    inaccessible, \textbf{Calcul}, point~(4)), \code{precision\_insuffisante} si
     \code{uniroot()} ne converge pas (\textbf{Calcul}, point~(4)), sinon
     \code{produite} si la postcondition est tenue,
     \code{precision\_insuffisante} sinon. La
@@ -15654,8 +15668,9 @@ p-valeur n'y est comparée à un niveau.
     point~(4)~; règle~(3) ci-dessus). (i)~Un pivot $d_i$ de l'élimination
     non fini ou non strictement positif, pour les deux branches du
     segment ensemble~: jamais observé~; un test l'exerce par appel direct.
-    (ii)~Une limite $\lambda_s(\pm\infty)$ indéterminée (\code{NA},
-    \code{NaN} ou $-\infty$)~: garde défensive, que des pivots valides
+    (ii)~Une limite $\lambda_s(\pm\infty)$ indéterminée, c'est-à-dire non
+    déterminée par le calcul (valeur calculée \code{NA}, \code{NaN} ou
+    $-\infty$, alors que la vraie limite est dans $[0~; +\infty]$)~: garde défensive, que des pivots valides
     excluent (lecture du code)~; un test l'exerce par appel direct.
     (iii)~La non-convergence de \code{uniroot()} en 1\,000 itérations
     (issue~\#339), qui n'est atteinte par aucun plan de référence et n'a
@@ -15687,8 +15702,8 @@ p-valeur n'y est comparée à un niveau.
     même configuration avec une exposition de X de $10^{-305}$ en
     strate~2~: \code{produite}, $\theta_{80}^{+} \approx 3{,}84 \cdot
     10^{307}$, égal au recalcul indépendant par la forme à deux
-    segments~; avec A à 0,32 en strate~1 (limite à 3,3~\% au-dessus du
-    seuil) et X à $10^{-307}$~: \code{produite}, $\theta_{80}^{+} \approx
+    segments~; avec A à 0,32 et X à 0,68 en strate~1 (limite à 3,3~\% au-dessus du
+    seuil) et X à $10^{-307}$ en strate~2~: \code{produite}, $\theta_{80}^{+} \approx
     1{,}39 \cdot 10^{308}$~; constat de mesure d'\code{actuary} par appel
     direct de \code{ecart\_minimal\_homogeneite()}, étape~(7) de B32)~; un test l'exerce par appel direct, racine en $|u| = 800$.
     Une part d'exposition dénormalisée (inférieure à environ $2{,}2 \cdot
@@ -15723,7 +15738,18 @@ p-valeur n'y est comparée à un niveau.
     $10^{-308}$, exposition déclarée, recette \code{agregats},
     $\theta_{80}^{+}$ était \code{precision\_}\allowbreak\code{insuffisante}
     et vaut désormais \code{produite}~; \textbf{Vérifications},
-    ci-dessous). Le texte du statut énonce ce motif et ces quatre voies
+    ci-dessous). (v)~$\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ alors
+    que la limite dépasse le seuil (constat CR2 de la revue finale de
+    B32)~: garde défensive, inaccessible à la vraie $\lambda_s$ (résultat
+    exact~: $\lambda_s(\pm 1024)$ est calculée par les mêmes opérations
+    sur les mêmes doubles que la limite, $e^{-1024}$ valant~0 et
+    $\mathrm{expm1}(-1024)$ valant $-1$ en double précision~; aucun écart
+    sur 16\,780 branches simulées, constat de simulation d'\code{actuary}
+    du 21/11/2026)~; un test l'exerce par appel direct avec une fonction
+    $\lambda_s$ factice. Le texte du statut énonce ce motif et les voies
+    (i) à (iv)~; la voie~(v), qu'aucune donnée ne peut atteindre, n'y
+    figure pas, alors que la voie~(ii), dont l'exclusion ne repose que sur
+    une lecture du code, y figure (avis d'\code{actuary} du 21/11/2026)
     (\textbf{Statut}, ci-dessous).
   \item \textbf{Signal}~: l'avertissement \code{ecart\_minimal\_detectable}
     (étape \code{homogeneite}), \textbf{jamais un refus}, est émis quand au
@@ -16060,6 +16086,10 @@ $\lambda_s$ jamais évaluée, y compris quand la limite est sous le seuil
 représentable ($\lambda_s(u) = \lambda_{80}\, e^{|u| - 800}$, de limite
 $+\infty$, racine en $|u| = 800$, $e^{800}$ valant $+\infty$ et $e^{-800}$
 valant~0 en double précision, deux branches)~: \code{precision\_insuffisante} par la postcondition, sans
+erreur ni avertissement~; limite $4\lambda_{80}$ et $\lambda_s =
+0{,}5\,\lambda_{80}$ pour tout $|u|$ fini (précondition $\lambda_s(\pm
+1024) = \lambda_s(\pm\infty)$ non tenue, constat CR2 de la revue finale
+de B32)~: \code{precision\_insuffisante} sur les deux branches, sans
 erreur ni avertissement~; les messages d'une valeur \code{NaN} hors de
 \code{zeroin} (boucle de doublement en $|u| = 1$, 2, 4 et~8, bornes $u
 = 0$ et $|u| = 1024$, \textbf{Calcul}, point~(4))~; le scénario de
@@ -17392,7 +17422,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives, statistique observée et fonction des répliques, données des réplications et de la p-valeur exacte, groupe de chaque ligne utilisée (\code{groupe\_utilise}) et racine de la composante connexe de chaque groupe, lui-même pour un groupe absent (\code{composante}), pour l'écart minimal détectable \\
 \catalogue{fonctions-validation}{p\_exacte\_homogeneite()} & interne & résultat de la ligne précédente & p-valeur exacte bilatérale à deux groupes (somme de binomiales) et son état \\
 \catalogue{fonctions-validation}{non\_centralite\_ecart\_minimal()} & interne & ddl, niveau, puissance (par défaut, les deux constantes) & $\lambda_{80}$~: racine par \code{uniroot()} de la puissance du khi-deux non central (\code{pchisq()}) égale à la puissance visée \\
-\catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
+\catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{ecart\_minimal\_homogeneite()} & interne & objet du score du test global, état du test, états des lignes globales des segments, $S$ & $\theta_{80}^{+}$, $\theta_{80}^{-}$ et leurs états par segment, $\lambda_{80}$~; chaque segment référence de sa composante connexe, $\lambda_s$ calculée sans soustraction, résolution en $\log\theta$, chaque branche par la fonction de la ligne précédente~; \code{precision\_}\allowbreak\code{insuffisante} est un état, jamais un arrêt (section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; ne contrôle aucun paramètre \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices, chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
