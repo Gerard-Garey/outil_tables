@@ -1394,10 +1394,12 @@ verifier("I T7 débordement de D_c |h_c| en -infini (recalcul indépendant ; con
 })
 # Strate où s est seul exposé sur deux lignes (C1 d'actuary, visa de la
 # correction) : âge 60, A sur deux lignes (E 100, D 5 chacune) ; âge 61, A
-# (100, 5) et X (100, 9). La strate 60 est informative (deux lignes
-# exposées) mais a_c = 0 pour A : |h| y vaut 0, sans terme 1/0 en -infini.
-# Recalcul indépendant restreint à la cellule où les deux segments sont
-# exposés (âge 61 : D 14, parts 1/2 et 1/2).
+# (100, 5) et X (100, 9). Avant #335, la strate 60 était informative (deux
+# lignes exposées) avec a_c = 0 pour A : |h| y valait 0, sans terme 1/0 en
+# -infini ; depuis #335, les deux lignes sont agrégées et la strate 60 n'est
+# plus informative (un seul segment exposé). Recalcul indépendant restreint à
+# la cellule où les deux segments sont exposés (âge 61 : D 14, parts 1/2 et
+# 1/2).
 verifier("I strate à un seul segment exposé sur deux lignes (recalcul indépendant) : deux ordres ; theta- de A et de X produites, égales, à 1e-12 du recalcul et de 0.14367128799545387 ; signal ecart_minimal_detectable", {
   d <- expo_seg(c("A", "A", "A", "X"), c(60, 60, 61, 61), rep(100, 4L), c(5, 5, 5, 9))
   att <- exp(stats::uniroot(function(u) lambda_deux(14, 0.5, 0.5, exp(u)) - L80_1, c(-30, 0), tol = 1e-14)$root)
@@ -1417,37 +1419,102 @@ verifier("I strate à un seul segment exposé sur deux lignes (recalcul indépen
 })
 # Invariance au découpage d'une cellule en plusieurs lignes (constat C-R1 de
 # l'audit ; décision du mainteneur du 20/11/2026, (a) : pi_jc cumulé par
-# (strate, segment)). Âges 60 et 61 ; une ligne : A (100, 4), X (300, 9),
-# A (200, 6), X (100, 3). Découpage de (A, 61) en 150 / 4 et 50 / 2, puis de
-# (X, 61) en 30 / 1 et 70 / 2, chacun dans deux ordres : pour s = A, la
-# découpe porte tantôt sur s (référence de s), tantôt sur l'autre segment, et
-# inversement pour s = X. Attendus : valeurs du code de 303d6e0 (passage par
-# la statistique, agrégée par rowsum) sur une ligne.
-# Limite (#335) : score_homogeneite() n'agrège pas non plus par (strate,
-# groupe) ; T est faux quand la cellule découpée appartient à un segment
-# autre que la référence du test global (le premier de la table). Le segment
-# découpé est donc toujours placé en tête, seul cas où T est invariant.
-verifier("I invariance au découpage d'une cellule en plusieurs lignes (valeurs de 303d6e0 sur une ligne) : A puis X découpé, deux ordres chacun : T, états et theta à 1e-12 de la variante sur une ligne", {
+# (strate, segment) ; #335 : lignes saines agrégées par (segment, cellule)
+# dans calculer_homogeneite(), forme F335, spécification d'actuary-approfondi,
+# Q1, critères I1 et I3). Âges 60 et 61 ; une ligne : A (100, 4), X (300, 9),
+# A (200, 6), X (100, 3). Découpages exacts en double (150 + 50, 30 + 70) de
+# (A, 61) et de (X, 61), le segment découpé en tête ou non, dans plusieurs
+# ordres. Le résultat entier (tests, dont p exacte et p de Monte-Carlo,
+# segments, dont z et états, ecart_minimal, diagnostics, avertissements) est
+# identical() à celui de la table à une ligne prise dans l'ordre de première
+# occurrence des couples (segment, âge) de la variante (I1 ; la p de
+# Monte-Carlo suit l'ordre des lignes de chaque strate, I2). Attendus
+# numériques : valeurs du code de 303d6e0 sur une ligne (T, theta), p exacte
+# et z remesurées à 368e110 sur une ligne. Mesure adverse (C7) : à 368e110,
+# (X, 61) découpé avec A en tête (variante X_decoupe_A_en_tete) donnait T =
+# 0.11369378473976757, p exacte 0.82977183901774476, p de Monte-Carlo 0.85 et
+# z de X -0.33718508973524852 ; la contrainte « segment découpé en tête » de
+# ce test est levée.
+une_ligne_ordonnee <- function(un, variante) {
+  cle <- function(d) paste(d$segment, d$age)
+  un[match(unique(cle(variante)), cle(un)), ]
+}
+verifier("I invariance au découpage d'une cellule en plusieurs lignes (#335, I1, I3) : A puis X découpé, en tête ou non, plusieurs ordres : résultat identical() à la table à une ligne dans l'ordre de première occurrence ; T, p exacte, p de Monte-Carlo, z, états et theta de la variante sur une ligne", {
   un <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(100, 300, 200, 100), c(4, 9, 6, 3))
   da <- expo_seg(c("A", "X", "A", "X", "A"), c(60, 60, 61, 61, 61), c(100, 300, 150, 100, 50), c(4, 9, 4, 3, 2))
   dx <- expo_seg(c("X", "X", "A", "A", "X"), c(61, 60, 61, 60, 61), c(70, 300, 200, 100, 30), c(2, 9, 6, 4, 1))
+  dxa <- expo_seg(c("A", "X", "A", "X", "X"), c(60, 60, 61, 61, 61), c(100, 300, 200, 30, 70), c(4, 9, 6, 1, 2))
   variantes <- list(une_ligne = un, A_decoupe = da, A_decoupe_permute = da[c(1L, 2L, 5L, 4L, 3L), ],
-                    X_decoupe = dx, X_decoupe_permute = dx[c(5L, 4L, 2L, 3L, 1L), ])
+                    A_decoupe_hors_tete = da[c(2L, 1L, 4L, 3L, 5L), ], X_decoupe = dx,
+                    X_decoupe_permute = dx[c(5L, 4L, 2L, 3L, 1L), ], X_decoupe_A_en_tete = dxa)
   att_v <- c(3.7393758326640887, 5.0691740146480493, 0.19727079739428313, 0.26742430949700979)
   e <- character(0)
   for (nom in names(variantes)) {
-    r <- tryCatch(homog(variantes[[nom]], "segment", c(60, 61), 60), error = function(x) x)
+    va <- variantes[[nom]]
+    r <- tryCatch(homog(va, "segment", c(60, 61), 60), error = function(x) x)
     if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    r1 <- homog(une_ligne_ordonnee(un, va), "segment", c(60, 61), 60)
+    if (!identical(r, r1)) e <- c(e, paste(nom, ": résultat différent de la table à une ligne"))
     em <- r$resultat$ecart_minimal[match(c("A", "X"), r$resultat$ecart_minimal$segment), ]
     if (!identical(c(em$etat_superieur, em$etat_inferieur), rep("produite", 4L)))
       { e <- c(e, paste(nom, ": états", paste(c(em$etat_superieur, em$etat_inferieur), collapse = "/"))); next }
     v <- c(em$theta_80_superieur, em$theta_80_inferieur)
     if (!isTRUE(proche(v, att_v, 1e-12, 0)))
       e <- c(e, paste(nom, ": theta", paste(format(v, digits = 17), collapse = ", ")))
-    if (!isTRUE(proche(ligne_test(r, "global")$statistique, 0.12676056338028169, 1e-12, 0)))
-      e <- c(e, paste(nom, ": T"))
+    g <- ligne_test(r, "global")
+    if (!isTRUE(proche(g$statistique, 0.12676056338028169, 1e-12, 0))) e <- c(e, paste(nom, ": T"))
+    if (!isTRUE(proche(g$p_exacte, 0.81249998595734196, 1e-12, 0))) e <- c(e, paste(nom, ": p exacte"))
+    sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]
+    if (!identical(sg$etat, c("produite", "produite")) ||
+        !isTRUE(proche(sg$z[sg$segment == "X"], -0.35603449745815596, 1e-12, 0)))
+      e <- c(e, paste(nom, ": z ou états des segments"))
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I invariance au découpage (#335, I1) : segment seul dans sa strate (Y à 62 ans, 250 / 5 deux fois contre 500 / 10), A seul à 60 ans (100 / 5 deux fois contre 200 / 10, cas de #336), ligne (A, 60, E = 0, D = 0) ajoutée : résultat identical() à la table à une ligne dans l'ordre de première occurrence", {
+  un <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(100, 300, 200, 100), c(4, 9, 6, 3))
+  y1 <- rbind(un, expo_seg("Y", 62, 500, 10))
+  y2 <- rbind(un[1:2, ], expo_seg("Y", 62, 250, 5), un[3:4, ], expo_seg("Y", 62, 250, 5))
+  a1 <- expo_seg(c("A", "A", "X"), c(60, 61, 61), c(200, 100, 100), c(10, 5, 9))
+  a2 <- expo_seg(c("A", "A", "A", "X"), c(60, 61, 60, 61), c(100, 100, 100, 100), c(5, 5, 5, 9))
+  z0 <- rbind(un, expo_seg("A", 60, 0, 0))
+  cas <- list(Y_seul = list(y2, y1, c(60, 62), 0.12676056338028169, 0.81249998595734196),
+              A_seul = list(a2, a1, c(60, 61), 1.1428571428571428, 0.42395019531249978),
+              ligne_nulle = list(z0, un, c(60, 61), 0.12676056338028169, 0.81249998595734196))
+  e <- character(0)
+  for (nom in names(cas)) {
+    k <- cas[[nom]]
+    r <- tryCatch(homog(k[[1L]], "segment", k[[3L]], 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    if (!identical(r, homog(une_ligne_ordonnee(k[[2L]], k[[1L]]), "segment", k[[3L]], 60)))
+      e <- c(e, paste(nom, ": résultat différent de la table à une ligne"))
+    g <- ligne_test(r, "global")
+    if (!isTRUE(proche(c(g$statistique, g$p_exacte), c(k[[4L]], k[[5L]]), 1e-12, 0)))
+      e <- c(e, paste(nom, ": T ou p exacte", paste(format(c(g$statistique, g$p_exacte), digits = 17), collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I invariance au découpage (#335, I1) : deux variables (sexe, fumeur), cellule (F, n, 61) découpée hors de tête : résultat identical() (tests par variable compris) à la table à une ligne dans l'ordre de première occurrence", {
+  g <- expand.grid(fumeur = c("o", "n"), sexe = c("F", "H"), age = 60:62, stringsAsFactors = FALSE)[, c("sexe", "fumeur", "age")]
+  g$exposition_centrale <- c(120, 340, 90, 410, 150, 300, 110, 380, 130, 360, 100, 400)
+  g$evenements <- c(3L, 6L, 4L, 9L, 5L, 7L, 4L, 11L, 6L, 8L, 5L, 12L)
+  k <- which(g$sexe == "F" & g$fumeur == "n" & g$age == 61)
+  dec <- rbind(g[-k, ], g[k, ], g[k, ])
+  dec$exposition_centrale[nrow(dec) - 1:0] <- c(100, 200)
+  dec$evenements[nrow(dec) - 1:0] <- c(2L, 5L)
+  ref <- g[c(setdiff(seq_len(nrow(g)), k), k), ]
+  r <- homog(dec, c("sexe", "fumeur"), c(60, 62), 60)
+  r1 <- homog(ref, c("sexe", "fumeur"), c(60, 62), 60)
+  tous(variables = if (identical(sum(r$resultat$tests$test == "variable"), 2L) &&
+                       all(r$resultat$tests$etat == "produite")) TRUE else "tests par variable non produits",
+       identique = if (identical(r, r1)) TRUE else "résultat différent de la table à une ligne")
+})
+verifier("I score_homogeneite() : deux lignes de même (strate, groupe) -> erreur de programmation (précondition, #335, I4)", {
+  err <- tryCatch(tablexp:::score_homogeneite(c(1, 2, 3), c(10, 20, 30), c(1L, 1L, 1L), c(1L, 2L, 2L), 1L, 2L),
+                  error = function(x) x)
+  inherits(err, "error") && !inherits(err, "refus_tablexp") &&
+    grepl("erreur de programmation", conditionMessage(err), fixed = TRUE) &&
+    grepl("(strate, groupe)", conditionMessage(err), fixed = TRUE)
 })
 # Textes du rapport (spécification, § 8 ; M546, P1-c).
 verifier("I MENTIONS_RAPPORT (littéral de la spécification, § 8) : suffisance_intro, suffisance_homogeneite, suffisance_homogeneite_absente ; homogeneite_portee : deux premières phrases inchangées, puis l'écart minimal détectable", {
