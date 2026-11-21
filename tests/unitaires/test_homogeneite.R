@@ -1264,9 +1264,14 @@ verifier("I T4 balayage à deux segments en strate unique (valeur calculée à l
 # ecart_minimal_homogeneite(). La voie du débordement de D_c |h_c| en
 # -infini est supprimée (C1 d'actuary, décision du mainteneur du 20/11/2026 ;
 # T7). L'état reste atteignable par l'étape dans des cas extrêmes : racine
-# non représentable (theta+ au-delà du plus grand double), parts
-# dénormalisées où la postcondition échoue, limite lambda(-+infini) qui
-# déborde en +infini (b^2/d) quand la part d'un segment avoisine 1e-308 (#338).
+# non représentable (theta+ au-delà du plus grand double). Avec des parts
+# dénormalisées, la postcondition contrôle lambda calculée sur la part
+# arrondie et tient (cas mesurés) : la justesse de theta par rapport aux parts exactes est
+# dégradée, l'état reste produite (avis d'actuary, #338 ; E_X = 5e-307 du
+# scénario de Q1 ci-dessous). Une limite lambda(-+infini) qui déborde en
+# +infini (b^2/d) quand la part d'un segment avoisine 1e-308 ne mène plus à
+# precision_insuffisante : elle compte au-delà du seuil et la racine est
+# résolue (Q1 de #338 ; test « I #338 scénario de Q1 » ci-dessous).
 # D = 1e15 plutôt que 1e17, cas frontière où un ulp de décalage de la libm
 # ferait dépasser 1e-8 (C2 d'actuary).
 verifier("I T6 témoin precision_insuffisante (valeur calculée à la main) : strate unique 50 / 50 ; D = 1e20 : quatre branches precision_insuffisante, NA, sans erreur ; D = 1e15 : produites, postcondition |lambda(theta) / lambda_80 - 1| <= 1e-8 (recalcul indépendant)", {
@@ -1504,6 +1509,164 @@ verifier("I F339 troncature de f (Q1 de #338) : lambda = +Inf aux points intéri
     if (length(r$avertissements)) e <- c(e, sprintf("signe %d : avertissement %s", s, paste(r$avertissements, collapse = " / ")))
     if (!identical(r$valeur$etat, "produite") || !isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
       e <- c(e, sprintf("signe %d : %s %s", s, r$valeur$etat, format(r$valeur$theta, digits = 17)))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Ordre des contrôles et limite +Inf (Q1 et Q2 de #338, spécification
+# d'actuary-approfondi) : pivots en échec avant toute évaluation de lambda ;
+# limite NA, NaN ou -Inf : precision_insuffisante ; limite finie au plus le
+# seuil : non_atteint ; limite +Inf comprise au-delà du seuil : encadrement et
+# résolution. lambda factice de limite remplacée (racines inchangées, 4/3 et
+# 3/4, valeur calculée à la main).
+verifier("I #338 Q1 limite indéterminée (par la seam) : limite NaN, NA ou -Inf, signes 1 et -1 : precision_insuffisante, NA, sans erreur ni avertissement", {
+  e <- character(0)
+  for (lim in list(NaN, NA_real_, -Inf)) for (s in c(1, -1)) {
+    r <- branche_factice(function(u) if (is.infinite(u)) lim else LAMBDA_FACTICE(u), s)
+    if (!is.null(r$erreur) || length(r$avertissements) ||
+        !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("limite %s, signe %d : %s", format(lim), s,
+                        if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                        else paste(r$valeur$etat, format(r$valeur$theta), paste(r$avertissements, collapse = " / "))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I #338 Q1 limite +Inf (par la seam) : comptée au-delà du seuil, encadrement et résolution ; signes 1 et -1 : produite, 4/3 et 3/4 à 1e-14, sans erreur ni avertissement", {
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(function(u) if (is.infinite(u)) Inf else LAMBDA_FACTICE(u), s)
+    att <- if (s > 0) 4 / 3 else 3 / 4
+    if (!is.null(r$erreur)) { e <- c(e, sprintf("signe %d : erreur %s", s, conditionMessage(r$erreur))); next }
+    if (length(r$avertissements) || !identical(r$valeur$etat, "produite") || !isTRUE(proche(r$valeur$theta, att, 1e-14, 0)))
+      e <- c(e, sprintf("signe %d : %s %s %s", s, r$valeur$etat, format(r$valeur$theta, digits = 17),
+                        paste(r$avertissements, collapse = " / ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Limite +Inf, racine en u = 800 (theta = exp(800) = Inf en double) : la
+# résolution aboutit, la postcondition (theta fini) rend precision_insuffisante
+# (recommandation de l'audit léger de l'étape (2) de #338).
+verifier("I #338 Q1 limite +Inf, racine non représentable (par la seam) : lambda_80 exp(|u| - 800), signes 1 et -1 : precision_insuffisante par la postcondition, NA, sans erreur ni avertissement", {
+  e <- character(0)
+  for (s in c(1, -1)) {
+    r <- branche_factice(function(u) L80_1 * exp(abs(u) - 800), s)
+    if (!is.null(r$erreur) || length(r$avertissements) ||
+        !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+      e <- c(e, sprintf("signe %d : %s", s, if (!is.null(r$erreur)) conditionMessage(r$erreur)
+                                           else paste(r$valeur$etat, format(r$valeur$theta), paste(r$avertissements, collapse = " / "))))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I #338 Q2 pivots en échec (par la seam) : precision_insuffisante sur les deux signes, lambda jamais évaluée (compteur d'appels nul), y compris quand la limite est au plus le seuil (0,5 lambda_80 : non_atteint si le seuil passait d'abord) ou au-delà", {
+  e <- character(0)
+  for (cas in list(list("limite <= seuil", function(u) 0.5 * L80_1), list("limite 4 lambda_80", LAMBDA_FACTICE)))
+    for (s in c(1, -1)) {
+      n <- 0L
+      lam <- cas[[2L]]
+      r <- capte_branche(tablexp:::resoudre_branche_ecart_minimal(function(u) { n <<- n + 1L; lam(u) }, s, L80_1, SEUIL_1, FALSE))
+      if (!is.null(r$erreur) || length(r$avertissements) || n != 0L ||
+          !identical(r$valeur, list(theta = NA_real_, etat = "precision_insuffisante")))
+        e <- c(e, sprintf("%s, signe %d : %s, %d appel(s) de lambda", cas[[1L]], s,
+                          if (!is.null(r$erreur)) conditionMessage(r$erreur) else r$valeur$etat, n))
+    }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Constat m2 de l'audit de 1ef94e2 (commentaire de
+# resoudre_branche_ecart_minimal()) : un NaN de lambda (chemin qu'aucune
+# donnée n'atteint) dans la boucle de doublement en h < 1024 l'arrête sur
+# l'erreur de if ; en u = 0 ou |u| = 1024, seules bornes que la boucle n'a pas
+# évaluées sans NaN, uniroot lève « f.lower (f.upper) = ... is NA ». lambda
+# lente (racine en u voisin de 5,75) pour que la boucle double jusqu'à h = 8.
+verifier("I #338 m2 NaN de lambda hors de zeroin (par la seam ; messages de R 4.3.3) : en |u| = 1, 2, 4, 8 (boucle de doublement) : erreur « missing value where TRUE/FALSE needed » ; en u = 0 : « f.lower = f(lower) is NA » (signe 1) ; en |u| = 1024 (lambda finie sous lambda_80, limite au-delà) : « f.upper = f(upper) is NA » (signe 1)", {
+  lente <- function(u) 4 * L80_1 * (-expm1(-abs(u) / 20))
+  msg <- function(lam) { r <- branche_factice(lam, 1); if (is.null(r$erreur)) "aucune erreur" else conditionMessage(r$erreur) }
+  boucle <- vapply(c(1, 2, 4, 8), function(h) msg(function(u) if (is.finite(u) && abs(u) == h) NaN else lente(u)), "")
+  zero <- msg(function(u) if (u == 0) NaN else LAMBDA_FACTICE(u))
+  cap <- msg(function(u) if (is.finite(u) && abs(u) == 1024) NaN else if (is.infinite(u)) 2 * L80_1 else 0.5 * L80_1)
+  tous(boucle = if (all(boucle == "missing value where TRUE/FALSE needed")) TRUE else paste(boucle, collapse = " / "),
+       zero = if (identical(zero, "f.lower = f(lower) is NA")) TRUE else zero,
+       cap = if (identical(cap, "f.upper = f(upper) is NA")) TRUE else cap)
+})
+# Scénario de Q1 de #338 par les données : âge 60 seul ; A (5000, 600), X
+# (E_X, 1), E_X dans {5e-305, 5e-307} ; lambda_X(+infini) déborde en +Inf
+# (part de X voisine de 1e-308 ou dénormalisée). Avant : theta+ de X
+# precision_insuffisante ; après : produite. Recalcul indépendant par
+# l'inverse exacte de la forme à deux segments en strate unique (D = 601) :
+# lambda = D p_X p_A g^2, g = (theta - 1) / (p_A + p_X theta), donc theta =
+# (1 + g p_A) / (1 - g p_X), g = sqrt(lambda_80 / (D p_X p_A)). Tolérance 1e-10
+# en relatif (celle de T7) : écart mesuré 5,2e-14 et 1,6e-14, sous la
+# précision qu'assure la postcondition (1e-8 sur lambda, environ 5e-9 sur
+# theta, lambda en theta^2). A reste variance_nulle (#333, #334). Le signal
+# ecart_minimal_detectable, déjà émis avant par theta- de X non_atteint, l'est
+# une fois, à l'identique (constat d'actuary).
+verifier("I #338 scénario de Q1 (recalcul indépendant) : âge 60, A (5000, 600), X (E_X, 1), ordre (A, X), E_X dans {5e-305, 5e-307} : theta+ de X produite, à 1e-10 de l'inverse exacte (1.142789047e+153 et 1.142789047e+154), postcondition <= 1e-8 ; theta- de X non_atteint ; A variance_nulle ; signal ecart_minimal_detectable une fois ; aucun avertissement de R", {
+  e <- character(0)
+  for (k in 1:2) {
+    eX <- c(5e-305, 5e-307)[k]
+    d <- expo_seg(c("A", "X"), c(60, 60), c(5000, eX), c(600, 1))
+    av <- character(0)
+    r <- tryCatch(withCallingHandlers(homog(d, "segment", c(60, 60), 60), warning = function(w) {
+      av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning")
+    }), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, sprintf("E_X %g : erreur %s", eX, conditionMessage(r))); next }
+    em <- r$resultat$ecart_minimal
+    a <- match("A", em$segment); x <- match("X", em$segment)
+    Ec <- 5000 + eX; px <- eX / Ec; pa <- 5000 / Ec
+    g <- sqrt(L80_1 / (601 * px * pa))
+    att <- (1 + g * pa) / (1 - g * px)
+    th <- em$theta_80_superieur[x]
+    et <- c(em$etat_superieur[x], em$etat_inferieur[x], em$etat_superieur[a], em$etat_inferieur[a])
+    if (!identical(et, c("produite", "non_atteint", "variance_nulle", "variance_nulle")))
+      e <- c(e, sprintf("E_X %g : états %s", eX, paste(et, collapse = "/")))
+    else if (!isTRUE(proche(th, att, 1e-10, 0)) || !isTRUE(proche(th, c(1.142789047e153, 1.142789047e154)[k], 1e-9, 0)) ||
+             !(abs(lambda_deux(601, px, pa, th) / L80_1 - 1) <= 1e-8))
+      e <- c(e, sprintf("E_X %g : theta+ de X %s, attendu %s", eX, format(th, digits = 17), format(att, digits = 17)))
+    n_sig <- sum(r$avertissements$code == "ecart_minimal_detectable")
+    if (n_sig != 1L) e <- c(e, sprintf("E_X %g : %d signal(aux) ecart_minimal_detectable", eX, n_sig))
+    if (length(av)) e <- c(e, sprintf("E_X %g : avertissements de R %s", eX, paste(av, collapse = " / ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Ordre (X, A) du même scénario : le test global s'arrête avant theta_80 sur
+# « Lapack routine dgesv: system is exactly singular » (V réduite par
+# soustraction, dépendance à l'ordre : défaut de #334), avant comme après #338.
+# Critère (avis d'actuary, Q3 de la reprise de #338) : invariance de toute la
+# table ecart_minimal à l'ordre des segments, sans figer l'état de A
+# (variance_nulle relève de #333) : pour chaque segment (apparié par son nom),
+# mêmes états des deux branches, theta égaux à 1e-10 en relatif quand l'état
+# est produite et NA tous deux sinon, même nombre de signaux
+# ecart_minimal_detectable ; plus, sur X, theta+ produite à 1e-10 de l'inverse
+# exacte et theta- non_atteint. Seul l'arrêt dgesv rend un écart décrit (échec
+# attendu) ; tout autre écart lève une erreur (ECHEC, pas un échec attendu).
+echec_attendu("I #338 scénario de Q1, ordre (X, A) : mêmes états et theta des deux segments qu'en ordre (A, X), sans arrêt dgesv", "#334", {
+  e <- character(0)
+  for (eX in c(5e-305, 5e-307)) {
+    d <- expo_seg(c("A", "X"), c(60, 60), c(5000, eX), c(600, 1))
+    r_ax <- homog(d, "segment", c(60, 60), 60)
+    r <- tryCatch(homog(d[2:1, ], "segment", c(60, 60), 60), error = function(x)
+      if (grepl("dgesv", conditionMessage(x), fixed = TRUE)) conditionMessage(x) else stop(x))
+    if (is.character(r)) { e <- c(e, sprintf("E_X %g : arrêt %s", eX, r)); next }
+    em1 <- r_ax$resultat$ecart_minimal; em2 <- r$resultat$ecart_minimal
+    k <- match(em1$segment, em2$segment)
+    if (nrow(em1) != nrow(em2) || anyNA(k)) stop(sprintf("E_X %g : segments différents d'un ordre à l'autre", eX))
+    for (b in c("superieur", "inferieur")) {
+      et1 <- em1[[paste0("etat_", b)]]; et2 <- em2[[paste0("etat_", b)]][k]
+      th1 <- em1[[paste0("theta_80_", b)]]; th2 <- em2[[paste0("theta_80_", b)]][k]
+      if (!identical(et1, et2))
+        stop(sprintf("E_X %g : états %s %s / %s", eX, b, paste(et1, collapse = ","), paste(et2, collapse = ",")))
+      p <- et1 == "produite"
+      if ((any(p) && !isTRUE(proche(th2[p], th1[p], 1e-10, 0))) || !all(is.na(th1[!p]) & is.na(th2[!p])))
+        stop(sprintf("E_X %g : theta %s %s / %s", eX, b, paste(format(th1, digits = 17, trim = TRUE), collapse = ","),
+                     paste(format(th2, digits = 17, trim = TRUE), collapse = ",")))
+    }
+    n1 <- sum(r_ax$avertissements$code == "ecart_minimal_detectable")
+    n2 <- sum(r$avertissements$code == "ecart_minimal_detectable")
+    if (n1 != n2) stop(sprintf("E_X %g : %d / %d signal(aux) ecart_minimal_detectable", eX, n1, n2))
+    x <- match("X", em2$segment)
+    Ec <- 5000 + eX; px <- eX / Ec; pa <- 5000 / Ec
+    g <- sqrt(L80_1 / (601 * px * pa))
+    if (!identical(c(em2$etat_superieur[x], em2$etat_inferieur[x]), c("produite", "non_atteint")) ||
+        !isTRUE(proche(em2$theta_80_superieur[x], (1 + g * pa) / (1 - g * px), 1e-10, 0)))
+      stop(sprintf("E_X %g : X %s %s", eX, em2$etat_superieur[x], format(em2$theta_80_superieur[x], digits = 17)))
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })

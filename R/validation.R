@@ -1872,9 +1872,9 @@ SEUIL_ECART_MINIMAL <- 1.25
 # sinon produite, non_atteint quand la limite de lambda_s(theta) au bout de
 # la branche reste au plus lambda_80 (1 + TOLERANCE_ECART_MINIMAL), ou
 # precision_insuffisante quand la racine n'est pas représentable en double
-# précision à cette tolérance (pivot de l'élimination ou limite non finie,
-# postcondition non tenue ; décision du mainteneur du 19/11/2026, (b) ; aucun
-# signal). Valeur NA hors de l'état produite.
+# précision à cette tolérance (pivot de l'élimination, limite NA, NaN ou
+# -Inf, postcondition non tenue ; décision du mainteneur du 19/11/2026, (b) ;
+# aucun signal). Valeur NA hors de l'état produite.
 ETATS_ECART_MINIMAL_HOMOGENEITE <- c("produite", "non_atteint", "precision_insuffisante",
                                      "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
                                      "segment_sans_exposition", "variance_nulle")
@@ -2099,41 +2099,57 @@ non_centralite_ecart_minimal <- function(ddl, niveau = NIVEAU_ECART_MINIMAL, pui
 }
 
 # Règle d'une branche de theta_80 (forme F339 ; #339 ; spécification
-# d'actuary-approfondi, Q1 de #338 et Q3 de #339). lambda : fonction de
-# u = log theta (lambda_s du segment, limites exactes en +-Inf) ; signe : 1
+# d'actuary-approfondi, Q1 et Q2 de #338 et Q3 de #339). lambda : fonction
+# de u = log theta (lambda_s du segment, limites exactes en +-Inf) ; signe : 1
 # (theta > 1) ou -1 (theta < 1) ; lam80 : lambda_80 ; seuil : lambda_80 (1 +
 # TOLERANCE_ECART_MINIMAL) ; pivots : TRUE si les pivots de la factorisation
-# de L_s sont tous finis et > 0 (commun aux deux branches d'un segment) ;
-# maxiter : itérations de uniroot (1000L, sa valeur par défaut ; réduit
-# seulement par les tests). precision_insuffisante si un pivot n'est pas fini
-# et > 0 ou si la limite lambda(+-infini) n'est pas finie ; sinon non_atteint
-# si la limite est au plus seuil ; sinon racine en u (uniroot, tolérance
-# .Machine$double.eps) sur [h/2 (ou 0) ; h] (au signe de la branche), h
-# doublé depuis 1 tant que lambda(h) <= lambda_80 et h < 1024
-# (lambda_s(+-1024) = lambda_s(+-infini) exactement : exp(-1024) vaut 0 en
-# double), de f(u) = min(lambda(u), plus grand double) - lambda_80 : la
-# troncature fait la substitution de zeroin pour un +Inf en un point
-# intérieur, sans son avertissement, et ne change rien quand lambda est
-# finie (Q1 de #338). uniroot sous check.conv = TRUE : la non-convergence
-# en maxiter itérations devient precision_insuffisante, sans signal ; on la
-# reconnaît à l'identité du message, régénéré par le même appel ngettext
-# dans le domaine R-stats (l'erreur n'a pas de classe propre) ; toute autre
-# erreur est relancée. lambda est sans avertissement (seulement +, x, /, exp,
-# expm1, crossprod, sum sur des doubles) et sans NaN quand les pivots sont
-# finis et > 0. Seules les évaluations faites par zeroin sont sous le
-# tryCatch de check.conv : un avertissement ou un NaN de lambda en un point
-# intérieur y devient l'erreur relancée « convergence problem in zero
-# finding: ... » ; un NaN à une borne donne l'erreur « f.lower = f(lower) is
-# NA » (ou f.upper) ; un avertissement de lambda à la limite, dans la boucle
-# de doublement, aux bornes évaluées par uniroot ou dans la postcondition
-# n'est pas capté et sort tel quel (aucune donnée ne l'atteint). theta =
-# exp(u) ; postcondition :
-# theta fini, > 0, différent de 1, |lambda(log theta) / lambda_80 - 1| <=
-# TOLERANCE_ECART_MINIMAL, sinon precision_insuffisante. Rend list(theta,
-# etat).
+# de L_s sont tous finis et > 0 (commun aux deux branches d'un segment, qui
+# sont donc precision_insuffisante ensemble quand il est faux) ; maxiter :
+# itérations de uniroot (1000L, sa valeur par défaut ; réduit seulement par
+# les tests). Contrôles, dans cet ordre (Q1 et Q2 de #338) :
+#   1. un pivot n'est pas fini et > 0 : precision_insuffisante, avant toute
+#      évaluation de lambda (lambda n'est pas calculable : un d_i = +Inf
+#      annule son terme et pourrait faire passer la limite sous le seuil,
+#      donc un non_atteint, qui émet le signal, à tort) ;
+#   2. limite lambda(+-infini) NA, NaN ou -Inf : precision_insuffisante
+#      (garde défensive : avec des pivots finis et > 0, lambda est dans
+#      [0 ; +Inf], sans NaN) ;
+#   3. limite finie au plus seuil : non_atteint (une limite finie négative,
+#      impossible, y tombe aussi) ;
+#   4. sinon, limite +Inf comprise (la valeur exacte dépasse le plus grand
+#      double, donc lambda_80 de très loin ; Inf <= seuil est faux) : racine
+#      en u (uniroot, tolérance .Machine$double.eps) sur [h/2 (ou 0) ; h] (au
+#      signe de la branche), h doublé depuis 1 tant que lambda(h) <=
+#      lambda_80 et h < 1024 (lambda_s(+-1024) = lambda_s(+-infini)
+#      exactement : exp(-1024) vaut 0 en double), de f(u) = min(lambda(u),
+#      plus grand double) - lambda_80 : la troncature fait la substitution de
+#      zeroin pour un +Inf en un point intérieur, sans son avertissement, et
+#      ne change rien quand lambda est finie (Q1 de #338).
+# uniroot sous check.conv = TRUE : la non-convergence en maxiter itérations
+# devient precision_insuffisante, sans signal ; on la reconnaît à l'identité
+# du message, régénéré par le même appel ngettext dans le domaine R-stats
+# (l'erreur n'a pas de classe propre) ; toute autre erreur est relancée.
+# lambda est sans avertissement (seulement +, x, /, exp, expm1, crossprod, sum
+# sur des doubles) et sans NaN quand les pivots sont finis et > 0 ; les
+# chemins qui suivent ne sont atteints par aucune donnée. Un NaN de lambda
+# dans la boucle de doublement, en h < 1024, l'arrête sur l'erreur « missing
+# value where TRUE/FALSE needed » ; en h = 1024, la condition vaut FALSE (NA
+# && FALSE) et la boucle s'arrête sans erreur. Les bornes de uniroot ont donc
+# été évaluées sans NaN par la boucle, sauf u = 0 (borne quand h = 1, que la
+# boucle n'évalue pas) et |u| = 1024 : un NaN y donne l'erreur « f.lower =
+# f(lower) is NA » (ou « f.upper = f(upper) is NA »). Seules les
+# évaluations faites par zeroin sont sous le tryCatch de check.conv : un
+# avertissement ou un NaN de lambda en un point intérieur y devient l'erreur
+# relancée « convergence problem in zero finding: ... ». Un avertissement de
+# lambda à la limite, dans la boucle de doublement, aux bornes évaluées par
+# uniroot ou dans la postcondition n'est pas capté et sort tel quel. theta =
+# exp(u) ; postcondition : theta fini, > 0, différent de 1, |lambda(log
+# theta) / lambda_80 - 1| <= TOLERANCE_ECART_MINIMAL, sinon
+# precision_insuffisante. Rend list(theta, etat).
 resoudre_branche_ecart_minimal <- function(lambda, signe, lam80, seuil, pivots, maxiter = 1000L) {
+  if (!pivots) return(list(theta = NA_real_, etat = "precision_insuffisante"))
   limite <- lambda(signe * Inf)
-  if (!pivots || !is.finite(limite)) return(list(theta = NA_real_, etat = "precision_insuffisante"))
+  if (is.na(limite) || limite == -Inf) return(list(theta = NA_real_, etat = "precision_insuffisante"))
   if (limite <= seuil) return(list(theta = NA_real_, etat = "non_atteint"))
   haut <- 1
   while (lambda(signe * haut) <= lam80 && haut < 1024) haut <- 2 * haut
