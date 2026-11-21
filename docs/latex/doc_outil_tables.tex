@@ -15652,8 +15652,8 @@ p-valeur n'y est comparée à un niveau.
     est au plus $\lambda_{80}\,(1 + 10^{-8})$~; (c)~sinon, limite
     $+\infty$ comprise, résolution~: \code{precision\_insuffisante} si
     $\lambda_s(\pm 1024)$ reste au plus $\lambda_{80}$ (garde défensive
-    inaccessible, \textbf{Calcul}, point~(4)), \code{precision\_insuffisante} si
-    \code{uniroot()} ne converge pas (\textbf{Calcul}, point~(4)), sinon
+    inaccessible) ou si \code{uniroot()} ne converge pas (\textbf{Calcul},
+    point~(4)), sinon
     \code{produite} si la postcondition est tenue,
     \code{precision\_insuffisante} sinon. La
     valeur est \code{NA} dans tout état autre que \code{produite}.
@@ -15696,16 +15696,20 @@ p-valeur n'y est comparée à un niveau.
     $10^{-307}$, encore normalisée~; la racine dépend alors du partage de
     la limite entre les strates~: deux segments A et X, strate~1 avec A
     (exposition 0,31, 5~décès) et X (0,69, 5~décès), strate~2 avec A (1,
-    1~décès) et X ($10^{-307}$, aucun décès), limite de X à 0,13~\%
-    au-dessus du seuil~: $\theta_{80}^{+}$ de X au-delà de
-    $e^{712{,}8}$, \code{precision\_}\allowbreak\code{insuffisante}~;
+    1~décès) et X ($10^{-307}$, aucun décès), limite de X à 0,13~\% au-dessus du seuil~: $\theta_{80}^{+}$ de X
+    $\approx e^{712{,}84}$, au-delà du plus grand double ($e^{709{,}78}$),
+    \code{precision\_}\allowbreak\code{insuffisante}~;
     même configuration avec une exposition de X de $10^{-305}$ en
     strate~2~: \code{produite}, $\theta_{80}^{+} \approx 3{,}84 \cdot
     10^{307}$, égal au recalcul indépendant par la forme à deux
     segments~; avec A à 0,32 et X à 0,68 en strate~1 (limite à 3,3~\% au-dessus du
     seuil) et X à $10^{-307}$ en strate~2~: \code{produite}, $\theta_{80}^{+} \approx
     1{,}39 \cdot 10^{308}$~; constat de mesure d'\code{actuary} par appel
-    direct de \code{ecart\_minimal\_homogeneite()}, étape~(7) de B32)~; un test l'exerce par appel direct, racine en $|u| = 800$.
+    direct de \code{ecart\_minimal\_homogeneite()}, étape~(7) de B32~; la
+    racine non représentable, $e^{712{,}84}$, par la forme fermée à deux
+    segments, où $\lambda_s$ ne dépend de $u$ en strate~2 que par $\pi_X
+    e^{u}$, recoupée sur les deux racines produites ($u = 708{,}24$ et
+    $709{,}52$), remesure d'\code{actuary} du 21/11/2026)~; un test l'exerce par appel direct, racine en $|u| = 800$.
     Une part d'exposition dénormalisée (inférieure à environ $2{,}2 \cdot
     10^{-308}$) n'est pas, par elle-même, une voie~: la postcondition
     contrôle $\lambda_s$ calculée sur la part arrondie, et elle tient
