@@ -2036,7 +2036,9 @@ somme_par <- function(x, i, n) {
 # Cœur des tests du score conditionnels (spécification de #168, § 1), sur
 # des lignes (groupe, strate) d'une portée : D décès, E exposition centrale,
 # strate (1..K) et groupe (1..G) entiers ; aucune ligne d'une cellule qui
-# porte un événement sans exposition (écartées par l'appelant). Strate
+# porte un événement sans exposition (écartées par l'appelant) ; au plus une
+# ligne par couple (strate, groupe) (lignes agrégées par l'appelant, #335 ;
+# précondition contrôlée, erreur de programmation). Strate
 # informative : D_. > 0 et au moins deux groupes à E > 0 ; ligne utilisée :
 # strate informative et E > 0. Composantes connexes du graphe groupes-strates
 # par union au plus petit indice ; système réduit : un groupe de référence
@@ -2052,6 +2054,9 @@ somme_par <- function(x, i, n) {
 # l'écart minimal détectable (#218), exacte (list(n, p, o, a) quand deux groupes seulement sont comparés, NULL
 # sinon)).
 score_homogeneite <- function(D, E, strate, groupe, K, G) {
+  if (anyDuplicated((strate - 1) * as.numeric(G) + groupe))
+    stop("score_homogeneite() : plusieurs lignes pour un même couple (strate, groupe) (erreur de programmation).",
+         call. = FALSE)
   D <- as.numeric(D)
   Ds <- somme_par(D, strate, K)
   Es <- somme_par(E, strate, K)
@@ -2258,9 +2263,10 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
   n <- length(sc$effectifs)
   Ec <- somme_par(sc$poids, ru, n)
   # P[c, j] = pi_jc (strates informatives x groupes), cumulé par (strate,
-  # segment) : un segment peut occuper plusieurs lignes d'une cellule (somme
-  # des parts, sans soustraction ; constat C-R1 de l'audit, décision du
-  # mainteneur du 20/11/2026, (a)) ; W[j, k] = w_jk.
+  # segment) (somme des parts, sans soustraction ; constat C-R1 de l'audit,
+  # décision du mainteneur du 20/11/2026, (a)) ; cumul gardé, sans objet
+  # depuis #335 (une ligne par (strate, segment), précondition de
+  # score_homogeneite()) ; W[j, k] = w_jk.
   P <- matrix(somme_par(sc$poids / Ec[ru], ru + n * (gu - 1L), n * S), n, S)
   W0 <- crossprod(P, P * sc$effectifs)
   diag(W0) <- 0
@@ -2384,12 +2390,32 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   saine <- !fautive[cel]
   tranche_fautive <- tabulate(tranche_cel[fautive], nb) > 0
   toute_faute <- any(fautive)
+  # Agrégation unique des lignes saines par (segment, cellule) (#335 ; forme
+  # F335 ; spécification d'actuary-approfondi, Q1) : après l'écart des
+  # cellules fautives, jugées ligne par ligne ci-dessus ; E = somme des E et
+  # D = somme des D (en double), à la première occurrence du couple dans
+  # l'ordre des lignes de la plage. Sous H0, la somme de Poisson de même force
+  # est Poisson de l'exposition sommée (résultat exact) : le test compare des
+  # segments, pas des lignes. Ce vecteur alimente tout l'aval (scores global,
+  # par tranche et par variable, valeurs observées, diagnostics, exposition
+  # des segments). Sans couple répété, il est identique, valeur et ordre, aux
+  # lignes saines (flux des réplications inchangé, R11).
+  i_s <- which(saine)
+  couple <- (cel[i_s] - 1) * as.numeric(S) + sg[i_s]
+  a <- match(couple, unique(couple))
+  prem <- i_s[!duplicated(a)]
+  n_a <- length(prem)
+  D_a <- somme_par(D[i_s], a, n_a)
+  E_a <- somme_par(E[i_s], a, n_a)
+  cel_a <- cel[prem]
+  sg_a <- sg[prem]
+  tranche_a <- tranche[prem]
 
-  sc_g <- score_homogeneite(D[saine], E[saine], cel[saine], sg[saine], K, S)
-  lignes_g <- which(saine)[sc_g$utilisee]
+  sc_g <- score_homogeneite(D_a, E_a, cel_a, sg_a, K, S)
+  lignes_g <- which(sc_g$utilisee)
   sc_b <- lapply(seq_len(nb), function(b) {
-    l <- saine & tranche == b
-    s <- score_homogeneite(D[l], E[l], cel[l], sg[l], K, S)
+    l <- tranche_a == b
+    s <- score_homogeneite(D_a[l], E_a[l], cel_a[l], sg_a[l], K, S)
     s$position <- match(which(l)[s$utilisee], lignes_g)
     s
   })
@@ -2416,7 +2442,7 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
     t_rep <- replications_multinomiales(sc_g$poids, sc_g$strate_tirage, sc_g$effectifs, replications, graine, f_stat)
     # Valeurs observées du jeu par la même fonction que les répliques (global,
     # tranches, somme accumulée de la même façon ; reprise de l'audit, C2).
-    t_obs <- f_stat(matrix(D[lignes_g], ncol = 1L))
+    t_obs <- f_stat(matrix(D_a[lignes_g], ncol = 1L))
     jeux$cellules <- replications
   } else jeux$cellules <- 0
 
@@ -2468,9 +2494,10 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   if (length(segmentation) == 2L) for (k in 1:2) {
     v <- segmentation[k]; w <- segmentation[3L - k]
     mv <- unique(segments[[v]]); mw <- unique(segments[[w]])
-    gv <- match(ex[[v]], mv); gw <- match(ex[[w]], mw)
-    st <- (cel - 1L) * length(mw) + gw
-    sc_v <- score_homogeneite(D[saine], E[saine], st[saine], gv[saine], K * length(mw), length(mv))
+    # Lignes agrégées : (segment, cellule) unique, donc (strate, groupe) aussi.
+    gv <- match(ex[[v]][prem], mv); gw <- match(ex[[w]][prem], mw)
+    st <- (cel_a - 1L) * length(mw) + gw
+    sc_v <- score_homogeneite(D_a, E_a, st, gv, K * length(mw), length(mv))
     prod_v <- !toute_faute && sc_v$ddl > 0
     nom_jeu <- paste0("variable_", v)
     mc <- mc_na
@@ -2489,16 +2516,17 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   tests <- do.call(rbind, tests)
   rownames(tests) <- NULL
 
-  # Observés et attendus par segment (portée globale, puis par tranche).
-  portee <- function(nom, debut, fin, sc, l_toutes, faute) {
-    l_saines <- l_toutes & saine
+  # Observés et attendus par segment (portée globale, puis par tranche) ;
+  # l_toutes : lignes de la plage de la portée (cellules fautives comprises) ;
+  # l_a : lignes agrégées de la portée.
+  portee <- function(nom, debut, fin, sc, l_toutes, l_a, faute) {
     e_tout <- somme_par(E[l_toutes], sg[l_toutes], S)
     d_tout <- somme_par(D[l_toutes], sg[l_toutes], S)
     d <- data.frame(portee = rep(nom, S), stringsAsFactors = FALSE)
     for (k in segmentation) d[[k]] <- segments[[k]]
     d$tranche_debut <- rep(as.integer(debut), S)
     d$tranche_fin <- rep(as.integer(fin), S)
-    d$exposition_centrale <- somme_par(E[l_saines], sg[l_saines], S)
+    d$exposition_centrale <- somme_par(E_a[l_a], sg_a[l_a], S)
     d$observes <- denombrement_entier(sc$O, "homogeneite", "segments/observes")  # integer (#199)
     d$attendus <- sc$A
     # double et character même sans segment (#201) : ifelse() rend logical(0) sur S = 0.
@@ -2516,9 +2544,9 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
     d$etat <- etat
     d
   }
-  seg <- c(list(portee("global", na_i, na_i, sc_g, rep(TRUE, nrow(ex)), toute_faute)),
+  seg <- c(list(portee("global", na_i, na_i, sc_g, rep(TRUE, nrow(ex)), rep(TRUE, n_a), toute_faute)),
            lapply(seq_len(nb), function(b) portee("tranche", tranches_age[b], fin_tranche[b], sc_b[[b]], tranche == b,
-                                                  tranche_fautive[b])))
+                                                  tranche_a == b, tranche_fautive[b])))
   # Écart minimal détectable (#218 ; F218) : une ligne par segment du test
   # global, dans l'ordre des lignes globales de seg ; V du test global (sc_g),
   # chaque segment pris pour référence dans sa composante (décision du
@@ -2532,9 +2560,11 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   seg <- do.call(rbind, seg)
   rownames(seg) <- NULL
 
-  # Décomptes et identité des événements.
-  Dc <- somme_par(D, cel, K)
-  nexp <- somme_par(E > 0, cel, K)
+  # Décomptes et identité des événements ; Dc et nexp sur les lignes agrégées
+  # (nexp : segments exposés de la cellule ; cellules fautives exclues des
+  # diagnostics qui les emploient).
+  Dc <- somme_par(D_a, cel_a, K)
+  nexp <- somme_par(E_a > 0, cel_a, K)
   O <- sum(sc_g$O)
   ev_fautives <- sum(D[!saine])
   total <- sum(as.numeric(exposition$evenements))
