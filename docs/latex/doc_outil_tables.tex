@@ -15544,9 +15544,11 @@ p-valeur n'y est comparée à un niveau.
         $\theta_{80} = e^{u}$~; l'erreur de résolution est relative sur
         $\theta_{80}$, au plus $(4|\log\theta_{80}| + 1)\,\varepsilon$
         (tableau~\ref{tab:tolerances}). \code{zeroin}, l'algorithme de
-        \code{uniroot()}, remplace de lui-même une valeur infinie ou
-        manquante de la fonction en un point intérieur par $x_{\max}$, avec
-        l'avertissement «~NA/Inf replaced by maximum positive value~»~; la
+        \code{uniroot()}, remplace de lui-même une valeur $+\infty$,
+        \code{NA} ou \code{NaN} de la fonction en un point intérieur par
+        $x_{\max}$, avec l'avertissement «~NA/Inf replaced by maximum
+        positive value~», et une valeur $-\infty$ par $-x_{\max}$, avec
+        l'avertissement «~-Inf replaced by maximally negative value~»~; la
         troncature fait cette substitution pour une valeur $+\infty$ de
         $\lambda_s$, sans avertissement, et ne change rien quand $\lambda_s$
         est finie. \code{uniroot()} est appelée avec \code{check.conv =
