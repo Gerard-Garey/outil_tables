@@ -15144,6 +15144,46 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     indépendantes. \textbf{Fait exact}~: sachant $D_{\cdot c}$,
     $(D_{1c}, \ldots, D_{Sc})$ suit la loi multinomiale
     $(D_{\cdot c}~; \pi_c)$, libre de $\mu_c$~: la nuisance disparaît.
+  \item \textbf{Lignes agrégées par (segment, cellule)} (issue~\#335~;
+    forme F335, spécification d'\code{actuary-approfondi}, Q1). La table
+    d'exposition reçue peut porter plusieurs lignes d'un même segment dans
+    une cellule (appel direct de \code{calculer\_homogeneite()}~; la table
+    de l'étape \code{exposition} n'en a qu'une par cellule et par segment,
+    section~\ref{sec:exposition}, si bien que les constructions par
+    \code{construire\_table()} n'en portent pas). Après l'écart des
+    cellules qui portent un événement sans exposition, jugées ligne par
+    ligne (\textbf{Cas aux limites}, ci-dessous),
+    \code{calculer\_homogeneite()} additionne une seule fois les lignes
+    saines de chaque couple (segment, cellule)~: expositions et décès
+    sommés en \code{double}, la ligne agrégée prenant la place de la
+    première occurrence du couple dans l'ordre des lignes de la plage.
+    Tout l'aval part de ces lignes agrégées~: tests global, par tranche et
+    par variable, valeurs observées, $O_s$, $A_s$ et exposition des
+    segments, diagnostics, écart minimal détectable~; $D_{sc}$ et $E_{sc}$
+    sont donc les sommes des lignes du segment $s$ dans la cellule $c$.
+    \textbf{Fait exact}~: sous $H_0$, une somme de décès de Poisson
+    indépendants de même force $\mu_c$ suit la loi de Poisson de
+    l'exposition sommée~; le test compare des segments, non des lignes, et
+    son résultat ne dépend pas, en arithmétique exacte, du découpage d'un
+    segment en lignes dans une cellule. En double précision, le résultat
+    d'une table découpée est celui de la table à une ligne par couple,
+    rangée dans l'ordre de première occurrence des couples~: au bit près
+    quand les sommes partielles sont exactes en \code{double} (constat des
+    tests unitaires, sur des découpages exacts), à l'arrondi de la somme
+    près sinon (approximation numérique). L'ordre ne compte que pour la
+    p-valeur de Monte-Carlo~: les réplications suivent l'ordre des lignes
+    de chaque strate, si bien qu'une permutation des lignes, qui laisse
+    $T$ inchangé en arithmétique exacte, change les tirages~; l'ordre de
+    première occurrence laisse le vecteur des lignes saines d'une table
+    sans couple répété identique, en valeurs et en ordre, et avec lui le
+    flux des réplications. \code{score\_homogeneite()} suppose cette
+    agrégation faite~: deux lignes d'un même couple (strate, groupe)
+    l'arrêtent sur une erreur de programmation, non sur un refus. Jusqu'à
+    l'issue~\#335, les lignes entraient telles quelles dans les scores~:
+    un segment découpé dans une cellule y comptait comme plusieurs lignes
+    de la strate, et $T$ n'était pas invariant au découpage en général~:
+    le test d'alors ne le vérifiait que pour un segment découpé placé en
+    tête de la cellule.
   \item \textbf{Statistique}~: $O_s = \sum_c D_{sc}$, $A_s = \sum_c
     D_{\cdot c}\pi_{sc}$ (décès attendus si les taux étaient communs~:
     standardisation interne), $U = O - A$, $V = \sum_c D_{\cdot c}
@@ -15152,7 +15192,7 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
       T = U^{\top} V^{-} U ,
     \]
     sur les \emph{strates informatives} ($D_{\cdot c} > 0$ et au moins deux
-    groupes exposés), les autres apportant exactement 0 à $U$ et à $V$.
+    groupes exposés, comptés sur les lignes agrégées), les autres apportant exactement 0 à $U$ et à $V$.
     Degrés de liberté~: le rang de $V$, exact et combinatoire, soit le
     nombre de groupes exposés dans les strates informatives moins le nombre
     de composantes connexes du graphe groupes--strates ($S - 1$ dans le cas
@@ -15285,7 +15325,10 @@ avec $O = A = 0$ (état \code{segment\_sans\_exposition})~; moins de deux
 segments informatifs (ddl $= 0$)~: tests non produits, état
 \code{moins\_de\_deux\_segments\_informatifs}, aucun tirage~; une cellule de
 la plage où un segment compte des décès sans exposition ($E_{sc} = 0$,
-$D_{sc} > 0$) est écartée des sommes, et seuls les tests qui la contiennent
+$D_{sc} > 0$~; jugé ligne par ligne, avant l'agrégation des lignes~: une
+ligne d'exposition nulle et de décès positifs suffit, même si d'autres
+lignes du segment exposent la cellule) est
+écartée des sommes, et seuls les tests qui la contiennent
 ne sont pas produits (état \code{evenement\_sans\_exposition},
 décision M290~; les autres tranches restent produites), avec
 l'avertissement \code{evenements\_sans\_exposition} (module
@@ -15325,11 +15368,10 @@ p-valeur n'y est comparée à un niveau.
       \qquad
       \lambda_s(\theta) = \delta_s(\theta)^{\top} V^{-} \delta_s(\theta),
     \]
-    avec la même $V$ que le test global (hors lignes multiples d'un
-    segment dans une cellule, où la $V$ du test global n'agrège pas les
-    parts, issue~\#335), $\pi_{jc}$ étant la part de
-    l'exposition centrale du segment $j$ dans la strate $c$, somme des
-    parts de ses lignes quand il en occupe plusieurs dans la cellule~;
+    avec la même $V$ que le test global, $\pi_{jc}$ étant la part de
+    l'exposition centrale du segment $j$ dans la strate $c$, calculée sur
+    les lignes agrégées par (segment, cellule) (\textbf{Méthode},
+    ci-dessus~; issue~\#335)~;
     $\lambda_s$ ne dépend ni de l'ordre des segments ni du groupe de
     référence du test global~: chaque segment est pris pour référence dans
     sa propre composante connexe (\textbf{Calcul}, ci-dessous~; la clause
@@ -15372,10 +15414,13 @@ p-valeur n'y est comparée à un niveau.
     sont de même signe, et $|\delta_j| = \sum_c D_{\cdot c}\, \pi_{jc}\,
     |h_c(\theta)|$. Avec $a_c = \sum_{k \ne s} E_{kc}/E_{\cdot c}$, égal à
     $1 - \pi_{sc}$, $h_c(\theta) = \pi_{sc}(\theta - 1)/(a_c + \pi_{sc}\,
-    \theta)$~; quand $a_c = 0$ ($s$ seul exposé dans la strate, sur
-    plusieurs lignes~: la strate est informative, mais aucun autre segment
-    n'y a de part), $\pi_{jc} = 0$ pour tout $j \ne s$ et la strate
-    n'apporte rien aux $\delta_j$~; comme $V e_s = \sum_c D_{\cdot c}\,\pi_{sc}\,(e_s -
+    \theta)$~; en arithmétique exacte, $a_c > 0$ dans toute strate
+    informative, qui compte au moins deux segments exposés sur les lignes
+    agrégées (issue~\#335~; jusqu'à cette issue, un segment seul exposé
+    sur plusieurs lignes rendait la strate informative avec $a_c = 0$)~;
+    si $a_c = 0$ (aucun autre segment n'a de part dans la strate),
+    $\pi_{jc} = 0$ pour tout $j \ne s$ et la strate n'apporte rien aux
+    $\delta_j$~; comme $V e_s = \sum_c D_{\cdot c}\,\pi_{sc}\,(e_s -
     \pi_c)$, il vient $\delta_s(1 + h) = h\,V e_s + O(h^2)$ et
     $\lambda_s(1 + h) = h^2 V_{ss} + O(h^3)$, quel que soit le nombre de
     segments (identité de premier ordre). À deux segments, $p$ ne dépend
@@ -15453,7 +15498,12 @@ p-valeur n'y est comparée à un niveau.
     segment de part d'exposition infime~:
     \begin{enumerate}[label=(\arabic*), leftmargin=*, itemsep=1pt]
       \item $\pi_{jc}$ est cumulée par (strate, segment), somme des parts
-        des lignes du segment dans la cellule~; $a_c$ est la somme des
+        des lignes du segment dans la cellule (cumul introduit sur le
+        constat C-R1 de l'audit, décision du mainteneur du 20/11/2026,
+        (a), quand un segment
+        pouvait occuper plusieurs lignes d'une cellule~; gardé, il est
+        sans objet depuis l'issue~\#335, \code{score\_homogeneite()} ne
+        recevant qu'une ligne par (strate, segment))~; $a_c$ est la somme des
         expositions des autres segments divisée par $E_{\cdot c}$, jamais
         $1 - \pi_{sc}$.
       \item $|h_c|$ s'écrit en $u = \log\theta$, avec \code{expm1()}~:
@@ -15935,7 +15985,8 @@ une ligne par segment du test global, dans l'ordre des lignes globales de
 \code{etat\_inferieur} (\code{character}), types tenus aussi à 0~ligne~;
 \code{monte\_carlo} ($B$, graine, tirages par jeu).
 \code{diagnostics}~: cellules, cellules informatives, sans décès, non
-informatives et à événement sans exposition, décès de ces dernières,
+informatives (segments exposés comptés sur les lignes agrégées) et à
+événement sans exposition, décès de ces dernières,
 lignes, décès et exposition hors plage, total des décès. La fiche ne
 change pas la définition de la fiche.\par}
 
@@ -16059,11 +16110,31 @@ conformes aux conditions $p r < 1$ et $q r < 1$, valeurs à $10^{-12}$ de
 la forme close, écart entre les deux ordres au plus $10^{-14}$~; deux
 composantes connexes (chaque segment référence de la sienne, $\lambda_{80}$
 au ddl du test global), à $10^{-12}$ d'un recalcul indépendant~; une
-strate où un segment est seul exposé sur deux lignes ($a_c = 0$), de bout
-en bout~; l'invariance au découpage d'une cellule en plusieurs lignes, à
-$10^{-12}$, le segment découpé étant placé en tête (\code{score\_homogeneite()}
-n'agrège pas les parts par strate et segment~: $T$ n'est invariant que
-dans ce cas, issue~\#335)~; l'état \code{precision\_insuffisante} par appel
+strate où un segment est seul exposé sur deux lignes, non informative
+depuis l'issue~\#335 (lignes agrégées), de bout en bout, dans deux ordres
+des lignes~: $\theta_{80}^{-}$ des deux segments à $10^{-12}$ d'un
+recalcul indépendant restreint à la cellule où ils sont tous deux
+exposés~; l'invariance au découpage d'une cellule en plusieurs lignes
+(issue~\#335)~: découpages exacts en \code{double} d'une cellule de l'un
+ou l'autre segment, le segment découpé en tête de la cellule ou non, dans
+plusieurs ordres des lignes, résultat entier (tests, dont p-valeurs
+exacte et de Monte-Carlo, segments, écart minimal détectable,
+diagnostics, avertissements) identique au bit près (\code{identical()}) à
+celui de la table à une ligne par couple (segment, cellule) rangée dans
+l'ordre de première occurrence, $T$, p-valeur exacte, $z$ et
+$\theta_{80}$ à $10^{-12}$ de valeurs de référence~; la même identité pour
+un segment seul exposé dans sa strate, pour une ligne d'exposition et de
+décès nuls ajoutée, et sous deux variables de segmentation, tests par
+variable compris, la cellule découpée n'étant pas en tête~; l'ordre de
+première occurrence de l'agrégation (trois segments, rangés
+différemment d'une cellule à l'autre, sans couple répété~: $T$, p-valeurs
+et erreurs de Monte-Carlo et $z$ égaux, à $10^{-12}$, aux valeurs du
+moteur d'avant l'issue~\#335~; un rangement des lignes agrégées par
+(cellule, segment), mutant construit sur une copie, laisse $T$ et $z$
+inchangés mais change les p-valeurs de Monte-Carlo, et le test
+l'élimine)~; la précondition de \code{score\_homogeneite()} (deux
+lignes d'un même couple (strate, groupe)~: erreur de programmation, non
+un refus)~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
 branches produites, postcondition recalculée)~; la règle d'une branche
@@ -17423,12 +17494,12 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{STATUTS\_HOMOGENEITE} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque grandeur de \code{tests}, de \code{segments} et, en deux dernières lignes, de \code{ecart\_minimal} (E2.20) \\
 \catalogue{fonctions-validation}{controler\_parametres\_homogeneite()} & interne & plage, tranches, $B$, segmentation du plan & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue, puis \code{homogeneite\_sans\_}\allowbreak\code{segmentation} (module \code{homogeneite})~; appelée par \code{valider\_plan()} seule \\
 \catalogue{fonctions-validation}{somme\_par()} & interne & valeurs, indices, nombre d'indices & somme par indice, dans l'ordre des lignes~; 0 pour un indice sans ligne \\
-\catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives, statistique observée et fonction des répliques, données des réplications et de la p-valeur exacte, groupe de chaque ligne utilisée (\code{groupe\_utilise}) et racine de la composante connexe de chaque groupe, lui-même pour un groupe absent (\code{composante}), pour l'écart minimal détectable \\
+\catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, au plus une ligne par couple (strate, groupe), sinon erreur de programmation (issue~\#335), nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives, statistique observée et fonction des répliques, données des réplications et de la p-valeur exacte, groupe de chaque ligne utilisée (\code{groupe\_utilise}) et racine de la composante connexe de chaque groupe, lui-même pour un groupe absent (\code{composante}), pour l'écart minimal détectable \\
 \catalogue{fonctions-validation}{p\_exacte\_homogeneite()} & interne & résultat de la ligne précédente & p-valeur exacte bilatérale à deux groupes (somme de binomiales) et son état \\
 \catalogue{fonctions-validation}{non\_centralite\_ecart\_minimal()} & interne & ddl, niveau, puissance (par défaut, les deux constantes) & $\lambda_{80}$~: racine par \code{uniroot()} de la puissance du khi-deux non central (\code{pchisq()}) égale à la puissance visée \\
 \catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{ecart\_minimal\_homogeneite()} & interne & objet du score du test global, état du test, états des lignes globales des segments, $S$ & $\theta_{80}^{+}$, $\theta_{80}^{-}$ et leurs états par segment, $\lambda_{80}$~; chaque segment référence de sa composante connexe, $\lambda_s$ calculée sans soustraction, résolution en $\log\theta$, chaque branche par la fonction de la ligne précédente~; \code{precision\_}\allowbreak\code{insuffisante} est un état, jamais un arrêt (section~\ref{sec:homogeneite}) \\
-\catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; ne contrôle aucun paramètre \\
+\catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; lignes saines agrégées par (segment, cellule), à la première occurrence du couple, avant tout score (issue~\#335)~; ne contrôle aucun paramètre \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices, chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
 \catalogue{fonctions-validation}{MENTION\_CONVENTION\_TABLE\_REFERENCE} & constante & --- & convention d'âge restituée pour une table de référence évaluée~: «~non portée par la table de référence~» \\
 \catalogue{fonctions-validation}{NOM\_TABLE\_CONSTRUITE} & constante & --- & nom restitué de la table construite, sans nom d'étape productrice \\
