@@ -2379,3 +2379,73 @@ verifier("I #333 part arrondie à 0 : A (5000, 600 ; 100, 2), X (E_X60, 0 ; 100,
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
+
+# --- #348 : total des événements gardé avant tout tirage ----------------------
+#
+# Spécification d'actuary-approfondi de #348 (Q5 ; forme F348). Avant (copie
+# de 0990bab) : erreur de R « invalid second argument 'size' » de
+# rmultinom(), précédée de l'avertissement « NAs introduced by coercion to
+# integer range ». Après : refus homogeneite / denombrement_hors_plage avant
+# tout score et tout tirage, gardes dans leur ordre (valeur calculée à la
+# main : 2e9 + 2e9 + 1 + 1).
+refus_ou_erreur_348 <- function(expr) {
+  av <- character(0)
+  r <- tryCatch(withCallingHandlers(expr, warning = function(w) { av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning") }),
+                refus_tablexp = function(x) x, error = function(e) e)
+  list(r = r, av = av)
+}
+# controle() est masquée plus haut par une fonction de même nom (test du
+# statut theta_80_superieur, évalué dans l'environnement du fichier) : forme
+# propre ici.
+refus_348 <- function(r, module, motif)
+  if (!inherits(r, "refus_tablexp")) "aucun refus levé" else if (!identical(c(r$module, r$motif), c(module, motif)))
+    sprintf("refus %s / %s au lieu de %s / %s", r$module, r$motif, module, motif) else TRUE
+verifier("I #348 homogénéité : deux segments, 2e9 événements par ligne à 60 et 1 à 61 (total 4000000002) : refus homogeneite / denombrement_hors_plage, grandeur evenements_total, valeur 4000000002, limite .Machine$integer.max ; aucune erreur ni aucun avertissement de R", {
+  d <- expo_seg(c("A", "B", "A", "B"), c(60, 60, 61, 61), rep(1e10, 4L), c(2e9, 2e9, 1, 1))
+  x <- refus_ou_erreur_348(homog(d, "segment", c(60, 61), 60, B = 19))
+  r <- x$r
+  tous(refus = if (inherits(r, "refus_tablexp")) TRUE
+               else if (inherits(r, "error")) paste("erreur de R :", conditionMessage(r)) else "aucun refus",
+       motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_total") && identical(r$details$valeur, 4000000002) &&
+                      identical(r$details$limite, .Machine$integer.max)) TRUE else "détails du refus",
+       avertissements = if (!length(x$av)) TRUE else paste(x$av, collapse = " / "))
+})
+verifier("I #348 homogénéité, ordre des gardes conservé : 2e9 + 2e9 événements hors de la plage (âge 70), plage 60 seule : refus evenements_hors_plage (valeur 4e9), comme avant", {
+  d <- expo_seg(c("A", "B", "A", "B"), c(60, 60, 70, 70), rep(1e10, 4L), c(5, 3, 2e9, 2e9))
+  r <- refus_ou_erreur_348(homog(d, "segment", c(60, 60), 60, B = 19))$r
+  tous(motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_hors_plage") && identical(r$details$valeur, 4e9)) TRUE
+                  else paste(r$details$grandeur, r$details$valeur))
+})
+verifier("I #348 replications_multinomiales() : effectif au-delà de .Machine$integer.max -> erreur de programmation avant tout tirage (complément défensif), sans avertissement de R", {
+  x <- refus_ou_erreur_348(tablexp:::replications_multinomiales(c(1, 1), c(1L, 1L), 3e9, 2, 1L,
+                                                                 function(Dm) list(t = colSums(Dm))))
+  tous(erreur = if (inherits(x$r, "error") && grepl("replications_multinomiales() : groupes, poids ou effectifs invalides",
+                                                    conditionMessage(x$r), fixed = TRUE)) TRUE
+                else if (inherits(x$r, "error")) conditionMessage(x$r) else "aucune erreur",
+       avertissements = if (!length(x$av)) TRUE else paste(x$av, collapse = " / "))
+})
+# Garde avancée devant segments/observes (m1 de l'audit de l'étape (5) ;
+# spécification, Q5, § 2) : un seul segment, 2e9 + 1e9 événements. Avant
+# (copie de 0990bab) : refus sur segments/observes (portee()) ; après :
+# evenements_total, même motif (valeur 3e9, calculée à la main).
+verifier("I #348 garde avancée : un segment, 2e9 + 1e9 événements (âges 60 et 61) : refus homogeneite / denombrement_hors_plage, grandeur evenements_total (et non plus segments/observes), valeur 3e9", {
+  r <- refus_ou_erreur_348(homog(expo_seg(c("A", "A"), 60:61, c(1e10, 1e10), c(2e9, 1e9)), "segment", c(60, 61), 60,
+                                 B = 19))$r
+  tous(motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_total") && identical(r$details$valeur, 3e9)) TRUE
+                  else paste(r$details$grandeur, r$details$valeur))
+})
+# Ordre des deux premières gardes (m2) : cellule 60 fautive (E = 0, 2e9 + 2e9
+# décès) et 2e9 + 2e9 décès hors plage (âge 70) : les deux décomptes
+# dépassent l'entier maximal ; la première garde dans l'ordre est citée
+# (mesuré, identique à 0990bab).
+verifier("I #348 ordre des gardes : événements sans exposition dans la plage (4e9) et hors plage (4e9) au-delà de l'entier maximal : refus sur evenements_cellules_evenement_sans_exposition, la première dans l'ordre", {
+  d <- expo_seg(c("A", "B", "A", "B", "A", "B"), c(60, 60, 61, 61, 70, 70), c(0, 0, 1e10, 1e10, 1e10, 1e10),
+                c(2e9, 2e9, 5, 3, 2e9, 2e9))
+  r <- refus_ou_erreur_348(homog(d, "segment", c(60, 61), 60, B = 19))$r
+  tous(motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_cellules_evenement_sans_exposition") &&
+                      identical(r$details$valeur, 4e9)) TRUE else paste(r$details$grandeur, r$details$valeur))
+})

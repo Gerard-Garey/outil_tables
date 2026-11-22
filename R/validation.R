@@ -921,13 +921,15 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # (longueur B). Un groupe sans cellule n'est admis que d'effectif nul (il
 # est sauté, sans tirage) : d'effectif positif, ses décès n'auraient aucune
 # cellule où se répartir (erreur de programmation, contrôlée avant tout
-# tirage).
+# tirage). Un effectif au-delà de .Machine$integer.max (size de rmultinom())
+# est aussi une erreur de programmation : les appelants rangent le total des
+# événements en integer avant tout tirage (#348).
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
   G <- length(effectifs)
   if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || any(!(poids > 0)) ||
-      anyNA(effectifs) || any(effectifs < 0))
+      anyNA(effectifs) || any(effectifs < 0) || any(effectifs > .Machine$integer.max))
     stop("replications_multinomiales() : groupes, poids ou effectifs invalides (erreur de programmation).",
          call. = FALSE)
   idx <- lapply(seq_len(G), function(g) which(groupe == g))
@@ -1694,6 +1696,23 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
     A_v <- theta * at$attendus
     qx_v <- -expm1(-mu_v)
   }
+  # Décomptes d'événements en double, puis rangement en integer (#199 ; ADR
+  # 0009, point 9.6, (iii)) avant statistiques_validation() et tout tirage
+  # (#348 ; forme F348 ; spécification d'actuary-approfondi, Q5) : sous
+  # positionnee, l'effectif O_s tiré par rmultinom() est une somme partielle
+  # d'événements positifs, au plus le total ; refus denombrement_hors_plage
+  # au-delà de .Machine$integer.max, gardes dans leur ordre : pour toute
+  # entrée qui atteint aujourd'hui les gardes, le refus et sa grandeur citée
+  # restent identiques ; une entrée refusée plus loin sur
+  # sous_groupes/observes (sous_groupes_validation()) cite désormais la
+  # garde avancée, au même motif. Garde défensive : le total de l'étape
+  # exposition est gardé (M397).
+  sans_attendu <- at$etat %in% c("evenement_sans_exposition", "evenement_sous_taux_nul")
+  ev_sans_d <- sum(as.numeric(cel$evenements[sans_attendu]))
+  total_d <- sum(as.numeric(exposition$evenements))
+  ev_sans <- denombrement_entier(ev_sans_d, "validation", "evenements_sans_attendu")
+  ev_hors <- denombrement_entier(ap$hors_plage$evenements, "validation", "evenements_hors_plage")
+  total <- denombrement_entier(total_d, "validation", "evenements_total")
   # Séquence des suites : segment x année.
   sequence <- if (isTRUE(par_annee)) (ap$segment - 1L) * length(unique(cel$annee)) + match(cel$annee, sort(unique(cel$annee)))
               else ap$segment
@@ -1720,17 +1739,10 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
 
   # Décomptes et identité des événements (M253, point 5).
   O <- sum(as.numeric(cel$evenements[ret]))
-  sans_attendu <- at$etat %in% c("evenement_sans_exposition", "evenement_sous_taux_nul")
-  ev_sans <- sum(as.numeric(cel$evenements[sans_attendu]))
-  total <- sum(as.numeric(exposition$evenements))
-  if (!identical(O + ev_sans + ap$hors_plage$evenements, total))
+  # Identité vérifiée en double (décomptes rangés en integer avant les
+  # statistiques, #348) ; l'avertissement qui suit cite la valeur rangée.
+  if (!identical(O + ev_sans_d + ap$hors_plage$evenements, total_d))
     stop("calculer_validation() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
-  # Rangement en integer après l'identité, vérifiée en double (#199 ; ADR 0009,
-  # point 9.6, (iii)) : garde défensive, le total de l'étape exposition étant
-  # déjà gardé (M397) ; l'avertissement qui suit cite la valeur rangée.
-  ev_sans <- denombrement_entier(ev_sans, "validation", "evenements_sans_attendu")
-  ev_hors <- denombrement_entier(ap$hors_plage$evenements, "validation", "evenements_hors_plage")
-  total <- denombrement_entier(total, "validation", "evenements_total")
   avert <- avertissements_vides()
   if (any(sans_attendu))
     avert <- avertir(avert, "validation", "evenements_sans_attendu",
@@ -2502,6 +2514,23 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   sg_a <- sg[prem]
   tranche_a <- tranche[prem]
 
+  # Décomptes d'événements en double, puis rangement en integer (#199 ; ADR
+  # 0009, point 9.6, (iii)) avant tout score et tout tirage (#348 ; forme
+  # F348 ; spécification d'actuary-approfondi, Q5) : l'effectif de toute
+  # strate tirée par rmultinom() est une somme partielle d'événements
+  # positifs, au plus le total ; total au plus .Machine$integer.max, donc
+  # size valide ; sinon refus denombrement_hors_plage, gardes dans leur
+  # ordre : pour toute entrée qui atteint aujourd'hui les gardes, le refus et
+  # sa grandeur citée restent identiques ; une entrée refusée plus loin sur
+  # segments/observes (portee()) cite désormais la garde avancée, au même
+  # motif. Garde défensive : le total de l'étape exposition est gardé (M397).
+  ev_fautives_d <- sum(D[!saine])
+  total_d <- sum(as.numeric(exposition$evenements))
+  ev_hors_d <- sum(as.numeric(exposition$evenements[!dans]))
+  ev_fautives <- denombrement_entier(ev_fautives_d, "homogeneite", "evenements_cellules_evenement_sans_exposition")
+  ev_hors <- denombrement_entier(ev_hors_d, "homogeneite", "evenements_hors_plage")
+  total <- denombrement_entier(total_d, "homogeneite", "evenements_total")
+
   sc_g <- score_homogeneite(D_a, E_a, cel_a, sg_a, K, S)
   lignes_g <- which(sc_g$utilisee)
   sc_b <- lapply(seq_len(nb), function(b) {
@@ -2664,17 +2693,10 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   Dc <- somme_par(D_a, cel_a, K)
   nexp <- somme_par(E_a > 0, cel_a, K)
   O <- sum(sc_g$O)
-  ev_fautives <- sum(D[!saine])
-  total <- sum(as.numeric(exposition$evenements))
-  ev_hors <- sum(as.numeric(exposition$evenements[!dans]))
-  if (!identical(O + ev_fautives + ev_hors, total))
+  # Identité vérifiée en double (décomptes rangés en integer avant les scores,
+  # #348) ; l'avertissement qui suit cite la valeur rangée.
+  if (!identical(O + ev_fautives_d + ev_hors_d, total_d))
     stop("calculer_homogeneite() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
-  # Rangement en integer après l'identité, vérifiée en double (#199 ; ADR 0009,
-  # point 9.6, (iii)) : garde défensive (total de l'étape exposition gardé,
-  # M397) ; l'avertissement qui suit cite la valeur rangée.
-  ev_fautives <- denombrement_entier(ev_fautives, "homogeneite", "evenements_cellules_evenement_sans_exposition")
-  ev_hors <- denombrement_entier(ev_hors, "homogeneite", "evenements_hors_plage")
-  total <- denombrement_entier(total, "homogeneite", "evenements_total")
   avert <- avertissements_vides()
   if (toute_faute)
     avert <- avertir(avert, "homogeneite", "evenements_sans_exposition",

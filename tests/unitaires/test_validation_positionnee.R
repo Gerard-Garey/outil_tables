@@ -1026,3 +1026,62 @@ verifier("L (#199) : sous_groupes_validation() sans groupe -> observes integer(0
   tous(vide = if (all(vide == "integer")) TRUE else paste(vide, collapse = " "),
        refus = if (all(ok)) TRUE else paste("relation(s) sans le refus attendu :", paste(rels[!ok], collapse = ", ")))
 })
+
+# #348 (spécification d'actuary-approfondi, Q5 ; forme F348) : sous
+# positionnee, l'effectif O_s d'un segment est tiré par rmultinom() ; un
+# total au-delà de .Machine$integer.max est refusé avant
+# statistiques_validation(). L'objet positionnement est construit sur des
+# décès réduits (calculer_positionnement() refuserait plus tôt sur
+# observes), puis ses décès de cellules remplacés par ceux de l'entrée (grille
+# identique). Avant (copie de 0990bab) : erreur de R « invalid second
+# argument 'size' » et avertissement « NAs introduced by coercion to integer
+# range ». Valeur calculée à la main : 1,5e9 + 1e9 + 10.
+local({
+  t1 <- table_reference(data.frame(age = 40:70, sexe = "ensemble", qx = 0.01), "T1", "importee", "test")
+  ex <- data.frame(age = 50:52, exposition_jours = 0, exposition_centrale = c(2e11, 2e11, 1e11),
+                   evenements = c(1500000000L, 1000000000L, 10L), sorties_concurrentes = 0L)
+  exs <- ex; exs$evenements <- c(15L, 10L, 1L)
+  pos <- tablexp:::calculer_positionnement(exs, character(0), FALSE, "dernier_anniversaire", t1, "t", "smr", c(50, 52), 0.95)
+  appel <- function(e, p) {
+    av <- character(0)
+    r <- tryCatch(withCallingHandlers(tablexp:::calculer_validation(e, character(0), FALSE, "dernier_anniversaire", t1, "t",
+                                                                     "positionnee", c(50, 52), 50, 0.95, 19, 5L,
+                                                                     p[c("parametres", "resultat", "diagnostics")]),
+                                      warning = function(w) { av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning") }),
+                  refus_tablexp = function(x) x, error = function(x) x)
+    list(r = r, av = av)
+  }
+  gros <- pos; gros$resultat$cellules$evenements <- ex$evenements
+  x <- appel(ex, gros)
+  verifier("#348 validation positionnee : O_s = 2500000010 au-delà de .Machine$integer.max -> refus validation / denombrement_hors_plage, grandeur evenements_total, valeur 2500000010, avant tout tirage ; aucune erreur ni aucun avertissement de R", tous(
+    refus = if (inherits(x$r, "refus_tablexp")) TRUE
+            else if (inherits(x$r, "error")) paste("erreur de R :", conditionMessage(x$r)) else "aucun refus",
+    motif = controle(x$r, "validation", "denombrement_hors_plage"),
+    grandeur = if (identical(x$r$details$grandeur, "evenements_total") && identical(x$r$details$valeur, 2500000010)) TRUE
+               else "détails du refus",
+    avertissements = if (!length(x$av)) TRUE else paste(x$av, collapse = " / ")))
+  # Ordre des gardes conservé : événements hors plage seuls au-delà.
+  exh <- rbind(exs, data.frame(age = 60:61, exposition_jours = 0, exposition_centrale = 1e11,
+                               evenements = c(2000000000L, 2000000000L), sorties_concurrentes = 0L))
+  y <- appel(exh, pos)$r
+  verifier("#348 validation positionnee, ordre des gardes conservé : 4e9 événements hors plage -> refus evenements_hors_plage (valeur 4e9), comme avant", tous(
+    motif = controle(y, "validation", "denombrement_hors_plage"),
+    grandeur = if (identical(y$details$grandeur, "evenements_hors_plage") && identical(y$details$valeur, 4e9)) TRUE
+               else paste(y$details$grandeur, y$details$valeur)))
+})
+# Ordre des deux premières gardes de la validation (m2 de l'audit de l'étape
+# (5), #348) : cellules 50 et 51 sans exposition (2e9 décès chacune, état
+# evenement_sans_exposition) et 2e9 + 2e9 décès hors plage : les deux
+# décomptes dépassent l'entier maximal ; la première garde dans l'ordre,
+# evenements_sans_attendu, est citée (mesuré, identique à 0990bab).
+local({
+  t1 <- table_reference(data.frame(age = 40:70, sexe = "ensemble", qx = 0.01), "T1", "importee", "test")
+  ex <- data.frame(age = c(50:52, 60:61), exposition_jours = 0, exposition_centrale = c(0, 0, 1e5, 1e5, 1e5),
+                   evenements = c(2000000000L, 2000000000L, 10L, 2000000000L, 2000000000L), sorties_concurrentes = 0L)
+  r <- refus_de(tablexp:::calculer_validation(ex, character(0), FALSE, "dernier_anniversaire", t1, "t", "independante",
+                                              c(50, 52), 50, 0.95, 19, 5L, NULL))
+  verifier("#348 validation, ordre des gardes : événements sans attendu (4e9) et hors plage (4e9) au-delà de l'entier maximal -> refus evenements_sans_attendu, la première dans l'ordre", tous(
+    motif = controle(r, "validation", "denombrement_hors_plage"),
+    grandeur = if (identical(r$details$grandeur, "evenements_sans_attendu") && identical(r$details$valeur, 4e9)) TRUE
+               else paste(r$details$grandeur, r$details$valeur)))
+})
