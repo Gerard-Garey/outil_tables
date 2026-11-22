@@ -1204,6 +1204,132 @@ local({
 })
 verifier("#322 revue finale : les méthodes de session sont retirées de globalenv()",
          !any(vapply(c("length.k322klen", "[.k322env"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
+# Cohérence de la liste des colonnes et de ses noms à l'entrée (#344, F344 ;
+# spécification d'actuary-approfondi, commentaire de #344) : sous une classe
+# dont length() ment, `[.data.frame` rend une liste de 1 (ou 3) élément(s)
+# munie de huit noms. Passée en entrée, elle levait l'erreur R « 'names'
+# attribute [8] must be the same length as the vector [1] » (mesuré à
+# e76b75b, appel direct, controler_roles() et construire_table()) ; elle
+# reçoit le refus donnees_mal_formees de l'étape donnees, premier contrôle de
+# controler_lignes_donnees(), avant nrow() et les noms de lignes. Messages
+# attendus écrits à la main (texte de la spécification) ; littéraux non ASCII
+# en \u00XX. Témoins : data.frame nu et sous-classes à méthode « [ » correcte,
+# admis, mêmes grandeurs que le data.frame nu. Précondition de
+# decomptes_colonnes() : erreur de programmation sur une liste incohérente.
+local({
+  m <- list(length.k344n1 = function(x) 1L, length.k344n3 = function(x) 3L,
+            dim.k344nr = function(x) c(99L, 8L),
+            `[.k344ok` = function(x, i, j, ..., drop = TRUE) NextMethod(),
+            `[.k344reset` = function(x, i, j, ..., drop = TRUE) {
+              r <- NextMethod(); attr(r, "row.names") <- seq_len(.row_names_info(r, 2L)); attr(r, "histo") <- "extrait"; r },
+            `[.k344attr` = function(x, i, j, ..., drop = TRUE) { r <- NextMethod(); attr(r, "histo") <- "extrait"; r })
+  for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+  on.exit(rm(list = names(m), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  avertissements <- function(expr) {
+    n <- 0L
+    withCallingHandlers(attrape(expr), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    n
+  }
+  PLAN <- list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = character(0)),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  chemins <- list(controler_lignes_donnees = function(d) tablexp:::controler_lignes_donnees(d),
+                  controler_roles = function(d) tablexp:::controler_roles(d, ROLES, "sexe"),
+                  construire_table = function(d) construire_table(d, ROLES, PLAN))
+  PREF <- paste0("Les donn\u00e9es sont un data.frame mal form\u00e9 : la liste de ses colonnes et ses noms de colonnes ",
+                 "n'ont pas la m\u00eame longueur (")
+  SUFF <- paste0("). Le moteur ne choisit pas entre ces d\u00e9comptes, et ne les corrige pas : passer un data.frame ",
+                 "dont la liste des colonnes et les noms de colonnes ont la m\u00eame longueur.")
+  x1 <- structure(BASE, class = c("k344n1", "data.frame"))[-2L, , drop = FALSE]
+  x3 <- structure(BASE, class = c("k344n3", "data.frame"))[-2L, , drop = FALSE]
+  # Liste incohérente, noms de lignes (7) et nrow() (99) discordants avec les colonnes : la cohérence est jugée la première.
+  xnr <- x1; attr(xnr, "row.names") <- 1:7; class(xnr) <- c("k344nr", "k344n1", "data.frame")
+  verifier("#344 : entr\u00e9es de forme attendue (1 et 3 colonnes de liste pour 8 noms ; noms de lignes 7 et nrow() 99 pour la troisi\u00e8me)",
+           identical(c(length(unclass(x1)), length(attr(x1, "names", exact = TRUE))), c(1L, 8L)) &&
+             identical(c(length(unclass(x3)), length(attr(x3, "names", exact = TRUE))), c(3L, 8L)) &&
+             identical(.row_names_info(xnr, 2L), 7L) && identical(nrow(xnr), 99L))
+  cas <- list(
+    list("1 colonne(s) pour 8 nom(s)", x1, "liste de 1 colonne(s) pour 8 nom(s) de colonne ; classe k344n1/data.frame",
+         list(classe = c("k344n1", "data.frame"), nombre_colonnes = 1L, nombre_noms = 8L)),
+    list("3 colonne(s) pour 8 nom(s)", x3, "liste de 3 colonne(s) pour 8 nom(s) de colonne ; classe k344n3/data.frame",
+         list(classe = c("k344n3", "data.frame"), nombre_colonnes = 3L, nombre_noms = 8L)),
+    list("1 colonne(s) pour 8 nom(s), noms de lignes et nrow() discordants", xnr,
+         "liste de 1 colonne(s) pour 8 nom(s) de colonne ; classe k344nr/k344n1/data.frame",
+         list(classe = c("k344nr", "k344n1", "data.frame"), nombre_colonnes = 1L, nombre_noms = 8L)))
+  for (c1 in cas) for (k in names(chemins)) {
+    x <- attrape(chemins[[k]](c1[[2L]]))
+    verifier(sprintf("#344 %s : %s -> refus donnees_mal_formees du module donnees, message et details exacts, une ligne marqu\u00e9e UTF-8, 0 avertissement R (avant : erreur R de names)", c1[[1L]], k), {
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), paste0(PREF, c1[[3L]], SUFF))) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non marqu\u00e9 UTF-8"
+      else if (!identical(x$details, c1[[4L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](c1[[2L]])) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Ordre (reprise de l'audit léger, mutant M2) : la cohérence est jugée avant nrow(), donc avant dim(). Sous une
+  # classe dont dim() compte ses appels puis lève une erreur, la liste incohérente reçoit le refus de cohérence et
+  # dim() n'est jamais appelée, par les trois chemins.
+  appels_dim <- 0L
+  assign("dim.k344dim", function(x) { appels_dim <<- appels_dim + 1L; stop("dim.k344dim appel\u00e9e") }, envir = globalenv())
+  xdim <- x1; class(xdim) <- c("k344dim", "k344n1", "data.frame")
+  for (k in names(chemins)) {
+    appels_dim <- 0L
+    x <- attrape(chemins[[k]](xdim))
+    verifier(sprintf("#344 ordre : liste incoh\u00e9rente sous une classe dont dim() l\u00e8ve une erreur, %s -> refus de coh\u00e9rence, 0 appel \u00e0 dim()", k), {
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$motif, "donnees_mal_formees") ||
+               !identical(conditionMessage(x), paste0(PREF, "liste de 1 colonne(s) pour 8 nom(s) de colonne ; classe k344dim/k344n1/data.frame", SUFF)))
+        paste("refus :", x$motif, conditionMessage(x))
+      else if (appels_dim != 0L) sprintf("dim() appel\u00e9e %d fois", appels_dim)
+      else TRUE
+    })
+  }
+  rm(list = "dim.k344dim", envir = globalenv())
+  verifier("#344 : decomptes_colonnes() sur une liste incoh\u00e9rente -> erreur de programmation (stop()), non l'erreur R de names", {
+    e <- tryCatch({ tablexp:::decomptes_colonnes(x1); NULL }, error = function(e) e)
+    if (is.null(e)) "aucune erreur"
+    else if (inherits(e, "refus_tablexp")) "refus au lieu d'une erreur de programmation"
+    else grepl("erreur de programmation", conditionMessage(e), fixed = TRUE) &&
+      !grepl("'names' attribute", conditionMessage(e), fixed = TRUE)
+  })
+  verifier("#344 : colonnes_lues() d'une liste sans attribut names : autant de noms (vides) que de colonnes, coh\u00e9rente",
+           identical(tablexp:::colonnes_lues(structure(list(1:2, 3:4), class = "data.frame", row.names = 1:2)),
+                     list(nombre_colonnes = 2L, nombre_noms = 2L, coherente = TRUE)))
+  # Témoins : data.frame nu et sous-classes à méthode « [ » correcte, admis ; objet construit identical() à celui du
+  # data.frame nu hors `execution` (horodatage, durée, session) et empreinte du code, la seule différence admise étant
+  # la classe de lignes_conservees (celle de l'entrée, sans autre attribut).
+  X0 <- construire_table(BASE, ROLES, PLAN)
+  net <- function(x) { x$execution <- NULL; x$fiche$empreintes$code <- NULL; x }
+  verifier("#344 t\u00e9moin : controler_lignes_donnees(BASE) rend TRUE", isTRUE(tablexp:::controler_lignes_donnees(BASE)))
+  for (k in c("k344ok", "k344reset", "k344attr")) {
+    d <- structure(BASE, class = c(k, "data.frame"))
+    verifier(sprintf("#344 t\u00e9moin : classe %s, admise par controler_lignes_donnees() et construire_table() ; objet construit identical() \u00e0 celui du data.frame nu hors execution et empreinte du code (lignes_conservees de classe %s/data.frame), 0 avertissement R", k, k), {
+      r <- attrape(tablexp:::controler_lignes_donnees(d))
+      x <- tryCatch(construire_table(d, ROLES, PLAN), error = function(e) e)
+      if (!is.null(r)) sprintf("controler_lignes_donnees : %s", conditionMessage(r))
+      else if (inherits(x, "error")) sprintf("construire_table : %s", conditionMessage(x))
+      else if (!identical(class(x$etapes$donnees$resultat$lignes_conservees), c(k, "data.frame")))
+        paste("classe de lignes_conservees :", paste(class(x$etapes$donnees$resultat$lignes_conservees), collapse = "/"))
+      else {
+        y <- net(x); class(y$etapes$donnees$resultat$lignes_conservees) <- "data.frame"
+        if (!identical(y, net(X0))) paste("objet diff\u00e9rent du t\u00e9moin :", paste(all.equal(y, net(X0)), collapse = " | "))
+        else if (avertissements(construire_table(d, ROLES, PLAN)) != 0L) "avertissement R"
+        else TRUE
+      }
+    })
+  }
+})
+verifier("#344 : les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
+         !any(vapply(c("length.k344n1", "length.k344n3", "dim.k344nr", "dim.k344dim", "[.k344ok", "[.k344reset", "[.k344attr"),
+                     exists, logical(1L), envir = globalenv(), inherits = FALSE)))
 # Colonne de rôle de type conforme sous un nom d'encodage bytes, à
 # preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur
 # R ; observations et lignes conservées égales à celles du même jeu sous le

@@ -552,6 +552,8 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
 # valeurs rendues (rendus), leur lisibilité (lisibles), les décomptes en double
 # (lc, as.double(unclass()), NA si illisibles) et les noms des colonnes
 # (noms_colonnes_lus(), seule lecture des noms de colonnes de ces contrôles).
+# Précondition : liste cohérente (colonnes_lues(), #344) ; sinon erreur de
+# programmation, stop() : les appelants refusent une liste incohérente avant.
 # colonnes_decompte_citees(k, dec, classes) : texte d'une ligne par colonne
 # discordante de position k (au plus NB_LIGNES_CITEES, puis leur nombre
 # restant), « colonne « nom » : décompte » ou, si illisible, son type et sa
@@ -573,6 +575,9 @@ decompte_colonne <- function(v) {
 }
 
 decomptes_colonnes <- function(x) {
+  if (!colonnes_lues(x)$coherente)
+    stop("decomptes_colonnes() : liste de colonnes et noms de colonnes de longueurs différentes (erreur de programmation).",
+         call. = FALSE)
   rendus <- lapply(unclass(x), decompte_colonne)
   lisibles <- vapply(rendus, decompte_lisible, logical(1L))
   lc <- rep(NA_real_, length(rendus))
@@ -614,16 +619,37 @@ colonnes_classe_citees <- function(colonnes, classes)
 # Noms de colonnes lus sans dispatch (attr(), character(n) à défaut de noms).
 # La longueur de l'attribut names n'est pas toujours celle de la liste :
 # `[.data.frame` sous une classe dont length() ment rend une liste d'un élément
-# munie de noms à plusieurs. Seule l'extraction est contrôlée
-# (controler_lignes_extraites(), #322) ; l'autre appelant de
-# decomptes_colonnes(), controler_lignes_donnees(), ne l'est pas (défaut
-# préexistant, issue à proposer au mainteneur).
-# Seule lecture des noms de colonnes de decomptes_colonnes() et de
-# controler_lignes_extraites() (#322, point 4).
+# munie de noms à plusieurs. Cette cohérence est lue par colonnes_lues(), et
+# contrôlée par les deux appelants de decomptes_colonnes() avant tout parcours :
+# controler_lignes_donnees() (#344) et controler_lignes_extraites() (#322).
+# Seule lecture des noms de colonnes de decomptes_colonnes(), de colonnes_lues()
+# et de controler_lignes_extraites() (#322, point 4).
 noms_colonnes_lus <- function(x) {
   noms <- attr(x, "names", exact = TRUE)
   if (is.null(noms)) character(length(unclass(x))) else noms
 }
+
+# Cohérence de la liste des colonnes et de ses noms (F344, #344, #345), seule
+# lecture de cette règle : nombre de colonnes de la liste (length(unclass(x)),
+# sans dispatch), nombre de noms (noms_colonnes_lus() : un attribut names
+# absent vaut autant de noms vides que de colonnes, donc accord) et leur accord.
+# Une liste incohérente n'est pas parcourue (decomptes_colonnes() : erreur de
+# programmation ; ailleurs, l'erreur R « 'names' attribute [8] must be the same
+# length as the vector [1] »). Précondition : x est une liste. Rend
+# list(nombre_colonnes, nombre_noms, coherente), les deux nombres en integer.
+colonnes_lues <- function(x) {
+  nombre_colonnes <- length(unclass(x))
+  nombre_noms <- length(noms_colonnes_lus(x))
+  list(nombre_colonnes = nombre_colonnes, nombre_noms = nombre_noms,
+       coherente = nombre_colonnes == nombre_noms)
+}
+
+# Constat d'une liste incohérente (rendu de colonnes_lues()), formé une fois et
+# cité tel quel par les refus de controler_lignes_donnees() (#344) et de
+# controler_lignes_extraites() (#345) : « liste de N colonne(s) pour M nom(s) de
+# colonne ».
+constat_colonnes_lues <- function(lues)
+  formuler("liste de %d colonne(s) pour %d nom(s) de colonne", lues$nombre_colonnes, lues$nombre_noms)
 
 # Première position où l'extraction s'écarte de l'entrée, cause « colonnes » de
 # la postcondition de #319 sous une entrée de classe exactement « data.frame » :
@@ -716,10 +742,22 @@ colonnes_ecart_citees <- function(nom_c, nom_d, premiere = NULL) {
 # NB_LIGNES_CITEES colonnes citées puis leur nombre restant ; details :
 # classe, lignes (noms de lignes, NA si illisibles), nrow (NA si illisible),
 # colonne, position et lignes_colonne (toutes les colonnes discordantes, sans
-# plafond ; NA pour une colonne illisible). Précondition : donnees est une
-# liste classée data.frame (controler_roles() refuse le reste avant).
-# Rend TRUE si les décomptes concordent.
+# plafond ; NA pour une colonne illisible). Avant tout décompte, et avant
+# nrow() qui dispatche, la liste des colonnes doit avoir autant d'éléments que
+# ses noms (colonnes_lues(), #344) : sinon refus donnees_mal_formees, qui cite
+# constat_colonnes_lues() ; details : classe, nombre_colonnes, nombre_noms.
+# Précondition : donnees est une liste classée data.frame (controler_roles()
+# refuse le reste avant). Rend TRUE si les décomptes concordent.
 controler_lignes_donnees <- function(donnees) {
+  lues <- colonnes_lues(donnees)
+  if (!lues$coherente)
+    refuser("donnees", "donnees_mal_formees",
+            formuler(paste("Les données sont un data.frame mal formé : la liste de ses colonnes et ses noms de colonnes n'ont",
+                           "pas la même longueur (%s ; classe %s). Le moteur ne choisit pas entre ces décomptes, et ne les",
+                           "corrige pas : passer un data.frame dont la liste des colonnes et les noms de colonnes ont la même",
+                           "longueur."),
+                     constat_colonnes_lues(lues), paste(citer(class(donnees)), collapse = "/")),
+            list(classe = class(donnees), nombre_colonnes = lues$nombre_colonnes, nombre_noms = lues$nombre_noms))
   rn <- .row_names_info(donnees, 2L)
   nr <- nrow(donnees)
   lisible_nr <- decompte_lisible(nr)
@@ -2013,10 +2051,11 @@ SUJETS_LIGNES_EXTRAITES <- c(
 # son nombre de lignes (.row_names_info(, 2L), sans dispatch) est celui des
 # numéros ; (1 bis) il a les mêmes colonnes que l'entrée, nombre et noms (lus
 # sans dispatch par noms_colonnes_lus(), le nombre de colonnes étant lu aussi
-# sur la liste, length(unclass()), qui doit être celui des noms et celui de
-# l'entrée : des noms identiques n'ont pas même nombre quand length() de la
-# classe ment, `[.data.frame` rendant alors une liste plus courte que son
-# attribut names, et decomptes_colonnes() lèverait une erreur R ; une colonne
+# sur la liste, length(unclass()), qui doit être celui des noms, lu par
+# colonnes_lues(), et celui de l'entrée : des noms identiques n'ont pas même
+# nombre quand length() de la classe ment, `[.data.frame` rendant alors une
+# liste plus courte que son attribut names, que decomptes_colonnes() ne
+# parcourt pas ; une colonne
 # dont la méthode « [ » rend NULL est retirée sans signal par `[.data.frame`,
 # et le contrôle (2) lirait alors les noms décalés) ; (2)
 # chacune de ses colonnes, toutes, compte ce nombre de lignes (règle de
@@ -2065,12 +2104,12 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   # « data.frame » est une erreur R, le refus est le (0).
   nom_d <- noms_colonnes_lus(donnees)
   nom_c <- if (forme) noms_colonnes_lus(extraites) else character(0)
-  long_c <- if (forme) length(unclass(extraites)) else NA_integer_
-  # Cohérence de la liste lue : aucun lapply() sur unclass(extraites) sans elle (un attribut names de 7 éléments
-  # sur une liste de 1 : « 'names' attribute [7] must be the same length as the vector [1] »).
-  coherente <- forme && long_c == length(nom_c)
+  # Cohérence de la liste lue (colonnes_lues(), F344) : aucun lapply() sur unclass(extraites) sans elle (un attribut
+  # names de 7 éléments sur une liste de 1 : « 'names' attribute [7] must be the same length as the vector [1] »).
+  lues <- if (forme) colonnes_lues(extraites) else NULL
+  coherente <- forme && lues$coherente
   ecart_colonnes <- forme && !ecart_compte &&
-    (!coherente || long_c != length(unclass(donnees)) || !identical(nom_c, nom_d))
+    (!coherente || lues$nombre_colonnes != length(unclass(donnees)) || !identical(nom_c, nom_d))
   dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL
   # Entrée exactement « data.frame » et écart de colonnes : décomptes lus pour situer la première position écartée
   # (et les éléments NULL, que `[.data.frame` laisse à la place d'une colonne retirée).
