@@ -2531,10 +2531,12 @@ troisième annotation du 10/11/2026). Dans les étapes \code{homogeneite} et
 écartés ou sans attendu, hors plage, total) sont faites avant tout tirage,
 dans leur ordre (issue~\#348)~: une entrée qu'elles refusaient déjà l'est
 au même motif et sur la même grandeur~; une entrée dont le total dépasse
-l'entier maximal, refusée jusque-là plus loin sur \code{segments/observes}
-(homogénéité) ou \code{sous\_groupes/observes} (validation), ou qui faisait
-échouer \code{rmultinom()}, cite désormais \code{evenements\_total}, au
-même motif \code{denombrement\_hors\_plage}, textes inchangés.
+l'entier maximal et qui était refusée jusque-là plus loin, sur
+\code{segments/observes} (homogénéité) ou \code{sous\_groupes/observes}
+(validation), est désormais refusée sur \code{evenements\_total}, au même
+motif \code{denombrement\_hors\_plage}, textes inchangés~; une entrée qui
+faisait échouer \code{rmultinom()} (erreur de R, sans motif) devient un
+refus \code{denombrement\_hors\_plage} sur \code{evenements\_total}.
 Vingt-sept chemins de ces quatre étapes (5, 9, 5 et~8) sont ainsi passés
 de \code{double} à \code{integer}, à valeurs identiques, et leurs 27 clés
 exactes sont retirées de \code{TOLERANCES}, qui passe de 175 à 148 clés,
@@ -15436,8 +15438,10 @@ d'\code{actuary-approfondi} de
 l'issue~\#336~; aucun état nouveau)~; en double précision, l'état est
 décidé sur $v_s$, somme des poids $w_{sk}$ formée sans soustraction~: il
 peut aussi être atteint par arrondi, mais seulement quand tous les
-produits $D_{\cdot c}\,\pi_{sc}\,\pi_{kc}$ du segment sont sous le plus
-petit double (parts d'exposition infimes~; par exemple deux segments en
+produits $D_{\cdot c}\,\pi_{sc}\,\pi_{kc}$ du segment sont arrondis à~0
+(sous $2^{-1075} \approx 2{,}5 \cdot 10^{-324}$~; un produit compris
+entre ce seuil et le plus petit double dénormalisé, environ $4{,}9 \cdot
+10^{-324}$, s'arrondit à ce dernier) (parts d'exposition infimes~; par exemple deux segments en
 strate unique, l'un d'exposition $10^{-320}$ face à 5\,000, dont la part
 s'arrondit à~0~: les deux segments sont alors \code{variance\_nulle}, et
 le test, dont un pivot est nul, est \code{precision\_insuffisante},
@@ -15449,7 +15453,8 @@ segments informatifs (ddl $= 0$)~: tests non produits, état
 \code{moins\_de\_deux\_segments\_informatifs}, aucun tirage~; un pivot de
 l'élimination de $V$ réduite non fini ou non strictement positif (par
 exemple quand les parts d'exposition sont si inégales que les poids
-$w_{jk}$ tombent sous le plus petit double)~: $T$ n'est pas calculable par
+$w_{jk}$ sont arrondis à~0, sous $2^{-1075} \approx 2{,}5 \cdot
+10^{-324}$)~: $T$ n'est pas calculable par
 cette méthode en double précision, et le test et sa p-valeur exacte
 prennent l'état \code{precision\_insuffisante}, $T$ et p-valeurs
 \code{NA}, sans refus (décision du mainteneur du 21/11/2026, M570,
@@ -15965,7 +15970,8 @@ p-valeur n'y est comparée à un niveau.
     majoritaire face à une part infime n'est plus \code{variance\_nulle}
     par l'arrondi du test global depuis la même issue~: sa variance $v$
     est la somme des poids hors diagonale, positive tant qu'ils sont
-    représentables~; quand tous sont sous le plus petit double (part
+    représentables~; quand tous sont arrondis à~0, sous $2^{-1075}
+    \approx 2{,}5 \cdot 10^{-324}$ (part
     infime arrondie à~0, par exemple exposition de $10^{-320}$ face à
     5\,000), les deux segments sont \code{variance\_nulle} par arrondi et
     le test global est \code{precision\_insuffisante}, dont les branches
@@ -17764,7 +17770,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite, ddl effectifs et ordre des différences du lissage (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; ne contrôle rien d'autre (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs}, \code{precision\_}\allowbreak\code{insuffisante} (pivot de l'élimination non fini ou non strictement positif~; M570, P1~(a)~; issue~\#334) \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version}~; ceux du test non produit comprennent \code{precision\_}\allowbreak\code{insuffisante} (issue~\#334) \\
-\catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} ($V_{ss}$ nulle~: en arithmétique exacte, segment exposé dans aucune strate informative~; par arrondi seulement quand tous les produits $D_{\cdot c}\pi_{sc}\pi_{kc}$ sont sous le plus petit double~; $z_s$ et $\theta_{80}$ non définis, sans signal~; issues~\#336 et~\#333) \\
+\catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} ($V_{ss}$ nulle~: en arithmétique exacte, segment exposé dans aucune strate informative~; par arrondi seulement quand tous les produits $D_{\cdot c}\pi_{sc}\pi_{kc}$ sont arrondis à~0 (sous $2^{-1075} \approx 2{,}5 \cdot 10^{-324}$)~; $z_s$ et $\theta_{80}$ non définis, sans signal~; issues~\#336 et~\#333) \\
 \catalogue{fonctions-validation}{INDEPENDANCE\_HOMOGENEITE} & constante & --- & mention d'indépendance des unités, en fin de chaque statut d'une loi (décision M278) \\
 \catalogue{fonctions-validation}{HYPOTHESE\_HOMOGENEITE} & constante & --- & texte de l'hypothèse nulle du test d'homogénéité et de sa loi conditionnelle \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_HOMOGENEITE} & constante & --- & identité de la source (Breslow et Day, 1987, chap.~3 et~4~: URL, SHA-256, pages lues) et écarts de l'outil à la source (section~\ref{sec:homogeneite}) \\
