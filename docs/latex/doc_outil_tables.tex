@@ -15410,7 +15410,16 @@ vaut ses décès~; dans une cellule sans décès, l'un et l'autre sont nuls),
 globale, ses deux branches de $\theta_{80}$ prennent cet état, valeurs
 \code{NA}, sans signal (texte D8 de la spécification
 d'\code{actuary-approfondi} de
-l'issue~\#336~; aucun état nouveau)~; un segment sans
+l'issue~\#336~; aucun état nouveau)~; en double précision, l'état est
+décidé sur $v_s$, somme des poids $w_{sk}$ formée sans soustraction~: il
+peut aussi être atteint par arrondi, mais seulement quand tous les
+produits $D_{\cdot c}\,\pi_{sc}\,\pi_{kc}$ du segment sont sous le plus
+petit double (parts d'exposition infimes~; par exemple deux segments en
+strate unique, l'un d'exposition $10^{-320}$ face à 5\,000, dont la part
+s'arrondit à~0~: les deux segments sont alors \code{variance\_nulle}, et
+le test, dont un pivot est nul, est \code{precision\_insuffisante},
+ci-dessous~; spécification d'\code{actuary-approfondi} de
+l'issue~\#333, Q4, §~1)~; un segment sans
 exposition sur une portée est hors du test et des ddl, sa ligne restituée
 avec $O = A = 0$ (état \code{segment\_sans\_exposition})~; moins de deux
 segments informatifs (ddl $= 0$)~: tests non produits, état
@@ -15521,9 +15530,11 @@ p-valeur n'y est comparée à un niveau.
     informative, qui compte au moins deux segments exposés sur les lignes
     agrégées (issue~\#335~; jusqu'à cette issue, un segment seul exposé
     sur plusieurs lignes rendait la strate informative avec $a_c = 0$)~;
-    si $a_c = 0$ (aucun autre segment n'a de part dans la strate),
-    $\pi_{jc} = 0$ pour tout $j \ne s$ et la strate n'apporte rien aux
-    $\delta_j$~; comme $V e_s = \sum_c D_{\cdot c}\,\pi_{sc}\,(e_s -
+    $a_c = 0$ n'y survient qu'en double précision, quand la part des
+    autres segments, exposés, s'arrondit à~0~; alors $\pi_{jc} = 0$ pour
+    tout $j \ne s$ et la strate n'apporte rien aux $\delta_j$ calculés
+    (issue~\#333~: la branche concernée est alors
+    \code{precision\_insuffisante}, \textbf{États}, ci-dessous)~; comme $V e_s = \sum_c D_{\cdot c}\,\pi_{sc}\,(e_s -
     \pi_c)$, il vient $\delta_s(1 + h) = h\,V e_s + O(h^2)$ et
     $\lambda_s(1 + h) = h^2 V_{ss} + O(h^3)$, quel que soit le nombre de
     segments (identité de premier ordre). À deux segments, $p$ ne dépend
@@ -15612,10 +15623,15 @@ p-valeur n'y est comparée à un niveau.
       \item $|h_c|$ s'écrit en $u = \log\theta$, avec \code{expm1()}~:
         $|h_c| = \pi_{sc}\,(1 - e^{-u})/(a_c\, e^{-u} + \pi_{sc})$ si $u
         \ge 0$, $|h_c| = \pi_{sc}\,(1 - e^{u})/(a_c + \pi_{sc}\, e^{u})$
-        si $u < 0$~; $|h_c| = 0$ si $\pi_{sc} = 0$ ou $a_c = 0$ (dans ce
-        second cas, aucun autre segment n'a de part dans la strate, qui
-        n'apporte rien à $b$, et la convention évite le quotient $1/0$ en
-        $u \to -\infty$)~; les mêmes formules donnent les limites exactes,
+        si $u < 0$~; $|h_c| = 0$ si $\pi_{sc} = 0$ ou $a_c = 0$ (la strate
+        n'apporte alors rien à $b$, et la convention évite le quotient
+        $1/0$ en $u \to -\infty$)~; dans une strate informative où $s$ et
+        un autre segment sont exposés, ces deux cas ne surviennent que
+        par arrondi d'une part à~0, et le terme de la strate manque alors
+        à la limite $\lambda_s(\pm\infty)$, qui n'est pas déterminée par
+        le calcul~: la branche concernée est
+        \code{precision\_}\allowbreak\code{insuffisante} (\textbf{États},
+        règle~(3)~(a), ci-dessous~; issue~\#333)~; les mêmes formules donnent les limites exactes,
         $1$ en $u = +\infty$ et $\pi_{sc}/a_c$ en $u = -\infty$. Le
         second membre $b_j = \sum_c D_{\cdot c}\,\pi_{jc}\,|h_c|$ est formé
         dans cet ordre~: le produit $\pi_{jc}\,|h_c|$ d'abord, puis sa
@@ -15800,7 +15816,15 @@ p-valeur n'y est comparée à un niveau.
     la ligne globale du segment dans \code{segments}, s'il n'est pas
     \code{produite} (\code{segment\_sans\_exposition},
     \code{variance\_nulle}, \code{evenement\_sans\_exposition})~; (3)~sinon,
-    branche par branche~: (a)~\code{precision\_insuffisante} si un pivot
+    branche par branche~: (a)~\code{precision\_insuffisante} si, dans une
+    strate informative où le segment et un autre segment ont une ligne
+    utilisée, la part calculée du segment est nulle (branche~$+$) ou celle
+    des autres segments est nulle (branche~$-$)~: contrôle fait par
+    \code{ecart\_minimal\_homogeneite()} avant tout autre (issue~\#333~;
+    spécification d'\code{actuary-approfondi}, Q4, §~3~; aucun seuil
+    au-delà de «~part nulle~», une part positive, même dénormalisée,
+    laissant la branche aux contrôles suivants~; aucun état nouveau),
+    sinon si un pivot
     $d_i$ de l'élimination n'est pas fini et strictement positif (contrôle
     commun aux deux branches du segment, qui sont alors
     \code{precision\_insuffisante} ensemble, fait avant toute évaluation
@@ -15830,7 +15854,15 @@ p-valeur n'y est comparée à un niveau.
     (ii)~Une limite $\lambda_s(\pm\infty)$ indéterminée, c'est-à-dire non
     déterminée par le calcul (valeur calculée \code{NA}, \code{NaN} ou
     $-\infty$, alors que la vraie limite est dans $[0~; +\infty]$)~: garde défensive, que des pivots valides
-    excluent (lecture du code)~; un test l'exerce par appel direct.
+    excluent (lecture du code)~; un test l'exerce par appel direct. Elle
+    comprend, depuis l'issue~\#333, la part d'exposition arrondie à~0
+    dans une strate où le segment et un autre segment sont exposés
+    (règle~(3)~(a))~: le terme de la strate est perdu dans la limite,
+    qui n'est pas déterminée par le calcul~; jusqu'à cette issue, la
+    branche pouvait sortir \code{non\_atteint}, et émettre le signal, à
+    tort~; un test l'exerce par les données (parts arrondies à~0 à
+    $4{,}94 \cdot 10^{-323}$ et $9{,}88 \cdot 10^{-324}$ d'exposition,
+    ci-dessous).
     (iii)~La non-convergence de \code{uniroot()} en 1\,000 itérations
     (issue~\#339), qui n'est atteinte par aucun plan de référence et n'a
     été observée sur aucun jeu simulé (constat de simulation
@@ -15870,7 +15902,8 @@ p-valeur n'y est comparée à un niveau.
     e^{u}$, recoupée sur les deux racines produites ($u = 708{,}24$ et
     $709{,}52$), remesure d'\code{actuary} du 21/11/2026)~; un test l'exerce par appel direct, racine en $|u| = 800$.
     Une part d'exposition dénormalisée (inférieure à environ $2{,}2 \cdot
-    10^{-308}$) n'est pas, par elle-même, une voie~: la postcondition
+    10^{-308}$) n'est pas, par elle-même, une voie (seule l'est une part
+    arrondie à~0, règle~(3)~(a), issue~\#333)~: la postcondition
     contrôle $\lambda_s$ calculée sur la part arrondie, et elle tient
     (scénario de l'issue~\#338, $E_X = 5 \cdot 10^{-307}$~:
     $\theta_{80}^{+}$ \code{produite}, \textbf{Vérifications},
@@ -15897,7 +15930,13 @@ p-valeur n'y est comparée à un niveau.
     majoritaire face à une part infime n'est plus \code{variance\_nulle}
     par l'arrondi du test global depuis la même issue~: sa variance $v$
     est la somme des poids hors diagonale, positive tant qu'ils sont
-    représentables.
+    représentables~; quand tous sont sous le plus petit double (part
+    infime arrondie à~0, par exemple exposition de $10^{-320}$ face à
+    5\,000), les deux segments sont \code{variance\_nulle} par arrondi et
+    le test global est \code{precision\_insuffisante}, dont les branches
+    héritent (issue~\#333~; constat de mesure de \code{docwriter} du
+    22/11/2026, exposition de $10^{-320}$, $1{,}5 \cdot 10^{-323}$ et
+    $5 \cdot 10^{-324}$, deux ordres).
     Une limite $\lambda_s(\pm\infty)$ qui
     dépasse la capacité des doubles par le quotient $b_i^2/d_i$ alors que
     la racine est représentable n'est plus une voie depuis l'issue~\#338~:
@@ -16027,9 +16066,12 @@ p-valeur n'y est comparée à un niveau.
     de \code{non\_atteint}, «~état precision\_insuffisante (NA) quand la
     racine n'est pas calculable par cette méthode en double précision à
     cette tolérance, qu'elle soit ou non représentable (pivot de
-    l'élimination non fini ou non positif, limite indéterminée, résolution
-    non convergée, ou postcondition |lambda\_s(theta\_80) / lambda\_80 -
-    1| <= 1e-8 non tenue)~» (issue~\#340). La mention d'indépendance est propre à
+    l'élimination non fini ou non positif, limite indéterminée (dont une
+    part d'exposition arrondie à 0 dans une strate où le segment et un
+    autre segment sont exposés), résolution non convergée, ou
+    postcondition |lambda\_s(theta\_80) / lambda\_80 - 1| <= 1e-8 non
+    tenue)~» (issue~\#340~; cause de la part arrondie à~0 nommée par
+    l'issue~\#333, décision M570). La mention d'indépendance est propre à
     $\theta_{80}$~: «~unités d'observation indépendantes~; sous l'unité
     contrat, les décès sont sur-dispersés et theta\_80 est trop proche
     de~1 (écart minimal détectable sous-estimé)~»~; sous une
@@ -16299,7 +16341,24 @@ $10^{-12}$ de sa valeur de référence)~; quatre segments dans six ordres
 des lignes ($T$ à $10^{-12}$ de la pseudo-inverse spectrale de $V$~; $T$,
 $z$ et $\theta_{80}$ à $10^{-12}$, états identiques d'un ordre à
 l'autre)~; les textes de statut de \code{statistique} et de
-\code{p\_exacte}~; l'état \code{precision\_insuffisante} par appel
+\code{p\_exacte}~; pour les parts infimes (issue~\#333)~: le cas du corps de
+l'issue (deux segments d'expositions $10^{5}$ et $5 \cdot 10^{-12}$ ou
+$10^{-12}$, part du premier égale à~1 en double, deux répartitions des
+décès, deux ordres~: les deux segments \code{produite}, $z$ opposés à
+$10^{-10}$ de leur forme close, $\theta_{80}^{-}$ du premier et
+$\theta_{80}^{+}$ du second à $10^{-10}$ de la forme close, les deux
+autres branches \code{non\_atteint}, signal de nombre~2~; réglé par
+l'issue~\#334)~; la part arrondie à~0 (deux segments, deux âges, part du
+second à 60~ans arrondie à~0 pour des expositions de $4{,}94 \cdot
+10^{-323}$ et $9{,}88 \cdot 10^{-324}$, deux ordres~: $\theta_{80}^{-}$
+du premier et $\theta_{80}^{+}$ du second
+\code{precision\_}\allowbreak\code{insuffisante}, au lieu de
+\code{non\_atteint} avant l'issue, les deux autres branches
+\code{non\_atteint}, $T = 1/3$ à $10^{-15}$, signal de nombre~2) et son
+témoin (exposition de $5 \cdot 10^{-315}$, part positive représentée~:
+la règle ne joue pas, $\theta_{80}^{-}$ du premier \code{produite} à
+$10^{-10}$ de sa valeur de référence)~; le texte de statut de
+$\theta_{80}$ (cause «~part d'exposition arrondie à 0~»)~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
 branches produites, postcondition recalculée)~; la règle d'une branche
@@ -17651,7 +17710,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite, ddl effectifs et ordre des différences du lissage (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs}, \code{precision\_}\allowbreak\code{insuffisante} (pivot de l'élimination non fini ou non strictement positif~; M570, P1~(a)~; issue~\#334) \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version}~; ceux du test non produit comprennent \code{precision\_}\allowbreak\code{insuffisante} (issue~\#334) \\
-\catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} ($V_{ss}$ nulle~: en arithmétique exacte, segment exposé dans aucune strate informative~; $z_s$ et $\theta_{80}$ non définis, sans signal~; issue~\#336) \\
+\catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} ($V_{ss}$ nulle~: en arithmétique exacte, segment exposé dans aucune strate informative~; par arrondi seulement quand tous les produits $D_{\cdot c}\pi_{sc}\pi_{kc}$ sont sous le plus petit double~; $z_s$ et $\theta_{80}$ non définis, sans signal~; issues~\#336 et~\#333) \\
 \catalogue{fonctions-validation}{INDEPENDANCE\_HOMOGENEITE} & constante & --- & mention d'indépendance des unités, en fin de chaque statut d'une loi (décision M278) \\
 \catalogue{fonctions-validation}{HYPOTHESE\_HOMOGENEITE} & constante & --- & texte de l'hypothèse nulle du test d'homogénéité et de sa loi conditionnelle \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_HOMOGENEITE} & constante & --- & identité de la source (Breslow et Day, 1987, chap.~3 et~4~: URL, SHA-256, pages lues) et écarts de l'outil à la source (section~\ref{sec:homogeneite}) \\
@@ -17669,7 +17728,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{p\_exacte\_homogeneite()} & interne & résultat de la ligne précédente & p-valeur exacte bilatérale à deux groupes (somme de binomiales) et son état~; groupe~1~: le groupe retenu, d'attendu le plus petit, tolérance d'égalité rapportée à son attendu (issue~\#334) \\
 \catalogue{fonctions-validation}{non\_centralite\_ecart\_minimal()} & interne & ddl, niveau, puissance (par défaut, les deux constantes) & $\lambda_{80}$~: racine par \code{uniroot()} de la puissance du khi-deux non central (\code{pchisq()}) égale à la puissance visée \\
 \catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
-\catalogue{fonctions-validation}{ecart\_minimal\_homogeneite()} & interne & objet du score du test global, état du test, états des lignes globales des segments, $S$ & $\theta_{80}^{+}$, $\theta_{80}^{-}$ et leurs états par segment, $\lambda_{80}$~; chaque segment référence de sa composante connexe, $\lambda_s$ calculée sans soustraction par l'élimination partagée avec le test, sur la matrice $W$ du test global (issue~\#334), état du test global transmis aux deux branches s'il n'est pas \code{produite}, résolution en $\log\theta$, chaque branche par la fonction de la ligne précédente~; \code{precision\_}\allowbreak\code{insuffisante} est un état, jamais un arrêt (section~\ref{sec:homogeneite}) \\
+\catalogue{fonctions-validation}{ecart\_minimal\_homogeneite()} & interne & objet du score du test global, état du test, états des lignes globales des segments, $S$ & $\theta_{80}^{+}$, $\theta_{80}^{-}$ et leurs états par segment, $\lambda_{80}$~; chaque segment référence de sa composante connexe, $\lambda_s$ calculée sans soustraction par l'élimination partagée avec le test, sur la matrice $W$ du test global (issue~\#334), état du test global transmis aux deux branches s'il n'est pas \code{produite}, branche \code{precision\_}\allowbreak\code{insuffisante} quand une part d'exposition s'arrondit à~0 dans une strate où le segment et un autre segment sont exposés (issue~\#333), résolution en $\log\theta$, chaque branche par la fonction de la ligne précédente~; \code{precision\_}\allowbreak\code{insuffisante} est un état, jamais un arrêt (section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; lignes saines agrégées par (segment, cellule), à la première occurrence du couple, avant tout score (issue~\#335)~; ne contrôle aucun paramètre \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices, chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
 \catalogue{fonctions-validation}{MENTION\_CONVENTION\_TABLE\_REFERENCE} & constante & --- & convention d'âge restituée pour une table de référence évaluée~: «~non portée par la table de référence~» \\
