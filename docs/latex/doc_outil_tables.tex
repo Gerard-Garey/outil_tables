@@ -2526,7 +2526,15 @@ qui somment des sous-ensembles des cellules de l'exposition, et celles de
 l'étape \code{importance\_exclusions}, dont les totaux sont majorés par le
 nombre de lignes sous le seam «~fenêtres~», seul admis pour cette étape,
 sont défensives et testées en appel direct (ADR 0009, point~9.6, (d)~4, et
-troisième annotation du 10/11/2026).
+troisième annotation du 10/11/2026). Dans les étapes \code{homogeneite} et
+\code{validation}, les trois gardes des décomptes d'événements (événements
+écartés ou sans attendu, hors plage, total) sont faites avant tout tirage,
+dans leur ordre (issue~\#348)~: une entrée qu'elles refusaient déjà l'est
+au même motif et sur la même grandeur~; une entrée dont le total dépasse
+l'entier maximal, refusée jusque-là plus loin sur \code{segments/observes}
+(homogénéité) ou \code{sous\_groupes/observes} (validation), ou qui faisait
+échouer \code{rmultinom()}, cite désormais \code{evenements\_total}, au
+même motif \code{denombrement\_hors\_plage}, textes inchangés.
 Vingt-sept chemins de ces quatre étapes (5, 9, 5 et~8) sont ainsi passés
 de \code{double} à \code{integer}, à valeurs identiques, et leurs 27 clés
 exactes sont retirées de \code{TOLERANCES}, qui passe de 175 à 148 clés,
@@ -14950,7 +14958,22 @@ indices, un tirage de \code{rmultinom()} chacun, sous
 \code{sous\_graine()} avec la graine du plan ---, ce qui rend les tirages
 indépendants du découpage par blocs~; les réplications de Poisson des deux
 autres relations sont inchangées. La boucle de tirage n'est pas vectorisée
-(décision M304). Aucun tirage n'est fait quand $n - S = 0$.
+(décision M304). Aucun tirage n'est fait quand $n - S = 0$. L'effectif
+$O_s$ passé à \code{rmultinom()} doit tenir dans la plage des entiers~:
+somme partielle d'événements positifs, il est au plus le total des
+événements de la table d'exposition, que \code{calculer\_validation()}
+range en \code{integer} par \code{denombrement\_entier()} avant
+\code{statistiques\_validation()}, donc avant tout tirage, avec les deux
+autres décomptes, dans cet ordre~: \code{evenements\_sans\_attendu},
+\code{evenements\_hors\_plage}, \code{evenements\_total}~; au-delà de
+$2^{31} - 1$, la construction est refusée (\code{denombrement\_hors\_plage},
+module \code{validation}, première garde dépassée citée), au lieu de
+l'erreur de R de \code{rmultinom()} sur un effectif hors plage (issue~\#348~;
+forme F348, spécification d'\code{actuary-approfondi}, Q5). Garde
+défensive~: le total de l'étape \code{exposition} est déjà gardé
+(section~\ref{sec:non-regression}, «~Type des dénombrements~»).
+\code{replications\_multinomiales()} contrôle en outre, en erreur de
+programmation, qu'aucun effectif ne dépasse \code{.Machine\$integer.max}.
 
 \medskip
 \textbf{P-valeur} (\code{pvaleur\_monte\_carlo()})~: $p_{MC} = (1 + K)/(B +
@@ -15448,6 +15471,18 @@ l'avertissement \code{evenements\_sans\_exposition} (module
 \code{ETATS\_P\_EXACTE\_HOMOGENEITE} et \code{ETATS\_SEGMENTS\_HOMOGENEITE}.
 L'identité $\sum_s O_s + {}$décès des cellules écartées${} + {}$décès hors
 plage${} = \sum$ \code{evenements} est contrôlée à chaque exécution.
+Les trois décomptes (\code{evenements\_cellules\_evenement\_sans\_exposition},
+\code{evenements\_hors\_plage}, \code{evenements\_total}) sont rangés en
+\code{integer} par \code{denombrement\_entier()}, dans cet ordre, avant
+le premier score et donc avant tout tirage~: l'effectif $D_{\cdot c}$ de
+toute strate tirée par \code{rmultinom()}, somme partielle d'événements
+positifs, est au plus le total, et un total au-delà de $2^{31} - 1$ est
+refusé (\code{denombrement\_hors\_plage}, module \code{homogeneite},
+première garde dépassée citée) au lieu de faire échouer
+\code{rmultinom()} (issue~\#348~; forme F348, spécification
+d'\code{actuary-approfondi}, Q5)~; garde défensive, le total de l'étape
+\code{exposition} étant déjà gardé. L'identité est vérifiée après, en
+\code{double}.
 
 \medskip
 {\sloppy \textbf{Écart minimal détectable par segment} (indicateur de
@@ -16358,7 +16393,18 @@ du premier et $\theta_{80}^{+}$ du second
 témoin (exposition de $5 \cdot 10^{-315}$, part positive représentée~:
 la règle ne joue pas, $\theta_{80}^{-}$ du premier \code{produite} à
 $10^{-10}$ de sa valeur de référence)~; le texte de statut de
-$\theta_{80}$ (cause «~part d'exposition arrondie à 0~»)~; l'état \code{precision\_insuffisante} par appel
+$\theta_{80}$ (cause «~part d'exposition arrondie à 0~»)~; pour le
+total des événements gardé avant tout tirage (issue~\#348)~: deux
+segments et un total de 4\,000\,000\,002 événements, refus
+\code{denombrement\_hors\_plage} sur \code{evenements\_total}, sans
+erreur ni avertissement de R (l'erreur de \code{rmultinom()} avant
+l'issue)~; un segment seul et 3~milliards d'événements, refus sur
+\code{evenements\_total} et non plus sur \code{segments/observes}~;
+l'ordre des gardes (un total hors plage seul, refusé sur
+\code{evenements\_hors\_plage}~; les deux premières gardes dépassées, la
+première citée)~; l'erreur de programmation de
+\code{replications\_multinomiales()} pour un effectif au-delà de
+l'entier maximal, avant tout tirage~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
 branches produites, postcondition recalculée)~; la règle d'une branche
@@ -17520,7 +17566,15 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{rep\_len()}, que le contrôle des longueurs détecte (issue~\#217)~;
     réplications multinomiales (somme des décès de chaque réplique égale à
     $O_s$, découpage par blocs sans effet, ordre de tirage, état du
-    générateur restauré, reproductibilité à graine égale)~;
+    générateur restauré, reproductibilité à graine égale)~; le total des
+    événements gardé avant tout tirage (issue~\#348~; objet de
+    positionnement construit à la main)~: $O_s$ de 2\,500\,000\,010,
+    refus \code{denombrement\_hors\_plage} sur \code{evenements\_total},
+    avant tout tirage, sans erreur ni avertissement de R (l'erreur de
+    \code{rmultinom()} avant l'issue)~; l'ordre des gardes, un total hors
+    plage seul restant refusé sur \code{evenements\_hors\_plage}, et, les
+    deux premières gardes dépassées, la première,
+    \code{evenements\_sans\_attendu}, étant citée~;
     \code{loi\_somme\_binomiales()} égale à la somme directe et
     \code{cout\_convolution\_binomiales()} égal au nombre de produits
     effectués, de part et d'autre du plafond~; dans
@@ -17696,7 +17750,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{signe\_residu()} & interne & résidus, attendus & signe à la tolérance~; seul ensemble de zéros \\
 \catalogue{fonctions-validation}{statistiques\_test()} & interne & matrice de décès (une colonne par jeu), attendus, début des séquences & $X^2$, $G^2$, signes, $R$, $z$ de Wilcoxon par colonne~; observé et répliques \\
 \catalogue{fonctions-validation}{replications\_poisson()} & interne & $A$, $B$, graine, fonction de réduction & statistiques des $B$ réplications, tirées par blocs sous \code{sous\_graine()} \\
-\catalogue{fonctions-validation}{replications\_multinomiales()} & interne & poids, groupe de chaque cellule, effectifs des groupes, $B$, graine, fonction de réduction & statistiques des $B$ réplications multinomiales par groupe, tirées réplique par réplique puis groupe par groupe sous \code{sous\_graine()}, par blocs~; erreur de programmation, avant tout tirage, pour un poids non positif, un groupe hors de~1 à~$G$, un effectif manquant ou négatif, ou un groupe d'effectif positif sans cellule \\
+\catalogue{fonctions-validation}{replications\_multinomiales()} & interne & poids, groupe de chaque cellule, effectifs des groupes, $B$, graine, fonction de réduction & statistiques des $B$ réplications multinomiales par groupe, tirées réplique par réplique puis groupe par groupe sous \code{sous\_graine()}, par blocs~; erreur de programmation, avant tout tirage, pour un poids non positif, un groupe hors de~1 à~$G$, un effectif manquant, négatif ou au-delà de \code{.Machine\$integer.max} (issue~\#348~; les appelants rangent le total des événements en \code{integer} avant tout tirage), ou un groupe d'effectif positif sans cellule \\
 \catalogue{fonctions-validation}{binomiale\_elaguee()} & interne & $n$, $p$ & \code{dbinom(0:n, n, p)} réduite à l'intervalle de ses valeurs non nulles, et sa première valeur \\
 \catalogue{fonctions-validation}{cout\_convolution\_binomiales()} & interne & effectifs, probabilités & nombre de produits de la convolution, calculé avant elle \\
 \catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe~; attribut \code{produits}~; brique partagée avec l'étape \code{homogeneite} \\
@@ -17707,7 +17761,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante~; sous \code{lissee}, SMR descriptif et états \\
 \catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau, plafond de convolution (\code{n\_max}, par défaut \code{N\_MAX\_}\allowbreak\code{PRODUITS\_}\allowbreak\code{CONVOLUTION}~; autre valeur pour les seuls tests) & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, exactes ou, au-delà du plafond, asymptotiques, bornes d'un segment, états \\
 \catalogue{fonctions-validation}{segments\_complets()} & interne & cellules du sous-groupe, segment, cellules retenues & segments touchés et, pour chacun, si le sous-groupe contient toutes ses cellules retenues (décompte, jamais un test flottant)~; partagée par les relations \code{positionnee} et \code{lissee} \\
-\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite, ddl effectifs et ordre des différences du lissage (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
+\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite, ddl effectifs et ordre des différences du lissage (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; ne contrôle rien d'autre (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs}, \code{precision\_}\allowbreak\code{insuffisante} (pivot de l'élimination non fini ou non strictement positif~; M570, P1~(a)~; issue~\#334) \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version}~; ceux du test non produit comprennent \code{precision\_}\allowbreak\code{insuffisante} (issue~\#334) \\
 \catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} ($V_{ss}$ nulle~: en arithmétique exacte, segment exposé dans aucune strate informative~; par arrondi seulement quand tous les produits $D_{\cdot c}\pi_{sc}\pi_{kc}$ sont sous le plus petit double~; $z_s$ et $\theta_{80}$ non définis, sans signal~; issues~\#336 et~\#333) \\
@@ -17729,7 +17783,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{non\_centralite\_ecart\_minimal()} & interne & ddl, niveau, puissance (par défaut, les deux constantes) & $\lambda_{80}$~: racine par \code{uniroot()} de la puissance du khi-deux non central (\code{pchisq()}) égale à la puissance visée \\
 \catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{ecart\_minimal\_homogeneite()} & interne & objet du score du test global, état du test, états des lignes globales des segments, $S$ & $\theta_{80}^{+}$, $\theta_{80}^{-}$ et leurs états par segment, $\lambda_{80}$~; chaque segment référence de sa composante connexe, $\lambda_s$ calculée sans soustraction par l'élimination partagée avec le test, sur la matrice $W$ du test global (issue~\#334), état du test global transmis aux deux branches s'il n'est pas \code{produite}, branche \code{precision\_}\allowbreak\code{insuffisante} quand une part d'exposition s'arrondit à~0 dans une strate où le segment et un autre segment sont exposés (issue~\#333), résolution en $\log\theta$, chaque branche par la fonction de la ligne précédente~; \code{precision\_}\allowbreak\code{insuffisante} est un état, jamais un arrêt (section~\ref{sec:homogeneite}) \\
-\catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; lignes saines agrégées par (segment, cellule), à la première occurrence du couple, avant tout score (issue~\#335)~; ne contrôle aucun paramètre \\
+\catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; lignes saines agrégées par (segment, cellule), à la première occurrence du couple, avant tout score (issue~\#335)~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; ne contrôle aucun paramètre \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices, chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
 \catalogue{fonctions-validation}{MENTION\_CONVENTION\_TABLE\_REFERENCE} & constante & --- & convention d'âge restituée pour une table de référence évaluée~: «~non portée par la table de référence~» \\
 \catalogue{fonctions-validation}{NOM\_TABLE\_CONSTRUITE} & constante & --- & nom restitué de la table construite, sans nom d'étape productrice \\
