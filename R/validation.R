@@ -2340,9 +2340,9 @@ resoudre_branche_ecart_minimal <- function(lambda, signe, lam80, seuil, pivots, 
 #   |h_c| en u = log theta sans soustraction, a_c = somme des E_kc (k != s) /
 #   E_.c (jamais 1 - pi_sc) : pi_sc (-expm1(-u)) / (a_c e^-u + pi_sc) si
 #   u >= 0, pi_sc (-expm1(u)) / (a_c + pi_sc e^u) sinon ; 0 si pi_sc = 0 ou
-#   a_c = 0 (strate où s est seul exposé, sur plusieurs lignes : aucun autre
-#   segment n'y porte de terme, b_j n'en reçoit rien ; sinon 1/0 en
-#   -infini) ;
+#   a_c = 0, sans terme (pi_sc = 0 : s non exposé dans la strate, h_c = 0
+#   exact, ou part arrondie à 0 ; a_c = 0 : par arrondi seulement depuis
+#   #335 ; une part arrondie à 0 rend la branche precision_insuffisante, #333) ;
 #   limites exactes par les mêmes formules (1 en +infini, pi_sc / a_c en
 #   -infini) ;
 #   L_s = M diag(d) M' par élimination sans soustraction (type GTH), dans
