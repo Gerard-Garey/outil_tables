@@ -15246,7 +15246,13 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     issue~\#334, forme F334, spécification d'\code{actuary-approfondi},
     Q3) évite toute soustraction de grandeurs voisines~: les poids hors
     diagonale $w_{jk} = \sum_c D_{\cdot c}\,\pi_{jc}\,\pi_{kc}$ ($j \ne k$,
-    strates informatives) sont formés une fois~; la diagonale de $V$ est
+    strates informatives) sont formés une fois, par un produit matriciel
+    (\code{crossprod()}), puis la matrice $W$ de ces poids est remplacée par
+    $(W + W^{\top})/2$~: le produit matriciel ne garantit pas $w_{jk} =
+    w_{kj}$ au bit près selon la BLAS de la plateforme~; la moyenne de deux
+    doubles égaux est exacte (une $W$ déjà symétrique est inchangée) et
+    l'addition flottante est commutative ($w_{jk} = w_{kj}$ au bit près
+    quelle que soit la BLAS~; issue~\#334)~; la diagonale de $V$ est
     $v_j = \sum_{k \ne j} w_{jk}$, somme de termes positifs, égale à
     $\sum_c D_{\cdot c}\,\pi_{jc}(1 - \pi_{jc})$ en arithmétique exacte
     (identité $\pi_{jc}(1 - \pi_{jc}) = \pi_{jc}\sum_{k \ne j}
@@ -15341,7 +15347,9 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     par sommes hors diagonale et $U$ du groupe de référence de chaque
     composante pris égal à moins la somme des $U$ des autres groupes de sa
     composante (identité exacte~; issue~\#334~; à deux segments d'une même
-    composante, les deux $z_s$ sont ainsi opposés au bit près),
+    composante, les deux $z_s$ sont ainsi opposés au bit près, $v_1 =
+    w_{12}$ et $v_2 = w_{21}$ étant égaux au bit près par la symétrisation
+    de $W$, \textbf{Statistique}, ci-dessus),
     non défini quand
     $V_{ss} = 0$ (état \code{variance\_nulle}, \textbf{Cas aux limites}),
     de loi asymptotique
@@ -17784,7 +17792,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{controler\_parametres\_homogeneite()} & interne & plage, tranches, $B$, segmentation du plan & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue, puis \code{homogeneite\_sans\_}\allowbreak\code{segmentation} (module \code{homogeneite})~; appelée par \code{valider\_plan()} seule \\
 \catalogue{fonctions-validation}{somme\_par()} & interne & valeurs, indices, nombre d'indices & somme par indice, dans l'ordre des lignes~; 0 pour un indice sans ligne \\
 \catalogue{fonctions-validation}{eliminer\_sans\_soustraction()} & interne & poids hors diagonale $w_{jk}$ des groupes retenus, poids $r_j$ vers la référence & élimination sans soustraction (de type GTH) de $V$ réduite~: pivots $d$, multiplicateurs, indicateur des pivots (tous finis et strictement positifs) et fonction d'évaluation de $b^{\top} V_g^{-1} b$ par colonne (substitution avant, puis $\sum_i b_i^2/d_i$)~; additions, multiplications et divisions de positifs seulement~; seule élimination de l'étape, appelée par la fonction du score ($T$) et par celle de l'écart minimal détectable ($\lambda_s$) (forme F334, issue~\#334) \\
-\catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, au plus une ligne par couple (strate, groupe), sinon erreur de programmation (issue~\#335), nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives ($D_{\cdot c} > 0$, au moins deux groupes distincts exposés~; issue~\#336), statistique observée et fonction des répliques (élimination sans soustraction, référence d'attendu $A$ le plus grand par composante~; $T = +\infty$ au-delà du plus grand double~; issue~\#334), poids hors diagonale $W$, diagonale $v$ par sommes hors diagonale, $U$ de la référence égal à moins la somme des autres, indicateur des pivots, groupes retenus (\code{garde}), données des réplications et de la p-valeur exacte, groupe de chaque ligne utilisée (\code{groupe\_utilise}) et racine de la composante connexe de chaque groupe, lui-même pour un groupe absent (\code{composante}), pour l'écart minimal détectable \\
+\catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, au plus une ligne par couple (strate, groupe), sinon erreur de programmation (issue~\#335), nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives ($D_{\cdot c} > 0$, au moins deux groupes distincts exposés~; issue~\#336), statistique observée et fonction des répliques (élimination sans soustraction, référence d'attendu $A$ le plus grand par composante~; $T = +\infty$ au-delà du plus grand double~; issue~\#334), poids hors diagonale $W$, symétrisée en $(W + W^{\top})/2$ après \code{crossprod()} (symétrie au bit près sous toute BLAS, $W$ déjà symétrique inchangée~; issue~\#334), diagonale $v$ par sommes hors diagonale, $U$ de la référence égal à moins la somme des autres, indicateur des pivots, groupes retenus (\code{garde}), données des réplications et de la p-valeur exacte, groupe de chaque ligne utilisée (\code{groupe\_utilise}) et racine de la composante connexe de chaque groupe, lui-même pour un groupe absent (\code{composante}), pour l'écart minimal détectable \\
 \catalogue{fonctions-validation}{p\_exacte\_homogeneite()} & interne & résultat de la ligne précédente & p-valeur exacte bilatérale à deux groupes (somme de binomiales) et son état~; groupe~1~: le groupe retenu, d'attendu le plus petit, tolérance d'égalité rapportée à son attendu (issue~\#334) \\
 \catalogue{fonctions-validation}{non\_centralite\_ecart\_minimal()} & interne & ddl, niveau, puissance (par défaut, les deux constantes) & $\lambda_{80}$~: racine par \code{uniroot()} de la puissance du khi-deux non central (\code{pchisq()}) égale à la puissance visée \\
 \catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
