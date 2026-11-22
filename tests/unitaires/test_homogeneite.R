@@ -2449,3 +2449,29 @@ verifier("I #348 ordre des gardes : événements sans exposition dans la plage (
        grandeur = if (identical(r$details$grandeur, "evenements_cellules_evenement_sans_exposition") &&
                       identical(r$details$valeur, 4e9)) TRUE else paste(r$details$grandeur, r$details$valeur))
 })
+
+# Symétrie de W (revue finale de B33, m1, voie (b) recommandée par actuary) :
+# crossprod() ne garantit pas w_jk == w_kj au bit selon le BLAS ;
+# score_homogeneite() symétrise W, d'où v_1 = v_2 et U_1 = -U_2 à deux
+# segments, donc z opposés au bit. Cas de l'audit (avant, sur une copie de
+# 98818fb : W asymétrique, z = -0.085734547871258518 / 0.085734547871258504)
+# et 300 cas tirés (deux segments, 2 à 6 âges, expositions de 10 à 1e5 en
+# échelle logarithmique ; avant : 77 cas en défaut sur ce poste). Identité
+# exacte : la propriété ne dépend d'aucun BLAS.
+verifier("I #334 W symétrique au bit et z opposés au bit à deux segments : cas de l'audit (âges 60 à 65) et 300 cas tirés sous une graine locale", {
+  d <- expo_seg(rep(c("a", "b"), each = 6L), rep(60:65, 2L),
+                c(92.39, 227.3, 65.18, 20.55, 33260, 67200, 608.1, 510.4, 223.1, 233.8, 125.9, 317.1),
+                c(2, 3, 6, 3, 4, 2, 6, 4, 6, 1, 3, 5))
+  sg <- homog(d, "segment", c(60, 65), 60, B = 19)$resultat$segments
+  sg <- sg[sg$portee == "global", ]
+  sc <- tablexp:::score_homogeneite(d$evenements, d$exposition_centrale, rep(1:6, 2L), rep(1:2, each = 6L), 6L, 2L)
+  defauts <- tablexp:::sous_graine(20261122L, sum(vapply(1:300, function(i) {
+    K <- sample(2:6, 1L); E <- exp(stats::runif(2L * K, log(10), log(1e5))); D <- stats::rpois(2L * K, 3)
+    s <- tablexp:::score_homogeneite(D, E, rep(seq_len(K), 2L), rep(1:2, each = K), K, 2L)
+    z <- s$U / sqrt(s$v)
+    !identical(s$W, t(s$W)) || (s$ddl > 0 && !identical(z[1L], -z[2L]))
+  }, NA)))
+  tous(w = if (identical(sc$W, t(sc$W))) TRUE else "W asymétrique (cas de l'audit)",
+       z = if (identical(sg$z[1L], -sg$z[2L])) TRUE else paste(format(sg$z, digits = 17), collapse = " / "),
+       tires = if (defauts == 0L) TRUE else sprintf("%d cas sur 300 en défaut", defauts))
+})

@@ -1847,8 +1847,8 @@ ETATS_P_EXACTE_HOMOGENEITE <- c("produite", "plus_de_deux_groupes", "convolution
 # soustraction (#334), nulle en double précision ; en arithmétique exacte,
 # segment exposé dans aucune strate informative : cellules où il est seul
 # exposé, ou sans décès ; par arrondi seulement quand tous les produits
-# D_.c pi_sc pi_kc sont sous le plus petit double (parts d'exposition
-# infimes) ; z et theta_80 non définis ; aucun signal ; spécification
+# D_.c pi_sc pi_kc sont arrondis à 0 (sous 2^-1075 ≈ 2,5e-324 ; parts
+# d'exposition infimes) ; z et theta_80 non définis ; aucun signal ; spécification
 # d'actuary-approfondi de #336, D8, et de #333, Q4, § 1) ; produite.
 ETATS_SEGMENTS_HOMOGENEITE <- c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle")
 # Mention d'indépendance des unités (M278, #159), en fin de chaque statut
@@ -2165,7 +2165,13 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
   # (diagonale de V) par sommes hors diagonale, v_j = somme des w_jk (k !=
   # j), sans soustraction (identité exacte : somme des pi_kc = 1 sur les
   # lignes utilisées ; #334, spécification d'actuary-approfondi, Q3, § 1).
+  # W symétrisée au bit avant tout usage : crossprod() ne garantit pas
+  # w_jk == w_kj selon le BLAS ; sans cela v, et donc z, d'une paire de
+  # segments en strates communes pouvaient différer au dernier bit (z non
+  # opposés à deux segments ; revue finale de B33, m1, voie (b)). La moyenne
+  # de deux doubles égaux est exacte : W déjà symétrique est inchangée.
   W <- crossprod(P, P * Ds[si])
+  W <- (W + t(W)) / 2
   diag(W) <- 0
   v <- rowSums(W)
   # U = O - A par groupe : O somme d'entiers (exacte en double), A calculée
