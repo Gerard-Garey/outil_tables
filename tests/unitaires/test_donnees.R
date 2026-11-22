@@ -336,6 +336,180 @@ local({
                                "table_colonne_mal_typee", "colonne(s) mal typée(s)"), TRUE))
   }
 })
+# Facteur mal formé en colonne de rôle (#342, F342 ; spécification
+# d'actuary-approfondi, commentaire de #342, amendée par M573) : un seul
+# prédicat, facteur_bien_forme() (niveaux character, codes integer, chaque
+# code NA ou de 1 au nombre de niveaux), appelé par type_conforme() pour
+# categorie et categorie_ou_entier. Refus type_incompatible du module donnees,
+# partie « reçu » précisée, message et details exacts, par construire_table()
+# (avec et sans exclusion sexe_manquant) et par type_conforme() (avant #342 :
+# erreur R « malformed factor », appel as.character.factor(x), mesurée sur
+# 7c800c0 pour chaque cas). Témoins : construction identique à la colonne
+# character. Facteur à codes doubles : unserialize() d'une sérialisation ASCII
+# dont l'en-tête 781 (INTSXP, objet, attributs) devient 782 (REALSXP).
+# Littéraux non ASCII en \u00XX ; méthodes S3 de session dans globalenv(),
+# retirées par on.exit(). Une erreur R est rendue, non propagée.
+local({
+  plan342 <- function(exclusions) list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = exclusions),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  # Valeur de expr, ou la condition levée.
+  valeur <- function(expr) tryCatch(expr, refus_tablexp = function(r) r, error = function(e) e)
+  avec <- function(...) {
+    l <- unclass(BASE); v <- list(...)
+    for (n in names(v)) l[[n]] <- v[[n]]
+    structure(l, class = "data.frame", row.names = seq_len(nrow(BASE)))
+  }
+  fac <- function(codes, niveaux, classe = "factor") {
+    x <- codes; attr(x, "levels") <- niveaux; oldClass(x) <- classe; x
+  }
+  sans_niveaux <- function(classe = "factor") {
+    x <- fac(c(2L, 1L, 2L, 2L), c("F", "H"), classe); attr(x, "levels") <- NULL; x
+  }
+  s <- rawToChar(serialize(fac(c(2L, 1L, 2L, 2L), c("F", "H")), NULL, ascii = TRUE))
+  codes_doubles <- unserialize(charToRaw(sub("\n781\n", "\n782\n", s, fixed = TRUE)))
+  verifier("#342 construction du facteur \u00e0 codes doubles : classe factor, codes de type double, niveaux F, H",
+           identical(oldClass(codes_doubles), "factor") && identical(typeof(unclass(codes_doubles)), "double") &&
+             identical(attr(codes_doubles, "levels", exact = TRUE), c("F", "H")))
+  MF <- paste(" mal form\u00e9 (niveaux absents ou non character, ou code qui n'est ni NA ni un integer de 1 au",
+              "nombre de niveaux)")
+  partie <- function(role, colonne, attendu, recu)
+    sprintf("r\u00f4le \u00ab %s \u00bb, colonne \u00ab %s \u00bb : %s attendu, %s re\u00e7u", role, colonne, attendu, recu)
+  message_attendu <- function(...) paste0("Type incompatible : ", paste(c(...), collapse = " ; "), ".")
+  CAT <- "character, factor"
+  # Refus exact : module, motif, message, details.
+  exact <- function(x, msg, details) {
+    if (is.null(x)) "aucun refus lev\u00e9"
+    else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+    else if (!identical(x$module, "donnees")) sprintf("module \u00ab %s \u00bb", x$module)
+    else if (!identical(x$motif, "type_incompatible")) sprintf("motif \u00ab %s \u00bb", x$motif)
+    else if (!identical(conditionMessage(x), msg)) paste("message :", conditionMessage(x))
+    else if (!identical(x$details, details)) paste("details :", paste(deparse(x$details), collapse = ""))
+    else TRUE
+  }
+  d_sexe <- list(role = "sexe", colonne = "sexe", type_attendu = CAT)
+  m_sexe <- message_attendu(partie("sexe", "sexe", CAT, paste0("factor", MF)))
+  m_cause <- message_attendu(partie("cause_sortie", "cause", CAT, paste0("factor", MF)))
+  REFUSES <- list(
+    list(nom = "sexe sans levels", d = list(sexe = sans_niveaux()), m = m_sexe, det = d_sexe),
+    list(nom = "sexe de classe monf/factor sans levels", d = list(sexe = sans_niveaux(c("monf", "factor"))),
+         m = message_attendu(partie("sexe", "sexe", CAT, paste0("monf/factor", MF))), det = d_sexe),
+    list(nom = "sexe aux levels entiers (1:2)", d = list(sexe = fac(c(2L, 1L, 2L, 2L), 1:2)), m = m_sexe, det = d_sexe),
+    list(nom = "sexe aux levels doubles", d = list(sexe = fac(c(2L, 1L, 2L, 2L), c(1, 2))), m = m_sexe, det = d_sexe),
+    list(nom = "sexe aux levels eux-m\u00eames facteur", d = list(sexe = fac(c(2L, 1L, 2L, 2L), factor(c("F", "H")))),
+         m = m_sexe, det = d_sexe),
+    list(nom = "sexe, code 3 pour deux niveaux", d = list(sexe = fac(c(2L, 1L, 3L, 2L), c("F", "H"))), m = m_sexe, det = d_sexe),
+    list(nom = "sexe, code 0", d = list(sexe = fac(c(2L, 1L, 0L, 2L), c("F", "H"))), m = m_sexe, det = d_sexe),
+    list(nom = "sexe, code -1", d = list(sexe = fac(c(2L, 1L, -1L, 2L), c("F", "H"))), m = m_sexe, det = d_sexe),
+    list(nom = "cause_sortie, code 4 pour trois niveaux",
+         d = list(cause = fac(c(3L, 2L, 1L, 4L), c("deces", "en_cours", "rachat"))), m = m_cause,
+         det = list(role = "cause_sortie", colonne = "cause", type_attendu = CAT)),
+    list(nom = "sexe aux codes doubles (unserialize)", d = list(sexe = codes_doubles), m = m_sexe, det = d_sexe),
+    list(nom = "sexe et cause_sortie mal form\u00e9s",
+         d = list(sexe = sans_niveaux(), cause = fac(c(3L, 2L, 1L, 4L), c("deces", "en_cours", "rachat"))),
+         m = message_attendu(partie("sexe", "sexe", CAT, paste0("factor", MF)),
+                             partie("cause_sortie", "cause", CAT, paste0("factor", MF))),
+         det = list(role = c("sexe", "cause_sortie"), colonne = c("sexe", "cause"), type_attendu = c(CAT, CAT))))
+  for (cas in REFUSES) {
+    d <- do.call(avec, cas$d)
+    for (ex in list(character(0), "sexe_manquant"))
+      verifier(sprintf("#342 %s : construire_table()%s -> refus type_incompatible, message et details exacts", cas$nom,
+                       if (length(ex)) " avec exclusion sexe_manquant" else ""),
+               exact(attrape(construire_table(d, ROLES, plan342(ex))), cas$m, cas$det))
+    verifier(sprintf("#342 %s : type_conforme() -> FALSE pour categorie et categorie_ou_entier", cas$nom),
+             all(vapply(cas$d, function(v) !tablexp:::type_conforme(v, "categorie") &&
+                          !tablexp:::type_conforme(v, "categorie_ou_entier"), logical(1L))))
+  }
+  # Rôle segment (categorie_ou_entier) : refus par controler_roles(), partie
+  # « reçu » précisée, type attendu de categorie_ou_entier.
+  RS <- c(ROLES, segment = "seg")
+  x <- attrape(tablexp:::controler_roles(avec(seg = fac(c(1L, 2L, 3L, 1L), c("a", "b"))), RS, "sexe"))
+  verifier("#342 segment (categorie_ou_entier), code 3 pour deux niveaux : controler_roles() -> refus type_incompatible exact",
+           exact(x, message_attendu(partie("segment", "seg", "character, factor, integer", paste0("factor", MF))),
+                 list(role = "segment", colonne = "seg", type_attendu = "character, factor, integer")))
+  verifier("#342 segment : facteur bien form\u00e9 et integer admis par controler_roles()",
+           is.null(attrape(tablexp:::controler_roles(avec(seg = fac(c(1L, 2L, 2L, 1L), c("a", "b"))), RS, "sexe"))) &&
+             is.null(attrape(tablexp:::controler_roles(avec(seg = c(1L, 2L, 2L, 1L)), RS, "sexe"))))
+  # Partie « reçu » réservée aux facteurs mal formés des types categorie et
+  # categorie_ou_entier : facteur (bien ou mal formé) pour id_tete, et integer
+  # pour sexe, gardent leur seule classe.
+  m_tete <- message_attendu(partie("id_tete", "tete", "character, integer, double entier fini", "factor"))
+  d_tete <- list(role = "id_tete", colonne = "tete", type_attendu = "character, integer, double entier fini")
+  for (k in list(list("bien form\u00e9", factor(BASE$tete)), list("sans levels", sans_niveaux())))
+    verifier(sprintf("#342 id_tete en facteur %s : refus type_incompatible inchang\u00e9, \u00ab factor re\u00e7u \u00bb", k[[1L]]),
+             exact(attrape(construire_table(avec(tete = k[[2L]]), ROLES, plan342(character(0)))), m_tete, d_tete))
+  verifier("#342 sexe integer : refus type_incompatible inchang\u00e9, \u00ab integer re\u00e7u \u00bb",
+           exact(attrape(construire_table(avec(sexe = c(1L, 2L, 1L, 1L)), ROLES, plan342(character(0)))),
+                 message_attendu(partie("sexe", "sexe", CAT, "integer")), d_sexe))
+  # Témoins : construits, brut identical() à la colonne character.
+  brut_ref <- function(d, ex) construire_table(d, ROLES, plan342(ex))$etapes$brut$resultat
+  ref <- brut_ref(BASE, character(0))
+  TEMOINS <- list(
+    "facteur nu" = factor(BASE$sexe),
+    "structure() aux codes doubles (convertis en integer)" = structure(c(2, 1, 2, 2), class = "factor", levels = c("F", "H")),
+    "facteur ordonn\u00e9" = factor(BASE$sexe, ordered = TRUE),
+    "sous-classe monf/factor bien form\u00e9e" = fac(c(2L, 1L, 2L, 2L), c("F", "H"), c("monf", "factor")),
+    "levels nomm\u00e9s" = fac(c(2L, 1L, 2L, 2L), c(a = "F", b = "H")),
+    "niveau inutilis\u00e9" = factor(BASE$sexe, levels = c("F", "H", "X")))
+  for (k in names(TEMOINS))
+    for (ex in list(character(0), "sexe_manquant"))
+      verifier(sprintf("#342 t\u00e9moin %s%s : construit, brut identical() \u00e0 la colonne character", k,
+                       if (length(ex)) " (exclusion sexe_manquant)" else ""), {
+        r <- valeur(brut_ref(avec(sexe = TEMOINS[[k]]), ex))
+        if (inherits(r, "condition")) conditionMessage(r) else identical(r, ref)
+      })
+  verifier("#342 t\u00e9moin structure() : codes de type integer (le facteur \u00e0 codes doubles ne se construit pas ainsi)",
+           is.integer(unclass(TEMOINS[[2L]])))
+  b_na <- BASE; b_na$sexe[2L] <- NA
+  ref_na <- brut_ref(b_na, "sexe_manquant")
+  for (k in list(list("code NA", fac(c(2L, NA, 2L, 2L), c("F", "H"))),
+                 list("niveau NA", factor(c("H", NA, "H", "H"), levels = c("F", "H", NA), exclude = NULL)))) {
+    verifier(sprintf("#342 t\u00e9moin %s sans exclusion : refus ligne_invalide (sexe_manquant), inchang\u00e9", k[[1L]]), {
+      x <- attrape(construire_table(avec(sexe = k[[2L]]), ROLES, plan342(character(0))))
+      inherits(x, "refus_tablexp") && identical(x$motif, "ligne_invalide") &&
+        identical(x$details$lignes, list(sexe_manquant = 2L))
+    })
+    verifier(sprintf("#342 t\u00e9moin %s avec exclusion sexe_manquant : construit, brut identical() \u00e0 la colonne character", k[[1L]]), {
+      r <- valeur(brut_ref(avec(sexe = k[[2L]]), "sexe_manquant"))
+      if (inherits(r, "condition")) conditionMessage(r) else identical(r, ref_na)
+    })
+  }
+  verifier("#342 t\u00e9moin niveaux r\u00e9p\u00e9t\u00e9s (H, H) : construit (hors p\u00e9rim\u00e8tre)",
+           is.null(attrape(construire_table(avec(sexe = fac(c(2L, 1L, 2L, 2L), c("H", "H"))), ROLES, plan342(character(0))))))
+  # Prédicat lu sans dispatch : méthodes de session qui lèvent une erreur.
+  m342 <- list(levels.k342 = function(x) stop("dispatch levels"), length.k342 = function(x) stop("dispatch length"),
+               `[.k342` = function(x, ...) stop("dispatch ["), Ops.k342 = function(e1, e2) stop("dispatch Ops"),
+               is.na.k342 = function(x) stop("dispatch is.na"))
+  for (n in names(m342)) assign(n, m342[[n]], envir = globalenv())
+  on.exit(rm(list = names(m342), envir = globalenv()))
+  bon <- fac(c(2L, 1L, 2L, 2L), c("F", "H"), c("k342", "factor"))
+  mauvais <- fac(c(2L, 1L, 3L, 2L), c("F", "H"), c("k342", "factor"))
+  verifier("#342 classe k342/factor aux m\u00e9thodes levels, length, [, Ops, is.na qui l\u00e8vent : facteur_bien_forme() rend TRUE / FALSE sans erreur",
+           identical(tryCatch(c(tablexp:::facteur_bien_forme(bon), tablexp:::facteur_bien_forme(mauvais)),
+                              error = function(e) conditionMessage(e)), c(TRUE, FALSE)))
+  verifier("#342 classe k342/factor mal form\u00e9e : controler_roles() -> refus type_incompatible exact, sans erreur R",
+           exact(attrape(tablexp:::controler_roles(avec(sexe = mauvais), ROLES, "sexe")),
+                 message_attendu(partie("sexe", "sexe", CAT, paste0("k342/factor", MF))), d_sexe))
+  # Même prédicat pour la colonne sexe d'une table de référence (type_conforme()
+  # categorie) : refus table_colonne_mal_typee (avant #342 : erreur R
+  # « malformed factor »).
+  tr <- function(sx) structure(list(age = 0:1, sexe = sx, qx = c(0.1, 0.2)), class = "data.frame", row.names = 1:2)
+  for (k in list(list("code 2 pour un niveau", fac(c(1L, 2L), "H")),
+                 list("codes doubles", unserialize(charToRaw(sub("\n781\n", "\n782\n",
+                   rawToChar(serialize(fac(c(1L, 1L), "H"), NULL, ascii = TRUE)), fixed = TRUE))))))
+    verifier(sprintf("#342 table_reference(), sexe en facteur mal form\u00e9 (%s) : refus table_colonne_mal_typee, details colonne sexe", k[[1L]]), {
+      x <- attrape(table_reference(tr(k[[2L]]), "t", "importee", "source de test"))
+      inherits(x, "refus_tablexp") && identical(x$motif, "table_colonne_mal_typee") &&
+        identical(x$details, list(colonne = "sexe"))
+    })
+  verifier("#342 table_reference(), sexe en facteur bien form\u00e9 : admis",
+           is.null(attrape(table_reference(tr(fac(c(1L, 1L), "H")), "t", "importee", "source de test"))))
+})
+verifier("#342 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
+         !any(c("levels.k342", "length.k342", "[.k342", "Ops.k342", "is.na.k342") %in% ls(globalenv(), all.names = TRUE)))
 # Décomptes de lignes des données (#312) : nrow() (avec dispatch), noms de
 # lignes (.row_names_info(, 2L)) et nombre de lignes de chaque colonne, toutes
 # les colonnes, doivent concorder ; sinon refus donnees_mal_formees de

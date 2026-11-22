@@ -412,7 +412,10 @@ entiers_finis <- function(v) {
 # sur une classe d'encodage « bytes » (mesuré) ; une colonne dont un élément de
 # la classe est d'encodage « bytes » est refusée, où qu'il se place dans la
 # classe (#150) : a_classe(x, "factor") est vrai pour c(<bytes>, "factor"), et
-# la suite (anyNA(), as.character()) lèverait l'erreur R.
+# la suite (anyNA(), as.character()) lèverait l'erreur R. Un facteur n'est
+# admis pour categorie et categorie_ou_entier que bien formé
+# (facteur_bien_forme(), #342) : sinon as.character() lèverait l'erreur R
+# « malformed factor » à l'extraction.
 type_conforme <- function(x, type) {
   if (!is.atomic(x) || !is.null(attr(x, "dim", exact = TRUE)) || classe_bytes(x)) return(FALSE)
   nu <- !is.object(x)
@@ -421,8 +424,8 @@ type_conforme <- function(x, type) {
   double_entier <- nu && is.double(x) && entiers_finis(x)
   switch(type,
     identifiant = chaine || entier || double_entier,
-    categorie = chaine || a_classe(x, "factor"),
-    categorie_ou_entier = chaine || a_classe(x, "factor") || entier,
+    categorie = chaine || (a_classe(x, "factor") && facteur_bien_forme(x)),
+    categorie_ou_entier = chaine || (a_classe(x, "factor") && facteur_bien_forme(x)) || entier,
     date = identical(class(x), "Date") && is.numeric(unclass(x)) &&
       entiers_finis(unclass(x)),
     entier = entier || double_entier,
@@ -431,6 +434,24 @@ type_conforme <- function(x, type) {
       all(x[!is.na(x)] > 0),
     numerique = nu && (is.integer(x) || is.double(x)),
     stop(sprintf("type_conforme() : type de catalogue inconnu « %s »", type), call. = FALSE))
+}
+
+# Bonne forme d'un facteur (F342, #342 ; M573), seul prédicat de cette règle,
+# appelé par type_conforme() pour categorie et categorie_ou_entier, et par
+# controler_roles() pour la partie « reçu » du refus : niveaux de type
+# character, codes de type integer, chaque code NA ou de 1 au nombre de
+# niveaux. Lu sans dispatch : niveaux par attr(exact = TRUE) (levels() et
+# nlevels() dispatchent sur la classe), codes par unclass() (primitive, sans
+# dispatch ; `[` ou les comparaisons sur x passeraient par Ops.factor),
+# nombre de niveaux par longueur_lue() (length() dispatche). Des niveaux NA,
+# répétés ou nommés ne sont pas une malformation : as.character() les lit
+# sans erreur. Des codes stockés en double (unserialize() d'une sérialisation
+# modifiée seulement : structure() les convertit, class<- les refuse) sont
+# refusés : as.character() lèverait « malformed factor ».
+facteur_bien_forme <- function(x) {
+  lv <- attr(x, "levels", exact = TRUE)
+  u <- unclass(x)
+  is.character(lv) && is.integer(u) && all(is.na(u) | (u >= 1L & u <= longueur_lue(lv)))
 }
 
 # --- refus au niveau des rôles (A.1) ------------------------------------------
@@ -881,7 +902,9 @@ controler_roles <- function(donnees, roles, segmentation) {
   # TYPES_ADMIS (« entières », non ASCII) est marquée UTF-8 à la source (#151) ;
   # texte_moteur() reste appliquée avant l'insertion par %s, règle de formuler()
   # (sous la locale C, sprintf() écrirait les octets « <c3><a8> » d'un libellé
-  # non marqué ; #127).
+  # non marqué ; #127). Facteur mal formé passé pour une catégorie : partie
+  # « reçu » précisée (#342, texte d'actuary) ; un facteur passé pour un autre
+  # type (identifiant...) garde sa seule classe.
   if (any(ko))
     refuser("donnees", "type_incompatible",
             formuler("Type incompatible : %s.",
@@ -889,7 +912,12 @@ controler_roles <- function(donnees, roles, segmentation) {
                                     citer(r[ko]), citer(roles[ko]),
                                     texte_moteur(TYPES_ADMIS[types[ko]]),
                                     vapply(which(ko), function(i)
-                                      paste(citer(class(colonne(i))), collapse = "/"),
+                                      if (types[i] %in% c("categorie", "categorie_ou_entier") &&
+                                          a_classe(colonne(i), "factor") && !facteur_bien_forme(colonne(i)))
+                                        formuler(paste("%s mal formé (niveaux absents ou non character, ou code",
+                                                       "qui n'est ni NA ni un integer de 1 au nombre de niveaux)"),
+                                                 paste(citer(class(colonne(i))), collapse = "/"))
+                                      else paste(citer(class(colonne(i))), collapse = "/"),
                                       character(1L))),
                            collapse = " ; ")),
             list(role = r[ko], colonne = unname(roles[ko]), type_attendu = unname(TYPES_ADMIS[types[ko]])))
