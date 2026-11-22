@@ -15192,7 +15192,9 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
       T = U^{\top} V^{-} U ,
     \]
     sur les \emph{strates informatives} ($D_{\cdot c} > 0$ et au moins deux
-    groupes exposés, comptés sur les lignes agrégées), les autres apportant exactement 0 à $U$ et à $V$.
+    groupes distincts exposés, comptés sur les lignes agrégées~: un groupe
+    seul exposé, fût-ce sur plusieurs lignes, ne rend pas la strate
+    informative~; issue~\#336), les autres apportant exactement 0 à $U$ et à $V$.
     Degrés de liberté~: le rang de $V$, exact et combinatoire, soit le
     nombre de groupes exposés dans les strates informatives moins le nombre
     de composantes connexes du graphe groupes--strates ($S - 1$ dans le cas
@@ -15248,7 +15250,9 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
   \item \textbf{Par segment} (\code{resultat\$segments}, sur la plage puis
     par tranche)~: $E^c$, $O_s$, $A_s$, $O_s / A_s$ --- rapport interne au
     regroupé, qui \textbf{n'est pas un SMR} rapporté à une table --- et
-    l'écart réduit $z_s = (O_s - A_s)/\sqrt{V_{ss}}$, de loi asymptotique
+    l'écart réduit $z_s = (O_s - A_s)/\sqrt{V_{ss}}$ (non défini quand
+    $V_{ss} = 0$, état \code{variance\_nulle}, \textbf{Cas aux limites}),
+    de loi asymptotique
     $\mathcal{N}(0, 1)$ sous $H_0$ quand $V_{ss} \to \infty$ (même
     régime que la p-valeur asymptotique,
     ci-dessous~; issue~\#185)~; aucune p-valeur n'en est tirée, et
@@ -15318,8 +15322,18 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
 \noindent
 \textbf{Cas aux limites} (spécification, §~3), sans refus quand ils
 dépendent des données~: une cellule sans décès, ou dont un seul segment
-est exposé, apporte 0 (décomptes \code{cellules\_sans\_deces} et
-\code{cellules\_non\_informatives} aux diagnostics)~; un segment sans
+est exposé, fût-ce sur plusieurs lignes, apporte 0 (décomptes
+\code{cellules\_sans\_deces} et \code{cellules\_non\_informatives} aux
+diagnostics)~; un segment exposé dans aucune strate informative de la
+portée (cellules où il est seul exposé, ou sans décès) a, en arithmétique
+exacte, $V_{ss} = 0$ et reste hors du test et des ddl~: sa ligne est restituée avec son $O_s$ et son
+$A_s$ (égaux~: là où il est seul exposé, $\pi_{sc} = 1$ et son attendu
+vaut ses décès~; dans une cellule sans décès, l'un et l'autre sont nuls),
+état \code{variance\_nulle}, $z_s$ non défini (\code{NA})~; à la portée
+globale, ses deux branches de $\theta_{80}$ prennent cet état, valeurs
+\code{NA}, sans signal (texte D8 de la spécification
+d'\code{actuary-approfondi} de
+l'issue~\#336~; aucun état nouveau)~; un segment sans
 exposition sur une portée est hors du test et des ddl, sa ligne restituée
 avec $O = A = 0$ (état \code{segment\_sans\_exposition})~; moins de deux
 segments informatifs (ddl $= 0$)~: tests non produits, état
@@ -15985,8 +15999,9 @@ une ligne par segment du test global, dans l'ordre des lignes globales de
 \code{etat\_inferieur} (\code{character}), types tenus aussi à 0~ligne~;
 \code{monte\_carlo} ($B$, graine, tirages par jeu).
 \code{diagnostics}~: cellules, cellules informatives, sans décès, non
-informatives (segments exposés comptés sur les lignes agrégées) et à
-événement sans exposition, décès de ces dernières,
+informatives (cellules de décès positifs à moins de deux segments
+distincts exposés, segments comptés sur les lignes agrégées~; issue~\#336)
+et à événement sans exposition, décès de ces dernières,
 lignes, décès et exposition hors plage, total des décès. La fiche ne
 change pas la définition de la fiche.\par}
 
@@ -16134,7 +16149,25 @@ moteur d'avant l'issue~\#335~; un rangement des lignes agrégées par
 inchangés mais change les p-valeurs de Monte-Carlo, et le test
 l'élimine)~; la précondition de \code{score\_homogeneite()} (deux
 lignes d'un même couple (strate, groupe)~: erreur de programmation, non
-un refus)~; l'état \code{precision\_insuffisante} par appel
+un refus)~; les strates informatives jugées sur les segments
+(issue~\#336), chaque cas sur une et sur deux lignes, la variante à deux
+lignes identique au bit près (\code{identical()}) à celle à une ligne~:
+un segment seul exposé à un âge (cas de l'issue~: diagnostics
+\code{cellules}, \code{cellules\_informatives},
+\code{cellules\_non\_informatives} et \code{cellules\_sans\_deces},
+\code{strates\_informatives} des tests global, par tranche et de leur
+somme, $T$, p-valeurs exacte et de Monte-Carlo), un segment exposé dans
+aucune strate informative (texte D8~: nombre de groupes et de strates
+informatives, p-valeur exacte produite à deux groupes, état
+\code{variance\_nulle} et $z_s$ \code{NA} aux portées globale et de
+tranche, deux branches de $\theta_{80}$ \code{variance\_nulle}, signal
+\code{ecart\_minimal\_}\allowbreak\code{detectable} compté sur les seuls
+autres segments), et, sous deux variables de segmentation, une strate
+(cellule $\times$ modalité de l'autre variable) à une seule modalité
+exposée découpée en deux lignes, pour chacune des deux variables
+(\code{strates\_informatives} du test global et des deux tests par
+variable)~; chaque cas fait échouer le test contre le moteur d'avant
+l'issue~\#335 (mesures consignées dans le test)~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
 branches produites, postcondition recalculée)~; la règle d'une branche
@@ -17481,7 +17514,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite, ddl effectifs et ordre des différences du lissage (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; ne contrôle rien (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs} \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version} \\
-\catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} \\
+\catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} ($V_{ss}$ nulle~: en arithmétique exacte, segment exposé dans aucune strate informative~; $z_s$ et $\theta_{80}$ non définis, sans signal~; issue~\#336) \\
 \catalogue{fonctions-validation}{INDEPENDANCE\_HOMOGENEITE} & constante & --- & mention d'indépendance des unités, en fin de chaque statut d'une loi (décision M278) \\
 \catalogue{fonctions-validation}{HYPOTHESE\_HOMOGENEITE} & constante & --- & texte de l'hypothèse nulle du test d'homogénéité et de sa loi conditionnelle \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_HOMOGENEITE} & constante & --- & identité de la source (Breslow et Day, 1987, chap.~3 et~4~: URL, SHA-256, pages lues) et écarts de l'outil à la source (section~\ref{sec:homogeneite}) \\
@@ -17494,7 +17527,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{STATUTS\_HOMOGENEITE} & constante & --- & \code{data.frame} (\code{table}, \code{grandeur}, \code{statut})~: statut de chaque grandeur de \code{tests}, de \code{segments} et, en deux dernières lignes, de \code{ecart\_minimal} (E2.20) \\
 \catalogue{fonctions-validation}{controler\_parametres\_homogeneite()} & interne & plage, tranches, $B$, segmentation du plan & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue, puis \code{homogeneite\_sans\_}\allowbreak\code{segmentation} (module \code{homogeneite})~; appelée par \code{valider\_plan()} seule \\
 \catalogue{fonctions-validation}{somme\_par()} & interne & valeurs, indices, nombre d'indices & somme par indice, dans l'ordre des lignes~; 0 pour un indice sans ligne \\
-\catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, au plus une ligne par couple (strate, groupe), sinon erreur de programmation (issue~\#335), nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives, statistique observée et fonction des répliques, données des réplications et de la p-valeur exacte, groupe de chaque ligne utilisée (\code{groupe\_utilise}) et racine de la composante connexe de chaque groupe, lui-même pour un groupe absent (\code{composante}), pour l'écart minimal détectable \\
+\catalogue{fonctions-validation}{score\_homogeneite()} & interne & $D$, $E$, strate, groupe, au plus une ligne par couple (strate, groupe), sinon erreur de programmation (issue~\#335), nombres de strates et de groupes & $O$, $A$, $U$, diagonale de $V$, ddl (rang de $V$), strates informatives ($D_{\cdot c} > 0$, au moins deux groupes distincts exposés~; issue~\#336), statistique observée et fonction des répliques, données des réplications et de la p-valeur exacte, groupe de chaque ligne utilisée (\code{groupe\_utilise}) et racine de la composante connexe de chaque groupe, lui-même pour un groupe absent (\code{composante}), pour l'écart minimal détectable \\
 \catalogue{fonctions-validation}{p\_exacte\_homogeneite()} & interne & résultat de la ligne précédente & p-valeur exacte bilatérale à deux groupes (somme de binomiales) et son état \\
 \catalogue{fonctions-validation}{non\_centralite\_ecart\_minimal()} & interne & ddl, niveau, puissance (par défaut, les deux constantes) & $\lambda_{80}$~: racine par \code{uniroot()} de la puissance du khi-deux non central (\code{pchisq()}) égale à la puissance visée \\
 \catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
